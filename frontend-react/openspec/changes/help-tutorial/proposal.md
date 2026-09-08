@@ -10,6 +10,7 @@ access to in-app guidance after the React cutover. Trivial scope, purely additiv
 ## Scope
 
 ### In Scope
+
 - New React route `help/tutorial` rendering the static tutorial content.
 - Native `<details>/<summary>` accordion (no UI library dependency).
 - 6 help images copied to `public/images/help/`.
@@ -18,6 +19,7 @@ access to in-app guidance after the React cutover. Trivial scope, purely additiv
 - Auth via inherited `authLoader` from app-layout (no feature gate).
 
 ### Out of Scope
+
 - Full i18n of step prose (carried over as hardcoded Spanish, matching source).
 - Any feature/role gating (`featureLoader`) — Angular had none; do not add.
 - New tutorial content, additional help pages, or search/filter behavior.
@@ -26,10 +28,12 @@ access to in-app guidance after the React cutover. Trivial scope, purely additiv
 ## Capabilities
 
 ### New Capabilities
+
 - `help`: static in-app help/tutorial page accessible to any authenticated user,
   surfaced via a Help menu group, with no feature gating.
 
 ### Modified Capabilities
+
 - None.
 
 ## Approach
@@ -43,22 +47,22 @@ by absolute path (`/images/help/menu.png`), no Vite import.
 
 ## Affected Areas
 
-| Area | Impact | Description |
-|------|--------|-------------|
-| `app/help/routes/tutorial.tsx` | New | Static tutorial page component |
-| `app/help/routes/__tests__/tutorial.test.tsx` | New | Render test |
-| `app/routes.ts` | Modified | Add route inside app-layout block |
-| `app/shared/lib/config/menu-config.ts` | Modified | Add Help → Tutorial group |
-| `app/shared/lib/i18n/es.ts` | Modified | Add 3 i18n keys |
-| `public/images/help/` | New | Copy 6 PNG/WEBP images |
+| Area                                          | Impact   | Description                       |
+| --------------------------------------------- | -------- | --------------------------------- |
+| `app/help/routes/tutorial.tsx`                | New      | Static tutorial page component    |
+| `app/help/routes/__tests__/tutorial.test.tsx` | New      | Render test                       |
+| `app/routes.ts`                               | Modified | Add route inside app-layout block |
+| `app/shared/lib/config/menu-config.ts`        | Modified | Add Help → Tutorial group         |
+| `app/shared/lib/i18n/es.ts`                   | Modified | Add 3 i18n keys                   |
+| `public/images/help/`                         | New      | Copy 6 PNG/WEBP images            |
 
 ## Risks
 
-| Risk | Likelihood | Mitigation |
-|------|------------|------------|
-| Images not copied to React `public/` | Med | Explicit task; verify paths in test |
-| New Help menu group affects sidebar layout | Low | Visual smoke test |
-| Over-restricting with `featureLoader` | Low | Documented: inherit `authLoader` only |
+| Risk                                       | Likelihood | Mitigation                            |
+| ------------------------------------------ | ---------- | ------------------------------------- |
+| Images not copied to React `public/`       | Med        | Explicit task; verify paths in test   |
+| New Help menu group affects sidebar layout | Low        | Visual smoke test                     |
+| Over-restricting with `featureLoader`      | Low        | Documented: inherit `authLoader` only |
 
 ## Rollback Plan
 

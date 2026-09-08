@@ -93,7 +93,13 @@ describe('entity-crypto — encryption absence is a permanent mode ONLY while th
     );
     const dek = new Uint8Array(32).fill(0x09);
     setDek(dek, 's1');
-    writeDeviceDekTable({ formatVersion: 1, dekSource: 'local', storeId: 's1', device: null, users: {} });
+    writeDeviceDekTable({
+      formatVersion: 1,
+      dekSource: 'local',
+      storeId: 's1',
+      device: null,
+      users: {},
+    });
 
     expect(encryptEntity('[{"a":1}]')).toMatch(/^enc:v1:/);
   });

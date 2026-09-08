@@ -62,9 +62,7 @@ export function EditProfileForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <h1 className="text-xl font-semibold">
-        {intl.formatMessage({ id: 'PROFILE.EDIT_TITLE' })}
-      </h1>
+      <h1 className="text-xl font-semibold">{intl.formatMessage({ id: 'PROFILE.EDIT_TITLE' })}</h1>
 
       {!isOnline && (
         <p className="text-sm text-yellow-700 bg-yellow-50 border border-yellow-200 rounded px-3 py-2">
@@ -78,9 +76,7 @@ export function EditProfileForm({
         </p>
       )}
 
-      {successMessage && (
-        <p className="text-sm text-green-700">{successMessage}</p>
-      )}
+      {successMessage && <p className="text-sm text-green-700">{successMessage}</p>}
 
       <div>
         <label htmlFor="fullName" className="block text-sm font-medium text-gray-700">

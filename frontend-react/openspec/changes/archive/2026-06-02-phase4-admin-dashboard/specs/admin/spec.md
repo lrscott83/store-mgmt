@@ -59,10 +59,10 @@ A `usageHttpService` singleton MUST exist at
 
 `usageHttpService` MUST expose exactly two methods:
 
-| Method | HTTP | Endpoint | Response type |
-|--------|------|----------|---------------|
-| `getStoresLastWeek()` | GET | `/v1/usages/stores-last-week` | `BaseResponseModel<StoreUsages>` |
-| `getStoresLastMonth()` | GET | `/v1/usages/stores-last-month` | `BaseResponseModel<StoreUsages>` |
+| Method                 | HTTP | Endpoint                       | Response type                    |
+| ---------------------- | ---- | ------------------------------ | -------------------------------- |
+| `getStoresLastWeek()`  | GET  | `/v1/usages/stores-last-week`  | `BaseResponseModel<StoreUsages>` |
+| `getStoresLastMonth()` | GET  | `/v1/usages/stores-last-month` | `BaseResponseModel<StoreUsages>` |
 
 `StoreUsages` MUST be defined as `{ storeUsagesCountDays: number[]; activeStoreCount: number }`.
 `BaseResponseModel<T>` fields `message`, `actionCode`, and `errors` are NON-nullable; test mocks
@@ -167,15 +167,15 @@ and one labelled `ADMIN_DASHBOARD.LAST_30_DAYS` — to switch between views.
 
 The following `ADMIN_DASHBOARD.*` keys MUST be added to `app/shared/lib/i18n/es.ts`:
 
-| Key | Purpose |
-|-----|---------|
-| `ADMIN_DASHBOARD.HEADER` | Card header label |
-| `ADMIN_DASHBOARD.TITLE` | Page heading |
-| `ADMIN_DASHBOARD.LAST_7_DAYS` | Toggle button — 7-day view |
-| `ADMIN_DASHBOARD.LAST_30_DAYS` | Toggle button — 30-day view |
+| Key                            | Purpose                        |
+| ------------------------------ | ------------------------------ |
+| `ADMIN_DASHBOARD.HEADER`       | Card header label              |
+| `ADMIN_DASHBOARD.TITLE`        | Page heading                   |
+| `ADMIN_DASHBOARD.LAST_7_DAYS`  | Toggle button — 7-day view     |
+| `ADMIN_DASHBOARD.LAST_30_DAYS` | Toggle button — 30-day view    |
 | `ADMIN_DASHBOARD.COL_CATEGORY` | Table column header — category |
-| `ADMIN_DASHBOARD.COL_VALUE` | Table column header — value |
-| `ADMIN_DASHBOARD.ERROR` | Inline error message |
+| `ADMIN_DASHBOARD.COL_VALUE`    | Table column header — value    |
+| `ADMIN_DASHBOARD.ERROR`        | Inline error message           |
 
 `en.ts` MUST NOT be modified (no English locale exists for admin keys in this project).
 
@@ -193,6 +193,7 @@ A smoke-test suite MUST exist at
 `app/admin/dashboard/routes/__tests__/dashboard.test.tsx`.
 
 Tests MUST cover:
+
 - SuperAdmin mounts page; default 7-day fetch fires; table renders with day labels.
 - OwnerAdmin is blocked by `superAdminLoader`.
 - Toggle to 30 days calls `getStoresLastMonth()`; table re-renders with numeric labels.
@@ -205,6 +206,7 @@ A unit test suite MUST exist at
 `app/admin/dashboard/lib/services/__tests__/usage-http-service.test.ts`.
 
 Tests MUST cover:
+
 - `getStoresLastWeek()` calls `GET /v1/usages/stores-last-week`.
 - `getStoresLastMonth()` calls `GET /v1/usages/stores-last-month`.
 - Mocks use non-nullable `BaseResponseModel<StoreUsages>` fields (`message: ''`, `actionCode: 0`,

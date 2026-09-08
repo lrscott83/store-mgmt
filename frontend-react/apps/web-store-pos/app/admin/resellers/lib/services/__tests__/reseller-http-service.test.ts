@@ -224,7 +224,7 @@ describe('resellerHttpService — propagates error on HTTP failure', () => {
         cellPhone: 'x',
         email: 'x',
         description: '',
-      })
+      }),
     ).rejects.toThrow('Network error');
   });
 
@@ -239,7 +239,7 @@ describe('resellerHttpService — propagates error on HTTP failure', () => {
         discountPrice: 0,
         isActive: true,
         description: '',
-      })
+      }),
     ).rejects.toThrow('Network error');
   });
 });

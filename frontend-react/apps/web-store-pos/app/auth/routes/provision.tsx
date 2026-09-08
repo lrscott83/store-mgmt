@@ -52,9 +52,7 @@ export function Provision() {
     return (
       <Card padding="tight" title={intl.formatMessage({ id: 'PROVISION.TITLE' })}>
         <div className="space-y-4">
-          <InfoBox variant="primary">
-            {intl.formatMessage({ id: 'PROVISION.SUCCESS' })}
-          </InfoBox>
+          <InfoBox variant="primary">{intl.formatMessage({ id: 'PROVISION.SUCCESS' })}</InfoBox>
           <Link to="/login" className="text-cyan-600 hover:text-cyan-700 font-medium text-sm">
             {intl.formatMessage({ id: 'AUTH.SIGN_IN' })}
           </Link>

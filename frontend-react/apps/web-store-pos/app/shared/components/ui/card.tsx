@@ -46,10 +46,7 @@ export function Card({
   const headerPadding = HEADER_PADDING[padding];
 
   return (
-    <div
-      data-slot="card"
-      className={`rounded-lg bg-surface shadow-card ${className}`.trim()}
-    >
+    <div data-slot="card" className={`rounded-lg bg-surface shadow-card ${className}`.trim()}>
       {title !== undefined && (
         <div
           data-slot="card-header"
@@ -61,9 +58,7 @@ export function Card({
         >
           {/* Angular's `.card-label` (h3) renders at ~1.275rem / 500 weight. */}
           <h3 className="text-xl font-medium text-text">{title}</h3>
-          {headerAction !== undefined && (
-            <div data-slot="card-toolbar">{headerAction}</div>
-          )}
+          {headerAction !== undefined && <div data-slot="card-toolbar">{headerAction}</div>}
         </div>
       )}
       <div data-slot="card-body" className={bodyPadding}>

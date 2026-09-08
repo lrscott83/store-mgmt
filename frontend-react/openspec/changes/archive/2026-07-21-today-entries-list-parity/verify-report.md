@@ -3,9 +3,11 @@
 **Change**: today-entries-list-parity | **Branch**: feat/today-entries-parity | **Mode**: Engram (hybrid, openspec files also present)
 
 ### Completeness (tasks.md)
+
 All checkboxes marked [x] — 0 unchecked items found via grep. Phases 1 (RED), 2 (GREEN), 3 (cleanup), 3b (scope expansion: Fecha column + i18n key removal), 4 (verification) all complete.
 
 ### Source Verification (read directly, not trusted from apply-progress)
+
 1. `apps/web-store-pos/app/inventory/routes/today-entries.tsx` — renders `<EntryList entries={entries} onEdit={handleEdit} onDeactivate={handleDeactivate} readOnly={false} isOwnerAdmin={isOwnerAdmin} />`. No `InventoryDailyEntries` import. CONFIRMED.
 2. `apps/web-store-pos/app/inventory/components/entry-list.tsx` — row is exactly `productName | quantity | costPrice (th/td gated `{isOwnerAdmin && (...)}`) | gear ActionMenu (gated `showActions = isOwnerAdmin && !readOnly`)`. No Fecha th/td anywhere in file (full file read, 97 lines). CONFIRMED.
 3. `inventory-daily-entries.tsx` and `.test.tsx` — both absent (ls confirms ENOENT). `rg -n "InventoryDailyEntries|inventory-daily-entries"` repo-wide: zero hits inside `frontend-react/apps/web-store-pos` (remaining hits are in Angular source `frontend/`, docs, and openspec historical markdown — all expected/inert). `inventory-components.test.tsx` has zero InventoryDailyEntries references. CONFIRMED.
@@ -18,6 +20,7 @@ All checkboxes marked [x] — 0 unchecked items found via grep. Phases 1 (RED), 
 7. `entries.tsx` (history screen) — `git diff --stat` and `git log` across the change's commit range (e232ae7..b4b2255) show **zero commits touching this file** — confirmed untouched. Still day-grouped via `groupEntriesByDay`, renders `<EntryList entries={dayGroup.entries} readOnly isOwnerAdmin={isOwnerAdmin} />` (readOnly=true, Angular parity, no add-entry button, matches file's own parity-comment block). Benefits from Fecha removal in shared `EntryList` component without any direct edit. "+ Entrada" button (`GENERAL.ENTRY` fab) only exists in `today-entries.tsx`, untouched by scope beyond the deliberate EntryList swap.
 
 ### Issues
+
 None found.
 
 - CRITICAL: 0

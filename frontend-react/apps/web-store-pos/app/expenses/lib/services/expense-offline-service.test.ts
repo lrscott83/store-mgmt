@@ -69,7 +69,12 @@ describe('ExpenseOfflineService', () => {
 
   beforeEach(() => {
     localStorage.clear();
-    useAuthStore.setState({ user: makeUser({ login: 'jdoe' }), isAuthenticated: true, isLoading: false, error: null });
+    useAuthStore.setState({
+      user: makeUser({ login: 'jdoe' }),
+      isAuthenticated: true,
+      isLoading: false,
+      error: null,
+    });
     svc = new ExpenseOfflineService(storeId);
   });
 
@@ -106,7 +111,9 @@ describe('ExpenseOfflineService', () => {
       svc.getStorageExpenses();
       svc.getStorageExpenses();
 
-      const callsForKey = getItemSpy.mock.calls.filter(([key]) => key === `lizoft.store-expenses-${storeId}`);
+      const callsForKey = getItemSpy.mock.calls.filter(
+        ([key]) => key === `lizoft.store-expenses-${storeId}`,
+      );
       expect(callsForKey).toHaveLength(1);
     });
 

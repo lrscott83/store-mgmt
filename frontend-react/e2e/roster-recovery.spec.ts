@@ -141,7 +141,7 @@ async function destroyDeviceKeyMaterial(page: Page): Promise<void> {
     before,
     `Precondición: se esperaba una tabla de wraps en localStorage['${DEVICE_DEK_KEY}'] ` +
       'creada por el login anterior (dek-provisioning.ts, paso 5). Si es null, el login no la ' +
-      'escribió y borrarla no prueba nada.'
+      'escribió y borrarla no prueba nada.',
   ).not.toBeNull();
 
   await page.evaluate((key) => window.localStorage.removeItem(key), DEVICE_DEK_KEY);
@@ -215,7 +215,7 @@ async function signOut(page: Page): Promise<void> {
 async function stripEveryKeySource(page: Page): Promise<void> {
   expect(
     await readStoredRoster(page),
-    'Precondición: el roster tiene que estar presente antes de borrarlo.'
+    'Precondición: el roster tiene que estar presente antes de borrarlo.',
   ).not.toBeNull();
   await page.evaluate((key) => window.localStorage.removeItem(key), ROSTER_STORAGE_KEY);
   expect(await readStoredRoster(page)).toBeNull();
@@ -304,7 +304,7 @@ async function expectDeviceKeyMaterialPresent(page: Page, when: string): Promise
     `Precondición (${when}): se esperaba una tabla de wraps en ` +
       `localStorage['${DEVICE_DEK_KEY}']. Si es null, el login no resolvió ninguna clave — ` +
       'revisá que la respuesta de login traiga wrappedDek/wrapSalt/wrapIv no vacíos ' +
-      '(LoginCommand.cs, TryBuildLoginDekWrapAsync).'
+      '(LoginCommand.cs, TryBuildLoginDekWrapAsync).',
   ).not.toBeNull();
 }
 
@@ -395,9 +395,7 @@ test.describe('recuperación por roster, bytes intactos y rechazo del login', ()
     // los datos. Quedaron ilegibles (que es justo lo que avisa
     // OFFLINE_ACCESS.DISABLE_MESSAGE_DATA_LOSS), no borrados.
     expect(await readEntityBytes(page, 'products', first.storeId)).toBe(productsBefore);
-    expect(await readEntityBytes(page, 'product-categories', first.storeId)).toBe(
-      categoriesBefore
-    );
+    expect(await readEntityBytes(page, 'product-categories', first.storeId)).toBe(categoriesBefore);
 
     // El roster NUEVO: otro bundle (otro `bundleId`), misma tienda, mismo
     // usuario, y el mismo wrap KAT — es decir, la misma clave que el servidor
@@ -500,7 +498,7 @@ test.describe('recuperación por roster, bytes intactos y rechazo del login', ()
     // verdad (es la primera de `loadData`), y `products` es la que el bug
     // original vaciaba desde el propio repositorio de productos.
     expect(await readEntityBytes(page, 'product-categories', bundle.storeId)).toBe(
-      categoriesBefore
+      categoriesBefore,
     );
     expect(await readEntityBytes(page, 'products', bundle.storeId)).toBe(productsBefore);
 
@@ -615,7 +613,7 @@ test.describe('recuperación por roster, bytes intactos y rechazo del login', ()
     // Y el rechazo no tocó un byte.
     expect(await readEntityBytes(page, 'products', bundle.storeId)).toBe(productsBefore);
     expect(await readEntityBytes(page, 'product-categories', bundle.storeId)).toBe(
-      categoriesBefore
+      categoriesBefore,
     );
 
     loginNetwork.expectNoLoginAttempt();
@@ -732,7 +730,7 @@ test.describe('el cifrado no depende del modo de autenticación (backend real) @
     expect(
       await readStoredRoster(page),
       'Precondición: este test no importa NINGÚN roster. Si hay uno, la recuperación de abajo ' +
-        'podría venir de él y el test dejaría de probar la vía online.'
+        'podría venir de él y el test dejaría de probar la vía online.',
     ).toBeNull();
 
     // El equipo se olvida de todo. Después de esto no queda ninguna fuente
@@ -863,7 +861,7 @@ test.describe('el cifrado no depende del modo de autenticación (backend real) @
     // sigue en 1, el del tramo anterior. Este login no le habló al servidor.
     expect(
       loginPosts(),
-      'el login del medio tiene que salir por la rama offline: cero HTTP al backend'
+      'el login del medio tiene que salir por la rama offline: cero HTTP al backend',
     ).toBe(1);
 
     await expectDeviceKeyMaterialPresent(page, 'después del login sin conexión');

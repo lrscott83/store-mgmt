@@ -36,6 +36,7 @@ All user-visible copy is in Spanish via react-intl with `STORES.*` and `MANAGEME
 EDIT (8), PRES (10), OWNER (3), MODULE (5), OFFLINE (5), I18N (4), ERR (6), TEST (7).
 
 **Key highlights:**
+
 - ACCESS-1: New `adminFeatureLoader` factory composing adminLoader + featureLoader
 - HTTP-1 to HTTP-11: storeHttpService with list/get/create/update/lifecycle methods + module catalog
 - LIST-1 to LIST-6: StoreListPage container with online/offline cache strategy
@@ -44,7 +45,7 @@ EDIT (8), PRES (10), OWNER (3), MODULE (5), OFFLINE (5), I18N (4), ERR (6), TEST
 - PRES-1 to PRES-10: StoreList + StoreForm + ModulePicker (pure presentational)
 - MODULE-1 to MODULE-5: priceIncluded auto-lock, merge logic, running total
 - OFFLINE-1 to OFFLINE-5: Write-through cache, offline read, blocked writes
-- I18N-1 to I18N-4: 27+ STORES.* keys, all copy from react-intl
+- I18N-1 to I18N-4: 27+ STORES.\* keys, all copy from react-intl
 - TEST-1 to TEST-7: Smoke tests, unit tests, IntlProvider wrapping, offline mocking
 
 Full requirement text available in openspec/specs/management/spec.md.
@@ -54,6 +55,7 @@ Full requirement text available in openspec/specs/management/spec.md.
 ## Acceptance Scenarios
 
 28 acceptance scenarios (S-ACCESS-1 through S-ERR-2):
+
 - S-ACCESS-1–4: Authentication and authorization flows
 - S-LIST-1–6: List container online/offline/lifecycle scenarios
 - S-CREATE-1–5: Create form with offline gating, priceIncluded, non-admin ownerId forcing

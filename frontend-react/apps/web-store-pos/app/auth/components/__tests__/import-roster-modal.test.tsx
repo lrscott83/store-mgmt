@@ -99,9 +99,9 @@ describe('ImportRosterModal', () => {
     // Direct proof the password survives the failed attempt — asserted BEFORE
     // the retry re-types the field, otherwise the retry's own change event
     // would mask a catch that cleared it.
-    expect(
-      (screen.getByLabelText(/contraseña de activación/i) as HTMLInputElement).value,
-    ).toBe('incorrect');
+    expect((screen.getByLabelText(/contraseña de activación/i) as HTMLInputElement).value).toBe(
+      'incorrect',
+    );
 
     // Retry with only the password corrected — the file is NOT re-selected.
     // This proves the chosen file survives a failed attempt: if it were
@@ -127,9 +127,8 @@ describe('ImportRosterModal', () => {
     // A roster.json-only zip is NOT an activation export — the failure must
     // stay diagnosable instead of degrading into a wrong-password blame.
     const payload = await serializeRoster(makeBundle(), 'master', STORE_ID);
-    const { ZipWriter, BlobWriter, TextReader, BlobReader, ZipReader, TextWriter } = await import(
-      '@zip.js/zip.js'
-    );
+    const { ZipWriter, BlobWriter, TextReader, BlobReader, ZipReader, TextWriter } =
+      await import('@zip.js/zip.js');
     const reader = new ZipReader(new BlobReader(new Blob([payload])));
     const entries = await reader.getEntries();
     const rosterEntry = entries.find((e) => !e.directory && e.filename === 'roster.json');

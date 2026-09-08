@@ -34,7 +34,9 @@ const PAYMENT_OPTIONS = [
  */
 export function EditOrderModal({ order, isOpen, onClose, onUpdate }: EditOrderModalProps) {
   const intl = useIntl();
-  const [paymentType, setPaymentType] = useState<PaymentType>(order.paymentType ?? PaymentType.Efectivo);
+  const [paymentType, setPaymentType] = useState<PaymentType>(
+    order.paymentType ?? PaymentType.Efectivo,
+  );
 
   if (!isOpen) return null;
 

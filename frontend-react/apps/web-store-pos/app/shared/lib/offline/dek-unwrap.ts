@@ -86,9 +86,11 @@ export async function wrapDekWithPassword(
   fixedSaltIv?: { wrapSalt: string; wrapIv: string },
 ): Promise<WrappedDekEntry> {
   const wrapSalt =
-    fixedSaltIv?.wrapSalt ?? base64FromBytes(crypto.getRandomValues(new Uint8Array(PBKDF2_SALT_BYTES)));
+    fixedSaltIv?.wrapSalt ??
+    base64FromBytes(crypto.getRandomValues(new Uint8Array(PBKDF2_SALT_BYTES)));
   const wrapIv =
-    fixedSaltIv?.wrapIv ?? base64FromBytes(crypto.getRandomValues(new Uint8Array(AES_GCM_IV_BYTES)));
+    fixedSaltIv?.wrapIv ??
+    base64FromBytes(crypto.getRandomValues(new Uint8Array(AES_GCM_IV_BYTES)));
 
   const preHash = await sha256Base64(password);
   const kekBase64 = await pbkdf2Base64(preHash, wrapSalt, DEK_WRAP_ITERATIONS);

@@ -6,9 +6,7 @@ import type { ReSellerCommission } from '@store-mgmt/domain';
 
 // ─── loader mock (Req: Route Gating — must be resellerFeatureLoader) ─────────
 
-const mockResellerFeatureLoader = vi.fn((_featureIds: number[]) =>
-  vi.fn().mockResolvedValue(null)
-);
+const mockResellerFeatureLoader = vi.fn((_featureIds: number[]) => vi.fn().mockResolvedValue(null));
 vi.mock('~/auth/routes/loaders', () => ({
   resellerFeatureLoader: (featureIds: number[]) => mockResellerFeatureLoader(featureIds),
 }));
@@ -105,9 +103,8 @@ describe('ReSellerCommissionsPage — route gating wiring', () => {
 
 describe('ReSellerCommissionsPage — rows', () => {
   it('renders MM/YYYY period, payment count, and total(formatCurrency) per row, and calls getReSellerCommissions on mount', async () => {
-    const { storeHttpService } = await import(
-      '~/management/stores/lib/services/store-http-service'
-    );
+    const { storeHttpService } =
+      await import('~/management/stores/lib/services/store-http-service');
     vi.mocked(storeHttpService.getReSellerCommissions).mockResolvedValue({
       succeeded: true,
       data: [makeRow({ year: 2026, month: 7, paymentCount: 5, totalCommission: 1234.5 })],
@@ -120,7 +117,7 @@ describe('ReSellerCommissionsPage — rows', () => {
     render(
       <Wrapper>
         <ReSellerCommissionsPage />
-      </Wrapper>
+      </Wrapper>,
     );
 
     await waitFor(() => {
@@ -133,9 +130,8 @@ describe('ReSellerCommissionsPage — rows', () => {
   });
 
   it('renders a different period/count/total for a second row (triangulation)', async () => {
-    const { storeHttpService } = await import(
-      '~/management/stores/lib/services/store-http-service'
-    );
+    const { storeHttpService } =
+      await import('~/management/stores/lib/services/store-http-service');
     vi.mocked(storeHttpService.getReSellerCommissions).mockResolvedValue({
       succeeded: true,
       data: [makeRow({ year: 2025, month: 12, paymentCount: 1, totalCommission: 10 })],
@@ -148,7 +144,7 @@ describe('ReSellerCommissionsPage — rows', () => {
     render(
       <Wrapper>
         <ReSellerCommissionsPage />
-      </Wrapper>
+      </Wrapper>,
     );
 
     await waitFor(() => {
@@ -160,9 +156,8 @@ describe('ReSellerCommissionsPage — rows', () => {
 
 describe('ReSellerCommissionsPage — empty state', () => {
   it('shows the empty-state message when there are no rows', async () => {
-    const { storeHttpService } = await import(
-      '~/management/stores/lib/services/store-http-service'
-    );
+    const { storeHttpService } =
+      await import('~/management/stores/lib/services/store-http-service');
     vi.mocked(storeHttpService.getReSellerCommissions).mockResolvedValue({
       succeeded: true,
       data: [],
@@ -175,7 +170,7 @@ describe('ReSellerCommissionsPage — empty state', () => {
     render(
       <Wrapper>
         <ReSellerCommissionsPage />
-      </Wrapper>
+      </Wrapper>,
     );
 
     await waitFor(() => {
@@ -192,9 +187,8 @@ describe('ReSellerCommissionsPage — empty state', () => {
 
 describe('ReSellerCommissionsPage — getReSellerCommissions succeeded:false', () => {
   it('shows BILLING.COMMISSIONS.ERROR and does not set rows from data', async () => {
-    const { storeHttpService } = await import(
-      '~/management/stores/lib/services/store-http-service'
-    );
+    const { storeHttpService } =
+      await import('~/management/stores/lib/services/store-http-service');
     vi.mocked(storeHttpService.getReSellerCommissions).mockResolvedValue({
       succeeded: false,
       data: null,
@@ -207,7 +201,7 @@ describe('ReSellerCommissionsPage — getReSellerCommissions succeeded:false', (
     render(
       <Wrapper>
         <ReSellerCommissionsPage />
-      </Wrapper>
+      </Wrapper>,
     );
 
     await waitFor(() => {

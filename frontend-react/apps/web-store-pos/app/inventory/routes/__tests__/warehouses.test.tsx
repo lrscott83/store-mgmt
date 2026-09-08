@@ -71,7 +71,14 @@ vi.mock('~/inventory/lib/services/warehouse-offline-service', () => {
     }
     updateWarehouse(id: string, name: string) {
       const w = fakeState.warehouses.find((x) => x.id === id);
-      if (!w) return { data: undefined, succeeded: false, message: null, actionCode: 400, errors: [WarehouseErrors.NotExists] };
+      if (!w)
+        return {
+          data: undefined,
+          succeeded: false,
+          message: null,
+          actionCode: 400,
+          errors: [WarehouseErrors.NotExists],
+        };
       w.name = name;
       return { data: w, succeeded: true, message: null, actionCode: 200, errors: [] };
     }
@@ -134,8 +141,22 @@ function seedCentralWarehouseWithStock() {
     ['prod-2', { id: 'prod-2', name: 'Leche', isActive: true, categoryId: 'cat-2' }],
   ];
   fakeState.levels = [
-    { id: 'sl-1', warehouseId: 'wh-1', productId: 'prod-1', onHand: 24, costPrice: 660, createdDate: new Date() },
-    { id: 'sl-2', warehouseId: 'wh-1', productId: 'prod-2', onHand: 10, costPrice: 100, createdDate: new Date() },
+    {
+      id: 'sl-1',
+      warehouseId: 'wh-1',
+      productId: 'prod-1',
+      onHand: 24,
+      costPrice: 660,
+      createdDate: new Date(),
+    },
+    {
+      id: 'sl-2',
+      warehouseId: 'wh-1',
+      productId: 'prod-2',
+      onHand: 10,
+      costPrice: 100,
+      createdDate: new Date(),
+    },
   ];
 }
 
@@ -244,16 +265,24 @@ describe('WarehousesPage', () => {
       fireEvent.click(screen.getByTestId('warehouse-category-toggle-wh-1-cat-2'));
 
       // Productos visibles con su cantidad.
-      expect(screen.getByTestId('warehouse-product-row-wh-1-prod-1').textContent).toContain('Cerveza');
+      expect(screen.getByTestId('warehouse-product-row-wh-1-prod-1').textContent).toContain(
+        'Cerveza',
+      );
       expect(screen.getByTestId('warehouse-product-row-wh-1-prod-1').textContent).toContain('(24)');
-      expect(screen.getByTestId('warehouse-product-row-wh-1-prod-2').textContent).toContain('Leche');
+      expect(screen.getByTestId('warehouse-product-row-wh-1-prod-2').textContent).toContain(
+        'Leche',
+      );
       expect(screen.getByTestId('warehouse-product-row-wh-1-prod-2').textContent).toContain('(10)');
 
       // Costo promedio y total por producto (mismo diseño que Disponible).
       expect(screen.getByTestId('warehouse-product-cost-wh-1-prod-1').textContent).toBe('$660');
-      expect(screen.getByTestId('warehouse-product-total-wh-1-prod-1').textContent).toBe('$15\u00A0840');
+      expect(screen.getByTestId('warehouse-product-total-wh-1-prod-1').textContent).toBe(
+        '$15\u00A0840',
+      );
       expect(screen.getByTestId('warehouse-product-cost-wh-1-prod-2').textContent).toBe('$100');
-      expect(screen.getByTestId('warehouse-product-total-wh-1-prod-2').textContent).toBe('$1\u00A0000');
+      expect(screen.getByTestId('warehouse-product-total-wh-1-prod-2').textContent).toBe(
+        '$1\u00A0000',
+      );
     });
 
     it('categories are collapsed by default and expand on click (WUI-4-c)', async () => {
@@ -295,10 +324,23 @@ describe('WarehousesPage', () => {
 
     it('shows product names for unknown product ids without crashing (WUI-4-f)', async () => {
       fakeState.warehouses = [
-        { id: 'wh-1', name: 'Central', isActive: true, createdDate: new Date(), createdByName: 'x' },
+        {
+          id: 'wh-1',
+          name: 'Central',
+          isActive: true,
+          createdDate: new Date(),
+          createdByName: 'x',
+        },
       ];
       fakeState.levels = [
-        { id: 'sl-1', warehouseId: 'wh-1', productId: 'prod-ghost', onHand: 5, costPrice: 100, createdDate: new Date() },
+        {
+          id: 'sl-1',
+          warehouseId: 'wh-1',
+          productId: 'prod-ghost',
+          onHand: 5,
+          costPrice: 100,
+          createdDate: new Date(),
+        },
       ];
       renderPage();
       fireEvent.click(screen.getByTestId('warehouse-toggle-Central'));

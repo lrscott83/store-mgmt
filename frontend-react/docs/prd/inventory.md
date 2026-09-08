@@ -55,16 +55,17 @@ The module is accessed exclusively by authenticated users and integrates tightly
 
 All routes require `AuthGuard`. Unauthenticated users are redirected to the login screen.
 
-| Path | Component | Feature Flag | Description |
-|------|-----------|--------------|-------------|
-| `/inventory/available` | `InventoryAvailableComponent` | Available (30) | Current available stock per product |
-| `/inventory/today-entries` | `TodayEntriesComponent` | Entries (31) | Stock entries recorded today |
-| `/inventory/today-quantities` | `InventoryTodayQuantitiesComponent` | InventoryTodayQuantities (34) | Quantity summary per product for today |
+| Path                            | Component                            | Feature Flag                  | Description                                |
+| ------------------------------- | ------------------------------------ | ----------------------------- | ------------------------------------------ |
+| `/inventory/available`          | `InventoryAvailableComponent`        | Available (30)                | Current available stock per product        |
+| `/inventory/today-entries`      | `TodayEntriesComponent`              | Entries (31)                  | Stock entries recorded today               |
+| `/inventory/today-quantities`   | `InventoryTodayQuantitiesComponent`  | InventoryTodayQuantities (34) | Quantity summary per product for today     |
 | `/inventory/today-sales-profit` | `InventoryTodaySalesProfitComponent` | InventoryTodaySaleProfit (35) | Sales revenue vs inventory cost comparison |
-| `/inventory/egress` | `EgressComponent` | Egress (33) | Non-sale outbound stock movements |
-| `/inventory/entries` | `EntriesComponent` | EntriesHistory (101) | Full paginated history of stock entries |
+| `/inventory/egress`             | `EgressComponent`                    | Egress (33)                   | Non-sale outbound stock movements          |
+| `/inventory/entries`            | `EntriesComponent`                   | EntriesHistory (101)          | Full paginated history of stock entries    |
 
 **Route guard behavior:**
+
 - `AuthGuard` checks for a valid session token before rendering any inventory route.
 - Feature flags control visibility of menu items and route accessibility. If a feature is disabled for the store, navigating to its route redirects to a fallback screen.
 
@@ -79,6 +80,7 @@ All routes require `AuthGuard`. Unauthenticated users are redirected to the logi
 Displays the current available stock for all active products. Each row shows the product name, category, and current available quantity. The list is derived from the cumulative sum of entries minus sold quantities and egress movements.
 
 **Responsibilities:**
+
 - Load and display available inventory from the offline service.
 - Support search/filter by product name or category.
 - Reflect real-time updates when orders are placed or deactivated (event-driven or reactive store).
@@ -90,6 +92,7 @@ Displays the current available stock for all active products. Each row shows the
 **Context:** Used within inventory views to display a filterable, scrollable list of products with their inventory-related data (quantity, cost, category).
 
 **Responsibilities:**
+
 - Render a list of `InventoryEntryView` items.
 - Emit selection events for parent components to handle actions (edit, view detail).
 - Accepts filter input from parent to narrow displayed items.
@@ -103,6 +106,7 @@ Displays the current available stock for all active products. Each row shows the
 Displays all stock entries recorded on the current calendar day. Groups entries by product or category when there are multiple entries for the same product.
 
 **Responsibilities:**
+
 - Filter `InventoryEntry` records by today's date.
 - Provide an action to open `EditInventoryEntryModalComponent` to add a new entry.
 - Allow editing or deactivating existing entries for the current day.
@@ -114,6 +118,7 @@ Displays all stock entries recorded on the current calendar day. Groups entries 
 **Context:** Presentational sub-component used by `TodayEntriesComponent` and potentially `EntriesComponent` to render a grouped daily view.
 
 **Responsibilities:**
+
 - Accept a list of entries for a single day and render them grouped.
 - Display totals (total quantity entered, total cost) for the day group.
 - Emit events for edit/delete actions on individual entries.
@@ -127,6 +132,7 @@ Displays all stock entries recorded on the current calendar day. Groups entries 
 Full paginated history of all stock entries across all dates. Supports filtering by date range, product, and category.
 
 **Responsibilities:**
+
 - Load all entries from the offline service.
 - Support pagination or virtual scroll for large datasets.
 - Provide date-range and product filters.
@@ -140,6 +146,7 @@ Full paginated history of all stock entries across all dates. Supports filtering
 **Context:** Reusable presentational component for rendering a flat list of inventory entries.
 
 **Responsibilities:**
+
 - Accept an array of `InventoryEntryView` and render each row.
 - Display: product name, quantity, cost price, date, and active status.
 - Emit action events: edit, toggle active.
@@ -151,6 +158,7 @@ Full paginated history of all stock entries across all dates. Supports filtering
 **Context:** Modal dialog triggered from `TodayEntriesComponent` or `EntriesComponent`.
 
 **Responsibilities:**
+
 - Render a form for creating or editing an `InventoryEntry`.
 - Fields: product (searchable select), category (auto-filled from product), quantity, cost price, date.
 - Validate required fields and numeric constraints (quantity > 0, cost price >= 0).
@@ -166,6 +174,7 @@ Full paginated history of all stock entries across all dates. Supports filtering
 Provides a consolidated quantity summary for the current day. Shows per-product totals of entries, sales deductions, egress movements, and net available change.
 
 **Responsibilities:**
+
 - Aggregate today's entries, sales, and egress by product.
 - Display the net quantity movement for each product.
 - Help the owner verify that what was stocked matches what was sold or moved.
@@ -179,6 +188,7 @@ Provides a consolidated quantity summary for the current day. Shows per-product 
 Compares today's sales revenue against the cost price of sold inventory. Calculates gross profit per product and overall.
 
 **Responsibilities:**
+
 - Load today's completed orders from the sales service.
 - For each sold product, retrieve the cost price from the relevant inventory entry (FIFO or latest-entry strategy, to be confirmed).
 - Display: product name, units sold, sale revenue, inventory cost, gross profit, margin %.
@@ -194,6 +204,7 @@ Compares today's sales revenue against the cost price of sold inventory. Calcula
 Manages non-sale outbound stock movements. Examples: product waste, supplier returns, store transfers, inventory adjustments.
 
 **Responsibilities:**
+
 - Display a list of egress records for today (default view) with option to view history.
 - Allow creating a new egress entry: product, quantity, egress type (waste/return/transfer/adjustment), notes, date.
 - On save, reduce available inventory via the offline service.
@@ -209,18 +220,19 @@ Extends `AuditableBaseModel` (includes `createdAt`, `updatedAt`, `isActive`, `st
 
 ```typescript
 interface InventoryEntry extends AuditableBaseModel {
-  id: string;           // UUID — unique entry identifier
-  productId: string;    // Reference to the product
-  categoryId: string;   // Denormalized category for query efficiency
-  quantity: number;     // Units added to inventory in this entry
-  available: number;    // Running available units at the time of entry
-  costPrice: number;    // Unit cost price at entry time (used for profit calculations)
-  date: Date;           // Business date of the entry (may differ from createdAt)
-  order: number;        // Sort order within a day for display purposes
+  id: string; // UUID — unique entry identifier
+  productId: string; // Reference to the product
+  categoryId: string; // Denormalized category for query efficiency
+  quantity: number; // Units added to inventory in this entry
+  available: number; // Running available units at the time of entry
+  costPrice: number; // Unit cost price at entry time (used for profit calculations)
+  date: Date; // Business date of the entry (may differ from createdAt)
+  order: number; // Sort order within a day for display purposes
 }
 ```
 
 **Constraints:**
+
 - `quantity` must be a positive integer.
 - `costPrice` must be >= 0.
 - `date` is the business date (owner-controlled), not necessarily the system timestamp.
@@ -236,7 +248,7 @@ Flattened read model for display purposes. Joins entry data with product name.
 interface InventoryEntryView {
   id: string;
   productId: string;
-  productName: string;   // Denormalized from product catalog
+  productName: string; // Denormalized from product catalog
   quantity: number;
   costPrice: number;
   date: Date;
@@ -271,26 +283,29 @@ interface EgressEntry extends AuditableBaseModel {
 The primary service for all inventory entry operations. All reads and writes go through this service, which abstracts the offline storage layer.
 
 **Storage:**
+
 - Backend: `localStorage`
 - Key format: `lizoft.store-inventory-entries-{storeId}`
 - Serialization: `Map<string, InventoryEntry>` serialized as an array of `[key, value]` entries (or flat array of `InventoryEntry` objects — confirm during implementation).
 
 **Core methods:**
 
-| Method | Description |
-|--------|-------------|
-| `getAll(storeId)` | Returns all entries for the store |
-| `getByDate(storeId, date)` | Returns entries for a specific business date |
-| `getAvailable(storeId)` | Returns the latest available quantity per product |
-| `save(entry)` | Inserts or updates a single entry; recomputes `available` if needed |
-| `deactivate(id)` | Soft-deletes an entry; restores affected available quantities |
-| `getById(id)` | Returns a single entry by ID |
+| Method                     | Description                                                         |
+| -------------------------- | ------------------------------------------------------------------- |
+| `getAll(storeId)`          | Returns all entries for the store                                   |
+| `getByDate(storeId, date)` | Returns entries for a specific business date                        |
+| `getAvailable(storeId)`    | Returns the latest available quantity per product                   |
+| `save(entry)`              | Inserts or updates a single entry; recomputes `available` if needed |
+| `deactivate(id)`           | Soft-deletes an entry; restores affected available quantities       |
+| `getById(id)`              | Returns a single entry by ID                                        |
 
 **Repository:**
+
 - `InventoryEntryOfflineService` depends on `InventoryEntryRepository`, which wraps the raw localStorage read/write operations.
 - The repository is responsible for serialization/deserialization and should not contain business logic.
 
 **Sync behavior:**
+
 - When online, the service queues write operations and syncs to the backend API.
 - Conflict resolution strategy: last-write-wins per entry ID (to be confirmed with team).
 
@@ -303,12 +318,14 @@ This is a critical integration point. The inventory module is not isolated — i
 ### Order Placement
 
 When a new order is created:
+
 1. For each line item where the product has `discountFromInventory: true`, reduce the product's `available` quantity by the ordered quantity.
 2. This reduction happens optimistically on the client (offline-first) and is confirmed on sync.
 
 ### Order Deactivation
 
 When an order is deactivated (cancelled or voided):
+
 1. For each line item where `discountFromInventory: true`, restore the product's `available` quantity.
 2. The restoration must be atomic per order — all line items are restored together or not at all.
 
@@ -367,16 +384,17 @@ All inventory routes are protected by `AuthGuard`. A valid session is required t
 
 Each sub-route is gated by a feature flag ID. Feature flags are resolved per store at login and cached for the session.
 
-| Feature | Flag ID | Description |
-|---------|---------|-------------|
-| Available | 30 | View current available stock |
-| Entries (today) | 31 | View and manage today's stock entries |
-| Egress | 33 | View and manage stock egress |
-| InventoryTodayQuantities | 34 | View today's quantity summary |
-| InventoryTodaySaleProfit | 35 | View today's sales profit breakdown |
-| EntriesHistory | 101 | View full historical entry log |
+| Feature                  | Flag ID | Description                           |
+| ------------------------ | ------- | ------------------------------------- |
+| Available                | 30      | View current available stock          |
+| Entries (today)          | 31      | View and manage today's stock entries |
+| Egress                   | 33      | View and manage stock egress          |
+| InventoryTodayQuantities | 34      | View today's quantity summary         |
+| InventoryTodaySaleProfit | 35      | View today's sales profit breakdown   |
+| EntriesHistory           | 101     | View full historical entry log        |
 
 **Behavior when a feature is disabled:**
+
 - The corresponding menu item is hidden.
 - Direct navigation to the route redirects to a generic "feature not available" screen or the dashboard.
 
@@ -387,4 +405,4 @@ Each sub-route is gated by a feature flag ID. Feature flags are resolved per sto
 - Egress creation requires `inventory:egress:write`.
 - Read-only roles can access all list and summary views but cannot open modals or forms.
 
-*(Exact role names to be confirmed against the auth module implementation.)*
+_(Exact role names to be confirmed against the auth module implementation.)_

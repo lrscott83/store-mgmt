@@ -52,7 +52,11 @@ describe('LoadingOverlay', () => {
 
 describe('Card', () => {
   it('renders children', () => {
-    render(<Card><span>card content</span></Card>);
+    render(
+      <Card>
+        <span>card content</span>
+      </Card>,
+    );
     expect(screen.getByText('card content')).toBeInTheDocument();
   });
 

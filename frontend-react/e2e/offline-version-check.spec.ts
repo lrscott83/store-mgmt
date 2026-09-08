@@ -103,7 +103,7 @@ test.describe('nueva versión en sesión offline (nacida del roster)', () => {
     // JWT de servidor.
     const auth = await readAuthModel(page);
     expect(auth?.authToken, 'la sesión debe haber nacido del roster (sentinel)').toBe(
-      'offline-session'
+      'offline-session',
     );
 
     // ---------------------------------------------------------------------
@@ -119,7 +119,7 @@ test.describe('nueva versión en sesión offline (nacida del roster)', () => {
             const reg = await navigator.serviceWorker.getRegistration();
             return reg?.active?.state ?? 'no-active';
           }),
-        { timeout: 30_000 }
+        { timeout: 30_000 },
       )
       .toBe('activated');
 
@@ -142,7 +142,7 @@ test.describe('nueva versión en sesión offline (nacida del roster)', () => {
 
       await expect(
         page.getByRole('heading', { name: UPDATE_DIALOG_TITLE }),
-        'la sesión offline debe mostrar el diálogo de nueva versión igual que una online'
+        'la sesión offline debe mostrar el diálogo de nueva versión igual que una online',
       ).toBeVisible({ timeout: 20_000 });
 
       // -----------------------------------------------------------------
@@ -164,7 +164,7 @@ test.describe('nueva versión en sesión offline (nacida del roster)', () => {
               const marker = (window as unknown as Record<string, unknown>).__e2ePreUpdateMarker;
               return marker === undefined ? 'reloaded' : String(marker);
             }),
-        { timeout: 20_000, intervals: [250] }
+          { timeout: 20_000, intervals: [250] },
         )
         .toBe('reloaded');
 
@@ -178,7 +178,7 @@ test.describe('nueva versión en sesión offline (nacida del roster)', () => {
 
       const authAfter = await readAuthModel(page);
       expect(authAfter?.authToken, 'la sesión offline debe sobrevivir al hard refresh').toBe(
-        'offline-session'
+        'offline-session',
       );
     } finally {
       // Restaurar el script original: el próximo test (offline-shell u otro

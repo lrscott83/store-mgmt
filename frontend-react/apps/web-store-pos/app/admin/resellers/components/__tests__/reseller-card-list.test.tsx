@@ -41,7 +41,7 @@ describe('ResellerCardList — renders a Card grid (Req: Resellers List Card Gri
     const { container } = render(
       <Wrapper>
         <ResellerCardList {...baseProps} resellers={[makeReseller()]} />
-      </Wrapper>
+      </Wrapper>,
     );
     const grid = container.querySelector('.grid');
     expect(grid?.className).toContain('grid-cols-1');
@@ -65,7 +65,7 @@ describe('ResellerCardList — renders a Card grid (Req: Resellers List Card Gri
     const { container } = render(
       <Wrapper>
         <ResellerCardList {...baseProps} resellers={resellers} />
-      </Wrapper>
+      </Wrapper>,
     );
     expect(container.querySelectorAll('[data-slot="card"]')).toHaveLength(1);
     expect(screen.getByText('Jane Reseller')).toBeInTheDocument();
@@ -84,7 +84,7 @@ describe('ResellerCardList — FAB (Req: Resellers L6 Text Parity, override 1)',
     render(
       <Wrapper>
         <ResellerCardList {...baseProps} onCreate={onCreate} resellers={[]} />
-      </Wrapper>
+      </Wrapper>,
     );
     expect(esMessages['RESELLERS.ADD']).toBe('Adicionar');
     const fab = screen.getByRole('button', { name: esMessages['RESELLERS.ADD'] });
@@ -102,7 +102,7 @@ describe('ResellerCardList — FAB (Req: Resellers L6 Text Parity, override 1)',
     render(
       <IntlProvider messages={sentinelMessages} locale="es" defaultLocale="es">
         <ResellerCardList {...baseProps} resellers={[]} />
-      </IntlProvider>
+      </IntlProvider>,
     );
     expect(screen.getByRole('button', { name: 'SENTINEL_RESELLERS_ADD' })).toBeInTheDocument();
   });
@@ -114,9 +114,11 @@ describe('ResellerCardList — gear action menu (Req: Resellers Gear Menu — Ed
     render(
       <Wrapper>
         <ResellerCardList {...baseProps} resellers={[makeReseller({ id: 'r-active' })]} />
-      </Wrapper>
+      </Wrapper>,
     );
-    expect(screen.queryByRole('menuitem', { name: esMessages['GENERAL.EDIT'] })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('menuitem', { name: esMessages['GENERAL.EDIT'] }),
+    ).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /acciones/i }));
     expect(screen.getByRole('menuitem', { name: esMessages['GENERAL.EDIT'] })).toBeInTheDocument();
     // exactly one menu item — no Activar/Desactivar/Eliminar
@@ -128,7 +130,7 @@ describe('ResellerCardList — gear action menu (Req: Resellers Gear Menu — Ed
     render(
       <Wrapper>
         <ResellerCardList {...baseProps} resellers={[makeReseller({ id: 'r-x' })]} />
-      </Wrapper>
+      </Wrapper>,
     );
     fireEvent.click(screen.getByRole('button', { name: /acciones/i }));
     expect(screen.queryByRole('menuitem', { name: /activar/i })).not.toBeInTheDocument();
@@ -141,8 +143,12 @@ describe('ResellerCardList — gear action menu (Req: Resellers Gear Menu — Ed
     const { ResellerCardList } = await import('../reseller-card-list');
     render(
       <Wrapper>
-        <ResellerCardList {...baseProps} onEdit={onEdit} resellers={[makeReseller({ id: 'r-edit' })]} />
-      </Wrapper>
+        <ResellerCardList
+          {...baseProps}
+          onEdit={onEdit}
+          resellers={[makeReseller({ id: 'r-edit' })]}
+        />
+      </Wrapper>,
     );
     fireEvent.click(screen.getByRole('button', { name: /acciones/i }));
     fireEvent.click(screen.getByRole('menuitem', { name: esMessages['GENERAL.EDIT'] }));
@@ -154,7 +160,7 @@ describe('ResellerCardList — gear action menu (Req: Resellers Gear Menu — Ed
     render(
       <Wrapper>
         <ResellerCardList {...baseProps} resellers={[makeReseller({ id: 'r-color' })]} />
-      </Wrapper>
+      </Wrapper>,
     );
     fireEvent.click(screen.getByRole('button', { name: /acciones/i }));
     const editItem = screen.getByRole('menuitem', { name: esMessages['GENERAL.EDIT'] });
@@ -169,7 +175,7 @@ describe('ResellerCardList — state indicator class (Req: Resellers State CSS C
     const { container } = render(
       <Wrapper>
         <ResellerCardList {...baseProps} resellers={[makeReseller({ isActive: false })]} />
-      </Wrapper>
+      </Wrapper>,
     );
     const card = container.querySelector('[data-slot="card"]');
     expect(card?.className).toContain('bg-danger');
@@ -180,7 +186,7 @@ describe('ResellerCardList — state indicator class (Req: Resellers State CSS C
     const { container } = render(
       <Wrapper>
         <ResellerCardList {...baseProps} resellers={[makeReseller({ isActive: true })]} />
-      </Wrapper>
+      </Wrapper>,
     );
     const card = container.querySelector('[data-slot="card"]');
     expect(card?.className).not.toContain('bg-danger');

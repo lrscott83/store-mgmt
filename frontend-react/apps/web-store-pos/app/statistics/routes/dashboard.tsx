@@ -3,7 +3,10 @@ import { useIntl } from 'react-intl';
 import { EFeatures } from '@store-mgmt/domain';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
-import { hasExpensesModuleAvailable, hasCreditsModuleAvailable } from '~/shared/lib/auth/authorization-service';
+import {
+  hasExpensesModuleAvailable,
+  hasCreditsModuleAvailable,
+} from '~/shared/lib/auth/authorization-service';
 import { OrderOfflineService } from '~/sales/lib/services/order-offline-service';
 import type { ChartData, TopProduct } from '~/sales/lib/services/order-offline-service';
 import { ExpenseOfflineService } from '~/expenses/lib/services/expense-offline-service';
@@ -145,9 +148,7 @@ export function DashboardPage() {
       {/* Header — Angular parity: dashboard.component.html:1-6 (card-header with the
           DASHBOARD.HEADER title and a bottom divider). */}
       <div className="border-b border-gray-200 pb-3">
-        <h1 className="text-2xl font-semibold">
-          {intl.formatMessage({ id: 'DASHBOARD.HEADER' })}
-        </h1>
+        <h1 className="text-2xl font-semibold">{intl.formatMessage({ id: 'DASHBOARD.HEADER' })}</h1>
       </div>
 
       {/* Currency selector — Angular dashboard.component.html:9-20 (literal, untranslated
@@ -201,7 +202,12 @@ export function DashboardPage() {
             value={(unpaidSaleCreditsToday / divisor).toFixed(2)}
             trendClass={getTrendClass(unpaidSaleCreditsToday, unpaidSaleCreditsYesterday)}
             trendGlyph={getTrendGlyph(unpaidSaleCreditsToday, unpaidSaleCreditsYesterday)}
-            trendText={trendTexto(unpaidSaleCreditsToday, unpaidSaleCreditsYesterday, divisor, 'vs ayer')}
+            trendText={trendTexto(
+              unpaidSaleCreditsToday,
+              unpaidSaleCreditsYesterday,
+              divisor,
+              'vs ayer',
+            )}
           />
         )}
         <KpiCard
@@ -218,11 +224,7 @@ export function DashboardPage() {
         <h2 className="mb-4 text-base font-semibold text-gray-700">
           {intl.formatMessage({ id: 'STATISTICS.SALES.TITLE' })}
         </h2>
-        <SalesChart
-          data={salesData}
-          loadingMessage={loadingMsg}
-          emptyMessage={emptyMsg}
-        />
+        <SalesChart data={salesData} loadingMessage={loadingMsg} emptyMessage={emptyMsg} />
       </section>
 
       {/* Profit Chart */}
@@ -230,11 +232,7 @@ export function DashboardPage() {
         <h2 className="mb-4 text-base font-semibold text-gray-700">
           {intl.formatMessage({ id: 'STATISTICS.PROFIT.TITLE' })}
         </h2>
-        <ProfitChart
-          data={profitData}
-          loadingMessage={loadingMsg}
-          emptyMessage={emptyMsg}
-        />
+        <ProfitChart data={profitData} loadingMessage={loadingMsg} emptyMessage={emptyMsg} />
       </section>
 
       {/* Top-products lists — Angular dashboard.component.html:127-163 (literal, untranslated

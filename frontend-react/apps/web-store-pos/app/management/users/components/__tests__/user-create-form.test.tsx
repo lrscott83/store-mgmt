@@ -24,7 +24,7 @@ describe('UserCreateForm — PRES-4: renders all required fields', () => {
     render(
       <Wrapper>
         <UserCreateForm {...baseProps} />
-      </Wrapper>
+      </Wrapper>,
     );
     expect(screen.getByLabelText(/nombre completo/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/^usuario$/i)).toBeInTheDocument();
@@ -41,12 +41,14 @@ describe('UserCreateForm — CREATE-4: password regex validation blocks submit',
     render(
       <Wrapper>
         <UserCreateForm {...baseProps} onSubmit={onSubmit} />
-      </Wrapper>
+      </Wrapper>,
     );
     fireEvent.change(screen.getByLabelText(/nombre completo/i), { target: { value: 'Test User' } });
     fireEvent.change(screen.getByLabelText(/^usuario$/i), { target: { value: 'testuser' } });
     fireEvent.change(screen.getByLabelText(/^contraseña$/i), { target: { value: 'weakpass' } });
-    fireEvent.change(screen.getByLabelText(/confirmar contraseña/i), { target: { value: 'weakpass' } });
+    fireEvent.change(screen.getByLabelText(/confirmar contraseña/i), {
+      target: { value: 'weakpass' },
+    });
     fireEvent.change(screen.getByLabelText(/teléfono/i), { target: { value: '+123' } });
     fireEvent.click(screen.getByRole('button', { name: /adicionar/i }));
     await waitFor(() => {
@@ -63,12 +65,14 @@ describe('UserCreateForm — CREATE-4: confirm password mismatch blocks submit',
     render(
       <Wrapper>
         <UserCreateForm {...baseProps} onSubmit={onSubmit} />
-      </Wrapper>
+      </Wrapper>,
     );
     fireEvent.change(screen.getByLabelText(/nombre completo/i), { target: { value: 'Test User' } });
     fireEvent.change(screen.getByLabelText(/^usuario$/i), { target: { value: 'testuser' } });
     fireEvent.change(screen.getByLabelText(/^contraseña$/i), { target: { value: 'ValidPass1' } });
-    fireEvent.change(screen.getByLabelText(/confirmar contraseña/i), { target: { value: 'DifferentPass1' } });
+    fireEvent.change(screen.getByLabelText(/confirmar contraseña/i), {
+      target: { value: 'DifferentPass1' },
+    });
     fireEvent.change(screen.getByLabelText(/teléfono/i), { target: { value: '+123' } });
     fireEvent.click(screen.getByRole('button', { name: /adicionar/i }));
     await waitFor(() => {
@@ -85,12 +89,16 @@ describe('UserCreateForm — PRES-9: valid submit fires onSubmit with correct pa
     render(
       <Wrapper>
         <UserCreateForm {...baseProps} onSubmit={onSubmit} />
-      </Wrapper>
+      </Wrapper>,
     );
-    fireEvent.change(screen.getByLabelText(/nombre completo/i), { target: { value: 'Valid User' } });
+    fireEvent.change(screen.getByLabelText(/nombre completo/i), {
+      target: { value: 'Valid User' },
+    });
     fireEvent.change(screen.getByLabelText(/^usuario$/i), { target: { value: 'validuser' } });
     fireEvent.change(screen.getByLabelText(/^contraseña$/i), { target: { value: 'ValidPass1' } });
-    fireEvent.change(screen.getByLabelText(/confirmar contraseña/i), { target: { value: 'ValidPass1' } });
+    fireEvent.change(screen.getByLabelText(/confirmar contraseña/i), {
+      target: { value: 'ValidPass1' },
+    });
     fireEvent.change(screen.getByLabelText(/teléfono/i), { target: { value: '51234567' } });
     fireEvent.click(screen.getByRole('button', { name: /adicionar/i }));
     await waitFor(() => {
@@ -111,7 +119,7 @@ describe('UserCreateForm — FREE-TEXT: cellPhone has no Cuban mask (the product
     render(
       <Wrapper>
         <UserCreateForm {...baseProps} />
-      </Wrapper>
+      </Wrapper>,
     );
     fireEvent.change(screen.getByLabelText(/teléfono/i), { target: { value: '+1 555 123 4567' } });
     expect(screen.getByDisplayValue('+1 555 123 4567')).toBeInTheDocument();
@@ -123,16 +131,22 @@ describe('UserCreateForm — FREE-TEXT: cellPhone has no Cuban mask (the product
     render(
       <Wrapper>
         <UserCreateForm {...baseProps} onSubmit={onSubmit} />
-      </Wrapper>
+      </Wrapper>,
     );
-    fireEvent.change(screen.getByLabelText(/nombre completo/i), { target: { value: 'Free Text User' } });
+    fireEvent.change(screen.getByLabelText(/nombre completo/i), {
+      target: { value: 'Free Text User' },
+    });
     fireEvent.change(screen.getByLabelText(/^usuario$/i), { target: { value: 'freetextuser' } });
     fireEvent.change(screen.getByLabelText(/^contraseña$/i), { target: { value: 'ValidPass1' } });
-    fireEvent.change(screen.getByLabelText(/confirmar contraseña/i), { target: { value: 'ValidPass1' } });
+    fireEvent.change(screen.getByLabelText(/confirmar contraseña/i), {
+      target: { value: 'ValidPass1' },
+    });
     fireEvent.change(screen.getByLabelText(/teléfono/i), { target: { value: '+1 555 123 4567' } });
     fireEvent.click(screen.getByRole('button', { name: /adicionar/i }));
     await waitFor(() => {
-      expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ cellPhone: '+1 555 123 4567' }));
+      expect(onSubmit).toHaveBeenCalledWith(
+        expect.objectContaining({ cellPhone: '+1 555 123 4567' }),
+      );
     });
   });
 });
@@ -143,7 +157,7 @@ describe('UserCreateForm — EMAIL-PLACEHOLDER: email placeholder matches Angula
     render(
       <Wrapper>
         <UserCreateForm {...baseProps} />
-      </Wrapper>
+      </Wrapper>,
     );
     expect(screen.getByLabelText(/correo|email/i)).toHaveAttribute('placeholder', 'info@mail.com');
   });
@@ -155,7 +169,7 @@ describe('UserCreateForm — L6 exact copy parity (Req: Copy Matches Angular Ter
     render(
       <Wrapper>
         <UserCreateForm {...baseProps} />
-      </Wrapper>
+      </Wrapper>,
     );
     expect(screen.getByText('Nombre Completo')).toBeInTheDocument();
     expect(screen.getByText('Usuario')).toBeInTheDocument();
@@ -167,7 +181,7 @@ describe('UserCreateForm — L6 exact copy parity (Req: Copy Matches Angular Ter
     render(
       <Wrapper>
         <UserCreateForm {...baseProps} />
-      </Wrapper>
+      </Wrapper>,
     );
     expect(screen.getByRole('button', { name: 'Adicionar' })).toBeInTheDocument();
   });
@@ -179,7 +193,7 @@ describe('UserCreateForm — PRES-9: offline disables submit and shows notice', 
     render(
       <Wrapper>
         <UserCreateForm {...baseProps} isOnline={false} />
-      </Wrapper>
+      </Wrapper>,
     );
     expect(screen.getByRole('button', { name: /adicionar/i })).toBeDisabled();
     expect(screen.getByText(/sin conexión/i)).toBeInTheDocument();
@@ -190,7 +204,7 @@ describe('UserCreateForm — PRES-9: offline disables submit and shows notice', 
     render(
       <Wrapper>
         <UserCreateForm {...baseProps} isOnline={false} />
-      </Wrapper>
+      </Wrapper>,
     );
     expect(screen.getByText('Sin conexión. Conéctate para guardar cambios.')).toBeInTheDocument();
   });
@@ -202,7 +216,7 @@ describe('UserCreateForm — PRES-10: error prop renders inline', () => {
     render(
       <Wrapper>
         <UserCreateForm {...baseProps} error="Server error occurred" />
-      </Wrapper>
+      </Wrapper>,
     );
     expect(screen.getByRole('alert')).toHaveTextContent('Server error occurred');
   });
@@ -216,7 +230,7 @@ describe('UserCreateForm — password visibility toggle (create-store-user.compo
     render(
       <Wrapper>
         <UserCreateForm {...baseProps} />
-      </Wrapper>
+      </Wrapper>,
     );
     const password = screen.getByLabelText(/^contraseña$/i);
     const confirm = screen.getByLabelText(/confirmar contraseña/i);
@@ -250,7 +264,7 @@ describe('UserCreateForm — submit renders as fab (create-store-user.component.
     render(
       <Wrapper>
         <UserCreateForm {...baseProps} />
-      </Wrapper>
+      </Wrapper>,
     );
     const submit = screen.getByRole('button', { name: 'Adicionar' });
     expect(submit).toHaveClass('rounded-full');
@@ -263,7 +277,7 @@ describe('UserCreateForm — submit renders as fab (create-store-user.component.
     render(
       <Wrapper>
         <UserCreateForm {...baseProps} />
-      </Wrapper>
+      </Wrapper>,
     );
     const submit = screen.getByRole('button', { name: 'Adicionar' });
     const path = submit.querySelector('svg path')?.getAttribute('d');
@@ -277,7 +291,7 @@ describe('UserCreateForm — PRES-5: no login/password clash with details shape'
     render(
       <Wrapper>
         <UserCreateForm {...baseProps} />
-      </Wrapper>
+      </Wrapper>,
     );
     expect(screen.queryByLabelText(/activo/i)).not.toBeInTheDocument();
   });

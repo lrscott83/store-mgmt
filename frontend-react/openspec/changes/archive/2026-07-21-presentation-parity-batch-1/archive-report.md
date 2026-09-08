@@ -13,18 +13,18 @@ No capability delta spec/design were produced for this change — it is a pure p
 
 ## The 10 Fixes
 
-| # | Area | File | Fix | Commit |
-|---|------|------|-----|--------|
-| 1 | Admin | `admin/stores/components/store-card-list.tsx` | Not-approved store card → `bg-warning/10 border-warning` (amber), was green/success; deactivated stays danger/red | `ccc3d54` |
-| 2 | Statistics | `statistics/routes/dashboard.tsx` | Wired currency selector (CUP/USD + rate), 4 gated KPI cards (Ventas/Gastos/Créditos/Ganancias w/ trend logic), 2 top-products lists (top-profit, top-sale-quantity); existing recharts charts kept untouched | `a2f5cd8` |
-| 3 | Sales | `sales/components/edit-products-modal.tsx` | Reworked from edit-existing-prices to bulk-CREATE (blank rows, "+ Nuevo", required/duplicate-name validation, `createProducts(categoryId, items)`) | `55f81ba` |
-| 4 | Profile | `profile/components/edit-profile-form.tsx` | cellPhone masked (`+53 0 000-0000`) + required, reusing `toDigits`/`formatCellPhone` from `management/users/lib/cell-phone-mask` | `cc909e1` |
-| 5 | Inventory | `inventory/routes/available.tsx` | `INVENTORY.NO_ENTRY_FOUND` shown only when `categories.length === 0`; per-category empty message preserved otherwise | `a9dc81f` |
-| 6 | Expenses | `expenses/components/expense-form-modal.tsx` | Create-mode default expense type → `ExpenseType.Salario` (was `Otro`) | `399b0a5` (combined w/ #7) |
-| 7 | Expenses | `expenses/components/expense-form-modal.tsx` | Total starts empty/`NaN`, invalid until entered (was defaulting to valid `0`) | `399b0a5` (combined w/ #6) |
-| 8 | Inventory | `inventory/components/edit-inventory-entry-modal.tsx` | Product `<select>` disabled unconditionally in both create/edit mode | `15fa7e8` |
-| 9 | Admin/Features | `admin/features/routes/features.tsx` | Gear icon → `EditIcon` (pencil); static `<p>` feedback → `showBlockingSuccess`/`showBlockingError` | `8f0cef0` |
-| 10 | Auth | `auth/components/auth-layout.tsx`, `auth/routes/register.tsx` | Ported guest-footer (legal links + Contact + copyright) via shared `Footer` component; removed invented `REGISTRATION.SUCCESS_REDIRECT` interim screen, navigates straight to `/login` | `928f716` |
+| #   | Area           | File                                                          | Fix                                                                                                                                                                                                          | Commit                     |
+| --- | -------------- | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------- |
+| 1   | Admin          | `admin/stores/components/store-card-list.tsx`                 | Not-approved store card → `bg-warning/10 border-warning` (amber), was green/success; deactivated stays danger/red                                                                                            | `ccc3d54`                  |
+| 2   | Statistics     | `statistics/routes/dashboard.tsx`                             | Wired currency selector (CUP/USD + rate), 4 gated KPI cards (Ventas/Gastos/Créditos/Ganancias w/ trend logic), 2 top-products lists (top-profit, top-sale-quantity); existing recharts charts kept untouched | `a2f5cd8`                  |
+| 3   | Sales          | `sales/components/edit-products-modal.tsx`                    | Reworked from edit-existing-prices to bulk-CREATE (blank rows, "+ Nuevo", required/duplicate-name validation, `createProducts(categoryId, items)`)                                                           | `55f81ba`                  |
+| 4   | Profile        | `profile/components/edit-profile-form.tsx`                    | cellPhone masked (`+53 0 000-0000`) + required, reusing `toDigits`/`formatCellPhone` from `management/users/lib/cell-phone-mask`                                                                             | `cc909e1`                  |
+| 5   | Inventory      | `inventory/routes/available.tsx`                              | `INVENTORY.NO_ENTRY_FOUND` shown only when `categories.length === 0`; per-category empty message preserved otherwise                                                                                         | `a9dc81f`                  |
+| 6   | Expenses       | `expenses/components/expense-form-modal.tsx`                  | Create-mode default expense type → `ExpenseType.Salario` (was `Otro`)                                                                                                                                        | `399b0a5` (combined w/ #7) |
+| 7   | Expenses       | `expenses/components/expense-form-modal.tsx`                  | Total starts empty/`NaN`, invalid until entered (was defaulting to valid `0`)                                                                                                                                | `399b0a5` (combined w/ #6) |
+| 8   | Inventory      | `inventory/components/edit-inventory-entry-modal.tsx`         | Product `<select>` disabled unconditionally in both create/edit mode                                                                                                                                         | `15fa7e8`                  |
+| 9   | Admin/Features | `admin/features/routes/features.tsx`                          | Gear icon → `EditIcon` (pencil); static `<p>` feedback → `showBlockingSuccess`/`showBlockingError`                                                                                                           | `8f0cef0`                  |
+| 10  | Auth           | `auth/components/auth-layout.tsx`, `auth/routes/register.tsx` | Ported guest-footer (legal links + Contact + copyright) via shared `Footer` component; removed invented `REGISTRATION.SUCCESS_REDIRECT` interim screen, navigates straight to `/login`                       | `928f716`                  |
 
 ## Apply Execution (2 Batches, Strict TDD)
 
@@ -38,21 +38,21 @@ Verification: `pnpm test` 1913/1913 passed (129 files), tsc clean, build succeed
 
 ## Commit Ledger (chronological, feat/presentation-parity-batch-1)
 
-| Commit | WU | Description |
-|--------|----|--------------|
-| `15fa7e8` | WU8 | fix(inventory): disable product select in edit-entry modal to match Angular |
-| `399b0a5` | WU6+WU7 | fix(expenses): default new expense type to Salario and require an explicit total |
-| `a9dc81f` | WU5 | fix(inventory): correct empty-inventory message on Available screen |
-| `55f81ba` | WU3 | fix(products): make "Nuevo Productos" modal create products to match Angular |
-| `a508e82` | — | chore(tasks): mark Batch 1 tasks complete |
-| `ccc3d54` | WU1 | fix(admin): store card not-approved state uses warning color matching Angular |
-| `8f0cef0` | WU9 | fix(admin): features activation uses EditIcon and blocking alerts matching Angular |
-| `cc909e1` | WU4 | fix(profile): mask and require cellPhone to match Angular |
-| `928f716` | WU10 | fix(auth): add guest footer and drop invented register success screen |
-| `a2f5cd8` | WU2 | fix(statistics): restore KPI cards, currency selector and top-products lists |
-| `9ae1f72` | — | chore(tasks): mark Batch 2 tasks complete |
-| `7171171` | post-verify | fix(auth): add missing email icon to guest-footer Contact trigger (F-1) |
-| (this archive commit) | — | chore(archive): close presentation-parity-batch-1 |
+| Commit                | WU          | Description                                                                        |
+| --------------------- | ----------- | ---------------------------------------------------------------------------------- |
+| `15fa7e8`             | WU8         | fix(inventory): disable product select in edit-entry modal to match Angular        |
+| `399b0a5`             | WU6+WU7     | fix(expenses): default new expense type to Salario and require an explicit total   |
+| `a9dc81f`             | WU5         | fix(inventory): correct empty-inventory message on Available screen                |
+| `55f81ba`             | WU3         | fix(products): make "Nuevo Productos" modal create products to match Angular       |
+| `a508e82`             | —           | chore(tasks): mark Batch 1 tasks complete                                          |
+| `ccc3d54`             | WU1         | fix(admin): store card not-approved state uses warning color matching Angular      |
+| `8f0cef0`             | WU9         | fix(admin): features activation uses EditIcon and blocking alerts matching Angular |
+| `cc909e1`             | WU4         | fix(profile): mask and require cellPhone to match Angular                          |
+| `928f716`             | WU10        | fix(auth): add guest footer and drop invented register success screen              |
+| `a2f5cd8`             | WU2         | fix(statistics): restore KPI cards, currency selector and top-products lists       |
+| `9ae1f72`             | —           | chore(tasks): mark Batch 2 tasks complete                                          |
+| `7171171`             | post-verify | fix(auth): add missing email icon to guest-footer Contact trigger (F-1)            |
+| (this archive commit) | —           | chore(archive): close presentation-parity-batch-1                                  |
 
 ## sdd-verify Result: PASS
 
@@ -80,20 +80,20 @@ The following were identified during the original audit and deliberately NOT tou
 
 ## Gate Summary (final state)
 
-| Gate | Result |
-|------|--------|
-| `pnpm test` | 1914/1914 passed (includes the F-1 footer-icon fix's test) |
-| `pnpm -C apps/web-store-pos exec tsc --noEmit` | Clean |
-| `pnpm -C apps/web-store-pos build` | Succeeded |
+| Gate                                           | Result                                                     |
+| ---------------------------------------------- | ---------------------------------------------------------- |
+| `pnpm test`                                    | 1914/1914 passed (includes the F-1 footer-icon fix's test) |
+| `pnpm -C apps/web-store-pos exec tsc --noEmit` | Clean                                                      |
+| `pnpm -C apps/web-store-pos build`             | Succeeded                                                  |
 
 ## Traceability — Engram Observation IDs
 
-| Artifact | Topic Key | Observation ID |
-|----------|-----------|-----------------|
-| Proposal | `sdd/presentation-parity-batch-1/proposal` | #1370 |
-| Tasks | `sdd/presentation-parity-batch-1/tasks` | #1371 |
-| Apply Progress | `sdd/presentation-parity-batch-1/apply-progress` | #1373 |
-| Verify Report | `sdd/presentation-parity-batch-1/verify-report` | #1379 |
+| Artifact       | Topic Key                                        | Observation ID  |
+| -------------- | ------------------------------------------------ | --------------- |
+| Proposal       | `sdd/presentation-parity-batch-1/proposal`       | #1370           |
+| Tasks          | `sdd/presentation-parity-batch-1/tasks`          | #1371           |
+| Apply Progress | `sdd/presentation-parity-batch-1/apply-progress` | #1373           |
+| Verify Report  | `sdd/presentation-parity-batch-1/verify-report`  | #1379           |
 | Archive Report | `sdd/presentation-parity-batch-1/archive-report` | (this document) |
 
 No spec/design observations exist for this change (skipped by explicit user instruction — this is a parity-fix batch, not a new-capability change).

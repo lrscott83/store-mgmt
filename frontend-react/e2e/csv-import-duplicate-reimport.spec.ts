@@ -86,7 +86,9 @@ test.describe.serial('CSV re-import reuses products (2026-09-02 row-level rule)'
     `${catC},Caramel,20,12,50`,
   ].join('\n');
 
-  test('second import reuses products, updates prices, adds entries, no duplicate dialog', async ({ signedInPage }) => {
+  test('second import reuses products, updates prices, adds entries, no duplicate dialog', async ({
+    signedInPage,
+  }) => {
     const { page } = signedInPage;
 
     // Start from a clean offline slate (products/categories/inventory for every

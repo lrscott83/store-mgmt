@@ -84,10 +84,16 @@ describe('i18n — GENERAL.RESPONSE.SUCCESS_TITLE (TOAST-I18N)', () => {
   });
 
   it('leaves the pre-existing sibling keys byte-unchanged', () => {
-    expect(esMessages['SHOPPING_CART.ORDER_CREATED']).toBe('La venta fue creada satisfactoriamente.');
+    expect(esMessages['SHOPPING_CART.ORDER_CREATED']).toBe(
+      'La venta fue creada satisfactoriamente.',
+    );
     expect(esMessages['SYNC.IMPORT_SUCCESS']).toBe('Los datos se importaron correctamente.');
-    expect(esMessages['FEATURES.FEATURES_ACTIVATED']).toBe('Las funcionalidades se activaron satisfactoriamente');
-    expect(esMessages['FEATURES.UNEXPECTED_ERROR']).toBe('Ocurrió un error inesperado activando las funcionalidades');
+    expect(esMessages['FEATURES.FEATURES_ACTIVATED']).toBe(
+      'Las funcionalidades se activaron satisfactoriamente',
+    );
+    expect(esMessages['FEATURES.UNEXPECTED_ERROR']).toBe(
+      'Ocurrió un error inesperado activando las funcionalidades',
+    );
     expect(esMessages['GENERAL.RESPONSE.ERROR_TITLE']).toBe('Error');
   });
 });

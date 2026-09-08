@@ -27,7 +27,12 @@ interface SaleCreditListProps {
  * `SaleCreditPaymentModalComponent` from THIS component (not the parent
  * page) — mirrored here by owning both modals' state locally.
  */
-export function SaleCreditList({ saleCredits, readOnly = true, onSave, onPay }: SaleCreditListProps) {
+export function SaleCreditList({
+  saleCredits,
+  readOnly = true,
+  onSave,
+  onPay,
+}: SaleCreditListProps) {
   const intl = useIntl();
   const [editingCredit, setEditingCredit] = useState<SaleCredit | null>(null);
   const [payingCredit, setPayingCredit] = useState<SaleCredit | null>(null);

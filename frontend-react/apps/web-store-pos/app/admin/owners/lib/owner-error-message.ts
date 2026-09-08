@@ -17,7 +17,7 @@ import { apiErrorMessageId } from '~/shared/lib/http/api-error-message';
 export function ownerErrorMessageId(
   error: unknown,
   byStatus: Record<number, string>,
-  byCode?: Record<string, string>
+  byCode?: Record<string, string>,
 ): string {
   return apiErrorMessageId(error, { byStatus, byCode, fallback: 'OWNER.ERROR' });
 }

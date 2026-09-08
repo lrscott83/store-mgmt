@@ -231,9 +231,9 @@ describe('ExpenseFormModal — footer button order (Angular parity: Close before
         <ExpenseFormModal isOpen onClose={() => {}} onSave={() => {}} />
       </Wrapper>,
     );
-    const buttons = screen.getAllByRole('button').filter(
-      (b) => b.textContent === 'Adicionar' || b.textContent === 'Cerrar',
-    );
+    const buttons = screen
+      .getAllByRole('button')
+      .filter((b) => b.textContent === 'Adicionar' || b.textContent === 'Cerrar');
     expect(buttons.map((b) => b.textContent)).toEqual(['Cerrar', 'Adicionar']);
   });
 });
@@ -309,7 +309,12 @@ describe('ExpenseList — readOnly gating (Angular parity: entry-list.component.
   it('shows edit/delete actions (via the gear menu) when not readOnly', () => {
     render(
       <Wrapper>
-        <ExpenseList expenses={[MOCK_EXPENSE]} readOnly={false} onEdit={() => {}} onDelete={() => {}} />
+        <ExpenseList
+          expenses={[MOCK_EXPENSE]}
+          readOnly={false}
+          onEdit={() => {}}
+          onDelete={() => {}}
+        />
       </Wrapper>,
     );
     fireEvent.click(screen.getByTestId('expense-actions-toggle-e1'));
@@ -322,7 +327,12 @@ describe('ExpenseList — gear action menu (S-GM-EXPENSE)', () => {
   it('S-GM-EXPENSE-1: not read-only with onDelete shows Editar (text-primary) and Eliminar (text-danger, separator)', () => {
     render(
       <Wrapper>
-        <ExpenseList expenses={[MOCK_EXPENSE]} readOnly={false} onEdit={() => {}} onDelete={() => {}} />
+        <ExpenseList
+          expenses={[MOCK_EXPENSE]}
+          readOnly={false}
+          onEdit={() => {}}
+          onDelete={() => {}}
+        />
       </Wrapper>,
     );
     fireEvent.click(screen.getByTestId('expense-actions-toggle-e1'));
@@ -358,7 +368,12 @@ describe('ExpenseList — gear action menu (S-GM-EXPENSE)', () => {
     const onDelete = vi.fn();
     render(
       <Wrapper>
-        <ExpenseList expenses={[MOCK_EXPENSE]} readOnly={false} onEdit={onEdit} onDelete={onDelete} />
+        <ExpenseList
+          expenses={[MOCK_EXPENSE]}
+          readOnly={false}
+          onEdit={onEdit}
+          onDelete={onDelete}
+        />
       </Wrapper>,
     );
     fireEvent.click(screen.getByTestId('expense-actions-toggle-e1'));

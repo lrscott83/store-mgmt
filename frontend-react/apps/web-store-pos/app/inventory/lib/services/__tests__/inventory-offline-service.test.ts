@@ -4,7 +4,14 @@ import { ProductRepository } from '~/sales/lib/repositories/product-repository';
 import { ProductCategoryRepository } from '~/sales/lib/repositories/product-category-repository';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { InventoryErrors, ProductErrors, Result } from '@store-mgmt/domain';
-import type { BaseResponseModel, InventoryEntry, OrderItem, Product, ProductCategory, UserModel } from '@store-mgmt/domain';
+import type {
+  BaseResponseModel,
+  InventoryEntry,
+  OrderItem,
+  Product,
+  ProductCategory,
+  UserModel,
+} from '@store-mgmt/domain';
 import { EntityUnreadableError } from '~/shared/lib/storage/read-entity-or-throw';
 import { MissingDataKeyError } from '~/shared/lib/storage/entity-crypto';
 
@@ -79,7 +86,11 @@ function makeUser(overrides: Partial<UserModel> = {}): UserModel {
   };
 }
 
-function makeEntry(id: string, productId: string, overrides: Partial<InventoryEntry> = {}): InventoryEntry {
+function makeEntry(
+  id: string,
+  productId: string,
+  overrides: Partial<InventoryEntry> = {},
+): InventoryEntry {
   return {
     id,
     productId,
@@ -101,7 +112,10 @@ function seedInventory(storeId: string, map: Map<string, InventoryEntry[]>): voi
   localStorage.setItem(`lizoft.store-inventory-entries-${storeId}`, JSON.stringify(entries));
 }
 
-function findRawEntry(storeId: string, entryId: string): (InventoryEntry & Record<string, unknown>) | undefined {
+function findRawEntry(
+  storeId: string,
+  entryId: string,
+): (InventoryEntry & Record<string, unknown>) | undefined {
   const raw = localStorage.getItem(`lizoft.store-inventory-entries-${storeId}`);
   if (!raw) return undefined;
   const entries: [string, InventoryEntry[]][] = JSON.parse(raw);
@@ -117,7 +131,12 @@ describe('InventoryOfflineService', () => {
 
   beforeEach(() => {
     localStorage.clear();
-    useAuthStore.setState({ user: makeUser({ login: 'jdoe' }), isAuthenticated: true, isLoading: false, error: null });
+    useAuthStore.setState({
+      user: makeUser({ login: 'jdoe' }),
+      isAuthenticated: true,
+      isLoading: false,
+      error: null,
+    });
     // Seed the products the guard'd methods reference (Angular's InventoryOfflineService
     // injects ProductRepository; the guards need real product records to exist).
     seedProducts(storeId, [makeProduct('p1'), makeProduct('p2')]);
@@ -209,9 +228,7 @@ describe('InventoryOfflineService', () => {
 
     it('deducts a fractional quantity (1.5) from available without float drift', () => {
       const map = new Map<string, InventoryEntry[]>();
-      map.set('p1', [
-        makeEntry('e1', 'p1', { order: 0, available: 10, costPrice: 2.5 }),
-      ]);
+      map.set('p1', [makeEntry('e1', 'p1', { order: 0, available: 10, costPrice: 2.5 })]);
       seedInventory(storeId, map);
 
       const costs = service.getAvailableInventoryCosts('p1', 1.5);
@@ -223,9 +240,7 @@ describe('InventoryOfflineService', () => {
 
     it('rounds a fractional deduction to 2 accounting decimal places', () => {
       const map = new Map<string, InventoryEntry[]>();
-      map.set('p1', [
-        makeEntry('e1', 'p1', { order: 0, available: 0.3, costPrice: 2.5 }),
-      ]);
+      map.set('p1', [makeEntry('e1', 'p1', { order: 0, available: 0.3, costPrice: 2.5 })]);
       seedInventory(storeId, map);
 
       // 0.3 - 0.1 yields 0.19999999999999998 without round2; with it, available stays 0.2.
@@ -819,7 +834,9 @@ describe('InventoryOfflineService', () => {
     it('does not divide by zero / produce NaN for fully-depleted products (documented divergence — Angular has a NaN bug here, not replicated)', () => {
       seedCategories(storeId, [makeCategory('cat-1', { name: 'Bebidas' })]);
       const map = new Map<string, InventoryEntry[]>();
-      map.set('p1', [makeEntry('e1', 'p1', { categoryId: 'cat-1', quantity: 10, available: 0, costPrice: 2 })]);
+      map.set('p1', [
+        makeEntry('e1', 'p1', { categoryId: 'cat-1', quantity: 10, available: 0, costPrice: 2 }),
+      ]);
       seedInventory(storeId, map);
 
       const categories = unwrap(service.getInventoryCategoriesView());
@@ -836,14 +853,18 @@ describe('InventoryOfflineService', () => {
       // No categories seeded — 'cat-missing' will not resolve in ProductCategoryRepository.
       seedProducts(storeId, [makeProduct('p1', { categoryId: 'cat-missing' })]);
       const map = new Map<string, InventoryEntry[]>();
-      map.set('p1', [makeEntry('e1', 'p1', { categoryId: 'cat-missing', available: 10, costPrice: 2 })]);
+      map.set('p1', [
+        makeEntry('e1', 'p1', { categoryId: 'cat-missing', available: 10, costPrice: 2 }),
+      ]);
       seedInventory(storeId, map);
 
       expect(() => service.getInventoryCategoriesView()).toThrow();
     });
 
     it('no method named getAvailableByCategory remains on the service (Angular-exact rename)', () => {
-      expect((service as unknown as { getAvailableByCategory?: unknown }).getAvailableByCategory).toBeUndefined();
+      expect(
+        (service as unknown as { getAvailableByCategory?: unknown }).getAvailableByCategory,
+      ).toBeUndefined();
     });
   });
 
@@ -952,11 +973,23 @@ describe('InventoryOfflineService', () => {
       const threshold = new Date('2024-03-01T00:00:00.000');
       const map = new Map<string, InventoryEntry[]>();
       map.set('p1', [
-        makeEntry('e1', 'p1', { available: 10, costPrice: 2, date: new Date('2024-02-01T10:00:00.000') }), // 20
-        makeEntry('e2', 'p1', { available: 5, costPrice: 3, date: new Date('2024-02-15T10:00:00.000') }), // 15
+        makeEntry('e1', 'p1', {
+          available: 10,
+          costPrice: 2,
+          date: new Date('2024-02-01T10:00:00.000'),
+        }), // 20
+        makeEntry('e2', 'p1', {
+          available: 5,
+          costPrice: 3,
+          date: new Date('2024-02-15T10:00:00.000'),
+        }), // 15
       ]);
       map.set('p2', [
-        makeEntry('e3', 'p2', { available: 100, costPrice: 1, date: new Date('2024-03-15T10:00:00.000') }), // after threshold
+        makeEntry('e3', 'p2', {
+          available: 100,
+          costPrice: 1,
+          date: new Date('2024-03-15T10:00:00.000'),
+        }), // after threshold
       ]);
       seedInventory(storeId, map);
       expect(service.getInventoryCostTotalBefore(threshold)).toBe(35);
@@ -966,8 +999,17 @@ describe('InventoryOfflineService', () => {
       const threshold = new Date('2024-03-01T00:00:00.000');
       const map = new Map<string, InventoryEntry[]>();
       map.set('p1', [
-        makeEntry('e1', 'p1', { available: 10, costPrice: 2, date: new Date('2024-02-01T10:00:00.000'), isActive: false }),
-        makeEntry('e2', 'p1', { available: 5, costPrice: 3, date: new Date('2024-02-15T10:00:00.000') }),
+        makeEntry('e1', 'p1', {
+          available: 10,
+          costPrice: 2,
+          date: new Date('2024-02-01T10:00:00.000'),
+          isActive: false,
+        }),
+        makeEntry('e2', 'p1', {
+          available: 5,
+          costPrice: 3,
+          date: new Date('2024-02-15T10:00:00.000'),
+        }),
       ]);
       seedInventory(storeId, map);
       expect(service.getInventoryCostTotalBefore(threshold)).toBe(15);
@@ -976,8 +1018,16 @@ describe('InventoryOfflineService', () => {
     it('getInventoryCostTotal sums all active entries up through end of today', () => {
       const map = new Map<string, InventoryEntry[]>();
       map.set('p1', [
-        makeEntry('e1', 'p1', { available: 4, costPrice: 5, date: new Date(Date.now() - 60 * 60 * 1000) }), // 20, "today"
-        makeEntry('e2', 'p1', { available: 2, costPrice: 3, date: new Date('2024-01-01T10:00:00.000') }), // 6
+        makeEntry('e1', 'p1', {
+          available: 4,
+          costPrice: 5,
+          date: new Date(Date.now() - 60 * 60 * 1000),
+        }), // 20, "today"
+        makeEntry('e2', 'p1', {
+          available: 2,
+          costPrice: 3,
+          date: new Date('2024-01-01T10:00:00.000'),
+        }), // 6
       ]);
       seedInventory(storeId, map);
       expect(service.getInventoryCostTotal()).toBe(26);
@@ -986,8 +1036,16 @@ describe('InventoryOfflineService', () => {
     it('getInventoryCostTotalYesterday sums only entries strictly before today start', () => {
       const map = new Map<string, InventoryEntry[]>();
       map.set('p1', [
-        makeEntry('e1', 'p1', { available: 2, costPrice: 3, date: new Date('2024-01-01T10:00:00.000') }), // 6
-        makeEntry('e2', 'p1', { available: 4, costPrice: 5, date: new Date(Date.now() - 60 * 60 * 1000) }), // today, excluded
+        makeEntry('e1', 'p1', {
+          available: 2,
+          costPrice: 3,
+          date: new Date('2024-01-01T10:00:00.000'),
+        }), // 6
+        makeEntry('e2', 'p1', {
+          available: 4,
+          costPrice: 5,
+          date: new Date(Date.now() - 60 * 60 * 1000),
+        }), // today, excluded
       ]);
       seedInventory(storeId, map);
       expect(service.getInventoryCostTotalYesterday()).toBe(6);
@@ -1089,7 +1147,9 @@ describe('InventoryOfflineService', () => {
 
       const result = await service.getInventoryEntriesView();
       const views = unwrap(result);
-      expect(views[0].availableEntries).toEqual([{ inventoryId: 'e3', costPrice: 2.5, quantity: 3 }]);
+      expect(views[0].availableEntries).toEqual([
+        { inventoryId: 'e3', costPrice: 2.5, quantity: 3 },
+      ]);
       expect(views[0].productAvailable).toBe(3);
     });
 
@@ -1343,7 +1403,11 @@ describe('InventoryOfflineService', () => {
 
       const updatedDate = new Date('2024-05-01T00:00:00.000Z');
       const incoming: InventoryEntry[] = [
-        { ...makeEntry('e1', 'p1', { available: 2, isActive: false }), updatedDate, updatedByName: 'importer' },
+        {
+          ...makeEntry('e1', 'p1', { available: 2, isActive: false }),
+          updatedDate,
+          updatedByName: 'importer',
+        },
         makeEntry('e2', 'p1', { available: 9 }),
       ];
       const result = service.updateImportedEntries('p1', incoming);
@@ -1574,7 +1638,8 @@ describe('InventoryOfflineService', () => {
         storeId,
         new ProductRepository(storeId, new ProductCategoryRepository(storeId)),
       );
-      const entry = freshService.getProductInventoriesByProductId('p1')[0] as InventoryEntry & Record<string, unknown>;
+      const entry = freshService.getProductInventoriesByProductId('p1')[0] as InventoryEntry &
+        Record<string, unknown>;
       expect(entry.date).toBeInstanceOf(Date);
       expect(typeof entry.createdDate).toBe('string');
       expect(entry.createdDate).not.toBeInstanceOf(Date);

@@ -54,9 +54,9 @@ describe('readEntityOrThrow', () => {
 
   it('wraps a parse failure in EntityUnreadableError', () => {
     localStorage.setItem(KEY, 'not json at all');
-    expect(() =>
-      readEntityOrThrow(KEY, (json) => JSON.parse(json) as unknown),
-    ).toThrow(EntityUnreadableError);
+    expect(() => readEntityOrThrow(KEY, (json) => JSON.parse(json) as unknown)).toThrow(
+      EntityUnreadableError,
+    );
   });
 
   it('NEVER writes to storage on any failure path', () => {

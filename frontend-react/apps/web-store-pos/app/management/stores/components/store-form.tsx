@@ -65,11 +65,11 @@ export function StoreForm({
   const [paymentStartDate, setPaymentStartDate] = useState(
     initialValues?.paymentStartDate
       ? new Date(initialValues.paymentStartDate).toISOString().split('T')[0]
-      : ''
+      : '',
   );
   const [isActive, setIsActive] = useState(initialValues?.isActive ?? false);
   const [moduleIds, setModuleIds] = useState<number[]>(() =>
-    modules.filter((m) => m.priceIncluded || m.selected).map((m) => m.id)
+    modules.filter((m) => m.priceIncluded || m.selected).map((m) => m.id),
   );
   const [validationError, setValidationError] = useState('');
 
@@ -170,7 +170,10 @@ export function StoreForm({
 
           {isAdminUser && (
             <div>
-              <label htmlFor="store-description" className="block text-sm font-medium text-gray-700">
+              <label
+                htmlFor="store-description"
+                className="block text-sm font-medium text-gray-700"
+              >
                 {intl.formatMessage({ id: 'STORES.DESCRIPTION' })}
               </label>
               <textarea
@@ -223,7 +226,10 @@ export function StoreForm({
 
           {isSuperAdmin && isEditMode && (
             <div>
-              <label htmlFor="store-payment-start" className="block text-sm font-medium text-gray-700">
+              <label
+                htmlFor="store-payment-start"
+                className="block text-sm font-medium text-gray-700"
+              >
                 {intl.formatMessage({ id: 'STORES.PAYMENT_START_DATE' })}
               </label>
               <input

@@ -29,14 +29,18 @@ function getStoreCardClass(store: Store): string {
   return '';
 }
 
-export function StoreCardList({ stores, onEdit, onApprove, onDisapprove, onToggle }: StoreCardListProps) {
+export function StoreCardList({
+  stores,
+  onEdit,
+  onApprove,
+  onDisapprove,
+  onToggle,
+}: StoreCardListProps) {
   const intl = useIntl();
 
   if (stores.length === 0) {
     return (
-      <p className="text-sm text-text-muted">
-        {intl.formatMessage({ id: 'STORES.EMPTY_STATE' })}
-      </p>
+      <p className="text-sm text-text-muted">{intl.formatMessage({ id: 'STORES.EMPTY_STATE' })}</p>
     );
   }
 

@@ -35,7 +35,7 @@ async function readPlanModuleIds(page: Page, storeId: string): Promise<number[]>
   if (!response.ok()) {
     throw new Error(
       `store-update: GET /v1/stores/${storeId}/plan failed (status ${response.status()}) while ` +
-        'reading the plan precondition — cannot verify \"plan untouched\" without it.'
+        'reading the plan precondition — cannot verify \"plan untouched\" without it.',
     );
   }
   const body = (await response.json()) as {
@@ -44,7 +44,9 @@ async function readPlanModuleIds(page: Page, storeId: string): Promise<number[]>
   return (body.data?.modules ?? []).map((m) => m.id).sort((a, b) => a - b);
 }
 
-test('la vista Update guarda datos sin tocar el plan y el menú muestra ambos enlaces', async ({ signedInPage }) => {
+test('la vista Update guarda datos sin tocar el plan y el menú muestra ambos enlaces', async ({
+  signedInPage,
+}) => {
   const { page, selectedStoreId } = signedInPage;
 
   // Misma autorización que el resto del flujo: sin la feature Stores, el

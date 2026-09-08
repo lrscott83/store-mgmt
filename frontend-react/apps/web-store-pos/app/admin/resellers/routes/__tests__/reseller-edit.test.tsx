@@ -75,7 +75,7 @@ async function renderPage() {
     result = render(
       <Wrapper>
         <ResellerEditPage />
-      </Wrapper>
+      </Wrapper>,
     );
   });
   return result;
@@ -87,9 +87,8 @@ async function renderPage() {
 
 describe('ResellerEditPage — exports', () => {
   it('exports a named loader = superAdminLoader', async () => {
-    const { resellerHttpService } = await import(
-      '~/admin/resellers/lib/services/reseller-http-service'
-    );
+    const { resellerHttpService } =
+      await import('~/admin/resellers/lib/services/reseller-http-service');
     vi.mocked(resellerHttpService.getReseller).mockResolvedValue({
       succeeded: true,
       data: makeReseller(),
@@ -113,9 +112,8 @@ describe('ResellerEditPage — exports', () => {
 
 describe('ResellerEditPage — submit label parity (Req: Resellers L6 Text Parity)', () => {
   it('submit button reads "Actualizar" (GENERAL.UPDATE), matching edit-reseller-details.component.html:101', async () => {
-    const { resellerHttpService } = await import(
-      '~/admin/resellers/lib/services/reseller-http-service'
-    );
+    const { resellerHttpService } =
+      await import('~/admin/resellers/lib/services/reseller-http-service');
     vi.mocked(resellerHttpService.getReseller).mockResolvedValue({
       succeeded: true,
       data: makeReseller(),
@@ -135,9 +133,8 @@ describe('ResellerEditPage — submit label parity (Req: Resellers L6 Text Parit
 
 describe('ResellerEditPage — submit renders as fab (edit-reseller-details.component.html:63 parity)', () => {
   it('renders the submit control as a fab (Button variant="fab"), not a plain button', async () => {
-    const { resellerHttpService } = await import(
-      '~/admin/resellers/lib/services/reseller-http-service'
-    );
+    const { resellerHttpService } =
+      await import('~/admin/resellers/lib/services/reseller-http-service');
     vi.mocked(resellerHttpService.getReseller).mockResolvedValue({
       succeeded: true,
       data: makeReseller(),
@@ -157,9 +154,8 @@ describe('ResellerEditPage — submit renders as fab (edit-reseller-details.comp
 
   // edit-reseller-details.component.html:99 — the fab carries a leading `edit` mat-icon.
   it('renders EditIcon inside the submit fab', async () => {
-    const { resellerHttpService } = await import(
-      '~/admin/resellers/lib/services/reseller-http-service'
-    );
+    const { resellerHttpService } =
+      await import('~/admin/resellers/lib/services/reseller-http-service');
     vi.mocked(resellerHttpService.getReseller).mockResolvedValue({
       succeeded: true,
       data: makeReseller(),
@@ -184,9 +180,8 @@ describe('ResellerEditPage — submit renders as fab (edit-reseller-details.comp
 // does nothing on click.
 describe('ResellerEditPage — toolbar add-reseller fab (edit-reseller.component.html:5-8 parity)', () => {
   it('renders the toolbar "+" fab labeled RESELLER.ADD_RESELLER, distinct from the details submit', async () => {
-    const { resellerHttpService } = await import(
-      '~/admin/resellers/lib/services/reseller-http-service'
-    );
+    const { resellerHttpService } =
+      await import('~/admin/resellers/lib/services/reseller-http-service');
     vi.mocked(resellerHttpService.getReseller).mockResolvedValue({
       succeeded: true,
       data: makeReseller(),
@@ -204,9 +199,8 @@ describe('ResellerEditPage — toolbar add-reseller fab (edit-reseller.component
   });
 
   it('does nothing on click (mirrors Angular navigateToCreateReSeller empty no-op)', async () => {
-    const { resellerHttpService } = await import(
-      '~/admin/resellers/lib/services/reseller-http-service'
-    );
+    const { resellerHttpService } =
+      await import('~/admin/resellers/lib/services/reseller-http-service');
     vi.mocked(resellerHttpService.getReseller).mockResolvedValue({
       succeeded: true,
       data: makeReseller(),
@@ -233,9 +227,8 @@ describe('ResellerEditPage — toolbar add-reseller fab (edit-reseller.component
 
 describe('ResellerEditPage — discount label parity (Req: Resellers L6 Text Parity)', () => {
   it('discount labels read "Porciento de descuento" / "Descuento"', async () => {
-    const { resellerHttpService } = await import(
-      '~/admin/resellers/lib/services/reseller-http-service'
-    );
+    const { resellerHttpService } =
+      await import('~/admin/resellers/lib/services/reseller-http-service');
     vi.mocked(resellerHttpService.getReseller).mockResolvedValue({
       succeeded: true,
       data: makeReseller(),
@@ -261,9 +254,8 @@ describe('ResellerEditPage — discount label parity (Req: Resellers L6 Text Par
 
 describe('ResellerEditPage — load by id and pre-populate', () => {
   it('calls getReseller(id) and pre-populates form fields', async () => {
-    const { resellerHttpService } = await import(
-      '~/admin/resellers/lib/services/reseller-http-service'
-    );
+    const { resellerHttpService } =
+      await import('~/admin/resellers/lib/services/reseller-http-service');
     vi.mocked(resellerHttpService.getReseller).mockResolvedValue({
       succeeded: true,
       data: makeReseller({
@@ -283,7 +275,9 @@ describe('ResellerEditPage — load by id and pre-populate', () => {
     });
 
     await waitFor(() => {
-      const fullNameInput = screen.getByLabelText(esMessages['GENERAL.FULL_NAME']) as HTMLInputElement;
+      const fullNameInput = screen.getByLabelText(
+        esMessages['GENERAL.FULL_NAME'],
+      ) as HTMLInputElement;
       expect(fullNameInput.value).toBe('Pre-Populated Name');
     });
   });
@@ -295,9 +289,8 @@ describe('ResellerEditPage — load by id and pre-populate', () => {
 
 describe('ResellerEditPage — login disabled', () => {
   it('login field is disabled/read-only', async () => {
-    const { resellerHttpService } = await import(
-      '~/admin/resellers/lib/services/reseller-http-service'
-    );
+    const { resellerHttpService } =
+      await import('~/admin/resellers/lib/services/reseller-http-service');
     vi.mocked(resellerHttpService.getReseller).mockResolvedValue({
       succeeded: true,
       data: makeReseller(),
@@ -315,9 +308,8 @@ describe('ResellerEditPage — login disabled', () => {
   });
 
   it('login is NOT included in updateReseller payload', async () => {
-    const { resellerHttpService } = await import(
-      '~/admin/resellers/lib/services/reseller-http-service'
-    );
+    const { resellerHttpService } =
+      await import('~/admin/resellers/lib/services/reseller-http-service');
     vi.mocked(resellerHttpService.getReseller).mockResolvedValue({
       succeeded: true,
       data: makeReseller(),
@@ -339,7 +331,9 @@ describe('ResellerEditPage — login disabled', () => {
       expect(screen.getByLabelText(esMessages['GENERAL.FULL_NAME'])).toBeInTheDocument();
     });
 
-    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.UPDATE'] }).closest('form')!);
+    fireEvent.submit(
+      screen.getByRole('button', { name: esMessages['GENERAL.UPDATE'] }).closest('form')!,
+    );
 
     await waitFor(() => {
       expect(resellerHttpService.updateReseller).toHaveBeenCalled();
@@ -355,9 +349,8 @@ describe('ResellerEditPage — login disabled', () => {
 
 describe('ResellerEditPage — isActive toggle', () => {
   it('isActive field is present and toggleable', async () => {
-    const { resellerHttpService } = await import(
-      '~/admin/resellers/lib/services/reseller-http-service'
-    );
+    const { resellerHttpService } =
+      await import('~/admin/resellers/lib/services/reseller-http-service');
     vi.mocked(resellerHttpService.getReseller).mockResolvedValue({
       succeeded: true,
       data: makeReseller({ isActive: true }),
@@ -383,9 +376,8 @@ describe('ResellerEditPage — isActive toggle', () => {
 
 describe('ResellerEditPage — discount fields min=0', () => {
   it('percentDiscountPrice and discountPrice have min=0', async () => {
-    const { resellerHttpService } = await import(
-      '~/admin/resellers/lib/services/reseller-http-service'
-    );
+    const { resellerHttpService } =
+      await import('~/admin/resellers/lib/services/reseller-http-service');
     vi.mocked(resellerHttpService.getReseller).mockResolvedValue({
       succeeded: true,
       data: makeReseller(),
@@ -397,8 +389,12 @@ describe('ResellerEditPage — discount fields min=0', () => {
     await renderPage();
 
     await waitFor(() => {
-      const percentInput = screen.getByLabelText(esMessages['RESELLERS.PERCENT_DISCOUNT']) as HTMLInputElement;
-      const discountInput = screen.getByLabelText(esMessages['RESELLERS.DISCOUNT_PRICE']) as HTMLInputElement;
+      const percentInput = screen.getByLabelText(
+        esMessages['RESELLERS.PERCENT_DISCOUNT'],
+      ) as HTMLInputElement;
+      const discountInput = screen.getByLabelText(
+        esMessages['RESELLERS.DISCOUNT_PRICE'],
+      ) as HTMLInputElement;
       expect(percentInput.min).toBe('0');
       expect(discountInput.min).toBe('0');
     });
@@ -411,9 +407,8 @@ describe('ResellerEditPage — discount fields min=0', () => {
 
 describe('ResellerEditPage — FE-OC8: phone-required 400 rejection', () => {
   it('shows RESELLERS.PHONE_REQUIRED when updateReseller rejects with 400 and code "CellPhone"', async () => {
-    const { resellerHttpService } = await import(
-      '~/admin/resellers/lib/services/reseller-http-service'
-    );
+    const { resellerHttpService } =
+      await import('~/admin/resellers/lib/services/reseller-http-service');
     vi.mocked(resellerHttpService.getReseller).mockResolvedValue({
       succeeded: true,
       data: makeReseller(),
@@ -431,7 +426,9 @@ describe('ResellerEditPage — FE-OC8: phone-required 400 rejection', () => {
       expect(screen.getByLabelText(esMessages['GENERAL.FULL_NAME'])).toBeInTheDocument();
     });
 
-    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.UPDATE'] }).closest('form')!);
+    fireEvent.submit(
+      screen.getByRole('button', { name: esMessages['GENERAL.UPDATE'] }).closest('form')!,
+    );
 
     await waitFor(() => {
       expect(screen.getByRole('alert')).toHaveTextContent(esMessages['RESELLERS.PHONE_REQUIRED']);
@@ -447,9 +444,8 @@ describe('ResellerEditPage — FE-OC8: phone-required 400 rejection', () => {
 
 describe('ResellerEditPage — FE-OC8: unrelated 400 and array-scan fallback', () => {
   it('shows RESELLERS.ERROR when updateReseller rejects with 400 and an unrelated code', async () => {
-    const { resellerHttpService } = await import(
-      '~/admin/resellers/lib/services/reseller-http-service'
-    );
+    const { resellerHttpService } =
+      await import('~/admin/resellers/lib/services/reseller-http-service');
     vi.mocked(resellerHttpService.getReseller).mockResolvedValue({
       succeeded: true,
       data: makeReseller(),
@@ -467,7 +463,9 @@ describe('ResellerEditPage — FE-OC8: unrelated 400 and array-scan fallback', (
       expect(screen.getByLabelText(esMessages['GENERAL.FULL_NAME'])).toBeInTheDocument();
     });
 
-    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.UPDATE'] }).closest('form')!);
+    fireEvent.submit(
+      screen.getByRole('button', { name: esMessages['GENERAL.UPDATE'] }).closest('form')!,
+    );
 
     await waitFor(() => {
       expect(screen.getByRole('alert')).toHaveTextContent(esMessages['RESELLERS.ERROR']);
@@ -475,9 +473,8 @@ describe('ResellerEditPage — FE-OC8: unrelated 400 and array-scan fallback', (
   });
 
   it('shows RESELLERS.PHONE_REQUIRED when updateReseller rejects with 400 and FullName occupies errors[0]', async () => {
-    const { resellerHttpService } = await import(
-      '~/admin/resellers/lib/services/reseller-http-service'
-    );
+    const { resellerHttpService } =
+      await import('~/admin/resellers/lib/services/reseller-http-service');
     vi.mocked(resellerHttpService.getReseller).mockResolvedValue({
       succeeded: true,
       data: makeReseller(),
@@ -495,7 +492,9 @@ describe('ResellerEditPage — FE-OC8: unrelated 400 and array-scan fallback', (
       expect(screen.getByLabelText(esMessages['GENERAL.FULL_NAME'])).toBeInTheDocument();
     });
 
-    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.UPDATE'] }).closest('form')!);
+    fireEvent.submit(
+      screen.getByRole('button', { name: esMessages['GENERAL.UPDATE'] }).closest('form')!,
+    );
 
     await waitFor(() => {
       expect(screen.getByRole('alert')).toHaveTextContent(esMessages['RESELLERS.PHONE_REQUIRED']);
@@ -509,9 +508,8 @@ describe('ResellerEditPage — FE-OC8: unrelated 400 and array-scan fallback', (
 
 describe('ResellerEditPage — successful update stays on page', () => {
   it('calls updateReseller and does NOT navigate away on success', async () => {
-    const { resellerHttpService } = await import(
-      '~/admin/resellers/lib/services/reseller-http-service'
-    );
+    const { resellerHttpService } =
+      await import('~/admin/resellers/lib/services/reseller-http-service');
     vi.mocked(resellerHttpService.getReseller).mockResolvedValue({
       succeeded: true,
       data: makeReseller(),
@@ -533,7 +531,9 @@ describe('ResellerEditPage — successful update stays on page', () => {
       expect(screen.getByLabelText(esMessages['GENERAL.FULL_NAME'])).toBeInTheDocument();
     });
 
-    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.UPDATE'] }).closest('form')!);
+    fireEvent.submit(
+      screen.getByRole('button', { name: esMessages['GENERAL.UPDATE'] }).closest('form')!,
+    );
 
     await waitFor(() => {
       expect(resellerHttpService.updateReseller).toHaveBeenCalledWith(
@@ -546,7 +546,7 @@ describe('ResellerEditPage — successful update stays on page', () => {
           discountPrice: 5,
           isActive: true,
           description: 'Edit reseller',
-        })
+        }),
       );
     });
 
@@ -561,9 +561,8 @@ describe('ResellerEditPage — successful update stays on page', () => {
 
 describe('ResellerEditPage — server-side error', () => {
   it('shows errors[0].description when succeeded is false', async () => {
-    const { resellerHttpService } = await import(
-      '~/admin/resellers/lib/services/reseller-http-service'
-    );
+    const { resellerHttpService } =
+      await import('~/admin/resellers/lib/services/reseller-http-service');
     vi.mocked(resellerHttpService.getReseller).mockResolvedValue({
       succeeded: true,
       data: makeReseller(),
@@ -585,7 +584,9 @@ describe('ResellerEditPage — server-side error', () => {
       expect(screen.getByLabelText(esMessages['GENERAL.FULL_NAME'])).toBeInTheDocument();
     });
 
-    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.UPDATE'] }).closest('form')!);
+    fireEvent.submit(
+      screen.getByRole('button', { name: esMessages['GENERAL.UPDATE'] }).closest('form')!,
+    );
 
     await waitFor(() => {
       expect(screen.getByText('Update failed on server')).toBeInTheDocument();
@@ -599,9 +600,8 @@ describe('ResellerEditPage — server-side error', () => {
 
 describe('ResellerEditPage — HTTP throw on update', () => {
   it('shows RESELLERS.ERROR when updateReseller throws', async () => {
-    const { resellerHttpService } = await import(
-      '~/admin/resellers/lib/services/reseller-http-service'
-    );
+    const { resellerHttpService } =
+      await import('~/admin/resellers/lib/services/reseller-http-service');
     vi.mocked(resellerHttpService.getReseller).mockResolvedValue({
       succeeded: true,
       data: makeReseller(),
@@ -617,7 +617,9 @@ describe('ResellerEditPage — HTTP throw on update', () => {
       expect(screen.getByLabelText(esMessages['GENERAL.FULL_NAME'])).toBeInTheDocument();
     });
 
-    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.UPDATE'] }).closest('form')!);
+    fireEvent.submit(
+      screen.getByRole('button', { name: esMessages['GENERAL.UPDATE'] }).closest('form')!,
+    );
 
     await waitFor(() => {
       expect(screen.getByText(esMessages['RESELLERS.ERROR'])).toBeInTheDocument();
@@ -634,9 +636,8 @@ describe('ResellerEditPage — HTTP throw on update', () => {
 
 describe('ResellerEditPage — getReseller succeeded:false', () => {
   it('shows RESELLERS.ERROR and does not populate form fields when getReseller resolves with succeeded:false', async () => {
-    const { resellerHttpService } = await import(
-      '~/admin/resellers/lib/services/reseller-http-service'
-    );
+    const { resellerHttpService } =
+      await import('~/admin/resellers/lib/services/reseller-http-service');
     vi.mocked(resellerHttpService.getReseller).mockResolvedValue({
       succeeded: false,
       data: null,
@@ -678,9 +679,8 @@ describe('ResellerEditPage — getReseller succeeded:false', () => {
 
 describe('ResellerEditPage — submit disabled while pristine', () => {
   it('submit button is disabled immediately after data loads (snapshot matches fields)', async () => {
-    const { resellerHttpService } = await import(
-      '~/admin/resellers/lib/services/reseller-http-service'
-    );
+    const { resellerHttpService } =
+      await import('~/admin/resellers/lib/services/reseller-http-service');
     vi.mocked(resellerHttpService.getReseller).mockResolvedValue({
       succeeded: true,
       data: makeReseller(),
@@ -700,9 +700,8 @@ describe('ResellerEditPage — submit disabled while pristine', () => {
   });
 
   it('submit button becomes enabled after a field is changed from the loaded snapshot', async () => {
-    const { resellerHttpService } = await import(
-      '~/admin/resellers/lib/services/reseller-http-service'
-    );
+    const { resellerHttpService } =
+      await import('~/admin/resellers/lib/services/reseller-http-service');
     vi.mocked(resellerHttpService.getReseller).mockResolvedValue({
       succeeded: true,
       data: makeReseller({ fullName: 'Original Name' }),
@@ -726,9 +725,8 @@ describe('ResellerEditPage — submit disabled while pristine', () => {
   });
 
   it('submit button goes back to disabled after successful save re-snapshots', async () => {
-    const { resellerHttpService } = await import(
-      '~/admin/resellers/lib/services/reseller-http-service'
-    );
+    const { resellerHttpService } =
+      await import('~/admin/resellers/lib/services/reseller-http-service');
     vi.mocked(resellerHttpService.getReseller).mockResolvedValue({
       succeeded: true,
       data: makeReseller({ fullName: 'Original' }),
@@ -756,7 +754,9 @@ describe('ResellerEditPage — submit disabled while pristine', () => {
     });
 
     // Submit
-    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.UPDATE'] }).closest('form')!);
+    fireEvent.submit(
+      screen.getByRole('button', { name: esMessages['GENERAL.UPDATE'] }).closest('form')!,
+    );
 
     // After save, re-snapshot → button should be disabled again
     await waitFor(() => {
@@ -776,9 +776,8 @@ describe('ResellerEditPage — submit disabled while pristine', () => {
 
 describe('ResellerEditPage — unsaved changes guard', () => {
   it('calls useUnsavedChangesPrompt with true when a field differs from loaded snapshot', async () => {
-    const { resellerHttpService } = await import(
-      '~/admin/resellers/lib/services/reseller-http-service'
-    );
+    const { resellerHttpService } =
+      await import('~/admin/resellers/lib/services/reseller-http-service');
     vi.mocked(resellerHttpService.getReseller).mockResolvedValue({
       succeeded: true,
       data: makeReseller({ fullName: 'Original Name' }),

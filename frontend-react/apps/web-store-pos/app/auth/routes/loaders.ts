@@ -76,7 +76,8 @@ export async function guestOnlyLoader(): Promise<Response | null> {
     // business-entity storage seams that throw MissingDataKeyError while
     // locked, so this check MUST precede it. Without ciphertext, a valid
     // session bounces home normally.
-    const { needsUnlock, hasUnreadableCiphertext } = await import('~/shared/lib/offline/unlock-gate');
+    const { needsUnlock, hasUnreadableCiphertext } =
+      await import('~/shared/lib/offline/unlock-gate');
     if (needsUnlock(user) && hasUnreadableCiphertext()) return null;
     preloadHeavyChunks();
     return redirect(await resolveUserHomePath(user));

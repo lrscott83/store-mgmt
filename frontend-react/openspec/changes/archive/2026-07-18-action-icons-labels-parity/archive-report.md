@@ -22,15 +22,15 @@ verified (PASS — 124 test files / 1760 tests passed, clean typecheck), committ
 
 All SDD artifacts captured with observation IDs for cross-session traceability:
 
-| Artifact | Engram ID | Topic Key | Type | Status |
-|----------|-----------|-----------|------|--------|
-| Proposal | #1244 | sdd/action-icons-labels-parity/proposal | architecture | Done |
-| Specification | #1246 | sdd/action-icons-labels-parity/spec | architecture | Done |
-| Design | n/a (skipped — mechanical UI-parity change, no architectural decisions) | — | — | Skipped |
-| Tasks | #1247 | sdd/action-icons-labels-parity/tasks | architecture | Done (19/19) |
-| Apply Progress | #1248 | sdd/action-icons-labels-parity/apply-progress | architecture | Done |
-| Verify Report | #1249 | sdd/action-icons-labels-parity/verify-report | architecture | PASS |
-| Archive Report | (this document) | sdd/action-icons-labels-parity/archive-report | architecture | Done |
+| Artifact       | Engram ID                                                               | Topic Key                                     | Type         | Status       |
+| -------------- | ----------------------------------------------------------------------- | --------------------------------------------- | ------------ | ------------ |
+| Proposal       | #1244                                                                   | sdd/action-icons-labels-parity/proposal       | architecture | Done         |
+| Specification  | #1246                                                                   | sdd/action-icons-labels-parity/spec           | architecture | Done         |
+| Design         | n/a (skipped — mechanical UI-parity change, no architectural decisions) | —                                             | —            | Skipped      |
+| Tasks          | #1247                                                                   | sdd/action-icons-labels-parity/tasks          | architecture | Done (19/19) |
+| Apply Progress | #1248                                                                   | sdd/action-icons-labels-parity/apply-progress | architecture | Done         |
+| Verify Report  | #1249                                                                   | sdd/action-icons-labels-parity/verify-report  | architecture | PASS         |
+| Archive Report | (this document)                                                         | sdd/action-icons-labels-parity/archive-report | architecture | Done         |
 
 ---
 
@@ -47,6 +47,7 @@ Path: `frontend-react/openspec/specs/products-action-ui/spec.md`
   capability domain; no prior `openspec/specs/products-action-ui/` existed.
 
 The canonical spec captures:
+
 - Category gear menu icons and order (1 requirement, 1 scenario)
 - Per-product gear menu icons (1 requirement, 2 scenarios)
 - Product-area modal footer labels and icons (1 requirement, 3 scenarios)
@@ -58,12 +59,15 @@ The canonical spec captures:
 ## Change Folder Archival
 
 ### Source
+
 `frontend-react/openspec/changes/action-icons-labels-parity/`
 
 ### Destination
+
 `frontend-react/openspec/changes/archive/2026-07-18-action-icons-labels-parity/`
 
 ### Contents Moved
+
 - `proposal.md` — Intent, scope, approach, risks, rollback plan
 - `explore.md` — Angular↔React side-by-side mapping (exploration phase)
 - `specs/products-action-ui/spec.md` — Delta spec (4 requirements, 7 scenarios)
@@ -72,6 +76,7 @@ The canonical spec captures:
 - `archive-report.md` — this document
 
 ### Note on Original Folder
+
 File system operations in this execution context use WRITE semantics (no delete/move primitive
 available to this agent). The orchestrator must explicitly remove the original folder and stage
 the new paths to finalize the archive:
@@ -88,15 +93,18 @@ git commit -m "docs(sdd): archive action-icons-labels-parity — merge spec to o
 ## Implementation Verification
 
 ### Test Results
+
 - **Total tests**: 1760 passing (124 test files)
 - **Failures**: 0
 - **Typecheck**: Clean (`pnpm -C apps/web-store-pos exec tsc --noEmit`)
 - **Verdict**: PASS
 
 ### Spec Requirement Coverage
+
 All 4 requirements / 7 scenarios met (see verify-report.md Spec Compliance Matrix for full evidence).
 
 ### Code Quality
+
 - Strict TDD discipline: RED→GREEN per work unit (5 phases, 19 tasks)
 - Out-of-scope guards held: orphan delete-confirm block in `edit-product-modal.tsx` and bulk
   price-edit body in `edit-products-modal.tsx` both verified untouched
@@ -107,19 +115,21 @@ All 4 requirements / 7 scenarios met (see verify-report.md Spec Compliance Matri
 
 ## Files Changed Summary
 
-| File | Action | Scope |
-|------|--------|-------|
-| `frontend-react/openspec/specs/products-action-ui/spec.md` | Created | NEW canonical spec for products-action-ui domain |
-| `frontend-react/openspec/changes/archive/2026-07-18-action-icons-labels-parity/proposal.md` | Archived | Preserved for audit trail |
-| `frontend-react/openspec/changes/archive/2026-07-18-action-icons-labels-parity/explore.md` | Archived | Preserved for audit trail |
-| `frontend-react/openspec/changes/archive/2026-07-18-action-icons-labels-parity/specs/products-action-ui/spec.md` | Archived | Preserved for audit trail |
-| `frontend-react/openspec/changes/archive/2026-07-18-action-icons-labels-parity/tasks.md` | Archived | Preserved for audit trail |
-| `frontend-react/openspec/changes/archive/2026-07-18-action-icons-labels-parity/verify-report.md` | Archived | Preserved for audit trail |
-| `frontend-react/openspec/changes/archive/2026-07-18-action-icons-labels-parity/archive-report.md` | Created | This document |
+| File                                                                                                             | Action   | Scope                                            |
+| ---------------------------------------------------------------------------------------------------------------- | -------- | ------------------------------------------------ |
+| `frontend-react/openspec/specs/products-action-ui/spec.md`                                                       | Created  | NEW canonical spec for products-action-ui domain |
+| `frontend-react/openspec/changes/archive/2026-07-18-action-icons-labels-parity/proposal.md`                      | Archived | Preserved for audit trail                        |
+| `frontend-react/openspec/changes/archive/2026-07-18-action-icons-labels-parity/explore.md`                       | Archived | Preserved for audit trail                        |
+| `frontend-react/openspec/changes/archive/2026-07-18-action-icons-labels-parity/specs/products-action-ui/spec.md` | Archived | Preserved for audit trail                        |
+| `frontend-react/openspec/changes/archive/2026-07-18-action-icons-labels-parity/tasks.md`                         | Archived | Preserved for audit trail                        |
+| `frontend-react/openspec/changes/archive/2026-07-18-action-icons-labels-parity/verify-report.md`                 | Archived | Preserved for audit trail                        |
+| `frontend-react/openspec/changes/archive/2026-07-18-action-icons-labels-parity/archive-report.md`                | Created  | This document                                    |
 
 ### Pending Orchestrator Action (filesystem cleanup)
+
 The following OLD paths still exist on disk and must be removed by the orchestrator (this agent
 has no delete/move primitive):
+
 - `frontend-react/openspec/changes/action-icons-labels-parity/proposal.md`
 - `frontend-react/openspec/changes/action-icons-labels-parity/explore.md`
 - `frontend-react/openspec/changes/action-icons-labels-parity/specs/products-action-ui/spec.md`

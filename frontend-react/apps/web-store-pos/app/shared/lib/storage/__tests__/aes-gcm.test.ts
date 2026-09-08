@@ -1,10 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  aesGcmEncrypt,
-  aesGcmDecrypt,
-  AES_GCM_IV_BYTES,
-  AES_GCM_TAG_BYTES,
-} from '../aes-gcm';
+import { aesGcmEncrypt, aesGcmDecrypt, AES_GCM_IV_BYTES, AES_GCM_TAG_BYTES } from '../aes-gcm';
 
 // Fixed key/iv/plaintext triple, cross-checked against Node's built-in
 // `crypto.createCipheriv('aes-256-gcm', ...)` to confirm this is the ONE

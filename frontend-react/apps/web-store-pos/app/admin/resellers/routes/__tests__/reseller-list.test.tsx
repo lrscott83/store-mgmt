@@ -82,9 +82,8 @@ describe('ResellerListPage — exports', () => {
 
 describe('ResellerListPage — render and card fields', () => {
   it('renders LIST_TITLE and calls listResellers on mount', async () => {
-    const { resellerHttpService } = await import(
-      '~/admin/resellers/lib/services/reseller-http-service'
-    );
+    const { resellerHttpService } =
+      await import('~/admin/resellers/lib/services/reseller-http-service');
     vi.mocked(resellerHttpService.listResellers).mockResolvedValue({
       succeeded: true,
       data: [makeReseller({ id: 'r1', fullName: 'John Reseller' })],
@@ -97,7 +96,7 @@ describe('ResellerListPage — render and card fields', () => {
     render(
       <Wrapper>
         <ResellerListPage />
-      </Wrapper>
+      </Wrapper>,
     );
 
     await waitFor(() => {
@@ -109,19 +108,20 @@ describe('ResellerListPage — render and card fields', () => {
   });
 
   it('shows percentDiscountPrice, discountPrice, cellPhone, email, description on card', async () => {
-    const { resellerHttpService } = await import(
-      '~/admin/resellers/lib/services/reseller-http-service'
-    );
+    const { resellerHttpService } =
+      await import('~/admin/resellers/lib/services/reseller-http-service');
     vi.mocked(resellerHttpService.listResellers).mockResolvedValue({
       succeeded: true,
-      data: [makeReseller({
-        fullName: 'Jane',
-        percentDiscountPrice: 15,
-        discountPrice: 8,
-        cellPhone: '+53 5 555-1234',
-        email: 'jane@test.com',
-        description: 'Top reseller',
-      })],
+      data: [
+        makeReseller({
+          fullName: 'Jane',
+          percentDiscountPrice: 15,
+          discountPrice: 8,
+          cellPhone: '+53 5 555-1234',
+          email: 'jane@test.com',
+          description: 'Top reseller',
+        }),
+      ],
       message: '',
       actionCode: 0,
       errors: [],
@@ -131,7 +131,7 @@ describe('ResellerListPage — render and card fields', () => {
     render(
       <Wrapper>
         <ResellerListPage />
-      </Wrapper>
+      </Wrapper>,
     );
 
     await waitFor(() => {
@@ -149,9 +149,8 @@ describe('ResellerListPage — render and card fields', () => {
 
 describe('ResellerListPage — bg-danger state indicator', () => {
   it('applies bg-danger indicator when isActive is false', async () => {
-    const { resellerHttpService } = await import(
-      '~/admin/resellers/lib/services/reseller-http-service'
-    );
+    const { resellerHttpService } =
+      await import('~/admin/resellers/lib/services/reseller-http-service');
     vi.mocked(resellerHttpService.listResellers).mockResolvedValue({
       succeeded: true,
       data: [makeReseller({ id: 'r2', fullName: 'Inactive Bob', isActive: false })],
@@ -164,7 +163,7 @@ describe('ResellerListPage — bg-danger state indicator', () => {
     const { container } = render(
       <Wrapper>
         <ResellerListPage />
-      </Wrapper>
+      </Wrapper>,
     );
 
     await waitFor(() => {
@@ -176,9 +175,8 @@ describe('ResellerListPage — bg-danger state indicator', () => {
   });
 
   it('does NOT apply bg-danger indicator when isActive is true', async () => {
-    const { resellerHttpService } = await import(
-      '~/admin/resellers/lib/services/reseller-http-service'
-    );
+    const { resellerHttpService } =
+      await import('~/admin/resellers/lib/services/reseller-http-service');
     vi.mocked(resellerHttpService.listResellers).mockResolvedValue({
       succeeded: true,
       data: [makeReseller({ id: 'r3', fullName: 'Active Ana', isActive: true })],
@@ -191,7 +189,7 @@ describe('ResellerListPage — bg-danger state indicator', () => {
     const { container } = render(
       <Wrapper>
         <ResellerListPage />
-      </Wrapper>
+      </Wrapper>,
     );
 
     await waitFor(() => {
@@ -209,9 +207,8 @@ describe('ResellerListPage — bg-danger state indicator', () => {
 
 describe('ResellerListPage — FAB navigation (Req: Resellers L6 Text Parity, override 1)', () => {
   it('navigates to /admin/resellers/create when the FAB (RESELLERS.ADD = "Adicionar") is clicked', async () => {
-    const { resellerHttpService } = await import(
-      '~/admin/resellers/lib/services/reseller-http-service'
-    );
+    const { resellerHttpService } =
+      await import('~/admin/resellers/lib/services/reseller-http-service');
     vi.mocked(resellerHttpService.listResellers).mockResolvedValue({
       succeeded: true,
       data: [],
@@ -224,7 +221,7 @@ describe('ResellerListPage — FAB navigation (Req: Resellers L6 Text Parity, ov
     render(
       <Wrapper>
         <ResellerListPage />
-      </Wrapper>
+      </Wrapper>,
     );
 
     await waitFor(() => {
@@ -243,9 +240,8 @@ describe('ResellerListPage — FAB navigation (Req: Resellers L6 Text Parity, ov
 
 describe('ResellerListPage — Edit menu item navigation (Req: Resellers Gear Menu — Edit Only)', () => {
   it('navigates to /admin/resellers/edit/:id when Editar is clicked via the gear menu', async () => {
-    const { resellerHttpService } = await import(
-      '~/admin/resellers/lib/services/reseller-http-service'
-    );
+    const { resellerHttpService } =
+      await import('~/admin/resellers/lib/services/reseller-http-service');
     vi.mocked(resellerHttpService.listResellers).mockResolvedValue({
       succeeded: true,
       data: [makeReseller({ id: 'r42', fullName: 'Edit Me' })],
@@ -258,7 +254,7 @@ describe('ResellerListPage — Edit menu item navigation (Req: Resellers Gear Me
     render(
       <Wrapper>
         <ResellerListPage />
-      </Wrapper>
+      </Wrapper>,
     );
 
     await waitFor(() => {
@@ -277,16 +273,15 @@ describe('ResellerListPage — Edit menu item navigation (Req: Resellers Gear Me
 
 describe('ResellerListPage — error state', () => {
   it('shows RESELLERS.ERROR when listResellers throws', async () => {
-    const { resellerHttpService } = await import(
-      '~/admin/resellers/lib/services/reseller-http-service'
-    );
+    const { resellerHttpService } =
+      await import('~/admin/resellers/lib/services/reseller-http-service');
     vi.mocked(resellerHttpService.listResellers).mockRejectedValue(new Error('Network error'));
 
     const { ResellerListPage } = await import('../reseller-list');
     render(
       <Wrapper>
         <ResellerListPage />
-      </Wrapper>
+      </Wrapper>,
     );
 
     await waitFor(() => {
@@ -302,9 +297,8 @@ describe('ResellerListPage — error state', () => {
 
 describe('ResellerListPage — succeeded:false response', () => {
   it('shows RESELLERS.ERROR when listResellers resolves with succeeded:false, does not set resellers from data', async () => {
-    const { resellerHttpService } = await import(
-      '~/admin/resellers/lib/services/reseller-http-service'
-    );
+    const { resellerHttpService } =
+      await import('~/admin/resellers/lib/services/reseller-http-service');
     vi.mocked(resellerHttpService.listResellers).mockResolvedValue({
       succeeded: false,
       data: null,
@@ -317,7 +311,7 @@ describe('ResellerListPage — succeeded:false response', () => {
     render(
       <Wrapper>
         <ResellerListPage />
-      </Wrapper>
+      </Wrapper>,
     );
 
     await waitFor(() => {
@@ -332,9 +326,8 @@ describe('ResellerListPage — succeeded:false response', () => {
 
 describe('ResellerListPage — no activate/deactivate/delete menu items', () => {
   it('gear menu shows exactly one item (Editar) — no Activar/Desactivar/Eliminar', async () => {
-    const { resellerHttpService } = await import(
-      '~/admin/resellers/lib/services/reseller-http-service'
-    );
+    const { resellerHttpService } =
+      await import('~/admin/resellers/lib/services/reseller-http-service');
     vi.mocked(resellerHttpService.listResellers).mockResolvedValue({
       succeeded: true,
       data: [makeReseller({ id: 'r1', fullName: 'Only Reseller' })],
@@ -347,7 +340,7 @@ describe('ResellerListPage — no activate/deactivate/delete menu items', () => 
     render(
       <Wrapper>
         <ResellerListPage />
-      </Wrapper>
+      </Wrapper>,
     );
 
     await waitFor(() => {

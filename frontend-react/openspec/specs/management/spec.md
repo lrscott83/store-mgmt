@@ -215,6 +215,7 @@ module catalog and allows the user to select/deselect modules. Modules where `pr
 MUST be auto-selected and rendered as locked (not user-toggleable).
 
 **PRES-6** — `StoreForm` MUST implement role-conditional field rendering:
+
 - super-admin or owner-admin: render `ownerId` (required, owner picker), `approved`, `description`.
 - super-admin + edit mode: render `paymentStartDate` (required).
 - super-admin: render `isActive`.
@@ -301,35 +302,35 @@ string literals are permitted in TSX.
 
 **I18N-2** — The following `STORES.*` keys MUST be added to `app/shared/lib/i18n/es.ts`:
 
-| Key | Purpose |
-|-----|---------|
-| `STORES.LIST_TITLE` | Page heading for the store list |
-| `STORES.CREATE_TITLE` | Page heading for the create form |
-| `STORES.EDIT_TITLE` | Page heading for the edit form |
-| `STORES.NAME` | Label for the store name field |
-| `STORES.ADDRESS` | Label for the address field |
-| `STORES.DESCRIPTION` | Label for the description field |
-| `STORES.OWNER` | Label for the owner picker |
-| `STORES.APPROVED` | Label for the approved toggle |
-| `STORES.IS_ACTIVE` | Label for the isActive toggle |
-| `STORES.PAYMENT_START_DATE` | Label for the paymentStartDate field |
-| `STORES.MODULES` | Section heading for the module picker |
-| `STORES.TOTAL_PRICE` | Label for the total price summary |
-| `STORES.SAVE` | Submit button label (create) |
-| `STORES.UPDATE` | Submit button label (edit) |
-| `STORES.CREATE_SUCCESS` | Success feedback after create |
-| `STORES.UPDATE_SUCCESS` | Success feedback after update |
-| `STORES.CREATE_ERROR` | Generic error for create failure |
-| `STORES.UPDATE_ERROR` | Generic error for update failure |
-| `STORES.OFFLINE_NOTICE` | Inline notice when offline |
-| `STORES.DEGRADED_NOTICE` | Notice shown when list is served from cache |
-| `STORES.EMPTY` | Empty state message for the list |
-| `STORES.ACTIVATE` | Action label for activate |
-| `STORES.DEACTIVATE` | Action label for deactivate |
-| `STORES.APPROVE` | Action label for approve |
-| `STORES.DISAPPROVE` | Action label for disapprove |
-| `STORES.EDIT` | Action label for edit row |
-| `STORES.CREATE_NEW` | Button label to navigate to create |
+| Key                         | Purpose                                     |
+| --------------------------- | ------------------------------------------- |
+| `STORES.LIST_TITLE`         | Page heading for the store list             |
+| `STORES.CREATE_TITLE`       | Page heading for the create form            |
+| `STORES.EDIT_TITLE`         | Page heading for the edit form              |
+| `STORES.NAME`               | Label for the store name field              |
+| `STORES.ADDRESS`            | Label for the address field                 |
+| `STORES.DESCRIPTION`        | Label for the description field             |
+| `STORES.OWNER`              | Label for the owner picker                  |
+| `STORES.APPROVED`           | Label for the approved toggle               |
+| `STORES.IS_ACTIVE`          | Label for the isActive toggle               |
+| `STORES.PAYMENT_START_DATE` | Label for the paymentStartDate field        |
+| `STORES.MODULES`            | Section heading for the module picker       |
+| `STORES.TOTAL_PRICE`        | Label for the total price summary           |
+| `STORES.SAVE`               | Submit button label (create)                |
+| `STORES.UPDATE`             | Submit button label (edit)                  |
+| `STORES.CREATE_SUCCESS`     | Success feedback after create               |
+| `STORES.UPDATE_SUCCESS`     | Success feedback after update               |
+| `STORES.CREATE_ERROR`       | Generic error for create failure            |
+| `STORES.UPDATE_ERROR`       | Generic error for update failure            |
+| `STORES.OFFLINE_NOTICE`     | Inline notice when offline                  |
+| `STORES.DEGRADED_NOTICE`    | Notice shown when list is served from cache |
+| `STORES.EMPTY`              | Empty state message for the list            |
+| `STORES.ACTIVATE`           | Action label for activate                   |
+| `STORES.DEACTIVATE`         | Action label for deactivate                 |
+| `STORES.APPROVE`            | Action label for approve                    |
+| `STORES.DISAPPROVE`         | Action label for disapprove                 |
+| `STORES.EDIT`               | Action label for edit row                   |
+| `STORES.CREATE_NEW`         | Button label to navigate to create          |
 
 **I18N-3** — Any shared `MANAGEMENT.*` keys needed for the management layout or breadcrumbs MUST
 also be added to `es.ts` if they do not already exist.
@@ -368,32 +369,36 @@ boundary.
 `app/management/stores/routes/__tests__/store-routes.test.tsx`.
 
 **TEST-2** — List container smoke tests MUST cover:
-  - Successful fetch renders `StoreList` with the returned stores and writes to cache.
-  - When the HTTP call fails, cache is read and a degraded indicator is visible.
-  - When the cache is also empty and the network is unavailable, the empty state is rendered.
-  - Lifecycle action callbacks are wired and call the correct `storeHttpService` method.
-  - Lifecycle actions are disabled when `useOnlineStatus` returns `false`.
+
+- Successful fetch renders `StoreList` with the returned stores and writes to cache.
+- When the HTTP call fails, cache is read and a degraded indicator is visible.
+- When the cache is also empty and the network is unavailable, the empty state is rendered.
+- Lifecycle action callbacks are wired and call the correct `storeHttpService` method.
+- Lifecycle actions are disabled when `useOnlineStatus` returns `false`.
 
 **TEST-3** — Create container smoke tests MUST cover:
-  - Module catalog is fetched on mount and passed to `StoreForm`.
-  - Submit is blocked and an offline error is visible when `useOnlineStatus` returns `false`.
-  - Successful submit calls `storeHttpService.create()` with the correct payload including `moduleIds`.
-  - On success, navigation goes to `/management/stores`.
-  - HTTP error passes an error prop to `StoreForm` without redirecting.
+
+- Module catalog is fetched on mount and passed to `StoreForm`.
+- Submit is blocked and an offline error is visible when `useOnlineStatus` returns `false`.
+- Successful submit calls `storeHttpService.create()` with the correct payload including `moduleIds`.
+- On success, navigation goes to `/management/stores`.
+- HTTP error passes an error prop to `StoreForm` without redirecting.
 
 **TEST-4** — Edit container smoke tests MUST cover:
-  - Store and module catalog are fetched on mount; form is pre-filled.
-  - Store modules are merged into the catalog (selected + price override).
-  - Submit is blocked and an offline error is visible when `useOnlineStatus` returns `false`.
-  - Successful submit calls `storeHttpService.update()` with the correct payload.
-  - On success, navigation goes to `/management/stores`.
-  - HTTP error passes an error prop to `StoreForm` without redirecting.
+
+- Store and module catalog are fetched on mount; form is pre-filled.
+- Store modules are merged into the catalog (selected + price override).
+- Submit is blocked and an offline error is visible when `useOnlineStatus` returns `false`.
+- Successful submit calls `storeHttpService.update()` with the correct payload.
+- On success, navigation goes to `/management/stores`.
+- HTTP error passes an error prop to `StoreForm` without redirecting.
 
 **TEST-5** — `adminFeatureLoader` MUST have unit tests covering:
-  - Unauthenticated user → redirects to `/login`.
-  - Authenticated user without the required role → redirects to `/unauthorized`.
-  - Authenticated admin without `EFeatures.Stores` → featureLoader redirect.
-  - Authenticated admin with `EFeatures.Stores` → loader resolves without redirect.
+
+- Unauthenticated user → redirects to `/login`.
+- Authenticated user without the required role → redirects to `/unauthorized`.
+- Authenticated admin without `EFeatures.Stores` → featureLoader redirect.
+- Authenticated admin with `EFeatures.Stores` → loader resolves without redirect.
 
 **TEST-6** — Test files that use `useIntl` MUST wrap the component under test in `IntlProvider`
 (consistent with project convention).
@@ -436,10 +441,11 @@ boundary.
 **Given** an authorised online user on `/management/stores`
 **When** the container mounts
 **Then**
-  - `GET /v1/stores/by-current-user` is called.
-  - `StoreList` renders the returned stores.
-  - The stores are written to `BaseRepository<Store>` localStorage cache.
-  - No degraded indicator is visible.
+
+- `GET /v1/stores/by-current-user` is called.
+- `StoreList` renders the returned stores.
+- The stores are written to `BaseRepository<Store>` localStorage cache.
+- No degraded indicator is visible.
 
 ### S-LIST-2: Empty list
 
@@ -452,9 +458,10 @@ boundary.
 **Given** an authorised user who is offline (or whose HTTP call fails due to connectivity)
 **When** the container mounts and a prior successful fetch has populated the cache
 **Then**
-  - `StoreList` renders the cached stores.
-  - A degraded-mode indicator (`STORES.DEGRADED_NOTICE`) is visible.
-  - No crash or unhandled error occurs.
+
+- `StoreList` renders the cached stores.
+- A degraded-mode indicator (`STORES.DEGRADED_NOTICE`) is visible.
+- No crash or unhandled error occurs.
 
 ### S-LIST-4: Offline — cache also empty
 
@@ -467,8 +474,9 @@ boundary.
 **Given** an authorised online user viewing the store list
 **When** they click the Activate action for store id 42
 **Then**
-  - `storeHttpService.activate(42)` is called.
-  - On success, `listByCurrentUser()` is called again and the list re-renders.
+
+- `storeHttpService.activate(42)` is called.
+- On success, `listByCurrentUser()` is called again and the list re-renders.
 
 ### S-LIST-6: Lifecycle action — offline blocked
 
@@ -483,26 +491,29 @@ boundary.
 **Given** an authorised online user on `/management/stores/create`
 **When** they fill in all required fields, select modules, and submit
 **Then**
-  - `POST /v1/stores` is called with the form payload including `moduleIds` of selected modules.
-  - On success, the user is navigated to `/management/stores`.
+
+- `POST /v1/stores` is called with the form payload including `moduleIds` of selected modules.
+- On success, the user is navigated to `/management/stores`.
 
 ### S-CREATE-2: Create — offline blocked
 
 **Given** an authorised user on `/management/stores/create` who is offline
 **When** the form is loaded or the device goes offline
 **Then**
-  - The submit button is disabled.
-  - `STORES.OFFLINE_NOTICE` is visible.
-  - When connectivity is restored the button re-enables without a page reload.
+
+- The submit button is disabled.
+- `STORES.OFFLINE_NOTICE` is visible.
+- When connectivity is restored the button re-enables without a page reload.
 
 ### S-CREATE-3: Create — HTTP error
 
 **Given** an authorised online user who submits the create form
 **When** the server returns a 4xx or 5xx error
 **Then**
-  - An inline error message is shown inside `StoreForm`.
-  - All field values are preserved.
-  - No navigation occurs.
+
+- An inline error message is shown inside `StoreForm`.
+- All field values are preserved.
+- No navigation occurs.
 
 ### S-CREATE-4: Create — price-included modules auto-selected
 
@@ -523,18 +534,20 @@ boundary.
 **Given** an authorised online user on `/management/stores/edit/42`
 **When** they modify fields and submit
 **Then**
-  - `PUT /v1/stores/42` is called with the updated payload including `moduleIds`.
-  - On success the user is navigated to `/management/stores`.
+
+- `PUT /v1/stores/42` is called with the updated payload including `moduleIds`.
+- On success the user is navigated to `/management/stores`.
 
 ### S-EDIT-2: Edit — store and modules pre-filled
 
 **Given** an authorised online user who opens `/management/stores/edit/42`
 **When** the container mounts
 **Then**
-  - `GET /v1/stores/42` and `GET /v1/modules/ToStore` are called (may be in parallel).
-  - `StoreForm` is pre-filled with the store's current field values.
-  - Modules in `store.modules` are marked selected; their `price`, `currentPrice`, `discountText` come from the store record, not the catalog defaults.
-  - Modules with `priceIncluded === true` are auto-selected and locked regardless.
+
+- `GET /v1/stores/42` and `GET /v1/modules/ToStore` are called (may be in parallel).
+- `StoreForm` is pre-filled with the store's current field values.
+- Modules in `store.modules` are marked selected; their `price`, `currentPrice`, `discountText` come from the store record, not the catalog defaults.
+- Modules with `priceIncluded === true` are auto-selected and locked regardless.
 
 ### S-EDIT-3: Edit — offline blocked
 
@@ -754,9 +767,9 @@ boundary.
 
 **I18N-1** — All user-visible strings via `useIntl`/`FormattedMessage`.
 
-**I18N-2** — 27 USERS.* keys minimum: LIST_TITLE, CREATE_TITLE, EDIT_TITLE, FULL_NAME, LOGIN, PASSWORD, CONFIRM_PASSWORD, CELL_PHONE, EMAIL, IS_ACTIVE, OLD_PASSWORD, NEW_PASSWORD, CONFIRM_NEW_PASSWORD, STORE, SAVE, UPDATE, CHANGE_PASSWORD, CREATE_SUCCESS, UPDATE_SUCCESS, PASSWORD_CHANGED, OFFLINE_NOTICE, DEGRADED_NOTICE, EMPTY, ACTIVATE, DEACTIVATE, PASSWORD_POLICY, PASSWORDS_MUST_MATCH.
+**I18N-2** — 27 USERS.\* keys minimum: LIST_TITLE, CREATE_TITLE, EDIT_TITLE, FULL_NAME, LOGIN, PASSWORD, CONFIRM_PASSWORD, CELL_PHONE, EMAIL, IS_ACTIVE, OLD_PASSWORD, NEW_PASSWORD, CONFIRM_NEW_PASSWORD, STORE, SAVE, UPDATE, CHANGE_PASSWORD, CREATE_SUCCESS, UPDATE_SUCCESS, PASSWORD_CHANGED, OFFLINE_NOTICE, DEGRADED_NOTICE, EMPTY, ACTIVATE, DEACTIVATE, PASSWORD_POLICY, PASSWORDS_MUST_MATCH.
 
-**I18N-3** — Shared MANAGEMENT.* keys added if absent.
+**I18N-3** — Shared MANAGEMENT.\* keys added if absent.
 
 **I18N-4** — Additional keys beyond the 27-key floor are permitted.
 

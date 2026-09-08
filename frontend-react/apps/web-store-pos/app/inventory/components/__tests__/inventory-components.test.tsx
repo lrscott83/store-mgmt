@@ -394,7 +394,13 @@ describe('EntryList — gear action menu (S-GM-ENTRY)', () => {
   it('S-GM-ENTRY-1: owner-admin, not read-only sees the gear with Editar (text-primary) and Eliminar (text-danger, separator)', () => {
     render(
       <Wrapper>
-        <EntryList entries={MOCK_ENTRIES} onEdit={vi.fn()} onDeactivate={vi.fn()} isOwnerAdmin readOnly={false} />
+        <EntryList
+          entries={MOCK_ENTRIES}
+          onEdit={vi.fn()}
+          onDeactivate={vi.fn()}
+          isOwnerAdmin
+          readOnly={false}
+        />
       </Wrapper>,
     );
     fireEvent.click(screen.getByTestId('entry-actions-toggle-e1'));
@@ -426,7 +432,13 @@ describe('EntryList — gear action menu (S-GM-ENTRY)', () => {
     const onDeactivate = vi.fn();
     render(
       <Wrapper>
-        <EntryList entries={MOCK_ENTRIES} onEdit={onEdit} onDeactivate={onDeactivate} isOwnerAdmin readOnly={false} />
+        <EntryList
+          entries={MOCK_ENTRIES}
+          onEdit={onEdit}
+          onDeactivate={onDeactivate}
+          isOwnerAdmin
+          readOnly={false}
+        />
       </Wrapper>,
     );
     fireEvent.click(screen.getByTestId('entry-actions-toggle-e1'));
@@ -492,7 +504,13 @@ describe('EntryList — isOwnerAdmin gating (Angular parity)', () => {
 // ProductSelectView[]) and no longer touches ProductCategoryOfflineService.
 vi.mock('~/sales/lib/services/product-offline-service', () => ({
   ProductOfflineService: vi.fn().mockImplementation(() => ({
-    getProductsToSelect: vi.fn(async () => ({ data: [], succeeded: true, message: '', actionCode: 200, errors: [] })),
+    getProductsToSelect: vi.fn(async () => ({
+      data: [],
+      succeeded: true,
+      message: '',
+      actionCode: 200,
+      errors: [],
+    })),
   })),
 }));
 
@@ -521,12 +539,7 @@ describe('EditInventoryEntryModal — smoke render', () => {
   it('does not render when closed', () => {
     const { container } = render(
       <Wrapper>
-        <EditInventoryEntryModal
-          isOpen={false}
-          onClose={vi.fn()}
-          onSave={vi.fn()}
-          storeId="s1"
-        />
+        <EditInventoryEntryModal isOpen={false} onClose={vi.fn()} onSave={vi.fn()} storeId="s1" />
       </Wrapper>,
     );
     expect(container.querySelector('[role="dialog"]')).toBeNull();
@@ -535,12 +548,7 @@ describe('EditInventoryEntryModal — smoke render', () => {
   it('renders form when open', () => {
     render(
       <Wrapper>
-        <EditInventoryEntryModal
-          isOpen={true}
-          onClose={vi.fn()}
-          onSave={vi.fn()}
-          storeId="s1"
-        />
+        <EditInventoryEntryModal isOpen={true} onClose={vi.fn()} onSave={vi.fn()} storeId="s1" />
       </Wrapper>,
     );
     expect(screen.getByRole('dialog')).toBeInTheDocument();
@@ -625,7 +633,13 @@ describe('EditInventoryEntryModal — product select is selectable (Angular pari
   it('does not disable the product select in edit mode (entry passed)', () => {
     render(
       <Wrapper>
-        <EditInventoryEntryModal isOpen onClose={vi.fn()} onSave={vi.fn()} storeId="s1" entry={makeEntry()} />
+        <EditInventoryEntryModal
+          isOpen
+          onClose={vi.fn()}
+          onSave={vi.fn()}
+          storeId="s1"
+          entry={makeEntry()}
+        />
       </Wrapper>,
     );
     expect(screen.getByRole('combobox')).not.toBeDisabled();
@@ -860,10 +874,7 @@ describe('EditInventoryEntryModal — searchable product combobox filters while 
     fireEvent.change(screen.getByLabelText('Cantidad'), { target: { value: '2' } });
     fireEvent.change(screen.getByLabelText('Precio de costo'), { target: { value: '4' } });
     fireEvent.click(screen.getByRole('button', { name: 'Adicionar' }));
-    expect(onSave).toHaveBeenCalledWith(
-      { productId: 'p1', quantity: 2, costPrice: 4 },
-      undefined,
-    );
+    expect(onSave).toHaveBeenCalledWith({ productId: 'p1', quantity: 2, costPrice: 4 }, undefined);
   });
 
   it('selects the highlighted option with Enter and navigates with ArrowDown', async () => {
@@ -886,9 +897,6 @@ describe('EditInventoryEntryModal — searchable product combobox filters while 
     fireEvent.change(screen.getByLabelText('Cantidad'), { target: { value: '5' } });
     fireEvent.change(screen.getByLabelText('Precio de costo'), { target: { value: '1' } });
     fireEvent.click(screen.getByRole('button', { name: 'Adicionar' }));
-    expect(onSave).toHaveBeenCalledWith(
-      { productId: 'p2', quantity: 5, costPrice: 1 },
-      undefined,
-    );
+    expect(onSave).toHaveBeenCalledWith({ productId: 'p2', quantity: 5, costPrice: 1 }, undefined);
   });
 });

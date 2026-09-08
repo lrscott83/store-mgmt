@@ -59,11 +59,15 @@ test.describe('CSP report-only header (dev)', () => {
     });
 
     await expect
-      .poll(() => page.evaluate(() => (window as unknown as { __cspTestViolation?: unknown }).__cspTestViolation))
+      .poll(() =>
+        page.evaluate(
+          () => (window as unknown as { __cspTestViolation?: unknown }).__cspTestViolation,
+        ),
+      )
       .not.toBeNull();
 
     const violation = (await page.evaluate(
-      () => (window as unknown as { __cspTestViolation?: unknown }).__cspTestViolation
+      () => (window as unknown as { __cspTestViolation?: unknown }).__cspTestViolation,
     )) as { disposition: string; effectiveDirective: string };
 
     expect(violation.disposition).toBe('report');

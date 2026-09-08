@@ -77,7 +77,10 @@ describe('vitest.setup unhandledRejection -> window bridge', () => {
     // honoured and every claimed rejection would start failing runs.
     const seen: Array<{ reason: unknown; cancelable: boolean }> = [];
     const spy = (event: Event) => {
-      seen.push({ reason: (event as Event & { reason: unknown }).reason, cancelable: event.cancelable });
+      seen.push({
+        reason: (event as Event & { reason: unknown }).reason,
+        cancelable: event.cancelable,
+      });
       event.preventDefault();
     };
     window.addEventListener('unhandledrejection', spy);

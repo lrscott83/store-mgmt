@@ -34,9 +34,7 @@ const sampleData: ChartData[] = [
 
 describe('sales-chart.tsx — SalesChart', () => {
   it('renders with data', async () => {
-    render(
-      <SalesChart data={sampleData} loadingMessage="Cargando..." emptyMessage="Sin datos" />
-    );
+    render(<SalesChart data={sampleData} loadingMessage="Cargando..." emptyMessage="Sin datos" />);
     await waitFor(() => {
       expect(screen.getByTestId('sales-chart-core')).toBeTruthy();
     });
@@ -44,9 +42,7 @@ describe('sales-chart.tsx — SalesChart', () => {
   });
 
   it('renders empty message when no data', async () => {
-    render(
-      <SalesChart data={[]} loadingMessage="Cargando..." emptyMessage="Sin datos" />
-    );
+    render(<SalesChart data={[]} loadingMessage="Cargando..." emptyMessage="Sin datos" />);
     await waitFor(() => {
       expect(screen.getByText('Sin datos')).toBeTruthy();
     });
@@ -55,9 +51,7 @@ describe('sales-chart.tsx — SalesChart', () => {
 
 describe('profit-chart.tsx — ProfitChart', () => {
   it('renders with data', async () => {
-    render(
-      <ProfitChart data={sampleData} loadingMessage="Cargando..." emptyMessage="Sin datos" />
-    );
+    render(<ProfitChart data={sampleData} loadingMessage="Cargando..." emptyMessage="Sin datos" />);
     await waitFor(() => {
       expect(screen.getByTestId('profit-chart-core')).toBeTruthy();
     });
@@ -65,9 +59,7 @@ describe('profit-chart.tsx — ProfitChart', () => {
   });
 
   it('renders empty message when no data', async () => {
-    render(
-      <ProfitChart data={[]} loadingMessage="Cargando..." emptyMessage="Sin datos" />
-    );
+    render(<ProfitChart data={[]} loadingMessage="Cargando..." emptyMessage="Sin datos" />);
     await waitFor(() => {
       expect(screen.getByText('Sin datos')).toBeTruthy();
     });

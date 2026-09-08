@@ -24,7 +24,13 @@ interface UserCardListProps {
  * Deactivated users get a red/danger card indicator (`users.component.scss:3-6`
  * `.deactive-user`).
  */
-export function UserCardList({ users, onCreate, onEdit, onActivate, onDeactivate }: UserCardListProps) {
+export function UserCardList({
+  users,
+  onCreate,
+  onEdit,
+  onActivate,
+  onDeactivate,
+}: UserCardListProps) {
   const intl = useIntl();
 
   return (

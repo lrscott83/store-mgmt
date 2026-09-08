@@ -81,7 +81,13 @@ function emptyForm(expense?: Expense): ExpenseFormInput {
   };
 }
 
-export function ExpenseFormModal({ isOpen, onClose, onSave, expense, error }: ExpenseFormModalProps) {
+export function ExpenseFormModal({
+  isOpen,
+  onClose,
+  onSave,
+  expense,
+  error,
+}: ExpenseFormModalProps) {
   const intl = useIntl();
   const [form, setForm] = useState<ExpenseFormInput>(() => emptyForm(expense));
   // Angular parity: isControlInvalid(name, validator) only reports an error once the
@@ -147,7 +153,9 @@ export function ExpenseFormModal({ isOpen, onClose, onSave, expense, error }: Ex
             </label>
             <select
               value={form.type}
-              onChange={(e) => setForm((f) => ({ ...f, type: Number(e.target.value) as ExpenseType }))}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, type: Number(e.target.value) as ExpenseType }))
+              }
               className="w-full rounded border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             >
               {EXPENSE_TYPES.map((t) => (
@@ -160,7 +168,10 @@ export function ExpenseFormModal({ isOpen, onClose, onSave, expense, error }: Ex
 
           {/* Total */}
           <div>
-            <label htmlFor="expense-form-total" className="mb-1 block text-sm font-medium text-text">
+            <label
+              htmlFor="expense-form-total"
+              className="mb-1 block text-sm font-medium text-text"
+            >
               {intl.formatMessage({ id: 'EXPENSES.FORM.TOTAL' })}
             </label>
             <input
@@ -189,10 +200,14 @@ export function ExpenseFormModal({ isOpen, onClose, onSave, expense, error }: Ex
             </label>
             <select
               value={form.paymentType}
-              onChange={(e) => setForm((f) => ({ ...f, paymentType: Number(e.target.value) as PaymentType }))}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, paymentType: Number(e.target.value) as PaymentType }))
+              }
               className="w-full rounded border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             >
-              {([PaymentType.Efectivo, PaymentType.Tarjeta, PaymentType.Zelle] as PaymentType[]).map((pt) => (
+              {(
+                [PaymentType.Efectivo, PaymentType.Tarjeta, PaymentType.Zelle] as PaymentType[]
+              ).map((pt) => (
                 <option key={pt} value={pt}>
                   {intl.formatMessage({ id: PAYMENT_TYPE_KEYS[pt] })}
                 </option>

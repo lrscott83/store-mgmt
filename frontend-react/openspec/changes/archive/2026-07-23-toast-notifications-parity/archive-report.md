@@ -16,11 +16,13 @@ The `toast-notifications-parity` SDD change has been fully implemented, verified
 ## What Was Implemented
 
 ### Toast Infrastructure
+
 - Installed `react-toastify` v11.0.5 and mounted a single global `<ToastContainer>` in `root.tsx` `Layout` with Angular-equivalent config: `position="top-right"`, `autoClose={1000}`, `closeButton` enabled, message-keyed `toastId` for duplicate prevention.
 - Created `shared/lib/toast.tsx` helper module exporting `showToastSuccess(message, title?)` and `showToastError(message, title?)` — the only entry point for firing toasts at call sites.
 - Added one new i18n key: `GENERAL.RESPONSE.SUCCESS_TITLE` = "Éxito" (needed for success toast titles at call sites #2 and #6).
 
 ### Call-Site Migrations (7 sites)
+
 1. **CSV import success** (`sales/routes/products.tsx:223`) — `showBlockingSuccess` Swal → `showToastSuccess` (no title)
 2. **Cart order create success** (`shared/components/cart-shell.tsx:222`) — Swal → `showToastSuccess` with restored "Éxito" title
 3. **Cart order create failure** (`shared/components/cart-shell.tsx:208-211`) — Functional gap closed: generic inline error → specific `showToastError(SHOPPING_CART.ORDER_NOT_CREATED, "Error")` toast; `submitError` state removed entirely
@@ -32,6 +34,7 @@ The `toast-notifications-parity` SDD change has been fully implemented, verified
 All old notification surfaces (Swal calls, inline banners, `submitError` state) have been fully removed with no dead code.
 
 ### Spec Updates
+
 - Created canonical `frontend-react/openspec/specs/toast-notifications/spec.md` — full 5 requirements defining the toast contract (container mount, helper module, 7 call sites, corrected error title, removed legacy surfaces, i18n key).
 - Updated `frontend-react/openspec/specs/admin/spec.md` PAGE-5/PAGE-6 to replace "inline message / no toast" with toast-based notification, citing `toast-notifications-parity` as the superseding change. Immutable archive records left untouched; broader admin "no toast" convention (PAGE-7, PAGE-8) and `management/spec.md:352` left unchanged (out of scope).
 
@@ -45,6 +48,7 @@ migrated and the cart exception-path correctly fires no toast. It surfaced **2 l
 side-effect ORDERING divergences**; 1 fixed, 1 accepted.
 
 ### Finding #1: FIXED — Success toast fired AFTER clearing the cart (cart-shell)
+
 **Severity:** Low | **Status:** Fixed
 
 **Description:** Angular `nav-right.component.ts:213-221` fires `toastrService.success(...)` FIRST,
@@ -58,6 +62,7 @@ then close the panel — 1:1 with Angular. Locked by a TDD assertion in cart-she
 (`showToastSuccess` invocationCallOrder < `clear` invocationCallOrder). Committed on the branch.
 
 ### Finding #2: ACCEPTED — CSV import success toast vs conditional dialog ordering
+
 **Severity:** Low | **Status:** Accepted with rationale
 
 **Description:** Angular `csv-product-importer-modal.component.ts:52-65` runs the conditional
@@ -78,6 +83,7 @@ below as ACCEPTED INTENTIONAL DIVERGENCES — they are design decisions, not par
 ## Test Evidence
 
 **Final Test Suite Result:** 2002/2002 PASS (100% green)
+
 - Helper unit test (`shared/lib/__tests__/toast.test.tsx`) — all cases: no-title, with-title, dedupe intent
 - Root integration test (`__tests__/root.test.tsx`) — `<ToastContainer>` config asserted
 - Per-call-site tests (products, cart-shell, import-form, features) — all mocked `showToastSuccess`/`showToastError` calls asserted; old Swal/inline surfaces confirmed removed
@@ -108,6 +114,7 @@ All SDD artifacts for this change have been moved to:
 `frontend-react/openspec/changes/archive/2026-07-23-toast-notifications-parity/`
 
 Contents:
+
 - ✅ `explore.md` — exploration findings (7 call-site inventory, library recommendation, i18n audit)
 - ✅ `proposal.md` — intent, approach, scope, risks, references
 - ✅ `design.md` — architecture, library integration, per-call-site changes, test strategy, ADRs
@@ -116,6 +123,7 @@ Contents:
 - ✅ `specs/admin/spec.md` — delta spec for admin PAGE-5/PAGE-6 updates
 
 Main specs updated:
+
 - ✅ `frontend-react/openspec/specs/toast-notifications/spec.md` (created, new canonical)
 - ✅ `frontend-react/openspec/specs/admin/spec.md` (updated PAGE-5/PAGE-6 in-place with toast wording)
 
@@ -124,6 +132,7 @@ Main specs updated:
 ## SDD Cycle Complete
 
 The change has been:
+
 1. ✅ **Proposed** — Problem, approach, scope, risks defined
 2. ✅ **Specified** — 5 requirements, scenarios, edge cases documented
 3. ✅ **Designed** — Architecture, library choice, call-site changes, test strategy, ADRs

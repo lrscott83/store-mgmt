@@ -88,8 +88,13 @@ export function PlanPicker({ modules, onChange, readOnly = false }: PlanPickerPr
       </p>
 
       <div className="flex border-b border-gray-200" role="tablist">
-        <button type="button" role="tab" aria-selected={tab === 'free'}
-          onClick={() => setTab('free')} className={tabClass(tab === 'free')}>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === 'free'}
+          onClick={() => setTab('free')}
+          className={tabClass(tab === 'free')}
+        >
           {t('STORES.PLAN.FREE_TAB')}
           {active === 'free' && (
             <span className="rounded bg-green-100 px-1.5 py-0.5 text-xs text-green-700">
@@ -97,8 +102,13 @@ export function PlanPicker({ modules, onChange, readOnly = false }: PlanPickerPr
             </span>
           )}
         </button>
-        <button type="button" role="tab" aria-selected={tab === 'paid'}
-          onClick={() => setTab('paid')} className={tabClass(tab === 'paid')}>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === 'paid'}
+          onClick={() => setTab('paid')}
+          className={tabClass(tab === 'paid')}
+        >
           <span className="flex items-center gap-2">
             {t('STORES.PLAN.PAID_TAB')} ·
             {hasDiscount && (
@@ -106,9 +116,7 @@ export function PlanPicker({ modules, onChange, readOnly = false }: PlanPickerPr
                 {formatPlanAmount(paidOriginalTotal)}
               </span>
             )}
-            <span className="font-semibold">
-              {formatPlanPrice(paidTotal)}
-            </span>
+            <span className="font-semibold">{formatPlanPrice(paidTotal)}</span>
           </span>
           {active === 'paid' && (
             <span className="rounded bg-green-100 px-1.5 py-0.5 text-xs text-green-700">
@@ -132,8 +140,11 @@ export function PlanPicker({ modules, onChange, readOnly = false }: PlanPickerPr
           <p className="text-sm font-medium text-primary">{t('STORES.PLAN.SELECTED')}</p>
         ) : (
           !readOnly && (
-            <button type="button" onClick={() => choosePlan(tab)}
-              className="rounded bg-primary px-4 py-2 text-sm font-medium text-white">
+            <button
+              type="button"
+              onClick={() => choosePlan(tab)}
+              className="rounded bg-primary px-4 py-2 text-sm font-medium text-white"
+            >
               {t('STORES.PLAN.ACTIVATE')}
             </button>
           )

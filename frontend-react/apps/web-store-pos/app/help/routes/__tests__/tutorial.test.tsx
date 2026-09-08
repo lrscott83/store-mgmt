@@ -180,7 +180,9 @@ describe('TutorialPage — S-HELP-CONTENT-3: 6 images with /images/help/ paths',
       </Wrapper>,
     );
     expandPanel();
-    const srcs = Array.from(container.querySelectorAll('img')).map((img) => img.getAttribute('src'));
+    const srcs = Array.from(container.querySelectorAll('img')).map((img) =>
+      img.getAttribute('src'),
+    );
     expect(srcs).toContain('/images/help/menu.png');
     expect(srcs).toContain('/images/help/add-cat-dialog.png');
     expect(srcs).toContain('/images/help/add-product-btn.png');

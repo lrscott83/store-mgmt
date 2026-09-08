@@ -95,9 +95,15 @@ let mockUpdateStore = vi.fn();
 
 vi.mock('~/management/stores/lib/services/store-http-service', () => ({
   storeHttpService: {
-    get getStorePlan() { return mockGetStorePlan; },
-    get getModulesToStore() { return mockGetModulesToStore; },
-    get updateStore() { return mockUpdateStore; },
+    get getStorePlan() {
+      return mockGetStorePlan;
+    },
+    get getModulesToStore() {
+      return mockGetModulesToStore;
+    },
+    get updateStore() {
+      return mockUpdateStore;
+    },
   },
 }));
 
@@ -119,9 +125,15 @@ const localStorageMock = (() => {
   let store: Record<string, string> = {};
   return {
     getItem: (key: string) => store[key] ?? null,
-    setItem: (key: string, value: string) => { store[key] = value; },
-    removeItem: (key: string) => { delete store[key]; },
-    clear: () => { store = {}; },
+    setItem: (key: string, value: string) => {
+      store[key] = value;
+    },
+    removeItem: (key: string) => {
+      delete store[key];
+    },
+    clear: () => {
+      store = {};
+    },
   };
 })();
 Object.defineProperty(global, 'localStorage', { value: localStorageMock });
@@ -142,14 +154,12 @@ describe('StorePlanPage — renders the plan picker with the store plan merged i
     localStorageMock.clear();
     mockUser = makeUser();
     mockParams = {};
-    mockGetStorePlan = vi
-      .fn()
-      .mockResolvedValue({
-        succeeded: true,
-        data: makePlan({
-          modules: [makeModule({ id: 1, selected: true })],
-        }),
-      });
+    mockGetStorePlan = vi.fn().mockResolvedValue({
+      succeeded: true,
+      data: makePlan({
+        modules: [makeModule({ id: 1, selected: true })],
+      }),
+    });
     mockGetModulesToStore = vi.fn().mockResolvedValue({
       succeeded: true,
       data: [
@@ -161,7 +171,11 @@ describe('StorePlanPage — renders the plan picker with the store plan merged i
 
   it('fetches the plan and the catalog, merges them, and renders the picker', async () => {
     const { StorePlanPage } = await import('../store-plan');
-    render(<Wrapper><StorePlanPage /></Wrapper>);
+    render(
+      <Wrapper>
+        <StorePlanPage />
+      </Wrapper>,
+    );
 
     await waitFor(() => {
       expect(mockGetStorePlan).toHaveBeenCalledWith('s1');
@@ -169,7 +183,9 @@ describe('StorePlanPage — renders the plan picker with the store plan merged i
     });
     // SECTION_TITLE renders twice: the page heading and the picker's section label
     await waitFor(() => {
-      expect(screen.getAllByText(esMessages['STORES.PLAN.SECTION_TITLE']).length).toBeGreaterThan(0);
+      expect(screen.getAllByText(esMessages['STORES.PLAN.SECTION_TITLE']).length).toBeGreaterThan(
+        0,
+      );
     });
     // The store's paid module is selected → paid tab carries the ACTIVE badge.
     // Price format is "8 USD" (plan-picker's formatPlanPrice — no $ symbol;
@@ -185,15 +201,13 @@ describe('StorePlanPage — save', () => {
     localStorageMock.clear();
     mockUser = makeUser();
     mockParams = {};
-    mockGetStorePlan = vi
-      .fn()
-      .mockResolvedValue({
-        succeeded: true,
-        data: makePlan({
-          // Free store: no paid module selected
-          modules: [makeModule({ id: 2, priceIncluded: true })],
-        }),
-      });
+    mockGetStorePlan = vi.fn().mockResolvedValue({
+      succeeded: true,
+      data: makePlan({
+        // Free store: no paid module selected
+        modules: [makeModule({ id: 2, priceIncluded: true })],
+      }),
+    });
     mockGetModulesToStore = vi.fn().mockResolvedValue({
       succeeded: true,
       data: [
@@ -207,7 +221,11 @@ describe('StorePlanPage — save', () => {
 
   it('sends the full update payload with the chosen moduleIds and refreshes the session', async () => {
     const { StorePlanPage } = await import('../store-plan');
-    render(<Wrapper><StorePlanPage /></Wrapper>);
+    render(
+      <Wrapper>
+        <StorePlanPage />
+      </Wrapper>,
+    );
 
     // Default tab is the ACTIVE plan (free); the activate button renders only on
     // the non-selected paid tab — same flow as the plan E2E.
@@ -234,15 +252,17 @@ describe('StorePlanPage — save', () => {
   });
 
   it('omits paymentStartDate when the store has none', async () => {
-    mockGetStorePlan = vi
-      .fn()
-      .mockResolvedValue({
-        succeeded: true,
-        data: makePlan({ paymentStartDate: null, modules: [] }),
-      });
+    mockGetStorePlan = vi.fn().mockResolvedValue({
+      succeeded: true,
+      data: makePlan({ paymentStartDate: null, modules: [] }),
+    });
 
     const { StorePlanPage } = await import('../store-plan');
-    render(<Wrapper><StorePlanPage /></Wrapper>);
+    render(
+      <Wrapper>
+        <StorePlanPage />
+      </Wrapper>,
+    );
 
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /Guardar/ })).toBeEnabled();
@@ -284,7 +304,11 @@ describe('StorePlanPage — next billing date', () => {
     });
 
     const { StorePlanPage } = await import('../store-plan');
-    render(<Wrapper><StorePlanPage /></Wrapper>);
+    render(
+      <Wrapper>
+        <StorePlanPage />
+      </Wrapper>,
+    );
 
     const banner = await screen.findByTestId('plan-next-billing-date');
     expect(banner).toHaveTextContent(esMessages['STORES.PLAN.NEXT_BILLING_DATE']);
@@ -301,7 +325,11 @@ describe('StorePlanPage — next billing date', () => {
     });
 
     const { StorePlanPage } = await import('../store-plan');
-    render(<Wrapper><StorePlanPage /></Wrapper>);
+    render(
+      <Wrapper>
+        <StorePlanPage />
+      </Wrapper>,
+    );
 
     await waitFor(() => {
       expect(screen.getByRole('tab', { name: /Gratis/ })).toBeInTheDocument();
@@ -324,7 +352,11 @@ describe('StorePlanPage — load failure (ST-ERROR parity with the plan E2E)', (
 
   it('shows STORES.ERROR and does not mount the picker when the catalog fails', async () => {
     const { StorePlanPage } = await import('../store-plan');
-    render(<Wrapper><StorePlanPage /></Wrapper>);
+    render(
+      <Wrapper>
+        <StorePlanPage />
+      </Wrapper>,
+    );
 
     await waitFor(() => {
       expect(screen.getByRole('alert')).toHaveTextContent(esMessages['STORES.ERROR']);
@@ -344,7 +376,11 @@ describe('StorePlanPage — no selected store', () => {
 
   it('shows NO_STORE_SELECTED and fetches nothing', async () => {
     const { StorePlanPage } = await import('../store-plan');
-    render(<Wrapper><StorePlanPage /></Wrapper>);
+    render(
+      <Wrapper>
+        <StorePlanPage />
+      </Wrapper>,
+    );
 
     await waitFor(() => {
       expect(screen.getByText(esMessages['STORES.NO_STORE_SELECTED'])).toBeInTheDocument();

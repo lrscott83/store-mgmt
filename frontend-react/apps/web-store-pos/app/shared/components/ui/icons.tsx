@@ -12,8 +12,19 @@ const BASE = 'h-5 w-5 shrink-0';
 /** Material `add`. */
 export function PlusIcon({ className = '' }: IconProps) {
   return (
-    <svg className={`${BASE} ${className}`.trim()} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.5v15m7.5-7.5h-15" />
+    <svg
+      className={`${BASE} ${className}`.trim()}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      aria-hidden="true"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M12 4.5v15m7.5-7.5h-15"
+      />
     </svg>
   );
 }
@@ -21,7 +32,13 @@ export function PlusIcon({ className = '' }: IconProps) {
 /** Material `attach_file`. */
 export function PaperclipIcon({ className = '' }: IconProps) {
   return (
-    <svg className={`${BASE} ${className}`.trim()} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+    <svg
+      className={`${BASE} ${className}`.trim()}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      aria-hidden="true"
+    >
       <path
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -35,7 +52,13 @@ export function PaperclipIcon({ className = '' }: IconProps) {
 /** Material `email` (envelope) — used in the footer "Contáctanos" link. */
 export function EmailIcon({ className = '' }: IconProps) {
   return (
-    <svg className={`${BASE} ${className}`.trim()} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+    <svg
+      className={`${BASE} ${className}`.trim()}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      aria-hidden="true"
+    >
       <path
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -49,7 +72,13 @@ export function EmailIcon({ className = '' }: IconProps) {
 /** Material `edit`. */
 export function EditIcon({ className = '' }: IconProps) {
   return (
-    <svg className={`${BASE} ${className}`.trim()} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+    <svg
+      className={`${BASE} ${className}`.trim()}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      aria-hidden="true"
+    >
       <path
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -63,14 +92,25 @@ export function EditIcon({ className = '' }: IconProps) {
 /** Material `settings` (gear, per-card action-menu trigger, e.g. `users.component.html:26`). */
 export function SettingsIcon({ className = '' }: IconProps) {
   return (
-    <svg className={`${BASE} ${className}`.trim()} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+    <svg
+      className={`${BASE} ${className}`.trim()}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      aria-hidden="true"
+    >
       <path
         strokeLinecap="round"
         strokeLinejoin="round"
         strokeWidth={2}
         d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
       />
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+      />
     </svg>
   );
 }
@@ -80,7 +120,10 @@ export function SettingsIcon({ className = '' }: IconProps) {
  * when its panel is expanded). Extracted from the one-off inline SVG that used to live only
  * in `products.tsx` so every collapsible-panel header can share it.
  */
-export function ChevronDownIcon({ className = '', isExpanded = false }: IconProps & { isExpanded?: boolean }) {
+export function ChevronDownIcon({
+  className = '',
+  isExpanded = false,
+}: IconProps & { isExpanded?: boolean }) {
   return (
     <svg
       className={`${BASE} transition-transform ${isExpanded ? 'rotate-180' : ''} ${className}`.trim()}
@@ -89,7 +132,12 @@ export function ChevronDownIcon({ className = '', isExpanded = false }: IconProp
       stroke="currentColor"
       aria-hidden="true"
     >
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M19.5 8.25l-7.5 7.5-7.5-7.5"
+      />
     </svg>
   );
 }
@@ -97,7 +145,13 @@ export function ChevronDownIcon({ className = '', isExpanded = false }: IconProp
 /** Material `close` (modal header/footer close button, e.g. edit-expense-modal.component.html:7,71). */
 export function CloseIcon({ className = '' }: IconProps) {
   return (
-    <svg className={`${BASE} ${className}`.trim()} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+    <svg
+      className={`${BASE} ${className}`.trim()}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      aria-hidden="true"
+    >
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
     </svg>
   );
@@ -106,7 +160,13 @@ export function CloseIcon({ className = '' }: IconProps) {
 /** Material `save` (modal footer save/insert-or-update button, edit-expense-modal.component.html:75). */
 export function SaveIcon({ className = '' }: IconProps) {
   return (
-    <svg className={`${BASE} ${className}`.trim()} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+    <svg
+      className={`${BASE} ${className}`.trim()}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      aria-hidden="true"
+    >
       <path
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -120,7 +180,13 @@ export function SaveIcon({ className = '' }: IconProps) {
 /** Material `delete` (row action, warn-colored — entry-list/expense-list "Eliminar"). */
 export function TrashIcon({ className = '' }: IconProps) {
   return (
-    <svg className={`${BASE} ${className}`.trim()} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+    <svg
+      className={`${BASE} ${className}`.trim()}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      aria-hidden="true"
+    >
       <path
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -137,7 +203,13 @@ export function TrashIcon({ className = '' }: IconProps) {
  */
 export function DownloadIcon({ className = '' }: IconProps) {
   return (
-    <svg className={`${BASE} ${className}`.trim()} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+    <svg
+      className={`${BASE} ${className}`.trim()}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      aria-hidden="true"
+    >
       <path
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -155,7 +227,13 @@ export function DownloadIcon({ className = '' }: IconProps) {
  */
 export function BarChartIcon({ className = '' }: IconProps) {
   return (
-    <svg className={`${BASE} ${className}`.trim()} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+    <svg
+      className={`${BASE} ${className}`.trim()}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      aria-hidden="true"
+    >
       <path
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -172,36 +250,55 @@ export function BarChartIcon({ className = '' }: IconProps) {
  * Same SVG paths as the local `PaymentTypeIcon` in `cart-shell.tsx`, extracted here so other
  * modules (Expenses) can reuse them without duplicating markup.
  */
-export function PaymentMethodIcon({ kind, className = '' }: IconProps & { kind: 'cash' | 'card' | 'phone' | 'dollar' }) {
+export function PaymentMethodIcon({
+  kind,
+  className = '',
+}: IconProps & { kind: 'cash' | 'card' | 'phone' | 'dollar' }) {
   const cls = `h-4 w-4 shrink-0 ${className}`.trim();
   if (kind === 'cash') {
     return (
       <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-          d="M3 6h18M3 6v12a1 1 0 001 1h16a1 1 0 001-1V6M3 6l2-3h14l2 3M12 10a2.5 2.5 0 100 5 2.5 2.5 0 000-5z" />
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M3 6h18M3 6v12a1 1 0 001 1h16a1 1 0 001-1V6M3 6l2-3h14l2 3M12 10a2.5 2.5 0 100 5 2.5 2.5 0 000-5z"
+        />
       </svg>
     );
   }
   if (kind === 'card') {
     return (
       <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-          d="M3 6h18a1 1 0 011 1v10a1 1 0 01-1 1H3a1 1 0 01-1-1V7a1 1 0 011-1zM2 10h20M6 15h4" />
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M3 6h18a1 1 0 011 1v10a1 1 0 01-1 1H3a1 1 0 01-1-1V7a1 1 0 011-1zM2 10h20M6 15h4"
+        />
       </svg>
     );
   }
   if (kind === 'phone') {
     return (
       <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-          d="M7 3h10a1 1 0 011 1v16a1 1 0 01-1 1H7a1 1 0 01-1-1V4a1 1 0 011-1zM11 18h2" />
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M7 3h10a1 1 0 011 1v16a1 1 0 01-1 1H7a1 1 0 01-1-1V4a1 1 0 011-1zM11 18h2"
+        />
       </svg>
     );
   }
   return (
     <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-        d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8V6m0 12v-2m0-8c1.11 0 2.08.402 2.599 1M9.401 15c.52.598 1.489 1 2.599 1" />
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8V6m0 12v-2m0-8c1.11 0 2.08.402 2.599 1M9.401 15c.52.598 1.489 1 2.599 1"
+      />
     </svg>
   );
 }
@@ -209,9 +306,25 @@ export function PaymentMethodIcon({ kind, className = '' }: IconProps & { kind: 
 /** Material `visibility` (password show/hide toggle, revealed state — sync export/import forms). */
 export function EyeIcon({ className = '' }: IconProps) {
   return (
-    <svg className={`${BASE} ${className}`.trim()} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+    <svg
+      className={`${BASE} ${className}`.trim()}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      aria-hidden="true"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"
+      />
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+      />
     </svg>
   );
 }
@@ -219,8 +332,19 @@ export function EyeIcon({ className = '' }: IconProps) {
 /** Material `visibility_off` (password show/hide toggle, hidden state — sync export/import forms). */
 export function EyeOffIcon({ className = '' }: IconProps) {
   return (
-    <svg className={`${BASE} ${className}`.trim()} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.98 8.223A10.477 10.477 0 001.934 12c1.292 4.338 5.31 7.5 10.066 7.5.993 0 1.953-.138 2.863-.395M6.228 6.228A10.451 10.451 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" />
+    <svg
+      className={`${BASE} ${className}`.trim()}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      aria-hidden="true"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M3.98 8.223A10.477 10.477 0 001.934 12c1.292 4.338 5.31 7.5 10.066 7.5.993 0 1.953-.138 2.863-.395M6.228 6.228A10.451 10.451 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88"
+      />
     </svg>
   );
 }
@@ -228,8 +352,19 @@ export function EyeOffIcon({ className = '' }: IconProps) {
 /** Material `help` (question-mark circle — offline-access help popup trigger). */
 export function HelpIcon({ className = '' }: IconProps) {
   return (
-    <svg className={`${BASE} ${className}`.trim()} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-5.25h.008v.008H12V6.75z" />
+    <svg
+      className={`${BASE} ${className}`.trim()}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      aria-hidden="true"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-5.25h.008v.008H12V6.75z"
+      />
     </svg>
   );
 }
@@ -237,7 +372,13 @@ export function HelpIcon({ className = '' }: IconProps) {
 /** Material `payments` (cash glyph — action-menu `pay` intent, same path as `PaymentMethodIcon` kind='cash', promoted to `BASE` size). */
 export function PayIcon({ className = '' }: IconProps) {
   return (
-    <svg className={`${BASE} ${className}`.trim()} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+    <svg
+      className={`${BASE} ${className}`.trim()}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      aria-hidden="true"
+    >
       <path
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -251,9 +392,19 @@ export function PayIcon({ className = '' }: IconProps) {
 /** Material `payment` (credit-card glyph — sale-credit submit fabs, same path as `PaymentMethodIcon` kind='card', promoted to `BASE` size). */
 export function PaymentIcon({ className = '' }: IconProps) {
   return (
-    <svg className={`${BASE} ${className}`.trim()} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-        d="M3 6h18a1 1 0 011 1v10a1 1 0 01-1 1H3a1 1 0 01-1-1V7a1 1 0 011-1zM2 10h20M6 15h4" />
+    <svg
+      className={`${BASE} ${className}`.trim()}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      aria-hidden="true"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M3 6h18a1 1 0 011 1v10a1 1 0 01-1 1H3a1 1 0 01-1-1V7a1 1 0 011-1zM2 10h20M6 15h4"
+      />
     </svg>
   );
 }
@@ -261,7 +412,13 @@ export function PaymentIcon({ className = '' }: IconProps) {
 /** Material `check_circle` (action-menu `activate`/`approve` intents). */
 export function CheckCircleIcon({ className = '' }: IconProps) {
   return (
-    <svg className={`${BASE} ${className}`.trim()} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+    <svg
+      className={`${BASE} ${className}`.trim()}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      aria-hidden="true"
+    >
       <path
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -275,7 +432,13 @@ export function CheckCircleIcon({ className = '' }: IconProps) {
 /** Material `block` (action-menu `deactivate`/`disapprove` intents). */
 export function BanIcon({ className = '' }: IconProps) {
   return (
-    <svg className={`${BASE} ${className}`.trim()} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+    <svg
+      className={`${BASE} ${className}`.trim()}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      aria-hidden="true"
+    >
       <path
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -289,8 +452,19 @@ export function BanIcon({ className = '' }: IconProps) {
 /** Material `swap_horiz` — intercambio horizontal entre almacenes (transferencia). */
 export function SwapHorizontalIcon({ className = '' }: IconProps) {
   return (
-    <svg className={`${BASE} ${className}`.trim()} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 4v12m0 0l4-4m-4 4l-4-4" />
+    <svg
+      className={`${BASE} ${className}`.trim()}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      aria-hidden="true"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M7 16V4m0 0L3 8m4-4l4 4m6 4v12m0 0l4-4m-4 4l-4-4"
+      />
     </svg>
   );
 }
@@ -298,8 +472,19 @@ export function SwapHorizontalIcon({ className = '' }: IconProps) {
 /** Material `inventory` (entrada/salida de mercancía — inbound/outbound warehouse operations). */
 export function InOutIcon({ className = '' }: IconProps) {
   return (
-    <svg className={`${BASE} ${className}`.trim()} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+    <svg
+      className={`${BASE} ${className}`.trim()}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      aria-hidden="true"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+      />
     </svg>
   );
 }
@@ -307,8 +492,19 @@ export function InOutIcon({ className = '' }: IconProps) {
 /** Material `local_shipping` (salida a tienda / delivery — warehouse sale-out operations). */
 export function TruckIcon({ className = '' }: IconProps) {
   return (
-    <svg className={`${BASE} ${className}`.trim()} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m4-4l-4-4" />
+    <svg
+      className={`${BASE} ${className}`.trim()}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      aria-hidden="true"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m4-4l-4-4"
+      />
     </svg>
   );
 }
@@ -316,7 +512,13 @@ export function TruckIcon({ className = '' }: IconProps) {
 /** Material `login` (auth submit fab leading glyph, login.component.html:97). */
 export function LoginIcon({ className = '' }: IconProps) {
   return (
-    <svg className={`${BASE} ${className}`.trim()} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+    <svg
+      className={`${BASE} ${className}`.trim()}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      aria-hidden="true"
+    >
       <path
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -330,7 +532,13 @@ export function LoginIcon({ className = '' }: IconProps) {
 /** Material `lock_open` (register submit fab leading glyph, register.component.html:208). */
 export function LockOpenIcon({ className = '' }: IconProps) {
   return (
-    <svg className={`${BASE} ${className}`.trim()} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+    <svg
+      className={`${BASE} ${className}`.trim()}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      aria-hidden="true"
+    >
       <path
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -386,7 +594,13 @@ export function EmptyTrendingIcon({ className = '' }: IconProps) {
 /** Heroicons `qr-code`-style barcode scan icon — sale view scanner entry point. */
 export function ScanBarcodeIcon({ className = '' }: IconProps) {
   return (
-    <svg className={`${BASE} ${className}`.trim()} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+    <svg
+      className={`${BASE} ${className}`.trim()}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      aria-hidden="true"
+    >
       <path
         strokeLinecap="round"
         strokeLinejoin="round"

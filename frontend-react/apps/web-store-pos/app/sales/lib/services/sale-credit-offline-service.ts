@@ -73,9 +73,7 @@ export class SaleCreditOfflineService {
     const activeCreditsResponse = this.getSaleCreditsInDay(date);
     return Promise.resolve(
       success(
-        activeCreditsResponse.succeeded
-          ? activeCreditsResponse.data.filter((c) => !c.isPaid)
-          : [],
+        activeCreditsResponse.succeeded ? activeCreditsResponse.data.filter((c) => !c.isPaid) : [],
       ),
     );
   }
@@ -93,11 +91,7 @@ export class SaleCreditOfflineService {
     const filtered = this.getStorageSaleCredits()
       .filter(
         (c) =>
-          c.isActive &&
-          c.isPaid &&
-          c.paidDate &&
-          c.paidDate >= startDate &&
-          c.paidDate < endDate,
+          c.isActive && c.isPaid && c.paidDate && c.paidDate >= startDate && c.paidDate < endDate,
       )
       .sort((c1, c2) => c1.date.getTime() - c2.date.getTime());
     return Promise.resolve(success(filtered));
@@ -144,7 +138,9 @@ export class SaleCreditOfflineService {
    * `getActiveSaleCreditsBetweenDates`.
    */
   private activeSaleCreditsBetween(start: Date, end: Date): SaleCredit[] {
-    return this.getStorageSaleCredits().filter((c) => c.isActive && c.date >= start && c.date < end);
+    return this.getStorageSaleCredits().filter(
+      (c) => c.isActive && c.date >= start && c.date < end,
+    );
   }
 
   private activeUnpaidSaleCreditsBetween(start: Date, end: Date): SaleCredit[] {
@@ -163,12 +159,7 @@ export class SaleCreditOfflineService {
   getPaidSaleCreditsBetween(start: Date, end: Date): SaleCredit[] {
     const filtered = this.getStorageSaleCredits()
       .filter(
-        (c) =>
-          c.isActive &&
-          c.isPaid &&
-          c.paidDate &&
-          c.paidDate >= start &&
-          c.paidDate < end,
+        (c) => c.isActive && c.isPaid && c.paidDate && c.paidDate >= start && c.paidDate < end,
       )
       .sort((c1, c2) => c1.date.getTime() - c2.date.getTime());
     return filtered;
@@ -230,7 +221,12 @@ export class SaleCreditOfflineService {
    * (flagged mismatch #5). Always succeeds, returns SYNC `DataResult<SaleCredit>`
    * (`new DataResult(credit, true, [])`) — never throws.
    */
-  createSaleCredit(orderId: string, client: string, total: number, note: string): DataResult<SaleCredit> {
+  createSaleCredit(
+    orderId: string,
+    client: string,
+    total: number,
+    note: string,
+  ): DataResult<SaleCredit> {
     const now = new Date();
     const credit: SaleCredit = {
       id: generateId(),

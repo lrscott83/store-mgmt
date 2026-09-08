@@ -24,7 +24,9 @@ function makeProduct(overrides: Partial<Product> = {}): Product {
   } as Product;
 }
 
-function makeOrderItem(overrides: Partial<{ productId: string; quantity: number; price: number }> = {}) {
+function makeOrderItem(
+  overrides: Partial<{ productId: string; quantity: number; price: number }> = {},
+) {
   return {
     productId: 'p1',
     productName: 'Ron',
@@ -86,7 +88,9 @@ function makeInventoryEntry(overrides: Partial<InventoryEntry> = {}): InventoryE
   } as InventoryEntry;
 }
 
-function makeInventoryCategoryView(overrides: Partial<InventoryCategoryView> = {}): InventoryCategoryView {
+function makeInventoryCategoryView(
+  overrides: Partial<InventoryCategoryView> = {},
+): InventoryCategoryView {
   return {
     categoryId: 'c1',
     categoryName: 'Bebidas',
@@ -235,12 +239,29 @@ describe('generateProductRows', () => {
   });
 
   it('ROW-05: multiple available products each produce their own row (no dropped rows)', () => {
-    const products = [makeProduct({ id: 'p1', name: 'Ron' }), makeProduct({ id: 'p2', name: 'Vodka' })];
+    const products = [
+      makeProduct({ id: 'p1', name: 'Ron' }),
+      makeProduct({ id: 'p2', name: 'Vodka' }),
+    ];
     const categories = [
       makeInventoryCategoryView({
         products: [
-          { productId: 'p1', productName: 'Ron', categoryId: 'c1', categoryName: 'Bebidas', totalAvailable: 4, avgCostPrice: 2 },
-          { productId: 'p2', productName: 'Vodka', categoryId: 'c1', categoryName: 'Bebidas', totalAvailable: 6, avgCostPrice: 3 },
+          {
+            productId: 'p1',
+            productName: 'Ron',
+            categoryId: 'c1',
+            categoryName: 'Bebidas',
+            totalAvailable: 4,
+            avgCostPrice: 2,
+          },
+          {
+            productId: 'p2',
+            productName: 'Vodka',
+            categoryId: 'c1',
+            categoryName: 'Bebidas',
+            totalAvailable: 6,
+            avgCostPrice: 3,
+          },
         ],
       }),
     ];

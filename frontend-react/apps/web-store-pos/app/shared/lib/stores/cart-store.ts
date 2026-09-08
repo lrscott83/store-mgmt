@@ -61,9 +61,7 @@ export const useCartStore = create<CartState>()(
           if (existing) {
             return {
               items: state.items.map((i) =>
-                i.product.id === product.id
-                  ? { ...i, quantity: i.quantity + quantity }
-                  : i
+                i.product.id === product.id ? { ...i, quantity: i.quantity + quantity } : i,
               ),
             };
           }
@@ -89,7 +87,7 @@ export const useCartStore = create<CartState>()(
           items: state.items.map((i) =>
             i.product.id === productId
               ? { ...i, quantity: qty, ...(price !== undefined ? { price } : {}) }
-              : i
+              : i,
           ),
         }));
       },
@@ -129,8 +127,8 @@ export const useCartStore = create<CartState>()(
         return round2(
           get().items.reduce(
             (sum, item) => sum + round2((item.price ?? item.product.price) * item.quantity),
-            0
-          )
+            0,
+          ),
         );
       },
 
@@ -142,6 +140,6 @@ export const useCartStore = create<CartState>()(
     }),
     {
       name: 'lizoft-cart',
-    }
-  )
+    },
+  ),
 );

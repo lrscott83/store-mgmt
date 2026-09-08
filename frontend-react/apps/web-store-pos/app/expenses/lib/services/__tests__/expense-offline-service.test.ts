@@ -4,7 +4,16 @@ import { ExpenseOfflineService } from '../expense-offline-service';
 
 const storeId = 'test-store';
 
-function makeExpense(overrides: Partial<{ type: ExpenseType; total: number; date: Date; paymentType: PaymentType; note: string; isActive: boolean }> = {}) {
+function makeExpense(
+  overrides: Partial<{
+    type: ExpenseType;
+    total: number;
+    date: Date;
+    paymentType: PaymentType;
+    note: string;
+    isActive: boolean;
+  }> = {},
+) {
   return {
     type: overrides.type ?? ExpenseType.Otro,
     total: overrides.total ?? 100,

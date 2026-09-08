@@ -67,7 +67,7 @@ describe('FeaturesPage — render', () => {
     render(
       <Wrapper>
         <FeaturesPage />
-      </Wrapper>
+      </Wrapper>,
     );
     expect(screen.getByText(esMessages['FEATURES.TITLE'])).toBeInTheDocument();
   });
@@ -77,10 +77,10 @@ describe('FeaturesPage — render', () => {
     render(
       <Wrapper>
         <FeaturesPage />
-      </Wrapper>
+      </Wrapper>,
     );
     expect(
-      screen.getByRole('button', { name: esMessages['FEATURES.ACTIVATE_FEATURES'] })
+      screen.getByRole('button', { name: esMessages['FEATURES.ACTIVATE_FEATURES'] }),
     ).toBeInTheDocument();
   });
 
@@ -89,7 +89,7 @@ describe('FeaturesPage — render', () => {
     const { container } = render(
       <Wrapper>
         <FeaturesPage />
-      </Wrapper>
+      </Wrapper>,
     );
     expect(container.querySelector('[data-slot="card"]')).toBeTruthy();
   });
@@ -99,7 +99,7 @@ describe('FeaturesPage — render', () => {
     render(
       <Wrapper>
         <FeaturesPage />
-      </Wrapper>
+      </Wrapper>,
     );
     const button = screen.getByRole('button', {
       name: esMessages['FEATURES.ACTIVATE_FEATURES'],
@@ -112,7 +112,7 @@ describe('FeaturesPage — render', () => {
     render(
       <Wrapper>
         <FeaturesPage />
-      </Wrapper>
+      </Wrapper>,
     );
     const button = screen.getByRole('button', {
       name: esMessages['FEATURES.ACTIVATE_FEATURES'],
@@ -130,9 +130,8 @@ describe('FeaturesPage — render', () => {
 
 describe('FeaturesPage — button click', () => {
   it('calls featureHttpService.activateFeatures when button is clicked', async () => {
-    const { featureHttpService } = await import(
-      '~/admin/features/lib/services/feature-http-service'
-    );
+    const { featureHttpService } =
+      await import('~/admin/features/lib/services/feature-http-service');
     vi.mocked(featureHttpService.activateFeatures).mockResolvedValue({
       succeeded: true,
       data: true,
@@ -145,7 +144,7 @@ describe('FeaturesPage — button click', () => {
     render(
       <Wrapper>
         <FeaturesPage />
-      </Wrapper>
+      </Wrapper>,
     );
 
     const button = screen.getByRole('button', {
@@ -165,9 +164,8 @@ describe('FeaturesPage — button click', () => {
 
 describe('FeaturesPage — success state', () => {
   it('calls showToastSuccess with FEATURES.FEATURES_ACTIVATED + "Éxito" title when succeeded is true (no static <p>)', async () => {
-    const { featureHttpService } = await import(
-      '~/admin/features/lib/services/feature-http-service'
-    );
+    const { featureHttpService } =
+      await import('~/admin/features/lib/services/feature-http-service');
     const { showToastSuccess } = await import('~/shared/lib/toast');
     vi.mocked(featureHttpService.activateFeatures).mockResolvedValue({
       succeeded: true,
@@ -181,12 +179,10 @@ describe('FeaturesPage — success state', () => {
     render(
       <Wrapper>
         <FeaturesPage />
-      </Wrapper>
+      </Wrapper>,
     );
 
-    fireEvent.click(
-      screen.getByRole('button', { name: esMessages['FEATURES.ACTIVATE_FEATURES'] })
-    );
+    fireEvent.click(screen.getByRole('button', { name: esMessages['FEATURES.ACTIVATE_FEATURES'] }));
 
     await waitFor(() => {
       expect(showToastSuccess).toHaveBeenCalledWith(
@@ -196,9 +192,7 @@ describe('FeaturesPage — success state', () => {
     });
     // Angular's success feedback is a toastr, not a static persisted <p> — proves the
     // old non-dismissing text node is gone.
-    expect(
-      screen.queryByText(esMessages['FEATURES.FEATURES_ACTIVATED'])
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText(esMessages['FEATURES.FEATURES_ACTIVATED'])).not.toBeInTheDocument();
   });
 });
 
@@ -208,9 +202,8 @@ describe('FeaturesPage — success state', () => {
 
 describe('FeaturesPage — error state (succeeded false)', () => {
   it('calls showToastError with FEATURES.UNEXPECTED_ERROR + "Error" title when succeeded is false (no static <p>)', async () => {
-    const { featureHttpService } = await import(
-      '~/admin/features/lib/services/feature-http-service'
-    );
+    const { featureHttpService } =
+      await import('~/admin/features/lib/services/feature-http-service');
     const { showToastError } = await import('~/shared/lib/toast');
     vi.mocked(featureHttpService.activateFeatures).mockResolvedValue({
       succeeded: false,
@@ -224,12 +217,10 @@ describe('FeaturesPage — error state (succeeded false)', () => {
     render(
       <Wrapper>
         <FeaturesPage />
-      </Wrapper>
+      </Wrapper>,
     );
 
-    fireEvent.click(
-      screen.getByRole('button', { name: esMessages['FEATURES.ACTIVATE_FEATURES'] })
-    );
+    fireEvent.click(screen.getByRole('button', { name: esMessages['FEATURES.ACTIVATE_FEATURES'] }));
 
     await waitFor(() => {
       expect(showToastError).toHaveBeenCalledWith(
@@ -237,9 +228,7 @@ describe('FeaturesPage — error state (succeeded false)', () => {
         esMessages['GENERAL.RESPONSE.ERROR_TITLE'],
       );
     });
-    expect(
-      screen.queryByText(esMessages['FEATURES.UNEXPECTED_ERROR'])
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText(esMessages['FEATURES.UNEXPECTED_ERROR'])).not.toBeInTheDocument();
   });
 });
 
@@ -249,14 +238,25 @@ describe('FeaturesPage — error state (succeeded false)', () => {
 
 describe('FeaturesPage — double-submit guard', () => {
   it('ignores a second click while activateFeatures is already in-flight', async () => {
-    const { featureHttpService } = await import(
-      '~/admin/features/lib/services/feature-http-service'
-    );
+    const { featureHttpService } =
+      await import('~/admin/features/lib/services/feature-http-service');
 
-    let resolveFirst!: (v: { succeeded: boolean; data: boolean; message: string; actionCode: number; errors: unknown[] }) => void;
-    const firstCall = new Promise<{ succeeded: boolean; data: boolean; message: string; actionCode: number; errors: unknown[] }>(
-      (resolve) => { resolveFirst = resolve; }
-    );
+    let resolveFirst!: (v: {
+      succeeded: boolean;
+      data: boolean;
+      message: string;
+      actionCode: number;
+      errors: unknown[];
+    }) => void;
+    const firstCall = new Promise<{
+      succeeded: boolean;
+      data: boolean;
+      message: string;
+      actionCode: number;
+      errors: unknown[];
+    }>((resolve) => {
+      resolveFirst = resolve;
+    });
 
     vi.mocked(featureHttpService.activateFeatures).mockReturnValueOnce(
       firstCall as ReturnType<typeof featureHttpService.activateFeatures>,
@@ -267,7 +267,7 @@ describe('FeaturesPage — double-submit guard', () => {
     render(
       <Wrapper>
         <FeaturesPage />
-      </Wrapper>
+      </Wrapper>,
     );
 
     const button = screen.getByRole('button', {
@@ -301,24 +301,19 @@ describe('FeaturesPage — double-submit guard', () => {
 
 describe('FeaturesPage — error state (HTTP error)', () => {
   it('calls showToastError with FEATURES.UNEXPECTED_ERROR + "Error" title when activateFeatures throws', async () => {
-    const { featureHttpService } = await import(
-      '~/admin/features/lib/services/feature-http-service'
-    );
+    const { featureHttpService } =
+      await import('~/admin/features/lib/services/feature-http-service');
     const { showToastError } = await import('~/shared/lib/toast');
-    vi.mocked(featureHttpService.activateFeatures).mockRejectedValue(
-      new Error('Network error')
-    );
+    vi.mocked(featureHttpService.activateFeatures).mockRejectedValue(new Error('Network error'));
 
     const { FeaturesPage } = await import('../features');
     render(
       <Wrapper>
         <FeaturesPage />
-      </Wrapper>
+      </Wrapper>,
     );
 
-    fireEvent.click(
-      screen.getByRole('button', { name: esMessages['FEATURES.ACTIVATE_FEATURES'] })
-    );
+    fireEvent.click(screen.getByRole('button', { name: esMessages['FEATURES.ACTIVATE_FEATURES'] }));
 
     await waitFor(() => {
       expect(showToastError).toHaveBeenCalledWith(
@@ -329,9 +324,8 @@ describe('FeaturesPage — error state (HTTP error)', () => {
   });
 
   it('shows the connectivity message (GENERAL.OFFLINE) when activateFeatures rejects with a tagged network error', async () => {
-    const { featureHttpService } = await import(
-      '~/admin/features/lib/services/feature-http-service'
-    );
+    const { featureHttpService } =
+      await import('~/admin/features/lib/services/feature-http-service');
     const { showToastError } = await import('~/shared/lib/toast');
     // api-client.ts's response interceptor tags `isNetworkError` when the call never
     // reached a server (offline / 30s timeout).
@@ -344,12 +338,10 @@ describe('FeaturesPage — error state (HTTP error)', () => {
     render(
       <Wrapper>
         <FeaturesPage />
-      </Wrapper>
+      </Wrapper>,
     );
 
-    fireEvent.click(
-      screen.getByRole('button', { name: esMessages['FEATURES.ACTIVATE_FEATURES'] })
-    );
+    fireEvent.click(screen.getByRole('button', { name: esMessages['FEATURES.ACTIVATE_FEATURES'] }));
 
     await waitFor(() => {
       expect(showToastError).toHaveBeenCalledWith(

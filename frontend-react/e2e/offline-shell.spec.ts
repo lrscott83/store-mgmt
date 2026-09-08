@@ -46,7 +46,9 @@ const PRECACHE_NAME = 'app-shell-v3';
  * entonces espera `controller` — el estado del usuario que abre la app ya
  * instalada: la página de arranque SÍ pasa por el SW.
  */
-async function waitForControlledServiceWorker(page: import('@playwright/test').Page): Promise<void> {
+async function waitForControlledServiceWorker(
+  page: import('@playwright/test').Page,
+): Promise<void> {
   await expect
     .poll(
       () =>
@@ -58,7 +60,7 @@ async function waitForControlledServiceWorker(page: import('@playwright/test').P
             controlled: navigator.serviceWorker.controller != null,
           };
         }),
-      { timeout: 30_000 }
+      { timeout: 30_000 },
     )
     .toMatchObject({ state: 'activated' });
 
@@ -77,14 +79,11 @@ async function waitForControlledServiceWorker(page: import('@playwright/test').P
 
 /** Lee las claves de la caché de precache: prueba que el shell ESTÁ cacheado. */
 async function precachedKeys(page: import('@playwright/test').Page): Promise<string[]> {
-  return page.evaluate(
-    async (cacheName) => {
-      if (!('caches' in window)) return [];
-      const cache = await caches.open(cacheName);
-      return (await cache.keys()).map((r) => r.url);
-    },
-    PRECACHE_NAME
-  );
+  return page.evaluate(async (cacheName) => {
+    if (!('caches' in window)) return [];
+    const cache = await caches.open(cacheName);
+    return (await cache.keys()).map((r) => r.url);
+  }, PRECACHE_NAME);
 }
 
 test.describe('offline shell — service worker sirve la app sin conexión', () => {
@@ -109,7 +108,7 @@ test.describe('offline shell — service worker sirve la app sin conexión', () 
     const keys = await precachedKeys(page);
     expect(
       keys.some((u) => u.endsWith('/index.html')),
-      `esperaba /index.html en ${PRECACHE_NAME}, pero las claves son: ${keys.join(', ')}`
+      `esperaba /index.html en ${PRECACHE_NAME}, pero las claves son: ${keys.join(', ')}`,
     ).toBe(true);
 
     // ---------------------------------------------------------------------
@@ -145,7 +144,7 @@ test.describe('offline shell — service worker sirve la app sin conexión', () 
     const loginChunkCached = keys.some((u) => /\/assets\/login-[^/]+\.js$/.test(u));
     expect(
       loginChunkCached,
-      `esperaba un chunk assets/login-*.js en ${PRECACHE_NAME}, pero las claves son: ${keys.join(', ')}`
+      `esperaba un chunk assets/login-*.js en ${PRECACHE_NAME}, pero las claves son: ${keys.join(', ')}`,
     ).toBe(true);
   });
 });

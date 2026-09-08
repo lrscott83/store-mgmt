@@ -40,7 +40,9 @@ test.describe('FC-E1 — /auth/provision', () => {
 
     // Should show error about missing file or password
     // The InfoBox with variant="danger" renders error text
-    await expect(page.getByText(/error|archivo|contraseña|requerido/i).first()).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText(/error|archivo|contraseña|requerido/i).first()).toBeVisible({
+      timeout: 10_000,
+    });
   });
 
   test('password visibility toggle works', async ({ page }) => {

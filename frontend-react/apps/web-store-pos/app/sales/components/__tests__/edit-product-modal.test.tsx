@@ -9,17 +9,17 @@ import { EditProductModal } from '../edit-product-modal';
 // (lazy chunk) in jsdom. The mock CAPTURES the decode callback so tests can fire
 // decoded barcodes like a camera would (the 2026-09-07 redesign removed the
 // manual-entry form, so the decode path is the only way in).
-const decodeCallbackRef = vi.hoisted(() => ({ current: null as ((result: unknown) => void) | null }));
+const decodeCallbackRef = vi.hoisted(() => ({
+  current: null as ((result: unknown) => void) | null,
+}));
 vi.mock('@zxing/browser', () => ({
   BrowserMultiFormatReader: vi.fn().mockImplementation(() => ({
     decodeFromVideoDevice: vi
       .fn()
-      .mockImplementation(
-        (_device: unknown, _video: unknown, cb: (result: unknown) => void) => {
-          decodeCallbackRef.current = cb;
-          return Promise.resolve({ stop: vi.fn() });
-        },
-      ),
+      .mockImplementation((_device: unknown, _video: unknown, cb: (result: unknown) => void) => {
+        decodeCallbackRef.current = cb;
+        return Promise.resolve({ stop: vi.fn() });
+      }),
   })),
 }));
 
@@ -104,7 +104,11 @@ describe('EditProductModal — Angular field set/order parity', () => {
   it('prefills Orden=product.order and Activo=product.isActive', () => {
     render(
       <Wrapper>
-        <EditProductModal product={makeProduct({ order: 7, isActive: false })} onSave={vi.fn()} onClose={vi.fn()} />
+        <EditProductModal
+          product={makeProduct({ order: 7, isActive: false })}
+          onSave={vi.fn()}
+          onClose={vi.fn()}
+        />
       </Wrapper>,
     );
     expect(screen.getByTestId('edit-product-order-input')).toHaveValue(7);
@@ -123,7 +127,11 @@ describe('EditProductModal — Angular field set/order parity', () => {
   it('prefills the barcode input with the stored barcode and renders the scan button beside it', () => {
     render(
       <Wrapper>
-        <EditProductModal product={makeProduct({ barcode: '7501234567890' })} onSave={vi.fn()} onClose={vi.fn()} />
+        <EditProductModal
+          product={makeProduct({ barcode: '7501234567890' })}
+          onSave={vi.fn()}
+          onClose={vi.fn()}
+        />
       </Wrapper>,
     );
     expect(screen.getByTestId('edit-product-barcode-input')).toHaveValue('7501234567890');
@@ -135,7 +143,11 @@ describe('EditProductModal — Angular field set/order parity', () => {
   it('prefills the barcode input empty when the product has no stored barcode', () => {
     render(
       <Wrapper>
-        <EditProductModal product={makeProduct({ barcode: undefined })} onSave={vi.fn()} onClose={vi.fn()} />
+        <EditProductModal
+          product={makeProduct({ barcode: undefined })}
+          onSave={vi.fn()}
+          onClose={vi.fn()}
+        />
       </Wrapper>,
     );
     expect(screen.getByTestId('edit-product-barcode-input')).toHaveValue('');
@@ -173,7 +185,11 @@ describe('EditProductModal — Angular field set/order parity', () => {
     const onSave = vi.fn();
     render(
       <Wrapper>
-        <EditProductModal product={makeProduct({ categoryId: 'cat-9' })} onSave={onSave} onClose={vi.fn()} />
+        <EditProductModal
+          product={makeProduct({ categoryId: 'cat-9' })}
+          onSave={onSave}
+          onClose={vi.fn()}
+        />
       </Wrapper>,
     );
     fireEvent.click(screen.getByTestId('edit-product-submit'));
@@ -269,7 +285,9 @@ describe('EditProductModal — footer icons/labels parity', () => {
       </Wrapper>,
     );
     const saveButton = screen.getByTestId('edit-product-submit');
-    const closeButton = saveButton.parentElement?.querySelector('button:first-child') as HTMLElement;
+    const closeButton = saveButton.parentElement?.querySelector(
+      'button:first-child',
+    ) as HTMLElement;
     expect(saveButton.className).toContain('rounded-full');
     expect(closeButton.className).toContain('rounded-full');
   });
@@ -280,7 +298,11 @@ describe('EditProductModal — barcode field (React-owned, scanner-capturable)',
     const onSave = vi.fn();
     render(
       <Wrapper>
-        <EditProductModal product={makeProduct({ barcode: '7501234567890' })} onSave={onSave} onClose={vi.fn()} />
+        <EditProductModal
+          product={makeProduct({ barcode: '7501234567890' })}
+          onSave={onSave}
+          onClose={vi.fn()}
+        />
       </Wrapper>,
     );
     fireEvent.click(screen.getByTestId('edit-product-submit'));
@@ -292,7 +314,11 @@ describe('EditProductModal — barcode field (React-owned, scanner-capturable)',
     const onSave = vi.fn();
     render(
       <Wrapper>
-        <EditProductModal product={makeProduct({ barcode: '7501234567890' })} onSave={onSave} onClose={vi.fn()} />
+        <EditProductModal
+          product={makeProduct({ barcode: '7501234567890' })}
+          onSave={onSave}
+          onClose={vi.fn()}
+        />
       </Wrapper>,
     );
     fireEvent.change(screen.getByTestId('edit-product-barcode-input'), { target: { value: '' } });
@@ -305,10 +331,16 @@ describe('EditProductModal — barcode field (React-owned, scanner-capturable)',
     const onSave = vi.fn();
     render(
       <Wrapper>
-        <EditProductModal product={makeProduct({ barcode: '111' })} onSave={onSave} onClose={vi.fn()} />
+        <EditProductModal
+          product={makeProduct({ barcode: '111' })}
+          onSave={onSave}
+          onClose={vi.fn()}
+        />
       </Wrapper>,
     );
-    fireEvent.change(screen.getByTestId('edit-product-barcode-input'), { target: { value: '7790561234567' } });
+    fireEvent.change(screen.getByTestId('edit-product-barcode-input'), {
+      target: { value: '7790561234567' },
+    });
     fireEvent.click(screen.getByTestId('edit-product-submit'));
 
     expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ barcode: '7790561234567' }));
@@ -328,7 +360,11 @@ describe('EditProductModal — barcode field (React-owned, scanner-capturable)',
   it('a decoded scan replaces the barcode field AND closes the scanner (capture-once cadence)', async () => {
     render(
       <Wrapper>
-        <EditProductModal product={makeProduct({ barcode: '111' })} onSave={vi.fn()} onClose={vi.fn()} />
+        <EditProductModal
+          product={makeProduct({ barcode: '111' })}
+          onSave={vi.fn()}
+          onClose={vi.fn()}
+        />
       </Wrapper>,
     );
     fireEvent.click(screen.getByTestId('edit-product-barcode-scan'));
@@ -345,7 +381,11 @@ describe('EditProductModal — barcode field (React-owned, scanner-capturable)',
     const onSave = vi.fn();
     render(
       <Wrapper>
-        <EditProductModal product={makeProduct({ barcode: '111' })} onSave={onSave} onClose={vi.fn()} />
+        <EditProductModal
+          product={makeProduct({ barcode: '111' })}
+          onSave={onSave}
+          onClose={vi.fn()}
+        />
       </Wrapper>,
     );
     fireEvent.click(screen.getByTestId('edit-product-barcode-scan'));
@@ -354,7 +394,9 @@ describe('EditProductModal — barcode field (React-owned, scanner-capturable)',
       decodeCallbackRef.current!({ getText: () => '7790561234567' });
     });
 
-    fireEvent.change(screen.getByTestId('edit-product-name-input'), { target: { value: 'Coca Cola Zero' } });
+    fireEvent.change(screen.getByTestId('edit-product-name-input'), {
+      target: { value: 'Coca Cola Zero' },
+    });
     fireEvent.click(screen.getByTestId('edit-product-submit'));
 
     expect(onSave).toHaveBeenCalledWith(

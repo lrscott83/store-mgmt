@@ -8,7 +8,7 @@ function renderDialog() {
   return render(
     <IntlProvider locale="es" messages={messages}>
       <UnsavedChangesDialog onSave={vi.fn()} onDiscard={vi.fn()} onCancel={vi.fn()} />
-    </IntlProvider>
+    </IntlProvider>,
   );
 }
 
@@ -22,8 +22,8 @@ describe('UnsavedChangesDialog — view-text-parity (Angular can-deactivate.guar
     renderDialog();
     expect(
       screen.getByText(
-        'Usted tiene cambios pendientes. ¿Desea salvar los cambios antes de pasar a la otra página?'
-      )
+        'Usted tiene cambios pendientes. ¿Desea salvar los cambios antes de pasar a la otra página?',
+      ),
     ).toBeInTheDocument();
   });
 

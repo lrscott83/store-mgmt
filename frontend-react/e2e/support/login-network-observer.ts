@@ -235,7 +235,7 @@ export function installLoginNetworkObserver(page: Page): LoginNetworkObserver {
             'Login quota exhausted for this IP: 40 login attempts per 1-minute sliding window, ' +
               '3 segments (RateLimitPolicies.cs:15-24, LoginPolicy, PermitLimit=40). Wait roughly ' +
               'a minute — the window releases permits gradually, not all at once. This failure ' +
-              'does NOT indicate an app defect.'
+              'does NOT indicate an app defect.',
           ),
       });
     },
@@ -247,12 +247,12 @@ export function installLoginNetworkObserver(page: Page): LoginNetworkObserver {
 
       if (loginRequests.length !== 1) {
         throw new Error(
-          `Expected exactly one POST .../v1/auth/login, observed ${loginRequests.length}.`
+          `Expected exactly one POST .../v1/auth/login, observed ${loginRequests.length}.`,
         );
       }
       if (loginResponses.length !== 1) {
         throw new Error(
-          `Expected exactly one response for POST .../v1/auth/login, observed ${loginResponses.length}.`
+          `Expected exactly one response for POST .../v1/auth/login, observed ${loginResponses.length}.`,
         );
       }
       if (meRequests.length === 0) {
@@ -269,7 +269,7 @@ export function installLoginNetworkObserver(page: Page): LoginNetworkObserver {
         throw new Error(
           `GET .../v1/auth/me started at ${firstMeRequest.at}, before the login response ` +
             `arrived at ${loginResponse.at}. Expected /me to start AFTER the login response, ` +
-            'not merely at some point during the flow (auth-store.ts:197,230).'
+            'not merely at some point during the flow (auth-store.ts:197,230).',
         );
       }
     },
@@ -283,7 +283,7 @@ export function installLoginNetworkObserver(page: Page): LoginNetworkObserver {
           observedCount: loginAttempts.length,
           firstUrl: first.url,
           subject: 'login',
-        })
+        }),
       );
     },
 
@@ -293,7 +293,7 @@ export function installLoginNetworkObserver(page: Page): LoginNetworkObserver {
       throw new Error(
         `Expected zero requests matching /product/i under ${E2E_API_URL}, but observed ` +
           `${productApiRequests.length}: ${urls}. resolveUserHomePath must resolve from the ` +
-          'offline product service, never the API (user-home.ts:2,24).'
+          'offline product service, never the API (user-home.ts:2,24).',
       );
     },
 
@@ -301,7 +301,7 @@ export function installLoginNetworkObserver(page: Page): LoginNetworkObserver {
       const meRequests = events.filter((e) => e.kind === 'me' && e.phase === 'request');
       if (meRequests.length !== expected) {
         throw new Error(
-          `Expected exactly ${expected} GET .../v1/auth/me request(s), observed ${meRequests.length}.`
+          `Expected exactly ${expected} GET .../v1/auth/me request(s), observed ${meRequests.length}.`,
         );
       }
     },

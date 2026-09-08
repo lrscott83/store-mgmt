@@ -21,10 +21,10 @@ This module is part of the React migration from the Angular version of the "Vend
 
 ## Routes
 
-| Path                       | Component                  | EFeatures      | Guard     |
-|----------------------------|----------------------------|----------------|-----------|
-| `/profile/edit`            | EditProfileComponent       | Profile (70)   | AuthGuard |
-| `/profile/change-password` | ChangePasswordComponent    | Profile (70)   | AuthGuard |
+| Path                       | Component               | EFeatures    | Guard     |
+| -------------------------- | ----------------------- | ------------ | --------- |
+| `/profile/edit`            | EditProfileComponent    | Profile (70) | AuthGuard |
+| `/profile/change-password` | ChangePasswordComponent | Profile (70) | AuthGuard |
 
 ### Route Notes
 
@@ -46,11 +46,13 @@ This module is part of the React migration from the Angular version of the "Vend
 **Data source (read):** `currentUser` from localStorage — pre-fills form fields on mount.
 
 **Fields:**
+
 - Full name (required)
 - Cell phone (optional)
 - Email (optional, validated format)
 
 **Behavior:**
+
 - On mount: read `currentUser` from localStorage and populate form.
 - On submit: call API to update user details. Requires online connectivity.
 - On success: update `currentUser` in localStorage to reflect changes, show success feedback, optionally navigate back.
@@ -65,11 +67,13 @@ This module is part of the React migration from the Angular version of the "Vend
 **Role:** Form page for changing the current user's password.
 
 **Fields:**
+
 - Old password (required, masked)
 - New password (required, masked, minimum length enforced)
 - Confirm new password (required, must match new password)
 
 **Behavior:**
+
 - Validates that new password and confirm password match before submitting.
 - On submit: call API to change password using the `Credentials` model. Requires online connectivity.
 - On success: show success message. Consider logging the user out and redirecting to login (password change invalidates session — confirm with backend behavior).
@@ -86,7 +90,7 @@ interface UserProfile {
   fullName: string;
   cellPhone: string;
   email: string;
-  login: string;      // read-only in this context — displayed but not editable
+  login: string; // read-only in this context — displayed but not editable
   storeId: string;
   storeName: string;
   isActive: boolean;
@@ -105,11 +109,11 @@ interface Credentials {
 
 ## Online vs Offline Behavior
 
-| Action                              | Online | Offline                                                        |
-|-------------------------------------|--------|----------------------------------------------------------------|
-| View current profile (read-only)    | API    | localStorage `currentUser` (full offline support)             |
-| Edit profile (name, phone, email)   | API    | Blocked — disable form submit, show inline notice             |
-| Change password                     | API    | Blocked — disable form submit, show inline notice             |
+| Action                            | Online | Offline                                           |
+| --------------------------------- | ------ | ------------------------------------------------- |
+| View current profile (read-only)  | API    | localStorage `currentUser` (full offline support) |
+| Edit profile (name, phone, email) | API    | Blocked — disable form submit, show inline notice |
+| Change password                   | API    | Blocked — disable form submit, show inline notice |
 
 For offline detection, use `navigator.onLine` and listen to browser `online`/`offline` events. The UI should react in real-time: if a user goes offline while on the edit form, the submit button becomes disabled and the notice appears without requiring a page reload.
 
@@ -118,7 +122,7 @@ For offline detection, use `navigator.onLine` and listen to browser `online`/`of
 ## Permissions
 
 | Role            | Feature Required | Can Access Profile Routes |
-|-----------------|------------------|---------------------------|
+| --------------- | ---------------- | ------------------------- |
 | SuperAdmin      | Profile (70)     | Yes                       |
 | OwnerAdmin      | Profile (70)     | Yes                       |
 | Cashier         | Profile (70)     | Yes, if feature assigned  |

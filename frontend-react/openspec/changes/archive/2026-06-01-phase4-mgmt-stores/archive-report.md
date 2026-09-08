@@ -13,14 +13,14 @@ All artifacts listed below were created, reviewed, and verified during the SDD l
 
 ### Engram References
 
-| Artifact | Topic Key | Engram ID | Date | Status |
-|----------|-----------|-----------|------|--------|
-| **Proposal** | `sdd/phase4-mgmt-stores/proposal` | #205 | 2026-05-31 | ARCHIVED |
-| **Spec** | `sdd/phase4-mgmt-stores/spec` | #207 | 2026-05-31 | ARCHIVED |
-| **Design** | `sdd/phase4-mgmt-stores/design` | #206 | 2026-05-31 | ARCHIVED |
-| **Tasks** | `sdd/phase4-mgmt-stores/tasks` | #208 | 2026-05-31 | ARCHIVED |
-| **Verify Report** | `sdd/phase4-mgmt-stores/verify-report` | #211 | 2026-05-31 | ARCHIVED |
-| **Archive Report** | `sdd/phase4-mgmt-stores/archive-report` | (this document) | 2026-06-01 | CREATED |
+| Artifact           | Topic Key                               | Engram ID       | Date       | Status   |
+| ------------------ | --------------------------------------- | --------------- | ---------- | -------- |
+| **Proposal**       | `sdd/phase4-mgmt-stores/proposal`       | #205            | 2026-05-31 | ARCHIVED |
+| **Spec**           | `sdd/phase4-mgmt-stores/spec`           | #207            | 2026-05-31 | ARCHIVED |
+| **Design**         | `sdd/phase4-mgmt-stores/design`         | #206            | 2026-05-31 | ARCHIVED |
+| **Tasks**          | `sdd/phase4-mgmt-stores/tasks`          | #208            | 2026-05-31 | ARCHIVED |
+| **Verify Report**  | `sdd/phase4-mgmt-stores/verify-report`  | #211            | 2026-05-31 | ARCHIVED |
+| **Archive Report** | `sdd/phase4-mgmt-stores/archive-report` | (this document) | 2026-06-01 | CREATED  |
 
 ---
 
@@ -61,6 +61,7 @@ The delta spec from the change was **copied directly** to the main specs directo
 **Action**: Copy (full content, no merge required for first spec)
 
 #### Spec Contents
+
 - **81 requirements** across 17 requirement domains
 - **28 acceptance scenarios** (S-ACCESS-1 through S-ERR-2)
 - **Constraints and non-requirements** (backend changes OUT, offline queue OUT, domain models unchanged, etc.)
@@ -73,26 +74,28 @@ The delta spec from the change was **copied directly** to the main specs directo
 ### Scope Delivered
 
 **3 routes registered** in `app/routes.ts`:
+
 - `/management/stores` → `StoreListPage` (list container)
 - `/management/stores/create` → `StoreCreatePage` (create container)
 - `/management/stores/edit/:id` → `StoreEditPage` (edit container)
 
 **7 work units completed** (all [x] marked DONE):
+
 1. [x] **adminFeatureLoader factory** — ACCESS-1 through ACCESS-6, ROUTE-4
 2. [x] **storeHttpService** — HTTP-1 through HTTP-11, OWNER-1, OWNER-3
 3. [x] **ModulePicker presentational** — MODULE-1 through MODULE-5, presentational tests
 4. [x] **StoreForm presentational** — PRES-4 through PRES-10, form tests
 5. [x] **StoreList presentational** — PRES-1 through PRES-3, list tests
 6. [x] **Route containers** (StoreListPage, StoreCreatePage, StoreEditPage) — LIST-1 through LIST-6, CREATE-1 through CREATE-6, EDIT-1 through EDIT-8
-7. [x] **Wiring** — 3 routes in app/routes.ts, 34 STORES.* i18n keys in es.ts, MANAGEMENT.* keys added
+7. [x] **Wiring** — 3 routes in app/routes.ts, 34 STORES._ i18n keys in es.ts, MANAGEMENT._ keys added
 
 ### Test Coverage
 
-| Layer | Test Count | Files | Coverage |
-|-------|-----------|-------|----------|
-| Unit (loaders, http service) | 21 | 2 | 100% on service, 96.7% on loaders |
-| Integration (components, containers) | 40 | 4 | 77.8%–100% per file |
-| **Total** | **61** | **6** | **~96% avg** |
+| Layer                                | Test Count | Files | Coverage                          |
+| ------------------------------------ | ---------- | ----- | --------------------------------- |
+| Unit (loaders, http service)         | 21         | 2     | 100% on service, 96.7% on loaders |
+| Integration (components, containers) | 40         | 4     | 77.8%–100% per file               |
+| **Total**                            | **61**     | **6** | **~96% avg**                      |
 
 **TDD Evidence**: All 7 units followed RED → GREEN → REFACTOR. Baseline (454) preserved. Final count: 515 tests passing.
 
@@ -104,17 +107,18 @@ The delta spec from the change was **copied directly** to the main specs directo
 
 ### Evidence Summary
 
-| Check | Result | Details |
-|-------|--------|---------|
-| Test suite | ✅ PASS | 515/515 passed, 49 test files, 0 failures |
-| Typecheck (tsc) | ✅ PASS | `turbo run typecheck` — 5 packages, 0 errors |
-| Build (vite + SSR) | ✅ PASS | 367 kB SSR bundle, PWA manifest injected |
-| Task completion | ✅ PASS | 7/7 units done, all required files present |
-| Spec compliance | ✅ MOSTLY | 79/81 requirements fully passing; 2 warnings (see below) |
+| Check              | Result    | Details                                                  |
+| ------------------ | --------- | -------------------------------------------------------- |
+| Test suite         | ✅ PASS   | 515/515 passed, 49 test files, 0 failures                |
+| Typecheck (tsc)    | ✅ PASS   | `turbo run typecheck` — 5 packages, 0 errors             |
+| Build (vite + SSR) | ✅ PASS   | 367 kB SSR bundle, PWA manifest injected                 |
+| Task completion    | ✅ PASS   | 7/7 units done, all required files present               |
+| Spec compliance    | ✅ MOSTLY | 79/81 requirements fully passing; 2 warnings (see below) |
 
 ### Warnings (3)
 
 **W-1 — PRES-6 Partial (Spec Gap)**
+
 - Non-owner-admin create does not auto-force ownerId to current user
 - Expected: submitted payload contains user's ownerId
 - Actual: ownerId field hidden but submitted as empty string
@@ -122,12 +126,14 @@ The delta spec from the change was **copied directly** to the main specs directo
 - Severity: WARNING (pre-existing gap, not critical)
 
 **W-2 — ERR-5 / UX Deviation (Misleading UI)**
+
 - When module catalog fetch fails, submit is blocked via `isOnline={false}` workaround
 - User sees "Sin conexión" (offline notice) instead of catalog-specific error
 - Behavior is correct (submit blocked), message is misleading
 - Severity: WARNING (functional but confusing)
 
 **W-3 — Test Assertion Quality**
+
 - `module-picker.test.tsx` line 129: orphan mock call read without `expect()` wrapper
 - Assertion intent is not evaluated, but surrounding assertions still validate behavior
 - Severity: WARNING (low risk; test coverage still adequate)
@@ -137,6 +143,7 @@ The delta spec from the change was **copied directly** to the main specs directo
 **S-1 — Coverage Gap**: `store-list.tsx` lifecycle success path not covered by explicit test. Consider adding test for activate/approve/deactivate success in future.
 
 ### Critical Issues
+
 **0 CRITICAL**. All blockers resolved. Change is safe to merge and deploy.
 
 ---
@@ -144,29 +151,34 @@ The delta spec from the change was **copied directly** to the main specs directo
 ## Design Decisions Locked
 
 ### Access Control
+
 - **adminFeatureLoader** composes existing `adminLoader` + `featureLoader` without modification
 - No new auth model; reuses role + feature guard composition
 - Unauthenticated → `/login`, unauthorized → `/unauthorized`
 
 ### Architecture
+
 - **Container/presentational split** mirrors `app/profile/` precedent
 - **Offline policy**: read-from-cache (list), block-writes (create/edit/lifecycle)
 - **No offline write queue** — explicit decision #204
 - **Module selection logic** ported exactly from legacy Angular
 
 ### Module Assignment
+
 - Modules with `priceIncluded=true` are auto-selected and locked
 - Edit mode: merge store.modules into catalog with price overrides
 - Submit payload includes all selected module IDs
 
 ### Role-Conditional Fields
+
 - super-admin/owner-admin: ownerId (picker) + approved + description
 - super-admin + edit: paymentStartDate (required)
 - super-admin: isActive
 - non-owner-admin create: ownerId forced (spec says so; implementation gap exists — see W-1)
 
 ### Internationalization
-- 34 STORES.* keys + MANAGEMENT.* keys added to es.ts
+
+- 34 STORES._ keys + MANAGEMENT._ keys added to es.ts
 - All copy via useIntl / FormattedMessage (no hardcoded strings)
 - Spanish (Rioplatense tone) per project convention
 
@@ -187,9 +199,11 @@ The delta spec from the change was **copied directly** to the main specs directo
 3. **Test assertion gap** — One orphan mock call read in module-picker tests. Coverage still adequate; no functional risk.
 
 ### No Backend Changes Required
+
 All contracts (list, get, create, update, activate, approve, disapprove, deactivate, modules, owners) already exist in backend. No API changes needed.
 
 ### Future Dependencies
+
 - **phase4-mgmt-users** (separate SDD): depends on stores existing; post-create nav currently goes to `/management/stores` (users route not yet available).
 - **phase4-mgmt-configurations** (separate SDD): scoped to stores (configurations are store-scoped).
 
@@ -198,9 +212,11 @@ All contracts (list, get, create, update, activate, approve, disapprove, deactiv
 ## Files Merged & Archived
 
 ### Main Spec Created
+
 - **frontend-react/openspec/specs/management/spec.md** — 81 requirements, 28 acceptance scenarios, constraints documented
 
 ### Change Folder Archived
+
 - **frontend-react/openspec/changes/archive/2026-06-01-phase4-mgmt-stores/** — Full audit trail (proposal, spec, design, tasks, verify, delta spec, this report)
 
 ### Openspec Directory Structure
@@ -231,12 +247,14 @@ frontend-react/openspec/
 ## Next Steps
 
 ### Immediate (Orchestrator)
+
 1. Review this archive report for any concerns
 2. Commit the merged spec and archive folder to git
 3. Verify git status (staged/unstaged as per orchestrator preference)
 4. If satisfied, proceed to PR/merge review
 
 ### Post-Archive (Future Sessions)
+
 1. **Fix PRES-6 ownerId gap** (optional patch): Auto-set ownerId to current user's ID in non-owner-admin create form
 2. **Fix ERR-5 UX** (optional patch): Show catalog-specific error message instead of misleading offline notice
 3. **phase4-mgmt-users**: Next sub-slice (users), depends on stores being deployed
@@ -249,6 +267,7 @@ frontend-react/openspec/
 The **phase4-mgmt-stores** change has been fully planned (proposal + spec + design), implemented (7 units, 61 tests, TDD-compliant), verified (PASS WITH WARNINGS), and archived.
 
 All artifacts are persisted:
+
 - **Engram**: Observation IDs #205, #206, #207, #208, #211 for cross-session recovery
 - **Filesystem**: Archived folder + merged main spec for team visibility
 - **This report**: Complete traceability of decisions, artifacts, and residual risks

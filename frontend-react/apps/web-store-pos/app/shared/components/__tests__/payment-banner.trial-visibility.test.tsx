@@ -73,7 +73,11 @@ function Wrapper({ children }: { children: React.ReactNode }) {
 
 async function renderBanner() {
   const { PaymentBanner } = await import('../payment-banner');
-  return render(<Wrapper><PaymentBanner /></Wrapper>);
+  return render(
+    <Wrapper>
+      <PaymentBanner />
+    </Wrapper>,
+  );
 }
 
 // ─── The trial must be visible during the trial ───────────────────────────────

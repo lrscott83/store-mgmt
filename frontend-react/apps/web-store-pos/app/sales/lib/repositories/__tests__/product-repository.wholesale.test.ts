@@ -68,7 +68,12 @@ describe('ProductRepository — persistence de la config mayorista', () => {
   beforeEach(() => {
     localStorage.clear();
     seedCategories(storeId, [makeCategory('cat-1')]);
-    useAuthStore.setState({ user: makeUser({ login: 'jdoe' }), isAuthenticated: true, isLoading: false, error: null });
+    useAuthStore.setState({
+      user: makeUser({ login: 'jdoe' }),
+      isAuthenticated: true,
+      isLoading: false,
+      error: null,
+    });
     repo = new ProductRepository(storeId, new ProductCategoryRepository(storeId));
   });
 

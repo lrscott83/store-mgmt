@@ -305,8 +305,8 @@ describe('ErrorBoundary — view-text-parity: Spanish copy (Angular parity, no i
     expect(screen.getByRole('heading', { name: '404' })).toBeInTheDocument();
     expect(
       screen.getByText(
-        'Puede que necesite estar conectado a Internet para hacer esta operación. Por favor, vuelva a intentarlo y si persiste el error contacte al equipo de soporte técnico.'
-      )
+        'Puede que necesite estar conectado a Internet para hacer esta operación. Por favor, vuelva a intentarlo y si persiste el error contacte al equipo de soporte técnico.',
+      ),
     ).toBeInTheDocument();
   });
 
@@ -316,8 +316,8 @@ describe('ErrorBoundary — view-text-parity: Spanish copy (Angular parity, no i
     expect(screen.getByRole('heading', { name: 'Error' })).toBeInTheDocument();
     expect(
       screen.getByText(
-        'Por favor, vuelva a intentarlo y si persiste el error contacte al equipo de soporte técnico.'
-      )
+        'Por favor, vuelva a intentarlo y si persiste el error contacte al equipo de soporte técnico.',
+      ),
     ).toBeInTheDocument();
   });
 });

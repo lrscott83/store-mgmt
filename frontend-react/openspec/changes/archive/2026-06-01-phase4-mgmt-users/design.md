@@ -6,7 +6,7 @@ Mirror the shipped Stores slice EXACTLY: container/presentational split, three l
 (route container → pure presentational → thin Axios http-service over `apiClient` returning
 `BaseResponseModel<T>` and unwrapping `.data`). New self-contained slice under
 `app/management/users/`. The ONLY files touched outside the slice are `app/routes.ts`
-(3 route entries) and `shared/lib/i18n/es.ts` (USERS.* namespace). The `management/` parent
+(3 route entries) and `shared/lib/i18n/es.ts` (USERS.\* namespace). The `management/` parent
 dir already exists from Stores.
 
 Key divergence from Stores: the **edit page stacks two independent sub-forms** — `UserDetailsForm`
@@ -45,27 +45,27 @@ No catalog fetch. `handleSubmit` → `createUser({storeId,fullName,login,passwor
 
 **UserEditPage** (container): hydration — `useEffect` `getUser(id)` into `user` state; **form does not mount until `user` is set** (render LOADING then forms), same lesson as `StoreEditPage` lines 120-127. `id = paramId ?? selectedStoreId`. Two handlers: `handleDetailsSubmit` → `updateUserDetails(id,{fullName,cellPhone,email,isActive})`; `handlePasswordSubmit` → `changePassword(id,{oldPassword,newPassword})`. Each form owns its own `error`/`isLoading`.
 
-| Component | Props |
-|-----------|-------|
-| `UserList` | `users: StoreUser[]; isOnline; isDegraded; error?; onCreate(); onEdit(id); onActivate(id); onDeactivate(id)` |
-| `UserCreateForm` | `isOnline; isLoading; onSubmit(values); error?` — values: `{fullName,login,password,cellPhone,email}` (storeId injected by container) |
-| `UserDetailsForm` | `initialValues?: Partial<StoreUser>; isOnline; isLoading; canToggleActive: boolean; onSubmit(values); error?` — values: `{fullName,cellPhone,email,isActive}` |
-| `UserCredentialsForm` | `isOnline; isLoading; onSubmit(values); error?` — values: `{oldPassword,newPassword}` |
+| Component             | Props                                                                                                                                                         |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `UserList`            | `users: StoreUser[]; isOnline; isDegraded; error?; onCreate(); onEdit(id); onActivate(id); onDeactivate(id)`                                                  |
+| `UserCreateForm`      | `isOnline; isLoading; onSubmit(values); error?` — values: `{fullName,login,password,cellPhone,email}` (storeId injected by container)                         |
+| `UserDetailsForm`     | `initialValues?: Partial<StoreUser>; isOnline; isLoading; canToggleActive: boolean; onSubmit(values); error?` — values: `{fullName,cellPhone,email,isActive}` |
+| `UserCredentialsForm` | `isOnline; isLoading; onSubmit(values); error?` — values: `{oldPassword,newPassword}`                                                                         |
 
 Validation in presentationals (mirror StoreForm): required-field guards via `setValidationError`;
 password regex `(?=\D*\d)(?=[^a-z]*[a-z])(?=[^A-Z]*[A-Z]).{8,30}` + frontend confirm match in create + credentials forms. cellPhone required, email optional. `isActive` toggle only rendered when `canToggleActive` (super-admin/owner-admin).
 
 ## userHttpService (paths rel /v1, envelope, `.data` returned)
 
-| Method | Verb / Path | Payload | Returns |
-|--------|-------------|---------|---------|
-| `listUsers` | GET `/storeusers/list/true` | — | `StoreUser[]` |
-| `getUser` | GET `/storeusers/:id` | — | `StoreUser` |
-| `createUser` | POST `/storeusers` | `{storeId,fullName,login,password,cellPhone,email,roleIds:[3]}` | `boolean` |
-| `updateUserDetails` | PUT `/users/:id` | `{id,fullName,cellPhone,email,isActive}` | `boolean` |
-| `activateUser` | POST `/users/activate` | `{id,isActive:true}` | `boolean` |
-| `deactivateUser` | DELETE `/users/:id` | — | `boolean` |
-| `changePassword` | POST `/users/change-password/:id` | `{oldPassword,newPassword}` | `boolean` |
+| Method              | Verb / Path                       | Payload                                                         | Returns       |
+| ------------------- | --------------------------------- | --------------------------------------------------------------- | ------------- |
+| `listUsers`         | GET `/storeusers/list/true`       | —                                                               | `StoreUser[]` |
+| `getUser`           | GET `/storeusers/:id`             | —                                                               | `StoreUser`   |
+| `createUser`        | POST `/storeusers`                | `{storeId,fullName,login,password,cellPhone,email,roleIds:[3]}` | `boolean`     |
+| `updateUserDetails` | PUT `/users/:id`                  | `{id,fullName,cellPhone,email,isActive}`                        | `boolean`     |
+| `activateUser`      | POST `/users/activate`            | `{id,isActive:true}`                                            | `boolean`     |
+| `deactivateUser`    | DELETE `/users/:id`               | —                                                               | `boolean`     |
+| `changePassword`    | POST `/users/change-password/:id` | `{oldPassword,newPassword}`                                     | `boolean`     |
 
 No `change-login` (OQ-U3, no backend endpoint).
 
@@ -85,17 +85,17 @@ UserEditPage ─getUser(id)─> [LOADING until user set] ──> mount two forms
 
 ## Architecture Decisions (ADR)
 
-| ID | Decision | Alternatives rejected | Rationale |
-|----|----------|-----------------------|-----------|
-| DU1 | Mirror Stores container/presentational + 3 layers | reinvent structure | Consistency, proven, archived precedent |
-| DU2 | Reuse `adminFeatureLoader([EFeatures.Users])` | new factory / inline | Factory already shipped by Stores (D2); zero new auth surface |
-| DU3 | Edit = TWO stacked independent sub-forms, each own submit/error/loading | single merged form | Different concerns (PII vs credentials), independent failures, mirrors legacy split |
-| DU4 | Create form distinct from edit-details (no shared shape) | shared StoreForm-style component w/ flags | create has login+pwd+confirm; edit-details has none — flags would bloat |
-| DU5 | Password: oldPassword REQUIRED, no admin bypass | admin reset endpoint | No backend endpoint (OQ-U2); avoid inventing contract |
-| DU6 | List offline = cache-read degraded; writes blocked via `useOnlineStatus` | offline write queue | Out of scope (#204); mirror Stores D7 |
-| DU7 | Write-through cache on online list + refetch after lifecycle | full upsert merge | List returns full `StoreUser[]`; simpler than Stores D6 (no boolean-merge needed) |
-| DU8 | Create guard: missing `selectedStoreId` → redirect `/management/stores` | render error inline | User must belong to a store; redirect matches proposal |
-| DU9 | UserEditPage gates form mount on async `user` (LOADING state) | mount form w/ empty initialValues | Hydration lesson from StoreEditPage 120-127 — useState init runs once, empty initialValues never re-hydrate |
+| ID  | Decision                                                                 | Alternatives rejected                     | Rationale                                                                                                   |
+| --- | ------------------------------------------------------------------------ | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| DU1 | Mirror Stores container/presentational + 3 layers                        | reinvent structure                        | Consistency, proven, archived precedent                                                                     |
+| DU2 | Reuse `adminFeatureLoader([EFeatures.Users])`                            | new factory / inline                      | Factory already shipped by Stores (D2); zero new auth surface                                               |
+| DU3 | Edit = TWO stacked independent sub-forms, each own submit/error/loading  | single merged form                        | Different concerns (PII vs credentials), independent failures, mirrors legacy split                         |
+| DU4 | Create form distinct from edit-details (no shared shape)                 | shared StoreForm-style component w/ flags | create has login+pwd+confirm; edit-details has none — flags would bloat                                     |
+| DU5 | Password: oldPassword REQUIRED, no admin bypass                          | admin reset endpoint                      | No backend endpoint (OQ-U2); avoid inventing contract                                                       |
+| DU6 | List offline = cache-read degraded; writes blocked via `useOnlineStatus` | offline write queue                       | Out of scope (#204); mirror Stores D7                                                                       |
+| DU7 | Write-through cache on online list + refetch after lifecycle             | full upsert merge                         | List returns full `StoreUser[]`; simpler than Stores D6 (no boolean-merge needed)                           |
+| DU8 | Create guard: missing `selectedStoreId` → redirect `/management/stores`  | render error inline                       | User must belong to a store; redirect matches proposal                                                      |
+| DU9 | UserEditPage gates form mount on async `user` (LOADING state)            | mount form w/ empty initialValues         | Hydration lesson from StoreEditPage 120-127 — useState init runs once, empty initialValues never re-hydrate |
 
 ## Cache
 
@@ -118,7 +118,7 @@ New `USERS.*` namespace in `es.ts` (MENU.USERS/MENU.MANAGEMENT exist). ~24 keys:
 (LIST/CREATE/EDIT), field labels (FULL_NAME, LOGIN, PASSWORD, CONFIRM, OLD_PASSWORD, NEW_PASSWORD,
 CELL_PHONE, EMAIL, IS_ACTIVE, STORE), actions (CREATE/EDIT/SAVE/SAVING/ACTIVATE/DEACTIVATE/CHANGE_PASSWORD),
 success/error, offline notice, degraded notice, empty state, validation (REQUIRED/PASSWORD_POLICY/PASSWORD_MISMATCH).
-Rioplatense tone matching STORES.*.
+Rioplatense tone matching STORES.\*.
 
 ## TDD build sequence (RED → GREEN)
 
@@ -134,14 +134,14 @@ Test harness = Stores' `vi` mocks (auth-store, user-http-service, useOnlineStatu
 
 ## Spec traceability
 
-| Spec requirement | Design element |
-|------------------|----------------|
-| 3 routes render, admin+feature gated | routes.ts entries + `adminFeatureLoader([Users])` (DU2) |
-| List StoreUser[] + activate/deactivate | UserListPage + UserList + listUsers/activate/deactivate (DU7) |
-| Create against store roleIds:[3] | UserCreatePage guard (DU8) + UserCreateForm + createUser (DU4) |
-| Edit details + password reset | UserEditPage two sub-forms (DU3) + updateUserDetails + changePassword (DU5) |
-| Offline read-cache + block writes | DU6 + BaseRepository + useOnlineStatus |
-| Hydration correctness | DU9 LOADING gate |
+| Spec requirement                       | Design element                                                              |
+| -------------------------------------- | --------------------------------------------------------------------------- |
+| 3 routes render, admin+feature gated   | routes.ts entries + `adminFeatureLoader([Users])` (DU2)                     |
+| List StoreUser[] + activate/deactivate | UserListPage + UserList + listUsers/activate/deactivate (DU7)               |
+| Create against store roleIds:[3]       | UserCreatePage guard (DU8) + UserCreateForm + createUser (DU4)              |
+| Edit details + password reset          | UserEditPage two sub-forms (DU3) + updateUserDetails + changePassword (DU5) |
+| Offline read-cache + block writes      | DU6 + BaseRepository + useOnlineStatus                                      |
+| Hydration correctness                  | DU9 LOADING gate                                                            |
 
 ## Migration / Rollout
 

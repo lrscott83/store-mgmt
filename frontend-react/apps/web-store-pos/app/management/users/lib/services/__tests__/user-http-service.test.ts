@@ -120,7 +120,12 @@ describe('userHttpService.editUser — HTTP-5: PUT /v1/users/:id', () => {
   it('calls PUT /v1/users/:id with payload including isActive', async () => {
     const { userHttpService } = await import('../user-http-service');
     const { apiClient } = await import('~/shared/lib/http/api-client');
-    const payload = { fullName: 'Updated User', cellPhone: '+456', email: 'u@test.com', isActive: true };
+    const payload = {
+      fullName: 'Updated User',
+      cellPhone: '+456',
+      email: 'u@test.com',
+      isActive: true,
+    };
     await userHttpService.editUser('u1', payload);
     expect(apiClient.put).toHaveBeenCalledWith('/v1/users/u1', payload);
   });
@@ -128,7 +133,10 @@ describe('userHttpService.editUser — HTTP-5: PUT /v1/users/:id', () => {
   it('returns the boolean response data', async () => {
     const { userHttpService } = await import('../user-http-service');
     const result = await userHttpService.editUser('u1', {
-      fullName: 'X', cellPhone: '', email: '', isActive: false,
+      fullName: 'X',
+      cellPhone: '',
+      email: '',
+      isActive: false,
     });
     expect(result.data).toBe(true);
   });
@@ -152,7 +160,10 @@ describe('userHttpService.activateUser — HTTP-6: POST /v1/users/activate', () 
     const { userHttpService } = await import('../user-http-service');
     const { apiClient } = await import('~/shared/lib/http/api-client');
     await userHttpService.activateUser('u1', false);
-    expect(apiClient.post).toHaveBeenCalledWith('/v1/users/activate', { id: 'u1', isActive: false });
+    expect(apiClient.post).toHaveBeenCalledWith('/v1/users/activate', {
+      id: 'u1',
+      isActive: false,
+    });
   });
 });
 

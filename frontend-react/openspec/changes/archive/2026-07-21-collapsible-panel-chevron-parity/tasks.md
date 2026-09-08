@@ -2,14 +2,14 @@
 
 ## Review Workload Forecast
 
-| Field | Value |
-|-------|-------|
+| Field                   | Value                                                                                                                                             |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Estimated changed lines | ~180-260 (icon +test ~60, products refactor ~15, 6 list screens ~5-10 each ~50, today-stats restructure ~40, tutorial restructure ~40, tests ~60) |
-| 400-line budget risk | Low |
-| Chained PRs recommended | No |
-| Suggested split | Single PR (commits-only per work unit, no chained PRs needed) |
-| Delivery strategy | commits-only on current branch (per project convention) |
-| Chain strategy | pending |
+| 400-line budget risk    | Low                                                                                                                                               |
+| Chained PRs recommended | No                                                                                                                                                |
+| Suggested split         | Single PR (commits-only per work unit, no chained PRs needed)                                                                                     |
+| Delivery strategy       | commits-only on current branch (per project convention)                                                                                           |
+| Chain strategy          | pending                                                                                                                                           |
 
 Decision needed before apply: No
 Chained PRs recommended: No
@@ -24,13 +24,13 @@ Chain strategy: pending
 
 ### Suggested Work Units
 
-| Unit | Goal | Likely PR | Notes |
-|------|------|-----------|-------|
-| WU1 | Shared `ChevronDownIcon` + `products.tsx` refactor | single PR (commit 1) | Foundation; other WUs depend on this icon existing |
-| WU2 | 6 uniform list screens get the chevron | single PR (commit 2) | Additive, low-risk, depends on WU1 |
-| WU3 | `today-stats.tsx` `<details>` → controlled restructure + chevron | single PR (commit 3) | RED tests first; depends on WU1 |
-| WU4 | `tutorial.tsx` `<details>` → controlled restructure + chevron | single PR (commit 4) | RED tests first; depends on WU1; locked in-scope by orchestrator despite design ADR-4 deferral |
-| WU5 | Full verification sweep | single PR (commit 5) | tests + typecheck + build |
+| Unit | Goal                                                             | Likely PR            | Notes                                                                                          |
+| ---- | ---------------------------------------------------------------- | -------------------- | ---------------------------------------------------------------------------------------------- |
+| WU1  | Shared `ChevronDownIcon` + `products.tsx` refactor               | single PR (commit 1) | Foundation; other WUs depend on this icon existing                                             |
+| WU2  | 6 uniform list screens get the chevron                           | single PR (commit 2) | Additive, low-risk, depends on WU1                                                             |
+| WU3  | `today-stats.tsx` `<details>` → controlled restructure + chevron | single PR (commit 3) | RED tests first; depends on WU1                                                                |
+| WU4  | `tutorial.tsx` `<details>` → controlled restructure + chevron    | single PR (commit 4) | RED tests first; depends on WU1; locked in-scope by orchestrator despite design ADR-4 deferral |
+| WU5  | Full verification sweep                                          | single PR (commit 5) | tests + typecheck + build                                                                      |
 
 ## Phase 1: Foundation — Shared ChevronDownIcon
 

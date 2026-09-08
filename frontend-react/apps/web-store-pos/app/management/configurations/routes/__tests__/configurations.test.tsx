@@ -43,7 +43,7 @@ describe('ConfigurationsPage — parity stub', () => {
     render(
       <Wrapper>
         <ConfigurationsPage />
-      </Wrapper>
+      </Wrapper>,
     );
     expect(screen.getByText('configurations works!')).toBeInTheDocument();
   });
@@ -53,7 +53,7 @@ describe('ConfigurationsPage — parity stub', () => {
     render(
       <Wrapper>
         <ConfigurationsPage />
-      </Wrapper>
+      </Wrapper>,
     );
     const p = screen.getByText('configurations works!');
     expect(p.tagName.toLowerCase()).toBe('p');

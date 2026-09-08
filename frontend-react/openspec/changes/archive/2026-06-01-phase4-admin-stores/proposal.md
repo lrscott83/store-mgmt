@@ -7,6 +7,7 @@ Migrate the Angular `admin/stores` route (super-admin store list, gated by `Supe
 ## Scope
 
 ### In Scope
+
 - New container `AdminStoreListPage` at `app/admin/stores/routes/store-list.tsx` (template = admin/features slice).
 - Register route `admin/stores` in `app/routes.ts`.
 - Reuse `storeHttpService.listStores()` (GET `/v1/stores/by-current-user`; backend scopes by role) — no new service.
@@ -18,6 +19,7 @@ Migrate the Angular `admin/stores` route (super-admin store list, gated by `Supe
 - Unit tests `app/admin/stores/routes/__tests__/store-list.test.tsx`.
 
 ### Out of Scope
+
 - Offline/degraded cache (Angular StoreListComponent has none → admin/stores stays 1:1, no BaseRepository).
 - Activate/Deactivate behavior (commented out in Angular).
 - Any change to `storeHttpService`, `Store` model, or management/stores container.
@@ -25,9 +27,11 @@ Migrate the Angular `admin/stores` route (super-admin store list, gated by `Supe
 ## Capabilities
 
 ### New Capabilities
+
 - None (extends existing `admin` capability spec).
 
 ### Modified Capabilities
+
 - `admin`: add `admin/stores` route requirement — super-admin store list rendering shared StoreList, reusing storeHttpService, gated by superAdminLoader, wiring create/edit/approve/disapprove only.
 - `management`: relax `StoreListProps` so `onActivate`/`onDeactivate` are optional (no behavior change for management/stores; enables admin reuse without no-ops).
 
@@ -37,22 +41,22 @@ Mirror the `admin/features` slice structure. Container loads stores via `storeHt
 
 ## Affected Areas
 
-| Area | Impact | Description |
-|------|--------|-------------|
-| `app/admin/stores/routes/store-list.tsx` | New | AdminStoreListPage container + superAdminLoader |
-| `app/admin/stores/routes/__tests__/store-list.test.tsx` | New | Unit tests for container |
-| `app/routes.ts` | Modified | Register `admin/stores` route |
-| `app/management/stores/components/store-list.tsx` | Modified | onActivate/onDeactivate optional in props |
-| `app/shared/lib/i18n/es.ts` | Modified (maybe) | Add ADMIN_STORES title only if distinct from STORES.LIST_TITLE |
-| `storeHttpService`, `Store` model | Reuse (no change) | Imported as-is |
+| Area                                                    | Impact            | Description                                                    |
+| ------------------------------------------------------- | ----------------- | -------------------------------------------------------------- |
+| `app/admin/stores/routes/store-list.tsx`                | New               | AdminStoreListPage container + superAdminLoader                |
+| `app/admin/stores/routes/__tests__/store-list.test.tsx` | New               | Unit tests for container                                       |
+| `app/routes.ts`                                         | Modified          | Register `admin/stores` route                                  |
+| `app/management/stores/components/store-list.tsx`       | Modified          | onActivate/onDeactivate optional in props                      |
+| `app/shared/lib/i18n/es.ts`                             | Modified (maybe)  | Add ADMIN_STORES title only if distinct from STORES.LIST_TITLE |
+| `storeHttpService`, `Store` model                       | Reuse (no change) | Imported as-is                                                 |
 
 ## Risks
 
-| Risk | Likelihood | Mitigation |
-|------|------------|------------|
-| `/v1/stores/by-current-user` not returning all stores for super-admin | Low | Backend behavior verified in exploration; assert in test via service mock |
-| Relaxing props breaks management/stores typing | Low | Optional widening is backward-compatible; type-check + management tests |
-| StoreList renders activate/deactivate UI when handlers undefined | Med | Guard rendering on handler presence inside presentational |
+| Risk                                                                  | Likelihood | Mitigation                                                                |
+| --------------------------------------------------------------------- | ---------- | ------------------------------------------------------------------------- |
+| `/v1/stores/by-current-user` not returning all stores for super-admin | Low        | Backend behavior verified in exploration; assert in test via service mock |
+| Relaxing props breaks management/stores typing                        | Low        | Optional widening is backward-compatible; type-check + management tests   |
+| StoreList renders activate/deactivate UI when handlers undefined      | Med        | Guard rendering on handler presence inside presentational                 |
 
 ## Rollback Plan
 

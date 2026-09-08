@@ -2,14 +2,14 @@
 
 ## Review Workload Forecast
 
-| Field | Value |
-|-------|-------|
-| Estimated changed lines | ~280-340 (5 impl files ~120 net + 3 test rewrites ~180-220) |
-| 400-line budget risk | Medium |
-| Chained PRs recommended | No |
-| Suggested split | Single PR (commits-only per work unit, no PR per repo policy) |
-| Delivery strategy | commits-only on feature branch (no PR workflow per project convention) |
-| Chain strategy | pending |
+| Field                   | Value                                                                  |
+| ----------------------- | ---------------------------------------------------------------------- |
+| Estimated changed lines | ~280-340 (5 impl files ~120 net + 3 test rewrites ~180-220)            |
+| 400-line budget risk    | Medium                                                                 |
+| Chained PRs recommended | No                                                                     |
+| Suggested split         | Single PR (commits-only per work unit, no PR per repo policy)          |
+| Delivery strategy       | commits-only on feature branch (no PR workflow per project convention) |
+| Chain strategy          | pending                                                                |
 
 Decision needed before apply: No
 Chained PRs recommended: No
@@ -18,12 +18,12 @@ Chain strategy: pending
 
 ### Suggested Work Units
 
-| Unit | Goal | Likely PR | Notes |
-|------|------|-----------|-------|
-| 1 | i18n copy fix (DISCOUNT_FROM_INVENTORY) | commit 1 | Independent, zero risk, unblocks label assertions in later units |
-| 2 | CreateProductModal field/prop rework | commit 2 | Depends on unit 1 (label text) |
-| 3 | EditProductModal field/prop rework + delete removal | commit 3 | Independent of unit 2, depends on unit 1 |
-| 4 | products.tsx wiring (defaultOrder precompute, prop threading) | commit 4 | Depends on units 2+3 (new prop shapes) |
+| Unit | Goal                                                          | Likely PR | Notes                                                            |
+| ---- | ------------------------------------------------------------- | --------- | ---------------------------------------------------------------- |
+| 1    | i18n copy fix (DISCOUNT_FROM_INVENTORY)                       | commit 1  | Independent, zero risk, unblocks label assertions in later units |
+| 2    | CreateProductModal field/prop rework                          | commit 2  | Depends on unit 1 (label text)                                   |
+| 3    | EditProductModal field/prop rework + delete removal           | commit 3  | Independent of unit 2, depends on unit 1                         |
+| 4    | products.tsx wiring (defaultOrder precompute, prop threading) | commit 4  | Depends on units 2+3 (new prop shapes)                           |
 
 ## Phase 1: i18n Foundation
 

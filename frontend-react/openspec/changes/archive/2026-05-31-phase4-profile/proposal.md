@@ -13,10 +13,10 @@ Deliver self-service profile management to the React 19 PWA POS: an authenticate
 
 ## Intent
 
-| Question | Answer |
-|----------|--------|
-| What problem | Authenticated users have no way to update their own profile or rotate their password in the React app. Nav scaffolding (`menu-config.ts`, `EFeatures.Profile=70`, `MENU.*` i18n) exists but the routes are unregistered and the navbar dropdown only offers logout. |
-| Why now | Phases 1-3 and Phase 4 Synchronization are complete. Profile is the remaining Phase 4 self-service slice and unblocks parity with the legacy Angular profile flow. |
+| Question                | Answer                                                                                                                                                                                                                                                                                                                                                             |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| What problem            | Authenticated users have no way to update their own profile or rotate their password in the React app. Nav scaffolding (`menu-config.ts`, `EFeatures.Profile=70`, `MENU.*` i18n) exists but the routes are unregistered and the navbar dropdown only offers logout.                                                                                                |
+| Why now                 | Phases 1-3 and Phase 4 Synchronization are complete. Profile is the remaining Phase 4 self-service slice and unblocks parity with the legacy Angular profile flow.                                                                                                                                                                                                 |
 | What success looks like | A user opens the navbar top-right dropdown, picks Edit Profile or Change Password, submits while online, and (a) sees their profile persisted to backend + reflected immediately in the navbar, or (b) changes their password and is logged out and redirected to `/login`. Offline disables submit with a live inline notice. All copy is Spanish via react-intl. |
 
 ---
@@ -47,6 +47,7 @@ Deliver self-service profile management to the React 19 PWA POS: an authenticate
 ### File list
 
 **New:**
+
 - `app/profile/routes/edit-profile.tsx`
 - `app/profile/routes/change-password.tsx`
 - `app/profile/routes/__tests__/profile-routes.test.tsx`
@@ -54,6 +55,7 @@ Deliver self-service profile management to the React 19 PWA POS: an authenticate
 - `app/shared/lib/hooks/use-online-status.ts`
 
 **Modified:**
+
 - `app/routes.ts` — register `/profile/edit` and `/profile/change-password`.
 - `app/shared/components/navbar.tsx` — add two dropdown links + close-on-nav.
 - `app/shared/lib/i18n/es.ts` — add `PROFILE.*` keys.
@@ -67,12 +69,12 @@ All paths relative to `frontend-react/apps/web-store-pos/`.
 
 ### Building blocks
 
-| Block | Responsibility |
-|-------|----------------|
-| `profileHttpService` | Module-scope singleton (mirrors `authHttpService`). `updateProfile(userId, { fullName, cellPhone, email, isActive })` → `PUT /v1/users/{id}`. `changePassword(userId, { oldPassword, newPassword })` → `POST /v1/users/change-password/{id}`. Uses shared `apiClient` (Bearer + 401 interceptors already wired). |
-| `auth-store.updateUser(user)` | Patches the user in Zustand AND writes BOTH `StorageKeys.AUTH_MODEL` and `StorageKeys.CURRENT_USER`, same as `setUser()`. Single source of truth; navbar reads `user.fullName` from here. |
-| `useOnlineStatus()` | Returns live `isOnline` boolean by subscribing to `online`/`offline` window events; cleans up on unmount. Reusable beyond profile. |
-| Route containers | Follow the `today-expenses.tsx` template: named export + `export default`, module-scope `featureLoader` loader, read user from `useAuthStore`, instantiate/consume the HTTP service inline. |
+| Block                         | Responsibility                                                                                                                                                                                                                                                                                                   |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `profileHttpService`          | Module-scope singleton (mirrors `authHttpService`). `updateProfile(userId, { fullName, cellPhone, email, isActive })` → `PUT /v1/users/{id}`. `changePassword(userId, { oldPassword, newPassword })` → `POST /v1/users/change-password/{id}`. Uses shared `apiClient` (Bearer + 401 interceptors already wired). |
+| `auth-store.updateUser(user)` | Patches the user in Zustand AND writes BOTH `StorageKeys.AUTH_MODEL` and `StorageKeys.CURRENT_USER`, same as `setUser()`. Single source of truth; navbar reads `user.fullName` from here.                                                                                                                        |
+| `useOnlineStatus()`           | Returns live `isOnline` boolean by subscribing to `online`/`offline` window events; cleans up on unmount. Reusable beyond profile.                                                                                                                                                                               |
+| Route containers              | Follow the `today-expenses.tsx` template: named export + `export default`, module-scope `featureLoader` loader, read user from `useAuthStore`, instantiate/consume the HTTP service inline.                                                                                                                      |
 
 ### Edit-profile flow
 
@@ -99,26 +101,26 @@ All paths relative to `frontend-react/apps/web-store-pos/`.
 
 ## Key Decisions
 
-| Decision | Rationale |
-|----------|-----------|
-| Extend `auth-store` with `updateUser()` instead of a new `useProfileStore` | Profile data already lives in `useAuthStore` and the navbar reads from it. A second store would split the source of truth and risk stale reads. `updateUser()` mirrors the existing `setUser()` dual-key write — minimal, consistent. |
-| Pass storeId to `featureLoader` via module-scope `getState()` | Profile routes have no `:storeId` URL param; `featureLoader` defaults to `params.storeId`, which would fail the StoreUser check. Using `featureLoader([EFeatures.Profile], useAuthStore.getState().user?.selectedStoreId)` at module scope works because Zustand `getState()` is callable outside React render. |
-| Logout + redirect to `/login` on successful password change | LOCKED user decision. The backend may invalidate the token after a password change; forcing re-auth is the safe default and avoids a silently-dead session. Legacy Angular navigated to `/management/users`, but that was an admin-editing-another-user flow, not self-service. |
-| Use the Angular password regex client-side | LOCKED user decision: `(?=\D*\d)(?=[^a-z]*[a-z])(?=[^A-Z]*[A-Z]).{8,30}` (≥1 digit, ≥1 lower, ≥1 upper, 8-30 chars). Keeps the React client aligned with backend/legacy validation; server remains the authority but we fail fast. |
-| Separate `profileHttpService` rather than extending `authHttpService` | Keeps the auth service focused on auth lifecycle; profile/user-management calls live in their own module-scope singleton following the established HTTP-layer pattern. |
-| Navbar dropdown links (NOT sidebar), close on nav | PRD/exploration: profile is reached from the top-right user dropdown. Closing on link click prevents a lingering open menu after navigation. |
+| Decision                                                                   | Rationale                                                                                                                                                                                                                                                                                                       |
+| -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Extend `auth-store` with `updateUser()` instead of a new `useProfileStore` | Profile data already lives in `useAuthStore` and the navbar reads from it. A second store would split the source of truth and risk stale reads. `updateUser()` mirrors the existing `setUser()` dual-key write — minimal, consistent.                                                                           |
+| Pass storeId to `featureLoader` via module-scope `getState()`              | Profile routes have no `:storeId` URL param; `featureLoader` defaults to `params.storeId`, which would fail the StoreUser check. Using `featureLoader([EFeatures.Profile], useAuthStore.getState().user?.selectedStoreId)` at module scope works because Zustand `getState()` is callable outside React render. |
+| Logout + redirect to `/login` on successful password change                | LOCKED user decision. The backend may invalidate the token after a password change; forcing re-auth is the safe default and avoids a silently-dead session. Legacy Angular navigated to `/management/users`, but that was an admin-editing-another-user flow, not self-service.                                 |
+| Use the Angular password regex client-side                                 | LOCKED user decision: `(?=\D*\d)(?=[^a-z]*[a-z])(?=[^A-Z]*[A-Z]).{8,30}` (≥1 digit, ≥1 lower, ≥1 upper, 8-30 chars). Keeps the React client aligned with backend/legacy validation; server remains the authority but we fail fast.                                                                              |
+| Separate `profileHttpService` rather than extending `authHttpService`      | Keeps the auth service focused on auth lifecycle; profile/user-management calls live in their own module-scope singleton following the established HTTP-layer pattern.                                                                                                                                          |
+| Navbar dropdown links (NOT sidebar), close on nav                          | PRD/exploration: profile is reached from the top-right user dropdown. Closing on link click prevents a lingering open menu after navigation.                                                                                                                                                                    |
 
 ---
 
 ## Risks & Mitigations
 
-| Risk | Mitigation |
-|------|------------|
+| Risk                                                                             | Mitigation                                                                                                                         |
+| -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
 | Dual localStorage drift — partial write leaves navbar showing a stale `fullName` | `updateUser()` MUST write BOTH `AUTH_MODEL` and `CURRENT_USER` atomically, identical to `setUser()`. Covered by a smoke assertion. |
-| `featureLoader` storeId — StoreUser blocked when storeId is undefined | Pass `useAuthStore.getState().user?.selectedStoreId` as the loader's storeId arg at module scope. |
-| Password-change token invalidation uncertainty | Resolved by the LOCKED logout-on-success decision — always re-auth, no reliance on backend token behavior. |
-| Offline submit attempts / lost connectivity mid-form | `useOnlineStatus()` listens to live events; submit stays disabled while offline and re-enables automatically when back online. |
-| Navbar dropdown stays open after navigating | Explicitly close the dropdown on link click. |
+| `featureLoader` storeId — StoreUser blocked when storeId is undefined            | Pass `useAuthStore.getState().user?.selectedStoreId` as the loader's storeId arg at module scope.                                  |
+| Password-change token invalidation uncertainty                                   | Resolved by the LOCKED logout-on-success decision — always re-auth, no reliance on backend token behavior.                         |
+| Offline submit attempts / lost connectivity mid-form                             | `useOnlineStatus()` listens to live events; submit stays disabled while offline and re-enables automatically when back online.     |
+| Navbar dropdown stays open after navigating                                      | Explicitly close the dropdown on link click.                                                                                       |
 
 ---
 

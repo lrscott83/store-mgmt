@@ -69,11 +69,13 @@ vi.mock('~/shared/lib/toast', () => ({
 // input render in most tests; CART-CREDITS-GATE-* tests override this per-case.
 let mockUser: Record<string, unknown> = { selectedStoreId: 's1', storeModuleIds: [11] };
 vi.mock('~/shared/lib/stores/auth-store', () => {
-  const useAuthStore = vi.fn((selector?: (s: { user: unknown; isAuthenticated: boolean }) => unknown) => {
-    const state = { user: mockUser, isAuthenticated: true };
-    if (typeof selector === 'function') return selector(state);
-    return state;
-  });
+  const useAuthStore = vi.fn(
+    (selector?: (s: { user: unknown; isAuthenticated: boolean }) => unknown) => {
+      const state = { user: mockUser, isAuthenticated: true };
+      if (typeof selector === 'function') return selector(state);
+      return state;
+    },
+  );
   return { useAuthStore };
 });
 
@@ -271,9 +273,7 @@ describe('CartShell — print-invoice toggle (UI-only, no print behavior)', () =
     openCart();
     expect(screen.getByText('Imprimir Factura (prueba)')).toBeInTheDocument();
     // Angular uses mat-slide-toggle — parity means a switch, not a checkbox
-    expect(
-      screen.getByRole('switch', { name: 'Imprimir Factura (prueba)' }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: 'Imprimir Factura (prueba)' })).toBeInTheDocument();
   });
 
   it('toggling it does not throw or trigger any print/window.open call', () => {
@@ -398,7 +398,11 @@ describe('CartShell — in-cart quantity +/- stock validation (Angular parity)',
     const product = makeProduct({ id: 'p1', name: 'Coca Cola', isActive: false });
     mockProductLookup = { p1: product };
     const updateQuantity = vi.fn();
-    mockCartState({ items: [{ product, quantity: 2 }], total: vi.fn().mockReturnValue(10), updateQuantity });
+    mockCartState({
+      items: [{ product, quantity: 2 }],
+      total: vi.fn().mockReturnValue(10),
+      updateQuantity,
+    });
 
     renderCartShell();
     openCart();
@@ -415,7 +419,11 @@ describe('CartShell — in-cart quantity +/- stock validation (Angular parity)',
     const product = makeProduct({ id: 'p1', name: 'Coca Cola', isActive: false });
     mockProductLookup = { p1: product };
     const updateQuantity = vi.fn();
-    mockCartState({ items: [{ product, quantity: 2 }], total: vi.fn().mockReturnValue(10), updateQuantity });
+    mockCartState({
+      items: [{ product, quantity: 2 }],
+      total: vi.fn().mockReturnValue(10),
+      updateQuantity,
+    });
 
     renderCartShell();
     openCart();
@@ -456,7 +464,11 @@ describe('CartShell — in-cart quantity +/- stock validation (Angular parity)',
     );
     const updateQuantity = vi.fn();
     // Already 3 in cart, only 3 available -> increasing to 4 must fail.
-    mockCartState({ items: [{ product, quantity: 3 }], total: vi.fn().mockReturnValue(15), updateQuantity });
+    mockCartState({
+      items: [{ product, quantity: 3 }],
+      total: vi.fn().mockReturnValue(15),
+      updateQuantity,
+    });
 
     renderCartShell();
     openCart();
@@ -500,7 +512,11 @@ describe('CartShell — in-cart quantity +/- stock validation (Angular parity)',
       ]),
     );
     const updateQuantity = vi.fn();
-    mockCartState({ items: [{ product, quantity: 2 }], total: vi.fn().mockReturnValue(10), updateQuantity });
+    mockCartState({
+      items: [{ product, quantity: 2 }],
+      total: vi.fn().mockReturnValue(10),
+      updateQuantity,
+    });
 
     renderCartShell();
     openCart();
@@ -514,7 +530,11 @@ describe('CartShell — in-cart quantity +/- stock validation (Angular parity)',
     const product = makeProduct({ id: 'p1', name: 'Coca Cola' });
     mockProductLookup = { p1: product };
     const updateQuantity = vi.fn();
-    mockCartState({ items: [{ product, quantity: 2 }], total: vi.fn().mockReturnValue(10), updateQuantity });
+    mockCartState({
+      items: [{ product, quantity: 2 }],
+      total: vi.fn().mockReturnValue(10),
+      updateQuantity,
+    });
 
     renderCartShell();
     openCart();
@@ -530,7 +550,11 @@ describe('CartShell — in-cart quantity +/- stock validation (Angular parity)',
     const product = makeProduct({ id: 'p1', name: 'Coca Cola', discountFromInvantory: true });
     mockProductLookup = { p1: product };
     const updateQuantity = vi.fn();
-    mockCartState({ items: [{ product, quantity: 2 }], total: vi.fn().mockReturnValue(10), updateQuantity });
+    mockCartState({
+      items: [{ product, quantity: 2 }],
+      total: vi.fn().mockReturnValue(10),
+      updateQuantity,
+    });
 
     renderCartShell();
     openCart();
@@ -678,7 +702,11 @@ describe('CartShell — wholesale cart floor rule + tier repricing', () => {
     const product = makeProduct({ id: 'p1', name: 'Coca Cola', price: 5 });
     mockProductLookup = { p1: product };
     const updateQuantity = vi.fn();
-    mockCartState({ items: [{ product, quantity: 2 }], total: vi.fn().mockReturnValue(10), updateQuantity });
+    mockCartState({
+      items: [{ product, quantity: 2 }],
+      total: vi.fn().mockReturnValue(10),
+      updateQuantity,
+    });
 
     renderCartShell();
     openCart();
@@ -781,12 +809,17 @@ describe('CartShell — createOrder validations (Registrar)', () => {
     fireEvent.click(screen.getByText('Registrar'));
 
     await waitFor(() => {
-      expect(showToastSuccessMock).toHaveBeenCalledWith('La venta fue creada satisfactoriamente.', 'Éxito');
+      expect(showToastSuccessMock).toHaveBeenCalledWith(
+        'La venta fue creada satisfactoriamente.',
+        'Éxito',
+      );
     });
     expect(clear).toHaveBeenCalledTimes(1);
     // Angular fires the success toast FIRST, then clears the cart (nav-right.component.ts:213-221:
     // toastrService.success(...) precedes clearShoppingCart()). Assert that ordering here.
-    expect(showToastSuccessMock.mock.invocationCallOrder[0]).toBeLessThan(clear.mock.invocationCallOrder[0]);
+    expect(showToastSuccessMock.mock.invocationCallOrder[0]).toBeLessThan(
+      clear.mock.invocationCallOrder[0],
+    );
     // Sale registered -> the cart popup closes (Angular ngbDropdown autoClose parity).
     expect(screen.queryByText('Venta actual')).not.toBeInTheDocument();
   });
@@ -833,7 +866,7 @@ describe('CartShell — createOrder validations (Registrar)', () => {
   // banner"), React's catch branch mirrors that absence of feedback rather than assuming the
   // same error toast as the succeeded:false branch (a deviation from the design's literal
   // assumption, flagged in the apply report).
-  it('CART-09 (T2.0 finding): a thrown/rejected createOrder shows NO toast (mirrors Angular\'s absent error handler) and leaks no raw err.message', async () => {
+  it("CART-09 (T2.0 finding): a thrown/rejected createOrder shows NO toast (mirrors Angular's absent error handler) and leaks no raw err.message", async () => {
     const product = makeProduct();
     const clear = vi.fn();
     mockCartState({ items: [{ product, quantity: 1 }], total: vi.fn().mockReturnValue(5), clear });
@@ -950,14 +983,20 @@ describe('CartShell — venta mayorista mostrada en paquetes', () => {
   });
 
   it('el badge del carrito cuenta paquetes: 72 unidades = 3 cajas', () => {
-    mockCartState({ items: [{ product: beer, quantity: 72 }], total: vi.fn().mockReturnValue(47520) });
+    mockCartState({
+      items: [{ product: beer, quantity: 72 }],
+      total: vi.fn().mockReturnValue(47520),
+    });
     renderCartShell();
     expect(screen.getByTestId('cart-badge')).toHaveTextContent('3');
   });
 
   it('la línea del carrito muestra la cantidad en cajas y el precio de la caja', () => {
     // 2 cajas a 660/unidad → precio de caja 660 × 24 = 15 840.
-    mockCartState({ items: [{ product: beer, quantity: 48, price: 660 }], total: vi.fn().mockReturnValue(31680) });
+    mockCartState({
+      items: [{ product: beer, quantity: 48, price: 660 }],
+      total: vi.fn().mockReturnValue(31680),
+    });
     renderCartShell();
     openCart();
     expect(screen.getByText('Cajas: 2 · Precio: $15 840')).toBeInTheDocument();
@@ -968,7 +1007,11 @@ describe('CartShell — venta mayorista mostrada en paquetes', () => {
   it('el botón + agrega un paquete: +24 unidades con un click (y re-tier del precio)', async () => {
     mockProductLookup = { beer };
     const updateQuantity = vi.fn();
-    mockCartState({ items: [{ product: beer, quantity: 48 }], total: vi.fn().mockReturnValue(31680), updateQuantity });
+    mockCartState({
+      items: [{ product: beer, quantity: 48 }],
+      total: vi.fn().mockReturnValue(31680),
+      updateQuantity,
+    });
 
     renderCartShell();
     openCart();
@@ -982,7 +1025,11 @@ describe('CartShell — venta mayorista mostrada en paquetes', () => {
   it('el botón − quita un paquete: −24 unidades con un click (y re-tier del precio)', async () => {
     mockProductLookup = { beer };
     const updateQuantity = vi.fn();
-    mockCartState({ items: [{ product: beer, quantity: 48 }], total: vi.fn().mockReturnValue(31680), updateQuantity });
+    mockCartState({
+      items: [{ product: beer, quantity: 48 }],
+      total: vi.fn().mockReturnValue(31680),
+      updateQuantity,
+    });
 
     renderCartShell();
     openCart();
@@ -995,7 +1042,10 @@ describe('CartShell — venta mayorista mostrada en paquetes', () => {
 
   it('un carrito normal sigue mostrando unidades y precio unitario (sin regresión)', () => {
     const normal = makeProduct({ id: 'n1', name: 'Dulce', price: 5 });
-    mockCartState({ items: [{ product: normal, quantity: 10 }], total: vi.fn().mockReturnValue(50) });
+    mockCartState({
+      items: [{ product: normal, quantity: 10 }],
+      total: vi.fn().mockReturnValue(50),
+    });
     renderCartShell();
     openCart();
     expect(screen.getByText('Precio: $5 (10)')).toBeInTheDocument();
@@ -1003,7 +1053,10 @@ describe('CartShell — venta mayorista mostrada en paquetes', () => {
 
   it('el badge de un carrito normal sigue contando unidades', () => {
     const normal = makeProduct({ id: 'n1', name: 'Dulce', price: 5 });
-    mockCartState({ items: [{ product: normal, quantity: 10 }], total: vi.fn().mockReturnValue(50) });
+    mockCartState({
+      items: [{ product: normal, quantity: 10 }],
+      total: vi.fn().mockReturnValue(50),
+    });
     renderCartShell();
     expect(screen.getByTestId('cart-badge')).toHaveTextContent('10');
   });

@@ -17,7 +17,11 @@ function makeCategory(overrides: Partial<ProductCategory> = {}): ProductCategory
 class FakeProductCategoryService implements ProductCategoryService {
   private items: ProductCategory[] = [makeCategory()];
 
-  async createProductCategory(name: string, order: number, isActive: boolean): Promise<BaseResponseModel<boolean>> {
+  async createProductCategory(
+    name: string,
+    order: number,
+    isActive: boolean,
+  ): Promise<BaseResponseModel<boolean>> {
     if (this.items.some((c) => c.name === name)) {
       return failure([{ code: 'ProductCategory.NameExists', description: 'exists' }]);
     }
@@ -61,7 +65,13 @@ describe('ProductCategoryService', () => {
     const svc: ProductCategoryService = new FakeProductCategoryService();
 
     const created = await svc.createProductCategory('Snacks', 2, true);
-    expect(created).toEqual({ data: true, succeeded: true, message: '', actionCode: 200, errors: [] });
+    expect(created).toEqual({
+      data: true,
+      succeeded: true,
+      message: '',
+      actionCode: 200,
+      errors: [],
+    });
 
     const maxOrder = await svc.getMaxOrder();
     expect(maxOrder.data).toBe(2);

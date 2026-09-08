@@ -162,7 +162,7 @@ describe('CsvProductImporterModal — parse-on-import + error text parity', () =
 
   // T3 (Angular parity, component.ts:71-78 handleError): `error.message || fallback` — the
   // caught error's OWN message surfaces verbatim, not always the hardcoded literal.
-  it('T3: surfaces the caught error\'s own message (Angular error.message || fallback)', async () => {
+  it("T3: surfaces the caught error's own message (Angular error.message || fallback)", async () => {
     vi.spyOn(csvParser, 'parseCsvProducts').mockImplementation(() => {
       throw new Error('boom');
     });
@@ -174,9 +174,7 @@ describe('CsvProductImporterModal — parse-on-import + error text parity', () =
     fireEvent.change(screen.getByTestId('csv-file-input'), { target: { files: [makeFile()] } });
     fireEvent.click(screen.getByTestId('csv-import-button'));
 
-    await waitFor(() =>
-      expect(showBlockingErrorMock).toHaveBeenCalledWith('Error', 'boom'),
-    );
+    await waitFor(() => expect(showBlockingErrorMock).toHaveBeenCalledWith('Error', 'boom'));
   });
 
   it('T3: falls back to "Error al importar los productos" when the thrown error has no message', async () => {
@@ -192,7 +190,10 @@ describe('CsvProductImporterModal — parse-on-import + error text parity', () =
     fireEvent.click(screen.getByTestId('csv-import-button'));
 
     await waitFor(() =>
-      expect(showBlockingErrorMock).toHaveBeenCalledWith('Error', 'Error al importar los productos'),
+      expect(showBlockingErrorMock).toHaveBeenCalledWith(
+        'Error',
+        'Error al importar los productos',
+      ),
     );
   });
 
@@ -210,7 +211,10 @@ describe('CsvProductImporterModal — parse-on-import + error text parity', () =
     fireEvent.change(screen.getByTestId('csv-file-input'), { target: { files: [makeFile()] } });
     fireEvent.click(screen.getByTestId('csv-import-button'));
     await waitFor(() =>
-      expect(showBlockingErrorMock).toHaveBeenCalledWith('Error', 'Error al importar los productos'),
+      expect(showBlockingErrorMock).toHaveBeenCalledWith(
+        'Error',
+        'Error al importar los productos',
+      ),
     );
 
     FileReader.prototype.readAsText = originalReadAsText;

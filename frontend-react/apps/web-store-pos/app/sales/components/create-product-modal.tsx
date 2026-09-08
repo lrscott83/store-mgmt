@@ -40,7 +40,12 @@ interface CreateProductModalProps {
 // rendered there) — the React form now OWNS an editable barcode field with scanner capture
 // (Angular is legacy; its commented-out control is history). The category dropdown stays
 // pinned to the click-context `category` prop instead.
-export function CreateProductModal({ category, defaultOrder, onSave, onClose }: CreateProductModalProps) {
+export function CreateProductModal({
+  category,
+  defaultOrder,
+  onSave,
+  onClose,
+}: CreateProductModalProps) {
   const intl = useIntl();
   const [form, setForm] = useState<CreateProductForm>({
     name: '',

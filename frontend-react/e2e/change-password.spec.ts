@@ -87,10 +87,10 @@ test('cambiar contraseña cierra sesión y la nueva funciona', async ({ page }) 
   // Aserción 3: the POST payload is exactly { oldPassword, newPassword }
   // (profile-http-service.ts:11-14).
   await expect
-    .poll(
-      () => capturedRequests.some((r) => r.method === 'POST'),
-      { timeout: 10_000, message: 'Expected POST /v1/users/change-password/{id}' }
-    )
+    .poll(() => capturedRequests.some((r) => r.method === 'POST'), {
+      timeout: 10_000,
+      message: 'Expected POST /v1/users/change-password/{id}',
+    })
     .toBe(true);
 
   const postBody = JSON.parse(capturedRequests.find((r) => r.method === 'POST')!.body);

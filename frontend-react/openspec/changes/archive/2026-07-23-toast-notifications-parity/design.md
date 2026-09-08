@@ -78,12 +78,12 @@ Mount exactly ONE container in `root.tsx` `Layout`, in `<body>`, next to `<I18nP
 Props mirror `ToastrModule.forRoot({ closeButton:true, timeOut:1000, positionClass:'toast-top-right',
 preventDuplicates:true })` (`frontend/src/app/app.module.ts:50-55`):
 
-| Angular `forRoot` | react-toastify prop | Value |
-|---|---|---|
-| `positionClass: 'toast-top-right'` | `position` | `"top-right"` |
-| `timeOut: 1000` | `autoClose` | `1000` |
-| `closeButton: true` | `closeButton` | `true` (bare prop) |
-| `preventDuplicates: true` | — (per-toast `toastId`) | handled in the helper, §2 |
+| Angular `forRoot`                  | react-toastify prop     | Value                     |
+| ---------------------------------- | ----------------------- | ------------------------- |
+| `positionClass: 'toast-top-right'` | `position`              | `"top-right"`             |
+| `timeOut: 1000`                    | `autoClose`             | `1000`                    |
+| `closeButton: true`                | `closeButton`           | `true` (bare prop)        |
+| `preventDuplicates: true`          | — (per-toast `toastId`) | handled in the helper, §2 |
 
 Accepted library-default deviations (locked decision — design = defaults, text = identical):
 react-toastify shows a progress bar and uses its own colors/animation; ngx-toastr's Bootstrap5 theme
@@ -162,17 +162,18 @@ Signatures used: `showToastSuccess(message, title?)`, `showToastError(message, t
 and title values come from the **existing** React i18n catalog (plus the new `SUCCESS_TITLE`, §4);
 no literals change.
 
-| # | File:line | Calls today | Replacement |
-|---|---|---|---|
-| 1 | `sales/routes/products.tsx:223` | `await showBlockingSuccess(\`Importados ${csvProducts.length} productos correctamente.\`)` | `showToastSuccess(\`Importados ${csvProducts.length} productos correctamente.\`)` (no title). Drop the `await`; the conditional `showBlockingInfo("...ya existen")` dialog that follows STAYS (it is an Angular info Swal, not a toastr) — no longer sequenced behind an awaited success. |
-| 2 | `shared/components/cart-shell.tsx:222` | `showBlockingSuccess(intl.formatMessage({ id: 'SHOPPING_CART.ORDER_CREATED' }))` | `showToastSuccess(intl.formatMessage({ id: 'SHOPPING_CART.ORDER_CREATED' }), intl.formatMessage({ id: 'GENERAL.RESPONSE.SUCCESS_TITLE' }))` — restores the lost "Éxito" title. |
-| 3 | `shared/components/cart-shell.tsx:208-211` | `setSubmitError(intl.formatMessage({ id: 'GENERAL.ERROR' }))` (functional gap — generic inline error) | `showToastError(intl.formatMessage({ id: 'SHOPPING_CART.ORDER_NOT_CREATED' }), intl.formatMessage({ id: 'GENERAL.RESPONSE.ERROR_TITLE' }))` — new specific error toast. See §3.1 for the `submitError` removal. |
-| 4 | `sync/components/import-form.tsx:57-59` | `setSuccess(true)` → renders `<InfoBox variant="primary">{SYNC.IMPORT_SUCCESS}</InfoBox>` | `showToastSuccess(intl.formatMessage({ id: 'SYNC.IMPORT_SUCCESS' }))` (no title). Remove the `success` state, `setSuccess` calls, and the `{success && <InfoBox>}` JSX. The `error`/`<InfoBox variant="danger">` path (pre-submit validation: no-file / empty-password) has NO Angular toastr counterpart and STAYS. |
-| 5 | `admin/features/routes/features.tsx:24-27` | `showBlockingError(ERROR_TITLE, FEATURES.UNEXPECTED_ERROR)` | `showToastError(intl.formatMessage({ id: 'FEATURES.UNEXPECTED_ERROR' }), intl.formatMessage({ id: 'GENERAL.RESPONSE.ERROR_TITLE' }))` |
-| 6 | `admin/features/routes/features.tsx:22` | `await showBlockingSuccess(FEATURES.FEATURES_ACTIVATED)` | `showToastSuccess(intl.formatMessage({ id: 'FEATURES.FEATURES_ACTIVATED' }), intl.formatMessage({ id: 'GENERAL.RESPONSE.SUCCESS_TITLE' }))` — restores "Éxito" title; drop `await`. |
-| 7 | `admin/features/routes/features.tsx:30-33` (catch) | `showBlockingError(ERROR_TITLE, FEATURES.UNEXPECTED_ERROR)` | `showToastError(intl.formatMessage({ id: 'FEATURES.UNEXPECTED_ERROR' }), intl.formatMessage({ id: 'GENERAL.RESPONSE.ERROR_TITLE' }))` (same as #5) |
+| #   | File:line                                          | Calls today                                                                                           | Replacement                                                                                                                                                                                                                                                                                                          |
+| --- | -------------------------------------------------- | ----------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | `sales/routes/products.tsx:223`                    | `await showBlockingSuccess(\`Importados ${csvProducts.length} productos correctamente.\`)`            | `showToastSuccess(\`Importados ${csvProducts.length} productos correctamente.\`)`(no title). Drop the`await`; the conditional `showBlockingInfo("...ya existen")` dialog that follows STAYS (it is an Angular info Swal, not a toastr) — no longer sequenced behind an awaited success.                              |
+| 2   | `shared/components/cart-shell.tsx:222`             | `showBlockingSuccess(intl.formatMessage({ id: 'SHOPPING_CART.ORDER_CREATED' }))`                      | `showToastSuccess(intl.formatMessage({ id: 'SHOPPING_CART.ORDER_CREATED' }), intl.formatMessage({ id: 'GENERAL.RESPONSE.SUCCESS_TITLE' }))` — restores the lost "Éxito" title.                                                                                                                                       |
+| 3   | `shared/components/cart-shell.tsx:208-211`         | `setSubmitError(intl.formatMessage({ id: 'GENERAL.ERROR' }))` (functional gap — generic inline error) | `showToastError(intl.formatMessage({ id: 'SHOPPING_CART.ORDER_NOT_CREATED' }), intl.formatMessage({ id: 'GENERAL.RESPONSE.ERROR_TITLE' }))` — new specific error toast. See §3.1 for the `submitError` removal.                                                                                                      |
+| 4   | `sync/components/import-form.tsx:57-59`            | `setSuccess(true)` → renders `<InfoBox variant="primary">{SYNC.IMPORT_SUCCESS}</InfoBox>`             | `showToastSuccess(intl.formatMessage({ id: 'SYNC.IMPORT_SUCCESS' }))` (no title). Remove the `success` state, `setSuccess` calls, and the `{success && <InfoBox>}` JSX. The `error`/`<InfoBox variant="danger">` path (pre-submit validation: no-file / empty-password) has NO Angular toastr counterpart and STAYS. |
+| 5   | `admin/features/routes/features.tsx:24-27`         | `showBlockingError(ERROR_TITLE, FEATURES.UNEXPECTED_ERROR)`                                           | `showToastError(intl.formatMessage({ id: 'FEATURES.UNEXPECTED_ERROR' }), intl.formatMessage({ id: 'GENERAL.RESPONSE.ERROR_TITLE' }))`                                                                                                                                                                                |
+| 6   | `admin/features/routes/features.tsx:22`            | `await showBlockingSuccess(FEATURES.FEATURES_ACTIVATED)`                                              | `showToastSuccess(intl.formatMessage({ id: 'FEATURES.FEATURES_ACTIVATED' }), intl.formatMessage({ id: 'GENERAL.RESPONSE.SUCCESS_TITLE' }))` — restores "Éxito" title; drop `await`.                                                                                                                                  |
+| 7   | `admin/features/routes/features.tsx:30-33` (catch) | `showBlockingError(ERROR_TITLE, FEATURES.UNEXPECTED_ERROR)`                                           | `showToastError(intl.formatMessage({ id: 'FEATURES.UNEXPECTED_ERROR' }), intl.formatMessage({ id: 'GENERAL.RESPONSE.ERROR_TITLE' }))` (same as #5)                                                                                                                                                                   |
 
 Import bookkeeping per file:
+
 - `products.tsx` — remove `showBlockingSuccess` from the `~/shared/lib/blocking-alert` import (keep
   `showBlockingInfo`); add `import { showToastSuccess } from '~/shared/lib/toast';`.
 - `cart-shell.tsx` — remove `showBlockingSuccess` from the `blocking-alert` import (keep
@@ -229,15 +230,15 @@ Add ONE key to `apps/web-store-pos/app/shared/lib/i18n/es.ts`, next to `GENERAL.
 
 Every other message/title already exists and is byte-identical to Angular — confirmed keys and text:
 
-| # | Message key | Message text | Title key | Title text |
-|---|---|---|---|---|
-| 1 | *(literal)* | `Importados ${N} productos correctamente.` | — | — |
-| 2 | `SHOPPING_CART.ORDER_CREATED` (es.ts:192) | `La venta fue creada satisfactoriamente.` | `GENERAL.RESPONSE.SUCCESS_TITLE` **(new)** | `Éxito` |
-| 3 | `SHOPPING_CART.ORDER_NOT_CREATED` (es.ts:193) | `Ocurrío un error creando la venta...` | `GENERAL.RESPONSE.ERROR_TITLE` (es.ts:299) | `Error` |
-| 4 | `SYNC.IMPORT_SUCCESS` (es.ts:733) | `Los datos se importaron correctamente.` | — | — |
-| 5 | `FEATURES.UNEXPECTED_ERROR` (es.ts:683) | `Ocurrió un error inesperado activando las funcionalidades` | `GENERAL.RESPONSE.ERROR_TITLE` | `Error` |
-| 6 | `FEATURES.FEATURES_ACTIVATED` (es.ts:682) | `Las funcionalidades se activaron satisfactoriamente` | `GENERAL.RESPONSE.SUCCESS_TITLE` **(new)** | `Éxito` |
-| 7 | *(same as #5)* | | | |
+| #   | Message key                                   | Message text                                                | Title key                                  | Title text |
+| --- | --------------------------------------------- | ----------------------------------------------------------- | ------------------------------------------ | ---------- |
+| 1   | _(literal)_                                   | `Importados ${N} productos correctamente.`                  | —                                          | —          |
+| 2   | `SHOPPING_CART.ORDER_CREATED` (es.ts:192)     | `La venta fue creada satisfactoriamente.`                   | `GENERAL.RESPONSE.SUCCESS_TITLE` **(new)** | `Éxito`    |
+| 3   | `SHOPPING_CART.ORDER_NOT_CREATED` (es.ts:193) | `Ocurrío un error creando la venta...`                      | `GENERAL.RESPONSE.ERROR_TITLE` (es.ts:299) | `Error`    |
+| 4   | `SYNC.IMPORT_SUCCESS` (es.ts:733)             | `Los datos se importaron correctamente.`                    | —                                          | —          |
+| 5   | `FEATURES.UNEXPECTED_ERROR` (es.ts:683)       | `Ocurrió un error inesperado activando las funcionalidades` | `GENERAL.RESPONSE.ERROR_TITLE`             | `Error`    |
+| 6   | `FEATURES.FEATURES_ACTIVATED` (es.ts:682)     | `Las funcionalidades se activaron satisfactoriamente`       | `GENERAL.RESPONSE.SUCCESS_TITLE` **(new)** | `Éxito`    |
+| 7   | _(same as #5)_                                |                                                             |                                            |            |
 
 Intentional Angular-title-bug fix (#3/#5/#7): Angular passes `GENERAL.RESPONSE.ERROR`, a **missing**
 key, so its toasts render the literal string `"GENERAL.RESPONSE.ERROR"` as the title. React uses the
@@ -259,11 +260,15 @@ Mock `react-toastify`, assert each function calls the right method with content 
 const successMock = vi.fn();
 const errorMock = vi.fn();
 vi.mock('react-toastify', () => ({
-  toast: { success: (...a: unknown[]) => successMock(...a), error: (...a: unknown[]) => errorMock(...a) },
+  toast: {
+    success: (...a: unknown[]) => successMock(...a),
+    error: (...a: unknown[]) => errorMock(...a),
+  },
 }));
 ```
 
 Cases:
+
 - `showToastSuccess('msg')` → `toast.success` called with content resolving to `'msg'` and
   `{ toastId: 'msg' }` (no title).
 - `showToastSuccess('msg', 'Éxito')` → content renders both `'Éxito'` and `'msg'`; `toastId: 'msg'`.
@@ -280,7 +285,10 @@ Mock `react-toastify` with a recording stub component and assert the mirrored co
 ```tsx
 const containerProps = vi.fn();
 vi.mock('react-toastify', () => ({
-  ToastContainer: (props: Record<string, unknown>) => { containerProps(props); return null; },
+  ToastContainer: (props: Record<string, unknown>) => {
+    containerProps(props);
+    return null;
+  },
   toast: { success: vi.fn(), error: vi.fn() },
 }));
 // render <Layout>…</Layout>, then:
@@ -315,7 +323,7 @@ vi.mock('~/shared/lib/toast', () => ({
   NOT closed, and NO inline `role="alert"` banner is rendered (proves `submitError` removed and the
   functional gap closed). This is the failing-first test for the net-new behavior.
 - **#4 import-form.test** — success path asserts `showToastSuccess('Los datos se importaron
-  correctamente.')`; assert the old `<InfoBox variant="primary">` success banner is gone; the
+correctamente.')`; assert the old `<InfoBox variant="primary">` success banner is gone; the
   no-file / empty-password / failure error-banner tests stay.
 - **#5/#6/#7 features.test — PAGE-5/PAGE-6 CHANGE.** Replace the `blocking-alert` mock with a
   `~/shared/lib/toast` mock. `succeeded:true` → `showToastSuccess(FEATURES_ACTIVATED, 'Éxito')`;

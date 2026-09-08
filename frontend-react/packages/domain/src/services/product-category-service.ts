@@ -39,7 +39,11 @@ import type { BaseResponseModel } from '../models/base';
  * — NOT added to this abstract interface.
  */
 export interface ProductCategoryService {
-  createProductCategory(name: string, order: number, isActive: boolean): Promise<BaseResponseModel<boolean>>;
+  createProductCategory(
+    name: string,
+    order: number,
+    isActive: boolean,
+  ): Promise<BaseResponseModel<boolean>>;
   updateProductCategory(
     id: string,
     name: string,

@@ -1,7 +1,15 @@
 import { createContext, useContext, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useClickOutside } from '~/shared/lib/hooks/use-click-outside';
-import { BanIcon, CheckCircleIcon, EditIcon, PayIcon, PlusIcon, SettingsIcon, TrashIcon } from './icons';
+import {
+  BanIcon,
+  CheckCircleIcon,
+  EditIcon,
+  PayIcon,
+  PlusIcon,
+  SettingsIcon,
+  TrashIcon,
+} from './icons';
 
 export type ActionIntent =
   | 'edit'
@@ -56,7 +64,12 @@ interface ActionMenuProps {
  * dropdown container, `useClickOutside` close behavior, and (via `ActionMenuItem`) the
  * `intent -> color` map. See openspec/changes/gear-menu-action-styling/design.md.
  */
-export function ActionMenu({ label = 'Acciones', testId, widthClass = 'min-w-44', children }: ActionMenuProps) {
+export function ActionMenu({
+  label = 'Acciones',
+  testId,
+  widthClass = 'min-w-44',
+  children,
+}: ActionMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 

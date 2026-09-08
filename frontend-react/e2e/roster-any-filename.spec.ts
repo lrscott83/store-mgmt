@@ -33,10 +33,7 @@ const ACTIVATION_MASTER_PASSWORD = 'ActivacionE2E123';
 
 /** Names that the OLD filename contract would have rejected: no
  * `roster-<GUID>` shape at all. Each must import now. */
-const RENAMED_FILE_NAMES = [
-  'activacion.smcabundle',
-  'mi tienda.zip',
-];
+const RENAMED_FILE_NAMES = ['activacion.smcabundle', 'mi tienda.zip'];
 
 function uniqueLogin(prefix: string): string {
   return `e2e-any-filename-${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -95,9 +92,7 @@ test.describe('roster-any-filename — activación con archivo renombrado', () =
     expect((JSON.parse(stored!) as { bundleId: string }).bundleId).toBe(bundle.bundleId);
 
     // The panel flipped: the device is provisioned under the renamed file.
-    await expect(
-      page.getByRole('button', { name: DISABLE_BUTTON, exact: true }),
-    ).toBeVisible();
+    await expect(page.getByRole('button', { name: DISABLE_BUTTON, exact: true })).toBeVisible();
     await expect(enableButton(page)).toHaveCount(0);
   });
 
@@ -133,8 +128,6 @@ test.describe('roster-any-filename — activación con archivo renombrado', () =
       ROSTER_STORAGE_KEY,
     );
     expect((JSON.parse(stored!) as { bundleId: string }).bundleId).toBe(bundle.bundleId);
-    await expect(
-      page.getByRole('button', { name: DISABLE_BUTTON, exact: true }),
-    ).toBeVisible();
+    await expect(page.getByRole('button', { name: DISABLE_BUTTON, exact: true })).toBeVisible();
   });
 });

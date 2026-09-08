@@ -34,7 +34,7 @@ test.describe.configure({ mode: 'serial', timeout: 120_000 });
  */
 async function createStoreUserViaApi(
   page: import('@playwright/test').Page,
-  storeId: string
+  storeId: string,
 ): Promise<TestIdentity> {
   const token = await readBearerToken(page);
   const identity = newTestIdentity();
@@ -53,7 +53,7 @@ async function createStoreUserViaApi(
   if (!response.ok()) {
     const body = await response.text();
     throw new Error(
-      `createStoreUserViaApi: POST /v1/storeusers returned ${response.status()}: ${body}`
+      `createStoreUserViaApi: POST /v1/storeusers returned ${response.status()}: ${body}`,
     );
   }
   return identity;
@@ -146,7 +146,7 @@ test('activar y desactivar usuario desde la lista', async ({ signedInPage }) => 
         capturedRequests
           .slice(preActionCount)
           .some((r) => r.method === 'DELETE' && r.url.includes('/v1/users/')),
-      { timeout: 10_000, message: 'Expected DELETE /v1/users/{id} after clicking Desactivar' }
+      { timeout: 10_000, message: 'Expected DELETE /v1/users/{id} after clicking Desactivar' },
     )
     .toBe(true);
 
@@ -169,12 +169,8 @@ test('activar y desactivar usuario desde la lista', async ({ signedInPage }) => 
       () =>
         capturedRequests
           .slice(preReactivateCount)
-          .some(
-            (r) =>
-              r.method === 'POST' &&
-              r.url.includes('/v1/users/activate')
-          ),
-      { timeout: 10_000, message: 'Expected POST /v1/users/activate after clicking Activar' }
+          .some((r) => r.method === 'POST' && r.url.includes('/v1/users/activate')),
+      { timeout: 10_000, message: 'Expected POST /v1/users/activate after clicking Activar' },
     )
     .toBe(true);
 

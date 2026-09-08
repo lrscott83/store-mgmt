@@ -160,7 +160,7 @@ No offline write queue SHALL be implemented.
 
 ---
 
-### Requirement: CONFIGURATIONS.* i18n Keys
+### Requirement: CONFIGURATIONS.\* i18n Keys
 
 All user-visible strings in this sub-domain MUST be sourced from `CONFIGURATIONS.*` keys in `es.ts`.
 Minimum 10 keys: `TITLE`, `SAVE`, `SAVE_SUCCESS`, `OFFLINE_NOTICE`, `DEGRADED_NOTICE`, `EMPTY`, `VALUE_LABEL`, `NAME_LABEL`, `SAVE_ERROR`, `LOADING`.

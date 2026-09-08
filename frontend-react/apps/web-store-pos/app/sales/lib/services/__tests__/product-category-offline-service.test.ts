@@ -46,7 +46,12 @@ describe('ProductCategoryOfflineService — async category-C surface (Angular pa
 
   beforeEach(() => {
     localStorage.clear();
-    useAuthStore.setState({ user: makeUser(), isAuthenticated: true, isLoading: false, error: null });
+    useAuthStore.setState({
+      user: makeUser(),
+      isAuthenticated: true,
+      isLoading: false,
+      error: null,
+    });
     categoryRepository = new ProductCategoryRepository(storeId);
     service = new ProductCategoryOfflineService(storeId, categoryRepository);
   });
@@ -54,7 +59,13 @@ describe('ProductCategoryOfflineService — async category-C surface (Angular pa
   describe('CAT-01: createProductCategory', () => {
     it('resolves a success envelope with data: true on create', async () => {
       const result = await service.createProductCategory('Bebidas', 1, true);
-      expect(result).toEqual({ data: true, succeeded: true, message: '', actionCode: 200, errors: [] });
+      expect(result).toEqual({
+        data: true,
+        succeeded: true,
+        message: '',
+        actionCode: 200,
+        errors: [],
+      });
     });
 
     it('persists the category, retrievable via the repository', async () => {
@@ -70,7 +81,9 @@ describe('ProductCategoryOfflineService — async category-C surface (Angular pa
       const result = await service.createProductCategory('Bebidas', 2, true);
       expect(result.succeeded).toBe(false);
       expect(result.data).toBeNull();
-      expect(result.errors).toEqual([{ code: 'ProductCategory.NameExists', description: 'El nombre de la categoría ya existe.' }]);
+      expect(result.errors).toEqual([
+        { code: 'ProductCategory.NameExists', description: 'El nombre de la categoría ya existe.' },
+      ]);
     });
   });
 
@@ -80,7 +93,13 @@ describe('ProductCategoryOfflineService — async category-C surface (Angular pa
       const [existing] = categoryRepository.getProductCategories();
 
       const result = await service.updateProductCategory(existing.id, 'Bebidas Frías', 2, false);
-      expect(result).toEqual({ data: true, succeeded: true, message: '', actionCode: 200, errors: [] });
+      expect(result).toEqual({
+        data: true,
+        succeeded: true,
+        message: '',
+        actionCode: 200,
+        errors: [],
+      });
 
       const updated = categoryRepository.getProductCategoryById(existing.id);
       expect(updated?.name).toBe('Bebidas Frías');
@@ -91,7 +110,9 @@ describe('ProductCategoryOfflineService — async category-C surface (Angular pa
     it('resolves a failure envelope for a non-existent id', async () => {
       const result = await service.updateProductCategory('missing-id', 'X', 1, true);
       expect(result.succeeded).toBe(false);
-      expect(result.errors).toEqual([{ code: 'ProductCategory.NotExists', description: 'La categoría no existe.' }]);
+      expect(result.errors).toEqual([
+        { code: 'ProductCategory.NotExists', description: 'La categoría no existe.' },
+      ]);
     });
   });
 
@@ -106,7 +127,13 @@ describe('ProductCategoryOfflineService — async category-C surface (Angular pa
   describe('CAT-09: getMaxOrder (global, distinct from Product per-category getMaxOrder)', () => {
     it('resolves 0 when there are no categories', async () => {
       const result = await service.getMaxOrder();
-      expect(result).toEqual({ data: 0, succeeded: true, message: '', actionCode: 200, errors: [] });
+      expect(result).toEqual({
+        data: 0,
+        succeeded: true,
+        message: '',
+        actionCode: 200,
+        errors: [],
+      });
     });
 
     it('resolves the global max order across all categories', async () => {

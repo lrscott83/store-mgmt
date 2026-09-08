@@ -75,9 +75,7 @@ function translateBackendError(desc: string): string {
   // If the description is not in the map but contains 'contrase', it is
   // already a Spanish string. Normalize voseo/informal to neutral Latin American.
   if (desc.includes('contrase')) {
-    return desc
-      .replace(/inval[ií]dos/gi, 'incorrectos')
-      .replace(/inv[aá]lidas/gi, 'incorrectas');
+    return desc.replace(/inval[ií]dos/gi, 'incorrectos').replace(/inv[aá]lidas/gi, 'incorrectas');
   }
   return map[desc] ?? desc;
 }
@@ -204,7 +202,7 @@ export default function LoginPage() {
         setErrors({
           form: intl.formatMessage(
             { id: 'AUTH.INVALID_ERROR' },
-            { error: translateBackendError(rejectionDescription) }
+            { error: translateBackendError(rejectionDescription) },
           ),
         });
         return;

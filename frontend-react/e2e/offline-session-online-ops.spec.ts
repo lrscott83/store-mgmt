@@ -151,7 +151,7 @@ async function expectDeviceKeyMaterialPresent(page: Page, when: string): Promise
     raw,
     `Precondición (${when}): se esperaba la tabla de wraps en ` +
       `localStorage['${DEVICE_DEK_KEY}']. Sin ella el login offline no puede ` +
-      'resolver el DEK y este test fallaría por el motivo equivocado.'
+      'resolver el DEK y este test fallaría por el motivo equivocado.',
   ).not.toBeNull();
 }
 
@@ -174,7 +174,10 @@ test.describe('sesión nacida del roster + internet: las llamadas online usan el
     const storeId = await readSelectedStoreId(page);
     const userId = await readCurrentUserId(page);
     const onlineJwt = await readBearerToken(page);
-    expect(onlineJwt, 'el login online tiene que dejar un JWT real en el token de sesión').toBeTruthy();
+    expect(
+      onlineJwt,
+      'el login online tiene que dejar un JWT real en el token de sesión',
+    ).toBeTruthy();
     await expectDeviceKeyMaterialPresent(page, 'tras el login online');
 
     await signOut(page);

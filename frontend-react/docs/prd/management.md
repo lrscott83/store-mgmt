@@ -22,15 +22,15 @@ This module is part of the React migration from the Angular version of the "Vend
 
 ## Routes
 
-| Path                                | Component                  | EFeatures            | Guard          |
-|-------------------------------------|----------------------------|----------------------|----------------|
-| `/management/stores`                | EditStoreComponent         | Stores (73)          | AdminAuthGuard |
-| `/management/stores/create`         | EditStoreComponent         | Stores (73)          | AdminAuthGuard |
-| `/management/stores/edit/:id`       | EditStoreComponent         | Stores (73)          | AdminAuthGuard |
-| `/management/users`                 | UsersComponent             | Users (72)           | AdminAuthGuard |
-| `/management/users/create/:storeId` | CreateStoreUserComponent   | Users (72)           | AdminAuthGuard |
-| `/management/users/edit/:id`        | EditUserComponent          | Users (72)           | AdminAuthGuard |
-| `/management/configurations`        | ConfigurationsComponent    | Configurations (74)  | AdminAuthGuard |
+| Path                                | Component                | EFeatures           | Guard          |
+| ----------------------------------- | ------------------------ | ------------------- | -------------- |
+| `/management/stores`                | EditStoreComponent       | Stores (73)         | AdminAuthGuard |
+| `/management/stores/create`         | EditStoreComponent       | Stores (73)         | AdminAuthGuard |
+| `/management/stores/edit/:id`       | EditStoreComponent       | Stores (73)         | AdminAuthGuard |
+| `/management/users`                 | UsersComponent           | Users (72)          | AdminAuthGuard |
+| `/management/users/create/:storeId` | CreateStoreUserComponent | Users (72)          | AdminAuthGuard |
+| `/management/users/edit/:id`        | EditUserComponent        | Users (72)          | AdminAuthGuard |
+| `/management/configurations`        | ConfigurationsComponent  | Configurations (74) | AdminAuthGuard |
 
 ### AdminAuthGuard
 
@@ -53,11 +53,13 @@ Regular cashiers and viewers cannot access any `/management/*` route regardless 
 **Role:** Multi-purpose container. Renders store list, create form, and edit form based on the current route.
 
 **Behavior by route:**
+
 - `/management/stores` → renders `StoreListComponent` inside
 - `/management/stores/create` → renders an empty store form
 - `/management/stores/edit/:id` → loads the store by ID and renders a pre-filled form
 
 **Responsibilities:**
+
 - Load store data from API (or localStorage cache if offline).
 - Handle form submission (create/update) with API calls.
 - Show loading, success, and error states.
@@ -83,6 +85,7 @@ Regular cashiers and viewers cannot access any `/management/*` route regardless 
 **Role:** Container page for user management. Loads user list for the current store context.
 
 **Responsibilities:**
+
 - Fetch users from API (or localStorage cache if offline).
 - Render `UserListComponent`.
 - Provide navigation to create and edit user routes.
@@ -124,6 +127,7 @@ Regular cashiers and viewers cannot access any `/management/*` route regardless 
 **Role:** Container for editing an existing user. Composes two sub-components.
 
 **Sub-components:**
+
 - `EditUserDetailsComponent` — edits name, phone, email, active status.
 - `EditUserCredentialsComponent` — changes login and/or password.
 
@@ -210,13 +214,14 @@ interface Module {
 
 ## Services
 
-| Service                  | Responsibility                                               |
-|--------------------------|--------------------------------------------------------------|
-| `StoreService`           | CRUD operations for stores via API; cache to localStorage    |
-| `UserManagementService`  | CRUD operations for store users via API; cache to localStorage |
-| `ConfigurationService`   | Read and write store configurations via API; cache to localStorage |
+| Service                 | Responsibility                                                     |
+| ----------------------- | ------------------------------------------------------------------ |
+| `StoreService`          | CRUD operations for stores via API; cache to localStorage          |
+| `UserManagementService` | CRUD operations for store users via API; cache to localStorage     |
+| `ConfigurationService`  | Read and write store configurations via API; cache to localStorage |
 
 All services should:
+
 1. Attempt the API call first when online.
 2. Fall back to localStorage cache for read operations when offline.
 3. Write operations when offline: queue the change and notify the user that it will sync when online (or block and show an error — TBD per implementation).
@@ -225,17 +230,17 @@ All services should:
 
 ## Online vs Offline Behavior
 
-| Action                          | Online | Offline                                              |
-|---------------------------------|--------|------------------------------------------------------|
-| View store list                 | API    | localStorage cache (read-only)                       |
-| Create store                    | API    | Blocked — show "requires internet connection" notice |
-| Edit store details              | API    | Blocked — show "requires internet connection" notice |
-| View user list                  | API    | localStorage cache (read-only)                       |
-| Create user                     | API    | Blocked — show "requires internet connection" notice |
-| Edit user details               | API    | Blocked — show "requires internet connection" notice |
-| Change user credentials         | API    | Blocked — show "requires internet connection" notice |
-| View configurations             | API    | localStorage cache (read-only)                       |
-| Save configurations             | API    | Blocked — show "requires internet connection" notice |
+| Action                  | Online | Offline                                              |
+| ----------------------- | ------ | ---------------------------------------------------- |
+| View store list         | API    | localStorage cache (read-only)                       |
+| Create store            | API    | Blocked — show "requires internet connection" notice |
+| Edit store details      | API    | Blocked — show "requires internet connection" notice |
+| View user list          | API    | localStorage cache (read-only)                       |
+| Create user             | API    | Blocked — show "requires internet connection" notice |
+| Edit user details       | API    | Blocked — show "requires internet connection" notice |
+| Change user credentials | API    | Blocked — show "requires internet connection" notice |
+| View configurations     | API    | localStorage cache (read-only)                       |
+| Save configurations     | API    | Blocked — show "requires internet connection" notice |
 
 The app should detect online/offline status via the browser's `navigator.onLine` and the `online`/`offline` events, and surface a global or inline banner when the user tries to perform a write action while offline.
 
@@ -243,11 +248,11 @@ The app should detect online/offline status via the browser's `navigator.onLine`
 
 ## Permissions
 
-| Role            | Features Available                     | Access                                          |
-|-----------------|----------------------------------------|-------------------------------------------------|
-| SuperAdmin      | Stores (73), Users (72), Config (74)  | Full access to all management routes            |
-| OwnerAdmin      | Stores (73), Users (72), Config (74)  | Access scoped to their own store                |
-| Cashier/Viewer  | None                                   | No access — AdminAuthGuard redirects            |
-| Unauthenticated | None                                   | No access — redirected to login                 |
+| Role            | Features Available                   | Access                               |
+| --------------- | ------------------------------------ | ------------------------------------ |
+| SuperAdmin      | Stores (73), Users (72), Config (74) | Full access to all management routes |
+| OwnerAdmin      | Stores (73), Users (72), Config (74) | Access scoped to their own store     |
+| Cashier/Viewer  | None                                 | No access — AdminAuthGuard redirects |
+| Unauthenticated | None                                 | No access — redirected to login      |
 
 OwnerAdmin users should only see and manage users and configuration for their own store. API-level enforcement is assumed; the frontend should also filter and scope requests to `storeId` from `currentUser`.

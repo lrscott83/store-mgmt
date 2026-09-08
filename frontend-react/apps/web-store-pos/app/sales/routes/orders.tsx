@@ -88,9 +88,15 @@ export function OrdersPage() {
       .getStorageOrders()
       .filter((o) => o.isActive)
       .filter((o) => !paymentType || paymentType === o.paymentType)
-      .filter((o) => isCredit === -1 || (isCredit === 1 && o.isCredit) || (isCredit === 0 && !o.isCredit));
+      .filter(
+        (o) => isCredit === -1 || (isCredit === 1 && o.isCredit) || (isCredit === 0 && !o.isCredit),
+      );
     setGroups(
-      groupByLocalDay(filtered, (o) => new Date(o.date), (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
+      groupByLocalDay(
+        filtered,
+        (o) => new Date(o.date),
+        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+      ),
     );
   }
 
@@ -151,7 +157,10 @@ export function OrdersPage() {
   );
 
   const ordersCount = groups.reduce((count, g) => count + g.items.length, 0);
-  const ordersTotal = groups.reduce((total, g) => total + g.items.reduce((t, o) => t + o.total, 0), 0);
+  const ordersTotal = groups.reduce(
+    (total, g) => total + g.items.reduce((t, o) => t + o.total, 0),
+    0,
+  );
 
   return (
     <Card
@@ -165,7 +174,9 @@ export function OrdersPage() {
               ({ordersCount})
             </span>
           </span>
-          <span className="text-sm font-semibold text-text whitespace-nowrap">{formatCurrency(ordersTotal)}</span>
+          <span className="text-sm font-semibold text-text whitespace-nowrap">
+            {formatCurrency(ordersTotal)}
+          </span>
         </div>
       }
     >

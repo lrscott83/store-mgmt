@@ -49,7 +49,7 @@ EditProfile → `UserService.editUser()` → PUT. ChangePassword → `UserServic
 ## File Map
 
 New: `app/profile/routes/edit-profile.tsx`, `app/profile/routes/change-password.tsx`, `app/profile/routes/__tests__/profile-routes.test.tsx`, `app/profile/lib/services/profile-http-service.ts`, `app/shared/lib/hooks/use-online-status.ts`.
-Modified: `app/routes.ts` (register 2 routes), `app/shared/components/navbar.tsx` (dropdown links + close on nav), `app/shared/lib/i18n/es.ts` (PROFILE.* keys), `app/shared/lib/stores/auth-store.ts` (updateUser action).
+Modified: `app/routes.ts` (register 2 routes), `app/shared/components/navbar.tsx` (dropdown links + close on nav), `app/shared/lib/i18n/es.ts` (PROFILE.\* keys), `app/shared/lib/stores/auth-store.ts` (updateUser action).
 
 ## Risks / Open Questions
 

@@ -46,14 +46,13 @@ async function promoteToSuperAdmin(userId: string): Promise<void> {
     // Check if user already has SuperAdmin role (RoleType.SuperAdmin = 1)
     const check = await client.query(
       'SELECT 1 FROM "UserRole" WHERE "UserId" = $1 AND "RoleId" = 1',
-      [userId]
+      [userId],
     );
     if (check.rows.length === 0) {
       // Get the tenantId from the user
-      const userResult = await client.query(
-        'SELECT "TenantId" FROM "User" WHERE "Id" = $1',
-        [userId]
-      );
+      const userResult = await client.query('SELECT "TenantId" FROM "User" WHERE "Id" = $1', [
+        userId,
+      ]);
       const tenantId = userResult.rows[0]?.TenantId;
       if (!tenantId) {
         throw new Error(`User ${userId} has no TenantId`);
@@ -62,7 +61,7 @@ async function promoteToSuperAdmin(userId: string): Promise<void> {
       // UserRole has composite PK (UserId, RoleId) — no separate Id column
       await client.query(
         'INSERT INTO "UserRole" ("UserId", "RoleId", "TenantId", "IsActive", "CreatedDate", "CreatedBy") VALUES ($1, 1, $2, true, NOW(), $1)',
-        [userId, tenantId]
+        [userId, tenantId],
       );
     }
   } finally {
@@ -140,7 +139,7 @@ export async function mintSuperAdmin(browser: Browser): Promise<SuperAdminSnapsh
   const localStorage = originState.localStorage.filter(
     (entry) =>
       entry.name !== 'lizoft.device-dek' &&
-      !(entry.name.startsWith('lizoft.store-') && entry.value.startsWith('enc:v1:'))
+      !(entry.name.startsWith('lizoft.store-') && entry.value.startsWith('enc:v1:')),
   );
 
   await context.close();
@@ -151,7 +150,10 @@ export async function mintSuperAdmin(browser: Browser): Promise<SuperAdminSnapsh
  * Restores a SuperAdmin snapshot onto a page — same pattern as
  * restoreSignedInSession() in session.ts.
  */
-export async function applySuperAdminSnapshot(page: Page, snapshot: SuperAdminSnapshot): Promise<void> {
+export async function applySuperAdminSnapshot(
+  page: Page,
+  snapshot: SuperAdminSnapshot,
+): Promise<void> {
   await page.goto('/login');
   await page.evaluate((entries) => {
     for (const { name, value } of entries) {

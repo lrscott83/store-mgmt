@@ -71,7 +71,10 @@ describe('storeHttpService.getStore — HTTP-3: GET /v1/stores/:id', () => {
     const { storeHttpService } = await import('../store-http-service');
     const { apiClient } = await import('~/shared/lib/http/api-client');
     (apiClient.get as ReturnType<typeof vi.fn>).mockResolvedValue({
-      data: { succeeded: true, data: { id: 's1', name: 'Store One', paymentStartDate: '2026-03-10' } },
+      data: {
+        succeeded: true,
+        data: { id: 's1', name: 'Store One', paymentStartDate: '2026-03-10' },
+      },
     });
     const result = await storeHttpService.getStore('s1');
     if (!result.succeeded) throw new Error('expected succeeded response');
@@ -286,7 +289,10 @@ describe('storeHttpService.getReSellerCommissions — HTTP-14: GET /v1/stores/re
     vi.clearAllMocks();
     const { apiClient } = await import('~/shared/lib/http/api-client');
     (apiClient.get as ReturnType<typeof vi.fn>).mockResolvedValue({
-      data: { succeeded: true, data: [{ year: 2026, month: 7, paymentCount: 3, totalCommission: 90 }] },
+      data: {
+        succeeded: true,
+        data: [{ year: 2026, month: 7, paymentCount: 3, totalCommission: 90 }],
+      },
     });
   });
 
@@ -311,7 +317,20 @@ describe('storeHttpService.getModulesToStore — HTTP-11: GET /v1/modules/ToStor
     vi.clearAllMocks();
     const { apiClient } = await import('~/shared/lib/http/api-client');
     (apiClient.get as ReturnType<typeof vi.fn>).mockResolvedValue({
-      data: { succeeded: true, data: [{ id: 1, name: 'Module A', price: 10, currentPrice: 8, priceIncluded: false, discountText: '', selected: false }] },
+      data: {
+        succeeded: true,
+        data: [
+          {
+            id: 1,
+            name: 'Module A',
+            price: 10,
+            currentPrice: 8,
+            priceIncluded: false,
+            discountText: '',
+            selected: false,
+          },
+        ],
+      },
     });
   });
 

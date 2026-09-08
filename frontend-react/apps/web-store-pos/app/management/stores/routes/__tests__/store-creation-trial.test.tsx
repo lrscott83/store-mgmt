@@ -129,12 +129,24 @@ let mockListOwners = vi.fn();
 
 vi.mock('~/management/stores/lib/services/store-http-service', () => ({
   storeHttpService: {
-    get listStores() { return mockListStores; },
-    get getStore() { return mockGetStore; },
-    get createStore() { return mockCreateStore; },
-    get updateStore() { return mockUpdateStore; },
-    get getModulesToStore() { return mockGetModulesToStore; },
-    get listOwners() { return mockListOwners; },
+    get listStores() {
+      return mockListStores;
+    },
+    get getStore() {
+      return mockGetStore;
+    },
+    get createStore() {
+      return mockCreateStore;
+    },
+    get updateStore() {
+      return mockUpdateStore;
+    },
+    get getModulesToStore() {
+      return mockGetModulesToStore;
+    },
+    get listOwners() {
+      return mockListOwners;
+    },
   },
 }));
 
@@ -175,7 +187,10 @@ describe('Store creation — client never sends paymentStartDate (server owns th
     mockParams = {};
     mockGetModulesToStore = vi.fn().mockResolvedValue({
       succeeded: true,
-      data: [makeModule({ id: 1, priceIncluded: true }), makeModule({ id: 2, priceIncluded: false })],
+      data: [
+        makeModule({ id: 1, priceIncluded: true }),
+        makeModule({ id: 2, priceIncluded: false }),
+      ],
     });
     mockListOwners = vi.fn().mockResolvedValue({ succeeded: true, data: [makeOwner()] });
     mockCreateStore = vi.fn().mockResolvedValue({ succeeded: true, data: makeStore() });
@@ -183,7 +198,11 @@ describe('Store creation — client never sends paymentStartDate (server owns th
 
   it('omits paymentStartDate from the create payload entirely', async () => {
     const { EditStorePage } = await import('../edit-store');
-    render(<Wrapper><EditStorePage /></Wrapper>);
+    render(
+      <Wrapper>
+        <EditStorePage />
+      </Wrapper>,
+    );
     await submitCreateForm('New Store');
 
     await waitFor(() => expect(mockCreateStore).toHaveBeenCalledTimes(1));
@@ -194,7 +213,11 @@ describe('Store creation — client never sends paymentStartDate (server owns th
 
   it('sends exactly the six create fields — no billing field smuggled in', async () => {
     const { EditStorePage } = await import('../edit-store');
-    render(<Wrapper><EditStorePage /></Wrapper>);
+    render(
+      <Wrapper>
+        <EditStorePage />
+      </Wrapper>,
+    );
     await submitCreateForm('New Store');
 
     await waitFor(() => expect(mockCreateStore).toHaveBeenCalledTimes(1));
@@ -210,12 +233,18 @@ describe('Store creation — client never sends paymentStartDate (server owns th
 
   it('still omits paymentStartDate when the paid plan is chosen at creation', async () => {
     const { EditStorePage } = await import('../edit-store');
-    render(<Wrapper><EditStorePage /></Wrapper>);
+    render(
+      <Wrapper>
+        <EditStorePage />
+      </Wrapper>,
+    );
     // The create-mode form mounts before the catalog resolves, and PlanPicker's
     // effect resets the active tab when `modules` arrives (plan-picker.tsx:38).
     // Wait for the catalog+owners batch to land before touching the picker,
     // otherwise that reset silently undoes the tab switch.
-    await waitFor(() => expect(screen.getByRole('option', { name: 'Owner One' })).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByRole('option', { name: 'Owner One' })).toBeInTheDocument(),
+    );
 
     // Switch to the paid tab and activate it, so moduleIds carries a paid module.
     fireEvent.click(screen.getByRole('tab', { name: /^Pago/ }));
@@ -244,16 +273,29 @@ describe('Store creation — no payment-start-date field is reachable in create 
   it('hides the field from a super admin in create mode (the strongest role)', async () => {
     mockUser = makeUser({ isSuperAdmin: true, selectedStoreId: '' });
     const { EditStorePage } = await import('../edit-store');
-    render(<Wrapper><EditStorePage /></Wrapper>);
+    render(
+      <Wrapper>
+        <EditStorePage />
+      </Wrapper>,
+    );
     await waitFor(() => screen.getByLabelText('Nombre'));
 
     expect(screen.queryByLabelText('Fecha de inicio de pago')).not.toBeInTheDocument();
   });
 
   it('hides the field from an owner admin in create mode (triangulation)', async () => {
-    mockUser = makeUser({ isSuperAdmin: false, isOwnerAdmin: true, featureIds: [73], selectedStoreId: '' });
+    mockUser = makeUser({
+      isSuperAdmin: false,
+      isOwnerAdmin: true,
+      featureIds: [73],
+      selectedStoreId: '',
+    });
     const { EditStorePage } = await import('../edit-store');
-    render(<Wrapper><EditStorePage /></Wrapper>);
+    render(
+      <Wrapper>
+        <EditStorePage />
+      </Wrapper>,
+    );
     await waitFor(() => screen.getByLabelText('Nombre'));
 
     expect(screen.queryByLabelText('Fecha de inicio de pago')).not.toBeInTheDocument();
@@ -277,7 +319,11 @@ describe('Store creation — server-assigned trial state is read back unmodified
       data: makeStore({ paymentStartDate: '2026-08-04' }),
     });
     const { EditStorePage } = await import('../edit-store');
-    render(<Wrapper><EditStorePage /></Wrapper>);
+    render(
+      <Wrapper>
+        <EditStorePage />
+      </Wrapper>,
+    );
 
     await waitFor(() => screen.getByLabelText('Fecha de inicio de pago'));
     expect(screen.getByLabelText('Fecha de inicio de pago')).toHaveValue('2026-08-04');

@@ -66,9 +66,7 @@ export function UserCreatePage() {
 
   return (
     <div className="space-y-4 p-4">
-      <h1 className="text-xl font-semibold">
-        {intl.formatMessage({ id: 'USERS.CREATE_TITLE' })}
-      </h1>
+      <h1 className="text-xl font-semibold">{intl.formatMessage({ id: 'USERS.CREATE_TITLE' })}</h1>
       <UserCreateForm
         storeId={resolvedStoreId}
         isOnline={isOnline}

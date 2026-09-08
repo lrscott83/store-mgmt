@@ -32,7 +32,8 @@ export function ChangePasswordPage() {
       // entity-migration.ts:15-18's swallow doctrine: a failed rewrap must
       // never block the mandatory logout that follows a password change.
       try {
-        const { rewrapDeviceDekForPassword } = await import('~/shared/lib/offline/dek-provisioning');
+        const { rewrapDeviceDekForPassword } =
+          await import('~/shared/lib/offline/dek-provisioning');
         await rewrapDeviceDekForPassword(user.login, payload.newPassword);
       } catch (err) {
         // intentionally swallowed — see comment above; logged only

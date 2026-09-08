@@ -45,13 +45,13 @@ Sales → Inventory → Expenses → Management → Admin → Sync → Reports �
 
 ## Risks
 
-| Risk | Likelihood | Mitigation |
-|---|---|---|
-| PWA offline services (connection, download-manager, SW update) unconfirmed in React | High | Verify in Sync foundation stage before declaring any module at parity |
-| i18n ~123-key gap + hardcoded Spanish strings | High | Flatten-and-diff per module; grep templates for literal Spanish |
-| Management list/edit structural divergence | Medium | UX-parity decision in Management slice |
-| `TodayInventoryStats=32` may be dead in Angular (route commented) | Low | Confirm live before porting |
-| Design tokens misread → inconsistent theme | Medium | Extract tokens once into shared base components, review before per-view apply |
+| Risk                                                                                | Likelihood | Mitigation                                                                    |
+| ----------------------------------------------------------------------------------- | ---------- | ----------------------------------------------------------------------------- |
+| PWA offline services (connection, download-manager, SW update) unconfirmed in React | High       | Verify in Sync foundation stage before declaring any module at parity         |
+| i18n ~123-key gap + hardcoded Spanish strings                                       | High       | Flatten-and-diff per module; grep templates for literal Spanish               |
+| Management list/edit structural divergence                                          | Medium     | UX-parity decision in Management slice                                        |
+| `TodayInventoryStats=32` may be dead in Angular (route commented)                   | Low        | Confirm live before porting                                                   |
+| Design tokens misread → inconsistent theme                                          | Medium     | Extract tokens once into shared base components, review before per-view apply |
 
 ## Rollback Plan
 

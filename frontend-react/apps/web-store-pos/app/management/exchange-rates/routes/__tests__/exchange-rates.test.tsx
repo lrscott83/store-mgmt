@@ -103,9 +103,7 @@ describe('ExchangeRatesPage (daily-exchange-rate) — month-grouped collapsed pa
     // the month boundary splits the range, expand that panel too).
     const currentMonthKey = monthKeyOf(new Date());
     await waitFor(() => {
-      expect(
-        screen.getByTestId(`rate-month-panel-toggle-${currentMonthKey}`),
-      ).toBeDefined();
+      expect(screen.getByTestId(`rate-month-panel-toggle-${currentMonthKey}`)).toBeDefined();
     });
 
     const anchorMonthKey = monthKeyOf(anchor);
@@ -200,9 +198,10 @@ describe('ExchangeRatesPage (daily-exchange-rate) — month-grouped collapsed pa
     });
 
     // The current month starts expanded (aria-expanded=true).
-    expect(
-      screen.getByTestId(`rate-month-panel-toggle-${currentMonthKey}`),
-    ).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByTestId(`rate-month-panel-toggle-${currentMonthKey}`)).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
 
     // Every other month panel starts collapsed (aria-expanded=false).
     const otherToggles = screen

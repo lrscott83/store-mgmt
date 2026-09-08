@@ -30,6 +30,7 @@ Precedent: archived `phase4-mgmt-stores` and `phase4-mgmt-users` proposal/spec/d
 ## Intent
 
 ### Problem
+
 The React migration (`frontend-react/`) declares a `MENU.CONFIGURATIONS` entry, but `/management/configurations`
 is a ghost link: no route, no slice, no HTTP service, no UI exists. Unlike Stores and Users — which already had a
 fully implemented Angular feature and live backend contracts to migrate against — Configurations has **nothing**:
@@ -38,6 +39,7 @@ platform-level `SystemConfiguration` values, which are currently locked inside t
 getters, never exposed via an API).
 
 ### Why now
+
 Configurations is the third and final sub-domain of the Management slice (order locked in #204:
 stores → users → configurations). Stores and Users have both shipped and been archived. Completing Configurations
 closes out the Management slice and removes the last dead menu entry. The user decided (#237) to make
@@ -45,6 +47,7 @@ closes out the Management slice and removes the last dead menu entry. The user d
 values rather than leaving a stub or deferring.
 
 ### Success looks like
+
 - `/management/configurations` renders in React and is reachable only by an authenticated user who is admin AND
   has `EFeatures.Configurations = 74`.
 - The page lists the platform `SystemConfiguration` values as editable name/value rows and can save changes
@@ -66,6 +69,7 @@ values rather than leaving a stub or deferring.
 ## Scope
 
 ### In scope (frontend-react ONLY)
+
 - Route: `/management/configurations` (single settings page — the PRD defines only ONE route; no create/edit
   sub-routes).
 - New `app/management/configurations/` slice: one route container (side effects), one presentational form
@@ -83,6 +87,7 @@ values rather than leaving a stub or deferring.
 - Tests for all three layers, written against the mocked contract.
 
 ### Out of scope (explicit)
+
 - **Backend work** — the `ConfigurationsController` (GET list + PUT update) and the repository update method
   (`SystemConfiguration` is read-only today) are OUT of scope and delivered separately later (#237). The React
   slice is built and tested against the mocked contract only.
@@ -130,6 +135,7 @@ form tests mock the service.
 > Contract with sdd-spec. Existing capability: `management` (`openspec/specs/management/spec.md`).
 
 ### Modified Capabilities
+
 - `management`: add Configurations sub-domain requirements — single configurations route,
   `configurationHttpService` contracts (list + update), one `ConfigurationsForm` presentational component
   rendering a generic editable name/value list, platform-global (non-store-scoped) read + save, offline

@@ -152,7 +152,11 @@ describe('resolveDekForLogin (design §5, the login-path algorithm)', () => {
     const wrap = await wrapDekWithPassword('secret', rosterDek);
     importRoster(v2Bundle('ana', wrap));
 
-    await resolveDekForLogin({ login: 'ana', password: 'secret', sessionStoreId: 'ignored-when-roster-decides' });
+    await resolveDekForLogin({
+      login: 'ana',
+      password: 'secret',
+      sessionStoreId: 'ignored-when-roster-decides',
+    });
 
     expect(Array.from(getDek()!)).toEqual(Array.from(rosterDek));
     const table = readDeviceDekTable();
@@ -194,7 +198,7 @@ describe('resolveDekForLogin (design §5, the login-path algorithm)', () => {
     expect(table?.conflictStoreId).toBe(STORE_ID);
   });
 
-  it('5.7 (F9): device DEK X + a roster wrap that fails to unwrap -> resolves, this login\'s table entry is refreshed', async () => {
+  it("5.7 (F9): device DEK X + a roster wrap that fails to unwrap -> resolves, this login's table entry is refreshed", async () => {
     // SETUP RESEEDED (D2 removed the mint this used to borrow): X is written
     // straight into the device table instead of being minted by a first
     // `resolveDekForLogin` call. Every assertion below is untouched.
@@ -230,7 +234,7 @@ describe('resolveDekForLogin (design §5, the login-path algorithm)', () => {
     expect(getDek()).toBeNull();
   });
 
-  it('5.11: rewrapDeviceDekForPassword replaces (not adds) this login\'s table entry', async () => {
+  it("5.11: rewrapDeviceDekForPassword replaces (not adds) this login's table entry", async () => {
     // SETUP RESEEDED (D2 removed the mint this used to borrow). The real
     // `resolveDekForLogin` call is KEPT — `rewrapDeviceDekForPassword` reads
     // the in-memory DEK, so this test still needs the production resolver to
@@ -333,7 +337,9 @@ describe('resolveDekForLogin (design §5, the login-path algorithm)', () => {
     // be "never took the fallback branch at all" in disguise.
     const staleOwn = readDeviceDekTable()!.users['ana'];
     expect(staleOwn).toBeDefined();
-    await expect(unwrapDek('new-secret', staleOwn)).rejects.toMatchObject({ name: 'DekUnwrapError' }); // genuinely stale under the new password
+    await expect(unwrapDek('new-secret', staleOwn)).rejects.toMatchObject({
+      name: 'DekUnwrapError',
+    }); // genuinely stale under the new password
     const rosterCheck = await unwrapDek('new-secret', freshRosterWrap); // genuinely fresh and valid under the new password
     expect(Array.from(rosterCheck)).toEqual(Array.from(x));
 
@@ -435,7 +441,7 @@ describe('resolveDekForLogin (design §5, the login-path algorithm)', () => {
   // entry either. Without this, a device carrying an unrelated user's wrap is
   // still refused even though the login response just handed over a valid
   // key — the same lockout D1 exists to close, one branch over.
-  it('D1 (F5): table with wraps for another user only, no roster, login-response wrap -> adopts it and adds this login\'s entry', async () => {
+  it("D1 (F5): table with wraps for another user only, no roster, login-response wrap -> adopts it and adds this login's entry", async () => {
     await seedDeviceTableWithDek(KEY_A, 'other-user', 'secret2', STORE_ID);
     const serverDek = KEY_B;
     const loginWrap = await wrapDekWithPassword('secret', serverDek);
@@ -487,7 +493,7 @@ describe('resolveDekForLogin (design §5, the login-path algorithm)', () => {
 
     // PRECONDITION — the roster entry is genuinely VALID under this password,
     // so what decides here is the priority rule, not a failure to unwrap.
-    const rosterCheck = await unwrapDek('pw', (await wrapDekWithPassword('pw', KEY_A)));
+    const rosterCheck = await unwrapDek('pw', await wrapDekWithPassword('pw', KEY_A));
     expect(Array.from(rosterCheck)).toEqual(Array.from(KEY_A));
 
     await resolveDekForLogin({
@@ -633,7 +639,7 @@ describe('resolveDekForLogin (design §5, the login-path algorithm)', () => {
   // `bootstrapDeviceDek`, which this file's harness disables by default, so it
   // gets its own test immediately below rather than being asserted by proxy
   // here. Each assertion below says which of the two it actually discriminates.
-  it('D1 (F5) cross-store: adopting the login response\'s key rewrites the table to describe it, and the next load agrees', async () => {
+  it("D1 (F5) cross-store: adopting the login response's key rewrites the table to describe it, and the next load agrees", async () => {
     // `withDeviceWrap` matters: a device wrap of the ABANDONED store's key
     // must not survive the adoption. Seeded `device: null` instead, step 5
     // would write one unconditionally and this test would pass even if the
@@ -709,7 +715,7 @@ describe('resolveDekForLogin (design §5, the login-path algorithm)', () => {
   // corrected STORE-NEW label — the wrong key under the right label, which
   // reads as healthy while every byte written under it is lost to the store
   // that actually owns STORE-NEW.
-  it('D1 (F5) cross-store: the stale device wrap must not survive, or the next page load recovers the OLD store\'s key under the NEW store\'s label', async () => {
+  it("D1 (F5) cross-store: the stale device wrap must not survive, or the next page load recovers the OLD store's key under the NEW store's label", async () => {
     // One STABLE real `CryptoKey` across both seams, restored in `finally`.
     // The file-level mock hands out a FRESH key per `getOrCreateDeviceKey`
     // call, which is fine for byte-inequality checks but cannot round-trip a
@@ -800,7 +806,7 @@ describe('resolveDekForLogin (design §5, the login-path algorithm)', () => {
   // same byte-comparison proxy the login-response cross-store test above uses —
   // `withDeviceWrap: true` is what makes that assertion able to fail, since a
   // seeded `device: null` would be re-wrapped by step 5 regardless).
-  it('F5 roster cross-store: adopting the roster\'s key rewrites the table to describe the ROSTER\'s store, and the next load agrees', async () => {
+  it("F5 roster cross-store: adopting the roster's key rewrites the table to describe the ROSTER's store, and the next load agrees", async () => {
     await seedDeviceTableWithDek(KEY_A, 'other-user', 'secret2', 'STORE-OLD', {
       withDeviceWrap: true,
     });
@@ -961,7 +967,7 @@ describe('resolveDekForLogin (design §5, the login-path algorithm)', () => {
   // password wrap must both be re-written under the ADOPTED key, or the next
   // login (or the next page load's device-key bootstrap) would silently
   // resurrect the abandoned local key.
-  it('D3: re-wraps the device copy and this login\'s password wrap under the adopted key', async () => {
+  it("D3: re-wraps the device copy and this login's password wrap under the adopted key", async () => {
     // The device must ALREADY hold a device wrap of the abandoned key. With
     // `device: null` seeded instead, step 5 rewraps unconditionally and this
     // test would pass even if the adoption forgot to invalidate the stale

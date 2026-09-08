@@ -19,11 +19,11 @@ merged into that file at archive time. Existing requirements in that file are un
 
 The system MUST register three routes in `app/routes.ts` under the existing `app-layout` route:
 
-| Path | Component | Loader |
-|------|-----------|--------|
-| `/admin/resellers` | `ResellerListPage` | `superAdminLoader` |
-| `/admin/resellers/create` | `ResellerCreatePage` | `superAdminLoader` |
-| `/admin/resellers/edit/:id` | `ResellerEditPage` | `superAdminLoader` |
+| Path                        | Component            | Loader             |
+| --------------------------- | -------------------- | ------------------ |
+| `/admin/resellers`          | `ResellerListPage`   | `superAdminLoader` |
+| `/admin/resellers/create`   | `ResellerCreatePage` | `superAdminLoader` |
+| `/admin/resellers/edit/:id` | `ResellerEditPage`   | `superAdminLoader` |
 
 Each route module MUST export a named `loader` bound to `superAdminLoader` AND a default export
 for the page component.
@@ -96,12 +96,12 @@ A `resellerHttpService` singleton MUST exist at
 
 `resellerHttpService` MUST expose exactly four methods:
 
-| Method | HTTP verb | Endpoint | Response type |
-|--------|-----------|----------|---------------|
-| `listResellers()` | GET | `/v1/reSellers/all/true` | `BaseResponseModel<ReSeller[]>` |
-| `getReseller(id: string)` | GET | `/v1/reSellers/:id` | `BaseResponseModel<ReSeller>` |
-| `createReseller(payload)` | POST | `/v1/reSellers/` | `BaseResponseModel<string>` |
-| `updateReseller(id: string, payload)` | PUT | `/v1/reSellers/:id` | `BaseResponseModel<boolean>` |
+| Method                                | HTTP verb | Endpoint                 | Response type                   |
+| ------------------------------------- | --------- | ------------------------ | ------------------------------- |
+| `listResellers()`                     | GET       | `/v1/reSellers/all/true` | `BaseResponseModel<ReSeller[]>` |
+| `getReseller(id: string)`             | GET       | `/v1/reSellers/:id`      | `BaseResponseModel<ReSeller>`   |
+| `createReseller(payload)`             | POST      | `/v1/reSellers/`         | `BaseResponseModel<string>`     |
+| `updateReseller(id: string, payload)` | PUT       | `/v1/reSellers/:id`      | `BaseResponseModel<boolean>`    |
 
 The `ReSeller` type is imported from `@store-mgmt/domain` (`packages/domain/src/models/store.ts`).
 `BaseResponseModel<T>` fields `message`, `actionCode`, and `errors` are NON-nullable; test mocks
@@ -156,6 +156,7 @@ On mount the container MUST call `resellerHttpService.listResellers()` and rende
 resellers as a card grid.
 
 Each card MUST display:
+
 - `fullName`
 - `percentDiscountPrice`
 - `discountPrice`
@@ -233,15 +234,15 @@ A container `ResellerCreatePage` MUST exist at
 
 The page MUST render a controlled form with the following fields:
 
-| Field | Type | Validation |
-|-------|------|-----------|
-| `fullName` | text input | required |
-| `login` | text input | required |
-| `password` | password input (show/hide toggle) | required; regex `(?=\D*\d)(?=[^a-z]*[a-z])(?=[^A-Z]*[A-Z]).{8,30}` (min 8, max 30, at least one digit, one lower, one upper) |
-| `confirmPassword` | password input | required; MUST match `password` field exactly (cross-field validation) |
-| `cellPhone` | text input | required; format validation (no mask library) |
-| `email` | email input | required; email format |
-| `description` | textarea | optional |
+| Field             | Type                              | Validation                                                                                                                   |
+| ----------------- | --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `fullName`        | text input                        | required                                                                                                                     |
+| `login`           | text input                        | required                                                                                                                     |
+| `password`        | password input (show/hide toggle) | required; regex `(?=\D*\d)(?=[^a-z]*[a-z])(?=[^A-Z]*[A-Z]).{8,30}` (min 8, max 30, at least one digit, one lower, one upper) |
+| `confirmPassword` | password input                    | required; MUST match `password` field exactly (cross-field validation)                                                       |
+| `cellPhone`       | text input                        | required; format validation (no mask library)                                                                                |
+| `email`           | email input                       | required; email format                                                                                                       |
+| `description`     | textarea                          | optional                                                                                                                     |
 
 The submit button MUST be disabled when any required field is empty or any validation fails.
 
@@ -326,16 +327,16 @@ MUST be pre-populated via `patchValue` equivalent.
 
 The page MUST render a controlled form with the following fields:
 
-| Field | Type | Notes |
-|-------|------|-------|
-| `login` | text input | Disabled/read-only — display only, never submitted |
-| `fullName` | text input | required |
-| `isActive` | toggle/checkbox | no required validation |
-| `percentDiscountPrice` | number input | required; `min=0` |
-| `discountPrice` | number input | required; `min=0` |
-| `cellPhone` | text input | required; format validation (no mask library) |
-| `email` | email input | required; email format |
-| `description` | textarea | optional |
+| Field                  | Type            | Notes                                              |
+| ---------------------- | --------------- | -------------------------------------------------- |
+| `login`                | text input      | Disabled/read-only — display only, never submitted |
+| `fullName`             | text input      | required                                           |
+| `isActive`             | toggle/checkbox | no required validation                             |
+| `percentDiscountPrice` | number input    | required; `min=0`                                  |
+| `discountPrice`        | number input    | required; `min=0`                                  |
+| `cellPhone`            | text input      | required; format validation (no mask library)      |
+| `email`                | email input     | required; email format                             |
+| `description`          | textarea        | optional                                           |
 
 The `reSellerId` control that appears conditionally in the Angular source MUST NOT be included
 (it is dead code — never used in the Angular template).
@@ -410,15 +411,15 @@ Field-level labels that already exist under `GENERAL.*` or `USER.*` MUST be refe
 those existing keys in the component — no duplicate key must be added to `es.ts`.
 Only net-new slice-specific keys are listed here:
 
-| Key | Purpose |
-|-----|---------|
-| `RESELLERS.LIST_TITLE` | Page heading for the list page |
-| `RESELLERS.ADD` | Label for the add/create button on the list page |
-| `RESELLERS.CREATE_TITLE` | Page heading for the create form |
-| `RESELLERS.EDIT_TITLE` | Page heading for the edit form |
-| `RESELLERS.PERCENT_DISCOUNT` | Label for `percentDiscountPrice` field |
-| `RESELLERS.DISCOUNT_PRICE` | Label for `discountPrice` field |
-| `RESELLERS.ERROR` | Generic inline error message for HTTP failures |
+| Key                          | Purpose                                          |
+| ---------------------------- | ------------------------------------------------ |
+| `RESELLERS.LIST_TITLE`       | Page heading for the list page                   |
+| `RESELLERS.ADD`              | Label for the add/create button on the list page |
+| `RESELLERS.CREATE_TITLE`     | Page heading for the create form                 |
+| `RESELLERS.EDIT_TITLE`       | Page heading for the edit form                   |
+| `RESELLERS.PERCENT_DISCOUNT` | Label for `percentDiscountPrice` field           |
+| `RESELLERS.DISCOUNT_PRICE`   | Label for `discountPrice` field                  |
+| `RESELLERS.ERROR`            | Generic inline error message for HTTP failures   |
 
 `en.ts` MUST NOT be modified (no English locale exists for admin keys in this project).
 
@@ -442,12 +443,12 @@ literals are permitted in TSX.
 
 The following test suites MUST exist:
 
-| File | What it covers |
-|------|---------------|
-| `app/admin/resellers/lib/services/__tests__/reseller-http-service.test.ts` | Service: all 4 methods call correct endpoints; mocks use non-nullable `BaseResponseModel` fields |
-| `app/admin/resellers/routes/__tests__/reseller-list.test.tsx` | List page: load renders cards; inactive card has `deactive-reSeller` class; navigate-to-create; navigate-to-edit; no activate/deactivate/delete; HTTP error shows inline error |
-| `app/admin/resellers/routes/__tests__/reseller-create.test.tsx` | Create page: form fields present; submit disabled when invalid; password regex enforced; confirm-match enforced; success navigates to list; error shows inline; unsaved-changes guard triggers on dirty form |
-| `app/admin/resellers/routes/__tests__/reseller-edit.test.tsx` | Edit page: load pre-populates fields; login is disabled; success stays on page; error shows inline; unsaved-changes guard triggers on dirty; reSellerId absent |
+| File                                                                       | What it covers                                                                                                                                                                                               |
+| -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `app/admin/resellers/lib/services/__tests__/reseller-http-service.test.ts` | Service: all 4 methods call correct endpoints; mocks use non-nullable `BaseResponseModel` fields                                                                                                             |
+| `app/admin/resellers/routes/__tests__/reseller-list.test.tsx`              | List page: load renders cards; inactive card has `deactive-reSeller` class; navigate-to-create; navigate-to-edit; no activate/deactivate/delete; HTTP error shows inline error                               |
+| `app/admin/resellers/routes/__tests__/reseller-create.test.tsx`            | Create page: form fields present; submit disabled when invalid; password regex enforced; confirm-match enforced; success navigates to list; error shows inline; unsaved-changes guard triggers on dirty form |
+| `app/admin/resellers/routes/__tests__/reseller-edit.test.tsx`              | Edit page: load pre-populates fields; login is disabled; success stays on page; error shows inline; unsaved-changes guard triggers on dirty; reSellerId absent                                               |
 
 All test files that use `useIntl` MUST wrap the component under test in `IntlProvider`
 (consistent with project convention).

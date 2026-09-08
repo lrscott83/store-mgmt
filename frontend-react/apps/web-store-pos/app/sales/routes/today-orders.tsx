@@ -38,7 +38,9 @@ export function TodayOrdersPage() {
     const filtered = service
       .getActiveOrdersInDay(new Date())
       .filter((o) => !paymentType || paymentType === o.paymentType)
-      .filter((o) => isCredit === -1 || (isCredit === 1 && o.isCredit) || (isCredit === 0 && !o.isCredit))
+      .filter(
+        (o) => isCredit === -1 || (isCredit === 1 && o.isCredit) || (isCredit === 0 && !o.isCredit),
+      )
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     setOrders(filtered);
   }
@@ -82,7 +84,9 @@ export function TodayOrdersPage() {
               ({ordersItemsCount})
             </span>
           </span>
-          <span className="text-sm font-semibold text-primary whitespace-nowrap">{formatCurrency(ordersTotal)}</span>
+          <span className="text-sm font-semibold text-primary whitespace-nowrap">
+            {formatCurrency(ordersTotal)}
+          </span>
         </div>
       }
     >
@@ -151,7 +155,12 @@ export function TodayOrdersPage() {
         </InfoBox>
       )}
 
-      <OrderList orders={orders} readOnly={false} onEditOrder={setEditingOrder} onDeactivateOrder={handleDeactivate} />
+      <OrderList
+        orders={orders}
+        readOnly={false}
+        onEditOrder={setEditingOrder}
+        onDeactivateOrder={handleDeactivate}
+      />
 
       {editingOrder && (
         <EditOrderModal

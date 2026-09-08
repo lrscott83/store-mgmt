@@ -25,13 +25,13 @@
 
 ## Review Workload Forecast
 
-| Field | Value |
-|-------|-------|
-| Estimated changed lines | ~230–290 LOC |
-| Number of files touched | ~10 new + 2 modified |
-| 400-line budget risk | Low |
-| Chained PRs recommended | No |
-| Decision needed before apply | No |
+| Field                        | Value                |
+| ---------------------------- | -------------------- |
+| Estimated changed lines      | ~230–290 LOC         |
+| Number of files touched      | ~10 new + 2 modified |
+| 400-line budget risk         | Low                  |
+| Chained PRs recommended      | No                   |
+| Decision needed before apply | No                   |
 
 This is the smallest slice of the Management phase: 1 route, 1 presentational component, 1 HTTP service, no create/edit sub-routes. Total ~338 LOC. Under the 400-line budget. Single PR delivery.
 
@@ -72,11 +72,11 @@ This is the smallest slice of the Management phase: 1 route, 1 presentational co
 
 ## Test Delta Summary
 
-| Work Unit | New Tests | Running Total |
-|-----------|-----------|---------------|
-| Baseline | — | 576 |
-| W-1 HTTP service | +5 | 581 |
-| W-2 ConfigurationsForm | +7 | 588 |
-| W-3 Container | +13 | 601 |
+| Work Unit              | New Tests | Running Total |
+| ---------------------- | --------- | ------------- |
+| Baseline               | —         | 576           |
+| W-1 HTTP service       | +5        | 581           |
+| W-2 ConfigurationsForm | +7        | 588           |
+| W-3 Container          | +13       | 601           |
 
 **Final: 601 tests GREEN. 3/3 work units, 13/13 tasks complete.**

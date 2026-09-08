@@ -2,16 +2,16 @@
 
 ## Review Workload Forecast
 
-| Field | Value |
-|-------|-------|
-| Estimated new files | 15 |
-| Estimated modified files | 7 |
-| Estimated changed lines | 900–1 200 |
-| 400-line budget risk | High |
-| Chained PRs recommended | Yes |
-| Suggested split | Slice 1 (foundation + Expenses) → Slice 2 (Reports) → Slice 3 (Statistics) |
-| Delivery strategy | ask-on-risk |
-| Chain strategy | pending — orchestrator must ask user before apply |
+| Field                    | Value                                                                      |
+| ------------------------ | -------------------------------------------------------------------------- |
+| Estimated new files      | 15                                                                         |
+| Estimated modified files | 7                                                                          |
+| Estimated changed lines  | 900–1 200                                                                  |
+| 400-line budget risk     | High                                                                       |
+| Chained PRs recommended  | Yes                                                                        |
+| Suggested split          | Slice 1 (foundation + Expenses) → Slice 2 (Reports) → Slice 3 (Statistics) |
+| Delivery strategy        | ask-on-risk                                                                |
+| Chain strategy           | pending — orchestrator must ask user before apply                          |
 
 Decision needed before apply: Yes
 Chained PRs recommended: Yes
@@ -47,11 +47,11 @@ menu-config.ts
 
 ### Suggested Work Units (chained PRs)
 
-| Unit | Goal | Likely PR | Notes |
-|------|------|-----------|-------|
-| 1 | date-utils extraction + ExpenseOfflineService + Expenses routes & components + menu item + i18n | PR 1 | Base = main. Gate items 1, 2, 5, 6, 7, 8, 9, 10, 18. |
-| 2 | ReportAggregationService + /reports/today route + i18n | PR 2 | Base = PR 1 branch. Gate items 3, 11, 12, 13, 18, 24. |
-| 3 | recharts dep + chart-core + lazy chart wrappers + StatisticsAggregationService + /stats/dashboard route + i18n | PR 3 | Base = PR 2 branch. Gate items 4, 14, 15, 16, 17, 20, 23. |
+| Unit | Goal                                                                                                           | Likely PR | Notes                                                     |
+| ---- | -------------------------------------------------------------------------------------------------------------- | --------- | --------------------------------------------------------- |
+| 1    | date-utils extraction + ExpenseOfflineService + Expenses routes & components + menu item + i18n                | PR 1      | Base = main. Gate items 1, 2, 5, 6, 7, 8, 9, 10, 18.      |
+| 2    | ReportAggregationService + /reports/today route + i18n                                                         | PR 2      | Base = PR 1 branch. Gate items 3, 11, 12, 13, 18, 24.     |
+| 3    | recharts dep + chart-core + lazy chart wrappers + StatisticsAggregationService + /stats/dashboard route + i18n | PR 3      | Base = PR 2 branch. Gate items 4, 14, 15, 16, 17, 20, 23. |
 
 ---
 
@@ -164,29 +164,29 @@ menu-config.ts
 
 ## Acceptance Gate Summary
 
-| Gate Item | Slice |
-|-----------|-------|
-| 1 — /expenses/today registered (featureLoader 80) | Slice 1 |
-| 2 — /expenses/expenses registered (featureLoader 102) | Slice 1 |
-| 3 — /reports/today registered (featureLoader 50) | Slice 2 |
-| 4 — /stats/dashboard registered (featureLoader 60) | Slice 3 |
-| 5 — ExpensesHistory menu item → /expenses/expenses | Slice 1 |
-| 6 — date-utils.ts exports startOfDay + addDays + tests | Slice 1 |
-| 7 — ExpenseOfflineService all methods + tests | Slice 1 |
-| 8 — Today Expenses add/edit/delete + running total | Slice 1 |
-| 9 — History: no add, no delete | Slice 1 |
-| 10 — History filter + pagination | Slice 1 |
-| 11 — ReportAggregationService aggregations | Slice 2 |
-| 12 — Reports empty states | Slice 2 |
-| 13 — Reports Actualizar button | Slice 2 |
-| 14 — getDailySales 30 entries, correct values | Slice 3 |
-| 15 — getDailyProfit via calculateOrderProfit | Slice 3 |
-| 16 — Chart empty + loading states | Slice 3 |
-| 17 — recharts absent from auth/login bundle | Slice 3 |
-| 18 — i18n keys present in es.ts | Slice 1 + 2 + 3 |
-| 19 — tsc --noEmit exits 0 | Slice 3 final gate |
-| 20 — pnpm build succeeds; recharts in stats chunk | Slice 3 |
-| 21 — pnpm test exits 0 with > 287 passing | Slice 3 final gate |
-| 22 — All pre-existing tests pass | Slice 1 (1.A.5) + 3 |
-| 23 — recharts in package.json | Slice 3 |
+| Gate Item                                                    | Slice                         |
+| ------------------------------------------------------------ | ----------------------------- |
+| 1 — /expenses/today registered (featureLoader 80)            | Slice 1                       |
+| 2 — /expenses/expenses registered (featureLoader 102)        | Slice 1                       |
+| 3 — /reports/today registered (featureLoader 50)             | Slice 2                       |
+| 4 — /stats/dashboard registered (featureLoader 60)           | Slice 3                       |
+| 5 — ExpensesHistory menu item → /expenses/expenses           | Slice 1                       |
+| 6 — date-utils.ts exports startOfDay + addDays + tests       | Slice 1                       |
+| 7 — ExpenseOfflineService all methods + tests                | Slice 1                       |
+| 8 — Today Expenses add/edit/delete + running total           | Slice 1                       |
+| 9 — History: no add, no delete                               | Slice 1                       |
+| 10 — History filter + pagination                             | Slice 1                       |
+| 11 — ReportAggregationService aggregations                   | Slice 2                       |
+| 12 — Reports empty states                                    | Slice 2                       |
+| 13 — Reports Actualizar button                               | Slice 2                       |
+| 14 — getDailySales 30 entries, correct values                | Slice 3                       |
+| 15 — getDailyProfit via calculateOrderProfit                 | Slice 3                       |
+| 16 — Chart empty + loading states                            | Slice 3                       |
+| 17 — recharts absent from auth/login bundle                  | Slice 3                       |
+| 18 — i18n keys present in es.ts                              | Slice 1 + 2 + 3               |
+| 19 — tsc --noEmit exits 0                                    | Slice 3 final gate            |
+| 20 — pnpm build succeeds; recharts in stats chunk            | Slice 3                       |
+| 21 — pnpm test exits 0 with > 287 passing                    | Slice 3 final gate            |
+| 22 — All pre-existing tests pass                             | Slice 1 (1.A.5) + 3           |
+| 23 — recharts in package.json                                | Slice 3                       |
 | 24 — today-quantities.tsx + today-sales-profit.tsx unchanged | Slice 1 guard + Slice 2 guard |

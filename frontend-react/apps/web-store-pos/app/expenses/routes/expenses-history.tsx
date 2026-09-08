@@ -109,7 +109,9 @@ export function ExpensesHistoryPage() {
               ({expensesCount})
             </span>
           </span>
-          <span className="text-sm font-semibold text-danger whitespace-nowrap">{formatCurrency(expensesTotal)}</span>
+          <span className="text-sm font-semibold text-danger whitespace-nowrap">
+            {formatCurrency(expensesTotal)}
+          </span>
         </div>
       }
     >
@@ -130,7 +132,10 @@ export function ExpensesHistoryPage() {
                 className="text-primary focus:ring-primary"
               />
               {opt.value != null && (
-                <PaymentMethodIcon kind={getPaymentTypeIconKind(opt.value)} className="text-success" />
+                <PaymentMethodIcon
+                  kind={getPaymentTypeIconKind(opt.value)}
+                  className="text-success"
+                />
               )}
               {intl.formatMessage({ id: opt.labelKey })}
             </label>

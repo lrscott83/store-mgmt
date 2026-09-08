@@ -42,10 +42,7 @@ export function StorePlanPage() {
   useEffect(() => {
     if (!storeId) return;
     let cancelled = false;
-    Promise.all([
-      storeHttpService.getStorePlan(storeId),
-      storeHttpService.getModulesToStore(),
-    ])
+    Promise.all([storeHttpService.getStorePlan(storeId), storeHttpService.getModulesToStore()])
       .then(([planRes, modulesRes]) => {
         if (cancelled) return;
         if (!planRes.succeeded || !modulesRes.succeeded) {
@@ -58,9 +55,7 @@ export function StorePlanPage() {
         const mergedModules = mergeStoreModules(modulesRes.data, planRes.data.modules);
         setPlan(planRes.data);
         setModules(mergedModules);
-        setModuleIds(
-          mergedModules.filter((m) => m.priceIncluded || m.selected).map((m) => m.id)
-        );
+        setModuleIds(mergedModules.filter((m) => m.priceIncluded || m.selected).map((m) => m.id));
         setError('');
       })
       .catch((error) => {
@@ -119,7 +114,9 @@ export function StorePlanPage() {
   if (error) {
     return (
       <div className="space-y-4 p-4">
-        <p role="alert" className="text-sm text-red-600">{error}</p>
+        <p role="alert" className="text-sm text-red-600">
+          {error}
+        </p>
       </div>
     );
   }

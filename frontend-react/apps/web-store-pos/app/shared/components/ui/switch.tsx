@@ -11,7 +11,13 @@ interface SwitchProps {
  * Toggle switch matching Angular's `mat-slide-toggle`: a pill track with a
  * sliding knob and a text label. Exposed as role="switch" for accessibility.
  */
-export function Switch({ checked, onChange, label, disabled = false, className = '' }: SwitchProps) {
+export function Switch({
+  checked,
+  onChange,
+  label,
+  disabled = false,
+  className = '',
+}: SwitchProps) {
   return (
     <span className={`inline-flex items-center gap-2 ${className}`.trim()}>
       <button

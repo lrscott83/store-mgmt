@@ -79,12 +79,10 @@ export function installAnyRequestObserver(page: Page): AnyRequestObserver {
 
     expectNoRequests: (context?: string) => {
       if (records.length === 0) return;
-      const summary = records
-        .map((r) => `${r.method} ${r.url} (${r.resourceType})`)
-        .join('; ');
+      const summary = records.map((r) => `${r.method} ${r.url} (${r.resourceType})`).join('; ');
       throw new Error(
         `Expected zero HTTP requests${context ? ` (${context})` : ''}, but observed ` +
-          `${records.length}: ${summary}.`
+          `${records.length}: ${summary}.`,
       );
     },
   };

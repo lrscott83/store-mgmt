@@ -24,13 +24,17 @@ import type { Page } from '@playwright/test';
 
 const WHOLESALE_HEADER = 'Ventas Mayoristas'; // SALES.WHOLESALE.HEADER
 const ADDED_TEXT = 'adicionado a la venta mayorista'; // SALES.WHOLESALE.ADDED
-const EMPTY_CART_TEXT = 'La venta no tiene ningún producto. Usted debe adicionar algún producto a la venta para pagar.'; // SHOPPING_CART.DON_NOT_PAY_EMPTY_CART
+const EMPTY_CART_TEXT =
+  'La venta no tiene ningún producto. Usted debe adicionar algún producto a la venta para pagar.'; // SHOPPING_CART.DON_NOT_PAY_EMPTY_CART
 
 /**
  * Seeds wholesale config (packSize 24, minPacks 5 → $6, minPacks 12 → $5)
  * + inventory on the first sellable product. Returns name + id.
  */
-async function seedWholesale(page: Page, storeId: string): Promise<{ name: string; id: string } | null> {
+async function seedWholesale(
+  page: Page,
+  storeId: string,
+): Promise<{ name: string; id: string } | null> {
   return page.evaluate(
     ({ sid }) => {
       const productKey = `lizoft.store-products-${sid}`;
@@ -95,7 +99,10 @@ async function seedWholesale(page: Page, storeId: string): Promise<{ name: strin
 }
 
 /** Opens the wholesale screen with the seeded product re-read from storage. */
-async function openWholesaleSeeded(page: Page, storeId: string): Promise<{ name: string; id: string }> {
+async function openWholesaleSeeded(
+  page: Page,
+  storeId: string,
+): Promise<{ name: string; id: string }> {
   await page.goto('/sales/wholesale');
   await expect(page.getByText(WHOLESALE_HEADER)).toBeVisible();
   const seeded = await seedWholesale(page, storeId);
@@ -124,7 +131,9 @@ test.describe.serial('wholesale cart — floor del menor rango y re-precificaci�
 
   test.use({ persona: 'owner-admin-with-products' });
 
-  test('− no baja del menor rango: al quedar por debajo, la línea se elimina del carrito', async ({ signedInPage }) => {
+  test('− no baja del menor rango: al quedar por debajo, la línea se elimina del carrito', async ({
+    signedInPage,
+  }) => {
     const { page, selectedStoreId } = signedInPage;
 
     const product = await openWholesaleSeeded(page, selectedStoreId);
@@ -148,7 +157,9 @@ test.describe.serial('wholesale cart — floor del menor rango y re-precificaci�
     await expect(badge).toHaveText('0');
   });
 
-  test('± cruza de rango y el precio de la línea se recalcula al rango aplicable', async ({ signedInPage }) => {
+  test('± cruza de rango y el precio de la línea se recalcula al rango aplicable', async ({
+    signedInPage,
+  }) => {
     const { page, selectedStoreId } = signedInPage;
 
     const product = await openWholesaleSeeded(page, selectedStoreId);

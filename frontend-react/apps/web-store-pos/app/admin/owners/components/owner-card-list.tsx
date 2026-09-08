@@ -54,15 +54,17 @@ export function OwnerCardList({ owners, onEdit, onDelete }: OwnerCardListProps) 
         {owners.map((owner) => {
           const totalPrice = owner.storeModules.reduce(
             (sum, m) => sum + m.storeModuleTotalCurrentPrice,
-            0
+            0,
           );
           const storeCount = owner.storeModules.length;
           const nextDueDates = owner.storeModules
             .filter((m) => m.nextDueDate !== null)
             .map((m) => m.nextDueDate as string)
             .sort();
-          const daysRemaining = nextDueDates.length > 0 ? daysFromToday(nextDueDates[0], today) : null;
-          const showDaysRemaining = daysRemaining !== null && daysRemaining >= 0 && daysRemaining <= 5;
+          const daysRemaining =
+            nextDueDates.length > 0 ? daysFromToday(nextDueDates[0], today) : null;
+          const showDaysRemaining =
+            daysRemaining !== null && daysRemaining >= 0 && daysRemaining <= 5;
           const overdueClass = getOverdueClass(owner, today);
 
           return (
@@ -115,7 +117,9 @@ export function OwnerCardList({ owners, onEdit, onDelete }: OwnerCardListProps) 
                   {owner.reSellerName || 'ADMIN'}
                 </p>
                 <p className="text-sm text-text-muted">{owner.cellPhone}</p>
-                {owner.description && <p className="text-sm text-text-muted">{owner.description}</p>}
+                {owner.description && (
+                  <p className="text-sm text-text-muted">{owner.description}</p>
+                )}
               </div>
             </Card>
           );
@@ -134,7 +138,7 @@ export function OwnerCardList({ owners, onEdit, onDelete }: OwnerCardListProps) 
         title={intl.formatMessage({ id: 'OWNER.DELETE_CONFIRM_TITLE' })}
         description={intl.formatMessage(
           { id: 'OWNER.DELETE_CONFIRM_MESSAGE' },
-          { name: ownerToDelete?.fullName ?? '' }
+          { name: ownerToDelete?.fullName ?? '' },
         )}
         confirmLabel={intl.formatMessage({ id: 'OWNER.DELETE_CONFIRM_BUTTON' })}
       />

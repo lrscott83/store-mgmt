@@ -21,12 +21,8 @@ export function guardOrderType(params: {
   const conflicts = hasItems && cartOrderType !== requested;
   if (!conflicts) return Result.Success();
 
-  const inCourse =
-    cartOrderType === OrderType.Mayorista
-      ? 'venta mayorista'
-      : 'venta normal';
-  const requestedLabel =
-    requested === OrderType.Mayorista ? 'venta mayorista' : 'venta normal';
+  const inCourse = cartOrderType === OrderType.Mayorista ? 'venta mayorista' : 'venta normal';
+  const requestedLabel = requested === OrderType.Mayorista ? 'venta mayorista' : 'venta normal';
 
   const description =
     `No se puede iniciar una ${requestedLabel} porque hay una ${inCourse} en curso. ` +

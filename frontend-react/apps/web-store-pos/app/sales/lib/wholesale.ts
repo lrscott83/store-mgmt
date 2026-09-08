@@ -36,9 +36,7 @@ export function wholesaleUnits(packs: number, packSize: number): number {
  * el usuario ("caja" para cervezas, "paquete" para croquetas…). Sin config o
  * con label vacío → "paquete" (el label histórico de todos los textos).
  */
-export function wholesaleUnitName(
-  product: Pick<Product, 'wholesaleUnitLabel'>,
-): string {
+export function wholesaleUnitName(product: Pick<Product, 'wholesaleUnitLabel'>): string {
   const label = product.wholesaleUnitLabel?.trim();
   return label ? label : WHOLESALE_DEFAULT_UNIT_LABEL;
 }
@@ -67,7 +65,10 @@ export function getWholesaleMinPacks(
 }
 
 export function getWholesaleConfig(
-  product: Pick<Product, 'wholesaleEnabled' | 'wholesalePackSize' | 'wholesaleTiers' | 'wholesaleUnitLabel'>,
+  product: Pick<
+    Product,
+    'wholesaleEnabled' | 'wholesalePackSize' | 'wholesaleTiers' | 'wholesaleUnitLabel'
+  >,
 ): WholesaleConfig | undefined {
   if (
     !product.wholesaleEnabled ||
@@ -149,7 +150,10 @@ const WholesaleErrors = {
   },
 } as const satisfies Record<string, BaseError>;
 
-export function validateWholesaleConfig(config: WholesaleConfig | undefined, retailPrice: number): Result {
+export function validateWholesaleConfig(
+  config: WholesaleConfig | undefined,
+  retailPrice: number,
+): Result {
   if (!config) return Result.Success();
 
   const errors: BaseError[] = [];
@@ -182,7 +186,10 @@ export function validateWholesaleConfig(config: WholesaleConfig | undefined, ret
   return errors.length > 0 ? Result.Failure(errors) : Result.Success();
 }
 
-export function normalizeWholesaleConfig(config: WholesaleConfig, _retailPrice?: number): WholesaleConfig {
+export function normalizeWholesaleConfig(
+  config: WholesaleConfig,
+  _retailPrice?: number,
+): WholesaleConfig {
   const normalizedTiers = [...config.tiers]
     .map<WholesaleTier>((tier) => ({
       minPacks: Math.round(tier.minPacks),

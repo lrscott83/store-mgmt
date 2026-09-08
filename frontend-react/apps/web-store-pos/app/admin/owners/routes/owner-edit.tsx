@@ -174,12 +174,15 @@ export function OwnerEditPage() {
 
   useEffect(() => {
     if (!isSuperAdmin) return;
-    resellerHttpService.listResellers().then((res) => {
-      if (!res.succeeded) return;
-      setResellers(res.data);
-    }).catch(() => {
-      // non-critical
-    });
+    resellerHttpService
+      .listResellers()
+      .then((res) => {
+        if (!res.succeeded) return;
+        setResellers(res.data);
+      })
+      .catch(() => {
+        // non-critical
+      });
   }, [isSuperAdmin]);
 
   // presentation-parity-bucket-b WU2: the Tiendas tab lazy-renders (ADR-9), so fetch
@@ -238,9 +241,9 @@ export function OwnerEditPage() {
               404: 'OWNER.NOT_FOUND',
               403: 'OWNER.FORBIDDEN',
             },
-            { [API_ERROR_CODE_CELL_PHONE]: 'OWNER.PHONE_REQUIRED' }
+            { [API_ERROR_CODE_CELL_PHONE]: 'OWNER.PHONE_REQUIRED' },
           ),
-        })
+        }),
       );
     } finally {
       setIsSubmitting(false);
@@ -254,7 +257,9 @@ export function OwnerEditPage() {
   if (loadError) {
     return (
       <div className="space-y-4 p-4">
-        <p role="alert" className="text-sm text-red-600">{loadError}</p>
+        <p role="alert" className="text-sm text-red-600">
+          {loadError}
+        </p>
       </div>
     );
   }
@@ -403,9 +408,7 @@ export function OwnerEditPage() {
   if (!isSuperAdmin) {
     return (
       <div className="space-y-4 p-4">
-        <h1 className="text-xl font-semibold">
-          {intl.formatMessage({ id: 'OWNER.EDIT_TITLE' })}
-        </h1>
+        <h1 className="text-xl font-semibold">{intl.formatMessage({ id: 'OWNER.EDIT_TITLE' })}</h1>
         {toolbarFab}
         {detailsForm}
       </div>
@@ -415,9 +418,7 @@ export function OwnerEditPage() {
   // SuperAdmin: 3-tab shell
   return (
     <div className="space-y-4 p-4">
-      <h1 className="text-xl font-semibold">
-        {intl.formatMessage({ id: 'OWNER.EDIT_TITLE' })}
-      </h1>
+      <h1 className="text-xl font-semibold">{intl.formatMessage({ id: 'OWNER.EDIT_TITLE' })}</h1>
       {toolbarFab}
 
       {/* Tab buttons */}
@@ -450,7 +451,11 @@ export function OwnerEditPage() {
 
       {activeTab === 'stores' && (
         <div className="space-y-4">
-          {storesError && <p role="alert" className="text-sm text-red-600">{storesError}</p>}
+          {storesError && (
+            <p role="alert" className="text-sm text-red-600">
+              {storesError}
+            </p>
+          )}
           <StoreCardList
             stores={stores}
             onEdit={(storeId) => navigate(`/management/stores/edit/${storeId}`)}

@@ -109,7 +109,9 @@ function makeInventoryEntryView(overrides: Partial<InventoryEntryView> = {}): In
   };
 }
 
-function makeInventoryCategoryView(overrides: Partial<InventoryCategoryView> = {}): InventoryCategoryView {
+function makeInventoryCategoryView(
+  overrides: Partial<InventoryCategoryView> = {},
+): InventoryCategoryView {
   return {
     categoryId: 'c1',
     categoryName: 'Bebidas',
@@ -131,9 +133,27 @@ function makeInventoryCategoryView(overrides: Partial<InventoryCategoryView> = {
 
 describe('generateProductRowsForDate', () => {
   it('FOR-DATE-01: entries before/during/after the day + orders during/after → hand-derived 13-col row, no suspects', () => {
-    const e1 = makeInventoryEntry({ id: 'e1', date: BEFORE_DATE, quantity: 10, available: 6, costPrice: 2 });
-    const e2 = makeInventoryEntry({ id: 'e2', date: DURING_DATE, quantity: 5, available: 5, costPrice: 5 });
-    const e3 = makeInventoryEntry({ id: 'e3', date: AFTER_DATE, quantity: 3, available: 3, costPrice: 6 });
+    const e1 = makeInventoryEntry({
+      id: 'e1',
+      date: BEFORE_DATE,
+      quantity: 10,
+      available: 6,
+      costPrice: 2,
+    });
+    const e2 = makeInventoryEntry({
+      id: 'e2',
+      date: DURING_DATE,
+      quantity: 5,
+      available: 5,
+      costPrice: 5,
+    });
+    const e3 = makeInventoryEntry({
+      id: 'e3',
+      date: AFTER_DATE,
+      quantity: 3,
+      available: 3,
+      costPrice: 6,
+    });
 
     // Day order: 2 sold @10. After-day order consumed 4 of e1 (recorded at sale time).
     const dayOrder = makeOrder(DURING_DATE, [
@@ -180,7 +200,13 @@ describe('generateProductRowsForDate', () => {
   });
 
   it('FOR-DATE-02: an entry partially consumed AFTER the day → final equals as-of-day stock, not current', () => {
-    const e1 = makeInventoryEntry({ id: 'e1', date: BEFORE_DATE, quantity: 10, available: 3, costPrice: 5 });
+    const e1 = makeInventoryEntry({
+      id: 'e1',
+      date: BEFORE_DATE,
+      quantity: 10,
+      available: 3,
+      costPrice: 5,
+    });
     const afterOrder = makeOrder(
       AFTER_DATE,
       [
@@ -216,10 +242,24 @@ describe('generateProductRowsForDate', () => {
   });
 
   it('FOR-DATE-03: deactivated entries (available forced 0 / negative, no productCosts) contribute 0 to available', () => {
-    const e1 = makeInventoryEntry({ id: 'e1', date: BEFORE_DATE, quantity: 5, available: 0, costPrice: 4, isActive: false });
+    const e1 = makeInventoryEntry({
+      id: 'e1',
+      date: BEFORE_DATE,
+      quantity: 5,
+      available: 0,
+      costPrice: 4,
+      isActive: false,
+    });
     // A never-restored entry holding a negative available is excluded from the available sum
     // (inactive), so it must not pull the row negative either.
-    const e2 = makeInventoryEntry({ id: 'e2', date: BEFORE_DATE, quantity: 3, available: -3, costPrice: 4, isActive: false });
+    const e2 = makeInventoryEntry({
+      id: 'e2',
+      date: BEFORE_DATE,
+      quantity: 3,
+      available: -3,
+      costPrice: 4,
+      isActive: false,
+    });
 
     const result = generateProductRowsForDate({
       products: [makeProduct()],
@@ -269,13 +309,35 @@ describe('generateProductRowsForDate', () => {
   it('FOR-DATE-05: orders and entries on other LOCAL days are excluded (before AND after)', () => {
     const entries = [
       makeInventoryEntry({ id: 'e1', date: DURING_DATE, quantity: 5, available: 5, costPrice: 4 }),
-      makeInventoryEntry({ id: 'eBefore', date: BEFORE_DATE, quantity: 5, available: 5, costPrice: 2 }),
-      makeInventoryEntry({ id: 'eAfter', date: AFTER_DATE, quantity: 3, available: 3, costPrice: 9 }),
+      makeInventoryEntry({
+        id: 'eBefore',
+        date: BEFORE_DATE,
+        quantity: 5,
+        available: 5,
+        costPrice: 2,
+      }),
+      makeInventoryEntry({
+        id: 'eAfter',
+        date: AFTER_DATE,
+        quantity: 3,
+        available: 3,
+        costPrice: 9,
+      }),
     ];
     const orders = [
-      makeOrder(DURING_DATE, [makeOrderItem({ productId: 'p1', quantity: 2, price: 10, productCosts: [] })]),
-      makeOrder(BEFORE_DATE, [makeOrderItem({ productId: 'p1', quantity: 1, price: 5, productCosts: [] })], 'oB'),
-      makeOrder(AFTER_DATE, [makeOrderItem({ productId: 'p1', quantity: 1, price: 5, productCosts: [] })], 'oA'),
+      makeOrder(DURING_DATE, [
+        makeOrderItem({ productId: 'p1', quantity: 2, price: 10, productCosts: [] }),
+      ]),
+      makeOrder(
+        BEFORE_DATE,
+        [makeOrderItem({ productId: 'p1', quantity: 1, price: 5, productCosts: [] })],
+        'oB',
+      ),
+      makeOrder(
+        AFTER_DATE,
+        [makeOrderItem({ productId: 'p1', quantity: 1, price: 5, productCosts: [] })],
+        'oA',
+      ),
     ];
 
     const result = generateProductRowsForDate({
@@ -321,7 +383,13 @@ describe('generateProductRowsForDate', () => {
   it('FOR-DATE-07: suspect — reconstructed stock exceeding received quantity flags the product', () => {
     // available(10) already exceeds the received quantity(5) — a signal the entry was
     // edited after the day even without an updatedDate stamp.
-    const e1 = makeInventoryEntry({ id: 'e1', date: BEFORE_DATE, quantity: 5, available: 10, costPrice: 4 });
+    const e1 = makeInventoryEntry({
+      id: 'e1',
+      date: BEFORE_DATE,
+      quantity: 5,
+      available: 10,
+      costPrice: 4,
+    });
 
     const result = generateProductRowsForDate({
       products: [makeProduct()],
@@ -380,7 +448,13 @@ describe('generateProductRowsForDate', () => {
   });
 
   it('FOR-DATE-10: isActive — inactive entries never contribute to available or entrada', () => {
-    const e1 = makeInventoryEntry({ id: 'e1', date: BEFORE_DATE, quantity: 5, available: 5, costPrice: 4 });
+    const e1 = makeInventoryEntry({
+      id: 'e1',
+      date: BEFORE_DATE,
+      quantity: 5,
+      available: 5,
+      costPrice: 4,
+    });
     // Inactive but positive — must NOT feed the available (Final) basis.
     const eInactiveBefore = makeInventoryEntry({
       id: 'eInactiveBefore',
@@ -422,7 +496,11 @@ describe('generateProductRowsForDate', () => {
       makeInventoryEntry({ id: 'e1', date: BEFORE_DATE, quantity: 10, available: 8, costPrice: 2 }),
       makeInventoryEntry({ id: 'e2', date: today, quantity: 5, available: 5, costPrice: 4 }),
     ];
-    const orders = [makeOrder(today, [makeOrderItem({ productId: 'p1', quantity: 3, price: 10, productCosts: [] })])];
+    const orders = [
+      makeOrder(today, [
+        makeOrderItem({ productId: 'p1', quantity: 3, price: 10, productCosts: [] }),
+      ]),
+    ];
 
     const result = generateProductRowsForDate({
       products,
@@ -452,7 +530,10 @@ describe('day-report reconstruction helpers', () => {
   it('HELPER-01: getActiveOrdersOfDay — includes active orders at 23:00 local of the day, excludes next-day 00:30 and inactive', () => {
     const lateDayOrder = makeOrder(new Date(2026, 6, 22, 23, 0, 0), [makeOrderItem()], 'o-late');
     const nextDayOrder = makeOrder(new Date(2026, 6, 23, 0, 30, 0), [makeOrderItem()], 'o-next');
-    const inactiveOrder = { ...makeOrder(DURING_DATE, [makeOrderItem()], 'o-inactive'), isActive: false };
+    const inactiveOrder = {
+      ...makeOrder(DURING_DATE, [makeOrderItem()], 'o-inactive'),
+      isActive: false,
+    };
 
     const result = getActiveOrdersOfDay([lateDayOrder, nextDayOrder, inactiveOrder], DAY);
 
@@ -517,7 +598,9 @@ describe('day-report reconstruction helpers', () => {
     const touchedOn = makeInventoryEntry({ updatedDate: new Date(2026, 6, 23, 10, 0, 0) });
     // Raw-string `updatedDate` (inventory revival hydrates only `date`) round-trips
     // through `toISOString()` to the same instant, timezone-independently.
-    const rawString = makeInventoryEntry({ updatedDate: new Date(2026, 6, 23, 10, 0, 0).toISOString() as unknown as Date });
+    const rawString = makeInventoryEntry({
+      updatedDate: new Date(2026, 6, 23, 10, 0, 0).toISOString() as unknown as Date,
+    });
     const touchedBefore = makeInventoryEntry({ updatedDate: new Date(2026, 6, 22, 10, 0, 0) });
     const unparseable = makeInventoryEntry({ updatedDate: 'not-a-date' as unknown as Date });
     const absent = makeInventoryEntry();
@@ -539,7 +622,12 @@ describe('day-report reconstruction helpers', () => {
   it('HELPER-05: reconstructEntriesAtDay — only entries dated before dayEnd, each with reconstructed stock', () => {
     const eBefore = makeInventoryEntry({ id: 'e1', date: BEFORE_DATE, quantity: 10, available: 4 });
     const eDuring = makeInventoryEntry({ id: 'e2', date: DURING_DATE, quantity: 5, available: 5 });
-    const eAtDayEnd = makeInventoryEntry({ id: 'e4', date: localDayRange(DAY).end, quantity: 2, available: 2 });
+    const eAtDayEnd = makeInventoryEntry({
+      id: 'e4',
+      date: localDayRange(DAY).end,
+      quantity: 2,
+      available: 2,
+    });
     const eAfter = makeInventoryEntry({ id: 'e3', date: AFTER_DATE, quantity: 3, available: 3 });
     const consumed = new Map<string, number>([['e1', 6]]);
 
@@ -620,7 +708,7 @@ describe('ported reference suite (reconstructEntriesAtDay + getActiveOrdersOfDay
     expect(atDay.map((x) => x.entry.id)).toEqual(['e1']);
   });
 
-  it('REC-05: consumption is attributed per inventoryId — another entry\'s sales do not leak in', () => {
+  it("REC-05: consumption is attributed per inventoryId — another entry's sales do not leak in", () => {
     const e1 = makeInventoryEntry({ id: 'e1', date: BEFORE_DATE, available: 2 });
     const e2 = makeInventoryEntry({ id: 'e2', date: BEFORE_DATE, available: 3 });
     const order = makeOrder(
@@ -637,7 +725,10 @@ describe('ported reference suite (reconstructEntriesAtDay + getActiveOrdersOfDay
     );
     const consumed = getConsumedAfterDayByEntry([order], DAY);
     const byId = new Map(
-      reconstructEntriesAtDay([e1, e2], DAY, consumed).map((x) => [x.entry.id, x.availableAtEndOfDay]),
+      reconstructEntriesAtDay([e1, e2], DAY, consumed).map((x) => [
+        x.entry.id,
+        x.availableAtEndOfDay,
+      ]),
     );
     expect(byId.get('e1')).toBe(2);
     expect(byId.get('e2')).toBe(8);
@@ -649,14 +740,25 @@ describe('ported reference suite (reconstructEntriesAtDay + getActiveOrdersOfDay
       makeOrder(
         AFTER_DATE,
         [
-          makeOrderItem({ productId: 'p1', productCosts: [{ inventoryId: 'e1', costPrice: 4, quantity: 3 }] }),
-          makeOrderItem({ productId: 'p1', productCosts: [{ inventoryId: 'e1', costPrice: 4, quantity: 2 }] }),
+          makeOrderItem({
+            productId: 'p1',
+            productCosts: [{ inventoryId: 'e1', costPrice: 4, quantity: 3 }],
+          }),
+          makeOrderItem({
+            productId: 'p1',
+            productCosts: [{ inventoryId: 'e1', costPrice: 4, quantity: 2 }],
+          }),
         ],
         'o-1',
       ),
       makeOrder(
         AFTER_DATE,
-        [makeOrderItem({ productId: 'p1', productCosts: [{ inventoryId: 'e1', costPrice: 4, quantity: 4 }] })],
+        [
+          makeOrderItem({
+            productId: 'p1',
+            productCosts: [{ inventoryId: 'e1', costPrice: 4, quantity: 4 }],
+          }),
+        ],
         'o-2',
       ),
     ];
@@ -677,7 +779,11 @@ describe('ported reference suite (reconstructEntriesAtDay + getActiveOrdersOfDay
   });
 
   it('REC-08: an entry edited BEFORE the target day, or never edited, is not suspect', () => {
-    const edited = makeInventoryEntry({ id: 'e1', date: BEFORE_DATE, updatedDate: new Date(2026, 6, 20, 10, 0, 0) });
+    const edited = makeInventoryEntry({
+      id: 'e1',
+      date: BEFORE_DATE,
+      updatedDate: new Date(2026, 6, 20, 10, 0, 0),
+    });
     const untouched = makeInventoryEntry({ id: 'e2', date: BEFORE_DATE, updatedDate: undefined });
     const atDay = reconstructEntriesAtDay([edited, untouched], DAY, new Map());
     expect(atDay.every((x) => !x.isSuspect)).toBe(true);
@@ -685,7 +791,12 @@ describe('ported reference suite (reconstructEntriesAtDay + getActiveOrdersOfDay
 
   it('REC-09: a replay exceeding the entry quantity is flagged, NOT clamped — the signature of a later amortizeSoldEntry', () => {
     // amortizeSoldEntry zeroed `available` and dropped `quantity` from 10 to 4.
-    const amortized = makeInventoryEntry({ id: 'e1', date: BEFORE_DATE, quantity: 4, available: 0 });
+    const amortized = makeInventoryEntry({
+      id: 'e1',
+      date: BEFORE_DATE,
+      quantity: 4,
+      available: 0,
+    });
     const order = makeOrder(
       AFTER_DATE,
       [
@@ -715,14 +826,19 @@ describe('ported reference suite (reconstructEntriesAtDay + getActiveOrdersOfDay
   });
 
   it('DAY-01: returns only the orders of the requested day — NOT today', () => {
-    const orders = [makeOrder(BEFORE_DATE, [makeOrderItem()], 'o-before'), makeOrder(DURING_DATE, [makeOrderItem()], 'o-day')];
+    const orders = [
+      makeOrder(BEFORE_DATE, [makeOrderItem()], 'o-before'),
+      makeOrder(DURING_DATE, [makeOrderItem()], 'o-day'),
+    ];
     const result = getActiveOrdersOfDay(orders, DAY);
     expect(result).toHaveLength(1);
     expect(result[0].date).toBe(DURING_DATE);
   });
 
   it('DAY-02: excludes inactive orders', () => {
-    const orders = [{ ...makeOrder(DURING_DATE, [makeOrderItem()], 'o-inactive'), isActive: false }];
+    const orders = [
+      { ...makeOrder(DURING_DATE, [makeOrderItem()], 'o-inactive'), isActive: false },
+    ];
     expect(getActiveOrdersOfDay(orders, DAY)).toHaveLength(0);
   });
 
@@ -730,7 +846,9 @@ describe('ported reference suite (reconstructEntriesAtDay + getActiveOrdersOfDay
     const atMidnight = new Date(2026, 6, 22, 0, 0, 0, 0);
     const lastMillisecond = new Date(2026, 6, 22, 23, 59, 59, 999);
     const nextMidnight = new Date(2026, 6, 23, 0, 0, 0, 0);
-    const orders = [atMidnight, lastMillisecond, nextMidnight].map((d) => makeOrder(d, [makeOrderItem()]));
+    const orders = [atMidnight, lastMillisecond, nextMidnight].map((d) =>
+      makeOrder(d, [makeOrderItem()]),
+    );
     const result = getActiveOrdersOfDay(orders, DAY);
     expect(result.map((o) => o.date)).toEqual([atMidnight, lastMillisecond]);
   });

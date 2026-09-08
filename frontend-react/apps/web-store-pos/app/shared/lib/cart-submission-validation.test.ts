@@ -6,7 +6,13 @@ import { validateCartSubmission } from './cart-submission-validation';
 describe('validateCartSubmission', () => {
   it('returns EMPTY_CART when itemCount is 0', () => {
     expect(
-      validateCartSubmission({ itemCount: 0, payment: undefined, total: 0, isCredit: false, client: '' }),
+      validateCartSubmission({
+        itemCount: 0,
+        payment: undefined,
+        total: 0,
+        isCredit: false,
+        client: '',
+      }),
     ).toBe('EMPTY_CART');
   });
 
@@ -18,13 +24,25 @@ describe('validateCartSubmission', () => {
 
   it('returns CREDIT_WITHOUT_CLIENT when isCredit is true and client is empty', () => {
     expect(
-      validateCartSubmission({ itemCount: 1, payment: undefined, total: 10, isCredit: true, client: '' }),
+      validateCartSubmission({
+        itemCount: 1,
+        payment: undefined,
+        total: 10,
+        isCredit: true,
+        client: '',
+      }),
     ).toBe('CREDIT_WITHOUT_CLIENT');
   });
 
   it('returns null when cart has items, payment is sufficient (or absent), and credit has a client', () => {
     expect(
-      validateCartSubmission({ itemCount: 1, payment: 10, total: 10, isCredit: true, client: 'Juan' }),
+      validateCartSubmission({
+        itemCount: 1,
+        payment: 10,
+        total: 10,
+        isCredit: true,
+        client: 'Juan',
+      }),
     ).toBeNull();
   });
 

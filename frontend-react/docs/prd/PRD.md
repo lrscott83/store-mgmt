@@ -14,12 +14,12 @@ Enable small business owners to manage their entire sales operation — products
 
 ### Role Hierarchy
 
-| Role | ID | Description | Access Level |
-|------|----|-------------|-------------|
-| SuperAdmin | 1 | Platform administrator | Full access to all features across all stores |
-| ReSeller | 4 | Reseller partner | Manages owners assigned to them |
-| OwnerAdmin | 2 | Store owner/administrator | Full access to their stores, manages users and configuration |
-| StoreUser | 3 | Store employee | Access limited to features assigned by their OwnerAdmin per store |
+| Role       | ID  | Description               | Access Level                                                      |
+| ---------- | --- | ------------------------- | ----------------------------------------------------------------- |
+| SuperAdmin | 1   | Platform administrator    | Full access to all features across all stores                     |
+| ReSeller   | 4   | Reseller partner          | Manages owners assigned to them                                   |
+| OwnerAdmin | 2   | Store owner/administrator | Full access to their stores, manages users and configuration      |
+| StoreUser  | 3   | Store employee            | Access limited to features assigned by their OwnerAdmin per store |
 
 ### Permission Model
 
@@ -58,19 +58,19 @@ Statistics=6, Management=7, Expenses=8, Billing=9, Histories=10, Credits=11
 
 ## 4. Core Features Overview
 
-| Module | Description | PRD Document |
-|--------|-------------|-------------|
-| [Auth](./auth.md) | Login, registration, token management (35-day offline expiry), route guards | auth.md |
-| [Landing](./landing.md) | Marketing landing page, legal pages (cookies, privacy, terms) | landing.md |
-| [Sales](./sales.md) | Product catalog, POS sale screen, orders, sale credits, barcode scanning | sales.md |
-| [Inventory](./inventory.md) | Stock management, entries, quantities, egress, profit tracking | inventory.md |
-| [Expenses](./expenses.md) | Daily expense tracking and history | expenses.md |
-| [Synchronization](./synchronization.md) | Device-to-device data sync via encrypted ZIP export/import | synchronization.md |
-| [Reports](./reports.md) | Daily combined inventory and sales reports | reports.md |
-| [Statistics](./statistics.md) | Dashboard with charts (sales trends, profit margins) | statistics.md |
-| [Management](./management.md) | Store settings, user management, app configuration | management.md |
-| [Profile](./profile.md) | User profile editing, password change | profile.md |
-| [Admin](./admin.md) | Platform administration: owners, resellers, features, stores | admin.md |
+| Module                                  | Description                                                                 | PRD Document       |
+| --------------------------------------- | --------------------------------------------------------------------------- | ------------------ |
+| [Auth](./auth.md)                       | Login, registration, token management (35-day offline expiry), route guards | auth.md            |
+| [Landing](./landing.md)                 | Marketing landing page, legal pages (cookies, privacy, terms)               | landing.md         |
+| [Sales](./sales.md)                     | Product catalog, POS sale screen, orders, sale credits, barcode scanning    | sales.md           |
+| [Inventory](./inventory.md)             | Stock management, entries, quantities, egress, profit tracking              | inventory.md       |
+| [Expenses](./expenses.md)               | Daily expense tracking and history                                          | expenses.md        |
+| [Synchronization](./synchronization.md) | Device-to-device data sync via encrypted ZIP export/import                  | synchronization.md |
+| [Reports](./reports.md)                 | Daily combined inventory and sales reports                                  | reports.md         |
+| [Statistics](./statistics.md)           | Dashboard with charts (sales trends, profit margins)                        | statistics.md      |
+| [Management](./management.md)           | Store settings, user management, app configuration                          | management.md      |
+| [Profile](./profile.md)                 | User profile editing, password change                                       | profile.md         |
+| [Admin](./admin.md)                     | Platform administration: owners, resellers, features, stores                | admin.md           |
 
 ## 5. Technical Architecture
 
@@ -100,22 +100,22 @@ frontend-react/
 
 ### 5.2 Technology Stack
 
-| Layer | Technology | Version |
-|-------|-----------|---------|
-| Runtime | Node.js | >= 22 |
-| Package manager | pnpm | 10.33+ |
-| Monorepo | Turborepo | 2.8+ |
-| Language | TypeScript (strict) | 5.8.3 |
-| UI | React | 19.x |
-| Routing / SSR | React Router v7 (framework mode) | 7.15+ |
-| Bundler | Vite | 6.x |
-| CSS | Tailwind CSS v4 | 4.x |
-| Linting | ESLint v9 + Prettier | 9.x / 3.6+ |
-| i18n | react-intl or react-i18next | TBD |
-| Charts | Lazy-loaded chart library | TBD |
-| ZIP encryption | @zip.js/zip.js | Latest |
-| Barcode scanning | @zxing/browser | Latest |
-| PDF generation | jspdf + jspdf-autotable | Latest |
+| Layer            | Technology                       | Version    |
+| ---------------- | -------------------------------- | ---------- |
+| Runtime          | Node.js                          | >= 22      |
+| Package manager  | pnpm                             | 10.33+     |
+| Monorepo         | Turborepo                        | 2.8+       |
+| Language         | TypeScript (strict)              | 5.8.3      |
+| UI               | React                            | 19.x       |
+| Routing / SSR    | React Router v7 (framework mode) | 7.15+      |
+| Bundler          | Vite                             | 6.x        |
+| CSS              | Tailwind CSS v4                  | 4.x        |
+| Linting          | ESLint v9 + Prettier             | 9.x / 3.6+ |
+| i18n             | react-intl or react-i18next      | TBD        |
+| Charts           | Lazy-loaded chart library        | TBD        |
+| ZIP encryption   | @zip.js/zip.js                   | Latest     |
+| Barcode scanning | @zxing/browser                   | Latest     |
+| PDF generation   | jspdf + jspdf-autotable          | Latest     |
 
 ### 5.3 Offline-First Architecture
 
@@ -166,18 +166,18 @@ Each entity has a repository that reads/writes to localStorage:
 
 #### localStorage Keys
 
-| Data | Key |
-|------|-----|
-| Products | `lizoft.store-products-{storeId}` |
-| Categories | `lizoft.store-product-categories-{storeId}` |
-| Inventory Entries | `lizoft.store-inventory-entries-{storeId}` |
-| Orders | `lizoft.store-orders-{storeId}` |
-| Expenses | `lizoft.store-expenses-{storeId}` |
-| Sale Credits | `lizoft.store-saleCredits-{storeId}` |
-| Auth token | `token` |
-| Current user | `currentUser` |
-| Auth model | `{appVersion}-authf496fc5a9f17` |
-| Language | `language` |
+| Data              | Key                                         |
+| ----------------- | ------------------------------------------- |
+| Products          | `lizoft.store-products-{storeId}`           |
+| Categories        | `lizoft.store-product-categories-{storeId}` |
+| Inventory Entries | `lizoft.store-inventory-entries-{storeId}`  |
+| Orders            | `lizoft.store-orders-{storeId}`             |
+| Expenses          | `lizoft.store-expenses-{storeId}`           |
+| Sale Credits      | `lizoft.store-saleCredits-{storeId}`        |
+| Auth token        | `token`                                     |
+| Current user      | `currentUser`                               |
+| Auth model        | `{appVersion}-authf496fc5a9f17`             |
+| Language          | `language`                                  |
 
 ### 5.4 PWA Requirements
 
@@ -292,6 +292,7 @@ After successful authentication, the app must:
 All domain models are defined in the `@store-mgmt/domain` package. See [Angular Analysis Reference](../plans/angular-analysis.md) for complete model definitions.
 
 Key entities:
+
 - **Product** (id, name, barcode, categoryId, price, order, availableToSale)
 - **ProductCategory** (id, name, order, isActive)
 - **Order** (id, orderItems[], total, date, type, paymentType, isCredit)
@@ -314,6 +315,7 @@ Key entities:
 ## 9. Migration Strategy
 
 ### Phase 1: Core Infrastructure
+
 - Auth module (login, token management, guards)
 - App shell (layout, sidebar, navigation, breadcrumbs)
 - Offline service layer (repositories, localStorage)
@@ -322,26 +324,31 @@ Key entities:
 - Domain models package
 
 ### Phase 2: Primary Business Features
+
 - Products (catalog management)
 - Sales (POS screen, cart, order creation)
 - Inventory (stock management, entries)
 
 ### Phase 3: Secondary Business Features
+
 - Expenses
 - Orders history and sale credits
 - Reports and statistics
 
 ### Phase 4: Sync and Management
+
 - Export/Import synchronization
 - Store and user management
 - Configuration
 - Profile
 
 ### Phase 5: Platform Administration
+
 - Admin dashboard
 - Owners, resellers, features management
 
 ### Phase 6: Polish
+
 - Landing page and legal pages
 - Tutorial/help
 - Performance optimization
@@ -349,19 +356,19 @@ Key entities:
 
 ## 10. Non-Functional Requirements
 
-| Requirement | Target |
-|------------|--------|
-| Offline capability | Full functionality after authentication |
-| Token expiry | 35 days client-side enforcement |
-| Login page load | < 3 seconds on 3G |
-| PWA installable | Yes (standalone mode) |
-| Browser support | Modern browsers (ES2022) |
-| Responsive | Mobile-first, works on phones and tablets |
-| Data persistence | localStorage per store |
-| Sync format | Backward-compatible encrypted ZIP with Angular version |
-| All assets local | No external CDN, fonts, or icon references |
-| i18n | Infrastructure ready, Spanish only at launch |
-| Social login | Not included (email/password only) |
+| Requirement        | Target                                                 |
+| ------------------ | ------------------------------------------------------ |
+| Offline capability | Full functionality after authentication                |
+| Token expiry       | 35 days client-side enforcement                        |
+| Login page load    | < 3 seconds on 3G                                      |
+| PWA installable    | Yes (standalone mode)                                  |
+| Browser support    | Modern browsers (ES2022)                               |
+| Responsive         | Mobile-first, works on phones and tablets              |
+| Data persistence   | localStorage per store                                 |
+| Sync format        | Backward-compatible encrypted ZIP with Angular version |
+| All assets local   | No external CDN, fonts, or icon references             |
+| i18n               | Infrastructure ready, Spanish only at launch           |
+| Social login       | Not included (email/password only)                     |
 
 ## 11. Out of Scope
 

@@ -72,7 +72,12 @@ export function TodaySaleCreditsPage() {
         </InfoBox>
       )}
 
-      <SaleCreditList saleCredits={saleCredits} readOnly={false} onSave={handleSave} onPay={handlePay} />
+      <SaleCreditList
+        saleCredits={saleCredits}
+        readOnly={false}
+        onSave={handleSave}
+        onPay={handlePay}
+      />
     </Card>
   );
 }

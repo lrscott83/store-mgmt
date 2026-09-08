@@ -112,7 +112,11 @@ export function AdminStoreListPage() {
         </Button>
       </div>
 
-      {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
+      {error && (
+        <p role="alert" className="text-sm text-red-600">
+          {error}
+        </p>
+      )}
 
       <div className="flex items-center gap-2">
         <label htmlFor="store-visibility-filter" className="text-sm font-medium text-text">
@@ -124,12 +128,8 @@ export function AdminStoreListPage() {
           onChange={(e) => setFilter(e.target.value as 'paid-plan' | 'free-plan')}
           className="rounded border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
         >
-          <option value="paid-plan">
-            {formatMessage({ id: 'STORES.PAID_PLAN' })}
-          </option>
-          <option value="free-plan">
-            {formatMessage({ id: 'STORES.FREE_PLAN' })}
-          </option>
+          <option value="paid-plan">{formatMessage({ id: 'STORES.PAID_PLAN' })}</option>
+          <option value="free-plan">{formatMessage({ id: 'STORES.FREE_PLAN' })}</option>
         </select>
       </div>
 

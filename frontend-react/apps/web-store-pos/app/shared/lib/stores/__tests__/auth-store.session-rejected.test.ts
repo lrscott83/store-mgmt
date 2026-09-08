@@ -50,11 +50,11 @@ function seedSessionWithoutUsableCache() {
   const expiresIn = Date.now() + THIRTY_FIVE_DAYS_MS;
   localStorage.setItem(
     StorageKeys.AUTH_MODEL,
-    JSON.stringify({ authToken: 'token123', expiresIn })
+    JSON.stringify({ authToken: 'token123', expiresIn }),
   );
   localStorage.setItem(
     StorageKeys.CURRENT_USER,
-    JSON.stringify(makeUser({ authToken: 'a-different-token' }))
+    JSON.stringify(makeUser({ authToken: 'a-different-token' })),
   );
 }
 

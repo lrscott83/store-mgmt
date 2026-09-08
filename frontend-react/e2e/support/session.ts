@@ -100,7 +100,7 @@ export async function readSelectedStoreId(page: Page): Promise<string> {
   if (!raw) {
     throw new Error(
       'Expected localStorage.currentUser to be populated after a real login, found none. ' +
-        'The login this snapshot depends on may have failed silently.'
+        'The login this snapshot depends on may have failed silently.',
     );
   }
   const parsed = JSON.parse(raw) as { selectedStoreId?: string };
@@ -115,7 +115,7 @@ async function captureSnapshot(
   page: Page,
   identity: TestIdentity,
   selectedStoreId: string,
-  homePath: string
+  homePath: string,
 ): Promise<CapturedSnapshot> {
   const state = await context.storageState();
   const origin = new URL(page.url()).origin;
@@ -123,7 +123,7 @@ async function captureSnapshot(
   if (!originState) {
     throw new Error(
       `No localStorage captured for origin ${origin} while minting a persona — the real login ` +
-        'this snapshot depends on may have failed silently.'
+        'this snapshot depends on may have failed silently.',
     );
   }
   // `lizoft.device-dek` (device-dek-table.ts:16) is deliberately NOT captured.
@@ -160,7 +160,7 @@ async function captureSnapshot(
   const localStorage = originState.localStorage.filter(
     (entry) =>
       entry.name !== 'lizoft.device-dek' &&
-      !(entry.name.startsWith('lizoft.store-') && entry.value.startsWith('enc:v1:'))
+      !(entry.name.startsWith('lizoft.store-') && entry.value.startsWith('enc:v1:')),
   );
   return { localStorage, identity, selectedStoreId, homePath };
 }
@@ -202,7 +202,7 @@ export async function createStoreUserViaUi(ownerPage: Page, identity: TestIdenti
       '[persona:store-user] El OwnerAdmin auto-registrado NO tiene la feature Users: ' +
         'adminFeatureLoader deslogueó y rebotó a /login (loaders.ts:107-112 + H-8). Esto es el ' +
         'riesgo R3 de la propuesta materializándose. PARAR y preguntarle al usuario si crear el ' +
-        'StoreUser por API directa o diferir D3. No lo resuelvas por tu cuenta.'
+        'StoreUser por API directa o diferir D3. No lo resuelvas por tu cuenta.',
     );
   }
 
@@ -232,7 +232,7 @@ export async function createStoreUserViaUi(ownerPage: Page, identity: TestIdenti
  */
 async function mintOwnerAdmin(
   browser: Browser,
-  primed: CapturedSnapshot | null
+  primed: CapturedSnapshot | null,
 ): Promise<CapturedSnapshot> {
   if (primed) {
     return primed;
@@ -257,7 +257,13 @@ async function mintOwnerAdmin(
   await page.waitForURL(/\/sales\/products$/);
 
   const ownerStoreId = await readSelectedStoreId(page);
-  const snapshot = await captureSnapshot(context, page, ownerIdentity, ownerStoreId, '/sales/products');
+  const snapshot = await captureSnapshot(
+    context,
+    page,
+    ownerIdentity,
+    ownerStoreId,
+    '/sales/products',
+  );
   await context.close();
   return snapshot;
 }
@@ -272,7 +278,7 @@ async function mintOwnerAdmin(
 async function mintStoreUser(
   browser: Browser,
   primed: CapturedSnapshot | null,
-  getOwnerAdmin: () => Promise<CapturedSnapshot>
+  getOwnerAdmin: () => Promise<CapturedSnapshot>,
 ): Promise<CapturedSnapshot> {
   const ownerSnapshot = await getOwnerAdmin();
 
@@ -285,7 +291,7 @@ async function mintStoreUser(
       throw new Error(
         `[persona:store-user-with-products] storeId mismatch: owner=${ownerSnapshot.selectedStoreId}, ` +
           `store-user=${storeUserStoreId}. design.md R5 assumed these always match because the ` +
-          "StoreUser is created inside the owner's own store (user-create.tsx:20,43)."
+          "StoreUser is created inside the owner's own store (user-create.tsx:20,43).",
       );
     }
   };
@@ -322,7 +328,7 @@ async function mintStoreUser(
     storeUserPage,
     storeUserIdentity,
     storeUserStoreId,
-    '/sales/products'
+    '/sales/products',
   );
   await storeUserContext.close();
   return snapshot;
@@ -340,7 +346,7 @@ async function mintStoreUser(
  */
 async function mintOwnerAdminWithProducts(
   browser: Browser,
-  getOwnerAdmin: () => Promise<CapturedSnapshot>
+  getOwnerAdmin: () => Promise<CapturedSnapshot>,
 ): Promise<CapturedSnapshot> {
   const ownerSnapshot = await getOwnerAdmin();
 
@@ -358,7 +364,7 @@ async function mintOwnerAdminWithProducts(
     page,
     ownerSnapshot.identity,
     ownerSnapshot.selectedStoreId,
-    homePath
+    homePath,
   );
   await context.close();
   return snapshot;
@@ -375,7 +381,7 @@ async function mintOwnerAdminWithProducts(
  */
 async function mintStoreUserWithProducts(
   getStoreUser: () => Promise<CapturedSnapshot>,
-  getOwnerAdminWithProducts: () => Promise<CapturedSnapshot>
+  getOwnerAdminWithProducts: () => Promise<CapturedSnapshot>,
 ): Promise<CapturedSnapshot> {
   const [storeUserSnapshot, ownerWithProductsSnapshot] = await Promise.all([
     getStoreUser(),
@@ -384,7 +390,8 @@ async function mintStoreUserWithProducts(
 
   const entityEntries = ownerWithProductsSnapshot.localStorage.filter(
     (entry) =>
-      entry.name.startsWith('lizoft.store-') && entry.name.endsWith(`-${storeUserSnapshot.selectedStoreId}`)
+      entry.name.startsWith('lizoft.store-') &&
+      entry.name.endsWith(`-${storeUserSnapshot.selectedStoreId}`),
   );
   return {
     ...storeUserSnapshot,
@@ -429,14 +436,17 @@ export function createPersonaCache(browser: Browser): PersonaCache {
   }
 
   function getStoreUserWithProducts(): Promise<CapturedSnapshot> {
-    storeUserWithProductsPromise ??= mintStoreUserWithProducts(getStoreUser, getOwnerAdminWithProducts);
+    storeUserWithProductsPromise ??= mintStoreUserWithProducts(
+      getStoreUser,
+      getOwnerAdminWithProducts,
+    );
     return storeUserWithProductsPromise;
   }
 
   async function prime(
     slot: 'owner-admin' | 'store-user',
     page: Page,
-    identity: TestIdentity
+    identity: TestIdentity,
   ): Promise<void> {
     const alreadyResolving = slot === 'owner-admin' ? ownerAdminPromise : storeUserPromise;
     if (alreadyResolving) {
@@ -446,7 +456,13 @@ export function createPersonaCache(browser: Browser): PersonaCache {
       // (owner-admin-with-products, store-user-with-products) build from it.
       const selectedStoreId = await readSelectedStoreId(page);
       const homePath = new URL(page.url()).pathname;
-      const snapshot = await captureSnapshot(page.context(), page, identity, selectedStoreId, homePath);
+      const snapshot = await captureSnapshot(
+        page.context(),
+        page,
+        identity,
+        selectedStoreId,
+        homePath,
+      );
       if (slot === 'owner-admin') {
         primedOwnerAdmin = snapshot;
       } else {
@@ -456,7 +472,13 @@ export function createPersonaCache(browser: Browser): PersonaCache {
     }
     const selectedStoreId = await readSelectedStoreId(page);
     const homePath = new URL(page.url()).pathname;
-    const snapshot = await captureSnapshot(page.context(), page, identity, selectedStoreId, homePath);
+    const snapshot = await captureSnapshot(
+      page.context(),
+      page,
+      identity,
+      selectedStoreId,
+      homePath,
+    );
     if (slot === 'owner-admin') {
       primedOwnerAdmin = snapshot;
     } else {
@@ -511,7 +533,7 @@ export function createPersonaCache(browser: Browser): PersonaCache {
 export async function restoreSignedInSession(
   page: Page,
   cache: PersonaCache,
-  persona: PersonaKind
+  persona: PersonaKind,
 ): Promise<SignedInSession> {
   const snapshot = await cache.resolve(persona);
   await applySnapshot(page, snapshot);

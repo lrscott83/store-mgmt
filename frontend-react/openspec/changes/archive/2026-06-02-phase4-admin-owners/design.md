@@ -22,19 +22,22 @@ so a NEW `resellerFeatureLoader([EFeatures.Owners])` composer is added to `loade
 ## CRITICAL RESOLUTION — Stores/Users tabs (the lead risk)
 
 The proposal flagged HIGH risk: React `StoreList`/`UserList` are pure presentational (take resolved data
-+ full callback sets), while the Angular `<app-store-list>`/`<app-user-list>` were self-loading 0-param
-components. I read the real Angular tab components AND the React route pages to resolve this concretely.
+
+- full callback sets), while the Angular `<app-store-list>`/`<app-user-list>` were self-loading 0-param
+  components. I read the real Angular tab components AND the React route pages to resolve this concretely.
 
 ### What the Angular tabs ACTUALLY did (ground truth)
 
 **Shell** — `frontend/src/app/presentation/owners/edit-owner/edit-owner.component.ts:17-32` +
 `.../edit-owner.component.html:12-26`:
+
 - `EditOwnerComponent` takes the owner `:id` for nothing tab-related. It reads only `isSuperAdmin`.
 - It renders `<app-store-list>` and `<app-user-list>` **with ZERO inputs** — the tabs are completely
   DECOUPLED from the owner being edited. The owner id is never forwarded to either tab.
 - `openCreateOwnerModal()` in the shell is an EMPTY no-op (`.ts:29-31`).
 
 **Stores tab** — `frontend/src/app/presentation/stores/store-list/store-list.component.ts:20-58`:
+
 - Self-loads via `storeService.getStoresByCurrentUser()` → `GET /v1/stores/by-current-user`
   (`frontend/src/app/_services/store/store.service.ts:22-26`). This is scoped to the CURRENT logged-in
   user (the SuperAdmin viewing the page), NOT to the owner. So the tab shows the SuperAdmin's OWN stores.
@@ -43,16 +46,17 @@ components. I read the real Angular tab components AND the React route pages to 
 
 **Users tab** — `frontend/src/app/presentation/users/user-list/user-list.component.ts:9-11` +
 `.../user-list.component.html:1`:
+
 - The component class is EMPTY. The template is literally `<p>user-list works!</p>`. It loads NOTHING,
   takes NO owner param, has ZERO behavior. It is a placeholder stub that shipped to production.
 
 ### React parity wiring (resolved, cited)
 
-| Tab | Angular source | React data source | React callbacks |
-|-----|----------------|-------------------|-----------------|
-| **Details** | `EditOwnerDetailsComponent.getOwnerById` (`edit-owner-details.component.ts:67-84`) → `GET /v1/owners/:id` | `ownerHttpService.getOwner(id)` on mount (useEffect) | Submit → `ownerHttpService.updateOwner(id, payload)`; SuperAdmin also `resellerHttpService.listResellers()` for the reSellerId select |
-| **Stores** (SuperAdmin only) | `StoreListComponent` self-loads `getStoresByCurrentUser` → `/v1/stores/by-current-user` | REUSE `storeHttpService.listStores()` — already maps to the EXACT same endpoint `/v1/stores/by-current-user` (`store-http-service.ts:25-30`). Load lazily when the Stores tab mounts. | Reuse the EXACT callbacks the production `StoreListPage` route passes (`management/stores/routes/store-list.tsx:74-79`): `onCreate`→`navigate('/management/stores/create')`, `onEdit`→`navigate('/management/stores/edit/:id')`, `onActivate/onApprove/onDisapprove/onDeactivate`→`handleLifecycleAction(storeHttpService.*)` with reload. This is FULLER than Angular (Angular had no create/edit, only act/deact/appr/disappr) but is the canonical React `StoreList` contract; to stay parity-faithful we pass the SAME callback set the existing route uses, since `StoreList` requires `onCreate/onApprove/onDisapprove` (non-optional). |
-| **Users** (SuperAdmin only) | `UserListComponent` is `<p>user-list works!</p>` — empty stub, no data, no behavior | NO data fetch. Render a placeholder matching the Angular stub: a single line of text. Do NOT mount the React `UserList` presentational component (it requires resolved `users` + 5 mandatory callbacks that Angular never wired). | None — placeholder only |
+| Tab                          | Angular source                                                                                            | React data source                                                                                                                                                                                                                 | React callbacks                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Details**                  | `EditOwnerDetailsComponent.getOwnerById` (`edit-owner-details.component.ts:67-84`) → `GET /v1/owners/:id` | `ownerHttpService.getOwner(id)` on mount (useEffect)                                                                                                                                                                              | Submit → `ownerHttpService.updateOwner(id, payload)`; SuperAdmin also `resellerHttpService.listResellers()` for the reSellerId select                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| **Stores** (SuperAdmin only) | `StoreListComponent` self-loads `getStoresByCurrentUser` → `/v1/stores/by-current-user`                   | REUSE `storeHttpService.listStores()` — already maps to the EXACT same endpoint `/v1/stores/by-current-user` (`store-http-service.ts:25-30`). Load lazily when the Stores tab mounts.                                             | Reuse the EXACT callbacks the production `StoreListPage` route passes (`management/stores/routes/store-list.tsx:74-79`): `onCreate`→`navigate('/management/stores/create')`, `onEdit`→`navigate('/management/stores/edit/:id')`, `onActivate/onApprove/onDisapprove/onDeactivate`→`handleLifecycleAction(storeHttpService.*)` with reload. This is FULLER than Angular (Angular had no create/edit, only act/deact/appr/disappr) but is the canonical React `StoreList` contract; to stay parity-faithful we pass the SAME callback set the existing route uses, since `StoreList` requires `onCreate/onApprove/onDisapprove` (non-optional). |
+| **Users** (SuperAdmin only)  | `UserListComponent` is `<p>user-list works!</p>` — empty stub, no data, no behavior                       | NO data fetch. Render a placeholder matching the Angular stub: a single line of text. Do NOT mount the React `UserList` presentational component (it requires resolved `users` + 5 mandatory callbacks that Angular never wired). | None — placeholder only                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 
 #### Decision: Stores tab — reuse the route component, not re-wire StoreList by hand
 
@@ -83,6 +87,7 @@ onDeactivate, none of which existed). This is the parity-faithful low-risk choic
 #### Line-estimate impact of tabs
 
 The tab-shell adds modest lines vs. a flat edit because the heavy lifting is reuse, not re-wiring:
+
 - Tab state + tab buttons + 3 panels: ~40 lines
 - Stores panel = `<StoreListPage />` import + mount: ~3 lines
 - Users panel = placeholder `<p>{intl...}</p>`: ~3 lines
@@ -97,6 +102,7 @@ The tab-shell adds modest lines vs. a flat edit because the heavy lifting is reu
   EXACTLY on the existing `adminFeatureLoader` (`loaders.ts:51-57`): run the role loader first, return its
   redirect if any, else delegate to `featureLoader(featureIds)`. Role loader = existing `resellerLoader`
   (`loaders.ts:70-79`, allows `isSuperAdmin || isReSeller`). Signature:
+
   ```ts
   export function resellerFeatureLoader(featureIds: number[]) {
     return async ({ params }: LoaderFunctionArgs): Promise<Response | null> => {
@@ -106,6 +112,7 @@ The tab-shell adds modest lines vs. a flat edit because the heavy lifting is reu
     };
   }
   ```
+
   All 3 owner routes use `export const loader = resellerFeatureLoader([EFeatures.Owners])`. Rejected:
   inline composition per route (duplication) and reusing bare `resellerLoader` (skips the feature check,
   breaks parity).
@@ -121,8 +128,8 @@ The tab-shell adds modest lines vs. a flat edit because the heavy lifting is reu
   | `updateOwner(id, payload)` | PUT | `/v1/owners/:id` | `BaseResponseModel<boolean>` |
   | `deleteOwner(id)` | DELETE | `/v1/owners/:id` | `BaseResponseModel<boolean>` |
   Each returns `response.data`. `CreateOwnerPayload = {fullName, login, password, cellPhone, email,
-  description, reSellerId}`; `UpdateOwnerPayload = {fullName, cellPhone, email, guest, isActive,
-  description, reSellerId}` (matches Angular `editOwner` arg order, `edit-owner-details.component.ts:100`).
+description, reSellerId}`; `UpdateOwnerPayload = {fullName, cellPhone, email, guest, isActive,
+description, reSellerId}` (matches Angular `editOwner` arg order, `edit-owner-details.component.ts:100`).
   NOTE: do NOT reuse `storeHttpService.listOwners()` (`store-http-service.ts:93-98`) — it exists but
   belongs to the stores slice; owners owns its own service for cohesion. `getOwnerDetailsById` (dead) and
   approve/activate/deactivate (no-ops) OMITTED. Rejected: typing create as `<boolean>` — Angular returns
@@ -144,7 +151,7 @@ The tab-shell adds modest lines vs. a flat edit because the heavy lifting is reu
   the `UnsavedChangesDialog` component is unused — do NOT wire it). Create dirty = any tracked field
   non-empty (mirror `reseller-create.tsx:32`). Edit dirty = any tracked field differs from a loaded
   snapshot; re-snapshot after a successful PUT since edit STAYS on page (mirror `reseller-edit.tsx:24-34,
-  60-71, 127`). Snapshot tracks the Details-tab fields only (tabs don't affect dirty).
+60-71, 127`). Snapshot tracks the Details-tab fields only (tabs don't affect dirty).
 
 - **ADR-6 — Error handling inline.** `!res.succeeded` → `res.errors[0]?.description ?? OWNER.ERROR`
   (Angular parity, `edit-owner-details.component.ts:119`; `errors` is non-nullable `BaseError[]`, use `?.`
@@ -202,6 +209,7 @@ app/admin/owners/
 ```
 
 Modified (shared):
+
 - `app/auth/routes/loaders.ts` — add `resellerFeatureLoader` (~10 lines) [ADR-1]
 - `app/routes.ts` — +3 routes after `admin/resellers/edit/:id` (line 72):
   ```ts
@@ -230,7 +238,7 @@ No domain change (`Owner`, `OwnerStoreModule`, `isActive` via `AuditableBaseMode
 - **owner-edit.tsx** — `useParams<{id}>`; useEffect calls `getOwner(id)` → populate Details fields +
   capture `guest`/`approved` into state + build snapshot; if SuperAdmin also `listResellers()`. Tab-shell
   per ADR-9. Details submit: phone validate → `updateOwner(id, {fullName, cellPhone, email, guest,
-  isActive, description, reSellerId})` → re-snapshot, STAY on page; `useUnsavedChangesPrompt(isDirty)`.
+isActive, description, reSellerId})` → re-snapshot, STAY on page; `useUnsavedChangesPrompt(isDirty)`.
   Stores panel mounts `<StoreListPage />`; Users panel = placeholder.
 
 ---
@@ -278,7 +286,7 @@ the SuperAdmin reSellerId branch, also mock `~/shared/lib/stores/auth-store` ret
   tab chrome, no isActive/reSellerId; clicking Stores tab mounts StoreListPage (mock
   `~/management/stores/routes/store-list` default → assert rendered; do NOT exercise its internals here);
   clicking Users tab shows `OWNER.USERS_TAB_PLACEHOLDER`; bad phone blocks PUT; valid → `updateOwner(id,
-  {fullName,cellPhone,email,guest,isActive,description,reSellerId})` STAYS on page (no navigate); guest
+{fullName,cellPhone,email,guest,isActive,description,reSellerId})` STAYS on page (no navigate); guest
   carried from loaded value into payload; `!succeeded` → `errors[0].description`; throw → `OWNER.ERROR`;
   guard active on snapshot diff.
 
@@ -286,15 +294,15 @@ the SuperAdmin reSellerId branch, also mock `~/shared/lib/stores/auth-store` ret
 
 ## Risk resolutions
 
-| Proposal risk | Resolution |
-|---------------|------------|
-| LEAD (High) Stores/Users tab reuse | RESOLVED. Stores tab = mount existing `StoreListPage` (same `/v1/stores/by-current-user` endpoint as Angular, all callbacks wired, ~3 lines). Users tab = placeholder stub matching Angular's `<p>user-list works!</p>` (NOT the real UserList). Tab cost ~45-50 lines, not ~150. |
-| reSellerId coupling (Med) | Accepted — same coupling as Angular; `resellerHttpService.listResellers()` exists; loaded only when SuperAdmin. |
-| storeModules price/count (Low) | Inline reduce + `intl.formatNumber` USD; empty-array → 0/0 covered in list test. |
-| Create route unreachable from UI (Low) | Intentional — route registered, no list button (Angular commented out). Documented. |
-| Post-create redirect to `/management/stores/create` (Low) | Preserved verbatim (Angular parity); differs from all other slices by design. |
-| Slice ~1190 lines (High) | Chained PRs at tasks under ask-on-risk. Suggested: PR-1 service+list+resellerFeatureLoader+i18n+routes+tests (~380); PR-2 create+tests (~360); PR-3 tab-shell edit+tests (~430). |
-| Guard composition new loader (Low) | `resellerFeatureLoader` mirrors `adminFeatureLoader` exactly; covered by a loader test (compose role then feature). |
+| Proposal risk                                             | Resolution                                                                                                                                                                                                                                                                        |
+| --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| LEAD (High) Stores/Users tab reuse                        | RESOLVED. Stores tab = mount existing `StoreListPage` (same `/v1/stores/by-current-user` endpoint as Angular, all callbacks wired, ~3 lines). Users tab = placeholder stub matching Angular's `<p>user-list works!</p>` (NOT the real UserList). Tab cost ~45-50 lines, not ~150. |
+| reSellerId coupling (Med)                                 | Accepted — same coupling as Angular; `resellerHttpService.listResellers()` exists; loaded only when SuperAdmin.                                                                                                                                                                   |
+| storeModules price/count (Low)                            | Inline reduce + `intl.formatNumber` USD; empty-array → 0/0 covered in list test.                                                                                                                                                                                                  |
+| Create route unreachable from UI (Low)                    | Intentional — route registered, no list button (Angular commented out). Documented.                                                                                                                                                                                               |
+| Post-create redirect to `/management/stores/create` (Low) | Preserved verbatim (Angular parity); differs from all other slices by design.                                                                                                                                                                                                     |
+| Slice ~1190 lines (High)                                  | Chained PRs at tasks under ask-on-risk. Suggested: PR-1 service+list+resellerFeatureLoader+i18n+routes+tests (~380); PR-2 create+tests (~360); PR-3 tab-shell edit+tests (~430).                                                                                                  |
+| Guard composition new loader (Low)                        | `resellerFeatureLoader` mirrors `adminFeatureLoader` exactly; covered by a loader test (compose role then feature).                                                                                                                                                               |
 
 ---
 

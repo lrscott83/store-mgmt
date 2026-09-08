@@ -40,10 +40,7 @@ describe('ExchangeRateOfflineService', () => {
   // ─── backfillDailyRecords ───
   describe('backfillDailyRecords', () => {
     it('creates one record per day from the anchor through today, defaulting to 1', () => {
-      const added = service.backfillDailyRecords(
-        localDate(2026, 8, 1),
-        localDate(2026, 8, 4),
-      );
+      const added = service.backfillDailyRecords(localDate(2026, 8, 1), localDate(2026, 8, 4));
       expect(added).toBe(4);
 
       const rates = service.getStorageExchangeRates();
@@ -63,10 +60,7 @@ describe('ExchangeRateOfflineService', () => {
       const edited = service.updateValue('2026-08-01', 120);
       expect(edited.succeeded).toBe(true);
 
-      const added = service.backfillDailyRecords(
-        localDate(2026, 8, 1),
-        localDate(2026, 8, 3),
-      );
+      const added = service.backfillDailyRecords(localDate(2026, 8, 1), localDate(2026, 8, 3));
       expect(added).toBe(2);
 
       const rates = service.getStorageExchangeRates();
@@ -85,10 +79,7 @@ describe('ExchangeRateOfflineService', () => {
       service.backfillDailyRecords(localDate(2026, 8, 1), localDate(2026, 8, 3));
       service.updateValue('2026-08-02', 150);
 
-      const added = service.backfillDailyRecords(
-        localDate(2026, 8, 1),
-        localDate(2026, 8, 5),
-      );
+      const added = service.backfillDailyRecords(localDate(2026, 8, 1), localDate(2026, 8, 5));
       expect(added).toBe(2);
 
       const rates = service.getStorageExchangeRates();
@@ -117,10 +108,7 @@ describe('ExchangeRateOfflineService', () => {
         value: 200,
       });
 
-      const added = service.backfillDailyRecords(
-        localDate(2026, 8, 1),
-        localDate(2026, 8, 2),
-      );
+      const added = service.backfillDailyRecords(localDate(2026, 8, 1), localDate(2026, 8, 2));
       expect(added).toBe(3);
 
       const rates = service.getStorageExchangeRates();
@@ -133,10 +121,7 @@ describe('ExchangeRateOfflineService', () => {
     });
 
     it('does nothing when the anchor is in the future', () => {
-      const added = service.backfillDailyRecords(
-        localDate(2026, 9, 1),
-        localDate(2026, 8, 1),
-      );
+      const added = service.backfillDailyRecords(localDate(2026, 9, 1), localDate(2026, 8, 1));
       expect(added).toBe(0);
       expect(service.getStorageExchangeRates()).toEqual([]);
     });

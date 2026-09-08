@@ -8,12 +8,12 @@
 
 ## Build & Test Evidence
 
-| Check | Result |
-|-------|--------|
-| `pnpm test` (vitest run) | 596/596 tests, 58 files, 0 failures |
-| `pnpm typecheck` (react-router typegen + tsc) | Clean, no errors |
-| New tests introduced | 16 (4 service + 3 loader + 9 route) |
-| Baseline regression | 0 regressions (580 → 596) |
+| Check                                         | Result                              |
+| --------------------------------------------- | ----------------------------------- |
+| `pnpm test` (vitest run)                      | 596/596 tests, 58 files, 0 failures |
+| `pnpm typecheck` (react-router typegen + tsc) | Clean, no errors                    |
+| New tests introduced                          | 16 (4 service + 3 loader + 9 route) |
+| Baseline regression                           | 0 regressions (580 → 596)           |
 
 ## Spec Requirement Coverage
 

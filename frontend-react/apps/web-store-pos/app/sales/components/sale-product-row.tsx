@@ -55,13 +55,17 @@ export function SaleProductRow({
         // ProductErrors.ProductNotAvailable.description when errors is empty.
         // The stock ceiling is appended when the caller supplied it (sale.tsx
         // passes availableQuantity for inventory-discounting products).
-        const message = result.errors[0]?.description ?? ProductErrors.ProductNotAvailable.description;
+        const message =
+          result.errors[0]?.description ?? ProductErrors.ProductNotAvailable.description;
         const detail =
           result.errors[0]?.code === ProductErrors.ProductQuantityNotAvailable.code &&
           availableQuantity !== undefined
             ? `\n${intl.formatMessage({ id: 'SALES.AVAILABLE_STOCK' }, { available: availableQuantity })}`
             : '';
-        showBlockingError(intl.formatMessage({ id: 'GENERAL.RESPONSE.ERROR_TITLE' }), message + detail);
+        showBlockingError(
+          intl.formatMessage({ id: 'GENERAL.RESPONSE.ERROR_TITLE' }),
+          message + detail,
+        );
         return;
       }
     }
@@ -114,8 +118,12 @@ export function SaleProductRow({
         className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-primary text-white shadow-card hover:bg-primary-hover transition-colors"
       >
         <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-            d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
+          />
         </svg>
       </button>
     </form>

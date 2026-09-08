@@ -8,7 +8,13 @@ import { SaleCreditOfflineService } from '~/sales/lib/services/sale-credit-offli
 
 // Category-C envelope helper: the Observable/filter siblings resolve BaseResponseModel<SaleCredit[]>.
 function creditsResponse(credits: SaleCredit[] = []) {
-  return Promise.resolve({ data: credits, succeeded: true, message: '', actionCode: 200, errors: [] });
+  return Promise.resolve({
+    data: credits,
+    succeeded: true,
+    message: '',
+    actionCode: 200,
+    errors: [],
+  });
 }
 
 // response-envelope-nullability WU-D — the resolved-failure shape both offline reads guard
@@ -204,7 +210,9 @@ describe('TodaySaleCreditsPage — behavioral (Angular parity)', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText(esMessages['SALE_CREDIT.NO_SALE_CREDIT_FOUND_IN_DAY'])).toBeInTheDocument();
+      expect(
+        screen.getByText(esMessages['SALE_CREDIT.NO_SALE_CREDIT_FOUND_IN_DAY']),
+      ).toBeInTheDocument();
     });
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });

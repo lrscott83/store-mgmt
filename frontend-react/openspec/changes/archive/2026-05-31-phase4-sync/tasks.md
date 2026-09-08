@@ -9,6 +9,7 @@
 ## Summary
 
 All 35 tasks marked complete. Implementation delivered across two chained PR slices:
+
 - **Slice 1** (feat/phase4-sync-services): services + tests + fflate dependency
 - **Slice 2** (feat/phase4-sync-ui): routes + forms + i18n + registration
 

@@ -135,11 +135,11 @@ apiClient.interceptors.response.use(
         // error dialog with translate.instant(...) + the same fallback text.
         showBlockingError(
           esMessages['GENERAL.RESPONSE.ERROR_TITLE'],
-          esMessages['GENERAL.RESPONSE.ERROR500_MESSAGE']
+          esMessages['GENERAL.RESPONSE.ERROR500_MESSAGE'],
         );
         return Promise.reject(error);
       }
     }
     return Promise.reject(error);
-  }
+  },
 );

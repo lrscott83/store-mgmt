@@ -2,14 +2,14 @@
 
 ## Review Workload Forecast
 
-| Field | Value |
-|-------|-------|
-| Estimated changed lines | 700–780 |
-| 400-line budget risk | High |
-| Chained PRs recommended | Yes |
-| Suggested split | PR-1 (service + list + i18n baseline + routes) → PR-2 (create + edit + remaining i18n + routes) |
-| Delivery strategy | ask-on-risk |
-| Chain strategy | to confirm |
+| Field                   | Value                                                                                           |
+| ----------------------- | ----------------------------------------------------------------------------------------------- |
+| Estimated changed lines | 700–780                                                                                         |
+| 400-line budget risk    | High                                                                                            |
+| Chained PRs recommended | Yes                                                                                             |
+| Suggested split         | PR-1 (service + list + i18n baseline + routes) → PR-2 (create + edit + remaining i18n + routes) |
+| Delivery strategy       | ask-on-risk                                                                                     |
+| Chain strategy          | to confirm                                                                                      |
 
 Decision needed before apply: Yes
 Chained PRs recommended: Yes
@@ -18,10 +18,10 @@ Chain strategy: to confirm
 
 ### Suggested Work Units
 
-| Unit | Goal | Likely PR | Notes |
-|------|------|-----------|-------|
-| 1 | HTTP service + ResellerListPage + i18n baseline + list route | PR-1 | Base = `feat/phase4-admin-dashboard`; self-contained, shippable |
-| 2 | ResellerCreatePage + ResellerEditPage + remaining i18n + create/edit routes | PR-2 | Base = PR-1 branch; depends on service from PR-1 |
+| Unit | Goal                                                                        | Likely PR | Notes                                                           |
+| ---- | --------------------------------------------------------------------------- | --------- | --------------------------------------------------------------- |
+| 1    | HTTP service + ResellerListPage + i18n baseline + list route                | PR-1      | Base = `feat/phase4-admin-dashboard`; self-contained, shippable |
+| 2    | ResellerCreatePage + ResellerEditPage + remaining i18n + create/edit routes | PR-2      | Base = PR-1 branch; depends on service from PR-1                |
 
 ---
 
@@ -95,6 +95,7 @@ Chain strategy: to confirm
 ## Files
 
 ### PR-1
+
 - CREATE `app/admin/resellers/lib/services/reseller-http-service.ts`
 - CREATE `app/admin/resellers/lib/services/__tests__/reseller-http-service.test.ts`
 - CREATE `app/admin/resellers/routes/reseller-list.tsx`
@@ -103,6 +104,7 @@ Chain strategy: to confirm
 - MODIFY `app/routes.ts` (list route)
 
 ### PR-2
+
 - CREATE `app/admin/resellers/routes/reseller-create.tsx`
 - CREATE `app/admin/resellers/routes/__tests__/reseller-create.test.tsx`
 - CREATE `app/admin/resellers/routes/reseller-edit.tsx`

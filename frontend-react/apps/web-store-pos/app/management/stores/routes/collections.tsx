@@ -102,18 +102,13 @@ export function CollectionsPage() {
                 <tr key={row.storeId} className="hover:bg-background">
                   <td className="px-4 py-3 font-medium text-text">{row.storeName}</td>
                   <td className="px-4 py-3 text-text">{row.ownerName}</td>
-                  <td className="px-4 py-3 text-right text-text">
-                    {formatCurrency(row.amount)}
-                  </td>
+                  <td className="px-4 py-3 text-right text-text">{formatCurrency(row.amount)}</td>
                   <td className="px-4 py-3 text-text">{formatDateOnly(row.nextDueDate)}</td>
                   <td className="px-4 py-3 text-text">
                     {intl.formatMessage({ id: `BILLING.STATUS.${row.status}` })}
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <Button
-                      variant="outline"
-                      onClick={() => handleRegisterPayment(row.storeId)}
-                    >
+                    <Button variant="outline" onClick={() => handleRegisterPayment(row.storeId)}>
                       {intl.formatMessage({ id: 'BILLING.COLLECTIONS.REGISTER_PAYMENT' })}
                     </Button>
                   </td>

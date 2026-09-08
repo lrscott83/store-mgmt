@@ -63,8 +63,7 @@ export function ImportForm({ onImport }: ImportFormProps) {
         // generic message — not an inline banner.
         showBlockingError(
           intl.formatMessage({ id: 'GENERAL.RESPONSE.ERROR_TITLE' }),
-          syncResult.errors[0]?.message ??
-            intl.formatMessage({ id: 'SYNC.IMPORT_ERROR' }),
+          syncResult.errors[0]?.message ?? intl.formatMessage({ id: 'SYNC.IMPORT_ERROR' }),
         );
       }
     } catch (err) {
@@ -77,10 +76,7 @@ export function ImportForm({ onImport }: ImportFormProps) {
         err instanceof WrongStoreError
           ? intl.formatMessage({ id: 'SYNC.ERROR_WRONG_STORE' })
           : intl.formatMessage({ id: 'SYNC.IMPORT_ERROR' });
-      showBlockingError(
-        intl.formatMessage({ id: 'GENERAL.RESPONSE.ERROR_TITLE' }),
-        message,
-      );
+      showBlockingError(intl.formatMessage({ id: 'GENERAL.RESPONSE.ERROR_TITLE' }), message);
     } finally {
       setBusy(false);
     }

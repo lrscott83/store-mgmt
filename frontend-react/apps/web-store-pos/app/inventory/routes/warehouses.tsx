@@ -13,7 +13,13 @@ import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { Card } from '~/shared/components/ui/card';
 import { InfoBox } from '~/shared/components/ui/info-box';
 import { Button } from '~/shared/components/ui/button';
-import { ChevronDownIcon, PlusIcon, InOutIcon, SwapHorizontalIcon, TruckIcon } from '~/shared/components/ui/icons';
+import {
+  ChevronDownIcon,
+  PlusIcon,
+  InOutIcon,
+  SwapHorizontalIcon,
+  TruckIcon,
+} from '~/shared/components/ui/icons';
 import { ActionMenu, ActionMenuItem } from '~/shared/components/ui/action-menu';
 import { showBlockingError } from '~/shared/lib/blocking-alert';
 import { showToastSuccess } from '~/shared/lib/toast';
@@ -64,7 +70,9 @@ export function WarehousesPage() {
   const [stockLevels, setStockLevels] = useState<WarehouseStockLevel[]>([]);
   const [movements, setMovements] = useState<WarehouseStockMovement[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
-  const [categories, setCategories] = useState<Map<string, { id: string; name: string }>>(new Map());
+  const [categories, setCategories] = useState<Map<string, { id: string; name: string }>>(
+    new Map(),
+  );
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   /** Modal state: creating XOR editing (null/undefined = closed). */
   const [modalOpen, setModalOpen] = useState(false);
@@ -100,10 +108,7 @@ export function WarehousesPage() {
     setWarehouses([...service.getStorageWarehouses()]);
     setStockLevels([...service.getStorageStockLevels()]);
     setMovements([...service.getStorageMovements()].reverse());
-    const productRepo = new ProductRepository(
-      storeId,
-      new ProductCategoryRepository(storeId),
-    );
+    const productRepo = new ProductRepository(storeId, new ProductCategoryRepository(storeId));
     setProducts([...productRepo.getStorageProductsMap().values()]);
     setCategories(new Map(productRepo.getCategoryRepository().getStorageCategoriesMap()));
   }
@@ -114,12 +119,13 @@ export function WarehousesPage() {
   }, [service]);
 
   const productName = (id: string) => products.find((p) => p.id === id)?.name ?? id;
-  const warehouseName = (id: string) =>
-    warehouses.find((w) => w.id === id)?.name ?? id;
+  const warehouseName = (id: string) => warehouses.find((w) => w.id === id)?.name ?? id;
 
   function handleModalSave(name: string) {
     if (!service) return;
-    const result = editing ? service.updateWarehouse(editing.id, name) : service.createWarehouse(name);
+    const result = editing
+      ? service.updateWarehouse(editing.id, name)
+      : service.createWarehouse(name);
     if (!result.succeeded) {
       showBlockingError(
         intl.formatMessage({ id: 'GENERAL.ERROR' }),
@@ -129,7 +135,9 @@ export function WarehousesPage() {
     }
     setModalOpen(false);
     setEditing(null);
-    showToastSuccess(intl.formatMessage({ id: editing ? 'WAREHOUSES.UPDATED' : 'WAREHOUSES.CREATED' }));
+    showToastSuccess(
+      intl.formatMessage({ id: editing ? 'WAREHOUSES.UPDATED' : 'WAREHOUSES.CREATED' }),
+    );
     load();
   }
 
@@ -156,7 +164,11 @@ export function WarehousesPage() {
     load();
   }
 
-  function openMovementModal(mode: WarehouseMovementMode, warehouse: Warehouse, productId: string | null) {
+  function openMovementModal(
+    mode: WarehouseMovementMode,
+    warehouse: Warehouse,
+    productId: string | null,
+  ) {
     setMovementModal({ mode, warehouseId: warehouse.id, productId });
   }
 
@@ -293,9 +305,7 @@ export function WarehousesPage() {
             open
             mode={movementModal.mode}
             warehouse={movementSource}
-            targetWarehouses={warehouses.filter(
-              (w) => w.id !== movementSource.id && w.isActive,
-            )}
+            targetWarehouses={warehouses.filter((w) => w.id !== movementSource.id && w.isActive)}
             products={
               movementModal.mode === 'purchase_in' || movementModal.productId
                 ? products
@@ -312,7 +322,10 @@ export function WarehousesPage() {
         {/* Resumen global bajo el título: (unidades) a la izquierda,
             costo total de todos los almacenes a la derecha. */}
         <div className="flex items-center justify-between">
-          <span data-testid="warehouses-total-units" className="text-sm font-semibold text-text-muted">
+          <span
+            data-testid="warehouses-total-units"
+            className="text-sm font-semibold text-text-muted"
+          >
             ({totalUnits})
           </span>
           <span
@@ -354,8 +367,7 @@ export function WarehousesPage() {
                     className="flex min-w-0 flex-1 items-center justify-between gap-2 text-left"
                   >
                     <span className="min-w-0 truncate text-sm font-semibold uppercase tracking-wide text-text-muted">
-                      <span className="text-text">{warehouse.name}</span>{' '}
-                      ({unitsOf(warehouse.id)})
+                      <span className="text-text">{warehouse.name}</span> ({unitsOf(warehouse.id)})
                       {!warehouse.isActive && (
                         <span className="ml-1 text-xs normal-case text-text-muted">
                           ({intl.formatMessage({ id: 'WAREHOUSES.INACTIVE' })})
@@ -560,16 +572,14 @@ export function WarehousesPage() {
                         {intl.formatMessage({ id: MOVEMENT_TYPE_LABEL[movement.type] })}
                       </td>
                       <td className="px-2 py-2 text-text">{productName(movement.productId)}</td>
-                      <td
-                        data-testid={`mv-qty-${movement.id}`}
-                        className="px-2 py-2 text-text"
-                      >
+                      <td data-testid={`mv-qty-${movement.id}`} className="px-2 py-2 text-text">
                         {movement.quantity}
                       </td>
                       <td className="px-2 py-2 text-text">
                         {warehouseName(movement.warehouseId)}
                         {movement.toWarehouseId && ` → ${warehouseName(movement.toWarehouseId)}`}
-                        {movement.fromWarehouseId && ` ← ${warehouseName(movement.fromWarehouseId)}`}
+                        {movement.fromWarehouseId &&
+                          ` ← ${warehouseName(movement.fromWarehouseId)}`}
                       </td>
                     </tr>
                   ))}

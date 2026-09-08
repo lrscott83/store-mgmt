@@ -52,7 +52,7 @@ Anything outside this list is out of scope for phase4-sync:
 9. **ExportForm — validation and delivery:** PASS
 10. **ImportForm — validation, results, errors:** PASS
 11. **No Angular fixture in tests:** PASS
-12. **i18n keys:** PASS (all 15 SYNC.* keys present)
+12. **i18n keys:** PASS (all 15 SYNC.\* keys present)
 13. **EFeatures.Download dormant:** PASS
 14. **TypeScript clean:** PASS
 15. **Build succeeds:** PASS

@@ -12,18 +12,21 @@ Precedent: archived `phase4-mgmt-stores` proposal/spec/design (mirror its archit
 ## Intent
 
 ### Problem
+
 The React migration (`frontend-react/`) declares a `MENU.USERS` entry, but `/management/users` is a ghost link:
 no route, no slice, no HTTP service, no UI exists. Store-user administration (the ability for super-admins and
 owner-admins to list store users, create them against a store, edit their details, manage active state, and reset
 passwords) is still only available in the legacy Angular app under `frontend/`.
 
 ### Why now
+
 Users is the second sub-domain of the Management slice (order locked in #204: stores → users → configurations).
 The Stores slice shipped first (archived, 515/515 tests, `adminFeatureLoader` live). A store user is created
 against a store, so Users depends conceptually on Stores existing. Delivering Users continues the Management
 migration and removes a dead menu entry.
 
 ### Success looks like
+
 - `/management/users`, `/management/users/create`, `/management/users/:id/edit` render in React and are reachable
   only by an authenticated user who is super-admin or owner-admin AND has `EFeatures.Users = 72`.
 - The list shows `StoreUser[]` (with `login`, `storeId`, `storeName`); create persists a store user via the same
@@ -37,6 +40,7 @@ migration and removes a dead menu entry.
 ## Scope
 
 ### In scope
+
 - Routes: `/management/users` (list), `/management/users/create` (create form),
   `/management/users/:id/edit` (edit: details + credentials).
 - New `app/management/users/` slice: route containers (side effects), presentational components
@@ -53,6 +57,7 @@ migration and removes a dead menu entry.
 - Register the 3 user routes in `app/routes.ts`.
 
 ### Out of scope (explicit)
+
 - **Configurations sub-slice** (`/management/configurations`) — separate change `phase4-mgmt-configurations`.
 - **Change-login** — OMITTED entirely (no backend endpoint exists; decision #215 OQ-U3). No "New login" field.
 - **Admin password bypass** — NOT supported (no endpoint; decision #215 OQ-U2). oldPassword is always required.
@@ -96,17 +101,18 @@ login/password. Two distinct presentational components (not a shared form like S
 All paths are relative to `${apiUrl}/${apiVersion}` (e.g. `/v1`). Responses use the `BaseResponseModel<T>`
 envelope: `{ data, succeeded, message, actionCode, errors }`.
 
-| Operation | Method + Path | Request body | Response | Notes |
-|-----------|---------------|--------------|----------|-------|
-| List store users | `GET /storeusers/list/true` | — | `BaseResponseModel<StoreUser[]>` | full fields incl. login/storeId/storeName (decision OQ-U1) |
-| Get by id (edit) | `GET /storeusers/:id` | — | `BaseResponseModel<StoreUser>` | consistency w/ list (decision OQ-U1) |
-| Create store user | `POST /storeusers` | `{ storeId, fullName, login, password, cellPhone, email, roleIds: [3] }` | `BaseResponseModel<boolean>` | requires `:storeId` route param |
-| Edit details | `PUT /users/:id` | `{ fullName, cellPhone, email, isActive }` | `BaseResponseModel<boolean>` | |
-| Deactivate | `DELETE /users/:id` | — | `BaseResponseModel<boolean>` | sets isActive=false |
-| Activate | `POST /users/activate` | `{ id, isActive: true }` | `BaseResponseModel<boolean>` | |
-| Change password | `POST /users/change-password/:id` | `{ oldPassword, newPassword }` | `BaseResponseModel<boolean>` | oldPassword REQUIRED (decision OQ-U2) |
+| Operation         | Method + Path                     | Request body                                                             | Response                         | Notes                                                      |
+| ----------------- | --------------------------------- | ------------------------------------------------------------------------ | -------------------------------- | ---------------------------------------------------------- |
+| List store users  | `GET /storeusers/list/true`       | —                                                                        | `BaseResponseModel<StoreUser[]>` | full fields incl. login/storeId/storeName (decision OQ-U1) |
+| Get by id (edit)  | `GET /storeusers/:id`             | —                                                                        | `BaseResponseModel<StoreUser>`   | consistency w/ list (decision OQ-U1)                       |
+| Create store user | `POST /storeusers`                | `{ storeId, fullName, login, password, cellPhone, email, roleIds: [3] }` | `BaseResponseModel<boolean>`     | requires `:storeId` route param                            |
+| Edit details      | `PUT /users/:id`                  | `{ fullName, cellPhone, email, isActive }`                               | `BaseResponseModel<boolean>`     |                                                            |
+| Deactivate        | `DELETE /users/:id`               | —                                                                        | `BaseResponseModel<boolean>`     | sets isActive=false                                        |
+| Activate          | `POST /users/activate`            | `{ id, isActive: true }`                                                 | `BaseResponseModel<boolean>`     |                                                            |
+| Change password   | `POST /users/change-password/:id` | `{ oldPassword, newPassword }`                                           | `BaseResponseModel<boolean>`     | oldPassword REQUIRED (decision OQ-U2)                      |
 
 **Model shapes (confirmed in `@store-mgmt/domain`, no changes):**
+
 - `StoreUser` — `frontend-react/packages/domain/src/models/store.ts:68-77`
   (`id, storeId, storeName, login, fullName, cellPhone, email, isActive`).
 - `ERoles.StoreUser = 3`, `EFeatures.Users = 72` — `enums/index.ts`.
@@ -120,9 +126,11 @@ Password policy regex (ported): `(?=\D*\d)(?=[^a-z]*[a-z])(?=[^A-Z]*[A-Z]).{8,30
 > Contract with sdd-spec. Existing capability: `management` (`openspec/specs/management/spec.md`).
 
 ### New Capabilities
+
 None.
 
 ### Modified Capabilities
+
 - `management`: add Users sub-domain requirements — three user routes, `userHttpService` contracts, the four
   presentational components, create-against-store flow with `roleIds: [3]`, edit details + credentials (password
   reset with oldPassword), offline read-cache + write-block, `adminFeatureLoader([Users])` gating, `USERS.*` i18n.
@@ -131,16 +139,17 @@ None.
 
 ## Affected Areas
 
-| Area | Impact | Description |
-|------|--------|-------------|
-| `app/management/users/routes/` | New | `user-list.tsx`, `user-create.tsx`, `user-edit.tsx` containers + tests |
-| `app/management/users/components/` | New | `UserList`, `UserCreateForm`, `UserDetailsForm`, `UserCredentialsForm` + tests |
-| `app/management/users/lib/services/user-http-service.ts` | New | thin functions over `apiClient` + tests |
-| `app/routes.ts` | Modified | register 3 user routes |
-| `app/shared/lib/i18n/es.ts` | Modified | add `USERS.*` namespace (~20-25 keys) |
-| `app/auth/routes/loaders.ts` | No change | `adminFeatureLoader` reused as-is |
+| Area                                                     | Impact    | Description                                                                    |
+| -------------------------------------------------------- | --------- | ------------------------------------------------------------------------------ |
+| `app/management/users/routes/`                           | New       | `user-list.tsx`, `user-create.tsx`, `user-edit.tsx` containers + tests         |
+| `app/management/users/components/`                       | New       | `UserList`, `UserCreateForm`, `UserDetailsForm`, `UserCredentialsForm` + tests |
+| `app/management/users/lib/services/user-http-service.ts` | New       | thin functions over `apiClient` + tests                                        |
+| `app/routes.ts`                                          | Modified  | register 3 user routes                                                         |
+| `app/shared/lib/i18n/es.ts`                              | Modified  | add `USERS.*` namespace (~20-25 keys)                                          |
+| `app/auth/routes/loaders.ts`                             | No change | `adminFeatureLoader` reused as-is                                              |
 
 ### Reused directly (no change)
+
 `apiClient`, `useAuthStore` (role flags + `selectedStoreId`), `useOnlineStatus`, `adminFeatureLoader`,
 `BaseRepository<T>` + `StorageKeys.entityKey`, `StoreUser` domain model, `ERoles.StoreUser`, `EFeatures.Users`.
 
@@ -148,12 +157,12 @@ None.
 
 ## Risks
 
-| Risk | Likelihood | Mitigation |
-|------|------------|------------|
-| List endpoint returns unexpected shape (legacy used `/users/all/true`) | Low | Decision OQ-U1 locks `GET /storeusers/list/true`; verify response in apply via service test |
-| Backend rejects `change-password` without admin context | Low | oldPassword required is the known-supported contract (OQ-U2); surface backend error clearly |
-| Create blocked when no `:storeId` available | Med | Guard: redirect to `/management/stores` when param missing (ported from Angular) |
-| PR size borderline (~350-450 lines: 3 routes + 4 components + service + tests) | Med | Monitor at tasks; credentials form kept lean; chain/split decision deferred to tasks guard |
+| Risk                                                                           | Likelihood | Mitigation                                                                                  |
+| ------------------------------------------------------------------------------ | ---------- | ------------------------------------------------------------------------------------------- |
+| List endpoint returns unexpected shape (legacy used `/users/all/true`)         | Low        | Decision OQ-U1 locks `GET /storeusers/list/true`; verify response in apply via service test |
+| Backend rejects `change-password` without admin context                        | Low        | oldPassword required is the known-supported contract (OQ-U2); surface backend error clearly |
+| Create blocked when no `:storeId` available                                    | Med        | Guard: redirect to `/management/stores` when param missing (ported from Angular)            |
+| PR size borderline (~350-450 lines: 3 routes + 4 components + service + tests) | Med        | Monitor at tasks; credentials form kept lean; chain/split decision deferred to tasks guard  |
 
 ---
 

@@ -27,13 +27,13 @@ rendered in ambient/default text color instead of the muted gray `products.tsx` 
 
 ## Commits
 
-| Commit | Content |
-|---|---|
-| `55773af` | WU1 — shared `ChevronDownIcon` + `products.tsx` refactor |
-| `f67c126` | WU2 — 6 uniform list screens gain the chevron |
-| `b2abd2b` | WU3 — `today-stats.tsx` `<details>` → controlled restructure + chevron |
-| `47b1496` | WU4 — `tutorial.tsx` `<details>` → controlled restructure + chevron |
-| `fad2139` | WU5 — full verification sweep (tests/typecheck/build) |
+| Commit    | Content                                                                                          |
+| --------- | ------------------------------------------------------------------------------------------------ |
+| `55773af` | WU1 — shared `ChevronDownIcon` + `products.tsx` refactor                                         |
+| `f67c126` | WU2 — 6 uniform list screens gain the chevron                                                    |
+| `b2abd2b` | WU3 — `today-stats.tsx` `<details>` → controlled restructure + chevron                           |
+| `47b1496` | WU4 — `tutorial.tsx` `<details>` → controlled restructure + chevron                              |
+| `fad2139` | WU5 — full verification sweep (tests/typecheck/build)                                            |
 | `db8d2ae` | Post-verify color-parity polish — `className="text-text-muted"` on all 8 non-products call sites |
 
 ## Gate Results
@@ -51,8 +51,8 @@ rendered in ambient/default text color instead of the muted gray `products.tsx` 
 
 ## Specs Synced
 
-| Domain | Action | Details |
-|--------|--------|---------|
+| Domain                      | Action  | Details                                                                                                                                                                                                                                                                                                  |
+| --------------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `collapsible-panel-chevron` | Created | New capability — no prior main spec existed. Delta spec copied as the full spec (4 requirements, 13 scenarios) into `openspec/specs/collapsible-panel-chevron/spec.md`, plus a color-parity clarification note and a Non-Goals section documenting the pre-existing tutorial.tsx panel-count divergence. |
 
 ## Archive Contents

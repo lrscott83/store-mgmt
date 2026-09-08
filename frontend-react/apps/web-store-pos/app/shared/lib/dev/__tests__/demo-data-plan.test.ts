@@ -28,7 +28,9 @@ describe('buildDemoPlan', () => {
     const plan = buildDemoPlan(bigCatalog(), ANCHOR);
     expect(plan.orders.length).toBeGreaterThan(0);
 
-    const oldest = startOfDay(new Date(ANCHOR.getFullYear(), ANCHOR.getMonth(), ANCHOR.getDate() - (DEMO_WINDOW_DAYS - 1)));
+    const oldest = startOfDay(
+      new Date(ANCHOR.getFullYear(), ANCHOR.getMonth(), ANCHOR.getDate() - (DEMO_WINDOW_DAYS - 1)),
+    );
     const newest = startOfDay(ANCHOR);
     const byDay = new Map<string, number>();
     for (const order of plan.orders) {
@@ -59,9 +61,7 @@ describe('buildDemoPlan', () => {
   it('uses only the three payment types and includes all of them (no credit anywhere)', () => {
     const plan = buildDemoPlan(bigCatalog(), ANCHOR);
     const used = new Set(plan.orders.map((o) => o.paymentType));
-    expect(used).toEqual(
-      new Set([PaymentType.Efectivo, PaymentType.Tarjeta, PaymentType.Zelle]),
-    );
+    expect(used).toEqual(new Set([PaymentType.Efectivo, PaymentType.Tarjeta, PaymentType.Zelle]));
     // The planner has no credit concept — there is nothing carrying a client/isCredit.
     for (const order of plan.orders) {
       expect(order.items.length).toBeGreaterThan(0);

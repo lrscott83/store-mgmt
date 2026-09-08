@@ -23,11 +23,7 @@ vi.mock('~/admin/dashboard/lib/services/usage-http-service', () => ({
 // including the owner names the dashboard aligns per day) ──
 
 vi.mock('~/admin/dashboard/components/store-usage-chart', () => ({
-  StoreUsageChart: ({
-    data,
-  }: {
-    data: { label: string; value: number; owners: string[] }[];
-  }) => (
+  StoreUsageChart: ({ data }: { data: { label: string; value: number; owners: string[] }[] }) => (
     <div data-testid="store-usage-chart">
       {`store-usage-chart(${data.length})`}
       {data[0]?.owners?.length ? `|owners:${data[0].owners.join(',')}` : ''}
@@ -107,9 +103,7 @@ describe('AdminDashboardPage — exports', () => {
 
 describe('AdminDashboardPage — render', () => {
   it('renders header, title, and both toggle buttons', async () => {
-    const { usageHttpService } = await import(
-      '~/admin/dashboard/lib/services/usage-http-service'
-    );
+    const { usageHttpService } = await import('~/admin/dashboard/lib/services/usage-http-service');
     vi.mocked(usageHttpService.getStoresLastWeek).mockResolvedValue({
       succeeded: true,
       data: { storeUsagesCountDays: [1, 2, 3, 4, 5, 6, 7], activeStoreCount: 5 },
@@ -122,7 +116,7 @@ describe('AdminDashboardPage — render', () => {
     render(
       <Wrapper>
         <AdminDashboardPage />
-      </Wrapper>
+      </Wrapper>,
     );
 
     await waitFor(() => {
@@ -131,10 +125,10 @@ describe('AdminDashboardPage — render', () => {
 
     expect(screen.getByText(esMessages['ADMIN_DASHBOARD.TITLE'])).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: esMessages['ADMIN_DASHBOARD.LAST_7_DAYS'] })
+      screen.getByRole('button', { name: esMessages['ADMIN_DASHBOARD.LAST_7_DAYS'] }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: esMessages['ADMIN_DASHBOARD.LAST_30_DAYS'] })
+      screen.getByRole('button', { name: esMessages['ADMIN_DASHBOARD.LAST_30_DAYS'] }),
     ).toBeInTheDocument();
   });
 });
@@ -145,9 +139,7 @@ describe('AdminDashboardPage — render', () => {
 
 describe('AdminDashboardPage — 7-day fetch on mount', () => {
   it('calls getStoresLastWeek on mount and drives the chart with one point per day label', async () => {
-    const { usageHttpService } = await import(
-      '~/admin/dashboard/lib/services/usage-http-service'
-    );
+    const { usageHttpService } = await import('~/admin/dashboard/lib/services/usage-http-service');
     vi.mocked(usageHttpService.getStoresLastWeek).mockResolvedValue({
       succeeded: true,
       data: { storeUsagesCountDays: [10, 20, 30, 40, 50, 60, 70], activeStoreCount: 5 },
@@ -160,7 +152,7 @@ describe('AdminDashboardPage — 7-day fetch on mount', () => {
     render(
       <Wrapper>
         <AdminDashboardPage />
-      </Wrapper>
+      </Wrapper>,
     );
 
     await waitFor(() => {
@@ -170,9 +162,7 @@ describe('AdminDashboardPage — 7-day fetch on mount', () => {
     // The Categoría/Valor table was removed — the chart receives one point per
     // 7-day label (empty owners when the response has no ownerNamesPerDay).
     await waitFor(() => {
-      expect(screen.getByTestId('store-usage-chart')).toHaveTextContent(
-        'store-usage-chart(7)'
-      );
+      expect(screen.getByTestId('store-usage-chart')).toHaveTextContent('store-usage-chart(7)');
     });
   });
 });
@@ -183,9 +173,7 @@ describe('AdminDashboardPage — 7-day fetch on mount', () => {
 
 describe('AdminDashboardPage — 30-day toggle', () => {
   it('calls getStoresLastMonth when 30-day button is clicked', async () => {
-    const { usageHttpService } = await import(
-      '~/admin/dashboard/lib/services/usage-http-service'
-    );
+    const { usageHttpService } = await import('~/admin/dashboard/lib/services/usage-http-service');
     vi.mocked(usageHttpService.getStoresLastWeek).mockResolvedValue({
       succeeded: true,
       data: { storeUsagesCountDays: [1, 2, 3, 4, 5, 6, 7], activeStoreCount: 3 },
@@ -208,7 +196,7 @@ describe('AdminDashboardPage — 30-day toggle', () => {
     render(
       <Wrapper>
         <AdminDashboardPage />
-      </Wrapper>
+      </Wrapper>,
     );
 
     await waitFor(() => {
@@ -216,7 +204,7 @@ describe('AdminDashboardPage — 30-day toggle', () => {
     });
 
     fireEvent.click(
-      screen.getByRole('button', { name: esMessages['ADMIN_DASHBOARD.LAST_30_DAYS'] })
+      screen.getByRole('button', { name: esMessages['ADMIN_DASHBOARD.LAST_30_DAYS'] }),
     );
 
     await waitFor(() => {
@@ -225,9 +213,7 @@ describe('AdminDashboardPage — 30-day toggle', () => {
 
     // Chart should now receive 30 points, one per 30-day label
     await waitFor(() => {
-      expect(screen.getByTestId('store-usage-chart')).toHaveTextContent(
-        'store-usage-chart(30)'
-      );
+      expect(screen.getByTestId('store-usage-chart')).toHaveTextContent('store-usage-chart(30)');
     });
   });
 });
@@ -238,18 +224,14 @@ describe('AdminDashboardPage — 30-day toggle', () => {
 
 describe('AdminDashboardPage — error state', () => {
   it('shows ADMIN_DASHBOARD.ERROR when getStoresLastWeek throws', async () => {
-    const { usageHttpService } = await import(
-      '~/admin/dashboard/lib/services/usage-http-service'
-    );
-    vi.mocked(usageHttpService.getStoresLastWeek).mockRejectedValue(
-      new Error('Network error')
-    );
+    const { usageHttpService } = await import('~/admin/dashboard/lib/services/usage-http-service');
+    vi.mocked(usageHttpService.getStoresLastWeek).mockRejectedValue(new Error('Network error'));
 
     const { AdminDashboardPage } = await import('../dashboard');
     render(
       <Wrapper>
         <AdminDashboardPage />
-      </Wrapper>
+      </Wrapper>,
     );
 
     await waitFor(() => {
@@ -258,9 +240,7 @@ describe('AdminDashboardPage — error state', () => {
   });
 
   it('shows the connectivity message (GENERAL.OFFLINE) when getStoresLastWeek rejects with a tagged network error', async () => {
-    const { usageHttpService } = await import(
-      '~/admin/dashboard/lib/services/usage-http-service'
-    );
+    const { usageHttpService } = await import('~/admin/dashboard/lib/services/usage-http-service');
     // api-client.ts's response interceptor tags `isNetworkError` when the call never
     // reached a server (offline / 30s timeout).
     vi.mocked(usageHttpService.getStoresLastWeek).mockRejectedValue({
@@ -272,7 +252,7 @@ describe('AdminDashboardPage — error state', () => {
     render(
       <Wrapper>
         <AdminDashboardPage />
-      </Wrapper>
+      </Wrapper>,
     );
 
     await waitFor(() => {
@@ -290,9 +270,7 @@ describe('AdminDashboardPage — error state', () => {
 
 describe('AdminDashboardPage — activeStoreCount rendered in the horizontal bar', () => {
   it('renders the active store count next to the horizontal bar', async () => {
-    const { usageHttpService } = await import(
-      '~/admin/dashboard/lib/services/usage-http-service'
-    );
+    const { usageHttpService } = await import('~/admin/dashboard/lib/services/usage-http-service');
     vi.mocked(usageHttpService.getStoresLastWeek).mockResolvedValue({
       succeeded: true,
       data: { storeUsagesCountDays: [1, 2, 3, 4, 5, 6, 7], activeStoreCount: 9999 },
@@ -305,12 +283,12 @@ describe('AdminDashboardPage — activeStoreCount rendered in the horizontal bar
     render(
       <Wrapper>
         <AdminDashboardPage />
-      </Wrapper>
+      </Wrapper>,
     );
 
     await waitFor(() => {
       expect(
-        screen.getByText(`${esMessages['ADMIN_DASHBOARD.ACTIVE_STORES']}: 9999`)
+        screen.getByText(`${esMessages['ADMIN_DASHBOARD.ACTIVE_STORES']}: 9999`),
       ).toBeInTheDocument();
     });
     expect(screen.getByTestId('admin-active-stores-bar')).toBeInTheDocument();
@@ -323,9 +301,7 @@ describe('AdminDashboardPage — activeStoreCount rendered in the horizontal bar
 
 describe('AdminDashboardPage — Total | Promedio summary line', () => {
   it('shows the sum and the average of the daily counts', async () => {
-    const { usageHttpService } = await import(
-      '~/admin/dashboard/lib/services/usage-http-service'
-    );
+    const { usageHttpService } = await import('~/admin/dashboard/lib/services/usage-http-service');
     vi.mocked(usageHttpService.getStoresLastWeek).mockResolvedValue({
       succeeded: true,
       data: { storeUsagesCountDays: [10, 20, 30, 40, 50, 60, 70], activeStoreCount: 5 },
@@ -338,14 +314,14 @@ describe('AdminDashboardPage — Total | Promedio summary line', () => {
     render(
       <Wrapper>
         <AdminDashboardPage />
-      </Wrapper>
+      </Wrapper>,
     );
 
     await waitFor(() => {
       expect(
         screen.getByText(
-          `${esMessages['ADMIN_DASHBOARD.TOTAL']}: 280 | ${esMessages['ADMIN_DASHBOARD.AVERAGE']}: 40.00`
-        )
+          `${esMessages['ADMIN_DASHBOARD.TOTAL']}: 280 | ${esMessages['ADMIN_DASHBOARD.AVERAGE']}: 40.00`,
+        ),
       ).toBeInTheDocument();
     });
   });
@@ -357,9 +333,7 @@ describe('AdminDashboardPage — Total | Promedio summary line', () => {
 
 describe('AdminDashboardPage — toggle back to 7-day', () => {
   it('calls getStoresLastWeek again after toggling 30-day then back to 7-day', async () => {
-    const { usageHttpService } = await import(
-      '~/admin/dashboard/lib/services/usage-http-service'
-    );
+    const { usageHttpService } = await import('~/admin/dashboard/lib/services/usage-http-service');
     vi.mocked(usageHttpService.getStoresLastWeek).mockResolvedValue({
       succeeded: true,
       data: { storeUsagesCountDays: [1, 2, 3, 4, 5, 6, 7], activeStoreCount: 3 },
@@ -382,7 +356,7 @@ describe('AdminDashboardPage — toggle back to 7-day', () => {
     render(
       <Wrapper>
         <AdminDashboardPage />
-      </Wrapper>
+      </Wrapper>,
     );
 
     // Wait for initial 7-day fetch
@@ -392,7 +366,7 @@ describe('AdminDashboardPage — toggle back to 7-day', () => {
 
     // Toggle to 30-day
     fireEvent.click(
-      screen.getByRole('button', { name: esMessages['ADMIN_DASHBOARD.LAST_30_DAYS'] })
+      screen.getByRole('button', { name: esMessages['ADMIN_DASHBOARD.LAST_30_DAYS'] }),
     );
     await waitFor(() => {
       expect(usageHttpService.getStoresLastMonth).toHaveBeenCalledTimes(1);
@@ -400,7 +374,7 @@ describe('AdminDashboardPage — toggle back to 7-day', () => {
 
     // Toggle back to 7-day — getStoresLastWeek must be called a second time
     fireEvent.click(
-      screen.getByRole('button', { name: esMessages['ADMIN_DASHBOARD.LAST_7_DAYS'] })
+      screen.getByRole('button', { name: esMessages['ADMIN_DASHBOARD.LAST_7_DAYS'] }),
     );
     await waitFor(() => {
       expect(usageHttpService.getStoresLastWeek).toHaveBeenCalledTimes(2);
@@ -416,9 +390,7 @@ describe('AdminDashboardPage — toggle back to 7-day', () => {
 
 describe('AdminDashboardPage — succeeded:false leaves chart with zeroed points', () => {
   it('renders the chart with 7 zero labels when succeeded is false and data is null', async () => {
-    const { usageHttpService } = await import(
-      '~/admin/dashboard/lib/services/usage-http-service'
-    );
+    const { usageHttpService } = await import('~/admin/dashboard/lib/services/usage-http-service');
     // The backend really does return `data: null` on a failed response, which the
     // BaseResponseModel type does not admit — hence the cast through the awaited
     // return type rather than a blanket `any`.
@@ -435,7 +407,7 @@ describe('AdminDashboardPage — succeeded:false leaves chart with zeroed points
     render(
       <Wrapper>
         <AdminDashboardPage />
-      </Wrapper>
+      </Wrapper>,
     );
 
     await waitFor(() => {
@@ -446,9 +418,7 @@ describe('AdminDashboardPage — succeeded:false leaves chart with zeroed points
     expect(screen.queryByText(esMessages['ADMIN_DASHBOARD.ERROR'])).not.toBeInTheDocument();
 
     // Chart is still rendered (categories are set before fetch) with 7 labels
-    expect(screen.getByTestId('store-usage-chart')).toHaveTextContent(
-      'store-usage-chart(7)'
-    );
+    expect(screen.getByTestId('store-usage-chart')).toHaveTextContent('store-usage-chart(7)');
 
     // No owners are mapped when data is null
     expect(screen.getByTestId('store-usage-chart')).not.toHaveTextContent('|owners:');
@@ -461,9 +431,7 @@ describe('AdminDashboardPage — succeeded:false leaves chart with zeroed points
 
 describe('AdminDashboardPage — range-button active state', () => {
   it('marks the 7-day button active on load, and moves the active state to 30-day on click', async () => {
-    const { usageHttpService } = await import(
-      '~/admin/dashboard/lib/services/usage-http-service'
-    );
+    const { usageHttpService } = await import('~/admin/dashboard/lib/services/usage-http-service');
     vi.mocked(usageHttpService.getStoresLastWeek).mockResolvedValue({
       succeeded: true,
       data: { storeUsagesCountDays: [1, 2, 3, 4, 5, 6, 7], activeStoreCount: 5 },
@@ -473,7 +441,10 @@ describe('AdminDashboardPage — range-button active state', () => {
     });
     vi.mocked(usageHttpService.getStoresLastMonth).mockResolvedValue({
       succeeded: true,
-      data: { storeUsagesCountDays: Array.from({ length: 30 }, (_, i) => i + 1), activeStoreCount: 5 },
+      data: {
+        storeUsagesCountDays: Array.from({ length: 30 }, (_, i) => i + 1),
+        activeStoreCount: 5,
+      },
       message: '',
       actionCode: 0,
       errors: [],
@@ -483,10 +454,12 @@ describe('AdminDashboardPage — range-button active state', () => {
     render(
       <Wrapper>
         <AdminDashboardPage />
-      </Wrapper>
+      </Wrapper>,
     );
 
-    const btn7 = await screen.findByRole('button', { name: esMessages['ADMIN_DASHBOARD.LAST_7_DAYS'] });
+    const btn7 = await screen.findByRole('button', {
+      name: esMessages['ADMIN_DASHBOARD.LAST_7_DAYS'],
+    });
     const btn30 = screen.getByRole('button', { name: esMessages['ADMIN_DASHBOARD.LAST_30_DAYS'] });
 
     await waitFor(() => {
@@ -510,9 +483,7 @@ describe('AdminDashboardPage — range-button active state', () => {
 
 describe('AdminDashboardPage — value||0 fallback for missing days', () => {
   it('hands the chart 7 points and maps ownerNamesPerDay by index', async () => {
-    const { usageHttpService } = await import(
-      '~/admin/dashboard/lib/services/usage-http-service'
-    );
+    const { usageHttpService } = await import('~/admin/dashboard/lib/services/usage-http-service');
     // Only 3 values for a 7-label window — points 4-7 must exist with value 0.
     // ownerNamesPerDay aligns by index: day 0 has two owners, day 3 has none.
     vi.mocked(usageHttpService.getStoresLastWeek).mockResolvedValue({
@@ -531,7 +502,7 @@ describe('AdminDashboardPage — value||0 fallback for missing days', () => {
     render(
       <Wrapper>
         <AdminDashboardPage />
-      </Wrapper>
+      </Wrapper>,
     );
 
     await waitFor(() => {
@@ -540,9 +511,7 @@ describe('AdminDashboardPage — value||0 fallback for missing days', () => {
 
     // The chart always receives one point per label of the active window
     await waitFor(() => {
-      expect(screen.getByTestId('store-usage-chart')).toHaveTextContent(
-        'store-usage-chart(7)'
-      );
+      expect(screen.getByTestId('store-usage-chart')).toHaveTextContent('store-usage-chart(7)');
     });
 
     // Owners of the first day are mapped through to the chart
@@ -558,9 +527,7 @@ describe('AdminDashboardPage — value||0 fallback for missing days', () => {
 
 describe('AdminDashboardPage — store-usage chart all-zero contract', () => {
   it('hands the chart 7 points when every day is zero', async () => {
-    const { usageHttpService } = await import(
-      '~/admin/dashboard/lib/services/usage-http-service'
-    );
+    const { usageHttpService } = await import('~/admin/dashboard/lib/services/usage-http-service');
     vi.mocked(usageHttpService.getStoresLastWeek).mockResolvedValue({
       succeeded: true,
       data: { storeUsagesCountDays: [0, 0, 0, 0, 0, 0, 0], activeStoreCount: 0 },
@@ -573,13 +540,11 @@ describe('AdminDashboardPage — store-usage chart all-zero contract', () => {
     render(
       <Wrapper>
         <AdminDashboardPage />
-      </Wrapper>
+      </Wrapper>,
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId('store-usage-chart')).toHaveTextContent(
-        'store-usage-chart(7)'
-      );
+      expect(screen.getByTestId('store-usage-chart')).toHaveTextContent('store-usage-chart(7)');
     });
   });
 });

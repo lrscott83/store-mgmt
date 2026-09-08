@@ -122,18 +122,22 @@ async function sha256Base64(text: string): Promise<string> {
 }
 
 /** Node mirror of `offline-crypto.ts`'s `pbkdf2Base64`. */
-async function pbkdf2Base64(input: string, saltBase64: string, iterations: number): Promise<string> {
+async function pbkdf2Base64(
+  input: string,
+  saltBase64: string,
+  iterations: number,
+): Promise<string> {
   const keyMaterial = await webcrypto.subtle.importKey(
     'raw',
     new TextEncoder().encode(input),
     'PBKDF2',
     false,
-    ['deriveBits']
+    ['deriveBits'],
   );
   const derivedBits = await webcrypto.subtle.deriveBits(
     { name: 'PBKDF2', salt: bytesFromBase64(saltBase64), iterations, hash: 'SHA-256' },
     keyMaterial,
-    32 * 8
+    32 * 8,
   );
   return base64FromBytes(new Uint8Array(derivedBits));
 }
@@ -155,7 +159,7 @@ async function ensureTripwire(): Promise<void> {
       `roster-fixture tripwire failed: sha256Base64('${KAT_PASSWORD}') produced '${actual}', ` +
         `expected '${KAT.passwordPreHash}' (docs/contracts/offline-roster-dek-kat.json, ` +
         'provenance: dotnet-backend). The Node Web Crypto derivation no longer matches the ' +
-        'backend KAT — STOP, do not plant a roster with an unverified password derivation.'
+        'backend KAT — STOP, do not plant a roster with an unverified password derivation.',
     );
   }
   tripwireChecked = true;
@@ -222,7 +226,10 @@ export interface RosterSpec {
   storeId?: string;
 }
 
-async function buildRosterUser(userSpec: RosterUserSpec, storeId: string): Promise<OfflineRosterUser> {
+async function buildRosterUser(
+  userSpec: RosterUserSpec,
+  storeId: string,
+): Promise<OfflineRosterUser> {
   const password = userSpec.password ?? KAT_PASSWORD;
   const verifierSpec = userSpec.verifier === undefined ? 'valid' : userSpec.verifier;
 
@@ -311,21 +318,18 @@ export async function plantRoster(page: Page, spec: RosterSpec): Promise<Offline
   const bundle = await buildRosterBundle(spec);
   const serialized = JSON.stringify(bundle);
 
-  await page.evaluate(
-    ({ key, value }) => window.localStorage.setItem(key, value),
-    { key: ROSTER_STORAGE_KEY, value: serialized }
-  );
+  await page.evaluate(({ key, value }) => window.localStorage.setItem(key, value), {
+    key: ROSTER_STORAGE_KEY,
+    value: serialized,
+  });
 
-  const reread = await page.evaluate(
-    (key) => window.localStorage.getItem(key),
-    ROSTER_STORAGE_KEY
-  );
+  const reread = await page.evaluate((key) => window.localStorage.getItem(key), ROSTER_STORAGE_KEY);
   if (!reread) {
     throw new Error(
       `plantRoster: localStorage['${ROSTER_STORAGE_KEY}'] is empty right after writing it — the ` +
         'roster was not actually planted. A missing roster silently takes the ONLINE branch ' +
         '(roster-store.ts:170-172), which would make every downstream assertion fail for the ' +
-        'wrong reason.'
+        'wrong reason.',
     );
   }
 
@@ -335,14 +339,14 @@ export async function plantRoster(page: Page, spec: RosterSpec): Promise<Offline
   } catch (cause) {
     throw new Error(
       `plantRoster: localStorage['${ROSTER_STORAGE_KEY}'] is not valid JSON after writing it: ` +
-        `${cause instanceof Error ? cause.message : String(cause)}.`
+        `${cause instanceof Error ? cause.message : String(cause)}.`,
     );
   }
   if (parsed.bundleId !== bundle.bundleId || parsed.expiresAt !== bundle.expiresAt) {
     throw new Error(
       `plantRoster: precondition mismatch after reread — wrote bundleId='${bundle.bundleId}' ` +
         `expiresAt=${bundle.expiresAt}, read back bundleId='${parsed.bundleId}' ` +
-        `expiresAt=${parsed.expiresAt}.`
+        `expiresAt=${parsed.expiresAt}.`,
     );
   }
 

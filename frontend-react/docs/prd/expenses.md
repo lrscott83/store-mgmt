@@ -21,10 +21,10 @@ This module is part of the Angular-to-React migration. The behavior, data model,
 
 ## 3. Routes
 
-| Path | Component | Required Feature | Guard |
-|------|-----------|-----------------|-------|
-| `/expenses/today` | `ExpensesTodayComponent` | `TodayExpenses` (80) | `AuthGuard` |
-| `/expenses/expenses` | `ExpensesComponent` | `ExpensesHistory` (102) | `AuthGuard` |
+| Path                 | Component                | Required Feature        | Guard       |
+| -------------------- | ------------------------ | ----------------------- | ----------- |
+| `/expenses/today`    | `ExpensesTodayComponent` | `TodayExpenses` (80)    | `AuthGuard` |
+| `/expenses/expenses` | `ExpensesComponent`      | `ExpensesHistory` (102) | `AuthGuard` |
 
 Both routes are protected by `AuthGuard`. Feature IDs are checked against the user's `StoreModuleFeatures` for the active store. SuperAdmin and OwnerAdmin bypass feature checks.
 
@@ -37,6 +37,7 @@ Both routes are protected by `AuthGuard`. Feature IDs are checked against the us
 **Purpose:** Shows today's expenses and provides the primary entry point for adding new expenses during the workday.
 
 **Behavior:**
+
 - Loads and displays all expenses for the current calendar day.
 - Shows a summary total at the top (sum of all today's expenses).
 - Provides an "Add Expense" button that opens `EditExpenseModalComponent`.
@@ -45,6 +46,7 @@ Both routes are protected by `AuthGuard`. Feature IDs are checked against the us
 - List is sorted by date descending (most recent first).
 
 **State:**
+
 - Derives `todayExpenses` by filtering the full store from `ExpenseOfflineService` on mount and after any mutation.
 
 ---
@@ -54,6 +56,7 @@ Both routes are protected by `AuthGuard`. Feature IDs are checked against the us
 **Purpose:** Full expense history with filtering. Allows reviewing expenses beyond today.
 
 **Behavior:**
+
 - Loads all expenses from `ExpenseOfflineService`.
 - Provides filter controls: date range picker and expense type selector.
 - Displays filtered list using `ExpenseListComponent`.
@@ -68,12 +71,14 @@ Both routes are protected by `AuthGuard`. Feature IDs are checked against the us
 **Purpose:** Reusable presentational component for rendering a list of expenses.
 
 **Props:**
+
 - `expenses: Expense[]` — the list to render.
 - `onEdit?: (expense: Expense) => void` — callback when user triggers edit.
 - `onDelete?: (id: string) => void` — callback when user triggers delete.
 - `showActions?: boolean` — whether to show edit/delete controls (default `true`).
 
 **Behavior:**
+
 - Renders each expense as a row showing: date, type label, payment type label, total amount, and note (truncated).
 - Delegates all data fetching and mutation to parent components.
 - Shows an empty state message when the list is empty.
@@ -85,11 +90,13 @@ Both routes are protected by `AuthGuard`. Feature IDs are checked against the us
 **Purpose:** Modal form for creating a new expense or editing an existing one.
 
 **Props:**
+
 - `expense?: Expense` — if provided, form is in edit mode pre-populated with these values. If omitted, form is in create mode.
 - `onSave: (expense: Expense) => void` — called after successful save.
 - `onCancel: () => void` — called when user dismisses the modal.
 
 **Form Fields:**
+
 - `type` — dropdown using `ExpenseType` enum values with human-readable labels.
 - `total` — numeric input, required, must be > 0.
 - `date` — date picker, defaults to today in create mode.
@@ -97,6 +104,7 @@ Both routes are protected by `AuthGuard`. Feature IDs are checked against the us
 - `note` — optional text area.
 
 **Behavior:**
+
 - Validates all required fields before saving.
 - On save, calls `ExpenseOfflineService.save(expense)` and then calls `onSave`.
 - On cancel, discards changes and calls `onCancel`.
@@ -116,23 +124,23 @@ interface Expense extends AuditableBaseModel {
 }
 
 enum ExpenseType {
-  Salario     = 1,
-  Transporte  = 2,
-  Alquiler    = 3,
-  Corriente   = 4,
-  Agua        = 5,
-  Comida      = 6,
+  Salario = 1,
+  Transporte = 2,
+  Alquiler = 3,
+  Corriente = 4,
+  Agua = 5,
+  Comida = 6,
   Operaciones = 7,
-  Viaje       = 8,
-  Divisa      = 9,
-  Impuesto    = 10,
-  Otro        = 100,
+  Viaje = 8,
+  Divisa = 9,
+  Impuesto = 10,
+  Otro = 100,
 }
 
 enum PaymentType {
   Efectivo = 1,
-  Tarjeta  = 2,
-  Zelle    = 3,
+  Tarjeta = 2,
+  Zelle = 3,
 }
 ```
 
@@ -157,12 +165,13 @@ interface ExpenseOfflineService {
   getAll(): Expense[];
   getByDateRange(from: Date, to: Date): Expense[];
   getToday(): Expense[];
-  save(expense: Expense): void;       // insert or update by id
+  save(expense: Expense): void; // insert or update by id
   delete(id: string): void;
 }
 ```
 
 **Internal behavior:**
+
 - Reads full array from localStorage on each call (no in-memory cache beyond what React state manages).
 - Serializes dates as ISO 8601 strings for JSON storage.
 - Deserializes ISO strings back to `Date` objects on read.
@@ -181,10 +190,10 @@ interface ExpenseOfflineService {
 
 ## 8. Permissions
 
-| Feature | Feature ID | Who has access |
-|---------|-----------|----------------|
-| TodayExpenses | 80 | StoreUser (if granted), OwnerAdmin, SuperAdmin |
-| ExpensesHistory | 102 | StoreUser (if granted), OwnerAdmin, SuperAdmin |
+| Feature         | Feature ID | Who has access                                 |
+| --------------- | ---------- | ---------------------------------------------- |
+| TodayExpenses   | 80         | StoreUser (if granted), OwnerAdmin, SuperAdmin |
+| ExpensesHistory | 102        | StoreUser (if granted), OwnerAdmin, SuperAdmin |
 
 - SuperAdmin and OwnerAdmin always have access regardless of `featureIds`.
 - ReSeller role does not have access to expense data.

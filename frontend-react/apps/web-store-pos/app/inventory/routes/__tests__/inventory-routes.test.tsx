@@ -2,7 +2,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, within, waitFor } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
-import type { InventoryEntryView, Order, OrderItem, Product, ProductCategory } from '@store-mgmt/domain';
+import type {
+  InventoryEntryView,
+  Order,
+  OrderItem,
+  Product,
+  ProductCategory,
+} from '@store-mgmt/domain';
 import { PaymentType, OrderType } from '@store-mgmt/domain';
 import { OrderOfflineService } from '~/sales/lib/services/order-offline-service';
 import { InventoryOfflineService } from '~/inventory/lib/services/inventory-offline-service';
@@ -86,7 +92,10 @@ vi.mock('~/sales/lib/services/product-offline-service', () => ({
     ),
     // Flag #4: EditInventoryEntryModal loads its dropdown via getProductsToSelect (async).
     getProductsToSelect: vi.fn(async () => ({
-      data: mockEgressProducts.map((p: { id: string; name: string }) => ({ id: p.id, fullName: p.name })),
+      data: mockEgressProducts.map((p: { id: string; name: string }) => ({
+        id: p.id,
+        fullName: p.name,
+      })),
       succeeded: true,
       message: '',
       actionCode: 200,
@@ -107,7 +116,9 @@ vi.mock('~/sales/lib/services/product-category-offline-service', () => ({
     // WU10: InventoryAvailablePage now loads ALL categories (active + inactive, same unfiltered
     // set as the previous sync getAll) via the async offline-only getProductCategories. This
     // route never populates mockEgressCategories, so it keeps seeing [].
-    getProductCategories: vi.fn(async () => bm([...mockEgressCategories].sort((a, b) => a.order - b.order))),
+    getProductCategories: vi.fn(async () =>
+      bm([...mockEgressCategories].sort((a, b) => a.order - b.order)),
+    ),
   })),
 }));
 
@@ -171,8 +182,20 @@ function bm<T>(data: T): { data: T; succeeded: true; message: ''; actionCode: 20
 
 // response-envelope-nullability WU-D — the resolved-failure shape the category-B sync reads
 // guard against, even though the local-storage read they wrap never actually produces it.
-function bmFail(): { data: null; succeeded: false; message: null; actionCode: null; errors: [{ code: string; description: string }] } {
-  return { data: null, succeeded: false, message: null, actionCode: null, errors: [{ code: 'E01', description: 'failed' }] };
+function bmFail(): {
+  data: null;
+  succeeded: false;
+  message: null;
+  actionCode: null;
+  errors: [{ code: string; description: string }];
+} {
+  return {
+    data: null,
+    succeeded: false,
+    message: null,
+    actionCode: null,
+    errors: [{ code: 'E01', description: 'failed' }],
+  };
 }
 
 // ─── InventoryAvailablePage ──────────────────────────────────────────────────
@@ -562,11 +585,24 @@ describe('TodayEntriesPage — handleSave/handleDeactivate check .succeeded (WU2
   // the previous console.error-only behavior.
   it('T2: confirms via confirmDialog, then on deleteInventoryEntry failure shows a blocking error Swal', async () => {
     const todayEntries: InventoryEntryView[] = [
-      { id: 'e1', productId: 'p1', productName: 'Ron', quantity: 5, costPrice: 3, date: new Date(), isActive: true },
+      {
+        id: 'e1',
+        productId: 'p1',
+        productName: 'Ron',
+        quantity: 5,
+        costPrice: 3,
+        date: new Date(),
+        isActive: true,
+      },
     ];
     const deactivateMock = vi.fn().mockReturnValue({
       succeeded: false,
-      errors: [{ code: 'Inventory.SaleExistsWithThisEntry', description: 'Existe una venta que corresponde con esta entrada.' }],
+      errors: [
+        {
+          code: 'Inventory.SaleExistsWithThisEntry',
+          description: 'Existe una venta que corresponde con esta entrada.',
+        },
+      ],
     });
     vi.mocked(InventoryOfflineService).mockImplementation(
       () =>
@@ -590,12 +626,14 @@ describe('TodayEntriesPage — handleSave/handleDeactivate check .succeeded (WU2
     fireEvent.click(screen.getByTestId('entry-actions-toggle-e1'));
     fireEvent.click(screen.getByText('Eliminar'));
 
-    await waitFor(() => expect(confirmDialogMock).toHaveBeenCalledWith({
-      title: 'Confirmación para eliminar',
-      message: '¿Está seguro que desea eliminar esta Entrada?',
-      confirmButtonText: 'Si',
-      cancelButtonText: 'No',
-    }));
+    await waitFor(() =>
+      expect(confirmDialogMock).toHaveBeenCalledWith({
+        title: 'Confirmación para eliminar',
+        message: '¿Está seguro que desea eliminar esta Entrada?',
+        confirmButtonText: 'Si',
+        cancelButtonText: 'No',
+      }),
+    );
     await waitFor(() => expect(deactivateMock).toHaveBeenCalledWith('p1', 'e1'));
     expect(showBlockingErrorMock).toHaveBeenCalledWith(
       'Error',
@@ -605,7 +643,15 @@ describe('TodayEntriesPage — handleSave/handleDeactivate check .succeeded (WU2
 
   it('T2: confirms via confirmDialog, then on deleteInventoryEntry success reloads entries (no Swal)', async () => {
     const todayEntries: InventoryEntryView[] = [
-      { id: 'e1', productId: 'p1', productName: 'Ron', quantity: 5, costPrice: 3, date: new Date(), isActive: true },
+      {
+        id: 'e1',
+        productId: 'p1',
+        productName: 'Ron',
+        quantity: 5,
+        costPrice: 3,
+        date: new Date(),
+        isActive: true,
+      },
     ];
     const getByDateMock = vi.fn().mockReturnValue(bm(todayEntries));
     const deactivateMock = vi.fn().mockReturnValue({ succeeded: true, errors: [] });
@@ -639,7 +685,15 @@ describe('TodayEntriesPage — handleSave/handleDeactivate check .succeeded (WU2
 
   it('T2: isNotSoldEntry failure shows the blocking error Swal and skips the confirm dialog entirely', async () => {
     const todayEntries: InventoryEntryView[] = [
-      { id: 'e1', productId: 'p1', productName: 'Ron', quantity: 5, costPrice: 3, date: new Date(), isActive: true },
+      {
+        id: 'e1',
+        productId: 'p1',
+        productName: 'Ron',
+        quantity: 5,
+        costPrice: 3,
+        date: new Date(),
+        isActive: true,
+      },
     ];
     const deactivateMock = vi.fn();
     vi.mocked(InventoryOfflineService).mockImplementation(
@@ -654,7 +708,12 @@ describe('TodayEntriesPage — handleSave/handleDeactivate check .succeeded (WU2
           deleteInventoryEntry: deactivateMock,
           isNotSoldEntry: vi.fn().mockReturnValue({
             succeeded: false,
-            errors: [{ code: 'Inventory.SaleExistsWithThisEntry', description: 'Existe una venta que corresponde con esta entrada.' }],
+            errors: [
+              {
+                code: 'Inventory.SaleExistsWithThisEntry',
+                description: 'Existe una venta que corresponde con esta entrada.',
+              },
+            ],
           }),
         }) as unknown as InstanceType<typeof InventoryOfflineService>,
     );
@@ -679,7 +738,15 @@ describe('TodayEntriesPage — handleSave/handleDeactivate check .succeeded (WU2
 
   it('T2: does NOT call deleteInventoryEntry when the confirmDialog is cancelled', async () => {
     const todayEntries: InventoryEntryView[] = [
-      { id: 'e1', productId: 'p1', productName: 'Ron', quantity: 5, costPrice: 3, date: new Date(), isActive: true },
+      {
+        id: 'e1',
+        productId: 'p1',
+        productName: 'Ron',
+        quantity: 5,
+        costPrice: 3,
+        date: new Date(),
+        isActive: true,
+      },
     ];
     const deactivateMock = vi.fn();
     confirmDialogMock.mockResolvedValueOnce(false);
@@ -712,7 +779,9 @@ describe('TodayEntriesPage — handleSave/handleDeactivate check .succeeded (WU2
   it('handleSave (create): on DataResult failure, shows the modal error from errors[0].description', async () => {
     const createMock = vi.fn().mockReturnValue({
       succeeded: false,
-      errors: [{ code: 'Inventory.ProductNotAvailable', description: 'El producto no está disponible' }],
+      errors: [
+        { code: 'Inventory.ProductNotAvailable', description: 'El producto no está disponible' },
+      ],
       data: undefined,
     });
     vi.mocked(InventoryOfflineService).mockImplementation(
@@ -748,7 +817,15 @@ describe('TodayEntriesPage — handleSave/handleDeactivate check .succeeded (WU2
     const createMock = vi.fn().mockReturnValue({
       succeeded: true,
       errors: [],
-      data: { id: 'new-1', productId: 'p1', productName: '', quantity: 3, costPrice: 1.5, date: new Date(), isActive: true },
+      data: {
+        id: 'new-1',
+        productId: 'p1',
+        productName: '',
+        quantity: 3,
+        costPrice: 1.5,
+        date: new Date(),
+        isActive: true,
+      },
     });
     const getByDateMock = vi.fn().mockReturnValue(bm([]));
     vi.mocked(InventoryOfflineService).mockImplementation(
@@ -1106,7 +1183,9 @@ describe('InventoryTodayQuantitiesPage — getInventoryEntriesInDay succeeded:fa
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(screen.getByText('Cargando...')).toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-    expect(screen.queryByText(esMessages['INVENTORY.QUANTITIES.NO_PRODUCTS'])).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(esMessages['INVENTORY.QUANTITIES.NO_PRODUCTS']),
+    ).not.toBeInTheDocument();
   });
 
   // Second, independent guard on the same effect (today-quantities.tsx:96) —
@@ -1149,13 +1228,35 @@ describe('InventoryTodayQuantitiesPage — Angular inicio/entradas/disponible/ve
 
   it('computes inicio/entradas/disponible/vendido/final for a product with known entries and sales', () => {
     mockEgressProducts = [
-      makeEgressProduct({ id: 'p1', name: 'Ron', categoryId: 'cat-1', categoryName: 'Bebidas', order: 1 }),
+      makeEgressProduct({
+        id: 'p1',
+        name: 'Ron',
+        categoryId: 'cat-1',
+        categoryName: 'Bebidas',
+        order: 1,
+      }),
     ];
     mockEgressCategories = [makeCategory({ id: 'cat-1', order: 1 })];
 
     const entries: InventoryEntryView[] = [
-      { id: 'e1', productId: 'p1', productName: 'Ron', quantity: 4, costPrice: 5, date: new Date(), isActive: true },
-      { id: 'e2', productId: 'p1', productName: 'Ron', quantity: 6, costPrice: 5, date: new Date(), isActive: true },
+      {
+        id: 'e1',
+        productId: 'p1',
+        productName: 'Ron',
+        quantity: 4,
+        costPrice: 5,
+        date: new Date(),
+        isActive: true,
+      },
+      {
+        id: 'e2',
+        productId: 'p1',
+        productName: 'Ron',
+        quantity: 6,
+        costPrice: 5,
+        date: new Date(),
+        isActive: true,
+      },
     ];
     const categoryView: InventoryCategoryView[] = [
       {
@@ -1259,9 +1360,27 @@ describe('InventoryTodayQuantitiesPage — Angular inicio/entradas/disponible/ve
       makeCategory({ id: 'cat-1', name: 'Bebidas', order: 1 }),
     ];
     mockEgressProducts = [
-      makeEgressProduct({ id: 'p-a', name: 'Papas', categoryId: 'cat-2', categoryName: 'Snacks', order: 1 }),
-      makeEgressProduct({ id: 'p-b', name: 'Cerveza', categoryId: 'cat-1', categoryName: 'Bebidas', order: 2 }),
-      makeEgressProduct({ id: 'p-c', name: 'Agua', categoryId: 'cat-1', categoryName: 'Bebidas', order: 1 }),
+      makeEgressProduct({
+        id: 'p-a',
+        name: 'Papas',
+        categoryId: 'cat-2',
+        categoryName: 'Snacks',
+        order: 1,
+      }),
+      makeEgressProduct({
+        id: 'p-b',
+        name: 'Cerveza',
+        categoryId: 'cat-1',
+        categoryName: 'Bebidas',
+        order: 2,
+      }),
+      makeEgressProduct({
+        id: 'p-c',
+        name: 'Agua',
+        categoryId: 'cat-1',
+        categoryName: 'Bebidas',
+        order: 1,
+      }),
     ];
 
     render(
@@ -1472,7 +1591,9 @@ describe('InventoryTodaySalesProfitPage — Angular product-set filter (gap #3b)
       () =>
         ({
           getActiveInventoryEntriesStorage: vi.fn().mockReturnValue([]),
-          getInventoryEntriesInDay: vi.fn().mockReturnValue(bm([makeEntryView({ productId: 'p1' })])),
+          getInventoryEntriesInDay: vi
+            .fn()
+            .mockReturnValue(bm([makeEntryView({ productId: 'p1' })])),
           getInventoryCategoriesView: vi.fn().mockReturnValue(bm([])),
           getAvailableQuantity: vi.fn().mockReturnValue({ hasEntries: false, available: 0 }),
           createInventoryEntry: vi.fn(),
@@ -1498,7 +1619,9 @@ describe('InventoryTodaySalesProfitPage — Angular product-set filter (gap #3b)
       () =>
         ({
           getActiveInventoryEntriesStorage: vi.fn().mockReturnValue([]),
-          getInventoryEntriesInDay: vi.fn().mockReturnValue(bm([makeEntryView({ productId: 'p1' })])),
+          getInventoryEntriesInDay: vi
+            .fn()
+            .mockReturnValue(bm([makeEntryView({ productId: 'p1' })])),
           getInventoryCategoriesView: vi.fn().mockReturnValue(bm([])),
           getAvailableQuantity: vi.fn().mockReturnValue({ hasEntries: false, available: 0 }),
           createInventoryEntry: vi.fn(),
@@ -1557,10 +1680,14 @@ describe('InventoryTodaySalesProfitPage — entry-only rows (gap #4)', () => {
       () =>
         ({
           getActiveInventoryEntriesStorage: vi.fn().mockReturnValue([]),
-          getInventoryEntriesInDay: vi.fn().mockReturnValue(bm([
-            makeEntryView({ id: 'e1', productId: 'p1', quantity: 10, costPrice: 2 }),
-            makeEntryView({ id: 'e2', productId: 'p1', quantity: 10, costPrice: 4 }),
-          ])),
+          getInventoryEntriesInDay: vi
+            .fn()
+            .mockReturnValue(
+              bm([
+                makeEntryView({ id: 'e1', productId: 'p1', quantity: 10, costPrice: 2 }),
+                makeEntryView({ id: 'e2', productId: 'p1', quantity: 10, costPrice: 4 }),
+              ]),
+            ),
           getInventoryCategoriesView: vi.fn().mockReturnValue(bm([])),
           getAvailableQuantity: vi.fn().mockReturnValue({ hasEntries: false, available: 0 }),
           createInventoryEntry: vi.fn(),
@@ -1613,7 +1740,13 @@ describe('InventoryTodaySalesProfitPage — entry-only rows (gap #4)', () => {
 describe('InventoryTodaySalesProfitPage — non-mutating FIFO cost (gap #3c, deliberate bug-fix over Angular)', () => {
   beforeEach(() => {
     mockEgressProducts = [
-      makeEgressProduct({ id: 'p1', name: 'Ron', categoryId: 'cat-1', categoryName: 'Bebidas', price: 10 }),
+      makeEgressProduct({
+        id: 'p1',
+        name: 'Ron',
+        categoryId: 'cat-1',
+        categoryName: 'Bebidas',
+        price: 10,
+      }),
     ];
     mockEgressCategories = [makeCategory({ id: 'cat-1', order: 1 })];
   });
@@ -1750,7 +1883,10 @@ describe('EgressPage — Mayorista wholesale-sale screen (Angular egress.compone
   });
 
   it('renders one category button per active category', async () => {
-    mockEgressCategories = [makeCategory({ id: 'c1', name: 'Bebidas' }), makeCategory({ id: 'c2', name: 'Snacks' })];
+    mockEgressCategories = [
+      makeCategory({ id: 'c1', name: 'Bebidas' }),
+      makeCategory({ id: 'c2', name: 'Snacks' }),
+    ];
     render(
       <Wrapper>
         <EgressPage />

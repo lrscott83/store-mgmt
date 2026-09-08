@@ -1,7 +1,11 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import {
-  toLocalDayKey, fromLocalDayKey, localDayRange, isInLocalDay,
-  groupByLocalDay, formatLocalDate,
+  toLocalDayKey,
+  fromLocalDayKey,
+  localDayRange,
+  isInLocalDay,
+  groupByLocalDay,
+  formatLocalDate,
 } from '../date-utils';
 
 describe('toLocalDayKey', () => {
@@ -20,8 +24,9 @@ describe('toLocalDayKey', () => {
   });
 
   it('DAYKEY-03: local midnight and the last millisecond of the day share one key', () => {
-    expect(toLocalDayKey(new Date(2026, 6, 22, 0, 0, 0, 0)))
-      .toBe(toLocalDayKey(new Date(2026, 6, 22, 23, 59, 59, 999)));
+    expect(toLocalDayKey(new Date(2026, 6, 22, 0, 0, 0, 0))).toBe(
+      toLocalDayKey(new Date(2026, 6, 22, 23, 59, 59, 999)),
+    );
   });
 
   it('DAYKEY-04: the next local midnight starts a new key', () => {
@@ -89,7 +94,11 @@ describe('groupByLocalDay', () => {
 
   it('GROUP-04: items are ordered by the supplied comparator, leaving the input untouched', () => {
     const input = [at(9), at(23), at(15)];
-    const groups = groupByLocalDay(input, (i) => i.date, (a, b) => b.date.getTime() - a.date.getTime());
+    const groups = groupByLocalDay(
+      input,
+      (i) => i.date,
+      (a, b) => b.date.getTime() - a.date.getTime(),
+    );
 
     expect(groups[0].items.map((i) => i.date.getHours())).toEqual([23, 15, 9]);
     expect(input.map((i) => i.date.getHours())).toEqual([9, 23, 15]);

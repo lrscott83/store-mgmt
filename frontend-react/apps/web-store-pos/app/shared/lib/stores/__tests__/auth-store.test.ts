@@ -93,7 +93,7 @@ describe('useAuthStore', () => {
       const user = makeUser();
       localStorage.setItem(
         StorageKeys.AUTH_MODEL,
-        JSON.stringify({ authToken: user.authToken, expiresIn: user.expiresIn })
+        JSON.stringify({ authToken: user.authToken, expiresIn: user.expiresIn }),
       );
       localStorage.setItem(StorageKeys.CURRENT_USER, JSON.stringify(user));
 
@@ -110,7 +110,7 @@ describe('useAuthStore', () => {
       const user = makeUser({ expiresIn: Date.now() - 1000 });
       localStorage.setItem(
         StorageKeys.AUTH_MODEL,
-        JSON.stringify({ authToken: user.authToken, expiresIn: user.expiresIn })
+        JSON.stringify({ authToken: user.authToken, expiresIn: user.expiresIn }),
       );
       localStorage.setItem(StorageKeys.TOKEN, user.authToken as string);
       localStorage.setItem(StorageKeys.CURRENT_USER, JSON.stringify(user));
@@ -188,9 +188,7 @@ describe('useAuthStore', () => {
 
       const { useAuthStore: freshStore } = await import('../auth-store');
 
-      await expect(
-        freshStore.getState().login('a@b.com', 'password123')
-      ).rejects.toMatchObject({
+      await expect(freshStore.getState().login('a@b.com', 'password123')).rejects.toMatchObject({
         loginRejectionDescription: 'usuario o contraseña incorrecta',
       });
 
@@ -212,7 +210,9 @@ describe('useAuthStore', () => {
             succeeded: false,
             message: '',
             actionCode: 401,
-            errors: [{ code: 'Auth.InvalidCredentials', description: 'usuario o contraseña incorrecta' }],
+            errors: [
+              { code: 'Auth.InvalidCredentials', description: 'usuario o contraseña incorrecta' },
+            ],
           },
         },
       });
@@ -226,9 +226,7 @@ describe('useAuthStore', () => {
 
       const { useAuthStore: freshStore } = await import('../auth-store');
 
-      await expect(
-        freshStore.getState().login('a@b.com', 'password123')
-      ).rejects.toMatchObject({
+      await expect(freshStore.getState().login('a@b.com', 'password123')).rejects.toMatchObject({
         loginRejectionDescription: 'usuario o contraseña incorrecta',
       });
 
@@ -267,11 +265,12 @@ describe('useAuthStore', () => {
         .login('a@b.com', 'password123')
         .then(
           () => undefined,
-          (err: unknown) => err
+          (err: unknown) => err,
         );
 
-      expect((rejection as { loginRejectionDescription?: string }).loginRejectionDescription)
-        .toBeUndefined();
+      expect(
+        (rejection as { loginRejectionDescription?: string }).loginRejectionDescription,
+      ).toBeUndefined();
       expect((rejection as { response?: { status?: number } }).response?.status).toBe(403);
 
       vi.doUnmock('~/shared/lib/http/api-client');
@@ -320,7 +319,7 @@ describe('useAuthStore', () => {
       const user = makeUser();
       localStorage.setItem(
         StorageKeys.AUTH_MODEL,
-        JSON.stringify({ authToken: user.authToken, expiresIn: user.expiresIn })
+        JSON.stringify({ authToken: user.authToken, expiresIn: user.expiresIn }),
       );
       localStorage.setItem(StorageKeys.TOKEN, user.authToken as string);
       localStorage.setItem(StorageKeys.CURRENT_USER, JSON.stringify(user));
@@ -457,7 +456,7 @@ describe('useAuthStore', () => {
       const user = makeUser();
       localStorage.setItem(
         StorageKeys.AUTH_MODEL,
-        JSON.stringify({ authToken: user.authToken, expiresIn: user.expiresIn })
+        JSON.stringify({ authToken: user.authToken, expiresIn: user.expiresIn }),
       );
       localStorage.setItem(StorageKeys.CURRENT_USER, JSON.stringify(user));
       localStorage.setItem(StorageKeys.TOKEN, 'token123');
@@ -474,7 +473,7 @@ describe('useAuthStore', () => {
       const user = makeUser();
       localStorage.setItem(
         StorageKeys.AUTH_MODEL,
-        JSON.stringify({ authToken: user.authToken, expiresIn: user.expiresIn })
+        JSON.stringify({ authToken: user.authToken, expiresIn: user.expiresIn }),
       );
       localStorage.setItem(StorageKeys.CURRENT_USER, JSON.stringify(user));
       localStorage.setItem(StorageKeys.TOKEN, 'token123');
@@ -503,7 +502,7 @@ describe('useAuthStore', () => {
       const user = makeUser();
       localStorage.setItem(
         StorageKeys.AUTH_MODEL,
-        JSON.stringify({ authToken: user.authToken, expiresIn: user.expiresIn })
+        JSON.stringify({ authToken: user.authToken, expiresIn: user.expiresIn }),
       );
       localStorage.setItem(StorageKeys.CURRENT_USER, JSON.stringify(user));
 
@@ -535,7 +534,7 @@ describe('useAuthStore', () => {
       const user = makeUser({ expiresIn: Date.now() });
       localStorage.setItem(
         StorageKeys.AUTH_MODEL,
-        JSON.stringify({ authToken: user.authToken, expiresIn: user.expiresIn })
+        JSON.stringify({ authToken: user.authToken, expiresIn: user.expiresIn }),
       );
       localStorage.setItem(StorageKeys.CURRENT_USER, JSON.stringify(user));
 
@@ -550,7 +549,7 @@ describe('useAuthStore', () => {
       const user = makeUser({ expiresIn: Date.now() + THIRTY_FIVE_DAYS_MS });
       localStorage.setItem(
         StorageKeys.AUTH_MODEL,
-        JSON.stringify({ authToken: user.authToken, expiresIn: user.expiresIn })
+        JSON.stringify({ authToken: user.authToken, expiresIn: user.expiresIn }),
       );
       localStorage.setItem(StorageKeys.CURRENT_USER, JSON.stringify(user));
 
@@ -565,7 +564,7 @@ describe('useAuthStore', () => {
       const user = makeUser();
       localStorage.setItem(
         StorageKeys.AUTH_MODEL,
-        JSON.stringify({ authToken: user.authToken, expiresIn: user.expiresIn })
+        JSON.stringify({ authToken: user.authToken, expiresIn: user.expiresIn }),
       );
       localStorage.setItem(StorageKeys.CURRENT_USER, JSON.stringify(user));
       Object.defineProperty(navigator, 'onLine', { value: false, configurable: true });
@@ -583,7 +582,7 @@ describe('useAuthStore', () => {
       // "no usable cache" branch. Must still hydrate synchronously.
       localStorage.setItem(
         StorageKeys.AUTH_MODEL,
-        JSON.stringify({ authToken: user.authToken, expiresIn: user.expiresIn })
+        JSON.stringify({ authToken: user.authToken, expiresIn: user.expiresIn }),
       );
 
       // Deliberately NOT awaited — state must already be set before this line
@@ -599,7 +598,7 @@ describe('useAuthStore', () => {
       const user = makeUser();
       localStorage.setItem(
         StorageKeys.AUTH_MODEL,
-        JSON.stringify({ authToken: user.authToken, expiresIn: user.expiresIn })
+        JSON.stringify({ authToken: user.authToken, expiresIn: user.expiresIn }),
       );
 
       vi.doMock('~/shared/lib/http/auth-http-service', () => ({
@@ -642,7 +641,11 @@ describe('useAuthStore', () => {
       vi.doMock('~/shared/lib/http/auth-http-service', () => ({
         authHttpService: {
           login: vi.fn().mockResolvedValue({
-            data: { authToken: 'tok', refreshToken: 'r', expiresIn: Date.now() + THIRTY_FIVE_DAYS_MS },
+            data: {
+              authToken: 'tok',
+              refreshToken: 'r',
+              expiresIn: Date.now() + THIRTY_FIVE_DAYS_MS,
+            },
             succeeded: true,
             message: '',
             actionCode: 200,

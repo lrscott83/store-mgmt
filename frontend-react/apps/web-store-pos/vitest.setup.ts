@@ -1,6 +1,9 @@
 import '@testing-library/jest-dom';
 import { afterEach } from 'vitest';
-import { installHttpBlocker, isReportingSuppressed } from './app/shared/lib/testing/block-real-http';
+import {
+  installHttpBlocker,
+  isReportingSuppressed,
+} from './app/shared/lib/testing/block-real-http';
 
 // No unit test may reach the network. See block-real-http.ts for why a silent
 // real request is worse than a failing one: the app catches its own network
@@ -18,7 +21,7 @@ afterEach(() => {
     throw new Error(
       `This test made ${attempts.length} unmocked HTTP request(s):\n` +
         attempts.map((attempt) => `  - ${attempt}`).join('\n') +
-        "\nMock the module that issues them — see app/shared/lib/testing/block-real-http.ts."
+        '\nMock the module that issues them — see app/shared/lib/testing/block-real-http.ts.',
     );
   }
 });

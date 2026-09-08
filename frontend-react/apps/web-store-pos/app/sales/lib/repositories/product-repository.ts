@@ -55,7 +55,11 @@ export class ProductRepository {
 
   /** 1:1 port of Angular `getStorageProductsMap` (product.repository.ts:36-40). */
   getStorageProductsMap(): Map<string, Product> {
-    if (!this.products || this.products.size === 0 || this.getCurrentStorageKey() !== this.lastProductsKey) {
+    if (
+      !this.products ||
+      this.products.size === 0 ||
+      this.getCurrentStorageKey() !== this.lastProductsKey
+    ) {
       this.products = this.getProductsFromLocalStorage();
     }
     return this.products;
@@ -121,7 +125,9 @@ export class ProductRepository {
    */
   findProductByCategoryAndName(categoryId: string, name: string): Product | undefined {
     const key = name.trim().toLowerCase();
-    return this.getProductsByCategoryId(categoryId).find((p) => p.name.trim().toLowerCase() === key);
+    return this.getProductsByCategoryId(categoryId).find(
+      (p) => p.name.trim().toLowerCase() === key,
+    );
   }
 
   /**
@@ -192,7 +198,9 @@ export class ProductRepository {
       if (existingProduct) return Result.Failure([ProductErrors.BarcodeExists]);
     }
 
-    const nameCollision = this.getStorageProducts().find((p) => p.categoryId === categoryId && p.name === name);
+    const nameCollision = this.getStorageProducts().find(
+      (p) => p.categoryId === categoryId && p.name === name,
+    );
     if (nameCollision) return Result.Failure([ProductErrors.NameExists]);
 
     const products = this.getStorageProductsMap();
@@ -278,9 +286,14 @@ export class ProductRepository {
   }
 
   /** Private port of Angular `updateProductsOrderByCategory` (product.repository.ts:187-191). */
-  private updateProductsOrderByCategory(products: Map<string, Product>, categoryId: string, order: number): void {
+  private updateProductsOrderByCategory(
+    products: Map<string, Product>,
+    categoryId: string,
+    order: number,
+  ): void {
     products.forEach((product) => {
-      if (product.categoryId === categoryId && product.order >= order) product.order = product.order + 1;
+      if (product.categoryId === categoryId && product.order >= order)
+        product.order = product.order + 1;
     });
   }
 

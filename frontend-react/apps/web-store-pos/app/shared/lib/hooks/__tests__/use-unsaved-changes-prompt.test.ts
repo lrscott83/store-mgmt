@@ -23,7 +23,7 @@ describe('useUnsavedChangesPrompt — view-text-parity: window.confirm() message
     renderHook(() => useUnsavedChangesPrompt(true));
 
     expect(confirmSpy).toHaveBeenCalledWith(
-      'Usted tiene cambios pendientes. ¿Desea salvar los cambios antes de pasar a la otra página?'
+      'Usted tiene cambios pendientes. ¿Desea salvar los cambios antes de pasar a la otra página?',
     );
     expect(mockProceed).toHaveBeenCalled();
   });

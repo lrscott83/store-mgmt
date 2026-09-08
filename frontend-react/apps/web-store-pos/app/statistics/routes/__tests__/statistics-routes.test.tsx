@@ -40,34 +40,35 @@ vi.mock('~/shared/lib/stores/auth-store', () => {
   return { useAuthStore };
 });
 
-const { mockOrderService, mockExpenseService, mockSaleCreditService, mockCurrencyService } = vi.hoisted(() => ({
-  // Typed so a mock return value that drifts from the real view model is a
-  // typecheck failure. An untyped vi.fn() let a TopProduct without its `id`
-  // through, which surfaced only as a React "unique key prop" warning on
-  // stderr while the test still passed.
-  mockOrderService: {
-    getLastMonthSales: vi.fn<() => ChartData[]>().mockReturnValue([]),
-    getLastMonthSaleProfits: vi.fn<() => ChartData[]>().mockReturnValue([]),
-    getActiveOrdersPriceToday: vi.fn().mockReturnValue(0),
-    getActiveOrdersPriceYesterday: vi.fn().mockReturnValue(0),
-    getActiveOrdersProfitToday: vi.fn().mockReturnValue(0),
-    getActiveOrdersProfitYesterday: vi.fn().mockReturnValue(0),
-    getTopProductsProfitInLastMonth: vi.fn<() => TopProduct[]>().mockReturnValue([]),
-    getTopProductsSaleQuantityInLastMonth: vi.fn<() => TopProduct[]>().mockReturnValue([]),
-  },
-  mockExpenseService: {
-    getActiveExpensesPriceToday: vi.fn().mockReturnValue(0),
-    getActiveExpensesPriceYesterday: vi.fn().mockReturnValue(0),
-  },
-  mockSaleCreditService: {
-    getActiveUnpaidSaleCreditsPriceToday: vi.fn().mockReturnValue(0),
-    getActiveUnpaidSaleCreditsPriceYesterday: vi.fn().mockReturnValue(0),
-  },
-  mockCurrencyService: {
-    getCurrentCurrency: vi.fn().mockReturnValue({ currency: 'CUP', rate: 370 }),
-    setCurrency: vi.fn(),
-  },
-}));
+const { mockOrderService, mockExpenseService, mockSaleCreditService, mockCurrencyService } =
+  vi.hoisted(() => ({
+    // Typed so a mock return value that drifts from the real view model is a
+    // typecheck failure. An untyped vi.fn() let a TopProduct without its `id`
+    // through, which surfaced only as a React "unique key prop" warning on
+    // stderr while the test still passed.
+    mockOrderService: {
+      getLastMonthSales: vi.fn<() => ChartData[]>().mockReturnValue([]),
+      getLastMonthSaleProfits: vi.fn<() => ChartData[]>().mockReturnValue([]),
+      getActiveOrdersPriceToday: vi.fn().mockReturnValue(0),
+      getActiveOrdersPriceYesterday: vi.fn().mockReturnValue(0),
+      getActiveOrdersProfitToday: vi.fn().mockReturnValue(0),
+      getActiveOrdersProfitYesterday: vi.fn().mockReturnValue(0),
+      getTopProductsProfitInLastMonth: vi.fn<() => TopProduct[]>().mockReturnValue([]),
+      getTopProductsSaleQuantityInLastMonth: vi.fn<() => TopProduct[]>().mockReturnValue([]),
+    },
+    mockExpenseService: {
+      getActiveExpensesPriceToday: vi.fn().mockReturnValue(0),
+      getActiveExpensesPriceYesterday: vi.fn().mockReturnValue(0),
+    },
+    mockSaleCreditService: {
+      getActiveUnpaidSaleCreditsPriceToday: vi.fn().mockReturnValue(0),
+      getActiveUnpaidSaleCreditsPriceYesterday: vi.fn().mockReturnValue(0),
+    },
+    mockCurrencyService: {
+      getCurrentCurrency: vi.fn().mockReturnValue({ currency: 'CUP', rate: 370 }),
+      setCurrency: vi.fn(),
+    },
+  }));
 
 vi.mock('~/sales/lib/services/order-offline-service', () => ({
   OrderOfflineService: vi.fn().mockImplementation(() => mockOrderService),
@@ -249,7 +250,10 @@ describe('DashboardPage — currency selector (Angular dashboard.component.html:
     );
     fireEvent.change(screen.getByLabelText(/moneda/i), { target: { value: 'USD' } });
     fireEvent.change(screen.getByPlaceholderText(/1 usd/i), { target: { value: '400' } });
-    expect(mockCurrencyService.setCurrency).toHaveBeenLastCalledWith({ currency: 'USD', rate: 400 });
+    expect(mockCurrencyService.setCurrency).toHaveBeenLastCalledWith({
+      currency: 'USD',
+      rate: 400,
+    });
   });
 });
 
@@ -348,7 +352,9 @@ describe('DashboardPage — KPI cards (Angular dashboard.component.html:24-84)',
         <DashboardPage />
       </Wrapper>,
     );
-    expect(screen.getByText('Ventas Hoy').closest('div')?.querySelector('.text-success')).toBeTruthy();
+    expect(
+      screen.getByText('Ventas Hoy').closest('div')?.querySelector('.text-success'),
+    ).toBeTruthy();
   });
 
   it('trend class is text-danger when actual < anterior', () => {
@@ -359,7 +365,9 @@ describe('DashboardPage — KPI cards (Angular dashboard.component.html:24-84)',
         <DashboardPage />
       </Wrapper>,
     );
-    expect(screen.getByText('Ventas Hoy').closest('div')?.querySelector('.text-danger')).toBeTruthy();
+    expect(
+      screen.getByText('Ventas Hoy').closest('div')?.querySelector('.text-danger'),
+    ).toBeTruthy();
   });
 
   it('trend class is text-secondary when actual === anterior', () => {
@@ -370,7 +378,9 @@ describe('DashboardPage — KPI cards (Angular dashboard.component.html:24-84)',
         <DashboardPage />
       </Wrapper>,
     );
-    expect(screen.getByText('Ventas Hoy').closest('div')?.querySelector('.text-secondary')).toBeTruthy();
+    expect(
+      screen.getByText('Ventas Hoy').closest('div')?.querySelector('.text-secondary'),
+    ).toBeTruthy();
   });
 });
 
@@ -435,9 +445,7 @@ describe('DashboardPage — regression: charts still render after the KPI/curren
   });
 
   it('ProfitChart still receives getLastMonthSaleProfits() data', () => {
-    mockOrderService.getLastMonthSaleProfits.mockReturnValue([
-      { label: new Date(), value: 5 },
-    ]);
+    mockOrderService.getLastMonthSaleProfits.mockReturnValue([{ label: new Date(), value: 5 }]);
     render(
       <Wrapper>
         <DashboardPage />

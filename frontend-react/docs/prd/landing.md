@@ -33,11 +33,11 @@ There are two distinct categories:
 
 All routes in this module are **public** — no authentication check, no redirect, no layout wrapper.
 
-| Path | Component | Type |
-|------|-----------|------|
-| `/` | `LandingDeepComponent` | Marketing (redesigned) |
-| `/cookies-private` | `CookiesPrivateComponent` | Legal (static, migrated) |
-| `/private-police` | `PrivatePoliceComponent` | Legal (static, migrated) |
+| Path                | Component                  | Type                     |
+| ------------------- | -------------------------- | ------------------------ |
+| `/`                 | `LandingDeepComponent`     | Marketing (redesigned)   |
+| `/cookies-private`  | `CookiesPrivateComponent`  | Legal (static, migrated) |
+| `/private-police`   | `PrivatePoliceComponent`   | Legal (static, migrated) |
 | `/terms-conditions` | `TermsConditionsComponent` | Legal (static, migrated) |
 
 > **Note on Angular alternates:** The Angular codebase contains `LandingComponent` and `Landing2Component` as unused alternates alongside `LandingDeepComponent`. Only `LandingDeepComponent` is migrated. The unused alternates are discarded.
@@ -51,12 +51,14 @@ All routes in this module are **public** — no authentication check, no redirec
 The primary entry point for unauthenticated users. This component is **redesigned** — it is not a direct port from Angular.
 
 Responsibilities:
+
 - Display app name, tagline, and key feature highlights.
 - Communicate the offline-first / PWA value proposition.
 - Provide prominent call-to-action links to `/login` and `/register`.
 - Include footer links to the legal pages (`/cookies-private`, `/private-police`, `/terms-conditions`).
 
 Design constraints:
+
 - Built with Tailwind CSS, consistent with the React app's design system.
 - Responsive — mobile-first layout.
 - No authentication state dependency. The component must render correctly regardless of whether a session exists.
@@ -122,12 +124,12 @@ These are the lightest pages in the app. The following constraints are non-negot
 
 ### Target Metrics
 
-| Metric | Target |
-|--------|--------|
-| Landing page LCP | < 2.5s on 3G |
-| Legal page FCP | < 1.5s on 3G |
+| Metric                | Target            |
+| --------------------- | ----------------- |
+| Landing page LCP      | < 2.5s on 3G      |
+| Legal page FCP        | < 1.5s on 3G      |
 | Landing JS chunk size | < 50 KB (gzipped) |
-| Legal pages JS chunk | < 20 KB (gzipped) |
+| Legal pages JS chunk  | < 20 KB (gzipped) |
 
 ---
 
@@ -156,9 +158,7 @@ These pages are intentionally outside the authentication boundary.
   <Route path="/register" element={<RegisterPage />} />
 
   {/* Authenticated app — layout shell + guards applied here */}
-  <Route element={<AuthenticatedLayout />}>
-    {/* ... POS, inventory, admin routes ... */}
-  </Route>
+  <Route element={<AuthenticatedLayout />}>{/* ... POS, inventory, admin routes ... */}</Route>
 </Routes>
 ```
 

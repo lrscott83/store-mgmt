@@ -1,4 +1,9 @@
-import type { BaseResponseModel, ProductCategory, ProductCategoryService, ProductCategoryView } from '@store-mgmt/domain';
+import type {
+  BaseResponseModel,
+  ProductCategory,
+  ProductCategoryService,
+  ProductCategoryView,
+} from '@store-mgmt/domain';
 import { failure, success } from '@store-mgmt/domain';
 import { ProductCategoryRepository } from '../repositories/product-category-repository';
 import { ProductRepository } from '../repositories/product-repository';
@@ -36,11 +41,16 @@ export class ProductCategoryOfflineService implements ProductCategoryService {
     productRepository?: ProductRepository,
   ) {
     this.categoryRepository = categoryRepository ?? new ProductCategoryRepository(storeId);
-    this.productRepository = productRepository ?? new ProductRepository(storeId, new ProductCategoryRepository(storeId));
+    this.productRepository =
+      productRepository ?? new ProductRepository(storeId, new ProductCategoryRepository(storeId));
   }
 
   /** 1:1 port of Angular `createProductCategory` (product-category-offline.service.ts:30-33). */
-  createProductCategory(name: string, order: number, isActive: boolean): Promise<BaseResponseModel<boolean>> {
+  createProductCategory(
+    name: string,
+    order: number,
+    isActive: boolean,
+  ): Promise<BaseResponseModel<boolean>> {
     const result = this.categoryRepository.addProductCategory(name, order, isActive);
     return Promise.resolve(result.succeeded ? success(true) : failure(result.errors));
   }

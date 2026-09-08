@@ -2,10 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { Result } from '@store-mgmt/domain';
 import type { ExchangeRate } from '@store-mgmt/domain';
 import type { ParsedData } from '../data-serializer-service';
-import {
-  DataSynchronizerService,
-  SynchronizerErrors,
-} from '../data-synchronizer-service';
+import { DataSynchronizerService, SynchronizerErrors } from '../data-synchronizer-service';
 import type {
   CategoryImportRepo,
   ExpenseImportService,
@@ -108,7 +105,9 @@ describe('DataSynchronizerService — exchangeRates merge (daily-exchange-rate)'
       exchange.svc,
     );
 
-    const result = await svc.sync(makeData([makeRate('2026-08-01', 120), makeRate('2026-08-02', 120)]));
+    const result = await svc.sync(
+      makeData([makeRate('2026-08-01', 120), makeRate('2026-08-02', 120)]),
+    );
 
     expect(result.succeeded).toBe(true);
     expect(exchange.addImportedExchangeRate).toHaveBeenCalledTimes(2);

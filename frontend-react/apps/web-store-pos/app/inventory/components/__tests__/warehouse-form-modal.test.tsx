@@ -16,12 +16,7 @@ const WAREHOUSE: Warehouse = {
 function renderModal(props: Partial<Parameters<typeof WarehouseFormModal>[0]> = {}) {
   return render(
     <IntlProvider locale="es" messages={esMessages}>
-      <WarehouseFormModal
-        open
-        onClose={vi.fn()}
-        onSave={vi.fn()}
-        {...props}
-      />
+      <WarehouseFormModal open onClose={vi.fn()} onSave={vi.fn()} {...props} />
     </IntlProvider>,
   );
 }
@@ -58,7 +53,9 @@ describe('WarehouseFormModal', () => {
     const onSave = vi.fn();
     const onClose = vi.fn();
     renderModal({ onSave, onClose });
-    fireEvent.change(screen.getByTestId('warehouse-name-input'), { target: { value: '  Norte  ' } });
+    fireEvent.change(screen.getByTestId('warehouse-name-input'), {
+      target: { value: '  Norte  ' },
+    });
     fireEvent.click(screen.getByText('Guardar'));
     expect(onSave).toHaveBeenCalledWith('Norte');
     expect(onClose).not.toHaveBeenCalled();

@@ -76,7 +76,7 @@ test.describe('register — rate limit (REQ-9)', { tag: '@rate-limit' }, () => {
     throw new Error(
       `Sent ${MAX_ATTEMPTS} registration attempts and never observed a 429 (rate limit). ` +
         'Either the limiter is misconfigured, or the 429 response failed CORS and surfaced as ' +
-        'a different failure — see design.md §11, risk R1.'
+        'a different failure — see design.md §11, risk R1.',
     );
   });
 });

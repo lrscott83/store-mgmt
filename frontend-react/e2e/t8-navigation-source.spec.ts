@@ -151,7 +151,7 @@ async function seedExpiredSession(page: Page): Promise<void> {
   await page.evaluate((key) => {
     window.localStorage.setItem(
       key,
-      JSON.stringify({ authToken: 'p3-probe-token', expiresIn: Date.now() - 1 })
+      JSON.stringify({ authToken: 'p3-probe-token', expiresIn: Date.now() - 1 }),
     );
   }, AUTH_MODEL_KEY);
 }
@@ -176,7 +176,7 @@ async function measureBoot(page: Page, i: number): Promise<Iteration> {
 
   const pushes = (await page.evaluate(
     (globalName) => (window as unknown as Record<string, unknown>)[globalName as string] ?? [],
-    PROBE_GLOBAL
+    PROBE_GLOBAL,
   )) as NavPush[];
 
   return {
@@ -203,7 +203,7 @@ function assertTheAppConsumedTheSeed(iterations: Iteration[]): void {
     unread.length,
     `The app never consumed AUTH_MODEL at key "${AUTH_MODEL_KEY}" — it survived ` +
       `${unread.length}/${iterations.length} boots. The version prefix is likely wrong ` +
-      `(global-config.ts:3), so this probe measured anonymous boots, not expired-session ones.`
+      `(global-config.ts:3), so this probe measured anonymous boots, not expired-session ones.`,
   ).toBe(0);
 }
 
@@ -211,7 +211,7 @@ async function report(
   label: string,
   expectation: string,
   iterations: Iteration[],
-  testInfo: TestInfo
+  testInfo: TestInfo,
 ): Promise<void> {
   const withPush = iterations.filter((it) => it.pushes.length > 0);
 
@@ -222,23 +222,25 @@ async function report(
 
   // Printed as well as attached: the point is to be pasteable straight out of
   // the terminal, without opening the HTML report.
-  console.log(`\n===== P-3 PROBE [${label}] — history pushes in ${withPush.length}/${ITERATIONS} boots =====`);
+  console.log(
+    `\n===== P-3 PROBE [${label}] — history pushes in ${withPush.length}/${ITERATIONS} boots =====`,
+  );
   console.log(`expectation: ${expectation}`);
   for (const it of iterations) {
     console.log(
-      `\n[boot ${it.i}] navigations=${JSON.stringify(it.navigations)} documents=${it.documents} pushes=${it.pushes.length}`
+      `\n[boot ${it.i}] navigations=${JSON.stringify(it.navigations)} documents=${it.documents} pushes=${it.pushes.length}`,
     );
     for (const push of it.pushes) {
       console.log(
         `  ${push.kind} -> ${push.url || '(same url)'} @${push.atMs}ms  ` +
-          `pathname=${push.pathnameAtCall} readyState=${push.readyState}`
+          `pathname=${push.pathnameAtCall} readyState=${push.readyState}`,
       );
       console.log(
         push.stack
           .split('\n')
           .slice(1, 8)
           .map((line) => `      ${line.trim()}`)
-          .join('\n')
+          .join('\n'),
       );
     }
   }
@@ -270,7 +272,7 @@ test.describe('P-3 probe — who pushes the extra /login navigation', () => {
       'same-url-reload',
       'the router stamps its state once; only the first boot should push',
       iterations,
-      testInfo
+      testInfo,
     );
   });
 
@@ -295,7 +297,7 @@ test.describe('P-3 probe — who pushes the extra /login navigation', () => {
       'every boot lands on a fresh history entry, so every boot should push — ' +
         'anything less than 8/8 REFUTES the mechanism and the hunt reopens',
       iterations,
-      testInfo
+      testInfo,
     );
   });
 

@@ -92,7 +92,7 @@ export default async function globalTeardown(): Promise<void> {
     throw new Error(
       `[e2e teardown] no pude conectar a "${database}" para limpiar las filas e2e-*: ${reason}. ` +
         'Levantá PostgreSQL, o pasá E2E_DB_URL si el backend apunta a otra base. ' +
-        'La corrida dejó filas sin borrar.'
+        'La corrida dejó filas sin borrar.',
     );
   }
 
@@ -124,10 +124,12 @@ export default async function globalTeardown(): Promise<void> {
     // which the first version of this message did not.
     console.warn(
       `[e2e teardown] nada que borrar en "${database}" ` +
-        '(si esta corrida registró usuarios, el backend apunta a otra base)'
+        '(si esta corrida registró usuarios, el backend apunta a otra base)',
     );
     return;
   }
 
-  console.log(`[e2e teardown] ${total} filas e2e-* borradas en "${database}" (${deletedByTable.join(', ')})`);
+  console.log(
+    `[e2e teardown] ${total} filas e2e-* borradas en "${database}" (${deletedByTable.join(', ')})`,
+  );
 }

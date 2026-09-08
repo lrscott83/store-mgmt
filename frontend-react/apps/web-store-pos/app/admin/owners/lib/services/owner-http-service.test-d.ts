@@ -11,11 +11,13 @@ import { ownerHttpService } from './owner-http-service';
 // manual `tsc --noEmit` gate.
 
 test('createOwner resolves to BaseResponseModel<Owner>, not a lying generic', () => {
-  expectTypeOf(ownerHttpService.createOwner)
-    .returns.resolves.toEqualTypeOf<BaseResponseModel<Owner>>();
+  expectTypeOf(ownerHttpService.createOwner).returns.resolves.toEqualTypeOf<
+    BaseResponseModel<Owner>
+  >();
 });
 
 test('updateOwner resolves to BaseResponseModel<Owner>, not a lying generic', () => {
-  expectTypeOf(ownerHttpService.updateOwner)
-    .returns.resolves.toEqualTypeOf<BaseResponseModel<Owner>>();
+  expectTypeOf(ownerHttpService.updateOwner).returns.resolves.toEqualTypeOf<
+    BaseResponseModel<Owner>
+  >();
 });

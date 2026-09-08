@@ -4,7 +4,10 @@ import { EFeatures, ExpenseType, PaymentType } from '@store-mgmt/domain';
 import type { Expense, Order, SaleCredit } from '@store-mgmt/domain';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
-import { hasCreditsModuleAvailable, hasExpensesModuleAvailable } from '~/shared/lib/auth/authorization-service';
+import {
+  hasCreditsModuleAvailable,
+  hasExpensesModuleAvailable,
+} from '~/shared/lib/auth/authorization-service';
 import { Card } from '~/shared/components/ui/card';
 import { Button } from '~/shared/components/ui/button';
 import { ChevronDownIcon } from '~/shared/components/ui/icons';
@@ -153,7 +156,10 @@ export function CuadrePorFechasPage() {
     const salesTotal = orderService.getActiveOrdersPriceBetweenDates(rangeStart, rangeEnd);
     const grossProfit = orderService.getActiveOrdersProfitBetweenDates(rangeStart, rangeEnd);
 
-    const categoriesResponse = orderService.getCategoryCartItemsViewBetweenDates(rangeStart, rangeEnd);
+    const categoriesResponse = orderService.getCategoryCartItemsViewBetweenDates(
+      rangeStart,
+      rangeEnd,
+    );
     const categories = categoriesResponse.succeeded ? categoriesResponse.data : [];
 
     const activeOrders: Order[] = orderService.getActiveOrdersBetween(rangeStart, rangeEnd);
@@ -219,9 +225,7 @@ export function CuadrePorFechasPage() {
     ? summary.categories.reduce((acc, c) => acc + c.itemsCount, 0)
     : 0;
   const creditsCount = summary ? summary.saleCredits.length : 0;
-  const creditsTotal = summary
-    ? summary.saleCredits.reduce((acc, c) => acc + c.total, 0)
-    : 0;
+  const creditsTotal = summary ? summary.saleCredits.reduce((acc, c) => acc + c.total, 0) : 0;
   const paidSaleCreditsTotal = summary
     ? summary.paidSaleCredits.reduce((acc, c) => acc + c.total, 0)
     : 0;
@@ -239,7 +243,10 @@ export function CuadrePorFechasPage() {
       {/* Date range picker */}
       <div className="flex flex-wrap items-end gap-3">
         <div>
-          <label htmlFor="cuadre-start-date" className="mb-1 block text-sm font-medium text-gray-700">
+          <label
+            htmlFor="cuadre-start-date"
+            className="mb-1 block text-sm font-medium text-gray-700"
+          >
             {intl.formatMessage({ id: 'CUADRE_FECHAS.START_DATE' })}
           </label>
           <input
@@ -327,7 +334,9 @@ export function CuadrePorFechasPage() {
                         <span className="font-bold text-text">Ventas</span>
                       </td>
                       <td className="p-1 text-right">
-                        <span className="font-bold text-success whitespace-nowrap">{formatCurrency(summary.salesCashTotal)}</span>
+                        <span className="font-bold text-success whitespace-nowrap">
+                          {formatCurrency(summary.salesCashTotal)}
+                        </span>
                       </td>
                     </tr>
                     {hasCreditsModule && (
@@ -336,7 +345,9 @@ export function CuadrePorFechasPage() {
                           <span className="font-bold text-text">Créditos Pagados</span>
                         </td>
                         <td className="p-1 text-right">
-                          <span className="font-bold text-success whitespace-nowrap">{formatCurrency(summary.paidCreditsCashTotal)}</span>
+                          <span className="font-bold text-success whitespace-nowrap">
+                            {formatCurrency(summary.paidCreditsCashTotal)}
+                          </span>
                         </td>
                       </tr>
                     )}
@@ -346,7 +357,9 @@ export function CuadrePorFechasPage() {
                           <span className="font-bold text-text">Gastos</span>
                         </td>
                         <td className="p-1 text-right">
-                          <span className="font-bold text-danger whitespace-nowrap">{formatCurrency(summary.expensesCashTotal)}</span>
+                          <span className="font-bold text-danger whitespace-nowrap">
+                            {formatCurrency(summary.expensesCashTotal)}
+                          </span>
                         </td>
                       </tr>
                     )}
@@ -368,7 +381,9 @@ export function CuadrePorFechasPage() {
                         <span className="font-bold text-text">Ventas</span>
                       </td>
                       <td className="p-1 text-right">
-                        <span className="font-bold text-success whitespace-nowrap">{formatCurrency(summary.salesCardTotal)}</span>
+                        <span className="font-bold text-success whitespace-nowrap">
+                          {formatCurrency(summary.salesCardTotal)}
+                        </span>
                       </td>
                     </tr>
                   </tbody>
@@ -393,10 +408,13 @@ export function CuadrePorFechasPage() {
                         {summary.expenses.map((expense) => (
                           <tr key={expense.id} className="border-b border-border last:border-0">
                             <td className="p-1 text-text">
-                              {formatLocalDate(expense.date)} — {intl.formatMessage({ id: EXPENSE_TYPE_KEYS[expense.type] })}
+                              {formatLocalDate(expense.date)} —{' '}
+                              {intl.formatMessage({ id: EXPENSE_TYPE_KEYS[expense.type] })}
                             </td>
                             <td className="p-1 text-right text-danger">
-                              <span className="whitespace-nowrap">{formatCurrency(expense.total)}</span>
+                              <span className="whitespace-nowrap">
+                                {formatCurrency(expense.total)}
+                              </span>
                             </td>
                             <td className="p-1 text-right">
                               <span className="rounded-full bg-success/10 px-2 py-0.5 text-xs font-semibold text-success">
@@ -468,7 +486,9 @@ function SaleCreditsTable({ saleCredits }: { saleCredits: SaleCredit[] }) {
               <span className="text-text">{saleCredit.client}</span>
             </td>
             <td className="p-1 text-right">
-              <span className={`whitespace-nowrap ${saleCredit.isPaid ? 'text-success' : 'text-danger'}`}>
+              <span
+                className={`whitespace-nowrap ${saleCredit.isPaid ? 'text-success' : 'text-danger'}`}
+              >
                 {formatCurrency(saleCredit.total)}
               </span>
             </td>

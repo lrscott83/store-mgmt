@@ -28,26 +28,29 @@ Confirmed trivial. No hidden complexity.
 ## Affected Areas
 
 **New files:**
+
 - `apps/web-store-pos/app/help/routes/tutorial.tsx` — page component (static JSX, one `useIntl` call).
 - `apps/web-store-pos/app/help/routes/__tests__/tutorial.test.tsx` — smoke test (render + assert heading).
 - `apps/web-store-pos/public/images/help/` — 6 image assets copied from Angular `frontend/src/assets/images/help/`.
 
 **Modified files:**
+
 - `apps/web-store-pos/app/routes.ts` — add `route('help/tutorial', 'help/routes/tutorial.tsx')` inside the app-layout block.
 - `apps/web-store-pos/app/shared/lib/i18n/es.ts` — add `TUTORIAL.TITLE`, `MENU.HELP`, `MENU.TUTORIAL`.
 - `apps/web-store-pos/app/shared/lib/config/menu-config.ts` — add a Help group with one Tutorial item (`featureIds: []`).
 
 ## Approaches
 
-| Approach | Pros | Cons | Effort |
-|----------|------|------|--------|
-| A. Single inline static route file | Fewest files; matches simplest existing slices; no indirection | Markup isolation marginally harder to test (minor) | Low |
-| B. Route container + presentational component | Consistent with profile/reports | Over-engineering for static text+images | Low-Med |
-| C. MDX/markdown-driven content | Future-proof if it grows | Adds tooling not in stack; disproportionate | High |
+| Approach                                      | Pros                                                           | Cons                                               | Effort  |
+| --------------------------------------------- | -------------------------------------------------------------- | -------------------------------------------------- | ------- |
+| A. Single inline static route file            | Fewest files; matches simplest existing slices; no indirection | Markup isolation marginally harder to test (minor) | Low     |
+| B. Route container + presentational component | Consistent with profile/reports                                | Over-engineering for static text+images            | Low-Med |
+| C. MDX/markdown-driven content                | Future-proof if it grows                                       | Adds tooling not in stack; disproportionate        | High    |
 
 ## Recommendation
 
 **Approach A** — single `tutorial.tsx` route file with:
+
 - `useIntl` for `TUTORIAL.TITLE` only.
 - Native `<details>/<summary>` accordion (no library dep; Tailwind-styled).
 - Images referenced as `/images/help/*.png` (public/ absolute paths).

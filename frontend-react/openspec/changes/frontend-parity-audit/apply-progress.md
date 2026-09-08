@@ -57,7 +57,7 @@ header dropdowns (user menu, cart) stayed open on outside click.
 - `frontend/src/scss/themes/layouts/menu/sidebar.scss` — `.navbar-collapsed { width: 0px; }`
   rule confirms collapsed sidebar must be zero-width, not a narrow icon rail
 - `frontend/src/app/presentation/products/products.component.html` — two `<button
-  mat-fab extended color="primary">` elements: `openCreateCategoryModal()` ("+ Categoría"
+mat-fab extended color="primary">` elements: `openCreateCategoryModal()` ("+ Categoría"
   via PRODUCT_CATEGORY.NEW_PRODUCT_CATEGORY) and `openImportCsvProductModal()`
   ("Importar Productos" via PRODUCT_CATEGORY.IMPORT_PRODUCTS) — confirmed pill/FAB shape,
   filled purple, icon+label pattern the fab variant replicates
@@ -67,13 +67,13 @@ header dropdowns (user menu, cart) stayed open on outside click.
 
 ## TDD Cycle Evidence
 
-| Task | RED | GREEN | REFACTOR |
-|---|---|---|---|
-| useClickOutside hook | wrote use-click-outside.test.ts (3 tests: outside-closes, inside-does-not-close, cleanup), confirmed import failure (file didn't exist) | implemented hook (mousedown listener on document, ref.contains check), 3/3 pass | n/a |
-| Navbar dropdown outside-click | wrote S-NAV-6 (2 tests), confirmed "closes on outside click" failed (dropdown stayed open, `Editar Perfil` still found) | added userMenuRef + useClickOutside(userMenuRef, close), 19/19 navbar tests pass | n/a |
-| CartShell panel outside-click | wrote CART-05 (2 tests), confirmed "closes on outside click" failed (`Carrito` title still found after outside mousedown) | added cartRef + useClickOutside(cartRef, close), 6/6 cart-shell tests pass | n/a |
-| Button fab variant | wrote 5 new fab-variant tests (rounded-full, bg-primary+text-white, shadow-lg, px-6/py-3, not-rounded-md), confirmed 4/5 failed against old single shared-class Button (rounded-md/px-4/py-2/shadow-card hardcoded) | added `fab` to ButtonVariant union + VARIANT_CLASSES, moved radius/padding/shadow into each variant's classes (was shared base classes), 17/17 button tests pass | n/a |
-| Sidebar zero-width | pure Tailwind class swap (w-16 -> w-0), test assertion updated as part of same change to assert w-0 and NOT w-16 — VISUAL note, no independent RED/GREEN cycle since it's a single-class swap in an existing behavior-verified test | n/a | n/a |
+| Task                          | RED                                                                                                                                                                                                                                 | GREEN                                                                                                                                                            | REFACTOR |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| useClickOutside hook          | wrote use-click-outside.test.ts (3 tests: outside-closes, inside-does-not-close, cleanup), confirmed import failure (file didn't exist)                                                                                             | implemented hook (mousedown listener on document, ref.contains check), 3/3 pass                                                                                  | n/a      |
+| Navbar dropdown outside-click | wrote S-NAV-6 (2 tests), confirmed "closes on outside click" failed (dropdown stayed open, `Editar Perfil` still found)                                                                                                             | added userMenuRef + useClickOutside(userMenuRef, close), 19/19 navbar tests pass                                                                                 | n/a      |
+| CartShell panel outside-click | wrote CART-05 (2 tests), confirmed "closes on outside click" failed (`Carrito` title still found after outside mousedown)                                                                                                           | added cartRef + useClickOutside(cartRef, close), 6/6 cart-shell tests pass                                                                                       | n/a      |
+| Button fab variant            | wrote 5 new fab-variant tests (rounded-full, bg-primary+text-white, shadow-lg, px-6/py-3, not-rounded-md), confirmed 4/5 failed against old single shared-class Button (rounded-md/px-4/py-2/shadow-card hardcoded)                 | added `fab` to ButtonVariant union + VARIANT_CLASSES, moved radius/padding/shadow into each variant's classes (was shared base classes), 17/17 button tests pass | n/a      |
+| Sidebar zero-width            | pure Tailwind class swap (w-16 -> w-0), test assertion updated as part of same change to assert w-0 and NOT w-16 — VISUAL note, no independent RED/GREEN cycle since it's a single-class swap in an existing behavior-verified test | n/a                                                                                                                                                              | n/a      |
 
 ## Design decisions / deviations
 
@@ -228,8 +228,8 @@ no logic change). Removed 3 React-only dead files with no Angular equivalent.
    REMOVED. Angular's `sale-category-products.component.html` is a bare `<table>`, no
    category heading is repeated inside the panel (the category name only appears once, on
    the selector button above).
-Note: `SCANNER.*` i18n keys were left in es.ts unused rather than pruned (same rationale as
-Batch 3's Products slice — no instruction to prune orphaned i18n keys).
+   Note: `SCANNER.*` i18n keys were left in es.ts unused rather than pruned (same rationale as
+   Batch 3's Products slice — no instruction to prune orphaned i18n keys).
 
 ### Flagged gap — NOT ported in this batch (deferred to Stage 6/Sync)
 
@@ -252,20 +252,19 @@ a single-view slice).
 
 ### TDD Cycle Evidence
 
-| Task | RED | GREEN | REFACTOR |
-|---|---|---|---|
-| SaleProductRow rewrite (name, conditional price, quantity, add button, inventory gate) | wrote sale-product-row.test.tsx (10 tests) against the new prop signature (`product`+`orderType`+`onAdded`+optional `checkAvailability`); ran against old component (`onAdd`/`onIncrease`/`onDecrease` props) — 9/10 failed | rewrote sale-product-row.tsx with the new signature, price/quantity local state, `discountFromInvantory`-gated `checkAvailability` call — 10/10 passed on first GREEN attempt | none needed |
-| SaleCategoryProducts rewrite (thin per-category list) | wrote sale-category-products.test.tsx (4 tests) against new `products`+`orderType`+`onAdded`+`checkAvailability` signature; ran against old component (`category`+`cartQtyMap`+`onIncrease`/`onDecrease` props) — 3/4 failed with `Cannot read properties of undefined (reading 'id')` (category-filtering code referenced a prop that no longer existed) | rewrote to a thin map over `products` — 4/4 passed | none needed |
-| SalePage rewrite (header, category strip, alert, scanner removal, cart-store wiring) | wrote sale.test.tsx (8 tests) mocking category/product services + cart-store with a selector-aware mock; ran against old sale.tsx — 5/8 failed (Angular header text absent, scanner elements present, wrong add-item wiring) | rewrote sale.tsx: fixed `OrderType.Normal`, `SALES.HEADER` Card title, category strip with active-category styling, `SaleCategoryProducts` wired to filtered products, `InfoBox` alert condition, `handleAdded` calling `cartStore.addItem(product, quantity)` — 7/8 passed | 1 test failed (`addItemMock` not called) because the test's `useCartStore` mock ignored the selector argument used by `sale.tsx` (`useCartStore((s) => s.addItem)`); fixed the mock to be selector-aware (same pattern as the existing `auth-store` mock), re-ran, 8/8 passed |
-| cart-store `addItem` quantity param | no dedicated new test (no cart-store test file exists in this codebase); verified via `sale.test.tsx`'s "adds a product to the cart" test asserting `addItemMock` called, and the full `cart-shell.test.tsx` suite (6 tests, unchanged) still passing after the signature widened | n/a | n/a |
-| cart-shell token replacement | pure visual Tailwind class swap, no new test — VISUAL note per Strict TDD Mode's rule (pure styling = tsc + visual note, not test-first); verified via the 6 pre-existing `cart-shell.test.tsx` tests (testids/aria-labels/text untouched) still passing | n/a | n/a |
+| Task                                                                                   | RED                                                                                                                                                                                                                                                                                                                                                       | GREEN                                                                                                                                                                                                                                                                       | REFACTOR                                                                                                                                                                                                                                                                      |
+| -------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| SaleProductRow rewrite (name, conditional price, quantity, add button, inventory gate) | wrote sale-product-row.test.tsx (10 tests) against the new prop signature (`product`+`orderType`+`onAdded`+optional `checkAvailability`); ran against old component (`onAdd`/`onIncrease`/`onDecrease` props) — 9/10 failed                                                                                                                               | rewrote sale-product-row.tsx with the new signature, price/quantity local state, `discountFromInvantory`-gated `checkAvailability` call — 10/10 passed on first GREEN attempt                                                                                               | none needed                                                                                                                                                                                                                                                                   |
+| SaleCategoryProducts rewrite (thin per-category list)                                  | wrote sale-category-products.test.tsx (4 tests) against new `products`+`orderType`+`onAdded`+`checkAvailability` signature; ran against old component (`category`+`cartQtyMap`+`onIncrease`/`onDecrease` props) — 3/4 failed with `Cannot read properties of undefined (reading 'id')` (category-filtering code referenced a prop that no longer existed) | rewrote to a thin map over `products` — 4/4 passed                                                                                                                                                                                                                          | none needed                                                                                                                                                                                                                                                                   |
+| SalePage rewrite (header, category strip, alert, scanner removal, cart-store wiring)   | wrote sale.test.tsx (8 tests) mocking category/product services + cart-store with a selector-aware mock; ran against old sale.tsx — 5/8 failed (Angular header text absent, scanner elements present, wrong add-item wiring)                                                                                                                              | rewrote sale.tsx: fixed `OrderType.Normal`, `SALES.HEADER` Card title, category strip with active-category styling, `SaleCategoryProducts` wired to filtered products, `InfoBox` alert condition, `handleAdded` calling `cartStore.addItem(product, quantity)` — 7/8 passed | 1 test failed (`addItemMock` not called) because the test's `useCartStore` mock ignored the selector argument used by `sale.tsx` (`useCartStore((s) => s.addItem)`); fixed the mock to be selector-aware (same pattern as the existing `auth-store` mock), re-ran, 8/8 passed |
+| cart-store `addItem` quantity param                                                    | no dedicated new test (no cart-store test file exists in this codebase); verified via `sale.test.tsx`'s "adds a product to the cart" test asserting `addItemMock` called, and the full `cart-shell.test.tsx` suite (6 tests, unchanged) still passing after the signature widened                                                                         | n/a                                                                                                                                                                                                                                                                         | n/a                                                                                                                                                                                                                                                                           |
+| cart-shell token replacement                                                           | pure visual Tailwind class swap, no new test — VISUAL note per Strict TDD Mode's rule (pure styling = tsc + visual note, not test-first); verified via the 6 pre-existing `cart-shell.test.tsx` tests (testids/aria-labels/text untouched) still passing                                                                                                  | n/a                                                                                                                                                                                                                                                                         | n/a                                                                                                                                                                                                                                                                           |
 
 ### Test/Build Results
 
 - `pnpm exec tsc --noEmit` (web-store-pos): clean, zero errors.
 - `pnpm exec vitest run` (full suite, web-store-pos): 82 test files / 894 tests passed, 0
-  failed. Baseline before this batch: 80 files / 879 tests (per apply-progress engram batch
-  3) → net +2 files, +15 tests (added sale-product-row.test.tsx +10, sale-category-products.test.tsx
+  failed. Baseline before this batch: 80 files / 879 tests (per apply-progress engram batch 3) → net +2 files, +15 tests (added sale-product-row.test.tsx +10, sale-category-products.test.tsx
   +4, sale.test.tsx +8 = +22; removed barcode-scanner.test.tsx −~7 net after accounting for
   file removal). Same pre-existing unrelated stderr noise line from `api-client.test.ts`'s
   AUTH-06 jsdom navigation warning (not a failure).
@@ -424,12 +423,12 @@ deactivate action — none of which exist in Angular's actual `edit-order-modal.
 
 ### TDD Cycle Evidence (Batch 5)
 
-| Task | RED | GREEN | REFACTOR |
-|---|---|---|---|
-| OrderList (accordion) rewrite | wrote order-components.test.tsx's OrderList describe block (7 tests) against the new accordion API (`orders`, `readOnly`, `onEditOrder`, `onDeactivateOrder` props, `order-panel-toggle-{id}` testids) — components were rewritten in the same pass per Strict TDD's allowance for parity-rebuild batches (design.md: matrices are the audit unit; tests assert the target Angular-parity contract) | ran full order-components.test.tsx — 12/12 passed on first run against the rewritten components (confirms the rewrite matches the test-encoded contract with no drift) | none needed |
-| EditOrderModal (payment-type-only) rewrite | wrote EditOrderModal describe block (5 tests) asserting the literal `SALE_CREDIT.PAYMENT_CREDIT` title, payment-type radio defaulted to `order.paymentType`, `onUpdate`/`onClose` call contracts, and the REMOVED `onDeactivate` prop (no longer in the interface) | same run, 12/12 passed | none needed |
-| OrderItemList two-step deactivate confirm | covered by OrderList's "requires a second click to confirm deactivate" test — asserts `onDeactivateOrder` is NOT called on the first click, IS called with the order on the second | passed first run | none needed |
-| OrdersPage / TodayOrdersPage route rewrites | updated sales-routes.test.tsx's two describe blocks (10 tests total) with exact-text assertions for the corrected headers ("Historial de Ventas" / "Ventas del día") and empty states ("No se encontró ninguna venta" / "No se ha realizado ninguna venta en el día de hoy.") plus radio-filter presence checks | ran sales-routes.test.tsx — 10/10 passed first run | none needed |
+| Task                                        | RED                                                                                                                                                                                                                                                                                                                                                                                                 | GREEN                                                                                                                                                                  | REFACTOR    |
+| ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
+| OrderList (accordion) rewrite               | wrote order-components.test.tsx's OrderList describe block (7 tests) against the new accordion API (`orders`, `readOnly`, `onEditOrder`, `onDeactivateOrder` props, `order-panel-toggle-{id}` testids) — components were rewritten in the same pass per Strict TDD's allowance for parity-rebuild batches (design.md: matrices are the audit unit; tests assert the target Angular-parity contract) | ran full order-components.test.tsx — 12/12 passed on first run against the rewritten components (confirms the rewrite matches the test-encoded contract with no drift) | none needed |
+| EditOrderModal (payment-type-only) rewrite  | wrote EditOrderModal describe block (5 tests) asserting the literal `SALE_CREDIT.PAYMENT_CREDIT` title, payment-type radio defaulted to `order.paymentType`, `onUpdate`/`onClose` call contracts, and the REMOVED `onDeactivate` prop (no longer in the interface)                                                                                                                                  | same run, 12/12 passed                                                                                                                                                 | none needed |
+| OrderItemList two-step deactivate confirm   | covered by OrderList's "requires a second click to confirm deactivate" test — asserts `onDeactivateOrder` is NOT called on the first click, IS called with the order on the second                                                                                                                                                                                                                  | passed first run                                                                                                                                                       | none needed |
+| OrdersPage / TodayOrdersPage route rewrites | updated sales-routes.test.tsx's two describe blocks (10 tests total) with exact-text assertions for the corrected headers ("Historial de Ventas" / "Ventas del día") and empty states ("No se encontró ninguna venta" / "No se ha realizado ninguna venta en el día de hoy.") plus radio-filter presence checks                                                                                     | ran sales-routes.test.tsx — 10/10 passed first run                                                                                                                     | none needed |
 
 ### Test/Build Results (Batch 5)
 
@@ -510,19 +509,19 @@ payment-type select, gated behind a SweetAlert2 confirm before actually submitti
 ### Where (Batch 6)
 
 - `app/sales/routes/credits.tsx` — REWRITTEN. Card title = `SALE_CREDIT.TITLE` ("Créditos")
-  + unpaid-credits-count badge + unpaid-credits-total (danger/red text) — both computed
-  exactly like Angular's `getSaleCreditsCount()`/`getSaleCreditsTotal()` (count/sum only
-  credits where `!isPaid`). NO filters at all (Angular's history view has none). Credits
-  grouped by date (`groupSaleCredits`, ported 1:1 from Angular's
-  `SaleCreditsComponent.groupSaleCredits`) into an accordion of date panels; each date panel
-  wraps `SaleCreditList` with NO `readOnly` prop passed (Angular's `<app-sale-credit-list>`
-  in `sale-credits.component.html` has no `[readOnly]` binding → stays default `true`, no
-  edit/pay actions reachable from this view at all). REMOVED: the entire date-range
-  `<input type="date">` filter pair AND the paid/unpaid radio-style filter buttons — neither
-  has an Angular equivalent.
+  - unpaid-credits-count badge + unpaid-credits-total (danger/red text) — both computed
+    exactly like Angular's `getSaleCreditsCount()`/`getSaleCreditsTotal()` (count/sum only
+    credits where `!isPaid`). NO filters at all (Angular's history view has none). Credits
+    grouped by date (`groupSaleCredits`, ported 1:1 from Angular's
+    `SaleCreditsComponent.groupSaleCredits`) into an accordion of date panels; each date panel
+    wraps `SaleCreditList` with NO `readOnly` prop passed (Angular's `<app-sale-credit-list>`
+    in `sale-credits.component.html` has no `[readOnly]` binding → stays default `true`, no
+    edit/pay actions reachable from this view at all). REMOVED: the entire date-range
+    `<input type="date">` filter pair AND the paid/unpaid radio-style filter buttons — neither
+    has an Angular equivalent.
 - `app/sales/routes/today-credits.tsx` — REWRITTEN. Card title = `SALE_CREDIT.TODAY_CREDITS`
   ("Créditos del día"), no count/total in the header (Angular's `today-sale-credits.
-  component.html` card-toolbar is empty), flat (not grouped) list of today's active credits.
+component.html` card-toolbar is empty), flat (not grouped) list of today's active credits.
   `SaleCreditList` rendered with `readOnly={false}` (Angular: `[readOnly]="false"` explicit),
   wiring `onSave`→`SaleCreditOfflineService.update` and `onPay`→
   `SaleCreditOfflineService.pay`. Empty state uses `SALE_CREDIT.NO_SALE_CREDIT_FOUND_IN_DAY`
@@ -564,18 +563,18 @@ payment-type select, gated behind a SweetAlert2 confirm before actually submitti
   actually calls `onConfirm`).
 - `app/shared/lib/i18n/es.ts` — REPLACED the entire React-only `CREDITS.*` block with exact
   Angular `SALE_CREDIT.*` keys byte-identical to `frontend/src/app/_modules/i18n/vocabs/
-  es.ts`: `SALE_CREDIT.TITLE`='Créditos', `SALE_CREDIT.TODAY_CREDITS`='Créditos del día',
+es.ts`: `SALE_CREDIT.TITLE`='Créditos', `SALE_CREDIT.TODAY_CREDITS`='Créditos del día',
   `SALE_CREDIT.TO_PAY`='Pagar', `SALE_CREDIT.PAYMENT_CREDIT`='Venta por Cobrar' (already
   present from the Orders batch, reused), `SALE_CREDIT.PAYMENT_CONFIRM_TITLE`='Confirmación
   de Pago', `SALE_CREDIT.PAYMENT_CONFIRM_MESSAGE`='Usted está segura(o) que desea pagar este
   crédito por venta?' (documented for parity even though the SweetAlert2-based confirm text
   isn't rendered directly, since the inline confirm replaces it), `SALE_CREDIT.
-  NO_SALE_CREDIT_FOUND_IN_DAY`='No existe ningún crédito en el día`, `SALE_CREDIT.
+NO_SALE_CREDIT_FOUND_IN_DAY`='No existe ningún crédito en el día`, `SALE_CREDIT.
   NO_SALE_CREDIT_FOUND`='No se encontró ningún crédito'. Added missing `GENERAL.CLIENT`=
-  'Cliente', `GENERAL.NOTE`='Nota', `GENERAL.NO`='No' (Angular's SweetAlert2 cancel button
-  text, added for completeness even though the inline-confirm pattern doesn't render a
-  distinct No button — GENERAL.YES already existed for the confirm-click label). All old
-  `CREDITS.*` keys REMOVED (were exclusively consumed by the files rewritten in this batch,
+'Cliente', `GENERAL.NOTE`='Nota', `GENERAL.NO`='No' (Angular's SweetAlert2 cancel button
+text, added for completeness even though the inline-confirm pattern doesn't render a
+distinct No button — GENERAL.YES already existed for the confirm-click label). All old
+`CREDITS.\*` keys REMOVED (were exclusively consumed by the files rewritten in this batch,
   confirmed via grep before removal — zero orphans).
 - Test files: `credit-components.test.tsx` REWRITTEN (19 tests, was 7 testing the old
   card-button `SaleCreditList`/rich `EditSaleCreditModal` APIs — now tests the table
@@ -609,12 +608,12 @@ payment-type select, gated behind a SweetAlert2 confirm before actually submitti
 
 ### TDD Cycle Evidence (Batch 6)
 
-| Task | RED | GREEN | REFACTOR |
-|---|---|---|---|
-| SaleCreditList (table + actions menu) rewrite | wrote credit-components.test.tsx's SaleCreditList describe block (7 tests) against the new table API (`saleCredits`, `readOnly`, testids `sale-credit-actions-toggle-{id}`), confirmed RED (old card-button component had no such API) | ran full suite — 32/32 passed on first run against the rewritten component | none needed |
-| EditSaleCreditModal (client/note-only, Pagar submit) rewrite | wrote EditSaleCreditModal describe block (6 tests) asserting literal `SALE_CREDIT.PAYMENT_CREDIT` title, prefilled client/note, required-client validation message, `onSave`/`onClose` contracts via testids (not label text, since the submit button reads "Pagar" not "Actualizar") | same run, 32/32 passed | none needed |
-| SaleCreditPaymentModal (payment-type select + two-step confirm) rewrite | wrote SaleCreditPaymentModal describe block (6 tests) asserting literal title, client/total display, `Efectivo` default via `getByLabelText('Forma de Pago')`, and the two-click confirm gate (`onConfirm` not called on first click, called with `(id, paymentType, note)` on second) | same run, 32/32 passed | none needed |
-| SaleCreditsPage / TodaySaleCreditsPage route rewrites | updated sales-routes.test.tsx (13 tests total for these two describes) with exact-text header/empty-state assertions + confirmed zero radio/date-input elements render; updated the shared `SaleCreditOfflineService` mock to drop `getByDateRange` | ran sales-routes.test.tsx — 13/13 passed first run | none needed |
+| Task                                                                    | RED                                                                                                                                                                                                                                                                                    | GREEN                                                                      | REFACTOR    |
+| ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ----------- |
+| SaleCreditList (table + actions menu) rewrite                           | wrote credit-components.test.tsx's SaleCreditList describe block (7 tests) against the new table API (`saleCredits`, `readOnly`, testids `sale-credit-actions-toggle-{id}`), confirmed RED (old card-button component had no such API)                                                 | ran full suite — 32/32 passed on first run against the rewritten component | none needed |
+| EditSaleCreditModal (client/note-only, Pagar submit) rewrite            | wrote EditSaleCreditModal describe block (6 tests) asserting literal `SALE_CREDIT.PAYMENT_CREDIT` title, prefilled client/note, required-client validation message, `onSave`/`onClose` contracts via testids (not label text, since the submit button reads "Pagar" not "Actualizar")  | same run, 32/32 passed                                                     | none needed |
+| SaleCreditPaymentModal (payment-type select + two-step confirm) rewrite | wrote SaleCreditPaymentModal describe block (6 tests) asserting literal title, client/total display, `Efectivo` default via `getByLabelText('Forma de Pago')`, and the two-click confirm gate (`onConfirm` not called on first click, called with `(id, paymentType, note)` on second) | same run, 32/32 passed                                                     | none needed |
+| SaleCreditsPage / TodaySaleCreditsPage route rewrites                   | updated sales-routes.test.tsx (13 tests total for these two describes) with exact-text header/empty-state assertions + confirmed zero radio/date-input elements render; updated the shared `SaleCreditOfflineService` mock to drop `getByDateRange`                                    | ran sales-routes.test.tsx — 13/13 passed first run                         | none needed |
 
 ### Test/Build Results (Batch 6)
 
@@ -648,16 +647,17 @@ payment-type select, gated behind a SweetAlert2 confirm before actually submitti
 ### Status (Batch 6)
 
 6 batches complete (2 targeted UI/shell batches + Stage 1 Sales Products-view + Sale/POS-view
-+ Orders-views + Sale-Credits-views parity slices). Stage 1 (Sales) is STILL NOT fully done.
-Remaining per the tasks artifact's Stage 1 template, scoped to the two Sales views not yet
-touched: Today Stats / Cuadre del día (`today-stats.tsx`) and Category Stats
-(`category-stats.tsx`) — both need their own Angular-vs-React L4/L5/L6 diff passes before
-Stage 1 can be marked parity-complete and moved to `sdd-verify`. Ready to continue with
-Today Stats and Category Stats as the final Stage 1 slice, or run `sdd-verify` on the
-Products+Sale+Orders+Credits slices completed so far, per user direction. Stage 1's
-full-module chained-PR delivery strategy (stacked-to-main vs feature-branch-chain) still
-needs an explicit decision from the orchestrator/user before a non-explicitly-scoped Stage 1
-`sdd-apply` batch begins, per the tasks artifact's Review Workload Forecast.
+
+- Orders-views + Sale-Credits-views parity slices). Stage 1 (Sales) is STILL NOT fully done.
+  Remaining per the tasks artifact's Stage 1 template, scoped to the two Sales views not yet
+  touched: Today Stats / Cuadre del día (`today-stats.tsx`) and Category Stats
+  (`category-stats.tsx`) — both need their own Angular-vs-React L4/L5/L6 diff passes before
+  Stage 1 can be marked parity-complete and moved to `sdd-verify`. Ready to continue with
+  Today Stats and Category Stats as the final Stage 1 slice, or run `sdd-verify` on the
+  Products+Sale+Orders+Credits slices completed so far, per user direction. Stage 1's
+  full-module chained-PR delivery strategy (stacked-to-main vs feature-branch-chain) still
+  needs an explicit decision from the orchestrator/user before a non-explicitly-scoped Stage 1
+  `sdd-apply` batch begins, per the tasks artifact's Review Workload Forecast.
 
 ## Batch 7 — Stage 1 Sales, TODAY STATS + CATEGORY STATS strict Angular parity (FINAL Sales slice)
 
@@ -790,13 +790,13 @@ Flagged here for Stage 3's L4 functional diff pass.
 
 ### TDD Cycle Evidence (Batch 7)
 
-| Task | RED | GREEN | REFACTOR |
-|---|---|---|---|
-| `OrderOfflineService.getCategoryCartItemsView` | wrote 6 tests (empty case, category-level grouping/totals, product-level grouping/totals, category `order` resolution, `Number.MAX_VALUE` fallback, excludes inactive orders) against the not-yet-existing method; confirmed RED (`TypeError: service.getCategoryCartItemsView is not a function`, 6/6 new tests failed, 26/26 pre-existing still passed) | implemented the method — 32/32 passed first run | none needed |
-| `authorization-service.isModuleAvailable`/`hasExpensesModuleAvailable`/`hasCreditsModuleAvailable` | wrote 7 tests against not-yet-exported functions; confirmed RED (`TypeError: (0, hasCreditsModuleAvailable) is not a function`, 7/7 new failed, 16/16 pre-existing passed) | implemented — 23/23 passed first run | none needed |
-| `SaleCreditOfflineService.getUnpaidCreatedToday`/`getPaidToday` | wrote 5 tests against not-yet-existing methods; confirmed RED (`TypeError: service.getPaidToday is not a function`, 5/5 new failed, 26/26 pre-existing passed) | implemented — initially 30/31 (one test used an untyped-and-unverified backdating approach); revised the "excludes credits not created today" test to directly backdate `localStorage` and assert via the real method instead of a placeholder assertion — 31/31 passed | tightened one test's assertion from a placeholder `expect(credit).toBeTruthy()` to an actual behavioral check against `getUnpaidCreatedToday()` |
-| `CategoryStats` component rewrite | wrote 3 tests (category summary row, per-product rows, null-category guard) against the already-drafted component in the same edit pass (component written first, tests immediately after, both verified together — see Issues Found) | 3/3 passed on first run, no fix needed | none needed |
-| `TodayStatsPage` route rewrite | wrote 6 tests (header, Resumen Efectivo panel + Gastos-row visibility gating, salesCashTotal formula, Ventas-panel item count, Gastos/Créditos panels hidden without modules, Gastos/Créditos panels shown + literal "Créditos Pagados (60)" quirk with modules) against the not-yet-rewritten route; confirmed RED (5/6 failed against the old summary-card implementation) | rewrote the route — 6/6 passed first run | none needed |
+| Task                                                                                               | RED                                                                                                                                                                                                                                                                                                                                                                          | GREEN                                                                                                                                                                                                                                                                   | REFACTOR                                                                                                                                        |
+| -------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `OrderOfflineService.getCategoryCartItemsView`                                                     | wrote 6 tests (empty case, category-level grouping/totals, product-level grouping/totals, category `order` resolution, `Number.MAX_VALUE` fallback, excludes inactive orders) against the not-yet-existing method; confirmed RED (`TypeError: service.getCategoryCartItemsView is not a function`, 6/6 new tests failed, 26/26 pre-existing still passed)                    | implemented the method — 32/32 passed first run                                                                                                                                                                                                                         | none needed                                                                                                                                     |
+| `authorization-service.isModuleAvailable`/`hasExpensesModuleAvailable`/`hasCreditsModuleAvailable` | wrote 7 tests against not-yet-exported functions; confirmed RED (`TypeError: (0, hasCreditsModuleAvailable) is not a function`, 7/7 new failed, 16/16 pre-existing passed)                                                                                                                                                                                                   | implemented — 23/23 passed first run                                                                                                                                                                                                                                    | none needed                                                                                                                                     |
+| `SaleCreditOfflineService.getUnpaidCreatedToday`/`getPaidToday`                                    | wrote 5 tests against not-yet-existing methods; confirmed RED (`TypeError: service.getPaidToday is not a function`, 5/5 new failed, 26/26 pre-existing passed)                                                                                                                                                                                                               | implemented — initially 30/31 (one test used an untyped-and-unverified backdating approach); revised the "excludes credits not created today" test to directly backdate `localStorage` and assert via the real method instead of a placeholder assertion — 31/31 passed | tightened one test's assertion from a placeholder `expect(credit).toBeTruthy()` to an actual behavioral check against `getUnpaidCreatedToday()` |
+| `CategoryStats` component rewrite                                                                  | wrote 3 tests (category summary row, per-product rows, null-category guard) against the already-drafted component in the same edit pass (component written first, tests immediately after, both verified together — see Issues Found)                                                                                                                                        | 3/3 passed on first run, no fix needed                                                                                                                                                                                                                                  | none needed                                                                                                                                     |
+| `TodayStatsPage` route rewrite                                                                     | wrote 6 tests (header, Resumen Efectivo panel + Gastos-row visibility gating, salesCashTotal formula, Ventas-panel item count, Gastos/Créditos panels hidden without modules, Gastos/Créditos panels shown + literal "Créditos Pagados (60)" quirk with modules) against the not-yet-rewritten route; confirmed RED (5/6 failed against the old summary-card implementation) | rewrote the route — 6/6 passed first run                                                                                                                                                                                                                                | none needed                                                                                                                                     |
 
 ### Issues Found (Batch 7)
 
@@ -827,9 +827,9 @@ RED-confirmed-failing → GREEN sequencing.
 - Mode: direct work-unit commit on `feat/frontend-parity-audit`, NO PR, per explicit user
   instruction (same as batches 1-6).
 - 1 work-unit commit: `bea961f` (913 insertions / 124 deletions across 13 files: 3 new files
-  + 10 modified). Exceeds the 400-line single-PR review budget on raw insertion count;
-  explicitly instructed as a direct-commit, no-PR, single-slice batch (same
-  accepted-exception pattern as prior batches).
+  - 10 modified). Exceeds the 400-line single-PR review budget on raw insertion count;
+    explicitly instructed as a direct-commit, no-PR, single-slice batch (same
+    accepted-exception pattern as prior batches).
 - Boundary: this batch = Today Stats (`today-stats.tsx`) + Category Stats
   (`category-stats.tsx`) + their two new service methods (`getCategoryCartItemsView`,
   `getUnpaidCreatedToday`/`getPaidToday`) + the new `authorization-service.ts` module-check
@@ -841,19 +841,20 @@ RED-confirmed-failing → GREEN sequencing.
 ### Status (Batch 7) — Stage 1 (Sales) COMPLETE
 
 7 batches complete (2 targeted UI/shell batches + Stage 1 Sales Products-view + Sale/POS-view
-+ Orders-views + Sale-Credits-views + Today-Stats/Category-Stats parity slices). **Stage 1
-(Sales) is now FULLY parity-complete** — every Sales view listed in the tasks artifact's
-Stage 1 template has undergone its own L4 (functional diff) + L5 (visual/token) + L6 (i18n)
-pass: Products, Sale/POS, Orders (`orders.tsx`/`today-orders.tsx`), Sale Credits
-(`credits.tsx`/`today-credits.tsx`), and now Today Stats (`today-stats.tsx`) + Category Stats
-(`category-stats.tsx`). No Sales view remains untouched. Ready for `sdd-verify` on the full
-Stage 1 (Sales) module, or to proceed to Stage 2 (Inventory) per the tasks artifact's module
-order. Stage 1's full-module chained-PR delivery strategy question is now moot for delivery
-purposes (all 7 batches were delivered as direct work-unit commits, no PR, per explicit user
-instruction throughout) — but the orchestrator/user should still confirm chain strategy
-(stacked-to-main vs feature-branch-chain) before Stage 2 (Inventory) `sdd-apply` begins if a
-PR-based workflow is desired going forward, per the tasks artifact's Review Workload
-Forecast.
+
+- Orders-views + Sale-Credits-views + Today-Stats/Category-Stats parity slices). **Stage 1
+  (Sales) is now FULLY parity-complete** — every Sales view listed in the tasks artifact's
+  Stage 1 template has undergone its own L4 (functional diff) + L5 (visual/token) + L6 (i18n)
+  pass: Products, Sale/POS, Orders (`orders.tsx`/`today-orders.tsx`), Sale Credits
+  (`credits.tsx`/`today-credits.tsx`), and now Today Stats (`today-stats.tsx`) + Category Stats
+  (`category-stats.tsx`). No Sales view remains untouched. Ready for `sdd-verify` on the full
+  Stage 1 (Sales) module, or to proceed to Stage 2 (Inventory) per the tasks artifact's module
+  order. Stage 1's full-module chained-PR delivery strategy question is now moot for delivery
+  purposes (all 7 batches were delivered as direct work-unit commits, no PR, per explicit user
+  instruction throughout) — but the orchestrator/user should still confirm chain strategy
+  (stacked-to-main vs feature-branch-chain) before Stage 2 (Inventory) `sdd-apply` begins if a
+  PR-based workflow is desired going forward, per the tasks artifact's Review Workload
+  Forecast.
 
 ## Batch 8 — Stage 1 Sales, Cart (nav-right) parity + docs reconciliation
 
@@ -869,8 +870,9 @@ the cross-cutting offline `ShoppingCartService`/inventory-availability-on-increa
 audit stays Stage 6 (Sync) scope, left untouched here (deferred sub-item, see below).
 
 Gaps closed (previously React had only badge + header total from an earlier batch):
+
 1. Dropdown header replaced generic `CART.TITLE` with Angular's exact "Venta actual" title
-   + order-type subtitle (`getOrderTypeText(OrderType.Normal)` = "Normal").
+   - order-type subtitle (`getOrderTypeText(OrderType.Normal)` = "Normal").
 2. Added the `payment` (Pago) numeric input + Vuelto (change) readout, colored
    success/danger/neutral to match Angular's `payment-return-positive`/`-negative` CSS
    classes (React uses semantic Tailwind color classes instead of literal class names).
@@ -958,13 +960,13 @@ in Angular's own template) — not ported, per the batch's exact-scope instructi
 
 ### TDD Cycle Evidence (Batch 8)
 
-| Task | Test File | Layer | Safety Net | RED | GREEN | TRIANGULATE | REFACTOR |
-|---|---|---|---|---|---|---|---|
-| `getOrderTypeText` | `sales/lib/__tests__/order-type-utils.test.ts` | Unit | N/A (new) | Written, confirmed RED (module not found) | 2/2 passed first run | 2 cases (Normal, Mayorista) | None needed |
-| `getPaymentTypeIconKind` | `shared/lib/payment-type-icon.test.ts` | Unit | N/A (new) | Written, confirmed RED | 4/4 passed first run | 4 cases (cash/card/phone/default) | None needed |
-| `getPaymentReturn`/`getPaymentReturnKind` | `shared/lib/payment-return.test.ts` | Unit | N/A (new) | Written, confirmed RED | 6/6 passed first run | 6 cases across both functions | None needed |
-| `validateCartSubmission` | `shared/lib/cart-submission-validation.test.ts` | Unit | N/A (new) | Written, confirmed RED | 5/5 passed first run | 5 cases (all 3 error codes + 2 null-path cases) | None needed |
-| `CartShell` component rewrite | `shared/components/__tests__/cart-shell.test.tsx` | Integration (RTL) | Baseline 6/6 passing before edit | Written first (22/23 new assertions RED against pre-rewrite component) | Fixed 1 bug found by GREEN run (success message wiped by a shared `handleClear` reset) — 23/23 passed after fix | Multiple scenarios per behavior (empty vs non-empty cart, credits-module gated vs ungated, all 3 validation branches, success path) | Extracted `clearCartAfterSuccessfulOrder` to avoid clobbering `submitSuccess` |
+| Task                                      | Test File                                         | Layer             | Safety Net                       | RED                                                                    | GREEN                                                                                                           | TRIANGULATE                                                                                                                         | REFACTOR                                                                      |
+| ----------------------------------------- | ------------------------------------------------- | ----------------- | -------------------------------- | ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `getOrderTypeText`                        | `sales/lib/__tests__/order-type-utils.test.ts`    | Unit              | N/A (new)                        | Written, confirmed RED (module not found)                              | 2/2 passed first run                                                                                            | 2 cases (Normal, Mayorista)                                                                                                         | None needed                                                                   |
+| `getPaymentTypeIconKind`                  | `shared/lib/payment-type-icon.test.ts`            | Unit              | N/A (new)                        | Written, confirmed RED                                                 | 4/4 passed first run                                                                                            | 4 cases (cash/card/phone/default)                                                                                                   | None needed                                                                   |
+| `getPaymentReturn`/`getPaymentReturnKind` | `shared/lib/payment-return.test.ts`               | Unit              | N/A (new)                        | Written, confirmed RED                                                 | 6/6 passed first run                                                                                            | 6 cases across both functions                                                                                                       | None needed                                                                   |
+| `validateCartSubmission`                  | `shared/lib/cart-submission-validation.test.ts`   | Unit              | N/A (new)                        | Written, confirmed RED                                                 | 5/5 passed first run                                                                                            | 5 cases (all 3 error codes + 2 null-path cases)                                                                                     | None needed                                                                   |
+| `CartShell` component rewrite             | `shared/components/__tests__/cart-shell.test.tsx` | Integration (RTL) | Baseline 6/6 passing before edit | Written first (22/23 new assertions RED against pre-rewrite component) | Fixed 1 bug found by GREEN run (success message wiped by a shared `handleClear` reset) — 23/23 passed after fix | Multiple scenarios per behavior (empty vs non-empty cart, credits-module gated vs ungated, all 3 validation branches, success path) | Extracted `clearCartAfterSuccessfulOrder` to avoid clobbering `submitSuccess` |
 
 ### Issues Found (Batch 8)
 
@@ -1129,17 +1131,17 @@ number" check.
 
 ### TDD Cycle Evidence (Batch 9)
 
-| Task | RED | GREEN | TRIANGULATE | REFACTOR |
-|---|---|---|---|---|
-| `checkProductAvailabilityToSale` | written, confirmed RED (module not found) | 10/10 passed first run | 10 branch cases (all 5 error codes + 2 gate variants + cart-quantity inclusion) | none needed |
-| `getItemQuantity` (cart-store) | written, confirmed RED (`getItemQuantity is not a function`) | 3/3 passed first run | 3 cases incl. cross-call summation | none needed |
-| `showBlockingError` | written, confirmed RED (module not found) | 1/1 passed first run | title+message content check | none needed |
-| `hasInventoryModuleAvailable` | written, confirmed RED (`is not a function`) | 2/2 passed first run | true/false cases | none needed |
-| `getAvailableQuantity` (inventory-offline-service) | written, confirmed RED (`is not a function`) | 4/4 passed first run | no-entries / inactive-only / active-sum / mixed-active cases | none needed |
-| `SaleProductRow` full rewiring | written first, confirmed RED against pre-change component (12 new/changed assertions) | 12/12 passed after implementation | unconditional-call, per-error-code message resolution, quantity forwarding | removed dead `error` state + inline `<p role=alert>` |
-| `sale.tsx` end-to-end wiring | written first (2 new tests), confirmed RED (`getItemQuantity is not a function` on unmocked selector / real service returning "not available" against unseeded localStorage) | 10/10 passed (8 existing + 2 new) after wiring | insufficient-stock-blocks / sufficient-stock-allows | mock fixes: added `storeModuleIds`/`getItemQuantity` to existing test mocks |
-| W2 text fixes (3 modals) | git-stashed the 3 pre-written implementation edits, wrote 4 new test files (11 tests), ran against ORIGINAL code -> confirmed all 11 RED (e.g. "Precio is required" found instead of "Precio es requerido") | git-stash-popped the fix, reran -> 11/11 GREEN | Nombre/Precio/Categoría/Orden across 3 components + negative-order-allowed case | none needed |
-| CSV importer unification | written first (2 tests: parse-throw path via `vi.spyOn`, file-read-error path via `FileReader.prototype.readAsText` override), confirmed RED against original 2 English strings | 2/2 passed after single-literal fix | both failure paths produce the identical string | none needed |
+| Task                                               | RED                                                                                                                                                                                                         | GREEN                                          | TRIANGULATE                                                                     | REFACTOR                                                                    |
+| -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- | ------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| `checkProductAvailabilityToSale`                   | written, confirmed RED (module not found)                                                                                                                                                                   | 10/10 passed first run                         | 10 branch cases (all 5 error codes + 2 gate variants + cart-quantity inclusion) | none needed                                                                 |
+| `getItemQuantity` (cart-store)                     | written, confirmed RED (`getItemQuantity is not a function`)                                                                                                                                                | 3/3 passed first run                           | 3 cases incl. cross-call summation                                              | none needed                                                                 |
+| `showBlockingError`                                | written, confirmed RED (module not found)                                                                                                                                                                   | 1/1 passed first run                           | title+message content check                                                     | none needed                                                                 |
+| `hasInventoryModuleAvailable`                      | written, confirmed RED (`is not a function`)                                                                                                                                                                | 2/2 passed first run                           | true/false cases                                                                | none needed                                                                 |
+| `getAvailableQuantity` (inventory-offline-service) | written, confirmed RED (`is not a function`)                                                                                                                                                                | 4/4 passed first run                           | no-entries / inactive-only / active-sum / mixed-active cases                    | none needed                                                                 |
+| `SaleProductRow` full rewiring                     | written first, confirmed RED against pre-change component (12 new/changed assertions)                                                                                                                       | 12/12 passed after implementation              | unconditional-call, per-error-code message resolution, quantity forwarding      | removed dead `error` state + inline `<p role=alert>`                        |
+| `sale.tsx` end-to-end wiring                       | written first (2 new tests), confirmed RED (`getItemQuantity is not a function` on unmocked selector / real service returning "not available" against unseeded localStorage)                                | 10/10 passed (8 existing + 2 new) after wiring | insufficient-stock-blocks / sufficient-stock-allows                             | mock fixes: added `storeModuleIds`/`getItemQuantity` to existing test mocks |
+| W2 text fixes (3 modals)                           | git-stashed the 3 pre-written implementation edits, wrote 4 new test files (11 tests), ran against ORIGINAL code -> confirmed all 11 RED (e.g. "Precio is required" found instead of "Precio es requerido") | git-stash-popped the fix, reran -> 11/11 GREEN | Nombre/Precio/Categoría/Orden across 3 components + negative-order-allowed case | none needed                                                                 |
+| CSV importer unification                           | written first (2 tests: parse-throw path via `vi.spyOn`, file-read-error path via `FileReader.prototype.readAsText` override), confirmed RED against original 2 English strings                             | 2/2 passed after single-literal fix            | both failure paths produce the identical string                                 | none needed                                                                 |
 
 **Process note on the W2 RED-first recovery:** the 3 modal-fix edits (`create-product-modal.tsx`,
 `edit-product-modal.tsx`, `edit-product-category-modal.tsx`) were initially implemented BEFORE
@@ -1224,25 +1226,25 @@ text sweep.
     these call sites, preserved verbatim). Replaces the old `window.alert` implementation;
     same public API, so `sale-product-row.tsx` needed no code change.
   - `confirmDialog(options): Promise<boolean>` — `Swal.fire({ title, text, icon: 'question',
-    showCancelButton: true, confirmButtonColor: '#3456ff', cancelButtonColor: '#dc3545',
-    confirmButtonText, cancelButtonText })`, resolves `true` only on `result.isConfirmed`.
+showCancelButton: true, confirmButtonColor: '#3456ff', cancelButtonColor: '#dc3545',
+confirmButtonText, cancelButtonText })`, resolves `true` only on `result.isConfirmed`.
   - `showAcknowledgeError(options)` — `Swal.fire({ title, text, icon: 'error',
-    showCancelButton: false, confirmButtonColor: '#3456ff', cancelButtonColor: '#dc3545',
-    confirmButtonText })` — the one Angular call site (`order-item-list`'s `showErrorMessage`)
+showCancelButton: false, confirmButtonColor: '#3456ff', cancelButtonColor: '#dc3545',
+confirmButtonText })` — the one Angular call site (`order-item-list`'s `showErrorMessage`)
     with an explicit translated OK button + explicit colors on an error dialog.
 
 ### Ported Swal call sites (Angular source -> React file)
 
-| Angular source | React file | Config restored |
-|---|---|---|
-| `sale-product-row.component.ts:68-74` (stock error) | `sale-product-row.tsx` (via `blocking-alert.ts`) | Now real `Swal.fire` (was `window.alert`); no code change to the component, only the wrapper's internals. |
-| `sale-product-row.component.ts:117-121` (add-to-cart failure) | `sale-product-row.tsx` `addCartItem` path | Same `showBlockingError` wrapper — not separately wired in React (this failure branch has no reachable React caller; `addCartItem`'s equivalent success/fail split was not ported in earlier batches — flagged below, not invented here). |
-| `sale-credit-payment-modal.component.ts:52-60` (payment confirm) | `sale-credit-payment-modal.tsx` | RESTORED: real `confirmDialog` (title `SALE_CREDIT.PAYMENT_CONFIRM_TITLE`, message `PAYMENT_CONFIRM_MESSAGE`, YES/NO) replaces the double-click-to-confirm pattern the code comment said had "no SweetAlert2 equivalent". |
-| `sale-credit-payment-modal.component.ts:71-75` (payment failure) | `sale-credit-payment-modal.tsx` | NEW: `onConfirm` now returns `boolean`; on `false`, `showBlockingError(GENERAL.ERROR, GENERAL.RESPONSE.ERROR500_MESSAGE)`, modal stays open (was previously always closing regardless of outcome). |
-| `edit-sale-credit-modal.component.ts:66-70` | `edit-sale-credit-modal.tsx` | NEW: `onSave` returns `boolean`; same error-dialog-and-stay-open treatment. |
-| `edit-order-modal.component.ts:49-53` | `edit-order-modal.tsx` | NEW: `onUpdate` returns `boolean`; same treatment. |
-| `order-item-list.component.ts:35-44` (deactivateOrder confirm) | `order-item-list.tsx` | RESTORED: real `confirmDialog` (title `GENERAL.DELETE_CONFIRM_TITLE`, message `GENERAL.DELETE_CONFIRM_MESSAGE_A` with name=`TODAY_ORDERS.TEXT` -> "Venta") replaces the double-click pattern. |
-| `order-item-list.component.ts:124-135` (`showErrorMessage`, called from deactivateOrder's failure branch) | `order-item-list.tsx` | NEW: `onDeactivateOrder` returns `boolean`; on `false`, `showAcknowledgeError` with Angular's exact hardcoded literal ("La venta no pudo ser cancelada. ...") wrapped in `TODAY_ORDERS.ERROR_DELETING_ORDER`, `GENERAL.OK` button. |
+| Angular source                                                                                            | React file                                       | Config restored                                                                                                                                                                                                                           |
+| --------------------------------------------------------------------------------------------------------- | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sale-product-row.component.ts:68-74` (stock error)                                                       | `sale-product-row.tsx` (via `blocking-alert.ts`) | Now real `Swal.fire` (was `window.alert`); no code change to the component, only the wrapper's internals.                                                                                                                                 |
+| `sale-product-row.component.ts:117-121` (add-to-cart failure)                                             | `sale-product-row.tsx` `addCartItem` path        | Same `showBlockingError` wrapper — not separately wired in React (this failure branch has no reachable React caller; `addCartItem`'s equivalent success/fail split was not ported in earlier batches — flagged below, not invented here). |
+| `sale-credit-payment-modal.component.ts:52-60` (payment confirm)                                          | `sale-credit-payment-modal.tsx`                  | RESTORED: real `confirmDialog` (title `SALE_CREDIT.PAYMENT_CONFIRM_TITLE`, message `PAYMENT_CONFIRM_MESSAGE`, YES/NO) replaces the double-click-to-confirm pattern the code comment said had "no SweetAlert2 equivalent".                 |
+| `sale-credit-payment-modal.component.ts:71-75` (payment failure)                                          | `sale-credit-payment-modal.tsx`                  | NEW: `onConfirm` now returns `boolean`; on `false`, `showBlockingError(GENERAL.ERROR, GENERAL.RESPONSE.ERROR500_MESSAGE)`, modal stays open (was previously always closing regardless of outcome).                                        |
+| `edit-sale-credit-modal.component.ts:66-70`                                                               | `edit-sale-credit-modal.tsx`                     | NEW: `onSave` returns `boolean`; same error-dialog-and-stay-open treatment.                                                                                                                                                               |
+| `edit-order-modal.component.ts:49-53`                                                                     | `edit-order-modal.tsx`                           | NEW: `onUpdate` returns `boolean`; same treatment.                                                                                                                                                                                        |
+| `order-item-list.component.ts:35-44` (deactivateOrder confirm)                                            | `order-item-list.tsx`                            | RESTORED: real `confirmDialog` (title `GENERAL.DELETE_CONFIRM_TITLE`, message `GENERAL.DELETE_CONFIRM_MESSAGE_A` with name=`TODAY_ORDERS.TEXT` -> "Venta") replaces the double-click pattern.                                             |
+| `order-item-list.component.ts:124-135` (`showErrorMessage`, called from deactivateOrder's failure branch) | `order-item-list.tsx`                            | NEW: `onDeactivateOrder` returns `boolean`; on `false`, `showAcknowledgeError` with Angular's exact hardcoded literal ("La venta no pudo ser cancelada. ...") wrapped in `TODAY_ORDERS.ERROR_DELETING_ORDER`, `GENERAL.OK` button.        |
 
 **Callback-contract propagation** (mechanical, needed so the failure signal reaches the modal
 that owns the Swal error dialog — mirrors Angular's component-owns-the-service-call
@@ -1291,7 +1293,7 @@ counterpart (see stray-text section): `PRODUCTS.CSV.COL_ROW`, `PRODUCTS.CSV.COL_
   `CsvRowError.errorCode: CsvRowErrorCode` (a plain lib fn has no `useIntl` access, so it
   returns a code, same pattern as `product-availability.ts`); the modal component maps each
   code to the ALREADY-EXISTING `PRODUCTS.CSV.ERROR.MISSING_NAME/MISSING_PRICE/INVALID_PRICE/
-  DUPLICATE_BARCODE` Spanish keys (these keys existed since Batch 9 but were unused — the
+DUPLICATE_BARCODE` Spanish keys (these keys existed since Batch 9 but were unused — the
   parser wasn't wired to them).
 - `cart-shell.tsx` — 3 cart line-item control `aria-label`s (decrease/increase quantity,
   remove item) were hardcoded English template strings -> `CART.DECREASE_QUANTITY`/
@@ -1323,17 +1325,17 @@ counterpart (see stray-text section): `PRODUCTS.CSV.COL_ROW`, `PRODUCTS.CSV.COL_
 
 ### TDD Cycle Evidence (Batch 10)
 
-| Task | RED | GREEN | TRIANGULATE |
-|---|---|---|---|
-| `blocking-alert.ts` (3 exports) | 4 tests written first, confirmed RED (`is not a function`) | 4/4 passed | error shape / confirm-true / confirm-false / acknowledge-error shape |
-| `sale-product-row.test.tsx` update | switched from `window.alert` spy to `showBlockingError` mock, ran to confirm still-passing (component code unchanged, only wrapper internals changed) | 12/12 passed | single-error case + all 5 ProductErrors codes |
-| `order-components.test.tsx` (OrderList deactivate + EditOrderModal) | 4 new/changed tests written first, confirmed RED (4 failing) | 15/15 passed | confirm-then-deactivate / cancel-then-no-op / failure-shows-acknowledge-error / EditOrderModal success-closes vs failure-stays-open+shows-error |
-| `credit-components.test.tsx` (SaleCreditPaymentModal + EditSaleCreditModal) | 4 new/changed tests written first, confirmed RED (4 failing) | 22/22 passed | confirm-then-pay / cancel-then-no-op / failure-shows-error-stays-open (both modals) |
-| `edit-product-category-modal.test.tsx` (Active label) | 1 test written first, confirmed RED | 5/5 passed | "Activo" present, "Active" absent |
-| `csv-product-parser.test.ts` (errorCode) | 4 assertions changed to `errorCode`, confirmed RED (`undefined` vs expected code) | 11/11 passed | MISSING_NAME/MISSING_PRICE/INVALID_PRICE/DUPLICATE_BARCODE |
-| `csv-product-importer-modal.test.tsx` (Spanish headers/status/error-message) | 2 new tests written first, confirmed RED | 4/4 passed | valid-row Spanish headers+badge / invalid-row Spanish error message |
-| `cart-shell.test.tsx` (Spanish aria-labels) | 1 new test written first, confirmed RED | 24/24 passed | decrease/increase/remove labels |
-| `sale.test.tsx` (overselling e2e) | pre-existing test broke (real Swal + jsdom `matchMedia` missing) when the wrapper switched to real `sweetalert2` — fixed by mocking `~/shared/lib/blocking-alert` instead of `window.alert` | 10/10 passed | — (regression fix, not new behavior) |
+| Task                                                                         | RED                                                                                                                                                                                         | GREEN        | TRIANGULATE                                                                                                                                     |
+| ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `blocking-alert.ts` (3 exports)                                              | 4 tests written first, confirmed RED (`is not a function`)                                                                                                                                  | 4/4 passed   | error shape / confirm-true / confirm-false / acknowledge-error shape                                                                            |
+| `sale-product-row.test.tsx` update                                           | switched from `window.alert` spy to `showBlockingError` mock, ran to confirm still-passing (component code unchanged, only wrapper internals changed)                                       | 12/12 passed | single-error case + all 5 ProductErrors codes                                                                                                   |
+| `order-components.test.tsx` (OrderList deactivate + EditOrderModal)          | 4 new/changed tests written first, confirmed RED (4 failing)                                                                                                                                | 15/15 passed | confirm-then-deactivate / cancel-then-no-op / failure-shows-acknowledge-error / EditOrderModal success-closes vs failure-stays-open+shows-error |
+| `credit-components.test.tsx` (SaleCreditPaymentModal + EditSaleCreditModal)  | 4 new/changed tests written first, confirmed RED (4 failing)                                                                                                                                | 22/22 passed | confirm-then-pay / cancel-then-no-op / failure-shows-error-stays-open (both modals)                                                             |
+| `edit-product-category-modal.test.tsx` (Active label)                        | 1 test written first, confirmed RED                                                                                                                                                         | 5/5 passed   | "Activo" present, "Active" absent                                                                                                               |
+| `csv-product-parser.test.ts` (errorCode)                                     | 4 assertions changed to `errorCode`, confirmed RED (`undefined` vs expected code)                                                                                                           | 11/11 passed | MISSING_NAME/MISSING_PRICE/INVALID_PRICE/DUPLICATE_BARCODE                                                                                      |
+| `csv-product-importer-modal.test.tsx` (Spanish headers/status/error-message) | 2 new tests written first, confirmed RED                                                                                                                                                    | 4/4 passed   | valid-row Spanish headers+badge / invalid-row Spanish error message                                                                             |
+| `cart-shell.test.tsx` (Spanish aria-labels)                                  | 1 new test written first, confirmed RED                                                                                                                                                     | 24/24 passed | decrease/increase/remove labels                                                                                                                 |
+| `sale.test.tsx` (overselling e2e)                                            | pre-existing test broke (real Swal + jsdom `matchMedia` missing) when the wrapper switched to real `sweetalert2` — fixed by mocking `~/shared/lib/blocking-alert` instead of `window.alert` | 10/10 passed | — (regression fix, not new behavior)                                                                                                            |
 
 ### Issues Found (Batch 10)
 
@@ -1401,6 +1403,7 @@ description" rationale in Batch 10 did not hold.
 ### Where
 
 **Fix 1 (NEW-W2 — wrong error-dialog text):**
+
 - Verified Angular literals directly at the source (not paraphrased):
   - `frontend/src/app/domain/entities/sale-credits/sale-credit.errors.ts:6` —
     `SaleCreditErrors.NotExists.description = 'El gasto no existe.'` (trailing period).
@@ -1413,7 +1416,7 @@ description" rationale in Batch 10 did not hold.
     `OrderOfflineService.updateTodayOrder`) has exactly ONE failure branch (not-found), so the
     text is static and knowable per call site — not genuinely dynamic.
 - `app/shared/lib/i18n/es.ts` — added `SALE_CREDIT_ERRORS.NOT_EXISTS` = `'El gasto no
-  existe.'` and `ORDER_ERRORS.NOT_EXISTS` = `'La orden no existe'` (byte-identical to
+existe.'` and `ORDER_ERRORS.NOT_EXISTS` = `'La orden no existe'` (byte-identical to
   Angular, including the punctuation difference between the two), following the same
   `PRODUCT_ERRORS.*` domain-error-as-i18n-key precedent from Batch 9.
 - `app/sales/components/edit-sale-credit-modal.tsx:51` — `showBlockingError` message
@@ -1426,6 +1429,7 @@ description" rationale in Batch 10 did not hold.
   `app/sales/components/__tests__/order-components.test.tsx` (1 assertion).
 
 **Fix 2 (NEW-W1 — `getAvailableQuantity` branch-order divergence):**
+
 - Re-read Angular's `hasAvailableProductToSale`
   (`frontend/src/app/application/entries/inventory-offline.service.ts:410-419`): checks
   `inventories.length === 0` against the RAW entry list (line 411, before any `isActive`
@@ -1435,24 +1439,24 @@ description" rationale in Batch 10 did not hold.
   lines 323-327) — reordered to match: `hasEntries` now reflects the RAW `repo.getByProductId`
   result length (not the active-only subset); `available` still sums only active entries. A
   product whose only entries are all inactive now correctly returns `{ hasEntries: true,
-  available: 0 }` (falls through to the quantity check, 0 < requested, so
+available: 0 }` (falls through to the quantity check, 0 < requested, so
   `QUANTITY_NOT_AVAILABLE`/`ProductQuantityNotAvailable`) instead of the previous `{
-  hasEntries: false }` (`NOT_AVAILABLE`/`ProductNotAvailable`), matching Angular's branch
+hasEntries: false }` (`NOT_AVAILABLE`/`ProductNotAvailable`), matching Angular's branch
   exactly. `app/sales/lib/product-availability.ts` (the consumer) needed NO change — it
   already read `inventory.hasEntries`/`inventory.available` correctly; only the upstream data
   source had the wrong branch order.
 - Test updated (RED confirmed, then GREEN):
   `app/inventory/lib/services/__tests__/inventory-offline-service.test.ts` — the
   all-inactive-entries case (`INV-08` describe block) now asserts `{ hasEntries: true,
-  available: 0 }` instead of the previous (incorrect per Angular) `{ hasEntries: false,
-  available: 0 }`.
+available: 0 }` instead of the previous (incorrect per Angular) `{ hasEntries: false,
+available: 0 }`.
 
 ### TDD Cycle Evidence (Batch 11)
 
-| Task | RED | GREEN |
-|---|---|---|
-| Error-dialog text (3 call sites) | `credit-components.test.tsx` (2 assertions) + `order-components.test.tsx` (1 assertion) edited to expect the exact Angular literals first; ran and confirmed 3 failures (received the old `ERROR500_MESSAGE` string) | i18n keys added + call sites switched; re-ran, 37/37 + 15/15 passed |
-| `getAvailableQuantity` all-inactive edge case | `inventory-offline-service.test.ts` edge-case assertion changed to `{ hasEntries: true, available: 0 }` first; ran and confirmed 1 failure (received `{ hasEntries: false }`) | branch order fixed in `getAvailableQuantity`; re-ran, 31/31 passed |
+| Task                                          | RED                                                                                                                                                                                                                  | GREEN                                                               |
+| --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| Error-dialog text (3 call sites)              | `credit-components.test.tsx` (2 assertions) + `order-components.test.tsx` (1 assertion) edited to expect the exact Angular literals first; ran and confirmed 3 failures (received the old `ERROR500_MESSAGE` string) | i18n keys added + call sites switched; re-ran, 37/37 + 15/15 passed |
+| `getAvailableQuantity` all-inactive edge case | `inventory-offline-service.test.ts` edge-case assertion changed to `{ hasEntries: true, available: 0 }` first; ran and confirmed 1 failure (received `{ hasEntries: false }`)                                        | branch order fixed in `getAvailableQuantity`; re-ran, 31/31 passed  |
 
 ### Issues Found (Batch 11)
 
@@ -1503,6 +1507,7 @@ port gap of Angular's `APP_INITIALIZER` (`app.module.ts:69-83` → `AppInitServi
 `AuthService.getUserByToken()`).
 
 **Investigation — RR-v7 mechanism options considered:**
+
 - This app runs in **SPA mode** (`ssr:false` in `react-router.config.ts` — confirmed by
   reading the file; comment explains: "Auth state lives in a client-side Zustand store
   hydrated from localStorage, which server loaders cannot see — running loaders on the client
@@ -1525,11 +1530,13 @@ port gap of Angular's `APP_INITIALIZER` (`app.module.ts:69-83` → `AppInitServi
 
 **Fix:** `app/shared/lib/stores/auth-store.ts` — added, after the `create<AuthState>(...)`
 call:
+
 ```ts
 if (typeof window !== 'undefined') {
   useAuthStore.getState().initialize();
 }
 ```
+
 SSR-safe: this only ever executes in the browser at runtime (SPA mode has no server-time
 evaluation), but the `typeof window` guard also keeps the file safe to import from any
 Node-side tooling. Token-expiry behavior preserved unchanged — `initialize()`'s existing
@@ -1571,6 +1578,7 @@ was inert in this offline-first POS.
 
 **Angular reference (verbatim source, not paraphrased):**
 `frontend/src/app/_services/update/update.service.ts` `showUpdateDialog()`:
+
 - `title: '¡Nueva versión disponible!'`
 - `text: 'Se ha detectado una nueva versión de la aplicación.'`
 - `icon: 'info'`, `showConfirmButton: true`, `allowOutsideClick: false`,
@@ -1578,16 +1586,17 @@ was inert in this offline-first POS.
 - `confirmButtonText: 'Actualizar ahora'`
 - `customClass: { confirmButton: 'swal2-confirm swal2-styled' }`
 - On confirm: `activateUpdate().then(() => location.reload())`
-This is the ONE Angular Swal call site that hardcodes Spanish text directly (no i18n key) —
-React reproduces that verbatim, not routed through `es.ts`.
+  This is the ONE Angular Swal call site that hardcodes Spanish text directly (no i18n key) —
+  React reproduces that verbatim, not routed through `es.ts`.
 
 **Fix:**
+
 - `app/shared/lib/blocking-alert.ts` — added `showUpdateAvailable(onConfirm)`, matching
   Angular's dialog config exactly (byte-identical strings/config), calling `onConfirm()` only
   when `result.isConfirmed`.
 - `app/root.tsx` — added `registerServiceWorker()`, called from a `useEffect` in the default
   `App()` component (root layout, wraps every route). Guarded by `typeof window !==
-  'undefined'` AND `'serviceWorker' in navigator` (also keeps this inert in jsdom test env,
+'undefined'` AND `'serviceWorker' in navigator` (also keeps this inert in jsdom test env,
   which doesn't implement `navigator.serviceWorker`). Dynamically imports
   `virtual:pwa-register`, calls `registerSW({ onNeedRefresh, onOfflineReady })`.
   `onNeedRefresh` → `showUpdateAvailable(() => updateSW(true))` (matches Angular's confirm →
@@ -1610,6 +1619,7 @@ is not a function` before implementation. **GREEN confirmed** after.
 
 **Integration verification (built-bundle grep — the exact check the audit used to prove SW
 registration was missing):**
+
 - `react-router build` succeeded (SPA mode client build + service-worker build + injectManifest
   precache of 104 entries / 1342.70 KiB).
 - `grep -rl "serviceWorker" build/client/assets/*.js` → matches in `root-*.js`,
@@ -1638,6 +1648,7 @@ migrator/reader was built.
 
 **Tests updated (old key literal → new key literal, mechanical replacement, no behavior
 change to test intent):**
+
 - `app/inventory/lib/repositories/__tests__/inventory-repository.test.ts` (2 occurrences)
 - `app/inventory/lib/services/__tests__/inventory-offline-service.test.ts` (2 occurrences)
 - `app/inventory/lib/services/__tests__/egress-offline-service.test.ts` (2 occurrences)
@@ -1659,11 +1670,11 @@ matches.
 
 ### TDD Cycle Evidence (Tier-0 Hotfix Batch)
 
-| Fix | RED | GREEN |
-|---|---|---|
-| A — session cold-boot hydration | `loaders.cold-boot.test.ts` (new file, 3 cases) — confirmed 1 failure (valid-session case redirected to `/login` instead of returning `null`) before the module-scope `initialize()` guard was added | module-scope hydration added to `auth-store.ts`; re-ran, 3/3 new + 14/14 `auth-store.test.ts` + 28/28 `loaders.test.ts` passed |
-| B — SW registration + update dialog | `blocking-alert.test.ts` (2 new cases) — confirmed `showUpdateAvailable is not a function` before implementation | `showUpdateAvailable` added to `blocking-alert.ts`, wired into `root.tsx`; re-ran, 2/2 new + build-bundle grep positive |
-| C — inventory key rename | 4 test files edited to the new key literal first — confirmed 19 failures (`lizoft.store-inventoryentries-s1` not found) across 3 files before the repository fix | `inventory-repository.ts` literal changed; re-ran, 68/68 passed across the 4 affected files |
+| Fix                                 | RED                                                                                                                                                                                                  | GREEN                                                                                                                          |
+| ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| A — session cold-boot hydration     | `loaders.cold-boot.test.ts` (new file, 3 cases) — confirmed 1 failure (valid-session case redirected to `/login` instead of returning `null`) before the module-scope `initialize()` guard was added | module-scope hydration added to `auth-store.ts`; re-ran, 3/3 new + 14/14 `auth-store.test.ts` + 28/28 `loaders.test.ts` passed |
+| B — SW registration + update dialog | `blocking-alert.test.ts` (2 new cases) — confirmed `showUpdateAvailable is not a function` before implementation                                                                                     | `showUpdateAvailable` added to `blocking-alert.ts`, wired into `root.tsx`; re-ran, 2/2 new + build-bundle grep positive        |
+| C — inventory key rename            | 4 test files edited to the new key literal first — confirmed 19 failures (`lizoft.store-inventoryentries-s1` not found) across 3 files before the repository fix                                     | `inventory-repository.ts` literal changed; re-ran, 68/68 passed across the 4 affected files                                    |
 
 ### Test/Build Results (Tier-0 Hotfix Batch)
 

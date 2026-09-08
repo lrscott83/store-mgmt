@@ -73,12 +73,24 @@ const mockDeleteUser = vi.fn();
 
 vi.mock('~/management/users/lib/services/user-http-service', () => ({
   userHttpService: {
-    get getUsers() { return mockGetUsers; },
-    get getUserById() { return mockGetUserById; },
-    get createUser() { return mockCreateUser; },
-    get editUser() { return mockEditUser; },
-    get activateUser() { return mockActivateUser; },
-    get deleteUser() { return mockDeleteUser; },
+    get getUsers() {
+      return mockGetUsers;
+    },
+    get getUserById() {
+      return mockGetUserById;
+    },
+    get createUser() {
+      return mockCreateUser;
+    },
+    get editUser() {
+      return mockEditUser;
+    },
+    get activateUser() {
+      return mockActivateUser;
+    },
+    get deleteUser() {
+      return mockDeleteUser;
+    },
   },
 }));
 
@@ -111,9 +123,15 @@ const localStorageMock = (() => {
   let store: Record<string, string> = {};
   return {
     getItem: (key: string) => store[key] ?? null,
-    setItem: (key: string, value: string) => { store[key] = value; },
-    removeItem: (key: string) => { delete store[key]; },
-    clear: () => { store = {}; },
+    setItem: (key: string, value: string) => {
+      store[key] = value;
+    },
+    removeItem: (key: string) => {
+      delete store[key];
+    },
+    clear: () => {
+      store = {};
+    },
   };
 })();
 Object.defineProperty(global, 'localStorage', { value: localStorageMock });
@@ -136,12 +154,18 @@ describe('UserListPage — S-LIST-1: online fetch and render', () => {
     mockUser = makeUser();
     mockIsOnline = true;
     localStorageMock.clear();
-    mockGetUsers = vi.fn().mockResolvedValue({ succeeded: true, data: [makeDomainUser({ fullName: 'Alice Smith' })] });
+    mockGetUsers = vi
+      .fn()
+      .mockResolvedValue({ succeeded: true, data: [makeDomainUser({ fullName: 'Alice Smith' })] });
   });
 
   it('fetches users on mount and renders them', async () => {
     const { UserListPage } = await import('../user-list');
-    render(<Wrapper><UserListPage /></Wrapper>);
+    render(
+      <Wrapper>
+        <UserListPage />
+      </Wrapper>,
+    );
     await waitFor(() => {
       expect(screen.getByText('Alice Smith')).toBeInTheDocument();
     });
@@ -150,7 +174,11 @@ describe('UserListPage — S-LIST-1: online fetch and render', () => {
 
   it('renders the "Empleados" page title, not "Usuarios" (Req: Copy Matches Angular Terminology Exactly)', async () => {
     const { UserListPage } = await import('../user-list');
-    render(<Wrapper><UserListPage /></Wrapper>);
+    render(
+      <Wrapper>
+        <UserListPage />
+      </Wrapper>,
+    );
     await waitFor(() => screen.getByText('Alice Smith'));
     expect(screen.getByRole('heading', { name: 'Empleados' })).toBeInTheDocument();
   });
@@ -166,7 +194,11 @@ describe('UserListPage — S-LIST-2: empty state', () => {
 
   it('shows empty state when no users exist', async () => {
     const { UserListPage } = await import('../user-list');
-    render(<Wrapper><UserListPage /></Wrapper>);
+    render(
+      <Wrapper>
+        <UserListPage />
+      </Wrapper>,
+    );
     await waitFor(() => {
       expect(screen.getByText(/no hay empleados/i)).toBeInTheDocument();
     });
@@ -178,12 +210,21 @@ describe('UserListPage — S-LIST-3: HTTP-only fetch regardless of connectivity 
     vi.clearAllMocks();
     mockIsOnline = false;
     localStorageMock.clear();
-    mockGetUsers = vi.fn().mockResolvedValue({ succeeded: true, data: [makeDomainUser({ fullName: 'Offline Fetch User' })] });
+    mockGetUsers = vi
+      .fn()
+      .mockResolvedValue({
+        succeeded: true,
+        data: [makeDomainUser({ fullName: 'Offline Fetch User' })],
+      });
   });
 
   it('calls the users HTTP service on mount even when isOnline=false (no local cache read)', async () => {
     const { UserListPage } = await import('../user-list');
-    render(<Wrapper><UserListPage /></Wrapper>);
+    render(
+      <Wrapper>
+        <UserListPage />
+      </Wrapper>,
+    );
     await waitFor(() => {
       expect(screen.getByText('Offline Fetch User')).toBeInTheDocument();
     });
@@ -201,7 +242,11 @@ describe('UserListPage — S-LIST-4: no degraded/offline banner ever renders (Re
 
   it('shows empty state and no degraded/cache notice when offline', async () => {
     const { UserListPage } = await import('../user-list');
-    render(<Wrapper><UserListPage /></Wrapper>);
+    render(
+      <Wrapper>
+        <UserListPage />
+      </Wrapper>,
+    );
     await waitFor(() => {
       expect(screen.getByText(/no hay empleados/i)).toBeInTheDocument();
     });
@@ -215,13 +260,22 @@ describe('UserListPage — S-LIST-5: lifecycle action wired through the gear men
     mockIsOnline = true;
     localStorageMock.clear();
     // Use isActive:false so the Activar menu item is present after opening the gear menu.
-    mockGetUsers = vi.fn().mockResolvedValue({ succeeded: true, data: [makeDomainUser({ fullName: 'User Z', id: 'uz', isActive: false })] });
+    mockGetUsers = vi
+      .fn()
+      .mockResolvedValue({
+        succeeded: true,
+        data: [makeDomainUser({ fullName: 'User Z', id: 'uz', isActive: false })],
+      });
     mockActivateUser = vi.fn().mockResolvedValue({ data: true });
   });
 
   it('calls activateUser when Activar is chosen from the gear menu', async () => {
     const { UserListPage } = await import('../user-list');
-    render(<Wrapper><UserListPage /></Wrapper>);
+    render(
+      <Wrapper>
+        <UserListPage />
+      </Wrapper>,
+    );
     await waitFor(() => screen.getByText('User Z'));
     fireEvent.click(screen.getByRole('button', { name: /acciones/i }));
     fireEvent.click(screen.getByRole('menuitem', { name: /^activar$/i }));
@@ -254,7 +308,11 @@ describe('UserListPage — succeeded:false response (Req: Users List Surfaces su
 
   it('shows USERS.ERROR when getUsers resolves with succeeded:false, does not set users from data', async () => {
     const { UserListPage } = await import('../user-list');
-    render(<Wrapper><UserListPage /></Wrapper>);
+    render(
+      <Wrapper>
+        <UserListPage />
+      </Wrapper>,
+    );
     await waitFor(() => {
       expect(screen.getByText(esMessages['USERS.ERROR'])).toBeInTheDocument();
     });
@@ -280,7 +338,11 @@ describe('UserListPage — succeeded:true still populates users (regression)', (
 
   it('renders users and clears the error state on succeeded:true', async () => {
     const { UserListPage } = await import('../user-list');
-    render(<Wrapper><UserListPage /></Wrapper>);
+    render(
+      <Wrapper>
+        <UserListPage />
+      </Wrapper>,
+    );
     await waitFor(() => {
       expect(screen.getByText('Still Works')).toBeInTheDocument();
     });
@@ -302,7 +364,11 @@ describe('UserCreatePage — S-CREATE-1: missing selectedStoreId → redirect to
 
   it('navigates to /management/stores/create when no storeId available', async () => {
     const { UserCreatePage } = await import('../user-create');
-    render(<Wrapper><UserCreatePage /></Wrapper>);
+    render(
+      <Wrapper>
+        <UserCreatePage />
+      </Wrapper>,
+    );
     await waitFor(() => {
       expect(mockNavigate).toHaveBeenCalledWith('/management/stores/create');
     });
@@ -319,7 +385,11 @@ describe('UserCreatePage — S-CREATE-TITLE: renders "Adicionar Empleado", not "
 
   it('shows the "Adicionar Empleado" page title', async () => {
     const { UserCreatePage } = await import('../user-create');
-    render(<Wrapper><UserCreatePage /></Wrapper>);
+    render(
+      <Wrapper>
+        <UserCreatePage />
+      </Wrapper>,
+    );
     await waitFor(() => screen.getByLabelText(/nombre completo/i));
     expect(screen.getByRole('heading', { name: 'Adicionar Empleado' })).toBeInTheDocument();
   });
@@ -336,12 +406,18 @@ describe('UserCreatePage — S-CREATE-2: success navigates to /management/users'
 
   it('navigates to /management/users after successful create', async () => {
     const { UserCreatePage } = await import('../user-create');
-    render(<Wrapper><UserCreatePage /></Wrapper>);
+    render(
+      <Wrapper>
+        <UserCreatePage />
+      </Wrapper>,
+    );
     await waitFor(() => screen.getByLabelText(/nombre completo/i));
     fireEvent.change(screen.getByLabelText(/nombre completo/i), { target: { value: 'New User' } });
     fireEvent.change(screen.getByLabelText(/^usuario$/i), { target: { value: 'newuser' } });
     fireEvent.change(screen.getByLabelText(/^contraseña$/i), { target: { value: 'ValidPass1' } });
-    fireEvent.change(screen.getByLabelText(/confirmar contraseña/i), { target: { value: 'ValidPass1' } });
+    fireEvent.change(screen.getByLabelText(/confirmar contraseña/i), {
+      target: { value: 'ValidPass1' },
+    });
     fireEvent.change(screen.getByLabelText(/teléfono/i), { target: { value: '+111' } });
     fireEvent.click(screen.getByRole('button', { name: /adicionar/i }));
     await waitFor(() => {
@@ -360,7 +436,11 @@ describe('UserCreatePage — S-CREATE-3: offline blocked', () => {
 
   it('disables submit and shows offline notice when offline', async () => {
     const { UserCreatePage } = await import('../user-create');
-    render(<Wrapper><UserCreatePage /></Wrapper>);
+    render(
+      <Wrapper>
+        <UserCreatePage />
+      </Wrapper>,
+    );
     await waitFor(() => screen.getByRole('button', { name: /adicionar/i }));
     expect(screen.getByRole('button', { name: /adicionar/i })).toBeDisabled();
     expect(screen.getByText(/sin conexión/i)).toBeInTheDocument();
@@ -378,12 +458,18 @@ describe('UserCreatePage — S-CREATE-4: HTTP error shown inline', () => {
 
   it('shows inline error when createUser throws', async () => {
     const { UserCreatePage } = await import('../user-create');
-    render(<Wrapper><UserCreatePage /></Wrapper>);
+    render(
+      <Wrapper>
+        <UserCreatePage />
+      </Wrapper>,
+    );
     await waitFor(() => screen.getByLabelText(/nombre completo/i));
     fireEvent.change(screen.getByLabelText(/nombre completo/i), { target: { value: 'User X' } });
     fireEvent.change(screen.getByLabelText(/^usuario$/i), { target: { value: 'userx' } });
     fireEvent.change(screen.getByLabelText(/^contraseña$/i), { target: { value: 'ValidPass1' } });
-    fireEvent.change(screen.getByLabelText(/confirmar contraseña/i), { target: { value: 'ValidPass1' } });
+    fireEvent.change(screen.getByLabelText(/confirmar contraseña/i), {
+      target: { value: 'ValidPass1' },
+    });
     fireEvent.change(screen.getByLabelText(/teléfono/i), { target: { value: '+111' } });
     fireEvent.click(screen.getByRole('button', { name: /adicionar/i }));
     await waitFor(() => {
@@ -404,12 +490,18 @@ describe('UserCreatePage — S-CREATE-5: password validation blocks submit', () 
 
   it('blocks submit when password is too weak', async () => {
     const { UserCreatePage } = await import('../user-create');
-    render(<Wrapper><UserCreatePage /></Wrapper>);
+    render(
+      <Wrapper>
+        <UserCreatePage />
+      </Wrapper>,
+    );
     await waitFor(() => screen.getByLabelText(/nombre completo/i));
     fireEvent.change(screen.getByLabelText(/nombre completo/i), { target: { value: 'User Y' } });
     fireEvent.change(screen.getByLabelText(/^usuario$/i), { target: { value: 'usery' } });
     fireEvent.change(screen.getByLabelText(/^contraseña$/i), { target: { value: 'weakpass' } });
-    fireEvent.change(screen.getByLabelText(/confirmar contraseña/i), { target: { value: 'weakpass' } });
+    fireEvent.change(screen.getByLabelText(/confirmar contraseña/i), {
+      target: { value: 'weakpass' },
+    });
     fireEvent.change(screen.getByLabelText(/teléfono/i), { target: { value: '+111' } });
     fireEvent.click(screen.getByRole('button', { name: /adicionar/i }));
     await waitFor(() => {
@@ -429,12 +521,21 @@ describe('UserEditPage — S-EDIT-1: pre-fills UserDetailsForm after getById', (
     mockUser = makeUser({ isSuperAdmin: true });
     mockIsOnline = true;
     mockParams = { id: 'u1' };
-    mockGetUserById = vi.fn().mockResolvedValue({ succeeded: true, data: makeDomainUser({ fullName: 'Pre-filled Name' }) });
+    mockGetUserById = vi
+      .fn()
+      .mockResolvedValue({
+        succeeded: true,
+        data: makeDomainUser({ fullName: 'Pre-filled Name' }),
+      });
   });
 
   it('pre-fills the fullName input from the fetched user', async () => {
     const { UserEditPage } = await import('../user-edit');
-    render(<Wrapper><UserEditPage /></Wrapper>);
+    render(
+      <Wrapper>
+        <UserEditPage />
+      </Wrapper>,
+    );
     await waitFor(() => {
       expect(screen.getByDisplayValue('Pre-filled Name')).toBeInTheDocument();
     });
@@ -448,17 +549,26 @@ describe('UserEditPage — S-EDIT-2: details submit calls editUser', () => {
     mockUser = makeUser({ isSuperAdmin: true });
     mockIsOnline = true;
     mockParams = { id: 'u1' };
-    mockGetUserById = vi.fn().mockResolvedValue({ succeeded: true, data: makeDomainUser({ fullName: 'Existing User' }) });
+    mockGetUserById = vi
+      .fn()
+      .mockResolvedValue({ succeeded: true, data: makeDomainUser({ fullName: 'Existing User' }) });
     mockEditUser = vi.fn().mockResolvedValue({ data: true });
   });
 
   it('calls editUser when details form submitted', async () => {
     const { UserEditPage } = await import('../user-edit');
-    render(<Wrapper><UserEditPage /></Wrapper>);
+    render(
+      <Wrapper>
+        <UserEditPage />
+      </Wrapper>,
+    );
     await waitFor(() => screen.getByDisplayValue('Existing User'));
     fireEvent.click(screen.getByRole('button', { name: /actualizar/i }));
     await waitFor(() => {
-      expect(mockEditUser).toHaveBeenCalledWith('u1', expect.objectContaining({ fullName: 'Existing User' }));
+      expect(mockEditUser).toHaveBeenCalledWith(
+        'u1',
+        expect.objectContaining({ fullName: 'Existing User' }),
+      );
     });
   });
 });
@@ -469,13 +579,19 @@ describe('UserEditPage — S-EDIT-NAV: successful save navigates to the users li
     mockUser = makeUser({ isSuperAdmin: true });
     mockIsOnline = true;
     mockParams = { id: 'u1' };
-    mockGetUserById = vi.fn().mockResolvedValue({ succeeded: true, data: makeDomainUser({ fullName: 'Existing User' }) });
+    mockGetUserById = vi
+      .fn()
+      .mockResolvedValue({ succeeded: true, data: makeDomainUser({ fullName: 'Existing User' }) });
     mockEditUser = vi.fn().mockResolvedValue({ data: true });
   });
 
   it('navigates to /management/users after a successful details save, with no inline success message', async () => {
     const { UserEditPage } = await import('../user-edit');
-    render(<Wrapper><UserEditPage /></Wrapper>);
+    render(
+      <Wrapper>
+        <UserEditPage />
+      </Wrapper>,
+    );
     await waitFor(() => screen.getByDisplayValue('Existing User'));
     fireEvent.click(screen.getByRole('button', { name: /actualizar/i }));
     await waitFor(() => {
@@ -496,7 +612,11 @@ describe('UserEditPage — S-EDIT-4: details form offline blocked', () => {
 
   it('details submit is disabled when offline', async () => {
     const { UserEditPage } = await import('../user-edit');
-    render(<Wrapper><UserEditPage /></Wrapper>);
+    render(
+      <Wrapper>
+        <UserEditPage />
+      </Wrapper>,
+    );
     await waitFor(() => screen.getByRole('button', { name: /actualizar/i }));
     expect(screen.getByRole('button', { name: /actualizar/i })).toBeDisabled();
   });
@@ -513,7 +633,11 @@ describe('UserEditPage — S-EDIT-6: isActive hidden for non-admin', () => {
 
   it('does not show isActive toggle for regular (non-admin) user', async () => {
     const { UserEditPage } = await import('../user-edit');
-    render(<Wrapper><UserEditPage /></Wrapper>);
+    render(
+      <Wrapper>
+        <UserEditPage />
+      </Wrapper>,
+    );
     await waitFor(() => screen.getByRole('button', { name: /actualizar/i }));
     expect(screen.queryByLabelText(/activo/i)).not.toBeInTheDocument();
   });
@@ -530,7 +654,11 @@ describe('UserEditPage — S-ERR-1: getById rejection renders error, no form mou
 
   it('shows error alert and does not mount the details form', async () => {
     const { UserEditPage } = await import('../user-edit');
-    render(<Wrapper><UserEditPage /></Wrapper>);
+    render(
+      <Wrapper>
+        <UserEditPage />
+      </Wrapper>,
+    );
     await waitFor(() => {
       expect(screen.getByRole('alert')).toBeInTheDocument();
     });
@@ -559,7 +687,11 @@ describe('UserEditPage — getUserById succeeded:false', () => {
 
   it('shows USERS.ERROR and does not mount the details form when getUserById resolves with succeeded:false', async () => {
     const { UserEditPage } = await import('../user-edit');
-    render(<Wrapper><UserEditPage /></Wrapper>);
+    render(
+      <Wrapper>
+        <UserEditPage />
+      </Wrapper>,
+    );
     await waitFor(() => {
       expect(screen.getByRole('alert')).toBeInTheDocument();
       expect(screen.getByText(esMessages['USERS.ERROR'])).toBeInTheDocument();
@@ -579,7 +711,11 @@ describe('UserEditPage — S-NOCRED: no credentials/password UI is rendered (Req
 
   it('does not render any password/credentials fields or change-password action', async () => {
     const { UserEditPage } = await import('../user-edit');
-    render(<Wrapper><UserEditPage /></Wrapper>);
+    render(
+      <Wrapper>
+        <UserEditPage />
+      </Wrapper>,
+    );
     await waitFor(() => screen.getByDisplayValue('User One'));
     expect(screen.queryByLabelText(/contraseña actual/i)).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/^nueva contraseña$/i)).not.toBeInTheDocument();
@@ -627,17 +763,23 @@ describe('UserCreatePage — ROUTE-STOREID: resolves storeId from :storeId param
     mockParams = { storeId: 'param-store' };
     mockCreateUser = vi.fn().mockResolvedValue({ data: true });
     const { UserCreatePage } = await import('../user-create');
-    render(<Wrapper><UserCreatePage /></Wrapper>);
+    render(
+      <Wrapper>
+        <UserCreatePage />
+      </Wrapper>,
+    );
     await waitFor(() => screen.getByLabelText(/nombre completo/i));
     fireEvent.change(screen.getByLabelText(/nombre completo/i), { target: { value: 'User A' } });
     fireEvent.change(screen.getByLabelText(/^usuario$/i), { target: { value: 'usera' } });
     fireEvent.change(screen.getByLabelText(/^contraseña$/i), { target: { value: 'ValidPass1' } });
-    fireEvent.change(screen.getByLabelText(/confirmar contraseña/i), { target: { value: 'ValidPass1' } });
+    fireEvent.change(screen.getByLabelText(/confirmar contraseña/i), {
+      target: { value: 'ValidPass1' },
+    });
     fireEvent.change(screen.getByLabelText(/teléfono/i), { target: { value: '+111' } });
     fireEvent.click(screen.getByRole('button', { name: /adicionar/i }));
     await waitFor(() => {
       expect(mockCreateUser).toHaveBeenCalledWith(
-        expect.objectContaining({ storeId: 'param-store' })
+        expect.objectContaining({ storeId: 'param-store' }),
       );
     });
   });
@@ -647,17 +789,23 @@ describe('UserCreatePage — ROUTE-STOREID: resolves storeId from :storeId param
     mockParams = {};
     mockCreateUser = vi.fn().mockResolvedValue({ data: true });
     const { UserCreatePage } = await import('../user-create');
-    render(<Wrapper><UserCreatePage /></Wrapper>);
+    render(
+      <Wrapper>
+        <UserCreatePage />
+      </Wrapper>,
+    );
     await waitFor(() => screen.getByLabelText(/nombre completo/i));
     fireEvent.change(screen.getByLabelText(/nombre completo/i), { target: { value: 'User B' } });
     fireEvent.change(screen.getByLabelText(/^usuario$/i), { target: { value: 'userb' } });
     fireEvent.change(screen.getByLabelText(/^contraseña$/i), { target: { value: 'ValidPass1' } });
-    fireEvent.change(screen.getByLabelText(/confirmar contraseña/i), { target: { value: 'ValidPass1' } });
+    fireEvent.change(screen.getByLabelText(/confirmar contraseña/i), {
+      target: { value: 'ValidPass1' },
+    });
     fireEvent.change(screen.getByLabelText(/teléfono/i), { target: { value: '+222' } });
     fireEvent.click(screen.getByRole('button', { name: /adicionar/i }));
     await waitFor(() => {
       expect(mockCreateUser).toHaveBeenCalledWith(
-        expect.objectContaining({ storeId: 'fallback-store' })
+        expect.objectContaining({ storeId: 'fallback-store' }),
       );
     });
   });

@@ -13,15 +13,15 @@ with identical behavior.
 
 ## Architecture Decisions
 
-| Decision | Choice | Alternatives rejected | Rationale |
-|---|---|---|---|
-| Expenses layer | Direct service calls in route containers | Aggregation service | Trivial CRUD + flat filtering; matches today-quantities pattern |
-| Reports/Stats layer | Dedicated aggregation services returning view models | Inline `useEffect` aggregation | Strict TDD needs isolated unit tests; thin containers; shared day-grouping |
-| Profit cost source | `calculateOrderProfit(orderItem)` (embedded `productCosts`) | Re-read InventoryEntries | FIFO cost baked at order time; re-reading mis-costs depleted historical stock |
-| recharts loading | `React.lazy(() => import('./chart-core'))` + Suspense | Static top-level import | Keeps recharts out of auth/main bundle; proven scanner pattern |
-| date helpers | Extract to `shared/lib/date-utils.ts` | Leave duplicated | Two copies already exist; prevent a third |
-| Expenses delete | `BaseRepository.remove` (hard delete) today-only | Soft-delete via isActive | Matches proposal; history is edit-only so no delete surface there |
-| Statistics path | Register route at `stats/dashboard` | `statistics/dashboard` | Existing menu-config path is `/stats/dashboard`; do not change menu |
+| Decision            | Choice                                                      | Alternatives rejected          | Rationale                                                                     |
+| ------------------- | ----------------------------------------------------------- | ------------------------------ | ----------------------------------------------------------------------------- |
+| Expenses layer      | Direct service calls in route containers                    | Aggregation service            | Trivial CRUD + flat filtering; matches today-quantities pattern               |
+| Reports/Stats layer | Dedicated aggregation services returning view models        | Inline `useEffect` aggregation | Strict TDD needs isolated unit tests; thin containers; shared day-grouping    |
+| Profit cost source  | `calculateOrderProfit(orderItem)` (embedded `productCosts`) | Re-read InventoryEntries       | FIFO cost baked at order time; re-reading mis-costs depleted historical stock |
+| recharts loading    | `React.lazy(() => import('./chart-core'))` + Suspense       | Static top-level import        | Keeps recharts out of auth/main bundle; proven scanner pattern                |
+| date helpers        | Extract to `shared/lib/date-utils.ts`                       | Leave duplicated               | Two copies already exist; prevent a third                                     |
+| Expenses delete     | `BaseRepository.remove` (hard delete) today-only            | Soft-delete via isActive       | Matches proposal; history is edit-only so no delete surface there             |
+| Statistics path     | Register route at `stats/dashboard`                         | `statistics/dashboard`         | Existing menu-config path is `/stats/dashboard`; do not change menu           |
 
 ## Data Flow
 
@@ -41,29 +41,29 @@ they hold no state and are constructed per call (same as today-sales-profit).
 
 ## File Changes
 
-| File | Action | Description |
-|---|---|---|
-| `app/shared/lib/date-utils.ts` | Create | Export `startOfDay`, `addDays` |
-| `app/sales/lib/services/order-offline-service.ts` | Modify | Import date helpers from date-utils; delete local copies |
-| `app/inventory/lib/services/inventory-offline-service.ts` | Modify | Same import swap; delete local copies |
-| `app/expenses/lib/services/expense-offline-service.ts` | Create | Thin `BaseRepository<Expense>` wrapper |
-| `app/expenses/routes/today-expenses.tsx` | Create | Container: add/edit/delete + running total |
-| `app/expenses/routes/expenses-history.tsx` | Create | Container: filters + pagination + filtered total, edit-only |
-| `app/expenses/components/expense-form-modal.tsx` | Create | Presentational form (type, total, paymentType, date, note) |
-| `app/expenses/components/expense-list.tsx` | Create | Presentational list/table |
-| `app/expenses/components/expense-filters.tsx` | Create | Date-range + type filter controls |
-| `app/expenses/components/expense-pagination.tsx` | Create | page/limit control |
-| `app/reports/lib/services/report-aggregation-service.ts` | Create | `getTodayReport()` → `ReportSummary` |
-| `app/reports/routes/today-report.tsx` | Create | Container + presentational sections + refresh |
-| `app/statistics/lib/services/statistics-aggregation-service.ts` | Create | 30-day rollups |
-| `app/statistics/components/chart-core.tsx` | Create | ONLY file importing `recharts` |
-| `app/statistics/components/sales-chart.tsx` | Create | `React.lazy` + Suspense wrapper |
-| `app/statistics/components/profit-chart.tsx` | Create | `React.lazy` + Suspense wrapper |
-| `app/statistics/routes/dashboard.tsx` | Create | Container: both charts |
-| `app/routes.ts` | Modify | Register 4 routes under app-layout |
-| `app/shared/lib/config/menu-config.ts` | Modify | Add `ExpensesHistory` item to EXPENSES group |
-| `app/shared/lib/i18n/es.ts` | Modify | Add feature/label/chart/expense-type keys |
-| `apps/web-store-pos/package.json` | Modify | Add `recharts` |
+| File                                                            | Action | Description                                                 |
+| --------------------------------------------------------------- | ------ | ----------------------------------------------------------- |
+| `app/shared/lib/date-utils.ts`                                  | Create | Export `startOfDay`, `addDays`                              |
+| `app/sales/lib/services/order-offline-service.ts`               | Modify | Import date helpers from date-utils; delete local copies    |
+| `app/inventory/lib/services/inventory-offline-service.ts`       | Modify | Same import swap; delete local copies                       |
+| `app/expenses/lib/services/expense-offline-service.ts`          | Create | Thin `BaseRepository<Expense>` wrapper                      |
+| `app/expenses/routes/today-expenses.tsx`                        | Create | Container: add/edit/delete + running total                  |
+| `app/expenses/routes/expenses-history.tsx`                      | Create | Container: filters + pagination + filtered total, edit-only |
+| `app/expenses/components/expense-form-modal.tsx`                | Create | Presentational form (type, total, paymentType, date, note)  |
+| `app/expenses/components/expense-list.tsx`                      | Create | Presentational list/table                                   |
+| `app/expenses/components/expense-filters.tsx`                   | Create | Date-range + type filter controls                           |
+| `app/expenses/components/expense-pagination.tsx`                | Create | page/limit control                                          |
+| `app/reports/lib/services/report-aggregation-service.ts`        | Create | `getTodayReport()` → `ReportSummary`                        |
+| `app/reports/routes/today-report.tsx`                           | Create | Container + presentational sections + refresh               |
+| `app/statistics/lib/services/statistics-aggregation-service.ts` | Create | 30-day rollups                                              |
+| `app/statistics/components/chart-core.tsx`                      | Create | ONLY file importing `recharts`                              |
+| `app/statistics/components/sales-chart.tsx`                     | Create | `React.lazy` + Suspense wrapper                             |
+| `app/statistics/components/profit-chart.tsx`                    | Create | `React.lazy` + Suspense wrapper                             |
+| `app/statistics/routes/dashboard.tsx`                           | Create | Container: both charts                                      |
+| `app/routes.ts`                                                 | Modify | Register 4 routes under app-layout                          |
+| `app/shared/lib/config/menu-config.ts`                          | Modify | Add `ExpensesHistory` item to EXPENSES group                |
+| `app/shared/lib/i18n/es.ts`                                     | Modify | Add feature/label/chart/expense-type keys                   |
+| `apps/web-store-pos/package.json`                               | Modify | Add `recharts`                                              |
 
 ## Interfaces / Contracts
 
@@ -78,22 +78,35 @@ export class ExpenseOfflineService {
   constructor(storeId: string);
   getAll(): Expense[];
   getById(id: string): Expense | undefined;
-  getByDateRange(from: Date, to: Date): Expense[];   // type filter applied by caller
-  getActiveToday(): Expense[];                         // start..start+1, isActive
-  create(input: { type: ExpenseType; total: number; date: Date; paymentType: PaymentType; note: string }): Expense;
-  update(id: string, patch: Partial<Pick<Expense,'type'|'total'|'date'|'paymentType'|'note'>>): Expense;
-  delete(id: string): void;                            // repo.remove; today route only
+  getByDateRange(from: Date, to: Date): Expense[]; // type filter applied by caller
+  getActiveToday(): Expense[]; // start..start+1, isActive
+  create(input: {
+    type: ExpenseType;
+    total: number;
+    date: Date;
+    paymentType: PaymentType;
+    note: string;
+  }): Expense;
+  update(
+    id: string,
+    patch: Partial<Pick<Expense, 'type' | 'total' | 'date' | 'paymentType' | 'note'>>,
+  ): Expense;
+  delete(id: string): void; // repo.remove; today route only
 }
 
 // reports/lib/services/report-aggregation-service.ts
-export interface ReportProductAvailable { productId: string; productName: string; available: number; }
+export interface ReportProductAvailable {
+  productId: string;
+  productName: string;
+  available: number;
+}
 export interface ReportSummary {
   date: Date;
-  orderCount: number;          // active orders today
+  orderCount: number; // active orders today
   totalRevenue: number;
   totalCost: number;
   totalProfit: number;
-  available: ReportProductAvailable[];   // sum InventoryEntry.available per product
+  available: ReportProductAvailable[]; // sum InventoryEntry.available per product
 }
 export class ReportAggregationService {
   constructor(storeId: string);
@@ -101,11 +114,18 @@ export class ReportAggregationService {
 }
 
 // statistics/lib/services/statistics-aggregation-service.ts
-export interface DailySalesPoint { date: string; totalRevenue: number; orderCount: number; }
-export interface DailyProfitPoint { date: string; profit: number; }
+export interface DailySalesPoint {
+  date: string;
+  totalRevenue: number;
+  orderCount: number;
+}
+export interface DailyProfitPoint {
+  date: string;
+  profit: number;
+}
 export class StatisticsAggregationService {
   constructor(storeId: string);
-  getLast30DaysSales(today?: Date): DailySalesPoint[];   // revenue primary, count tooltip
+  getLast30DaysSales(today?: Date): DailySalesPoint[]; // revenue primary, count tooltip
   getLast30DaysProfit(today?: Date): DailyProfitPoint[]; // calculateOrderProfit per item
 }
 ```
@@ -132,13 +152,13 @@ extract-and-import refactor with no behavior change.
 
 ## Testing Strategy
 
-| Layer | What | Approach |
-|---|---|---|
-| Unit (RED→GREEN) | `date-utils` startOfDay/addDays | Pure-function assertions incl. month/DST boundary |
-| Unit (RED→GREEN) | `ExpenseOfflineService` CRUD + getActiveToday + getByDateRange | localStorage clear in beforeEach; assert storage key + revival |
-| Unit (RED→GREEN) | `ReportAggregationService.getTodayReport` | Mock Order/Inventory services; assert totals + available |
-| Unit (RED→GREEN) | `StatisticsAggregationService` 30-day rollups | Seed orders across days; assert point arrays + profit via calculateOrderProfit |
-| Smoke render | expense form/list/filters, report sections, chart wrappers | RTL inside `<IntlProvider locale="es">`; chart wrappers assert Suspense fallback then render |
+| Layer            | What                                                           | Approach                                                                                     |
+| ---------------- | -------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| Unit (RED→GREEN) | `date-utils` startOfDay/addDays                                | Pure-function assertions incl. month/DST boundary                                            |
+| Unit (RED→GREEN) | `ExpenseOfflineService` CRUD + getActiveToday + getByDateRange | localStorage clear in beforeEach; assert storage key + revival                               |
+| Unit (RED→GREEN) | `ReportAggregationService.getTodayReport`                      | Mock Order/Inventory services; assert totals + available                                     |
+| Unit (RED→GREEN) | `StatisticsAggregationService` 30-day rollups                  | Seed orders across days; assert point arrays + profit via calculateOrderProfit               |
+| Smoke render     | expense form/list/filters, report sections, chart wrappers     | RTL inside `<IntlProvider locale="es">`; chart wrappers assert Suspense fallback then render |
 
 Strict TDD: aggregation + service logic gets failing-first unit tests; presentational components get
 smoke render tests (mock services / pass props). `recharts` is not exercised in unit tests (lazy chunk).

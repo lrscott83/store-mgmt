@@ -128,7 +128,7 @@ export function installRegisterNetworkObserver(page: Page): RegisterNetworkObser
           observedCount: attempts.length,
           firstUrl: first.url,
           subject: 'registro',
-        })
+        }),
       );
     },
 
@@ -141,7 +141,7 @@ export function installRegisterNetworkObserver(page: Page): RegisterNetworkObser
             'Registration quota exhausted for this IP: 50 registrations per 10-minute window ' +
               '(RateLimitPolicies.cs:26-35). Wait up to 10 minutes — the limiter releases permits ' +
               'at roughly 5 per minute (SegmentsPerWindow=10, PermitLimit=50). This failure does ' +
-              'NOT indicate an app defect.'
+              'NOT indicate an app defect.',
           ),
       });
     },

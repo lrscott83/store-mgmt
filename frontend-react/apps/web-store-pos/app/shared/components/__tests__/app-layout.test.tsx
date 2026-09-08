@@ -46,7 +46,13 @@ import { useAuthStore } from '~/shared/lib/stores/auth-store';
 
 function renderLayout() {
   const router = createMemoryRouter(
-    [{ path: '/', element: <AppLayout />, children: [{ index: true, element: <div>content</div> }] }],
+    [
+      {
+        path: '/',
+        element: <AppLayout />,
+        children: [{ index: true, element: <div>content</div> }],
+      },
+    ],
     { initialEntries: ['/'] },
   );
   return render(
@@ -58,7 +64,11 @@ function renderLayout() {
 
 describe('AppLayout — sidebar default state (user preference: collapsed by default)', () => {
   beforeEach(() => {
-    Object.defineProperty(window, 'innerWidth', { writable: true, configurable: true, value: 1440 });
+    Object.defineProperty(window, 'innerWidth', {
+      writable: true,
+      configurable: true,
+      value: 1440,
+    });
   });
 
   it('sidebar is collapsed by default even at desktop width', () => {
@@ -69,7 +79,11 @@ describe('AppLayout — sidebar default state (user preference: collapsed by def
 
   it('does not force-open the sidebar on resize to desktop width', () => {
     renderLayout();
-    Object.defineProperty(window, 'innerWidth', { writable: true, configurable: true, value: 1920 });
+    Object.defineProperty(window, 'innerWidth', {
+      writable: true,
+      configurable: true,
+      value: 1920,
+    });
     window.dispatchEvent(new Event('resize'));
     const sidebar = screen.getByRole('navigation', { name: 'Navegación principal' });
     expect(sidebar.className).toContain('w-0');
@@ -78,7 +92,11 @@ describe('AppLayout — sidebar default state (user preference: collapsed by def
 
 describe('AppLayout — sidebar overlays content instead of pushing it', () => {
   beforeEach(() => {
-    Object.defineProperty(window, 'innerWidth', { writable: true, configurable: true, value: 1440 });
+    Object.defineProperty(window, 'innerWidth', {
+      writable: true,
+      configurable: true,
+      value: 1440,
+    });
   });
 
   it('opening the sidebar via the header toggle does not shrink the main content column', () => {
@@ -110,11 +128,15 @@ describe('AppLayout — sidebar overlays content instead of pushing it', () => {
     renderLayout();
 
     fireEvent.click(screen.getByRole('button', { name: 'Alternar barra lateral' }));
-    expect(screen.getByRole('navigation', { name: 'Navegación principal' }).className).toContain('w-64');
+    expect(screen.getByRole('navigation', { name: 'Navegación principal' }).className).toContain(
+      'w-64',
+    );
 
     fireEvent.click(screen.getByRole('button', { name: 'Contraer barra lateral' }));
 
-    expect(screen.getByRole('navigation', { name: 'Navegación principal' }).className).toContain('w-0');
+    expect(screen.getByRole('navigation', { name: 'Navegación principal' }).className).toContain(
+      'w-0',
+    );
   });
 });
 
@@ -139,7 +161,11 @@ describe('AppLayout — does not render its own PWA install button (moved to roo
   }
 
   beforeEach(() => {
-    Object.defineProperty(window, 'innerWidth', { writable: true, configurable: true, value: 1440 });
+    Object.defineProperty(window, 'innerWidth', {
+      writable: true,
+      configurable: true,
+      value: 1440,
+    });
     setServiceWorkerSupported(true);
     setStandalone(false);
   });
@@ -159,7 +185,11 @@ describe('AppLayout — does not render its own PWA install button (moved to roo
 // padding is therefore top-only (pt-*), not py-*.
 describe('AppLayout — <main> responsive padding (Angular 3-breakpoint parity)', () => {
   beforeEach(() => {
-    Object.defineProperty(window, 'innerWidth', { writable: true, configurable: true, value: 1440 });
+    Object.defineProperty(window, 'innerWidth', {
+      writable: true,
+      configurable: true,
+      value: 1440,
+    });
   });
 
   it('applies top-only vertical padding (px-2 pt-4 md:px-12 md:pt-6) mirroring Angular .coded-content', () => {
@@ -214,7 +244,11 @@ describe('AppLayout — useOfflineIdleLock (D5, offline sessions only)', () => {
   }
 
   beforeEach(() => {
-    Object.defineProperty(window, 'innerWidth', { writable: true, configurable: true, value: 1440 });
+    Object.defineProperty(window, 'innerWidth', {
+      writable: true,
+      configurable: true,
+      value: 1440,
+    });
     logoutMock.mockClear();
     vi.useFakeTimers();
   });

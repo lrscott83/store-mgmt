@@ -93,7 +93,12 @@ let mockGetUserByToken = vi.fn();
 
 vi.mock('~/shared/lib/stores/auth-store', () => {
   const useAuthStore = vi.fn((selector?: (s: unknown) => unknown) => {
-    const state = { user: mockUser, isAuthenticated: true, updateUser: mockUpdateUser, getUserByToken: mockGetUserByToken };
+    const state = {
+      user: mockUser,
+      isAuthenticated: true,
+      updateUser: mockUpdateUser,
+      getUserByToken: mockGetUserByToken,
+    };
     if (typeof selector === 'function') return selector(state);
     return state;
   });
@@ -117,12 +122,24 @@ let mockListOwners = vi.fn();
 
 vi.mock('~/management/stores/lib/services/store-http-service', () => ({
   storeHttpService: {
-    get listStores() { return mockListStores; },
-    get getStore() { return mockGetStore; },
-    get createStore() { return mockCreateStore; },
-    get updateStore() { return mockUpdateStore; },
-    get getModulesToStore() { return mockGetModulesToStore; },
-    get listOwners() { return mockListOwners; },
+    get listStores() {
+      return mockListStores;
+    },
+    get getStore() {
+      return mockGetStore;
+    },
+    get createStore() {
+      return mockCreateStore;
+    },
+    get updateStore() {
+      return mockUpdateStore;
+    },
+    get getModulesToStore() {
+      return mockGetModulesToStore;
+    },
+    get listOwners() {
+      return mockListOwners;
+    },
   },
 }));
 
@@ -147,7 +164,9 @@ vi.mock('~/auth/routes/loaders', () => ({
 let mockGetMe = vi.fn();
 vi.mock('~/shared/lib/http/auth-http-service', () => ({
   authHttpService: {
-    get getMe() { return mockGetMe; },
+    get getMe() {
+      return mockGetMe;
+    },
   },
 }));
 
@@ -157,9 +176,15 @@ const localStorageMock = (() => {
   let store: Record<string, string> = {};
   return {
     getItem: (key: string) => store[key] ?? null,
-    setItem: (key: string, value: string) => { store[key] = value; },
-    removeItem: (key: string) => { delete store[key]; },
-    clear: () => { store = {}; },
+    setItem: (key: string, value: string) => {
+      store[key] = value;
+    },
+    removeItem: (key: string) => {
+      delete store[key];
+    },
+    clear: () => {
+      store = {};
+    },
   };
 })();
 Object.defineProperty(global, 'localStorage', { value: localStorageMock });
@@ -187,9 +212,15 @@ describe('EditStorePage — mode resolution', () => {
   it('no route param + selectedStoreId present -> edit mode, id = selectedStoreId', async () => {
     mockUser = makeUser({ isSuperAdmin: true, selectedStoreId: 's-from-user' });
     mockParams = {};
-    mockGetStore = vi.fn().mockResolvedValue({ succeeded: true, data: makeStore({ name: 'User Store' }) });
+    mockGetStore = vi
+      .fn()
+      .mockResolvedValue({ succeeded: true, data: makeStore({ name: 'User Store' }) });
     const { EditStorePage } = await import('../edit-store');
-    render(<Wrapper><EditStorePage /></Wrapper>);
+    render(
+      <Wrapper>
+        <EditStorePage />
+      </Wrapper>,
+    );
     await waitFor(() => {
       expect(mockGetStore).toHaveBeenCalledWith('s-from-user');
     });
@@ -201,7 +232,11 @@ describe('EditStorePage — mode resolution', () => {
     mockParams = {};
     mockGetStore = vi.fn();
     const { EditStorePage } = await import('../edit-store');
-    render(<Wrapper><EditStorePage /></Wrapper>);
+    render(
+      <Wrapper>
+        <EditStorePage />
+      </Wrapper>,
+    );
     await waitFor(() => {
       expect(screen.getByText(esMessages['STORES.CREATE_TITLE'])).toBeInTheDocument();
     });
@@ -211,9 +246,15 @@ describe('EditStorePage — mode resolution', () => {
   it('/edit/:id -> edit mode, id from route param overrides selectedStoreId', async () => {
     mockUser = makeUser({ isSuperAdmin: true, selectedStoreId: 's-from-user' });
     mockParams = { id: 's2' };
-    mockGetStore = vi.fn().mockResolvedValue({ succeeded: true, data: makeStore({ id: 's2', name: 'Param Store' }) });
+    mockGetStore = vi
+      .fn()
+      .mockResolvedValue({ succeeded: true, data: makeStore({ id: 's2', name: 'Param Store' }) });
     const { EditStorePage } = await import('../edit-store');
-    render(<Wrapper><EditStorePage /></Wrapper>);
+    render(
+      <Wrapper>
+        <EditStorePage />
+      </Wrapper>,
+    );
     await waitFor(() => {
       expect(mockGetStore).toHaveBeenCalledWith('s2');
     });
@@ -225,12 +266,22 @@ describe('EditStorePage — mode resolution', () => {
     mockParams = {};
     mockGetStore = vi.fn();
     const { EditStorePage } = await import('../edit-store');
-    render(<Wrapper><EditStorePage /></Wrapper>);
+    render(
+      <Wrapper>
+        <EditStorePage />
+      </Wrapper>,
+    );
     await waitFor(() => screen.getByLabelText(/nombre/i));
     expect(screen.queryByText(esMessages['STORES.LIST_TITLE'])).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: esMessages['STORES.ACTIVATE'] })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: esMessages['STORES.APPROVE'] })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: esMessages['STORES.DISAPPROVE'] })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: esMessages['STORES.ACTIVATE'] }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: esMessages['STORES.APPROVE'] }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: esMessages['STORES.DISAPPROVE'] }),
+    ).not.toBeInTheDocument();
   });
 });
 
@@ -250,7 +301,11 @@ describe('EditStorePage — create mode: success navigates to user create', () =
 
   it('navigates to /management/users/create/ after successful create (Angular parity)', async () => {
     const { EditStorePage } = await import('../edit-store');
-    render(<Wrapper><EditStorePage /></Wrapper>);
+    render(
+      <Wrapper>
+        <EditStorePage />
+      </Wrapper>,
+    );
     await waitFor(() => screen.getByLabelText(/nombre/i));
     fireEvent.change(screen.getByLabelText(/nombre/i), { target: { value: 'New Store' } });
     const ownerSelect = screen.queryByLabelText(/propietario/i);
@@ -276,7 +331,11 @@ describe('EditStorePage — create mode: HTTP error shown inline', () => {
 
   it('shows inline error when createStore throws', async () => {
     const { EditStorePage } = await import('../edit-store');
-    render(<Wrapper><EditStorePage /></Wrapper>);
+    render(
+      <Wrapper>
+        <EditStorePage />
+      </Wrapper>,
+    );
     await waitFor(() => screen.getByLabelText(/nombre/i));
     fireEvent.change(screen.getByLabelText(/nombre/i), { target: { value: 'Store X' } });
     const ownerSelect = screen.queryByLabelText(/propietario/i);
@@ -300,13 +359,22 @@ describe('EditStorePage — create mode: module catalog fetched on mount', () =>
     // the panel without any tab switch. A paid-only module would force the click
     // to race the PlanPicker's async re-sync effect (plan-picker.tsx:48-52),
     // which resets the tab back to the active plan and flakes the assertion.
-    mockGetModulesToStore = vi.fn().mockResolvedValue({ succeeded: true, data: [makeModule({ name: 'Catalog Module', priceIncluded: true })] });
+    mockGetModulesToStore = vi
+      .fn()
+      .mockResolvedValue({
+        succeeded: true,
+        data: [makeModule({ name: 'Catalog Module', priceIncluded: true })],
+      });
     mockListOwners = vi.fn().mockResolvedValue({ succeeded: true, data: [] });
   });
 
   it('renders module catalog in the form', async () => {
     const { EditStorePage } = await import('../edit-store');
-    render(<Wrapper><EditStorePage /></Wrapper>);
+    render(
+      <Wrapper>
+        <EditStorePage />
+      </Wrapper>,
+    );
     // The plan shows a single price: the paid total on the "Pago" tab — never a
     // per-module price. A free catalog (paid total = 0) renders "0 USD" (trailing
     // zeros dropped) and lists modules by name only. Wait for the catalog to land
@@ -330,7 +398,11 @@ describe('EditStorePage — create mode: module catalog error blocks submit', ()
 
   it('shows catalog error and disables submit when catalog fails', async () => {
     const { EditStorePage } = await import('../edit-store');
-    render(<Wrapper><EditStorePage /></Wrapper>);
+    render(
+      <Wrapper>
+        <EditStorePage />
+      </Wrapper>,
+    );
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /guardar/i })).toBeDisabled();
     });
@@ -346,27 +418,54 @@ describe('EditStorePage — create mode: isOwnerAdmin computed from feature', ()
   });
 
   it('shows owner picker for non-superAdmin user who has EFeatures.Owners in featureIds', async () => {
-    mockUser = makeUser({ isSuperAdmin: false, isOwnerAdmin: true, featureIds: [73, 11], selectedStoreId: '' });
+    mockUser = makeUser({
+      isSuperAdmin: false,
+      isOwnerAdmin: true,
+      featureIds: [73, 11],
+      selectedStoreId: '',
+    });
     const { EditStorePage } = await import('../edit-store');
-    render(<Wrapper><EditStorePage /></Wrapper>);
+    render(
+      <Wrapper>
+        <EditStorePage />
+      </Wrapper>,
+    );
     await waitFor(() => {
       expect(screen.getByLabelText(/propietario/i)).toBeInTheDocument();
     });
   });
 
   it('shows owner picker for superAdmin even without Owners featureId', async () => {
-    mockUser = makeUser({ isSuperAdmin: true, isOwnerAdmin: false, featureIds: [73], selectedStoreId: '' });
+    mockUser = makeUser({
+      isSuperAdmin: true,
+      isOwnerAdmin: false,
+      featureIds: [73],
+      selectedStoreId: '',
+    });
     const { EditStorePage } = await import('../edit-store');
-    render(<Wrapper><EditStorePage /></Wrapper>);
+    render(
+      <Wrapper>
+        <EditStorePage />
+      </Wrapper>,
+    );
     await waitFor(() => {
       expect(screen.getByLabelText(/propietario/i)).toBeInTheDocument();
     });
   });
 
   it('does NOT show owner picker for plain ownerAdmin without EFeatures.Owners in featureIds', async () => {
-    mockUser = makeUser({ isSuperAdmin: false, isOwnerAdmin: true, featureIds: [73], selectedStoreId: '' });
+    mockUser = makeUser({
+      isSuperAdmin: false,
+      isOwnerAdmin: true,
+      featureIds: [73],
+      selectedStoreId: '',
+    });
     const { EditStorePage } = await import('../edit-store');
-    render(<Wrapper><EditStorePage /></Wrapper>);
+    render(
+      <Wrapper>
+        <EditStorePage />
+      </Wrapper>,
+    );
     await waitFor(() => screen.getByRole('button', { name: /guardar/i }));
     expect(screen.queryByLabelText(/propietario/i)).not.toBeInTheDocument();
   });
@@ -383,7 +482,11 @@ describe('EditStorePage — create mode: HTTP-only, no offline notice (Req: HTTP
 
   it('does NOT show an offline notice or gate submit on connectivity state (Angular store.service.ts is pure HTTP)', async () => {
     const { EditStorePage } = await import('../edit-store');
-    render(<Wrapper><EditStorePage /></Wrapper>);
+    render(
+      <Wrapper>
+        <EditStorePage />
+      </Wrapper>,
+    );
     await waitFor(() => screen.getByRole('button', { name: /guardar/i }));
     expect(screen.getByRole('button', { name: /guardar/i })).not.toBeDisabled();
     expect(screen.queryByText(/sin conexión/i)).not.toBeInTheDocument();
@@ -399,7 +502,9 @@ describe('EditStorePage — edit mode: success navigates to store list', () => {
     vi.clearAllMocks();
     mockUser = makeUser({ isSuperAdmin: true });
     mockParams = { id: 's1' };
-    mockGetStore = vi.fn().mockResolvedValue({ succeeded: true, data: makeStore({ name: 'Existing Store' }) });
+    mockGetStore = vi
+      .fn()
+      .mockResolvedValue({ succeeded: true, data: makeStore({ name: 'Existing Store' }) });
     mockGetModulesToStore = vi.fn().mockResolvedValue({ succeeded: true, data: [makeModule()] });
     mockListOwners = vi.fn().mockResolvedValue({ succeeded: true, data: [makeOwner()] });
     mockUpdateStore = vi.fn().mockResolvedValue({ data: true });
@@ -408,7 +513,11 @@ describe('EditStorePage — edit mode: success navigates to store list', () => {
 
   it('navigates to /management/stores after successful update', async () => {
     const { EditStorePage } = await import('../edit-store');
-    render(<Wrapper><EditStorePage /></Wrapper>);
+    render(
+      <Wrapper>
+        <EditStorePage />
+      </Wrapper>,
+    );
     await waitFor(() => screen.getByDisplayValue('Existing Store'));
     fireEvent.click(screen.getByRole('button', { name: /guardar/i }));
     await waitFor(() => {
@@ -422,14 +531,20 @@ describe('EditStorePage — edit mode: pre-fills form from fetched store', () =>
     vi.clearAllMocks();
     mockUser = makeUser({ isSuperAdmin: true });
     mockParams = { id: 's1' };
-    mockGetStore = vi.fn().mockResolvedValue({ succeeded: true, data: makeStore({ name: 'Pre-filled Name' }) });
+    mockGetStore = vi
+      .fn()
+      .mockResolvedValue({ succeeded: true, data: makeStore({ name: 'Pre-filled Name' }) });
     mockGetModulesToStore = vi.fn().mockResolvedValue({ succeeded: true, data: [makeModule()] });
     mockListOwners = vi.fn().mockResolvedValue({ succeeded: true, data: [makeOwner()] });
   });
 
   it('pre-fills the name input from the fetched store', async () => {
     const { EditStorePage } = await import('../edit-store');
-    render(<Wrapper><EditStorePage /></Wrapper>);
+    render(
+      <Wrapper>
+        <EditStorePage />
+      </Wrapper>,
+    );
     await waitFor(() => {
       expect(screen.getByDisplayValue('Pre-filled Name')).toBeInTheDocument();
     });
@@ -448,7 +563,11 @@ describe('EditStorePage — edit mode: HTTP-only, no offline notice (Req: HTTP-O
 
   it('does NOT show an offline notice or gate submit on connectivity state (Angular store.service.ts is pure HTTP)', async () => {
     const { EditStorePage } = await import('../edit-store');
-    render(<Wrapper><EditStorePage /></Wrapper>);
+    render(
+      <Wrapper>
+        <EditStorePage />
+      </Wrapper>,
+    );
     await waitFor(() => screen.getByRole('button', { name: /guardar/i }));
     expect(screen.getByRole('button', { name: /guardar/i })).not.toBeDisabled();
     expect(screen.queryByText(/sin conexión/i)).not.toBeInTheDocument();
@@ -460,7 +579,9 @@ describe('EditStorePage — no BaseRepository cache read/write on load or save (
     vi.clearAllMocks();
     mockUser = makeUser({ isSuperAdmin: true });
     mockParams = { id: 's1' };
-    mockGetStore = vi.fn().mockResolvedValue({ succeeded: true, data: makeStore({ name: 'Existing Store' }) });
+    mockGetStore = vi
+      .fn()
+      .mockResolvedValue({ succeeded: true, data: makeStore({ name: 'Existing Store' }) });
     mockGetModulesToStore = vi.fn().mockResolvedValue({ succeeded: true, data: [] });
     mockListOwners = vi.fn().mockResolvedValue({ succeeded: true, data: [] });
     mockUpdateStore = vi.fn().mockResolvedValue({ data: true });
@@ -470,7 +591,11 @@ describe('EditStorePage — no BaseRepository cache read/write on load or save (
   it('never touches localStorage cache on load or successful save', async () => {
     const setItemSpy = vi.spyOn(localStorageMock, 'setItem');
     const { EditStorePage } = await import('../edit-store');
-    render(<Wrapper><EditStorePage /></Wrapper>);
+    render(
+      <Wrapper>
+        <EditStorePage />
+      </Wrapper>,
+    );
     await waitFor(() => screen.getByDisplayValue('Existing Store'));
     expect(setItemSpy).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: /guardar/i }));
@@ -486,7 +611,9 @@ describe('EditStorePage — edit mode: HTTP error shown inline without redirect'
     vi.clearAllMocks();
     mockUser = makeUser({ isSuperAdmin: true });
     mockParams = { id: 's1' };
-    mockGetStore = vi.fn().mockResolvedValue({ succeeded: true, data: makeStore({ name: 'Edit Me' }) });
+    mockGetStore = vi
+      .fn()
+      .mockResolvedValue({ succeeded: true, data: makeStore({ name: 'Edit Me' }) });
     mockGetModulesToStore = vi.fn().mockResolvedValue({ succeeded: true, data: [] });
     mockListOwners = vi.fn().mockResolvedValue({ succeeded: true, data: [] });
     mockUpdateStore = vi.fn().mockRejectedValue(new Error('Update failed'));
@@ -494,7 +621,11 @@ describe('EditStorePage — edit mode: HTTP error shown inline without redirect'
 
   it('shows inline error when updateStore throws and does not navigate', async () => {
     const { EditStorePage } = await import('../edit-store');
-    render(<Wrapper><EditStorePage /></Wrapper>);
+    render(
+      <Wrapper>
+        <EditStorePage />
+      </Wrapper>,
+    );
     await waitFor(() => screen.getByDisplayValue('Edit Me'));
     fireEvent.click(screen.getByRole('button', { name: /guardar/i }));
     await waitFor(() => {
@@ -516,7 +647,11 @@ describe('EditStorePage — edit mode: store not found shows error state', () =>
 
   it('shows error state when getStore fails', async () => {
     const { EditStorePage } = await import('../edit-store');
-    render(<Wrapper><EditStorePage /></Wrapper>);
+    render(
+      <Wrapper>
+        <EditStorePage />
+      </Wrapper>,
+    );
     await waitFor(() => {
       expect(screen.getByRole('alert')).toBeInTheDocument();
     });
@@ -548,7 +683,11 @@ describe('EditStorePage — edit mode: getStore/getModulesToStore/listOwners suc
 
   it('sets loadError (not catalogError) to STORES.ERROR and does not pre-fill the form', async () => {
     const { EditStorePage } = await import('../edit-store');
-    render(<Wrapper><EditStorePage /></Wrapper>);
+    render(
+      <Wrapper>
+        <EditStorePage />
+      </Wrapper>,
+    );
 
     await waitFor(() => {
       expect(screen.getByRole('alert')).toBeInTheDocument();
@@ -593,7 +732,11 @@ describe('EditStorePage — create mode: getModulesToStore/listOwners succeeded:
 
   it('sets catalogError (not loadError) to STORES.ERROR and disables submit', async () => {
     const { EditStorePage } = await import('../edit-store');
-    render(<Wrapper><EditStorePage /></Wrapper>);
+    render(
+      <Wrapper>
+        <EditStorePage />
+      </Wrapper>,
+    );
 
     await waitFor(() => {
       expect(screen.getByRole('alert')).toBeInTheDocument();
@@ -609,7 +752,9 @@ describe('EditStorePage — edit mode: refreshes user after successful edit (no 
     vi.clearAllMocks();
     mockUser = makeUser({ isSuperAdmin: true });
     mockParams = { id: 's1' };
-    mockGetStore = vi.fn().mockResolvedValue({ succeeded: true, data: makeStore({ name: 'Existing Store' }) });
+    mockGetStore = vi
+      .fn()
+      .mockResolvedValue({ succeeded: true, data: makeStore({ name: 'Existing Store' }) });
     mockGetModulesToStore = vi.fn().mockResolvedValue({ succeeded: true, data: [] });
     mockListOwners = vi.fn().mockResolvedValue({ succeeded: true, data: [] });
     mockUpdateStore = vi.fn().mockResolvedValue({ data: true });
@@ -618,7 +763,11 @@ describe('EditStorePage — edit mode: refreshes user after successful edit (no 
 
   it('calls getUserByToken after successful edit instead of reload', async () => {
     const { EditStorePage } = await import('../edit-store');
-    render(<Wrapper><EditStorePage /></Wrapper>);
+    render(
+      <Wrapper>
+        <EditStorePage />
+      </Wrapper>,
+    );
     await waitFor(() => screen.getByDisplayValue('Existing Store'));
     fireEvent.click(screen.getByRole('button', { name: /guardar/i }));
     await waitFor(() => {
@@ -628,7 +777,11 @@ describe('EditStorePage — edit mode: refreshes user after successful edit (no 
 
   it('still navigates away after successful edit', async () => {
     const { EditStorePage } = await import('../edit-store');
-    render(<Wrapper><EditStorePage /></Wrapper>);
+    render(
+      <Wrapper>
+        <EditStorePage />
+      </Wrapper>,
+    );
     await waitFor(() => screen.getByDisplayValue('Existing Store'));
     fireEvent.click(screen.getByRole('button', { name: /guardar/i }));
     await waitFor(() => {

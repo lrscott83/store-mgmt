@@ -17,9 +17,7 @@ test.use({ persona: 'owner-admin' });
 test.describe('FC-B2 — Configurations', () => {
   test.describe.configure({ timeout: 120_000 });
 
-  test('la página carga sin errores y muestra contenido', async ({
-    signedInPage,
-  }) => {
+  test('la página carga sin errores y muestra contenido', async ({ signedInPage }) => {
     const { page } = signedInPage;
 
     await page.goto('/management/configurations');

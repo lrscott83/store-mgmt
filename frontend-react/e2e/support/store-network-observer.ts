@@ -176,7 +176,7 @@ export function installStoreNetworkObserver(page: Page, storeId: string): StoreN
           new Error(
             `Unexpected 429 on PUT .../v1/stores/${storeId} — this endpoint carries no ` +
               '[EnableRateLimiting] policy (StoresController.cs), so a 429 here is not a known ' +
-              'rate limit and points at something else.'
+              'rate limit and points at something else.',
           ),
       });
     },
@@ -187,13 +187,13 @@ export function installStoreNetworkObserver(page: Page, storeId: string): StoreN
 
       if (putRequests_.length !== 1) {
         throw new Error(
-          `Expected exactly one PUT .../v1/stores/${storeId}, observed ${putRequests_.length}.`
+          `Expected exactly one PUT .../v1/stores/${storeId}, observed ${putRequests_.length}.`,
         );
       }
       if (putResponses.length !== 1) {
         throw new Error(
           `Expected exactly one response for PUT .../v1/stores/${storeId}, observed ` +
-            `${putResponses.length}.`
+            `${putResponses.length}.`,
         );
       }
     },
@@ -203,7 +203,7 @@ export function installStoreNetworkObserver(page: Page, storeId: string): StoreN
         const urls = putRequests.map((r) => r.url).join(', ');
         throw new Error(
           `Expected exactly ${expected} PUT(s) to .../v1/stores/${storeId}, observed ` +
-            `${putRequests.length}${urls ? `: ${urls}` : ''}.`
+            `${putRequests.length}${urls ? `: ${urls}` : ''}.`,
         );
       }
     },
@@ -219,7 +219,7 @@ export function installStoreNetworkObserver(page: Page, storeId: string): StoreN
           `Expected zero document-resourceType requests${context ? ` ${context}` : ''}, observed ` +
             `${delta}. A full-page reload (location.reload() or a hard navigation) fires one; a ` +
             "client-side navigate() never does — edit-store.tsx's save flow is expected to use the " +
-            'latter (edit-store.tsx:139).'
+            'latter (edit-store.tsx:139).',
         );
       }
     },

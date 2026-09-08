@@ -93,9 +93,7 @@ function installRejectionRecorder(page: import('@playwright/test').Page) {
         push({
           kind: 'console-error',
           message: args
-            .map((a) =>
-              a instanceof Error ? `${a.name}: ${a.message}` : String(a).slice(0, 500),
-            )
+            .map((a) => (a instanceof Error ? `${a.name}: ${a.message}` : String(a).slice(0, 500)))
             .join(' | ')
             .slice(0, 2000),
           stack: args.find((a): a is Error => a instanceof Error)?.stack,
@@ -145,23 +143,18 @@ test('logout from a data screen is silent — no dialog, no unhandled rejection'
   // Give any in-flight promise a chance to reject before reading the recorder.
   await page.waitForTimeout(1500);
 
-  const rejections = (await page.evaluate(
-    () => window.__logoutRejections
-  )) as CapturedRejection[];
+  const rejections = (await page.evaluate(() => window.__logoutRejections)) as CapturedRejection[];
 
   // The dialog the user reported — asserted soft-collapsed into the
   // rejection evidence: if the bug reproduces, this prints name+message+stack.
-  const dialog = await page
-    .getByText('No se pudo abrir la información de esta tienda.')
-    .count();
+  const dialog = await page.getByText('No se pudo abrir la información de esta tienda.').count();
 
   const evidence = rejections
     .map((r) => `[${r.time}] ${r.reasonName}: ${r.message}\n${r.stack ?? '(no stack)'}`)
     .join('\n---\n');
 
-  expect(
-    rejections,
-    `BUG REPRODUCED — unhandled rejections during logout:\n${evidence}`,
-  ).toEqual([]);
+  expect(rejections, `BUG REPRODUCED — unhandled rejections during logout:\n${evidence}`).toEqual(
+    [],
+  );
   expect(dialog, 'the KEY_UNAVAILABLE dialog must not appear after logout').toBe(0);
 });

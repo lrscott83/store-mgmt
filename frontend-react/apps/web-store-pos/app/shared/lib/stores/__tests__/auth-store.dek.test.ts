@@ -160,9 +160,9 @@ describe('useAuthStore.login — DEK unwrap wiring (design §11, WU11, first beh
   it('11.3: no roster entry for this login -> login rejects DekUnwrapError and no key is invented (design D2, was the Q2 mint)', async () => {
     mockAuthHttp(successEnvelope(), makeAuthUser());
 
-    await expect(
-      useAuthStore.getState().login('ana@example.com', 'secret'),
-    ).rejects.toMatchObject({ name: 'DekUnwrapError' });
+    await expect(useAuthStore.getState().login('ana@example.com', 'secret')).rejects.toMatchObject({
+      name: 'DekUnwrapError',
+    });
     expect(getDek()).toBeNull();
     expect(readDeviceDekTable()).toBeNull();
 
@@ -176,9 +176,9 @@ describe('useAuthStore.login — DEK unwrap wiring (design §11, WU11, first beh
     await seedV2Roster(await wrapDek('old-password', FIXED_DEK));
     mockAuthHttp(successEnvelope(), makeAuthUser());
 
-    await expect(
-      useAuthStore.getState().login('ana@example.com', 'secret'),
-    ).rejects.toMatchObject({ name: 'DekUnwrapError' });
+    await expect(useAuthStore.getState().login('ana@example.com', 'secret')).rejects.toMatchObject({
+      name: 'DekUnwrapError',
+    });
     expect(getDek()).toBeNull();
 
     vi.doUnmock('~/shared/lib/http/auth-http-service');
@@ -213,10 +213,9 @@ describe('useAuthStore.login — DEK unwrap wiring (design §11, WU11, first beh
 
     const seen: Array<{ login: string; password: string; sessionStoreId: string }> = [];
     vi.doMock('../../offline/dek-provisioning', async () => {
-      const actual =
-        await vi.importActual<typeof import('../../offline/dek-provisioning')>(
-          '../../offline/dek-provisioning',
-        );
+      const actual = await vi.importActual<typeof import('../../offline/dek-provisioning')>(
+        '../../offline/dek-provisioning',
+      );
       return {
         ...actual,
         resolveDekForLogin: (args: { login: string; password: string; sessionStoreId: string }) => {

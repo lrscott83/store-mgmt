@@ -16,7 +16,7 @@ export function isReSeller(user: UserModel): boolean {
 export function isUserAuthorized(
   user: UserModel,
   featureIds: number[],
-  storeId: string | undefined
+  storeId: string | undefined,
 ): boolean {
   // Gate #1 — per-call expiry guard (Angular authorization.service.ts:18).
   // `<` EXCLUSIVE (NOT the `<=` inclusive session-load check at auth-store.ts:76 /

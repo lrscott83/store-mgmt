@@ -32,8 +32,7 @@ const TODAY_ORDERS_HEADER = 'Ventas del día'; // TODAY_ORDERS.HEADER
 const TODAY_CREDITS_HEADER = 'Créditos del día'; // SALE_CREDIT.TODAY_CREDITS
 const NO_ORDER_FOUND = 'No se ha realizado ninguna venta en el día de hoy.'; // TODAY_STATS.NO_ORDER_FOUND
 const NO_CREDIT_FOUND = 'No existe ningún crédito en el día'; // SALE_CREDIT.NO_SALE_CREDIT_FOUND_IN_DAY
-const QUANTITY_NOT_AVAILABLE =
-  'La cantidad del producto no está disponible en el inventario.'; // ProductErrors.ProductQuantityNotAvailable
+const QUANTITY_NOT_AVAILABLE = 'La cantidad del producto no está disponible en el inventario.'; // ProductErrors.ProductQuantityNotAvailable
 
 interface SeededProduct {
   name: string;
@@ -163,7 +162,9 @@ test.describe.serial('Ventas Mayoristas — flujo completo', () => {
 
   test.use({ persona: 'owner-admin-with-products' });
 
-  test('configurar producto mayorista y vender 12 paquetes como 288 unidades', async ({ signedInPage }) => {
+  test('configurar producto mayorista y vender 12 paquetes como 288 unidades', async ({
+    signedInPage,
+  }) => {
     const { page, selectedStoreId } = signedInPage;
 
     const product = await openWholesaleWithSeededProduct(page, selectedStoreId);
@@ -197,7 +198,9 @@ test.describe.serial('Ventas Mayoristas — flujo completo', () => {
     await expect(page.getByText(product.name)).toBeVisible();
   });
 
-  test('venta mayorista con pago Zelle queda filtrable por método de pago', async ({ signedInPage }) => {
+  test('venta mayorista con pago Zelle queda filtrable por método de pago', async ({
+    signedInPage,
+  }) => {
     const { page, selectedStoreId } = signedInPage;
 
     const product = await openWholesaleWithSeededProduct(page, selectedStoreId);
@@ -247,7 +250,9 @@ test.describe.serial('Ventas Mayoristas — flujo completo', () => {
     await expect(page.getByText('Mayorista Test')).toBeVisible();
   });
 
-  test('solicitar más unidades de las disponibles bloquea la venta mayorista', async ({ signedInPage }) => {
+  test('solicitar más unidades de las disponibles bloquea la venta mayorista', async ({
+    signedInPage,
+  }) => {
     const { page, selectedStoreId } = signedInPage;
 
     // Solo 100 unidades disponibles: 12 paquetes (288 unidades) no caben.
@@ -263,7 +268,9 @@ test.describe.serial('Ventas Mayoristas — flujo completo', () => {
     await expect(page.getByTestId('cart-badge')).toHaveText('0');
   });
 
-  test('el icono de info abre el popup readonly con los rangos y precios', async ({ signedInPage }) => {
+  test('el icono de info abre el popup readonly con los rangos y precios', async ({
+    signedInPage,
+  }) => {
     const { page, selectedStoreId } = signedInPage;
 
     const product = await openWholesaleWithSeededProduct(page, selectedStoreId);
@@ -282,7 +289,9 @@ test.describe.serial('Ventas Mayoristas — flujo completo', () => {
     await expect(page.getByText('Rangos de precio mayorista')).toHaveCount(0);
   });
 
-  test('una cantidad menor al primer rango se bloquea con el error de mínimo', async ({ signedInPage }) => {
+  test('una cantidad menor al primer rango se bloquea con el error de mínimo', async ({
+    signedInPage,
+  }) => {
     const { page, selectedStoreId } = signedInPage;
 
     // Primer rango en 6 paquetes ($6/ud): 3 paquetes no alcanzan el mínimo.
@@ -295,12 +304,16 @@ test.describe.serial('Ventas Mayoristas — flujo completo', () => {
     await page.getByTestId(`wholesale-add-${product.id}`).click();
 
     // El error de mínimo aparece y el carrito queda vacío.
-    await expect(page.getByText(/cantidad mínima para la venta mayorista es de 6 paquetes/)).toBeVisible();
+    await expect(
+      page.getByText(/cantidad mínima para la venta mayorista es de 6 paquetes/),
+    ).toBeVisible();
     await expect(page.getByTestId('cart-badge')).toHaveText('0');
 
     // Cerrar el diálogo de error para liberar el puntero.
     await page.locator('.swal2-confirm').click();
-    await expect(page.getByText(/cantidad mínima para la venta mayorista es de 6 paquetes/)).toHaveCount(0);
+    await expect(
+      page.getByText(/cantidad mínima para la venta mayorista es de 6 paquetes/),
+    ).toHaveCount(0);
 
     // Con exactamente el mínimo (6 paquetes) la venta sí procede.
     await page.getByTestId(`wholesale-packs-input-${product.id}`).fill('6');

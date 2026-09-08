@@ -45,7 +45,12 @@ describe('SaleCreditOfflineService', () => {
 
   beforeEach(() => {
     localStorage.clear();
-    useAuthStore.setState({ user: makeUser({ login: 'jdoe' }), isAuthenticated: true, isLoading: false, error: null });
+    useAuthStore.setState({
+      user: makeUser({ login: 'jdoe' }),
+      isAuthenticated: true,
+      isLoading: false,
+      error: null,
+    });
     service = new SaleCreditOfflineService(storeId);
   });
 
@@ -180,7 +185,9 @@ describe('SaleCreditOfflineService', () => {
       const result = service.paidSaleCredit('missing-id', PaymentType.Efectivo, '');
       expect(result.succeeded).toBe(false);
       expect(result.data).toBeUndefined();
-      expect(result.errors).toEqual([{ code: 'SaleCredit.NotExists', description: 'El gasto no existe.' }]);
+      expect(result.errors).toEqual([
+        { code: 'SaleCredit.NotExists', description: 'El gasto no existe.' },
+      ]);
     });
   });
 
@@ -205,7 +212,9 @@ describe('SaleCreditOfflineService', () => {
       const secondAfter = all.find((c) => c.id === second.id);
       // .find() returns the first ACTIVE match in storage insertion order — only ONE is
       // deactivated, the other keeps isActive=true (loop semantics would deactivate both).
-      expect([firstAfter?.isActive, secondAfter?.isActive].filter((v) => v === false)).toHaveLength(1);
+      expect([firstAfter?.isActive, secondAfter?.isActive].filter((v) => v === false)).toHaveLength(
+        1,
+      );
     });
 
     it('only deactivates credits for the matching orderId', () => {
@@ -257,7 +266,9 @@ describe('SaleCreditOfflineService', () => {
       const result = service.updateSaleCredit('missing-id', 'X', 'Y');
       expect(result.succeeded).toBe(false);
       expect(result.data).toBeUndefined();
-      expect(result.errors).toEqual([{ code: 'SaleCredit.NotExists', description: 'El gasto no existe.' }]);
+      expect(result.errors).toEqual([
+        { code: 'SaleCredit.NotExists', description: 'El gasto no existe.' },
+      ]);
     });
   });
 
@@ -274,7 +285,9 @@ describe('SaleCreditOfflineService', () => {
     it('returns a failed Result (SaleCreditErrors.NotExists) for a missing id, without throwing', () => {
       const result = service.deleteSaleCredit('missing-id');
       expect(result.succeeded).toBe(false);
-      expect(result.errors).toEqual([{ code: 'SaleCredit.NotExists', description: 'El gasto no existe.' }]);
+      expect(result.errors).toEqual([
+        { code: 'SaleCredit.NotExists', description: 'El gasto no existe.' },
+      ]);
     });
 
     // deleteSaleCredit's Result MUST NOT be a BaseResponseModel/DataResult (no data/message
@@ -589,7 +602,9 @@ describe('SaleCreditOfflineService', () => {
       service.getStorageSaleCredits();
       service.getStorageSaleCredits();
 
-      const callsForKey = getItemSpy.mock.calls.filter(([key]) => key === 'lizoft.store-saleCredits-s1');
+      const callsForKey = getItemSpy.mock.calls.filter(
+        ([key]) => key === 'lizoft.store-saleCredits-s1',
+      );
       expect(callsForKey).toHaveLength(1);
     });
 
@@ -821,7 +836,9 @@ describe('SaleCreditOfflineService', () => {
     it('excludes voided credits regardless of filters', async () => {
       createCredit('o1', 'Ana', 10);
       service.deactivateSaleCreditByOrderId('o1');
-      await expect(service.filterSaleCredits(false, null, null, null)).resolves.toMatchObject({ data: [] });
+      await expect(service.filterSaleCredits(false, null, null, null)).resolves.toMatchObject({
+        data: [],
+      });
     });
 
     it('all-null call returns every active credit (Angular parity: filterSaleCredits(null, null, null, null))', async () => {

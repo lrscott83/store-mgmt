@@ -23,9 +23,7 @@ test.describe.serial('Sale category filtering', () => {
     await expect(page.getByRole('button', { name: 'Todos' })).toBeVisible();
   });
 
-  test('sale page shows products when Todos is selected', async ({
-    signedInPage,
-  }) => {
+  test('sale page shows products when Todos is selected', async ({ signedInPage }) => {
     const { page } = signedInPage;
     await page.goto('/sales/new');
     await page.waitForTimeout(2000);

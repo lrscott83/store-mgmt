@@ -102,14 +102,14 @@ describe('registerStoreActivity — USAGE-2: POSTs only unsaved days', () => {
     expect(apiClient.post).toHaveBeenCalledWith(
       '/v1/usages/store-daily-usage',
       { activeDays: [{ day: today(), saved: false }] },
-      { skipLoading: true }
+      { skipLoading: true },
     );
   });
 
   it('excludes already-saved days from the POST payload', async () => {
     localStorage.setItem(
       STORAGE_KEY,
-      JSON.stringify({ activeDays: [{ day: '2020-01-01', saved: true }] })
+      JSON.stringify({ activeDays: [{ day: '2020-01-01', saved: true }] }),
     );
     const { apiClient } = await import('~/shared/lib/http/api-client');
     (apiClient.post as ReturnType<typeof vi.fn>).mockResolvedValue({
@@ -122,14 +122,20 @@ describe('registerStoreActivity — USAGE-2: POSTs only unsaved days', () => {
     expect(apiClient.post).toHaveBeenCalledWith(
       '/v1/usages/store-daily-usage',
       { activeDays: [{ day: today(), saved: false }] },
-      { skipLoading: true }
+      { skipLoading: true },
     );
   });
 
   it('marks the buffered days saved on a successful response', async () => {
     const { apiClient } = await import('~/shared/lib/http/api-client');
     (apiClient.post as ReturnType<typeof vi.fn>).mockResolvedValue({
-      data: { succeeded: true, data: [{ day: today(), saved: true }], message: '', actionCode: 0, errors: [] },
+      data: {
+        succeeded: true,
+        data: [{ day: today(), saved: true }],
+        message: '',
+        actionCode: 0,
+        errors: [],
+      },
     });
 
     const { registerStoreActivity } = await import('../store-usage-tracker');
@@ -141,7 +147,10 @@ describe('registerStoreActivity — USAGE-2: POSTs only unsaved days', () => {
   });
 
   it('skips the POST entirely when there are zero unsaved days', async () => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ activeDays: [{ day: today(), saved: true }] }));
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ activeDays: [{ day: today(), saved: true }] }),
+    );
     const { apiClient } = await import('~/shared/lib/http/api-client');
 
     const { registerStoreActivity } = await import('../store-usage-tracker');
@@ -164,7 +173,7 @@ describe('registerStoreActivity — USAGE-3: sending mutex blocks concurrent POS
       () =>
         new Promise((resolve) => {
           resolvePost = resolve;
-        })
+        }),
     );
 
     const { registerStoreActivity } = await import('../store-usage-tracker');
@@ -196,7 +205,7 @@ describe('registerStoreActivity — USAGE-6: roster JWT bearer on the usage POST
         formatVersion: 3,
         storeId: STORE_ID,
         users,
-      })
+      }),
     );
   }
 
@@ -238,7 +247,7 @@ describe('registerStoreActivity — USAGE-6: roster JWT bearer on the usage POST
       expect.objectContaining({
         skipLoading: true,
         headers: { Authorization: 'Bearer roster-jwt-abc' },
-      })
+      }),
     );
   });
 
@@ -272,7 +281,7 @@ describe('registerStoreActivity — USAGE-6: roster JWT bearer on the usage POST
     expect(apiClient.post).toHaveBeenCalledWith(
       '/v1/usages/store-daily-usage',
       { activeDays: [{ day: today(), saved: false }] },
-      { skipLoading: true }
+      { skipLoading: true },
     );
   });
 
@@ -306,7 +315,7 @@ describe('registerStoreActivity — USAGE-6: roster JWT bearer on the usage POST
     expect(apiClient.post).toHaveBeenCalledWith(
       '/v1/usages/store-daily-usage',
       { activeDays: [{ day: today(), saved: false }] },
-      { skipLoading: true }
+      { skipLoading: true },
     );
   });
 });
@@ -411,7 +420,7 @@ describe('cleanOldStoreUsage — USAGE-5: retention prune on mount (parity)', ()
   it('prunes an entry strictly before the cutoff date', async () => {
     localStorage.setItem(
       STORAGE_KEY,
-      JSON.stringify({ activeDays: [{ day: '2026-06-12', saved: true }] })
+      JSON.stringify({ activeDays: [{ day: '2026-06-12', saved: true }] }),
     );
 
     const { cleanOldStoreUsage } = await import('../store-usage-tracker');
@@ -424,7 +433,7 @@ describe('cleanOldStoreUsage — USAGE-5: retention prune on mount (parity)', ()
   it('keeps an entry exactly at the cutoff date (inclusive >= boundary)', async () => {
     localStorage.setItem(
       STORAGE_KEY,
-      JSON.stringify({ activeDays: [{ day: '2026-06-13', saved: true }] })
+      JSON.stringify({ activeDays: [{ day: '2026-06-13', saved: true }] }),
     );
 
     const { cleanOldStoreUsage } = await import('../store-usage-tracker');
@@ -437,7 +446,7 @@ describe('cleanOldStoreUsage — USAGE-5: retention prune on mount (parity)', ()
   it('keeps an entry after the cutoff date', async () => {
     localStorage.setItem(
       STORAGE_KEY,
-      JSON.stringify({ activeDays: [{ day: '2026-07-01', saved: true }] })
+      JSON.stringify({ activeDays: [{ day: '2026-07-01', saved: true }] }),
     );
 
     const { cleanOldStoreUsage } = await import('../store-usage-tracker');
@@ -450,7 +459,7 @@ describe('cleanOldStoreUsage — USAGE-5: retention prune on mount (parity)', ()
   it('does not write to storage when nothing is pruned (no-op write)', async () => {
     localStorage.setItem(
       STORAGE_KEY,
-      JSON.stringify({ activeDays: [{ day: '2026-07-01', saved: true }] })
+      JSON.stringify({ activeDays: [{ day: '2026-07-01', saved: true }] }),
     );
     const setItemSpy = vi.spyOn(Storage.prototype, 'setItem');
 
@@ -468,7 +477,7 @@ describe('cleanOldStoreUsage — USAGE-5: retention prune on mount (parity)', ()
           { day: '2026-06-12', saved: true },
           { day: '2026-07-01', saved: true },
         ],
-      })
+      }),
     );
     const setItemSpy = vi.spyOn(Storage.prototype, 'setItem');
 
@@ -478,7 +487,7 @@ describe('cleanOldStoreUsage — USAGE-5: retention prune on mount (parity)', ()
     expect(setItemSpy).toHaveBeenCalledTimes(1);
     expect(setItemSpy).toHaveBeenCalledWith(
       STORAGE_KEY,
-      JSON.stringify({ activeDays: [{ day: '2026-07-01', saved: true }] })
+      JSON.stringify({ activeDays: [{ day: '2026-07-01', saved: true }] }),
     );
   });
 });

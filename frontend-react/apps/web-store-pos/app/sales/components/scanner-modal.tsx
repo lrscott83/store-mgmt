@@ -46,7 +46,9 @@ export function ScannerModal({ onScanned, onClose }: ScannerModalProps) {
   useEffect(() => {
     onScannedRef.current = onScanned;
   }, [onScanned]);
-  const [status, setStatus] = useState<'idle' | 'starting' | 'scanning' | 'denied' | 'failed'>('idle');
+  const [status, setStatus] = useState<'idle' | 'starting' | 'scanning' | 'denied' | 'failed'>(
+    'idle',
+  );
   const [quantity, setQuantity] = useState(1);
   const quantityRef = useRef(quantity);
   useEffect(() => {
@@ -161,7 +163,10 @@ export function ScannerModal({ onScanned, onClose }: ScannerModalProps) {
           </p>
         )}
         {status === 'denied' && (
-          <p className="mb-3 rounded bg-red-50 px-3 py-2 text-center text-sm text-red-600" data-testid="scanner-denied">
+          <p
+            className="mb-3 rounded bg-red-50 px-3 py-2 text-center text-sm text-red-600"
+            data-testid="scanner-denied"
+          >
             {intl.formatMessage({ id: 'SCANNER.CAMERA_PERMISSION_DENIED' })}
           </p>
         )}

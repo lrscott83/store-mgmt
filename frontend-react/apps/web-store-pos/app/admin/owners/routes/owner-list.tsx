@@ -48,16 +48,15 @@ export function OwnerListPage() {
 
   // An owner is on a paid plan when at least one store has a calculable next payment
   // date (`nextDueDate`). On a free plan, no store has one.
-  const visibleOwners = filter === 'paid-plan'
-    ? owners.filter((o) => o.storeModules.some((m) => m.nextDueDate !== null))
-    : owners.filter((o) => o.storeModules.every((m) => m.nextDueDate === null));
+  const visibleOwners =
+    filter === 'paid-plan'
+      ? owners.filter((o) => o.storeModules.some((m) => m.nextDueDate !== null))
+      : owners.filter((o) => o.storeModules.every((m) => m.nextDueDate === null));
 
   return (
     <div className="space-y-4 p-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">
-          {intl.formatMessage({ id: 'OWNER.LIST_TITLE' })}
-        </h1>
+        <h1 className="text-xl font-semibold">{intl.formatMessage({ id: 'OWNER.LIST_TITLE' })}</h1>
         <Button variant="fab" onClick={() => navigate('/admin/owners/create')}>
           <PlusIcon />
           {intl.formatMessage({ id: 'GENERAL.ADD' })}
@@ -80,12 +79,8 @@ export function OwnerListPage() {
           onChange={(e) => setFilter(e.target.value as 'paid-plan' | 'free-plan')}
           className="rounded border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
         >
-          <option value="paid-plan">
-            {intl.formatMessage({ id: 'OWNER.PAID_PLAN' })}
-          </option>
-          <option value="free-plan">
-            {intl.formatMessage({ id: 'OWNER.FREE_PLAN' })}
-          </option>
+          <option value="paid-plan">{intl.formatMessage({ id: 'OWNER.PAID_PLAN' })}</option>
+          <option value="free-plan">{intl.formatMessage({ id: 'OWNER.FREE_PLAN' })}</option>
         </select>
       </div>
 

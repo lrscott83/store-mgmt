@@ -24,6 +24,7 @@ After Phase 3 is applied the following MUST be true:
 11. `pnpm test` passes with more tests than the current 287; `tsc --noEmit` is clean; `pnpm build` succeeds.
 
 Anything outside this list is out of scope for Phase 3:
+
 - Existing inventory routes (`today-quantities`, `today-sales-profit`) are NOT modified.
 - No new domain model fields or enum values are added (all exist).
 - No Intl.NumberFormat — currency rendered with `$` prefix (existing pattern).
@@ -46,26 +47,31 @@ Anything outside this list is out of scope for Phase 3:
 ### Scenarios
 
 **S-DATE-1: startOfDay zeros the time component**
+
 - GIVEN a Date representing 2026-04-15T14:32:00
 - WHEN `startOfDay(date)` is called
 - THEN the result is a Date equal to 2026-04-15T00:00:00.000 (same timezone)
 
 **S-DATE-2: startOfDay on already-midnight date is idempotent**
+
 - GIVEN a Date representing 2026-04-15T00:00:00.000
 - WHEN `startOfDay(date)` is called
 - THEN the result equals 2026-04-15T00:00:00.000
 
 **S-DATE-3: addDays positive shift**
+
 - GIVEN a Date representing 2026-04-15T00:00:00.000
 - WHEN `addDays(date, 3)` is called
 - THEN the result equals 2026-04-18T00:00:00.000
 
 **S-DATE-4: addDays negative shift (subtract)**
+
 - GIVEN a Date representing 2026-04-15T00:00:00.000
 - WHEN `addDays(date, -2)` is called
 - THEN the result equals 2026-04-13T00:00:00.000
 
 **S-DATE-5: addDays does not mutate the input**
+
 - GIVEN a Date `d` representing 2026-04-15
 - WHEN `addDays(d, 5)` is called
 - THEN `d` is still 2026-04-15
@@ -123,91 +129,109 @@ Anything outside this list is out of scope for Phase 3:
 ### Scenarios
 
 **S-EXP-1: save inserts a new expense**
+
 - GIVEN localStorage is empty for the current store
 - WHEN `service.save({ id: 'e1', type: ExpenseType.Salario, total: 100, date: today, paymentType: PaymentType.Efectivo, note: '' })`
 - THEN `service.getAll()` returns an array of length 1 containing the saved expense
 
 **S-EXP-2: save updates an existing expense**
+
 - GIVEN an expense with id `'e1'` and total `100` is in storage
 - WHEN `service.save({ id: 'e1', total: 200, ...otherFields })`
 - THEN `service.getAll()` returns 1 record with total `200`
 
 **S-EXP-3: delete removes the record**
+
 - GIVEN expenses `['e1', 'e2']` are in storage
 - WHEN `service.delete('e1')`
 - THEN `service.getAll()` returns only `['e2']`
 
 **S-EXP-4: delete non-existent id is no-op**
+
 - GIVEN one expense with id `'e1'` is in storage
 - WHEN `service.delete('x99')`
 - THEN `service.getAll()` still returns 1 record and no error is thrown
 
 **S-EXP-5: getToday filters by calendar day**
+
 - GIVEN 3 expenses: one dated yesterday, one dated today at 09:00, one dated tomorrow
 - WHEN `service.getToday()` is called with today's date
 - THEN only the expense dated today is returned (array length 1)
 
 **S-EXP-6: getByDateRange inclusive boundary**
+
 - GIVEN expenses on 2026-04-01, 2026-04-15, 2026-04-30, 2026-05-01
 - WHEN `service.getByDateRange(new Date('2026-04-01'), new Date('2026-04-30'))`
 - THEN returns 3 expenses (Apr 01, Apr 15, Apr 30); May 01 excluded
 
 **S-EXP-7: note defaults to empty string**
+
 - GIVEN a form submit where the note field is left blank (value = `undefined`)
 - WHEN `save` is called with `note: value ?? ''`
 - THEN `service.getAll()[0].note` equals `''` (not null, not undefined)
 
 **S-EXP-8: running total is sum of today's expenses**
+
 - GIVEN two today expenses with totals 50 and 30
 - WHEN the Today Expenses page renders
 - THEN the displayed total equals `$80`
 
 **S-EXP-9: delete requires confirmation — cancel aborts deletion**
+
 - GIVEN an expense row is displayed on the Today Expenses page
 - WHEN the user clicks delete and then cancels the confirmation
 - THEN `service.delete` is NOT called and the expense remains in the list
 
 **S-EXP-10: delete confirmed — expense removed and total updates**
+
 - GIVEN two today expenses with totals 50 and 30 (displayed total `$80`)
 - WHEN the user confirms deletion of the 50-total expense
 - THEN the list shows 1 expense and the total updates to `$30`
 
 **S-EXP-11: history page has no Add and no Delete actions**
+
 - GIVEN the History page is rendered with 3 expenses
 - WHEN the component is inspected
 - THEN there is no "Add Expense" button and no delete control per row
 
 **S-EXP-12: history type filter**
+
 - GIVEN 5 expenses: 3 of type `Salario`, 2 of type `Alquiler`
 - WHEN the type filter is set to `Alquiler`
 - THEN the list shows exactly 2 expenses and the filtered total reflects only those 2
 
 **S-EXP-13: history date-range filter**
+
 - GIVEN expenses on 2026-04-01, 2026-04-20, 2026-05-10
 - WHEN date range is set to 2026-04-01 → 2026-04-30
 - THEN 2 expenses are shown (Apr 01, Apr 20); May 10 excluded
 
 **S-EXP-14: history pagination — second page shows next batch**
+
 - GIVEN 15 expenses, page size is 10
 - WHEN the user navigates to page 2
 - THEN 5 expenses are shown and the filtered total does not change
 
 **S-EXP-15: empty state on Today page**
+
 - GIVEN no expenses exist for today
 - WHEN the Today Expenses page renders
 - THEN an empty-state message is displayed and the total is `$0`
 
 **S-EXP-16: Today page form validation — total must be > 0**
+
 - GIVEN the add expense form is open
 - WHEN the user enters `total = 0` and submits
 - THEN `service.save` is NOT called and a validation error is shown
 
 **S-EXP-17: feature gate — TodayExpenses (80)**
+
 - GIVEN a user without feature 80
 - WHEN navigating to `/expenses/today`
 - THEN the user is redirected to the unauthorized route
 
 **S-EXP-18: feature gate — ExpensesHistory (102)**
+
 - GIVEN a user without feature 102
 - WHEN navigating to `/expenses/expenses`
 - THEN the user is redirected to the unauthorized route
@@ -223,6 +247,7 @@ Anything outside this list is out of scope for Phase 3:
 **REP-2** — `ReportAggregationService` MUST be a plain class under `reports/lib/services/`. It accepts `OrderOfflineService` and `InventoryOfflineService` instances (constructor or method parameters; no global module-scope dependency on new service instances).
 
 **REP-3** — `ReportAggregationService.getTodayReport(date: Date)` MUST return a view model containing:
+
 - `totalRevenue: number` — sum of `order.total` for all active orders today (`order.isActive === true`)
 - `orderCount: number` — count of active orders today
 - `revenueByPaymentType: Record<PaymentType, number>` — revenue grouped by payment type
@@ -256,58 +281,69 @@ Anything outside this list is out of scope for Phase 3:
 ### Scenarios
 
 **S-REP-1: totalRevenue sums only active orders**
+
 - GIVEN 3 active orders with totals 100, 200, 150 and 1 cancelled order (isActive=false) with total 500
 - WHEN `getTodayReport(today)` is called
 - THEN `totalRevenue` equals 450 and `orderCount` equals 3; the cancelled order's 500 is excluded
 
 **S-REP-2: availableQty from InventoryEntry.available**
+
 - GIVEN product `p1` has 2 inventory entries with `available` values 30 and 20
 - WHEN `getTodayReport(today)` is called
 - THEN `inventoryStatus[p1].availableQty` equals 50
 
 **S-REP-3: receivedToday sums today's inventory entries**
+
 - GIVEN 2 inventory entries for product `p1` dated today with quantities 10 and 15
 - AND 1 inventory entry for `p1` dated yesterday with quantity 100
 - WHEN `getTodayReport(today)` is called
 - THEN `inventoryStatus[p1].receivedToday` equals 25
 
 **S-REP-4: consumedToday from order line items**
+
 - GIVEN 2 active orders today each containing product `p1` with quantities 3 and 7
 - WHEN `getTodayReport(today)` is called
 - THEN `inventoryStatus[p1].consumedToday` equals 10
 
 **S-REP-5: netChange = received - consumed**
+
 - GIVEN `receivedToday` = 25 and `consumedToday` = 10 for product `p1`
 - WHEN `getTodayReport(today)` is called
 - THEN `inventoryStatus[p1].netChange` equals 15
 
 **S-REP-6: revenueByPaymentType groups correctly**
+
 - GIVEN 2 active orders with PaymentType.Efectivo (100, 200) and 1 with PaymentType.Zelle (80)
 - WHEN `getTodayReport(today)` is called
 - THEN `revenueByPaymentType[PaymentType.Efectivo]` equals 300, `revenueByPaymentType[PaymentType.Zelle]` equals 80, `revenueByPaymentType[PaymentType.Tarjeta]` equals 0
 
 **S-REP-7: topProducts sorted descending by quantity**
+
 - GIVEN product `A` sold 5 units and product `B` sold 10 units today
 - WHEN `getTodayReport(today)` is called
 - THEN `topProducts[0].productId` equals `B`'s id and `topProducts[1].productId` equals `A`'s id
 
 **S-REP-8: empty state — no orders today**
+
 - GIVEN no orders exist for today
 - WHEN the Reports page renders
 - THEN the Sales Summary section shows a zero-state message and `totalRevenue` displayed is 0
 
 **S-REP-9: Actualizar button triggers re-read**
+
 - GIVEN the Reports page is mounted and displaying data
 - WHEN a new order is added to localStorage (simulated) and the user clicks "Actualizar"
 - THEN `getTodayReport` is called again and the new order's total is included in the displayed revenue
 
 **S-REP-10: cancelled orders excluded from topProducts**
+
 - GIVEN product `p1` appears only in a cancelled order (isActive=false) with quantity 999
 - AND 1 active order for product `p2` with quantity 1
 - WHEN `getTodayReport(today)` is called
 - THEN `topProducts` contains only `p2`; `p1` does not appear
 
 **S-REP-11: feature gate — TodayReports (50)**
+
 - GIVEN a user without feature 50
 - WHEN navigating to `/reports/today`
 - THEN the user is redirected to the unauthorized route
@@ -323,11 +359,13 @@ Anything outside this list is out of scope for Phase 3:
 **STAT-2** — `StatisticsAggregationService` MUST be a plain class under `statistics/lib/services/`. It uses `OrderOfflineService.getByDateRange(from, to)` to read the last 30 calendar days of orders.
 
 **STAT-3** — `StatisticsAggregationService.getDailySales(fromDate: Date, toDate: Date): DailySalesPoint[]` MUST return one entry per calendar day in the range. Each entry contains:
+
 - `date: string` — ISO date string (e.g. `"2026-04-27"`)
 - `orderCount: number` — count of active orders on that day
 - `totalRevenue: number` — sum of `order.total` for active orders on that day
 
 **STAT-4** — `StatisticsAggregationService.getDailyProfit(fromDate: Date, toDate: Date): DailyProfitPoint[]` MUST return one entry per calendar day. Each entry contains:
+
 - `date: string` — ISO date string
 - `grossProfit: number` — sum of `calculateOrderProfit(orderItem).profit` across all order items in active orders that day
 - `totalRevenue: number` — sum of `calculateOrderProfit(orderItem).revenue` for the same
@@ -354,36 +392,43 @@ Anything outside this list is out of scope for Phase 3:
 ### Scenarios
 
 **S-STAT-1: getDailySales returns exactly 30 entries**
+
 - GIVEN the service is called with `fromDate = today-29d` and `toDate = today`
 - WHEN `getDailySales(fromDate, toDate)` is called
 - THEN the returned array has exactly 30 entries, one per calendar day
 
 **S-STAT-2: getDailySales — day with active orders**
+
 - GIVEN 2 active orders on 2026-04-15 with totals 100 and 200
 - WHEN `getDailySales(...)` is called for a range including 2026-04-15
 - THEN the entry for 2026-04-15 has `orderCount: 2` and `totalRevenue: 300`
 
 **S-STAT-3: getDailySales — day with no orders**
+
 - GIVEN no orders exist on 2026-04-16
 - WHEN `getDailySales(...)` is called for a range including 2026-04-16
 - THEN the entry for 2026-04-16 has `orderCount: 0` and `totalRevenue: 0`
 
 **S-STAT-4: getDailySales — cancelled orders excluded**
+
 - GIVEN 1 active order (total 100) and 1 cancelled order (total 500) on 2026-04-15
 - WHEN `getDailySales(...)` is called
 - THEN the entry for 2026-04-15 has `orderCount: 1` and `totalRevenue: 100`
 
 **S-STAT-5: getDailyProfit uses calculateOrderProfit**
+
 - GIVEN an active order on 2026-04-15 with one OrderItem: `price=10, quantity=5, productCosts=[{costPrice:6, quantity:5}]`
 - WHEN `getDailyProfit(...)` is called for a range including 2026-04-15
 - THEN the entry for 2026-04-15 has `totalRevenue: 50`, `totalCost: 30`, `grossProfit: 20`
 
 **S-STAT-6: getDailyProfit — zero-order day**
+
 - GIVEN no active orders on 2026-04-16
 - WHEN `getDailyProfit(...)` is called for a range including 2026-04-16
 - THEN the entry for 2026-04-16 has `grossProfit: 0`, `totalRevenue: 0`, `totalCost: 0`
 
 **S-STAT-7: getDailyProfit — multiple items in one order**
+
 - GIVEN 1 active order with 2 OrderItems:
   - Item A: price=10, qty=2, productCosts=[{costPrice:6, qty:2}] → profit=8
   - Item B: price=20, qty=1, productCosts=[{costPrice:12, qty:1}] → profit=8
@@ -391,26 +436,31 @@ Anything outside this list is out of scope for Phase 3:
 - THEN the day entry has `grossProfit: 16`, `totalRevenue: 40`, `totalCost: 24`
 
 **S-STAT-8: getDailyProfit does NOT read InventoryEntries**
+
 - GIVEN `InventoryOfflineService` is available but has different costs than `productCosts`
 - WHEN `getDailyProfit(...)` is called
 - THEN `InventoryOfflineService` is not called (profit source is exclusively `calculateOrderProfit`)
 
 **S-STAT-9: chart renders empty state when all 30 days are zero**
+
 - GIVEN all 30 entries have `totalRevenue: 0` and `orderCount: 0`
 - WHEN `LastMonthSalesComponent` renders with `loading: false` and `error: null`
 - THEN the component renders "No sales data for this period" (no chart rendered)
 
 **S-STAT-10: chart renders loading indicator**
+
 - GIVEN `loading: true`
 - WHEN `LastMonthSalesComponent` renders
 - THEN a loading indicator is present (chart data is not rendered)
 
 **S-STAT-11: feature gate — Dashboard (60)**
+
 - GIVEN a user without feature 60
 - WHEN navigating to `/stats/dashboard`
 - THEN the user is redirected to the unauthorized route
 
 **S-STAT-12: recharts not in auth bundle**
+
 - GIVEN the app is built with `pnpm build`
 - WHEN the output chunks are inspected
 - THEN no chunk serving the auth or login route contains `recharts`
@@ -424,6 +474,7 @@ Anything outside this list is out of scope for Phase 3:
 **CC-2** — All four routes MUST be registered in `apps/web-store-pos/app/routes.ts`.
 
 **CC-3** — i18n keys for form labels, expense type labels, payment type labels, chart titles, empty-state messages, and the "Actualizar" button MUST be added to `apps/web-store-pos/app/shared/lib/i18n/es.ts`. The following keys MUST exist at minimum:
+
 - `EXPENSES.FORM_TYPE`, `EXPENSES.FORM_TOTAL`, `EXPENSES.FORM_DATE`, `EXPENSES.FORM_PAYMENT_TYPE`, `EXPENSES.FORM_NOTE`
 - `EXPENSES.ADD_BUTTON`, `EXPENSES.EDIT_TITLE`, `EXPENSES.CREATE_TITLE`, `EXPENSES.DELETE_CONFIRM`
 - `EXPENSES.TOTAL_LABEL`, `EXPENSES.EMPTY_STATE`

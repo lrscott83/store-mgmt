@@ -62,7 +62,7 @@ function renderRegister(initialEntries: string[] = ['/register']) {
       <MemoryRouter initialEntries={initialEntries}>
         <RegisterPage />
       </MemoryRouter>
-    </IntlProvider>
+    </IntlProvider>,
   );
 }
 
@@ -126,7 +126,7 @@ describe('RegisterPage — auth-http-register-parity call-site', () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText('Error de validación. Por favor, revise sus datos.')
+        screen.getByText('Error de validación. Por favor, revise sus datos.'),
       ).toBeInTheDocument();
     });
     expect(mockNavigate).not.toHaveBeenCalled();
@@ -177,7 +177,7 @@ describe('RegisterPage — auth-http-register-parity call-site', () => {
 
     await waitFor(() => {
       expect(authHttpService.register).toHaveBeenCalledWith(
-        expect.objectContaining({ code: 'ABC123' })
+        expect.objectContaining({ code: 'ABC123' }),
       );
     });
   });
@@ -310,8 +310,8 @@ describe('RegisterPage — view-text-parity: validate() error strings', () => {
     await waitFor(() => {
       expect(
         screen.getByText(
-          'La contraseña debe tener al menos 8 caracteres, un número y una letra en mayúscula'
-        )
+          'La contraseña debe tener al menos 8 caracteres, un número y una letra en mayúscula',
+        ),
       ).toBeInTheDocument();
     });
   });
@@ -341,7 +341,7 @@ describe('RegisterPage — view-text-parity: loading/offline/success copy', () =
     vi.mocked(authHttpService.register).mockReturnValue(
       new Promise((resolve) => {
         resolveRegister = resolve;
-      })
+      }),
     );
     renderRegister();
     fillRequiredFields();
@@ -368,7 +368,7 @@ describe('RegisterPage — view-text-parity: loading/offline/success copy', () =
 
     await waitFor(() => {
       expect(
-        screen.getByText('Estás sin conexión. Se requiere conexión para registrarte.')
+        screen.getByText('Estás sin conexión. Se requiere conexión para registrarte.'),
       ).toBeInTheDocument();
     });
   });
@@ -382,8 +382,8 @@ describe('RegisterPage — view-text-parity: loading/offline/success copy', () =
     await waitFor(() => {
       expect(
         screen.getByText(
-          'Demasiados intentos de registro. Por favor, espere unos minutos antes de volver a intentar.'
-        )
+          'Demasiados intentos de registro. Por favor, espere unos minutos antes de volver a intentar.',
+        ),
       ).toBeInTheDocument();
     });
   });
@@ -397,8 +397,8 @@ describe('RegisterPage — view-text-parity: loading/offline/success copy', () =
     await waitFor(() => {
       expect(
         screen.getByText(
-          'Ocurrió un error inesperado en la creación de la cuenta. Por favor, revise su conexión o contacte al equipo de soporte técnico.'
-        )
+          'Ocurrió un error inesperado en la creación de la cuenta. Por favor, revise su conexión o contacte al equipo de soporte técnico.',
+        ),
       ).toBeInTheDocument();
     });
   });
@@ -419,7 +419,7 @@ describe('RegisterPage — view-text-parity: loading/offline/success copy', () =
       expect(mockNavigate).toHaveBeenCalledWith('/login');
     });
     expect(
-      screen.queryByText('Cuenta creada. Redirigiendo al inicio de sesión…')
+      screen.queryByText('Cuenta creada. Redirigiendo al inicio de sesión…'),
     ).not.toBeInTheDocument();
   });
 });
@@ -443,8 +443,8 @@ describe('RegisterPage — terms-acceptance toggle (Angular parity: register.com
     renderRegister();
     expect(
       screen.getByText(
-        'Usted debe aceptar los términos y condiciones para registrarse en el sistema.'
-      )
+        'Usted debe aceptar los términos y condiciones para registrarse en el sistema.',
+      ),
     ).toBeInTheDocument();
   });
 

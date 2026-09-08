@@ -56,9 +56,7 @@ test('payload incluye roleIds [3], storeId del usuario, y navega a lista', async
   await page.getByRole('button', { name: SAVE_TEXT }).click();
 
   // Aserción 1+2: POST /v1/storeusers includes roleIds: [3] and storeId.
-  await expect
-    .poll(() => capturedPayloads.length, { timeout: 10_000 })
-    .toBe(1);
+  await expect.poll(() => capturedPayloads.length, { timeout: 10_000 }).toBe(1);
 
   const payload = capturedPayloads[0];
   expect(payload.roleIds).toEqual([3]); // Aserción 1: roleIds hardcodeado
@@ -123,7 +121,9 @@ test('StoreUser en /management/users/create es deslogueado', async ({ signedInPa
   await loginPage.submit();
 
   // Wait for successful login (StoreUser sees the sales nav).
-  await expect(storeUserPage.getByRole('link', { name: 'Catálogo Productos' })).toBeVisible({ timeout: 15_000 });
+  await expect(storeUserPage.getByRole('link', { name: 'Catálogo Productos' })).toBeVisible({
+    timeout: 15_000,
+  });
 
   // Aserción 7: navigate to /management/users/create → redirect to /login
   // (adminFeatureLoader → adminLoader → loaders.ts:113).

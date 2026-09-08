@@ -75,9 +75,7 @@ test('exportar roster: descarga ZIP con nombre correcto, panel se cierra', async
   await dialog.getByRole('button', { name: CONFIRM_TEXT }).click();
 
   // Aserción 3: exactly one GET was emitted.
-  await expect
-    .poll(() => rosterRequests.length, { timeout: 10_000 })
-    .toBe(1);
+  await expect.poll(() => rosterRequests.length, { timeout: 10_000 }).toBe(1);
 
   // Aserción 4+5: download file with correct name and ZIP content.
   const download = await downloadPromise;
@@ -194,7 +192,7 @@ function decodeJwtExp(token: string): number | null {
 // captured response body and the downloaded bundle filename (if any).
 async function captureRosterResponse(
   page: import('@playwright/test').Page,
-  selectedStoreId: string
+  selectedStoreId: string,
 ): Promise<RosterShape> {
   let captured: RosterShape | null = null;
   await page.route(`**/v1/storeusers/${selectedStoreId}/offline-roster`, async (route) => {
@@ -210,9 +208,7 @@ async function captureRosterResponse(
   await dialog.locator('#roster-export-master').fill('TestMaster123');
   await dialog.getByRole('button', { name: CONFIRM_TEXT }).click();
 
-  await expect
-    .poll(() => captured !== null, { timeout: 10_000 })
-    .toBe(true);
+  await expect.poll(() => captured !== null, { timeout: 10_000 }).toBe(true);
   return captured!;
 }
 
@@ -233,11 +229,7 @@ test('roster pagado: expira 5 días después de la próxima fecha de pago y el J
   const paidUser = roster.users.find((u) => u.paymentDueDate);
   expect(paidUser).toBeTruthy();
   const due = new Date(`${paidUser!.paymentDueDate}T00:00:00Z`);
-  const expected = Date.UTC(
-    due.getUTCFullYear(),
-    due.getUTCMonth(),
-    due.getUTCDate() + 5
-  );
+  const expected = Date.UTC(due.getUTCFullYear(), due.getUTCMonth(), due.getUTCDate() + 5);
   expect(roster.expiresAt).toBe(expected);
 
   for (const user of roster.users) {

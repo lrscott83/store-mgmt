@@ -53,9 +53,12 @@ describe('ProductCategoryRepository — 1:1 port of Angular product-category.rep
       const parsed = JSON.parse(raw!);
       expect(Array.isArray(parsed)).toBe(true);
       expect(parsed).toHaveLength(2);
-      expect(parsed.every((entry: unknown) => Array.isArray(entry) && entry.length === 2 && typeof entry[0] === 'string')).toBe(
-        true,
-      );
+      expect(
+        parsed.every(
+          (entry: unknown) =>
+            Array.isArray(entry) && entry.length === 2 && typeof entry[0] === 'string',
+        ),
+      ).toBe(true);
     });
 
     it('auto-writes an empty Map-entries array on the first empty read, without throwing', () => {
@@ -127,10 +130,7 @@ describe('ProductCategoryRepository — 1:1 port of Angular product-category.rep
     });
 
     it('sorts ascending by order', () => {
-      seedCategories([
-        makeCategory('c2', { order: 2 }),
-        makeCategory('c1', { order: 1 }),
-      ]);
+      seedCategories([makeCategory('c2', { order: 2 }), makeCategory('c1', { order: 1 })]);
       expect(repo.getProductCategories().map((c) => c.id)).toEqual(['c1', 'c2']);
     });
   });
@@ -174,7 +174,10 @@ describe('ProductCategoryRepository — 1:1 port of Angular product-category.rep
     });
 
     it('returns true when at least one category is active', () => {
-      seedCategories([makeCategory('c1', { isActive: false }), makeCategory('c2', { isActive: true })]);
+      seedCategories([
+        makeCategory('c1', { isActive: false }),
+        makeCategory('c2', { isActive: true }),
+      ]);
       expect(repo.hasAnyAvailableCategory()).toBe(true);
     });
   });
@@ -185,7 +188,9 @@ describe('ProductCategoryRepository — 1:1 port of Angular product-category.rep
       seedCategories([makeCategory('c1', { name: 'Bebidas' })]);
       const result = repo.addProductCategory('Bebidas', 1, true);
       expect(result.succeeded).toBe(false);
-      expect(result.errors).toEqual([{ code: 'ProductCategory.NameExists', description: 'El nombre de la categoría ya existe.' }]);
+      expect(result.errors).toEqual([
+        { code: 'ProductCategory.NameExists', description: 'El nombre de la categoría ya existe.' },
+      ]);
       expect(readStoredCategories()).toHaveLength(1);
     });
 
@@ -247,7 +252,9 @@ describe('ProductCategoryRepository — 1:1 port of Angular product-category.rep
     it('fails with NotExists when the id does not exist', () => {
       const result = repo.updateProductCategory('missing', 'Name', 1, true);
       expect(result.succeeded).toBe(false);
-      expect(result.errors).toEqual([{ code: 'ProductCategory.NotExists', description: 'La categoría no existe.' }]);
+      expect(result.errors).toEqual([
+        { code: 'ProductCategory.NotExists', description: 'La categoría no existe.' },
+      ]);
     });
 
     it('fails with NameExists when another category already has that name (excluding self)', () => {
@@ -257,7 +264,9 @@ describe('ProductCategoryRepository — 1:1 port of Angular product-category.rep
       ]);
       const result = repo.updateProductCategory('c2', 'Bebidas', 1, true);
       expect(result.succeeded).toBe(false);
-      expect(result.errors).toEqual([{ code: 'ProductCategory.NameExists', description: 'El nombre de la categoría ya existe.' }]);
+      expect(result.errors).toEqual([
+        { code: 'ProductCategory.NameExists', description: 'El nombre de la categoría ya existe.' },
+      ]);
     });
 
     it('succeeds when renaming to its own unchanged name', () => {
@@ -308,7 +317,9 @@ describe('ProductCategoryRepository — 1:1 port of Angular product-category.rep
     it('activateProductCategory fails with NotExists when the id does not exist', () => {
       const result = repo.activateProductCategory('missing', true);
       expect(result.succeeded).toBe(false);
-      expect(result.errors).toEqual([{ code: 'ProductCategory.NotExists', description: 'La categoría no existe.' }]);
+      expect(result.errors).toEqual([
+        { code: 'ProductCategory.NotExists', description: 'La categoría no existe.' },
+      ]);
     });
 
     it('the 2nd isActive argument is inert — passing false to activateProductCategory still sets isActive=true (Angular hardcodes it)', () => {

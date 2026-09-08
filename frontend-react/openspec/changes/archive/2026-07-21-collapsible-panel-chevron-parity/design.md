@@ -40,13 +40,19 @@ export function ChevronDownIcon({ className = '', isExpanded = false }: ChevronI
       stroke="currentColor"
       aria-hidden="true"
     >
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M19.5 8.25l-7.5 7.5-7.5-7.5"
+      />
     </svg>
   );
 }
 ```
 
 Notes:
+
 - The exact path `M19.5 8.25l-7.5 7.5-7.5-7.5` and size `h-5 w-5` come straight from
   `products.tsx` (lines 313-321). `BASE` adds `shrink-0`, which is strictly beneficial (prevents
   the icon squashing in a flex row) and does not alter the visual size.
@@ -63,14 +69,14 @@ indicator and `products.tsx`), the chevron is grouped with the existing right-si
 a `flex items-center gap-2` wrapper, so `justify-between` still pushes title left / value+chevron
 right. The screen's own `isExpanded` is passed through; no new state.
 
-| Screen | File | Header anchor | Placement |
-| --- | --- | --- | --- |
-| Expenses history | `expenses/routes/expenses-history.tsx` (~L177-184) | day-panel `<button>` | wrap amount `<span>` + `<ChevronDownIcon isExpanded={isExpanded} />` in `flex items-center gap-2` |
-| Inventory entries | `inventory/routes/entries.tsx` (~L155-161) | day-panel `<button>` | same wrap around the `text-primary` amount span |
-| Inventory available | `inventory/components/inventory-product-list.tsx` (~L86-93) | category `<button>` | wrap `totalCostPrice` span + chevron |
-| Orders (per order) | `sales/components/order-list.tsx` (~L95-103) | order `<button>` | right side is **already** a `flex items-center gap-2` span (PaymentTypeIcon + amount) — append `<ChevronDownIcon isExpanded={isExpanded} />` as its last child |
-| Orders (date group) | `sales/routes/orders.tsx` (~L189-192) | date `<button>` | wrap amount span + chevron |
-| Credits (date group) | `sales/routes/credits.tsx` (~L126-131) | date `<button>` | wrap `text-danger` amount span + chevron |
+| Screen               | File                                                        | Header anchor        | Placement                                                                                                                                                      |
+| -------------------- | ----------------------------------------------------------- | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Expenses history     | `expenses/routes/expenses-history.tsx` (~L177-184)          | day-panel `<button>` | wrap amount `<span>` + `<ChevronDownIcon isExpanded={isExpanded} />` in `flex items-center gap-2`                                                              |
+| Inventory entries    | `inventory/routes/entries.tsx` (~L155-161)                  | day-panel `<button>` | same wrap around the `text-primary` amount span                                                                                                                |
+| Inventory available  | `inventory/components/inventory-product-list.tsx` (~L86-93) | category `<button>`  | wrap `totalCostPrice` span + chevron                                                                                                                           |
+| Orders (per order)   | `sales/components/order-list.tsx` (~L95-103)                | order `<button>`     | right side is **already** a `flex items-center gap-2` span (PaymentTypeIcon + amount) — append `<ChevronDownIcon isExpanded={isExpanded} />` as its last child |
+| Orders (date group)  | `sales/routes/orders.tsx` (~L189-192)                       | date `<button>`      | wrap amount span + chevron                                                                                                                                     |
+| Credits (date group) | `sales/routes/credits.tsx` (~L126-131)                      | date `<button>`      | wrap `text-danger` amount span + chevron                                                                                                                       |
 
 Standard wrap for the five that need it:
 
@@ -85,7 +91,7 @@ Standard wrap for the five that need it:
 
 ### products.tsx refactor (remove duplicate)
 
-Replace the inline `<svg className={\`h-5 w-5 transition-transform ${isExpanded ? 'rotate-180' : ''}\`} ...>` at lines 313-321 with `<ChevronDownIcon isExpanded={isExpanded} />`, keeping the surrounding dedicated toggle `<button>` (lines 305-322) untouched. Visual output is identical: same path, same `h-5 w-5`, same `transition-transform` + `rotate-180`, same inherited `text-text-muted` from the button. `shrink-0` (added by `BASE`) is the only class delta and is inert here. Add `ChevronDownIcon` to the existing icons import.
+Replace the inline `<svg className={\`h-5 w-5 transition-transform ${isExpanded ? 'rotate-180' : ''}\`} ...>`at lines 313-321 with`<ChevronDownIcon isExpanded={isExpanded} />`, keeping the surrounding dedicated toggle `<button>`(lines 305-322) untouched. Visual output is identical: same path, same`h-5 w-5`, same `transition-transform`+`rotate-180`, same inherited `text-text-muted`from the button.`shrink-0`(added by`BASE`) is the only class delta and is inert here. Add `ChevronDownIcon` to the existing icons import.
 
 ### today-stats.tsx restructure (`<details>` -> controlled panel)
 
@@ -94,13 +100,22 @@ class="list-none">`: browser-managed open state, collapsed by default (no `open`
 panel independent. To host a state-driven chevron, convert to the same
 `div + button + conditional body` pattern used across the app, backed by a **local per-instance
 `useState(false)`**. This preserves the exact semantics:
+
 - Default collapsed (`useState(false)` == no `open` attr).
 - Each panel toggles independently (local state per instance == independent `<details>`).
 - Click header toggles open/close.
 
 ```tsx
-function ExpansionPanel({ title, amount, amountClassName, children }: {
-  title: string; amount: string; amountClassName: string; children: React.ReactNode;
+function ExpansionPanel({
+  title,
+  amount,
+  amountClassName,
+  children,
+}: {
+  title: string;
+  amount: string;
+  amountClassName: string;
+  children: React.ReactNode;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   return (
@@ -160,6 +175,7 @@ No data flow changes. `isExpanded` already computed in each render (from the scr
 ## ADR-style Decisions
 
 ### ADR-1: One shared icon, not a shared panel component
+
 - **Decision**: Extract only `ChevronDownIcon`; leave each screen's header/panel markup in place.
 - **Rationale**: Angular has no shared "panel" abstraction beyond Material's directive; the React
   screens already diverge in header content (payment icon, badges, chips, gear menu). A shared
@@ -170,6 +186,7 @@ No data flow changes. `isExpanded` already computed in each render (from the scr
   over-engineering and non-parity; explicitly flagged Low risk in the proposal.
 
 ### ADR-2: today-stats moves to controlled state, not a CSS-only chevron on `<details>`
+
 - **Decision**: Convert `<details>`/`<summary>` to `div + button + useState + conditional body`.
 - **Rationale**: A chevron that rotates with state needs the open flag in React. `<details>`
   open state is DOM-owned and not reactively readable without extra wiring (`onToggle` +
@@ -182,6 +199,7 @@ No data flow changes. `isExpanded` already computed in each render (from the scr
   second, divergent chevron mechanism from the other six screens.
 
 ### ADR-3: Chevron grouped with the right-side value, inherits color
+
 - **Decision**: Wrap value + chevron in `flex items-center gap-2`, chevron `className="text-text-muted"`.
 - **Rationale**: Mirrors Angular Material's right-aligned indicator and `products.tsx`. Keeping
   the chevron muted (not the value's success/danger color) matches Material's neutral indicator
@@ -190,6 +208,7 @@ No data flow changes. `isExpanded` already computed in each render (from the scr
   apart, breaking the right-cluster look).
 
 ### ADR-4: tutorial.tsx stays native (honor proposal scope) — SUPERSEDED, see note above
+
 - **Decision**: Do not modify tutorial.tsx in this change.
 - **Rationale**: Proposal marked it DEFER/out-of-scope; it is already functional with a native
   triangle. Touching it is scope creep on a parity fix. Recipe captured above for a future pass.

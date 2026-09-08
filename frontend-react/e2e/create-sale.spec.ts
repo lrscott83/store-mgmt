@@ -144,7 +144,9 @@ test.describe.serial('S2-B1 — Crear venta', () => {
 
   test.use({ persona: 'owner-admin-with-products' });
 
-  test('crear una venta de contado con 1 producto y verificar en Ventas del día', async ({ signedInPage }) => {
+  test('crear una venta de contado con 1 producto y verificar en Ventas del día', async ({
+    signedInPage,
+  }) => {
     const { page, selectedStoreId } = signedInPage;
 
     await addProductAndOpenCart(page, selectedStoreId);

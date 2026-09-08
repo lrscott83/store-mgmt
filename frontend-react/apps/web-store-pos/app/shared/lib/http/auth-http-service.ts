@@ -17,10 +17,7 @@ export { SessionRejectedError } from './session-rejected-error';
 
 export const authHttpService = {
   async login(payload: LoginPayload): Promise<BaseResponseModel<AuthModel>> {
-    const response = await apiClient.post<BaseResponseModel<AuthModel>>(
-      '/v1/auth/login',
-      payload
-    );
+    const response = await apiClient.post<BaseResponseModel<AuthModel>>('/v1/auth/login', payload);
     return response.data;
   },
 
@@ -39,7 +36,7 @@ export const authHttpService = {
     }
     const response = await apiClient.post<BaseResponseModel<RegisterAuthModel>>(
       '/v1/auth/register',
-      body
+      body,
     );
     return response.data;
   },

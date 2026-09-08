@@ -6,9 +6,7 @@ import type { StoreToCollect } from '@store-mgmt/domain';
 
 // ─── loader mock (Req: Route Gating — must be resellerFeatureLoader) ─────────
 
-const mockResellerFeatureLoader = vi.fn((_featureIds: number[]) =>
-  vi.fn().mockResolvedValue(null)
-);
+const mockResellerFeatureLoader = vi.fn((_featureIds: number[]) => vi.fn().mockResolvedValue(null));
 vi.mock('~/auth/routes/loaders', () => ({
   resellerFeatureLoader: (featureIds: number[]) => mockResellerFeatureLoader(featureIds),
 }));
@@ -108,9 +106,8 @@ describe('CollectionsPage — route gating wiring', () => {
 
 describe('CollectionsPage — rows', () => {
   it('renders store/owner/amount(formatCurrency)/status for each row and calls getStoresToCollect on mount', async () => {
-    const { storeHttpService } = await import(
-      '~/management/stores/lib/services/store-http-service'
-    );
+    const { storeHttpService } =
+      await import('~/management/stores/lib/services/store-http-service');
     vi.mocked(storeHttpService.getStoresToCollect).mockResolvedValue({
       succeeded: true,
       data: [makeRow({ amount: 1234.5, status: 'EnGracia' })],
@@ -123,7 +120,7 @@ describe('CollectionsPage — rows', () => {
     render(
       <Wrapper>
         <CollectionsPage />
-      </Wrapper>
+      </Wrapper>,
     );
 
     await waitFor(() => {
@@ -139,9 +136,8 @@ describe('CollectionsPage — rows', () => {
 
 describe('CollectionsPage — mark paid', () => {
   it('calls registerStorePayment(storeId) and reloads the list on click', async () => {
-    const { storeHttpService } = await import(
-      '~/management/stores/lib/services/store-http-service'
-    );
+    const { storeHttpService } =
+      await import('~/management/stores/lib/services/store-http-service');
     vi.mocked(storeHttpService.getStoresToCollect).mockResolvedValue({
       succeeded: true,
       data: [makeRow({ storeId: 's42' })],
@@ -161,14 +157,16 @@ describe('CollectionsPage — mark paid', () => {
     render(
       <Wrapper>
         <CollectionsPage />
-      </Wrapper>
+      </Wrapper>,
     );
 
     await waitFor(() => {
       expect(screen.getByText('Store One')).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole('button', { name: esMessages['BILLING.COLLECTIONS.REGISTER_PAYMENT'] }));
+    fireEvent.click(
+      screen.getByRole('button', { name: esMessages['BILLING.COLLECTIONS.REGISTER_PAYMENT'] }),
+    );
 
     await waitFor(() => {
       expect(storeHttpService.registerStorePayment).toHaveBeenCalledWith('s42');
@@ -179,9 +177,8 @@ describe('CollectionsPage — mark paid', () => {
 
 describe('CollectionsPage — empty state', () => {
   it('shows the empty-state message when there are no rows', async () => {
-    const { storeHttpService } = await import(
-      '~/management/stores/lib/services/store-http-service'
-    );
+    const { storeHttpService } =
+      await import('~/management/stores/lib/services/store-http-service');
     vi.mocked(storeHttpService.getStoresToCollect).mockResolvedValue({
       succeeded: true,
       data: [],
@@ -194,7 +191,7 @@ describe('CollectionsPage — empty state', () => {
     render(
       <Wrapper>
         <CollectionsPage />
-      </Wrapper>
+      </Wrapper>,
     );
 
     await waitFor(() => {
@@ -211,9 +208,8 @@ describe('CollectionsPage — empty state', () => {
 
 describe('CollectionsPage — getStoresToCollect succeeded:false', () => {
   it('shows BILLING.COLLECTIONS.ERROR and does not set rows from data', async () => {
-    const { storeHttpService } = await import(
-      '~/management/stores/lib/services/store-http-service'
-    );
+    const { storeHttpService } =
+      await import('~/management/stores/lib/services/store-http-service');
     vi.mocked(storeHttpService.getStoresToCollect).mockResolvedValue({
       succeeded: false,
       data: null,
@@ -226,7 +222,7 @@ describe('CollectionsPage — getStoresToCollect succeeded:false', () => {
     render(
       <Wrapper>
         <CollectionsPage />
-      </Wrapper>
+      </Wrapper>,
     );
 
     await waitFor(() => {

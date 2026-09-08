@@ -76,14 +76,14 @@ sub-slices.
 Thin async functions over `apiClient`, all paths relative to `/v1`, all returning
 `BaseResponseModel<T>` (the `.data` envelope, matching `profileHttpService`).
 
-| Function | Method + path | Payload | Returns |
-|----------|---------------|---------|---------|
-| `listStores()` | `GET /v1/stores/by-current-user` | — | `BaseResponseModel<Store[]>` |
-| `getStore(id)` | `GET /v1/stores/${id}` | — | `BaseResponseModel<Store>` |
-| `createStore(payload)` | `POST /v1/stores` | `{ ownerId, name, address, description, approved, moduleIds[] }` | `BaseResponseModel<Store>` |
-| `updateStore(id, payload)` | `PUT /v1/stores/${id}` | `{ id, name, address, description, approved, paymentStartDate, moduleIds[], isActive }` | `BaseResponseModel<boolean>` |
-| `listModulesToStore()` | `GET /v1/modules/ToStore` | — | `BaseResponseModel<Module[]>` |
-| `listOwners()` | `GET /v1/owners/all/true` | — | `BaseResponseModel<Owner[]>` |
+| Function                   | Method + path                    | Payload                                                                                 | Returns                       |
+| -------------------------- | -------------------------------- | --------------------------------------------------------------------------------------- | ----------------------------- |
+| `listStores()`             | `GET /v1/stores/by-current-user` | —                                                                                       | `BaseResponseModel<Store[]>`  |
+| `getStore(id)`             | `GET /v1/stores/${id}`           | —                                                                                       | `BaseResponseModel<Store>`    |
+| `createStore(payload)`     | `POST /v1/stores`                | `{ ownerId, name, address, description, approved, moduleIds[] }`                        | `BaseResponseModel<Store>`    |
+| `updateStore(id, payload)` | `PUT /v1/stores/${id}`           | `{ id, name, address, description, approved, paymentStartDate, moduleIds[], isActive }` | `BaseResponseModel<boolean>`  |
+| `listModulesToStore()`     | `GET /v1/modules/ToStore`        | —                                                                                       | `BaseResponseModel<Module[]>` |
+| `listOwners()`             | `GET /v1/owners/all/true`        | —                                                                                       | `BaseResponseModel<Owner[]>`  |
 
 Activate / approve / disapprove / deactivate (delete) endpoints exist in legacy but are **list-row
 actions**. Decision: scope the first cut to **deactivate** only if the list needs it; approve/activate
@@ -94,6 +94,7 @@ pin down.)
 ### 3.2 Route containers
 
 **StoreListPage (`routes/store-list.tsx`)**
+
 - `loader = adminFeatureLoader([EFeatures.Stores])`.
 - On mount: read `isOnline` from `useOnlineStatus`, `selectedStoreId` from auth-store.
 - Online → `await storeHttpService.listStores()`, then write-through to the read-cache
@@ -104,6 +105,7 @@ pin down.)
 - Renders `<StoreList stores isOnline isLoading error onCreate onEdit />`.
 
 **StoreCreatePage (`routes/store-create.tsx`)**
+
 - `loader = adminFeatureLoader([EFeatures.Stores])`.
 - On mount fetches in parallel: `listModulesToStore()` and, if owner-admin/super-admin,
   `listOwners()`. Computes role flags from auth-store (`isSuperAdmin`, `isOwnerAdmin`).
@@ -116,6 +118,7 @@ pin down.)
 - Renders `<StoreForm mode="create" ... />`.
 
 **StoreEditPage (`routes/store-edit.tsx`)**
+
 - `loader = adminFeatureLoader([EFeatures.Stores])`.
 - `id` from `useParams()`; fallback to `currentUser.selectedStoreId` (mirrors legacy line 53).
 - On mount fetches `getStore(id)`, `listModulesToStore()`, and owners (role-gated) in parallel.
@@ -139,12 +142,13 @@ Pure; no fetching.
 `isLoading`, `onSubmit(values)`, `error?`. Owns local field state (`name`, `address`, `description`,
 `ownerId`, `approved`, `paymentStartDate`, `isActive`) and the working module list. Renders fields
 **conditionally by role** (ported from legacy `loadForm`):
+
 - always: `name` (required), `address`.
 - owner-admin OR super-admin: `ownerId` (required, from `owners` picker), `approved`, `description`.
 - super-admin AND edit: `paymentStartDate` (required).
 - super-admin: `isActive`.
-Validation mirrors `EditProfileForm`: `name` required; submit disabled when `!isOnline || isLoading`;
-inline `role="alert"` error. Embeds `<ModulePicker>`.
+  Validation mirrors `EditProfileForm`: `name` required; submit disabled when `!isOnline || isLoading`;
+  inline `role="alert"` error. Embeds `<ModulePicker>`.
 
 **ModulePicker (`components/module-picker.tsx`)** — props: `modules: Module[]`,
 `onChange(modules)`. Renders a **checkbox list** (one per module) plus a select-all toggle and a
@@ -164,6 +168,7 @@ running total of `currentPrice` for selected modules. `priceIncluded` modules re
 ## 4. Data flow
 
 ### 4.1 List (`/management/stores`)
+
 ```
 adminFeatureLoader([Stores]) → gate (role + feature) → render container
 container mount:
@@ -174,6 +179,7 @@ StoreList renders rows; onCreate/onEdit → navigate
 ```
 
 ### 4.2 Create (`/management/stores/create`)
+
 ```
 loader gate → container mount:
   Promise.all([ listModulesToStore(), roleNeedsOwners ? listOwners() : [] ])
@@ -186,6 +192,7 @@ submit (online only):
 ```
 
 ### 4.3 Edit (`/management/stores/edit/:id`)
+
 ```
 loader gate → container mount (id ?? selectedStoreId):
   Promise.all([ getStore(id), listModulesToStore(), roleNeedsOwners ? listOwners() : [] ])
@@ -219,15 +226,17 @@ then update state / cache / navigate. No optimistic UI, no queue.
 ## 6. Route registration & gating
 
 ### 6.1 `adminFeatureLoader` (NEW in `app/auth/routes/loaders.ts`)
+
 ```ts
 export function adminFeatureLoader(requiredFeatureIds: number[], storeIdParam?: string) {
   return async (args: LoaderFunctionArgs): Promise<Response | null> => {
-    const adminResult = await adminLoader();      // role: super-admin || owner-admin
-    if (adminResult) return adminResult;           // redirect short-circuits
+    const adminResult = await adminLoader(); // role: super-admin || owner-admin
+    if (adminResult) return adminResult; // redirect short-circuits
     return featureLoader(requiredFeatureIds, storeIdParam)(args); // feature gate
   };
 }
 ```
+
 > **Decision — factory composition over inline or extending featureLoader.** A reusable factory is
 > DRY (the two later mgmt slices reuse it), keeps the existing tested `adminLoader`/`featureLoader`
 > untouched (no regression risk), and reads as a single intent ("admin AND feature"). Rejected:
@@ -236,12 +245,14 @@ export function adminFeatureLoader(requiredFeatureIds: number[], storeIdParam?: 
 > (cheaper, no params), then feature.
 
 ### 6.2 `app/routes.ts` — add 3 entries inside the authenticated `app-layout` group
+
 ```ts
 // Management — Stores
 route('management/stores', 'management/stores/routes/store-list.tsx'),
 route('management/stores/create', 'management/stores/routes/store-create.tsx'),
 route('management/stores/edit/:id', 'management/stores/routes/store-edit.tsx'),
 ```
+
 Placed after the Profile block, before utility routes. Feature gating (EFeatures.Stores=73) is
 enforced by each route module's `loader`, consistent with how profile uses `featureLoader`.
 
@@ -252,32 +263,32 @@ enforced by each route module's `loader`, consistent with how profile uses `feat
 `MENU.STORES` and `MENU.MANAGEMENT` already exist. Add a `STORES.*` namespace (Rioplatense, matching
 the `PROFILE.*` tone):
 
-| Key | Value (es) |
-|-----|-----------|
-| `STORES.LIST_TITLE` | Tiendas |
-| `STORES.CREATE_TITLE` | Crear tienda |
-| `STORES.EDIT_TITLE` | Editar tienda |
-| `STORES.NAME` | Nombre |
-| `STORES.ADDRESS` | Dirección |
-| `STORES.DESCRIPTION` | Descripción |
-| `STORES.OWNER` | Propietario |
-| `STORES.APPROVED` | Aprobada |
-| `STORES.PAYMENT_START_DATE` | Fecha de inicio de pago |
-| `STORES.IS_ACTIVE` | Activa |
-| `STORES.MODULES` | Módulos |
-| `STORES.MODULES_TOTAL` | Total |
-| `STORES.SELECT_ALL` | Seleccionar todos |
-| `STORES.CREATE_ACTION` | Crear tienda |
-| `STORES.EDIT_ACTION` | Editar |
-| `STORES.SAVE` | Guardar cambios |
-| `STORES.SAVING` | Guardando... |
-| `STORES.CREATE_SUCCESS` | Tienda creada correctamente. |
-| `STORES.UPDATE_SUCCESS` | Tienda actualizada correctamente. |
-| `STORES.SAVE_ERROR` | No se pudo guardar la tienda. Intentá de nuevo. |
-| `STORES.LOAD_ERROR` | No se pudieron cargar las tiendas. |
-| `STORES.OFFLINE_NOTICE` | Sin conexión. Conectate a internet para guardar cambios. |
-| `STORES.REQUIRED` | Este campo es obligatorio. |
-| `STORES.EMPTY` | No hay tiendas para mostrar. |
+| Key                         | Value (es)                                               |
+| --------------------------- | -------------------------------------------------------- |
+| `STORES.LIST_TITLE`         | Tiendas                                                  |
+| `STORES.CREATE_TITLE`       | Crear tienda                                             |
+| `STORES.EDIT_TITLE`         | Editar tienda                                            |
+| `STORES.NAME`               | Nombre                                                   |
+| `STORES.ADDRESS`            | Dirección                                                |
+| `STORES.DESCRIPTION`        | Descripción                                              |
+| `STORES.OWNER`              | Propietario                                              |
+| `STORES.APPROVED`           | Aprobada                                                 |
+| `STORES.PAYMENT_START_DATE` | Fecha de inicio de pago                                  |
+| `STORES.IS_ACTIVE`          | Activa                                                   |
+| `STORES.MODULES`            | Módulos                                                  |
+| `STORES.MODULES_TOTAL`      | Total                                                    |
+| `STORES.SELECT_ALL`         | Seleccionar todos                                        |
+| `STORES.CREATE_ACTION`      | Crear tienda                                             |
+| `STORES.EDIT_ACTION`        | Editar                                                   |
+| `STORES.SAVE`               | Guardar cambios                                          |
+| `STORES.SAVING`             | Guardando...                                             |
+| `STORES.CREATE_SUCCESS`     | Tienda creada correctamente.                             |
+| `STORES.UPDATE_SUCCESS`     | Tienda actualizada correctamente.                        |
+| `STORES.SAVE_ERROR`         | No se pudo guardar la tienda. Intentá de nuevo.          |
+| `STORES.LOAD_ERROR`         | No se pudieron cargar las tiendas.                       |
+| `STORES.OFFLINE_NOTICE`     | Sin conexión. Conectate a internet para guardar cambios. |
+| `STORES.REQUIRED`           | Este campo es obligatorio.                               |
+| `STORES.EMPTY`              | No hay tiendas para mostrar.                             |
 
 (Final key set is refined by `sdd-spec`; this is the design-level plan.)
 
@@ -349,7 +360,7 @@ harness (vi mocks for auth-store, http-service, useOnlineStatus, react-router, l
      error → alert, no navigate; offline → submit disabled.
    - Edit: prefills from `getStore`; merges modules; success → `updateStore` + cache upsert + navigate;
      error → alert.
-   Then implement the three containers.
+     Then implement the three containers.
 7. **Wiring (no new logic, covered indirectly):** add the 3 route entries to `app/routes.ts` and the
    `STORES.*` keys to `es.ts`. Verified by the route tests resolving copy via `IntlProvider`.
 
@@ -360,13 +371,13 @@ containers into a small local helper if the duplication is real (only after both
 
 ## 11. Architecture decisions (ADR summary)
 
-| # | Decision | Rationale | Rejected alternative |
-|---|----------|-----------|----------------------|
-| D1 | Container/presentational slice mirroring `app/profile/` | Established project convention; test harness reuse; consistency | New ad-hoc structure |
-| D2 | `adminFeatureLoader(featureIds)` factory composing `adminLoader` + `featureLoader` | DRY, reused by later mgmt slices, zero regression on tested loaders | Inline per-route; extend featureLoader with role param |
-| D3 | Module picker as **checkbox list** with locked `priceIncluded` rows + running total | Matches legacy UX, keeps price/locked affordance visible, easy to test | Multi-select dropdown; separate module step/route |
-| D4 | Owner thin-read as `storeHttpService.listOwners()` (`GET /v1/owners/all/true`) | Single read for the picker only; owner CRUD is out of scope | New owner-http-service / owner slice (implies CRUD) |
-| D5 | Post-create → navigate to `/management/stores` list | Reachable today; users slice ships later | Navigate to users/create (route doesn't exist yet) |
-| D6 | Write-through cache on online read; `upsert` on edit; no eager create-time write | Coherent offline list; avoids redundant round-trips | No cache; full re-fetch-replace after every write |
-| D7 | Await-then-update, navigation in container, offline blocks writes | Decision #204; mirrors profile/sync | Optimistic UI; offline write queue |
-| D8 | One extra presentational `ModulePicker` split out of `StoreForm` | Non-trivial picker logic deserves isolated tests | Inline picker inside StoreForm |
+| #   | Decision                                                                            | Rationale                                                              | Rejected alternative                                   |
+| --- | ----------------------------------------------------------------------------------- | ---------------------------------------------------------------------- | ------------------------------------------------------ |
+| D1  | Container/presentational slice mirroring `app/profile/`                             | Established project convention; test harness reuse; consistency        | New ad-hoc structure                                   |
+| D2  | `adminFeatureLoader(featureIds)` factory composing `adminLoader` + `featureLoader`  | DRY, reused by later mgmt slices, zero regression on tested loaders    | Inline per-route; extend featureLoader with role param |
+| D3  | Module picker as **checkbox list** with locked `priceIncluded` rows + running total | Matches legacy UX, keeps price/locked affordance visible, easy to test | Multi-select dropdown; separate module step/route      |
+| D4  | Owner thin-read as `storeHttpService.listOwners()` (`GET /v1/owners/all/true`)      | Single read for the picker only; owner CRUD is out of scope            | New owner-http-service / owner slice (implies CRUD)    |
+| D5  | Post-create → navigate to `/management/stores` list                                 | Reachable today; users slice ships later                               | Navigate to users/create (route doesn't exist yet)     |
+| D6  | Write-through cache on online read; `upsert` on edit; no eager create-time write    | Coherent offline list; avoids redundant round-trips                    | No cache; full re-fetch-replace after every write      |
+| D7  | Await-then-update, navigation in container, offline blocks writes                   | Decision #204; mirrors profile/sync                                    | Optimistic UI; offline write queue                     |
+| D8  | One extra presentational `ModulePicker` split out of `StoreForm`                    | Non-trivial picker logic deserves isolated tests                       | Inline picker inside StoreForm                         |

@@ -152,7 +152,9 @@ describe('Provision route (offline-device-provisioning spec)', () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText('Este archivo de activación ya venció. Pedile uno nuevo al administrador.'),
+        screen.getByText(
+          'Este archivo de activación ya venció. Pedile uno nuevo al administrador.',
+        ),
       ).toBeInTheDocument();
     });
     expect(getRoster()).toBeNull();
@@ -169,7 +171,9 @@ describe('Provision route (offline-device-provisioning spec)', () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText('Este archivo ya se usó en este equipo. Pedile uno nuevo al administrador.'),
+        screen.getByText(
+          'Este archivo ya se usó en este equipo. Pedile uno nuevo al administrador.',
+        ),
       ).toBeInTheDocument();
     });
     expect(getRoster()?.bundleId).toBe(bundle.bundleId);

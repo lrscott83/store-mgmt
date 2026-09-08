@@ -62,7 +62,12 @@ describe('exportInventoryTodaySalePdf', () => {
   // Every export invocation now downloads via a temporary <a download>, so ALL
   // tests spy on the anchor: jsdom does not implement blob: navigation and would
   // otherwise print "Not implemented: navigation" per real click.
-  type MockAnchor = { href: string; download: string; click: ReturnType<typeof vi.fn>; remove: ReturnType<typeof vi.fn> };
+  type MockAnchor = {
+    href: string;
+    download: string;
+    click: ReturnType<typeof vi.fn>;
+    remove: ReturnType<typeof vi.fn>;
+  };
   let link: MockAnchor;
 
   beforeEach(() => {
@@ -82,8 +87,12 @@ describe('exportInventoryTodaySalePdf', () => {
       click: vi.fn(),
       remove: vi.fn(),
     } as MockAnchor;
-    const createElementSpy = vi.spyOn(document, 'createElement').mockReturnValue(link as unknown as HTMLElement);
-    const appendSpy = vi.spyOn(document.body, 'appendChild').mockImplementation(() => link as unknown as Node);
+    const createElementSpy = vi
+      .spyOn(document, 'createElement')
+      .mockReturnValue(link as unknown as HTMLElement);
+    const appendSpy = vi
+      .spyOn(document.body, 'appendChild')
+      .mockImplementation(() => link as unknown as Node);
     documentSpies.push(createElementSpy, appendSpy);
   });
 
@@ -139,9 +148,19 @@ describe('exportInventoryTodaySalePdf', () => {
     const [, options] = mockAutoTable.mock.calls[0];
     expect(options.head).toEqual([
       [
-        'Producto', 'U.M', 'Inicio', 'Entrada', 'Disponible', 'Vendido',
-        'Precio Venta', 'Importe Venta', 'Costo Unitario', 'Costo Total',
-        'C.P Venta', 'Final', 'Importe Final',
+        'Producto',
+        'U.M',
+        'Inicio',
+        'Entrada',
+        'Disponible',
+        'Vendido',
+        'Precio Venta',
+        'Importe Venta',
+        'Costo Unitario',
+        'Costo Total',
+        'C.P Venta',
+        'Final',
+        'Importe Final',
       ],
     ]);
   });
@@ -149,7 +168,9 @@ describe('exportInventoryTodaySalePdf', () => {
   it('PDF-05: autoTable body carries one row per ledger row, values formatted for display', async () => {
     const { exportInventoryTodaySalePdf } = await import('./inventory-today-sale-pdf');
 
-    await exportInventoryTodaySalePdf([makeRow({ productName: 'Vodka', inicio: 1, entrada: 2, disponible: 3, vendido: 4 })]);
+    await exportInventoryTodaySalePdf([
+      makeRow({ productName: 'Vodka', inicio: 1, entrada: 2, disponible: 3, vendido: 4 }),
+    ]);
 
     const [, options] = mockAutoTable.mock.calls[0];
     expect(options.body).toEqual([

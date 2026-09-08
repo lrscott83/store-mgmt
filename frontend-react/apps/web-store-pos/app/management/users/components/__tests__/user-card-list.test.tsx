@@ -35,13 +35,19 @@ describe('UserCardList — renders a Card grid (Req: Users List Uses Shared Chro
   it('renders a card per user with fullName, cellPhone and email', async () => {
     const { UserCardList } = await import('../user-card-list');
     const users = [
-      makeUser({ id: 'u1', login: 'alice', fullName: 'Alice Smith', cellPhone: '+53 5 123-4567', email: 'alice@test.com' }),
+      makeUser({
+        id: 'u1',
+        login: 'alice',
+        fullName: 'Alice Smith',
+        cellPhone: '+53 5 123-4567',
+        email: 'alice@test.com',
+      }),
       makeUser({ id: 'u2', login: 'bob', fullName: 'Bob Jones' }),
     ];
     render(
       <Wrapper>
         <UserCardList {...baseProps} users={users} />
-      </Wrapper>
+      </Wrapper>,
     );
     // Card header is the login; the name renders as the first content row.
     expect(screen.getByText('alice')).toBeInTheDocument();
@@ -57,7 +63,7 @@ describe('UserCardList — renders a Card grid (Req: Users List Uses Shared Chro
     const { container } = render(
       <Wrapper>
         <UserCardList {...baseProps} users={[makeUser()]} />
-      </Wrapper>
+      </Wrapper>,
     );
     expect(container.querySelector('[data-slot="card"]')).toBeInTheDocument();
   });
@@ -69,7 +75,7 @@ describe('UserCardList — empty state', () => {
     render(
       <Wrapper>
         <UserCardList {...baseProps} users={[]} />
-      </Wrapper>
+      </Wrapper>,
     );
     expect(screen.getByText(/no hay empleados/i)).toBeInTheDocument();
   });
@@ -82,7 +88,7 @@ describe('UserCardList — FAB triggers onCreate', () => {
     render(
       <Wrapper>
         <UserCardList {...baseProps} users={[]} onCreate={onCreate} />
-      </Wrapper>
+      </Wrapper>,
     );
     fireEvent.click(screen.getByRole('button', { name: esMessages['USERS.CREATE'] }));
     expect(onCreate).toHaveBeenCalledTimes(1);
@@ -93,7 +99,7 @@ describe('UserCardList — FAB triggers onCreate', () => {
     render(
       <Wrapper>
         <UserCardList {...baseProps} users={[]} />
-      </Wrapper>
+      </Wrapper>,
     );
     expect(screen.getByRole('button', { name: 'Adicionar' })).toBeInTheDocument();
   });
@@ -110,9 +116,11 @@ describe('UserCardList — gear action menu (Req: Users List Uses Shared Chrome 
           onEdit={onEdit}
           users={[makeUser({ id: 'u-active', fullName: 'Active User', isActive: true })]}
         />
-      </Wrapper>
+      </Wrapper>,
     );
-    expect(screen.queryByRole('menuitem', { name: esMessages['USERS.EDIT'] })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('menuitem', { name: esMessages['USERS.EDIT'] }),
+    ).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /acciones/i }));
     const editItem = screen.getByRole('menuitem', { name: esMessages['USERS.EDIT'] });
     expect(editItem).toBeInTheDocument();
@@ -130,10 +138,12 @@ describe('UserCardList — gear action menu (Req: Users List Uses Shared Chrome 
           onDeactivate={onDeactivate}
           users={[makeUser({ id: 'u-active', isActive: true })]}
         />
-      </Wrapper>
+      </Wrapper>,
     );
     fireEvent.click(screen.getByRole('button', { name: /acciones/i }));
-    expect(screen.queryByRole('menuitem', { name: esMessages['USERS.ACTIVATE'] })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('menuitem', { name: esMessages['USERS.ACTIVATE'] }),
+    ).not.toBeInTheDocument();
     const deactivateItem = screen.getByRole('menuitem', { name: esMessages['USERS.DEACTIVATE'] });
     fireEvent.click(deactivateItem);
     expect(onDeactivate).toHaveBeenCalledWith('u-active');
@@ -149,10 +159,12 @@ describe('UserCardList — gear action menu (Req: Users List Uses Shared Chrome 
           onActivate={onActivate}
           users={[makeUser({ id: 'u-inactive', isActive: false })]}
         />
-      </Wrapper>
+      </Wrapper>,
     );
     fireEvent.click(screen.getByRole('button', { name: /acciones/i }));
-    expect(screen.queryByRole('menuitem', { name: esMessages['USERS.DEACTIVATE'] })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('menuitem', { name: esMessages['USERS.DEACTIVATE'] }),
+    ).not.toBeInTheDocument();
     const activateItem = screen.getByRole('menuitem', { name: esMessages['USERS.ACTIVATE'] });
     fireEvent.click(activateItem);
     expect(onActivate).toHaveBeenCalledWith('u-inactive');
@@ -163,11 +175,15 @@ describe('UserCardList — gear action menu (Req: Users List Uses Shared Chrome 
     render(
       <Wrapper>
         <UserCardList {...baseProps} users={[makeUser({ id: 'u-inactive', isActive: false })]} />
-      </Wrapper>
+      </Wrapper>,
     );
     fireEvent.click(screen.getByRole('button', { name: /acciones/i }));
-    expect(screen.getByRole('menuitem', { name: esMessages['USERS.EDIT'] })).toHaveClass('text-primary');
-    expect(screen.getByRole('menuitem', { name: esMessages['USERS.ACTIVATE'] })).toHaveClass('text-success');
+    expect(screen.getByRole('menuitem', { name: esMessages['USERS.EDIT'] })).toHaveClass(
+      'text-primary',
+    );
+    expect(screen.getByRole('menuitem', { name: esMessages['USERS.ACTIVATE'] })).toHaveClass(
+      'text-success',
+    );
     expect(screen.queryByRole('separator')).not.toBeInTheDocument();
   });
 
@@ -176,11 +192,15 @@ describe('UserCardList — gear action menu (Req: Users List Uses Shared Chrome 
     render(
       <Wrapper>
         <UserCardList {...baseProps} users={[makeUser({ id: 'u-active', isActive: true })]} />
-      </Wrapper>
+      </Wrapper>,
     );
     fireEvent.click(screen.getByRole('button', { name: /acciones/i }));
-    expect(screen.getByRole('menuitem', { name: esMessages['USERS.EDIT'] })).toHaveClass('text-primary');
-    expect(screen.getByRole('menuitem', { name: esMessages['USERS.DEACTIVATE'] })).toHaveClass('text-warning');
+    expect(screen.getByRole('menuitem', { name: esMessages['USERS.EDIT'] })).toHaveClass(
+      'text-primary',
+    );
+    expect(screen.getByRole('menuitem', { name: esMessages['USERS.DEACTIVATE'] })).toHaveClass(
+      'text-warning',
+    );
     expect(screen.queryByRole('separator')).not.toBeInTheDocument();
   });
 });
@@ -195,7 +215,7 @@ describe('UserCardList — deactivated user shows danger indicator (Req: Users L
     const { container } = render(
       <Wrapper>
         <UserCardList {...baseProps} users={[makeUser({ id: 'u-deact', isActive: false })]} />
-      </Wrapper>
+      </Wrapper>,
     );
     const card = container.querySelector('[data-slot="card"]');
     expect(card?.className).toContain('bg-danger');
@@ -206,7 +226,7 @@ describe('UserCardList — deactivated user shows danger indicator (Req: Users L
     const { container } = render(
       <Wrapper>
         <UserCardList {...baseProps} users={[makeUser({ id: 'u-act', isActive: true })]} />
-      </Wrapper>
+      </Wrapper>,
     );
     const card = container.querySelector('[data-slot="card"]');
     expect(card?.className).not.toContain('bg-danger');

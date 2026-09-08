@@ -68,5 +68,8 @@ export interface ProductService {
   ): Promise<BaseResponseModel<boolean>>;
 
   getMaxOrderByCategoryId(categoryId: string): Promise<BaseResponseModel<number>>;
-  createProducts(categoryId: string, items: { name: string; price: number }[]): Promise<BaseResponseModel<boolean>>;
+  createProducts(
+    categoryId: string,
+    items: { name: string; price: number }[],
+  ): Promise<BaseResponseModel<boolean>>;
 }

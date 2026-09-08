@@ -27,12 +27,20 @@ function makeItem(): CartItem {
 
 describe('guardOrderType — exclusividad Normal/Mayorista', () => {
   it('permite añadir Normal con carrito vacío', () => {
-    const result = guardOrderType({ items: [], cartOrderType: OrderType.Normal, requested: OrderType.Normal });
+    const result = guardOrderType({
+      items: [],
+      cartOrderType: OrderType.Normal,
+      requested: OrderType.Normal,
+    });
     expect(result.succeeded).toBe(true);
   });
 
   it('permite añadir Mayorista con carrito vacío', () => {
-    const result = guardOrderType({ items: [], cartOrderType: OrderType.Normal, requested: OrderType.Mayorista });
+    const result = guardOrderType({
+      items: [],
+      cartOrderType: OrderType.Normal,
+      requested: OrderType.Mayorista,
+    });
     expect(result.succeeded).toBe(true);
   });
 
@@ -85,7 +93,11 @@ describe('guardOrderType — exclusividad Normal/Mayorista', () => {
   });
 
   it('devuelve Result tipado (contrato con los handlers de las vistas)', () => {
-    const result = guardOrderType({ items: [], cartOrderType: OrderType.Normal, requested: OrderType.Normal });
+    const result = guardOrderType({
+      items: [],
+      cartOrderType: OrderType.Normal,
+      requested: OrderType.Normal,
+    });
     expect(result).toBeInstanceOf(Result);
   });
 });

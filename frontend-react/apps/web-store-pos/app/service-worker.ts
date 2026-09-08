@@ -36,7 +36,9 @@ const PRECACHE_MANIFEST = self.__WB_MANIFEST ?? [];
 // FIRST install (no existing controller) there is no `waiting` phase: the worker
 // activates directly and `activate`'s `clients.claim()` takes control.
 self.addEventListener('install', (event) => {
-  console.info('[SW] install: precaching shell — NOT calling skipWaiting (stays waiting until user confirms)');
+  console.info(
+    '[SW] install: precaching shell — NOT calling skipWaiting (stays waiting until user confirms)',
+  );
   event.waitUntil(
     caches.open(PRECACHE_NAME).then(async (cache) => {
       const urls = PRECACHE_MANIFEST.map((entry) => entry.url);
@@ -50,7 +52,7 @@ self.addEventListener('install', (event) => {
         // is no network left to recover with.
         await cache.addAll(urls.map((url) => new Request(url, { cache: 'reload' })));
       }
-    })
+    }),
   );
 });
 
@@ -58,14 +60,18 @@ self.addEventListener('install', (event) => {
 // then claim clients (pwa-offline-shell spec: "Activation prunes stale
 // caches").
 self.addEventListener('activate', (event) => {
-  console.info('[SW] activate: cleaning old caches + clients.claim() (new version is now controlling)');
+  console.info(
+    '[SW] activate: cleaning old caches + clients.claim() (new version is now controlling)',
+  );
   event.waitUntil(
     caches
       .keys()
       .then((cacheNames) =>
-        Promise.all(cacheNames.filter((name) => name !== PRECACHE_NAME).map((name) => caches.delete(name)))
+        Promise.all(
+          cacheNames.filter((name) => name !== PRECACHE_NAME).map((name) => caches.delete(name)),
+        ),
       )
-      .then(() => self.clients.claim())
+      .then(() => self.clients.claim()),
   );
 });
 
@@ -126,11 +132,14 @@ self.addEventListener('fetch', (event) => {
           // an unhandled promise rejection in the worker's global scope —
           // same silent-failure intent as the removed dead precache-refresh
           // handler this file used to have.
-          caches.open(PRECACHE_NAME).then((cache) => cache.put(request, responseToCache)).catch(() => {});
+          caches
+            .open(PRECACHE_NAME)
+            .then((cache) => cache.put(request, responseToCache))
+            .catch(() => {});
         }
         return response;
       });
-    })
+    }),
   );
 });
 

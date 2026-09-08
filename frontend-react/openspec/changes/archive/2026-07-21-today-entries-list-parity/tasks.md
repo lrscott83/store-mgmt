@@ -2,14 +2,14 @@
 
 ## Review Workload Forecast
 
-| Field | Value |
-|-------|-------|
+| Field                   | Value                                                    |
+| ----------------------- | -------------------------------------------------------- |
 | Estimated changed lines | ~250-280 (mostly deletions: dead component + dead tests) |
-| 400-line budget risk | Low |
-| Chained PRs recommended | No |
-| Suggested split | Single PR |
-| Delivery strategy | ask-on-risk (default; not specified by orchestrator) |
-| Chain strategy | pending (not needed — risk is Low) |
+| 400-line budget risk    | Low                                                      |
+| Chained PRs recommended | No                                                       |
+| Suggested split         | Single PR                                                |
+| Delivery strategy       | ask-on-risk (default; not specified by orchestrator)     |
+| Chain strategy          | pending (not needed — risk is Low)                       |
 
 Decision needed before apply: No
 Chained PRs recommended: No
@@ -18,9 +18,9 @@ Chain strategy: pending
 
 ### Suggested Work Units
 
-| Unit | Goal | Likely PR | Notes |
-|------|------|-----------|-------|
-| 1 | Full change (RED test → swap → dead-code removal → verification) | PR 1 (single) | Small, atomic, no dependencies |
+| Unit | Goal                                                             | Likely PR     | Notes                          |
+| ---- | ---------------------------------------------------------------- | ------------- | ------------------------------ |
+| 1    | Full change (RED test → swap → dead-code removal → verification) | PR 1 (single) | Small, atomic, no dependencies |
 
 ## ⚠️ Discovery (verified against Angular source, not in proposal) — SUPERSEDED
 

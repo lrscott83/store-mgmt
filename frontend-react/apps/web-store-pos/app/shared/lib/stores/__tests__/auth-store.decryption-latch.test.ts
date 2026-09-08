@@ -177,9 +177,9 @@ describe('auth-store — a successful login clears the decryption-failure latch 
     handleDecryptionFailure(new MissingDataKeyError());
     expect(showBlockingErrorMock).toHaveBeenCalledTimes(1);
 
-    await expect(
-      useAuthStore.getState().login('ana@example.com', PASSWORD),
-    ).rejects.toMatchObject({ name: 'DekUnwrapError' });
+    await expect(useAuthStore.getState().login('ana@example.com', PASSWORD)).rejects.toMatchObject({
+      name: 'DekUnwrapError',
+    });
     vi.doUnmock('~/shared/lib/http/auth-http-service');
 
     handleDecryptionFailure(new MissingDataKeyError());

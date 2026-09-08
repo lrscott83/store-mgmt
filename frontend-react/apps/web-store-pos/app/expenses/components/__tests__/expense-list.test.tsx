@@ -48,7 +48,9 @@ describe('ExpenseList — list/table parity sweep (WU4)', () => {
         <ExpenseList expenses={[makeExpense()]} readOnly onEdit={vi.fn()} onDelete={vi.fn()} />
       </Wrapper>,
     );
-    const row = container.querySelector('[class*="items-center"][class*="justify-between"]') as HTMLElement;
+    const row = container.querySelector(
+      '[class*="items-center"][class*="justify-between"]',
+    ) as HTMLElement;
     expect(row.className).toMatch(/\bp-2\b/);
     expect(row.className).not.toMatch(/px-4 py-3/);
   });
@@ -79,7 +81,12 @@ describe('ExpenseList — list/table parity sweep (WU4)', () => {
   it('formats the amount with thousands separator via formatCurrency', () => {
     render(
       <Wrapper>
-        <ExpenseList expenses={[makeExpense({ total: 2000 })]} readOnly onEdit={vi.fn()} onDelete={vi.fn()} />
+        <ExpenseList
+          expenses={[makeExpense({ total: 2000 })]}
+          readOnly
+          onEdit={vi.fn()}
+          onDelete={vi.fn()}
+        />
       </Wrapper>,
     );
     expect(screen.getByText('$2 000')).toBeInTheDocument();

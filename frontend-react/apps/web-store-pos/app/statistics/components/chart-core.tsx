@@ -69,7 +69,14 @@ export function SalesChartCore({ data, emptyMessage }: SalesChartCoreProps) {
           formatter={(value: number) => [formatCurrency(value), 'Ingresos']}
           labelFormatter={(label: Date) => formatLabel(label)}
         />
-        <Line type="monotone" dataKey="value" stroke="#2563eb" strokeWidth={2} dot={false} name="value" />
+        <Line
+          type="monotone"
+          dataKey="value"
+          stroke="#2563eb"
+          strokeWidth={2}
+          dot={false}
+          name="value"
+        />
       </LineChart>
     </ResponsiveContainer>
   );
@@ -146,9 +153,7 @@ export function StoreUsageChartCore({
       {selected && (
         <div className="mt-2 text-sm text-gray-700" data-testid="store-usage-selected">
           <span className="font-medium">{selected.label}: </span>
-          <span>
-            {selected.owners.length > 0 ? selected.owners.join(' | ') : noOwnersMessage}
-          </span>
+          <span>{selected.owners.length > 0 ? selected.owners.join(' | ') : noOwnersMessage}</span>
         </div>
       )}
     </div>

@@ -46,7 +46,10 @@ describe('SaleCategoryProducts — Angular parity (sale-category-products.compon
     render(
       <Wrapper>
         <SaleCategoryProducts
-          products={[makeProduct({ id: 'p1', name: 'Coca Cola' }), makeProduct({ id: 'p2', name: 'Sprite' })]}
+          products={[
+            makeProduct({ id: 'p1', name: 'Coca Cola' }),
+            makeProduct({ id: 'p2', name: 'Sprite' }),
+          ]}
           orderType={OrderType.Normal}
           onAdded={vi.fn()}
         />

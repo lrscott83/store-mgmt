@@ -52,7 +52,7 @@ describe('OwnerCardList — renders a Card grid (Req: Owners List Card Grid)', (
     const { container } = render(
       <Wrapper>
         <OwnerCardList {...baseProps} owners={[makeOwner()]} />
-      </Wrapper>
+      </Wrapper>,
     );
     const grid = container.querySelector('.grid');
     expect(grid?.className).toContain('grid-cols-1');
@@ -76,13 +76,13 @@ describe('OwnerCardList — renders a Card grid (Req: Owners List Card Grid)', (
     const { container } = render(
       <Wrapper>
         <OwnerCardList {...baseProps} owners={owners} />
-      </Wrapper>
+      </Wrapper>,
     );
     expect(container.querySelectorAll('[data-slot="card"]')).toHaveLength(1);
     expect(screen.getByText('Jane Owner')).toBeInTheDocument();
     expect(screen.getByText(/2\s*tiendas/i)).toBeInTheDocument();
     expect(
-      screen.getByText(new RegExp(`${esMessages['GENERAL.RESELLER']}.*My Reseller`))
+      screen.getByText(new RegExp(`${esMessages['GENERAL.RESELLER']}.*My Reseller`)),
     ).toBeInTheDocument();
     expect(screen.getByText('+53 5 555-1234')).toBeInTheDocument();
     expect(screen.getByText('Top owner')).toBeInTheDocument();
@@ -93,7 +93,7 @@ describe('OwnerCardList — renders a Card grid (Req: Owners List Card Grid)', (
     render(
       <Wrapper>
         <OwnerCardList {...baseProps} owners={[makeOwner({ reSellerName: '' })]} />
-      </Wrapper>
+      </Wrapper>,
     );
     expect(screen.getByText(/ADMIN/)).toBeInTheDocument();
   });
@@ -115,7 +115,7 @@ describe('OwnerCardList — price·stores label order (Angular parity: owners.co
     render(
       <Wrapper>
         <OwnerCardList {...baseProps} owners={owners} />
-      </Wrapper>
+      </Wrapper>,
     );
     expect(screen.getByText('$100 en 2 tiendas')).toBeInTheDocument();
   });
@@ -131,7 +131,7 @@ describe('OwnerCardList — price·stores label order (Angular parity: owners.co
     render(
       <Wrapper>
         <OwnerCardList {...baseProps} owners={owners} />
-      </Wrapper>
+      </Wrapper>,
     );
     expect(screen.getByText('$100 en 1 tienda')).toBeInTheDocument();
   });
@@ -143,12 +143,18 @@ describe('OwnerCardList — gear action menu (Req: Owners Gear Menu — Live Act
     render(
       <Wrapper>
         <OwnerCardList {...baseProps} owners={[makeOwner({ id: 'o-active' })]} />
-      </Wrapper>
+      </Wrapper>,
     );
-    expect(screen.queryByRole('menuitem', { name: esMessages['OWNER.EDIT_OWNER'] })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('menuitem', { name: esMessages['OWNER.EDIT_OWNER'] }),
+    ).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /acciones/i }));
-    expect(screen.getByRole('menuitem', { name: esMessages['OWNER.EDIT_OWNER'] })).toBeInTheDocument();
-    expect(screen.getByRole('menuitem', { name: esMessages['GENERAL.DELETE'] })).toBeInTheDocument();
+    expect(
+      screen.getByRole('menuitem', { name: esMessages['OWNER.EDIT_OWNER'] }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('menuitem', { name: esMessages['GENERAL.DELETE'] }),
+    ).toBeInTheDocument();
     // exactly two menu items — no Aprobar/Activar/Desactivar
     expect(screen.getAllByRole('menuitem')).toHaveLength(2);
   });
@@ -158,7 +164,7 @@ describe('OwnerCardList — gear action menu (Req: Owners Gear Menu — Live Act
     render(
       <Wrapper>
         <OwnerCardList {...baseProps} owners={[makeOwner({ id: 'o-x' })]} />
-      </Wrapper>
+      </Wrapper>,
     );
     fireEvent.click(screen.getByRole('button', { name: /acciones/i }));
     expect(screen.queryByRole('menuitem', { name: /aprobar/i })).not.toBeInTheDocument();
@@ -172,7 +178,7 @@ describe('OwnerCardList — gear action menu (Req: Owners Gear Menu — Live Act
     render(
       <Wrapper>
         <OwnerCardList {...baseProps} onEdit={onEdit} owners={[makeOwner({ id: 'o-edit' })]} />
-      </Wrapper>
+      </Wrapper>,
     );
     fireEvent.click(screen.getByRole('button', { name: /acciones/i }));
     fireEvent.click(screen.getByRole('menuitem', { name: esMessages['OWNER.EDIT_OWNER'] }));
@@ -185,7 +191,7 @@ describe('OwnerCardList — gear action menu (Req: Owners Gear Menu — Live Act
     render(
       <Wrapper>
         <OwnerCardList {...baseProps} onDelete={onDelete} owners={[makeOwner({ id: 'o-del' })]} />
-      </Wrapper>
+      </Wrapper>,
     );
     fireEvent.click(screen.getByRole('button', { name: /acciones/i }));
     fireEvent.click(screen.getByRole('menuitem', { name: esMessages['GENERAL.DELETE'] }));
@@ -194,7 +200,9 @@ describe('OwnerCardList — gear action menu (Req: Owners Gear Menu — Live Act
     expect(screen.getByRole('dialog')).toBeInTheDocument();
     expect(onDelete).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole('button', { name: esMessages['OWNER.DELETE_CONFIRM_BUTTON'] }));
+    fireEvent.click(
+      screen.getByRole('button', { name: esMessages['OWNER.DELETE_CONFIRM_BUTTON'] }),
+    );
     expect(onDelete).toHaveBeenCalledTimes(1);
     expect(onDelete).toHaveBeenCalledWith('o-del');
   });
@@ -204,7 +212,7 @@ describe('OwnerCardList — gear action menu (Req: Owners Gear Menu — Live Act
     render(
       <Wrapper>
         <OwnerCardList {...baseProps} owners={[makeOwner({ id: 'o-color' })]} />
-      </Wrapper>
+      </Wrapper>,
     );
     fireEvent.click(screen.getByRole('button', { name: /acciones/i }));
     const editItem = screen.getByRole('menuitem', { name: esMessages['OWNER.EDIT_OWNER'] });
@@ -221,7 +229,7 @@ describe('OwnerCardList — state indicator classes (Req: Owners State CSS Class
     const { container } = render(
       <Wrapper>
         <OwnerCardList {...baseProps} owners={[makeOwner({ isActive: false, approved: true })]} />
-      </Wrapper>
+      </Wrapper>,
     );
     const card = container.querySelector('[data-slot="card"]');
     expect(card?.className).toContain('bg-danger');
@@ -232,7 +240,7 @@ describe('OwnerCardList — state indicator classes (Req: Owners State CSS Class
     const { container } = render(
       <Wrapper>
         <OwnerCardList {...baseProps} owners={[makeOwner({ isActive: true, approved: false })]} />
-      </Wrapper>
+      </Wrapper>,
     );
     const card = container.querySelector('[data-slot="card"]');
     expect(card?.className).toContain('bg-success');
@@ -243,7 +251,7 @@ describe('OwnerCardList — state indicator classes (Req: Owners State CSS Class
     const { container } = render(
       <Wrapper>
         <OwnerCardList {...baseProps} owners={[makeOwner({ isActive: true, approved: true })]} />
-      </Wrapper>
+      </Wrapper>,
     );
     const card = container.querySelector('[data-slot="card"]');
     expect(card?.className).not.toContain('bg-danger');

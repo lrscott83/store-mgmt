@@ -21,7 +21,10 @@ const fixtures = vi.hoisted(() => ({
 // --- Global mocks ---
 
 vi.mock('~/shared/lib/stores/auth-store', () => {
-  const state = { user: { selectedStoreId: 's1', storeModuleIds: [] as number[] }, isAuthenticated: true };
+  const state = {
+    user: { selectedStoreId: 's1', storeModuleIds: [] as number[] },
+    isAuthenticated: true,
+  };
   const useAuthStore = vi.fn((selector?: (s: typeof state) => unknown) => {
     if (typeof selector === 'function') return selector(state);
     return state;
@@ -58,7 +61,9 @@ vi.mock('~/sales/lib/repositories/product-category-repository', () => ({
 
 vi.mock('~/inventory/lib/services/inventory-offline-service', () => ({
   InventoryOfflineService: vi.fn().mockImplementation(() => ({
-    getProductInventoriesByProductId: vi.fn((productId: string) => fixtures.entries[productId] ?? []),
+    getProductInventoriesByProductId: vi.fn(
+      (productId: string) => fixtures.entries[productId] ?? [],
+    ),
   })),
 }));
 
@@ -181,7 +186,7 @@ describe('OrdersPage — per-day inventory-at-sale-price export', () => {
     expect(screen.getByTestId('date-panel-toggle-2026-01-01')).toBeInTheDocument();
   });
 
-  it('clicking the menu item exports that day group\'s report with the correct local day and filename', async () => {
+  it("clicking the menu item exports that day group's report with the correct local day and filename", async () => {
     fixtures.orders = [
       makeOrder({ id: 'o1', date: new Date(2026, 0, 1, 12, 0, 0) }),
       makeOrder({ id: 'oInactive', date: new Date(2026, 0, 1, 11, 0, 0), isActive: false }),

@@ -53,7 +53,10 @@ export function EntriesPage() {
   const [expandedDayIds, setExpandedDayIds] = useState<Set<string>>(new Set());
 
   function loadEntries() {
-    const productRepository = new ProductRepository(storeId, new ProductCategoryRepository(storeId));
+    const productRepository = new ProductRepository(
+      storeId,
+      new ProductCategoryRepository(storeId),
+    );
     const svc = new InventoryOfflineService(storeId, productRepository);
     const products = [...productRepository.getStorageProductsMap().values()];
     const productMap = new Map(products.map((p) => [p.id, p.name]));
@@ -107,7 +110,9 @@ export function EntriesPage() {
               ({entriesCount})
             </span>
           </span>
-          <span className="text-sm font-semibold text-primary whitespace-nowrap">{formatCurrency(entriesTotal)}</span>
+          <span className="text-sm font-semibold text-primary whitespace-nowrap">
+            {formatCurrency(entriesTotal)}
+          </span>
         </div>
       }
     >
@@ -136,7 +141,11 @@ export function EntriesPage() {
                   </span>
                   <span className="flex items-center gap-2">
                     <span className="text-sm font-semibold text-primary whitespace-nowrap">
-                      {formatCurrency(round2(dayGroup.items.reduce((total, e) => total + e.costPrice * e.quantity, 0)))}
+                      {formatCurrency(
+                        round2(
+                          dayGroup.items.reduce((total, e) => total + e.costPrice * e.quantity, 0),
+                        ),
+                      )}
                     </span>
                     <ChevronDownIcon isExpanded={isExpanded} className="text-text-muted" />
                   </span>

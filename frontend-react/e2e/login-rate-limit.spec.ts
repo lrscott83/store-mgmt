@@ -72,7 +72,7 @@ test.describe('login — rate limit (REQ-8)', { tag: '@rate-limit' }, () => {
     throw new Error(
       `Sent ${MAX_ATTEMPTS} login attempts and never observed a 429 (rate limit). Either the ` +
         'limiter is misconfigured, or the 429 response failed CORS and surfaced as a different ' +
-        'failure — see design.md §11, risk R8.'
+        'failure — see design.md §11, risk R8.',
     );
   });
 });

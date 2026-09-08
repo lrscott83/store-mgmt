@@ -86,7 +86,9 @@ export function SaleCreditsPage() {
               ({creditsCount})
             </span>
           </span>
-          <span className="text-sm font-semibold text-danger whitespace-nowrap">{formatCurrency(creditsTotal)}</span>
+          <span className="text-sm font-semibold text-danger whitespace-nowrap">
+            {formatCurrency(creditsTotal)}
+          </span>
         </div>
       }
     >
@@ -116,7 +118,12 @@ export function SaleCreditsPage() {
                 </span>
                 <span className="flex items-center gap-2">
                   <span className="text-sm font-semibold text-danger whitespace-nowrap">
-                    {formatCurrency(dateSaleCredit.items.reduce((total, c) => total + (!c.isPaid ? c.total : 0), 0))}
+                    {formatCurrency(
+                      dateSaleCredit.items.reduce(
+                        (total, c) => total + (!c.isPaid ? c.total : 0),
+                        0,
+                      ),
+                    )}
                   </span>
                   <ChevronDownIcon isExpanded={isExpanded} className="text-text-muted" />
                 </span>

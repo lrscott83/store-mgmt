@@ -18,8 +18,8 @@ This module is part of the Angular-to-React migration. All data is read from loc
 
 ## 3. Routes
 
-| Path | Component | Required Feature | Guard |
-|------|-----------|-----------------|-------|
+| Path             | Component                     | Required Feature    | Guard       |
+| ---------------- | ----------------------------- | ------------------- | ----------- |
 | `/reports/today` | `InventoryTodaySaleComponent` | `TodayReports` (50) | `AuthGuard` |
 
 The route is protected by `AuthGuard`. The `TodayReports` (50) feature ID is checked against the user's `StoreModuleFeatures` for the active store. SuperAdmin and OwnerAdmin bypass feature checks.
@@ -33,6 +33,7 @@ The route is protected by `AuthGuard`. The `TodayReports` (50) feature ID is che
 **Purpose:** Single-page daily dashboard combining inventory status and sales summary for the current day.
 
 **Behavior:**
+
 - Loads data from three sources on mount:
   1. Products — from `lizoft.store-products-{storeId}` via the products offline service.
   2. Inventory entries — from `lizoft.store-inventory-entries-{storeId}` filtered to today.
@@ -44,18 +45,21 @@ The route is protected by `AuthGuard`. The `TodayReports` (50) feature ID is che
   - **Inventory Status** — current stock levels and today's movement.
 
 **Sales Summary section displays:**
+
 - Total revenue for today (sum of order totals).
 - Number of completed orders today.
 - Breakdown by payment type (cash, card, Zelle).
 - Top-selling products by quantity sold today.
 
 **Inventory Status section displays:**
+
 - Per-product current available quantity.
 - Quantity consumed today (derived from today's order line items).
 - Quantity received today (from today's inventory entry records).
 - Net change for the day (received minus consumed).
 
 **Empty states:**
+
 - If there are no orders today, the sales section shows a zero-state message.
 - If there are no inventory entries today, the inventory movement columns show zero.
 
@@ -102,9 +106,9 @@ All aggregation is performed in-memory on the client after loading the three dat
 
 ## 7. Permissions
 
-| Feature | Feature ID | Who has access |
-|---------|-----------|----------------|
-| TodayReports | 50 | StoreUser (if granted), OwnerAdmin, SuperAdmin |
+| Feature      | Feature ID | Who has access                                 |
+| ------------ | ---------- | ---------------------------------------------- |
+| TodayReports | 50         | StoreUser (if granted), OwnerAdmin, SuperAdmin |
 
 - SuperAdmin and OwnerAdmin always have access regardless of `featureIds`.
 - ReSeller role does not have access to store-level reports.

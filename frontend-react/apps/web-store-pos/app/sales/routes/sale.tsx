@@ -155,7 +155,6 @@ export function SalePage() {
     return source.filter((product) => product.name.toLowerCase().includes(query));
   }, [allProducts, products, selectedCategoryId, searchQuery, searchAllCategories]);
 
-
   function handleAdded(productId: string, quantity: number, price: number) {
     const product = displayedProducts.find((p) => p.id === productId);
     if (!product) return;
@@ -202,7 +201,11 @@ export function SalePage() {
 
   function checkAvailability(productId: string, quantity: number) {
     // Exclusividad primero: el popup de mezcla de ventas tiene prioridad sobre el de inventario.
-    const typeGuard = guardOrderType({ items: cartItems, cartOrderType, requested: OrderType.Normal });
+    const typeGuard = guardOrderType({
+      items: cartItems,
+      cartOrderType,
+      requested: OrderType.Normal,
+    });
     if (!typeGuard.succeeded) return typeGuard;
     const product = displayedProducts.find((p) => p.id === productId);
     return availabilityGate(product, productId, quantity);
@@ -216,7 +219,11 @@ export function SalePage() {
    */
   function addProductToSale(product: Product, quantity: number, price?: number) {
     // Exclusividad: no se puede mezclar venta normal y mayorista en el mismo carrito.
-    const typeGuard = guardOrderType({ items: cartItems, cartOrderType, requested: OrderType.Normal });
+    const typeGuard = guardOrderType({
+      items: cartItems,
+      cartOrderType,
+      requested: OrderType.Normal,
+    });
     if (!typeGuard.succeeded) {
       return typeGuard;
     }
@@ -248,7 +255,9 @@ export function SalePage() {
         return;
       }
       if (!product.isActive || !product.availableToSale) {
-        showToastError(intl.formatMessage({ id: 'SCANNER.PRODUCT_NOT_SELLABLE' }, { name: product.name }));
+        showToastError(
+          intl.formatMessage({ id: 'SCANNER.PRODUCT_NOT_SELLABLE' }, { name: product.name }),
+        );
         return;
       }
       const availability = addProductToSale(product, quantity);
@@ -262,7 +271,10 @@ export function SalePage() {
         const detail = stock.hasEntries
           ? `\n${intl.formatMessage({ id: 'SALES.AVAILABLE_STOCK' }, { available: stock.available })}`
           : '';
-        showBlockingError(intl.formatMessage({ id: 'GENERAL.RESPONSE.ERROR_TITLE' }), message + detail);
+        showBlockingError(
+          intl.formatMessage({ id: 'GENERAL.RESPONSE.ERROR_TITLE' }),
+          message + detail,
+        );
         return;
       }
       showToastSuccess(intl.formatMessage({ id: 'SCANNER.PRODUCT_ADDED' }, { name: product.name }));

@@ -86,12 +86,12 @@ the single activate button.
 
 **I18N-1** — The following `FEATURES.*` keys MUST be added to `app/shared/lib/i18n/es.ts`:
 
-| Key | Purpose |
-|-----|---------|
-| `FEATURES.TITLE` | Page heading |
-| `FEATURES.ACTIVATE_FEATURES` | Activate button label |
+| Key                           | Purpose                |
+| ----------------------------- | ---------------------- |
+| `FEATURES.TITLE`              | Page heading           |
+| `FEATURES.ACTIVATE_FEATURES`  | Activate button label  |
 | `FEATURES.FEATURES_ACTIVATED` | Inline success message |
-| `FEATURES.UNEXPECTED_ERROR` | Inline error message |
+| `FEATURES.UNEXPECTED_ERROR`   | Inline error message   |
 
 **I18N-2** — If `en.ts` exists in the same directory, the same four keys MUST be added to it.
 
@@ -106,16 +106,18 @@ string literals are permitted in TSX.
 `app/admin/features/routes/__tests__/features.test.tsx`.
 
 **TEST-2** — Route smoke tests MUST cover:
-  - SuperAdmin user navigating to `/admin/features` renders `FeaturesPage` with title and button.
-  - Non-SuperAdmin user (e.g., OwnerAdmin) is redirected by `superAdminLoader`.
-  - Clicking the activate button calls `featureHttpService.activateFeatures()`.
-  - On `succeeded === true`, the inline success message (`FEATURES.FEATURES_ACTIVATED`) is visible.
-  - On `succeeded === false` or HTTP error, the inline error message (`FEATURES.UNEXPECTED_ERROR`) is visible.
+
+- SuperAdmin user navigating to `/admin/features` renders `FeaturesPage` with title and button.
+- Non-SuperAdmin user (e.g., OwnerAdmin) is redirected by `superAdminLoader`.
+- Clicking the activate button calls `featureHttpService.activateFeatures()`.
+- On `succeeded === true`, the inline success message (`FEATURES.FEATURES_ACTIVATED`) is visible.
+- On `succeeded === false` or HTTP error, the inline error message (`FEATURES.UNEXPECTED_ERROR`) is visible.
 
 **TEST-3** — `superAdminLoader` MUST have unit tests covering:
-  - Unauthenticated user → redirects (consistent with `adminLoader`).
-  - Authenticated OwnerAdmin who is NOT SuperAdmin → redirected/blocked.
-  - Authenticated SuperAdmin → loader resolves without redirect.
+
+- Unauthenticated user → redirects (consistent with `adminLoader`).
+- Authenticated OwnerAdmin who is NOT SuperAdmin → redirected/blocked.
+- Authenticated SuperAdmin → loader resolves without redirect.
 
 **TEST-4** — Test files that use `useIntl` MUST wrap the component under test in `IntlProvider`
 (consistent with project convention).

@@ -13,7 +13,7 @@ i18n cleanup, plus a post-verify regression fix:
 
 1. **Component rewire**: `today-entries.tsx` now renders the already-correct
    `EntryList` component (`<EntryList entries={entries} onEdit={handleEdit}
-   onDeactivate={handleDeactivate} readOnly={false} isOwnerAdmin={isOwnerAdmin} />`)
+onDeactivate={handleDeactivate} readOnly={false} isOwnerAdmin={isOwnerAdmin} />`)
    instead of the invented `InventoryDailyEntries` (labeled cards grouped by
    product name, extra "Fecha" field, inline pill buttons — none of which exist
    in Angular).
@@ -39,15 +39,15 @@ i18n cleanup, plus a post-verify regression fix:
 
 ## Commits
 
-| Commit | Content |
-|---|---|
-| `f536ec9` | RED — failing test asserting `EntryList`-shaped compact row (name+quantity, gear toggle, no grouping header, no Fecha) against the pre-swap `InventoryDailyEntries` |
-| `56c0e80` | GREEN — swapped `today-entries.tsx` to render `EntryList` instead of `InventoryDailyEntries` |
-| `3aa4971` | Removed the unconditional "Fecha" column + `toLocaleDateString('es')` cell from `entry-list.tsx` (scope expansion, Angular parity) |
-| `1cbf51e` | Deleted dead `inventory-daily-entries.tsx` + its describe blocks/import in `inventory-components.test.tsx`; pruned orphaned `INVENTORY.ENTRY.DATE` i18n key from `es.ts` |
-| `b4b2255` | Verification sweep — full suite green (1866/1866), `tsc --noEmit` clean, build succeeds |
-| `cbc4726` | Post-verify fix — parent-owned empty-day `InfoBox` in `today-entries.tsx` rendering Angular's entry-specific `INVENTORY_ENTRY.NO_ENTRY_FOUND_IN_DAY` copy (RED-first test); re-verified 1867/1867 |
-| *(pending)* | Archive commit — `git rm` of the active change folder + `git add` of this archive folder, to be made by the orchestrator after this report |
+| Commit      | Content                                                                                                                                                                                           |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `f536ec9`   | RED — failing test asserting `EntryList`-shaped compact row (name+quantity, gear toggle, no grouping header, no Fecha) against the pre-swap `InventoryDailyEntries`                               |
+| `56c0e80`   | GREEN — swapped `today-entries.tsx` to render `EntryList` instead of `InventoryDailyEntries`                                                                                                      |
+| `3aa4971`   | Removed the unconditional "Fecha" column + `toLocaleDateString('es')` cell from `entry-list.tsx` (scope expansion, Angular parity)                                                                |
+| `1cbf51e`   | Deleted dead `inventory-daily-entries.tsx` + its describe blocks/import in `inventory-components.test.tsx`; pruned orphaned `INVENTORY.ENTRY.DATE` i18n key from `es.ts`                          |
+| `b4b2255`   | Verification sweep — full suite green (1866/1866), `tsc --noEmit` clean, build succeeds                                                                                                           |
+| `cbc4726`   | Post-verify fix — parent-owned empty-day `InfoBox` in `today-entries.tsx` rendering Angular's entry-specific `INVENTORY_ENTRY.NO_ENTRY_FOUND_IN_DAY` copy (RED-first test); re-verified 1867/1867 |
+| _(pending)_ | Archive commit — `git rm` of the active change folder + `git add` of this archive folder, to be made by the orchestrator after this report                                                        |
 
 ## Gate Results
 

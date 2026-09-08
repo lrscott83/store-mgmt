@@ -66,7 +66,7 @@ function renderLogin(loginFn = vi.fn()) {
       <MemoryRouter>
         <LoginPage />
       </MemoryRouter>
-    </IntlProvider>
+    </IntlProvider>,
   );
 }
 
@@ -186,7 +186,7 @@ describe('LoginPage (AUTH-01)', () => {
     await waitFor(() => {
       // AUTH.TOO_MANY_ATTEMPTS = "Demasiados intentos. Espera un momento antes de volver a intentar."
       expect(
-        screen.getByText('Demasiados intentos. Espera un momento antes de volver a intentar.')
+        screen.getByText('Demasiados intentos. Espera un momento antes de volver a intentar.'),
       ).toBeInTheDocument();
     });
   });
@@ -215,8 +215,8 @@ describe('LoginPage (AUTH-01)', () => {
     await waitFor(() => {
       expect(
         screen.getByText(
-          'La autenticación no es válida por el siguiente error: Credenciales incorrectas'
-        )
+          'La autenticación no es válida por el siguiente error: Credenciales incorrectas',
+        ),
       ).toBeInTheDocument();
     });
   });
@@ -229,7 +229,10 @@ describe('LoginPage (AUTH-01)', () => {
   it('replaces the form with a loading state while the login flow is in-flight (no form flash)', async () => {
     let resolveLogin!: (u: UserModel) => void;
     const loginFn = vi.fn(
-      () => new Promise<UserModel>((res) => { resolveLogin = res; })
+      () =>
+        new Promise<UserModel>((res) => {
+          resolveLogin = res;
+        }),
     );
     renderLogin(loginFn);
 
@@ -245,9 +248,7 @@ describe('LoginPage (AUTH-01)', () => {
     // by the loading indicator. Previously the button stayed mounted, so the
     // form was visible during the gaps between API calls.
     await waitFor(() => {
-      expect(
-        screen.queryByRole('button', { name: /iniciar sesión/i })
-      ).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /iniciar sesión/i })).not.toBeInTheDocument();
     });
 
     resolveLogin(makeUser());
@@ -332,16 +333,14 @@ describe('LoginPage — unlock gate removal + DekUnwrapError copy (design §10)'
         <MemoryRouter initialEntries={[path]}>
           <LoginPage />
         </MemoryRouter>
-      </IntlProvider>
+      </IntlProvider>,
     );
   }
 
   it('does NOT render any unlock notice even when reached with ?unlock=1', () => {
     renderLoginAt('/login?unlock=1');
     expect(
-      screen.queryByText(
-        'Ingresa tu contraseña para desbloquear los datos de este dispositivo.'
-      )
+      screen.queryByText('Ingresa tu contraseña para desbloquear los datos de este dispositivo.'),
     ).not.toBeInTheDocument();
   });
 
@@ -367,8 +366,8 @@ describe('LoginPage — unlock gate removal + DekUnwrapError copy (design §10)'
     await waitFor(() => {
       expect(
         screen.getByText(
-          'No se pudo abrir la información de esta tienda. Inicie sesión con conexión o importe un roster para recuperarla.'
-        )
+          'No se pudo abrir la información de esta tienda. Inicie sesión con conexión o importe un roster para recuperarla.',
+        ),
       ).toBeInTheDocument();
     });
   });

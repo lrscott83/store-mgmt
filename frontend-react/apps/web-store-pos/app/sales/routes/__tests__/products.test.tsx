@@ -7,7 +7,12 @@ import {
   registerDecryptionFailurePolicy,
   resetDecryptionFailureLatch,
 } from '~/shared/lib/storage/decryption-failure-policy';
-import type { BaseResponseModel, CsvImportResult, Product, ProductCategory } from '@store-mgmt/domain';
+import type {
+  BaseResponseModel,
+  CsvImportResult,
+  Product,
+  ProductCategory,
+} from '@store-mgmt/domain';
 
 // --- Mutable in-memory fixtures, controlled per-test ---
 let mockCategories: ProductCategory[] = [];
@@ -54,18 +59,34 @@ vi.mock('~/shared/lib/storage/store-data-reset', () => ({
 // lets tests inspect ProductOfflineService.create's call args directly.
 const okEnvelope = { data: true, succeeded: true, message: '', actionCode: 200, errors: [] };
 const productServiceSpies = vi.hoisted(() => ({
-  createProduct: vi.fn((..._args: unknown[]) => Promise.resolve({ data: true, succeeded: true, message: '', actionCode: 200, errors: [] })),
-  updateProduct: vi.fn((..._args: unknown[]) => Promise.resolve({ data: true, succeeded: true, message: '', actionCode: 200, errors: [] })),
-  deleteProduct: vi.fn((..._args: unknown[]) => Promise.resolve({ data: true, succeeded: true, message: '', actionCode: 200, errors: [] })),
+  createProduct: vi.fn((..._args: unknown[]) =>
+    Promise.resolve({ data: true, succeeded: true, message: '', actionCode: 200, errors: [] }),
+  ),
+  updateProduct: vi.fn((..._args: unknown[]) =>
+    Promise.resolve({ data: true, succeeded: true, message: '', actionCode: 200, errors: [] }),
+  ),
+  deleteProduct: vi.fn((..._args: unknown[]) =>
+    Promise.resolve({ data: true, succeeded: true, message: '', actionCode: 200, errors: [] }),
+  ),
   // ADR-1/ADR-2 (csv-import-cost-quantity-entries): createCsvProducts ALWAYS resolves
   // success(...) — a per-row {created,failed} payload replaces the old boolean, so callers
   // branch on `data.failed.length > 0`, never on `succeeded`.
   createCsvProducts: vi.fn(
     (..._args: unknown[]): Promise<BaseResponseModel<CsvImportResult>> =>
-      Promise.resolve({ data: { created: [], failed: [] }, succeeded: true, message: '', actionCode: 200, errors: [] }),
+      Promise.resolve({
+        data: { created: [], failed: [] },
+        succeeded: true,
+        message: '',
+        actionCode: 200,
+        errors: [],
+      }),
   ),
-  createProducts: vi.fn((..._args: unknown[]) => Promise.resolve({ data: true, succeeded: true, message: '', actionCode: 200, errors: [] })),
-  getMaxOrderByCategoryId: vi.fn((..._args: unknown[]) => Promise.resolve({ data: 0, succeeded: true, message: '', actionCode: 200, errors: [] })),
+  createProducts: vi.fn((..._args: unknown[]) =>
+    Promise.resolve({ data: true, succeeded: true, message: '', actionCode: 200, errors: [] }),
+  ),
+  getMaxOrderByCategoryId: vi.fn((..._args: unknown[]) =>
+    Promise.resolve({ data: 0, succeeded: true, message: '', actionCode: 200, errors: [] }),
+  ),
 }));
 
 const { bm } = vi.hoisted(() => ({
@@ -232,7 +253,13 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     confirmDialogMock.mockClear();
     confirmDialogMock.mockResolvedValue(true);
     productServiceSpies.getMaxOrderByCategoryId.mockClear();
-    productServiceSpies.getMaxOrderByCategoryId.mockResolvedValue({ data: 0, succeeded: true, message: '', actionCode: 200, errors: [] });
+    productServiceSpies.getMaxOrderByCategoryId.mockResolvedValue({
+      data: 0,
+      succeeded: true,
+      message: '',
+      actionCode: 200,
+      errors: [],
+    });
     categoryServiceSpies.createProductCategory.mockClear();
     categoryServiceSpies.createProductCategory.mockResolvedValue({
       data: true,
@@ -266,7 +293,11 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       errors: [],
     });
     inventoryServiceSpies.createInventoryEntry.mockClear();
-    inventoryServiceSpies.createInventoryEntry.mockReturnValue({ succeeded: true, errors: [], data: undefined });
+    inventoryServiceSpies.createInventoryEntry.mockReturnValue({
+      succeeded: true,
+      errors: [],
+      data: undefined,
+    });
     showBlockingInfoMock.mockClear();
     showBlockingErrorMock.mockClear();
     showToastSuccessMock.mockClear();
@@ -451,7 +482,9 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     fireEvent.click(await screen.findByTestId('category-actions-toggle-cat-1'));
     fireEvent.click(screen.getByTestId('add-product-button'));
 
-    await waitFor(() => expect(productServiceSpies.getMaxOrderByCategoryId).toHaveBeenCalledWith('cat-1'));
+    await waitFor(() =>
+      expect(productServiceSpies.getMaxOrderByCategoryId).toHaveBeenCalledWith('cat-1'),
+    );
     expect(await screen.findByTestId('product-order-input')).toHaveValue(5);
   });
 
@@ -474,7 +507,9 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     fireEvent.click(await screen.findByTestId('category-actions-toggle-cat-1'));
     fireEvent.click(screen.getByTestId('add-product-button'));
 
-    fireEvent.change(await screen.findByTestId('product-name-input'), { target: { value: 'Sprite' } });
+    fireEvent.change(await screen.findByTestId('product-name-input'), {
+      target: { value: 'Sprite' },
+    });
     fireEvent.change(screen.getByTestId('product-price-input'), { target: { value: '2.5' } });
     fireEvent.click(screen.getByTestId('create-product-submit'));
 
@@ -500,11 +535,15 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
 
     fireEvent.click(await screen.findByTestId('category-actions-toggle-cat-1'));
     fireEvent.click(screen.getByTestId('add-product-button'));
-    fireEvent.change(await screen.findByTestId('product-name-input'), { target: { value: 'Sprite' } });
+    fireEvent.change(await screen.findByTestId('product-name-input'), {
+      target: { value: 'Sprite' },
+    });
     fireEvent.change(screen.getByTestId('product-price-input'), { target: { value: '2.5' } });
     fireEvent.click(screen.getByTestId('create-product-submit'));
 
-    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
     // Liveness: without this the assertion below also passes if the control did
     // nothing at all, which is indistinguishable from the behaviour under test.
     expect(productServiceSpies.createProduct).toHaveBeenCalled();
@@ -529,12 +568,16 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
 
     fireEvent.click(screen.getByTestId('category-actions-toggle-cat-1'));
     fireEvent.click(screen.getByTestId('add-product-button'));
-    fireEvent.change(await screen.findByTestId('product-name-input'), { target: { value: 'Sprite' } });
+    fireEvent.change(await screen.findByTestId('product-name-input'), {
+      target: { value: 'Sprite' },
+    });
     fireEvent.change(screen.getByTestId('product-price-input'), { target: { value: '2.5' } });
     categoryServiceSpies.getProductCategoriesView.mockRejectedValueOnce(new MissingDataKeyError());
     fireEvent.click(screen.getByTestId('create-product-submit'));
 
-    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
     // Liveness: without this the assertion below also passes if the control did
     // nothing at all, which is indistinguishable from the behaviour under test.
     expect(productServiceSpies.createProduct).toHaveBeenCalled();
@@ -558,7 +601,9 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     fireEvent.click(await screen.findByTestId('category-panel-toggle-cat-1'));
     fireEvent.click(await screen.findByLabelText('Acciones'));
     fireEvent.click(screen.getByText('Editar Producto'));
-    fireEvent.change(screen.getByTestId('edit-product-name-input'), { target: { value: 'Coca Cola Zero' } });
+    fireEvent.change(screen.getByTestId('edit-product-name-input'), {
+      target: { value: 'Coca Cola Zero' },
+    });
     fireEvent.click(screen.getByTestId('edit-product-submit'));
 
     await waitFor(() => expect(productServiceSpies.updateProduct).toHaveBeenCalledTimes(1));
@@ -582,10 +627,14 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     fireEvent.click(await screen.findByTestId('category-panel-toggle-cat-1'));
     fireEvent.click(await screen.findByLabelText('Acciones'));
     fireEvent.click(screen.getByText('Editar Producto'));
-    fireEvent.change(screen.getByTestId('edit-product-name-input'), { target: { value: 'Coca Cola Zero' } });
+    fireEvent.change(screen.getByTestId('edit-product-name-input'), {
+      target: { value: 'Coca Cola Zero' },
+    });
     fireEvent.click(screen.getByTestId('edit-product-submit'));
 
-    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
     // Liveness: without this the assertion below also passes if the control did
     // nothing at all, which is indistinguishable from the behaviour under test.
     expect(productServiceSpies.updateProduct).toHaveBeenCalled();
@@ -606,11 +655,15 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     fireEvent.click(screen.getByTestId('category-panel-toggle-cat-1'));
     fireEvent.click(await screen.findByLabelText('Acciones'));
     fireEvent.click(screen.getByText('Editar Producto'));
-    fireEvent.change(screen.getByTestId('edit-product-name-input'), { target: { value: 'Coca Cola Zero' } });
+    fireEvent.change(screen.getByTestId('edit-product-name-input'), {
+      target: { value: 'Coca Cola Zero' },
+    });
     categoryServiceSpies.getProductCategoriesView.mockRejectedValueOnce(new MissingDataKeyError());
     fireEvent.click(screen.getByTestId('edit-product-submit'));
 
-    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
     // Liveness: without this the assertion below also passes if the control did
     // nothing at all, which is indistinguishable from the behaviour under test.
     expect(productServiceSpies.updateProduct).toHaveBeenCalled();
@@ -720,7 +773,9 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
   // parity does NOT apply here: activation must not wipe an existing barcode).
   it('confirms via confirmDialog with the hardcoded "activar" copy, then calls updateProduct with isActive: true', async () => {
     mockCategories = [makeCategory()];
-    mockProducts = [makeProduct({ id: 'prod-1', name: 'Sprite', isActive: false, barcode: '7790001' })];
+    mockProducts = [
+      makeProduct({ id: 'prod-1', name: 'Sprite', isActive: false, barcode: '7790001' }),
+    ];
 
     render(
       <Wrapper>
@@ -818,7 +873,9 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     fireEvent.change(await screen.findByTestId('product-price-0'), { target: { value: '9.99' } });
     fireEvent.click(screen.getByTestId('bulk-save-button'));
 
-    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
     // Liveness: without this the assertion below also passes if the control did
     // nothing at all, which is indistinguishable from the behaviour under test.
     expect(productServiceSpies.createProducts).toHaveBeenCalled();
@@ -843,7 +900,9 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     categoryServiceSpies.getProductCategoriesView.mockRejectedValueOnce(new MissingDataKeyError());
     fireEvent.click(screen.getByTestId('bulk-save-button'));
 
-    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
     // Liveness: without this the assertion below also passes if the control did
     // nothing at all, which is indistinguishable from the behaviour under test.
     expect(productServiceSpies.createProducts).toHaveBeenCalled();
@@ -880,7 +939,9 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     // The repaint's own DEK failure no longer surfaces a message of its own here; it reaches
     // the app-wide policy, which has its own suite. Both assertions below survived that change
     // and are the reason this test was kept rather than dropped with the guard.
-    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
     expect(showBlockingErrorMock).toHaveBeenCalledWith(
       'Error',
       'Algunos productos no fueron adicionados porque ya existen.',
@@ -943,11 +1004,18 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
 
     fireEvent.click(await screen.findByTestId('category-actions-toggle-cat-1'));
     fireEvent.click(screen.getByTestId('add-product-button'));
-    fireEvent.change(await screen.findByTestId('product-name-input'), { target: { value: 'Sprite' } });
+    fireEvent.change(await screen.findByTestId('product-name-input'), {
+      target: { value: 'Sprite' },
+    });
     fireEvent.change(screen.getByTestId('product-price-input'), { target: { value: '2.5' } });
     fireEvent.click(screen.getByTestId('create-product-submit'));
 
-    await waitFor(() => expect(showBlockingErrorMock).toHaveBeenCalledWith('Error', 'El nombre del producto ya existe.'));
+    await waitFor(() =>
+      expect(showBlockingErrorMock).toHaveBeenCalledWith(
+        'Error',
+        'El nombre del producto ya existe.',
+      ),
+    );
     // Modal stays open on failure — not force-closed.
     expect(screen.getByTestId('create-product-submit')).toBeInTheDocument();
   });
@@ -966,7 +1034,9 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
           <ProductsPage />
         </Wrapper>,
       );
-      await waitFor(() => expect(categoryServiceSpies.getProductCategoriesView).toHaveBeenCalledTimes(1));
+      await waitFor(() =>
+        expect(categoryServiceSpies.getProductCategoriesView).toHaveBeenCalledTimes(1),
+      );
 
       // logout() (auth-store.ts:352-353) releases the DEK and nulls the user synchronously,
       // and only then redirects — through /login's async guestOnlyLoader, so this page is
@@ -1005,7 +1075,9 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       fireEvent.click(await screen.findByTestId('category-actions-toggle-cat-1'));
       fireEvent.click(screen.getByTestId('add-product-button'));
 
-      await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 0));
+      });
       // Liveness: without this the assertion below also passes if the control did
       // nothing at all, which is indistinguishable from the behaviour under test.
       expect(productServiceSpies.getMaxOrderByCategoryId).toHaveBeenCalled();
@@ -1024,7 +1096,9 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
 
       fireEvent.click(screen.getByTestId('add-category-button'));
 
-      await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 0));
+      });
       // Liveness: without this the assertion below also passes if the control did
       // nothing at all, which is indistinguishable from the behaviour under test.
       expect(categoryServiceSpies.getMaxOrder).toHaveBeenCalled();
@@ -1044,7 +1118,9 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       );
 
       fireEvent.click(screen.getByTestId('add-category-button'));
-      fireEvent.change(await screen.findByTestId('category-name-input'), { target: { value: 'Snacks' } });
+      fireEvent.change(await screen.findByTestId('category-name-input'), {
+        target: { value: 'Snacks' },
+      });
       fireEvent.click(screen.getByTestId('category-save-button'));
 
       await waitFor(() =>
@@ -1052,7 +1128,9 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       );
       expect(categoryServiceSpies.updateProductCategory).not.toHaveBeenCalled();
       // Modal closes on success.
-      await waitFor(() => expect(screen.queryByTestId('category-name-input')).not.toBeInTheDocument());
+      await waitFor(() =>
+        expect(screen.queryByTestId('category-name-input')).not.toBeInTheDocument(),
+      );
     });
 
     it('keeps the modal open when createProductCategory rejects with MissingDataKeyError', async () => {
@@ -1065,10 +1143,14 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       );
 
       fireEvent.click(screen.getByTestId('add-category-button'));
-      fireEvent.change(await screen.findByTestId('category-name-input'), { target: { value: 'Snacks' } });
+      fireEvent.change(await screen.findByTestId('category-name-input'), {
+        target: { value: 'Snacks' },
+      });
       fireEvent.click(screen.getByTestId('category-save-button'));
 
-      await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 0));
+      });
       // Liveness: without this the assertion below also passes if the control did
       // nothing at all, which is indistinguishable from the behaviour under test.
       expect(categoryServiceSpies.createProductCategory).toHaveBeenCalled();
@@ -1083,11 +1165,17 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       );
 
       fireEvent.click(screen.getByTestId('add-category-button'));
-      fireEvent.change(await screen.findByTestId('category-name-input'), { target: { value: 'Snacks' } });
-      categoryServiceSpies.getProductCategoriesView.mockRejectedValueOnce(new MissingDataKeyError());
+      fireEvent.change(await screen.findByTestId('category-name-input'), {
+        target: { value: 'Snacks' },
+      });
+      categoryServiceSpies.getProductCategoriesView.mockRejectedValueOnce(
+        new MissingDataKeyError(),
+      );
       fireEvent.click(screen.getByTestId('category-save-button'));
 
-      await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 0));
+      });
       // Liveness: without this the assertion below also passes if the control did
       // nothing at all, which is indistinguishable from the behaviour under test.
       expect(categoryServiceSpies.createProductCategory).toHaveBeenCalled();
@@ -1104,11 +1192,18 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
 
       fireEvent.click(await screen.findByTestId('category-actions-toggle-cat-1'));
       fireEvent.click(screen.getByTestId('edit-category-button'));
-      fireEvent.change(screen.getByTestId('category-name-input'), { target: { value: 'Bebidas Frías' } });
+      fireEvent.change(screen.getByTestId('category-name-input'), {
+        target: { value: 'Bebidas Frías' },
+      });
       fireEvent.click(screen.getByTestId('category-save-button'));
 
       await waitFor(() =>
-        expect(categoryServiceSpies.updateProductCategory).toHaveBeenCalledWith('cat-1', 'Bebidas Frías', 1, true),
+        expect(categoryServiceSpies.updateProductCategory).toHaveBeenCalledWith(
+          'cat-1',
+          'Bebidas Frías',
+          1,
+          true,
+        ),
       );
       expect(categoryServiceSpies.createProductCategory).not.toHaveBeenCalled();
     });
@@ -1119,7 +1214,12 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
         succeeded: false,
         message: '',
         actionCode: 400,
-        errors: [{ code: 'ProductCategory.NameExists', description: 'El nombre de la categoría ya existe.' }],
+        errors: [
+          {
+            code: 'ProductCategory.NameExists',
+            description: 'El nombre de la categoría ya existe.',
+          },
+        ],
       } as unknown as BaseResponseModel<boolean>);
 
       render(
@@ -1129,11 +1229,16 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       );
 
       fireEvent.click(screen.getByTestId('add-category-button'));
-      fireEvent.change(await screen.findByTestId('category-name-input'), { target: { value: 'Bebidas' } });
+      fireEvent.change(await screen.findByTestId('category-name-input'), {
+        target: { value: 'Bebidas' },
+      });
       fireEvent.click(screen.getByTestId('category-save-button'));
 
       await waitFor(() =>
-        expect(showBlockingErrorMock).toHaveBeenCalledWith('Error', 'El nombre de la categoría ya existe.'),
+        expect(showBlockingErrorMock).toHaveBeenCalledWith(
+          'Error',
+          'El nombre de la categoría ya existe.',
+        ),
       );
       // Modal stays open on failure — not force-closed.
       expect(screen.getByTestId('category-name-input')).toBeInTheDocument();
@@ -1179,11 +1284,17 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       );
 
       fireEvent.click(screen.getByTestId('add-category-button'));
-      fireEvent.change(await screen.findByTestId('category-name-input'), { target: { value: 'Galletas' } });
+      fireEvent.change(await screen.findByTestId('category-name-input'), {
+        target: { value: 'Galletas' },
+      });
       fireEvent.click(screen.getByTestId('category-save-button'));
 
       await waitFor(() =>
-        expect(categoryServiceSpies.createProductCategory).toHaveBeenCalledWith('Galletas', 7, true),
+        expect(categoryServiceSpies.createProductCategory).toHaveBeenCalledWith(
+          'Galletas',
+          7,
+          true,
+        ),
       );
     });
 
@@ -1217,11 +1328,15 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
   // (`!(-3)` is `false`) slip through.
   describe('handleCsvImport — ProductService.createCsvProducts call site', () => {
     function makeCsvFile(): File {
-      return new File(['name,price,category\nChips,10,Snacks'], 'products.csv', { type: 'text/csv' });
+      return new File(['name,price,category\nChips,10,Snacks'], 'products.csv', {
+        type: 'text/csv',
+      });
     }
 
     function makeCsvFileWithCostQuantity(): File {
-      return new File(['name,price,category,cost,quantity\nChips,10,Snacks,6,12'], 'products.csv', { type: 'text/csv' });
+      return new File(['name,price,category,cost,quantity\nChips,10,Snacks,6,12'], 'products.csv', {
+        type: 'text/csv',
+      });
     }
 
     function mockCreateCsvProductsOnce(
@@ -1234,7 +1349,13 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
         quantity?: number;
         existing?: boolean;
       }[],
-      failed: { category: string; name: string; price: number; cost?: number; quantity?: number }[] = [],
+      failed: {
+        category: string;
+        name: string;
+        price: number;
+        cost?: number;
+        quantity?: number;
+      }[] = [],
     ) {
       productServiceSpies.createCsvProducts.mockResolvedValueOnce({
         data: {
@@ -1256,7 +1377,9 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       );
 
       fireEvent.click(screen.getByTestId('import-csv-button'));
-      fireEvent.change(screen.getByTestId('csv-file-input'), { target: { files: [makeCsvFileWithCostQuantity()] } });
+      fireEvent.change(screen.getByTestId('csv-file-input'), {
+        target: { files: [makeCsvFileWithCostQuantity()] },
+      });
       await waitFor(() => expect(screen.getByTestId('csv-import-button')).toBeInTheDocument());
       fireEvent.click(screen.getByTestId('csv-import-button'));
 
@@ -1278,7 +1401,11 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       fireEvent.click(screen.getByTestId('import-csv-button'));
       fireEvent.change(screen.getByTestId('csv-file-input'), {
         target: {
-          files: [new File(['name,price,category\nChips,10,Snacks\nNoCat,5,'], 'products.csv', { type: 'text/csv' })],
+          files: [
+            new File(['name,price,category\nChips,10,Snacks\nNoCat,5,'], 'products.csv', {
+              type: 'text/csv',
+            }),
+          ],
         },
       });
       await waitFor(() => expect(screen.getByTestId('csv-import-button')).toBeInTheDocument());
@@ -1303,7 +1430,14 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     // for a legacy CSV whose entries count is 0.
     it('always shows both counts, including zero entries for a legacy CSV', async () => {
       mockCreateCsvProductsOnce([
-        { id: 'p1', category: 'Snacks', name: 'Chips', price: 10, cost: undefined, quantity: undefined },
+        {
+          id: 'p1',
+          category: 'Snacks',
+          name: 'Chips',
+          price: 10,
+          cost: undefined,
+          quantity: undefined,
+        },
       ]);
       render(
         <Wrapper>
@@ -1312,12 +1446,16 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       );
 
       fireEvent.click(screen.getByTestId('import-csv-button'));
-      fireEvent.change(screen.getByTestId('csv-file-input'), { target: { files: [makeCsvFile()] } });
+      fireEvent.change(screen.getByTestId('csv-file-input'), {
+        target: { files: [makeCsvFile()] },
+      });
       await waitFor(() => expect(screen.getByTestId('csv-import-button')).toBeInTheDocument());
       fireEvent.click(screen.getByTestId('csv-import-button'));
 
       await waitFor(() =>
-        expect(showToastSuccessMock).toHaveBeenCalledWith('Importados 1 productos y 0 entradas correctamente.'),
+        expect(showToastSuccessMock).toHaveBeenCalledWith(
+          'Importados 1 productos y 0 entradas correctamente.',
+        ),
       );
       expect(inventoryServiceSpies.createInventoryEntry).not.toHaveBeenCalled();
       expect(showBlockingInfoMock).not.toHaveBeenCalled();
@@ -1326,7 +1464,14 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     it('reports both real counts when some rows also create entries', async () => {
       mockCreateCsvProductsOnce([
         { id: 'p1', category: 'Snacks', name: 'Chips', price: 10, cost: 6, quantity: 12 },
-        { id: 'p2', category: 'Snacks', name: 'Soda', price: 5, cost: undefined, quantity: undefined },
+        {
+          id: 'p2',
+          category: 'Snacks',
+          name: 'Soda',
+          price: 5,
+          cost: undefined,
+          quantity: undefined,
+        },
       ]);
       render(
         <Wrapper>
@@ -1335,18 +1480,24 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       );
 
       fireEvent.click(screen.getByTestId('import-csv-button'));
-      fireEvent.change(screen.getByTestId('csv-file-input'), { target: { files: [makeCsvFileWithCostQuantity()] } });
+      fireEvent.change(screen.getByTestId('csv-file-input'), {
+        target: { files: [makeCsvFileWithCostQuantity()] },
+      });
       await waitFor(() => expect(screen.getByTestId('csv-import-button')).toBeInTheDocument());
       fireEvent.click(screen.getByTestId('csv-import-button'));
 
       await waitFor(() =>
-        expect(showToastSuccessMock).toHaveBeenCalledWith('Importados 2 productos y 1 entradas correctamente.'),
+        expect(showToastSuccessMock).toHaveBeenCalledWith(
+          'Importados 2 productos y 1 entradas correctamente.',
+        ),
       );
       expect(inventoryServiceSpies.createInventoryEntry).toHaveBeenCalledTimes(1);
     });
 
     it('creates one inventory entry per created row with a qualifying quantity, called as (id, quantity, cost)', async () => {
-      mockCreateCsvProductsOnce([{ id: 'p1', category: 'Snacks', name: 'Chips', price: 10, cost: 6, quantity: 12 }]);
+      mockCreateCsvProductsOnce([
+        { id: 'p1', category: 'Snacks', name: 'Chips', price: 10, cost: 6, quantity: 12 },
+      ]);
       render(
         <Wrapper>
           <ProductsPage />
@@ -1354,11 +1505,15 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       );
 
       fireEvent.click(screen.getByTestId('import-csv-button'));
-      fireEvent.change(screen.getByTestId('csv-file-input'), { target: { files: [makeCsvFileWithCostQuantity()] } });
+      fireEvent.change(screen.getByTestId('csv-file-input'), {
+        target: { files: [makeCsvFileWithCostQuantity()] },
+      });
       await waitFor(() => expect(screen.getByTestId('csv-import-button')).toBeInTheDocument());
       fireEvent.click(screen.getByTestId('csv-import-button'));
 
-      await waitFor(() => expect(inventoryServiceSpies.createInventoryEntry).toHaveBeenCalledTimes(1));
+      await waitFor(() =>
+        expect(inventoryServiceSpies.createInventoryEntry).toHaveBeenCalledTimes(1),
+      );
       expect(inventoryServiceSpies.createInventoryEntry).toHaveBeenCalledWith('p1', 12, 6);
     });
 
@@ -1373,18 +1528,24 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       );
 
       fireEvent.click(screen.getByTestId('import-csv-button'));
-      fireEvent.change(screen.getByTestId('csv-file-input'), { target: { files: [makeCsvFileWithCostQuantity()] } });
+      fireEvent.change(screen.getByTestId('csv-file-input'), {
+        target: { files: [makeCsvFileWithCostQuantity()] },
+      });
       await waitFor(() => expect(screen.getByTestId('csv-import-button')).toBeInTheDocument());
       fireEvent.click(screen.getByTestId('csv-import-button'));
 
-      await waitFor(() => expect(inventoryServiceSpies.createInventoryEntry).toHaveBeenCalledTimes(1));
+      await waitFor(() =>
+        expect(inventoryServiceSpies.createInventoryEntry).toHaveBeenCalledTimes(1),
+      );
       expect(inventoryServiceSpies.createInventoryEntry).toHaveBeenCalledWith('p2', 5, 10);
     });
 
     // Decision #16: cost="0" is a VALID explicit zero, never a fallback trigger. `?? ` handles
     // this correctly; `||` would NOT (0 is falsy), which is exactly the bug this pins.
     it('uses an explicit cost of 0 for the entry, never falling back to price', async () => {
-      mockCreateCsvProductsOnce([{ id: 'p8', category: 'Snacks', name: 'Chips', price: 10, cost: 0, quantity: 5 }]);
+      mockCreateCsvProductsOnce([
+        { id: 'p8', category: 'Snacks', name: 'Chips', price: 10, cost: 0, quantity: 5 },
+      ]);
       render(
         <Wrapper>
           <ProductsPage />
@@ -1392,11 +1553,15 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       );
 
       fireEvent.click(screen.getByTestId('import-csv-button'));
-      fireEvent.change(screen.getByTestId('csv-file-input'), { target: { files: [makeCsvFileWithCostQuantity()] } });
+      fireEvent.change(screen.getByTestId('csv-file-input'), {
+        target: { files: [makeCsvFileWithCostQuantity()] },
+      });
       await waitFor(() => expect(screen.getByTestId('csv-import-button')).toBeInTheDocument());
       fireEvent.click(screen.getByTestId('csv-import-button'));
 
-      await waitFor(() => expect(inventoryServiceSpies.createInventoryEntry).toHaveBeenCalledTimes(1));
+      await waitFor(() =>
+        expect(inventoryServiceSpies.createInventoryEntry).toHaveBeenCalledTimes(1),
+      );
       expect(inventoryServiceSpies.createInventoryEntry).toHaveBeenCalledWith('p8', 5, 0);
     });
 
@@ -1416,19 +1581,25 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       );
 
       fireEvent.click(screen.getByTestId('import-csv-button'));
-      fireEvent.change(screen.getByTestId('csv-file-input'), { target: { files: [makeCsvFileWithCostQuantity()] } });
+      fireEvent.change(screen.getByTestId('csv-file-input'), {
+        target: { files: [makeCsvFileWithCostQuantity()] },
+      });
       await waitFor(() => expect(screen.getByTestId('csv-import-button')).toBeInTheDocument());
       fireEvent.click(screen.getByTestId('csv-import-button'));
 
       await waitFor(() =>
-        expect(showToastSuccessMock).toHaveBeenCalledWith('Importados 3 productos y 0 entradas correctamente.'),
+        expect(showToastSuccessMock).toHaveBeenCalledWith(
+          'Importados 3 productos y 0 entradas correctamente.',
+        ),
       );
       expect(inventoryServiceSpies.createInventoryEntry).not.toHaveBeenCalled();
     });
 
     it('does not count a bare-null return from createInventoryEntry toward the entries count (R2)', async () => {
       inventoryServiceSpies.createInventoryEntry.mockReturnValueOnce(null);
-      mockCreateCsvProductsOnce([{ id: 'p6', category: 'Snacks', name: 'Chips', price: 10, cost: 6, quantity: 12 }]);
+      mockCreateCsvProductsOnce([
+        { id: 'p6', category: 'Snacks', name: 'Chips', price: 10, cost: 6, quantity: 12 },
+      ]);
       render(
         <Wrapper>
           <ProductsPage />
@@ -1436,12 +1607,16 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       );
 
       fireEvent.click(screen.getByTestId('import-csv-button'));
-      fireEvent.change(screen.getByTestId('csv-file-input'), { target: { files: [makeCsvFileWithCostQuantity()] } });
+      fireEvent.change(screen.getByTestId('csv-file-input'), {
+        target: { files: [makeCsvFileWithCostQuantity()] },
+      });
       await waitFor(() => expect(screen.getByTestId('csv-import-button')).toBeInTheDocument());
       fireEvent.click(screen.getByTestId('csv-import-button'));
 
       await waitFor(() =>
-        expect(showToastSuccessMock).toHaveBeenCalledWith('Importados 1 productos y 0 entradas correctamente.'),
+        expect(showToastSuccessMock).toHaveBeenCalledWith(
+          'Importados 1 productos y 0 entradas correctamente.',
+        ),
       );
     });
 
@@ -1461,18 +1636,24 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       );
 
       fireEvent.click(screen.getByTestId('import-csv-button'));
-      fireEvent.change(screen.getByTestId('csv-file-input'), { target: { files: [makeCsvFile()] } });
+      fireEvent.change(screen.getByTestId('csv-file-input'), {
+        target: { files: [makeCsvFile()] },
+      });
       await waitFor(() => expect(screen.getByTestId('csv-import-button')).toBeInTheDocument());
       fireEvent.click(screen.getByTestId('csv-import-button'));
 
       await waitFor(() =>
-        expect(showToastSuccessMock).toHaveBeenCalledWith('Importados 2 productos y 0 entradas correctamente.'),
+        expect(showToastSuccessMock).toHaveBeenCalledWith(
+          'Importados 2 productos y 0 entradas correctamente.',
+        ),
       );
       expect(showBlockingInfoMock).not.toHaveBeenCalled();
     });
 
     it('does not show the duplicate dialog when there are no failed rows', async () => {
-      mockCreateCsvProductsOnce([{ id: 'p1', category: 'Snacks', name: 'Chips', price: 10, cost: 6, quantity: 12 }]);
+      mockCreateCsvProductsOnce([
+        { id: 'p1', category: 'Snacks', name: 'Chips', price: 10, cost: 6, quantity: 12 },
+      ]);
       render(
         <Wrapper>
           <ProductsPage />
@@ -1480,7 +1661,9 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       );
 
       fireEvent.click(screen.getByTestId('import-csv-button'));
-      fireEvent.change(screen.getByTestId('csv-file-input'), { target: { files: [makeCsvFileWithCostQuantity()] } });
+      fireEvent.change(screen.getByTestId('csv-file-input'), {
+        target: { files: [makeCsvFileWithCostQuantity()] },
+      });
       await waitFor(() => expect(screen.getByTestId('csv-import-button')).toBeInTheDocument());
       fireEvent.click(screen.getByTestId('csv-import-button'));
 
@@ -1495,11 +1678,51 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     // row carrying a qualifying quantity.
     it('reports real non-zero counts for a mixed new/existing batch, from a single import, with NO duplicate dialog', async () => {
       mockCreateCsvProductsOnce([
-        { id: 'p10', category: 'Pizzas', name: 'Pizza de Queso', price: 150, cost: 120, quantity: 10, existing: false },
-        { id: 'p11', category: 'Pizzas', name: 'Pizza Especial', price: 200, cost: 150, quantity: 5, existing: false },
-        { id: 'p12', category: 'Confituras', name: 'Caramelo', price: 20, cost: undefined, quantity: undefined, existing: false },
-        { id: 'p13', category: 'Pizzas', name: 'Pizza Vieja', price: 100, cost: undefined, quantity: undefined, existing: true },
-        { id: 'p14', category: 'Confituras', name: 'Chocolate', price: 30, cost: undefined, quantity: undefined, existing: true },
+        {
+          id: 'p10',
+          category: 'Pizzas',
+          name: 'Pizza de Queso',
+          price: 150,
+          cost: 120,
+          quantity: 10,
+          existing: false,
+        },
+        {
+          id: 'p11',
+          category: 'Pizzas',
+          name: 'Pizza Especial',
+          price: 200,
+          cost: 150,
+          quantity: 5,
+          existing: false,
+        },
+        {
+          id: 'p12',
+          category: 'Confituras',
+          name: 'Caramelo',
+          price: 20,
+          cost: undefined,
+          quantity: undefined,
+          existing: false,
+        },
+        {
+          id: 'p13',
+          category: 'Pizzas',
+          name: 'Pizza Vieja',
+          price: 100,
+          cost: undefined,
+          quantity: undefined,
+          existing: true,
+        },
+        {
+          id: 'p14',
+          category: 'Confituras',
+          name: 'Chocolate',
+          price: 30,
+          cost: undefined,
+          quantity: undefined,
+          existing: true,
+        },
       ]);
       render(
         <Wrapper>
@@ -1508,13 +1731,17 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       );
 
       fireEvent.click(screen.getByTestId('import-csv-button'));
-      fireEvent.change(screen.getByTestId('csv-file-input'), { target: { files: [makeCsvFileWithCostQuantity()] } });
+      fireEvent.change(screen.getByTestId('csv-file-input'), {
+        target: { files: [makeCsvFileWithCostQuantity()] },
+      });
       await waitFor(() => expect(screen.getByTestId('csv-import-button')).toBeInTheDocument());
       fireEvent.click(screen.getByTestId('csv-import-button'));
 
       // 5 rows processed, 2 entries (only the 2 rows carrying a qualifying quantity).
       await waitFor(() =>
-        expect(showToastSuccessMock).toHaveBeenCalledWith('Importados 5 productos y 2 entradas correctamente.'),
+        expect(showToastSuccessMock).toHaveBeenCalledWith(
+          'Importados 5 productos y 2 entradas correctamente.',
+        ),
       );
       expect(showToastSuccessMock).toHaveBeenCalledTimes(1);
       expect(inventoryServiceSpies.createInventoryEntry).toHaveBeenCalledTimes(2);
@@ -1535,11 +1762,15 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       );
 
       fireEvent.click(screen.getByTestId('import-csv-button'));
-      fireEvent.change(screen.getByTestId('csv-file-input'), { target: { files: [makeCsvFile()] } });
+      fireEvent.change(screen.getByTestId('csv-file-input'), {
+        target: { files: [makeCsvFile()] },
+      });
       await waitFor(() => expect(screen.getByTestId('csv-import-button')).toBeInTheDocument());
       fireEvent.click(screen.getByTestId('csv-import-button'));
 
-      await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 0));
+      });
       // Liveness: without this the assertion below also passes if the control did
       // nothing at all, which is indistinguishable from the behaviour under test.
       expect(productServiceSpies.createCsvProducts).toHaveBeenCalled();
@@ -1548,7 +1779,14 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
 
     it('closes the modal when the post-import repaint rejects with MissingDataKeyError', async () => {
       mockCreateCsvProductsOnce([
-        { id: 'p1', category: 'Snacks', name: 'Chips', price: 10, cost: undefined, quantity: undefined },
+        {
+          id: 'p1',
+          category: 'Snacks',
+          name: 'Chips',
+          price: 10,
+          cost: undefined,
+          quantity: undefined,
+        },
       ]);
 
       render(
@@ -1559,22 +1797,32 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       // Let the initial mount's loadData() resolve normally before queuing the rejection —
       // otherwise the Once rejection would be consumed by the mount call instead of the
       // import-triggered repaint this test targets.
-      await waitFor(() => expect(categoryServiceSpies.getProductCategoriesView).toHaveBeenCalledTimes(1));
+      await waitFor(() =>
+        expect(categoryServiceSpies.getProductCategoriesView).toHaveBeenCalledTimes(1),
+      );
 
       fireEvent.click(screen.getByTestId('import-csv-button'));
-      fireEvent.change(screen.getByTestId('csv-file-input'), { target: { files: [makeCsvFile()] } });
+      fireEvent.change(screen.getByTestId('csv-file-input'), {
+        target: { files: [makeCsvFile()] },
+      });
       await waitFor(() => expect(screen.getByTestId('csv-import-button')).toBeInTheDocument());
-      categoryServiceSpies.getProductCategoriesView.mockRejectedValueOnce(new MissingDataKeyError());
+      categoryServiceSpies.getProductCategoriesView.mockRejectedValueOnce(
+        new MissingDataKeyError(),
+      );
       fireEvent.click(screen.getByTestId('csv-import-button'));
 
-      await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 0));
+      });
       // Liveness: without this the assertion below also passes if the control did
       // nothing at all, which is indistinguishable from the behaviour under test.
       expect(productServiceSpies.createCsvProducts).toHaveBeenCalled();
       expect(screen.queryByTestId('csv-import-button')).not.toBeInTheDocument();
       // The toast still fired — the mutation itself (including the toast/dialog reporting it)
       // completed before the repaint ran and failed.
-      expect(showToastSuccessMock).toHaveBeenCalledWith('Importados 1 productos y 0 entradas correctamente.');
+      expect(showToastSuccessMock).toHaveBeenCalledWith(
+        'Importados 1 productos y 0 entradas correctamente.',
+      );
     });
   });
 
@@ -1592,7 +1840,10 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       // Opening the gear reveals the actions but must NOT expand the panel
       fireEvent.click(await screen.findByTestId('category-actions-toggle-cat-1'));
       expect(screen.getByTestId('edit-category-button')).toBeInTheDocument();
-      expect(screen.getByTestId('category-panel-toggle-cat-1')).toHaveAttribute('aria-expanded', 'false');
+      expect(screen.getByTestId('category-panel-toggle-cat-1')).toHaveAttribute(
+        'aria-expanded',
+        'false',
+      );
       expect(screen.queryByText('Coca Cola')).not.toBeInTheDocument();
     });
 
@@ -1835,7 +2086,9 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     expect(await screen.findByText('Bebidas')).toBeInTheDocument();
 
     clearStoreDataMock.mockReturnValueOnce([]);
-    categoryServiceSpies.getProductCategoriesView.mockRejectedValueOnce(new Error('no DEK in memory'));
+    categoryServiceSpies.getProductCategoriesView.mockRejectedValueOnce(
+      new Error('no DEK in memory'),
+    );
 
     fireEvent.click(screen.getByTestId('clear-data-button'));
 

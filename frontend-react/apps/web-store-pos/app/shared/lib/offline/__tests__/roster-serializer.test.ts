@@ -71,7 +71,9 @@ describe('roster-serializer — bundle container round-trips losslessly', () => 
   it('raises WrongPasswordError when deserializing with an incorrect master', async () => {
     const bundle = makeBundle();
     const payload = await serializeRoster(bundle, 'm', 's1');
-    await expect(deserializeRoster(payload, 'wrong', 's1')).rejects.toBeInstanceOf(WrongPasswordError);
+    await expect(deserializeRoster(payload, 'wrong', 's1')).rejects.toBeInstanceOf(
+      WrongPasswordError,
+    );
   });
 
   it('raises CorruptFileError for a structurally invalid file', async () => {
@@ -113,9 +115,8 @@ describe('roster-serializer — plaintext meta.json envelope', () => {
     const payload = await serializeRoster(bundle, 'm', 's1');
 
     // Re-zip the roster.json entry alone, WITHOUT the envelope.
-    const { ZipWriter, BlobWriter, TextReader, BlobReader, ZipReader, TextWriter } = await import(
-      '@zip.js/zip.js'
-    );
+    const { ZipWriter, BlobWriter, TextReader, BlobReader, ZipReader, TextWriter } =
+      await import('@zip.js/zip.js');
     const reader = new ZipReader(new BlobReader(new Blob([payload])));
     const entries = await reader.getEntries();
     const rosterEntry = entries.find((e) => !e.directory && e.filename === 'roster.json');

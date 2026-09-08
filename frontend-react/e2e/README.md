@@ -57,14 +57,14 @@ Tests end-to-end del frontend React con [Playwright](https://playwright.dev/).
 
 Desde `frontend-react/`:
 
-| Comando | Qué hace |
-| --- | --- |
-| `pnpm test:e2e` | Corre la suite por defecto (smoke + register REQ-1..REQ-8 + login A1-A7/D1-D6 + login offline S1-03), **excluye** ambos specs de rate-limit. Consume 2 registros + 4 logins reales — ver la advertencia de cuota de login más abajo. `login-offline.spec.ts` no agrega a ese costo: cero peticiones reales de red. |
-| `pnpm test:e2e:rate-limit` | Corre AMBOS specs de rate-limit (`register-rate-limit.spec.ts` REQ-9 y `login-rate-limit.spec.ts` REQ-8), filtrados por el tag `@rate-limit`. Agota la cuota de registro (~10 min) y la de login (~1 min) de tu IP — a demanda, no en la corrida por defecto. |
-| `pnpm test:e2e:api` | Chequeo de conectividad con la API, sin navegador (`playwright.api.config.ts`). |
-| `pnpm exec playwright test --ui` | Modo interactivo (UI) con el test runner |
-| `pnpm exec playwright test e2e/smoke.spec.ts` | Corre solo el archivo indicado |
-| `pnpm exec playwright show-report` | Abre el reporte HTML generado |
+| Comando                                       | Qué hace                                                                                                                                                                                                                                                                                                           |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `pnpm test:e2e`                               | Corre la suite por defecto (smoke + register REQ-1..REQ-8 + login A1-A7/D1-D6 + login offline S1-03), **excluye** ambos specs de rate-limit. Consume 2 registros + 4 logins reales — ver la advertencia de cuota de login más abajo. `login-offline.spec.ts` no agrega a ese costo: cero peticiones reales de red. |
+| `pnpm test:e2e:rate-limit`                    | Corre AMBOS specs de rate-limit (`register-rate-limit.spec.ts` REQ-9 y `login-rate-limit.spec.ts` REQ-8), filtrados por el tag `@rate-limit`. Agota la cuota de registro (~10 min) y la de login (~1 min) de tu IP — a demanda, no en la corrida por defecto.                                                      |
+| `pnpm test:e2e:api`                           | Chequeo de conectividad con la API, sin navegador (`playwright.api.config.ts`).                                                                                                                                                                                                                                    |
+| `pnpm exec playwright test --ui`              | Modo interactivo (UI) con el test runner                                                                                                                                                                                                                                                                           |
+| `pnpm exec playwright test e2e/smoke.spec.ts` | Corre solo el archivo indicado                                                                                                                                                                                                                                                                                     |
+| `pnpm exec playwright show-report`            | Abre el reporte HTML generado                                                                                                                                                                                                                                                                                      |
 
 ## Cómo se levanta el servidor
 
@@ -165,12 +165,12 @@ contra un backend real, no contra un mock. Capa de soporte en `e2e/support/`:
 Si la suite choca con la cuota de registro agotada, con el backend caído, o con `API_URL` mal
 configurada, el fallo lo dice así — no como un `expect` crudo indistinguible de un bug real:
 
-| Mensaje que vas a ver | Qué significa | Qué hacer |
-| --- | --- | --- |
-| `Registration quota exhausted for this IP...` | Cuota de 10 registros/10min agotada | Esperar hasta 10 minutos |
-| `The backend did not respond at ...` | El backend está caído | Levantarlo (paso 1, arriba) |
+| Mensaje que vas a ver                                                 | Qué significa                                                                                                                                                                                  | Qué hacer                                                  |
+| --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| `Registration quota exhausted for this IP...`                         | Cuota de 10 registros/10min agotada                                                                                                                                                            | Esperar hasta 10 minutos                                   |
+| `The backend did not respond at ...`                                  | El backend está caído                                                                                                                                                                          | Levantarlo (paso 1, arriba)                                |
 | `La petición de registro salió a ... pero el backend esperado es ...` | Había un dev server en :3333 levantado a mano ANTES de Playwright, con otro `API_URL` — `reuseExistingServer:true` lo reutilizó tal cual y la suite terminó hablando con el backend equivocado | Parar ese dev server (`Ctrl+C`) y volver a correr la suite |
-| `API_URL points at the wrong base — is /api missing?` | `E2E_API_URL` (si lo overrideaste) no termina en `/api` | Revisar el valor exportado en tu shell |
+| `API_URL points at the wrong base — is /api missing?`                 | `E2E_API_URL` (si lo overrideaste) no termina en `/api`                                                                                                                                        | Revisar el valor exportado en tu shell                     |
 
 Ninguno de estos 4 es un defecto de la aplicación — son fallos de entorno, y por eso el mensaje
 lo dice explícitamente en vez de dejarte adivinar.
@@ -216,12 +216,12 @@ test('...', async ({ signedInPage }) => {
 
 Las 4 personas disponibles:
 
-| Persona | Estado de la tienda | Home resuelto |
-| --- | --- | --- |
-| `owner-admin` (default) | Recién registrada, sin categorías ni productos | `/sales/products` |
-| `owner-admin-with-products` | +1 categoría activa, +1 producto activo/vendible | `/sales/new` |
-| `store-user` | Empleado de la MISMA tienda, acuñado antes de sembrar | `/sales/products` |
-| `store-user-with-products` | Snapshot de `store-user` + las claves de entidad sembradas | `/sales/new` |
+| Persona                     | Estado de la tienda                                        | Home resuelto     |
+| --------------------------- | ---------------------------------------------------------- | ----------------- |
+| `owner-admin` (default)     | Recién registrada, sin categorías ni productos             | `/sales/products` |
+| `owner-admin-with-products` | +1 categoría activa, +1 producto activo/vendible           | `/sales/new`      |
+| `store-user`                | Empleado de la MISMA tienda, acuñado antes de sembrar      | `/sales/products` |
+| `store-user-with-products`  | Snapshot de `store-user` + las claves de entidad sembradas | `/sales/new`      |
 
 Invariantes que la fixture garantiza siempre:
 
@@ -326,7 +326,7 @@ adicional en `e2e/support/`:
 
 - `support/store-fixture.ts` — siembra de SERVIDOR, no flujo de usuario:
   degrada la tienda de `owner-admin` al plan gratuito con un `PUT
-  /v1/stores/{id}` real (los `moduleIds` salen del catálogo real
+/v1/stores/{id}` real (los `moduleIds` salen del catálogo real
   `GET /v1/modules/ToStore`, nunca hardcodeados), y re-lee la tienda para
   pinear la precondición antes de devolver el control — mismo patrón que
   `roster-fixture.ts`'s `plantRoster()`. También expone `assertStoresFeature()`,
@@ -336,7 +336,7 @@ adicional en `e2e/support/`:
   genérico — un PUT a otra tienda se detecta, no se cuenta junto), un matcher
   local de `/me` (4 líneas, no importado de `login-network-observer.ts`) para
   el orden causal PUT→`/me`, y un contador de peticiones `resourceType() ===
-  'document'` para medir la ausencia de recarga en vez de asumirla.
+'document'` para medir la ausencia de recarga en vez de asumirla.
 
 **Costo**: **0 logins nuevos** — reusa la persona `owner-admin` existente
 (REQ-14). **4 peticiones de siembra reales** vía `page.request` (`GET

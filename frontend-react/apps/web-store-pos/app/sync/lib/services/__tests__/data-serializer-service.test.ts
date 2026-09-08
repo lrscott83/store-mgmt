@@ -1,5 +1,12 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { BlobReader, BlobWriter, TextReader, TextWriter, ZipReader, ZipWriter } from '@zip.js/zip.js';
+import {
+  BlobReader,
+  BlobWriter,
+  TextReader,
+  TextWriter,
+  ZipReader,
+  ZipWriter,
+} from '@zip.js/zip.js';
 import type { Entry, EntryGetDataOptions } from '@zip.js/zip.js';
 import {
   DataSerializerService,
@@ -60,7 +67,6 @@ const ALL_ENTRY_NAMES = [
   'warehouse-stock-levels.json',
   'warehouse-stock-movements.json',
 ];
-
 
 const mockCategory: ProductCategory = {
   id: 'cat-1',
@@ -295,9 +301,7 @@ async function readRawEntriesV2(payload: Uint8Array, password: string) {
   const blob = new Blob([payload]);
   const zipReader = new ZipReader(new BlobReader(blob));
   const entries = await zipReader.getEntries();
-  const metaEntry = entries.find(
-    (e) => !e.directory && e.filename === V2_META_FILENAME,
-  );
+  const metaEntry = entries.find((e) => !e.directory && e.filename === V2_META_FILENAME);
   if (!metaEntry || metaEntry.directory) {
     throw new Error('v2 archive is missing meta.json');
   }
@@ -385,11 +389,15 @@ async function buildV2ZipWithIterations(
 /** The 6 Angular-named payloads for a legacy v1 archive (matches makeService defaults). */
 function makeV1Payloads(): Record<string, string> {
   return {
-    [EDataFileName.Categories]: JSON.stringify([['cat-1', mockCategory]] as [string, ProductCategory][]),
+    [EDataFileName.Categories]: JSON.stringify([['cat-1', mockCategory]] as [
+      string,
+      ProductCategory,
+    ][]),
     [EDataFileName.Products]: JSON.stringify([['prod-1', mockProduct]] as [string, Product][]),
-    [EDataFileName.InventoryEntries]: JSON.stringify([
-      ['prod-1', [mockInventoryEntry]],
-    ] as [string, InventoryEntry[]][]),
+    [EDataFileName.InventoryEntries]: JSON.stringify([['prod-1', [mockInventoryEntry]]] as [
+      string,
+      InventoryEntry[],
+    ][]),
     [EDataFileName.Orders]: JSON.stringify([mockOrder]),
     [EDataFileName.Expenses]: JSON.stringify([mockExpense]),
     [EDataFileName.SaleCredits]: JSON.stringify([mockSaleCredit]),
@@ -469,7 +477,7 @@ describe('DataSerializerService', () => {
 
     // parity-audit-remediation Slice 2: naming-only alignment with Angular's
     // EDataFileName enum (data.file.model.ts:6-13) — PascalCase members, same string values.
-    it('EDataFileName mirrors Angular\'s PascalCase member names with unchanged string values, plus the daily-exchange-rate seventh entry and the three warehouses entries', () => {
+    it("EDataFileName mirrors Angular's PascalCase member names with unchanged string values, plus the daily-exchange-rate seventh entry and the three warehouses entries", () => {
       expect(EDataFileName).toEqual({
         Categories: 'categories.json',
         Products: 'products.json',
@@ -559,16 +567,22 @@ describe('DataSerializerService', () => {
       const { entries, key } = await readRawEntriesV2(payload, PASSWORD);
 
       const ordersEntry = entries.find((e) => e.filename === 'orders.json');
-      const ordersParsed = JSON.parse(await getEntryText(ordersEntry!, { rawPassword: key })) as Order[];
+      const ordersParsed = JSON.parse(
+        await getEntryText(ordersEntry!, { rawPassword: key }),
+      ) as Order[];
       expect(ordersParsed[0]).not.toBeInstanceOf(Array);
       expect(ordersParsed[0].id).toBe('order-1');
 
       const expensesEntry = entries.find((e) => e.filename === 'expenses.json');
-      const expensesParsed = JSON.parse(await getEntryText(expensesEntry!, { rawPassword: key })) as Expense[];
+      const expensesParsed = JSON.parse(
+        await getEntryText(expensesEntry!, { rawPassword: key }),
+      ) as Expense[];
       expect(expensesParsed[0].id).toBe('exp-1');
 
       const creditsEntry = entries.find((e) => e.filename === 'sale-credits.json');
-      const creditsParsed = JSON.parse(await getEntryText(creditsEntry!, { rawPassword: key })) as SaleCredit[];
+      const creditsParsed = JSON.parse(
+        await getEntryText(creditsEntry!, { rawPassword: key }),
+      ) as SaleCredit[];
       expect(creditsParsed[0].id).toBe('credit-1');
     });
 
@@ -872,7 +886,11 @@ describe('DataSerializerService', () => {
         [EDataFileName.InventoryEntries]: '{}',
       };
 
-      const v2Payload = await buildV2ZipWithIterations(emptyInventoryPayloads, PASSWORD, V2_ITERATIONS);
+      const v2Payload = await buildV2ZipWithIterations(
+        emptyInventoryPayloads,
+        PASSWORD,
+        V2_ITERATIONS,
+      );
       const v2Parsed = await makeService().import(v2Payload, PASSWORD);
       expect(v2Parsed.inventoryEntries).toEqual([]);
       expect(v2Parsed.categories).toHaveLength(1);
@@ -897,7 +915,11 @@ describe('DataSerializerService', () => {
     });
 
     it('export writes exchange-rates.json and import parses it back', async () => {
-      const rates = [mockRate('2026-08-01', 120), mockRate('2026-08-02', 120), mockRate('2026-08-03', 125)];
+      const rates = [
+        mockRate('2026-08-01', 120),
+        mockRate('2026-08-02', 120),
+        mockRate('2026-08-03', 125),
+      ];
       const svc = makeService({ categories: [], products: [], exchangeRates: rates });
       const payload = await svc.export(PASSWORD);
       const parsed = await svc.import(payload, PASSWORD);
@@ -922,10 +944,7 @@ describe('DataSerializerService', () => {
       // makeV1Payloads()/buildLegacyV1Zip build an archive from the six
       // Angular entry names only — the seventh entry simply does not exist in
       // archives exported before this feature.
-      const v1Payload = await buildLegacyV1Zip(
-        makeV1Payloads(),
-        PASSWORD + STORE_ID,
-      );
+      const v1Payload = await buildLegacyV1Zip(makeV1Payloads(), PASSWORD + STORE_ID);
       const parsed = await makeService().import(v1Payload, PASSWORD);
       expect(parsed.exchangeRates).toEqual([]);
       expect(parsed.categories).toHaveLength(1);

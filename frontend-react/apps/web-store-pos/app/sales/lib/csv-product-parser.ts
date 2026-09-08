@@ -14,7 +14,11 @@ export interface ParsedProductRow {
   quantity?: number;
 }
 
-export type CsvRowErrorCode = 'MISSING_NAME' | 'MISSING_PRICE' | 'INVALID_PRICE' | 'MISSING_CATEGORY';
+export type CsvRowErrorCode =
+  | 'MISSING_NAME'
+  | 'MISSING_PRICE'
+  | 'INVALID_PRICE'
+  | 'MISSING_CATEGORY';
 
 export interface CsvRowError {
   row: number;

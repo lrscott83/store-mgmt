@@ -18,6 +18,7 @@ Admin Resellers CRUD (SuperAdmin reseller list, create, edit) has been successfu
 ## Change Summary
 
 **Slice 4/5 of the admin group.** Purely additive: 8 new files, 2 modified files. Implements three SuperAdmin-gated routes:
+
 - `ResellerListPage` (list with card grid, no activate/deactivate/delete)
 - `ResellerCreatePage` (form with password regex, phone validation, unsaved-changes guard)
 - `ResellerEditPage` (flat route, pre-populated form, login read-only)
@@ -30,6 +31,7 @@ i18n: 7 new `RESELLERS.*` keys in `es.ts` only.
 ## What Shipped
 
 ### Files Created (8)
+
 - `app/admin/resellers/lib/services/reseller-http-service.ts` — 45 lines
 - `app/admin/resellers/lib/services/__tests__/reseller-http-service.test.ts` — 84 lines (mocks: message:'', actionCode:0, errors:[])
 - `app/admin/resellers/routes/reseller-list.tsx` — 105 lines
@@ -40,16 +42,19 @@ i18n: 7 new `RESELLERS.*` keys in `es.ts` only.
 - `app/admin/resellers/routes/__tests__/reseller-edit.test.tsx` — 198 lines
 
 ### Files Modified (2)
+
 - `app/routes.ts` — +3 lines (list, create, edit route registrations)
-- `app/shared/lib/i18n/es.ts` — +14 lines (RESELLERS.* keys)
+- `app/shared/lib/i18n/es.ts` — +14 lines (RESELLERS.\* keys)
 
 ### Test Coverage
+
 - **+46 tests, +4 test files** (baseline was 626 tests/61 files → 672 tests/65 files)
 - All tests passing, zero regressions
 - Strict TDD mode active: RED-first for all phases
 - All scenarios covered (38 total)
 
 ### Type Safety
+
 - `tsc --noEmit` — clean exit, zero TypeScript errors
 - Shared domain type `ReSeller` from `@store-mgmt/domain` — no domain changes (per NGOAL-5)
 - Type assertion workaround for `login` field (S-1 follow-up: domain type enhancement)
@@ -58,12 +63,12 @@ i18n: 7 new `RESELLERS.*` keys in `es.ts` only.
 
 ## Build / Verification Evidence
 
-| Check | Result | Detail |
-|-------|--------|--------|
-| `pnpm test` | PASS | 672 tests, 65 files — zero failures, zero regressions |
-| `tsc --noEmit` | PASS | Zero errors, clean exit |
-| Integration | PASS | Routes registered, loaders.test covers access control |
-| Spec compliance | PASS | All 8 requirements (38 scenarios), all 8 non-goals verified |
+| Check           | Result | Detail                                                      |
+| --------------- | ------ | ----------------------------------------------------------- |
+| `pnpm test`     | PASS   | 672 tests, 65 files — zero failures, zero regressions       |
+| `tsc --noEmit`  | PASS   | Zero errors, clean exit                                     |
+| Integration     | PASS   | Routes registered, loaders.test covers access control       |
+| Spec compliance | PASS   | All 8 requirements (38 scenarios), all 8 non-goals verified |
 
 ---
 
@@ -76,17 +81,20 @@ i18n: 7 new `RESELLERS.*` keys in `es.ts` only.
 ### WARNING Issues: 3
 
 **W-1 — react act() warnings in reseller-edit.test.tsx**
+
 - useEffect async state updates not wrapped in act()
 - Tests pass via waitFor; cosmetic pattern issue
 - **Status:** FIXED in commit e87ec04
 
 **W-2 — Submit button validity testing**
+
 - Button disables only during isSubmitting (not on live form validity)
 - Validation via early-return works correctly
 - No toBeDisabled() assertion for invalid state
 - **Status:** Intentional design (validation on submit)
 
 **W-3 — ACCESS-4/ACCESS-5 implicit coverage**
+
 - superAdminLoader shared tests cover reseller routes implicitly
 - Loaders.test.ts labels: ACCESS-1 through ACCESS-3 only
 - Routes inherit access via `loader = superAdminLoader`
@@ -95,6 +103,7 @@ i18n: 7 new `RESELLERS.*` keys in `es.ts` only.
 ### SUGGESTION: 1
 
 **S-1 — Add login?: string to ReSeller domain type**
+
 - Current: Type assertion `(r as ReSeller & { login?: string }).login ?? ''`
 - Future: Enhance `ReSeller` model to include optional `login` field
 - Impact: Eliminates type workaround in reseller-edit.tsx:81
@@ -104,23 +113,25 @@ i18n: 7 new `RESELLERS.*` keys in `es.ts` only.
 
 ## Commit SHAs
 
-| Commit | Message |
-|--------|---------|
-| 44abead | feat(admin-resellers): add HTTP service + list page + i18n baseline |
-| 418b815 | test(admin-resellers): service tests, list page tests, route integration |
-| 756e0f5 | feat(admin-resellers): add create page with validation + unsaved guard |
-| 9c8e97b | test(admin-resellers): create page tests, password/phone validation coverage |
+| Commit  | Message                                                                           |
+| ------- | --------------------------------------------------------------------------------- |
+| 44abead | feat(admin-resellers): add HTTP service + list page + i18n baseline               |
+| 418b815 | test(admin-resellers): service tests, list page tests, route integration          |
+| 756e0f5 | feat(admin-resellers): add create page with validation + unsaved guard            |
+| 9c8e97b | test(admin-resellers): create page tests, password/phone validation coverage      |
 | 1cb89c2 | feat(admin-resellers): add edit page (flat route), pre-population, login disabled |
-| e87ec04 | test(admin-resellers): edit page tests, fix act() warnings, ACCESS guard tests |
+| e87ec04 | test(admin-resellers): edit page tests, fix act() warnings, ACCESS guard tests    |
 
 ---
 
 ## Spec Integration
 
 ### Delta Spec Merged
+
 Delta spec (`frontend-react/openspec/changes/admin-resellers/specs/admin/spec.md`) has been merged into canonical admin spec (`frontend-react/openspec/specs/admin/spec.md`).
 
 **Sections added to canonical spec:**
+
 - Admin Resellers Route Registration (3 scenarios)
 - Admin Resellers Access Control (5 scenarios)
 - Admin Resellers HTTP Service (5 scenarios)
@@ -138,10 +149,13 @@ Delta spec (`frontend-react/openspec/changes/admin-resellers/specs/admin/spec.md
 ## Follow-Up Recommendations
 
 ### S-1 Enhancement (Optional, Future)
+
 Consider adding `login?: string` to `ReSeller` domain type in next admin/reseller maintenance window or domain cleanup phase. Eliminates runtime type assertion and improves type safety for future consumers.
 
 ### Dependencies
+
 No new external dependencies introduced. Uses existing patterns:
+
 - `superAdminLoader` (shared auth)
 - `apiClient` (shared HTTP)
 - `useUnsavedChangesPrompt` (shared hook)
@@ -152,14 +166,14 @@ No new external dependencies introduced. Uses existing patterns:
 
 ## Artifact References
 
-| Artifact | Location | ID |
-|----------|----------|---|
-| Proposal | `sdd/admin-resellers/proposal` | #284 |
-| Spec (delta) | `sdd/admin-resellers/spec` | #288 |
-| Design | `sdd/admin-resellers/design` | (engram) |
-| Tasks | `sdd/admin-resellers/tasks` | (engram) |
-| Verify Report | `sdd/admin-resellers/verify-report` | #296 |
-| Archive Report | `sdd/admin-resellers/archive-report` | (this) |
+| Artifact       | Location                             | ID       |
+| -------------- | ------------------------------------ | -------- |
+| Proposal       | `sdd/admin-resellers/proposal`       | #284     |
+| Spec (delta)   | `sdd/admin-resellers/spec`           | #288     |
+| Design         | `sdd/admin-resellers/design`         | (engram) |
+| Tasks          | `sdd/admin-resellers/tasks`          | (engram) |
+| Verify Report  | `sdd/admin-resellers/verify-report`  | #296     |
+| Archive Report | `sdd/admin-resellers/archive-report` | (this)   |
 
 ---
 

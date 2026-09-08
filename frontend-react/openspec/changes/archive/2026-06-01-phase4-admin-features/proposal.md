@@ -7,6 +7,7 @@ The React POS app has no `admin/` routes. The menu already links `/admin/feature
 ## Scope
 
 ### In Scope
+
 - `admin/features` container route mirroring `management/users` / `management/configurations` structure.
 - `feature-http-service.activateFeatures()` → `POST /v1/features/activate`, empty body, returns `BaseResponseModel<boolean>`.
 - New `superAdminLoader` (strict `isSuperAdmin` only) in `auth/routes/loaders.ts`.
@@ -15,6 +16,7 @@ The React POS app has no `admin/` routes. The menu already links `/admin/feature
 - Route + service tests.
 
 ### Out of Scope
+
 - Backend work — `POST /v1/features/activate` confirmed to exist.
 - Toast UI — use inline success/error state per React convention (Angular used toastr).
 - Loading/disabled button state — Angular has none.
@@ -25,9 +27,11 @@ The React POS app has no `admin/` routes. The menu already links `/admin/feature
 ## Capabilities
 
 ### New Capabilities
+
 - `admin-features`: SuperAdmin-gated page to activate features, plus the strict-SuperAdmin loader and `admin/` route prefix it establishes.
 
 ### Modified Capabilities
+
 - None.
 
 ## Approach
@@ -36,22 +40,22 @@ Mirror the existing `management/*` structural template: container route + `lib/s
 
 ## Affected Areas
 
-| Area | Impact | Description |
-|------|--------|-------------|
-| `apps/web-store-pos/app/admin/features/routes/features.tsx` | New | Container page |
-| `apps/web-store-pos/app/admin/features/lib/services/feature-http-service.ts` | New | `activateFeatures()` |
-| `apps/web-store-pos/app/admin/features/routes/__tests__/` | New | Route + service tests |
-| `apps/web-store-pos/app/routes.ts` | Modified | Register `admin/features` |
-| `apps/web-store-pos/app/auth/routes/loaders.ts` | Modified | Add `superAdminLoader` |
-| `apps/web-store-pos/app/shared/lib/i18n/es.ts` | Modified | `FEATURES.*` keys |
+| Area                                                                         | Impact   | Description               |
+| ---------------------------------------------------------------------------- | -------- | ------------------------- |
+| `apps/web-store-pos/app/admin/features/routes/features.tsx`                  | New      | Container page            |
+| `apps/web-store-pos/app/admin/features/lib/services/feature-http-service.ts` | New      | `activateFeatures()`      |
+| `apps/web-store-pos/app/admin/features/routes/__tests__/`                    | New      | Route + service tests     |
+| `apps/web-store-pos/app/routes.ts`                                           | Modified | Register `admin/features` |
+| `apps/web-store-pos/app/auth/routes/loaders.ts`                              | Modified | Add `superAdminLoader`    |
+| `apps/web-store-pos/app/shared/lib/i18n/es.ts`                               | Modified | `FEATURES.*` keys         |
 
 ## Risks
 
-| Risk | Likelihood | Mitigation |
-|------|------------|------------|
-| `superAdminLoader` diverges from `adminLoader` behavior | Low | Strict parity is the locked decision; document the difference |
-| `GENERAL.RESPONSE.*` keys missing in React i18n | Med | Verify during spec/apply; add if absent |
-| `en.ts` may not exist | Low | Add keys only if file present |
+| Risk                                                    | Likelihood | Mitigation                                                    |
+| ------------------------------------------------------- | ---------- | ------------------------------------------------------------- |
+| `superAdminLoader` diverges from `adminLoader` behavior | Low        | Strict parity is the locked decision; document the difference |
+| `GENERAL.RESPONSE.*` keys missing in React i18n         | Med        | Verify during spec/apply; add if absent                       |
+| `en.ts` may not exist                                   | Low        | Add keys only if file present                                 |
 
 ## Rollback Plan
 

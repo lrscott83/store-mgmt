@@ -96,9 +96,7 @@ describe('ScannerModal', () => {
   it('camera failure shows CAMERA_PERMISSION_DENIED and stops the stream on unmount', async () => {
     const { unmount } = renderModal();
     expect(await screen.findByTestId('scanner-denied')).toBeInTheDocument();
-    expect(
-      screen.getByText(/Permiso de cámara denegado/i),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/Permiso de cámara denegado/i)).toBeInTheDocument();
     // Cleanup contract: unmounting must never throw — the stream-stop path
     // is exercised even when start never succeeded.
     expect(() => unmount()).not.toThrow();

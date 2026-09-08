@@ -21,20 +21,20 @@
 
 ## Build / Test / Typecheck Evidence
 
-| Check | Result | Evidence |
-|-------|--------|----------|
-| Test suite | PASS | `pnpm test` → **601 passed (601)**, 58 test files, 0 failures |
-| Typecheck | PASS | `pnpm turbo run typecheck --force` → 5/5 tasks successful, 0 errors |
+| Check      | Result | Evidence                                                            |
+| ---------- | ------ | ------------------------------------------------------------------- |
+| Test suite | PASS   | `pnpm test` → **601 passed (601)**, 58 test files, 0 failures       |
+| Typecheck  | PASS   | `pnpm turbo run typecheck --force` → 5/5 tasks successful, 0 errors |
 
 ---
 
 ## Task Completeness
 
-| Unit | Status |
-|------|--------|
-| W-1 | SystemConfiguration model + HTTP service (GET + full-array PUT) — DONE |
-| W-2 | ConfigurationsForm presentational (generic N name/value rows) — DONE |
-| W-3 | Route container (LOADING gate, online/offline/degraded, submit) + routes.ts + CONFIGURATIONS.* i18n — DONE |
+| Unit | Status                                                                                                      |
+| ---- | ----------------------------------------------------------------------------------------------------------- |
+| W-1  | SystemConfiguration model + HTTP service (GET + full-array PUT) — DONE                                      |
+| W-2  | ConfigurationsForm presentational (generic N name/value rows) — DONE                                        |
+| W-3  | Route container (LOADING gate, online/offline/degraded, submit) + routes.ts + CONFIGURATIONS.\* i18n — DONE |
 
 **3/3 units, 13/13 tasks complete.** New tests: +5 http service, +7 form, +13 container = +25 (576 → 601).
 
@@ -42,16 +42,16 @@
 
 ## Locked Decisions — Confirmed in Code
 
-| Decision | Location | Result |
-|----------|----------|--------|
-| Single route `/management/configurations` | `app/routes.ts:58` | CONFIRMED |
-| `adminFeatureLoader([EFeatures.Configurations])` reused, no new factory | `routes/configurations.tsx:15` | CONFIRMED |
-| GET `/v1/configurations` → SystemConfiguration[] | `lib/services/configuration-http-service.ts:5-7` | CONFIRMED |
-| PUT `/v1/configurations` sends FULL SystemConfiguration[] array (DC3) | `configuration-http-service.ts:12-17` | CONFIRMED |
-| LOADING gate before form mount (DC5) | `routes/configurations.tsx:21-22,63` | CONFIRMED |
-| NOT store-scoped (platform-global, no selectedStoreId) | service has no storeId param | CONFIRMED |
-| `SystemConfiguration` model in domain | `packages/domain/src/models/store.ts:87` | CONFIRMED |
-| Generic N-row name/value form | `components/ConfigurationsForm.tsx` | CONFIRMED |
+| Decision                                                                | Location                                         | Result    |
+| ----------------------------------------------------------------------- | ------------------------------------------------ | --------- |
+| Single route `/management/configurations`                               | `app/routes.ts:58`                               | CONFIRMED |
+| `adminFeatureLoader([EFeatures.Configurations])` reused, no new factory | `routes/configurations.tsx:15`                   | CONFIRMED |
+| GET `/v1/configurations` → SystemConfiguration[]                        | `lib/services/configuration-http-service.ts:5-7` | CONFIRMED |
+| PUT `/v1/configurations` sends FULL SystemConfiguration[] array (DC3)   | `configuration-http-service.ts:12-17`            | CONFIRMED |
+| LOADING gate before form mount (DC5)                                    | `routes/configurations.tsx:21-22,63`             | CONFIRMED |
+| NOT store-scoped (platform-global, no selectedStoreId)                  | service has no storeId param                     | CONFIRMED |
+| `SystemConfiguration` model in domain                                   | `packages/domain/src/models/store.ts:87`         | CONFIRMED |
+| Generic N-row name/value form                                           | `components/ConfigurationsForm.tsx`              | CONFIRMED |
 
 ---
 

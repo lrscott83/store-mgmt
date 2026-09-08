@@ -17,11 +17,13 @@ function makeCategory(overrides: Partial<ProductCategory> = {}): ProductCategory
   return { id: 'cat-1', name: 'Bebidas', order: 1, isActive: true, ...overrides };
 }
 
-function renderMenu(handlers: Partial<{
-  onEditCategory: () => void;
-  onAddProduct: () => void;
-  onAddProducts: () => void;
-}> = {}) {
+function renderMenu(
+  handlers: Partial<{
+    onEditCategory: () => void;
+    onAddProduct: () => void;
+    onAddProducts: () => void;
+  }> = {},
+) {
   render(
     <Wrapper>
       <CategoryActionsMenu

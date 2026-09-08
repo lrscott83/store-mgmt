@@ -173,7 +173,12 @@ describe('EditProductCategoryModal — default order', () => {
     );
     fireEvent.change(screen.getByTestId('category-name-input'), { target: { value: 'Galletas' } });
     fireEvent.click(screen.getByTestId('category-save-button'));
-    expect(onSave).toHaveBeenCalledWith({ id: undefined, name: 'Galletas', order: 8, isActive: true });
+    expect(onSave).toHaveBeenCalledWith({
+      id: undefined,
+      name: 'Galletas',
+      order: 8,
+      isActive: true,
+    });
   });
 
   it('ignores defaultOrder in edit-mode and shows the category own order', () => {

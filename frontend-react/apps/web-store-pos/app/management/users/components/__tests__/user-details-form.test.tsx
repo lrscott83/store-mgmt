@@ -24,7 +24,7 @@ describe('UserDetailsForm — PRES-6: renders fullName, cellPhone, email fields'
     render(
       <Wrapper>
         <UserDetailsForm {...baseProps} />
-      </Wrapper>
+      </Wrapper>,
     );
     expect(screen.getByLabelText(/nombre completo/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/teléfono/i)).toBeInTheDocument();
@@ -38,7 +38,7 @@ describe('UserDetailsForm — EDIT-5: isActive toggle shown when canToggleActive
     render(
       <Wrapper>
         <UserDetailsForm {...baseProps} canToggleActive={true} />
-      </Wrapper>
+      </Wrapper>,
     );
     expect(screen.getByLabelText(/activo/i)).toBeInTheDocument();
   });
@@ -50,7 +50,7 @@ describe('UserDetailsForm — EDIT-5: isActive toggle hidden when canToggleActiv
     render(
       <Wrapper>
         <UserDetailsForm {...baseProps} canToggleActive={false} />
-      </Wrapper>
+      </Wrapper>,
     );
     expect(screen.queryByLabelText(/activo/i)).not.toBeInTheDocument();
   });
@@ -68,7 +68,7 @@ describe('UserDetailsForm — EDIT-3: pre-fills from initialValues', () => {
     render(
       <Wrapper>
         <UserDetailsForm {...baseProps} initialValues={initialValues} canToggleActive={true} />
-      </Wrapper>
+      </Wrapper>,
     );
     expect(screen.getByDisplayValue('Jane Doe')).toBeInTheDocument();
     expect(screen.getByDisplayValue('+1 555 987 6543')).toBeInTheDocument();
@@ -83,7 +83,7 @@ describe('UserDetailsForm — PHONE-2: cellPhone is no longer required', () => {
     render(
       <Wrapper>
         <UserDetailsForm {...baseProps} onSubmit={onSubmit} />
-      </Wrapper>
+      </Wrapper>,
     );
     fireEvent.change(screen.getByLabelText(/nombre completo/i), { target: { value: 'Alice' } });
     // Leave cellPhone empty
@@ -100,7 +100,7 @@ describe('UserDetailsForm — PHONE-2: cellPhone is no longer required', () => {
     render(
       <Wrapper>
         <UserDetailsForm {...baseProps} onSubmit={onSubmit} />
-      </Wrapper>
+      </Wrapper>,
     );
     fireEvent.change(screen.getByLabelText(/nombre completo/i), { target: { value: 'Alice' } });
     fireEvent.change(screen.getByLabelText(/teléfono/i), { target: { value: '+123' } });
@@ -119,14 +119,16 @@ describe('UserDetailsForm — PRES-9: valid submit fires onSubmit', () => {
     render(
       <Wrapper>
         <UserDetailsForm {...baseProps} onSubmit={onSubmit} />
-      </Wrapper>
+      </Wrapper>,
     );
-    fireEvent.change(screen.getByLabelText(/nombre completo/i), { target: { value: 'Updated Name' } });
+    fireEvent.change(screen.getByLabelText(/nombre completo/i), {
+      target: { value: 'Updated Name' },
+    });
     fireEvent.change(screen.getByLabelText(/teléfono/i), { target: { value: '111' } });
     fireEvent.click(screen.getByRole('button', { name: /actualizar/i }));
     await waitFor(() => {
       expect(onSubmit).toHaveBeenCalledWith(
-        expect.objectContaining({ fullName: 'Updated Name', cellPhone: '111' })
+        expect.objectContaining({ fullName: 'Updated Name', cellPhone: '111' }),
       );
     });
   });
@@ -138,7 +140,7 @@ describe('UserDetailsForm — FREE-TEXT: cellPhone has no Cuban mask (the produc
     render(
       <Wrapper>
         <UserDetailsForm {...baseProps} />
-      </Wrapper>
+      </Wrapper>,
     );
     fireEvent.change(screen.getByLabelText(/teléfono/i), { target: { value: '+1 555 123 4567' } });
     expect(screen.getByDisplayValue('+1 555 123 4567')).toBeInTheDocument();
@@ -150,13 +152,17 @@ describe('UserDetailsForm — FREE-TEXT: cellPhone has no Cuban mask (the produc
     render(
       <Wrapper>
         <UserDetailsForm {...baseProps} onSubmit={onSubmit} />
-      </Wrapper>
+      </Wrapper>,
     );
-    fireEvent.change(screen.getByLabelText(/nombre completo/i), { target: { value: 'Free Text User' } });
+    fireEvent.change(screen.getByLabelText(/nombre completo/i), {
+      target: { value: 'Free Text User' },
+    });
     fireEvent.change(screen.getByLabelText(/teléfono/i), { target: { value: '+1 555 123 4567' } });
     fireEvent.click(screen.getByRole('button', { name: /actualizar/i }));
     await waitFor(() => {
-      expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ cellPhone: '+1 555 123 4567' }));
+      expect(onSubmit).toHaveBeenCalledWith(
+        expect.objectContaining({ cellPhone: '+1 555 123 4567' }),
+      );
     });
   });
 });
@@ -167,7 +173,7 @@ describe('UserDetailsForm — EMAIL-PLACEHOLDER: email placeholder matches Angul
     render(
       <Wrapper>
         <UserDetailsForm {...baseProps} />
-      </Wrapper>
+      </Wrapper>,
     );
     expect(screen.getByLabelText(/correo|email/i)).toHaveAttribute('placeholder', 'info@mail.com');
   });
@@ -179,7 +185,7 @@ describe('UserDetailsForm — L6 exact copy parity (Req: Copy Matches Angular Te
     render(
       <Wrapper>
         <UserDetailsForm {...baseProps} />
-      </Wrapper>
+      </Wrapper>,
     );
     expect(screen.getByText('Nombre Completo')).toBeInTheDocument();
     expect(screen.getByText('Correo')).toBeInTheDocument();
@@ -192,7 +198,7 @@ describe('UserDetailsForm — PRES-9: offline disables submit and shows notice',
     render(
       <Wrapper>
         <UserDetailsForm {...baseProps} isOnline={false} />
-      </Wrapper>
+      </Wrapper>,
     );
     expect(screen.getByRole('button', { name: /actualizar/i })).toBeDisabled();
     expect(screen.getByText(/sin conexión/i)).toBeInTheDocument();
@@ -203,7 +209,7 @@ describe('UserDetailsForm — PRES-9: offline disables submit and shows notice',
     render(
       <Wrapper>
         <UserDetailsForm {...baseProps} isOnline={false} />
-      </Wrapper>
+      </Wrapper>,
     );
     expect(screen.getByText('Sin conexión. Conéctate para guardar cambios.')).toBeInTheDocument();
   });
@@ -215,7 +221,7 @@ describe('UserDetailsForm — submit renders as fab (edit-user-details.component
     render(
       <Wrapper>
         <UserDetailsForm {...baseProps} />
-      </Wrapper>
+      </Wrapper>,
     );
     const submit = screen.getByRole('button', { name: 'Actualizar' });
     expect(submit).toHaveClass('rounded-full');
@@ -228,7 +234,7 @@ describe('UserDetailsForm — submit renders as fab (edit-user-details.component
     render(
       <Wrapper>
         <UserDetailsForm {...baseProps} />
-      </Wrapper>
+      </Wrapper>,
     );
     const submit = screen.getByRole('button', { name: 'Actualizar' });
     const path = submit.querySelector('svg path')?.getAttribute('d');

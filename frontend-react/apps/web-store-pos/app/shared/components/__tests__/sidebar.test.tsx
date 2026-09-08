@@ -69,7 +69,7 @@ function renderSidebar(user: UserModel, isOpen = true, onClose = () => {}) {
       <MemoryRouter>
         <Sidebar isOpen={isOpen} onClose={onClose} />
       </MemoryRouter>
-    </IntlProvider>
+    </IntlProvider>,
   );
 }
 
@@ -223,7 +223,9 @@ describe('Sidebar — SHELL-05: in-sidebar collapse toggle (top-right of sidebar
   it('does not render the collapse button when closed', () => {
     renderSidebar(makeSuperAdmin(), false);
 
-    expect(screen.queryByRole('button', { name: 'Contraer barra lateral' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Contraer barra lateral' }),
+    ).not.toBeInTheDocument();
   });
 
   it('calls onClose when the in-sidebar collapse button is clicked', () => {
@@ -347,8 +349,14 @@ describe('Sidebar — sidebar-menu-parity: INVENTORY group item set and order', 
 
   it('StoreUser without EntriesHistory does not see "Entradas" (history) item; other 5 INVENTORY items unaffected', () => {
     const user = makeStoreUser(
-      [EFeatures.Available, EFeatures.Entries, EFeatures.InventoryTodayQuantities, EFeatures.InventoryTodaySaleProfit, EFeatures.Egress],
-      's1'
+      [
+        EFeatures.Available,
+        EFeatures.Entries,
+        EFeatures.InventoryTodayQuantities,
+        EFeatures.InventoryTodaySaleProfit,
+        EFeatures.Egress,
+      ],
+      's1',
     );
     renderSidebar(user);
 
@@ -407,9 +415,7 @@ describe('Sidebar — billing menu entries (superadmin/reseller only, StorePayme
     expect(screen.getByText('Cobros pendientes')).toBeInTheDocument();
     expect(screen.getByText('Comisiones')).toBeInTheDocument();
 
-    const hrefs = screen
-      .getAllByRole('link')
-      .map((l) => l.getAttribute('href'));
+    const hrefs = screen.getAllByRole('link').map((l) => l.getAttribute('href'));
     expect(hrefs).toContain('/management/stores/collections');
     expect(hrefs).toContain('/management/stores/commissions');
   });
@@ -500,7 +506,9 @@ describe('Sidebar — no emoji icons on menu items (plain text labels only)', ()
     renderSidebar(makeSuperAdmin());
 
     const links = screen.getAllByRole('link');
-    const withEmoji = links.filter((l) => /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(l.textContent ?? ''));
+    const withEmoji = links.filter((l) =>
+      /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(l.textContent ?? ''),
+    );
     expect(withEmoji).toHaveLength(0);
   });
 

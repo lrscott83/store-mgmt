@@ -65,7 +65,8 @@ function findLoginResponseWrapEntry(args: {
   return undefined;
 }
 
-const CONFLICT_LOG_MARKER = '[dek-provisioning] roster DEK disagrees with the established device DEK';
+const CONFLICT_LOG_MARKER =
+  '[dek-provisioning] roster DEK disagrees with the established device DEK';
 
 // SUGGESTION (verify-report, this batch): logging only, matching the D6
 // precedent above — does NOT change the swallow's guarantee (step 6 must
@@ -519,7 +520,10 @@ export async function resolveDekForLogin(args: {
  * never throws) when there is no DEK in memory or no table yet — both mean
  * there is nothing to re-wrap.
  */
-export async function rewrapDeviceDekForPassword(login: string, newPassword: string): Promise<void> {
+export async function rewrapDeviceDekForPassword(
+  login: string,
+  newPassword: string,
+): Promise<void> {
   const dek = getDek();
   if (dek === null) return;
   const table = readDeviceDekTable();

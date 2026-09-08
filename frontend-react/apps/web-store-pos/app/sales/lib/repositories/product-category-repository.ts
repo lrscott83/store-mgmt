@@ -145,7 +145,12 @@ export class ProductCategoryRepository {
 
   /** 1:1 port of Angular `addImportedProductCategory` (repo.ts:105-107). */
   addImportedProductCategory(category: ProductCategory): Result {
-    return this.addProductCategoryData(category.id, category.name, category.order, category.isActive);
+    return this.addProductCategoryData(
+      category.id,
+      category.name,
+      category.order,
+      category.isActive,
+    );
   }
 
   /** Private port of Angular `updateCategoriesOrder` (repo.ts:109-115). */
@@ -157,7 +162,12 @@ export class ProductCategoryRepository {
 
   /** 1:1 port of Angular `updateImportedProductCategory` (repo.ts:117-119). */
   updateImportedProductCategory(category: ProductCategory): Result {
-    return this.updateProductCategory(category.id, category.name, category.order, category.isActive);
+    return this.updateProductCategory(
+      category.id,
+      category.name,
+      category.order,
+      category.isActive,
+    );
   }
 
   /**

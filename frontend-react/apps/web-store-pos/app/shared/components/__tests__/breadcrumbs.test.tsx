@@ -11,10 +11,9 @@ import { Breadcrumbs } from '../breadcrumbs';
  */
 describe('Breadcrumbs — parity: hidden everywhere by default (Angular breadcrumbs:false on all routes)', () => {
   it('renders nothing on a route with no handle', async () => {
-    const router = createMemoryRouter(
-      [{ path: '/', element: <Breadcrumbs /> }],
-      { initialEntries: ['/'] },
-    );
+    const router = createMemoryRouter([{ path: '/', element: <Breadcrumbs /> }], {
+      initialEntries: ['/'],
+    });
     const { container } = render(<RouterProvider router={router} />);
     expect(container).toBeEmptyDOMElement();
   });

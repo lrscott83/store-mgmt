@@ -122,7 +122,15 @@ export function ResellerEditPage() {
       }
 
       // Re-snapshot after successful PUT — stay on page
-      setSnapshot({ fullName, cellPhone, email, percentDiscountPrice, discountPrice, isActive, description });
+      setSnapshot({
+        fullName,
+        cellPhone,
+        email,
+        percentDiscountPrice,
+        discountPrice,
+        isActive,
+        description,
+      });
     } catch (error) {
       setServerError(
         formatMessage({
@@ -130,7 +138,7 @@ export function ResellerEditPage() {
             byCode: { [API_ERROR_CODE_CELL_PHONE]: 'RESELLERS.PHONE_REQUIRED' },
             fallback: 'RESELLERS.ERROR',
           }),
-        })
+        }),
       );
     } finally {
       setIsSubmitting(false);
@@ -145,7 +153,9 @@ export function ResellerEditPage() {
   if (loadError) {
     return (
       <div className="space-y-4 p-4">
-        <p role="alert" className="text-sm text-red-600">{loadError}</p>
+        <p role="alert" className="text-sm text-red-600">
+          {loadError}
+        </p>
       </div>
     );
   }
@@ -160,9 +170,7 @@ export function ResellerEditPage() {
 
   return (
     <div className="space-y-4 p-4">
-      <h1 className="text-xl font-semibold">
-        {formatMessage({ id: 'RESELLERS.EDIT_TITLE' })}
-      </h1>
+      <h1 className="text-xl font-semibold">{formatMessage({ id: 'RESELLERS.EDIT_TITLE' })}</h1>
 
       {/* edit-reseller.component.html:4-9 — card-toolbar "+" fab, distinct from the
           details-form submit fab below. */}

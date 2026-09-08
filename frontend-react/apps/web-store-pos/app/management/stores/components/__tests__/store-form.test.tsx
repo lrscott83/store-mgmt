@@ -63,7 +63,7 @@ describe('StoreForm — PRES-4: renders name field (always)', () => {
     render(
       <Wrapper>
         <StoreForm {...baseProps} />
-      </Wrapper>
+      </Wrapper>,
     );
     expect(screen.getByLabelText(/nombre/i)).toBeInTheDocument();
   });
@@ -74,12 +74,8 @@ describe('StoreForm — PRES-6: role-conditional fields for owner-admin', () => 
     const { StoreForm } = await import('../store-form');
     render(
       <Wrapper>
-        <StoreForm
-          {...baseProps}
-          isOwnerAdmin={true}
-          owners={[makeOwner()]}
-        />
-      </Wrapper>
+        <StoreForm {...baseProps} isOwnerAdmin={true} owners={[makeOwner()]} />
+      </Wrapper>,
     );
     expect(screen.getByLabelText(/propietario/i)).toBeInTheDocument();
     // L6 parity: STORES.APPROVED renamed 'Aprobada' -> 'Aceptado'
@@ -90,13 +86,8 @@ describe('StoreForm — PRES-6: role-conditional fields for owner-admin', () => 
     const { StoreForm } = await import('../store-form');
     render(
       <Wrapper>
-        <StoreForm
-          {...baseProps}
-          isOwnerAdmin={true}
-          isEditMode={false}
-          owners={[makeOwner()]}
-        />
-      </Wrapper>
+        <StoreForm {...baseProps} isOwnerAdmin={true} isEditMode={false} owners={[makeOwner()]} />
+      </Wrapper>,
     );
     expect(screen.queryByLabelText(/fecha de inicio/i)).not.toBeInTheDocument();
     // L6 parity: STORES.IS_ACTIVE renamed 'Activa' -> 'Activo'
@@ -109,13 +100,8 @@ describe('StoreForm — PRES-6: role-conditional fields for super-admin', () => 
     const { StoreForm } = await import('../store-form');
     render(
       <Wrapper>
-        <StoreForm
-          {...baseProps}
-          isSuperAdmin={true}
-          isEditMode={true}
-          owners={[makeOwner()]}
-        />
-      </Wrapper>
+        <StoreForm {...baseProps} isSuperAdmin={true} isEditMode={true} owners={[makeOwner()]} />
+      </Wrapper>,
     );
     expect(screen.getByLabelText(/fecha de inicio/i)).toBeInTheDocument();
   });
@@ -124,12 +110,8 @@ describe('StoreForm — PRES-6: role-conditional fields for super-admin', () => 
     const { StoreForm } = await import('../store-form');
     render(
       <Wrapper>
-        <StoreForm
-          {...baseProps}
-          isSuperAdmin={true}
-          owners={[makeOwner()]}
-        />
-      </Wrapper>
+        <StoreForm {...baseProps} isSuperAdmin={true} owners={[makeOwner()]} />
+      </Wrapper>,
     );
     // L6 parity: STORES.IS_ACTIVE renamed 'Activa' -> 'Activo'
     expect(screen.getByLabelText(/activo/i)).toBeInTheDocument();
@@ -143,7 +125,7 @@ describe('StoreForm — PRES-4: name required validation', () => {
     render(
       <Wrapper>
         <StoreForm {...baseProps} onSubmit={onSubmit} />
-      </Wrapper>
+      </Wrapper>,
     );
     fireEvent.click(screen.getByRole('button', { name: /guardar/i }));
     expect(onSubmit).not.toHaveBeenCalled();
@@ -156,7 +138,7 @@ describe('StoreForm — HTTP-only: no offline notice, no isOnline prop (Req: HTT
     render(
       <Wrapper>
         <StoreForm {...baseProps} />
-      </Wrapper>
+      </Wrapper>,
     );
     expect(screen.queryByText(/sin conexión/i)).not.toBeInTheDocument();
   });
@@ -166,7 +148,7 @@ describe('StoreForm — HTTP-only: no offline notice, no isOnline prop (Req: HTT
     render(
       <Wrapper>
         <StoreForm {...baseProps} submitDisabled />
-      </Wrapper>
+      </Wrapper>,
     );
     expect(screen.getByRole('button', { name: /guardar/i })).toBeDisabled();
     expect(screen.queryByText(/sin conexión/i)).not.toBeInTheDocument();
@@ -179,7 +161,7 @@ describe('StoreForm — PRES-7: error display', () => {
     render(
       <Wrapper>
         <StoreForm {...baseProps} error="Something went wrong" />
-      </Wrapper>
+      </Wrapper>,
     );
     expect(screen.getByRole('alert')).toHaveTextContent('Something went wrong');
   });
@@ -193,11 +175,13 @@ describe('StoreForm — PRES-4: valid submit calls onSubmit with payload', () =>
   it('calls onSubmit with name, address and moduleIds on valid submit', async () => {
     const { StoreForm } = await import('../store-form');
     const onSubmit = vi.fn();
-    const modules = [makeModule({ id: 1, name: 'Module A', priceIncluded: false, selected: false })];
+    const modules = [
+      makeModule({ id: 1, name: 'Module A', priceIncluded: false, selected: false }),
+    ];
     render(
       <Wrapper>
         <StoreForm {...baseProps} modules={modules} onSubmit={onSubmit} />
-      </Wrapper>
+      </Wrapper>,
     );
     fireEvent.change(screen.getByLabelText(/nombre/i), { target: { value: 'My Store' } });
     fireEvent.click(screen.getByRole('button', { name: /guardar/i }));
@@ -213,7 +197,7 @@ describe('StoreForm — PRES-4: isLoading state', () => {
     render(
       <Wrapper>
         <StoreForm {...baseProps} isLoading={true} />
-      </Wrapper>
+      </Wrapper>,
     );
     expect(screen.getByRole('button', { name: /guardando/i })).toBeDisabled();
   });
@@ -226,13 +210,8 @@ describe('StoreForm — EDIT-1: owner select disabled in edit mode', () => {
     const { StoreForm } = await import('../store-form');
     render(
       <Wrapper>
-        <StoreForm
-          {...baseProps}
-          isOwnerAdmin={true}
-          isEditMode={true}
-          owners={[makeOwner()]}
-        />
-      </Wrapper>
+        <StoreForm {...baseProps} isOwnerAdmin={true} isEditMode={true} owners={[makeOwner()]} />
+      </Wrapper>,
     );
     const ownerSelect = screen.getByLabelText(/propietario/i) as HTMLSelectElement;
     expect(ownerSelect.disabled).toBe(true);
@@ -242,13 +221,8 @@ describe('StoreForm — EDIT-1: owner select disabled in edit mode', () => {
     const { StoreForm } = await import('../store-form');
     render(
       <Wrapper>
-        <StoreForm
-          {...baseProps}
-          isOwnerAdmin={true}
-          isEditMode={false}
-          owners={[makeOwner()]}
-        />
-      </Wrapper>
+        <StoreForm {...baseProps} isOwnerAdmin={true} isEditMode={false} owners={[makeOwner()]} />
+      </Wrapper>,
     );
     const ownerSelect = screen.getByLabelText(/propietario/i) as HTMLSelectElement;
     expect(ownerSelect.disabled).toBe(false);
@@ -270,7 +244,7 @@ describe('StoreForm — VALID-1: ownerId required for ownerAdmin', () => {
           owners={[makeOwner()]}
           onSubmit={onSubmit}
         />
-      </Wrapper>
+      </Wrapper>,
     );
     fireEvent.change(screen.getByLabelText(/nombre/i), { target: { value: 'My Store' } });
     // ownerId left empty
@@ -294,7 +268,7 @@ describe('StoreForm — VALID-1: ownerId required for ownerAdmin', () => {
           owners={[makeOwner({ id: 'o1' })]}
           onSubmit={onSubmit}
         />
-      </Wrapper>
+      </Wrapper>,
     );
     fireEvent.change(screen.getByLabelText(/nombre/i), { target: { value: 'My Store' } });
     fireEvent.change(screen.getByLabelText(/propietario/i), { target: { value: 'o1' } });
@@ -312,12 +286,8 @@ describe('StoreForm — INIT-1: isActive defaults false in create mode', () => {
     const { StoreForm } = await import('../store-form');
     render(
       <Wrapper>
-        <StoreForm
-          {...baseProps}
-          isSuperAdmin={true}
-          isEditMode={false}
-        />
-      </Wrapper>
+        <StoreForm {...baseProps} isSuperAdmin={true} isEditMode={false} />
+      </Wrapper>,
     );
     // L6 parity: STORES.IS_ACTIVE renamed 'Activa' -> 'Activo'
     const isActiveCheckbox = screen.getByLabelText(/activo/i) as HTMLInputElement;
@@ -344,14 +314,16 @@ describe('StoreForm — VALID-2: paymentStartDate required for superAdmin in edi
           initialValues={{ ownerId: 'o1', name: 'Existing Store' }}
           onSubmit={onSubmit}
         />
-      </Wrapper>
+      </Wrapper>,
     );
     // paymentStartDate left empty
     fireEvent.click(screen.getByRole('button', { name: /guardar/i }));
     await waitFor(() => {
       expect(onSubmit).not.toHaveBeenCalled();
       // Req: Field-Name-Aware Required Validation (Angular GENERAL.VALIDATION.REQUIRED : { name: STORE.PAYMENT_START_DATE })
-      expect(screen.getByRole('alert')).toHaveTextContent('La fecha de inicio de pago es obligatoria.');
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        'La fecha de inicio de pago es obligatoria.',
+      );
     });
   });
 
@@ -368,10 +340,12 @@ describe('StoreForm — VALID-2: paymentStartDate required for superAdmin in edi
           initialValues={{ ownerId: 'o1', name: 'Existing Store' }}
           onSubmit={onSubmit}
         />
-      </Wrapper>
+      </Wrapper>,
     );
     // name is pre-filled, paymentStartDate needs to be filled
-    fireEvent.change(screen.getByLabelText(/fecha de inicio/i), { target: { value: '2024-01-01' } });
+    fireEvent.change(screen.getByLabelText(/fecha de inicio/i), {
+      target: { value: '2024-01-01' },
+    });
     fireEvent.click(screen.getByRole('button', { name: /guardar/i }));
     await waitFor(() => {
       expect(onSubmit).toHaveBeenCalled();
@@ -417,7 +391,7 @@ describe('StoreForm — PlanPicker readOnly wiring (DG-7)', () => {
           owners={[makeOwner({ id: 'o1' })]}
           initialValues={{ ownerId: 'o1', name: 'Existing Store', paymentStartDate: '2024-01-01' }}
         />
-      </Wrapper>
+      </Wrapper>,
     );
     fireEvent.click(screen.getByRole('tab', { name: /Gratis/ }));
     expect(screen.queryByRole('button', { name: 'Activar este plan' })).not.toBeInTheDocument();
@@ -437,7 +411,7 @@ describe('StoreForm — PlanPicker readOnly wiring (DG-7)', () => {
           // NOT be read as "the owner already activated the paid plan".
           initialValues={{ ownerId: 'o1', name: 'Existing Store', paymentStartDate: '2026-08-04' }}
         />
-      </Wrapper>
+      </Wrapper>,
     );
     fireEvent.click(screen.getByRole('tab', { name: /Pago/ }));
     expect(screen.getByRole('button', { name: 'Activar este plan' })).toBeInTheDocument();
@@ -455,7 +429,7 @@ describe('StoreForm — PlanPicker readOnly wiring (DG-7)', () => {
           owners={[makeOwner({ id: 'o1' })]}
           initialValues={{ ownerId: 'o1', name: 'Existing Store', paymentStartDate: '2024-01-01' }}
         />
-      </Wrapper>
+      </Wrapper>,
     );
     fireEvent.click(screen.getByRole('tab', { name: /Gratis/ }));
     expect(screen.getByRole('button', { name: 'Activar este plan' })).toBeInTheDocument();
@@ -471,7 +445,7 @@ describe('StoreForm — PlanPicker readOnly wiring (DG-7)', () => {
           isEditMode={false}
           owners={[makeOwner({ id: 'o1' })]}
         />
-      </Wrapper>
+      </Wrapper>,
     );
     fireEvent.click(screen.getByRole('tab', { name: /Pago/ }));
     expect(screen.getByRole('button', { name: 'Activar este plan' })).toBeInTheDocument();

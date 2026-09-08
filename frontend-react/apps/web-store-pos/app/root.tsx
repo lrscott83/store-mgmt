@@ -146,9 +146,7 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
   // Whether hiding this page is safe is decided ONCE, on the render that first
   // showed the boundary, and before the effect below navigates: afterwards the
   // pathname is `/login` and the same question would answer differently.
-  const [redirectIsComing] = useState(
-    () => isDecryptionFailure && willLogoutRedirect(),
-  );
+  const [redirectIsComing] = useState(() => isDecryptionFailure && willLogoutRedirect());
 
   // The announcement and the sign-out are side effects — a SweetAlert, a
   // zustand `set()` and a `navigate()`. Running them in the render body made

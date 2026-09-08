@@ -22,7 +22,11 @@ const mockGetActiveOrdersPriceBetweenDates = vi.fn().mockReturnValue(0);
 const mockGetActiveOrdersProfitBetweenDates = vi.fn().mockReturnValue(0);
 const mockGetActiveOrdersBetween = vi.fn().mockReturnValue([] as Order[]);
 const mockGetCategoryCartItemsViewBetweenDates = vi.fn().mockReturnValue({
-  data: [], succeeded: true, message: '', actionCode: 200, errors: [],
+  data: [],
+  succeeded: true,
+  message: '',
+  actionCode: 200,
+  errors: [],
 });
 vi.mock('~/sales/lib/services/order-offline-service', () => ({
   OrderOfflineService: vi.fn().mockImplementation(() => ({
@@ -125,7 +129,11 @@ describe('CuadrePorFechasPage', () => {
     mockGetActiveOrdersProfitBetweenDates.mockReturnValue(0);
     mockGetActiveOrdersBetween.mockReturnValue([]);
     mockGetCategoryCartItemsViewBetweenDates.mockReturnValue({
-      data: [], succeeded: true, message: '', actionCode: 200, errors: [],
+      data: [],
+      succeeded: true,
+      message: '',
+      actionCode: 200,
+      errors: [],
     });
     mockGetActiveExpensesBetween.mockReturnValue([]);
     mockGetUnPaidSaleCreditsBetween.mockReturnValue([]);
@@ -210,21 +218,39 @@ describe('CuadrePorFechasPage', () => {
       makeOrder({ total: 100, paymentType: PaymentType.Efectivo, isCredit: false }),
       makeOrder({ total: 120, paymentType: PaymentType.Tarjeta, isCredit: false }),
       // Credit sales never count toward the payment summaries (cash or card).
-      makeOrder({ id: 'card-credit', total: 999, paymentType: PaymentType.Tarjeta, isCredit: true }),
+      makeOrder({
+        id: 'card-credit',
+        total: 999,
+        paymentType: PaymentType.Tarjeta,
+        isCredit: true,
+      }),
     ]);
     mockGetCategoryCartItemsViewBetweenDates.mockReturnValue({
       data: [
         {
-          id: 'cat-1', name: 'Bebidas', order: 1, total: 100, itemsCount: 2,
+          id: 'cat-1',
+          name: 'Bebidas',
+          order: 1,
+          total: 100,
+          itemsCount: 2,
           productItems: [],
         },
       ],
-      succeeded: true, message: '', actionCode: 200, errors: [],
+      succeeded: true,
+      message: '',
+      actionCode: 200,
+      errors: [],
     });
     mockGetActiveExpensesBetween.mockReturnValue([makeExpense({ total: 20 })]);
     mockGetUnPaidSaleCreditsBetween.mockReturnValue([makeCredit({ total: 50, isPaid: false })]);
     mockGetPaidSaleCreditsBetween.mockReturnValue([
-      makeCredit({ id: 'credit-2', total: 30, isPaid: true, paidDate: new Date(), paidType: PaymentType.Efectivo }),
+      makeCredit({
+        id: 'credit-2',
+        total: 30,
+        isPaid: true,
+        paidDate: new Date(),
+        paidType: PaymentType.Efectivo,
+      }),
     ]);
 
     renderPage();

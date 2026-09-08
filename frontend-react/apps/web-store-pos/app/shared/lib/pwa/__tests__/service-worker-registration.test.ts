@@ -24,7 +24,9 @@ describe('setupServiceWorker — PWA-SW-1: polls registration.update() on the co
   });
 
   it('calls registration.update() once the interval elapses after onRegisteredSW fires', async () => {
-    const registration = { update: vi.fn().mockResolvedValue(undefined) } as unknown as ServiceWorkerRegistration;
+    const registration = {
+      update: vi.fn().mockResolvedValue(undefined),
+    } as unknown as ServiceWorkerRegistration;
     let capturedOnRegisteredSW:
       | ((swScriptUrl: string, reg: ServiceWorkerRegistration | undefined) => void)
       | undefined;

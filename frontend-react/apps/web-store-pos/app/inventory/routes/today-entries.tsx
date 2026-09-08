@@ -32,7 +32,10 @@ export function TodayEntriesPage() {
   const [modalError, setModalError] = useState('');
 
   function loadEntries() {
-    const productRepository = new ProductRepository(storeId, new ProductCategoryRepository(storeId));
+    const productRepository = new ProductRepository(
+      storeId,
+      new ProductCategoryRepository(storeId),
+    );
     const svc = new InventoryOfflineService(storeId, productRepository);
     const products = [...productRepository.getStorageProductsMap().values()];
     const productMap = new Map(products.map((p) => [p.id, p.name]));
@@ -44,13 +47,16 @@ export function TodayEntriesPage() {
     // never actually fails; this guard exists for the type only.
     if (!response.succeeded) return;
     setEntries(
-      response.data.map((e: InventoryEntryView) => ({ ...e, productName: productMap.get(e.productId) ?? e.productName })),
+      response.data.map((e: InventoryEntryView) => ({
+        ...e,
+        productName: productMap.get(e.productId) ?? e.productName,
+      })),
     );
   }
 
   useEffect(() => {
     loadEntries();
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- loadEntries reads only storeId
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadEntries reads only storeId
   }, [storeId]);
 
   function handleEdit(entry: InventoryEntryView) {
@@ -146,9 +152,7 @@ export function TodayEntriesPage() {
     // create() returns null (Angular parity) when the product does not exist; treat as a
     // generic failure since there is no DataResult envelope in that branch.
     if (!result || !result.succeeded) {
-      setModalError(
-        result?.errors[0]?.description ?? intl.formatMessage({ id: 'GENERAL.ERROR' }),
-      );
+      setModalError(result?.errors[0]?.description ?? intl.formatMessage({ id: 'GENERAL.ERROR' }));
       return;
     }
 

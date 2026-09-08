@@ -262,7 +262,9 @@ export function InventoryTodayQuantitiesPage() {
                     <p className="text-text-muted">
                       {intl.formatMessage({ id: 'INVENTORY.QUANTITIES.ENTRIES' })}
                     </p>
-                    <p className={product.entradas > 0 ? 'font-semibold text-success' : 'text-text'}>
+                    <p
+                      className={product.entradas > 0 ? 'font-semibold text-success' : 'text-text'}
+                    >
                       {product.entradas}
                     </p>
                   </div>

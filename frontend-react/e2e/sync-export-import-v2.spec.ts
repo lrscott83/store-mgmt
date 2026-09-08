@@ -76,9 +76,7 @@ function uniqueLogin(prefix: string): string {
  * with the full request list for diagnosis.
  */
 function expectOnlyKnownTelemetry(anyRequest: AnyRequestObserver, context: string): void {
-  const unexpected = anyRequest
-    .requests()
-    .filter((r) => !r.url.includes(USAGE_TRACKER_PATH));
+  const unexpected = anyRequest.requests().filter((r) => !r.url.includes(USAGE_TRACKER_PATH));
   expect(unexpected, `${context} — zero HTTP beyond the tolerated usage tracker`).toEqual([]);
 }
 
@@ -128,11 +126,7 @@ async function navigateTo(page: Page, path: string): Promise<void> {
  * the ZIP bytes the browser actually produced. The download is written to
  * `testInfo.outputPath` so Playwright cleans it up with the run.
  */
-async function exportBackupZip(
-  page: Page,
-  password: string,
-  outputPath: string,
-): Promise<Buffer> {
+async function exportBackupZip(page: Page, password: string, outputPath: string): Promise<Buffer> {
   await navigateTo(page, '/sync/export');
   await page.locator('#export-password').fill(password);
   const downloadPromise = page.waitForEvent('download');

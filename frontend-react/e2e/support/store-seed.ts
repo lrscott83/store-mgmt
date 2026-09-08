@@ -24,13 +24,15 @@ export async function seedCategoryAndProduct(page: Page, name: string): Promise<
       throw new Error(
         `[persona:owner-admin-with-products] la siembra falló en el paso "${label}": ` +
           `${causeMessage}. Esto NO es un fallo de login: revisá /sales/products y el modal de ` +
-          'categoría (products.tsx, edit-product-category-modal.tsx).'
+          'categoría (products.tsx, edit-product-category-modal.tsx).',
       );
     }
   }
 
   await step('abrir modal de categoría', () => page.getByTestId('add-category-button').click());
-  await step('completar nombre de categoría', () => page.getByTestId('category-name-input').fill(name));
+  await step('completar nombre de categoría', () =>
+    page.getByTestId('category-name-input').fill(name),
+  );
   await step('guardar categoría', () => page.getByTestId('category-save-button').click());
 
   // The toggle's data-testid is `category-actions-toggle-{id}` — the id is
@@ -41,7 +43,11 @@ export async function seedCategoryAndProduct(page: Page, name: string): Promise<
   await step('abrir menú de la categoría', () => categoryActionsToggle.click());
   await step('abrir "Nuevo Producto"', () => page.getByTestId('add-product-button').click());
 
-  await step('completar nombre de producto', () => page.getByTestId('product-name-input').fill(name));
-  await step('completar precio de producto', () => page.getByTestId('product-price-input').fill('10'));
+  await step('completar nombre de producto', () =>
+    page.getByTestId('product-name-input').fill(name),
+  );
+  await step('completar precio de producto', () =>
+    page.getByTestId('product-price-input').fill('10'),
+  );
   await step('guardar producto', () => page.getByTestId('create-product-submit').click());
 }

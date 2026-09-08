@@ -40,7 +40,9 @@ const INSTALLED_FLAG_KEY = 'pwa-installed';
 
 function readInstalledFlag(): boolean {
   try {
-    return typeof localStorage !== 'undefined' && localStorage.getItem(INSTALLED_FLAG_KEY) === 'true';
+    return (
+      typeof localStorage !== 'undefined' && localStorage.getItem(INSTALLED_FLAG_KEY) === 'true'
+    );
   } catch {
     return false;
   }
@@ -88,7 +90,11 @@ function writeInstalledFlag(value: boolean): void {
 export function usePwaInstall(): PwaInstall {
   const swSupported = typeof navigator !== 'undefined' && 'serviceWorker' in navigator;
   const [installed, setInstalled] = useState<boolean>(() => readInstalledFlag());
-  const deferredPrompt = useSyncExternalStore(subscribeDeferredPrompt, getDeferredPrompt, getServerSnapshot);
+  const deferredPrompt = useSyncExternalStore(
+    subscribeDeferredPrompt,
+    getDeferredPrompt,
+    getServerSnapshot,
+  );
 
   useEffect(() => {
     function onAppInstalled() {

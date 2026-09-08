@@ -1,4 +1,9 @@
-import type { BaseResponseModel, ProductCategory, ProductCategoryService, ProductCategoryView } from '@store-mgmt/domain';
+import type {
+  BaseResponseModel,
+  ProductCategory,
+  ProductCategoryService,
+  ProductCategoryView,
+} from '@store-mgmt/domain';
 import { apiClient } from '~/shared/lib/http/api-client';
 
 /**

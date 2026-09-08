@@ -160,7 +160,9 @@ test.describe('wholesale-scanner — modal redesign y filtro Todos en venta mayo
     await expect(page.getByTestId('scanner-modal')).toHaveCount(0);
   });
 
-  test('el switch "Todos" ON busca en todas las categorías; OFF restringe a la seleccionada', async ({ signedInPage }) => {
+  test('el switch "Todos" ON busca en todas las categorías; OFF restringe a la seleccionada', async ({
+    signedInPage,
+  }) => {
     const { page, selectedStoreId } = signedInPage;
 
     const product = await openWholesaleSeeded(page, selectedStoreId);
@@ -188,9 +190,10 @@ test.describe('wholesale-scanner — modal redesign y filtro Todos en venta mayo
         localStorage.setItem(catKey, JSON.stringify(cats));
 
         const productKey = `lizoft.store-products-${sid}`;
-        const entries = JSON.parse(
-          localStorage.getItem(productKey) ?? '[]',
-        ) as [string, Record<string, unknown>][];
+        const entries = JSON.parse(localStorage.getItem(productKey) ?? '[]') as [
+          string,
+          Record<string, unknown>,
+        ][];
         const prodId = crypto.randomUUID();
         const prod = {
           id: prodId,

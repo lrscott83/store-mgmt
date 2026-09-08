@@ -86,7 +86,12 @@ export function WarehouseFormModal({ open, warehouse, onClose, onSave }: Warehou
             <CloseIcon />
             {intl.formatMessage({ id: 'WAREHOUSES.CANCEL' })}
           </Button>
-          <Button variant="fab" className="flex-1 justify-center" disabled={!isValid} onClick={() => onSave(trimmed)}>
+          <Button
+            variant="fab"
+            className="flex-1 justify-center"
+            disabled={!isValid}
+            onClick={() => onSave(trimmed)}
+          >
             <SaveIcon />
             {intl.formatMessage({ id: 'WAREHOUSES.SAVE' })}
           </Button>

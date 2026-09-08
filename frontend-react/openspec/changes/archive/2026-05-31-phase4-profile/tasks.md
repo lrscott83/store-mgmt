@@ -18,14 +18,14 @@ Apply completed with: **454 tests passing** (+51 net-new).
 
 ## Review Workload Forecast
 
-| Field | Value |
-|-------|-------|
-| Estimated changed lines | 550–700 |
-| 400-line budget risk | High |
-| Chained PRs recommended | Yes |
-| Suggested split | PR 1 (foundation + service + hook + store) → PR 2 (containers + forms + navbar + i18n + routes) |
-| Delivery strategy | ask-on-risk |
-| Chain strategy | pending |
+| Field                   | Value                                                                                           |
+| ----------------------- | ----------------------------------------------------------------------------------------------- |
+| Estimated changed lines | 550–700                                                                                         |
+| 400-line budget risk    | High                                                                                            |
+| Chained PRs recommended | Yes                                                                                             |
+| Suggested split         | PR 1 (foundation + service + hook + store) → PR 2 (containers + forms + navbar + i18n + routes) |
+| Delivery strategy       | ask-on-risk                                                                                     |
+| Chain strategy          | pending                                                                                         |
 
 Decision needed before apply: Yes
 Chained PRs recommended: Yes
@@ -36,10 +36,10 @@ Chain strategy: pending
 
 ### Suggested Work Units
 
-| Unit | Goal | Likely PR | Notes |
-|------|------|-----------|-------|
-| 1 | Foundation: service + hook + store extension + unit tests | PR 1 | Base: `feat/phase4-sync-ui`; no UI changes; independently mergeable |
-| 2 | UI: forms + containers + navbar + routes + i18n + integration tests | PR 2 | Base: PR 1 branch; depends on unit 1 |
+| Unit | Goal                                                                | Likely PR | Notes                                                               |
+| ---- | ------------------------------------------------------------------- | --------- | ------------------------------------------------------------------- |
+| 1    | Foundation: service + hook + store extension + unit tests           | PR 1      | Base: `feat/phase4-sync-ui`; no UI changes; independently mergeable |
+| 2    | UI: forms + containers + navbar + routes + i18n + integration tests | PR 2      | Base: PR 1 branch; depends on unit 1                                |
 
 ---
 
@@ -92,16 +92,16 @@ Chain strategy: pending
 
 ## Spec Coverage Matrix
 
-| Req group | Tasks covering it |
-|-----------|-------------------|
-| FEAT-1–4 | 5.1 |
-| HTTP-1–5 | 1.1, 1.2 |
-| STORE-1–4 | 1.5, 1.6 |
-| HOOK-1–4 | 1.3, 1.4 |
-| EDIT-1–9 | 3.1, 3.2, 4.1, 4.2 |
-| PWD-1–8 | 3.3, 3.4, 4.3, 4.4 |
-| NAV-1–4 | 5.2, 5.3, 5.4 |
-| I18N-1–4 | 2.1 |
+| Req group   | Tasks covering it                      |
+| ----------- | -------------------------------------- |
+| FEAT-1–4    | 5.1                                    |
+| HTTP-1–5    | 1.1, 1.2                               |
+| STORE-1–4   | 1.5, 1.6                               |
+| HOOK-1–4    | 1.3, 1.4                               |
+| EDIT-1–9    | 3.1, 3.2, 4.1, 4.2                     |
+| PWD-1–8     | 3.3, 3.4, 4.3, 4.4                     |
+| NAV-1–4     | 5.2, 5.3, 5.4                          |
+| I18N-1–4    | 2.1                                    |
 | OFFLINE-1–3 | 1.3, 1.4, 3.1, 3.2, 3.3, 3.4, 4.1, 4.2 |
-| ERR-1–4 | 4.1, 4.2, 4.3, 4.4 |
-| TEST-1–5 | 1.1, 1.3, 1.5, 3.1, 3.3, 4.1, 4.3 |
+| ERR-1–4     | 4.1, 4.2, 4.3, 4.4                     |
+| TEST-1–5    | 1.1, 1.3, 1.5, 3.1, 3.3, 4.1, 4.3      |

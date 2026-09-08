@@ -41,6 +41,7 @@ and allows the user to select/deselect modules. Modules where `priceIncluded ===
 auto-selected and rendered as locked (not user-toggleable).
 
 `StoreForm` MUST implement role-conditional field rendering:
+
 - super-admin or owner-admin: render `ownerId` (required, owner picker), `approved`, `description`.
 - super-admin + edit mode: render `paymentStartDate` (required).
 - super-admin: render `isActive`.

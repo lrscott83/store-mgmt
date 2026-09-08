@@ -46,9 +46,8 @@ export function ImportRosterModal({ onImported, onCancel }: ImportRosterModalPro
       // activates offline access must not pay for the offline modules
       // (design D4). Inside the try: if the chunk itself fails to load, the
       // outer catch below handles it distinctly from an import failure.
-      const { importRosterFile, rosterImportErrorMessageId } = await import(
-        '~/shared/lib/offline/roster-import'
-      );
+      const { importRosterFile, rosterImportErrorMessageId } =
+        await import('~/shared/lib/offline/roster-import');
       try {
         await importRosterFile({ file, master });
         onImported();
@@ -117,7 +116,11 @@ export function ImportRosterModal({ onImported, onCancel }: ImportRosterModalPro
                 })}
                 className="absolute inset-y-0 right-0 flex items-center px-2 text-gray-500 hover:text-gray-700"
               >
-                {showPassword ? <EyeIcon className="h-5 w-5" /> : <EyeOffIcon className="h-5 w-5" />}
+                {showPassword ? (
+                  <EyeIcon className="h-5 w-5" />
+                ) : (
+                  <EyeOffIcon className="h-5 w-5" />
+                )}
               </button>
             </div>
           </div>

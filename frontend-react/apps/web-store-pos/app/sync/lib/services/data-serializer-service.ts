@@ -358,12 +358,20 @@ export class DataSerializerService {
     await zipWriter.add(EDataFileName.Warehouses, new TextReader(warehousesJson), {
       rawPassword: key,
     });
-    await zipWriter.add(EDataFileName.WarehouseStockLevels, new TextReader(warehouseStockLevelsJson), {
-      rawPassword: key,
-    });
-    await zipWriter.add(EDataFileName.WarehouseStockMovements, new TextReader(warehouseStockMovementsJson), {
-      rawPassword: key,
-    });
+    await zipWriter.add(
+      EDataFileName.WarehouseStockLevels,
+      new TextReader(warehouseStockLevelsJson),
+      {
+        rawPassword: key,
+      },
+    );
+    await zipWriter.add(
+      EDataFileName.WarehouseStockMovements,
+      new TextReader(warehouseStockMovementsJson),
+      {
+        rawPassword: key,
+      },
+    );
 
     const blob = await zipWriter.close();
     return new Uint8Array(await blob.arrayBuffer());
@@ -393,8 +401,7 @@ export class DataSerializerService {
 
     try {
       const metaEntry = entries.find(
-        (entry): entry is FileEntry =>
-          !entry.directory && entry.filename === V2_META_FILENAME,
+        (entry): entry is FileEntry => !entry.directory && entry.filename === V2_META_FILENAME,
       );
       if (metaEntry) {
         return await this.importV2(entries, metaEntry, password);
@@ -467,10 +474,7 @@ export class DataSerializerService {
    * derivation) passed per-entry, preserving v1 semantics for React v1 and
    * real Angular-exported archives (V2-07, SYNC-01/02).
    */
-  private async importV1Fallback(
-    entries: Entry[],
-    password: string,
-  ): Promise<ParsedData> {
+  private async importV1Fallback(entries: Entry[], password: string): Promise<ParsedData> {
     const contents = new Map<string, string>();
     try {
       for (const entry of entries) {

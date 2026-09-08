@@ -109,9 +109,7 @@ describe('chart-core.tsx — ProfitChartCore', () => {
   });
 
   it('renders empty message when all values are zero', () => {
-    const zeroData: ChartData[] = [
-      { label: new Date('2026-01-01'), value: 0 },
-    ];
+    const zeroData: ChartData[] = [{ label: new Date('2026-01-01'), value: 0 }];
     render(<ProfitChartCore data={zeroData} emptyMessage="Sin datos" />);
     expect(screen.getByText('Sin datos')).toBeTruthy();
     expect(screen.queryByTestId('bar-chart')).toBeNull();
@@ -120,12 +118,8 @@ describe('chart-core.tsx — ProfitChartCore', () => {
 
 describe('chart-core.tsx — formatLabel', () => {
   it('formats dates as d-MMM in Spanish without leading zero (3-Jul, not 03-Jul)', () => {
-    const data: ChartData[] = [
-      { label: new Date(2026, 6, 3), value: 42 },
-    ];
-    const { container, unmount } = render(
-      <SalesChartCore data={data} emptyMessage="Sin datos" />,
-    );
+    const data: ChartData[] = [{ label: new Date(2026, 6, 3), value: 42 }];
+    const { container, unmount } = render(<SalesChartCore data={data} emptyMessage="Sin datos" />);
     // formatLabel is internal — verified through the XAxis tickFormatter mock.
     // 2026-07-03 -> "3-Jul" (day 3, no leading zero; abbreviated Spanish month).
     expect(container.querySelector('[data-testid="x-axis-ticks"]')?.textContent).toBe(
@@ -136,12 +130,8 @@ describe('chart-core.tsx — formatLabel', () => {
 
   it('formats ProfitChartCore ticks identically', () => {
     xAxisSamples.first = new Date(2026, 0, 31);
-    const data: ChartData[] = [
-      { label: new Date(2026, 0, 31), value: 42 },
-    ];
-    const { container, unmount } = render(
-      <ProfitChartCore data={data} emptyMessage="Sin datos" />,
-    );
+    const data: ChartData[] = [{ label: new Date(2026, 0, 31), value: 42 }];
+    const { container, unmount } = render(<ProfitChartCore data={data} emptyMessage="Sin datos" />);
     expect(container.querySelector('[data-testid="x-axis-ticks"]')?.textContent).toBe(
       '31-Ene|15-Mar',
     );
