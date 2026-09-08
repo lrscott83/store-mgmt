@@ -257,10 +257,21 @@ describe('EditOrderModal', () => {
         <EditOrderModal order={order} isOpen={true} onClose={onClose} onUpdate={onUpdate} />
       </Wrapper>,
     );
-    fireEvent.click(screen.getByRole('radio', { name: 'Zelle' }));
+    // Zelle removed from the options (user request 2026-09-08) — switch to Tarjeta.
+    fireEvent.click(screen.getByRole('radio', { name: 'Tarjeta' }));
     fireEvent.click(screen.getByTestId('edit-order-update-button'));
-    expect(onUpdate).toHaveBeenCalledWith('o1', PaymentType.Zelle);
+    expect(onUpdate).toHaveBeenCalledWith('o1', PaymentType.Tarjeta);
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it('no longer offers Zelle as a payment option (visual removal only, enum intact)', () => {
+    const order = makeOrder({ id: 'o1', paymentType: PaymentType.Efectivo });
+    render(
+      <Wrapper>
+        <EditOrderModal order={order} isOpen={true} onClose={vi.fn()} onUpdate={vi.fn()} />
+      </Wrapper>,
+    );
+    expect(screen.queryByRole('radio', { name: 'Zelle' })).not.toBeInTheDocument();
   });
 
   // Angular: edit-order-modal.component.ts:39-54 — on `updateTodayOrder` failure, Swal.fire({

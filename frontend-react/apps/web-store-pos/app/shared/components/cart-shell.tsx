@@ -26,10 +26,12 @@ import { formatCurrency } from '~/shared/lib/format-currency';
 import { Switch } from '~/shared/components/ui/switch';
 import { InfoBox } from '~/shared/components/ui/info-box';
 
+// Zelle removed from the visual options (user request 2026-09-08) — the enum
+// member stays and historical Zelle data still renders (display maps elsewhere
+// keep it). Re-add here when Zelle goes live again.
 const PAYMENT_TYPE_OPTIONS: { type: PaymentType; labelKey: string }[] = [
   { type: PaymentType.Efectivo, labelKey: 'CART.EFECTIVO' },
   { type: PaymentType.Tarjeta, labelKey: 'CART.TARJETA' },
-  { type: PaymentType.Zelle, labelKey: 'CART.ZELLE' },
 ];
 
 function PaymentTypeIcon({ kind }: { kind: PaymentTypeIconKind }) {
