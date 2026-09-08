@@ -125,6 +125,8 @@ export const MENU_GROUPS: MenuGroup[] = [
     items: [
       { label: 'MENU.DASHBOARD', path: '/stats/dashboard', featureIds: [EFeatures.Dashboard], moduleId: EModules.Statistics,
         helpContent: 'Panel de estadísticas. Visualiza gráficas de ventas, productos más vendidos, tendencias y comparativos por período. Toma decisiones basadas en datos.' },
+      { label: 'MENU.CUADRE_POR_FECHAS', path: '/stats/cuadre-por-fechas', featureIds: [EFeatures.Dashboard], moduleId: EModules.Statistics,
+        helpContent: 'Cuadre por fechas. Selecciona un rango de fechas (inicio y fin, ambos días incluidos) y genera un resumen de las operaciones del período: ventas, gastos, ganancias bruta y ganancias, más el detalle del cuadre.' },
     ],
   },
   {

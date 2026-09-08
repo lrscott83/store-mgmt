@@ -40,6 +40,7 @@ const fakeState = vi.hoisted(() => ({
   levels: [] as WarehouseStockLevel[],
   movements: [] as WarehouseStockMovement[],
   products: [] as Array<[string, Record<string, unknown>]>,
+  categories: [] as Array<[string, Record<string, unknown>]>,
   recordMovementImpl: vi.fn(),
   createWarehouseImpl: vi.fn(),
   deactivateImpl: vi.fn(),
@@ -99,6 +100,9 @@ vi.mock('~/inventory/lib/services/inventory-offline-service', () => ({
 vi.mock('~/sales/lib/repositories/product-repository', () => ({
   ProductRepository: vi.fn().mockImplementation(() => ({
     getStorageProductsMap: () => new Map(fakeState.products),
+    getCategoryRepository: () => ({
+      getStorageCategoriesMap: () => new Map(fakeState.categories),
+    }),
   })),
 }));
 
@@ -116,6 +120,25 @@ function renderPage() {
   );
 }
 
+/** Siembra un almacén Central con stock de 2 productos en categorías distintas. */
+function seedCentralWarehouseWithStock() {
+  fakeState.warehouses = [
+    { id: 'wh-1', name: 'Central', isActive: true, createdDate: new Date(), createdByName: 'x' },
+  ];
+  fakeState.categories = [
+    ['cat-1', { id: 'cat-1', name: 'Bebidas', isActive: true }],
+    ['cat-2', { id: 'cat-2', name: 'Lácteos', isActive: true }],
+  ];
+  fakeState.products = [
+    ['prod-1', { id: 'prod-1', name: 'Cerveza', isActive: true, categoryId: 'cat-1' }],
+    ['prod-2', { id: 'prod-2', name: 'Leche', isActive: true, categoryId: 'cat-2' }],
+  ];
+  fakeState.levels = [
+    { id: 'sl-1', warehouseId: 'wh-1', productId: 'prod-1', onHand: 24, costPrice: 660, createdDate: new Date() },
+    { id: 'sl-2', warehouseId: 'wh-1', productId: 'prod-2', onHand: 10, costPrice: 100, createdDate: new Date() },
+  ];
+}
+
 describe('WarehousesPage', () => {
   beforeEach(() => {
     localStorage.clear();
@@ -123,6 +146,7 @@ describe('WarehousesPage', () => {
     fakeState.levels = [];
     fakeState.movements = [];
     fakeState.products = [];
+    fakeState.categories = [];
     fakeState.recordMovementImpl.mockClear();
     fakeState.createWarehouseImpl.mockClear();
     fakeState.deactivateImpl.mockClear();
@@ -150,25 +174,14 @@ describe('WarehousesPage', () => {
   });
 
   it('lists warehouses with their unit count in the header', async () => {
-    fakeState.warehouses = [
-      { id: 'wh-1', name: 'Central', isActive: true, createdDate: new Date(), createdByName: 'x' },
-    ];
-    fakeState.levels = [
-      { id: 'sl-1', warehouseId: 'wh-1', productId: 'prod-1', onHand: 24, costPrice: 660, createdDate: new Date() },
-    ];
+    seedCentralWarehouseWithStock();
     renderPage();
     expect(screen.getByText('Central')).toBeTruthy();
-    expect(screen.getByTestId('warehouse-toggle-Central').textContent).toContain('(24)');
+    expect(screen.getByTestId('warehouse-toggle-Central').textContent).toContain('(34)');
   });
 
   it('shows units and total cost in the header plus the global summary row (WUI-1-a)', async () => {
-    fakeState.warehouses = [
-      { id: 'wh-1', name: 'Central', isActive: true, createdDate: new Date(), createdByName: 'x' },
-    ];
-    fakeState.levels = [
-      { id: 'sl-1', warehouseId: 'wh-1', productId: 'prod-1', onHand: 24, costPrice: 660, createdDate: new Date() },
-      { id: 'sl-2', warehouseId: 'wh-1', productId: 'prod-2', onHand: 10, costPrice: 100, createdDate: new Date() },
-    ];
+    seedCentralWarehouseWithStock();
     renderPage();
     // Header estilo InventoryProductList: nombre (unidades) + costo total.
     expect(screen.getByTestId('warehouse-toggle-Central').textContent).toContain('(34)');
@@ -204,22 +217,109 @@ describe('WarehousesPage', () => {
     expect(screen.getAllByText('Desactivar')).toHaveLength(1);
   });
 
-  it('shows the movement modal and records a sale_out', async () => {
-    fakeState.warehouses = [
-      { id: 'wh-1', name: 'Central', isActive: true, createdDate: new Date(), createdByName: 'x' },
-    ];
-    fakeState.levels = [
-      { id: 'sl-1', warehouseId: 'wh-1', productId: 'prod-1', onHand: 24, costPrice: 660, createdDate: new Date() },
-    ];
+  describe('expanded panel — productos agrupados por categoría (estilo Disponible)', () => {
+    it('groups the warehouse stock by category with headers "Nombre (N) $Total" (WUI-4-a)', async () => {
+      seedCentralWarehouseWithStock();
+      renderPage();
+      fireEvent.click(screen.getByTestId('warehouse-toggle-Central'));
+
+      // Header de categoría estilo InventoryProductList: nombre (cantidad) + costo total.
+      const bebidasHeader = screen.getByTestId('warehouse-category-toggle-wh-1-cat-1');
+      expect(bebidasHeader.textContent).toContain('Bebidas');
+      expect(bebidasHeader.textContent).toContain('(24)');
+      expect(bebidasHeader.textContent).toContain('$15\u00A0840'); // 24 × 660
+
+      const lacteosHeader = screen.getByTestId('warehouse-category-toggle-wh-1-cat-2');
+      expect(lacteosHeader.textContent).toContain('Lácteos');
+      expect(lacteosHeader.textContent).toContain('(10)');
+      expect(lacteosHeader.textContent).toContain('$1\u00A0000'); // 10 × 100
+    });
+
+    it('shows product rows with quantity and costs, same layout as Disponible (WUI-4-b)', async () => {
+      seedCentralWarehouseWithStock();
+      renderPage();
+      fireEvent.click(screen.getByTestId('warehouse-toggle-Central'));
+      // Acordeón: expandir la categoría para ver sus productos (igual que Disponible).
+      fireEvent.click(screen.getByTestId('warehouse-category-toggle-wh-1-cat-1'));
+      fireEvent.click(screen.getByTestId('warehouse-category-toggle-wh-1-cat-2'));
+
+      // Productos visibles con su cantidad.
+      expect(screen.getByTestId('warehouse-product-row-wh-1-prod-1').textContent).toContain('Cerveza');
+      expect(screen.getByTestId('warehouse-product-row-wh-1-prod-1').textContent).toContain('(24)');
+      expect(screen.getByTestId('warehouse-product-row-wh-1-prod-2').textContent).toContain('Leche');
+      expect(screen.getByTestId('warehouse-product-row-wh-1-prod-2').textContent).toContain('(10)');
+
+      // Costo promedio y total por producto (mismo diseño que Disponible).
+      expect(screen.getByTestId('warehouse-product-cost-wh-1-prod-1').textContent).toBe('$660');
+      expect(screen.getByTestId('warehouse-product-total-wh-1-prod-1').textContent).toBe('$15\u00A0840');
+      expect(screen.getByTestId('warehouse-product-cost-wh-1-prod-2').textContent).toBe('$100');
+      expect(screen.getByTestId('warehouse-product-total-wh-1-prod-2').textContent).toBe('$1\u00A0000');
+    });
+
+    it('categories are collapsed by default and expand on click (WUI-4-c)', async () => {
+      seedCentralWarehouseWithStock();
+      renderPage();
+      fireEvent.click(screen.getByTestId('warehouse-toggle-Central'));
+
+      // Colapsado por defecto: los productos no son visibles aún.
+      expect(screen.queryByTestId('warehouse-product-row-wh-1-prod-1')).toBeNull();
+
+      // Expandir la categoría revela sus productos.
+      fireEvent.click(screen.getByTestId('warehouse-category-toggle-wh-1-cat-1'));
+      expect(screen.getByTestId('warehouse-product-row-wh-1-prod-1')).toBeTruthy();
+      // La otra categoría sigue colapsada.
+      expect(screen.queryByTestId('warehouse-product-row-wh-1-prod-2')).toBeNull();
+    });
+
+    it('removes the purchase selector and per-row action buttons from the panel (WUI-4-d)', async () => {
+      seedCentralWarehouseWithStock();
+      renderPage();
+      fireEvent.click(screen.getByTestId('warehouse-toggle-Central'));
+
+      // El selector de compra y los botones por fila ya no existen dentro del panel.
+      expect(screen.queryByTestId('purchase-select-Central')).toBeNull();
+      expect(screen.queryAllByTestId(/^stock-action-/)).toHaveLength(0);
+      // Los movimientos se hacen desde el gear del almacén (sigue disponible).
+      fireEvent.click(screen.getByTestId('warehouse-actions-toggle-wh-1'));
+      expect(screen.getByRole('menuitem', { name: 'Entrada' })).toBeTruthy();
+    });
+
+    it('shows the empty-stock InfoBox when the warehouse has no products (WUI-4-e)', async () => {
+      fakeState.warehouses = [
+        { id: 'wh-1', name: 'Vacío', isActive: true, createdDate: new Date(), createdByName: 'x' },
+      ];
+      renderPage();
+      fireEvent.click(screen.getByTestId('warehouse-toggle-Vacío'));
+      expect(screen.getByText('Este almacén no tiene productos en stock.')).toBeTruthy();
+    });
+
+    it('shows product names for unknown product ids without crashing (WUI-4-f)', async () => {
+      fakeState.warehouses = [
+        { id: 'wh-1', name: 'Central', isActive: true, createdDate: new Date(), createdByName: 'x' },
+      ];
+      fakeState.levels = [
+        { id: 'sl-1', warehouseId: 'wh-1', productId: 'prod-ghost', onHand: 5, costPrice: 100, createdDate: new Date() },
+      ];
+      renderPage();
+      fireEvent.click(screen.getByTestId('warehouse-toggle-Central'));
+      // El producto no existe en el repositorio — se omite y la vista no revienta:
+      // queda el InfoBox de sin stock (no hay filas de producto para ese ghost).
+      expect(screen.getByText('Este almacén no tiene productos en stock.')).toBeTruthy();
+      expect(screen.queryByTestId('warehouse-product-row-wh-1-prod-ghost')).toBeNull();
+    });
+  });
+
+  it('shows the movement modal and records a sale_out from the gear', async () => {
+    seedCentralWarehouseWithStock();
     renderPage();
 
-    // expand the warehouse → stock table with action buttons
-    fireEvent.click(screen.getByTestId('warehouse-toggle-Central'));
-    fireEvent.click(screen.getAllByText('Salida a tienda')[0]);
-
-    // the movement modal opens (title + warehouse name)
+    // gear → Salida abre el modal con el selector de producto habilitado
+    fireEvent.click(screen.getByTestId('warehouse-actions-toggle-wh-1'));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Salida' }));
     expect(screen.getByText(/Salida a tienda — Central/)).toBeTruthy();
+    expect((screen.getByTestId('movement-product') as HTMLSelectElement).disabled).toBe(false);
 
+    fireEvent.change(screen.getByTestId('movement-product'), { target: { value: 'prod-1' } });
     fireEvent.change(screen.getByTestId('movement-quantity'), { target: { value: '12' } });
     fireEvent.change(screen.getByTestId('movement-reason'), { target: { value: 'pedido' } });
     fireEvent.click(screen.getAllByText('Guardar')[0]);
@@ -239,15 +339,10 @@ describe('WarehousesPage', () => {
   });
 
   it('records a purchase_in from the gear with the product selector (modal)', async () => {
-    fakeState.warehouses = [
-      { id: 'wh-1', name: 'Central', isActive: true, createdDate: new Date(), createdByName: 'x' },
-    ];
-    fakeState.products = [
-      ['prod-1', { id: 'prod-1', name: 'Café', isActive: true }],
-    ];
+    seedCentralWarehouseWithStock();
     renderPage();
 
-    // gear → Entrada opens the modal with an ENABLED product selector
+    // gear → Entrada abre el modal con un selector de producto HABILITADO
     fireEvent.click(screen.getByTestId('warehouse-actions-toggle-wh-1'));
     fireEvent.click(screen.getByRole('menuitem', { name: 'Entrada' }));
     expect(screen.getByText(/Entrada al almacén — Central/)).toBeTruthy();
@@ -272,12 +367,7 @@ describe('WarehousesPage', () => {
   });
 
   it('blocks deactivation when the warehouse has stock', async () => {
-    fakeState.warehouses = [
-      { id: 'wh-1', name: 'Central', isActive: true, createdDate: new Date(), createdByName: 'x' },
-    ];
-    fakeState.levels = [
-      { id: 'sl-1', warehouseId: 'wh-1', productId: 'prod-1', onHand: 24, costPrice: 660, createdDate: new Date() },
-    ];
+    seedCentralWarehouseWithStock();
     renderPage();
     fireEvent.click(screen.getByTestId('warehouse-actions-toggle-wh-1'));
     fireEvent.click(screen.getByRole('menuitem', { name: 'Desactivar' }));

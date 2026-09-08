@@ -23,6 +23,7 @@ import { InventoryOfflineService } from '../lib/services/inventory-offline-servi
 import { WarehouseOfflineService } from '../lib/services/warehouse-offline-service';
 import { ProductRepository } from '~/sales/lib/repositories/product-repository';
 import { ProductCategoryRepository } from '~/sales/lib/repositories/product-category-repository';
+import type { InventoryCategoryView } from '../lib/services/inventory-offline-service';
 import { WarehouseFormModal } from '../components/warehouse-form-modal';
 import {
   WarehouseMovementModal,
@@ -63,6 +64,7 @@ export function WarehousesPage() {
   const [stockLevels, setStockLevels] = useState<WarehouseStockLevel[]>([]);
   const [movements, setMovements] = useState<WarehouseStockMovement[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Map<string, { id: string; name: string }>>(new Map());
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   /** Modal state: creating XOR editing (null/undefined = closed). */
   const [modalOpen, setModalOpen] = useState(false);
@@ -73,8 +75,10 @@ export function WarehousesPage() {
     warehouseId: string;
     productId: string | null;
   } | null>(null);
-  /** Producto elegido por almacén para registrar una entrada (compra) sin stock previo. */
-  const [purchaseProduct, setPurchaseProduct] = useState<Record<string, string>>({});
+  /** Categorías expandidas dentro del panel de cada almacén (estilo Disponible). */
+  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
+  /** Búsqueda dentro del panel del almacén (igual que Disponible). */
+  const [search, setSearch] = useState('');
 
   const service = useMemo(
     () =>
@@ -101,6 +105,7 @@ export function WarehousesPage() {
       new ProductCategoryRepository(storeId),
     );
     setProducts([...productRepo.getStorageProductsMap().values()]);
+    setCategories(new Map(productRepo.getCategoryRepository().getStorageCategoriesMap()));
   }
 
   useEffect(() => {
@@ -178,12 +183,6 @@ export function WarehousesPage() {
     load();
   }
 
-  function handleAddPurchase(warehouse: Warehouse) {
-    const productId = purchaseProduct[warehouse.id];
-    if (!productId) return;
-    openMovementModal('purchase_in', warehouse, productId);
-  }
-
   function stockOf(warehouseId: string): WarehouseStockLevel[] {
     return stockLevels.filter((level) => level.warehouseId === warehouseId);
   }
@@ -191,6 +190,62 @@ export function WarehousesPage() {
   /** Unidades totales del almacén — el (N) del header. */
   const unitsOf = (warehouseId: string) =>
     stockOf(warehouseId).reduce((sum, level) => sum + level.onHand, 0);
+
+  /**
+   * Vista por categorías del stock del almacén — mismo modo y diseño que la
+   * vista Disponible del Inventario (InventoryProductList): agrupa por
+   * categoría con Σ cantidades y Σ costo total, y filas de producto con
+   * costo promedio. Filtra por búsqueda igual que `filterInventoryCategories`.
+   */
+  function categoryViewsOf(warehouseId: string): InventoryCategoryView[] {
+    const levels = stockOf(warehouseId);
+    const byCategory = new Map<string, WarehouseStockLevel[]>();
+    for (const level of levels) {
+      const product = products.find((p) => p.id === level.productId);
+      if (!product) continue; // producto eliminado: no se muestra
+      const categoryId = (product as { categoryId?: string }).categoryId ?? '';
+      const group = byCategory.get(categoryId);
+      if (group) group.push(level);
+      else byCategory.set(categoryId, [level]);
+    }
+
+    const q = search.trim().toLowerCase();
+    const views: InventoryCategoryView[] = [];
+    byCategory.forEach((catLevels, categoryId) => {
+      const categoryName = categories.get(categoryId)?.name ?? '';
+      const items = catLevels.map((level) => {
+        const product = products.find((p) => p.id === level.productId)!;
+        return {
+          productId: level.productId,
+          productName: product.name,
+          categoryId,
+          categoryName,
+          totalAvailable: level.onHand,
+          avgCostPrice: level.costPrice,
+        };
+      });
+      const categoryMatches = categoryName.toLowerCase().includes(q);
+      const filteredItems = q
+        ? categoryMatches
+          ? items
+          : items.filter((p) => p.productName.toLowerCase().includes(q))
+        : items;
+      if (filteredItems.length === 0) return;
+      views.push({
+        categoryId,
+        categoryName,
+        totalQuantity: filteredItems.reduce((sum, p) => sum + p.totalAvailable, 0),
+        totalCostPrice: filteredItems.reduce(
+          (sum, p) => sum + p.avgCostPrice * p.totalAvailable,
+          0,
+        ),
+        products: filteredItems,
+      });
+    });
+    return views;
+  }
+
+  const isSearching = search.trim() !== '';
 
   /** Costo total del almacén: Σ(onHand × costo promedio) — el total del header. */
   const totalCostOf = (warehouseId: string) =>
@@ -360,40 +415,18 @@ export function WarehousesPage() {
 
                 {isExpanded && (
                   <div className="border-t border-border bg-surface px-4 py-3">
-                    {warehouse.isActive && products.length > 0 && (
-                      <div className="mb-3 flex flex-wrap items-end gap-2 rounded-lg border border-border bg-background p-2">
-                        <div className="min-w-40 flex-1">
-                          <div className="mb-1 text-xs text-text-muted">
-                            {intl.formatMessage({ id: 'WAREHOUSES.PRODUCT' })}
-                          </div>
-                          <select
-                            data-testid={`purchase-select-${warehouse.name}`}
-                            value={purchaseProduct[warehouse.id] ?? ''}
-                            onChange={(e) =>
-                              setPurchaseProduct((prev) => ({
-                                ...prev,
-                                [warehouse.id]: e.target.value,
-                              }))
-                            }
-                            className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-text outline-none focus:border-primary"
-                          >
-                            <option value="">
-                              {intl.formatMessage({ id: 'WAREHOUSES.SELECT_PRODUCT' })}
-                            </option>
-                            {products.map((p) => (
-                              <option key={p.id} value={p.id}>
-                                {p.name}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                        <Button
-                          variant="outline"
-                          disabled={!purchaseProduct[warehouse.id]}
-                          onClick={() => handleAddPurchase(warehouse)}
-                        >
-                          {intl.formatMessage({ id: 'WAREHOUSES.PURCHASE_IN' })}
-                        </Button>
+                    {/* Búsqueda — mismo modo y diseño que la vista Disponible. */}
+                    {levels.length > 0 && (
+                      <div className="mb-3">
+                        <input
+                          role="searchbox"
+                          type="text"
+                          value={search}
+                          onChange={(e) => setSearch(e.target.value)}
+                          placeholder={intl.formatMessage({ id: 'GENERAL.SEARCH' })}
+                          data-testid={`warehouse-search-${warehouse.id}`}
+                          className="w-full rounded border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                        />
                       </div>
                     )}
                     {levels.length === 0 && (
@@ -401,66 +434,86 @@ export function WarehousesPage() {
                         {intl.formatMessage({ id: 'WAREHOUSES.NO_STOCK' })}
                       </InfoBox>
                     )}
-                    {levels.length > 0 && (
-                      /* Filas de productos — mismo diseño que la vista Disponible
-                          del Inventario: nombre (cantidad) a la izquierda, costo
-                          promedio (success) + total (primary) a la derecha. Las
-                          acciones de movimiento viven al final de cada fila. */
-                      <div className="divide-y divide-border border-t border-border bg-surface">
-                        {levels.map((level) => (
-                          <div
-                            key={`${level.warehouseId}:${level.productId}`}
-                            className="flex items-center justify-between gap-2 px-4 py-3"
-                          >
-                            <p className="min-w-0 flex-1 font-medium text-text">
-                              {productName(level.productId)}{' '}
-                              (<span
-                                data-testid={`stock-onhand-${level.warehouseId}-${level.productId}`}
-                              >
-                                {level.onHand}
-                              </span>)
-                            </p>
-                            <div className="shrink-0 text-right">
-                              <p
-                                data-testid={`stock-cost-${level.warehouseId}-${level.productId}`}
-                                className="whitespace-nowrap text-sm font-semibold text-success"
-                              >
-                                {formatCurrency(level.costPrice)}
-                              </p>
-                              <p className="whitespace-nowrap text-sm font-semibold text-primary">
-                                {formatCurrency(level.costPrice * level.onHand)}
-                              </p>
-                            </div>
-                            <div className="flex shrink-0 items-center gap-1">
-                              <Button
-                                variant="outline"
-                                onClick={() =>
-                                  openMovementModal('purchase_in', warehouse, level.productId)
-                                }
-                              >
-                                {intl.formatMessage({ id: 'WAREHOUSES.PURCHASE_IN' })}
-                              </Button>
-                              <Button
-                                variant="outline"
-                                onClick={() =>
-                                  openMovementModal('sale_out', warehouse, level.productId)
-                                }
-                              >
-                                {intl.formatMessage({ id: 'WAREHOUSES.SALE_OUT' })}
-                              </Button>
-                              <Button
-                                variant="outline"
-                                onClick={() =>
-                                  openMovementModal('transfer_out', warehouse, level.productId)
-                                }
-                              >
-                                {intl.formatMessage({ id: 'WAREHOUSES.TRANSFER' })}
-                              </Button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
+                    {levels.length > 0 && categoryViewsOf(warehouse.id).length === 0 && (
+                      <InfoBox variant="primary" className="text-center">
+                        {intl.formatMessage({ id: 'WAREHOUSES.NO_STOCK' })}
+                      </InfoBox>
                     )}
+                    {levels.length > 0 &&
+                      /* Productos agrupados por categoría — mismo modo y diseño
+                          que la vista Disponible del Inventario (InventoryProductList):
+                          acordeón de categorías "Nombre (N) $Total" y filas de
+                          productos con costo promedio + total. Dentro del panel
+                          no hay selector de compra ni botones por fila: los
+                          movimientos se hacen desde el gear del almacén. */
+                      categoryViewsOf(warehouse.id).map((cat) => {
+                        const catExpanded = isSearching
+                          ? true
+                          : !!expandedCategories[cat.categoryId];
+                        return (
+                          <div
+                            key={cat.categoryId}
+                            className="space-y-1 rounded-lg border border-border"
+                          >
+                            <button
+                              type="button"
+                              data-testid={`warehouse-category-toggle-${warehouse.id}-${cat.categoryId}`}
+                              onClick={() =>
+                                setExpandedCategories((prev) => ({
+                                  ...prev,
+                                  [cat.categoryId]: !prev[cat.categoryId],
+                                }))
+                              }
+                              aria-expanded={catExpanded}
+                              className="flex w-full items-center justify-between px-4 py-3 text-left"
+                            >
+                              <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">
+                                {cat.categoryName} ({cat.totalQuantity})
+                              </h2>
+                              <span className="flex items-center gap-2">
+                                <span className="whitespace-nowrap text-sm font-semibold text-primary">
+                                  {formatCurrency(cat.totalCostPrice)}
+                                </span>
+                                <ChevronDownIcon
+                                  isExpanded={catExpanded}
+                                  className="text-text-muted"
+                                />
+                              </span>
+                            </button>
+                            {catExpanded && (
+                              <div className="divide-y divide-border border-t border-border bg-surface">
+                                {cat.products.map((p) => (
+                                  <div
+                                    key={p.productId}
+                                    data-testid={`warehouse-product-row-${warehouse.id}-${p.productId}`}
+                                    className="flex items-center justify-between px-4 py-3"
+                                  >
+                                    <div>
+                                      <p className="font-medium text-text">
+                                        {p.productName} ({p.totalAvailable})
+                                      </p>
+                                    </div>
+                                    <div className="text-right">
+                                      <p
+                                        data-testid={`warehouse-product-cost-${warehouse.id}-${p.productId}`}
+                                        className="whitespace-nowrap text-sm font-semibold text-success"
+                                      >
+                                        {formatCurrency(p.avgCostPrice)}
+                                      </p>
+                                      <p
+                                        data-testid={`warehouse-product-total-${warehouse.id}-${p.productId}`}
+                                        className="whitespace-nowrap text-sm font-semibold text-primary"
+                                      >
+                                        {formatCurrency(p.avgCostPrice * p.totalAvailable)}
+                                      </p>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                   </div>
                 )}
               </div>

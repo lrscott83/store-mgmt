@@ -1,7 +1,7 @@
-import { type RouteConfig, index, layout, route } from '@react-router/dev/routes';
+﻿import { type RouteConfig, index, layout, route } from '@react-router/dev/routes';
 
 export default [
-  // Public landing page — no auth required, matches Angular's unguarded '' route.
+  // Public landing page â€” no auth required, matches Angular's unguarded '' route.
   // NOTE (frontend-parity-audit 2.6.3, investigated 2026-07-02): Angular's
   // app-routing.module.ts ALSO registers a second '' route nested inside
   // ClientLayoutComponent with `redirectTo: '/sales/sale', pathMatch: 'full'`
@@ -9,11 +9,11 @@ export default [
   // Angular Router resolves route arrays in declaration order and the FIRST
   // `{ path: '', component: LandingDeepComponent }` (no guard, no children)
   // fully matches the exact root URL with zero leftover segments and wins
-  // outright — the nested ClientLayoutComponent '' redirect is unreachable
+  // outright â€” the nested ClientLayoutComponent '' redirect is unreachable
   // for '/'. Confirmed by tracing: LandingDeepComponent has no auth check in
   // its .ts/.html, and AppComponent has no root-level redirect either. So an
   // authenticated Angular user hitting '/' ALSO sees the public landing page,
-  // same as an unauthenticated one — this index route intentionally has NO
+  // same as an unauthenticated one â€” this index route intentionally has NO
   // clientLoader/redirect for authenticated users, matching real Angular
   // behavior. Do NOT "fix" this into an authenticated-root redirect without
   // first re-verifying against a live running Angular instance.
@@ -24,7 +24,7 @@ export default [
     route('login', 'auth/routes/login.tsx'),
     route('register', 'auth/routes/register.tsx'),
     // Device provisioning (offline-auth-frontend): imports a roster bundle so
-    // this device can authenticate offline. No `clientLoader` — a
+    // this device can authenticate offline. No `clientLoader` â€” a
     // `guestOnlyLoader` would redirect an authenticated admin away, but
     // provisioning must work regardless of this device's current auth state.
     route('auth/provision', 'auth/routes/provision.tsx'),
@@ -32,16 +32,16 @@ export default [
 
   // Authenticated routes (require auth via authLoader)
   layout('shared/components/app-layout.tsx', { id: 'app-layout' }, [
-    // Sales — Products
+    // Sales â€” Products
     route('sales/products', 'sales/routes/products.tsx'),
-    // Sales — POS & Orders
+    // Sales â€” POS & Orders
     route('sales/new', 'sales/routes/sale.tsx'),
-    // Sales — Wholesale (mismo guard de Ventas)
+    // Sales â€” Wholesale (mismo guard de Ventas)
     route('sales/wholesale', 'sales/routes/wholesale.tsx'),
     route('sales/today-orders', 'sales/routes/today-orders.tsx'),
     route('sales/orders', 'sales/routes/orders.tsx'),
     route('sales/today-stats', 'sales/routes/today-stats.tsx'),
-    // Sales — Credits
+    // Sales â€” Credits
     route('sales/today-credits', 'sales/routes/today-credits.tsx'),
     route('sales/credits', 'sales/routes/credits.tsx'),
 
@@ -63,15 +63,16 @@ export default [
 
     // Statistics
     route('stats/dashboard', 'statistics/routes/dashboard.tsx'),
+    route('stats/cuadre-por-fechas', 'statistics/routes/cuadre-por-fechas.tsx'),
 
-    // Sync — Export / Import
+    // Sync â€” Export / Import
     route('sync/export', 'sync/routes/export.tsx'),
     route('sync/import', 'sync/routes/import.tsx'),
 
-    // Management — Stores
+    // Management â€” Stores
     // Plan/update split: the PLAN view lives at `management/stores` (PlanPicker +
     // plan save) and the store-DATA update view at `management/stores/update` and
-    // `management/stores/edit/:id` (no plan section — moduleIds omitted on save).
+    // `management/stores/edit/:id` (no plan section â€” moduleIds omitted on save).
     // Creation stays on `management/stores/create` (it needs the plan picker).
     // Distinct route `id`s are required because RR7 rejects reusing one file across
     // multiple route() entries without one (see design.md).
@@ -80,51 +81,51 @@ export default [
     route('management/stores/create', 'management/stores/routes/edit-store.tsx', { id: 'management-stores-create' }),
     route('management/stores/edit/:id', 'management/stores/routes/update-store.tsx', { id: 'management-stores-edit' }),
 
-    // Management — Stores — Billing (Req: billing-collections; DG-4 resellerFeatureLoader)
+    // Management â€” Stores â€” Billing (Req: billing-collections; DG-4 resellerFeatureLoader)
     route('management/stores/collections', 'management/stores/routes/collections.tsx'),
     route('management/stores/commissions', 'management/stores/routes/reseller-commissions.tsx'),
 
-    // Management — Exchange rates (daily USD→MN register; same guard as
-    // Configurations — daily-exchange-rate)
+    // Management â€” Exchange rates (daily USDâ†’MN register; same guard as
+    // Configurations â€” daily-exchange-rate)
     route('management/exchange-rates', 'management/exchange-rates/routes/exchange-rates.tsx', {
       id: 'management-exchange-rates',
     }),
 
-    // Management — Users
+    // Management â€” Users
     route('management/users', 'management/users/routes/user-list.tsx'),
     // storeId is optional: matches both /create (from user list) and /create/:storeId
     // (after store creation), mirroring Angular's single CreateStoreUserComponent.
     route('management/users/create/:storeId?', 'management/users/routes/user-create.tsx'),
     route('management/users/edit/:id', 'management/users/routes/user-edit.tsx'),
 
-    // Management — Configurations
+    // Management â€” Configurations
     route('management/configurations', 'management/configurations/routes/configurations.tsx'),
 
-    // Admin — Features
+    // Admin â€” Features
     route('admin/features', 'admin/features/routes/features.tsx'),
 
-    // Admin — Stores
+    // Admin â€” Stores
     route('admin/stores', 'admin/stores/routes/store-list.tsx'),
 
-    // Admin — Dashboard
+    // Admin â€” Dashboard
     route('admin/dashboard', 'admin/dashboard/routes/dashboard.tsx'),
 
-    // Admin — Resellers
+    // Admin â€” Resellers
     route('admin/resellers', 'admin/resellers/routes/reseller-list.tsx'),
     route('admin/resellers/create', 'admin/resellers/routes/reseller-create.tsx'),
     route('admin/resellers/edit/:id', 'admin/resellers/routes/reseller-edit.tsx'),
 
-    // Admin — Owners
+    // Admin â€” Owners
     route('admin/owners', 'admin/owners/routes/owner-list.tsx'),
     route('admin/owners/create', 'admin/owners/routes/owner-create.tsx'),
     route('admin/owners/edit/:id', 'admin/owners/routes/owner-edit.tsx'),
 
-    // Profile — User profile management
+    // Profile â€” User profile management
     route('profile/edit', 'profile/routes/edit-profile.tsx'),
     route('profile/change-password', 'profile/routes/change-password.tsx'),
   ]),
 
-  // Help — Tutorial (PUBLIC — mirrors Angular's app-routing.module.ts:89-97,
+  // Help â€” Tutorial (PUBLIC â€” mirrors Angular's app-routing.module.ts:89-97,
   // which nests help/tutorial inside ClientLayoutComponent with NO canActivate
   // guard). Same chrome as app-layout, but reached via a layout module that
   // does NOT re-export authLoader as its clientLoader.

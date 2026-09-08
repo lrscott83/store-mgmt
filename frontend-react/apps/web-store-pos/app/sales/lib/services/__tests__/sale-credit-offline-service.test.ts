@@ -545,6 +545,17 @@ describe('SaleCreditOfflineService', () => {
     service = new SaleCreditOfflineService(storeId);
   }
 
+  // Test-only helper: same localStorage-rewrite technique as setCreditDate, but
+  // for `paidDate` — createSaleCredit/paidSaleCredit always stamp paidDate as
+  // now, so paid-window assertions need explicit control over it.
+  function setPaidDate(id: string, date: Date) {
+    const raw = localStorage.getItem('lizoft.store-saleCredits-s1');
+    const credits: Record<string, unknown>[] = JSON.parse(raw ?? '[]');
+    const patched = credits.map((c) => (c.id === id ? { ...c, paidDate: date.toISOString() } : c));
+    localStorage.setItem('lizoft.store-saleCredits-s1', JSON.stringify(patched));
+    service = new SaleCreditOfflineService(storeId);
+  }
+
   // WU4 (eliminate-base-repository): inlined persistence — plain-array wire-format, cache,
   // auto-init, 1:1 port of Angular's sale-credit-offline.service.ts:285-302. Revival fields
   // (date/paidDate/createdDate/updatedDate) are UNCHANGED from current React behavior
@@ -683,6 +694,43 @@ describe('SaleCreditOfflineService', () => {
       setCreditDate(paid.id, yesterdayDate);
       service.paidSaleCredit(paid.id, PaymentType.Efectivo, '');
       expect(service.getActiveUnpaidSaleCreditsPriceYesterday()).toBe(25);
+    });
+  });
+
+  // Cuadre por fechas (range view): getUnPaidSaleCreditsBetween / getPaidSaleCreditsBetween
+  describe('getUnPaidSaleCreditsBetween / getPaidSaleCreditsBetween (Cuadre por fechas)', () => {
+    it('unpaid range: active + unpaid credits CREATED in the window', () => {
+      const start = new Date('2024-02-01T00:00:00.000');
+      const end = new Date('2024-02-05T00:00:00.000');
+      const inRange = createCredit('o1', 'Ana', 30);
+      setCreditDate(inRange.id, new Date('2024-02-02T10:00:00.000'));
+      const paidInRange = createCredit('o2', 'Bob', 20);
+      setCreditDate(paidInRange.id, new Date('2024-02-03T10:00:00.000'));
+      service.paidSaleCredit(paidInRange.id, PaymentType.Efectivo, '');
+      const outOfRange = createCredit('o3', 'Carl', 999);
+      setCreditDate(outOfRange.id, new Date('2024-01-15T10:00:00.000'));
+      const result = service.getUnPaidSaleCreditsBetween(start, end);
+      expect(result.map((c) => c.id)).toEqual([inRange.id]);
+    });
+
+    it('paid range: credits PAID (paidDate) in the window, regardless of creation date', () => {
+      const start = new Date('2024-02-01T00:00:00.000');
+      const end = new Date('2024-02-05T00:00:00.000');
+      // Created BEFORE the window, paid INSIDE it → included.
+      const paidInside = createCredit('o1', 'Ana', 30);
+      setCreditDate(paidInside.id, new Date('2024-01-10T10:00:00.000'));
+      service.paidSaleCredit(paidInside.id, PaymentType.Efectivo, '');
+      setPaidDate(paidInside.id, new Date('2024-02-02T10:00:00.000'));
+      // Created INSIDE the window, paid AFTER it → excluded.
+      const paidAfter = createCredit('o2', 'Bob', 20);
+      setCreditDate(paidAfter.id, new Date('2024-02-02T10:00:00.000'));
+      service.paidSaleCredit(paidAfter.id, PaymentType.Efectivo, '');
+      setPaidDate(paidAfter.id, new Date('2024-02-20T10:00:00.000'));
+      // Unpaid credit created inside the window → excluded.
+      const unpaid = createCredit('o3', 'Carl', 999);
+      setCreditDate(unpaid.id, new Date('2024-02-03T10:00:00.000'));
+      const result = service.getPaidSaleCreditsBetween(start, end);
+      expect(result.map((c) => c.id)).toEqual([paidInside.id]);
     });
   });
 
