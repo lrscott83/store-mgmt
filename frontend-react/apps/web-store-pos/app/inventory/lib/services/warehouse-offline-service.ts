@@ -274,13 +274,33 @@ export class WarehouseOfflineService {
               WarehouseErrors.InsufficientStock,
             ]);
           }
+
+          // Snapshot for rollback: the store entry is created and confirmed
+          // BEFORE the warehouse debit is persisted (plan 2026-09-08 BUG-2).
+          const prevOnHand = level.onHand;
+          const prevUpdatedDate = level.updatedDate;
+
           const next = applyMovement(level, 'sale_out', quantity);
           level.onHand = next.onHand;
           level.updatedDate = new Date();
-          this.setLocalStorage('warehouse-stock-levels', this.stockLevels!);
 
-          // Entrada a la tienda con el costo promedio del almacén.
-          this.inventoryService.createInventoryEntry(params.productId, quantity, level.costPrice);
+          // Entrada a la tienda con el costo promedio del almacén. Si falla
+          // (null — producto inexistente — o success:false), el débito se
+          // revierte en memoria, no se persiste y no queda movimiento.
+          const entry = this.inventoryService.createInventoryEntry(
+            params.productId,
+            quantity,
+            level.costPrice,
+          );
+          if (!entry || !entry.succeeded) {
+            level.onHand = prevOnHand;
+            level.updatedDate = prevUpdatedDate;
+            return new DataResultImpl<WarehouseStockMovement>(undefined, false, [
+              WarehouseErrors.ProductNotExists,
+            ]);
+          }
+
+          this.setLocalStorage('warehouse-stock-levels', this.stockLevels!);
 
           return new DataResultImpl<WarehouseStockMovement>(
             this.appendMovement({

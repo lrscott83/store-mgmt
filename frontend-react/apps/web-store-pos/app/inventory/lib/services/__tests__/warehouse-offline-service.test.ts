@@ -243,6 +243,50 @@ describe('WarehouseOfflineService', () => {
       expect(result.succeeded).toBe(true);
       expect(service.getStockLevel(wh.id, 'prod-1')!.onHand).toBe(1.5);
     });
+
+    it('does not debit the warehouse nor record a movement when the store entry fails (BUG-2 atomicity)', () => {
+      // The warehouse service validates the product against ITS OWN repo; the
+      // inventory service below is backed by a repo for ANOTHER store, so its
+      // createInventoryEntry finds no product and returns null — the seam that
+      // simulates the store-entry failure without stubs.
+      const otherCategoryRepo = new ProductCategoryRepository('other-store');
+      const otherProductRepo = new ProductRepository('other-store', otherCategoryRepo);
+      const otherInventorySvc = new InventoryOfflineService('other-store', otherProductRepo);
+      const failingService = new WarehouseOfflineService(storeId, productRepo, otherInventorySvc);
+
+      const wh = service.createWarehouse('A').data!;
+      service.recordMovement({
+        type: 'purchase_in',
+        warehouseId: wh.id,
+        productId: 'prod-1',
+        quantity: 5,
+        costPrice: 660,
+      });
+
+      const result = failingService.recordMovement({
+        type: 'sale_out',
+        warehouseId: wh.id,
+        productId: 'prod-1',
+        quantity: 3,
+      });
+
+      expect(result.succeeded).toBe(false);
+      expect(result.errors[0]).toEqual(WarehouseErrors.ProductNotExists);
+
+      // The warehouse is NOT debited — in memory AND in persisted storage.
+      expect(service.getStockLevel(wh.id, 'prod-1')!.onHand).toBe(5);
+      const fresh = new WarehouseOfflineService(storeId, productRepo, inventorySvc);
+      expect(fresh.getStockLevel(wh.id, 'prod-1')!.onHand).toBe(5);
+
+      // No sale_out movement was recorded (only the purchase_in), in memory
+      // and persisted.
+      expect(service.getMovements()).toHaveLength(1);
+      expect(fresh.getMovements()).toHaveLength(1);
+      expect(fresh.getMovements()[0].type).toBe('purchase_in');
+
+      // No store entry was created.
+      expect(inventorySvc.getProductInventoriesByProductId('prod-1')).toHaveLength(0);
+    });
   });
 
   // ─── transfer ───
@@ -309,6 +353,55 @@ describe('WarehouseOfflineService', () => {
       expect(result.succeeded).toBe(true);
       expect(service.getStockLevel(whA.id, 'prod-1')!.onHand).toBe(16);
       expect(service.getStockLevel(whB.id, 'prod-1')!.onHand).toBe(8);
+    });
+
+    // ─── GAP-3: transfer to a destination that ALREADY holds stock (plan 2026-09-08, Paso 4) ───
+
+    it('transfer_out to a destination with prior stock recomputes the weighted cost (GAP-3)', () => {
+      const whA = service.createWarehouse('A').data!;
+      const whB = service.createWarehouse('B').data!;
+      // Origin: prod-1 @ $10 (10 units). Destination: prod-1 @ $6 (10 units).
+      service.recordMovement({ type: 'purchase_in', warehouseId: whA.id, productId: 'prod-1', quantity: 10, costPrice: 10 });
+      service.recordMovement({ type: 'purchase_in', warehouseId: whB.id, productId: 'prod-1', quantity: 10, costPrice: 6 });
+
+      const result = service.recordMovement({
+        type: 'transfer_out',
+        warehouseId: whA.id,
+        productId: 'prod-1',
+        quantity: 5,
+        toWarehouseId: whB.id,
+      });
+      expect(result.succeeded).toBe(true);
+
+      // Origin: 10 − 5 = 5, cost unchanged.
+      expect(service.getStockLevel(whA.id, 'prod-1')!.onHand).toBe(5);
+      expect(service.getStockLevel(whA.id, 'prod-1')!.costPrice).toBe(10);
+
+      // Destination: 10 + 5 = 15 at weighted cost ((10×6)+(5×10))/15 = 110/15 = 7.33.
+      const levelB = service.getStockLevel(whB.id, 'prod-1')!;
+      expect(levelB.onHand).toBe(15);
+      expect(levelB.costPrice).toBe(7.33);
+    });
+
+    it('transfer_in to a destination with prior stock recomputes the weighted cost (GAP-3)', () => {
+      const whA = service.createWarehouse('A').data!;
+      const whB = service.createWarehouse('B').data!;
+      service.recordMovement({ type: 'purchase_in', warehouseId: whA.id, productId: 'prod-1', quantity: 10, costPrice: 10 });
+      service.recordMovement({ type: 'purchase_in', warehouseId: whB.id, productId: 'prod-1', quantity: 10, costPrice: 6 });
+
+      const result = service.recordMovement({
+        type: 'transfer_in',
+        warehouseId: whB.id,
+        productId: 'prod-1',
+        quantity: 5,
+        fromWarehouseId: whA.id,
+      });
+      expect(result.succeeded).toBe(true);
+
+      expect(service.getStockLevel(whA.id, 'prod-1')!.onHand).toBe(5);
+      const levelB = service.getStockLevel(whB.id, 'prod-1')!;
+      expect(levelB.onHand).toBe(15);
+      expect(levelB.costPrice).toBe(7.33);
     });
   });
 
