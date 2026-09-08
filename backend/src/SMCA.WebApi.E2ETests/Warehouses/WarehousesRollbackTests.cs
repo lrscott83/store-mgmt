@@ -22,6 +22,11 @@ namespace SMCA.WebApi.E2ETests.Warehouses;
 /// The Down statements mirror exactly what the generated migration class emits:
 /// WarehousesModuleBackfill.DownSql (SRF -> StoreModule) followed by the EF DeleteData
 /// calls (Feature 36 -> Feature 37 -> Module 13) and the history-row delete.
+///
+/// Migration-chain note (added with Add-StorePlanModules): the newer StorePlanModule table
+/// references Module 13 with a Restrict FK, so reversing migration 11 alone requires first
+/// removing those plan-assignment rows — the same ordering EF enforces when rolling back the
+/// chain newest-first. The simulated Down clears them before the module DELETE.
 /// </summary>
 [Collection("e2e")]
 public sealed class WarehousesRollbackTests
@@ -49,6 +54,13 @@ public sealed class WarehousesRollbackTests
         {
             // 1) DownSql: per-store rows, SRF before StoreModule (same constant the migration Down runs).
             await db.Database.ExecuteSqlRawAsync(WarehousesModuleBackfill.DownSql);
+            // 1b) Newer-chain ordering: the Add-StorePlanModules migration references Module 13
+            // with a Restrict FK, so reversing migration 11 requires clearing those plan rows
+            // first (the order EF enforces when rolling back newest-first).
+            await db.Database.ExecuteSqlRawAsync(
+                """
+                DELETE FROM "StorePlanModule" WHERE "ModuleId" = 13;
+                """);
             // 2) The exact DeleteData statements the generated Down emits, in its order.
             await db.Database.ExecuteSqlRawAsync(
                 """
@@ -66,6 +78,8 @@ public sealed class WarehousesRollbackTests
                 .AnyAsync(sm => sm.ModuleId == 13)).Should().BeFalse("Down deletes per-store rows after SRF");
             (await db.Set<StoreRoleFeature>().IgnoreQueryFilters()
                 .AnyAsync(srf => WarehouseFeatureIds.Contains(srf.FeatureId))).Should().BeFalse();
+            (await db.Set<Domain.Entities.Plans.StorePlanModule>().IgnoreQueryFilters()
+                .AnyAsync(spm => spm.ModuleId == 13)).Should().BeFalse("Restrict FK rows cleared before module delete");
 
             var history = await db.Database.SqlQueryRaw<string>(
                 $"SELECT \"MigrationId\" AS \"Value\" FROM \"__EFMigrationsHistory\" WHERE \"MigrationId\" = '{MigrationId}'")
