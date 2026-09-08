@@ -1,6 +1,7 @@
 ﻿using Domain.Common.Entities;
 using Domain.Common.Events;
 using Domain.Entities.Features;
+using Domain.Entities.Plans;
 using Domain.Entities.StoreModules;
 
 namespace Domain.Entities.Modules
@@ -10,6 +11,7 @@ namespace Domain.Entities.Modules
         public string Name { get; set; }
         public ICollection<Feature> Features { get; set; }
         public ICollection<StoreModule> StoreModules { get; set; }
+        public ICollection<StorePlanModule> StorePlanModules { get; set; }
         public bool IsActive { get; set; } = false;
         public int Order { get; set; }
         public bool PriceIncluded { get; set; }
@@ -30,6 +32,7 @@ namespace Domain.Entities.Modules
             AvailableToStore = availableToStore;
             PercentDiscountPrice = percentDiscountPrice;
             Features = new List<Feature>();
+            StorePlanModules = new List<StorePlanModule>();
         }
 
         public static Module Create(int id, string name, int order, bool priceIncluded, float price, float discountPrice, float percentDiscountPrice, 
