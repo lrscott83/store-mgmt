@@ -151,8 +151,8 @@ describe('CuadrePorFechasPage', () => {
 
   it('shows INVALID_RANGE error when start > end', () => {
     renderPage();
-    fireEvent.change(screen.getByTestId('cuadre-start-date'), { target: { value: '2026-09-10' } });
-    fireEvent.change(screen.getByTestId('cuadre-end-date'), { target: { value: '2026-09-05' } });
+    fireEvent.change(screen.getByTestId('cuadre-start-date'), { target: { value: '10-09-2026' } });
+    fireEvent.change(screen.getByTestId('cuadre-end-date'), { target: { value: '05-09-2026' } });
     fireEvent.click(screen.getByTestId('cuadre-generate'));
     expect(screen.getByTestId('cuadre-range-error').textContent).toBe(
       'La fecha de inicio debe ser anterior o igual a la fecha de fin.',
@@ -167,8 +167,8 @@ describe('CuadrePorFechasPage', () => {
     mockGetActiveExpensesBetween.mockReturnValue([makeExpense({ total: 80 })]);
 
     renderPage();
-    fireEvent.change(screen.getByTestId('cuadre-start-date'), { target: { value: '2026-09-01' } });
-    fireEvent.change(screen.getByTestId('cuadre-end-date'), { target: { value: '2026-09-07' } });
+    fireEvent.change(screen.getByTestId('cuadre-start-date'), { target: { value: '01-09-2026' } });
+    fireEvent.change(screen.getByTestId('cuadre-end-date'), { target: { value: '07-09-2026' } });
     fireEvent.click(screen.getByTestId('cuadre-generate'));
 
     await waitFor(() => {
@@ -187,8 +187,8 @@ describe('CuadrePorFechasPage', () => {
 
   it('calls the range services with an inclusive [start, end+1day) window', async () => {
     renderPage();
-    fireEvent.change(screen.getByTestId('cuadre-start-date'), { target: { value: '2026-09-01' } });
-    fireEvent.change(screen.getByTestId('cuadre-end-date'), { target: { value: '2026-09-03' } });
+    fireEvent.change(screen.getByTestId('cuadre-start-date'), { target: { value: '01-09-2026' } });
+    fireEvent.change(screen.getByTestId('cuadre-end-date'), { target: { value: '03-09-2026' } });
     fireEvent.click(screen.getByTestId('cuadre-generate'));
 
     await waitFor(() => {
@@ -228,8 +228,8 @@ describe('CuadrePorFechasPage', () => {
     ]);
 
     renderPage();
-    fireEvent.change(screen.getByTestId('cuadre-start-date'), { target: { value: '2026-09-01' } });
-    fireEvent.change(screen.getByTestId('cuadre-end-date'), { target: { value: '2026-09-07' } });
+    fireEvent.change(screen.getByTestId('cuadre-start-date'), { target: { value: '01-09-2026' } });
+    fireEvent.change(screen.getByTestId('cuadre-end-date'), { target: { value: '07-09-2026' } });
     fireEvent.click(screen.getByTestId('cuadre-generate'));
 
     await waitFor(() => {
@@ -255,12 +255,107 @@ describe('CuadrePorFechasPage', () => {
     expect(screen.getByTestId('category-stats-cat-1')).toBeTruthy();
   });
 
+  describe('date format dd-mm-yyyy + generate button (user request 2026-09-08)', () => {
+    it('renders text inputs with dd-mm-yyyy placeholder instead of native date pickers', () => {
+      renderPage();
+      const start = screen.getByTestId('cuadre-start-date') as HTMLInputElement;
+      const end = screen.getByTestId('cuadre-end-date') as HTMLInputElement;
+      // Text inputs with a dd-mm-yyyy placeholder — not native type="date" pickers.
+      expect(start.type).toBe('text');
+      expect(end.type).toBe('text');
+      expect(start.placeholder).toBe('dd-mm-yyyy');
+      expect(end.placeholder).toBe('dd-mm-yyyy');
+    });
+
+    it('auto-formats typed digits into the dd-mm-yyyy mask while typing', () => {
+      renderPage();
+      const start = screen.getByTestId('cuadre-start-date') as HTMLInputElement;
+      // Typing raw digits gets progressively masked: "09012026" → "09-01-2026".
+      fireEvent.change(start, { target: { value: '0901' } });
+      expect(start.value).toBe('09-01');
+      fireEvent.change(start, { target: { value: '09012026' } });
+      expect(start.value).toBe('09-01-2026');
+    });
+
+    it('accepts a complete dd-mm-yyyy date and generates the summary', async () => {
+      mockGetActiveOrdersPriceBetweenDates.mockReturnValue(500);
+      renderPage();
+      fireEvent.change(screen.getByTestId('cuadre-start-date'), { target: { value: '01092026' } });
+      fireEvent.change(screen.getByTestId('cuadre-end-date'), { target: { value: '07092026' } });
+      fireEvent.click(screen.getByTestId('cuadre-generate'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Ganancias Bruta')).toBeTruthy();
+      });
+      // Window parsed from dd-mm-yyyy: Sep 1..7 2026 inclusive.
+      const [start, end] = mockGetActiveOrdersPriceBetweenDates.mock.calls[0] as [Date, Date];
+      expect(start.getDate()).toBe(1);
+      expect(start.getMonth()).toBe(8);
+      expect(start.getFullYear()).toBe(2026);
+      expect(end.getTime() - start.getTime()).toBe(7 * 24 * 60 * 60 * 1000);
+    });
+
+    it('rejects an invalid dd-mm-yyyy date with a clear error', () => {
+      renderPage();
+      fireEvent.change(screen.getByTestId('cuadre-start-date'), { target: { value: '32012026' } }); // día 32
+      fireEvent.change(screen.getByTestId('cuadre-end-date'), { target: { value: '07092026' } });
+      fireEvent.click(screen.getByTestId('cuadre-generate'));
+      expect(screen.getByTestId('cuadre-range-error').textContent).toBe('Formato de fecha inválido. Usa dd-mm-yyyy.');
+      expect(mockGetActiveOrdersPriceBetweenDates).not.toHaveBeenCalled();
+    });
+
+    it('rejects an incomplete date with the same format error', () => {
+      renderPage();
+      fireEvent.change(screen.getByTestId('cuadre-start-date'), { target: { value: '01-09' } });
+      fireEvent.change(screen.getByTestId('cuadre-end-date'), { target: { value: '07-09-2026' } });
+      fireEvent.click(screen.getByTestId('cuadre-generate'));
+      expect(screen.getByTestId('cuadre-range-error').textContent).toBe('Formato de fecha inválido. Usa dd-mm-yyyy.');
+      expect(mockGetActiveOrdersPriceBetweenDates).not.toHaveBeenCalled();
+    });
+
+    it('accepts fully dashed dd-mm-yyyy input (mask-friendly paste/edit)', async () => {
+      renderPage();
+      fireEvent.change(screen.getByTestId('cuadre-start-date'), { target: { value: '01-09-2026' } });
+      fireEvent.change(screen.getByTestId('cuadre-end-date'), { target: { value: '03-09-2026' } });
+      fireEvent.click(screen.getByTestId('cuadre-generate'));
+
+      await waitFor(() => {
+        expect(mockGetActiveOrdersPriceBetweenDates).toHaveBeenCalled();
+      });
+      const [start] = mockGetActiveOrdersPriceBetweenDates.mock.calls[0] as [Date, Date];
+      expect(start.getDate()).toBe(1);
+      expect(start.getMonth()).toBe(8);
+    });
+
+    it('the generate button renders the magnifying-glass icon next to the date controls', () => {
+      renderPage();
+      expect(screen.getByTestId('cuadre-generate-icon')).toBeTruthy();
+    });
+
+    it('shows the Spanish weekday under each input once the date is complete (user request 2026-09-08)', () => {
+      renderPage();
+      // Not shown while the date is incomplete or invalid.
+      fireEvent.change(screen.getByTestId('cuadre-start-date'), { target: { value: '01-09' } });
+      expect(screen.queryByTestId('cuadre-start-weekday')).toBeNull();
+
+      // 2026-09-01 is a Tuesday; 2026-09-07 is a Monday.
+      fireEvent.change(screen.getByTestId('cuadre-start-date'), { target: { value: '01092026' } });
+      expect(screen.getByTestId('cuadre-start-weekday').textContent).toBe('martes');
+      fireEvent.change(screen.getByTestId('cuadre-end-date'), { target: { value: '07092026' } });
+      expect(screen.getByTestId('cuadre-end-weekday').textContent).toBe('lunes');
+
+      // An invalid complete date hides the weekday again.
+      fireEvent.change(screen.getByTestId('cuadre-start-date'), { target: { value: '32012026' } });
+      expect(screen.queryByTestId('cuadre-start-weekday')).toBeNull();
+    });
+  });
+
   it('hides the Gastos KPI and the expenses/credits panels when modules are unavailable', async () => {
     mockAuthState.user.storeModuleIds = [];
 
     renderPage();
-    fireEvent.change(screen.getByTestId('cuadre-start-date'), { target: { value: '2026-09-01' } });
-    fireEvent.change(screen.getByTestId('cuadre-end-date'), { target: { value: '2026-09-07' } });
+    fireEvent.change(screen.getByTestId('cuadre-start-date'), { target: { value: '01-09-2026' } });
+    fireEvent.change(screen.getByTestId('cuadre-end-date'), { target: { value: '07-09-2026' } });
     fireEvent.click(screen.getByTestId('cuadre-generate'));
 
     await waitFor(() => {

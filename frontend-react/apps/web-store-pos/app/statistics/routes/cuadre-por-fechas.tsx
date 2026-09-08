@@ -7,9 +7,9 @@ import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { hasCreditsModuleAvailable, hasExpensesModuleAvailable } from '~/shared/lib/auth/authorization-service';
 import { Card } from '~/shared/components/ui/card';
 import { Button } from '~/shared/components/ui/button';
-import { ChevronDownIcon } from '~/shared/components/ui/icons';
+import { ChevronDownIcon, SearchIcon } from '~/shared/components/ui/icons';
 import { formatCurrency } from '~/shared/lib/format-currency';
-import { formatLocalDate, addDays, startOfDay } from '~/shared/lib/date-utils';
+import { formatLocalDate, addDays, startOfDay, maskDashedDate, parseDashedDate, weekdayNameEs } from '~/shared/lib/date-utils';
 import { OrderOfflineService } from '~/sales/lib/services/order-offline-service';
 import { ExpenseOfflineService } from '~/expenses/lib/services/expense-offline-service';
 import { SaleCreditOfflineService } from '~/sales/lib/services/sale-credit-offline-service';
@@ -136,8 +136,17 @@ export function CuadrePorFechasPage() {
       setRangeError(intl.formatMessage({ id: 'CUADRE_FECHAS.EMPTY_DATES' }));
       return;
     }
-    const start = startOfDay(new Date(`${startDate}T00:00:00`));
-    const end = startOfDay(new Date(`${endDate}T00:00:00`));
+    // dd-mm-yyyy inputs (user request 2026-09-08): parse with parseDashedDate —
+    // returns null for incomplete or impossible dates (day 32, month 13, Feb 29
+    // in a non-leap year).
+    const parsedStart = parseDashedDate(startDate);
+    const parsedEnd = parseDashedDate(endDate);
+    if (!parsedStart || !parsedEnd) {
+      setRangeError(intl.formatMessage({ id: 'CUADRE_FECHAS.INVALID_FORMAT' }));
+      return;
+    }
+    const start = parsedStart;
+    const end = parsedEnd;
     if (start > end) {
       setRangeError(intl.formatMessage({ id: 'CUADRE_FECHAS.INVALID_RANGE' }));
       return;
@@ -206,6 +215,10 @@ export function CuadrePorFechasPage() {
     });
   }
 
+  /** Día de la semana (es) de la fecha tecleada, o null si aún no es válida. */
+  const startWeekday = parseDashedDate(startDate) ? weekdayNameEs(parseDashedDate(startDate)!) : null;
+  const endWeekday = parseDashedDate(endDate) ? weekdayNameEs(parseDashedDate(endDate)!) : null;
+
   const total = summary
     ? summary.categories.reduce((acc, c) => acc + c.total, 0) +
       summary.paidSaleCredits.reduce((acc, c) => acc + c.total, 0) -
@@ -245,11 +258,18 @@ export function CuadrePorFechasPage() {
           <input
             id="cuadre-start-date"
             data-testid="cuadre-start-date"
-            type="date"
+            type="text"
+            inputMode="numeric"
+            placeholder="dd-mm-yyyy"
             value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
+            onChange={(e) => setStartDate(maskDashedDate(e.target.value))}
             className="rounded border border-gray-300 px-3 py-2 text-sm"
           />
+          {startWeekday && (
+            <p data-testid="cuadre-start-weekday" className="mt-1 text-xs font-medium text-gray-600">
+              {startWeekday}
+            </p>
+          )}
         </div>
         <div>
           <label htmlFor="cuadre-end-date" className="mb-1 block text-sm font-medium text-gray-700">
@@ -258,13 +278,23 @@ export function CuadrePorFechasPage() {
           <input
             id="cuadre-end-date"
             data-testid="cuadre-end-date"
-            type="date"
+            type="text"
+            inputMode="numeric"
+            placeholder="dd-mm-yyyy"
             value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
+            onChange={(e) => setEndDate(maskDashedDate(e.target.value))}
             className="rounded border border-gray-300 px-3 py-2 text-sm"
           />
+          {endWeekday && (
+            <p data-testid="cuadre-end-weekday" className="mt-1 text-xs font-medium text-gray-600">
+              {endWeekday}
+            </p>
+          )}
         </div>
-        <Button variant="primary" data-testid="cuadre-generate" onClick={generate}>
+        <Button variant="primary" data-testid="cuadre-generate" onClick={generate} className="flex items-center gap-2">
+          <span data-testid="cuadre-generate-icon">
+            <SearchIcon />
+          </span>
           {intl.formatMessage({ id: 'CUADRE_FECHAS.GENERATE' })}
         </Button>
         {rangeError && (

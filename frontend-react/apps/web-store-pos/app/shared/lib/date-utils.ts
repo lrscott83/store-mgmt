@@ -74,6 +74,57 @@ export function formatLocalDate(date: Date): string {
 }
 
 /**
+ * dd-mm-yyyy input mask (user request 2026-09-08, Cuadre por fechas).
+ *
+ * Formats typed characters into `dd-mm-yyyy` as the user types: digits are
+ * kept, separators (`-`, `/`, `.`) become the canonical dash, and everything
+ * else is dropped. Inserted dashes appear after 2 digits (day) and after 4
+ * (day-month). Output is capped at 10 characters. Pure — no Date involved.
+ */
+export function maskDashedDate(raw: string): string {
+  const cleaned = raw.replace(/[^\d-]/g, '').slice(0, 10);
+  const digits = cleaned.replace(/-/g, '');
+  const parts: string[] = [];
+  if (digits.length > 0) parts.push(digits.slice(0, 2));
+  if (digits.length > 2) parts.push(digits.slice(2, 4));
+  if (digits.length > 4) parts.push(digits.slice(4, 8));
+  return parts.join('-');
+}
+
+/**
+ * Inverse of `maskDashedDate`: parses `dd-mm-yyyy` (dashes optional — digits
+ * alone work too, e.g. pasted) into the LOCAL midnight of that calendar day.
+ * Returns `null` for anything incomplete or impossible (day 32, month 13,
+ * Feb 29 in a non-leap year) — the caller decides how to surface the error.
+ */
+export function parseDashedDate(raw: string): Date | null {
+  const digits = raw.replace(/[^\d]/g, '');
+  if (digits.length !== 8) return null;
+  const day = Number(digits.slice(0, 2));
+  const month = Number(digits.slice(2, 4));
+  const year = Number(digits.slice(4, 8));
+  if (month < 1 || month > 12) return null;
+  if (day < 1 || day > 31) return null;
+  const date = new Date(year, month - 1, day);
+  // Reject roll-overs (Feb 30, Feb 29 in a non-leap year, day 31 in a 30-day
+  // month): `new Date(y, m, d)` silently normalizes them to the next month.
+  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) {
+    return null;
+  }
+  return startOfDay(date);
+}
+
+/**
+ * Spanish weekday name (lowercase, RAE style) of a `Date`'s LOCAL calendar day.
+ * The app is Spanish-only (i18n-provider resolves 'es'), so this is a fixed
+ * table rather than an `Intl` call — deterministic in every environment.
+ */
+export function weekdayNameEs(date: Date): string {
+  const WEEKDAYS_ES = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+  return WEEKDAYS_ES[new Date(date).getDay()];
+}
+
+/**
  * Calendar-day key of an instant in the VIEWER's LOCAL timezone; agrees by
  * construction with startOfDay and formatLocalDate. Do NOT use
  * toISOString().split('T')[0] — it projects onto the UTC calendar day, so a

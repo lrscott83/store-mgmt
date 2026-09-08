@@ -730,6 +730,7 @@ const messages: Record<string, string> = {
   'CUADRE_FECHAS.GENERATE': 'Generar',
   'CUADRE_FECHAS.INVALID_RANGE': 'La fecha de inicio debe ser anterior o igual a la fecha de fin.',
   'CUADRE_FECHAS.EMPTY_DATES': 'Selecciona las fechas de inicio y fin.',
+  'CUADRE_FECHAS.INVALID_FORMAT': 'Formato de fecha inválido. Usa dd-mm-yyyy.',
   'CUADRE_FECHAS.CUADRE': 'Cuadre',
   'CUADRE_FECHAS.KPI_SALES': 'Ventas',
   'CUADRE_FECHAS.KPI_EXPENSES': 'Gastos',
