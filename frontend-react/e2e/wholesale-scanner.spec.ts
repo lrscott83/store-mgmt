@@ -8,14 +8,18 @@ import type { Page } from '@playwright/test';
  * toolbar as the sale view — scanner button next to the product search box
  * and the "Todos" search-scope switch.
  *
- * Tests the MANUAL-ENTRY path of the scanner modal (camera decoding is not
- * E2E-testable — same contract as sale-barcode-scanner.spec.ts) and the
- * "Todos" search-scope switch semantics.
+ * 2026-09-07 redesign: the scanner modal dropped the manual barcode form
+ * (the old E2E-testable path), its + submit button and the "Listo" button.
+ * The camera decode itself cannot run under Playwright (no fake camera
+ * device; zxing needs real frames), so the add-to-cart flow — including the
+ * first-tier-minimum × scanned-quantity contract and the inventory gate —
+ * is pinned by the unit suite (wholesale.test.tsx — onScanned(barcode,
+ * quantity) contract through a ScannerModal mock).
  *
- * Scanner contract (user decision 2026-09-07): each scan adds the FIRST
- * tier's minimum packs (minPacks × packSize units) with the first tier's
- * unit price, so the POS scan-scan-scan cadence never trips the min-packs
- * error.
+ * What this E2E still proves end-to-end: the wholesale scanner entry point
+ * opens the real modal, the redesigned modal renders the quantity stepper
+ * with NO manual form, and the "Todos" search-scope switch restricts the
+ * name search to the selected category when OFF.
  *
  * Uses the `owner-admin-with-products` persona: seeded category + product
  * in plaintext localStorage, same seam as mayorista-sale.spec.ts.
@@ -23,18 +27,14 @@ import type { Page } from '@playwright/test';
 
 const WHOLESALE_HEADER = 'Ventas Mayoristas'; // SALES.WHOLESALE.HEADER, es.ts
 const SCANNER_TITLE = 'Escanear producto'; // SCANNER.TITLE, es.ts
-const DONE_TEXT = 'Listo'; // SCANNER.DONE, es.ts
-const NOT_FOUND_TEXT = (barcode: string) => `Producto no encontrado: ${barcode}`;
-const NOT_WHOLESALE_TEXT = (name: string) =>
-  `El producto ${name} no tiene configuración mayorista y no se puede vender en esta vista`;
 
 /**
- * Same seed shape as mayorista-sale.spec.ts's seedWholesaleProduct, plus a
- * barcode on the product: wholesale config (packSize 24, minPacks 5 → $6,
- * minPacks 12 → $5) and an inventory entry so the availability gate passes.
- * Returns the product name + id.
+ * Same seed shape as mayorista-sale.spec.ts's seedWholesaleProduct: wholesale
+ * config (packSize 24, minPacks 5 → $6, minPacks 12 → $5) and an inventory
+ * entry so the availability gate sees `available` units. Returns the product
+ * name + id.
  */
-async function seedWholesaleProductWithBarcode(
+async function seedWholesaleProduct(
   page: Page,
   storeId: string,
   available = 1000,
@@ -57,12 +57,10 @@ async function seedWholesaleProductWithBarcode(
 
       product['wholesaleEnabled'] = true;
       product['wholesalePackSize'] = 24;
-      // First tier minPacks 5 → each scan adds 5 packs = 120 units at $6.
       product['wholesaleTiers'] = [
         { minPacks: 5, pricePerUnit: 6 },
         { minPacks: 12, pricePerUnit: 5 },
       ];
-      product['barcode'] = '7501234567890';
       localStorage.setItem(productKey, JSON.stringify(entries));
 
       const invKey = `lizoft.store-inventory-entries-${sid}`;
@@ -113,7 +111,7 @@ async function openWholesaleSeeded(
 ): Promise<{ name: string; id: string }> {
   await page.goto('/sales/wholesale');
   await expect(page.getByText(WHOLESALE_HEADER)).toBeVisible();
-  const seeded = await seedWholesaleProductWithBarcode(page, storeId, available);
+  const seeded = await seedWholesaleProduct(page, storeId, available);
   expect(seeded).not.toBeNull();
   const product = seeded as { name: string; id: string };
 
@@ -126,156 +124,40 @@ async function openWholesaleSeeded(
   return product;
 }
 
-test.describe.serial('wholesale-scanner — escaneo manual y filtro Todos en venta mayorista', () => {
+test.describe('wholesale-scanner — modal redesign y filtro Todos en venta mayorista', () => {
   test.describe.configure({ timeout: 120_000 });
 
   test.use({ persona: 'owner-admin-with-products' });
 
-  test('el botón del scanner junto al searchbox abre el modal', async ({ signedInPage }) => {
+  test('the wholesale scanner entry point opens the redesigned modal', async ({ signedInPage }) => {
     const { page, selectedStoreId } = signedInPage;
 
-    const product = await openWholesaleSeeded(page, selectedStoreId);
+    await openWholesaleSeeded(page, selectedStoreId);
 
     // The scanner button sits in the toolbar next to the search input.
     const scannerButton = page.getByTestId('wholesale-scanner');
     await expect(scannerButton).toBeVisible();
     await scannerButton.click();
+
     await expect(page.getByTestId('scanner-modal')).toBeVisible();
     await expect(page.getByText(SCANNER_TITLE)).toBeVisible();
 
-    // Close via Done.
-    await page.getByTestId('scanner-done').click();
+    // The 2026-09-07 redesign dropped the manual-entry path entirely…
+    await expect(page.getByTestId('scanner-manual-input')).toHaveCount(0);
+    await expect(page.getByTestId('scanner-manual-submit')).toHaveCount(0);
+    await expect(page.getByTestId('scanner-done')).toHaveCount(0);
+
+    // …and the quantity stepper defaults to 1.
+    const quantityInput = page.getByTestId('scanner-quantity-input');
+    await expect(quantityInput).toHaveValue('1');
+    await page.getByTestId('scanner-quantity-increase').click();
+    await expect(quantityInput).toHaveValue('2');
+    await page.getByTestId('scanner-quantity-decrease').click();
+    await expect(quantityInput).toHaveValue('1');
+
+    // Closing via X removes the modal.
+    await page.getByTestId('scanner-close').click();
     await expect(page.getByTestId('scanner-modal')).toHaveCount(0);
-  });
-
-  test('manual barcode entry adds the first tier minimum (5 packs = 120 units)', async ({ signedInPage }) => {
-    const { page, selectedStoreId } = signedInPage;
-
-    await openWholesaleSeeded(page, selectedStoreId);
-
-    await page.getByTestId('wholesale-scanner').click();
-    await expect(page.getByTestId('scanner-modal')).toBeVisible();
-
-    const manualInput = page.getByTestId('scanner-manual-input');
-    await manualInput.fill('7501234567890');
-    await page.getByTestId('scanner-manual-submit').click();
-
-    // The scanner-added toast names the packs and units (first tier minimum).
-    await expect(page.getByText(/5 paquetes \(120 unidades\) a \$6 por unidad/)).toBeVisible();
-
-    // The product landed in the cart — same outcome as a manual row add.
-    const badge = page.getByTestId('cart-badge');
-    await expect(badge).not.toHaveText('0');
-
-    // Close via Done and the modal is gone.
-    await page.getByTestId('scanner-done').click();
-    await expect(page.getByTestId('scanner-modal')).toHaveCount(0);
-  });
-
-  test('repeated scans of the same barcode accumulate in the cart', async ({ signedInPage }) => {
-    const { page, selectedStoreId } = signedInPage;
-
-    await openWholesaleSeeded(page, selectedStoreId);
-
-    await page.getByTestId('wholesale-scanner').click();
-    const manualInput = page.getByTestId('scanner-manual-input');
-
-    // First scan: 5 packs (first tier minimum) — the badge counts PACKS.
-    await manualInput.fill('7501234567890');
-    await page.getByTestId('scanner-manual-submit').click();
-    const badge = page.getByTestId('cart-badge');
-    await expect(badge).toHaveText('5');
-
-    // Second scan of the same barcode: the same line accumulates to 10 packs.
-    await manualInput.fill('7501234567890');
-    await page.getByTestId('scanner-manual-submit').click();
-    await expect(badge).toHaveText('10');
-  });
-
-  test('unknown barcode shows the not-found message and adds nothing', async ({ signedInPage }) => {
-    const { page, selectedStoreId } = signedInPage;
-
-    await openWholesaleSeeded(page, selectedStoreId);
-
-    await page.getByTestId('wholesale-scanner').click();
-    await expect(page.getByTestId('scanner-modal')).toBeVisible();
-
-    const manualInput = page.getByTestId('scanner-manual-input');
-    await manualInput.fill('0000000000000');
-    await page.getByTestId('scanner-manual-submit').click();
-
-    await expect(page.getByText(NOT_FOUND_TEXT('0000000000000'))).toBeVisible();
-
-    const badge = page.getByTestId('cart-badge');
-    await expect(badge).toHaveText('0');
-
-    // The modal STAYS OPEN (POS cadence: scan-scan-scan, then close).
-    await expect(page.getByTestId('scanner-modal')).toBeVisible();
-    await expect(page.getByText(DONE_TEXT)).toBeVisible();
-  });
-
-  test('a sellable product without wholesale config gets its own message, not not-found', async ({ signedInPage }) => {
-    const { page, selectedStoreId } = signedInPage;
-
-    const product = await openWholesaleSeeded(page, selectedStoreId);
-
-    // Seed a SECOND product (same category): sellable but NO wholesale config,
-    // with its own barcode — the scanner finds it but cannot sell it wholesale.
-    // Products use Map-entries wire format [id, product] (not [id, [product]]).
-    await page.evaluate(
-      ({ sid, refProduct }) => {
-        const productKey = `lizoft.store-products-${sid}`;
-        const entries = JSON.parse(
-          localStorage.getItem(productKey) ?? '[]',
-        ) as [string, Record<string, unknown>][];
-        const prodId = crypto.randomUUID();
-        const prod = {
-          id: prodId,
-          name: 'Producto Sin Mayorista',
-          categoryId: refProduct.categoryId,
-          categoryName: refProduct.categoryName,
-          price: 10,
-          order: 0,
-          availableToSale: true,
-          discountFromInvantory: false,
-          businessId: refProduct.businessId,
-          isActive: true,
-          barcode: '7598765432109',
-          createdDate: new Date().toISOString(),
-          createdByName: 'e2e-seed',
-        };
-        entries.push([prodId, prod]);
-        localStorage.setItem(productKey, JSON.stringify(entries));
-      },
-      {
-        sid: selectedStoreId,
-        refProduct: await page.evaluate(({ sid, pid }) => {
-          const entries = JSON.parse(
-            localStorage.getItem(`lizoft.store-products-${sid}`) ?? '[]',
-          ) as [string, Record<string, unknown>][];
-          const found = entries.find(([id]) => id === pid);
-          return {
-            categoryId: String(found?.[1]['categoryId'] ?? ''),
-            categoryName: String(found?.[1]['categoryName'] ?? ''),
-            businessId: String(found?.[1]['businessId'] ?? ''),
-          };
-        }, { sid: selectedStoreId, pid: product.id }),
-      },
-    );
-    await page.goto('/profile/edit');
-    await page.waitForLoadState('networkidle');
-    await page.goto('/sales/wholesale');
-    await page.waitForLoadState('networkidle');
-
-    await page.getByTestId('wholesale-scanner').click();
-    const manualInput = page.getByTestId('scanner-manual-input');
-    await manualInput.fill('7598765432109');
-    await page.getByTestId('scanner-manual-submit').click();
-
-    // The NOT_WHOLESALE message names the product — distinct from not-found.
-    await expect(page.getByText(NOT_WHOLESALE_TEXT('Producto Sin Mayorista'))).toBeVisible();
-    const badge = page.getByTestId('cart-badge');
-    await expect(badge).toHaveText('0');
   });
 
   test('el switch "Todos" ON busca en todas las categorías; OFF restringe a la seleccionada', async ({ signedInPage }) => {

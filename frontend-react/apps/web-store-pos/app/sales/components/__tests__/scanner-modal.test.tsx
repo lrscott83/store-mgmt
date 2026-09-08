@@ -7,9 +7,8 @@ import { ScannerModal } from '../scanner-modal';
 const onScannedMock = vi.fn();
 const onCloseMock = vi.fn();
 
-// jsdom has no camera; the real @zxing/browser mock (hoisted by sale.test.tsx
-// conventions) makes the open effect reject into the 'denied' state — which
-// is exactly the state these tests assert against.
+// jsdom has no camera; the mock makes the open effect reject into the
+// 'denied' state — which is exactly the state these tests assert against.
 vi.mock('@zxing/browser', () => ({
   BrowserMultiFormatReader: vi.fn().mockImplementation(() => ({
     decodeFromVideoDevice: vi.fn().mockRejectedValue(new Error('no camera in jsdom')),
@@ -24,49 +23,67 @@ function renderModal() {
   );
 }
 
+/**
+ * ScannerModal — 2026-09-07 redesign suite. The manual barcode form, its +
+ * submit button and the "Listo" button are GONE; the modal now carries a
+ * quantity stepper (default 1, right-aligned, cart-style round −/+ buttons)
+ * whose value the camera decode reads at scan time. These tests pin the
+ * stepper's behavior directly (the camera decode itself cannot run in jsdom).
+ */
 describe('ScannerModal', () => {
   beforeEach(() => {
     onScannedMock.mockClear();
     onCloseMock.mockClear();
   });
 
-  it('renders the modal with the manual entry fallback (jsdom: camera path degrades to denied)', async () => {
+  it('renders the modal with the quantity stepper and NO manual form / + / Listo', async () => {
     renderModal();
     expect(screen.getByTestId('scanner-modal')).toBeInTheDocument();
-    expect(screen.getByTestId('scanner-manual-input')).toBeInTheDocument();
+    // The 2026-09-07 redesign dropped the manual-entry path entirely.
+    expect(screen.queryByTestId('scanner-manual-input')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('scanner-manual-submit')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('scanner-done')).not.toBeInTheDocument();
+    // The quantity stepper is present, defaulting to 1.
+    const stepper = screen.getByTestId('scanner-quantity-stepper');
+    expect(stepper).toBeInTheDocument();
+    const input = screen.getByTestId('scanner-quantity-input') as HTMLInputElement;
+    expect(input.value).toBe('1');
     // Camera unavailable in jsdom -> the denied message appears and the video
     // stays hidden (no dead black rectangle).
     expect(await screen.findByTestId('scanner-denied')).toBeInTheDocument();
     expect(screen.queryByTestId('scanner-video')).not.toBeInTheDocument();
   });
 
-  it('manual entry submits the trimmed barcode through onScanned and clears the input', async () => {
+  it('the + button increments the quantity and − decrements it (floor 1)', () => {
     renderModal();
-    const input = screen.getByTestId('scanner-manual-input');
-    fireEvent.change(input, { target: { value: '  7501234  ' } });
-    fireEvent.submit(input.closest('form')!);
-
-    expect(onScannedMock).toHaveBeenCalledWith('7501234');
-    expect((input as HTMLInputElement).value).toBe('');
+    const input = screen.getByTestId('scanner-quantity-input') as HTMLInputElement;
+    fireEvent.click(screen.getByTestId('scanner-quantity-increase'));
+    expect(input.value).toBe('2');
+    fireEvent.click(screen.getByTestId('scanner-quantity-increase'));
+    expect(input.value).toBe('3');
+    fireEvent.click(screen.getByTestId('scanner-quantity-decrease'));
+    expect(input.value).toBe('2');
+    // Floor: at 1 the − button is disabled and never drops below 1.
+    fireEvent.click(screen.getByTestId('scanner-quantity-decrease'));
+    expect(input.value).toBe('1');
+    const decrease = screen.getByTestId('scanner-quantity-decrease') as HTMLButtonElement;
+    expect(decrease.disabled).toBe(true);
   });
 
-  it('empty manual entry does not call onScanned', () => {
+  it('the quantity input accepts typed values and falls back to 1 on invalid', () => {
     renderModal();
-    const input = screen.getByTestId('scanner-manual-input');
-    fireEvent.change(input, { target: { value: '   ' } });
-    fireEvent.submit(input.closest('form')!);
-    expect(onScannedMock).not.toHaveBeenCalled();
+    const input = screen.getByTestId('scanner-quantity-input') as HTMLInputElement;
+    fireEvent.change(input, { target: { value: '7' } });
+    expect(input.value).toBe('7');
+    fireEvent.change(input, { target: { value: '0' } });
+    expect(input.value).toBe('1');
+    fireEvent.change(input, { target: { value: 'abc' } });
+    expect(input.value).toBe('1');
   });
 
   it('the X button calls onClose', () => {
     renderModal();
     fireEvent.click(screen.getByTestId('scanner-close'));
-    expect(onCloseMock).toHaveBeenCalledTimes(1);
-  });
-
-  it('the Done button calls onClose', () => {
-    renderModal();
-    fireEvent.click(screen.getByTestId('scanner-done'));
     expect(onCloseMock).toHaveBeenCalledTimes(1);
   });
 

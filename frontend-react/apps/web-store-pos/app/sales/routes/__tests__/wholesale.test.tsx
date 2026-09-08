@@ -76,6 +76,13 @@ vi.mock('~/inventory/lib/services/inventory-offline-service', () => ({
   })),
 }));
 
+// ScannerModal — the 2026-09-07 redesign dropped the manual-entry form; tests
+// drive the parent's onScanned(barcode, quantity) contract through this mock.
+const scannerModalMock = vi.hoisted(() => vi.fn());
+vi.mock('../../components/scanner-modal', () => ({
+  ScannerModal: scannerModalMock,
+}));
+
 let mockCategories: ProductCategory[] = [];
 let mockProducts: Product[] = [];
 /** Producto retornado por getProductByBarcode — null = "no encontrado". */
@@ -140,6 +147,44 @@ describe('WholesalePage — Ventas Mayoristas', () => {
     cartStateMock.items = [];
     cartStateMock.orderType = 1; // OrderType.Normal
     mockBarcodeProduct = null;
+    scannerModalMock.mockImplementation(
+      ({ onScanned, onClose }: { onScanned: (barcode: string, quantity: number) => void; onClose: () => void }) => (
+        <div data-testid="scanner-modal">
+          <input
+            type="text"
+            data-testid="scanner-mock-barcode"
+            onChange={(e) => {
+              (e.target as HTMLInputElement).dataset.barcode = e.target.value;
+            }}
+          />
+          <input
+            type="number"
+            data-testid="scanner-mock-quantity"
+            defaultValue={1}
+            onChange={(e) => {
+              (e.target as HTMLInputElement).dataset.quantity = e.target.value;
+            }}
+          />
+          <button
+            type="button"
+            data-testid="scanner-mock-scan"
+            onClick={() => {
+              const root = document.body;
+              const barcode = (root.querySelector('[data-testid="scanner-mock-barcode"]') as HTMLInputElement)?.dataset.barcode ?? '';
+              const quantity = Number(
+                (root.querySelector('[data-testid="scanner-mock-quantity"]') as HTMLInputElement)?.dataset.quantity ?? '1',
+              );
+              onScanned(barcode, quantity);
+            }}
+          >
+            scan
+          </button>
+          <button type="button" data-testid="scanner-mock-close" onClick={onClose}>
+            close
+          </button>
+        </div>
+      ),
+    );
     mockCategories = [makeCategory()];
     mockProducts = [
       makeProduct('beer-1', {
@@ -576,14 +621,24 @@ describe('WholesalePage — Ventas Mayoristas', () => {
     expect(await screen.findByTestId('scanner-modal')).toBeInTheDocument();
   });
 
+  /** Dispara un escaneo a través del ScannerModal mockeado. */
+  function fireScan(barcode: string, quantity = 1) {
+    const input = screen.getByTestId('scanner-mock-barcode') as HTMLInputElement;
+    fireEvent.change(input, { target: { value: barcode } });
+    input.dataset.barcode = barcode;
+    const quantityInput = screen.getByTestId('scanner-mock-quantity') as HTMLInputElement;
+    fireEvent.change(quantityInput, { target: { value: String(quantity) } });
+    quantityInput.dataset.quantity = String(quantity);
+    fireEvent.click(screen.getByTestId('scanner-mock-scan'));
+  }
+
   it('scanner: barcode desconocido muestra PRODUCT_NOT_FOUND y no agrega nada', async () => {
     render(<Wrapper><WholesalePage /></Wrapper>);
     await waitFor(() => expect(screen.getByText('Cerveza')).toBeInTheDocument());
 
     fireEvent.click(screen.getByTestId('wholesale-scanner'));
-    const input = await screen.findByTestId('scanner-manual-input');
-    fireEvent.change(input, { target: { value: '999999' } });
-    fireEvent.submit(input.closest('form')!);
+    await screen.findByTestId('scanner-modal');
+    fireScan('999999');
 
     await waitFor(() => expect(showToastErrorMock).toHaveBeenCalledTimes(1));
     expect(showToastErrorMock).toHaveBeenCalledWith('Producto no encontrado: 999999');
@@ -606,9 +661,8 @@ describe('WholesalePage — Ventas Mayoristas', () => {
     await waitFor(() => expect(screen.getByText('Cerveza')).toBeInTheDocument());
 
     fireEvent.click(screen.getByTestId('wholesale-scanner'));
-    const input = await screen.findByTestId('scanner-manual-input');
-    fireEvent.change(input, { target: { value: '7501' } });
-    fireEvent.submit(input.closest('form')!);
+    await screen.findByTestId('scanner-modal');
+    fireScan('7501');
 
     // Cada escaneo agrega el mínimo del primer rango: 5 packs → 120 unidades.
     await waitFor(() => expect(addItemMock).toHaveBeenCalledTimes(1));
@@ -617,6 +671,29 @@ describe('WholesalePage — Ventas Mayoristas', () => {
     expect(quantity).toBe(120); // 5 × 24
     expect(orderType).toBe(OrderType.Mayorista);
     expect(price).toBe(680); // precio del primer rango
+  });
+
+  it('scanner: la cantidad escaneada multiplica el mínimo del primer rango', async () => {
+    mockBarcodeProduct = makeProduct('beer-1', {
+      name: 'Cerveza',
+      barcode: '7501',
+      wholesaleEnabled: true,
+      wholesalePackSize: 24,
+      wholesaleTiers: [{ minPacks: 5, pricePerUnit: 680 }],
+    });
+    mockProducts = [mockBarcodeProduct];
+    render(<Wrapper><WholesalePage /></Wrapper>);
+    await waitFor(() => expect(screen.getByText('Cerveza')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByTestId('wholesale-scanner'));
+    await screen.findByTestId('scanner-modal');
+    fireScan('7501', 3);
+
+    // 3 × minPacks(5) = 15 packs → 15 × 24 = 360 unidades.
+    await waitFor(() => expect(addItemMock).toHaveBeenCalledTimes(1));
+    const [product, quantity] = addItemMock.mock.calls[0];
+    expect(product.id).toBe('beer-1');
+    expect(quantity).toBe(360);
   });
 
   it('scanner: producto sin config mayorista obtiene su propio mensaje (distinto de not-found)', async () => {
@@ -631,9 +708,8 @@ describe('WholesalePage — Ventas Mayoristas', () => {
     await waitFor(() => expect(screen.getByText('Cerveza')).toBeInTheDocument());
 
     fireEvent.click(screen.getByTestId('wholesale-scanner'));
-    const input = await screen.findByTestId('scanner-manual-input');
-    fireEvent.change(input, { target: { value: '7502' } });
-    fireEvent.submit(input.closest('form')!);
+    await screen.findByTestId('scanner-modal');
+    fireScan('7502');
 
     await waitFor(() => expect(showToastErrorMock).toHaveBeenCalledTimes(1));
     expect(showToastErrorMock).toHaveBeenCalledWith(
@@ -655,18 +731,16 @@ describe('WholesalePage — Ventas Mayoristas', () => {
     await waitFor(() => expect(screen.getByText('Cerveza')).toBeInTheDocument());
 
     fireEvent.click(screen.getByTestId('wholesale-scanner'));
-    const input = await screen.findByTestId('scanner-manual-input');
+    await screen.findByTestId('scanner-modal');
 
-    fireEvent.change(input, { target: { value: '7501' } });
-    fireEvent.submit(input.closest('form')!);
+    fireScan('7501');
     await waitFor(() => expect(addItemMock).toHaveBeenCalledTimes(1));
 
-    fireEvent.change(input, { target: { value: '7501' } });
-    fireEvent.submit(input.closest('form')!);
+    fireScan('7501');
     await waitFor(() => expect(addItemMock).toHaveBeenCalledTimes(2));
   });
 
-  it('scanner: falla del gate de inventario muestra la alerta bloqueante y no agrega', async () => {
+  it('scanner: falla del gate de inventario muestra la alerta bloqueante con disponibles y no agrega', async () => {
     hasInventoryModuleMock.mockReturnValue(true);
     inventoryServiceMock.mockReturnValue({ hasEntries: true, available: 40 });
     getItemQuantityMock.mockReturnValue(0);
@@ -683,12 +757,14 @@ describe('WholesalePage — Ventas Mayoristas', () => {
     await waitFor(() => expect(screen.getByText('Cerveza')).toBeInTheDocument());
 
     fireEvent.click(screen.getByTestId('wholesale-scanner'));
-    const input = await screen.findByTestId('scanner-manual-input');
-    fireEvent.change(input, { target: { value: '7501' } });
-    fireEvent.submit(input.closest('form')!);
+    await screen.findByTestId('scanner-modal');
+    fireScan('7501');
 
     await waitFor(() => expect(showBlockingErrorMock).toHaveBeenCalledTimes(1));
     expect(addItemMock).not.toHaveBeenCalled();
+    const message = String(showBlockingErrorMock.mock.calls[0]?.[1] ?? '');
+    expect(message).toContain('La cantidad del producto no está disponible');
+    expect(message).toContain('Disponibles en inventario: 40');
   });
 
   it('la búsqueda con el switch "Todos" ON recorre productos de todas las categorías', async () => {

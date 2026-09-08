@@ -49,6 +49,9 @@ export function BarcodeInput({ value, onChange, inputTestId, scanTestId }: Barco
       </div>
       {isScannerOpen && (
         <ScannerModal
+          // The scanner's onScanned carries (barcode, quantity) for the sale
+          // views; this capture field ignores the quantity — it only fills the
+          // input with the decoded code and closes (capture cadence, not POS).
           onScanned={(barcode) => {
             onChange(barcode);
             setIsScannerOpen(false);

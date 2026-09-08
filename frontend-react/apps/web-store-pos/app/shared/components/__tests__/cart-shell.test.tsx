@@ -465,7 +465,11 @@ describe('CartShell — in-cart quantity +/- stock validation (Angular parity)',
     await waitFor(() => expect(showBlockingErrorMock).toHaveBeenCalledTimes(1));
     expect(updateQuantity).not.toHaveBeenCalled();
     const [, text] = showBlockingErrorMock.mock.calls[0];
-    expect(text).toBe('La cantidad del producto no está disponible en el inventario.');
+    // 2026-09-07: the stock ceiling is appended so the merchant sees how many
+    // units are actually available (user-mandated message change).
+    expect(text).toBe(
+      'La cantidad del producto no está disponible en el inventario.\nDisponibles en inventario: 3.',
+    );
   });
 
   it('CART-STOCK-04: allows increasing quantity when stock covers the new total', async () => {

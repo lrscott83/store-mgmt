@@ -13,7 +13,7 @@ import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { Card } from '~/shared/components/ui/card';
 import { InfoBox } from '~/shared/components/ui/info-box';
 import { Button } from '~/shared/components/ui/button';
-import { ChevronDownIcon, PlusIcon } from '~/shared/components/ui/icons';
+import { ChevronDownIcon, PlusIcon, InOutIcon, SwapHorizontalIcon, TruckIcon } from '~/shared/components/ui/icons';
 import { ActionMenu, ActionMenuItem } from '~/shared/components/ui/action-menu';
 import { showBlockingError } from '~/shared/lib/blocking-alert';
 import { showToastSuccess } from '~/shared/lib/toast';
@@ -321,18 +321,21 @@ export function WarehousesPage() {
                     <ActionMenuItem
                       data-testid={`warehouse-entry-${warehouse.id}`}
                       onClick={() => openMovementModal('purchase_in', warehouse, null)}
+                      icon={<InOutIcon />}
                     >
                       {intl.formatMessage({ id: 'WAREHOUSES.MENU_ENTRY' })}
                     </ActionMenuItem>
                     <ActionMenuItem
                       data-testid={`warehouse-movement-${warehouse.id}`}
                       onClick={() => openMovementModal('transfer_out', warehouse, null)}
+                      icon={<SwapHorizontalIcon />}
                     >
                       {intl.formatMessage({ id: 'WAREHOUSES.MENU_MOVEMENT' })}
                     </ActionMenuItem>
                     <ActionMenuItem
                       data-testid={`warehouse-sale-out-${warehouse.id}`}
                       onClick={() => openMovementModal('sale_out', warehouse, null)}
+                      icon={<TruckIcon />}
                     >
                       {intl.formatMessage({ id: 'WAREHOUSES.MENU_SALE_OUT' })}
                     </ActionMenuItem>

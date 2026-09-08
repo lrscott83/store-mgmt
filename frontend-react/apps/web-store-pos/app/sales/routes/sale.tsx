@@ -230,14 +230,16 @@ export function SalePage() {
 
   /**
    * Scanner flow: barcode -> lookup -> sellability -> the SAME shared
-   * addProductToSale gate as the manual add. The repository's barcode
-   * lookup does NOT filter isActive/availableToSale (unlike the
-   * category-scoped sellable query the manual rows come from), so the
-   * scanner must check both before adding — a non-sellable product gets
-   * its own message, NOT "not found", so the merchant knows the barcode
-   * works but the product can't be sold.
+   * addProductToSale gate as the manual add, adding the scanned QUANTITY
+   * (the scanner modal's stepper value). The repository's barcode lookup
+   * does NOT filter isActive/availableToSale (unlike the category-scoped
+   * sellable query the manual rows come from), so the scanner must check
+   * both before adding — a non-sellable product gets its own message, NOT
+   * "not found", so the merchant knows the barcode works but the product
+   * can't be sold. An inventory-gate failure appends how many units are
+   * actually available so the merchant can see the stock ceiling.
    */
-  function handleScanned(barcode: string) {
+  function handleScanned(barcode: string, quantity: number) {
     const productService = createProductService(storeId);
     productService.getProductByBarcode(barcode).then((result) => {
       const product = result.data;
@@ -249,13 +251,18 @@ export function SalePage() {
         showToastError(intl.formatMessage({ id: 'SCANNER.PRODUCT_NOT_SELLABLE' }, { name: product.name }));
         return;
       }
-      const availability = addProductToSale(product, 1);
+      const availability = addProductToSale(product, quantity);
       if (!availability.succeeded) {
         // Same blocking-alert contract as the manual row add
-        // (sale-product-row.tsx:44-45).
+        // (sale-product-row.tsx:44-45), with the store's available stock
+        // appended so the merchant sees the inventory ceiling.
         const message =
           availability.errors[0]?.description ?? ProductErrors.ProductNotAvailable.description;
-        showBlockingError(intl.formatMessage({ id: 'GENERAL.RESPONSE.ERROR_TITLE' }), message);
+        const stock = inventoryService.getAvailableQuantity(product.id);
+        const detail = stock.hasEntries
+          ? `\n${intl.formatMessage({ id: 'SALES.AVAILABLE_STOCK' }, { available: stock.available })}`
+          : '';
+        showBlockingError(intl.formatMessage({ id: 'GENERAL.RESPONSE.ERROR_TITLE' }), message + detail);
         return;
       }
       showToastSuccess(intl.formatMessage({ id: 'SCANNER.PRODUCT_ADDED' }, { name: product.name }));
