@@ -89,7 +89,7 @@ store-pos-package/
 
 :8443 {
     tls internal
-    root * C:\store-pos\site
+    root * ./site
     encode gzip
 
     # SPA: cualquier ruta que no sea fichero cae en index.html
@@ -196,6 +196,7 @@ $dir = Split-Path -Parent $MyInvocation.MyCommand.Path
 
 ```powershell
 # Requiere ejecución como Administrador.
+New-Item -ItemType Directory -Force "$dir\logs" | Out-Null
 $dir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $svc = "StorePOS"
 
