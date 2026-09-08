@@ -208,6 +208,9 @@ describe('CuadrePorFechasPage', () => {
     mockAuthState.user.storeModuleIds = [EModules.Expenses, EModules.Credits];
     mockGetActiveOrdersBetween.mockReturnValue([
       makeOrder({ total: 100, paymentType: PaymentType.Efectivo, isCredit: false }),
+      makeOrder({ total: 120, paymentType: PaymentType.Tarjeta, isCredit: false }),
+      // Credit sales never count toward the payment summaries (cash or card).
+      makeOrder({ id: 'card-credit', total: 999, paymentType: PaymentType.Tarjeta, isCredit: true }),
     ]);
     mockGetCategoryCartItemsViewBetweenDates.mockReturnValue({
       data: [
@@ -235,6 +238,10 @@ describe('CuadrePorFechasPage', () => {
 
     // The five panels exist. NBSP amounts normalize to plain space for getByText.
     expect(screen.getByText('Resumen Efectivo')).toBeTruthy();
+    // Pago por Tarjeta sits right after Resumen Efectivo (user request 2026-09-07)
+    // and sums the range's card-paid non-credit sales (120).
+    expect(screen.getByRole('button', { name: /Pago por Tarjeta/ })).toBeTruthy();
+    expect(screen.getAllByText('$120').length).toBeGreaterThan(0);
     expect(screen.getByText('Gastos (1)')).toBeTruthy();
     expect(screen.getByText('Créditos Por Cobrar (1)')).toBeTruthy();
     // Angular parity: the paid-credits panel "(...)" slot shows the currency SUM

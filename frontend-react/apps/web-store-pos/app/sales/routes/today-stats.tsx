@@ -104,6 +104,7 @@ export function TodayStatsPage() {
   const [saleCredits, setSaleCredits] = useState<SaleCredit[]>([]);
   const [paidSaleCredits, setPaidSaleCredits] = useState<SaleCredit[]>([]);
   const [salesCashTotal, setSalesCashTotal] = useState(0);
+  const [salesCardTotal, setSalesCardTotal] = useState(0);
 
   useEffect(() => {
     const orderService = new OrderOfflineService(storeId);
@@ -116,6 +117,11 @@ export function TodayStatsPage() {
     setSalesCashTotal(
       activeOrders
         .filter((o) => o.paymentType === PaymentType.Efectivo && !o.isCredit)
+        .reduce((acc, o) => acc + o.total, 0),
+    );
+    setSalesCardTotal(
+      activeOrders
+        .filter((o) => o.paymentType === PaymentType.Tarjeta && !o.isCredit)
         .reduce((acc, o) => acc + o.total, 0),
     );
 
@@ -219,6 +225,27 @@ export function TodayStatsPage() {
           </table>
         </ExpansionPanel>
         {/* END CASH */}
+
+        {/* BEGIN CARD PAYMENTS */}
+        <ExpansionPanel
+          title="Pago por Tarjeta"
+          amount={formatCurrency(salesCardTotal)}
+          amountClassName={valueClassName(salesCardTotal)}
+        >
+          <table className="w-full text-sm">
+            <tbody>
+              <tr className="border-b border-border last:border-0">
+                <td className="p-1">
+                  <span className="font-bold text-text">Ventas</span>
+                </td>
+                <td className="p-1 text-right">
+                  <span className="font-bold text-success whitespace-nowrap">{formatCurrency(salesCardTotal)}</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </ExpansionPanel>
+        {/* END CARD PAYMENTS */}
 
         {/* BEGIN EXPENSES */}
         {hasExpensesModule && (
