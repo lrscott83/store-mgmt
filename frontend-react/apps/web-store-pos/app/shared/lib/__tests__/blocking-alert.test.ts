@@ -109,7 +109,8 @@ describe('showAcknowledgeError', () => {
   it('fires an OK-only INFO dialog with the exact Angular colors and confirm text when icon is overridden', () => {
     showAcknowledgeError({
       title: 'Información',
-      message: 'La venta no tiene ningún producto. Usted debe adicionar algún producto a la venta para pagar.',
+      message:
+        'La venta no tiene ningún producto. Usted debe adicionar algún producto a la venta para pagar.',
       confirmButtonText: 'Ok',
       icon: 'info',
     });

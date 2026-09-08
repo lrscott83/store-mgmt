@@ -25,15 +25,15 @@ This is a repeatable AUDIT methodology, not a feature build. Angular (`frontend/
 
 ## Audit Method Per Layer
 
-| Layer | Read in Angular | Read in React | Record |
-|---|---|---|---|
-| L1 models/enums | `packages/domain` entities, `EFeatures` | React `packages/domain` | enum/value + error-type/view-model matrix; confirm `TodayInventoryStats=32` is LIVE (route not commented) before porting |
-| L2 services | `frontend/src/app/application/*` (offline/online factory) + `_services/*` cross-cutting | `app/**/lib/services/*-offline-service.ts`, `shared/lib/services/service-factory.ts` | method-level gap matrix; offline path first |
-| L3 auth | Angular `canActivate` guards | RR loaders/guards, `authorization-service.ts` (EXISTS) | spot-check gate parity |
-| L4 views | component .html + .ts (fields, validators, behavior) | route + component .tsx | field/validation/behavior matrix |
-| L5 visual | `.scss` + token source files (below) | .tsx classes + `web-common/styles.css` | token map + per-view class application |
-| L6 i18n | `vocabs/es.ts` (nested) | `i18n/es.ts` (flat) | missing/changed keys + hardcoded-Spanish list |
-| L7 routes | Angular route table | RR route tree + catch-all `shared/routes/$.tsx` | rename + catch-all matrix |
+| Layer           | Read in Angular                                                                         | Read in React                                                                        | Record                                                                                                                   |
+| --------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
+| L1 models/enums | `packages/domain` entities, `EFeatures`                                                 | React `packages/domain`                                                              | enum/value + error-type/view-model matrix; confirm `TodayInventoryStats=32` is LIVE (route not commented) before porting |
+| L2 services     | `frontend/src/app/application/*` (offline/online factory) + `_services/*` cross-cutting | `app/**/lib/services/*-offline-service.ts`, `shared/lib/services/service-factory.ts` | method-level gap matrix; offline path first                                                                              |
+| L3 auth         | Angular `canActivate` guards                                                            | RR loaders/guards, `authorization-service.ts` (EXISTS)                               | spot-check gate parity                                                                                                   |
+| L4 views        | component .html + .ts (fields, validators, behavior)                                    | route + component .tsx                                                               | field/validation/behavior matrix                                                                                         |
+| L5 visual       | `.scss` + token source files (below)                                                    | .tsx classes + `web-common/styles.css`                                               | token map + per-view class application                                                                                   |
+| L6 i18n         | `vocabs/es.ts` (nested)                                                                 | `i18n/es.ts` (flat)                                                                  | missing/changed keys + hardcoded-Spanish list                                                                            |
+| L7 routes       | Angular route table                                                                     | RR route tree + catch-all `shared/routes/$.tsx`                                      | rename + catch-all matrix                                                                                                |
 
 ## L5 Design-Token Strategy (where things live)
 

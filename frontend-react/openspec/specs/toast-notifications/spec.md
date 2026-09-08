@@ -81,15 +81,15 @@ Both MUST derive `toastId` deterministically from `message` (+ `title`, if prese
 Each of the 7 live Angular `toastrService` call sites MUST fire the matching toast, with the
 exact text below, at the trigger described:
 
-| # | Trigger | File | Helper | Message (i18n key = text) | Title (i18n key = text) |
-|---|---|---|---|---|---|
-| 1 | CSV import success | `sales/routes/products.tsx` | `showToastSuccess` | literal `` `Importados ${N} productos correctamente.` `` | none |
-| 2 | Cart order create success | `shared/components/cart-shell.tsx` | `showToastSuccess` | `SHOPPING_CART.ORDER_CREATED` = "La venta fue creada satisfactoriamente." | `GENERAL.RESPONSE.SUCCESS_TITLE` = "Éxito" |
-| 3 | Cart order create failure (**NEW**) | `shared/components/cart-shell.tsx` | `showToastError` | `SHOPPING_CART.ORDER_NOT_CREATED` = "Ocurrío un error creando la venta. Por favor, vuelva a intentarlo y si persiste contacte al equipo de soporte técnico." | `GENERAL.RESPONSE.ERROR_TITLE` = "Error" |
-| 4 | Sync import success | `sync/components/import-form.tsx` | `showToastSuccess` | `SYNC.IMPORT_SUCCESS` = "Los datos se importaron correctamente." | none |
-| 5 | Features activate HTTP error | `admin/features/routes/features.tsx` | `showToastError` | `FEATURES.UNEXPECTED_ERROR` = "Ocurrió un error inesperado activando las funcionalidades" | `GENERAL.RESPONSE.ERROR_TITLE` = "Error" |
-| 6 | Features activate success | `admin/features/routes/features.tsx` | `showToastSuccess` | `FEATURES.FEATURES_ACTIVATED` = "Las funcionalidades se activaron satisfactoriamente" | `GENERAL.RESPONSE.SUCCESS_TITLE` = "Éxito" |
-| 7 | Features `succeeded:false` | `admin/features/routes/features.tsx` | `showToastError` | same as #5 | same as #5 |
+| #   | Trigger                             | File                                 | Helper             | Message (i18n key = text)                                                                                                                                    | Title (i18n key = text)                    |
+| --- | ----------------------------------- | ------------------------------------ | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------ |
+| 1   | CSV import success                  | `sales/routes/products.tsx`          | `showToastSuccess` | literal `` `Importados ${N} productos correctamente.` ``                                                                                                     | none                                       |
+| 2   | Cart order create success           | `shared/components/cart-shell.tsx`   | `showToastSuccess` | `SHOPPING_CART.ORDER_CREATED` = "La venta fue creada satisfactoriamente."                                                                                    | `GENERAL.RESPONSE.SUCCESS_TITLE` = "Éxito" |
+| 3   | Cart order create failure (**NEW**) | `shared/components/cart-shell.tsx`   | `showToastError`   | `SHOPPING_CART.ORDER_NOT_CREATED` = "Ocurrío un error creando la venta. Por favor, vuelva a intentarlo y si persiste contacte al equipo de soporte técnico." | `GENERAL.RESPONSE.ERROR_TITLE` = "Error"   |
+| 4   | Sync import success                 | `sync/components/import-form.tsx`    | `showToastSuccess` | `SYNC.IMPORT_SUCCESS` = "Los datos se importaron correctamente."                                                                                             | none                                       |
+| 5   | Features activate HTTP error        | `admin/features/routes/features.tsx` | `showToastError`   | `FEATURES.UNEXPECTED_ERROR` = "Ocurrió un error inesperado activando las funcionalidades"                                                                    | `GENERAL.RESPONSE.ERROR_TITLE` = "Error"   |
+| 6   | Features activate success           | `admin/features/routes/features.tsx` | `showToastSuccess` | `FEATURES.FEATURES_ACTIVATED` = "Las funcionalidades se activaron satisfactoriamente"                                                                        | `GENERAL.RESPONSE.SUCCESS_TITLE` = "Éxito" |
+| 7   | Features `succeeded:false`          | `admin/features/routes/features.tsx` | `showToastError`   | same as #5                                                                                                                                                   | same as #5                                 |
 
 #### Scenario: #1 — CSV import success fires toast
 

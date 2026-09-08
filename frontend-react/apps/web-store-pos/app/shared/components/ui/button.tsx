@@ -6,7 +6,8 @@ const VARIANT_CLASSES: Record<ButtonVariant, string> = {
   primary: 'rounded-md px-4 py-2 shadow-card bg-primary text-white hover:bg-primary-hover',
   secondary: 'rounded-md px-4 py-2 shadow-card bg-secondary text-white hover:opacity-90',
   danger: 'rounded-md px-4 py-2 shadow-card bg-danger text-white hover:opacity-90',
-  outline: 'rounded-md px-4 py-2 shadow-card border border-primary text-primary bg-transparent hover:bg-primary-light',
+  outline:
+    'rounded-md px-4 py-2 shadow-card border border-primary text-primary bg-transparent hover:bg-primary-light',
   // Extended FAB, matching Angular's `mat-fab extended` prominent actions (e.g. Products'
   // "+ Categoría" / "Importar Productos"): pill-shaped, filled purple, white text, elevated
   // shadow, comfortable padding.
@@ -28,7 +29,12 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
  * `@store-mgmt/web-common/styles.css`. Use `variant="fab"` for prominent actions that
  * match Angular's `mat-fab extended` pill-shaped buttons.
  */
-export function Button({ variant = 'primary', className = '', type = 'button', ...props }: ButtonProps) {
+export function Button({
+  variant = 'primary',
+  className = '',
+  type = 'button',
+  ...props
+}: ButtonProps) {
   const variantClasses = VARIANT_CLASSES[variant];
   return (
     <button

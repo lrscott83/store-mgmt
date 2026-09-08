@@ -14,26 +14,29 @@ implemented in React as flat inline buttons.
 ## User-Approved Design (Option A)
 
 Every action-menu item follows:
+
 - Semantic color on the FOREGROUND (icon AND text) by action type — never a solid
   background fill at rest.
 - Hover = a SOFT tint of the action color (e.g. violet-50 / red-50), not a full fill.
 - A thin separator line ABOVE the destructive (Eliminar/Delete) item.
 
 ### Color map by action type
-| Action (es / en) | Intent | Color |
-|---|---|---|
-| Editar / edit | edit | primary (violet) |
-| Nuevo, Adicionar / add | create | primary (violet) |
-| Pagar / pay | pay | success (green) |
-| Activar / activate | activate | success (green) |
-| Desactivar / deactivate | deactivate | amber / muted |
-| Aprobar / approve | approve | success (green) |
-| Desaprobar / disapprove | disapprove | amber / muted |
-| Eliminar / delete | delete | danger (red) + separator above |
+
+| Action (es / en)        | Intent     | Color                          |
+| ----------------------- | ---------- | ------------------------------ |
+| Editar / edit           | edit       | primary (violet)               |
+| Nuevo, Adicionar / add  | create     | primary (violet)               |
+| Pagar / pay             | pay        | success (green)                |
+| Activar / activate      | activate   | success (green)                |
+| Desactivar / deactivate | deactivate | amber / muted                  |
+| Aprobar / approve       | approve    | success (green)                |
+| Desaprobar / disapprove | disapprove | amber / muted                  |
+| Eliminar / delete       | delete     | danger (red) + separator above |
 
 ## Inventory of gear/action menus
 
 ### RESTYLE (gear already exists)
+
 - `sales/components/category-actions-menu.tsx` — Editar Categoría (edit), Nuevo
   Productos (add), Nuevo Producto (add). No destructive item.
 - `sales/components/category-product-list.tsx` ProductRow menu — Editar Producto
@@ -49,6 +52,7 @@ Every action-menu item follows:
   NO icons — add icons + colors + separator before Eliminar.
 
 ### ADD A GEAR (Angular has settings gear + mat-menu; React uses flat buttons)
+
 - `inventory/components/entry-list.tsx` — flat Editar/Eliminar buttons → gear menu
   (Angular `entry-list.component.html:24-38`).
 - `expenses/components/expense-list.tsx` — flat Editar/Eliminar (Eliminar already
@@ -57,16 +61,19 @@ Every action-menu item follows:
   buttons → gear menu (Angular `store-list.component.html:17-51`).
 
 ## Reference implementation
+
 Gear + dropdown + `useClickOutside` pattern lives in
 `sales/components/category-product-list.tsx` (ProductRow) and
 `category-actions-menu.tsx`.
 
 ## Icons
+
 Existing in `shared/components/ui/icons.tsx`: `EditIcon`, `TrashIcon`, `PlusIcon`,
 `SettingsIcon`. Likely MISSING and to be added: pay/payment, activate/check,
 deactivate/ban, approve/check (approve may reuse the check icon).
 
 ## Constraints
+
 - Strict TDD active. Test: `pnpm test`. Typecheck:
   `pnpm -C apps/web-store-pos exec tsc --noEmit`.
 - Migration = parity; do NOT invent abstractions Angular lacks beyond the shared UI

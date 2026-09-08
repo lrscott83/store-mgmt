@@ -106,9 +106,8 @@ describe('Export route loader — S-ROUTE-1', () => {
       isAuthenticated: true,
       logout: () => {},
     };
-    (
-      useAuthStore as unknown as { getState: () => typeof restrictedState }
-    ).getState = () => restrictedState;
+    (useAuthStore as unknown as { getState: () => typeof restrictedState }).getState = () =>
+      restrictedState;
 
     const { clientLoader } = await import('../export');
     const result = await clientLoader({ params: { storeId: 'store-s1' } } as never);
@@ -151,9 +150,8 @@ describe('Import route loader — S-ROUTE-2', () => {
       isAuthenticated: true,
       logout: () => {},
     };
-    (
-      useAuthStore as unknown as { getState: () => typeof restrictedState }
-    ).getState = () => restrictedState;
+    (useAuthStore as unknown as { getState: () => typeof restrictedState }).getState = () =>
+      restrictedState;
 
     const { clientLoader } = await import('../import');
     const result = await clientLoader({ params: { storeId: 'store-s1' } } as never);

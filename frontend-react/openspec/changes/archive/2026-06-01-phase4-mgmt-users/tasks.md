@@ -15,15 +15,15 @@
 
 ## Review Workload Forecast
 
-| Field | Value |
-|-------|-------|
+| Field                   | Value                                    |
+| ----------------------- | ---------------------------------------- |
 | Estimated changed lines | ~1,050–1,150 LOC (additions + deletions) |
-| Number of files touched | ~20 new + 2 modified |
-| 400-line budget risk | High |
-| Chained PRs recommended | Yes |
-| Suggested split | PR 1 (Units 1–4) → PR 2 (Units 5–7) |
-| Delivery strategy | ask-on-risk |
-| Chain strategy | pending |
+| Number of files touched | ~20 new + 2 modified                     |
+| 400-line budget risk    | High                                     |
+| Chained PRs recommended | Yes                                      |
+| Suggested split         | PR 1 (Units 1–4) → PR 2 (Units 5–7)      |
+| Delivery strategy       | ask-on-risk                              |
+| Chain strategy          | pending                                  |
 
 Decision needed before apply: Yes
 Chained PRs recommended: Yes
@@ -32,15 +32,15 @@ Chain strategy: pending
 
 ### Suggested Work Units
 
-| Unit | Goal | Likely PR | Notes |
-|------|------|-----------|-------|
-| 1 | `userHttpService` — 7 HTTP contracts | PR 1 | Base = feat/phase4-mgmt-users; no UI deps |
-| 2 | `UserCreateForm` presentational | PR 1 | Password regex + confirm validation |
-| 3 | `UserDetailsForm` presentational | PR 1 | isActive role-conditional toggle |
-| 4 | `UserCredentialsForm` presentational | PR 1 | oldPassword required; no login field |
-| 5 | `UserList` presentational | PR 2 | Base = PR 1 branch; degraded + empty-state |
-| 6 | Route containers (3) + integration tests | PR 2 | UserEditPage: 2 independent sub-forms |
-| 7 | Wire `app/routes.ts` + `es.ts` | PR 2 | 27 USERS.* keys; 3 routes with :id/edit shape |
+| Unit | Goal                                     | Likely PR | Notes                                          |
+| ---- | ---------------------------------------- | --------- | ---------------------------------------------- |
+| 1    | `userHttpService` — 7 HTTP contracts     | PR 1      | Base = feat/phase4-mgmt-users; no UI deps      |
+| 2    | `UserCreateForm` presentational          | PR 1      | Password regex + confirm validation            |
+| 3    | `UserDetailsForm` presentational         | PR 1      | isActive role-conditional toggle               |
+| 4    | `UserCredentialsForm` presentational     | PR 1      | oldPassword required; no login field           |
+| 5    | `UserList` presentational                | PR 2      | Base = PR 1 branch; degraded + empty-state     |
+| 6    | Route containers (3) + integration tests | PR 2      | UserEditPage: 2 independent sub-forms          |
+| 7    | Wire `app/routes.ts` + `es.ts`           | PR 2      | 27 USERS.\* keys; 3 routes with :id/edit shape |
 
 PR 1 estimated: ~560 LOC (Units 1–4). PR 2 estimated: ~540 LOC (Units 5–7).
 Both slices exceed 400 lines individually; a 3-PR split is also viable (see risks section).
@@ -103,7 +103,7 @@ Both slices exceed 400 lines individually; a 3-PR split is also viable (see risk
 
 ## Phase 4: Wiring — Routes + i18n (Unit 7)
 
-- [x] 7.1 I18N: Added 27+ USERS.* keys to `app/shared/lib/i18n/es.ts` (done first to prevent false-RED).
+- [x] 7.1 I18N: Added 27+ USERS.\* keys to `app/shared/lib/i18n/es.ts` (done first to prevent false-RED).
 - [x] 7.2 ROUTES: Added 3 entries to `app/routes.ts` after the Stores block — `management/users`, `management/users/create`, `management/users/:id/edit`.
 - [x] 7.3 VERIFY: Full suite 575 tests GREEN; `tsc --noEmit` clean; typecheck passes.
 
@@ -133,15 +133,15 @@ Units 2, 3, 4 CAN be implemented in parallel (no inter-dependency). Unit 5 (User
 
 ## Spec Traceability
 
-| Req group | Tasks |
-|-----------|-------|
-| HTTP-1..8, CRED-1..3 | 1.1, 1.2 |
-| PRES-4,5,8,9,10 / CREATE-4 | 2.1, 2.2 |
-| PRES-6,8,9 / EDIT-3,5 | 3.1, 3.2 |
-| PRES-7,8,9 / CRED-1..3 / EDIT-6 | 4.1, 4.2 |
-| PRES-1..3,8 / LIST-4,5 | 5.1, 5.2 |
-| LIST-1..6, CREATE-1..7, EDIT-1..8, ACCESS-1..5, ROUTE-1..4, OFFLINE-1..5, ERR-1..6, TEST-1..7 | 6.1..6.5 |
-| I18N-1..4, ROUTE-1..4 | 7.1, 7.2, 7.3 |
+| Req group                                                                                     | Tasks         |
+| --------------------------------------------------------------------------------------------- | ------------- |
+| HTTP-1..8, CRED-1..3                                                                          | 1.1, 1.2      |
+| PRES-4,5,8,9,10 / CREATE-4                                                                    | 2.1, 2.2      |
+| PRES-6,8,9 / EDIT-3,5                                                                         | 3.1, 3.2      |
+| PRES-7,8,9 / CRED-1..3 / EDIT-6                                                               | 4.1, 4.2      |
+| PRES-1..3,8 / LIST-4,5                                                                        | 5.1, 5.2      |
+| LIST-1..6, CREATE-1..7, EDIT-1..8, ACCESS-1..5, ROUTE-1..4, OFFLINE-1..5, ERR-1..6, TEST-1..7 | 6.1..6.5      |
+| I18N-1..4, ROUTE-1..4                                                                         | 7.1, 7.2, 7.3 |
 
 ---
 

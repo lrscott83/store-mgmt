@@ -7,6 +7,7 @@ React's Products-area action UI diverges from Angular (the source of truth) on I
 ## Scope
 
 ### In Scope (footer buttons / menu items / icons / text only)
+
 - **`category-actions-menu.tsx`**: add `EditIcon` to "Editar Categoría", `PlusIcon` to "Nuevo Producto" and "Nuevo Productos"; reorder items to Angular order → Categoría, Productos (bulk), Producto (single).
 - **`category-product-list.tsx`** (ProductRow menu): add `EditIcon` (primary color) to "Editar Producto"; add `TrashIcon` to "Eliminar Producto" (inherits red via existing `text-danger`).
 - **`edit-product-category-modal.tsx`**: Close `GENERAL.CANCEL` → `GENERAL.CLOSE` + `CloseIcon`; Save `isEditing ? GENERAL.UPDATE : GENERAL.SAVE` + `SaveIcon`.
@@ -16,6 +17,7 @@ React's Products-area action UI diverges from Angular (the source of truth) on I
 - **`shared/lib/i18n/es.ts`**: `GENERAL.SAVE` `'Guardar'` → `'Salvar'`.
 
 ### Out of Scope (explicitly deferred — do NOT touch)
+
 - Orphan delete/confirm-discard footer block in `edit-product-modal.tsx` (no Angular equivalent) — separate follow-up.
 - BODY of `edit-products-modal.tsx` (React bulk price-edit vs Angular bulk-add) — different feature, separate follow-up.
 - Invented modal header-title i18n keys, optional `SettingsIcon` DRY cleanup, and any consumers of `GENERAL.SAVE` beyond the i18n value change.
@@ -23,9 +25,11 @@ React's Products-area action UI diverges from Angular (the source of truth) on I
 ## Capabilities
 
 ### New Capabilities
+
 None.
 
 ### Modified Capabilities
+
 None — no spec-level requirement changes. Pure UI parity (icons + i18n values). Behavior of save/close actions is unchanged; only rendered icon and label text move to Angular values.
 
 ## Baked Decision (user-approved, do NOT re-open)
@@ -38,23 +42,23 @@ Wire already-existing icon components into the 5 in-scope component files using 
 
 ## Affected Areas
 
-| Area | Impact | Description |
-|------|--------|-------------|
-| `sales/components/category-actions-menu.tsx` | Modified | Edit/Plus/Plus icons + reorder |
-| `sales/components/category-product-list.tsx` | Modified | Edit(primary)/Trash icons in ProductRow menu |
-| `sales/components/edit-product-category-modal.tsx` | Modified | Close key+icon; Save UPDATE branch+icon |
-| `sales/components/create-product-modal.tsx` | Modified | Close key+icon; Save icon |
-| `sales/components/edit-product-modal.tsx` | Modified | Close key+icon; Save→Update+icon |
-| `sales/components/edit-products-modal.tsx` | Modified | Footer Close key+icon; Save icon |
-| `shared/lib/i18n/es.ts` | Modified | `GENERAL.SAVE` → `'Salvar'` |
+| Area                                               | Impact   | Description                                  |
+| -------------------------------------------------- | -------- | -------------------------------------------- |
+| `sales/components/category-actions-menu.tsx`       | Modified | Edit/Plus/Plus icons + reorder               |
+| `sales/components/category-product-list.tsx`       | Modified | Edit(primary)/Trash icons in ProductRow menu |
+| `sales/components/edit-product-category-modal.tsx` | Modified | Close key+icon; Save UPDATE branch+icon      |
+| `sales/components/create-product-modal.tsx`        | Modified | Close key+icon; Save icon                    |
+| `sales/components/edit-product-modal.tsx`          | Modified | Close key+icon; Save→Update+icon             |
+| `sales/components/edit-products-modal.tsx`         | Modified | Footer Close key+icon; Save icon             |
+| `shared/lib/i18n/es.ts`                            | Modified | `GENERAL.SAVE` → `'Salvar'`                  |
 
 ## Risks
 
-| Risk | Likelihood | Mitigation |
-|------|------------|------------|
-| `GENERAL.SAVE` blast radius into closed expenses/orders modals | Low | User-approved as correct parity; typecheck + full suite |
-| Accidentally touching orphan delete block / bulk-edit body | Low | Explicitly out of scope; footer-only edits |
-| Icon color/variant mismatch vs Angular | Low | Copy exact `expense-form-modal.tsx` pattern |
+| Risk                                                           | Likelihood | Mitigation                                              |
+| -------------------------------------------------------------- | ---------- | ------------------------------------------------------- |
+| `GENERAL.SAVE` blast radius into closed expenses/orders modals | Low        | User-approved as correct parity; typecheck + full suite |
+| Accidentally touching orphan delete block / bulk-edit body     | Low        | Explicitly out of scope; footer-only edits              |
+| Icon color/variant mismatch vs Angular                         | Low        | Copy exact `expense-form-modal.tsx` pattern             |
 
 ## Rollback Plan
 

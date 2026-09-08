@@ -1,7 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
 import { InstallAppButton } from '../install-app-button';
-import { initPwaInstallCapture, resetPwaInstallPromptForTests } from '~/shared/lib/pwa/pwa-install-prompt';
+import {
+  initPwaInstallCapture,
+  resetPwaInstallPromptForTests,
+} from '~/shared/lib/pwa/pwa-install-prompt';
 
 /** Builds a fake `beforeinstallprompt` event with the prompt()/userChoice API. */
 function makeInstallPromptEvent(outcome: 'accepted' | 'dismissed' = 'accepted') {

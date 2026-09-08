@@ -240,7 +240,10 @@ export class InventoryOfflineService {
           categoryName = categoriesMap.get(categoryId)!.name;
         }
 
-        const weightedCostSum = productEntries.reduce((sum, e) => sum + e.available * e.costPrice, 0);
+        const weightedCostSum = productEntries.reduce(
+          (sum, e) => sum + e.available * e.costPrice,
+          0,
+        );
         products.push({
           productId,
           productName: product.name,
@@ -541,9 +544,7 @@ export class InventoryOfflineService {
     if (!product) return null;
 
     const existing = this.getStorageInventoriesMap().get(productId) ?? [];
-    const maxOrder = existing.length > 0
-      ? Math.max(...existing.map((e) => e.order))
-      : -1;
+    const maxOrder = existing.length > 0 ? Math.max(...existing.map((e) => e.order)) : -1;
     const date = new Date();
     const categoryId = this.productRepository.getStorageProductsMap().get(productId)!.categoryId;
 
@@ -764,7 +765,9 @@ export class InventoryOfflineService {
     // Target-product availability guard (Angular parity, updateInventoryEntry:107-108):
     // the product being moved TO must exist AND be active.
     if (!this.productRepository.getAvailableProductById(newProductId)) {
-      return new DataResult<InventoryEntryView>(undefined, false, [InventoryErrors.ProductNotAvailable]);
+      return new DataResult<InventoryEntryView>(undefined, false, [
+        InventoryErrors.ProductNotAvailable,
+      ]);
     }
 
     const oldEntries = this.getProductInventoriesByProductId(oldProductId);
@@ -884,9 +887,7 @@ export class InventoryOfflineService {
    */
   getAvailableQuantity(productId: string): { hasEntries: boolean; available: number } {
     const allEntries = this.getProductInventoriesByProductId(productId);
-    const available = allEntries
-      .filter((e) => e.isActive)
-      .reduce((sum, e) => sum + e.available, 0);
+    const available = allEntries.filter((e) => e.isActive).reduce((sum, e) => sum + e.available, 0);
     return { hasEntries: allEntries.length > 0, available };
   }
 

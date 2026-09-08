@@ -91,9 +91,7 @@ vi.mock('~/shared/lib/hooks/use-unsaved-changes-prompt', () => ({
 beforeEach(async () => {
   vi.clearAllMocks();
   mockParams.id = 'o42';
-  const { storeHttpService } = await import(
-    '~/management/stores/lib/services/store-http-service'
-  );
+  const { storeHttpService } = await import('~/management/stores/lib/services/store-http-service');
   vi.mocked(storeHttpService.listStores).mockResolvedValue({
     succeeded: true,
     data: [],
@@ -184,9 +182,7 @@ function Wrapper({ children }: { children: React.ReactNode }) {
 
 async function renderPage(isSuperAdmin = false, ownerOverrides: Partial<Owner> = {}) {
   await setAuthUser(isSuperAdmin);
-  const { ownerHttpService } = await import(
-    '~/admin/owners/lib/services/owner-http-service'
-  );
+  const { ownerHttpService } = await import('~/admin/owners/lib/services/owner-http-service');
   vi.mocked(ownerHttpService.getOwner).mockResolvedValue({
     succeeded: true,
     data: makeOwner(ownerOverrides),
@@ -202,9 +198,8 @@ async function renderPage(isSuperAdmin = false, ownerOverrides: Partial<Owner> =
     errors: [],
   });
 
-  const { resellerHttpService } = await import(
-    '~/admin/resellers/lib/services/reseller-http-service'
-  );
+  const { resellerHttpService } =
+    await import('~/admin/resellers/lib/services/reseller-http-service');
   if (isSuperAdmin) {
     vi.mocked(resellerHttpService.listResellers).mockResolvedValue({
       succeeded: true,
@@ -221,7 +216,7 @@ async function renderPage(isSuperAdmin = false, ownerOverrides: Partial<Owner> =
     result = render(
       <Wrapper>
         <OwnerEditPage />
-      </Wrapper>
+      </Wrapper>,
     );
   });
   return result;
@@ -322,17 +317,21 @@ describe('OwnerEditPage — toolbar add-owner fab (edit-owner.component.html:5-8
 
 describe('OwnerEditPage — loads and pre-populates', () => {
   it('calls getOwner with :id and pre-populates fullName, cellPhone, email, description', async () => {
-    const { ownerHttpService } = await import(
-      '~/admin/owners/lib/services/owner-http-service'
-    );
+    const { ownerHttpService } = await import('~/admin/owners/lib/services/owner-http-service');
     await renderPage(false);
 
     expect(ownerHttpService.getOwner).toHaveBeenCalledWith('o42');
 
     await waitFor(() => {
-  expect((screen.getByLabelText(esMessages['GENERAL.FULL_NAME']) as HTMLInputElement).value).toBe('John Edit');
-      expect((screen.getByLabelText(esMessages['GENERAL.CELL_PHONE']) as HTMLInputElement).value).toBe('+53 5 123-4567');
-      expect((screen.getByLabelText(esMessages['GENERAL.EMAIL']) as HTMLInputElement).value).toBe('john@example.com');
+      expect(
+        (screen.getByLabelText(esMessages['GENERAL.FULL_NAME']) as HTMLInputElement).value,
+      ).toBe('John Edit');
+      expect(
+        (screen.getByLabelText(esMessages['GENERAL.CELL_PHONE']) as HTMLInputElement).value,
+      ).toBe('+53 5 123-4567');
+      expect((screen.getByLabelText(esMessages['GENERAL.EMAIL']) as HTMLInputElement).value).toBe(
+        'john@example.com',
+      );
     });
   });
 
@@ -408,10 +407,10 @@ describe('OwnerEditPage — Gestor (reSeller) field position (Angular parity)', 
     const isActiveToggle = screen.getByLabelText(esMessages['USERS.IS_ACTIVE']);
 
     expect(
-      fullNameInput.compareDocumentPosition(reSellerSelect) & Node.DOCUMENT_POSITION_FOLLOWING
+      fullNameInput.compareDocumentPosition(reSellerSelect) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     expect(
-      reSellerSelect.compareDocumentPosition(isActiveToggle) & Node.DOCUMENT_POSITION_FOLLOWING
+      reSellerSelect.compareDocumentPosition(isActiveToggle) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
   });
 });
@@ -422,16 +421,16 @@ describe('OwnerEditPage — Gestor (reSeller) field position (Angular parity)', 
 
 describe('OwnerEditPage — login not in PUT body', () => {
   it('does NOT include login in the PUT payload', async () => {
-    const { ownerHttpService } = await import(
-      '~/admin/owners/lib/services/owner-http-service'
-    );
+    const { ownerHttpService } = await import('~/admin/owners/lib/services/owner-http-service');
     await renderPage(false);
 
     await waitFor(() => {
       expect(screen.getByLabelText(esMessages['GENERAL.FULL_NAME'])).toBeInTheDocument();
     });
 
-    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.UPDATE'] }).closest('form')!);
+    fireEvent.submit(
+      screen.getByRole('button', { name: esMessages['GENERAL.UPDATE'] }).closest('form')!,
+    );
 
     await waitFor(() => {
       expect(ownerHttpService.updateOwner).toHaveBeenCalled();
@@ -447,9 +446,7 @@ describe('OwnerEditPage — login not in PUT body', () => {
 
 describe('OwnerEditPage — guest carried silently', () => {
   it('includes guest from loaded Owner in PUT payload without rendering a field', async () => {
-    const { ownerHttpService } = await import(
-      '~/admin/owners/lib/services/owner-http-service'
-    );
+    const { ownerHttpService } = await import('~/admin/owners/lib/services/owner-http-service');
     await renderPage(false, { guest: true });
 
     await waitFor(() => {
@@ -459,7 +456,9 @@ describe('OwnerEditPage — guest carried silently', () => {
     // guest should NOT be a visible field
     expect(screen.queryByLabelText(/guest/i)).not.toBeInTheDocument();
 
-    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.UPDATE'] }).closest('form')!);
+    fireEvent.submit(
+      screen.getByRole('button', { name: esMessages['GENERAL.UPDATE'] }).closest('form')!,
+    );
 
     await waitFor(() => {
       const payload = vi.mocked(ownerHttpService.updateOwner).mock.calls[0]?.[1];
@@ -468,23 +467,22 @@ describe('OwnerEditPage — guest carried silently', () => {
   });
 });
 
-
 // ═══════════════════════════════════════════════════════════════════════════════
 // S-ADMIN-OWNERS-EDIT-DETAILS-8 — PUT success stays on page
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('OwnerEditPage — PUT success stays on page', () => {
   it('does NOT navigate away after successful PUT', async () => {
-    const { ownerHttpService } = await import(
-      '~/admin/owners/lib/services/owner-http-service'
-    );
+    const { ownerHttpService } = await import('~/admin/owners/lib/services/owner-http-service');
     await renderPage(false);
 
     await waitFor(() => {
       expect(screen.getByLabelText(esMessages['GENERAL.FULL_NAME'])).toBeInTheDocument();
     });
 
-    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.UPDATE'] }).closest('form')!);
+    fireEvent.submit(
+      screen.getByRole('button', { name: esMessages['GENERAL.UPDATE'] }).closest('form')!,
+    );
 
     await waitFor(() => {
       expect(ownerHttpService.updateOwner).toHaveBeenCalledWith('o42', expect.any(Object));
@@ -501,9 +499,7 @@ describe('OwnerEditPage — PUT success stays on page', () => {
 describe('OwnerEditPage — PUT failure inline error', () => {
   it('shows errors[0].description when succeeded is false', async () => {
     await setAuthUser(false);
-    const { ownerHttpService } = await import(
-      '~/admin/owners/lib/services/owner-http-service'
-    );
+    const { ownerHttpService } = await import('~/admin/owners/lib/services/owner-http-service');
     vi.mocked(ownerHttpService.getOwner).mockResolvedValue({
       succeeded: true,
       data: makeOwner(),
@@ -521,14 +517,20 @@ describe('OwnerEditPage — PUT failure inline error', () => {
 
     const { OwnerEditPage } = await import('../owner-edit');
     await act(async () => {
-      render(<Wrapper><OwnerEditPage /></Wrapper>);
+      render(
+        <Wrapper>
+          <OwnerEditPage />
+        </Wrapper>,
+      );
     });
 
     await waitFor(() => {
       expect(screen.getByLabelText(esMessages['GENERAL.FULL_NAME'])).toBeInTheDocument();
     });
 
-    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.UPDATE'] }).closest('form')!);
+    fireEvent.submit(
+      screen.getByRole('button', { name: esMessages['GENERAL.UPDATE'] }).closest('form')!,
+    );
 
     await waitFor(() => {
       expect(screen.getByRole('alert')).toBeInTheDocument();
@@ -538,9 +540,7 @@ describe('OwnerEditPage — PUT failure inline error', () => {
 
   it('shows OWNER.ERROR when updateOwner throws', async () => {
     await setAuthUser(false);
-    const { ownerHttpService } = await import(
-      '~/admin/owners/lib/services/owner-http-service'
-    );
+    const { ownerHttpService } = await import('~/admin/owners/lib/services/owner-http-service');
     vi.mocked(ownerHttpService.getOwner).mockResolvedValue({
       succeeded: true,
       data: makeOwner(),
@@ -552,14 +552,20 @@ describe('OwnerEditPage — PUT failure inline error', () => {
 
     const { OwnerEditPage } = await import('../owner-edit');
     await act(async () => {
-      render(<Wrapper><OwnerEditPage /></Wrapper>);
+      render(
+        <Wrapper>
+          <OwnerEditPage />
+        </Wrapper>,
+      );
     });
 
     await waitFor(() => {
       expect(screen.getByLabelText(esMessages['GENERAL.FULL_NAME'])).toBeInTheDocument();
     });
 
-    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.UPDATE'] }).closest('form')!);
+    fireEvent.submit(
+      screen.getByRole('button', { name: esMessages['GENERAL.UPDATE'] }).closest('form')!,
+    );
 
     await waitFor(() => {
       expect(screen.getByText(esMessages['OWNER.ERROR'])).toBeInTheDocument();
@@ -574,9 +580,7 @@ describe('OwnerEditPage — PUT failure inline error', () => {
 describe('OwnerEditPage — FE-OC3: classified rejections', () => {
   async function submitWithRejection(rejection: unknown) {
     await setAuthUser(false);
-    const { ownerHttpService } = await import(
-      '~/admin/owners/lib/services/owner-http-service'
-    );
+    const { ownerHttpService } = await import('~/admin/owners/lib/services/owner-http-service');
     vi.mocked(ownerHttpService.getOwner).mockResolvedValue({
       succeeded: true,
       data: makeOwner(),
@@ -588,14 +592,20 @@ describe('OwnerEditPage — FE-OC3: classified rejections', () => {
 
     const { OwnerEditPage } = await import('../owner-edit');
     await act(async () => {
-      render(<Wrapper><OwnerEditPage /></Wrapper>);
+      render(
+        <Wrapper>
+          <OwnerEditPage />
+        </Wrapper>,
+      );
     });
 
     await waitFor(() => {
       expect(screen.getByLabelText(esMessages['GENERAL.FULL_NAME'])).toBeInTheDocument();
     });
 
-    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.UPDATE'] }).closest('form')!);
+    fireEvent.submit(
+      screen.getByRole('button', { name: esMessages['GENERAL.UPDATE'] }).closest('form')!,
+    );
   }
 
   it('shows OWNER.NOT_FOUND when updateOwner rejects with 404, form stays mounted', async () => {
@@ -634,7 +644,9 @@ describe('OwnerEditPage — FE-OC3: classified rejections', () => {
   });
 
   it('shows OWNER.PHONE_REQUIRED when updateOwner rejects with 400 and code "CellPhone"', async () => {
-    await submitWithRejection({ response: { status: 400, data: { errors: [{ code: 'CellPhone' }] } } });
+    await submitWithRejection({
+      response: { status: 400, data: { errors: [{ code: 'CellPhone' }] } },
+    });
 
     await waitFor(() => {
       expect(screen.getByRole('alert')).toHaveTextContent(esMessages['OWNER.PHONE_REQUIRED']);
@@ -664,9 +676,7 @@ describe('OwnerEditPage — FE-OC3: classified rejections', () => {
 describe('OwnerEditPage — FE-OC6: untouched paths', () => {
   it('shows OWNER.ERROR (not a business-specific key) when updateOwner rejects with 500', async () => {
     await setAuthUser(false);
-    const { ownerHttpService } = await import(
-      '~/admin/owners/lib/services/owner-http-service'
-    );
+    const { ownerHttpService } = await import('~/admin/owners/lib/services/owner-http-service');
     vi.mocked(ownerHttpService.getOwner).mockResolvedValue({
       succeeded: true,
       data: makeOwner(),
@@ -680,14 +690,20 @@ describe('OwnerEditPage — FE-OC6: untouched paths', () => {
 
     const { OwnerEditPage } = await import('../owner-edit');
     await act(async () => {
-      render(<Wrapper><OwnerEditPage /></Wrapper>);
+      render(
+        <Wrapper>
+          <OwnerEditPage />
+        </Wrapper>,
+      );
     });
 
     await waitFor(() => {
       expect(screen.getByLabelText(esMessages['GENERAL.FULL_NAME'])).toBeInTheDocument();
     });
 
-    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.UPDATE'] }).closest('form')!);
+    fireEvent.submit(
+      screen.getByRole('button', { name: esMessages['GENERAL.UPDATE'] }).closest('form')!,
+    );
 
     await waitFor(() => {
       expect(screen.getByRole('alert')).toHaveTextContent(esMessages['OWNER.ERROR']);
@@ -699,9 +715,7 @@ describe('OwnerEditPage — FE-OC6: untouched paths', () => {
 
   it('leaves the auth store untouched (no logout) when updateOwner rejects with 401', async () => {
     await setAuthUser(false);
-    const { ownerHttpService } = await import(
-      '~/admin/owners/lib/services/owner-http-service'
-    );
+    const { ownerHttpService } = await import('~/admin/owners/lib/services/owner-http-service');
     vi.mocked(ownerHttpService.getOwner).mockResolvedValue({
       succeeded: true,
       data: makeOwner(),
@@ -716,14 +730,20 @@ describe('OwnerEditPage — FE-OC6: untouched paths', () => {
 
     const { OwnerEditPage } = await import('../owner-edit');
     await act(async () => {
-      render(<Wrapper><OwnerEditPage /></Wrapper>);
+      render(
+        <Wrapper>
+          <OwnerEditPage />
+        </Wrapper>,
+      );
     });
 
     await waitFor(() => {
       expect(screen.getByLabelText(esMessages['GENERAL.FULL_NAME'])).toBeInTheDocument();
     });
 
-    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.UPDATE'] }).closest('form')!);
+    fireEvent.submit(
+      screen.getByRole('button', { name: esMessages['GENERAL.UPDATE'] }).closest('form')!,
+    );
 
     await waitFor(() => {
       expect(screen.getByRole('alert')).toHaveTextContent(esMessages['OWNER.ERROR']);
@@ -740,9 +760,7 @@ describe('OwnerEditPage — FE-OC6: untouched paths', () => {
 
 describe('OwnerEditPage — FE-OC4: snapshot and form rehydrate from res.data', () => {
   it('re-seeds fullName from the server response and clears dirty state', async () => {
-    const { ownerHttpService } = await import(
-      '~/admin/owners/lib/services/owner-http-service'
-    );
+    const { ownerHttpService } = await import('~/admin/owners/lib/services/owner-http-service');
     await renderPage(false);
 
     await waitFor(() => {
@@ -761,12 +779,14 @@ describe('OwnerEditPage — FE-OC4: snapshot and form rehydrate from res.data', 
       target: { value: 'Typed Name' },
     });
 
-    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.UPDATE'] }).closest('form')!);
+    fireEvent.submit(
+      screen.getByRole('button', { name: esMessages['GENERAL.UPDATE'] }).closest('form')!,
+    );
 
     await waitFor(() => {
-      expect((screen.getByLabelText(esMessages['GENERAL.FULL_NAME']) as HTMLInputElement).value).toBe(
-        'Server Normalised Name'
-      );
+      expect(
+        (screen.getByLabelText(esMessages['GENERAL.FULL_NAME']) as HTMLInputElement).value,
+      ).toBe('Server Normalised Name');
     });
 
     const btn = screen.getByRole('button', { name: esMessages['GENERAL.UPDATE'] });
@@ -783,8 +803,12 @@ describe('OwnerEditPage — tabs (SuperAdmin)', () => {
     await renderPage(true);
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: esMessages['GENERAL.DETAILS'] })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: esMessages['GENERAL.STORES'] })).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: esMessages['GENERAL.DETAILS'] }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: esMessages['GENERAL.STORES'] }),
+      ).toBeInTheDocument();
       expect(screen.getByRole('button', { name: esMessages['GENERAL.USERS'] })).toBeInTheDocument();
     });
   });
@@ -799,8 +823,12 @@ describe('OwnerEditPage — Reseller sees Details only', () => {
     await renderPage(false);
 
     await waitFor(() => {
-      expect(screen.queryByRole('button', { name: esMessages['GENERAL.STORES'] })).not.toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: esMessages['GENERAL.USERS'] })).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: esMessages['GENERAL.STORES'] }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: esMessages['GENERAL.USERS'] }),
+      ).not.toBeInTheDocument();
     });
   });
 });
@@ -812,9 +840,8 @@ describe('OwnerEditPage — Reseller sees Details only', () => {
 
 describe('OwnerEditPage — Tiendas tab renders grid only (bucket-b WU2)', () => {
   async function openStoresTab(stores: ReturnType<typeof makeStore>[] = [makeStore()]) {
-    const { storeHttpService } = await import(
-      '~/management/stores/lib/services/store-http-service'
-    );
+    const { storeHttpService } =
+      await import('~/management/stores/lib/services/store-http-service');
     vi.mocked(storeHttpService.listStores).mockResolvedValue({
       succeeded: true,
       data: stores as never,
@@ -826,7 +853,9 @@ describe('OwnerEditPage — Tiendas tab renders grid only (bucket-b WU2)', () =>
     await renderPage(true);
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: esMessages['GENERAL.STORES'] })).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: esMessages['GENERAL.STORES'] }),
+      ).toBeInTheDocument();
     });
 
     fireEvent.click(screen.getByRole('button', { name: esMessages['GENERAL.STORES'] }));
@@ -863,7 +892,9 @@ describe('OwnerEditPage — Tiendas tab renders grid only (bucket-b WU2)', () =>
       expect(screen.getByText('Store Alpha')).toBeInTheDocument();
     });
 
-    expect(screen.queryByRole('button', { name: esMessages['GENERAL.ADD'] })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: esMessages['GENERAL.ADD'] }),
+    ).not.toBeInTheDocument();
   });
 
   it('approve handler fires exactly as it does on /admin/stores', async () => {
@@ -1008,9 +1039,7 @@ describe('OwnerEditPage — submit disabled while pristine', () => {
   });
 
   it('submit button is disabled again after successful save (re-snapshotted)', async () => {
-    const { ownerHttpService } = await import(
-      '~/admin/owners/lib/services/owner-http-service'
-    );
+    const { ownerHttpService } = await import('~/admin/owners/lib/services/owner-http-service');
     await renderPage(false);
 
     await waitFor(() => {
@@ -1064,9 +1093,7 @@ describe('OwnerEditPage — reSellerId label is GENERAL.RESELLER', () => {
 describe('OwnerEditPage — getOwner succeeded:false (Req: Owner Edit Load Surfaces succeeded:false via OWNER.ERROR)', () => {
   it('shows OWNER.ERROR and does not populate form fields when getOwner resolves with succeeded:false', async () => {
     await setAuthUser(false);
-    const { ownerHttpService } = await import(
-      '~/admin/owners/lib/services/owner-http-service'
-    );
+    const { ownerHttpService } = await import('~/admin/owners/lib/services/owner-http-service');
     vi.mocked(ownerHttpService.getOwner).mockResolvedValue({
       succeeded: false,
       data: null,
@@ -1077,7 +1104,11 @@ describe('OwnerEditPage — getOwner succeeded:false (Req: Owner Edit Load Surfa
 
     const { OwnerEditPage } = await import('../owner-edit');
     await act(async () => {
-      render(<Wrapper><OwnerEditPage /></Wrapper>);
+      render(
+        <Wrapper>
+          <OwnerEditPage />
+        </Wrapper>,
+      );
     });
 
     await waitFor(() => {
@@ -1111,9 +1142,7 @@ describe('OwnerEditPage — getOwner succeeded:false (Req: Owner Edit Load Surfa
 describe('OwnerEditPage — load classifies succeeded:false via actionCode (owners-getbyid-envelope-404)', () => {
   it('shows OWNER.NOT_FOUND and does not populate form fields when getOwner resolves with succeeded:false, actionCode:404', async () => {
     await setAuthUser(false);
-    const { ownerHttpService } = await import(
-      '~/admin/owners/lib/services/owner-http-service'
-    );
+    const { ownerHttpService } = await import('~/admin/owners/lib/services/owner-http-service');
     vi.mocked(ownerHttpService.getOwner).mockResolvedValue({
       succeeded: false,
       data: null,
@@ -1124,7 +1153,11 @@ describe('OwnerEditPage — load classifies succeeded:false via actionCode (owne
 
     const { OwnerEditPage } = await import('../owner-edit');
     await act(async () => {
-      render(<Wrapper><OwnerEditPage /></Wrapper>);
+      render(
+        <Wrapper>
+          <OwnerEditPage />
+        </Wrapper>,
+      );
     });
 
     await waitFor(() => {
@@ -1136,9 +1169,7 @@ describe('OwnerEditPage — load classifies succeeded:false via actionCode (owne
 
   it('shows OWNER.FORBIDDEN when getOwner resolves with succeeded:false, actionCode:403', async () => {
     await setAuthUser(false);
-    const { ownerHttpService } = await import(
-      '~/admin/owners/lib/services/owner-http-service'
-    );
+    const { ownerHttpService } = await import('~/admin/owners/lib/services/owner-http-service');
     vi.mocked(ownerHttpService.getOwner).mockResolvedValue({
       succeeded: false,
       data: null,
@@ -1149,7 +1180,11 @@ describe('OwnerEditPage — load classifies succeeded:false via actionCode (owne
 
     const { OwnerEditPage } = await import('../owner-edit');
     await act(async () => {
-      render(<Wrapper><OwnerEditPage /></Wrapper>);
+      render(
+        <Wrapper>
+          <OwnerEditPage />
+        </Wrapper>,
+      );
     });
 
     await waitFor(() => {
@@ -1169,14 +1204,16 @@ describe('OwnerEditPage — load classifies succeeded:false via actionCode (owne
 describe('OwnerEditPage — load rejection classified by response.status (owners-getbyid-envelope-404)', () => {
   it('shows OWNER.NOT_FOUND when getOwner rejects with error.response.status === 404', async () => {
     await setAuthUser(false);
-    const { ownerHttpService } = await import(
-      '~/admin/owners/lib/services/owner-http-service'
-    );
+    const { ownerHttpService } = await import('~/admin/owners/lib/services/owner-http-service');
     vi.mocked(ownerHttpService.getOwner).mockRejectedValue({ response: { status: 404 } });
 
     const { OwnerEditPage } = await import('../owner-edit');
     await act(async () => {
-      render(<Wrapper><OwnerEditPage /></Wrapper>);
+      render(
+        <Wrapper>
+          <OwnerEditPage />
+        </Wrapper>,
+      );
     });
 
     await waitFor(() => {
@@ -1188,9 +1225,8 @@ describe('OwnerEditPage — load rejection classified by response.status (owners
 
 describe('OwnerEditPage — loadStores succeeded:false (Req: Owner Edit Stores Tab Fetch Surfaces succeeded:false via Its Own storesError State)', () => {
   it('sets storesError (not loadError) to STORES.ERROR, does not set stores from data', async () => {
-    const { storeHttpService } = await import(
-      '~/management/stores/lib/services/store-http-service'
-    );
+    const { storeHttpService } =
+      await import('~/management/stores/lib/services/store-http-service');
     vi.mocked(storeHttpService.listStores).mockResolvedValue({
       succeeded: false,
       data: null,
@@ -1202,7 +1238,9 @@ describe('OwnerEditPage — loadStores succeeded:false (Req: Owner Edit Stores T
     await renderPage(true);
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: esMessages['GENERAL.STORES'] })).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: esMessages['GENERAL.STORES'] }),
+      ).toBeInTheDocument();
     });
 
     fireEvent.click(screen.getByRole('button', { name: esMessages['GENERAL.STORES'] }));
@@ -1220,9 +1258,7 @@ describe('OwnerEditPage — loadStores succeeded:false (Req: Owner Edit Stores T
 describe('OwnerEditPage — listResellers succeeded:false (Req: Owner Edit Reseller Dropdown Fetch Preserves Its Existing Silent-Failure Idiom)', () => {
   it('leaves the dropdown empty and renders no new error UI when listResellers resolves with succeeded:false', async () => {
     await setAuthUser(true);
-    const { ownerHttpService } = await import(
-      '~/admin/owners/lib/services/owner-http-service'
-    );
+    const { ownerHttpService } = await import('~/admin/owners/lib/services/owner-http-service');
     vi.mocked(ownerHttpService.getOwner).mockResolvedValue({
       succeeded: true,
       data: makeOwner(),
@@ -1231,9 +1267,8 @@ describe('OwnerEditPage — listResellers succeeded:false (Req: Owner Edit Resel
       errors: [],
     });
 
-    const { resellerHttpService } = await import(
-      '~/admin/resellers/lib/services/reseller-http-service'
-    );
+    const { resellerHttpService } =
+      await import('~/admin/resellers/lib/services/reseller-http-service');
     vi.mocked(resellerHttpService.listResellers).mockResolvedValue({
       succeeded: false,
       data: null,
@@ -1244,7 +1279,11 @@ describe('OwnerEditPage — listResellers succeeded:false (Req: Owner Edit Resel
 
     const { OwnerEditPage } = await import('../owner-edit');
     await act(async () => {
-      render(<Wrapper><OwnerEditPage /></Wrapper>);
+      render(
+        <Wrapper>
+          <OwnerEditPage />
+        </Wrapper>,
+      );
     });
 
     await waitFor(() => {

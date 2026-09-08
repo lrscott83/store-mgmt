@@ -54,7 +54,12 @@ describe('EntryList — list/table parity sweep (WU5)', () => {
   it('renders the cost price using formatCurrency (thousands separator)', () => {
     render(
       <Wrapper>
-        <EntryList entries={[makeEntry({ costPrice: 2000 })]} isOwnerAdmin onEdit={vi.fn()} onDeactivate={vi.fn()} />
+        <EntryList
+          entries={[makeEntry({ costPrice: 2000 })]}
+          isOwnerAdmin
+          onEdit={vi.fn()}
+          onDeactivate={vi.fn()}
+        />
       </Wrapper>,
     );
     expect(screen.getByText('$2 000')).toBeInTheDocument();

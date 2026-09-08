@@ -23,9 +23,7 @@ test.describe.serial('SuperAdmin login without store', () => {
     expect(superAdmin.homePath).toMatch(/\/(admin|sales)/);
   });
 
-  test('SuperAdmin session survives page reload without DEK error', async ({
-    browser,
-  }) => {
+  test('SuperAdmin session survives page reload without DEK error', async ({ browser }) => {
     const page = await browser.newPage();
     await applySuperAdminSnapshot(page, superAdmin);
 
@@ -41,9 +39,7 @@ test.describe.serial('SuperAdmin login without store', () => {
 
     // Should NOT show the DEK error message anywhere
     const body = await page.textContent('body');
-    expect(body).not.toContain(
-      'No se pudo abrir la información de esta tienda',
-    );
+    expect(body).not.toContain('No se pudo abrir la información de esta tienda');
 
     await page.close();
   });

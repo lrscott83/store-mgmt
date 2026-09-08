@@ -45,7 +45,12 @@ describe('ProductOfflineService', () => {
 
   beforeEach(() => {
     localStorage.clear();
-    useAuthStore.setState({ user: makeUser({ login: 'jdoe' }), isAuthenticated: true, isLoading: false, error: null });
+    useAuthStore.setState({
+      user: makeUser({ login: 'jdoe' }),
+      isAuthenticated: true,
+      isLoading: false,
+      error: null,
+    });
     service = new ProductOfflineService(storeId);
   });
 
@@ -65,7 +70,13 @@ describe('ProductOfflineService', () => {
   describe('PROD-10: getMaxOrderByCategoryId (async)', () => {
     it('resolves a success envelope with 0 when the category has no products', async () => {
       const result = await service.getMaxOrderByCategoryId('empty-cat');
-      expect(result).toEqual({ data: 0, succeeded: true, message: '', actionCode: 200, errors: [] });
+      expect(result).toEqual({
+        data: 0,
+        succeeded: true,
+        message: '',
+        actionCode: 200,
+        errors: [],
+      });
     });
 
     it('resolves the max order among all products (active+inactive) in the category', async () => {
@@ -129,7 +140,13 @@ describe('ProductOfflineService', () => {
       productRepository.addProduct(categoryId, 'Coca Cola', 1.5, '', 1, true, true, true);
 
       const result = await service.hasAnyAvailableToSaleProduct();
-      expect(result).toEqual({ data: true, succeeded: true, message: '', actionCode: 200, errors: [] });
+      expect(result).toEqual({
+        data: true,
+        succeeded: true,
+        message: '',
+        actionCode: 200,
+        errors: [],
+      });
     });
 
     it('resolves false when there is no active category or no available-to-sale product', async () => {
@@ -180,7 +197,9 @@ describe('ProductOfflineService', () => {
     it('resolves a failure envelope with ProductErrors.NotExists when missing', async () => {
       const result = await service.getProductByBarcode('UNKNOWN');
       expect(result.succeeded).toBe(false);
-      expect(result.errors).toEqual([{ code: 'Product.NotExists', description: 'El producto no existe.' }]);
+      expect(result.errors).toEqual([
+        { code: 'Product.NotExists', description: 'El producto no existe.' },
+      ]);
     });
   });
 
@@ -194,13 +213,25 @@ describe('ProductOfflineService', () => {
       const created = productRepository.getProductsByCategoryId(categoryId)[0];
 
       const result = await service.deleteProduct(created.id);
-      expect(result).toEqual({ data: true, succeeded: true, message: '', actionCode: 200, errors: [] });
+      expect(result).toEqual({
+        data: true,
+        succeeded: true,
+        message: '',
+        actionCode: 200,
+        errors: [],
+      });
       expect(productRepository.getProductById(created.id)?.isActive).toBe(false);
     });
 
     it('resolves a success envelope with data: false for a missing id (repository never fails)', async () => {
       const result = await service.deleteProduct('missing-id');
-      expect(result).toEqual({ data: false, succeeded: true, message: '', actionCode: 200, errors: [] });
+      expect(result).toEqual({
+        data: false,
+        succeeded: true,
+        message: '',
+        actionCode: 200,
+        errors: [],
+      });
     });
   });
 
@@ -239,7 +270,13 @@ describe('ProductOfflineService', () => {
 
     it('resolves an empty array (never fails) when no products match', async () => {
       const result = await service.getProductsByCategoryId('none');
-      expect(result).toEqual({ data: [], succeeded: true, message: '', actionCode: 200, errors: [] });
+      expect(result).toEqual({
+        data: [],
+        succeeded: true,
+        message: '',
+        actionCode: 200,
+        errors: [],
+      });
     });
   });
 
@@ -253,7 +290,13 @@ describe('ProductOfflineService', () => {
       const created = productRepository.getProductsByCategoryId(categoryId)[0];
 
       const result = await service.setDiscountFromInvantory(created.id, true);
-      expect(result).toEqual({ data: true, succeeded: true, message: '', actionCode: 200, errors: [] });
+      expect(result).toEqual({
+        data: true,
+        succeeded: true,
+        message: '',
+        actionCode: 200,
+        errors: [],
+      });
       expect(productRepository.getProductById(created.id)?.discountFromInvantory).toBe(true);
     });
 
@@ -302,15 +345,33 @@ describe('ProductOfflineService', () => {
       service = new ProductOfflineService(storeId, productRepository, categoryRepository);
       const categoryId = categoryRepository.addProductCategoryByName('Bebidas');
 
-      const result = await service.createProduct(categoryId, 'Coca Cola', 1.5, '', 1, true, true, false, '123');
-      expect(result).toEqual({ data: true, succeeded: true, message: '', actionCode: 200, errors: [] });
+      const result = await service.createProduct(
+        categoryId,
+        'Coca Cola',
+        1.5,
+        '',
+        1,
+        true,
+        true,
+        false,
+        '123',
+      );
+      expect(result).toEqual({
+        data: true,
+        succeeded: true,
+        message: '',
+        actionCode: 200,
+        errors: [],
+      });
       expect(productRepository.getProductsByCategoryId(categoryId)).toHaveLength(1);
     });
 
     it('resolves a failure envelope with the repository errors when the category does not exist', async () => {
       const result = await service.createProduct('missing-cat', 'X', 1, '', 1, true, true, false);
       expect(result.succeeded).toBe(false);
-      expect(result.errors).toEqual([{ code: 'ProductCategory.NotExists', description: 'La categoría no existe.' }]);
+      expect(result.errors).toEqual([
+        { code: 'ProductCategory.NotExists', description: 'La categoría no existe.' },
+      ]);
     });
   });
 
@@ -323,8 +384,24 @@ describe('ProductOfflineService', () => {
       productRepository.addProduct(categoryId, 'Coca Cola', 1.5, '', 1, true, true, true);
       const id = productRepository.getProductsByCategoryId(categoryId)[0].id;
 
-      const result = await service.updateProduct(id, categoryId, 'Coca Cola Zero', 2.0, '', 1, true, true, true);
-      expect(result).toEqual({ data: true, succeeded: true, message: '', actionCode: 200, errors: [] });
+      const result = await service.updateProduct(
+        id,
+        categoryId,
+        'Coca Cola Zero',
+        2.0,
+        '',
+        1,
+        true,
+        true,
+        true,
+      );
+      expect(result).toEqual({
+        data: true,
+        succeeded: true,
+        message: '',
+        actionCode: 200,
+        errors: [],
+      });
       expect(productRepository.getProductById(id)?.name).toBe('Coca Cola Zero');
     });
 
@@ -334,9 +411,21 @@ describe('ProductOfflineService', () => {
       service = new ProductOfflineService(storeId, productRepository, categoryRepository);
       const categoryId = categoryRepository.addProductCategoryByName('Bebidas');
 
-      const result = await service.updateProduct('missing-id', categoryId, 'X', 1, '', 1, true, true, true);
+      const result = await service.updateProduct(
+        'missing-id',
+        categoryId,
+        'X',
+        1,
+        '',
+        1,
+        true,
+        true,
+        true,
+      );
       expect(result.succeeded).toBe(false);
-      expect(result.errors).toEqual([{ code: 'Product.NotExists', description: 'El producto no existe.' }]);
+      expect(result.errors).toEqual([
+        { code: 'Product.NotExists', description: 'El producto no existe.' },
+      ]);
     });
   });
 
@@ -351,7 +440,13 @@ describe('ProductOfflineService', () => {
         { name: 'Coca Cola', price: 1.5 },
         { name: 'Fanta', price: 1.2 },
       ]);
-      expect(result).toEqual({ data: true, succeeded: true, message: '', actionCode: 200, errors: [] });
+      expect(result).toEqual({
+        data: true,
+        succeeded: true,
+        message: '',
+        actionCode: 200,
+        errors: [],
+      });
       const products = productRepository.getProductsByCategoryId(categoryId);
       expect(products).toHaveLength(2);
       expect(products.every((p) => p.discountFromInvantory === true)).toBe(true);
@@ -359,7 +454,13 @@ describe('ProductOfflineService', () => {
 
     it('resolves a failure envelope with an empty errors array when any item fails', async () => {
       const result = await service.createProducts('missing-cat', [{ name: 'X', price: 1 }]);
-      expect(result).toEqual({ data: null, succeeded: false, message: '', actionCode: 400, errors: [] });
+      expect(result).toEqual({
+        data: null,
+        succeeded: false,
+        message: '',
+        actionCode: 400,
+        errors: [],
+      });
     });
   });
 
@@ -369,7 +470,9 @@ describe('ProductOfflineService', () => {
       const productRepository = new ProductRepository(storeId, categoryRepository);
       service = new ProductOfflineService(storeId, productRepository, categoryRepository);
 
-      const result = await service.createCsvProducts([{ category: 'Snacks', name: 'Papas', price: 1.5 }]);
+      const result = await service.createCsvProducts([
+        { category: 'Snacks', name: 'Papas', price: 1.5 },
+      ]);
       if (!result.succeeded) throw new Error('expected succeeded response');
       expect(result.succeeded).toBe(true);
       expect(result.data.created).toHaveLength(1);
@@ -397,7 +500,9 @@ describe('ProductOfflineService', () => {
       const productRepository = new ProductRepository(storeId, categoryRepository);
       service = new ProductOfflineService(storeId, productRepository, categoryRepository);
 
-      const result = await service.createCsvProducts([{ category: 'Snacks', name: 'Papas', price: 1.5 }]);
+      const result = await service.createCsvProducts([
+        { category: 'Snacks', name: 'Papas', price: 1.5 },
+      ]);
       if (!result.succeeded) throw new Error('expected succeeded response');
       const createdRow = result.data.created[0];
       expect(createdRow.id).toBeTruthy();
@@ -426,11 +531,18 @@ describe('ProductOfflineService', () => {
       productRepository.addProduct(categoryId, 'Coca Cola', 1.5, '', 1, true, true, true);
       const existingId = productRepository.getProductsByCategoryId(categoryId)[0].id;
 
-      const result = await service.createCsvProducts([{ category: 'Bebidas', name: 'Coca Cola', price: 2.5 }]);
+      const result = await service.createCsvProducts([
+        { category: 'Bebidas', name: 'Coca Cola', price: 2.5 },
+      ]);
       if (!result.succeeded) throw new Error('expected succeeded response');
       expect(result.data.failed).toHaveLength(0);
       expect(result.data.created).toHaveLength(1);
-      expect(result.data.created[0]).toMatchObject({ category: 'Bebidas', name: 'Coca Cola', price: 2.5, existing: true });
+      expect(result.data.created[0]).toMatchObject({
+        category: 'Bebidas',
+        name: 'Coca Cola',
+        price: 2.5,
+        existing: true,
+      });
       // The SAME product id is reused — not a new product.
       expect(result.data.created[0].id).toBe(existingId);
       // No duplicate product was created.
@@ -476,7 +588,9 @@ describe('ProductOfflineService', () => {
       productRepository.addProduct(categoryId, 'Coca Cola', 1.5, '', 1, true, true, true);
       const existingId = productRepository.getProductsByCategoryId(categoryId)[0].id;
 
-      const result = await service.createCsvProducts([{ category: 'Bebidas', name: 'coca cola', price: 3.0 }]);
+      const result = await service.createCsvProducts([
+        { category: 'Bebidas', name: 'coca cola', price: 3.0 },
+      ]);
       if (!result.succeeded) throw new Error('expected succeeded response');
       expect(result.data.failed).toHaveLength(0);
       expect(result.data.created).toHaveLength(1);
@@ -493,7 +607,9 @@ describe('ProductOfflineService', () => {
       productRepository.addProduct(categoryId, 'Coca Cola', 1.5, '', 1, true, true, true);
       const existingId = productRepository.getProductsByCategoryId(categoryId)[0].id;
 
-      const result = await service.createCsvProducts([{ category: 'bebidas', name: 'Coca Cola', price: 2.0 }]);
+      const result = await service.createCsvProducts([
+        { category: 'bebidas', name: 'Coca Cola', price: 2.0 },
+      ]);
       if (!result.succeeded) throw new Error('expected succeeded response');
       expect(result.data.created).toHaveLength(1);
       expect(result.data.created[0].id).toBe(existingId);
@@ -508,7 +624,9 @@ describe('ProductOfflineService', () => {
       const productRepository = new ProductRepository(storeId, categoryRepository);
       service = new ProductOfflineService(storeId, productRepository, categoryRepository);
 
-      const result = await service.createCsvProducts([{ category: 'snacks', name: '  papas fritas ', price: 1.5 }]);
+      const result = await service.createCsvProducts([
+        { category: 'snacks', name: '  papas fritas ', price: 1.5 },
+      ]);
       if (!result.succeeded) throw new Error('expected succeeded response');
       expect(result.data.created).toHaveLength(1);
       expect(result.data.created[0].name).toBe('Papas fritas');
@@ -543,7 +661,9 @@ describe('ProductOfflineService', () => {
     });
 
     it('resolves succeeded:true for every import (ADR-1)', async () => {
-      const result = await service.createCsvProducts([{ category: 'Bebidas', name: 'Coca Cola', price: 1.5 }]);
+      const result = await service.createCsvProducts([
+        { category: 'Bebidas', name: 'Coca Cola', price: 1.5 },
+      ]);
       expect(result.succeeded).toBe(true);
     });
   });

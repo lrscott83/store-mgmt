@@ -251,10 +251,7 @@ test.describe.serial('auth/me — session-rejection scenarios', () => {
 
   // ─── Scenario 6: Reactivate user + re-login ──────────────────────────
 
-  test('6 — reactivate user then re-login: session restored', async ({
-    page,
-    browser,
-  }) => {
+  test('6 — reactivate user then re-login: session restored', async ({ page, browser }) => {
     // Step 1: Deactivate the user → forces logout on next load
     await deactivateUser(superAdmin.identity.login);
 

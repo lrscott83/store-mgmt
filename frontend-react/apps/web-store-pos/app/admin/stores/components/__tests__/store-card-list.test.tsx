@@ -38,8 +38,14 @@ describe('StoreCardList — renders a Card grid (Req: Card-Grid List Uses Shared
     ];
     render(
       <Wrapper>
-        <StoreCardList stores={stores} onEdit={vi.fn()} onApprove={vi.fn()} onDisapprove={vi.fn()} onToggle={vi.fn()} />
-      </Wrapper>
+        <StoreCardList
+          stores={stores}
+          onEdit={vi.fn()}
+          onApprove={vi.fn()}
+          onDisapprove={vi.fn()}
+          onToggle={vi.fn()}
+        />
+      </Wrapper>,
     );
     expect(screen.getByText('Store Alpha')).toBeInTheDocument();
     expect(screen.getByText('Addr A')).toBeInTheDocument();
@@ -51,8 +57,14 @@ describe('StoreCardList — renders a Card grid (Req: Card-Grid List Uses Shared
     const { StoreCardList } = await import('../store-card-list');
     const { container } = render(
       <Wrapper>
-        <StoreCardList stores={[makeStore()]} onEdit={vi.fn()} onApprove={vi.fn()} onDisapprove={vi.fn()} onToggle={vi.fn()} />
-      </Wrapper>
+        <StoreCardList
+          stores={[makeStore()]}
+          onEdit={vi.fn()}
+          onApprove={vi.fn()}
+          onDisapprove={vi.fn()}
+          onToggle={vi.fn()}
+        />
+      </Wrapper>,
     );
     expect(container.querySelector('[data-slot="card"]')).toBeInTheDocument();
   });
@@ -63,8 +75,14 @@ describe('StoreCardList — empty state', () => {
     const { StoreCardList } = await import('../store-card-list');
     render(
       <Wrapper>
-        <StoreCardList stores={[]} onEdit={vi.fn()} onApprove={vi.fn()} onDisapprove={vi.fn()} onToggle={vi.fn()} />
-      </Wrapper>
+        <StoreCardList
+          stores={[]}
+          onEdit={vi.fn()}
+          onApprove={vi.fn()}
+          onDisapprove={vi.fn()}
+          onToggle={vi.fn()}
+        />
+      </Wrapper>,
     );
     expect(screen.getByText(/no hay tiendas/i)).toBeInTheDocument();
   });
@@ -80,9 +98,10 @@ describe('StoreCardList — gear menu actions wired', () => {
           stores={[makeStore({ id: 'store-x', name: 'Store X' })]}
           onEdit={onEdit}
           onApprove={vi.fn()}
-          onDisapprove={vi.fn()} onToggle={vi.fn()}
+          onDisapprove={vi.fn()}
+          onToggle={vi.fn()}
         />
-      </Wrapper>
+      </Wrapper>,
     );
     fireEvent.click(screen.getByTestId('store-actions-toggle-store-x'));
     fireEvent.click(screen.getByRole('menuitem', { name: esMessages['STORES.EDIT'] }));
@@ -98,9 +117,10 @@ describe('StoreCardList — gear menu actions wired', () => {
           stores={[makeStore({ id: 'store-y', name: 'Store Y', approved: false })]}
           onEdit={vi.fn()}
           onApprove={onApprove}
-          onDisapprove={vi.fn()} onToggle={vi.fn()}
+          onDisapprove={vi.fn()}
+          onToggle={vi.fn()}
         />
-      </Wrapper>
+      </Wrapper>,
     );
     fireEvent.click(screen.getByTestId('store-actions-toggle-store-y'));
     fireEvent.click(screen.getByRole('menuitem', { name: esMessages['STORES.APPROVE'] }));
@@ -118,7 +138,7 @@ describe('StoreCardList — gear menu actions wired', () => {
           onApprove={vi.fn()}
           onDisapprove={onDisapprove}
         />
-      </Wrapper>
+      </Wrapper>,
     );
     fireEvent.click(screen.getByTestId('store-actions-toggle-store-z'));
     fireEvent.click(screen.getByRole('menuitem', { name: esMessages['STORES.DISAPPROVE'] }));
@@ -135,9 +155,10 @@ describe('StoreCardList — Approve XOR Disapprove (Req: Card-Grid List Uses Sha
           stores={[makeStore({ id: 'store-a', approved: true })]}
           onEdit={vi.fn()}
           onApprove={vi.fn()}
-          onDisapprove={vi.fn()} onToggle={vi.fn()}
+          onDisapprove={vi.fn()}
+          onToggle={vi.fn()}
         />
-      </Wrapper>
+      </Wrapper>,
     );
     fireEvent.click(screen.getByTestId('store-actions-toggle-store-a'));
     const editItem = screen.getByRole('menuitem', { name: esMessages['STORES.EDIT'] });
@@ -145,7 +166,7 @@ describe('StoreCardList — Approve XOR Disapprove (Req: Card-Grid List Uses Sha
     expect(editItem).toHaveClass('text-primary');
     expect(disapproveItem).toHaveClass('text-warning');
     expect(
-      screen.queryByRole('menuitem', { name: esMessages['STORES.APPROVE'] })
+      screen.queryByRole('menuitem', { name: esMessages['STORES.APPROVE'] }),
     ).not.toBeInTheDocument();
     expect(screen.queryByRole('separator')).not.toBeInTheDocument();
   });
@@ -158,15 +179,16 @@ describe('StoreCardList — Approve XOR Disapprove (Req: Card-Grid List Uses Sha
           stores={[makeStore({ id: 'store-b', approved: false })]}
           onEdit={vi.fn()}
           onApprove={vi.fn()}
-          onDisapprove={vi.fn()} onToggle={vi.fn()}
+          onDisapprove={vi.fn()}
+          onToggle={vi.fn()}
         />
-      </Wrapper>
+      </Wrapper>,
     );
     fireEvent.click(screen.getByTestId('store-actions-toggle-store-b'));
     const approveItem = screen.getByRole('menuitem', { name: esMessages['STORES.APPROVE'] });
     expect(approveItem).toHaveClass('text-success');
     expect(
-      screen.queryByRole('menuitem', { name: esMessages['STORES.DISAPPROVE'] })
+      screen.queryByRole('menuitem', { name: esMessages['STORES.DISAPPROVE'] }),
     ).not.toBeInTheDocument();
     expect(screen.queryByRole('separator')).not.toBeInTheDocument();
   });
@@ -181,9 +203,10 @@ describe('StoreCardList — state CSS (Req: Store Card Visual Lifecycle State)',
           stores={[makeStore({ isActive: false, approved: true })]}
           onEdit={vi.fn()}
           onApprove={vi.fn()}
-          onDisapprove={vi.fn()} onToggle={vi.fn()}
+          onDisapprove={vi.fn()}
+          onToggle={vi.fn()}
         />
-      </Wrapper>
+      </Wrapper>,
     );
     const card = container.querySelector('[data-slot="card"]');
     expect(card).toHaveClass('bg-danger/10', 'border-danger');
@@ -197,9 +220,10 @@ describe('StoreCardList — state CSS (Req: Store Card Visual Lifecycle State)',
           stores={[makeStore({ isActive: true, approved: false })]}
           onEdit={vi.fn()}
           onApprove={vi.fn()}
-          onDisapprove={vi.fn()} onToggle={vi.fn()}
+          onDisapprove={vi.fn()}
+          onToggle={vi.fn()}
         />
-      </Wrapper>
+      </Wrapper>,
     );
     const card = container.querySelector('[data-slot="card"]');
     expect(card).toHaveClass('bg-warning/10', 'border-warning');
@@ -214,9 +238,10 @@ describe('StoreCardList — state CSS (Req: Store Card Visual Lifecycle State)',
           stores={[makeStore({ isActive: true, approved: true })]}
           onEdit={vi.fn()}
           onApprove={vi.fn()}
-          onDisapprove={vi.fn()} onToggle={vi.fn()}
+          onDisapprove={vi.fn()}
+          onToggle={vi.fn()}
         />
-      </Wrapper>
+      </Wrapper>,
     );
     const card = container.querySelector('[data-slot="card"]');
     expect(card).not.toHaveClass('bg-danger/10');
@@ -231,9 +256,10 @@ describe('StoreCardList — state CSS (Req: Store Card Visual Lifecycle State)',
           stores={[makeStore({ isActive: false, approved: false })]}
           onEdit={vi.fn()}
           onApprove={vi.fn()}
-          onDisapprove={vi.fn()} onToggle={vi.fn()}
+          onDisapprove={vi.fn()}
+          onToggle={vi.fn()}
         />
-      </Wrapper>
+      </Wrapper>,
     );
     const card = container.querySelector('[data-slot="card"]');
     expect(card).toHaveClass('bg-danger/10', 'border-danger');
@@ -254,7 +280,7 @@ describe('StoreCardList — Change Plan gear item (spec store-plan-toggle R3)', 
           onDisapprove={vi.fn()}
           onToggle={onToggle}
         />
-      </Wrapper>
+      </Wrapper>,
     );
     fireEvent.click(screen.getByTestId('store-actions-toggle-store-t'));
     fireEvent.click(screen.getByRole('menuitem', { name: esMessages['STORES.CHANGE_PLAN'] }));
@@ -273,11 +299,11 @@ describe('StoreCardList — Change Plan gear item (spec store-plan-toggle R3)', 
           onDisapprove={vi.fn()}
           onToggle={onToggle}
         />
-      </Wrapper>
+      </Wrapper>,
     );
     fireEvent.click(screen.getByTestId('store-actions-toggle-store-i'));
     expect(
-      screen.queryByRole('menuitem', { name: esMessages['STORES.CHANGE_PLAN'] })
+      screen.queryByRole('menuitem', { name: esMessages['STORES.CHANGE_PLAN'] }),
     ).not.toBeInTheDocument();
   });
 });
@@ -287,14 +313,20 @@ describe('StoreCardList — Activate/Deactivate removed (Req: Activate/Deactivat
     const { StoreCardList } = await import('../store-card-list');
     render(
       <Wrapper>
-        <StoreCardList stores={[makeStore()]} onEdit={vi.fn()} onApprove={vi.fn()} onDisapprove={vi.fn()} onToggle={vi.fn()} />
-      </Wrapper>
+        <StoreCardList
+          stores={[makeStore()]}
+          onEdit={vi.fn()}
+          onApprove={vi.fn()}
+          onDisapprove={vi.fn()}
+          onToggle={vi.fn()}
+        />
+      </Wrapper>,
     );
     expect(
-      screen.queryByRole('button', { name: esMessages['STORES.ACTIVATE'] })
+      screen.queryByRole('button', { name: esMessages['STORES.ACTIVATE'] }),
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole('button', { name: esMessages['STORES.DEACTIVATE'] })
+      screen.queryByRole('button', { name: esMessages['STORES.DEACTIVATE'] }),
     ).not.toBeInTheDocument();
   });
 });

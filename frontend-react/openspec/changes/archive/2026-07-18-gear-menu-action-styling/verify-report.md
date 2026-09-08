@@ -24,6 +24,7 @@
 ## Primitive Contract (ActionMenu / ActionMenuItem)
 
 `apps/web-store-pos/app/shared/components/ui/action-menu.tsx` verified against GM-MENU/GM-ITEM:
+
 - Gear trigger uses shared `SettingsIcon`, default `label="Acciones"`, `testId` forwarded to
   `data-testid`, `aria-expanded` reflects open state — matches S-GM-MENU-2/4.
 - Dropdown `role="menu"`, absent from DOM when closed — matches S-GM-MENU-1.
@@ -43,26 +44,27 @@
 
 ## All 9 Menus — Requirement Compliance
 
-| Menu | File | Items/Intents | Separator | Status |
-|---|---|---|---|---|
-| category-actions-menu | `sales/components/category-actions-menu.tsx` | Editar Categoría(edit), Nuevo Productos(create), Nuevo Producto(create); custom label "Opciones de categoría" | none | PASS |
-| category-product-list ProductRow | `sales/components/category-product-list.tsx` | Editar(edit), Eliminar(delete) | before delete | PASS |
-| sale-credit-list | `sales/components/sale-credit-list.tsx` | Editar(edit), Pagar por(pay, only `!saleCredit.paid`); per-row `ActionMenu` instance (no shared `openMenuId`) | none | PASS |
-| owner-card-list | `admin/owners/components/owner-card-list.tsx` | Editar(edit), Eliminar(delete) | before delete | PASS |
-| reseller-card-list | `admin/resellers/components/reseller-card-list.tsx` | Editar(edit) ONLY — see Deviation below | n/a | PASS (documented deviation) |
-| user-card-list | `management/users/components/user-card-list.tsx` | Editar(edit, always), Activar(activate, `!isActive`) XOR Desactivar(deactivate, `isActive`) | none | PASS |
-| entry-list (gear-ified) | `inventory/components/entry-list.tsx` | Editar(edit)→`onEdit?.(entry)`, Eliminar(delete)→`onDeactivate?.(entry)`; gate `isOwnerAdmin && !readOnly` preserved | before delete | PASS |
-| expense-list (gear-ified) | `expenses/components/expense-list.tsx` | Editar(edit)→`onEdit?.(expense)`, Eliminar(delete, only when `onDelete` provided)→`onDelete(expense)`; gate `!readOnly` | before delete | PASS |
-| store-card-list (gear-ified) | `admin/stores/components/store-card-list.tsx` | Editar(edit)→`onEdit(store.id)`, Desaprobar(disapprove) XOR Aprobar(approve) by `store.approved`; Activate/Deactivate stay dead-coded | none | PASS |
+| Menu                             | File                                                | Items/Intents                                                                                                                         | Separator     | Status                      |
+| -------------------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ------------- | --------------------------- |
+| category-actions-menu            | `sales/components/category-actions-menu.tsx`        | Editar Categoría(edit), Nuevo Productos(create), Nuevo Producto(create); custom label "Opciones de categoría"                         | none          | PASS                        |
+| category-product-list ProductRow | `sales/components/category-product-list.tsx`        | Editar(edit), Eliminar(delete)                                                                                                        | before delete | PASS                        |
+| sale-credit-list                 | `sales/components/sale-credit-list.tsx`             | Editar(edit), Pagar por(pay, only `!saleCredit.paid`); per-row `ActionMenu` instance (no shared `openMenuId`)                         | none          | PASS                        |
+| owner-card-list                  | `admin/owners/components/owner-card-list.tsx`       | Editar(edit), Eliminar(delete)                                                                                                        | before delete | PASS                        |
+| reseller-card-list               | `admin/resellers/components/reseller-card-list.tsx` | Editar(edit) ONLY — see Deviation below                                                                                               | n/a           | PASS (documented deviation) |
+| user-card-list                   | `management/users/components/user-card-list.tsx`    | Editar(edit, always), Activar(activate, `!isActive`) XOR Desactivar(deactivate, `isActive`)                                           | none          | PASS                        |
+| entry-list (gear-ified)          | `inventory/components/entry-list.tsx`               | Editar(edit)→`onEdit?.(entry)`, Eliminar(delete)→`onDeactivate?.(entry)`; gate `isOwnerAdmin && !readOnly` preserved                  | before delete | PASS                        |
+| expense-list (gear-ified)        | `expenses/components/expense-list.tsx`              | Editar(edit)→`onEdit?.(expense)`, Eliminar(delete, only when `onDelete` provided)→`onDelete(expense)`; gate `!readOnly`               | before delete | PASS                        |
+| store-card-list (gear-ified)     | `admin/stores/components/store-card-list.tsx`       | Editar(edit)→`onEdit(store.id)`, Desaprobar(disapprove) XOR Aprobar(approve) by `store.approved`; Activate/Deactivate stay dead-coded | none          | PASS                        |
 
 All handler call signatures preserved (verified by direct source read, matches GM-PARITY-2). Owner/reseller/user
 `getByRole('menuitem', {name})` + `/acciones/i` assertions confirmed unedited (GM-PARITY-1) — `git diff` on those
-test files shows only new S-GM-* assertions appended, no existing lines removed/changed.
+test files shows only new S-GM-\* assertions appended, no existing lines removed/changed.
 
 ## Reseller Deviation — Classified: Acceptable Deviation (not a defect)
 
 Design doc said "identical migration to owner-card-list" (Editar + Eliminar). Apply deviated to
 Editar-only. Verified independently against both the React source/test and the Angular source:
+
 - `reseller-card-list.tsx` props: `{resellers, onCreate, onEdit}` — **no `onDelete` prop exists.**
 - `reseller-card-list.test.tsx` explicitly asserts Activar/Desactivar/Eliminar are **not** rendered
   and exactly one menuitem (Editar) exists.

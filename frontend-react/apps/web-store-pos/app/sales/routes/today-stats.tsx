@@ -4,7 +4,10 @@ import { EFeatures, ExpenseType, PaymentType } from '@store-mgmt/domain';
 import type { Expense, Order, SaleCredit } from '@store-mgmt/domain';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
-import { hasCreditsModuleAvailable, hasExpensesModuleAvailable } from '~/shared/lib/auth/authorization-service';
+import {
+  hasCreditsModuleAvailable,
+  hasExpensesModuleAvailable,
+} from '~/shared/lib/auth/authorization-service';
 import { Card } from '~/shared/components/ui/card';
 import { ChevronDownIcon } from '~/shared/components/ui/icons';
 import { formatCurrency } from '~/shared/lib/format-currency';
@@ -104,6 +107,7 @@ export function TodayStatsPage() {
   const [saleCredits, setSaleCredits] = useState<SaleCredit[]>([]);
   const [paidSaleCredits, setPaidSaleCredits] = useState<SaleCredit[]>([]);
   const [salesCashTotal, setSalesCashTotal] = useState(0);
+  const [salesCardTotal, setSalesCardTotal] = useState(0);
 
   useEffect(() => {
     const orderService = new OrderOfflineService(storeId);
@@ -118,16 +122,19 @@ export function TodayStatsPage() {
         .filter((o) => o.paymentType === PaymentType.Efectivo && !o.isCredit)
         .reduce((acc, o) => acc + o.total, 0),
     );
+    setSalesCardTotal(
+      activeOrders
+        .filter((o) => o.paymentType === PaymentType.Tarjeta && !o.isCredit)
+        .reduce((acc, o) => acc + o.total, 0),
+    );
 
     if (hasExpensesModule) {
       // Angular parity (today-stats.component.ts:79): loads today's expenses via
       // getExpensesInDayObservable(new Date()) and unwraps the BaseResponseModel `.data`.
       const expenseService = new ExpenseOfflineService(storeId);
-      void expenseService
-        .getExpensesInDayObservable(new Date())
-        .then((response) => {
-          if (response.succeeded) setExpenses(response.data);
-        });
+      void expenseService.getExpensesInDayObservable(new Date()).then((response) => {
+        if (response.succeeded) setExpenses(response.data);
+      });
     }
 
     if (hasCreditsModule) {
@@ -135,16 +142,12 @@ export function TodayStatsPage() {
       // getUnPaidSaleCreditsInDayObservable/getPaidSaleCreditsInDayObservable and unwraps
       // the BaseResponseModel `.data` (flagged mismatch #3).
       const creditService = new SaleCreditOfflineService(storeId);
-      void creditService
-        .getUnPaidSaleCreditsInDayObservable(new Date())
-        .then((response) => {
-          if (response.succeeded) setSaleCredits(response.data);
-        });
-      void creditService
-        .getPaidSaleCreditsInDayObservable(new Date())
-        .then((response) => {
-          if (response.succeeded) setPaidSaleCredits(response.data);
-        });
+      void creditService.getUnPaidSaleCreditsInDayObservable(new Date()).then((response) => {
+        if (response.succeeded) setSaleCredits(response.data);
+      });
+      void creditService.getPaidSaleCreditsInDayObservable(new Date()).then((response) => {
+        if (response.succeeded) setPaidSaleCredits(response.data);
+      });
     }
   }, [storeId, hasExpensesModule, hasCreditsModule]);
 
@@ -192,7 +195,9 @@ export function TodayStatsPage() {
                   <span className="font-bold text-text">Ventas</span>
                 </td>
                 <td className="p-1 text-right">
-                  <span className="font-bold text-success whitespace-nowrap">{formatCurrency(salesCashTotal)}</span>
+                  <span className="font-bold text-success whitespace-nowrap">
+                    {formatCurrency(salesCashTotal)}
+                  </span>
                 </td>
               </tr>
               {hasCreditsModule && (
@@ -201,7 +206,9 @@ export function TodayStatsPage() {
                     <span className="font-bold text-text">Créditos Pagados</span>
                   </td>
                   <td className="p-1 text-right">
-                    <span className="font-bold text-success whitespace-nowrap">{formatCurrency(paidCreditsCashTotal)}</span>
+                    <span className="font-bold text-success whitespace-nowrap">
+                      {formatCurrency(paidCreditsCashTotal)}
+                    </span>
                   </td>
                 </tr>
               )}
@@ -211,7 +218,9 @@ export function TodayStatsPage() {
                     <span className="font-bold text-text">Gastos</span>
                   </td>
                   <td className="p-1 text-right">
-                    <span className="font-bold text-danger whitespace-nowrap">{formatCurrency(expensesCashTotal)}</span>
+                    <span className="font-bold text-danger whitespace-nowrap">
+                      {formatCurrency(expensesCashTotal)}
+                    </span>
                   </td>
                 </tr>
               )}
@@ -219,6 +228,29 @@ export function TodayStatsPage() {
           </table>
         </ExpansionPanel>
         {/* END CASH */}
+
+        {/* BEGIN CARD PAYMENTS */}
+        <ExpansionPanel
+          title="Pago por Tarjeta"
+          amount={formatCurrency(salesCardTotal)}
+          amountClassName={valueClassName(salesCardTotal)}
+        >
+          <table className="w-full text-sm">
+            <tbody>
+              <tr className="border-b border-border last:border-0">
+                <td className="p-1">
+                  <span className="font-bold text-text">Ventas</span>
+                </td>
+                <td className="p-1 text-right">
+                  <span className="font-bold text-success whitespace-nowrap">
+                    {formatCurrency(salesCardTotal)}
+                  </span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </ExpansionPanel>
+        {/* END CARD PAYMENTS */}
 
         {/* BEGIN EXPENSES */}
         {hasExpensesModule && (
@@ -317,7 +349,9 @@ function SaleCreditsTable({ saleCredits }: { saleCredits: SaleCredit[] }) {
               <span className="text-text">{saleCredit.client}</span>
             </td>
             <td className="p-1 text-right">
-              <span className={`whitespace-nowrap ${saleCredit.isPaid ? 'text-success' : 'text-danger'}`}>
+              <span
+                className={`whitespace-nowrap ${saleCredit.isPaid ? 'text-success' : 'text-danger'}`}
+              >
                 {formatCurrency(saleCredit.total)}
               </span>
             </td>

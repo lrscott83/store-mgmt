@@ -8,7 +8,7 @@ top-right toasts at 7 live call sites. React currently substitutes these with a 
 SweetAlert2 dialogs, inline banners, and — in one case — nothing at all. The result is three
 distinct parity defects:
 
-1. **Wrong modality/timing.** 5 of 7 sites surface as a *blocking* Swal (user must click OK) or
+1. **Wrong modality/timing.** 5 of 7 sites surface as a _blocking_ Swal (user must click OK) or
    an inline box, instead of a 1s auto-dismissing toast.
 2. **Lost titles.** Success sites that carry a `SUCCESS_TITLE` ("Éxito") in Angular drop the
    title in React (#2 cart-create, #6 features-activated), because the React catalog is missing
@@ -31,15 +31,15 @@ toast system). The stale specs are updated to match.
 
 Migrate the **7 live Angular `ngx-toastr` call sites** to React toasts via `react-toastify`:
 
-| # | Trigger | Angular text (key) | React "before" → "after" |
-|---|---------|--------------------|--------------------------|
-| 1 | CSV import success | literal `Importados N productos correctamente.` (no title) | `showBlockingSuccess` Swal → success toast |
-| 2 | Order create success | `SHOPPING_CART.ORDER_CREATED` + `SUCCESS_TITLE` "Éxito" | `showBlockingSuccess` Swal (title lost) → success toast **with** restored title |
-| 3 | Order create failure | `SHOPPING_CART.ORDER_NOT_CREATED` + corrected `ERROR_TITLE` | **missing** (generic inline error) → **new** error toast |
-| 4 | Sync import success | `SYNCHRONIZATION.RECEIVE_IMPORT_SUCCESS` (no title) | inline `<InfoBox>` → success toast |
-| 5 | Features activate HTTP error | `FEATURES.UNEXPECTED_ERROR` + corrected `ERROR_TITLE` | `showBlockingError` Swal → error toast |
-| 6 | Features activate success | `FEATURES.FEATURES_ACTIVATED` + `SUCCESS_TITLE` "Éxito" | `showBlockingSuccess` Swal (title lost) → success toast **with** restored title |
-| 7 | Features `succeeded:false` | same as #5 | `showBlockingError` Swal → error toast |
+| #   | Trigger                      | Angular text (key)                                          | React "before" → "after"                                                        |
+| --- | ---------------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| 1   | CSV import success           | literal `Importados N productos correctamente.` (no title)  | `showBlockingSuccess` Swal → success toast                                      |
+| 2   | Order create success         | `SHOPPING_CART.ORDER_CREATED` + `SUCCESS_TITLE` "Éxito"     | `showBlockingSuccess` Swal (title lost) → success toast **with** restored title |
+| 3   | Order create failure         | `SHOPPING_CART.ORDER_NOT_CREATED` + corrected `ERROR_TITLE` | **missing** (generic inline error) → **new** error toast                        |
+| 4   | Sync import success          | `SYNCHRONIZATION.RECEIVE_IMPORT_SUCCESS` (no title)         | inline `<InfoBox>` → success toast                                              |
+| 5   | Features activate HTTP error | `FEATURES.UNEXPECTED_ERROR` + corrected `ERROR_TITLE`       | `showBlockingError` Swal → error toast                                          |
+| 6   | Features activate success    | `FEATURES.FEATURES_ACTIVATED` + `SUCCESS_TITLE` "Éxito"     | `showBlockingSuccess` Swal (title lost) → success toast **with** restored title |
+| 7   | Features `succeeded:false`   | same as #5                                                  | `showBlockingError` Swal → error toast                                          |
 
 Also in scope:
 
@@ -93,7 +93,7 @@ Call sites import these and pass **existing React i18n catalog keys** (plus the 
 - Replace the inline `<InfoBox>` at #4 (sync import) with a success toast.
 - At #3 (cart order failure), **remove** the generic inline `setSubmitError(GENERAL.ERROR)` path
   and emit the specific `showToastError(ORDER_NOT_CREATED, ERROR_TITLE)` toast — closing the
-  functional gap. (Validation-guard Swals in the cart that have no Angular *toastr* counterpart
+  functional gap. (Validation-guard Swals in the cart that have no Angular _toastr_ counterpart
   are untouched.)
 
 **Test-first (Strict TDD active).** Every change lands test-first:
@@ -129,8 +129,8 @@ activate/error notifications are toasts, and annotate the superseded `frontend-p
 
 ## Risks / accepted consequences
 
-- **Accepted UX change (explicit).** 5 of 7 call sites change from a *blocking* dialog / inline
-  box to a **1000ms auto-dismissing toast**. This is the *literal Angular behavior* and has been
+- **Accepted UX change (explicit).** 5 of 7 call sites change from a _blocking_ dialog / inline
+  box to a **1000ms auto-dismissing toast**. This is the _literal Angular behavior_ and has been
   accepted by the user. Consequence: users no longer click OK to dismiss these, and a fast-moving
   user may not read a 1s toast — this is intended parity, not a regression.
 - **#3 is a real functional add, not a re-skin.** The order-failure toast is net-new behavior in

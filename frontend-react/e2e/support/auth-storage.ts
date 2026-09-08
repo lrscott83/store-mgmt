@@ -78,11 +78,11 @@ export async function mutateAuthModel(page: Page, overrides: Partial<AuthModel>)
       }
       return false;
     },
-    { suffix: AUTH_MODEL_KEY_SUFFIX, overrides }
+    { suffix: AUTH_MODEL_KEY_SUFFIX, overrides },
   );
   if (!mutated) {
     throw new Error(
-      'No AUTH_MODEL key found in localStorage to mutate — restore a persona (restoreSignedInSession) first.'
+      'No AUTH_MODEL key found in localStorage to mutate — restore a persona (restoreSignedInSession) first.',
     );
   }
 }
@@ -129,11 +129,11 @@ export async function writeRawAuthModel(page: Page, raw: string): Promise<void> 
       }
       return false;
     },
-    { suffix: AUTH_MODEL_KEY_SUFFIX, raw }
+    { suffix: AUTH_MODEL_KEY_SUFFIX, raw },
   );
   if (!wrote) {
     throw new Error(
-      'No AUTH_MODEL key found in localStorage to overwrite — restore a persona (restoreSignedInSession) first.'
+      'No AUTH_MODEL key found in localStorage to overwrite — restore a persona (restoreSignedInSession) first.',
     );
   }
 }

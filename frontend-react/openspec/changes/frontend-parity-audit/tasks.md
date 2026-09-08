@@ -21,63 +21,63 @@ visual/token change, spot-check instead of new test.
 ## Stage 0 — Cross-Cutting Foundations (sequential, blocks Stage 1-10) — STATUS: COMPLETE
 
 - [x] 0.1 L1 Models/Enums: 0.1.1 enumerate Angular domain/enums; 0.1.2 enumerate React domain/enums;
-  0.1.3 build diff matrix excluding ratified-dead (TodayInventoryStats=32 CONFIRMED dead - nav
-  commented out; fleet/carrier enums; message.model.ts); 0.1.4 add missing live fields/enums to
-  React domain [TDD]. RESULT: zero gaps found, no fix needed — full matrix in apply-progress.
-- [x] 0.2 L2 Services: 0.2.1 enumerate Angular application/* methods + _services/* cross-cutting
-  (connection, download-manager, update, usage-tracker, shopping-cart) - list only, full audit
-  deferred to Stage 6; 0.2.2 confirm offline routing when USE_ONLINE_SERVICE=false — the LIVE
-  routing is the per-entity factories createProductService/createProductCategoryService
-  (product-service.factory.ts / product-category-service.factory.ts), mirroring Angular's per-entity
-  factories. NOTE (2026-07-14): the generic service-factory.ts originally cited here was a dead R12
-  invention (no Angular correlate, zero call-sites) and was DELETED during Judgment Day;
-  0.2.3 map each Angular method -> React *-offline-service.ts, build method-gap matrix per module.
-  RESULT: offline-service counterparts confirmed present for all core entities; PWA cross-cutting
-  method-level mapping deferred to Stage 6 as designed.
+      0.1.3 build diff matrix excluding ratified-dead (TodayInventoryStats=32 CONFIRMED dead - nav
+      commented out; fleet/carrier enums; message.model.ts); 0.1.4 add missing live fields/enums to
+      React domain [TDD]. RESULT: zero gaps found, no fix needed — full matrix in apply-progress.
+- [x] 0.2 L2 Services: 0.2.1 enumerate Angular application/_ methods + \_services/_ cross-cutting
+      (connection, download-manager, update, usage-tracker, shopping-cart) - list only, full audit
+      deferred to Stage 6; 0.2.2 confirm offline routing when USE_ONLINE_SERVICE=false — the LIVE
+      routing is the per-entity factories createProductService/createProductCategoryService
+      (product-service.factory.ts / product-category-service.factory.ts), mirroring Angular's per-entity
+      factories. NOTE (2026-07-14): the generic service-factory.ts originally cited here was a dead R12
+      invention (no Angular correlate, zero call-sites) and was DELETED during Judgment Day;
+      0.2.3 map each Angular method -> React \*-offline-service.ts, build method-gap matrix per module.
+      RESULT: offline-service counterparts confirmed present for all core entities; PWA cross-cutting
+      method-level mapping deferred to Stage 6 as designed.
 - [x] 0.3 L3 Auth: 0.3.1 list Angular canActivate guards; 0.3.2 spot-verify React loaders 1:1 (.some()
-  over roles, selectedStoreId check, deny->logout->/login) - mostly done, verification only unless
-  gap found [TDD only if gap fixed]. RESULT: no gap found, all three checks confirmed matching.
+      over roles, selectedStoreId check, deny->logout->/login) - mostly done, verification only unless
+      gap found [TDD only if gap fixed]. RESULT: no gap found, all three checks confirmed matching.
 - [x] 0.4 L7 Routes: 0.4.1 extract Angular route table incl. renames; 0.4.2 extract React route tree +
-  catch-all shared/routes/$.tsx; 0.4.3 reconcile paths/params/guards/menu 1:1, fix mismatches [TDD
-  if behavior changes]. RESULT: catch-all gap found+fixed (was static 404, now redirects to / per
-  Angular's `{path:'**',redirectTo:''}`) [TDD, 1 test]. Full per-route reconciliation for all
-  ~35+ routes deferred to each module's Stage 1-9 L7 sub-task (partial completion, documented).
+      catch-all shared/routes/$.tsx; 0.4.3 reconcile paths/params/guards/menu 1:1, fix mismatches [TDD
+      if behavior changes]. RESULT: catch-all gap found+fixed (was static 404, now redirects to / per
+      Angular's `{path:'**',redirectTo:''}`) [TDD, 1 test]. Full per-route reconciliation for all
+      ~35+ routes deferred to each module's Stage 1-9 L7 sub-task (partial completion, documented).
 - [x] 0.5 Design tokens (L5 foundation, blocking gate for Stage 1+): 0.5.1 extract Angular tokens from
-  frontend/src/scss/settings/color-variables.scss + theme-variables.scss - primary PURPLE #6f42c1
-  (CONFIRMED live from running-app screenshot per task instructions; static analysis found Angular
-  Material's rendered primary is actually #673ab7 via deeppurple-amber theme — recorded as open
-  question, screenshot authority followed), blue #1677ff = link/secondary accent only, amber =
-  install-app, --pc-* vars (sidebar #fff, header shadow, header height 60px, sidebar width 260px,
-  card box-shadow); 0.5.2 replace packages/web-common/styles.css :root/@theme block - removed wrong
-  cyan primary (34 211 238), added purple + full token set [VISUAL] DONE; 0.5.3 build
-  app/shared/components/ui/button.tsx (Button + FloatingButton) [TDD] DONE — 12 tests; 0.5.4 build
-  ui/card.tsx (Card) [TDD+VISUAL] DONE — 5 tests; 0.5.5 build ui/info-box.tsx (InfoBox) [TDD+VISUAL]
-  DONE — 5 tests; 0.5.6 review checkpoint - blocking gate, no per-view styling starts before this
-  passes. DONE — gate satisfied, Stage 1 may begin.
+      frontend/src/scss/settings/color-variables.scss + theme-variables.scss - primary PURPLE #6f42c1
+      (CONFIRMED live from running-app screenshot per task instructions; static analysis found Angular
+      Material's rendered primary is actually #673ab7 via deeppurple-amber theme — recorded as open
+      question, screenshot authority followed), blue #1677ff = link/secondary accent only, amber =
+      install-app, --pc-\* vars (sidebar #fff, header shadow, header height 60px, sidebar width 260px,
+      card box-shadow); 0.5.2 replace packages/web-common/styles.css :root/@theme block - removed wrong
+      cyan primary (34 211 238), added purple + full token set [VISUAL] DONE; 0.5.3 build
+      app/shared/components/ui/button.tsx (Button + FloatingButton) [TDD] DONE — 12 tests; 0.5.4 build
+      ui/card.tsx (Card) [TDD+VISUAL] DONE — 5 tests; 0.5.5 build ui/info-box.tsx (InfoBox) [TDD+VISUAL]
+      DONE — 5 tests; 0.5.6 review checkpoint - blocking gate, no per-view styling starts before this
+      passes. DONE — gate satisfied, Stage 1 may begin.
 
 ## Stage 1 — Sales
 
-- [x] 1.1 L4 functional diff (Angular Sales components vs React app/sales/**) + fix gaps [TDD].
+- [x] 1.1 L4 functional diff (Angular Sales components vs React app/sales/\*\*) + fix gaps [TDD].
 - [x] 1.2 L5 visual: apply tokens + Button/Card/InfoBox to Sales views [VISUAL].
 - [x] 1.3 L6 i18n: flatten-diff Sales keys vs es.ts, fill gaps, remove hardcoded Spanish.
 - [x] 1.5 Cart (nav-right) L4/L5/L6 parity — badge+header total, payment/Vuelto,
-  payment-type icons, credit-module gating, print-invoice toggle, validations. Scope
-  RESOLUTION: the cart UI + POS checkout FLOW (dropdown header "Venta actual"+order-type,
-  payment/Vuelto, payment-type selector with icons, credit toggle+client input gated by
-  `hasCreditsModuleAvailable`, print-invoice toggle (UI-only, no print output — parity with
-  Angular's disabled jsPDF path), Limpiar/Registrar buttons, createOrder validations) is
-  Sales-stage (L4/L5/L6) parity work, done here. Only the cross-cutting offline
-  `ShoppingCartService`/inventory-availability-on-increase/decrease audit stays referenced
-  under Stage 6 Sync (see 6.1 note below) — this reconciles the prior contradiction between
-  explore.md (verify in Sales stage) and design.md/this file (routed cart service to Sync).
-  Deferred sub-item (NOT implemented here): inventory-availability validation on cart
-  increase/decrease (Angular's `ShoppingCartService.increaseCartItem` checks stock; React
-  cart store is local-only). MOVED to Stage 2 (see 2.5) — it depends on
-  `InventoryOfflineService`/stock data that Stage 2 owns, so it is an Inventory dependency,
-  not a generic Sync one.
+      payment-type icons, credit-module gating, print-invoice toggle, validations. Scope
+      RESOLUTION: the cart UI + POS checkout FLOW (dropdown header "Venta actual"+order-type,
+      payment/Vuelto, payment-type selector with icons, credit toggle+client input gated by
+      `hasCreditsModuleAvailable`, print-invoice toggle (UI-only, no print output — parity with
+      Angular's disabled jsPDF path), Limpiar/Registrar buttons, createOrder validations) is
+      Sales-stage (L4/L5/L6) parity work, done here. Only the cross-cutting offline
+      `ShoppingCartService`/inventory-availability-on-increase/decrease audit stays referenced
+      under Stage 6 Sync (see 6.1 note below) — this reconciles the prior contradiction between
+      explore.md (verify in Sales stage) and design.md/this file (routed cart service to Sync).
+      Deferred sub-item (NOT implemented here): inventory-availability validation on cart
+      increase/decrease (Angular's `ShoppingCartService.increaseCartItem` checks stock; React
+      cart store is local-only). MOVED to Stage 2 (see 2.5) — it depends on
+      `InventoryOfflineService`/stock data that Stage 2 owns, so it is an Inventory dependency,
+      not a generic Sync one.
 - [x] 1.4 Verify: matrix all-green, tests pass, visual spot-check.
 - [x] 1.6 Verify-report follow-up fix batch (resolves verify-report.md W1 + W2 findings,
-  2026-07-02):
+      2026-07-02):
   - `checkAvailability` FULL parity (closes W1 AND supersedes/completes 2.5.2 below): ported
     Angular's `InventoryOfflineService.hasAvailableProductToSale` 5-way branch exactly
     (`app/sales/lib/product-availability.ts` — `checkProductAvailabilityToSale`), including
@@ -100,7 +100,7 @@ visual/token change, spot-check instead of new test.
     error) to Angular's single hardcoded Spanish fallback literal "Error al importar los
     productos" (byte-identical, matches Angular hardcoding it too, not an i18n key).
   - New i18n keys added to `es.ts`: `PRODUCT_ERRORS.NOT_EXISTS/INACTIVE/
-    NOT_AVAILABLE_TO_SALE/QUANTITY_NOT_AVAILABLE`, `GENERAL.RESPONSE.ERROR_TITLE`,
+NOT_AVAILABLE_TO_SALE/QUANTITY_NOT_AVAILABLE`, `GENERAL.RESPONSE.ERROR_TITLE`,
     `GENERAL.ORDER`. `NOT_AVAILABLE` reuses the pre-existing
     `SALES.NOT_INVENTORY_AVAILABLE_MESSAGE` key.
   - NOT in this batch's scope (flagged, carried forward): `edit-product-category-modal.tsx`'s
@@ -145,119 +145,119 @@ a React-added a11y improvement Angular's template lacks entirely (translated, no
 build` succeeds (new `sweetalert2` chunk ~79.5 kB / 21.1 kB gzip).
 
 - [x] 1.8 Stage 1 RE-VERIFY follow-up fix batch (Batch 11, 2026-07-02) — resolved NEW-W1
-  (`getAvailableQuantity` isActive-filter-before-hasEntries branch-order divergence vs
-  Angular's `hasAvailableProductToSale`, `app/inventory/lib/services/inventory-offline-service.ts`)
-  + NEW-W2 (3 error dialogs — `edit-sale-credit-modal.tsx`, `sale-credit-payment-modal.tsx`,
-  `edit-order-modal.tsx` — showing the generic `GENERAL.RESPONSE.ERROR500_MESSAGE` instead of
-  Angular's static, single-failure-branch `SaleCreditErrors.NotExists`/`OrderErrors.NotExists`
-  literals; new `SALE_CREDIT_ERRORS.NOT_EXISTS`/`ORDER_ERRORS.NOT_EXISTS` i18n keys added,
-  byte-identical to Angular). `tsc --noEmit` clean; `pnpm test` 95 files / 1028 tests passed
-  (0 new tests — 3 existing assertions corrected); `react-router build` succeeds. Full detail
-  in apply-progress.md Batch 11. Stage 1 (Sales) now fully closed pending a final
-  `sdd-verify` re-pass.
+      (`getAvailableQuantity` isActive-filter-before-hasEntries branch-order divergence vs
+      Angular's `hasAvailableProductToSale`, `app/inventory/lib/services/inventory-offline-service.ts`)
+  - NEW-W2 (3 error dialogs — `edit-sale-credit-modal.tsx`, `sale-credit-payment-modal.tsx`,
+    `edit-order-modal.tsx` — showing the generic `GENERAL.RESPONSE.ERROR500_MESSAGE` instead of
+    Angular's static, single-failure-branch `SaleCreditErrors.NotExists`/`OrderErrors.NotExists`
+    literals; new `SALE_CREDIT_ERRORS.NOT_EXISTS`/`ORDER_ERRORS.NOT_EXISTS` i18n keys added,
+    byte-identical to Angular). `tsc --noEmit` clean; `pnpm test` 95 files / 1028 tests passed
+    (0 new tests — 3 existing assertions corrected); `react-router build` succeeds. Full detail
+    in apply-progress.md Batch 11. Stage 1 (Sales) now fully closed pending a final
+    `sdd-verify` re-pass.
 
 ## Stage 2 — Inventory
 
-- [ ] 2.1 L4 functional diff (app/inventory/**) + fix [TDD].
+- [ ] 2.1 L4 functional diff (app/inventory/\*\*) + fix [TDD].
 - [ ] 2.2 L5 visual [VISUAL].
 - [ ] 2.3 L6 i18n.
 - [ ] 2.5 Inventory-availability cross-cutting wiring (CARRY-OVER pulled into Stage 2 from
-  Stage 1 / Stage 6 — depends on `InventoryOfflineService`/stock data this stage builds) [TDD]:
+      Stage 1 / Stage 6 — depends on `InventoryOfflineService`/stock data this stage builds) [TDD]:
   - [ ] 2.5.1 Cart increase/decrease stock validation (from 1.5 deferred sub-item): port
-    Angular `ShoppingCartService.increaseCartItem`/`decreaseCartItem` stock check
-    (`inventoryService.n(productId, qty)`) into the React cart flow; the local-only cart
-    store must validate available stock before increasing.
+        Angular `ShoppingCartService.increaseCartItem`/`decreaseCartItem` stock check
+        (`inventoryService.n(productId, qty)`) into the React cart flow; the local-only cart
+        store must validate available stock before increasing.
   - [x] 2.5.2 Sale/POS `checkAvailability` wiring — DONE, moved to Stage 1 (see 1.6). Delivered
-    as the FULL 5-way `hasAvailableProductToSale` parity (not just `hasAvailableStock` +
-    gate as originally scoped here), including cart-quantity inclusion and a blocking error
-    alert. `SaleProductRow`/`SaleCategoryProducts` DID change (checkAvailability's return
-    type), contrary to this item's original "no further changes needed" assumption.
+        as the FULL 5-way `hasAvailableProductToSale` parity (not just `hasAvailableStock` +
+        gate as originally scoped here), including cart-quantity inclusion and a blocking error
+        alert. `SaleProductRow`/`SaleCategoryProducts` DID change (checkAvailability's return
+        type), contrary to this item's original "no further changes needed" assumption.
 - [ ] 2.6 Login / auth parity (CARRY-OVER — login has no dedicated module stage; co-located
-  here because the post-login redirect depends on product-availability/Inventory data. NOTE:
-  2.6.1 is a pure guest-form view parity with NO Inventory dependency — placed here for
-  scheduling only, keep it clearly labeled as auth, not inventory) [TDD]:
+      here because the post-login redirect depends on product-availability/Inventory data. NOTE:
+      2.6.1 is a pure guest-form view parity with NO Inventory dependency — placed here for
+      scheduling only, keep it clearly labeled as auth, not inventory) [TDD]:
   - [ ] 2.6.1 Login form L4/L5 view parity: `app/auth/routes/login.tsx` +
-    `auth/components/auth-layout.tsx` vs Angular `layouts/guest/**` +
-    `presentation/auth/login/login.component.html` (functional + visual/token parity). No
-    inventory dependency. CONCRETE GAP found 2026-07-02: React invented English copy
-    "POS Management" that Angular has NOWHERE — appears in `auth-layout.tsx:9`
-    (`<p>POS Management</p>`), `es.ts:4` (`'GENERAL.APP_SUBTITLE': 'POS Management'`), and
-    `public/manifest.webmanifest:4` (`"description": "POS Management System"`). Angular's login
-    shows brand "VendeDTo" + Spanish tagline "Automatiza tu Negocio"
-    (`login.component.html:19,21`) and has no APP_SUBTITLE key. FIX: replace the subtitle with
-    "Automatiza tu Negocio" (or i18n key), reconcile the manifest description, and drop/rename
-    the invented APP_SUBTITLE key.
+        `auth/components/auth-layout.tsx` vs Angular `layouts/guest/**` +
+        `presentation/auth/login/login.component.html` (functional + visual/token parity). No
+        inventory dependency. CONCRETE GAP found 2026-07-02: React invented English copy
+        "POS Management" that Angular has NOWHERE — appears in `auth-layout.tsx:9`
+        (`<p>POS Management</p>`), `es.ts:4` (`'GENERAL.APP_SUBTITLE': 'POS Management'`), and
+        `public/manifest.webmanifest:4` (`"description": "POS Management System"`). Angular's login
+        shows brand "VendeDTo" + Spanish tagline "Automatiza tu Negocio"
+        (`login.component.html:19,21`) and has no APP_SUBTITLE key. FIX: replace the subtitle with
+        "Automatiza tu Negocio" (or i18n key), reconcile the manifest description, and drop/rename
+        the invented APP_SUBTITLE key.
   - [ ] 2.6.2 Post-login `navigateToUserHome` product-availability branch: after login, a
-    non-admin user with NO available-to-sale products redirects to the products view (to add
-    products) instead of `/sales/sale`. Depends on `hasAnyAvailableToSaleProduct`
-    (product-availability). Partially flagged in prior memory as not-migrated.
+        non-admin user with NO available-to-sale products redirects to the products view (to add
+        products) instead of `/sales/sale`. Depends on `hasAnyAvailableToSaleProduct`
+        (product-availability). Partially flagged in prior memory as not-migrated.
   - [ ] 2.6.3 Authenticated-root redirect (from Stage 1 NOTE / Stage 0 open question):
-    Angular's `'' -> /sales/sale` for an authenticated user; React's index route currently
-    always shows the public landing page. Reconcile.
+        Angular's `'' -> /sales/sale` for an authenticated user; React's index route currently
+        always shows the public landing page. Reconcile.
 - [ ] 2.7 Verify (incl. 2.5 + 2.6 carry-overs): matrix all-green, tests pass, visual spot-check.
 
 ## Stage 3 — Expenses
 
-- [ ] 3.1 L4 functional diff (app/expenses/**) + fix [TDD].
+- [ ] 3.1 L4 functional diff (app/expenses/\*\*) + fix [TDD].
 - [ ] 3.2 L5 visual [VISUAL].
 - [ ] 3.3 L6 i18n.
 - [ ] 3.4 Verify.
 
 ## Stage 4 — Management
 
-- [ ] 4.1 L4 functional diff (Angular EditStoreComponent + Users + Configurations vs app/management/**)
-  [TDD].
+- [ ] 4.1 L4 functional diff (Angular EditStoreComponent + Users + Configurations vs app/management/\*\*)
+      [TDD].
 - [ ] 4.2 UX-parity DECISION: Angular EditStoreComponent (single component, list root doubles
-  as edit form) vs React's confirmed split routes (store-list.tsx/store-create.tsx/store-edit.tsx)
+      as edit form) vs React's confirmed split routes (store-list.tsx/store-create.tsx/store-edit.tsx)
   - decide keep-split-if-UX-matches or restructure; document rationale - BLOCKING for module
-  completion per spec.
+    completion per spec.
 - [ ] 4.3 L5 visual (Stores/Users/Configurations) [VISUAL].
 - [ ] 4.4 L6 i18n.
 - [ ] 4.5 Verify incl. 4.2 decision documented.
 
 ## Stage 5 — Admin
 
-- [ ] 5.1 L4 functional diff (Owners/Resellers/Features/Dashboard/admin-Stores vs app/admin/**),
-  EXCLUDE admin/roles (ratified dead) [TDD].
+- [ ] 5.1 L4 functional diff (Owners/Resellers/Features/Dashboard/admin-Stores vs app/admin/\*\*),
+      EXCLUDE admin/roles (ratified dead) [TDD].
 - [ ] 5.2 L5 visual [VISUAL].
 - [ ] 5.3 L6 i18n.
 - [ ] 5.4 Verify.
 
 ## Stage 6 — Sync (includes deferred PWA cross-cutting audit)
 
-- [ ] 6.1 PWA cross-cutting audit: for each Angular _services/* (connection, download-manager, SW
-  update, usage-tracker) determine React coverage - Angular has dedicated
-  services, React coverage scattered/unconfirmed per design; build gap matrix per service.
-  SCOPE NOTE: the cart UI + POS checkout FLOW parity (dropdown, payment/Vuelto, payment-type
-  icons, credit gating, print-invoice toggle, validations) was done in Stage 1 (see 1.5). The
-  `ShoppingCartService`/inventory-availability-on-increase/decrease stock check was MOVED to
-  Stage 2 (see 2.5.1) — it is an Inventory dependency, not a generic Sync one. Stage 6 keeps
-  ONLY the non-inventory PWA cross-cutting services (connection, download-manager, SW update,
-  usage-tracker). Do NOT re-scope the cart flow or the inventory-availability check here.
+- [ ] 6.1 PWA cross-cutting audit: for each Angular \_services/\* (connection, download-manager, SW
+      update, usage-tracker) determine React coverage - Angular has dedicated
+      services, React coverage scattered/unconfirmed per design; build gap matrix per service.
+      SCOPE NOTE: the cart UI + POS checkout FLOW parity (dropdown, payment/Vuelto, payment-type
+      icons, credit gating, print-invoice toggle, validations) was done in Stage 1 (see 1.5). The
+      `ShoppingCartService`/inventory-availability-on-increase/decrease stock check was MOVED to
+      Stage 2 (see 2.5.1) — it is an Inventory dependency, not a generic Sync one. Stage 6 keeps
+      ONLY the non-inventory PWA cross-cutting services (connection, download-manager, SW update,
+      usage-tracker). Do NOT re-scope the cart flow or the inventory-availability check here.
 - [ ] 6.2 Fix identified gaps, consolidate scattered React logic into dedicated services where missing
-  [TDD].
-- [ ] 6.3 L4 functional diff (app/sync/**) + fix [TDD].
+      [TDD].
+- [ ] 6.3 L4 functional diff (app/sync/\*\*) + fix [TDD].
 - [ ] 6.4 L5 visual [VISUAL].
 - [ ] 6.5 L6 i18n.
 - [ ] 6.6 Verify incl. PWA cross-cutting confirmed as prerequisite per spec.
 
 ## Stage 7 — Reports
 
-- [ ] 7.1 L4 functional diff (app/reports/**) + fix [TDD].
+- [ ] 7.1 L4 functional diff (app/reports/\*\*) + fix [TDD].
 - [ ] 7.2 L5 visual [VISUAL].
 - [ ] 7.3 L6 i18n.
 - [ ] 7.4 Verify.
 
 ## Stage 8 — Statistics
 
-- [ ] 8.1 L4 functional diff (charts/aggregations, app/statistics/**) + fix [TDD].
+- [ ] 8.1 L4 functional diff (charts/aggregations, app/statistics/\*\*) + fix [TDD].
 - [ ] 8.2 L5 visual incl. charts [VISUAL].
 - [ ] 8.3 L6 i18n.
 - [ ] 8.4 Verify.
 
 ## Stage 9 — Profile
 
-- [ ] 9.1 L4 functional diff (app/profile/**) + fix [TDD].
+- [ ] 9.1 L4 functional diff (app/profile/\*\*) + fix [TDD].
 - [ ] 9.2 L5 visual [VISUAL].
 - [ ] 9.3 L6 i18n.
 - [ ] 9.4 Verify.
@@ -265,8 +265,8 @@ build` succeeds (new `sweetalert2` chunk ~79.5 kB / 21.1 kB gzip).
 ## Stage 10 — Help
 
 - [ ] 10.1 Ratify tutorial-page consolidation: confirm React app/help/routes/tutorial.tsx (already
-  exists) is intentional replacement for Angular's 25 per-page help-dialogs - document
-  ratification, NOT a mechanical port.
+      exists) is intentional replacement for Angular's 25 per-page help-dialogs - document
+      ratification, NOT a mechanical port.
 - [ ] 10.2 L6 i18n: verify tutorial-page keys in es.ts, byte-identical Spanish where reused [text spot-check].
 - [ ] 10.3 L5 visual if needed [VISUAL].
 - [ ] 10.4 Verify: ratification + L6 check only, no L4 matrix needed (dialogs intentionally not ported).
@@ -287,19 +287,19 @@ technical dependency, EXCEPT Stage 6 (Sync) depends on the PWA cross-cutting mat
 Estimated changed lines per stage (based on ~205 files in app/, work concentrated in
 components/routes/lib-services/i18n plus shared styles.css/ui/):
 
-| Stage | Estimate | Actual / Notes |
-|---|---|---|
-| Stage 0 Foundations | 600-900 ln | ACTUAL ~376 ln (audit found zero L1/L2/L3 gaps requiring code, only L7 catch-all needed a fix; tokens+ui components as estimated) |
-| Stage 1 Sales | 500-800 ln | ACTUAL ~3,700+ ln across 9 batches (largest module by far) + Batch 10's SweetAlert2 cross-cutting slice (~1,000+ ln incl. tests, 24 files touched) |
-| Stage 2 Inventory | 300-450 ln | 8 components |
-| Stage 3 Expenses | 200-300 ln | 4 components |
-| Stage 4 Management | 350-550 ln | incl. UX-parity decision, possible route restructure |
-| Stage 5 Admin | 400-600 ln | Owners/Resellers/Features/Dashboard, 4 sub-areas |
-| Stage 6 Sync | 350-550 ln | incl. PWA cross-cutting consolidation |
-| Stage 7 Reports | 150-250 ln | |
-| Stage 8 Statistics | 250-350 ln | 3 chart components |
-| Stage 9 Profile | 100-200 ln | smallest functional module |
-| Stage 10 Help | 50-100 ln | |
+| Stage               | Estimate   | Actual / Notes                                                                                                                                     |
+| ------------------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Stage 0 Foundations | 600-900 ln | ACTUAL ~376 ln (audit found zero L1/L2/L3 gaps requiring code, only L7 catch-all needed a fix; tokens+ui components as estimated)                  |
+| Stage 1 Sales       | 500-800 ln | ACTUAL ~3,700+ ln across 9 batches (largest module by far) + Batch 10's SweetAlert2 cross-cutting slice (~1,000+ ln incl. tests, 24 files touched) |
+| Stage 2 Inventory   | 300-450 ln | 8 components                                                                                                                                       |
+| Stage 3 Expenses    | 200-300 ln | 4 components                                                                                                                                       |
+| Stage 4 Management  | 350-550 ln | incl. UX-parity decision, possible route restructure                                                                                               |
+| Stage 5 Admin       | 400-600 ln | Owners/Resellers/Features/Dashboard, 4 sub-areas                                                                                                   |
+| Stage 6 Sync        | 350-550 ln | incl. PWA cross-cutting consolidation                                                                                                              |
+| Stage 7 Reports     | 150-250 ln |                                                                                                                                                    |
+| Stage 8 Statistics  | 250-350 ln | 3 chart components                                                                                                                                 |
+| Stage 9 Profile     | 100-200 ln | smallest functional module                                                                                                                         |
+| Stage 10 Help       | 50-100 ln  |                                                                                                                                                    |
 
 TOTAL estimated: ~3,250-5,050 changed lines across the full audit (Stage 0 actual came in under
 forecast).
@@ -326,17 +326,17 @@ explicitly limited to Fix A/B/C — no Tier-1 items (http services, interceptors
 sidebar, guards). Full detail in `apply-progress.md` "Tier-0 Hotfix Batch" section.
 
 - [x] Fix A (P0) — Session not restored on app boot. `auth-store.ts` module-scope
-  `initialize()` hydration guarded by `typeof window !== 'undefined'`; new integration test
-  `app/auth/routes/__tests__/loaders.cold-boot.test.ts` proves `authLoader` no longer bounces
-  a valid unexpired cold-boot session to `/login`.
+      `initialize()` hydration guarded by `typeof window !== 'undefined'`; new integration test
+      `app/auth/routes/__tests__/loaders.cold-boot.test.ts` proves `authLoader` no longer bounces
+      a valid unexpired cold-boot session to `/login`.
 - [x] Fix B — Service Worker never registered. `registerSW` wired in `root.tsx` (client-only
-  `useEffect`), Angular's exact "nueva versión disponible" dialog ported to
-  `blocking-alert.ts` (`showUpdateAvailable`), `workbox-window` added as a required direct
-  dependency, `vite-plugin-pwa/client` added to `tsconfig.json` types. Verified via built-
-  bundle grep (the audit's original missing-SW check, now positive).
+      `useEffect`), Angular's exact "nueva versión disponible" dialog ported to
+      `blocking-alert.ts` (`showUpdateAvailable`), `workbox-window` added as a required direct
+      dependency, `vite-plugin-pwa/client` added to `tsconfig.json` types. Verified via built-
+      bundle grep (the audit's original missing-SW check, now positive).
 - [x] Fix C — Inventory localStorage key naming. `inventory-repository.ts` key literal
-  changed from `inventoryentries` to `inventory-entries`, matching Angular. No migrator
-  (clean base). 4 test files updated to the new key literal.
+      changed from `inventoryentries` to `inventory-entries`, matching Angular. No migrator
+      (clean base). 4 test files updated to the new key literal.
 
 Test/Build: `tsc --noEmit` clean; `pnpm test` 96 files / 1033 tests passed (was 95/1028,
 +5 net); `react-router build` succeeds (workbox-window dependency fix required first).

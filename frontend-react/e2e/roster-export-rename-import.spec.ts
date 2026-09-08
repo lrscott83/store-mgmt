@@ -70,9 +70,7 @@ test.describe('roster-any-filename — export real, renombrar, activar', () => {
 
     // Precondition: this device holds NO roster (the signed-in persona
     // device never imported one) — the enable button is what shows.
-    await expect(
-      page.getByRole('button', { name: ENABLE_BUTTON, exact: true }),
-    ).toBeVisible();
+    await expect(page.getByRole('button', { name: ENABLE_BUTTON, exact: true })).toBeVisible();
 
     // ---------------------------------------------------------------
     // 4. IMPORT THE RENAMED FILE through the login modal.

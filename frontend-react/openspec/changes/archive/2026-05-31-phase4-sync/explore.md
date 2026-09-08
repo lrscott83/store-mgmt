@@ -17,6 +17,7 @@ Phase 4 (Sync and Management) per `docs/prd/PRD.md`, scoped to **Synchronization
 The Synchronization module is scaffolded at the nav/enum level but has **zero implementation files**. No `sync/` directory exists under `apps/web-store-pos/app/`.
 
 Existing scaffolding:
+
 - `app/shared/lib/config/menu-config.ts` L59–65: `MENU.SYNCHRONIZATION` group → `/sync/export` (EFeatures.Send=40), `/sync/import` (EFeatures.Receive=42).
 - `app/shared/lib/i18n/es.ts` L88–89: `MENU.EXPORT`, `MENU.IMPORT` already translated.
 - `packages/domain/src/enums/index.ts` L25–27: `Send=40`, `Download=41`, `Receive=42`.
@@ -26,27 +27,27 @@ Existing scaffolding:
 
 ## Storage Layer — Repository Map
 
-| Entity | React class | entityKey | React localStorage key | Angular key | Match |
-|---|---|---|---|---|---|
-| ProductCategory | `ProductCategoryOfflineService` (BaseRepository) | `product-categories` | `lizoft.store-product-categories-{storeId}` | same | ✅ |
-| Product | `ProductOfflineService` (BaseRepository) | `products` | `lizoft.store-products-{storeId}` | same | ✅ |
-| InventoryEntry | `InventoryRepository` (custom) | `inventoryentries` | `lizoft.store-inventoryentries-{storeId}` | `lizoft.store-inventory-entries-{storeId}` | ⚠ KEY MISMATCH |
-| Order | `OrderOfflineService` (BaseRepository) | `orders` | `lizoft.store-orders-{storeId}` | same | ✅ |
-| Expense | `ExpenseOfflineService` (BaseRepository) | `expenses` | `lizoft.store-expenses-{storeId}` | same | ✅ |
-| SaleCredit | `SaleCreditOfflineService` (BaseRepository) | `saleCredits` | `lizoft.store-saleCredits-{storeId}` | same | ✅ |
+| Entity          | React class                                      | entityKey            | React localStorage key                      | Angular key                                | Match          |
+| --------------- | ------------------------------------------------ | -------------------- | ------------------------------------------- | ------------------------------------------ | -------------- |
+| ProductCategory | `ProductCategoryOfflineService` (BaseRepository) | `product-categories` | `lizoft.store-product-categories-{storeId}` | same                                       | ✅             |
+| Product         | `ProductOfflineService` (BaseRepository)         | `products`           | `lizoft.store-products-{storeId}`           | same                                       | ✅             |
+| InventoryEntry  | `InventoryRepository` (custom)                   | `inventoryentries`   | `lizoft.store-inventoryentries-{storeId}`   | `lizoft.store-inventory-entries-{storeId}` | ⚠ KEY MISMATCH |
+| Order           | `OrderOfflineService` (BaseRepository)           | `orders`             | `lizoft.store-orders-{storeId}`             | same                                       | ✅             |
+| Expense         | `ExpenseOfflineService` (BaseRepository)         | `expenses`           | `lizoft.store-expenses-{storeId}`           | same                                       | ✅             |
+| SaleCredit      | `SaleCreditOfflineService` (BaseRepository)      | `saleCredits`        | `lizoft.store-saleCredits-{storeId}`        | same                                       | ✅             |
 
 ## CRITICAL: Serialization Format Divergence
 
 React `BaseRepository.save()` (`base-repository.ts` L46) always serializes as `JSON.stringify(Array.from(map.entries()))` — `[[id, entity], ...]` Map-entries. Angular used **two formats** by entity type:
 
-| Entity | Angular ZIP format | React internal format | Rule |
-|---|---|---|---|
-| Categories | `[[id, cat], ...]` | `[[id, cat], ...]` | same |
-| Products | `[[id, prod], ...]` | `[[id, prod], ...]` | same |
-| Inventory Entries | `[[productId, InventoryEntry[]], ...]` | same | same |
-| Orders | `[order, ...]` flat array | `[[id, order], ...]` | **export must flatten** |
-| Expenses | `[expense, ...]` flat array | `[[id, expense], ...]` | **export must flatten** |
-| SaleCredits | `[credit, ...]` flat array | `[[id, credit], ...]` | **export must flatten** |
+| Entity            | Angular ZIP format                     | React internal format  | Rule                    |
+| ----------------- | -------------------------------------- | ---------------------- | ----------------------- |
+| Categories        | `[[id, cat], ...]`                     | `[[id, cat], ...]`     | same                    |
+| Products          | `[[id, prod], ...]`                    | `[[id, prod], ...]`    | same                    |
+| Inventory Entries | `[[productId, InventoryEntry[]], ...]` | same                   | same                    |
+| Orders            | `[order, ...]` flat array              | `[[id, order], ...]`   | **export must flatten** |
+| Expenses          | `[expense, ...]` flat array            | `[[id, expense], ...]` | **export must flatten** |
+| SaleCredits       | `[credit, ...]` flat array             | `[[id, credit], ...]`  | **export must flatten** |
 
 Confirmed: Angular `order-offline.service.ts` L422 `JSON.stringify(orders)` (Order[]); `expense-offline.service.ts` L201; `sale-credit-offline.service.ts` L277. React `base-repository.ts` L46 always Map-entries.
 
@@ -55,6 +56,7 @@ Confirmed: Angular `order-offline.service.ts` L422 `JSON.stringify(orders)` (Ord
 ## Affected Areas
 
 New (greenfield):
+
 - `app/sync/routes/export.tsx` — `/sync/export`, `featureLoader([EFeatures.Send])`
 - `app/sync/routes/import.tsx` — `/sync/import`, `featureLoader([EFeatures.Receive])`
 - `app/sync/lib/services/data-serializer-service.ts` — ZIP creation/parse, format translation
@@ -63,6 +65,7 @@ New (greenfield):
 - `app/sync/components/import-form.tsx`
 
 Modified:
+
 - `app/routes.ts` — register two sync routes
 - `app/shared/lib/i18n/es.ts` — add `SYNC.*` keys
 - `apps/web-store-pos/package.json` — add `@zip.js/zip.js`

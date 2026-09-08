@@ -104,9 +104,15 @@ let mockUpdateStore = vi.fn();
 
 vi.mock('~/management/stores/lib/services/store-http-service', () => ({
   storeHttpService: {
-    get getStore() { return mockGetStore; },
-    get listOwners() { return mockListOwners; },
-    get updateStore() { return mockUpdateStore; },
+    get getStore() {
+      return mockGetStore;
+    },
+    get listOwners() {
+      return mockListOwners;
+    },
+    get updateStore() {
+      return mockUpdateStore;
+    },
   },
 }));
 
@@ -130,9 +136,15 @@ const localStorageMock = (() => {
   let store: Record<string, string> = {};
   return {
     getItem: (key: string) => store[key] ?? null,
-    setItem: (key: string, value: string) => { store[key] = value; },
-    removeItem: (key: string) => { delete store[key]; },
-    clear: () => { store = {}; },
+    setItem: (key: string, value: string) => {
+      store[key] = value;
+    },
+    removeItem: (key: string) => {
+      delete store[key];
+    },
+    clear: () => {
+      store = {};
+    },
   };
 })();
 Object.defineProperty(global, 'localStorage', { value: localStorageMock });
@@ -161,7 +173,11 @@ describe('UpdateStorePage — data form WITHOUT the plan section', () => {
 
   it('pre-fills the store data and renders no PlanPicker and no plan tabs', async () => {
     const { UpdateStorePage } = await import('../update-store');
-    render(<Wrapper><UpdateStorePage /></Wrapper>);
+    render(
+      <Wrapper>
+        <UpdateStorePage />
+      </Wrapper>,
+    );
 
     await waitFor(() => {
       expect(screen.getByDisplayValue('Existing Store')).toBeInTheDocument();
@@ -174,7 +190,11 @@ describe('UpdateStorePage — data form WITHOUT the plan section', () => {
   it('saves WITHOUT moduleIds so the backend leaves the plan untouched', async () => {
     mockUpdateStore = vi.fn().mockResolvedValue({ data: true });
     const { UpdateStorePage } = await import('../update-store');
-    render(<Wrapper><UpdateStorePage /></Wrapper>);
+    render(
+      <Wrapper>
+        <UpdateStorePage />
+      </Wrapper>,
+    );
 
     await waitFor(() => {
       expect(screen.getByDisplayValue('Existing Store')).toBeInTheDocument();
@@ -199,19 +219,21 @@ describe('UpdateStorePage — non-super admin save omits empty paymentStartDate'
     localStorageMock.clear();
     mockUser = makeUser({ isSuperAdmin: false, selectedStoreId: 's1' });
     mockParams = {};
-    mockGetStore = vi
-      .fn()
-      .mockResolvedValue({
-        succeeded: true,
-        data: makeStore({ paymentStartDate: null, approved: false }),
-      });
+    mockGetStore = vi.fn().mockResolvedValue({
+      succeeded: true,
+      data: makeStore({ paymentStartDate: null, approved: false }),
+    });
     mockListOwners = vi.fn().mockResolvedValue({ succeeded: true, data: [] });
     mockUpdateStore = vi.fn().mockResolvedValue({ data: true });
   });
 
   it('omits paymentStartDate (empty) and moduleIds on save', async () => {
     const { UpdateStorePage } = await import('../update-store');
-    render(<Wrapper><UpdateStorePage /></Wrapper>);
+    render(
+      <Wrapper>
+        <UpdateStorePage />
+      </Wrapper>,
+    );
 
     await waitFor(() => {
       expect(screen.getByDisplayValue('Store One')).toBeInTheDocument();
@@ -242,7 +264,11 @@ describe('UpdateStorePage — load/save errors', () => {
     mockListOwners = vi.fn().mockResolvedValue({ succeeded: true, data: [] });
 
     const { UpdateStorePage } = await import('../update-store');
-    render(<Wrapper><UpdateStorePage /></Wrapper>);
+    render(
+      <Wrapper>
+        <UpdateStorePage />
+      </Wrapper>,
+    );
 
     await waitFor(() => {
       expect(screen.getByRole('alert')).toHaveTextContent(esMessages['STORES.ERROR']);
@@ -257,7 +283,11 @@ describe('UpdateStorePage — load/save errors', () => {
     mockUpdateStore = vi.fn().mockRejectedValue(new Error('Update failed'));
 
     const { UpdateStorePage } = await import('../update-store');
-    render(<Wrapper><UpdateStorePage /></Wrapper>);
+    render(
+      <Wrapper>
+        <UpdateStorePage />
+      </Wrapper>,
+    );
 
     await waitFor(() => {
       expect(screen.getByDisplayValue('Edit Me')).toBeInTheDocument();
@@ -281,7 +311,11 @@ describe('UpdateStorePage — no selected store', () => {
 
   it('shows NO_STORE_SELECTED and fetches nothing', async () => {
     const { UpdateStorePage } = await import('../update-store');
-    render(<Wrapper><UpdateStorePage /></Wrapper>);
+    render(
+      <Wrapper>
+        <UpdateStorePage />
+      </Wrapper>,
+    );
 
     await waitFor(() => {
       expect(screen.getByText(esMessages['STORES.NO_STORE_SELECTED'])).toBeInTheDocument();

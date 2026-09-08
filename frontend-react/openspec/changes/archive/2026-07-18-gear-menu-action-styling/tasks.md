@@ -2,14 +2,14 @@
 
 ## Review Workload Forecast
 
-| Field | Value |
-|-------|-------|
+| Field                   | Value                                                                                        |
+| ----------------------- | -------------------------------------------------------------------------------------------- |
 | Estimated changed lines | ~750-950 (1 new component + test ~220, icons +60, 9 menu files ~50-90 each incl. test edits) |
-| 400-line budget risk | High |
-| Chained PRs recommended | No (delivery is commits-per-work-unit on main, not PRs) |
-| Suggested split | N/A — sequential work-unit commits, not PR chain |
-| Delivery strategy | commits-only on feature branch (per project convention; no chained PRs) |
-| Chain strategy | N/A |
+| 400-line budget risk    | High                                                                                         |
+| Chained PRs recommended | No (delivery is commits-per-work-unit on main, not PRs)                                      |
+| Suggested split         | N/A — sequential work-unit commits, not PR chain                                             |
+| Delivery strategy       | commits-only on feature branch (per project convention; no chained PRs)                      |
+| Chain strategy          | N/A                                                                                          |
 
 Decision needed before apply: No
 Chained PRs recommended: No
@@ -20,12 +20,12 @@ Note: this repo's established delivery convention (`delivery-commits-only-on-fea
 
 ### Suggested Work Units
 
-| Unit | Goal | Notes |
-|------|------|-------|
-| 1 | Icons + ActionMenu/ActionMenuItem primitive | Foundation; own test file; nothing else depends-on until this lands |
-| 2-7 | Restyle 6 existing gear menus (1 commit each) | Independent per file; existing tests preserved + extended |
-| 8-10 | Gear-ify 3 flat-button screens (1 commit each) | Independent per file; tests rewritten for gear interaction |
-| 11 | Full verification | typecheck + full suite + grep sweep |
+| Unit | Goal                                           | Notes                                                               |
+| ---- | ---------------------------------------------- | ------------------------------------------------------------------- |
+| 1    | Icons + ActionMenu/ActionMenuItem primitive    | Foundation; own test file; nothing else depends-on until this lands |
+| 2-7  | Restyle 6 existing gear menus (1 commit each)  | Independent per file; existing tests preserved + extended           |
+| 8-10 | Gear-ify 3 flat-button screens (1 commit each) | Independent per file; tests rewritten for gear interaction          |
+| 11   | Full verification                              | typecheck + full suite + grep sweep                                 |
 
 ## Phase 1: Foundation
 

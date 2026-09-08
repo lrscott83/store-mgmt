@@ -1,5 +1,12 @@
 import type { BaseResponseModel, Order, OrderItem } from '@store-mgmt/domain';
-import { DataResult, OrderErrors, OrderType, PaymentType, Result, success } from '@store-mgmt/domain';
+import {
+  DataResult,
+  OrderErrors,
+  OrderType,
+  PaymentType,
+  Result,
+  success,
+} from '@store-mgmt/domain';
 import type { CartItem } from '~/shared/lib/stores/cart-store';
 import { StorageKeys } from '~/shared/lib/storage/storage-keys';
 import { encryptEntity, decryptEntity } from '~/shared/lib/storage/entity-crypto';
@@ -85,7 +92,11 @@ export class OrderOfflineService {
 
   /** 1:1 port of Angular `getStorageOrders` (order-offline.service.ts:400-405). */
   getStorageOrders(): Order[] {
-    if (!this.orders || this.orders.length === 0 || this.getCurrentStorageKey() !== this.lastOrdersKey) {
+    if (
+      !this.orders ||
+      this.orders.length === 0 ||
+      this.getCurrentStorageKey() !== this.lastOrdersKey
+    ) {
       this.orders = this.getOrdersFromLocalStorage();
     }
     return this.orders;
@@ -358,7 +369,10 @@ export class OrderOfflineService {
    * pre-snapped (ADR-5) instead of a single day. Angular has no correlate;
    * additive method for the new view.
    */
-  getCategoryCartItemsViewBetweenDates(start: Date, end: Date): BaseResponseModel<CategoryCartItemsView[]> {
+  getCategoryCartItemsViewBetweenDates(
+    start: Date,
+    end: Date,
+  ): BaseResponseModel<CategoryCartItemsView[]> {
     const categoryRepository = new ProductCategoryRepository(this.storeId);
     const storageCategories = categoryRepository.getProductCategories();
     const orderItems: OrderItem[] = this.activeOrdersBetween(start, end).flatMap(
@@ -401,7 +415,9 @@ export class OrderOfflineService {
    * the sync call already returns a `BaseResponseModel`, so the Observable variant reuses
    * its `.data` as the payload rather than double-wrapping the whole envelope.
    */
-  getCategoryCartItemsViewObservable(date: Date): Promise<BaseResponseModel<CategoryCartItemsView[]>> {
+  getCategoryCartItemsViewObservable(
+    date: Date,
+  ): Promise<BaseResponseModel<CategoryCartItemsView[]>> {
     // getCategoryCartItemsView is a sync local-storage read that always returns success();
     // this guard exists for the type only.
     const response = this.getCategoryCartItemsView(date);
@@ -645,7 +661,9 @@ export class OrderOfflineService {
     // auto-init below survives only for its honest case — no stored value at
     // all, i.e. a genuinely new store.
     const stored = readEntityOrThrow(this.getStorageKey(), (json) =>
-      json ? (JSON.parse(json) as Order[]).map((order) => this.reviveAndBackfillOrder(order)) : null,
+      json
+        ? (JSON.parse(json) as Order[]).map((order) => this.reviveAndBackfillOrder(order))
+        : null,
     );
     if (stored) return stored;
 

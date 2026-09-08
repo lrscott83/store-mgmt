@@ -36,9 +36,7 @@ vi.mock('~/sales/lib/services/order-offline-service', () => ({
 function expensesEnvelope(data: Expense[] = []) {
   return { data, succeeded: true, message: '', actionCode: 200, errors: [] };
 }
-const mockGetExpensesInDayObservable = vi
-  .fn()
-  .mockResolvedValue(expensesEnvelope([]));
+const mockGetExpensesInDayObservable = vi.fn().mockResolvedValue(expensesEnvelope([]));
 vi.mock('~/expenses/lib/services/expense-offline-service', () => ({
   ExpenseOfflineService: vi.fn().mockImplementation(() => ({
     getExpensesInDayObservable: mockGetExpensesInDayObservable,
@@ -50,12 +48,8 @@ vi.mock('~/expenses/lib/services/expense-offline-service', () => ({
 function creditsEnvelope(data: SaleCredit[] = []) {
   return { data, succeeded: true, message: '', actionCode: 200, errors: [] };
 }
-const mockGetUnPaidSaleCreditsInDayObservable = vi
-  .fn()
-  .mockResolvedValue(creditsEnvelope([]));
-const mockGetPaidSaleCreditsInDayObservable = vi
-  .fn()
-  .mockResolvedValue(creditsEnvelope([]));
+const mockGetUnPaidSaleCreditsInDayObservable = vi.fn().mockResolvedValue(creditsEnvelope([]));
+const mockGetPaidSaleCreditsInDayObservable = vi.fn().mockResolvedValue(creditsEnvelope([]));
 vi.mock('~/sales/lib/services/sale-credit-offline-service', () => ({
   SaleCreditOfflineService: vi.fn().mockImplementation(() => ({
     getUnPaidSaleCreditsInDayObservable: mockGetUnPaidSaleCreditsInDayObservable,
@@ -228,7 +222,9 @@ describe('TodayStatsPage — with Expenses + Credits modules available', () => {
   });
 
   it('renders Gastos and Créditos panels when the user has those modules', async () => {
-    mockGetExpensesInDayObservable.mockResolvedValue(expensesEnvelope([makeExpense({ total: 15 })]));
+    mockGetExpensesInDayObservable.mockResolvedValue(
+      expensesEnvelope([makeExpense({ total: 15 })]),
+    );
     mockGetUnPaidSaleCreditsInDayObservable.mockResolvedValue(
       creditsEnvelope([makeCredit({ total: 40 })]),
     );
@@ -248,6 +244,41 @@ describe('TodayStatsPage — with Expenses + Credits modules available', () => {
     // Angular's literal template bug: header shows getPaidSaleCreditsTotal() (a currency
     // sum), not a count, inside the "(...)" slot — preserved verbatim, see today-stats.tsx.
     expect(await screen.findByText('Créditos Pagados (60)')).toBeInTheDocument();
+  });
+
+  // Pago por Tarjeta panel (user request 2026-09-07): sits right after Resumen
+  // Efectivo, sums TODAY's card-paid non-credit sales, always rendered.
+  it('renders Pago por Tarjeta after Resumen Efectivo with today card sales', async () => {
+    mockGetActiveOrdersInDay.mockReturnValue([
+      makeOrder({ id: 'card-1', total: 120, paymentType: PaymentType.Tarjeta, isCredit: false }),
+      makeOrder({ id: 'cash-1', total: 80, paymentType: PaymentType.Efectivo, isCredit: false }),
+      // Credit sales never count toward the payment summaries (cash or card).
+      makeOrder({
+        id: 'card-credit',
+        total: 999,
+        paymentType: PaymentType.Tarjeta,
+        isCredit: true,
+      }),
+    ]);
+
+    render(
+      <Wrapper>
+        <TodayStatsPage />
+      </Wrapper>,
+    );
+
+    const cardPanel = await screen.findByRole('button', { name: /Pago por Tarjeta/ });
+    expect(cardPanel).toBeInTheDocument();
+    // Panel amount in the collapsed header: only the 120 card sale counts.
+    expect(screen.getAllByText('$120').length).toBeGreaterThan(0);
+
+    // Expanded: the Ventas row shows the same card total.
+    fireEvent.click(cardPanel);
+    const ventasRow = within(cardPanel.parentElement as HTMLElement).getAllByText('Ventas');
+    expect(ventasRow.length).toBeGreaterThan(0);
+    expect(
+      within(cardPanel.parentElement as HTMLElement).getAllByText('$120').length,
+    ).toBeGreaterThan(0);
   });
 
   // Parity fix (react-list-table-parity follow-up): Angular renders the expenses breakdown via
@@ -281,7 +312,9 @@ describe('TodayStatsPage — with Expenses + Credits modules available', () => {
   // semantics (guards ADR-2), and now renders a rotating ChevronDownIcon.
   describe('ExpansionPanel — controlled restructure (collapsible-panel-chevron-parity)', () => {
     it('defaults every panel to collapsed (body not rendered)', async () => {
-      mockGetExpensesInDayObservable.mockResolvedValue(expensesEnvelope([makeExpense({ total: 15 })]));
+      mockGetExpensesInDayObservable.mockResolvedValue(
+        expensesEnvelope([makeExpense({ total: 15 })]),
+      );
       mockGetUnPaidSaleCreditsInDayObservable.mockResolvedValue(
         creditsEnvelope([makeCredit({ total: 40, client: 'Ana' })]),
       );
@@ -300,7 +333,9 @@ describe('TodayStatsPage — with Expenses + Credits modules available', () => {
     });
 
     it('opens a panel on click, revealing its body, and renders a chevron rotated only while open', async () => {
-      mockGetExpensesInDayObservable.mockResolvedValue(expensesEnvelope([makeExpense({ total: 15 })]));
+      mockGetExpensesInDayObservable.mockResolvedValue(
+        expensesEnvelope([makeExpense({ total: 15 })]),
+      );
 
       render(
         <Wrapper>
@@ -321,7 +356,9 @@ describe('TodayStatsPage — with Expenses + Credits modules available', () => {
     });
 
     it('closes an open panel on a second click (body removed again, chevron un-rotates)', async () => {
-      mockGetExpensesInDayObservable.mockResolvedValue(expensesEnvelope([makeExpense({ total: 15 })]));
+      mockGetExpensesInDayObservable.mockResolvedValue(
+        expensesEnvelope([makeExpense({ total: 15 })]),
+      );
 
       render(
         <Wrapper>
@@ -340,7 +377,9 @@ describe('TodayStatsPage — with Expenses + Credits modules available', () => {
     });
 
     it('toggles two panel instances independently', async () => {
-      mockGetExpensesInDayObservable.mockResolvedValue(expensesEnvelope([makeExpense({ total: 15 })]));
+      mockGetExpensesInDayObservable.mockResolvedValue(
+        expensesEnvelope([makeExpense({ total: 15 })]),
+      );
       mockGetUnPaidSaleCreditsInDayObservable.mockResolvedValue(
         creditsEnvelope([makeCredit({ total: 40, client: 'Ana' })]),
       );

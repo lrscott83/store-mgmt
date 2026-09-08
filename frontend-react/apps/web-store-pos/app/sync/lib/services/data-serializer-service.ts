@@ -358,12 +358,20 @@ export class DataSerializerService {
     await zipWriter.add(EDataFileName.Warehouses, new TextReader(warehousesJson), {
       rawPassword: key,
     });
-    await zipWriter.add(EDataFileName.WarehouseStockLevels, new TextReader(warehouseStockLevelsJson), {
-      rawPassword: key,
-    });
-    await zipWriter.add(EDataFileName.WarehouseStockMovements, new TextReader(warehouseStockMovementsJson), {
-      rawPassword: key,
-    });
+    await zipWriter.add(
+      EDataFileName.WarehouseStockLevels,
+      new TextReader(warehouseStockLevelsJson),
+      {
+        rawPassword: key,
+      },
+    );
+    await zipWriter.add(
+      EDataFileName.WarehouseStockMovements,
+      new TextReader(warehouseStockMovementsJson),
+      {
+        rawPassword: key,
+      },
+    );
 
     const blob = await zipWriter.close();
     return new Uint8Array(await blob.arrayBuffer());
@@ -393,8 +401,7 @@ export class DataSerializerService {
 
     try {
       const metaEntry = entries.find(
-        (entry): entry is FileEntry =>
-          !entry.directory && entry.filename === V2_META_FILENAME,
+        (entry): entry is FileEntry => !entry.directory && entry.filename === V2_META_FILENAME,
       );
       if (metaEntry) {
         return await this.importV2(entries, metaEntry, password);
@@ -467,10 +474,7 @@ export class DataSerializerService {
    * derivation) passed per-entry, preserving v1 semantics for React v1 and
    * real Angular-exported archives (V2-07, SYNC-01/02).
    */
-  private async importV1Fallback(
-    entries: Entry[],
-    password: string,
-  ): Promise<ParsedData> {
+  private async importV1Fallback(entries: Entry[], password: string): Promise<ParsedData> {
     const contents = new Map<string, string>();
     try {
       for (const entry of entries) {
@@ -488,6 +492,50 @@ export class DataSerializerService {
     }
 
     return this.parseContents(contents);
+  }
+
+  /**
+   * Returns the current store data as a plain ParsedData object, without any
+   * encryption or ZIP packaging. Used for debug exports (visible only to
+   * `lrscott`). This method reads directly from the same repositories/services
+   * as `export()`, but returns the parsed objects instead of a ZIP payload.
+   */
+  async exportPlainData(): Promise<ParsedData> {
+    const orders = this.orderReader.getStorageOrders();
+    const expenses = this.expenseReader.getStorageExpenses();
+    const saleCredits = this.saleCreditReader.getStorageSaleCredits();
+    const exchangeRates = this.exchangeRateReader?.getStorageExchangeRates() ?? [];
+    const warehouses = this.warehouseReader?.getStorageWarehouses() ?? [];
+    const warehouseStockLevels = this.warehouseReader?.getStorageStockLevels() ?? [];
+    const warehouseStockMovements = this.warehouseReader?.getStorageMovements() ?? [];
+
+    // Categories and products: read raw JSON and parse
+    const categoriesJson = this.categoryRepository.getCategoriesJson() ?? '[]';
+    const productsJson = this.productRepository.getProductsJson() ?? '[]';
+    const inventoryJson = this.inventoryService.getInventoryEntriesJson();
+
+    // Parse to objects
+    const categoryEntries = JSON.parse(categoriesJson) as [string, ProductCategory][];
+    const productEntries = JSON.parse(productsJson) as [string, Product][];
+    const rawInventory = JSON.parse(inventoryJson) as unknown;
+    const inventoryEntries: InventoryEntry[] = Array.isArray(rawInventory)
+      ? (rawInventory as [string, InventoryEntry[]][]).flatMap(
+          ([, entriesForProduct]) => entriesForProduct,
+        )
+      : [];
+
+    return {
+      categories: categoryEntries.map(([, category]) => category),
+      products: productEntries.map(([, product]) => product),
+      inventoryEntries,
+      orders,
+      expenses,
+      saleCredits,
+      exchangeRates,
+      warehouses,
+      warehouseStockLevels,
+      warehouseStockMovements,
+    };
   }
 
   private parseContents(contents: Map<string, string>): ParsedData {

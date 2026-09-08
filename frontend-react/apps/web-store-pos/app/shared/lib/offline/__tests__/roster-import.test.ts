@@ -1,9 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import {
-  importRosterFile,
-  rosterImportErrorMessageId,
-  UnknownFileError,
-} from '../roster-import';
+import { importRosterFile, rosterImportErrorMessageId, UnknownFileError } from '../roster-import';
 import * as rosterImportModule from '../roster-import';
 import { serializeRoster } from '../roster-serializer';
 import { getRoster, importRoster } from '../roster-store';
@@ -47,7 +43,10 @@ describe('importRosterFile', () => {
     const bundle = makeBundle();
     // The name is deliberately NOT the export name — the envelope inside
     // the archive is the only storeId source now.
-    const file = makeFile(await serializeRoster(bundle, 'master', STORE_ID), 'activacion.smcabundle');
+    const file = makeFile(
+      await serializeRoster(bundle, 'master', STORE_ID),
+      'activacion.smcabundle',
+    );
 
     await importRosterFile({ file, master: 'master' });
 
@@ -68,7 +67,10 @@ describe('importRosterFile', () => {
     // only the explicit argument can open it, so a pass proves precedence.
     const EXPLICIT_ID = '9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d';
     const bundle = makeBundle({ storeId: EXPLICIT_ID });
-    const file = makeFile(await serializeRoster(bundle, 'master', EXPLICIT_ID), 'renamed.smcabundle');
+    const file = makeFile(
+      await serializeRoster(bundle, 'master', EXPLICIT_ID),
+      'renamed.smcabundle',
+    );
 
     await importRosterFile({ file, master: 'master', storeId: EXPLICIT_ID });
 
@@ -89,9 +91,8 @@ describe('importRosterFile', () => {
     // so the failure must be "unknown file", not "wrong password".
     const bundle = makeBundle();
     const payload = await serializeRoster(bundle, 'master', STORE_ID);
-    const { ZipWriter, BlobWriter, TextReader, BlobReader, ZipReader, TextWriter } = await import(
-      '@zip.js/zip.js'
-    );
+    const { ZipWriter, BlobWriter, TextReader, BlobReader, ZipReader, TextWriter } =
+      await import('@zip.js/zip.js');
     const reader = new ZipReader(new BlobReader(new Blob([payload])));
     const entries = await reader.getEntries();
     const rosterEntry = entries.find((e) => !e.directory && e.filename === 'roster.json');
@@ -177,9 +178,7 @@ describe('rosterImportErrorMessageId', () => {
     expect(rosterImportErrorMessageId({ name: 'ReplayBundleError' })).toBe(
       'PROVISION.ERROR_REPLAY',
     );
-    expect(rosterImportErrorMessageId(new UnknownFileError())).toBe(
-      'PROVISION.ERROR_UNKNOWN_FILE',
-    );
+    expect(rosterImportErrorMessageId(new UnknownFileError())).toBe('PROVISION.ERROR_UNKNOWN_FILE');
   });
 
   it('falls back to the corrupt-file message for anything unrecognised', () => {

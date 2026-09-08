@@ -60,7 +60,9 @@ export class ProductOnlineService implements ProductService {
     return response.data;
   }
 
-  async getAvailableProductsByCategoryId(categoryId: string): Promise<BaseResponseModel<Product[]>> {
+  async getAvailableProductsByCategoryId(
+    categoryId: string,
+  ): Promise<BaseResponseModel<Product[]>> {
     const url = this.API_URL + 'availableByCategoryId/' + categoryId;
     const response = await apiClient.get<BaseResponseModel<Product[]>>(url);
     return response.data;

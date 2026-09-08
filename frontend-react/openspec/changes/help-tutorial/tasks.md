@@ -10,14 +10,14 @@
 
 ## Review Workload Forecast
 
-| Field | Value |
-|-------|-------|
+| Field                   | Value                                                       |
+| ----------------------- | ----------------------------------------------------------- |
 | Estimated changed lines | ~130 (2 new files + 4 small modifications + 6 image copies) |
-| 400-line budget risk | Low |
-| Chained PRs recommended | No |
-| Suggested split | Single PR |
-| Delivery strategy | ask-on-risk |
-| Chain strategy | N/A |
+| 400-line budget risk    | Low                                                         |
+| Chained PRs recommended | No                                                          |
+| Suggested split         | Single PR                                                   |
+| Delivery strategy       | ask-on-risk                                                 |
+| Chain strategy          | N/A                                                         |
 
 Decision needed before apply: No
 Chained PRs recommended: No
@@ -26,9 +26,9 @@ Chain strategy: size-exception
 
 ### Suggested Work Units
 
-| Unit | Goal | Likely PR | Notes |
-|------|------|-----------|-------|
-| 1 | Full help-tutorial feature (images + component + route + menu + i18n + tests) | PR 1 (single) | ~130 lines; well under 400-line budget; additive only; no schema/migration risk |
+| Unit | Goal                                                                          | Likely PR     | Notes                                                                           |
+| ---- | ----------------------------------------------------------------------------- | ------------- | ------------------------------------------------------------------------------- |
+| 1    | Full help-tutorial feature (images + component + route + menu + i18n + tests) | PR 1 (single) | ~130 lines; well under 400-line budget; additive only; no schema/migration risk |
 
 ---
 

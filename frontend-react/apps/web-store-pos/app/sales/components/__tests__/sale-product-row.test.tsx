@@ -49,7 +49,11 @@ describe('SaleProductRow — Angular parity (sale-product-row.component.html)', 
   it('renders the product name', () => {
     render(
       <Wrapper>
-        <SaleProductRow product={makeProduct({ name: 'Sprite' })} orderType={OrderType.Normal} onAdded={vi.fn()} />
+        <SaleProductRow
+          product={makeProduct({ name: 'Sprite' })}
+          orderType={OrderType.Normal}
+          onAdded={vi.fn()}
+        />
       </Wrapper>,
     );
     expect(screen.getByText('Sprite')).toBeInTheDocument();
@@ -72,7 +76,11 @@ describe('SaleProductRow — Angular parity (sale-product-row.component.html)', 
   it('shows the read-only price (not an input) for a Normal-type sale', () => {
     render(
       <Wrapper>
-        <SaleProductRow product={makeProduct({ price: 2 })} orderType={OrderType.Normal} onAdded={vi.fn()} />
+        <SaleProductRow
+          product={makeProduct({ price: 2 })}
+          orderType={OrderType.Normal}
+          onAdded={vi.fn()}
+        />
       </Wrapper>,
     );
     expect(screen.getByText('$2')).toBeInTheDocument();
@@ -126,7 +134,11 @@ describe('SaleProductRow — Angular parity (sale-product-row.component.html)', 
   it('formats the read-only price with a thousands separator via formatCurrency (WU7 list-parity sweep)', () => {
     render(
       <Wrapper>
-        <SaleProductRow product={makeProduct({ price: 2000 })} orderType={OrderType.Normal} onAdded={vi.fn()} />
+        <SaleProductRow
+          product={makeProduct({ price: 2000 })}
+          orderType={OrderType.Normal}
+          onAdded={vi.fn()}
+        />
       </Wrapper>,
     );
     expect(screen.getByText('$2 000')).toBeInTheDocument();
@@ -135,7 +147,11 @@ describe('SaleProductRow — Angular parity (sale-product-row.component.html)', 
   it('shows an editable price input for a non-Normal sale (e.g. Mayorista)', () => {
     render(
       <Wrapper>
-        <SaleProductRow product={makeProduct({ price: 2 })} orderType={OrderType.Mayorista} onAdded={vi.fn()} />
+        <SaleProductRow
+          product={makeProduct({ price: 2 })}
+          orderType={OrderType.Mayorista}
+          onAdded={vi.fn()}
+        />
       </Wrapper>,
     );
     expect(screen.getByLabelText('Precio')).toBeInTheDocument();
@@ -212,7 +228,11 @@ describe('SaleProductRow — Angular parity (sale-product-row.component.html)', 
     const onAdded = vi.fn();
     render(
       <Wrapper>
-        <SaleProductRow product={makeProduct({ id: 'prod-9', price: 3 })} orderType={OrderType.Normal} onAdded={onAdded} />
+        <SaleProductRow
+          product={makeProduct({ id: 'prod-9', price: 3 })}
+          orderType={OrderType.Normal}
+          onAdded={onAdded}
+        />
       </Wrapper>,
     );
     fireEvent.change(screen.getByLabelText('Cantidad'), { target: { value: '4' } });
@@ -272,7 +292,10 @@ describe('SaleProductRow — Angular parity (sale-product-row.component.html)', 
           product={makeProduct({ id: 'prod-low-stock', discountFromInvantory: true })}
           orderType={OrderType.Normal}
           onAdded={onAdded}
-          checkAvailability={() => ({ succeeded: false, errors: [ProductErrors.ProductQuantityNotAvailable] })}
+          checkAvailability={() => ({
+            succeeded: false,
+            errors: [ProductErrors.ProductQuantityNotAvailable],
+          })}
         />
       </Wrapper>,
     );

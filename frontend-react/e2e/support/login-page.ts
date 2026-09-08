@@ -67,7 +67,7 @@ export class LoginPage {
           message:
             `no pudo escribir login/password en el formulario de /login (la navegación ` +
             'client-side desde /register pudo haber desmontado el formulario con los valores)',
-        }
+        },
       )
       .toBe(true);
   }

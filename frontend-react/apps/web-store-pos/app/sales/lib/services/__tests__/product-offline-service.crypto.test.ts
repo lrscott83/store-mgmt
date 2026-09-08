@@ -16,23 +16,25 @@ function v2Bundle(): OfflineRosterBundle {
     expiresAt: 999_999_999_999,
     formatVersion: 2,
     storeId,
-    users: [{
-      id: 'u1',
-      login: 'ana',
-      fullName: 'Ana',
-      isActive: true,
-      roles: [],
-      featureIds: [],
-      storeModuleIds: [],
-      isSuperAdmin: false,
-      isOwnerAdmin: false,
-      isReSeller: false,
-      selectedStoreId: storeId,
-      verifier: { hash: 'h', salt: 's', iterations: 210_000 },
-      wrappedDek: 'ct',
-      wrapSalt: 'salt',
-      wrapIv: 'iv',
-    }],
+    users: [
+      {
+        id: 'u1',
+        login: 'ana',
+        fullName: 'Ana',
+        isActive: true,
+        roles: [],
+        featureIds: [],
+        storeModuleIds: [],
+        isSuperAdmin: false,
+        isOwnerAdmin: false,
+        isReSeller: false,
+        selectedStoreId: storeId,
+        verifier: { hash: 'h', salt: 's', iterations: 210_000 },
+        wrappedDek: 'ct',
+        wrapSalt: 'salt',
+        wrapIv: 'iv',
+      },
+    ],
   };
 }
 
@@ -99,7 +101,9 @@ describe('product-offline-service — at-rest encryption', () => {
 
     clearDek();
     const lockedService = new ProductOfflineService(storeId);
-    await expect(lockedService.getAvailableProductsByCategoryId(catId)).rejects.toThrow(MissingDataKeyError);
+    await expect(lockedService.getAvailableProductsByCategoryId(catId)).rejects.toThrow(
+      MissingDataKeyError,
+    );
 
     const rawAfter = localStorage.getItem(storageKey);
     expect(rawAfter).toBe(rawBefore);

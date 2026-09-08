@@ -57,7 +57,7 @@ async function requireBearerToken(page: Page): Promise<string> {
   if (!token) {
     throw new Error(
       'store-fixture: no Bearer token found in localStorage (`token` key). Restore a signed-in ' +
-        'persona (signedInPage) before calling readModuleCatalog()/degradeStoreToFreePlan().'
+        'persona (signedInPage) before calling readModuleCatalog()/degradeStoreToFreePlan().',
     );
   }
   return token;
@@ -76,7 +76,7 @@ async function fetchStore(page: Page, storeId: string, token: string): Promise<S
   if (!response.ok() || !body?.succeeded) {
     throw new Error(
       `store-fixture: GET /v1/stores/${storeId} failed (status ${response.status()}) while reading ` +
-        'the store — cannot seed or verify the free-plan precondition without it.'
+        'the store — cannot seed or verify the free-plan precondition without it.',
     );
   }
   return body.data;
@@ -100,7 +100,7 @@ export async function readModuleCatalog(page: Page): Promise<ModuleCatalog> {
   if (!response.ok() || !body?.succeeded) {
     throw new Error(
       `store-fixture: GET /v1/modules/ToStore failed (status ${response.status()}) while reading ` +
-        'the module catalog — cannot compute free/paid module ids without it.'
+        'the module catalog — cannot compute free/paid module ids without it.',
     );
   }
   const freeIds = body.data.filter((m) => m.priceIncluded).map((m) => m.id);
@@ -127,7 +127,7 @@ export async function readModuleCatalog(page: Page): Promise<ModuleCatalog> {
  */
 export async function degradeStoreToFreePlan(
   page: Page,
-  storeId: string
+  storeId: string,
 ): Promise<FreePlanPrecondition> {
   const token = await requireBearerToken(page);
   const catalog = await readModuleCatalog(page);
@@ -145,14 +145,14 @@ export async function degradeStoreToFreePlan(
     throw new Error(
       `store-fixture: degradeStoreToFreePlan(${storeId}) precondition mismatch — expected module ` +
         `ids [${expectedIds.join(',')}] after the direct-DB seed, observed [${observedIds.join(',')}]. ` +
-        'The free-plan precondition this spec relies on was not actually written.'
+        'The free-plan precondition this spec relies on was not actually written.',
     );
   }
   if (!reread.paymentStartDate) {
     throw new Error(
       `store-fixture: degradeStoreToFreePlan(${storeId}) precondition mismatch — expected ` +
         'paymentStartDate to remain non-null after degrading to the free plan (the Store row is ' +
-        'untouched by the direct-DB seed), observed null. S2-02 depends on this staying non-null.'
+        'untouched by the direct-DB seed), observed null. S2-02 depends on this staying non-null.',
     );
   }
 
@@ -198,14 +198,14 @@ async function seedStoreModulesDirect(storeId: string, moduleIds: number[]): Pro
               now(), '00000000-0000-0000-0000-000000000000', NULL, NULL
          FROM "Module" m, "Store" s
         WHERE m."Id" = ANY($2::int[]) AND s."Id" = $1`,
-      [storeId, moduleIds]
+      [storeId, moduleIds],
     );
     await client.query('COMMIT');
   } catch (cause) {
     await client.query('ROLLBACK').catch(() => undefined);
     throw new Error(
       `store-fixture: seedStoreModulesDirect(${storeId}, [${moduleIds.join(',')}]) failed — ` +
-        `free-plan seeding did not happen: ${cause instanceof Error ? cause.message : String(cause)}`
+        `free-plan seeding did not happen: ${cause instanceof Error ? cause.message : String(cause)}`,
     );
   } finally {
     await client.end();
@@ -226,7 +226,7 @@ export async function assertStoresFeature(page: Page): Promise<void> {
   if (!raw) {
     throw new Error(
       'store-fixture: assertStoresFeature — localStorage.currentUser is empty. Expected an ' +
-        'already-authenticated OwnerAdmin session (signedInPage) before this guard runs.'
+        'already-authenticated OwnerAdmin session (signedInPage) before this guard runs.',
     );
   }
 
@@ -236,7 +236,7 @@ export async function assertStoresFeature(page: Page): Promise<void> {
   } catch (cause) {
     throw new Error(
       'store-fixture: assertStoresFeature — localStorage.currentUser is not valid JSON: ' +
-        `${cause instanceof Error ? cause.message : String(cause)}.`
+        `${cause instanceof Error ? cause.message : String(cause)}.`,
     );
   }
 
@@ -246,7 +246,7 @@ export async function assertStoresFeature(page: Page): Promise<void> {
         `${STORES_FEATURE_ID} (feature Stores, module Management). Without it, ` +
         'adminFeatureLoader([EFeatures.Stores]) logs this user out of /management/stores instead ' +
         'of rendering the form (H-7/H-8) — every downstream assertion in this scenario would fail ' +
-        'as a silent logout, not as a readable assertion failure.'
+        'as a silent logout, not as a readable assertion failure.',
     );
   }
 }

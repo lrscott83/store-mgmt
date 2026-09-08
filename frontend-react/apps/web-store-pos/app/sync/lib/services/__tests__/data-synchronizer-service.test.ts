@@ -344,7 +344,15 @@ function makeService(opts?: {
     expenseService,
     saleCreditService,
   );
-  return { svc, catRepo, prodRepo, inventoryService, orderService, expenseService, saleCreditService };
+  return {
+    svc,
+    catRepo,
+    prodRepo,
+    inventoryService,
+    orderService,
+    expenseService,
+    saleCreditService,
+  };
 }
 
 function emptyData(): ParsedData {
@@ -631,7 +639,10 @@ describe('DataSynchronizerService', () => {
       localStorage.clear();
     });
 
-    function makeRealPair(): { categoryRepo: ProductCategoryRepository; productRepo: ProductRepository } {
+    function makeRealPair(): {
+      categoryRepo: ProductCategoryRepository;
+      productRepo: ProductRepository;
+    } {
       const categoryRepo = new ProductCategoryRepository(REAL_STORE_ID);
       const productRepo = new ProductRepository(REAL_STORE_ID, categoryRepo);
       return { categoryRepo, productRepo };
@@ -655,9 +666,7 @@ describe('DataSynchronizerService', () => {
 
       const data: ParsedData = {
         ...emptyData(),
-        products: [
-          { ...makeProduct('prod-1', 'Cola', 1), categoryId: 'cat-missing' },
-        ],
+        products: [{ ...makeProduct('prod-1', 'Cola', 1), categoryId: 'cat-missing' }],
       };
 
       const result = await svc.sync(data);
@@ -680,8 +689,30 @@ describe('DataSynchronizerService', () => {
       const { categoryRepo, productRepo } = makeRealPair();
       categoryRepo.addImportedProductCategory(makeCategory('cat-1', 'Bebidas', 1));
       // prod-a is created via the normal (non-import) path, which DOES persist barcode.
-      productRepo.addProductData('prod-a', 'cat-1', 'Coca Cola', 1000, 'biz-1', 1, true, true, false, '7501234');
-      productRepo.addProductData('prod-b', 'cat-1', 'Sprite', 1000, 'biz-1', 2, true, true, false, '999999');
+      productRepo.addProductData(
+        'prod-a',
+        'cat-1',
+        'Coca Cola',
+        1000,
+        'biz-1',
+        1,
+        true,
+        true,
+        false,
+        '7501234',
+      );
+      productRepo.addProductData(
+        'prod-b',
+        'cat-1',
+        'Sprite',
+        1000,
+        'biz-1',
+        2,
+        true,
+        true,
+        false,
+        '999999',
+      );
       const svc = makeSvc(categoryRepo, productRepo);
 
       const data: ParsedData = {
@@ -725,7 +756,9 @@ describe('DataSynchronizerService', () => {
 
       const data: ParsedData = {
         ...emptyData(),
-        products: [{ ...makeProduct('prod-new', 'Cola', 1), categoryId: 'cat-2', categoryName: 'Snacks' }],
+        products: [
+          { ...makeProduct('prod-new', 'Cola', 1), categoryId: 'cat-2', categoryName: 'Snacks' },
+        ],
       };
 
       const result = await svc.sync(data);
@@ -1348,18 +1381,20 @@ describe('DataSynchronizerService', () => {
       const existing: Order = {
         ...makeOrder('o1'),
         total: 500,
-        orderItems: [{
-          productId: 'p1',
-          productName: 'Coca Cola',
-          categoryId: 'cat-1',
-          categoryName: 'Bebidas',
-          name: 'Coca Cola',
-          quantity: 2,
-          price: 5,
-          productBusinessId: 'biz-1',
-          productCosts: [],
-          order: 0,
-        }],
+        orderItems: [
+          {
+            productId: 'p1',
+            productName: 'Coca Cola',
+            categoryId: 'cat-1',
+            categoryName: 'Bebidas',
+            name: 'Coca Cola',
+            quantity: 2,
+            price: 5,
+            productBusinessId: 'biz-1',
+            productCosts: [],
+            order: 0,
+          },
+        ],
         isCredit: true,
         paymentType: 0 as Order['paymentType'],
       };

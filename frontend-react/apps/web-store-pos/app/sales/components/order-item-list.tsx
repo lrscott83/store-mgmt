@@ -69,7 +69,11 @@ export function OrderItemList({
     <div className="space-y-2">
       {!readOnly && (
         <div className="flex justify-end gap-2">
-          <Button variant="fab" onClick={() => onEditOrder?.(order)} data-testid="edit-order-button">
+          <Button
+            variant="fab"
+            onClick={() => onEditOrder?.(order)}
+            data-testid="edit-order-button"
+          >
             {/* GENERAL.EDIT */}
             {intl.formatMessage({ id: 'GENERAL.EDIT' })}
           </Button>

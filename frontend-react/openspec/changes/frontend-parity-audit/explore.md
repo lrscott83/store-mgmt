@@ -24,6 +24,7 @@ Angular (`frontend/`) is the validated source of truth for a live offline-first 
 **React sources**: `frontend-react/packages/domain/src/models/{base,product,order,expense,sale-credit,auth,inventory,store}.ts`, `frontend-react/packages/domain/src/enums/index.ts`.
 
 **Enum diff (ERoles/EFeatures/EModules/PaymentType/OrderType/ExpenseType) — CONFIRMED MATCH**:
+
 - `ERoles`, `EModules` — identical in both.
 - `EFeatures` — near-identical; Angular has `TodayOrdersStats = 23` and `TodayInventoryStats = 32`; React has `TodayStats = 23` (renamed) and is MISSING `TodayInventoryStats = 32` entirely (gap — flag).
 - Angular has extra enums NOT ported to React domain package (status: likely N/A for this app, verify): `EPermissions`, `ENotificationTemplateType`, `SignatureProvider`, `EMessageStatus` — these look like carried-over boilerplate from a different vertical (fleet/carrier terms like "HiringService", "EscrowAccount" suggest template leftovers, not used by store-mgmt UI). Recommend confirming these are dead code before treating as gaps.
@@ -31,24 +32,24 @@ Angular (`frontend/`) is the validated source of truth for a live offline-first 
 
 **Model gap list (Angular item | React item | status)**:
 
-| Angular | React | Status |
-|---|---|---|
-| `owner.model.ts`, `owner-store-module.model.ts` | `store.ts` (Owner, OwnerStoreModule interfaces) | present |
-| `product-category.model.ts` + `.errors.ts` | `product.ts` (verify category errors) | present, verify error-type parity |
-| `sale-credit.model.ts` + `.errors.ts` | `sale-credit.ts` | present, verify error-type parity |
-| `users/user.model.ts`, `credentials.model.ts` | `auth.ts` (UserModel, Credentials) | present |
-| `features/feature.model.ts` | `store.ts` (Feature interface) | present |
-| `stores/store.model.ts` | `store.ts` (Store interface) | present |
-| `entries/inventory-entry.model.ts`, `inventory-entry-view.model.ts`, `.errors.ts` | `inventory.ts` | present, verify view-model parity |
-| `orders/order.model.ts`, `order-item.model.ts`, `.errors.ts` | `order.ts` | present |
-| `expenses/expense.model.ts` + `.errors.ts` | `expense.ts` | present |
-| `store-user/store-user.model.ts` | `store.ts` (StoreUser) | present |
-| `messages/message.model.ts` | none found | MISSING — confirm messaging feature is unused/dead in both apps before flagging as real gap |
-| `modules/module.model.ts` | `store.ts` (Module interface) | present |
-| `resellers/reseller.model.ts` | `store.ts` (ReSeller interface) | present |
-| `commons/type-data.ts`, `commons/result.ts` | `base.ts` (verify Result/TypeData equivalents) | unknown, needs read |
-| `_services/auth/_models/social-networks.model.ts`, `address.model.ts` | unknown | unknown — verify if used in Owner/Reseller forms |
-| `_services/usage/store-usages.model.ts`, `usage-tracker/usage.model.ts` | `admin/dashboard` usage-http-service types | present (React has usage-http-service.ts under admin/dashboard) |
+| Angular                                                                           | React                                           | Status                                                                                      |
+| --------------------------------------------------------------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `owner.model.ts`, `owner-store-module.model.ts`                                   | `store.ts` (Owner, OwnerStoreModule interfaces) | present                                                                                     |
+| `product-category.model.ts` + `.errors.ts`                                        | `product.ts` (verify category errors)           | present, verify error-type parity                                                           |
+| `sale-credit.model.ts` + `.errors.ts`                                             | `sale-credit.ts`                                | present, verify error-type parity                                                           |
+| `users/user.model.ts`, `credentials.model.ts`                                     | `auth.ts` (UserModel, Credentials)              | present                                                                                     |
+| `features/feature.model.ts`                                                       | `store.ts` (Feature interface)                  | present                                                                                     |
+| `stores/store.model.ts`                                                           | `store.ts` (Store interface)                    | present                                                                                     |
+| `entries/inventory-entry.model.ts`, `inventory-entry-view.model.ts`, `.errors.ts` | `inventory.ts`                                  | present, verify view-model parity                                                           |
+| `orders/order.model.ts`, `order-item.model.ts`, `.errors.ts`                      | `order.ts`                                      | present                                                                                     |
+| `expenses/expense.model.ts` + `.errors.ts`                                        | `expense.ts`                                    | present                                                                                     |
+| `store-user/store-user.model.ts`                                                  | `store.ts` (StoreUser)                          | present                                                                                     |
+| `messages/message.model.ts`                                                       | none found                                      | MISSING — confirm messaging feature is unused/dead in both apps before flagging as real gap |
+| `modules/module.model.ts`                                                         | `store.ts` (Module interface)                   | present                                                                                     |
+| `resellers/reseller.model.ts`                                                     | `store.ts` (ReSeller interface)                 | present                                                                                     |
+| `commons/type-data.ts`, `commons/result.ts`                                       | `base.ts` (verify Result/TypeData equivalents)  | unknown, needs read                                                                         |
+| `_services/auth/_models/social-networks.model.ts`, `address.model.ts`             | unknown                                         | unknown — verify if used in Owner/Reseller forms                                            |
+| `_services/usage/store-usages.model.ts`, `usage-tracker/usage.model.ts`           | `admin/dashboard` usage-http-service types      | present (React has usage-http-service.ts under admin/dashboard)                             |
 
 ## 2. Services (data layer)
 
@@ -60,31 +61,31 @@ Angular (`frontend/`) is the validated source of truth for a live offline-first 
 
 **Gap list**:
 
-| Angular | React | Status |
-|---|---|---|
-| `product-category-offline/online.service.ts` | `product-category-offline-service.ts` | present (online variant unclear in React — verify) |
-| `product-offline/online.service.ts` + repository | `product-offline-service.ts` | present |
-| `sale-credit-offline.service.ts` | `sale-credit-offline-service.ts` | present |
-| `order-offline.service.ts`, category-cart-items-view, product-cart-items-view | `order-offline-service.ts` | present, cart view-models need per-file check in Sales stage |
-| `expense-offline.service.ts` | `expense-offline-service.ts` | present |
-| `entries/inventory-offline.service.ts`, inventory-product-view, inventory-item-cost-view, inventory-entries-view, inventory-category-view, currency.service | `inventory-offline-service.ts`, `egress-offline-service.ts` | present, currency-service equivalent unconfirmed — check Inventory stage |
-| `synchronization/data-serializer.service.ts`, `data-synchronizer.service.ts`, `data.file.model.ts`, `synchronizer.error.ts` | `sync/lib/services/data-serializer-service.ts`, `data-synchronizer-service.ts` | present, error-type parity unconfirmed |
-| `_services/csv/csv-product.service.ts` + model | `sales/lib/csv-product-parser.ts` | present (renamed) |
-| `_services/owner/owner.service.ts` | `admin/owners/lib/services/owner-http-service.ts` | present |
-| `_services/reseller/reseller.service.ts` | `admin/resellers/lib/services/reseller-http-service.ts` | present |
-| `_services/store/store.service.ts` | `management/stores/lib/services/store-http-service.ts` | present |
-| `_services/storeuser/store-user.service.ts`, `user/user.service.ts` | `management/users/lib/services/user-http-service.ts` | present, verify both Angular services map to single React service or two |
-| `_services/features/feature.service.ts` | `admin/features/lib/services/feature-http-service.ts` | present |
-| `_services/usage/usage.service.ts`, `usage-tracker/store-usage-tracker.service.ts` | `admin/dashboard/lib/services/usage-http-service.ts` | present, verify tracker (client-side accumulation) logic ported, not just the HTTP fetch |
-| `_services/order/shopping-cart.service.ts` | unknown — likely folded into sales cart state/hooks | unknown, verify in Sales stage |
-| `_services/download-manager/download-manager.service.ts` (+ spec) | unknown | unknown — check Sync stage (PWA install/update prompts) |
-| `_services/update/update.service.ts` | unknown | unknown — PWA service-worker update flow, check Sync/root app shell |
-| `_services/connection/connection.service.ts` | unknown | unknown — online/offline detection, likely needed for offline-first badge; check shared/lib |
-| `_services/auth/*` (auth-http, auth-fake-http, auth.guard, auth.service) | `auth/` routes use `authLoader` (React Router loader) | present pattern-wise; verify fake/mock auth parity not needed (dev-only) |
-| `_services/module/module.service.ts` | menu-config.ts (`shared/lib/config/menu-config.ts`) | present, structurally different (static config vs service) — verify feature-gating logic parity |
-| `_services/authorization/authorization.service.ts` | unknown | unknown — CRITICAL, verify permission-gating exists in React (guards feature/module visibility) |
-| `_services/storage/storage.service.ts` | unknown | unknown — local-storage abstraction, verify React equivalent (likely per-service or a shared util) |
-| `_services/global-error-handler.service.ts`, `icon-setup.service.ts`, `loading.service.ts`, `preloading.service.ts` | unknown | unknown — cross-cutting concerns, low priority but verify error-handling parity |
+| Angular                                                                                                                                                     | React                                                                          | Status                                                                                             |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
+| `product-category-offline/online.service.ts`                                                                                                                | `product-category-offline-service.ts`                                          | present (online variant unclear in React — verify)                                                 |
+| `product-offline/online.service.ts` + repository                                                                                                            | `product-offline-service.ts`                                                   | present                                                                                            |
+| `sale-credit-offline.service.ts`                                                                                                                            | `sale-credit-offline-service.ts`                                               | present                                                                                            |
+| `order-offline.service.ts`, category-cart-items-view, product-cart-items-view                                                                               | `order-offline-service.ts`                                                     | present, cart view-models need per-file check in Sales stage                                       |
+| `expense-offline.service.ts`                                                                                                                                | `expense-offline-service.ts`                                                   | present                                                                                            |
+| `entries/inventory-offline.service.ts`, inventory-product-view, inventory-item-cost-view, inventory-entries-view, inventory-category-view, currency.service | `inventory-offline-service.ts`, `egress-offline-service.ts`                    | present, currency-service equivalent unconfirmed — check Inventory stage                           |
+| `synchronization/data-serializer.service.ts`, `data-synchronizer.service.ts`, `data.file.model.ts`, `synchronizer.error.ts`                                 | `sync/lib/services/data-serializer-service.ts`, `data-synchronizer-service.ts` | present, error-type parity unconfirmed                                                             |
+| `_services/csv/csv-product.service.ts` + model                                                                                                              | `sales/lib/csv-product-parser.ts`                                              | present (renamed)                                                                                  |
+| `_services/owner/owner.service.ts`                                                                                                                          | `admin/owners/lib/services/owner-http-service.ts`                              | present                                                                                            |
+| `_services/reseller/reseller.service.ts`                                                                                                                    | `admin/resellers/lib/services/reseller-http-service.ts`                        | present                                                                                            |
+| `_services/store/store.service.ts`                                                                                                                          | `management/stores/lib/services/store-http-service.ts`                         | present                                                                                            |
+| `_services/storeuser/store-user.service.ts`, `user/user.service.ts`                                                                                         | `management/users/lib/services/user-http-service.ts`                           | present, verify both Angular services map to single React service or two                           |
+| `_services/features/feature.service.ts`                                                                                                                     | `admin/features/lib/services/feature-http-service.ts`                          | present                                                                                            |
+| `_services/usage/usage.service.ts`, `usage-tracker/store-usage-tracker.service.ts`                                                                          | `admin/dashboard/lib/services/usage-http-service.ts`                           | present, verify tracker (client-side accumulation) logic ported, not just the HTTP fetch           |
+| `_services/order/shopping-cart.service.ts`                                                                                                                  | unknown — likely folded into sales cart state/hooks                            | unknown, verify in Sales stage                                                                     |
+| `_services/download-manager/download-manager.service.ts` (+ spec)                                                                                           | unknown                                                                        | unknown — check Sync stage (PWA install/update prompts)                                            |
+| `_services/update/update.service.ts`                                                                                                                        | unknown                                                                        | unknown — PWA service-worker update flow, check Sync/root app shell                                |
+| `_services/connection/connection.service.ts`                                                                                                                | unknown                                                                        | unknown — online/offline detection, likely needed for offline-first badge; check shared/lib        |
+| `_services/auth/*` (auth-http, auth-fake-http, auth.guard, auth.service)                                                                                    | `auth/` routes use `authLoader` (React Router loader)                          | present pattern-wise; verify fake/mock auth parity not needed (dev-only)                           |
+| `_services/module/module.service.ts`                                                                                                                        | menu-config.ts (`shared/lib/config/menu-config.ts`)                            | present, structurally different (static config vs service) — verify feature-gating logic parity    |
+| `_services/authorization/authorization.service.ts`                                                                                                          | unknown                                                                        | unknown — CRITICAL, verify permission-gating exists in React (guards feature/module visibility)    |
+| `_services/storage/storage.service.ts`                                                                                                                      | unknown                                                                        | unknown — local-storage abstraction, verify React equivalent (likely per-service or a shared util) |
+| `_services/global-error-handler.service.ts`, `icon-setup.service.ts`, `loading.service.ts`, `preloading.service.ts`                                         | unknown                                                                        | unknown — cross-cutting concerns, low priority but verify error-handling parity                    |
 
 ## 3. Views by module (EModules)
 
@@ -107,11 +108,13 @@ Angular presentation layer has **255 `.ts` files** (components) across `frontend
 ## 4. Routes diff (Angular `app-routing.module.ts` vs React `app/routes.ts`)
 
 Confirmed renames:
+
 - `sales/sale` → `sales/new`
 - `synchronization/export` → `sync/export`, `synchronization/import` → `sync/import`
 - `statistics/dashboard` → `stats/dashboard`
 
 Structural differences:
+
 - Angular guards via route-level `canActivate` (not inspected in this pass — verify auth.guard.ts logic maps to React's `authLoader`).
 - Angular `management/users/create/:storeId` (required param) vs React `management/users/create/:storeId?` (optional) — React explicitly reconciles two Angular use-cases (from user-list vs from store-creation flow) into one optional-param route; documented as intentional in React's own route comment.
 - Angular has `{ path: 'local', redirectTo: '' }` and wildcard `{ path: '**', redirectTo: '' }`; React has `route('*', 'shared/routes/$.tsx')` — verify React's catch-all renders equivalent behavior (redirect vs 404 page) rather than assuming parity.

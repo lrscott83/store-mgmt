@@ -103,9 +103,12 @@ describe('ProductRepository (React mirror of Angular product.repository.ts looku
       const parsed = JSON.parse(raw!);
       expect(Array.isArray(parsed)).toBe(true);
       expect(parsed).toHaveLength(2);
-      expect(parsed.every((entry: unknown) => Array.isArray(entry) && entry.length === 2 && typeof entry[0] === 'string')).toBe(
-        true,
-      );
+      expect(
+        parsed.every(
+          (entry: unknown) =>
+            Array.isArray(entry) && entry.length === 2 && typeof entry[0] === 'string',
+        ),
+      ).toBe(true);
     });
 
     it('auto-writes an empty Map-entries array on the first empty read, without throwing', () => {
@@ -121,7 +124,9 @@ describe('ProductRepository (React mirror of Angular product.repository.ts looku
       repo.getStorageProductsMap();
       repo.getStorageProductsMap();
 
-      const callsForKey = getItemSpy.mock.calls.filter(([key]) => key === `lizoft.store-products-${storeId}`);
+      const callsForKey = getItemSpy.mock.calls.filter(
+        ([key]) => key === `lizoft.store-products-${storeId}`,
+      );
       expect(callsForKey).toHaveLength(1);
     });
 
@@ -270,8 +275,18 @@ describe('ProductRepository (React mirror of Angular product.repository.ts looku
     it('filters by isActive AND availableToSale within the category, sorted by order', () => {
       seedProducts(storeId, [
         makeProduct('p1', { categoryId: 'cat-1', order: 2, isActive: true, availableToSale: true }),
-        makeProduct('p2', { categoryId: 'cat-1', order: 1, isActive: true, availableToSale: false }),
-        makeProduct('p3', { categoryId: 'cat-1', order: 0, isActive: false, availableToSale: true }),
+        makeProduct('p2', {
+          categoryId: 'cat-1',
+          order: 1,
+          isActive: true,
+          availableToSale: false,
+        }),
+        makeProduct('p3', {
+          categoryId: 'cat-1',
+          order: 0,
+          isActive: false,
+          availableToSale: true,
+        }),
       ]);
       expect(repo.getAvailableToSaleProductsByCategoryId('cat-1').map((p) => p.id)).toEqual(['p1']);
     });
@@ -301,7 +316,12 @@ describe('ProductRepository (React mirror of Angular product.repository.ts looku
   // ─── 3.5 deleteProduct (soft-delete) ──────────────────────────────────────
   describe('deleteProduct — soft-delete: isActive=false + audit stamps (product.repository.ts:88-98)', () => {
     beforeEach(() => {
-      useAuthStore.setState({ user: makeUser({ login: 'jdoe' }), isAuthenticated: true, isLoading: false, error: null });
+      useAuthStore.setState({
+        user: makeUser({ login: 'jdoe' }),
+        isAuthenticated: true,
+        isLoading: false,
+        error: null,
+      });
     });
 
     it('sets isActive=false and stamps updatedDate/updatedByName, returning true', () => {
@@ -322,14 +342,21 @@ describe('ProductRepository (React mirror of Angular product.repository.ts looku
   // ─── 3.6 addProductData ───────────────────────────────────────────────────
   describe('addProductData — validations + order-shift (product.repository.ts:100-146)', () => {
     beforeEach(() => {
-      useAuthStore.setState({ user: makeUser({ login: 'jdoe' }), isAuthenticated: true, isLoading: false, error: null });
+      useAuthStore.setState({
+        user: makeUser({ login: 'jdoe' }),
+        isAuthenticated: true,
+        isLoading: false,
+        error: null,
+      });
       seedCategories(storeId, [makeCategory('cat-1', { name: 'Bebidas' })]);
     });
 
     it('fails with ProductCategoryErrors.NotExists when the category does not exist', () => {
       const result = repo.addProductData('p1', 'missing-cat', 'Ron', 10, '', 1, true, true, false);
       expect(result.succeeded).toBe(false);
-      expect(result.errors).toEqual([{ code: 'ProductCategory.NotExists', description: 'La categoría no existe.' }]);
+      expect(result.errors).toEqual([
+        { code: 'ProductCategory.NotExists', description: 'La categoría no existe.' },
+      ]);
     });
 
     it('fails with ProductErrors.BarcodeExists when the barcode is already used', () => {
@@ -337,7 +364,10 @@ describe('ProductRepository (React mirror of Angular product.repository.ts looku
       const result = repo.addProductData('p1', 'cat-1', 'Ron', 10, '', 1, true, true, false, '123');
       expect(result.succeeded).toBe(false);
       expect(result.errors).toEqual([
-        { code: 'Product.BarcodeExists', description: 'El código de barras ya está asociado a otro producto.' },
+        {
+          code: 'Product.BarcodeExists',
+          description: 'El código de barras ya está asociado a otro producto.',
+        },
       ]);
     });
 
@@ -345,7 +375,9 @@ describe('ProductRepository (React mirror of Angular product.repository.ts looku
       seedProducts(storeId, [makeProduct('existing', { categoryId: 'cat-1', name: 'Ron' })]);
       const result = repo.addProductData('p1', 'cat-1', 'Ron', 10, '', 1, true, true, false);
       expect(result.succeeded).toBe(false);
-      expect(result.errors).toEqual([{ code: 'Product.NameExists', description: 'El nombre del producto ya existe.' }]);
+      expect(result.errors).toEqual([
+        { code: 'Product.NameExists', description: 'El nombre del producto ya existe.' },
+      ]);
     });
 
     it('creates the product and shifts siblings order, landing the new product exactly at the requested order', () => {
@@ -353,7 +385,18 @@ describe('ProductRepository (React mirror of Angular product.repository.ts looku
         makeProduct('e1', { categoryId: 'cat-1', order: 1 }),
         makeProduct('e2', { categoryId: 'cat-1', order: 2 }),
       ]);
-      const result = repo.addProductData('p1', 'cat-1', 'Ron', 10, 'biz-1', 2, true, true, false, '999');
+      const result = repo.addProductData(
+        'p1',
+        'cat-1',
+        'Ron',
+        10,
+        'biz-1',
+        2,
+        true,
+        true,
+        false,
+        '999',
+      );
       expect(result.succeeded).toBe(true);
       const byId = new Map(readStoredProducts(storeId).map((p) => [p.id, p]));
       expect(byId.get('e1')?.order).toBe(1);
@@ -368,7 +411,12 @@ describe('ProductRepository (React mirror of Angular product.repository.ts looku
   // ─── 3.7 addProduct / addImportedProduct ──────────────────────────────────
   describe('addProduct — delegates to addProductData with a generated id (product.repository.ts:148-171)', () => {
     beforeEach(() => {
-      useAuthStore.setState({ user: makeUser({ login: 'jdoe' }), isAuthenticated: true, isLoading: false, error: null });
+      useAuthStore.setState({
+        user: makeUser({ login: 'jdoe' }),
+        isAuthenticated: true,
+        isLoading: false,
+        error: null,
+      });
       seedCategories(storeId, [makeCategory('cat-1', { name: 'Bebidas' })]);
     });
 
@@ -384,7 +432,12 @@ describe('ProductRepository (React mirror of Angular product.repository.ts looku
 
   describe('addImportedProduct — preserves the imported id (product.repository.ts:173-185)', () => {
     beforeEach(() => {
-      useAuthStore.setState({ user: makeUser({ login: 'jdoe' }), isAuthenticated: true, isLoading: false, error: null });
+      useAuthStore.setState({
+        user: makeUser({ login: 'jdoe' }),
+        isAuthenticated: true,
+        isLoading: false,
+        error: null,
+      });
       seedCategories(storeId, [makeCategory('cat-1', { name: 'Bebidas' })]);
     });
 
@@ -399,19 +452,28 @@ describe('ProductRepository (React mirror of Angular product.repository.ts looku
   // ─── 3.8 updateProduct / updateImportedProduct ────────────────────────────
   describe('updateProduct — validations w/ self-exclusion + order-shift (product.repository.ts:193-242)', () => {
     beforeEach(() => {
-      useAuthStore.setState({ user: makeUser({ login: 'jdoe' }), isAuthenticated: true, isLoading: false, error: null });
+      useAuthStore.setState({
+        user: makeUser({ login: 'jdoe' }),
+        isAuthenticated: true,
+        isLoading: false,
+        error: null,
+      });
       seedCategories(storeId, [makeCategory('cat-1', { name: 'Bebidas' })]);
     });
 
     it('fails with ProductCategoryErrors.NotExists when the category does not exist', () => {
       seedProducts(storeId, [makeProduct('p1', { categoryId: 'cat-1' })]);
       const result = repo.updateProduct('p1', 'missing-cat', 'Ron', 10, '', 1, true, true, false);
-      expect(result.errors).toEqual([{ code: 'ProductCategory.NotExists', description: 'La categoría no existe.' }]);
+      expect(result.errors).toEqual([
+        { code: 'ProductCategory.NotExists', description: 'La categoría no existe.' },
+      ]);
     });
 
     it('fails with ProductErrors.NotExists when the product does not exist', () => {
       const result = repo.updateProduct('missing', 'cat-1', 'Ron', 10, '', 1, true, true, false);
-      expect(result.errors).toEqual([{ code: 'Product.NotExists', description: 'El producto no existe.' }]);
+      expect(result.errors).toEqual([
+        { code: 'Product.NotExists', description: 'El producto no existe.' },
+      ]);
     });
 
     it('succeeds when re-saving a product with its own unchanged barcode (self-exclusion)', () => {
@@ -427,7 +489,10 @@ describe('ProductRepository (React mirror of Angular product.repository.ts looku
       ]);
       const result = repo.updateProduct('p1', 'cat-1', 'Ron', 12, '', 1, true, true, false, '222');
       expect(result.errors).toEqual([
-        { code: 'Product.BarcodeExists', description: 'El código de barras ya está asociado a otro producto.' },
+        {
+          code: 'Product.BarcodeExists',
+          description: 'El código de barras ya está asociado a otro producto.',
+        },
       ]);
     });
 
@@ -437,7 +502,9 @@ describe('ProductRepository (React mirror of Angular product.repository.ts looku
         makeProduct('p2', { categoryId: 'cat-1', name: 'Vodka' }),
       ]);
       const result = repo.updateProduct('p2', 'cat-1', 'Ron', 12, '', 1, true, true, false);
-      expect(result.errors).toEqual([{ code: 'Product.NameExists', description: 'El nombre del producto ya existe.' }]);
+      expect(result.errors).toEqual([
+        { code: 'Product.NameExists', description: 'El nombre del producto ya existe.' },
+      ]);
     });
 
     it('updates all fields, stamps audit fields, and shifts order landing exactly at the requested order', () => {
@@ -445,7 +512,18 @@ describe('ProductRepository (React mirror of Angular product.repository.ts looku
         makeProduct('p1', { categoryId: 'cat-1', name: 'Old', order: 1 }),
         makeProduct('p2', { categoryId: 'cat-1', order: 2 }),
       ]);
-      const result = repo.updateProduct('p1', 'cat-1', 'New', 15, 'biz-2', 2, false, false, true, '555');
+      const result = repo.updateProduct(
+        'p1',
+        'cat-1',
+        'New',
+        15,
+        'biz-2',
+        2,
+        false,
+        false,
+        true,
+        '555',
+      );
       expect(result.succeeded).toBe(true);
       const byId = new Map(readStoredProducts(storeId).map((p) => [p.id, p]));
       const updated = byId.get('p1')!;
@@ -465,7 +543,12 @@ describe('ProductRepository (React mirror of Angular product.repository.ts looku
 
   describe('updateImportedProduct — delegates to updateProduct by id (product.repository.ts:244-259)', () => {
     beforeEach(() => {
-      useAuthStore.setState({ user: makeUser({ login: 'jdoe' }), isAuthenticated: true, isLoading: false, error: null });
+      useAuthStore.setState({
+        user: makeUser({ login: 'jdoe' }),
+        isAuthenticated: true,
+        isLoading: false,
+        error: null,
+      });
       seedCategories(storeId, [makeCategory('cat-1', { name: 'Bebidas' })]);
     });
 
@@ -481,7 +564,9 @@ describe('ProductRepository (React mirror of Angular product.repository.ts looku
   // ─── 3.9 setDiscountFromInvantory ──────────────────────────────────────────
   describe('setDiscountFromInvantory — only that flag, no audit stamps (product.repository.ts:261-268)', () => {
     it('sets the flag without touching other fields', () => {
-      seedProducts(storeId, [makeProduct('p1', { discountFromInvantory: false, updatedByName: undefined })]);
+      seedProducts(storeId, [
+        makeProduct('p1', { discountFromInvantory: false, updatedByName: undefined }),
+      ]);
       const result = repo.setDiscountFromInvantory('p1', true);
       expect(result.succeeded).toBe(true);
       const updated = repo.getProductById('p1');
@@ -491,14 +576,18 @@ describe('ProductRepository (React mirror of Angular product.repository.ts looku
 
     it('fails with ProductErrors.NotExists when the id does not exist', () => {
       const result = repo.setDiscountFromInvantory('missing', true);
-      expect(result.errors).toEqual([{ code: 'Product.NotExists', description: 'El producto no existe.' }]);
+      expect(result.errors).toEqual([
+        { code: 'Product.NotExists', description: 'El producto no existe.' },
+      ]);
     });
   });
 
   // ─── 3.10 activateProduct / deactivateProduct ─────────────────────────────
   describe('activateProduct / deactivateProduct — toggle ONLY isActive, no audit stamps (product.repository.ts:270-285)', () => {
     it('activateProduct sets isActive=true without touching audit fields', () => {
-      seedProducts(storeId, [makeProduct('p1', { isActive: false, updatedDate: undefined, updatedByName: undefined })]);
+      seedProducts(storeId, [
+        makeProduct('p1', { isActive: false, updatedDate: undefined, updatedByName: undefined }),
+      ]);
       const result = repo.activateProduct('p1');
       expect(result.succeeded).toBe(true);
       const updated = repo.getProductById('p1');
@@ -516,7 +605,9 @@ describe('ProductRepository (React mirror of Angular product.repository.ts looku
 
     it('fails with ProductErrors.NotExists when the id does not exist', () => {
       const result = repo.activateProduct('missing');
-      expect(result.errors).toEqual([{ code: 'Product.NotExists', description: 'El producto no existe.' }]);
+      expect(result.errors).toEqual([
+        { code: 'Product.NotExists', description: 'El producto no existe.' },
+      ]);
     });
   });
 
@@ -565,7 +656,17 @@ describe('ProductRepository (React mirror of Angular product.repository.ts looku
       const categoryRepository = new ProductCategoryRepository(storeId);
       seedCategories(storeId, [makeCategory('cat-1', { name: 'Bebidas' })]);
       const injectedRepo = new ProductRepository(storeId, categoryRepository);
-      const result = injectedRepo.addProductData('p1', 'cat-1', 'Ron', 10, '', 1, true, true, false);
+      const result = injectedRepo.addProductData(
+        'p1',
+        'cat-1',
+        'Ron',
+        10,
+        '',
+        1,
+        true,
+        true,
+        false,
+      );
       expect(result.succeeded).toBe(true);
     });
   });

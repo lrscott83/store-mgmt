@@ -140,11 +140,11 @@ The group MUST have `featureIds: []` (no feature gate — always visible to auth
 
 The following keys MUST be added to `app/shared/lib/i18n/es.ts`:
 
-| Key | Purpose |
-|-----|---------|
-| `TUTORIAL.TITLE` | Page heading |
-| `MENU.HELP` | Sidebar group label |
-| `MENU.TUTORIAL` | Sidebar item label |
+| Key              | Purpose             |
+| ---------------- | ------------------- |
+| `TUTORIAL.TITLE` | Page heading        |
+| `MENU.HELP`      | Sidebar group label |
+| `MENU.TUTORIAL`  | Sidebar item label  |
 
 `en.ts` MUST NOT be modified (no English locale exists for these keys in this project).
 
@@ -174,11 +174,11 @@ A smoke-test suite MUST exist at `app/help/routes/__tests__/tutorial.test.tsx`.
 
 Tests MUST cover:
 
-| Scenario | Assertion |
-|----------|-----------|
+| Scenario                        | Assertion                                                                               |
+| ------------------------------- | --------------------------------------------------------------------------------------- |
 | Authenticated user renders page | Title heading present; 4 step elements present; 6 img elements with `/images/help/` src |
-| Unauthenticated user redirected | `authLoader` redirects to `/login`; tutorial component does not render |
-| No feature gate | Component renders with no feature-flag mocking required |
+| Unauthenticated user redirected | `authLoader` redirects to `/login`; tutorial component does not render                  |
+| No feature gate                 | Component renders with no feature-flag mocking required                                 |
 
 All test files that use `useIntl` MUST wrap the component under test in `IntlProvider`.
 

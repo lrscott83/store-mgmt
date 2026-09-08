@@ -28,7 +28,20 @@ function Wrapper({ children }: { children: React.ReactNode }) {
 function makeOrder(overrides: Partial<Order> = {}): Order {
   return {
     id: 'order-1',
-    orderItems: [{ productId: 'p1', productName: 'Coca-Cola', categoryId: 'c1', categoryName: 'Bebidas', name: 'Coca-Cola', quantity: 2, price: 50, productBusinessId: '', productCosts: [], order: 0 }],
+    orderItems: [
+      {
+        productId: 'p1',
+        productName: 'Coca-Cola',
+        categoryId: 'c1',
+        categoryName: 'Bebidas',
+        name: 'Coca-Cola',
+        quantity: 2,
+        price: 50,
+        productBusinessId: '',
+        productCosts: [],
+        order: 0,
+      },
+    ],
     total: 100,
     itemsCount: 2,
     date: new Date('2025-01-01T10:30:00Z'),
@@ -89,7 +102,12 @@ describe('OrderList', () => {
     const orders = [makeOrder({ id: 'o1' })];
     render(
       <Wrapper>
-        <OrderList orders={orders} readOnly={false} onEditOrder={vi.fn()} onDeactivateOrder={vi.fn()} />
+        <OrderList
+          orders={orders}
+          readOnly={false}
+          onEditOrder={vi.fn()}
+          onDeactivateOrder={vi.fn()}
+        />
       </Wrapper>,
     );
     fireEvent.click(screen.getByTestId('order-panel-toggle-o1'));
@@ -102,7 +120,12 @@ describe('OrderList', () => {
     const order = makeOrder({ id: 'o1' });
     render(
       <Wrapper>
-        <OrderList orders={[order]} readOnly={false} onEditOrder={onEditOrder} onDeactivateOrder={vi.fn()} />
+        <OrderList
+          orders={[order]}
+          readOnly={false}
+          onEditOrder={onEditOrder}
+          onDeactivateOrder={vi.fn()}
+        />
       </Wrapper>,
     );
     fireEvent.click(screen.getByTestId('order-panel-toggle-o1'));
@@ -121,7 +144,12 @@ describe('OrderList', () => {
     confirmDialogMock.mockResolvedValue(true);
     render(
       <Wrapper>
-        <OrderList orders={[order]} readOnly={false} onEditOrder={vi.fn()} onDeactivateOrder={onDeactivateOrder} />
+        <OrderList
+          orders={[order]}
+          readOnly={false}
+          onEditOrder={vi.fn()}
+          onDeactivateOrder={onDeactivateOrder}
+        />
       </Wrapper>,
     );
     fireEvent.click(screen.getByTestId('order-panel-toggle-o1'));
@@ -141,7 +169,12 @@ describe('OrderList', () => {
     confirmDialogMock.mockResolvedValue(false);
     render(
       <Wrapper>
-        <OrderList orders={[order]} readOnly={false} onEditOrder={vi.fn()} onDeactivateOrder={onDeactivateOrder} />
+        <OrderList
+          orders={[order]}
+          readOnly={false}
+          onEditOrder={vi.fn()}
+          onDeactivateOrder={onDeactivateOrder}
+        />
       </Wrapper>,
     );
     fireEvent.click(screen.getByTestId('order-panel-toggle-o1'));
@@ -160,7 +193,12 @@ describe('OrderList', () => {
     confirmDialogMock.mockResolvedValue(true);
     render(
       <Wrapper>
-        <OrderList orders={[order]} readOnly={false} onEditOrder={vi.fn()} onDeactivateOrder={onDeactivateOrder} />
+        <OrderList
+          orders={[order]}
+          readOnly={false}
+          onEditOrder={vi.fn()}
+          onDeactivateOrder={onDeactivateOrder}
+        />
       </Wrapper>,
     );
     fireEvent.click(screen.getByTestId('order-panel-toggle-o1'));
@@ -179,7 +217,12 @@ describe('OrderList', () => {
     const orders = [makeOrder({ id: 'o1', isActive: false })];
     render(
       <Wrapper>
-        <OrderList orders={orders} readOnly={false} onEditOrder={vi.fn()} onDeactivateOrder={vi.fn()} />
+        <OrderList
+          orders={orders}
+          readOnly={false}
+          onEditOrder={vi.fn()}
+          onDeactivateOrder={vi.fn()}
+        />
       </Wrapper>,
     );
     fireEvent.click(screen.getByTestId('order-panel-toggle-o1'));
@@ -257,10 +300,21 @@ describe('EditOrderModal', () => {
         <EditOrderModal order={order} isOpen={true} onClose={onClose} onUpdate={onUpdate} />
       </Wrapper>,
     );
-    fireEvent.click(screen.getByRole('radio', { name: 'Zelle' }));
+    // Zelle removed from the options (user request 2026-09-08) — switch to Tarjeta.
+    fireEvent.click(screen.getByRole('radio', { name: 'Tarjeta' }));
     fireEvent.click(screen.getByTestId('edit-order-update-button'));
-    expect(onUpdate).toHaveBeenCalledWith('o1', PaymentType.Zelle);
+    expect(onUpdate).toHaveBeenCalledWith('o1', PaymentType.Tarjeta);
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it('no longer offers Zelle as a payment option (visual removal only, enum intact)', () => {
+    const order = makeOrder({ id: 'o1', paymentType: PaymentType.Efectivo });
+    render(
+      <Wrapper>
+        <EditOrderModal order={order} isOpen={true} onClose={vi.fn()} onUpdate={vi.fn()} />
+      </Wrapper>,
+    );
+    expect(screen.queryByRole('radio', { name: 'Zelle' })).not.toBeInTheDocument();
   });
 
   // Angular: edit-order-modal.component.ts:39-54 — on `updateTodayOrder` failure, Swal.fire({

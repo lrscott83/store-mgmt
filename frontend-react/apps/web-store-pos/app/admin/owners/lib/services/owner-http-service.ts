@@ -23,39 +23,27 @@ interface UpdateOwnerPayload {
 
 export const ownerHttpService = {
   async listOwners(): Promise<BaseResponseModel<Owner[]>> {
-    const response = await apiClient.get<BaseResponseModel<Owner[]>>(
-      '/v1/owners/all/true'
-    );
+    const response = await apiClient.get<BaseResponseModel<Owner[]>>('/v1/owners/all/true');
     return response.data;
   },
 
   async getOwner(id: string): Promise<BaseResponseModel<Owner>> {
-    const response = await apiClient.get<BaseResponseModel<Owner>>(
-      `/v1/owners/${id}`
-    );
+    const response = await apiClient.get<BaseResponseModel<Owner>>(`/v1/owners/${id}`);
     return response.data;
   },
 
   async createOwner(payload: CreateOwnerPayload): Promise<BaseResponseModel<Owner>> {
-    const response = await apiClient.post<BaseResponseModel<Owner>>(
-      '/v1/owners/',
-      payload
-    );
+    const response = await apiClient.post<BaseResponseModel<Owner>>('/v1/owners/', payload);
     return response.data;
   },
 
   async updateOwner(id: string, payload: UpdateOwnerPayload): Promise<BaseResponseModel<Owner>> {
-    const response = await apiClient.put<BaseResponseModel<Owner>>(
-      `/v1/owners/${id}`,
-      payload
-    );
+    const response = await apiClient.put<BaseResponseModel<Owner>>(`/v1/owners/${id}`, payload);
     return response.data;
   },
 
   async deleteOwner(id: string): Promise<BaseResponseModel<boolean>> {
-    const response = await apiClient.delete<BaseResponseModel<boolean>>(
-      `/v1/owners/${id}`
-    );
+    const response = await apiClient.delete<BaseResponseModel<boolean>>(`/v1/owners/${id}`);
     return response.data;
   },
 };

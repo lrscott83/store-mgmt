@@ -76,10 +76,18 @@ export default [
     // Creation stays on `management/stores/create` (it needs the plan picker).
     // Distinct route `id`s are required because RR7 rejects reusing one file across
     // multiple route() entries without one (see design.md).
-    route('management/stores', 'management/stores/routes/store-plan.tsx', { id: 'management-stores-index' }),
-    route('management/stores/update', 'management/stores/routes/update-store.tsx', { id: 'management-stores-update' }),
-    route('management/stores/create', 'management/stores/routes/edit-store.tsx', { id: 'management-stores-create' }),
-    route('management/stores/edit/:id', 'management/stores/routes/update-store.tsx', { id: 'management-stores-edit' }),
+    route('management/stores', 'management/stores/routes/store-plan.tsx', {
+      id: 'management-stores-index',
+    }),
+    route('management/stores/update', 'management/stores/routes/update-store.tsx', {
+      id: 'management-stores-update',
+    }),
+    route('management/stores/create', 'management/stores/routes/edit-store.tsx', {
+      id: 'management-stores-create',
+    }),
+    route('management/stores/edit/:id', 'management/stores/routes/update-store.tsx', {
+      id: 'management-stores-edit',
+    }),
 
     // Management â€” Stores â€” Billing (Req: billing-collections; DG-4 resellerFeatureLoader)
     route('management/stores/collections', 'management/stores/routes/collections.tsx'),

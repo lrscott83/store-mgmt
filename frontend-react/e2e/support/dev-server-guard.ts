@@ -65,7 +65,10 @@ export function apiOriginFromCsp(cspHeader: string | null | undefined): string |
     if (tokens[0] !== 'connect-src') continue;
     const origin = tokens
       .slice(1)
-      .find((token) => !token.startsWith("'") && !token.startsWith('ws://') && !token.startsWith('wss://'));
+      .find(
+        (token) =>
+          !token.startsWith("'") && !token.startsWith('ws://') && !token.startsWith('wss://'),
+      );
     return origin ?? null;
   }
   return null;
@@ -107,7 +110,7 @@ export async function assertDevServerBackend(expectedApiUrl: string = E2E_API_UR
   } catch (error) {
     console.warn(
       `[e2e] No se pudo consultar ${DEV_SERVER_URL} para verificar su backend (${String(error)}). ` +
-        'Sigo adelante: la corrida puede fallar más tarde si el dev server apunta a otro backend.'
+        'Sigo adelante: la corrida puede fallar más tarde si el dev server apunta a otro backend.',
     );
     return;
   }
@@ -116,7 +119,7 @@ export async function assertDevServerBackend(expectedApiUrl: string = E2E_API_UR
   if (!observedOrigin) {
     console.warn(
       `[e2e] El dev server de ${DEV_SERVER_URL} no expuso un origen de API en su cabecera CSP, ` +
-        'así que no puedo verificar contra qué backend está configurado. Sigo adelante.'
+        'así que no puedo verificar contra qué backend está configurado. Sigo adelante.',
     );
     return;
   }

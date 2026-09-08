@@ -252,9 +252,9 @@ describe('useAuthStore.loginOffline — DEK provisioning (device-wrapped-dek des
   it('loginOffline() on a v1 roster (no wrap fields), unprovisioned device -> rejects DekUnwrapError (design D2, was the Q2 mint)', async () => {
     await seedRoster();
 
-    await expect(
-      useAuthStore.getState().loginOffline('ana', 'secret'),
-    ).rejects.toMatchObject({ name: 'DekUnwrapError' });
+    await expect(useAuthStore.getState().loginOffline('ana', 'secret')).rejects.toMatchObject({
+      name: 'DekUnwrapError',
+    });
 
     expect(getDek()).toBeNull();
     expect(readDeviceDekTable()).toBeNull();
@@ -268,7 +268,7 @@ describe('useAuthStore.loginOffline — DEK provisioning (device-wrapped-dek des
   // not about v1 rosters being rejected wholesale. `seedProvisionedDevice`
   // writes `device: null`, so recovery here is step 3a's PASSWORD wrap, not
   // the device-key wrap.
-  it('loginOffline() on a v1 roster, provisioned device -> recovers the key from this login\'s password wrap and signs in', async () => {
+  it("loginOffline() on a v1 roster, provisioned device -> recovers the key from this login's password wrap and signs in", async () => {
     await seedRoster();
     await seedProvisionedDevice('ana', 'secret', 's1');
 
@@ -377,10 +377,9 @@ describe('useAuthStore.loginOffline — DEK provisioning (device-wrapped-dek des
 
     const seen: Array<{ login: string; password: string; sessionStoreId: string }> = [];
     vi.doMock('../../offline/dek-provisioning', async () => {
-      const actual =
-        await vi.importActual<typeof import('../../offline/dek-provisioning')>(
-          '../../offline/dek-provisioning',
-        );
+      const actual = await vi.importActual<typeof import('../../offline/dek-provisioning')>(
+        '../../offline/dek-provisioning',
+      );
       return {
         ...actual,
         resolveDekForLogin: (args: { login: string; password: string; sessionStoreId: string }) => {

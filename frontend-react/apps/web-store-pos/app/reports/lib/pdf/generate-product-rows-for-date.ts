@@ -66,7 +66,10 @@ export function getEntriesOfDay(
  * `available`; adding it back restores the entry to what it held at the end of
  * the day.
  */
-export function getConsumedAfterDayByEntry(orders: Order[], day: Date): ReadonlyMap<string, number> {
+export function getConsumedAfterDayByEntry(
+  orders: Order[],
+  day: Date,
+): ReadonlyMap<string, number> {
   const { end: dayEnd } = localDayRange(day);
   const consumedAfterByEntry = new Map<string, number>();
   for (const order of orders) {
@@ -141,7 +144,8 @@ export function reconstructEntriesAtDay(
       entry,
       availableAtEndOfDay: availableAtEndOfDay(entry, consumedAfterByEntry),
       isSuspect:
-        wasTouchedAfter(entry, dayEnd) || availableAtEndOfDay(entry, consumedAfterByEntry) > entry.quantity,
+        wasTouchedAfter(entry, dayEnd) ||
+        availableAtEndOfDay(entry, consumedAfterByEntry) > entry.quantity,
     }));
 }
 
@@ -174,7 +178,9 @@ export function reconstructEntriesAtDay(
  * to `generateProductRows` called with equivalent service fakes built from the same data
  * (pinned by generate-product-rows-for-date.test.ts).
  */
-export function generateProductRowsForDate(input: GenerateProductRowsForDateInput): DayReportResult {
+export function generateProductRowsForDate(
+  input: GenerateProductRowsForDateInput,
+): DayReportResult {
   const { products, orders, inventories, day } = input;
 
   const isInDay = (d: Date): boolean => isInLocalDay(d, day);
@@ -185,10 +191,14 @@ export function generateProductRowsForDate(input: GenerateProductRowsForDateInpu
   const suspectProductNames: string[] = [];
 
   const rows = products.map((prod) => {
-    const soldItems = dayOrders.flatMap((o) => o.orderItems).filter((oi) => oi.productId === prod.id);
+    const soldItems = dayOrders
+      .flatMap((o) => o.orderItems)
+      .filter((oi) => oi.productId === prod.id);
     const vendido = soldItems.reduce((total, oi) => total + oi.quantity, 0);
     const precioVenta =
-      soldItems.length > 0 ? soldItems.reduce((total, oi) => total + oi.price, 0) / soldItems.length : 0;
+      soldItems.length > 0
+        ? soldItems.reduce((total, oi) => total + oi.price, 0) / soldItems.length
+        : 0;
     const importeVenta = round2(vendido * precioVenta);
 
     const entries = inventories.get(prod.id) ?? [];
@@ -205,7 +215,9 @@ export function generateProductRowsForDate(input: GenerateProductRowsForDateInpu
     if (isSuspect) suspectProductNames.push(prod.name);
 
     // Entrada counts only ACTIVE entries dated inside the day.
-    const entrada = entries.filter((e) => e.isActive && isInDay(e.date)).reduce((total, e) => total + e.quantity, 0);
+    const entrada = entries
+      .filter((e) => e.isActive && isInDay(e.date))
+      .reduce((total, e) => total + e.quantity, 0);
     const disponible = available + vendido;
     const inicio = disponible - entrada;
 

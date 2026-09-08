@@ -17,7 +17,7 @@ describe('I18nProvider', () => {
     render(
       <I18nProvider>
         <MessageDisplay id="GENERAL.APP_NAME" />
-      </I18nProvider>
+      </I18nProvider>,
     );
     expect(screen.getByText('VendeDTo')).toBeInTheDocument();
   });
@@ -27,7 +27,7 @@ describe('I18nProvider', () => {
     render(
       <I18nProvider>
         <MessageDisplay id="AUTH.SIGN_IN" />
-      </I18nProvider>
+      </I18nProvider>,
     );
     expect(screen.getByText('Iniciar sesión')).toBeInTheDocument();
   });
@@ -37,7 +37,7 @@ describe('I18nProvider', () => {
     render(
       <I18nProvider>
         <MessageDisplay id="GENERAL.LOADING" />
-      </I18nProvider>
+      </I18nProvider>,
     );
     expect(screen.getByText('Cargando...')).toBeInTheDocument();
   });
@@ -46,7 +46,7 @@ describe('I18nProvider', () => {
     render(
       <I18nProvider>
         <div data-testid="child">content</div>
-      </I18nProvider>
+      </I18nProvider>,
     );
     expect(screen.getByTestId('child')).toBeInTheDocument();
   });

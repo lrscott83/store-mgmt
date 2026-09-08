@@ -25,7 +25,10 @@ const FROZEN_OUTSIDE_APP_LAYOUT = [
   'shared/routes/health.tsx',
 ].sort();
 
-function collectLeafFilesOutsideAppLayout(entries: RouteEntry[], insideAppLayout: boolean): string[] {
+function collectLeafFilesOutsideAppLayout(
+  entries: RouteEntry[],
+  insideAppLayout: boolean,
+): string[] {
   const out: string[] = [];
   for (const entry of entries) {
     const nowInside = insideAppLayout || entry.id === 'app-layout';

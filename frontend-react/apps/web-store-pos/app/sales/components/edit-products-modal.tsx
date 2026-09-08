@@ -155,7 +155,12 @@ export function EditProductsModal({ categoryId, onSave, onClose }: EditProductsM
         </div>
 
         <div className="flex justify-end pt-2">
-          <Button variant="fab" type="button" onClick={handleAddRow} data-testid="add-product-row-button">
+          <Button
+            variant="fab"
+            type="button"
+            onClick={handleAddRow}
+            data-testid="add-product-row-button"
+          >
             <PlusIcon />
             {intl.formatMessage({ id: 'GENERAL.NEW' })}
           </Button>

@@ -51,7 +51,9 @@ class FakeProductService implements ProductService {
     );
   }
 
-  async getAvailableProductsByCategoryId(categoryId: string): Promise<BaseResponseModel<Product[]>> {
+  async getAvailableProductsByCategoryId(
+    categoryId: string,
+  ): Promise<BaseResponseModel<Product[]>> {
     return success(
       this.items
         .filter((p) => p.categoryId === categoryId && p.isActive)
@@ -67,7 +69,9 @@ class FakeProductService implements ProductService {
   async createCsvProducts(csvProducts: CsvProduct[]): Promise<BaseResponseModel<CsvImportResult>> {
     const created: CsvProductCreated[] = csvProducts.map((row, index) => {
       const id = `csv-${index}`;
-      this.items.push(makeProduct({ id, name: row.name, price: row.price, categoryName: row.category }));
+      this.items.push(
+        makeProduct({ id, name: row.name, price: row.price, categoryName: row.category }),
+      );
       return { ...row, id, existing: false };
     });
     return success({ created, failed: [] });
@@ -145,7 +149,9 @@ class FakeProductService implements ProductService {
     items: { name: string; price: number }[],
   ): Promise<BaseResponseModel<boolean>> {
     items.forEach((item, index) => {
-      this.items.push(makeProduct({ id: `bulk-${index}`, categoryId, name: item.name, price: item.price }));
+      this.items.push(
+        makeProduct({ id: `bulk-${index}`, categoryId, name: item.name, price: item.price }),
+      );
     });
     return success(true);
   }
@@ -172,7 +178,13 @@ describe('ProductService', () => {
     expect(availableByCategory.data).toHaveLength(1);
 
     const created = await svc.createProduct('cat1', 'Fanta', 3, 'biz1', 2, true, true, true, '999');
-    expect(created).toEqual({ data: true, succeeded: true, message: '', actionCode: 200, errors: [] });
+    expect(created).toEqual({
+      data: true,
+      succeeded: true,
+      message: '',
+      actionCode: 200,
+      errors: [],
+    });
 
     const maxOrder = await svc.getMaxOrderByCategoryId('cat1');
     expect(maxOrder.data).toBe(2);
@@ -180,17 +192,34 @@ describe('ProductService', () => {
     const toSale = await svc.getProductsToSaleByCategoryId('cat1');
     expect(toSale.data).toHaveLength(2);
 
-    const csvResult = await svc.createCsvProducts([{ category: 'Snacks', name: 'Papas', price: 1.5 }]);
+    const csvResult = await svc.createCsvProducts([
+      { category: 'Snacks', name: 'Papas', price: 1.5 },
+    ]);
     expect(csvResult.succeeded).toBe(true);
     if (!csvResult.succeeded) throw new Error('expected succeeded response');
     expect(csvResult.data.created).toHaveLength(1);
-    expect(csvResult.data.created[0]).toMatchObject({ category: 'Snacks', name: 'Papas', price: 1.5 });
+    expect(csvResult.data.created[0]).toMatchObject({
+      category: 'Snacks',
+      name: 'Papas',
+      price: 1.5,
+    });
     expect(csvResult.data.failed).toHaveLength(0);
 
     const bulkResult = await svc.createProducts('cat1', [{ name: 'Sprite', price: 2 }]);
     expect(bulkResult.succeeded).toBe(true);
 
-    const updated = await svc.updateProduct('p1', 'cat1', 'Coca Cola Zero', 6, 'biz1', 1, true, true, false, '123');
+    const updated = await svc.updateProduct(
+      'p1',
+      'cat1',
+      'Coca Cola Zero',
+      6,
+      'biz1',
+      1,
+      true,
+      true,
+      false,
+      '123',
+    );
     expect(updated.succeeded).toBe(true);
 
     const deleted = await svc.deleteProduct('p1');

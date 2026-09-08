@@ -98,7 +98,9 @@ describe('ImportForm', () => {
     // Fill form
     const fileInput = screen.getByLabelText(/Archivo de respaldo/i);
     fireEvent.change(fileInput, { target: { files: [makeFile()] } });
-    fireEvent.change(screen.getByLabelText(/Contraseña de cifrado/i), { target: { value: 'test123' } });
+    fireEvent.change(screen.getByLabelText(/Contraseña de cifrado/i), {
+      target: { value: 'test123' },
+    });
 
     fireEvent.click(screen.getByRole('button', { name: 'Importar' }));
 
@@ -115,7 +117,9 @@ describe('ImportForm', () => {
 
     const fileInput = screen.getByLabelText(/Archivo de respaldo/i);
     fireEvent.change(fileInput, { target: { files: [makeFile()] } });
-    fireEvent.change(screen.getByLabelText(/Contraseña de cifrado/i), { target: { value: 'test123' } });
+    fireEvent.change(screen.getByLabelText(/Contraseña de cifrado/i), {
+      target: { value: 'test123' },
+    });
 
     fireEvent.click(screen.getByRole('button', { name: 'Importar' }));
 
@@ -130,7 +134,9 @@ describe('ImportForm', () => {
 
     const fileInput = screen.getByLabelText(/Archivo de respaldo/i);
     fireEvent.change(fileInput, { target: { files: [makeFile()] } });
-    fireEvent.change(screen.getByLabelText(/Contraseña de cifrado/i), { target: { value: 'test123' } });
+    fireEvent.change(screen.getByLabelText(/Contraseña de cifrado/i), {
+      target: { value: 'test123' },
+    });
 
     fireEvent.click(screen.getByRole('button', { name: 'Importar' }));
 
@@ -147,7 +153,9 @@ describe('ImportForm', () => {
 
     const fileInput = screen.getByLabelText(/Archivo de respaldo/i);
     fireEvent.change(fileInput, { target: { files: [makeFile()] } });
-    fireEvent.change(screen.getByLabelText(/Contraseña de cifrado/i), { target: { value: 'test123' } });
+    fireEvent.change(screen.getByLabelText(/Contraseña de cifrado/i), {
+      target: { value: 'test123' },
+    });
 
     fireEvent.click(screen.getByRole('button', { name: 'Importar' }));
 

@@ -91,9 +91,8 @@ describe('AdminStoreListPage — exports', () => {
 
 describe('AdminStoreListPage — render', () => {
   it('renders the LIST_TITLE and calls listStores on mount', async () => {
-    const { storeHttpService } = await import(
-      '~/management/stores/lib/services/store-http-service'
-    );
+    const { storeHttpService } =
+      await import('~/management/stores/lib/services/store-http-service');
     vi.mocked(storeHttpService.listStores).mockResolvedValue({
       succeeded: true,
       data: [makeStore({ id: 's1', name: 'Store Alpha' })],
@@ -106,7 +105,7 @@ describe('AdminStoreListPage — render', () => {
     render(
       <Wrapper>
         <AdminStoreListPage />
-      </Wrapper>
+      </Wrapper>,
     );
 
     await waitFor(() => {
@@ -118,9 +117,8 @@ describe('AdminStoreListPage — render', () => {
   });
 
   it('renders the header FAB with the GENERAL.ADD label (Req: Store List Create Label Copy Parity)', async () => {
-    const { storeHttpService } = await import(
-      '~/management/stores/lib/services/store-http-service'
-    );
+    const { storeHttpService } =
+      await import('~/management/stores/lib/services/store-http-service');
     vi.mocked(storeHttpService.listStores).mockResolvedValue({
       succeeded: true,
       data: [],
@@ -133,12 +131,10 @@ describe('AdminStoreListPage — render', () => {
     render(
       <Wrapper>
         <AdminStoreListPage />
-      </Wrapper>
+      </Wrapper>,
     );
 
-    expect(
-      screen.getByRole('button', { name: esMessages['GENERAL.ADD'] })
-    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: esMessages['GENERAL.ADD'] })).toBeInTheDocument();
 
     await waitFor(() => {
       expect(storeHttpService.listStores).toHaveBeenCalledTimes(1);
@@ -152,9 +148,8 @@ describe('AdminStoreListPage — render', () => {
 
 describe('AdminStoreListPage — approve requires confirmation', () => {
   beforeEach(async () => {
-    const { storeHttpService } = await import(
-      '~/management/stores/lib/services/store-http-service'
-    );
+    const { storeHttpService } =
+      await import('~/management/stores/lib/services/store-http-service');
     vi.mocked(storeHttpService.listStores).mockResolvedValue({
       succeeded: true,
       data: [makeStore({ id: 's1', name: 'Store One', approved: false })],
@@ -173,15 +168,14 @@ describe('AdminStoreListPage — approve requires confirmation', () => {
 
   it('confirmed (true) -> calls approveStore then re-fetches', async () => {
     mockConfirmDialog.mockResolvedValue(true);
-    const { storeHttpService } = await import(
-      '~/management/stores/lib/services/store-http-service'
-    );
+    const { storeHttpService } =
+      await import('~/management/stores/lib/services/store-http-service');
 
     const { AdminStoreListPage } = await import('../store-list');
     render(
       <Wrapper>
         <AdminStoreListPage />
-      </Wrapper>
+      </Wrapper>,
     );
 
     await waitFor(() => {
@@ -206,15 +200,14 @@ describe('AdminStoreListPage — approve requires confirmation', () => {
 
   it('cancelled (false) -> does NOT call approveStore, status unchanged', async () => {
     mockConfirmDialog.mockResolvedValue(false);
-    const { storeHttpService } = await import(
-      '~/management/stores/lib/services/store-http-service'
-    );
+    const { storeHttpService } =
+      await import('~/management/stores/lib/services/store-http-service');
 
     const { AdminStoreListPage } = await import('../store-list');
     render(
       <Wrapper>
         <AdminStoreListPage />
-      </Wrapper>
+      </Wrapper>,
     );
 
     await waitFor(() => {
@@ -244,9 +237,8 @@ describe('AdminStoreListPage — approve requires confirmation', () => {
 
 describe('AdminStoreListPage — disapprove requires confirmation', () => {
   beforeEach(async () => {
-    const { storeHttpService } = await import(
-      '~/management/stores/lib/services/store-http-service'
-    );
+    const { storeHttpService } =
+      await import('~/management/stores/lib/services/store-http-service');
     vi.mocked(storeHttpService.listStores).mockResolvedValue({
       succeeded: true,
       data: [makeStore({ id: 's2', name: 'Store Beta' })],
@@ -265,15 +257,14 @@ describe('AdminStoreListPage — disapprove requires confirmation', () => {
 
   it('confirmed (true) -> calls disapproveStore then re-fetches', async () => {
     mockConfirmDialog.mockResolvedValue(true);
-    const { storeHttpService } = await import(
-      '~/management/stores/lib/services/store-http-service'
-    );
+    const { storeHttpService } =
+      await import('~/management/stores/lib/services/store-http-service');
 
     const { AdminStoreListPage } = await import('../store-list');
     render(
       <Wrapper>
         <AdminStoreListPage />
-      </Wrapper>
+      </Wrapper>,
     );
 
     await waitFor(() => {
@@ -298,15 +289,14 @@ describe('AdminStoreListPage — disapprove requires confirmation', () => {
 
   it('cancelled (false) -> does NOT call disapproveStore, status unchanged', async () => {
     mockConfirmDialog.mockResolvedValue(false);
-    const { storeHttpService } = await import(
-      '~/management/stores/lib/services/store-http-service'
-    );
+    const { storeHttpService } =
+      await import('~/management/stores/lib/services/store-http-service');
 
     const { AdminStoreListPage } = await import('../store-list');
     render(
       <Wrapper>
         <AdminStoreListPage />
-      </Wrapper>
+      </Wrapper>,
     );
 
     await waitFor(() => {
@@ -336,16 +326,15 @@ describe('AdminStoreListPage — disapprove requires confirmation', () => {
 
 describe('AdminStoreListPage — error state', () => {
   it('shows STORES.ERROR when listStores throws', async () => {
-    const { storeHttpService } = await import(
-      '~/management/stores/lib/services/store-http-service'
-    );
+    const { storeHttpService } =
+      await import('~/management/stores/lib/services/store-http-service');
     vi.mocked(storeHttpService.listStores).mockRejectedValue(new Error('Network error'));
 
     const { AdminStoreListPage } = await import('../store-list');
     render(
       <Wrapper>
         <AdminStoreListPage />
-      </Wrapper>
+      </Wrapper>,
     );
 
     await waitFor(() => {
@@ -356,9 +345,8 @@ describe('AdminStoreListPage — error state', () => {
   it('shows the connectivity message (GENERAL.OFFLINE) when listStores rejects with a tagged network error', async () => {
     // api-client.ts's response interceptor tags `isNetworkError` when the call never
     // reached a server (offline / 30s timeout).
-    const { storeHttpService } = await import(
-      '~/management/stores/lib/services/store-http-service'
-    );
+    const { storeHttpService } =
+      await import('~/management/stores/lib/services/store-http-service');
     vi.mocked(storeHttpService.listStores).mockRejectedValue({
       isNetworkError: true,
       message: 'Network Error',
@@ -368,7 +356,7 @@ describe('AdminStoreListPage — error state', () => {
     render(
       <Wrapper>
         <AdminStoreListPage />
-      </Wrapper>
+      </Wrapper>,
     );
 
     await waitFor(() => {
@@ -385,9 +373,8 @@ describe('AdminStoreListPage — error state', () => {
 
 describe('AdminStoreListPage — succeeded:false response', () => {
   it('shows STORES.ERROR when listStores resolves with succeeded:false, does not set stores from data', async () => {
-    const { storeHttpService } = await import(
-      '~/management/stores/lib/services/store-http-service'
-    );
+    const { storeHttpService } =
+      await import('~/management/stores/lib/services/store-http-service');
     vi.mocked(storeHttpService.listStores).mockResolvedValue({
       succeeded: false,
       data: null,
@@ -400,7 +387,7 @@ describe('AdminStoreListPage — succeeded:false response', () => {
     render(
       <Wrapper>
         <AdminStoreListPage />
-      </Wrapper>
+      </Wrapper>,
     );
 
     await waitFor(() => {
@@ -415,9 +402,8 @@ describe('AdminStoreListPage — succeeded:false response', () => {
 
 describe('AdminStoreListPage — no activate/deactivate buttons', () => {
   it('does NOT render Activate or Deactivate buttons', async () => {
-    const { storeHttpService } = await import(
-      '~/management/stores/lib/services/store-http-service'
-    );
+    const { storeHttpService } =
+      await import('~/management/stores/lib/services/store-http-service');
     vi.mocked(storeHttpService.listStores).mockResolvedValue({
       succeeded: true,
       data: [makeStore({ id: 's1', name: 'Store One' })],
@@ -430,7 +416,7 @@ describe('AdminStoreListPage — no activate/deactivate buttons', () => {
     render(
       <Wrapper>
         <AdminStoreListPage />
-      </Wrapper>
+      </Wrapper>,
     );
 
     await waitFor(() => {
@@ -438,10 +424,10 @@ describe('AdminStoreListPage — no activate/deactivate buttons', () => {
     });
 
     expect(
-      screen.queryByRole('button', { name: esMessages['STORES.ACTIVATE'] })
+      screen.queryByRole('button', { name: esMessages['STORES.ACTIVATE'] }),
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole('button', { name: esMessages['STORES.DEACTIVATE'] })
+      screen.queryByRole('button', { name: esMessages['STORES.DEACTIVATE'] }),
     ).not.toBeInTheDocument();
   });
 });
@@ -454,9 +440,8 @@ describe('AdminStoreListPage — no activate/deactivate buttons', () => {
 
 describe('AdminStoreListPage — toggle plan', () => {
   beforeEach(async () => {
-    const { storeHttpService } = await import(
-      '~/management/stores/lib/services/store-http-service'
-    );
+    const { storeHttpService } =
+      await import('~/management/stores/lib/services/store-http-service');
     vi.mocked(storeHttpService.toggleStorePlan).mockResolvedValue({
       succeeded: true,
       data: true,
@@ -468,9 +453,8 @@ describe('AdminStoreListPage — toggle plan', () => {
 
   it('Free→Paid store shows "Activar plan pago" dialog copy and re-fetches after confirm', async () => {
     mockConfirmDialog.mockResolvedValue(true);
-    const { storeHttpService } = await import(
-      '~/management/stores/lib/services/store-http-service'
-    );
+    const { storeHttpService } =
+      await import('~/management/stores/lib/services/store-http-service');
     vi.mocked(storeHttpService.listStores).mockResolvedValue({
       succeeded: true,
       data: [makeStore({ id: 's1', name: 'Store One', paymentStartDate: null })],
@@ -483,7 +467,7 @@ describe('AdminStoreListPage — toggle plan', () => {
     render(
       <Wrapper>
         <AdminStoreListPage />
-      </Wrapper>
+      </Wrapper>,
     );
 
     // Free stores are only visible under the "free-plan" filter.
@@ -512,9 +496,8 @@ describe('AdminStoreListPage — toggle plan', () => {
 
   it('Paid→Free store shows "Desactivar plan pago" dialog copy and re-fetches after confirm', async () => {
     mockConfirmDialog.mockResolvedValue(true);
-    const { storeHttpService } = await import(
-      '~/management/stores/lib/services/store-http-service'
-    );
+    const { storeHttpService } =
+      await import('~/management/stores/lib/services/store-http-service');
     vi.mocked(storeHttpService.listStores).mockResolvedValue({
       succeeded: true,
       data: [makeStore({ id: 's2', name: 'Store Two', paymentStartDate: '2024-01-01' })],
@@ -527,7 +510,7 @@ describe('AdminStoreListPage — toggle plan', () => {
     render(
       <Wrapper>
         <AdminStoreListPage />
-      </Wrapper>
+      </Wrapper>,
     );
 
     await waitFor(() => {
@@ -551,9 +534,8 @@ describe('AdminStoreListPage — toggle plan', () => {
 
   it('cancel (false) -> does NOT call toggleStorePlan, list NOT re-fetched', async () => {
     mockConfirmDialog.mockResolvedValue(false);
-    const { storeHttpService } = await import(
-      '~/management/stores/lib/services/store-http-service'
-    );
+    const { storeHttpService } =
+      await import('~/management/stores/lib/services/store-http-service');
     vi.mocked(storeHttpService.listStores).mockResolvedValue({
       succeeded: true,
       data: [makeStore({ id: 's3', name: 'Store Three' })],
@@ -566,7 +548,7 @@ describe('AdminStoreListPage — toggle plan', () => {
     render(
       <Wrapper>
         <AdminStoreListPage />
-      </Wrapper>
+      </Wrapper>,
     );
 
     await waitFor(() => {

@@ -44,7 +44,11 @@ function Harness({
   );
 }
 
-function renderSection(initialValue: WholesaleConfig | undefined, retailPrice = 700, onChange = vi.fn()) {
+function renderSection(
+  initialValue: WholesaleConfig | undefined,
+  retailPrice = 700,
+  onChange = vi.fn(),
+) {
   render(<Harness initialValue={initialValue} retailPrice={retailPrice} onChange={onChange} />);
   return onChange;
 }
@@ -158,7 +162,9 @@ describe('WholesaleConfigSection — formulario mayorista del producto', () => {
 
   it('escribir la unidad emite la config con unitLabel', () => {
     const onChange = renderSection({ packSize: 24, tiers: [{ minPacks: 1, pricePerUnit: 680 }] });
-    fireEvent.change(screen.getByTestId('wholesale-unit-label-input'), { target: { value: 'caja' } });
+    fireEvent.change(screen.getByTestId('wholesale-unit-label-input'), {
+      target: { value: 'caja' },
+    });
     const emitted = onChange.mock.calls[0][0] as WholesaleConfig;
     expect(emitted.unitLabel).toBe('caja');
     // El resto de la config viaja intacta.

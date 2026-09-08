@@ -31,7 +31,7 @@ export function PaymentBanner() {
   // DG-2: defaulting for a stale/pre-backend payload lives HERE, not in getMe.
   const paymentStatus = user?.paymentStatus ?? 'NoAplica';
   const [trialDismissed, setTrialDismissed] = useState(
-    () => localStorage.getItem(StorageKeys.TRIAL_NOTICE_DISMISSED) === '1'
+    () => localStorage.getItem(StorageKeys.TRIAL_NOTICE_DISMISSED) === '1',
   );
 
   // No billing clock at all → nothing to say.

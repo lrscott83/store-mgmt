@@ -4,12 +4,15 @@ import { EFeatures, ExpenseType, PaymentType } from '@store-mgmt/domain';
 import type { Expense, Order, SaleCredit } from '@store-mgmt/domain';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
-import { hasCreditsModuleAvailable, hasExpensesModuleAvailable } from '~/shared/lib/auth/authorization-service';
+import {
+  hasCreditsModuleAvailable,
+  hasExpensesModuleAvailable,
+} from '~/shared/lib/auth/authorization-service';
 import { Card } from '~/shared/components/ui/card';
 import { Button } from '~/shared/components/ui/button';
-import { ChevronDownIcon } from '~/shared/components/ui/icons';
+import { ChevronDownIcon, SearchIcon } from '~/shared/components/ui/icons';
 import { formatCurrency } from '~/shared/lib/format-currency';
-import { formatLocalDate, addDays, startOfDay } from '~/shared/lib/date-utils';
+import { formatLocalDate, addDays, startOfDay, maskDashedDate, parseDashedDate, weekdayNameEs } from '~/shared/lib/date-utils';
 import { OrderOfflineService } from '~/sales/lib/services/order-offline-service';
 import { ExpenseOfflineService } from '~/expenses/lib/services/expense-offline-service';
 import { SaleCreditOfflineService } from '~/sales/lib/services/sale-credit-offline-service';
@@ -101,6 +104,7 @@ interface RangeSummary {
   saleCredits: SaleCredit[];
   paidSaleCredits: SaleCredit[];
   salesCashTotal: number;
+  salesCardTotal: number;
   expensesCashTotal: number;
   paidCreditsCashTotal: number;
 }
@@ -135,8 +139,17 @@ export function CuadrePorFechasPage() {
       setRangeError(intl.formatMessage({ id: 'CUADRE_FECHAS.EMPTY_DATES' }));
       return;
     }
-    const start = startOfDay(new Date(`${startDate}T00:00:00`));
-    const end = startOfDay(new Date(`${endDate}T00:00:00`));
+    // dd-mm-yyyy inputs (user request 2026-09-08): parse with parseDashedDate —
+    // returns null for incomplete or impossible dates (day 32, month 13, Feb 29
+    // in a non-leap year).
+    const parsedStart = parseDashedDate(startDate);
+    const parsedEnd = parseDashedDate(endDate);
+    if (!parsedStart || !parsedEnd) {
+      setRangeError(intl.formatMessage({ id: 'CUADRE_FECHAS.INVALID_FORMAT' }));
+      return;
+    }
+    const start = parsedStart;
+    const end = parsedEnd;
     if (start > end) {
       setRangeError(intl.formatMessage({ id: 'CUADRE_FECHAS.INVALID_RANGE' }));
       return;
@@ -152,12 +165,18 @@ export function CuadrePorFechasPage() {
     const salesTotal = orderService.getActiveOrdersPriceBetweenDates(rangeStart, rangeEnd);
     const grossProfit = orderService.getActiveOrdersProfitBetweenDates(rangeStart, rangeEnd);
 
-    const categoriesResponse = orderService.getCategoryCartItemsViewBetweenDates(rangeStart, rangeEnd);
+    const categoriesResponse = orderService.getCategoryCartItemsViewBetweenDates(
+      rangeStart,
+      rangeEnd,
+    );
     const categories = categoriesResponse.succeeded ? categoriesResponse.data : [];
 
     const activeOrders: Order[] = orderService.getActiveOrdersBetween(rangeStart, rangeEnd);
     const salesCashTotal = activeOrders
       .filter((o) => o.paymentType === PaymentType.Efectivo && !o.isCredit)
+      .reduce((acc, o) => acc + o.total, 0);
+    const salesCardTotal = activeOrders
+      .filter((o) => o.paymentType === PaymentType.Tarjeta && !o.isCredit)
       .reduce((acc, o) => acc + o.total, 0);
 
     let expenses: Expense[] = [];
@@ -196,10 +215,15 @@ export function CuadrePorFechasPage() {
       saleCredits,
       paidSaleCredits,
       salesCashTotal,
+      salesCardTotal,
       expensesCashTotal,
       paidCreditsCashTotal,
     });
   }
+
+  /** Día de la semana (es) de la fecha tecleada, o null si aún no es válida. */
+  const startWeekday = parseDashedDate(startDate) ? weekdayNameEs(parseDashedDate(startDate)!) : null;
+  const endWeekday = parseDashedDate(endDate) ? weekdayNameEs(parseDashedDate(endDate)!) : null;
 
   const total = summary
     ? summary.categories.reduce((acc, c) => acc + c.total, 0) +
@@ -214,9 +238,7 @@ export function CuadrePorFechasPage() {
     ? summary.categories.reduce((acc, c) => acc + c.itemsCount, 0)
     : 0;
   const creditsCount = summary ? summary.saleCredits.length : 0;
-  const creditsTotal = summary
-    ? summary.saleCredits.reduce((acc, c) => acc + c.total, 0)
-    : 0;
+  const creditsTotal = summary ? summary.saleCredits.reduce((acc, c) => acc + c.total, 0) : 0;
   const paidSaleCreditsTotal = summary
     ? summary.paidSaleCredits.reduce((acc, c) => acc + c.total, 0)
     : 0;
@@ -234,17 +256,27 @@ export function CuadrePorFechasPage() {
       {/* Date range picker */}
       <div className="flex flex-wrap items-end gap-3">
         <div>
-          <label htmlFor="cuadre-start-date" className="mb-1 block text-sm font-medium text-gray-700">
+          <label
+            htmlFor="cuadre-start-date"
+            className="mb-1 block text-sm font-medium text-gray-700"
+          >
             {intl.formatMessage({ id: 'CUADRE_FECHAS.START_DATE' })}
           </label>
           <input
             id="cuadre-start-date"
             data-testid="cuadre-start-date"
-            type="date"
+            type="text"
+            inputMode="numeric"
+            placeholder="dd-mm-yyyy"
             value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
+            onChange={(e) => setStartDate(maskDashedDate(e.target.value))}
             className="rounded border border-gray-300 px-3 py-2 text-sm"
           />
+          {startWeekday && (
+            <p data-testid="cuadre-start-weekday" className="mt-1 text-xs font-medium text-gray-600">
+              {startWeekday}
+            </p>
+          )}
         </div>
         <div>
           <label htmlFor="cuadre-end-date" className="mb-1 block text-sm font-medium text-gray-700">
@@ -253,13 +285,23 @@ export function CuadrePorFechasPage() {
           <input
             id="cuadre-end-date"
             data-testid="cuadre-end-date"
-            type="date"
+            type="text"
+            inputMode="numeric"
+            placeholder="dd-mm-yyyy"
             value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
+            onChange={(e) => setEndDate(maskDashedDate(e.target.value))}
             className="rounded border border-gray-300 px-3 py-2 text-sm"
           />
+          {endWeekday && (
+            <p data-testid="cuadre-end-weekday" className="mt-1 text-xs font-medium text-gray-600">
+              {endWeekday}
+            </p>
+          )}
         </div>
-        <Button variant="primary" data-testid="cuadre-generate" onClick={generate}>
+        <Button variant="primary" data-testid="cuadre-generate" onClick={generate} className="flex items-center gap-2">
+          <span data-testid="cuadre-generate-icon">
+            <SearchIcon />
+          </span>
           {intl.formatMessage({ id: 'CUADRE_FECHAS.GENERATE' })}
         </Button>
         {rangeError && (
@@ -322,7 +364,9 @@ export function CuadrePorFechasPage() {
                         <span className="font-bold text-text">Ventas</span>
                       </td>
                       <td className="p-1 text-right">
-                        <span className="font-bold text-success whitespace-nowrap">{formatCurrency(summary.salesCashTotal)}</span>
+                        <span className="font-bold text-success whitespace-nowrap">
+                          {formatCurrency(summary.salesCashTotal)}
+                        </span>
                       </td>
                     </tr>
                     {hasCreditsModule && (
@@ -331,7 +375,9 @@ export function CuadrePorFechasPage() {
                           <span className="font-bold text-text">Créditos Pagados</span>
                         </td>
                         <td className="p-1 text-right">
-                          <span className="font-bold text-success whitespace-nowrap">{formatCurrency(summary.paidCreditsCashTotal)}</span>
+                          <span className="font-bold text-success whitespace-nowrap">
+                            {formatCurrency(summary.paidCreditsCashTotal)}
+                          </span>
                         </td>
                       </tr>
                     )}
@@ -341,7 +387,9 @@ export function CuadrePorFechasPage() {
                           <span className="font-bold text-text">Gastos</span>
                         </td>
                         <td className="p-1 text-right">
-                          <span className="font-bold text-danger whitespace-nowrap">{formatCurrency(summary.expensesCashTotal)}</span>
+                          <span className="font-bold text-danger whitespace-nowrap">
+                            {formatCurrency(summary.expensesCashTotal)}
+                          </span>
                         </td>
                       </tr>
                     )}
@@ -349,6 +397,29 @@ export function CuadrePorFechasPage() {
                 </table>
               </ExpansionPanel>
               {/* END CASH */}
+
+              {/* BEGIN CARD PAYMENTS */}
+              <ExpansionPanel
+                title="Pago por Tarjeta"
+                amount={formatCurrency(summary.salesCardTotal)}
+                amountClassName={valueClassName(summary.salesCardTotal)}
+              >
+                <table className="w-full text-sm">
+                  <tbody>
+                    <tr className="border-b border-border last:border-0">
+                      <td className="p-1">
+                        <span className="font-bold text-text">Ventas</span>
+                      </td>
+                      <td className="p-1 text-right">
+                        <span className="font-bold text-success whitespace-nowrap">
+                          {formatCurrency(summary.salesCardTotal)}
+                        </span>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </ExpansionPanel>
+              {/* END CARD PAYMENTS */}
 
               {/* BEGIN EXPENSES */}
               {hasExpensesModule && (
@@ -367,10 +438,13 @@ export function CuadrePorFechasPage() {
                         {summary.expenses.map((expense) => (
                           <tr key={expense.id} className="border-b border-border last:border-0">
                             <td className="p-1 text-text">
-                              {formatLocalDate(expense.date)} — {intl.formatMessage({ id: EXPENSE_TYPE_KEYS[expense.type] })}
+                              {formatLocalDate(expense.date)} —{' '}
+                              {intl.formatMessage({ id: EXPENSE_TYPE_KEYS[expense.type] })}
                             </td>
                             <td className="p-1 text-right text-danger">
-                              <span className="whitespace-nowrap">{formatCurrency(expense.total)}</span>
+                              <span className="whitespace-nowrap">
+                                {formatCurrency(expense.total)}
+                              </span>
                             </td>
                             <td className="p-1 text-right">
                               <span className="rounded-full bg-success/10 px-2 py-0.5 text-xs font-semibold text-success">
@@ -442,7 +516,9 @@ function SaleCreditsTable({ saleCredits }: { saleCredits: SaleCredit[] }) {
               <span className="text-text">{saleCredit.client}</span>
             </td>
             <td className="p-1 text-right">
-              <span className={`whitespace-nowrap ${saleCredit.isPaid ? 'text-success' : 'text-danger'}`}>
+              <span
+                className={`whitespace-nowrap ${saleCredit.isPaid ? 'text-success' : 'text-danger'}`}
+              >
                 {formatCurrency(saleCredit.total)}
               </span>
             </td>

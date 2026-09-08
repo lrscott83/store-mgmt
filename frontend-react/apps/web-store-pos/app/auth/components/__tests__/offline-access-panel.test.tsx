@@ -283,9 +283,13 @@ describe('OfflineAccessPanel — help popup', () => {
 
     await screen.findByRole('button', { name: /^activar acceso sin conexión$/i });
 
-    fireEvent.click(screen.getByRole('button', { name: /ayuda para activar el acceso sin conexión/i }));
+    fireEvent.click(
+      screen.getByRole('button', { name: /ayuda para activar el acceso sin conexión/i }),
+    );
 
-    const dialog = await screen.findByRole('dialog', { name: /cómo activar el acceso sin conexión/i });
+    const dialog = await screen.findByRole('dialog', {
+      name: /cómo activar el acceso sin conexión/i,
+    });
     expect(dialog).toBeInTheDocument();
     expect(dialog).toHaveTextContent('1. Desde un equipo ya activado');
     expect(dialog).toHaveTextContent('2. Transfiere ese archivo');
@@ -297,14 +301,20 @@ describe('OfflineAccessPanel — help popup', () => {
 
     await screen.findByRole('button', { name: /^activar acceso sin conexión$/i });
 
-    fireEvent.click(screen.getByRole('button', { name: /ayuda para activar el acceso sin conexión/i }));
-    const _dialog = await screen.findByRole('dialog', { name: /cómo activar el acceso sin conexión/i });
+    fireEvent.click(
+      screen.getByRole('button', { name: /ayuda para activar el acceso sin conexión/i }),
+    );
+    const _dialog = await screen.findByRole('dialog', {
+      name: /cómo activar el acceso sin conexión/i,
+    });
 
     const closeButtons = screen.getAllByRole('button', { name: /^cerrar$/i });
     fireEvent.click(closeButtons[0]);
 
     await waitFor(() =>
-      expect(screen.queryByRole('dialog', { name: /cómo activar el acceso sin conexión/i })).not.toBeInTheDocument(),
+      expect(
+        screen.queryByRole('dialog', { name: /cómo activar el acceso sin conexión/i }),
+      ).not.toBeInTheDocument(),
     );
   });
 
@@ -313,13 +323,19 @@ describe('OfflineAccessPanel — help popup', () => {
 
     await screen.findByRole('button', { name: /^activar acceso sin conexión$/i });
 
-    fireEvent.click(screen.getByRole('button', { name: /ayuda para activar el acceso sin conexión/i }));
-    const dialog = await screen.findByRole('dialog', { name: /cómo activar el acceso sin conexión/i });
+    fireEvent.click(
+      screen.getByRole('button', { name: /ayuda para activar el acceso sin conexión/i }),
+    );
+    const dialog = await screen.findByRole('dialog', {
+      name: /cómo activar el acceso sin conexión/i,
+    });
 
     fireEvent.click(dialog);
 
     await waitFor(() =>
-      expect(screen.queryByRole('dialog', { name: /cómo activar el acceso sin conexión/i })).not.toBeInTheDocument(),
+      expect(
+        screen.queryByRole('dialog', { name: /cómo activar el acceso sin conexión/i }),
+      ).not.toBeInTheDocument(),
     );
   });
 

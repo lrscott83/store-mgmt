@@ -29,11 +29,7 @@ export function EditProfilePage() {
   // returns early below — so `false` here enables nothing unsafe.
   const phoneRequired = user ? isOwnerAdmin(user) || isReSeller(user) : false;
 
-  async function handleSubmit(values: {
-    fullName: string;
-    cellPhone: string;
-    email: string;
-  }) {
+  async function handleSubmit(values: { fullName: string; cellPhone: string; email: string }) {
     if (!user) return;
     setError('');
     setSuccessMessage('');

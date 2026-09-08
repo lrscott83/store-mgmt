@@ -45,7 +45,10 @@ export async function wrapDekForDevice(dek: Uint8Array, deviceKey: CryptoKey): P
 }
 
 /** Length ≠ 32 or any WebCrypto failure (tag mismatch, wrong key) → `DekUnwrapError` — same vocabulary as `offline/dek-unwrap.ts`'s `unwrapDek` (design D7). */
-export async function unwrapDekFromDevice(wrap: DeviceWrap, deviceKey: CryptoKey): Promise<Uint8Array> {
+export async function unwrapDekFromDevice(
+  wrap: DeviceWrap,
+  deviceKey: CryptoKey,
+): Promise<Uint8Array> {
   try {
     const iv = bytesFromBase64(wrap.wrapIv);
     const ciphertext = bytesFromBase64(wrap.wrappedDek);

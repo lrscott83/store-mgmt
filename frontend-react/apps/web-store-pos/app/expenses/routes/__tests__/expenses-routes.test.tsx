@@ -8,7 +8,13 @@ import { ExpenseOfflineService } from '~/expenses/lib/services/expense-offline-s
 
 // Category-C envelope helper: getExpensesInDayObservable resolves a BaseResponseModel<Expense[]>.
 function expensesResponse(expenses: Expense[] = []) {
-  return Promise.resolve({ data: expenses, succeeded: true, message: '', actionCode: 200, errors: [] });
+  return Promise.resolve({
+    data: expenses,
+    succeeded: true,
+    message: '',
+    actionCode: 200,
+    errors: [],
+  });
 }
 
 // response-envelope-nullability WU-D — the resolved-failure shape both offline reads guard
@@ -136,7 +142,9 @@ describe('TodayExpensesPage — smoke render', () => {
       }) as any;
     // Scoped to exactly the 2 constructor calls this test triggers (mount load + save), so
     // the module-level mock reverts to its default (empty) implementation for later tests.
-    vi.mocked(ExpenseOfflineService).mockImplementationOnce(mockImpl).mockImplementationOnce(mockImpl);
+    vi.mocked(ExpenseOfflineService)
+      .mockImplementationOnce(mockImpl)
+      .mockImplementationOnce(mockImpl);
 
     render(
       <Wrapper>
@@ -290,12 +298,14 @@ describe('TodayExpensesPage — getExpensesInDayObservable succeeded:false (sile
 
 import { ExpensesHistoryPage } from '../expenses-history';
 
-function makeExpense(overrides: Partial<{
-  id: string;
-  total: number;
-  date: Date;
-  paymentType: PaymentType;
-}> = {}) {
+function makeExpense(
+  overrides: Partial<{
+    id: string;
+    total: number;
+    date: Date;
+    paymentType: PaymentType;
+  }> = {},
+) {
   return {
     id: overrides.id ?? 'e1',
     type: ExpenseType.Comida,

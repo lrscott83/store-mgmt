@@ -47,7 +47,12 @@ describe('expense-offline-service — at-rest encryption seam (entity-at-rest-en
 
   it('plaintext mode: unprovisioned device writes/reads raw plain JSON, byte-identical to before', () => {
     const service = new ExpenseOfflineService(storeId);
-    service.create({ type: ExpenseType.Otro, total: 50, date: new Date(), paymentType: PaymentType.Efectivo });
+    service.create({
+      type: ExpenseType.Otro,
+      total: 50,
+      date: new Date(),
+      paymentType: PaymentType.Efectivo,
+    });
 
     const raw = localStorage.getItem(storageKey);
     expect(raw).not.toBeNull();
@@ -61,7 +66,12 @@ describe('expense-offline-service — at-rest encryption seam (entity-at-rest-en
     setDek(new Uint8Array(32).fill(0x07), storeId);
 
     const service = new ExpenseOfflineService(storeId);
-    service.create({ type: ExpenseType.Otro, total: 50, date: new Date(), paymentType: PaymentType.Efectivo });
+    service.create({
+      type: ExpenseType.Otro,
+      total: 50,
+      date: new Date(),
+      paymentType: PaymentType.Efectivo,
+    });
 
     const raw = localStorage.getItem(storageKey);
     expect(raw).not.toBeNull();
@@ -75,7 +85,12 @@ describe('expense-offline-service — at-rest encryption seam (entity-at-rest-en
     importRoster(v2Bundle(), 500);
     setDek(new Uint8Array(32).fill(0x07), storeId);
     const service = new ExpenseOfflineService(storeId);
-    service.create({ type: ExpenseType.Otro, total: 50, date: new Date(), paymentType: PaymentType.Efectivo });
+    service.create({
+      type: ExpenseType.Otro,
+      total: 50,
+      date: new Date(),
+      paymentType: PaymentType.Efectivo,
+    });
 
     const rawBefore = localStorage.getItem(storageKey);
     expect(rawBefore!.startsWith('enc:v1:')).toBe(true);

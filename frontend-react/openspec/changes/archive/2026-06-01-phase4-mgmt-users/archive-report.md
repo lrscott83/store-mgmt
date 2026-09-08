@@ -13,14 +13,14 @@ All artifacts listed below were created, reviewed, and verified during the SDD l
 
 ### Engram References
 
-| Artifact | Topic Key | Engram ID | Date | Status |
-|----------|-----------|-----------|------|--------|
-| **Proposal** | `sdd/phase4-mgmt-users/proposal` | #216 | 2026-06-01 | ARCHIVED |
-| **Spec** | `sdd/phase4-mgmt-users/spec` | #219 | 2026-06-01 | ARCHIVED |
-| **Design** | `sdd/phase4-mgmt-users/design` | #218 | 2026-06-01 | ARCHIVED |
-| **Tasks** | `sdd/phase4-mgmt-users/tasks` | #220 | 2026-06-01 | ARCHIVED |
-| **Verify Report** | `sdd/phase4-mgmt-users/verify-report` | #229 | 2026-06-01 | ARCHIVED |
-| **Archive Report** | `sdd/phase4-mgmt-users/archive-report` | (this document) | 2026-06-01 | CREATED |
+| Artifact           | Topic Key                              | Engram ID       | Date       | Status   |
+| ------------------ | -------------------------------------- | --------------- | ---------- | -------- |
+| **Proposal**       | `sdd/phase4-mgmt-users/proposal`       | #216            | 2026-06-01 | ARCHIVED |
+| **Spec**           | `sdd/phase4-mgmt-users/spec`           | #219            | 2026-06-01 | ARCHIVED |
+| **Design**         | `sdd/phase4-mgmt-users/design`         | #218            | 2026-06-01 | ARCHIVED |
+| **Tasks**          | `sdd/phase4-mgmt-users/tasks`          | #220            | 2026-06-01 | ARCHIVED |
+| **Verify Report**  | `sdd/phase4-mgmt-users/verify-report`  | #229            | 2026-06-01 | ARCHIVED |
+| **Archive Report** | `sdd/phase4-mgmt-users/archive-report` | (this document) | 2026-06-01 | CREATED  |
 
 ---
 
@@ -74,27 +74,29 @@ The Users delta spec was **merged into** the existing main spec, which previousl
 ### Scope Delivered
 
 **3 routes registered** in `app/routes.ts`:
+
 - `/management/users` → `UserListPage` (list container)
 - `/management/users/create` → `UserCreatePage` (create container)
 - `/management/users/:id/edit` → `UserEditPage` (edit container with 2 stacked sub-forms)
 
 **7 work units completed** (all [x] marked DONE):
+
 1. [x] **userHttpService** — 7 HTTP endpoint contracts, all via shared `apiClient`
 2. [x] **UserCreateForm presentational** — login + password + confirm validation
 3. [x] **UserDetailsForm presentational** — fullName/cellPhone/email/isActive (role-conditional)
 4. [x] **UserCredentialsForm presentational** — oldPassword (required) + newPassword + confirm
 5. [x] **UserList presentational** — table with activate/deactivate + offline gate
 6. [x] **Route containers (3)** — UserListPage, UserCreatePage, UserEditPage with independent state management
-7. [x] **Wiring** — 3 routes in app/routes.ts, 31 USERS.* i18n keys in es.ts (27 minimum + 4 extra)
+7. [x] **Wiring** — 3 routes in app/routes.ts, 31 USERS.\* i18n keys in es.ts (27 minimum + 4 extra)
 
 ### Test Coverage
 
-| Layer | Test Count | Files | Coverage |
-|-------|-----------|-------|----------|
-| Unit (service) | 13 | 1 | 100% on contracts |
-| Component (forms + list) | 27 | 4 | 95%+ per component |
-| Integration (routes) | 20 | 1 | 100% on container flows |
-| **Total** | **60** | **6** | **99%+ avg** |
+| Layer                    | Test Count | Files | Coverage                |
+| ------------------------ | ---------- | ----- | ----------------------- |
+| Unit (service)           | 13         | 1     | 100% on contracts       |
+| Component (forms + list) | 27         | 4     | 95%+ per component      |
+| Integration (routes)     | 20         | 1     | 100% on container flows |
+| **Total**                | **60**     | **6** | **99%+ avg**            |
 
 **TDD Evidence**: All 7 units followed RED → GREEN → REFACTOR. Baseline (515) preserved. Final count: 575 tests passing.
 
@@ -106,17 +108,18 @@ The Users delta spec was **merged into** the existing main spec, which previousl
 
 ### Evidence Summary
 
-| Check | Result | Details |
-|-------|--------|---------|
-| Test suite | ✅ PASS | 575/575 passed, 55 test files, 0 failures |
-| Typecheck (tsc) | ✅ PASS | `turbo run typecheck` — 5 packages, 0 errors |
-| Build (vite + SSR) | ✅ PASS | PWA manifest injected, bundle clean |
-| Task completion | ✅ PASS | 7/7 units done, all required files present |
-| Spec compliance | ✅ MOSTLY | 66/66 requirements fully passing; 65/66 tested (ERR-5 untested but code-correct) |
+| Check              | Result    | Details                                                                          |
+| ------------------ | --------- | -------------------------------------------------------------------------------- |
+| Test suite         | ✅ PASS   | 575/575 passed, 55 test files, 0 failures                                        |
+| Typecheck (tsc)    | ✅ PASS   | `turbo run typecheck` — 5 packages, 0 errors                                     |
+| Build (vite + SSR) | ✅ PASS   | PWA manifest injected, bundle clean                                              |
+| Task completion    | ✅ PASS   | 7/7 units done, all required files present                                       |
+| Spec compliance    | ✅ MOSTLY | 66/66 requirements fully passing; 65/66 tested (ERR-5 untested but code-correct) |
 
 ### Warnings (1)
 
 **W-1 — ERR-5 Partial (Test Gap)**
+
 - Non-blocking issue: getById() failure path is code-correct but has no test
 - The implementation in `user-edit.tsx` correctly renders error state
 - Test scenario (S-ERR-1) exists in spec but not in test suite
@@ -126,10 +129,12 @@ The Users delta spec was **merged into** the existing main spec, which previousl
 ### Suggestions (2)
 
 **S-1 — S-LIST-6 coverage location**
+
 - Lifecycle offline scenario covered in component test (correct layer) not route test
 - Architecturally sound; spec ambiguity on test level boundaries
 
 **S-2 — UserCreateForm storeId display**
+
 - storeId prop exists but not visually rendered in form
 - Container controls storeId; submission correct
 - PRES-4 says "display" but does not mandate visible UI element
@@ -143,34 +148,40 @@ The Users delta spec was **merged into** the existing main spec, which previousl
 ## Design Decisions Locked
 
 ### Access Control
+
 - **adminFeatureLoader** reused from Stores (no new factory); composes existing `adminLoader` + `featureLoader`
 - Unauthenticated → `/login`, unauthorized → `/unauthorized`
 - Feature guard (`EFeatures.Users = 72`) already live
 
 ### Architecture
+
 - **Container/presentational split** mirrors Stores slice exactly
 - **Offline policy**: read-from-cache (list), block-writes (all mutations)
 - **No offline write queue** — explicit decision (#204)
 - **Edit page diverges from Stores**: TWO stacked independent sub-forms (not merged)
 
 ### Form Shape Separation
+
 - **Create form**: login + password + confirm (required)
 - **Details form**: fullName/cellPhone/email/isActive (no login/password)
 - **Credentials form**: oldPassword (required) + newPassword + confirm
 - All three forms distinct, no sharing
 
 ### Password Policy
+
 - Regex: `(?=\D*\d)(?=[^a-z]*[a-z])(?=[^A-Z]*[A-Z]).{8,30}`
 - oldPassword ALWAYS required for credentials reset (no admin bypass)
 - No change-login field anywhere (OQ-U3 out of scope)
 
 ### HTTP Service
+
 - 7 methods: listUsers, getUser, createUser, updateUserDetails, activateUser, deactivateUser, changePassword
 - All paths verified against backend: `/v1/storeusers/list/true` (not `/users/all/true`), etc.
 - Create enforces `roleIds: [ERoles.StoreUser = 3]` — store user role only
 
 ### Internationalization
-- 31 USERS.* keys in es.ts (27 minimum floor + 4 extra)
+
+- 31 USERS.\* keys in es.ts (27 minimum floor + 4 extra)
 - All copy via `useIntl`/`FormattedMessage` — zero hardcoded strings
 - Spanish (Rioplatense tone) per project convention
 
@@ -202,9 +213,11 @@ All contracts (list, get, create, update, activate, deactivate, credentials chan
 ## Files Merged & Archived
 
 ### Main Spec Updated
+
 - **frontend-react/openspec/specs/management/spec.md** — Merged Users delta (66 new requirements) into existing Stores spec (81 requirements) = 147 total requirements, both sub-domains fully integrated
 
 ### Change Folder Archived
+
 - **frontend-react/openspec/changes/archive/2026-06-01-phase4-mgmt-users/** — Full audit trail (proposal, spec, design, tasks, verify, delta spec, this report)
 
 ### Openspec Directory Structure (Final)
@@ -243,12 +256,14 @@ The original `changes/phase4-mgmt-users/` folder has been moved (not copied) to 
 ## Next Steps
 
 ### Immediate (Orchestrator)
+
 1. Review this archive report for any concerns
 2. Verify git status: `changes/phase4-mgmt-users/` should no longer exist, archive folder should be present
 3. Commit the merged spec and archive folder to git
 4. If satisfied, proceed to PR/merge review
 
 ### Post-Archive (Future Sessions)
+
 1. **Fix ERR-5 test gap** (optional patch): Add test case for getById() failure → error state
 2. **Review S-2 storeId display** (optional enhancement): If business needs visual store selection display in create form, add it
 3. **phase4-mgmt-configurations**: Next sub-slice (configurations), scoped to stores; depends on Users being deployed
@@ -261,6 +276,7 @@ The original `changes/phase4-mgmt-users/` folder has been moved (not copied) to 
 The **phase4-mgmt-users** change has been fully planned (proposal + spec + design), implemented (7 units, 60 tests, TDD-compliant), verified (PASS WITH WARNINGS), and archived.
 
 All artifacts are persisted:
+
 - **Engram**: Observation IDs #216, #218, #219, #220, #229 for cross-session recovery
 - **Filesystem**: Archived folder + merged main spec for team visibility
 - **This report**: Complete traceability of decisions, artifacts, and residual risks

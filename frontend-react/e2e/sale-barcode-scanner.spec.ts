@@ -26,7 +26,9 @@ test.describe('sale-barcode-scanner — modal redesign (quantity stepper, no man
 
   test.use({ persona: 'owner-admin-with-products' });
 
-  test('the scanner entry point opens the redesigned modal with the quantity stepper', async ({ signedInPage }) => {
+  test('the scanner entry point opens the redesigned modal with the quantity stepper', async ({
+    signedInPage,
+  }) => {
     const { page } = signedInPage;
 
     await page.goto('/sales/new');

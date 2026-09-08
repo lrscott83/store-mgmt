@@ -5,7 +5,7 @@ import messages from '~/shared/lib/i18n/es';
 export function useUnsavedChangesPrompt(isDirty: boolean): void {
   const blocker = useBlocker(
     ({ currentLocation, nextLocation }) =>
-      isDirty && currentLocation.pathname !== nextLocation.pathname
+      isDirty && currentLocation.pathname !== nextLocation.pathname,
   );
 
   useEffect(() => {

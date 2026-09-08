@@ -97,17 +97,36 @@ test.describe.serial('S2-G2 — Importar datos offline', () => {
     const dummyZip = await page.evaluate(() => {
       // Create a minimal valid ZIP file (PK\x03\x04 header + empty content)
       const bytes = new Uint8Array([
-        0x50, 0x4b, 0x03, 0x04, // PK\x03\x04 local file header
-        0x0a, 0x00,             // version needed
-        0x00, 0x00,             // flags
-        0x00, 0x00,             // compression: none
-        0x00, 0x00,             // mod time
-        0x00, 0x00,             // mod date
-        0x00, 0x00, 0x00, 0x00, // CRC-32
-        0x00, 0x00, 0x00, 0x00, // compressed size
-        0x00, 0x00, 0x00, 0x00, // uncompressed size
-        0x00, 0x00,             // filename length
-        0x00, 0x00,             // extra field length
+        0x50,
+        0x4b,
+        0x03,
+        0x04, // PK\x03\x04 local file header
+        0x0a,
+        0x00, // version needed
+        0x00,
+        0x00, // flags
+        0x00,
+        0x00, // compression: none
+        0x00,
+        0x00, // mod time
+        0x00,
+        0x00, // mod date
+        0x00,
+        0x00,
+        0x00,
+        0x00, // CRC-32
+        0x00,
+        0x00,
+        0x00,
+        0x00, // compressed size
+        0x00,
+        0x00,
+        0x00,
+        0x00, // uncompressed size
+        0x00,
+        0x00, // filename length
+        0x00,
+        0x00, // extra field length
       ]);
       return Array.from(bytes);
     });

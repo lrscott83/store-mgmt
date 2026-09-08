@@ -21,12 +21,7 @@ interface UserCreateFormProps {
   error?: string;
 }
 
-export function UserCreateForm({
-  isOnline,
-  isLoading,
-  onSubmit,
-  error,
-}: UserCreateFormProps) {
+export function UserCreateForm({ isOnline, isLoading, onSubmit, error }: UserCreateFormProps) {
   const intl = useIntl();
 
   const [fullName, setFullName] = useState('');
@@ -71,9 +66,7 @@ export function UserCreateForm({
         </p>
       )}
 
-      {validationError && (
-        <p className="text-sm text-red-600">{validationError}</p>
-      )}
+      {validationError && <p className="text-sm text-red-600">{validationError}</p>}
 
       <div>
         <label htmlFor="fullName" className="block text-sm font-medium text-gray-700">

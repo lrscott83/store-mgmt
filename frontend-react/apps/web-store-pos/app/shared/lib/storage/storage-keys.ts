@@ -13,8 +13,7 @@ export const StorageKeys = {
   // authenticated on this device. The daily USD→MN register's list runs from
   // today down to this day; stamped once, never updated (daily-exchange-rate).
   EXCHANGE_RATES_FIRST_LOGIN: 'exchangeRatesFirstLogin',
-  entityKey: (entity: string, storeId: string) =>
-    `lizoft.store-${entity}-${storeId}`,
+  entityKey: (entity: string, storeId: string) => `lizoft.store-${entity}-${storeId}`,
 } as const;
 
 /**

@@ -24,15 +24,15 @@ All artifacts listed below were created, reviewed, and verified during the SDD l
 
 ### Engram References
 
-| Artifact | Topic Key | Engram ID | Date | Status |
-|----------|-----------|-----------|------|--------|
-| **Proposal** | `sdd/phase4-mgmt-configurations/proposal` | #238 | 2026-06-01 | ARCHIVED |
-| **Spec** | `sdd/phase4-mgmt-configurations/spec` | #240 | 2026-06-01 | ARCHIVED |
-| **Design** | `sdd/phase4-mgmt-configurations/design` | #239 | 2026-06-01 | ARCHIVED |
-| **Tasks** | `sdd/phase4-mgmt-configurations/tasks` | #241 | 2026-06-01 | ARCHIVED |
-| **Apply Progress** | `sdd/phase4-mgmt-configurations/apply-progress` | #243 | 2026-06-01 | ARCHIVED |
-| **Verify Report** | `sdd/phase4-mgmt-configurations/verify-report` | #245 | 2026-06-01 | ARCHIVED |
-| **Archive Report** | `sdd/phase4-mgmt-configurations/archive-report` | (this document) | 2026-06-01 | CREATED |
+| Artifact           | Topic Key                                       | Engram ID       | Date       | Status   |
+| ------------------ | ----------------------------------------------- | --------------- | ---------- | -------- |
+| **Proposal**       | `sdd/phase4-mgmt-configurations/proposal`       | #238            | 2026-06-01 | ARCHIVED |
+| **Spec**           | `sdd/phase4-mgmt-configurations/spec`           | #240            | 2026-06-01 | ARCHIVED |
+| **Design**         | `sdd/phase4-mgmt-configurations/design`         | #239            | 2026-06-01 | ARCHIVED |
+| **Tasks**          | `sdd/phase4-mgmt-configurations/tasks`          | #241            | 2026-06-01 | ARCHIVED |
+| **Apply Progress** | `sdd/phase4-mgmt-configurations/apply-progress` | #243            | 2026-06-01 | ARCHIVED |
+| **Verify Report**  | `sdd/phase4-mgmt-configurations/verify-report`  | #245            | 2026-06-01 | ARCHIVED |
+| **Archive Report** | `sdd/phase4-mgmt-configurations/archive-report` | (this document) | 2026-06-01 | CREATED  |
 
 ---
 
@@ -87,20 +87,22 @@ The delta spec from the change was **merged into** the existing `openspec/specs/
 ### Scope Delivered
 
 **1 route registered** in `app/routes.ts`:
+
 - `/management/configurations` → `ConfigurationsPage` (list + save container)
 
 **3 work units completed** (all [x] marked DONE):
+
 1. [x] **SystemConfiguration domain model + configurationHttpService** — HTTP service with list() + update()
 2. [x] **ConfigurationsForm presentational** — Generic N-row name/value editable form
 3. [x] **Route container + wiring** — ConfigurationsPage with LOADING gate, online/offline logic, route registration, i18n
 
 ### Test Coverage
 
-| Layer | Test Count | Files | Coverage |
-|-------|-----------|-------|----------|
-| Unit (http service) | 5 | 1 | service + mocked apiClient |
-| Integration (form, container) | 20 | 2 | form rendering, container state, submit handling |
-| **Total** | **25** | **3** | **100% on service, comprehensive on form/container** |
+| Layer                         | Test Count | Files | Coverage                                             |
+| ----------------------------- | ---------- | ----- | ---------------------------------------------------- |
+| Unit (http service)           | 5          | 1     | service + mocked apiClient                           |
+| Integration (form, container) | 20         | 2     | form rendering, container state, submit handling     |
+| **Total**                     | **25**     | **3** | **100% on service, comprehensive on form/container** |
 
 **TDD Evidence**: All 3 units followed RED → GREEN. Baseline (576) preserved. Final count: 601 tests passing.
 
@@ -112,16 +114,17 @@ The delta spec from the change was **merged into** the existing `openspec/specs/
 
 ### Evidence Summary
 
-| Check | Result | Details |
-|-------|--------|---------|
-| Test suite | ✅ PASS | 601/601 passed, 58 test files, 0 failures |
-| Typecheck (tsc) | ✅ PASS | `turbo run typecheck` — 5 packages, 0 errors |
-| Task completion | ✅ PASS | 3/3 units done, all required files present |
+| Check           | Result    | Details                                               |
+| --------------- | --------- | ----------------------------------------------------- |
+| Test suite      | ✅ PASS   | 601/601 passed, 58 test files, 0 failures             |
+| Typecheck (tsc) | ✅ PASS   | `turbo run typecheck` — 5 packages, 0 errors          |
+| Task completion | ✅ PASS   | 3/3 units done, all required files present            |
 | Spec compliance | ✅ MOSTLY | 40/40 requirements implemented; 1 warning (see below) |
 
 ### Warnings (1)
 
 **W-1 — Backend contract alignment**
+
 - `SystemConfiguration.id` is string (spec/design said number) due to `BaseRepository<T extends {id:string}>` constraint
 - When the real `ConfigurationsController` is built (out of scope), the endpoint must handle id as string or service coerces
 - Impact: Isolated to `configuration-http-service.ts`, minimal risk
@@ -141,18 +144,21 @@ The backend `/v1/configurations` endpoint does NOT exist. This is a documented, 
 ## Design Decisions Locked
 
 ### Access Control
+
 - **adminFeatureLoader** reuses existing loader composition without modification
 - No new auth model; reuses role + feature guard
 - Unauthenticated → `/login`, unauthorized → `/unauthorized`
 
 ### Architecture
+
 - **Container/presentational split** mirrors `app/management/stores` and `app/management/users` precedents
 - **Offline policy**: read-from-cache (list), block-writes (save)
 - **No offline write queue** — explicit design decision
 - **Generic name/value list** — no hardcoded fields; new backend keys appear automatically
 
 ### Internationalization
-- 10 CONFIGURATIONS.* keys + shared MANAGEMENT.* keys added to es.ts
+
+- 10 CONFIGURATIONS._ keys + shared MANAGEMENT._ keys added to es.ts
 - All copy via useIntl / FormattedMessage (no hardcoded strings)
 - Spanish (Rioplatense tone) per project convention
 
@@ -177,9 +183,11 @@ All contracts (list, update) are mocked in this change. Real backend `/v1/config
 ## Files Merged & Archived
 
 ### Main Spec Updated
+
 - **frontend-react/openspec/specs/management/spec.md** — now contains ~187 requirements (Stores 81 + Users 66 + Configurations 40), complete with acceptance scenarios and constraints
 
 ### Change Folder Archived
+
 - **frontend-react/openspec/changes/archive/2026-06-01-phase4-mgmt-configurations/** — Full audit trail (proposal, spec, design, tasks, apply-progress, verify, delta spec, this report)
 
 ### Directory Structure
@@ -217,12 +225,14 @@ frontend-react/openspec/
 ## Next Steps
 
 ### Immediate (Orchestrator)
+
 1. Review this archive report for any concerns
 2. Verify main spec merge (`frontend-react/openspec/specs/management/spec.md` now has ~187 reqs)
 3. Commit the merged spec and archive folder to git
 4. If satisfied, proceed to PR/merge review
 
 ### Post-Archive (Future Sessions)
+
 1. **Backend implementation** (#237): Implement `ConfigurationsController` with GET + PUT endpoints matching the mocked contract
 2. Once backend exists, real `/v1/configurations` calls will work end-to-end
 3. **Future enhancements**: Typed per-field forms, per-store configurations, offline write queue (deferred to v2)
@@ -234,6 +244,7 @@ frontend-react/openspec/
 The **phase4-mgmt-configurations** change has been fully planned (proposal + spec + design), implemented (3 units, 25 tests, TDD-compliant), verified (PASS WITH WARNINGS), and archived.
 
 All artifacts are persisted:
+
 - **Engram**: Observation IDs #238, #239, #240, #241, #243, #245 for cross-session recovery
 - **Filesystem**: Archived folder + merged main spec for team visibility
 - **This report**: Complete traceability of decisions, artifacts, and residual risks

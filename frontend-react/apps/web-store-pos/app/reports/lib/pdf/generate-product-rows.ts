@@ -1,4 +1,10 @@
-import type { BaseResponseModel, InventoryEntry, InventoryEntryView, Order, Product } from '@store-mgmt/domain';
+import type {
+  BaseResponseModel,
+  InventoryEntry,
+  InventoryEntryView,
+  Order,
+  Product,
+} from '@store-mgmt/domain';
 import type { InventoryCategoryView } from '~/inventory/lib/services/inventory-offline-service';
 import type { InventoryTodaySaleRow } from './inventory-today-sale-pdf';
 import { round2 } from '~/shared/lib/money';
@@ -52,7 +58,9 @@ export function generateProductRows(
     : [];
 
   return products.map((prod) => {
-    const orderItems = todayOrders.flatMap((o) => o.orderItems).filter((oi) => oi.productId === prod.id);
+    const orderItems = todayOrders
+      .flatMap((o) => o.orderItems)
+      .filter((oi) => oi.productId === prod.id);
     const productTodayEntries = todayEntries.succeeded
       ? todayEntries.data.filter((e) => e.productId === prod.id)
       : [];
@@ -66,7 +74,9 @@ export function generateProductRows(
     const disponible = available + vendido;
     const inicio = available + vendido - entryQuantity;
     const precioVenta =
-      orderItems.length > 0 ? orderItems.reduce((total, oi) => total + oi.price, 0) / orderItems.length : 0;
+      orderItems.length > 0
+        ? orderItems.reduce((total, oi) => total + oi.price, 0) / orderItems.length
+        : 0;
     const importeVenta = round2(vendido * precioVenta);
     let costoUnitario = 0;
     if (productAvailableEntries.length > 0) {

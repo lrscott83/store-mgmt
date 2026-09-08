@@ -386,14 +386,8 @@ async function readTotalProfit(page: Page): Promise<string> {
   // The Card title's total span (today-sales-profit.tsx:218) — text-lg font-bold
   // text-success; the text-success class disambiguates from the sidebar's own
   // text-lg font-bold "VendeDTo" brand span should the sidebar ever be open.
-  return (
-    await page
-      .locator('span.text-lg.font-bold.text-success')
-      .first()
-      .innerText()
-  ).trim();
+  return (await page.locator('span.text-lg.font-bold.text-success').first().innerText()).trim();
 }
-
 
 test.describe.serial('Almacenes — flujo completo', () => {
   test.describe.configure({ timeout: 120_000 });
@@ -523,7 +517,9 @@ test.describe.serial('Almacenes — flujo completo', () => {
     await expect(page.getByText(CANNOT_DEACTIVATE)).toBeVisible();
     await dismissSwal(page);
     await expect(page.getByTestId('warehouse-card-Con Stock')).toBeVisible();
-    await expect(page.getByTestId('warehouse-card-Con Stock').getByText(INACTIVE_TAG)).toHaveCount(0);
+    await expect(page.getByTestId('warehouse-card-Con Stock').getByText(INACTIVE_TAG)).toHaveCount(
+      0,
+    );
 
     // Almacén VACÍO (sin stock ni movimientos): sí se desactiva → (Inactivo).
     await createWarehouse(page, 'Vacío');

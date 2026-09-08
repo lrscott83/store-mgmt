@@ -2,7 +2,7 @@
 
 ## Intent
 
-**Problem.** Phase 2 shipped the primary transactional features (products, POS/orders/credits, inventory entries/egress/availability). What remains is the *insight* layer: the store owner can record sales but cannot record operating expenses, cannot see a consolidated daily report, and has no historical/visual view of business performance. The `Expense` domain model, the `Expenses`/`Reports`/`Statistics` modules, and their feature flags (`TodayExpenses=80`, `ExpensesHistory=102`, `TodayReports=50`, `Dashboard=60`) all already exist in the codebase but have **no routes wired**.
+**Problem.** Phase 2 shipped the primary transactional features (products, POS/orders/credits, inventory entries/egress/availability). What remains is the _insight_ layer: the store owner can record sales but cannot record operating expenses, cannot see a consolidated daily report, and has no historical/visual view of business performance. The `Expense` domain model, the `Expenses`/`Reports`/`Statistics` modules, and their feature flags (`TodayExpenses=80`, `ExpensesHistory=102`, `TodayReports=50`, `Dashboard=60`) all already exist in the codebase but have **no routes wired**.
 
 **Why now.** Phase 3 closes the analytics/expenses gap left after Phase 2. The aggregation backbone (`OrderOfflineService.getByDateRange`, `calculateOrderProfit`, `InventoryOfflineService`) is already in place, so the cost of building these three modules now is low and they unblock the owner's day-to-day financial visibility.
 
@@ -32,12 +32,12 @@
 
 ## Routes to add
 
-| Route path | Feature flag | Module | Description |
-|---|---|---|---|
-| `/expenses/today` | `EFeatures.TodayExpenses` (80) | Expenses=8 | Add/edit/delete today's expenses + running total |
-| `/expenses/expenses` | `EFeatures.ExpensesHistory` (102) | Expenses=8 | Edit-only history with date+type filters + filtered total (no add, no delete) |
-| `/reports/today` | `EFeatures.TodayReports` (50) | Reports=5 | Combined today dashboard: sales, profit, inventory status, available qty |
-| `/stats/dashboard` | `EFeatures.Dashboard` (60) | Statistics=6 | Last-30-days sales-revenue + profit charts (recharts, lazy) |
+| Route path           | Feature flag                      | Module       | Description                                                                   |
+| -------------------- | --------------------------------- | ------------ | ----------------------------------------------------------------------------- |
+| `/expenses/today`    | `EFeatures.TodayExpenses` (80)    | Expenses=8   | Add/edit/delete today's expenses + running total                              |
+| `/expenses/expenses` | `EFeatures.ExpensesHistory` (102) | Expenses=8   | Edit-only history with date+type filters + filtered total (no add, no delete) |
+| `/reports/today`     | `EFeatures.TodayReports` (50)     | Reports=5    | Combined today dashboard: sales, profit, inventory status, available qty      |
+| `/stats/dashboard`   | `EFeatures.Dashboard` (60)        | Statistics=6 | Last-30-days sales-revenue + profit charts (recharts, lazy)                   |
 
 Each route module follows the established pattern: `export default function XxxPage()` + `export const loader = featureLoader([EFeatures.X])`.
 
@@ -77,15 +77,15 @@ Extract `startOfDay` / `addDays` into `shared/lib/date-utils.ts` and have both n
 
 ## Risks & mitigations
 
-| Risk | Mitigation |
-|---|---|
-| Recharts bundle leak into auth/other bundles | Lazy-load via a single core chart file behind `React.lazy` at the Statistics route; validate with a build/bundle check (mirror `@zxing/browser` split). |
-| Reports vs inventory route overlap → duplicated aggregation | Scope Reports as a combined dashboard only; do NOT refactor `today-quantities`/`today-sales-profit`. Aggregation lives in `ReportAggregationService`. |
-| 30-day localStorage scan performance | Acceptable (<5ms) at typical small-store volumes; O(n) synchronous read. Document it; revisit only on reported slowness. Reject the cached-summaries approach as premature. |
-| `startOfDay`/`addDays` duplication growing | Extract to `shared/lib/date-utils.ts` in this phase before writing a third copy. |
-| `Expense.note` non-optional crashes on empty | Enforce `note: value ?? ''` at the form-submit layer. |
-| `menu-config` missing `ExpensesHistory` item | Add the item alongside the history route registration. |
-| Recharts not yet installed | Add to `package.json`; verify Vite tree-shaking and lazy chunk emission. |
+| Risk                                                        | Mitigation                                                                                                                                                                  |
+| ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Recharts bundle leak into auth/other bundles                | Lazy-load via a single core chart file behind `React.lazy` at the Statistics route; validate with a build/bundle check (mirror `@zxing/browser` split).                     |
+| Reports vs inventory route overlap → duplicated aggregation | Scope Reports as a combined dashboard only; do NOT refactor `today-quantities`/`today-sales-profit`. Aggregation lives in `ReportAggregationService`.                       |
+| 30-day localStorage scan performance                        | Acceptable (<5ms) at typical small-store volumes; O(n) synchronous read. Document it; revisit only on reported slowness. Reject the cached-summaries approach as premature. |
+| `startOfDay`/`addDays` duplication growing                  | Extract to `shared/lib/date-utils.ts` in this phase before writing a third copy.                                                                                            |
+| `Expense.note` non-optional crashes on empty                | Enforce `note: value ?? ''` at the form-submit layer.                                                                                                                       |
+| `menu-config` missing `ExpensesHistory` item                | Add the item alongside the history route registration.                                                                                                                      |
+| Recharts not yet installed                                  | Add to `package.json`; verify Vite tree-shaking and lazy chunk emission.                                                                                                    |
 
 ## Review Workload Forecast (rough size signal)
 

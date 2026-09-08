@@ -213,10 +213,7 @@ describe('Route Loaders (AUTH-04)', () => {
     // entity-crypto.ts:23 + storage-keys.ts entityKey shape, mirrored as
     // literals — the app source is mocked/partial here, not importable.
     function plantEncryptedEntity(storeId: string): void {
-      localStorage.setItem(
-        `lizoft.store-products-${storeId}`,
-        'enc:v1:AAAA',
-      );
+      localStorage.setItem(`lizoft.store-products-${storeId}`, 'enc:v1:AAAA');
     }
 
     // Valid-session fix (2026-09-06): locked + provisioned + NO ciphertext on
@@ -337,7 +334,13 @@ describe('Route Loaders (AUTH-04)', () => {
         'decrypt',
       ]);
       const wrap = await wrapDekForDevice(dek, key);
-      writeDeviceDekTable({ formatVersion: 1, dekSource: 'local', storeId, device: wrap, users: {} });
+      writeDeviceDekTable({
+        formatVersion: 1,
+        dekSource: 'local',
+        storeId,
+        device: wrap,
+        users: {},
+      });
       return key;
     }
 
@@ -376,20 +379,18 @@ describe('Route Loaders (AUTH-04)', () => {
       );
 
       let dekWhenProductServiceCalled: Uint8Array | null = null;
-      const spy = vi
-        .spyOn(productServiceFactory, 'createProductService')
-        .mockImplementation(() => {
-          dekWhenProductServiceCalled = getDek();
-          return {
-            hasAnyAvailableToSaleProduct: vi.fn().mockResolvedValue({
-              data: false,
-              succeeded: true,
-              message: '',
-              actionCode: 200,
-              errors: [],
-            }),
-          } as unknown as ReturnType<typeof productServiceFactory.createProductService>;
-        });
+      const spy = vi.spyOn(productServiceFactory, 'createProductService').mockImplementation(() => {
+        dekWhenProductServiceCalled = getDek();
+        return {
+          hasAnyAvailableToSaleProduct: vi.fn().mockResolvedValue({
+            data: false,
+            succeeded: true,
+            message: '',
+            actionCode: 200,
+            errors: [],
+          }),
+        } as unknown as ReturnType<typeof productServiceFactory.createProductService>;
+      });
 
       setAuthState(makeUser({ login: ORDERING_LOGIN }));
       await guestOnlyLoader();
@@ -422,7 +423,7 @@ describe('Route Loaders (AUTH-04)', () => {
       setAuthState(
         makeUser({
           roles: [{ storeId: 's1', storeName: 'S1', moduleId: 2, featureIds: [20] }],
-        })
+        }),
       );
       const loader = featureLoader([21], 's1');
       const result = await loader({ params: {} } as never);
@@ -435,7 +436,7 @@ describe('Route Loaders (AUTH-04)', () => {
       setAuthState(
         makeUser({
           roles: [{ storeId: 's1', storeName: 'S1', moduleId: 2, featureIds: [21] }],
-        })
+        }),
       );
       const loader = featureLoader([21], 's1');
       const result = await loader({ params: {} } as never);

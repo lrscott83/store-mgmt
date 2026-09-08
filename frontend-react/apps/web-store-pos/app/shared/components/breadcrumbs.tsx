@@ -41,13 +41,21 @@ export function Breadcrumbs() {
 
 function BreadcrumbNav({ items }: { items: BreadcrumbItem[] }) {
   return (
-    <nav aria-label="Breadcrumb" className="flex items-center gap-1 text-sm text-gray-500 px-4 py-2">
+    <nav
+      aria-label="Breadcrumb"
+      className="flex items-center gap-1 text-sm text-gray-500 px-4 py-2"
+    >
       <Link to="/sales/new" className="hover:text-primary transition-colors">
         Home
       </Link>
       {items.map((item) => (
         <span key={item.path} className="flex items-center gap-1">
-          <svg className="h-3 w-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg
+            className="h-3 w-3 text-gray-400"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
           </svg>
           {item.isLast ? (

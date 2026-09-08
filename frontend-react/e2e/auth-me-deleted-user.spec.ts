@@ -110,10 +110,7 @@ test.describe.serial('auth/me — deleted user scenarios', () => {
     expect(superAdmin.homePath).toMatch(/\/(admin|sales)/);
   });
 
-  test('A — online + user deleted: getMe() rejects → logout', async ({
-    page,
-    browser,
-  }) => {
+  test('A — online + user deleted: getMe() rejects → logout', async ({ page, browser }) => {
     // Delete the user from the DB
     await deleteUserByLogin(superAdmin.identity.login);
 
@@ -130,17 +127,12 @@ test.describe.serial('auth/me — deleted user scenarios', () => {
     await page.close();
   });
 
-  test('B — offline + user deleted: network error → retain session', async ({
-    page,
-    browser,
-  }) => {
+  test('B — offline + user deleted: network error → retain session', async ({ page, browser }) => {
     // Apply snapshot with invalidated cache so getMe() fires
     await applySnapshotAndForceMeRefresh(page, superAdmin);
 
     // Intercept /v1/auth/me to simulate a network failure (no internet)
-    await page.route('**/v1/auth/me', (route) =>
-      route.abort('connectionrefused')
-    );
+    await page.route('**/v1/auth/me', (route) => route.abort('connectionrefused'));
 
     // Navigate to home — triggers initialize() → getUserByToken() → getMe()
     // getMe() gets a network error → NOT isSessionRejection → retains user

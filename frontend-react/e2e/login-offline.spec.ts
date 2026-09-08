@@ -36,7 +36,8 @@ const ACCOUNT_INACTIVE_TEXT = 'Tu cuenta está inactiva. Contacta soporte.'; // 
 const SERVER_ERROR_TEXT = 'Ocurrió un error. Inténtalo de nuevo.'; // es.ts:90
 const TOO_MANY_ATTEMPTS_TEXT = 'Demasiados intentos. Espera un momento antes de volver a intentar.'; // es.ts:91
 const OFFLINE_LOGIN_TEXT = 'Estás sin conexión. Se requiere conexión para iniciar sesión.'; // es.ts:93
-const UNLOCK_REQUIRED_TEXT = 'Ingresa tu contraseña para desbloquear los datos de este dispositivo.'; // es.ts:99
+const UNLOCK_REQUIRED_TEXT =
+  'Ingresa tu contraseña para desbloquear los datos de este dispositivo.'; // es.ts:99
 const UNLOCK_FAILED_TEXT =
   'No se pudieron desbloquear los datos de este dispositivo. Si cambiaste tu contraseña, solicita una nueva activación.'; // es.ts:100-101
 
@@ -76,7 +77,7 @@ function expectOnlyKnownTelemetry(anyRequest: AnyRequestObserver, context: strin
       `Expected zero HTTP requests other than the known store-usage telemetry POST (${context}), ` +
         `but observed ${unexpected.length}: ` +
         unexpected.map((r) => `${r.method} ${r.url} (${r.resourceType})`).join('; ') +
-        '.'
+        '.',
     );
   }
 }
@@ -99,7 +100,10 @@ const ENTITY_ENVELOPE_PREFIX = 'enc:v1:';
  * produced ciphertext (`enc:v1:` prefix), not merely that no UI error
  * appeared. */
 async function readProductsEntityRaw(page: Page, storeId: string): Promise<string | null> {
-  return page.evaluate((key) => window.localStorage.getItem(key), `lizoft.store-products-${storeId}`);
+  return page.evaluate(
+    (key) => window.localStorage.getItem(key),
+    `lizoft.store-products-${storeId}`,
+  );
 }
 
 /**
@@ -139,7 +143,7 @@ async function deleteDeviceKeyDatabase(page: Page): Promise<void> {
         request.onerror = () => reject(request.error);
         request.onblocked = () => resolve();
       }),
-    DEVICE_KEY_DB
+    DEVICE_KEY_DB,
   );
 }
 
@@ -189,9 +193,7 @@ async function expectProductVisibleInCategory(page: Page, name: string): Promise
   // panel as that div's NEXT SIBLING. Selecting the sibling reaches the
   // product list and nothing else, without adding a `data-testid` to
   // production for a test's convenience (the rule store-seed.ts:6-7 states).
-  const expandedPanel = page.locator(
-    'div:has(> [data-testid^="category-panel-toggle-"]) + div'
-  );
+  const expandedPanel = page.locator('div:has(> [data-testid^="category-panel-toggle-"]) + div');
   await expect(expandedPanel.getByText(name)).toBeVisible();
 }
 
@@ -231,7 +233,9 @@ test.describe('login offline — dispositivo aprovisionado (S1-03)', () => {
     loginNetwork.expectNoLoginAttempt();
   });
 
-  test('T2: destino con productos — siembra por UI, logout y 2º submit offline', async ({ page }) => {
+  test('T2: destino con productos — siembra por UI, logout y 2º submit offline', async ({
+    page,
+  }) => {
     const anyRequest = installAnyRequestObserver(page);
     const loginPage = new LoginPage(page);
     const login = uniqueLogin('t2');
@@ -563,11 +567,17 @@ test.describe('login offline — dispositivo aprovisionado (S1-03)', () => {
     await expect(page.getByText(name).first()).toBeVisible();
     await expectProductsEntityEncrypted(page, bundle.storeId);
 
-    expectOnlyKnownTelemetry(anyRequest, 'F4 clave de dispositivo destruida, wrap de contraseña intacto');
+    expectOnlyKnownTelemetry(
+      anyRequest,
+      'F4 clave de dispositivo destruida, wrap de contraseña intacto',
+    );
     loginNetwork.expectNoLoginAttempt();
   });
 
-  test('T11: sin conexión aterriza en la misma ruta que con conexión', async ({ page, loginNetwork }) => {
+  test('T11: sin conexión aterriza en la misma ruta que con conexión', async ({
+    page,
+    loginNetwork,
+  }) => {
     const anyRequest = installAnyRequestObserver(page);
     const loginPage = new LoginPage(page);
     const login = uniqueLogin('t11');

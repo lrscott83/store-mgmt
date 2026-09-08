@@ -35,13 +35,21 @@ const CATALOG: Module[] = [
 describe('PlanPicker — PLAN-1: section title + billing notice', () => {
   it('renders the section title and the verbatim billing notice', async () => {
     const { PlanPicker } = await import('../plan-picker');
-    render(<Wrapper><PlanPicker modules={CATALOG} onChange={vi.fn()} /></Wrapper>);
+    render(
+      <Wrapper>
+        <PlanPicker modules={CATALOG} onChange={vi.fn()} />
+      </Wrapper>,
+    );
     expect(screen.getByText('Plan de la tienda')).toBeInTheDocument();
     expect(
-      screen.getByText('Plan Pago: 1 mes GRATIS. Luego se cobra por mes vencido → el primer pago después del segundo mes.')
+      screen.getByText(
+        'Plan Pago: 1 mes GRATIS. Luego se cobra por mes vencido → el primer pago después del segundo mes.',
+      ),
     ).toBeInTheDocument();
     expect(
-      screen.getByText('Los precios se muestran en USD. El pago se realiza en MN al cambio oficial del día.')
+      screen.getByText(
+        'Los precios se muestran en USD. El pago se realiza en MN al cambio oficial del día.',
+      ),
     ).toBeInTheDocument();
   });
 });
@@ -49,7 +57,11 @@ describe('PlanPicker — PLAN-1: section title + billing notice', () => {
 describe('PlanPicker — PLAN-2: paid tab label shows the summed total', () => {
   it('shows "Pago" with the sum of paid currentPrice formatted as USD', async () => {
     const { PlanPicker } = await import('../plan-picker');
-    render(<Wrapper><PlanPicker modules={CATALOG} onChange={vi.fn()} /></Wrapper>);
+    render(
+      <Wrapper>
+        <PlanPicker modules={CATALOG} onChange={vi.fn()} />
+      </Wrapper>,
+    );
     // No discount in test data (price === currentPrice for all paid modules)
     expect(screen.getByRole('tab', { name: /Pago/ })).toHaveTextContent('2,000 USD');
   });
@@ -59,10 +71,12 @@ describe('PlanPicker — PLAN-2b: paid tab shows decimas only when present', () 
   it('omits trailing zeros but keeps fractional decimals on the paid total', async () => {
     const { PlanPicker } = await import('../plan-picker');
     // paid total = 1500 + 500.25 = 2000.25 → keeps decimals
-    const fractional = CATALOG.map((m) =>
-      m.id === 3 ? { ...m, currentPrice: 500.25 } : m,
+    const fractional = CATALOG.map((m) => (m.id === 3 ? { ...m, currentPrice: 500.25 } : m));
+    render(
+      <Wrapper>
+        <PlanPicker modules={fractional} onChange={vi.fn()} />
+      </Wrapper>,
     );
-    render(<Wrapper><PlanPicker modules={fractional} onChange={vi.fn()} /></Wrapper>);
     expect(screen.getByRole('tab', { name: /Pago/ })).toHaveTextContent('2,000.25 USD');
   });
 });
@@ -75,7 +89,11 @@ describe('PlanPicker — PLAN-2c: discounted original price is struck-through in
       makeModule({ id: 1, name: 'Ventas', priceIncluded: true, currentPrice: 0 }),
       makeModule({ id: 2, name: 'Reportes', priceIncluded: false, price: 10, currentPrice: 5 }),
     ];
-    render(<Wrapper><PlanPicker modules={discounted} onChange={vi.fn()} /></Wrapper>);
+    render(
+      <Wrapper>
+        <PlanPicker modules={discounted} onChange={vi.fn()} />
+      </Wrapper>,
+    );
 
     const tab = screen.getByRole('tab', { name: /Pago/ });
     // original struck-through: bare number, no USD
@@ -93,7 +111,11 @@ describe('PlanPicker — PLAN-2c: discounted original price is struck-through in
 describe('PlanPicker — PLAN-3: module lists per tab (no prices)', () => {
   it('free tab lists free modules; paid tab lists paid modules after switching', async () => {
     const { PlanPicker } = await import('../plan-picker');
-    render(<Wrapper><PlanPicker modules={CATALOG} onChange={vi.fn()} /></Wrapper>);
+    render(
+      <Wrapper>
+        <PlanPicker modules={CATALOG} onChange={vi.fn()} />
+      </Wrapper>,
+    );
     // default tab = active plan = free (no paid selected)
     expect(screen.getByText('Ventas')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('tab', { name: /Pago/ }));
@@ -105,14 +127,22 @@ describe('PlanPicker — PLAN-3: module lists per tab (no prices)', () => {
 describe('PlanPicker — PLAN-4: active badge', () => {
   it('shows Activo on the Gratis tab when no paid module is selected', async () => {
     const { PlanPicker } = await import('../plan-picker');
-    render(<Wrapper><PlanPicker modules={CATALOG} onChange={vi.fn()} /></Wrapper>);
+    render(
+      <Wrapper>
+        <PlanPicker modules={CATALOG} onChange={vi.fn()} />
+      </Wrapper>,
+    );
     expect(screen.getByRole('tab', { name: /Gratis/ })).toHaveTextContent('Activo');
   });
 
   it('shows Activo on the Pago tab when a paid module is selected', async () => {
     const { PlanPicker } = await import('../plan-picker');
     const modules = CATALOG.map((m) => (m.id === 2 ? { ...m, selected: true } : m));
-    render(<Wrapper><PlanPicker modules={modules} onChange={vi.fn()} /></Wrapper>);
+    render(
+      <Wrapper>
+        <PlanPicker modules={modules} onChange={vi.fn()} />
+      </Wrapper>,
+    );
     expect(screen.getByRole('tab', { name: /Pago/ })).toHaveTextContent('Activo');
   });
 });
@@ -121,7 +151,11 @@ describe('PlanPicker — PLAN-5: initial selection = active plan, no emit on mou
   it('marks the active plan as selected and does not call onChange on mount', async () => {
     const { PlanPicker } = await import('../plan-picker');
     const onChange = vi.fn();
-    render(<Wrapper><PlanPicker modules={CATALOG} onChange={onChange} /></Wrapper>);
+    render(
+      <Wrapper>
+        <PlanPicker modules={CATALOG} onChange={onChange} />
+      </Wrapper>,
+    );
     // active = free; free tab is shown and marked selected
     expect(screen.getByText('Plan seleccionado')).toBeInTheDocument();
     expect(onChange).not.toHaveBeenCalled();
@@ -132,7 +166,11 @@ describe('PlanPicker — PLAN-6: activating Pago emits ALL module ids', () => {
   it('emits every module id when the paid plan is activated', async () => {
     const { PlanPicker } = await import('../plan-picker');
     const onChange = vi.fn();
-    render(<Wrapper><PlanPicker modules={CATALOG} onChange={onChange} /></Wrapper>);
+    render(
+      <Wrapper>
+        <PlanPicker modules={CATALOG} onChange={onChange} />
+      </Wrapper>,
+    );
     fireEvent.click(screen.getByRole('tab', { name: /Pago/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Activar este plan' }));
     expect(onChange).toHaveBeenCalledWith([1, 2, 3]);
@@ -145,7 +183,11 @@ describe('PlanPicker — PLAN-7: activating Gratis emits only free ids', () => {
     const onChange = vi.fn();
     // active = paid (Reportes selected) so Gratis is not the selected plan
     const modules = CATALOG.map((m) => (m.id === 2 ? { ...m, selected: true } : m));
-    render(<Wrapper><PlanPicker modules={modules} onChange={onChange} /></Wrapper>);
+    render(
+      <Wrapper>
+        <PlanPicker modules={modules} onChange={onChange} />
+      </Wrapper>,
+    );
     fireEvent.click(screen.getByRole('tab', { name: /Gratis/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Activar este plan' }));
     expect(onChange).toHaveBeenCalledWith([1]);
@@ -155,7 +197,11 @@ describe('PlanPicker — PLAN-7: activating Gratis emits only free ids', () => {
 describe('PlanPicker — PLAN-8: "Se activará al guardar" hint', () => {
   it('shows the hint on the selected plan when it differs from the active plan', async () => {
     const { PlanPicker } = await import('../plan-picker');
-    render(<Wrapper><PlanPicker modules={CATALOG} onChange={vi.fn()} /></Wrapper>);
+    render(
+      <Wrapper>
+        <PlanPicker modules={CATALOG} onChange={vi.fn()} />
+      </Wrapper>,
+    );
     // active = free; activate Pago → selected(paid) !== active(free)
     fireEvent.click(screen.getByRole('tab', { name: /Pago/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Activar este plan' }));
@@ -166,9 +212,17 @@ describe('PlanPicker — PLAN-8: "Se activará al guardar" hint', () => {
 describe('PlanPicker — PLAN-9: re-syncs to active plan when modules arrive async', () => {
   it('moves the Activo badge to Pago after modules load with a paid module selected', async () => {
     const { PlanPicker } = await import('../plan-picker');
-    const { rerender } = render(<Wrapper><PlanPicker modules={[]} onChange={vi.fn()} /></Wrapper>);
+    const { rerender } = render(
+      <Wrapper>
+        <PlanPicker modules={[]} onChange={vi.fn()} />
+      </Wrapper>,
+    );
     const loaded = CATALOG.map((m) => (m.id === 2 ? { ...m, selected: true } : m));
-    rerender(<Wrapper><PlanPicker modules={loaded} onChange={vi.fn()} /></Wrapper>);
+    rerender(
+      <Wrapper>
+        <PlanPicker modules={loaded} onChange={vi.fn()} />
+      </Wrapper>,
+    );
     expect(screen.getByRole('tab', { name: /Pago/ })).toHaveTextContent('Activo');
   });
 });
@@ -180,7 +234,11 @@ describe('PlanPicker — Read-Only Lock (DG-7)', () => {
   it('readOnly=true hides "Activar este plan" and tab clicks never call onChange', async () => {
     const { PlanPicker } = await import('../plan-picker');
     const onChange = vi.fn();
-    render(<Wrapper><PlanPicker modules={CATALOG} onChange={onChange} readOnly /></Wrapper>);
+    render(
+      <Wrapper>
+        <PlanPicker modules={CATALOG} onChange={onChange} readOnly />
+      </Wrapper>,
+    );
 
     // Tabs still render (readOnly does not disable browsing the plan catalog).
     expect(screen.getByRole('tab', { name: /Gratis/ })).toBeInTheDocument();
@@ -195,7 +253,11 @@ describe('PlanPicker — Read-Only Lock (DG-7)', () => {
   it('readOnly=false (default) still shows "Activar este plan" and onChange fires normally', async () => {
     const { PlanPicker } = await import('../plan-picker');
     const onChange = vi.fn();
-    render(<Wrapper><PlanPicker modules={CATALOG} onChange={onChange} /></Wrapper>);
+    render(
+      <Wrapper>
+        <PlanPicker modules={CATALOG} onChange={onChange} />
+      </Wrapper>,
+    );
     fireEvent.click(screen.getByRole('tab', { name: /Pago/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Activar este plan' }));
     expect(onChange).toHaveBeenCalledWith([1, 2, 3]);

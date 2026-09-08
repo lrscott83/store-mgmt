@@ -40,7 +40,12 @@ let mockUpdateUser = vi.fn();
 
 vi.mock('~/shared/lib/stores/auth-store', () => {
   const useAuthStore = vi.fn((selector?: (s: unknown) => unknown) => {
-    const state = { user: mockUser, isAuthenticated: true, logout: mockLogout, updateUser: mockUpdateUser };
+    const state = {
+      user: mockUser,
+      isAuthenticated: true,
+      logout: mockLogout,
+      updateUser: mockUpdateUser,
+    };
     if (typeof selector === 'function') return selector(state);
     return state;
   });
@@ -60,8 +65,12 @@ let mockChangePassword = vi.fn();
 
 vi.mock('~/profile/lib/services/profile-http-service', () => ({
   profileHttpService: {
-    get updateProfile() { return mockUpdateProfile; },
-    get changePassword() { return mockChangePassword; },
+    get updateProfile() {
+      return mockUpdateProfile;
+    },
+    get changePassword() {
+      return mockChangePassword;
+    },
   },
 }));
 
@@ -195,9 +204,12 @@ describe('EditProfilePage — S-EDIT-1: successful submit calls updateProfile an
     fireEvent.click(screen.getByRole('button', { name: /guardar cambios/i }));
 
     await waitFor(() => {
-      expect(mockUpdateProfile).toHaveBeenCalledWith('u1', expect.objectContaining({
-        fullName: 'María García',
-      }));
+      expect(mockUpdateProfile).toHaveBeenCalledWith(
+        'u1',
+        expect.objectContaining({
+          fullName: 'María García',
+        }),
+      );
     });
   });
 
@@ -235,7 +247,10 @@ describe('EditProfilePage — PHONE-3: phone required only for owner/reseller', 
     fireEvent.click(screen.getByRole('button', { name: /guardar cambios/i }));
 
     await waitFor(() => {
-      expect(mockUpdateProfile).toHaveBeenCalledWith('u1', expect.objectContaining({ cellPhone: '' }));
+      expect(mockUpdateProfile).toHaveBeenCalledWith(
+        'u1',
+        expect.objectContaining({ cellPhone: '' }),
+      );
     });
   });
 

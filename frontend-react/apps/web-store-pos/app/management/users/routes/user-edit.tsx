@@ -69,7 +69,9 @@ export function UserEditPage() {
   if (loadError) {
     return (
       <div className="space-y-4 p-4">
-        <p role="alert" className="text-sm text-red-600">{loadError}</p>
+        <p role="alert" className="text-sm text-red-600">
+          {loadError}
+        </p>
       </div>
     );
   }
@@ -86,9 +88,7 @@ export function UserEditPage() {
 
   return (
     <div className="space-y-6 p-4">
-      <h1 className="text-xl font-semibold">
-        {intl.formatMessage({ id: 'USERS.EDIT_TITLE' })}
-      </h1>
+      <h1 className="text-xl font-semibold">{intl.formatMessage({ id: 'USERS.EDIT_TITLE' })}</h1>
 
       <section className="space-y-4">
         <h2 className="text-base font-medium text-gray-700">

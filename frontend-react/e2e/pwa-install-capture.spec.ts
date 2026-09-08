@@ -80,7 +80,7 @@ test.describe('pwa install capture script', () => {
       window.addEventListener = ((
         type: string,
         listener: EventListenerOrEventListenerObject,
-        options?: boolean | AddEventListenerOptions
+        options?: boolean | AddEventListenerOptions,
       ) => {
         const alreadyObserved = (window as unknown as Record<string, unknown>)[globalName] !== null;
         if (type !== 'beforeinstallprompt' || alreadyObserved) {
@@ -102,7 +102,7 @@ test.describe('pwa install capture script', () => {
 
     const probe = (await page.evaluate(
       (globalName) => (window as unknown as Record<string, unknown>)[globalName],
-      PARSE_TIME_PROBE_GLOBAL
+      PARSE_TIME_PROBE_GLOBAL,
     )) as ParseTimeProbe | null;
 
     expect(probe, 'no beforeinstallprompt listener was ever registered').not.toBeNull();
@@ -113,7 +113,7 @@ test.describe('pwa install capture script', () => {
     expect(probe?.readyStateAtRegistration).toBe('loading');
 
     const promptHeldAfterHydration = await page.evaluate(
-      () => (window as unknown as { __pwaInstallPrompt?: unknown }).__pwaInstallPrompt != null
+      () => (window as unknown as { __pwaInstallPrompt?: unknown }).__pwaInstallPrompt != null,
     );
     expect(promptHeldAfterHydration).toBe(true);
 

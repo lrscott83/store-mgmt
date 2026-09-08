@@ -34,9 +34,7 @@ export function getExchangeRateAnchor(): Date {
  * Fire-and-forget on purpose: a storage failure here must never block login
  * (same policy as the entity migration pass).
  */
-export async function ensureExchangeRateDailyRecords(
-  user: UserModel | null,
-): Promise<void> {
+export async function ensureExchangeRateDailyRecords(user: UserModel | null): Promise<void> {
   if (!user || !user.isOwnerAdmin) return;
   const storeId = user.selectedStoreId;
   if (!storeId || storeId === EMPTY_GUID) return;
@@ -45,9 +43,8 @@ export async function ensureExchangeRateDailyRecords(
     if (!localStorage.getItem(StorageKeys.EXCHANGE_RATES_FIRST_LOGIN)) {
       localStorage.setItem(StorageKeys.EXCHANGE_RATES_FIRST_LOGIN, toLocalDayKey(new Date()));
     }
-    const { ExchangeRateOfflineService } = await import(
-      '~/management/exchange-rates/lib/services/exchange-rate-offline-service'
-    );
+    const { ExchangeRateOfflineService } =
+      await import('~/management/exchange-rates/lib/services/exchange-rate-offline-service');
     const svc = new ExchangeRateOfflineService(storeId);
     svc.backfillDailyRecords(getExchangeRateAnchor());
   } catch {

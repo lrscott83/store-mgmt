@@ -81,7 +81,7 @@ export default function RegisterPage() {
     }
     if (!form.passwordConfirmation) {
       errs.passwordConfirmation = requiredError(
-        intl.formatMessage({ id: 'GENERAL.CONFIRM_PASSWORD' })
+        intl.formatMessage({ id: 'GENERAL.CONFIRM_PASSWORD' }),
       );
     } else if (form.password !== form.passwordConfirmation) {
       errs.passwordConfirmation = intl.formatMessage({ id: 'GENERAL.VALIDATION.INVALID_PASSWORD' });
@@ -175,9 +175,7 @@ export default function RegisterPage() {
             onChange={(e) => setForm((f) => ({ ...f, fullName: e.target.value }))}
             className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
           />
-          {errors.fullName && (
-            <p className="mt-1 text-xs text-red-600">{errors.fullName}</p>
-          )}
+          {errors.fullName && <p className="mt-1 text-xs text-red-600">{errors.fullName}</p>}
         </div>
 
         <div className="mb-4">
@@ -192,9 +190,7 @@ export default function RegisterPage() {
             onChange={(e) => setForm((f) => ({ ...f, login: e.target.value }))}
             className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
           />
-          {errors.login && (
-            <p className="mt-1 text-xs text-red-600">{errors.login}</p>
-          )}
+          {errors.login && <p className="mt-1 text-xs text-red-600">{errors.login}</p>}
         </div>
 
         <div className="mb-4">
@@ -209,9 +205,7 @@ export default function RegisterPage() {
             onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
             className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
           />
-          {errors.email && (
-            <p className="mt-1 text-xs text-red-600">{errors.email}</p>
-          )}
+          {errors.email && <p className="mt-1 text-xs text-red-600">{errors.email}</p>}
         </div>
 
         <div className="mb-4">
@@ -226,9 +220,7 @@ export default function RegisterPage() {
             onChange={(e) => setForm((f) => ({ ...f, cellPhone: e.target.value }))}
             className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
           />
-          {errors.cellPhone && (
-            <p className="mt-1 text-xs text-red-600">{errors.cellPhone}</p>
-          )}
+          {errors.cellPhone && <p className="mt-1 text-xs text-red-600">{errors.cellPhone}</p>}
         </div>
 
         <div className="mb-4">
@@ -243,9 +235,7 @@ export default function RegisterPage() {
             onChange={(e) => setForm((f) => ({ ...f, storeName: e.target.value }))}
             className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
           />
-          {errors.storeName && (
-            <p className="mt-1 text-xs text-red-600">{errors.storeName}</p>
-          )}
+          {errors.storeName && <p className="mt-1 text-xs text-red-600">{errors.storeName}</p>}
         </div>
 
         <div className="mb-4">
@@ -272,13 +262,14 @@ export default function RegisterPage() {
               {showPassword ? <EyeIcon className="h-5 w-5" /> : <EyeOffIcon className="h-5 w-5" />}
             </button>
           </div>
-          {errors.password && (
-            <p className="mt-1 text-xs text-red-600">{errors.password}</p>
-          )}
+          {errors.password && <p className="mt-1 text-xs text-red-600">{errors.password}</p>}
         </div>
 
         <div className="mb-6">
-          <label htmlFor="passwordConfirmation" className="block text-sm font-medium text-gray-700 mb-1">
+          <label
+            htmlFor="passwordConfirmation"
+            className="block text-sm font-medium text-gray-700 mb-1"
+          >
             {intl.formatMessage({ id: 'GENERAL.CONFIRM_PASSWORD' })}
           </label>
           <div className="relative">

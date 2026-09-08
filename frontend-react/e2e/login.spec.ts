@@ -166,7 +166,7 @@ test.describe.serial('login — authenticated flows (A1-A3, A6-A7, D1, D3-D6)', 
       // everything derived from `owner-admin` below reuses it instead of
       // paying for a second, invisible login (design.md §2).
       await personaCache.primeOwnerAdmin(page, ownerIdentity);
-    }
+    },
   );
 
   test('REQ-3: a wrong password against the account just registered shows the literal backend text', async ({
@@ -193,7 +193,7 @@ test.describe.serial('login — authenticated flows (A1-A3, A6-A7, D1, D3-D6)', 
     const translated = translationMap[body.errors[0].description] ?? body.errors[0].description;
     const banner = page.getByText(
       `La autenticación no es válida por el siguiente error: ${translated}`,
-      { exact: true }
+      { exact: true },
     );
 
     // Two assertions, both required (same provenance logic as
@@ -300,7 +300,7 @@ test.describe.serial('login — authenticated flows (A1-A3, A6-A7, D1, D3-D6)', 
       // in REQ-11) — re-checked here cheaply via restore.
       await restoreSignedInSession(page, personaCache, 'store-user');
       expect(page.url()).not.toMatch(/\/admin\/owners$/);
-    }
+    },
   );
 
   // S1-04 (e2e-session-hydration): T1-T11, appended after the live-login
@@ -373,7 +373,7 @@ test.describe.serial('login — authenticated flows (A1-A3, A6-A7, D1, D3-D6)', 
     await restoreSignedInSession(page, personaCache, 'owner-admin');
     await mutateAuthModel(page, { authToken: 'e2e-mismatched-auth-model-token-t5' });
     await page.route('**/v1/auth/me', (route) =>
-      route.fulfill({ status: 500, contentType: 'application/json', body: '{}' })
+      route.fulfill({ status: 500, contentType: 'application/json', body: '{}' }),
     );
     await page.reload();
     await loginNetwork.waitForMeRequest();
@@ -383,8 +383,8 @@ test.describe.serial('login — authenticated flows (A1-A3, A6-A7, D1, D3-D6)', 
     await expect(page.getByRole('heading', { name: 'Error' })).toBeVisible();
     await expect(
       page.getByText(
-        'Por favor, vuelva a intentarlo y si persiste el error contacte al equipo de soporte técnico.'
-      )
+        'Por favor, vuelva a intentarlo y si persiste el error contacte al equipo de soporte técnico.',
+      ),
     ).toBeVisible();
     await page.getByRole('button', { name: 'OK' }).click();
 
@@ -568,7 +568,7 @@ test.describe.serial('login — authenticated flows (A1-A3, A6-A7, D1, D3-D6)', 
     // nothing to expire — which would still satisfy the assertion below,
     // vacuously.
     const recordNavigations = async (
-      expireSession: boolean
+      expireSession: boolean,
     ): Promise<{ navigations: string[]; documents: number }> => {
       await page.goto(NEUTRAL_ROUTE);
       await page.waitForLoadState('networkidle');
@@ -632,7 +632,10 @@ test.describe.serial('login — authenticated flows (A1-A3, A6-A7, D1, D3-D6)', 
     expect(withLogout).toEqual(withoutLogout);
   });
 
-  test('REQ-9: a 401 outside /me leaves the session intact (T9)', async ({ page, personaCache }) => {
+  test('REQ-9: a 401 outside /me leaves the session intact (T9)', async ({
+    page,
+    personaCache,
+  }) => {
     await restoreSignedInSession(page, personaCache, 'owner-admin');
     await page.goto('/profile/edit');
 
@@ -653,7 +656,7 @@ test.describe.serial('login — authenticated flows (A1-A3, A6-A7, D1, D3-D6)', 
     // edit-profile.tsx's own catch shows its OWN error copy, never a
     // session-ending redirect.
     await expect(
-      page.getByText('No se pudo actualizar el perfil. Intentá de nuevo.')
+      page.getByText('No se pudo actualizar el perfil. Intentá de nuevo.'),
     ).toBeVisible();
 
     const authModel = await readRawAuthModel(page);

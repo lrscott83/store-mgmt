@@ -681,9 +681,7 @@ export class DataSynchronizerService {
     let inserted = 0;
     let updated = 0;
     try {
-      const existing = new Map(
-        this.warehouseService.getStorageWarehouses().map((w) => [w.id, w]),
-      );
+      const existing = new Map(this.warehouseService.getStorageWarehouses().map((w) => [w.id, w]));
       for (const warehouse of incoming) {
         const isNew = !existing.has(warehouse.id);
         if (isNew) {
@@ -786,9 +784,7 @@ export class DataSynchronizerService {
 
     let inserted = 0;
     try {
-      const existingIds = new Set(
-        this.warehouseService.getStorageMovements().map((m) => m.id),
-      );
+      const existingIds = new Set(this.warehouseService.getStorageMovements().map((m) => m.id));
       for (const movement of incoming) {
         if (existingIds.has(movement.id)) continue;
         existingIds.add(movement.id);
@@ -841,9 +837,7 @@ export class DataSynchronizerService {
       // (field-level for updates) — the synchronizer only decides add-vs-update and counts.
       const existingMap = this.inventoryService.getStorageInventoriesMap();
       for (const [productId, newEntries] of byProduct) {
-        const existingById = new Map(
-          (existingMap.get(productId) ?? []).map((e) => [e.id, e]),
-        );
+        const existingById = new Map((existingMap.get(productId) ?? []).map((e) => [e.id, e]));
         for (const newEntry of newEntries) {
           if (existingById.has(newEntry.id)) updated++;
           else inserted++;

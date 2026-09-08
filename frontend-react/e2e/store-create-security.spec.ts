@@ -101,10 +101,10 @@ test('OwnerAdmin en /management/stores/create ve el formulario de edición y gua
 
   // Wait for the PUT to arrive (edit-store.tsx:120-131).
   await expect
-    .poll(
-      () => capturedRequests.slice(preSaveCount).some((r) => r.method === 'PUT'),
-      { timeout: 15_000, message: 'Expected a PUT /v1/stores/{id} after clicking Guardar' }
-    )
+    .poll(() => capturedRequests.slice(preSaveCount).some((r) => r.method === 'PUT'), {
+      timeout: 15_000,
+      message: 'Expected a PUT /v1/stores/{id} after clicking Guardar',
+    })
     .toBe(true);
 
   // Aserción 5: no POST was emitted — the create branch (edit-store.tsx:141-148)

@@ -67,7 +67,7 @@ describe('ActionMenuItem — intent colors, icon, separator (S-GM-ITEM)', () => 
     expect(screen.queryByRole('menu')).toBeNull();
   });
 
-  it("S-GM-ITEM-2: each intent maps to its color class and default icon", () => {
+  it('S-GM-ITEM-2: each intent maps to its color class and default icon', () => {
     const intents: ActionIntent[] = [
       'edit',
       'create',
@@ -146,7 +146,9 @@ describe('ActionMenuItem — intent colors, icon, separator (S-GM-ITEM)', () => 
     const separators = menu.querySelectorAll('[role="separator"]');
     expect(separators).toHaveLength(1);
     const deleteItem = screen.getByRole('menuitem', { name: 'Eliminar' });
-    expect(separators[0].compareDocumentPosition(deleteItem) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(
+      separators[0].compareDocumentPosition(deleteItem) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
     const editItem = screen.getByRole('menuitem', { name: 'Editar' });
     expect(editItem.previousElementSibling).toBeNull();
   });

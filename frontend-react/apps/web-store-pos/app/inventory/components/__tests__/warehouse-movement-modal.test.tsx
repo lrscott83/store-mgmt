@@ -3,10 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 import type { Product, Warehouse } from '@store-mgmt/domain';
-import {
-  WarehouseMovementModal,
-  type WarehouseMovementMode,
-} from '../warehouse-movement-modal';
+import { WarehouseMovementModal, type WarehouseMovementMode } from '../warehouse-movement-modal';
 
 const WAREHOUSE: Warehouse = {
   id: 'wh-1',
@@ -140,7 +137,9 @@ describe('WarehouseMovementModal', () => {
     const onClose = vi.fn();
     renderModal({ onSubmit, onClose });
     fillValidForm();
-    fireEvent.change(screen.getByTestId('movement-reason'), { target: { value: '  reposición  ' } });
+    fireEvent.change(screen.getByTestId('movement-reason'), {
+      target: { value: '  reposición  ' },
+    });
     fireEvent.click(screen.getByText('Guardar'));
 
     expect(onSubmit).toHaveBeenCalledWith({

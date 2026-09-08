@@ -11,6 +11,7 @@ Option A design and restores gear-menu parity where it was lost.
 ## Scope
 
 ### In Scope
+
 - A shared `ActionMenu` + `ActionMenuItem` component in `shared/components/ui/`
   encapsulating Option A (icon slot + colored label + soft hover tint +
   optional `separatorBefore`) with an `intent` prop centralizing the color map.
@@ -20,6 +21,7 @@ Option A design and restores gear-menu parity where it was lost.
 - Add missing icons to `shared/components/ui/icons.tsx`.
 
 ### Out of Scope
+
 - Raw fab buttons in login/profile/creates/modals — a SEPARATE later change.
 - Any behavioral/data-layer change; this is presentation + parity only.
 
@@ -31,6 +33,7 @@ prop, then refactor every gear menu to consume it. Recommended over per-file inl
 styling: it enforces consistency and centralizes the color map in one place.
 
 ## Color Map (intent → foreground)
+
 edit/create → violet · pay/activate/approve → green · deactivate/disapprove →
 amber · delete → red + separator above. Rest = colored fg only; hover = soft tint.
 
@@ -45,16 +48,17 @@ svg with `SettingsIcon`), `owner-card-list.tsx`, `reseller-card-list.tsx`,
 `expense-list.tsx`, `store-card-list.tsx`.
 
 ## Missing Icons
+
 Add: pay/payment, activate/check, deactivate/ban, approve/check (approve may reuse
 check). Present already: `EditIcon`, `TrashIcon`, `PlusIcon`, `SettingsIcon`.
 
 ## Risks
 
-| Risk | Likelihood | Mitigation |
-|------|------------|------------|
-| Shared component too rigid for edge menus | Med | Icon slot + children escape hatch; `intent` optional |
-| Regressions in click-outside/dropdown behavior | Med | Model on proven `category-product-list` pattern; TDD |
-| Icon-name/style drift from Angular | Low | Mirror Angular mat-icon semantics |
+| Risk                                           | Likelihood | Mitigation                                           |
+| ---------------------------------------------- | ---------- | ---------------------------------------------------- |
+| Shared component too rigid for edge menus      | Med        | Icon slot + children escape hatch; `intent` optional |
+| Regressions in click-outside/dropdown behavior | Med        | Model on proven `category-product-list` pattern; TDD |
+| Icon-name/style drift from Angular             | Low        | Mirror Angular mat-icon semantics                    |
 
 ## Rollback Plan
 

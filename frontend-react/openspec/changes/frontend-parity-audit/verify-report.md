@@ -18,19 +18,23 @@ No CRITICAL findings. No Stage 0 foundation was regressed by Stage 1/cart/i18n w
 ## Test/Build Evidence (run 2026-07-02, actual output)
 
 **Vitest full suite** (`cd frontend-react/apps/web-store-pos && ./node_modules/.bin/vitest run`):
+
 ```
  Test Files  88 passed (88)
       Tests  980 passed (980)
    Start at  03:13:38
    Duration  5.31s
 ```
+
 Matches apply-progress's Batch 8 claim exactly (88 files / 980 tests, +4 files / +34 tests over the prior verify's 74/819 baseline — the delta is Stage 1's pure-function extractions + cart-shell test growth, not Stage 0 files).
 
 **Shared-chrome subset** (`vitest run app/shared/components`):
+
 ```
  Test Files  9 passed (9)
       Tests  93 passed (93)
 ```
+
 Covers `ui/{button,card,info-box}`, `cart-shell`, `navbar`, `sidebar`, `app-layout`, `footer`, `breadcrumbs`. `button.test.tsx` grew from 12 to 17 tests (the `fab` variant added in commit `df02889`, reviewed below).
 
 **TypeScript** (`npx tsc -p apps/web-store-pos/tsconfig.json --noEmit`): zero errors (only an unrelated npm config warning about `auto-install-peers`).
@@ -42,21 +46,27 @@ Covers `ui/{button,card,info-box}`, `cart-shell`, `navbar`, `sidebar`, `app-layo
 ## Stage 0 Requirement-by-Requirement Re-Validation
 
 ### 0.1 — L1 Models/Enums (spec Requirement L1)
+
 **Status: PASS, unchanged.** `git log` confirms `packages/domain/src` has zero commits since the prior verify (last touch: `6fd7d4a`, pre-dates Stage 0). Zero regression risk — Stage 1 did not touch domain types. `TodayInventoryStats=32` dead-status unchanged.
 
 ### 0.2 — L2 Services (spec Requirement L2)
+
 > **CORRECTION (2026-07-14, Judgment Day):** the PASS below audited the WRONG artifact. `service-factory.ts`'s generic `createService<T>(offline, online)` had ZERO production call-sites — the live offline/online routing is the per-entity factories `createProductService`/`createProductCategoryService` (`app/sales/lib/services/product-service.factory.ts` + `product-category-service.factory.ts`), which mirror Angular's per-entity `productServiceFactory`/`productCategoryServiceFactory` (Angular has NO generic factory). The generic `service-factory.ts` was pre-migration scaffolding (2026-05-28) that violated playbook R12 (invented abstraction Angular never had) and was DELETED. The L2 conclusion (offline-service counterparts all present) still holds via the real factories.
 
 **Status: PASS, unchanged.** `service-factory.ts`'s `createService(offline, online)` still routes via `GlobalConfig.USE_ONLINE_SERVICE` (`app/shared/lib/services/service-factory.ts:11-15`). All offline-service counterparts still present and unchanged in location: `egress-offline-service.ts`, `inventory-offline-service.ts`, `product-offline-service.ts`, `order-offline-service.ts`, `product-category-offline-service.ts`, `sale-credit-offline-service.ts`, `expense-offline-service.ts`. PWA cross-cutting mapping remains deferred — task ownership was reshuffled (inventory-availability-on-increase/decrease moved from Stage 6 to new Stage 2.5, per tasks.md carry-over) but that is a **task-graph edit, not Stage 0 code**, and is explicitly out of this re-verify's scope per the request.
 
 ### 0.3 — L3 Auth (spec Requirement L3)
+
 **Status: PASS, unchanged.** `authorization-service.ts`: `featureIds.some(...)` (lines 26-27, 38-39) still present, `effectiveStoreId = storeId ?? user.selectedStoreId` (line 33) still present. `loaders.ts`: `denyAccess()` still calls `useAuthStore.getState().logout()` then `redirect('/login')` (lines 14-15). All three semantics confirmed matching Angular guards. No file in this path was touched by Stage 1.
 
 ### 0.4 — L7 Routes / catch-all (spec Requirement L7)
-**Status: PASS, minor implementation-detail change, not a regression.** `shared/routes/$.tsx` still redirects to `/`, matching Angular's `{path:'**',redirectTo:''}`. One change since the prior report: the export is now `clientLoader` (not `loader`), with an added comment: *"clientLoader (not loader) — SPA mode (ssr:false) rejects server `loader` exports."* This is an SPA-mode correctness fix, not a Stage 1 side effect — semantics (redirect to `/`) are identical. 1 test still passing (`$.test.tsx`).
+
+**Status: PASS, minor implementation-detail change, not a regression.** `shared/routes/$.tsx` still redirects to `/`, matching Angular's `{path:'**',redirectTo:''}`. One change since the prior report: the export is now `clientLoader` (not `loader`), with an added comment: _"clientLoader (not loader) — SPA mode (ssr:false) rejects server `loader` exports."_ This is an SPA-mode correctness fix, not a Stage 1 side effect — semantics (redirect to `/`) are identical. 1 test still passing (`$.test.tsx`).
 
 ### 0.5 — Design Tokens (spec Requirement L5, the hard gate) — REGRESSION CHECK
+
 **Status: PASS, confirmed intact, zero regression from the cart batch.**
+
 - `packages/web-common/styles.css:11` — `--color-primary: rgb(103 58 183)` — still #673ab7 (Material Deep Purple / deeppurple-amber theme). NOT cyan (`34 211 238`), NOT Bootstrap `#6f42c1`. Full token set (secondary/accent/success/danger/warning/info/background/surface/text/border/radii/shadows/font-sizes) unchanged since prior verify.
 - `ui/button.tsx`, `ui/card.tsx`, `ui/info-box.tsx` all still exist, all still use `bg-primary`/`text-primary`/`border-primary`/`bg-primary-light` token utility classes. `card.tsx` and `info-box.tsx` have **zero commits** since Stage 0 creation — completely untouched by Stage 1. `button.tsx` gained one addition: a `fab` variant (commit `df02889`, "add extended-FAB button variant, apply to Products") — reviewed, it reuses `bg-primary`/`bg-primary-hover` (button.tsx:13), same token discipline, no hardcoded color introduced, 17/17 tests pass (was 12).
 - **Cart-batch regression scan (explicit ask):** grepped `cart-shell.tsx` + the 4 new pure-function lib modules (`order-type-utils.ts`, `payment-type-icon.ts`, `payment-return.ts`, `cart-submission-validation.ts`) for `#[0-9a-fA-F]{3,6}` hex patterns and cyan-family hex values — **zero matches**. Cart-shell uses Tailwind semantic classes (success/danger/neutral) for the Vuelto readout, not hardcoded colors, per apply-progress's own claim. Also scanned the full shared-chrome set (`navbar.tsx`, `sidebar.tsx`, `app-layout.tsx`, `footer.tsx`) — zero hardcoded hex in any of them.
@@ -75,12 +85,13 @@ Covers `ui/{button,card,info-box}`, `cart-shell`, `navbar`, `sidebar`, `app-layo
 ## Findings
 
 ### CRITICAL
+
 None.
 
 ### WARNING
 
 **W1 — spec.md not updated for the Stage 2 carry-over reassignment (documentation drift, same class of issue as the prior report's W1).**
-`specs/frontend-parity-audit/spec.md:136` (Sync row) still reads: *"only the cross-cutting offline `ShoppingCartService`/inventory-availability-on-increase/decrease audit is Sync scope"* — but `tasks.md` and `design.md` (both edited in the same commit, `84d10aa`, and further refined in the current uncommitted working-tree diff) now say this item was **MOVED to Stage 2 (Inventory)**, not Sync, because it depends on `InventoryOfflineService`/stock data that Stage 2 owns. `spec.md` was not updated to match. This is the exact same failure mode flagged as CRITICAL→WARNING in the prior report (artifact narrative drifting from the authoritative code/task state) — recurring, so worth calling out as a process pattern, not just a one-off. Does not block Stage 0 (spec.md's Stage 0 content is unaffected) but should be fixed before Stage 2 apply begins, to avoid a verify agent trusting the wrong scope owner.
+`specs/frontend-parity-audit/spec.md:136` (Sync row) still reads: _"only the cross-cutting offline `ShoppingCartService`/inventory-availability-on-increase/decrease audit is Sync scope"_ — but `tasks.md` and `design.md` (both edited in the same commit, `84d10aa`, and further refined in the current uncommitted working-tree diff) now say this item was **MOVED to Stage 2 (Inventory)**, not Sync, because it depends on `InventoryOfflineService`/stock data that Stage 2 owns. `spec.md` was not updated to match. This is the exact same failure mode flagged as CRITICAL→WARNING in the prior report (artifact narrative drifting from the authoritative code/task state) — recurring, so worth calling out as a process pattern, not just a one-off. Does not block Stage 0 (spec.md's Stage 0 content is unaffected) but should be fixed before Stage 2 apply begins, to avoid a verify agent trusting the wrong scope owner.
 
 **W2 — uncommitted openspec doc changes.**
 `git status` shows `design.md` and `tasks.md` modified but not committed (the Stage 2 carry-over edits reviewed above). `apply-progress.md`/`spec.md` changes from Batch 8 are already committed (in `84d10aa`), but these two files are not. Not a code risk, but if a session ends here without a commit, the next agent's `git diff`/`git log` correlation (as used throughout this re-verify) becomes unreliable. Recommend committing docs alongside or immediately after this report, per the user's own instruction not to commit code changes — flagging so the user can decide when to commit.
@@ -135,24 +146,26 @@ No CRITICAL findings. Three WARNINGs (one functional-parity gap, one i18n/hardco
 **TypeScript** (`pnpm -C apps/web-store-pos exec tsc --noEmit`, from `frontend-react/`): zero errors, no output (clean).
 
 **Full test suite** (`pnpm test`, turbo across `@store-mgmt/domain`, `@store-mgmt/web-common`, `@store-mgmt/web-store-pos`):
+
 ```
 Test Files  88 passed (88)
      Tests  980 passed (980)
   Duration  5.65s
 ```
+
 Matches apply-progress's Batch 8 claim exactly (88 files / 980 tests). All Stage 1 Sales test files pass, including the new pure-function tests added in Batch 8: `order-type-utils.test.ts` (2), `payment-type-icon.test.ts` (4), `payment-return.test.ts` (6), `cart-submission-validation.test.ts` (5), and `cart-shell.test.tsx` (23, was 6 pre-Batch-8). One unrelated `stderr` line in `api-client.test.ts` (jsdom "Not implemented: navigation" warning) is expected test noise, not a failure — the test still passes.
 
 ---
 
 ## Task Completeness (tasks.md Stage 1)
 
-| Task | Status | Evidence |
-|---|---|---|
-| 1.1 L4 functional diff + fix gaps | [x] claimed done | Confirmed for Products/Sale/Orders/Sale-Credits/Today-Stats/Category-Stats. One tracked exception found: see W1 below (SaleProductRow `checkAvailability` not wired in `sale.tsx`) — explicitly deferred to Stage 2 (task 2.5.2), consistently documented in tasks.md/design.md/spec.md, not a silent gap. |
-| 1.2 L5 visual (tokens + Button/Card/InfoBox) | [x] claimed done | Confirmed — `sale.tsx` uses `Card`/`InfoBox`, `products.tsx` uses the new `fab` Button variant (commit `df02889`), `cart-shell.tsx` uses Tailwind semantic classes for Vuelto, no hardcoded hex found in any Stage 1 file (see regression scan below). |
-| 1.3 L6 i18n | [x] claimed done | Mostly confirmed — `SHOPPING_CART.*`/`GENERAL.PAY`/`SALES.NOT_INVENTORY_AVAILABLE_MESSAGE` keys byte-identical to Angular's `es.ts`. Exception found: see W2 below (hardcoded English strings in two Products-view components, not part of Batch 8's claimed scope). |
-| 1.5 Cart (nav-right) parity | [x] claimed done | Confirmed by direct code comparison against `nav-right.component.ts`/`.html` — see Cart Parity Detail below. |
-| 1.4 Verify (matrix, tests, visual spot-check) | [x] claimed done | Per-batch tsc/vitest/build evidence in apply-progress is accurate; this is the first *formal* `sdd-verify` pass on the full Stage 1 module, as tasks.md itself notes was still outstanding. |
+| Task                                          | Status           | Evidence                                                                                                                                                                                                                                                                                                   |
+| --------------------------------------------- | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1.1 L4 functional diff + fix gaps             | [x] claimed done | Confirmed for Products/Sale/Orders/Sale-Credits/Today-Stats/Category-Stats. One tracked exception found: see W1 below (SaleProductRow `checkAvailability` not wired in `sale.tsx`) — explicitly deferred to Stage 2 (task 2.5.2), consistently documented in tasks.md/design.md/spec.md, not a silent gap. |
+| 1.2 L5 visual (tokens + Button/Card/InfoBox)  | [x] claimed done | Confirmed — `sale.tsx` uses `Card`/`InfoBox`, `products.tsx` uses the new `fab` Button variant (commit `df02889`), `cart-shell.tsx` uses Tailwind semantic classes for Vuelto, no hardcoded hex found in any Stage 1 file (see regression scan below).                                                     |
+| 1.3 L6 i18n                                   | [x] claimed done | Mostly confirmed — `SHOPPING_CART.*`/`GENERAL.PAY`/`SALES.NOT_INVENTORY_AVAILABLE_MESSAGE` keys byte-identical to Angular's `es.ts`. Exception found: see W2 below (hardcoded English strings in two Products-view components, not part of Batch 8's claimed scope).                                       |
+| 1.5 Cart (nav-right) parity                   | [x] claimed done | Confirmed by direct code comparison against `nav-right.component.ts`/`.html` — see Cart Parity Detail below.                                                                                                                                                                                               |
+| 1.4 Verify (matrix, tests, visual spot-check) | [x] claimed done | Per-batch tsc/vitest/build evidence in apply-progress is accurate; this is the first _formal_ `sdd-verify` pass on the full Stage 1 module, as tasks.md itself notes was still outstanding.                                                                                                                |
 
 ---
 
@@ -169,6 +182,7 @@ Matches apply-progress's Batch 8 claim exactly (88 files / 980 tests). All Stage
 **Orders / Today Orders / Sale Credits / Today Sale Credits / Today Stats / Category Stats**: spot-checked, all present with matching structure. `today-stats.tsx`'s hardcoded `"Resumen Efectivo"` string matches Angular's own hardcoded literal in `today-stats.component.html:18` (no `[translate]` pipe there either) — legitimate parity, not a gap.
 
 **Cart (nav-right) — full detail check:**
+
 - Header "Venta actual" + `getOrderTypeText(OrderType.Normal)` subtitle: confirmed 1:1 port of `OrderTypeUtils.getOrderTypeText` (`order-type-utils.ts`).
 - Payment/Vuelto: `getPaymentReturn()`/`getPaymentReturnClass()` ported as `payment-return.ts`, semantics match `nav-right.component.ts:154-159` exactly (positive/negative/neutral).
 - `createOrder()` validation sequence: `validateCartSubmission()` in `cart-submission-validation.ts` is byte-exact in check order and condition logic vs `nav-right.component.ts:162-199` (empty-cart → payment-less-than-total → credit-without-client), confirmed by direct source read.
@@ -176,9 +190,11 @@ Matches apply-progress's Batch 8 claim exactly (88 files / 980 tests). All Stage
 - Payment-type literals (`Efectivo`/`Tarjeta`/`Zelle`) hardcoded in `orders.tsx`/`today-orders.tsx`/`edit-order-modal.tsx`/`sale-credit-payment-modal.tsx`: confirmed these mirror Angular's own `PaymentTypeUtils.getPaymentTypes()` (`payment-type.ts:4-6`), which hardcodes the same Spanish literals with **no** i18n pipe — legitimate parity, not a hardcoded-string violation.
 
 ### L5 — Visual/token parity
+
 PASS. No hardcoded hex found in any Stage 1 file via `#[0-9a-fA-F]{3,6}` grep across `app/sales/**` and `cart-shell.tsx`. All styling goes through `bg-primary`/`text-primary`/Tailwind semantic classes and the shared `Card`/`InfoBox`/`Button` components.
 
 ### L6 — i18n parity
+
 PASS WITH WARNING. `SHOPPING_CART.*`, `GENERAL.PAY`, `SALES.NOT_INVENTORY_AVAILABLE_MESSAGE`, `ORDERS.*`, `TODAY_ORDERS.*`, `TODAY_STATS.*`, `SALE_CREDIT.*` all confirmed present and byte-identical to Angular's `es.ts`. **Gap (W2):** two Products-view components contain hardcoded **English** strings that don't exist in Angular at all, or diverge from Angular's Spanish equivalent — see Findings.
 
 ---
@@ -186,6 +202,7 @@ PASS WITH WARNING. `SHOPPING_CART.*`, `GENERAL.PAY`, `SALES.NOT_INVENTORY_AVAILA
 ## Findings
 
 ### CRITICAL
+
 None.
 
 ### WARNING
@@ -194,10 +211,11 @@ None.
 `app/sales/routes/sale.tsx` renders `<SaleCategoryProducts products={categoryProducts} orderType={ORDER_TYPE} onAdded={handleAdded} />` with no `checkAvailability` prop, so `SaleProductRow`'s stock-gate (`sale-product-row.tsx:36`, gated on `product.discountFromInvantory`) never fires in production — it only fires in tests where the prop is passed directly. Angular's equivalent (`sale-product-row.component.ts:58-104`) performs this check unconditionally on every add-to-cart click. This is a real, live divergence in the Sales module's core action, not a cosmetic issue: a cashier can currently add more units of a stock-tracked product than are available. It is already tracked as tasks.md 2.5.2 (Stage 2 carry-over) with consistent documentation across tasks.md/design.md/spec.md's Inventory row — not a silently-missed gap. However, the stated rationale ("depends on `InventoryOfflineService`... that Stage 2 owns") is only partially accurate: `InventoryOfflineService.hasAvailableStock()` already exists and is fully tested (27 tests) as of Stage 0. The remaining work is a small integration change confined to `sale.tsx` (pass `checkAvailability={(id, qty) => inventoryService.hasAvailableStock(id, qty)}`), not new cross-cutting infrastructure. **Recommendation:** either close this 1-line wiring gap before Stage 1 is archived as fully parity-complete (it would take a small, low-risk, already-tested-downstream change), or explicitly record it as an accepted interim risk in spec.md's Sales row (currently only the Inventory row mentions the carry-over; the Sales row's "actions match Angular (L4)" claim has no caveat for this specific action).
 
 **W2 — Hardcoded English strings in two Products-view components, one also invents an untested validation rule not present in Angular.**
+
 - `app/sales/components/edit-product-category-modal.tsx:27`: `newErrors.order = 'Order must be a positive number'` — hardcoded English, no i18n key. Angular's equivalent (`edit-product-category-modal.component.html:24-28`) only validates `required` on the order field via `GENERAL.VALIDATION.REQUIRED` (translated); it has **no** "must be positive" rule at all. React invented an extra validation Angular doesn't have, in English, uncovered by any test.
 - `app/sales/components/csv-product-importer-modal.tsx:34,41`: `setParseError('Failed to parse CSV file')` and `setParseError('Failed to read file')` — hardcoded English. Angular's equivalent error path (`csv-product-importer-modal.component.ts:71-72`) shows a Spanish fallback: `error.message || 'Error al importar los productos'` (also a literal, but in Spanish, matching the app's language). Neither React string matches Angular's language or wording.
-Neither of these two components has a dedicated component-level test file (only `csv-product-parser.test.ts` exists, covering the pure parsing logic, not the modal's error-message strings) — these paths are currently untested at the UI layer.
-**Recommendation:** translate both error messages to Spanish (ideally via new i18n keys, consistent with the rest of the module's L6 discipline), and reconsider whether the "positive number" validation should be kept as an intentional improvement (if so, document it as a deliberate deviation) or removed to match Angular exactly.
+  Neither of these two components has a dedicated component-level test file (only `csv-product-parser.test.ts` exists, covering the pure parsing logic, not the modal's error-message strings) — these paths are currently untested at the UI layer.
+  **Recommendation:** translate both error messages to Spanish (ideally via new i18n keys, consistent with the rest of the module's L6 discipline), and reconsider whether the "positive number" validation should be kept as an intentional improvement (if so, document it as a deliberate deviation) or removed to match Angular exactly.
 
 **W3 — (informational, not a new problem) Prior Stage 0 report's W1 documentation-drift finding is now confirmed resolved.**
 The 2026-07-02 Stage 0 re-verify (obs #465) flagged `spec.md` as not yet updated to match `tasks.md`/`design.md`'s reassignment of the cart's inventory-availability audit from Sync to Inventory scope. As of this Stage 1 pass, `specs/frontend-parity-audit/spec.md:131-132,136` (commits `e4331bc`/`76e2311`) now correctly reflects the three-way split (Sales = cart UI/flow, Inventory = stock-check wiring incl. `sale.tsx checkAvailability`, Sync = only the generic PWA cross-cutting services). No further action needed; noting for continuity since this was an open item from the prior report.
@@ -214,7 +232,7 @@ Still out of Stage 1 scope; will need cleanup under Stage 8 (Statistics) / landi
 
 ## Scope Note
 
-This report covers **Stage 1 only** (Sales module: Products, Sale/POS, Orders, Sale Credits, Today Stats, Category Stats, Cart/nav-right), validated against current code as of 2026-07-02. Stage 0 (Foundations) was re-verified separately (see the RE-VERIFY section above, obs #465) and is not re-litigated here. Stage 2's carry-over tasks (2.5 inventory-availability wiring, 2.6 login/auth parity incl. the "POS Management" copy gap at 2.6.1) are explicitly **out of scope** — they are correctly scheduled as Stage 2 work, not Stage 1 failures, and this report treats W1 as a *tracked* Stage 1 exception rather than an undiscovered defect.
+This report covers **Stage 1 only** (Sales module: Products, Sale/POS, Orders, Sale Credits, Today Stats, Category Stats, Cart/nav-right), validated against current code as of 2026-07-02. Stage 0 (Foundations) was re-verified separately (see the RE-VERIFY section above, obs #465) and is not re-litigated here. Stage 2's carry-over tasks (2.5 inventory-availability wiring, 2.6 login/auth parity incl. the "POS Management" copy gap at 2.6.1) are explicitly **out of scope** — they are correctly scheduled as Stage 2 work, not Stage 1 failures, and this report treats W1 as a _tracked_ Stage 1 exception rather than an undiscovered defect.
 
 ---
 
@@ -240,11 +258,13 @@ Zero CRITICAL. Prior W1 (overselling gap) and W2 (hardcoded English/invented val
 **TypeScript** (`pnpm -C apps/web-store-pos exec tsc --noEmit`, from `frontend-react/`): clean, zero errors, no output.
 
 **Full test suite** (`pnpm test`, turbo across `@store-mgmt/domain`, `@store-mgmt/web-common`, `@store-mgmt/web-store-pos`):
+
 ```
  Test Files  95 passed (95)
       Tests  1028 passed (1028)
    Duration  5.93s
 ```
+
 Matches apply-progress's Batch 10 claim exactly (95 files / 1028 tests, +7 files / +48 tests over the prior verify's 88/980 baseline — the delta is Batch 9's W1/W2 fix tests plus Batch 10's SweetAlert2/CSV/cart-aria-label tests). One expected `stderr` noise line in `api-client.test.ts` (jsdom navigation warning), not a failure.
 
 **Production build** (`pnpm -C apps/web-store-pos exec react-router build`): succeeded. New `sweetalert2` chunk `blocking-alert-*.js` ~79.5 kB / 21.1 kB gzip, present in the client asset manifest. No build errors or warnings beyond normal chunk-size output.
@@ -255,26 +275,27 @@ Matches apply-progress's Batch 10 claim exactly (95 files / 1028 tests, +7 files
 
 `app/sales/lib/product-availability.ts` (`checkProductAvailabilityToSale`) is a faithful port of Angular's `InventoryOfflineService.hasAvailableProductToSale` (`inventory-offline.service.ts:397-423`):
 
-| Branch | Angular | React |
-|---|---|---|
-| 1. Not found | `Result.Failure([ProductErrors.NotExists])` | `{ succeeded:false, errorCode:'NOT_EXISTS' }` |
-| 2. Inactive | `ProductErrors.Inactive` | `'INACTIVE'` |
-| 3. Not available to sale | `ProductErrors.ProductNotAvailableToSale` | `'NOT_AVAILABLE_TO_SALE'` |
-| 4. Gate | `!hasInventoryModuleAvailable() \|\| !discountFromInvantory` → Success | same condition → `succeeded:true` |
-| 5. No active inventory entries | `ProductErrors.ProductNotAvailable` | `'NOT_AVAILABLE'` (see WARNING below re: entry-detection edge case) |
-| 6. Quantity check | `available >= quantity` (quantity = form qty only, no cart addition **in the service itself** — see note) | `inventory.available >= (quantity + cartQuantity)` |
+| Branch                         | Angular                                                                                                   | React                                                               |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| 1. Not found                   | `Result.Failure([ProductErrors.NotExists])`                                                               | `{ succeeded:false, errorCode:'NOT_EXISTS' }`                       |
+| 2. Inactive                    | `ProductErrors.Inactive`                                                                                  | `'INACTIVE'`                                                        |
+| 3. Not available to sale       | `ProductErrors.ProductNotAvailableToSale`                                                                 | `'NOT_AVAILABLE_TO_SALE'`                                           |
+| 4. Gate                        | `!hasInventoryModuleAvailable() \|\| !discountFromInvantory` → Success                                    | same condition → `succeeded:true`                                   |
+| 5. No active inventory entries | `ProductErrors.ProductNotAvailable`                                                                       | `'NOT_AVAILABLE'` (see WARNING below re: entry-detection edge case) |
+| 6. Quantity check              | `available >= quantity` (quantity = form qty only, no cart addition **in the service itself** — see note) | `inventory.available >= (quantity + cartQuantity)`                  |
 
 All 5 error-code Spanish messages verified byte-identical against `product.errors.ts`/`es.ts` (`PRODUCT_ERRORS.NOT_EXISTS` = "El producto no existe.", `.INACTIVE` = "El producto no está activo.", `.NOT_AVAILABLE_TO_SALE` = "El producto no está disponible para la venta.", `SALES.NOT_INVENTORY_AVAILABLE_MESSAGE` = "El producto no está disponible en el inventario." for NOT_AVAILABLE, `PRODUCT_ERRORS.QUANTITY_NOT_AVAILABLE` = "La cantidad del producto no está disponible en el inventario.").
 
 Wiring confirmed end-to-end: `sale.tsx:67-77` (`checkAvailability`, includes `getCartItemQuantity` from the cart store and `hasInventoryModuleAvailable(user)`) → `SaleCategoryProducts` (prop passthrough) → `SaleProductRow.handleAddToCart` (`sale-product-row.tsx:35-49`), which calls `showBlockingError` with `GENERAL.RESPONSE.ERROR_TITLE` + the mapped message and **aborts the add** (`return` before `onAdded`) on failure — matches Angular's blocking `Swal.fire({icon:'error',...})` in `sale-product-row.component.ts:62-104`.
 
-Cart-quantity accumulation confirmed: React explicitly adds `cartQuantity` to the requested `quantity` before comparing against `available` (`product-availability.ts:76-77`), which is the *correct* interpretation of Angular's intent — Angular's own `hasAvailableProductToSale` signature takes a raw `quantity` argument, and the cart-quantity accumulation happens at the **caller** level in Angular (`sale-product-row.component.ts` computes `quantity = form qty + existing cart qty` before calling the service — confirmed by reading the call site, not just the service). React's single-function `checkProductAvailabilityToSale` folds both into one call, functionally equivalent.
+Cart-quantity accumulation confirmed: React explicitly adds `cartQuantity` to the requested `quantity` before comparing against `available` (`product-availability.ts:76-77`), which is the _correct_ interpretation of Angular's intent — Angular's own `hasAvailableProductToSale` signature takes a raw `quantity` argument, and the cart-quantity accumulation happens at the **caller** level in Angular (`sale-product-row.component.ts` computes `quantity = form qty + existing cart qty` before calling the service — confirmed by reading the call site, not just the service). React's single-function `checkProductAvailabilityToSale` folds both into one call, functionally equivalent.
 
 **Conclusion: W1 CLOSED. No remaining overselling gap in the live Sale/POS screen.**
 
 ### NEW — WARNING found during W1 re-verify (not present in the original W1 finding)
 
 `app/inventory/lib/services/inventory-offline-service.ts:323-327` (`getAvailableQuantity`, added in commit `60b0e09`):
+
 ```ts
 getAvailableQuantity(productId: string): { hasEntries: boolean; available: number } {
   const activeEntries = this.repo.getByProductId(this.storeId, productId).filter((e) => e.isActive);
@@ -282,6 +303,7 @@ getAvailableQuantity(productId: string): { hasEntries: boolean; available: numbe
   return { hasEntries: activeEntries.length > 0, available };
 }
 ```
+
 filters `isActive` **before** computing `hasEntries`. Angular's `hasAvailableProductToSale` (`inventory-offline.service.ts:410-419`) checks `inventories.length === 0` on the **raw, unfiltered** result of `getProductInventoriesByProductId` first (branch 5, `ProductErrors.ProductNotAvailable`), and only filters `isActive` afterward when summing `available` for the quantity comparison (branch 6, `ProductErrors.ProductQuantityNotAvailable`).
 
 **Edge case:** a product whose inventory entries all exist but are all `isActive: false` (deactivated inventory rows, not deleted). Angular: `inventories.length > 0` (raw) → passes the NOT_AVAILABLE check, falls through to the quantity sum which computes `0` (all filtered out) → `0 >= quantity` is false → returns `ProductQuantityNotAvailable` ("La cantidad del producto no está disponible en el inventario."). React: `activeEntries.length === 0` → `hasEntries: false` → returns `NOT_AVAILABLE` ("El producto no está disponible en el inventario."). Both **block the sale** (no functional/security regression — overselling is still prevented), but the **specific error text shown to the user differs from Angular** in this one edge case, which is a genuine (if narrow) violation of spec.md's L6 "byte-identical Spanish text" requirement. This is a new deviation introduced by the W1 fix itself, not present before `60b0e09`.
@@ -291,7 +313,7 @@ filters `isActive` **before** computing `hasEntries`. Angular's `hasAvailablePro
 ## W2 Re-Verification (text-parity fixes) — RESOLVED
 
 - `create-product-modal.tsx` (3 sites), `edit-product-modal.tsx` (2 sites), `edit-product-category-modal.tsx` (2 sites) — all 7 `GENERAL.VALIDATION.REQUIRED` call sites confirmed, rendering `"{name} es requerido"`, matching Angular's `VALIDATION.REQUIRED = '{{name}} es requerido'` (`es.ts:232`) — same rendered Spanish text, syntax difference is only the react-intl `{name}` vs ngx-translate `{{name}}` placeholder convention, not a text discrepancy.
-- The invented "Order must be a positive number" check is gone from `edit-product-category-modal.tsx`; code comment at line 30 explicitly notes *"Angular's ONLY validation on `order` is `required`"* — confirmed against Angular's template, which has no positivity rule.
+- The invented "Order must be a positive number" check is gone from `edit-product-category-modal.tsx`; code comment at line 30 explicitly notes _"Angular's ONLY validation on `order` is `required`"_ — confirmed against Angular's template, which has no positivity rule.
 - `csv-product-importer-modal.tsx:46,53`: both `setParseError` calls now use `'Error al importar los productos'`, matching Angular's Spanish fallback literal (`csv-product-importer-modal.component.ts:71-72`, `error.message || 'Error al importar los productos'`).
 
 **Conclusion: W2 CLOSED. No remaining hardcoded English or invented validation found in the re-checked components.**
@@ -303,8 +325,9 @@ filters `isActive` **before** computing `hasEntries`. Angular's `hasAvailablePro
 `app/shared/lib/blocking-alert.ts` — all 3 exported wrappers (`showBlockingError`, `confirmDialog`, `showAcknowledgeError`) verified against Angular's 3 distinct `Swal.fire` shapes used across the Sale module (error-only, question+confirm/cancel, error+explicit-OK-button), including exact `#3456ff`/`#dc3545` button colors and `icon: 'question'`/`'error'` values. No global `Swal.mixin` exists on either side (confirmed by repo grep) — stock defaults on both, correctly not invented.
 
 **Restored confirm dialogs, both verified byte-exact:**
+
 1. **Payment confirm** (`sale-credit-payment-modal.tsx:56-61` vs `sale-credit-payment-modal.component.ts:52-60`): title `SALE_CREDIT.PAYMENT_CONFIRM_TITLE` = "Confirmación de Pago", message `SALE_CREDIT.PAYMENT_CONFIRM_MESSAGE` = "Usted está segura(o) que desea pagar este crédito por venta?" — byte-identical both sides (`es.ts:305-306` React vs `es.ts:523-524` Angular).
-2. **Deactivate confirm** (`order-item-list.tsx:36-45` vs `order-item-list.component.ts:34-53`): title `GENERAL.DELETE_CONFIRM_TITLE` = "Confirmación para eliminar", message `GENERAL.DELETE_CONFIRM_MESSAGE_A` with `{name}` = `TODAY_ORDERS.TEXT` = "¿Está seguro que desea eliminar esta Ventas del día?" — byte-identical. The failure path is also correctly layered: React's `showAcknowledgeError` interpolates Angular's own hardcoded literal *inside* the `TODAY_ORDERS.ERROR_DELETING_ORDER` template (`"Ocurrió un error eliminando la venta. {message}"`), exactly matching Angular's `showErrorMessage(['La venta no pudo ser cancelada...'])` → `translate.instant('TODAY_ORDERS.ERROR_DELETING_ORDER', {message: errors.join('<br>')})` composition (`order-item-list.component.ts:50-51,96-99,124-135`). This is a subtle two-key composition that was easy to get wrong (e.g. by only porting the inner literal) and it was ported correctly.
+2. **Deactivate confirm** (`order-item-list.tsx:36-45` vs `order-item-list.component.ts:34-53`): title `GENERAL.DELETE_CONFIRM_TITLE` = "Confirmación para eliminar", message `GENERAL.DELETE_CONFIRM_MESSAGE_A` with `{name}` = `TODAY_ORDERS.TEXT` = "¿Está seguro que desea eliminar esta Ventas del día?" — byte-identical. The failure path is also correctly layered: React's `showAcknowledgeError` interpolates Angular's own hardcoded literal _inside_ the `TODAY_ORDERS.ERROR_DELETING_ORDER` template (`"Ocurrió un error eliminando la venta. {message}"`), exactly matching Angular's `showErrorMessage(['La venta no pudo ser cancelada...'])` → `translate.instant('TODAY_ORDERS.ERROR_DELETING_ORDER', {message: errors.join('<br>')})` composition (`order-item-list.component.ts:50-51,96-99,124-135`). This is a subtle two-key composition that was easy to get wrong (e.g. by only porting the inner literal) and it was ported correctly.
 
 "Active"→"Activo" label gap (flagged-but-deferred in the prior W2) confirmed closed: `edit-product-category-modal.tsx:99` now uses `GENERAL.ACTIVE` = "Activo".
 
@@ -322,17 +345,18 @@ Read Angular's exact `Swal.fire` call at all three flagged sites:
 
 Traced the underlying service calls to determine what `dataEntry.errors[0].description` actually resolves to at runtime:
 
-| Call site | Service method | Angular's ONLY failure branch | `errors[0].description` |
-|---|---|---|---|
-| `edit-sale-credit-modal` | `SaleCreditOfflineService.updateSaleCredit` (`sale-credit-offline.service.ts:67-79`) | `!saleCredit` (not found) | `SaleCreditErrors.NotExists` = **"El gasto no existe."** |
-| `sale-credit-payment-modal` | `SaleCreditOfflineService.paidSaleCredit` (`:81-97`) | `!saleCredit` (not found) | `SaleCreditErrors.NotExists` = **"El gasto no existe."** |
-| `edit-order-modal` | `OrderOfflineService.updateTodayOrder` (`order-offline.service.ts:342-352`) | `!order` (not found) | `OrderErrors.NotExists` = **"La orden no existe"** |
+| Call site                   | Service method                                                                       | Angular's ONLY failure branch | `errors[0].description`                                  |
+| --------------------------- | ------------------------------------------------------------------------------------ | ----------------------------- | -------------------------------------------------------- |
+| `edit-sale-credit-modal`    | `SaleCreditOfflineService.updateSaleCredit` (`sale-credit-offline.service.ts:67-79`) | `!saleCredit` (not found)     | `SaleCreditErrors.NotExists` = **"El gasto no existe."** |
+| `sale-credit-payment-modal` | `SaleCreditOfflineService.paidSaleCredit` (`:81-97`)                                 | `!saleCredit` (not found)     | `SaleCreditErrors.NotExists` = **"El gasto no existe."** |
+| `edit-order-modal`          | `OrderOfflineService.updateTodayOrder` (`order-offline.service.ts:342-352`)          | `!order` (not found)          | `OrderErrors.NotExists` = **"La orden no existe"**       |
 
 In all three cases the "dynamic" description is **not actually dynamic** — each local-storage service method has exactly one failure branch (record not found), so the text shown is a single, known, static string per call site. Angular's title is `GENERAL.ERROR`, not `GENERAL.RESPONSE.ERROR_TITLE`.
 
 React (`edit-sale-credit-modal.tsx:49-52`, `edit-order-modal.tsx:47-51`, `sale-credit-payment-modal.tsx:67-71`) uses the correct title (`GENERAL.ERROR`) but shows `GENERAL.RESPONSE.ERROR500_MESSAGE` = **"Por favor, vuelva a intentarlo y si persiste el error contacte al equipo de soporte técnico."** at all three sites — a generic, unrelated fallback message. Apply-progress's stated rationale for this choice ("React's services can't surface a dynamic description like Angular's `DataResult.errors[0].description`") does not hold up under inspection: the description is static and knowable per call site, not truly dynamic, so a generic fallback was an avoidable simplification rather than a forced tradeoff.
 
 **Exact expected Spanish (what Angular actually shows):**
+
 - `edit-sale-credit-modal.tsx` and `sale-credit-payment-modal.tsx` failure dialogs should show: title "Error", text **"El gasto no existe."**
 - `edit-order-modal.tsx` failure dialog should show: title "Error", text **"La orden no existe"**
 
@@ -343,6 +367,7 @@ React (`edit-sale-credit-modal.tsx:49-52`, `edit-order-modal.tsx:47-51`, `sale-c
 ## Findings Summary
 
 ### CRITICAL
+
 None.
 
 ### WARNING
@@ -358,6 +383,7 @@ None.
 ### SUGGESTION
 
 Carried unchanged from the prior Stage 1 report (not re-litigated, no new evidence found this pass):
+
 - **S1** — `QuickSaleScannerComponent` confirmed dead code, correctly not ported; recommend adding to spec.md's ratified dead-code list.
 - **S2** — pre-existing hardcoded hex in `chart-core.tsx`/`landing-deep.*`, out of Stage 1 scope.
 
@@ -396,6 +422,7 @@ Zero CRITICAL. Zero WARNING. NEW-W1 and NEW-W2 both **CONFIRMED RESOLVED** with 
 **TypeScript** (`pnpm -C apps/web-store-pos exec tsc --noEmit`, from `frontend-react/`): clean, zero errors, no output.
 
 **Full test suite** (`pnpm test`, turbo across `@store-mgmt/domain`, `@store-mgmt/web-common`, `@store-mgmt/web-store-pos`):
+
 ```
 @store-mgmt/domain:test:      Tests  66 passed (66)
 @store-mgmt/web-common:test:  Tests  11 passed (11)
@@ -403,6 +430,7 @@ Zero CRITICAL. Zero WARNING. NEW-W1 and NEW-W2 both **CONFIRMED RESOLVED** with 
 @store-mgmt/web-store-pos:test:       Tests  1028 passed (1028)
  Tasks:    3 successful, 3 total
 ```
+
 Matches expected counts exactly (domain 66, web-common 11, web-store-pos 95/1028 — same totals as the prior RE-VERIFY pass; apply-progress Batch 11 confirms 0 net new tests, 3 existing assertions corrected to the right literals). One expected `stderr` noise line in `api-client.test.ts` (jsdom navigation warning), not a failure.
 
 **Production build** (`pnpm -C apps/web-store-pos exec react-router build`): succeeded. `blocking-alert-C1w1tbeV.js` chunk (sweetalert2) present, 79.51 kB / 21.13 kB gzip. No build errors or new warnings.
@@ -435,17 +463,19 @@ Test evidence: `app/inventory/lib/services/__tests__/inventory-offline-service.t
 
 Read the current React source at all three flagged call sites and the i18n dictionary, cross-checked against Angular's exact source (both re-read fresh this pass, not from apply-progress claims):
 
-| Call site | React (current) | Angular source-of-truth | Match |
-|---|---|---|---|
-| `edit-sale-credit-modal.tsx:51-54` | `intl.formatMessage({id:'SALE_CREDIT_ERRORS.NOT_EXISTS'})` → **"El gasto no existe."** | `sale-credit.errors.ts:6` `SaleCreditErrors.NotExists.description` = `` `El gasto no existe.` `` | ✅ byte-identical, trailing period preserved |
-| `sale-credit-payment-modal.tsx:70-73` | same key → **"El gasto no existe."** | same | ✅ byte-identical |
-| `edit-order-modal.tsx:50-53` | `intl.formatMessage({id:'ORDER_ERRORS.NOT_EXISTS'})` → **"La orden no existe"** | `order.errors.ts:6` `OrderErrors.NotExists.description` = `'La orden no existe'` | ✅ byte-identical, **no** trailing period — the punctuation asymmetry between the two error messages is correctly preserved, not normalized away |
+| Call site                             | React (current)                                                                        | Angular source-of-truth                                                                          | Match                                                                                                                                            |
+| ------------------------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `edit-sale-credit-modal.tsx:51-54`    | `intl.formatMessage({id:'SALE_CREDIT_ERRORS.NOT_EXISTS'})` → **"El gasto no existe."** | `sale-credit.errors.ts:6` `SaleCreditErrors.NotExists.description` = `` `El gasto no existe.` `` | ✅ byte-identical, trailing period preserved                                                                                                     |
+| `sale-credit-payment-modal.tsx:70-73` | same key → **"El gasto no existe."**                                                   | same                                                                                             | ✅ byte-identical                                                                                                                                |
+| `edit-order-modal.tsx:50-53`          | `intl.formatMessage({id:'ORDER_ERRORS.NOT_EXISTS'})` → **"La orden no existe"**        | `order.errors.ts:6` `OrderErrors.NotExists.description` = `'La orden no existe'`                 | ✅ byte-identical, **no** trailing period — the punctuation asymmetry between the two error messages is correctly preserved, not normalized away |
 
 i18n dictionary (`app/shared/lib/i18n/es.ts:245-246`):
+
 ```
 'SALE_CREDIT_ERRORS.NOT_EXISTS': 'El gasto no existe.',
 'ORDER_ERRORS.NOT_EXISTS': 'La orden no existe',
 ```
+
 Both confirmed present and byte-identical to the Angular literals, including the deliberate period/no-period asymmetry.
 
 None of the three call sites reference `GENERAL.RESPONSE.ERROR500_MESSAGE` any longer.
@@ -459,6 +489,7 @@ Test evidence: `credit-components.test.tsx` (2 assertions) and `order-components
 ## Regression Check
 
 Re-scanned the full Stage 1 finding history for drift:
+
 - Original **W1** (overselling gap) — still closed, `product-availability.ts` 5-way branch parity unchanged by this batch.
 - Original **W2** (hardcoded English/invented validation) — still closed, no files in Batch 11's diff touch the previously-fixed validation/CSV-import call sites.
 - **SweetAlert2 (task 1.7)** — `blocking-alert.ts` wrapper untouched by Batch 11; both restored confirm dialogs (payment, deactivate) unaffected.
@@ -471,14 +502,17 @@ No regressions found.
 ## Findings Summary (Final)
 
 ### CRITICAL
+
 None.
 
 ### WARNING
+
 None. NEW-W1 and NEW-W2 both closed, see sections above. All prior WARNINGs (original W1, W2) remain closed with no regression.
 
 ### SUGGESTION
 
 Carried unchanged from all prior Stage 1 passes (not re-litigated, no new evidence found this pass, both explicitly out of Stage 1 scope):
+
 - **S1** — `QuickSaleScannerComponent` confirmed dead code, correctly not ported; recommend adding to spec.md's ratified dead-code list.
 - **S2** — pre-existing hardcoded hex in `chart-core.tsx`/`landing-deep.*`, out of Stage 1 scope.
 

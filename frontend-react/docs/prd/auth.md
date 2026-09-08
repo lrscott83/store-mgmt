@@ -23,37 +23,37 @@ All outbound HTTP requests automatically carry a `Bearer` token injected by an A
 
 ### Authentication
 
-| ID | As a… | I want to… | So that… |
-|----|-------|------------|----------|
-| AUTH-01 | Store user | Log in with email/phone and password | I can access the POS |
-| AUTH-02 | Store user | Stay logged in for 35 days without internet | I can keep working offline |
-| AUTH-03 | Store user | Be automatically logged out when my session expires | Unauthorized access is prevented |
-| AUTH-04 | Store user | Register a new account | I can onboard my business |
-| AUTH-05 | Store user | See a clear error when login fails | I know what went wrong |
-| AUTH-06 | Store user | See a message when I'm offline and try to log in | I understand why login is unavailable |
+| ID      | As a…      | I want to…                                          | So that…                              |
+| ------- | ---------- | --------------------------------------------------- | ------------------------------------- |
+| AUTH-01 | Store user | Log in with email/phone and password                | I can access the POS                  |
+| AUTH-02 | Store user | Stay logged in for 35 days without internet         | I can keep working offline            |
+| AUTH-03 | Store user | Be automatically logged out when my session expires | Unauthorized access is prevented      |
+| AUTH-04 | Store user | Register a new account                              | I can onboard my business             |
+| AUTH-05 | Store user | See a clear error when login fails                  | I know what went wrong                |
+| AUTH-06 | Store user | See a message when I'm offline and try to log in    | I understand why login is unavailable |
 
 ### Authorization
 
-| ID | As a… | I want to… | So that… |
-|----|-------|------------|----------|
-| AUTH-07 | Super admin | Access all modules and features | I can manage the entire platform |
-| AUTH-08 | Owner admin | Access features assigned to my account | I can manage my stores |
-| AUTH-09 | Reseller | Access features assigned to my reseller account | I can manage my client stores |
-| AUTH-10 | Store user | Only see features my role permits for my store | I have a clean, role-scoped experience |
-| AUTH-11 | Store user | Be warned before leaving a form with unsaved changes | I don't accidentally lose work |
+| ID      | As a…       | I want to…                                           | So that…                               |
+| ------- | ----------- | ---------------------------------------------------- | -------------------------------------- |
+| AUTH-07 | Super admin | Access all modules and features                      | I can manage the entire platform       |
+| AUTH-08 | Owner admin | Access features assigned to my account               | I can manage my stores                 |
+| AUTH-09 | Reseller    | Access features assigned to my reseller account      | I can manage my client stores          |
+| AUTH-10 | Store user  | Only see features my role permits for my store       | I have a clean, role-scoped experience |
+| AUTH-11 | Store user  | Be warned before leaving a form with unsaved changes | I don't accidentally lose work         |
 
 ---
 
 ## 3. Routes
 
-| Path | Guard | Layout | Component |
-|------|-------|--------|-----------|
-| `/login` | `guestOnly` (redirect to `/` if already authenticated) | `AuthLayout` | `LoginPage` |
-| `/register` | `guestOnly` | `AuthLayout` | `RegisterPage` |
-| `/` | `authLoader` | `AppLayout` | Dashboard (redirect to default store module) |
-| `/:storeId/*` | `authLoader` + `featureLoader` | `AppLayout` | Store module pages |
-| `/admin/*` | `adminLoader` | `AppLayout` | Admin pages |
-| `/reseller/*` | `resellerLoader` | `AppLayout` | Reseller pages |
+| Path          | Guard                                                  | Layout       | Component                                    |
+| ------------- | ------------------------------------------------------ | ------------ | -------------------------------------------- |
+| `/login`      | `guestOnly` (redirect to `/` if already authenticated) | `AuthLayout` | `LoginPage`                                  |
+| `/register`   | `guestOnly`                                            | `AuthLayout` | `RegisterPage`                               |
+| `/`           | `authLoader`                                           | `AppLayout`  | Dashboard (redirect to default store module) |
+| `/:storeId/*` | `authLoader` + `featureLoader`                         | `AppLayout`  | Store module pages                           |
+| `/admin/*`    | `adminLoader`                                          | `AppLayout`  | Admin pages                                  |
+| `/reseller/*` | `resellerLoader`                                       | `AppLayout`  | Reseller pages                               |
 
 ### Loader behavior (React Router v6 loaders replace Angular guards)
 
@@ -74,6 +74,7 @@ All loaders are synchronous against in-memory state (no network calls). They rea
 Full-page login form. Handles online/offline detection before submission.
 
 **Responsibilities:**
+
 - Render email/phone + password fields
 - Validate inputs (non-empty; basic email/phone format)
 - Check connectivity before calling the login API; show an offline banner if unreachable
@@ -89,6 +90,7 @@ Full-page login form. Handles online/offline detection before submission.
 Full-page registration form.
 
 **Responsibilities:**
+
 - Collect full name, email, phone, and password (with confirmation)
 - Validate inputs client-side before submission
 - Check connectivity (registration requires online)
@@ -102,6 +104,7 @@ Full-page registration form.
 Wrapper layout for unauthenticated pages (`/login`, `/register`).
 
 **Responsibilities:**
+
 - Center the form card on screen
 - Render the app logo and branding
 - Provide no navigation chrome (no sidebar, no top bar)
@@ -113,6 +116,7 @@ Wrapper layout for unauthenticated pages (`/login`, `/register`).
 Inline informational component displayed when a feature requires connectivity but the device is offline.
 
 **Props:**
+
 ```ts
 interface OfflineBannerProps {
   message?: string; // defaults to a generic "requires internet connection" message
@@ -126,6 +130,7 @@ interface OfflineBannerProps {
 Modal shown when a token expiry is detected mid-session (app was left open past 35 days).
 
 **Responsibilities:**
+
 - Inform the user the session has expired
 - Provide a "Log in again" CTA
 - Prevent interaction with the rest of the app until dismissed
@@ -137,10 +142,12 @@ Modal shown when a token expiry is detected mid-session (app was left open past 
 Confirmation dialog triggered by the `dirtyFormGuard` when navigating away from a form with unsaved changes.
 
 **Responsibilities:**
+
 - Present three options: **Save**, **Discard**, **Cancel**
 - Block navigation until the user resolves the dialog
 
 **Props:**
+
 ```ts
 interface UnsavedChangesDialogProps {
   onSave: () => Promise<void>;
@@ -156,12 +163,13 @@ interface UnsavedChangesDialogProps {
 Wrapper component for conditional rendering based on feature access. Use inside pages to show/hide UI sections.
 
 **Props:**
+
 ```ts
 interface RequireFeatureProps {
   featureIds: number[];
-  storeId?: string;       // if omitted, checks owner/reseller-level features
+  storeId?: string; // if omitted, checks owner/reseller-level features
   children: ReactNode;
-  fallback?: ReactNode;   // rendered when access is denied; defaults to null
+  fallback?: ReactNode; // rendered when access is denied; defaults to null
 }
 ```
 
@@ -195,8 +203,8 @@ interface UserModel extends AuthModel {
   isActive: boolean;
   password: string; // not used client-side after login; included in model for API parity
   roles: StoreModuleFeatures[];
-  featureIds: number[];        // reseller/owner-level flat feature list
-  storeModuleIds: number[];    // modules available to this user
+  featureIds: number[]; // reseller/owner-level flat feature list
+  storeModuleIds: number[]; // modules available to this user
   isSuperAdmin: boolean;
   isOwnerAdmin: boolean;
   isReSeller: boolean;
@@ -213,7 +221,7 @@ interface StoreModuleFeatures {
 
 // Login form payload
 interface LoginRequest {
-  login: string;    // email or phone
+  login: string; // email or phone
   password: string;
 }
 
@@ -267,12 +275,15 @@ interface AuthService {
 
 **Key behavior — token expiry override:**  
 After a successful login the server's `expiresIn` is DISCARDED. The client always sets:
+
 ```ts
 authModel.expiresIn = Date.now() + 35 * 24 * 60 * 60 * 1000;
 ```
+
 This enables offline use for 35 days regardless of the server-issued token lifetime.
 
 **Startup flow:**
+
 1. Read `localStorage['{appVersion}-authf496fc5a9f17']` → parse as `UserModel`
 2. If missing or `user.expiresIn < Date.now()` → call `logout()`
 3. Otherwise → set user in state immediately (synchronous, no render block)
@@ -313,6 +324,7 @@ interface AuthorizationService {
 ```
 
 **Authorization hierarchy:**
+
 1. **SuperAdmin** (`isSuperAdmin === true`) — always authorized, bypasses all feature checks
 2. **ReSeller** (`isReSeller === true`) — check `user.featureIds` contains ALL required feature IDs
 3. **OwnerAdmin** (`isOwnerAdmin === true`) — check `user.featureIds` contains ALL required feature IDs
@@ -379,10 +391,7 @@ export async function authLoader(): Promise<Response | null> {
 
 ```ts
 // higher-order loader factory
-export function featureLoader(
-  requiredFeatureIds: number[],
-  storeIdParam?: string
-) {
+export function featureLoader(requiredFeatureIds: number[], storeIdParam?: string) {
   return async ({ params }: LoaderFunctionArgs): Promise<Response | null> => {
     const user = authService.getCurrentUser();
     if (!user || !authService.isAuthenticated()) return redirect('/login');
@@ -442,20 +451,20 @@ useUnsavedChangesPrompt(isDirty);
 
 ### Features that work offline (no connectivity required)
 
-| Feature | Condition |
-|---------|-----------|
-| Access any route | Valid, non-expired token in localStorage |
-| View all POS data | Data previously cached in localStorage / IndexedDB |
-| Create/edit transactions | Queued locally; synced when online |
-| Role-based UI rendering | Evaluated against locally stored UserModel |
-| Session expiry check | Evaluated against locally stored `expiresIn` |
+| Feature                  | Condition                                          |
+| ------------------------ | -------------------------------------------------- |
+| Access any route         | Valid, non-expired token in localStorage           |
+| View all POS data        | Data previously cached in localStorage / IndexedDB |
+| Create/edit transactions | Queued locally; synced when online                 |
+| Role-based UI rendering  | Evaluated against locally stored UserModel         |
+| Session expiry check     | Evaluated against locally stored `expiresIn`       |
 
 ### Features that require online connectivity
 
-| Feature | Reason |
-|---------|--------|
-| Login | Credential verification happens server-side |
-| Register | Account creation is server-side |
+| Feature                                     | Reason                                      |
+| ------------------------------------------- | ------------------------------------------- |
+| Login                                       | Credential verification happens server-side |
+| Register                                    | Account creation is server-side             |
 | Background user refresh (`GET /v1/auth/me`) | Network call; silently skipped when offline |
 
 ### Offline UX rules
@@ -468,6 +477,7 @@ useUnsavedChangesPrompt(isDirty);
 ### Session expiry while offline
 
 If the user opens the app after 35 days without connectivity, the token is expired. The app:
+
 1. Detects expiry on startup (`expiresIn < Date.now()`)
 2. Calls `authService.logout()` (clears localStorage)
 3. Redirects to `/login`
@@ -477,9 +487,9 @@ If the user opens the app after 35 days without connectivity, the token is expir
 
 ## 9. localStorage Schema
 
-| Key | Type | Description |
-|-----|------|-------------|
-| `token` | `string` | Raw JWT token. Read by the HTTP interceptor for every API call. |
+| Key                             | Type               | Description                                                                                                                                     |
+| ------------------------------- | ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `token`                         | `string`           | Raw JWT token. Read by the HTTP interceptor for every API call.                                                                                 |
 | `{appVersion}-authf496fc5a9f17` | `UserModel` (JSON) | Full user model including overridden `expiresIn`. The `{appVersion}` prefix is the running app version string (e.g., `1.0.0-authf496fc5a9f17`). |
 
 ### `UserModel` stored shape (example)
@@ -527,6 +537,7 @@ If the user opens the app after 35 days without connectivity, the token is expir
 Authenticate a user with email/phone and password.
 
 **Request:**
+
 ```json
 {
   "login": "user@example.com",
@@ -535,6 +546,7 @@ Authenticate a user with email/phone and password.
 ```
 
 **Response (200):**
+
 ```json
 {
   "success": true,
@@ -552,12 +564,12 @@ Authenticate a user with email/phone and password.
 
 **Error responses:**
 
-| HTTP Status | Scenario |
-|-------------|----------|
-| 400 | Missing or malformed fields |
-| 401 | Invalid credentials |
-| 403 | Account inactive |
-| 503 | Server unavailable (offline scenario) |
+| HTTP Status | Scenario                              |
+| ----------- | ------------------------------------- |
+| 400         | Missing or malformed fields           |
+| 401         | Invalid credentials                   |
+| 403         | Account inactive                      |
+| 503         | Server unavailable (offline scenario) |
 
 ---
 
@@ -566,6 +578,7 @@ Authenticate a user with email/phone and password.
 Create a new user account.
 
 **Request:**
+
 ```json
 {
   "fullName": "Jane Doe",
@@ -577,6 +590,7 @@ Create a new user account.
 ```
 
 **Response (201):**
+
 ```json
 {
   "success": true,
@@ -587,10 +601,10 @@ Create a new user account.
 
 **Error responses:**
 
-| HTTP Status | Scenario |
-|-------------|----------|
-| 400 | Validation error (duplicate email, weak password, mismatched confirmation) |
-| 503 | Server unavailable |
+| HTTP Status | Scenario                                                                   |
+| ----------- | -------------------------------------------------------------------------- |
+| 400         | Validation error (duplicate email, weak password, mismatched confirmation) |
+| 503         | Server unavailable                                                         |
 
 ---
 
@@ -599,25 +613,29 @@ Create a new user account.
 Fetch the full user profile for the authenticated user. Called in the background after startup.
 
 **Request headers:**
+
 ```
 Authorization: Bearer <authToken>
 ```
 
 **Response (200):**
+
 ```json
 {
   "success": true,
   "message": "",
-  "data": { /* UserModel */ }
+  "data": {
+    /* UserModel */
+  }
 }
 ```
 
 **Error responses:**
 
-| HTTP Status | Scenario |
-|-------------|----------|
-| 401 | Token expired or invalid — trigger logout |
-| 503 | Server unavailable — silently ignore |
+| HTTP Status | Scenario                                  |
+| ----------- | ----------------------------------------- |
+| 401         | Token expired or invalid — trigger logout |
+| 503         | Server unavailable — silently ignore      |
 
 ---
 
@@ -625,40 +643,40 @@ Authorization: Bearer <authToken>
 
 ### Login errors
 
-| Error condition | UX behavior |
-|----------------|-------------|
-| Device offline | Show `OfflineBanner` inline; block form submission |
-| 401 Invalid credentials | Show field-level or form-level error: "Invalid email or password" |
-| 403 Account inactive | Show: "Your account is inactive. Contact support." |
-| Network timeout | Show: "Connection error. Please try again." |
-| Unexpected server error (5xx) | Show: "Something went wrong. Please try again." |
+| Error condition               | UX behavior                                                       |
+| ----------------------------- | ----------------------------------------------------------------- |
+| Device offline                | Show `OfflineBanner` inline; block form submission                |
+| 401 Invalid credentials       | Show field-level or form-level error: "Invalid email or password" |
+| 403 Account inactive          | Show: "Your account is inactive. Contact support."                |
+| Network timeout               | Show: "Connection error. Please try again."                       |
+| Unexpected server error (5xx) | Show: "Something went wrong. Please try again."                   |
 
 ### Registration errors
 
-| Error condition | UX behavior |
-|----------------|-------------|
-| Device offline | Show `OfflineBanner`; block form submission |
-| 400 Duplicate email | Show field error on email: "This email is already registered" |
-| 400 Password mismatch | Show field error on confirmation field |
-| 400 Weak password | Show field error with password requirements |
-| Other 400 | Show API-provided `message` in form-level error area |
-| 5xx | Show: "Something went wrong. Please try again." |
+| Error condition       | UX behavior                                                   |
+| --------------------- | ------------------------------------------------------------- |
+| Device offline        | Show `OfflineBanner`; block form submission                   |
+| 400 Duplicate email   | Show field error on email: "This email is already registered" |
+| 400 Password mismatch | Show field error on confirmation field                        |
+| 400 Weak password     | Show field error with password requirements                   |
+| Other 400             | Show API-provided `message` in form-level error area          |
+| 5xx                   | Show: "Something went wrong. Please try again."               |
 
 ### Session / startup errors
 
-| Error condition | UX behavior |
-|----------------|-------------|
-| No token in localStorage | Redirect to `/login` silently |
-| Token expired (`expiresIn < Date.now()`) | Show session-expired message, redirect to `/login` |
-| Corrupted user JSON in localStorage | Clear storage, redirect to `/login` |
-| `GET /v1/auth/me` fails (offline/5xx) | Silently ignore; use cached user data |
-| `GET /v1/auth/me` returns 401 | Token invalid; call `logout()` and redirect to `/login` |
+| Error condition                          | UX behavior                                             |
+| ---------------------------------------- | ------------------------------------------------------- |
+| No token in localStorage                 | Redirect to `/login` silently                           |
+| Token expired (`expiresIn < Date.now()`) | Show session-expired message, redirect to `/login`      |
+| Corrupted user JSON in localStorage      | Clear storage, redirect to `/login`                     |
+| `GET /v1/auth/me` fails (offline/5xx)    | Silently ignore; use cached user data                   |
+| `GET /v1/auth/me` returns 401            | Token invalid; call `logout()` and redirect to `/login` |
 
 ### Authorization errors
 
-| Error condition | UX behavior |
-|----------------|-------------|
-| Route access denied | Redirect to `/unauthorized` page |
+| Error condition         | UX behavior                                |
+| ----------------------- | ------------------------------------------ |
+| Route access denied     | Redirect to `/unauthorized` page           |
 | Feature-gated UI hidden | Component does not render (no error shown) |
 
 ---
@@ -696,7 +714,7 @@ axiosInstance.interceptors.response.use(
       authService.logout();
     }
     return Promise.reject(error);
-  }
+  },
 );
 ```
 

@@ -1,12 +1,6 @@
 import { test as base, expect } from '@playwright/test';
-import {
-  installRegisterNetworkObserver,
-  type RegisterNetworkObserver,
-} from './network-observer';
-import {
-  installLoginNetworkObserver,
-  type LoginNetworkObserver,
-} from './login-network-observer';
+import { installRegisterNetworkObserver, type RegisterNetworkObserver } from './network-observer';
+import { installLoginNetworkObserver, type LoginNetworkObserver } from './login-network-observer';
 import { createPersonaCache, restoreSignedInSession } from './session';
 import type { PersonaCache, PersonaKind, SignedInSession } from './session';
 

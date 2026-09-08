@@ -77,17 +77,17 @@ menu MUST no longer be present after the click).
 
 The item's foreground color MUST be driven by `intent` per this map:
 
-| intent | color class | default icon |
-|---|---|---|
-| `edit` | `text-primary` | `EditIcon` |
-| `create` | `text-primary` | `PlusIcon` |
-| `pay` | `text-success` | `PayIcon` |
-| `activate` | `text-success` | `CheckCircleIcon` |
-| `approve` | `text-success` | `CheckCircleIcon` |
-| `deactivate` | `text-warning` | `BanIcon` |
-| `disapprove` | `text-warning` | `BanIcon` |
-| `delete` | `text-danger` | `TrashIcon` |
-| _(no intent)_ | `text-text` | none |
+| intent        | color class    | default icon      |
+| ------------- | -------------- | ----------------- |
+| `edit`        | `text-primary` | `EditIcon`        |
+| `create`      | `text-primary` | `PlusIcon`        |
+| `pay`         | `text-success` | `PayIcon`         |
+| `activate`    | `text-success` | `CheckCircleIcon` |
+| `approve`     | `text-success` | `CheckCircleIcon` |
+| `deactivate`  | `text-warning` | `BanIcon`         |
+| `disapprove`  | `text-warning` | `BanIcon`         |
+| `delete`      | `text-danger`  | `TrashIcon`       |
+| _(no intent)_ | `text-text`    | none              |
 
 When `separatorBefore` is `true`, a `role="separator"` divider element MUST render
 immediately before the item's `menuitem` element.

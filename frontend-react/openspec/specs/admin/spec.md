@@ -93,12 +93,12 @@ the single activate button.
 
 **I18N-1** — The following `FEATURES.*` keys MUST be added to `app/shared/lib/i18n/es.ts`:
 
-| Key | Purpose |
-|-----|---------|
-| `FEATURES.TITLE` | Page heading |
-| `FEATURES.ACTIVATE_FEATURES` | Activate button label |
+| Key                           | Purpose                |
+| ----------------------------- | ---------------------- |
+| `FEATURES.TITLE`              | Page heading           |
+| `FEATURES.ACTIVATE_FEATURES`  | Activate button label  |
 | `FEATURES.FEATURES_ACTIVATED` | Inline success message |
-| `FEATURES.UNEXPECTED_ERROR` | Inline error message |
+| `FEATURES.UNEXPECTED_ERROR`   | Inline error message   |
 
 **I18N-2** — If `en.ts` exists in the same directory, the same four keys MUST be added to it.
 
@@ -116,6 +116,7 @@ The route module MUST export a named `loader` bound to `superAdminLoader` AND a 
 for the page component.
 
 **Scenarios:**
+
 - S-ADMIN-STORES-ROUTE-1 — Route registered with superAdminLoader; no EFeatures check.
 
 ---
@@ -127,6 +128,7 @@ Users who are `isOwnerAdmin` but NOT `isSuperAdmin` MUST be blocked. No `EFeatur
 applied.
 
 **Scenarios:**
+
 - S-ADMIN-STORES-ACCESS-1 — SuperAdmin reaches page
 - S-ADMIN-STORES-ACCESS-2 — OwnerAdmin blocked
 - S-ADMIN-STORES-ACCESS-3 — Unauthenticated → /login
@@ -152,6 +154,7 @@ The container MUST NOT wire `onActivate` or `onDeactivate` (these are commented 
 source and are intentionally omitted).
 
 **Scenarios:**
+
 - S-ADMIN-STORES-PAGE-1 — Successful load renders StoreList
 - S-ADMIN-STORES-PAGE-2 — onCreate navigates to create route
 - S-ADMIN-STORES-PAGE-3 — onEdit navigates to edit route
@@ -180,16 +183,18 @@ are absent.
 `app/admin/features/routes/__tests__/features.test.tsx`.
 
 **TEST-2** — Route smoke tests MUST cover:
-  - SuperAdmin user navigating to `/admin/features` renders `FeaturesPage` with title and button.
-  - Non-SuperAdmin user (e.g., OwnerAdmin) is redirected by `superAdminLoader`.
-  - Clicking the activate button calls `featureHttpService.activateFeatures()`.
-  - On `succeeded === true`, the inline success message (`FEATURES.FEATURES_ACTIVATED`) is visible.
-  - On `succeeded === false` or HTTP error, the inline error message (`FEATURES.UNEXPECTED_ERROR`) is visible.
+
+- SuperAdmin user navigating to `/admin/features` renders `FeaturesPage` with title and button.
+- Non-SuperAdmin user (e.g., OwnerAdmin) is redirected by `superAdminLoader`.
+- Clicking the activate button calls `featureHttpService.activateFeatures()`.
+- On `succeeded === true`, the inline success message (`FEATURES.FEATURES_ACTIVATED`) is visible.
+- On `succeeded === false` or HTTP error, the inline error message (`FEATURES.UNEXPECTED_ERROR`) is visible.
 
 **TEST-3** — `superAdminLoader` MUST have unit tests covering:
-  - Unauthenticated user → redirects (consistent with `adminLoader`).
-  - Authenticated OwnerAdmin who is NOT SuperAdmin → redirected/blocked.
-  - Authenticated SuperAdmin → loader resolves without redirect.
+
+- Unauthenticated user → redirects (consistent with `adminLoader`).
+- Authenticated OwnerAdmin who is NOT SuperAdmin → redirected/blocked.
+- Authenticated SuperAdmin → loader resolves without redirect.
 
 **TEST-4** — Test files that use `useIntl` MUST wrap the component under test in `IntlProvider`
 (consistent with project convention).
@@ -303,10 +308,10 @@ A `usageHttpService` singleton MUST exist at
 
 `usageHttpService` MUST expose exactly two methods:
 
-| Method | HTTP | Endpoint | Response type |
-|--------|------|----------|---------------|
-| `getStoresLastWeek()` | GET | `/v1/usages/stores-last-week` | `BaseResponseModel<StoreUsages>` |
-| `getStoresLastMonth()` | GET | `/v1/usages/stores-last-month` | `BaseResponseModel<StoreUsages>` |
+| Method                 | HTTP | Endpoint                       | Response type                    |
+| ---------------------- | ---- | ------------------------------ | -------------------------------- |
+| `getStoresLastWeek()`  | GET  | `/v1/usages/stores-last-week`  | `BaseResponseModel<StoreUsages>` |
+| `getStoresLastMonth()` | GET  | `/v1/usages/stores-last-month` | `BaseResponseModel<StoreUsages>` |
 
 `StoreUsages` MUST be defined as `{ storeUsagesCountDays: number[]; activeStoreCount: number }`.
 `BaseResponseModel<T>` fields `message` and `actionCode` are nullable (`string | null` /
@@ -412,15 +417,15 @@ and one labelled `ADMIN_DASHBOARD.LAST_30_DAYS` — to switch between views.
 
 The following `ADMIN_DASHBOARD.*` keys MUST be added to `app/shared/lib/i18n/es.ts`:
 
-| Key | Purpose |
-|-----|---------|
-| `ADMIN_DASHBOARD.HEADER` | Card header label |
-| `ADMIN_DASHBOARD.TITLE` | Page heading |
-| `ADMIN_DASHBOARD.LAST_7_DAYS` | Toggle button — 7-day view |
-| `ADMIN_DASHBOARD.LAST_30_DAYS` | Toggle button — 30-day view |
+| Key                            | Purpose                        |
+| ------------------------------ | ------------------------------ |
+| `ADMIN_DASHBOARD.HEADER`       | Card header label              |
+| `ADMIN_DASHBOARD.TITLE`        | Page heading                   |
+| `ADMIN_DASHBOARD.LAST_7_DAYS`  | Toggle button — 7-day view     |
+| `ADMIN_DASHBOARD.LAST_30_DAYS` | Toggle button — 30-day view    |
 | `ADMIN_DASHBOARD.COL_CATEGORY` | Table column header — category |
-| `ADMIN_DASHBOARD.COL_VALUE` | Table column header — value |
-| `ADMIN_DASHBOARD.ERROR` | Inline error message |
+| `ADMIN_DASHBOARD.COL_VALUE`    | Table column header — value    |
+| `ADMIN_DASHBOARD.ERROR`        | Inline error message           |
 
 `en.ts` MUST NOT be modified (no English locale exists for admin keys in this project).
 
@@ -438,6 +443,7 @@ A smoke-test suite MUST exist at
 `app/admin/dashboard/routes/__tests__/dashboard.test.tsx`.
 
 Tests MUST cover:
+
 - SuperAdmin mounts page; default 7-day fetch fires; table renders with day labels.
 - OwnerAdmin is blocked by `superAdminLoader`.
 - Toggle to 30 days calls `getStoresLastMonth()`; table re-renders with numeric labels.
@@ -450,6 +456,7 @@ A unit test suite MUST exist at
 `app/admin/dashboard/lib/services/__tests__/usage-http-service.test.ts`.
 
 Tests MUST cover:
+
 - `getStoresLastWeek()` calls `GET /v1/usages/stores-last-week`.
 - `getStoresLastMonth()` calls `GET /v1/usages/stores-last-month`.
 - Mocks populate the `BaseResponseModel<StoreUsages>` fields.
@@ -512,11 +519,11 @@ None of the five dead Angular helpers (`getTotalTiendas`, `getAverageTiendas`, `
 
 The system MUST register three routes in `app/routes.ts` under the existing `app-layout` route:
 
-| Path | Component | Loader |
-|------|-----------|--------|
-| `/admin/resellers` | `ResellerListPage` | `superAdminLoader` |
-| `/admin/resellers/create` | `ResellerCreatePage` | `superAdminLoader` |
-| `/admin/resellers/edit/:id` | `ResellerEditPage` | `superAdminLoader` |
+| Path                        | Component            | Loader             |
+| --------------------------- | -------------------- | ------------------ |
+| `/admin/resellers`          | `ResellerListPage`   | `superAdminLoader` |
+| `/admin/resellers/create`   | `ResellerCreatePage` | `superAdminLoader` |
+| `/admin/resellers/edit/:id` | `ResellerEditPage`   | `superAdminLoader` |
 
 Each route module MUST export a named `loader` bound to `superAdminLoader` AND a default export
 for the page component.
@@ -589,12 +596,12 @@ A `resellerHttpService` singleton MUST exist at
 
 `resellerHttpService` MUST expose exactly four methods:
 
-| Method | HTTP verb | Endpoint | Response type |
-|--------|-----------|----------|---------------|
-| `listResellers()` | GET | `/v1/reSellers/all/true` | `BaseResponseModel<ReSeller[]>` |
-| `getReseller(id: string)` | GET | `/v1/reSellers/:id` | `BaseResponseModel<ReSeller>` |
-| `createReseller(payload)` | POST | `/v1/reSellers/` | `BaseResponseModel<string>` |
-| `updateReseller(id: string, payload)` | PUT | `/v1/reSellers/:id` | `BaseResponseModel<boolean>` |
+| Method                                | HTTP verb | Endpoint                 | Response type                   |
+| ------------------------------------- | --------- | ------------------------ | ------------------------------- |
+| `listResellers()`                     | GET       | `/v1/reSellers/all/true` | `BaseResponseModel<ReSeller[]>` |
+| `getReseller(id: string)`             | GET       | `/v1/reSellers/:id`      | `BaseResponseModel<ReSeller>`   |
+| `createReseller(payload)`             | POST      | `/v1/reSellers/`         | `BaseResponseModel<string>`     |
+| `updateReseller(id: string, payload)` | PUT       | `/v1/reSellers/:id`      | `BaseResponseModel<boolean>`    |
 
 The `ReSeller` type is imported from `@store-mgmt/domain` (`packages/domain/src/models/store.ts`).
 `BaseResponseModel<T>` fields `message` and `actionCode` are nullable (`string | null` /
@@ -650,6 +657,7 @@ On mount the container MUST call `resellerHttpService.listResellers()` and rende
 resellers as a card grid.
 
 Each card MUST display:
+
 - `fullName`
 - `percentDiscountPrice`
 - `discountPrice`
@@ -727,15 +735,15 @@ A container `ResellerCreatePage` MUST exist at
 
 The page MUST render a controlled form with the following fields:
 
-| Field | Type | Validation |
-|-------|------|-----------|
-| `fullName` | text input | required |
-| `login` | text input | required |
-| `password` | password input (show/hide toggle) | required; regex `(?=\D*\d)(?=[^a-z]*[a-z])(?=[^A-Z]*[A-Z]).{8,30}` (min 8, max 30, at least one digit, one lower, one upper) |
-| `confirmPassword` | password input | required; MUST match `password` field exactly (cross-field validation) |
-| `cellPhone` | text input | required; format validation (no mask library) |
-| `email` | email input | required; email format |
-| `description` | textarea | optional |
+| Field             | Type                              | Validation                                                                                                                   |
+| ----------------- | --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `fullName`        | text input                        | required                                                                                                                     |
+| `login`           | text input                        | required                                                                                                                     |
+| `password`        | password input (show/hide toggle) | required; regex `(?=\D*\d)(?=[^a-z]*[a-z])(?=[^A-Z]*[A-Z]).{8,30}` (min 8, max 30, at least one digit, one lower, one upper) |
+| `confirmPassword` | password input                    | required; MUST match `password` field exactly (cross-field validation)                                                       |
+| `cellPhone`       | text input                        | required; format validation (no mask library)                                                                                |
+| `email`           | email input                       | required; email format                                                                                                       |
+| `description`     | textarea                          | optional                                                                                                                     |
 
 The submit button MUST be disabled when any required field is empty or any validation fails.
 
@@ -820,16 +828,16 @@ MUST be pre-populated via `patchValue` equivalent.
 
 The page MUST render a controlled form with the following fields:
 
-| Field | Type | Notes |
-|-------|------|-------|
-| `login` | text input | Disabled/read-only — display only, never submitted |
-| `fullName` | text input | required |
-| `isActive` | toggle/checkbox | no required validation |
-| `percentDiscountPrice` | number input | required; `min=0` |
-| `discountPrice` | number input | required; `min=0` |
-| `cellPhone` | text input | required; format validation (no mask library) |
-| `email` | email input | required; email format |
-| `description` | textarea | optional |
+| Field                  | Type            | Notes                                              |
+| ---------------------- | --------------- | -------------------------------------------------- |
+| `login`                | text input      | Disabled/read-only — display only, never submitted |
+| `fullName`             | text input      | required                                           |
+| `isActive`             | toggle/checkbox | no required validation                             |
+| `percentDiscountPrice` | number input    | required; `min=0`                                  |
+| `discountPrice`        | number input    | required; `min=0`                                  |
+| `cellPhone`            | text input      | required; format validation (no mask library)      |
+| `email`                | email input     | required; email format                             |
+| `description`          | textarea        | optional                                           |
 
 The `reSellerId` control that appears conditionally in the Angular source MUST NOT be included
 (it is dead code — never used in the Angular template).
@@ -904,15 +912,15 @@ Field-level labels that already exist under `GENERAL.*` or `USER.*` MUST be refe
 those existing keys in the component — no duplicate key must be added to `es.ts`.
 Only net-new slice-specific keys are listed here:
 
-| Key | Purpose |
-|-----|---------|
-| `RESELLERS.LIST_TITLE` | Page heading for the list page |
-| `RESELLERS.ADD` | Label for the add/create button on the list page |
-| `RESELLERS.CREATE_TITLE` | Page heading for the create form |
-| `RESELLERS.EDIT_TITLE` | Page heading for the edit form |
-| `RESELLERS.PERCENT_DISCOUNT` | Label for `percentDiscountPrice` field |
-| `RESELLERS.DISCOUNT_PRICE` | Label for `discountPrice` field |
-| `RESELLERS.ERROR` | Generic inline error message for HTTP failures |
+| Key                          | Purpose                                          |
+| ---------------------------- | ------------------------------------------------ |
+| `RESELLERS.LIST_TITLE`       | Page heading for the list page                   |
+| `RESELLERS.ADD`              | Label for the add/create button on the list page |
+| `RESELLERS.CREATE_TITLE`     | Page heading for the create form                 |
+| `RESELLERS.EDIT_TITLE`       | Page heading for the edit form                   |
+| `RESELLERS.PERCENT_DISCOUNT` | Label for `percentDiscountPrice` field           |
+| `RESELLERS.DISCOUNT_PRICE`   | Label for `discountPrice` field                  |
+| `RESELLERS.ERROR`            | Generic inline error message for HTTP failures   |
 
 `en.ts` MUST NOT be modified (no English locale exists for admin keys in this project).
 
@@ -936,12 +944,12 @@ literals are permitted in TSX.
 
 The following test suites MUST exist:
 
-| File | What it covers |
-|------|---------------|
-| `app/admin/resellers/lib/services/__tests__/reseller-http-service.test.ts` | Service: all 4 methods call correct endpoints; mocks use `BaseResponseModel` fields |
-| `app/admin/resellers/routes/__tests__/reseller-list.test.tsx` | List page: load renders cards; inactive card has `deactive-reSeller` class; navigate-to-create; navigate-to-edit; no activate/deactivate/delete; HTTP error shows inline error |
-| `app/admin/resellers/routes/__tests__/reseller-create.test.tsx` | Create page: form fields present; submit disabled when invalid; password regex enforced; confirm-match enforced; success navigates to list; error shows inline; unsaved-changes guard triggers on dirty form |
-| `app/admin/resellers/routes/__tests__/reseller-edit.test.tsx` | Edit page: load pre-populates fields; login is disabled; success stays on page; error shows inline; unsaved-changes guard triggers on dirty; reSellerId absent |
+| File                                                                       | What it covers                                                                                                                                                                                               |
+| -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `app/admin/resellers/lib/services/__tests__/reseller-http-service.test.ts` | Service: all 4 methods call correct endpoints; mocks use `BaseResponseModel` fields                                                                                                                          |
+| `app/admin/resellers/routes/__tests__/reseller-list.test.tsx`              | List page: load renders cards; inactive card has `deactive-reSeller` class; navigate-to-create; navigate-to-edit; no activate/deactivate/delete; HTTP error shows inline error                               |
+| `app/admin/resellers/routes/__tests__/reseller-create.test.tsx`            | Create page: form fields present; submit disabled when invalid; password regex enforced; confirm-match enforced; success navigates to list; error shows inline; unsaved-changes guard triggers on dirty form |
+| `app/admin/resellers/routes/__tests__/reseller-edit.test.tsx`              | Edit page: load pre-populates fields; login is disabled; success stays on page; error shows inline; unsaved-changes guard triggers on dirty; reSellerId absent                                               |
 
 All test files that use `useIntl` MUST wrap the component under test in `IntlProvider`
 (consistent with project convention).
@@ -1029,11 +1037,11 @@ the React service. It is dead code in the Angular source.
 
 The system MUST register three routes in `app/routes.ts` under the existing `app-layout` route:
 
-| Path | Component | Loader |
-|------|-----------|--------|
-| `/admin/owners` | `OwnerListPage` | `resellerFeatureLoader([EFeatures.Owners])` |
-| `/admin/owners/create` | `OwnerCreatePage` | `resellerFeatureLoader([EFeatures.Owners])` |
-| `/admin/owners/edit/:id` | `OwnerEditPage` | `resellerFeatureLoader([EFeatures.Owners])` |
+| Path                     | Component         | Loader                                      |
+| ------------------------ | ----------------- | ------------------------------------------- |
+| `/admin/owners`          | `OwnerListPage`   | `resellerFeatureLoader([EFeatures.Owners])` |
+| `/admin/owners/create`   | `OwnerCreatePage` | `resellerFeatureLoader([EFeatures.Owners])` |
+| `/admin/owners/edit/:id` | `OwnerEditPage`   | `resellerFeatureLoader([EFeatures.Owners])` |
 
 Each route module MUST export a named `loader` bound to `resellerFeatureLoader([EFeatures.Owners])`
 AND a default export for the page component.
@@ -1108,13 +1116,13 @@ An `ownerHttpService` singleton MUST exist at
 
 `ownerHttpService` MUST expose exactly five methods:
 
-| Method | HTTP | Endpoint | Response type |
-|--------|------|----------|---------------|
-| `getOwners()` | GET | `/v1/owners/all/true` | `BaseResponseModel<Owner[]>` |
-| `getOwnerById(id: string)` | GET | `/v1/owners/:id` | `BaseResponseModel<Owner>` |
-| `createOwner(payload)` | POST | `/v1/owners/` | `BaseResponseModel<string>` |
-| `editOwner(id: string, payload)` | PUT | `/v1/owners/:id` | `BaseResponseModel<boolean>` |
-| `deleteOwner(id: string)` | DELETE | `/v1/owners/:id` | `BaseResponseModel<boolean>` |
+| Method                           | HTTP   | Endpoint              | Response type                |
+| -------------------------------- | ------ | --------------------- | ---------------------------- |
+| `getOwners()`                    | GET    | `/v1/owners/all/true` | `BaseResponseModel<Owner[]>` |
+| `getOwnerById(id: string)`       | GET    | `/v1/owners/:id`      | `BaseResponseModel<Owner>`   |
+| `createOwner(payload)`           | POST   | `/v1/owners/`         | `BaseResponseModel<string>`  |
+| `editOwner(id: string, payload)` | PUT    | `/v1/owners/:id`      | `BaseResponseModel<boolean>` |
+| `deleteOwner(id: string)`        | DELETE | `/v1/owners/:id`      | `BaseResponseModel<boolean>` |
 
 `Owner` and `OwnerStoreModule` are imported from `@store-mgmt/domain`.
 `BaseResponseModel<T>` fields `message` and `actionCode` are nullable (`string | null` /
@@ -1172,6 +1180,7 @@ On mount the container MUST call `ownerHttpService.getOwners()` and render the r
 as a card grid.
 
 Each card MUST display:
+
 - `fullName`
 - Computed total price: sum of `owner.storeModules[].storeModuleTotalCurrentPrice` (formatted; `0` when array is empty)
 - Store count: `owner.storeModules.length`
@@ -1181,6 +1190,7 @@ Each card MUST display:
 - `description`
 
 Card background CSS MUST reflect owner state:
+
 - `isActive === false` → apply `deactive-owner` class
 - `isActive === true` AND `approved === false` → apply `guest-owner` class
 - Otherwise → no extra class
@@ -1273,16 +1283,16 @@ as a named export AND as `default`.
 
 The page MUST render a controlled form with the following fields:
 
-| Field | Type | Validation |
-|-------|------|------------|
-| `fullName` | text input | required |
-| `login` | text input | required |
-| `password` | password input (show/hide toggle) | required; regex `(?=\D*\d)(?=[^a-z]*[a-z])(?=[^A-Z]*[A-Z]).{8,30}` |
-| `confirmPassword` | password input | required; MUST match `password` exactly |
-| `cellPhone` | text input | required; PHONE_REGEX format validation (no mask library) |
-| `email` | email input | required; email format |
-| `description` | textarea | optional |
-| `reSellerId` | select (SuperAdmin-only) | optional; populated from `resellerHttpService.listResellers()` |
+| Field             | Type                              | Validation                                                         |
+| ----------------- | --------------------------------- | ------------------------------------------------------------------ |
+| `fullName`        | text input                        | required                                                           |
+| `login`           | text input                        | required                                                           |
+| `password`        | password input (show/hide toggle) | required; regex `(?=\D*\d)(?=[^a-z]*[a-z])(?=[^A-Z]*[A-Z]).{8,30}` |
+| `confirmPassword` | password input                    | required; MUST match `password` exactly                            |
+| `cellPhone`       | text input                        | required; PHONE_REGEX format validation (no mask library)          |
+| `email`           | email input                       | required; email format                                             |
+| `description`     | textarea                          | optional                                                           |
+| `reSellerId`      | select (SuperAdmin-only)          | optional; populated from `resellerHttpService.listResellers()`     |
 
 The `reSellerId` select MUST be shown only when `isSuperAdmin === true`. When visible it MUST be
 populated by calling `resellerHttpService.listResellers()` on mount.
@@ -1372,15 +1382,15 @@ On mount the container MUST read the `:id` path parameter and call
 
 The Details tab form MUST contain the following fields:
 
-| Field | Type | Notes |
-|-------|------|-------|
-| `login` | text input | Disabled/read-only; NOT included in PUT body |
-| `fullName` | text input | required |
-| `isActive` | toggle | Shown only when `isSuperAdmin === true` |
-| `cellPhone` | text input | required; PHONE_REGEX format (no mask library) |
-| `email` | email input | required; email format |
-| `description` | textarea | optional |
-| `reSellerId` | select | Shown only when `isSuperAdmin === true`; populated from `resellerHttpService.listResellers()` |
+| Field         | Type        | Notes                                                                                         |
+| ------------- | ----------- | --------------------------------------------------------------------------------------------- |
+| `login`       | text input  | Disabled/read-only; NOT included in PUT body                                                  |
+| `fullName`    | text input  | required                                                                                      |
+| `isActive`    | toggle      | Shown only when `isSuperAdmin === true`                                                       |
+| `cellPhone`   | text input  | required; PHONE_REGEX format (no mask library)                                                |
+| `email`       | email input | required; email format                                                                        |
+| `description` | textarea    | optional                                                                                      |
+| `reSellerId`  | select      | Shown only when `isSuperAdmin === true`; populated from `resellerHttpService.listResellers()` |
 
 `guest` MUST NOT be rendered as a form control. It MUST be read from the loaded owner state and
 included in the PUT payload as-is.
@@ -1500,14 +1510,14 @@ The following `OWNER.*` keys MUST be added to `app/shared/lib/i18n/es.ts`.
 Keys that already exist under `GENERAL.*`, `USER.*`, or `MENU.*` MUST be referenced from those
 existing keys — no duplicate key is added to `es.ts`.
 
-| Key | Purpose |
-|-----|---------|
-| `OWNER.LIST_TITLE` | Page heading for the list page |
-| `OWNER.CREATE_TITLE` | Page heading for the create form |
-| `OWNER.EDIT_TITLE` | Page heading for the edit form |
-| `OWNER.EDIT_OWNER` | Card menu item label — navigate to edit |
+| Key                       | Purpose                                          |
+| ------------------------- | ------------------------------------------------ |
+| `OWNER.LIST_TITLE`        | Page heading for the list page                   |
+| `OWNER.CREATE_TITLE`      | Page heading for the create form                 |
+| `OWNER.EDIT_TITLE`        | Page heading for the edit form                   |
+| `OWNER.EDIT_OWNER`        | Card menu item label — navigate to edit          |
 | `OWNER.STORE_PRICE_LABEL` | Store price display with `{count}` interpolation |
-| `OWNER.ERROR` | Generic inline error message for HTTP failures |
+| `OWNER.ERROR`             | Generic inline error message for HTTP failures   |
 
 `en.ts` MUST NOT be modified (no English locale exists for admin keys in this project).
 
@@ -1531,12 +1541,12 @@ literals are permitted in TSX.
 
 The following test suites MUST exist:
 
-| File | What it covers |
-|------|---------------|
-| `app/admin/owners/lib/services/__tests__/owner-http-service.test.ts` | Service: all 5 methods call correct endpoints; mocks use `BaseResponseModel` fields |
-| `app/admin/owners/routes/__tests__/owner-list.test.tsx` | List: load renders cards; state-based CSS classes; price/count computed; reSellerName fallback; email conditional; delete fires without confirm + refreshes; navigate-to-edit; no create button; HTTP error shows inline error |
-| `app/admin/owners/routes/__tests__/owner-create.test.tsx` | Create: fields present; reSellerId conditional on SuperAdmin; submit disabled when pristine/invalid; PASSWORD_REGEX; confirm-match; success navigates to `/management/stores/create`; failure shows inline error; unsaved-changes guard |
-| `app/admin/owners/routes/__tests__/owner-edit.test.tsx` | Edit: pre-populates fields; login disabled and excluded from PUT; SuperAdmin-only fields conditional; guest from loaded state; success stays on page; failure inline error; unsaved-changes guard; tab shell for SuperAdmin; no tabs for Reseller |
+| File                                                                 | What it covers                                                                                                                                                                                                                                    |
+| -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `app/admin/owners/lib/services/__tests__/owner-http-service.test.ts` | Service: all 5 methods call correct endpoints; mocks use `BaseResponseModel` fields                                                                                                                                                               |
+| `app/admin/owners/routes/__tests__/owner-list.test.tsx`              | List: load renders cards; state-based CSS classes; price/count computed; reSellerName fallback; email conditional; delete fires without confirm + refreshes; navigate-to-edit; no create button; HTTP error shows inline error                    |
+| `app/admin/owners/routes/__tests__/owner-create.test.tsx`            | Create: fields present; reSellerId conditional on SuperAdmin; submit disabled when pristine/invalid; PASSWORD_REGEX; confirm-match; success navigates to `/management/stores/create`; failure shows inline error; unsaved-changes guard           |
+| `app/admin/owners/routes/__tests__/owner-edit.test.tsx`              | Edit: pre-populates fields; login disabled and excluded from PUT; SuperAdmin-only fields conditional; guest from loaded state; success stays on page; failure inline error; unsaved-changes guard; tab shell for SuperAdmin; no tabs for Reseller |
 
 All test files using `useIntl` MUST wrap the component under test in `IntlProvider`.
 `BaseResponseModel<T>` fields `message` and `actionCode` are nullable (`string | null` /

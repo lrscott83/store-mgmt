@@ -46,7 +46,13 @@ vi.mock('@zxing/browser', () => ({
 const scannerModalMock = vi.hoisted(() => vi.fn());
 vi.mock('../../components/scanner-modal', () => ({
   ScannerModal: scannerModalMock.mockImplementation(
-    ({ onScanned, onClose }: { onScanned: (barcode: string, quantity: number) => void; onClose: () => void }) => (
+    ({
+      onScanned,
+      onClose,
+    }: {
+      onScanned: (barcode: string, quantity: number) => void;
+      onClose: () => void;
+    }) => (
       <div data-testid="scanner-modal">
         <input
           type="text"
@@ -68,9 +74,12 @@ vi.mock('../../components/scanner-modal', () => ({
           data-testid="scanner-mock-scan"
           onClick={() => {
             const root = document.body;
-            const barcode = (root.querySelector('[data-testid="scanner-mock-barcode"]') as HTMLInputElement)?.dataset.barcode ?? '';
+            const barcode =
+              (root.querySelector('[data-testid="scanner-mock-barcode"]') as HTMLInputElement)
+                ?.dataset.barcode ?? '';
             const quantity = Number(
-              (root.querySelector('[data-testid="scanner-mock-quantity"]') as HTMLInputElement)?.dataset.quantity ?? '1',
+              (root.querySelector('[data-testid="scanner-mock-quantity"]') as HTMLInputElement)
+                ?.dataset.quantity ?? '1',
             );
             onScanned(barcode, quantity);
           }}
@@ -196,7 +205,13 @@ describe('SalePage — Angular parity (sale.component.html)', () => {
     showToastSuccessMock.mockClear();
     scannerModalMock.mockClear();
     scannerModalMock.mockImplementation(
-      ({ onScanned, onClose }: { onScanned: (barcode: string, quantity: number) => void; onClose: () => void }) => (
+      ({
+        onScanned,
+        onClose,
+      }: {
+        onScanned: (barcode: string, quantity: number) => void;
+        onClose: () => void;
+      }) => (
         <div data-testid="scanner-modal">
           <input
             type="text"
@@ -218,9 +233,12 @@ describe('SalePage — Angular parity (sale.component.html)', () => {
             data-testid="scanner-mock-scan"
             onClick={() => {
               const root = document.body;
-              const barcode = (root.querySelector('[data-testid="scanner-mock-barcode"]') as HTMLInputElement)?.dataset.barcode ?? '';
+              const barcode =
+                (root.querySelector('[data-testid="scanner-mock-barcode"]') as HTMLInputElement)
+                  ?.dataset.barcode ?? '';
               const quantity = Number(
-                (root.querySelector('[data-testid="scanner-mock-quantity"]') as HTMLInputElement)?.dataset.quantity ?? '1',
+                (root.querySelector('[data-testid="scanner-mock-quantity"]') as HTMLInputElement)
+                  ?.dataset.quantity ?? '1',
               );
               onScanned(barcode, quantity);
             }}
@@ -259,7 +277,10 @@ describe('SalePage — Angular parity (sale.component.html)', () => {
   });
 
   it('renders one category button per active category', async () => {
-    mockCategories = [makeCategory({ id: 'c1', name: 'Bebidas' }), makeCategory({ id: 'c2', name: 'Snacks' })];
+    mockCategories = [
+      makeCategory({ id: 'c1', name: 'Bebidas' }),
+      makeCategory({ id: 'c2', name: 'Snacks' }),
+    ];
     render(
       <Wrapper>
         <SalePage />
@@ -284,7 +305,10 @@ describe('SalePage — Angular parity (sale.component.html)', () => {
   });
 
   it('switches products shown when a different category button is clicked', async () => {
-    mockCategories = [makeCategory({ id: 'c1', name: 'Bebidas' }), makeCategory({ id: 'c2', name: 'Snacks' })];
+    mockCategories = [
+      makeCategory({ id: 'c1', name: 'Bebidas' }),
+      makeCategory({ id: 'c2', name: 'Snacks' }),
+    ];
     mockProducts = [
       makeProduct({ id: 'p1', name: 'Coca Cola', categoryId: 'c1' }),
       makeProduct({ id: 'p2', name: 'Papas', categoryId: 'c2' }),
@@ -319,10 +343,34 @@ describe('SalePage — Angular parity (sale.component.html)', () => {
   it('only filters products by categoryId, isActive and availableToSale (matches Angular repository filter)', async () => {
     mockCategories = [makeCategory({ id: 'c1', name: 'Bebidas' })];
     mockProducts = [
-      makeProduct({ id: 'p1', name: 'Visible', categoryId: 'c1', isActive: true, availableToSale: true }),
-      makeProduct({ id: 'p2', name: 'Inactive', categoryId: 'c1', isActive: false, availableToSale: true }),
-      makeProduct({ id: 'p3', name: 'NotForSale', categoryId: 'c1', isActive: true, availableToSale: false }),
-      makeProduct({ id: 'p4', name: 'OtherCategory', categoryId: 'c-other', isActive: true, availableToSale: true }),
+      makeProduct({
+        id: 'p1',
+        name: 'Visible',
+        categoryId: 'c1',
+        isActive: true,
+        availableToSale: true,
+      }),
+      makeProduct({
+        id: 'p2',
+        name: 'Inactive',
+        categoryId: 'c1',
+        isActive: false,
+        availableToSale: true,
+      }),
+      makeProduct({
+        id: 'p3',
+        name: 'NotForSale',
+        categoryId: 'c1',
+        isActive: true,
+        availableToSale: false,
+      }),
+      makeProduct({
+        id: 'p4',
+        name: 'OtherCategory',
+        categoryId: 'c-other',
+        isActive: true,
+        availableToSale: true,
+      }),
     ];
     render(
       <Wrapper>
@@ -398,7 +446,13 @@ describe('SalePage — Angular parity (sale.component.html)', () => {
     mockUser.storeModuleIds = [EModules.Inventory];
     mockCategories = [makeCategory({ id: 'c1', name: 'Bebidas' })];
     mockProducts = [
-      makeProduct({ id: 'p1', name: 'Coca Cola', categoryId: 'c1', price: 2, discountFromInvantory: true }),
+      makeProduct({
+        id: 'p1',
+        name: 'Coca Cola',
+        categoryId: 'c1',
+        price: 2,
+        discountFromInvantory: true,
+      }),
     ];
     const entries = [
       {
@@ -415,10 +469,7 @@ describe('SalePage — Angular parity (sale.component.html)', () => {
         createdByName: 'test',
       },
     ];
-    localStorage.setItem(
-      'lizoft.store-inventory-entries-s1',
-      JSON.stringify([['p1', entries]]),
-    );
+    localStorage.setItem('lizoft.store-inventory-entries-s1', JSON.stringify([['p1', entries]]));
 
     render(
       <Wrapper>
@@ -434,7 +485,13 @@ describe('SalePage — Angular parity (sale.component.html)', () => {
     mockUser.storeModuleIds = [EModules.Inventory];
     mockCategories = [makeCategory({ id: 'c1', name: 'Bebidas' })];
     mockProducts = [
-      makeProduct({ id: 'p1', name: 'Coca Cola', categoryId: 'c1', price: 2, discountFromInvantory: false }),
+      makeProduct({
+        id: 'p1',
+        name: 'Coca Cola',
+        categoryId: 'c1',
+        price: 2,
+        discountFromInvantory: false,
+      }),
     ];
     const entries = [
       {
@@ -451,10 +508,7 @@ describe('SalePage — Angular parity (sale.component.html)', () => {
         createdByName: 'test',
       },
     ];
-    localStorage.setItem(
-      'lizoft.store-inventory-entries-s1',
-      JSON.stringify([['p1', entries]]),
-    );
+    localStorage.setItem('lizoft.store-inventory-entries-s1', JSON.stringify([['p1', entries]]));
 
     render(
       <Wrapper>
@@ -487,10 +541,7 @@ describe('SalePage — Angular parity (sale.component.html)', () => {
         createdByName: 'test',
       },
     ];
-    localStorage.setItem(
-      'lizoft.store-inventory-entries-s1',
-      JSON.stringify([['p1', entries]]),
-    );
+    localStorage.setItem('lizoft.store-inventory-entries-s1', JSON.stringify([['p1', entries]]));
 
     render(
       <Wrapper>
@@ -729,5 +780,3 @@ describe('SalePage — Angular parity (sale.component.html)', () => {
     expect(text).toBe('El producto no está disponible en el inventario.');
   });
 });
-
-

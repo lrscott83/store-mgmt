@@ -41,7 +41,12 @@ describe('ProductOfflineService — roundtrip de la config mayorista', () => {
 
   beforeEach(() => {
     localStorage.clear();
-    useAuthStore.setState({ user: makeUser({ login: 'jdoe' }), isAuthenticated: true, isLoading: false, error: null });
+    useAuthStore.setState({
+      user: makeUser({ login: 'jdoe' }),
+      isAuthenticated: true,
+      isLoading: false,
+      error: null,
+    });
     service = new ProductOfflineService(storeId);
   });
 

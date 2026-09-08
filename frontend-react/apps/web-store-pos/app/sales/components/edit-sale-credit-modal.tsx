@@ -27,7 +27,12 @@ interface EditSaleCreditModalProps {
  * "Pagar" here even though `onSubmit()` only updates client/note, not
  * payment; preserved verbatim (not a paraphrase or a bug fix).
  */
-export function EditSaleCreditModal({ saleCredit, isOpen, onClose, onSave }: EditSaleCreditModalProps) {
+export function EditSaleCreditModal({
+  saleCredit,
+  isOpen,
+  onClose,
+  onSave,
+}: EditSaleCreditModalProps) {
   const intl = useIntl();
   const [client, setClient] = useState(saleCredit.client);
   const [note, setNote] = useState(saleCredit.note ?? '');

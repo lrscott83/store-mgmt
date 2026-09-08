@@ -7,7 +7,13 @@ import AuthLayout from '../auth-layout';
 
 function renderLayout() {
   const router = createMemoryRouter(
-    [{ path: '/', element: <AuthLayout />, children: [{ index: true, element: <div>content</div> }] }],
+    [
+      {
+        path: '/',
+        element: <AuthLayout />,
+        children: [{ index: true, element: <div>content</div> }],
+      },
+    ],
     { initialEntries: ['/'] },
   );
   return render(
@@ -42,7 +48,7 @@ describe('AuthLayout — guest footer (Req: parity with guest-footer.component.h
     expect(contact?.querySelector('svg')).toHaveClass('text-[#f5b026]');
   });
 
-  it('renders the Contact Us text in a legible color on the light auth background (not Angular\'s dark-theme cream literal)', () => {
+  it("renders the Contact Us text in a legible color on the light auth background (not Angular's dark-theme cream literal)", () => {
     renderLayout();
     const contact = screen.getByText(esMessages['FOOTER.CONTACT_US']).closest('button');
     expect(contact).toHaveClass('text-gray-700');

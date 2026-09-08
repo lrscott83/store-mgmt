@@ -9,17 +9,17 @@ import { CreateProductModal } from '../create-product-modal';
 // (lazy chunk) in jsdom. The mock CAPTURES the decode callback so tests can fire
 // decoded barcodes like a camera would (the 2026-09-07 redesign removed the
 // manual-entry form, so the decode path is the only way in).
-const decodeCallbackRef = vi.hoisted(() => ({ current: null as ((result: unknown) => void) | null }));
+const decodeCallbackRef = vi.hoisted(() => ({
+  current: null as ((result: unknown) => void) | null,
+}));
 vi.mock('@zxing/browser', () => ({
   BrowserMultiFormatReader: vi.fn().mockImplementation(() => ({
     decodeFromVideoDevice: vi
       .fn()
-      .mockImplementation(
-        (_device: unknown, _video: unknown, cb: (result: unknown) => void) => {
-          decodeCallbackRef.current = cb;
-          return Promise.resolve({ stop: vi.fn() });
-        },
-      ),
+      .mockImplementation((_device: unknown, _video: unknown, cb: (result: unknown) => void) => {
+        decodeCallbackRef.current = cb;
+        return Promise.resolve({ stop: vi.fn() });
+      }),
   })),
 }));
 
@@ -44,7 +44,12 @@ describe('CreateProductModal — name field autofocus', () => {
   it('focuses the name input on mount', () => {
     render(
       <Wrapper>
-        <CreateProductModal category={makeCategory()} defaultOrder={1} onSave={vi.fn()} onClose={vi.fn()} />
+        <CreateProductModal
+          category={makeCategory()}
+          defaultOrder={1}
+          onSave={vi.fn()}
+          onClose={vi.fn()}
+        />
       </Wrapper>,
     );
     expect(screen.getByTestId('product-name-input')).toHaveFocus();
@@ -55,7 +60,12 @@ describe('CreateProductModal — validation text parity (GENERAL.VALIDATION.REQU
   it('shows "Nombre es requerido" when name is empty', () => {
     render(
       <Wrapper>
-        <CreateProductModal category={makeCategory()} defaultOrder={1} onSave={vi.fn()} onClose={vi.fn()} />
+        <CreateProductModal
+          category={makeCategory()}
+          defaultOrder={1}
+          onSave={vi.fn()}
+          onClose={vi.fn()}
+        />
       </Wrapper>,
     );
     fireEvent.click(screen.getByTestId('create-product-submit'));
@@ -65,7 +75,12 @@ describe('CreateProductModal — validation text parity (GENERAL.VALIDATION.REQU
   it('shows "Precio es requerido" when price is empty', () => {
     render(
       <Wrapper>
-        <CreateProductModal category={makeCategory()} defaultOrder={1} onSave={vi.fn()} onClose={vi.fn()} />
+        <CreateProductModal
+          category={makeCategory()}
+          defaultOrder={1}
+          onSave={vi.fn()}
+          onClose={vi.fn()}
+        />
       </Wrapper>,
     );
     fireEvent.change(screen.getByTestId('product-name-input'), { target: { value: 'Coca Cola' } });
@@ -76,7 +91,12 @@ describe('CreateProductModal — validation text parity (GENERAL.VALIDATION.REQU
   it('shows "Orden es requerido" when order is cleared', () => {
     render(
       <Wrapper>
-        <CreateProductModal category={makeCategory()} defaultOrder={1} onSave={vi.fn()} onClose={vi.fn()} />
+        <CreateProductModal
+          category={makeCategory()}
+          defaultOrder={1}
+          onSave={vi.fn()}
+          onClose={vi.fn()}
+        />
       </Wrapper>,
     );
     fireEvent.change(screen.getByTestId('product-name-input'), { target: { value: 'Coca Cola' } });
@@ -91,7 +111,12 @@ describe('CreateProductModal — Angular field set/order parity', () => {
   it('prefills Orden with defaultOrder and checks all 3 toggles by default', () => {
     render(
       <Wrapper>
-        <CreateProductModal category={makeCategory()} defaultOrder={5} onSave={vi.fn()} onClose={vi.fn()} />
+        <CreateProductModal
+          category={makeCategory()}
+          defaultOrder={5}
+          onSave={vi.fn()}
+          onClose={vi.fn()}
+        />
       </Wrapper>,
     );
     expect(screen.getByTestId('product-order-input')).toHaveValue(5);
@@ -103,7 +128,12 @@ describe('CreateProductModal — Angular field set/order parity', () => {
   it('renders the Precio field without a currency prefix', () => {
     render(
       <Wrapper>
-        <CreateProductModal category={makeCategory()} defaultOrder={1} onSave={vi.fn()} onClose={vi.fn()} />
+        <CreateProductModal
+          category={makeCategory()}
+          defaultOrder={1}
+          onSave={vi.fn()}
+          onClose={vi.fn()}
+        />
       </Wrapper>,
     );
     expect(screen.queryByTestId('product-price-prefix')).not.toBeInTheDocument();
@@ -112,7 +142,12 @@ describe('CreateProductModal — Angular field set/order parity', () => {
   it('renders the barcode input empty and the scan button beside it (React-owned field)', () => {
     render(
       <Wrapper>
-        <CreateProductModal category={makeCategory()} defaultOrder={1} onSave={vi.fn()} onClose={vi.fn()} />
+        <CreateProductModal
+          category={makeCategory()}
+          defaultOrder={1}
+          onSave={vi.fn()}
+          onClose={vi.fn()}
+        />
       </Wrapper>,
     );
     expect(screen.getByTestId('product-barcode-input')).toHaveValue('');
@@ -124,7 +159,12 @@ describe('CreateProductModal — Angular field set/order parity', () => {
   it('does not render a category dropdown', () => {
     render(
       <Wrapper>
-        <CreateProductModal category={makeCategory()} defaultOrder={1} onSave={vi.fn()} onClose={vi.fn()} />
+        <CreateProductModal
+          category={makeCategory()}
+          defaultOrder={1}
+          onSave={vi.fn()}
+          onClose={vi.fn()}
+        />
       </Wrapper>,
     );
     expect(screen.queryByTestId('product-category-select')).not.toBeInTheDocument();
@@ -134,7 +174,12 @@ describe('CreateProductModal — Angular field set/order parity', () => {
   it('title resolves PRODUCT.NEW_PRODUCT ("Producto")', () => {
     render(
       <Wrapper>
-        <CreateProductModal category={makeCategory()} defaultOrder={1} onSave={vi.fn()} onClose={vi.fn()} />
+        <CreateProductModal
+          category={makeCategory()}
+          defaultOrder={1}
+          onSave={vi.fn()}
+          onClose={vi.fn()}
+        />
       </Wrapper>,
     );
     expect(screen.getByRole('heading', { name: 'Producto' })).toBeInTheDocument();
@@ -143,7 +188,12 @@ describe('CreateProductModal — Angular field set/order parity', () => {
   it('inventory-discount checkbox label reads exactly "Descuenta del Inventario"', () => {
     render(
       <Wrapper>
-        <CreateProductModal category={makeCategory()} defaultOrder={1} onSave={vi.fn()} onClose={vi.fn()} />
+        <CreateProductModal
+          category={makeCategory()}
+          defaultOrder={1}
+          onSave={vi.fn()}
+          onClose={vi.fn()}
+        />
       </Wrapper>,
     );
     expect(screen.getByText('Descuenta del Inventario')).toBeInTheDocument();
@@ -153,7 +203,12 @@ describe('CreateProductModal — Angular field set/order parity', () => {
     const onSave = vi.fn();
     render(
       <Wrapper>
-        <CreateProductModal category={makeCategory({ id: 'cat-2' })} defaultOrder={3} onSave={onSave} onClose={vi.fn()} />
+        <CreateProductModal
+          category={makeCategory({ id: 'cat-2' })}
+          defaultOrder={3}
+          onSave={onSave}
+          onClose={vi.fn()}
+        />
       </Wrapper>,
     );
     fireEvent.change(screen.getByTestId('product-name-input'), { target: { value: 'Sprite' } });
@@ -178,12 +233,19 @@ describe('CreateProductModal — barcode field (React-owned, scanner-capturable)
     const onSave = vi.fn();
     render(
       <Wrapper>
-        <CreateProductModal category={makeCategory()} defaultOrder={1} onSave={onSave} onClose={vi.fn()} />
+        <CreateProductModal
+          category={makeCategory()}
+          defaultOrder={1}
+          onSave={onSave}
+          onClose={vi.fn()}
+        />
       </Wrapper>,
     );
     fireEvent.change(screen.getByTestId('product-name-input'), { target: { value: 'Coca Cola' } });
     fireEvent.change(screen.getByTestId('product-price-input'), { target: { value: '1.5' } });
-    fireEvent.change(screen.getByTestId('product-barcode-input'), { target: { value: '7501234567890' } });
+    fireEvent.change(screen.getByTestId('product-barcode-input'), {
+      target: { value: '7501234567890' },
+    });
     fireEvent.click(screen.getByTestId('create-product-submit'));
 
     expect(onSave).toHaveBeenCalledWith(
@@ -195,7 +257,12 @@ describe('CreateProductModal — barcode field (React-owned, scanner-capturable)
     const onSave = vi.fn();
     render(
       <Wrapper>
-        <CreateProductModal category={makeCategory()} defaultOrder={1} onSave={onSave} onClose={vi.fn()} />
+        <CreateProductModal
+          category={makeCategory()}
+          defaultOrder={1}
+          onSave={onSave}
+          onClose={vi.fn()}
+        />
       </Wrapper>,
     );
     fireEvent.change(screen.getByTestId('product-name-input'), { target: { value: 'Coca Cola' } });
@@ -209,7 +276,12 @@ describe('CreateProductModal — barcode field (React-owned, scanner-capturable)
     const onSave = vi.fn();
     render(
       <Wrapper>
-        <CreateProductModal category={makeCategory()} defaultOrder={1} onSave={onSave} onClose={vi.fn()} />
+        <CreateProductModal
+          category={makeCategory()}
+          defaultOrder={1}
+          onSave={onSave}
+          onClose={vi.fn()}
+        />
       </Wrapper>,
     );
     fireEvent.change(screen.getByTestId('product-name-input'), { target: { value: 'Coca Cola' } });
@@ -223,7 +295,12 @@ describe('CreateProductModal — barcode field (React-owned, scanner-capturable)
   it('opens the scanner when the scan button is clicked', () => {
     render(
       <Wrapper>
-        <CreateProductModal category={makeCategory()} defaultOrder={1} onSave={vi.fn()} onClose={vi.fn()} />
+        <CreateProductModal
+          category={makeCategory()}
+          defaultOrder={1}
+          onSave={vi.fn()}
+          onClose={vi.fn()}
+        />
       </Wrapper>,
     );
     expect(screen.queryByTestId('scanner-modal')).not.toBeInTheDocument();
@@ -234,7 +311,12 @@ describe('CreateProductModal — barcode field (React-owned, scanner-capturable)
   it('a decoded scan fills the barcode field AND closes the scanner (capture-once cadence)', async () => {
     render(
       <Wrapper>
-        <CreateProductModal category={makeCategory()} defaultOrder={1} onSave={vi.fn()} onClose={vi.fn()} />
+        <CreateProductModal
+          category={makeCategory()}
+          defaultOrder={1}
+          onSave={vi.fn()}
+          onClose={vi.fn()}
+        />
       </Wrapper>,
     );
     fireEvent.click(screen.getByTestId('product-barcode-scan'));
@@ -252,7 +334,12 @@ describe('CreateProductModal — barcode field (React-owned, scanner-capturable)
     const onSave = vi.fn();
     render(
       <Wrapper>
-        <CreateProductModal category={makeCategory()} defaultOrder={1} onSave={onSave} onClose={vi.fn()} />
+        <CreateProductModal
+          category={makeCategory()}
+          defaultOrder={1}
+          onSave={onSave}
+          onClose={vi.fn()}
+        />
       </Wrapper>,
     );
     fireEvent.click(screen.getByTestId('product-barcode-scan'));
@@ -276,7 +363,12 @@ describe('CreateProductModal — price min(0) and order pattern parity (Angular 
     const onSave = vi.fn();
     render(
       <Wrapper>
-        <CreateProductModal category={makeCategory()} defaultOrder={1} onSave={onSave} onClose={vi.fn()} />
+        <CreateProductModal
+          category={makeCategory()}
+          defaultOrder={1}
+          onSave={onSave}
+          onClose={vi.fn()}
+        />
       </Wrapper>,
     );
     fireEvent.change(screen.getByTestId('product-name-input'), { target: { value: 'Coca Cola' } });
@@ -291,7 +383,12 @@ describe('CreateProductModal — price min(0) and order pattern parity (Angular 
     const onSave = vi.fn();
     render(
       <Wrapper>
-        <CreateProductModal category={makeCategory()} defaultOrder={1} onSave={onSave} onClose={vi.fn()} />
+        <CreateProductModal
+          category={makeCategory()}
+          defaultOrder={1}
+          onSave={onSave}
+          onClose={vi.fn()}
+        />
       </Wrapper>,
     );
     fireEvent.change(screen.getByTestId('product-name-input'), { target: { value: 'Coca Cola' } });
@@ -307,7 +404,12 @@ describe('CreateProductModal — price min(0) and order pattern parity (Angular 
     const onSave = vi.fn();
     render(
       <Wrapper>
-        <CreateProductModal category={makeCategory()} defaultOrder={1} onSave={onSave} onClose={vi.fn()} />
+        <CreateProductModal
+          category={makeCategory()}
+          defaultOrder={1}
+          onSave={onSave}
+          onClose={vi.fn()}
+        />
       </Wrapper>,
     );
     fireEvent.change(screen.getByTestId('product-name-input'), { target: { value: 'Coca Cola' } });
@@ -323,7 +425,12 @@ describe('CreateProductModal — price min(0) and order pattern parity (Angular 
     const onSave = vi.fn();
     render(
       <Wrapper>
-        <CreateProductModal category={makeCategory()} defaultOrder={1} onSave={onSave} onClose={vi.fn()} />
+        <CreateProductModal
+          category={makeCategory()}
+          defaultOrder={1}
+          onSave={onSave}
+          onClose={vi.fn()}
+        />
       </Wrapper>,
     );
     fireEvent.change(screen.getByTestId('product-name-input'), { target: { value: 'Coca Cola' } });
@@ -339,7 +446,12 @@ describe('CreateProductModal — footer icons/labels parity', () => {
   it('close button reads "Cerrar" (not "Cancelar") and renders a close icon', () => {
     render(
       <Wrapper>
-        <CreateProductModal category={makeCategory()} defaultOrder={1} onSave={vi.fn()} onClose={vi.fn()} />
+        <CreateProductModal
+          category={makeCategory()}
+          defaultOrder={1}
+          onSave={vi.fn()}
+          onClose={vi.fn()}
+        />
       </Wrapper>,
     );
     const closeButton = screen.getByRole('button', { name: 'Cerrar' });
@@ -351,7 +463,12 @@ describe('CreateProductModal — footer icons/labels parity', () => {
   it('confirm button reads "Salvar" and renders a save icon', () => {
     render(
       <Wrapper>
-        <CreateProductModal category={makeCategory()} defaultOrder={1} onSave={vi.fn()} onClose={vi.fn()} />
+        <CreateProductModal
+          category={makeCategory()}
+          defaultOrder={1}
+          onSave={vi.fn()}
+          onClose={vi.fn()}
+        />
       </Wrapper>,
     );
     const saveButton = screen.getByTestId('create-product-submit');
@@ -362,7 +479,12 @@ describe('CreateProductModal — footer icons/labels parity', () => {
   it('footer buttons use the purple fab pill style (Angular mat-fab parity)', () => {
     render(
       <Wrapper>
-        <CreateProductModal category={makeCategory()} defaultOrder={1} onSave={vi.fn()} onClose={vi.fn()} />
+        <CreateProductModal
+          category={makeCategory()}
+          defaultOrder={1}
+          onSave={vi.fn()}
+          onClose={vi.fn()}
+        />
       </Wrapper>,
     );
     expect(screen.getByRole('button', { name: 'Cerrar' }).className).toContain('rounded-full');

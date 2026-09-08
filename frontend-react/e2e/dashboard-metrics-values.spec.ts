@@ -45,9 +45,7 @@ test.describe.serial('FC-A5 — Dashboard: métricas con valores', () => {
     await expect(page.getByText('Ganancias Hoy')).toBeVisible();
   });
 
-  test('trend indicators show glyph (▲, ▼, or –) and "vs ayer" text', async ({
-    signedInPage,
-  }) => {
+  test('trend indicators show glyph (▲, ▼, or –) and "vs ayer" text', async ({ signedInPage }) => {
     const { page } = signedInPage;
 
     // Each KPI card has a trend line with "vs ayer"
@@ -77,9 +75,7 @@ test.describe.serial('FC-A5 — Dashboard: métricas con valores', () => {
     await expect(page.locator('small:has-text("vs ayer")').first()).toBeVisible();
   });
 
-  test('sales and profit charts render with data or empty state', async ({
-    signedInPage,
-  }) => {
+  test('sales and profit charts render with data or empty state', async ({ signedInPage }) => {
     const { page } = signedInPage;
 
     // Sales chart section — text from STATISTICS.SALES.TITLE
@@ -89,10 +85,8 @@ test.describe.serial('FC-A5 — Dashboard: métricas con valores', () => {
     await expect(page.getByText('Ganancia bruta').first()).toBeVisible();
 
     // Either chart has data or shows empty state message
-    const hasContent =
-      (await page.locator('canvas, svg, .recharts-surface').count()) > 0;
-    const hasEmptyState =
-      (await page.getByText('Sin datos').count()) > 0;
+    const hasContent = (await page.locator('canvas, svg, .recharts-surface').count()) > 0;
+    const hasEmptyState = (await page.getByText('Sin datos').count()) > 0;
 
     expect(hasContent || hasEmptyState).toBeTruthy();
   });
@@ -101,13 +95,9 @@ test.describe.serial('FC-A5 — Dashboard: métricas con valores', () => {
     const { page } = signedInPage;
 
     // Top profit products
-    await expect(
-      page.getByText('Productos mayor ganancias (últimos 30 días)')
-    ).toBeVisible();
+    await expect(page.getByText('Productos mayor ganancias (últimos 30 días)')).toBeVisible();
 
     // Top sold products
-    await expect(
-      page.getByText('Productos más vendidos (últimos 30 días)')
-    ).toBeVisible();
+    await expect(page.getByText('Productos más vendidos (últimos 30 días)')).toBeVisible();
   });
 });

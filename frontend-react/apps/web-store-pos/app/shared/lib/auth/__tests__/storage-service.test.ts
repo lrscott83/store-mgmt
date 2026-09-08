@@ -61,7 +61,10 @@ describe('StorageService', () => {
     });
 
     it('does not touch AUTH_MODEL when a value already exists there', () => {
-      localStorage.setItem(StorageKeys.AUTH_MODEL, JSON.stringify({ authToken: 'x', expiresIn: 1 }));
+      localStorage.setItem(
+        StorageKeys.AUTH_MODEL,
+        JSON.stringify({ authToken: 'x', expiresIn: 1 }),
+      );
       StorageService.setCurrentUser(makeUser());
       expect(localStorage.getItem(StorageKeys.AUTH_MODEL)).toBe(
         JSON.stringify({ authToken: 'x', expiresIn: 1 }),

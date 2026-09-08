@@ -7,6 +7,7 @@ Migrate the Angular `admin/dashboard` route to React 19 at `apps/web-store-pos/`
 ## Scope
 
 ### In Scope
+
 - `usageHttpService` singleton (2 GET methods) on shared `apiClient`.
 - `AdminDashboardPage` container with `export const loader = superAdminLoader`.
 - View toggle: `7days` (default, `/v1/usages/stores-last-week`) and `30days` (`/v1/usages/stores-last-month`).
@@ -17,6 +18,7 @@ Migrate the Angular `admin/dashboard` route to React 19 at `apps/web-store-pos/`
 - Co-located service + route smoke tests.
 
 ### Out of Scope (explicit non-goals)
+
 - NO chart (Angular `ng-apexcharts` is 100% commented out — table only).
 - NO `activeStoreCount` display (captured in Angular, never rendered).
 - NO dead helpers (`getTotalTiendas/getAverageTiendas/getMaxTiendas/getPorcentajePromedio/getPorcentajeMaximo`).
@@ -25,9 +27,11 @@ Migrate the Angular `admin/dashboard` route to React 19 at `apps/web-store-pos/`
 ## Capabilities
 
 ### New Capabilities
+
 - None.
 
 ### Modified Capabilities
+
 - `admin`: add admin-dashboard requirement (SuperAdmin-gated store-usage stats table with 7/30-day toggle) to canonical `openspec/specs/admin/spec.md` at archive.
 
 ## Approach
@@ -36,22 +40,22 @@ Approach A (table-only thin slice), per exploration. Mirror the established admi
 
 ## Affected Areas
 
-| Area | Impact | Description |
-|------|--------|-------------|
-| `app/admin/dashboard/lib/services/usage-http-service.ts` | New | 2 GET methods → `BaseResponseModel<StoreUsages>` |
-| `app/admin/dashboard/routes/dashboard.tsx` | New | Container; default + named export; `loader = superAdminLoader` |
-| `app/admin/dashboard/**/__tests__/*` | New | Service + route smoke tests |
-| `app/routes.ts` | Modified | `route('admin/dashboard', 'admin/dashboard/routes/dashboard.tsx')` |
-| `app/shared/lib/i18n/es.ts` | Modified | `ADMIN_DASHBOARD.HEADER/TITLE/LAST_7_DAYS/LAST_30_DAYS/COL_CATEGORY/COL_VALUE/ERROR` |
-| `openspec/specs/admin/spec.md` | Modified (archive) | Append admin-dashboard requirement |
+| Area                                                     | Impact             | Description                                                                          |
+| -------------------------------------------------------- | ------------------ | ------------------------------------------------------------------------------------ |
+| `app/admin/dashboard/lib/services/usage-http-service.ts` | New                | 2 GET methods → `BaseResponseModel<StoreUsages>`                                     |
+| `app/admin/dashboard/routes/dashboard.tsx`               | New                | Container; default + named export; `loader = superAdminLoader`                       |
+| `app/admin/dashboard/**/__tests__/*`                     | New                | Service + route smoke tests                                                          |
+| `app/routes.ts`                                          | Modified           | `route('admin/dashboard', 'admin/dashboard/routes/dashboard.tsx')`                   |
+| `app/shared/lib/i18n/es.ts`                              | Modified           | `ADMIN_DASHBOARD.HEADER/TITLE/LAST_7_DAYS/LAST_30_DAYS/COL_CATEGORY/COL_VALUE/ERROR` |
+| `openspec/specs/admin/spec.md`                           | Modified (archive) | Append admin-dashboard requirement                                                   |
 
 ## Risks
 
-| Risk | Likelihood | Mitigation |
-|------|------------|------------|
-| `getDiasSemana()` day math (Sunday edge) | Low | Port logic directly; unit-cover the Sunday→index 6 case |
-| `storeUsagesCountDays` length mismatch with categories | Low | Zip + `value || 0` fallback (matches Angular) |
-| Accidental scope creep (chart/activeStoreCount) | Low | Non-goals stated explicitly above |
+| Risk                                                   | Likelihood | Mitigation                                              |
+| ------------------------------------------------------ | ---------- | ------------------------------------------------------- | --- | ----------------------------- |
+| `getDiasSemana()` day math (Sunday edge)               | Low        | Port logic directly; unit-cover the Sunday→index 6 case |
+| `storeUsagesCountDays` length mismatch with categories | Low        | Zip + `value                                            |     | 0` fallback (matches Angular) |
+| Accidental scope creep (chart/activeStoreCount)        | Low        | Non-goals stated explicitly above                       |
 
 ## Rollback Plan
 

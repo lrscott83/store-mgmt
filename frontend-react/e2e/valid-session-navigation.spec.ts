@@ -34,7 +34,7 @@ async function deleteDeviceKeyDatabase(page: Page): Promise<void> {
         request.onerror = () => reject(request.error);
         request.onblocked = () => resolve();
       }),
-    DEVICE_KEY_DB
+    DEVICE_KEY_DB,
   );
 }
 
@@ -77,8 +77,7 @@ const localTest = test.extend<{}, { onlineLockedSnapshot: SnapshotEntries }>({
       await registerAndLoginOnline(page);
       const origin = new URL(page.url()).origin;
       const state = await context.storageState();
-      const localStorage =
-        state.origins.find((o) => o.origin === origin)?.localStorage ?? [];
+      const localStorage = state.origins.find((o) => o.origin === origin)?.localStorage ?? [];
       await context.close();
       await use({ origin, localStorage });
     },
@@ -140,7 +139,7 @@ localTest.describe('online — sin clave de dispositivo', () => {
       await page.goto('/login');
       await page.waitForURL(HOME_URL, { timeout: 15_000 });
       await context.close();
-    }
+    },
   );
 
   localTest(
@@ -160,7 +159,7 @@ localTest.describe('online — sin clave de dispositivo', () => {
       await page.goto('/register');
       await page.waitForURL(HOME_URL, { timeout: 15_000 });
       await context.close();
-    }
+    },
   );
 
   localTest('6. online/sin clave: recargar la vista mantiene la sesión', async ({ browser }) => {

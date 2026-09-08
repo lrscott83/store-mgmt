@@ -47,7 +47,11 @@ describe('getWholesaleMinPacks — cantidad mínima de paquetes', () => {
 
   it('devuelve el minPacks del primer rango (el menor de todos)', () => {
     const result = getWholesaleMinPacks(
-      makeProduct({ wholesaleEnabled: true, wholesalePackSize: 24, wholesaleTiers: beerConfig.tiers }),
+      makeProduct({
+        wholesaleEnabled: true,
+        wholesalePackSize: 24,
+        wholesaleTiers: beerConfig.tiers,
+      }),
     );
     expect(result).toBe(1);
   });
@@ -80,7 +84,11 @@ describe('getWholesaleMinPacks — cantidad mínima de paquetes', () => {
   it('wholesaleEnabled=false o sin tiers devuelve 0', () => {
     expect(
       getWholesaleMinPacks(
-        makeProduct({ wholesaleEnabled: false, wholesalePackSize: 24, wholesaleTiers: beerConfig.tiers }),
+        makeProduct({
+          wholesaleEnabled: false,
+          wholesalePackSize: 24,
+          wholesaleTiers: beerConfig.tiers,
+        }),
       ),
     ).toBe(0);
     expect(
@@ -109,7 +117,11 @@ describe('resolveWholesalePrice', () => {
 
   it('wholesaleEnabled=false cae al precio retail', () => {
     const result = resolveWholesalePrice(
-      makeProduct({ wholesaleEnabled: false, wholesalePackSize: 24, wholesaleTiers: beerConfig.tiers }),
+      makeProduct({
+        wholesaleEnabled: false,
+        wholesalePackSize: 24,
+        wholesaleTiers: beerConfig.tiers,
+      }),
       2,
     );
     expect(result).toEqual({ unitPrice: 700, total: 1400 });
@@ -117,7 +129,11 @@ describe('resolveWholesalePrice', () => {
 
   it('usa el tier base (minPacks 1) cuando no se supera ningún umbral', () => {
     const result = resolveWholesalePrice(
-      makeProduct({ wholesaleEnabled: true, wholesalePackSize: 24, wholesaleTiers: beerConfig.tiers }),
+      makeProduct({
+        wholesaleEnabled: true,
+        wholesalePackSize: 24,
+        wholesaleTiers: beerConfig.tiers,
+      }),
       5,
     );
     expect(result.unitPrice).toBe(680);
@@ -126,7 +142,11 @@ describe('resolveWholesalePrice', () => {
 
   it('elige el tier con el mayor minPacks <= paquetes (12 cajas → tier de 11 → 660)', () => {
     const result = resolveWholesalePrice(
-      makeProduct({ wholesaleEnabled: true, wholesalePackSize: 24, wholesaleTiers: beerConfig.tiers }),
+      makeProduct({
+        wholesaleEnabled: true,
+        wholesalePackSize: 24,
+        wholesaleTiers: beerConfig.tiers,
+      }),
       12,
     );
     expect(result.unitPrice).toBe(660);
@@ -135,7 +155,11 @@ describe('resolveWholesalePrice', () => {
 
   it('elige el tier superior (21+ cajas → 640) y respeta la cantidad', () => {
     const result = resolveWholesalePrice(
-      makeProduct({ wholesaleEnabled: true, wholesalePackSize: 24, wholesaleTiers: beerConfig.tiers }),
+      makeProduct({
+        wholesaleEnabled: true,
+        wholesalePackSize: 24,
+        wholesaleTiers: beerConfig.tiers,
+      }),
       25,
     );
     expect(result.unitPrice).toBe(640);
@@ -172,7 +196,12 @@ describe('resolveWholesalePrice', () => {
 
   it('redondea el total a 2 decimales', () => {
     const result = resolveWholesalePrice(
-      makeProduct({ price: 10, wholesaleEnabled: true, wholesalePackSize: 3, wholesaleTiers: [{ minPacks: 1, pricePerUnit: 3.333333 }] }),
+      makeProduct({
+        price: 10,
+        wholesaleEnabled: true,
+        wholesalePackSize: 3,
+        wholesaleTiers: [{ minPacks: 1, pricePerUnit: 3.333333 }],
+      }),
       2,
     );
     expect(result.total).toBe(round3(2 * 3 * 3.333333));
@@ -241,10 +270,13 @@ describe('validateWholesaleConfig', () => {
 
   it('minPacks duplicados fallan', () => {
     const result = validateWholesaleConfig(
-      { packSize: 24, tiers: [
-        { minPacks: 1, pricePerUnit: 680 },
-        { minPacks: 1, pricePerUnit: 660 },
-      ] },
+      {
+        packSize: 24,
+        tiers: [
+          { minPacks: 1, pricePerUnit: 680 },
+          { minPacks: 1, pricePerUnit: 660 },
+        ],
+      },
       700,
     );
     expect(result.succeeded).toBe(false);
@@ -451,8 +483,16 @@ describe('wholesaleCartDisplay — presentación del carrito en paquetes', () =>
 
   it('calcula el badge del carrito: 3 + 2 paquetes → 5', () => {
     const items = [
-      { product: beer, quantity: 72 },  // 3 cajas
-      { product: makeProduct({ id: 'beer2', wholesaleEnabled: true, wholesalePackSize: 6, wholesaleTiers: [{ minPacks: 1, pricePerUnit: 100 }] }), quantity: 12 }, // 2 packs de 6
+      { product: beer, quantity: 72 }, // 3 cajas
+      {
+        product: makeProduct({
+          id: 'beer2',
+          wholesaleEnabled: true,
+          wholesalePackSize: 6,
+          wholesaleTiers: [{ minPacks: 1, pricePerUnit: 100 }],
+        }),
+        quantity: 12,
+      }, // 2 packs de 6
     ];
     expect(wholesaleCartDisplay.cartBadgeCount(items)).toBe(5);
   });

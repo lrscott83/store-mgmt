@@ -51,12 +51,16 @@ describe('resolveUserHomePath', () => {
   });
 
   it('sends a reseller to /admin/owners (no product lookup)', async () => {
-    await expect(resolveUserHomePath(makeUser({ isReSeller: true }))).resolves.toBe('/admin/owners');
+    await expect(resolveUserHomePath(makeUser({ isReSeller: true }))).resolves.toBe(
+      '/admin/owners',
+    );
     expect(hasAnyAvailableToSaleProduct).not.toHaveBeenCalled();
   });
 
   it('sends a superadmin to /admin/owners (no product lookup)', async () => {
-    await expect(resolveUserHomePath(makeUser({ isSuperAdmin: true }))).resolves.toBe('/admin/owners');
+    await expect(resolveUserHomePath(makeUser({ isSuperAdmin: true }))).resolves.toBe(
+      '/admin/owners',
+    );
     expect(hasAnyAvailableToSaleProduct).not.toHaveBeenCalled();
   });
 

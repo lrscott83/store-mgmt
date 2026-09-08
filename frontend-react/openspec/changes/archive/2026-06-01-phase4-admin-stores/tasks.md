@@ -2,14 +2,14 @@
 
 ## Review Workload Forecast
 
-| Field | Value |
-|-------|-------|
-| Estimated changed lines | 80–120 |
-| 400-line budget risk | Low |
-| Chained PRs recommended | No |
-| Suggested split | Single work unit |
-| Delivery strategy | local-branch-only |
-| Chain strategy | N/A |
+| Field                   | Value             |
+| ----------------------- | ----------------- |
+| Estimated changed lines | 80–120            |
+| 400-line budget risk    | Low               |
+| Chained PRs recommended | No                |
+| Suggested split         | Single work unit  |
+| Delivery strategy       | local-branch-only |
+| Chain strategy          | N/A               |
 
 Decision needed before apply: No
 Chained PRs recommended: No
@@ -18,9 +18,9 @@ Chain strategy: size-exception
 
 ### Suggested Work Units
 
-| Unit | Goal | Likely PR | Notes |
-|------|------|-----------|-------|
-| 1 | Presentational guard + admin container + route | local branch | TDD sequence; tests + code together |
+| Unit | Goal                                           | Likely PR    | Notes                               |
+| ---- | ---------------------------------------------- | ------------ | ----------------------------------- |
+| 1    | Presentational guard + admin container + route | local branch | TDD sequence; tests + code together |
 
 ---
 

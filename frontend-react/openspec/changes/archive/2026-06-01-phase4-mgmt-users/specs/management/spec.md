@@ -200,7 +200,7 @@ offline queue, and a reactive gate (disable/re-enable on connectivity change wit
 
 ---
 
-### Requirement: USERS.* i18n Keys
+### Requirement: USERS.\* i18n Keys
 
 The system MUST add the 27 minimum `USERS.*` keys to `es.ts`. All user-visible copy in the Users
 slice MUST originate from `es.ts` message keys via `useIntl`/`FormattedMessage`.

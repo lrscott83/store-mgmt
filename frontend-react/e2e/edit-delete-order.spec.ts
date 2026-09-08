@@ -30,21 +30,42 @@ async function seedInventoryEntry(page: Page, storeId: string): Promise<void> {
       const rawProducts = localStorage.getItem(productKey);
       if (!rawProducts) return;
       let productsEntries: [string, Record<string, unknown>][];
-      try { productsEntries = JSON.parse(rawProducts); } catch { return; }
-      const sellableProduct = productsEntries.find(([, p]) => p['isActive'] && p['availableToSale']);
+      try {
+        productsEntries = JSON.parse(rawProducts);
+      } catch {
+        return;
+      }
+      const sellableProduct = productsEntries.find(
+        ([, p]) => p['isActive'] && p['availableToSale'],
+      );
       if (!sellableProduct) return;
       const [productId] = sellableProduct;
       const invKey = `lizoft.store-inventory-entries-${sid}`;
       const rawInv = localStorage.getItem(invKey);
       let invMapEntries: [string, Record<string, unknown>[]][] = [];
-      if (rawInv) { try { invMapEntries = JSON.parse(rawInv); } catch { invMapEntries = []; } }
+      if (rawInv) {
+        try {
+          invMapEntries = JSON.parse(rawInv);
+        } catch {
+          invMapEntries = [];
+        }
+      }
       const existingBucket = invMapEntries.find(([pid]) => pid === productId);
       if (existingBucket?.[1].some((e) => e['isActive'])) return;
       const newEntry = {
-        id: crypto.randomUUID(), productId, categoryId: '', quantity: 100, available: 100,
-        costPrice: 5, date: new Date().toISOString(), order: 0, isActive: true,
-        createdDate: new Date().toISOString(), createdByName: 'e2e-seed',
-        updatedDate: undefined, updatedByName: undefined,
+        id: crypto.randomUUID(),
+        productId,
+        categoryId: '',
+        quantity: 100,
+        available: 100,
+        costPrice: 5,
+        date: new Date().toISOString(),
+        order: 0,
+        isActive: true,
+        createdDate: new Date().toISOString(),
+        createdByName: 'e2e-seed',
+        updatedDate: undefined,
+        updatedByName: undefined,
       };
       if (existingBucket) existingBucket[1].push(newEntry);
       else invMapEntries.push([productId, [newEntry]]);
@@ -136,6 +157,8 @@ test.describe.serial('S2-B2 — Editar y eliminar órdenes', () => {
     await page.getByRole('button', { name: 'Si' }).click();
 
     // The order should be removed — empty state should appear
-    await expect(page.getByText('No se ha realizado ninguna venta en el día de hoy.')).toBeVisible();
+    await expect(
+      page.getByText('No se ha realizado ninguna venta en el día de hoy.'),
+    ).toBeVisible();
   });
 });

@@ -13,12 +13,14 @@ hard project rule: React must mirror Angular code exactly.
 ## Scope
 
 ### In Scope
+
 - Rewire `today-entries.tsx` to use the already-correct `EntryList` component
   (`<EntryList entries onEdit onDeactivate readOnly={false} isOwnerAdmin />`).
 - Delete the now-dead `inventory-daily-entries.tsx` (React invention with no
   Angular correlate) and its test file.
 
 ### Out of Scope
+
 - Any change to `EntryList` itself — already at parity (parity review confirms).
 - The history screen `entries.tsx` (already correctly wired to `EntryList`).
 - Delete/edit business logic, the "+ Entrada" create-modal button, and data
@@ -27,9 +29,11 @@ hard project rule: React must mirror Angular code exactly.
 ## Capabilities
 
 ### New Capabilities
+
 - None.
 
 ### Modified Capabilities
+
 - None. Pure component rewire + dead-code removal; no spec-level requirement
   change (both screens already specified around `EntryList` parity behavior).
 
@@ -44,19 +48,19 @@ invents nothing new".
 
 ## Affected Areas
 
-| Area | Impact | Description |
-|------|--------|-------------|
-| `apps/web-store-pos/app/inventory/routes/today-entries.tsx` | Modified | Swap `InventoryDailyEntries` for `EntryList` |
-| `apps/web-store-pos/app/inventory/components/inventory-daily-entries.tsx` | Removed | Dead React invention, no Angular correlate |
-| `apps/web-store-pos/app/inventory/components/inventory-daily-entries.test.tsx` | Removed | Test for deleted component |
+| Area                                                                           | Impact   | Description                                  |
+| ------------------------------------------------------------------------------ | -------- | -------------------------------------------- |
+| `apps/web-store-pos/app/inventory/routes/today-entries.tsx`                    | Modified | Swap `InventoryDailyEntries` for `EntryList` |
+| `apps/web-store-pos/app/inventory/components/inventory-daily-entries.tsx`      | Removed  | Dead React invention, no Angular correlate   |
+| `apps/web-store-pos/app/inventory/components/inventory-daily-entries.test.tsx` | Removed  | Test for deleted component                   |
 
 ## Risks
 
-| Risk | Likelihood | Mitigation |
-|------|------------|------------|
-| `EntryList` not truly 1:1 with Angular `entry-list.component` | Low | Parity review vs Angular source confirms before apply |
-| `InventoryDailyEntries` has other importers | Low | Grep confirmed only `today-entries.tsx` imports it; re-grep before deletion |
-| Breaking create-modal / data-fetch in today screen | Low | Scope limited to list component; leave button + fetch untouched |
+| Risk                                                          | Likelihood | Mitigation                                                                  |
+| ------------------------------------------------------------- | ---------- | --------------------------------------------------------------------------- |
+| `EntryList` not truly 1:1 with Angular `entry-list.component` | Low        | Parity review vs Angular source confirms before apply                       |
+| `InventoryDailyEntries` has other importers                   | Low        | Grep confirmed only `today-entries.tsx` imports it; re-grep before deletion |
+| Breaking create-modal / data-fetch in today screen            | Low        | Scope limited to list component; leave button + fetch untouched             |
 
 ## Rollback Plan
 

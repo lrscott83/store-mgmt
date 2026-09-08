@@ -132,9 +132,8 @@ async function setAuthUser(isSuperAdmin: boolean) {
 
 async function renderPage(isSuperAdmin = false) {
   await setAuthUser(isSuperAdmin);
-  const { resellerHttpService } = await import(
-    '~/admin/resellers/lib/services/reseller-http-service'
-  );
+  const { resellerHttpService } =
+    await import('~/admin/resellers/lib/services/reseller-http-service');
   if (isSuperAdmin) {
     vi.mocked(resellerHttpService.listResellers).mockResolvedValue({
       succeeded: true,
@@ -150,7 +149,7 @@ async function renderPage(isSuperAdmin = false) {
     result = render(
       <Wrapper>
         <OwnerCreatePage />
-      </Wrapper>
+      </Wrapper>,
     );
   });
   return result;
@@ -257,9 +256,8 @@ describe('OwnerCreatePage — reSellerId SuperAdmin-only', () => {
 describe('OwnerCreatePage — listResellers succeeded:false (silent-failure idiom, pinned)', () => {
   it('leaves the dropdown empty and renders no error UI when listResellers resolves with succeeded:false', async () => {
     await setAuthUser(true);
-    const { resellerHttpService } = await import(
-      '~/admin/resellers/lib/services/reseller-http-service'
-    );
+    const { resellerHttpService } =
+      await import('~/admin/resellers/lib/services/reseller-http-service');
     vi.mocked(resellerHttpService.listResellers).mockResolvedValue({
       succeeded: false,
       data: null,
@@ -273,7 +271,7 @@ describe('OwnerCreatePage — listResellers succeeded:false (silent-failure idio
       render(
         <Wrapper>
           <OwnerCreatePage />
-        </Wrapper>
+        </Wrapper>,
       );
     });
 
@@ -295,18 +293,28 @@ describe('OwnerCreatePage — listResellers succeeded:false (silent-failure idio
 
 describe('OwnerCreatePage — password regex validation', () => {
   it('shows OWNER.PASSWORD_POLICY error when password fails regex', async () => {
-    const { ownerHttpService } = await import(
-      '~/admin/owners/lib/services/owner-http-service'
-    );
+    const { ownerHttpService } = await import('~/admin/owners/lib/services/owner-http-service');
     await renderPage(false);
 
-    fireEvent.change(screen.getByLabelText(esMessages['GENERAL.FULL_NAME']), { target: { value: 'Jane' } });
-    fireEvent.change(screen.getByLabelText(esMessages['USERS.LOGIN']), { target: { value: 'jane' } });
-    fireEvent.change(screen.getByLabelText(esMessages['GENERAL.PASSWORD']), { target: { value: 'weak' } });
-    fireEvent.change(screen.getByLabelText(esMessages['USERS.CONFIRM_PASSWORD']), { target: { value: 'weak' } });
-    fireEvent.change(screen.getByLabelText(esMessages['GENERAL.CELL_PHONE']), { target: { value: '+53 5 123-4567' } });
+    fireEvent.change(screen.getByLabelText(esMessages['GENERAL.FULL_NAME']), {
+      target: { value: 'Jane' },
+    });
+    fireEvent.change(screen.getByLabelText(esMessages['USERS.LOGIN']), {
+      target: { value: 'jane' },
+    });
+    fireEvent.change(screen.getByLabelText(esMessages['GENERAL.PASSWORD']), {
+      target: { value: 'weak' },
+    });
+    fireEvent.change(screen.getByLabelText(esMessages['USERS.CONFIRM_PASSWORD']), {
+      target: { value: 'weak' },
+    });
+    fireEvent.change(screen.getByLabelText(esMessages['GENERAL.CELL_PHONE']), {
+      target: { value: '+53 5 123-4567' },
+    });
 
-    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')!);
+    fireEvent.submit(
+      screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')!,
+    );
 
     await waitFor(() => {
       expect(screen.getByText(esMessages['OWNER.PASSWORD_POLICY'])).toBeInTheDocument();
@@ -322,18 +330,28 @@ describe('OwnerCreatePage — password regex validation', () => {
 
 describe('OwnerCreatePage — password mismatch validation', () => {
   it('shows OWNER.PASSWORDS_MUST_MATCH when passwords differ', async () => {
-    const { ownerHttpService } = await import(
-      '~/admin/owners/lib/services/owner-http-service'
-    );
+    const { ownerHttpService } = await import('~/admin/owners/lib/services/owner-http-service');
     await renderPage(false);
 
-    fireEvent.change(screen.getByLabelText(esMessages['GENERAL.FULL_NAME']), { target: { value: 'Jane' } });
-    fireEvent.change(screen.getByLabelText(esMessages['USERS.LOGIN']), { target: { value: 'jane' } });
-    fireEvent.change(screen.getByLabelText(esMessages['GENERAL.PASSWORD']), { target: { value: 'Password1' } });
-    fireEvent.change(screen.getByLabelText(esMessages['USERS.CONFIRM_PASSWORD']), { target: { value: 'Password2' } });
-    fireEvent.change(screen.getByLabelText(esMessages['GENERAL.CELL_PHONE']), { target: { value: '+53 5 123-4567' } });
+    fireEvent.change(screen.getByLabelText(esMessages['GENERAL.FULL_NAME']), {
+      target: { value: 'Jane' },
+    });
+    fireEvent.change(screen.getByLabelText(esMessages['USERS.LOGIN']), {
+      target: { value: 'jane' },
+    });
+    fireEvent.change(screen.getByLabelText(esMessages['GENERAL.PASSWORD']), {
+      target: { value: 'Password1' },
+    });
+    fireEvent.change(screen.getByLabelText(esMessages['USERS.CONFIRM_PASSWORD']), {
+      target: { value: 'Password2' },
+    });
+    fireEvent.change(screen.getByLabelText(esMessages['GENERAL.CELL_PHONE']), {
+      target: { value: '+53 5 123-4567' },
+    });
 
-    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')!);
+    fireEvent.submit(
+      screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')!,
+    );
 
     await waitFor(() => {
       expect(screen.getByText(esMessages['OWNER.PASSWORDS_MUST_MATCH'])).toBeInTheDocument();
@@ -349,9 +367,7 @@ describe('OwnerCreatePage — password mismatch validation', () => {
 
 describe('OwnerCreatePage — successful submit', () => {
   it('calls createOwner and navigates to /management/stores/create on success', async () => {
-    const { ownerHttpService } = await import(
-      '~/admin/owners/lib/services/owner-http-service'
-    );
+    const { ownerHttpService } = await import('~/admin/owners/lib/services/owner-http-service');
     vi.mocked(ownerHttpService.createOwner).mockResolvedValue({
       succeeded: true,
       data: makeOwner(),
@@ -363,7 +379,9 @@ describe('OwnerCreatePage — successful submit', () => {
     await renderPage(false);
     fillValidForm();
 
-    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')!);
+    fireEvent.submit(
+      screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')!,
+    );
 
     await waitFor(() => {
       expect(ownerHttpService.createOwner).toHaveBeenCalledWith(
@@ -373,7 +391,7 @@ describe('OwnerCreatePage — successful submit', () => {
           password: 'Password1',
           cellPhone: '+53 5 123-4567',
           email: 'jane@example.com',
-        })
+        }),
       );
       expect(mockNavigate).toHaveBeenCalledWith('/management/stores/create');
     });
@@ -386,9 +404,7 @@ describe('OwnerCreatePage — successful submit', () => {
 
 describe('OwnerCreatePage — server error', () => {
   it('shows errors[0].description when succeeded is false', async () => {
-    const { ownerHttpService } = await import(
-      '~/admin/owners/lib/services/owner-http-service'
-    );
+    const { ownerHttpService } = await import('~/admin/owners/lib/services/owner-http-service');
     vi.mocked(ownerHttpService.createOwner).mockResolvedValue({
       succeeded: false,
       data: null,
@@ -400,7 +416,9 @@ describe('OwnerCreatePage — server error', () => {
     await renderPage(false);
     fillValidForm();
 
-    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')!);
+    fireEvent.submit(
+      screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')!,
+    );
 
     await waitFor(() => {
       expect(screen.getByRole('alert')).toBeInTheDocument();
@@ -409,15 +427,15 @@ describe('OwnerCreatePage — server error', () => {
   });
 
   it('shows OWNER.ERROR when createOwner throws', async () => {
-    const { ownerHttpService } = await import(
-      '~/admin/owners/lib/services/owner-http-service'
-    );
+    const { ownerHttpService } = await import('~/admin/owners/lib/services/owner-http-service');
     vi.mocked(ownerHttpService.createOwner).mockRejectedValue(new Error('Network'));
 
     await renderPage(false);
     fillValidForm();
 
-    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')!);
+    fireEvent.submit(
+      screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')!,
+    );
 
     await waitFor(() => {
       expect(screen.getByText(esMessages['OWNER.ERROR'])).toBeInTheDocument();
@@ -431,9 +449,7 @@ describe('OwnerCreatePage — server error', () => {
 
 describe('OwnerCreatePage — FE-OC2: classified rejections', () => {
   it('shows OWNER.DUPLICATE_LOGIN and does not navigate when createOwner rejects with 409', async () => {
-    const { ownerHttpService } = await import(
-      '~/admin/owners/lib/services/owner-http-service'
-    );
+    const { ownerHttpService } = await import('~/admin/owners/lib/services/owner-http-service');
     vi.mocked(ownerHttpService.createOwner).mockRejectedValue({
       response: { status: 409 },
     });
@@ -441,7 +457,9 @@ describe('OwnerCreatePage — FE-OC2: classified rejections', () => {
     await renderPage(false);
     fillValidForm();
 
-    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')!);
+    fireEvent.submit(
+      screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')!,
+    );
 
     await waitFor(() => {
       expect(screen.getByRole('alert')).toHaveTextContent(esMessages['OWNER.DUPLICATE_LOGIN']);
@@ -450,9 +468,7 @@ describe('OwnerCreatePage — FE-OC2: classified rejections', () => {
   });
 
   it('shows OWNER.FORBIDDEN when createOwner rejects with 403', async () => {
-    const { ownerHttpService } = await import(
-      '~/admin/owners/lib/services/owner-http-service'
-    );
+    const { ownerHttpService } = await import('~/admin/owners/lib/services/owner-http-service');
     vi.mocked(ownerHttpService.createOwner).mockRejectedValue({
       response: { status: 403 },
     });
@@ -460,7 +476,9 @@ describe('OwnerCreatePage — FE-OC2: classified rejections', () => {
     await renderPage(false);
     fillValidForm();
 
-    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')!);
+    fireEvent.submit(
+      screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')!,
+    );
 
     await waitFor(() => {
       expect(screen.getByRole('alert')).toHaveTextContent(esMessages['OWNER.FORBIDDEN']);
@@ -469,9 +487,7 @@ describe('OwnerCreatePage — FE-OC2: classified rejections', () => {
   });
 
   it('shows OWNER.ERROR (generic) when createOwner rejects with an unclassified status', async () => {
-    const { ownerHttpService } = await import(
-      '~/admin/owners/lib/services/owner-http-service'
-    );
+    const { ownerHttpService } = await import('~/admin/owners/lib/services/owner-http-service');
     vi.mocked(ownerHttpService.createOwner).mockRejectedValue({
       response: { status: 400 },
     });
@@ -479,7 +495,9 @@ describe('OwnerCreatePage — FE-OC2: classified rejections', () => {
     await renderPage(false);
     fillValidForm();
 
-    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')!);
+    fireEvent.submit(
+      screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')!,
+    );
 
     await waitFor(() => {
       expect(screen.getByRole('alert')).toHaveTextContent(esMessages['OWNER.ERROR']);
@@ -487,9 +505,7 @@ describe('OwnerCreatePage — FE-OC2: classified rejections', () => {
   });
 
   it('shows the connectivity message (GENERAL.OFFLINE) when createOwner rejects with a tagged network error (no response)', async () => {
-    const { ownerHttpService } = await import(
-      '~/admin/owners/lib/services/owner-http-service'
-    );
+    const { ownerHttpService } = await import('~/admin/owners/lib/services/owner-http-service');
     // api-client.ts's response interceptor tags `isNetworkError` when the call never
     // reached a server (offline / 30s timeout).
     vi.mocked(ownerHttpService.createOwner).mockRejectedValue({
@@ -499,7 +515,9 @@ describe('OwnerCreatePage — FE-OC2: classified rejections', () => {
     await renderPage(false);
     fillValidForm();
 
-    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')!);
+    fireEvent.submit(
+      screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')!,
+    );
 
     await waitFor(() => {
       expect(screen.getByRole('alert')).toHaveTextContent(esMessages['GENERAL.OFFLINE']);
@@ -516,9 +534,7 @@ describe('OwnerCreatePage — FE-OC2: classified rejections', () => {
 
 describe('OwnerCreatePage — FE-OC6: untouched paths', () => {
   it('shows OWNER.ERROR (not a business-specific key) when createOwner rejects with 500', async () => {
-    const { ownerHttpService } = await import(
-      '~/admin/owners/lib/services/owner-http-service'
-    );
+    const { ownerHttpService } = await import('~/admin/owners/lib/services/owner-http-service');
     vi.mocked(ownerHttpService.createOwner).mockRejectedValue({
       response: { status: 500 },
     });
@@ -526,7 +542,9 @@ describe('OwnerCreatePage — FE-OC6: untouched paths', () => {
     await renderPage(false);
     fillValidForm();
 
-    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')!);
+    fireEvent.submit(
+      screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')!,
+    );
 
     await waitFor(() => {
       expect(screen.getByRole('alert')).toHaveTextContent(esMessages['OWNER.ERROR']);
@@ -537,9 +555,7 @@ describe('OwnerCreatePage — FE-OC6: untouched paths', () => {
   });
 
   it('leaves the auth store untouched (no logout) when createOwner rejects with 401', async () => {
-    const { ownerHttpService } = await import(
-      '~/admin/owners/lib/services/owner-http-service'
-    );
+    const { ownerHttpService } = await import('~/admin/owners/lib/services/owner-http-service');
     vi.mocked(ownerHttpService.createOwner).mockRejectedValue({
       response: { status: 401 },
     });
@@ -548,7 +564,9 @@ describe('OwnerCreatePage — FE-OC6: untouched paths', () => {
     await renderPage(false);
     fillValidForm();
 
-    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')!);
+    fireEvent.submit(
+      screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')!,
+    );
 
     await waitFor(() => {
       expect(screen.getByRole('alert')).toHaveTextContent(esMessages['OWNER.ERROR']);
@@ -615,7 +633,7 @@ describe('OwnerCreatePage — Gestor (reSeller) field position (Angular parity)'
     const fullNameInput = screen.getByLabelText(esMessages['GENERAL.FULL_NAME']);
 
     expect(
-      reSellerSelect.compareDocumentPosition(fullNameInput) & Node.DOCUMENT_POSITION_FOLLOWING
+      reSellerSelect.compareDocumentPosition(fullNameInput) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
   });
 });
@@ -702,9 +720,7 @@ describe('OwnerCreatePage — submit renders as fab (create-owner.component.html
 
 describe('OwnerCreatePage — FE-OC7: phone-required 400 rejection', () => {
   it('shows OWNER.PHONE_REQUIRED when createOwner rejects with 400 and code "Cellphone"', async () => {
-    const { ownerHttpService } = await import(
-      '~/admin/owners/lib/services/owner-http-service'
-    );
+    const { ownerHttpService } = await import('~/admin/owners/lib/services/owner-http-service');
     vi.mocked(ownerHttpService.createOwner).mockRejectedValue({
       response: { status: 400, data: { errors: [{ code: 'Cellphone' }] } },
     });
@@ -712,7 +728,9 @@ describe('OwnerCreatePage — FE-OC7: phone-required 400 rejection', () => {
     await renderPage(false);
     fillValidForm();
 
-    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')!);
+    fireEvent.submit(
+      screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')!,
+    );
 
     await waitFor(() => {
       expect(screen.getByRole('alert')).toHaveTextContent(esMessages['OWNER.PHONE_REQUIRED']);
@@ -728,9 +746,7 @@ describe('OwnerCreatePage — FE-OC7: phone-required 400 rejection', () => {
 
 describe('OwnerCreatePage — FE-OC7: array-scan finds phone code past errors[0]', () => {
   it('shows OWNER.PHONE_REQUIRED when createOwner rejects with 400 and FullName occupies errors[0]', async () => {
-    const { ownerHttpService } = await import(
-      '~/admin/owners/lib/services/owner-http-service'
-    );
+    const { ownerHttpService } = await import('~/admin/owners/lib/services/owner-http-service');
     vi.mocked(ownerHttpService.createOwner).mockRejectedValue({
       response: { status: 400, data: { errors: [{ code: 'FullName' }, { code: 'Cellphone' }] } },
     });
@@ -738,7 +754,9 @@ describe('OwnerCreatePage — FE-OC7: array-scan finds phone code past errors[0]
     await renderPage(false);
     fillValidForm();
 
-    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')!);
+    fireEvent.submit(
+      screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')!,
+    );
 
     await waitFor(() => {
       expect(screen.getByRole('alert')).toHaveTextContent(esMessages['OWNER.PHONE_REQUIRED']);

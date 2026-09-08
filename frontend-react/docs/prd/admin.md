@@ -39,25 +39,25 @@ This module is distinct from the store-level POS modules. Users who reach these 
 
 Protected by `SuperAdminAuthGuard` (`isSuperAdmin === true` required).
 
-| Path | Component | Feature Flag |
-|------|-----------|--------------|
-| `/admin/dashboard` | `AdminDashboardComponent` | `AdminDashboard` (16) |
-| `/admin/stores` | `StoresComponent` | `AdminStores` (15) |
-| `/admin/resellers` | `ResellersComponent` | `ReSellers` (13) |
-| `/admin/resellers/create` | `CreateResellerComponent` | `ReSellers` (13) |
-| `/admin/resellers/edit/:id` | `EditResellerComponent` | `ReSellers` (13) |
-| `/admin/features` | `FeaturesComponent` | `Features` (14) |
-| `/admin/roles` | `OwnersComponent` | `Roles` (12) |
+| Path                        | Component                 | Feature Flag          |
+| --------------------------- | ------------------------- | --------------------- |
+| `/admin/dashboard`          | `AdminDashboardComponent` | `AdminDashboard` (16) |
+| `/admin/stores`             | `StoresComponent`         | `AdminStores` (15)    |
+| `/admin/resellers`          | `ResellersComponent`      | `ReSellers` (13)      |
+| `/admin/resellers/create`   | `CreateResellerComponent` | `ReSellers` (13)      |
+| `/admin/resellers/edit/:id` | `EditResellerComponent`   | `ReSellers` (13)      |
+| `/admin/features`           | `FeaturesComponent`       | `Features` (14)       |
+| `/admin/roles`              | `OwnersComponent`         | `Roles` (12)          |
 
 ### Reseller Routes
 
 Protected by `ReSellerAuthGuard` (`isSuperAdmin === true` OR `isReSeller === true` + feature check).
 
-| Path | Component | Feature Flag |
-|------|-----------|--------------|
-| `/admin/owners` | `OwnersComponent` | `Owners` (11) |
-| `/admin/owners/create` | `CreateOwnerComponent` | `Owners` (11) |
-| `/admin/owners/edit/:id` | `EditOwnerComponent` | `Owners` (11) |
+| Path                     | Component              | Feature Flag  |
+| ------------------------ | ---------------------- | ------------- |
+| `/admin/owners`          | `OwnersComponent`      | `Owners` (11) |
+| `/admin/owners/create`   | `CreateOwnerComponent` | `Owners` (11) |
+| `/admin/owners/edit/:id` | `EditOwnerComponent`   | `Owners` (11) |
 
 ---
 
@@ -226,16 +226,16 @@ This is a deliberate constraint, not a gap. Admin actions (creating owners, togg
 
 ## Permissions Matrix
 
-| Action | SuperAdmin | Reseller | Owner | Unauthenticated |
-|--------|-----------|----------|-------|-----------------|
-| View dashboard | ✓ | ✗ | ✗ | ✗ |
-| Manage stores | ✓ | ✗ | ✗ | ✗ |
-| Manage resellers | ✓ | ✗ | ✗ | ✗ |
-| Manage features | ✓ | ✗ | ✗ | ✗ |
-| View all owners (roles) | ✓ | ✗ | ✗ | ✗ |
-| Manage assigned owners | ✓ | ✓ | ✗ | ✗ |
-| Create owner | ✓ | ✓ | ✗ | ✗ |
-| Edit owner | ✓ | ✓ | ✗ | ✗ |
+| Action                  | SuperAdmin | Reseller | Owner | Unauthenticated |
+| ----------------------- | ---------- | -------- | ----- | --------------- |
+| View dashboard          | ✓          | ✗        | ✗     | ✗               |
+| Manage stores           | ✓          | ✗        | ✗     | ✗               |
+| Manage resellers        | ✓          | ✗        | ✗     | ✗               |
+| Manage features         | ✓          | ✗        | ✗     | ✗               |
+| View all owners (roles) | ✓          | ✗        | ✗     | ✗               |
+| Manage assigned owners  | ✓          | ✓        | ✗     | ✗               |
+| Create owner            | ✓          | ✓        | ✗     | ✗               |
+| Edit owner              | ✓          | ✓        | ✗     | ✗               |
 
 ---
 

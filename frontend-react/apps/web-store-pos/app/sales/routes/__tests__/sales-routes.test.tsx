@@ -9,7 +9,10 @@ import { OrderOfflineService } from '~/sales/lib/services/order-offline-service'
 // --- Global mocks ---
 
 vi.mock('~/shared/lib/stores/auth-store', () => {
-  const state = { user: { selectedStoreId: 's1', storeModuleIds: [] as number[] }, isAuthenticated: true };
+  const state = {
+    user: { selectedStoreId: 's1', storeModuleIds: [] as number[] },
+    isAuthenticated: true,
+  };
   const useAuthStore = vi.fn((selector?: (s: typeof state) => unknown) => {
     if (typeof selector === 'function') return selector(state);
     return state;
@@ -53,7 +56,9 @@ vi.mock('~/sales/lib/services/order-offline-service', () => ({
   OrderOfflineService: vi.fn().mockImplementation(() => ({
     getStorageOrders: vi.fn().mockReturnValue([]),
     getActiveOrdersInDay: vi.fn().mockReturnValue([]),
-    getCategoryCartItemsView: vi.fn().mockReturnValue({ data: [], succeeded: true, message: '', actionCode: 200, errors: [] }),
+    getCategoryCartItemsView: vi
+      .fn()
+      .mockReturnValue({ data: [], succeeded: true, message: '', actionCode: 200, errors: [] }),
     deactivateOrder: vi.fn().mockReturnValue({ succeeded: true, errors: [] }),
     updateTodayOrder: vi.fn().mockReturnValue({ data: undefined, succeeded: true, errors: [] }),
   })),
@@ -202,9 +207,19 @@ describe('OrdersPage — smoke render', () => {
         ({
           getStorageOrders: vi.fn().mockReturnValue([order]),
           getActiveOrdersInDay: vi.fn().mockReturnValue([]),
-          getCategoryCartItemsView: vi.fn().mockReturnValue({ data: [], succeeded: true, message: '', actionCode: 200, errors: [] }),
+          getCategoryCartItemsView: vi
+            .fn()
+            .mockReturnValue({
+              data: [],
+              succeeded: true,
+              message: '',
+              actionCode: 200,
+              errors: [],
+            }),
           deactivateOrder: vi.fn().mockReturnValue({ succeeded: true, errors: [] }),
-          updateTodayOrder: vi.fn().mockReturnValue({ data: undefined, succeeded: true, errors: [] }),
+          updateTodayOrder: vi
+            .fn()
+            .mockReturnValue({ data: undefined, succeeded: true, errors: [] }),
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
         }) as any,
     );

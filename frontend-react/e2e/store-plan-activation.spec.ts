@@ -140,7 +140,7 @@ test('OwnerAdmin activa el plan pago una sola vez', async ({ signedInPage, login
   // modules, not just the paid ones — getPlanModuleIds(modules, 'paid')
   // returns modules.map(m => m.id) unfiltered (plan-picker.tsx:26-27,49).
   expect([...putCapture.moduleIds].sort((a, b) => a - b)).toEqual(
-    [...allIds].sort((a, b) => a - b)
+    [...allIds].sort((a, b) => a - b),
   );
 
   // ANCHOR for the two negative assertions below. edit-store.tsx wraps the
@@ -243,7 +243,9 @@ test('OwnerAdmin activa el plan pago una sola vez', async ({ signedInPage, login
  * real mock — which design.md D5 rejects. See
  * docs/testing/e2e-stage-1/S2-01.md and README.md.
  */
-test('fallo de carga por red muestra el mensaje de conexión y no monta el formulario', async ({ signedInPage }) => {
+test('fallo de carga por red muestra el mensaje de conexión y no monta el formulario', async ({
+  signedInPage,
+}) => {
   const { page } = signedInPage;
 
   await page.route('**/v1/modules/ToStore', (route) => route.abort());

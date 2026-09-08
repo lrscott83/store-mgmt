@@ -1,6 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useIntl } from 'react-intl';
-import type { CsvProduct, Product, ProductCategory, ProductCategoryView, WholesaleConfig } from '@store-mgmt/domain';
+import type {
+  CsvProduct,
+  Product,
+  ProductCategory,
+  ProductCategoryView,
+  WholesaleConfig,
+} from '@store-mgmt/domain';
 import { EFeatures } from '@store-mgmt/domain';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
@@ -89,7 +95,7 @@ export function ProductsPage() {
     // whole app (design D5). The per-call-site guard this replaced would show
     // a second dialog for the same failure.
     void loadData();
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- loadData reads only storeId; intl is stable
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadData reads only storeId; intl is stable
   }, [storeId]);
 
   function togglePanel(categoryId: string) {
@@ -151,7 +157,10 @@ export function ProductsPage() {
       data.wholesale,
     );
     if (!result.succeeded) {
-      showBlockingError(intl.formatMessage({ id: 'GENERAL.ERROR' }), result.errors[0]?.description ?? '');
+      showBlockingError(
+        intl.formatMessage({ id: 'GENERAL.ERROR' }),
+        result.errors[0]?.description ?? '',
+      );
       return;
     }
 
@@ -187,7 +196,10 @@ export function ProductsPage() {
         : undefined,
     );
     if (!result.succeeded) {
-      showBlockingError(intl.formatMessage({ id: 'GENERAL.ERROR' }), result.errors[0]?.description ?? '');
+      showBlockingError(
+        intl.formatMessage({ id: 'GENERAL.ERROR' }),
+        result.errors[0]?.description ?? '',
+      );
       return;
     }
 
@@ -249,7 +261,10 @@ export function ProductsPage() {
       product.barcode,
     );
     if (!result.succeeded) {
-      showBlockingError(intl.formatMessage({ id: 'GENERAL.ERROR' }), result.errors[0]?.description ?? '');
+      showBlockingError(
+        intl.formatMessage({ id: 'GENERAL.ERROR' }),
+        result.errors[0]?.description ?? '',
+      );
       return;
     }
 
@@ -285,13 +300,21 @@ export function ProductsPage() {
   // fetch-then-save two/three-step). On failure, surface it via the same
   // Swal-error shape Angular uses (`icon: 'error', title: GENERAL.ERROR, text:
   // errors[0].description`) instead of silently swallowing it.
-  async function handleCategorySave(data: { name: string; order: number; isActive: boolean; id?: string }) {
+  async function handleCategorySave(data: {
+    name: string;
+    order: number;
+    isActive: boolean;
+    id?: string;
+  }) {
     const result = data.id
       ? await categoryService.updateProductCategory(data.id, data.name, data.order, data.isActive)
       : await categoryService.createProductCategory(data.name, data.order, data.isActive);
 
     if (!result.succeeded) {
-      showBlockingError(intl.formatMessage({ id: 'GENERAL.ERROR' }), result.errors[0]?.description ?? '');
+      showBlockingError(
+        intl.formatMessage({ id: 'GENERAL.ERROR' }),
+        result.errors[0]?.description ?? '',
+      );
       return;
     }
 
@@ -360,7 +383,9 @@ export function ProductsPage() {
     // rule every row is processed (created or reused), so `created.length` equals the row count.
     // The string stays hardcoded Spanish (no i18n key), matching Angular's own and the
     // pre-existing React literal — introducing keys is out of scope (R6).
-    showToastSuccess(`Importados ${created.length} productos y ${entriesCreated} entradas correctamente.`);
+    showToastSuccess(
+      `Importados ${created.length} productos y ${entriesCreated} entradas correctamente.`,
+    );
 
     void loadData();
   }
@@ -472,7 +497,11 @@ export function ProductsPage() {
               Limpiar
             </Button>
           )}
-          <Button variant="fab" onClick={() => setModal({ type: 'csv' })} data-testid="import-csv-button">
+          <Button
+            variant="fab"
+            onClick={() => setModal({ type: 'csv' })}
+            data-testid="import-csv-button"
+          >
             {/* Angular: <mat-icon>attach_file</mat-icon> */}
             <PaperclipIcon />
             {/* PRODUCT_CATEGORY.IMPORT_PRODUCTS */}
@@ -486,10 +515,7 @@ export function ProductsPage() {
             const categoryProducts = productsByCategory[category.id] ?? [];
             const isExpanded = expandedCategoryIds.has(category.id);
             return (
-              <div
-                key={category.id}
-                className="rounded-lg border border-border bg-surface"
-              >
+              <div key={category.id} className="rounded-lg border border-border bg-surface">
                 {/* Header row: name+count toggle the panel; a gear menu sits to the LEFT of
                     the chevron and exposes the category actions WITHOUT expanding — clicking
                     the gear must not toggle. The chevron is its own toggle button so the gear
@@ -512,7 +538,9 @@ export function ProductsPage() {
                     data-testid={`category-panel-toggle-${category.id}`}
                     aria-expanded={isExpanded}
                   >
-                    <span className="flex-1 text-left text-base font-medium text-text">{category.name}</span>
+                    <span className="flex-1 text-left text-base font-medium text-text">
+                      {category.name}
+                    </span>
                     {!category.isActive && <InactiveBadge />}
                     {/* productsCount is the category's TOTAL product count, resolved through the
                         SAME repository method as the panel's product list below — the badge and
@@ -521,7 +549,9 @@ export function ProductsPage() {
                   </button>
                   <CategoryActionsMenu
                     category={category}
-                    onEditCategory={() => setModal({ type: 'category', category, defaultOrder: category.order })}
+                    onEditCategory={() =>
+                      setModal({ type: 'category', category, defaultOrder: category.order })
+                    }
                     onAddProduct={() => handleAddProduct(category)}
                     onAddProducts={() => setModal({ type: 'bulk', category })}
                   />
@@ -587,10 +617,7 @@ export function ProductsPage() {
       )}
 
       {modal?.type === 'csv' && (
-        <CsvProductImporterModal
-          onImport={handleCsvImport}
-          onClose={() => setModal(null)}
-        />
+        <CsvProductImporterModal onImport={handleCsvImport} onClose={() => setModal(null)} />
       )}
     </div>
   );

@@ -41,8 +41,18 @@ function groupByMonth(records: ExchangeRate[]): MonthGroup[] {
 }
 
 const MONTH_NAMES_ES = [
-  'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
-  'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre',
+  'enero',
+  'febrero',
+  'marzo',
+  'abril',
+  'mayo',
+  'junio',
+  'julio',
+  'agosto',
+  'septiembre',
+  'octubre',
+  'noviembre',
+  'diciembre',
 ];
 
 /**
@@ -290,7 +300,12 @@ export function ExchangeRatesPage() {
             </div>
 
             <div className="flex justify-end gap-2">
-              <Button variant="fab" type="button" onClick={closeEdit} data-testid="rate-edit-cancel">
+              <Button
+                variant="fab"
+                type="button"
+                onClick={closeEdit}
+                data-testid="rate-edit-cancel"
+              >
                 <CloseIcon />
                 {intl.formatMessage({ id: 'GENERAL.CLOSE' })}
               </Button>

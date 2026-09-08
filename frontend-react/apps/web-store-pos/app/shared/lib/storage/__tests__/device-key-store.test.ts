@@ -37,7 +37,11 @@ describe('device-key-store — getOrCreateDeviceKey (task 1.1)', () => {
     // "same key" the only way that matters: it decrypts what the OTHER
     // instance encrypted.
     const iv = crypto.getRandomValues(new Uint8Array(12));
-    const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key1!, new TextEncoder().encode('probe'));
+    const ciphertext = await crypto.subtle.encrypt(
+      { name: 'AES-GCM', iv },
+      key1!,
+      new TextEncoder().encode('probe'),
+    );
     const plaintext = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key2!, ciphertext);
     expect(new TextDecoder().decode(plaintext)).toBe('probe');
 

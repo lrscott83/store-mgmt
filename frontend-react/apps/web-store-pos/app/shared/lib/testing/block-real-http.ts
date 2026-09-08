@@ -60,7 +60,7 @@ function blockedError(method: string, url: string): Error {
       'request gets whatever the dev server answers (usually a 404) — and a 404 from /me is ' +
       'a real session verdict this app acts on, which ends the session mid-test.\n' +
       "Mock the module that issues it, e.g. vi.mock('~/shared/lib/http/auth-http-service', ...) — " +
-      'see app/shared/lib/stores/__tests__/auth-store.test.ts for the established shape.'
+      'see app/shared/lib/stores/__tests__/auth-store.test.ts for the established shape.',
   );
 }
 
@@ -70,7 +70,9 @@ function blockedError(method: string, url: string): Error {
  * to the global one) so its own test can exercise it against a fake without
  * unpatching the real globals every other test file depends on.
  */
-export function installHttpBlocker(scope: HttpScope = globalThis as unknown as HttpScope): HttpBlocker {
+export function installHttpBlocker(
+  scope: HttpScope = globalThis as unknown as HttpScope,
+): HttpBlocker {
   const attempts: string[] = [];
   const originalFetch = scope.fetch;
   const OriginalXhr = scope.XMLHttpRequest;

@@ -19,7 +19,11 @@ interface WholesaleConfigSectionProps {
   onChange: (config: WholesaleConfig | undefined) => void;
 }
 
-export function WholesaleConfigSection({ value, retailPrice, onChange }: WholesaleConfigSectionProps) {
+export function WholesaleConfigSection({
+  value,
+  retailPrice,
+  onChange,
+}: WholesaleConfigSectionProps) {
   const intl = useIntl();
 
   const enabled = value !== undefined;
@@ -137,7 +141,9 @@ export function WholesaleConfigSection({ value, retailPrice, onChange }: Wholesa
                       value={Number.isFinite(tier.minPacks) ? tier.minPacks : ''}
                       onChange={(e) => {
                         const minPacks = parseInt(e.target.value, 10);
-                        updateTiers(value.tiers.map((t, i) => (i === index ? { ...t, minPacks } : t)));
+                        updateTiers(
+                          value.tiers.map((t, i) => (i === index ? { ...t, minPacks } : t)),
+                        );
                       }}
                       className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-cyan-500"
                       data-testid={`wholesale-tier-min-${index}`}
@@ -154,7 +160,9 @@ export function WholesaleConfigSection({ value, retailPrice, onChange }: Wholesa
                       value={Number.isFinite(tier.pricePerUnit) ? tier.pricePerUnit : ''}
                       onChange={(e) => {
                         const pricePerUnit = parseFloat(e.target.value);
-                        updateTiers(value.tiers.map((t, i) => (i === index ? { ...t, pricePerUnit } : t)));
+                        updateTiers(
+                          value.tiers.map((t, i) => (i === index ? { ...t, pricePerUnit } : t)),
+                        );
                       }}
                       className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-cyan-500"
                       data-testid={`wholesale-tier-price-${index}`}

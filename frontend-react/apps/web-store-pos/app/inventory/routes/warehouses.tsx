@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactElement } from 'react';
 import { useIntl } from 'react-intl';
 import type {
   Product,
@@ -13,12 +13,18 @@ import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { Card } from '~/shared/components/ui/card';
 import { InfoBox } from '~/shared/components/ui/info-box';
 import { Button } from '~/shared/components/ui/button';
-import { ChevronDownIcon, PlusIcon, InOutIcon, SwapHorizontalIcon, TruckIcon } from '~/shared/components/ui/icons';
+import {
+  ChevronDownIcon,
+  PlusIcon,
+  InOutIcon,
+  SwapHorizontalIcon,
+  TruckIcon,
+} from '~/shared/components/ui/icons';
 import { ActionMenu, ActionMenuItem } from '~/shared/components/ui/action-menu';
 import { showBlockingError } from '~/shared/lib/blocking-alert';
 import { showToastSuccess } from '~/shared/lib/toast';
 import { formatCurrency } from '~/shared/lib/format-currency';
-import { formatLocalDate } from '~/shared/lib/date-utils';
+import { formatLocalDate, groupByLocalDay } from '~/shared/lib/date-utils';
 import { InventoryOfflineService } from '../lib/services/inventory-offline-service';
 import { WarehouseOfflineService } from '../lib/services/warehouse-offline-service';
 import { ProductRepository } from '~/sales/lib/repositories/product-repository';
@@ -64,7 +70,9 @@ export function WarehousesPage() {
   const [stockLevels, setStockLevels] = useState<WarehouseStockLevel[]>([]);
   const [movements, setMovements] = useState<WarehouseStockMovement[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
-  const [categories, setCategories] = useState<Map<string, { id: string; name: string }>>(new Map());
+  const [categories, setCategories] = useState<Map<string, { id: string; name: string }>>(
+    new Map(),
+  );
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   /** Modal state: creating XOR editing (null/undefined = closed). */
   const [modalOpen, setModalOpen] = useState(false);
@@ -79,6 +87,17 @@ export function WarehousesPage() {
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
   /** Búsqueda dentro del panel del almacén (igual que Disponible). */
   const [search, setSearch] = useState('');
+  /** Días expandidos del historial de movimientos (acordeón agrupado por día). */
+  const [expandedMovementDays, setExpandedMovementDays] = useState<Set<string>>(new Set());
+
+  function toggleMovementDay(dayKey: string) {
+    setExpandedMovementDays((prev) => {
+      const next = new Set(prev);
+      if (next.has(dayKey)) next.delete(dayKey);
+      else next.add(dayKey);
+      return next;
+    });
+  }
 
   const service = useMemo(
     () =>
@@ -100,10 +119,7 @@ export function WarehousesPage() {
     setWarehouses([...service.getStorageWarehouses()]);
     setStockLevels([...service.getStorageStockLevels()]);
     setMovements([...service.getStorageMovements()].reverse());
-    const productRepo = new ProductRepository(
-      storeId,
-      new ProductCategoryRepository(storeId),
-    );
+    const productRepo = new ProductRepository(storeId, new ProductCategoryRepository(storeId));
     setProducts([...productRepo.getStorageProductsMap().values()]);
     setCategories(new Map(productRepo.getCategoryRepository().getStorageCategoriesMap()));
   }
@@ -113,13 +129,22 @@ export function WarehousesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- load reads storeId/service only
   }, [service]);
 
+  /** Icono por tipo de movimiento: entrada verde, salida naranja, transferencia azul. */
+  const MOVEMENT_TYPE_ICON: Record<WarehouseMovementType, { icon: ReactElement; color: string }> = {
+    purchase_in: { icon: <InOutIcon />, color: 'text-success' },
+    sale_out: { icon: <TruckIcon />, color: 'text-warning' },
+    transfer_in: { icon: <SwapHorizontalIcon />, color: 'text-primary' },
+    transfer_out: { icon: <SwapHorizontalIcon />, color: 'text-primary' },
+  };
+
   const productName = (id: string) => products.find((p) => p.id === id)?.name ?? id;
-  const warehouseName = (id: string) =>
-    warehouses.find((w) => w.id === id)?.name ?? id;
+  const warehouseName = (id: string) => warehouses.find((w) => w.id === id)?.name ?? id;
 
   function handleModalSave(name: string) {
     if (!service) return;
-    const result = editing ? service.updateWarehouse(editing.id, name) : service.createWarehouse(name);
+    const result = editing
+      ? service.updateWarehouse(editing.id, name)
+      : service.createWarehouse(name);
     if (!result.succeeded) {
       showBlockingError(
         intl.formatMessage({ id: 'GENERAL.ERROR' }),
@@ -129,7 +154,9 @@ export function WarehousesPage() {
     }
     setModalOpen(false);
     setEditing(null);
-    showToastSuccess(intl.formatMessage({ id: editing ? 'WAREHOUSES.UPDATED' : 'WAREHOUSES.CREATED' }));
+    showToastSuccess(
+      intl.formatMessage({ id: editing ? 'WAREHOUSES.UPDATED' : 'WAREHOUSES.CREATED' }),
+    );
     load();
   }
 
@@ -156,7 +183,11 @@ export function WarehousesPage() {
     load();
   }
 
-  function openMovementModal(mode: WarehouseMovementMode, warehouse: Warehouse, productId: string | null) {
+  function openMovementModal(
+    mode: WarehouseMovementMode,
+    warehouse: Warehouse,
+    productId: string | null,
+  ) {
     setMovementModal({ mode, warehouseId: warehouse.id, productId });
   }
 
@@ -258,6 +289,13 @@ export function WarehousesPage() {
     0,
   );
 
+  /** Historial de movimientos agrupado por día (más reciente primero), como
+   *  los historiales del resto de las vistas (Entradas, Créditos). */
+  const movementDayGroups = useMemo(
+    () => groupByLocalDay(movements, (m) => new Date(m.createdDate)),
+    [movements],
+  );
+
   const movementSource = movementModal
     ? warehouses.find((w) => w.id === movementModal.warehouseId)
     : undefined;
@@ -293,9 +331,7 @@ export function WarehousesPage() {
             open
             mode={movementModal.mode}
             warehouse={movementSource}
-            targetWarehouses={warehouses.filter(
-              (w) => w.id !== movementSource.id && w.isActive,
-            )}
+            targetWarehouses={warehouses.filter((w) => w.id !== movementSource.id && w.isActive)}
             products={
               movementModal.mode === 'purchase_in' || movementModal.productId
                 ? products
@@ -312,7 +348,10 @@ export function WarehousesPage() {
         {/* Resumen global bajo el título: (unidades) a la izquierda,
             costo total de todos los almacenes a la derecha. */}
         <div className="flex items-center justify-between">
-          <span data-testid="warehouses-total-units" className="text-sm font-semibold text-text-muted">
+          <span
+            data-testid="warehouses-total-units"
+            className="text-sm font-semibold text-text-muted"
+          >
             ({totalUnits})
           </span>
           <span
@@ -354,8 +393,7 @@ export function WarehousesPage() {
                     className="flex min-w-0 flex-1 items-center justify-between gap-2 text-left"
                   >
                     <span className="min-w-0 truncate text-sm font-semibold uppercase tracking-wide text-text-muted">
-                      <span className="text-text">{warehouse.name}</span>{' '}
-                      ({unitsOf(warehouse.id)})
+                      <span className="text-text">{warehouse.name}</span> ({unitsOf(warehouse.id)})
                       {!warehouse.isActive && (
                         <span className="ml-1 text-xs normal-case text-text-muted">
                           ({intl.formatMessage({ id: 'WAREHOUSES.INACTIVE' })})
@@ -525,58 +563,77 @@ export function WarehousesPage() {
           <div className="mb-2 text-sm font-semibold text-text">
             {intl.formatMessage({ id: 'WAREHOUSES.MOVEMENTS_TITLE' })}
           </div>
-          {movements.length === 0 && (
+          {movementDayGroups.length === 0 && (
             <InfoBox variant="primary" className="text-center">
               {intl.formatMessage({ id: 'WAREHOUSES.NO_MOVEMENTS' })}
             </InfoBox>
           )}
-          {movements.length > 0 && (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border text-left text-xs text-text-muted">
-                    <th className="px-2 py-1 font-medium">
-                      {intl.formatMessage({ id: 'WAREHOUSES.DATE' })}
-                    </th>
-                    <th className="px-2 py-1 font-medium">
-                      {intl.formatMessage({ id: 'WAREHOUSES.TYPE' })}
-                    </th>
-                    <th className="px-2 py-1 font-medium">
-                      {intl.formatMessage({ id: 'WAREHOUSES.PRODUCT' })}
-                    </th>
-                    <th className="px-2 py-1 font-medium">
-                      {intl.formatMessage({ id: 'WAREHOUSES.QUANTITY' })}
-                    </th>
-                    <th className="px-2 py-1 font-medium">Almacén</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {movements.map((movement) => (
-                    <tr key={movement.id} className="border-b border-border/50">
-                      <td className="px-2 py-2 text-text">
-                        {formatLocalDate(movement.createdDate)}
-                      </td>
-                      <td className="px-2 py-2 text-text">
-                        {intl.formatMessage({ id: MOVEMENT_TYPE_LABEL[movement.type] })}
-                      </td>
-                      <td className="px-2 py-2 text-text">{productName(movement.productId)}</td>
-                      <td
-                        data-testid={`mv-qty-${movement.id}`}
-                        className="px-2 py-2 text-text"
-                      >
-                        {movement.quantity}
-                      </td>
-                      <td className="px-2 py-2 text-text">
-                        {warehouseName(movement.warehouseId)}
-                        {movement.toWarehouseId && ` → ${warehouseName(movement.toWarehouseId)}`}
-                        {movement.fromWarehouseId && ` ← ${warehouseName(movement.fromWarehouseId)}`}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+{/* Acordeón agrupado por día — mismo patrón que los historiales de
+              Entradas (entries.tsx) y Créditos: panel por día con la fecha en
+              el header y, al desplegar, las filas de movimientos con icono por
+              tipo, producto, cantidad y almacén origen → destino. */}
+          <div className="space-y-2">
+            {movementDayGroups.map((dayGroup) => {
+              const dayKey = dayGroup.dayKey;
+              const isDayExpanded = expandedMovementDays.has(dayKey);
+              return (
+                <div
+                  key={dayKey}
+                  className="rounded-lg border border-border bg-background"
+                >
+                  <button
+                    type="button"
+                    onClick={() => toggleMovementDay(dayKey)}
+                    className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left"
+                    data-testid={`mv-day-panel-toggle-${dayKey}`}
+                    aria-expanded={isDayExpanded}
+                  >
+                    <span className="text-sm font-medium text-text">
+                      {formatLocalDate(dayGroup.date)}
+                    </span>
+                    <span className="flex items-center gap-2">
+                      <span className="whitespace-nowrap text-sm font-semibold text-text-muted">
+                        ({dayGroup.items.length})
+                      </span>
+                      <ChevronDownIcon isExpanded={isDayExpanded} className="text-text-muted" />
+                    </span>
+                  </button>
+                  {isDayExpanded && (
+                    <div className="divide-y divide-border border-t border-border">
+                      {dayGroup.items.map((movement) => (
+                        <div
+                          key={movement.id}
+                          className="flex items-center gap-3 px-4 py-2"
+                        >
+                          <span
+                            data-testid={`mv-type-icon-${movement.id}`}
+                            className={MOVEMENT_TYPE_ICON[movement.type].color}
+                            title={intl.formatMessage({ id: MOVEMENT_TYPE_LABEL[movement.type] })}
+                          >
+                            {MOVEMENT_TYPE_ICON[movement.type].icon}
+                          </span>
+                          <span className="min-w-0 flex-1 truncate text-sm text-text">
+                            {productName(movement.productId)}
+                          </span>
+                          <span
+                            data-testid={`mv-qty-${movement.id}`}
+                            className="shrink-0 text-sm font-semibold text-text"
+                          >
+                            {movement.quantity}
+                          </span>
+                          <span className="min-w-0 flex-1 truncate text-right text-sm text-text-muted">
+                            {warehouseName(movement.warehouseId)}
+                            {movement.toWarehouseId && ` → ${warehouseName(movement.toWarehouseId)}`}
+                            {movement.fromWarehouseId && ` ← ${warehouseName(movement.fromWarehouseId)}`}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
     </Card>

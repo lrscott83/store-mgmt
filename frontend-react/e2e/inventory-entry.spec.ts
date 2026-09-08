@@ -29,7 +29,12 @@ async function navigateToEntries(page: Page): Promise<void> {
 /**
  * Opens the new entry modal and fills the form.
  */
-async function createEntry(page: Page, productName: string, quantity: string, costPrice: string): Promise<void> {
+async function createEntry(
+  page: Page,
+  productName: string,
+  quantity: string,
+  costPrice: string,
+): Promise<void> {
   // Click "Entrada" button to open the modal
   await page.getByRole('button', { name: ENTRY_BUTTON }).click();
 
@@ -65,7 +70,11 @@ const DELETE_CONFIRM = '¿Está seguro que desea eliminar esta entrada?'; // GEN
 /**
  * Opens the gear menu on an entry row and clicks an action.
  */
-async function openEntryGearAction(page: Page, productName: string, action: 'edit' | 'delete'): Promise<void> {
+async function openEntryGearAction(
+  page: Page,
+  productName: string,
+  action: 'edit' | 'delete',
+): Promise<void> {
   // Find the entry row by product name, then click its gear menu
   const row = page.locator('tr').filter({ hasText: productName });
   const gear = row.locator('[data-testid^="entry-actions-toggle-"]');

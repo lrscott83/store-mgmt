@@ -198,7 +198,11 @@ describe('offline-auth-service — authenticateOffline DEK unwrap (design §11, 
     clearDek();
   });
 
-  async function seedV2Bundle(wrapFields: { wrappedDek: string; wrapSalt: string; wrapIv: string }) {
+  async function seedV2Bundle(wrapFields: {
+    wrappedDek: string;
+    wrapSalt: string;
+    wrapIv: string;
+  }) {
     const verifier = await makeVerifier('secret');
     const bundle: OfflineRosterBundle = {
       bundleId: 'b1',

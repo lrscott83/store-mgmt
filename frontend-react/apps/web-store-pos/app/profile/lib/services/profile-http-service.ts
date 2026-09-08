@@ -16,22 +16,22 @@ interface ChangePasswordPayload {
 export const profileHttpService = {
   async updateProfile(
     userId: string,
-    payload: UpdateProfilePayload
+    payload: UpdateProfilePayload,
   ): Promise<BaseResponseModel<UserModel>> {
     const response = await apiClient.put<BaseResponseModel<UserModel>>(
       `/v1/users/${userId}`,
-      payload
+      payload,
     );
     return response.data;
   },
 
   async changePassword(
     userId: string,
-    payload: ChangePasswordPayload
+    payload: ChangePasswordPayload,
   ): Promise<BaseResponseModel<void>> {
     const response = await apiClient.post<BaseResponseModel<void>>(
       `/v1/users/change-password/${userId}`,
-      payload
+      payload,
     );
     return response.data;
   },

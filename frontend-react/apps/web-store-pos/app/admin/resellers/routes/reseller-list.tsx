@@ -36,9 +36,7 @@ export function ResellerListPage() {
   return (
     <div className="space-y-4 p-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">
-          {formatMessage({ id: 'RESELLERS.LIST_TITLE' })}
-        </h1>
+        <h1 className="text-xl font-semibold">{formatMessage({ id: 'RESELLERS.LIST_TITLE' })}</h1>
       </div>
 
       {error && (

@@ -53,9 +53,7 @@ import { Navbar } from '../navbar';
 function Wrapper({ children }: { children: React.ReactNode }) {
   return (
     <IntlProvider messages={esMessages} locale="es" defaultLocale="es">
-      <MemoryRouter>
-        {children}
-      </MemoryRouter>
+      <MemoryRouter>{children}</MemoryRouter>
     </IntlProvider>
   );
 }
@@ -165,7 +163,9 @@ describe('Navbar — S-NAV-3: header keeps only the EXPAND toggle; collapse now 
         <Navbar isSidebarOpen={true} onSidebarToggle={vi.fn()} />
       </Wrapper>,
     );
-    expect(screen.queryByRole('button', { name: 'Alternar barra lateral' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Alternar barra lateral' }),
+    ).not.toBeInTheDocument();
   });
 });
 

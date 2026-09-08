@@ -53,7 +53,7 @@ export function EditStorePage({ includePlan = true }: EditStorePageProps) {
   const isEditMode = Boolean(storeId);
   const isSuperAdmin = user?.isSuperAdmin ?? false;
   // Angular: isOwnerAdmin = isSuperAdmin || authorizationService.hasOwnersAvailableFeature()
-  const isOwnerAdmin = user ? (isSuperAdmin || hasOwnersAvailableFeature(user)) : false;
+  const isOwnerAdmin = user ? isSuperAdmin || hasOwnersAvailableFeature(user) : false;
 
   const [store, setStore] = useState<Store | undefined>(undefined);
   const [modules, setModules] = useState<Module[]>([]);
@@ -70,7 +70,9 @@ export function EditStorePage({ includePlan = true }: EditStorePageProps) {
         includePlan
           ? storeHttpService.getModulesToStore()
           : Promise.resolve(success([] as Module[])),
-        (isSuperAdmin || isOwnerAdmin) ? storeHttpService.listOwners() : Promise.resolve(success([] as Owner[])),
+        isSuperAdmin || isOwnerAdmin
+          ? storeHttpService.listOwners()
+          : Promise.resolve(success([] as Owner[])),
       ])
         .then(([storeRes, modulesRes, ownersRes]) => {
           if (!storeRes.succeeded || !modulesRes.succeeded || !ownersRes.succeeded) {
@@ -80,9 +82,7 @@ export function EditStorePage({ includePlan = true }: EditStorePageProps) {
           const fetchedStore = storeRes.data;
           // Merge store.modules into catalog: selected=true, price overrides
           setStore(fetchedStore);
-          setModules(
-            includePlan ? mergeStoreModules(modulesRes.data, fetchedStore.modules) : []
-          );
+          setModules(includePlan ? mergeStoreModules(modulesRes.data, fetchedStore.modules) : []);
           setOwners(ownersRes.data);
           setLoadError('');
         })
@@ -92,7 +92,9 @@ export function EditStorePage({ includePlan = true }: EditStorePageProps) {
     } else if (includePlan) {
       Promise.all([
         storeHttpService.getModulesToStore(),
-        (isSuperAdmin || isOwnerAdmin) ? storeHttpService.listOwners() : Promise.resolve(success([] as Owner[])),
+        isSuperAdmin || isOwnerAdmin
+          ? storeHttpService.listOwners()
+          : Promise.resolve(success([] as Owner[])),
       ])
         .then(([modulesRes, ownersRes]) => {
           if (!modulesRes.succeeded || !ownersRes.succeeded) {
@@ -185,7 +187,9 @@ export function EditStorePage({ includePlan = true }: EditStorePageProps) {
   if (loadError) {
     return (
       <div className="space-y-4 p-4">
-        <p role="alert" className="text-sm text-red-600">{loadError}</p>
+        <p role="alert" className="text-sm text-red-600">
+          {loadError}
+        </p>
       </div>
     );
   }
@@ -205,7 +209,9 @@ export function EditStorePage({ includePlan = true }: EditStorePageProps) {
         {intl.formatMessage({ id: isEditMode ? 'STORES.EDIT_TITLE' : 'STORES.CREATE_TITLE' })}
       </h1>
       {!isEditMode && catalogError && (
-        <p role="alert" className="text-sm text-red-600">{catalogError}</p>
+        <p role="alert" className="text-sm text-red-600">
+          {catalogError}
+        </p>
       )}
       <StoreForm
         modules={modules}

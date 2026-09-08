@@ -71,7 +71,10 @@ describe('storeHttpService.getStore — HTTP-3: GET /v1/stores/:id', () => {
     const { storeHttpService } = await import('../store-http-service');
     const { apiClient } = await import('~/shared/lib/http/api-client');
     (apiClient.get as ReturnType<typeof vi.fn>).mockResolvedValue({
-      data: { succeeded: true, data: { id: 's1', name: 'Store One', paymentStartDate: '2026-03-10' } },
+      data: {
+        succeeded: true,
+        data: { id: 's1', name: 'Store One', paymentStartDate: '2026-03-10' },
+      },
     });
     const result = await storeHttpService.getStore('s1');
     if (!result.succeeded) throw new Error('expected succeeded response');
@@ -260,6 +263,27 @@ describe('storeHttpService.getStoresToCollect — HTTP-12: GET /v1/stores/to-col
   });
 });
 
+describe('storeHttpService.setMyStore — HTTP-15: PUT /v1/stores (SetMyStore)', () => {
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    const { apiClient } = await import('~/shared/lib/http/api-client');
+    (apiClient.put as ReturnType<typeof vi.fn>).mockResolvedValue({ data: { data: true } });
+  });
+
+  it('calls PUT /v1/stores with { storeId }', async () => {
+    const { storeHttpService } = await import('../store-http-service');
+    const { apiClient } = await import('~/shared/lib/http/api-client');
+    await storeHttpService.setMyStore('s1');
+    expect(apiClient.put).toHaveBeenCalledWith('/v1/stores', { storeId: 's1' });
+  });
+
+  it('returns the raw boolean response.data', async () => {
+    const { storeHttpService } = await import('../store-http-service');
+    const result = await storeHttpService.setMyStore('s1');
+    expect(result.data).toBe(true);
+  });
+});
+
 describe('storeHttpService.registerStorePayment — HTTP-13: POST /v1/stores/:id/payments', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
@@ -286,7 +310,10 @@ describe('storeHttpService.getReSellerCommissions — HTTP-14: GET /v1/stores/re
     vi.clearAllMocks();
     const { apiClient } = await import('~/shared/lib/http/api-client');
     (apiClient.get as ReturnType<typeof vi.fn>).mockResolvedValue({
-      data: { succeeded: true, data: [{ year: 2026, month: 7, paymentCount: 3, totalCommission: 90 }] },
+      data: {
+        succeeded: true,
+        data: [{ year: 2026, month: 7, paymentCount: 3, totalCommission: 90 }],
+      },
     });
   });
 
@@ -311,7 +338,20 @@ describe('storeHttpService.getModulesToStore — HTTP-11: GET /v1/modules/ToStor
     vi.clearAllMocks();
     const { apiClient } = await import('~/shared/lib/http/api-client');
     (apiClient.get as ReturnType<typeof vi.fn>).mockResolvedValue({
-      data: { succeeded: true, data: [{ id: 1, name: 'Module A', price: 10, currentPrice: 8, priceIncluded: false, discountText: '', selected: false }] },
+      data: {
+        succeeded: true,
+        data: [
+          {
+            id: 1,
+            name: 'Module A',
+            price: 10,
+            currentPrice: 8,
+            priceIncluded: false,
+            discountText: '',
+            selected: false,
+          },
+        ],
+      },
     });
   });
 

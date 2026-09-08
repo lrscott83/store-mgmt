@@ -31,14 +31,14 @@ reference implementations, so click-outside composes with zero changes to the ho
 
 From `@theme` in `styles.css` (Tailwind v4 registers a utility per `--color-*`):
 
-| Token | Value | Utilities available |
-|---|---|---|
-| `primary` | rgb(103 58 183) violet | `text-primary`, `bg-primary`, `bg-primary/10`, `hover:bg-primary/10` |
-| `primary-light` | rgb(237 231 246) | `bg-primary-light`, `hover:bg-primary-light` |
-| `success` | rgb(82 196 26) green | `text-success`, `hover:bg-success/10` |
-| `danger` | rgb(255 77 79) red | `text-danger`, `hover:bg-danger/10` (already used in ProductRow) |
-| `warning` | rgb(250 173 20) amber | `text-warning`, `hover:bg-warning/10` |
-| `text` / `text-muted` / `surface` / `border` | — | `text-text`, `text-text-muted`, `bg-surface`, `border-border` |
+| Token                                        | Value                  | Utilities available                                                  |
+| -------------------------------------------- | ---------------------- | -------------------------------------------------------------------- |
+| `primary`                                    | rgb(103 58 183) violet | `text-primary`, `bg-primary`, `bg-primary/10`, `hover:bg-primary/10` |
+| `primary-light`                              | rgb(237 231 246)       | `bg-primary-light`, `hover:bg-primary-light`                         |
+| `success`                                    | rgb(82 196 26) green   | `text-success`, `hover:bg-success/10`                                |
+| `danger`                                     | rgb(255 77 79) red     | `text-danger`, `hover:bg-danger/10` (already used in ProductRow)     |
+| `warning`                                    | rgb(250 173 20) amber  | `text-warning`, `hover:bg-warning/10`                                |
+| `text` / `text-muted` / `surface` / `border` | —                      | `text-text`, `text-text-muted`, `bg-surface`, `border-border`        |
 
 DECISION — amber intent uses the existing `warning` token, NOT an invented
 `amber-600`. The theme already defines `--color-warning: rgb(250 173 20)` (Material
@@ -71,7 +71,7 @@ Rendered structure (mirrors the reference pattern exactly):
 <div className="relative" ref={menuRef}>
   <button
     type="button"
-    onClick={() => setIsOpen(v => !v)}
+    onClick={() => setIsOpen((v) => !v)}
     aria-label={label /* default 'Acciones' */}
     aria-expanded={isOpen}
     data-testid={testId}
@@ -93,6 +93,7 @@ Rendered structure (mirrors the reference pattern exactly):
 ```
 
 Decisions:
+
 - Trigger uses the shared `SettingsIcon` (replaces every hand-rolled inline gear svg,
   including `sale-credit-list.tsx`'s `viewBox 0 0 16 16` variant).
 - `role="menu"` on the dropdown and `aria-label` default `'Acciones'` are MANDATORY —
@@ -105,14 +106,20 @@ Decisions:
 
 ```tsx
 export type ActionIntent =
-  | 'edit' | 'create' | 'pay' | 'activate'
-  | 'deactivate' | 'approve' | 'disapprove' | 'delete';
+  | 'edit'
+  | 'create'
+  | 'pay'
+  | 'activate'
+  | 'deactivate'
+  | 'approve'
+  | 'disapprove'
+  | 'delete';
 
 interface ActionMenuItemProps {
   /** Drives foreground color + default icon. Omit for a neutral item (escape hatch). */
   intent?: ActionIntent;
   onClick: () => void;
-  children: ReactNode;               // label text (usually intl.formatMessage(...))
+  children: ReactNode; // label text (usually intl.formatMessage(...))
   /** Override/supply the leading icon. Pass `null` to render no icon. */
   icon?: ReactNode;
   /** Renders a thin divider line above this item (destructive grouping). */
@@ -123,17 +130,17 @@ interface ActionMenuItemProps {
 
 Intent -> classes + default icon (SINGLE SOURCE OF TRUTH — hardcode as a `const` map):
 
-| intent | resting fg (icon+text) | soft hover tint | default icon |
-|---|---|---|---|
-| `edit` | `text-primary` | `hover:bg-primary/10` | `EditIcon` |
-| `create` | `text-primary` | `hover:bg-primary/10` | `PlusIcon` |
-| `pay` | `text-success` | `hover:bg-success/10` | `PayIcon` (new) |
-| `activate` | `text-success` | `hover:bg-success/10` | `CheckCircleIcon` (new) |
-| `approve` | `text-success` | `hover:bg-success/10` | `CheckCircleIcon` (reused) |
-| `deactivate` | `text-warning` | `hover:bg-warning/10` | `BanIcon` (new) |
-| `disapprove` | `text-warning` | `hover:bg-warning/10` | `BanIcon` (reused) |
-| `delete` | `text-danger` | `hover:bg-danger/10` | `TrashIcon` |
-| _none_ (neutral) | `text-text` | `hover:bg-primary/10` | none (unless `icon` passed) |
+| intent           | resting fg (icon+text) | soft hover tint       | default icon                |
+| ---------------- | ---------------------- | --------------------- | --------------------------- |
+| `edit`           | `text-primary`         | `hover:bg-primary/10` | `EditIcon`                  |
+| `create`         | `text-primary`         | `hover:bg-primary/10` | `PlusIcon`                  |
+| `pay`            | `text-success`         | `hover:bg-success/10` | `PayIcon` (new)             |
+| `activate`       | `text-success`         | `hover:bg-success/10` | `CheckCircleIcon` (new)     |
+| `approve`        | `text-success`         | `hover:bg-success/10` | `CheckCircleIcon` (reused)  |
+| `deactivate`     | `text-warning`         | `hover:bg-warning/10` | `BanIcon` (new)             |
+| `disapprove`     | `text-warning`         | `hover:bg-warning/10` | `BanIcon` (reused)          |
+| `delete`         | `text-danger`          | `hover:bg-danger/10`  | `TrashIcon`                 |
+| _none_ (neutral) | `text-text`            | `hover:bg-primary/10` | none (unless `icon` passed) |
 
 DECISION — hover tint is uniformly `hover:bg-<token>/10` across ALL four color
 families. Only `primary` has a dedicated `-light` token; success/warning/danger do
@@ -154,7 +161,10 @@ return (
       type="button"
       role="menuitem"
       data-testid={dataTestId}
-      onClick={() => { close(); onClick(); }}
+      onClick={() => {
+        close();
+        onClick();
+      }}
       className={`flex w-full items-center gap-2 px-4 py-2 text-left text-sm ${s.fg} ${s.hover} transition-colors`}
     >
       {resolvedIcon}
@@ -165,6 +175,7 @@ return (
 ```
 
 Decisions:
+
 - `role="menuitem"` MANDATORY (test contract).
 - Escape hatch: `intent` optional -> neutral `text-text`; `icon` prop overrides the
   default and `icon={null}` renders label-only. Covers any non-standard item without
@@ -180,11 +191,11 @@ Follow the existing convention exactly: `type IconProps`, `const BASE = 'h-5 w-5
 `fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"`, `currentColor`
 so `text-*` drives color. Three NEW components:
 
-| Component | Material semantic | Path (heroicons/Material outline) |
-|---|---|---|
-| `PayIcon` | `payments` / cash | `M3 6h18M3 6v12a1 1 0 001 1h16a1 1 0 001-1V6M3 6l2-3h14l2 3M12 10a2.5 2.5 0 100 5 2.5 2.5 0 000-5z` (same cash glyph as `PaymentMethodIcon` kind='cash', promoted to `BASE` size) |
-| `CheckCircleIcon` | `check_circle` | `M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z` |
-| `BanIcon` | `block` | `M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636` |
+| Component         | Material semantic | Path (heroicons/Material outline)                                                                                                                                                 |
+| ----------------- | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `PayIcon`         | `payments` / cash | `M3 6h18M3 6v12a1 1 0 001 1h16a1 1 0 001-1V6M3 6l2-3h14l2 3M12 10a2.5 2.5 0 100 5 2.5 2.5 0 000-5z` (same cash glyph as `PaymentMethodIcon` kind='cash', promoted to `BASE` size) |
+| `CheckCircleIcon` | `check_circle`    | `M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z`                                                                                                                                   |
+| `BanIcon`         | `block`           | `M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636`                                                                                  |
 
 DECISION — `approve` reuses `CheckCircleIcon` and `disapprove` reuses `BanIcon`
 (affirmative = check, negative = block), matching the proposal's "approve may reuse
@@ -233,7 +244,7 @@ check". No separate approve/disapprove glyphs. Net new icons: exactly THREE.
    Items: Editar (`intent="edit"`, `USERS.EDIT`, always); Activar (`intent="activate"`,
    `USERS.ACTIVATE`, when `!user.isActive`); Desactivar (`intent="deactivate"`,
    `USERS.DEACTIVATE`, when `user.isActive`). No delete => no separator. `handleEdit/
-   handleActivate/handleDeactivate` unchanged. `menuitem` role + `/acciones/i` preserved
+handleActivate/handleDeactivate` unchanged. `menuitem` role + `/acciones/i` preserved
    => NO test change. Fab "Adicionar" create button stays a `Button`, NOT a menu item.
 
 ### B. Add a gear — flat buttons -> gear menu (3, Angular parity)
@@ -244,7 +255,7 @@ existing tests WILL be rewritten under strict TDD: assert gear (`/acciones/i`) o
 conditional gating are preserved.
 
 7. **`inventory/components/entry-list.tsx`** — The `showActions` cell (`isOwnerAdmin &&
-   !readOnly`) currently renders two flat buttons. Wrap in `<ActionMenu>` inside the same
+!readOnly`) currently renders two flat buttons. Wrap in `<ActionMenu>` inside the same
    `<td>`. Items: Editar (`intent="edit"`, `GENERAL.EDIT`, `onEdit?.(entry)`); Eliminar
    (`intent="delete"`, `separatorBefore`, `GENERAL.DELETE`, `onDeactivate?.(entry)` — keep
    the existing handler name; the CRITICAL i18n fix `GENERAL.DELETE` stays). Matches Angular
@@ -273,6 +284,7 @@ conditional gating are preserved.
 ## 7. Testability (strict TDD active)
 
 Assertion surface the primitive guarantees:
+
 - Trigger: `getByRole('button', { name: /acciones/i })` (or the custom `label`), and/or
   `getByTestId(testId)`; `aria-expanded` reflects open state.
 - Dropdown: `getByRole('menu')` present only when open.

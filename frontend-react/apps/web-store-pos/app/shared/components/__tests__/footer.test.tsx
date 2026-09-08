@@ -33,14 +33,26 @@ describe('Footer — parity with Angular client-footer.component.html', () => {
 
   it('legal links point to the Angular-equivalent paths', () => {
     renderFooter();
-    expect(screen.getByText('Políticas de Privacidad').closest('a')).toHaveAttribute('href', '/private-police');
-    expect(screen.getByText('Términos y Condiciones').closest('a')).toHaveAttribute('href', '/terms-conditions');
+    expect(screen.getByText('Políticas de Privacidad').closest('a')).toHaveAttribute(
+      'href',
+      '/private-police',
+    );
+    expect(screen.getByText('Términos y Condiciones').closest('a')).toHaveAttribute(
+      'href',
+      '/terms-conditions',
+    );
   });
 
   it('legal links open in a new tab, matching Angular target="_blank"', () => {
     renderFooter();
-    expect(screen.getByText('Políticas de Privacidad').closest('a')).toHaveAttribute('target', '_blank');
-    expect(screen.getByText('Términos y Condiciones').closest('a')).toHaveAttribute('target', '_blank');
+    expect(screen.getByText('Políticas de Privacidad').closest('a')).toHaveAttribute(
+      'target',
+      '_blank',
+    );
+    expect(screen.getByText('Términos y Condiciones').closest('a')).toHaveAttribute(
+      'target',
+      '_blank',
+    );
   });
 
   it('renders the email icon before "Contáctanos", matching Angular <mat-icon>email</mat-icon>', () => {
@@ -73,7 +85,7 @@ describe('Footer — guest variant parity with Angular guest-footer.component.sc
     expect(contact?.querySelector('svg')).toHaveClass('text-[#f5b026]');
   });
 
-  it('uses a legible text color on the light auth background, not Angular\'s dark-theme cream literal', () => {
+  it("uses a legible text color on the light auth background, not Angular's dark-theme cream literal", () => {
     renderFooter('guest');
     const contact = screen.getByText('Contáctanos').closest('button');
     // Angular's `rgba(232,228,220,0.7)` cream only reads on a dark login background;
@@ -82,7 +94,7 @@ describe('Footer — guest variant parity with Angular guest-footer.component.sc
     expect(contact).not.toHaveClass('text-[rgba(232,228,220,0.7)]');
   });
 
-  it('deepens the Contact text on hover as a deliberate emphasis, matching the app\'s muted-to-emphasis convention', () => {
+  it("deepens the Contact text on hover as a deliberate emphasis, matching the app's muted-to-emphasis convention", () => {
     renderFooter('guest');
     const contact = screen.getByText('Contáctanos').closest('button');
     expect(contact).toHaveClass('hover:text-text');

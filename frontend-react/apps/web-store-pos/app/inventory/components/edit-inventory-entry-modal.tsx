@@ -50,16 +50,18 @@ export function EditInventoryEntryModal({
   useEffect(() => {
     if (!isOpen) return;
     let cancelled = false;
-    createProductService(storeId).getProductsToSelect().then((result) => {
-      if (!cancelled && result.succeeded) {
-        setProducts(result.data);
-        // Edit mode: prefill the query with the current entry's product name once loaded.
-        if (entry) {
-          const match = result.data.find((p) => p.id === entry.productId);
-          if (match) setQuery(match.fullName);
+    createProductService(storeId)
+      .getProductsToSelect()
+      .then((result) => {
+        if (!cancelled && result.succeeded) {
+          setProducts(result.data);
+          // Edit mode: prefill the query with the current entry's product name once loaded.
+          if (entry) {
+            const match = result.data.find((p) => p.id === entry.productId);
+            if (match) setQuery(match.fullName);
+          }
         }
-      }
-    });
+      });
     return () => {
       cancelled = true;
     };
@@ -67,7 +69,10 @@ export function EditInventoryEntryModal({
 
   // Accent- and case-insensitive filter: "cafe" matches "Café", "RON" matches "Ron".
   const normalized = (value: string) =>
-    value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    value
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
   const filteredProducts =
     query.trim() === ''
       ? products
@@ -114,10 +119,7 @@ export function EditInventoryEntryModal({
       return;
     }
 
-    onSave(
-      { productId, quantity: qty, costPrice: cost },
-      entry?.id,
-    );
+    onSave({ productId, quantity: qty, costPrice: cost }, entry?.id);
   }
 
   function selectProduct(product: ProductSelectView) {
@@ -131,7 +133,9 @@ export function EditInventoryEntryModal({
     if (event.key === 'ArrowDown') {
       event.preventDefault();
       setIsListOpen(true);
-      setActiveIndex((prev) => (filteredProducts.length === 0 ? 0 : Math.min(prev + 1, filteredProducts.length - 1)));
+      setActiveIndex((prev) =>
+        filteredProducts.length === 0 ? 0 : Math.min(prev + 1, filteredProducts.length - 1),
+      );
     } else if (event.key === 'ArrowUp') {
       event.preventDefault();
       setActiveIndex((prev) => (filteredProducts.length === 0 ? 0 : Math.max(prev - 1, 0)));
@@ -234,7 +238,9 @@ export function EditInventoryEntryModal({
                         }}
                         onClick={() => selectProduct(p)}
                         className={`cursor-pointer px-3 py-2 text-sm ${
-                          index === activeIndex ? 'bg-primary/10 text-primary' : 'text-text hover:bg-surface-hover'
+                          index === activeIndex
+                            ? 'bg-primary/10 text-primary'
+                            : 'text-text hover:bg-surface-hover'
                         }`}
                       >
                         {p.fullName}

@@ -4,6 +4,7 @@ import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 import type { Warehouse, WarehouseStockLevel, WarehouseStockMovement } from '@store-mgmt/domain';
 import { Result, WarehouseErrors } from '@store-mgmt/domain';
+import { toLocalDayKey } from '~/shared/lib/date-utils';
 
 const mockUser = vi.hoisted(() => ({
   selectedStoreId: 's1',
@@ -71,7 +72,14 @@ vi.mock('~/inventory/lib/services/warehouse-offline-service', () => {
     }
     updateWarehouse(id: string, name: string) {
       const w = fakeState.warehouses.find((x) => x.id === id);
-      if (!w) return { data: undefined, succeeded: false, message: null, actionCode: 400, errors: [WarehouseErrors.NotExists] };
+      if (!w)
+        return {
+          data: undefined,
+          succeeded: false,
+          message: null,
+          actionCode: 400,
+          errors: [WarehouseErrors.NotExists],
+        };
       w.name = name;
       return { data: w, succeeded: true, message: null, actionCode: 200, errors: [] };
     }
@@ -134,8 +142,22 @@ function seedCentralWarehouseWithStock() {
     ['prod-2', { id: 'prod-2', name: 'Leche', isActive: true, categoryId: 'cat-2' }],
   ];
   fakeState.levels = [
-    { id: 'sl-1', warehouseId: 'wh-1', productId: 'prod-1', onHand: 24, costPrice: 660, createdDate: new Date() },
-    { id: 'sl-2', warehouseId: 'wh-1', productId: 'prod-2', onHand: 10, costPrice: 100, createdDate: new Date() },
+    {
+      id: 'sl-1',
+      warehouseId: 'wh-1',
+      productId: 'prod-1',
+      onHand: 24,
+      costPrice: 660,
+      createdDate: new Date(),
+    },
+    {
+      id: 'sl-2',
+      warehouseId: 'wh-1',
+      productId: 'prod-2',
+      onHand: 10,
+      costPrice: 100,
+      createdDate: new Date(),
+    },
   ];
 }
 
@@ -244,16 +266,24 @@ describe('WarehousesPage', () => {
       fireEvent.click(screen.getByTestId('warehouse-category-toggle-wh-1-cat-2'));
 
       // Productos visibles con su cantidad.
-      expect(screen.getByTestId('warehouse-product-row-wh-1-prod-1').textContent).toContain('Cerveza');
+      expect(screen.getByTestId('warehouse-product-row-wh-1-prod-1').textContent).toContain(
+        'Cerveza',
+      );
       expect(screen.getByTestId('warehouse-product-row-wh-1-prod-1').textContent).toContain('(24)');
-      expect(screen.getByTestId('warehouse-product-row-wh-1-prod-2').textContent).toContain('Leche');
+      expect(screen.getByTestId('warehouse-product-row-wh-1-prod-2').textContent).toContain(
+        'Leche',
+      );
       expect(screen.getByTestId('warehouse-product-row-wh-1-prod-2').textContent).toContain('(10)');
 
       // Costo promedio y total por producto (mismo diseño que Disponible).
       expect(screen.getByTestId('warehouse-product-cost-wh-1-prod-1').textContent).toBe('$660');
-      expect(screen.getByTestId('warehouse-product-total-wh-1-prod-1').textContent).toBe('$15\u00A0840');
+      expect(screen.getByTestId('warehouse-product-total-wh-1-prod-1').textContent).toBe(
+        '$15\u00A0840',
+      );
       expect(screen.getByTestId('warehouse-product-cost-wh-1-prod-2').textContent).toBe('$100');
-      expect(screen.getByTestId('warehouse-product-total-wh-1-prod-2').textContent).toBe('$1\u00A0000');
+      expect(screen.getByTestId('warehouse-product-total-wh-1-prod-2').textContent).toBe(
+        '$1\u00A0000',
+      );
     });
 
     it('categories are collapsed by default and expand on click (WUI-4-c)', async () => {
@@ -295,10 +325,23 @@ describe('WarehousesPage', () => {
 
     it('shows product names for unknown product ids without crashing (WUI-4-f)', async () => {
       fakeState.warehouses = [
-        { id: 'wh-1', name: 'Central', isActive: true, createdDate: new Date(), createdByName: 'x' },
+        {
+          id: 'wh-1',
+          name: 'Central',
+          isActive: true,
+          createdDate: new Date(),
+          createdByName: 'x',
+        },
       ];
       fakeState.levels = [
-        { id: 'sl-1', warehouseId: 'wh-1', productId: 'prod-ghost', onHand: 5, costPrice: 100, createdDate: new Date() },
+        {
+          id: 'sl-1',
+          warehouseId: 'wh-1',
+          productId: 'prod-ghost',
+          onHand: 5,
+          costPrice: 100,
+          createdDate: new Date(),
+        },
       ];
       renderPage();
       fireEvent.click(screen.getByTestId('warehouse-toggle-Central'));
@@ -400,7 +443,9 @@ describe('WarehousesPage', () => {
     expect(showToastSuccessMock).toHaveBeenCalled();
   });
 
-  it('shows the movements history', async () => {
+  it('shows the movements history grouped by day, accordion style like other views', async () => {
+    const today = new Date();
+    const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
     fakeState.warehouses = [
       { id: 'wh-1', name: 'Central', isActive: true, createdDate: new Date(), createdByName: 'x' },
     ];
@@ -412,11 +457,75 @@ describe('WarehousesPage', () => {
         type: 'purchase_in',
         quantity: 24,
         reason: null,
-        createdDate: new Date(),
+        createdDate: today,
+        createdByName: 'x',
+      },
+      {
+        id: 'mv-2',
+        warehouseId: 'wh-1',
+        productId: 'prod-1',
+        type: 'sale_out',
+        quantity: 6,
+        reason: null,
+        createdDate: today,
+        createdByName: 'x',
+      },
+      {
+        id: 'mv-3',
+        warehouseId: 'wh-1',
+        productId: 'prod-2',
+        type: 'transfer_out',
+        quantity: 10,
+        reason: null,
+        createdDate: yesterday,
         createdByName: 'x',
       },
     ];
     renderPage();
-    expect(screen.getByText('Entrada (compra)')).toBeTruthy();
+
+    // No table: the movements render as day-grouped accordion panels.
+    expect(screen.queryByRole('table')).toBeNull();
+
+    // Two day panels (today first, newest-first) with the day date as header.
+    const todayKey = toLocalDayKey(today);
+    const yesterdayKey = toLocalDayKey(yesterday);
+    expect(screen.getByTestId(`mv-day-panel-toggle-${todayKey}`)).toBeTruthy();
+    expect(screen.getByTestId(`mv-day-panel-toggle-${yesterdayKey}`)).toBeTruthy();
+
+    // Panels are collapsed by default; expanding today reveals its 2 movements.
+    expect(screen.queryByTestId('mv-qty-mv-1')).toBeNull();
+    fireEvent.click(screen.getByTestId(`mv-day-panel-toggle-${todayKey}`));
+    expect(screen.getByTestId('mv-qty-mv-1')).toBeTruthy();
+    expect(screen.getByTestId('mv-qty-mv-2')).toBeTruthy();
+    // Yesterday's movement is not in today's panel.
+    expect(screen.queryByTestId('mv-qty-mv-3')).toBeNull();
+
+    // Each movement row shows the type icon.
+    expect(screen.getByTestId('mv-type-icon-mv-1')).toBeTruthy();
+    expect(screen.getByTestId('mv-type-icon-mv-2')).toBeTruthy();
+
+    // Expanding yesterday reveals its movement.
+    fireEvent.click(screen.getByTestId(`mv-day-panel-toggle-${yesterdayKey}`));
+    expect(screen.getByTestId('mv-qty-mv-3')).toBeTruthy();
+  });
+
+  it('movement type icons map: purchase_in/sale_out/transfer use the right icon', async () => {
+    const today = new Date();
+    fakeState.warehouses = [
+      { id: 'wh-1', name: 'Central', isActive: true, createdDate: new Date(), createdByName: 'x' },
+    ];
+    fakeState.movements = [
+      { id: 'mv-in', warehouseId: 'wh-1', productId: 'prod-1', type: 'purchase_in', quantity: 24, reason: null, createdDate: today, createdByName: 'x' },
+      { id: 'mv-out', warehouseId: 'wh-1', productId: 'prod-1', type: 'sale_out', quantity: 6, reason: null, createdDate: today, createdByName: 'x' },
+      { id: 'mv-tr-out', warehouseId: 'wh-1', productId: 'prod-1', type: 'transfer_out', quantity: 6, reason: null, createdDate: today, createdByName: 'x' },
+      { id: 'mv-tr-in', warehouseId: 'wh-1', productId: 'prod-1', type: 'transfer_in', quantity: 6, reason: null, createdDate: today, createdByName: 'x' },
+    ];
+    renderPage();
+    const todayKey = toLocalDayKey(today);
+    fireEvent.click(screen.getByTestId(`mv-day-panel-toggle-${todayKey}`));
+    // All 4 movements visible with their type icons.
+    for (const id of ['mv-in', 'mv-out', 'mv-tr-out', 'mv-tr-in']) {
+      expect(screen.getByTestId(`mv-type-icon-${id}`)).toBeTruthy();
+    }
   });
 });

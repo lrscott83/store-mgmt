@@ -94,9 +94,7 @@ describe('OwnerListPage — exports', () => {
 
 describe('OwnerListPage — render and title', () => {
   it('renders LIST_TITLE and calls listOwners on mount', async () => {
-    const { ownerHttpService } = await import(
-      '~/admin/owners/lib/services/owner-http-service'
-    );
+    const { ownerHttpService } = await import('~/admin/owners/lib/services/owner-http-service');
     vi.mocked(ownerHttpService.listOwners).mockResolvedValue({
       succeeded: true,
       data: [makeOwner()],
@@ -109,7 +107,7 @@ describe('OwnerListPage — render and title', () => {
     render(
       <Wrapper>
         <OwnerListPage />
-      </Wrapper>
+      </Wrapper>,
     );
 
     await waitFor(() => {
@@ -126,19 +124,19 @@ describe('OwnerListPage — render and title', () => {
 
 describe('OwnerListPage — card fields', () => {
   it('shows fullName, computed total price (sum), store count, reSellerName, cellPhone, description', async () => {
-    const { ownerHttpService } = await import(
-      '~/admin/owners/lib/services/owner-http-service'
-    );
+    const { ownerHttpService } = await import('~/admin/owners/lib/services/owner-http-service');
     vi.mocked(ownerHttpService.listOwners).mockResolvedValue({
       succeeded: true,
-      data: [makeOwner({
-        fullName: 'Jane Owner',
-        storeModules: [makeModule(150), makeModule(250)],
-        reSellerName: 'My Reseller',
-        cellPhone: '+53 5 555-1234',
-        email: 'jane@test.com',
-        description: 'Top owner',
-      })],
+      data: [
+        makeOwner({
+          fullName: 'Jane Owner',
+          storeModules: [makeModule(150), makeModule(250)],
+          reSellerName: 'My Reseller',
+          cellPhone: '+53 5 555-1234',
+          email: 'jane@test.com',
+          description: 'Top owner',
+        }),
+      ],
       message: '',
       actionCode: 0,
       errors: [],
@@ -148,7 +146,7 @@ describe('OwnerListPage — card fields', () => {
     render(
       <Wrapper>
         <OwnerListPage />
-      </Wrapper>
+      </Wrapper>,
     );
 
     await waitFor(() => {
@@ -160,9 +158,7 @@ describe('OwnerListPage — card fields', () => {
   });
 
   it('shows reSellerName fallback ADMIN when empty', async () => {
-    const { ownerHttpService } = await import(
-      '~/admin/owners/lib/services/owner-http-service'
-    );
+    const { ownerHttpService } = await import('~/admin/owners/lib/services/owner-http-service');
     vi.mocked(ownerHttpService.listOwners).mockResolvedValue({
       succeeded: true,
       data: [makeOwner({ reSellerName: '', storeModules: [makeModule()] })],
@@ -175,7 +171,7 @@ describe('OwnerListPage — card fields', () => {
     render(
       <Wrapper>
         <OwnerListPage />
-      </Wrapper>
+      </Wrapper>,
     );
 
     await waitFor(() => {
@@ -184,9 +180,7 @@ describe('OwnerListPage — card fields', () => {
   });
 
   it('shows 0 stores and $0 when storeModules is empty (All filter)', async () => {
-    const { ownerHttpService } = await import(
-      '~/admin/owners/lib/services/owner-http-service'
-    );
+    const { ownerHttpService } = await import('~/admin/owners/lib/services/owner-http-service');
     vi.mocked(ownerHttpService.listOwners).mockResolvedValue({
       succeeded: true,
       data: [makeOwner({ storeModules: [] })],
@@ -199,7 +193,7 @@ describe('OwnerListPage — card fields', () => {
     render(
       <Wrapper>
         <OwnerListPage />
-      </Wrapper>
+      </Wrapper>,
     );
 
     // The empty-owned owner has no paid-plan store, so it is hidden by the default
@@ -221,9 +215,7 @@ describe('OwnerListPage — card fields', () => {
 
 describe('OwnerListPage — state indicator classes (Req: Owners State CSS Classes)', () => {
   it('applies bg-danger indicator when isActive is false', async () => {
-    const { ownerHttpService } = await import(
-      '~/admin/owners/lib/services/owner-http-service'
-    );
+    const { ownerHttpService } = await import('~/admin/owners/lib/services/owner-http-service');
     vi.mocked(ownerHttpService.listOwners).mockResolvedValue({
       succeeded: true,
       data: [makeOwner({ isActive: false, approved: true })],
@@ -236,7 +228,7 @@ describe('OwnerListPage — state indicator classes (Req: Owners State CSS Class
     const { container } = render(
       <Wrapper>
         <OwnerListPage />
-      </Wrapper>
+      </Wrapper>,
     );
 
     await waitFor(() => {
@@ -246,9 +238,7 @@ describe('OwnerListPage — state indicator classes (Req: Owners State CSS Class
   });
 
   it('applies bg-success indicator when isActive is true AND approved is false', async () => {
-    const { ownerHttpService } = await import(
-      '~/admin/owners/lib/services/owner-http-service'
-    );
+    const { ownerHttpService } = await import('~/admin/owners/lib/services/owner-http-service');
     vi.mocked(ownerHttpService.listOwners).mockResolvedValue({
       succeeded: true,
       data: [makeOwner({ isActive: true, approved: false })],
@@ -261,7 +251,7 @@ describe('OwnerListPage — state indicator classes (Req: Owners State CSS Class
     const { container } = render(
       <Wrapper>
         <OwnerListPage />
-      </Wrapper>
+      </Wrapper>,
     );
 
     await waitFor(() => {
@@ -271,9 +261,7 @@ describe('OwnerListPage — state indicator classes (Req: Owners State CSS Class
   });
 
   it('applies no special indicator when isActive is true AND approved is true', async () => {
-    const { ownerHttpService } = await import(
-      '~/admin/owners/lib/services/owner-http-service'
-    );
+    const { ownerHttpService } = await import('~/admin/owners/lib/services/owner-http-service');
     vi.mocked(ownerHttpService.listOwners).mockResolvedValue({
       succeeded: true,
       data: [makeOwner({ isActive: true, approved: true })],
@@ -286,7 +274,7 @@ describe('OwnerListPage — state indicator classes (Req: Owners State CSS Class
     const { container } = render(
       <Wrapper>
         <OwnerListPage />
-      </Wrapper>
+      </Wrapper>,
     );
 
     await waitFor(() => {
@@ -303,9 +291,7 @@ describe('OwnerListPage — state indicator classes (Req: Owners State CSS Class
 
 describe('OwnerListPage — delete button', () => {
   it('opens confirmation dialog before deleting and refreshes list after confirm', async () => {
-    const { ownerHttpService } = await import(
-      '~/admin/owners/lib/services/owner-http-service'
-    );
+    const { ownerHttpService } = await import('~/admin/owners/lib/services/owner-http-service');
     vi.mocked(ownerHttpService.listOwners).mockResolvedValue({
       succeeded: true,
       data: [makeOwner({ id: 'o99', fullName: 'To Delete' })],
@@ -325,7 +311,7 @@ describe('OwnerListPage — delete button', () => {
     render(
       <Wrapper>
         <OwnerListPage />
-      </Wrapper>
+      </Wrapper>,
     );
 
     await waitFor(() => {
@@ -354,9 +340,7 @@ describe('OwnerListPage — delete button', () => {
   });
 
   it('closes dialog without deleting when cancel is clicked', async () => {
-    const { ownerHttpService } = await import(
-      '~/admin/owners/lib/services/owner-http-service'
-    );
+    const { ownerHttpService } = await import('~/admin/owners/lib/services/owner-http-service');
     vi.mocked(ownerHttpService.listOwners).mockResolvedValue({
       succeeded: true,
       data: [makeOwner({ id: 'o99', fullName: 'To Delete' })],
@@ -369,7 +353,7 @@ describe('OwnerListPage — delete button', () => {
     render(
       <Wrapper>
         <OwnerListPage />
-      </Wrapper>
+      </Wrapper>,
     );
 
     await waitFor(() => {
@@ -402,9 +386,7 @@ describe('OwnerListPage — delete button', () => {
 
 describe('OwnerListPage — create button', () => {
   it('renders an Adicionar button that navigates to /admin/owners/create', async () => {
-    const { ownerHttpService } = await import(
-      '~/admin/owners/lib/services/owner-http-service'
-    );
+    const { ownerHttpService } = await import('~/admin/owners/lib/services/owner-http-service');
     vi.mocked(ownerHttpService.listOwners).mockResolvedValue({
       succeeded: true,
       data: [],
@@ -417,7 +399,7 @@ describe('OwnerListPage — create button', () => {
     render(
       <Wrapper>
         <OwnerListPage />
-      </Wrapper>
+      </Wrapper>,
     );
 
     await waitFor(() => {
@@ -437,9 +419,7 @@ describe('OwnerListPage — create button', () => {
 
 describe('OwnerListPage — edit navigation', () => {
   it('navigates to /admin/owners/edit/:id when edit button clicked', async () => {
-    const { ownerHttpService } = await import(
-      '~/admin/owners/lib/services/owner-http-service'
-    );
+    const { ownerHttpService } = await import('~/admin/owners/lib/services/owner-http-service');
     vi.mocked(ownerHttpService.listOwners).mockResolvedValue({
       succeeded: true,
       data: [makeOwner({ id: 'o42', fullName: 'Editable Owner' })],
@@ -452,7 +432,7 @@ describe('OwnerListPage — edit navigation', () => {
     render(
       <Wrapper>
         <OwnerListPage />
-      </Wrapper>
+      </Wrapper>,
     );
 
     await waitFor(() => {
@@ -473,9 +453,7 @@ describe('OwnerListPage — edit navigation', () => {
 
 describe('OwnerListPage — GENERAL.RESELLER label', () => {
   it('renders the GENERAL.RESELLER label prefix before the reSellerName value', async () => {
-    const { ownerHttpService } = await import(
-      '~/admin/owners/lib/services/owner-http-service'
-    );
+    const { ownerHttpService } = await import('~/admin/owners/lib/services/owner-http-service');
     vi.mocked(ownerHttpService.listOwners).mockResolvedValue({
       succeeded: true,
       data: [makeOwner({ reSellerName: 'Label Reseller' })],
@@ -488,12 +466,14 @@ describe('OwnerListPage — GENERAL.RESELLER label', () => {
     render(
       <Wrapper>
         <OwnerListPage />
-      </Wrapper>
+      </Wrapper>,
     );
 
     await waitFor(() => {
       // The paragraph should contain both the label key translation and the value
-      expect(screen.getByText(new RegExp(`${esMessages['GENERAL.RESELLER']}.*Label Reseller`))).toBeInTheDocument();
+      expect(
+        screen.getByText(new RegExp(`${esMessages['GENERAL.RESELLER']}.*Label Reseller`)),
+      ).toBeInTheDocument();
     });
   });
 });
@@ -504,9 +484,7 @@ describe('OwnerListPage — GENERAL.RESELLER label', () => {
 
 describe('OwnerListPage — no approve/activate/deactivate buttons', () => {
   it('does NOT render approve, activate, or deactivate controls (Angular no-ops omitted)', async () => {
-    const { ownerHttpService } = await import(
-      '~/admin/owners/lib/services/owner-http-service'
-    );
+    const { ownerHttpService } = await import('~/admin/owners/lib/services/owner-http-service');
     vi.mocked(ownerHttpService.listOwners).mockResolvedValue({
       succeeded: true,
       data: [makeOwner()],
@@ -519,7 +497,7 @@ describe('OwnerListPage — no approve/activate/deactivate buttons', () => {
     render(
       <Wrapper>
         <OwnerListPage />
-      </Wrapper>
+      </Wrapper>,
     );
 
     await waitFor(() => {
@@ -530,7 +508,9 @@ describe('OwnerListPage — no approve/activate/deactivate buttons', () => {
 
     expect(screen.queryByRole('menuitem', { name: /aprobar|approve/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('menuitem', { name: /activar|activate/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole('menuitem', { name: /desactivar|deactivate/i })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('menuitem', { name: /desactivar|deactivate/i }),
+    ).not.toBeInTheDocument();
     // exactly Editar + Eliminar — no other menu items
     expect(screen.getAllByRole('menuitem')).toHaveLength(2);
   });
@@ -542,16 +522,14 @@ describe('OwnerListPage — no approve/activate/deactivate buttons', () => {
 
 describe('OwnerListPage — HTTP error inline', () => {
   it('shows OWNER.ERROR inline when listOwners throws', async () => {
-    const { ownerHttpService } = await import(
-      '~/admin/owners/lib/services/owner-http-service'
-    );
+    const { ownerHttpService } = await import('~/admin/owners/lib/services/owner-http-service');
     vi.mocked(ownerHttpService.listOwners).mockRejectedValue(new Error('Network'));
 
     const { OwnerListPage } = await import('../owner-list');
     render(
       <Wrapper>
         <OwnerListPage />
-      </Wrapper>
+      </Wrapper>,
     );
 
     await waitFor(() => {
@@ -568,9 +546,7 @@ describe('OwnerListPage — HTTP error inline', () => {
 
 describe('OwnerListPage — succeeded:false response', () => {
   it('shows OWNER.ERROR when listOwners resolves with succeeded:false, does not set owners from data', async () => {
-    const { ownerHttpService } = await import(
-      '~/admin/owners/lib/services/owner-http-service'
-    );
+    const { ownerHttpService } = await import('~/admin/owners/lib/services/owner-http-service');
     vi.mocked(ownerHttpService.listOwners).mockResolvedValue({
       succeeded: false,
       data: null,
@@ -583,7 +559,7 @@ describe('OwnerListPage — succeeded:false response', () => {
     render(
       <Wrapper>
         <OwnerListPage />
-      </Wrapper>
+      </Wrapper>,
     );
 
     await waitFor(() => {

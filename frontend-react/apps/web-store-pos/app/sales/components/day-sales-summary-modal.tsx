@@ -71,7 +71,9 @@ export function DaySalesSummaryModal({ summary, onClose }: DaySalesSummaryModalP
             </div>
           </div>
           <div className="rounded bg-gray-50 p-3 text-center">
-            <div className="text-2xl font-bold text-red-600 whitespace-nowrap">{formatCurrency(summary.totalCost)}</div>
+            <div className="text-2xl font-bold text-red-600 whitespace-nowrap">
+              {formatCurrency(summary.totalCost)}
+            </div>
             <div className="mt-1 text-xs text-gray-500">
               {intl.formatMessage({ id: 'REPORTS.SALES_SUMMARY.TOTAL_COST' })}
             </div>

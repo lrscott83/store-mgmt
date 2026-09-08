@@ -58,9 +58,7 @@ describe('SaleCreditList', () => {
   });
 
   it('shows paid date label only when the credit is paid', () => {
-    const credits = [
-      makeCredit({ id: 'c1', isPaid: true, paidDate: new Date(2025, 2, 5) }),
-    ];
+    const credits = [makeCredit({ id: 'c1', isPaid: true, paidDate: new Date(2025, 2, 5) })];
     render(
       <Wrapper>
         <SaleCreditList saleCredits={credits} />
@@ -194,7 +192,12 @@ describe('EditSaleCreditModal', () => {
     const credit = makeCredit();
     render(
       <Wrapper>
-        <EditSaleCreditModal saleCredit={credit} isOpen={false} onClose={vi.fn()} onSave={vi.fn()} />
+        <EditSaleCreditModal
+          saleCredit={credit}
+          isOpen={false}
+          onClose={vi.fn()}
+          onSave={vi.fn()}
+        />
       </Wrapper>,
     );
     expect(screen.queryByRole('dialog')).toBeNull();
@@ -278,7 +281,12 @@ describe('EditSaleCreditModal', () => {
       const credit = makeCredit();
       render(
         <Wrapper>
-          <EditSaleCreditModal saleCredit={credit} isOpen={true} onClose={vi.fn()} onSave={vi.fn()} />
+          <EditSaleCreditModal
+            saleCredit={credit}
+            isOpen={true}
+            onClose={vi.fn()}
+            onSave={vi.fn()}
+          />
         </Wrapper>,
       );
       const headerClose = screen.getByTestId('edit-sale-credit-close-x');
@@ -290,7 +298,12 @@ describe('EditSaleCreditModal', () => {
       const credit = makeCredit();
       render(
         <Wrapper>
-          <EditSaleCreditModal saleCredit={credit} isOpen={true} onClose={vi.fn()} onSave={vi.fn()} />
+          <EditSaleCreditModal
+            saleCredit={credit}
+            isOpen={true}
+            onClose={vi.fn()}
+            onSave={vi.fn()}
+          />
         </Wrapper>,
       );
       expect(screen.getByTestId('edit-sale-credit-close').querySelector('svg')).not.toBeNull();
@@ -300,7 +313,12 @@ describe('EditSaleCreditModal', () => {
       const credit = makeCredit();
       render(
         <Wrapper>
-          <EditSaleCreditModal saleCredit={credit} isOpen={true} onClose={vi.fn()} onSave={vi.fn()} />
+          <EditSaleCreditModal
+            saleCredit={credit}
+            isOpen={true}
+            onClose={vi.fn()}
+            onSave={vi.fn()}
+          />
         </Wrapper>,
       );
       const path = screen
@@ -326,7 +344,12 @@ describe('SaleCreditPaymentModal', () => {
     const credit = makeCredit();
     render(
       <Wrapper>
-        <SaleCreditPaymentModal saleCredit={credit} isOpen={true} onClose={vi.fn()} onConfirm={vi.fn()} />
+        <SaleCreditPaymentModal
+          saleCredit={credit}
+          isOpen={true}
+          onClose={vi.fn()}
+          onConfirm={vi.fn()}
+        />
       </Wrapper>,
     );
     expect(screen.getByText('Venta por Cobrar')).toBeInTheDocument();
@@ -336,7 +359,12 @@ describe('SaleCreditPaymentModal', () => {
     const credit = makeCredit();
     render(
       <Wrapper>
-        <SaleCreditPaymentModal saleCredit={credit} isOpen={false} onClose={vi.fn()} onConfirm={vi.fn()} />
+        <SaleCreditPaymentModal
+          saleCredit={credit}
+          isOpen={false}
+          onClose={vi.fn()}
+          onConfirm={vi.fn()}
+        />
       </Wrapper>,
     );
     expect(screen.queryByRole('dialog')).toBeNull();
@@ -346,7 +374,12 @@ describe('SaleCreditPaymentModal', () => {
     const credit = makeCredit({ client: 'Pedro', total: 320 });
     render(
       <Wrapper>
-        <SaleCreditPaymentModal saleCredit={credit} isOpen={true} onClose={vi.fn()} onConfirm={vi.fn()} />
+        <SaleCreditPaymentModal
+          saleCredit={credit}
+          isOpen={true}
+          onClose={vi.fn()}
+          onConfirm={vi.fn()}
+        />
       </Wrapper>,
     );
     expect(screen.getByText(/Pedro/)).toBeInTheDocument();
@@ -357,7 +390,12 @@ describe('SaleCreditPaymentModal', () => {
     const credit = makeCredit();
     render(
       <Wrapper>
-        <SaleCreditPaymentModal saleCredit={credit} isOpen={true} onClose={vi.fn()} onConfirm={vi.fn()} />
+        <SaleCreditPaymentModal
+          saleCredit={credit}
+          isOpen={true}
+          onClose={vi.fn()}
+          onConfirm={vi.fn()}
+        />
       </Wrapper>,
     );
     const select = screen.getByLabelText('Forma de Pago') as HTMLSelectElement;
@@ -375,7 +413,12 @@ describe('SaleCreditPaymentModal', () => {
     confirmDialogMock.mockResolvedValue(true);
     render(
       <Wrapper>
-        <SaleCreditPaymentModal saleCredit={credit} isOpen={true} onClose={vi.fn()} onConfirm={onConfirm} />
+        <SaleCreditPaymentModal
+          saleCredit={credit}
+          isOpen={true}
+          onClose={vi.fn()}
+          onConfirm={onConfirm}
+        />
       </Wrapper>,
     );
     fireEvent.click(screen.getByTestId('sale-credit-payment-submit'));
@@ -394,7 +437,12 @@ describe('SaleCreditPaymentModal', () => {
     confirmDialogMock.mockResolvedValue(false);
     render(
       <Wrapper>
-        <SaleCreditPaymentModal saleCredit={credit} isOpen={true} onClose={vi.fn()} onConfirm={onConfirm} />
+        <SaleCreditPaymentModal
+          saleCredit={credit}
+          isOpen={true}
+          onClose={vi.fn()}
+          onConfirm={onConfirm}
+        />
       </Wrapper>,
     );
     fireEvent.click(screen.getByTestId('sale-credit-payment-submit'));
@@ -412,7 +460,12 @@ describe('SaleCreditPaymentModal', () => {
     confirmDialogMock.mockResolvedValue(true);
     render(
       <Wrapper>
-        <SaleCreditPaymentModal saleCredit={credit} isOpen={true} onClose={onClose} onConfirm={onConfirm} />
+        <SaleCreditPaymentModal
+          saleCredit={credit}
+          isOpen={true}
+          onClose={onClose}
+          onConfirm={onConfirm}
+        />
       </Wrapper>,
     );
     fireEvent.click(screen.getByTestId('sale-credit-payment-submit'));
@@ -427,7 +480,12 @@ describe('SaleCreditPaymentModal', () => {
     const credit = makeCredit();
     render(
       <Wrapper>
-        <SaleCreditPaymentModal saleCredit={credit} isOpen={true} onClose={onClose} onConfirm={onConfirm} />
+        <SaleCreditPaymentModal
+          saleCredit={credit}
+          isOpen={true}
+          onClose={onClose}
+          onConfirm={onConfirm}
+        />
       </Wrapper>,
     );
     fireEvent.click(screen.getByTestId('sale-credit-payment-close'));
@@ -443,7 +501,12 @@ describe('SaleCreditPaymentModal', () => {
       const credit = makeCredit();
       render(
         <Wrapper>
-          <SaleCreditPaymentModal saleCredit={credit} isOpen={true} onClose={vi.fn()} onConfirm={vi.fn()} />
+          <SaleCreditPaymentModal
+            saleCredit={credit}
+            isOpen={true}
+            onClose={vi.fn()}
+            onConfirm={vi.fn()}
+          />
         </Wrapper>,
       );
       const headerClose = screen.getByTestId('sale-credit-payment-close-x');
@@ -455,7 +518,12 @@ describe('SaleCreditPaymentModal', () => {
       const credit = makeCredit();
       render(
         <Wrapper>
-          <SaleCreditPaymentModal saleCredit={credit} isOpen={true} onClose={vi.fn()} onConfirm={vi.fn()} />
+          <SaleCreditPaymentModal
+            saleCredit={credit}
+            isOpen={true}
+            onClose={vi.fn()}
+            onConfirm={vi.fn()}
+          />
         </Wrapper>,
       );
       expect(screen.getByTestId('sale-credit-payment-close').querySelector('svg')).not.toBeNull();
@@ -465,7 +533,12 @@ describe('SaleCreditPaymentModal', () => {
       const credit = makeCredit();
       render(
         <Wrapper>
-          <SaleCreditPaymentModal saleCredit={credit} isOpen={true} onClose={vi.fn()} onConfirm={vi.fn()} />
+          <SaleCreditPaymentModal
+            saleCredit={credit}
+            isOpen={true}
+            onClose={vi.fn()}
+            onConfirm={vi.fn()}
+          />
         </Wrapper>,
       );
       const path = screen

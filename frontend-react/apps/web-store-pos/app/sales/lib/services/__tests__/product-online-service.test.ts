@@ -144,7 +144,18 @@ describe('ProductOnlineService (reference-only, apiClient-mocked)', () => {
   it('ONLINE-12: updateProduct → PUT /v1/Products/:id including barcode in the payload', async () => {
     const svc = await getService();
     const api = await mockedApiClient();
-    await svc.updateProduct('p1', 'cat-1', 'Coca Cola', 1.5, 'biz-1', 2, true, true, false, 'BARCODE123');
+    await svc.updateProduct(
+      'p1',
+      'cat-1',
+      'Coca Cola',
+      1.5,
+      'biz-1',
+      2,
+      true,
+      true,
+      false,
+      'BARCODE123',
+    );
     expect(api.put).toHaveBeenCalledTimes(1);
     const [url, body] = api.put.mock.calls[0];
     expect(url).toBe('/v1/Products/p1');
@@ -165,9 +176,15 @@ describe('ProductOnlineService (reference-only, apiClient-mocked)', () => {
   it('ONLINE-13: createProducts → POST /v1/Products/createProducts with { categoryId, products }', async () => {
     const svc = await getService();
     const api = await mockedApiClient();
-    const items = [{ name: 'A', price: 1 }, { name: 'B', price: 2 }];
+    const items = [
+      { name: 'A', price: 1 },
+      { name: 'B', price: 2 },
+    ];
     await svc.createProducts('cat-1', items);
-    expect(api.post).toHaveBeenCalledWith('/v1/Products/createProducts', { categoryId: 'cat-1', products: items });
+    expect(api.post).toHaveBeenCalledWith('/v1/Products/createProducts', {
+      categoryId: 'cat-1',
+      products: items,
+    });
   });
 
   // Req "Offline-Only Public Methods (Offline/Online Asymmetry)": the online service must NOT
@@ -184,6 +201,8 @@ describe('ProductOnlineService (reference-only, apiClient-mocked)', () => {
     api.get.mockRejectedValue(new Error('Network error'));
     api.post.mockRejectedValue(new Error('Network error'));
     await expect(svc.getProductById('p1')).rejects.toThrow('Network error');
-    await expect(svc.createProduct('c', 'n', 1, '', 1, true, true, false)).rejects.toThrow('Network error');
+    await expect(svc.createProduct('c', 'n', 1, '', 1, true, true, false)).rejects.toThrow(
+      'Network error',
+    );
   });
 });

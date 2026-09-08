@@ -93,16 +93,16 @@ describe('roster-store — anti-replay + expiry (spec offline-roster-bundle)', (
 
   it('rejects a different bundle with an equal issuedAt', () => {
     importRoster(makeBundle({ bundleId: 'b1', issuedAt: 1000 }), 10_000);
-    expect(() =>
-      importRoster(makeBundle({ bundleId: 'b2', issuedAt: 1000 }), 11_000),
-    ).toThrow(ReplayBundleError);
+    expect(() => importRoster(makeBundle({ bundleId: 'b2', issuedAt: 1000 }), 11_000)).toThrow(
+      ReplayBundleError,
+    );
   });
 
   it('rejects a different bundle with an older issuedAt', () => {
     importRoster(makeBundle({ bundleId: 'b1', issuedAt: 1000 }), 10_000);
-    expect(() =>
-      importRoster(makeBundle({ bundleId: 'b2', issuedAt: 500 }), 11_000),
-    ).toThrow(ReplayBundleError);
+    expect(() => importRoster(makeBundle({ bundleId: 'b2', issuedAt: 500 }), 11_000)).toThrow(
+      ReplayBundleError,
+    );
   });
 
   it('accepts a strictly newer bundle and replaces the stored roster', () => {

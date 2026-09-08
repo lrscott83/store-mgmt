@@ -65,9 +65,7 @@ test('editar perfil: pre-carga, payload con isActive, éxito muestra mensaje y p
   await expect(page).toHaveURL(/\/profile\/edit$/);
 
   // Aserción 2: payload includes isActive.
-  await expect
-    .poll(() => capturedPayloads.length, { timeout: 5_000 })
-    .toBe(1);
+  await expect.poll(() => capturedPayloads.length, { timeout: 5_000 }).toBe(1);
   expect(capturedPayloads[0].isActive).toBeDefined();
 
   // Aserción 8: password is NOT in the payload.

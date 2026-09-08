@@ -97,27 +97,21 @@ describe('AuthorizationService', () => {
 
     it('StoreUser with correct storeId and featureIds returns true', () => {
       const user = makeUser({
-        roles: [
-          { storeId: 's1', storeName: 'Store 1', moduleId: 2, featureIds: [21, 22] },
-        ],
+        roles: [{ storeId: 's1', storeName: 'Store 1', moduleId: 2, featureIds: [21, 22] }],
       });
       expect(isUserAuthorized(user, [21], 's1')).toBe(true);
     });
 
     it('StoreUser wrong store returns false — AUTH-05 scenario', () => {
       const user = makeUser({
-        roles: [
-          { storeId: 's1', storeName: 'Store 1', moduleId: 2, featureIds: [21, 22] },
-        ],
+        roles: [{ storeId: 's1', storeName: 'Store 1', moduleId: 2, featureIds: [21, 22] }],
       });
       expect(isUserAuthorized(user, [21], 's2')).toBe(false);
     });
 
     it('StoreUser with correct store but missing featureId returns false', () => {
       const user = makeUser({
-        roles: [
-          { storeId: 's1', storeName: 'Store 1', moduleId: 2, featureIds: [21] },
-        ],
+        roles: [{ storeId: 's1', storeName: 'Store 1', moduleId: 2, featureIds: [21] }],
       });
       expect(isUserAuthorized(user, [22], 's1')).toBe(false);
     });
@@ -139,18 +133,18 @@ describe('AuthorizationService', () => {
     it('denies when expired — expiry guard precedes even superAdmin (Angular :18 before :21)', () => {
       vi.useFakeTimers();
       vi.setSystemTime(1000);
-      expect(
-        isUserAuthorized(makeUser({ isSuperAdmin: true, expiresIn: 999 }), [21], 's1')
-      ).toBe(false);
+      expect(isUserAuthorized(makeUser({ isSuperAdmin: true, expiresIn: 999 }), [21], 's1')).toBe(
+        false,
+      );
       vi.useRealTimers();
     });
 
     it('boundary: expiresIn === now is NOT expired (< exclusive, not <=)', () => {
       vi.useFakeTimers();
       vi.setSystemTime(1000);
-      expect(
-        isUserAuthorized(makeUser({ isSuperAdmin: true, expiresIn: 1000 }), [21], 's1')
-      ).toBe(true);
+      expect(isUserAuthorized(makeUser({ isSuperAdmin: true, expiresIn: 1000 }), [21], 's1')).toBe(
+        true,
+      );
       vi.useRealTimers();
     });
 

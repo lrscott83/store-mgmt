@@ -19,30 +19,30 @@ KEY DIVERGENCE vs Users/Stores: SINGLE route (`/management/configurations`) with
 
 ## Architecture Decisions
 
-| ID | Decision | Choice | Rationale |
-|----|----------|--------|-----------|
-| DC1 | Slice shape | Mirror Stores/Users 3-layer slice | Consistency, reviewer familiarity, archived precedent |
-| DC2 | Loader | REUSE `adminFeatureLoader([EFeatures.Configurations])` (=74) | Already live; no new gating code |
-| DC3 | **PUT payload shape** | **Full `SystemConfiguration[]` array** | Simplest, least-transform path; symmetry with GET; future-proof contract |
-| DC4 | Form model | Generic: iterate `SystemConfiguration[]` → editable rows | New backend keys appear automatically; no UI redeploy |
-| DC5 | Hydration gate | Form does NOT mount until list resolved (LOADING state) | `useState` initializers run once; empty initial never re-hydrates |
-| DC6 | Offline | List cache-read degraded; writes blocked via `useOnlineStatus`; no queue | Mirrors users; v1 scope |
-| DC7 | Domain model location | `SystemConfiguration` in `models/store.ts` | Barrel already exports; zero index.ts change |
-| DC8 | Cache key | `entityKey('configurations', '')` | Platform-global, no selectedStoreId |
+| ID  | Decision              | Choice                                                                   | Rationale                                                                |
+| --- | --------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------ |
+| DC1 | Slice shape           | Mirror Stores/Users 3-layer slice                                        | Consistency, reviewer familiarity, archived precedent                    |
+| DC2 | Loader                | REUSE `adminFeatureLoader([EFeatures.Configurations])` (=74)             | Already live; no new gating code                                         |
+| DC3 | **PUT payload shape** | **Full `SystemConfiguration[]` array**                                   | Simplest, least-transform path; symmetry with GET; future-proof contract |
+| DC4 | Form model            | Generic: iterate `SystemConfiguration[]` → editable rows                 | New backend keys appear automatically; no UI redeploy                    |
+| DC5 | Hydration gate        | Form does NOT mount until list resolved (LOADING state)                  | `useState` initializers run once; empty initial never re-hydrates        |
+| DC6 | Offline               | List cache-read degraded; writes blocked via `useOnlineStatus`; no queue | Mirrors users; v1 scope                                                  |
+| DC7 | Domain model location | `SystemConfiguration` in `models/store.ts`                               | Barrel already exports; zero index.ts change                             |
+| DC8 | Cache key             | `entityKey('configurations', '')`                                        | Platform-global, no selectedStoreId                                      |
 
 ## File Changes
 
-| File | Action | Description |
-|------|--------|-------------|
-| `app/management/configurations/lib/services/configuration-http-service.ts` | Create | `listConfigurations` GET, `updateConfigurations` PUT |
-| `app/management/configurations/lib/services/__tests__/configuration-http-service.test.ts` | Create | verb/path/payload/.data vs mocked apiClient |
-| `app/management/configurations/components/ConfigurationsForm.tsx` | Create | generic N-row name/value editable form |
-| `app/management/configurations/components/__tests__/ConfigurationsForm.test.tsx` | Create | renders N rows, edits value, emits full list, offline disables |
-| `app/management/configurations/routes/configurations.tsx` | Create | container: loader + fetch + online-gate + LOADING + submit |
-| `app/management/configurations/routes/__tests__/configurations.test.tsx` | Create | online/offline/degraded, hydrate-then-mount, submit success/error |
-| `packages/domain/src/models/store.ts` | Modify | add `SystemConfiguration` interface |
-| `app/routes.ts` | Modify | add 1 route after users block |
-| `shared/lib/i18n/es.ts` | Modify | `CONFIGURATIONS.*` (~10-15 keys) |
+| File                                                                                      | Action | Description                                                       |
+| ----------------------------------------------------------------------------------------- | ------ | ----------------------------------------------------------------- |
+| `app/management/configurations/lib/services/configuration-http-service.ts`                | Create | `listConfigurations` GET, `updateConfigurations` PUT              |
+| `app/management/configurations/lib/services/__tests__/configuration-http-service.test.ts` | Create | verb/path/payload/.data vs mocked apiClient                       |
+| `app/management/configurations/components/ConfigurationsForm.tsx`                         | Create | generic N-row name/value editable form                            |
+| `app/management/configurations/components/__tests__/ConfigurationsForm.test.tsx`          | Create | renders N rows, edits value, emits full list, offline disables    |
+| `app/management/configurations/routes/configurations.tsx`                                 | Create | container: loader + fetch + online-gate + LOADING + submit        |
+| `app/management/configurations/routes/__tests__/configurations.test.tsx`                  | Create | online/offline/degraded, hydrate-then-mount, submit success/error |
+| `packages/domain/src/models/store.ts`                                                     | Modify | add `SystemConfiguration` interface                               |
+| `app/routes.ts`                                                                           | Modify | add 1 route after users block                                     |
+| `shared/lib/i18n/es.ts`                                                                   | Modify | `CONFIGURATIONS.*` (~10-15 keys)                                  |
 
 ## Spec Traceability
 

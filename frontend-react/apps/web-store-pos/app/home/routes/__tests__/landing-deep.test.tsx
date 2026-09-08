@@ -183,7 +183,9 @@ describe('LandingDeep — public landing route', () => {
 
     it('reveals a feature wrapper (opacity-0 → opacity-100) when the observer fires isIntersecting', () => {
       renderLanding();
-      const firstWrapper = screen.getByText('Seguridad total').closest('[data-slot="card"]')?.parentElement;
+      const firstWrapper = screen
+        .getByText('Seguridad total')
+        .closest('[data-slot="card"]')?.parentElement;
       expect(firstWrapper).toHaveClass('opacity-0');
 
       const observer = observerInstances[0];

@@ -22,10 +22,7 @@ const CSV_DIR = path.join(process.cwd(), 'test-results');
 /**
  * Creates a valid CSV file and returns its path.
  */
-async function createCsvFile(
-  name: string,
-  rows: string,
-): Promise<string> {
+async function createCsvFile(name: string, rows: string): Promise<string> {
   const filePath = path.join(CSV_DIR, name);
   await fs.mkdir(CSV_DIR, { recursive: true });
   await fs.writeFile(filePath, rows, 'utf-8');

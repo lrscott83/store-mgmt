@@ -35,7 +35,7 @@ Client bundle includes sync chunks in production build.
 
 ## All 17 Acceptance Gate Items: PASS
 
-All SYNC-* requirements met.
+All SYNC-\* requirements met.
 
 ---
 
@@ -70,12 +70,13 @@ No test verifies zip member filenames explicitly (either the 6 named files from 
 ## Task Completeness
 
 All 35 tasks from apply-progress confirmed complete:
+
 - T-0.1, T-0.2: Baseline verified
 - T-1.1: fflate installed
 - T-2.1, T-2.2: Service skeletons created
 - T-3.1–T-3.4: Serializer TDD complete (17 tests)
 - T-4.1–T-4.5: Synchronizer TDD complete (11 tests)
-- T-5.1: 15 SYNC.* keys in es.ts
+- T-5.1: 15 SYNC.\* keys in es.ts
 - T-6.1–T-6.5: Route containers TDD complete (8 tests)
 - T-7.1–T-7.5: Form components TDD complete (11 tests)
 - T-8.1: Routes registered
@@ -86,6 +87,7 @@ All 35 tasks from apply-progress confirmed complete:
 ## Spec Compliance
 
 ### All 17 acceptance gate items PASS
+
 1. fflate in package.json; @zip.js absent — PASS
 2. /sync/export registered with featureLoader(Send=40) — PASS
 3. /sync/import registered with featureLoader(Receive=42) — PASS
@@ -97,7 +99,7 @@ All 35 tasks from apply-progress confirmed complete:
 9. S-EXPORT-1..4 (export form scenarios) — PASS
 10. S-IMPORT-1..6 (import form scenarios) — PASS
 11. No Angular fixture in tests — PASS
-12. All 15 SYNC.* keys in es.ts — PASS
+12. All 15 SYNC.\* keys in es.ts — PASS
 13. EFeatures.Download(41) dormant — PASS
 14. tsc --noEmit exits 0 — PASS
 15. pnpm build exits 0; sync routes resolve — PASS

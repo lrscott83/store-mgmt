@@ -1,12 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  ERoles,
-  EFeatures,
-  EModules,
-  PaymentType,
-  OrderType,
-  ExpenseType,
-} from '../enums';
+import { ERoles, EFeatures, EModules, PaymentType, OrderType, ExpenseType } from '../enums';
 
 describe('ERoles', () => {
   it('SuperAdmin is 1', () => expect(ERoles.SuperAdmin).toBe(1));

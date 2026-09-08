@@ -32,7 +32,9 @@ export function ResellerCreatePage() {
   // drives BOTH password + confirmPassword fields.
   const [showPassword, setShowPassword] = useState(false);
 
-  const isDirty = Boolean(fullName || login || password || confirmPassword || cellPhone || email || description);
+  const isDirty = Boolean(
+    fullName || login || password || confirmPassword || cellPhone || email || description,
+  );
 
   // ADR-5: only the hook — no UnsavedChangesDialog wiring
   useUnsavedChangesPrompt(isDirty);
@@ -77,7 +79,7 @@ export function ResellerCreatePage() {
             byCode: { [API_ERROR_CODE_CELL_PHONE]: 'RESELLERS.PHONE_REQUIRED' },
             fallback: 'RESELLERS.ERROR',
           }),
-        })
+        }),
       );
     } finally {
       setIsSubmitting(false);
@@ -86,9 +88,7 @@ export function ResellerCreatePage() {
 
   return (
     <div className="space-y-4 p-4">
-      <h1 className="text-xl font-semibold">
-        {formatMessage({ id: 'RESELLERS.CREATE_TITLE' })}
-      </h1>
+      <h1 className="text-xl font-semibold">{formatMessage({ id: 'RESELLERS.CREATE_TITLE' })}</h1>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         {(validationError || serverError) && (

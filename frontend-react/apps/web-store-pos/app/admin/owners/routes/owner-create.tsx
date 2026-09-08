@@ -42,7 +42,14 @@ export function OwnerCreatePage() {
   const [showPassword, setShowPassword] = useState(false);
 
   const isDirty = Boolean(
-    fullName || login || password || confirmPassword || cellPhone || email || description || reSellerId
+    fullName ||
+    login ||
+    password ||
+    confirmPassword ||
+    cellPhone ||
+    email ||
+    description ||
+    reSellerId,
   );
 
   // ADR-5: only the hook — no UnsavedChangesDialog
@@ -50,12 +57,15 @@ export function OwnerCreatePage() {
 
   useEffect(() => {
     if (!isSuperAdmin) return;
-    resellerHttpService.listResellers().then((res) => {
-      if (!res.succeeded) return;
-      setResellers(res.data);
-    }).catch(() => {
-      // non-critical — reseller list failure doesn't block form
-    });
+    resellerHttpService
+      .listResellers()
+      .then((res) => {
+        if (!res.succeeded) return;
+        setResellers(res.data);
+      })
+      .catch(() => {
+        // non-critical — reseller list failure doesn't block form
+      });
   }, [isSuperAdmin]);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -101,9 +111,9 @@ export function OwnerCreatePage() {
               409: 'OWNER.DUPLICATE_LOGIN',
               403: 'OWNER.FORBIDDEN',
             },
-            { [API_ERROR_CODE_CELL_PHONE]: 'OWNER.PHONE_REQUIRED' }
+            { [API_ERROR_CODE_CELL_PHONE]: 'OWNER.PHONE_REQUIRED' },
           ),
-        })
+        }),
       );
     } finally {
       setIsSubmitting(false);
@@ -112,9 +122,7 @@ export function OwnerCreatePage() {
 
   return (
     <div className="space-y-4 p-4">
-      <h1 className="text-xl font-semibold">
-        {intl.formatMessage({ id: 'OWNER.CREATE_TITLE' })}
-      </h1>
+      <h1 className="text-xl font-semibold">{intl.formatMessage({ id: 'OWNER.CREATE_TITLE' })}</h1>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         {(validationError || serverError) && (

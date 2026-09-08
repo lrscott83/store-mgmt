@@ -165,8 +165,7 @@ export function InventoryTodaySalesProfitPage() {
     // Angular line 123 (gap #4): include rows with sold>0 OR today entries (quantity>0).
     const productsWithActivity = productProfits.filter(
       (pp) =>
-        pp.sold > 0 ||
-        todayEntries.some((e) => e.productId === pp.productId && e.quantity > 0),
+        pp.sold > 0 || todayEntries.some((e) => e.productId === pp.productId && e.quantity > 0),
     );
 
     // Angular lines 126-149: group by category, ordered by category order, products ordered
@@ -215,7 +214,9 @@ export function InventoryTodaySalesProfitPage() {
       title={
         <div className="flex items-center justify-between">
           <span>{intl.formatMessage({ id: 'INVENTORY.PROFIT.TITLE' })}</span>
-          <span className="text-lg font-bold text-success whitespace-nowrap">{formatCurrency(totals.profit)}</span>
+          <span className="text-lg font-bold text-success whitespace-nowrap">
+            {formatCurrency(totals.profit)}
+          </span>
         </div>
       }
     >
@@ -266,13 +267,19 @@ export function InventoryTodaySalesProfitPage() {
                       </td>
                       <td className="px-4 py-3 text-right text-text-muted">
                         <div className="whitespace-nowrap">{formatCurrency(product.salePrice)}</div>
-                        <div className="whitespace-nowrap text-xs text-text-muted/70">{formatCurrency(product.amount)}</div>
+                        <div className="whitespace-nowrap text-xs text-text-muted/70">
+                          {formatCurrency(product.amount)}
+                        </div>
                       </td>
                       <td className="px-4 py-3 text-right text-text-muted">
                         <div className="whitespace-nowrap">{formatCurrency(product.unitCost)}</div>
-                        <div className="whitespace-nowrap text-xs text-text-muted/70">{formatCurrency(product.totalCost)}</div>
+                        <div className="whitespace-nowrap text-xs text-text-muted/70">
+                          {formatCurrency(product.totalCost)}
+                        </div>
                       </td>
-                      <td className={`px-4 py-3 text-right font-semibold whitespace-nowrap ${profitClass(product.profit)}`}>
+                      <td
+                        className={`px-4 py-3 text-right font-semibold whitespace-nowrap ${profitClass(product.profit)}`}
+                      >
                         {formatCurrency(product.profit)}
                       </td>
                     </tr>
@@ -285,9 +292,15 @@ export function InventoryTodaySalesProfitPage() {
                     {intl.formatMessage({ id: 'INVENTORY.PROFIT.TOTAL' })}
                   </td>
                   <td className="px-4 py-3 text-right text-text">{totals.sold}</td>
-                  <td className="px-4 py-3 text-right text-text whitespace-nowrap">{formatCurrency(totals.amount)}</td>
-                  <td className="px-4 py-3 text-right text-text whitespace-nowrap">{formatCurrency(totals.cost)}</td>
-                  <td className={`px-4 py-3 text-right whitespace-nowrap ${profitClass(totals.profit)}`}>
+                  <td className="px-4 py-3 text-right text-text whitespace-nowrap">
+                    {formatCurrency(totals.amount)}
+                  </td>
+                  <td className="px-4 py-3 text-right text-text whitespace-nowrap">
+                    {formatCurrency(totals.cost)}
+                  </td>
+                  <td
+                    className={`px-4 py-3 text-right whitespace-nowrap ${profitClass(totals.profit)}`}
+                  >
                     {formatCurrency(totals.profit)}
                   </td>
                 </tr>
@@ -319,15 +332,23 @@ export function InventoryTodaySalesProfitPage() {
                     <p className="text-text-muted">
                       {intl.formatMessage({ id: 'INVENTORY.PROFIT.PRICE' })}
                     </p>
-                    <p className="text-text whitespace-nowrap">{formatCurrency(product.salePrice)}</p>
-                    <p className="text-text-muted/70 whitespace-nowrap">{formatCurrency(product.amount)}</p>
+                    <p className="text-text whitespace-nowrap">
+                      {formatCurrency(product.salePrice)}
+                    </p>
+                    <p className="text-text-muted/70 whitespace-nowrap">
+                      {formatCurrency(product.amount)}
+                    </p>
                   </div>
                   <div>
                     <p className="text-text-muted">
                       {intl.formatMessage({ id: 'INVENTORY.PROFIT.COST' })}
                     </p>
-                    <p className="text-text whitespace-nowrap">{formatCurrency(product.unitCost)}</p>
-                    <p className="text-text-muted/70 whitespace-nowrap">{formatCurrency(product.totalCost)}</p>
+                    <p className="text-text whitespace-nowrap">
+                      {formatCurrency(product.unitCost)}
+                    </p>
+                    <p className="text-text-muted/70 whitespace-nowrap">
+                      {formatCurrency(product.totalCost)}
+                    </p>
                   </div>
                   <div>
                     <p className="text-text-muted">

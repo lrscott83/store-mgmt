@@ -11,10 +11,7 @@ import { ProductRepository } from '~/sales/lib/repositories/product-repository';
 import { InventoryOfflineService } from '~/inventory/lib/services/inventory-offline-service';
 import { WarehouseOfflineService } from '~/inventory/lib/services/warehouse-offline-service';
 import { DataSerializerService } from '../data-serializer-service';
-import {
-  DataSynchronizerService,
-  SynchronizerErrors,
-} from '../data-synchronizer-service';
+import { DataSynchronizerService, SynchronizerErrors } from '../data-synchronizer-service';
 import type {
   CategoryImportRepo,
   ExchangeRateImportService,
@@ -76,8 +73,20 @@ function makeWarehouse(id: string, name: string): Warehouse {
   return { id, name, isActive: true, createdDate: new Date(), createdByName: 'x' };
 }
 
-function makeLevel(warehouseId: string, productId: string, onHand: number, costPrice: number): WarehouseStockLevel {
-  return { id: `${warehouseId}:${productId}`, warehouseId, productId, onHand, costPrice, createdDate: new Date() };
+function makeLevel(
+  warehouseId: string,
+  productId: string,
+  onHand: number,
+  costPrice: number,
+): WarehouseStockLevel {
+  return {
+    id: `${warehouseId}:${productId}`,
+    warehouseId,
+    productId,
+    onHand,
+    costPrice,
+    createdDate: new Date(),
+  };
 }
 
 function makeMovement(id: string, warehouseId: string): WarehouseStockMovement {

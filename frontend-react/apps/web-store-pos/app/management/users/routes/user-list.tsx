@@ -41,10 +41,7 @@ export function UserListPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only fetch (Angular ngOnInit parity)
   }, []);
 
-  async function handleLifecycleAction(
-    action: (id: string) => Promise<unknown>,
-    id: string
-  ) {
+  async function handleLifecycleAction(action: (id: string) => Promise<unknown>, id: string) {
     if (!isOnline) return;
     try {
       await action(id);
@@ -58,9 +55,7 @@ export function UserListPage() {
   return (
     <div className="space-y-4 p-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">
-          {intl.formatMessage({ id: 'USERS.LIST_TITLE' })}
-        </h1>
+        <h1 className="text-xl font-semibold">{intl.formatMessage({ id: 'USERS.LIST_TITLE' })}</h1>
         <RosterExportPanel />
       </div>
 
@@ -70,7 +65,9 @@ export function UserListPage() {
         users={users}
         onCreate={() => navigate('/management/users/create')}
         onEdit={(id) => navigate(`/management/users/edit/${id}`)}
-        onActivate={(id) => handleLifecycleAction((userId) => userHttpService.activateUser(userId, true), id)}
+        onActivate={(id) =>
+          handleLifecycleAction((userId) => userHttpService.activateUser(userId, true), id)
+        }
         onDeactivate={(id) => handleLifecycleAction(userHttpService.deleteUser, id)}
       />
     </div>

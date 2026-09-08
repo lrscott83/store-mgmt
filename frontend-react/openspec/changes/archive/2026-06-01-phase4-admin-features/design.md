@@ -6,13 +6,13 @@ Mirror the `management/*` template exactly: a container route under `admin/featu
 
 ## Architecture Decisions
 
-| Decision | Choice | Rejected | Rationale |
-|----------|--------|----------|-----------|
-| Auth guard | New `superAdminLoader` (isSuperAdmin only) | Reuse `adminLoader` (isSuperAdmin \|\| isOwnerAdmin) | Angular gates on SuperAdmin only; reusing the broadened guard would widen access. Establishes the strict guard for future admin slices. |
-| Layout | Reuse `app-layout` | New `admin/` layout | Angular has no separate admin layout. |
-| Feedback UX | Inline `useState` success/error | toastr/toast | Avoids a toast dependency; Angular used toastr but proposal locks inline. |
-| i18n keys | Self-contained `FEATURES.*` (incl. SUCCESS/ERROR) | `GENERAL.RESPONSE.*` | Verified those keys do NOT exist in React `es.ts`; self-contained avoids missing-key risk. |
-| Service shape | `featureHttpService` object, `apiClient.post`, returns `response.data` | class/instance | Matches `userHttpService` pattern exactly (`user-http-service.ts:26-78`). |
+| Decision      | Choice                                                                 | Rejected                                             | Rationale                                                                                                                               |
+| ------------- | ---------------------------------------------------------------------- | ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Auth guard    | New `superAdminLoader` (isSuperAdmin only)                             | Reuse `adminLoader` (isSuperAdmin \|\| isOwnerAdmin) | Angular gates on SuperAdmin only; reusing the broadened guard would widen access. Establishes the strict guard for future admin slices. |
+| Layout        | Reuse `app-layout`                                                     | New `admin/` layout                                  | Angular has no separate admin layout.                                                                                                   |
+| Feedback UX   | Inline `useState` success/error                                        | toastr/toast                                         | Avoids a toast dependency; Angular used toastr but proposal locks inline.                                                               |
+| i18n keys     | Self-contained `FEATURES.*` (incl. SUCCESS/ERROR)                      | `GENERAL.RESPONSE.*`                                 | Verified those keys do NOT exist in React `es.ts`; self-contained avoids missing-key risk.                                              |
+| Service shape | `featureHttpService` object, `apiClient.post`, returns `response.data` | class/instance                                       | Matches `userHttpService` pattern exactly (`user-http-service.ts:26-78`).                                                               |
 
 ## Data Flow
 
@@ -27,15 +27,15 @@ Mirror the `management/*` template exactly: a container route under `admin/featu
 
 ## File Changes
 
-| File | Action | Description |
-|------|--------|-------------|
-| `apps/web-store-pos/app/admin/features/routes/features.tsx` | Create | `loader = superAdminLoader`; `FeaturesPage` renders title + single activate button; `useIntl` + `useState` for inline success/error; default export. |
-| `apps/web-store-pos/app/admin/features/lib/services/feature-http-service.ts` | Create | `featureHttpService.activateFeatures()` → `apiClient.post<BaseResponseModel<boolean>>('/v1/features/activate', {})`, returns `response.data`. |
-| `apps/web-store-pos/app/admin/features/routes/__tests__/features.test.tsx` | Create | Mocks `~/auth/routes/loaders` + service; asserts exports, render (title+button), click→success text, click→error text. |
-| `apps/web-store-pos/app/admin/features/lib/services/__tests__/feature-http-service.test.ts` | Create | Mocks `~/shared/lib/http/api-client`; asserts POST `/v1/features/activate` with `{}`, returns boolean. |
-| `apps/web-store-pos/app/auth/routes/loaders.ts` | Modify | Add `superAdminLoader` (auth check → redirect `/login`; `!user.isSuperAdmin` → redirect `/unauthorized`). |
-| `apps/web-store-pos/app/routes.ts` | Modify | Add `route('admin/features', 'admin/features/routes/features.tsx')` under `app-layout`. |
-| `apps/web-store-pos/app/shared/lib/i18n/es.ts` | Modify | Add `FEATURES.TITLE`, `FEATURES.ACTIVATE`, `FEATURES.SUCCESS`, `FEATURES.ERROR`. |
+| File                                                                                        | Action | Description                                                                                                                                          |
+| ------------------------------------------------------------------------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/web-store-pos/app/admin/features/routes/features.tsx`                                 | Create | `loader = superAdminLoader`; `FeaturesPage` renders title + single activate button; `useIntl` + `useState` for inline success/error; default export. |
+| `apps/web-store-pos/app/admin/features/lib/services/feature-http-service.ts`                | Create | `featureHttpService.activateFeatures()` → `apiClient.post<BaseResponseModel<boolean>>('/v1/features/activate', {})`, returns `response.data`.        |
+| `apps/web-store-pos/app/admin/features/routes/__tests__/features.test.tsx`                  | Create | Mocks `~/auth/routes/loaders` + service; asserts exports, render (title+button), click→success text, click→error text.                               |
+| `apps/web-store-pos/app/admin/features/lib/services/__tests__/feature-http-service.test.ts` | Create | Mocks `~/shared/lib/http/api-client`; asserts POST `/v1/features/activate` with `{}`, returns boolean.                                               |
+| `apps/web-store-pos/app/auth/routes/loaders.ts`                                             | Modify | Add `superAdminLoader` (auth check → redirect `/login`; `!user.isSuperAdmin` → redirect `/unauthorized`).                                            |
+| `apps/web-store-pos/app/routes.ts`                                                          | Modify | Add `route('admin/features', 'admin/features/routes/features.tsx')` under `app-layout`.                                                              |
+| `apps/web-store-pos/app/shared/lib/i18n/es.ts`                                              | Modify | Add `FEATURES.TITLE`, `FEATURES.ACTIVATE`, `FEATURES.SUCCESS`, `FEATURES.ERROR`.                                                                     |
 
 > `en.ts` does NOT exist — no en changes.
 
@@ -66,11 +66,11 @@ export async function superAdminLoader(): Promise<Response | null> {
 
 ## Testing Strategy
 
-| Layer | What to Test | Approach |
-|-------|--------------|----------|
-| Unit (service) | POST `/v1/features/activate` with `{}`, returns `response.data` | vitest, mock `api-client` (mirror `user-http-service.test.ts`) |
-| Unit (route) | exports `loader`+`FeaturesPage`; renders title+button; click sets success; click failure sets error | vitest + RTL, `IntlProvider` w/ `esMessages`, mock loaders + service (mirror `configurations.test.tsx`) |
-| E2E | — | None (parity slice) |
+| Layer          | What to Test                                                                                        | Approach                                                                                                |
+| -------------- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Unit (service) | POST `/v1/features/activate` with `{}`, returns `response.data`                                     | vitest, mock `api-client` (mirror `user-http-service.test.ts`)                                          |
+| Unit (route)   | exports `loader`+`FeaturesPage`; renders title+button; click sets success; click failure sets error | vitest + RTL, `IntlProvider` w/ `esMessages`, mock loaders + service (mirror `configurations.test.tsx`) |
+| E2E            | —                                                                                                   | None (parity slice)                                                                                     |
 
 ## Migration / Rollout
 

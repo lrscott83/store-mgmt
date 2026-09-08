@@ -47,9 +47,7 @@ describe('offline-auth-service — authenticateOffline with a null verifier (off
 
   it('throws OfflineVerifierError for the correct password', async () => {
     seedBundleWithNullVerifier();
-    await expect(authenticateOffline('ana', 'secret')).rejects.toBeInstanceOf(
-      OfflineVerifierError,
-    );
+    await expect(authenticateOffline('ana', 'secret')).rejects.toBeInstanceOf(OfflineVerifierError);
   });
 
   it('throws OfflineVerifierError for an incorrect password too — never OfflineInvalidPasswordError', async () => {

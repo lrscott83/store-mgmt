@@ -41,7 +41,12 @@ const cases: Case[] = [
   },
   {
     name: '/apiary/report.js is NOT falsely excluded as an API path → cache-first',
-    input: { url: url('/apiary/report.js'), method: 'GET', mode: 'no-cors', selfOrigin: SELF_ORIGIN },
+    input: {
+      url: url('/apiary/report.js'),
+      method: 'GET',
+      mode: 'no-cors',
+      selfOrigin: SELF_ORIGIN,
+    },
     expected: 'cache-first',
   },
   {
@@ -66,22 +71,42 @@ const cases: Case[] = [
   },
   {
     name: 'same-origin JS asset → cache-first',
-    input: { url: url('/assets/app-abc123.js'), method: 'GET', mode: 'cors', selfOrigin: SELF_ORIGIN },
+    input: {
+      url: url('/assets/app-abc123.js'),
+      method: 'GET',
+      mode: 'cors',
+      selfOrigin: SELF_ORIGIN,
+    },
     expected: 'cache-first',
   },
   {
     name: 'same-origin CSS asset → cache-first',
-    input: { url: url('/assets/app-abc123.css'), method: 'GET', mode: 'cors', selfOrigin: SELF_ORIGIN },
+    input: {
+      url: url('/assets/app-abc123.css'),
+      method: 'GET',
+      mode: 'cors',
+      selfOrigin: SELF_ORIGIN,
+    },
     expected: 'cache-first',
   },
   {
     name: 'same-origin font asset → cache-first',
-    input: { url: url('/fonts/inter/inter-400.woff2'), method: 'GET', mode: 'cors', selfOrigin: SELF_ORIGIN },
+    input: {
+      url: url('/fonts/inter/inter-400.woff2'),
+      method: 'GET',
+      mode: 'cors',
+      selfOrigin: SELF_ORIGIN,
+    },
     expected: 'cache-first',
   },
   {
     name: 'same-origin icon asset → cache-first',
-    input: { url: url('/icons/icon-192.png'), method: 'GET', mode: 'no-cors', selfOrigin: SELF_ORIGIN },
+    input: {
+      url: url('/icons/icon-192.png'),
+      method: 'GET',
+      mode: 'no-cors',
+      selfOrigin: SELF_ORIGIN,
+    },
     expected: 'cache-first',
   },
 ];

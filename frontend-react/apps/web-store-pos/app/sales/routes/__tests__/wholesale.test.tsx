@@ -148,7 +148,13 @@ describe('WholesalePage — Ventas Mayoristas', () => {
     cartStateMock.orderType = 1; // OrderType.Normal
     mockBarcodeProduct = null;
     scannerModalMock.mockImplementation(
-      ({ onScanned, onClose }: { onScanned: (barcode: string, quantity: number) => void; onClose: () => void }) => (
+      ({
+        onScanned,
+        onClose,
+      }: {
+        onScanned: (barcode: string, quantity: number) => void;
+        onClose: () => void;
+      }) => (
         <div data-testid="scanner-modal">
           <input
             type="text"
@@ -170,9 +176,12 @@ describe('WholesalePage — Ventas Mayoristas', () => {
             data-testid="scanner-mock-scan"
             onClick={() => {
               const root = document.body;
-              const barcode = (root.querySelector('[data-testid="scanner-mock-barcode"]') as HTMLInputElement)?.dataset.barcode ?? '';
+              const barcode =
+                (root.querySelector('[data-testid="scanner-mock-barcode"]') as HTMLInputElement)
+                  ?.dataset.barcode ?? '';
               const quantity = Number(
-                (root.querySelector('[data-testid="scanner-mock-quantity"]') as HTMLInputElement)?.dataset.quantity ?? '1',
+                (root.querySelector('[data-testid="scanner-mock-quantity"]') as HTMLInputElement)
+                  ?.dataset.quantity ?? '1',
               );
               onScanned(barcode, quantity);
             }}
@@ -210,14 +219,22 @@ describe('WholesalePage — Ventas Mayoristas', () => {
       }),
       makeProduct('pan-1', { name: 'Pan' }), // sin config mayorista
     ];
-    render(<Wrapper><WholesalePage /></Wrapper>);
+    render(
+      <Wrapper>
+        <WholesalePage />
+      </Wrapper>,
+    );
     await waitFor(() => expect(screen.getByText('Cerveza')).toBeInTheDocument());
     expect(screen.queryByText('Pan')).not.toBeInTheDocument();
   });
 
   it('muestra mensaje vacío cuando no hay productos mayoristas', async () => {
     mockProducts = [makeProduct('pan-1', { name: 'Pan' })];
-    render(<Wrapper><WholesalePage /></Wrapper>);
+    render(
+      <Wrapper>
+        <WholesalePage />
+      </Wrapper>,
+    );
     await waitFor(() =>
       expect(
         screen.getByText(
@@ -228,10 +245,16 @@ describe('WholesalePage — Ventas Mayoristas', () => {
   });
 
   it('al añadir 12 paquetes agrega 288 unidades al carrito con OrderType.Mayorista y el precio del tier', async () => {
-    render(<Wrapper><WholesalePage /></Wrapper>);
+    render(
+      <Wrapper>
+        <WholesalePage />
+      </Wrapper>,
+    );
     await waitFor(() => expect(screen.getByText('Cerveza')).toBeInTheDocument());
 
-    fireEvent.change(screen.getByTestId('wholesale-packs-input-beer-1'), { target: { value: '12' } });
+    fireEvent.change(screen.getByTestId('wholesale-packs-input-beer-1'), {
+      target: { value: '12' },
+    });
     fireEvent.click(screen.getByTestId('wholesale-add-beer-1'));
 
     expect(addItemMock).toHaveBeenCalledWith(
@@ -243,10 +266,16 @@ describe('WholesalePage — Ventas Mayoristas', () => {
   });
 
   it('muestra la cotización packs × packSize × unitPrice', async () => {
-    render(<Wrapper><WholesalePage /></Wrapper>);
+    render(
+      <Wrapper>
+        <WholesalePage />
+      </Wrapper>,
+    );
     await waitFor(() => expect(screen.getByText('Cerveza')).toBeInTheDocument());
 
-    fireEvent.change(screen.getByTestId('wholesale-packs-input-beer-1'), { target: { value: '12' } });
+    fireEvent.change(screen.getByTestId('wholesale-packs-input-beer-1'), {
+      target: { value: '12' },
+    });
     const quote = screen.getByTestId('wholesale-quote-beer-1');
     expect(quote.textContent).toContain('12 × 24 ×');
     // El total se muestra con formatCurrency (compacto "190 080" — sin coma).
@@ -255,7 +284,11 @@ describe('WholesalePage — Ventas Mayoristas', () => {
   });
 
   it('no agrega nada con paquetes vacíos o 0', async () => {
-    render(<Wrapper><WholesalePage /></Wrapper>);
+    render(
+      <Wrapper>
+        <WholesalePage />
+      </Wrapper>,
+    );
     await waitFor(() => expect(screen.getByText('Cerveza')).toBeInTheDocument());
     fireEvent.click(screen.getByTestId('wholesale-add-beer-1'));
     expect(addItemMock).not.toHaveBeenCalled();
@@ -271,10 +304,16 @@ describe('WholesalePage — Ventas Mayoristas', () => {
         wholesaleTiers: [{ minPacks: 5, pricePerUnit: 680 }],
       }),
     ];
-    render(<Wrapper><WholesalePage /></Wrapper>);
+    render(
+      <Wrapper>
+        <WholesalePage />
+      </Wrapper>,
+    );
     await waitFor(() => expect(screen.getByText('Cerveza')).toBeInTheDocument());
 
-    fireEvent.change(screen.getByTestId('wholesale-packs-input-beer-1'), { target: { value: '3' } });
+    fireEvent.change(screen.getByTestId('wholesale-packs-input-beer-1'), {
+      target: { value: '3' },
+    });
     fireEvent.click(screen.getByTestId('wholesale-add-beer-1'));
 
     expect(addItemMock).not.toHaveBeenCalled();
@@ -296,7 +335,11 @@ describe('WholesalePage — Ventas Mayoristas', () => {
         wholesaleTiers: [{ minPacks: 1, pricePerUnit: 680 }],
       }),
     ];
-    render(<Wrapper><WholesalePage /></Wrapper>);
+    render(
+      <Wrapper>
+        <WholesalePage />
+      </Wrapper>,
+    );
     await waitFor(() => expect(screen.getByText('Cerveza')).toBeInTheDocument());
     expect(screen.getByText(/96/)).toBeInTheDocument();
   });
@@ -313,7 +356,11 @@ describe('WholesalePage — Ventas Mayoristas', () => {
         wholesaleTiers: [{ minPacks: 1, pricePerUnit: 680 }],
       }),
     ];
-    render(<Wrapper><WholesalePage /></Wrapper>);
+    render(
+      <Wrapper>
+        <WholesalePage />
+      </Wrapper>,
+    );
     await waitFor(() => expect(screen.getByText('Cerveza')).toBeInTheDocument());
     expect(screen.queryByText(/96/)).not.toBeInTheDocument();
   });
@@ -330,7 +377,11 @@ describe('WholesalePage — Ventas Mayoristas', () => {
         ],
       }),
     ];
-    render(<Wrapper><WholesalePage /></Wrapper>);
+    render(
+      <Wrapper>
+        <WholesalePage />
+      </Wrapper>,
+    );
     await waitFor(() => expect(screen.getByText('Cerveza')).toBeInTheDocument());
 
     fireEvent.click(screen.getByTestId('wholesale-tiers-info-beer-1'));
@@ -352,10 +403,16 @@ describe('WholesalePage — Ventas Mayoristas', () => {
         wholesaleTiers: [{ minPacks: 5, pricePerUnit: 680 }],
       }),
     ];
-    render(<Wrapper><WholesalePage /></Wrapper>);
+    render(
+      <Wrapper>
+        <WholesalePage />
+      </Wrapper>,
+    );
     await waitFor(() => expect(screen.getByText('Cerveza')).toBeInTheDocument());
 
-    fireEvent.change(screen.getByTestId('wholesale-packs-input-beer-1'), { target: { value: '5' } });
+    fireEvent.change(screen.getByTestId('wholesale-packs-input-beer-1'), {
+      target: { value: '5' },
+    });
     fireEvent.click(screen.getByTestId('wholesale-add-beer-1'));
 
     expect(addItemMock).toHaveBeenCalledWith(
@@ -374,7 +431,12 @@ describe('WholesalePage — Ventas Mayoristas', () => {
   it('filtra los productos por categoría seleccionada', async () => {
     mockCategories = [makeCategory(), makeCategory({ id: 'cat-2', name: 'Carnes' })];
     mockProducts = [
-      makeProduct('beer-1', { name: 'Cerveza Pilsen', wholesaleEnabled: true, wholesalePackSize: 24, wholesaleTiers: [{ minPacks: 1, pricePerUnit: 680 }] }),
+      makeProduct('beer-1', {
+        name: 'Cerveza Pilsen',
+        wholesaleEnabled: true,
+        wholesalePackSize: 24,
+        wholesaleTiers: [{ minPacks: 1, pricePerUnit: 680 }],
+      }),
       makeProduct('croq-1', {
         name: 'Croquetas',
         categoryId: 'cat-2',
@@ -383,7 +445,11 @@ describe('WholesalePage — Ventas Mayoristas', () => {
         wholesaleTiers: [{ minPacks: 1, pricePerUnit: 300 }],
       }),
     ];
-    render(<Wrapper><WholesalePage /></Wrapper>);
+    render(
+      <Wrapper>
+        <WholesalePage />
+      </Wrapper>,
+    );
     await waitFor(() => expect(screen.getByText('Cerveza Pilsen')).toBeInTheDocument());
     expect(screen.getByText('Croquetas')).toBeInTheDocument();
 
@@ -400,10 +466,24 @@ describe('WholesalePage — Ventas Mayoristas', () => {
 
   it('filtra los productos por nombre en el searchbox', async () => {
     mockProducts = [
-      makeProduct('beer-1', { name: 'Cerveza Nacional', wholesaleEnabled: true, wholesalePackSize: 24, wholesaleTiers: [{ minPacks: 1, pricePerUnit: 680 }] }),
-      makeProduct('wine-1', { name: 'Vino Tinto', wholesaleEnabled: true, wholesalePackSize: 6, wholesaleTiers: [{ minPacks: 1, pricePerUnit: 1200 }] }),
+      makeProduct('beer-1', {
+        name: 'Cerveza Nacional',
+        wholesaleEnabled: true,
+        wholesalePackSize: 24,
+        wholesaleTiers: [{ minPacks: 1, pricePerUnit: 680 }],
+      }),
+      makeProduct('wine-1', {
+        name: 'Vino Tinto',
+        wholesaleEnabled: true,
+        wholesalePackSize: 6,
+        wholesaleTiers: [{ minPacks: 1, pricePerUnit: 1200 }],
+      }),
     ];
-    render(<Wrapper><WholesalePage /></Wrapper>);
+    render(
+      <Wrapper>
+        <WholesalePage />
+      </Wrapper>,
+    );
     await waitFor(() => expect(screen.getByText('Cerveza Nacional')).toBeInTheDocument());
     expect(screen.getByText('Vino Tinto')).toBeInTheDocument();
 
@@ -426,7 +506,11 @@ describe('WholesalePage — Ventas Mayoristas', () => {
         wholesaleTiers: [{ minPacks: 1, pricePerUnit: 680 }],
       }),
     ];
-    render(<Wrapper><WholesalePage /></Wrapper>);
+    render(
+      <Wrapper>
+        <WholesalePage />
+      </Wrapper>,
+    );
     await waitFor(() => expect(screen.getByText('Cerveza')).toBeInTheDocument());
 
     // El label del input de packs es la unidad del producto con el packSize:
@@ -449,7 +533,11 @@ describe('WholesalePage — Ventas Mayoristas', () => {
         wholesaleTiers: [{ minPacks: 1, pricePerUnit: 300 }],
       }),
     ];
-    render(<Wrapper><WholesalePage /></Wrapper>);
+    render(
+      <Wrapper>
+        <WholesalePage />
+      </Wrapper>,
+    );
     await waitFor(() => expect(screen.getByText('Croquetas')).toBeInTheDocument());
 
     expect(screen.getByText('paquete (10)')).toBeInTheDocument();
@@ -469,10 +557,16 @@ describe('WholesalePage — Ventas Mayoristas', () => {
         wholesaleTiers: [{ minPacks: 6, pricePerUnit: 680 }],
       }),
     ];
-    render(<Wrapper><WholesalePage /></Wrapper>);
+    render(
+      <Wrapper>
+        <WholesalePage />
+      </Wrapper>,
+    );
     await waitFor(() => expect(screen.getByText('Cerveza')).toBeInTheDocument());
 
-    fireEvent.change(screen.getByTestId('wholesale-packs-input-beer-1'), { target: { value: '3' } });
+    fireEvent.change(screen.getByTestId('wholesale-packs-input-beer-1'), {
+      target: { value: '3' },
+    });
     fireEvent.click(screen.getByTestId('wholesale-add-beer-1'));
 
     const message = showBlockingErrorMock.mock.calls[0]?.[1] ?? '';
@@ -499,7 +593,11 @@ describe('WholesalePage — Ventas Mayoristas', () => {
       }),
       makeProduct('pan-1', { name: 'Pan', categoryId: 'cat-2' }), // Carnes: sin mayorista
     ];
-    render(<Wrapper><WholesalePage /></Wrapper>);
+    render(
+      <Wrapper>
+        <WholesalePage />
+      </Wrapper>,
+    );
     await waitFor(() => expect(screen.getByText('Cerveza')).toBeInTheDocument());
 
     expect(screen.getByTestId('wholesale-category-cat-1')).toBeInTheDocument();
@@ -507,16 +605,26 @@ describe('WholesalePage — Ventas Mayoristas', () => {
   });
 
   it('mantiene el orden de la venta: buscador arriba, tabs de categorías debajo', async () => {
-    render(<Wrapper><WholesalePage /></Wrapper>);
+    render(
+      <Wrapper>
+        <WholesalePage />
+      </Wrapper>,
+    );
     await waitFor(() => expect(screen.getByText('Cerveza')).toBeInTheDocument());
 
     const search = screen.getByTestId('wholesale-search-input');
     const firstTab = screen.getByTestId('wholesale-category-all');
-    expect(search.compareDocumentPosition(firstTab) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(
+      search.compareDocumentPosition(firstTab) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 
   it('el botón de agregar es el icono del carrito, sin texto', async () => {
-    render(<Wrapper><WholesalePage /></Wrapper>);
+    render(
+      <Wrapper>
+        <WholesalePage />
+      </Wrapper>,
+    );
     await waitFor(() => expect(screen.getByText('Cerveza')).toBeInTheDocument());
 
     const add = screen.getByTestId('wholesale-add-beer-1');
@@ -541,10 +649,16 @@ describe('WholesalePage — Ventas Mayoristas', () => {
         wholesaleTiers: [{ minPacks: 1, pricePerUnit: 680 }],
       }),
     ];
-    render(<Wrapper><WholesalePage /></Wrapper>);
+    render(
+      <Wrapper>
+        <WholesalePage />
+      </Wrapper>,
+    );
     await waitFor(() => expect(screen.getByText('Cerveza')).toBeInTheDocument());
 
-    fireEvent.change(screen.getByTestId('wholesale-packs-input-beer-1'), { target: { value: '12' } });
+    fireEvent.change(screen.getByTestId('wholesale-packs-input-beer-1'), {
+      target: { value: '12' },
+    });
     fireEvent.click(screen.getByTestId('wholesale-add-beer-1'));
 
     expect(addItemMock).not.toHaveBeenCalled();
@@ -565,10 +679,16 @@ describe('WholesalePage — Ventas Mayoristas', () => {
         wholesaleTiers: [{ minPacks: 1, pricePerUnit: 680 }],
       }),
     ];
-    render(<Wrapper><WholesalePage /></Wrapper>);
+    render(
+      <Wrapper>
+        <WholesalePage />
+      </Wrapper>,
+    );
     await waitFor(() => expect(screen.getByText('Cerveza')).toBeInTheDocument());
 
-    fireEvent.change(screen.getByTestId('wholesale-packs-input-beer-1'), { target: { value: '12' } });
+    fireEvent.change(screen.getByTestId('wholesale-packs-input-beer-1'), {
+      target: { value: '12' },
+    });
     fireEvent.click(screen.getByTestId('wholesale-add-beer-1'));
 
     expect(showBlockingErrorMock).not.toHaveBeenCalled();
@@ -588,11 +708,17 @@ describe('WholesalePage — Ventas Mayoristas', () => {
         wholesaleTiers: [{ minPacks: 1, pricePerUnit: 680 }],
       }),
     ];
-    render(<Wrapper><WholesalePage /></Wrapper>);
+    render(
+      <Wrapper>
+        <WholesalePage />
+      </Wrapper>,
+    );
     await waitFor(() => expect(screen.getByText('Cerveza')).toBeInTheDocument());
 
     // 12 packs × 24 = 288 unidades pedidas, solo 40 disponibles → faltan 248.
-    fireEvent.change(screen.getByTestId('wholesale-packs-input-beer-1'), { target: { value: '12' } });
+    fireEvent.change(screen.getByTestId('wholesale-packs-input-beer-1'), {
+      target: { value: '12' },
+    });
     fireEvent.click(screen.getByTestId('wholesale-add-beer-1'));
 
     expect(showBlockingErrorMock).toHaveBeenCalledTimes(1);
@@ -610,7 +736,11 @@ describe('WholesalePage — Ventas Mayoristas', () => {
   // ═══════════════════════════════════════════════════════════════════════════
 
   it('renderiza el botón del scanner junto al searchbox y abre el modal', async () => {
-    render(<Wrapper><WholesalePage /></Wrapper>);
+    render(
+      <Wrapper>
+        <WholesalePage />
+      </Wrapper>,
+    );
     await waitFor(() => expect(screen.getByText('Cerveza')).toBeInTheDocument());
 
     const scannerButton = screen.getByTestId('wholesale-scanner');
@@ -633,7 +763,11 @@ describe('WholesalePage — Ventas Mayoristas', () => {
   }
 
   it('scanner: barcode desconocido muestra PRODUCT_NOT_FOUND y no agrega nada', async () => {
-    render(<Wrapper><WholesalePage /></Wrapper>);
+    render(
+      <Wrapper>
+        <WholesalePage />
+      </Wrapper>,
+    );
     await waitFor(() => expect(screen.getByText('Cerveza')).toBeInTheDocument());
 
     fireEvent.click(screen.getByTestId('wholesale-scanner'));
@@ -657,7 +791,11 @@ describe('WholesalePage — Ventas Mayoristas', () => {
       ],
     });
     mockProducts = [mockBarcodeProduct];
-    render(<Wrapper><WholesalePage /></Wrapper>);
+    render(
+      <Wrapper>
+        <WholesalePage />
+      </Wrapper>,
+    );
     await waitFor(() => expect(screen.getByText('Cerveza')).toBeInTheDocument());
 
     fireEvent.click(screen.getByTestId('wholesale-scanner'));
@@ -682,7 +820,11 @@ describe('WholesalePage — Ventas Mayoristas', () => {
       wholesaleTiers: [{ minPacks: 5, pricePerUnit: 680 }],
     });
     mockProducts = [mockBarcodeProduct];
-    render(<Wrapper><WholesalePage /></Wrapper>);
+    render(
+      <Wrapper>
+        <WholesalePage />
+      </Wrapper>,
+    );
     await waitFor(() => expect(screen.getByText('Cerveza')).toBeInTheDocument());
 
     fireEvent.click(screen.getByTestId('wholesale-scanner'));
@@ -704,7 +846,11 @@ describe('WholesalePage — Ventas Mayoristas', () => {
       barcode: '7502',
       availableToSale: true,
     });
-    render(<Wrapper><WholesalePage /></Wrapper>);
+    render(
+      <Wrapper>
+        <WholesalePage />
+      </Wrapper>,
+    );
     await waitFor(() => expect(screen.getByText('Cerveza')).toBeInTheDocument());
 
     fireEvent.click(screen.getByTestId('wholesale-scanner'));
@@ -727,7 +873,11 @@ describe('WholesalePage — Ventas Mayoristas', () => {
       wholesaleTiers: [{ minPacks: 1, pricePerUnit: 680 }],
     });
     mockProducts = [mockBarcodeProduct];
-    render(<Wrapper><WholesalePage /></Wrapper>);
+    render(
+      <Wrapper>
+        <WholesalePage />
+      </Wrapper>,
+    );
     await waitFor(() => expect(screen.getByText('Cerveza')).toBeInTheDocument());
 
     fireEvent.click(screen.getByTestId('wholesale-scanner'));
@@ -753,7 +903,11 @@ describe('WholesalePage — Ventas Mayoristas', () => {
       wholesaleTiers: [{ minPacks: 5, pricePerUnit: 680 }], // 5×24=120 > 40
     });
     mockProducts = [mockBarcodeProduct];
-    render(<Wrapper><WholesalePage /></Wrapper>);
+    render(
+      <Wrapper>
+        <WholesalePage />
+      </Wrapper>,
+    );
     await waitFor(() => expect(screen.getByText('Cerveza')).toBeInTheDocument());
 
     fireEvent.click(screen.getByTestId('wholesale-scanner'));
@@ -770,7 +924,12 @@ describe('WholesalePage — Ventas Mayoristas', () => {
   it('la búsqueda con el switch "Todos" ON recorre productos de todas las categorías', async () => {
     mockCategories = [makeCategory(), makeCategory({ id: 'cat-2', name: 'Carnes' })];
     mockProducts = [
-      makeProduct('beer-1', { name: 'Cerveza Pilsen', wholesaleEnabled: true, wholesalePackSize: 24, wholesaleTiers: [{ minPacks: 1, pricePerUnit: 680 }] }),
+      makeProduct('beer-1', {
+        name: 'Cerveza Pilsen',
+        wholesaleEnabled: true,
+        wholesalePackSize: 24,
+        wholesaleTiers: [{ minPacks: 1, pricePerUnit: 680 }],
+      }),
       makeProduct('croq-1', {
         name: 'Croquetas',
         categoryId: 'cat-2',
@@ -779,7 +938,11 @@ describe('WholesalePage — Ventas Mayoristas', () => {
         wholesaleTiers: [{ minPacks: 1, pricePerUnit: 300 }],
       }),
     ];
-    render(<Wrapper><WholesalePage /></Wrapper>);
+    render(
+      <Wrapper>
+        <WholesalePage />
+      </Wrapper>,
+    );
     await waitFor(() => expect(screen.getByText('Cerveza Pilsen')).toBeInTheDocument());
 
     // Seleccionar la pestaña Carnes (solo Croquetas visibles)…
@@ -797,7 +960,12 @@ describe('WholesalePage — Ventas Mayoristas', () => {
   it('la búsqueda con el switch "Todos" OFF se restringe a la categoría seleccionada', async () => {
     mockCategories = [makeCategory(), makeCategory({ id: 'cat-2', name: 'Carnes' })];
     mockProducts = [
-      makeProduct('beer-1', { name: 'Cerveza Pilsen', wholesaleEnabled: true, wholesalePackSize: 24, wholesaleTiers: [{ minPacks: 1, pricePerUnit: 680 }] }),
+      makeProduct('beer-1', {
+        name: 'Cerveza Pilsen',
+        wholesaleEnabled: true,
+        wholesalePackSize: 24,
+        wholesaleTiers: [{ minPacks: 1, pricePerUnit: 680 }],
+      }),
       makeProduct('croq-1', {
         name: 'Croquetas',
         categoryId: 'cat-2',
@@ -806,7 +974,11 @@ describe('WholesalePage — Ventas Mayoristas', () => {
         wholesaleTiers: [{ minPacks: 1, pricePerUnit: 300 }],
       }),
     ];
-    render(<Wrapper><WholesalePage /></Wrapper>);
+    render(
+      <Wrapper>
+        <WholesalePage />
+      </Wrapper>,
+    );
     await waitFor(() => expect(screen.getByText('Cerveza Pilsen')).toBeInTheDocument());
 
     // Seleccionar Carnes y apagar "Todos": la búsqueda "pilsen" ya no encuentra
@@ -816,7 +988,9 @@ describe('WholesalePage — Ventas Mayoristas', () => {
     fireEvent.change(screen.getByTestId('wholesale-search-input'), { target: { value: 'pilsen' } });
     await waitFor(() => expect(screen.queryByText('Cerveza Pilsen')).not.toBeInTheDocument());
 
-    fireEvent.change(screen.getByTestId('wholesale-search-input'), { target: { value: 'croquetas' } });
+    fireEvent.change(screen.getByTestId('wholesale-search-input'), {
+      target: { value: 'croquetas' },
+    });
     expect(screen.getByText('Croquetas')).toBeInTheDocument();
   });
 });

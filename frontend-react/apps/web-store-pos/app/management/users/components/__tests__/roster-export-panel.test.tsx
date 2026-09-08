@@ -55,11 +55,20 @@ describe('RosterExportPanel — offline-device-provisioning "Admin export action
 
   it('enables the export action when online and storeId is set', () => {
     renderPanel();
-    expect(screen.getByRole('button', { name: /exportar roster sin conexión/i })).not.toBeDisabled();
+    expect(
+      screen.getByRole('button', { name: /exportar roster sin conexión/i }),
+    ).not.toBeDisabled();
   });
 
   it('fetches the roster and serializes it into a bundle on confirm', async () => {
-    const bundle = { bundleId: 'b1', issuedAt: 1, expiresAt: 2, formatVersion: 1, storeId: 's1', users: [] };
+    const bundle = {
+      bundleId: 'b1',
+      issuedAt: 1,
+      expiresAt: 2,
+      formatVersion: 1,
+      storeId: 's1',
+      users: [],
+    };
     getOfflineRosterMock.mockResolvedValue(bundle);
     serializeRosterMock.mockResolvedValue(new Uint8Array([1, 2, 3]));
 
@@ -78,7 +87,14 @@ describe('RosterExportPanel — offline-device-provisioning "Admin export action
   // the fetched bundle to serializeRoster verbatim, regardless of its
   // formatVersion — same case as above with a v2 bundle.
   it('fetches and serializes a v2 bundle the same way (WU14 regression coverage)', async () => {
-    const bundle = { bundleId: 'b1', issuedAt: 1, expiresAt: 2, formatVersion: 2, storeId: 's1', users: [] };
+    const bundle = {
+      bundleId: 'b1',
+      issuedAt: 1,
+      expiresAt: 2,
+      formatVersion: 2,
+      storeId: 's1',
+      users: [],
+    };
     getOfflineRosterMock.mockResolvedValue(bundle);
     serializeRosterMock.mockResolvedValue(new Uint8Array([1, 2, 3]));
 

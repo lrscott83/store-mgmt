@@ -51,14 +51,10 @@ export function EntryList({
         <tbody>
           {entries.map((entry) => (
             <tr key={entry.id} className="hover:bg-background">
-              <td className="p-2 font-medium text-text">
-                {entry.productName || entry.productId}
-              </td>
+              <td className="p-2 font-medium text-text">{entry.productName || entry.productId}</td>
               <td className="p-2 text-right text-text-muted">{entry.quantity}</td>
               {isOwnerAdmin && (
-                <td className="p-2 text-right text-success">
-                  {formatCurrency(entry.costPrice)}
-                </td>
+                <td className="p-2 text-right text-success">{formatCurrency(entry.costPrice)}</td>
               )}
               {showActions && (
                 <td className="p-2 text-right">
@@ -66,7 +62,11 @@ export function EntryList({
                     <ActionMenuItem intent="edit" onClick={() => onEdit?.(entry)}>
                       {intl.formatMessage({ id: 'GENERAL.EDIT' })}
                     </ActionMenuItem>
-                    <ActionMenuItem intent="delete" separatorBefore onClick={() => onDeactivate?.(entry)}>
+                    <ActionMenuItem
+                      intent="delete"
+                      separatorBefore
+                      onClick={() => onDeactivate?.(entry)}
+                    >
                       {/* CRITICAL bug fix (Angular parity: entry-list.component.html:36
                           GENERAL.DELETE) — was wrongly wired to ORDERS.DEACTIVATE
                           ("Anular pedido"), the cancel-order label, not delete-entry. */}

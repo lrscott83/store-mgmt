@@ -19,10 +19,11 @@ interface EditOrderModalProps {
 // Angular's PaymentTypeUtils.getPaymentTypes() maps enum keys to labels as-is
 // (no translation applied in the template) — keep the raw Spanish-adjacent
 // enum member names, same as sale-credit-payment-modal / order-list precedent.
+// Zelle removed from the options (user request 2026-09-08) — the enum member
+// stays and existing Zelle orders still display their label.
 const PAYMENT_OPTIONS = [
   { value: PaymentType.Efectivo, label: 'Efectivo' },
   { value: PaymentType.Tarjeta, label: 'Tarjeta' },
-  { value: PaymentType.Zelle, label: 'Zelle' },
 ];
 
 /**
@@ -34,7 +35,9 @@ const PAYMENT_OPTIONS = [
  */
 export function EditOrderModal({ order, isOpen, onClose, onUpdate }: EditOrderModalProps) {
   const intl = useIntl();
-  const [paymentType, setPaymentType] = useState<PaymentType>(order.paymentType ?? PaymentType.Efectivo);
+  const [paymentType, setPaymentType] = useState<PaymentType>(
+    order.paymentType ?? PaymentType.Efectivo,
+  );
 
   if (!isOpen) return null;
 

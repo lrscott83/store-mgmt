@@ -2,14 +2,14 @@
 
 ## Review Workload Forecast
 
-| Field | Value |
-|-------|-------|
-| Estimated changed lines | ~150–200 |
-| 400-line budget risk | Low |
-| Chained PRs recommended | No |
-| Suggested split | Single work unit |
-| Delivery strategy | local-branch-only |
-| Chain strategy | N/A |
+| Field                   | Value             |
+| ----------------------- | ----------------- |
+| Estimated changed lines | ~150–200          |
+| 400-line budget risk    | Low               |
+| Chained PRs recommended | No                |
+| Suggested split         | Single work unit  |
+| Delivery strategy       | local-branch-only |
+| Chain strategy          | N/A               |
 
 Decision needed before apply: No
 Chained PRs recommended: No
@@ -18,9 +18,9 @@ Chain strategy: N/A
 
 ### Suggested Work Units
 
-| Unit | Goal | Likely PR | Notes |
-|------|------|-----------|-------|
-| 1 | Full admin/features slice (service + route + loader + i18n) | Single local commit | All tests must RED→GREEN before wiring |
+| Unit | Goal                                                        | Likely PR           | Notes                                  |
+| ---- | ----------------------------------------------------------- | ------------------- | -------------------------------------- |
+| 1    | Full admin/features slice (service + route + loader + i18n) | Single local commit | All tests must RED→GREEN before wiring |
 
 ---
 

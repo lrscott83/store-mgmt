@@ -37,12 +37,16 @@ test.describe.serial('CSV import shared categories regression', () => {
   test.describe.configure({ timeout: 180_000 });
   test.use({ persona: 'owner-admin' });
 
-  test('3 products with the same category in one CSV import all succeed', async ({ signedInPage }) => {
+  test('3 products with the same category in one CSV import all succeed', async ({
+    signedInPage,
+  }) => {
     const { page } = signedInPage;
     // Use unique timestamp to avoid collision with prior test runs
-    const cat = `RgCat${Date.now()}`
-    const csv = await createCsvFile('reg_shared.csv',
-      `category,name,price,cost,quantity\n${cat},ProductA,10,5,1\n${cat},ProductB,20,5,2\n${cat},ProductC,30,5,3`);
+    const cat = `RgCat${Date.now()}`;
+    const csv = await createCsvFile(
+      'reg_shared.csv',
+      `category,name,price,cost,quantity\n${cat},ProductA,10,5,1\n${cat},ProductB,20,5,2\n${cat},ProductC,30,5,3`,
+    );
     await importCsvAndWait(page, csv);
 
     // Category should exist once (not duplicated)
@@ -59,18 +63,24 @@ test.describe.serial('CSV import shared categories regression', () => {
     await expect(page.getByText('ProductC')).toBeVisible();
   });
 
-  test('adding another product to the same category via second import', async ({ signedInPage }) => {
+  test('adding another product to the same category via second import', async ({
+    signedInPage,
+  }) => {
     const { page } = signedInPage;
     const cat = `RgSeq${Date.now()}`;
 
     // First import creates the category with one product
-    const csv1 = await createCsvFile('reg_seq_a.csv',
-      `category,name,price,cost,quantity\n${cat},FirstItem,10,5,1`);
+    const csv1 = await createCsvFile(
+      'reg_seq_a.csv',
+      `category,name,price,cost,quantity\n${cat},FirstItem,10,5,1`,
+    );
     await importCsvAndWait(page, csv1);
 
     // Second import adds another product to the same category
-    const csv2 = await createCsvFile('reg_seq_b.csv',
-      `category,name,price,cost,quantity\n${cat},SecondItem,20,5,2`);
+    const csv2 = await createCsvFile(
+      'reg_seq_b.csv',
+      `category,name,price,cost,quantity\n${cat},SecondItem,20,5,2`,
+    );
     await importCsvAndWait(page, csv2);
 
     // Category exists once

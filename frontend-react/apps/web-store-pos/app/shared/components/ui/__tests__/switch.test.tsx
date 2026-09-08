@@ -15,7 +15,10 @@ describe('Switch', () => {
 
   it('reports unchecked via aria-checked=false', () => {
     render(<Switch checked={false} label="Crédito" onChange={() => {}} />);
-    expect(screen.getByRole('switch', { name: 'Crédito' })).toHaveAttribute('aria-checked', 'false');
+    expect(screen.getByRole('switch', { name: 'Crédito' })).toHaveAttribute(
+      'aria-checked',
+      'false',
+    );
   });
 
   it('calls onChange with the toggled value when clicked', () => {

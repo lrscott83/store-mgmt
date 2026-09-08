@@ -65,7 +65,11 @@ function seedCategories(categories: ProductCategory[]): void {
   localStorage.setItem(`lizoft.store-product-categories-${storeId}`, JSON.stringify(entries));
 }
 
-function makeEntry(id: string, productId: string, overrides: Partial<InventoryEntry> = {}): InventoryEntry {
+function makeEntry(
+  id: string,
+  productId: string,
+  overrides: Partial<InventoryEntry> = {},
+): InventoryEntry {
   return {
     id,
     productId,
@@ -83,7 +87,10 @@ function makeEntry(id: string, productId: string, overrides: Partial<InventoryEn
 }
 
 function seedInventory(map: Map<string, InventoryEntry[]>): void {
-  localStorage.setItem(`lizoft.store-inventory-entries-${storeId}`, JSON.stringify(Array.from(map.entries())));
+  localStorage.setItem(
+    `lizoft.store-inventory-entries-${storeId}`,
+    JSON.stringify(Array.from(map.entries())),
+  );
 }
 
 function Wrapper({ children }: { children: React.ReactNode }) {
@@ -175,7 +182,9 @@ describe('TodayReportPage — Generar Reporte PDF export button', () => {
 
     expect(button).toBeInTheDocument();
     // DOCUMENT_POSITION_FOLLOWING (4) means salesSummaryHeading comes AFTER button.
-    expect(button.compareDocumentPosition(salesSummaryHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(
+      button.compareDocumentPosition(salesSummaryHeading) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 
   it('keeps the existing sales-summary dashboard section unchanged alongside the new button', () => {
@@ -192,7 +201,9 @@ describe('TodayReportPage — Generar Reporte PDF export button', () => {
   it('activating the button builds rows from real offline data and invokes the PDF export with them', async () => {
     seedProducts([makeProduct('p1', { name: 'Coca Cola 500ml', categoryId: 'cat-1' })]);
     seedCategories([makeCategory('cat-1', { name: 'Bebidas' })]);
-    seedInventory(new Map([['p1', [makeEntry('e1', 'p1', { available: 5, quantity: 5, costPrice: 2 })]]]));
+    seedInventory(
+      new Map([['p1', [makeEntry('e1', 'p1', { available: 5, quantity: 5, costPrice: 2 })]]]),
+    );
 
     render(
       <Wrapper>

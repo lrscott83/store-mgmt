@@ -24,17 +24,17 @@ Shared logic belongs in packages. Application code must never be duplicated acro
 
 ## Technology Stack
 
-| Layer | Technology | Version |
-|-------|-----------|---------|
-| Runtime | Node.js | >= 22 |
-| Package manager | pnpm | 10.33+ |
-| Monorepo orchestrator | Turborepo | 2.8+ |
-| Language | TypeScript (strict) | 5.8.3 |
-| UI library | React | 19.x |
-| Routing / SSR | React Router v7 (framework mode) | 7.15+ |
-| Bundler | Vite | 6.x |
-| CSS | Tailwind CSS v4 (Vite plugin) | 4.x |
-| Linter | ESLint v9 (flat config) + Prettier | 9.x / 3.6+ |
+| Layer                 | Technology                         | Version    |
+| --------------------- | ---------------------------------- | ---------- |
+| Runtime               | Node.js                            | >= 22      |
+| Package manager       | pnpm                               | 10.33+     |
+| Monorepo orchestrator | Turborepo                          | 2.8+       |
+| Language              | TypeScript (strict)                | 5.8.3      |
+| UI library            | React                              | 19.x       |
+| Routing / SSR         | React Router v7 (framework mode)   | 7.15+      |
+| Bundler               | Vite                               | 6.x        |
+| CSS                   | Tailwind CSS v4 (Vite plugin)      | 4.x        |
+| Linter                | ESLint v9 (flat config) + Prettier | 9.x / 3.6+ |
 
 ## Build / Dev / Test Commands
 
@@ -137,13 +137,13 @@ Mobile-first responsive design using Tailwind breakpoints.
 
 Loaded from monorepo root. Allowed prefixes:
 
-| Prefix | Purpose |
-|--------|---------|
-| `VITE_` | Client-side visible vars |
-| `API_` | API endpoint configuration |
-| `SESSION_` | Session management |
-| `NODE_` | Node environment |
-| `APP_` | App metadata (version) |
+| Prefix     | Purpose                    |
+| ---------- | -------------------------- |
+| `VITE_`    | Client-side visible vars   |
+| `API_`     | API endpoint configuration |
+| `SESSION_` | Session management         |
+| `NODE_`    | Node environment           |
+| `APP_`     | App metadata (version)     |
 
 Turbo passes through: `NODE_ENV`, `APP_VERSION`, `API_URL`, `SESSION_SECRET`, `SESSION_DOMAIN`.
 

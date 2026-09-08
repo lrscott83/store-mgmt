@@ -32,9 +32,7 @@ describe('ExportForm — S-EXPORT-1: empty password blocked', () => {
       </Wrapper>,
     );
     fireEvent.click(screen.getByRole('button', { name: /exportar/i }));
-    expect(
-      screen.getByText(/La contraseña no puede estar vacía/i),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/La contraseña no puede estar vacía/i)).toBeInTheDocument();
   });
 });
 
@@ -193,9 +191,7 @@ describe('ExportForm — S-EXPORT-4: loading state (button disabled, label uncha
     });
     fireEvent.click(screen.getByRole('button', { name: /exportar/i }));
 
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: /exportar/i })).toBeDisabled(),
-    );
+    await waitFor(() => expect(screen.getByRole('button', { name: /exportar/i })).toBeDisabled());
 
     await act(async () => {
       resolveExport(new Uint8Array([1, 2, 3]));

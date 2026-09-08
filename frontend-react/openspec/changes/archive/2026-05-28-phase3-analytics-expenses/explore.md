@@ -32,6 +32,7 @@ Two routes: `/expenses/today` (EFeatures.TodayExpenses=80) and `/expenses/expens
 - `history`: filter by date range and expense type, paginated list, total for filtered set.
 
 **Ambiguities:**
+
 1. Edit from history: PRD section 4.2 says "does not allow adding new expenses (read + edit only from history)" — contradictory wording. Is edit allowed from history? Must be resolved before proposal.
 2. Delete from history: not mentioned. Likely intentional (only today's entries are deletable). Needs confirmation.
 3. Pagination: PRD says "pagination or virtual scrolling" — which is preferred? Virtual scroll adds complexity; simple pagination recommended.
@@ -42,12 +43,14 @@ Two routes: `/expenses/today` (EFeatures.TodayExpenses=80) and `/expenses/expens
 Single route: `/reports/today` (EFeatures.TodayReports=50). Reads products, inventory-entries, and orders from localStorage.
 
 **Overlap with existing inventory routes:**
+
 - `today-quantities.tsx` (Inventory module) shows per-product entered/sold/egressed/net-change for today — overlaps with Reports "Inventory Status" section.
 - `today-sales-profit.tsx` (Inventory module) shows per-product revenue/cost/profit/margin — overlaps with Reports "Sales Summary."
 - BUT: Reports is a separate module (Reports=5 vs Inventory=3), different feature IDs, combined single-page layout. The two inventory routes stay as-is. Reports re-implements similar aggregations in a unified layout for the Reports module.
 - Key difference: Inventory profit route filters by `discountFromInvantory`; Reports aggregates ALL orders.
 
 **Ambiguities:**
+
 1. `product.availableQuantity` referenced in PRD does not exist on the `Product` domain model (only `availableToSale: boolean` exists). "Current available" must mean sum of `InventoryEntry.available` per product from `InventoryOfflineService`. Proposal must clarify.
 2. "Updates automatically" — since all data is localStorage + `useEffect`, updates only happen on mount. Proposal must define: mount-only, manual refresh button, or polling interval.
 3. Order status filter: `Order.isActive` = true is the "completed" proxy. No separate status enum exists. Consistent with existing code.
@@ -59,6 +62,7 @@ Single route: `/statistics/dashboard` (EFeatures.Dashboard=60). Two chart compon
 **Critical discrepancy:** PRD says route path is `/statistics/dashboard` but `menu-config.ts` has it as `/stats/dashboard`. Must be reconciled.
 
 **Ambiguities:**
+
 1. Route path: `/statistics/dashboard` (PRD) vs `/stats/dashboard` (menu-config). Pick one before proposal.
 2. Cost source for profit: PRD says "look up cost from InventoryEntries" but `calculateOrderProfit(orderItem)` already uses `orderItem.productCosts` (FIFO cost baked in at order creation). The correct approach is to use `calculateOrderProfit` — re-reading InventoryEntries would give wrong results for historical data where stock has been partially depleted.
 3. Sales chart Y-axis: PRD says "order count OR total revenue" — must pick a primary metric.
@@ -68,31 +72,31 @@ Single route: `/statistics/dashboard` (EFeatures.Dashboard=60). Two chart compon
 
 ## Affected Areas
 
-| File/Path | Reason |
-|---|---|
-| `apps/web-store-pos/app/routes.ts` | Add expenses/reports/statistics routes |
-| `apps/web-store-pos/app/shared/lib/config/menu-config.ts` | Add ExpensesHistory item; fix Statistics path |
-| `apps/web-store-pos/app/shared/lib/i18n/es.ts` | Add feature-specific i18n keys for all 3 modules |
-| `apps/web-store-pos/app/expenses/` | New feature folder (routes, components, lib/services) |
-| `apps/web-store-pos/app/reports/` | New feature folder (routes only — aggregates from existing services) |
-| `apps/web-store-pos/app/statistics/` | New feature folder (routes, components with charts, lib/services) |
-| `packages/domain/src/` | No new models needed — Expense is complete, all enums complete |
-| `apps/web-store-pos/package.json` | Add `recharts` dependency |
+| File/Path                                                 | Reason                                                               |
+| --------------------------------------------------------- | -------------------------------------------------------------------- |
+| `apps/web-store-pos/app/routes.ts`                        | Add expenses/reports/statistics routes                               |
+| `apps/web-store-pos/app/shared/lib/config/menu-config.ts` | Add ExpensesHistory item; fix Statistics path                        |
+| `apps/web-store-pos/app/shared/lib/i18n/es.ts`            | Add feature-specific i18n keys for all 3 modules                     |
+| `apps/web-store-pos/app/expenses/`                        | New feature folder (routes, components, lib/services)                |
+| `apps/web-store-pos/app/reports/`                         | New feature folder (routes only — aggregates from existing services) |
+| `apps/web-store-pos/app/statistics/`                      | New feature folder (routes, components with charts, lib/services)    |
+| `packages/domain/src/`                                    | No new models needed — Expense is complete, all enums complete       |
+| `apps/web-store-pos/package.json`                         | Add `recharts` dependency                                            |
 
 ---
 
 ## Reuse Map
 
-| Existing Asset | Reused By | How |
-|---|---|---|
-| `BaseRepository<Expense>('expenses', ['date', 'createdDate', 'updatedDate'])` | `ExpenseOfflineService` | Thin wrapper, identical to orders/credits pattern |
-| `OrderOfflineService.getByDateRange(from, to)` | Reports, Statistics | Date-range filtering already implemented |
-| `OrderOfflineService.getActiveOrdersInDay(date)` | Reports | Direct call, same pattern as today-quantities |
-| `calculateOrderProfit(orderItem)` in `profit-calculator.ts` | Statistics profit chart, Reports | Call per orderItem across 30-day window |
-| `InventoryOfflineService.getByDate(date)` | Reports | Already implemented |
-| `featureLoader([EFeatures.X])` | All 3 new route modules | No changes needed |
-| `useAuthStore` selector for storeId | All new routes | Standard pattern |
-| `EFeatures.*` / `EModules.*` enum values | All new routes | Already defined, no domain rebuild needed |
+| Existing Asset                                                                | Reused By                        | How                                               |
+| ----------------------------------------------------------------------------- | -------------------------------- | ------------------------------------------------- |
+| `BaseRepository<Expense>('expenses', ['date', 'createdDate', 'updatedDate'])` | `ExpenseOfflineService`          | Thin wrapper, identical to orders/credits pattern |
+| `OrderOfflineService.getByDateRange(from, to)`                                | Reports, Statistics              | Date-range filtering already implemented          |
+| `OrderOfflineService.getActiveOrdersInDay(date)`                              | Reports                          | Direct call, same pattern as today-quantities     |
+| `calculateOrderProfit(orderItem)` in `profit-calculator.ts`                   | Statistics profit chart, Reports | Call per orderItem across 30-day window           |
+| `InventoryOfflineService.getByDate(date)`                                     | Reports                          | Already implemented                               |
+| `featureLoader([EFeatures.X])`                                                | All 3 new route modules          | No changes needed                                 |
+| `useAuthStore` selector for storeId                                           | All new routes                   | Standard pattern                                  |
+| `EFeatures.*` / `EModules.*` enum values                                      | All new routes                   | Already defined, no domain rebuild needed         |
 
 ---
 
@@ -127,6 +131,7 @@ Maintain a `daily-stats` key updated on every order save/cancel.
 **Hybrid: Approach A for Expenses + Approach B for Reports and Statistics.**
 
 Expenses is a simple CRUD module with trivial filtering — direct service calls in route components are fine and consistent. Reports and Statistics have non-trivial aggregation logic (30-day rollups, profit computation, payment-type breakdown, top-sellers) that is shared between the two modules. Extracting to aggregation services:
+
 1. Keeps route components thin (container-presentational convention).
 2. Makes aggregation logic independently testable — required by Strict TDD.
 3. Avoids duplicating the "group orders by day" loop.

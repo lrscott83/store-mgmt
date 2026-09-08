@@ -65,15 +65,15 @@ Angular `data[i] || 0`). Table shows categories with `0` until/while data is emp
 
 ## File Changes
 
-| File | Action | Description |
-|------|--------|-------------|
-| `apps/web-store-pos/app/admin/dashboard/lib/services/usage-http-service.ts` | Create | `usageHttpService` singleton: `getStoresLastWeek()`, `getStoresLastMonth()`; inline `StoreUsages` type |
-| `apps/web-store-pos/app/admin/dashboard/lib/services/__tests__/usage-http-service.test.ts` | Create | RED-first service tests |
-| `apps/web-store-pos/app/admin/dashboard/routes/dashboard.tsx` | Create | `AdminDashboardPage` (default + named), `loader = superAdminLoader`, pure `getDiasSemana`/`getDias30` |
-| `apps/web-store-pos/app/admin/dashboard/routes/__tests__/dashboard.test.tsx` | Create | RED-first container + helper tests |
-| `apps/web-store-pos/app/routes.ts` | Modify | Add `route('admin/dashboard', 'admin/dashboard/routes/dashboard.tsx')` under app-layout |
-| `apps/web-store-pos/app/shared/lib/i18n/es.ts` | Modify | Add 7 `ADMIN_DASHBOARD.*` keys (es only) |
-| `openspec/specs/admin/spec.md` | Modify (at archive) | Append admin-dashboard requirement |
+| File                                                                                       | Action              | Description                                                                                            |
+| ------------------------------------------------------------------------------------------ | ------------------- | ------------------------------------------------------------------------------------------------------ |
+| `apps/web-store-pos/app/admin/dashboard/lib/services/usage-http-service.ts`                | Create              | `usageHttpService` singleton: `getStoresLastWeek()`, `getStoresLastMonth()`; inline `StoreUsages` type |
+| `apps/web-store-pos/app/admin/dashboard/lib/services/__tests__/usage-http-service.test.ts` | Create              | RED-first service tests                                                                                |
+| `apps/web-store-pos/app/admin/dashboard/routes/dashboard.tsx`                              | Create              | `AdminDashboardPage` (default + named), `loader = superAdminLoader`, pure `getDiasSemana`/`getDias30`  |
+| `apps/web-store-pos/app/admin/dashboard/routes/__tests__/dashboard.test.tsx`               | Create              | RED-first container + helper tests                                                                     |
+| `apps/web-store-pos/app/routes.ts`                                                         | Modify              | Add `route('admin/dashboard', 'admin/dashboard/routes/dashboard.tsx')` under app-layout                |
+| `apps/web-store-pos/app/shared/lib/i18n/es.ts`                                             | Modify              | Add 7 `ADMIN_DASHBOARD.*` keys (es only)                                                               |
+| `openspec/specs/admin/spec.md`                                                             | Modify (at archive) | Append admin-dashboard requirement                                                                     |
 
 ## Interfaces / Contracts
 
@@ -102,11 +102,11 @@ Tiendas Activos", `.LAST_7_DAYS`="Últimos 7 días", `.LAST_30_DAYS`="Últimos 3
 
 ## Testing Strategy (STRICT TDD — RED first)
 
-| Layer | What to Test | Approach |
-|-------|--------------|----------|
-| Unit (helper) | `getDiasSemana` Mon-first order; Sunday edge (`new Date('2026-06-07')` Sun → ends 'Dom'); Monday (`'2026-06-01'` → ['Lun'..'Dom']); `getDias30` returns '1'..'30' | Inject fixed `Date`; assert array equality. Deterministic — no real clock |
-| Unit (service) | singleton exists; `getStoresLastWeek`/`getStoresLastMonth` call correct GET URL; return `response.data`; propagate throw | `vi.mock('~/shared/lib/http/api-client')`; mocks use `message:''`, `actionCode:0`, `errors:[]` (NON-nullable) |
-| Component | exports (named loader, named + default page); renders header/title/two toggle buttons; default 7-day labels render; succeeded→rows show counts; toggle 30-day re-fetches + relabels ('1'..'30'); throw→`ADMIN_DASHBOARD.ERROR`; `activeStoreCount` NOT in DOM | mock `superAdminLoader` + `usageHttpService`; `IntlProvider` wrapper with `esMessages`; `fireEvent`+`waitFor`, mirroring features.test.tsx |
+| Layer          | What to Test                                                                                                                                                                                                                                                  | Approach                                                                                                                                   |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| Unit (helper)  | `getDiasSemana` Mon-first order; Sunday edge (`new Date('2026-06-07')` Sun → ends 'Dom'); Monday (`'2026-06-01'` → ['Lun'..'Dom']); `getDias30` returns '1'..'30'                                                                                             | Inject fixed `Date`; assert array equality. Deterministic — no real clock                                                                  |
+| Unit (service) | singleton exists; `getStoresLastWeek`/`getStoresLastMonth` call correct GET URL; return `response.data`; propagate throw                                                                                                                                      | `vi.mock('~/shared/lib/http/api-client')`; mocks use `message:''`, `actionCode:0`, `errors:[]` (NON-nullable)                              |
+| Component      | exports (named loader, named + default page); renders header/title/two toggle buttons; default 7-day labels render; succeeded→rows show counts; toggle 30-day re-fetches + relabels ('1'..'30'); throw→`ADMIN_DASHBOARD.ERROR`; `activeStoreCount` NOT in DOM | mock `superAdminLoader` + `usageHttpService`; `IntlProvider` wrapper with `esMessages`; `fireEvent`+`waitFor`, mirroring features.test.tsx |
 
 Mock mismatch gotcha: `BaseResponseModel<T>` fields `message/actionCode/errors` are
 NON-nullable — all mocks use `''`/`0`/`[]`, never `null`.
@@ -119,6 +119,6 @@ push/PR. Rollback = revert the slice commit.
 ## Open Questions
 
 - [ ] `ADMIN_DASHBOARD.ERROR` copy: Angular has no error UI (it rethrows). Adding inline
-  error is a minor, consistent enhancement matching other admin slices — confirm copy text
-  at apply (suggest reuse "Ocurrió un error. Intentá de nuevo."). Parity-ambiguous but
-  additive and non-breaking.
+      error is a minor, consistent enhancement matching other admin slices — confirm copy text
+      at apply (suggest reuse "Ocurrió un error. Intentá de nuevo."). Parity-ambiguous but
+      additive and non-breaking.

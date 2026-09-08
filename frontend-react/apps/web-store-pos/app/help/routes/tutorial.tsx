@@ -36,9 +36,7 @@ export function TutorialPage() {
 
   return (
     <div className="space-y-4 p-4">
-      <h1 className="text-2xl font-bold">
-        {intl.formatMessage({ id: 'TUTORIAL.TITLE' })}
-      </h1>
+      <h1 className="text-2xl font-bold">{intl.formatMessage({ id: 'TUTORIAL.TITLE' })}</h1>
 
       <TutorialPanel>
         <h6 className="font-semibold">1. Adicionar un producto al catálogo.</h6>
@@ -48,17 +46,37 @@ export function TutorialPage() {
           1.2 Tocar el botón + Categoría para adicionar una nueva Categoría si no está adicionada.
           Escribir el nombre de la categoría y tocar el botón Salvar.
         </p>
-        <img src="/images/help/add-cat-dialog.png" alt="Adicionar categoría" className="my-2 max-w-full" />
-        <p>1.3 Tocar la flecha hacia abajo para desplegar la Categoría y tocar el botón + Producto.</p>
-        <img src="/images/help/add-product-btn.png" alt="Botón agregar producto" className="my-2 max-w-full" />
+        <img
+          src="/images/help/add-cat-dialog.png"
+          alt="Adicionar categoría"
+          className="my-2 max-w-full"
+        />
+        <p>
+          1.3 Tocar la flecha hacia abajo para desplegar la Categoría y tocar el botón + Producto.
+        </p>
+        <img
+          src="/images/help/add-product-btn.png"
+          alt="Botón agregar producto"
+          className="my-2 max-w-full"
+        />
         <p>1.4 Escribir el nombre y precio del producto y tocar el botón Salvar.</p>
-        <img src="/images/help/add-product-dialog.png" alt="Diálogo agregar producto" className="my-2 max-w-full" />
+        <img
+          src="/images/help/add-product-dialog.png"
+          alt="Diálogo agregar producto"
+          className="my-2 max-w-full"
+        />
 
         <h6 className="font-semibold">2. Adicionar una entrada al inventario.</h6>
         <p>2.1 Abrir el menú y en la sección Inventario tocar en Entradas.</p>
-        <p>2.2 Tocar el botón + Entrada para adicionar una entrada en el Inventario de un producto.</p>
+        <p>
+          2.2 Tocar el botón + Entrada para adicionar una entrada en el Inventario de un producto.
+        </p>
         <p>2.3 Seleccionar el producto, entrar el precio de costo y tocar el botón Salvar.</p>
-        <img src="/images/help/add-entry-dialog.png" alt="Diálogo agregar entrada" className="my-2 max-w-full" />
+        <img
+          src="/images/help/add-entry-dialog.png"
+          alt="Diálogo agregar entrada"
+          className="my-2 max-w-full"
+        />
 
         <h6 className="font-semibold">3. Adicionar el producto a la venta actual.</h6>
         <p>3.1 Abrir el menú y en la sección Venta tocar en Vender.</p>

@@ -22,10 +22,10 @@ The module has two routes: export ("Send") and import ("Receive"). The export pr
 
 ## 3. Routes
 
-| Path | Component | Required Feature | Guard |
-|------|-----------|-----------------|-------|
-| `/synchronization/export` | `SendDataComponent` | `Send` (40) | `AuthGuard` |
-| `/synchronization/import` | `ReceiveDataComponent` | `Receive` (42) | `AuthGuard` |
+| Path                      | Component              | Required Feature | Guard       |
+| ------------------------- | ---------------------- | ---------------- | ----------- |
+| `/synchronization/export` | `SendDataComponent`    | `Send` (40)      | `AuthGuard` |
+| `/synchronization/import` | `ReceiveDataComponent` | `Receive` (42)   | `AuthGuard` |
 
 Both routes are protected by `AuthGuard`. Feature IDs are checked against the user's `StoreModuleFeatures` for the active store. SuperAdmin and OwnerAdmin bypass feature checks.
 
@@ -38,6 +38,7 @@ Both routes are protected by `AuthGuard`. Feature IDs are checked against the us
 **Purpose:** Triggers a full data export, encrypts it, and delivers it to the user as a file download or via the Web Share API.
 
 **Behavior:**
+
 - Displays a password input field (user must enter their account password to confirm).
 - On submit, calls `DataSerializerService.serializeEncryptedZip(password)`.
 - Displays a loading indicator while the ZIP is being generated.
@@ -53,6 +54,7 @@ Both routes are protected by `AuthGuard`. Feature IDs are checked against the us
 **Purpose:** Accepts a ZIP file from the user, decrypts it, and merges its contents into local storage.
 
 **Behavior:**
+
 - Displays a file picker (accepts `.zip` only) and a password input.
 - On submit, calls `DataSerializerService.deserializeEncryptedZip(file, password)`.
 - Categories are processed before all other entities (referential integrity — products reference categories).
@@ -104,14 +106,14 @@ Step-by-step process when the user imports a file:
 
 Each JSON file in the ZIP contains a JSON array of objects. The shape of each object must match the localStorage record format exactly — no transformation is applied during export or import beyond JSON serialization.
 
-| File | Entity | Key Rules |
-|------|--------|-----------|
-| `categories.json` | Category | Upsert by `id`; sorted by `order` field after merge |
-| `products.json` | Product | Upsert by `id`; sorted by `order` field after merge |
+| File                     | Entity         | Key Rules                                                 |
+| ------------------------ | -------------- | --------------------------------------------------------- |
+| `categories.json`        | Category       | Upsert by `id`; sorted by `order` field after merge       |
+| `products.json`          | Product        | Upsert by `id`; sorted by `order` field after merge       |
 | `inventory-entries.json` | InventoryEntry | Grouped by `productId`; upsert by entry `id` within group |
-| `orders.json` | Order | Upsert by `id` |
-| `expenses.json` | Expense | Upsert by `id` |
-| `sale-credits.json` | SaleCredit | Upsert by `id` |
+| `orders.json`            | Order          | Upsert by `id`                                            |
+| `expenses.json`          | Expense        | Upsert by `id`                                            |
+| `sale-credits.json`      | SaleCredit     | Upsert by `id`                                            |
 
 **Upsert semantics:** If a record with the same `id` already exists in localStorage, it is replaced with the incoming record. If no record with that `id` exists, the incoming record is inserted.
 
@@ -177,8 +179,8 @@ interface DataSynchronizerService {
 }
 
 interface SyncResult {
-  inserted: Record<string, number>;   // entity -> count of new records
-  updated: Record<string, number>;    // entity -> count of updated records
+  inserted: Record<string, number>; // entity -> count of new records
+  updated: Record<string, number>; // entity -> count of updated records
   errors: SyncError[];
 }
 
@@ -200,10 +202,10 @@ interface SyncError {
 
 ## 12. Permissions
 
-| Feature | Feature ID | Who has access |
-|---------|-----------|----------------|
-| Send (Export) | 40 | StoreUser (if granted), OwnerAdmin, SuperAdmin |
-| Receive (Import) | 42 | StoreUser (if granted), OwnerAdmin, SuperAdmin |
+| Feature          | Feature ID | Who has access                                 |
+| ---------------- | ---------- | ---------------------------------------------- |
+| Send (Export)    | 40         | StoreUser (if granted), OwnerAdmin, SuperAdmin |
+| Receive (Import) | 42         | StoreUser (if granted), OwnerAdmin, SuperAdmin |
 
 - SuperAdmin and OwnerAdmin always have access regardless of `featureIds`.
 - ReSeller role does not have access to synchronization.

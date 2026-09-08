@@ -53,7 +53,8 @@ export class ProductOfflineService implements ProductService {
     // stay in sync. Previously each got its own instance, so categories
     // created via categoryRepository were invisible to productRepository.
     this.categoryRepository = categoryRepository ?? new ProductCategoryRepository(storeId);
-    this.productRepository = productRepository ?? new ProductRepository(storeId, this.categoryRepository);
+    this.productRepository =
+      productRepository ?? new ProductRepository(storeId, this.categoryRepository);
   }
 
   /**
@@ -83,7 +84,9 @@ export class ProductOfflineService implements ProductService {
    * `ProductOnlineService` — i.e. leaving the catalog, which this change's scope
    * rule forbids (design §D3).
    */
-  async getAvailableProductsByCategoryId(categoryId: string): Promise<BaseResponseModel<Product[]>> {
+  async getAvailableProductsByCategoryId(
+    categoryId: string,
+  ): Promise<BaseResponseModel<Product[]>> {
     return success(this.productRepository.getProductsByCategoryId(categoryId));
   }
 
@@ -132,7 +135,10 @@ export class ProductOfflineService implements ProductService {
    * Offline-only public method (NOT on the abstract interface), 1:1 port of Angular
    * `setDiscountFromInvantory` (product-offline.service.ts:113-116).
    */
-  async setDiscountFromInvantory(id: string, discountFromInvantory: boolean): Promise<BaseResponseModel<boolean>> {
+  async setDiscountFromInvantory(
+    id: string,
+    discountFromInvantory: boolean,
+  ): Promise<BaseResponseModel<boolean>> {
     const result = this.productRepository.setDiscountFromInvantory(id, discountFromInvantory);
     return result.succeeded ? success(true) : failure(result.errors);
   }
@@ -159,7 +165,10 @@ export class ProductOfflineService implements ProductService {
         categoryProducts
           .sort((p1, p2) => p1.order - p2.order)
           .forEach((product) => {
-            productsToSelect.push({ id: product.id, fullName: product.categoryName + ' - ' + product.name });
+            productsToSelect.push({
+              id: product.id,
+              fullName: product.categoryName + ' - ' + product.name,
+            });
           });
       }
     });
@@ -232,11 +241,23 @@ export class ProductOfflineService implements ProductService {
    * availableToSale:true, discountFromInvantory:true`; `Failure([])` on any failure
    * (ANGULAR-BUG-SUSPECT #1: empty errors array — mirror do-not-fix).
    */
-  async createProducts(categoryId: string, items: { name: string; price: number }[]): Promise<BaseResponseModel<boolean>> {
+  async createProducts(
+    categoryId: string,
+    items: { name: string; price: number }[],
+  ): Promise<BaseResponseModel<boolean>> {
     let hasError = false;
     items.forEach((item) => {
       const order = this.getNextOrder(categoryId);
-      const result = this.productRepository.addProduct(categoryId, item.name, item.price, '', order, true, true, true);
+      const result = this.productRepository.addProduct(
+        categoryId,
+        item.name,
+        item.price,
+        '',
+        order,
+        true,
+        true,
+        true,
+      );
       if (!result.succeeded) hasError = true;
     });
     return !hasError ? success(true) : failure([]);
@@ -276,7 +297,10 @@ export class ProductOfflineService implements ProductService {
         ? existingCat.id
         : this.categoryRepository.addProductCategoryByName(categoryName);
 
-      const existingProduct = this.productRepository.findProductByCategoryAndName(categoryId, productName);
+      const existingProduct = this.productRepository.findProductByCategoryAndName(
+        categoryId,
+        productName,
+      );
       if (existingProduct) {
         // Reuse the existing product's id and refresh its sale price to this row's value. The
         // row keeps its own cost/quantity for the inventory entry.
@@ -286,7 +310,13 @@ export class ProductOfflineService implements ProductService {
           name: productName,
           categoryName,
         });
-        created.push({ ...csvProduct, category: categoryName, name: productName, id: existingProduct.id, existing: true });
+        created.push({
+          ...csvProduct,
+          category: categoryName,
+          name: productName,
+          id: existingProduct.id,
+          existing: true,
+        });
       } else {
         const order = this.getNextOrder(categoryId);
         const id = generateId();
@@ -301,7 +331,14 @@ export class ProductOfflineService implements ProductService {
           true,
           true,
         );
-        if (result.succeeded) created.push({ ...csvProduct, category: categoryName, name: productName, id, existing: false });
+        if (result.succeeded)
+          created.push({
+            ...csvProduct,
+            category: categoryName,
+            name: productName,
+            id,
+            existing: false,
+          });
         else failed.push(csvProduct);
       }
     });

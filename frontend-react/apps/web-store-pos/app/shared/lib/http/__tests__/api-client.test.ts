@@ -37,7 +37,8 @@ afterEach(() => {
 /** Extract an interceptor handler from an Axios instance. */
 function getRequestInterceptor(instance: ReturnType<typeof axios.create>) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const handlers: Array<{ fulfilled?: unknown } | null> = (instance.interceptors.request as any).handlers;
+  const handlers: Array<{ fulfilled?: unknown } | null> = (instance.interceptors.request as any)
+    .handlers;
   const handler = handlers.find((h) => h !== null && typeof h?.fulfilled === 'function');
   if (!handler?.fulfilled) throw new Error('Request interceptor not found');
   return handler.fulfilled as (config: InternalAxiosRequestConfig) => InternalAxiosRequestConfig;
@@ -45,7 +46,8 @@ function getRequestInterceptor(instance: ReturnType<typeof axios.create>) {
 
 function getResponseInterceptor(instance: ReturnType<typeof axios.create>) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const handlers: Array<{ rejected?: unknown } | null> = (instance.interceptors.response as any).handlers;
+  const handlers: Array<{ rejected?: unknown } | null> = (instance.interceptors.response as any)
+    .handlers;
   const handler = handlers.find((h) => h !== null && typeof h?.rejected === 'function');
   if (!handler?.rejected) throw new Error('Response interceptor not found');
   return handler.rejected as (error: AxiosError) => Promise<never>;
@@ -53,7 +55,8 @@ function getResponseInterceptor(instance: ReturnType<typeof axios.create>) {
 
 function getResponseSuccessInterceptor(instance: ReturnType<typeof axios.create>) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const handlers: Array<{ fulfilled?: unknown } | null> = (instance.interceptors.response as any).handlers;
+  const handlers: Array<{ fulfilled?: unknown } | null> = (instance.interceptors.response as any)
+    .handlers;
   const handler = handlers.find((h) => h !== null && typeof h?.fulfilled === 'function');
   if (!handler?.fulfilled) throw new Error('Response success interceptor not found');
   return handler.fulfilled as (response: unknown) => unknown;
@@ -127,7 +130,7 @@ describe('api-client (AUTH-06)', () => {
       localStorage.setItem(TOKEN_KEY, 'offline-session');
       localStorage.setItem(
         CURRENT_USER_KEY,
-        JSON.stringify({ id: 'u1', login: 'ana', authToken: 'offline-session' })
+        JSON.stringify({ id: 'u1', login: 'ana', authToken: 'offline-session' }),
       );
       const verifier = { hash: 'h', salt: 's', iterations: 1 };
       importRoster({
@@ -192,7 +195,7 @@ describe('api-client (AUTH-06)', () => {
       localStorage.setItem(TOKEN_KEY, 'offline-session');
       localStorage.setItem(
         CURRENT_USER_KEY,
-        JSON.stringify({ id: 'u1', login: 'ana', authToken: 'offline-session' })
+        JSON.stringify({ id: 'u1', login: 'ana', authToken: 'offline-session' }),
       );
       const { apiClient } = await import('../api-client');
 
@@ -275,7 +278,7 @@ describe('api-client (AUTH-06)', () => {
       // these locally-seeded values.
       localStorage.setItem(
         StorageKeys.AUTH_MODEL,
-        JSON.stringify({ authToken: 'test-token', expiresIn: Date.now() + 1000 })
+        JSON.stringify({ authToken: 'test-token', expiresIn: Date.now() + 1000 }),
       );
       localStorage.setItem(TOKEN_KEY, 'test-token');
       localStorage.setItem(StorageKeys.CURRENT_USER, 'user-data');
@@ -333,19 +336,13 @@ describe('api-client (AUTH-06)', () => {
 
       const rejected = getResponseInterceptor(apiClient);
 
-      const mockError = new axios.AxiosError(
-        'Internal Server Error',
-        '500',
-        undefined,
-        undefined,
-        {
-          status: 500,
-          data: {},
-          headers: {},
-          config: {} as InternalAxiosRequestConfig,
-          statusText: 'Internal Server Error',
-        }
-      );
+      const mockError = new axios.AxiosError('Internal Server Error', '500', undefined, undefined, {
+        status: 500,
+        data: {},
+        headers: {},
+        config: {} as InternalAxiosRequestConfig,
+        statusText: 'Internal Server Error',
+      });
 
       try {
         await rejected(mockError);
@@ -387,7 +384,7 @@ describe('api-client (AUTH-06)', () => {
         'ERR_NETWORK',
         undefined,
         undefined,
-        undefined
+        undefined,
       );
 
       await expect(rejected(networkError)).rejects.toMatchObject({ isNetworkError: true });
@@ -504,7 +501,7 @@ describe('api-client (AUTH-06)', () => {
         'ERR_NETWORK',
         undefined,
         undefined,
-        undefined
+        undefined,
       );
 
       try {

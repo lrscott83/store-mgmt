@@ -113,8 +113,10 @@ const messages: Record<string, string> = {
   'PROVISION.SUBMIT': 'Activar',
   'PROVISION.ERROR_WRONG_PASSWORD': 'La contraseña de activación es incorrecta.',
   'PROVISION.ERROR_CORRUPT_FILE': 'El archivo está dañado o no tiene un formato válido.',
-  'PROVISION.ERROR_EXPIRED': 'Este archivo de activación ya venció. Pedile uno nuevo al administrador.',
-  'PROVISION.ERROR_REPLAY': 'Este archivo ya se usó en este equipo. Pedile uno nuevo al administrador.',
+  'PROVISION.ERROR_EXPIRED':
+    'Este archivo de activación ya venció. Pedile uno nuevo al administrador.',
+  'PROVISION.ERROR_REPLAY':
+    'Este archivo ya se usó en este equipo. Pedile uno nuevo al administrador.',
   'PROVISION.ERROR_UNKNOWN_FILE':
     'No pudimos reconocer el archivo. No parece un archivo de activación exportado por el sistema.',
 
@@ -139,9 +141,11 @@ const messages: Record<string, string> = {
     'No pudimos completar la acción. Recarga la página e intenta de nuevo.',
   'OFFLINE_ACCESS.HELP_BUTTON': 'Ayuda para activar el acceso sin conexión',
   'OFFLINE_ACCESS.HELP_TITLE': 'Cómo activar el acceso sin conexión',
-  'OFFLINE_ACCESS.HELP_STEP1': '1. Desde un equipo ya activado, el administrador exporta el roster con una contraseña usando el botón "Exportar roster sin conexión" de la página de Empleados.',
+  'OFFLINE_ACCESS.HELP_STEP1':
+    '1. Desde un equipo ya activado, el administrador exporta el roster con una contraseña usando el botón "Exportar roster sin conexión" de la página de Empleados.',
   'OFFLINE_ACCESS.HELP_STEP2': '2. Transfiere ese archivo de roster a este equipo.',
-  'OFFLINE_ACCESS.HELP_STEP3': '3. En este equipo toca "Activar acceso sin conexión", elige el archivo y escribe la contraseña.',
+  'OFFLINE_ACCESS.HELP_STEP3':
+    '3. En este equipo toca "Activar acceso sin conexión", elige el archivo y escribe la contraseña.',
 
   // Registration (Angular REGISTRATION.* — vocabs/es.ts:131-134, top-level sibling of
   // AUTH/GENERAL, not nested. view-text-parity.)
@@ -353,7 +357,8 @@ const messages: Record<string, string> = {
 
   // Sale / POS screen (Angular SALES.* — frontend/src/app/_modules/i18n/vocabs/es.ts)
   'SALES.HEADER': 'Productos para vender',
-  'SALES.NO_SELECTED_CATEGORY_ALERT_MESSAGE': 'Seleccione primero una categoría para adicionar productos a la venta.',
+  'SALES.NO_SELECTED_CATEGORY_ALERT_MESSAGE':
+    'Seleccione primero una categoría para adicionar productos a la venta.',
   'SALES.PRODUCT_ADDED_TO_CART': 'El producto fue adicionado a la venta',
   'SALES.PRODUCT_NOT_ADDED_TO_CART':
     'Ocurrío un error adicionando el producto a la venta. Por favor, vuelva a intentarlo y si persiste contacte al equipo de soporte técnico.',
@@ -376,7 +381,8 @@ const messages: Record<string, string> = {
   'SALES.WHOLESALE.FROM': 'desde',
   'SALES.WHOLESALE.UNIT': 'unidad',
   'SALES.WHOLESALE.ADD': 'Añadir',
-  'SALES.WHOLESALE.EMPTY': 'No hay productos configurados para la venta mayorista. Active la opción "Venta Mayorista" al crear o editar un producto.',
+  'SALES.WHOLESALE.EMPTY':
+    'No hay productos configurados para la venta mayorista. Active la opción "Venta Mayorista" al crear o editar un producto.',
   'SALES.WHOLESALE.ADDED': '{name} adicionado a la venta mayorista',
   'SALES.WHOLESALE.MIN_PACKS_ERROR':
     'La cantidad mínima para la venta mayorista es de {min} {unit} ({min} × {packSize} unidades).',
@@ -384,9 +390,12 @@ const messages: Record<string, string> = {
   'SALES.WHOLESALE.TIERS_POPUP_TITLE': 'Rangos de precio mayorista',
   'SALES.WHOLESALE.TIERS_POPUP_PACK': 'Unidades por paquete',
   'SALES.WHOLESALE.TIERS_POPUP_FROM': 'Desde {min} {unit}: {price} por unidad',
-  'SALES.WHOLESALE.QUANTITY_UNAVAILABLE': 'Disponibles: {available}. Faltan {missing} para cubrir los {requested} solicitados.',
-  'SALES.WHOLESALE.SCANNER_ADDED': '{name}: {packs} paquetes ({units} unidades) a {price} por unidad, adicionado a la venta mayorista',
-  'SALES.WHOLESALE.SCANNER_NOT_WHOLESALE': 'El producto {name} no tiene configuración mayorista y no se puede vender en esta vista',
+  'SALES.WHOLESALE.QUANTITY_UNAVAILABLE':
+    'Disponibles: {available}. Faltan {missing} para cubrir los {requested} solicitados.',
+  'SALES.WHOLESALE.SCANNER_ADDED':
+    '{name}: {packs} paquetes ({units} unidades) a {price} por unidad, adicionado a la venta mayorista',
+  'SALES.WHOLESALE.SCANNER_NOT_WHOLESALE':
+    'El producto {name} no tiene configuración mayorista y no se puede vender en esta vista',
   'SALES.WHOLESALE.UNIT_NAME_FALLBACK': 'paquete',
 
   // ProductErrors (Angular frontend/src/app/domain/entities/products/product.errors.ts —
@@ -396,7 +405,8 @@ const messages: Record<string, string> = {
   'PRODUCT_ERRORS.NOT_EXISTS': 'El producto no existe.',
   'PRODUCT_ERRORS.INACTIVE': 'El producto no está activo.',
   'PRODUCT_ERRORS.NOT_AVAILABLE_TO_SALE': 'El producto no está disponible para la venta.',
-  'PRODUCT_ERRORS.QUANTITY_NOT_AVAILABLE': 'La cantidad del producto no está disponible en el inventario.',
+  'PRODUCT_ERRORS.QUANTITY_NOT_AVAILABLE':
+    'La cantidad del producto no está disponible en el inventario.',
 
   // GENERAL.RESPONSE.* (Angular GENERAL.RESPONSE — used as the blocking-error-modal title,
   // e.g. sale-product-row.component.ts:72 Swal.fire title)
@@ -475,7 +485,8 @@ const messages: Record<string, string> = {
   'ORDERS.EMPTY_STATE': 'No hay pedidos',
   'ORDERS.DEACTIVATE': 'Anular pedido',
   'ORDERS.DEACTIVATE_CONFIRM': '¿Estás seguro de que deseas anular este pedido?',
-  'ORDERS.DEACTIVATE_WITH_CREDIT_WARNING': 'Este pedido tiene un crédito asociado que también será anulado.',
+  'ORDERS.DEACTIVATE_WITH_CREDIT_WARNING':
+    'Este pedido tiene un crédito asociado que también será anulado.',
   'ORDERS.DATE_FROM': 'Desde',
   'ORDERS.DATE_TO': 'Hasta',
   'ORDERS.STATS.REVENUE': 'Ingresos totales',
@@ -485,7 +496,8 @@ const messages: Record<string, string> = {
   'TODAY_ORDERS.HEADER': 'Ventas del día',
   'TODAY_ORDERS.NO_ORDER_FOUND': 'No se ha realizado ninguna venta en el día de hoy.',
   'TODAY_ORDERS.SEND_TO_CART_CONFIRM_TITLE': 'Confirmación para volver a vender',
-  'TODAY_ORDERS.SEND_TO_CART_CONFIRM_MESSAGE': 'Hay una venta en proceso. ¿Desea eliminar esa venta y continuar?',
+  'TODAY_ORDERS.SEND_TO_CART_CONFIRM_MESSAGE':
+    'Hay una venta en proceso. ¿Desea eliminar esa venta y continuar?',
   'TODAY_ORDERS.TEXT': 'Venta',
   'TODAY_ORDERS.ERROR_DELETING_ORDER': 'Ocurrió un error eliminando la venta. {message}',
   'TODAY_ORDERS.EDIT_ORDER': 'Editar Venta',
@@ -515,7 +527,8 @@ const messages: Record<string, string> = {
   'SALE_CREDIT.TO_PAY': 'Pagar',
   'SALE_CREDIT.PAYMENT_CREDIT': 'Venta por Cobrar',
   'SALE_CREDIT.PAYMENT_CONFIRM_TITLE': 'Confirmación de Pago',
-  'SALE_CREDIT.PAYMENT_CONFIRM_MESSAGE': 'Usted está segura(o) que desea pagar este crédito por venta?',
+  'SALE_CREDIT.PAYMENT_CONFIRM_MESSAGE':
+    'Usted está segura(o) que desea pagar este crédito por venta?',
   'SALE_CREDIT.NO_SALE_CREDIT_FOUND_IN_DAY': 'No existe ningún crédito en el día',
   'SALE_CREDIT.NO_SALE_CREDIT_FOUND': 'No se encontró ningún crédito',
 
@@ -626,8 +639,10 @@ const messages: Record<string, string> = {
   'INVENTORY.ENTRY.QUANTITY': 'Cantidad',
   'INVENTORY.ENTRY.COST_PRICE': 'Precio de costo',
   'INVENTORY.ENTRY.AVAILABLE': 'Disponible',
-  'INVENTORY.ERRORS.SOLD_ENTRY_CANNOT_EDIT': 'No se puede editar una entrada que ya tiene ventas asociadas',
-  'INVENTORY.ERRORS.SOLD_ENTRY_CANNOT_DELETE': 'No se puede eliminar una entrada que ya tiene ventas asociadas',
+  'INVENTORY.ERRORS.SOLD_ENTRY_CANNOT_EDIT':
+    'No se puede editar una entrada que ya tiene ventas asociadas',
+  'INVENTORY.ERRORS.SOLD_ENTRY_CANNOT_DELETE':
+    'No se puede eliminar una entrada que ya tiene ventas asociadas',
   // Orphaned since Stage 2.3 (L6 parity): was overloaded across 3 distinct empty-states with
   // different Angular text (see INVENTORY_ENTRY.NO_ENTRY_FOUND_IN_DAY / INVENTORY.NO_ENTRY_FOUND
   // / INVENTORY.CATEGORY_PRODUCT_NO_FOUND above, now used instead). Left in place, not pruned,
@@ -644,7 +659,8 @@ const messages: Record<string, string> = {
   'SCANNER.MANUAL_ENTRY_PLACEHOLDER': 'Código de barras',
   'SCANNER.PRODUCT_ADDED': '{name} agregado a la venta',
   'SCANNER.PRODUCT_NOT_SELLABLE': 'El producto {name} no está disponible para la venta',
-  'SCANNER.CAMERA_PERMISSION_DENIED': 'Permiso de cámara denegado. Habilitá el acceso a la cámara para usar el escáner.',
+  'SCANNER.CAMERA_PERMISSION_DENIED':
+    'Permiso de cámara denegado. Habilitá el acceso a la cámara para usar el escáner.',
   'SCANNER.PRODUCT_NOT_FOUND': 'Producto no encontrado: {barcode}',
   'SCANNER.SCANNING': 'Escaneando...',
 
@@ -730,6 +746,7 @@ const messages: Record<string, string> = {
   'CUADRE_FECHAS.GENERATE': 'Generar',
   'CUADRE_FECHAS.INVALID_RANGE': 'La fecha de inicio debe ser anterior o igual a la fecha de fin.',
   'CUADRE_FECHAS.EMPTY_DATES': 'Selecciona las fechas de inicio y fin.',
+  'CUADRE_FECHAS.INVALID_FORMAT': 'Formato de fecha inválido. Usa dd-mm-yyyy.',
   'CUADRE_FECHAS.CUADRE': 'Cuadre',
   'CUADRE_FECHAS.KPI_SALES': 'Ventas',
   'CUADRE_FECHAS.KPI_EXPENSES': 'Gastos',
@@ -757,7 +774,8 @@ const messages: Record<string, string> = {
   'PROFILE.NEW_PASSWORD': 'Nueva contraseña',
   'PROFILE.CONFIRM_PASSWORD': 'Confirmar nueva contraseña',
   'PROFILE.CHANGE_PASSWORD_SUBMIT': 'Cambiar contraseña',
-  'PROFILE.PASSWORD_REGEX_ERROR': 'La contraseña debe tener entre 8 y 30 caracteres, al menos una mayúscula, una minúscula y un número.',
+  'PROFILE.PASSWORD_REGEX_ERROR':
+    'La contraseña debe tener entre 8 y 30 caracteres, al menos una mayúscula, una minúscula y un número.',
   'PROFILE.PASSWORD_MISMATCH': 'Las contraseñas no coinciden.',
   'PROFILE.OFFLINE_NOTICE': 'Sin conexión. Conectate a internet para guardar cambios.',
   'PROFILE.PASSWORD_RULES': 'Mínimo 8 caracteres, una mayúscula, una minúscula y un número.',
@@ -800,7 +818,8 @@ const messages: Record<string, string> = {
   'STORES.NAME_REQUIRED': 'El nombre es obligatorio.',
   'STORES.PLAN.SECTION_TITLE': 'Plan de la tienda',
   'STORES.NO_STORE_SELECTED': 'No hay una tienda seleccionada.',
-  'STORES.PLAN.BILLING_NOTICE': 'Plan Pago: 1 mes GRATIS. Luego se cobra por mes vencido → el primer pago después del segundo mes.',
+  'STORES.PLAN.BILLING_NOTICE':
+    'Plan Pago: 1 mes GRATIS. Luego se cobra por mes vencido → el primer pago después del segundo mes.',
   'STORES.PLAN.FREE_TAB': 'Gratis',
   'STORES.PLAN.PAID_TAB': 'Pago',
   'STORES.PLAN.ACTIVE_BADGE': 'Activo',
@@ -810,11 +829,13 @@ const messages: Record<string, string> = {
   'STORES.PLAN.NEXT_BILLING_DATE': 'Próximo cobro',
   'STORES.PLAN.ACTIVATE': 'Activar este plan',
   'STORES.PLAN.WILL_ACTIVATE_ON_SAVE': 'Se activará al guardar',
-  'STORES.PLAN.CURRENCY_NOTICE': 'Los precios se muestran en USD. El pago se realiza en MN al cambio oficial del día.',
+  'STORES.PLAN.CURRENCY_NOTICE':
+    'Los precios se muestran en USD. El pago se realiza en MN al cambio oficial del día.',
 
   // Exchange rates — daily USD→MN register (daily-exchange-rate)
   'EXCHANGE_RATES.TITLE': 'Registro del cambio de USD a MN',
-  'EXCHANGE_RATES.INFO': 'Cada día se añade automáticamente un registro con el valor del día anterior (el primer día usa el valor por defecto 1). El valor indica cuántos pesos (MN) equivale 1 USD en esa fecha. Solo se puede editar el valor de cada día.',
+  'EXCHANGE_RATES.INFO':
+    'Cada día se añade automáticamente un registro con el valor del día anterior (el primer día usa el valor por defecto 1). El valor indica cuántos pesos (MN) equivale 1 USD en esa fecha. Solo se puede editar el valor de cada día.',
   'EXCHANGE_RATES.DATE_COLUMN': 'Fecha',
   'EXCHANGE_RATES.VALUE_COLUMN': '1 USD = (MN)',
   'EXCHANGE_RATES.SAVE': 'Guardar',
@@ -840,14 +861,30 @@ const messages: Record<string, string> = {
   // Plan toggle (spec store-plan-toggle R3: gear item + direction-aware confirm dialog)
   'STORES.CHANGE_PLAN': 'Cambiar plan',
   'STORES.ACTIVATE_PAID_TITLE': 'Activar plan pago',
-  'STORES.ACTIVATE_PAID_MESSAGE': '¿Está seguro que desea activar el plan de pago para esta tienda? Se habilitarán todos los módulos de pago.',
+  'STORES.ACTIVATE_PAID_MESSAGE':
+    '¿Está seguro que desea activar el plan de pago para esta tienda? Se habilitarán todos los módulos de pago.',
   'STORES.DEACTIVATE_PAID_TITLE': 'Desactivar plan pago',
-  'STORES.DEACTIVATE_PAID_MESSAGE': '¿Está seguro que desea desactivar el plan de pago? Se deshabilitarán los módulos de pago asociados.',
+  'STORES.DEACTIVATE_PAID_MESSAGE':
+    '¿Está seguro que desea desactivar el plan de pago? Se deshabilitarán los módulos de pago asociados.',
+
+  // Store switcher — owner-only navbar popup + Configuraciones active-store
+  // select (store-switcher-react). Switching stores ends the session so the
+  // DEK for the new store is provisioned on the next login.
+  'STORE_SELECTOR.TITLE': 'Cambiar tienda',
+  'STORE_SELECTOR.LOADING': 'Cargando tiendas...',
+  'STORE_SELECTOR.LOAD_ERROR': 'No se pudieron cargar las tiendas.',
+  'STORE_SELECTOR.EMPTY': 'No hay tiendas para seleccionar.',
+  'STORE_SELECTOR.CURRENT': 'Actual',
+  'STORE_SELECTOR.SWITCH_ERROR': 'No se pudo cambiar la tienda.',
+  'CONFIGURATIONS.STORE_LABEL': 'Tienda activa',
 
   // Billing — payment status banner (neutral Latin American Spanish, no voseo)
-  'BILLING.TRIAL_NOTICE': 'Probando el plan de pago. Primer cobro será el {date}, PERO si no pagas pasas al plan gratis.',
-  'BILLING.DUE_NOTICE': 'El pago del plan vence el {date}. Realice el pago para evitar interrupciones en el servicio.',
-  'BILLING.OVERDUE_NOTICE': 'El pago del plan está vencido. Algunas funciones pueden estar restringidas hasta regularizar la situación.',
+  'BILLING.TRIAL_NOTICE':
+    'Probando el plan de pago. Primer cobro será el {date}, PERO si no pagas pasas al plan gratis.',
+  'BILLING.DUE_NOTICE':
+    'El pago del plan vence el {date}. Realice el pago para evitar interrupciones en el servicio.',
+  'BILLING.OVERDUE_NOTICE':
+    'El pago del plan está vencido. Algunas funciones pueden estar restringidas hasta regularizar la situación.',
 
   // Billing — status labels (StoreToCollect.status, DG-8 narrow union)
   'BILLING.STATUS.PorVencer': 'Por vencer',
@@ -892,7 +929,8 @@ const messages: Record<string, string> = {
   'USERS.EMPTY': 'No hay empleados registrados.',
   'USERS.ACTIVATE': 'Activar',
   'USERS.DEACTIVATE': 'Desactivar',
-  'USERS.PASSWORD_POLICY': 'La contraseña debe tener entre 8 y 30 caracteres, e incluir al menos una mayúscula, una minúscula y un número.',
+  'USERS.PASSWORD_POLICY':
+    'La contraseña debe tener entre 8 y 30 caracteres, e incluir al menos una mayúscula, una minúscula y un número.',
   'USERS.PASSWORDS_MUST_MATCH': 'Las contraseñas no coinciden.',
   'USERS.ERROR': 'Ocurrió un error. Intente de nuevo.',
   'USERS.EDIT': 'Editar',
@@ -927,7 +965,8 @@ const messages: Record<string, string> = {
   'RESELLERS.EDIT_TITLE': 'Editar revendedor',
   'RESELLERS.PERCENT_DISCOUNT': 'Porciento de descuento',
   'RESELLERS.DISCOUNT_PRICE': 'Descuento',
-  'RESELLERS.PASSWORD_POLICY': 'La contraseña debe tener entre 8 y 30 caracteres, e incluir al menos una mayúscula, una minúscula y un número.',
+  'RESELLERS.PASSWORD_POLICY':
+    'La contraseña debe tener entre 8 y 30 caracteres, e incluir al menos una mayúscula, una minúscula y un número.',
   'RESELLERS.PASSWORDS_MUST_MATCH': 'Las contraseñas no coinciden.',
   'RESELLERS.PHONE_REQUIRED': 'El teléfono es obligatorio.',
   'RESELLERS.ERROR': 'Ocurrió un error. Intentá de nuevo.',
@@ -960,12 +999,14 @@ const messages: Record<string, string> = {
   'OWNER.DUPLICATE_LOGIN': 'Ese login ya está en uso. Elige otro.',
   'OWNER.FORBIDDEN': 'No tienes permiso para esta acción.',
   'OWNER.NOT_FOUND': 'El propietario no existe o fue eliminado.',
-  'OWNER.PASSWORD_POLICY': 'La contraseña debe tener entre 8 y 30 caracteres, e incluir al menos una mayúscula, una minúscula y un número.',
+  'OWNER.PASSWORD_POLICY':
+    'La contraseña debe tener entre 8 y 30 caracteres, e incluir al menos una mayúscula, una minúscula y un número.',
   'OWNER.PASSWORDS_MUST_MATCH': 'Las contraseñas no coinciden.',
   'OWNER.PHONE_REQUIRED': 'El teléfono es obligatorio.',
   'OWNER.EDIT_TITLE_LABEL': 'Editar propietario',
   'OWNER.DELETE_CONFIRM_TITLE': 'Eliminar propietario permanentemente',
-  'OWNER.DELETE_CONFIRM_MESSAGE': '¿Está seguro que desea eliminar permanentemente a {name}? Se eliminarán la tienda, todos los usuarios asociados y todos los datos. Esta acción no se puede deshacer.',
+  'OWNER.DELETE_CONFIRM_MESSAGE':
+    '¿Está seguro que desea eliminar permanentemente a {name}? Se eliminarán la tienda, todos los usuarios asociados y todos los datos. Esta acción no se puede deshacer.',
   'OWNER.DELETE_CONFIRM_BUTTON': 'Eliminar permanentemente',
   'OWNER.DELETE_SUCCESS': 'El propietario fue eliminado correctamente.',
   'OWNER.USERS_TAB_PLACEHOLDER': 'Gestión de usuarios próximamente.',
@@ -1002,13 +1043,15 @@ const messages: Record<string, string> = {
   'SYNC.IMPORT_BUTTON': 'Importar',
   'SYNC.FILE_LABEL': 'Archivo de respaldo (.zip)',
   'SYNC.IMPORT_SUCCESS': 'Los datos se importaron correctamente.',
-  'SYNC.IMPORT_ERROR': 'Ha ocurrido un error al importar los datos. Si el error persiste contacte al servicio técnico.',
+  'SYNC.IMPORT_ERROR':
+    'Ha ocurrido un error al importar los datos. Si el error persiste contacte al servicio técnico.',
   'SYNC.ERROR_EMPTY_PASSWORD': 'La contraseña no puede estar vacía.',
   'SYNC.ERROR_NO_FILE': 'Selecciona un archivo de respaldo.',
   // sync-export-import-v2 (V2-10): shown when the backup was exported from a
   // DIFFERENT store — a store mismatch is not a password problem, so the user
   // must retry with the right file/password, not just retype theirs.
-  'SYNC.ERROR_WRONG_STORE': 'Este respaldo pertenece a otra tienda. Usá la contraseña y el archivo de exportación de la tienda actual.',
+  'SYNC.ERROR_WRONG_STORE':
+    'Este respaldo pertenece a otra tienda. Usá la contraseña y el archivo de exportación de la tienda actual.',
   'SYNC.SHOW_PASSWORD': 'Mostrar contraseña',
   'SYNC.HIDE_PASSWORD': 'Ocultar contraseña',
 

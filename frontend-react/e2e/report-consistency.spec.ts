@@ -23,7 +23,11 @@ async function seedInventoryEntry(page: Page, storeId: string): Promise<void> {
       const raw = localStorage.getItem(productKey);
       if (!raw) return;
       let entries: [string, Record<string, unknown>][];
-      try { entries = JSON.parse(raw); } catch { return; }
+      try {
+        entries = JSON.parse(raw);
+      } catch {
+        return;
+      }
       const p = entries.find(([, v]) => v['isActive'] && v['availableToSale']);
       if (!p) return;
       const [pid] = p;
@@ -31,14 +35,29 @@ async function seedInventoryEntry(page: Page, storeId: string): Promise<void> {
       const invKey = `lizoft.store-inventory-entries-${sid}`;
       const rawInv = localStorage.getItem(invKey);
       let map: [string, Record<string, unknown>[]][] = [];
-      if (rawInv) { try { map = JSON.parse(rawInv); } catch { map = []; } }
+      if (rawInv) {
+        try {
+          map = JSON.parse(rawInv);
+        } catch {
+          map = [];
+        }
+      }
       const bucket = map.find(([id]) => id === pid);
       if (bucket?.[1].some((e) => e['isActive'])) return;
       const entry = {
-        id: crypto.randomUUID(), productId: pid, categoryId: catId, quantity: 50,
-        available: 50, costPrice: 8, date: new Date().toISOString(), order: 0,
-        isActive: true, createdDate: new Date().toISOString(), createdByName: 'e2e-seed',
-        updatedDate: undefined, updatedByName: undefined,
+        id: crypto.randomUUID(),
+        productId: pid,
+        categoryId: catId,
+        quantity: 50,
+        available: 50,
+        costPrice: 8,
+        date: new Date().toISOString(),
+        order: 0,
+        isActive: true,
+        createdDate: new Date().toISOString(),
+        createdByName: 'e2e-seed',
+        updatedDate: undefined,
+        updatedByName: undefined,
       };
       if (bucket) bucket[1].push(entry);
       else map.push([pid, [entry]]);

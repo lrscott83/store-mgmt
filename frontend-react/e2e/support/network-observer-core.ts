@@ -194,7 +194,7 @@ interface CaptureLike {
  */
 export function resolveCapture<C extends CaptureLike>(
   outcome: Outcome<C>,
-  opts: { subject: ObserverSubject; rateLimitError: () => Error }
+  opts: { subject: ObserverSubject; rateLimitError: () => Error },
 ): C {
   if (outcome.kind === 'failed') {
     throw new Error(outcome.message);

@@ -5,11 +5,17 @@ import { ProductErrors } from '../product-errors';
 // hardcoded Spanish literals there (not i18n keys), byte-identical here.
 describe('ProductErrors — 1:1 port of Angular product.errors.ts', () => {
   it('NotExists', () => {
-    expect(ProductErrors.NotExists).toEqual({ code: 'Product.NotExists', description: 'El producto no existe.' });
+    expect(ProductErrors.NotExists).toEqual({
+      code: 'Product.NotExists',
+      description: 'El producto no existe.',
+    });
   });
 
   it('Inactive', () => {
-    expect(ProductErrors.Inactive).toEqual({ code: 'Product.Inactive', description: 'El producto no está activo.' });
+    expect(ProductErrors.Inactive).toEqual({
+      code: 'Product.Inactive',
+      description: 'El producto no está activo.',
+    });
   });
 
   it('ProductNotAvailableToSale', () => {

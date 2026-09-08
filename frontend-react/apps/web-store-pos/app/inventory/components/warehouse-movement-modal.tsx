@@ -85,7 +85,8 @@ export function WarehouseMovementModal({
   const isValid =
     selectedProduct !== '' &&
     validQty &&
-    (mode !== 'purchase_in' || (Number.isFinite(parseFloat(costPrice)) && parseFloat(costPrice) > 0)) &&
+    (mode !== 'purchase_in' ||
+      (Number.isFinite(parseFloat(costPrice)) && parseFloat(costPrice) > 0)) &&
     (mode !== 'transfer_out' || toWarehouseId !== '');
 
   const productKnown = products.some((p) => p.id === selectedProduct);
@@ -130,9 +131,7 @@ export function WarehouseMovementModal({
               onChange={(e) => setSelectedProduct(e.target.value)}
               className={inputClass}
             >
-              <option value="">
-                {intl.formatMessage({ id: 'WAREHOUSES.SELECT_PRODUCT' })}
-              </option>
+              <option value="">{intl.formatMessage({ id: 'WAREHOUSES.SELECT_PRODUCT' })}</option>
               {products.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name}

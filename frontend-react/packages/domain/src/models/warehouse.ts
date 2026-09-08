@@ -14,11 +14,7 @@ import type { AuditableBaseModel } from './base';
  */
 
 /** Tipos de movimiento en v1 (sin `adjustment_*` — decisión #2). */
-export type WarehouseMovementType =
-  | 'purchase_in'
-  | 'sale_out'
-  | 'transfer_in'
-  | 'transfer_out';
+export type WarehouseMovementType = 'purchase_in' | 'sale_out' | 'transfer_in' | 'transfer_out';
 
 /** Maestro de almacén — soft-delete vía `isActive`. */
 export interface Warehouse extends AuditableBaseModel {

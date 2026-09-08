@@ -82,7 +82,9 @@ function ProductRow({ product, onEdit, onDeactivate, onActivate }: ProductRowPro
         {/* Angular formats with `currency:'USD':'symbol':'1.2-2'` -> literal $X.XX,
             not locale-formatted (es locale would render "2,00 US$"). formatCurrency
             hard-codes 'en-US' to match, independent of the app's own 'es' display locale. */}
-        <span className={`text-sm font-medium text-primary ${product.isActive ? '' : 'opacity-60'}`.trim()}>
+        <span
+          className={`text-sm font-medium text-primary ${product.isActive ? '' : 'opacity-60'}`.trim()}
+        >
           {formattedPrice}
         </span>
         <ActionMenu>

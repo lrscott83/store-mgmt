@@ -87,36 +87,60 @@ describe('PaymentBanner — visibility matrix', () => {
 
 describe('PaymentBanner — trial notice (PorVencer/EnGracia + isInTrial=true)', () => {
   it('shows the trial notice with the formatted due date for PorVencer', async () => {
-    mockUser = makeUser({ paymentStatus: 'PorVencer', isInTrial: true, paymentDueDate: '2026-08-15' });
+    mockUser = makeUser({
+      paymentStatus: 'PorVencer',
+      isInTrial: true,
+      paymentDueDate: '2026-08-15',
+    });
     await renderBanner();
     expect(
-      screen.getByText('Probando el plan de pago. Primer cobro será el 15/08/2026, PERO si no pagas pasas al plan gratis.'),
+      screen.getByText(
+        'Probando el plan de pago. Primer cobro será el 15/08/2026, PERO si no pagas pasas al plan gratis.',
+      ),
     ).toBeInTheDocument();
   });
 
   it('shows the trial notice for EnGracia (triangulation: different status, same isInTrial branch)', async () => {
-    mockUser = makeUser({ paymentStatus: 'EnGracia', isInTrial: true, paymentDueDate: '2026-09-01' });
+    mockUser = makeUser({
+      paymentStatus: 'EnGracia',
+      isInTrial: true,
+      paymentDueDate: '2026-09-01',
+    });
     await renderBanner();
     expect(
-      screen.getByText('Probando el plan de pago. Primer cobro será el 01/09/2026, PERO si no pagas pasas al plan gratis.'),
+      screen.getByText(
+        'Probando el plan de pago. Primer cobro será el 01/09/2026, PERO si no pagas pasas al plan gratis.',
+      ),
     ).toBeInTheDocument();
   });
 });
 
 describe('PaymentBanner — due notice (PorVencer/EnGracia + isInTrial=false)', () => {
   it('shows the due notice with the formatted due date for PorVencer', async () => {
-    mockUser = makeUser({ paymentStatus: 'PorVencer', isInTrial: false, paymentDueDate: '2026-08-15' });
+    mockUser = makeUser({
+      paymentStatus: 'PorVencer',
+      isInTrial: false,
+      paymentDueDate: '2026-08-15',
+    });
     await renderBanner();
     expect(
-      screen.getByText('El pago del plan vence el 15/08/2026. Realice el pago para evitar interrupciones en el servicio.'),
+      screen.getByText(
+        'El pago del plan vence el 15/08/2026. Realice el pago para evitar interrupciones en el servicio.',
+      ),
     ).toBeInTheDocument();
   });
 
   it('shows the due notice for EnGracia (triangulation)', async () => {
-    mockUser = makeUser({ paymentStatus: 'EnGracia', isInTrial: false, paymentDueDate: '2026-09-01' });
+    mockUser = makeUser({
+      paymentStatus: 'EnGracia',
+      isInTrial: false,
+      paymentDueDate: '2026-09-01',
+    });
     await renderBanner();
     expect(
-      screen.getByText('El pago del plan vence el 01/09/2026. Realice el pago para evitar interrupciones en el servicio.'),
+      screen.getByText(
+        'El pago del plan vence el 01/09/2026. Realice el pago para evitar interrupciones en el servicio.',
+      ),
     ).toBeInTheDocument();
   });
 });
@@ -129,9 +153,7 @@ describe('PaymentBanner — dismissible trial notice', () => {
   it('shows a close (X) button on the trial notice', async () => {
     mockUser = makeUser({ paymentStatus: 'AlDia', isInTrial: true, paymentDueDate: '2026-10-04' });
     await renderBanner();
-    expect(
-      screen.getByRole('button', { name: esMessages['GENERAL.CLOSE'] }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: esMessages['GENERAL.CLOSE'] })).toBeInTheDocument();
   });
 
   it('hides the trial notice when the X is clicked and persists the dismissal', async () => {
@@ -149,7 +171,11 @@ describe('PaymentBanner — dismissible trial notice', () => {
   });
 
   it('does not add the close button to the due or overdue notices', async () => {
-    mockUser = makeUser({ paymentStatus: 'PorVencer', isInTrial: false, paymentDueDate: '2026-08-15' });
+    mockUser = makeUser({
+      paymentStatus: 'PorVencer',
+      isInTrial: false,
+      paymentDueDate: '2026-08-15',
+    });
     await renderBanner();
     expect(
       screen.queryByRole('button', { name: esMessages['GENERAL.CLOSE'] }),
@@ -159,18 +185,30 @@ describe('PaymentBanner — dismissible trial notice', () => {
 
 describe('PaymentBanner — overdue notice (Vencido outranks trial)', () => {
   it('shows the overdue notice when Vencido and isInTrial=true (overdue wins)', async () => {
-    mockUser = makeUser({ paymentStatus: 'Vencido', isInTrial: true, paymentDueDate: '2026-07-01' });
+    mockUser = makeUser({
+      paymentStatus: 'Vencido',
+      isInTrial: true,
+      paymentDueDate: '2026-07-01',
+    });
     await renderBanner();
     expect(
-      screen.getByText('El pago del plan está vencido. Algunas funciones pueden estar restringidas hasta regularizar la situación.'),
+      screen.getByText(
+        'El pago del plan está vencido. Algunas funciones pueden estar restringidas hasta regularizar la situación.',
+      ),
     ).toBeInTheDocument();
   });
 
   it('shows the overdue notice when Vencido and isInTrial=false', async () => {
-    mockUser = makeUser({ paymentStatus: 'Vencido', isInTrial: false, paymentDueDate: '2026-07-01' });
+    mockUser = makeUser({
+      paymentStatus: 'Vencido',
+      isInTrial: false,
+      paymentDueDate: '2026-07-01',
+    });
     await renderBanner();
     expect(
-      screen.getByText('El pago del plan está vencido. Algunas funciones pueden estar restringidas hasta regularizar la situación.'),
+      screen.getByText(
+        'El pago del plan está vencido. Algunas funciones pueden estar restringidas hasta regularizar la situación.',
+      ),
     ).toBeInTheDocument();
   });
 });

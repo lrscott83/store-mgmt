@@ -108,7 +108,7 @@ async function buildActivationFile(login: string): Promise<ActivationFile> {
       `El storeId del bundle ('${bundle.storeId}') no tiene forma de GUID, así que el nombre ` +
         '`roster-<storeId>.smcabundle` no va a matchear ROSTER_FILENAME_PATTERN ' +
         '(roster-import.ts:14-15) y el diálogo va a responder UnknownFileError ("No pudimos ' +
-        'reconocer el archivo..."). Eso sería un problema de ESTE fixture, no de la app.'
+        'reconocer el archivo..."). Eso sería un problema de ESTE fixture, no de la app.',
     );
   }
 
@@ -122,14 +122,14 @@ async function buildActivationFile(login: string): Promise<ActivationFile> {
       // `JSON.stringify(bundle)`, así que el cast no oculta ningún riesgo real.
       bundle as unknown as Parameters<typeof serializeRoster>[0],
       ACTIVATION_MASTER_PASSWORD,
-      bundle.storeId
+      bundle.storeId,
     );
   } catch (cause) {
     throw new Error(
       'serializeRoster falló en Node al armar el archivo de activación: ' +
         `${cause instanceof Error ? cause.message : String(cause)}. zip.js necesita Blob, ` +
         'crypto y Web Streams globales (Node >= 18) — si tu runtime no los expone, el problema ' +
-        'es el entorno, no la app.'
+        'es el entorno, no la app.',
     );
   }
 
@@ -167,10 +167,7 @@ function modalTitle(page: Page) {
 /** Lee el bundle crudo del `localStorage` del dispositivo. `ROSTER_STORAGE_KEY`
  * es la MISMA clave que lee la app (`roster-store.ts:19`). */
 async function readStoredRoster(page: Page): Promise<{ bundleId?: string } | null> {
-  const raw = await page.evaluate(
-    (key) => window.localStorage.getItem(key),
-    ROSTER_STORAGE_KEY
-  );
+  const raw = await page.evaluate((key) => window.localStorage.getItem(key), ROSTER_STORAGE_KEY);
   if (raw === null) return null;
   return JSON.parse(raw) as { bundleId?: string };
 }
@@ -198,7 +195,7 @@ async function expectActivationAccepted(page: Page): Promise<void> {
           : 'No hay ninguno de los cinco mensajes de error conocidos en pantalla. ') +
         'Recordá: "No pudimos reconocer el archivo..." significa que el NOMBRE del archivo no ' +
         'matchea `roster-<GUID>.smcabundle`, y "La contraseña de activación es incorrecta" ' +
-        'significa que el master usado al serializar no coincide con el tipeado.'
+        'significa que el master usado al serializar no coincide con el tipeado.',
     );
   }
 }

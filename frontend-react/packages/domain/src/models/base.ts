@@ -11,8 +11,20 @@ export interface AuditableBaseModel extends BaseModel {
 }
 
 export type BaseResponseModel<T> =
-  | { data: T; succeeded: true; message: string | null; actionCode: number | null; errors: BaseError[] }
-  | { data: null; succeeded: false; message: string | null; actionCode: number | null; errors: BaseError[] };
+  | {
+      data: T;
+      succeeded: true;
+      message: string | null;
+      actionCode: number | null;
+      errors: BaseError[];
+    }
+  | {
+      data: null;
+      succeeded: false;
+      message: string | null;
+      actionCode: number | null;
+      errors: BaseError[];
+    };
 
 export interface BaseError {
   code: string;

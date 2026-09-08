@@ -88,10 +88,10 @@ export class WarehouseOfflineService {
       this.warehouses.length === 0 ||
       this.getCurrentStorageKey('warehouses') !== this.lastWarehousesKey
     ) {
-      this.warehouses = this.getFromLocalStorage<Warehouse>(
-        'warehouses',
-        ['createdDate', 'updatedDate'],
-      );
+      this.warehouses = this.getFromLocalStorage<Warehouse>('warehouses', [
+        'createdDate',
+        'updatedDate',
+      ]);
     }
     return this.warehouses;
   }
@@ -157,10 +157,10 @@ export class WarehouseOfflineService {
       this.stockLevels.length === 0 ||
       this.getCurrentStorageKey('warehouse-stock-levels') !== this.lastStockLevelsKey
     ) {
-      this.stockLevels = this.getFromLocalStorage<WarehouseStockLevel>(
-        'warehouse-stock-levels',
-        ['createdDate', 'updatedDate'],
-      );
+      this.stockLevels = this.getFromLocalStorage<WarehouseStockLevel>('warehouse-stock-levels', [
+        'createdDate',
+        'updatedDate',
+      ]);
     }
     return this.stockLevels;
   }
@@ -226,7 +226,10 @@ export class WarehouseOfflineService {
         else if (!target.isActive) errors.push(WarehouseErrors.Inactive);
       }
     }
-    if (params.type === 'transfer_in' && (!params.fromWarehouseId || params.fromWarehouseId === params.warehouseId)) {
+    if (
+      params.type === 'transfer_in' &&
+      (!params.fromWarehouseId || params.fromWarehouseId === params.warehouseId)
+    ) {
       errors.push(WarehouseErrors.SameWarehouseTransfer);
     }
 

@@ -77,7 +77,7 @@ export class RegisterPage {
    */
   async fillValidForm(
     identity: TestIdentity,
-    overrides: Partial<Record<FillableField, string>> = {}
+    overrides: Partial<Record<FillableField, string>> = {},
   ): Promise<void> {
     const values: Record<FillableField, string> = {
       fullName: identity.fullName,
@@ -125,7 +125,7 @@ export class RegisterPage {
           message:
             'no pudo escribir los campos en el formulario de /register (una navegación ' +
             'client-side desde /login pudo haber desmontado el formulario con los valores)',
-        }
+        },
       )
       .toBe(true);
   }

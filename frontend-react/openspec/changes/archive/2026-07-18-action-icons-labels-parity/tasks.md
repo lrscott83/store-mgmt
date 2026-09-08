@@ -2,14 +2,14 @@
 
 ## Review Workload Forecast
 
-| Field | Value |
-|-------|-------|
+| Field                   | Value                                                                         |
+| ----------------------- | ----------------------------------------------------------------------------- |
 | Estimated changed lines | ~180-260 (7 files: 5 tsx tweaks + 1 i18n value + 2 blast-radius test updates) |
-| 400-line budget risk | Low |
-| Chained PRs recommended | No |
-| Suggested split | Single PR |
-| Delivery strategy | ask-on-risk |
-| Chain strategy | pending |
+| 400-line budget risk    | Low                                                                           |
+| Chained PRs recommended | No                                                                            |
+| Suggested split         | Single PR                                                                     |
+| Delivery strategy       | ask-on-risk                                                                   |
+| Chain strategy          | pending                                                                       |
 
 Decision needed before apply: No
 Chained PRs recommended: No
@@ -18,9 +18,9 @@ Chain strategy: pending
 
 ### Suggested Work Units
 
-| Unit | Goal | Likely PR | Notes |
-|------|------|-----------|-------|
-| 1 | All 7 in-scope files, one PR | PR 1 | Small mechanical parity change; no dependency boundary needed |
+| Unit | Goal                         | Likely PR | Notes                                                         |
+| ---- | ---------------------------- | --------- | ------------------------------------------------------------- |
+| 1    | All 7 in-scope files, one PR | PR 1      | Small mechanical parity change; no dependency boundary needed |
 
 ## Phase 1: GENERAL.SAVE i18n value (foundation — global blast radius)
 

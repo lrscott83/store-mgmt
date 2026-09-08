@@ -19,7 +19,9 @@ function formatTime(date: Date): string {
 }
 
 function getOrderTotal(order: Order): number {
-  return round2(order.orderItems.reduce((sum, item) => sum + round2(item.price * item.quantity), 0));
+  return round2(
+    order.orderItems.reduce((sum, item) => sum + round2(item.price * item.quantity), 0),
+  );
 }
 
 function getOrderItemsCount(order: Order): number {
@@ -32,7 +34,12 @@ function getOrderItemsCount(order: Order): number {
  * and total; expanding reveals `OrderItemList`. Credit orders get the
  * `credit-order` visual treatment (Angular: `getOrderBackgroundColor`).
  */
-export function OrderList({ orders, readOnly = true, onEditOrder, onDeactivateOrder }: OrderListProps) {
+export function OrderList({
+  orders,
+  readOnly = true,
+  onEditOrder,
+  onDeactivateOrder,
+}: OrderListProps) {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
   function togglePanel(orderId: string) {

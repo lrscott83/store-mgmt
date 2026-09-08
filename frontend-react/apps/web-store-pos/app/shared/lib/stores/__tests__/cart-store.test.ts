@@ -74,7 +74,9 @@ describe('useCartStore — orderType + price threading (Egress/Mayorista realign
   });
 
   it('stores the per-item price when provided on a NEW-item add', () => {
-    useCartStore.getState().addItem(makeProduct({ id: 'prod-1', price: 5 }), 1, OrderType.Mayorista, 8);
+    useCartStore
+      .getState()
+      .addItem(makeProduct({ id: 'prod-1', price: 5 }), 1, OrderType.Mayorista, 8);
     const item = useCartStore.getState().items.find((i) => i.product.id === 'prod-1');
     expect(item?.price).toBe(8);
   });
@@ -86,8 +88,12 @@ describe('useCartStore — orderType + price threading (Egress/Mayorista realign
   });
 
   it('does NOT overwrite orderType or price when incrementing an existing item', () => {
-    useCartStore.getState().addItem(makeProduct({ id: 'prod-1', price: 5 }), 1, OrderType.Mayorista, 9);
-    useCartStore.getState().addItem(makeProduct({ id: 'prod-1', price: 5 }), 2, OrderType.Normal, 1);
+    useCartStore
+      .getState()
+      .addItem(makeProduct({ id: 'prod-1', price: 5 }), 1, OrderType.Mayorista, 9);
+    useCartStore
+      .getState()
+      .addItem(makeProduct({ id: 'prod-1', price: 5 }), 2, OrderType.Normal, 1);
     expect(useCartStore.getState().orderType).toBe(OrderType.Mayorista);
     const item = useCartStore.getState().items.find((i) => i.product.id === 'prod-1');
     expect(item?.price).toBe(9);
@@ -101,7 +107,9 @@ describe('useCartStore — orderType + price threading (Egress/Mayorista realign
   });
 
   it('total() uses the per-item price when set (not product.price)', () => {
-    useCartStore.getState().addItem(makeProduct({ id: 'prod-1', price: 5 }), 2, OrderType.Mayorista, 8);
+    useCartStore
+      .getState()
+      .addItem(makeProduct({ id: 'prod-1', price: 5 }), 2, OrderType.Mayorista, 8);
     expect(useCartStore.getState().total()).toBe(16); // 8 * 2, NOT 5 * 2
   });
 

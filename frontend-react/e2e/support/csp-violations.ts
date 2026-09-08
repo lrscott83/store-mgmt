@@ -98,11 +98,11 @@ export async function installCspViolationObserver(page: Page): Promise<CspViolat
         .map(
           (r) =>
             `${r.effectiveDirective} blocked ${r.blockedURI} on ${r.documentURI} (${r.disposition})` +
-            `${r.sample ? ` sample: ${JSON.stringify(r.sample)}` : ' sample: <empty>'}`
+            `${r.sample ? ` sample: ${JSON.stringify(r.sample)}` : ' sample: <empty>'}`,
         )
         .join('; ');
       throw new Error(
-        `Expected zero CSP violations${context ? ` (${context})` : ''}, observed ${unexpected.length}: ${summary}.`
+        `Expected zero CSP violations${context ? ` (${context})` : ''}, observed ${unexpected.length}: ${summary}.`,
       );
     },
   };

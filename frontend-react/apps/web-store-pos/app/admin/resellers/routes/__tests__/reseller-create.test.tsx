@@ -49,7 +49,7 @@ async function renderPage() {
   return render(
     <Wrapper>
       <ResellerCreatePage />
-    </Wrapper>
+    </Wrapper>,
   );
 }
 
@@ -127,9 +127,8 @@ describe('ResellerCreatePage — fields', () => {
 
 describe('ResellerCreatePage — password regex validation', () => {
   it('shows PASSWORD_POLICY error and does NOT call createReseller when password fails regex', async () => {
-    const { resellerHttpService } = await import(
-      '~/admin/resellers/lib/services/reseller-http-service'
-    );
+    const { resellerHttpService } =
+      await import('~/admin/resellers/lib/services/reseller-http-service');
     await renderPage();
 
     fireEvent.change(screen.getByLabelText(esMessages['GENERAL.FULL_NAME']), {
@@ -148,7 +147,9 @@ describe('ResellerCreatePage — password regex validation', () => {
       target: { value: '+53 5 123-4567' },
     });
 
-    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')!);
+    fireEvent.submit(
+      screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')!,
+    );
 
     await waitFor(() => {
       expect(screen.getByText(esMessages['RESELLERS.PASSWORD_POLICY'])).toBeInTheDocument();
@@ -164,9 +165,8 @@ describe('ResellerCreatePage — password regex validation', () => {
 
 describe('ResellerCreatePage — password mismatch validation', () => {
   it('shows PASSWORDS_MUST_MATCH and does NOT call createReseller when passwords differ', async () => {
-    const { resellerHttpService } = await import(
-      '~/admin/resellers/lib/services/reseller-http-service'
-    );
+    const { resellerHttpService } =
+      await import('~/admin/resellers/lib/services/reseller-http-service');
     await renderPage();
 
     fireEvent.change(screen.getByLabelText(esMessages['GENERAL.FULL_NAME']), {
@@ -185,7 +185,9 @@ describe('ResellerCreatePage — password mismatch validation', () => {
       target: { value: '+53 5 123-4567' },
     });
 
-    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')!);
+    fireEvent.submit(
+      screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')!,
+    );
 
     await waitFor(() => {
       expect(screen.getByText(esMessages['RESELLERS.PASSWORDS_MUST_MATCH'])).toBeInTheDocument();
@@ -201,9 +203,8 @@ describe('ResellerCreatePage — password mismatch validation', () => {
 
 describe('ResellerCreatePage — FE-OC8: phone-required 400 rejection', () => {
   it('shows RESELLERS.PHONE_REQUIRED when createReseller rejects with 400 and code "Cellphone"', async () => {
-    const { resellerHttpService } = await import(
-      '~/admin/resellers/lib/services/reseller-http-service'
-    );
+    const { resellerHttpService } =
+      await import('~/admin/resellers/lib/services/reseller-http-service');
     vi.mocked(resellerHttpService.createReseller).mockRejectedValue({
       response: { status: 400, data: { errors: [{ code: 'Cellphone' }] } },
     });
@@ -211,7 +212,9 @@ describe('ResellerCreatePage — FE-OC8: phone-required 400 rejection', () => {
     await renderPage();
     fillValidForm();
 
-    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')!);
+    fireEvent.submit(
+      screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')!,
+    );
 
     await waitFor(() => {
       expect(screen.getByRole('alert')).toHaveTextContent(esMessages['RESELLERS.PHONE_REQUIRED']);
@@ -228,9 +231,8 @@ describe('ResellerCreatePage — FE-OC8: phone-required 400 rejection', () => {
 
 describe('ResellerCreatePage — FE-OC8: unrelated 400 and array-scan fallback', () => {
   it('shows RESELLERS.ERROR when createReseller rejects with 400 and an unrelated code', async () => {
-    const { resellerHttpService } = await import(
-      '~/admin/resellers/lib/services/reseller-http-service'
-    );
+    const { resellerHttpService } =
+      await import('~/admin/resellers/lib/services/reseller-http-service');
     vi.mocked(resellerHttpService.createReseller).mockRejectedValue({
       response: { status: 400, data: { errors: [{ code: 'FullName' }] } },
     });
@@ -238,7 +240,9 @@ describe('ResellerCreatePage — FE-OC8: unrelated 400 and array-scan fallback',
     await renderPage();
     fillValidForm();
 
-    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')!);
+    fireEvent.submit(
+      screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')!,
+    );
 
     await waitFor(() => {
       expect(screen.getByRole('alert')).toHaveTextContent(esMessages['RESELLERS.ERROR']);
@@ -246,9 +250,8 @@ describe('ResellerCreatePage — FE-OC8: unrelated 400 and array-scan fallback',
   });
 
   it('shows RESELLERS.PHONE_REQUIRED when createReseller rejects with 400 and FullName occupies errors[0]', async () => {
-    const { resellerHttpService } = await import(
-      '~/admin/resellers/lib/services/reseller-http-service'
-    );
+    const { resellerHttpService } =
+      await import('~/admin/resellers/lib/services/reseller-http-service');
     vi.mocked(resellerHttpService.createReseller).mockRejectedValue({
       response: { status: 400, data: { errors: [{ code: 'FullName' }, { code: 'Cellphone' }] } },
     });
@@ -256,7 +259,9 @@ describe('ResellerCreatePage — FE-OC8: unrelated 400 and array-scan fallback',
     await renderPage();
     fillValidForm();
 
-    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')!);
+    fireEvent.submit(
+      screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')!,
+    );
 
     await waitFor(() => {
       expect(screen.getByRole('alert')).toHaveTextContent(esMessages['RESELLERS.PHONE_REQUIRED']);
@@ -271,9 +276,8 @@ describe('ResellerCreatePage — FE-OC8: unrelated 400 and array-scan fallback',
 
 describe('ResellerCreatePage — successful submit', () => {
   it('calls createReseller and navigates to /admin/resellers on success', async () => {
-    const { resellerHttpService } = await import(
-      '~/admin/resellers/lib/services/reseller-http-service'
-    );
+    const { resellerHttpService } =
+      await import('~/admin/resellers/lib/services/reseller-http-service');
     vi.mocked(resellerHttpService.createReseller).mockResolvedValue({
       succeeded: true,
       data: true,
@@ -285,7 +289,9 @@ describe('ResellerCreatePage — successful submit', () => {
     await renderPage();
     fillValidForm();
 
-    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')!);
+    fireEvent.submit(
+      screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')!,
+    );
 
     await waitFor(() => {
       expect(resellerHttpService.createReseller).toHaveBeenCalledWith(
@@ -295,7 +301,7 @@ describe('ResellerCreatePage — successful submit', () => {
           password: 'Password1',
           cellPhone: '+53 5 123-4567',
           email: 'jane@example.com',
-        })
+        }),
       );
       expect(mockNavigate).toHaveBeenCalledWith('/admin/resellers');
     });
@@ -308,9 +314,8 @@ describe('ResellerCreatePage — successful submit', () => {
 
 describe('ResellerCreatePage — server-side error', () => {
   it('shows errors[0].description when succeeded is false', async () => {
-    const { resellerHttpService } = await import(
-      '~/admin/resellers/lib/services/reseller-http-service'
-    );
+    const { resellerHttpService } =
+      await import('~/admin/resellers/lib/services/reseller-http-service');
     vi.mocked(resellerHttpService.createReseller).mockResolvedValue({
       succeeded: false,
       data: null,
@@ -322,7 +327,9 @@ describe('ResellerCreatePage — server-side error', () => {
     await renderPage();
     fillValidForm();
 
-    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')!);
+    fireEvent.submit(
+      screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')!,
+    );
 
     await waitFor(() => {
       expect(screen.getByText('Login already exists')).toBeInTheDocument();
@@ -338,15 +345,16 @@ describe('ResellerCreatePage — server-side error', () => {
 
 describe('ResellerCreatePage — HTTP throw', () => {
   it('shows RESELLERS.ERROR when createReseller throws', async () => {
-    const { resellerHttpService } = await import(
-      '~/admin/resellers/lib/services/reseller-http-service'
-    );
+    const { resellerHttpService } =
+      await import('~/admin/resellers/lib/services/reseller-http-service');
     vi.mocked(resellerHttpService.createReseller).mockRejectedValue(new Error('Network error'));
 
     await renderPage();
     fillValidForm();
 
-    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')!);
+    fireEvent.submit(
+      screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')!,
+    );
 
     await waitFor(() => {
       expect(screen.getByText(esMessages['RESELLERS.ERROR'])).toBeInTheDocument();

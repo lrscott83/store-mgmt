@@ -8,14 +8,16 @@ This SUPERSEDES the earlier decision that mapped Angular toastr → React inline
 ## 1. Angular toastr general config (confirmed)
 
 `frontend/src/app/app.module.ts:50-55`, wired via `provideToastr()` (line 71):
+
 ```ts
 ToastrModule.forRoot({
   closeButton: true,
-  timeOut: 1000,               // 1 second
+  timeOut: 1000, // 1 second
   positionClass: 'toast-top-right',
   preventDuplicates: true,
-})
+});
 ```
+
 - No per-call `timeOut`/`positionClass` overrides anywhere in `frontend/src` (grep confirmed).
 - No custom toast component. Stock Bootstrap5 theme: `styles.scss:52-53`
   (`@import 'ngx-toastr/toastr'; @import 'ngx-toastr/toastr-bs5-alert';`), no global overrides.
@@ -23,15 +25,15 @@ ToastrModule.forRoot({
 
 ## 2-3. Live call-site inventory + current React "before" state
 
-| # | Angular file:line | Method | Message / Title | Trigger | React "before" |
-|---|---|---|---|---|---|
-| 1 | `csv-product-importer-modal.component.ts:64` | success(msg) | literal `Importados N productos correctamente.` / no title | createCsvProducts success | `sales/routes/products.tsx:223` — `showBlockingSuccess` (Swal), same text, no title |
-| 2 | `nav-right.component.ts:213-216` | success(msg,title) | `SHOPPING_CART.ORDER_CREATED` "La venta fue creada satisfactoriamente." / `GENERAL.RESPONSE.SUCCESS_TITLE` "Éxito" | order create success | `cart-shell.tsx:222` — `showBlockingSuccess` (Swal), text OK, TITLE lost |
-| 3 | `nav-right.component.ts:223-226` | error(msg,title) | `SHOPPING_CART.ORDER_NOT_CREATED` "Ocurrío un error creando la venta..." / `GENERAL.RESPONSE.ERROR` ← MISSING KEY (Angular bug: shows literal "GENERAL.RESPONSE.ERROR" as title) | order create failure | `cart-shell.tsx:208-211` — FUNCTIONAL GAP: inline `setSubmitError` with generic `GENERAL.ERROR`, not `ORDER_NOT_CREATED` |
-| 4 | `receive-data.component.ts:43` | success(msg) | `SYNCHRONIZATION.RECEIVE_IMPORT_SUCCESS` "Los datos se importaron correctamente." | sync import success | `sync/components/import-form.tsx:57-59` — inline `<InfoBox variant="primary">` |
-| 5 | `features.component.ts:23-26` | error(msg,title) | `FEATURES.UNEXPECTED_ERROR` / `GENERAL.RESPONSE.ERROR` (same missing-key bug) | activateFeatures HTTP error | `admin/features/routes/features.tsx:24-27` — `showBlockingError` with CORRECT `ERROR_TITLE` (silently fixes the bug) |
-| 6 | `features.component.ts:30-32` | success(msg,title) | `FEATURES.FEATURES_ACTIVATED` / `SUCCESS_TITLE` "Éxito" | activateFeatures success | `features.tsx:22` — `showBlockingSuccess`, text OK, TITLE lost |
-| 7 | `features.component.ts:34-36` | error(msg,title) | same as #5 | activateFeatures `succeeded:false` | `features.tsx:30-33` — same as #5 |
+| #   | Angular file:line                            | Method             | Message / Title                                                                                                                                                                  | Trigger                            | React "before"                                                                                                           |
+| --- | -------------------------------------------- | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| 1   | `csv-product-importer-modal.component.ts:64` | success(msg)       | literal `Importados N productos correctamente.` / no title                                                                                                                       | createCsvProducts success          | `sales/routes/products.tsx:223` — `showBlockingSuccess` (Swal), same text, no title                                      |
+| 2   | `nav-right.component.ts:213-216`             | success(msg,title) | `SHOPPING_CART.ORDER_CREATED` "La venta fue creada satisfactoriamente." / `GENERAL.RESPONSE.SUCCESS_TITLE` "Éxito"                                                               | order create success               | `cart-shell.tsx:222` — `showBlockingSuccess` (Swal), text OK, TITLE lost                                                 |
+| 3   | `nav-right.component.ts:223-226`             | error(msg,title)   | `SHOPPING_CART.ORDER_NOT_CREATED` "Ocurrío un error creando la venta..." / `GENERAL.RESPONSE.ERROR` ← MISSING KEY (Angular bug: shows literal "GENERAL.RESPONSE.ERROR" as title) | order create failure               | `cart-shell.tsx:208-211` — FUNCTIONAL GAP: inline `setSubmitError` with generic `GENERAL.ERROR`, not `ORDER_NOT_CREATED` |
+| 4   | `receive-data.component.ts:43`               | success(msg)       | `SYNCHRONIZATION.RECEIVE_IMPORT_SUCCESS` "Los datos se importaron correctamente."                                                                                                | sync import success                | `sync/components/import-form.tsx:57-59` — inline `<InfoBox variant="primary">`                                           |
+| 5   | `features.component.ts:23-26`                | error(msg,title)   | `FEATURES.UNEXPECTED_ERROR` / `GENERAL.RESPONSE.ERROR` (same missing-key bug)                                                                                                    | activateFeatures HTTP error        | `admin/features/routes/features.tsx:24-27` — `showBlockingError` with CORRECT `ERROR_TITLE` (silently fixes the bug)     |
+| 6   | `features.component.ts:30-32`                | success(msg,title) | `FEATURES.FEATURES_ACTIVATED` / `SUCCESS_TITLE` "Éxito"                                                                                                                          | activateFeatures success           | `features.tsx:22` — `showBlockingSuccess`, text OK, TITLE lost                                                           |
+| 7   | `features.component.ts:34-36`                | error(msg,title)   | same as #5                                                                                                                                                                       | activateFeatures `succeeded:false` | `features.tsx:30-33` — same as #5                                                                                        |
 
 **Dead (commented out, excluded):** `login.component.ts:58,62,151,154` (offline/online status toasts);
 `sale-product-row.component.ts:110-111` (commented `PRODUCT_ADDED_TO_CART`).

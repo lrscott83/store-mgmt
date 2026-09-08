@@ -16,9 +16,7 @@ test('FC-D1 — SuperAdmin persona mint produces isSuperAdmin=true', async ({ br
   expect(snapshot.localStorage.length).toBeGreaterThan(0);
 
   // Verify the localStorage contains a currentUser with isSuperAdmin
-  const currentUserEntry = snapshot.localStorage.find(
-    (e) => e.name === 'currentUser'
-  );
+  const currentUserEntry = snapshot.localStorage.find((e) => e.name === 'currentUser');
   expect(currentUserEntry).toBeDefined();
   const user = JSON.parse(currentUserEntry!.value);
   expect(user.isSuperAdmin).toBe(true);

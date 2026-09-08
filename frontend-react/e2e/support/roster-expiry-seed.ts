@@ -38,7 +38,7 @@ export async function setPaymentStartDateNull(page: Page, storeId: string): Prom
     await client.query('ROLLBACK').catch(() => undefined);
     throw new Error(
       `roster-expiry-seed: setPaymentStartDateNull(${storeId}) failed — ` +
-        `${cause instanceof Error ? cause.message : String(cause)}`
+        `${cause instanceof Error ? cause.message : String(cause)}`,
     );
   } finally {
     await client.end();

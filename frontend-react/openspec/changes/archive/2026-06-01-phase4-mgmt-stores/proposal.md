@@ -11,6 +11,7 @@ Structuring decision: engram `sdd/phase4-management/decisions` (#204).
 ## Intent
 
 ### Problem
+
 The React migration (`frontend-react/`) already declares a `MENU.MANAGEMENT` group with a
 `/management/stores` entry (feature-gated on `EFeatures.Stores = 73`), but it is a ghost link:
 no route, no slice, no HTTP service, no UI exists. Store administration (the ability for super-admins
@@ -18,12 +19,14 @@ and owner-admins to list, create, and edit stores, including assigning the modul
 is still only available in the legacy Angular app under `frontend/`.
 
 ### Why now
+
 Stores is the first sub-domain of the Management slice (order locked in #204: stores → users → configurations).
 Users and Configurations sub-slices both depend conceptually on store administration existing first
 (a store user is created against a store; configurations are store-scoped). Delivering Stores unblocks the
 rest of the Management migration and removes a dead menu entry.
 
 ### Success looks like
+
 - `/management/stores`, `/management/stores/create`, `/management/stores/edit/:id` render in React and are
   reachable only by an authenticated user who is super-admin or owner-admin AND has `EFeatures.Stores`.
 - The list shows the stores returned by the backend for the current user; create/edit forms persist via the
@@ -38,6 +41,7 @@ rest of the Management migration and removes a dead menu entry.
 ## Scope
 
 ### In scope
+
 - Routes: `/management/stores` (list), `/management/stores/create` (create form),
   `/management/stores/edit/:id` (edit form).
 - New `adminFeatureLoader([EFeatures.Stores])` factory in `app/auth/routes/loaders.ts`, composed from the
@@ -52,6 +56,7 @@ rest of the Management migration and removes a dead menu entry.
 - Register the 3 store routes in `app/routes.ts`.
 
 ### Out of scope (explicit)
+
 - **Users sub-slice** (`/management/users/*`) — separate change `phase4-mgmt-users`.
 - **Configurations sub-slice** (`/management/configurations`) — separate change `phase4-mgmt-configurations`.
 - Owner CRUD. The form consumes an owner list for the owner picker (owner-admin/super-admin only); building
@@ -83,6 +88,7 @@ list reads write through to the cache. Create/edit/lifecycle actions are disable
 offline (no queue).
 
 **Module selection logic (ported from Angular `EditStoreComponent`):**
+
 - On form mount, fetch the module catalog (`GET /v1/modules/ToStore`).
 - Modules where `priceIncluded === true` are auto-selected and locked (cannot be unselected).
 - In edit mode, after the store loads, merge the store's existing `modules` into the catalog: mark them
@@ -91,6 +97,7 @@ offline (no queue).
 - Total price helpers (`sum of currentPrice / price over selected modules`) are presentation concerns.
 
 **Role-conditional form shape (ported):**
+
 - owner-admin/super-admin: form adds `ownerId` (required, owner picker), `approved`, `description`.
 - super-admin + editing existing store: adds `paymentStartDate` (required).
 - super-admin: adds `isActive`.
@@ -103,27 +110,28 @@ offline (no queue).
 All paths are relative to `${apiUrl}/${apiVersion}` (e.g. `/v1`). Responses use the
 `BaseResponseModel<T>` envelope: `{ data, succeeded, message, actionCode, errors }`.
 
-| Operation | Method + Path | Request body | Response | Evidence |
-|-----------|---------------|--------------|----------|----------|
-| List (current user) | `GET /stores/by-current-user` | — | `BaseResponseModel<Store[]>` | `store.service.ts:22-26` |
-| Get by id | `GET /stores/:id` | — | `BaseResponseModel<Store>` | `store.service.ts:89-92` |
-| Create | `POST /stores` | `{ ownerId, name, address, description, approved, moduleIds: number[] }` | `BaseResponseModel<Store>` | `store.service.ts:37-47` |
-| Update | `PUT /stores/:id` | `{ id, name, address, description, approved, paymentStartDate, moduleIds: number[], isActive }` | `BaseResponseModel<boolean>` | `store.service.ts:49-63` |
-| Activate | `POST /stores/activate` | `{ id }` | `BaseResponseModel<boolean>` | `store.service.ts:65-71` |
-| Approve | `POST /stores/approve` | `{ id }` | `BaseResponseModel<boolean>` | `store.service.ts:73-79` |
-| Disapprove | `POST /stores/disapprove` | `{ id }` | `BaseResponseModel<boolean>` | `store.service.ts:81-87` |
-| Deactivate | `DELETE /stores/:id` | — | `BaseResponseModel<...>` | base `delete()` used in `store-list.component.ts:73` |
+| Operation           | Method + Path                 | Request body                                                                                    | Response                     | Evidence                                             |
+| ------------------- | ----------------------------- | ----------------------------------------------------------------------------------------------- | ---------------------------- | ---------------------------------------------------- |
+| List (current user) | `GET /stores/by-current-user` | —                                                                                               | `BaseResponseModel<Store[]>` | `store.service.ts:22-26`                             |
+| Get by id           | `GET /stores/:id`             | —                                                                                               | `BaseResponseModel<Store>`   | `store.service.ts:89-92`                             |
+| Create              | `POST /stores`                | `{ ownerId, name, address, description, approved, moduleIds: number[] }`                        | `BaseResponseModel<Store>`   | `store.service.ts:37-47`                             |
+| Update              | `PUT /stores/:id`             | `{ id, name, address, description, approved, paymentStartDate, moduleIds: number[], isActive }` | `BaseResponseModel<boolean>` | `store.service.ts:49-63`                             |
+| Activate            | `POST /stores/activate`       | `{ id }`                                                                                        | `BaseResponseModel<boolean>` | `store.service.ts:65-71`                             |
+| Approve             | `POST /stores/approve`        | `{ id }`                                                                                        | `BaseResponseModel<boolean>` | `store.service.ts:73-79`                             |
+| Disapprove          | `POST /stores/disapprove`     | `{ id }`                                                                                        | `BaseResponseModel<boolean>` | `store.service.ts:81-87`                             |
+| Deactivate          | `DELETE /stores/:id`          | —                                                                                               | `BaseResponseModel<...>`     | base `delete()` used in `store-list.component.ts:73` |
 
 **Module catalog fetch (the form's module picker source):**
 
-| Operation | Method + Path | Response | Evidence |
-|-----------|---------------|----------|----------|
+| Operation                     | Method + Path          | Response                      | Evidence                  |
+| ----------------------------- | ---------------------- | ----------------------------- | ------------------------- |
 | Available modules for a store | `GET /modules/ToStore` | `BaseResponseModel<Module[]>` | `module.service.ts:20-21` |
 
 > The list deliberately uses the dedicated `/stores/by-current-user` endpoint, NOT the generic
 > `BaseService.getAllItems()` (`{API_URL}all/false`). Backend scoping is server-side.
 
 **Model shapes (confirmed in `@store-mgmt/domain`):**
+
 - `Store` — `frontend-react/packages/domain/src/models/store.ts:23-35`
   (`id, name, displayName, ownerId, ownerName, address, description, approved, paymentStartDate, modules: Module[], isActive`).
 - `Module` — same file, `:3-11` (`id, name, price, currentPrice, priceIncluded, discountText, selected`).
@@ -133,6 +141,7 @@ No domain model changes required.
 ---
 
 ## OQ-3 — OwnerAdmin scoping (resolved)
+
 Backend enforces store scope server-side. The list endpoint is `by-current-user`; the frontend passes no
 owner/store filter for the list. The edit container resolves the target store id from the `:id` route param,
 falling back to `currentUser.selectedStoreId` when absent (Angular `edit-store.component.ts:53`). Role flags
@@ -164,6 +173,7 @@ auth/user state and navigate back to the list.
 ## Reused vs Net-New Assets
 
 ### Reused directly (no change)
+
 - `apiClient` — `app/shared/lib/http/api-client.ts`
 - `useAuthStore` — role flags + `selectedStoreId`
 - `useOnlineStatus` — `app/shared/lib/hooks/use-online-status.ts`
@@ -173,6 +183,7 @@ auth/user state and navigate back to the list.
 - `EFeatures.Stores` (73) from domain enum
 
 ### Net-new
+
 - `adminFeatureLoader(featureIds)` in `app/auth/routes/loaders.ts`
 - `app/management/stores/routes/` — list, create, edit route modules (containers)
 - `app/management/stores/components/` — `StoreList`, `StoreForm` (+ module picker subcomponent)

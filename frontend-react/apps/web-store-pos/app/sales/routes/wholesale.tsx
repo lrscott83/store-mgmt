@@ -104,7 +104,11 @@ export function WholesalePage() {
   }
 
   /** Mismo gate de inventario que la venta normal, pero SIEMPRE en unidades (packs × packSize). */
-  function availabilityGate(product: Product | undefined, productId: string, units: number): Result {
+  function availabilityGate(
+    product: Product | undefined,
+    productId: string,
+    units: number,
+  ): Result {
     return hasAvailableProductToSale({
       product,
       quantity: units,
@@ -129,16 +133,17 @@ export function WholesalePage() {
               `<p style="margin:0">${intl
                 .formatMessage(
                   { id: 'SALES.WHOLESALE.TIERS_POPUP_FROM' },
-                  { min: tier.minPacks, price: formatCurrency(tier.pricePerUnit), unit: unitPlural },
+                  {
+                    min: tier.minPacks,
+                    price: formatCurrency(tier.pricePerUnit),
+                    unit: unitPlural,
+                  },
                 )
                 .replace(/</g, '&lt;')}</p>`,
           )
           .join('')}
       </div>`;
-    showBlockingInfoHtml(
-      intl.formatMessage({ id: 'SALES.WHOLESALE.TIERS_POPUP_TITLE' }),
-      html,
-    );
+    showBlockingInfoHtml(intl.formatMessage({ id: 'SALES.WHOLESALE.TIERS_POPUP_TITLE' }), html);
   }
 
   /**
@@ -152,7 +157,11 @@ export function WholesalePage() {
    */
   function addProductToWholesale(product: Product, packs: number): Result | undefined {
     // Exclusividad: no se puede mezclar venta normal y mayorista en el mismo carrito.
-    const typeGuard = guardOrderType({ items: cartItems, cartOrderType, requested: OrderType.Mayorista });
+    const typeGuard = guardOrderType({
+      items: cartItems,
+      cartOrderType,
+      requested: OrderType.Mayorista,
+    });
     if (!typeGuard.succeeded) return typeGuard;
 
     // La cantidad mínima de paquetes es el primer rango de la config mayorista.
@@ -239,19 +248,31 @@ export function WholesalePage() {
         return;
       }
       if (!product.isActive || !product.availableToSale) {
-        showToastError(intl.formatMessage({ id: 'SCANNER.PRODUCT_NOT_SELLABLE' }, { name: product.name }));
+        showToastError(
+          intl.formatMessage({ id: 'SCANNER.PRODUCT_NOT_SELLABLE' }, { name: product.name }),
+        );
         return;
       }
-      if (!product.wholesaleEnabled || !product.wholesalePackSize || !product.wholesaleTiers?.length) {
+      if (
+        !product.wholesaleEnabled ||
+        !product.wholesalePackSize ||
+        !product.wholesaleTiers?.length
+      ) {
         showToastError(
-          intl.formatMessage({ id: 'SALES.WHOLESALE.SCANNER_NOT_WHOLESALE' }, { name: product.name }),
+          intl.formatMessage(
+            { id: 'SALES.WHOLESALE.SCANNER_NOT_WHOLESALE' },
+            { name: product.name },
+          ),
         );
         return;
       }
       const minPacks = getWholesaleMinPacks(product);
       if (minPacks <= 0) {
         showToastError(
-          intl.formatMessage({ id: 'SALES.WHOLESALE.SCANNER_NOT_WHOLESALE' }, { name: product.name }),
+          intl.formatMessage(
+            { id: 'SALES.WHOLESALE.SCANNER_NOT_WHOLESALE' },
+            { name: product.name },
+          ),
         );
         return;
       }
@@ -268,7 +289,10 @@ export function WholesalePage() {
         const detail = stock.hasEntries
           ? `\n${intl.formatMessage({ id: 'SALES.AVAILABLE_STOCK' }, { available: stock.available })}`
           : '';
-        showBlockingError(intl.formatMessage({ id: 'GENERAL.RESPONSE.ERROR_TITLE' }), message + detail);
+        showBlockingError(
+          intl.formatMessage({ id: 'GENERAL.RESPONSE.ERROR_TITLE' }),
+          message + detail,
+        );
         return;
       }
       const { unitPrice } = resolveWholesalePrice(product, packs);
@@ -392,15 +416,15 @@ export function WholesalePage() {
                     <div className="min-w-0 flex-1">
                       {/* Nombre + disponibilidad entre paréntesis + icono ? — debajo del
                           nombre, como el precio en /sales/new (sale-product-row.tsx). */}
-                      <p className="truncate text-sm text-text">
-                        {product.name}
-                      </p>
+                      <p className="truncate text-sm text-text">{product.name}</p>
                       <p className="flex items-center gap-1 text-xs text-muted">
                         {available !== undefined && <span>({available})</span>}
                         <button
                           type="button"
                           onClick={() => showTiers(product)}
-                          aria-label={intl.formatMessage({ id: 'SALES.WHOLESALE.TIERS_POPUP_TITLE' })}
+                          aria-label={intl.formatMessage({
+                            id: 'SALES.WHOLESALE.TIERS_POPUP_TITLE',
+                          })}
                           data-testid={`wholesale-tiers-info-${product.id}`}
                           className="inline-flex align-middle text-text-muted transition-colors hover:text-primary"
                         >
@@ -408,8 +432,12 @@ export function WholesalePage() {
                         </button>
                       </p>
                       {packs > 0 && (
-                        <p className="text-xs text-primary" data-testid={`wholesale-quote-${product.id}`}>
-                          {packs} × {packSize} × {formatCurrency(unitPrice)} = {formatCurrency(total)}
+                        <p
+                          className="text-xs text-primary"
+                          data-testid={`wholesale-quote-${product.id}`}
+                        >
+                          {packs} × {packSize} × {formatCurrency(unitPrice)} ={' '}
+                          {formatCurrency(total)}
                         </p>
                       )}
                     </div>
@@ -436,9 +464,18 @@ export function WholesalePage() {
                       className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-white shadow-card hover:bg-primary-hover transition-colors"
                       data-testid={`wholesale-add-${product.id}`}
                     >
-                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                          d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                      <svg
+                        className="h-5 w-5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
+                        />
                       </svg>
                     </button>
                   </div>

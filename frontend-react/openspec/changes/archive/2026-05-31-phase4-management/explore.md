@@ -3,6 +3,7 @@
 ### Current State
 
 **Scaffolded (exists, zero implementation):**
+
 - `menu-config.ts` already declares the `MENU.MANAGEMENT` group with three entries:
   - `{ path: '/management/stores', featureIds: [EFeatures.Stores] }` — EFeatures.Stores = 73
   - `{ path: '/management/users', featureIds: [EFeatures.Users] }` — EFeatures.Users = 72
@@ -13,6 +14,7 @@
 - `authorization-service.ts` has `adminLoader` (checks `isSuperAdmin || isOwnerAdmin`) and `isUserAuthorized` for feature-based access.
 
 **Zero implementation:**
+
 - No `/management/` routes registered in `app/routes.ts` — the menu items are ghost links.
 - No `management/` slice directory exists anywhere under `app/`.
 - No HTTP services for stores, users (management CRUD), or configurations.
@@ -20,6 +22,7 @@
 - No i18n keys under `MANAGEMENT.*`, `STORES.*`, `USERS.*`, or `CONFIGURATIONS.*` namespaces.
 
 **Existing infra reusable directly:**
+
 - `apiClient` (Axios, Bearer token, 401 interceptor)
 - `useAuthStore` → `user.isSuperAdmin`, `user.isOwnerAdmin`, `user.selectedStoreId`
 - `useOnlineStatus` hook
@@ -42,6 +45,7 @@
 Seven routes, three sub-slices:
 
 **1. Stores sub-slice** (EFeatures.Stores = 73, AdminAuthGuard)
+
 - `/management/stores` — list
 - `/management/stores/create` — create form
 - `/management/stores/edit/:id` — edit form
@@ -49,6 +53,7 @@ Seven routes, three sub-slices:
 - Online writes; offline read from localStorage cache
 
 **2. Users sub-slice** (EFeatures.Users = 72, AdminAuthGuard)
+
 - `/management/users` — list
 - `/management/users/create/:storeId` — create form
 - `/management/users/edit/:id` — edit container (details + credentials sub-components)
@@ -56,6 +61,7 @@ Seven routes, three sub-slices:
 - Online writes; offline read from localStorage cache
 
 **3. Configurations sub-slice** (EFeatures.Configurations = 74, AdminAuthGuard)
+
 - `/management/configurations` — dynamic settings page
 - Domain: configuration model is backend-driven — no typed interface in domain yet (OQ-1)
 - Online writes; offline read from localStorage cache
@@ -68,11 +74,11 @@ Recommendation: compose both into a new `adminFeatureLoader(featureIds)` factory
 
 ### Approaches
 
-| Approach | Description | Pros | Cons | Effort |
-|----------|-------------|------|------|--------|
-| A — Monolith slice | Single `management/` slice, one HTTP service, all 7 routes | Simple to start | God-service, hard to test per sub-domain, hard to deliver incrementally | Medium |
-| B — Three sub-slices (recommended) | `management/stores/`, `management/users/`, `management/configurations/` each with own HTTP service, components, routes | Mirrors PRD sub-domain split, independent deliverability, focused PRs, matches profile/sync precedent | Slightly more folder structure | Medium-High (per sub-slice: Low) |
-| C — Flat routes, shared service | All routes flat under `management/routes/`, one `managementHttpService` | Less folders | Mixes domain concerns, harder to maintain | Low-Medium |
+| Approach                           | Description                                                                                                            | Pros                                                                                                  | Cons                                                                    | Effort                           |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- | -------------------------------- |
+| A — Monolith slice                 | Single `management/` slice, one HTTP service, all 7 routes                                                             | Simple to start                                                                                       | God-service, hard to test per sub-domain, hard to deliver incrementally | Medium                           |
+| B — Three sub-slices (recommended) | `management/stores/`, `management/users/`, `management/configurations/` each with own HTTP service, components, routes | Mirrors PRD sub-domain split, independent deliverability, focused PRs, matches profile/sync precedent | Slightly more folder structure                                          | Medium-High (per sub-slice: Low) |
+| C — Flat routes, shared service    | All routes flat under `management/routes/`, one `managementHttpService`                                                | Less folders                                                                                          | Mixes domain concerns, harder to maintain                               | Low-Medium                       |
 
 **Recommendation: Approach B** — three independent sub-slices, each deliverable as a focused PR. Matches profile/sync precedent exactly.
 
@@ -80,11 +86,11 @@ Recommendation: compose both into a new `adminFeatureLoader(featureIds)` factory
 
 ### AdminAuthGuard Options
 
-| Option | Description | Tradeoff |
-|--------|-------------|----------|
-| Compose two loaders inline | `loader = async (args) => (await adminLoader()) ?? (await featureLoader([F])(args))` | Simple, no new helper |
-| `adminFeatureLoader(featureIds)` factory | New function in loaders.ts | DRY, reusable — preferred |
-| Extend existing `featureLoader` | Add role check param | Risks regression on existing tested code |
+| Option                                   | Description                                                                          | Tradeoff                                 |
+| ---------------------------------------- | ------------------------------------------------------------------------------------ | ---------------------------------------- |
+| Compose two loaders inline               | `loader = async (args) => (await adminLoader()) ?? (await featureLoader([F])(args))` | Simple, no new helper                    |
+| `adminFeatureLoader(featureIds)` factory | New function in loaders.ts                                                           | DRY, reusable — preferred                |
+| Extend existing `featureLoader`          | Add role check param                                                                 | Risks regression on existing tested code |
 
 Recommendation: `adminFeatureLoader(featureIds)` in `app/auth/routes/loaders.ts`.
 
@@ -95,10 +101,11 @@ Recommendation: `adminFeatureLoader(featureIds)` in `app/auth/routes/loaders.ts`
 **OQ-1 — Configuration model**: PRD says configurations are backend-driven dynamic keys. Is there a TypeScript interface, or `Record<string, unknown>`? What are the actual config keys? Blocks `ConfigurationService` spec.
 
 **OQ-2 — API endpoints**: Expected pattern:
+
 - `GET/POST/PUT /v1/stores`, `GET /v1/stores/:id`
 - `GET/POST/PUT /v1/users` (store-scoped), `GET /v1/users/:id`
 - `GET/PUT /v1/configurations` (store-scoped)
-Are these the actual backend routes? Need confirmation before speccing HTTP services.
+  Are these the actual backend routes? Need confirmation before speccing HTTP services.
 
 **OQ-3 — OwnerAdmin scoping**: Does backend enforce store-scope server-side (frontend just passes `storeId`), or must frontend filter responses?
 
@@ -112,17 +119,17 @@ Are these the actual backend routes? Need confirmation before speccing HTTP serv
 
 ### Reusable Assets
 
-| Asset | Location | Reuse |
-|-------|----------|-------|
-| `apiClient` | `app/shared/lib/http/api-client.ts` | Import directly in new HTTP services |
-| `useAuthStore` | `app/shared/lib/stores/auth-store.ts` | `selectedStoreId`, role flags |
-| `useOnlineStatus` | `app/shared/lib/hooks/use-online-status.ts` | Write-blocking in all containers |
-| `featureLoader` + `adminLoader` | `app/auth/routes/loaders.ts` | Compose into `adminFeatureLoader` |
-| `BaseRepository<T>` | `app/shared/lib/storage/base-repository.ts` | Read-cache for stores, users, configs |
-| `StorageKeys.entityKey` | `app/shared/lib/storage/storage-keys.ts` | Cache key generation |
-| `Store`, `StoreUser`, `Module` models | `@store-mgmt/domain` | Direct use, no changes needed |
-| `EFeatures.Stores/Users/Configurations` | `@store-mgmt/domain` | Direct use |
-| `EModules.Management` | `@store-mgmt/domain` | Already in menu-config |
+| Asset                                   | Location                                    | Reuse                                 |
+| --------------------------------------- | ------------------------------------------- | ------------------------------------- |
+| `apiClient`                             | `app/shared/lib/http/api-client.ts`         | Import directly in new HTTP services  |
+| `useAuthStore`                          | `app/shared/lib/stores/auth-store.ts`       | `selectedStoreId`, role flags         |
+| `useOnlineStatus`                       | `app/shared/lib/hooks/use-online-status.ts` | Write-blocking in all containers      |
+| `featureLoader` + `adminLoader`         | `app/auth/routes/loaders.ts`                | Compose into `adminFeatureLoader`     |
+| `BaseRepository<T>`                     | `app/shared/lib/storage/base-repository.ts` | Read-cache for stores, users, configs |
+| `StorageKeys.entityKey`                 | `app/shared/lib/storage/storage-keys.ts`    | Cache key generation                  |
+| `Store`, `StoreUser`, `Module` models   | `@store-mgmt/domain`                        | Direct use, no changes needed         |
+| `EFeatures.Stores/Users/Configurations` | `@store-mgmt/domain`                        | Direct use                            |
+| `EModules.Management`                   | `@store-mgmt/domain`                        | Already in menu-config                |
 
 ### Net-New
 

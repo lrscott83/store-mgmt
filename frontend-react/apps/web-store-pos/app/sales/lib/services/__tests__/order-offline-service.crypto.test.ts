@@ -71,7 +71,14 @@ describe('order-offline-service — at-rest encryption seam (entity-at-rest-encr
 
   it('plaintext mode: unprovisioned device writes/reads raw plain JSON, byte-identical to before', async () => {
     const service = new OrderOfflineService(storeId);
-    await service.createOrder(makeCartItems(), OrderType.Normal, false, PaymentType.Efectivo, undefined, '');
+    await service.createOrder(
+      makeCartItems(),
+      OrderType.Normal,
+      false,
+      PaymentType.Efectivo,
+      undefined,
+      '',
+    );
 
     const raw = localStorage.getItem(storageKey);
     expect(raw).not.toBeNull();
@@ -85,7 +92,14 @@ describe('order-offline-service — at-rest encryption seam (entity-at-rest-encr
     setDek(new Uint8Array(32).fill(0x07), storeId);
 
     const service = new OrderOfflineService(storeId);
-    await service.createOrder(makeCartItems(), OrderType.Normal, false, PaymentType.Efectivo, undefined, '');
+    await service.createOrder(
+      makeCartItems(),
+      OrderType.Normal,
+      false,
+      PaymentType.Efectivo,
+      undefined,
+      '',
+    );
 
     const raw = localStorage.getItem(storageKey);
     expect(raw).not.toBeNull();
@@ -99,7 +113,14 @@ describe('order-offline-service — at-rest encryption seam (entity-at-rest-encr
     importRoster(v2Bundle(), 500);
     setDek(new Uint8Array(32).fill(0x07), storeId);
     const service = new OrderOfflineService(storeId);
-    await service.createOrder(makeCartItems(), OrderType.Normal, false, PaymentType.Efectivo, undefined, '');
+    await service.createOrder(
+      makeCartItems(),
+      OrderType.Normal,
+      false,
+      PaymentType.Efectivo,
+      undefined,
+      '',
+    );
 
     const rawBefore = localStorage.getItem(storageKey);
     expect(rawBefore!.startsWith('enc:v1:')).toBe(true);

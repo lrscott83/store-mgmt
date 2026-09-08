@@ -24,8 +24,19 @@ Confituras,Caramelo,20,12,50`;
 // shared DownloadIcon in the icon set, so it is inlined here (same precedent as the cart SVG).
 function DownloadIcon({ className = '' }: { className?: string }) {
   return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" />
+    <svg
+      className={className}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      aria-hidden="true"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3"
+      />
     </svg>
   );
 }
@@ -148,7 +159,9 @@ export function CsvProductImporterModal({ onImport, onClose }: CsvProductImporte
                 showRequired ? 'border-danger' : 'border-border'
               }`}
             >
-              <span className={`min-w-0 flex-1 truncate text-sm ${file ? 'text-text' : 'text-muted'}`}>
+              <span
+                className={`min-w-0 flex-1 truncate text-sm ${file ? 'text-text' : 'text-muted'}`}
+              >
                 {file?.name ?? intl.formatMessage({ id: 'GENERAL.FILE' })}
               </span>
               <button

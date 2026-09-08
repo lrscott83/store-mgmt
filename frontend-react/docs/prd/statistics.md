@@ -20,9 +20,9 @@ This module is part of the React migration from the Angular version of the "Vend
 
 ## Routes
 
-| Path                    | Component            | EFeatures       | Guard     |
-|-------------------------|----------------------|-----------------|-----------|
-| `/statistics/dashboard` | DashboardComponent   | Dashboard (60)  | AuthGuard |
+| Path                    | Component          | EFeatures      | Guard     |
+| ----------------------- | ------------------ | -------------- | --------- |
+| `/statistics/dashboard` | DashboardComponent | Dashboard (60) | AuthGuard |
 
 ### Route Notes
 
@@ -41,6 +41,7 @@ This module is part of the React migration from the Angular version of the "Vend
 **Role:** Container/page component. Composes the statistics view. Handles data fetching from localStorage aggregation services and distributes props to child chart components.
 
 **Responsibilities:**
+
 - Trigger data aggregation on mount.
 - Handle loading and error states.
 - Render `LastMonthSalesComponent` and `LastMonthSaleProfitsComponent` side by side or stacked depending on viewport.
@@ -62,15 +63,17 @@ This module is part of the React migration from the Angular version of the "Vend
 **Y-axis:** Total number of transactions (order count) or total revenue in local currency.
 
 **Data shape:**
+
 ```ts
 interface DailySalesPoint {
-  date: string;      // ISO date string, e.g. "2026-04-27"
+  date: string; // ISO date string, e.g. "2026-04-27"
   orderCount: number;
   totalRevenue: number;
 }
 ```
 
 **Props:**
+
 ```ts
 interface LastMonthSalesProps {
   data: DailySalesPoint[];
@@ -94,9 +97,10 @@ interface LastMonthSalesProps {
 **Y-axis:** Gross profit in local currency (revenue minus cost of goods sold).
 
 **Data shape:**
+
 ```ts
 interface DailyProfitPoint {
-  date: string;      // ISO date string
+  date: string; // ISO date string
   grossProfit: number;
   totalRevenue: number;
   totalCost: number;
@@ -104,6 +108,7 @@ interface DailyProfitPoint {
 ```
 
 **Props:**
+
 ```ts
 interface LastMonthSaleProfitsProps {
   data: DailyProfitPoint[];
@@ -116,17 +121,17 @@ interface LastMonthSaleProfitsProps {
 
 ## Chart Specifications
 
-| Attribute          | Sales Chart                         | Profit Chart                        |
-|--------------------|--------------------------------------|--------------------------------------|
-| Library            | Recharts (lazy-loaded)              | Recharts (lazy-loaded)              |
-| Chart type         | Bar or AreaChart                    | LineChart or AreaChart              |
-| X-axis             | Date label (`MMM DD`)               | Date label (`MMM DD`)               |
-| Y-axis             | Order count or revenue amount       | Gross profit amount                 |
-| Tooltip            | Show date, order count, revenue     | Show date, revenue, cost, profit    |
-| Responsive         | Yes — `ResponsiveContainer` wrapper | Yes — `ResponsiveContainer` wrapper |
-| Legend             | Optional                            | Optional                            |
-| Color              | Brand primary                       | Brand success/green                 |
-| Empty state        | "No sales data for this period"     | "No profit data for this period"    |
+| Attribute   | Sales Chart                         | Profit Chart                        |
+| ----------- | ----------------------------------- | ----------------------------------- |
+| Library     | Recharts (lazy-loaded)              | Recharts (lazy-loaded)              |
+| Chart type  | Bar or AreaChart                    | LineChart or AreaChart              |
+| X-axis      | Date label (`MMM DD`)               | Date label (`MMM DD`)               |
+| Y-axis      | Order count or revenue amount       | Gross profit amount                 |
+| Tooltip     | Show date, order count, revenue     | Show date, revenue, cost, profit    |
+| Responsive  | Yes — `ResponsiveContainer` wrapper | Yes — `ResponsiveContainer` wrapper |
+| Legend      | Optional                            | Optional                            |
+| Color       | Brand primary                       | Brand success/green                 |
+| Empty state | "No sales data for this period"     | "No profit data for this period"    |
 
 ---
 
@@ -136,19 +141,21 @@ All data is read from localStorage. No API calls are made in this module.
 
 ### Source Collections
 
-| Collection        | Key in localStorage    | Purpose                            |
-|-------------------|------------------------|------------------------------------|
-| Orders            | `orders` (or equivalent) | Sales volume, revenue per day     |
-| InventoryEntries  | `inventoryEntries` (or equivalent) | Cost price per product per batch |
+| Collection       | Key in localStorage                | Purpose                          |
+| ---------------- | ---------------------------------- | -------------------------------- |
+| Orders           | `orders` (or equivalent)           | Sales volume, revenue per day    |
+| InventoryEntries | `inventoryEntries` (or equivalent) | Cost price per product per batch |
 
 ### Aggregation Logic
 
 **Daily Sales (last 30 days):**
+
 1. Filter `Orders` where `createdAt` is within the last 30 calendar days.
 2. Group by `createdAt` date (day granularity).
 3. For each day: count orders and sum `totalAmount`.
 
 **Daily Profit (last 30 days):**
+
 1. Filter `Orders` within the last 30 days (same as above).
 2. For each order line item, look up the last known cost price from `InventoryEntries` for that product.
 3. Cost of an order = sum of (unit cost × quantity) for all line items.
@@ -163,14 +170,15 @@ All data is read from localStorage. No API calls are made in this module.
 The chart library (Recharts or equivalent) MUST NOT be included in the initial bundle loaded at login or during authentication.
 
 Implementation approach:
+
 - Use React's `React.lazy` + `Suspense` to lazy-load the `DashboardComponent` or the chart components.
 - The statistics route chunk should be code-split at the route level using the router's lazy loading mechanism.
 - Validate with bundle analysis that the chart library is not present in the main/auth bundle.
 
 ```tsx
 // Route-level lazy loading example
-const DashboardComponent = React.lazy(() =>
-  import('./features/statistics/pages/DashboardComponent')
+const DashboardComponent = React.lazy(
+  () => import('./features/statistics/pages/DashboardComponent'),
 );
 ```
 
@@ -178,12 +186,12 @@ const DashboardComponent = React.lazy(() =>
 
 ## Offline Behavior
 
-| Scenario                                  | Behavior                                               |
-|-------------------------------------------|--------------------------------------------------------|
-| User is offline, data exists in localStorage | Charts render normally from local data             |
-| User is offline, no data in localStorage  | Show empty state with message                          |
-| User is online                            | Same as offline — no API calls are made in this module |
-| localStorage is cleared                   | Show empty state — no retry mechanism needed           |
+| Scenario                                     | Behavior                                               |
+| -------------------------------------------- | ------------------------------------------------------ |
+| User is offline, data exists in localStorage | Charts render normally from local data                 |
+| User is offline, no data in localStorage     | Show empty state with message                          |
+| User is online                               | Same as offline — no API calls are made in this module |
+| localStorage is cleared                      | Show empty state — no retry mechanism needed           |
 
 This module is fully offline-capable by design. There is no sync or refresh mechanism required.
 
@@ -191,11 +199,11 @@ This module is fully offline-capable by design. There is no sync or refresh mech
 
 ## Permissions
 
-| Role         | Feature Required | Can Access Dashboard |
-|--------------|------------------|----------------------|
-| SuperAdmin   | Dashboard (60)   | Yes                  |
-| OwnerAdmin   | Dashboard (60)   | Yes                  |
-| Cashier      | Dashboard (60)   | Yes, if feature assigned |
-| Unauthenticated | —             | No — redirected to login |
+| Role            | Feature Required | Can Access Dashboard     |
+| --------------- | ---------------- | ------------------------ |
+| SuperAdmin      | Dashboard (60)   | Yes                      |
+| OwnerAdmin      | Dashboard (60)   | Yes                      |
+| Cashier         | Dashboard (60)   | Yes, if feature assigned |
+| Unauthenticated | —                | No — redirected to login |
 
 Feature 60 must be present in the authenticated user's feature list (read from localStorage `currentUser`).

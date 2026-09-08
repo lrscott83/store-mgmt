@@ -302,7 +302,7 @@ describe('ownerHttpService — propagates error on HTTP failure', () => {
         email: 'x',
         description: '',
         reSellerId: '',
-      })
+      }),
     ).rejects.toThrow('Network error');
   });
 
@@ -317,7 +317,7 @@ describe('ownerHttpService — propagates error on HTTP failure', () => {
         isActive: true,
         description: '',
         reSellerId: '',
-      })
+      }),
     ).rejects.toThrow('Network error');
   });
 

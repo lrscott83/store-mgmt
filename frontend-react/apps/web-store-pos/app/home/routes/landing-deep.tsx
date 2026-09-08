@@ -23,7 +23,13 @@ const FEATURES: Array<{ title: string; desc: string; icon: React.ReactNode }> = 
     title: 'Seguridad total',
     desc: 'Tus datos se guardan en el teléfono. Nadie más accede a ellos, nunca.',
     icon: (
-      <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <svg
+        width="28"
+        height="28"
+        viewBox="0 0 28 28"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
         <path
           d="M14 2L4 6v8c0 5.5 4.3 10.7 10 12 5.7-1.3 10-6.5 10-12V6L14 2z"
           stroke="currentColor"
@@ -31,7 +37,12 @@ const FEATURES: Array<{ title: string; desc: string; icon: React.ReactNode }> = 
           strokeLinejoin="round"
         />
         <rect x="9" y="12" width="10" height="8" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
-        <path d="M12 12v-2a2 2 0 0 1 4 0v2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        <path
+          d="M12 12v-2a2 2 0 0 1 4 0v2"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+        />
         <circle cx="14" cy="16" r="1" fill="currentColor" />
       </svg>
     ),
@@ -40,12 +51,35 @@ const FEATURES: Array<{ title: string; desc: string; icon: React.ReactNode }> = 
     title: 'Funciona sin Internet',
     desc: 'Todas las funciones disponibles sin conexión. Solo la autenticación requiere Internet.',
     icon: (
-      <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M14 20c4.4 0 8-2.7 8-6s-3.6-6-8-6-8 2.7-8 6 3.6 6 8 6z" stroke="currentColor" strokeWidth="1.5" />
-        <path d="M10 14c1.7-1 3.4-1.5 4-1.5s2.3.5 4 1.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <svg
+        width="28"
+        height="28"
+        viewBox="0 0 28 28"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <path
+          d="M14 20c4.4 0 8-2.7 8-6s-3.6-6-8-6-8 2.7-8 6 3.6 6 8 6z"
+          stroke="currentColor"
+          strokeWidth="1.5"
+        />
+        <path
+          d="M10 14c1.7-1 3.4-1.5 4-1.5s2.3.5 4 1.5"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+        />
         <path d="M4 20V8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
         <path d="M24 20V8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-        <line x1="6" y1="6" x2="22" y2="22" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        <line
+          x1="6"
+          y1="6"
+          x2="22"
+          y2="22"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+        />
       </svg>
     ),
   },
@@ -53,7 +87,13 @@ const FEATURES: Array<{ title: string; desc: string; icon: React.ReactNode }> = 
     title: 'Registro instantáneo',
     desc: 'Anota cada venta en segundos. Sin papel, sin cálculos manuales.',
     icon: (
-      <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <svg
+        width="28"
+        height="28"
+        viewBox="0 0 28 28"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
         <path
           d="M15.5 3L8 15h7l-1.5 10L22 13h-7l1-7L15.5 3z"
           stroke="currentColor"
@@ -61,7 +101,15 @@ const FEATURES: Array<{ title: string; desc: string; icon: React.ReactNode }> = 
           strokeLinejoin="round"
           strokeLinecap="round"
         />
-        <circle cx="15.5" cy="13" r="2" fill="currentColor" fillOpacity="0.2" stroke="currentColor" strokeWidth="1" />
+        <circle
+          cx="15.5"
+          cy="13"
+          r="2"
+          fill="currentColor"
+          fillOpacity="0.2"
+          stroke="currentColor"
+          strokeWidth="1"
+        />
       </svg>
     ),
   },
@@ -69,13 +117,44 @@ const FEATURES: Array<{ title: string; desc: string; icon: React.ReactNode }> = 
     title: 'Cuadre de caja rápido',
     desc: 'Cierra tu día en minutos con totales y diferencias calculadas automáticamente.',
     icon: (
-      <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <svg
+        width="28"
+        height="28"
+        viewBox="0 0 28 28"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
         <rect x="3" y="8" width="22" height="15" rx="2" stroke="currentColor" strokeWidth="1.5" />
         <path d="M8 8V6a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v2" stroke="currentColor" strokeWidth="1.5" />
         <line x1="3" y1="14" x2="25" y2="14" stroke="currentColor" strokeWidth="1.5" />
-        <rect x="7" y="17" width="4" height="3" rx="0.5" fill="currentColor" fillOpacity="0.3" stroke="currentColor" strokeWidth="0.75" />
-        <rect x="13" y="17" width="4" height="3" rx="0.5" fill="currentColor" fillOpacity="0.3" stroke="currentColor" strokeWidth="0.75" />
-        <path d="M19 17v3M22 18.5h.01" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        <rect
+          x="7"
+          y="17"
+          width="4"
+          height="3"
+          rx="0.5"
+          fill="currentColor"
+          fillOpacity="0.3"
+          stroke="currentColor"
+          strokeWidth="0.75"
+        />
+        <rect
+          x="13"
+          y="17"
+          width="4"
+          height="3"
+          rx="0.5"
+          fill="currentColor"
+          fillOpacity="0.3"
+          stroke="currentColor"
+          strokeWidth="0.75"
+        />
+        <path
+          d="M19 17v3M22 18.5h.01"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+        />
       </svg>
     ),
   },
@@ -83,9 +162,25 @@ const FEATURES: Array<{ title: string; desc: string; icon: React.ReactNode }> = 
     title: 'Inventario en tiempo real',
     desc: 'Consulta cuánto tienes y cuánto vale tu stock al instante.',
     icon: (
-      <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M4 8l10-4 10 4v4l-10 4-10-4V8z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-        <path d="M4 12l10 4 10-4M14 16v8" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+      <svg
+        width="28"
+        height="28"
+        viewBox="0 0 28 28"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <path
+          d="M4 8l10-4 10 4v4l-10 4-10-4V8z"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinejoin="round"
+        />
+        <path
+          d="M4 12l10 4 10-4M14 16v8"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinejoin="round"
+        />
         <path d="M14 20l-10-4M14 20l10-4" stroke="currentColor" strokeWidth="1.5" />
       </svg>
     ),
@@ -94,13 +189,67 @@ const FEATURES: Array<{ title: string; desc: string; icon: React.ReactNode }> = 
     title: 'Reportes claros',
     desc: 'Ganancias del día, productos más vendidos y tendencias — con un clic.',
     icon: (
-      <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <line x1="5" y1="22" x2="5" y2="14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-        <line x1="10" y1="22" x2="10" y2="9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-        <line x1="15" y1="22" x2="15" y2="5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-        <line x1="20" y1="22" x2="20" y2="12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-        <line x1="25" y1="22" x2="25" y2="17" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-        <line x1="3" y1="22" x2="27" y2="22" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <svg
+        width="28"
+        height="28"
+        viewBox="0 0 28 28"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <line
+          x1="5"
+          y1="22"
+          x2="5"
+          y2="14"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+        />
+        <line
+          x1="10"
+          y1="22"
+          x2="10"
+          y2="9"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+        />
+        <line
+          x1="15"
+          y1="22"
+          x2="15"
+          y2="5"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+        />
+        <line
+          x1="20"
+          y1="22"
+          x2="20"
+          y2="12"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+        />
+        <line
+          x1="25"
+          y1="22"
+          x2="25"
+          y2="17"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+        />
+        <line
+          x1="3"
+          y1="22"
+          x2="27"
+          y2="22"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+        />
         <path d="M15 5l4-2M19 3l-4 2" stroke="currentColor" strokeWidth="1" strokeLinecap="round" />
       </svg>
     ),
@@ -109,13 +258,56 @@ const FEATURES: Array<{ title: string; desc: string; icon: React.ReactNode }> = 
     title: 'Facturación integrada',
     desc: 'Emite facturas PDF al registrar cada venta, sin pasos extra.',
     icon: (
-      <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <svg
+        width="28"
+        height="28"
+        viewBox="0 0 28 28"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
         <rect x="5" y="3" width="18" height="22" rx="2" stroke="currentColor" strokeWidth="1.5" />
-        <line x1="9" y1="9" x2="19" y2="9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-        <line x1="9" y1="13" x2="19" y2="13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-        <line x1="9" y1="17" x2="15" y2="17" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-        <circle cx="20" cy="21" r="6" className="fill-[var(--color-surface)]" stroke="currentColor" strokeWidth="1.5" />
-        <path d="M18 21l1.5 1.5L22 19.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        <line
+          x1="9"
+          y1="9"
+          x2="19"
+          y2="9"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+        />
+        <line
+          x1="9"
+          y1="13"
+          x2="19"
+          y2="13"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+        />
+        <line
+          x1="9"
+          y1="17"
+          x2="15"
+          y2="17"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+        />
+        <circle
+          cx="20"
+          cy="21"
+          r="6"
+          className="fill-[var(--color-surface)]"
+          stroke="currentColor"
+          strokeWidth="1.5"
+        />
+        <path
+          d="M18 21l1.5 1.5L22 19.5"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
       </svg>
     ),
   },
@@ -123,13 +315,40 @@ const FEATURES: Array<{ title: string; desc: string; icon: React.ReactNode }> = 
     title: 'Panel de decisiones',
     desc: 'Visualiza datos clave para planificar mejor y vender más.',
     icon: (
-      <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <svg
+        width="28"
+        height="28"
+        viewBox="0 0 28 28"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
         <rect x="3" y="3" width="22" height="22" rx="2" stroke="currentColor" strokeWidth="1.5" />
         <path d="M3 9h22" stroke="currentColor" strokeWidth="1.5" />
-        <path d="M8 9V20a2 2 0 0 0 2 2h0a2 2 0 0 0 2-2V9" stroke="currentColor" strokeWidth="1.25" />
-        <path d="M14 9v7a2 2 0 0 0 2 2h0a2 2 0 0 0 2-2V9" stroke="currentColor" strokeWidth="1.25" />
-        <path d="M20 9v4a2 2 0 0 0 2 2h0a2 2 0 0 0 2-2V9" stroke="currentColor" strokeWidth="1.25" />
-        <line x1="6" y1="12" x2="11" y2="12" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeDasharray="1.5 1.5" />
+        <path
+          d="M8 9V20a2 2 0 0 0 2 2h0a2 2 0 0 0 2-2V9"
+          stroke="currentColor"
+          strokeWidth="1.25"
+        />
+        <path
+          d="M14 9v7a2 2 0 0 0 2 2h0a2 2 0 0 0 2-2V9"
+          stroke="currentColor"
+          strokeWidth="1.25"
+        />
+        <path
+          d="M20 9v4a2 2 0 0 0 2 2h0a2 2 0 0 0 2-2V9"
+          stroke="currentColor"
+          strokeWidth="1.25"
+        />
+        <line
+          x1="6"
+          y1="12"
+          x2="11"
+          y2="12"
+          stroke="currentColor"
+          strokeWidth="1"
+          strokeLinecap="round"
+          strokeDasharray="1.5 1.5"
+        />
       </svg>
     ),
   },
@@ -137,25 +356,62 @@ const FEATURES: Array<{ title: string; desc: string; icon: React.ReactNode }> = 
     title: 'Sincronización flexible',
     desc: 'Sube y descarga tus datos cuando lo necesites, sin perder información.',
     icon: (
-      <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <svg
+        width="28"
+        height="28"
+        viewBox="0 0 28 28"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
         <path
           d="M5 12a3 3 0 0 1 3-3h4l3-3h5a3 3 0 0 1 3 3v1a3 3 0 0 1-3 3h-1"
           stroke="currentColor"
           strokeWidth="1.5"
           strokeLinecap="round"
         />
-        <path d="M23 12v4a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3v-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-        <path d="M14 10v4a3 3 0 0 0 3 3h1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-        <line x1="5" y1="8" x2="14" y2="8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeDasharray="2 2" />
+        <path
+          d="M23 12v4a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3v-4"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+        />
+        <path
+          d="M14 10v4a3 3 0 0 0 3 3h1"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+        />
+        <line
+          x1="5"
+          y1="8"
+          x2="14"
+          y2="8"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeDasharray="2 2"
+        />
       </svg>
     ),
   },
 ];
 
 const STEPS = [
-  { number: '01', title: 'Regístrate', desc: 'Crea tu cuenta en segundos. Solo necesitas un teléfono y una contraseña.' },
-  { number: '02', title: 'Configura tu punto', desc: 'Agrega productos al catálogo y registra tu inventario inicial.' },
-  { number: '03', title: 'Empieza a vender', desc: 'Registra cada venta, consulta tu cuadre y reportes. Así de fácil.' },
+  {
+    number: '01',
+    title: 'Regístrate',
+    desc: 'Crea tu cuenta en segundos. Solo necesitas un teléfono y una contraseña.',
+  },
+  {
+    number: '02',
+    title: 'Configura tu punto',
+    desc: 'Agrega productos al catálogo y registra tu inventario inicial.',
+  },
+  {
+    number: '03',
+    title: 'Empieza a vender',
+    desc: 'Registra cada venta, consulta tu cuadre y reportes. Así de fácil.',
+  },
 ];
 
 export default function LandingDeep() {
@@ -259,39 +515,68 @@ export default function LandingDeep() {
             </a>
 
             <div className="hidden items-center gap-6 lg:flex">
-              <a className="text-sm font-medium uppercase tracking-wide text-text-muted hover:text-accent" href="#caracteristicas">
+              <a
+                className="text-sm font-medium uppercase tracking-wide text-text-muted hover:text-accent"
+                href="#caracteristicas"
+              >
                 Características
               </a>
-              <a className="text-sm font-medium uppercase tracking-wide text-text-muted hover:text-accent" href="#como-funciona">
+              <a
+                className="text-sm font-medium uppercase tracking-wide text-text-muted hover:text-accent"
+                href="#como-funciona"
+              >
                 Cómo funciona
               </a>
               {showLoginButton && (
-                <Link className="text-sm font-medium uppercase tracking-wide text-text-muted hover:text-accent" to="/login">
+                <Link
+                  className="text-sm font-medium uppercase tracking-wide text-text-muted hover:text-accent"
+                  to="/login"
+                >
                   Entrar
                 </Link>
               )}
               <a className={ctaPrimary} href="#registro">
                 Comenzar
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                  <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  <path
+                    d="M3 8h10M9 4l4 4-4 4"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
                 </svg>
               </a>
             </div>
 
             <div className="relative lg:hidden">
-              <Button variant="outline" className="px-2 py-2" onClick={() => setMenuOpen((v) => !v)} aria-label="Menu">
+              <Button
+                variant="outline"
+                className="px-2 py-2"
+                onClick={() => setMenuOpen((v) => !v)}
+                aria-label="Menu"
+              >
                 {menuOpen ? (
                   <CloseIcon className="h-5 w-5" />
                 ) : (
                   <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-                    <path d="M3 5h14M3 10h14M3 15h14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                    <path
+                      d="M3 5h14M3 10h14M3 15h14"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                    />
                   </svg>
                 )}
               </Button>
 
               {menuOpen && (
                 <div className="absolute right-0 top-full min-w-[200px] rounded-md border border-border border-t-2 border-t-accent bg-surface py-4 shadow-card">
-                  <a className="block px-6 py-2 text-sm text-text hover:bg-accent/5 hover:text-accent" href="#hero" onClick={closeMenu}>
+                  <a
+                    className="block px-6 py-2 text-sm text-text hover:bg-accent/5 hover:text-accent"
+                    href="#hero"
+                    onClick={closeMenu}
+                  >
                     Inicio
                   </a>
                   <a
@@ -344,8 +629,8 @@ export default function LandingDeep() {
                 Controla <span className="text-accent italic">todo.</span>
               </h1>
               <p className="landing-animate-in mb-10 max-w-[500px] text-lg text-text-muted sm:text-xl [animation-delay:400ms]">
-                Gestiona tu negocio sin depender de Internet. Ventas, inventario, cuadre de caja y reportes — siempre disponibles en tu
-                dispositivo.
+                Gestiona tu negocio sin depender de Internet. Ventas, inventario, cuadre de caja y
+                reportes — siempre disponibles en tu dispositivo.
               </p>
               <div className="landing-animate-in flex flex-col gap-4 sm:flex-row [animation-delay:550ms]">
                 <a href="#registro" className={ctaPrimary}>
@@ -375,15 +660,21 @@ export default function LandingDeep() {
               <div className="landing-animate-in rounded-lg border border-border bg-surface p-10 shadow-card [animation-delay:700ms]">
                 <div className="mb-3 flex items-baseline gap-2">
                   <span className="text-4xl leading-none font-bold text-accent">24</span>
-                  <span className="text-xs font-medium tracking-wide text-text-muted uppercase">hrs, sin conexión</span>
+                  <span className="text-xs font-medium tracking-wide text-text-muted uppercase">
+                    hrs, sin conexión
+                  </span>
                 </div>
                 <div className="mb-3 flex items-baseline gap-2">
                   <span className="text-4xl leading-none font-bold text-accent">100%</span>
-                  <span className="text-xs font-medium tracking-wide text-text-muted uppercase">seguridad de tus datos</span>
+                  <span className="text-xs font-medium tracking-wide text-text-muted uppercase">
+                    seguridad de tus datos
+                  </span>
                 </div>
                 <div className="flex items-baseline gap-2">
                   <span className="text-4xl leading-none font-bold text-accent">0</span>
-                  <span className="text-xs font-medium tracking-wide text-text-muted uppercase">descontrol</span>
+                  <span className="text-xs font-medium tracking-wide text-text-muted uppercase">
+                    descontrol
+                  </span>
                 </div>
               </div>
             </div>
@@ -408,7 +699,8 @@ export default function LandingDeep() {
             </div>
             <div className="flex items-end">
               <p className="max-w-[500px] text-lg text-text-muted">
-                Una herramienta completa que crece contigo. Sin suscripciones, sin complicaciones, sin internet.
+                Una herramienta completa que crece contigo. Sin suscripciones, sin complicaciones,
+                sin internet.
               </p>
             </div>
           </div>
@@ -421,7 +713,9 @@ export default function LandingDeep() {
                   featureCardRefs.current[index] = el;
                 }}
                 className={`transition-all duration-500 ${
-                  revealedFeatures.has(index) ? 'translate-y-0 opacity-100' : 'translate-y-5 opacity-0'
+                  revealedFeatures.has(index)
+                    ? 'translate-y-0 opacity-100'
+                    : 'translate-y-5 opacity-0'
                 }`}
               >
                 <Card>
@@ -453,7 +747,9 @@ export default function LandingDeep() {
           <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
             {STEPS.map((step) => (
               <Card key={step.number}>
-                <span className="mb-6 block text-2xl leading-none font-bold text-accent">{step.number}</span>
+                <span className="mb-6 block text-2xl leading-none font-bold text-accent">
+                  {step.number}
+                </span>
                 <h3 className="mb-2 text-lg font-semibold text-text">{step.title}</h3>
                 <p className="text-sm leading-relaxed text-text-muted">{step.desc}</p>
               </Card>
@@ -481,10 +777,18 @@ export default function LandingDeep() {
             <Link to="/register" className={`${ctaPrimary} px-10 py-4 text-base`}>
               Crear cuenta gratis
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                <path
+                  d="M3 8h10M9 4l4 4-4 4"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
               </svg>
             </Link>
-            <p className="mt-5 text-sm tracking-wide text-text-muted/60">2 meses de prueba gratis · Pago mensual post-uso</p>
+            <p className="mt-5 text-sm tracking-wide text-text-muted/60">
+              2 meses de prueba gratis · Pago mensual post-uso
+            </p>
           </div>
         </div>
       </section>
@@ -492,7 +796,9 @@ export default function LandingDeep() {
       {/* FOOTER */}
       <footer className="border-t border-border py-8 text-center">
         <div className="mx-auto w-full max-w-6xl px-4">
-          <p className="text-xs tracking-wide text-text-muted">&copy; 2026 VendeDTo · Desarrollado para emprendedores con éxito</p>
+          <p className="text-xs tracking-wide text-text-muted">
+            &copy; 2026 VendeDTo · Desarrollado para emprendedores con éxito
+          </p>
         </div>
       </footer>
     </div>

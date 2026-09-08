@@ -33,13 +33,25 @@ describe('pbkdf2Base64 — determinism + output shape', () => {
   const fixedSalt = 'AAAAAAAAAAAAAAAAAAAAAA=='; // 16 zero bytes, Base64
 
   it('is deterministic for the same input/salt/iterations', async () => {
-    const a = await pbkdf2Base64('n4bQgYhMfWWaL+qgxVrQFaO/TxsrC4Is0V1sFbDwCgg=', fixedSalt, 210_000);
-    const b = await pbkdf2Base64('n4bQgYhMfWWaL+qgxVrQFaO/TxsrC4Is0V1sFbDwCgg=', fixedSalt, 210_000);
+    const a = await pbkdf2Base64(
+      'n4bQgYhMfWWaL+qgxVrQFaO/TxsrC4Is0V1sFbDwCgg=',
+      fixedSalt,
+      210_000,
+    );
+    const b = await pbkdf2Base64(
+      'n4bQgYhMfWWaL+qgxVrQFaO/TxsrC4Is0V1sFbDwCgg=',
+      fixedSalt,
+      210_000,
+    );
     expect(a).toBe(b);
   });
 
   it('produces a 32-byte derived key', async () => {
-    const derived = await pbkdf2Base64('n4bQgYhMfWWaL+qgxVrQFaO/TxsrC4Is0V1sFbDwCgg=', fixedSalt, 210_000);
+    const derived = await pbkdf2Base64(
+      'n4bQgYhMfWWaL+qgxVrQFaO/TxsrC4Is0V1sFbDwCgg=',
+      fixedSalt,
+      210_000,
+    );
     expect(atob(derived)).toHaveLength(32);
   });
 });

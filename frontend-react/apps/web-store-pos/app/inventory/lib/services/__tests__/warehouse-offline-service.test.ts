@@ -14,7 +14,12 @@ function seedProduct(
   id: string,
   name: string,
 ) {
-  categoryRepo.addImportedProductCategory({ id: 'cat-1', name: 'Cerveza', order: 1, isActive: true });
+  categoryRepo.addImportedProductCategory({
+    id: 'cat-1',
+    name: 'Cerveza',
+    order: 1,
+    isActive: true,
+  });
   productRepo.addImportedProduct({
     id,
     name,
@@ -157,8 +162,20 @@ describe('WarehouseOfflineService', () => {
 
     it('recomputes the weighted average cost', () => {
       const wh = service.createWarehouse('A').data!;
-      service.recordMovement({ type: 'purchase_in', warehouseId: wh.id, productId: 'prod-1', quantity: 10, costPrice: 700 });
-      service.recordMovement({ type: 'purchase_in', warehouseId: wh.id, productId: 'prod-1', quantity: 10, costPrice: 500 });
+      service.recordMovement({
+        type: 'purchase_in',
+        warehouseId: wh.id,
+        productId: 'prod-1',
+        quantity: 10,
+        costPrice: 700,
+      });
+      service.recordMovement({
+        type: 'purchase_in',
+        warehouseId: wh.id,
+        productId: 'prod-1',
+        quantity: 10,
+        costPrice: 500,
+      });
       const level = service.getStockLevel(wh.id, 'prod-1')!;
       expect(level.onHand).toBe(20);
       expect(level.costPrice).toBe(600);
@@ -166,14 +183,26 @@ describe('WarehouseOfflineService', () => {
 
     it('accepts decimal quantities with round2', () => {
       const wh = service.createWarehouse('A').data!;
-      service.recordMovement({ type: 'purchase_in', warehouseId: wh.id, productId: 'prod-1', quantity: 2.555, costPrice: 700 });
+      service.recordMovement({
+        type: 'purchase_in',
+        warehouseId: wh.id,
+        productId: 'prod-1',
+        quantity: 2.555,
+        costPrice: 700,
+      });
       const level = service.getStockLevel(wh.id, 'prod-1')!;
       expect(level.onHand).toBe(2.56);
     });
 
     it('requires a costPrice', () => {
       const wh = service.createWarehouse('A').data!;
-      const result = service.recordMovement({ type: 'purchase_in', warehouseId: wh.id, productId: 'prod-1', quantity: 10, costPrice: 0 });
+      const result = service.recordMovement({
+        type: 'purchase_in',
+        warehouseId: wh.id,
+        productId: 'prod-1',
+        quantity: 10,
+        costPrice: 0,
+      });
       expect(result.succeeded).toBe(false);
     });
   });
@@ -182,7 +211,13 @@ describe('WarehouseOfflineService', () => {
   describe('recordMovement sale_out', () => {
     it('debits the warehouse AND creates a store InventoryEntry with the warehouse cost', () => {
       const wh = service.createWarehouse('A').data!;
-      service.recordMovement({ type: 'purchase_in', warehouseId: wh.id, productId: 'prod-1', quantity: 24, costPrice: 660 });
+      service.recordMovement({
+        type: 'purchase_in',
+        warehouseId: wh.id,
+        productId: 'prod-1',
+        quantity: 24,
+        costPrice: 660,
+      });
       const result = service.recordMovement({
         type: 'sale_out',
         warehouseId: wh.id,
@@ -212,8 +247,19 @@ describe('WarehouseOfflineService', () => {
 
     it('fails with InsufficientStock and creates nothing', () => {
       const wh = service.createWarehouse('A').data!;
-      service.recordMovement({ type: 'purchase_in', warehouseId: wh.id, productId: 'prod-1', quantity: 5, costPrice: 660 });
-      const result = service.recordMovement({ type: 'sale_out', warehouseId: wh.id, productId: 'prod-1', quantity: 6 });
+      service.recordMovement({
+        type: 'purchase_in',
+        warehouseId: wh.id,
+        productId: 'prod-1',
+        quantity: 5,
+        costPrice: 660,
+      });
+      const result = service.recordMovement({
+        type: 'sale_out',
+        warehouseId: wh.id,
+        productId: 'prod-1',
+        quantity: 6,
+      });
       expect(result.succeeded).toBe(false);
       expect(result.errors[0]).toEqual(WarehouseErrors.InsufficientStock);
       expect(service.getStockLevel(wh.id, 'prod-1')!.onHand).toBe(5);
@@ -231,15 +277,31 @@ describe('WarehouseOfflineService', () => {
         createdByName: 'x',
       });
       expect(inactiveWh.succeeded).toBe(true);
-      const result = service.recordMovement({ type: 'sale_out', warehouseId: 'wh-inactive', productId: 'prod-1', quantity: 1 });
+      const result = service.recordMovement({
+        type: 'sale_out',
+        warehouseId: 'wh-inactive',
+        productId: 'prod-1',
+        quantity: 1,
+      });
       expect(result.succeeded).toBe(false);
       expect(result.errors[0]).toEqual(WarehouseErrors.Inactive);
     });
 
     it('accepts decimal quantities', () => {
       const wh = service.createWarehouse('A').data!;
-      service.recordMovement({ type: 'purchase_in', warehouseId: wh.id, productId: 'prod-1', quantity: 3, costPrice: 660 });
-      const result = service.recordMovement({ type: 'sale_out', warehouseId: wh.id, productId: 'prod-1', quantity: 1.5 });
+      service.recordMovement({
+        type: 'purchase_in',
+        warehouseId: wh.id,
+        productId: 'prod-1',
+        quantity: 3,
+        costPrice: 660,
+      });
+      const result = service.recordMovement({
+        type: 'sale_out',
+        warehouseId: wh.id,
+        productId: 'prod-1',
+        quantity: 1.5,
+      });
       expect(result.succeeded).toBe(true);
       expect(service.getStockLevel(wh.id, 'prod-1')!.onHand).toBe(1.5);
     });
@@ -294,7 +356,13 @@ describe('WarehouseOfflineService', () => {
     it('moves stock between warehouses and propagates the cost to a fresh destination', () => {
       const whA = service.createWarehouse('A').data!;
       const whB = service.createWarehouse('B').data!;
-      service.recordMovement({ type: 'purchase_in', warehouseId: whA.id, productId: 'prod-1', quantity: 24, costPrice: 660 });
+      service.recordMovement({
+        type: 'purchase_in',
+        warehouseId: whA.id,
+        productId: 'prod-1',
+        quantity: 24,
+        costPrice: 660,
+      });
 
       const result = service.recordMovement({
         type: 'transfer_out',
@@ -313,7 +381,13 @@ describe('WarehouseOfflineService', () => {
 
     it('rejects transferring to the same warehouse', () => {
       const whA = service.createWarehouse('A').data!;
-      service.recordMovement({ type: 'purchase_in', warehouseId: whA.id, productId: 'prod-1', quantity: 24, costPrice: 660 });
+      service.recordMovement({
+        type: 'purchase_in',
+        warehouseId: whA.id,
+        productId: 'prod-1',
+        quantity: 24,
+        costPrice: 660,
+      });
       const result = service.recordMovement({
         type: 'transfer_out',
         warehouseId: whA.id,
@@ -342,7 +416,13 @@ describe('WarehouseOfflineService', () => {
     it('supports transfer_in with a fromWarehouseId', () => {
       const whA = service.createWarehouse('A').data!;
       const whB = service.createWarehouse('B').data!;
-      service.recordMovement({ type: 'purchase_in', warehouseId: whA.id, productId: 'prod-1', quantity: 24, costPrice: 660 });
+      service.recordMovement({
+        type: 'purchase_in',
+        warehouseId: whA.id,
+        productId: 'prod-1',
+        quantity: 24,
+        costPrice: 660,
+      });
       const result = service.recordMovement({
         type: 'transfer_in',
         warehouseId: whB.id,
@@ -409,8 +489,20 @@ describe('WarehouseOfflineService', () => {
   describe('movements list', () => {
     it('is append-only and filterable by warehouse/product', () => {
       const whA = service.createWarehouse('A').data!;
-      service.recordMovement({ type: 'purchase_in', warehouseId: whA.id, productId: 'prod-1', quantity: 10, costPrice: 700 });
-      service.recordMovement({ type: 'purchase_in', warehouseId: whA.id, productId: 'prod-2', quantity: 6, costPrice: 500 });
+      service.recordMovement({
+        type: 'purchase_in',
+        warehouseId: whA.id,
+        productId: 'prod-1',
+        quantity: 10,
+        costPrice: 700,
+      });
+      service.recordMovement({
+        type: 'purchase_in',
+        warehouseId: whA.id,
+        productId: 'prod-2',
+        quantity: 6,
+        costPrice: 500,
+      });
       expect(service.getMovements()).toHaveLength(2);
       expect(service.getMovements(whA.id, 'prod-1')).toHaveLength(1);
       expect(service.getMovements(whA.id, 'prod-1')[0].productId).toBe('prod-1');
@@ -418,7 +510,13 @@ describe('WarehouseOfflineService', () => {
 
     it('stamps createdByName and keeps reason null when omitted', () => {
       const whA = service.createWarehouse('A').data!;
-      const result = service.recordMovement({ type: 'purchase_in', warehouseId: whA.id, productId: 'prod-1', quantity: 10, costPrice: 700 });
+      const result = service.recordMovement({
+        type: 'purchase_in',
+        warehouseId: whA.id,
+        productId: 'prod-1',
+        quantity: 10,
+        costPrice: 700,
+      });
       const movement = service.getMovements()[0];
       expect(movement.createdByName).toBe('');
       expect(movement.reason).toBeNull();

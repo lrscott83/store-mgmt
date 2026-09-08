@@ -19,9 +19,8 @@ import { SessionRejectedError } from '../http/session-rejected-error';
 // only to authenticated owner sessions.
 async function ensureExchangeRates(user: UserModel | null): Promise<void> {
   try {
-    const { ensureExchangeRateDailyRecords } = await import(
-      '../exchange-rates/exchange-rate-daily'
-    );
+    const { ensureExchangeRateDailyRecords } =
+      await import('../exchange-rates/exchange-rate-daily');
     await ensureExchangeRateDailyRecords(user);
   } catch {
     // Fire-and-forget: a register failure must never block authentication.
@@ -241,7 +240,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     StorageService.setCurrentUser(userWithExpiry);
     localStorage.setItem(
       StorageKeys.AUTH_MODEL,
-      JSON.stringify({ authToken: token, expiresIn: stamped })
+      JSON.stringify({ authToken: token, expiresIn: stamped }),
     );
     set({ user: userWithExpiry, isAuthenticated: true, error: null });
   },
@@ -250,13 +249,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set((state) => {
       // /v1/auth/me returns no expiresIn; preserve the current session expiry
       // (or stamp a fresh one) so a refresh-after-edit never logs the user out.
-      const expiresIn =
-        user.expiresIn || state.user?.expiresIn || Date.now() + THIRTY_FIVE_DAYS_MS;
+      const expiresIn = user.expiresIn || state.user?.expiresIn || Date.now() + THIRTY_FIVE_DAYS_MS;
       const updatedUser: UserModel = { ...user, expiresIn, password: '' };
       StorageService.setCurrentUser(updatedUser);
       localStorage.setItem(
         StorageKeys.AUTH_MODEL,
-        JSON.stringify({ authToken: state.user?.authToken, expiresIn })
+        JSON.stringify({ authToken: state.user?.authToken, expiresIn }),
       );
       return { user: updatedUser };
     });
@@ -319,14 +317,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const serverExpiresIn = authData.expiresIn
         ? new Date(authData.expiresIn as unknown as string).getTime()
         : undefined;
-      const expiresIn = serverExpiresIn && !isNaN(serverExpiresIn)
-        ? serverExpiresIn
-        : Date.now() + THIRTY_FIVE_DAYS_MS;
+      const expiresIn =
+        serverExpiresIn && !isNaN(serverExpiresIn)
+          ? serverExpiresIn
+          : Date.now() + THIRTY_FIVE_DAYS_MS;
 
       StorageService.setTokenToLocalStorage(authData.authToken);
       localStorage.setItem(
         StorageKeys.AUTH_MODEL,
-        JSON.stringify({ authToken: authData.authToken, expiresIn })
+        JSON.stringify({ authToken: authData.authToken, expiresIn }),
       );
 
       // Decision 3: login() delegates the /me fetch + state hydration to the
@@ -376,9 +375,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       // more: `decryption-failure-policy` imports THIS module, so a static
       // import here would close a cycle at module-evaluation time, and it
       // would drag sweetalert2 into every cold boot.
-      const { resetDecryptionFailureLatch } = await import(
-        '../storage/decryption-failure-policy'
-      );
+      const { resetDecryptionFailureLatch } = await import('../storage/decryption-failure-policy');
       resetDecryptionFailureLatch();
 
       // daily-exchange-rate (online login): stamp first-login anchor + backfill.
@@ -418,15 +415,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       // idempotent either way. Not swallowed, same rationale as the
       // online path above.
       const { resolveDekForLogin } = await import('../offline/dek-provisioning');
-      await resolveDekForLogin({ login: user.login, password, sessionStoreId: user.selectedStoreId });
+      await resolveDekForLogin({
+        login: user.login,
+        password,
+        sessionStoreId: user.selectedStoreId,
+      });
       // Task 4: re-arm the decryption-failure latch, same rationale as the
       // online path above — and dynamic for the same two reasons, restated
       // here because this call site is edited on its own: a static import
       // would close a cycle (`decryption-failure-policy` imports THIS module)
       // and would pull sweetalert2 into every cold boot.
-      const { resetDecryptionFailureLatch } = await import(
-        '../storage/decryption-failure-policy'
-      );
+      const { resetDecryptionFailureLatch } = await import('../storage/decryption-failure-policy');
       resetDecryptionFailureLatch();
       // The ONE hydration seam (auth-session spec: "loginOffline hydrates
       // through the existing setUser seam") — writes TOKEN/CURRENT_USER/

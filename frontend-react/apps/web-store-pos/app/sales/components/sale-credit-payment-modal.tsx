@@ -20,10 +20,11 @@ interface SaleCreditPaymentModalProps {
 // Angular's PaymentTypeUtils.getPaymentTypes() maps enum keys to labels as-is
 // (no translation applied in the template) — same raw enum-member-name
 // precedent as order-list / edit-order-modal.
+// Zelle removed from the options (user request 2026-09-08) — the enum member
+// stays and existing Zelle credits still display their label.
 const PAYMENT_OPTIONS = [
   { value: PaymentType.Efectivo, label: 'Efectivo' },
   { value: PaymentType.Tarjeta, label: 'Tarjeta' },
-  { value: PaymentType.Zelle, label: 'Zelle' },
 ];
 
 /**
@@ -109,7 +110,10 @@ export function SaleCreditPaymentModal({
           </div>
 
           <div className="mb-4">
-            <label htmlFor="sale-credit-payment-type" className="mb-1 block text-sm font-medium text-text">
+            <label
+              htmlFor="sale-credit-payment-type"
+              className="mb-1 block text-sm font-medium text-text"
+            >
               Forma de Pago
             </label>
             <select
@@ -147,7 +151,11 @@ export function SaleCreditPaymentModal({
               {/* GENERAL.CLOSE */}
               {intl.formatMessage({ id: 'GENERAL.CLOSE' })}
             </Button>
-            <Button variant="fab" onClick={handleSubmitClick} data-testid="sale-credit-payment-submit">
+            <Button
+              variant="fab"
+              onClick={handleSubmitClick}
+              data-testid="sale-credit-payment-submit"
+            >
               <PaymentIcon />
               {/* SALE_CREDIT.TO_PAY — the real SweetAlert2 confirm dialog (not a button-text
                   swap) now gates the actual payment, matching Angular exactly. */}

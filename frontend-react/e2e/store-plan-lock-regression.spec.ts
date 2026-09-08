@@ -77,18 +77,18 @@ async function setPaymentStartDateDirect(storeId: string, value: string | null):
     await client.connect();
     const result = await client.query(
       'UPDATE "Store" SET "PaymentStartDate" = $1 WHERE "Id" = $2',
-      [value, storeId]
+      [value, storeId],
     );
     if (result.rowCount !== 1) {
       throw new Error(
         `expected exactly 1 Store row for ${storeId}, the UPDATE touched ${result.rowCount}. ` +
-          'The paymentStartDate seed did not land where this spec thinks it should.'
+          'The paymentStartDate seed did not land where this spec thinks it should.',
       );
     }
   } catch (cause) {
     throw new Error(
       `store-plan-lock-regression: setPaymentStartDateDirect(${storeId}, ${value}) failed — ` +
-        `the paymentStartDate seed did not happen: ${cause instanceof Error ? cause.message : String(cause)}`
+        `the paymentStartDate seed did not happen: ${cause instanceof Error ? cause.message : String(cause)}`,
     );
   } finally {
     await client.end();
@@ -105,7 +105,7 @@ async function readPlanPaymentStartDate(page: Page, storeId: string): Promise<st
     throw new Error(
       `store-plan-lock-regression: GET /v1/stores/${storeId}/plan failed (status ` +
         `${response.status()}) while reading the paymentStartDate precondition — cannot verify ` +
-        'the seeded state without it.'
+        'the seeded state without it.',
     );
   }
   const body = (await response.json()) as { data?: { paymentStartDate?: string | null } };
@@ -116,13 +116,13 @@ async function readPlanPaymentStartDate(page: Page, storeId: string): Promise<st
 async function assertPlanPaymentStartDateIs(
   page: Page,
   storeId: string,
-  expected: string | null
+  expected: string | null,
 ): Promise<void> {
   const observed = await readPlanPaymentStartDate(page, storeId);
   if (observed !== expected) {
     throw new Error(
       `store-plan-lock-regression: expected paymentStartDate ${expected} after the direct-DB ` +
-        `seed, observed ${observed}. The precondition this spec relies on was not actually written.`
+        `seed, observed ${observed}. The precondition this spec relies on was not actually written.`,
     );
   }
 }

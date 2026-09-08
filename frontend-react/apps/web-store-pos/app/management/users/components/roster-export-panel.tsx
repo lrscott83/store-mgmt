@@ -79,12 +79,7 @@ export function RosterExportPanel() {
 
   return (
     <>
-      <Button
-        type="button"
-        variant="outline"
-        disabled={disabled}
-        onClick={() => setOpen(true)}
-      >
+      <Button type="button" variant="outline" disabled={disabled} onClick={() => setOpen(true)}>
         <DownloadIcon className="h-4 w-4" />
         {intl.formatMessage({ id: 'USERS.EXPORT_ROSTER' })}
       </Button>
@@ -116,7 +111,10 @@ export function RosterExportPanel() {
             >
               <form onSubmit={handleConfirm} className="space-y-3">
                 <div>
-                  <label htmlFor="roster-export-master" className="mb-1 block text-sm font-medium text-text">
+                  <label
+                    htmlFor="roster-export-master"
+                    className="mb-1 block text-sm font-medium text-text"
+                  >
                     {intl.formatMessage({ id: 'PROVISION.MASTER_PASSWORD_LABEL' })}
                   </label>
                   <div className="relative">
@@ -137,7 +135,11 @@ export function RosterExportPanel() {
                       })}
                       className="absolute inset-y-0 right-0 flex items-center px-2 text-text-muted hover:text-text"
                     >
-                      {showPassword ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
+                      {showPassword ? (
+                        <EyeOffIcon className="h-5 w-5" />
+                      ) : (
+                        <EyeIcon className="h-5 w-5" />
+                      )}
                     </button>
                   </div>
                 </div>

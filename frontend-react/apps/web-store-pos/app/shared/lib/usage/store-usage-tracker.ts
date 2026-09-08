@@ -91,7 +91,9 @@ function writeUsage(userId: string, usage: Usage): void {
  * happens (scopes tracking to an authenticated user with a store selected).
  */
 function isTrackingContextValid(userId: string, selectedStoreId: string): boolean {
-  return Boolean(userId && userId !== EMPTY_GUID && selectedStoreId && selectedStoreId !== EMPTY_GUID);
+  return Boolean(
+    userId && userId !== EMPTY_GUID && selectedStoreId && selectedStoreId !== EMPTY_GUID,
+  );
 }
 
 function flushUsage(userId: string): void {
@@ -170,7 +172,11 @@ export function registerStoreActivity(userId: string, selectedStoreId: string): 
  * than `daysToKeep` days, keeping the entry exactly at the cutoff (inclusive
  * `>=`), and writes back only when something was actually pruned.
  */
-export function cleanOldStoreUsage(userId: string, selectedStoreId: string, daysToKeep: number): void {
+export function cleanOldStoreUsage(
+  userId: string,
+  selectedStoreId: string,
+  daysToKeep: number,
+): void {
   if (!isTrackingContextValid(userId, selectedStoreId)) return;
 
   const usage = readUsage(userId);

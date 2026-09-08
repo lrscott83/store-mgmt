@@ -151,7 +151,9 @@ test.describe.serial('S2-C1 — Crear crédito desde venta', () => {
 
   test.use({ persona: 'owner-admin-with-products' });
 
-  test('crear venta de crédito genera un crédito visible en Créditos del día', async ({ signedInPage }) => {
+  test('crear venta de crédito genera un crédito visible en Créditos del día', async ({
+    signedInPage,
+  }) => {
     const { page, selectedStoreId } = signedInPage;
 
     await addProductAndOpenCart(page, selectedStoreId);

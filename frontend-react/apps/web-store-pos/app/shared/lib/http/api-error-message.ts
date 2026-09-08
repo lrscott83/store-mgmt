@@ -33,7 +33,10 @@ interface EnvelopeShape {
   actionCode?: number | null;
 }
 
-function findByCodeMatch(errors: unknown, byCode: Record<string, string> | undefined): string | undefined {
+function findByCodeMatch(
+  errors: unknown,
+  byCode: Record<string, string> | undefined,
+): string | undefined {
   if (!byCode || !Array.isArray(errors)) return undefined;
 
   // ADR-3: scan the WHOLE array — a co-failure (e.g. FullName + CellPhone both
@@ -64,9 +67,11 @@ export function apiErrorMessageId(error: unknown, options: ApiErrorMessageOption
   // rejection has no top-level actionCode; a resolved envelope has no response), so
   // precedence only matters for the synthetic case that pins it.
   const status =
-    rejection?.response?.status ?? (envelope?.succeeded === false ? envelope?.actionCode ?? undefined : undefined);
+    rejection?.response?.status ??
+    (envelope?.succeeded === false ? (envelope?.actionCode ?? undefined) : undefined);
   const errorsSource =
-    rejection?.response?.data?.errors ?? (envelope?.succeeded === false ? envelope?.errors : undefined);
+    rejection?.response?.data?.errors ??
+    (envelope?.succeeded === false ? envelope?.errors : undefined);
 
   const byCodeMatch = findByCodeMatch(errorsSource, byCode);
   if (byCodeMatch) return byCodeMatch;

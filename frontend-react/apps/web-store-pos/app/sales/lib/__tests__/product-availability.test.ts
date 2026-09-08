@@ -107,7 +107,10 @@ describe('hasAvailableProductToSale (Result envelope, Angular exact name)', () =
       hasInventoryModule: true,
       inventory: { hasEntries: true, available: 8 },
     });
-    expect(result).toEqual({ succeeded: false, errors: [ProductErrors.ProductQuantityNotAvailable] });
+    expect(result).toEqual({
+      succeeded: false,
+      errors: [ProductErrors.ProductQuantityNotAvailable],
+    });
   });
 
   it('branch 6: includes cart quantity in the requested total (Angular quantity + shoppingCartQty)', () => {
@@ -118,7 +121,10 @@ describe('hasAvailableProductToSale (Result envelope, Angular exact name)', () =
       hasInventoryModule: true,
       inventory: { hasEntries: true, available: 8 },
     });
-    expect(result).toEqual({ succeeded: false, errors: [ProductErrors.ProductQuantityNotAvailable] });
+    expect(result).toEqual({
+      succeeded: false,
+      errors: [ProductErrors.ProductQuantityNotAvailable],
+    });
   });
 
   it('branch 7: available >= (quantity + cartQuantity) -> Result.Success()', () => {
