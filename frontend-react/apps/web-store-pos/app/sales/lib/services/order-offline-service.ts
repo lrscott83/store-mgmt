@@ -145,6 +145,11 @@ export class OrderOfflineService {
     return this.activeOrdersBetween(start, end).reduce((sum, o) => sum + o.total, 0);
   }
 
+  /** Public range variant of the private activeOrdersBetween — feeds "Cuadre por fechas". */
+  getActiveOrdersBetween(start: Date, end: Date): Order[] {
+    return this.activeOrdersBetween(start, end);
+  }
+
   getActiveOrdersPriceToday(): number {
     const { start, end } = localDayRange(new Date());
     return this.getActiveOrdersPriceBetweenDates(start, end);
@@ -313,6 +318,50 @@ export class OrderOfflineService {
     const categoryRepository = new ProductCategoryRepository(this.storeId);
     const storageCategories = categoryRepository.getProductCategories();
     const orderItems: OrderItem[] = this.getActiveOrdersInDay(date).flatMap(
+      (order) => order.orderItems,
+    );
+    const categoryGroups = groupBy(orderItems, 'categoryId');
+
+    const categoryItemsView: CategoryCartItemsView[] = [];
+    categoryGroups.forEach((categoryItems) => {
+      const item = categoryItems[0];
+      const productGroups = groupBy(categoryItems, 'productId');
+      const productItems: ProductCartItemsView[] = [];
+      productGroups.forEach((products) => {
+        const product = products[0];
+        productItems.push({
+          name: product.name,
+          order: product.order,
+          total: getOrderItemsTotal(products),
+          itemsCount: getOrderItemsCount(products),
+          price: product.price,
+        });
+      });
+      const storageCategory = storageCategories.find((c) => c.id === item.categoryId);
+      categoryItemsView.push({
+        id: item.categoryId,
+        name: item.categoryName,
+        order: storageCategory ? storageCategory.order : Number.MAX_VALUE,
+        total: getOrderItemsTotal(categoryItems),
+        itemsCount: getOrderItemsCount(categoryItems),
+        productItems,
+      });
+    });
+
+    return success(categoryItemsView);
+  }
+
+  /**
+   * Range variant of getCategoryCartItemsView for the "Cuadre por fechas" view —
+   * same aggregation (category → product, category `order` resolved from
+   * ProductCategoryRepository), but over the RAW [start, end) window the caller
+   * pre-snapped (ADR-5) instead of a single day. Angular has no correlate;
+   * additive method for the new view.
+   */
+  getCategoryCartItemsViewBetweenDates(start: Date, end: Date): BaseResponseModel<CategoryCartItemsView[]> {
+    const categoryRepository = new ProductCategoryRepository(this.storeId);
+    const storageCategories = categoryRepository.getProductCategories();
+    const orderItems: OrderItem[] = this.activeOrdersBetween(start, end).flatMap(
       (order) => order.orderItems,
     );
     const categoryGroups = groupBy(orderItems, 'categoryId');

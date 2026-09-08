@@ -223,6 +223,7 @@ const messages: Record<string, string> = {
   // Menu items — Reports / Stats / Management (Angular MENU.REPORTS.*, MENU.STATISTICS.*, MENU.STORE_MGMT.*)
   'MENU.TODAY_REPORTS': 'Reportes del día',
   'MENU.DASHBOARD': 'Panel de Control',
+  'MENU.CUADRE_POR_FECHAS': 'Cuadre por fechas',
   // Plan/update split: the single 'Tiendas' entry became two links — the plan
   // view (/management/stores) and the store-data update view
   // (/management/stores/update), same authorization (EFeatures.Stores).
@@ -717,6 +718,19 @@ const messages: Record<string, string> = {
   'STATISTICS.SALES.TITLE': 'Ventas',
   'STATISTICS.PROFIT.TITLE': 'Ganancia bruta',
   'STATISTICS.EMPTY_STATE': 'Sin datos para mostrar',
+
+  // Statistics — Cuadre por fechas (range summary; UI copy owned by the React app)
+  'CUADRE_FECHAS.HEADER': 'Cuadre por fechas',
+  'CUADRE_FECHAS.START_DATE': 'Fecha inicio',
+  'CUADRE_FECHAS.END_DATE': 'Fecha fin',
+  'CUADRE_FECHAS.GENERATE': 'Generar',
+  'CUADRE_FECHAS.INVALID_RANGE': 'La fecha de inicio debe ser anterior o igual a la fecha de fin.',
+  'CUADRE_FECHAS.EMPTY_DATES': 'Selecciona las fechas de inicio y fin.',
+  'CUADRE_FECHAS.CUADRE': 'Cuadre',
+  'CUADRE_FECHAS.KPI_SALES': 'Ventas',
+  'CUADRE_FECHAS.KPI_EXPENSES': 'Gastos',
+  'CUADRE_FECHAS.KPI_GROSS_PROFIT': 'Ganancias Bruta',
+  'CUADRE_FECHAS.KPI_NET_PROFIT': 'Ganancias',
 
   // Footer (exact Angular FOOTER.* strings from vocabs/es.ts)
   'FOOTER.COPYRIGHT1': '© AutoBusinessPro - {year}',
