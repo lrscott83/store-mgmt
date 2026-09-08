@@ -28,7 +28,10 @@ interface CartState {
   clientName: string;
   addItem: (product: Product, quantity?: number, orderType?: OrderType, price?: number) => void;
   removeItem: (productId: string) => void;
-  updateQuantity: (productId: string, qty: number) => void;
+  /** Sets the line's quantity (and optionally its per-line price — the
+   * wholesale cart re-tiers the unit price when ± moves the pack count
+   * across tiers). qty <= 0 removes the line. */
+  updateQuantity: (productId: string, qty: number, price?: number) => void;
   setPaymentType: (type: PaymentType) => void;
   setClientName: (name: string) => void;
   toggleCredit: () => void;
@@ -77,14 +80,16 @@ export const useCartStore = create<CartState>()(
         }));
       },
 
-      updateQuantity: (productId: string, qty: number) => {
+      updateQuantity: (productId: string, qty: number, price?: number) => {
         if (qty <= 0) {
           get().removeItem(productId);
           return;
         }
         set((state) => ({
           items: state.items.map((i) =>
-            i.product.id === productId ? { ...i, quantity: qty } : i
+            i.product.id === productId
+              ? { ...i, quantity: qty, ...(price !== undefined ? { price } : {}) }
+              : i
           ),
         }));
       },

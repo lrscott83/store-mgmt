@@ -6,6 +6,7 @@ import {
   normalizeWholesaleConfig,
   resolveWholesalePrice,
   validateWholesaleConfig,
+  wholesaleTierUnitPrice,
   wholesaleUnitName,
   wholesaleUnitPlural,
   wholesaleUnits,
@@ -354,6 +355,50 @@ describe('getWholesaleConfig — unitLabel en la config normalizada', () => {
       unitLabel: '   ',
     });
     expect(normalized.unitLabel).toBeUndefined();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// wholesaleTierUnitPrice — recálculo de rango del carrito mayorista (2026-09-07)
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('wholesaleTierUnitPrice — precio del rango aplicable (sin fallback retail)', () => {
+  const tiered = makeProduct({
+    price: 700,
+    wholesaleEnabled: true,
+    wholesalePackSize: 24,
+    wholesaleTiers: [
+      { minPacks: 1, pricePerUnit: 680 },
+      { minPacks: 11, pricePerUnit: 660 },
+      { minPacks: 21, pricePerUnit: 640 },
+    ],
+  });
+
+  it('dentro del primer rango devuelve su precio (5 packs → 680)', () => {
+    expect(wholesaleTierUnitPrice(tiered, 5)).toBe(680);
+  });
+
+  it('en el umbral del segundo rango devuelve su precio (11 packs → 660)', () => {
+    expect(wholesaleTierUnitPrice(tiered, 11)).toBe(660);
+  });
+
+  it('por debajo del primer rango devuelve undefined (el caller decide el fallback)', () => {
+    const firstTierAt5 = makeProduct({
+      price: 700,
+      wholesaleEnabled: true,
+      wholesalePackSize: 24,
+      wholesaleTiers: [{ minPacks: 5, pricePerUnit: 680 }],
+    });
+    expect(wholesaleTierUnitPrice(firstTierAt5, 4)).toBeUndefined();
+  });
+
+  it('sin config mayorista devuelve undefined', () => {
+    expect(wholesaleTierUnitPrice(makeProduct(), 5)).toBeUndefined();
+  });
+
+  it('packs 0 o negativos devuelven undefined', () => {
+    expect(wholesaleTierUnitPrice(tiered, 0)).toBeUndefined();
+    expect(wholesaleTierUnitPrice(tiered, -3)).toBeUndefined();
   });
 });
 

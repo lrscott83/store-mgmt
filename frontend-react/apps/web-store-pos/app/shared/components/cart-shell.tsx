@@ -15,7 +15,7 @@ import { ProductCategoryRepository } from '~/sales/lib/repositories/product-cate
 import { hasCreditsModuleAvailable, hasInventoryModuleAvailable } from '~/shared/lib/auth/authorization-service';
 import { getOrderTypeText } from '~/sales/lib/order-type-utils';
 import { wholesaleCartDisplay } from '~/sales/lib/wholesale-cart-display';
-import { wholesaleUnitPlural } from '~/sales/lib/wholesale';
+import { getWholesaleMinPacks, wholesaleTierUnitPrice, wholesaleUnitPlural } from '~/sales/lib/wholesale';
 import { getPaymentTypeIconKind, type PaymentTypeIconKind } from '~/shared/lib/payment-type-icon';
 import { getPaymentReturn, getPaymentReturnKind } from '~/shared/lib/payment-return';
 import { validateCartSubmission } from '~/shared/lib/cart-submission-validation';
@@ -173,6 +173,18 @@ export function CartShell() {
     const step = config ? config.packSize : 1;
     const deltaUnits = delta * step;
 
+    // Mayorista floor rule (2026-09-07): el − no puede dejar la línea por debajo
+    // del menor rango — si packs-1 < minPacks, la línea sale del carrito (el
+    // mínimo del primer rango es la cantidad vendible más pequeña).
+    if (config && delta < 0) {
+      const currentPacks = wholesaleCartDisplay.packsFromUnits(currentQuantity, stepProduct!);
+      const newPacks = currentPacks - 1;
+      if (newPacks < getWholesaleMinPacks(stepProduct!)) {
+        removeItem(productId);
+        return;
+      }
+    }
+
     const productService = createProductService(storeId);
     const inventoryService = new InventoryOfflineService(
       storeId,
@@ -201,7 +213,20 @@ export function CartShell() {
       showBlockingError(intl.formatMessage({ id: 'GENERAL.RESPONSE.ERROR_TITLE' }), message + detail);
       return;
     }
-    updateQuantity(productId, currentQuantity + deltaUnits);
+
+    // Mayorista re-tier (2026-09-07): al mover packs los ±, la línea cae en otro
+    // rango y el precio por unidad se recalcula al del rango aplicable. Por
+    // debajo del primer rango (nada aplicable) mantiene el precio retail.
+    const newQuantity = currentQuantity + deltaUnits;
+    if (config && stepProduct) {
+      const newPacks = Math.floor(newQuantity / config.packSize);
+      const tierPrice = wholesaleTierUnitPrice(stepProduct, newPacks);
+      const linePrice =
+        tierPrice !== undefined ? tierPrice : stepProduct.price;
+      updateQuantity(productId, newQuantity, linePrice);
+      return;
+    }
+    updateQuantity(productId, newQuantity);
   }
 
   function clearCartAfterSuccessfulOrder() {
