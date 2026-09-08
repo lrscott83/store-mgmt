@@ -458,6 +458,20 @@ describe('ExpenseOfflineService', () => {
     });
   });
 
+  // Cuadre por fechas (range view): getActiveExpensesBetween
+  describe('getActiveExpensesBetween (Cuadre por fechas)', () => {
+    it('returns the active expenses of the raw window only', () => {
+      const start = new Date('2024-02-01T00:00:00.000');
+      const end = new Date('2024-02-05T00:00:00.000');
+      const inRange = create({ date: new Date('2024-02-02T10:00:00.000'), total: 30 });
+      const deleted = create({ date: new Date('2024-02-03T10:00:00.000'), total: 20 });
+      create({ date: new Date('2024-01-15T10:00:00.000'), total: 999 }); // before range
+      svc.deleteExpense(deleted.id);
+      const result = svc.getActiveExpensesBetween(start, end);
+      expect(result.map((e) => e.id)).toEqual([inRange.id]);
+    });
+  });
+
   // WU3: getExpensesTotalBefore/Total/Yesterday
   describe('getExpensesTotalBefore/Total/Yesterday', () => {
     it('getExpensesTotalBefore sums active expenses strictly before threshold date', () => {

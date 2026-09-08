@@ -155,6 +155,25 @@ export class SaleCreditOfflineService {
     return this.activeSaleCreditsBetween(start, end).reduce((sum, c) => sum + c.total, 0);
   }
 
+  /** Range variants for the "Cuadre por fechas" view (no Angular correlate — additive). */
+  getUnPaidSaleCreditsBetween(start: Date, end: Date): SaleCredit[] {
+    return this.activeUnpaidSaleCreditsBetween(start, end);
+  }
+
+  getPaidSaleCreditsBetween(start: Date, end: Date): SaleCredit[] {
+    const filtered = this.getStorageSaleCredits()
+      .filter(
+        (c) =>
+          c.isActive &&
+          c.isPaid &&
+          c.paidDate &&
+          c.paidDate >= start &&
+          c.paidDate < end,
+      )
+      .sort((c1, c2) => c1.date.getTime() - c2.date.getTime());
+    return filtered;
+  }
+
   getActiveSaleCreditsPriceToday(): number {
     const { start, end } = localDayRange(new Date());
     return this.getActiveSaleCreditsPriceBetweenDates(start, end);

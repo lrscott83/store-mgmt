@@ -1676,4 +1676,54 @@ describe('OrderOfflineService', () => {
       });
     });
   });
+
+  // ─── Cuadre por fechas (range view): getActiveOrdersBetween / getCategoryCartItemsViewBetweenDates ───
+  describe('Range variants for Cuadre por fechas', () => {
+    it('getActiveOrdersBetween returns active orders in the raw window only', () => {
+      const now = new Date();
+      seedOrders(storeId, [
+        makeOrder({ id: 'in-1', total: 10, date: addDays(now, -2), isActive: true }),
+        makeOrder({ id: 'in-2', total: 20, date: addDays(now, -1), isActive: true }),
+        makeOrder({ id: 'out', total: 999, date: now, isActive: true }),
+        makeOrder({ id: 'inactive', total: 5, date: addDays(now, -1), isActive: false }),
+      ]);
+      const start = addDays(startOfDay(now), -2);
+      const end = startOfDay(now); // [start, end) = two full days
+      const result = service.getActiveOrdersBetween(start, end);
+      expect(result.map((o) => o.id)).toEqual(['in-1', 'in-2']);
+    });
+
+    it('getCategoryCartItemsViewBetweenDates aggregates items across the range by category', () => {
+      const now = new Date();
+      seedOrders(storeId, [
+        makeOrder({
+          id: 'o1',
+          date: addDays(now, -2),
+          isActive: true,
+          orderItems: [orderItemFor('p1', 'Cola', { price: 10, qty: 2, costPrice: 3 })],
+        }),
+        makeOrder({
+          id: 'o2',
+          date: addDays(now, -1),
+          isActive: true,
+          orderItems: [orderItemFor('p1', 'Cola', { price: 10, qty: 3, costPrice: 3 })],
+        }),
+        makeOrder({
+          id: 'out',
+          date: now,
+          isActive: true,
+          orderItems: [orderItemFor('p2', 'Otra', { price: 50, qty: 1 })],
+        }),
+      ]);
+      const start = addDays(startOfDay(now), -2);
+      const end = startOfDay(now);
+      const response = service.getCategoryCartItemsViewBetweenDates(start, end);
+      expect(response.succeeded).toBe(true);
+      const categories = response.data ?? [];
+      expect(categories).toHaveLength(1);
+      expect(categories[0].itemsCount).toBe(5); // 2 + 3 across both days
+      // total = price * qty summed across orders: 10*2 + 10*3 = 50.
+      expect(categories[0].total).toBe(50);
+    });
+  });
 });

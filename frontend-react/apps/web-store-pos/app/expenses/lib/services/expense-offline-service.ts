@@ -79,6 +79,11 @@ export class ExpenseOfflineService {
     return this.activeExpensesBetween(start, end).reduce((sum, e) => sum + e.total, 0);
   }
 
+  /** Public range variant of the private activeExpensesBetween — feeds "Cuadre por fechas". */
+  getActiveExpensesBetween(start: Date, end: Date): Expense[] {
+    return this.activeExpensesBetween(start, end);
+  }
+
   getActiveExpensesPriceToday(): number {
     const { start, end } = localDayRange(new Date());
     return this.getActiveExpensesPriceBetweenDates(start, end);
