@@ -6,6 +6,9 @@ import {
   isInLocalDay,
   groupByLocalDay,
   formatLocalDate,
+  maskDashedDate,
+  parseDashedDate,
+  weekdayNameEs,
 } from '../date-utils';
 
 describe('toLocalDayKey', () => {
@@ -164,5 +167,78 @@ describe('DST regression (America/Sao_Paulo — transitions at midnight, histori
     expect(feb18.end.getTime() - feb18.start.getTime()).toBe(24 * 60 * 60 * 1000);
     expect(feb18.start.getTime()).toBe(new Date(2018, 1, 18, 0, 0, 0).getTime());
     expect(feb18.end.getTime()).toBe(new Date(2018, 1, 19, 0, 0, 0).getTime());
+  });
+});
+
+describe('maskDashedDate (dd-mm-yyyy input mask, user request 2026-09-08)', () => {
+  it('formats raw digits progressively: day, then day-month, then full date', () => {
+    expect(maskDashedDate('0')).toBe('0');
+    expect(maskDashedDate('09')).toBe('09');
+    expect(maskDashedDate('090')).toBe('09-0');
+    expect(maskDashedDate('0901')).toBe('09-01');
+    expect(maskDashedDate('09012')).toBe('09-01-2');
+    expect(maskDashedDate('0901202')).toBe('09-01-202');
+    expect(maskDashedDate('09012026')).toBe('09-01-2026');
+  });
+
+  it('keeps dashes the user already typed (edits stay coherent)', () => {
+    expect(maskDashedDate('09-01-2026')).toBe('09-01-2026');
+    expect(maskDashedDate('09-01')).toBe('09-01');
+  });
+
+  it('ignores non-digit, non-dash characters', () => {
+    expect(maskDashedDate('09/01/2026')).toBe('09-01-2026');
+    expect(maskDashedDate('abc')).toBe('');
+  });
+
+  it('caps at 10 characters (dd-mm-yyyy)', () => {
+    expect(maskDashedDate('090120269')).toBe('09-01-2026');
+  });
+});
+
+describe('parseDashedDate (dd-mm-yyyy → local midnight)', () => {
+  it('parses a valid date to LOCAL midnight of that day', () => {
+    const parsed = parseDashedDate('09-01-2026');
+    expect(parsed).not.toBeNull();
+    expect(parsed!.getFullYear()).toBe(2026);
+    expect(parsed!.getMonth()).toBe(0); // January
+    expect(parsed!.getDate()).toBe(9);
+    expect(parsed!.getHours()).toBe(0);
+    expect(parsed!.getMinutes()).toBe(0);
+  });
+
+  it('accepts both dashed and digit-only input (mask or paste)', () => {
+    expect(parseDashedDate('09012026')!.getDate()).toBe(9);
+    expect(parseDashedDate('09-01-2026')!.getDate()).toBe(9);
+  });
+
+  it('returns null for incomplete input', () => {
+    expect(parseDashedDate('09-01')).toBeNull();
+    expect(parseDashedDate('')).toBeNull();
+    expect(parseDashedDate('0901')).toBeNull();
+  });
+
+  it('returns null for impossible dates (day 32, month 13, non-leap Feb 29)', () => {
+    expect(parseDashedDate('32-01-2026')).toBeNull();
+    expect(parseDashedDate('09-13-2026')).toBeNull();
+    expect(parseDashedDate('29-02-2025')).toBeNull(); // 2025 is not a leap year
+    expect(parseDashedDate('29-02-2024')).not.toBeNull(); // 2024 IS a leap year
+  });
+});
+
+describe('weekdayNameEs (día de la semana en español, user request 2026-09-08)', () => {
+  it('returns the Spanish weekday name (lowercase, RAE style) of the LOCAL day', () => {
+    // 2026-09-08 is a Tuesday; 2026-09-06 a Sunday; 2026-09-07 a Monday.
+    expect(weekdayNameEs(new Date(2026, 8, 8))).toBe('martes');
+    expect(weekdayNameEs(new Date(2026, 8, 6))).toBe('domingo');
+    expect(weekdayNameEs(new Date(2026, 8, 7))).toBe('lunes');
+    expect(weekdayNameEs(new Date(2026, 8, 12))).toBe('sábado');
+    expect(weekdayNameEs(new Date(2026, 8, 9))).toBe('miércoles');
+  });
+
+  it('agrees with parseDashedDate for the same calendar day', () => {
+    const parsed = parseDashedDate('08-09-2026');
+    expect(parsed).not.toBeNull();
+    expect(weekdayNameEs(parsed!)).toBe('martes');
   });
 });

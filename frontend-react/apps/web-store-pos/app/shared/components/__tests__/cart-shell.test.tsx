@@ -217,14 +217,16 @@ describe('CartShell — payment-type selector with icons', () => {
     mockCartState({ items: [], total: vi.fn().mockReturnValue(0) });
   });
 
-  it('renders the three payment type options as radio buttons: Efectivo, Tarjeta, Zelle', () => {
+  it('renders the payment type options as radio buttons: Efectivo, Tarjeta (Zelle hidden from the UI)', () => {
     renderCartShell();
     openCart();
     expect(screen.getByText('Efectivo')).toBeInTheDocument();
     expect(screen.getByText('Tarjeta')).toBeInTheDocument();
-    expect(screen.getByText('Zelle')).toBeInTheDocument();
+    // Zelle removed from the visual options (user request 2026-09-08) — the enum
+    // member stays for historical data, but the selector no longer offers it.
+    expect(screen.queryByText('Zelle')).not.toBeInTheDocument();
     // Angular uses mat-radio-group — parity means true radio controls, not a button group
-    expect(screen.getAllByRole('radio')).toHaveLength(3);
+    expect(screen.getAllByRole('radio')).toHaveLength(2);
   });
 
   it('renders a distinct inline SVG icon per payment type option', () => {
@@ -232,7 +234,8 @@ describe('CartShell — payment-type selector with icons', () => {
     openCart();
     expect(screen.getByTestId('payment-type-icon-cash')).toBeInTheDocument();
     expect(screen.getByTestId('payment-type-icon-card')).toBeInTheDocument();
-    expect(screen.getByTestId('payment-type-icon-phone')).toBeInTheDocument();
+    // Zelle (phone icon) is no longer offered in the selector.
+    expect(screen.queryByTestId('payment-type-icon-phone')).not.toBeInTheDocument();
   });
 });
 

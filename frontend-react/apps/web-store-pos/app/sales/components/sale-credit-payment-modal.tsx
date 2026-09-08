@@ -20,10 +20,11 @@ interface SaleCreditPaymentModalProps {
 // Angular's PaymentTypeUtils.getPaymentTypes() maps enum keys to labels as-is
 // (no translation applied in the template) — same raw enum-member-name
 // precedent as order-list / edit-order-modal.
+// Zelle removed from the options (user request 2026-09-08) — the enum member
+// stays and existing Zelle credits still display their label.
 const PAYMENT_OPTIONS = [
   { value: PaymentType.Efectivo, label: 'Efectivo' },
   { value: PaymentType.Tarjeta, label: 'Tarjeta' },
-  { value: PaymentType.Zelle, label: 'Zelle' },
 ];
 
 /**

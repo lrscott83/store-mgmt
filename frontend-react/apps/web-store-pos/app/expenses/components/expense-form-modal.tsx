@@ -205,9 +205,8 @@ export function ExpenseFormModal({
               }
               className="w-full rounded border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             >
-              {(
-                [PaymentType.Efectivo, PaymentType.Tarjeta, PaymentType.Zelle] as PaymentType[]
-              ).map((pt) => (
+{/* Zelle removed from the options (user request 2026-09-08) — enum member stays. */}
+              {([PaymentType.Efectivo, PaymentType.Tarjeta] as PaymentType[]).map((pt) => (
                 <option key={pt} value={pt}>
                   {intl.formatMessage({ id: PAYMENT_TYPE_KEYS[pt] })}
                 </option>
