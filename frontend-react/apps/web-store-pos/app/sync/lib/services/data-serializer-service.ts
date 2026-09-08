@@ -494,6 +494,50 @@ export class DataSerializerService {
     return this.parseContents(contents);
   }
 
+  /**
+   * Returns the current store data as a plain ParsedData object, without any
+   * encryption or ZIP packaging. Used for debug exports (visible only to
+   * `lrscott`). This method reads directly from the same repositories/services
+   * as `export()`, but returns the parsed objects instead of a ZIP payload.
+   */
+  async exportPlainData(): Promise<ParsedData> {
+    const orders = this.orderReader.getStorageOrders();
+    const expenses = this.expenseReader.getStorageExpenses();
+    const saleCredits = this.saleCreditReader.getStorageSaleCredits();
+    const exchangeRates = this.exchangeRateReader?.getStorageExchangeRates() ?? [];
+    const warehouses = this.warehouseReader?.getStorageWarehouses() ?? [];
+    const warehouseStockLevels = this.warehouseReader?.getStorageStockLevels() ?? [];
+    const warehouseStockMovements = this.warehouseReader?.getStorageMovements() ?? [];
+
+    // Categories and products: read raw JSON and parse
+    const categoriesJson = this.categoryRepository.getCategoriesJson() ?? '[]';
+    const productsJson = this.productRepository.getProductsJson() ?? '[]';
+    const inventoryJson = this.inventoryService.getInventoryEntriesJson();
+
+    // Parse to objects
+    const categoryEntries = JSON.parse(categoriesJson) as [string, ProductCategory][];
+    const productEntries = JSON.parse(productsJson) as [string, Product][];
+    const rawInventory = JSON.parse(inventoryJson) as unknown;
+    const inventoryEntries: InventoryEntry[] = Array.isArray(rawInventory)
+      ? (rawInventory as [string, InventoryEntry[]][]).flatMap(
+          ([, entriesForProduct]) => entriesForProduct,
+        )
+      : [];
+
+    return {
+      categories: categoryEntries.map(([, category]) => category),
+      products: productEntries.map(([, product]) => product),
+      inventoryEntries,
+      orders,
+      expenses,
+      saleCredits,
+      exchangeRates,
+      warehouses,
+      warehouseStockLevels,
+      warehouseStockMovements,
+    };
+  }
+
   private parseContents(contents: Map<string, string>): ParsedData {
     const categoryEntries = parseJson<[string, ProductCategory][]>(
       contents,
