@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useIntl } from 'react-intl';
 import { EFeatures, ExpenseType, PaymentType } from '@store-mgmt/domain';
 import type { Expense, Order, SaleCredit } from '@store-mgmt/domain';
@@ -142,6 +142,30 @@ export function CuadrePorFechasPage() {
   const [rangeError, setRangeError] = useState<string | null>(null);
   const [summary, setSummary] = useState<RangeSummary | null>(null);
 
+  const startDateInputRef = useRef<HTMLInputElement>(null);
+  const endDateInputRef = useRef<HTMLInputElement>(null);
+
+  /**
+   * Open the native date picker explicitly. Some engines do not open the
+   * picker popup when the type="date" input is invisible (opacity 0), so the
+   * tap handler uses the platform API (showPicker) instead of relying on the
+   * click landing on the input.
+   */
+  function openStartPicker() {
+    try {
+      startDateInputRef.current?.showPicker();
+    } catch {
+      startDateInputRef.current?.focus();
+    }
+  }
+  function openEndPicker() {
+    try {
+      endDateInputRef.current?.showPicker();
+    } catch {
+      endDateInputRef.current?.focus();
+    }
+  }
+
   function generate() {
     if (!startDate || !endDate) {
       setRangeError(intl.formatMessage({ id: 'CUADRE_FECHAS.EMPTY_DATES' }));
@@ -273,13 +297,18 @@ export function CuadrePorFechasPage() {
           >
             {intl.formatMessage({ id: 'CUADRE_FECHAS.START_DATE' })}
           </label>
-          <div className="relative w-32 rounded border border-gray-300 bg-white focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/30">
+          <div
+            data-testid="cuadre-start-field"
+            onClick={openStartPicker}
+            className="relative w-32 cursor-pointer rounded border border-gray-300 bg-white focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/30"
+          >
             <input
+              ref={startDateInputRef}
               id="cuadre-start-date"
               data-testid="cuadre-start-date"
               type="date"
               aria-label={intl.formatMessage({ id: 'CUADRE_FECHAS.START_DATE' })}
-              className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+              className="pointer-events-none absolute inset-0 h-full w-full opacity-0"
               value={dashedToIsoDate(startDate)}
               onChange={(e) => setStartDate(isoToDashedDate(e.target.value))}
             />
@@ -304,13 +333,18 @@ export function CuadrePorFechasPage() {
           <label htmlFor="cuadre-end-date" className="mb-1 block text-xs font-medium text-gray-700">
             {intl.formatMessage({ id: 'CUADRE_FECHAS.END_DATE' })}
           </label>
-          <div className="relative w-32 rounded border border-gray-300 bg-white focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/30">
+          <div
+            data-testid="cuadre-end-field"
+            onClick={openEndPicker}
+            className="relative w-32 cursor-pointer rounded border border-gray-300 bg-white focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/30"
+          >
             <input
+              ref={endDateInputRef}
               id="cuadre-end-date"
               data-testid="cuadre-end-date"
               type="date"
               aria-label={intl.formatMessage({ id: 'CUADRE_FECHAS.END_DATE' })}
-              className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+              className="pointer-events-none absolute inset-0 h-full w-full opacity-0"
               value={dashedToIsoDate(endDate)}
               onChange={(e) => setEndDate(isoToDashedDate(e.target.value))}
             />

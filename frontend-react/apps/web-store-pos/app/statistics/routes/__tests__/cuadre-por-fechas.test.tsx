@@ -406,20 +406,36 @@ describe('CuadrePorFechasPage', () => {
         expect(picker.className).toContain('h-full');
         expect(picker.className).toContain('w-full');
         expect(picker.className).toContain('opacity-0');
-        expect(picker.className).toContain('cursor-pointer');
+        expect(picker.className).toContain('pointer-events-none');
       }
     });
 
-    it('a tap (click) on the date layer focuses the native picker — the popup trigger', async () => {
+    it('a tap on the visible field calls showPicker() on the native picker input', async () => {
       const user = userEvent.setup();
       renderPage();
       const start = screen.getByTestId('cuadre-start-date') as HTMLInputElement;
-      await user.click(start);
-      // The interaction reaches the date input (jsdom cannot render the native
-      // calendar; the browser opens the popup on that click). It must never
-      // land on the read-only display.
+      const end = screen.getByTestId('cuadre-end-date') as HTMLInputElement;
+      const startShowPicker = vi.fn();
+      const endShowPicker = vi.fn();
+      start.showPicker = startShowPicker;
+      end.showPicker = endShowPicker;
+
+      await user.click(screen.getByTestId('cuadre-start-field'));
+      expect(startShowPicker).toHaveBeenCalledTimes(1);
+      expect(endShowPicker).not.toHaveBeenCalled();
+
+      await user.click(screen.getByTestId('cuadre-end-field'));
+      expect(endShowPicker).toHaveBeenCalledTimes(1);
+    });
+
+    it('falls back to focusing the native picker when showPicker is unsupported', async () => {
+      const user = userEvent.setup();
+      renderPage();
+      const start = screen.getByTestId('cuadre-start-date') as HTMLInputElement;
+      // jsdom's HTMLInputElement has no showPicker — the tap must not throw
+      // and must still focus the native input.
+      await user.click(screen.getByTestId('cuadre-start-field'));
       expect(document.activeElement).toBe(start);
-      expect(document.activeElement).not.toBe(screen.getByTestId('cuadre-start-display'));
     });
 
     it('the picker overlay is layered over the display inside the same field wrapper', () => {
@@ -430,8 +446,9 @@ describe('CuadrePorFechasPage', () => {
       // ON TOP of the display, not beside it.
       expect(picker.parentElement).toBe(display.parentElement);
       // CSS painting order: the absolutely positioned date input paints ABOVE
-      // the static in-flow display regardless of DOM order, so a real tap hits
-      // the picker (which opens the popup), never the read-only text.
+      // the static in-flow display regardless of DOM order. Clicks pass
+      // through it (pointer-events-none) to the wrapper's tap handler, which
+      // opens the popup via showPicker() — never the read-only text.
       expect(picker.className).toContain('absolute');
       expect(display.classList.contains('absolute')).toBe(false);
       expect(display.classList.contains('relative')).toBe(false);
