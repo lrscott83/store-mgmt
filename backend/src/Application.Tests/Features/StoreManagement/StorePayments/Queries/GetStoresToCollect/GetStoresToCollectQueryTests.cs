@@ -72,17 +72,18 @@ public class GetStoresToCollectQueryHandlerTests
     }
 
     /// <summary>
-    /// Create a Store with a fixed ID using the private 7-param factory via reflection.
+    /// Create a Store with a fixed ID using the private 9-param factory via reflection.
     /// </summary>
     private static Store CreateStoreWithId(Guid id, string name, Owner owner, DateOnly? paymentStartDate = null)
     {
         var method = typeof(Store).GetMethods(System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic)
-            .FirstOrDefault(m => m.Name == "Create" && m.GetParameters().Length == 8);
+            .FirstOrDefault(m => m.Name == "Create" && m.GetParameters().Length == 9);
         if (method is null)
-            throw new InvalidOperationException("Cannot find private Store.Create factory with 8 params");
+            throw new InvalidOperationException("Cannot find private Store.Create factory with 9 params");
 
         var store = (Store)method.Invoke(null, new object?[] {
-            id, owner.Id, name, true, Guid.NewGuid(), paymentStartDate ?? PaymentStartPorVencer, null, null
+            id, owner.Id, name, true, Guid.NewGuid(), paymentStartDate ?? PaymentStartPorVencer, null, null,
+            (int)Domain.Common.Enums.StorePlanType.Pago
         })!;
 
         store.Owner = owner;

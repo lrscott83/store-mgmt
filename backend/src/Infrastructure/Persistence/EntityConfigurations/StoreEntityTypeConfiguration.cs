@@ -20,6 +20,13 @@ namespace Infrastructure.Persistence.EntityConfigurations
 
             builder.HasKey(x => x.Id);
 
+            builder.Property(x => x.StorePlanId).HasDefaultValue(2);
+
+            builder.HasOne(c => c.StorePlan)
+             .WithMany()
+             .HasForeignKey(e => e.StorePlanId)
+             .OnDelete(DeleteBehavior.Restrict);
+
             builder.HasMany(c => c.StoreUsers)
              .WithOne(e => e.Store)
              .HasForeignKey(e => e.StoreId)

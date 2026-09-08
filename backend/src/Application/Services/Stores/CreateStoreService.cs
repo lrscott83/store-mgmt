@@ -1,4 +1,5 @@
 ﻿using Application.Abstractions.Time;
+using Domain.Common.Enums;
 using Domain.Entities.Modules;
 using Domain.Entities.StoreModules;
 using Domain.Entities.Stores;
@@ -40,7 +41,8 @@ namespace Application.Services.Stores
             // Identical derivation to UpdateStoreCommandHandler.cs's activation-on-first-paid conditional,
             // so the two paths cannot drift.
             var store = Store.Create(name, ownerId, approved, tenantId,
-                DateOnly.FromDateTime(_dateTimeProvider.UtcNow.UtcDateTime), address, description);
+                DateOnly.FromDateTime(_dateTimeProvider.UtcNow.UtcDateTime), address, description,
+                (int)StorePlanType.Pago);
             await _storeRepository.AddAsync(store);
 
             var modules = (await _moduleRepository.GetModulesByIdsAsync(moduleIds)).ToDictionary(m => m.Id);
