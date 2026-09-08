@@ -34,15 +34,22 @@ import { newTestIdentity } from './support/identity';
  * del featureIds top-level chequea roles[].featureIds
  * (authorization-service.ts:35-38) — por eso el seam toca ambos. El test de
  * gating lo QUITA primero para probar que el ítem se oculta sin él, y luego lo
- * vuelve a habilitar. (2026-09-06 UI redesign: los botones "Desactivar" viven
- * en el menú de engranaje por almacén; los tests adaptados lo abren primero.)
+ * vuelve a habilitar.
+ *
+ * ACTUALIZADO 2026-09-08 (autorizado por el usuario en persona): el rediseño
+ * 2026-09-07 de warehouses.tsx (paneles colapsables por categoría, commits
+ * 8cd0959d → c928b104) eliminó la compra rápida por fila (purchase-select-),
+ * las celdas stock-onhand-/stock-cost- y los botones por fila; compra,
+ * transferencia y salida pasaron al menú de engranaje (Entrada / Movimiento /
+ * Salida) + WarehouseMovementModal. Los helpers fueron reescritos contra esa
+ * UI. El stock ahora se lee de la fila de producto del panel expandido
+ * ("Nombre (N)") y el costo de warehouse-product-cost- con formatCurrency.
+ * La cobertura extendida (GAP-3, atomicidad) vive en
+ * warehouse-movements-extended.spec.ts (spec NUEVO, plan 2026-09-08).
  */
 
 const NEW_WAREHOUSE = 'Nuevo almacén'; // WAREHOUSES.NEW_WAREHOUSE
 const SAVE = 'Guardar'; // WAREHOUSES.SAVE
-const PURCHASE_IN = 'Entrada (compra)'; // WAREHOUSES.PURCHASE_IN
-const SALE_OUT = 'Salida a tienda'; // WAREHOUSES.SALE_OUT
-const TRANSFER = 'Transferir'; // WAREHOUSES.TRANSFER
 const INSUFFICIENT_STOCK = 'No hay suficiente stock en el almacén.'; // Warehouse.InsufficientStock
 const TODAY_ENTRIES_TITLE = 'Entradas del día'; // INVENTORY.TODAY_ENTRIES.TITLE
 const CANNOT_DEACTIVATE = 'No se puede desactivar un almacén con stock o movimientos.'; // Warehouse.CannotDeactivate
@@ -174,16 +181,47 @@ function warehouseCard(page: Page, name: string): ReturnType<Page['locator']> {
   return page.locator(`[data-testid="warehouse-card-${name}"]`);
 }
 
-function onHandCell(page: Page, warehouseName: string): ReturnType<Page['locator']> {
-  return warehouseCard(page, warehouseName)
-    .locator('[data-testid^="stock-onhand-"]')
-    .first();
+/**
+ * Expands a warehouse's panel (and its first category when present) so the
+ * product rows render, and returns the warehouse's product-row locator.
+ * Post-2026-09-07 UI: stock lives inside the collapsible category panel.
+ * Idempotent — reads aria-expanded before clicking, so a second call on an
+ * already-expanded panel does not collapse it.
+ */
+async function expandWarehouseProducts(
+  page: Page,
+  warehouseName: string,
+): Promise<ReturnType<Page['locator']>> {
+  const card = warehouseCard(page, warehouseName);
+  const toggle = card.locator(`[data-testid^="warehouse-toggle-"]`);
+  if ((await toggle.getAttribute('aria-expanded')) !== 'true') {
+    await toggle.click();
+  }
+  // Expand the first category (persona store has a single category). NOTE:
+  // expandedCategories is keyed by categoryId and shared across warehouses, so
+  // the same category opened in one panel renders expanded in another.
+  const categoryToggle = card.locator(`[data-testid^="warehouse-category-toggle-"]`).first();
+  await expect(categoryToggle).toBeVisible();
+  if ((await categoryToggle.getAttribute('aria-expanded')) !== 'true') {
+    await categoryToggle.click();
+  }
+  const row = card.locator('[data-testid^="warehouse-product-row-"]').first();
+  await expect(row).toBeVisible();
+  return row;
 }
 
-function costCell(page: Page, warehouseName: string): ReturnType<Page['locator']> {
-  return warehouseCard(page, warehouseName)
-    .locator('[data-testid^="stock-cost-"]')
-    .first();
+/** Reads the first product row's onHand — the "(N)" in "Name (N)". */
+async function onHandCell(page: Page, warehouseName: string): Promise<string> {
+  const row = await expandWarehouseProducts(page, warehouseName);
+  const text = await row.locator('p.font-medium').innerText();
+  const match = /\(([-\d.]+)\)$/.exec(text.trim());
+  return match ? match[1] : text.trim();
+}
+
+/** Reads the first product row's avg cost — formatCurrency, e.g. "$660" / "$7.33". */
+async function costCell(page: Page, warehouseName: string): Promise<string> {
+  const row = await expandWarehouseProducts(page, warehouseName);
+  return (await row.locator('[data-testid^="warehouse-product-cost-"]').innerText()).trim();
 }
 
 /** Reads the first sellable product's name from localStorage (plaintext persona format). */
@@ -205,10 +243,16 @@ async function firstProductName(page: Page, storeId: string): Promise<string> {
 }
 
 /**
- * Purchase: on an empty warehouse the only way in is the quick-purchase row
- * (product select + "Entrada (compra)"), which opens the movement form with
- * the chosen product. The same button opens a restock for stocked products.
+ * Opens the warehouse's gear menu and clicks a movement item (post-2026-09-07
+ * UI): 'Entrada' → purchase_in modal, 'Movimiento' → transfer_out modal,
+ * 'Salida' → sale_out modal. The modal opens with a blank product select.
  */
+async function openGearMovement(page: Page, warehouseName: string, item: string): Promise<void> {
+  await page.getByRole('button', { name: `Acciones de ${warehouseName}` }).click();
+  await page.getByRole('menuitem', { name: item, exact: true }).click();
+}
+
+/** Purchase via gear → Entrada: picks the product, fills quantity + cost, saves. */
 async function purchaseIn(
   page: Page,
   warehouseName: string,
@@ -216,16 +260,20 @@ async function purchaseIn(
   quantity: string,
   cost: string,
 ): Promise<void> {
-  await page.getByTestId(`purchase-select-${warehouseName}`).selectOption({ label: productName });
-  await page.getByText(PURCHASE_IN, { exact: true }).first().click();
+  await openGearMovement(page, warehouseName, 'Entrada');
+  await page.getByTestId('movement-product').selectOption({ label: productName });
   await page.getByTestId('movement-quantity').fill(quantity);
   await page.getByTestId('movement-cost').fill(cost);
   await page.getByRole('button', { name: SAVE }).click();
 }
 
-/** Sale out: opens the movement form on the first stocked row and saves. */
+/** Sale out via gear → Salida: picks the first stocked product and saves. */
 async function saleOut(page: Page, warehouseName: string, quantity: string): Promise<void> {
-  await page.getByText(SALE_OUT, { exact: true }).first().click();
+  await openGearMovement(page, warehouseName, 'Salida');
+  // Gear mode opens the modal with a BLANK product select — the modal lists
+  // only stocked products, so the first option after the placeholder is the
+  // (only) product this suite stocks in the warehouse.
+  await page.getByTestId('movement-product').selectOption({ index: 1 });
   await page.getByTestId('movement-quantity').fill(quantity);
   await page.getByRole('button', { name: SAVE }).click();
 }
@@ -359,13 +407,12 @@ test.describe.serial('Almacenes — flujo completo', () => {
 
     await createWarehouse(page, 'Almacén Central');
     const product = await firstProductName(page, selectedStoreId);
-    await page.getByTestId('warehouse-toggle-Almacén Central').click();
 
     await purchaseIn(page, 'Almacén Central', product, '24', '660');
 
     // Stock visible: on-hand 24 y costo 660 en la fila del producto.
-    await expect(onHandCell(page, 'Almacén Central')).toHaveText('24');
-    await expect(costCell(page, 'Almacén Central')).toHaveText('$660');
+    expect(await onHandCell(page, 'Almacén Central')).toBe('24');
+    expect(await costCell(page, 'Almacén Central')).toBe('$660');
   });
 
   test('salida a tienda debita el almacén y crea una entrada en Entradas del día', async ({
@@ -377,18 +424,18 @@ test.describe.serial('Almacenes — flujo completo', () => {
 
     await createWarehouse(page, 'Central');
     const product = await firstProductName(page, selectedStoreId);
-    await page.getByTestId('warehouse-toggle-Central').click();
     await purchaseIn(page, 'Central', product, '24', '660');
-    await expect(onHandCell(page, 'Central')).toHaveText('24');
+    expect(await onHandCell(page, 'Central')).toBe('24');
 
     // Salida a tienda de 12 unidades.
-    await page.getByText(SALE_OUT, { exact: true }).first().click();
+    await openGearMovement(page, 'Central', 'Salida');
+    await page.getByTestId('movement-product').selectOption({ label: product });
     await page.getByTestId('movement-quantity').fill('12');
     await page.getByTestId('movement-reason').fill('pedido tienda');
     await page.getByRole('button', { name: SAVE }).click();
 
     // El almacén queda con 12.
-    await expect(onHandCell(page, 'Central')).toHaveText('12');
+    expect(await onHandCell(page, 'Central')).toBe('12');
 
     // La entrada aparece en Entradas del día con el costo del almacén (660).
     await page.goto('/inventory/today-entries');
@@ -405,17 +452,22 @@ test.describe.serial('Almacenes — flujo completo', () => {
 
     await createWarehouse(page, 'Central');
     const product = await firstProductName(page, selectedStoreId);
-    await page.getByTestId('warehouse-toggle-Central').click();
     await purchaseIn(page, 'Central', product, '5', '660');
-    await expect(onHandCell(page, 'Central')).toHaveText('5');
+    expect(await onHandCell(page, 'Central')).toBe('5');
 
-    await page.getByText(SALE_OUT, { exact: true }).first().click();
+    await openGearMovement(page, 'Central', 'Salida');
+    await page.getByTestId('movement-product').selectOption({ label: product });
     await page.getByTestId('movement-quantity').fill('6');
     await page.getByRole('button', { name: SAVE }).click();
 
     // Error de stock visible (Swal) — el almacén sigue con 5.
     await expect(page.getByText(INSUFFICIENT_STOCK)).toBeVisible();
-    await expect(onHandCell(page, 'Central')).toHaveText('5');
+    // The movement modal STAYS OPEN on failure (warehouses.tsx closes it only
+    // on success) — dismiss the Swal, then close the modal.
+    await dismissSwal(page);
+    await page.getByRole('button', { name: 'Cancelar' }).click();
+    await expect(page.getByTestId('movement-form-sale_out')).toHaveCount(0);
+    expect(await onHandCell(page, 'Central')).toBe('5');
 
     // No se creó ninguna entrada en la tienda.
     await page.goto('/inventory/today-entries');
@@ -432,23 +484,22 @@ test.describe.serial('Almacenes — flujo completo', () => {
     await createWarehouse(page, 'Almacén B');
 
     const product = await firstProductName(page, selectedStoreId);
-    await page.getByTestId('warehouse-toggle-Almacén A').click();
     await purchaseIn(page, 'Almacén A', product, '24', '660');
-    await expect(onHandCell(page, 'Almacén A')).toHaveText('24');
+    expect(await onHandCell(page, 'Almacén A')).toBe('24');
 
-    // Transferir 10 de A → B.
-    await page.getByText(TRANSFER, { exact: true }).first().click();
+    // Transferir 10 de A → B (gear → Movimiento).
+    await openGearMovement(page, 'Almacén A', 'Movimiento');
+    await page.getByTestId('movement-product').selectOption({ label: product });
     await page.getByTestId('movement-quantity').fill('10');
     await page.getByTestId('movement-target').selectOption({ label: 'Almacén B' });
     await page.getByRole('button', { name: SAVE }).click();
 
     // A queda con 14.
-    await expect(onHandCell(page, 'Almacén A')).toHaveText('14');
+    expect(await onHandCell(page, 'Almacén A')).toBe('14');
 
     // B recibe 10 con el costo propagado (660).
-    await page.getByTestId('warehouse-toggle-Almacén B').click();
-    await expect(onHandCell(page, 'Almacén B')).toHaveText('10');
-    await expect(costCell(page, 'Almacén B')).toHaveText('$660');
+    expect(await onHandCell(page, 'Almacén B')).toBe('10');
+    expect(await costCell(page, 'Almacén B')).toBe('$660');
   });
 
   test('desactivar almacén con stock se bloquea y almacén vacío sí se desactiva', async ({
@@ -461,9 +512,8 @@ test.describe.serial('Almacenes — flujo completo', () => {
     // Almacén CON stock: crear + comprar 24.
     await createWarehouse(page, 'Con Stock');
     const product = await firstProductName(page, selectedStoreId);
-    await page.getByTestId('warehouse-toggle-Con Stock').click();
     await purchaseIn(page, 'Con Stock', product, '24', '660');
-    await expect(onHandCell(page, 'Con Stock')).toHaveText('24');
+    expect(await onHandCell(page, 'Con Stock')).toBe('24');
 
     // Intentar desactivar → Swal con CannotDeactivate, el almacén sigue activo.
     // (2026-09-06 UI redesign: "Desactivar" lives in the per-warehouse gear menu
@@ -489,18 +539,17 @@ test.describe.serial('Almacenes — flujo completo', () => {
 
     await createWarehouse(page, 'Decimal');
     const product = await firstProductName(page, selectedStoreId);
-    await page.getByTestId('warehouse-toggle-Decimal').click();
 
     // purchase_in de 10.555 → onHand 10.56 (round2).
     await purchaseIn(page, 'Decimal', product, '10.555', '100');
-    await expect(onHandCell(page, 'Decimal')).toHaveText('10.56');
+    expect(await onHandCell(page, 'Decimal')).toBe('10.56');
 
     // El movimiento registra la cantidad redondeada (10.56).
     await expect(page.locator('[data-testid^="mv-qty-"]').first()).toHaveText('10.56');
 
     // sale_out de 2.5 → almacén queda en 8.06 y la entrada de la tienda se crea.
     await saleOut(page, 'Decimal', '2.5');
-    await expect(onHandCell(page, 'Decimal')).toHaveText('8.06');
+    expect(await onHandCell(page, 'Decimal')).toBe('8.06');
 
     // La InventoryEntry de la tienda quedó persistida con quantity 2.5.
     const entryQty = await page.evaluate((sid) => {
@@ -530,9 +579,8 @@ test.describe.serial('Almacenes — flujo completo', () => {
     // Estado: 1 almacén con stock + 1 movimiento purchase_in.
     await createWarehouse(page, 'Backup');
     const product = await firstProductName(page, selectedStoreId);
-    await page.getByTestId('warehouse-toggle-Backup').click();
     await purchaseIn(page, 'Backup', product, '24', '660');
-    await expect(onHandCell(page, 'Backup')).toHaveText('24');
+    expect(await onHandCell(page, 'Backup')).toBe('24');
 
     // Exportar ZIP real desde /sync/export.
     const zip = await exportBackupZip(page, testInfo.outputPath('warehouses-backup.zip'));
@@ -549,9 +597,8 @@ test.describe.serial('Almacenes — flujo completo', () => {
     await openWarehouses(page);
     const card = warehouseCard(page, 'Backup');
     await expect(card).toBeVisible();
-    await page.getByTestId('warehouse-toggle-Backup').click();
-    await expect(onHandCell(page, 'Backup')).toHaveText('24');
-    await expect(costCell(page, 'Backup')).toHaveText('$660');
+    expect(await onHandCell(page, 'Backup')).toBe('24');
+    expect(await costCell(page, 'Backup')).toBe('$660');
 
     // Movimientos: el merge append-only restauró exactamente el exportado (sin duplicar).
     await expect(page.locator('[data-testid^="mv-qty-"]')).toHaveCount(1);
@@ -593,11 +640,10 @@ test.describe.serial('Almacenes — flujo completo', () => {
     // Almacén con costo conocido: 24 × $660, sale_out de 12 → entrada 12 × 660.
     await createWarehouse(page, 'FIFO');
     const product = await firstProductName(page, selectedStoreId);
-    await page.getByTestId('warehouse-toggle-FIFO').click();
     await purchaseIn(page, 'FIFO', product, '24', '660');
-    await expect(onHandCell(page, 'FIFO')).toHaveText('24');
+    expect(await onHandCell(page, 'FIFO')).toBe('24');
     await saleOut(page, 'FIFO', '12');
-    await expect(onHandCell(page, 'FIFO')).toHaveText('12');
+    expect(await onHandCell(page, 'FIFO')).toBe('12');
 
     // Vender 1 unidad: la ganancia usa precio_venta − 660 (FIFO al costo del almacén).
     await createSaleOfFirstProduct(page);
