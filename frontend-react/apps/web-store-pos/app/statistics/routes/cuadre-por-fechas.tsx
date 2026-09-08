@@ -101,6 +101,7 @@ interface RangeSummary {
   saleCredits: SaleCredit[];
   paidSaleCredits: SaleCredit[];
   salesCashTotal: number;
+  salesCardTotal: number;
   expensesCashTotal: number;
   paidCreditsCashTotal: number;
 }
@@ -159,6 +160,9 @@ export function CuadrePorFechasPage() {
     const salesCashTotal = activeOrders
       .filter((o) => o.paymentType === PaymentType.Efectivo && !o.isCredit)
       .reduce((acc, o) => acc + o.total, 0);
+    const salesCardTotal = activeOrders
+      .filter((o) => o.paymentType === PaymentType.Tarjeta && !o.isCredit)
+      .reduce((acc, o) => acc + o.total, 0);
 
     let expenses: Expense[] = [];
     let expensesTotal = 0;
@@ -196,6 +200,7 @@ export function CuadrePorFechasPage() {
       saleCredits,
       paidSaleCredits,
       salesCashTotal,
+      salesCardTotal,
       expensesCashTotal,
       paidCreditsCashTotal,
     });
@@ -349,6 +354,27 @@ export function CuadrePorFechasPage() {
                 </table>
               </ExpansionPanel>
               {/* END CASH */}
+
+              {/* BEGIN CARD PAYMENTS */}
+              <ExpansionPanel
+                title="Pago por Tarjeta"
+                amount={formatCurrency(summary.salesCardTotal)}
+                amountClassName={valueClassName(summary.salesCardTotal)}
+              >
+                <table className="w-full text-sm">
+                  <tbody>
+                    <tr className="border-b border-border last:border-0">
+                      <td className="p-1">
+                        <span className="font-bold text-text">Ventas</span>
+                      </td>
+                      <td className="p-1 text-right">
+                        <span className="font-bold text-success whitespace-nowrap">{formatCurrency(summary.salesCardTotal)}</span>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </ExpansionPanel>
+              {/* END CARD PAYMENTS */}
 
               {/* BEGIN EXPENSES */}
               {hasExpensesModule && (

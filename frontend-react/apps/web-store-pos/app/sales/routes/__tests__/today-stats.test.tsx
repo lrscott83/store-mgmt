@@ -250,6 +250,36 @@ describe('TodayStatsPage — with Expenses + Credits modules available', () => {
     expect(await screen.findByText('Créditos Pagados (60)')).toBeInTheDocument();
   });
 
+  // Pago por Tarjeta panel (user request 2026-09-07): sits right after Resumen
+  // Efectivo, sums TODAY's card-paid non-credit sales, always rendered.
+  it('renders Pago por Tarjeta after Resumen Efectivo with today card sales', async () => {
+    mockGetActiveOrdersInDay.mockReturnValue([
+      makeOrder({ id: 'card-1', total: 120, paymentType: PaymentType.Tarjeta, isCredit: false }),
+      makeOrder({ id: 'cash-1', total: 80, paymentType: PaymentType.Efectivo, isCredit: false }),
+      // Credit sales never count toward the payment summaries (cash or card).
+      makeOrder({ id: 'card-credit', total: 999, paymentType: PaymentType.Tarjeta, isCredit: true }),
+    ]);
+
+    render(
+      <Wrapper>
+        <TodayStatsPage />
+      </Wrapper>,
+    );
+
+    const cardPanel = await screen.findByRole('button', { name: /Pago por Tarjeta/ });
+    expect(cardPanel).toBeInTheDocument();
+    // Panel amount in the collapsed header: only the 120 card sale counts.
+    expect(screen.getAllByText('$120').length).toBeGreaterThan(0);
+
+    // Expanded: the Ventas row shows the same card total.
+    fireEvent.click(cardPanel);
+    const ventasRow = within(cardPanel.parentElement as HTMLElement).getAllByText('Ventas');
+    expect(ventasRow.length).toBeGreaterThan(0);
+    expect(
+      within(cardPanel.parentElement as HTMLElement).getAllByText('$120').length,
+    ).toBeGreaterThan(0);
+  });
+
   // Parity fix (react-list-table-parity follow-up): Angular renders the expenses breakdown via
   // <app-expense-list>, whose payment marker is `<i class="bi …">`. The bootstrap-icons font is
   // imported nowhere (not styles.scss/index.html/angular.json), so NO glyph renders. React had a
