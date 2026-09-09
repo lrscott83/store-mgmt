@@ -42,7 +42,7 @@ namespace Application.Services.Stores
             // so the two paths cannot drift.
             var store = Store.Create(name, ownerId, approved, tenantId,
                 DateOnly.FromDateTime(_dateTimeProvider.UtcNow.UtcDateTime), address, description,
-                (int)StorePlanType.Pago);
+                (int)StorePlanType.Superior);
             await _storeRepository.AddAsync(store);
 
             var modules = (await _moduleRepository.GetModulesByIdsAsync(moduleIds)).ToDictionary(m => m.Id);

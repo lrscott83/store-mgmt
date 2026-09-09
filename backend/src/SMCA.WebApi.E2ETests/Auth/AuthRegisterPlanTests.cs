@@ -35,7 +35,7 @@ public sealed class AuthRegisterPlanTests
     private const int WarehousesModuleId = 13;
     private const int WholesaleSalesModuleId = 12;
     private const int MultiStoresModuleId = 14;
-    private const int PagoPlanId = (int)StorePlanType.Pago;
+    private const int SuperiorPlanId = (int)StorePlanType.Superior;
 
     public AuthRegisterPlanTests(WebAppFixture fixture)
     {
@@ -48,7 +48,7 @@ public sealed class AuthRegisterPlanTests
     // ── Happy Path ─────────────────────────────────────────────────────────
 
     [Fact]
-    public async Task Register_creates_store_with_pago_plan_and_all_available_modules()
+    public async Task Register_creates_store_with_superior_plan_and_all_available_modules()
     {
         Registered? registered = null;
         try
@@ -59,7 +59,7 @@ public sealed class AuthRegisterPlanTests
             var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
             var store = await db.Set<Store>().IgnoreQueryFilters().SingleAsync(s => s.Id == registered.StoreId);
-            store.StorePlanId.Should().Be(PagoPlanId);
+            store.StorePlanId.Should().Be(SuperiorPlanId); // default plan is Superior (3)
             store.PaymentStartDate.Should().Be(DateOnly.FromDateTime(DateTime.UtcNow)); // trial clock
 
             var activeModuleIds = await db.Set<StoreModule>().IgnoreQueryFilters()
