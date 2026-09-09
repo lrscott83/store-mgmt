@@ -31,8 +31,15 @@ vi.mock('~/shared/lib/auth/connectivity-service', () => ({
   },
 }));
 
+// Register surfaces form-level errors via the blocking popup wrapper, never
+// as an inline banner — mock the wrapper so failure tests are deterministic.
+vi.mock('~/shared/lib/blocking-alert', () => ({
+  showBlockingError: vi.fn(),
+}));
+
 import { authHttpService } from '~/shared/lib/http/auth-http-service';
 import { ConnectivityService } from '~/shared/lib/auth/connectivity-service';
+import { showBlockingError } from '~/shared/lib/blocking-alert';
 import RegisterPage from '../register';
 import type { BaseResponseModel, RegisterAuthModel } from '@store-mgmt/domain';
 
@@ -87,7 +94,7 @@ describe('RegisterPage — auth-http-register-parity call-site', () => {
   // BadRequest(result) on EVERY failure (AuthController.cs:90-102) — a succeeded:false
   // envelope therefore NEVER resolves; it always arrives as an axios rejection whose body
   // is { succeeded:false, data:null, message:null, errors:[{code,description}], actionCode }.
-  it('HTTP 400 rejection surfaces errors[0].description and does not navigate', async () => {
+  it('HTTP 400 rejection surfaces errors[0].description in the popup and does not navigate', async () => {
     vi.mocked(authHttpService.register).mockRejectedValue({
       response: {
         status: 400,
@@ -105,8 +112,13 @@ describe('RegisterPage — auth-http-register-parity call-site', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Registrar' }));
 
     await waitFor(() => {
-      expect(screen.getByText('Login already exists')).toBeInTheDocument();
+      expect(vi.mocked(showBlockingError)).toHaveBeenCalledWith(
+        messages['GENERAL.RESPONSE.ERROR_TITLE'],
+        'Login already exists',
+      );
     });
+    // The error lives ONLY in the popup — never painted inline in the view.
+    expect(screen.queryByText('Login already exists')).not.toBeInTheDocument();
     expect(mockNavigate).not.toHaveBeenCalled();
   });
 
@@ -125,9 +137,10 @@ describe('RegisterPage — auth-http-register-parity call-site', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Registrar' }));
 
     await waitFor(() => {
-      expect(
-        screen.getByText('Error de validación. Por favor, revise sus datos.'),
-      ).toBeInTheDocument();
+      expect(vi.mocked(showBlockingError)).toHaveBeenCalledWith(
+        messages['GENERAL.RESPONSE.ERROR_TITLE'],
+        'Error de validación. Por favor, revise sus datos.',
+      );
     });
     expect(mockNavigate).not.toHaveBeenCalled();
   });
@@ -380,11 +393,10 @@ describe('RegisterPage — view-text-parity: loading/offline/success copy', () =
     fireEvent.click(screen.getByRole('button', { name: 'Registrar' }));
 
     await waitFor(() => {
-      expect(
-        screen.getByText(
-          'Demasiados intentos de registro. Por favor, espere unos minutos antes de volver a intentar.',
-        ),
-      ).toBeInTheDocument();
+      expect(vi.mocked(showBlockingError)).toHaveBeenCalledWith(
+        messages['GENERAL.RESPONSE.ERROR_TITLE'],
+        'Demasiados intentos de registro. Por favor, espere unos minutos antes de volver a intentar.',
+      );
     });
   });
 
@@ -395,11 +407,10 @@ describe('RegisterPage — view-text-parity: loading/offline/success copy', () =
     fireEvent.click(screen.getByRole('button', { name: 'Registrar' }));
 
     await waitFor(() => {
-      expect(
-        screen.getByText(
-          'Ocurrió un error inesperado en la creación de la cuenta. Por favor, revise su conexión o contacte al equipo de soporte técnico.',
-        ),
-      ).toBeInTheDocument();
+      expect(vi.mocked(showBlockingError)).toHaveBeenCalledWith(
+        messages['GENERAL.RESPONSE.ERROR_TITLE'],
+        'Ocurrió un error inesperado en la creación de la cuenta. Por favor, revise su conexión o contacte al equipo de soporte técnico.',
+      );
     });
   });
 
