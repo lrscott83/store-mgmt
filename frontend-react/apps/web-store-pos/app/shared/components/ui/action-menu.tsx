@@ -104,6 +104,9 @@ export function ActionMenu({
 interface ActionMenuItemProps {
   /** Drives foreground color + default icon. Omit for a neutral item (escape hatch). */
   intent?: ActionIntent;
+  /** Overrides the foreground color class (e.g. 'text-primary'). Defaults to the
+   * intent/neutral color. */
+  fgClass?: string;
   onClick: () => void;
   /** Label text (usually intl.formatMessage(...)). */
   children: ReactNode;
@@ -119,6 +122,7 @@ export function ActionMenuItem({
   onClick,
   children,
   icon,
+  fgClass,
   separatorBefore = false,
   'data-testid': dataTestId,
 }: ActionMenuItemProps) {
@@ -137,7 +141,7 @@ export function ActionMenuItem({
           ctx?.close();
           onClick();
         }}
-        className={`flex w-full items-center gap-2 whitespace-nowrap px-4 py-2 text-left text-sm ${s.fg} ${s.hover} transition-colors`}
+        className={`flex w-full items-center gap-2 whitespace-nowrap px-4 py-2 text-left text-sm ${fgClass ?? s.fg} ${s.hover} transition-colors`}
       >
         {resolvedIcon}
         {children}

@@ -14,9 +14,9 @@ import { Button } from '~/shared/components/ui/button';
 import {
   ChevronDownIcon,
   PlusIcon,
-  InOutIcon,
+  ArrowInIcon,
+  ArrowOutIcon,
   SwapHorizontalIcon,
-  TruckIcon,
 } from '~/shared/components/ui/icons';
 import { ActionMenu, ActionMenuItem } from '~/shared/components/ui/action-menu';
 import { showBlockingError } from '~/shared/lib/blocking-alert';
@@ -374,7 +374,8 @@ export function WarehousesPage() {
                     <ActionMenuItem
                       data-testid={`warehouse-entry-${warehouse.id}`}
                       onClick={() => openMovementModal('purchase_in', warehouse, null)}
-                      icon={<InOutIcon />}
+                      icon={<ArrowInIcon />}
+                      fgClass="text-primary"
                     >
                       {intl.formatMessage({ id: 'WAREHOUSES.MENU_ENTRY' })}
                     </ActionMenuItem>
@@ -382,13 +383,15 @@ export function WarehousesPage() {
                       data-testid={`warehouse-movement-${warehouse.id}`}
                       onClick={() => openMovementModal('transfer_out', warehouse, null)}
                       icon={<SwapHorizontalIcon />}
+                      fgClass="text-primary"
                     >
                       {intl.formatMessage({ id: 'WAREHOUSES.MENU_MOVEMENT' })}
                     </ActionMenuItem>
                     <ActionMenuItem
                       data-testid={`warehouse-sale-out-${warehouse.id}`}
                       onClick={() => openMovementModal('sale_out', warehouse, null)}
-                      icon={<TruckIcon />}
+                      icon={<ArrowOutIcon />}
+                      fgClass="text-primary"
                     >
                       {intl.formatMessage({ id: 'WAREHOUSES.MENU_SALE_OUT' })}
                     </ActionMenuItem>

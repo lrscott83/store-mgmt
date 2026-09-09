@@ -449,7 +449,7 @@ export function BanIcon({ className = '' }: IconProps) {
   );
 }
 
-/** Material `swap_horiz` — intercambio horizontal entre almacenes (transferencia). */
+/** Material `swap_horiz` — dos flechas horizontales opuestas (entra y sale). */
 export function SwapHorizontalIcon({ className = '' }: IconProps) {
   return (
     <svg
@@ -463,7 +463,47 @@ export function SwapHorizontalIcon({ className = '' }: IconProps) {
         strokeLinecap="round"
         strokeLinejoin="round"
         strokeWidth={2}
-        d="M7 16V4m0 0L3 8m4-4l4 4m6 4v12m0 0l4-4m-4 4l-4-4"
+        d="M8 3 4 7l4 4M4 7h16M16 21l4-4-4-4M20 17H4"
+      />
+    </svg>
+  );
+}
+
+/** Flecha horizontal que entra — apunta a la derecha (entrada de mercancía). */
+export function ArrowInIcon({ className = '' }: IconProps) {
+  return (
+    <svg
+      className={`${BASE} ${className}`.trim()}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      aria-hidden="true"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M5 12h14M12 5l7 7-7 7"
+      />
+    </svg>
+  );
+}
+
+/** Flecha horizontal que sale — apunta a la izquierda (salida de mercancía). */
+export function ArrowOutIcon({ className = '' }: IconProps) {
+  return (
+    <svg
+      className={`${BASE} ${className}`.trim()}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      aria-hidden="true"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M19 12H5M12 19l-7-7 7-7"
       />
     </svg>
   );
