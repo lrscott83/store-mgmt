@@ -5,13 +5,14 @@ import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { storeHttpService } from '~/management/stores/lib/services/store-http-service';
 import { mergeStoreModules } from '~/management/stores/lib/store-modules';
+import { groupFeaturesByModuleId, planModuleIdsForActivation } from '~/management/stores/lib/plan-utils';
 import { OwnerStoreCard } from '~/management/stores/components/owner-store-card';
 import { EditStoreModal } from '~/management/stores/components/edit-store-modal';
 import { EditPlanModal } from '~/management/stores/components/edit-plan-modal';
 import { httpErrorKey } from '~/shared/lib/http/http-error';
 import { confirmDialog } from '~/shared/lib/blocking-alert';
 import { showToastSuccess } from '~/shared/lib/toast';
-import type { Module, OwnerStoreWithPlan } from '@store-mgmt/domain';
+import type { Feature, Module, OwnerStoreWithPlan, Plan } from '@store-mgmt/domain';
 
 export const clientLoader = featureLoader([EFeatures.Stores]);
 
@@ -20,8 +21,8 @@ export const clientLoader = featureLoader([EFeatures.Stores]);
  * every store the current user owns — active AND inactive — rendered as cards with
  * plan type, next billing date and the paid total (struck-through when discounted).
  * The gear exposes "Editar" (name + isActive popup) and "Editar el plan" (the same
- * plan view logic as store-plan.tsx, inside a modal — P3). The store-plan page
- * itself is untouched (P4).
+ * catalog-driven plan panels as store-plan.tsx, inside a modal). The store-plan
+ * page itself is untouched (P4).
  *
  * HTTP-only data access, same as every other management-stores route.
  */
@@ -32,6 +33,10 @@ export function MyStoresPage() {
 
   const [stores, setStores] = useState<OwnerStoreWithPlan[]>([]);
   const [catalog, setCatalog] = useState<Module[]>([]);
+  const [plans, setPlans] = useState<Plan[]>([]);
+  const [featuresByModuleId, setFeaturesByModuleId] = useState<ReadonlyMap<number, Feature[]>>(
+    new Map(),
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -43,16 +48,20 @@ export function MyStoresPage() {
   const load = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [storesRes, catalogRes] = await Promise.all([
+      const [storesRes, catalogRes, plansRes, featuresRes] = await Promise.all([
         storeHttpService.getMyStores(),
         storeHttpService.getModulesToStore(),
+        storeHttpService.getPlans(),
+        storeHttpService.getFeaturesToStore(),
       ]);
-      if (!storesRes.succeeded || !catalogRes.succeeded) {
+      if (!storesRes.succeeded || !catalogRes.succeeded || !plansRes.succeeded || !featuresRes.succeeded) {
         setError(intl.formatMessage({ id: 'STORES.ERROR' }));
         return;
       }
       setStores(storesRes.data);
       setCatalog(catalogRes.data);
+      setPlans(plansRes.data);
+      setFeaturesByModuleId(groupFeaturesByModuleId(featuresRes.data));
       setError('');
     } catch (err) {
       setError(intl.formatMessage({ id: httpErrorKey(err, 'STORES.ERROR') }));
@@ -65,7 +74,7 @@ export function MyStoresPage() {
     load();
   }, [load]);
 
-  /** Merged catalog for one store — same hydration the plan view uses. */
+  /** Merged catalog for one store card — the card's price lines hydrate from it. */
   const mergedModulesOf = (store: OwnerStoreWithPlan): Module[] =>
     mergeStoreModules(catalog, store.modules);
 
@@ -115,13 +124,14 @@ export function MyStoresPage() {
     }
   }
 
-  async function handlePlanSave(moduleIds: number[]) {
+  async function handlePlanActivate(selectedPlan: Plan) {
     if (!planStore) return;
     setModalError('');
     setModalBusy(true);
     try {
-      // Same save as store-plan.tsx: full store update carrying the module set —
-      // the backend applies modules only when moduleIds is present.
+      // Immediate per-panel activation, same contract as store-plan.tsx: the full
+      // store update carries the free + chosen-plan module union — the backend
+      // applies modules only when moduleIds is present.
       await storeHttpService.updateStore(planStore.id, {
         id: planStore.id,
         name: planStore.name,
@@ -129,11 +139,11 @@ export function MyStoresPage() {
         description: '',
         approved: planStore.approved,
         paymentStartDate: planStore.paymentStartDate ?? undefined,
-        moduleIds,
+        moduleIds: planModuleIdsForActivation(plans, selectedPlan),
         isActive: planStore.isActive,
       });
       setPlanStore(null);
-      // Angular parity: refresh the session after a plan save (store-plan.tsx does
+      // Angular parity: refresh the session after a plan change (store-plan.tsx does
       // the same) so feature-driven menus reflect the new module set.
       try {
         await getUserByToken();
@@ -203,13 +213,14 @@ export function MyStoresPage() {
       <EditPlanModal
         open={planStore !== null}
         storeId={planStore?.id ?? null}
-        modules={planStore ? mergedModulesOf(planStore) : []}
+        plans={plans}
+        storePlanType={planStore?.planType ?? 'Gratis'}
+        featuresByModuleId={featuresByModuleId}
         nextDueDate={planStore?.nextDueDate ?? null}
         isSuperAdmin={isSuperAdmin}
-        isLoading={modalBusy}
         error={modalError}
         onClose={() => setPlanStore(null)}
-        onSave={handlePlanSave}
+        onActivate={handlePlanActivate}
       />
     </div>
   );

@@ -2,7 +2,15 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
-import type { BaseResponseModel, Module, OwnerStoreWithPlan, UserModel } from '@store-mgmt/domain';
+import type {
+  BaseResponseModel,
+  Feature,
+  Module,
+  OwnerStoreWithPlan,
+  Plan,
+  PlanModule,
+  UserModel,
+} from '@store-mgmt/domain';
 
 // ─── Domain factories ─────────────────────────────────────────────────────────
 
@@ -33,6 +41,88 @@ function makeCatalogModule(overrides: Partial<Module> = {}): Module {
     priceIncluded: false,
     discountText: '',
     selected: false,
+    ...overrides,
+  };
+}
+
+// ─── Plan catalog factories (GET /v1/plans shape) ─────────────────────────────
+
+function makePlanModule(overrides: Partial<PlanModule> = {}): PlanModule {
+  return {
+    moduleId: 1,
+    name: 'Module A',
+    order: 1,
+    priceIncluded: false,
+    price: 10,
+    currentPrice: 8,
+    discountPrice: 0,
+    percentDiscountPrice: 0,
+    discountText: '- 20%',
+    featureDescriptions: [],
+    ...overrides,
+  };
+}
+
+function makePlan(overrides: Partial<Plan> = {}): Plan {
+  return {
+    id: 1,
+    name: 'Pago',
+    order: 1,
+    planType: 'Pago',
+    price: 8,
+    modules: [makePlanModule()],
+    ...overrides,
+  };
+}
+
+/** Real catalog shape: free module (id 2) + paid (id 1) + superior (1+3). */
+function makePlanCatalog(): Plan[] {
+  return [
+    makePlan({
+      id: 1,
+      name: 'Gratis',
+      planType: 'Gratis',
+      price: 0,
+      modules: [
+        makePlanModule({
+          moduleId: 2,
+          name: 'Free Module',
+          priceIncluded: true,
+          price: 0,
+          currentPrice: 0,
+          discountText: '',
+        }),
+      ],
+    }),
+    makePlan({ id: 2, name: 'Pago', planType: 'Pago', price: 8 }),
+    makePlan({
+      id: 3,
+      name: 'Superior',
+      planType: 'Superior',
+      price: 12,
+      modules: [
+        makePlanModule(),
+        makePlanModule({
+          moduleId: 3,
+          name: 'Module C',
+          price: 4,
+          currentPrice: 4,
+          discountText: '',
+        }),
+      ],
+    }),
+  ];
+}
+
+function makeFeature(overrides: Partial<Feature> = {}): Feature {
+  return {
+    id: 10,
+    name: 'feature-a',
+    moduleId: 1,
+    displayName: 'Feature A',
+    description: 'Feature A description',
+    order: 1,
+    availableToStore: true,
     ...overrides,
   };
 }
@@ -85,6 +175,8 @@ vi.mock('~/shared/lib/stores/auth-store', () => {
 
 const mockGetMyStores = vi.fn();
 const mockGetModulesToStore = vi.fn();
+const mockGetPlans = vi.fn();
+const mockGetFeaturesToStore = vi.fn();
 const mockUpdateStore = vi.fn();
 const mockSetStoreActivation = vi.fn();
 
@@ -95,6 +187,12 @@ vi.mock('~/management/stores/lib/services/store-http-service', () => ({
     },
     get getModulesToStore() {
       return mockGetModulesToStore;
+    },
+    get getPlans() {
+      return mockGetPlans;
+    },
+    get getFeaturesToStore() {
+      return mockGetFeaturesToStore;
     },
     get updateStore() {
       return mockUpdateStore;
@@ -144,6 +242,14 @@ describe('MyStoresPage — card rendering', () => {
       succeeded: true,
       data: [makeCatalogModule()],
     } satisfies Partial<BaseResponseModel<Module[]>> as BaseResponseModel<Module[]>);
+    mockGetPlans.mockResolvedValue({
+      succeeded: true,
+      data: makePlanCatalog(),
+    } as BaseResponseModel<Plan[]>);
+    mockGetFeaturesToStore.mockResolvedValue({
+      succeeded: true,
+      data: [makeFeature()],
+    } as BaseResponseModel<Feature[]>);
   });
 
   it('renders one card per store with the store name and the gear', async () => {
@@ -274,6 +380,14 @@ describe('MyStoresPage — Editar popup', () => {
       succeeded: true,
       data: [makeCatalogModule()],
     } as BaseResponseModel<Module[]>);
+    mockGetPlans.mockResolvedValue({
+      succeeded: true,
+      data: makePlanCatalog(),
+    } as BaseResponseModel<Plan[]>);
+    mockGetFeaturesToStore.mockResolvedValue({
+      succeeded: true,
+      data: [makeFeature()],
+    } as BaseResponseModel<Feature[]>);
     mockGetMyStores.mockResolvedValue({
       succeeded: true,
       data: [makeOwnerStore({ id: 's1', name: 'Alpha' })],
@@ -400,6 +514,14 @@ describe('MyStoresPage — Editar el plan popup', () => {
       succeeded: true,
       data: [makeCatalogModule()],
     } as BaseResponseModel<Module[]>);
+    mockGetPlans.mockResolvedValue({
+      succeeded: true,
+      data: makePlanCatalog(),
+    } as BaseResponseModel<Plan[]>);
+    mockGetFeaturesToStore.mockResolvedValue({
+      succeeded: true,
+      data: [makeFeature()],
+    } as BaseResponseModel<Feature[]>);
     mockGetMyStores.mockResolvedValue({
       succeeded: true,
       data: [makeOwnerStore({ id: 's1', name: 'Alpha' })],
@@ -407,7 +529,20 @@ describe('MyStoresPage — Editar el plan popup', () => {
     mockGetUserByToken.mockResolvedValue(undefined);
   });
 
-  it('renders the PlanPicker and saves the full module set (store-plan save shape)', async () => {
+  it('renders the catalog panels and activating a plan saves, closes and refreshes', async () => {
+    mockGetMyStores.mockResolvedValue({
+      succeeded: true,
+      data: [
+        makeOwnerStore({
+          id: 's1',
+          name: 'Alpha',
+          planType: 'Gratis',
+          modules: [],
+          paymentStartDate: null,
+          nextDueDate: null,
+        }),
+      ],
+    } as BaseResponseModel<OwnerStoreWithPlan[]>);
     const { MyStoresPage } = await import('../my-stores');
     render(
       <Wrapper>
@@ -420,30 +555,64 @@ describe('MyStoresPage — Editar el plan popup', () => {
     fireEvent.click(screen.getByTestId('owner-store-actions-toggle-s1'));
     fireEvent.click(screen.getByTestId('owner-store-edit-plan-s1'));
 
+    // Modal testid stays; Gratis is expanded by default (planType from backend)
     expect(await screen.findByTestId('owner-store-plan-modal-s1')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Pago/ }));
     mockUpdateStore.mockResolvedValue({ succeeded: true, data: true });
-    fireEvent.click(screen.getByTestId('owner-plan-save-s1'));
+    fireEvent.click(screen.getByRole('button', { name: 'Activar ese plan' }));
 
     await waitFor(() => {
       expect(mockUpdateStore).toHaveBeenCalledWith(
         's1',
-        expect.objectContaining({ moduleIds: expect.any(Array) }),
+        expect.objectContaining({ moduleIds: [2, 1] }),
       );
     });
-    // Session refresh after a plan save — store-plan parity.
+    // Activation closes the modal and refreshes the session — store-plan parity
     await waitFor(() => {
       expect(mockGetUserByToken).toHaveBeenCalled();
     });
+    expect(screen.queryByTestId('owner-store-plan-modal-s1')).not.toBeInTheDocument();
   });
 
-  it('hides "Activar este plan" for an owner on a paid store (DG-7 readOnly)', async () => {
+  it('hides every activation action for an owner on a paid store (DG-7 readOnly) and keeps testids', async () => {
+    mockGetMyStores.mockResolvedValue({
+      succeeded: true,
+      data: [makeOwnerStore({ id: 's1', name: 'Alpha', planType: 'Pago' })],
+    } as BaseResponseModel<OwnerStoreWithPlan[]>);
+    const { MyStoresPage } = await import('../my-stores');
+    render(
+      <Wrapper>
+        <MyStoresPage />
+      </Wrapper>,
+    );
+    await waitFor(() => {
+      expect(screen.getByText('Alpha')).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByTestId('owner-store-actions-toggle-s1'));
+    fireEvent.click(screen.getByTestId('owner-store-edit-plan-s1'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('owner-store-plan-modal-s1')).toBeInTheDocument();
+    });
+    // The paid store keeps prices + billing banner (testids stay) but no actions
+    expect(screen.getByTestId('owner-plan-next-billing-date-s1')).toBeInTheDocument();
+    expect(screen.getByText('Module A')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: esMessages['STORES.PLAN.ACTIVATE_PLAN'] }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('lets an owner on a FREE store activate a paid plan', async () => {
     mockGetMyStores.mockResolvedValue({
       succeeded: true,
       data: [
         makeOwnerStore({
           id: 's1',
           name: 'Alpha',
-          modules: [{ ...makeCatalogModule(), selected: true }],
+          planType: 'Gratis',
+          modules: [],
+          paymentStartDate: null,
+          nextDueDate: null,
         }),
       ],
     } as BaseResponseModel<OwnerStoreWithPlan[]>);
@@ -462,17 +631,24 @@ describe('MyStoresPage — Editar el plan popup', () => {
     await waitFor(() => {
       expect(screen.getByTestId('owner-store-plan-modal-s1')).toBeInTheDocument();
     });
-    // The free tab is the discriminating one (on the paid tab, selected === tab
-    // hides the button structurally — same reasoning as store-plan-lock-regression).
-    fireEvent.click(screen.getByRole('tab', { name: /Gratis/ }));
-    expect(screen.queryByRole('button', { name: esMessages['STORES.PLAN.ACTIVATE'] })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /Pago/ }));
+    expect(
+      screen.getByRole('button', { name: esMessages['STORES.PLAN.ACTIVATE_PLAN'] }),
+    ).toBeInTheDocument();
   });
 
-  it('shows "Activar este plan" for an owner on a FREE store (single activation spend)', async () => {
+  it('surfaces a visible error and keeps the modal open when the activation fails', async () => {
     mockGetMyStores.mockResolvedValue({
       succeeded: true,
       data: [
-        makeOwnerStore({ id: 's1', name: 'Alpha', modules: [], paymentStartDate: null, nextDueDate: null }),
+        makeOwnerStore({
+          id: 's1',
+          name: 'Alpha',
+          planType: 'Gratis',
+          modules: [],
+          paymentStartDate: null,
+          nextDueDate: null,
+        }),
       ],
     } as BaseResponseModel<OwnerStoreWithPlan[]>);
     const { MyStoresPage } = await import('../my-stores');
@@ -490,37 +666,14 @@ describe('MyStoresPage — Editar el plan popup', () => {
     await waitFor(() => {
       expect(screen.getByTestId('owner-store-plan-modal-s1')).toBeInTheDocument();
     });
-    fireEvent.click(screen.getByRole('tab', { name: /Pago/ }));
-    expect(
-      screen.getByRole('button', { name: esMessages['STORES.PLAN.ACTIVATE'] }),
-    ).toBeInTheDocument();
-  });
-
-  it('surfaces a visible error when the plan save fails', async () => {
-    mockGetMyStores.mockResolvedValue({
-      succeeded: true,
-      data: [makeOwnerStore({ id: 's1', name: 'Alpha', modules: [] })],
-    } as BaseResponseModel<OwnerStoreWithPlan[]>);
-    const { MyStoresPage } = await import('../my-stores');
-    render(
-      <Wrapper>
-        <MyStoresPage />
-      </Wrapper>,
-    );
-    await waitFor(() => {
-      expect(screen.getByText('Alpha')).toBeInTheDocument();
-    });
-    fireEvent.click(screen.getByTestId('owner-store-actions-toggle-s1'));
-    fireEvent.click(screen.getByTestId('owner-store-edit-plan-s1'));
-
-    await waitFor(() => {
-      expect(screen.getByTestId('owner-store-plan-modal-s1')).toBeInTheDocument();
-    });
+    fireEvent.click(screen.getByRole('button', { name: /Pago/ }));
     mockUpdateStore.mockRejectedValue(new Error('boom'));
-    fireEvent.click(screen.getByTestId('owner-plan-save-s1'));
+    fireEvent.click(screen.getByRole('button', { name: 'Activar ese plan' }));
 
     await waitFor(() => {
       expect(screen.getByRole('alert')).toBeInTheDocument();
     });
+    // Failure keeps the modal open for the user to retry
+    expect(screen.getByTestId('owner-store-plan-modal-s1')).toBeInTheDocument();
   });
 });
