@@ -15,6 +15,7 @@ function makeOwnerStore(overrides: Partial<OwnerStoreWithPlan> = {}): OwnerStore
     paymentStartDate: '2026-01-01',
     nextDueDate: '2026-11-01',
     modules: [],
+    planType: 'Pago',
     ...overrides,
   };
 }

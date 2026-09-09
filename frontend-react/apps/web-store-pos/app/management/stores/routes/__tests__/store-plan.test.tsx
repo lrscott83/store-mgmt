@@ -17,6 +17,7 @@ function makePlan(overrides: Partial<StorePlan> = {}): StorePlan {
     paymentStartDate: '2024-01-01',
     nextDueDate: null,
     modules: [],
+    planType: 'Gratis',
     ...overrides,
   };
 }

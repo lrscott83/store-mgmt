@@ -51,6 +51,42 @@ export interface StorePlan {
   // calculable next billing date (never activated the paid plan).
   nextDueDate: string | null;
   modules: Module[];
+  // Backend-serialized plan name ("Gratis" | "Pago" | "Superior") from
+  // Store.StorePlanId — the frontend never infers the active plan from module
+  // flags (that heuristic contradicted seeded membership).
+  planType: string;
+}
+
+/**
+ * Plan member module row of the plan catalog (GET /v1/plans). Backend prices
+ * come from the live module catalog, same CurrentPriceServiceUtils as the
+ * module catalog endpoint.
+ */
+export interface PlanModule {
+  moduleId: number;
+  name: string;
+  order: number;
+  priceIncluded: boolean;
+  price: number;
+  currentPrice: number;
+  discountPrice: number;
+  percentDiscountPrice: number;
+  discountText: string;
+  featureDescriptions: string[];
+}
+
+/**
+ * Plan catalog entry (GET /v1/plans): the three active plans — Gratis, Pago,
+ * Superior (VIP excluded server-side) — with member modules and the computed
+ * plan price (Σ member module currentPrice).
+ */
+export interface Plan {
+  id: number;
+  name: string;
+  order: number;
+  planType: string;
+  price: number;
+  modules: PlanModule[];
 }
 
 /**
@@ -72,6 +108,9 @@ export interface OwnerStoreWithPlan {
   nextDueDate: string | null;
   // Store's own module snapshot (prices frozen at activation).
   modules: Module[];
+  // Backend-serialized plan name ("Gratis" | "Pago" | "Superior"), same source
+  // as StorePlan.planType.
+  planType: string;
 }
 
 export interface StoreToCollect {
