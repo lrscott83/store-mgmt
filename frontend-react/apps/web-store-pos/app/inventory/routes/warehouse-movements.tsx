@@ -11,7 +11,7 @@ import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { Card } from '~/shared/components/ui/card';
 import { InfoBox } from '~/shared/components/ui/info-box';
-import { ChevronDownIcon, InOutIcon, SwapHorizontalIcon, TruckIcon } from '~/shared/components/ui/icons';
+import { ChevronDownIcon, ArrowInIcon, ArrowOutIcon, SwapHorizontalIcon } from '~/shared/components/ui/icons';
 import { formatLocalDate, groupByLocalDay } from '~/shared/lib/date-utils';
 import { WarehouseOfflineService } from '../lib/services/warehouse-offline-service';
 import { InventoryOfflineService } from '../lib/services/inventory-offline-service';
@@ -85,10 +85,12 @@ export function WarehouseMovementsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- load reads storeId/service only
   }, [service]);
 
-  /** Icono por tipo de movimiento: entrada verde, salida naranja, transferencia azul. */
+  /** Icono por tipo de movimiento — mismos iconos que las opciones del gear de
+   *  la gestión de almacenes: entrada → ArrowInIcon, salida → ArrowOutIcon,
+   *  transferencia → SwapHorizontalIcon. Entrada verde, salida naranja, transferencia azul. */
   const MOVEMENT_TYPE_ICON: Record<WarehouseMovementType, { icon: ReactElement; color: string }> = {
-    purchase_in: { icon: <InOutIcon />, color: 'text-success' },
-    sale_out: { icon: <TruckIcon />, color: 'text-warning' },
+    purchase_in: { icon: <ArrowInIcon />, color: 'text-success' },
+    sale_out: { icon: <ArrowOutIcon />, color: 'text-warning' },
     transfer_in: { icon: <SwapHorizontalIcon />, color: 'text-primary' },
     transfer_out: { icon: <SwapHorizontalIcon />, color: 'text-primary' },
   };
@@ -103,14 +105,10 @@ export function WarehouseMovementsPage() {
   );
 
   return (
-    <Card>
+    <Card padding="tight">
       <h1 className="mb-4 text-xl font-bold text-text">
         {intl.formatMessage({ id: 'MENU.WAREHOUSE_MOVEMENTS' })}
       </h1>
-
-      <div className="mb-2 text-sm font-semibold text-text">
-        {intl.formatMessage({ id: 'WAREHOUSES.MOVEMENTS_TITLE' })}
-      </div>
       {movementDayGroups.length === 0 && (
         <InfoBox variant="primary" className="text-center">
           {intl.formatMessage({ id: 'WAREHOUSES.NO_MOVEMENTS' })}
