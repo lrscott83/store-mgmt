@@ -205,7 +205,7 @@ const messages: Record<string, string> = {
 
   // Menu items — Inventory (Angular MENU.INVENTORY_MGMT.*)
   'MENU.AVAILABLE': 'Disponible',
-  'MENU.WAREHOUSES': 'Almacenes',
+  'MENU.WAREHOUSES': 'Gestión de Almacenes',
   'MENU.WAREHOUSES_MODULE': 'ALMACENES',
   'MENU.WAREHOUSE_MOVEMENTS': 'Movimientos',
   'MENU.TODAY_ENTRIES': 'Entradas del día',
