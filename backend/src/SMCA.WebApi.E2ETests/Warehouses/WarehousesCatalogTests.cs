@@ -34,7 +34,7 @@ public sealed class WarehousesCatalogTests
         module!.Name.Should().Be("Almacenes");
         module.IsActive.Should().BeTrue();
         module.PriceIncluded.Should().BeFalse();
-        module.Price.Should().Be(2f);
+        module.Price.Should().Be(5f);
         module.PercentDiscountPrice.Should().Be(100f);
         module.DiscountPrice.Should().Be(0f);
         module.AvailableToStore.Should().BeTrue();

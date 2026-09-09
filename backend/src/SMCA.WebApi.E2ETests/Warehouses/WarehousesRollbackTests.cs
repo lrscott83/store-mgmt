@@ -47,6 +47,9 @@ public sealed class WarehousesRollbackTests
         await using var tx = await db.Database.BeginTransactionAsync();
         try
         {
+            // 0) Remove StorePlanModule references to module 13 so the Down can delete the module without FK violation.
+            await db.Database.ExecuteSqlRawAsync(
+                "DELETE FROM \"StorePlanModule\" WHERE \"ModuleId\" = 13;");
             // 1) DownSql: per-store rows, SRF before StoreModule (same constant the migration Down runs).
             await db.Database.ExecuteSqlRawAsync(WarehousesModuleBackfill.DownSql);
             // 2) The exact DeleteData statements the generated Down emits, in its order.

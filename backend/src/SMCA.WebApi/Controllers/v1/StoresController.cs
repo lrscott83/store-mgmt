@@ -11,7 +11,9 @@ using Application.Features.StoreManagement.Stores.Commands.CreateStore;
 using Application.Features.StoreManagement.Stores.Commands.DeleteStore;
 using Application.Features.StoreManagement.Stores.Commands.DisapproveStore;
 using Application.Features.StoreManagement.Stores.Commands.SetMyStore;
+using Application.Features.StoreManagement.Stores.Commands.SetStoreActivation;
 using Application.Features.StoreManagement.Stores.Commands.UpdateStore;
+using Application.Features.StoreManagement.Stores.Queries.GetMyStores;
 using Application.Features.StoreManagement.Stores.Queries.GetStoreById;
 using Application.Features.StoreManagement.Stores.Queries.GetStorePlan;
 using Application.Features.StoreManagement.Stores.Queries.GetStores;
@@ -52,6 +54,39 @@ namespace SMCA.WebApi.Controllers.v1
         public async Task<IActionResult> GetStoresByCurrentUserQueryAsync()
         {
             return Ok(await Sender.Send(new GetStoresByCurrentUserQuery()));
+        }
+
+        /// <summary>
+        /// Owner's "my stores" listing (docs/plans/2026-09-08-owner-stores-cards-plan.md):
+        /// every store the current user owns — ACTIVE AND INACTIVE — with each store's
+        /// module price snapshot and the calculated next billing date. SuperAdmin sees
+        /// everything; an OwnerAdmin sees their own stores (same branch-by-role shape as
+        /// by-current-user). Backs the owner's store cards view.
+        /// </summary>
+        [HttpGet("my-stores")]
+        [ProducesResponseType(typeof(ResponseResult<List<OwnerStoreDto>>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        public async Task<IActionResult> GetMyStoresAsync()
+        {
+            return Ok(await Sender.Send(new GetMyStoresQuery()));
+        }
+
+        /// <summary>
+        /// Sets a store's IsActive flag (both directions). The owner's lever over their
+        /// stores: unlike the general store update (where IsActive is SuperAdmin-only),
+        /// an OwnerAdmin may flip the flag through this dedicated endpoint. SuperAdmin
+        /// keeps full reach, same as every other store command.
+        /// </summary>
+        [HttpPut("{id}/activation")]
+        [ProducesResponseType(typeof(ResponseResult<bool>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> SetStoreActivationAsync(Guid id, [FromBody] SetStoreActivationCommand command)
+        {
+            return Ok(await Sender.Send(new SetStoreActivationCommand(id, command.IsActive)));
         }
 
         /// <summary>

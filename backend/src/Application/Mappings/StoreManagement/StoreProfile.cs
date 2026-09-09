@@ -26,6 +26,13 @@ namespace Application.Mappings.StoreManagement
                 .ForMember(dest => dest.StoreName, opt => opt.MapFrom(src => src.Name))
                 .ForMember(dest => dest.Modules, opt => opt.MapFrom(src => src.StoreModules));
 
+            CreateMap<Store, OwnerStoreDto>()
+                .IgnoreAllSourcePropertiesWithAnInaccessibleSetter()
+                .ForMember(dest => dest.Id, opt => opt.MapFrom(src => src.Id))
+                .ForMember(dest => dest.Modules, opt => opt.MapFrom(src => src.StoreModules));
+            // NextDueDate is NOT mappable from the entity — GetMyStoresQueryHandler computes
+            // it per store (same canonical calculation as GetStorePlanQuery) and sets it by hand.
+
             CreateMap<Store, OwnerStoreModuleDto>()
                 .IgnoreAllSourcePropertiesWithAnInaccessibleSetter()
                 .ForMember(dest => dest.StoreId, opt => opt.MapFrom(src => src.Id))

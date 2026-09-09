@@ -53,6 +53,27 @@ export interface StorePlan {
   modules: Module[];
 }
 
+/**
+ * Owner's "my stores" listing item (GET /v1/stores/my-stores): every store the
+ * current user owns — active AND inactive — with the store's own module price
+ * snapshot and the calculated next billing date. Distinct from Store/StorePlan:
+ * it backs the owner's store cards view.
+ */
+export interface OwnerStoreWithPlan {
+  id: string;
+  name: string;
+  isActive: boolean;
+  approved: boolean;
+  // Nullable ISO date string (backend `DateOnly?`). Null when the store never
+  // activated the paid plan.
+  paymentStartDate: string | null;
+  // Nullable ISO date string (backend `DateOnly?`). Null when the billing clock
+  // never started (paymentStartDate null) — same calculation as the plan view.
+  nextDueDate: string | null;
+  // Store's own module snapshot (prices frozen at activation).
+  modules: Module[];
+}
+
 export interface StoreToCollect {
   storeId: string;
   storeName: string;

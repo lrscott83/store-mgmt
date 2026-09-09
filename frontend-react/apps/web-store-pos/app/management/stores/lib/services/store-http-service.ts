@@ -4,6 +4,7 @@ import type {
   StorePlan,
   Module,
   Owner,
+  OwnerStoreWithPlan,
   StoreToCollect,
   ReSellerCommission,
 } from '@store-mgmt/domain';
@@ -44,6 +45,30 @@ export const storeHttpService = {
     return response.data;
   },
 
+  /**
+   * Owner's "my stores" listing (GET /v1/stores/my-stores): every store the
+   * current user owns — active AND inactive — with each store's module price
+   * snapshot and the calculated next billing date. Backs the owner's store
+   * cards view.
+   */
+  async getMyStores(): Promise<BaseResponseModel<OwnerStoreWithPlan[]>> {
+    const response = await apiClient.get<BaseResponseModel<OwnerStoreWithPlan[]>>(
+      '/v1/stores/my-stores',
+    );
+    return response.data;
+  },
+
+  /**
+   * Sets a store's IsActive flag (both directions — activate AND deactivate).
+   * The owner's lever over their stores; SuperAdmin keeps full reach.
+   */
+  async setStoreActivation(id: string, isActive: boolean): Promise<BaseResponseModel<boolean>> {
+    const response = await apiClient.put<BaseResponseModel<boolean>>(`/v1/stores/${id}/activation`, {
+      isActive,
+    });
+    return response.data;
+  },
+
   async getStore(id: string): Promise<BaseResponseModel<Store>> {
     const response = await apiClient.get<BaseResponseModel<Store>>(`/v1/stores/${id}`);
     return response.data;
@@ -61,13 +86,6 @@ export const storeHttpService = {
 
   async updateStore(id: string, payload: UpdateStorePayload): Promise<BaseResponseModel<boolean>> {
     const response = await apiClient.put<BaseResponseModel<boolean>>(`/v1/stores/${id}`, payload);
-    return response.data;
-  },
-
-  async activateStore(id: string): Promise<BaseResponseModel<boolean>> {
-    const response = await apiClient.post<BaseResponseModel<boolean>>('/v1/stores/activate', {
-      id,
-    });
     return response.data;
   },
 

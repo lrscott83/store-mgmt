@@ -1,7 +1,9 @@
 ﻿using Domain.Entities.Owners;
 using Domain.Entities.Stores;
+using Domain.Entities.StoreModules;
 using Domain.Entities.Tenants;
 using Domain.Interfaces.Repositories;
+using Domain.Common.Constants;
 using Infrastructure.Persistence.Contexts;
 using Microsoft.EntityFrameworkCore;
 
@@ -21,6 +23,48 @@ namespace Infrastructure.Persistence.Repositories
                 .Where(s => s.Owner != null && s.Owner.IsActive && s.Owner.UserId == userId && s.IsActive)
                 .Include(s => s.Owner)
                     .ThenInclude(o => o.User);
+
+            if (excludeStoreId.HasValue)
+                query = query.Where(s => s.Id != excludeStoreId.Value);
+
+            return await query.ToListAsync();
+        }
+
+        public async Task<IEnumerable<Store>> GetAllStoresByOwnerUserIdAsync(Guid userId, Guid? excludeStoreId = null)
+        {
+            // Same shape as GetActiveStoresByUserIdAsync MINUS the s.IsActive filter:
+            // the owner's listing must include their inactive stores too. The global
+            // tenant query filter (StoreEntityTypeConfiguration: IsSuperAdmin ||
+            // TenantId == context.TenantId) is deliberately LEFT ACTIVE — no
+            // IgnoreQueryFilters here; tenant isolation is not part of this change.
+            // StoreModules + Module are loaded so the DTO mapping gets the store's
+            // own price snapshot (the plain active-listing repo never includes them).
+            IQueryable<Store> query = _stores
+                .Where(s => s.Owner != null && s.Owner.UserId == userId)
+                .Include(s => s.Owner)
+                    .ThenInclude(o => o.User)
+                .Include(s => s.StoreModules)
+                    .ThenInclude(sm => sm.Module);
+
+            if (excludeStoreId.HasValue)
+                query = query.Where(s => s.Id != excludeStoreId.Value);
+
+            return await query.ToListAsync();
+        }
+
+        public async Task<IEnumerable<Store>> GetAllStoresWithModulesAsync(Guid? excludeStoreId = null)
+        {
+            // SuperAdmin branch of my-stores: every store across every tenant, active
+            // AND inactive — same shape as GetAllStoresIncludingOwnerAndIgnoreQueryFiltersAsync
+            // (IgnoreQueryFilters is what grants the cross-tenant reach; the SuperAdmin
+            // claim is the only caller of this method) plus the StoreModules snapshot.
+            IQueryable<Store> query = _stores
+                .IgnoreQueryFilters()
+                .Where(s => s.Owner != null)
+                .Include(s => s.Owner)
+                    .ThenInclude(o => o.User)
+                .Include(s => s.StoreModules)
+                    .ThenInclude(sm => sm.Module);
 
             if (excludeStoreId.HasValue)
                 query = query.Where(s => s.Id != excludeStoreId.Value);

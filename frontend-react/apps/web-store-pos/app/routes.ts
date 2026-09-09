@@ -79,6 +79,11 @@ export default [
     route('management/stores', 'management/stores/routes/store-plan.tsx', {
       id: 'management-stores-index',
     }),
+    // Owner's "my stores" cards listing (owner-stores-cards plan, 2026-09-08):
+    // every store the current user owns (active AND inactive) with plan data.
+    route('management/my-stores', 'management/stores/routes/my-stores.tsx', {
+      id: 'management-my-stores',
+    }),
     route('management/stores/update', 'management/stores/routes/update-store.tsx', {
       id: 'management-stores-update',
     }),
