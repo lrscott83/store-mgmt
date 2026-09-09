@@ -891,6 +891,7 @@ const messages: Record<string, string> = {
   'STORE_SELECTOR.EMPTY': 'No hay tiendas para seleccionar.',
   'STORE_SELECTOR.CURRENT': 'Actual',
   'STORE_SELECTOR.SWITCH_ERROR': 'No se pudo cambiar la tienda.',
+  'STORE_SELECTOR.CURRENT_STORE': 'La tienda seleccionada es: {store}',
   'CONFIGURATIONS.STORE_LABEL': 'Tienda activa',
 
   // Billing — payment status banner (neutral Latin American Spanish, no voseo)

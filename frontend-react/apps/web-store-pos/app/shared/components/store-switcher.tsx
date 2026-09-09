@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { useIntl } from 'react-intl';
+import { EModules } from '@store-mgmt/domain';
 import type { Store } from '@store-mgmt/domain';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { useClickOutside } from '~/shared/lib/hooks/use-click-outside';
@@ -7,9 +8,13 @@ import { storeHttpService } from '~/management/stores/lib/services/store-http-se
 
 /**
  * Owner-only store switcher shown in the navbar before the tutorial link.
- * Opens a popup listing the owner's active stores; selecting a different store
- * persists it server-side and ends the session (logout), so the DEK for the
- * new store is provisioned on the next login.
+ * Visible ONLY for owners whose selected store has the MultiStores module
+ * (module 14). Opens a popup listing the owner's active stores; selecting a
+ * different store persists it server-side and ends the session (logout), so
+ * the DEK for the new store is provisioned on the next login.
+ * When the list load or the switch fails (no internet / server error), the
+ * popup shows a black first paragraph with the currently selected store name
+ * (from the cached user roles, works offline) followed by the error paragraph.
  */
 export function StoreSwitcher() {
   const intl = useIntl();
@@ -27,6 +32,16 @@ export function StoreSwitcher() {
   if (!user?.isOwnerAdmin) {
     return null;
   }
+  // Gate MultiStores (módulo 14): el propietario solo puede cambiar de tienda si
+  // su tienda seleccionada tiene el módulo activo (storeModuleIds del user,
+  // online vía auth/me y offline vía roster).
+  if (!user.storeModuleIds.includes(EModules.MultiStores)) {
+    return null;
+  }
+
+  /** Nombre de la tienda seleccionada actualmente (roles del user cacheado). */
+  const currentStoreName =
+    user.roles.find((r) => r.storeId === user.selectedStoreId)?.storeName ?? '';
 
   async function openPopup() {
     if (!isOpen) {
@@ -96,9 +111,16 @@ export function StoreSwitcher() {
               {intl.formatMessage({ id: 'STORE_SELECTOR.LOADING' })}
             </p>
           ) : loadError ? (
-            <p className="px-4 py-3 text-sm text-red-600">
-              {intl.formatMessage({ id: 'STORE_SELECTOR.LOAD_ERROR' })}
-            </p>
+            <div className="px-4 py-3">
+              {/* Primer párrafo: tienda seleccionada actualmente (texto negro).
+                  Segundo párrafo: el mensaje de error (rojo). */}
+              <p className="mb-1 text-sm font-semibold text-gray-900">
+                {intl.formatMessage({ id: 'STORE_SELECTOR.CURRENT_STORE' }, { store: currentStoreName })}
+              </p>
+              <p className="text-sm text-red-600">
+                {intl.formatMessage({ id: 'STORE_SELECTOR.LOAD_ERROR' })}
+              </p>
+            </div>
           ) : stores.length === 0 ? (
             <p className="px-4 py-3 text-sm text-gray-500">
               {intl.formatMessage({ id: 'STORE_SELECTOR.EMPTY' })}
@@ -128,9 +150,14 @@ export function StoreSwitcher() {
             </ul>
           )}
           {switchError && (
-            <p className="border-t border-gray-100 px-4 py-2 text-sm text-red-600">
-              {intl.formatMessage({ id: 'STORE_SELECTOR.SWITCH_ERROR' })}
-            </p>
+            <div className="border-t border-gray-100 px-4 py-2">
+              <p className="mb-1 text-sm font-semibold text-gray-900">
+                {intl.formatMessage({ id: 'STORE_SELECTOR.CURRENT_STORE' }, { store: currentStoreName })}
+              </p>
+              <p className="text-sm text-red-600">
+                {intl.formatMessage({ id: 'STORE_SELECTOR.SWITCH_ERROR' })}
+              </p>
+            </div>
           )}
         </div>
       )}

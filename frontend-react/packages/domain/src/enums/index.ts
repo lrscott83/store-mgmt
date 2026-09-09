@@ -58,6 +58,8 @@ export enum EModules {
   Credits = 11,
   /** Módulo Almacenes — espejo de ModuleType.Warehouses=13 (backend). */
   Warehouses = 13,
+  /** Módulo MultiStores — espejo de ModuleType.MultiStores=14 (backend). */
+  MultiStores = 14,
 }
 
 export enum PaymentType {

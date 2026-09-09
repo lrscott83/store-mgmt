@@ -22,9 +22,9 @@ function buildOwnerUser() {
     authToken: 'tok',
     refreshToken: 'ref',
     expiresIn: Date.now() + 35 * 24 * 60 * 60 * 1000,
-    roles: [],
+    roles: [{ storeId: 's1', storeName: 'Tienda A', moduleId: 14, featureIds: [38] }],
     featureIds: [70],
-    storeModuleIds: [],
+    storeModuleIds: [14],
     isSuperAdmin: false,
     isOwnerAdmin: true,
     isReSeller: false,
@@ -116,6 +116,20 @@ describe('StoreSwitcher — owner gate', () => {
 
   it('renders nothing when the user is not an owner-admin', () => {
     mockAuthState({ ...buildOwnerUser(), isOwnerAdmin: false });
+    render(
+      <Wrapper>
+        <StoreSwitcher />
+      </Wrapper>,
+    );
+    expect(screen.queryByRole('button', { name: 'Cambiar tienda' })).not.toBeInTheDocument();
+  });
+
+  it('renders nothing when the owner lacks the MultiStores module (14)', () => {
+    mockAuthState({
+      ...buildOwnerUser(),
+      storeModuleIds: [7],
+      roles: [{ storeId: 's1', storeName: 'Tienda A', moduleId: 7, featureIds: [70] }],
+    });
     render(
       <Wrapper>
         <StoreSwitcher />
@@ -229,6 +243,25 @@ describe('StoreSwitcher — popup list', () => {
     ).toBeInTheDocument();
   });
 
+  it('error message shows the current-store paragraph first, in black, then the error', async () => {
+    vi.mocked(storeHttpService.listStores).mockRejectedValue(new Error('network down'));
+    render(
+      <Wrapper>
+        <StoreSwitcher />
+      </Wrapper>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Cambiar tienda' }));
+
+    const paragraph = await screen.findByText('La tienda seleccionada es: Tienda A');
+    // Primer párrafo: texto negro (text-gray-900/text-black), NO rojo.
+    expect(paragraph.className).not.toMatch(/text-red/);
+    expect(paragraph.className).toMatch(/text-(gray-900|black)/);
+
+    // Después viene el párrafo del error (rojo).
+    const errorMsg = screen.getByText('No se pudieron cargar las tiendas.');
+    expect(errorMsg.className).toMatch(/text-red/);
+  });
+
   it('closes the popup when clicking outside it', async () => {
     render(
       <Wrapper>
@@ -303,5 +336,25 @@ describe('StoreSwitcher — switching stores', () => {
     expect(await screen.findByText('No se pudo cambiar la tienda.')).toBeInTheDocument();
     expect(mockLogout).not.toHaveBeenCalled();
     expect(storeHttpService.setMyStore).toHaveBeenCalledWith('s2');
+  });
+
+  it('switch error message shows the current-store paragraph first, in black, then the error', async () => {
+    vi.mocked(storeHttpService.setMyStore).mockRejectedValue(new Error('network down'));
+    render(
+      <Wrapper>
+        <StoreSwitcher />
+      </Wrapper>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Cambiar tienda' }));
+    await screen.findByText('Tienda B');
+    fireEvent.click(screen.getByText('Tienda B'));
+
+    const paragraph = await screen.findByText('La tienda seleccionada es: Tienda A');
+    expect(paragraph.className).not.toMatch(/text-red/);
+    expect(paragraph.className).toMatch(/text-(gray-900|black)/);
+
+    const errorMsg = screen.getByText('No se pudo cambiar la tienda.');
+    expect(errorMsg.className).toMatch(/text-red/);
+    expect(mockLogout).not.toHaveBeenCalled();
   });
 });

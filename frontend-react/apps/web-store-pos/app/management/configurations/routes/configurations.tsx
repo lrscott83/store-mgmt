@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useIntl } from 'react-intl';
-import { EFeatures } from '@store-mgmt/domain';
+import { EFeatures, EModules } from '@store-mgmt/domain';
 import type { Store } from '@store-mgmt/domain';
 import { adminFeatureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
@@ -17,7 +17,13 @@ export function ConfigurationsPage() {
   const [isSwitching, setIsSwitching] = useState(false);
   const [switchError, setSwitchError] = useState(false);
 
+  // Gate MultiStores (módulo 14): solo los propietarios con el módulo activo en
+  // su tienda seleccionada pueden cambiar de tienda (storeModuleIds del user,
+  // online vía auth/me y offline vía roster).
+  const hasMultiStores = (user?.storeModuleIds ?? []).includes(EModules.MultiStores);
+
   useEffect(() => {
+    if (!hasMultiStores) return;
     let cancelled = false;
     setIsLoading(true);
     setLoadError(false);
@@ -44,7 +50,7 @@ export function ConfigurationsPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [hasMultiStores]);
 
   async function handleStoreChange(event: React.ChangeEvent<HTMLSelectElement>) {
     const storeId = event.target.value;
@@ -74,43 +80,57 @@ export function ConfigurationsPage() {
         {intl.formatMessage({ id: 'MENU.CONFIGURATIONS' })}
       </h1>
 
-      <div>
-        <label
-          htmlFor="active-store-select"
-          className="mb-1 block text-sm font-medium text-gray-700"
-        >
-          {intl.formatMessage({ id: 'CONFIGURATIONS.STORE_LABEL' })}
-        </label>
-        <select
-          id="active-store-select"
-          value={user?.selectedStoreId ?? ''}
-          onChange={handleStoreChange}
-          disabled={isLoading || isSwitching}
-          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-800 disabled:bg-gray-100"
-        >
-          {isLoading ? (
-            <option value="">{intl.formatMessage({ id: 'STORE_SELECTOR.LOADING' })}</option>
-          ) : !loadError && stores.length === 0 ? (
-            <option value="">{intl.formatMessage({ id: 'STORE_SELECTOR.EMPTY' })}</option>
-          ) : (
-            stores.map((store) => (
-              <option key={store.id} value={store.id}>
-                {store.displayName || store.name}
-              </option>
-            ))
+      {hasMultiStores && (
+        <div>
+          <label
+            htmlFor="active-store-select"
+            className="mb-1 block text-sm font-medium text-gray-700"
+          >
+            {intl.formatMessage({ id: 'CONFIGURATIONS.STORE_LABEL' })}
+          </label>
+          <select
+            id="active-store-select"
+            value={user?.selectedStoreId ?? ''}
+            onChange={handleStoreChange}
+            disabled={isLoading || isSwitching}
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-800 disabled:bg-gray-100"
+          >
+            {isLoading ? (
+              <option value="">{intl.formatMessage({ id: 'STORE_SELECTOR.LOADING' })}</option>
+            ) : loadError ? (
+              // La carga falló (sin internet / error): el select conserva la
+              // tienda seleccionada actualmente, con su nombre, como única opción.
+              (() => {
+                const currentStoreName =
+                  user?.roles.find((r) => r.storeId === user.selectedStoreId)?.storeName ?? '';
+                return (
+                  <option value={user?.selectedStoreId ?? ''}>
+                    {currentStoreName || intl.formatMessage({ id: 'STORE_SELECTOR.CURRENT' })}
+                  </option>
+                );
+              })()
+            ) : stores.length === 0 ? (
+              <option value="">{intl.formatMessage({ id: 'STORE_SELECTOR.EMPTY' })}</option>
+            ) : (
+              stores.map((store) => (
+                <option key={store.id} value={store.id}>
+                  {store.displayName || store.name}
+                </option>
+              ))
+            )}
+          </select>
+          {loadError && (
+            <p className="mt-2 text-sm text-red-600">
+              {intl.formatMessage({ id: 'STORE_SELECTOR.LOAD_ERROR' })}
+            </p>
           )}
-        </select>
-        {loadError && (
-          <p className="mt-2 text-sm text-red-600">
-            {intl.formatMessage({ id: 'STORE_SELECTOR.LOAD_ERROR' })}
-          </p>
-        )}
-        {switchError && (
-          <p className="mt-2 text-sm text-red-600">
-            {intl.formatMessage({ id: 'STORE_SELECTOR.SWITCH_ERROR' })}
-          </p>
-        )}
-      </div>
+          {switchError && (
+            <p className="mt-2 text-sm text-red-600">
+              {intl.formatMessage({ id: 'STORE_SELECTOR.SWITCH_ERROR' })}
+            </p>
+          )}
+        </div>
+      )}
     </div>
   );
 }
