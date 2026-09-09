@@ -19,7 +19,6 @@ import {
   parseDashedDate,
   isoToDashedDate,
   dashedToIsoDate,
-  weekdayNameEs,
 } from '~/shared/lib/date-utils';
 import { OrderOfflineService } from '~/sales/lib/services/order-offline-service';
 import { ExpenseOfflineService } from '~/expenses/lib/services/expense-offline-service';
@@ -253,10 +252,6 @@ export function CuadrePorFechasPage() {
     });
   }
 
-  /** Día de la semana (es) de la fecha tecleada, o null si aún no es válida. */
-  const startWeekday = parseDashedDate(startDate) ? weekdayNameEs(parseDashedDate(startDate)!) : null;
-  const endWeekday = parseDashedDate(endDate) ? weekdayNameEs(parseDashedDate(endDate)!) : null;
-
   const total = summary
     ? summary.categories.reduce((acc, c) => acc + c.total, 0) +
       summary.paidSaleCredits.reduce((acc, c) => acc + c.total, 0) -
@@ -287,8 +282,8 @@ export function CuadrePorFechasPage() {
 
       {/* Date range picker — native type="date" input over a dd-mm-yyyy display
           (tap opens the native picker; the visible text keeps the dd-mm-yyyy
-          format + Spanish weekday from the 2026-09-08 request). Compact so the
-          two fields and the icon-only generate button fit on one mobile line. */}
+          format from the 2026-09-08 request). Compact so the two fields and
+          the icon-only generate button fit on one mobile line. */}
       <div className="flex flex-wrap items-end gap-2">
         <div>
           <label
@@ -323,11 +318,6 @@ export function CuadrePorFechasPage() {
               className="w-full rounded bg-transparent px-2 py-1 text-sm"
             />
           </div>
-          {startWeekday && (
-            <p data-testid="cuadre-start-weekday" className="mt-1 text-xs font-medium text-gray-600">
-              {startWeekday}
-            </p>
-          )}
         </div>
         <div>
           <label htmlFor="cuadre-end-date" className="mb-1 block text-xs font-medium text-gray-700">
@@ -359,11 +349,6 @@ export function CuadrePorFechasPage() {
               className="w-full rounded bg-transparent px-2 py-1 text-sm"
             />
           </div>
-          {endWeekday && (
-            <p data-testid="cuadre-end-weekday" className="mt-1 text-xs font-medium text-gray-600">
-              {endWeekday}
-            </p>
-          )}
         </div>
         <Button
           variant="primary"

@@ -296,28 +296,29 @@ describe('CuadrePorFechasPage', () => {
       expect(screen.getAllByPlaceholderText('dd-mm-yyyy').length).toBe(2);
     });
 
-    it('shows the picked date as dd-mm-yyyy and the Spanish weekday under each field', () => {
+    it('shows the picked date as dd-mm-yyyy and never shows a Spanish weekday under a field', () => {
       renderPage();
       // 2026-09-01 is a Tuesday; 2026-09-07 is a Monday.
       fireEvent.change(screen.getByTestId('cuadre-start-date'), { target: { value: '2026-09-01' } });
       fireEvent.change(screen.getByTestId('cuadre-end-date'), { target: { value: '2026-09-07' } });
       expect(screen.getByDisplayValue('01-09-2026')).toBeTruthy();
       expect(screen.getByDisplayValue('07-09-2026')).toBeTruthy();
-      expect(screen.getByTestId('cuadre-start-weekday').textContent).toBe('martes');
-      expect(screen.getByTestId('cuadre-end-weekday').textContent).toBe('lunes');
+      // The weekday hint was removed by user request — no weekday elements.
+      expect(screen.queryByTestId('cuadre-start-weekday')).toBeNull();
+      expect(screen.queryByTestId('cuadre-end-weekday')).toBeNull();
     });
 
-    it('hides the display value and weekday while the picker is empty', () => {
+    it('shows no weekday while the picker is empty or after picking a date', () => {
       renderPage();
       expect(screen.queryByTestId('cuadre-start-weekday')).toBeNull();
       expect(screen.queryByTestId('cuadre-end-weekday')).toBeNull();
 
       fireEvent.change(screen.getByTestId('cuadre-start-date'), { target: { value: '2026-09-01' } });
-      expect(screen.getByTestId('cuadre-start-weekday').textContent).toBe('martes');
-
-      // Clearing the picker clears both the display and the weekday.
-      fireEvent.change(screen.getByTestId('cuadre-start-date'), { target: { value: '' } });
       expect(screen.queryByTestId('cuadre-start-weekday')).toBeNull();
+
+      // Clearing the picker clears the display value.
+      fireEvent.change(screen.getByTestId('cuadre-start-date'), { target: { value: '' } });
+      expect((screen.getByTestId('cuadre-start-display') as HTMLInputElement).value).toBe('');
     });
 
     it('generates the summary from dates chosen in the picker', async () => {
