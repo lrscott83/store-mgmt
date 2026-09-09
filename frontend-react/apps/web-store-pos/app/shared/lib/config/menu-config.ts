@@ -315,6 +315,14 @@ export const MENU_GROUPS: MenuGroup[] = [
     moduleId: EModules.Management,
     items: [
       {
+        label: 'MENU.MY_STORES',
+        path: '/management/my-stores',
+        featureIds: [EFeatures.Stores],
+        moduleId: EModules.Management,
+        helpContent:
+          'Mis tiendas. Lista todas tus tiendas (activas e inactivas) en tarjetas con su plan, próximo cobro y precio. Desde el engranaje puedes editar el nombre, activar o desactivar la tienda y cambiar el plan.',
+      },
+      {
         label: 'MENU.STORES_PLAN',
         path: '/management/stores',
         featureIds: [EFeatures.Stores],

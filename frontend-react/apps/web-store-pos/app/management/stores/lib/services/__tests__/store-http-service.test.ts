@@ -174,22 +174,45 @@ describe('storeHttpService.updateStore — HTTP-5: PUT /v1/stores/:id', () => {
   });
 });
 
-describe('storeHttpService.activateStore — HTTP-6: POST /v1/stores/activate', () => {
+describe('storeHttpService.getMyStores — HTTP-6: GET /v1/stores/my-stores', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     const { apiClient } = await import('~/shared/lib/http/api-client');
-    (apiClient.post as ReturnType<typeof vi.fn>).mockResolvedValue({ data: { data: true } });
+    (apiClient.get as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: { data: [], succeeded: true },
+    });
   });
 
-  it('calls POST /v1/stores/activate with {id}', async () => {
+  it('calls GET /v1/stores/my-stores', async () => {
     const { storeHttpService } = await import('../store-http-service');
     const { apiClient } = await import('~/shared/lib/http/api-client');
-    await storeHttpService.activateStore('s1');
-    expect(apiClient.post).toHaveBeenCalledWith('/v1/stores/activate', { id: 's1' });
+    await storeHttpService.getMyStores();
+    expect(apiClient.get).toHaveBeenCalledWith('/v1/stores/my-stores');
+  });
+
+  it('returns the listing data', async () => {
+    const { storeHttpService } = await import('../store-http-service');
+    const result = await storeHttpService.getMyStores();
+    expect(result.succeeded).toBe(true);
   });
 });
 
-describe('storeHttpService.approveStore — HTTP-7: POST /v1/stores/approve', () => {
+describe('storeHttpService.setStoreActivation — HTTP-7: PUT /v1/stores/{id}/activation', () => {
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    const { apiClient } = await import('~/shared/lib/http/api-client');
+    (apiClient.put as ReturnType<typeof vi.fn>).mockResolvedValue({ data: { data: true } });
+  });
+
+  it('calls PUT /v1/stores/{id}/activation with {isActive}', async () => {
+    const { storeHttpService } = await import('../store-http-service');
+    const { apiClient } = await import('~/shared/lib/http/api-client');
+    await storeHttpService.setStoreActivation('s1', false);
+    expect(apiClient.put).toHaveBeenCalledWith('/v1/stores/s1/activation', { isActive: false });
+  });
+});
+
+describe('storeHttpService.approveStore — HTTP-8: POST /v1/stores/approve', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     const { apiClient } = await import('~/shared/lib/http/api-client');
@@ -204,7 +227,7 @@ describe('storeHttpService.approveStore — HTTP-7: POST /v1/stores/approve', ()
   });
 });
 
-describe('storeHttpService.disapproveStore — HTTP-8: POST /v1/stores/disapprove', () => {
+describe('storeHttpService.disapproveStore — HTTP-9: POST /v1/stores/disapprove', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     const { apiClient } = await import('~/shared/lib/http/api-client');

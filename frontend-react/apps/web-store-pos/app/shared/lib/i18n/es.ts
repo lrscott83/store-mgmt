@@ -235,6 +235,8 @@ const messages: Record<string, string> = {
   // (/management/stores/update), same authorization (EFeatures.Stores).
   'MENU.STORES_PLAN': 'Plan de la tienda',
   'MENU.STORES_UPDATE': 'Editar la tienda',
+  // Owner's "my stores" cards listing (owner-stores-cards plan, 2026-09-08)
+  'MENU.MY_STORES': 'Mis tiendas',
   'MENU.EXCHANGE_RATES': 'Cambio USD a MN',
   'MENU.USERS': 'Empleados',
   'MENU.BILLING_COLLECTIONS': 'Cobros pendientes',
@@ -868,6 +870,17 @@ const messages: Record<string, string> = {
   'STORES.DEACTIVATE_PAID_TITLE': 'Desactivar plan pago',
   'STORES.DEACTIVATE_PAID_MESSAGE':
     '¿Está seguro que desea desactivar el plan de pago? Se deshabilitarán los módulos de pago asociados.',
+
+  // Owner's "my stores" cards view (owner-stores-cards plan, 2026-09-08)
+  'STORES.MY_STORES_TITLE': 'Mis tiendas',
+  'STORES.INACTIVE_BADGE': 'Inactiva',
+  'STORES.EDIT_STORE_TITLE': 'Editar la tienda',
+  'STORES.EDIT_PLAN': 'Editar el plan',
+  'STORES.EDIT_PLAN_TITLE': 'Plan de la tienda',
+  'STORES.ACTIVATION_CONFIRM_TITLE': 'Confirmación',
+  'STORES.ACTIVATION_CONFIRM_DEACTIVATE':
+    '¿Está seguro que desea desactivar esta tienda? Dejará de aparecer como activa.',
+  'STORES.ACTIVATION_ERROR': 'No se pudo cambiar el estado de la tienda. Intente de nuevo.',
 
   // Store switcher — owner-only navbar popup + Configuraciones active-store
   // select (store-switcher-react). Switching stores ends the session so the

@@ -14,6 +14,19 @@ namespace Domain.Interfaces.Repositories
         Task<Store> GetStoreByIdIncludingModulesAsync(Guid id);
         Task<IEnumerable<Store>> GetActiveStoresByUserIdAsync(Guid userId, Guid? excludeStoreId = null);
         Task<IEnumerable<Store>> GetActiveStoresByUserIdAndIgnoreQueryFiltersAsync(Guid userId, Guid? excludeStoreId = null);
+        /// <summary>
+        /// ALL stores owned by the owner user (active AND inactive — same query as
+        /// GetActiveStoresByUserIdAsync minus the s.IsActive filter), with the
+        /// store's ACTIVE module snapshot loaded. Backs GET /v1/stores/my-stores.
+        /// </summary>
+        Task<IEnumerable<Store>> GetAllStoresByOwnerUserIdAsync(Guid userId, Guid? excludeStoreId = null);
+        /// <summary>
+        /// ALL stores in the system (every tenant, active + inactive) with their
+        /// ACTIVE module snapshot — the SuperAdmin branch of my-stores, mirroring
+        /// GetAllStoresIncludingOwnerAndIgnoreQueryFiltersAsync plus the StoreModules
+        /// include the listing cards need.
+        /// </summary>
+        Task<IEnumerable<Store>> GetAllStoresWithModulesAsync(Guid? excludeStoreId = null);
         Task<int> GetActiveStoreCountAsync();
 
         Task<Store?> GetStoreWithModulesAndReSellerOwnerAsync(Guid storeId);
