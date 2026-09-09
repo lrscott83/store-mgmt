@@ -41,6 +41,7 @@ namespace Application.Features.Administration.Owners.Commands.DeleteOwner
             IHttpContextService httpContextService,
             IStringLocalizer<I18n> localizer,
             IStoreRepository storeRepository,
+            IStoreUserRepository storeUserRepository,
             IUserRepository userRepository,
             IReSellerOwnerRepository reSellerOwnerRepository,
             ITenantRepository tenantRepository,
@@ -55,6 +56,7 @@ namespace Application.Features.Administration.Owners.Commands.DeleteOwner
             _httpContextService = httpContextService;
             _localizer = localizer;
             _storeRepository = storeRepository;
+            _storeUserRepository = storeUserRepository;
             _userRepository = userRepository;
             _reSellerOwnerRepository = reSellerOwnerRepository;
             _tenantRepository = tenantRepository;
@@ -125,7 +127,7 @@ namespace Application.Features.Administration.Owners.Commands.DeleteOwner
                         {
                             var first = su.FirstOrDefault();
                             _logger.LogError(ex, "DeleteOwner: 4a. EXCEPTION. FirstIsNull={IsNull}, Count={Count}, RepoType={Repo}",
-                                first == null, su.Count, _storeUserRepository.GetType().FullName);
+                                first == null, su.Count, _storeUserRepository?.GetType().FullName ?? "null");
                             throw;
                         }
                     }
