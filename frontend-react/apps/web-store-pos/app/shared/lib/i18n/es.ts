@@ -596,6 +596,11 @@ const messages: Record<string, string> = {
   'WAREHOUSES.TYPE_SALE_OUT': 'Salida a tienda',
   'WAREHOUSES.TYPE_TRANSFER_IN': 'Entrada por transferencia',
   'WAREHOUSES.TYPE_TRANSFER_OUT': 'Salida por transferencia',
+  'WAREHOUSES.COMPRA': 'Compra',
+  'WAREHOUSES.EDIT_MOVEMENT': 'Editar movimiento',
+  'WAREHOUSES.DELETE_MOVEMENT_TITLE': 'Eliminar movimiento',
+  'WAREHOUSES.DELETE_MOVEMENT_CONFIRM':
+    '¿Está seguro de que desea eliminar el movimiento de {product} ({quantity}) del almacén {warehouse}?',
   'WAREHOUSES.DEACTIVATE_BLOCKED': 'No se puede desactivar un almacén con stock o movimientos.',
   'WAREHOUSES.CREATED': 'Almacén creado.',
   'WAREHOUSES.UPDATED': 'Almacén actualizado.',
