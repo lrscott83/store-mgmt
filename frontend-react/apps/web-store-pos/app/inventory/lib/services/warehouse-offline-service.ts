@@ -823,10 +823,18 @@ export class WarehouseOfflineService {
     return Result.Success();
   }
 
-  /** Movimientos append-only: agrega si el id no existe (no duplica). */
+  /**
+   * Movimientos append-only: agrega si el id no existe (no duplica). Una
+   * reversa cuyo original ya tiene reversa local se salta en silencio
+   * (plan 2026-09-09, F7.3 — el otro dispositivo revirtió lo mismo).
+   */
   addImportedMovement(movement: WarehouseStockMovement): Result {
     const exists = this.getStorageMovements().some((m) => m.id === movement.id);
-    if (!exists) {
+    const duplicateReversal =
+      movement.type === 'reversal' &&
+      movement.reversalOfMovementId !== undefined &&
+      this.isReversed(movement.reversalOfMovementId);
+    if (!exists && !duplicateReversal) {
       const revived = reviveDate(movement, ['createdDate']);
       this.getStorageMovements().push(revived);
       this.setLocalStorage('warehouse-stock-movements', this.movements!);

@@ -348,4 +348,161 @@ describe('DataSerializerService — warehouses roundtrip (warehouses-plan)', () 
     expect(parsed.warehouseStockLevels[0].costPrice).toBe(660);
     expect(parsed.warehouseStockMovements[0].type).toBe('purchase_in');
   });
+
+  // ─── Plan 2026-09-09: reversas + lotes a través del sync (D8, F7) ─────────
+
+  it('I-6: exporta los campos nuevos (lots, costPrice, inventoryEntryId, reversalOfMovementId) completos', async () => {
+    const categoryRepository = new ProductCategoryRepository(STORE_ID);
+    const productRepository = new ProductRepository(STORE_ID, categoryRepository);
+    const inventorySvc = new InventoryOfflineService(STORE_ID, productRepository);
+    const warehouseSvc = new WarehouseOfflineService(STORE_ID, productRepository, inventorySvc);
+
+    categoryRepository.addImportedProductCategory({
+      id: 'cat-1',
+      name: 'Cerveza',
+      order: 1,
+      isActive: true,
+    });
+    productRepository.addImportedProduct({
+      id: 'prod-1',
+      name: 'Cerveza X',
+      categoryId: 'cat-1',
+      categoryName: 'Cerveza',
+      price: 700,
+      order: 1,
+      availableToSale: true,
+      discountFromInvantory: true,
+      businessId: STORE_ID,
+      isActive: true,
+      createdDate: new Date(),
+      createdByName: 'x',
+    });
+
+    const wh = warehouseSvc.createWarehouse('Central').data!;
+    warehouseSvc.recordMovement({ type: 'purchase_in', warehouseId: wh.id, productId: 'prod-1', quantity: 24, costPrice: 660 });
+    const sale = warehouseSvc.recordMovement({ type: 'sale_out', warehouseId: wh.id, productId: 'prod-1', quantity: 12 }).data!;
+    const reversal = warehouseSvc.reverseMovement(sale[0].id).data!;
+
+    const serializer = new DataSerializerService(
+      STORE_ID,
+      categoryRepository,
+      productRepository,
+      inventorySvc,
+      { getStorageOrders: () => [] },
+      { getStorageExpenses: () => [] },
+      { getStorageSaleCredits: () => [] },
+      { getStorageExchangeRates: () => [] },
+      warehouseSvc,
+    );
+
+    const payload = await serializer.export('pass');
+    const parsed = await serializer.import(payload, 'pass');
+
+    // Nivel con lotes, salida con costPrice+inventoryEntryId, reversa con enlace.
+    expect(parsed.warehouseStockLevels[0].lots).toEqual([{ costPrice: 660, quantity: 24 }]);
+    const saleRow = parsed.warehouseStockMovements.find((m) => m.type === 'sale_out')!;
+    expect(saleRow.costPrice).toBe(660);
+    expect(saleRow.inventoryEntryId).toBeDefined();
+    const reversalRow = parsed.warehouseStockMovements.find((m) => m.type === 'reversal')!;
+    expect(reversalRow.reversalOfMovementId).toBe(saleRow.id);
+    expect(reversalRow.reversalInventoryEntryId).toBe(saleRow.inventoryEntryId);
+  });
+
+  it('U-S18/I-4b: import de una reversa cuando ya existe una local del mismo original → skip silencioso', async () => {
+    const warehouseSvc = makeWarehouseService();
+    // Local: compra + reversa local de esa compra.
+    warehouseSvc.addImportedMovement(makeMovement('mv-1', 'wh-1'));
+    warehouseSvc.addImportedMovement({
+      id: 'rev-local',
+      warehouseId: 'wh-1',
+      productId: 'prod-1',
+      type: 'reversal',
+      quantity: 10,
+      reason: null,
+      createdDate: new Date(),
+      createdByName: 'x',
+      reversalOfMovementId: 'mv-1',
+    });
+
+    const svc = new DataSynchronizerService(
+      STORE_ID,
+      makeCategoryRepo(),
+      makeProductRepo(),
+      makeInventoryService(),
+      makeOrderService(),
+      makeExpenseService(),
+      makeSaleCreditService(),
+      undefined,
+      warehouseSvc,
+    );
+
+    // Dispositivo A exporta su reversa del MISMO original (distinto id de fila).
+    const result = await svc.sync(
+      makeData([], [], [
+        {
+          id: 'rev-remota',
+          warehouseId: 'wh-1',
+          productId: 'prod-1',
+          type: 'reversal',
+          quantity: 10,
+          reason: null,
+          createdDate: new Date(),
+          createdByName: 'A',
+          reversalOfMovementId: 'mv-1',
+        },
+      ]),
+    );
+
+    // Sin error y sin duplicado: la reversa remota se salta (F7.3).
+    expect(result.succeeded).toBe(true);
+    const reversals = warehouseSvc.getStorageMovements().filter((m) => m.type === 'reversal');
+    expect(reversals).toHaveLength(1);
+    expect(reversals[0].id).toBe('rev-local');
+    // La compra original y la reversa local — nada más.
+    expect(warehouseSvc.getStorageMovements()).toHaveLength(2);
+  });
+
+  it('I-4d: import de datos legacy (movimientos sin campos nuevos) → tolerante', async () => {
+    const warehouseSvc = makeWarehouseService();
+    const svc = new DataSynchronizerService(
+      STORE_ID,
+      makeCategoryRepo(),
+      makeProductRepo(),
+      makeInventoryService(),
+      makeOrderService(),
+      makeExpenseService(),
+      makeSaleCreditService(),
+      undefined,
+      warehouseSvc,
+    );
+
+    const legacyMovement: WarehouseStockMovement = {
+      id: 'mv-legacy',
+      warehouseId: 'wh-1',
+      productId: 'prod-1',
+      type: 'sale_out',
+      quantity: 4,
+      reason: null,
+      createdDate: new Date(),
+      createdByName: 'old-device',
+      // sin costPrice, sin inventoryEntryId — dato viejo
+    };
+    const legacyLevel: WarehouseStockLevel = {
+      id: 'sl-legacy',
+      warehouseId: 'wh-1',
+      productId: 'prod-1',
+      onHand: 10,
+      costPrice: 640,
+      createdDate: new Date(),
+      // sin lots — dato viejo
+    };
+
+    const result = await svc.sync(
+      makeData([makeWarehouse('wh-1', 'Central')], [legacyLevel], [legacyMovement]),
+    );
+
+    expect(result.succeeded).toBe(true);
+    expect(warehouseSvc.getStorageMovements()).toHaveLength(1);
+    expect(warehouseSvc.getStockLevel('wh-1', 'prod-1')!.onHand).toBe(10);
+  });
 });
