@@ -3,8 +3,9 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 import type { Warehouse, WarehouseStockLevel, WarehouseStockMovement } from '@store-mgmt/domain';
+// (movements state kept: the movements fake still seeds the service used by the
+// movement modal flows)
 import { Result, WarehouseErrors } from '@store-mgmt/domain';
-import { toLocalDayKey } from '~/shared/lib/date-utils';
 
 const mockUser = vi.hoisted(() => ({
   selectedStoreId: 's1',
@@ -54,9 +55,6 @@ vi.mock('~/inventory/lib/services/warehouse-offline-service', () => {
     }
     getStorageStockLevels() {
       return fakeState.levels;
-    }
-    getStorageMovements() {
-      return fakeState.movements;
     }
     createWarehouse(name: string) {
       fakeState.createWarehouseImpl(name);
@@ -443,89 +441,4 @@ describe('WarehousesPage', () => {
     expect(showToastSuccessMock).toHaveBeenCalled();
   });
 
-  it('shows the movements history grouped by day, accordion style like other views', async () => {
-    const today = new Date();
-    const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
-    fakeState.warehouses = [
-      { id: 'wh-1', name: 'Central', isActive: true, createdDate: new Date(), createdByName: 'x' },
-    ];
-    fakeState.movements = [
-      {
-        id: 'mv-1',
-        warehouseId: 'wh-1',
-        productId: 'prod-1',
-        type: 'purchase_in',
-        quantity: 24,
-        reason: null,
-        createdDate: today,
-        createdByName: 'x',
-      },
-      {
-        id: 'mv-2',
-        warehouseId: 'wh-1',
-        productId: 'prod-1',
-        type: 'sale_out',
-        quantity: 6,
-        reason: null,
-        createdDate: today,
-        createdByName: 'x',
-      },
-      {
-        id: 'mv-3',
-        warehouseId: 'wh-1',
-        productId: 'prod-2',
-        type: 'transfer_out',
-        quantity: 10,
-        reason: null,
-        createdDate: yesterday,
-        createdByName: 'x',
-      },
-    ];
-    renderPage();
-
-    // No table: the movements render as day-grouped accordion panels.
-    expect(screen.queryByRole('table')).toBeNull();
-
-    // Two day panels (today first, newest-first) with the day date as header.
-    const todayKey = toLocalDayKey(today);
-    const yesterdayKey = toLocalDayKey(yesterday);
-    expect(screen.getByTestId(`mv-day-panel-toggle-${todayKey}`)).toBeTruthy();
-    expect(screen.getByTestId(`mv-day-panel-toggle-${yesterdayKey}`)).toBeTruthy();
-
-    // Panels are collapsed by default; expanding today reveals its 2 movements.
-    expect(screen.queryByTestId('mv-qty-mv-1')).toBeNull();
-    fireEvent.click(screen.getByTestId(`mv-day-panel-toggle-${todayKey}`));
-    expect(screen.getByTestId('mv-qty-mv-1')).toBeTruthy();
-    expect(screen.getByTestId('mv-qty-mv-2')).toBeTruthy();
-    // Yesterday's movement is not in today's panel.
-    expect(screen.queryByTestId('mv-qty-mv-3')).toBeNull();
-
-    // Each movement row shows the type icon.
-    expect(screen.getByTestId('mv-type-icon-mv-1')).toBeTruthy();
-    expect(screen.getByTestId('mv-type-icon-mv-2')).toBeTruthy();
-
-    // Expanding yesterday reveals its movement.
-    fireEvent.click(screen.getByTestId(`mv-day-panel-toggle-${yesterdayKey}`));
-    expect(screen.getByTestId('mv-qty-mv-3')).toBeTruthy();
-  });
-
-  it('movement type icons map: purchase_in/sale_out/transfer use the right icon', async () => {
-    const today = new Date();
-    fakeState.warehouses = [
-      { id: 'wh-1', name: 'Central', isActive: true, createdDate: new Date(), createdByName: 'x' },
-    ];
-    fakeState.movements = [
-      { id: 'mv-in', warehouseId: 'wh-1', productId: 'prod-1', type: 'purchase_in', quantity: 24, reason: null, createdDate: today, createdByName: 'x' },
-      { id: 'mv-out', warehouseId: 'wh-1', productId: 'prod-1', type: 'sale_out', quantity: 6, reason: null, createdDate: today, createdByName: 'x' },
-      { id: 'mv-tr-out', warehouseId: 'wh-1', productId: 'prod-1', type: 'transfer_out', quantity: 6, reason: null, createdDate: today, createdByName: 'x' },
-      { id: 'mv-tr-in', warehouseId: 'wh-1', productId: 'prod-1', type: 'transfer_in', quantity: 6, reason: null, createdDate: today, createdByName: 'x' },
-    ];
-    renderPage();
-    const todayKey = toLocalDayKey(today);
-    fireEvent.click(screen.getByTestId(`mv-day-panel-toggle-${todayKey}`));
-    // All 4 movements visible with their type icons.
-    for (const id of ['mv-in', 'mv-out', 'mv-tr-out', 'mv-tr-in']) {
-      expect(screen.getByTestId(`mv-type-icon-${id}`)).toBeTruthy();
-    }
-  });
 });

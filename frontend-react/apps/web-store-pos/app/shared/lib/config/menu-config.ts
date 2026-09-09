@@ -195,21 +195,38 @@ export const MENU_GROUPS: MenuGroup[] = [
           'Salidas de inventario. Registra productos que salen del almacén por motivos distintos a la venta (deterioro, regalo, ajuste de stock, etc.).',
       },
       {
-        label: 'MENU.WAREHOUSES',
-        path: '/inventory/warehouses',
-        featureIds: [EFeatures.Warehouses],
-        moduleId: EModules.Inventory,
-        isNew: true,
-        helpContent:
-          'Gestiona tus almacenes. Crea almacenes, registra entradas por compra, transfiere stock entre almacenes y haz salidas a la tienda: cada salida crea una entrada de inventario en la tienda con el costo promedio del almacén.',
-      },
-      {
         label: 'MENU.ENTRIES_HISTORY',
         path: '/inventory/entries',
         featureIds: [EFeatures.EntriesHistory],
         moduleId: EModules.Inventory,
         helpContent:
           'Historial de entradas. Consulta todas las entradas de inventario realizadas con filtros por fecha y producto. Ideal para auditorías.',
+      },
+    ],
+  },
+  {
+    // Módulo Almacenes (ModuleType 13, backend) con sus dos features:
+    // Gestión de Almacenes (36) y Movimientos de almacén (37).
+    groupLabel: 'MENU.WAREHOUSES_MODULE',
+    moduleId: EModules.Warehouses,
+    items: [
+      {
+        label: 'MENU.WAREHOUSES',
+        path: '/inventory/warehouses',
+        featureIds: [EFeatures.Warehouses],
+        moduleId: EModules.Warehouses,
+        isNew: true,
+        helpContent:
+          'Gestiona tus almacenes. Crea almacenes, registra entradas por compra, transfiere stock entre almacenes y haz salidas a la tienda: cada salida crea una entrada de inventario en la tienda con el costo promedio del almacén.',
+      },
+      {
+        label: 'MENU.WAREHOUSE_MOVEMENTS',
+        path: '/inventory/warehouse-movements',
+        featureIds: [EFeatures.WarehouseStockMovements],
+        moduleId: EModules.Warehouses,
+        isNew: true,
+        helpContent:
+          'Historial de movimientos de almacenes. Consulta todas las entradas, salidas y transferencias entre almacenes, agrupadas por día, con el origen y destino de cada una.',
       },
     ],
   },
