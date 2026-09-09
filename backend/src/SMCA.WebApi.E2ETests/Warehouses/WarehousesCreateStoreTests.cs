@@ -57,7 +57,7 @@ public sealed class WarehousesCreateStoreTests
                 .FirstOrDefaultAsync(x => x.StoreId == storeId && x.ModuleId == 13);
             sm.Should().NotBeNull("module 13 was explicitly requested at creation");
             sm!.ModulePrice.Should().Be(5f);
-            sm.ModulePercentDiscountPrice.Should().Be(100f);
+            sm.ModulePercentDiscountPrice.Should().Be(50f);
             sm.ModulePriceIncluded.Should().BeFalse();
             sm.IsActive.Should().BeTrue();
 

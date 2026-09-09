@@ -286,6 +286,27 @@ describe('storeHttpService.getStoresToCollect — HTTP-12: GET /v1/stores/to-col
   });
 });
 
+describe('storeHttpService.setMyStore — HTTP-15: PUT /v1/stores (SetMyStore)', () => {
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    const { apiClient } = await import('~/shared/lib/http/api-client');
+    (apiClient.put as ReturnType<typeof vi.fn>).mockResolvedValue({ data: { data: true } });
+  });
+
+  it('calls PUT /v1/stores with { storeId }', async () => {
+    const { storeHttpService } = await import('../store-http-service');
+    const { apiClient } = await import('~/shared/lib/http/api-client');
+    await storeHttpService.setMyStore('s1');
+    expect(apiClient.put).toHaveBeenCalledWith('/v1/stores', { storeId: 's1' });
+  });
+
+  it('returns the raw boolean response.data', async () => {
+    const { storeHttpService } = await import('../store-http-service');
+    const result = await storeHttpService.setMyStore('s1');
+    expect(result.data).toBe(true);
+  });
+});
+
 describe('storeHttpService.registerStorePayment — HTTP-13: POST /v1/stores/:id/payments', () => {
   beforeEach(async () => {
     vi.clearAllMocks();

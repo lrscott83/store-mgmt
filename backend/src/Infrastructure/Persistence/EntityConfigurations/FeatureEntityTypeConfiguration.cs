@@ -201,6 +201,24 @@ namespace Infrastructure.Persistence.EntityConfigurations
                       true,
                       true
                   ),
+                  Feature.Create(
+                      (int)FeatureType.OwnerStores,
+                      FeatureType.OwnerStores.GetDescription(),
+                      "Funcionalidad para gestionar las tiendas del propietario",
+                      (int)ModuleType.MultiStores,
+                      74,
+                      true,
+                      true
+                  ),
+                  Feature.Create(
+                      (int)FeatureType.WholesaleSales,
+                      FeatureType.WholesaleSales.GetDescription(),
+                      "Funcionalidad para gestionar las ventas mayoristas",
+                      (int)ModuleType.WholesaleSales,
+                      75,
+                      true,
+                      true
+                  ),
 
                  // Synchronization
                  Feature.Create(

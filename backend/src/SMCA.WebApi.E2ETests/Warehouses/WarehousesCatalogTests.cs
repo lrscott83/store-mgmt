@@ -23,29 +23,29 @@ public sealed class WarehousesCatalogTests
     public WarehousesCatalogTests(WebAppFixture fixture) => _f = fixture.Factory;
 
     [Fact]
-    public async Task Migration_seeds_module_13_with_paid_zero_effective_price()
+    public async Task Migration_seeds_module_13_with_paid_two_and_a_half_effective_price()
     {
         using var scope = _f.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
-        // WMC-1a: exact catalog row shape
+        // WMC-1a: exact catalog row shape (price updated by Update-Warehouses-Price migration)
         var module = await db.Set<Module>().FindAsync((int)Domain.Common.Enums.ModuleType.Warehouses);
         module.Should().NotBeNull();
         module!.Name.Should().Be("Almacenes");
         module.IsActive.Should().BeTrue();
         module.PriceIncluded.Should().BeFalse();
         module.Price.Should().Be(5f);
-        module.PercentDiscountPrice.Should().Be(100f);
+        module.PercentDiscountPrice.Should().Be(50f);
         module.DiscountPrice.Should().Be(0f);
         module.AvailableToStore.Should().BeTrue();
         module.Order.Should().Be(110);
     }
 
     [Fact]
-    public void Current_price_of_module_13_is_zero()
+    public void Current_price_of_module_13_is_two_and_a_half()
     {
-        // WMC-1b: price 2 with 100% percent discount and no flat discount => effective 0
-        CurrentPriceServiceUtils.GetCurrentPrice(2f, 100f, 0f).Should().Be(0f);
+        // WMC-1b: price 5 with 50% percent discount and no flat discount => effective 2.5
+        CurrentPriceServiceUtils.GetCurrentPrice(5f, 50f, 0f).Should().Be(2.5f);
     }
 
     [Fact]

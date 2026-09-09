@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useIntl } from 'react-intl';
 import { EFeatures, ExpenseType, PaymentType } from '@store-mgmt/domain';
 import type { Expense, Order, SaleCredit } from '@store-mgmt/domain';
@@ -12,7 +12,14 @@ import { Card } from '~/shared/components/ui/card';
 import { Button } from '~/shared/components/ui/button';
 import { ChevronDownIcon, SearchIcon } from '~/shared/components/ui/icons';
 import { formatCurrency } from '~/shared/lib/format-currency';
-import { formatLocalDate, addDays, startOfDay, maskDashedDate, parseDashedDate, weekdayNameEs } from '~/shared/lib/date-utils';
+import {
+  formatLocalDate,
+  addDays,
+  startOfDay,
+  parseDashedDate,
+  isoToDashedDate,
+  dashedToIsoDate,
+} from '~/shared/lib/date-utils';
 import { OrderOfflineService } from '~/sales/lib/services/order-offline-service';
 import { ExpenseOfflineService } from '~/expenses/lib/services/expense-offline-service';
 import { SaleCreditOfflineService } from '~/sales/lib/services/sale-credit-offline-service';
@@ -134,6 +141,30 @@ export function CuadrePorFechasPage() {
   const [rangeError, setRangeError] = useState<string | null>(null);
   const [summary, setSummary] = useState<RangeSummary | null>(null);
 
+  const startDateInputRef = useRef<HTMLInputElement>(null);
+  const endDateInputRef = useRef<HTMLInputElement>(null);
+
+  /**
+   * Open the native date picker explicitly. Some engines do not open the
+   * picker popup when the type="date" input is invisible (opacity 0), so the
+   * tap handler uses the platform API (showPicker) instead of relying on the
+   * click landing on the input.
+   */
+  function openStartPicker() {
+    try {
+      startDateInputRef.current?.showPicker();
+    } catch {
+      startDateInputRef.current?.focus();
+    }
+  }
+  function openEndPicker() {
+    try {
+      endDateInputRef.current?.showPicker();
+    } catch {
+      endDateInputRef.current?.focus();
+    }
+  }
+
   function generate() {
     if (!startDate || !endDate) {
       setRangeError(intl.formatMessage({ id: 'CUADRE_FECHAS.EMPTY_DATES' }));
@@ -221,10 +252,6 @@ export function CuadrePorFechasPage() {
     });
   }
 
-  /** Día de la semana (es) de la fecha tecleada, o null si aún no es válida. */
-  const startWeekday = parseDashedDate(startDate) ? weekdayNameEs(parseDashedDate(startDate)!) : null;
-  const endWeekday = parseDashedDate(endDate) ? weekdayNameEs(parseDashedDate(endDate)!) : null;
-
   const total = summary
     ? summary.categories.reduce((acc, c) => acc + c.total, 0) +
       summary.paidSaleCredits.reduce((acc, c) => acc + c.total, 0) -
@@ -253,56 +280,87 @@ export function CuadrePorFechasPage() {
         </h1>
       </div>
 
-      {/* Date range picker */}
-      <div className="flex flex-wrap items-end gap-3">
+      {/* Date range picker — native type="date" input over a dd-mm-yyyy display
+          (tap opens the native picker; the visible text keeps the dd-mm-yyyy
+          format from the 2026-09-08 request). Compact so the two fields and
+          the icon-only generate button fit on one mobile line. */}
+      <div className="flex flex-wrap items-end gap-2">
         <div>
           <label
             htmlFor="cuadre-start-date"
-            className="mb-1 block text-sm font-medium text-gray-700"
+            className="mb-1 block text-xs font-medium text-gray-700"
           >
             {intl.formatMessage({ id: 'CUADRE_FECHAS.START_DATE' })}
           </label>
-          <input
-            id="cuadre-start-date"
-            data-testid="cuadre-start-date"
-            type="text"
-            inputMode="numeric"
-            placeholder="dd-mm-yyyy"
-            value={startDate}
-            onChange={(e) => setStartDate(maskDashedDate(e.target.value))}
-            className="rounded border border-gray-300 px-3 py-2 text-sm"
-          />
-          {startWeekday && (
-            <p data-testid="cuadre-start-weekday" className="mt-1 text-xs font-medium text-gray-600">
-              {startWeekday}
-            </p>
-          )}
+          <div
+            data-testid="cuadre-start-field"
+            onClick={openStartPicker}
+            className="relative w-32 cursor-pointer rounded border border-gray-300 bg-white focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/30"
+          >
+            <input
+              ref={startDateInputRef}
+              id="cuadre-start-date"
+              data-testid="cuadre-start-date"
+              type="date"
+              aria-label={intl.formatMessage({ id: 'CUADRE_FECHAS.START_DATE' })}
+              className="pointer-events-none absolute inset-0 h-full w-full opacity-0"
+              value={dashedToIsoDate(startDate)}
+              onChange={(e) => setStartDate(isoToDashedDate(e.target.value))}
+            />
+            <input
+              type="text"
+              readOnly
+              tabIndex={-1}
+              placeholder="dd-mm-yyyy"
+              aria-hidden="true"
+              data-testid="cuadre-start-display"
+              value={startDate}
+              className="w-full rounded bg-transparent px-2 py-1 text-sm"
+            />
+          </div>
         </div>
         <div>
-          <label htmlFor="cuadre-end-date" className="mb-1 block text-sm font-medium text-gray-700">
+          <label htmlFor="cuadre-end-date" className="mb-1 block text-xs font-medium text-gray-700">
             {intl.formatMessage({ id: 'CUADRE_FECHAS.END_DATE' })}
           </label>
-          <input
-            id="cuadre-end-date"
-            data-testid="cuadre-end-date"
-            type="text"
-            inputMode="numeric"
-            placeholder="dd-mm-yyyy"
-            value={endDate}
-            onChange={(e) => setEndDate(maskDashedDate(e.target.value))}
-            className="rounded border border-gray-300 px-3 py-2 text-sm"
-          />
-          {endWeekday && (
-            <p data-testid="cuadre-end-weekday" className="mt-1 text-xs font-medium text-gray-600">
-              {endWeekday}
-            </p>
-          )}
+          <div
+            data-testid="cuadre-end-field"
+            onClick={openEndPicker}
+            className="relative w-32 cursor-pointer rounded border border-gray-300 bg-white focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/30"
+          >
+            <input
+              ref={endDateInputRef}
+              id="cuadre-end-date"
+              data-testid="cuadre-end-date"
+              type="date"
+              aria-label={intl.formatMessage({ id: 'CUADRE_FECHAS.END_DATE' })}
+              className="pointer-events-none absolute inset-0 h-full w-full opacity-0"
+              value={dashedToIsoDate(endDate)}
+              onChange={(e) => setEndDate(isoToDashedDate(e.target.value))}
+            />
+            <input
+              type="text"
+              readOnly
+              tabIndex={-1}
+              placeholder="dd-mm-yyyy"
+              aria-hidden="true"
+              data-testid="cuadre-end-display"
+              value={endDate}
+              className="w-full rounded bg-transparent px-2 py-1 text-sm"
+            />
+          </div>
         </div>
-        <Button variant="primary" data-testid="cuadre-generate" onClick={generate} className="flex items-center gap-2">
+        <Button
+          variant="primary"
+          data-testid="cuadre-generate"
+          onClick={generate}
+          aria-label={intl.formatMessage({ id: 'CUADRE_FECHAS.GENERATE' })}
+          title={intl.formatMessage({ id: 'CUADRE_FECHAS.GENERATE' })}
+          className="h-8 w-8 shrink-0 justify-center p-0"
+        >
           <span data-testid="cuadre-generate-icon">
             <SearchIcon />
           </span>
-          {intl.formatMessage({ id: 'CUADRE_FECHAS.GENERATE' })}
         </Button>
         {rangeError && (
           <p data-testid="cuadre-range-error" className="text-sm font-medium text-danger">

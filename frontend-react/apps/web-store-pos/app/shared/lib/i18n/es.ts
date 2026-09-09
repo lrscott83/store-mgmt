@@ -880,6 +880,17 @@ const messages: Record<string, string> = {
     '¿Está seguro que desea desactivar esta tienda? Dejará de aparecer como activa.',
   'STORES.ACTIVATION_ERROR': 'No se pudo cambiar el estado de la tienda. Intente de nuevo.',
 
+  // Store switcher — owner-only navbar popup + Configuraciones active-store
+  // select (store-switcher-react). Switching stores ends the session so the
+  // DEK for the new store is provisioned on the next login.
+  'STORE_SELECTOR.TITLE': 'Cambiar tienda',
+  'STORE_SELECTOR.LOADING': 'Cargando tiendas...',
+  'STORE_SELECTOR.LOAD_ERROR': 'No se pudieron cargar las tiendas.',
+  'STORE_SELECTOR.EMPTY': 'No hay tiendas para seleccionar.',
+  'STORE_SELECTOR.CURRENT': 'Actual',
+  'STORE_SELECTOR.SWITCH_ERROR': 'No se pudo cambiar la tienda.',
+  'CONFIGURATIONS.STORE_LABEL': 'Tienda activa',
+
   // Billing — payment status banner (neutral Latin American Spanish, no voseo)
   'BILLING.TRIAL_NOTICE':
     'Probando el plan de pago. Primer cobro será el {date}, PERO si no pagas pasas al plan gratis.',

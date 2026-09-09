@@ -92,6 +92,10 @@ El `ProductVersion` debe coincidir con el que registro `dotnet ef database updat
 | 09 | `09-update-module-prices.sql` | — | Repricing módulos (v2) |
 | 10 | `10-update-module-prices-v3.sql` | `20260901163808_UpdateModulePricesV3` | Repricing módulos (v3): Price=2, 50% |
 | 11 | `11-20260905-Add-Warehouses-Module.sql` | `20260905224007_Add-Warehouses-Module` | Módulo 13 Warehouses (precio 2, 100% desc) + features 36/37 + asignación a tiendas activas existentes |
+| 12 | `12-20260908-Add-StorePlans.sql` | `20260908194349_Add-StorePlans` | Tabla StorePlan (Gratis/Pago/Superior/VIP) + columna Store.StorePlanId (DEFAULT 2) + FK Restrict |
+| 13 | `13-20260908-Add-WholesaleSales-And-MultiStores-Modules.sql` | `20260908194626_Add-WholesaleSales-And-MultiStores-Modules` | Módulos 12 (Ventas Mayoristas) y 14 (Múltiples tiendas) + features 38/39 |
+| 14 | `14-20260908-Add-StorePlanModules.sql` | `20260908194919_Add-StorePlanModules` | Tabla StorePlanModule + asignación completa por plan |
+| 15 | `15-20260908-Update-Warehouses-Price.sql` | `20260908195026_Update-Warehouses-Price` | Precio módulo 13: 2→5, 100%→50% + sync snapshots StoreModule |
 
 ### 4. Commit
 

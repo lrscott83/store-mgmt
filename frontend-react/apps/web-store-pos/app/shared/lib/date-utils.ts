@@ -115,6 +115,29 @@ export function parseDashedDate(raw: string): Date | null {
 }
 
 /**
+ * Converts a native `<input type="date">` value (`YYYY-MM-DD`) to the
+ * dd-mm-yyyy display form. Empty or malformed input returns `''` — the native
+ * control only ever emits complete dates or an empty string.
+ */
+export function isoToDashedDate(iso: string): string {
+  if (!iso) return '';
+  const [year, month, day] = iso.split('-');
+  if (!year || !month || !day) return '';
+  return `${day}-${month}-${year}`;
+}
+
+/**
+ * Converts a dd-mm-yyyy value (dashes optional) to the native date input's
+ * `YYYY-MM-DD`, or `''` when the value is incomplete or impossible. The native
+ * control is the single source of truth in Cuadre por fechas; this bridges its
+ * ISO value to the display mask.
+ */
+export function dashedToIsoDate(raw: string): string {
+  const parsed = parseDashedDate(raw);
+  return parsed ? toLocalDayKey(parsed) : '';
+}
+
+/**
  * Spanish weekday name (lowercase, RAE style) of a `Date`'s LOCAL calendar day.
  * The app is Spanish-only (i18n-provider resolves 'es'), so this is a fixed
  * table rather than an `Intl` call — deterministic in every environment.

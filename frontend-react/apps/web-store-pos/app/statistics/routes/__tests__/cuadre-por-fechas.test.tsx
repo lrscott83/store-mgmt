@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 import { ExpenseType, OrderType, PaymentType, EModules } from '@store-mgmt/domain';
@@ -145,6 +146,9 @@ describe('CuadrePorFechasPage', () => {
     expect(screen.getByText('Cuadre por fechas')).toBeTruthy();
     expect(screen.getByTestId('cuadre-start-date')).toBeTruthy();
     expect(screen.getByTestId('cuadre-end-date')).toBeTruthy();
+    // Native date pickers (tap opens the system picker) under a dd-mm-yyyy display.
+    expect((screen.getByTestId('cuadre-start-date') as HTMLInputElement).type).toBe('date');
+    expect((screen.getByTestId('cuadre-end-date') as HTMLInputElement).type).toBe('date');
     expect(screen.queryByTestId('cuadre-card-title')).toBeNull();
   });
 
@@ -159,8 +163,8 @@ describe('CuadrePorFechasPage', () => {
 
   it('shows INVALID_RANGE error when start > end', () => {
     renderPage();
-    fireEvent.change(screen.getByTestId('cuadre-start-date'), { target: { value: '10-09-2026' } });
-    fireEvent.change(screen.getByTestId('cuadre-end-date'), { target: { value: '05-09-2026' } });
+    fireEvent.change(screen.getByTestId('cuadre-start-date'), { target: { value: '2026-09-10' } });
+    fireEvent.change(screen.getByTestId('cuadre-end-date'), { target: { value: '2026-09-05' } });
     fireEvent.click(screen.getByTestId('cuadre-generate'));
     expect(screen.getByTestId('cuadre-range-error').textContent).toBe(
       'La fecha de inicio debe ser anterior o igual a la fecha de fin.',
@@ -175,8 +179,8 @@ describe('CuadrePorFechasPage', () => {
     mockGetActiveExpensesBetween.mockReturnValue([makeExpense({ total: 80 })]);
 
     renderPage();
-    fireEvent.change(screen.getByTestId('cuadre-start-date'), { target: { value: '01-09-2026' } });
-    fireEvent.change(screen.getByTestId('cuadre-end-date'), { target: { value: '07-09-2026' } });
+    fireEvent.change(screen.getByTestId('cuadre-start-date'), { target: { value: '2026-09-01' } });
+    fireEvent.change(screen.getByTestId('cuadre-end-date'), { target: { value: '2026-09-07' } });
     fireEvent.click(screen.getByTestId('cuadre-generate'));
 
     await waitFor(() => {
@@ -195,8 +199,8 @@ describe('CuadrePorFechasPage', () => {
 
   it('calls the range services with an inclusive [start, end+1day) window', async () => {
     renderPage();
-    fireEvent.change(screen.getByTestId('cuadre-start-date'), { target: { value: '01-09-2026' } });
-    fireEvent.change(screen.getByTestId('cuadre-end-date'), { target: { value: '03-09-2026' } });
+    fireEvent.change(screen.getByTestId('cuadre-start-date'), { target: { value: '2026-09-01' } });
+    fireEvent.change(screen.getByTestId('cuadre-end-date'), { target: { value: '2026-09-03' } });
     fireEvent.click(screen.getByTestId('cuadre-generate'));
 
     await waitFor(() => {
@@ -254,8 +258,8 @@ describe('CuadrePorFechasPage', () => {
     ]);
 
     renderPage();
-    fireEvent.change(screen.getByTestId('cuadre-start-date'), { target: { value: '01-09-2026' } });
-    fireEvent.change(screen.getByTestId('cuadre-end-date'), { target: { value: '07-09-2026' } });
+    fireEvent.change(screen.getByTestId('cuadre-start-date'), { target: { value: '2026-09-01' } });
+    fireEvent.change(screen.getByTestId('cuadre-end-date'), { target: { value: '2026-09-07' } });
     fireEvent.click(screen.getByTestId('cuadre-generate'));
 
     await waitFor(() => {
@@ -281,39 +285,53 @@ describe('CuadrePorFechasPage', () => {
     expect(screen.getByTestId('category-stats-cat-1')).toBeTruthy();
   });
 
-  describe('date format dd-mm-yyyy + generate button (user request 2026-09-08)', () => {
-    it('renders text inputs with dd-mm-yyyy placeholder instead of native date pickers', () => {
+  describe('native date picker over dd-mm-yyyy display + compact controls (2026-09-08 follow-up)', () => {
+    it('renders native type="date" pickers with a dd-mm-yyyy display placeholder', () => {
       renderPage();
       const start = screen.getByTestId('cuadre-start-date') as HTMLInputElement;
       const end = screen.getByTestId('cuadre-end-date') as HTMLInputElement;
-      // Text inputs with a dd-mm-yyyy placeholder — not native type="date" pickers.
-      expect(start.type).toBe('text');
-      expect(end.type).toBe('text');
-      expect(start.placeholder).toBe('dd-mm-yyyy');
-      expect(end.placeholder).toBe('dd-mm-yyyy');
+      // Tap opens the native picker again; the visible display keeps the mask.
+      expect(start.type).toBe('date');
+      expect(end.type).toBe('date');
+      expect(screen.getAllByPlaceholderText('dd-mm-yyyy').length).toBe(2);
     });
 
-    it('auto-formats typed digits into the dd-mm-yyyy mask while typing', () => {
+    it('shows the picked date as dd-mm-yyyy and never shows a Spanish weekday under a field', () => {
       renderPage();
-      const start = screen.getByTestId('cuadre-start-date') as HTMLInputElement;
-      // Typing raw digits gets progressively masked: "09012026" → "09-01-2026".
-      fireEvent.change(start, { target: { value: '0901' } });
-      expect(start.value).toBe('09-01');
-      fireEvent.change(start, { target: { value: '09012026' } });
-      expect(start.value).toBe('09-01-2026');
+      // 2026-09-01 is a Tuesday; 2026-09-07 is a Monday.
+      fireEvent.change(screen.getByTestId('cuadre-start-date'), { target: { value: '2026-09-01' } });
+      fireEvent.change(screen.getByTestId('cuadre-end-date'), { target: { value: '2026-09-07' } });
+      expect(screen.getByDisplayValue('01-09-2026')).toBeTruthy();
+      expect(screen.getByDisplayValue('07-09-2026')).toBeTruthy();
+      // The weekday hint was removed by user request — no weekday elements.
+      expect(screen.queryByTestId('cuadre-start-weekday')).toBeNull();
+      expect(screen.queryByTestId('cuadre-end-weekday')).toBeNull();
     });
 
-    it('accepts a complete dd-mm-yyyy date and generates the summary', async () => {
+    it('shows no weekday while the picker is empty or after picking a date', () => {
+      renderPage();
+      expect(screen.queryByTestId('cuadre-start-weekday')).toBeNull();
+      expect(screen.queryByTestId('cuadre-end-weekday')).toBeNull();
+
+      fireEvent.change(screen.getByTestId('cuadre-start-date'), { target: { value: '2026-09-01' } });
+      expect(screen.queryByTestId('cuadre-start-weekday')).toBeNull();
+
+      // Clearing the picker clears the display value.
+      fireEvent.change(screen.getByTestId('cuadre-start-date'), { target: { value: '' } });
+      expect((screen.getByTestId('cuadre-start-display') as HTMLInputElement).value).toBe('');
+    });
+
+    it('generates the summary from dates chosen in the picker', async () => {
       mockGetActiveOrdersPriceBetweenDates.mockReturnValue(500);
       renderPage();
-      fireEvent.change(screen.getByTestId('cuadre-start-date'), { target: { value: '01092026' } });
-      fireEvent.change(screen.getByTestId('cuadre-end-date'), { target: { value: '07092026' } });
+      fireEvent.change(screen.getByTestId('cuadre-start-date'), { target: { value: '2026-09-01' } });
+      fireEvent.change(screen.getByTestId('cuadre-end-date'), { target: { value: '2026-09-07' } });
       fireEvent.click(screen.getByTestId('cuadre-generate'));
 
       await waitFor(() => {
         expect(screen.getByText('Ganancias Bruta')).toBeTruthy();
       });
-      // Window parsed from dd-mm-yyyy: Sep 1..7 2026 inclusive.
+      // Window parsed from the picked dates: Sep 1..7 2026 inclusive.
       const [start, end] = mockGetActiveOrdersPriceBetweenDates.mock.calls[0] as [Date, Date];
       expect(start.getDate()).toBe(1);
       expect(start.getMonth()).toBe(8);
@@ -321,58 +339,120 @@ describe('CuadrePorFechasPage', () => {
       expect(end.getTime() - start.getTime()).toBe(7 * 24 * 60 * 60 * 1000);
     });
 
-    it('rejects an invalid dd-mm-yyyy date with a clear error', () => {
-      renderPage();
-      fireEvent.change(screen.getByTestId('cuadre-start-date'), { target: { value: '32012026' } }); // día 32
-      fireEvent.change(screen.getByTestId('cuadre-end-date'), { target: { value: '07092026' } });
-      fireEvent.click(screen.getByTestId('cuadre-generate'));
-      expect(screen.getByTestId('cuadre-range-error').textContent).toBe('Formato de fecha inválido. Usa dd-mm-yyyy.');
-      expect(mockGetActiveOrdersPriceBetweenDates).not.toHaveBeenCalled();
-    });
-
-    it('rejects an incomplete date with the same format error', () => {
-      renderPage();
-      fireEvent.change(screen.getByTestId('cuadre-start-date'), { target: { value: '01-09' } });
-      fireEvent.change(screen.getByTestId('cuadre-end-date'), { target: { value: '07-09-2026' } });
-      fireEvent.click(screen.getByTestId('cuadre-generate'));
-      expect(screen.getByTestId('cuadre-range-error').textContent).toBe('Formato de fecha inválido. Usa dd-mm-yyyy.');
-      expect(mockGetActiveOrdersPriceBetweenDates).not.toHaveBeenCalled();
-    });
-
-    it('accepts fully dashed dd-mm-yyyy input (mask-friendly paste/edit)', async () => {
-      renderPage();
-      fireEvent.change(screen.getByTestId('cuadre-start-date'), { target: { value: '01-09-2026' } });
-      fireEvent.change(screen.getByTestId('cuadre-end-date'), { target: { value: '03-09-2026' } });
-      fireEvent.click(screen.getByTestId('cuadre-generate'));
-
-      await waitFor(() => {
-        expect(mockGetActiveOrdersPriceBetweenDates).toHaveBeenCalled();
-      });
-      const [start] = mockGetActiveOrdersPriceBetweenDates.mock.calls[0] as [Date, Date];
-      expect(start.getDate()).toBe(1);
-      expect(start.getMonth()).toBe(8);
-    });
-
-    it('the generate button renders the magnifying-glass icon next to the date controls', () => {
+    it('the generate button is icon-only (lupa) with an accessible label — no visible "Generar" text', () => {
       renderPage();
       expect(screen.getByTestId('cuadre-generate-icon')).toBeTruthy();
+      expect(screen.getByRole('button', { name: 'Generar' })).toBeTruthy();
+      expect(screen.queryByText('Generar')).toBeNull();
+    });
+  });
+
+  describe('visible textbox — type and dd-mm-yyyy format', () => {
+    it('renders each visible field as a read-only text input (never a native picker)', () => {
+      renderPage();
+      const startDisplay = screen.getByTestId('cuadre-start-display') as HTMLInputElement;
+      const endDisplay = screen.getByTestId('cuadre-end-display') as HTMLInputElement;
+      expect(startDisplay.type).toBe('text');
+      expect(endDisplay.type).toBe('text');
+      // The textbox must not intercept taps: read-only, unfocusable, hidden
+      // from assistive technology (the labelled element is the date input).
+      expect(startDisplay.readOnly).toBe(true);
+      expect(startDisplay.tabIndex).toBe(-1);
+      expect(startDisplay.getAttribute('aria-hidden')).toBe('true');
+      expect(endDisplay.readOnly).toBe(true);
+      expect(endDisplay.tabIndex).toBe(-1);
+      expect(endDisplay.getAttribute('aria-hidden')).toBe('true');
     });
 
-    it('shows the Spanish weekday under each input once the date is complete (user request 2026-09-08)', () => {
+    it('formats the picked date as dd-mm-yyyy (never the ISO value)', () => {
       renderPage();
-      // Not shown while the date is incomplete or invalid.
-      fireEvent.change(screen.getByTestId('cuadre-start-date'), { target: { value: '01-09' } });
-      expect(screen.queryByTestId('cuadre-start-weekday')).toBeNull();
+      fireEvent.change(screen.getByTestId('cuadre-start-date'), { target: { value: '2026-09-01' } });
+      fireEvent.change(screen.getByTestId('cuadre-end-date'), { target: { value: '2026-12-25' } });
+      const startDisplay = screen.getByTestId('cuadre-start-display') as HTMLInputElement;
+      const endDisplay = screen.getByTestId('cuadre-end-display') as HTMLInputElement;
+      expect(startDisplay.value).toBe('01-09-2026');
+      expect(endDisplay.value).toBe('25-12-2026');
+      for (const display of [startDisplay, endDisplay]) {
+        // dd-mm-yyyy shape: 2-digit day, 2-digit month, 4-digit year, dashes.
+        expect(display.value).toMatch(/^\d{2}-\d{2}-\d{4}$/);
+      }
+      // The native ISO value must never leak into the visible textbox.
+      expect(startDisplay.value).not.toContain('2026-09-01');
+      expect(endDisplay.value).not.toContain('2026-12-25');
+    });
 
-      // 2026-09-01 is a Tuesday; 2026-09-07 is a Monday.
-      fireEvent.change(screen.getByTestId('cuadre-start-date'), { target: { value: '01092026' } });
-      expect(screen.getByTestId('cuadre-start-weekday').textContent).toBe('martes');
-      fireEvent.change(screen.getByTestId('cuadre-end-date'), { target: { value: '07092026' } });
-      expect(screen.getByTestId('cuadre-end-weekday').textContent).toBe('lunes');
+    it('clears the textbox when the picker is cleared', () => {
+      renderPage();
+      fireEvent.change(screen.getByTestId('cuadre-start-date'), { target: { value: '2026-09-01' } });
+      expect((screen.getByTestId('cuadre-start-display') as HTMLInputElement).value).toBe(
+        '01-09-2026',
+      );
+      fireEvent.change(screen.getByTestId('cuadre-start-date'), { target: { value: '' } });
+      expect((screen.getByTestId('cuadre-start-display') as HTMLInputElement).value).toBe('');
+    });
+  });
 
-      // An invalid complete date hides the weekday again.
-      fireEvent.change(screen.getByTestId('cuadre-start-date'), { target: { value: '32012026' } });
-      expect(screen.queryByTestId('cuadre-start-weekday')).toBeNull();
+  describe('tap on the control opens the native date picker popup', () => {
+    it('the clickable layer of each field is the native type="date" input covering the display', () => {
+      renderPage();
+      const start = screen.getByTestId('cuadre-start-date') as HTMLInputElement;
+      const end = screen.getByTestId('cuadre-end-date') as HTMLInputElement;
+      // Native date controls open the picker popup on tap; the overlay is
+      // transparent but covers the whole field so taps land on it.
+      expect(start.type).toBe('date');
+      expect(end.type).toBe('date');
+      for (const picker of [start, end]) {
+        expect(picker.className).toContain('absolute');
+        expect(picker.className).toContain('inset-0');
+        expect(picker.className).toContain('h-full');
+        expect(picker.className).toContain('w-full');
+        expect(picker.className).toContain('opacity-0');
+        expect(picker.className).toContain('pointer-events-none');
+      }
+    });
+
+    it('a tap on the visible field calls showPicker() on the native picker input', async () => {
+      const user = userEvent.setup();
+      renderPage();
+      const start = screen.getByTestId('cuadre-start-date') as HTMLInputElement;
+      const end = screen.getByTestId('cuadre-end-date') as HTMLInputElement;
+      const startShowPicker = vi.fn();
+      const endShowPicker = vi.fn();
+      start.showPicker = startShowPicker;
+      end.showPicker = endShowPicker;
+
+      await user.click(screen.getByTestId('cuadre-start-field'));
+      expect(startShowPicker).toHaveBeenCalledTimes(1);
+      expect(endShowPicker).not.toHaveBeenCalled();
+
+      await user.click(screen.getByTestId('cuadre-end-field'));
+      expect(endShowPicker).toHaveBeenCalledTimes(1);
+    });
+
+    it('falls back to focusing the native picker when showPicker is unsupported', async () => {
+      const user = userEvent.setup();
+      renderPage();
+      const start = screen.getByTestId('cuadre-start-date') as HTMLInputElement;
+      // jsdom's HTMLInputElement has no showPicker — the tap must not throw
+      // and must still focus the native input.
+      await user.click(screen.getByTestId('cuadre-start-field'));
+      expect(document.activeElement).toBe(start);
+    });
+
+    it('the picker overlay is layered over the display inside the same field wrapper', () => {
+      renderPage();
+      const picker = screen.getByTestId('cuadre-start-date');
+      const display = screen.getByTestId('cuadre-start-display');
+      // Both live in the field's relative wrapper — the overlay is layered
+      // ON TOP of the display, not beside it.
+      expect(picker.parentElement).toBe(display.parentElement);
+      // CSS painting order: the absolutely positioned date input paints ABOVE
+      // the static in-flow display regardless of DOM order. Clicks pass
+      // through it (pointer-events-none) to the wrapper's tap handler, which
+      // opens the popup via showPicker() — never the read-only text.
+      expect(picker.className).toContain('absolute');
+      expect(display.classList.contains('absolute')).toBe(false);
+      expect(display.classList.contains('relative')).toBe(false);
     });
   });
 
@@ -380,8 +460,8 @@ describe('CuadrePorFechasPage', () => {
     mockAuthState.user.storeModuleIds = [];
 
     renderPage();
-    fireEvent.change(screen.getByTestId('cuadre-start-date'), { target: { value: '01-09-2026' } });
-    fireEvent.change(screen.getByTestId('cuadre-end-date'), { target: { value: '07-09-2026' } });
+    fireEvent.change(screen.getByTestId('cuadre-start-date'), { target: { value: '2026-09-01' } });
+    fireEvent.change(screen.getByTestId('cuadre-end-date'), { target: { value: '2026-09-07' } });
     fireEvent.click(screen.getByTestId('cuadre-generate'));
 
     await waitFor(() => {

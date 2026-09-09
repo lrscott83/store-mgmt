@@ -1,5 +1,12 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { startOfDay, addDays, formatDateOnly, formatLocalDate } from './date-utils';
+import {
+  startOfDay,
+  addDays,
+  formatDateOnly,
+  formatLocalDate,
+  isoToDashedDate,
+  dashedToIsoDate,
+} from './date-utils';
 
 describe('startOfDay', () => {
   it('S-DATE-1: zeroes time to midnight keeping same calendar date', () => {
@@ -151,5 +158,32 @@ describe('formatLocalDate', () => {
       expect(localEvening.getUTCDate()).toBe(11); // sanity: crosses the UTC day boundary
       expect(formatLocalDate(localEvening)).toBe('10/03/2026');
     });
+  });
+});
+
+describe('isoToDashedDate / dashedToIsoDate (native picker ↔ dd-mm-yyyy bridge, 2026-09-08)', () => {
+  it('S-DATE-17: converts a native date input value to the dd-mm-yyyy display form', () => {
+    expect(isoToDashedDate('2026-09-01')).toBe('01-09-2026');
+    expect(isoToDashedDate('2026-11-05')).toBe('05-11-2026');
+  });
+
+  it('S-DATE-18: empty or malformed ISO becomes an empty display', () => {
+    expect(isoToDashedDate('')).toBe('');
+    expect(isoToDashedDate('2026-09')).toBe('');
+  });
+
+  it('S-DATE-19: converts a complete dd-mm-yyyy value back to the YYYY-MM-DD the native input expects', () => {
+    expect(dashedToIsoDate('01-09-2026')).toBe('2026-09-01');
+    expect(dashedToIsoDate('07122026')).toBe('2026-12-07');
+  });
+
+  it('S-DATE-20: incomplete or impossible dd-mm-yyyy values yield an empty ISO value', () => {
+    expect(dashedToIsoDate('')).toBe('');
+    expect(dashedToIsoDate('01-09')).toBe('');
+    expect(dashedToIsoDate('32-01-2026')).toBe('');
+  });
+
+  it('S-DATE-21: round-trips through the same local calendar day', () => {
+    expect(dashedToIsoDate(isoToDashedDate('2026-09-01'))).toBe('2026-09-01');
   });
 });

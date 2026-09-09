@@ -3,6 +3,7 @@ using System;
 using Infrastructure.Persistence.Contexts;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260908194626_Add-WholesaleSales-And-MultiStores-Modules")]
+    partial class AddWholesaleSalesAndMultiStoresModules
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -994,233 +997,6 @@ namespace Infrastructure.Migrations
                         });
                 });
 
-            modelBuilder.Entity("Domain.Entities.Plans.StorePlanModule", b =>
-                {
-                    b.Property<int>("PlanId")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("ModuleId")
-                        .HasColumnType("integer");
-
-                    b.HasKey("PlanId", "ModuleId");
-
-                    b.HasIndex("ModuleId");
-
-                    b.ToTable("StorePlanModule");
-
-                    b.HasData(
-                        new
-                        {
-                            PlanId = 1,
-                            ModuleId = 2
-                        },
-                        new
-                        {
-                            PlanId = 1,
-                            ModuleId = 3
-                        },
-                        new
-                        {
-                            PlanId = 1,
-                            ModuleId = 4
-                        },
-                        new
-                        {
-                            PlanId = 1,
-                            ModuleId = 5
-                        },
-                        new
-                        {
-                            PlanId = 1,
-                            ModuleId = 7
-                        },
-                        new
-                        {
-                            PlanId = 2,
-                            ModuleId = 2
-                        },
-                        new
-                        {
-                            PlanId = 2,
-                            ModuleId = 3
-                        },
-                        new
-                        {
-                            PlanId = 2,
-                            ModuleId = 4
-                        },
-                        new
-                        {
-                            PlanId = 2,
-                            ModuleId = 5
-                        },
-                        new
-                        {
-                            PlanId = 2,
-                            ModuleId = 6
-                        },
-                        new
-                        {
-                            PlanId = 2,
-                            ModuleId = 7
-                        },
-                        new
-                        {
-                            PlanId = 2,
-                            ModuleId = 12
-                        },
-                        new
-                        {
-                            PlanId = 2,
-                            ModuleId = 8
-                        },
-                        new
-                        {
-                            PlanId = 2,
-                            ModuleId = 9
-                        },
-                        new
-                        {
-                            PlanId = 2,
-                            ModuleId = 10
-                        },
-                        new
-                        {
-                            PlanId = 2,
-                            ModuleId = 11
-                        },
-                        new
-                        {
-                            PlanId = 3,
-                            ModuleId = 2
-                        },
-                        new
-                        {
-                            PlanId = 3,
-                            ModuleId = 3
-                        },
-                        new
-                        {
-                            PlanId = 3,
-                            ModuleId = 4
-                        },
-                        new
-                        {
-                            PlanId = 3,
-                            ModuleId = 5
-                        },
-                        new
-                        {
-                            PlanId = 3,
-                            ModuleId = 6
-                        },
-                        new
-                        {
-                            PlanId = 3,
-                            ModuleId = 7
-                        },
-                        new
-                        {
-                            PlanId = 3,
-                            ModuleId = 12
-                        },
-                        new
-                        {
-                            PlanId = 3,
-                            ModuleId = 8
-                        },
-                        new
-                        {
-                            PlanId = 3,
-                            ModuleId = 9
-                        },
-                        new
-                        {
-                            PlanId = 3,
-                            ModuleId = 10
-                        },
-                        new
-                        {
-                            PlanId = 3,
-                            ModuleId = 11
-                        },
-                        new
-                        {
-                            PlanId = 3,
-                            ModuleId = 13
-                        },
-                        new
-                        {
-                            PlanId = 3,
-                            ModuleId = 14
-                        },
-                        new
-                        {
-                            PlanId = 4,
-                            ModuleId = 2
-                        },
-                        new
-                        {
-                            PlanId = 4,
-                            ModuleId = 3
-                        },
-                        new
-                        {
-                            PlanId = 4,
-                            ModuleId = 4
-                        },
-                        new
-                        {
-                            PlanId = 4,
-                            ModuleId = 5
-                        },
-                        new
-                        {
-                            PlanId = 4,
-                            ModuleId = 6
-                        },
-                        new
-                        {
-                            PlanId = 4,
-                            ModuleId = 7
-                        },
-                        new
-                        {
-                            PlanId = 4,
-                            ModuleId = 12
-                        },
-                        new
-                        {
-                            PlanId = 4,
-                            ModuleId = 8
-                        },
-                        new
-                        {
-                            PlanId = 4,
-                            ModuleId = 9
-                        },
-                        new
-                        {
-                            PlanId = 4,
-                            ModuleId = 10
-                        },
-                        new
-                        {
-                            PlanId = 4,
-                            ModuleId = 11
-                        },
-                        new
-                        {
-                            PlanId = 4,
-                            ModuleId = 13
-                        },
-                        new
-                        {
-                            PlanId = 4,
-                            ModuleId = 14
-                        });
-                });
-
             modelBuilder.Entity("Domain.Entities.ProductCategories.ProductCategory", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2182,25 +1958,6 @@ namespace Infrastructure.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("Domain.Entities.Plans.StorePlanModule", b =>
-                {
-                    b.HasOne("Domain.Entities.Modules.Module", "Module")
-                        .WithMany("StorePlanModules")
-                        .HasForeignKey("ModuleId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("Domain.Entities.Plans.StorePlan", "StorePlan")
-                        .WithMany("StorePlanModules")
-                        .HasForeignKey("PlanId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Module");
-
-                    b.Navigation("StorePlan");
-                });
-
             modelBuilder.Entity("Domain.Entities.ProductCategories.ProductCategory", b =>
                 {
                     b.HasOne("Domain.Entities.Stores.Store", "Store")
@@ -2414,8 +2171,6 @@ namespace Infrastructure.Migrations
                     b.Navigation("Features");
 
                     b.Navigation("StoreModules");
-
-                    b.Navigation("StorePlanModules");
                 });
 
             modelBuilder.Entity("Domain.Entities.OrderItems.OrderItem", b =>
@@ -2434,11 +2189,6 @@ namespace Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("Stores");
-                });
-
-            modelBuilder.Entity("Domain.Entities.Plans.StorePlan", b =>
-                {
-                    b.Navigation("StorePlanModules");
                 });
 
             modelBuilder.Entity("Domain.Entities.ProductCategories.ProductCategory", b =>

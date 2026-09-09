@@ -4,6 +4,7 @@ import { Link, useLocation, useNavigate } from 'react-router';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { useClickOutside } from '~/shared/lib/hooks/use-click-outside';
 import { CartShell } from './cart-shell';
+import { StoreSwitcher } from './store-switcher';
 
 interface NavbarProps {
   isSidebarOpen: boolean;
@@ -76,8 +77,11 @@ export function Navbar({ isSidebarOpen, onSidebarToggle }: NavbarProps) {
         </button>
       )}
 
-      {/* Right: tutorial + cart + user dropdown */}
+      {/* Right: store switcher + tutorial + cart + user dropdown */}
       <div className="flex items-center gap-2">
+        {/* Store switcher — owner-only popup; renders nothing for other roles */}
+        <StoreSwitcher />
+
         {/* Tutorial — header link, matches Angular's nav-right question-circle (bg-gray-200 pill) */}
         <Link
           to={HELP_PATH}

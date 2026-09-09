@@ -69,6 +69,15 @@ export const storeHttpService = {
     return response.data;
   },
 
+  /**
+   * Switches the current user's active store (PUT /v1/stores, SetMyStoreCommand).
+   * The backend persists the target store as the session's SelectedStoreId.
+   */
+  async setMyStore(storeId: string): Promise<BaseResponseModel<boolean>> {
+    const response = await apiClient.put<BaseResponseModel<boolean>>('/v1/stores', { storeId });
+    return response.data;
+  },
+
   async getStore(id: string): Promise<BaseResponseModel<Store>> {
     const response = await apiClient.get<BaseResponseModel<Store>>(`/v1/stores/${id}`);
     return response.data;
