@@ -157,6 +157,8 @@ describe('WarehouseOfflineService', () => {
       const level = service.getStockLevel(wh.id, 'prod-1')!;
       expect(level.onHand).toBe(10);
       expect(level.costPrice).toBe(700);
+      // el movimiento persiste el costo real de la compra (Σ = onHand × costPrice)
+      expect(result.data!.costPrice).toBe(700);
       expect(service.getMovements()).toHaveLength(1);
     });
 
@@ -179,6 +181,9 @@ describe('WarehouseOfflineService', () => {
       const level = service.getStockLevel(wh.id, 'prod-1')!;
       expect(level.onHand).toBe(20);
       expect(level.costPrice).toBe(600);
+      // cada movimiento retiene su costo real: Σ(700×10 + 500×10) = 12000 = 20 × 600
+      const costs = service.getMovements().map((m) => m.costPrice);
+      expect(costs).toEqual([700, 500]);
     });
 
     it('accepts decimal quantities with round2', () => {
@@ -243,6 +248,8 @@ describe('WarehouseOfflineService', () => {
       expect(movements).toHaveLength(2); // purchase + sale_out
       expect(movements[1].type).toBe('sale_out');
       expect(movements[1].reason).toBe('pedido tienda');
+      // la salida persiste el promedio vigente (mismo costo que la InventoryEntry)
+      expect(movements[1].costPrice).toBe(660);
     });
 
     it('fails with InsufficientStock and creates nothing', () => {
@@ -377,6 +384,8 @@ describe('WarehouseOfflineService', () => {
       const levelB = service.getStockLevel(whB.id, 'prod-1')!;
       expect(levelB.onHand).toBe(10);
       expect(levelB.costPrice).toBe(660); // propagated as-is (decisión #4)
+      // el transfer_out persiste el costo del origen (el mismo que se propaga)
+      expect(result.data!.costPrice).toBe(660);
     });
 
     it('rejects transferring to the same warehouse', () => {
@@ -433,6 +442,8 @@ describe('WarehouseOfflineService', () => {
       expect(result.succeeded).toBe(true);
       expect(service.getStockLevel(whA.id, 'prod-1')!.onHand).toBe(16);
       expect(service.getStockLevel(whB.id, 'prod-1')!.onHand).toBe(8);
+      // transfer_in persiste el costo propagado del origen
+      expect(result.data!.costPrice).toBe(660);
     });
 
     // ─── GAP-3: transfer to a destination that ALREADY holds stock (plan 2026-09-08, Paso 4) ───

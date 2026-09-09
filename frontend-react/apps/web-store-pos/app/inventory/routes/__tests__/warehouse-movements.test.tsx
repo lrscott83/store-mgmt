@@ -256,6 +256,43 @@ describe('Vista Movimientos de almacén', () => {
     expect(screen.getByText('Salida a tienda')).toBeTruthy();
   });
 
+  it('una compra con costPrice persistido muestra su costo real, no el promedio del nivel', () => {
+    const today = new Date();
+    fakeState.warehouses = [
+      { id: 'wh-1', name: 'Central', isActive: true, createdDate: new Date(), createdByName: 'x' },
+    ];
+    fakeState.products = [['prod-1', { id: 'prod-1', name: 'Cerveza' }]];
+    // Nivel con promedio $2.50/ud, pero la compra costó $3.00/ud.
+    fakeState.stockLevels = [
+      {
+        id: 'lvl-1',
+        warehouseId: 'wh-1',
+        productId: 'prod-1',
+        onHand: 100,
+        costPrice: 2.5,
+        createdDate: new Date(),
+      },
+    ];
+    fakeState.movements = [
+      {
+        id: 'mv-1',
+        warehouseId: 'wh-1',
+        productId: 'prod-1',
+        type: 'purchase_in',
+        quantity: 24,
+        costPrice: 3,
+        reason: null,
+        createdDate: today,
+        createdByName: 'x',
+      },
+    ];
+    renderPage();
+    fireEvent.click(screen.getByTestId(`mv-day-panel-toggle-${toLocalDayKey(today)}`));
+
+    // Precio real persistido: 3 × 24 = $72 (no el 2.5 × 24 = $60 del promedio).
+    expect(screen.getByTestId('mv-price-mv-1').textContent).toBe(`$72`);
+  });
+
   it('el gear del card expone Editar y Eliminar; Editar abre popup visual de edición', () => {
     const today = new Date();
     fakeState.warehouses = [

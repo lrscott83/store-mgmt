@@ -108,16 +108,16 @@ export function WarehouseMovementsPage() {
   const productName = (id: string) => products.find((p) => p.id === id)?.name ?? id;
   const warehouseName = (id: string) => warehouses.find((w) => w.id === id)?.name ?? id;
 
-  /** Importe mostrado en compras: costPrice (costo promedio por unidad del
-   *  almacén+producto) × cantidad. El movimiento es un log append-only sin
-   *  precio propio; el costPrice es la única fuente disponible y es el mismo
-   *  dato que se muestra como costo promedio en la gestión de almacenes. */
+  /** Importe mostrado en compras: costPrice del propio movimiento (costo real
+   *  de la compra, persistido desde el cambio de "movimientos sin cambio de
+   *  costo") × cantidad; fallback al costo promedio del nivel para movimientos
+   *  creados antes de que el costo se persistiera. */
   const purchasePrice = (movement: WarehouseStockMovement): string | null => {
-    const level = stockLevels.find(
+    const unitCost = movement.costPrice ?? stockLevels.find(
       (l) => l.warehouseId === movement.warehouseId && l.productId === movement.productId,
-    );
-    if (!level || !level.costPrice) return null;
-    return formatCurrency(level.costPrice * movement.quantity);
+    )?.costPrice;
+    if (!unitCost) return null;
+    return formatCurrency(unitCost * movement.quantity);
   };
 
   /** Línea de almacén(s) del movimiento. */

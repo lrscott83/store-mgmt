@@ -264,6 +264,7 @@ export class WarehouseOfflineService {
               productId: params.productId,
               type: 'purchase_in',
               quantity,
+              costPrice,
               reason: params.reason ?? null,
             }),
             true,
@@ -311,6 +312,7 @@ export class WarehouseOfflineService {
               productId: params.productId,
               type: 'sale_out',
               quantity,
+              costPrice: level.costPrice,
               reason: params.reason ?? null,
             }),
             true,
@@ -349,6 +351,7 @@ export class WarehouseOfflineService {
               productId: params.productId,
               type: 'transfer_out',
               quantity,
+              costPrice: level.costPrice,
               reason: params.reason ?? null,
               toWarehouseId: params.toWarehouseId,
             }),
@@ -387,6 +390,7 @@ export class WarehouseOfflineService {
               productId: params.productId,
               type: 'transfer_in',
               quantity,
+              costPrice: from.costPrice,
               reason: params.reason ?? null,
               fromWarehouseId: params.fromWarehouseId,
             }),
@@ -499,6 +503,8 @@ export class WarehouseOfflineService {
     productId: string;
     type: WarehouseMovementType;
     quantity: number;
+    /** Costo unitario de la transacción (movimientos sin cambio de costo). */
+    costPrice?: number;
     reason: string | null;
     toWarehouseId?: string;
     fromWarehouseId?: string;
@@ -509,6 +515,7 @@ export class WarehouseOfflineService {
       productId: input.productId,
       type: input.type,
       quantity: input.quantity,
+      costPrice: input.costPrice,
       reason: input.reason,
       createdDate: new Date(),
       createdByName: getCurrentUserLogin(),
