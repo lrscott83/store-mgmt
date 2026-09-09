@@ -3,6 +3,8 @@ using Application.Dtos.Administration.Owners;
 using Application.Dtos.StoreManagement;
 using Application.Features.StoreManagement.Stores.Commands.CreateStore;
 using AutoMapper;
+using Domain.Common.Enums;
+using Domain.Common.Extensions;
 using Domain.Common.Utils;
 using Domain.Entities.StoreModules;
 using Domain.Entities.Stores;
@@ -24,11 +26,13 @@ namespace Application.Mappings.StoreManagement
                 .IgnoreAllSourcePropertiesWithAnInaccessibleSetter()
                 .ForMember(dest => dest.StoreId, opt => opt.MapFrom(src => src.Id))
                 .ForMember(dest => dest.StoreName, opt => opt.MapFrom(src => src.Name))
+                .ForMember(dest => dest.PlanType, opt => opt.MapFrom(src => ResolvePlanType(src.StorePlanId)))
                 .ForMember(dest => dest.Modules, opt => opt.MapFrom(src => src.StoreModules));
 
             CreateMap<Store, OwnerStoreDto>()
                 .IgnoreAllSourcePropertiesWithAnInaccessibleSetter()
                 .ForMember(dest => dest.Id, opt => opt.MapFrom(src => src.Id))
+                .ForMember(dest => dest.PlanType, opt => opt.MapFrom(src => ResolvePlanType(src.StorePlanId)))
                 .ForMember(dest => dest.Modules, opt => opt.MapFrom(src => src.StoreModules));
             // NextDueDate is NOT mappable from the entity — GetMyStoresQueryHandler computes
             // it per store (same canonical calculation as GetStorePlanQuery) and sets it by hand.
@@ -47,6 +51,13 @@ namespace Application.Mappings.StoreManagement
         private static float GetStoreModuleTotalCurrentPrice(ICollection<StoreModule> storeModules)
         {
             return storeModules.Sum(sm => CurrentPriceServiceUtils.GetCurrentPrice(sm.Price, sm.ModulePercentDiscountPrice, sm.ModuleDiscountPrice));
+        }
+
+        private static string ResolvePlanType(int storePlanId)
+        {
+            return Enum.IsDefined(typeof(StorePlanType), storePlanId)
+                ? ((StorePlanType)storePlanId).GetDescription()
+                : "Gratis";
         }
     }
 }

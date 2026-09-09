@@ -24,5 +24,10 @@ namespace Application.Dtos.StoreManagement
         public DateOnly? NextDueDate { get; set; }
         /// <summary>Store's own module snapshot (prices frozen at activation).</summary>
         public List<ModuleDto> Modules { get; set; } = new();
+        /// <summary>
+        /// The store's current plan name (Gratis, Pago or Superior) serialized
+        /// from <c>Store.StorePlanId</c>, so the frontend never infers it.
+        /// </summary>
+        public string PlanType { get; set; }
     }
 }
