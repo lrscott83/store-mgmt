@@ -29,6 +29,8 @@ const MOVEMENT_TYPE_LABEL: Record<WarehouseMovementType, string> = {
   sale_out: 'WAREHOUSES.TYPE_SALE_OUT',
   transfer_in: 'WAREHOUSES.TYPE_TRANSFER_IN',
   transfer_out: 'WAREHOUSES.TYPE_TRANSFER_OUT',
+  // Reversa — compensa una fila anterior (plan 2026-09-09, D7a/F5).
+  reversal: 'WAREHOUSES.TYPE_REVERSAL',
 };
 
 /**
@@ -85,12 +87,14 @@ export function WarehouseMovementsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- load reads storeId/service only
   }, [service]);
 
-  /** Icono por tipo de movimiento: entrada verde, salida naranja, transferencia azul. */
+  /** Icono por tipo de movimiento: entrada verde, salida naranja, transferencia azul, reversa violeta (plan 2026-09-09, F5). */
   const MOVEMENT_TYPE_ICON: Record<WarehouseMovementType, { icon: ReactElement; color: string }> = {
     purchase_in: { icon: <InOutIcon />, color: 'text-success' },
     sale_out: { icon: <TruckIcon />, color: 'text-warning' },
     transfer_in: { icon: <SwapHorizontalIcon />, color: 'text-primary' },
     transfer_out: { icon: <SwapHorizontalIcon />, color: 'text-primary' },
+    // Reversa violeta con el mismo icono de intercambio (D7a/F5).
+    reversal: { icon: <SwapHorizontalIcon />, color: 'text-violet-600' },
   };
 
   const productName = (id: string) => products.find((p) => p.id === id)?.name ?? id;
