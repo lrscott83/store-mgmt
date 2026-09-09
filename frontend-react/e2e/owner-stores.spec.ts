@@ -1,4 +1,5 @@
 import { test, expect } from './support/test';
+import { randomUUID } from 'node:crypto';
 import type { Page } from '@playwright/test';
 import { Client } from 'pg';
 import { assertStoresFeature } from './support/store-fixture';
@@ -43,6 +44,46 @@ async function readStoreRow(storeId: string): Promise<{ isActive: boolean; name:
       throw new Error(`owner-stores: expected exactly 1 Store row for ${storeId}`);
     }
     return { isActive: result.rows[0].IsActive === true, name: result.rows[0].Name };
+  } finally {
+    await client.end();
+  }
+}
+
+/**
+ * Seeds a SECOND store for the same owner (reference store's OwnerId/TenantId,
+ * direct DB INSERT) in the INACTIVE state. Plan E-02 originally asked for an
+ * inactive second store, and it is the only safe shape for the badge assertion:
+ * flipping the owner's ONLY store inactive would kill their StoresAdmin claim
+ * (backend pins this — MyStoresTests "an owner whose ONLY store is inactive
+ * loses the StoresAdmin claim"), and `load()` would fail the listing right at
+ * the point E-02 wants to see the card. Same OwnerId/TenantId means the global
+ * teardown's Owner→User `e2e-%` sweep cleans the new row automatically.
+ */
+async function seedInactiveSecondStore(referenceStoreId: string): Promise<string> {
+  const connectionString = process.env['E2E_DB_URL'] ?? DEFAULT_DB_URL;
+  const client = new Client({ connectionString });
+  try {
+    await client.connect();
+    const owner = await client.query('SELECT "OwnerId", "TenantId" FROM "Store" WHERE "Id" = $1', [
+      referenceStoreId,
+    ]);
+    if (owner.rowCount !== 1) {
+      throw new Error(`owner-stores: no Store row found to copy Owner/Tenant from (${referenceStoreId})`);
+    }
+    const secondStoreId = randomUUID();
+    await client.query(
+      `INSERT INTO "Store"
+         ("Id", "Name", "Address", "Description", "Approved", "CreatedBy", "CreatedDate",
+          "IsActive", "OwnerId", "PaymentStartDate", "StorePlanId", "TenantId", "UpdatedBy", "UpdatedDate")
+       VALUES ($1, $2, NULL, NULL, true, '00000000-0000-0000-0000-000000000000', now(), false, $3, NULL, 2, $4, NULL, NULL)`,
+      [secondStoreId, `e2e-owner-stores-inactive-${Date.now()}`, owner.rows[0].OwnerId, owner.rows[0].TenantId],
+    );
+    return secondStoreId;
+  } catch (cause) {
+    throw new Error(
+      `owner-stores: seedInactiveSecondStore(${referenceStoreId}) failed — the inactive second ` +
+        `store was not written: ${cause instanceof Error ? cause.message : String(cause)}`,
+    );
   } finally {
     await client.end();
   }
@@ -120,17 +161,25 @@ test('E-01..E-05 — cards render plan, next due date and discounted price', asy
   // is struck through next to the current price; either way the price line exists.
   await expect(page.getByTestId(`owner-store-price-${selectedStoreId}`)).toBeVisible();
 
-  // E-02: seed an inactive second store directly in the DB, reload, and pin the
-  // inactive styling + badge. The persona owns exactly one store, so we flip the
-  // SAME store inactive after the assertions above (serial mode keeps order).
-  await setStoreActiveDirect(selectedStoreId, false);
+  // E-02: seed an inactive SECOND store directly in the DB, reload, and pin the
+  // inactive styling + badge. The persona's own store stays ACTIVE: deactivating
+  // the owner's ONLY store would kill the StoresAdmin claim (backend pins this)
+  // and `load()` would fail the whole listing. A second inactive store renders
+  // the badge without breaking auth.
+  const inactiveStoreId = await seedInactiveSecondStore(selectedStoreId);
   await page.reload();
 
-  await expect(page.getByTestId(`owner-store-inactive-${selectedStoreId}`)).toBeVisible();
+  await expect(page.getByTestId(`owner-store-inactive-${inactiveStoreId}`)).toBeVisible();
   // Inactive stores still appear in the listing (the key my-stores difference).
+  const secondCard = page.getByTestId(`owner-store-card-${inactiveStoreId}`);
+  await expect(secondCard).toBeVisible();
+  // The persona's own store stays ACTIVE after the reload (auth contract).
+  await expect(page.getByTestId(`owner-store-inactive-${selectedStoreId}`)).toHaveCount(0);
   await expect(card).toBeVisible();
-  // Restore the active state for the following tests.
-  await setStoreActiveDirect(selectedStoreId, true);
+  // Leave the second store ACTIVE for E-07: deactivating the selected store
+  // through the popup must still leave the owner at least one active store
+  // (same auth contract), or load() would fail after that save too.
+  await setStoreActiveDirect(inactiveStoreId, true);
 });
 
 test('E-06 — Editar popup renames the store', async ({ signedInPage }) => {
@@ -159,31 +208,42 @@ test('E-06 — Editar popup renames the store', async ({ signedInPage }) => {
 test('E-07 — Editar popup deactivates and reactivates the store', async ({ signedInPage }) => {
   const { page, selectedStoreId } = signedInPage;
   await assertStoresFeature(page);
+
+  // The popup deactivates a SECOND store, never the token's selected store. The
+  // per-request permission derivation (HasUserPermissionRequirementFilter ->
+  // StoreModuleRepository.GetAvailableModulesByStoreIdAsync) filters
+  // sm.Store.IsActive for the token's own StoreId, so deactivating the selected
+  // store drops the StoresAdmin claim mid-session (zero modules -> 403) even when
+  // the owner still owns another active store. Seed + activate so the cycle
+  // starts from the ACTIVE state, matching the popup toggle's "on -> off" path.
+  const targetStoreId = await seedInactiveSecondStore(selectedStoreId);
+  await setStoreActiveDirect(targetStoreId, true);
   await page.goto('/management/my-stores');
+  await expect(page.getByTestId(`owner-store-card-${targetStoreId}`)).toBeVisible();
+  await expect(page.getByTestId(`owner-store-inactive-${targetStoreId}`)).toHaveCount(0);
 
-  // Deactivate through the popup (confirm dialog R-1 accepts).
-  await page.getByTestId(`owner-store-actions-toggle-${selectedStoreId}`).click();
-  await page.getByTestId(`owner-store-edit-${selectedStoreId}`).click();
-  await page.getByTestId(`owner-store-active-toggle-${selectedStoreId}`).click();
-
-  const confirmButton = page.getByTestId('confirm-dialog-confirm');
-  await page.getByTestId(`owner-store-save-${selectedStoreId}`).click();
-  await confirmButton.click();
+  // Deactivate through the popup (confirm dialog R-1 accepts). SweetAlert2 — the
+  // suite's existing pattern is the .swal2-confirm class (mayorista-sale.spec.ts), not a testid.
+  await page.getByTestId(`owner-store-actions-toggle-${targetStoreId}`).click();
+  await page.getByTestId(`owner-store-edit-${targetStoreId}`).click();
+  await page.getByTestId(`owner-store-active-toggle-${targetStoreId}`).click();
+  await page.getByTestId(`owner-store-save-${targetStoreId}`).click();
+  await page.locator('.swal2-confirm').click();
 
   // The card repaints with the inactive badge (setStoreActivation exercised for real).
-  await expect(page.getByTestId(`owner-store-inactive-${selectedStoreId}`)).toBeVisible();
+  await expect(page.getByTestId(`owner-store-inactive-${targetStoreId}`)).toBeVisible();
 
   // Pin: the flag really flipped in the DB.
-  expect((await readStoreRow(selectedStoreId)).isActive).toBe(false);
+  expect((await readStoreRow(targetStoreId)).isActive).toBe(false);
 
   // Reactivate through the same popup (no confirm needed for activation).
-  await page.getByTestId(`owner-store-actions-toggle-${selectedStoreId}`).click();
-  await page.getByTestId(`owner-store-edit-${selectedStoreId}`).click();
-  await page.getByTestId(`owner-store-active-toggle-${selectedStoreId}`).click();
-  await page.getByTestId(`owner-store-save-${selectedStoreId}`).click();
+  await page.getByTestId(`owner-store-actions-toggle-${targetStoreId}`).click();
+  await page.getByTestId(`owner-store-edit-${targetStoreId}`).click();
+  await page.getByTestId(`owner-store-active-toggle-${targetStoreId}`).click();
+  await page.getByTestId(`owner-store-save-${targetStoreId}`).click();
 
-  await expect(page.getByTestId(`owner-store-inactive-${selectedStoreId}`)).toHaveCount(0);
-  expect((await readStoreRow(selectedStoreId)).isActive).toBe(true);
+  await expect(page.getByTestId(`owner-store-inactive-${targetStoreId}`)).toHaveCount(0);
+  expect((await readStoreRow(targetStoreId)).isActive).toBe(true);
 });
 
 test('E-09 — Editar el plan popup locks the paid store for the owner (DG-7)', async ({
