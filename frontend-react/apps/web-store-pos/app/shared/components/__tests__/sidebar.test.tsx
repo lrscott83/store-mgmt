@@ -369,6 +369,61 @@ describe('Sidebar — sidebar-menu-parity: INVENTORY group item set and order', 
   });
 });
 
+describe('Sidebar — sidebar-menu-parity: WAREHOUSES module group (features 36 + 37)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('SuperAdmin sees the ALMACENES group with "Almacenes" then "Movimientos" after the INVENTORY group', () => {
+    renderSidebar(makeSuperAdmin());
+
+    const links = screen.getAllByRole('link');
+    // Los items con badge NEW concatenan "NEW" al textContent del link; se normaliza.
+    const linkTexts = links.map((l) => (l.textContent ?? '').replace(/NEW$/, ''));
+
+    // Ambos items del nuevo módulo, en orden: Almacenes → Movimientos.
+    const almacenesIdx = linkTexts.indexOf('Almacenes');
+    const movimientosIdx = linkTexts.indexOf('Movimientos');
+    expect(almacenesIdx).toBeGreaterThan(-1);
+    expect(movimientosIdx).toBeGreaterThan(-1);
+    expect(movimientosIdx).toBeGreaterThan(almacenesIdx);
+
+    // El grupo ALMACENES va después del grupo INVENTARIO (último item: Entradas).
+    const inventoryLastIdx = linkTexts.indexOf('Entradas');
+    expect(almacenesIdx).toBeGreaterThan(inventoryLastIdx);
+  });
+
+  it('StoreUser with only the Warehouses feature (36) sees "Almacenes" but NOT "Movimientos"', () => {
+    const user = makeStoreUser([EFeatures.Warehouses], 's1');
+    renderSidebar(user);
+
+    expect(screen.getByText('Almacenes')).toBeInTheDocument();
+    expect(screen.queryByText('Movimientos')).not.toBeInTheDocument();
+  });
+
+  it('StoreUser with only the WarehouseStockMovements feature (37) sees "Movimientos" but NOT "Almacenes"', () => {
+    const user = makeStoreUser([EFeatures.WarehouseStockMovements], 's1');
+    renderSidebar(user);
+
+    expect(screen.getByText('Movimientos')).toBeInTheDocument();
+    expect(screen.queryByText('Almacenes')).not.toBeInTheDocument();
+  });
+
+  it('"Almacenes" no longer appears inside the INVENTORY group (moved to the new module)', () => {
+    renderSidebar(makeSuperAdmin());
+
+    const links = screen.getAllByRole('link');
+    const linkTexts = links.map((l) => (l.textContent ?? '').replace(/NEW$/, ''));
+    const egressIdx = linkTexts.indexOf('Salida');
+    const entriesHistoryIdx = linkTexts.indexOf('Entradas');
+    const almacenesIdx = linkTexts.indexOf('Almacenes');
+    // Dentro de INVENTARIO el orden es ...Salida → Entradas (historial);
+    // Almacenes vive después del grupo, no entre ambos.
+    expect(almacenesIdx).toBeGreaterThan(entriesHistoryIdx);
+    expect(entriesHistoryIdx).toBeGreaterThan(egressIdx);
+  });
+});
+
 describe('Sidebar — sidebar-menu-parity: no Profile group', () => {
   beforeEach(() => {
     vi.clearAllMocks();

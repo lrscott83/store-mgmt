@@ -23,6 +23,8 @@ export enum EFeatures {
   InventoryTodayQuantities = 34,
   InventoryTodaySaleProfit = 35,
   Warehouses = 36,
+  /** Movimientos de almacén — espejo de FeatureType.WarehouseStockMovements=37 (backend). */
+  WarehouseStockMovements = 37,
   Send = 40,
   Download = 41,
   Receive = 42,
@@ -54,6 +56,8 @@ export enum EModules {
   Billing = 9,
   Histories = 10,
   Credits = 11,
+  /** Módulo Almacenes — espejo de ModuleType.Warehouses=13 (backend). */
+  Warehouses = 13,
 }
 
 export enum PaymentType {

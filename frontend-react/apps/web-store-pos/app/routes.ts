@@ -53,6 +53,8 @@ export default [
     route('inventory/today-sales-profit', 'inventory/routes/today-sales-profit.tsx'),
     route('inventory/egress', 'inventory/routes/egress.tsx'),
     route('inventory/warehouses', 'inventory/routes/warehouses.tsx'),
+    // Almacenes — Movimientos (feature 37, vista dedicada)
+    route('inventory/warehouse-movements', 'inventory/routes/warehouse-movements.tsx'),
 
     // Expenses
     route('expenses/today', 'expenses/routes/today-expenses.tsx'),
