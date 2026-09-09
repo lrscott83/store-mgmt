@@ -176,4 +176,51 @@ describe('WarehouseMovementModal', () => {
     fireEvent.click(container.querySelector('[role="dialog"]')!);
     expect(onClose).toHaveBeenCalledTimes(2);
   });
+
+  it('shows the product search only when opened from the gear', () => {
+    const { unmount } = renderModal({ productId: null });
+    expect(screen.getByTestId('movement-product-search')).toBeTruthy();
+    unmount();
+
+    renderModal({ productId: 'prod-1' });
+    expect(screen.queryByTestId('movement-product-search')).toBeNull();
+  });
+
+  it('filters product options while typing in the search', () => {
+    renderModal({ productId: null });
+    const search = screen.getByTestId('movement-product-search');
+    const select = screen.getByTestId('movement-product') as HTMLSelectElement;
+
+    fireEvent.change(search, { target: { value: 'azuc' } });
+    const options = Array.from(select.options).map((o) => o.value);
+    expect(options).toEqual(['', 'prod-2']);
+
+    fireEvent.change(search, { target: { value: 'cafe' } });
+    expect(Array.from(select.options).map((o) => o.value)).toEqual(['', 'prod-1']);
+  });
+
+  it('matches accents case-insensitively (CAFÉ via "cafe")', () => {
+    renderModal({ productId: null });
+    fireEvent.change(screen.getByTestId('movement-product-search'), {
+      target: { value: 'CAF' },
+    });
+    const select = screen.getByTestId('movement-product') as HTMLSelectElement;
+    expect(Array.from(select.options).map((o) => o.value)).toEqual(['', 'prod-1']);
+  });
+
+  it('selects a filtered product and submits its id', () => {
+    const onSubmit = vi.fn();
+    renderModal({ onSubmit, productId: null });
+    fireEvent.change(screen.getByTestId('movement-product-search'), {
+      target: { value: 'azuc' },
+    });
+    fireEvent.change(screen.getByTestId('movement-product'), { target: { value: 'prod-2' } });
+    fireEvent.change(screen.getByTestId('movement-quantity'), { target: { value: '3' } });
+    fireEvent.change(screen.getByTestId('movement-cost'), { target: { value: '500' } });
+    fireEvent.click(screen.getByText('Guardar'));
+
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({ productId: 'prod-2', quantity: 3 }),
+    );
+  });
 });
