@@ -63,7 +63,11 @@ export function WarehouseMovementModal({
 }: WarehouseMovementModalProps) {
   const intl = useIntl();
   const [selectedProduct, setSelectedProduct] = useState('');
-  const [productSearch, setProductSearch] = useState('');
+  // Searchable combobox (same UX as EditInventoryEntryModal's "+ Entrada" product
+  // picker): the input holds the typed query while the list filters as the user types.
+  const [query, setQuery] = useState('');
+  const [isListOpen, setIsListOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(0);
   const [quantity, setQuantity] = useState('');
   const [costPrice, setCostPrice] = useState('');
   const [toWarehouseId, setToWarehouseId] = useState('');
@@ -72,13 +76,21 @@ export function WarehouseMovementModal({
   useEffect(() => {
     if (open) {
       setSelectedProduct(productId ?? '');
-      setProductSearch('');
+      // Prefill the combobox with the fixed product's name (row/edition mode) or with
+      // the raw id when the product is no longer in the catalog (submit keeps working).
+      setQuery(
+        productId ? (products.find((p) => p.id === productId)?.name ?? productId) : '',
+      );
+      setIsListOpen(false);
+      setActiveIndex(0);
       // Edición (F3): precarga los valores de la fila original; create arranca limpio.
       setQuantity(initial ? String(initial.quantity) : '');
       setCostPrice(initial?.costPrice !== undefined ? String(initial.costPrice) : '');
       setToWarehouseId(initial?.toWarehouseId ?? '');
       setReason('');
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- prefill only on open; changing
+    // products/initial must not reset form fields while the user is typing.
   }, [open, productId, initial]);
 
   useEffect(() => {
@@ -101,7 +113,6 @@ export function WarehouseMovementModal({
       (Number.isFinite(parseFloat(costPrice)) && parseFloat(costPrice) > 0)) &&
     (mode !== 'transfer_out' || toWarehouseId !== '');
 
-  const productKnown = products.some((p) => p.id === selectedProduct);
   // Accent- and case-insensitive filter (same as edit-inventory-entry-modal):
   // "cafe" matches "Café", "RON" matches "Ron".
   const normalized = (value: string) =>
@@ -109,10 +120,40 @@ export function WarehouseMovementModal({
       .toLowerCase()
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '');
-  const visibleProducts =
-    productSearch.trim() === ''
+  const filteredProducts =
+    query.trim() === ''
       ? products
-      : products.filter((p) => normalized(p.name).includes(normalized(productSearch)));
+      : products.filter((p) => normalized(p.name).includes(normalized(query)));
+
+  function selectProduct(p: Product) {
+    setSelectedProduct(p.id);
+    setQuery(p.name);
+    setIsListOpen(false);
+    setActiveIndex(0);
+  }
+
+  function handleProductKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setActiveIndex((i) => Math.min(i + 1, filteredProducts.length - 1));
+      setIsListOpen(true);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setActiveIndex((i) => Math.max(i - 1, 0));
+      setIsListOpen(true);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      const option = filteredProducts[activeIndex];
+      if (isListOpen && option) {
+        selectProduct(option);
+      }
+    } else if (e.key === 'Escape' && isListOpen) {
+      // Cierra solo la lista; el modal lo cierra el listener global de Escape.
+      e.stopPropagation();
+      setIsListOpen(false);
+    }
+  }
+
   const inputClass =
     'w-full rounded border border-border bg-background px-3 py-2 text-sm text-text focus:outline-none focus:ring-2 focus:ring-primary';
 
@@ -146,35 +187,64 @@ export function WarehouseMovementModal({
             <label htmlFor="movement-product" className="mb-1 block text-sm font-medium text-text">
               {intl.formatMessage({ id: 'WAREHOUSES.PRODUCT' })}
             </label>
-            {productId === null && (
-              <input
-                id="movement-product-search"
-                data-testid="movement-product-search"
-                type="text"
-                value={productSearch}
-                onChange={(e) => setProductSearch(e.target.value)}
-                className={`${inputClass} mb-2`}
-                placeholder={intl.formatMessage({ id: 'WAREHOUSES.SEARCH_PRODUCT' })}
-              />
-            )}
-            <select
+            <input
               id="movement-product"
               data-testid="movement-product"
-              value={selectedProduct}
+              type="text"
+              role="combobox"
+              autoComplete="off"
+              value={query}
               disabled={productId !== null}
-              onChange={(e) => setSelectedProduct(e.target.value)}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                setSelectedProduct('');
+                setIsListOpen(true);
+                setActiveIndex(0);
+              }}
+              onFocus={() => setIsListOpen(true)}
+              onBlur={() => setIsListOpen(false)}
+              onKeyDown={handleProductKeyDown}
+              aria-expanded={isListOpen}
+              aria-controls="movement-product-listbox"
+              aria-autocomplete="list"
+              aria-activedescendant={
+                isListOpen && filteredProducts[activeIndex]
+                  ? `movement-product-option-${activeIndex}`
+                  : undefined
+              }
               className={inputClass}
-            >
-              <option value="">{intl.formatMessage({ id: 'WAREHOUSES.SELECT_PRODUCT' })}</option>
-              {visibleProducts.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-              {!productKnown && selectedProduct !== '' && (
-                <option value={selectedProduct}>{selectedProduct}</option>
-              )}
-            </select>
+              placeholder={intl.formatMessage({ id: 'WAREHOUSES.SELECT_PRODUCT' })}
+            />
+            {isListOpen && (
+              <ul
+                id="movement-product-listbox"
+                role="listbox"
+                data-testid="movement-product-listbox"
+                className="mt-1 max-h-48 overflow-auto rounded border border-border bg-background py-1 shadow-lg"
+              >
+                {filteredProducts.length === 0 ? (
+                  <li className="px-3 py-2 text-sm text-text-muted">
+                    {intl.formatMessage({ id: 'GENERAL.NO_RESULTS' })}
+                  </li>
+                ) : (
+                  filteredProducts.map((p, index) => (
+                    <li
+                      key={p.id}
+                      id={`movement-product-option-${index}`}
+                      role="option"
+                      aria-selected={index === activeIndex}
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => selectProduct(p)}
+                      className={`cursor-pointer px-3 py-2 text-sm text-text ${
+                        index === activeIndex ? 'bg-primary/10' : ''
+                      }`}
+                    >
+                      {p.name}
+                    </li>
+                  ))
+                )}
+              </ul>
+            )}
           </div>
 
           <div>
