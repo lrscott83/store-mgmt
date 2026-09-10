@@ -1,4 +1,5 @@
-﻿using Domain.Entities.Modules;
+﻿using Domain.Common.Enums;
+using Domain.Entities.Modules;
 using Domain.Entities.Stores;
 using Domain.Interfaces.Repositories;
 using FluentValidation;
@@ -36,6 +37,12 @@ namespace Application.Features.StoreManagement.Stores.Commands.UpdateStore
                 .MustAsync((moduleIds, ct) => AvailableModuleIdsToStore(moduleIds!, ct))
                     .WithMessage(_localizer["ModuleNotAvailableToStore", "{PropertyName}"])
                 .When(x => x.ModuleIds is not null);
+
+            // PlanId is optional: when present it must be a defined StorePlanType.
+            RuleFor(x => x.PlanId)
+                .Must(planId => planId is null || Enum.IsDefined(typeof(StorePlanType), planId.Value))
+                    .WithMessage("The plan id must be one of the defined store plan types.")
+                .When(x => x.PlanId is not null);
         }
 
         private async Task<bool> AvailableModuleIdsToStore(List<int> moduleIds, CancellationToken cancellationToken)
