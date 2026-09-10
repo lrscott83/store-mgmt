@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 import type { Warehouse, WarehouseStockMovement } from '@store-mgmt/domain';
@@ -25,11 +25,25 @@ vi.mock('~/shared/lib/stores/auth-store', () => {
   return { useAuthStore };
 });
 
+// ─── blocking-alert + toast mocks (patrón de inventory-routes.test.tsx) ────
+const confirmDialogMock = vi.hoisted(() => vi.fn().mockResolvedValue(true));
+const showBlockingErrorMock = vi.hoisted(() => vi.fn());
+const showToastSuccessMock = vi.hoisted(() => vi.fn());
+vi.mock('~/shared/lib/blocking-alert', () => ({
+  confirmDialog: (...args: unknown[]) => confirmDialogMock(...args),
+  showBlockingError: (...args: unknown[]) => showBlockingErrorMock(...args),
+}));
+vi.mock('~/shared/lib/toast', () => ({
+  showToastSuccess: (...args: unknown[]) => showToastSuccessMock(...args),
+}));
+
 // ─── fake WarehouseOfflineService (estado controlado) ───────────────────────
 const fakeState = vi.hoisted(() => ({
   warehouses: [] as Warehouse[],
   movements: [] as WarehouseStockMovement[],
   products: [] as Array<[string, Record<string, unknown>]>,
+  reverseMovementImpl: vi.fn() as unknown as ReturnType<typeof vi.fn>,
+  isOwnerAdminFlag: true,
 }));
 
 vi.mock('~/inventory/lib/services/warehouse-offline-service', () => ({
@@ -42,6 +56,14 @@ vi.mock('~/inventory/lib/services/warehouse-offline-service', () => ({
     }
     getStorageMovements() {
       return fakeState.movements;
+    }
+    reverseMovement(id: string, reason?: string) {
+      return fakeState.reverseMovementImpl(id, reason);
+    }
+    isReversed(id: string) {
+      return fakeState.movements.some(
+        (m) => m.type === 'reversal' && m.reversalOfMovementId === id,
+      );
     }
   },
 }));
@@ -174,5 +196,129 @@ describe('Vista Movimientos de almacén', () => {
     ];
     renderPage();
     expect(screen.getByText('No hay movimientos registrados.')).toBeTruthy();
+  });
+
+  // ─── Plan 2026-09-09: engranaje Editar/Revertir + badge (F4/F5, D6/D10) ────
+
+  function seedTodayMovements() {
+    const today = new Date();
+    fakeState.warehouses = [
+      { id: 'wh-1', name: 'Central', isActive: true, createdDate: new Date(), createdByName: 'x' },
+      { id: 'wh-2', name: 'Anexo', isActive: true, createdDate: new Date(), createdByName: 'x' },
+    ];
+    fakeState.products = [['prod-1', { id: 'prod-1', name: 'Cerveza' }]];
+    fakeState.movements = [
+      { id: 'mv-in', warehouseId: 'wh-1', productId: 'prod-1', type: 'purchase_in', quantity: 24, reason: null, createdDate: today, createdByName: 'x' },
+      { id: 'mv-out', warehouseId: 'wh-1', productId: 'prod-1', type: 'sale_out', quantity: 6, reason: null, createdDate: today, createdByName: 'x' },
+      { id: 'mv-tr-in', warehouseId: 'wh-2', productId: 'prod-1', type: 'transfer_in', quantity: 6, reason: null, fromWarehouseId: 'wh-1', createdDate: today, createdByName: 'x' },
+      {
+        id: 'mv-rev', warehouseId: 'wh-1', productId: 'prod-1', type: 'reversal', quantity: 2, reason: null,
+        createdDate: today, createdByName: 'x', reversalOfMovementId: 'mv-other-reverted',
+      },
+      {
+        id: 'mv-other-reverted', warehouseId: 'wh-1', productId: 'prod-1', type: 'purchase_in', quantity: 2, reason: null,
+        createdDate: today, createdByName: 'x',
+      },
+    ];
+  }
+
+  function openToday() {
+    fireEvent.click(screen.getByTestId(`mv-day-panel-toggle-${toLocalDayKey(new Date())}`));
+  }
+
+  it('U-M1: OwnerAdmin ve engranaje solo en filas UI sin reversa (no en reversal ni transfer_in)', () => {
+    seedTodayMovements();
+    renderPage();
+    openToday();
+    expect(screen.getByTestId('mv-actions-toggle-mv-in')).toBeTruthy();
+    expect(screen.getByTestId('mv-actions-toggle-mv-out')).toBeTruthy();
+    expect(screen.queryByTestId('mv-actions-toggle-mv-rev')).toBeNull(); // reversal: solo lectura
+    expect(screen.queryByTestId('mv-actions-toggle-mv-tr-in')).toBeNull(); // transfer_in: solo lectura
+    expect(screen.queryByTestId('mv-actions-toggle-mv-other-reverted')).toBeNull(); // ya revertida
+  });
+
+  it('U-M2: StoreUser no ve engranajes (D6)', () => {
+    seedTodayMovements();
+    mockUser.isOwnerAdmin = false;
+    renderPage();
+    openToday();
+    expect(screen.queryByTestId('mv-actions-toggle-mv-in')).toBeNull();
+    expect(screen.queryByTestId('mv-actions-toggle-mv-out')).toBeNull();
+    mockUser.isOwnerAdmin = true;
+  });
+
+  it('U-M4: Revertir confirma con Swal Si/No; No cancela sin llamar al servicio', async () => {
+    seedTodayMovements();
+    confirmDialogMock.mockResolvedValueOnce(false);
+    renderPage();
+    openToday();
+    fireEvent.click(screen.getByTestId('mv-actions-toggle-mv-out'));
+    fireEvent.click(screen.getByTestId('mv-revert-mv-out'));
+    await waitFor(() => expect(confirmDialogMock).toHaveBeenCalledTimes(1));
+    // El mensaje de confirmación es el de la reversa (F4).
+    expect(confirmDialogMock.mock.calls[0][0].message).toContain(
+      '¿Está seguro que desea revertir este movimiento?',
+    );
+    expect(fakeState.reverseMovementImpl).not.toHaveBeenCalled();
+  });
+
+  it('U-M4b: confirmar Si ejecuta reverseMovement y recarga', async () => {
+    seedTodayMovements();
+    fakeState.reverseMovementImpl.mockReturnValue({ succeeded: true, data: {}, errors: [] });
+    renderPage();
+    openToday();
+    fireEvent.click(screen.getByTestId('mv-actions-toggle-mv-out'));
+    fireEvent.click(screen.getByTestId('mv-revert-mv-out'));
+    await waitFor(() => expect(fakeState.reverseMovementImpl).toHaveBeenCalledWith('mv-out', undefined));
+    expect(showToastSuccessMock).toHaveBeenCalled();
+  });
+
+  it('U-M5: reverseMovement fallida → Swal blocking error con mensaje específico', async () => {
+    seedTodayMovements();
+    fakeState.reverseMovementImpl.mockReturnValue({
+      succeeded: false,
+      data: undefined,
+      errors: [{ code: 'Warehouse.SaleOutAlreadyConsumed', description: 'La salida ya fue consumida por ventas — no se puede revertir la entrada de tienda.' }],
+    });
+    renderPage();
+    openToday();
+    fireEvent.click(screen.getByTestId('mv-actions-toggle-mv-out'));
+    fireEvent.click(screen.getByTestId('mv-revert-mv-out'));
+    await waitFor(() =>
+      expect(showBlockingErrorMock).toHaveBeenCalledWith(
+        expect.any(String),
+        'La salida ya fue consumida por ventas — no se puede revertir la entrada de tienda.',
+      ),
+    );
+  });
+
+  it('U-M6: fila revertida muestra badge Revertido; fila reversal con icono propio', () => {
+    seedTodayMovements();
+    renderPage();
+    openToday();
+    expect(screen.getByTestId('mv-reversal-badge-mv-other-reverted').textContent).toBe('Revertido');
+    // La fila reversal existe con su icono y NO lleva badge (no es reversible).
+    expect(screen.getByTestId('mv-type-icon-mv-rev')).toBeTruthy();
+    expect(screen.queryByTestId('mv-reversal-badge-mv-rev')).toBeNull();
+  });
+
+  it('U-M9: load() refresca el historial tras la reversa (movements re-leído)', async () => {
+    seedTodayMovements();
+    fakeState.reverseMovementImpl.mockImplementation(() => {
+      // La reversa "aterriza" en el storage — la página debe volver a leerla.
+      fakeState.movements = [
+        ...fakeState.movements,
+        { id: 'mv-new-rev', warehouseId: 'wh-1', productId: 'prod-1', type: 'reversal', quantity: 6, reason: null, createdDate: new Date(), createdByName: 'x', reversalOfMovementId: 'mv-out' },
+      ];
+      return { succeeded: true, data: {}, errors: [] };
+    });
+    renderPage();
+    openToday();
+    expect(screen.queryByTestId('mv-qty-mv-new-rev')).toBeNull();
+    fireEvent.click(screen.getByTestId('mv-actions-toggle-mv-out'));
+    fireEvent.click(screen.getByTestId('mv-revert-mv-out'));
+    await waitFor(() => expect(screen.getByTestId('mv-qty-mv-new-rev')).toBeTruthy());
+    // El original ahora lleva badge.
+    expect(screen.getByTestId('mv-reversal-badge-mv-out')).toBeTruthy();
   });
 });

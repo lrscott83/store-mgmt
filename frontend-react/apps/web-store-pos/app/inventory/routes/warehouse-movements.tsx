@@ -9,8 +9,12 @@ import type {
 import { EFeatures } from '@store-mgmt/domain';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
+import { isOwnerAdmin } from '~/shared/lib/auth/authorization-service';
+import { confirmDialog, showBlockingError } from '~/shared/lib/blocking-alert';
+import { showToastSuccess } from '~/shared/lib/toast';
 import { Card } from '~/shared/components/ui/card';
 import { InfoBox } from '~/shared/components/ui/info-box';
+import { ActionMenu, ActionMenuItem } from '~/shared/components/ui/action-menu';
 import { ChevronDownIcon, InOutIcon, SwapHorizontalIcon, TruckIcon } from '~/shared/components/ui/icons';
 import { formatLocalDate, groupByLocalDay } from '~/shared/lib/date-utils';
 import { WarehouseOfflineService } from '../lib/services/warehouse-offline-service';
@@ -106,6 +110,53 @@ export function WarehouseMovementsPage() {
     [movements],
   );
 
+  // ─── Plan 2026-09-09: engranaje Revertir + badge (F4/F5, D6/D10) ─────────
+  const canManageMovements = user ? isOwnerAdmin(user) : false;
+
+  /** Ids con reversa emparejada — derivado en runtime, sin migración (F5). */
+  const reversedIds = useMemo(
+    () =>
+      new Set(
+        movements
+          .filter((m) => m.type === 'reversal' && m.reversalOfMovementId)
+          .map((m) => m.reversalOfMovementId!),
+      ),
+    [movements],
+  );
+
+  /** Filas reversibles: los 3 tipos del UI, sin reversa previa (D2/D10). */
+  function isReversible(movement: WarehouseStockMovement): boolean {
+    return (
+      canManageMovements &&
+      (movement.type === 'purchase_in' ||
+        movement.type === 'sale_out' ||
+        movement.type === 'transfer_out') &&
+      !reversedIds.has(movement.id)
+    );
+  }
+
+  async function handleRevert(movement: WarehouseStockMovement) {
+    if (!service) return;
+    const confirmed = await confirmDialog({
+      title: intl.formatMessage({ id: 'GENERAL.DELETE_CONFIRM_TITLE' }),
+      message: intl.formatMessage({ id: 'WAREHOUSES.REVERSAL_CONFIRM_MESSAGE_A' }),
+      confirmButtonText: intl.formatMessage({ id: 'GENERAL.YES' }),
+      cancelButtonText: intl.formatMessage({ id: 'GENERAL.NO' }),
+    });
+    if (!confirmed) return;
+
+    const result = service.reverseMovement(movement.id);
+    if (!result.succeeded) {
+      showBlockingError(
+        intl.formatMessage({ id: 'GENERAL.ERROR' }),
+        result.errors[0]?.description ?? '',
+      );
+      return;
+    }
+    showToastSuccess(intl.formatMessage({ id: 'WAREHOUSES.REVERSAL_SUCCESS' }));
+    load();
+  }
+
   return (
     <Card>
       <h1 className="mb-4 text-xl font-bold text-text">
@@ -172,6 +223,29 @@ export function WarehouseMovementsPage() {
                         {movement.toWarehouseId && ` → ${warehouseName(movement.toWarehouseId)}`}
                         {movement.fromWarehouseId && ` ← ${warehouseName(movement.fromWarehouseId)}`}
                       </span>
+                      {/* Badge Revertido en la fila original (F5) — derivado en runtime. */}
+                      {reversedIds.has(movement.id) && (
+                        <span
+                          data-testid={`mv-reversal-badge-${movement.id}`}
+                          className="shrink-0 rounded-full bg-violet-100 px-2 py-0.5 text-xs font-semibold text-violet-700"
+                        >
+                          {intl.formatMessage({ id: 'WAREHOUSES.REVERSAL_BADGE' })}
+                        </span>
+                      )}
+                      {isReversible(movement) && (
+                        <ActionMenu
+                          label={`${intl.formatMessage({ id: 'WAREHOUSES.ACTIONS' })} ${productName(movement.productId)}`}
+                          testId={`mv-actions-toggle-${movement.id}`}
+                        >
+                          <ActionMenuItem
+                            intent="delete"
+                            data-testid={`mv-revert-${movement.id}`}
+                            onClick={() => void handleRevert(movement)}
+                          >
+                            {intl.formatMessage({ id: 'WAREHOUSES.REVERT_ACTION' })}
+                          </ActionMenuItem>
+                        </ActionMenu>
+                      )}
                     </div>
                   ))}
                 </div>

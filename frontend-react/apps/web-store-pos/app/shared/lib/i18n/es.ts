@@ -610,6 +610,8 @@ const messages: Record<string, string> = {
   'WAREHOUSES.REVERSAL_EDIT_TITLE': 'Editar movimiento',
   'WAREHOUSES.MOVEMENT_NOT_FOUND': 'El movimiento no existe.',
   'WAREHOUSES.MOVEMENT_UPDATED': 'Movimiento actualizado.',
+  'WAREHOUSES.ACTIONS': 'Acciones de',
+  'WAREHOUSES.REVERT_ACTION': 'Revertir',
   'WAREHOUSES.DEACTIVATE_BLOCKED': 'No se puede desactivar un almacén con stock o movimientos.',
   'WAREHOUSES.CREATED': 'Almacén creado.',
   'WAREHOUSES.UPDATED': 'Almacén actualizado.',
