@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 import type { Owner, OwnerStoreModule } from '@store-mgmt/domain';
@@ -31,13 +30,6 @@ vi.mock('react-intl', async (importOriginal) => {
 vi.mock('~/shared/lib/i18n/es', () => ({
   default: {
     'OWNER.LIST_TITLE': 'Propietarios',
-    'OWNER.FILTER_LABEL': 'Mostrar:',
-    'OWNER.FILTER_ALL': 'Todos',
-    'OWNER.FILTER_NOT_FREE': 'No Gratis',
-    'OWNER.FILTER_VIP': 'VIP',
-    'OWNER.FILTER_SUPERIOR': 'Superior',
-    'OWNER.FILTER_PAID': 'Pago',
-    'OWNER.FILTER_FREE': 'Gratis',
     'GENERAL.ADD': 'Adicionar',
     'OWNER.ERROR': 'Error de propietarios',
     'GENERAL.RESELLER': 'Gestor',
@@ -216,7 +208,7 @@ describe('OwnerListPage — card fields', () => {
     });
   });
 
-  it('shows 0 stores and $0 when storeModules is empty (All filter)', async () => {
+  it('shows owners with 0 stores and $0 (no plan filter — list is unfiltered)', async () => {
     const { ownerHttpService } = await import('~/admin/owners/lib/services/owner-http-service');
     vi.mocked(ownerHttpService.listOwners).mockResolvedValue({
       succeeded: true,
@@ -233,23 +225,38 @@ describe('OwnerListPage — card fields', () => {
       </Wrapper>,
     );
 
-    await waitFor(() => {
-      // Wait for the page to load
-      expect(screen.getByText('Propietarios')).toBeInTheDocument();
-    });
-
-    // The empty-owned owner has no paid-plan store, so it is hidden by the default
-    // "not-free" filter; switch to "all" to reveal it.
-    // Find the "Todos" button - the accessible name may include the count
-    const allButtons = screen.getAllByRole('button', { name: /Todos/i });
-    expect(allButtons.length).toBeGreaterThan(0);
-    fireEvent.click(allButtons[0]);
-
-    // After clicking "Todos", the owner with no stores should be visible
-    // The owner card shows "John Owner" which was in the mock data
+    // No plan filter anymore: the empty-owned owner renders without any interaction.
     await waitFor(() => {
       expect(screen.getByText('John Owner')).toBeInTheDocument();
     });
+  });
+
+  it('renders no plan filter buttons (filter removed from owners view)', async () => {
+    const { ownerHttpService } = await import('~/admin/owners/lib/services/owner-http-service');
+    vi.mocked(ownerHttpService.listOwners).mockResolvedValue({
+      succeeded: true,
+      data: [makeOwner()],
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
+
+    const { OwnerListPage } = await import('../owner-list');
+    render(
+      <Wrapper>
+        <OwnerListPage />
+      </Wrapper>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('John Owner')).toBeInTheDocument();
+    });
+
+    // No "Mostrar:" label, no filter buttons
+    expect(screen.queryByText('Mostrar:')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Todos/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /No Gratis/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Gratis/i })).not.toBeInTheDocument();
   });
 });
 
