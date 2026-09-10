@@ -169,6 +169,35 @@ async function openWarehouses(page: Page): Promise<void> {
   await expect(page.getByTestId('warehouses-page-title')).toBeVisible();
 }
 
+/**
+ * Post-feature-37 (cde85508) the movement history lives in its own view
+ * (/inventory/warehouse-movements), not inline in Almacenes. These two
+ * helpers let asserts reach mv-qty-* rows in the dedicated view.
+ * Authorized adaptation (2026-09-10): warehouses.spec.ts decimal + backup tests.
+ */
+
+/** Local calendar day key of "now" INSIDE the page (never toISOString — UTC day). */
+async function localTodayKey(page: Page): Promise<string> {
+  return page.evaluate(() => {
+    const d = new Date();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${d.getFullYear()}-${month}-${day}`;
+  });
+}
+
+/** Opens the movements history page and expands today's panel. */
+async function openMovementsToday(page: Page): Promise<void> {
+  await page.goto('/inventory/warehouse-movements');
+  await page.waitForLoadState('networkidle');
+  const todayKey = await localTodayKey(page);
+  const toggle = page.getByTestId(`mv-day-panel-toggle-${todayKey}`);
+  await expect(toggle).toBeVisible();
+  if ((await toggle.getAttribute('aria-expanded')) !== 'true') {
+    await toggle.click();
+  }
+}
+
 /** Creates a warehouse and returns its visible name. */
 async function createWarehouse(page: Page, name: string): Promise<void> {
   await page.getByText(NEW_WAREHOUSE).click();
@@ -541,7 +570,9 @@ test.describe.serial('Almacenes — flujo completo', () => {
     expect(await onHandCell(page, 'Decimal')).toBe('10.56');
 
     // El movimiento registra la cantidad redondeada (10.56).
+    await openMovementsToday(page);
     await expect(page.locator('[data-testid^="mv-qty-"]').first()).toHaveText('10.56');
+    await openWarehouses(page);
 
     // sale_out de 2.5 → almacén queda en 8.06 y la entrada de la tienda se crea.
     await saleOut(page, 'Decimal', '2.5');
@@ -597,6 +628,7 @@ test.describe.serial('Almacenes — flujo completo', () => {
     expect(await costCell(page, 'Backup')).toBe('$660');
 
     // Movimientos: el merge append-only restauró exactamente el exportado (sin duplicar).
+    await openMovementsToday(page);
     await expect(page.locator('[data-testid^="mv-qty-"]')).toHaveCount(1);
   });
 

@@ -1,30 +1,26 @@
-import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
+import { useEffect, useMemo, useState, type ReactElement } from 'react';
 import { useIntl } from 'react-intl';
 import type {
   Product,
   Warehouse,
   WarehouseMovementType,
-  WarehouseStockLevel,
   WarehouseStockMovement,
 } from '@store-mgmt/domain';
 import { EFeatures } from '@store-mgmt/domain';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
+import { isOwnerAdmin } from '~/shared/lib/auth/authorization-service';
+import { confirmDialog, showBlockingError } from '~/shared/lib/blocking-alert';
+import { showToastSuccess } from '~/shared/lib/toast';
 import { Card } from '~/shared/components/ui/card';
 import { InfoBox } from '~/shared/components/ui/info-box';
 import { ActionMenu, ActionMenuItem } from '~/shared/components/ui/action-menu';
-import { ConfirmDialog } from '~/shared/components/ui/confirm-dialog';
-import {
-  ArrowInIcon,
-  ArrowOutIcon,
-  ChevronDownIcon,
-  SwapHorizontalIcon,
-} from '~/shared/components/ui/icons';
-import { useClickOutside } from '~/shared/lib/hooks/use-click-outside';
+import { ChevronDownIcon, InOutIcon, SwapHorizontalIcon, TruckIcon } from '~/shared/components/ui/icons';
 import { formatLocalDate, groupByLocalDay } from '~/shared/lib/date-utils';
-import { formatCurrency } from '~/shared/lib/format-currency';
 import { WarehouseOfflineService } from '../lib/services/warehouse-offline-service';
 import { InventoryOfflineService } from '../lib/services/inventory-offline-service';
+import { WarehouseMovementModal } from '../components/warehouse-movement-modal';
+import type { WarehouseMovementFields, WarehouseMovementMode } from '../components/warehouse-movement-modal';
 import { ProductRepository } from '~/sales/lib/repositories/product-repository';
 import { ProductCategoryRepository } from '~/sales/lib/repositories/product-category-repository';
 
@@ -39,17 +35,15 @@ const MOVEMENT_TYPE_LABEL: Record<WarehouseMovementType, string> = {
   sale_out: 'WAREHOUSES.TYPE_SALE_OUT',
   transfer_in: 'WAREHOUSES.TYPE_TRANSFER_IN',
   transfer_out: 'WAREHOUSES.TYPE_TRANSFER_OUT',
+  // Reversa — compensa una fila anterior (plan 2026-09-09, D7a/F5).
+  reversal: 'WAREHOUSES.TYPE_REVERSAL',
 };
 
 /**
  * Movimientos de almacén — vista dedicada (antes vivía dentro del CRUD de
  * Almacenes): historial global de todos los almacenes, agrupado por días en
- * acordeón (mismo patrón que Entradas y Créditos). Cada movimiento se
- * representa como un card compacto de 3 filas:
- * 1) producto + cantidad entre paréntesis + gear (Editar/Eliminar, visual)
- * 2) tipo de operación (icono de salida para salidas; texto "Compra" con el
- *    precio a la derecha en compras)
- * 3) el almacén implicado, con flecha de entrada en las entradas.
+ * acordeón (mismo patrón que Entradas y Créditos) con icono por tipo,
+ * producto, cantidad y almacén origen → destino.
  */
 export function WarehouseMovementsPage() {
   const intl = useIntl();
@@ -59,13 +53,8 @@ export function WarehouseMovementsPage() {
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [movements, setMovements] = useState<WarehouseStockMovement[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
-  const [stockLevels, setStockLevels] = useState<WarehouseStockLevel[]>([]);
   /** Días expandidos del historial (acordeón agrupado por día). */
   const [expandedMovementDays, setExpandedMovementDays] = useState<Set<string>>(new Set());
-  /** Movimiento cuyo popup de edición (solo visual) está abierto. */
-  const [editingMovement, setEditingMovement] = useState<WarehouseStockMovement | null>(null);
-  /** Movimiento cuyo popup de confirmación de borrado (solo visual) está abierto. */
-  const [deletingMovement, setDeletingMovement] = useState<WarehouseStockMovement | null>(null);
 
   function toggleMovementDay(dayKey: string) {
     setExpandedMovementDays((prev) => {
@@ -95,7 +84,6 @@ export function WarehouseMovementsPage() {
     if (!service) return;
     setWarehouses([...service.getStorageWarehouses()]);
     setMovements([...service.getStorageMovements()].reverse());
-    setStockLevels([...service.getStorageStockLevels()]);
     const productRepo = new ProductRepository(storeId, new ProductCategoryRepository(storeId));
     setProducts([...productRepo.getStorageProductsMap().values()] as Product[]);
   }
@@ -105,28 +93,18 @@ export function WarehouseMovementsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- load reads storeId/service only
   }, [service]);
 
+  /** Icono por tipo de movimiento: entrada verde, salida naranja, transferencia azul, reversa violeta (plan 2026-09-09, F5). */
+  const MOVEMENT_TYPE_ICON: Record<WarehouseMovementType, { icon: ReactElement; color: string }> = {
+    purchase_in: { icon: <InOutIcon />, color: 'text-success' },
+    sale_out: { icon: <TruckIcon />, color: 'text-warning' },
+    transfer_in: { icon: <SwapHorizontalIcon />, color: 'text-primary' },
+    transfer_out: { icon: <SwapHorizontalIcon />, color: 'text-primary' },
+    // Reversa violeta con el mismo icono de intercambio (D7a/F5).
+    reversal: { icon: <SwapHorizontalIcon />, color: 'text-violet-600' },
+  };
+
   const productName = (id: string) => products.find((p) => p.id === id)?.name ?? id;
   const warehouseName = (id: string) => warehouses.find((w) => w.id === id)?.name ?? id;
-
-  /** Importe mostrado en compras: costPrice del propio movimiento (costo real
-   *  de la compra, persistido desde el cambio de "movimientos sin cambio de
-   *  costo") × cantidad; fallback al costo promedio del nivel para movimientos
-   *  creados antes de que el costo se persistiera. */
-  const purchasePrice = (movement: WarehouseStockMovement): string | null => {
-    const unitCost = movement.costPrice ?? stockLevels.find(
-      (l) => l.warehouseId === movement.warehouseId && l.productId === movement.productId,
-    )?.costPrice;
-    if (!unitCost) return null;
-    return formatCurrency(unitCost * movement.quantity);
-  };
-
-  /** Línea de almacén(s) del movimiento. */
-  const warehouseLine = (movement: WarehouseStockMovement): string => {
-    if (movement.type === 'transfer_out' && movement.toWarehouseId) {
-      return `${warehouseName(movement.warehouseId)} → ${warehouseName(movement.toWarehouseId)}`;
-    }
-    return warehouseName(movement.warehouseId);
-  };
 
   /** Historial agrupado por día (más reciente primero). */
   const movementDayGroups = useMemo(
@@ -134,11 +112,111 @@ export function WarehouseMovementsPage() {
     [movements],
   );
 
+  // ─── Plan 2026-09-09: engranaje Revertir + badge (F4/F5, D6/D10) ─────────
+  const canManageMovements = user ? isOwnerAdmin(user) : false;
+
+  /** Ids con reversa emparejada — derivado en runtime, sin migración (F5). */
+  const reversedIds = useMemo(
+    () =>
+      new Set(
+        movements
+          .filter((m) => m.type === 'reversal' && m.reversalOfMovementId)
+          .map((m) => m.reversalOfMovementId!),
+      ),
+    [movements],
+  );
+
+  /** Filas reversibles: los 3 tipos del UI, sin reversa previa (D2/D10). */
+  function isReversible(movement: WarehouseStockMovement): boolean {
+    return (
+      canManageMovements &&
+      (movement.type === 'purchase_in' ||
+        movement.type === 'sale_out' ||
+        movement.type === 'transfer_out') &&
+      !reversedIds.has(movement.id)
+    );
+  }
+
+  async function handleRevert(movement: WarehouseStockMovement) {
+    if (!service) return;
+    const confirmed = await confirmDialog({
+      title: intl.formatMessage({ id: 'GENERAL.DELETE_CONFIRM_TITLE' }),
+      message: intl.formatMessage({ id: 'WAREHOUSES.REVERSAL_CONFIRM_MESSAGE_A' }),
+      confirmButtonText: intl.formatMessage({ id: 'GENERAL.YES' }),
+      cancelButtonText: intl.formatMessage({ id: 'GENERAL.NO' }),
+    });
+    if (!confirmed) return;
+
+    const result = service.reverseMovement(movement.id);
+    if (!result.succeeded) {
+      showBlockingError(
+        intl.formatMessage({ id: 'GENERAL.ERROR' }),
+        result.errors[0]?.description ?? '',
+      );
+      return;
+    }
+    showToastSuccess(intl.formatMessage({ id: 'WAREHOUSES.REVERSAL_SUCCESS' }));
+    load();
+  }
+
+  // ─── Edición = reversa + recreación (F3, por fila D10) ──────────────────────
+
+  const [editingMovement, setEditingMovement] = useState<WarehouseStockMovement | null>(null);
+
+  function openEdit(movement: WarehouseStockMovement) {
+    setEditingMovement(movement);
+  }
+
+  /**
+   * F3: la edición NO muta la fila original — compensa (reversa al costo
+   * exacto del lote) y registra el movimiento corregido. Si el paso 2 falla,
+   * la reversa YA quedó persistida (§7.3 del plan): se informa con el error
+   * específico y se recarga el historial (la guía al usuario es el propio
+   * error — p.ej. InsufficientStock para la nueva cantidad).
+   */
+  function handleEditSubmit(fields: WarehouseMovementFields) {
+    if (!service || !editingMovement) return;
+    const original = editingMovement;
+    const reversal = service.reverseMovement(original.id);
+    if (!reversal.succeeded) {
+      showBlockingError(
+        intl.formatMessage({ id: 'GENERAL.ERROR' }),
+        reversal.errors[0]?.description ?? '',
+      );
+      return;
+    }
+    const recreated = service.recordMovement({
+      type: original.type as WarehouseMovementMode,
+      warehouseId: original.warehouseId,
+      productId: original.productId,
+      quantity: fields.quantity,
+      costPrice: fields.costPrice,
+      toWarehouseId: fields.toWarehouseId ?? original.toWarehouseId,
+      reason: fields.reason,
+    });
+    setEditingMovement(null);
+    if (!recreated.succeeded) {
+      // La reversa quedó huérfana (no-atómico, §7.3) — el error guía al usuario.
+      showBlockingError(
+        intl.formatMessage({ id: 'GENERAL.ERROR' }),
+        recreated.errors[0]?.description ?? '',
+      );
+      load();
+      return;
+    }
+    showToastSuccess(intl.formatMessage({ id: 'WAREHOUSES.MOVEMENT_UPDATED' }));
+    load();
+  }
+
   return (
-    <Card padding="tight">
+    <Card>
       <h1 className="mb-4 text-xl font-bold text-text">
         {intl.formatMessage({ id: 'MENU.WAREHOUSE_MOVEMENTS' })}
       </h1>
+
+      <div className="mb-2 text-sm font-semibold text-text">
+        {intl.formatMessage({ id: 'WAREHOUSES.MOVEMENTS_TITLE' })}
+      </div>
       {movementDayGroups.length === 0 && (
         <InfoBox variant="primary" className="text-center">
           {intl.formatMessage({ id: 'WAREHOUSES.NO_MOVEMENTS' })}
@@ -146,7 +224,8 @@ export function WarehouseMovementsPage() {
       )}
       {/* Acordeón agrupado por día — mismo patrón que los historiales de
           Entradas y Créditos: panel por día con la fecha en el header y, al
-          desplegar, los cards de movimientos. */}
+          desplegar, las filas de movimientos con icono por tipo, producto,
+          cantidad y almacén origen → destino. */}
       <div className="space-y-2">
         {movementDayGroups.map((dayGroup) => {
           const dayKey = dayGroup.dayKey;
@@ -171,17 +250,62 @@ export function WarehouseMovementsPage() {
                 </span>
               </button>
               {isDayExpanded && (
-                <div className="space-y-1.5 p-2">
+                <div className="divide-y divide-border border-t border-border">
                   {dayGroup.items.map((movement) => (
-                    <MovementCard
-                      key={movement.id}
-                      movement={movement}
-                      productName={productName(movement.productId)}
-                      warehouseLine={warehouseLine(movement)}
-                      price={purchasePrice(movement)}
-                      onEdit={() => setEditingMovement(movement)}
-                      onDelete={() => setDeletingMovement(movement)}
-                    />
+                    <div key={movement.id} className="flex items-center gap-3 px-4 py-2">
+                      <span
+                        data-testid={`mv-type-icon-${movement.id}`}
+                        className={MOVEMENT_TYPE_ICON[movement.type].color}
+                        title={intl.formatMessage({ id: MOVEMENT_TYPE_LABEL[movement.type] })}
+                      >
+                        {MOVEMENT_TYPE_ICON[movement.type].icon}
+                      </span>
+                      <span className="min-w-0 flex-1 truncate text-sm text-text">
+                        {productName(movement.productId)}
+                      </span>
+                      <span
+                        data-testid={`mv-qty-${movement.id}`}
+                        className="shrink-0 text-sm font-semibold text-text"
+                      >
+                        {movement.quantity}
+                      </span>
+                      <span className="min-w-0 flex-1 truncate text-right text-sm text-text-muted">
+                        {warehouseName(movement.warehouseId)}
+                        {movement.toWarehouseId && ` → ${warehouseName(movement.toWarehouseId)}`}
+                        {movement.fromWarehouseId && ` ← ${warehouseName(movement.fromWarehouseId)}`}
+                      </span>
+                      {/* Badge Revertido en la fila original (F5) — derivado en runtime. */}
+                      {reversedIds.has(movement.id) && (
+                        <span
+                          data-testid={`mv-reversal-badge-${movement.id}`}
+                          className="shrink-0 rounded-full bg-violet-100 px-2 py-0.5 text-xs font-semibold text-violet-700"
+                        >
+                          {intl.formatMessage({ id: 'WAREHOUSES.REVERSAL_BADGE' })}
+                        </span>
+                      )}
+                      {isReversible(movement) && (
+                        <ActionMenu
+                          label={`${intl.formatMessage({ id: 'WAREHOUSES.ACTIONS' })} ${productName(movement.productId)}`}
+                          testId={`mv-actions-toggle-${movement.id}`}
+                        >
+                          <ActionMenuItem
+                            intent="edit"
+                            data-testid={`mv-edit-${movement.id}`}
+                            onClick={() => openEdit(movement)}
+                          >
+                            {intl.formatMessage({ id: 'WAREHOUSES.EDIT_ACTION' })}
+                          </ActionMenuItem>
+                          <ActionMenuItem
+                            intent="delete"
+                            separatorBefore
+                            data-testid={`mv-revert-${movement.id}`}
+                            onClick={() => void handleRevert(movement)}
+                          >
+                            {intl.formatMessage({ id: 'WAREHOUSES.REVERT_ACTION' })}
+                          </ActionMenuItem>
+                        </ActionMenu>
+                      )}
+                    </div>
                   ))}
                 </div>
               )}
@@ -190,258 +314,38 @@ export function WarehouseMovementsPage() {
         })}
       </div>
 
-      {/* Popup de edición — SOLO VISUAL: muestra los datos del movimiento según
-          su tipo; el botón Guardar cierra sin persistir nada (sin implementar). */}
-      {editingMovement && (
-        <MovementEditDialog
-          movement={editingMovement}
-          productName={productName(editingMovement.productId)}
-          warehouseName={warehouseName(editingMovement.warehouseId)}
-          destinationName={
-            editingMovement.toWarehouseId
-              ? warehouseName(editingMovement.toWarehouseId)
-              : editingMovement.fromWarehouseId
-                ? warehouseName(editingMovement.fromWarehouseId)
-                : null
+      {/* Modal de edición (F3): reutiliza el modal de movimientos con los
+          valores de la fila original precargados. El producto y el almacén
+          origen quedan fijos — se edita cantidad/costo/destino. */}
+      {editingMovement && service && (
+        <WarehouseMovementModal
+          open
+          mode={editingMovement.type as WarehouseMovementMode}
+          warehouse={
+            warehouses.find((w) => w.id === editingMovement.warehouseId) ?? {
+              id: editingMovement.warehouseId,
+              name: warehouseName(editingMovement.warehouseId),
+              isActive: true,
+              createdDate: new Date(),
+              createdByName: '',
+            }
           }
+          targetWarehouses={warehouses.filter(
+            (w) => w.isActive && w.id !== editingMovement.warehouseId,
+          )}
+          products={products}
+          productId={editingMovement.productId}
+          initial={{
+            quantity: editingMovement.quantity,
+            costPrice: editingMovement.costPrice,
+            toWarehouseId: editingMovement.toWarehouseId,
+          }}
+          titleId="WAREHOUSES.REVERSAL_EDIT_TITLE"
           onClose={() => setEditingMovement(null)}
+          onSubmit={handleEditSubmit}
         />
       )}
-
-      {/* Popup de confirmación de borrado — SOLO VISUAL: muestra los datos del
-          movimiento; Confirmar solo cierra (sin implementar). */}
-      <ConfirmDialog
-        open={deletingMovement !== null}
-        onClose={() => setDeletingMovement(null)}
-        onConfirm={() => setDeletingMovement(null)}
-        confirmLabel={intl.formatMessage({ id: 'GENERAL.DELETE' })}
-        title={intl.formatMessage({ id: 'WAREHOUSES.DELETE_MOVEMENT_TITLE' })}
-        description={
-          deletingMovement
-            ? intl.formatMessage(
-                { id: 'WAREHOUSES.DELETE_MOVEMENT_CONFIRM' },
-                {
-                  product: productName(deletingMovement.productId),
-                  quantity: deletingMovement.quantity,
-                  warehouse: warehouseName(deletingMovement.warehouseId),
-                },
-              )
-            : undefined
-        }
-      />
     </Card>
-  );
-}
-
-/** Icono por tipo de movimiento — mismos iconos que las opciones del gear de
- *  la gestión de almacenes: entrada → ArrowInIcon, salida → ArrowOutIcon,
- *  transferencia → SwapHorizontalIcon. Entrada verde, salida naranja,
- *  transferencia azul. */
-const MOVEMENT_TYPE_ICON: Record<WarehouseMovementType, { icon: ReactElement; color: string }> = {
-  purchase_in: { icon: <ArrowInIcon />, color: 'text-success' },
-  sale_out: { icon: <ArrowOutIcon />, color: 'text-warning' },
-  transfer_in: { icon: <SwapHorizontalIcon />, color: 'text-primary' },
-  transfer_out: { icon: <SwapHorizontalIcon />, color: 'text-primary' },
-};
-
-interface MovementCardProps {
-  movement: WarehouseStockMovement;
-  productName: string;
-  warehouseLine: string;
-  price: string | null;
-  onEdit: () => void;
-  onDelete: () => void;
-}
-
-/** Card compacto de un movimiento (3 filas: producto+cantidad+gear, tipo,
- *  almacén). Editar/Eliminar son SOLO visuales (popups sin lógica). */
-function MovementCard({
-  movement,
-  productName,
-  warehouseLine,
-  price,
-  onEdit,
-  onDelete,
-}: MovementCardProps) {
-  const intl = useIntl();
-  const isEntry = movement.type === 'purchase_in' || movement.type === 'transfer_in';
-  const isPurchase = movement.type === 'purchase_in';
-  const typeIcon = MOVEMENT_TYPE_ICON[movement.type];
-  const typeLabel = intl.formatMessage({ id: MOVEMENT_TYPE_LABEL[movement.type] });
-
-  return (
-    <div
-      data-testid={`mv-card-${movement.id}`}
-      className="rounded-lg border border-border bg-surface px-2.5 py-1.5"
-    >
-      {/* Fila 1: producto + cantidad (paréntesis) + gear */}
-      <div className="flex items-center justify-between gap-2">
-        <span className="min-w-0 flex-1 truncate text-sm font-medium text-text">
-          {productName}
-        </span>
-        <span
-          data-testid={`mv-qty-${movement.id}`}
-          className="shrink-0 text-sm font-semibold text-text"
-        >
-          ({movement.quantity})
-        </span>
-        <ActionMenu testId={`mv-actions-${movement.id}`} widthClass="min-w-40">
-          <ActionMenuItem
-            intent="edit"
-            data-testid={`mv-edit-${movement.id}`}
-            onClick={onEdit}
-          >
-            {intl.formatMessage({ id: 'GENERAL.EDIT' })}
-          </ActionMenuItem>
-          <ActionMenuItem
-            intent="delete"
-            separatorBefore
-            data-testid={`mv-delete-${movement.id}`}
-            onClick={onDelete}
-          >
-            {intl.formatMessage({ id: 'GENERAL.DELETE' })}
-          </ActionMenuItem>
-        </ActionMenu>
-      </div>
-
-      {/* Fila 2: tipo de operación; en compras, "Compra" + precio a la derecha */}
-      <div className="mt-1 flex items-center justify-between gap-2">
-        <span className="flex min-w-0 items-center gap-1.5 text-xs text-text-muted">
-          <span
-            data-testid={`mv-type-icon-${movement.id}`}
-            className={`shrink-0 ${typeIcon.color}`}
-            title={typeLabel}
-          >
-            {typeIcon.icon}
-          </span>
-          <span className="truncate">
-            {isPurchase
-              ? intl.formatMessage({ id: 'WAREHOUSES.COMPRA' })
-              : typeLabel}
-          </span>
-        </span>
-        {isPurchase && price && (
-          <span
-            data-testid={`mv-price-${movement.id}`}
-            className="shrink-0 text-xs font-semibold text-text"
-          >
-            {price}
-          </span>
-        )}
-      </div>
-
-      {/* Fila 3: almacén implicado; flecha de entrada en las entradas */}
-      <div className="mt-0.5 flex items-center gap-1 text-xs text-text-muted">
-        {isEntry && <ArrowInIcon className="size-3.5 shrink-0" />}
-        <span className="truncate">{warehouseLine}</span>
-      </div>
-    </div>
-  );
-}
-
-interface MovementEditDialogProps {
-  movement: WarehouseStockMovement;
-  productName: string;
-  warehouseName: string;
-  destinationName: string | null;
-  onClose: () => void;
-}
-
-/** Popup de edición de movimiento — SOLO VISUAL: muestra los campos según el
- *  tipo del movimiento (producto, cantidad, almacenes, motivo). El botón
- *  Guardar no persiste nada; la edición real no está implementada. */
-function MovementEditDialog({
-  movement,
-  productName,
-  warehouseName,
-  destinationName,
-  onClose,
-}: MovementEditDialogProps) {
-  const intl = useIntl();
-  const dialogRef = useRef<HTMLDivElement>(null);
-
-  useClickOutside(dialogRef, onClose);
-
-  useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    document.addEventListener('keydown', handleEscape);
-    return () => document.removeEventListener('keydown', handleEscape);
-  }, [onClose]);
-
-  const typeLabel = intl.formatMessage({ id: MOVEMENT_TYPE_LABEL[movement.type] });
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="mv-edit-dialog-title"
-    >
-      <div ref={dialogRef} className="bg-surface rounded-xl shadow-xl p-6 max-w-md w-full mx-4">
-        <h2 id="mv-edit-dialog-title" className="text-lg font-semibold mb-4">
-          {intl.formatMessage({ id: 'WAREHOUSES.EDIT_MOVEMENT' })}
-        </h2>
-        <div className="space-y-3 text-sm">
-          <div>
-            <span className="text-xs text-text-muted">
-              {intl.formatMessage({ id: 'WAREHOUSES.PRODUCT' })}
-            </span>
-            <div className="font-medium text-text">{productName}</div>
-          </div>
-          <div>
-            <span className="text-xs text-text-muted">
-              {intl.formatMessage({ id: 'WAREHOUSES.QUANTITY' })}
-            </span>
-            <div className="font-semibold text-text">({movement.quantity})</div>
-          </div>
-          <div>
-            <span className="text-xs text-text-muted">
-              {intl.formatMessage({ id: 'WAREHOUSES.TYPE' })}
-            </span>
-            <div className="font-medium text-text">{typeLabel}</div>
-          </div>
-          <div>
-            <span className="text-xs text-text-muted">
-              {intl.formatMessage({ id: 'WAREHOUSES.NAME' })}
-            </span>
-            <div className="font-medium text-text">{warehouseName}</div>
-          </div>
-          {destinationName && (
-            <div>
-              <span className="text-xs text-text-muted">
-                {intl.formatMessage({ id: 'WAREHOUSES.TO_WAREHOUSE' })}
-              </span>
-              <div className="font-medium text-text">{destinationName}</div>
-            </div>
-          )}
-          <div>
-            <span className="text-xs text-text-muted">
-              {intl.formatMessage({ id: 'WAREHOUSES.REASON' })}
-            </span>
-            <div className="font-medium text-text">{movement.reason ?? '—'}</div>
-          </div>
-        </div>
-        <div className="flex justify-end gap-3 mt-6">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 text-sm rounded-lg border border-border hover:bg-surface-hover transition-colors"
-          >
-            {intl.formatMessage({ id: 'GENERAL.CANCEL' })}
-          </button>
-          <button
-            type="button"
-            onClick={onClose}
-            data-testid="mv-edit-dialog-save"
-            className="px-4 py-2 text-sm rounded-lg bg-primary text-white hover:bg-primary/90 transition-colors"
-          >
-            {intl.formatMessage({ id: 'WAREHOUSES.SAVE' })}
-          </button>
-        </div>
-      </div>
-    </div>
   );
 }
 

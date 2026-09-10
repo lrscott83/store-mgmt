@@ -230,10 +230,9 @@ const messages: Record<string, string> = {
   'MENU.TODAY_REPORTS': 'Reportes del día',
   'MENU.DASHBOARD': 'Panel de Control',
   'MENU.CUADRE_POR_FECHAS': 'Cuadre por fechas',
-  // Plan/update split: the single 'Tiendas' entry became two links — the plan
-  // view (/management/stores) and the store-data update view
-  // (/management/stores/update), same authorization (EFeatures.Stores).
-  'MENU.STORES_UPDATE': 'Editar la tienda',
+  // Plan split: the single 'Tiendas' entry became one link — the plan view
+  // (/management/stores), same authorization (EFeatures.Stores). The store-data
+  // edit view is reached only from store cards, not from the menu.
   // Owner's "my stores" cards listing (owner-stores-cards plan, 2026-09-08)
   'MENU.MY_STORES': 'Mis tiendas',
   'MENU.EXCHANGE_RATES': 'Cambio USD a MN',
@@ -595,6 +594,24 @@ const messages: Record<string, string> = {
   'WAREHOUSES.TYPE_SALE_OUT': 'Salida a tienda',
   'WAREHOUSES.TYPE_TRANSFER_IN': 'Entrada por transferencia',
   'WAREHOUSES.TYPE_TRANSFER_OUT': 'Salida por transferencia',
+  // ─── Plan 2026-09-09: reversa de movimientos (D1-D12, F5/F8) ─────────────
+  'WAREHOUSES.TYPE_REVERSAL': 'Reversa',
+  'WAREHOUSES.REVERSAL_BADGE': 'Revertido',
+  'WAREHOUSES.REVERSAL_CONFIRM_MESSAGE_A': '¿Está seguro que desea revertir este movimiento? Se ajustará el stock de los almacenes involucrados.',
+  'WAREHOUSES.REVERSAL_SUCCESS': 'Movimiento revertido.',
+  'WAREHOUSES.REVERSAL_BLOCKED_CONSUMED': 'La salida ya fue consumida por ventas — no se puede revertir.',
+  'WAREHOUSES.REVERSAL_BLOCKED_STOCK': 'No hay suficiente stock en el almacén para revertir el movimiento.',
+  'WAREHOUSES.REVERSAL_BLOCKED_TRANSFER_IN': 'Los movimientos de entrada por transferencia no se pueden revertir.',
+  'WAREHOUSES.REVERSAL_BLOCKED_DUPLICATE': 'El movimiento ya tiene una reversa.',
+  'WAREHOUSES.REVERSAL_BLOCKED_AMBIGUOUS': 'Hay varias entradas de tienda que coinciden con la salida — no se puede revertir automáticamente.',
+  'WAREHOUSES.REVERSAL_ENTRY_NOT_FOUND': 'No se encontró la entrada de tienda asociada a la salida.',
+  'WAREHOUSES.REVERSAL_LOT_CONSUMED': 'El lote de la compra ya fue consumido — no quedan unidades que revertir.',
+  'WAREHOUSES.REVERSAL_EDIT_TITLE': 'Editar movimiento',
+  'WAREHOUSES.MOVEMENT_NOT_FOUND': 'El movimiento no existe.',
+  'WAREHOUSES.MOVEMENT_UPDATED': 'Movimiento actualizado.',
+  'WAREHOUSES.ACTIONS': 'Acciones de',
+  'WAREHOUSES.REVERT_ACTION': 'Revertir',
+  'WAREHOUSES.EDIT_ACTION': 'Editar',
   'WAREHOUSES.COMPRA': 'Compra',
   'WAREHOUSES.EDIT_MOVEMENT': 'Editar movimiento',
   'WAREHOUSES.DELETE_MOVEMENT_TITLE': 'Eliminar movimiento',
