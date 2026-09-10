@@ -88,8 +88,12 @@ internal sealed class RegisterStorePaymentCommandHandler : ICommandHandler<Regis
         DateOnly? lastPaidBeforeDate = lastPayment is null
             ? null
             : DateOnly.FromDateTime(lastPayment.PaymentBeforeDate.UtcDateTime);
-        DateOnly currentDue = StoreBillingUtils.GetNextDueDate(store.PaymentStartDate.Value, trialMonths, lastPaidBeforeDate) ?? store.PaymentStartDate.Value;
+        DateOnly currentDue = StoreBillingUtils.GetNextDueDate(store.PaymentStartDate.Value, trialMonths, lastPaidBeforeDate, store.NextDueDateOverride) ?? store.PaymentStartDate.Value;
         DateOnly newDue = currentDue.AddMonths(1);
+
+        // owner-plan-change U4: a payment consumes the pinned override. The store's
+        // billing clock returns to the natural chain (anchor + paid months).
+        store.NextDueDateOverride = null;
 
         // Create StorePayment with status Paid
         var now = DateTimeOffset.UtcNow;
@@ -108,6 +112,9 @@ internal sealed class RegisterStorePaymentCommandHandler : ICommandHandler<Regis
             byReSeller: isReSeller);
 
         await _storePaymentRepository.AddAsync(payment);
+        // NoTracking context: the cleared override only persists if the Store is
+        // attached explicitly (CLAUDE.md gotcha — query-then-mutate writes nothing).
+        await _storeRepository.UpdateAsync(store);
         await _applicationUnitOfWork.SaveChangesAsync(cancellationToken);
         return ResponseResult.Success(true);
     }

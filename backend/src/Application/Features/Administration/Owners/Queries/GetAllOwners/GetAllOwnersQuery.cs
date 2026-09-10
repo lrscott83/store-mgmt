@@ -90,7 +90,8 @@ namespace Application.Features.Administration.Owners.Queries.GetAllOwners
                     storeModule.NextDueDate = StoreBillingUtils.GetNextDueDate(
                         store.PaymentStartDate,
                         trialMonths,
-                        lastPaidBeforeDateByStoreId[store.Id]);
+                        lastPaidBeforeDateByStoreId[store.Id],
+                        store.NextDueDateOverride);
                 }
             }
         }

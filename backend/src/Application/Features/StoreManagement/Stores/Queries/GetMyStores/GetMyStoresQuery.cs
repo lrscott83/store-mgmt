@@ -77,7 +77,8 @@ namespace Application.Features.StoreManagement.Stores.Queries.GetMyStores
                 dto.NextDueDate = StoreBillingUtils.GetNextDueDate(
                     store.PaymentStartDate,
                     trialMonths,
-                    lastPaidBeforeDate);
+                    lastPaidBeforeDate,
+                    store.NextDueDateOverride);
 
                 dtos.Add(dto);
             }
