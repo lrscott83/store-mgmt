@@ -9,6 +9,7 @@ import type { Store } from '@store-mgmt/domain';
 // need a non-owner override the useAuthStore implementation with mockAuthState.
 
 const mockLogout = vi.fn();
+const mockUpdateUser = vi.fn();
 
 function buildOwnerUser() {
   return {
@@ -40,6 +41,7 @@ vi.mock('~/shared/lib/stores/auth-store', () => {
       user: defaultOwnerUser,
       isAuthenticated: true,
       logout: mockLogout,
+      updateUser: mockUpdateUser,
     };
     if (typeof selector === 'function') return selector(state);
     return state;
@@ -48,9 +50,23 @@ vi.mock('~/shared/lib/stores/auth-store', () => {
     user: defaultOwnerUser,
     isAuthenticated: true,
     logout: mockLogout,
+    updateUser: mockUpdateUser,
   });
   return { useAuthStore };
 });
+
+// ─── switch-store mock (seamless-store-switch) ──────────────────────────────
+// The UI delegates to the shared helper; these tests pin the UI's contract
+// with it (called with the new id; error UI on rejection; no direct logout).
+// The helper's own behaviour is covered in switch-store.test.ts.
+
+// vi.hoisted: the factory is hoisted above this module's body, and it
+// dereferences the fn DIRECTLY (switchToStore: mockSwitchToStore), so the fn
+// must exist before the mocked module is first imported.
+const mockSwitchToStore = vi.hoisted(() => vi.fn());
+vi.mock('~/shared/lib/stores/switch-store', () => ({
+  switchToStore: mockSwitchToStore,
+}));
 
 // ─── store-http-service mock ──────────────────────────────────────────────────
 
@@ -110,6 +126,7 @@ describe('StoreSwitcher — owner gate', () => {
           user: defaultOwnerUser,
           isAuthenticated: true,
           logout: mockLogout,
+          updateUser: mockUpdateUser,
         };
         if (typeof selector === 'function') return selector(state);
         return state;
@@ -160,6 +177,7 @@ describe('StoreSwitcher — popup list', () => {
           user: defaultOwnerUser,
           isAuthenticated: true,
           logout: mockLogout,
+          updateUser: mockUpdateUser,
         };
         if (typeof selector === 'function') return selector(state);
         return state;
@@ -292,6 +310,7 @@ describe('StoreSwitcher — switching stores', () => {
           user: defaultOwnerUser,
           isAuthenticated: true,
           logout: mockLogout,
+          updateUser: mockUpdateUser,
         };
         if (typeof selector === 'function') return selector(state);
         return state;
@@ -307,7 +326,7 @@ describe('StoreSwitcher — switching stores', () => {
     } as never);
   });
 
-  it('calls setMyStore with the new store id and logs out on success', async () => {
+  it('delegates the switch to switchToStore and stays logged in on success', async () => {
     render(
       <Wrapper>
         <StoreSwitcher />
@@ -317,16 +336,16 @@ describe('StoreSwitcher — switching stores', () => {
     await screen.findByText('Tienda B');
     fireEvent.click(screen.getByText('Tienda B'));
 
-    expect(storeHttpService.setMyStore).toHaveBeenCalledWith('s2');
-    await waitFor(() => expect(mockLogout).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(mockSwitchToStore).toHaveBeenCalledWith('s2'));
+    // seamless-store-switch: the helper resolves after window.location.reload()
+    // (or via its own logout fallback) — the UI itself must NOT log out.
+    expect(mockLogout).not.toHaveBeenCalled();
   });
 
-  it('shows the switch error and does NOT log out when setMyStore fails', async () => {
-    vi.mocked(storeHttpService.setMyStore).mockResolvedValue({
-      succeeded: false,
-      data: false,
-      message: 'error',
-    } as never);
+  it('shows the switch error and does NOT log out when the switch is rejected', async () => {
+    // setMyStore refused/failed inside the helper → it rejects → error UI,
+    // session untouched (still no logout from the UI itself).
+    mockSwitchToStore.mockRejectedValueOnce(new Error('STORE_SWITCH_REJECTED'));
     render(
       <Wrapper>
         <StoreSwitcher />
@@ -338,11 +357,11 @@ describe('StoreSwitcher — switching stores', () => {
 
     expect(await screen.findByText('No se pudo cambiar la tienda.')).toBeInTheDocument();
     expect(mockLogout).not.toHaveBeenCalled();
-    expect(storeHttpService.setMyStore).toHaveBeenCalledWith('s2');
+    expect(mockSwitchToStore).toHaveBeenCalledWith('s2');
   });
 
   it('switch error message shows the current-store paragraph first, in black, then the error', async () => {
-    vi.mocked(storeHttpService.setMyStore).mockRejectedValue(new Error('network down'));
+    mockSwitchToStore.mockRejectedValueOnce(new Error('network down'));
     render(
       <Wrapper>
         <StoreSwitcher />

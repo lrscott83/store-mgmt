@@ -5,20 +5,24 @@ import type { Store } from '@store-mgmt/domain';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { useClickOutside } from '~/shared/lib/hooks/use-click-outside';
 import { storeHttpService } from '~/management/stores/lib/services/store-http-service';
+import { switchToStore } from '~/shared/lib/stores/switch-store';
 
 /**
  * Owner-only store switcher shown in the navbar before the tutorial link.
  * Visible ONLY for owners whose selected store has the MultiStores module
  * (module 14). Opens a popup listing the owner's active stores; selecting a
- * different store persists it server-side and ends the session (logout), so
- * the DEK for the new store is provisioned on the next login.
+ * different store stays logged in: the selection persists server-side, the
+ * session refreshes for the new store and the page hard-reloads into it —
+ * the new store's DEK comes from the per-store device wrap provisioned at
+ * login (seamless-store-switch). Falls back to a logout only when this
+ * device holds no wrap for the target store.
  * When the list load or the switch fails (no internet / server error), the
  * popup shows a black first paragraph with the currently selected store name
  * (from the cached user roles, works offline) followed by the error paragraph.
  */
 export function StoreSwitcher() {
   const intl = useIntl();
-  const { user, logout } = useAuthStore();
+  const { user } = useAuthStore();
   const [isOpen, setIsOpen] = useState(false);
   const [stores, setStores] = useState<Store[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -71,14 +75,11 @@ export function StoreSwitcher() {
     setIsSwitching(true);
     setSwitchError(false);
     try {
-      const response = await storeHttpService.setMyStore(storeId);
-      if (response.succeeded) {
-        logout();
-      } else {
-        setSwitchError(true);
-        setIsSwitching(false);
-      }
+      // Resolves via window.location.reload() on success (no code after it
+      // runs) or via logout() on the no-wrap fallback.
+      await switchToStore(storeId);
     } catch {
+      // setMyStore refused/failed: the session is untouched — show the error.
       setSwitchError(true);
       setIsSwitching(false);
     }

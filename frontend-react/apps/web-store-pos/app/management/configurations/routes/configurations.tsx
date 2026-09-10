@@ -5,12 +5,13 @@ import type { Store } from '@store-mgmt/domain';
 import { adminFeatureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { storeHttpService } from '~/management/stores/lib/services/store-http-service';
+import { switchToStore } from '~/shared/lib/stores/switch-store';
 
 export const clientLoader = adminFeatureLoader([EFeatures.Configurations]);
 
 export function ConfigurationsPage() {
   const intl = useIntl();
-  const { user, logout } = useAuthStore();
+  const { user } = useAuthStore();
   const [stores, setStores] = useState<Store[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -60,15 +61,12 @@ export function ConfigurationsPage() {
     setIsSwitching(true);
     setSwitchError(false);
     try {
-      const response = await storeHttpService.setMyStore(storeId);
-      if (response.succeeded) {
-        // Ends the session so the DEK for the new store is provisioned on login.
-        logout();
-      } else {
-        setSwitchError(true);
-        setIsSwitching(false);
-      }
+      // Resolves via window.location.reload() on success (no code after it
+      // runs) or via logout() on the no-wrap fallback. See
+      // docs/plans/2026-09-10-seamless-store-switch-plan.md.
+      await switchToStore(storeId);
     } catch {
+      // setMyStore refused/failed: the session is untouched — show the error.
       setSwitchError(true);
       setIsSwitching(false);
     }
