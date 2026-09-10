@@ -97,6 +97,35 @@ async function openWarehouses(page: Page): Promise<void> {
   await expect(page.getByTestId('warehouses-page-title')).toBeVisible();
 }
 
+/**
+ * Post-feature-37 (cde85508) the movement history lives in its own view
+ * (/inventory/warehouse-movements), not inline in Almacenes. These two
+ * helpers let asserts reach mv-qty-* rows in the dedicated view.
+ * Authorized adaptation (2026-09-10): extended.spec.ts decimal test.
+ */
+
+/** Local calendar day key of "now" INSIDE the page (never toISOString — UTC day). */
+async function localTodayKey(page: Page): Promise<string> {
+  return page.evaluate(() => {
+    const d = new Date();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${d.getFullYear()}-${month}-${day}`;
+  });
+}
+
+/** Opens the movements history page and expands today's panel. */
+async function openMovementsToday(page: Page): Promise<void> {
+  await page.goto('/inventory/warehouse-movements');
+  await page.waitForLoadState('networkidle');
+  const todayKey = await localTodayKey(page);
+  const toggle = page.getByTestId(`mv-day-panel-toggle-${todayKey}`);
+  await expect(toggle).toBeVisible();
+  if ((await toggle.getAttribute('aria-expanded')) !== 'true') {
+    await toggle.click();
+  }
+}
+
 /** Creates a warehouse via the "Nuevo almacén" modal. */
 async function createWarehouse(page: Page, name: string): Promise<void> {
   await page.getByText(NEW_WAREHOUSE).click();
@@ -339,6 +368,7 @@ test.describe.serial('Movimientos de almacenes — cobertura extendida', () => {
     // Both movements are recorded with their ROUNDED quantities: the table is
     // rendered newest-first (getStorageMovements().reverse()), and the text
     // match must be anchored — "0.5" is a substring of "10.56".
+    await openMovementsToday(page);
     await expect(
       page.locator('[data-testid^="mv-qty-"]').filter({ hasText: /^10\.56$/ }),
     ).toHaveCount(1);
