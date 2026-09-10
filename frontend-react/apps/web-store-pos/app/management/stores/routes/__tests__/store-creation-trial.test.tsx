@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
-import type { Store, Module, Owner, UserModel } from '@store-mgmt/domain';
+import type { Store, Owner, UserModel, Plan, PlanModule } from '@store-mgmt/domain';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Trial-on-create contract (client side)
@@ -33,19 +33,6 @@ function makeStore(overrides: Partial<Store> = {}): Store {
     paymentStartDate: '2026-08-04',
     modules: [],
     isActive: true,
-    ...overrides,
-  };
-}
-
-function makeModule(overrides: Partial<Module> = {}): Module {
-  return {
-    id: 1,
-    name: 'Module A',
-    price: 10,
-    currentPrice: 8,
-    priceIncluded: false,
-    discountText: '',
-    selected: false,
     ...overrides,
   };
 }
@@ -96,6 +83,49 @@ function makeUser(overrides: Partial<UserModel> = {}): UserModel {
   };
 }
 
+function makePlanModule(overrides: Partial<PlanModule> = {}): PlanModule {
+  return {
+    moduleId: 2,
+    name: 'Management',
+    order: 1,
+    priceIncluded: true,
+    price: 0,
+    currentPrice: 0,
+    discountPrice: 0,
+    percentDiscountPrice: 0,
+    discountText: '',
+    featureDescriptions: [],
+    ...overrides,
+  };
+}
+
+/** The three active plans; Superior (id 3) carries the full catalog member set. */
+function makePlanCatalog(): Plan[] {
+  return [
+    {
+      id: 1,
+      name: 'Gratis',
+      order: 1,
+      planType: 'Gratis',
+      price: 0,
+      modules: [makePlanModule()],
+    },
+    { id: 2, name: 'Pago', order: 2, planType: 'Pago', price: 8, modules: [] },
+    {
+      id: 3,
+      name: 'Superior',
+      order: 3,
+      planType: 'Superior',
+      price: 12,
+      modules: [
+        makePlanModule({ moduleId: 2 }),
+        makePlanModule({ moduleId: 3, name: 'Warehouses' }),
+        makePlanModule({ moduleId: 4, name: 'MultiStores' }),
+      ],
+    },
+  ];
+}
+
 let mockUser: UserModel | null = makeUser();
 const mockUpdateUser = vi.fn();
 const mockGetUserByToken = vi.fn();
@@ -124,8 +154,8 @@ const mockListStores = vi.fn();
 let mockGetStore = vi.fn();
 let mockCreateStore = vi.fn();
 const mockUpdateStore = vi.fn();
-let mockGetModulesToStore = vi.fn();
 let mockListOwners = vi.fn();
+let mockGetPlans = vi.fn();
 
 vi.mock('~/management/stores/lib/services/store-http-service', () => ({
   storeHttpService: {
@@ -141,11 +171,11 @@ vi.mock('~/management/stores/lib/services/store-http-service', () => ({
     get updateStore() {
       return mockUpdateStore;
     },
-    get getModulesToStore() {
-      return mockGetModulesToStore;
-    },
     get listOwners() {
       return mockListOwners;
+    },
+    get getPlans() {
+      return mockGetPlans;
     },
   },
 }));
@@ -185,15 +215,9 @@ describe('Store creation — client never sends paymentStartDate (server owns th
     vi.clearAllMocks();
     mockUser = makeUser({ isSuperAdmin: true, selectedStoreId: '' });
     mockParams = {};
-    mockGetModulesToStore = vi.fn().mockResolvedValue({
-      succeeded: true,
-      data: [
-        makeModule({ id: 1, priceIncluded: true }),
-        makeModule({ id: 2, priceIncluded: false }),
-      ],
-    });
     mockListOwners = vi.fn().mockResolvedValue({ succeeded: true, data: [makeOwner()] });
     mockCreateStore = vi.fn().mockResolvedValue({ succeeded: true, data: makeStore() });
+    mockGetPlans = vi.fn().mockResolvedValue({ succeeded: true, data: makePlanCatalog() });
   });
 
   it('omits paymentStartDate from the create payload entirely', async () => {
@@ -211,7 +235,7 @@ describe('Store creation — client never sends paymentStartDate (server owns th
     expect(Object.keys(payload)).not.toContain('paymentStartDate');
   });
 
-  it('sends exactly the six create fields — no billing field smuggled in', async () => {
+  it('sends exactly the five data fields plus Superior birth moduleIds — no billing field smuggled in', async () => {
     const { EditStorePage } = await import('../edit-store');
     render(
       <Wrapper>
@@ -221,6 +245,10 @@ describe('Store creation — client never sends paymentStartDate (server owns th
     await submitCreateForm('New Store');
 
     await waitFor(() => expect(mockCreateStore).toHaveBeenCalledTimes(1));
+    // Plan split: create carries store DATA plus birth provisioning. The store
+    // is created on the Superior plan — the container resolves its member
+    // module ids once from GET /v1/plans and sends them (the backend requires
+    // a non-empty moduleIds and grants exactly those modules).
     expect(Object.keys(mockCreateStore.mock.calls[0][0]).sort()).toEqual([
       'address',
       'approved',
@@ -229,33 +257,25 @@ describe('Store creation — client never sends paymentStartDate (server owns th
       'name',
       'ownerId',
     ]);
+    expect(mockCreateStore.mock.calls[0][0].moduleIds).toEqual([2, 3, 4]);
   });
 
-  it('still omits paymentStartDate when the paid plan is chosen at creation', async () => {
+  it('shows no plan UI and sends the Superior plan birth moduleIds on create', async () => {
     const { EditStorePage } = await import('../edit-store');
     render(
       <Wrapper>
         <EditStorePage />
       </Wrapper>,
     );
-    // The create-mode form mounts before the catalog resolves, and PlanPicker's
-    // effect resets the active tab when `modules` arrives (plan-picker.tsx:38).
-    // Wait for the catalog+owners batch to land before touching the picker,
-    // otherwise that reset silently undoes the tab switch.
-    await waitFor(() =>
-      expect(screen.getByRole('option', { name: 'Owner One' })).toBeInTheDocument(),
-    );
-
-    // Switch to the paid tab and activate it, so moduleIds carries a paid module.
-    fireEvent.click(screen.getByRole('tab', { name: /^Pago/ }));
-    fireEvent.click(screen.getByRole('button', { name: 'Activar este plan' }));
-
     await submitCreateForm('Paid Store');
 
     await waitFor(() => expect(mockCreateStore).toHaveBeenCalledTimes(1));
     const payload = mockCreateStore.mock.calls[0][0];
-    expect(payload.moduleIds).toContain(2);
+    expect(payload.moduleIds).toEqual([2, 3, 4]);
     expect(Object.keys(payload)).not.toContain('paymentStartDate');
+    // Plan split: the plan UI lives on the plan page/modal, never in the form.
+    expect(screen.queryByRole('tab')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Activar este plan' })).not.toBeInTheDocument();
   });
 });
 
@@ -265,9 +285,9 @@ describe('Store creation — no payment-start-date field is reachable in create 
   beforeEach(() => {
     vi.clearAllMocks();
     mockParams = {};
-    mockGetModulesToStore = vi.fn().mockResolvedValue({ succeeded: true, data: [makeModule()] });
     mockListOwners = vi.fn().mockResolvedValue({ succeeded: true, data: [makeOwner()] });
     mockCreateStore = vi.fn().mockResolvedValue({ succeeded: true, data: makeStore() });
+    mockGetPlans = vi.fn().mockResolvedValue({ succeeded: true, data: makePlanCatalog() });
   });
 
   it('hides the field from a super admin in create mode (the strongest role)', async () => {
@@ -309,7 +329,6 @@ describe('Store creation — server-assigned trial state is read back unmodified
     vi.clearAllMocks();
     mockUser = makeUser({ isSuperAdmin: true, selectedStoreId: 's1' });
     mockParams = { id: 's1' };
-    mockGetModulesToStore = vi.fn().mockResolvedValue({ succeeded: true, data: [makeModule()] });
     mockListOwners = vi.fn().mockResolvedValue({ succeeded: true, data: [makeOwner()] });
   });
 

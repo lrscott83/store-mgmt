@@ -233,7 +233,6 @@ const messages: Record<string, string> = {
   // Plan/update split: the single 'Tiendas' entry became two links — the plan
   // view (/management/stores) and the store-data update view
   // (/management/stores/update), same authorization (EFeatures.Stores).
-  'MENU.STORES_PLAN': 'Plan de la tienda',
   'MENU.STORES_UPDATE': 'Editar la tienda',
   // Owner's "my stores" cards listing (owner-stores-cards plan, 2026-09-08)
   'MENU.MY_STORES': 'Mis tiendas',
@@ -840,7 +839,6 @@ const messages: Record<string, string> = {
   'STORES.PLAN.NEXT_BILLING_DATE': 'Próximo cobro',
   'STORES.PLAN.ACTIVATE': 'Activar este plan',
   'STORES.PLAN.ACTIVATE_PLAN': 'Activar ese plan',
-  'STORES.PLAN.WILL_ACTIVATE_ON_SAVE': 'Se activará al guardar',
   'STORES.PLAN.CURRENCY_NOTICE':
     'Los precios se muestran en USD. El pago se realiza en MN al cambio oficial del día.',
 

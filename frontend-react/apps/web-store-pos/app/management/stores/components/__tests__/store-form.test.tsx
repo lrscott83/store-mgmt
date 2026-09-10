@@ -2,20 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
-import type { Module, Owner } from '@store-mgmt/domain';
-
-function makeModule(overrides: Partial<Module> = {}): Module {
-  return {
-    id: 1,
-    name: 'Module A',
-    price: 10,
-    currentPrice: 8,
-    priceIncluded: false,
-    discountText: '',
-    selected: false,
-    ...overrides,
-  };
-}
+import type { Owner } from '@store-mgmt/domain';
 
 function makeOwner(overrides: Partial<Owner> = {}): Owner {
   return {
@@ -46,7 +33,6 @@ function Wrapper({ children }: { children: React.ReactNode }) {
 }
 
 const baseProps = {
-  modules: [makeModule()],
   owners: [] as Owner[],
   initialValues: undefined as unknown as undefined,
   isLoading: false,
@@ -143,17 +129,7 @@ describe('StoreForm — HTTP-only: no offline notice, no isOnline prop (Req: HTT
     expect(screen.queryByText(/sin conexión/i)).not.toBeInTheDocument();
   });
 
-  it('submitDisabled prop (e.g. catalog load failure) disables submit without any offline notice', async () => {
-    const { StoreForm } = await import('../store-form');
-    render(
-      <Wrapper>
-        <StoreForm {...baseProps} submitDisabled />
-      </Wrapper>,
-    );
-    expect(screen.getByRole('button', { name: /guardar/i })).toBeDisabled();
-    expect(screen.queryByText(/sin conexión/i)).not.toBeInTheDocument();
   });
-});
 
 describe('StoreForm — PRES-7: error display', () => {
   it('shows error alert from container when error prop is set', async () => {
@@ -172,15 +148,12 @@ describe('StoreForm — PRES-4: valid submit calls onSubmit with payload', () =>
     vi.clearAllMocks();
   });
 
-  it('calls onSubmit with name, address and moduleIds on valid submit', async () => {
+  it('calls onSubmit with data fields and NO moduleIds on valid submit', async () => {
     const { StoreForm } = await import('../store-form');
     const onSubmit = vi.fn();
-    const modules = [
-      makeModule({ id: 1, name: 'Module A', priceIncluded: false, selected: false }),
-    ];
     render(
       <Wrapper>
-        <StoreForm {...baseProps} modules={modules} onSubmit={onSubmit} />
+        <StoreForm {...baseProps} onSubmit={onSubmit} />
       </Wrapper>,
     );
     fireEvent.change(screen.getByLabelText(/nombre/i), { target: { value: 'My Store' } });
@@ -188,6 +161,8 @@ describe('StoreForm — PRES-4: valid submit calls onSubmit with payload', () =>
     await waitFor(() => {
       expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ name: 'My Store' }));
     });
+    // Plan split: module selection lives on the plan page/modal, not in the form.
+    expect(onSubmit.mock.calls[0][0]).not.toHaveProperty('moduleIds');
   });
 });
 
@@ -353,101 +328,10 @@ describe('StoreForm — VALID-2: paymentStartDate required for superAdmin in edi
   });
 });
 
-// ─── DG-7: readOnly = "the owner already spent their one plan activation" ─────
+// ─── DG-7 contract moved (Phase 5, plan split) ────────────────────────────────
 //
-// `openspec/specs/billing/spec.md:5` — "plan activation (owner, once)". The lock
-// exists to spend the owner's SINGLE activation; afterwards only a super admin
-// may change the plan.
-//
-// `initialValues?.paymentStartDate != null` used to be a sound PROXY for "already
-// activated", because the billing clock only started when a paid module was first
-// selected (activation-on-first-paid, `UpdateStoreCommand.cs:96-97`). The proxy
-// dies the moment EVERY store starts its clock at creation: it would spend the
-// owner's one activation at birth — before they ever picked a plan — locking them
-// out of the paid plan permanently.
-//
-// So the predicate is now the real condition it always stood for: the store is ON
-// the paid plan, i.e. a non-`priceIncluded` module is selected.
-//
-// Note on the tab clicked in each case: the activate button only renders when the
-// browsed tab differs from the selected plan (`plan-picker.tsx:97-106`). A store
-// on the paid plan must therefore be probed from the FREE tab, and vice versa —
-// probing the already-selected tab would assert nothing.
-
-const FREE_SELECTED = makeModule({ id: 1, priceIncluded: true, selected: true });
-const PAID_SELECTED = makeModule({ id: 2, priceIncluded: false, selected: true });
-const PAID_AVAILABLE = makeModule({ id: 2, priceIncluded: false, selected: false });
-
-describe('StoreForm — PlanPicker readOnly wiring (DG-7)', () => {
-  it('locks the picker for an owner whose store is already ON the paid plan', async () => {
-    const { StoreForm } = await import('../store-form');
-    render(
-      <Wrapper>
-        <StoreForm
-          {...baseProps}
-          modules={[FREE_SELECTED, PAID_SELECTED]}
-          isOwnerAdmin={true}
-          isEditMode={true}
-          owners={[makeOwner({ id: 'o1' })]}
-          initialValues={{ ownerId: 'o1', name: 'Existing Store', paymentStartDate: '2024-01-01' }}
-        />
-      </Wrapper>,
-    );
-    fireEvent.click(screen.getByRole('tab', { name: /Gratis/ }));
-    expect(screen.queryByRole('button', { name: 'Activar este plan' })).not.toBeInTheDocument();
-  });
-
-  it('keeps the picker interactive for an owner still on the free plan, even though the billing clock already runs', async () => {
-    const { StoreForm } = await import('../store-form');
-    render(
-      <Wrapper>
-        <StoreForm
-          {...baseProps}
-          modules={[FREE_SELECTED, PAID_AVAILABLE]}
-          isOwnerAdmin={true}
-          isEditMode={true}
-          owners={[makeOwner({ id: 'o1' })]}
-          // Every store now carries a paymentStartDate from creation — it must
-          // NOT be read as "the owner already activated the paid plan".
-          initialValues={{ ownerId: 'o1', name: 'Existing Store', paymentStartDate: '2026-08-04' }}
-        />
-      </Wrapper>,
-    );
-    fireEvent.click(screen.getByRole('tab', { name: /Pago/ }));
-    expect(screen.getByRole('button', { name: 'Activar este plan' })).toBeInTheDocument();
-  });
-
-  it('keeps the picker interactive for a super admin even on the paid plan', async () => {
-    const { StoreForm } = await import('../store-form');
-    render(
-      <Wrapper>
-        <StoreForm
-          {...baseProps}
-          modules={[FREE_SELECTED, PAID_SELECTED]}
-          isSuperAdmin={true}
-          isEditMode={true}
-          owners={[makeOwner({ id: 'o1' })]}
-          initialValues={{ ownerId: 'o1', name: 'Existing Store', paymentStartDate: '2024-01-01' }}
-        />
-      </Wrapper>,
-    );
-    fireEvent.click(screen.getByRole('tab', { name: /Gratis/ }));
-    expect(screen.getByRole('button', { name: 'Activar este plan' })).toBeInTheDocument();
-  });
-
-  it('keeps the picker interactive in create mode (no plan chosen yet)', async () => {
-    const { StoreForm } = await import('../store-form');
-    render(
-      <Wrapper>
-        <StoreForm
-          {...baseProps}
-          isOwnerAdmin={true}
-          isEditMode={false}
-          owners={[makeOwner({ id: 'o1' })]}
-        />
-      </Wrapper>,
-    );
-    fireEvent.click(screen.getByRole('tab', { name: /Pago/ }));
-    expect(screen.getByRole('button', { name: 'Activar este plan' })).toBeInTheDocument();
-  });
-});
+// The readOnly/DG-7 wiring the PlanPicker used to enforce ("the owner already
+// spent their one plan activation") now lives in `plan-panels.tsx`, which the
+// plan page (`store-plan.tsx`) and the owner plan modal (`edit-plan-modal.tsx`)
+// exercise directly. The store DATA form no longer renders the picker, so it
+// carries no DG-7 wiring to test here.

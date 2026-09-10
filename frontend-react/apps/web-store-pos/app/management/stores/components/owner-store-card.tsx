@@ -6,7 +6,7 @@ import { formatDateOnly } from '~/shared/lib/date-utils';
 
 /**
  * Format a plan amount as a bare number — decimals shown only when present
- * (10 → "10", 10.5 → "10.5"), no currency. Same shape as plan-picker's
+ * (10 → "10", 10.5 → "10.5"), no currency. Same shape as the plan panels'
  * formatPlanAmount: used for the struck-through original price.
  */
 function formatPlanAmount(amount: number): string {
@@ -16,7 +16,7 @@ function formatPlanAmount(amount: number): string {
   }).format(amount);
 }
 
-/** Format as "5 USD" or "5.5 USD" (no $ symbol) — same shape as plan-picker. */
+/** Format as "5 USD" or "5.5 USD" (no $ symbol) — same shape as the plan panels. */
 function formatPlanPrice(amount: number): string {
   return `${formatPlanAmount(amount)} USD`;
 }
