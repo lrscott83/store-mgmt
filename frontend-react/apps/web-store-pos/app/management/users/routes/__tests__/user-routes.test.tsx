@@ -64,7 +64,7 @@ vi.mock('~/shared/lib/stores/auth-store', () => {
 
 // ─── userHttpService mock ─────────────────────────────────────────────────────
 
-let mockGetUsers = vi.fn();
+let mockGetUsersByStoreId = vi.fn();
 let mockGetUserById = vi.fn();
 let mockCreateUser = vi.fn();
 let mockEditUser = vi.fn();
@@ -73,8 +73,8 @@ const mockDeleteUser = vi.fn();
 
 vi.mock('~/management/users/lib/services/user-http-service', () => ({
   userHttpService: {
-    get getUsers() {
-      return mockGetUsers;
+    get getUsersByStoreId() {
+      return mockGetUsersByStoreId;
     },
     get getUserById() {
       return mockGetUserById;
@@ -154,7 +154,7 @@ describe('UserListPage — S-LIST-1: online fetch and render', () => {
     mockUser = makeUser();
     mockIsOnline = true;
     localStorageMock.clear();
-    mockGetUsers = vi
+    mockGetUsersByStoreId = vi
       .fn()
       .mockResolvedValue({ succeeded: true, data: [makeDomainUser({ fullName: 'Alice Smith' })] });
   });
@@ -169,7 +169,7 @@ describe('UserListPage — S-LIST-1: online fetch and render', () => {
     await waitFor(() => {
       expect(screen.getByText('Alice Smith')).toBeInTheDocument();
     });
-    expect(mockGetUsers).toHaveBeenCalledTimes(1);
+    expect(mockGetUsersByStoreId).toHaveBeenCalledTimes(1);
   });
 
   it('renders the "Empleados" page title, not "Usuarios" (Req: Copy Matches Angular Terminology Exactly)', async () => {
@@ -189,7 +189,7 @@ describe('UserListPage — S-LIST-2: empty state', () => {
     vi.clearAllMocks();
     mockIsOnline = true;
     localStorageMock.clear();
-    mockGetUsers = vi.fn().mockResolvedValue({ succeeded: true, data: [] });
+    mockGetUsersByStoreId = vi.fn().mockResolvedValue({ succeeded: true, data: [] });
   });
 
   it('shows empty state when no users exist', async () => {
@@ -210,7 +210,7 @@ describe('UserListPage — S-LIST-3: HTTP-only fetch regardless of connectivity 
     vi.clearAllMocks();
     mockIsOnline = false;
     localStorageMock.clear();
-    mockGetUsers = vi
+    mockGetUsersByStoreId = vi
       .fn()
       .mockResolvedValue({
         succeeded: true,
@@ -228,7 +228,7 @@ describe('UserListPage — S-LIST-3: HTTP-only fetch regardless of connectivity 
     await waitFor(() => {
       expect(screen.getByText('Offline Fetch User')).toBeInTheDocument();
     });
-    expect(mockGetUsers).toHaveBeenCalledTimes(1);
+    expect(mockGetUsersByStoreId).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -237,7 +237,7 @@ describe('UserListPage — S-LIST-4: no degraded/offline banner ever renders (Re
     vi.clearAllMocks();
     mockIsOnline = false;
     localStorageMock.clear();
-    mockGetUsers = vi.fn().mockResolvedValue({ succeeded: true, data: [] });
+    mockGetUsersByStoreId = vi.fn().mockResolvedValue({ succeeded: true, data: [] });
   });
 
   it('shows empty state and no degraded/cache notice when offline', async () => {
@@ -260,7 +260,7 @@ describe('UserListPage — S-LIST-5: lifecycle action wired through the gear men
     mockIsOnline = true;
     localStorageMock.clear();
     // Use isActive:false so the Activar menu item is present after opening the gear menu.
-    mockGetUsers = vi
+    mockGetUsersByStoreId = vi
       .fn()
       .mockResolvedValue({
         succeeded: true,
@@ -297,7 +297,7 @@ describe('UserListPage — succeeded:false response (Req: Users List Surfaces su
     mockUser = makeUser();
     mockIsOnline = true;
     localStorageMock.clear();
-    mockGetUsers = vi.fn().mockResolvedValue({
+    mockGetUsersByStoreId = vi.fn().mockResolvedValue({
       succeeded: false,
       data: null,
       message: null,
@@ -327,7 +327,7 @@ describe('UserListPage — succeeded:true still populates users (regression)', (
     mockUser = makeUser();
     mockIsOnline = true;
     localStorageMock.clear();
-    mockGetUsers = vi.fn().mockResolvedValue({
+    mockGetUsersByStoreId = vi.fn().mockResolvedValue({
       succeeded: true,
       data: [makeDomainUser({ fullName: 'Still Works' })],
       message: null,

@@ -24,6 +24,13 @@ export const userHttpService = {
     return response.data;
   },
 
+  async getUsersByStoreId(storeId: string): Promise<BaseResponseModel<User[]>> {
+    const response = await apiClient.get<BaseResponseModel<User[]>>(
+      `/v1/users/store/${storeId}/true`,
+    );
+    return response.data;
+  },
+
   async getUserById(id: string): Promise<BaseResponseModel<User>> {
     const response = await apiClient.get<BaseResponseModel<User>>(`/v1/users/${id}`);
     return response.data;

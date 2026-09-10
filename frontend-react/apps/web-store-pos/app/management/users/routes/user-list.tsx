@@ -4,6 +4,7 @@ import { useIntl } from 'react-intl';
 import { EFeatures } from '@store-mgmt/domain';
 import { adminFeatureLoader } from '~/auth/routes/loaders';
 import { useOnlineStatus } from '~/shared/lib/hooks/use-online-status';
+import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { userHttpService } from '~/management/users/lib/services/user-http-service';
 import { UserCardList } from '~/management/users/components/user-card-list';
 import { httpErrorKey } from '~/shared/lib/http/http-error';
@@ -16,13 +17,17 @@ export function UserListPage() {
   const intl = useIntl();
   const navigate = useNavigate();
   const isOnline = useOnlineStatus();
+  const { user } = useAuthStore();
 
   const [users, setUsers] = useState<User[]>([]);
   const [error, setError] = useState('');
 
   function loadUsers() {
+    if (!user?.selectedStoreId) {
+      return;
+    }
     userHttpService
-      .getUsers()
+      .getUsersByStoreId(user.selectedStoreId)
       .then((res) => {
         if (!res.succeeded) {
           setError(intl.formatMessage({ id: 'USERS.ERROR' }));
@@ -39,7 +44,7 @@ export function UserListPage() {
   useEffect(() => {
     loadUsers();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only fetch (Angular ngOnInit parity)
-  }, []);
+  }, [user?.selectedStoreId]);
 
   async function handleLifecycleAction(action: (id: string) => Promise<unknown>, id: string) {
     if (!isOnline) return;

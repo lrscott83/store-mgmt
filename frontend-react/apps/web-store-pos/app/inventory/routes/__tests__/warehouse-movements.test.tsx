@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
-import type { Warehouse, WarehouseStockLevel, WarehouseStockMovement } from '@store-mgmt/domain';
+import type { Warehouse, WarehouseStockMovement } from '@store-mgmt/domain';
 import { toLocalDayKey } from '~/shared/lib/date-utils';
 
 // ─── mock auth-store (mismo patrón que warehouses.test.tsx) ─────────────────
@@ -25,12 +25,26 @@ vi.mock('~/shared/lib/stores/auth-store', () => {
   return { useAuthStore };
 });
 
+// ─── blocking-alert + toast mocks (patrón de inventory-routes.test.tsx) ────
+const confirmDialogMock = vi.hoisted(() => vi.fn().mockResolvedValue(true));
+const showBlockingErrorMock = vi.hoisted(() => vi.fn());
+const showToastSuccessMock = vi.hoisted(() => vi.fn());
+vi.mock('~/shared/lib/blocking-alert', () => ({
+  confirmDialog: (...args: unknown[]) => confirmDialogMock(...args),
+  showBlockingError: (...args: unknown[]) => showBlockingErrorMock(...args),
+}));
+vi.mock('~/shared/lib/toast', () => ({
+  showToastSuccess: (...args: unknown[]) => showToastSuccessMock(...args),
+}));
+
 // ─── fake WarehouseOfflineService (estado controlado) ───────────────────────
 const fakeState = vi.hoisted(() => ({
   warehouses: [] as Warehouse[],
   movements: [] as WarehouseStockMovement[],
-  stockLevels: [] as WarehouseStockLevel[],
   products: [] as Array<[string, Record<string, unknown>]>,
+  reverseMovementImpl: vi.fn() as unknown as ReturnType<typeof vi.fn>,
+  recordMovementImpl: vi.fn() as unknown as ReturnType<typeof vi.fn>,
+  isOwnerAdminFlag: true,
 }));
 
 vi.mock('~/inventory/lib/services/warehouse-offline-service', () => ({
@@ -39,10 +53,21 @@ vi.mock('~/inventory/lib/services/warehouse-offline-service', () => ({
       return fakeState.warehouses;
     }
     getStorageStockLevels() {
-      return fakeState.stockLevels;
+      return [];
     }
     getStorageMovements() {
       return fakeState.movements;
+    }
+    reverseMovement(id: string, reason?: string) {
+      return fakeState.reverseMovementImpl(id, reason);
+    }
+    recordMovement(params: unknown) {
+      return fakeState.recordMovementImpl(params);
+    }
+    isReversed(id: string) {
+      return fakeState.movements.some(
+        (m) => m.type === 'reversal' && m.reversalOfMovementId === id,
+      );
     }
   },
 }));
@@ -76,8 +101,13 @@ describe('Vista Movimientos de almacén', () => {
   beforeEach(() => {
     fakeState.warehouses = [];
     fakeState.movements = [];
-    fakeState.stockLevels = [];
     fakeState.products = [];
+    fakeState.reverseMovementImpl.mockReset();
+    fakeState.recordMovementImpl.mockReset();
+    confirmDialogMock.mockReset();
+    confirmDialogMock.mockResolvedValue(true);
+    showBlockingErrorMock.mockReset();
+    showToastSuccessMock.mockReset();
   });
 
   it('muestra el historial de todos los almacenes agrupado por días (acordeón)', () => {
@@ -178,196 +208,192 @@ describe('Vista Movimientos de almacén', () => {
     expect(screen.getByText('No hay movimientos registrados.')).toBeTruthy();
   });
 
-  it('cada movimiento se representa como card compacto: producto, cantidad entre paréntesis y fila de almacén', () => {
+  // ─── Plan 2026-09-09: engranaje Editar/Revertir + badge (F4/F5, D6/D10) ────
+
+  function seedTodayMovements() {
     const today = new Date();
     fakeState.warehouses = [
       { id: 'wh-1', name: 'Central', isActive: true, createdDate: new Date(), createdByName: 'x' },
+      { id: 'wh-2', name: 'Anexo', isActive: true, createdDate: new Date(), createdByName: 'x' },
     ];
     fakeState.products = [['prod-1', { id: 'prod-1', name: 'Cerveza' }]];
     fakeState.movements = [
+      { id: 'mv-in', warehouseId: 'wh-1', productId: 'prod-1', type: 'purchase_in', quantity: 24, reason: null, createdDate: today, createdByName: 'x', costPrice: 5 },
+      { id: 'mv-out', warehouseId: 'wh-1', productId: 'prod-1', type: 'sale_out', quantity: 6, reason: null, createdDate: today, createdByName: 'x' },
+      { id: 'mv-tr-in', warehouseId: 'wh-2', productId: 'prod-1', type: 'transfer_in', quantity: 6, reason: null, fromWarehouseId: 'wh-1', createdDate: today, createdByName: 'x' },
       {
-        id: 'mv-1',
-        warehouseId: 'wh-1',
-        productId: 'prod-1',
-        type: 'purchase_in',
-        quantity: 24,
-        reason: null,
-        createdDate: today,
-        createdByName: 'x',
+        id: 'mv-rev', warehouseId: 'wh-1', productId: 'prod-1', type: 'reversal', quantity: 2, reason: null,
+        createdDate: today, createdByName: 'x', reversalOfMovementId: 'mv-other-reverted',
+      },
+      {
+        id: 'mv-other-reverted', warehouseId: 'wh-1', productId: 'prod-1', type: 'purchase_in', quantity: 2, reason: null,
+        createdDate: today, createdByName: 'x',
       },
     ];
-    renderPage();
-    fireEvent.click(screen.getByTestId(`mv-day-panel-toggle-${toLocalDayKey(today)}`));
+  }
 
-    expect(screen.getByTestId('mv-card-mv-1')).toBeTruthy();
-    // Cantidad entre paréntesis, con el testid histórico preservado.
-    expect(screen.getByTestId('mv-qty-mv-1').textContent).toBe('(24)');
-    expect(screen.getByText('Cerveza')).toBeTruthy();
-    // Fila 3: almacén implicado.
-    expect(screen.getByText('Central')).toBeTruthy();
+  function openToday() {
+    fireEvent.click(screen.getByTestId(`mv-day-panel-toggle-${toLocalDayKey(new Date())}`));
+  }
+
+  it('U-M1: OwnerAdmin ve engranaje solo en filas UI sin reversa (no en reversal ni transfer_in)', () => {
+    seedTodayMovements();
+    renderPage();
+    openToday();
+    expect(screen.getByTestId('mv-actions-toggle-mv-in')).toBeTruthy();
+    expect(screen.getByTestId('mv-actions-toggle-mv-out')).toBeTruthy();
+    expect(screen.queryByTestId('mv-actions-toggle-mv-rev')).toBeNull(); // reversal: solo lectura
+    expect(screen.queryByTestId('mv-actions-toggle-mv-tr-in')).toBeNull(); // transfer_in: solo lectura
+    expect(screen.queryByTestId('mv-actions-toggle-mv-other-reverted')).toBeNull(); // ya revertida
   });
 
-  it('una compra (purchase_in) muestra el texto "Compra" y el precio a la derecha (costPrice × cantidad)', () => {
-    const today = new Date();
-    fakeState.warehouses = [
-      { id: 'wh-1', name: 'Central', isActive: true, createdDate: new Date(), createdByName: 'x' },
-    ];
-    fakeState.products = [['prod-1', { id: 'prod-1', name: 'Cerveza' }]];
-    fakeState.stockLevels = [
-      {
-        id: 'lvl-1',
-        warehouseId: 'wh-1',
-        productId: 'prod-1',
-        onHand: 100,
-        costPrice: 2.5,
-        createdDate: new Date(),
-      },
-    ];
-    fakeState.movements = [
-      {
-        id: 'mv-1',
-        warehouseId: 'wh-1',
-        productId: 'prod-1',
-        type: 'purchase_in',
-        quantity: 24,
-        reason: null,
-        createdDate: today,
-        createdByName: 'x',
-      },
-      {
-        id: 'mv-2',
-        warehouseId: 'wh-1',
-        productId: 'prod-1',
-        type: 'sale_out',
-        quantity: 6,
-        reason: null,
-        createdDate: today,
-        createdByName: 'x',
-      },
-    ];
+  it('U-M2: StoreUser no ve engranajes (D6)', () => {
+    seedTodayMovements();
+    mockUser.isOwnerAdmin = false;
     renderPage();
-    fireEvent.click(screen.getByTestId(`mv-day-panel-toggle-${toLocalDayKey(today)}`));
-
-    // Compra: texto "Compra" + precio (2.5 × 24 = $60).
-    expect(screen.getByText('Compra')).toBeTruthy();
-    expect(screen.getByTestId('mv-price-mv-1').textContent).toBe(`$60`);
-    // Salida: sin precio, con el texto del tipo.
-    expect(screen.queryByTestId('mv-price-mv-2')).toBeNull();
-    expect(screen.getByText('Salida a tienda')).toBeTruthy();
+    openToday();
+    expect(screen.queryByTestId('mv-actions-toggle-mv-in')).toBeNull();
+    expect(screen.queryByTestId('mv-actions-toggle-mv-out')).toBeNull();
+    mockUser.isOwnerAdmin = true;
   });
 
-  it('una compra con costPrice persistido muestra su costo real, no el promedio del nivel', () => {
-    const today = new Date();
-    fakeState.warehouses = [
-      { id: 'wh-1', name: 'Central', isActive: true, createdDate: new Date(), createdByName: 'x' },
-    ];
-    fakeState.products = [['prod-1', { id: 'prod-1', name: 'Cerveza' }]];
-    // Nivel con promedio $2.50/ud, pero la compra costó $3.00/ud.
-    fakeState.stockLevels = [
-      {
-        id: 'lvl-1',
-        warehouseId: 'wh-1',
-        productId: 'prod-1',
-        onHand: 100,
-        costPrice: 2.5,
-        createdDate: new Date(),
-      },
-    ];
-    fakeState.movements = [
-      {
-        id: 'mv-1',
-        warehouseId: 'wh-1',
-        productId: 'prod-1',
-        type: 'purchase_in',
-        quantity: 24,
-        costPrice: 3,
-        reason: null,
-        createdDate: today,
-        createdByName: 'x',
-      },
-    ];
+  it('U-M4: Revertir confirma con Swal Si/No; No cancela sin llamar al servicio', async () => {
+    seedTodayMovements();
+    confirmDialogMock.mockResolvedValueOnce(false);
     renderPage();
-    fireEvent.click(screen.getByTestId(`mv-day-panel-toggle-${toLocalDayKey(today)}`));
-
-    // Precio real persistido: 3 × 24 = $72 (no el 2.5 × 24 = $60 del promedio).
-    expect(screen.getByTestId('mv-price-mv-1').textContent).toBe(`$72`);
+    openToday();
+    fireEvent.click(screen.getByTestId('mv-actions-toggle-mv-out'));
+    fireEvent.click(screen.getByTestId('mv-revert-mv-out'));
+    await waitFor(() => expect(confirmDialogMock).toHaveBeenCalledTimes(1));
+    // El mensaje de confirmación es el de la reversa (F4).
+    expect(confirmDialogMock.mock.calls[0][0].message).toContain(
+      '¿Está seguro que desea revertir este movimiento?',
+    );
+    expect(fakeState.reverseMovementImpl).not.toHaveBeenCalled();
   });
 
-  it('el gear del card expone Editar y Eliminar; Editar abre popup visual de edición', () => {
-    const today = new Date();
-    fakeState.warehouses = [
-      { id: 'wh-1', name: 'Central', isActive: true, createdDate: new Date(), createdByName: 'x' },
-    ];
-    fakeState.products = [['prod-1', { id: 'prod-1', name: 'Cerveza' }]];
-    fakeState.movements = [
-      {
-        id: 'mv-1',
-        warehouseId: 'wh-1',
-        productId: 'prod-1',
-        type: 'purchase_in',
-        quantity: 24,
-        reason: 'Reposición',
-        createdDate: today,
-        createdByName: 'x',
-      },
-    ];
+  it('U-M4b: confirmar Si ejecuta reverseMovement y recarga', async () => {
+    seedTodayMovements();
+    fakeState.reverseMovementImpl.mockReturnValue({ succeeded: true, data: {}, errors: [] });
     renderPage();
-    fireEvent.click(screen.getByTestId(`mv-day-panel-toggle-${toLocalDayKey(today)}`));
-
-    // Gear con las dos acciones.
-    fireEvent.click(screen.getByTestId(`mv-actions-mv-1`));
-    expect(screen.getByTestId('mv-edit-mv-1')).toBeTruthy();
-    expect(screen.getByTestId('mv-delete-mv-1')).toBeTruthy();
-
-    // Editar abre el popup visual con los datos según el tipo.
-    fireEvent.click(screen.getByTestId('mv-edit-mv-1'));
-    const dialog = within(screen.getByRole('dialog'));
-    expect(dialog.getByText('Editar movimiento')).toBeTruthy();
-    expect(dialog.getByText('Cerveza')).toBeTruthy();
-    expect(dialog.getByText('(24)')).toBeTruthy();
-    expect(dialog.getByText('Entrada (compra)')).toBeTruthy();
-    expect(dialog.getByText('Central')).toBeTruthy();
-    expect(dialog.getByText('Reposición')).toBeTruthy();
-
-    // Guardar cierra el popup sin lógica.
-    fireEvent.click(screen.getByTestId('mv-edit-dialog-save'));
-    expect(screen.queryByText('Editar movimiento')).toBeNull();
+    openToday();
+    fireEvent.click(screen.getByTestId('mv-actions-toggle-mv-out'));
+    fireEvent.click(screen.getByTestId('mv-revert-mv-out'));
+    await waitFor(() => expect(fakeState.reverseMovementImpl).toHaveBeenCalledWith('mv-out', undefined));
+    expect(showToastSuccessMock).toHaveBeenCalled();
   });
 
-  it('Eliminar abre el popup de confirmación con los datos del movimiento; Confirmar solo cierra', () => {
-    const today = new Date();
-    fakeState.warehouses = [
-      { id: 'wh-1', name: 'Central', isActive: true, createdDate: new Date(), createdByName: 'x' },
-    ];
-    fakeState.products = [['prod-1', { id: 'prod-1', name: 'Cerveza' }]];
-    fakeState.movements = [
-      {
-        id: 'mv-1',
-        warehouseId: 'wh-1',
-        productId: 'prod-1',
-        type: 'sale_out',
-        quantity: 12,
-        reason: null,
-        createdDate: today,
-        createdByName: 'x',
-      },
-    ];
+  it('U-M5: reverseMovement fallida → Swal blocking error con mensaje específico', async () => {
+    seedTodayMovements();
+    fakeState.reverseMovementImpl.mockReturnValue({
+      succeeded: false,
+      data: undefined,
+      errors: [{ code: 'Warehouse.SaleOutAlreadyConsumed', description: 'La salida ya fue consumida por ventas — no se puede revertir la entrada de tienda.' }],
+    });
     renderPage();
-    fireEvent.click(screen.getByTestId(`mv-day-panel-toggle-${toLocalDayKey(today)}`));
-
-    fireEvent.click(screen.getByTestId(`mv-actions-mv-1`));
-    fireEvent.click(screen.getByTestId('mv-delete-mv-1'));
-
-    expect(screen.getByText('Eliminar movimiento')).toBeTruthy();
-    expect(
-      screen.getByText(
-        '¿Está seguro de que desea eliminar el movimiento de Cerveza (12) del almacén Central?',
+    openToday();
+    fireEvent.click(screen.getByTestId('mv-actions-toggle-mv-out'));
+    fireEvent.click(screen.getByTestId('mv-revert-mv-out'));
+    await waitFor(() =>
+      expect(showBlockingErrorMock).toHaveBeenCalledWith(
+        expect.any(String),
+        'La salida ya fue consumida por ventas — no se puede revertir la entrada de tienda.',
       ),
-    ).toBeTruthy();
+    );
+  });
 
-    fireEvent.click(screen.getByTestId('confirm-dialog-confirm'));
-    expect(screen.queryByText('Eliminar movimiento')).toBeNull();
-    // El movimiento sigue listado (nada se borró).
-    expect(screen.getByTestId('mv-card-mv-1')).toBeTruthy();
+  it('U-M6: fila revertida muestra badge Revertido; fila reversal con icono propio', () => {
+    seedTodayMovements();
+    renderPage();
+    openToday();
+    expect(screen.getByTestId('mv-reversal-badge-mv-other-reverted').textContent).toBe('Revertido');
+    // La fila reversal existe con su icono y NO lleva badge (no es reversible).
+    expect(screen.getByTestId('mv-type-icon-mv-rev')).toBeTruthy();
+    expect(screen.queryByTestId('mv-reversal-badge-mv-rev')).toBeNull();
+  });
+
+  it('U-M9: load() refresca el historial tras la reversa (movements re-leído)', async () => {
+    seedTodayMovements();
+    fakeState.reverseMovementImpl.mockImplementation(() => {
+      // La reversa "aterriza" en el storage — la página debe volver a leerla.
+      fakeState.movements = [
+        ...fakeState.movements,
+        { id: 'mv-new-rev', warehouseId: 'wh-1', productId: 'prod-1', type: 'reversal', quantity: 6, reason: null, createdDate: new Date(), createdByName: 'x', reversalOfMovementId: 'mv-out' },
+      ];
+      return { succeeded: true, data: {}, errors: [] };
+    });
+    renderPage();
+    openToday();
+    expect(screen.queryByTestId('mv-qty-mv-new-rev')).toBeNull();
+    fireEvent.click(screen.getByTestId('mv-actions-toggle-mv-out'));
+    fireEvent.click(screen.getByTestId('mv-revert-mv-out'));
+    await waitFor(() => expect(screen.getByTestId('mv-qty-mv-new-rev')).toBeTruthy());
+    // El original ahora lleva badge.
+    expect(screen.getByTestId('mv-reversal-badge-mv-out')).toBeTruthy();
+  });
+
+  // ─── Edición = reversa + recreación (F3, por fila D10) ─────────────────────
+
+  it('U-M3: Editar abre el modal precargado con los valores de la fila', () => {
+    seedTodayMovements();
+    renderPage();
+    openToday();
+    fireEvent.click(screen.getByTestId('mv-actions-toggle-mv-in'));
+    fireEvent.click(screen.getByTestId('mv-edit-mv-in'));
+    // Modal de edición con la cantidad y el costo de la fila original precargados.
+    const modal = screen.getByTestId('movement-form-purchase_in');
+    expect(modal).toBeTruthy();
+    expect((screen.getByTestId('movement-quantity') as HTMLInputElement).value).toBe('24');
+    expect((screen.getByTestId('movement-cost') as HTMLInputElement).value).toBe(String(5));
+  });
+
+  it('U-M7b: guardar la edición ejecuta reversa + recordMovement y recarga', async () => {
+    seedTodayMovements();
+    // mv-in: purchase_in qty 24 @ 5 → se edita a 15 @ 7.
+    fakeState.reverseMovementImpl.mockReturnValue({ succeeded: true, data: {}, errors: [] });
+    fakeState.recordMovementImpl.mockReturnValue({
+      succeeded: true,
+      data: [{ id: 'mv-new' }],
+      errors: [],
+    });
+    renderPage();
+    openToday();
+    fireEvent.click(screen.getByTestId('mv-actions-toggle-mv-in'));
+    fireEvent.click(screen.getByTestId('mv-edit-mv-in'));
+    fireEvent.change(screen.getByTestId('movement-quantity'), { target: { value: '15' } });
+    fireEvent.change(screen.getByTestId('movement-cost'), { target: { value: '7' } });
+    // Botón Guardar del modal (sin testid — por texto).
+    fireEvent.click(screen.getByText('Guardar'));
+    await waitFor(() => expect(fakeState.reverseMovementImpl).toHaveBeenCalledWith('mv-in', undefined));
+    expect(fakeState.recordMovementImpl).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'purchase_in', quantity: 15, costPrice: 7 }),
+    );
+    expect(showToastSuccessMock).toHaveBeenCalled();
+    // El modal se cierra tras guardar.
+    expect(screen.queryByTestId('movement-form-purchase_in')).toBeNull();
+  });
+
+  it('U-M7: si recordMovement falla tras la reversa, el error se muestra y la reversa NO se deshace', async () => {
+    seedTodayMovements();
+    fakeState.reverseMovementImpl.mockReturnValue({ succeeded: true, data: {}, errors: [] });
+    fakeState.recordMovementImpl.mockReturnValue({
+      succeeded: false,
+      data: undefined,
+      errors: [{ code: 'Warehouse.InsufficientStock', description: 'No hay suficiente stock en el almacén.' }],
+    });
+    renderPage();
+    openToday();
+    fireEvent.click(screen.getByTestId('mv-actions-toggle-mv-in'));
+    fireEvent.click(screen.getByTestId('mv-edit-mv-in'));
+    fireEvent.change(screen.getByTestId('movement-quantity'), { target: { value: '99' } });
+    fireEvent.click(screen.getByText('Guardar'));
+    await waitFor(() =>
+      expect(showBlockingErrorMock).toHaveBeenCalledWith(
+        expect.any(String),
+        'No hay suficiente stock en el almacén.',
+      ),
+    );
+    // La reversa quedó persistida (no-atómico §7.3) — no se llamó dos veces.
+    expect(fakeState.reverseMovementImpl).toHaveBeenCalledTimes(1);
   });
 });

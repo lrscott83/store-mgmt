@@ -73,8 +73,8 @@ export default [
 
     // Management â€” Stores
     // Plan split: the store-DATA form never touches the plan. The PLAN view
-    // lives at `management/stores` and the owner plan modal in my-stores; the
-    // data edit at `management/stores/update` and `management/stores/edit/:id`
+    // lives at `management/stores` and the owner plan modal in my-stores;
+    // data editing at `management/stores/edit/:id`
     // (no moduleIds on save), and creation at `management/stores/create` (data
     // only — the store is born on the Superior plan).
     // Distinct route `id`s are required because RR7 rejects reusing one file across
@@ -86,9 +86,6 @@ export default [
     // every store the current user owns (active AND inactive) with plan data.
     route('management/my-stores', 'management/stores/routes/my-stores.tsx', {
       id: 'management-my-stores',
-    }),
-    route('management/stores/update', 'management/stores/routes/update-store.tsx', {
-      id: 'management-stores-update',
     }),
     route('management/stores/create', 'management/stores/routes/edit-store.tsx', {
       id: 'management-stores-create',
