@@ -11,6 +11,35 @@ vi.mock('react-router', () => ({
   useNavigate: () => mockNavigate,
 }));
 
+// ─── react-intl mock ──────────────────────────────────────────────────────────
+
+const mockFormatMessage = vi.fn(({ id }: { id: string }) => esMessages[id] || id);
+vi.mock('react-intl', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('react-intl')>();
+  return {
+    ...actual,
+    useIntl: () => ({
+      formatMessage: mockFormatMessage,
+      messages: esMessages,
+      locale: 'es',
+      defaultLocale: 'es',
+    }),
+  };
+});
+
+vi.mock('~/shared/lib/i18n/es', () => ({
+  default: {
+    'OWNER.LIST_TITLE': 'Propietarios',
+    'GENERAL.ADD': 'Adicionar',
+    'OWNER.ERROR': 'Error de propietarios',
+    'GENERAL.RESELLER': 'Gestor',
+    'OWNER.EDIT_OWNER': 'Editar Propietario',
+    'GENERAL.DELETE': 'Eliminar',
+    'OWNER.DELETE_CONFIRM_TITLE': 'Eliminar propietario',
+    'GENERAL.CANCEL': 'Cancelar',
+  },
+}));
+
 // ─── loader mock ─────────────────────────────────────────────────────────────
 
 vi.mock('~/auth/routes/loaders', () => ({
@@ -179,7 +208,7 @@ describe('OwnerListPage — card fields', () => {
     });
   });
 
-  it('shows 0 stores and $0 when storeModules is empty (All filter)', async () => {
+  it('shows owners with 0 stores and $0 (no plan filter — list is unfiltered)', async () => {
     const { ownerHttpService } = await import('~/admin/owners/lib/services/owner-http-service');
     vi.mocked(ownerHttpService.listOwners).mockResolvedValue({
       succeeded: true,
@@ -196,16 +225,38 @@ describe('OwnerListPage — card fields', () => {
       </Wrapper>,
     );
 
-    // The empty-owned owner has no paid-plan store, so it is hidden by the default
-    // "paid plan only" filter; switch to "all" to reveal it.
-    fireEvent.change(screen.getByRole('combobox'), {
-      target: { value: 'all' },
+    // No plan filter anymore: the empty-owned owner renders without any interaction.
+    await waitFor(() => {
+      expect(screen.getByText('John Owner')).toBeInTheDocument();
+    });
+  });
+
+  it('renders no plan filter buttons (filter removed from owners view)', async () => {
+    const { ownerHttpService } = await import('~/admin/owners/lib/services/owner-http-service');
+    vi.mocked(ownerHttpService.listOwners).mockResolvedValue({
+      succeeded: true,
+      data: [makeOwner()],
+      message: '',
+      actionCode: 0,
+      errors: [],
     });
 
+    const { OwnerListPage } = await import('../owner-list');
+    render(
+      <Wrapper>
+        <OwnerListPage />
+      </Wrapper>,
+    );
+
     await waitFor(() => {
-      // 0 stores in i18n plural
-      expect(screen.getByText(/0\s*tiendas?/i)).toBeInTheDocument();
+      expect(screen.getByText('John Owner')).toBeInTheDocument();
     });
+
+    // No "Mostrar:" label, no filter buttons
+    expect(screen.queryByText('Mostrar:')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Todos/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /No Gratis/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Gratis/i })).not.toBeInTheDocument();
   });
 });
 

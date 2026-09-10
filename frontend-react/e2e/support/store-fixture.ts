@@ -19,7 +19,9 @@ import { readBearerToken } from './auth-storage';
  * `PlanLocked`). The owner-admin session this suite uses therefore cannot
  * degrade a paid store through the API anymore; the fixture seeds the
  * precondition at the persistence layer instead, exactly like the backend
- * E2E suite seeds its own fixtures. The `Store` row itself is untouched.
+ * E2E suite seeds its own fixtures. The `Store` row is touched only to reset
+ * `StorePlanId` to Gratis (1), so the degraded store's planType matches its
+ * free-only module set.
  */
 
 export interface ModuleCatalog {
@@ -118,8 +120,9 @@ export async function readModuleCatalog(page: Page): Promise<ModuleCatalog> {
  * 2. In one transaction: delete the store's `StoreRoleFeature` +
  *    `StoreModule` rows, then re-insert `StoreModule` rows for the free
  *    modules only — copied from the `Module` catalog (`PriceIncluded`,
- *    `Price`, etc.), carrying the store's `TenantId`. The `Store` row is
- *    untouched (`name`/`address`/`paymentStartDate` survive).
+ *    `Price`, etc.), carrying the store's `TenantId`. The `Store` row keeps
+ *    `name`/`address`/`paymentStartDate`; only `StorePlanId` is reset to
+ *    Gratis (1) so the store's planType matches its free-only modules.
  * 3. Re-`GET` through the API and throw a loud, diagnosable error if the
  *    store did not end up exactly where step 2 asked it to — same
  *    precondition-pinning pattern as `plantRoster()`
@@ -200,6 +203,7 @@ async function seedStoreModulesDirect(storeId: string, moduleIds: number[]): Pro
         WHERE m."Id" = ANY($2::int[]) AND s."Id" = $1`,
       [storeId, moduleIds],
     );
+    await client.query('UPDATE "Store" SET "StorePlanId" = 1 WHERE "Id" = $1', [storeId]);
     await client.query('COMMIT');
   } catch (cause) {
     await client.query('ROLLBACK').catch(() => undefined);

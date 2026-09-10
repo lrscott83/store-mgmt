@@ -393,7 +393,7 @@ describe('Sidebar — sidebar-menu-parity: WAREHOUSES module group (features 36 
     expect(almacenesIdx).toBeGreaterThan(inventoryLastIdx);
   });
 
-  it('StoreUser with only the Warehouses feature (36) sees "Almacenes" but NOT "Movimientos"', () => {
+  it('StoreUser with only the Warehouses feature (36) sees "Gestión de Almacenes" but NOT "Movimientos"', () => {
     const user = makeStoreUser([EFeatures.Warehouses], 's1');
     renderSidebar(user);
 
@@ -409,7 +409,7 @@ describe('Sidebar — sidebar-menu-parity: WAREHOUSES module group (features 36 
     expect(screen.queryByText('Gestión de Almacenes')).not.toBeInTheDocument();
   });
 
-  it('"Almacenes" no longer appears inside the INVENTORY group (moved to the new module)', () => {
+  it('"Gestión de Almacenes" no longer appears inside the INVENTORY group (moved to the new module)', () => {
     renderSidebar(makeSuperAdmin());
 
     const links = screen.getAllByRole('link');

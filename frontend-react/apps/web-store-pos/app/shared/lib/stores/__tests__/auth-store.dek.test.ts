@@ -104,7 +104,9 @@ function mockAuthHttp(loginResponse: BaseResponseModel<AuthModel>, meUser: UserM
 // with no wrap — which is also the shape the backend returns when it cannot
 // produce one (`AuthDto`'s three fields default to `""`).
 function successEnvelope(
-  dekWrap: Partial<Pick<AuthModel, 'wrappedDek' | 'wrapSalt' | 'wrapIv'>> = {},
+  dekWrap: Partial<
+    Pick<AuthModel, 'wrappedDek' | 'wrapSalt' | 'wrapIv' | 'storeDekWraps'>
+  > = {},
 ): BaseResponseModel<AuthModel> {
   return {
     data: {
@@ -281,6 +283,61 @@ describe('useAuthStore.login — DEK unwrap wiring (design §11, WU11, first beh
     expect(table.users['ana@example.com']).toBeDefined();
 
     vi.doUnmock('~/shared/lib/http/auth-http-service');
+  });
+
+  // seamless-store-switch (docs/plans/2026-09-10-seamless-store-switch-plan.md):
+  // the response's per-store wraps must reach provisionStoreDekWraps WHILE the
+  // password is still in hand — switch time has no password, so this call is
+  // the only chance to provision the per-store device wrap table. Same shape
+  // as 11.5: the real provisioner runs underneath (real crypto), the spy only
+  // observes the forwarding; the crypto behaviour itself is owned by
+  // dek-provisioning.test.ts's PS1-PS4.
+  it('11.7: login() forwards storeDekWraps to provisionStoreDekWraps with the login password', async () => {
+    await seedV2Roster(await wrapDek('secret', FIXED_DEK));
+    const wraps = [
+      { storeId: 's1', ...(await wrapDek('secret', FIXED_DEK)) },
+      { storeId: 's2', ...(await wrapDek('secret', new Uint8Array(32).fill(0x77))) },
+    ];
+    mockAuthHttp(successEnvelope({ storeDekWraps: wraps }), makeAuthUser());
+
+    const forwarded: Array<{
+      password: string;
+      wraps: Array<{ storeId: string; wrappedDek: string; wrapSalt: string; wrapIv: string }>;
+    }> = [];
+    vi.doMock('../../offline/dek-provisioning', async () => {
+      const actual = await vi.importActual<typeof import('../../offline/dek-provisioning')>(
+        '../../offline/dek-provisioning',
+      );
+      return {
+        ...actual,
+        provisionStoreDekWraps: async (args: {
+          password: string;
+          wraps: Array<{ storeId: string; wrappedDek: string; wrapSalt: string; wrapIv: string }>;
+        }) => {
+          forwarded.push(args);
+          return actual.provisionStoreDekWraps(args);
+        },
+      };
+    });
+
+    try {
+      await useAuthStore.getState().login('ana@example.com', 'secret');
+
+      // The binding under test: exactly one provisioning call, carrying THIS
+      // login's password and every wrap the response brought.
+      expect(forwarded).toHaveLength(1);
+      expect(forwarded[0].password).toBe('secret');
+      expect(forwarded[0].wraps.map((w) => w.storeId).sort()).toEqual(['s1', 's2']);
+
+      // The delegated real provisioner ran (this jsdom device has no device
+      // key, so it is the documented no-op) and left the ACTIVE material
+      // describing the selected store — provisioning never switches stores.
+      expect(readDeviceDekTable()).not.toBeNull();
+      expect(Array.from(getDek()!)).toEqual(Array.from(FIXED_DEK));
+    } finally {
+      vi.doUnmock('../../offline/dek-provisioning');
+      vi.doUnmock('~/shared/lib/http/auth-http-service');
+    }
   });
 });
 

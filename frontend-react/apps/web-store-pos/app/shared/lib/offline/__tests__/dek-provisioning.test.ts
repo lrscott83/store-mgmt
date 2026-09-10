@@ -23,14 +23,22 @@ vi.mock('../../storage/device-key-store', () => ({
   getDeviceKey: vi.fn(async () => null),
 }));
 
-import { resolveDekForLogin, rewrapDeviceDekForPassword } from '../dek-provisioning';
+import {
+  resolveDekForLogin,
+  rewrapDeviceDekForPassword,
+  provisionStoreDekWraps,
+} from '../dek-provisioning';
 import { getDek, getDekStoreId, clearDek } from '../../storage/data-key-store';
 import {
   readDeviceDekTable,
   writeDeviceDekTable,
   clearDeviceDekTable,
 } from '../../storage/device-dek-table';
-import { wrapDekForDevice, bootstrapDeviceDek } from '../../storage/dek-bootstrap';
+import {
+  wrapDekForDevice,
+  bootstrapDeviceDek,
+  unwrapDekFromDevice,
+} from '../../storage/dek-bootstrap';
 import { getOrCreateDeviceKey, getDeviceKey } from '../../storage/device-key-store';
 import { importRoster, clearRoster, getRawRoster } from '../roster-store';
 import { unwrapDek, wrapDekWithPassword, DekUnwrapError } from '../dek-unwrap';
@@ -1028,5 +1036,165 @@ describe('resolveDekForLogin (design §5, the login-path algorithm)', () => {
     // that the two disagreed.
     expect(table.conflictDetectedAt).toBeTypeOf('number');
     expect(table.conflictStoreId).toBe('STORE-NEW');
+  });
+
+  // seamless-store-switch — closes this file's documented KNOWN GAP: an
+  // ALREADY-established DEK (here via step 3a's own-entry branch) was never
+  // compared against the login response. With in-session store switching, the
+  // disagreement it can hide is exactly the cross-store split: a stale device
+  // wrap for store A plus a fresh login whose session (and response wrap) are
+  // for store B. The response wrap is server-derived for the CURRENT
+  // selectedStoreId, so it is the authority and must win.
+  it('SS1: adopts the login-response key over an ALREADY-established disagreeing DEK (KNOWN GAP closed)', async () => {
+    await seedDeviceTableWithDek(KEY_A, 'jdoe', 'pw', 'STORE-OLD', { withDeviceWrap: true });
+    const staleDeviceWrap = readDeviceDekTable()!.device;
+    expect(staleDeviceWrap).not.toBeNull(); // precondition, not an outcome
+
+    await resolveDekForLogin({
+      login: 'jdoe',
+      password: 'pw',
+      sessionStoreId: 'STORE-NEW',
+      ...(await wrapDekWithPassword('pw', KEY_B)),
+    });
+
+    // The response wrap is the authority for THIS session's store.
+    expect(getDek()).toEqual(KEY_B);
+    expect(getDekStoreId()).toBe('STORE-NEW');
+
+    const table = readDeviceDekTable()!;
+    expect(table.storeId).toBe('STORE-NEW');
+    expect(table.dekSource).toBe('login-response');
+    // The stale device wrap of the ABANDONED key must not survive (same rule
+    // as every other adoption site in the file).
+    expect(table.device).not.toBeNull();
+    expect(table.device!.wrappedDek).not.toBe(staleDeviceWrap!.wrappedDek);
+    expect(table.conflictDetectedAt).toBeUndefined();
+  });
+
+  it('SS2: an agreeing login-response wrap leaves an already-established DEK untouched', async () => {
+    await seedDeviceTableWithDek(KEY_A, 'jdoe', 'pw', STORE_ID, { withDeviceWrap: true });
+    const establishedDeviceWrap = readDeviceDekTable()!.device;
+
+    await resolveDekForLogin({
+      login: 'jdoe',
+      password: 'pw',
+      sessionStoreId: STORE_ID,
+      ...(await wrapDekWithPassword('pw', KEY_A)),
+    });
+
+    expect(getDek()).toEqual(KEY_A);
+    const table = readDeviceDekTable()!;
+    expect(table.device!.wrappedDek).toBe(establishedDeviceWrap!.wrappedDek);
+    expect(table.dekSource).toBe('local'); // unchanged, not re-labelled
+  });
+
+  it('SS3: a login-response wrap that FAILS to open never unseats an established DEK', async () => {
+    await seedDeviceTableWithDek(KEY_A, 'jdoe', 'pw', STORE_ID);
+
+    await expect(
+      resolveDekForLogin({
+        login: 'jdoe',
+        password: 'pw',
+        sessionStoreId: STORE_ID,
+        ...CORRUPT_LOGIN_WRAP,
+      }),
+    ).resolves.toBeUndefined();
+
+    expect(getDek()).toEqual(KEY_A);
+    expect(readDeviceDekTable()!.storeId).toBe(STORE_ID);
+  });
+});
+
+// seamless-store-switch — the per-store wrap table (device-dek-table v2) and
+// the provisioning step that fills it at login, when the password is briefly
+// in hand. These tests use REAL WebCrypto end to end (same discipline as the
+// rest of this file): each provisioned entry must unwrap back to the exact
+// 32-byte DEK the server wrapped.
+describe('provisionStoreDekWraps (seamless-store-switch, per-store device wraps)', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    clearDek();
+    clearRoster();
+    clearDeviceDekTable();
+  });
+
+  it('PS1: unwraps each login-response wrap and stores a device wrap per store', async () => {
+    // The module-level mock mints a FRESH key on every getOrCreateDeviceKey
+    // call, but provisioning and the round-trip assertions below must share
+    // ONE key — so a stable one is pinned for this test (the same override
+    // discipline the file header documents for its D3 recovery test, restored
+    // in a finally).
+    const stableKey = await crypto.subtle.generateKey(
+      { name: 'AES-GCM', length: 256 },
+      true,
+      ['encrypt', 'decrypt'],
+    );
+    vi.mocked(getOrCreateDeviceKey).mockImplementation(async () => stableKey);
+    try {
+      await seedDeviceTableWithDek(KEY_A, 'jdoe', 'pw', 's1');
+      const deviceKey = (await getOrCreateDeviceKey())!;
+      const wrapB = await wrapDekWithPassword('pw', KEY_B);
+
+      await provisionStoreDekWraps({
+        password: 'pw',
+        wraps: [
+          { storeId: 's1', ...(await wrapDekWithPassword('pw', KEY_A)) },
+          { storeId: 's2', ...wrapB },
+        ],
+      });
+
+      const table = readDeviceDekTable()!;
+      expect(table.formatVersion).toBe(2);
+      expect(Object.keys(table.stores ?? {}).sort()).toEqual(['s1', 's2']);
+      // Round-trip through the REAL crypto: each entry opens to its store's key.
+      expect(Array.from(await unwrapDekFromDevice(table.stores!['s1'].device, deviceKey))).toEqual(
+        Array.from(KEY_A),
+      );
+      expect(Array.from(await unwrapDekFromDevice(table.stores!['s2'].device, deviceKey))).toEqual(
+        Array.from(KEY_B),
+      );
+      // The ACTIVE wrap is untouched — provisioning never switches stores.
+      expect(table.storeId).toBe('s1');
+    } finally {
+      vi.mocked(getOrCreateDeviceKey).mockImplementation(async () =>
+        crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']),
+      );
+    }
+  });
+
+  it('PS2: one failing wrap is skipped and the rest still provision', async () => {
+    // A wrap that exists but opens to nothing (corrupt ciphertext). Defined
+    // here because the first describe's CORRUPT_LOGIN_WRAP is scoped to it.
+    const corruptWrap = { wrappedDek: 'AAAA', wrapSalt: 'BBBB', wrapIv: 'CCCC' };
+    await seedDeviceTableWithDek(KEY_A, 'jdoe', 'pw', 's1');
+
+    await provisionStoreDekWraps({
+      password: 'pw',
+      wraps: [
+        { storeId: 's1', ...corruptWrap },
+        { storeId: 's3', ...(await wrapDekWithPassword('pw', KEY_B)) },
+      ],
+    });
+
+    const table = readDeviceDekTable()!;
+    expect(table.stores?.s1).toBeUndefined(); // corrupt entry skipped
+    expect(table.stores?.s3).toBeDefined(); // healthy entry provisioned
+    expect(table.storeId).toBe('s1');
+  });
+
+  it('PS3: no table (resolveDekForLogin could not build one) -> no-op, never throws', async () => {
+    await expect(
+      provisionStoreDekWraps({
+        password: 'pw',
+        wraps: [{ storeId: 's1', ...(await wrapDekWithPassword('pw', KEY_A)) }],
+      }),
+    ).resolves.toBeUndefined();
+    expect(readDeviceDekTable()).toBeNull();
+  });
+
+  it('PS4: empty or absent wraps array -> no-op', async () => {
+    await seedDeviceTableWithDek(KEY_A, 'jdoe', 'pw', 's1');
+    await provisionStoreDekWraps({ password: 'pw', wraps: [] });
+    expect(readDeviceDekTable()!.stores).toBeUndefined();
   });
 });

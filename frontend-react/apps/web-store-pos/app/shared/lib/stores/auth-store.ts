@@ -354,7 +354,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       // DekUnwrapError, blocking login for a user who doesn't need data encryption.
       const EMPTY_GUID = '00000000-0000-0000-0000-000000000000';
       if (user.selectedStoreId && user.selectedStoreId !== EMPTY_GUID) {
-        const { resolveDekForLogin } = await import('../offline/dek-provisioning');
+        const { resolveDekForLogin, provisionStoreDekWraps } = await import('../offline/dek-provisioning');
         await resolveDekForLogin({
           login: user.login,
           password,
@@ -363,6 +363,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           wrapSalt: authData.wrapSalt,
           wrapIv: authData.wrapIv,
         });
+        // seamless-store-switch (docs/plans/2026-09-10-seamless-store-switch-plan.md):
+        // the password exists ONLY here — provision the per-store device wraps from
+        // the response's storeDekWraps now, or in-session switching can never
+        // obtain another store's key without a logout. NEVER fatal (the provisioner
+        // skips per-entry failures); stores this device fails to provision simply
+        // keep the legacy logout fallback at switch time.
+        if (authData.storeDekWraps && authData.storeDekWraps.length > 0) {
+          await provisionStoreDekWraps({ password, wraps: authData.storeDekWraps });
+        }
       }
 
       // Task 4: a login that RESOLVED a key is the one event meaning "this

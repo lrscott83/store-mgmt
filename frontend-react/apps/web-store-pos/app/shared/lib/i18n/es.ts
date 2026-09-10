@@ -837,6 +837,12 @@ const messages: Record<string, string> = {
   // L6 parity: Angular is register-neutral, no voseo ("Intentá" -> "Intente")
   'STORES.ERROR': 'Ocurrió un error. Intente de nuevo.',
   'STORES.FILTER_LABEL': 'Mostrar:',
+  'STORES.FILTER_ALL': 'Todos',
+  'STORES.FILTER_NOT_FREE': 'No Gratis',
+  'STORES.FILTER_VIP': 'VIP',
+  'STORES.FILTER_SUPERIOR': 'Superior',
+  'STORES.FILTER_PAID': 'Pago',
+  'STORES.FILTER_FREE': 'Gratis',
   'STORES.PAID_PLAN': 'Plan de Pago',
   'STORES.FREE_PLAN': 'Plan Gratis',
   'STORES.EMPTY_STATE': 'No hay tiendas registradas.',
@@ -848,10 +854,18 @@ const messages: Record<string, string> = {
   'STORES.PLAN.FREE_TAB': 'Gratis',
   'STORES.PLAN.PAID_TAB': 'Pago',
   'STORES.PLAN.SUPERIOR_TAB': 'Superior',
+  'STORES.PLAN.VIP_TAB': 'VIP',
+  'STORES.PLAN.DISPLAY': 'Plan: {plan}',
   'STORES.PLAN.ACTIVE_BADGE': 'Activo',
   'STORES.PLAN.INCLUDES': 'Incluye:',
   'STORES.PLAN.NEXT_BILLING_DATE': 'Próximo cobro',
   'STORES.PLAN.ACTIVATE_PLAN': 'Activar ese plan',
+
+  // Super-admin store cards (2026-09-10): owner contact + description labels.
+  // The plan line reuses the STORES.PLAN.*_TAB names; the phone renders as a tel: link.
+  'STORES.OWNER_LABEL': 'Owner',
+  'STORES.STORE_PHONE_LABEL': 'Teléfono',
+  'STORES.STORE_DESCRIPTION_LABEL': 'Descripción',
 
   // Exchange rates — daily USD→MN register (daily-exchange-rate)
   'EXCHANGE_RATES.TITLE': 'Registro del cambio de USD a MN',
@@ -1028,6 +1042,12 @@ const messages: Record<string, string> = {
   'OWNER.STORE_PRICE_LABEL': '{count, plural, one {# tienda} other {# tiendas}}',
   'OWNER.DAYS_LEFT': '{count, plural, one {# día} other {# días}}',
   'OWNER.FILTER_LABEL': 'Mostrar:',
+  'OWNER.FILTER_ALL': 'Todos',
+  'OWNER.FILTER_NOT_FREE': 'No Gratis',
+  'OWNER.FILTER_VIP': 'VIP',
+  'OWNER.FILTER_SUPERIOR': 'Superior',
+  'OWNER.FILTER_PAID': 'Pago',
+  'OWNER.FILTER_FREE': 'Gratis',
   'OWNER.PAID_PLAN': 'Plan de Pago',
   'OWNER.FREE_PLAN': 'Plan Gratis',
   'OWNER.ERROR': 'Ocurrió un error. Inténtalo de nuevo.',

@@ -4,6 +4,23 @@ export interface Credentials {
   newPassword: string;
 }
 
+/**
+ * One store's DEK, wrapped under this user's password pre-hash — the per-store
+ * sibling of `AuthModel`'s top-level `wrappedDek`/`wrapSalt`/`wrapIv`
+ * (backend `AuthDto.StoreDekWraps`, same `StoreKeyWrapService.WrapDek` format,
+ * byte-compatible with the roster's per-user wrap). The login response carries
+ * one entry per store the user can switch to, so the device can hold a
+ * per-store wrap table (device-dek-table v2) and later switch stores in-session
+ * — no logout, no password. See
+ * docs/plans/2026-09-10-seamless-store-switch-plan.md.
+ */
+export interface StoreDekWrap {
+  storeId: string;
+  wrappedDek: string;
+  wrapSalt: string;
+  wrapIv: string;
+}
+
 export interface AuthModel {
   login: string;
   authToken: string;
@@ -22,6 +39,14 @@ export interface AuthModel {
   wrappedDek?: string;
   wrapSalt?: string;
   wrapIv?: string;
+  /**
+   * Wraps for EVERY store the user can switch to (login path only; absent on
+   * Register/Refresh and when the server could not produce them). Optional for
+   * the same reason the top-level fields are: the contract's "not available"
+   * signal, which degrades in-session store switching to the legacy logout
+   * flow instead of failing the login.
+   */
+  storeDekWraps?: StoreDekWrap[];
 }
 
 /**

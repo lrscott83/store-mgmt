@@ -23,9 +23,10 @@ export function AdminStoreListPage() {
   const { formatMessage } = useIntl();
   const [stores, setStores] = useState<Store[]>([]);
   const [error, setError] = useState<string | undefined>(undefined);
-  // A store is on a paid plan when it has activated one (`paymentStartDate` set);
-  // otherwise (null) it is on the free plan.
-  const [filter, setFilter] = useState<'paid-plan' | 'free-plan'>('paid-plan');
+  // Filter by plan type: 'all' shows all stores, 'not-free' excludes Gratis plan,
+  // and specific plan types (VIP, Superior, Pago, Gratis) filter by that plan.
+  // Default is 'not-free' to show all paid plans except Gratis.
+  const [filter, setFilter] = useState<string>('not-free');
 
   const loadStores = useCallback(async () => {
     try {
@@ -102,6 +103,29 @@ export function AdminStoreListPage() {
     }
   }
 
+  function getFilteredStores(): Store[] {
+    if (filter === 'all') {
+      return stores;
+    }
+    if (filter === 'not-free') {
+      return stores.filter((s) => s.planType !== 'Gratis');
+    }
+    // Filter by specific plan type (VIP, Superior, Pago, Gratis)
+    return stores.filter((s) => s.planType === filter);
+  }
+
+  function getStoreCountByPlan(): Record<string, number> {
+    const counts: Record<string, number> = {
+      all: stores.length,
+      'not-free': stores.filter((s) => s.planType !== 'Gratis').length,
+      VIP: stores.filter((s) => s.planType === 'VIP').length,
+      Superior: stores.filter((s) => s.planType === 'Superior').length,
+      Pago: stores.filter((s) => s.planType === 'Pago').length,
+      Gratis: stores.filter((s) => s.planType === 'Gratis').length,
+    };
+    return counts;
+  }
+
   return (
     <div className="space-y-4 p-4">
       <div className="flex items-center justify-between">
@@ -118,32 +142,68 @@ export function AdminStoreListPage() {
         </p>
       )}
 
-      <div className="flex items-center gap-2">
-        <label htmlFor="store-visibility-filter" className="text-sm font-medium text-text">
-          {formatMessage({ id: 'STORES.FILTER_LABEL' })}
-        </label>
-        <select
-          id="store-visibility-filter"
-          value={filter}
-          onChange={(e) => setFilter(e.target.value as 'paid-plan' | 'free-plan')}
-          className="rounded border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-        >
-          <option value="paid-plan">{formatMessage({ id: 'STORES.PAID_PLAN' })}</option>
-          <option value="free-plan">{formatMessage({ id: 'STORES.FREE_PLAN' })}</option>
-        </select>
-      </div>
+      <PlanFilterButtons
+        filter={filter}
+        onFilterChange={setFilter}
+        storeCountByPlan={getStoreCountByPlan()}
+        labelId="store-visibility-filter"
+      />
 
       <StoreCardList
-        stores={
-          filter === 'paid-plan'
-            ? stores.filter((s) => s.paymentStartDate !== null)
-            : stores.filter((s) => s.paymentStartDate === null)
-        }
+        stores={getFilteredStores()}
         onEdit={(id) => navigate(`/management/stores/edit/${id}`)}
         onApprove={handleApprove}
         onDisapprove={handleDisapprove}
         onToggle={handleToggle}
       />
+    </div>
+  );
+}
+
+interface PlanFilterButtonsProps {
+  filter: string;
+  onFilterChange: (value: string) => void;
+  storeCountByPlan: Record<string, number>;
+  labelId: string;
+}
+
+const PLAN_FILTER_ORDER = ['VIP', 'Superior', 'Pago', 'Gratis'] as const;
+
+function PlanFilterButtons({ filter, onFilterChange, storeCountByPlan, labelId }: PlanFilterButtonsProps) {
+  const { formatMessage } = useIntl();
+
+  const plans: { value: string; labelKey: string; count: number }[] = [
+    { value: 'all', labelKey: 'STORES.FILTER_ALL', count: storeCountByPlan.all },
+    { value: 'not-free', labelKey: 'STORES.FILTER_NOT_FREE', count: storeCountByPlan['not-free'] },
+    ...PLAN_FILTER_ORDER.map((planType) => ({
+      value: planType.toLowerCase(),
+      labelKey: `STORES.FILTER_${planType}`,
+      count: storeCountByPlan[planType],
+    })),
+  ];
+
+  return (
+    <div className="flex items-center gap-2 flex-wrap">
+      <label htmlFor={labelId} className="text-sm font-medium text-text">
+        {formatMessage({ id: 'STORES.FILTER_LABEL' })}
+      </label>
+      {plans.map(({ value, labelKey, count }) => (
+        <Button
+          key={value}
+          variant={filter === value ? 'primary' : 'secondary'}
+          onClick={() => onFilterChange(value)}
+          className="transition-colors text-sm"
+        >
+          <span className="flex items-center gap-1">
+            {formatMessage({ id: labelKey })}
+            {count > 0 && (
+              <span className="rounded bg-gray-200 px-1.5 py-0.5 text-xs text-text-muted">
+                {count}
+              </span>
+            )}
+          </span>
+        </Button>
+      ))}
     </div>
   );
 }

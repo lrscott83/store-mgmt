@@ -445,6 +445,59 @@ export async function resolveDekForLogin(args: {
     }
   }
 
+  // seamless-store-switch — closing this function's own documented KNOWN GAP:
+  // an ALREADY-established `dek` (step 1's device-wrap bootstrap or step 3a's own
+  // entry) was never reconciled against the login response, because dek !== null
+  // skips the whole `if (dek === null)` branch where source 3 lives. Without
+  // in-session store switching that gap was mostly theoretical; with it, a device
+  // that switches stores and then logs in again would keep binding logins to the
+  // FIRST store's key while the session points at the new one — the cross-store
+  // split this file exists to prevent.
+  //
+  // The rule is the same one `dekSourcedFromLoginResponseThisCall`'s comment
+  // establishes for the F5 site: `GetDek` is `HKDF(masterSecret, storeId)` —
+  // DETERMINISTIC — so a login-response wrap that disagrees with the established
+  // key cannot be a stale copy of the same key; it can only be scoped to a
+  // DIFFERENT store, namely the one THIS session is for (the server derived it
+  // for the CURRENT selectedStoreId at THIS login). The server is the authority,
+  // so the established key is replaced and the table re-scoped — D3's adoption
+  // discipline, applied to the already-established case. No conflict marker:
+  // same reasoning as the roster skip in step 4 — a user who ever switched
+  // stores would otherwise trip `conflictDetectedAt` on every login while an old
+  // roster sits in storage.
+  //
+  // Cost: one PBKDF2 + one AES-GCM per login, ONLY when a login-response wrap is
+  // present (online logins with a provisioned store). Accepted — it is the same
+  // order of cost step 4's roster reconciliation already pays.
+  let dekReadoptedFromLoginResponseThisCall = false;
+  if (!dekSourcedFromLoginResponseThisCall && loginResponseEntry) {
+    try {
+      const fromResponse = await unwrapDek(password, loginResponseEntry);
+      if (!bytesEqual(fromResponse, dek!)) {
+        dek = fromResponse;
+        setDek(dek, sessionStoreId);
+        workingTable = workingTable ?? {
+          formatVersion: 1,
+          dekSource: 'login-response',
+          storeId: sessionStoreId,
+          device: null,
+          users: {},
+        };
+        workingTable.storeId = sessionStoreId;
+        workingTable.dekSource = 'login-response';
+        // Mandatory, same reason as at every other adoption site in this file:
+        // a device wrap of the ABANDONED key must not survive, or the next page
+        // load recovers those bytes under the store id just written — the wrong
+        // key under the right label. Step 5 re-wraps it for the adopted key.
+        workingTable.device = null;
+        dekReadoptedFromLoginResponseThisCall = true;
+      }
+    } catch {
+      // A wrap that exists but fails to open must not hard-fail a login that
+      // already holds a usable key — same discipline as step 4's F9 catch.
+    }
+  }
+
   // Step 5 — persist, best-effort, never fatal.
   //
   // The `?? 'local'` fallback below is now unreachable, and deliberately left
@@ -499,7 +552,11 @@ export async function resolveDekForLogin(args: {
   // apply-progress for the full writeup). The extra PBKDF2 cost per login
   // in those branches is already accepted by design §7's own note on
   // `auth-store.dek.test.ts`'s wall time.
-  if (!(ownWrapValidatedThisCall && rosterEntry === undefined)) {
+  // narrowed again by seamless-store-switch: a login-response READOPTION
+  // (dekReadoptedFromLoginResponseThisCall above) replaces the key the own entry
+  // was validated against, so the provably-redundant skip must not fire after
+  // one — the password wrap has to be rewritten for the adopted key.
+  if (!(ownWrapValidatedThisCall && rosterEntry === undefined && !dekReadoptedFromLoginResponseThisCall)) {
     workingTable.users[login] = await wrapDekWithPassword(password, dek);
   }
   writeDeviceDekTable(workingTable);
@@ -530,4 +587,53 @@ export async function rewrapDeviceDekForPassword(
   if (!table) return;
   table.users[login] = await wrapDekWithPassword(newPassword, dek);
   writeDeviceDekTable(table);
+}
+
+/**
+ * seamless-store-switch — provisions THIS device's per-store wrap table from the
+ * login response's `storeDekWraps` (backend `AuthDto.StoreDekWraps`). For each
+ * entry: unwrap with the password (the ONLY moment it exists in memory) and
+ * re-wrap under the device key, into `table.stores[storeId]` — exactly how the
+ * active `table.device` entry is produced, just per store. Later,
+ * `retargetDeviceWrapStore(storeId)` copies one of these into `device` at
+ * switch time and the post-reload `bootstrapDeviceDek` recovers that store's
+ * key with NO password — the mechanism that makes in-session switching possible.
+ *
+ * Called from `auth-store.login` AFTER `resolveDekForLogin` (which guarantees a
+ * table exists and holds the CURRENT store's material) via fresh
+ * read-modify-write. NEVER fatal: no device key, no table, or a per-entry
+ * unwrap failure simply skips that entry — switching then falls back to the
+ * legacy logout flow for stores this device could not provision. Per-entry
+ * failures are expected whenever the wrap list is stale (password changed
+ * server-side between the wrap being built and this unwrap — impossible in
+ * practice, since both use THIS login's password — or a malformed entry).
+ */
+export async function provisionStoreDekWraps(args: {
+  password: string;
+  wraps: Array<{ storeId: string; wrappedDek: string; wrapSalt: string; wrapIv: string }>;
+}): Promise<void> {
+  const { password, wraps } = args;
+  if (!wraps || wraps.length === 0) return;
+  const table = readDeviceDekTable();
+  if (!table) return; // resolveDekForLogin just ran and always leaves a table
+  const deviceKey = await getOrCreateDeviceKey();
+  if (!deviceKey) return; // IndexedDB unavailable — same degradation as step 5
+
+  let mutated = false;
+  for (const wrap of wraps) {
+    if (!wrap?.storeId || !wrap.wrappedDek || !wrap.wrapSalt || !wrap.wrapIv) continue;
+    try {
+      const dek = await unwrapDek(password, wrap);
+      table.stores = table.stores ?? {};
+      table.stores[wrap.storeId] = { device: await wrapDekForDevice(dek, deviceKey) };
+      mutated = true;
+    } catch {
+      // Per-entry skip, never fatal — the active key material is untouched.
+    }
+  }
+
+  if (mutated) {
+    table.formatVersion = 2;
+    writeDeviceDekTable(table);
+  }
 }

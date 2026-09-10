@@ -3,26 +3,17 @@ import type { Module, OwnerStoreWithPlan } from '@store-mgmt/domain';
 import { Card } from '~/shared/components/ui/card';
 import { ActionMenu, ActionMenuItem } from '~/shared/components/ui/action-menu';
 import { formatDateOnly } from '~/shared/lib/date-utils';
-
-/**
- * Format a plan amount as a bare number — decimals shown only when present
- * (10 → "10", 10.5 → "10.5"), no currency. Same shape as the plan panels'
- * formatPlanAmount: used for the struck-through original price.
- */
-function formatPlanAmount(amount: number): string {
-  return new Intl.NumberFormat('en-US', {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  }).format(amount);
-}
-
-/** Format as "5 USD" or "5.5 USD" (no $ symbol) — same shape as the plan panels. */
-function formatPlanPrice(amount: number): string {
-  return `${formatPlanAmount(amount)} USD`;
-}
+import { formatPlanAmount, formatPlanPrice } from '~/shared/lib/price-utils';
 
 const getIsOnPaidPlan = (modules: Module[]) =>
   modules.some((m) => !m.priceIncluded && m.selected);
+
+const PLAN_NAME_KEYS: Record<string, string> = {
+  Gratis: 'STORES.PLAN.FREE_TAB',
+  Pago: 'STORES.PLAN.PAID_TAB',
+  Superior: 'STORES.PLAN.SUPERIOR_TAB',
+  VIP: 'STORES.PLAN.VIP_TAB',
+};
 
 interface OwnerStoreCardProps {
   store: OwnerStoreWithPlan;
@@ -89,9 +80,14 @@ export function OwnerStoreCard({ store, modules, onEdit, onEditPlan }: OwnerStor
     >
       <div className="space-y-1" data-testid={`owner-store-body-${store.id}`}>
         <p className="text-sm font-medium text-text">
-          {intl.formatMessage({
-            id: isOnPaidPlan ? 'STORES.PAID_PLAN' : 'STORES.FREE_PLAN',
-          })}
+          {intl.formatMessage(
+            { id: 'STORES.PLAN.DISPLAY' },
+            {
+              plan: PLAN_NAME_KEYS[store.planType]
+                ? intl.formatMessage({ id: PLAN_NAME_KEYS[store.planType] })
+                : store.planType,
+            },
+          )}
         </p>
         {isOnPaidPlan && store.nextDueDate && (
           <p className="text-sm text-text-muted">

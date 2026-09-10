@@ -15,6 +15,9 @@ function makeStore(overrides: Partial<Store> = {}): Store {
     description: 'A store',
     approved: true,
     paymentStartDate: '2024-01-01',
+    nextPaymentDate: null,
+    ownerPhone: null,
+    planType: 'Pago',
     modules: [],
     isActive: true,
     ...overrides,
@@ -30,11 +33,11 @@ function Wrapper({ children }: { children: React.ReactNode }) {
 }
 
 describe('StoreCardList — renders a Card grid (Req: Card-Grid List Uses Shared Chrome)', () => {
-  it('renders a card per store with name, address and description', async () => {
+  it('renders a card per store with name, plan line, owner, phone and description', async () => {
     const { StoreCardList } = await import('../store-card-list');
     const stores = [
-      makeStore({ id: 's1', name: 'Store Alpha', address: 'Addr A', description: 'Desc A' }),
-      makeStore({ id: 's2', name: 'Store Beta', address: 'Addr B', description: 'Desc B' }),
+      makeStore({ id: 's1', name: 'Store Alpha', description: 'Desc A' }),
+      makeStore({ id: 's2', name: 'Store Beta', description: 'Desc B' }),
     ];
     render(
       <Wrapper>
@@ -48,7 +51,6 @@ describe('StoreCardList — renders a Card grid (Req: Card-Grid List Uses Shared
       </Wrapper>,
     );
     expect(screen.getByText('Store Alpha')).toBeInTheDocument();
-    expect(screen.getByText('Addr A')).toBeInTheDocument();
     expect(screen.getByText('Desc A')).toBeInTheDocument();
     expect(screen.getByText('Store Beta')).toBeInTheDocument();
   });
@@ -67,6 +69,119 @@ describe('StoreCardList — renders a Card grid (Req: Card-Grid List Uses Shared
       </Wrapper>,
     );
     expect(container.querySelector('[data-slot="card"]')).toBeInTheDocument();
+  });
+});
+
+describe('StoreCardList — card body (plan line, owner, phone, description)', () => {
+  it('paid plan with discount renders plan name, struck original, current price and next payment date', async () => {
+    const { StoreCardList } = await import('../store-card-list');
+    render(
+      <Wrapper>
+        <StoreCardList
+          stores={[
+            makeStore({
+              id: 's1',
+              planType: 'Superior',
+              nextPaymentDate: '2026-10-31',
+              modules: [
+                { id: 2, name: 'Mgmt', price: 20, currentPrice: 10, priceIncluded: false, discountText: '- 50%', selected: true },
+              ],
+            }),
+          ]}
+          onEdit={vi.fn()}
+          onApprove={vi.fn()}
+          onDisapprove={vi.fn()}
+          onToggle={vi.fn()}
+        />
+      </Wrapper>,
+    );
+    expect(screen.getByText(/Superior:/)).toBeInTheDocument();
+    const original = screen.getByTestId('store-price-original-s1');
+    expect(original).toHaveTextContent('20');
+    expect(original.className).toContain('line-through');
+    expect(screen.getByTestId('store-price-s1')).toHaveTextContent('10 USD');
+    expect(screen.getByTestId('store-next-payment-s1')).toHaveTextContent('(2026-10-31)');
+  });
+
+  it('paid plan without discount shows no struck-through price', async () => {
+    const { StoreCardList } = await import('../store-card-list');
+    render(
+      <Wrapper>
+        <StoreCardList
+          stores={[
+            makeStore({
+              id: 's2',
+              planType: 'Pago',
+              nextPaymentDate: '2026-11-15',
+              modules: [
+                { id: 2, name: 'Mgmt', price: 10, currentPrice: 10, priceIncluded: false, discountText: '', selected: true },
+              ],
+            }),
+          ]}
+          onEdit={vi.fn()}
+          onApprove={vi.fn()}
+          onDisapprove={vi.fn()}
+          onToggle={vi.fn()}
+        />
+      </Wrapper>,
+    );
+    expect(screen.queryByTestId('store-price-original-s2')).not.toBeInTheDocument();
+    expect(screen.getByTestId('store-price-s2')).toHaveTextContent('10 USD');
+    expect(screen.getByTestId('store-next-payment-s2')).toHaveTextContent('(2026-11-15)');
+  });
+
+  it('free plan shows the plan name only — no price, no date', async () => {
+    const { StoreCardList } = await import('../store-card-list');
+    render(
+      <Wrapper>
+        <StoreCardList
+          stores={[makeStore({ id: 's3', planType: 'Gratis', nextPaymentDate: null, modules: [] })]}
+          onEdit={vi.fn()}
+          onApprove={vi.fn()}
+          onDisapprove={vi.fn()}
+          onToggle={vi.fn()}
+        />
+      </Wrapper>,
+    );
+    expect(screen.getByText('Gratis')).toBeInTheDocument();
+    expect(screen.queryByTestId('store-price-original-s3')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('store-price-s3')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('store-next-payment-s3')).not.toBeInTheDocument();
+  });
+
+  it('renders the owner name and a tel: link for the owner phone', async () => {
+    const { StoreCardList } = await import('../store-card-list');
+    render(
+      <Wrapper>
+        <StoreCardList
+          stores={[makeStore({ id: 's4', ownerName: 'Owner One', ownerPhone: '+57 300 1234567' })]}
+          onEdit={vi.fn()}
+          onApprove={vi.fn()}
+          onDisapprove={vi.fn()}
+          onToggle={vi.fn()}
+        />
+      </Wrapper>,
+    );
+    expect(screen.getByText('Owner One')).toBeInTheDocument();
+    const phone = screen.getByTestId('store-phone-s4');
+    expect(phone).toHaveAttribute('href', 'tel:+57 300 1234567');
+    expect(phone).toHaveTextContent('+57 300 1234567');
+  });
+
+  it('omits the phone line when the owner has no phone', async () => {
+    const { StoreCardList } = await import('../store-card-list');
+    render(
+      <Wrapper>
+        <StoreCardList
+          stores={[makeStore({ id: 's5', ownerPhone: null })]}
+          onEdit={vi.fn()}
+          onApprove={vi.fn()}
+          onDisapprove={vi.fn()}
+          onToggle={vi.fn()}
+        />
+      </Wrapper>,
+    );
+    expect(screen.queryByTestId('store-phone-s5')).not.toBeInTheDocument();
   });
 });
 
