@@ -134,7 +134,6 @@ namespace SMCA.WebApi.Controllers.v1
         }
 
         [HttpPost()]
-        [HasPermission(StoreRoleFeatures.SuperAdmin)]
         [ProducesResponseType(typeof(ResponseResult<StoreDto>), StatusCodes.Status201Created)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
