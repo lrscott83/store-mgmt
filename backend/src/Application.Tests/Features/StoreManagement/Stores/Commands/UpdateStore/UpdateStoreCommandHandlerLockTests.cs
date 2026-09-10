@@ -1,6 +1,5 @@
 using System.Linq.Expressions;
 using Application.Abstractions.HttpContext;
-using Application.Abstractions.Time;
 using Application.Exceptions;
 using Application.Features.StoreManagement.Stores.Commands.UpdateStore;
 using Application.UnitOfWorks;
@@ -37,7 +36,6 @@ public class UpdateStoreCommandHandlerLockTests
     private readonly Mock<IFeatureRepository> _mockFeatureRepository;
     private readonly Mock<IStoreRoleFeatureGenerator> _mockStoreRoleFeaturesGenerator;
     private readonly Mock<IStoreRoleFeatureRepository> _mockStoreRoleFeatureRepository;
-    private readonly Mock<IDateTimeProvider> _mockDateTimeProvider;
     private readonly UpdateStoreCommandHandler _handler;
 
     private readonly Guid _storeId = Guid.NewGuid();
@@ -55,7 +53,6 @@ public class UpdateStoreCommandHandlerLockTests
         _mockFeatureRepository = new Mock<IFeatureRepository>();
         _mockStoreRoleFeaturesGenerator = new Mock<IStoreRoleFeatureGenerator>();
         _mockStoreRoleFeatureRepository = new Mock<IStoreRoleFeatureRepository>();
-        _mockDateTimeProvider = new Mock<IDateTimeProvider>();
 
         _mockLocalizer
             .Setup(x => x["PlanLocked"])
@@ -71,8 +68,7 @@ public class UpdateStoreCommandHandlerLockTests
             _mockStoreByIdService.Object,
             _mockFeatureRepository.Object,
             _mockStoreRoleFeaturesGenerator.Object,
-            _mockStoreRoleFeatureRepository.Object,
-            _mockDateTimeProvider.Object);
+            _mockStoreRoleFeatureRepository.Object);
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────
@@ -151,10 +147,6 @@ public class UpdateStoreCommandHandlerLockTests
         _mockUnitOfWork
             .Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(1);
-
-        _mockDateTimeProvider
-            .Setup(x => x.UtcNow)
-            .Returns(new DateTimeOffset(2026, 7, 15, 0, 0, 0, TimeSpan.Zero));
     }
 
     private Store BuildPaidStore()
@@ -244,17 +236,30 @@ public class UpdateStoreCommandHandlerLockTests
     [Fact]
     public async Task Handle_OwnerAdminActivatesFreeStore_DoesNotThrow()
     {
-        // Arrange
-        // Adding the paid Statistics module (id=6) to a free store is activation, not a plan change.
+        // DG-7 (owner-plan-change): the plan lock now covers EVERY store, free or paid —
+        // a non-SuperAdmin may never change the module set, only keep it identical.
         var command = new UpdateStoreCommand(
             _storeId, "Renamed", null, null, Approved: false,
             ModuleIds: new List<int> { 7, 6 }, IsActive: true);
         ArrangeStore(command.ModuleIds, superAdmin: false);
 
-        // Act
+        Func<Task> act = async () => await _handler.Handle(command, CancellationToken.None);
+
+        var ex = await act.Should().ThrowAsync<ValidationException>();
+        ex.Which.Errors.Should().Contain(e => e.Code == "PlanLocked");
+    }
+
+    [Fact]
+    public async Task Handle_OwnerAdminKeepsSameModuleSetOnFreeStore_DoesNotThrow()
+    {
+        // Arrange: free store (only free module 7); OwnerAdmin saves data keeping the same set.
+        var command = new UpdateStoreCommand(
+            _storeId, "Renamed", null, null, Approved: false,
+            ModuleIds: new List<int> { 7 }, IsActive: true);
+        ArrangeStore(command.ModuleIds, superAdmin: false);
+
         var result = await _handler.Handle(command, CancellationToken.None);
 
-        // Assert
         result.Succeeded.Should().BeTrue();
     }
 
@@ -294,5 +299,47 @@ public class UpdateStoreCommandHandlerLockTests
         result.Succeeded.Should().BeTrue();
         _mockStoreModuleRepository.Verify(
             x => x.GetStoreModulesByIdAsync(_storeId), Times.Never);
+    }
+
+    // ── owner-plan-change: activation-on-first-paid removed ──────────────
+
+    [Fact]
+    public async Task Handle_SuperAdminAddsPaidModule_NeverAutoSetsAnchor()
+    {
+        // The billing anchor is sacred: UpdateStore no longer fabricates a clock when a
+        // paid module is requested (owner-plan-change). The store's anchor changes only
+        // through the dedicated SuperAdmin payment-date endpoint / explicit param.
+        var command = new UpdateStoreCommand(
+            _storeId, "Renamed", null, null, Approved: false,
+            ModuleIds: new List<int> { 7, 6 }, IsActive: true);
+        var store = BuildFreeStore();
+        _mockHttpContextService.Setup(x => x.IsSuperAdminOrOwnerAdmin).Returns(true);
+        _mockHttpContextService.Setup(x => x.IsSuperAdmin).Returns(true);
+        _mockStoreByIdService.Setup(x => x.GetStoreByIdIncludingModulesAsync(_storeId)).ReturnsAsync(store);
+        ArrangeDownstream(store, store.StoreModules.ToList(), command.ModuleIds!);
+
+        var result = await _handler.Handle(command, CancellationToken.None);
+
+        result.Succeeded.Should().BeTrue();
+        store.PaymentStartDate.Should().BeNull("activation-on-first-paid is removed");
+    }
+
+    [Fact]
+    public async Task Handle_ExplicitPaymentStartDate_SuperAdminOnly_WinsAndPersists()
+    {
+        var command = new UpdateStoreCommand(
+            _storeId, "Renamed", null, null, Approved: false,
+            ModuleIds: new List<int> { 7 }, IsActive: true,
+            PaymentStartDate: new DateOnly(2026, 7, 1));
+        var store = BuildFreeStore();
+        _mockHttpContextService.Setup(x => x.IsSuperAdminOrOwnerAdmin).Returns(true);
+        _mockHttpContextService.Setup(x => x.IsSuperAdmin).Returns(true);
+        _mockStoreByIdService.Setup(x => x.GetStoreByIdIncludingModulesAsync(_storeId)).ReturnsAsync(store);
+        ArrangeDownstream(store, store.StoreModules.ToList(), command.ModuleIds!);
+
+        var result = await _handler.Handle(command, CancellationToken.None);
+
+        result.Succeeded.Should().BeTrue();
+        store.PaymentStartDate.Should().Be(new DateOnly(2026, 7, 1));
     }
 }

@@ -34,7 +34,7 @@ public sealed class StoreActivationTests
     };
 
     [Fact]
-    public async Task Paid_module_on_null_start_sets_paymentStartDate_to_today()
+    public async Task Paid_module_on_null_start_keeps_paymentStartDate_null()
     {
         using var _ = _fixture.Clock.Pin(new DateTimeOffset(2026, 7, 15, 0, 0, 0, TimeSpan.Zero));
 
@@ -52,13 +52,15 @@ public sealed class StoreActivationTests
                         new[] { BillingSeed.ManagementModuleId, BillingSeed.StatisticsModuleId }));
             r.StatusCode.Should().Be(HttpStatusCode.OK);
 
-            // Assert: PaymentStartDate should now be set to today (2026-07-15)
+            // Assert (owner-plan-change): the billing anchor is sacred — adding a paid
+            // module no longer auto-sets PaymentStartDate. Only the dedicated SuperAdmin
+            // payment-date path writes the anchor; the store keeps its null anchor.
             using var scope = _f.Services.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
             var store = await db.Set<Domain.Entities.Stores.Store>()
                 .IgnoreQueryFilters()
                 .FirstAsync(s => s.Id == freeStore.StoreId);
-            store.PaymentStartDate.Should().Be(new DateOnly(2026, 7, 15));
+            store.PaymentStartDate.Should().BeNull();
         }
         finally
         {

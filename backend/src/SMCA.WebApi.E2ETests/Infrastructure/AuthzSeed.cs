@@ -36,7 +36,8 @@ public static class AuthzSeed
         db.Set<Owner>().Add(owner);
         await db.SaveChangesAsync();
 
-        var store = Store.Create($"OA-Store-{Guid.NewGuid():N}", owner.Id, false, tenantId, DateOnly.FromDateTime(DateTime.UtcNow));
+        var store = Store.Create($"OA-Store-{Guid.NewGuid():N}", owner.Id, false, tenantId, DateOnly.FromDateTime(DateTime.UtcNow),
+            storePlanId: (int)StorePlanType.Gratis);
         db.Set<Store>().Add(store);
         await db.SaveChangesAsync();
 
@@ -61,7 +62,8 @@ public static class AuthzSeed
         var owner = Owner.Create(user.Id, false, tenantId, "E2E Mismatch owner");
         db.Set<Owner>().Add(owner);
         await db.SaveChangesAsync();
-        var store = Store.Create($"MM-Store-{Guid.NewGuid():N}", owner.Id, false, tenantId, DateOnly.FromDateTime(DateTime.UtcNow));
+        var store = Store.Create($"MM-Store-{Guid.NewGuid():N}", owner.Id, false, tenantId, DateOnly.FromDateTime(DateTime.UtcNow),
+            storePlanId: (int)StorePlanType.Gratis);
         db.Set<Store>().Add(store);
         await db.SaveChangesAsync();
         db.Set<StoreModule>().Add(StoreModule.Create(store.Id, ManagementModuleId, 0, true, 0, 0, 0, tenantId));
@@ -85,7 +87,8 @@ public static class AuthzSeed
         var owner = Owner.Create(ownerUser.Id, false, tenantId, "E2E SU owner");
         db.Set<Owner>().Add(owner);
         await db.SaveChangesAsync();
-        var store = Store.Create($"SU-Store-{Guid.NewGuid():N}", owner.Id, false, tenantId, DateOnly.FromDateTime(DateTime.UtcNow));
+        var store = Store.Create($"SU-Store-{Guid.NewGuid():N}", owner.Id, false, tenantId, DateOnly.FromDateTime(DateTime.UtcNow),
+            storePlanId: (int)StorePlanType.Gratis);
         db.Set<Store>().Add(store);
         await db.SaveChangesAsync();
         db.Set<StoreModule>().Add(StoreModule.Create(store.Id, ManagementModuleId, 0, true, 0, 0, 0, tenantId));

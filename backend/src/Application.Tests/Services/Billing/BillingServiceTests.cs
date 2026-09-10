@@ -1,5 +1,6 @@
 using Application.Abstractions.Time;
 using Application.Services.Billing;
+using Domain.Common.Enums;
 using Domain.Common.Utils;
 using Domain.Entities.Modules;
 using Domain.Entities.StoreModules;
@@ -53,8 +54,11 @@ public class BillingServiceTests : IDisposable
     /// so that the service can resolve every dependency for the given storeId.
     /// </summary>
     private void ArrangeStore(Guid storeId, DateOnly? paymentStartDate, params StoreModule[] storeModules)
+        => ArrangeStore(storeId, paymentStartDate, (int)StorePlanType.Pago, storeModules);
+
+    private void ArrangeStore(Guid storeId, DateOnly? paymentStartDate, int storePlanId, params StoreModule[] storeModules)
     {
-        var store = Store.Create("Test Store", _ownerId, true, _tenantId, paymentStartDate);
+        var store = Store.Create("Test Store", _ownerId, true, _tenantId, paymentStartDate, storePlanId: storePlanId);
         typeof(Store).GetProperty("Id")!.SetValue(store, storeId);
         store.StoreModules = storeModules.ToList();
 
@@ -118,7 +122,7 @@ public class BillingServiceTests : IDisposable
             modulePrice: 0f, moduleDiscountPrice: 0f, modulePercentDiscountPrice: 0f,
             _tenantId);
 
-        ArrangeStore(storeId, DateOnly.FromDateTime(DateTime.UtcNow), freeModule);
+        ArrangeStore(storeId, DateOnly.FromDateTime(DateTime.UtcNow), (int)StorePlanType.Gratis, freeModule);
 
         var sut = CreateSut();
         var result = await sut.GetStoreBillingSummaryAsync(storeId);

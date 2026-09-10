@@ -1,4 +1,5 @@
 using Application.Abstractions.Time;
+using Domain.Common.Enums;
 using Domain.Common.Utils;
 using Domain.Entities.Billing;
 using Domain.Entities.Modules;
@@ -55,7 +56,12 @@ public class BillingService : IBillingService
         var moduleIds = store.StoreModules.Select(sm => sm.ModuleId);
         var modules = await _moduleRepository.GetModulesByIdsAsync(moduleIds);
         var hasPaidModule = modules.Any(m => !m.PriceIncluded);
-        var planType = hasPaidModule && store.PaymentStartDate is not null ? "Paid" : "Free";
+        // owner-plan-change (AD4): the plan derives from StorePlanId — the plan source of
+        // truth written by every plan-change path. The legacy hasPaidModule && anchor
+        // derivation kept the pre-existing planType/modules desync (a free store with a
+        // running trial clock reported "Paid"; a downgraded store with soft-deleted
+        // paid rows could still report "Paid" because GetModulesByIdsAsync ignores IsActive).
+        var planType = store.StorePlanId == (int)StorePlanType.Gratis ? "Free" : "Paid";
 
         // Monto efectivo del plan con los DESCUENTOS del snapshot de la tienda
         // (StoreModule): mismo cálculo que RegisterStorePaymentCommand usa para el
@@ -79,7 +85,8 @@ public class BillingService : IBillingService
         var nextDueDate = StoreBillingUtils.GetNextDueDate(
             store.PaymentStartDate,
             trialMonths,
-            lastPayment?.PaymentBeforeDate is DateTimeOffset pbd ? DateOnly.FromDateTime(pbd.UtcDateTime) : null);
+            lastPayment?.PaymentBeforeDate is DateTimeOffset pbd ? DateOnly.FromDateTime(pbd.UtcDateTime) : null,
+            store.NextDueDateOverride);
 
         var today = DateOnly.FromDateTime(_dateTimeProvider.UtcNow.UtcDateTime);
         // Gate de valor 0: sin monto efectivo no hay trial (ni cartel de primer cobro).

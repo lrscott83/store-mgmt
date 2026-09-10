@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using Domain.Common.Constants;
+using Domain.Common.Enums;
 using Domain.Entities.StoreModules;
 using Domain.Entities.StoreRoleFeatures;
 using Domain.Entities.Stores;
@@ -46,7 +47,7 @@ public sealed class StorePlanChangeTests
     {
         var saLogin = $"sa-{Guid.NewGuid():N}@test.com";
         var saId = await DbTestHelpers.SeedSuperAdminAsync(_f, saLogin, "Password123");
-        var seeded = await SeedStoreAsync(paidModules: [], paymentStartDate: null);
+        var seeded = await SeedStoreAsync(paidModules: [], paymentStartDate: null, storePlanId: (int)StorePlanType.Gratis);
         try
         {
             var r = await DbTestHelpers.AuthedClient(_f, saId, saLogin)
@@ -57,7 +58,11 @@ public sealed class StorePlanChangeTests
             var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
             var store = await db.Set<Store>().IgnoreQueryFilters().SingleAsync(s => s.Id == seeded.StoreId);
-            store.PaymentStartDate.Should().Be(DateOnly.FromDateTime(DateTime.UtcNow));
+            // owner-plan-change: the anchor is sacred — a Free→Paid toggle never writes it.
+            // Direction derives from StorePlanId; overdue stores pin NextDueDateOverride.
+            store.PaymentStartDate.Should().BeNull();
+            store.StorePlanId.Should().Be((int)StorePlanType.Pago);
+            store.NextDueDateOverride.Should().BeNull("null anchor → no clock → no pin");
 
             var activeModules = await db.Set<StoreModule>().IgnoreQueryFilters()
                 .Where(sm => sm.StoreId == seeded.StoreId && sm.IsActive).ToListAsync();
@@ -107,7 +112,11 @@ public sealed class StorePlanChangeTests
             var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
             var store = await db.Set<Store>().IgnoreQueryFilters().SingleAsync(s => s.Id == seeded.StoreId);
-            store.PaymentStartDate.Should().BeNull();
+            // owner-plan-change: Paid→Free keeps the anchor (never nulled), flips
+            // StorePlanId to Gratis and clears any override.
+            store.PaymentStartDate.Should().Be(DateOnly.FromDateTime(DateTime.UtcNow));
+            store.StorePlanId.Should().Be((int)StorePlanType.Gratis);
+            store.NextDueDateOverride.Should().BeNull();
 
             // Free module stays active; paid modules (incl. new 13/14) are soft-deleted.
             var active = await db.Set<StoreModule>().IgnoreQueryFilters()
@@ -235,9 +244,10 @@ public sealed class StorePlanChangeTests
             var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
             var store = await db.Set<Store>().IgnoreQueryFilters().SingleAsync(s => s.Id == seeded.StoreId);
-            // Activation-on-first-paid: adding a paid module to a never-billed store
-            // auto-starts the billing clock today.
-            store.PaymentStartDate.Should().Be(DateOnly.FromDateTime(DateTime.UtcNow));
+            // owner-plan-change: activation-on-first-paid is REMOVED — adding paid modules
+            // via PUT never fabricates the billing anchor; only the dedicated SuperAdmin
+            // payment-date path writes it.
+            store.PaymentStartDate.Should().BeNull();
 
             var active = await db.Set<StoreModule>().IgnoreQueryFilters()
                 .Where(sm => sm.StoreId == seeded.StoreId && sm.IsActive).Select(sm => sm.ModuleId).ToListAsync();
@@ -335,7 +345,8 @@ public sealed class StorePlanChangeTests
         IReadOnlyList<(int ModuleId, float Price, float PercentDiscount)> paidModules,
         DateOnly? paymentStartDate,
         bool seedRoleFeatures = false,
-        Guid? ownerId = null)
+        Guid? ownerId = null,
+        int? storePlanId = null)
     {
         using var scope = _f.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -356,7 +367,8 @@ public sealed class StorePlanChangeTests
             owner = oid2;
         }
 
-        var store = Store.Create($"SPC-Store-{Guid.NewGuid():N}", owner, true, tenantId, paymentStartDate);
+        var store = Store.Create($"SPC-Store-{Guid.NewGuid():N}", owner, true, tenantId, paymentStartDate,
+            storePlanId: storePlanId ?? (int)StorePlanType.Pago);
         db.Set<Store>().Add(store);
         await db.SaveChangesAsync();
 
