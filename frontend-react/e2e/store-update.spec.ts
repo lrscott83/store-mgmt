@@ -8,12 +8,14 @@ import { readBearerToken } from './support/auth-storage';
 /**
  * [Plan/update split] — the store-DATA update view (`/management/stores/update`)
  * saves WITHOUT `moduleIds` (the backend leaves the plan untouched), the menu
- * shows BOTH store links under the same authorization, and the plan survives a
- * data-only save with an identical module set.
+ * shows the store links under the same authorization, and the plan survives a
+ * data-only save with an identical module set. The shared "Plan de la tienda"
+ * menu entry was removed — the plan is reached from each card's gear in
+ * Mis tiendas.
  *
  * The PLAN half of the split is already covered end to end by
  * `store-plan-activation.spec.ts`; this file covers only what that file
- * cannot: the data view, the two menu links, and the data-only PUT contract.
+ * cannot: the data view, the menu links, and the data-only PUT contract.
  *
  * Costs ONE real login (the persona mint in its own worker) — the same budget
  * as `store-plan-activation.spec.ts`, well under the LoginPolicy ceiling of
@@ -44,7 +46,7 @@ async function readPlanModuleIds(page: Page, storeId: string): Promise<number[]>
   return (body.data?.modules ?? []).map((m) => m.id).sort((a, b) => a - b);
 }
 
-test('la vista Update guarda datos sin tocar el plan y el menú muestra ambos enlaces', async ({
+test('la vista Update guarda datos sin tocar el plan y el menú ya no muestra el enlace Plan', async ({
   signedInPage,
 }) => {
   const { page, selectedStoreId } = signedInPage;
@@ -53,10 +55,12 @@ test('la vista Update guarda datos sin tocar el plan y el menú muestra ambos en
   // adminFeatureLoader desloguea (loaders.ts). Fallo ruidoso y temprano.
   await assertStoresFeature(page);
 
-  // Menú: los DOS enlaces de la tienda (Plan + Update) con la misma feature.
+  // Menú: el enlace "Mis tiendas" y el de Update comparten la misma feature.
+  // El enlace "Plan de la tienda" ya no existe en el menú general — el plan se
+  // alcanza vía el engranaje de cada tarjeta en Mis tiendas (owner-store-card).
   await page.getByRole('button', { name: 'Alternar barra lateral' }).click();
-  await expect(page.getByRole('link', { name: 'Plan de la tienda' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Editar la tienda' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Plan de la tienda' })).toHaveCount(0);
   await page.getByRole('link', { name: 'Editar la tienda' }).click();
 
   // Vista Update: formulario de DATOS sin el picker de plan.
@@ -64,6 +68,7 @@ test('la vista Update guarda datos sin tocar el plan y el menú muestra ambos en
   await expect(page.getByRole('heading', { name: 'Editar la tienda' })).toBeVisible();
   await expect(page.locator('#store-name')).toBeVisible();
   await expect(page.getByRole('tab')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Activar ese plan' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Activar este plan' })).toHaveCount(0);
 
   // Precondición real: el conjunto de módulos del plan ANTES del guardado.

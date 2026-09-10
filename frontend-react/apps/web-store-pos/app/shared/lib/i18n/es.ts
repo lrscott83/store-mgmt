@@ -834,13 +834,8 @@ const messages: Record<string, string> = {
   'STORES.PLAN.SUPERIOR_TAB': 'Superior',
   'STORES.PLAN.ACTIVE_BADGE': 'Activo',
   'STORES.PLAN.INCLUDES': 'Incluye:',
-  'STORES.PLAN.INCLUDES_FREE_PLUS': 'Todo lo del plan Gratis, y además:',
-  'STORES.PLAN.SELECTED': 'Plan seleccionado',
   'STORES.PLAN.NEXT_BILLING_DATE': 'Próximo cobro',
-  'STORES.PLAN.ACTIVATE': 'Activar este plan',
   'STORES.PLAN.ACTIVATE_PLAN': 'Activar ese plan',
-  'STORES.PLAN.CURRENCY_NOTICE':
-    'Los precios se muestran en USD. El pago se realiza en MN al cambio oficial del día.',
 
   // Exchange rates — daily USD→MN register (daily-exchange-rate)
   'EXCHANGE_RATES.TITLE': 'Registro del cambio de USD a MN',

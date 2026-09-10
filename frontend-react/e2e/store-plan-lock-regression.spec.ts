@@ -8,44 +8,48 @@ import { readBearerToken } from './support/auth-storage';
 /**
  * [S2-02] Regresión DG-7 — el candado no puede volver a colgarse de
  * `paymentStartDate` (`docs/testing/e2e-stage-1/S2-02.md`). Covers the two
- * render assertions of that scenario plus its regression note.
+ * render assertions of that scenario plus its regression note. Rewritten for
+ * the store-plan-redesign contract: the plan view renders collapsible
+ * PlanPanels (no tabbed picker) and the lock is derived from the backend
+ * planType (`readOnly = planType !== '' && planType !== 'Gratis'` for
+ * non-super-admins, `store-plan.tsx`), so `paymentStartDate` still does not
+ * intervene.
  *
- * El defecto que este spec existe para cazar (`store-form.tsx:72-82`): el
- * candado leía `readOnly = !isSuperAdmin && initialValues?.paymentStartDate != null`.
+ * El defecto que este spec existe para cazar: el candado viejo leía
+ * `readOnly = !isSuperAdmin && initialValues?.paymentStartDate != null`.
  * Era un proxy correcto mientras el reloj arrancaba solo con el primer módulo
  * pago; desde que TODA tienda arranca su reloj al crearse
  * (`CreateStoreService.cs:39-43`), ese proxy gastaría la única activación del
- * dueño en el nacimiento de la tienda. La condición real es
- * `isOnPaidPlan = modules.some(m => !m.priceIncluded && m.selected)`
- * (`store-plan.tsx`), donde `paymentStartDate` NO interviene.
+ * dueño en el nacimiento de la tienda. La condición real es el `planType`
+ * backend (`store-plan.tsx`), donde `paymentStartDate` NO interviene.
  *
  * Un solo `test()` que camina la matriz completa (design.md §2 — nunca
  * partirlo: partir gasta un login que el techo no tiene):
  *
- *   1. Aserción 3 (simétrica): `paymentStartDate` NULO + un módulo pago
- *      seleccionado ⇒ el botón "Activar este plan" NO se renderiza. La
+ *   1. Aserción 3 (simétrica): `paymentStartDate` NULO + tienda en plan pago
+ *      ⇒ el botón "Activar ese plan" NO se renderiza en ningún panel. La
  *      precondición (tienda legacy con fecha nula) se siembra directo en la
  *      BD (`UPDATE "Store" SET "PaymentStartDate" = NULL`, design.md D1) y se
- *      pinna re-leyendo por la API real. El chequeo discriminante vive en la
- *      pestaña GRATIS: es la única pestaña donde el botón se renderizaría si
- *      `readOnly` fuera falso (en la pestaña Pago `selected === tab` lo
- *      oculta estructuralmente, cualquiera sea el candado).
+ *      pinna re-leyendo por la API real. El chequeo discriminante vive en el
+ *      panel GRATIS: es el único panel no activo donde el botón se
+ *      renderizaría si `readOnly` fuera falso (en el panel Pago `isActive`
+ *      lo oculta estructuralmente, cualquiera sea el candado).
  *
- *   2. Aserción 1 + nota de regresión: `paymentStartDate` NO NULO + cero
- *      módulos pagos seleccionados ⇒ el botón SÍ se renderiza. La
- *      precondición la da `degradeStoreToFreePlan` (que pinna AMBAS mitades:
- *      módulos solo-gratis Y fecha no nula, `store-fixture.ts`). Si alguien
- *      reintroduce `readOnly = ... paymentStartDate != null`, esta aserción
- *      falla (el botón dejaría de renderizar) y la de la pestaña gratis
- *      también (el botón aparecería con fecha nula) — la matriz entera queda
- *      clavada a la condición real.
+ *   2. Aserción 1 + nota de regresión: `paymentStartDate` NO NULO + tienda en
+ *      plan gratuito ⇒ el botón SÍ se renderiza. La precondición la da
+ *      `degradeStoreToFreePlan` (que pinna AMBAS mitades: módulos solo-gratis
+ *      Y fecha no nula, `store-fixture.ts`). Si alguien reintroduce
+ *      `readOnly = ... paymentStartDate != null`, esta aserción falla (el
+ *      botón dejaría de renderizar) y la del panel gratis también (el botón
+ *      aparecería con fecha nula) — la matriz entera queda clavada a la
+ *      condición real.
  *
  * Costo: UN login real (el mint de `owner-admin` en su propio worker), el
  * mismo presupuesto que `store-plan-activation.spec.ts` y `store-update.spec.ts`,
  * muy por debajo del techo de la `LoginPolicy` (10/min, `RateLimitPolicies.cs`).
  * No guarda nada (cero PUTs): el escenario prueba el RENDER, no el guardado.
  */
-const PAID_ACTIVATE_TEXT = 'Activar este plan'; // es.ts:643
+const PAID_ACTIVATE_TEXT = 'Activar ese plan'; // es.ts STORES.PLAN.ACTIVATE_PLAN
 
 test.use({ persona: 'owner-admin' });
 
@@ -147,16 +151,22 @@ test('el candado DG-7 depende del módulo pago seleccionado, no de paymentStartD
 
   await page.goto('/management/stores');
 
-  const freeTab = page.getByRole('tab', { name: /Gratis/ });
-  const paidTab = page.getByRole('tab', { name: /Pago/ });
+  // The redesign replaced tabs with collapsible panel HEADERS: the banner
+  // expands only the ACTIVE panel by default (plan-panels.tsx). With
+  // `paymentStartDate` NULLED the store is still on the paid plan
+  // (plan-panels reflects the backend planType, not the date), so the Pago
+  // header is the default-expanded one.
+  const freeHeader = page.getByRole('button', { name: /Gratis/ });
+  const paidHeader = page.getByRole('button', { name: /Pago/ });
 
-  // En la pestaña Pago `selected === tab` oculta el botón estructuralmente;
-  // el chequeo discriminante es la pestaña GRATIS (no seleccionada): ahí el
-  // botón se renderizaría si `readOnly` fuera falso. Con fecha nula Y módulo
-  // pago activo, la condición real (`isOnPaidPlan`) lo mantiene oculto —
-  // si alguien revirtiera el candado a `paymentStartDate != null`, acá
+  // En el panel Pago (`isActive`) el botón se oculta estructuralmente; el
+  // chequeo discriminante es el panel GRATIS (no activo): ahí el botón se
+  // renderizaría si `readOnly` fuera falso. Con fecha nula Y módulo pago
+  // activo, la condición real (planType 'Pago' → readOnly) lo mantiene oculto
+  // — si alguien revirtiera el candado a `paymentStartDate != null`, acá
   // aparecería y esta aserción falla.
-  await freeTab.click();
+  await freeHeader.click();
+  await expect(freeHeader).toHaveAttribute('aria-expanded', 'true');
   await expect(page.getByRole('button', { name: PAID_ACTIVATE_TEXT })).toHaveCount(0);
 
   // ── Aserción 1 + nota de regresión: fecha NO NULA + cero módulos pagos ⇒ SÍ se renderiza.
@@ -170,11 +180,14 @@ test('el candado DG-7 depende del módulo pago seleccionado, no de paymentStartD
 
   await page.reload();
 
-  // En la pestaña Pago (no seleccionada) el botón debe renderizarse: el
-  // candado es falso porque no hay módulo pago seleccionado, pese a que la
-  // fecha NO es nula. Esta es la aserción que falla si alguien reintroduce
+  // Ahora el planType backend es 'Gratis' → readOnly falso; el panel PAGO
+  // (no activo, colapsado por defecto) debe renderizar el botón al expandirlo:
+  // el candado es falso pese a que la fecha NO es nula. Esta es la aserción
+  // que falla si alguien reintroduce
   // `readOnly = !isSuperAdmin && initialValues?.paymentStartDate != null`
   // (S2-02.md, nota de regresión).
-  await paidTab.click();
+  await expect(paidHeader).toHaveAttribute('aria-expanded', 'false');
+  await paidHeader.click();
+  await expect(paidHeader).toHaveAttribute('aria-expanded', 'true');
   await expect(page.getByRole('button', { name: PAID_ACTIVATE_TEXT })).toBeVisible();
 });
