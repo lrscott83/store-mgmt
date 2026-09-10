@@ -44,6 +44,44 @@ namespace Application.Tests.DomainUtils
             StoreBillingUtils.GetNextDueDate(start, 1, lastPaid).Should().Be(lastPaid);
         }
 
+        // ── Next due date override (owner-plan-change) ────────────────────────────
+        [Fact]
+        public void GetNextDueDate_withOverride_overrideWinsOverLastPaid()
+        {
+            var start = new DateOnly(2026, 1, 10);
+            var lastPaid = new DateOnly(2026, 5, 10);
+            var overrideDue = new DateOnly(2026, 9, 10);
+            // Override has the highest priority: it pins the next due date.
+            StoreBillingUtils.GetNextDueDate(start, 1, lastPaid, overrideDue).Should().Be(overrideDue);
+        }
+
+        [Fact]
+        public void GetNextDueDate_withNullOverride_existingChainUnchanged()
+        {
+            var start = new DateOnly(2026, 1, 10);
+            var lastPaid = new DateOnly(2026, 5, 10);
+            // Null override must not change the existing computation.
+            StoreBillingUtils.GetNextDueDate(start, 1, lastPaid, null).Should().Be(lastPaid);
+        }
+
+        [Fact]
+        public void GetNextDueDate_nullAnchor_returnsNullEvenWithOverride()
+        {
+            // The clock never started (legacy null-anchor row): an override must
+            // not resurrect billing — no anchor, no next due date.
+            StoreBillingUtils.GetNextDueDate(null, 1, null, new DateOnly(2026, 9, 10)).Should().BeNull();
+        }
+
+        [Fact]
+        public void GetNextDueDate_overridePinsExactDate_itCarries()
+        {
+            var start = new DateOnly(2026, 1, 10);
+            var lastPaid = new DateOnly(2026, 5, 10);
+            // The override pins whatever date it carries (today at write time).
+            StoreBillingUtils.GetNextDueDate(start, 1, lastPaid, new DateOnly(2026, 8, 1))
+                .Should().Be(new DateOnly(2026, 8, 1));
+        }
+
         // ── Status (dueSoon = 5, grace = 5) ────────────────────────────────────────
         [Theory]
         [InlineData("2026-03-04", StoreBillingStatusType.AlDia)]     // > 5 days before due
