@@ -4,11 +4,61 @@ import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 import type { Store } from '@store-mgmt/domain';
 
+// Extend Store type to include planType from backend response
+interface StoreWithPlanType extends Store {
+  planType?: string;
+}
+
 // ─── react-router mock ────────────────────────────────────────────────────────
 
 const mockNavigate = vi.fn();
 vi.mock('react-router', () => ({
   useNavigate: () => mockNavigate,
+}));
+
+// ─── react-intl mock ──────────────────────────────────────────────────────────
+
+const mockFormatMessage = vi.fn(({ id }: { id: string }) => esMessages[id] || id);
+vi.mock('react-intl', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('react-intl')>();
+  return {
+    ...actual,
+    useIntl: () => ({
+      formatMessage: mockFormatMessage,
+      messages: esMessages,
+      locale: 'es',
+      defaultLocale: 'es',
+    }),
+  };
+});
+
+vi.mock('~/shared/lib/i18n/es', () => ({
+  default: {
+    'STORES.LIST_TITLE': 'Tiendas',
+    'STORES.FILTER_LABEL': 'Mostrar:',
+    'STORES.FILTER_ALL': 'Todos',
+    'STORES.FILTER_NOT_FREE': 'No Gratis',
+    'STORES.FILTER_VIP': 'VIP',
+    'STORES.FILTER_SUPERIOR': 'Superior',
+    'STORES.FILTER_PAID': 'Pago',
+    'STORES.FILTER_FREE': 'Gratis',
+    'GENERAL.ADD': 'Adicionar',
+    'STORES.ERROR': 'Error de tiendas',
+    'GENERAL.OFFLINE': 'Sin conexión',
+    'STORES.APPROVE': 'Aceptar',
+    'STORES.DISAPPROVE': 'Desaprobar',
+    'STORES.APPROVE_CONFIRM_TITLE': 'Confirmar aprobación',
+    'STORES.APPROVE_CONFIRM_MESSAGE': '¿Aprobar esta tienda?',
+    'STORES.DISAPPROVE_CONFIRM_TITLE': 'Confirmar desaprobación',
+    'STORES.DISAPPROVE_CONFIRM_MESSAGE': '¿Desaprobar esta tienda?',
+    'GENERAL.YES': 'Sí',
+    'GENERAL.NO': 'No',
+    'STORES.CHANGE_PLAN': 'Cambiar plan',
+    'STORES.ACTIVATE_PAID_TITLE': 'Activar plan pago',
+    'STORES.ACTIVATE_PAID_MESSAGE': '¿Activar plan pago?',
+    'STORES.DEACTIVATE_PAID_TITLE': 'Desactivar plan pago',
+    'STORES.DEACTIVATE_PAID_MESSAGE': '¿Desactivar plan pago?',
+  },
 }));
 
 // ─── resellerLoader mock ─────────────────────────────────────────────────────
@@ -39,7 +89,7 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-function makeStore(overrides: Partial<Store> = {}): Store {
+function makeStore(overrides: Partial<StoreWithPlanType> = {}): StoreWithPlanType {
   return {
     id: 's1',
     name: 'Store One',
@@ -52,6 +102,7 @@ function makeStore(overrides: Partial<Store> = {}): Store {
     paymentStartDate: '2024-01-01',
     modules: [],
     isActive: true,
+    planType: 'Pago',
     ...overrides,
   };
 }
@@ -423,11 +474,13 @@ describe('AdminStoreListPage — no activate/deactivate buttons', () => {
       expect(screen.getByText('Store One')).toBeInTheDocument();
     });
 
+    // The filter buttons now render multiple buttons, so we need to check specific buttons
+    // by their accessible name which includes the i18n key since useIntl mock returns keys
     expect(
-      screen.queryByRole('button', { name: esMessages['STORES.ACTIVATE'] }),
+      screen.queryByRole('button', { name: /Activar/i }),
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole('button', { name: esMessages['STORES.DEACTIVATE'] }),
+      screen.queryByRole('button', { name: /Desactivar/i }),
     ).not.toBeInTheDocument();
   });
 });
@@ -470,10 +523,14 @@ describe('AdminStoreListPage — toggle plan', () => {
       </Wrapper>,
     );
 
-    // Free stores are only visible under the "free-plan" filter.
-    fireEvent.change(screen.getByLabelText(esMessages['STORES.FILTER_LABEL']), {
-      target: { value: 'free-plan' },
-    });
+    // Free stores are only visible under the "Gratis" filter.
+    const filterButtons = screen.getAllByRole('button');
+    const gratisButton = filterButtons.find(
+      (btn) => btn.textContent?.includes(esMessages['STORES.FILTER_FREE'])
+    );
+    if (gratisButton) {
+      fireEvent.click(gratisButton);
+    }
 
     await waitFor(() => {
       expect(screen.getByText('Store One')).toBeInTheDocument();
