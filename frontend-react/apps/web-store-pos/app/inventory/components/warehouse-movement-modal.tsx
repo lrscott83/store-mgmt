@@ -77,7 +77,6 @@ export function WarehouseMovementModal({
       setToWarehouseId(initial?.toWarehouseId ?? '');
       setReason('');
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset only on open/productId/initial change
   }, [open, productId, initial]);
 
   useEffect(() => {

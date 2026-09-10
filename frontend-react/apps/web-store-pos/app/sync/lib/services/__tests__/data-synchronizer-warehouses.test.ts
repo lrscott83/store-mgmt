@@ -381,7 +381,7 @@ describe('DataSerializerService — warehouses roundtrip (warehouses-plan)', () 
     const wh = warehouseSvc.createWarehouse('Central').data!;
     warehouseSvc.recordMovement({ type: 'purchase_in', warehouseId: wh.id, productId: 'prod-1', quantity: 24, costPrice: 660 });
     const sale = warehouseSvc.recordMovement({ type: 'sale_out', warehouseId: wh.id, productId: 'prod-1', quantity: 12 }).data!;
-    const reversal = warehouseSvc.reverseMovement(sale[0].id).data!;
+    warehouseSvc.reverseMovement(sale[0].id);
 
     const serializer = new DataSerializerService(
       STORE_ID,
