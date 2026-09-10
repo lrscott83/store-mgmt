@@ -832,6 +832,8 @@ const messages: Record<string, string> = {
   'STORES.PLAN.FREE_TAB': 'Gratis',
   'STORES.PLAN.PAID_TAB': 'Pago',
   'STORES.PLAN.SUPERIOR_TAB': 'Superior',
+  'STORES.PLAN.VIP_TAB': 'VIP',
+  'STORES.PLAN.DISPLAY': 'Plan: {plan}',
   'STORES.PLAN.ACTIVE_BADGE': 'Activo',
   'STORES.PLAN.INCLUDES': 'Incluye:',
   'STORES.PLAN.NEXT_BILLING_DATE': 'Próximo cobro',

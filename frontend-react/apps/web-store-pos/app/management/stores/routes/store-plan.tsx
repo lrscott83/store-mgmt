@@ -97,6 +97,7 @@ export function StorePlanPage() {
         // Omit when null — the backend only applies a non-null value and an
         // empty string would fail DateOnly binding.
         paymentStartDate: plan.paymentStartDate ?? undefined,
+        planId: selectedPlan.id,
         moduleIds: planModuleIdsForActivation(plans, selectedPlan),
         isActive: plan.isActive,
       });

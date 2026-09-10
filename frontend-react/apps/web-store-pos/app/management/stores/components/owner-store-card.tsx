@@ -24,6 +24,13 @@ function formatPlanPrice(amount: number): string {
 const getIsOnPaidPlan = (modules: Module[]) =>
   modules.some((m) => !m.priceIncluded && m.selected);
 
+const PLAN_NAME_KEYS: Record<string, string> = {
+  Gratis: 'STORES.PLAN.FREE_TAB',
+  Pago: 'STORES.PLAN.PAID_TAB',
+  Superior: 'STORES.PLAN.SUPERIOR_TAB',
+  VIP: 'STORES.PLAN.VIP_TAB',
+};
+
 interface OwnerStoreCardProps {
   store: OwnerStoreWithPlan;
   /** Catalog merged with the store's snapshot (mergeStoreModules) — same hydration the plan view uses. */
@@ -89,9 +96,14 @@ export function OwnerStoreCard({ store, modules, onEdit, onEditPlan }: OwnerStor
     >
       <div className="space-y-1" data-testid={`owner-store-body-${store.id}`}>
         <p className="text-sm font-medium text-text">
-          {intl.formatMessage({
-            id: isOnPaidPlan ? 'STORES.PAID_PLAN' : 'STORES.FREE_PLAN',
-          })}
+          {intl.formatMessage(
+            { id: 'STORES.PLAN.DISPLAY' },
+            {
+              plan: PLAN_NAME_KEYS[store.planType]
+                ? intl.formatMessage({ id: PLAN_NAME_KEYS[store.planType] })
+                : store.planType,
+            },
+          )}
         </p>
         {isOnPaidPlan && store.nextDueDate && (
           <p className="text-sm text-text-muted">

@@ -171,6 +171,7 @@ export function MyStoresPage() {
         description: '',
         approved: planStore.approved,
         paymentStartDate: planStore.paymentStartDate ?? undefined,
+        planId: selectedPlan.id,
         moduleIds: planModuleIdsForActivation(plans, selectedPlan),
         isActive: planStore.isActive,
       });
