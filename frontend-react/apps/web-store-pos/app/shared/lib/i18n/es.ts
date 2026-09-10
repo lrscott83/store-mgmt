@@ -230,10 +230,9 @@ const messages: Record<string, string> = {
   'MENU.TODAY_REPORTS': 'Reportes del día',
   'MENU.DASHBOARD': 'Panel de Control',
   'MENU.CUADRE_POR_FECHAS': 'Cuadre por fechas',
-  // Plan/update split: the single 'Tiendas' entry became two links — the plan
-  // view (/management/stores) and the store-data update view
-  // (/management/stores/update), same authorization (EFeatures.Stores).
-  'MENU.STORES_UPDATE': 'Editar la tienda',
+  // Plan split: the single 'Tiendas' entry became one link — the plan view
+  // (/management/stores), same authorization (EFeatures.Stores). The store-data
+  // edit view is reached only from store cards, not from the menu.
   // Owner's "my stores" cards listing (owner-stores-cards plan, 2026-09-08)
   'MENU.MY_STORES': 'Mis tiendas',
   'MENU.EXCHANGE_RATES': 'Cambio USD a MN',

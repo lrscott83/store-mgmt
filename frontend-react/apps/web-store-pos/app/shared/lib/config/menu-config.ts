@@ -322,14 +322,6 @@ export const MENU_GROUPS: MenuGroup[] = [
         helpContent:
           'Mis tiendas. Lista todas tus tiendas (activas e inactivas) en tarjetas con su plan, próximo cobro y precio. Desde el engranaje puedes editar el nombre, activar o desactivar la tienda y cambiar el plan.',
       },
-      {
-        label: 'MENU.STORES_UPDATE',
-        path: '/management/stores/update',
-        featureIds: [EFeatures.Stores],
-        moduleId: EModules.Management,
-        helpContent:
-          'Editar información de la tienda. Actualiza el nombre, dirección, teléfono y otros datos de tu negocio. Estos cambios se reflejan en los reportes.',
-      },
       // Convention: NO menu item carries an icon — plain text labels only
       // (the wholesale 📦, exchange-rate 💱 and warehouses 🏬 icons were
       // removed; the icon property is gone from MenuItem entirely).

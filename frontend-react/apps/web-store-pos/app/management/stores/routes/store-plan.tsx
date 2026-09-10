@@ -15,7 +15,8 @@ export const clientLoader = adminFeatureLoader([EFeatures.Stores]);
 
 /**
  * Plan view (management stores) — the store's plan lives on its own page,
- * separate from the store-data update view (`/management/stores/update`).
+ * separate from the store-data form (reached from store cards via
+ * /management/stores/edit/:id).
  * The storeId resolves from the route param first, falling back to
  * `user.selectedStoreId` (same resolution as the edit-store route).
  *
