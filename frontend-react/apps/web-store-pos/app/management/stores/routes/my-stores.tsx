@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useIntl } from 'react-intl';
-import { EFeatures } from '@store-mgmt/domain';
+import { EFeatures, EModules } from '@store-mgmt/domain';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { storeHttpService } from '~/management/stores/lib/services/store-http-service';
@@ -9,6 +9,9 @@ import { groupFeaturesByModuleId, planModuleIdsForActivation } from '~/managemen
 import { OwnerStoreCard } from '~/management/stores/components/owner-store-card';
 import { EditStoreModal } from '~/management/stores/components/edit-store-modal';
 import { EditPlanModal } from '~/management/stores/components/edit-plan-modal';
+import { CreateStoreModal } from '~/management/stores/components/create-store-modal';
+import { Button } from '~/shared/components/ui/button';
+import { PlusIcon } from '~/shared/components/ui/icons';
 import { httpErrorKey } from '~/shared/lib/http/http-error';
 import { confirmDialog } from '~/shared/lib/blocking-alert';
 import { showToastSuccess } from '~/shared/lib/toast';
@@ -30,6 +33,9 @@ export function MyStoresPage() {
   const intl = useIntl();
   const { user, getUserByToken } = useAuthStore();
   const isSuperAdmin = user?.isSuperAdmin ?? false;
+  // Gate MultiStores (módulo 14): solo los propietarios con el módulo activo en
+  // la tienda seleccionada (patrón store-switcher) pueden crear otra tienda.
+  const hasMultiStores = (user?.storeModuleIds ?? []).includes(EModules.MultiStores);
 
   const [stores, setStores] = useState<OwnerStoreWithPlan[]>([]);
   const [catalog, setCatalog] = useState<Module[]>([]);
@@ -40,6 +46,7 @@ export function MyStoresPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingStore, setEditingStore] = useState<OwnerStoreWithPlan | null>(null);
   const [planStore, setPlanStore] = useState<OwnerStoreWithPlan | null>(null);
   const [modalBusy, setModalBusy] = useState(false);
@@ -124,6 +131,31 @@ export function MyStoresPage() {
     }
   }
 
+  async function handleCreateStore(values: { name: string }) {
+    setModalError('');
+    setModalBusy(true);
+    try {
+      // Owner-branch contract (owner-multistores store-creation): body ownerId is
+      // the zero-Guid — the backend derives the caller's own owner, forces
+      // approved=true and inherits the selected store's modules.
+      await storeHttpService.createStore({
+        ownerId: '00000000-0000-0000-0000-000000000000',
+        name: values.name,
+        address: '',
+        description: '',
+        approved: true,
+        moduleIds: [],
+      });
+      setIsCreateOpen(false);
+      showToastSuccess(intl.formatMessage({ id: 'STORES.CREATE_SUCCESS' }));
+      await load();
+    } catch (err) {
+      setModalError(intl.formatMessage({ id: httpErrorKey(err, 'STORES.ERROR') }));
+    } finally {
+      setModalBusy(false);
+    }
+  }
+
   async function handlePlanActivate(selectedPlan: Plan) {
     if (!planStore) return;
     setModalError('');
@@ -161,9 +193,24 @@ export function MyStoresPage() {
 
   return (
     <div className="space-y-4 p-4">
-      <h1 className="text-xl font-semibold" data-testid="my-stores-title">
-        {intl.formatMessage({ id: 'STORES.MY_STORES_TITLE' })}
-      </h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-semibold" data-testid="my-stores-title">
+          {intl.formatMessage({ id: 'STORES.MY_STORES_TITLE' })}
+        </h1>
+        {hasMultiStores && (
+          <Button
+            variant="fab"
+            onClick={() => {
+              setModalError('');
+              setIsCreateOpen(true);
+            }}
+            data-testid="my-stores-create-button"
+          >
+            <PlusIcon />
+            {intl.formatMessage({ id: 'STORES.CREATE_STORE_BUTTON' })}
+          </Button>
+        )}
+      </div>
 
       {error && (
         <p role="alert" className="text-sm text-danger">
@@ -200,6 +247,14 @@ export function MyStoresPage() {
           ))}
         </div>
       )}
+
+      <CreateStoreModal
+        open={isCreateOpen}
+        onClose={() => setIsCreateOpen(false)}
+        onSave={handleCreateStore}
+        isLoading={modalBusy}
+        error={modalError}
+      />
 
       <EditStoreModal
         open={editingStore !== null}

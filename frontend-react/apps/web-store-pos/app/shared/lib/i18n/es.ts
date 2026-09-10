@@ -874,6 +874,8 @@ const messages: Record<string, string> = {
 
   // Owner's "my stores" cards view (owner-stores-cards plan, 2026-09-08)
   'STORES.MY_STORES_TITLE': 'Mis tiendas',
+  // Owner create-store button (owner-multistores store-creation, 2026-09-09)
+  'STORES.CREATE_STORE_BUTTON': 'Tienda',
   'STORES.INACTIVE_BADGE': 'Inactiva',
   'STORES.EDIT_STORE_TITLE': 'Editar la tienda',
   'STORES.EDIT_PLAN': 'Editar el plan',

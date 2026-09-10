@@ -157,6 +157,7 @@ function makeUser(overrides: Partial<UserModel> = {}): UserModel {
 
 let mockUser: UserModel | null = makeUser();
 const mockGetUserByToken = vi.fn();
+const mockCreateStore = vi.fn();
 
 vi.mock('~/shared/lib/stores/auth-store', () => {
   const useAuthStore = vi.fn((selector?: (s: unknown) => unknown) => {
@@ -199,6 +200,9 @@ vi.mock('~/management/stores/lib/services/store-http-service', () => ({
     },
     get setStoreActivation() {
       return mockSetStoreActivation;
+    },
+    get createStore() {
+      return mockCreateStore;
     },
   },
 }));
@@ -675,5 +679,151 @@ describe('MyStoresPage — Editar el plan popup', () => {
     });
     // Failure keeps the modal open for the user to retry
     expect(screen.getByTestId('owner-store-plan-modal-s1')).toBeInTheDocument();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Nueva tienda flow (owner-multistores store-creation): the "+ Tienda" button is
+// gated by the selected store's MultiStores module (14), the modal is name-only,
+// and the body ownerId is the zero-Guid (backend derives the caller's own owner).
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('MyStoresPage — create store flow', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUser = makeUser();
+    mockGetModulesToStore.mockResolvedValue({
+      succeeded: true,
+      data: [makeCatalogModule()],
+    } as BaseResponseModel<Module[]>);
+    mockGetPlans.mockResolvedValue({
+      succeeded: true,
+      data: makePlanCatalog(),
+    } as BaseResponseModel<Plan[]>);
+    mockGetFeaturesToStore.mockResolvedValue({
+      succeeded: true,
+      data: [makeFeature()],
+    } as BaseResponseModel<Feature[]>);
+    mockGetMyStores.mockResolvedValue({
+      succeeded: true,
+      data: [makeOwnerStore({ id: 's1', name: 'Alpha' })],
+    } as BaseResponseModel<OwnerStoreWithPlan[]>);
+    mockCreateStore.mockResolvedValue({
+      succeeded: true,
+      data: { id: 'new-s', name: 'Nueva' },
+    } as BaseResponseModel<{ id: string; name: string }>);
+  });
+
+  function renderPage() {
+    return import('../my-stores').then(({ MyStoresPage }) =>
+      render(
+        <Wrapper>
+          <MyStoresPage />
+        </Wrapper>,
+      ),
+    );
+  }
+
+  it('hides the + Tienda button for an owner without the MultiStores module', async () => {
+    mockUser = makeUser({ storeModuleIds: [7] }); // Management sí, MultiStores no
+    await renderPage();
+    await waitFor(() => {
+      expect(screen.getByText('Alpha')).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId('my-stores-create-button')).not.toBeInTheDocument();
+  });
+
+  it('shows the + Tienda button when the selected store has MultiStores (14)', async () => {
+    mockUser = makeUser({ storeModuleIds: [14] });
+    await renderPage();
+    await waitFor(() => {
+      expect(screen.getByText('Alpha')).toBeInTheDocument();
+    });
+    expect(screen.getByTestId('my-stores-create-button')).toBeInTheDocument();
+  });
+
+  it('opens the create modal and blocks an empty name (no service call)', async () => {
+    mockUser = makeUser({ storeModuleIds: [14] });
+    await renderPage();
+    await waitFor(() => {
+      expect(screen.getByText('Alpha')).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByTestId('my-stores-create-button'));
+    expect(await screen.findByTestId('owner-store-create-modal')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByTestId('owner-store-name-input'), { target: { value: '   ' } });
+    fireEvent.click(screen.getByTestId('owner-store-create-save'));
+
+    expect(await screen.findByText(esMessages['STORES.NAME_REQUIRED'])).toBeInTheDocument();
+    expect(mockCreateStore).not.toHaveBeenCalled();
+  });
+
+  it('creates the store with the owner-branch contract payload (zero-Guid ownerId, approved true, no modules)', async () => {
+    mockUser = makeUser({ storeModuleIds: [14] });
+    await renderPage();
+    await waitFor(() => {
+      expect(screen.getByText('Alpha')).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByTestId('my-stores-create-button'));
+    await screen.findByTestId('owner-store-name-input');
+
+    fireEvent.change(screen.getByTestId('owner-store-name-input'), {
+      target: { value: 'Nueva Tienda' },
+    });
+    fireEvent.click(screen.getByTestId('owner-store-create-save'));
+
+    await waitFor(() => {
+      expect(mockCreateStore).toHaveBeenCalledWith({
+        ownerId: '00000000-0000-0000-0000-000000000000',
+        name: 'Nueva Tienda',
+        address: '',
+        description: '',
+        approved: true,
+        moduleIds: [],
+      });
+    });
+  });
+
+  it('closes the modal, shows the success toast and refreshes the list on success', async () => {
+    mockUser = makeUser({ storeModuleIds: [14] });
+    await renderPage();
+    await waitFor(() => {
+      expect(screen.getByText('Alpha')).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByTestId('my-stores-create-button'));
+    await screen.findByTestId('owner-store-name-input');
+
+    fireEvent.change(screen.getByTestId('owner-store-name-input'), {
+      target: { value: 'Nueva Tienda' },
+    });
+    fireEvent.click(screen.getByTestId('owner-store-create-save'));
+
+    await waitFor(() => {
+      expect(mockShowToastSuccess).toHaveBeenCalledWith(esMessages['STORES.CREATE_SUCCESS']);
+    });
+    expect(screen.queryByTestId('owner-store-create-modal')).not.toBeInTheDocument();
+    // The list reloads after a successful creation
+    expect(mockGetMyStores).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps the modal open with a visible error when the creation fails', async () => {
+    mockUser = makeUser({ storeModuleIds: [14] });
+    mockCreateStore.mockRejectedValue(new Error('boom'));
+    await renderPage();
+    await waitFor(() => {
+      expect(screen.getByText('Alpha')).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByTestId('my-stores-create-button'));
+    await screen.findByTestId('owner-store-name-input');
+
+    fireEvent.change(screen.getByTestId('owner-store-name-input'), {
+      target: { value: 'Nueva Tienda' },
+    });
+    fireEvent.click(screen.getByTestId('owner-store-create-save'));
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toBeInTheDocument();
+    });
+    expect(screen.getByTestId('owner-store-create-modal')).toBeInTheDocument();
   });
 });
