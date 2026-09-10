@@ -27,6 +27,13 @@ interface WarehouseMovementModalProps {
   productId: string | null;
   onClose: () => void;
   onSubmit: (fields: WarehouseMovementFields) => void;
+  /**
+   * Valores precargados de edición (plan 2026-09-09, F3): el modal Editar
+   * reutiliza este componente con los valores de la fila original.
+   */
+  initial?: { quantity: number; costPrice?: number; toWarehouseId?: string } | null;
+  /** Clave i18n del título — por defecto el del modo; el de edición lo sobreescribe. */
+  titleId?: string;
 }
 
 const MODAL_TITLE: Record<WarehouseMovementMode, string> = {
@@ -51,6 +58,8 @@ export function WarehouseMovementModal({
   productId,
   onClose,
   onSubmit,
+  initial = null,
+  titleId,
 }: WarehouseMovementModalProps) {
   const intl = useIntl();
   const [selectedProduct, setSelectedProduct] = useState('');
@@ -62,12 +71,14 @@ export function WarehouseMovementModal({
   useEffect(() => {
     if (open) {
       setSelectedProduct(productId ?? '');
-      setQuantity('');
-      setCostPrice('');
-      setToWarehouseId('');
+      // Edición (F3): precarga los valores de la fila original; create arranca limpio.
+      setQuantity(initial ? String(initial.quantity) : '');
+      setCostPrice(initial?.costPrice !== undefined ? String(initial.costPrice) : '');
+      setToWarehouseId(initial?.toWarehouseId ?? '');
       setReason('');
     }
-  }, [open, productId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset only on open/productId/initial change
+  }, [open, productId, initial]);
 
   useEffect(() => {
     if (!open) return;
@@ -106,7 +117,7 @@ export function WarehouseMovementModal({
       <div className="w-full max-w-md rounded-lg bg-surface p-6 shadow-xl">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-text">
-            {intl.formatMessage({ id: MODAL_TITLE[mode] })} — {warehouse.name}
+            {intl.formatMessage({ id: titleId ?? MODAL_TITLE[mode] })} — {warehouse.name}
           </h2>
           <button
             type="button"

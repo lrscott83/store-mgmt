@@ -19,6 +19,8 @@ import { ChevronDownIcon, InOutIcon, SwapHorizontalIcon, TruckIcon } from '~/sha
 import { formatLocalDate, groupByLocalDay } from '~/shared/lib/date-utils';
 import { WarehouseOfflineService } from '../lib/services/warehouse-offline-service';
 import { InventoryOfflineService } from '../lib/services/inventory-offline-service';
+import { WarehouseMovementModal } from '../components/warehouse-movement-modal';
+import type { WarehouseMovementFields, WarehouseMovementMode } from '../components/warehouse-movement-modal';
 import { ProductRepository } from '~/sales/lib/repositories/product-repository';
 import { ProductCategoryRepository } from '~/sales/lib/repositories/product-category-repository';
 
@@ -157,6 +159,55 @@ export function WarehouseMovementsPage() {
     load();
   }
 
+  // ─── Edición = reversa + recreación (F3, por fila D10) ──────────────────────
+
+  const [editingMovement, setEditingMovement] = useState<WarehouseStockMovement | null>(null);
+
+  function openEdit(movement: WarehouseStockMovement) {
+    setEditingMovement(movement);
+  }
+
+  /**
+   * F3: la edición NO muta la fila original — compensa (reversa al costo
+   * exacto del lote) y registra el movimiento corregido. Si el paso 2 falla,
+   * la reversa YA quedó persistida (§7.3 del plan): se informa con el error
+   * específico y se recarga el historial (la guía al usuario es el propio
+   * error — p.ej. InsufficientStock para la nueva cantidad).
+   */
+  function handleEditSubmit(fields: WarehouseMovementFields) {
+    if (!service || !editingMovement) return;
+    const original = editingMovement;
+    const reversal = service.reverseMovement(original.id);
+    if (!reversal.succeeded) {
+      showBlockingError(
+        intl.formatMessage({ id: 'GENERAL.ERROR' }),
+        reversal.errors[0]?.description ?? '',
+      );
+      return;
+    }
+    const recreated = service.recordMovement({
+      type: original.type as WarehouseMovementMode,
+      warehouseId: original.warehouseId,
+      productId: original.productId,
+      quantity: fields.quantity,
+      costPrice: fields.costPrice,
+      toWarehouseId: fields.toWarehouseId ?? original.toWarehouseId,
+      reason: fields.reason,
+    });
+    setEditingMovement(null);
+    if (!recreated.succeeded) {
+      // La reversa quedó huérfana (no-atómico, §7.3) — el error guía al usuario.
+      showBlockingError(
+        intl.formatMessage({ id: 'GENERAL.ERROR' }),
+        recreated.errors[0]?.description ?? '',
+      );
+      load();
+      return;
+    }
+    showToastSuccess(intl.formatMessage({ id: 'WAREHOUSES.MOVEMENT_UPDATED' }));
+    load();
+  }
+
   return (
     <Card>
       <h1 className="mb-4 text-xl font-bold text-text">
@@ -238,7 +289,15 @@ export function WarehouseMovementsPage() {
                           testId={`mv-actions-toggle-${movement.id}`}
                         >
                           <ActionMenuItem
+                            intent="edit"
+                            data-testid={`mv-edit-${movement.id}`}
+                            onClick={() => openEdit(movement)}
+                          >
+                            {intl.formatMessage({ id: 'WAREHOUSES.EDIT_ACTION' })}
+                          </ActionMenuItem>
+                          <ActionMenuItem
                             intent="delete"
+                            separatorBefore
                             data-testid={`mv-revert-${movement.id}`}
                             onClick={() => void handleRevert(movement)}
                           >
@@ -254,6 +313,38 @@ export function WarehouseMovementsPage() {
           );
         })}
       </div>
+
+      {/* Modal de edición (F3): reutiliza el modal de movimientos con los
+          valores de la fila original precargados. El producto y el almacén
+          origen quedan fijos — se edita cantidad/costo/destino. */}
+      {editingMovement && service && (
+        <WarehouseMovementModal
+          open
+          mode={editingMovement.type as WarehouseMovementMode}
+          warehouse={
+            warehouses.find((w) => w.id === editingMovement.warehouseId) ?? {
+              id: editingMovement.warehouseId,
+              name: warehouseName(editingMovement.warehouseId),
+              isActive: true,
+              createdDate: new Date(),
+              createdByName: '',
+            }
+          }
+          targetWarehouses={warehouses.filter(
+            (w) => w.isActive && w.id !== editingMovement.warehouseId,
+          )}
+          products={products}
+          productId={editingMovement.productId}
+          initial={{
+            quantity: editingMovement.quantity,
+            costPrice: editingMovement.costPrice,
+            toWarehouseId: editingMovement.toWarehouseId,
+          }}
+          titleId="WAREHOUSES.REVERSAL_EDIT_TITLE"
+          onClose={() => setEditingMovement(null)}
+          onSubmit={handleEditSubmit}
+        />
+      )}
     </Card>
   );
 }
