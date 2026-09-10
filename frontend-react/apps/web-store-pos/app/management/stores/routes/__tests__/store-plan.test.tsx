@@ -383,7 +383,6 @@ describe('StorePlanPage — DG-7 lock derived from planType', () => {
       succeeded: true,
       data: makeStorePlan({ planType: 'Pago', modules: [makeStoreModule()] }),
     });
-    const { StorePlanPage } = await import('../store-plan');
     await renderPage(makeUser({ isSuperAdmin: false }));
 
     await waitFor(() => {
@@ -400,7 +399,6 @@ describe('StorePlanPage — DG-7 lock derived from planType', () => {
       succeeded: true,
       data: makeStorePlan({ planType: 'Pago', modules: [makeStoreModule()] }),
     });
-    const { StorePlanPage } = await import('../store-plan');
     await renderPage(makeUser({ isSuperAdmin: true }));
 
     await waitFor(() => {
@@ -477,7 +475,6 @@ describe('StorePlanPage — no selected store', () => {
   });
 
   it('shows NO_STORE_SELECTED and fetches nothing', async () => {
-    const { StorePlanPage } = await import('../store-plan');
     await renderPage(makeUser({ selectedStoreId: '' }));
 
     await waitFor(() => {
