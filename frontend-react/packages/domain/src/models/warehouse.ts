@@ -68,7 +68,8 @@ export interface WarehouseStockMovement {
    * `purchase_in` → costo real de compra; `sale_out` → promedio ponderado vigente;
    * transferencias → costo propagado del origen. Permite reconstruir el valor
    * total como Σ(costPrice × quantity) con signo (entradas +, salidas −).
-   * Ausente en datos previos al cambio (fallback al nivel).
+   * Costo EXACTO del lote que esta fila movió (plan 2026-09-09, D8). Ausente
+   * solo en filas legacy anteriores al modelo de lotes (fallback al nivel).
    */
   costPrice?: number;
   /** Texto libre OPCIONAL en todos los tipos (decisión #6). */
@@ -79,11 +80,6 @@ export interface WarehouseStockMovement {
   toWarehouseId?: string;
   /** transfer_in → origen. */
   fromWarehouseId?: string;
-  /**
-   * Costo EXACTO del lote que esta fila movió (plan 2026-09-09, D8). Ausente
-   * solo en filas legacy anteriores al modelo de lotes.
-   */
-  costPrice?: number;
   /** reversal → movimiento original que esta fila compensa (D7a). */
   reversalOfMovementId?: string;
   /**
