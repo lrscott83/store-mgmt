@@ -3,6 +3,8 @@ import type {
   Store,
   StorePlan,
   Module,
+  Feature,
+  Plan,
   Owner,
   OwnerStoreWithPlan,
   StoreToCollect,
@@ -123,6 +125,26 @@ export const storeHttpService = {
 
   async getModulesToStore(): Promise<BaseResponseModel<Module[]>> {
     const response = await apiClient.get<BaseResponseModel<Module[]>>('/v1/modules/ToStore');
+    return response.data;
+  },
+
+  /**
+   * Plan catalog (GET /v1/plans): the three active plans — Gratis, Pago,
+   * Superior — with member modules and computed prices. VIP is excluded
+   * server-side; raw passthrough, no client mapping.
+   */
+  async getPlans(): Promise<BaseResponseModel<Plan[]>> {
+    const response = await apiClient.get<BaseResponseModel<Plan[]>>('/v1/plans');
+    return response.data;
+  },
+
+  /**
+   * Feature catalog (GET /v1/Features/available): real Feature descriptions
+   * feeding the "?" tooltips on the plan panels. Group client-side by
+   * ModuleId. Raw passthrough, no client mapping.
+   */
+  async getFeaturesToStore(): Promise<BaseResponseModel<Feature[]>> {
+    const response = await apiClient.get<BaseResponseModel<Feature[]>>('/v1/Features/available');
     return response.data;
   },
 

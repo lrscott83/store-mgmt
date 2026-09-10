@@ -24,6 +24,11 @@ namespace Application.Dtos.StoreManagement
         /// started (never-activated store).
         /// </summary>
         public DateOnly? NextDueDate { get; set; }
+        /// <summary>
+        /// The store's current plan name (Gratis, Pago or Superior) serialized
+        /// from <c>Store.StorePlanId</c>, so the frontend never infers it.
+        /// </summary>
+        public string PlanType { get; set; }
         public List<ModuleDto> Modules { get; set; } = new();
     }
 }

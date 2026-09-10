@@ -1,10 +1,9 @@
 import { useState } from 'react';
 import { useIntl } from 'react-intl';
-import type { Module, Owner, Store } from '@store-mgmt/domain';
+import type { Owner, Store } from '@store-mgmt/domain';
 import { Card } from '~/shared/components/ui/card';
 import { Button } from '~/shared/components/ui/button';
 import { PlusIcon, EditIcon } from '~/shared/components/ui/icons';
-import { PlanPicker } from './plan-picker';
 
 interface StoreFormValues {
   name: string;
@@ -14,11 +13,9 @@ interface StoreFormValues {
   approved: boolean;
   paymentStartDate: string;
   isActive: boolean;
-  moduleIds: number[];
 }
 
 interface StoreFormProps {
-  modules: Module[];
   owners: Owner[];
   initialValues?: Partial<Store>;
   isLoading: boolean;
@@ -27,14 +24,6 @@ interface StoreFormProps {
   isEditMode: boolean;
   onSubmit: (values: StoreFormValues) => void;
   error?: string;
-  /** External submit gate unrelated to connectivity — e.g. create-mode module catalog load failure. */
-  submitDisabled?: boolean;
-  /**
-   * Plan split (management stores): the store-data view renders WITHOUT the
-   * PlanPicker — the plan lives on its own page. Create mode keeps it (module
-   * selection happens at birth). Defaults to true.
-   */
-  includePlan?: boolean;
 }
 
 /**
@@ -43,7 +32,6 @@ interface StoreFormProps {
  * (edit-store.component.html:1,157-164). Fields themselves keep their existing markup/roles.
  */
 export function StoreForm({
-  modules,
   owners,
   initialValues,
   isLoading,
@@ -52,8 +40,6 @@ export function StoreForm({
   isEditMode,
   onSubmit,
   error,
-  submitDisabled: externalSubmitDisabled = false,
-  includePlan = true,
 }: StoreFormProps) {
   const intl = useIntl();
 
@@ -68,26 +54,10 @@ export function StoreForm({
       : '',
   );
   const [isActive, setIsActive] = useState(initialValues?.isActive ?? false);
-  const [moduleIds, setModuleIds] = useState<number[]>(() =>
-    modules.filter((m) => m.priceIncluded || m.selected).map((m) => m.id),
-  );
   const [validationError, setValidationError] = useState('');
 
   const isAdminUser = isSuperAdmin || isOwnerAdmin;
-  const submitDisabled = isLoading || externalSubmitDisabled;
-
-  /**
-   * DG-7 — "plan activation (owner, once)" (`openspec/specs/billing/spec.md`).
-   * The lock spends the owner's single activation, so it must engage on the real
-   * condition: the store is already ON the paid plan.
-   *
-   * This used to read `initialValues?.paymentStartDate != null`, a sound proxy
-   * back when the billing clock only started on first paid module. Once EVERY
-   * store starts its clock at creation, that proxy would spend the owner's one
-   * activation at birth — before any plan was chosen — locking them out of the
-   * paid plan forever.
-   */
-  const isOnPaidPlan = modules.some((m) => !m.priceIncluded && m.selected);
+  const submitDisabled = isLoading;
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -113,7 +83,6 @@ export function StoreForm({
       approved,
       paymentStartDate,
       isActive,
-      moduleIds,
     });
   }
 
@@ -257,14 +226,6 @@ export function StoreForm({
                 {intl.formatMessage({ id: 'STORES.IS_ACTIVE' })}
               </label>
             </div>
-          )}
-
-          {includePlan && (
-            <PlanPicker
-              modules={modules}
-              onChange={setModuleIds}
-              readOnly={!isSuperAdmin && isOnPaidPlan}
-            />
           )}
         </div>
       </Card>

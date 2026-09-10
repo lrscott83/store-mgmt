@@ -259,11 +259,17 @@ test('E-09 — Editar el plan popup locks the paid store for the owner (DG-7)', 
   const modal = page.getByTestId(`owner-store-plan-modal-${selectedStoreId}`);
   await expect(modal).toBeVisible();
 
-  // Same discriminating check as store-plan-lock-regression.spec.ts: on the FREE
-  // tab, the "Activar este plan" button would render if readOnly were false. The
-  // persona's store is on the PAID plan, so the DG-7 lock must hide it.
-  await page.getByRole('tab', { name: /Gratis/ }).click();
-  await expect(page.getByRole('button', { name: 'Activar este plan' })).toHaveCount(0);
+  // Same discriminating check as store-plan-lock-regression.spec.ts: the plan
+  // modal renders the same collapsible PlanPanels as store-plan.tsx (DG-7
+  // readOnly = !isSuperAdmin && storePlanType !== 'Gratis', edit-plan-modal.tsx).
+  // The persona's store is on the PAID plan, so the paid panel is the default
+  // expanded one; expand the FREE (non-active) panel — the only place the
+  // "Activar ese plan" button would render if readOnly were false — and pin
+  // that the lock hides it here too.
+  const freeHeader = modal.getByRole('button', { name: /Gratis/ });
+  await freeHeader.click();
+  await expect(freeHeader).toHaveAttribute('aria-expanded', 'true');
+  await expect(modal.getByRole('button', { name: 'Activar ese plan' })).toHaveCount(0);
 });
 
 test('E-08 — Editar el plan popup saves a plan change on a free store', async ({
@@ -286,14 +292,22 @@ test('E-08 — Editar el plan popup saves a plan change on a free store', async 
   await expect(page.getByTestId(`owner-store-next-due-${selectedStoreId}`)).toHaveCount(0);
   await expect(page.getByTestId(`owner-store-price-${selectedStoreId}`)).toHaveCount(0);
 
-  // Open the plan popup; on the paid tab the activation button IS available now.
+  // Open the plan popup; the paid panel is COLLAPSED (only the active FREE
+  // panel starts expanded — plan-panels.tsx). Expand it: the "Activar ese
+  // plan" button IS available now (readOnly is false on the free plan).
   await page.getByTestId(`owner-store-actions-toggle-${selectedStoreId}`).click();
   await page.getByTestId(`owner-store-edit-plan-${selectedStoreId}`).click();
-  await page.getByRole('tab', { name: /Pago/ }).click();
-  await page.getByRole('button', { name: 'Activar este plan' }).click();
+  const modal = page.getByTestId(`owner-store-plan-modal-${selectedStoreId}`);
+  const paidHeader = modal.getByRole('button', { name: /Pago/ });
+  await expect(paidHeader).toHaveAttribute('aria-expanded', 'false');
+  await paidHeader.click();
+  await expect(paidHeader).toHaveAttribute('aria-expanded', 'true');
+  await modal.getByRole('button', { name: 'Activar ese plan' }).click();
 
-  // Save rides the full module-set update (same shape as the plan view).
-  await page.getByTestId(`owner-plan-save-${selectedStoreId}`).click();
+  // Immediate activation (no Guardar footer in the modal): the parent saves
+  // the full module-set update, refreshes the session and CLOSES the popup
+  // (my-stores.tsx handlePlanActivate).
+  await expect(modal).not.toBeVisible();
 
   // After the save the card repaints as PAID: plan label + price line back.
   await expect(page.getByTestId(`owner-store-body-${selectedStoreId}`)).toContainText(

@@ -5,13 +5,11 @@ import { EFeatures } from '@store-mgmt/domain';
 import { adminFeatureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { storeHttpService } from '~/management/stores/lib/services/store-http-service';
-import { PlanPicker } from '~/management/stores/components/plan-picker';
-import { Card } from '~/shared/components/ui/card';
-import { Button } from '~/shared/components/ui/button';
+import { PlanPanels } from '~/management/stores/components/plan-panels';
+import { groupFeaturesByModuleId, planModuleIdsForActivation } from '~/management/stores/lib/plan-utils';
 import { httpErrorKey } from '~/shared/lib/http/http-error';
-import { mergeStoreModules } from '~/management/stores/lib/store-modules';
 import { formatDateOnly } from '~/shared/lib/date-utils';
-import type { StorePlan, Module } from '@store-mgmt/domain';
+import type { StorePlan, Plan, Feature } from '@store-mgmt/domain';
 
 export const clientLoader = adminFeatureLoader([EFeatures.Stores]);
 
@@ -21,9 +19,13 @@ export const clientLoader = adminFeatureLoader([EFeatures.Stores]);
  * The storeId resolves from the route param first, falling back to
  * `user.selectedStoreId` (same resolution as the edit-store route).
  *
- * HTTP-only data access (same as edit-store): reads the dedicated plan
- * endpoint plus the module catalog, and saves via the general store update
- * with the full module set (the backend applies modules only when present).
+ * Catalog-driven: GET /v1/plans renders the three PlanPanels (Gratis/Pago/
+ * Superior, VIP excluded server-side) with the store's backend-serialized
+ * planType deciding the default-expanded panel and the DG-7 read-only lock.
+ * Activation is per-panel and immediate: updateStore with the free+paid module
+ * union, session refresh, then a re-read of the store plan so the panels and
+ * the billing banner reflect the new plan. No tabbed picker, no merge, no
+ * Guardar footer — the change lives in the upgrade cost (Price), not in a save.
  */
 export function StorePlanPage() {
   const intl = useIntl();
@@ -34,45 +36,56 @@ export function StorePlanPage() {
   const isSuperAdmin = user?.isSuperAdmin ?? false;
 
   const [plan, setPlan] = useState<StorePlan | undefined>(undefined);
-  const [modules, setModules] = useState<Module[]>([]);
-  const [moduleIds, setModuleIds] = useState<number[]>([]);
+  const [plans, setPlans] = useState<Plan[]>([]);
+  const [featuresByModuleId, setFeaturesByModuleId] = useState<ReadonlyMap<number, Feature[]>>(
+    new Map(),
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [activationError, setActivationError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!storeId) return;
     let cancelled = false;
-    Promise.all([storeHttpService.getStorePlan(storeId), storeHttpService.getModulesToStore()])
-      .then(([planRes, modulesRes]) => {
+    setIsLoading(true);
+    Promise.all([
+      storeHttpService.getStorePlan(storeId),
+      storeHttpService.getPlans(),
+      storeHttpService.getFeaturesToStore(),
+    ])
+      .then(([planRes, plansRes, featuresRes]) => {
         if (cancelled) return;
-        if (!planRes.succeeded || !modulesRes.succeeded) {
+        if (!planRes.succeeded || !plansRes.succeeded || !featuresRes.succeeded) {
           setError(intl.formatMessage({ id: 'STORES.ERROR' }));
           return;
         }
-        // Merge the store's active modules into the catalog: selected=true,
-        // price overrides from the store's snapshot (shared helper, same as
-        // the create/edit form).
-        const mergedModules = mergeStoreModules(modulesRes.data, planRes.data.modules);
         setPlan(planRes.data);
-        setModules(mergedModules);
-        setModuleIds(mergedModules.filter((m) => m.priceIncluded || m.selected).map((m) => m.id));
+        setPlans(plansRes.data);
+        setFeaturesByModuleId(groupFeaturesByModuleId(featuresRes.data));
         setError('');
       })
       .catch((error) => {
         if (!cancelled) {
           setError(intl.formatMessage({ id: httpErrorKey(error, 'STORES.ERROR') }));
         }
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
       });
     return () => {
       cancelled = true;
     };
   }, [storeId, intl]);
 
-  const isOnPaidPlan = modules.some((m) => !m.priceIncluded && m.selected);
+  const planType = plan?.planType ?? '';
+  // DG-7: paid stores lock the plan editor for non-super-admins. The backend
+  // planType is the single source of truth — no module-price heuristic.
+  const readOnly = !isSuperAdmin && planType !== '' && planType !== 'Gratis';
+  const isOnPaidPlan = planType !== '' && planType !== 'Gratis';
 
-  async function handleSave() {
+  async function handleActivate(selectedPlan: Plan) {
     if (!plan || !storeId) return;
-    setError('');
+    setActivationError(null);
     setIsLoading(true);
     try {
       await storeHttpService.updateStore(storeId, {
@@ -84,18 +97,22 @@ export function StorePlanPage() {
         // Omit when null — the backend only applies a non-null value and an
         // empty string would fail DateOnly binding.
         paymentStartDate: plan.paymentStartDate ?? undefined,
-        moduleIds,
+        moduleIds: planModuleIdsForActivation(plans, selectedPlan),
         isActive: plan.isActive,
       });
-      // Angular parity: after save, refresh the user session via the
-      // consolidated getUserByToken() action — no page reload.
+      // Angular parity: refresh the user session via the consolidated
+      // getUserByToken() action — no page reload.
       try {
         await getUserByToken();
       } catch {
         // Non-critical: session refresh failure should not block the save UX
       }
+      // Re-read the store plan so the panels and the billing banner reflect
+      // the newly activated planType (PlanPanels re-expands via its effect).
+      const refreshed = await storeHttpService.getStorePlan(storeId);
+      if (refreshed.succeeded) setPlan(refreshed.data);
     } catch (error) {
-      setError(intl.formatMessage({ id: httpErrorKey(error, 'STORES.ERROR') }));
+      setActivationError(intl.formatMessage({ id: httpErrorKey(error, 'STORES.ERROR') }));
     } finally {
       setIsLoading(false);
     }
@@ -121,9 +138,7 @@ export function StorePlanPage() {
     );
   }
 
-  // Wait for the plan + catalog before mounting the picker so the initial
-  // moduleIds hydrate correctly (same gate as edit-store).
-  if (!plan) {
+  if (!plan || isLoading) {
     return (
       <div className="space-y-4 p-4">
         <p className="text-sm text-gray-500">{intl.formatMessage({ id: 'GENERAL.LOADING' })}</p>
@@ -136,34 +151,27 @@ export function StorePlanPage() {
       <h1 className="text-xl font-semibold">
         {intl.formatMessage({ id: 'STORES.PLAN.SECTION_TITLE' })}
       </h1>
-      <Card
-        footer={
-          <div className="text-center">
-            <Button type="button" variant="fab" disabled={isLoading} onClick={handleSave}>
-              {isLoading
-                ? intl.formatMessage({ id: 'STORES.SAVING' })
-                : intl.formatMessage({ id: 'STORES.SAVE' })}
-            </Button>
-          </div>
-        }
-      >
-        {/* Next billing date — only meaningful while the store is on a paid plan
-            (a paid module is active); hidden on the free plan. */}
-        {isOnPaidPlan && plan.nextDueDate && (
-          <p
-            data-testid="plan-next-billing-date"
-            className="mb-3 rounded border border-cyan-200 bg-cyan-50 px-3 py-2 text-sm text-cyan-800"
-          >
-            {intl.formatMessage({ id: 'STORES.PLAN.NEXT_BILLING_DATE' })}:{' '}
-            <span className="font-semibold">{formatDateOnly(plan.nextDueDate)}</span>
-          </p>
-        )}
-        <PlanPicker
-          modules={modules}
-          onChange={setModuleIds}
-          readOnly={!isSuperAdmin && isOnPaidPlan}
-        />
-      </Card>
+
+      {/* Next billing date — only meaningful while the store is on a paid plan
+          (backend planType); hidden on the free plan. */}
+      {isOnPaidPlan && plan.nextDueDate && (
+        <p
+          data-testid="plan-next-billing-date"
+          className="mb-3 rounded border border-cyan-200 bg-cyan-50 px-3 py-2 text-sm text-cyan-800"
+        >
+          {intl.formatMessage({ id: 'STORES.PLAN.NEXT_BILLING_DATE' })}:{' '}
+          <span className="font-semibold">{formatDateOnly(plan.nextDueDate)}</span>
+        </p>
+      )}
+
+      <PlanPanels
+        plans={plans}
+        storePlanType={planType}
+        featuresByModuleId={featuresByModuleId}
+        readOnly={readOnly}
+        onActivate={handleActivate}
+        activationError={activationError}
+      />
     </div>
   );
 }

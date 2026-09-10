@@ -323,15 +323,6 @@ export const MENU_GROUPS: MenuGroup[] = [
           'Mis tiendas. Lista todas tus tiendas (activas e inactivas) en tarjetas con su plan, próximo cobro y precio. Desde el engranaje puedes editar el nombre, activar o desactivar la tienda y cambiar el plan.',
       },
       {
-        label: 'MENU.STORES_PLAN',
-        path: '/management/stores',
-        featureIds: [EFeatures.Stores],
-        moduleId: EModules.Management,
-        exact: true,
-        helpContent:
-          'Plan y estado de la tienda. Consulta el plan actual (Gratis, Básico, Profesional), las fechas de pago y vencimiento. Renueva o cambia de plan según necesites.',
-      },
-      {
         label: 'MENU.STORES_UPDATE',
         path: '/management/stores/update',
         featureIds: [EFeatures.Stores],

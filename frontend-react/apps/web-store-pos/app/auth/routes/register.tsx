@@ -5,6 +5,7 @@ import { ConnectivityService } from '~/shared/lib/auth/connectivity-service';
 import { authHttpService } from '~/shared/lib/http/auth-http-service';
 import { Button } from '~/shared/components/ui/button';
 import { EyeIcon, EyeOffIcon, LockOpenIcon } from '~/shared/components/ui/icons';
+import { showBlockingError } from '~/shared/lib/blocking-alert';
 import { guestOnlyLoader } from './loaders';
 
 export const clientLoader = guestOnlyLoader;
@@ -27,7 +28,6 @@ interface FormErrors {
   storeName?: string;
   password?: string;
   passwordConfirmation?: string;
-  form?: string;
 }
 
 export default function RegisterPage() {
@@ -125,20 +125,28 @@ export default function RegisterPage() {
       // always arrives here as a rejection. ResponseResult.Message is always null (no setter
       // populated by ErrorHandlerMiddleware), so the literal failure text lives at
       // errors[0].description, never at data.message.
+      //
+      // The error is surfaced in a blocking popup, never as an inline banner.
       const axiosErr = err as {
         response?: { status: number; data?: { errors?: Array<{ description?: string }> } };
       };
       const status = axiosErr.response?.status;
-      if (status === 400) {
-        const description = axiosErr.response?.data?.errors?.[0]?.description;
-        setErrors({
-          form: description ?? intl.formatMessage({ id: 'REGISTRATION.VALIDATION_ERROR' }),
-        });
-      } else if (status === 429) {
-        setErrors({ form: intl.formatMessage({ id: 'REGISTRATION.TOO_MANY_ATTEMPTS' }) });
-      } else {
-        setErrors({ form: intl.formatMessage({ id: 'REGISTRATION.UNEXPECTED_ERROR' }) });
+      // A 500 already opened the app-wide blocking error popup (api-client.ts
+      // response interceptor) — a second popup here would stack two dialogs.
+      if (status === 500) {
+        return;
       }
+      let message: string;
+      if (status === 400) {
+        message =
+          axiosErr.response?.data?.errors?.[0]?.description ??
+          intl.formatMessage({ id: 'REGISTRATION.VALIDATION_ERROR' });
+      } else if (status === 429) {
+        message = intl.formatMessage({ id: 'REGISTRATION.TOO_MANY_ATTEMPTS' });
+      } else {
+        message = intl.formatMessage({ id: 'REGISTRATION.UNEXPECTED_ERROR' });
+      }
+      showBlockingError(intl.formatMessage({ id: 'GENERAL.RESPONSE.ERROR_TITLE' }), message);
     } finally {
       setIsLoading(false);
     }
@@ -153,12 +161,6 @@ export default function RegisterPage() {
       {isOffline && (
         <div className="mb-4 rounded-lg bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-800">
           {intl.formatMessage({ id: 'REGISTRATION.OFFLINE_BANNER' })}
-        </div>
-      )}
-
-      {errors.form && (
-        <div className="mb-4 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
-          {errors.form}
         </div>
       )}
 

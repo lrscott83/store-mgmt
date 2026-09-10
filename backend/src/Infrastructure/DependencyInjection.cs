@@ -66,6 +66,7 @@ namespace Infrastructure
             services.AddScoped<ITenantRepository, TenantRepository>();
             services.AddScoped<IFeatureRepository, FeatureRepository>();
             services.AddScoped<IModuleRepository, ModuleRepository>();
+            services.AddScoped<IPlanRepository, PlanRepository>();
             services.AddScoped<IStoreModuleRepository, StoreModuleRepository>();
             services.AddScoped<IStoreRepository, StoreRepository>();
             services.AddScoped<IStoreUserRepository, StoreUserRepository>();

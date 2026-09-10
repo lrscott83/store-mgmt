@@ -63,6 +63,7 @@ export function WarehouseMovementModal({
 }: WarehouseMovementModalProps) {
   const intl = useIntl();
   const [selectedProduct, setSelectedProduct] = useState('');
+  const [productSearch, setProductSearch] = useState('');
   const [quantity, setQuantity] = useState('');
   const [costPrice, setCostPrice] = useState('');
   const [toWarehouseId, setToWarehouseId] = useState('');
@@ -71,6 +72,7 @@ export function WarehouseMovementModal({
   useEffect(() => {
     if (open) {
       setSelectedProduct(productId ?? '');
+      setProductSearch('');
       // Edición (F3): precarga los valores de la fila original; create arranca limpio.
       setQuantity(initial ? String(initial.quantity) : '');
       setCostPrice(initial?.costPrice !== undefined ? String(initial.costPrice) : '');
@@ -100,6 +102,17 @@ export function WarehouseMovementModal({
     (mode !== 'transfer_out' || toWarehouseId !== '');
 
   const productKnown = products.some((p) => p.id === selectedProduct);
+  // Accent- and case-insensitive filter (same as edit-inventory-entry-modal):
+  // "cafe" matches "Café", "RON" matches "Ron".
+  const normalized = (value: string) =>
+    value
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+  const visibleProducts =
+    productSearch.trim() === ''
+      ? products
+      : products.filter((p) => normalized(p.name).includes(normalized(productSearch)));
   const inputClass =
     'w-full rounded border border-border bg-background px-3 py-2 text-sm text-text focus:outline-none focus:ring-2 focus:ring-primary';
 
@@ -133,6 +146,17 @@ export function WarehouseMovementModal({
             <label htmlFor="movement-product" className="mb-1 block text-sm font-medium text-text">
               {intl.formatMessage({ id: 'WAREHOUSES.PRODUCT' })}
             </label>
+            {productId === null && (
+              <input
+                id="movement-product-search"
+                data-testid="movement-product-search"
+                type="text"
+                value={productSearch}
+                onChange={(e) => setProductSearch(e.target.value)}
+                className={`${inputClass} mb-2`}
+                placeholder={intl.formatMessage({ id: 'WAREHOUSES.SEARCH_PRODUCT' })}
+              />
+            )}
             <select
               id="movement-product"
               data-testid="movement-product"
@@ -142,7 +166,7 @@ export function WarehouseMovementModal({
               className={inputClass}
             >
               <option value="">{intl.formatMessage({ id: 'WAREHOUSES.SELECT_PRODUCT' })}</option>
-              {products.map((p) => (
+              {visibleProducts.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name}
                 </option>

@@ -1,10 +1,10 @@
 import type { Module } from '@store-mgmt/domain';
 
 /**
- * Merges a store's active modules into the module catalog so the PlanPicker
- * can hydrate: catalog modules the store has are marked `selected: true` with
- * the store's price overrides (currentPrice/price/discountText); the rest stay
- * unselected. Shared by the plan view and the create/edit form.
+ * Merges a store's active modules into the module catalog so a card/list can
+ * hydrate: catalog modules the store has are marked `selected: true` with the
+ * store's price overrides (currentPrice/price/discountText); the rest stay
+ * unselected. Used by the my-stores cards (plan price per card).
  */
 export function mergeStoreModules(catalog: Module[], storeModules: Module[]): Module[] {
   return catalog.map((m) => {

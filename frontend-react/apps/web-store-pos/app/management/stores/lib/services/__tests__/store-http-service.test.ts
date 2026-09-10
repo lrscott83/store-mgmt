@@ -394,6 +394,106 @@ describe('storeHttpService.getModulesToStore — HTTP-11: GET /v1/modules/ToStor
   });
 });
 
+describe('storeHttpService.getPlans — CATALOG-1: GET /v1/plans', () => {
+  const planCatalog = [
+    {
+      id: 1,
+      name: 'Gratis',
+      order: 1,
+      planType: 'Gratis',
+      price: 0,
+      modules: [
+        {
+          moduleId: 1,
+          name: 'Ventas',
+          order: 1,
+          priceIncluded: true,
+          price: 100,
+          currentPrice: 100,
+          discountPrice: 0,
+          percentDiscountPrice: 0,
+          discountText: '',
+          featureDescriptions: ['Registro de ventas'],
+        },
+      ],
+    },
+    { id: 2, name: 'Pago', order: 2, planType: 'Pago', price: 900, modules: [] },
+    { id: 3, name: 'Superior', order: 3, planType: 'Superior', price: 1500, modules: [] },
+  ];
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    const { apiClient } = await import('~/shared/lib/http/api-client');
+    (apiClient.get as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: { succeeded: true, data: planCatalog },
+    });
+  });
+
+  it('calls GET /v1/plans', async () => {
+    const { storeHttpService } = await import('../store-http-service');
+    const { apiClient } = await import('~/shared/lib/http/api-client');
+    await storeHttpService.getPlans();
+    expect(apiClient.get).toHaveBeenCalledWith('/v1/plans');
+  });
+
+  it('returns the raw catalog array (no mapping)', async () => {
+    const { storeHttpService } = await import('../store-http-service');
+    const result = await storeHttpService.getPlans();
+    if (!result.succeeded) throw new Error('expected succeeded response');
+    expect(result.data).toEqual(planCatalog);
+  });
+
+  it('propagates a network rejection', async () => {
+    const { storeHttpService } = await import('../store-http-service');
+    const { apiClient } = await import('~/shared/lib/http/api-client');
+    (apiClient.get as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('network down'));
+    await expect(storeHttpService.getPlans()).rejects.toThrow('network down');
+  });
+});
+
+describe('storeHttpService.getFeaturesToStore — TOOLTIP-1: GET /v1/Features/available', () => {
+  const features = [
+    {
+      id: 1,
+      name: 'Registro de ventas',
+      moduleId: 1,
+      displayName: 'Registro de ventas',
+      description: 'Crea y consulta ventas',
+      order: 1,
+      availableToStore: true,
+    },
+  ];
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    const { apiClient } = await import('~/shared/lib/http/api-client');
+    (apiClient.get as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: { succeeded: true, data: features },
+    });
+  });
+
+  it('calls GET /v1/Features/available', async () => {
+    const { storeHttpService } = await import('../store-http-service');
+    const { apiClient } = await import('~/shared/lib/http/api-client');
+    await storeHttpService.getFeaturesToStore();
+    expect(apiClient.get).toHaveBeenCalledWith('/v1/Features/available');
+  });
+
+  it('returns the raw feature array (no mapping)', async () => {
+    const { storeHttpService } = await import('../store-http-service');
+    const result = await storeHttpService.getFeaturesToStore();
+    if (!result.succeeded) throw new Error('expected succeeded response');
+    expect(result.data).toEqual(features);
+  });
+
+  it('propagates a network rejection', async () => {
+    const { storeHttpService } = await import('../store-http-service');
+    const { apiClient } = await import('~/shared/lib/http/api-client');
+    (apiClient.get as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('network down'));
+    await expect(storeHttpService.getFeaturesToStore()).rejects.toThrow('network down');
+  });
+});
+
 describe('storeHttpService.listOwners — OWNER-1: GET /v1/owners/all/true', () => {
   beforeEach(async () => {
     vi.clearAllMocks();

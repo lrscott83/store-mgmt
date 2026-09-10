@@ -63,6 +63,14 @@ export interface WarehouseStockMovement {
   type: WarehouseMovementType;
   /** Magnitud positiva, round2 (decisión #7). */
   quantity: number;
+  /**
+   * Costo unitario de la transacción (decisión: movimientos sin cambio de costo).
+   * `purchase_in` → costo real de compra; `sale_out` → promedio ponderado vigente;
+   * transferencias → costo propagado del origen. Permite reconstruir el valor
+   * total como Σ(costPrice × quantity) con signo (entradas +, salidas −).
+   * Ausente en datos previos al cambio (fallback al nivel).
+   */
+  costPrice?: number;
   /** Texto libre OPCIONAL en todos los tipos (decisión #6). */
   reason: string | null;
   createdDate: Date;

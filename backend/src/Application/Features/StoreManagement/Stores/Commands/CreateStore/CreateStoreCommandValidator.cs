@@ -1,4 +1,5 @@
-﻿using Domain.Entities.Modules;
+﻿using Application.Abstractions.HttpContext;
+using Domain.Entities.Modules;
 using Domain.Interfaces.Repositories;
 using FluentValidation;
 using Microsoft.Extensions.Localization;
@@ -11,13 +12,15 @@ namespace Application.Features.StoreManagement.Stores.Commands.CreateStore
         private readonly IOwnerRepository _ownerRepository;
         private readonly IStoreRepository _storeRepository;
         private readonly IModuleRepository _moduleRepository;
+        private readonly IHttpContextService _httpContextService;
         private readonly IStringLocalizer<I18n> _localizer;
         public CreateStoreCommandValidator(IStringLocalizer<I18n> localizer, IOwnerRepository ownerRepository, 
-            IStoreRepository storeRepository, IModuleRepository moduleRepository)
+            IStoreRepository storeRepository, IModuleRepository moduleRepository, IHttpContextService httpContextService)
         {
             _ownerRepository = ownerRepository;
             _storeRepository = storeRepository;
             _moduleRepository = moduleRepository;
+            _httpContextService = httpContextService;
             _localizer = localizer;
 
             RuleFor(x => x.Name)
@@ -25,15 +28,22 @@ namespace Application.Features.StoreManagement.Stores.Commands.CreateStore
               .NotEmpty().WithMessage(_localizer["IsRequired", "{PropertyName}"])
               .MustAsync(IsUniqueName).WithMessage(_localizer["UserAlreadyExists", "{PropertyName}"]);
 
-            RuleFor(x => x.OwnerId)
-                .NotNull().WithMessage(_localizer["IsRequired", "{PropertyName}"])
-                .NotEmpty().WithMessage(_localizer["IsRequired", "{PropertyName}"])
-                .MustAsync(OwnerExists).WithMessage(_localizer["OwnerNotFound", "{PropertyName}"]);
+            // Owner branch (user-approved StoreCreation): OwnerId and ModuleIds are both
+            // DERIVED server-side (own owner + selected store inheritance) — body values are
+            // the owner-branch contract (zero-Guid / empty list) and must not be validated here.
+            // Name rules above still apply to every caller.
+            When(x => !_httpContextService.IsOwnerAdmin, () =>
+            {
+                RuleFor(x => x.OwnerId)
+                    .NotNull().WithMessage(_localizer["IsRequired", "{PropertyName}"])
+                    .NotEmpty().WithMessage(_localizer["IsRequired", "{PropertyName}"])
+                    .MustAsync(OwnerExists).WithMessage(_localizer["OwnerNotFound", "{PropertyName}"]);
 
-            RuleFor(x => x.ModuleIds)
-                .NotNull().WithMessage(_localizer["IsRequired", "{PropertyName}"])
-                .NotEmpty().WithMessage(_localizer["IsRequired", "{PropertyName}"])
-                .MustAsync(AvailableModuleIdsToStore).WithMessage(_localizer["ModuleNotAvailableToStore", "{PropertyName}"]);
+                RuleFor(x => x.ModuleIds)
+                    .NotNull().WithMessage(_localizer["IsRequired", "{PropertyName}"])
+                    .NotEmpty().WithMessage(_localizer["IsRequired", "{PropertyName}"])
+                    .MustAsync(AvailableModuleIdsToStore).WithMessage(_localizer["ModuleNotAvailableToStore", "{PropertyName}"]);
+            });
         }
 
         private async Task<bool> IsUniqueName(string name, CancellationToken cancellationToken)

@@ -72,10 +72,11 @@ export default [
     route('sync/import', 'sync/routes/import.tsx'),
 
     // Management â€” Stores
-    // Plan/update split: the PLAN view lives at `management/stores` (PlanPicker +
-    // plan save) and the store-DATA update view at `management/stores/update` and
-    // `management/stores/edit/:id` (no plan section â€” moduleIds omitted on save).
-    // Creation stays on `management/stores/create` (it needs the plan picker).
+    // Plan split: the store-DATA form never touches the plan. The PLAN view
+    // lives at `management/stores` and the owner plan modal in my-stores; the
+    // data edit at `management/stores/update` and `management/stores/edit/:id`
+    // (no moduleIds on save), and creation at `management/stores/create` (data
+    // only — the store is born on the Superior plan).
     // Distinct route `id`s are required because RR7 rejects reusing one file across
     // multiple route() entries without one (see design.md).
     route('management/stores', 'management/stores/routes/store-plan.tsx', {

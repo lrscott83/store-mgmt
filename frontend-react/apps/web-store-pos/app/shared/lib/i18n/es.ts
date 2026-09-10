@@ -205,7 +205,7 @@ const messages: Record<string, string> = {
 
   // Menu items — Inventory (Angular MENU.INVENTORY_MGMT.*)
   'MENU.AVAILABLE': 'Disponible',
-  'MENU.WAREHOUSES': 'Almacenes',
+  'MENU.WAREHOUSES': 'Gestión de Almacenes',
   'MENU.WAREHOUSES_MODULE': 'ALMACENES',
   'MENU.WAREHOUSE_MOVEMENTS': 'Movimientos',
   'MENU.TODAY_ENTRIES': 'Entradas del día',
@@ -233,7 +233,6 @@ const messages: Record<string, string> = {
   // Plan/update split: the single 'Tiendas' entry became two links — the plan
   // view (/management/stores) and the store-data update view
   // (/management/stores/update), same authorization (EFeatures.Stores).
-  'MENU.STORES_PLAN': 'Plan de la tienda',
   'MENU.STORES_UPDATE': 'Editar la tienda',
   // Owner's "my stores" cards listing (owner-stores-cards plan, 2026-09-08)
   'MENU.MY_STORES': 'Mis tiendas',
@@ -584,6 +583,7 @@ const messages: Record<string, string> = {
   'WAREHOUSES.TRANSFER': 'Transferir',
   'WAREHOUSES.QUANTITY': 'Cantidad',
   'WAREHOUSES.COST_PRICE': 'Costo por unidad',
+  'WAREHOUSES.SEARCH_PRODUCT': 'Buscar producto…',
   'WAREHOUSES.REASON': 'Motivo (opcional)',
   'WAREHOUSES.TO_WAREHOUSE': 'Almacén destino',
   'WAREHOUSES.SELECT_WAREHOUSE': 'Seleccione un almacén…',
@@ -613,6 +613,11 @@ const messages: Record<string, string> = {
   'WAREHOUSES.ACTIONS': 'Acciones de',
   'WAREHOUSES.REVERT_ACTION': 'Revertir',
   'WAREHOUSES.EDIT_ACTION': 'Editar',
+  'WAREHOUSES.COMPRA': 'Compra',
+  'WAREHOUSES.EDIT_MOVEMENT': 'Editar movimiento',
+  'WAREHOUSES.DELETE_MOVEMENT_TITLE': 'Eliminar movimiento',
+  'WAREHOUSES.DELETE_MOVEMENT_CONFIRM':
+    '¿Está seguro de que desea eliminar el movimiento de {product} ({quantity}) del almacén {warehouse}?',
   'WAREHOUSES.DEACTIVATE_BLOCKED': 'No se puede desactivar un almacén con stock o movimientos.',
   'WAREHOUSES.CREATED': 'Almacén creado.',
   'WAREHOUSES.UPDATED': 'Almacén actualizado.',
@@ -844,15 +849,11 @@ const messages: Record<string, string> = {
     'Plan Pago: 1 mes GRATIS. Luego se cobra por mes vencido → el primer pago después del segundo mes.',
   'STORES.PLAN.FREE_TAB': 'Gratis',
   'STORES.PLAN.PAID_TAB': 'Pago',
+  'STORES.PLAN.SUPERIOR_TAB': 'Superior',
   'STORES.PLAN.ACTIVE_BADGE': 'Activo',
   'STORES.PLAN.INCLUDES': 'Incluye:',
-  'STORES.PLAN.INCLUDES_FREE_PLUS': 'Todo lo del plan Gratis, y además:',
-  'STORES.PLAN.SELECTED': 'Plan seleccionado',
   'STORES.PLAN.NEXT_BILLING_DATE': 'Próximo cobro',
-  'STORES.PLAN.ACTIVATE': 'Activar este plan',
-  'STORES.PLAN.WILL_ACTIVATE_ON_SAVE': 'Se activará al guardar',
-  'STORES.PLAN.CURRENCY_NOTICE':
-    'Los precios se muestran en USD. El pago se realiza en MN al cambio oficial del día.',
+  'STORES.PLAN.ACTIVATE_PLAN': 'Activar ese plan',
 
   // Exchange rates — daily USD→MN register (daily-exchange-rate)
   'EXCHANGE_RATES.TITLE': 'Registro del cambio de USD a MN',
@@ -891,6 +892,8 @@ const messages: Record<string, string> = {
 
   // Owner's "my stores" cards view (owner-stores-cards plan, 2026-09-08)
   'STORES.MY_STORES_TITLE': 'Mis tiendas',
+  // Owner create-store button (owner-multistores store-creation, 2026-09-09)
+  'STORES.CREATE_STORE_BUTTON': 'Tienda',
   'STORES.INACTIVE_BADGE': 'Inactiva',
   'STORES.EDIT_STORE_TITLE': 'Editar la tienda',
   'STORES.EDIT_PLAN': 'Editar el plan',
