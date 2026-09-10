@@ -79,6 +79,9 @@ function buildStores(): Store[] {
     description: '',
     approved: true,
     paymentStartDate: null,
+    nextPaymentDate: null,
+    ownerPhone: null,
+    planType: 'Gratis',
     modules: [],
   };
   return [

@@ -10,11 +10,6 @@ import { Button } from '~/shared/components/ui/button';
 import { PlusIcon } from '~/shared/components/ui/icons';
 import type { Store } from '@store-mgmt/domain';
 
-// Extend Store type to include planType from backend response
-interface StoreWithPlanType extends Store {
-  planType?: string;
-}
-
 export const clientLoader = resellerLoader;
 
 /**
@@ -26,7 +21,7 @@ export const clientLoader = resellerLoader;
 export function AdminStoreListPage() {
   const navigate = useNavigate();
   const { formatMessage } = useIntl();
-  const [stores, setStores] = useState<StoreWithPlanType[]>([]);
+  const [stores, setStores] = useState<Store[]>([]);
   const [error, setError] = useState<string | undefined>(undefined);
   // Filter by plan type: 'all' shows all stores, 'not-free' excludes Gratis plan,
   // and specific plan types (VIP, Superior, Pago, Gratis) filter by that plan.

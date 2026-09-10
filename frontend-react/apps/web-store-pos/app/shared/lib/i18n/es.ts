@@ -845,6 +845,12 @@ const messages: Record<string, string> = {
   'STORES.PLAN.NEXT_BILLING_DATE': 'Próximo cobro',
   'STORES.PLAN.ACTIVATE_PLAN': 'Activar ese plan',
 
+  // Super-admin store cards (2026-09-10): owner contact + description labels.
+  // The plan line reuses the STORES.PLAN.*_TAB names; the phone renders as a tel: link.
+  'STORES.OWNER_LABEL': 'Owner',
+  'STORES.STORE_PHONE_LABEL': 'Teléfono',
+  'STORES.STORE_DESCRIPTION_LABEL': 'Descripción',
+
   // Exchange rates — daily USD→MN register (daily-exchange-rate)
   'EXCHANGE_RATES.TITLE': 'Registro del cambio de USD a MN',
   'EXCHANGE_RATES.INFO':

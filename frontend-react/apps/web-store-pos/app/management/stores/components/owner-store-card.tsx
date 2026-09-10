@@ -3,23 +3,7 @@ import type { Module, OwnerStoreWithPlan } from '@store-mgmt/domain';
 import { Card } from '~/shared/components/ui/card';
 import { ActionMenu, ActionMenuItem } from '~/shared/components/ui/action-menu';
 import { formatDateOnly } from '~/shared/lib/date-utils';
-
-/**
- * Format a plan amount as a bare number — decimals shown only when present
- * (10 → "10", 10.5 → "10.5"), no currency. Same shape as the plan panels'
- * formatPlanAmount: used for the struck-through original price.
- */
-function formatPlanAmount(amount: number): string {
-  return new Intl.NumberFormat('en-US', {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  }).format(amount);
-}
-
-/** Format as "5 USD" or "5.5 USD" (no $ symbol) — same shape as the plan panels. */
-function formatPlanPrice(amount: number): string {
-  return `${formatPlanAmount(amount)} USD`;
-}
+import { formatPlanAmount, formatPlanPrice } from '~/shared/lib/price-utils';
 
 const getIsOnPaidPlan = (modules: Module[]) =>
   modules.some((m) => !m.priceIncluded && m.selected);

@@ -4,6 +4,7 @@ using Application.Dtos.StoreManagement;
 using Application.Features.StoreManagement.Stores.Commands.CreateStore;
 using AutoMapper;
 using Domain.Common.Enums;
+using Domain.Common.Enums;
 using Domain.Common.Extensions;
 using Domain.Common.Utils;
 using Domain.Entities.StoreModules;
@@ -20,6 +21,8 @@ namespace Application.Mappings.StoreManagement
                 //.ForMember(dest => dest.DisplayName,opt => opt.MapFrom(src => src.Tenant != null && _contextService.IsSuperAdmin ? src.Tenant.Name + " - " + src.Name : src.Name))
                 .ForMember(dest => dest.DisplayName, opt => opt.MapFrom(src => src.Name))
                 .ForMember(dest => dest.OwnerName, opt => opt.MapFrom(src => src.Owner.User.FullName))
+                .ForMember(dest => dest.OwnerPhone, opt => opt.MapFrom(src => src.Owner.User.CellPhone))
+                .ForMember(dest => dest.PlanType, opt => opt.MapFrom(src => ResolvePlanType(src.StorePlanId)))
                 .ForMember(dest => dest.Modules, opt => opt.MapFrom(src => src.StoreModules));
 
             CreateMap<Store, StorePlanDto>()

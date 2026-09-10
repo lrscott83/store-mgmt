@@ -4,11 +4,6 @@ import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 import type { Store } from '@store-mgmt/domain';
 
-// Extend Store type to include planType from backend response
-interface StoreWithPlanType extends Store {
-  planType?: string;
-}
-
 // ─── react-router mock ────────────────────────────────────────────────────────
 
 const mockNavigate = vi.fn();
@@ -89,7 +84,7 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-function makeStore(overrides: Partial<StoreWithPlanType> = {}): StoreWithPlanType {
+function makeStore(overrides: Partial<Store> = {}): Store {
   return {
     id: 's1',
     name: 'Store One',
@@ -100,6 +95,8 @@ function makeStore(overrides: Partial<StoreWithPlanType> = {}): StoreWithPlanTyp
     description: 'A store',
     approved: true,
     paymentStartDate: '2024-01-01',
+    nextPaymentDate: null,
+    ownerPhone: null,
     modules: [],
     isActive: true,
     planType: 'Pago',
