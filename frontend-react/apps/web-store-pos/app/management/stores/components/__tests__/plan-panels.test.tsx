@@ -4,7 +4,7 @@ import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 import type { Feature, Plan, PlanModule } from '@store-mgmt/domain';
 
-// ─── Factories ────────────────────────────────────────────────────────────────
+// ─── Factories (owner-plan-change matrix) ────────────────────────────────────
 
 function makePlanModule(overrides: Partial<PlanModule> = {}): PlanModule {
   return {
@@ -34,14 +34,14 @@ function makePlan(overrides: Partial<Plan> = {}): Plan {
   };
 }
 
-// Gratis (sin módulos), Pago (Reportes $1500 c/ 25% off), Superior (Reportes + Créditos $500)
 function makeCatalog(): Plan[] {
   return [
-    makePlan({ id: 1, name: 'Gratis', planType: 'Gratis', price: 0, modules: [] }),
+    makePlan({ id: 1, name: 'Gratis', planType: 'Gratis', order: 1, price: 0, modules: [] }),
     makePlan({
       id: 2,
       name: 'Pago',
       planType: 'Pago',
+      order: 2,
       price: 1500,
       modules: [
         makePlanModule({
@@ -59,6 +59,7 @@ function makeCatalog(): Plan[] {
       id: 3,
       name: 'Superior',
       planType: 'Superior',
+      order: 3,
       price: 2000,
       modules: [
         makePlanModule({
@@ -112,7 +113,6 @@ const defaultProps = () => ({
   plans: makeCatalog(),
   storePlanType: 'Gratis',
   featuresByModuleId: FEATURES,
-  readOnly: false,
   activationError: null as string | null,
   onActivate: vi.fn(),
 });
@@ -130,50 +130,118 @@ async function renderPanels(props: Partial<TestProps> = {}) {
   return merged;
 }
 
-describe('PlanPanels — PANELS-1: three panels from real membership', () => {
-  it('renders Gratis, Pago and Superior panels with Σ currentPrice totals', async () => {
-    await renderPanels();
-    expect(screen.getByText('Gratis')).toBeInTheDocument();
-    expect(screen.getByText('Pago')).toBeInTheDocument();
-    expect(screen.getByText('Superior')).toBeInTheDocument();
-    // Σ totals rendered in the panel headers
-    expect(screen.getByText('1,500 USD')).toBeInTheDocument();
-    expect(screen.getByText('2,000 USD')).toBeInTheDocument();
-  });
-});
+// ─── owner-plan-change: dialog UI matrix (T6.1) ──────────────────────────────
 
-describe('PlanPanels — PANELS-2: active panel expands from planType', () => {
-  it('default-expands the Gratis panel (the active plan), collapsing the others', async () => {
-    await renderPanels({ storePlanType: 'Gratis' });
-    // Active badge marks the active plan
-    expect(screen.getByText('Activo')).toBeInTheDocument();
-    // Pago panel body is collapsed: its module content is hidden
-    expect(screen.queryByText('Reportes')).not.toBeInTheDocument();
-    // Expanding Pago reveals its lines
-    fireEvent.click(screen.getByRole('button', { name: /Pago/ }));
-    expect(screen.getByText('Reportes')).toBeInTheDocument();
-  });
-});
-
-describe('PlanPanels — PANELS-3: only the active panel expanded on mount', () => {
-  it('expands Pago only for a Pago store', async () => {
-    await renderPanels({ storePlanType: 'Pago' });
-    expect(screen.getByText('Reportes')).toBeInTheDocument();
-    // Superior is collapsed — its Créditos line must not render
-    expect(screen.queryByText('Créditos')).not.toBeInTheDocument();
-  });
-});
-
-describe('PlanPanels — PANELS-4: strike-through original price when discounted', () => {
-  it('shows discounted modules with the struck-through original price', async () => {
+describe('PlanPanels — ROWS-1: module rows are name+"?" only', () => {
+  it('renders the module name with no per-row price, strike, or discount text', async () => {
     await renderPanels({ storePlanType: 'Superior' });
-    expect(screen.getByText('Créditos')).toBeInTheDocument();
+    expect(screen.getByText('Reportes')).toBeInTheDocument();
+    // Module rows carry NO price: no discount text and no per-row "USD" total.
+    // (The 1,500 USD header total is the Pago panel header — legitimate, asserted
+    // in ROWS-2; "500 USD" as a row total is the old per-row pricing, now gone.)
+    expect(screen.queryByText('- 25%')).not.toBeInTheDocument();
+    expect(screen.queryByText('500 USD')).not.toBeInTheDocument();
+  });
+});
+
+describe('PlanPanels — ROWS-2: header keeps plan total, strike carried to header', () => {
+  it('shows the struck-through original total beside the current total in the header', async () => {
+    await renderPanels({ storePlanType: 'Gratis' });
+    // Pago header: strike 2,000 → current 1,500 USD (discount lifted to the header)
     const struck = screen.getByText('2,000');
     expect(struck.className).toContain('line-through');
+    expect(screen.getByText('1,500 USD')).toBeInTheDocument();
   });
 });
 
-describe('PlanPanels — TOOLTIP-1: "?" shows the real description', () => {
+describe('PlanPanels — HEADER-3: active badge stays on the active plan', () => {
+  it('marks the active panel with the Activo badge', async () => {
+    await renderPanels({ storePlanType: 'Pago' });
+    expect(screen.getByText('Activo')).toBeInTheDocument();
+  });
+});
+
+describe('PlanPanels — ACTIVATE-1: "Activar Plan" per-panel immediate action', () => {
+  it('renders "Activar Plan" on expanded non-active panels and calls onActivate', async () => {
+    const onActivate = vi.fn();
+    await renderPanels({ storePlanType: 'Gratis', onActivate });
+    fireEvent.click(screen.getByRole('button', { name: /Pago/ }));
+    const buttons = screen.getAllByRole('button', { name: 'Activar Plan' });
+    expect(buttons).toHaveLength(1);
+    fireEvent.click(buttons[0]);
+    expect(onActivate).toHaveBeenCalledTimes(1);
+    expect(onActivate.mock.calls[0][0].planType).toBe('Pago');
+    fireEvent.click(screen.getByRole('button', { name: /Superior/ }));
+    expect(screen.getAllByRole('button', { name: 'Activar Plan' })).toHaveLength(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Activar Plan' }));
+    expect(onActivate.mock.calls[1][0].planType).toBe('Superior');
+  });
+});
+
+describe('PlanPanels — ACTIVATE-2: no action on the active panel', () => {
+  it('never renders an activation action for the store’s current plan', async () => {
+    await renderPanels({ storePlanType: 'Pago' });
+    expect(screen.queryByRole('button', { name: 'Activar Plan' })).not.toBeInTheDocument();
+  });
+});
+
+describe('PlanPanels — NOLOCK-1: readOnly prop removed (owner can change any plan)', () => {
+  it('exposes the activation action even for a paid (non-Gratis) storePlanType', async () => {
+    const onActivate = vi.fn();
+    await renderPanels({ storePlanType: 'Pago', onActivate });
+    // The Pago panel is expanded (active) — Superior carries the action
+    fireEvent.click(screen.getByRole('button', { name: /Superior/ }));
+    expect(screen.getAllByRole('button', { name: 'Activar Plan' })).toHaveLength(1);
+    // The active plan itself never carries an action (Pago is active: only one button exists)
+    expect(screen.getAllByRole('button', { name: 'Activar Plan' })).toHaveLength(1);
+  });
+});
+
+describe('PlanPanels — COPY-1: INCLUDES_PREVIOUS_PLAN for paid targets', () => {
+  it('renders "Incluye todo lo del plan {plan_anterior} y además:" on non-active paid panels', async () => {
+    await renderPanels({ storePlanType: 'Gratis' });
+    fireEvent.click(screen.getByRole('button', { name: /Pago/ }));
+    // previous plan = the store's current plan (Gratis)
+    expect(
+      screen.getByText('Incluye todo lo del plan Gratis y además:'),
+    ).toBeInTheDocument();
+  });
+
+  it('uses the store’s current plan as plan_anterior (not the catalog predecessor)', async () => {
+    await renderPanels({ storePlanType: 'Pago' });
+    fireEvent.click(screen.getByRole('button', { name: /Superior/ }));
+    expect(
+      screen.getByText('Incluye todo lo del plan Pago y además:'),
+    ).toBeInTheDocument();
+  });
+});
+
+describe('PlanPanels — COPY-2: INCLUDES for the Gratis panel', () => {
+  it('renders "Incluye:" on the Gratis panel body', async () => {
+    await renderPanels({ storePlanType: 'Gratis' });
+    expect(screen.getByText('Incluye:')).toBeInTheDocument();
+  });
+});
+
+describe('PlanPanels — COPY-3: no cross-copy leakage between panels', () => {
+  it('never renders INCLUDES_PREVIOUS_PLAN on the active panel body', async () => {
+    await renderPanels({ storePlanType: 'Pago' });
+    // Pago (active, expanded) shows the plain "Incluye:" — it is not an upgrade target
+    expect(screen.getByText('Incluye:')).toBeInTheDocument();
+    expect(screen.queryByText(/Incluye todo lo del plan/)).not.toBeInTheDocument();
+  });
+});
+
+describe('PlanPanels — TOOLTIP-1: "?" h-6 w-6 green help icon', () => {
+  it('sizes the help icon h-6 w-6 and colors it green', async () => {
+    await renderPanels({ storePlanType: 'Superior' });
+    const help = screen.getByRole('button', { name: '?' });
+    expect(help.className).toContain('h-6');
+    expect(help.className).toContain('w-6');
+    // Green family (the panel renders a green help icon per the dialog design)
+    expect(help.className).toMatch(/green/);
+  });
+
   it('reveals the module feature description on demand', async () => {
     await renderPanels({ storePlanType: 'Superior' });
     fireEvent.click(screen.getByRole('button', { name: '?' }));
@@ -185,45 +253,6 @@ describe('PlanPanels — TOOLTIP-2: tooltips suppressed when features unavailabl
   it('hides the "?" affordances when no feature data is provided', async () => {
     await renderPanels({ storePlanType: 'Superior', featuresByModuleId: new Map() });
     expect(screen.queryByRole('button', { name: '?' })).not.toBeInTheDocument();
-    // Panels still render fine without tooltip data
-    expect(screen.getByText('Créditos')).toBeInTheDocument();
-  });
-});
-
-describe('PlanPanels — ACTIVATE-1: per-panel immediate activation action', () => {
-  it('renders "Activar ese plan" on expanded non-active panels and calls onActivate', async () => {
-    const onActivate = vi.fn();
-    await renderPanels({ storePlanType: 'Gratis', onActivate });
-    // Active panel (Gratis) is expanded with no action; expand Pago to reach its action
-    fireEvent.click(screen.getByRole('button', { name: /Pago/ }));
-    const buttons = screen.getAllByRole('button', { name: 'Activar ese plan' });
-    // Only the expanded panel's body shows its action; the active panel has none
-    expect(buttons).toHaveLength(1);
-    fireEvent.click(buttons[0]);
-    expect(onActivate).toHaveBeenCalledTimes(1);
-    expect(onActivate.mock.calls[0][0].planType).toBe('Pago');
-    // Expanding Superior swaps the view (single-open accordion) to its action
-    fireEvent.click(screen.getByRole('button', { name: /Superior/ }));
-    expect(screen.getAllByRole('button', { name: 'Activar ese plan' })).toHaveLength(1);
-    fireEvent.click(screen.getByRole('button', { name: 'Activar ese plan' }));
-    expect(onActivate.mock.calls[1][0].planType).toBe('Superior');
-  });
-});
-
-describe('PlanPanels — ACTIVATE-2: no Guardar on picker surfaces', () => {
-  it('does not render any Guardar button', async () => {
-    await renderPanels();
-    expect(screen.queryByRole('button', { name: /Guardar/ })).not.toBeInTheDocument();
-  });
-});
-
-describe('PlanPanels — LOCK-1: DG-7 read-only lock for paid stores', () => {
-  it('hides every activation action when readOnly, keeping prices visible', async () => {
-    await renderPanels({ storePlanType: 'Pago', readOnly: true });
-    expect(screen.queryByRole('button', { name: 'Activar ese plan' })).not.toBeInTheDocument();
-    expect(screen.getByText('Reportes')).toBeInTheDocument();
-    // Panel header total AND module row both price the discount — assert at least one
-    expect(screen.getAllByText('1,500 USD').length).toBeGreaterThan(0);
   });
 });
 

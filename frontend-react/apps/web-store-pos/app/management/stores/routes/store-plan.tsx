@@ -6,7 +6,7 @@ import { adminFeatureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { storeHttpService } from '~/management/stores/lib/services/store-http-service';
 import { PlanPanels } from '~/management/stores/components/plan-panels';
-import { groupFeaturesByModuleId, planModuleIdsForActivation } from '~/management/stores/lib/plan-utils';
+import { groupFeaturesByModuleId } from '~/management/stores/lib/plan-utils';
 import { httpErrorKey } from '~/shared/lib/http/http-error';
 import { formatDateOnly } from '~/shared/lib/date-utils';
 import type { StorePlan, Plan, Feature } from '@store-mgmt/domain';
@@ -22,8 +22,8 @@ export const clientLoader = adminFeatureLoader([EFeatures.Stores]);
  * Catalog-driven: GET /v1/plans renders the three PlanPanels (Gratis/Pago/
  * Superior, VIP excluded server-side) with the store's backend-serialized
  * planType deciding the default-expanded panel and the DG-7 read-only lock.
- * Activation is per-panel and immediate: updateStore with the free+paid module
- * union, session refresh, then a re-read of the store plan so the panels and
+ * Activation is per-panel and immediate: POST change-plan with the target
+ * plan id, session refresh, then a re-read of the store plan so the panels and
  * the billing banner reflect the new plan. No tabbed picker, no merge, no
  * Guardar footer — the change lives in the upgrade cost (Price), not in a save.
  */
@@ -33,7 +33,6 @@ export function StorePlanPage() {
   const { user, getUserByToken } = useAuthStore();
 
   const storeId = paramId ?? user?.selectedStoreId ?? '';
-  const isSuperAdmin = user?.isSuperAdmin ?? false;
 
   const [plan, setPlan] = useState<StorePlan | undefined>(undefined);
   const [plans, setPlans] = useState<Plan[]>([]);
@@ -78,9 +77,8 @@ export function StorePlanPage() {
   }, [storeId, intl]);
 
   const planType = plan?.planType ?? '';
-  // DG-7: paid stores lock the plan editor for non-super-admins. The backend
-  // planType is the single source of truth — no module-price heuristic.
-  const readOnly = !isSuperAdmin && planType !== '' && planType !== 'Gratis';
+  // owner-plan-change: the DG-7 readOnly lock is gone — the owner changes the
+  // store plan at any time; the backend ownership guard is the only authority.
   const isOnPaidPlan = planType !== '' && planType !== 'Gratis';
 
   async function handleActivate(selectedPlan: Plan) {
@@ -88,18 +86,10 @@ export function StorePlanPage() {
     setActivationError(null);
     setIsLoading(true);
     try {
-      await storeHttpService.updateStore(storeId, {
-        id: storeId,
-        name: plan.storeName,
-        address: plan.address ?? '',
-        description: plan.description ?? '',
-        approved: plan.approved,
-        // Omit when null — the backend only applies a non-null value and an
-        // empty string would fail DateOnly binding.
-        paymentStartDate: plan.paymentStartDate ?? undefined,
-        moduleIds: planModuleIdsForActivation(plans, selectedPlan),
-        isActive: plan.isActive,
-      });
+      // Owner-driven plan change (owner-plan-change): the dedicated change-plan
+      // endpoint carries the target plan id — the backend owns module rewriting,
+      // the anchor and the next-due pinning. No store payload ever rides this.
+      await storeHttpService.changeStorePlan(storeId, selectedPlan.id);
       // Angular parity: refresh the user session via the consolidated
       // getUserByToken() action — no page reload.
       try {
@@ -168,7 +158,6 @@ export function StorePlanPage() {
         plans={plans}
         storePlanType={planType}
         featuresByModuleId={featuresByModuleId}
-        readOnly={readOnly}
         onActivate={handleActivate}
         activationError={activationError}
       />

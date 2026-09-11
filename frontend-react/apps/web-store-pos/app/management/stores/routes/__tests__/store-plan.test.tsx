@@ -181,6 +181,7 @@ let mockGetStorePlan = vi.fn();
 let mockGetPlans = vi.fn();
 let mockGetFeaturesToStore = vi.fn();
 let mockUpdateStore = vi.fn();
+let mockChangeStorePlan = vi.fn();
 
 vi.mock('~/management/stores/lib/services/store-http-service', () => ({
   storeHttpService: {
@@ -195,6 +196,9 @@ vi.mock('~/management/stores/lib/services/store-http-service', () => ({
     },
     get updateStore() {
       return mockUpdateStore;
+    },
+    get changeStorePlan() {
+      return mockChangeStorePlan;
     },
   },
 }));
@@ -250,6 +254,7 @@ function seedDefaults() {
     data: [makeFeature()],
   });
   mockUpdateStore = vi.fn().mockResolvedValue({ data: true });
+  mockChangeStorePlan = vi.fn().mockResolvedValue({ succeeded: true, data: true });
   mockGetUserByToken = vi.fn().mockResolvedValue(makeUser());
 }
 
@@ -301,7 +306,7 @@ describe('StorePlanPage — immediate activation, no Guardar', () => {
     seedDefaults();
   });
 
-  it('activates a plan directly: updateStore with union moduleIds + session refresh', async () => {
+  it('activates a plan directly: POST change-plan with the target planId + session refresh', async () => {
     await renderPage();
 
     await waitFor(() => {
@@ -309,17 +314,14 @@ describe('StorePlanPage — immediate activation, no Guardar', () => {
     });
     // Expand the target panel to reach its action
     fireEvent.click(screen.getByRole('button', { name: /Pago/ }));
-    fireEvent.click(screen.getByRole('button', { name: 'Activar ese plan' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Activar Plan' }));
 
     await waitFor(() => {
-      expect(mockUpdateStore).toHaveBeenCalledTimes(1);
+      expect(mockChangeStorePlan).toHaveBeenCalledTimes(1);
     });
-    const [id, payload] = mockUpdateStore.mock.calls[0];
-    expect(id).toBe('s1');
-    // Choosing Pago sends the full union: free (priceIncluded across catalog) + chosen plan
-    expect(payload.moduleIds).toEqual([2, 1]);
-    expect(payload.name).toBe('Store One');
-    expect(payload.paymentStartDate).toBe('2024-01-01');
+    expect(mockChangeStorePlan).toHaveBeenCalledWith('s1', 2);
+    // The plan change rides the dedicated endpoint — never a moduleIds PUT
+    expect(mockUpdateStore).not.toHaveBeenCalled();
     expect(mockGetUserByToken).toHaveBeenCalled();
   });
 
@@ -332,7 +334,7 @@ describe('StorePlanPage — immediate activation, no Guardar', () => {
     expect(screen.queryByRole('button', { name: /Guardar/ })).not.toBeInTheDocument();
   });
 
-  it('omits paymentStartDate from the activation payload when the store has none', async () => {
+  it('never sends a store payload: the anchor cannot be touched by the activation', async () => {
     mockGetStorePlan = vi.fn().mockResolvedValue({
       succeeded: true,
       data: makeStorePlan({ paymentStartDate: null, planType: 'Gratis', modules: [] }),
@@ -343,24 +345,26 @@ describe('StorePlanPage — immediate activation, no Guardar', () => {
       expect(screen.getByText('Activo')).toBeInTheDocument();
     });
     fireEvent.click(screen.getByRole('button', { name: /Pago/ }));
-    fireEvent.click(screen.getByRole('button', { name: 'Activar ese plan' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Activar Plan' }));
 
     await waitFor(() => {
-      expect(mockUpdateStore).toHaveBeenCalledTimes(1);
+      expect(mockChangeStorePlan).toHaveBeenCalledTimes(1);
     });
-    const payload = mockUpdateStore.mock.calls[0][1];
-    expect(payload.paymentStartDate).toBeUndefined();
+    // changeStorePlan takes (storeId, planId) — no store payload exists at all,
+    // so paymentStartDate can never ride the activation
+    expect(mockChangeStorePlan).toHaveBeenCalledWith('s1', 2);
+    expect(mockUpdateStore).not.toHaveBeenCalled();
   });
 
   it('surfaces the activation error inline and keeps the panels mounted', async () => {
-    mockUpdateStore = vi.fn().mockRejectedValue(new Error('boom'));
+    mockChangeStorePlan = vi.fn().mockRejectedValue(new Error('boom'));
     await renderPage();
 
     await waitFor(() => {
       expect(screen.getByText('Activo')).toBeInTheDocument();
     });
     fireEvent.click(screen.getByRole('button', { name: /Pago/ }));
-    fireEvent.click(screen.getByRole('button', { name: 'Activar ese plan' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Activar Plan' }));
 
     await waitFor(() => {
       expect(screen.getByRole('alert')).toBeInTheDocument();
@@ -377,7 +381,7 @@ describe('StorePlanPage — DG-7 lock derived from planType', () => {
     mockParams = {};
   });
 
-  it('locks a paid store for a non-super-admin: no activation action, prices still visible', async () => {
+  it('lets a non-super-admin owner change a paid store (DG-7 lock removed)', async () => {
     seedDefaults();
     mockGetStorePlan = vi.fn().mockResolvedValue({
       succeeded: true,
@@ -388,9 +392,10 @@ describe('StorePlanPage — DG-7 lock derived from planType', () => {
     await waitFor(() => {
       expect(screen.getByText('Activo')).toBeInTheDocument();
     });
-    expect(screen.queryByRole('button', { name: 'Activar ese plan' })).not.toBeInTheDocument();
-    // Prices remain visible on the locked paid plan
+    // The paid store shows prices and exposes the activation action elsewhere
     expect(screen.getByText('Module A')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Superior/ }));
+    expect(screen.getByRole('button', { name: 'Activar Plan' })).toBeInTheDocument();
   });
 
   it('keeps activation available for a super-admin on a paid store', async () => {
@@ -405,7 +410,7 @@ describe('StorePlanPage — DG-7 lock derived from planType', () => {
       expect(screen.getByText('Activo')).toBeInTheDocument();
     });
     fireEvent.click(screen.getByRole('button', { name: /Superior/ }));
-    expect(screen.getByRole('button', { name: 'Activar ese plan' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Activar Plan' })).toBeInTheDocument();
   });
 });
 
