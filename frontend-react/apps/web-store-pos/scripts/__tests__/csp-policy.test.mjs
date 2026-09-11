@@ -42,7 +42,7 @@ describe('csp-policy', () => {
       expect(buildCspHeaderValue('prod')).toBe(
         "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; " +
           "form-action 'self'; script-src 'self' 'report-sample'; " +
-          "style-src 'self' 'unsafe-inline'; img-src 'self'; " +
+          "style-src 'self' 'unsafe-inline'; img-src 'self' data:; " +
           "font-src 'self'; connect-src 'self'; worker-src 'self'; manifest-src 'self'"
       );
     });
