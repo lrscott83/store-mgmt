@@ -107,6 +107,16 @@ namespace Application.Features.Authentication.Queries.GetMe
 
             var featureIds = await _allowedFeaturesService.GetAllowedFeatureIdsForCurrentUserAsync(storeModuleIds);
 
+            // OwnerAdmin sees ALL their stores (active + inactive) so the frontend
+            // can resolve a store name from any storeId. Other roles get an empty list.
+            var storeList = new List<StoreSummaryDto>();
+            if (_httpContextService.IsOwnerAdmin)
+            {
+                var ownedStores = await _storeRepository.GetAllStoresByOwnerUserIdAsync(user.Id);
+                storeList = ownedStores
+                    .Select(s => new StoreSummaryDto(s.Id, s.Name))
+                    .ToList();
+            }
 
             return ResponseResult.Success(new CurrentUserDto
             {
@@ -127,6 +137,7 @@ namespace Application.Features.Authentication.Queries.GetMe
                 IsInTrial = billing.IsInTrial,
                 PaymentStatus = billing.Status.ToString(),
                 PlanType = billing.PlanType,
+                StoreList = storeList,
             });
         }
 
