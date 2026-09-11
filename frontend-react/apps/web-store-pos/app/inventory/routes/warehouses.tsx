@@ -168,6 +168,7 @@ export function WarehousesPage() {
       costPrice: fields.costPrice,
       reason: fields.reason,
       toWarehouseId: fields.toWarehouseId,
+      toStoreId: movementModal.mode === 'sale_out' ? storeId : undefined,
     });
     if (!result.succeeded) {
       showBlockingError(

@@ -80,6 +80,8 @@ export interface WarehouseStockMovement {
   toWarehouseId?: string;
   /** transfer_in → origen. */
   fromWarehouseId?: string;
+  /** sale_out → id de la tienda destino. El nombre se resuelve con user.storeList (multi-tienda). */
+  toStoreId?: string;
   /** reversal → movimiento original que esta fila compensa (D7a). */
   reversalOfMovementId?: string;
   /**
