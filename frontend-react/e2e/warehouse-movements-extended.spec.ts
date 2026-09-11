@@ -199,12 +199,29 @@ async function readProductOnHand(page: Page, warehouseName: string): Promise<str
   return match ? match[1] : text.trim();
 }
 
+/**
+ * Selects a product in the searchable product combobox (2026-09-10): clicking
+ * the input opens the listbox; typing filters it; the first visible option is
+ * clicked. Mirrors the inventory-entry.spec.ts combobox pattern.
+ */
+async function selectMovementProduct(page: Page, productName?: string): Promise<void> {
+  const productInput = page.getByTestId('movement-product');
+  await expect(productInput).toBeVisible();
+  await productInput.click();
+  if (productName) {
+    await productInput.fill(productName);
+  }
+  const option = page.getByTestId('movement-product-listbox').locator('[role="option"]').first();
+  await expect(option).toBeVisible();
+  await option.click();
+}
+
 /** Fills the movement modal (product select + quantity [+ cost][+ target]) and saves. */
 async function fillMovement(
   page: Page,
   opts: { product: string; quantity: string; cost?: string; target?: string },
 ): Promise<void> {
-  await page.getByTestId('movement-product').selectOption({ label: opts.product });
+  await selectMovementProduct(page, opts.product);
   await page.getByTestId('movement-quantity').fill(opts.quantity);
   if (opts.cost) {
     await page.getByTestId('movement-cost').fill(opts.cost);

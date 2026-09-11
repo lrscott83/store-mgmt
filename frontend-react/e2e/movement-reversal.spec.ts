@@ -143,6 +143,23 @@ async function openGearMovement(page: Page, warehouseName: string, item: string)
   await page.getByRole('menuitem', { name: item, exact: true }).click();
 }
 
+/**
+ * Selects a product in the searchable product combobox (2026-09-10): clicking
+ * the input opens the listbox; typing filters it; the first visible option is
+ * clicked. Mirrors the inventory-entry.spec.ts combobox pattern.
+ */
+async function selectMovementProduct(page: Page, productName?: string): Promise<void> {
+  const productInput = page.getByTestId('movement-product');
+  await expect(productInput).toBeVisible();
+  await productInput.click();
+  if (productName) {
+    await productInput.fill(productName);
+  }
+  const option = page.getByTestId('movement-product-listbox').locator('[role="option"]').first();
+  await expect(option).toBeVisible();
+  await option.click();
+}
+
 async function purchaseIn(
   page: Page,
   warehouseName: string,
@@ -151,7 +168,7 @@ async function purchaseIn(
   cost: string,
 ): Promise<void> {
   await openGearMovement(page, warehouseName, 'Entrada');
-  await page.getByTestId('movement-product').selectOption({ label: productName });
+  await selectMovementProduct(page, productName);
   await page.getByTestId('movement-quantity').fill(quantity);
   await page.getByTestId('movement-cost').fill(cost);
   await page.getByRole('button', { name: SAVE }).click();
@@ -159,7 +176,7 @@ async function purchaseIn(
 
 async function saleOut(page: Page, warehouseName: string, quantity: string): Promise<void> {
   await openGearMovement(page, warehouseName, 'Salida');
-  await page.getByTestId('movement-product').selectOption({ index: 1 });
+  await selectMovementProduct(page);
   await page.getByTestId('movement-quantity').fill(quantity);
   await page.getByRole('button', { name: SAVE }).click();
 }
@@ -171,7 +188,7 @@ async function transferOut(
   targetName: string,
 ): Promise<void> {
   await openGearMovement(page, warehouseName, 'Movimiento');
-  await page.getByTestId('movement-product').selectOption({ index: 1 });
+  await selectMovementProduct(page);
   await page.getByTestId('movement-quantity').fill(quantity);
   await page.getByTestId('movement-target').selectOption({ label: targetName });
   await page.getByRole('button', { name: SAVE }).click();
