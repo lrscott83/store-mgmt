@@ -483,6 +483,144 @@ describe('AdminStoreListPage — no activate/deactivate buttons', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// Plan filter buttons — no "Mostrar:" label, resolved i18n labels, click filters
+// (child: store-list.tsx PlanFilterButtons). The raw plan names (Superior/Pago/Gratis)
+// must map to the real message keys (FILTER_SUPERIOR/FILTER_PAID/FILTER_FREE) instead of
+// interpolating the missing "STORES.FILTER_<plan>" keys, and the filter value must match
+// the store.planType casing exactly ('Pago' !== 'pago') or the click never filters.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('AdminStoreListPage — plan filter buttons', () => {
+  beforeEach(async () => {
+    const { storeHttpService } =
+      await import('~/management/stores/lib/services/store-http-service');
+    vi.mocked(storeHttpService.listStores).mockResolvedValue({
+      succeeded: true,
+      data: [
+        makeStore({ id: 's-vip', name: 'Store VIP', planType: 'VIP' }),
+        makeStore({ id: 's-sup', name: 'Store Superior', planType: 'Superior' }),
+        makeStore({ id: 's-pago', name: 'Store Pago', planType: 'Pago' }),
+        makeStore({ id: 's-gratis', name: 'Store Gratis', planType: 'Gratis' }),
+      ],
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
+  });
+
+  it('does NOT render the "Mostrar:" label', async () => {
+    const { AdminStoreListPage } = await import('../store-list');
+    render(
+      <Wrapper>
+        <AdminStoreListPage />
+      </Wrapper>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Store VIP')).toBeInTheDocument();
+    });
+
+    expect(screen.queryByText('Mostrar:')).not.toBeInTheDocument();
+  });
+
+  it('renders plan filter buttons with their resolved labels, no "STORES.FILTER_*" leakage', async () => {
+    const { AdminStoreListPage } = await import('../store-list');
+    render(
+      <Wrapper>
+        <AdminStoreListPage />
+      </Wrapper>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Store VIP')).toBeInTheDocument();
+    });
+
+    // The four plan buttons + the two aggregate buttons.
+    const todos = screen.getByRole('button', { name: /^Todos/ });
+    const noGratis = screen.getByRole('button', { name: /^No Gratis/ });
+    const vip = screen.getByRole('button', { name: /^VIP/ });
+    const superior = screen.getByRole('button', { name: /^Superior/ });
+    const pago = screen.getByRole('button', { name: /^Pago/ });
+    const gratis = screen.getByRole('button', { name: /^Gratis/ });
+
+    expect(todos).toBeInTheDocument();
+    expect(noGratis).toBeInTheDocument();
+    expect(vip).toBeInTheDocument();
+    expect(superior).toBeInTheDocument();
+    expect(pago).toBeInTheDocument();
+    expect(gratis).toBeInTheDocument();
+
+    // No button may expose a raw "STORES.*" key as its accessible name.
+    expect(screen.queryByRole('button', { name: /^STORES\./ })).not.toBeInTheDocument();
+  });
+
+  it('clicking "Superior" filters the grid to the Superior store', async () => {
+    const { AdminStoreListPage } = await import('../store-list');
+    render(
+      <Wrapper>
+        <AdminStoreListPage />
+      </Wrapper>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Store VIP')).toBeInTheDocument();
+    });
+
+    // Default filter is 'not-free', so the Gratis store is hidden already.
+    expect(screen.getByText('Store Superior')).toBeInTheDocument();
+    expect(screen.queryByText('Store Gratis')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /^Superior/ }));
+
+    expect(screen.getByText('Store Superior')).toBeInTheDocument();
+    expect(screen.queryByText('Store VIP')).not.toBeInTheDocument();
+    expect(screen.queryByText('Store Pago')).not.toBeInTheDocument();
+    expect(screen.queryByText('Store Gratis')).not.toBeInTheDocument();
+  });
+
+  it('clicking "Gratis" filters the grid to the Gratis store', async () => {
+    const { AdminStoreListPage } = await import('../store-list');
+    render(
+      <Wrapper>
+        <AdminStoreListPage />
+      </Wrapper>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Store VIP')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /^Gratis/ }));
+
+    expect(screen.getByText('Store Gratis')).toBeInTheDocument();
+    expect(screen.queryByText('Store VIP')).not.toBeInTheDocument();
+    expect(screen.queryByText('Store Superior')).not.toBeInTheDocument();
+    expect(screen.queryByText('Store Pago')).not.toBeInTheDocument();
+  });
+
+  it('clicking "Todos" shows every store', async () => {
+    const { AdminStoreListPage } = await import('../store-list');
+    render(
+      <Wrapper>
+        <AdminStoreListPage />
+      </Wrapper>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Store VIP')).toBeInTheDocument();
+    });
+
+    expect(screen.queryByText('Store Gratis')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /^Todos/ }));
+
+    expect(screen.getByText('Store Gratis')).toBeInTheDocument();
+    expect(screen.getByText('Store VIP')).toBeInTheDocument();
+    expect(screen.getByText('Store Superior')).toBeInTheDocument();
+    expect(screen.getByText('Store Pago')).toBeInTheDocument();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // store-plan-toggle R3 — Change Plan action: direction-aware confirm dialog,
 // cancel-no-call, POST + list refresh (spec scenarios: Free→Paid dialog copy,
 // Paid→Free dialog copy, Cancel dialog, List refreshes after toggle)
