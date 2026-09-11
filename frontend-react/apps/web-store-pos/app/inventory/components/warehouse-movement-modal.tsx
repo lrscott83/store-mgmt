@@ -89,8 +89,9 @@ export function WarehouseMovementModal({
       setToWarehouseId(initial?.toWarehouseId ?? '');
       setReason('');
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- prefill only on open; changing
-    // products/initial must not reset form fields while the user is typing.
+    // Prefill happens only on open: a products/initial change must not reset
+    // form fields while the user is typing.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, productId, initial]);
 
   useEffect(() => {
