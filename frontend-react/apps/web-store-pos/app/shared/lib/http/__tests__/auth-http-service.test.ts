@@ -159,6 +159,7 @@ describe('authHttpService.getMe — GET /v1/auth/me (billing fields passthrough)
           paymentDueDate: '2026-08-15',
           isInTrial: true,
           paymentStatus: 'PorVencer',
+          storeList: [{ id: 'store-1', name: 'Tienda Uno' }],
         },
         message: null,
         actionCode: 200,
@@ -172,6 +173,7 @@ describe('authHttpService.getMe — GET /v1/auth/me (billing fields passthrough)
       paymentDueDate: '2026-08-15',
       isInTrial: true,
       paymentStatus: 'PorVencer',
+      storeList: [{ id: 'store-1', name: 'Tienda Uno' }],
     });
   });
 

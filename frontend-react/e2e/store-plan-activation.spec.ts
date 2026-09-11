@@ -1,36 +1,37 @@
 import { test, expect } from './support/test';
 import { assertStoresFeature, degradeStoreToFreePlan } from './support/store-fixture';
-import { installStoreNetworkObserver } from './support/store-network-observer';
+import { installPlanChangeObserver } from './support/plan-change-observer';
 
 /**
- * [S2-01] DG-7 — El OwnerAdmin activa el plan pago una sola vez, en una sola
- * dirección (`docs/testing/e2e-stage-1/S2-01.md`). Rewritten for the
- * store-plan-redesign contract: the plan view (`/management/stores`) now
- * renders THREE collapsible PlanPanels (no tabs, no Guardar footer) and the
- * activation is IMMEDIATE — the "Activar ese plan" click sends the PUT and the
- * page re-reads the store plan (no reload, no "Se activará al guardar" step).
+ * [S2-01 → owner-plan-change] DG-7, repurposada (authorized update, T7.2):
+ * El OwnerAdmin cambia el plan de su tienda en cualquier dirección, a través
+ * de POST /v1/stores/{id}/change-plan (design.md AD7: el lock readOnly está
+ * muerto; la autoridad es el ownership guard del backend).
  *
  * `test()` #1 walks the full diagram end to end: restore → seed free plan →
- * assertions 1,2,3,8,9,10 → click activation → assertions 4,5 → re-read
- * reflection (the former manual reload step is now an assertion-6/7 check of
- * the effect that replaces it). It stays ONE test — splitting would spend a
- * login the ceiling does not have (see the login-budget comment below).
+ * DOM assertions → click activation → POST observed (no moduleIds PUT, no
+ * store payload) → re-read reflection without reload. It stays ONE test —
+ * splitting would spend a login the ceiling does not have (see the
+ * login-budget comment below).
  *
- * `test()` #2 (WU-6) covers the load-failure branch in isolation — it does not
- * share state with `test()` #1.
+ * `test()` #2 (WU-6) covers the load-failure branch in isolation — it does
+ * not share state with `test()` #1.
  *
  * Literal Spanish copy asserted below is cited from
  * `apps/web-store-pos/app/shared/lib/i18n/es.ts` — the browser is the black
  * box under test, the app's own source is not (same policy as
  * `login.spec.ts:14-17`, `login-offline.spec.ts:29-32`).
  */
-const PAID_ACTIVATE_TEXT = 'Activar ese plan'; // es.ts STORES.PLAN.ACTIVATE_PLAN
+const ACTIVATE_TEXT = 'Activar Plan'; // es.ts STORES.PLAN.ACTIVATE_PLAN (owner-plan-change)
 const ACTIVE_BADGE_TEXT = 'Activo'; // es.ts STORES.PLAN.ACTIVE_BADGE
 // GENERAL.OFFLINE (es.ts) — the plan view classifies a network cut as an
 // OFFLINE failure via httpErrorKey (api-client tags requests with no server
 // response), so the load-failure alert carries the connection message, not
 // the generic STORES.ERROR.
 const STORES_OFFLINE_TEXT = 'Sin conexión. Se requiere conexión a internet.'; // es.ts GENERAL.OFFLINE
+// AD8 cumulative copy — the Pago panel of a FREE store names its catalog
+// predecessor (Gratis) in the includes line (es.ts INCLUDES_PREVIOUS_PLAN).
+const PAID_INCLUDES_PREVIOUS_TEXT = 'Incluye todo lo del plan Gratis y además:';
 
 test.use({ persona: 'owner-admin' });
 
@@ -59,49 +60,57 @@ test.use({ persona: 'owner-admin' });
 // exactly what would spend a login the ceiling does not have.
 test.describe.configure({ mode: 'serial', timeout: 120_000 });
 
-test('OwnerAdmin activa el plan pago una sola vez', async ({ signedInPage, loginNetwork }) => {
+test('OwnerAdmin cambia el plan de su tienda vía POST change-plan', async ({
+  signedInPage,
+  loginNetwork,
+}) => {
   const { page, selectedStoreId } = signedInPage;
 
   // REQ-13/D9 — asserted BEFORE anything else: turns a silent logout
   // (H-7/H-8, adminFeatureLoader without the Stores feature) into a
-  // readable failure instead of every downstream assertion failing for the
-  // wrong reason.
+  // readable failure instead of every downstream assertion failing for
+  // the wrong reason.
   await assertStoresFeature(page);
 
-  // D1/REQ-12 — real precondition: the free-plan half of DG-7 is reached by
+  // D1/REQ-12 — real precondition: the free-plan half is reached by
   // seeding the store back to the free plan (design.md D1, H-15: the API
   // rejects non-SuperAdmin module-set changes on paid stores, so direct-DB
-  // seeding is the only seed available). The auto-registered store starts on
-  // the paid plan, so without this the free→paid direction is unreachable.
+  // seeding is the only seed available). The auto-registered store starts
+  // on the paid plan, so without this the free→paid direction is unreachable.
   //
   // G2 — DECLARED GAP, not assumed: no /me runs between this degrade and
   // the activation below, so whether `Stores=73` survives the downgrade is
-  // never observed here — neither broken nor confirmed. See
-  // docs/testing/e2e-stage-1/S2-01.md.
-  const { allIds } = await degradeStoreToFreePlan(page, selectedStoreId);
+  // never observed here — neither broken nor confirmed. Same gap the
+  // previous version declared.
+  await degradeStoreToFreePlan(page, selectedStoreId);
 
   await page.goto('/management/stores');
 
-  // The redesign replaced the tabbed picker with collapsible panel headers
-  // (`plan-panels.tsx`): each plan is a `<button aria-expanded>`; the banner
-  // shows the next billing date ONLY while on a paid plan (hidden now).
+  // The plan view renders collapsible panel headers (`plan-panels.tsx`):
+  // each plan is a `<button aria-expanded>`; the banner shows the next
+  // billing date ONLY while on a paid plan (hidden now).
   const paidHeader = page.getByRole('button', { name: /Pago/ });
   const freeHeader = page.getByRole('button', { name: /Gratis/ });
 
-  // Aserción 1 (REQ-1, redesign form): with the store on the free plan, the
-  // paid panel is COLLAPSED by default — the activation button is not yet in
-  // the DOM. Expanding the paid panel renders "Activar ese plan".
+  // Aserción 1 (REQ-1): with the store on the free plan, the paid panel is
+  // COLLAPSED by default — the activation button is not yet in the DOM.
+  // Expanding the paid panel renders "Activar Plan".
   await expect(paidHeader).toHaveAttribute('aria-expanded', 'false');
   await paidHeader.click();
   await expect(paidHeader).toHaveAttribute('aria-expanded', 'true');
-  const activateButton = page.getByRole('button', { name: PAID_ACTIVATE_TEXT });
+  const activateButton = page.getByRole('button', { name: ACTIVATE_TEXT });
   await expect(activateButton).toBeVisible();
 
-  // Aserción 2 (REQ-2, redesign form): the old "Se activará al guardar"
-  // intermediate step no longer exists — the first "Activar ese plan" click
-  // IS the activation (the PUT goes out immediately, assertion 4). Pinning
-  // the removed copy guards against reintroducing the two-step contract.
+  // Aserción 2 (REQ-2, owner-plan-change form): the two-step contract stays
+  // dead — the first "Activar Plan" click IS the activation (the POST goes
+  // out immediately, pinned below). Pinning the removed copy guards against
+  // reintroducing it.
   await expect(page.getByText('Se activará al guardar')).toHaveCount(0);
+
+  // AD8 (owner-plan-change): the paid panel of a FREE store carries the
+  // cumulative copy naming the target's catalog predecessor — "Incluye todo
+  // lo del plan Gratis y además:". This is the dialog copy contract.
+  await expect(page.getByText(PAID_INCLUDES_PREVIOUS_TEXT)).toBeVisible();
 
   // Aserción 3 (REQ-3): the ACTIVE badge still marks the FREE header — the
   // REAL active plan (derived from the backend planType, plan-panels.tsx),
@@ -126,30 +135,32 @@ test('OwnerAdmin activa el plan pago una sola vez', async ({ signedInPage, login
   await expect(page.locator('#store-owner')).toHaveCount(0);
 
   // WU-5 — activation round-trip. Installed AFTER the DOM assertions above so
-  // the PUT it watches for is unambiguously the activation click below, not
+  // the POST it watches for is unambiguously the activation click below, not
   // some earlier request (same pattern as any-request-observer.ts in
   // login-offline.spec.ts).
-  const storeObserver = installStoreNetworkObserver(page, selectedStoreId);
-  storeObserver.markDocumentBaseline();
+  const observer = installPlanChangeObserver(page, selectedStoreId);
+  observer.markDocumentBaseline();
 
   await activateButton.click();
 
-  const putCapture = await storeObserver.waitForPutResponse();
-  // Aserción 4 (REQ-4, redesign form): the PUT's moduleIds is the free + paid
-  // union recomputed from the LIVE plan catalog — `planModuleIdsForActivation`
-  // returns every `priceIncluded` module of the catalog plus the chosen plan's
-  // own modules (plan-utils.ts). For the Pago plan that union is the full
-  // catalog, the same set the old picker sent.
-  expect([...putCapture.moduleIds].sort((a, b) => a - b)).toEqual(
-    [...allIds].sort((a, b) => a - b),
-  );
+  const capture = await observer.waitForChangePlanResponse();
 
-  // ANCHOR for the negative assertions below. The old save-button anchor is
-  // gone with the Guardar footer; the new observable anchor is the re-read
-  // reflection: after the PUT, the page re-reads the store plan and the
-  // PlanPanels effect re-expands to the newly active plan — the ACTIVE badge
-  // moves to the paid header. That move only happens when the whole handler
-  // ran to completion (updateStore → getUserByToken → getStorePlan → setPlan).
+  // Aserción 4 (REQ-4, owner-plan-change form): the activation is ONE POST
+  // to /v1/stores/{id}/change-plan whose body carries ONLY the plan id —
+  // the backend owns module rewriting. No moduleIds array, no store payload,
+  // no anchor: the body cannot express them (ChangeStorePlanCommand is a
+  // single int).
+  expect(capture.status).toBe(200);
+  expect(capture.rawBody).not.toContain('moduleIds');
+  expect(capture.rawBody).not.toContain('paymentStartDate');
+  expect(capture.storePlanId).not.toBeNull();
+
+  // ANCHOR for the negative assertions below. The observable anchor is the
+  // re-read reflection: after the POST, the page re-reads the store plan and
+  // the PlanPanels effect re-expands to the newly active plan — the ACTIVE
+  // badge moves to the paid header. That move only happens when the whole
+  // handler ran to completion (changeStorePlan → getUserByToken →
+  // getStorePlan → setPlan).
   await expect(paidHeader).toHaveAttribute('aria-expanded', 'true');
   await expect(paidHeader.getByText(ACTIVE_BADGE_TEXT)).toBeVisible();
 
@@ -161,32 +172,36 @@ test('OwnerAdmin activa el plan pago una sola vez', async ({ signedInPage, login
   // tocar el backend (auth-store.ts). El corto es deliberado — el comentario
   // en auth-store.ts explica que Angular sí disparaba un /me de fondo y que se
   // quitó porque su 401 destruía la sesión de un usuario offline.
-  //
-  // CONSECUENCIA ABIERTA, no cubierta acá: el servidor recalcula los featureIds
-  // al cambiar los módulos (UpdateStoreCommand.cs desactiva las StoreRoleFeature
-  // de los módulos dados de baja), pero el cliente se queda con los featureIds
-  // viejos hasta el próximo login real. Ver el hallazgo en
-  // docs/testing/e2e-stage-1/README.md.
   loginNetwork.expectMeRequestCount(0);
-  storeObserver.expectExactlyOnePut();
-  storeObserver.expectNoDocumentSince('tras activar el plan pago');
+  observer.expectExactlyOneChangePlanPost();
+  // T7.1 regression: the old moduleIds PUT activation must not return.
+  observer.expectNoStorePut();
+  // "No reload" half, measured: the reflection above happened without a
+  // document navigation — a `location.reload()`/hard navigation would fire one;
+  // the handler's state updates (getUserByToken + getStorePlan) never do.
+  observer.expectNoDocumentSince('tras activar el plan pago');
 
-  // Aserción 6 (REQ-6, redesign): once truly on the paid plan, the ACTIVATE
-  // button no longer exists anywhere. The read-only lock is now derived from
-  // the backend planType (`readOnly = planType !== '' && planType !== 'Gratis'`
-  // for non-super-admins, store-plan.tsx), which is true after this activation.
-  await expect(page.getByRole('button', { name: PAID_ACTIVATE_TEXT })).toHaveCount(0);
+  // Aserción 6 (REQ-6, owner-plan-change form): on the paid plan the
+  // ACTIVATE button is gone from the paid panel — not because of a readOnly
+  // lock (dead, AD7) but because the panel is now the ACTIVE one (isActive
+  // hides the action structurally). The plan can still be changed: the other
+  // panels keep their activation action.
+  await expect(page.getByRole('button', { name: ACTIVATE_TEXT, exact: true })).toHaveCount(0);
 
-  // Aserción 7 (REQ-7, design.md D7): the panel headers stay clickable —
-  // clicking changes `aria-expanded` and the visible contents — but no click
-  // mutates the plan. `onActivate` hangs only off the (now permanently absent)
-  // "Activar ese plan" button, so there is no event to observe directly; the
-  // negative is shown through the badge staying on the paid header instead.
+  // Aserción 7 (REQ-7, AD7): the FREE panel of the now-PAID store still
+  // renders its activation action — the owner can change the plan in ANY
+  // direction at any time. The DG-7 one-way lock is dead; this is the
+  // assertion that fails if anyone resurrects it.
   await freeHeader.click();
   await expect(freeHeader).toHaveAttribute('aria-expanded', 'true');
-  await expect(freeHeader.getByRole('button', { name: PAID_ACTIVATE_TEXT })).toHaveCount(0);
+  await expect(freeHeader.getByRole('button', { name: ACTIVATE_TEXT, exact: true })).toBeVisible();
   await expect(freeHeader.getByText(ACTIVE_BADGE_TEXT)).toHaveCount(0);
   await expect(paidHeader.getByText(ACTIVE_BADGE_TEXT)).toBeVisible();
+
+  // The activation also wrote the plan id on the Store row (pin through the
+  // re-read reflection the badge already showed — the observer's plan read
+  // count proves the page re-fetched the plan after the POST).
+  expect(observer.planReadCount()).toBeGreaterThanOrEqual(1);
 });
 
 /**
@@ -212,8 +227,8 @@ test('OwnerAdmin activa el plan pago una sola vez', async ({ signedInPage, login
  * G1 — DECLARED GAP, not disguised: this does NOT cover the
  * `succeeded === false` branch that S2-01.md's assertion 11 literally
  * cites. Reaching that branch needs a fabricated 200 response body — a
- * real mock — which design.md D5 rejects. See
- * docs/testing/e2e-stage-1/S2-01.md and README.md.
+ * real mock — which design.md D5 rejects. Same gap the previous version
+ * declared.
  */
 test('fallo de carga por red muestra el mensaje de conexión y no monta los paneles', async ({
   signedInPage,

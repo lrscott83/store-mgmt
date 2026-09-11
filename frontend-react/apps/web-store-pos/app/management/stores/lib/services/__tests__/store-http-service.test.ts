@@ -518,3 +518,32 @@ describe('storeHttpService.listOwners — OWNER-1: GET /v1/owners/all/true', () 
     expect(result.data[0].fullName).toBe('Owner One');
   });
 });
+
+describe('storeHttpService.changeStorePlan — HTTP-16: POST /v1/stores/{id}/change-plan', () => {
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    const { apiClient } = await import('~/shared/lib/http/api-client');
+    (apiClient.post as ReturnType<typeof vi.fn>).mockResolvedValue({ data: { succeeded: true, data: true } });
+  });
+
+  it('calls POST /v1/stores/{id}/change-plan with { storePlanId }', async () => {
+    const { storeHttpService } = await import('../store-http-service');
+    const { apiClient } = await import('~/shared/lib/http/api-client');
+    await storeHttpService.changeStorePlan('s1', 3);
+    expect(apiClient.post).toHaveBeenCalledWith('/v1/stores/s1/change-plan', { storePlanId: 3 });
+  });
+
+  it('returns the boolean response data', async () => {
+    const { storeHttpService } = await import('../store-http-service');
+    const result = await storeHttpService.changeStorePlan('s1', 2);
+    if (!result.succeeded) throw new Error('expected succeeded response');
+    expect(result.data).toBe(true);
+  });
+
+  it('propagates a network rejection', async () => {
+    const { storeHttpService } = await import('../store-http-service');
+    const { apiClient } = await import('~/shared/lib/http/api-client');
+    (apiClient.post as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('network down'));
+    await expect(storeHttpService.changeStorePlan('s1', 2)).rejects.toThrow('network down');
+  });
+});

@@ -1,6 +1,5 @@
 ﻿using Application.Abstractions.HttpContext;
 using Application.Abstractions.Messaging;
-using Application.Abstractions.Time;
 using Application.Exceptions;
 using Application.ResponseModels;
 using Application.UnitOfWorks;
@@ -43,7 +42,6 @@ namespace Application.Features.StoreManagement.Stores.Commands.UpdateStore
         private readonly IStoreRoleFeatureGenerator _storeRoleFeaturesGenerator;
         private readonly IHttpContextService _httpContextService;
         private readonly IStringLocalizer<I18n> _localizer;
-        private readonly IDateTimeProvider _dateTimeProvider;
 
         public UpdateStoreCommandHandler(
             IApplicationUnitOfWork applicationUnitOfWork,
@@ -55,8 +53,7 @@ namespace Application.Features.StoreManagement.Stores.Commands.UpdateStore
             IGetStoreByIdService storeByIdService,
             IFeatureRepository featureRepository,
             IStoreRoleFeatureGenerator storeRoleFeaturesGenerator,
-            IStoreRoleFeatureRepository storeRoleFeatureRepository,
-            IDateTimeProvider dateTimeProvider)
+            IStoreRoleFeatureRepository storeRoleFeatureRepository)
         {
             _applicationUnitOfWork = applicationUnitOfWork;
             _httpContextService = httpContextService;
@@ -68,7 +65,6 @@ namespace Application.Features.StoreManagement.Stores.Commands.UpdateStore
             _featureRepository = featureRepository;
             _storeRoleFeaturesGenerator = storeRoleFeaturesGenerator;
             _storeRoleFeatureRepository = storeRoleFeatureRepository;
-            _dateTimeProvider = dateTimeProvider;
         }
 
         public async Task<ResponseResult<bool>> Handle(UpdateStoreCommand request, CancellationToken cancellationToken)
@@ -80,14 +76,15 @@ namespace Application.Features.StoreManagement.Stores.Commands.UpdateStore
             if (store is null)
                 throw new ValidationException { Errors = new List<Error> { new Error("Id", _localizer["StoreNotFound"]) } };
 
-            // DG-7 one-way plan lock: a non-SuperAdmin caller must not change the module set of a
-            // store that has any active paid module. The store is loaded with its active StoreModules
-            // already carrying ModulePriceIncluded, so this guard needs no extra queries. Same-set
-            // updates (e.g. renaming) stay allowed; duplicates/order never reject (distinct-sorted).
-            // A null ModuleIds (data-only update) requests no module change, so the lock never fires.
+            // DG-7 one-way plan lock (owner-plan-change): a non-SuperAdmin caller must not
+            // change the module set of ANY store — free or paid. Module mutations now have
+            // dedicated paths (ChangeStorePlan / ToggleStorePlan); UpdateStore only keeps a
+            // same-set save (e.g. renaming) allowed. The store is loaded with its active
+            // StoreModules already carrying ModulePriceIncluded, so this guard needs no extra
+            // queries. A null ModuleIds (data-only update) requests no module change, so the
+            // lock never fires.
             if (request.ModuleIds is not null
-                && !_httpContextService.IsSuperAdmin
-                && store.StoreModules.Any(sm => !sm.ModulePriceIncluded))
+                && !_httpContextService.IsSuperAdmin)
             {
                 var requested = request.ModuleIds.Distinct().OrderBy(id => id);
                 var current = store.StoreModules.Select(sm => sm.ModuleId).Distinct().OrderBy(id => id);
@@ -111,19 +108,9 @@ namespace Application.Features.StoreManagement.Stores.Commands.UpdateStore
                 store.IsActive = request.IsActive;
             }
 
-            // Activation-on-first-paid: if a paid module is requested on a store
-            // without PaymentStartDate, auto-set to now. Skipped for data-only
-            // updates (ModuleIds is null).
-            if (request.ModuleIds is not null)
-            {
-                bool hasPaidModuleRequested = (await _moduleRepository.GetModulesByIdsAsync(request.ModuleIds))
-                    .Any(m => !m.PriceIncluded);
-
-                if (store.PaymentStartDate is null && hasPaidModuleRequested)
-                    store.PaymentStartDate = DateOnly.FromDateTime(_dateTimeProvider.UtcNow.UtcDateTime);
-            }
-
-            // Explicit PaymentStartDate (SuperAdmin only) wins over auto-activation.
+            // Explicit PaymentStartDate (SuperAdmin only) is the ONLY way this command writes
+            // the billing anchor (owner-plan-change: activation-on-first-paid removed — the
+            // anchor is sacred and never fabricated from a module request).
             if (request.PaymentStartDate is not null && _httpContextService.IsSuperAdmin)
                 store.PaymentStartDate = request.PaymentStartDate;
 

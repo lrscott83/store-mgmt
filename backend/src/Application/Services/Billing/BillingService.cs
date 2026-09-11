@@ -1,4 +1,5 @@
 using Application.Abstractions.Time;
+using Domain.Common.Enums;
 using Domain.Common.Utils;
 using Domain.Entities.Billing;
 using Domain.Entities.Modules;
@@ -52,10 +53,23 @@ public class BillingService : IBillingService
         if (store is null)
             return new StoreBillingSummary { StoreId = storeId, Status = StoreBillingStatusType.NoAplica, PlanType = "Free" };
 
+        // Disapproved stores pay nothing and never expire — behavior identical to a store whose
+        // billing clock never started (PaymentStartDate == null): NoAplica, Free plan, no trial,
+        // no due date (product decision 2026-09-10). Reuse the null-clock branch below instead of
+        // duplicating it by deriving an effective start date for this computation.
+        var billingClockStart = store.Approved ? store.PaymentStartDate : (DateOnly?)null;
+
         var moduleIds = store.StoreModules.Select(sm => sm.ModuleId);
         var modules = await _moduleRepository.GetModulesByIdsAsync(moduleIds);
         var hasPaidModule = modules.Any(m => !m.PriceIncluded);
-        var planType = hasPaidModule && store.PaymentStartDate is not null ? "Paid" : "Free";
+        // owner-plan-change (AD4): the plan derives from StorePlanId — the plan source of
+        // truth written by every plan-change path. The legacy hasPaidModule && anchor
+        // derivation kept the pre-existing planType/modules desync (a free store with a
+        // running trial clock reported "Paid"; a downgraded store with soft-deleted
+        // paid rows could still report "Paid" because GetModulesByIdsAsync ignores IsActive).
+        // Disapproved stores (qa 2026-09-10) pay nothing: identical to a null billing
+        // clock, so the Free branch covers them regardless of StorePlanId.
+        var planType = !store.Approved || store.StorePlanId == (int)StorePlanType.Gratis ? "Free" : "Paid";
 
         // Monto efectivo del plan con los DESCUENTOS del snapshot de la tienda
         // (StoreModule): mismo cálculo que RegisterStorePaymentCommand usa para el
@@ -77,15 +91,21 @@ public class BillingService : IBillingService
         var trialMonths = Math.Max(1, await GetCachedConfigAsync("TestingPeriodInMonths", _configRepository.GetTestingPeriodInMonthsAsync));
 
         var nextDueDate = StoreBillingUtils.GetNextDueDate(
-            store.PaymentStartDate,
+            billingClockStart,
             trialMonths,
-            lastPayment?.PaymentBeforeDate is DateTimeOffset pbd ? DateOnly.FromDateTime(pbd.UtcDateTime) : null);
+            lastPayment?.PaymentBeforeDate is DateTimeOffset pbd ? DateOnly.FromDateTime(pbd.UtcDateTime) : null,
+            store.NextDueDateOverride);
+
+        // "Never expire" is absolute: a disapproved store surfaces no due date even when a
+        // historical StorePayment row exists (approve → pay → disapprove).
+        if (!store.Approved)
+            nextDueDate = null;
 
         var today = DateOnly.FromDateTime(_dateTimeProvider.UtcNow.UtcDateTime);
         // Gate de valor 0: sin monto efectivo no hay trial (ni cartel de primer cobro).
-        var isInTrial = hasBillableAmount && StoreBillingUtils.IsInTrial(store.PaymentStartDate, trialMonths, today);
+        var isInTrial = hasBillableAmount && StoreBillingUtils.IsInTrial(billingClockStart, trialMonths, today);
         var status = StoreBillingUtils.GetStatus(
-            store.PaymentStartDate,
+            billingClockStart,
             nextDueDate,
             today,
             dueSoonDays,
@@ -106,8 +126,8 @@ public class BillingService : IBillingService
                 lastPayment.ReSellerDiscountPrice);
         }
 
-        var monthsActive = store.PaymentStartDate is not null
-            ? ((today.Year - store.PaymentStartDate.Value.Year) * 12) + today.Month - store.PaymentStartDate.Value.Month
+        var monthsActive = billingClockStart is not null
+            ? ((today.Year - billingClockStart.Value.Year) * 12) + today.Month - billingClockStart.Value.Month
             : 0;
 
         return new StoreBillingSummary
@@ -115,7 +135,7 @@ public class BillingService : IBillingService
             StoreId = storeId,
             StoreName = store.Name,
             PlanType = planType,
-            PaymentStartDate = store.PaymentStartDate,
+            PaymentStartDate = billingClockStart,
             NextDueDate = nextDueDate,
             LastPaidDate = lastPayment?.PaidDate is DateTimeOffset pdo ? DateOnly.FromDateTime(pdo.UtcDateTime) : null,
             Status = status,

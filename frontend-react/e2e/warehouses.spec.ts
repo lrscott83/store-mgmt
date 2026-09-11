@@ -281,6 +281,23 @@ async function openGearMovement(page: Page, warehouseName: string, item: string)
   await page.getByRole('menuitem', { name: item, exact: true }).click();
 }
 
+/**
+ * Selects a product in the searchable product combobox (2026-09-10): clicking
+ * the input opens the listbox; typing filters it; the first visible option is
+ * clicked. Mirrors the inventory-entry.spec.ts combobox pattern.
+ */
+async function selectMovementProduct(page: Page, productName?: string): Promise<void> {
+  const productInput = page.getByTestId('movement-product');
+  await expect(productInput).toBeVisible();
+  await productInput.click();
+  if (productName) {
+    await productInput.fill(productName);
+  }
+  const option = page.getByTestId('movement-product-listbox').locator('[role="option"]').first();
+  await expect(option).toBeVisible();
+  await option.click();
+}
+
 /** Purchase via gear → Entrada: picks the product, fills quantity + cost, saves. */
 async function purchaseIn(
   page: Page,
@@ -290,7 +307,7 @@ async function purchaseIn(
   cost: string,
 ): Promise<void> {
   await openGearMovement(page, warehouseName, 'Entrada');
-  await page.getByTestId('movement-product').selectOption({ label: productName });
+  await selectMovementProduct(page, productName);
   await page.getByTestId('movement-quantity').fill(quantity);
   await page.getByTestId('movement-cost').fill(cost);
   await page.getByRole('button', { name: SAVE }).click();
@@ -299,10 +316,10 @@ async function purchaseIn(
 /** Sale out via gear → Salida: picks the first stocked product and saves. */
 async function saleOut(page: Page, warehouseName: string, quantity: string): Promise<void> {
   await openGearMovement(page, warehouseName, 'Salida');
-  // Gear mode opens the modal with a BLANK product select — the modal lists
-  // only stocked products, so the first option after the placeholder is the
-  // (only) product this suite stocks in the warehouse.
-  await page.getByTestId('movement-product').selectOption({ index: 1 });
+  // Gear mode opens the modal with a BLANK product combobox — the modal lists
+  // only stocked products, so the first visible option is the (only) product
+  // this suite stocks in the warehouse.
+  await selectMovementProduct(page);
   await page.getByTestId('movement-quantity').fill(quantity);
   await page.getByRole('button', { name: SAVE }).click();
 }
@@ -452,7 +469,7 @@ test.describe.serial('Almacenes — flujo completo', () => {
 
     // Salida a tienda de 12 unidades.
     await openGearMovement(page, 'Central', 'Salida');
-    await page.getByTestId('movement-product').selectOption({ label: product });
+    await selectMovementProduct(page, product);
     await page.getByTestId('movement-quantity').fill('12');
     await page.getByTestId('movement-reason').fill('pedido tienda');
     await page.getByRole('button', { name: SAVE }).click();
@@ -479,7 +496,7 @@ test.describe.serial('Almacenes — flujo completo', () => {
     expect(await onHandCell(page, 'Central')).toBe('5');
 
     await openGearMovement(page, 'Central', 'Salida');
-    await page.getByTestId('movement-product').selectOption({ label: product });
+    await selectMovementProduct(page, product);
     await page.getByTestId('movement-quantity').fill('6');
     await page.getByRole('button', { name: SAVE }).click();
 
@@ -512,7 +529,7 @@ test.describe.serial('Almacenes — flujo completo', () => {
 
     // Transferir 10 de A → B (gear → Movimiento).
     await openGearMovement(page, 'Almacén A', 'Movimiento');
-    await page.getByTestId('movement-product').selectOption({ label: product });
+    await selectMovementProduct(page, product);
     await page.getByTestId('movement-quantity').fill('10');
     await page.getByTestId('movement-target').selectOption({ label: 'Almacén B' });
     await page.getByRole('button', { name: SAVE }).click();

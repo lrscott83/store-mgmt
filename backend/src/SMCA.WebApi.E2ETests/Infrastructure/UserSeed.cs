@@ -53,7 +53,7 @@ public static class UserSeed
         var owner = Owner.Create(user.Id, false, tenantId, "E2E OwnerAdmin owner");
         db.Set<Owner>().Add(owner);
         await db.SaveChangesAsync();
-        var store = Store.Create($"OA-Store-{Guid.NewGuid():N}", owner.Id, false, tenantId, DateOnly.FromDateTime(DateTime.UtcNow));
+        var store = Store.Create($"OA-Store-{Guid.NewGuid():N}", owner.Id, true, tenantId, DateOnly.FromDateTime(DateTime.UtcNow));
         db.Set<Store>().Add(store);
         await db.SaveChangesAsync();
         db.Set<StoreModule>().Add(StoreModule.Create(store.Id, AuthzSeed.ManagementModuleId, 0, true, 0, 0, 0, tenantId));

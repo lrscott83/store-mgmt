@@ -1806,6 +1806,9 @@ namespace Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<DateOnly?>("NextDueDateOverride")
+                        .HasColumnType("date");
+
                     b.Property<Guid>("OwnerId")
                         .HasColumnType("uuid");
 

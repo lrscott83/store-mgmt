@@ -6,6 +6,7 @@ using Application.ResponseModels;
 using Application.UnitOfWorks;
 using Domain.Common.Enums;
 using Domain.Common.Extensions;
+using Domain.Common.Utils;
 using Domain.Entities.Modules;
 using Domain.Entities.Roles;
 using Domain.Entities.StoreModules;
@@ -23,9 +24,17 @@ public sealed record ToggleStorePlanCommand(Guid StoreId) : ICommand<bool>;
 
 /// <summary>
 /// Atomic Free &lt;-&gt; Paid plan toggle. Validates preconditions (store active, owner user
-/// active, ReSeller ownership), computes the target plan from <see cref="Store.PaymentStartDate"/>
-/// and applies the module/date mutations in a single <see cref="IApplicationUnitOfWork.SaveChangesAsync"/>
-/// transaction. Idempotent: toggling on the already-current plan is a no-op returning <c>true</c>.
+/// active, ReSeller ownership), derives the direction from <see cref="Store.StorePlanId"/>
+/// (never from <see cref="Store.PaymentStartDate"/> — every store's clock starts at creation),
+/// and applies the module mutations in a single
+/// <see cref="IApplicationUnitOfWork.SaveChangesAsync"/> transaction.
+/// owner-plan-change alignment:
+/// - The billing anchor (PaymentStartDate) is NEVER written — kept, never nulled.
+/// - <see cref="Store.StorePlanId"/> is written (Gratis ⇄ Pago), keeping planType in sync.
+/// - Override rule: Free→Paid while overdue pins <see cref="Store.NextDueDateOverride"/> to
+///   today; Paid→Free clears it.
+/// Module bookkeeping is idempotent: nothing to insert when every paid module is already
+/// active, nothing to soft-delete when none are.
 /// </summary>
 internal sealed class ToggleStorePlanCommandHandler : ICommandHandler<ToggleStorePlanCommand, bool>
 {
@@ -36,6 +45,8 @@ internal sealed class ToggleStorePlanCommandHandler : ICommandHandler<ToggleStor
     private readonly IFeatureRepository _featureRepository;
     private readonly IStoreRoleFeatureRepository _storeRoleFeatureRepository;
     private readonly IStoreRoleFeatureGenerator _storeRoleFeaturesGenerator;
+    private readonly ISystemConfigurationRepository _systemConfigurationRepository;
+    private readonly IStorePaymentRepository _storePaymentRepository;
     private readonly IHttpContextService _httpContextService;
     private readonly IStringLocalizer<I18n> _localizer;
     private readonly IDateTimeProvider _dateTimeProvider;
@@ -48,6 +59,8 @@ internal sealed class ToggleStorePlanCommandHandler : ICommandHandler<ToggleStor
         IFeatureRepository featureRepository,
         IStoreRoleFeatureRepository storeRoleFeatureRepository,
         IStoreRoleFeatureGenerator storeRoleFeaturesGenerator,
+        ISystemConfigurationRepository systemConfigurationRepository,
+        IStorePaymentRepository storePaymentRepository,
         IHttpContextService httpContextService,
         IStringLocalizer<I18n> localizer,
         IDateTimeProvider dateTimeProvider)
@@ -59,6 +72,8 @@ internal sealed class ToggleStorePlanCommandHandler : ICommandHandler<ToggleStor
         _featureRepository = featureRepository;
         _storeRoleFeatureRepository = storeRoleFeatureRepository;
         _storeRoleFeaturesGenerator = storeRoleFeaturesGenerator;
+        _systemConfigurationRepository = systemConfigurationRepository;
+        _storePaymentRepository = storePaymentRepository;
         _httpContextService = httpContextService;
         _localizer = localizer;
         _dateTimeProvider = dateTimeProvider;
@@ -93,9 +108,10 @@ internal sealed class ToggleStorePlanCommandHandler : ICommandHandler<ToggleStor
                 throw new ApiException(_localizer["StoreNotFound"], HttpStatusCode.BadRequest);
         }
 
-        // Determine target plan from PaymentStartDate: null => Free, set => Paid.
-        // Toggling to the same plan the store already is on is a no-op.
-        bool isPaid = store.PaymentStartDate is not null;
+        // Direction derives from StorePlanId (the plan source of truth), NEVER from
+        // PaymentStartDate — every store's clock starts at creation, so the anchor no
+        // longer discriminates plan state.
+        bool isPaid = store.StorePlanId != (int)StorePlanType.Gratis;
         bool targetPaid = !isPaid;
 
         if (targetPaid)
@@ -111,12 +127,14 @@ internal sealed class ToggleStorePlanCommandHandler : ICommandHandler<ToggleStor
     }
 
     /// <summary>
-    /// Free -&gt; Paid: set PaymentStartDate to today, activate ALL paid modules
-    /// (PriceIncluded=false), and generate/activate their StoreRoleFeatures.
+    /// Free -&gt; Paid: keep the anchor untouched, pin the override per the owner-plan-change
+    /// rule (paid target while overdue → today), activate ALL paid modules (PriceIncluded=false),
+    /// and generate/activate their StoreRoleFeatures.
     /// </summary>
     private async Task ApplyFreeToPaid(Store store)
     {
-        store.PaymentStartDate = DateOnly.FromDateTime(_dateTimeProvider.UtcNow.UtcDateTime);
+        store.StorePlanId = (int)StorePlanType.Pago;
+        await ApplyOverrideRule(store);
 
         IEnumerable<StoreModule> existingModules = await _storeModuleRepository.GetStoreModulesByIdAsync(store.Id);
         IEnumerable<Module> paidModules = (await _moduleRepository.GetAvailableModulesToStore())
@@ -166,12 +184,14 @@ internal sealed class ToggleStorePlanCommandHandler : ICommandHandler<ToggleStor
     }
 
     /// <summary>
-    /// Paid -&gt; Free: set PaymentStartDate to null, soft-delete ALL paid StoreModules
-    /// (IsActive=false), deactivate their StoreRoleFeatures. Free modules untouched.
+    /// Paid -&gt; Free: keep the anchor (NEVER null it), flip StorePlanId to Gratis, clear any
+    /// pinned override, soft-delete ALL paid StoreModules (IsActive=false), deactivate their
+    /// StoreRoleFeatures. Free modules untouched.
     /// </summary>
     private async Task ApplyPaidToFree(Store store)
     {
-        store.PaymentStartDate = null;
+        store.StorePlanId = (int)StorePlanType.Gratis;
+        store.NextDueDateOverride = null;
 
         var paidModules = store.StoreModules.Where(sm => sm.IsActive && !sm.ModulePriceIncluded).ToList();
         if (paidModules.Count == 0)
@@ -191,6 +211,29 @@ internal sealed class ToggleStorePlanCommandHandler : ICommandHandler<ToggleStor
             srf.IsActive = false;
             await _storeRoleFeatureRepository.UpdateAsync(srf);
         }
+    }
+
+    /// <summary>
+    /// Paid target while overdue → pin the next payment date to today (existing grace window
+    /// covers the payment period). A null anchor (legacy row) never gets a pin — no clock,
+    /// no due date.
+    /// </summary>
+    private async Task ApplyOverrideRule(Store store)
+    {
+        if (store.PaymentStartDate is null)
+            return;
+
+        DateOnly today = DateOnly.FromDateTime(_dateTimeProvider.UtcNow.UtcDateTime);
+        int trialMonths = await _systemConfigurationRepository.GetTestingPeriodInMonthsAsync();
+        var lastPayment = await _storePaymentRepository.GetLastByStoreIdAsync(store.Id);
+        DateOnly? lastPaidBeforeDate = lastPayment is null
+            ? null
+            : DateOnly.FromDateTime(lastPayment.PaymentBeforeDate.UtcDateTime);
+        DateOnly? computedDue = StoreBillingUtils.GetNextDueDate(store.PaymentStartDate, trialMonths, lastPaidBeforeDate,
+            store.NextDueDateOverride);
+
+        if (computedDue.HasValue && computedDue.Value <= today)
+            store.NextDueDateOverride = today;
     }
 
     private async Task ReactivateFeaturesForModule(Store store, int moduleId, List<int> featureIds)

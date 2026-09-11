@@ -301,5 +301,58 @@ public class RegisterStorePaymentCommandHandlerTests
         capturedPayment.Month.Should().Be(expectedDue.Month);
     }
 
+    [Fact]
+    public async Task Handle_overdueStore_withNextDueDateOverride_currentDueReadsOverride_andAdvancesFromIt()
+    {
+        // owner-plan-change U4: a store pinned by a plan change (Free->Paid while overdue
+        // pins NextDueDateOverride = today) must charge its next month FROM the override,
+        // not from the stale anchor+trial chain, and the payment must CLEAR the override.
+        // Arrange
+        var paymentStartDate = new DateOnly(2026, 1, 10);
+        var paidModule = CreateStoreModule(2, 2000, false);
+        var store = CreateStore(paymentStartDate: paymentStartDate);
+        store.StoreModules.Add(paidModule);
+        var pinnedOverride = new DateOnly(2026, 9, 12); // "today" in this scenario
+        store.NextDueDateOverride = pinnedOverride;
+
+        _mockHttpContextService.Setup(x => x.IsSuperAdmin).Returns(true);
+        _mockHttpContextService.Setup(x => x.IsReSeller).Returns(false);
+
+        _mockStoreRepository
+            .Setup(x => x.GetStoreWithModulesAndReSellerOwnerAsync(It.IsAny<Guid>()))
+            .ReturnsAsync(store);
+
+        // A last payment exists (anchor + trial would give 2026-03-10 without the
+        // override; the override must win over both anchor-chain and last payment).
+        var lastPayment = StorePayment.Create(
+            Guid.Empty, (int)StorePaymentStatusType.Paid, 2000f,
+            new DateTimeOffset(new DateOnly(2026, 3, 10).ToDateTime(TimeOnly.MinValue), TimeSpan.Zero),
+            2026, 3, Guid.Empty, reSellerId: null, reSellerPercentDiscountPrice: 0f, reSellerDiscountPrice: 0f, reSellerAmount: 0f, byReSeller: false);
+        _mockStorePaymentRepository
+            .Setup(x => x.GetLastByStoreIdAsync(It.IsAny<Guid>()))
+            .ReturnsAsync(lastPayment);
+
+        StorePayment? capturedPayment = null;
+        _mockStorePaymentRepository
+            .Setup(x => x.AddAsync(It.IsAny<StorePayment>()))
+            .Callback<StorePayment>(sp => capturedPayment = sp);
+
+        var handler = CreateHandler();
+        var command = new RegisterStorePaymentCommand(Guid.NewGuid());
+
+        // Act
+        var result = await handler.Handle(command, CancellationToken.None);
+
+        // Assert
+        result.Succeeded.Should().BeTrue();
+        capturedPayment.Should().NotBeNull();
+        // currentDue = override (2026-09-12); newDue = override + 1 month.
+        var actualDue = DateOnly.FromDateTime(capturedPayment!.PaymentBeforeDate.UtcDateTime);
+        actualDue.Should().Be(new DateOnly(2026, 10, 12),
+            "the override wins over both the anchor chain and the last payment");
+        // The payment consumed the override — the store's clock is back on the natural chain.
+        store.NextDueDateOverride.Should().BeNull("registering a payment clears the pinned override");
+    }
+
     #endregion
 }

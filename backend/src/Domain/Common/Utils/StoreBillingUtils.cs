@@ -19,12 +19,19 @@ namespace Domain.Common.Utils
         public static float GetReSellerCommission(float amount, float percentDiscountPrice, float discountPrice)
             => amount - CurrentPriceServiceUtils.GetCurrentPrice(amount, percentDiscountPrice, discountPrice);
 
+        /// <summary>
         /// First due ≈ activation + trial + 1 post-paid month; afterwards the latest paid PaymentBeforeDate.
         /// Returns null when paymentStartDate is null — no billing clock has started.
-        public static DateOnly? GetNextDueDate(DateOnly? paymentStartDate, int trialMonths, DateOnly? lastPaidBeforeDate)
+        /// A non-null <paramref name="nextDueDateOverride"/> (owner-plan-change: the store's plan
+        /// changed to a paid plan while overdue, so the next payment date was pinned to today)
+        /// wins over both, but never resurrects a null clock.
+        /// </summary>
+        public static DateOnly? GetNextDueDate(DateOnly? paymentStartDate, int trialMonths, DateOnly? lastPaidBeforeDate,
+            DateOnly? nextDueDateOverride = null)
         {
-            if (lastPaidBeforeDate is not null) return lastPaidBeforeDate;
             if (paymentStartDate is null) return null;
+            if (nextDueDateOverride is not null) return nextDueDateOverride;
+            if (lastPaidBeforeDate is not null) return lastPaidBeforeDate;
             return paymentStartDate.Value.AddMonths(trialMonths + 1);
         }
 

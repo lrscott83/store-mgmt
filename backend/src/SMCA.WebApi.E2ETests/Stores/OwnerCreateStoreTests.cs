@@ -25,7 +25,8 @@ namespace SMCA.WebApi.E2ETests.Stores;
 //   - OwnerAdmin without 14 (missing OR billing-Vencido) → 403, nothing persisted.
 //   - OwnerAdmin with foreign OwnerId → 403, nothing persisted.
 //   - StoreUser (even holding feature 73) → 403 at handler gate 2, nothing persisted.
-//   - SuperAdmin branch unchanged (body controls everything — complements untouchable StoreCreateTests).
+//   - SuperAdmin branch: modules come from the body, Approved is forced true (2026-09-10 — body
+//     Approved is ignored, complements untouchable StoreCreateTests).
 // Coupling: pin the handler two-gate rule (D1) and the end-to-end contract on the real API.
 [Collection("e2e")]
 public sealed class OwnerCreateStoreTests
@@ -56,7 +57,7 @@ public sealed class OwnerCreateStoreTests
         db.Add(owner);
         await db.SaveChangesAsync();
 
-        var store = Store.Create($"OM-Store-{Guid.NewGuid():N}", owner.Id, false, tenantId,
+        var store = Store.Create($"OM-Store-{Guid.NewGuid():N}", owner.Id, true, tenantId,
             paymentStartDate ?? DateOnly.FromDateTime(DateTime.UtcNow));
         db.Add(store);
         await db.SaveChangesAsync();
@@ -204,7 +205,7 @@ public sealed class OwnerCreateStoreTests
     }
 
     [Fact]
-    public async Task OC06_superadmin_regression_body_controls_modules_and_approved()
+    public async Task OC06_superadmin_creation_ignores_body_approved_and_persists_approved()
     {
         var login = $"admin-{Guid.NewGuid():N}@test.com";
         var adminId = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
@@ -227,7 +228,7 @@ public sealed class OwnerCreateStoreTests
             using var scope = _f.Services.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
             var store = await db.Set<Store>().IgnoreQueryFilters().FirstAsync(s => s.Id == created);
-            store.Approved.Should().BeFalse(); // body controls approved on the SuperAdmin branch
+            store.Approved.Should().BeTrue(); // body Approved=false is ignored: ALL creation paths force approved (2026-09-10)
             store.OwnerId.Should().Be(owner.OwnerId);
             var moduleIds = await db.Set<StoreModule>().IgnoreQueryFilters()
                 .Where(m => m.StoreId == created).Select(m => m.ModuleId).ToListAsync();

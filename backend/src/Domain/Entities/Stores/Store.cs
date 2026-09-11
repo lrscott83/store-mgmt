@@ -33,6 +33,13 @@ namespace Domain.Entities.Stores
 
         public Guid OwnerId { get; private set; }
         public DateOnly? PaymentStartDate { get; set; } = null;
+        /// <summary>
+        /// Owner-plan-change: pins the next payment date (e.g. plan changed to a paid plan while
+        /// overdue → pinned to today). Consumed by StoreBillingUtils.GetNextDueDate with top
+        /// priority; cleared on payment and on downgrade to Gratis. Nullable — null = no override.
+        /// Never a substitute for PaymentStartDate (the billing anchor, which stays untouched).
+        /// </summary>
+        public DateOnly? NextDueDateOverride { get; set; }
         public int StorePlanId { get; set; }
         public StorePlan StorePlan { get; set; } = null!;
 

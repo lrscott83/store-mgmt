@@ -70,6 +70,24 @@ describe('StoreCardList — renders a Card grid (Req: Card-Grid List Uses Shared
     );
     expect(container.querySelector('[data-slot="card"]')).toBeInTheDocument();
   });
+
+  it('renders four columns on desktop (grid-cols-4)', async () => {
+    const { StoreCardList } = await import('../store-card-list');
+    const { container } = render(
+      <Wrapper>
+        <StoreCardList
+          stores={[makeStore(), makeStore({ id: 's2' })]}
+          onEdit={vi.fn()}
+          onApprove={vi.fn()}
+          onDisapprove={vi.fn()}
+          onToggle={vi.fn()}
+        />
+      </Wrapper>,
+    );
+    const grid = container.querySelector('[class*="grid"]');
+    expect(grid).not.toBeNull();
+    expect(grid?.className).toContain('lg:grid-cols-4');
+  });
 });
 
 describe('StoreCardList — card body (plan line, owner, phone, description)', () => {

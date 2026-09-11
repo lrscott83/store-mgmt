@@ -78,19 +78,21 @@ public sealed class StorePlanLockTests
     }
 
     [Fact]
-    public async Task OwnerAdmin_activates_free_store_returns_200()
+    public async Task OwnerAdmin_activates_free_store_returns_400_PlanLocked()
     {
         var actor = await AuthzSeed.SeedOwnerAdminAsync(_f, withManagementModule: true);
         var fx = await BillingSeed.SeedFreeStoreAsync(_f);
         try
         {
-            // Free store has only module [7]; adding the paid module (id=6) is
-            // activation, not a plan change → allowed.
+            // owner-plan-change: DG-7 now covers EVERY store — free or paid. A
+            // non-SuperAdmin may not change the module set; module changes have dedicated
+            // paths (ChangeStorePlan / ToggleStorePlan). Adding a paid module via PUT is
+            // a plan change → PlanLocked.
             var r = await DbTestHelpers.AuthedClient(_f, actor.UserId, actor.Login)
                 .PutAsJsonAsync($"/api/v1/stores/{fx.StoreId}", Body(Guid.Empty, $"n-{Guid.NewGuid():N}", new[] { BillingSeed.ManagementModuleId, BillingSeed.StatisticsModuleId }));
-            r.StatusCode.Should().Be(HttpStatusCode.OK);
-            var b = await r.Content.ReadFromJsonAsync<ApiResponse<bool>>(ApiResponse.Json);
-            b!.Succeeded.Should().BeTrue();
+            r.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+            var b = await r.Content.ReadFromJsonAsync<ApiResponse<object>>(ApiResponse.Json);
+            b!.Errors.Should().Contain(e => e.Code == "PlanLocked");
         }
         finally
         {

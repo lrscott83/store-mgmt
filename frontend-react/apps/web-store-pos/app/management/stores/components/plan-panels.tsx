@@ -4,8 +4,7 @@ import type { Feature, Plan, PlanModule } from '@store-mgmt/domain';
 
 /**
  * Format a plan amount as a bare number — decimals shown only when present
- * (10 → "10", 10.5 → "10.5"), no currency. Used for strikes and module rows,
- * which drop the trailing "USD" to avoid doubling it.
+ * (10 → "10", 10.5 → "10.5"), no currency. Used for header strikes and totals.
  */
 function formatPlanAmount(amount: number): string {
   return new Intl.NumberFormat('en-US', {
@@ -30,9 +29,7 @@ interface PlanPanelsProps {
   storePlanType: string;
   /** Real Feature catalog grouped by ModuleId; empty map suppresses "?" tooltips. */
   featuresByModuleId: ReadonlyMap<number, Feature[]>;
-  /** DG-7: when true, no "Activar ese plan" action renders anywhere. */
-  readOnly?: boolean;
-  /** Per-panel immediate activation: parent performs updateStore + session refresh + close/reflect. */
+  /** Per-panel immediate activation: parent performs changeStorePlan + session refresh + close/reflect. */
   onActivate: (plan: Plan) => void;
   /** Inline activation error (kept by the parent) — panels render it but never mutate state. */
   activationError?: string | null;
@@ -48,14 +45,23 @@ export function PlanPanels({
   plans,
   storePlanType,
   featuresByModuleId,
-  readOnly = false,
   onActivate,
   activationError = null,
 }: PlanPanelsProps) {
   const intl = useIntl();
-  const t = (id: string) => intl.formatMessage({ id });
+  const t = (id: string, values?: Record<string, string>) => intl.formatMessage({ id }, values);
   const planName = (plan: Plan) =>
     PLAN_NAME_KEYS[plan.planType] ? t(PLAN_NAME_KEYS[plan.planType]) : plan.planType;
+
+  // AD8: plan_anterior in the cumulative copy is the target's catalog predecessor
+  // by Order chain (Superior → Pago, Pago → Gratis), not the store's current plan.
+  const predecessorName = (target: Plan): string | null => {
+    const previous = plans
+      .filter((p) => p.order < target.order)
+      .sort((a, b) => b.order - a.order)[0];
+    if (!previous) return null;
+    return PLAN_NAME_KEYS[previous.planType] ? t(PLAN_NAME_KEYS[previous.planType]) : previous.planType;
+  };
 
   // "Only the active panel is expanded": default from the store's planType, and
   // follow an activation-induced planType change (plan page reflects without reload).
@@ -82,6 +88,8 @@ export function PlanPanels({
         const isActive = plan.planType === storePlanType;
         const isExpanded = expanded === plan.planType;
         const total = plan.modules.reduce((sum, m) => sum + m.currentPrice, 0);
+        const listTotal = plan.modules.reduce((sum, m) => sum + m.price, 0);
+        const headerHasDiscount = listTotal > total;
 
         return (
           <div key={plan.planType} className="rounded border border-gray-200">
@@ -100,6 +108,9 @@ export function PlanPanels({
                 )}
               </span>
               <span className="flex items-center gap-2">
+                {headerHasDiscount && (
+                  <span className="text-red-600 line-through">{formatPlanAmount(listTotal)}</span>
+                )}
                 <span className="font-semibold">{formatPlanPrice(total)}</span>
                 <span aria-hidden="true">{isExpanded ? '−' : '+'}</span>
               </span>
@@ -107,7 +118,16 @@ export function PlanPanels({
 
             {isExpanded && (
               <div className="border-t border-gray-100 px-4 py-3">
-                <p className="text-sm text-gray-700">{t('STORES.PLAN.INCLUDES')}</p>
+                {/* AD8: cumulative copy names the target's catalog predecessor.
+                    Gratis (no predecessor) and the active panel keep plain INCLUDES. */}
+                <p className="text-sm text-gray-700">
+                  {(() => {
+                    const previous = predecessorName(plan);
+                    return plan.planType === 'Gratis' || isActive || !previous
+                      ? t('STORES.PLAN.INCLUDES')
+                      : t('STORES.PLAN.INCLUDES_PREVIOUS_PLAN', { plan: previous });
+                  })()}
+                </p>
                 <ul className="mt-1 space-y-2 text-sm text-gray-700">
                   {plan.modules.map((m) => (
                     <PlanModuleRow
@@ -118,7 +138,7 @@ export function PlanPanels({
                   ))}
                 </ul>
 
-                {!isActive && !readOnly && (
+                {!isActive && (
                   <button
                     type="button"
                     onClick={() => onActivate(plan)}
@@ -136,38 +156,28 @@ export function PlanPanels({
   );
 }
 
+/**
+ * Module row: name + "?" help icon ONLY — no per-row price, strike, or discount
+ * text (the dialog design prices plans at the header, not per module).
+ */
 function PlanModuleRow({ module, features }: { module: PlanModule; features: Feature[] }) {
   const [tooltipOpen, setTooltipOpen] = useState(false);
-  const hasDiscount = module.currentPrice < module.price || !!module.discountText;
 
   return (
     <li>
-      <div className="flex items-center justify-between gap-3">
-        <span className="flex items-center gap-2">
-          <span>{module.name}</span>
-          {features.length > 0 && (
-            <button
-              type="button"
-              aria-label="?"
-              aria-expanded={tooltipOpen}
-              onClick={() => setTooltipOpen((open) => !open)}
-              className="flex h-4 w-4 items-center justify-center rounded-full border border-gray-300 text-[10px] text-gray-500"
-            >
-              ?
-            </button>
-          )}
-        </span>
-        <span className="flex items-center gap-2">
-          {hasDiscount && (
-            <>
-              <span className="text-red-600 line-through">{formatPlanAmount(module.price)}</span>
-              {module.discountText && (
-                <span className="text-xs text-green-700">{module.discountText}</span>
-              )}
-            </>
-          )}
-          <span className="font-medium">{formatPlanPrice(module.currentPrice)}</span>
-        </span>
+      <div className="flex items-center gap-2">
+        <span>{module.name}</span>
+        {features.length > 0 && (
+          <button
+            type="button"
+            aria-label="?"
+            aria-expanded={tooltipOpen}
+            onClick={() => setTooltipOpen((open) => !open)}
+            className="flex h-6 w-6 items-center justify-center rounded-full border border-green-600 text-sm text-green-600"
+          >
+            ?
+          </button>
+        )}
       </div>
       {tooltipOpen && features.length > 0 && (
         <ul className="mt-1 rounded border border-gray-100 bg-gray-50 px-3 py-2 text-xs text-gray-600">

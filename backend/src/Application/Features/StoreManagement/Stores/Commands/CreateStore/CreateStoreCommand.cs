@@ -62,7 +62,11 @@ namespace Application.Features.StoreManagement.Stores.Commands.CreateStore
 
             var ownerId = request.OwnerId;
             List<int> moduleIds = request.ModuleIds;
-            var approved = request.Approved;
+            // Approved is forced true on EVERY creation path (SuperAdmin and OwnerAdmin) — product
+            // decision 2026-09-10: a store must be usable immediately and never pay/expire until it is
+            // disapproved. The request's Approved value is ignored; the DTO field is kept only for
+            // contract compatibility with the JSON body.
+            var approved = true;
 
             if (_httpContextService.IsOwnerAdmin)
             {
@@ -95,7 +99,8 @@ namespace Application.Features.StoreManagement.Stores.Commands.CreateStore
                     throw new ApiException(_localizer["NotAuthorized"], HttpStatusCode.Forbidden);
 
                 ownerId = ownOwner.Id;
-                approved = true; // user decision 6: owner-created stores are usable immediately
+                // User decision 6 note: owner-created stores are usable immediately — now universal
+                // (every creation path forces approved=true, 2026-09-10).
             }
 
             var owner = await _ownerRepository.GetOwnerIncludingUserByIdAsync(ownerId);

@@ -7,6 +7,7 @@ using Application.Features.StoreManagement.StorePayments.Commands.RegisterStoreP
 using Application.Features.StoreManagement.StorePayments.Queries.GetReSellerCommissions;
 using Application.Features.StoreManagement.StorePayments.Queries.GetStoresToCollect;
 using Application.Features.StoreManagement.Stores.Commands.ApproveStore;
+using Application.Features.StoreManagement.Stores.Commands.ChangeStorePlan;
 using Application.Features.StoreManagement.Stores.Commands.CreateStore;
 using Application.Features.StoreManagement.Stores.Commands.DeleteStore;
 using Application.Features.StoreManagement.Stores.Commands.DisapproveStore;
@@ -237,6 +238,21 @@ namespace SMCA.WebApi.Controllers.v1
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
         public async Task<IActionResult> ToggleStorePlanAsync(Guid storeId)
             => Ok(await Sender.Send(new ToggleStorePlanCommand(storeId)));
+
+        /// <summary>
+        /// Owner-driven plan change: switches the store to the given active plan (VIP allowed
+        /// even though it is not listed in the catalog). Body: { "storePlanId": 2 }.
+        /// The handler enforces store-ownership (owner user == caller) or SuperAdmin;
+        /// the billing anchor (PaymentStartDate) is never modified.
+        /// </summary>
+        [HttpPost("{storeId}/change-plan")]
+        [HasPermission(StoreRoleFeatures.SuperAdmin, StoreRoleFeatures.StoresAdmin)]
+        [ProducesResponseType(typeof(ResponseResult<bool>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        public async Task<IActionResult> ChangeStorePlanAsync(Guid storeId, [FromBody] ChangeStorePlanCommand command)
+            => Ok(await Sender.Send(command with { StoreId = storeId }));
 
         [HttpGet("to-collect")]
         [HasPermission(StoreRoleFeatures.SuperAdmin, StoreRoleFeatures.StorePaymentAdmin)]

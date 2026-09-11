@@ -75,7 +75,8 @@ internal sealed class GetStoresToCollectQueryHandler : IQueryHandler<GetStoresTo
             var nextDueDate = StoreBillingUtils.GetNextDueDate(
                 store.PaymentStartDate,
                 trialMonths,
-                lastPaidBeforeDate);
+                lastPaidBeforeDate,
+                store.NextDueDateOverride);
 
             var status = StoreBillingUtils.GetStatus(
                 store.PaymentStartDate,

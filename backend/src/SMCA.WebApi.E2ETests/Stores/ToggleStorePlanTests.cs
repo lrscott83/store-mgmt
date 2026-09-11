@@ -18,11 +18,11 @@ namespace SMCA.WebApi.E2ETests.Stores;
 
 /// <summary>
 /// E2E tests for the atomic plan toggle (<c>POST /api/v1/stores/{id}/toggle-plan</c>):
-/// both directions mutate PaymentStartDate + paid StoreModules + their StoreRoleFeatures
-/// against real PostgreSQL; ReSeller may toggle owned stores, OwnerAdmin is denied;
-/// preconditions (store active, owner user active) return 400. Also proves billing
-/// delta R8/R12 through the GET DTOs (null PaymentStartDate after Paid→Free, today's
-/// date after Free→Paid).
+/// direction derives from StorePlanId; both directions mutate StorePlanId + paid
+/// StoreModules + their StoreRoleFeatures against real PostgreSQL, while PaymentStartDate
+/// (the billing anchor) is NEVER written — kept on Free→Paid, never nulled on Paid→Free.
+/// Overdue Free→Paid pins NextDueDateOverride to today. ReSeller may toggle owned stores,
+/// OwnerAdmin is denied; preconditions (store active, owner user active) return 400.
 /// </summary>
 [Collection("e2e")]
 public sealed class ToggleStorePlanTests
@@ -48,6 +48,19 @@ public sealed class ToggleStorePlanTests
     }
 
     private static DateOnly Today() => DateOnly.FromDateTime(DateTime.UtcNow);
+
+    /// <summary>
+    /// Pins a seeded store's StorePlanId (owner-plan-change: direction derives from it).
+    /// ExecuteUpdateAsync bypasses the NoTracking trap (CLAUDE.md gotcha).
+    /// </summary>
+    private async Task SetStorePlanAsync(Guid storeId, int planId)
+    {
+        using var scope = _f.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        await db.Set<Store>().IgnoreQueryFilters()
+            .Where(s => s.Id == storeId)
+            .ExecuteUpdateAsync(s => s.SetProperty(x => x.StorePlanId, planId));
+    }
 
     /// <summary>Paid module ids exactly as the handler resolves them (GetAvailableModulesToStore minus PriceIncluded).</summary>
     private async Task<List<int>> PaidCatalogModuleIdsAsync()
@@ -106,6 +119,9 @@ public sealed class ToggleStorePlanTests
         var login = $"admin-{Guid.NewGuid():N}@test.com";
         var adminId = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
         var fx = await BillingSeed.SeedFreeStoreAsync(_f);
+        // owner-plan-change: direction derives from StorePlanId — pin the seeded free
+        // store to Gratis (the seed helper predates StorePlanId semantics).
+        await SetStorePlanAsync(fx.StoreId, (int)Domain.Common.Enums.StorePlanType.Gratis);
         try
         {
             var r = await DbTestHelpers.AuthedClient(_f, adminId, login)
@@ -115,10 +131,13 @@ public sealed class ToggleStorePlanTests
             b!.Succeeded.Should().BeTrue();
             b.Data.Should().BeTrue();
 
-            // PaymentStartDate set to today; ALL paid catalog modules activated;
-            // the free Management module stays active.
+            // owner-plan-change: StorePlanId flips to Pago; the anchor stays NULL (legacy
+            // free store) — the toggle never fabricates a clock; ALL paid catalog modules
+            // activate; the free Management module stays active.
             var store = await LoadStoreAsync(fx.StoreId);
-            store.PaymentStartDate.Should().Be(Today());
+            store.PaymentStartDate.Should().BeNull("the anchor is sacred — never fabricated");
+            store.StorePlanId.Should().Be((int)Domain.Common.Enums.StorePlanType.Pago);
+            store.NextDueDateOverride.Should().BeNull("null anchor → no clock → no pin");
 
             var paidCatalogIds = await PaidCatalogModuleIdsAsync();
             paidCatalogIds.Should().NotBeEmpty("the seed catalog must contain paid modules");
@@ -130,10 +149,10 @@ public sealed class ToggleStorePlanTests
                 .Should().Be(paidCatalogIds.Count);
             storeModules.Single(sm => sm.ModuleId == BillingSeed.ManagementModuleId).IsActive.Should().BeTrue();
 
-            // R12 (Free→Paid): the store DTO reflects today.
+            // R12 (Free→Paid): the store DTO keeps the null anchor (legacy free store).
             var dto = await DbTestHelpers.AuthedClient(_f, adminId, login)
                 .GetFromJsonAsync<ApiResponse<StoreData>>($"/api/v1/stores/{fx.StoreId}", ApiResponse.Json);
-            dto!.Data!.PaymentStartDate.Should().Be(Today());
+            dto!.Data!.PaymentStartDate.Should().BeNull();
         }
         finally
         {
@@ -159,22 +178,27 @@ public sealed class ToggleStorePlanTests
             b!.Succeeded.Should().BeTrue();
             b.Data.Should().BeTrue();
 
-            // R8: PaymentStartDate nullified; paid module soft-deleted; free module untouched.
+            // owner-plan-change: Paid→Free keeps the anchor (NEVER nulled), flips
+            // StorePlanId to Gratis, clears any override; paid module soft-deleted; free
+            // module untouched.
             var store = await LoadStoreAsync(fx.StoreId);
-            store.PaymentStartDate.Should().BeNull();
+            store.PaymentStartDate.Should().Be(new DateOnly(2026, 3, 10), "the anchor is never nulled");
+            store.StorePlanId.Should().Be((int)Domain.Common.Enums.StorePlanType.Gratis);
+            store.NextDueDateOverride.Should().BeNull();
 
             var storeModules = await LoadStoreModulesAsync(fx.StoreId);
             storeModules.Single(sm => sm.ModuleId == BillingSeed.StatisticsModuleId).IsActive.Should().BeFalse();
             storeModules.Single(sm => sm.ModuleId == BillingSeed.ManagementModuleId).IsActive.Should().BeTrue();
 
-            // R12 (Paid→Free): store DTO shows null; the plan GET shows null + free module only.
+            // R12 (Paid→Free): store DTO keeps the anchor; the plan GET shows free module only.
             var dto = await DbTestHelpers.AuthedClient(_f, adminId, login)
                 .GetFromJsonAsync<ApiResponse<StoreData>>($"/api/v1/stores/{fx.StoreId}", ApiResponse.Json);
-            dto!.Data!.PaymentStartDate.Should().BeNull();
+            dto!.Data!.PaymentStartDate.Should().Be(new DateOnly(2026, 3, 10));
 
             var plan = await DbTestHelpers.AuthedClient(_f, adminId, login)
                 .GetFromJsonAsync<ApiResponse<PlanData>>($"/api/v1/stores/{fx.StoreId}/plan", ApiResponse.Json);
-            plan!.Data!.PaymentStartDate.Should().BeNull();
+            plan!.Data!.PaymentStartDate.Should().Be(new DateOnly(2026, 3, 10),
+                "the plan GET reflects the kept anchor (owner-plan-change: never nulled)");
             plan.Data.Modules.Select(m => m.Id).Should().Equal(BillingSeed.ManagementModuleId);
         }
         finally
@@ -192,24 +216,32 @@ public sealed class ToggleStorePlanTests
         var login = $"admin-{Guid.NewGuid():N}@test.com";
         var adminId = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
         var fx = await BillingSeed.SeedFreeStoreAsync(_f);
+        // owner-plan-change: direction derives from StorePlanId — start the round trip
+        // from a genuinely Gratis store (null anchor stays null throughout: no clock).
+        await SetStorePlanAsync(fx.StoreId, (int)Domain.Common.Enums.StorePlanType.Gratis);
         try
         {
             var client = DbTestHelpers.AuthedClient(_f, adminId, login);
             var url = $"/api/v1/stores/{fx.StoreId}/toggle-plan";
 
             // Leg 1: Free → Paid inserts paid modules + generates their StoreRoleFeatures.
+            // The anchor is sacred — a null-anchored legacy store never gets a clock.
             (await client.PostAsync(url, null)).StatusCode.Should().Be(HttpStatusCode.OK);
             var activeAfterPaid = await CountActiveRoleFeaturesAsync(fx.StoreId);
             activeAfterPaid.Should().BeGreaterThan(0, "Free→Paid must generate StoreRoleFeatures for paid modules");
+            (await LoadStoreAsync(fx.StoreId)).PaymentStartDate.Should().BeNull();
 
             // Leg 2: Paid → Free soft-deletes modules and deactivates their features.
+            // The anchor is NEVER nulled — it stays null because it was always null.
             (await client.PostAsync(url, null)).StatusCode.Should().Be(HttpStatusCode.OK);
             (await LoadStoreAsync(fx.StoreId)).PaymentStartDate.Should().BeNull();
             (await CountActiveRoleFeaturesAsync(fx.StoreId)).Should().Be(0);
 
             // Leg 3: Free → Paid reactivates the SAME rows (no duplicates) and their features.
             (await client.PostAsync(url, null)).StatusCode.Should().Be(HttpStatusCode.OK);
-            (await LoadStoreAsync(fx.StoreId)).PaymentStartDate.Should().Be(Today());
+            var storeAfterRoundTrip = await LoadStoreAsync(fx.StoreId);
+            storeAfterRoundTrip.PaymentStartDate.Should().BeNull("null anchor stays null across the whole trip");
+            storeAfterRoundTrip.StorePlanId.Should().Be((int)Domain.Common.Enums.StorePlanType.Pago);
 
             var paidCatalogIds = await PaidCatalogModuleIdsAsync();
             var storeModules = await LoadStoreModulesAsync(fx.StoreId);
@@ -257,7 +289,9 @@ public sealed class ToggleStorePlanTests
             var b = await r.Content.ReadFromJsonAsync<ApiResponse<bool>>(ApiResponse.Json);
             b!.Succeeded.Should().BeTrue();
             b.Data.Should().BeTrue();
-            (await LoadStoreAsync(fx.StoreId)).PaymentStartDate.Should().BeNull();
+            var store = await LoadStoreAsync(fx.StoreId);
+            store.PaymentStartDate.Should().Be(new DateOnly(2026, 3, 10), "anchor kept on Paid→Free");
+            store.StorePlanId.Should().Be((int)Domain.Common.Enums.StorePlanType.Gratis);
         }
         finally
         {

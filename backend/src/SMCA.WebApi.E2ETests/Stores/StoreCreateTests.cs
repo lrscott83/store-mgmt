@@ -15,6 +15,7 @@ public sealed class StoreCreateTests
     private readonly AppTestFactory _f;
     public StoreCreateTests(WebAppFixture fixture) => _f = fixture.Factory;
 
+    // Approved is ignored on every creation path (2026-09-10); kept in the body for contract compat.
     private static object Body(Guid ownerId, string name, IEnumerable<int> moduleIds) => new
     { OwnerId = ownerId, Name = name, Address = (string?)null, Description = (string?)null, Approved = false, ModuleIds = moduleIds };
 
@@ -40,6 +41,7 @@ public sealed class StoreCreateTests
             var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
             (await db.Set<Domain.Entities.Stores.Store>().IgnoreQueryFilters().AnyAsync(s => s.Id == created)).Should().BeTrue();
             (await db.Set<Domain.Entities.StoreModules.StoreModule>().IgnoreQueryFilters().AnyAsync(m => m.StoreId == created)).Should().BeTrue();
+            (await StoreSeed.GetApprovedAsync(_f, created)).Should().BeTrue(); // body Approved=false is ignored: creation forces approved=true (2026-09-10)
         }
         finally
         {

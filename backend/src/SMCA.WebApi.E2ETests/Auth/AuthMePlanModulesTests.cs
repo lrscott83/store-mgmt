@@ -55,6 +55,15 @@ public sealed class AuthMePlanModulesTests
     {
         var login = $"me-free-{Guid.NewGuid():N}@test.com";
         var seeded = await SeedOwnerAdminWithModulesAsync(login, paidModules: [], paymentStartDate: null);
+        // owner-plan-change: PlanType derives from StorePlanId — pin the seeded free store
+        // to Gratis (the seed helper predates StorePlanId semantics; default is Pago).
+        using (var scope = _f.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            await db.Set<Store>().IgnoreQueryFilters()
+                .Where(s => s.Id == seeded.StoreId)
+                .ExecuteUpdateAsync(s => s.SetProperty(x => x.StorePlanId, (int)StorePlanType.Gratis));
+        }
         try
         {
             var body = await MeAsync(seeded.UserId, login);
@@ -138,6 +147,15 @@ public sealed class AuthMePlanModulesTests
         var saLogin = $"sa-{Guid.NewGuid():N}@test.com";
         var saId = await DbTestHelpers.SeedSuperAdminAsync(_f, saLogin, "Password123");
         var seeded = await SeedOwnerAdminWithModulesAsync(login, paidModules: [], paymentStartDate: null);
+        // owner-plan-change: direction derives from StorePlanId — pin the seeded free
+        // store to Gratis (the seed helper predates StorePlanId semantics; default is Pago).
+        using (var scope = _f.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            await db.Set<Store>().IgnoreQueryFilters()
+                .Where(s => s.Id == seeded.StoreId)
+                .ExecuteUpdateAsync(s => s.SetProperty(x => x.StorePlanId, (int)StorePlanType.Gratis));
+        }
         try
         {
             // Free: only Management visible.
@@ -152,7 +170,9 @@ public sealed class AuthMePlanModulesTests
             var after = await MeAsync(seeded.UserId, login);
             after.Data!.StoreModuleIds.Should().Contain(new[] { StatisticsModuleId, WarehousesModuleId, WholesaleSalesModuleId, MultiStoresModuleId });
             after.Data.PlanType.Should().Be("Paid");
-            after.Data.IsInTrial.Should().BeTrue();
+            // owner-plan-change: legacy null anchor stays null (the toggle never fabricates
+            // a clock), so the store is NOT in trial.
+            after.Data.IsInTrial.Should().BeFalse();
         }
         finally
         {
@@ -201,6 +221,15 @@ public sealed class AuthMePlanModulesTests
         var seeded = await SeedOwnerAdminWithModulesAsync(login,
             paidModules: [(StatisticsModuleId, 2000f, 75f)],
             paymentStartDate: DateOnly.FromDateTime(DateTime.UtcNow));
+        // owner-plan-change: soft-deleting every paid module is a downgrade to Gratis —
+        // pin StorePlanId so PlanType reflects the real plan (no desync).
+        using (var scope0 = _f.Services.CreateScope())
+        {
+            var db0 = scope0.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            await db0.Set<Store>().IgnoreQueryFilters()
+                .Where(s => s.Id == seeded.StoreId)
+                .ExecuteUpdateAsync(s => s.SetProperty(x => x.StorePlanId, (int)StorePlanType.Gratis));
+        }
         try
         {
             // Soft-delete the paid module directly in the DB (IsActive=false).

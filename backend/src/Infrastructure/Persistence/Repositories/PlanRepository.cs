@@ -24,5 +24,15 @@ namespace Infrastructure.Persistence.Repositories
                 .OrderBy(p => p.Order)
                 .ToListAsync();
         }
+
+        public async Task<StorePlan?> GetActivePlanWithModulesByIdAsync(int planId)
+        {
+            return await _plans
+                .Where(p => p.IsActive && p.Id == planId)
+                .Include(p => p.StorePlanModules)
+                    .ThenInclude(spm => spm.Module)
+                        .ThenInclude(m => m.Features)
+                .FirstOrDefaultAsync();
+        }
     }
 }

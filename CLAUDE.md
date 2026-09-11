@@ -47,11 +47,15 @@ Never create new files under `docs/superpowers/`. If that directory still exists
 
 ### Archiving a finished change
 
-When the work is complete and merged, move the whole folder:
+**Archiving runs through the SDD flow (`sdd-archive`), never a bare `git mv`.** Check readiness with `gentle-ai sdd-status <change-name>` first — the native engine gates archive on: tasks complete, verify persisted and non-stale (envelope totals MUST match the engine's requirement count — the engine counts only `### Requirement:` NEW-format headers in the delta, not MODIFIED sections), and no blocked reasons. If the engine reports `blocked`, fix the named cause (e.g. rerun verify and persist a matching report) before archiving.
 
-```bash
-git mv openspec/changes/<change-name> openspec/changes/archive/$(date +%F)-<change-name>
-```
+The proper archive sequence:
+
+1. `gentle-ai sdd-status <change-name>` → `archive: ready` (no blocked reasons).
+2. Canonical spec sync: apply the delta `specs/<domain>/spec.md` to `openspec/specs/<domain>/spec.md` — `## ADDED Requirements` appended, `## MODIFIED Requirements` replacing matching canonical blocks by exact requirement name, `## REMOVED Requirements` deleted. Normally done by `sdd-sync`; archive-time fallback needs explicit parent approval. Never drop scenarios from a MODIFIED block silently.
+3. Write `archive-report.md` inside the change folder (verdict, synced requirement names, final-state facts, move evidence).
+4. Move the whole folder with `git mv openspec/changes/<change-name> openspec/changes/archive/$(date +%F)-<change-name>` — byte-preserving. If the folder is untracked (e.g. after a revert), `git add` it first, then `git mv`.
+5. Verify the move: hash every file before and after (`find <folder> -type f -exec sha256sum {} \;`) and diff — byte-identical. Commit the archive + canonical spec changes together.
 
 **Move it, never rewrite it.** Re-authoring artifacts during archive has silently corrupted them before (a table `\|` became `||` at an identical line count, so the diff looked clean). `git mv` preserves bytes and history; a read-then-write does not. If a move is impossible and files must be recreated, diff every file against its original before deleting the source.
 

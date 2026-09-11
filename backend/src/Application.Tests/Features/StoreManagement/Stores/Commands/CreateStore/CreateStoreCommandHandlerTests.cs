@@ -26,7 +26,8 @@ namespace Application.Tests.Features.StoreManagement.Stores.Commands.CreateStore
 /// <summary>
 /// Unit tests for CreateStoreCommandHandler covering Gate 2 (role re-verification), the
 /// OwnerAdmin branch (own-owner derivation, selected-store MultiStores gate, module
-/// inheritance, forced approval) and the unchanged SuperAdmin branch.
+/// inheritance, forced approval) and the SuperAdmin branch (approved forced true, 2026-09-10 —
+/// the body's Approved value is ignored).
 /// </summary>
 public class CreateStoreCommandHandlerTests
 {
@@ -272,10 +273,10 @@ public class CreateStoreCommandHandlerTests
 
     #endregion
 
-    #region SuperAdmin branch (unchanged regression)
+    #region SuperAdmin branch
 
     [Fact]
-    public async Task Handle_super_admin_creates_with_body_values()
+    public async Task Handle_super_admin_creates_with_modules_and_request_approved_ignored()
     {
         ArrangeRoles(isSuperAdmin: true, isOwnerAdmin: false);
         var owner = Owner.Create(Guid.NewGuid(), false, Guid.NewGuid(), "Owner");
@@ -283,13 +284,14 @@ public class CreateStoreCommandHandlerTests
             .Setup(x => x.GetOwnerIncludingUserByIdAsync(owner.Id, CancellationToken.None))
             .ReturnsAsync(owner);
         ArrangeStoreCreation(owner, out _);
+        // Body says Approved=false — it is ignored: every creation path forces approved=true (2026-09-10).
         var request = new CreateStoreCommand(owner.Id, "Admin Store", null, null, false, new List<int> { 1, 2 });
 
         var result = await _handler.Handle(request, CancellationToken.None);
 
         result.Succeeded.Should().BeTrue();
         _mockCreateStoreService.Verify(x => x.CreateStoreAsync(
-            owner.Id, owner.TenantId, "Admin Store", null, null, false, It.Is<List<int>>(m => m.SequenceEqual(new List<int> { 1, 2 }))),
+            owner.Id, owner.TenantId, "Admin Store", null, null, true, It.Is<List<int>>(m => m.SequenceEqual(new List<int> { 1, 2 }))),
             Times.Once);
     }
 

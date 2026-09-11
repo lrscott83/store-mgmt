@@ -71,9 +71,15 @@ function renderModal(props: Partial<Parameters<typeof WarehouseMovementModal>[0]
 }
 
 function fillValidForm() {
-  fireEvent.change(screen.getByTestId('movement-product'), { target: { value: 'prod-1' } });
+  selectProductByName('Café');
   fireEvent.change(screen.getByTestId('movement-quantity'), { target: { value: '10' } });
   fireEvent.change(screen.getByTestId('movement-cost'), { target: { value: '660' } });
+}
+
+/** Escribe en el combobox y elige la opción filtrada, como haría el usuario. */
+function selectProductByName(name: string) {
+  fireEvent.change(screen.getByTestId('movement-product'), { target: { value: name } });
+  fireEvent.click(screen.getByRole('option', { name }));
 }
 
 describe('WarehouseMovementModal', () => {
@@ -90,16 +96,18 @@ describe('WarehouseMovementModal', () => {
     }
   });
 
-  it('enables the product select when opened from the gear', () => {
+  it('enables the product searchable combobox when opened from the gear', () => {
     renderModal({ productId: null });
-    expect((screen.getByTestId('movement-product') as HTMLSelectElement).disabled).toBe(false);
+    const input = screen.getByTestId('movement-product') as HTMLInputElement;
+    expect(input.disabled).toBe(false);
+    expect(input.getAttribute('role')).toBe('combobox');
   });
 
-  it('disables the product select and preselects when opened from a row', () => {
+  it('disables the product combobox and preselects its name when opened from a row', () => {
     renderModal({ productId: 'prod-1' });
-    const select = screen.getByTestId('movement-product') as HTMLSelectElement;
-    expect(select.disabled).toBe(true);
-    expect(select.value).toBe('prod-1');
+    const input = screen.getByTestId('movement-product') as HTMLInputElement;
+    expect(input.disabled).toBe(true);
+    expect(input.value).toBe('Café');
   });
 
   it('disables Save until product + quantity are valid (cost required for purchase_in)', () => {
@@ -107,7 +115,7 @@ describe('WarehouseMovementModal', () => {
     const save = screen.getByText('Guardar');
     expect((save as HTMLButtonElement).disabled).toBe(true);
 
-    fireEvent.change(screen.getByTestId('movement-product'), { target: { value: 'prod-1' } });
+    selectProductByName('Café');
     expect((save as HTMLButtonElement).disabled).toBe(true); // sin cantidad
 
     fireEvent.change(screen.getByTestId('movement-quantity'), { target: { value: '10' } });
@@ -177,44 +185,45 @@ describe('WarehouseMovementModal', () => {
     expect(onClose).toHaveBeenCalledTimes(2);
   });
 
-  it('shows the product search only when opened from the gear', () => {
+  it('shows the searchable combobox only from the gear (read-only from a row)', () => {
     const { unmount } = renderModal({ productId: null });
-    expect(screen.getByTestId('movement-product-search')).toBeTruthy();
+    // Desde el gear: el combobox abre su listbox al escribir.
+    fireEvent.change(screen.getByTestId('movement-product'), { target: { value: 'ca' } });
+    expect(screen.getByRole('listbox')).toBeTruthy();
     unmount();
 
     renderModal({ productId: 'prod-1' });
-    expect(screen.queryByTestId('movement-product-search')).toBeNull();
+    // Desde la fila: sin búsqueda, el nombre precargado queda en un input deshabilitado.
+    expect(screen.queryByRole('listbox')).toBeNull();
   });
 
-  it('filters product options while typing in the search', () => {
+  it('filters product options while typing in the combobox', () => {
     renderModal({ productId: null });
-    const search = screen.getByTestId('movement-product-search');
-    const select = screen.getByTestId('movement-product') as HTMLSelectElement;
+    const input = screen.getByTestId('movement-product') as HTMLInputElement;
 
-    fireEvent.change(search, { target: { value: 'azuc' } });
-    const options = Array.from(select.options).map((o) => o.value);
-    expect(options).toEqual(['', 'prod-2']);
+    fireEvent.change(input, { target: { value: 'azuc' } });
+    expect(Array.from(screen.getAllByRole('option')).map((o) => o.textContent)).toEqual([
+      'Azúcar',
+    ]);
 
-    fireEvent.change(search, { target: { value: 'cafe' } });
-    expect(Array.from(select.options).map((o) => o.value)).toEqual(['', 'prod-1']);
+    fireEvent.change(input, { target: { value: 'cafe' } });
+    expect(Array.from(screen.getAllByRole('option')).map((o) => o.textContent)).toEqual([
+      'Café',
+    ]);
   });
 
   it('matches accents case-insensitively (CAFÉ via "cafe")', () => {
     renderModal({ productId: null });
-    fireEvent.change(screen.getByTestId('movement-product-search'), {
-      target: { value: 'CAF' },
-    });
-    const select = screen.getByTestId('movement-product') as HTMLSelectElement;
-    expect(Array.from(select.options).map((o) => o.value)).toEqual(['', 'prod-1']);
+    fireEvent.change(screen.getByTestId('movement-product'), { target: { value: 'CAF' } });
+    expect(Array.from(screen.getAllByRole('option')).map((o) => o.textContent)).toEqual([
+      'Café',
+    ]);
   });
 
   it('selects a filtered product and submits its id', () => {
     const onSubmit = vi.fn();
     renderModal({ onSubmit, productId: null });
-    fireEvent.change(screen.getByTestId('movement-product-search'), {
-      target: { value: 'azuc' },
-    });
-    fireEvent.change(screen.getByTestId('movement-product'), { target: { value: 'prod-2' } });
+    selectProductByName('Azúcar');
     fireEvent.change(screen.getByTestId('movement-quantity'), { target: { value: '3' } });
     fireEvent.change(screen.getByTestId('movement-cost'), { target: { value: '500' } });
     fireEvent.click(screen.getByText('Guardar'));

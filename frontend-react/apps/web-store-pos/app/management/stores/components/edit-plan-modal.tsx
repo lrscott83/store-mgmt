@@ -11,27 +11,27 @@ interface EditPlanModalProps {
   storeId: string | null;
   /** Real plan catalog from GET /v1/plans — the three collapsible panels. */
   plans: Plan[];
-  /** The store's backend-serialized planType — decides the expanded panel + DG-7 lock. */
+  /** The store's backend-serialized planType — decides the expanded panel. */
   storePlanType: string;
   /** Real Feature catalog grouped by ModuleId for the "?" tooltips. */
   featuresByModuleId: ReadonlyMap<number, Feature[]>;
   /** Same nextDueDate the card shows — rendered above the panels like store-plan.tsx. */
   nextDueDate: string | null;
-  isSuperAdmin: boolean;
   /** Inline activation error — kept by the parent, rendered by PlanPanels (no close on failure). */
   error?: string;
   onClose: () => void;
-  /** Fires with the chosen Plan — the parent performs updateStore + session refresh + close. */
+  /** Fires with the chosen Plan — the parent performs changeStorePlan + session refresh + close. */
   onActivate: (plan: Plan) => void;
 }
 
 /**
- * "Editar el plan" popup of the owner's my-stores card (owner-stores-cards plan,
- * P3): the SAME catalog-driven plan view logic as store-plan.tsx, rendered inside
- * a modal — PlanPanels hydrated from the real catalog, next billing date above
- * them (paid plan only) and the DG-7 readOnly lock (readOnly = !isSuperAdmin &&
- * storePlanType !== 'Gratis'). Activation is immediate: no module selection, no
- * Guardar footer — the parent saves, refreshes the session and closes the modal.
+ * "Editar el plan" popup of the owner's my-stores card: the SAME catalog-driven
+ * plan view logic as store-plan.tsx, rendered inside a modal — PlanPanels
+ * hydrated from the real catalog, next billing date above them (paid plan only).
+ * The DG-7 readOnly lock is gone: the owner of the store can change its plan at
+ * any time (the backend ownership guard is the only authority). Activation is
+ * immediate: no module selection, no Guardar footer — the parent calls the
+ * change-plan endpoint, refreshes the session and closes the modal.
  */
 export function EditPlanModal({
   open,
@@ -40,7 +40,6 @@ export function EditPlanModal({
   storePlanType,
   featuresByModuleId,
   nextDueDate,
-  isSuperAdmin,
   error,
   onClose,
   onActivate,
@@ -48,8 +47,6 @@ export function EditPlanModal({
   const intl = useIntl();
 
   if (!open || !storeId) return null;
-
-  const readOnly = !isSuperAdmin && storePlanType !== 'Gratis';
 
   return (
     <div
@@ -89,12 +86,11 @@ export function EditPlanModal({
           plans={plans}
           storePlanType={storePlanType}
           featuresByModuleId={featuresByModuleId}
-          readOnly={readOnly}
           onActivate={onActivate}
           activationError={error}
         />
 
-        <div className="mt-4">
+        <div className="mt-4 flex justify-end">
           <Button variant="fab" onClick={onClose}>
             <CloseIcon />
             {intl.formatMessage({ id: 'GENERAL.CLOSE' })}

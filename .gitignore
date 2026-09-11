@@ -165,3 +165,6 @@ appsettings.Production.json
 
 # graphify code-knowledge graph (local build artifact)
 graphify-out/
+
+# Pi harness local state
+.pi/

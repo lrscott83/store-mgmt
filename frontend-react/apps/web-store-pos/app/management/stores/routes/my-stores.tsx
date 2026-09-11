@@ -5,7 +5,7 @@ import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { storeHttpService } from '~/management/stores/lib/services/store-http-service';
 import { mergeStoreModules } from '~/management/stores/lib/store-modules';
-import { groupFeaturesByModuleId, planModuleIdsForActivation } from '~/management/stores/lib/plan-utils';
+import { groupFeaturesByModuleId } from '~/management/stores/lib/plan-utils';
 import { OwnerStoreCard } from '~/management/stores/components/owner-store-card';
 import { EditStoreModal } from '~/management/stores/components/edit-store-modal';
 import { EditPlanModal } from '~/management/stores/components/edit-plan-modal';
@@ -32,7 +32,6 @@ export const clientLoader = featureLoader([EFeatures.Stores]);
 export function MyStoresPage() {
   const intl = useIntl();
   const { user, getUserByToken } = useAuthStore();
-  const isSuperAdmin = user?.isSuperAdmin ?? false;
   // Gate MultiStores (módulo 14): solo los propietarios con el módulo activo en
   // la tienda seleccionada (patrón store-switcher) pueden crear otra tienda.
   const hasMultiStores = (user?.storeModuleIds ?? []).includes(EModules.MultiStores);
@@ -161,20 +160,10 @@ export function MyStoresPage() {
     setModalError('');
     setModalBusy(true);
     try {
-      // Immediate per-panel activation, same contract as store-plan.tsx: the full
-      // store update carries the free + chosen-plan module union — the backend
-      // applies modules only when moduleIds is present.
-      await storeHttpService.updateStore(planStore.id, {
-        id: planStore.id,
-        name: planStore.name,
-        address: '',
-        description: '',
-        approved: planStore.approved,
-        paymentStartDate: planStore.paymentStartDate ?? undefined,
-        planId: selectedPlan.id,
-        moduleIds: planModuleIdsForActivation(plans, selectedPlan),
-        isActive: planStore.isActive,
-      });
+      // Owner-driven plan change (owner-plan-change): the dedicated change-plan
+      // endpoint carries the target plan id — the backend owns module rewriting,
+      // the anchor and the next-due pinning. No moduleIds PUT ever fires here.
+      await storeHttpService.changeStorePlan(planStore.id, selectedPlan.id);
       setPlanStore(null);
       // Angular parity: refresh the session after a plan change (store-plan.tsx does
       // the same) so feature-driven menus reflect the new module set.
@@ -273,7 +262,6 @@ export function MyStoresPage() {
         storePlanType={planStore?.planType ?? 'Gratis'}
         featuresByModuleId={featuresByModuleId}
         nextDueDate={planStore?.nextDueDate ?? null}
-        isSuperAdmin={isSuperAdmin}
         error={modalError}
         onClose={() => setPlanStore(null)}
         onActivate={handlePlanActivate}

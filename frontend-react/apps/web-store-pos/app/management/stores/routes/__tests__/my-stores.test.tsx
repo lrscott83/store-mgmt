@@ -180,6 +180,7 @@ const mockGetPlans = vi.fn();
 const mockGetFeaturesToStore = vi.fn();
 const mockUpdateStore = vi.fn();
 const mockSetStoreActivation = vi.fn();
+const mockChangeStorePlan = vi.fn();
 
 vi.mock('~/management/stores/lib/services/store-http-service', () => ({
   storeHttpService: {
@@ -200,6 +201,9 @@ vi.mock('~/management/stores/lib/services/store-http-service', () => ({
     },
     get setStoreActivation() {
       return mockSetStoreActivation;
+    },
+    get changeStorePlan() {
+      return mockChangeStorePlan;
     },
     get createStore() {
       return mockCreateStore;
@@ -563,15 +567,14 @@ describe('MyStoresPage — Editar el plan popup', () => {
     // Modal testid stays; Gratis is expanded by default (planType from backend)
     expect(await screen.findByTestId('owner-store-plan-modal-s1')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /Pago/ }));
-    mockUpdateStore.mockResolvedValue({ succeeded: true, data: true });
-    fireEvent.click(screen.getByRole('button', { name: 'Activar ese plan' }));
+    mockChangeStorePlan.mockResolvedValue({ succeeded: true, data: true });
+    fireEvent.click(screen.getByRole('button', { name: 'Activar Plan' }));
 
     await waitFor(() => {
-      expect(mockUpdateStore).toHaveBeenCalledWith(
-        's1',
-        expect.objectContaining({ moduleIds: [2, 1] }),
-      );
+      expect(mockChangeStorePlan).toHaveBeenCalledWith('s1', 2);
     });
+    // The plan change rides the dedicated endpoint — never a moduleIds PUT
+    expect(mockUpdateStore).not.toHaveBeenCalled();
     // Activation closes the modal and refreshes the session — store-plan parity
     await waitFor(() => {
       expect(mockGetUserByToken).toHaveBeenCalled();
@@ -579,10 +582,12 @@ describe('MyStoresPage — Editar el plan popup', () => {
     expect(screen.queryByTestId('owner-store-plan-modal-s1')).not.toBeInTheDocument();
   });
 
-  it('hides every activation action for an owner on a paid store (DG-7 readOnly) and keeps testids', async () => {
+  it('lets an owner on a PAID store change to another plan (DG-7 lock removed)', async () => {
     mockGetMyStores.mockResolvedValue({
       succeeded: true,
-      data: [makeOwnerStore({ id: 's1', name: 'Alpha', planType: 'Pago' })],
+      data: [
+        makeOwnerStore({ id: 's1', name: 'Alpha', planType: 'Pago', modules: [], nextDueDate: '2026-08-01' }),
+      ],
     } as BaseResponseModel<OwnerStoreWithPlan[]>);
     const { MyStoresPage } = await import('../my-stores');
     render(
@@ -599,12 +604,13 @@ describe('MyStoresPage — Editar el plan popup', () => {
     await waitFor(() => {
       expect(screen.getByTestId('owner-store-plan-modal-s1')).toBeInTheDocument();
     });
-    // The paid store keeps prices + billing banner (testids stay) but no actions
+    // The paid store keeps the billing banner (testid stays)
     expect(screen.getByTestId('owner-plan-next-billing-date-s1')).toBeInTheDocument();
-    expect(screen.getByText('Module A')).toBeInTheDocument();
+    // And exposes the activation action on another plan — the owner can change
+    fireEvent.click(screen.getByRole('button', { name: /Superior/ }));
     expect(
-      screen.queryByRole('button', { name: esMessages['STORES.PLAN.ACTIVATE_PLAN'] }),
-    ).not.toBeInTheDocument();
+      screen.getByRole('button', { name: esMessages['STORES.PLAN.ACTIVATE_PLAN'] }),
+    ).toBeInTheDocument();
   });
 
   it('lets an owner on a FREE store activate a paid plan', async () => {
@@ -672,8 +678,8 @@ describe('MyStoresPage — Editar el plan popup', () => {
       expect(screen.getByTestId('owner-store-plan-modal-s1')).toBeInTheDocument();
     });
     fireEvent.click(screen.getByRole('button', { name: /Pago/ }));
-    mockUpdateStore.mockRejectedValue(new Error('boom'));
-    fireEvent.click(screen.getByRole('button', { name: 'Activar ese plan' }));
+    mockChangeStorePlan.mockRejectedValue(new Error('boom'));
+    fireEvent.click(screen.getByRole('button', { name: 'Activar Plan' }));
 
     await waitFor(() => {
       expect(screen.getByRole('alert')).toBeInTheDocument();

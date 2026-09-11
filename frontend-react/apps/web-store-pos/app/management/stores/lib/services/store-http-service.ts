@@ -116,6 +116,22 @@ export const storeHttpService = {
     return response.data;
   },
 
+  /**
+   * Owner-driven plan change (POST /v1/stores/{id}/change-plan, body
+   * { storePlanId }): the backend validates ownership (403 for non-owners),
+   * rewrites the store's module set to the target plan universe, keeps
+   * PaymentStartDate untouched (the anchor is sacred) and pins
+   * NextDueDateOverride = today when an overdue store upgrades to a paid plan.
+   * The client sends only the plan id — no moduleIds, no store payload.
+   */
+  async changeStorePlan(id: string, storePlanId: number): Promise<BaseResponseModel<boolean>> {
+    const response = await apiClient.post<BaseResponseModel<boolean>>(
+      `/v1/stores/${id}/change-plan`,
+      { storePlanId },
+    );
+    return response.data;
+  },
+
   async approveStore(id: string): Promise<BaseResponseModel<boolean>> {
     const response = await apiClient.post<BaseResponseModel<boolean>>('/v1/stores/approve', { id });
     return response.data;

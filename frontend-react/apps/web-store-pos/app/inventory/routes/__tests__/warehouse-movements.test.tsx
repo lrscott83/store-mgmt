@@ -11,6 +11,7 @@ const mockUser = vi.hoisted(() => ({
   login: 'jdoe',
   isOwnerAdmin: true,
   featureIds: [],
+  storeList: [{ id: 's1', name: 'Tienda Seleccionada' }],
 }));
 
 vi.mock('~/shared/lib/stores/auth-store', () => {
@@ -395,5 +396,31 @@ describe('Vista Movimientos de almacén', () => {
     );
     // La reversa quedó persistida (no-atómico §7.3) — no se llamó dos veces.
     expect(fakeState.reverseMovementImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it('U-M-R1: la primera línea de cada fila usa el formato unificado (compra/sale_out/transferencia)', () => {
+    seedTodayMovements();
+    // sale_out con destino de tienda conocido (multi-tienda): resuelve por storeList.
+    fakeState.movements.push({
+      id: 'mv-out-store',
+      warehouseId: 'wh-1',
+      productId: 'prod-1',
+      type: 'sale_out',
+      quantity: 3,
+      reason: null,
+      toStoreId: 's1',
+      createdDate: new Date(),
+      createdByName: 'x',
+    });
+    renderPage();
+    openToday();
+    // purchase_in → 'Compra → Central' (las dos filas de compra del seed).
+    expect(screen.getAllByText('Compra → Central')).toHaveLength(2);
+    // sale_out con toStoreId → 'Central → Tienda Seleccionada'.
+    expect(screen.getByText('Central → Tienda Seleccionada')).toBeTruthy();
+    // transfer_in → 'Central → Anexo'.
+    expect(screen.getByText('Central → Anexo')).toBeTruthy();
+    // sale_out legacy sin toStoreId (mv-out) y reversal (mv-rev): solo 'Central' sin flecha.
+    expect(screen.getAllByText('Central')).toHaveLength(2);
   });
 });

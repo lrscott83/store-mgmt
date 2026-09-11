@@ -47,7 +47,8 @@ public static class BillingSeed
         db.Set<Owner>().Add(owner);
         await db.SaveChangesAsync();
 
-        var store = Store.Create($"Free-Store-{Guid.NewGuid():N}", owner.Id, true, tenantId, paymentStartDate: null);
+        var store = Store.Create($"Free-Store-{Guid.NewGuid():N}", owner.Id, true, tenantId,
+            paymentStartDate: null, storePlanId: (int)StorePlanType.Gratis);
         db.Set<Store>().Add(store);
         await db.SaveChangesAsync();
 

@@ -582,7 +582,6 @@ const messages: Record<string, string> = {
   'WAREHOUSES.TRANSFER': 'Transferir',
   'WAREHOUSES.QUANTITY': 'Cantidad',
   'WAREHOUSES.COST_PRICE': 'Costo por unidad',
-  'WAREHOUSES.SEARCH_PRODUCT': 'Buscar producto…',
   'WAREHOUSES.REASON': 'Motivo (opcional)',
   'WAREHOUSES.TO_WAREHOUSE': 'Almacén destino',
   'WAREHOUSES.SELECT_WAREHOUSE': 'Seleccione un almacén…',
@@ -859,8 +858,9 @@ const messages: Record<string, string> = {
   'STORES.PLAN.DISPLAY': 'Plan: {plan}',
   'STORES.PLAN.ACTIVE_BADGE': 'Activo',
   'STORES.PLAN.INCLUDES': 'Incluye:',
+  'STORES.PLAN.INCLUDES_PREVIOUS_PLAN': 'Incluye todo lo del plan {plan} y además:',
   'STORES.PLAN.NEXT_BILLING_DATE': 'Próximo cobro',
-  'STORES.PLAN.ACTIVATE_PLAN': 'Activar ese plan',
+  'STORES.PLAN.ACTIVATE_PLAN': 'Activar Plan',
 
   // Super-admin store cards (2026-09-10): owner contact + description labels.
   // The plan line reuses the STORES.PLAN.*_TAB names; the phone renders as a tel: link.

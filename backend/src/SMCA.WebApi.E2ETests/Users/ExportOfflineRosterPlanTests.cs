@@ -143,7 +143,11 @@ public sealed class ExportOfflineRosterPlanTests
             // the deactivated module (StoreRoleFeature rows are deactivated by the toggle).
             afterUser.StoreModuleIds.Should().Contain(new[] { FreeManagementModuleId, StatisticsModuleId, WarehousesModuleId });
             afterUser.Roles.Should().NotContain(r => r.ModuleId == WarehousesModuleId);
-            afterUser.PaymentStatus.Should().Be("NoAplica");
+            // owner-plan-change: the toggle no longer nulls the billing anchor, so the
+            // store's clock keeps running (anchor = today, within trial) → AlDia with a
+            // concrete due date instead of the legacy NoAplica.
+            afterUser.PaymentStatus.Should().Be("AlDia");
+            afterUser.PaymentDueDate.Should().NotBeNull();
         }
         finally
         {
