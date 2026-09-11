@@ -358,9 +358,10 @@ describe('WarehousesPage', () => {
     fireEvent.click(screen.getByTestId('warehouse-actions-toggle-wh-1'));
     fireEvent.click(screen.getByRole('menuitem', { name: 'Salida' }));
     expect(screen.getByText(/Salida a tienda — Central/)).toBeTruthy();
-    expect((screen.getByTestId('movement-product') as HTMLSelectElement).disabled).toBe(false);
+    expect((screen.getByTestId('movement-product') as HTMLInputElement).disabled).toBe(false);
 
-    fireEvent.change(screen.getByTestId('movement-product'), { target: { value: 'prod-1' } });
+    fireEvent.change(screen.getByTestId('movement-product'), { target: { value: 'Cerveza' } });
+    fireEvent.click(screen.getByRole('option', { name: 'Cerveza' }));
     fireEvent.change(screen.getByTestId('movement-quantity'), { target: { value: '12' } });
     fireEvent.change(screen.getByTestId('movement-reason'), { target: { value: 'pedido' } });
     fireEvent.click(screen.getAllByText('Guardar')[0]);
@@ -387,9 +388,10 @@ describe('WarehousesPage', () => {
     fireEvent.click(screen.getByTestId('warehouse-actions-toggle-wh-1'));
     fireEvent.click(screen.getByRole('menuitem', { name: 'Entrada' }));
     expect(screen.getByText(/Entrada al almacén — Central/)).toBeTruthy();
-    expect((screen.getByTestId('movement-product') as HTMLSelectElement).disabled).toBe(false);
+    expect((screen.getByTestId('movement-product') as HTMLInputElement).disabled).toBe(false);
 
-    fireEvent.change(screen.getByTestId('movement-product'), { target: { value: 'prod-1' } });
+    fireEvent.change(screen.getByTestId('movement-product'), { target: { value: 'Cerveza' } });
+    fireEvent.click(screen.getByRole('option', { name: 'Cerveza' }));
     fireEvent.change(screen.getByTestId('movement-quantity'), { target: { value: '10' } });
     fireEvent.change(screen.getByTestId('movement-cost'), { target: { value: '660' } });
     fireEvent.click(screen.getAllByText('Guardar')[0]);

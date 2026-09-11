@@ -29,7 +29,7 @@ public sealed class StoreGetByIdTests
             body.Data.Name.Should().Be(name);
             body.Data.Modules.Should().NotBeEmpty();
             body.Data.PaymentStartDate.Should().BeNull();
-            body.Data.NextPaymentDate.Should().Be(default(DateOnly));
+            body.Data.NextPaymentDate.Should().BeNull();
         }
         finally { await StoreSeed.CleanupStoreFixtureAsync(_f, fixture); await DbTestHelpers.CleanupUserAsync(_f, adminId); }
     }

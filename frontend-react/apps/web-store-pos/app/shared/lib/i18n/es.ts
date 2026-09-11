@@ -582,7 +582,6 @@ const messages: Record<string, string> = {
   'WAREHOUSES.TRANSFER': 'Transferir',
   'WAREHOUSES.QUANTITY': 'Cantidad',
   'WAREHOUSES.COST_PRICE': 'Costo por unidad',
-  'WAREHOUSES.SEARCH_PRODUCT': 'Buscar producto…',
   'WAREHOUSES.REASON': 'Motivo (opcional)',
   'WAREHOUSES.TO_WAREHOUSE': 'Almacén destino',
   'WAREHOUSES.SELECT_WAREHOUSE': 'Seleccione un almacén…',

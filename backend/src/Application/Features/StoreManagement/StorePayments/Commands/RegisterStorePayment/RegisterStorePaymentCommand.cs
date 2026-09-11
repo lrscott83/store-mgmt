@@ -64,6 +64,12 @@ internal sealed class RegisterStorePaymentCommandHandler : ICommandHandler<Regis
                 throw new ApiException(_localizer["StoreNotFound"], HttpStatusCode.BadRequest);
         }
 
+        // Disapproved stores never pay (product decision 2026-09-10): no billing clock, no due
+        // dates, no to-collect, no payment registration. Same error-shape as the legacy
+        // null-start-date guard below.
+        if (!store.Approved)
+            throw new ApiException(_localizer["StoreNotFound"], HttpStatusCode.BadRequest);
+
         // Legacy rows can still carry a null start date (no migration/backfill); new stores always carry one.
         if (store.PaymentStartDate is null)
             throw new ApiException(_localizer["StoreNotFound"], HttpStatusCode.BadRequest);

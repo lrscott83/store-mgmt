@@ -146,7 +146,6 @@ export function AdminStoreListPage() {
         filter={filter}
         onFilterChange={setFilter}
         storeCountByPlan={getStoreCountByPlan()}
-        labelId="store-visibility-filter"
       />
 
       <StoreCardList
@@ -164,29 +163,32 @@ interface PlanFilterButtonsProps {
   filter: string;
   onFilterChange: (value: string) => void;
   storeCountByPlan: Record<string, number>;
-  labelId: string;
 }
 
 const PLAN_FILTER_ORDER = ['VIP', 'Superior', 'Pago', 'Gratis'] as const;
 
-function PlanFilterButtons({ filter, onFilterChange, storeCountByPlan, labelId }: PlanFilterButtonsProps) {
+const PLAN_FILTER_KEYS: Record<string, string> = {
+  VIP: 'STORES.FILTER_VIP',
+  Superior: 'STORES.FILTER_SUPERIOR',
+  Pago: 'STORES.FILTER_PAID',
+  Gratis: 'STORES.FILTER_FREE',
+};
+
+function PlanFilterButtons({ filter, onFilterChange, storeCountByPlan }: PlanFilterButtonsProps) {
   const { formatMessage } = useIntl();
 
   const plans: { value: string; labelKey: string; count: number }[] = [
     { value: 'all', labelKey: 'STORES.FILTER_ALL', count: storeCountByPlan.all },
     { value: 'not-free', labelKey: 'STORES.FILTER_NOT_FREE', count: storeCountByPlan['not-free'] },
     ...PLAN_FILTER_ORDER.map((planType) => ({
-      value: planType.toLowerCase(),
-      labelKey: `STORES.FILTER_${planType}`,
+      value: planType,
+      labelKey: PLAN_FILTER_KEYS[planType],
       count: storeCountByPlan[planType],
     })),
   ];
 
   return (
     <div className="flex items-center gap-2 flex-wrap">
-      <label htmlFor={labelId} className="text-sm font-medium text-text">
-        {formatMessage({ id: 'STORES.FILTER_LABEL' })}
-      </label>
       {plans.map(({ value, labelKey, count }) => (
         <Button
           key={value}

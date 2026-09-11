@@ -155,7 +155,7 @@ public sealed class AuthRegisterDataAssertionsTests
     }
 
     [Fact]
-    public async Task Register_creates_store_with_test_description_and_not_approved()
+    public async Task Register_creates_store_with_test_description_and_approved()
     {
         Registered? registered = null;
         try
@@ -166,7 +166,7 @@ public sealed class AuthRegisterDataAssertionsTests
             var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
             var store = await db.Set<Store>().IgnoreQueryFilters().SingleAsync(s => s.Id == registered.StoreId);
             store.Description.Should().Be("Tienda de prueba");
-            store.Approved.Should().BeFalse();
+            store.Approved.Should().BeTrue(); // all creation paths force approved=true (2026-09-10)
         }
         finally
         {

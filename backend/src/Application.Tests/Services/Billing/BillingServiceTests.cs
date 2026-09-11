@@ -85,6 +85,35 @@ public class BillingServiceTests : IDisposable
             .ReturnsAsync(moduleList);
     }
 
+    /// <summary>
+    /// Mirrors <see cref="ArrangeStore"/> but creates a store with Approved=false.
+    /// </summary>
+    private void ArrangeDisapprovedStore(Guid storeId, DateOnly? paymentStartDate, params StoreModule[] storeModules)
+    {
+        var store = Store.Create("Test Store", _ownerId, false, _tenantId, paymentStartDate);
+        typeof(Store).GetProperty("Id")!.SetValue(store, storeId);
+        store.StoreModules = storeModules.ToList();
+
+        _storeRepository.Setup(x => x.GetStoreByIdIncludingModulesAsync(storeId)).ReturnsAsync(store);
+
+        var moduleList = storeModules.Select(sm =>
+            Module.Create(
+                sm.ModuleId,
+                $"Module-{sm.ModuleId}",
+                order: 1,
+                sm.ModulePriceIncluded,
+                sm.ModulePrice,
+                discountPrice: 0f,
+                percentDiscountPrice: 0f,
+                availableToStore: true,
+                isActive: true)
+        ).Cast<Module>().ToList();
+
+        _moduleRepository
+            .Setup(x => x.GetModulesByIdsAsync(It.IsAny<IEnumerable<int>>()))
+            .ReturnsAsync(moduleList);
+    }
+
     // ── Test 1: Free store (null PaymentStartDate) → NoAplica, no throw ──────────
     [Fact]
     public async Task GetStoreBillingSummary_freeStore_returnsNoAplica_andDoesNotThrow()
@@ -239,6 +268,32 @@ public class BillingServiceTests : IDisposable
         var result = await sut.GetStoreBillingSummaryAsync(storeId);
 
         result.MonthsActive.Should().BeGreaterThanOrEqualTo(0);
+    }
+
+    // ── Test 8: Disapproved store → same NoAplica null-clock summary (2026-09-10) ──
+    [Fact]
+    public async Task GetStoreBillingSummary_disapprovedStore_treatedLikeNullClock()
+    {
+        var storeId = Guid.NewGuid();
+        // A paid module + today's start date: WITHOUT the Approved guard this would be an active
+        // paid trial. Only approved=false must reduce it to the null-clock NoAplica branch.
+        var paidModule = StoreModule.Create(
+            storeId, moduleId: 1,
+            price: 200f, modulePriceIncluded: false,
+            modulePrice: 200f, moduleDiscountPrice: 0f, modulePercentDiscountPrice: 0f,
+            _tenantId);
+
+        ArrangeDisapprovedStore(storeId, DateOnly.FromDateTime(DateTime.UtcNow), paidModule);
+
+        var sut = CreateSut();
+        var result = await sut.GetStoreBillingSummaryAsync(storeId);
+
+        result.Status.Should().Be(StoreBillingStatusType.NoAplica);
+        result.PlanType.Should().Be("Free");
+        result.IsInTrial.Should().BeFalse();
+        result.NextDueDate.Should().BeNull();
+        result.PaymentStartDate.Should().BeNull();
+        result.MonthsActive.Should().Be(0);
     }
 
     public void Dispose() => _cache?.Dispose();
