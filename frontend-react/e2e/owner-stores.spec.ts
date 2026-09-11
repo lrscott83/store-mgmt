@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import type { Page } from '@playwright/test';
 import { Client } from 'pg';
 import { assertStoresFeature } from './support/store-fixture';
+import { installPlanChangeObserver } from './support/plan-change-observer';
 import { readBearerToken } from './support/auth-storage';
 import { E2E_API_URL } from './support/backend-url';
 
@@ -246,7 +247,7 @@ test('E-07 — Editar popup deactivates and reactivates the store', async ({ sig
   expect((await readStoreRow(targetStoreId)).isActive).toBe(true);
 });
 
-test('E-09 — Editar el plan popup locks the paid store for the owner (DG-7)', async ({
+test('E-09 — Editar el plan popup lets the owner change the PAID store plan (AD7)', async ({
   signedInPage,
 }) => {
   const { page, selectedStoreId } = signedInPage;
@@ -259,17 +260,17 @@ test('E-09 — Editar el plan popup locks the paid store for the owner (DG-7)', 
   const modal = page.getByTestId(`owner-store-plan-modal-${selectedStoreId}`);
   await expect(modal).toBeVisible();
 
-  // Same discriminating check as store-plan-lock-regression.spec.ts: the plan
-  // modal renders the same collapsible PlanPanels as store-plan.tsx (DG-7
-  // readOnly = !isSuperAdmin && storePlanType !== 'Gratis', edit-plan-modal.tsx).
-  // The persona's store is on the PAID plan, so the paid panel is the default
-  // expanded one; expand the FREE (non-active) panel — the only place the
-  // "Activar ese plan" button would render if readOnly were false — and pin
-  // that the lock hides it here too.
+  // owner-plan-change AD7 (repurposed from the old DG-7 lock, T7.3): the DG-7
+  // readOnly lock is DEAD — the owner of the store changes its plan at any
+  // time, in any direction. The persona's store is on the PAID plan, so the
+  // paid panel is the default expanded one; expand the FREE (non-active)
+  // panel — the discriminating panel where the old lock hid the action — and
+  // pin that "Activar Plan" now RENDERS there (this is the assertion that
+  // fails if anyone resurrects the lock).
   const freeHeader = modal.getByRole('button', { name: /Gratis/ });
   await freeHeader.click();
   await expect(freeHeader).toHaveAttribute('aria-expanded', 'true');
-  await expect(modal.getByRole('button', { name: 'Activar ese plan' })).toHaveCount(0);
+  await expect(modal.getByRole('button', { name: 'Activar Plan' })).toBeVisible();
 });
 
 test('E-08 — Editar el plan popup saves a plan change on a free store', async ({
@@ -293,8 +294,9 @@ test('E-08 — Editar el plan popup saves a plan change on a free store', async 
   await expect(page.getByTestId(`owner-store-price-${selectedStoreId}`)).toHaveCount(0);
 
   // Open the plan popup; the paid panel is COLLAPSED (only the active FREE
-  // panel starts expanded — plan-panels.tsx). Expand it: the "Activar ese
-  // plan" button IS available now (readOnly is false on the free plan).
+  // panel starts expanded — plan-panels.tsx). Expand it: the "Activar Plan"
+  // button is available (owner-plan-change AD7 — the DG-7 readOnly lock is
+  // dead; the backend ownership guard is the only authority).
   await page.getByTestId(`owner-store-actions-toggle-${selectedStoreId}`).click();
   await page.getByTestId(`owner-store-edit-plan-${selectedStoreId}`).click();
   const modal = page.getByTestId(`owner-store-plan-modal-${selectedStoreId}`);
@@ -302,10 +304,20 @@ test('E-08 — Editar el plan popup saves a plan change on a free store', async 
   await expect(paidHeader).toHaveAttribute('aria-expanded', 'false');
   await paidHeader.click();
   await expect(paidHeader).toHaveAttribute('aria-expanded', 'true');
-  await modal.getByRole('button', { name: 'Activar ese plan' }).click();
 
-  // Immediate activation (no Guardar footer in the modal): the parent saves
-  // the full module-set update, refreshes the session and CLOSES the popup
+  // owner-plan-change (T7.3): the activation goes through POST
+  // /v1/stores/{id}/change-plan — pinned by the observer, not assumed. The
+  // old moduleIds PUT must not fire during the plan change.
+  const observer = installPlanChangeObserver(page, selectedStoreId);
+  await modal.getByRole('button', { name: 'Activar Plan' }).click();
+
+  const capture = await observer.waitForChangePlanResponse();
+  expect(capture.status).toBe(200);
+  expect(capture.rawBody).not.toContain('moduleIds');
+  observer.expectNoStorePut();
+
+  // Immediate activation (no Guardar footer in the modal): the parent calls
+  // changeStorePlan, refreshes the session and CLOSES the popup
   // (my-stores.tsx handlePlanActivate).
   await expect(modal).not.toBeVisible();
 
