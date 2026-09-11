@@ -28,9 +28,9 @@ describe('extractHydrationScriptHashes', () => {
     expect(result).toEqual(expect.arrayContaining([sha256Source(s1), sha256Source(s2), sha256Source(s3)]));
   });
 
-  it('ignores an inline script that does not start with window.__reactRouterContext', () => {
+  it('throws when an inline script does not start with window.__reactRouterContext', () => {
     const html = '<script>console.log("hello");</script>';
-    expect(extractHydrationScriptHashes(html)).toEqual([]);
+    expect(() => extractHydrationScriptHashes(html)).toThrow(/externalize-bootstrap/);
   });
 
   it('ignores a <script src="..."> external script entirely (no crash, no false hash)', () => {
