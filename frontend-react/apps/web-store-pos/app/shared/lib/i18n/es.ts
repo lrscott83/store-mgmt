@@ -230,10 +230,9 @@ const messages: Record<string, string> = {
   'MENU.TODAY_REPORTS': 'Reportes del día',
   'MENU.DASHBOARD': 'Panel de Control',
   'MENU.CUADRE_POR_FECHAS': 'Cuadre por fechas',
-  // Plan/update split: the single 'Tiendas' entry became two links — the plan
-  // view (/management/stores) and the store-data update view
-  // (/management/stores/update), same authorization (EFeatures.Stores).
-  'MENU.STORES_UPDATE': 'Editar la tienda',
+  // Plan split: the single 'Tiendas' entry became one link — the plan view
+  // (/management/stores), same authorization (EFeatures.Stores). The store-data
+  // edit view is reached only from store cards, not from the menu.
   // Owner's "my stores" cards listing (owner-stores-cards plan, 2026-09-08)
   'MENU.MY_STORES': 'Mis tiendas',
   'MENU.EXCHANGE_RATES': 'Cambio USD a MN',
@@ -595,6 +594,24 @@ const messages: Record<string, string> = {
   'WAREHOUSES.TYPE_SALE_OUT': 'Salida a tienda',
   'WAREHOUSES.TYPE_TRANSFER_IN': 'Entrada por transferencia',
   'WAREHOUSES.TYPE_TRANSFER_OUT': 'Salida por transferencia',
+  // ─── Plan 2026-09-09: reversa de movimientos (D1-D12, F5/F8) ─────────────
+  'WAREHOUSES.TYPE_REVERSAL': 'Reversa',
+  'WAREHOUSES.REVERSAL_BADGE': 'Revertido',
+  'WAREHOUSES.REVERSAL_CONFIRM_MESSAGE_A': '¿Está seguro que desea revertir este movimiento? Se ajustará el stock de los almacenes involucrados.',
+  'WAREHOUSES.REVERSAL_SUCCESS': 'Movimiento revertido.',
+  'WAREHOUSES.REVERSAL_BLOCKED_CONSUMED': 'La salida ya fue consumida por ventas — no se puede revertir.',
+  'WAREHOUSES.REVERSAL_BLOCKED_STOCK': 'No hay suficiente stock en el almacén para revertir el movimiento.',
+  'WAREHOUSES.REVERSAL_BLOCKED_TRANSFER_IN': 'Los movimientos de entrada por transferencia no se pueden revertir.',
+  'WAREHOUSES.REVERSAL_BLOCKED_DUPLICATE': 'El movimiento ya tiene una reversa.',
+  'WAREHOUSES.REVERSAL_BLOCKED_AMBIGUOUS': 'Hay varias entradas de tienda que coinciden con la salida — no se puede revertir automáticamente.',
+  'WAREHOUSES.REVERSAL_ENTRY_NOT_FOUND': 'No se encontró la entrada de tienda asociada a la salida.',
+  'WAREHOUSES.REVERSAL_LOT_CONSUMED': 'El lote de la compra ya fue consumido — no quedan unidades que revertir.',
+  'WAREHOUSES.REVERSAL_EDIT_TITLE': 'Editar movimiento',
+  'WAREHOUSES.MOVEMENT_NOT_FOUND': 'El movimiento no existe.',
+  'WAREHOUSES.MOVEMENT_UPDATED': 'Movimiento actualizado.',
+  'WAREHOUSES.ACTIONS': 'Acciones de',
+  'WAREHOUSES.REVERT_ACTION': 'Revertir',
+  'WAREHOUSES.EDIT_ACTION': 'Editar',
   'WAREHOUSES.COMPRA': 'Compra',
   'WAREHOUSES.EDIT_MOVEMENT': 'Editar movimiento',
   'WAREHOUSES.DELETE_MOVEMENT_TITLE': 'Eliminar movimiento',
@@ -821,6 +838,12 @@ const messages: Record<string, string> = {
   // L6 parity: Angular is register-neutral, no voseo ("Intentá" -> "Intente")
   'STORES.ERROR': 'Ocurrió un error. Intente de nuevo.',
   'STORES.FILTER_LABEL': 'Mostrar:',
+  'STORES.FILTER_ALL': 'Todos',
+  'STORES.FILTER_NOT_FREE': 'No Gratis',
+  'STORES.FILTER_VIP': 'VIP',
+  'STORES.FILTER_SUPERIOR': 'Superior',
+  'STORES.FILTER_PAID': 'Pago',
+  'STORES.FILTER_FREE': 'Gratis',
   'STORES.PAID_PLAN': 'Plan de Pago',
   'STORES.FREE_PLAN': 'Plan Gratis',
   'STORES.EMPTY_STATE': 'No hay tiendas registradas.',
@@ -832,11 +855,19 @@ const messages: Record<string, string> = {
   'STORES.PLAN.FREE_TAB': 'Gratis',
   'STORES.PLAN.PAID_TAB': 'Pago',
   'STORES.PLAN.SUPERIOR_TAB': 'Superior',
+  'STORES.PLAN.VIP_TAB': 'VIP',
+  'STORES.PLAN.DISPLAY': 'Plan: {plan}',
   'STORES.PLAN.ACTIVE_BADGE': 'Activo',
   'STORES.PLAN.INCLUDES': 'Incluye:',
   'STORES.PLAN.INCLUDES_PREVIOUS_PLAN': 'Incluye todo lo del plan {plan} y además:',
   'STORES.PLAN.NEXT_BILLING_DATE': 'Próximo cobro',
   'STORES.PLAN.ACTIVATE_PLAN': 'Activar Plan',
+
+  // Super-admin store cards (2026-09-10): owner contact + description labels.
+  // The plan line reuses the STORES.PLAN.*_TAB names; the phone renders as a tel: link.
+  'STORES.OWNER_LABEL': 'Owner',
+  'STORES.STORE_PHONE_LABEL': 'Teléfono',
+  'STORES.STORE_DESCRIPTION_LABEL': 'Descripción',
 
   // Exchange rates — daily USD→MN register (daily-exchange-rate)
   'EXCHANGE_RATES.TITLE': 'Registro del cambio de USD a MN',
@@ -1013,6 +1044,12 @@ const messages: Record<string, string> = {
   'OWNER.STORE_PRICE_LABEL': '{count, plural, one {# tienda} other {# tiendas}}',
   'OWNER.DAYS_LEFT': '{count, plural, one {# día} other {# días}}',
   'OWNER.FILTER_LABEL': 'Mostrar:',
+  'OWNER.FILTER_ALL': 'Todos',
+  'OWNER.FILTER_NOT_FREE': 'No Gratis',
+  'OWNER.FILTER_VIP': 'VIP',
+  'OWNER.FILTER_SUPERIOR': 'Superior',
+  'OWNER.FILTER_PAID': 'Pago',
+  'OWNER.FILTER_FREE': 'Gratis',
   'OWNER.PAID_PLAN': 'Plan de Pago',
   'OWNER.FREE_PLAN': 'Plan Gratis',
   'OWNER.ERROR': 'Ocurrió un error. Inténtalo de nuevo.',

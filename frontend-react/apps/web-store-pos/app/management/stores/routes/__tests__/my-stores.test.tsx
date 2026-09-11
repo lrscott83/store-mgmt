@@ -308,6 +308,7 @@ describe('MyStoresPage — card rendering', () => {
       data: [
         makeOwnerStore({
           id: 's1',
+          planType: 'Gratis',
           paymentStartDate: null,
           nextDueDate: null,
           modules: [],
@@ -321,7 +322,7 @@ describe('MyStoresPage — card rendering', () => {
       </Wrapper>,
     );
     await waitFor(() => {
-      expect(screen.getByText(esMessages['STORES.FREE_PLAN'])).toBeInTheDocument();
+      expect(screen.getByText('Plan: Gratis')).toBeInTheDocument();
     });
     expect(screen.queryByTestId('owner-store-next-due-s1')).toBeNull();
     expect(screen.queryByTestId('owner-store-price-s1')).toBeNull();
@@ -347,7 +348,7 @@ describe('MyStoresPage — card rendering', () => {
       </Wrapper>,
     );
     await waitFor(() => {
-      expect(screen.getByText(esMessages['STORES.PAID_PLAN'])).toBeInTheDocument();
+      expect(screen.getByText('Plan: Pago')).toBeInTheDocument();
     });
     expect(screen.getByTestId('owner-store-next-due-s1')).toHaveTextContent('01/11/2026');
     // Discount: original 10 struck through, current 8 USD bold.
@@ -370,7 +371,7 @@ describe('MyStoresPage — card rendering', () => {
       </Wrapper>,
     );
     await waitFor(() => {
-      expect(screen.getByText(esMessages['STORES.PAID_PLAN'])).toBeInTheDocument();
+      expect(screen.getByText('Plan: Pago')).toBeInTheDocument();
     });
     expect(screen.queryByTestId('owner-store-next-due-s1')).toBeNull();
   });

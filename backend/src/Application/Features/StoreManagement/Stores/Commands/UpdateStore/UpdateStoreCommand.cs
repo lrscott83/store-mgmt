@@ -27,7 +27,7 @@ namespace Application.Features.StoreManagement.Stores.Commands.UpdateStore
     /// path through this same command with <c>ModuleIds</c> populated).
     /// </summary>
     public sealed record UpdateStoreCommand(Guid Id, string Name, string? Address, string? Description, 
-        bool Approved, List<int>? ModuleIds, bool IsActive, DateOnly? PaymentStartDate = null)
+        bool Approved, List<int>? ModuleIds, bool IsActive, DateOnly? PaymentStartDate = null, int? PlanId = null)
         : ICommand<bool> { }
 
     public class UpdateStoreCommandHandler : ICommandHandler<UpdateStoreCommand, bool>
@@ -113,6 +113,12 @@ namespace Application.Features.StoreManagement.Stores.Commands.UpdateStore
             // anchor is sacred and never fabricated from a module request).
             if (request.PaymentStartDate is not null && _httpContextService.IsSuperAdmin)
                 store.PaymentStartDate = request.PaymentStartDate;
+
+            // Plan activation persists the chosen plan id. Not gated behind IsSuperAdmin:
+            // the DG-7 module lock already governs who may change a paid store's modules,
+            // and an eligible store's plan activation must persist.
+            if (request.PlanId is not null && Enum.IsDefined(typeof(StorePlanType), request.PlanId.Value))
+                store.StorePlanId = request.PlanId.Value;
 
             await _storeRepository.UpdateAsync(store);
             if (request.ModuleIds is not null)

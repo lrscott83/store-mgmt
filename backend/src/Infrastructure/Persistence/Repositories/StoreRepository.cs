@@ -88,9 +88,15 @@ namespace Infrastructure.Persistence.Repositories
 
         public async Task<IEnumerable<Store>> GetAllStoresIncludingOwnerAndIgnoreQueryFiltersAsync(Guid? excludeStoreId = null)
         {
+            // StoreModules + Module are loaded so the DTO mapping gets the store's own
+            // price snapshot (ModuleProfile's StoreModule map reads sm.Module fields;
+            // EF Core has no lazy-loading here, so the navigation must be included) —
+            // same shape as GetAllStoresWithModulesAsync below.
             IQueryable<Store> query = _stores
                 .Include(s => s.Owner)
                     .ThenInclude(o => o.User)
+                .Include(s => s.StoreModules)
+                    .ThenInclude(sm => sm.Module)
                 .IgnoreQueryFilters();
 
             if (excludeStoreId.HasValue)

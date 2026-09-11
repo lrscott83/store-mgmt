@@ -35,6 +35,19 @@ export interface Store {
   // `null` here (never `""`) for a never-activated store; not enforceable
   // client-side.
   paymentStartDate: string | null;
+  // Nullable ISO date string (backend `DateOnly?`, raw passthrough). Null when the
+  // billing clock never started (PaymentStartDate null) — never a 0001-01-01
+  // sentinel. Computed server-side with the canonical GetNextDueDate calculation,
+  // the same value the store plan view shows.
+  nextPaymentDate: string | null;
+  // Owner's contact phone (Owner.User.CellPhone). Nullable: the User entity allows
+  // a missing cell phone, so the card renders no link when absent.
+  ownerPhone: string | null;
+  // Backend-serialized plan name ("Gratis" | "Pago" | "Superior" | "VIP") from
+  // Store.StorePlanId — same source as StorePlan.planType. The super-admin store
+  // cards and the plan filter read it; the frontend never infers the active plan
+  // from module flags (that heuristic contradicted seeded membership).
+  planType: string;
   modules: Module[];
   isActive: boolean;
 }

@@ -44,6 +44,34 @@ describe('userHttpService.getUsers — HTTP-2: GET /v1/users/all/true', () => {
   });
 });
 
+describe('userHttpService.getUsersByStoreId — HTTP-2B: GET /v1/users/store/:storeId/true', () => {
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    const { apiClient } = await import('~/shared/lib/http/api-client');
+    (apiClient.get as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: {
+        succeeded: true,
+        data: [{ id: 'u1', fullName: 'User One', isActive: false }],
+      },
+    });
+  });
+
+  it('calls GET /v1/users/store/s1/true (includes inactive users)', async () => {
+    const { userHttpService } = await import('../user-http-service');
+    const { apiClient } = await import('~/shared/lib/http/api-client');
+    await userHttpService.getUsersByStoreId('s1');
+    expect(apiClient.get).toHaveBeenCalledWith('/v1/users/store/s1/true');
+  });
+
+  it('returns the data array from the response', async () => {
+    const { userHttpService } = await import('../user-http-service');
+    const result = await userHttpService.getUsersByStoreId('s1');
+    if (!result.succeeded) throw new Error('expected succeeded response');
+    expect(result.data).toHaveLength(1);
+    expect(result.data[0].fullName).toBe('User One');
+  });
+});
+
 describe('userHttpService.getUserById — HTTP-3: GET /v1/users/:id', () => {
   beforeEach(async () => {
     vi.clearAllMocks();

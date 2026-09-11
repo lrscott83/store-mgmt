@@ -1,4 +1,4 @@
-﻿using Application.Abstractions.Authentication;
+using Application.Abstractions.Authentication;
 using Application.Abstractions.Messaging;
 using Application.Dtos.Authentication;
 using Application.ResponseModels;
@@ -27,6 +27,7 @@ namespace Application.Features.Authentication.Commands.Login
         private readonly IOfflinePreHashProtector _preHashProtector;
         private readonly IStoreDataKeyProvider _storeDataKeyProvider;
         private readonly IStoreKeyWrapService _storeKeyWrapService;
+        private readonly IStoreRepository _storeRepository;
 
         public LoginCommandHandler(
             IAuthenticationService authenticationService,
@@ -39,7 +40,8 @@ namespace Application.Features.Authentication.Commands.Login
             IUserRepository userRepository,
             IOfflinePreHashProtector preHashProtector,
             IStoreDataKeyProvider storeDataKeyProvider,
-            IStoreKeyWrapService storeKeyWrapService)
+            IStoreKeyWrapService storeKeyWrapService,
+            IStoreRepository storeRepository)
         {
             _authenticationService = authenticationService;
             _jwtProvider = jwtProvider;
@@ -52,6 +54,7 @@ namespace Application.Features.Authentication.Commands.Login
             _preHashProtector = preHashProtector;
             _storeDataKeyProvider = storeDataKeyProvider;
             _storeKeyWrapService = storeKeyWrapService;
+            _storeRepository = storeRepository;
         }
 
         public async Task<ResponseResult<AuthDto>> Handle(LoginCommand request, CancellationToken cancellationToken)
@@ -74,7 +77,7 @@ namespace Application.Features.Authentication.Commands.Login
                 _refreshTokenRepository.Add(refreshToken);
                 await _applicationUnitOfWork.SaveChangesAsync(cancellationToken);
 
-                var (wrappedDek, wrapSalt, wrapIv) = await TryBuildLoginDekWrapAsync(authResult.Data, cancellationToken);
+                var (wrappedDek, wrapSalt, wrapIv, storeDekWraps) = await TryBuildLoginDekWrapsAsync(authResult.Data, cancellationToken);
 
                 return ResponseResult.Success(new AuthDto(
                     request.Login,
@@ -84,7 +87,8 @@ namespace Application.Features.Authentication.Commands.Login
                     refreshExpiry,
                     wrappedDek,
                     wrapSalt,
-                    wrapIv));
+                    wrapIv,
+                    storeDekWraps));
             }
             catch (Exception ex)
             {
@@ -95,13 +99,24 @@ namespace Application.Features.Authentication.Commands.Login
         }
 
         /// <summary>
-        /// Builds the store DEK wrapped with the user's decrypted offline password pre-hash for
-        /// the login response — roster-compatible (ExportOfflineRosterQuery.cs:118-120). Called
-        /// after <see cref="IAuthenticationService.IsValidUserAsync"/> so the pre-hash backfill
-        /// has already persisted. Any degradation (missing user, missing pre-hash, no selected
-        /// store, Unprotect/WrapDek throwing) yields an empty tuple: login never fails.
+        /// Builds the store DEK wraps for the login response, wrapped with the user's
+        /// decrypted offline password pre-hash — roster-compatible
+        /// (ExportOfflineRosterQuery.cs:118-120). Called after
+        /// <see cref="IAuthenticationService.IsValidUserAsync"/> so the pre-hash backfill
+        /// has already persisted. Any degradation (missing user, missing pre-hash, no
+        /// selected store, Unprotect/WrapDek throwing) yields empty fields and an empty
+        /// list: login never fails.
+        ///
+        /// The response carries a wrap for EVERY store the user can switch to — the
+        /// selected store (top-level fields AND first list entry, so legacy clients and
+        /// the new per-store consumer see the same wrap) plus the owner's other active
+        /// stores. The per-store list is what lets the frontend provision a per-store
+        /// device wrap table at login and switch stores in-session later, with no
+        /// password and no logout (the client holds no password after login, so switch
+        /// time can never unwrap anything — provisioning MUST happen here).
         /// </summary>
-        private async Task<(string WrappedDek, string WrapSalt, string WrapIv)> TryBuildLoginDekWrapAsync(Guid userId, CancellationToken cancellationToken)
+        private async Task<(string WrappedDek, string WrapSalt, string WrapIv, List<StoreDekWrapDto>? StoreDekWraps)>
+            TryBuildLoginDekWrapsAsync(Guid userId, CancellationToken cancellationToken)
         {
             try
             {
@@ -111,22 +126,78 @@ namespace Application.Features.Authentication.Commands.Login
                 // query is mandatory (RefreshCommand.cs:61 precedent).
                 var user = await _userRepository.GetUserByIdIgnoreQueryFiltersAsync(userId.ToString());
                 if (user is null)
-                    return ("", "", "");
+                    return ("", "", "", null);
 
                 string? preHash = _preHashProtector.Unprotect(user.OfflinePasswordPreHash, user.Id);
                 if (preHash is null || user.SelectedStoreId == Guid.Empty)
-                    return ("", "", "");
+                    return ("", "", "", null);
 
-                byte[] dek = _storeDataKeyProvider.GetDek(user.SelectedStoreId);
-                WrappedDekResult wrapped = _storeKeyWrapService.WrapDek(preHash, dek);
-                return (wrapped.WrappedDek, wrapped.WrapSalt, wrapped.WrapIv);
+                // The IgnoreQueryFilters variant is mandatory here: login is AllowAnonymous,
+                // so the store's tenant filter (StoreEntityTypeConfiguration: IsSuperAdmin ||
+                // TenantId == context.TenantId) evaluates with no tenant in context and would
+                // hide every store — the same reason the user re-query above is filter-free.
+                var ownerStores = await _storeRepository.GetActiveStoresByUserIdAndIgnoreQueryFiltersAsync(
+                    user.Id);
+
+                // Every store this login can wrap: the SELECTED store first — the legacy
+                // top-level fields below bind to the FIRST wrap, so the selected store must
+                // always come first — then the owner's other active stores (SuperAdmin
+                // operating a store, or a store user with their own selected store, are
+                // covered by the selected-store pin; duplicates are skipped).
+                var storeIds = new List<Guid>();
+                storeIds.Add(user.SelectedStoreId);
+                foreach (var ownedStore in ownerStores)
+                {
+                    if (ownedStore.Id != user.SelectedStoreId && storeIds.All(s => s != ownedStore.Id))
+                        storeIds.Add(ownedStore.Id);
+                }
+
+                var wraps = new List<StoreDekWrapDto>(storeIds.Count);
+                string firstWrappedDek = "", firstWrapSalt = "", firstWrapIv = "";
+                foreach (var storeId in storeIds)
+                {
+                    // Per-store isolation: one store failing to wrap (deleted mid-login,
+                    // HKDF/key-provider hiccup) skips that entry only — the rest of the
+                    // list and the login itself proceed (same R4 discipline as the old
+                    // whole-method catch).
+                    try
+                    {
+                        byte[] dek = _storeDataKeyProvider.GetDek(storeId);
+                        WrappedDekResult wrapped = _storeKeyWrapService.WrapDek(preHash, dek);
+                        wraps.Add(new StoreDekWrapDto(
+                            storeId.ToString(),
+                            wrapped.WrappedDek,
+                            wrapped.WrapSalt,
+                            wrapped.WrapIv));
+                        if (firstWrappedDek.Length == 0)
+                        {
+                            // Legacy top-level fields stay bound to the SELECTED store's wrap
+                            // (consumers before the per-store list assume exactly that), so the
+                            // selected store is pinned first in storeIds above whenever it wraps.
+                            firstWrappedDek = wrapped.WrappedDek;
+                            firstWrapSalt = wrapped.WrapSalt;
+                            firstWrapIv = wrapped.WrapIv;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex,
+                            "Failed to build per-store DEK wrap for store {StoreId} (user {UserId}); skipping it",
+                            storeId, userId);
+                    }
+                }
+
+                if (wraps.Count == 0)
+                    return ("", "", "", null);
+
+                return (firstWrappedDek, firstWrapSalt, firstWrapIv, wraps);
             }
             catch (Exception ex)
             {
                 // Never let a wrap failure reach the handler's outer catch — that returns 500
                 // and violates "login never fails" (spec auth-login-wrapped-dek R4).
-                _logger.LogWarning(ex, "Failed to build login DEK wrap for {UserId}; returning empty wrap fields", userId);
-                return ("", "", "");
+                _logger.LogWarning(ex, "Failed to build login DEK wraps for {UserId}; returning empty wrap fields", userId);
+                return ("", "", "", null);
             }
         }
 

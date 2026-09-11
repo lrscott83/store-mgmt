@@ -7,6 +7,7 @@ using Application.Features.UserManagement.Users.Commands.DeleteUserRoles;
 using Application.Features.UserManagement.Users.Commands.UpdateUser;
 using Application.Features.UserManagement.Users.Commands.UpdateUserPassword;
 using Application.Features.UserManagement.Users.Queries.GetAllUsers;
+using Application.Features.UserManagement.Users.Queries.GetUsersByStoreId;
 using Application.Features.UserManagement.Users.Queries.GetUserById;
 using Application.ResponseModels;
 using Asp.Versioning;
@@ -35,6 +36,22 @@ namespace SMCA.WebApi.Controllers.v1
         public async Task<IActionResult> GetAllUsersAsync([FromRoute] bool includeInactive)
         {
             return Ok(await Sender.Send(new GetAllUsersQuery(includeInactive)));
+        }
+
+        /// <summary>
+        /// Get all users by store
+        /// </summary>
+        /// <returns></returns>
+        [HttpGet("store/{storeId}/{includeInactive}")]
+        [ProducesResponseType(typeof(ResponseResult<List<UserListDto>>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [HasPermission(StoreRoleFeatures.UsersAdmin)]
+
+        public async Task<IActionResult> GetUsersByStoreIdAsync([FromRoute] Guid storeId, [FromRoute] bool includeInactive)
+        {
+            return Ok(await Sender.Send(new GetUsersByStoreIdQuery(storeId, includeInactive)));
         }
 
         /// <summary>

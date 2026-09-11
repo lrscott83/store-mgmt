@@ -33,6 +33,11 @@ interface UpdateStorePayload {
    */
   paymentStartDate?: string;
   /**
+   * Optional plan id (StorePlanType) sent on activation. Omitted on data-only
+   * updates, so the backend leaves the store's plan untouched.
+   */
+  planId?: number;
+  /**
    * Optional since the store-data view and the plan view were split: the
    * data-only update omits it (backend leaves the plan untouched), while the
    * plan view sends the full set.

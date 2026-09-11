@@ -381,8 +381,8 @@ describe('Sidebar — sidebar-menu-parity: WAREHOUSES module group (features 36 
     // Los items con badge NEW concatenan "NEW" al textContent del link; se normaliza.
     const linkTexts = links.map((l) => (l.textContent ?? '').replace(/NEW$/, ''));
 
-    // Ambos items del nuevo módulo, en orden: Almacenes → Movimientos.
-    const almacenesIdx = linkTexts.indexOf('Almacenes');
+    // Ambos items del nuevo módulo, en orden: Gestión de Almacenes → Movimientos.
+    const almacenesIdx = linkTexts.indexOf('Gestión de Almacenes');
     const movimientosIdx = linkTexts.indexOf('Movimientos');
     expect(almacenesIdx).toBeGreaterThan(-1);
     expect(movimientosIdx).toBeGreaterThan(-1);
@@ -393,11 +393,11 @@ describe('Sidebar — sidebar-menu-parity: WAREHOUSES module group (features 36 
     expect(almacenesIdx).toBeGreaterThan(inventoryLastIdx);
   });
 
-  it('StoreUser with only the Warehouses feature (36) sees "Almacenes" but NOT "Movimientos"', () => {
+  it('StoreUser with only the Warehouses feature (36) sees "Gestión de Almacenes" but NOT "Movimientos"', () => {
     const user = makeStoreUser([EFeatures.Warehouses], 's1');
     renderSidebar(user);
 
-    expect(screen.getByText('Almacenes')).toBeInTheDocument();
+    expect(screen.getByText('Gestión de Almacenes')).toBeInTheDocument();
     expect(screen.queryByText('Movimientos')).not.toBeInTheDocument();
   });
 
@@ -406,17 +406,17 @@ describe('Sidebar — sidebar-menu-parity: WAREHOUSES module group (features 36 
     renderSidebar(user);
 
     expect(screen.getByText('Movimientos')).toBeInTheDocument();
-    expect(screen.queryByText('Almacenes')).not.toBeInTheDocument();
+    expect(screen.queryByText('Gestión de Almacenes')).not.toBeInTheDocument();
   });
 
-  it('"Almacenes" no longer appears inside the INVENTORY group (moved to the new module)', () => {
+  it('"Gestión de Almacenes" no longer appears inside the INVENTORY group (moved to the new module)', () => {
     renderSidebar(makeSuperAdmin());
 
     const links = screen.getAllByRole('link');
     const linkTexts = links.map((l) => (l.textContent ?? '').replace(/NEW$/, ''));
     const egressIdx = linkTexts.indexOf('Salida');
     const entriesHistoryIdx = linkTexts.indexOf('Entradas');
-    const almacenesIdx = linkTexts.indexOf('Almacenes');
+    const almacenesIdx = linkTexts.indexOf('Gestión de Almacenes');
     // Dentro de INVENTARIO el orden es ...Salida → Entradas (historial);
     // Almacenes vive después del grupo, no entre ambos.
     expect(almacenesIdx).toBeGreaterThan(entriesHistoryIdx);
@@ -551,7 +551,7 @@ describe('Sidebar — no emoji icons on menu items (plain text labels only)', ()
   it('does NOT render an emoji icon on the Almacenes item', () => {
     renderSidebar(makeSuperAdmin());
 
-    const warehousesLink = screen.getByText('Almacenes').closest('a');
+    const warehousesLink = screen.getByText('Gestión de Almacenes').closest('a');
     expect(warehousesLink).not.toBeNull();
     // The label span must contain only the text + optional NEW badge — no emoji
     expect(warehousesLink?.textContent).not.toMatch(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u);

@@ -149,9 +149,10 @@ test('E-01..E-05 — cards render plan, next due date and discounted price', asy
   await expect(card).toBeVisible();
   await expect(page.getByTestId(`owner-store-actions-toggle-${selectedStoreId}`)).toBeVisible();
 
-  // E-03: paid plan shape — "Plan de Pago" + next due date + price.
+  // E-03: paid plan shape — "Plan: Superior" + next due date + price. The
+  // persona store is created via register (CreateStoreService forces Superior).
   await expect(page.getByTestId(`owner-store-body-${selectedStoreId}`)).toContainText(
-    'Plan de Pago',
+    'Plan: Superior',
   );
 
   // E-04: next billing date line renders (paid store — the persona seed sets a
@@ -288,7 +289,7 @@ test('E-08 — Editar el plan popup saves a plan change on a free store', async 
 
   // Free shape on the card (E-03 free half): no date line, no price line.
   await expect(page.getByTestId(`owner-store-body-${selectedStoreId}`)).toContainText(
-    'Plan Gratis',
+    'Plan: Gratis',
   );
   await expect(page.getByTestId(`owner-store-next-due-${selectedStoreId}`)).toHaveCount(0);
   await expect(page.getByTestId(`owner-store-price-${selectedStoreId}`)).toHaveCount(0);
@@ -323,7 +324,7 @@ test('E-08 — Editar el plan popup saves a plan change on a free store', async 
 
   // After the save the card repaints as PAID: plan label + price line back.
   await expect(page.getByTestId(`owner-store-body-${selectedStoreId}`)).toContainText(
-    'Plan de Pago',
+    'Plan: Pago',
     { timeout: 30_000 },
   );
   await expect(page.getByTestId(`owner-store-price-${selectedStoreId}`)).toBeVisible();

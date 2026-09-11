@@ -12,12 +12,15 @@ import type { Owner } from '@store-mgmt/domain';
 
 export const clientLoader = resellerFeatureLoader([EFeatures.Owners]);
 
+/**
+ * Super-admin owners list. No plan filter — every owner renders unfiltered
+ * (the plan filter was removed; the stores list keeps its own plan buttons).
+ */
 export function OwnerListPage() {
   const navigate = useNavigate();
   const intl = useIntl();
   const [owners, setOwners] = useState<Owner[]>([]);
   const [error, setError] = useState<string | undefined>(undefined);
-  const [filter, setFilter] = useState<'paid-plan' | 'free-plan'>('paid-plan');
 
   const loadOwners = useCallback(async () => {
     try {
@@ -46,13 +49,6 @@ export function OwnerListPage() {
     }
   }
 
-  // An owner is on a paid plan when at least one store has a calculable next payment
-  // date (`nextDueDate`). On a free plan, no store has one.
-  const visibleOwners =
-    filter === 'paid-plan'
-      ? owners.filter((o) => o.storeModules.some((m) => m.nextDueDate !== null))
-      : owners.filter((o) => o.storeModules.every((m) => m.nextDueDate === null));
-
   return (
     <div className="space-y-4 p-4">
       <div className="flex items-center justify-between">
@@ -69,23 +65,8 @@ export function OwnerListPage() {
         </p>
       )}
 
-      <div className="flex items-center gap-2">
-        <label htmlFor="owner-visibility-filter" className="text-sm font-medium text-text">
-          {intl.formatMessage({ id: 'OWNER.FILTER_LABEL' })}
-        </label>
-        <select
-          id="owner-visibility-filter"
-          value={filter}
-          onChange={(e) => setFilter(e.target.value as 'paid-plan' | 'free-plan')}
-          className="rounded border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-        >
-          <option value="paid-plan">{intl.formatMessage({ id: 'OWNER.PAID_PLAN' })}</option>
-          <option value="free-plan">{intl.formatMessage({ id: 'OWNER.FREE_PLAN' })}</option>
-        </select>
-      </div>
-
       <OwnerCardList
-        owners={visibleOwners}
+        owners={owners}
         onEdit={(id) => navigate(`/admin/owners/edit/${id}`)}
         onDelete={handleDelete}
       />
