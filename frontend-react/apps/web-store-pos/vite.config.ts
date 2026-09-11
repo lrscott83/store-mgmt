@@ -4,16 +4,85 @@ import { defineConfig, loadEnv } from 'vite';
 import tsconfigPaths from 'vite-tsconfig-paths';
 import { VitePWA } from 'vite-plugin-pwa';
 import { join } from 'path';
+import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import type { Plugin, PreviewServer } from 'vite';
 // `.mjs` single source of truth for every CSP directive (design.md D1/D2) —
 // `csp-policy.d.mts` is the sibling declaration `tsc` resolves under
 // `moduleResolution: "bundler"` (tsconfig.json:16), proven by this file's own
 // `typecheck` gate (design.md D2's mandatory WU2 acceptance check).
 import { buildCspHeaderValue, CSP_HEADER_NAME } from './scripts/csp-policy.mjs';
+import { STABLE_INLINE_PREFIX, scanInlineScripts } from './scripts/externalize-inline-scripts.mjs';
 
 const ENV_DIR = join(__dirname, '../..');
 const ENV_PREFIXES = ['VITE_', 'API_', 'SESSION_', 'NODE_', 'APP_'];
 const DEV_SERVER_HOST = 'localhost';
 const DEV_SERVER_PORT = 3333;
+
+// `vite preview` serves the enforcing-CSP variant of this app when this is
+// '1' — see `cspEnforcingPreviewPlugin` below.
+function isCspEnforceEnabled(): boolean {
+  return process.env['E2E_CSP_ENFORCE'] === '1';
+}
+
+/**
+ * The EXACT value `deploy/nginx.conf` will serve once the report-only header
+ * flips to enforcing — not a hand-copied approximation. Derived from the same
+ * `csp-policy.mjs` single source of truth that `verify-csp.mjs` compares
+ * byte-for-byte against nginx, plus the hydration hashes of the build this
+ * preview serves, so the two can never drift.
+ *
+ * Mirrors `scripts/csp-hydration-hashes.mjs`'s hashing algorithm verbatim
+ * (SHA-256, base64, `'sha256-<b64>'`). That module cannot be imported here
+ * because its throw-on-unstable gate belongs to the build chain, not to the
+ * server runtime (a stale preview serving a fresh build must still serve);
+ * here, non-stable scripts are skipped instead of fatal.
+ */
+function buildEnforcingCspValue(): string {
+  const html = readFileSync(join(__dirname, 'build/client/index.html'), 'utf8');
+  const hashes = new Set<string>();
+  for (const { content } of scanInlineScripts(html)) {
+    if (!STABLE_INLINE_PREFIX.test(content)) continue;
+    STABLE_INLINE_PREFIX.lastIndex = 0;
+    hashes.add(`'sha256-${createHash('sha256').update(content, 'utf8').digest('base64')}'`);
+  }
+  return buildCspHeaderValue('prod', { hydrationScriptHashes: [...hashes].sort() });
+}
+
+/**
+ * E2E_CSP_ENFORCE=1 turns `vite preview` into the enforcing-CSP server the
+ * Step-2 export specs drive (playwright.csp.config.ts, port 4174). Off by
+ * default so `playwright.pwa.config.ts` — which shares this file's
+ * `vite preview` on port 4173 — keeps serving whatever headers preview serves
+ * today: no behavior change for any existing run.
+ *
+ * Why a PREVIEW middleware and not a dev-server middleware: the dev payload's
+ * inline hydration scripts are NOT the bytes nginx serves — they differ from
+ * the build's stable scripts (the KNOWN_DEV_ONLY_VIOLATIONS entry exists
+ * precisely because of that). Under enforcing CSP the dev hydration would be
+ * blocked and the app would never hydrate: a failure mode that exists ONLY in
+ * dev. The build carries exactly the 3 stable scripts whose hashes live in
+ * nginx.conf — the preview serves the real artifact.
+ *
+ * `configurePreviewServer` WITHOUT a returned closure runs BEFORE preview's
+ * internal static server, so the header reaches every response — same
+ * `res.setHeader` + `next()` merge semantics as the dev middleware above. The
+ * value is computed ONCE at startup from the served build's own index.html: a
+ * preview run never rebuilds, so there is nothing to recompute per request. A
+ * missing build/client/index.html throws here at startup, loudly.
+ */
+function cspEnforcingPreviewPlugin(): Plugin {
+  return {
+    name: 'csp-enforcing-preview-header',
+    configurePreviewServer(server: PreviewServer) {
+      const value = buildEnforcingCspValue();
+      server.middlewares.use((_req, res, next) => {
+        res.setHeader('Content-Security-Policy', value);
+        next();
+      });
+    },
+  };
+}
 
 export default defineConfig(({ mode }) => {
   // Same envDir/envPrefix the app itself uses (below), so this sees exactly
@@ -24,6 +93,8 @@ export default defineConfig(({ mode }) => {
     apiUrl: env['API_URL'],
     devServerOrigin: `http://${DEV_SERVER_HOST}:${DEV_SERVER_PORT}`,
   });
+
+  const enforceCsp = isCspEnforceEnabled();
 
   return {
     plugins: [
@@ -63,6 +134,7 @@ export default defineConfig(({ mode }) => {
           });
         },
       },
+      ...(enforceCsp ? [cspEnforcingPreviewPlugin()] : []),
       reactRouter(),
       tsconfigPaths(),
       VitePWA({
@@ -118,6 +190,25 @@ export default defineConfig(({ mode }) => {
       // dev registers a real worker too, so the collision goes both ways.
       port: 4173,
       host: 'localhost',
+      // E2E_CSP_ENFORCE runs preview as the Step-2 enforcing-CSP server
+      // (playwright.csp.config.ts, --port 4174). That server serves a build
+      // whose API_URL is the Dockerfile default '/api' (same-origin), so the
+      // API calls need the same '/api' proxy deploy/nginx.conf provides in
+      // production — pointed at the E2E backend (E2E_API_URL, see
+      // e2e/support/backend-url.ts). Mirrors nginx's `location /api {
+      // proxy_pass http://api; }`: the path is preserved, only the origin
+      // changes, so `connect-src 'self'` covers every call exactly as in
+      // production.
+      ...(enforceCsp
+        ? {
+            proxy: {
+              '/api': {
+                target: new URL(process.env['E2E_API_URL'] ?? 'http://localhost:5019/api').origin,
+                changeOrigin: true,
+              },
+            },
+          }
+        : {}),
     },
     envDir: ENV_DIR,
     envPrefix: ENV_PREFIXES,
