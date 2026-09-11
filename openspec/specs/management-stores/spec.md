@@ -134,38 +134,32 @@ activated the paid plan.
 - WHEN `storeHttpService.getStore()` resolves
 - THEN `Store.paymentStartDate` is `null` and the read-only lock (below) does not engage
 
-### Requirement: PlanPicker Read-Only Lock After Plan Activation
-(Added by SDD change `store-paid-plan-billing-frontend`, archived 2026-07-27. NEW feature work,
-no Angular source.)
+### Requirement: Plan Panels Activation Contract (owner plan change)
+(Replaced by SDD change `owner-plan-change`, archived 2026-09-11. Previously "PlanPicker Read-Only
+Lock After Plan Activation" from `store-paid-plan-billing-frontend`: readOnly lock for non-super
+admins on paid stores, activation via `updateStore(moduleIds)` — superseded by owner-driven
+`changeStorePlan`; the owner of a store can now change plans freely.)
 
-`PlanPicker` MUST accept a `readOnly` prop. When `true`, plan tabs MUST still render, but the
-"Activar este plan" button MUST NOT render and `onChange` MUST NOT fire on tab interaction.
-`store-form` MUST compute `readOnly={!isSuperAdmin && isOnPaidPlan}`, where `isOnPaidPlan` is
-`modules.some((m) => !m.priceIncluded && m.selected)`.
+Plan activation in the store's plan dialog SHALL use `changeStorePlan(storeId, planId)` — `POST /v1/stores/{id}/change-plan`. There SHALL be no readOnly lock: the owner of the store can change plans, and every non-active plan panel SHALL render an "Activar Plan" button.
 
-The lock enforces `billing/spec.md` — "plan activation (owner, once)" — so it MUST engage on the
-store actually being on the paid plan. It MUST NOT be derived from `paymentStartDate != null`:
-that was a sound proxy only while the billing clock started on the first paid module, and it
-became wrong once every store starts its clock at creation, where it would spend the owner's
-single activation at birth and lock them out of the paid plan permanently.
+Plan panel layout: module rows SHALL show module name + "?" help icon only (no per-module price, no discount badge); the plan header price SHALL show the red-strikethrough original followed by the current price, right-aligned ("20 10 USD") when discounted, or the current price alone when there is no discount. Paid plans SHALL render "Incluye todo lo del plan {plan_anterior} y además:" (plan_anterior = immediately preceding plan by `Order`; Gratis keeps "Incluye:"). The help "?" icon SHALL be bigger (h-6 w-6, text-base) and green (text-green-600, border-green-600). The dialog's close button SHALL be right-aligned (X top-right stays).
 
-#### Scenario: Owner already on the paid plan sees a locked picker
-- GIVEN a store with a `priceIncluded: false` module selected and the current user is not super admin
-- WHEN the edit form renders `PlanPicker`
-- THEN `readOnly` is `true`: no "Activar este plan" button renders and clicking a tab does not call `onChange`
+#### Scenario: Owner activates Pago from the dialog
+- GIVEN the owner of a Gratis store opens the plan dialog
+- WHEN clicking "Activar Plan" on the Pago panel
+- THEN changeStorePlan POST fires; on success the modal closes, session refreshes, card reflects new planType and price
 
-#### Scenario: Owner still on the free plan keeps their one activation
-- GIVEN a store on the free plan (no `priceIncluded: false` module selected) whose `paymentStartDate`
-  is set from creation, and the current user is not super admin
-- WHEN the edit form renders `PlanPicker`
-- THEN `readOnly` is `false`: the "Activar este plan" button renders, so the owner can still activate the paid plan once
+#### Scenario: Strikethrough header
+- GIVEN a plan with original total 20 and current 10 (discount)
+- WHEN the header renders
+- THEN "20" appears red-strikethrough followed by "10 USD", right-aligned
 
-#### Scenario: Super admin keeps full control
-- GIVEN a store on the paid plan and the current user is super admin
-- WHEN the edit form renders `PlanPicker`
-- THEN `readOnly` is `false`: the "Activar este plan" button renders and tab clicks call `onChange`
+#### Scenario: Includes-previous text
+- GIVEN the Pago panel on a store currently on Gratis
+- WHEN the panel body renders
+- THEN it starts with "Incluye todo lo del plan Gratis y además:"
 
-#### Scenario: Create mode is always interactive
-- GIVEN a new store with no `paymentStartDate` (create mode)
-- WHEN the create form renders `PlanPicker`
-- THEN `readOnly` is `false` regardless of the current user's role
+#### Scenario: Rows stripped
+- GIVEN any plan panel
+- WHEN module rows render
+- THEN each row shows only module name + "?" icon (no price, no discount badge)

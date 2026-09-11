@@ -12,12 +12,12 @@ Per-store paid-plan lifecycle: plan activation (owner, once), manual payment rec
 |--------|------|
 | Type | `DateOnly?` (nullable) — `null` = never activated paid plan (legacy rows only) |
 | Activation (creation) | Set unconditionally to `DateOnly.FromDateTime(_dateTimeProvider.UtcNow.UtcDateTime)` at store creation (`CreateStoreService.CreateStoreAsync`), for BOTH admin `POST /v1/stores` and self-registration, regardless of paid/free-only modules |
-| Activation (legacy update path) | For rows where `PaymentStartDate is null` at update time, `UpdateStoreCommandHandler` SHALL still set it to today on first paid-module add (unchanged conditional, `UpdateStoreCommand.cs:96-97`) — the only remaining activation path for pre-existing rows |
+| Activation (legacy update path) | REMOVED by `owner-plan-change` (archived 2026-09-11): update-store no longer auto-activates on first paid-module add — `PaymentStartDate` stays `null` on legacy rows; the clock starts only at store creation or via explicit SuperAdmin payment-date set (see Requirement: Sacred Payment Anchor) |
 | Client input | The client cannot seed `PaymentStartDate` on creation (no such field on `CreateStoreCommand`). On update, a value supplied by a non-SuperAdmin caller MUST be ignored; only SuperAdmin MAY set it explicitly (`UpdateStoreCommand.cs:100-101`) |
-| Lock | While the store has ANY active paid module (`ModulePriceIncluded == false`), OwnerAdmin MUST NOT change modules: requests whose `ModuleIds` differ from the current active set (distinct-sorted; duplicates/order never reject) SHALL be rejected (`ValidationException`, 400, code `PlanLocked`). Same-set updates SHALL stay allowed; stores with no active paid module SHALL activate; trigger is modules, not `PaymentStartDate`. SuperAdmin SHALL retain full edit |
+| Lock | OwnerAdmin MUST NOT change the module set of ANY store (paid or free): a non-SuperAdmin `update-store` with `ModuleIds != null` whose set differs from the current active set (distinct-sorted; duplicates/order never reject) SHALL be rejected (`ValidationException`, 400, code `PlanLocked`). Same-set updates SHALL stay allowed; `ModuleIds == null` (data-only) never fires the lock; there is no free-store activation exception anymore; SuperAdmin SHALL retain freeform edit. Non-SuperAdmin plan changes go exclusively through `change-plan` (see Requirement: Owner Plan Change Endpoint) |
 | Migration | Existing rows keep their current value. NO migration, NO backfill — legacy `null` rows are never retro-activated |
 
-(Previously: the Lock row read "Once non-null..." — the `PaymentStartDate` proxy.)
+(Previously: the Lock row read "Once non-null..." — the `PaymentStartDate` proxy; and before `owner-plan-change` it kept a free-store activation exception via update-store.)
 
 #### Scenario: Admin creates store with paid module
 - GIVEN admin calls `POST /v1/stores` assigning a paid module
@@ -529,6 +529,101 @@ DTO changes.
 - GIVEN all unit tests in the solution
 - WHEN the changes are applied
 - THEN all unit tests pass
+
+### Requirement: Owner Plan Change Endpoint
+(Added by SDD change `owner-plan-change`, archived 2026-09-11.)
+
+The system SHALL expose `POST /v1/stores/{id}/change-plan` with body `{ storePlanId }`. The caller SHALL be the store's owner (OwnerAdmin whose owned-store graph contains the target store) or SuperAdmin. Any other caller SHALL receive 403.
+
+On success (200, `data=true`): `Store.StorePlanId` SHALL be written to the target plan; the store's active `StoreModules` SHALL become the catalog `priceIncluded` modules ∪ target-plan members (soft-deleting absent, inserting new, reactivating soft-deleted); `StoreRoleFeatures` SHALL be regenerated for inserted modules; `Store.PaymentStartDate` SHALL NOT change (Sacred Payment Anchor); and `Store.NextDueDateOverride` SHALL be set to today when the target plan is paid and the computed next due date is <= today (Next-Due Override Mechanics), else left untouched.
+
+The target store and its owner user SHALL be active, and the target plan SHALL be known and active — otherwise 400 with the corresponding error code.
+
+#### Scenario: Owner changes Gratis→Pago (overdue clock)
+- GIVEN a store owned by user U with `StorePlanId=Gratis`, `PaymentStartDate = 2026-01-10` (trial expired, nextDue = 2026-02-10, today = 2026-09-10)
+- WHEN U posts `change-plan { storePlanId: Pago }`
+- THEN the response is 200 with `data=true`
+- AND `Store.StorePlanId` = Pago
+- AND the store's active `StoreModules` = catalog priceIncluded modules ∪ Pago members (soft-deleting absent, inserting new, reactivating soft-deleted)
+- AND `Store.PaymentStartDate` = 2026-01-10 (UNCHANGED)
+- AND `Store.NextDueDateOverride` = 2026-09-10 (today — next payment date becomes today)
+- AND `StoreRoleFeatures` regenerated for inserted modules
+
+#### Scenario: Next payment date becomes today — visible
+- GIVEN the store above after the change
+- WHEN `GET /v1/stores/{id}/plan` is called (or /auth/me billing fields)
+- THEN `nextDueDate` = today
+- AND billing status computes `PorVencer` (today is within dueSoonDays of due=today) → `IsPaidPlanActive=true` → paid modules NOT gated by FilterForBilling
+
+#### Scenario: Owner changes to paid plan with FUTURE due date
+- GIVEN a paid-plan store with nextDue = 2026-12-01, today = 2026-09-10
+- WHEN the owner changes to another paid plan
+- THEN `PaymentStartDate` and computed `nextDueDate` are unchanged (override NOT set; existing override, if any, is left untouched)
+
+#### Scenario: Owner changes to Gratis
+- GIVEN a Pago store (any due state)
+- WHEN the owner changes to Gratis
+- THEN modules become Gratis membership; `StorePlanId` = Gratis
+- AND `PaymentStartDate` unchanged; existing override cleared (Next-Due Override Mechanics)
+
+#### Scenario: Owner changes to VIP
+- GIVEN a store owned by U
+- WHEN U posts `change-plan { storePlanId: VIP }` (VIP is a paid plan)
+- THEN the same paid-plan rules apply: membership modules, anchor preserved, overdue ⇒ override = today
+
+#### Scenario: Not the store's owner
+- GIVEN an OwnerAdmin U2 who does NOT own the target store
+- WHEN U2 posts change-plan on that store
+- THEN 403 Forbidden
+
+#### Scenario: Inactive store or inactive owner user
+- GIVEN the target store `IsActive=false` OR the owner user `IsActive=false`
+- WHEN change-plan is posted
+- THEN 400 with the corresponding error code
+
+#### Scenario: SuperAdmin path
+- GIVEN a SuperAdmin posting change-plan on any store
+- THEN 200: same mutation rules (modules from membership, StorePlanId written, anchor kept, overdue paid-target ⇒ override=today)
+
+#### Scenario: Unknown plan / inactive plan
+- GIVEN `storePlanId` = 99 (unknown) or an inactive plan
+- WHEN change-plan is posted
+- THEN 400 validation error
+
+### Requirement: Sacred Payment Anchor
+(Added by SDD change `owner-plan-change`, archived 2026-09-11.)
+
+The system MUST NOT alter or nullify `Store.PaymentStartDate` on ANY plan-change path (change-plan, toggle-plan, update-store). Every plan-change test SHALL assert the anchor is unchanged.
+
+#### Scenario: Anchor immutability across all paths (integration + E2E)
+- GIVEN a store with `PaymentStartDate = D`
+- WHEN change-plan (owner or SuperAdmin), toggle-plan, or update-store runs
+- THEN `PaymentStartDate` = D in every case (assert in tests)
+
+#### Scenario: Activation-on-first-paid removed
+- GIVEN a free-modules store with `PaymentStartDate = null` (legacy row) and a caller with moduleIds containing paid modules
+- WHEN update-store runs
+- THEN `PaymentStartDate` remains null (no auto-activation; the clock starts only at creation or explicit SuperAdmin PUT payment-date)
+
+### Requirement: Next-Due Override Mechanics
+(Added by SDD change `owner-plan-change`, archived 2026-09-11.)
+
+`Store.NextDueDateOverride` (nullable `DateOnly`) SHALL override the computed next due date with priority: `override > lastPaidBeforeDate > paymentStartDate+trial+1`. The override SHALL be set to TODAY when a change to a paid plan finds computed nextDue <= today. The override SHALL be cleared when a payment is registered (`RegisterStorePayment`) and when the plan changes to Gratis. Changes to paid plans with future nextDue SHALL NOT create an override.
+
+#### Scenario: Override priority in GetNextDueDate
+- GIVEN anchor 2026-01-10, trial 1, lastPaid = 2026-07-10, override = 2026-09-10
+- WHEN computing next due
+- THEN result = 2026-09-10 (override wins over lastPaid)
+
+#### Scenario: Payment clears override
+- GIVEN a store with override = today
+- WHEN RegisterStorePayment runs (SuperAdmin/ReSeller)
+- THEN override is null and nextDue = payment.PaymentBeforeDate
+
+#### Scenario: Downgrade clears override
+- GIVEN a paid store with an active NextDueDateOverride
+- WHEN the plan changes to Gratis
+- THEN override is null
 
 ### Requirement: Free-plan stores surface in "to collect" at Amount = 0 (accepted consequence)
 
