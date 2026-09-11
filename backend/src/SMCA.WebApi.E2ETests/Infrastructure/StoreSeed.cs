@@ -83,7 +83,7 @@ public static class StoreSeed
         var owner = Owner.Create(user.Id, false, tenant.Id, "t2 owner");
         db.Set<Owner>().Add(owner);
         await db.SaveChangesAsync();
-        var store = Store.Create($"T2-Store-{Guid.NewGuid():N}", owner.Id, false, tenant.Id);
+        var store = Store.Create($"T2-Store-{Guid.NewGuid():N}", owner.Id, true, tenant.Id);
         db.Set<Store>().Add(store);
         await db.SaveChangesAsync();
         db.Set<StoreModule>().Add(StoreModule.Create(store.Id, ManagementModuleId, 0, true, 0, 0, 0, tenant.Id));

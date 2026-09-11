@@ -438,7 +438,7 @@ public class RegisterCommandHandlerTests : RegisterCommandHandlerTestFixture
             command.StoreName,
             It.IsAny<string?>(),
             It.Is<string>(s => s.Contains("prueba")),
-            false,
+            true, // all creation paths force approved=true (2026-09-10)
             It.Is<List<int>>(list => list.Contains(TestModule.Id))),
             Times.Once);
     }

@@ -24,7 +24,7 @@ public sealed class StoreData
     public Guid OwnerId { get; set; }
     public string? OwnerName { get; set; }
     public DateOnly? PaymentStartDate { get; set; }
-    public DateOnly NextPaymentDate { get; set; }
+    public DateOnly? NextPaymentDate { get; set; }
     public List<ModuleData> Modules { get; set; } = new();
 }
 

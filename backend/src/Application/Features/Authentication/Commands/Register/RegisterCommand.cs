@@ -79,8 +79,10 @@ namespace Application.Features.Authentication.Commands.Register
                     (int)HttpStatusCode.InternalServerError);
             }
             HashSet<int> availableModuleIds = availableModules.Select(f => f.Id).ToHashSet();
+            // Self-registered stores are approved immediately so they are usable without an admin
+            // act (product decision 2026-09-10): all creation paths force approved=true.
             var store = await _createStoreService.CreateStoreAsync(owner.Id, owner.TenantId, request.StoreName, null,
-                "Tienda de prueba", false, availableModuleIds.ToList());
+                "Tienda de prueba", true, availableModuleIds.ToList());
 
             // FIX: Add null check to prevent NullReferenceException
             if (owner.User == null)

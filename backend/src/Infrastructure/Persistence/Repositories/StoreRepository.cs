@@ -203,7 +203,7 @@ namespace Infrastructure.Persistence.Repositories
                     .ThenInclude(o => o.User)
                 .Include(s => s.StoreModules)
                     .ThenInclude(sm => sm.Module)
-                .Where(s => s.PaymentStartDate != null)
+                .Where(s => s.PaymentStartDate != null && s.Approved)
                 .IgnoreQueryFilters()
                 .ToListAsync();
 
@@ -217,6 +217,7 @@ namespace Infrastructure.Persistence.Repositories
                     .ThenInclude(o => o.ReSellerOwner)
                         .ThenInclude(rso => rso.ReSeller)
                 .Where(s => s.PaymentStartDate != null
+                    && s.Approved
                     && s.Owner.ReSellerOwner != null
                     && s.Owner.ReSellerOwner.ReSeller.UserId == reSellerUserId)
                 .IgnoreQueryFilters()

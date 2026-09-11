@@ -81,7 +81,7 @@ public sealed class StoresByCurrentUserTests
         using (var scope = _f.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-            var store2 = Store.Create($"OA-Store-2-{Guid.NewGuid():N}", ownerA.OwnerId, false, ownerA.TenantId, DateOnly.FromDateTime(DateTime.UtcNow));
+            var store2 = Store.Create($"OA-Store-2-{Guid.NewGuid():N}", ownerA.OwnerId, true, ownerA.TenantId, DateOnly.FromDateTime(DateTime.UtcNow));
             db.Set<Store>().Add(store2);
             await db.SaveChangesAsync();
             storeA2Id = store2.Id;
@@ -114,7 +114,7 @@ public sealed class StoresByCurrentUserTests
         using (var scope = _f.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-            var store2 = Store.Create($"OA-Store-2-{Guid.NewGuid():N}", ownerA.OwnerId, false, ownerA.TenantId, DateOnly.FromDateTime(DateTime.UtcNow));
+            var store2 = Store.Create($"OA-Store-2-{Guid.NewGuid():N}", ownerA.OwnerId, true, ownerA.TenantId, DateOnly.FromDateTime(DateTime.UtcNow));
             db.Set<Store>().Add(store2);
             await db.SaveChangesAsync();
             storeA2Id = store2.Id;
