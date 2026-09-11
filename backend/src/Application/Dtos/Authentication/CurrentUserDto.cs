@@ -21,5 +21,11 @@ namespace Application.Dtos.Authentication
         public bool IsInTrial { get; set; }
         public string PaymentStatus { get; set; } = StoreBillingStatusType.NoAplica.ToString();
         public string PlanType { get; set; } = "Free";
+        /// <summary>
+        /// All stores owned by this user (active + inactive). Populated only for
+        /// OwnerAdmin users; empty for all other roles. Used by the frontend to
+        /// resolve store names in warehouse-movements sale_out display.
+        /// </summary>
+        public List<StoreSummaryDto> StoreList { get; set; } = new();
     }
 }

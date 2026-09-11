@@ -105,6 +105,10 @@ export function WarehouseMovementsPage() {
 
   const productName = (id: string) => products.find((p) => p.id === id)?.name ?? id;
   const warehouseName = (id: string) => warehouses.find((w) => w.id === id)?.name ?? id;
+  const storeName = (id?: string) =>
+    user?.storeList?.find((s) => s.id === id)?.name ??
+    user?.roles?.find((r) => r.storeId === id)?.storeName ??
+    id;
 
   /** Historial agrupado por día (más reciente primero). */
   const movementDayGroups = useMemo(
@@ -192,6 +196,7 @@ export function WarehouseMovementsPage() {
       quantity: fields.quantity,
       costPrice: fields.costPrice,
       toWarehouseId: fields.toWarehouseId ?? original.toWarehouseId,
+      toStoreId: original.toStoreId,
       reason: fields.reason,
     });
     setEditingMovement(null);
@@ -207,6 +212,28 @@ export function WarehouseMovementsPage() {
     showToastSuccess(intl.formatMessage({ id: 'WAREHOUSES.MOVEMENT_UPDATED' }));
     load();
   }
+
+  const movementRoute = (movement: WarehouseStockMovement): string => {
+    switch (movement.type) {
+      case 'purchase_in':
+        return `${intl.formatMessage({ id: 'WAREHOUSES.COMPRA' })} → ${warehouseName(movement.warehouseId)}`;
+      case 'sale_out': {
+        const dest = storeName(movement.toStoreId);
+        return dest ? `${warehouseName(movement.warehouseId)} → ${dest}` : warehouseName(movement.warehouseId);
+      }
+      case 'transfer_out':
+        return `${warehouseName(movement.warehouseId)} → ${warehouseName(movement.toWarehouseId ?? '')}`;
+      case 'transfer_in':
+        return `${warehouseName(movement.fromWarehouseId ?? '')} → ${warehouseName(movement.warehouseId)}`;
+      default:
+        // reversal: mantener el rendering actual (solo almacén + campos presentes).
+        return [
+          warehouseName(movement.warehouseId),
+          movement.toWarehouseId ? ` → ${warehouseName(movement.toWarehouseId)}` : '',
+          movement.fromWarehouseId ? ` ← ${warehouseName(movement.fromWarehouseId)}` : '',
+        ].join('');
+    }
+  };
 
   return (
     <Card>
@@ -270,9 +297,7 @@ export function WarehouseMovementsPage() {
                         {movement.quantity}
                       </span>
                       <span className="min-w-0 flex-1 truncate text-right text-sm text-text-muted">
-                        {warehouseName(movement.warehouseId)}
-                        {movement.toWarehouseId && ` → ${warehouseName(movement.toWarehouseId)}`}
-                        {movement.fromWarehouseId && ` ← ${warehouseName(movement.fromWarehouseId)}`}
+                        {movementRoute(movement)}
                       </span>
                       {/* Badge Revertido en la fila original (F5) — derivado en runtime. */}
                       {reversedIds.has(movement.id) && (

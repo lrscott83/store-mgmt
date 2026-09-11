@@ -45,6 +45,13 @@ public sealed class MeData
     public Guid SelectedStoreId { get; set; }
     public List<int> StoreModuleIds { get; set; } = new();
     public bool IsActive { get; set; }
+    public List<StoreSummaryData> StoreList { get; set; } = new();
+}
+
+public sealed class StoreSummaryData
+{
+    public Guid Id { get; set; }
+    public string Name { get; set; } = string.Empty;
 }
 
 public sealed class RosterVerifierData

@@ -55,6 +55,8 @@ export interface RecordWarehouseMovementParams {
   toWarehouseId?: string;
   /** transfer_in → origen. */
   fromWarehouseId?: string;
+  /** sale_out → tienda destino (id). Opcional en otros tipos. */
+  toStoreId?: string;
 }
 
 /**
@@ -347,6 +349,7 @@ export class WarehouseOfflineService {
               reason: params.reason ?? null,
               costPrice: slice.costPrice,
               inventoryEntryId: entryId,
+              toStoreId: params.toStoreId,
             }),
           );
           return new DataResultImpl<WarehouseStockMovement[]>(rows, true, []);
@@ -881,6 +884,8 @@ export class WarehouseOfflineService {
     reason: string | null;
     toWarehouseId?: string;
     fromWarehouseId?: string;
+    /** sale_out → tienda destino (id). Opcional en otros tipos. */
+    toStoreId?: string;
     /** Costo exacto del lote (D8). */
     costPrice?: number;
     /** sale_out → entrada de tienda creada (enlace 1:1, D11). */
@@ -901,6 +906,7 @@ export class WarehouseOfflineService {
       createdByName: getCurrentUserLogin(),
       toWarehouseId: input.toWarehouseId,
       fromWarehouseId: input.fromWarehouseId,
+      toStoreId: input.toStoreId,
       costPrice: input.costPrice,
       inventoryEntryId: input.inventoryEntryId,
       reversalOfMovementId: input.reversalOfMovementId,

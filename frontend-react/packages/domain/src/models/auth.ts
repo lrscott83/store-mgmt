@@ -66,6 +66,12 @@ export interface RegisterAuthModel {
   expiresIn: string;
 }
 
+/** Resumen de tienda del owner devuelto por auth/me (StoreList): id + nombre. */
+export interface StoreSummary {
+  id: string;
+  name: string;
+}
+
 export interface StoreModuleFeatures {
   storeId: string;
   storeName: string;
@@ -88,6 +94,8 @@ export interface UserModel extends AuthModel {
   isSuperAdmin: boolean;
   isOwnerAdmin: boolean;
   isReSeller: boolean;
+  /** Tiendas del owner (auth/me, solo OwnerAdmin) — resuelve el nombre destino de sale_out. */
+  storeList?: StoreSummary[];
   selectedStoreId: string;
   paymentDueDate: string | null;
   isInTrial: boolean;
