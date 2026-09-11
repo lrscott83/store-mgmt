@@ -1,8 +1,8 @@
 # Plan: CSP enforcing flip — prerequisites and verification
 
-**Status**: planning / not started
+**Status**: Step 1 done (commit `e072fc78`) / Step 2 next
 **Created**: 2026-09-10
-**Related commits**: `177dd2fc` (nginx cache headers), `83b7de69` (externalize bootstrap + hydration-hash gate)
+**Related commits**: `177dd2fc` (nginx cache headers), `83b7de69` (externalize bootstrap + hydration-hash gate), `e072fc78` (img-src data: + worker-src decision)
 
 ## Context — what is already done
 
@@ -62,7 +62,7 @@ Both are **export** paths, not shell load — which is why report-only never sur
 
 ## Open decisions
 
-- **`worker-src`**: add `blob:` up front, or prove the fallback first? (Step 2 answers it.)
+- ~~**`worker-src`**: add `blob:` up front, or prove the fallback first?~~ **RESUELTO 2026-09-11**: `worker-src` se queda `'self'` — zip.js tiene `useWebWorkers: false` app-wide (`data-serializer-service.ts:35`, `roster-serializer.ts:23`), ningún worker `blob:` se crea jamás. Documentado en `csp-policy.mjs` (commit `e072fc78`).
 - **Where the enforcing policy is exercised in tests**: a local nginx override vs a test-only header injector. Needs a decision before Step 2.
 
 ## Non-negotiables (project rules)
