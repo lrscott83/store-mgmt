@@ -25,7 +25,10 @@ describe('externalizeInlineScripts', () => {
     expect(assets).toHaveLength(1);
     expect(assets[0].content).toBe(content);
     expect(assets[0].fileName).toBe(`assets/bootstrap-0-${sha256Hex8(content)}.js`);
-    expect(out).toBe(`<head><script type="module" src="${assets[0].fileName}"></script></head>`);
+    // The emitted src is ROOT-RELATIVE: index.html is the SPA shell served
+    // at every route, so a relative src 404s on any deep link
+    // (/sales/products → /sales/assets/...).
+    expect(out).toBe(`<head><script type="module" src="/${assets[0].fileName}"></script></head>`);
     expect(out).not.toContain('import ');
   });
 
@@ -35,7 +38,7 @@ describe('externalizeInlineScripts', () => {
     const { html: out, assets } = externalizeInlineScripts(html);
 
     expect(assets).toHaveLength(1);
-    expect(out).toBe(`<script src="${assets[0].fileName}"></script>`);
+    expect(out).toBe(`<script src="/${assets[0].fileName}"></script>`);
   });
 
   it('leaves scripts matching ^window.__reactRouterContext byte-identical', () => {
@@ -57,7 +60,7 @@ describe('externalizeInlineScripts', () => {
     const { html: out } = externalizeInlineScripts(html);
 
     const i1 = out.indexOf('window.__reactRouterContext =');
-    const i2 = out.indexOf('src="assets/bootstrap-0-');
+    const i2 = out.indexOf('src="/assets/bootstrap-0-');
     const i3 = out.indexOf('window.__reactRouterContext.streamController.close');
     expect(i1).toBeGreaterThanOrEqual(0);
     expect(i2).toBeGreaterThan(i1);

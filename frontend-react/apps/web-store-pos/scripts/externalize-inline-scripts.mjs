@@ -65,6 +65,13 @@ export function scanInlineScripts(html) {
  * preserving the tag's attributes in order and adding `src`. Stable-prefix
  * scripts are left byte-identical. Returns `{ html, assets }` where `assets`
  * is `[]` (and `html` unchanged) when nothing needed externalizing.
+ *
+ * The `src` is ROOT-RELATIVE (`/assets/...`), never relative (`assets/...`):
+ * the served `index.html` is the SPA shell for EVERY route, and a relative
+ * `src` resolves against the PAGE's path — at `/sales/products` it becomes
+ * `/sales/assets/bootstrap-*.js`, a 404 that kills hydration on any deep
+ * link (nginx `try_files` would answer that 404 with index.html, so the
+ * browser would try to execute HTML as JS — worse than the 404).
  */
 export function externalizeInlineScripts(html, options = {}) {
   const prefix = options.prefix ?? STABLE_INLINE_PREFIX;
@@ -78,7 +85,7 @@ export function externalizeInlineScripts(html, options = {}) {
     const fileName = `assets/bootstrap-${index}-${sha256Hex(content).slice(0, 8)}.js`;
     index += 1;
     assets.push({ fileName, content });
-    return `<script${attrs} src="${fileName}"></script>`;
+    return `<script${attrs} src="/${fileName}"></script>`;
   });
 
   return { html: output, assets };
