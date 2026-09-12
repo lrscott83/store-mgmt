@@ -29,6 +29,10 @@ async function main() {
   const leftInline = inlineBefore - assets.length;
 
   for (const asset of assets) {
+    // `fileName` is `assets/...` relative to build/client — the same shape
+    // every Vite asset emits — so the file lands in build/client/assets/.
+    // The emitted `src` in index.html is root-relative (`/assets/...`),
+    // matching how Vite itself references its assets (base: '/').
     await writeFile(resolve(ROOT, 'build/client', asset.fileName), asset.content, 'utf8');
   }
 

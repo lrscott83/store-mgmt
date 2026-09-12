@@ -36,9 +36,12 @@ const BASE_DIRECTIVES = [
   // from a genuinely new inline script. See e2e/support/csp-violations.ts.
   ['script-src', ["'self'", "'report-sample'"]],
   ['style-src', ["'self'", "'unsafe-inline'"]], // permanent carve-out, spec.md — chart tooltip inline styles
-  ['img-src', ["'self'"]],
+  // 'data:' is required because html2canvas rasterizes data:image/* sources for PDF export (jspdf).
+  ['img-src', ["'self'", "data:"]],
   ['font-src', ["'self'"]],
   ['connect-src', ["'self'"]],
+  // worker-src stays 'self': zip.js Web Workers are disabled app-wide
+  // (configure({ useWebWorkers: false })), so no blob: worker is ever spawned.
   ['worker-src', ["'self'"]],
   ['manifest-src', ["'self'"]],
 ];
