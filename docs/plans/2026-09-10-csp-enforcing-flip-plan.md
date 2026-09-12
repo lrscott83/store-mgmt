@@ -1,6 +1,6 @@
 # Plan: CSP enforcing flip — prerequisites and verification
 
-**Status**: Step 1 done (`e072fc78`) / Step 2 done (`54cd8b33`) / Step 3 done / Step 4 pending (needs deploy)
+**Status**: Step 1 done (`e072fc78`) / Step 2 done (`54cd8b33`) / Step 3 done (`04381655`) / Step 4 done — **ARC CLOSED 2026-09-11**
 **Created**: 2026-09-10
 **Related commits**: `177dd2fc` (nginx cache headers), `83b7de69` (externalize bootstrap + hydration-hash gate), `e072fc78` (img-src data: + worker-src decision)
 
@@ -58,8 +58,13 @@ Both are **export** paths, not shell load — which is why report-only never sur
 
 ### Step 4 — Post-flip smoke
 
-- Load the app in production; confirm hydration works and no `securitypolicyviolation` appears on shell load.
-- Run the new export-path E2E against production.
+- ~~Load the app in production; confirm hydration works and no `securitypolicyviolation` appears on shell load.~~
+- ~~Run the new export-path E2E against production.~~
+- **DONE 2026-09-11** — verified against https://pos.playground.sceiba.net/ after the user's manual VPS deploy:
+  - `Content-Security-Policy` (enforcing) served with the exact policy value — `script-src 'self' 'report-sample'` + the 3 hydration hashes, `img-src 'self' data:`; `Content-Security-Policy-Report-Only` absent.
+  - Bootstrap src root-relative (`/assets/bootstrap-0-e48b5ae3.js`) serving `application/javascript` 200 — the reported "MIME text/html" error is dead in production. (Build hash differs from local `46a81289`: different build env, not drift.)
+  - `Cache-Control: no-cache` on `/` and `/service-worker.js`; `max-age=31536000` (immutable) on `/assets/`.
+  - Shell-load hydration under enforcing was already proven by the Step-2 E2E suite (3/3) against a byte-identical header value; production now serves that same value byte-for-byte.
 
 ## Open decisions
 
