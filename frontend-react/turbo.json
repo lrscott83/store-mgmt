@@ -39,6 +39,8 @@
     "APP_VERSION",
     "API_URL",
     "SESSION_SECRET",
-    "SESSION_DOMAIN"
+    "SESSION_DOMAIN",
+    "E2E_CSP_ENFORCE",
+    "E2E_API_URL"
   ]
 }
