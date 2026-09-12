@@ -122,7 +122,9 @@ Every response MUST include these fields:
 
 ### R5: Per-User Data Shape (MUST)
 
-Each `OfflineRosterUserDto` MUST contain: `Id`, `Login`, `FullName`, `IsActive`, `Roles` (list of `StoreModuleFeaturesDto`), `FeatureIds`, `StoreModuleIds`, `IsSuperAdmin`, `IsOwnerAdmin`, `IsReSeller`, `SelectedStoreId`, `Verifier` (nullable: Hash, Salt, Iterations), `WrappedDek`, `WrapSalt`, `WrapIv`, `PaymentDueDate`, `IsInTrial`, `PaymentStatus`, `WrapIterations`.
+Each `OfflineRosterUserDto` MUST contain: `Id`, `Login`, `FullName`, `IsActive`, `Roles` (list of `StoreModuleFeaturesDto`), `FeatureIds`, `StoreModuleIds`, `IsSuperAdmin`, `IsOwnerAdmin`, `IsReSeller`, `SelectedStoreId`, `Verifier` (nullable: Hash, Salt, Iterations), `WrappedDek`, `WrapSalt`, `WrapIv`, `PaymentDueDate`, `IsInTrial`, `PaymentStatus`, `WrapIterations`, `StoreList` (list of `StoreSummaryDto` with `Id`, `Name`, `IsActive`).
+
+The roster's synthetic owner row (owner included via the `Owner` entity, not `StoreUser`) MUST have `StoreList` filled with every store owned by the roster store's owner — actives and inactives, `IsActive` reflecting the persisted flag — matching the `/me` fill. Non-owner roster users MUST carry an empty list (parity with `/me`).
 
 (Previously: no billing snapshot fields, no `WrapIterations`. Also
 previously: `Verifier` was non-nullable, defaulting to `new()` with empty
@@ -156,6 +158,26 @@ them apart and misrouted the case into "wrong password". Corrected by
 - WHEN the roster is exported
 - THEN every user carries `PaymentStatus == "Vencido"`, `PaymentDueDate` non-null, `IsInTrial == false`
 - AND a `NoAplica` store carries `PaymentStatus == "NoAplica"`, `PaymentDueDate == null`, `IsInTrial == false`
+
+#### Scenario: Owner row in roster carries all their stores
+- GIVEN a roster exported for store Alpha owned by owner O who also owns (active) Beta and (inactive) Chi
+- WHEN the bundle is inspected
+- THEN the owner row's `StoreList` contains Alpha (`IsActive: true`), Beta (`IsActive: true`) and Chi (`IsActive: false`)
+
+#### Scenario: Store user row carries an empty list
+- GIVEN the same roster containing store-user S
+- WHEN the bundle is inspected
+- THEN S's `StoreList` is empty
+
+#### Scenario: Offline toUserModel maps storeList
+- GIVEN an offline session hydrated from a roster whose owner row carried `StoreList`
+- WHEN `toUserModel` builds the user
+- THEN `user.storeList` equals the roster's list (same shape as `/me`'s)
+
+#### Scenario: Offline owner sees roster actives in the select
+- GIVEN a device offline-authenticated as the roster's owner with roster `StoreList` [Alpha active, Chi inactive]
+- WHEN the Configurations page renders
+- THEN the select offers only Alpha (plus fallback current-store behavior if Alpha is not the current store — current store is always offered)
 
 ### R6: Inactive Users Included (MUST)
 
