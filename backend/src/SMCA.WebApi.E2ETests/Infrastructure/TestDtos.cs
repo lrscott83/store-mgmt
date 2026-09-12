@@ -52,6 +52,7 @@ public sealed class StoreSummaryData
 {
     public Guid Id { get; set; }
     public string Name { get; set; } = string.Empty;
+    public bool IsActive { get; set; }
 }
 
 public sealed class RosterVerifierData
@@ -91,6 +92,7 @@ public sealed class RosterUserData
     public string PaymentStatus { get; set; } = string.Empty;
     public int WrapIterations { get; set; }
     public string OfflineAuthToken { get; set; } = string.Empty;
+    public List<StoreSummaryData> StoreList { get; set; } = new();
 }
 
 public sealed class RosterData

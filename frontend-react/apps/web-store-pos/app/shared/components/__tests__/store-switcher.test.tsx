@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
-import type { Store } from '@store-mgmt/domain';
 
 // ─── auth-store mock ──────────────────────────────────────────────────────────
 // The default user is an owner-admin (the switcher is owner-only). Tests that
@@ -11,7 +10,7 @@ import type { Store } from '@store-mgmt/domain';
 const mockLogout = vi.fn();
 const mockUpdateUser = vi.fn();
 
-function buildOwnerUser() {
+function buildOwnerUser(overrides: Record<string, unknown> = {}) {
   return {
     id: 'u1',
     fullName: 'Juan Pérez',
@@ -30,6 +29,15 @@ function buildOwnerUser() {
     isOwnerAdmin: true,
     isReSeller: false,
     selectedStoreId: 's1',
+    // store-list-active-stores: the switcher's ONLY data source is the
+    // session's storeList (from /me online, the roster offline) — the extra
+    // listStores fetch is gone.
+    storeList: [
+      { id: 's1', name: 'Tienda A', isActive: true },
+      { id: 's2', name: 'Tienda B', isActive: true },
+      { id: 's3', name: 'Tienda C', isActive: false },
+    ],
+    ...overrides,
   };
 }
 
@@ -68,8 +76,8 @@ vi.mock('~/shared/lib/stores/switch-store', () => ({
   switchToStore: mockSwitchToStore,
 }));
 
-// ─── store-http-service mock ──────────────────────────────────────────────────
-
+// store-list-active-stores: the switcher no longer fetches the store list.
+// The mock stays (asserting NOT called) so a regression to a fetch shows up.
 vi.mock('~/management/stores/lib/services/store-http-service', () => ({
   storeHttpService: {
     listStores: vi.fn(),
@@ -99,24 +107,6 @@ function mockAuthState(user: unknown) {
   );
 }
 
-function buildStores(): Store[] {
-  const base = {
-    ownerName: 'Juan Pérez',
-    address: 'Av. Central 123',
-    description: '',
-    approved: true,
-    paymentStartDate: null,
-    nextPaymentDate: null,
-    ownerPhone: null,
-    planType: 'Gratis',
-    modules: [],
-  };
-  return [
-    { id: 's1', name: 'Tienda A', displayName: 'Tienda A', ownerId: 'o1', isActive: true, ...base },
-    { id: 's2', name: 'Tienda B', displayName: 'Tienda B', ownerId: 'o1', isActive: true, ...base },
-  ];
-}
-
 describe('StoreSwitcher — owner gate', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -135,7 +125,7 @@ describe('StoreSwitcher — owner gate', () => {
   });
 
   it('renders nothing when the user is not an owner-admin', () => {
-    mockAuthState({ ...buildOwnerUser(), isOwnerAdmin: false });
+    mockAuthState(buildOwnerUser({ isOwnerAdmin: false }));
     render(
       <Wrapper>
         <StoreSwitcher />
@@ -145,11 +135,12 @@ describe('StoreSwitcher — owner gate', () => {
   });
 
   it('renders nothing when the owner lacks the MultiStores module (14)', () => {
-    mockAuthState({
-      ...buildOwnerUser(),
-      storeModuleIds: [7],
-      roles: [{ storeId: 's1', storeName: 'Tienda A', moduleId: 7, featureIds: [70] }],
-    });
+    mockAuthState(
+      buildOwnerUser({
+        storeModuleIds: [7],
+        roles: [{ storeId: 's1', storeName: 'Tienda A', moduleId: 7, featureIds: [70] }],
+      }),
+    );
     render(
       <Wrapper>
         <StoreSwitcher />
@@ -168,7 +159,7 @@ describe('StoreSwitcher — owner gate', () => {
   });
 });
 
-describe('StoreSwitcher — popup list', () => {
+describe('StoreSwitcher — popup list (from user.storeList)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     (useAuthStore as unknown as ReturnType<typeof vi.fn>).mockImplementation(
@@ -183,17 +174,13 @@ describe('StoreSwitcher — popup list', () => {
         return state;
       },
     );
-    vi.mocked(storeHttpService.listStores).mockResolvedValue({
-      succeeded: true,
-      data: buildStores(),
-    } as never);
     vi.mocked(storeHttpService.setMyStore).mockResolvedValue({
       succeeded: true,
       data: true,
     } as never);
   });
 
-  it('opens the popup and loads the store list on click', async () => {
+  it('opens the popup listing ONLY active stores — no listStores fetch', async () => {
     render(
       <Wrapper>
         <StoreSwitcher />
@@ -201,9 +188,48 @@ describe('StoreSwitcher — popup list', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: 'Cambiar tienda' }));
 
-    expect(storeHttpService.listStores).toHaveBeenCalledTimes(1);
     expect(await screen.findByText('Tienda A')).toBeInTheDocument();
     expect(screen.getByText('Tienda B')).toBeInTheDocument();
+    // Inactive store C is filtered out.
+    expect(screen.queryByText('Tienda C')).not.toBeInTheDocument();
+    // The fetch is gone: the session's storeList is the only source.
+    expect(storeHttpService.listStores).not.toHaveBeenCalled();
+  });
+
+  it('always offers the current store, even when it is inactive (never strands the user)', async () => {
+    mockAuthState(
+      buildOwnerUser({
+        selectedStoreId: 's3',
+        roles: [{ storeId: 's3', storeName: 'Tienda C', moduleId: 14, featureIds: [38] }],
+      }),
+    );
+    render(
+      <Wrapper>
+        <StoreSwitcher />
+      </Wrapper>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Cambiar tienda' }));
+
+    expect(await screen.findByText('Tienda C')).toBeInTheDocument();
+    expect(screen.getByText('Tienda A')).toBeInTheDocument();
+    // The inactive current store still renders, marked as the current one.
+    expect(screen.getByText('Actual')).toBeInTheDocument();
+  });
+
+  it('falls back to the current store only when storeList is undefined (offline legacy bundle)', async () => {
+    mockAuthState(buildOwnerUser({ storeList: undefined }));
+    render(
+      <Wrapper>
+        <StoreSwitcher />
+      </Wrapper>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Cambiar tienda' }));
+
+    // Current store from the cached roles — the popup is never empty and no
+    // fetch happens.
+    expect(await screen.findByText('Tienda A')).toBeInTheDocument();
+    expect(screen.queryByText('Tienda B')).not.toBeInTheDocument();
+    expect(storeHttpService.listStores).not.toHaveBeenCalled();
   });
 
   it('marks the current store with the "Actual" badge', async () => {
@@ -231,11 +257,14 @@ describe('StoreSwitcher — popup list', () => {
     expect(currentStoreButton).toBeDisabled();
   });
 
-  it('shows the empty message when the owner has no active stores', async () => {
-    vi.mocked(storeHttpService.listStores).mockResolvedValue({
-      succeeded: true,
-      data: [],
-    } as never);
+  it('never shows the empty message while a current store exists — [] still offers the current store', async () => {
+    mockAuthState(
+      buildOwnerUser({
+        storeList: [],
+        roles: [{ storeId: 's1', storeName: 'Tienda A', moduleId: 14, featureIds: [38] }],
+        selectedStoreId: 's1',
+      }),
+    );
     render(
       <Wrapper>
         <StoreSwitcher />
@@ -243,15 +272,22 @@ describe('StoreSwitcher — popup list', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: 'Cambiar tienda' }));
 
-    expect(await screen.findByText('No hay tiendas para seleccionar.')).toBeInTheDocument();
+    // Design D3: the select never strands the user — an empty session list
+    // still offers the current store (name from the cached roles), not the
+    // empty message.
+    expect(await screen.findByText('Tienda A')).toBeInTheDocument();
+    expect(screen.getByText('Actual')).toBeInTheDocument();
   });
 
-  it('shows the load error when listStores fails', async () => {
-    vi.mocked(storeHttpService.listStores).mockResolvedValue({
-      succeeded: false,
-      data: [],
-      message: 'error',
-    } as never);
+  it('treats legacy storeList entries without isActive as non-selectable (falls back to current only)', async () => {
+    mockAuthState(
+      buildOwnerUser({
+        storeList: [
+          { id: 's1', name: 'Tienda A' },
+          { id: 's2', name: 'Tienda B' },
+        ] as never,
+      }),
+    );
     render(
       <Wrapper>
         <StoreSwitcher />
@@ -259,28 +295,10 @@ describe('StoreSwitcher — popup list', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: 'Cambiar tienda' }));
 
-    expect(
-      await screen.findByText('No se pudieron cargar las tiendas.'),
-    ).toBeInTheDocument();
-  });
-
-  it('error message shows the current-store paragraph first, in black, then the error', async () => {
-    vi.mocked(storeHttpService.listStores).mockRejectedValue(new Error('network down'));
-    render(
-      <Wrapper>
-        <StoreSwitcher />
-      </Wrapper>,
-    );
-    fireEvent.click(screen.getByRole('button', { name: 'Cambiar tienda' }));
-
-    const paragraph = await screen.findByText('La tienda seleccionada es: Tienda A');
-    // Primer párrafo: texto negro (text-gray-900/text-black), NO rojo.
-    expect(paragraph.className).not.toMatch(/text-red/);
-    expect(paragraph.className).toMatch(/text-(gray-900|black)/);
-
-    // Después viene el párrafo del error (rojo).
-    const errorMsg = screen.getByText('No se pudieron cargar las tiendas.');
-    expect(errorMsg.className).toMatch(/text-red/);
+    // None of the legacy entries is known-active; the current store (s1)
+    // still renders via the always-offer edge.
+    expect(await screen.findByText('Tienda A')).toBeInTheDocument();
+    expect(screen.queryByText('Tienda B')).not.toBeInTheDocument();
   });
 
   it('closes the popup when clicking outside it', async () => {
@@ -316,10 +334,6 @@ describe('StoreSwitcher — switching stores', () => {
         return state;
       },
     );
-    vi.mocked(storeHttpService.listStores).mockResolvedValue({
-      succeeded: true,
-      data: buildStores(),
-    } as never);
     vi.mocked(storeHttpService.setMyStore).mockResolvedValue({
       succeeded: true,
       data: true,

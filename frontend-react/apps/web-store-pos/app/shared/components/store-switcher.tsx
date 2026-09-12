@@ -1,32 +1,33 @@
 import { useRef, useState } from 'react';
 import { useIntl } from 'react-intl';
 import { EModules } from '@store-mgmt/domain';
-import type { Store } from '@store-mgmt/domain';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { useClickOutside } from '~/shared/lib/hooks/use-click-outside';
-import { storeHttpService } from '~/management/stores/lib/services/store-http-service';
 import { switchToStore } from '~/shared/lib/stores/switch-store';
 
 /**
  * Owner-only store switcher shown in the navbar before the tutorial link.
  * Visible ONLY for owners whose selected store has the MultiStores module
- * (module 14). Opens a popup listing the owner's active stores; selecting a
+ * (module 14). Opens a popup listing the owner's ACTIVE stores; selecting a
  * different store stays logged in: the selection persists server-side, the
  * session refreshes for the new store and the page hard-reloads into it —
  * the new store's DEK comes from the per-store device wrap provisioned at
  * login (seamless-store-switch). Falls back to a logout only when this
  * device holds no wrap for the target store.
- * When the list load or the switch fails (no internet / server error), the
- * popup shows a black first paragraph with the currently selected store name
- * (from the cached user roles, works offline) followed by the error paragraph.
+ *
+ * store-list-active-stores: the popup's data source is the SESSION's
+ * `user.storeList` (from /me online, from the offline roster offline) — the
+ * extra `listStores` fetch is gone. Only ACTIVE stores are offered; the
+ * CURRENT store is always offered too (even when it just went inactive, so
+ * the user is never stranded with an empty popup). When the session carries
+ * no storeList at all (legacy cached /me or an old roster bundle), the
+ * fallback offers exactly the current store, so the popup still works
+ * offline — it self-heals on the next successful /me.
  */
 export function StoreSwitcher() {
   const intl = useIntl();
   const { user } = useAuthStore();
   const [isOpen, setIsOpen] = useState(false);
-  const [stores, setStores] = useState<Store[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [loadError, setLoadError] = useState(false);
   const [isSwitching, setIsSwitching] = useState(false);
   const [switchError, setSwitchError] = useState(false);
   const switcherRef = useRef<HTMLDivElement>(null);
@@ -47,23 +48,30 @@ export function StoreSwitcher() {
   const currentStoreName =
     user.roles.find((r) => r.storeId === user.selectedStoreId)?.storeName ?? '';
 
-  async function openPopup() {
-    if (!isOpen) {
-      setIsLoading(true);
-      setLoadError(false);
-      setSwitchError(false);
-      try {
-        const response = await storeHttpService.listStores();
-        setStores(response.succeeded ? (response.data ?? []) : []);
-        if (!response.succeeded) {
-          setLoadError(true);
-        }
-      } catch {
-        setLoadError(true);
-      } finally {
-        setIsLoading(false);
-      }
-    }
+  // Active stores from the session's list. Legacy entries without `isActive`
+  // (a /me cached before the field shipped) are NOT known-active — offering
+  // them could strand the user on a store they can no longer switch away
+  // from, so they are skipped until the next /me self-heals the cache.
+  const activeStores = (user.storeList ?? []).filter(
+    (store) => store.id === user.selectedStoreId || store.isActive === true,
+  );
+
+  // Fallback for sessions without a usable storeList (undefined or every
+  // entry lacking isActive): offer exactly the current store so the popup
+  // never strands the user. Its name comes from the cached roles, which work
+  // offline.
+  const offerStores =
+    activeStores.length > 0
+      ? activeStores
+      : [
+          {
+            id: user.selectedStoreId,
+            name: currentStoreName,
+          },
+        ];
+
+  function togglePopup() {
+    setSwitchError(false);
     setIsOpen((v) => !v);
   }
 
@@ -89,7 +97,7 @@ export function StoreSwitcher() {
     <div className="relative" ref={switcherRef}>
       <button
         type="button"
-        onClick={openPopup}
+        onClick={togglePopup}
         className="rounded-full p-2 bg-gray-200 text-gray-500 hover:bg-gray-300 transition-colors"
         aria-label={intl.formatMessage({ id: 'STORE_SELECTOR.TITLE' })}
         title={intl.formatMessage({ id: 'STORE_SELECTOR.TITLE' })}
@@ -107,28 +115,13 @@ export function StoreSwitcher() {
 
       {isOpen && (
         <div className="absolute right-0 top-full z-50 mt-1 w-56 rounded-xl border border-gray-200 bg-white py-1 shadow-lg">
-          {isLoading ? (
-            <p className="px-4 py-3 text-sm text-gray-500">
-              {intl.formatMessage({ id: 'STORE_SELECTOR.LOADING' })}
-            </p>
-          ) : loadError ? (
-            <div className="px-4 py-3">
-              {/* Primer párrafo: tienda seleccionada actualmente (texto negro).
-                  Segundo párrafo: el mensaje de error (rojo). */}
-              <p className="mb-1 text-sm font-semibold text-gray-900">
-                {intl.formatMessage({ id: 'STORE_SELECTOR.CURRENT_STORE' }, { store: currentStoreName })}
-              </p>
-              <p className="text-sm text-red-600">
-                {intl.formatMessage({ id: 'STORE_SELECTOR.LOAD_ERROR' })}
-              </p>
-            </div>
-          ) : stores.length === 0 ? (
+          {offerStores.length === 0 ? (
             <p className="px-4 py-3 text-sm text-gray-500">
               {intl.formatMessage({ id: 'STORE_SELECTOR.EMPTY' })}
             </p>
           ) : (
             <ul className="max-h-64 overflow-y-auto">
-              {stores.map((store) => {
+              {offerStores.map((store) => {
                 const isCurrent = store.id === user?.selectedStoreId;
                 return (
                   <li key={store.id}>
@@ -138,7 +131,7 @@ export function StoreSwitcher() {
                       disabled={isSwitching || isCurrent}
                       className="flex w-full items-center justify-between gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors disabled:cursor-default disabled:text-gray-400"
                     >
-                      <span className="truncate">{store.displayName || store.name}</span>
+                      <span className="truncate">{store.name}</span>
                       {isCurrent && (
                         <span className="shrink-0 rounded-full bg-cyan-100 px-2 py-0.5 text-xs font-medium text-cyan-700">
                           {intl.formatMessage({ id: 'STORE_SELECTOR.CURRENT' })}

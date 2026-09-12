@@ -834,3 +834,148 @@ describe('MyStoresPage — create store flow', () => {
     expect(screen.getByTestId('owner-store-create-modal')).toBeInTheDocument();
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// store-list-active-stores — session refresh after create/deactivate
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('MyStoresPage — session refresh after store mutations (store-list-active-stores)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUser = makeUser({ storeModuleIds: [14] });
+    mockGetModulesToStore.mockResolvedValue({
+      succeeded: true,
+      data: [makeCatalogModule()],
+    } as BaseResponseModel<Module[]>);
+    mockGetPlans.mockResolvedValue({
+      succeeded: true,
+      data: makePlanCatalog(),
+    } as BaseResponseModel<Plan[]>);
+    mockGetFeaturesToStore.mockResolvedValue({
+      succeeded: true,
+      data: [makeFeature()],
+    } as BaseResponseModel<Feature[]>);
+    mockGetMyStores.mockResolvedValue({
+      succeeded: true,
+      data: [makeOwnerStore({ id: 's1', name: 'Alpha' })],
+    } as BaseResponseModel<OwnerStoreWithPlan[]>);
+    mockCreateStore.mockResolvedValue({
+      succeeded: true,
+      data: { id: 'new-s', name: 'Nueva' },
+    } as BaseResponseModel<{ id: string; name: string }>);
+    mockUpdateStore.mockResolvedValue({ succeeded: true, data: true });
+    mockSetStoreActivation.mockResolvedValue({ succeeded: true, data: true });
+    mockGetUserByToken.mockResolvedValue(undefined);
+    mockConfirmDialog.mockResolvedValue(true);
+  });
+
+  function openEditMenu() {
+    return screen.getByTestId('owner-store-actions-toggle-s1');
+  }
+
+  function renderPage() {
+    return import('../my-stores').then(({ MyStoresPage }) =>
+      render(
+        <Wrapper>
+          <MyStoresPage />
+        </Wrapper>,
+      ),
+    );
+  }
+
+  it('refreshes the session (getUserByToken) after a successful store creation', async () => {
+    await renderPage();
+    await waitFor(() => {
+      expect(screen.getByText('Alpha')).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByTestId('my-stores-create-button'));
+    await screen.findByTestId('owner-store-name-input');
+
+    fireEvent.change(screen.getByTestId('owner-store-name-input'), {
+      target: { value: 'Nueva Tienda' },
+    });
+    fireEvent.click(screen.getByTestId('owner-store-create-save'));
+
+    await waitFor(() => {
+      expect(mockCreateStore).toHaveBeenCalledTimes(1);
+    });
+    // The new store must appear in the session's storeList without a relogin.
+    await waitFor(() => {
+      expect(mockGetUserByToken).toHaveBeenCalledTimes(1);
+    });
+    // The refresh happens before the list reload.
+    expect(mockGetMyStores).toHaveBeenCalledTimes(2);
+  });
+
+  it('refreshes the session (getUserByToken) after a successful deactivation', async () => {
+    await renderPage();
+    await waitFor(() => {
+      expect(screen.getByText('Alpha')).toBeInTheDocument();
+    });
+    fireEvent.click(openEditMenu());
+    fireEvent.click(screen.getByTestId('owner-store-edit-s1'));
+
+    const toggle = await screen.findByTestId('owner-store-active-toggle-s1');
+    fireEvent.click(toggle); // true -> false (deactivation path)
+
+    // R-1 confirm BEFORE the deactivation call fires.
+    fireEvent.click(screen.getByTestId('owner-store-save-s1'));
+
+    await waitFor(() => {
+      expect(mockSetStoreActivation).toHaveBeenCalledWith('s1', false);
+    });
+    await waitFor(() => {
+      expect(mockGetUserByToken).toHaveBeenCalledTimes(1);
+    });
+    expect(mockGetMyStores).toHaveBeenCalledTimes(2);
+  });
+
+  it('deactivating the CURRENT store: a session rejection on refresh still logs out (not swallowed)', async () => {
+    // The owner deactivates the very store their session is on: the next /me
+    // is a Store.Inactive verdict. getUserByToken resolves null AFTER its own
+    // logout() ran (auth-store's isSessionRejection branch) — the page must
+    // treat that as "session ended", not as a silent no-op.
+    mockGetUserByToken.mockResolvedValue(null);
+    await renderPage();
+    await waitFor(() => {
+      expect(screen.getByText('Alpha')).toBeInTheDocument();
+    });
+    fireEvent.click(openEditMenu());
+    fireEvent.click(screen.getByTestId('owner-store-edit-s1'));
+
+    const toggle = await screen.findByTestId('owner-store-active-toggle-s1');
+    fireEvent.click(toggle);
+    fireEvent.click(screen.getByTestId('owner-store-save-s1'));
+
+    await waitFor(() => {
+      expect(mockSetStoreActivation).toHaveBeenCalledWith('s1', false);
+    });
+    // The refresh still fired (the verdict is the store's own /me to deliver).
+    await waitFor(() => {
+      expect(mockGetUserByToken).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('a network failure on the session refresh does not break the save flow', async () => {
+    // Offline-resilient parity with handlePlanActivate: the refresh is
+    // best-effort — its failure must not surface as a save error.
+    mockGetUserByToken.mockRejectedValue(new Error('network down'));
+    await renderPage();
+    await waitFor(() => {
+      expect(screen.getByText('Alpha')).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByTestId('my-stores-create-button'));
+    await screen.findByTestId('owner-store-name-input');
+
+    fireEvent.change(screen.getByTestId('owner-store-name-input'), {
+      target: { value: 'Nueva Tienda' },
+    });
+    fireEvent.click(screen.getByTestId('owner-store-create-save'));
+
+    await waitFor(() => {
+      expect(mockShowToastSuccess).toHaveBeenCalledWith(esMessages['STORES.CREATE_SUCCESS']);
+    });
+    expect(screen.queryByTestId('owner-store-create-modal')).not.toBeInTheDocument();
+    expect(mockGetMyStores).toHaveBeenCalledTimes(2);
+  });
+});

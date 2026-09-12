@@ -114,7 +114,7 @@ namespace Application.Features.Authentication.Queries.GetMe
             {
                 var ownedStores = await _storeRepository.GetAllStoresByOwnerUserIdAsync(user.Id);
                 storeList = ownedStores
-                    .Select(s => new StoreSummaryDto(s.Id, s.Name))
+                    .Select(s => new StoreSummaryDto(s.Id, s.Name, s.IsActive))
                     .ToList();
             }
 

@@ -1,4 +1,4 @@
 namespace Application.Dtos.Authentication
 {
-    public sealed record StoreSummaryDto(Guid Id, string Name);
+    public sealed record StoreSummaryDto(Guid Id, string Name, bool IsActive);
 }

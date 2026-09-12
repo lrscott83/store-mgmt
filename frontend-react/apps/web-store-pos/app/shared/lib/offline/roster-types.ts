@@ -57,6 +57,28 @@ export interface OfflineRosterUser {
   paymentDueDate?: string | null;
   isInTrial?: boolean;
   paymentStatus?: string;
+  /**
+   * store-list-active-stores: the owner's full store list (id + name +
+   * `isActive`), carried on OwnerAdmin rows so an offline OwnerAdmin sees the
+   * same active-store selection as online (mirrors /me's StoreList).
+   * Non-owner rows carry an empty list, exactly like /me. Absent on legacy
+   * bundles from backends predating the field — consumers treat absence as
+   * "no store list available" and fall back to the current store only,
+   * the same self-healing as a cached /me without `isActive`.
+   */
+  storeList?: RosterStoreSummary[];
+}
+
+/**
+ * Store summary inside a roster user's `storeList` — same shape as
+ * `StoreSummary` from auth/me (camelCase over the backend's
+ * `StoreSummaryDto { Id, Name, IsActive }`), duplicated here because this
+ * module is type-only and must not import runtime-coupled models.
+ */
+export interface RosterStoreSummary {
+  id: string;
+  name: string;
+  isActive: boolean;
 }
 
 export interface OfflineRosterBundle {

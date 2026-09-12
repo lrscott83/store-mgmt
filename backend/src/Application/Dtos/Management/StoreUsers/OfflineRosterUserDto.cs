@@ -30,4 +30,11 @@ public sealed class OfflineRosterUserDto
     /// login. Empty for legacy bundles that predate this field.
     /// </summary>
     public string OfflineAuthToken { get; set; } = string.Empty;
+    /// <summary>
+    /// The owner's full store list (id, name, activation flag) for OwnerAdmin
+    /// rows — same shape and fill semantics as /me's StoreList, so offline
+    /// selects and name resolution match the online contract. Empty for
+    /// non-owner rows (parity with /me).
+    /// </summary>
+    public List<StoreSummaryDto> StoreList { get; set; } = new();
 }

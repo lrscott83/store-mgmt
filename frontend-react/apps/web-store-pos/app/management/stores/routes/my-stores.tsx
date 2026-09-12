@@ -119,6 +119,19 @@ export function MyStoresPage() {
       // SuperAdmin-only through the general update).
       if (values.isActive !== editingStore.isActive) {
         await storeHttpService.setStoreActivation(editingStore.id, values.isActive);
+        // store-list-active-stores: refresh the session so the storeList
+        // selects (switcher + Configuraciones) reflect the new activation
+        // without a relogin. Best-effort like handlePlanActivate — but a
+        // session REJECTION is not an error to swallow: auth-store's
+        // getUserByToken already ran logout() and resolved null before this
+        // catch sees anything, so the verdict stands and the save flow stays
+        // green for the store itself.
+        try {
+          await getUserByToken();
+        } catch {
+          // Non-critical: a network failure on the refresh must not surface
+          // as a save error.
+        }
       }
       setEditingStore(null);
       showToastSuccess(intl.formatMessage({ id: 'STORES.UPDATE_SUCCESS' }));
@@ -145,6 +158,14 @@ export function MyStoresPage() {
         approved: true,
         moduleIds: [],
       });
+      // store-list-active-stores: refresh the session so the new store
+      // lands in the session's storeList (switcher + Configuraciones
+      // selects) without a relogin. Best-effort like handlePlanActivate.
+      try {
+        await getUserByToken();
+      } catch {
+        // Non-critical: session refresh failure should not block the save UX.
+      }
       setIsCreateOpen(false);
       showToastSuccess(intl.formatMessage({ id: 'STORES.CREATE_SUCCESS' }));
       await load();

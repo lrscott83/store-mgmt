@@ -159,6 +159,27 @@ namespace Application.Features.Management.Users.Queries.ExportOfflineRoster
             }
 
             var rosterUsers = new List<OfflineRosterUserDto>(storeUsers.Count);
+
+            // store-list-active-stores: resolve the owner's full store list ONCE
+            // per export (the roster is store-scoped — every row shares the same
+            // owner) and hand it to OwnerAdmin rows, mirroring /me's fill. One
+            // repository call per export, never per user. The fill resolves the
+            // owner user id through the SAME owner check the export already did
+            // (GetOwnerIncludingUserByIdAsync), so it works whether or not the
+            // owner appears as a synthetic StoreUser row.
+            List<StoreSummaryDto> ownerStoreList = new();
+            if (store is not null)
+            {
+                var ownerUser = await _ownerRepository.GetOwnerIncludingUserByIdAsync(store.OwnerId);
+                if (ownerUser?.User is not null)
+                {
+                    var ownedStores = await _storeRepository.GetAllStoresByOwnerUserIdAsync(ownerUser.User.Id, null);
+                    ownerStoreList = ownedStores
+                        .Select(s => new StoreSummaryDto(s.Id, s.Name, s.IsActive))
+                        .ToList();
+                }
+            }
+
             foreach (var su in storeUsers)
             {
                 var roleFeatures = await _storeRoleFeatureRepository.GetStoreRoleFeaturesByUserIdAsync(su.UserId, storeModuleIds);
@@ -221,7 +242,8 @@ namespace Application.Features.Management.Users.Queries.ExportOfflineRoster
                     IsInTrial = billing.IsInTrial,
                     PaymentStatus = billing.Status.ToString(),
                     WrapIterations = wrapped?.Iterations ?? 0,
-                    OfflineAuthToken = offlineAuthToken
+                    OfflineAuthToken = offlineAuthToken,
+                    StoreList = isOwnerAdmin ? ownerStoreList : new List<StoreSummaryDto>()
                 });
             }
 

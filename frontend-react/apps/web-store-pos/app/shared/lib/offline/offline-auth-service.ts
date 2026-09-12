@@ -77,6 +77,14 @@ function toUserModel(user: OfflineRosterUser): UserModel {
     paymentDueDate: user.paymentDueDate ?? null,
     isInTrial: user.isInTrial ?? false,
     paymentStatus: (user.paymentStatus as PaymentStatus) ?? 'NoAplica',
+    // store-list-active-stores: propagate the roster's owner store list onto
+    // the UserModel — same optional shape as /me's `storeList`. Absent on
+    // legacy bundles (undefined stays undefined); non-owner rows carry [].
+    storeList: user.storeList?.map((s) => ({
+      id: s.id,
+      name: s.name,
+      isActive: s.isActive,
+    })),
     authToken: OFFLINE_SESSION_TOKEN,
     refreshToken: '',
     expiresIn: 0,

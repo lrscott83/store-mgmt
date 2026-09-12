@@ -66,10 +66,21 @@ export interface RegisterAuthModel {
   expiresIn: string;
 }
 
-/** Resumen de tienda del owner devuelto por auth/me (StoreList): id + nombre. */
+/**
+ * Resumen de tienda del owner devuelto por auth/me (StoreList): id + nombre.
+ */
 export interface StoreSummary {
   id: string;
   name: string;
+  /**
+   * store-list-active-stores: the store's activation flag. Consumers that
+   * build store-selection UIs filter on this (active-only); the list itself
+   * still carries EVERY store (active + inactive), so name lookups for
+   * historical documents keep working. Absent on cached sessions from
+   * backends predating the field — treat `undefined` as "unknown, do not
+   * select", falling back to the current store only.
+   */
+  isActive?: boolean;
 }
 
 export interface StoreModuleFeatures {
