@@ -5,6 +5,7 @@ import {
   deriveApiOrigin,
   ALLOWED_ENV_DELTA_DIRECTIVES,
   CSP_HEADER_NAME,
+  DEV_CSP_HEADER_NAME,
 } from '../csp-policy.mjs';
 
 // content-security-policy spec — design.md §4.2 / D3. `csp-policy.mjs` is the
@@ -112,8 +113,13 @@ describe('csp-policy', () => {
     });
   });
 
-  it('exports the report-only header name', () => {
-    expect(CSP_HEADER_NAME).toBe('Content-Security-Policy-Report-Only');
+  it('exports the enforcing header name for production and the report-only name for dev', () => {
+    // The 2026-09-11 flip (docs/plans/2026-09-10-csp-enforcing-flip-plan.md
+    // Step 3): production enforces. Dev stays report-only — dev's inline
+    // hydration payload is not the build's stable bytes, so an enforcing dev
+    // header would block hydration (see vite.config.ts's dev middleware).
+    expect(CSP_HEADER_NAME).toBe('Content-Security-Policy');
+    expect(DEV_CSP_HEADER_NAME).toBe('Content-Security-Policy-Report-Only');
   });
 
   describe('hydrationScriptHashes option — 2026-08-12 hash-allowlist for react-router\'s SPA hydration payload', () => {
