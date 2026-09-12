@@ -11,7 +11,7 @@ import type { Plugin, PreviewServer } from 'vite';
 // `csp-policy.d.mts` is the sibling declaration `tsc` resolves under
 // `moduleResolution: "bundler"` (tsconfig.json:16), proven by this file's own
 // `typecheck` gate (design.md D2's mandatory WU2 acceptance check).
-import { buildCspHeaderValue, CSP_HEADER_NAME } from './scripts/csp-policy.mjs';
+import { buildCspHeaderValue, DEV_CSP_HEADER_NAME } from './scripts/csp-policy.mjs';
 import { STABLE_INLINE_PREFIX, scanInlineScripts } from './scripts/externalize-inline-scripts.mjs';
 
 const ENV_DIR = join(__dirname, '../..');
@@ -129,7 +129,7 @@ export default defineConfig(({ mode }) => {
         name: 'csp-report-only-dev-header',
         configureServer(server) {
           server.middlewares.use((_req, res, next) => {
-            res.setHeader(CSP_HEADER_NAME, csp);
+            res.setHeader(DEV_CSP_HEADER_NAME, csp);
             next();
           });
         },
@@ -177,7 +177,7 @@ export default defineConfig(({ mode }) => {
     server: {
       port: DEV_SERVER_PORT,
       host: DEV_SERVER_HOST,
-      // NOT `headers: { [CSP_HEADER_NAME]: csp }` here — see the
+      // NOT `headers: { [DEV_CSP_HEADER_NAME]: csp }` here — see the
       // `csp-report-only-dev-header` plugin above for why that option is a
       // no-op for actual page loads in this dev harness.
     },

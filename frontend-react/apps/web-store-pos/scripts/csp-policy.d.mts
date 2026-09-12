@@ -9,3 +9,4 @@ export declare function buildCspDirectives(env: CspEnvironment, options?: CspDev
 export declare function deriveApiOrigin(apiUrl: string | undefined): string | null;
 export declare const ALLOWED_ENV_DELTA_DIRECTIVES: readonly string[];
 export declare const CSP_HEADER_NAME: string;
+export declare const DEV_CSP_HEADER_NAME: string;

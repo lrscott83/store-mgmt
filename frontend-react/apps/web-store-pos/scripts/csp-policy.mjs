@@ -7,9 +7,19 @@
 // "declared data + builder, one shared module" shape for the precache
 // manifest (design.md D1).
 
-// The report-only header this change ships. Enforcing mode is a separate,
-// future change (spec.md "Purpose").
-export const CSP_HEADER_NAME = 'Content-Security-Policy-Report-Only';
+// The ENFORCING header production serves — the 2026-09-11 flip
+// (docs/plans/2026-09-10-csp-enforcing-flip-plan.md Step 3). The dev surface
+// keeps the report-only name below: dev's inline hydration payload is not
+// the build's stable bytes (e2e/support/csp-violations.ts's
+// KNOWN_DEV_ONLY_VIOLATIONS exists for exactly that), so an enforcing dev
+// header would block hydration; and openspec/specs/content-security-policy
+// "Dev Header Delivery" pins dev to the report-only name.
+export const CSP_HEADER_NAME = 'Content-Security-Policy';
+
+// The report-only header the DEV middleware serves (vite.config.ts's
+// `csp-report-only-dev-header` plugin) — see CSP_HEADER_NAME above for why
+// dev must not enforce.
+export const DEV_CSP_HEADER_NAME = 'Content-Security-Policy-Report-Only';
 
 // The only directive allowed to differ between dev and prod (design.md D3).
 // A future engineer who wants a second axis edits this constant on purpose —
