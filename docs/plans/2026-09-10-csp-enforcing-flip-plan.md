@@ -1,6 +1,6 @@
 # Plan: CSP enforcing flip — prerequisites and verification
 
-**Status**: Step 1 done (commit `e072fc78`) / Step 2 next
+**Status**: Step 1 done (`e072fc78`) / Step 2 done (`54cd8b33`) / Step 3 done / Step 4 pending (needs deploy)
 **Created**: 2026-09-10
 **Related commits**: `177dd2fc` (nginx cache headers), `83b7de69` (externalize bootstrap + hydration-hash gate), `e072fc78` (img-src data: + worker-src decision)
 
@@ -50,10 +50,11 @@ Both are **export** paths, not shell load — which is why report-only never sur
 
 ### Step 3 — Flip the header (separate change)
 
-- Rename the constant `CSP_HEADER_NAME` in `scripts/csp-policy.mjs` from `Content-Security-Policy-Report-Only` to `Content-Security-Policy`.
-- Update the `add_header` name in `deploy/nginx.conf` to match.
-- `verify-csp.mjs` will then verify the enforcing value byte-for-byte.
-- Do the flip **only after** Steps 1–2 are green.
+- ~~Rename the constant `CSP_HEADER_NAME` in `scripts/csp-policy.mjs` from `Content-Security-Policy-Report-Only` to `Content-Security-Policy`.~~
+- **DONE 2026-09-11 — with a deviation the plan did not foresee**: a bare rename would have broken the dev surface. `CSP_HEADER_NAME` feeds BOTH the nginx gate (production, must enforce) AND the dev-server middleware in `vite.config.ts` (must stay report-only: dev's inline hydration payload is not the build's stable bytes, so enforcing would block hydration; and the existing, untouchable `e2e/csp-report-only.spec.ts` pins dev to the report-only name, as does the canonical spec's "Dev Header Delivery" requirement).
+- Implemented as a **split**: `CSP_HEADER_NAME = 'Content-Security-Policy'` (production: nginx.conf + verify-csp gate + csp-nginx tests) and new `DEV_CSP_HEADER_NAME = 'Content-Security-Policy-Report-Only'` (vite dev middleware, e2e/support/dev-server-guard.ts unchanged — it already reads the literal).
+- `deploy/nginx.conf` `add_header` renamed to `Content-Security-Policy` (value byte-identical — only the name changed).
+- Verified: vitest csp-policy + csp-nginx 51/51 (incl. new pin of both names), typecheck green, build green with `verify-csp: OK` (gate now verifies the ENFORCING value byte-for-byte), CSP enforcing E2E 3/3, existing `csp-report-only.spec.ts` (dev) 3/3.
 
 ### Step 4 — Post-flip smoke
 
