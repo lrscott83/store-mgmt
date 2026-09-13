@@ -166,6 +166,31 @@ public class GetMyStoresQueryHandlerTests
     }
 
     [Fact]
+    public async Task Handle_disapproved_store_with_recorded_payment_returns_null_next_due_date()
+    {
+        // REQ-MS-1: a disapproved store's recorded payment must NOT resurrect the date.
+        ArrangeRoles(isSuperAdminOrOwnerAdmin: true, isSuperAdmin: false, isOwnerAdmin: true);
+        var start = new DateOnly(2026, 1, 1);
+        var disapproved = CreateStore("Disapproved", paymentStartDate: start, approved: false);
+        _mockStoreRepository
+            .Setup(x => x.GetAllStoresByOwnerUserIdAsync(It.IsAny<Guid>(), It.IsAny<Guid?>()))
+            .ReturnsAsync(new List<Store> { disapproved });
+        var dto = new OwnerStoreDto { Id = disapproved.Id };
+        _mockMapper.Setup(x => x.Map<OwnerStoreDto>(disapproved)).Returns(dto);
+        var lastPaidBefore = new DateOnly(2026, 10, 15);
+        _mockStorePaymentRepository
+            .Setup(x => x.GetLastByStoreIdAsync(disapproved.Id))
+            .ReturnsAsync(CreatePayment(disapproved.Id, lastPaidBefore));
+
+        // Act
+        var result = await _handler.Handle(new GetMyStoresQuery(), CancellationToken.None);
+
+        // Assert — Approved guard wraps the whole computation (payment, override,
+        // clock all ignored for a disapproved store).
+        result.Data!.Single().NextDueDate.Should().BeNull();
+    }
+
+    [Fact]
     public async Task Handle_reads_the_trial_length_once_up_front()
     {
         ArrangeRoles(isSuperAdminOrOwnerAdmin: true, isSuperAdmin: false, isOwnerAdmin: true);
@@ -194,9 +219,9 @@ public class GetMyStoresQueryHandlerTests
         _mockHttpContextService.Setup(x => x.IsOwnerAdmin).Returns(isOwnerAdmin);
     }
 
-    private static Store CreateStore(string name, DateOnly? paymentStartDate = null)
+    private static Store CreateStore(string name, DateOnly? paymentStartDate = null, bool approved = true)
     {
-        return Store.Create(name, Guid.NewGuid(), true, Guid.NewGuid(), paymentStartDate);
+        return Store.Create(name, Guid.NewGuid(), approved, Guid.NewGuid(), paymentStartDate);
     }
 
     private static StorePayment CreatePayment(Guid storeId, DateOnly paidBefore)
