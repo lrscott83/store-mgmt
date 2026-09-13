@@ -73,4 +73,26 @@ describe('resolveUserHomePath', () => {
     hasAnyAvailableToSaleProduct.mockResolvedValue(envelope(true));
     await expect(resolveUserHomePath(makeUser())).resolves.toBe('/sales/new');
   });
+
+  // TOTAL by contract: an authenticated user must ALWAYS land somewhere usable
+  // (login submit + guestOnlyLoader). If the can-sell check fails for ANY reason,
+  // the user lands on /sales/products — the same destination the check itself
+  // chooses when the store has no sellable products. A throw here would strand a
+  // valid session on /login (docs/contracts/authenticated-session-redirect.md).
+  it('never throws: falls back to /sales/products when the can-sell check rejects', async () => {
+    hasAnyAvailableToSaleProduct.mockRejectedValue(new Error('IndexedDB read failed'));
+    await expect(resolveUserHomePath(makeUser())).resolves.toBe('/sales/products');
+  });
+
+  it('never throws: falls back to /sales/products when the can-sell check returns a malformed response', async () => {
+    hasAnyAvailableToSaleProduct.mockResolvedValue(null);
+    await expect(resolveUserHomePath(makeUser())).resolves.toBe('/sales/products');
+  });
+
+  it('never throws: falls back to /sales/products for a store user with no selected store', async () => {
+    hasAnyAvailableToSaleProduct.mockRejectedValue(new Error('no store selected'));
+    await expect(resolveUserHomePath(makeUser({ selectedStoreId: '' }))).resolves.toBe(
+      '/sales/products',
+    );
+  });
 });

@@ -213,11 +213,12 @@ export default function LoginPage() {
       try {
         navigate(await resolveUserHomePath(user));
       } catch (postAuthErr: unknown) {
-        // login() + getMe ALREADY succeeded — the credentials are correct and
-        // the session is valid. A throw here is purely client-side (home
-        // resolution/navigation failed), so tag it: the catch must show the
-        // distinct "credentials OK, could not open home" message instead of a
-        // misleading generic error.
+        // resolveUserHomePath is TOTAL by contract (never throws — it always
+        // falls back to /sales/products when the can-sell check fails). This
+        // catch is a last-resort safety net for genuinely unforeseen
+        // errors (e.g. a React Router harness failure during navigation),
+        // not a normal path. The distinct message is honest IF this ever
+        // fires, but it should be effectively unreachable.
         throw tagPostAuthError('resolver la pantalla de inicio', postAuthErr);
       }
     } catch (err: unknown) {
