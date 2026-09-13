@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { IntlProvider } from 'react-intl';
 import messages from '~/shared/lib/i18n/es';
@@ -251,7 +251,14 @@ describe('LoginPage (AUTH-01)', () => {
       expect(screen.queryByRole('button', { name: /iniciar sesión/i })).not.toBeInTheDocument();
     });
 
-    resolveLogin(makeUser());
+    // Flush the post-login continuation (resolveUserHomePath -> navigate)
+    // inside act: resolving the pending promise makes the async submit handler
+    // keep running AFTER this test's own body, and its navigate() would update
+    // the MemoryRouter outside act ("An update to MemoryRouter inside a test
+    // was not wrapped in act(...)").
+    await act(async () => {
+      resolveLogin(makeUser());
+    });
   });
 
   it('links to register page', () => {
