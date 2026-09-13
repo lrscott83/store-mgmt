@@ -91,6 +91,16 @@ const messages: Record<string, string> = {
   'AUTH.TOO_MANY_ATTEMPTS': 'Demasiados intentos. Espera un momento antes de volver a intentar.',
   'AUTH.INVALID_ERROR': 'La autenticación no es válida por el siguiente error: {error}',
   'AUTH.OFFLINE_LOGIN': 'Estás sin conexión. Se requiere conexión para iniciar sesión.',
+  // Client-side login failures (online path, login.tsx classification). These
+  // are NOT backend-returned errors: no E2E pins them, and AUTH.SERVER_ERROR
+  // itself stays byte-for-byte (pinned by e2e/login-offline.spec.ts T6 on the
+  // OFFLINE branch). Each shows a distinct, diagnostic copy with a detail excerpt.
+  'AUTH.LOGIN_OK_NAVIG_ERROR':
+    'Tus credenciales son correctas, pero no se pudo abrir tu pantalla de inicio. Falló al {fase}. Detalle: {detalle}. Recarga la página e inténtalo de nuevo.',
+  'AUTH.LOGIN_NETWORK_ERROR':
+    'No se pudo conectar con el servidor. Revisa tu conexión a internet e inténtalo de nuevo. Detalle: {detalle}.',
+  'AUTH.LOGIN_UNEXPECTED_ERROR':
+    'Ocurrió un error inesperado en el dispositivo durante el inicio de sesión. Detalle: {detalle}. Si el problema continúa, recarga la aplicación.',
   // at-rest-encryption-errors spec §"unlock banner and failure copy exact
   // strings" — ratified verbatim, do not reword. AUTH.UNLOCK_FAILED is
   // asserted byte-for-byte by e2e/login-offline.spec.ts T7 (:359,

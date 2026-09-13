@@ -80,6 +80,53 @@ function translateBackendError(desc: string): string {
   return map[desc] ?? desc;
 }
 
+// ─── Client-side failure diagnostics (online path) ─────────────────────────
+// AUTH.SERVER_ERROR is backend-attributable copy and is pinned byte-for-byte
+// by e2e/login-offline.spec.ts T6 (OFFLINE branch) — it must never carry
+// client-side details. Failures the backend did NOT return (post-auth steps
+// after login+/me succeeded, network drops, unexpected device errors) get
+// their own distinct message with a safe diagnostic excerpt.
+
+/** Bounded diagnostic excerpt from an error — code/name/message, ≤180 chars. */
+function safeErrorDetail(err: unknown, max = 180): string {
+  if (err == null) return 'desconocido';
+  const name = (err as { name?: string } | null)?.name ?? 'Error';
+  const message = (err as { message?: string } | null)?.message ?? '';
+  const code = (err as { code?: string } | null)?.code;
+  const parts = [code ?? '', message?.trim() ? message.trim() : name].filter(Boolean);
+  const detail = parts.join(': ');
+  return detail.length > max ? `${detail.slice(0, max)}…` : detail;
+}
+
+/**
+ * Tags a post-auth failure (login + /me already succeeded, only home
+ * resolution/navigation failed). The catch shows the distinct
+ * AUTH.LOGIN_OK_NAVIG_ERROR instead of a misleading generic error — the
+ * credentials were correct, the problem is purely client-side.
+ */
+function tagPostAuthError(phase: string, cause: unknown): Error & {
+  name: string;
+  postAuthPhase: string;
+  postAuthDetail: string;
+} {
+  const err = new Error(`Post-auth login failure (${phase})`) as Error & {
+    name: string;
+    postAuthPhase: string;
+    postAuthDetail: string;
+  };
+  err.name = 'PostAuthLoginError';
+  err.postAuthPhase = phase;
+  err.postAuthDetail = safeErrorDetail(cause);
+  return err;
+}
+
+/** Network/timeout rejections: axios errors with no server response. */
+function isNetworkError(err: unknown): boolean {
+  const e = err as { isNetworkError?: boolean; isAxiosError?: boolean; status?: number } | null;
+  if (e?.isNetworkError === true) return true;
+  return e?.isAxiosError === true && e.status == null;
+}
+
 export default function LoginPage() {
   const navigate = useNavigate();
   const intl = useIntl();
@@ -163,7 +210,16 @@ export default function LoginPage() {
       // Mirror Angular's navigateToUserHome() (shared with guestOnlyLoader):
       // warm the heavy route chunks, then resolve where to land.
       preloadHeavyChunks();
-      navigate(await resolveUserHomePath(user));
+      try {
+        navigate(await resolveUserHomePath(user));
+      } catch (postAuthErr: unknown) {
+        // login() + getMe ALREADY succeeded — the credentials are correct and
+        // the session is valid. A throw here is purely client-side (home
+        // resolution/navigation failed), so tag it: the catch must show the
+        // distinct "credentials OK, could not open home" message instead of a
+        // misleading generic error.
+        throw tagPostAuthError('resolver la pantalla de inicio', postAuthErr);
+      }
     } catch (err: unknown) {
       // Reveal the form again so the user can see the error and retry.
       setIsSubmitting(false);
@@ -208,6 +264,21 @@ export default function LoginPage() {
         return;
       }
 
+      const postAuth = (err as { name?: string } | null)?.name === 'PostAuthLoginError';
+      if (postAuth) {
+        const tagged = err as { postAuthPhase?: string; postAuthDetail?: string };
+        setErrors({
+          form: intl.formatMessage(
+            { id: 'AUTH.LOGIN_OK_NAVIG_ERROR' },
+            {
+              fase: tagged.postAuthPhase ?? 'resolver la pantalla de inicio',
+              detalle: tagged.postAuthDetail ?? 'desconocido',
+            },
+          ),
+        });
+        return;
+      }
+
       const status = (err as { status?: number })?.status;
       if (status === 401) {
         setErrors({ form: intl.formatMessage({ id: 'AUTH.INVALID_CREDENTIALS' }) });
@@ -215,8 +286,28 @@ export default function LoginPage() {
         setErrors({ form: intl.formatMessage({ id: 'AUTH.ACCOUNT_INACTIVE' }) });
       } else if (status === 429) {
         setErrors({ form: intl.formatMessage({ id: 'AUTH.TOO_MANY_ATTEMPTS' }) });
-      } else {
+      } else if (status != null) {
+        // The backend answered with an HTTP error we don't own copy for (e.g.
+        // 500). Backend-returned → the unchanged generic message (AUTH.SERVER_ERROR
+        // is byte-for-byte pinned by e2e/login-offline.spec.ts T6).
         setErrors({ form: intl.formatMessage({ id: 'AUTH.SERVER_ERROR' }) });
+      } else if (isNetworkError(err)) {
+        // The request never reached the server (offline drop, DNS, 30s timeout).
+        setErrors({
+          form: intl.formatMessage(
+            { id: 'AUTH.LOGIN_NETWORK_ERROR' },
+            { detalle: safeErrorDetail(err) },
+          ),
+        });
+      } else {
+        // Unexpected client-side failure with no server decision to attribute
+        // (e.g. session hydrated but a later device step failed).
+        setErrors({
+          form: intl.formatMessage(
+            { id: 'AUTH.LOGIN_UNEXPECTED_ERROR' },
+            { detalle: safeErrorDetail(err) },
+          ),
+        });
       }
     }
   }
