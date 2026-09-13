@@ -167,6 +167,38 @@ describe('StoreCardList — card body (plan line, owner, phone, description)', (
     expect(screen.queryByTestId('store-next-payment-s3')).not.toBeInTheDocument();
   });
 
+  it('disapproved store (planType Gratis) hides price and date even with paid snapshot modules', async () => {
+    const { StoreCardList } = await import('../store-card-list');
+    render(
+      <Wrapper>
+        <StoreCardList
+          stores={[
+            makeStore({
+              id: 's6',
+              approved: false,
+              planType: 'Gratis',
+              nextPaymentDate: null,
+              modules: [
+                { id: 2, name: 'Mgmt', price: 20, currentPrice: 20, priceIncluded: false, discountText: '', selected: true },
+              ],
+            }),
+          ]}
+          onEdit={vi.fn()}
+          onApprove={vi.fn()}
+          onDisapprove={vi.fn()}
+          onToggle={vi.fn()}
+        />
+      </Wrapper>,
+    );
+    expect(screen.getByText('Gratis')).toBeInTheDocument();
+    // The paid module snapshot must NOT leak a price — or a dangling colon — on a
+    // disapproved store, no matter what the modules array still carries.
+    expect(screen.queryByTestId('store-price-original-s6')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('store-price-s6')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('store-next-payment-s6')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Gratis:/)).not.toBeInTheDocument();
+  });
+
   it('renders the owner name and a tel: link for the owner phone', async () => {
     const { StoreCardList } = await import('../store-card-list');
     render(

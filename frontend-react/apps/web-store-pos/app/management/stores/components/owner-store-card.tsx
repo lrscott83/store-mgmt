@@ -35,7 +35,9 @@ export function OwnerStoreCard({ store, modules, onEdit, onEditPlan }: OwnerStor
 
   // Same paid-plan/price criteria as the store plan view (P2): the merged catalog's
   // paid modules, whose currentPrice/price come from the store's own snapshot.
-  const isOnPaidPlan = getIsOnPaidPlan(modules);
+  // Disapproved stores arrive as 'Gratis' (backend guard): never show a price or
+  // next-due date for them, even when the merged catalog still carries paid modules.
+  const isOnPaidPlan = store.planType !== 'Gratis' && getIsOnPaidPlan(modules);
   const paidModules = modules.filter((m) => !m.priceIncluded);
   const paidTotal = paidModules.reduce((sum, m) => sum + m.currentPrice, 0);
   const paidOriginalTotal = paidModules.reduce((sum, m) => sum + m.price, 0);
