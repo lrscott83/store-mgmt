@@ -63,6 +63,20 @@ export function PlanPanels({
     return PLAN_NAME_KEYS[previous.planType] ? t(PLAN_NAME_KEYS[previous.planType]) : previous.planType;
   };
 
+  // Delta list: paid panels render ONLY the modules the predecessor does not
+  // already carry — the cumulative copy ("Incluye todo lo del plan X y además:")
+  // would be a lie with the raw cumulative list repeated underneath. Gratis has
+  // no predecessor and keeps its full list. Defensive fallback: an unknown plan
+  // (no predecessor) renders everything.
+  const deltaModules = (target: Plan): PlanModule[] => {
+    const previous = plans
+      .filter((p) => p.order < target.order)
+      .sort((a, b) => b.order - a.order)[0];
+    if (!previous) return target.modules;
+    const previousIds = new Set(previous.modules.map((m) => m.moduleId));
+    return target.modules.filter((m) => !previousIds.has(m.moduleId));
+  };
+
   // "Only the active panel is expanded": default from the store's planType, and
   // follow an activation-induced planType change (plan page reflects without reload).
   const [expanded, setExpanded] = useState<string>(storePlanType);
@@ -123,13 +137,13 @@ export function PlanPanels({
                 <p className="text-sm text-gray-700">
                   {(() => {
                     const previous = predecessorName(plan);
-                    return plan.planType === 'Gratis' || isActive || !previous
+                    return plan.planType === 'Gratis' || !previous
                       ? t('STORES.PLAN.INCLUDES')
                       : t('STORES.PLAN.INCLUDES_PREVIOUS_PLAN', { plan: previous });
                   })()}
                 </p>
                 <ul className="mt-1 space-y-2 text-sm text-gray-700">
-                  {plan.modules.map((m) => (
+                  {deltaModules(plan).map((m) => (
                     <PlanModuleRow
                       key={m.moduleId}
                       module={m}

@@ -64,13 +64,14 @@ function makePlan(overrides: Partial<Plan> = {}): Plan {
   };
 }
 
-/** Real catalog shape GET /v1/plans returns: free module (id 2) + paid (id 1) + superior (1+3). */
+/** Real catalog shape (CUMULATIVE): Gratis [Free Module], Pago [Free Module + Module A], Superior [Free Module + Module A + Module C]. Explicit `order` is required — the delta filter walks the Order chain. */
 function makeCatalog(): Plan[] {
   return [
     makePlan({
       id: 1,
       name: 'Gratis',
       planType: 'Gratis',
+      order: 1,
       price: 0,
       modules: [
         makePlanModule({
@@ -87,15 +88,35 @@ function makeCatalog(): Plan[] {
       id: 2,
       name: 'Pago',
       planType: 'Pago',
+      order: 2,
       price: 8,
-      modules: [makePlanModule({ moduleId: 1, name: 'Module A' })],
+      modules: [
+        makePlanModule({
+          moduleId: 2,
+          name: 'Free Module',
+          priceIncluded: true,
+          price: 0,
+          currentPrice: 0,
+          discountText: '',
+        }),
+        makePlanModule({ moduleId: 1, name: 'Module A' }),
+      ],
     }),
     makePlan({
       id: 3,
       name: 'Superior',
       planType: 'Superior',
+      order: 3,
       price: 12,
       modules: [
+        makePlanModule({
+          moduleId: 2,
+          name: 'Free Module',
+          priceIncluded: true,
+          price: 0,
+          currentPrice: 0,
+          discountText: '',
+        }),
         makePlanModule({ moduleId: 1, name: 'Module A' }),
         makePlanModule({
           moduleId: 3,
@@ -393,7 +414,11 @@ describe('StorePlanPage — DG-7 lock derived from planType', () => {
       expect(screen.getByText('Activo')).toBeInTheDocument();
     });
     // The paid store shows prices and exposes the activation action elsewhere
+    // DELTA page pin: the ACTIVE paid panel lists only its additional modules —
+    // the cumulative catalog's Pago delta is exactly Module A (Free Module is
+    // the Gratis predecessor's module and must NOT repeat below the copy).
     expect(screen.getByText('Module A')).toBeInTheDocument();
+    expect(screen.queryByText('Free Module')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /Superior/ }));
     expect(screen.getByRole('button', { name: 'Activar Plan' })).toBeInTheDocument();
   });
