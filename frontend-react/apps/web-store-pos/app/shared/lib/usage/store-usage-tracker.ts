@@ -1,5 +1,6 @@
 import type { BaseResponseModel } from '@store-mgmt/domain';
 import { apiClient } from '~/shared/lib/http/api-client';
+import { StorageService } from '../auth/storage-service';
 import { getRoster } from '../offline/roster-store';
 
 /**
@@ -43,12 +44,19 @@ let sending = false;
 // (login.component.ts:169-170). On a page reload the subscription is never
 // re-armed, so Angular's tracker stays dormant for the whole session.
 //
-// `armed` is module state, so it resets to false on every page reload — exactly
-// reproducing Angular's dormant-after-reload behavior. The navigation hook
-// (use-store-usage-tracker.ts) checks `isTrackingArmed()` before firing.
+// `armed` keeps those exact semantics: module state that resets to false on
+// every page reload and is set ONLY by the explicit post-login `armTracking()`.
+// DELIBERATE DIVERGENCE from Angular (store-usage-tracker re-arm fix,
+// 2026-09-14): the hook no longer gates on `isTrackingArmed()` alone — it
+// consults `isTrackingReady()`, which ALSO accepts a persisted session with a
+// valid tracking context (see below), so after a reload or a version update
+// with a still-valid session the tracker keeps registering and flushing
+// instead of staying dormant until the next explicit login.
 let armed = false;
 
-/** Mirror of Angular `startTracking()` — called on explicit login only. */
+/** Mirror of Angular `startTracking()` — called on explicit login only
+ *  (login.tsx:183 offline, :209 online). Readiness also accepts a persisted
+ *  session — see `isTrackingReady()`. */
 export function armTracking(): void {
   armed = true;
 }
@@ -60,6 +68,29 @@ export function disarmTracking(): void {
 
 export function isTrackingArmed(): boolean {
   return armed;
+}
+
+/**
+ * Readiness gate the hook consults before stamping (see
+ * `use-store-usage-tracker.ts`): ready when the tracker was explicitly armed by
+ * a login (`armTracking()`) OR a persisted session exists in `currentUser`
+ * (`StorageService.getCurrentUser()`) with a valid tracking context — the
+ * reload/version-update re-arm. `auth-store` hydrates `user` synchronously
+ * from that same `currentUser` on module evaluation (getUserByToken), so after
+ * a reload with a valid, unexpired session the tracker is ready again without
+ * a re-login.
+ *
+ * Session expiry/verdicts are deliberately NOT re-checked here: the auth store
+ * owns that logic (getUserByToken ends expired/rejected sessions), and the
+ * hook only calls this with a live `userId`/`selectedStoreId` from the store —
+ * which are null after a logout even though the stale `currentUser` may linger
+ * (Angular-parity logout keeps it). Readiness alone never stamps; the missing
+ * live ids block every stamping path.
+ */
+export function isTrackingReady(): boolean {
+  if (armed) return true;
+  const persisted = StorageService.getCurrentUser();
+  return isTrackingContextValid(persisted?.id ?? '', persisted?.selectedStoreId ?? '');
 }
 
 function getToday(): string {
@@ -101,7 +132,14 @@ function isTrackingContextValid(userId: string, selectedStoreId: string): boolea
   );
 }
 
-function flushUsage(userId: string): void {
+/**
+ * Posts every unsaved buffered day for `userId`, guarded by the module-level
+ * `sending` mutex. Public so the hook can flush pending days on readiness (see
+ * `use-store-usage-tracker.ts`) — `registerStoreActivity()` is "stamp today +
+ * flush", this is the flush alone. Both are no-ops on an empty buffer; callers
+ * must hold a valid tracking context (the hook guards before calling).
+ */
+export function flushUsage(userId: string): void {
   if (sending) return;
 
   const usage = readUsage(userId);
@@ -154,9 +192,10 @@ function flushUsage(userId: string): void {
 }
 
 /**
- * Public entry point, called on every route navigation (see
- * `use-store-usage-tracker.ts`). Mirrors Angular's `registerActivity()`:
- * buffers today once, then attempts to flush all unsaved days.
+ * Public entry point, called on route navigation AND on throttled pointer /
+ * keyboard activity (see `use-store-usage-tracker.ts`). Mirrors Angular's
+ * `registerActivity()`: buffers today once, then attempts to flush all unsaved
+ * days.
  */
 export function registerStoreActivity(userId: string, selectedStoreId: string): void {
   if (!isTrackingContextValid(userId, selectedStoreId)) return;

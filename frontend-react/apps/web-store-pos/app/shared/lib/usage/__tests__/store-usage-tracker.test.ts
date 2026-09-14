@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { StorageKeys } from '~/shared/lib/storage/storage-keys';
 
 // ── USAGE-1 through USAGE-3 (Stage 6 Slice C — Daily Store Activity Recording,
 // Buffered POST With Mutex) ──────────────────────────────────────────────────
@@ -52,7 +53,7 @@ describe('registerStoreActivity — USAGE-7: buffers the LOCAL day, not UTC', ()
     if (offsetMinutes <= 0) return;
 
     vi.useFakeTimers();
-    vi.setSystemTime(new Date(2026, 8,  13, 21, 0, 0));
+    vi.setSystemTime(new Date(2026, 8, 13, 21, 0, 0));
     const { apiClient } = await import('~/shared/lib/http/api-client');
     (apiClient.post as ReturnType<typeof vi.fn>).mockResolvedValue({
       data: { succeeded: true, data: [], message: '', actionCode: 0, errors: [] },
@@ -543,5 +544,173 @@ describe('cleanOldStoreUsage — USAGE-5: retention prune on mount (parity)', ()
       STORAGE_KEY,
       JSON.stringify({ activeDays: [{ day: '2026-07-01', saved: true }] }),
     );
+  });
+});
+
+// ── USAGE-8 (store-usage-tracker re-arm fix, 2026-09-14): readiness is ALSO
+// derived from the PERSISTED session, so after a reload or a version update
+// the tracker keeps working (buffer + POST logic live in localStorage — only
+// the in-memory `armed` flag was lost). Unlike the `armed` flag, this is a
+// DELIBERATE divergence from Angular's dormant-after-reload behavior. Expiry
+// is deliberately NOT re-checked here: the auth store owns session expiry, and
+// the hook only ever calls this with a live, hydrated `userId`/
+// `selectedStoreId`.
+describe('tracking readiness — USAGE-8: persisted session re-arms after reload', () => {
+  beforeEach(async () => {
+    localStorage.clear();
+    const { disarmTracking } = await import('../store-usage-tracker');
+    disarmTracking();
+  });
+
+  it('is NOT ready when disarmed and no session is persisted (anonymous / first boot)', async () => {
+    const { isTrackingReady } = await import('../store-usage-tracker');
+    expect(isTrackingReady()).toBe(false);
+  });
+
+  it('is ready when a persisted session with id + selectedStoreId exists (reload re-arm)', async () => {
+    localStorage.setItem(
+      StorageKeys.CURRENT_USER,
+      JSON.stringify({ id: USER_ID, selectedStoreId: STORE_ID }),
+    );
+
+    const { isTrackingReady } = await import('../store-usage-tracker');
+    expect(isTrackingReady()).toBe(true);
+  });
+
+  it('is NOT ready when the persisted session has no selectedStoreId', async () => {
+    localStorage.setItem(
+      StorageKeys.CURRENT_USER,
+      JSON.stringify({ id: USER_ID, selectedStoreId: '' }),
+    );
+
+    const { isTrackingReady } = await import('../store-usage-tracker');
+    expect(isTrackingReady()).toBe(false);
+  });
+
+  it('is NOT ready when the persisted session has the empty-guid selectedStoreId (no store assigned)', async () => {
+    localStorage.setItem(
+      StorageKeys.CURRENT_USER,
+      JSON.stringify({ id: USER_ID, selectedStoreId: EMPTY_GUID }),
+    );
+
+    const { isTrackingReady } = await import('../store-usage-tracker');
+    expect(isTrackingReady()).toBe(false);
+  });
+
+  it('is NOT ready when the persisted session has no userId', async () => {
+    localStorage.setItem(
+      StorageKeys.CURRENT_USER,
+      JSON.stringify({ id: '', selectedStoreId: STORE_ID }),
+    );
+
+    const { isTrackingReady } = await import('../store-usage-tracker');
+    expect(isTrackingReady()).toBe(false);
+  });
+
+  it('is ready after an explicit armTracking() even without a persisted session (post-login path)', async () => {
+    const { armTracking, disarmTracking, isTrackingReady } = await import('../store-usage-tracker');
+    armTracking();
+    expect(isTrackingReady()).toBe(true);
+    disarmTracking();
+    expect(isTrackingReady()).toBe(false);
+  });
+
+  it('leaves the armed flag untouched: isTrackingArmed() stays a pure mirror', async () => {
+    // A persisted session alone must NOT flip the Angular-parity `armed` flag —
+    // only armTracking() does (explicit-login semantics preserved).
+    localStorage.setItem(
+      StorageKeys.CURRENT_USER,
+      JSON.stringify({ id: USER_ID, selectedStoreId: STORE_ID }),
+    );
+
+    const { isTrackingArmed, isTrackingReady } = await import('../store-usage-tracker');
+    expect(isTrackingArmed()).toBe(false);
+    expect(isTrackingReady()).toBe(true);
+  });
+});
+
+// ── USAGE-9 (version-survival): the usage buffer key must NEVER be
+// version-prefixed. `StorageKeys.AUTH_MODEL` is `${APP_VERSION}-auth...`
+// (storage-keys.ts) — sessions are isolated per deployment BY DESIGN, but the
+// usage buffer lives across versions on purpose: a version bump that orphaned
+// `lizoft.store-daily-usage-{userId}` would silently lose unsent usage days
+// (and no production code clears the key). Pin the raw key here so a future
+// "fix" cannot adopt the AUTH_MODEL prefix pattern.
+describe('registerStoreActivity — USAGE-9: buffer key is NOT version-prefixed', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    vi.clearAllMocks();
+  });
+
+  it('buffers under the literal lizoft.store-daily-usage-{userId} key (no APP_VERSION segment)', async () => {
+    const { apiClient } = await import('~/shared/lib/http/api-client');
+    (apiClient.post as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: { succeeded: true, data: [], message: '', actionCode: 0, errors: [] },
+    });
+
+    const { registerStoreActivity } = await import('../store-usage-tracker');
+    registerStoreActivity(USER_ID, STORE_ID);
+
+    // THE PIN: the unsent buffer must be found under exactly this unprefixed
+    // key — a version bump must never orphan it.
+    expect(localStorage.getItem(STORAGE_KEY)).not.toBeNull();
+  });
+});
+
+// ── USAGE-10 (store-usage-tracker re-arm fix, 2026-09-14): `flushUsage` is
+// public so the hook can flush pending days on readiness without stamping.
+// Same mutex + unsaved-only semantics as the flush inside `registerStoreActivity`.
+describe('flushUsage — USAGE-10: flushes unsaved days on demand (readiness flush)', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    vi.clearAllMocks();
+  });
+
+  it('POSTs only the unsaved days and marks them saved on success', async () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        activeDays: [
+          { day: '2026-09-10', saved: true },
+          { day: '2026-09-13', saved: false },
+        ],
+      }),
+    );
+    const { apiClient } = await import('~/shared/lib/http/api-client');
+    (apiClient.post as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: {
+        succeeded: true,
+        data: [{ day: '2026-09-13', saved: true }],
+        message: '',
+        actionCode: 0,
+        errors: [],
+      },
+    });
+
+    const { flushUsage } = await import('../store-usage-tracker');
+    flushUsage(USER_ID);
+
+    expect(apiClient.post).toHaveBeenCalledWith(
+      '/v1/usages/store-daily-usage',
+      { activeDays: [{ day: '2026-09-13', saved: false }] },
+      { skipLoading: true },
+    );
+    await vi.waitFor(() => {
+      const stored = JSON.parse(localStorage.getItem(STORAGE_KEY)!);
+      expect(stored.activeDays.every((d: { saved: boolean }) => d.saved)).toBe(true);
+    });
+  });
+
+  it('is a no-op when the buffer has no unsaved days', async () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ activeDays: [{ day: '2026-09-10', saved: true }] }),
+    );
+    const { apiClient } = await import('~/shared/lib/http/api-client');
+
+    const { flushUsage } = await import('../store-usage-tracker');
+    flushUsage(USER_ID);
+
+    expect(apiClient.post).not.toHaveBeenCalled();
   });
 });
