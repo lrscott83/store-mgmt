@@ -22,20 +22,20 @@ namespace Application.Mappings.StoreManagement
                 .ForMember(dest => dest.DisplayName, opt => opt.MapFrom(src => src.Name))
                 .ForMember(dest => dest.OwnerName, opt => opt.MapFrom(src => src.Owner.User.FullName))
                 .ForMember(dest => dest.OwnerPhone, opt => opt.MapFrom(src => src.Owner.User.CellPhone))
-                .ForMember(dest => dest.PlanType, opt => opt.MapFrom(src => ResolvePlanType(src.StorePlanId)))
+                .ForMember(dest => dest.PlanType, opt => opt.MapFrom(src => ResolvePlanType(src)))
                 .ForMember(dest => dest.Modules, opt => opt.MapFrom(src => src.StoreModules));
 
             CreateMap<Store, StorePlanDto>()
                 .IgnoreAllSourcePropertiesWithAnInaccessibleSetter()
                 .ForMember(dest => dest.StoreId, opt => opt.MapFrom(src => src.Id))
                 .ForMember(dest => dest.StoreName, opt => opt.MapFrom(src => src.Name))
-                .ForMember(dest => dest.PlanType, opt => opt.MapFrom(src => ResolvePlanType(src.StorePlanId)))
+                .ForMember(dest => dest.PlanType, opt => opt.MapFrom(src => ResolvePlanType(src)))
                 .ForMember(dest => dest.Modules, opt => opt.MapFrom(src => src.StoreModules));
 
             CreateMap<Store, OwnerStoreDto>()
                 .IgnoreAllSourcePropertiesWithAnInaccessibleSetter()
                 .ForMember(dest => dest.Id, opt => opt.MapFrom(src => src.Id))
-                .ForMember(dest => dest.PlanType, opt => opt.MapFrom(src => ResolvePlanType(src.StorePlanId)))
+                .ForMember(dest => dest.PlanType, opt => opt.MapFrom(src => ResolvePlanType(src)))
                 .ForMember(dest => dest.Modules, opt => opt.MapFrom(src => src.StoreModules));
             // NextDueDate is NOT mappable from the entity — GetMyStoresQueryHandler computes
             // it per store (same canonical calculation as GetStorePlanQuery) and sets it by hand.
@@ -56,10 +56,12 @@ namespace Application.Mappings.StoreManagement
             return storeModules.Sum(sm => CurrentPriceServiceUtils.GetCurrentPrice(sm.Price, sm.ModulePercentDiscountPrice, sm.ModuleDiscountPrice));
         }
 
-        private static string ResolvePlanType(int storePlanId)
+        private static string ResolvePlanType(Store src)
         {
-            return Enum.IsDefined(typeof(StorePlanType), storePlanId)
-                ? ((StorePlanType)storePlanId).GetDescription()
+            if (!src.Approved) return "Gratis";
+
+            return Enum.IsDefined(typeof(StorePlanType), src.StorePlanId)
+                ? ((StorePlanType)src.StorePlanId).GetDescription()
                 : "Gratis";
         }
     }

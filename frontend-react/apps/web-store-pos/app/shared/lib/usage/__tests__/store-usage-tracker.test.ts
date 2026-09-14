@@ -28,6 +28,60 @@ function today(): string {
   return new Date().toISOString().split('T')[0]!;
 }
 
+// ── USAGE-7 (usage-dashboard-alignment): the buffered day must be the user's
+// LOCAL calendar day, not the UTC instant's date. In UTC-4 (Cuba DST), a user
+// connecting Sunday 2026-09-13 at 21:00 local is 2026-09-14T01:00Z — toISOString
+// stamps "2026-09-14" (Monday) and the usage lands on the wrong day.
+describe('registerStoreActivity — USAGE-7: buffers the LOCAL day, not UTC', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('records the local calendar day when local date differs from UTC (late-night UTC-4)', async () => {
+    // Sunday 2026-09-13 21:00 in UTC-4 → 2026-09-14T01:00Z.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 8, 13, 21, 0, 0));
+    const offsetMinutes = new Date().getTimezoneOffset();
+    vi.useRealTimers();
+    // This spec is meaningful only in a UTC- (west-of-Greenwich) sandbox; skip elsewhere.
+    if (offsetMinutes <= 0) return;
+
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 8,  13, 21, 0, 0));
+    const { apiClient } = await import('~/shared/lib/http/api-client');
+    (apiClient.post as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: { succeeded: true, data: [], message: '', actionCode: 0, errors: [] },
+    });
+
+    const { registerStoreActivity } = await import('../store-usage-tracker');
+    registerStoreActivity(USER_ID, STORE_ID);
+
+    const stored = JSON.parse(localStorage.getItem(STORAGE_KEY)!);
+    expect(stored.activeDays).toEqual([{ day: '2026-09-13', saved: false }]);
+  });
+
+  it('records the UTC date unchanged when local date equals UTC date', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 8, 13, 10, 0, 0));
+    const { apiClient } = await import('~/shared/lib/http/api-client');
+    (apiClient.post as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: { succeeded: true, data: [], message: '', actionCode: 0, errors: [] },
+    });
+
+    const { registerStoreActivity } = await import('../store-usage-tracker');
+    registerStoreActivity(USER_ID, STORE_ID);
+
+    const expected = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD in local time
+    const stored = JSON.parse(localStorage.getItem(STORAGE_KEY)!);
+    expect(stored.activeDays).toEqual([{ day: expected, saved: false }]);
+  });
+});
+
 describe('registerStoreActivity — USAGE-1: buffers today once per day', () => {
   beforeEach(() => {
     localStorage.clear();

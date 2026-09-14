@@ -73,6 +73,9 @@ function PlanLine({ store }: { store: Store }) {
     ? intl.formatMessage({ id: PLAN_NAME_KEYS[store.planType] })
     : store.planType;
   const priceInfo = getPlanPriceInfo(store);
+  // Disapproved stores arrive as 'Gratis' (backend guard): a stale paid module
+  // snapshot must never render a price — only the plan name.
+  const showPrice = store.planType !== 'Gratis';
   const showDate =
     store.planType !== 'Gratis' &&
     store.nextPaymentDate !== null &&
@@ -82,7 +85,7 @@ function PlanLine({ store }: { store: Store }) {
   return (
     <p className="text-sm font-medium text-text">
       {planLabel}
-      {(priceInfo || showDate) && (
+      {(showPrice || showDate) && (
         <>
           :{' '}
           {priceInfo?.hasDiscount && (
