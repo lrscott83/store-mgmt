@@ -1,7 +1,8 @@
 # Plan: Fallos E2E preexistentes — diagnóstico y resolución
 
-**Status**: pendiente de diagnóstico profundo
+**Status**: RESUELTO — los 3 specs pasan (2026-09-14)
 **Created**: 2026-09-11
+**Closed**: 2026-09-14 — ver "Resolución" al final.
 **Origin**: detectados durante la verificación de no-regresión del trabajo CSP (flip Step 2), **probados preexistentes** — el mismo `store-plan-activation.spec.ts` falla en el commit baseline `83b7de69` (verificado en worktree aislado, sin ningún commit del trabajo CSP).
 
 ## Los 3 specs que fallan
@@ -55,3 +56,15 @@ Esto apunta a un problema en la cadena login → redirect → hidratación, no s
 - Imagen nginx del frontend NO reconstruida/desplegada: el error de actualización del SW y el error MIME del bootstrap (`bootstrap-0-46a81289.js` con src relativo del build viejo) persisten en producción hasta re-build + re-deploy.
 - 3 cambios UI en Movimientos (quitar texto "Movimientos", margen lateral, alinear iconos) — sin empezar.
 - Test backend pinneando `Plan.id` == `StorePlanType` (1–4) en activación de plan.
+
+## Resolución (2026-09-14)
+
+Los 3 specs pasan hoy en `dev`, cada uno con su causa raíz propia:
+
+| Spec | Causa raíz | Fix |
+|---|---|---|
+| `store-plan-activation.spec.ts` | Locator obsoleto: el botón "Activar Plan" vive en el BODY del panel, no en el header del accordion — el locator `freeHeader`-scoped nunca podía matchearlo; el PUT llegaba sin `moduleIds` (0 módulos) porque el panel nunca cargaba su body | `fix(e2e)` `f9053f8d` — locator page-wide |
+| `store-update.spec.ts` | Ruta y menú obsoletos: `/management/stores/update` y el enlace "Editar la tienda" ya no existen; la edición vive en `edit/:id` y el menú ahora muestra "Mis tiendas" | `fix(e2e)` `f9053f8d` — ruta corregida |
+| `users-crud.spec.ts` (Test 2) | **Bug de producción backend**: cláusula circular `u.StoreUser.User != null && u.StoreUser.User.IsActive` en `UserRepository.GetAllUsersByStoreIdIncludingStoreAndRolesAsync` exigía `IsActive==true` incondicionalmente — el GET con `includeInactive=true` nunca devolvía al usuario desactivado, así que tras el DELETE la lista no mostraba el card con "Activar" y el test moría en `userCardActionMenu` | `fix(users)` `ab734930` — cláusula removida (redundante con `(includeInactive \|\| u.IsActive)`) + test nuevo `StoreUsersByStoreIncludeInactiveTests` |
+
+Verificación 2026-09-14 en `dev` (merge `df35d0ff` con main): los 3 specs corren verdes contra backend `http-e2e` real (`smca_test`), teardown limpio. Los fixes se diagnosticaron con los specs temporales `e2e/diag-tmp/diag2..diag9` (gitignored, nunca commitear).
