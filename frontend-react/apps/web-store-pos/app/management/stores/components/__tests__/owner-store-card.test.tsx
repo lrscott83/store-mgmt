@@ -3,7 +3,6 @@ import { render, screen } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 import type { Module, OwnerStoreWithPlan } from '@store-mgmt/domain';
-import { OwnerStoreCard } from '../owner-store-card';
 
 function Wrapper({ children }: { children: React.ReactNode }) {
   return (
