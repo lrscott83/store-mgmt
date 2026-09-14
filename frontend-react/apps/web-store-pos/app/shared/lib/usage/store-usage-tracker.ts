@@ -63,7 +63,12 @@ export function isTrackingArmed(): boolean {
 }
 
 function getToday(): string {
-  return new Date().toISOString().split('T')[0]!;
+  // Local calendar day (usage-dashboard-alignment): toISOString() would stamp the
+  // UTC instant's date — a user connecting Sunday 21:00 in UTC-4 lands as "Monday"
+  // and the usage is counted on the wrong day. en-CA locale yields YYYY-MM-DD.
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 }
 
 function getStorageKey(userId: string): string {

@@ -19,8 +19,18 @@ export function getDiasSemana(today: Date = new Date()): string[] {
   return result;
 }
 
-export function getDias30(): string[] {
-  return Array.from({ length: 30 }, (_, i) => String(i + 1));
+export function getDias30(today: Date = new Date()): string[] {
+  // Real date labels (usage-dashboard-alignment): the backend returns dense
+  // buckets ending today, so a static "1".."30" misaligned every label. Same
+  // `d-MMM` Spanish format as the profit chart (chart-core formatLabel).
+  const MONTHS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+  const result: string[] = [];
+  for (let i = 29; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    result.push(`${d.getDate()}-${MONTHS[d.getMonth()]}`);
+  }
+  return result;
 }
 
 export function AdminDashboardPage() {
