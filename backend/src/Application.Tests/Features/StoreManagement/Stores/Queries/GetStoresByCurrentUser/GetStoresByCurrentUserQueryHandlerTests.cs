@@ -215,6 +215,31 @@ public class GetStoresByCurrentUserQueryHandlerTests
     }
 
     [Fact]
+    public async Task Handle_disapproved_store_with_recorded_payment_returns_null_next_payment_date()
+    {
+        // REQ-2: a disapproved store's recorded payment must NOT resurrect the date.
+        ArrangeRoles(isSuperAdmin: true, isReSeller: false);
+        var start = new DateOnly(2026, 1, 1);
+        var disapproved = CreateStore("Disapproved", paymentStartDate: start, approved: false);
+        _mockStoreRepository
+            .Setup(x => x.GetAllStoresIncludingOwnerAndIgnoreQueryFiltersAsync(It.IsAny<Guid?>()))
+            .ReturnsAsync(new List<Store> { disapproved });
+        var dto = new StoreDto { Id = disapproved.Id };
+        _mockMapper.Setup(x => x.Map<StoreDto>(disapproved)).Returns(dto);
+        var lastPaidBefore = new DateOnly(2026, 10, 15);
+        _mockStorePaymentRepository
+            .Setup(x => x.GetLastByStoreIdAsync(disapproved.Id))
+            .ReturnsAsync(CreatePayment(disapproved.Id, lastPaidBefore));
+
+        // Act
+        var result = await _handler.Handle(new GetStoresByCurrentUserQuery(), CancellationToken.None);
+
+        // Assert — Approved guard wraps the whole computation, so even a recorded
+        // payment with non-null PaymentStartDate stays hidden.
+        result.Data!.Single().NextPaymentDate.Should().BeNull();
+    }
+
+    [Fact]
     public async Task Handle_reads_the_trial_length_once_up_front()
     {
         // Arrange
@@ -262,9 +287,9 @@ public class GetStoresByCurrentUserQueryHandlerTests
             .ReturnsAsync((StorePayment?)null);
     }
 
-    private static Store CreateStore(string name, DateOnly? paymentStartDate = null)
+    private static Store CreateStore(string name, DateOnly? paymentStartDate = null, bool approved = true)
     {
-        return Store.Create(name, Guid.NewGuid(), true, Guid.NewGuid(), paymentStartDate);
+        return Store.Create(name, Guid.NewGuid(), approved, Guid.NewGuid(), paymentStartDate);
     }
 
     private static StorePayment CreatePayment(Guid storeId, DateOnly paidBefore)

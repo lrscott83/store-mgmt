@@ -47,11 +47,16 @@ namespace Application.Features.StoreManagement.Stores.Queries.GetStorePlan
             DateOnly? lastPaidBeforeDate = lastPayment is null
                 ? null
                 : DateOnly.FromDateTime(lastPayment.PaymentBeforeDate.UtcDateTime);
-            storePlanDto.NextDueDate = StoreBillingUtils.GetNextDueDate(
-                store.PaymentStartDate,
-                trialMonths,
-                lastPaidBeforeDate,
-                store.NextDueDateOverride);
+            // Disapproved stores expose no payment info: the Approved guard wraps the
+            // whole computation (payment, override, clock) — same rule as
+            // BillingService.cs:60,72,101-102 and GetMyStoresQuery.
+            storePlanDto.NextDueDate = store.Approved
+                ? StoreBillingUtils.GetNextDueDate(
+                    store.PaymentStartDate,
+                    trialMonths,
+                    lastPaidBeforeDate,
+                    store.NextDueDateOverride)
+                : null;
 
             return ResponseResult.Success(storePlanDto);
         }
