@@ -75,13 +75,14 @@ function makePlan(overrides: Partial<Plan> = {}): Plan {
   };
 }
 
-/** Real catalog shape: free module (id 2) + paid (id 1) + superior (1+3). */
+/** Real catalog shape (CUMULATIVE): free module (id 2) + paid (id 1) + superior (1+3). Explicit `order` is required — the delta filter walks the Order chain. */
 function makePlanCatalog(): Plan[] {
   return [
     makePlan({
       id: 1,
       name: 'Gratis',
       planType: 'Gratis',
+      order: 1,
       price: 0,
       modules: [
         makePlanModule({
@@ -94,13 +95,39 @@ function makePlanCatalog(): Plan[] {
         }),
       ],
     }),
-    makePlan({ id: 2, name: 'Pago', planType: 'Pago', price: 8 }),
+    makePlan({
+      id: 2,
+      name: 'Pago',
+      planType: 'Pago',
+      order: 2,
+      price: 8,
+      modules: [
+        makePlanModule({
+          moduleId: 2,
+          name: 'Free Module',
+          priceIncluded: true,
+          price: 0,
+          currentPrice: 0,
+          discountText: '',
+        }),
+        makePlanModule(),
+      ],
+    }),
     makePlan({
       id: 3,
       name: 'Superior',
       planType: 'Superior',
+      order: 3,
       price: 12,
       modules: [
+        makePlanModule({
+          moduleId: 2,
+          name: 'Free Module',
+          priceIncluded: true,
+          price: 0,
+          currentPrice: 0,
+          discountText: '',
+        }),
         makePlanModule(),
         makePlanModule({
           moduleId: 3,
@@ -606,6 +633,10 @@ describe('MyStoresPage — Editar el plan popup', () => {
     });
     // The paid store keeps the billing banner (testid stays)
     expect(screen.getByTestId('owner-plan-next-billing-date-s1')).toBeInTheDocument();
+    // DELTA popup pin: the ACTIVE paid panel lists only its additional modules —
+    // Module A (Pago's delta) renders, the Gratis predecessor's module does not.
+    expect(screen.getByText('Module A')).toBeInTheDocument();
+    expect(screen.queryByText('Free Module')).not.toBeInTheDocument();
     // And exposes the activation action on another plan — the owner can change
     fireEvent.click(screen.getByRole('button', { name: /Superior/ }));
     expect(

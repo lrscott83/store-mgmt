@@ -90,7 +90,6 @@ vi.mock('react-toastify', () => ({
 }));
 
 import App, { ErrorBoundary, Layout } from '../root';
-import { installClientLog } from '~/shared/lib/diagnostics/install-client-log';
 import { logClientError } from '~/shared/lib/diagnostics/client-log';
 
 function mockRouteError(status: number, statusText = '') {
