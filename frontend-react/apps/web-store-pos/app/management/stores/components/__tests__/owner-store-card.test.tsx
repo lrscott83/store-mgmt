@@ -91,4 +91,46 @@ describe('OwnerStoreCard — approved stores (control)', () => {
     expect(screen.getByTestId('owner-store-price-a1')).toHaveTextContent('2,000 USD');
     expect(screen.getByTestId('owner-store-next-due-a1')).toBeInTheDocument();
   });
+
+  it('sums ONLY the store-selected paid modules — catalog leftovers never inflate the price (price-parity plan CAUSA-1)', async () => {
+    const { OwnerStoreCard } = await import('../owner-store-card');
+    // Merged-catalog shape for a Pago store: Statistics selected @100 (the
+    // store's snapshot) + Warehouses/MultiStores NOT selected with catalog
+    // prices — a Superior-only set the store does NOT have. The card total
+    // must stay 100, not 100 + catalog leftovers.
+    render(
+      <Wrapper>
+        <OwnerStoreCard
+          store={makeOwnerStore({ id: 'a2', planType: 'Pago' })}
+          modules={[
+            paidModule({ id: 2, name: 'Statistics', price: 100, currentPrice: 100, selected: true }),
+            paidModule({ id: 13, name: 'Warehouses', price: 500, currentPrice: 500, selected: false }),
+            paidModule({ id: 14, name: 'MultiStores', price: 500, currentPrice: 500, selected: false }),
+          ]}
+          onEdit={vi.fn()}
+          onEditPlan={vi.fn()}
+        />
+      </Wrapper>,
+    );
+    // Anchored: '1,100 USD' (catalog leftovers summed in) must NOT pass —
+    // substring matching would let it slip through '100 USD'.
+    expect(screen.getByTestId('owner-store-price-a2')).toHaveTextContent(/^100 USD$/);
+  });
+
+  it('renders no price line when no paid module is selected (free store against the full catalog)', async () => {
+    const { OwnerStoreCard } = await import('../owner-store-card');
+    render(
+      <Wrapper>
+        <OwnerStoreCard
+          store={makeOwnerStore({ id: 'a3', planType: 'Gratis', nextDueDate: null })}
+          modules={[
+            paidModule({ id: 13, name: 'Warehouses', price: 500, currentPrice: 500, selected: false }),
+          ]}
+          onEdit={vi.fn()}
+          onEditPlan={vi.fn()}
+        />
+      </Wrapper>,
+    );
+    expect(screen.queryByTestId('owner-store-price-a3')).not.toBeInTheDocument();
+  });
 });

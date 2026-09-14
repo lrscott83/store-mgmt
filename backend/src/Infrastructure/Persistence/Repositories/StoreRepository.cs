@@ -22,7 +22,11 @@ namespace Infrastructure.Persistence.Repositories
             IQueryable<Store> query = _stores
                 .Where(s => s.Owner != null && s.Owner.IsActive && s.Owner.UserId == userId && s.IsActive)
                 .Include(s => s.Owner)
-                    .ThenInclude(o => o.User);
+                    .ThenInclude(o => o.User)
+                // Only ACTIVE rows — the by-current-user listing derives the store
+                // price from this snapshot (parity E2E StoreListPriceParityTests).
+                .Include(s => s.StoreModules.Where(sm => sm.IsActive))
+                    .ThenInclude(sm => sm.Module);
 
             if (excludeStoreId.HasValue)
                 query = query.Where(s => s.Id != excludeStoreId.Value);
@@ -39,11 +43,13 @@ namespace Infrastructure.Persistence.Repositories
             // IgnoreQueryFilters here; tenant isolation is not part of this change.
             // StoreModules + Module are loaded so the DTO mapping gets the store's
             // own price snapshot (the plain active-listing repo never includes them).
+            // Only ACTIVE rows: soft-deleted leftovers from plan changes must never
+            // leak an old price into the listings (parity E2E StoreListPriceParityTests).
             IQueryable<Store> query = _stores
                 .Where(s => s.Owner != null && s.Owner.UserId == userId)
                 .Include(s => s.Owner)
                     .ThenInclude(o => o.User)
-                .Include(s => s.StoreModules)
+                .Include(s => s.StoreModules.Where(sm => sm.IsActive))
                     .ThenInclude(sm => sm.Module);
 
             if (excludeStoreId.HasValue)
@@ -58,12 +64,14 @@ namespace Infrastructure.Persistence.Repositories
             // AND inactive — same shape as GetAllStoresIncludingOwnerAndIgnoreQueryFiltersAsync
             // (IgnoreQueryFilters is what grants the cross-tenant reach; the SuperAdmin
             // claim is the only caller of this method) plus the StoreModules snapshot.
+            // Only ACTIVE rows — parity with GetStoreByIdIncludingModulesAsync (see
+            // StoreListPriceParityTests).
             IQueryable<Store> query = _stores
                 .IgnoreQueryFilters()
                 .Where(s => s.Owner != null)
                 .Include(s => s.Owner)
                     .ThenInclude(o => o.User)
-                .Include(s => s.StoreModules)
+                .Include(s => s.StoreModules.Where(sm => sm.IsActive))
                     .ThenInclude(sm => sm.Module);
 
             if (excludeStoreId.HasValue)
@@ -91,11 +99,13 @@ namespace Infrastructure.Persistence.Repositories
             // StoreModules + Module are loaded so the DTO mapping gets the store's own
             // price snapshot (ModuleProfile's StoreModule map reads sm.Module fields;
             // EF Core has no lazy-loading here, so the navigation must be included) —
-            // same shape as GetAllStoresWithModulesAsync below.
+            // same shape as GetAllStoresWithModulesAsync below. Only ACTIVE rows:
+            // soft-deleted leftovers from plan changes must never leak a price into
+            // the superadmin listing (parity E2E StoreListPriceParityTests).
             IQueryable<Store> query = _stores
                 .Include(s => s.Owner)
                     .ThenInclude(o => o.User)
-                .Include(s => s.StoreModules)
+                .Include(s => s.StoreModules.Where(sm => sm.IsActive))
                     .ThenInclude(sm => sm.Module)
                 .IgnoreQueryFilters();
 
