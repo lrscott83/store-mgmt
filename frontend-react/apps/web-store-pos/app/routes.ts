@@ -136,6 +136,10 @@ export default [
     // Profile â€” User profile management
     route('profile/edit', 'profile/routes/edit-profile.tsx'),
     route('profile/change-password', 'profile/routes/change-password.tsx'),
+
+    // Diagnostics — client-error-log ring buffer viewer (client-error-log plan).
+    // adminLoader = SuperAdmin or OwnerAdmin only; the menu item gates the same set.
+    route('diagnostics', 'diagnostics/routes/diagnostics.tsx'),
   ]),
 
   // Help â€” Tutorial (PUBLIC â€” mirrors Angular's app-routing.module.ts:89-97,

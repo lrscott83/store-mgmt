@@ -1,6 +1,7 @@
 import { showBlockingError } from '../blocking-alert';
 import messages from '../i18n/es';
 import { useAuthStore } from '../stores/auth-store';
+import { logClientError } from '../diagnostics/client-log';
 
 // Note for anyone tidying imports: these three are static here, but
 // `auth-store.ts` reaches BACK for `resetDecryptionFailureLatch` through a
@@ -73,6 +74,14 @@ export function handleDecryptionFailure(error: unknown): boolean {
   if (kind === null) return false;
   if (announced) return true;
   announced = true;
+
+  // client-error-log: a decryption failure is the hardest field bug to
+  // reproduce — it MUST leave a trace in the diagnostic buffer before logout.
+  logClientError({
+    level: 'error',
+    message: `Decryption failure (${kind}): session ended`,
+    location: error instanceof Error ? error.stack : undefined,
+  });
 
   showBlockingError(
     messages['GENERAL.ERROR'],

@@ -12,6 +12,8 @@ import type { Route } from './+types/root';
 import { I18nProvider } from '~/shared/lib/i18n/i18n-provider';
 import messages from '~/shared/lib/i18n/es';
 import { registerServiceWorker } from '~/shared/lib/pwa/service-worker-registration';
+import { installClientLog } from '~/shared/lib/diagnostics/install-client-log';
+import { logClientError } from '~/shared/lib/diagnostics/client-log';
 import { useStoreUsageTracker } from '~/shared/lib/usage/use-store-usage-tracker';
 import { registerAuthRedirect, willLogoutRedirect } from '~/shared/lib/stores/auth-store';
 import { useLoadingStore } from '~/shared/lib/stores/loading-store';
@@ -29,6 +31,10 @@ import '@store-mgmt/web-common/styles.css';
 import 'react-toastify/ReactToastify.css';
 
 export function Layout({ children }: { children: React.ReactNode }) {
+  // client-error-log: global capture hooks mount BEFORE anything else so even
+  // boot-time errors land in the diagnostic ring buffer (/diagnostics view).
+  installClientLog();
+
   return (
     <html lang="es">
       <head>
@@ -138,6 +144,15 @@ export function HydrateFallback() {
 }
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
+  // client-error-log: a route-level error lands in the diagnostic buffer before
+  // any policy decides what to show — this is the only trace a blank-page bug
+  // leaves on a device in the field.
+  logClientError({
+    level: 'error',
+    message: error instanceof Error ? error.message : String(error),
+    location: error instanceof Error ? error.stack : undefined,
+  });
+
   // design D5, seam 2: a decryption failure THROWN during render or in a
   // loader never becomes an unhandled rejection, so the listener above cannot
   // see it — react-router routes it here instead.
