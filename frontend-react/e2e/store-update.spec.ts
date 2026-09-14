@@ -6,12 +6,16 @@ import { E2E_API_URL } from './support/backend-url';
 import { readBearerToken } from './support/auth-storage';
 
 /**
- * [Plan/update split] — the store-DATA update view (`/management/stores/update`)
- * saves WITHOUT `moduleIds` (the backend leaves the plan untouched), the menu
- * shows the store links under the same authorization, and the plan survives a
- * data-only save with an identical module set. The shared "Plan de la tienda"
- * menu entry was removed — the plan is reached from each card's gear in
- * Mis tiendas.
+ * [Plan/update split] — the store-DATA update view
+ * (`/management/stores/edit/:id`) saves WITHOUT `moduleIds` (the backend
+ * leaves the plan untouched), the menu shows the store links under the same
+ * authorization, and the plan survives a data-only save with an identical
+ * module set. The shared "Plan de la tienda" menu entry was removed — the
+ * plan is reached from each card's gear in Mis tiendas; and the old
+ * `/management/stores/update` route + "Editar la tienda" menu link no longer
+ * exist (routes.ts:74-93 — data editing lives at `edit/:id`, reached from the
+ * admin store list or directly; the owner's my-stores card opens the
+ * EditStoreModal instead).
  *
  * The PLAN half of the split is already covered end to end by
  * `store-plan-activation.spec.ts`; this file covers only what that file
@@ -55,16 +59,20 @@ test('la vista Update guarda datos sin tocar el plan y el menú ya no muestra el
   // adminFeatureLoader desloguea (loaders.ts). Fallo ruidoso y temprano.
   await assertStoresFeature(page);
 
-  // Menú: el enlace "Mis tiendas" y el de Update comparten la misma feature.
-  // El enlace "Plan de la tienda" ya no existe en el menú general — el plan se
-  // alcanza vía el engranaje de cada tarjeta en Mis tiendas (owner-store-card).
+  // Menú: el enlace "Mis tiendas" existe bajo la misma feature Stores. Los
+  // enlaces viejos ya no existen: ni "Plan de la tienda" (el plan se alcanza
+  // vía el engranaje de cada tarjeta en Mis tiendas, owner-store-card), ni
+  // "Editar la tienda" (la ruta /management/stores/update murió con el split
+  // plan/update — routes.ts:74-93; la edición de datos vive en edit/:id).
   await page.getByRole('button', { name: 'Alternar barra lateral' }).click();
-  await expect(page.getByRole('link', { name: 'Editar la tienda' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Mis tiendas' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Plan de la tienda' })).toHaveCount(0);
-  await page.getByRole('link', { name: 'Editar la tienda' }).click();
+  await expect(page.getByRole('link', { name: 'Editar la tienda' })).toHaveCount(0);
 
-  // Vista Update: formulario de DATOS sin el picker de plan.
-  await page.waitForURL(/\/management\/stores\/update$/);
+  // Vista Update: formulario de DATOS sin el picker de plan — reached by URL
+  // (the route is feature-gated the same way the dead menu link was; the
+  // clientLoader enforces EFeatures.Stores exactly as before).
+  await page.goto(`/management/stores/edit/${selectedStoreId}`);
   await expect(page.getByRole('heading', { name: 'Editar la tienda' })).toBeVisible();
   await expect(page.locator('#store-name')).toBeVisible();
   await expect(page.getByRole('tab')).toHaveCount(0);

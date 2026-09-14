@@ -24,8 +24,7 @@ namespace Infrastructure.Persistence.Repositories
             var query = _users
                 .Where(u => (includeInactive || u.IsActive)
                     && u.StoreUser != null && u.StoreUser.StoreId == storeId
-                    && u.StoreUser.User != null && u.StoreUser.User.IsActive
-                    && u.StoreUser.Store != null && u.StoreUser.Store.IsActive 
+                    && u.StoreUser.Store != null && u.StoreUser.Store.IsActive
                     && u.StoreUser.Store.Owner != null && u.StoreUser.Store.Owner.IsActive);
 
             query = IncludeStoreAndRoles(query);
