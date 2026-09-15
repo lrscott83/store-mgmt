@@ -79,7 +79,13 @@ namespace Application.Features.Authentication.Queries.GetMe
                 var store = await _storeRepository.Where(s => s.Id == user.SelectedStoreId)
                     .IgnoreQueryFilters().FirstOrDefaultAsync();
                 if (store is not null && !store.IsActive)
+                {
+                    // store-deactivation-session-revocation: parity with the
+                    // user-inactive branch — the verdict also kills the token so
+                    // the SAME access token cannot keep polling /me.
+                    await BlacklistCurrentTokenAsync();
                     return ResponseResult.Failure<CurrentUserDto>(StoreErrors.Inactive, (int)HttpStatusCode.NotFound);
+                }
 
                 // Check if the store's owner is active
                 if (store is not null)
@@ -87,7 +93,10 @@ namespace Application.Features.Authentication.Queries.GetMe
                     var owner = await _ownerRepository.Where(o => o.Id == store.OwnerId)
                         .IgnoreQueryFilters().FirstOrDefaultAsync();
                     if (owner is not null && !owner.IsActive)
+                    {
+                        await BlacklistCurrentTokenAsync();
                         return ResponseResult.Failure<CurrentUserDto>(OwnerErrors.Inactive, (int)HttpStatusCode.NotFound);
+                    }
                 }
             }
 
