@@ -42,6 +42,7 @@ namespace Application.Features.StoreManagement.Stores.Commands.UpdateStore
         private readonly IStoreRoleFeatureGenerator _storeRoleFeaturesGenerator;
         private readonly IHttpContextService _httpContextService;
         private readonly IStringLocalizer<I18n> _localizer;
+        private readonly IStoreSessionRevocationService _storeSessionRevocationService;
 
         public UpdateStoreCommandHandler(
             IApplicationUnitOfWork applicationUnitOfWork,
@@ -53,7 +54,8 @@ namespace Application.Features.StoreManagement.Stores.Commands.UpdateStore
             IGetStoreByIdService storeByIdService,
             IFeatureRepository featureRepository,
             IStoreRoleFeatureGenerator storeRoleFeaturesGenerator,
-            IStoreRoleFeatureRepository storeRoleFeatureRepository)
+            IStoreRoleFeatureRepository storeRoleFeatureRepository,
+            IStoreSessionRevocationService storeSessionRevocationService)
         {
             _applicationUnitOfWork = applicationUnitOfWork;
             _httpContextService = httpContextService;
@@ -65,6 +67,7 @@ namespace Application.Features.StoreManagement.Stores.Commands.UpdateStore
             _featureRepository = featureRepository;
             _storeRoleFeaturesGenerator = storeRoleFeaturesGenerator;
             _storeRoleFeatureRepository = storeRoleFeatureRepository;
+            _storeSessionRevocationService = storeSessionRevocationService;
         }
 
         public async Task<ResponseResult<bool>> Handle(UpdateStoreCommand request, CancellationToken cancellationToken)
@@ -101,11 +104,19 @@ namespace Application.Features.StoreManagement.Stores.Commands.UpdateStore
             store.Name = request.Name;
             store.Address = request.Address;
             
+            // Capture the transition BEFORE the SuperAdmin block: revocation fires
+            // only on true→false (store-deactivation-session-revocation). Reactivation
+            // and same-value PUTs must not re-run the pass.
+            var wasActive = store.IsActive;
+
             if (_httpContextService.IsSuperAdmin)
             {
                 store.Description = request.Description;
                 store.Approved = request.Approved;
                 store.IsActive = request.IsActive;
+
+                if (wasActive && !store.IsActive)
+                    await _storeSessionRevocationService.RevokeStoreSessionsAsync(store.Id, cancellationToken);
             }
 
             // Explicit PaymentStartDate (SuperAdmin only) is the ONLY way this command writes

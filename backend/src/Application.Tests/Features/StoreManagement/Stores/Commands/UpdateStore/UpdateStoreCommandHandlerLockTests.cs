@@ -36,6 +36,7 @@ public class UpdateStoreCommandHandlerLockTests
     private readonly Mock<IFeatureRepository> _mockFeatureRepository;
     private readonly Mock<IStoreRoleFeatureGenerator> _mockStoreRoleFeaturesGenerator;
     private readonly Mock<IStoreRoleFeatureRepository> _mockStoreRoleFeatureRepository;
+    private readonly Mock<IStoreSessionRevocationService> _mockSessionRevocationService;
     private readonly UpdateStoreCommandHandler _handler;
 
     private readonly Guid _storeId = Guid.NewGuid();
@@ -53,6 +54,7 @@ public class UpdateStoreCommandHandlerLockTests
         _mockFeatureRepository = new Mock<IFeatureRepository>();
         _mockStoreRoleFeaturesGenerator = new Mock<IStoreRoleFeatureGenerator>();
         _mockStoreRoleFeatureRepository = new Mock<IStoreRoleFeatureRepository>();
+        _mockSessionRevocationService = new Mock<IStoreSessionRevocationService>();
 
         _mockLocalizer
             .Setup(x => x["PlanLocked"])
@@ -68,7 +70,8 @@ public class UpdateStoreCommandHandlerLockTests
             _mockStoreByIdService.Object,
             _mockFeatureRepository.Object,
             _mockStoreRoleFeaturesGenerator.Object,
-            _mockStoreRoleFeatureRepository.Object);
+            _mockStoreRoleFeatureRepository.Object,
+            _mockSessionRevocationService.Object);
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────
@@ -341,5 +344,77 @@ public class UpdateStoreCommandHandlerLockTests
 
         result.Succeeded.Should().BeTrue();
         store.PaymentStartDate.Should().Be(new DateOnly(2026, 7, 1));
+    }
+
+    // ── store-deactivation-session-revocation: SuperAdmin IsActive hook ───
+
+    [Fact]
+    public async Task Handle_SuperAdminDeactivatesActiveStore_RevokesStoreSessions()
+    {
+        // IsActive in UpdateStore is SuperAdmin-only; the true→false transition
+        // must revoke the affected set's refresh tokens in the same transaction.
+        var command = new UpdateStoreCommand(
+            _storeId, "Renamed", null, null, Approved: false,
+            ModuleIds: new List<int> { 7 }, IsActive: false);
+        var store = BuildFreeStore(); // active by construction
+        _mockHttpContextService.Setup(x => x.IsSuperAdminOrOwnerAdmin).Returns(true);
+        _mockHttpContextService.Setup(x => x.IsSuperAdmin).Returns(true);
+        _mockStoreByIdService.Setup(x => x.GetStoreByIdIncludingModulesAsync(_storeId)).ReturnsAsync(store);
+        ArrangeDownstream(store, store.StoreModules.ToList(), command.ModuleIds!);
+
+        var result = await _handler.Handle(command, CancellationToken.None);
+
+        result.Succeeded.Should().BeTrue();
+        store.IsActive.Should().BeFalse();
+        _mockSessionRevocationService.Verify(
+            x => x.RevokeStoreSessionsAsync(_storeId, CancellationToken.None),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_SuperAdminReactivatesOrSameValue_DoesNotRevoke()
+    {
+        // false→true (reactivation) and same-value false (already inactive) must
+        // not run the revocation pass; also covers OwnerAdmin calls that never
+        // reach the IsActive assignment.
+        var command = new UpdateStoreCommand(
+            _storeId, "Renamed", null, null, Approved: false,
+            ModuleIds: new List<int> { 7 }, IsActive: false);
+        var store = BuildFreeStore();
+        store.IsActive = false; // same-value deactivation
+        _mockHttpContextService.Setup(x => x.IsSuperAdminOrOwnerAdmin).Returns(true);
+        _mockHttpContextService.Setup(x => x.IsSuperAdmin).Returns(true);
+        _mockStoreByIdService.Setup(x => x.GetStoreByIdIncludingModulesAsync(_storeId)).ReturnsAsync(store);
+        ArrangeDownstream(store, store.StoreModules.ToList(), command.ModuleIds!);
+
+        var result = await _handler.Handle(command, CancellationToken.None);
+
+        result.Succeeded.Should().BeTrue();
+        _mockSessionRevocationService.Verify(
+            x => x.RevokeStoreSessionsAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_OwnerAdminUpdateNeverTouchesIsActive_NoRevocation()
+    {
+        // OwnerAdmin cannot set IsActive through UpdateStore (SuperAdmin-only
+        // branch); their update must never trigger revocation.
+        var command = new UpdateStoreCommand(
+            _storeId, "Renamed", null, null, Approved: false,
+            ModuleIds: new List<int> { 7 }, IsActive: false);
+        var store = BuildFreeStore(); // active; OwnerAdmin branch must not flip it
+        _mockHttpContextService.Setup(x => x.IsSuperAdminOrOwnerAdmin).Returns(true);
+        _mockHttpContextService.Setup(x => x.IsSuperAdmin).Returns(false);
+        _mockStoreByIdService.Setup(x => x.GetStoreByIdIncludingModulesAsync(_storeId)).ReturnsAsync(store);
+        ArrangeDownstream(store, store.StoreModules.ToList(), command.ModuleIds!);
+
+        var result = await _handler.Handle(command, CancellationToken.None);
+
+        result.Succeeded.Should().BeTrue();
+        store.IsActive.Should().BeTrue("OwnerAdmin updates never assign IsActive");
+        _mockSessionRevocationService.Verify(
+            x => x.RevokeStoreSessionsAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 }

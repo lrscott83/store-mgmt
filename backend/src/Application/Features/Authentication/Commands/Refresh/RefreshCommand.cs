@@ -6,6 +6,7 @@ using Application.UnitOfWorks;
 using Domain.Common.Results;
 using Domain.Entities.Authentication;
 using Domain.Interfaces.Repositories;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System.Net;
@@ -19,6 +20,8 @@ internal sealed class RefreshCommandHandler : ICommandHandler<RefreshCommand, Au
     private readonly IRefreshTokenRepository _refreshTokenRepository;
     private readonly IJwtProvider _jwtProvider;
     private readonly IUserRepository _userRepository;
+    private readonly IStoreRepository _storeRepository;
+    private readonly IOwnerRepository _ownerRepository;
     private readonly AuthenticationSettings _authSettings;
     private readonly ILogger<RefreshCommandHandler> _logger;
     private readonly IApplicationUnitOfWork _applicationUnitOfWork;
@@ -29,11 +32,15 @@ internal sealed class RefreshCommandHandler : ICommandHandler<RefreshCommand, Au
         IUserRepository userRepository,
         IOptions<AuthenticationSettings> authSettings,
         ILogger<RefreshCommandHandler> logger,
-        IApplicationUnitOfWork applicationUnitOfWork)
+        IApplicationUnitOfWork applicationUnitOfWork,
+        IStoreRepository storeRepository,
+        IOwnerRepository ownerRepository)
     {
         _refreshTokenRepository = refreshTokenRepository;
         _jwtProvider = jwtProvider;
         _userRepository = userRepository;
+        _storeRepository = storeRepository;
+        _ownerRepository = ownerRepository;
         _authSettings = authSettings.Value;
         _logger = logger;
         _applicationUnitOfWork = applicationUnitOfWork;
@@ -66,6 +73,39 @@ internal sealed class RefreshCommandHandler : ICommandHandler<RefreshCommand, Au
                     (int)HttpStatusCode.Unauthorized);
             }
 
+            // 2b. Activation-state matrix (store-deactivation-session-revocation):
+            // mirror /me's three checks so a deactivation cannot be outlived by
+            // token rotation. Unlike /me (which blacklists the caller's access
+            // token), refresh has no access token in hand — revoking AND saving
+            // the presented refresh token is the enforcement (refresh-token-
+            // persistence R4 carve-out: activation-state failures DO save).
+            if (!user.IsActive)
+                return await RejectAndRevokeAsync(existingToken, "Auth.AccountInactive", "Account is inactive.", cancellationToken);
+
+            if (user.SelectedStoreId != Guid.Empty)
+            {
+                // Same IgnoreQueryFilters lookups as GetMeQuery: the store may be
+                // tenant-hidden or already inactive — both must be visible here.
+                var store = await _storeRepository
+                    .Where(s => s.Id == user.SelectedStoreId)
+                    .IgnoreQueryFilters()
+                    .FirstOrDefaultAsync(cancellationToken);
+
+                if (store is not null && !store.IsActive)
+                    return await RejectAndRevokeAsync(existingToken, "Store.Inactive", "The store is inactive.", cancellationToken);
+
+                if (store is not null)
+                {
+                    var owner = await _ownerRepository
+                        .Where(o => o.Id == store.OwnerId)
+                        .IgnoreQueryFilters()
+                        .FirstOrDefaultAsync(cancellationToken);
+
+                    if (owner is not null && !owner.IsActive)
+                        return await RejectAndRevokeAsync(existingToken, "Owner.Inactive", "The owner is inactive.", cancellationToken);
+                }
+            }
+
             // 3. Generate new access token
             string newAccessToken = _jwtProvider.GenerateToken(user.Id, user.Login);
 
@@ -95,5 +135,20 @@ internal sealed class RefreshCommandHandler : ICommandHandler<RefreshCommand, Au
             var error = new Error("Auth.ServiceError", "An unexpected error occurred. Please try again.");
             return ResponseResult.Failure<AuthDto>(new List<Error> { error }, (int)HttpStatusCode.InternalServerError);
         }
+    }
+
+    /// <summary>
+    /// Activation-state rejection: 401 with the same domain error codes /me uses,
+    /// plus revocation of the presented refresh token so the session cannot
+    /// resurrect through rotation. The revocation is saved (R4 carve-out).
+    /// </summary>
+    private async Task<ResponseResult<AuthDto>> RejectAndRevokeAsync(RefreshToken token, string code, string message, CancellationToken cancellationToken)
+    {
+        token.Revoke();
+        _refreshTokenRepository.Update(token);
+        await _applicationUnitOfWork.SaveChangesAsync(cancellationToken);
+        return ResponseResult.Failure<AuthDto>(
+            new Error(code, message),
+            (int)HttpStatusCode.Unauthorized);
     }
 }

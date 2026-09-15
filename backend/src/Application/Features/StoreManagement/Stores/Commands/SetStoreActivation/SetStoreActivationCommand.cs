@@ -27,19 +27,22 @@ namespace Application.Features.StoreManagement.Stores.Commands.SetStoreActivatio
         private readonly IApplicationUnitOfWork _applicationUnitOfWork;
         private readonly IHttpContextService _httpContextService;
         private readonly IStringLocalizer<I18n> _localizer;
+        private readonly IStoreSessionRevocationService _storeSessionRevocationService;
 
         public SetStoreActivationCommandHandler(
             IStoreRepository storeRepository,
             IGetStoreByIdService storeByIdService,
             IApplicationUnitOfWork applicationUnitOfWork,
             IHttpContextService httpContextService,
-            IStringLocalizer<I18n> localizer)
+            IStringLocalizer<I18n> localizer,
+            IStoreSessionRevocationService storeSessionRevocationService)
         {
             _storeRepository = storeRepository;
             _storeByIdService = storeByIdService;
             _applicationUnitOfWork = applicationUnitOfWork;
             _httpContextService = httpContextService;
             _localizer = localizer;
+            _storeSessionRevocationService = storeSessionRevocationService;
         }
 
         public async Task<ResponseResult<bool>> Handle(SetStoreActivationCommand request, CancellationToken cancellationToken)
@@ -61,7 +64,18 @@ namespace Application.Features.StoreManagement.Stores.Commands.SetStoreActivatio
             if (store.Id == Domain.Common.Constants.DataUtils.DefaultStore.Id)
                 throw new ApiException(_localizer["DontHavePermission"], HttpStatusCode.Forbidden);
 
+            // Capture the transition BEFORE the flip: revocation fires only on
+            // true→false (store-deactivation-session-revocation). Same-value PUTs
+            // (A-13 idempotency) and reactivations must not re-run the pass —
+            // revoked tokens stay revoked; reactivation restores login, not
+            // sessions.
+            var wasActive = store.IsActive;
+
             store.IsActive = request.IsActive;
+
+            if (wasActive && !store.IsActive)
+                await _storeSessionRevocationService.RevokeStoreSessionsAsync(store.Id, cancellationToken);
+
             await _storeRepository.UpdateAsync(store);
             return ResponseResult.Success(await _applicationUnitOfWork.SaveChangesAsync(cancellationToken) > 0);
         }
