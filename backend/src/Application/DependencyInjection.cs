@@ -49,6 +49,7 @@ namespace Application
             services.AddScoped<IRoleFilter, RoleFilter>();
 
             services.AddScoped<IGetStoreByIdService, GetStoreByIdService>();
+            services.AddScoped<IStoreSessionRevocationService, StoreSessionRevocationService>();
             services.AddScoped<ICreateStoreService, CreateStoreService>();
             services.AddScoped<IAllowedFeaturesService, AllowedFeaturesService>();
 

@@ -17,6 +17,14 @@ namespace Domain.Interfaces.Repositories
         Task<User?> GetByLoginWithRelatedAsync(string login, CancellationToken cancellationToken);
         Task SetOfflinePasswordPreHashIfNullAsync(Guid userId, string envelope, CancellationToken cancellationToken);
 
+        /// <summary>
+        /// Blast-radius query for store deactivation: ids of every user whose
+        /// SelectedStoreId points at the given store. Filter-free (SuperAdmin-driven
+        /// deactivations cross tenants) and Store.IsActive-free (the store is already
+        /// inactive when the revocation pass runs).
+        /// </summary>
+        Task<IEnumerable<Guid>> GetUserIdsBySelectedStoreIdIgnoreQueryFiltersAsync(Guid storeId, CancellationToken cancellationToken);
+
         new Task<bool> ExistsAsync(Guid id, CancellationToken cancellationToken = default);
     }
 }
