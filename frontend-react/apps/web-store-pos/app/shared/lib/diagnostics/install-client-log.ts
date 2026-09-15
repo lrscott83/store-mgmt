@@ -63,6 +63,9 @@ function onOnline(): void {
 
 /** Mount the global hooks. Idempotent — a second call is a no-op. */
 export function installClientLog(): void {
+  // Client-only: also runs during the SPA prerender (react-router build),
+  // where `window` does not exist and there is no client console to capture.
+  if (typeof window === 'undefined') return;
   if (installed) return;
   installed = true;
 
