@@ -55,7 +55,7 @@ test.describe.serial('Diagnóstico (SuperAdmin)', () => {
     await expect(page.locator('text=error').first()).toBeVisible();
   });
 
-  it('filters entries by level', async ({ page }) => {
+  test('filters entries by level', async ({ page }) => {
     await applySuperAdminSnapshot(page, superAdmin);
     await page.goto('/diagnostics');
     await expect(page.getByRole('heading', { name: TITLE })).toBeVisible();
@@ -72,7 +72,7 @@ test.describe.serial('Diagnóstico (SuperAdmin)', () => {
     await expect(page.getByText(/e2e-filter-error-probe/)).toBeHidden();
   });
 
-  it('downloads the export as client-log-*.json (desktop fallback, no navigator.share)', async ({ page }) => {
+  test('downloads the export as client-log-*.json (desktop fallback, no navigator.share)', async ({ page }) => {
     await applySuperAdminSnapshot(page, superAdmin);
     await page.goto('/diagnostics');
     await expect(page.getByRole('heading', { name: TITLE })).toBeVisible();
@@ -88,7 +88,7 @@ test.describe.serial('Diagnóstico (SuperAdmin)', () => {
     expect(download.suggestedFilename()).toMatch(/^client-log-\d{8}-\d{4}\.json$/);
   });
 
-  it('clears the buffer after confirming the Swal dialog', async ({ page }) => {
+  test('clears the buffer after confirming the Swal dialog', async ({ page }) => {
     await applySuperAdminSnapshot(page, superAdmin);
     await page.goto('/diagnostics');
     await expect(page.getByRole('heading', { name: TITLE })).toBeVisible();
