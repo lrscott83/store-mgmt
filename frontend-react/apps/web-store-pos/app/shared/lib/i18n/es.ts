@@ -1131,6 +1131,26 @@ const messages: Record<string, string> = {
     'No se pudo abrir la información de esta tienda. Inicie sesión con conexión o importe un roster para recuperarla.',
   'ENCRYPTION.DATA_DAMAGED':
     'La información guardada en este dispositivo está dañada y no se pudo leer. No se borró nada.',
+  // Damaged-data recovery (plan: docs/plans/2026-09-15-damaged-data-recovery-
+  // export-wipe-plan.md §4). The popup text above does NOT change — these label
+  // the flow its two buttons open: download what is still readable, then ask a
+  // second time before wiping this store's data on this device.
+  'ENCRYPTION.RECOVERY_ACTION': 'Recuperar datos',
+  'ENCRYPTION.RECOVERY_DISMISS': 'Ahora no',
+  'ENCRYPTION.RECOVERY_CONFIRM_TITLE': 'Borrar los datos de esta tienda',
+  'ENCRYPTION.RECOVERY_CONFIRM_MESSAGE':
+    '¿Ya guardaste el archivo? Al continuar se borrarán los datos de esta tienda en este dispositivo.',
+  'ENCRYPTION.RECOVERY_CONFIRM_BUTTON': 'Sí, borrar',
+  // Deliberately its own key rather than reusing GENERAL.CANCEL: this one is
+  // read as the paired secondary button of the confirmation above, and must be
+  // able to diverge from the general-purpose label.
+  'ENCRYPTION.RECOVERY_CANCEL_BUTTON': 'Cancelar',
+  'ENCRYPTION.RECOVERY_KEPT': 'No se borró nada.',
+  'ENCRYPTION.RECOVERY_WIPED':
+    'Los datos de esta tienda se borraron de este dispositivo. Vuelva a iniciar sesión para empezar de nuevo.',
+  // Followed by the list of entity names clearStoreData could not remove.
+  'ENCRYPTION.RECOVERY_WIPED_PARTIAL':
+    'Se borraron los datos de esta tienda, pero no se pudieron borrar las siguientes entidades: ',
 };
 
 export default messages;

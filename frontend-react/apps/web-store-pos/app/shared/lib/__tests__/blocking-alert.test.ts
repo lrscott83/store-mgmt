@@ -15,6 +15,7 @@ import {
   confirmDialog,
   showAcknowledgeError,
   showBlockingError,
+  showDamagedDataRecoveryDialog,
   showUpdateAvailable,
 } from '../blocking-alert';
 
@@ -123,6 +124,50 @@ describe('showAcknowledgeError', () => {
       cancelButtonColor: '#dc3545',
       confirmButtonText: 'Ok',
     });
+  });
+});
+
+describe('showDamagedDataRecoveryDialog', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  // Damaged-data recovery (plan: docs/plans/2026-09-15-damaged-data-recovery-
+  // export-wipe-plan.md §4): the SAME error popup `showBlockingError` fires for
+  // unreadable data, plus the two translated buttons. `showBlockingError` is
+  // the shape it must stay comparable to, so the two are asserted side by side
+  // in this file: identical icon and text, only the buttons differ.
+  it('keeps the error icon and both explicit button texts, and resolves true only on confirm', async () => {
+    fireMock.mockResolvedValue({ isConfirmed: true });
+
+    const result = await showDamagedDataRecoveryDialog(
+      'Error',
+      'La información guardada en este dispositivo está dañada y no se pudo leer. No se borró nada.',
+      { confirmButtonText: 'Recuperar datos', cancelButtonText: 'Ahora no' },
+    );
+
+    expect(fireMock).toHaveBeenCalledWith({
+      title: 'Error',
+      text: 'La información guardada en este dispositivo está dañada y no se pudo leer. No se borró nada.',
+      icon: 'error',
+      showCancelButton: true,
+      confirmButtonColor: '#3456ff',
+      cancelButtonColor: '#dc3545',
+      confirmButtonText: 'Recuperar datos',
+      cancelButtonText: 'Ahora no',
+    });
+    expect(result).toBe(true);
+  });
+
+  it('resolves false on "Ahora no", so the caller deletes nothing', async () => {
+    fireMock.mockResolvedValue({ isConfirmed: false });
+
+    const result = await showDamagedDataRecoveryDialog('Error', 'texto', {
+      confirmButtonText: 'Recuperar datos',
+      cancelButtonText: 'Ahora no',
+    });
+
+    expect(result).toBe(false);
   });
 });
 

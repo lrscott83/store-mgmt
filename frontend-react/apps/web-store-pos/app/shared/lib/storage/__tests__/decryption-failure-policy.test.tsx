@@ -4,21 +4,43 @@ import { MissingDataKeyError } from '../entity-crypto';
 import { EntityUnreadableError } from '../read-entity-or-throw';
 import { DekUnwrapError } from '../../offline/dek-unwrap';
 
+const STORE_ID = 's1';
+
 const showBlockingErrorMock = vi.fn();
+// The damaged branch's popup. Same text as `showBlockingError`, plus the two
+// buttons of the recovery flow; resolves `false` (the user chose "Ahora no")
+// unless a test says otherwise.
+const showDamagedDataRecoveryDialogMock = vi.fn();
 vi.mock('../../blocking-alert', () => ({
   showBlockingError: (...args: unknown[]) => showBlockingErrorMock(...args),
+  showDamagedDataRecoveryDialog: (...args: unknown[]) => showDamagedDataRecoveryDialogMock(...args),
 }));
 
 const logoutMock = vi.fn();
 // Defaults to true: the ordinary case, where App() mounted first and registered
 // the router's navigate. The cold-boot tests below flip it to false.
 const willLogoutRedirectMock = vi.fn(() => true);
+// The user the damaged branch reads `selectedStoreId` from — mutable, because
+// "there is no store to recover" is one of the branches under test. Read
+// lazily inside `getState()`, so the hoisted `vi.mock` factory is safe.
+let mockAuthUser: { selectedStoreId?: string } | null = { selectedStoreId: STORE_ID };
 vi.mock('../../stores/auth-store', () => ({
-  useAuthStore: { getState: () => ({ logout: logoutMock }) },
+  useAuthStore: { getState: () => ({ logout: logoutMock, user: mockAuthUser }) },
   // root.tsx (imported by the ErrorBoundary-route suite at the bottom of this
   // file) pulls these from the same module.
   registerAuthRedirect: vi.fn(),
   willLogoutRedirect: () => willLogoutRedirectMock(),
+}));
+
+// The recovery module: mocked so this file owns the policy and not the wipe.
+// Both halves matter here — `collectRecoveryBundle` is what the policy runs
+// SYNCHRONOUSLY (before the logout), `offerRecoveryAfterDamage` is what only a
+// confirmed "Recuperar datos" may reach.
+const collectRecoveryBundleMock = vi.fn();
+const offerRecoveryAfterDamageMock = vi.fn();
+vi.mock('../damaged-data-recovery', () => ({
+  collectRecoveryBundle: (...args: unknown[]) => collectRecoveryBundleMock(...args),
+  offerRecoveryAfterDamage: (...args: unknown[]) => offerRecoveryAfterDamageMock(...args),
 }));
 
 // root.tsx's module graph, stubbed only far enough to import it. None of these
@@ -41,10 +63,41 @@ const KEY_UNAVAILABLE =
   'No se pudo abrir la información de esta tienda. Inicie sesión con conexión o importe un roster para recuperarla.';
 const DATA_DAMAGED =
   'La información guardada en este dispositivo está dañada y no se pudo leer. No se borró nada.';
+// The two buttons the damaged popup gained. Texts come from `es.ts`, which the
+// policy reads; pinned here so a renamed key cannot silently render the raw id.
+const RECOVERY_ACTION = 'Recuperar datos';
+const RECOVERY_DISMISS = 'Ahora no';
+
+const RECOVERY_BUNDLE = {
+  meta: {
+    kind: 'damaged-recovery',
+    formatVersion: 1,
+    storeId: STORE_ID,
+    exportedAt: '2026-09-15T12:00:00.000Z',
+    appVersion: '1.0.0',
+  },
+  entities: [],
+};
+
+const RECOVERY_BUTTONS = {
+  confirmButtonText: RECOVERY_ACTION,
+  cancelButtonText: RECOVERY_DISMISS,
+};
+
+/** Let every already-queued microtask (and the `setTimeout` macrotask that
+ * follows them) run, so a `.then` chain chained off a resolved dialog has
+ * certainly had its chance before an assertion says it never happened. */
+function flushAsyncWork(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
 
 beforeEach(() => {
   vi.clearAllMocks();
   willLogoutRedirectMock.mockReturnValue(true);
+  mockAuthUser = { selectedStoreId: STORE_ID };
+  showDamagedDataRecoveryDialogMock.mockResolvedValue(false);
+  collectRecoveryBundleMock.mockReturnValue(RECOVERY_BUNDLE);
+  offerRecoveryAfterDamageMock.mockResolvedValue({ status: 'kept' });
   resetDecryptionFailureLatch();
 });
 
@@ -91,17 +144,101 @@ describe('handleDecryptionFailure', () => {
     expect(handleDecryptionFailure(new MissingDataKeyError())).toBe(true);
     expect(showBlockingErrorMock).toHaveBeenCalledWith('Error', KEY_UNAVAILABLE);
     expect(logoutMock).toHaveBeenCalledTimes(1);
+    // A missing key is recoverable by a login or a roster import, so no
+    // recovery flow is offered — and nothing is read from storage.
+    expect(showDamagedDataRecoveryDialogMock).not.toHaveBeenCalled();
+    expect(collectRecoveryBundleMock).not.toHaveBeenCalled();
   });
 
   it('tells the truth on damaged data — no promise of recovery — and still signs out', () => {
     expect(handleDecryptionFailure(new EntityUnreadableError('k', new Error('tag')))).toBe(true);
+
+    expect(showDamagedDataRecoveryDialogMock).toHaveBeenCalledTimes(1);
+    expect(showDamagedDataRecoveryDialogMock).toHaveBeenCalledWith(
+      'Error',
+      DATA_DAMAGED,
+      RECOVERY_BUTTONS,
+    );
+    // The same message, now with a way out — and never BOTH popups.
+    expect(showBlockingErrorMock).not.toHaveBeenCalled();
+    expect(logoutMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('captures the store BEFORE the logout — the DEK is gone once logout() returns', () => {
+    handleDecryptionFailure(new EntityUnreadableError('k', new Error('tag')));
+
+    expect(collectRecoveryBundleMock).toHaveBeenCalledWith(STORE_ID);
+    // Order, not just presence: `logout()` calls `clearDek()`, so a capture
+    // that ran after it could only ever see raw ciphertext and the readable
+    // entities would be lost. `invocationCallOrder` is used rather than a
+    // side-effect assertion inside the mock, because the policy wraps the
+    // capture in a try/catch and would swallow a throwing expectation.
+    expect(collectRecoveryBundleMock.mock.invocationCallOrder[0]).toBeLessThan(
+      logoutMock.mock.invocationCallOrder[0] as number,
+    );
+    expect(logoutMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('confirms → runs the recovery with the bundle captured before the logout', async () => {
+    showDamagedDataRecoveryDialogMock.mockResolvedValue(true);
+
+    handleDecryptionFailure(new EntityUnreadableError('k', new Error('tag')));
+    await flushAsyncWork();
+
+    expect(offerRecoveryAfterDamageMock).toHaveBeenCalledWith(RECOVERY_BUNDLE);
+  });
+
+  it('"Ahora no" → nothing is recovered and nothing is deleted', async () => {
+    showDamagedDataRecoveryDialogMock.mockResolvedValue(false);
+
+    handleDecryptionFailure(new EntityUnreadableError('k', new Error('tag')));
+    await flushAsyncWork();
+
+    expect(showDamagedDataRecoveryDialogMock).toHaveBeenCalledTimes(1);
+    expect(offerRecoveryAfterDamageMock).not.toHaveBeenCalled();
+    // The capture itself still ran — it has to, or the DEK would already be
+    // gone by the time the user clicks. It is a read of this store's entities
+    // and nothing else: no wipe is reachable without a confirmation.
+    expect(collectRecoveryBundleMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('a user with no store gets the plain single-button popup — there is nothing to recover', () => {
+    mockAuthUser = {};
+
+    expect(handleDecryptionFailure(new EntityUnreadableError('k', new Error('tag')))).toBe(true);
+
     expect(showBlockingErrorMock).toHaveBeenCalledWith('Error', DATA_DAMAGED);
+    expect(showDamagedDataRecoveryDialogMock).not.toHaveBeenCalled();
+    expect(collectRecoveryBundleMock).not.toHaveBeenCalled();
+    expect(logoutMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('no signed-in user at all: same plain popup, not a crash', () => {
+    mockAuthUser = null;
+
+    expect(handleDecryptionFailure(new EntityUnreadableError('k', new Error('tag')))).toBe(true);
+
+    expect(showBlockingErrorMock).toHaveBeenCalledWith('Error', DATA_DAMAGED);
+    expect(showDamagedDataRecoveryDialogMock).not.toHaveBeenCalled();
+    expect(logoutMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('a capture that fails is not fatal: the plain popup, and the session still ends', () => {
+    collectRecoveryBundleMock.mockImplementation(() => {
+      throw new Error('storage exploded');
+    });
+
+    expect(handleDecryptionFailure(new EntityUnreadableError('k', new Error('tag')))).toBe(true);
+
+    expect(showBlockingErrorMock).toHaveBeenCalledWith('Error', DATA_DAMAGED);
+    expect(showDamagedDataRecoveryDialogMock).not.toHaveBeenCalled();
     expect(logoutMock).toHaveBeenCalledTimes(1);
   });
 
   it('does nothing at all for an unrelated error', () => {
     expect(handleDecryptionFailure(new TypeError('unrelated'))).toBe(false);
     expect(showBlockingErrorMock).not.toHaveBeenCalled();
+    expect(showDamagedDataRecoveryDialogMock).not.toHaveBeenCalled();
     expect(logoutMock).not.toHaveBeenCalled();
   });
 
@@ -123,6 +260,11 @@ describe('handleDecryptionFailure', () => {
     handleDecryptionFailure(new MissingDataKeyError());
     handleDecryptionFailure(new EntityUnreadableError('k', new Error('tag')));
     expect(showBlockingErrorMock).toHaveBeenCalledTimes(1);
+    // The damaged failure was latched, so it neither speaks nor captures: a
+    // second popup would offer a recovery for data the first one already
+    // accounted for.
+    expect(showDamagedDataRecoveryDialogMock).not.toHaveBeenCalled();
+    expect(collectRecoveryBundleMock).not.toHaveBeenCalled();
     expect(logoutMock).toHaveBeenCalledTimes(1);
   });
 
@@ -229,7 +371,12 @@ describe('ErrorBoundary delivery route (design D5, seam 2)', () => {
   it('announces damaged data that arrived as a THROW, and signs the user out', async () => {
     const { container } = await renderBoundary(new EntityUnreadableError('k', new Error('tag')));
 
-    expect(showBlockingErrorMock).toHaveBeenCalledWith('Error', DATA_DAMAGED);
+    expect(showDamagedDataRecoveryDialogMock).toHaveBeenCalledWith(
+      'Error',
+      DATA_DAMAGED,
+      RECOVERY_BUTTONS,
+    );
+    expect(showBlockingErrorMock).not.toHaveBeenCalled();
     expect(logoutMock).toHaveBeenCalledTimes(1);
     expect(container).toBeEmptyDOMElement();
   });
