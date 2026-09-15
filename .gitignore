@@ -166,5 +166,8 @@ appsettings.Production.json
 # graphify code-knowledge graph (local build artifact)
 graphify-out/
 
+# codegraph code-knowledge index (local build artifact, one per worktree)
+.codegraph/
+
 # Pi harness local state
 .pi/
