@@ -20,6 +20,7 @@ public class SetStoreActivationCommandHandlerTests
     private readonly Mock<IApplicationUnitOfWork> _mockUnitOfWork;
     private readonly Mock<IHttpContextService> _mockHttpContextService;
     private readonly Mock<IStringLocalizer<I18n>> _mockLocalizer;
+    private readonly Mock<IStoreSessionRevocationService> _mockSessionRevocationService;
     private readonly SetStoreActivationCommandHandler _handler;
 
     public SetStoreActivationCommandHandlerTests()
@@ -29,6 +30,7 @@ public class SetStoreActivationCommandHandlerTests
         _mockUnitOfWork = new Mock<IApplicationUnitOfWork>();
         _mockHttpContextService = new Mock<IHttpContextService>();
         _mockLocalizer = new Mock<IStringLocalizer<I18n>>();
+        _mockSessionRevocationService = new Mock<IStoreSessionRevocationService>();
         _mockUnitOfWork.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(1);
         _handler = new SetStoreActivationCommandHandler(
@@ -36,7 +38,8 @@ public class SetStoreActivationCommandHandlerTests
             _mockStoreByIdService.Object,
             _mockUnitOfWork.Object,
             _mockHttpContextService.Object,
-            _mockLocalizer.Object);
+            _mockLocalizer.Object,
+            _mockSessionRevocationService.Object);
     }
 
     [Fact]
@@ -128,6 +131,63 @@ public class SetStoreActivationCommandHandlerTests
 
         result.Succeeded.Should().BeTrue();
         store.IsActive.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Handle_deactivation_true_to_false_revokes_store_sessions()
+    {
+        // store-deactivation-session-revocation: the deactivation ACT revokes the
+        // affected set's refresh tokens in the same transaction as the flag flip.
+        ArrangeRoles(isSuperAdminOrOwnerAdmin: true);
+        _mockHttpContextService.Setup(x => x.IsSuperAdmin).Returns(false);
+        var store = CreateStore(isActive: true);
+        ArrangeStore(store);
+
+        var result = await _handler.Handle(
+            new SetStoreActivationCommand(store.Id, false), CancellationToken.None);
+
+        result.Succeeded.Should().BeTrue();
+        _mockSessionRevocationService.Verify(
+            x => x.RevokeStoreSessionsAsync(store.Id, CancellationToken.None),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_reactivation_false_to_true_does_not_revoke()
+    {
+        // Revocation is one-way: a reactivation must not touch sessions (revoked
+        // tokens stay revoked; users log in again).
+        ArrangeRoles(isSuperAdminOrOwnerAdmin: true);
+        _mockHttpContextService.Setup(x => x.IsSuperAdmin).Returns(false);
+        var store = CreateStore(isActive: false);
+        ArrangeStore(store);
+
+        var result = await _handler.Handle(
+            new SetStoreActivationCommand(store.Id, true), CancellationToken.None);
+
+        result.Succeeded.Should().BeTrue();
+        _mockSessionRevocationService.Verify(
+            x => x.RevokeStoreSessionsAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_same_value_deactivation_does_not_revoke()
+    {
+        // A-13 idempotency: same-value PUT keeps 200 semantics; the revocation pass
+        // must not re-run (tokens were already revoked by the first flip).
+        ArrangeRoles(isSuperAdminOrOwnerAdmin: true);
+        _mockHttpContextService.Setup(x => x.IsSuperAdmin).Returns(false);
+        var store = CreateStore(isActive: false);
+        ArrangeStore(store);
+
+        var result = await _handler.Handle(
+            new SetStoreActivationCommand(store.Id, false), CancellationToken.None);
+
+        result.Succeeded.Should().BeTrue();
+        _mockSessionRevocationService.Verify(
+            x => x.RevokeStoreSessionsAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 
     private void ArrangeRoles(bool isSuperAdminOrOwnerAdmin)

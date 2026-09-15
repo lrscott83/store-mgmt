@@ -52,6 +52,21 @@ namespace Infrastructure.Persistence.Repositories
             return await query.OrderBy(u => u.Id).Take(1000).ToListAsync(cancellationToken);
         }
 
+        public async Task<IEnumerable<Guid>> GetUserIdsBySelectedStoreIdIgnoreQueryFiltersAsync(Guid storeId, CancellationToken cancellationToken)
+        {
+            // Store-deactivation blast radius: every user whose session store is the
+            // deactivated store. No tenant filter (SuperAdmin deactivations cross
+            // tenants), no Store.IsActive predicate (the store is already inactive
+            // here — the filtered GetAllUsersByStoreIdIncludingStoreAndRolesAsync
+            // would return an empty set).
+            return await _users
+                .IgnoreQueryFilters()
+                .Where(u => u.SelectedStoreId == storeId)
+                .Select(u => u.Id)
+                .Distinct()
+                .ToListAsync(cancellationToken);
+        }
+
         private IQueryable<User> IncludeStoreAndRoles(IQueryable<User> query)
         {
             return query
