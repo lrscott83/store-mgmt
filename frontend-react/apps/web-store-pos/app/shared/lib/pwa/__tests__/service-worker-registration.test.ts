@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { UPDATE_POLL_INTERVAL_MS } from '../service-worker-registration';
 import type { RegisterSWOptions } from '../service-worker-registration';
 
 // ── PWA-SW-1/2 (Stage 6 Slice D — Periodic Update Check) ────────────────────
@@ -12,7 +13,9 @@ vi.mock('sweetalert2', () => ({
   default: { fire: vi.fn().mockResolvedValue({ isConfirmed: false }) },
 }));
 
-const POLL_INTERVAL_MS = 15 * 60 * 1000;
+// Advance by the real configured interval (not a hardcoded copy) so this
+// stays accurate if the production interval is ever tuned again.
+const POLL_INTERVAL_MS = UPDATE_POLL_INTERVAL_MS;
 
 describe('setupServiceWorker — PWA-SW-1: polls registration.update() on the configured interval', () => {
   beforeEach(() => {
