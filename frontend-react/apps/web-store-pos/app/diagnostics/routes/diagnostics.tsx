@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useIntl } from 'react-intl';
 import { adminLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
@@ -51,8 +51,35 @@ export function DiagnosticsPage() {
   }, [entries, levelFilter, search]);
 
   function refresh(): void {
-    setEntries(getClientLogs());
+    setEntries((prev) => {
+      const next = getClientLogs();
+      // Keep referential equality when nothing changed so a 1s poll never
+      // forces a re-render of the list on idle screens.
+      const prevLast = prev[prev.length - 1];
+      const nextLast = next[next.length - 1];
+      if (prev.length === next.length && prevLast?.ts === nextLast?.ts) return prev;
+      return next;
+    });
   }
+
+  useEffect(() => {
+    refresh();
+    // Poll the localStorage buffer: `installClientLog` writes console.error /
+    // window error / online-offline entries there, but nothing notifies this
+    // page when a NEW entry lands (localStorage `storage` events never fire in
+    // the same tab). Without this, /diagnostics only shows the snapshot taken
+    // at mount and a failure reported while the page is open stays invisible.
+    const pollId = window.setInterval(refresh, 1000);
+    // Same-tab immediacy: refresh right away on actual window errors/rejections
+    // instead of waiting up to the poll tick.
+    window.addEventListener('error', refresh);
+    window.addEventListener('unhandledrejection', refresh);
+    return () => {
+      window.clearInterval(pollId);
+      window.removeEventListener('error', refresh);
+      window.removeEventListener('unhandledrejection', refresh);
+    };
+  }, []);
 
   async function handleShare(): Promise<void> {
     const json = exportClientLogs(selectedStoreId ?? undefined);

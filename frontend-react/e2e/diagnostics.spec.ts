@@ -52,7 +52,10 @@ test.describe.serial('Diagnóstico (SuperAdmin)', () => {
     await expect(page.getByText(/e2e-console-error-probe/)).toBeVisible();
     await expect(page.getByText(/e2e-uncaught-probe/)).toBeVisible();
     // The uncaught exception carries level "error" — verify the level styling exists.
-    await expect(page.locator('text=error').first()).toBeVisible();
+    // Anchor to the entry row: a bare `text=error`.first() can match the hidden
+    // <option value="error"> of the level filter instead of the entry's level span.
+    const errorEntry = page.locator('li', { hasText: /e2e-uncaught-probe/ });
+    await expect(errorEntry.getByText('error', { exact: true })).toBeVisible();
   });
 
   test('filters entries by level', async ({ page }) => {

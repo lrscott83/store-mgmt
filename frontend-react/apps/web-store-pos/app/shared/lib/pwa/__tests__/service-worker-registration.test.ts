@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { UPDATE_POLL_INTERVAL_MS } from '../service-worker-registration';
 import type { RegisterSWOptions } from '../service-worker-registration';
 
 // ── PWA-SW-1/2 (Stage 6 Slice D — Periodic Update Check) ────────────────────
@@ -12,10 +13,9 @@ vi.mock('sweetalert2', () => ({
   default: { fire: vi.fn().mockResolvedValue({ isConfirmed: false }) },
 }));
 
-// Must mirror UPDATE_POLL_INTERVAL_MS in service-worker-registration.ts —
-// commit c1612654 shortened the poll from 15 to 5 minutes but left this
-// constant at 15, so the assertion counted 1 call where 3 had already fired.
-const POLL_INTERVAL_MS = 5 * 60 * 1000;
+// Advance by the real configured interval (not a hardcoded copy) so this
+// stays accurate if the production interval is ever tuned again.
+const POLL_INTERVAL_MS = UPDATE_POLL_INTERVAL_MS;
 
 describe('setupServiceWorker — PWA-SW-1: polls registration.update() on the configured interval', () => {
   beforeEach(() => {

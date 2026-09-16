@@ -5,7 +5,7 @@ import { showUpdateAvailable } from '~/shared/lib/blocking-alert';
 // Angular's `UpdateService` (SwUpdate → Swal confirm → activateUpdate +
 // reload) plus the periodic-check requirement so a long-lived open tab
 // discovers a new version without a manual reload.
-const UPDATE_POLL_INTERVAL_MS = 5 * 60 * 1000;
+export const UPDATE_POLL_INTERVAL_MS = 5 * 60 * 1000;
 
 export interface RegisterSWOptions {
   onNeedRefresh?: () => void;

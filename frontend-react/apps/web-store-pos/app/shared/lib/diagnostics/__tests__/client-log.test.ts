@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 // ── client-error-log: ring buffer de diagnóstico en localStorage ────────────
 // Contrato (docs/plans/2026-09-14-client-error-log-pwa-plan.md):
@@ -64,6 +64,15 @@ describe('logClientError — ring buffer y cap 200 (FIFO)', () => {
 describe('logClientError — prune > 7 días', () => {
   beforeEach(() => {
     localStorage.clear();
+    // Freeze the clock: `appendEntry` computes its own cutoff with `Date.now()`,
+    // so a real clock would advance a few ms between the setup timestamp and
+    // the write, spuriously pruning an entry placed exactly on the boundary.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-01-15T12:00:00Z'));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('drops entries older than 7 days on write', async () => {

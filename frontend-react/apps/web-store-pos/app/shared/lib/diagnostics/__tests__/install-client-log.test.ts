@@ -104,6 +104,50 @@ describe('installClientLog — captura global', () => {
   });
 });
 
+describe('installClientLog — seguridad en prerender (regresión de build)', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    localStorage.clear();
+  });
+
+  it('es no-op durante el prerender SPA (window undefined): no lanza y no captura', async () => {
+    const { installClientLog } = await import('../install-client-log');
+    const { getClientLogs } = await import('../client-log');
+
+    // El prerender de react-router (build) ejecuta root.tsx sin `window`.
+    // Antes del guard, esto lanzaba ReferenceError y abortaba el build.
+    vi.stubGlobal('window', undefined);
+    expect(typeof window).toBe('undefined');
+
+    expect(() => installClientLog()).not.toThrow();
+
+    // Sin window no se montan hooks: un console.error no debe quedar en el buffer.
+    console.error('prerender probe');
+    expect(getClientLogs()).toHaveLength(0);
+  });
+
+  it('tras el no-op de prerender, con window presente vuelve a instalar y captura', async () => {
+    const { installClientLog, uninstallClientLog } = await import('../install-client-log');
+    const { getClientLogs } = await import('../client-log');
+
+    vi.stubGlobal('window', undefined);
+    installClientLog(); // no-op en prerender — no marca `installed`
+
+    vi.unstubAllGlobals(); // simula el hidratado en el navegador
+    installClientLog();
+
+    console.error('browser probe');
+    expect(getClientLogs()).toHaveLength(1);
+    expect(getClientLogs()[0].message).toContain('browser probe');
+
+    uninstallClientLog();
+  });
+});
+
 describe('uninstallClientLog — restauración completa', () => {
   beforeEach(() => {
     localStorage.clear();
