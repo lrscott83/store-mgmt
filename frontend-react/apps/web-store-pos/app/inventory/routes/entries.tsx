@@ -16,6 +16,16 @@ import type { LocalDayGroup } from '~/shared/lib/date-utils';
 import { EntryList } from '../components/entry-list';
 import { round2 } from '~/shared/lib/money';
 import { formatCurrency } from '~/shared/lib/format-currency';
+import { useMultiStore } from '~/shared/lib/hooks/use-multi-store';
+import {
+  MultiStoreSection,
+  MultiStoreTotal,
+} from '~/shared/components/multistore/multi-store-section';
+import {
+  groupEntryViewsByDay,
+  readStoreEntryViews,
+  unwrapStoreDek,
+} from '~/shared/lib/multistore/multi-store-aggregator';
 
 export const clientLoader = featureLoader([EFeatures.EntriesHistory]);
 
@@ -41,6 +51,10 @@ export const clientLoader = featureLoader([EFeatures.EntriesHistory]);
  * only on the separate Today Entries screen, `today-entries.component.html:7,24`, which passes
  * `[readOnly]="false"`). React mirrors this exactly: `EntryList` is rendered with `readOnly`,
  * and there is no add-entry button/modal here.
+ *
+ * multi-store-panels: OwnerAdmin + MultiStores + ≥2 tiendas activas → un panel
+ * colapsable por tienda con su acordeón por día, totales por tienda en la
+ * cabecera y agregado fuera. Sin MultiStores la vista es idéntica.
  */
 export function EntriesPage() {
   const intl = useIntl();
@@ -51,6 +65,11 @@ export function EntriesPage() {
   const isOwnerAdmin = user ? checkIsOwnerAdmin(user) : false;
   const [dayGroups, setDayGroups] = useState<LocalDayGroup<InventoryEntryView>[]>([]);
   const [expandedDayIds, setExpandedDayIds] = useState<Set<string>>(new Set());
+  const { enabled: multiStoreEnabled, stores: multiStoreStores } = useMultiStore();
+  const [storeEntryViews, setStoreEntryViews] = useState<Map<string, InventoryEntryView[]>>(
+    new Map(),
+  );
+  const [selectedMultiStoreId, setSelectedMultiStoreId] = useState<string | null>(null);
 
   function loadEntries() {
     const productRepository = new ProductRepository(
@@ -81,6 +100,27 @@ export function EntriesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- loadEntries reads only storeId
   }, [storeId]);
 
+  // multi-store-panels: per-store active entry views (read-only, per-store DEK).
+  useEffect(() => {
+    if (!multiStoreEnabled) {
+      setStoreEntryViews(new Map());
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      const entries = await Promise.all(
+        multiStoreStores.map(async (store) => {
+          const dek = await unwrapStoreDek(store.id);
+          return [store.id, readStoreEntryViews(store.id, dek)] as const;
+        }),
+      );
+      if (!cancelled) setStoreEntryViews(new Map(entries));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [multiStoreEnabled, multiStoreStores]);
+
   function toggleDayPanel(dayId: string) {
     setExpandedDayIds((prev) => {
       const next = new Set(prev);
@@ -98,6 +138,103 @@ export function EntriesPage() {
     (total, d) => total + d.items.reduce((t, e) => t + round2(e.costPrice * e.quantity), 0),
     0,
   );
+
+  // ─── multi-store mode ────────────────────────────────────────────────────
+  if (multiStoreEnabled) {
+    const visibleStoreIds =
+      selectedMultiStoreId === null
+        ? multiStoreStores.map((s) => s.id)
+        : [selectedMultiStoreId];
+    const totals = visibleStoreIds.reduce(
+      (acc, id) => {
+        for (const entry of storeEntryViews.get(id) ?? []) {
+          acc.count += entry.quantity;
+          acc.total = round2(acc.total + entry.costPrice * entry.quantity);
+        }
+        return acc;
+      },
+      { count: 0, total: 0 },
+    );
+
+    return (
+      <Card padding="tight" title={intl.formatMessage({ id: 'INVENTORY.ENTRIES.TITLE' })}>
+        <MultiStoreSection
+          stores={multiStoreStores}
+          selectedStoreId={selectedMultiStoreId}
+          onSelectedStoreIdChange={setSelectedMultiStoreId}
+          totals={
+            <MultiStoreTotal
+              label={intl.formatMessage({ id: 'INVENTORY.ENTRIES.TITLE' })}
+              value={totals.total}
+              valueClassName="text-primary"
+            />
+          }
+          renderStoreTotals={(store) => {
+            const entries = storeEntryViews.get(store.id) ?? [];
+            const total = entries.reduce((t, e) => t + round2(e.costPrice * e.quantity), 0);
+            const count = entries.reduce((c, e) => c + e.quantity, 0);
+            return (
+              <MultiStoreTotal label={`(${count})`} value={total} valueClassName="text-primary" />
+            );
+          }}
+        >
+          {(store) => {
+            const entries = storeEntryViews.get(store.id) ?? [];
+            if (entries.length === 0) {
+              return (
+                <div className="py-4 text-center text-text-muted">
+                  {intl.formatMessage({ id: 'MULTISTORE.NO_LOCAL_DATA' })}
+                </div>
+              );
+            }
+            // Same day-grouping as the single-store view (oldest day first).
+            return (
+              <div className="space-y-2">
+                {groupEntryViewsByDay(entries).map((dayGroup) => {
+                  const dayId = dayGroup.dayKey;
+                  const key = `${store.id}:${dayId}`;
+                  const isExpanded = expandedDayIds.has(key);
+                  return (
+                    <div key={key} className="rounded border border-border">
+                      <button
+                        type="button"
+                        onClick={() => toggleDayPanel(key)}
+                        className="flex w-full items-center justify-between gap-2 px-2 py-2 text-left"
+                        data-testid={`multistore-entry-day-toggle-${store.id}-${dayId}`}
+                        aria-expanded={isExpanded}
+                      >
+                        <span className="text-xs font-medium text-text">
+                          {formatLocalDate(dayGroup.date)}
+                        </span>
+                        <span className="flex items-center gap-2">
+                          <span className="text-xs font-semibold text-primary whitespace-nowrap">
+                            {formatCurrency(
+                              round2(
+                                dayGroup.items.reduce(
+                                  (total, e) => total + e.costPrice * e.quantity,
+                                  0,
+                                ),
+                              ),
+                            )}
+                          </span>
+                          <ChevronDownIcon isExpanded={isExpanded} className="text-text-muted" />
+                        </span>
+                      </button>
+                      {isExpanded && (
+                        <div className="border-t border-border px-2 py-2">
+                          <EntryList entries={dayGroup.items} readOnly isOwnerAdmin={isOwnerAdmin} />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          }}
+        </MultiStoreSection>
+      </Card>
+    );
+  }
 
   return (
     <Card

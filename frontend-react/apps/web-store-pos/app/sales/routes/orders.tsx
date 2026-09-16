@@ -23,6 +23,16 @@ import { OrderList } from '../components/order-list';
 import { DaySalesSummaryModal } from '../components/day-sales-summary-modal';
 import type { DaySalesSummary } from '../components/day-sales-summary-modal';
 import { formatCurrency } from '~/shared/lib/format-currency';
+import { useMultiStore } from '~/shared/lib/hooks/use-multi-store';
+import {
+  MultiStoreSection,
+  MultiStoreTotal,
+} from '~/shared/components/multistore/multi-store-section';
+import {
+  groupOrdersByDay,
+  readStoreOrders,
+  unwrapStoreDek,
+} from '~/shared/lib/multistore/multi-store-aggregator';
 
 export const clientLoader = featureLoader([EFeatures.SalesHistory]);
 
@@ -40,6 +50,10 @@ const PAYMENT_TYPE_OPTIONS = [
  * today report's isActive filter. Rule 12: no shared aggregation service is invented
  * on the React side — the today report keeps its computation inline in the route file,
  * so this day-scoped variant lives here too.
+ *
+ * multi-store-panels: the multi-store mode replicates this per store from the
+ * store's own read-only orders (`readStoreOrders`), never instantiating the
+ * write-capable offline service for another store.
  */
 function computeDaySalesSummary(storeId: string, dateId: string): DaySalesSummary {
   const orderService = new OrderOfflineService(storeId);
@@ -66,12 +80,46 @@ function computeDaySalesSummary(storeId: string, dateId: string): DaySalesSummar
   };
 }
 
+/** multi-store-panels: per-store day summary from read-only orders (same math as above). */
+function computeMultiStoreDaySummary(orders: Order[], dateId: string): DaySalesSummary {
+  const day = fromLocalDayKey(dateId);
+  const dayStart = new Date(day);
+  const dayEnd = new Date(day);
+  dayEnd.setDate(dayEnd.getDate() + 1);
+  const dayOrders = orders.filter((o) => o.isActive && o.date >= dayStart && o.date < dayEnd);
+
+  let totalRevenue = 0;
+  let totalCost = 0;
+
+  for (const order of dayOrders) {
+    for (const item of order.orderItems) {
+      const result = calculateOrderProfit(item);
+      totalRevenue = round2(totalRevenue + result.revenue);
+      totalCost = round2(totalCost + result.cost);
+    }
+  }
+
+  return {
+    date: day,
+    orderCount: dayOrders.length,
+    totalRevenue,
+    totalCost,
+    totalProfit: round2(totalRevenue - totalCost),
+  };
+}
+
 /**
  * Matches Angular's `orders.component.html` (Historial de Ventas): payment-type
  * + isCredit radio filters, orders grouped by day into an accordion, each date
  * panel wraps `OrderList` (read-only, no edit/delete actions — Angular's
  * `app-order-list` here has no `[readOnly]` binding, default `true`). No date
  * range picker exists in Angular; the React-only range inputs are removed.
+ *
+ * multi-store-panels: OwnerAdmin + MultiStores + ≥2 tiendas activas → los
+ * filtros (tipo de pago / pagadas-créditos) son GLOBALES fuera de los
+ * paneles, un panel colapsable por tienda con su acordeón por día (con las
+ * mismas acciones del día, scopeadas a esa tienda) y totales fuera de los
+ * paneles. Sin MultiStores la vista es idéntica a la original.
  */
 export function OrdersPage() {
   const intl = useIntl();
@@ -81,6 +129,9 @@ export function OrdersPage() {
   const [paymentType, setPaymentType] = useState<PaymentType | null>(null);
   const [isCredit, setIsCredit] = useState<number>(-1);
   const [daySummary, setDaySummary] = useState<DaySalesSummary | null>(null);
+  const { enabled: multiStoreEnabled, stores: multiStoreStores } = useMultiStore();
+  const [storeOrders, setStoreOrders] = useState<Map<string, Order[]>>(new Map());
+  const [selectedMultiStoreId, setSelectedMultiStoreId] = useState<string | null>(null);
 
   function loadOrders() {
     const service = new OrderOfflineService(storeId);
@@ -105,6 +156,36 @@ export function OrdersPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- loadOrders reads only the listed deps
   }, [storeId, paymentType, isCredit]);
 
+  // multi-store-panels: raw per-store orders (read-only, per-store DEK);
+  // the global payment/credit filters apply across all stores below.
+  useEffect(() => {
+    if (!multiStoreEnabled) {
+      setStoreOrders(new Map());
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      const entries = await Promise.all(
+        multiStoreStores.map(async (store) => {
+          const dek = await unwrapStoreDek(store.id);
+          return [store.id, readStoreOrders(store.id, dek)] as const;
+        }),
+      );
+      if (!cancelled) setStoreOrders(new Map(entries));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [multiStoreEnabled, multiStoreStores]);
+
+  const multiFilteredOrders = (orders: Order[]): Order[] =>
+    orders
+      .filter((o) => o.isActive)
+      .filter((o) => !paymentType || paymentType === o.paymentType)
+      .filter(
+        (o) => isCredit === -1 || (isCredit === 1 && o.isCredit) || (isCredit === 0 && !o.isCredit),
+      );
+
   function toggleDatePanel(dateId: string) {
     setExpandedDateIds((prev) => {
       const next = new Set(prev);
@@ -123,11 +204,11 @@ export function OrdersPage() {
   // verbatim for the filename. The report counts ALL active orders, matching the
   // today report (isActive only).
   const handleGenerateDayReport = useCallback(
-    async (dateId: string) => {
-      const categoryRepository = new ProductCategoryRepository(storeId);
-      const productRepository = new ProductRepository(storeId, categoryRepository);
-      const orderService = new OrderOfflineService(storeId);
-      const inventoryService = new InventoryOfflineService(storeId, productRepository);
+    async (storeIdForReport: string, dateId: string) => {
+      const categoryRepository = new ProductCategoryRepository(storeIdForReport);
+      const productRepository = new ProductRepository(storeIdForReport, categoryRepository);
+      const orderService = new OrderOfflineService(storeIdForReport);
+      const inventoryService = new InventoryOfflineService(storeIdForReport, productRepository);
 
       const products = productRepository.getAvailableProducts();
       const orders = orderService.getStorageOrders().filter((o) => o.isActive);
@@ -153,7 +234,7 @@ export function OrdersPage() {
       }
       await exportInventoryTodaySalePdf(rows, `${dateId}_ipv.pdf`);
     },
-    [storeId, intl],
+    [intl],
   );
 
   const ordersCount = groups.reduce((count, g) => count + g.items.length, 0);
@@ -161,6 +242,190 @@ export function OrdersPage() {
     (total, g) => total + g.items.reduce((t, o) => t + o.total, 0),
     0,
   );
+
+  // ─── multi-store mode ────────────────────────────────────────────────────
+  if (multiStoreEnabled) {
+    const visibleStoreIds =
+      selectedMultiStoreId === null
+        ? multiStoreStores.map((s) => s.id)
+        : [selectedMultiStoreId];
+    const totals = visibleStoreIds.reduce(
+      (acc, id) => {
+        for (const order of multiFilteredOrders(storeOrders.get(id) ?? [])) {
+          acc.count += 1;
+          acc.total = round2(acc.total + order.total);
+        }
+        return acc;
+      },
+      { count: 0, total: 0 },
+    );
+
+    return (
+      <Card padding="tight" title={intl.formatMessage({ id: 'ORDERS.TITLE' })}>
+        <MultiStoreSection
+          stores={multiStoreStores}
+          selectedStoreId={selectedMultiStoreId}
+          onSelectedStoreIdChange={setSelectedMultiStoreId}
+          filters={
+            <>
+              <fieldset className="flex flex-wrap items-center gap-4">
+                <label className="flex items-center gap-1 text-sm text-text">
+                  <input
+                    type="radio"
+                    name="multistore-paymentType"
+                    checked={paymentType === null}
+                    onChange={() => setPaymentType(null)}
+                    className="accent-primary"
+                  />
+                  Todas
+                </label>
+                {PAYMENT_TYPE_OPTIONS.map((opt) => (
+                  <label key={opt.value} className="flex items-center gap-1 text-sm text-text">
+                    <input
+                      type="radio"
+                      name="multistore-paymentType"
+                      checked={paymentType === opt.value}
+                      onChange={() => setPaymentType(opt.value)}
+                      className="accent-primary"
+                    />
+                    {opt.label}
+                  </label>
+                ))}
+              </fieldset>
+              <fieldset className="flex flex-wrap items-center gap-4">
+                <label className="flex items-center gap-1 text-sm text-text">
+                  <input
+                    type="radio"
+                    name="multistore-isCredit"
+                    checked={isCredit === -1}
+                    onChange={() => setIsCredit(-1)}
+                    className="accent-primary"
+                  />
+                  Todas
+                </label>
+                <label className="flex items-center gap-1 text-sm text-text">
+                  <input
+                    type="radio"
+                    name="multistore-isCredit"
+                    checked={isCredit === 0}
+                    onChange={() => setIsCredit(0)}
+                    className="accent-primary"
+                  />
+                  Pagadas
+                </label>
+                <label className="flex items-center gap-1 text-sm text-text">
+                  <input
+                    type="radio"
+                    name="multistore-isCredit"
+                    checked={isCredit === 1}
+                    onChange={() => setIsCredit(1)}
+                    className="accent-primary"
+                  />
+                  <span className="text-warning">Créditos</span>
+                </label>
+              </fieldset>
+            </>
+          }
+          totals={
+            <MultiStoreTotal
+              label={intl.formatMessage({ id: 'ORDERS.TITLE' })}
+              value={totals.total}
+            />
+          }
+          renderStoreTotals={(store) => {
+            const filtered = multiFilteredOrders(storeOrders.get(store.id) ?? []);
+            const total = filtered.reduce((t, o) => t + o.total, 0);
+            return <MultiStoreTotal label={`(${filtered.length})`} value={total} />;
+          }}
+        >
+          {(store) => {
+            const filtered = multiFilteredOrders(storeOrders.get(store.id) ?? []);
+            if (filtered.length === 0) {
+              return (
+                <div className="py-4 text-center text-text-muted">
+                  {intl.formatMessage({ id: 'MULTISTORE.NO_LOCAL_DATA' })}
+                </div>
+              );
+            }
+            // Same day-grouping as the single-store view (newest day first),
+            // with the same per-day actions scoped to this store.
+            return (
+              <div className="space-y-2">
+                {groupOrdersByDay(filtered).map((g) => {
+                  const dateId = g.dayKey;
+                  const key = `${store.id}:${dateId}`;
+                  const isExpanded = expandedDateIds.has(key);
+                  return (
+                    <div key={key} className="rounded border border-border">
+                      <div className="flex items-center gap-1 px-2 py-2">
+                        <button
+                          type="button"
+                          onClick={() => toggleDatePanel(key)}
+                          className="flex w-full items-center justify-between gap-2 text-left"
+                          data-testid={`multistore-date-panel-toggle-${store.id}-${dateId}`}
+                          aria-expanded={isExpanded}
+                        >
+                          <span className="text-xs font-medium text-text">
+                            {formatLocalDate(g.date)} ({g.items.length})
+                          </span>
+                          <span className="flex items-center gap-2">
+                            <span className="text-xs font-semibold text-text whitespace-nowrap">
+                              {formatCurrency(g.items.reduce((t, o) => t + o.total, 0))}
+                            </span>
+                            <ChevronDownIcon isExpanded={isExpanded} className="text-text-muted" />
+                          </span>
+                        </button>
+                        <ActionMenu
+                          testId={`multistore-day-actions-toggle-${store.id}-${dateId}`}
+                          label="Opciones del día"
+                          widthClass="min-w-52"
+                        >
+                          {/* PDF export uses the write-capable offline services
+                              (auto-init) — only safe against the SELECTED store,
+                              whose DEK is the global one. Other stores keep the
+                              read-only day summary. */}
+                          {store.id === storeId && (
+                            <ActionMenuItem
+                              intent="edit"
+                              icon={<DownloadIcon />}
+                              onClick={() => void handleGenerateDayReport(store.id, dateId)}
+                              data-testid={`multistore-day-report-button-${store.id}-${dateId}`}
+                            >
+                              {intl.formatMessage({ id: 'REPORT.INVENTORY_TODAY_SALE' })}
+                            </ActionMenuItem>
+                          )}
+                          <ActionMenuItem
+                            intent="edit"
+                            icon={<BarChartIcon />}
+                            onClick={() =>
+                              setDaySummary(
+                                computeMultiStoreDaySummary(storeOrders.get(store.id) ?? [], dateId),
+                              )
+                            }
+                            data-testid={`multistore-day-summary-button-${store.id}-${dateId}`}
+                          >
+                            {intl.formatMessage({ id: 'SALES.ORDERS.DAY_SALES_SUMMARY' })}
+                          </ActionMenuItem>
+                        </ActionMenu>
+                      </div>
+                      {isExpanded && (
+                        <div className="border-t border-border px-2 py-2">
+                          <OrderList orders={g.items} />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          }}
+        </MultiStoreSection>
+        {daySummary && (
+          <DaySalesSummaryModal summary={daySummary} onClose={() => setDaySummary(null)} />
+        )}
+      </Card>
+    );
+  }
 
   return (
     <Card
@@ -277,7 +542,7 @@ export function OrdersPage() {
                   <ActionMenuItem
                     intent="edit"
                     icon={<DownloadIcon />}
-                    onClick={() => handleGenerateDayReport(dateId)}
+                    onClick={() => void handleGenerateDayReport(storeId, dateId)}
                     data-testid={`day-report-button-${dateId}`}
                   >
                     {intl.formatMessage({ id: 'REPORT.INVENTORY_TODAY_SALE' })}

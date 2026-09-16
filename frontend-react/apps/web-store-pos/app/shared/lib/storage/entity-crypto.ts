@@ -20,6 +20,19 @@ import { getDek } from './data-key-store';
 import { isEncryptionProvisioned } from '../offline/roster-store';
 import { hasDeviceDekWrap } from './device-dek-table';
 
+// multi-store-panels: read-only cross-store reads need to decrypt with an
+// EXPLICIT store DEK (the in-memory singleton DEK always belongs to the
+// selected store). This is a pure addition — the global-DEK paths above are
+// untouched, and no write path ever accepts an explicit DEK (mixing store
+// keys is how data gets silently corrupted).
+export class MissingExplicitDekError extends Error {
+  readonly name = 'MissingExplicitDekError';
+  constructor(message = 'Explicit DEK required but not provided') {
+    super(message);
+    Object.setPrototypeOf(this, MissingExplicitDekError.prototype);
+  }
+}
+
 export const ENTITY_ENVELOPE_PREFIX = 'enc:v1:';
 
 export class MissingDataKeyError extends Error {
@@ -121,6 +134,38 @@ export function decryptEntity(stored: string | null): string | null {
   const dek = getDek();
   if (dek === null) {
     throw new MissingDataKeyError();
+  }
+
+  const envelope = bytesFromBase64(stored.slice(ENTITY_ENVELOPE_PREFIX.length));
+  const iv = envelope.slice(0, AES_GCM_IV_BYTES);
+  const ciphertextWithTag = envelope.slice(AES_GCM_IV_BYTES);
+  const plaintext = aesGcmDecrypt(dek, iv, ciphertextWithTag);
+  return new TextDecoder().decode(plaintext);
+}
+
+/**
+ * multi-store-panels — `decryptEntity` with an EXPLICIT DEK instead of the
+ * in-memory singleton (which always belongs to the selected store). Marker
+ * dispatch and passthrough semantics are IDENTICAL to `decryptEntity`:
+ *   - `null` in -> `null` out.
+ *   - no `enc:v1:` marker -> unchanged (plaintext passthrough — an entity
+ *     written before provisioning must read the same under any DEK).
+ *   - marked + no explicit DEK -> `MissingExplicitDekError` (NOT the global
+ *     `MissingDataKeyError` — the caller decides what a missing per-store
+ *     wrap means, usually "this store has no local data on this device").
+ *   - marked + DEK -> decrypt; GCM tag failure propagates raw, same as
+ *     `decryptEntity`.
+ * READ-ONLY by contract: no `encryptEntityWithDek` exists on purpose.
+ */
+export function decryptEntityWithDek(
+  stored: string | null,
+  dek: Uint8Array | null,
+): string | null {
+  if (stored === null) return null;
+  if (!isEncrypted(stored)) return stored;
+
+  if (dek === null) {
+    throw new MissingExplicitDekError();
   }
 
   const envelope = bytesFromBase64(stored.slice(ENTITY_ENVELOPE_PREFIX.length));

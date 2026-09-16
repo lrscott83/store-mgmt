@@ -1149,6 +1149,12 @@ const messages: Record<string, string> = {
     'No se pudo abrir la información de esta tienda. Inicie sesión con conexión o importe un roster para recuperarla.',
   'ENCRYPTION.DATA_DAMAGED':
     'La información guardada en este dispositivo está dañada y no se pudo leer. No se borró nada.',
+
+  // Multi-store panel views (OwnerAdmin + módulo MultiStores): select global,
+  // paneles colapsables por tienda y estado sin datos locales.
+  'MULTISTORE.ALL_STORES': 'Todas',
+  'MULTISTORE.STORE_LABEL': 'Tienda:',
+  'MULTISTORE.NO_LOCAL_DATA': 'Sin datos de esta tienda en este dispositivo',
 };
 
 export default messages;
