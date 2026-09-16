@@ -637,7 +637,7 @@ const messages: Record<string, string> = {
   'WAREHOUSES.MOVEMENT_NOT_FOUND': 'El movimiento no existe.',
   'WAREHOUSES.MOVEMENT_UPDATED': 'Movimiento actualizado.',
   'WAREHOUSES.ACTIONS': 'Acciones de',
-  'WAREHOUSES.REVERT_ACTION': 'Revertir',
+  'WAREHOUSES.REVERT_ACTION': 'Eliminar',
   'WAREHOUSES.EDIT_ACTION': 'Editar',
   'WAREHOUSES.COMPRA': 'Compra',
   'WAREHOUSES.EDIT_MOVEMENT': 'Editar movimiento',

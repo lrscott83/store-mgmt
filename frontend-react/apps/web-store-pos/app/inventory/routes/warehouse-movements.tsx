@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactElement } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useIntl } from 'react-intl';
 import type {
   Product,
@@ -15,8 +15,14 @@ import { showToastSuccess } from '~/shared/lib/toast';
 import { Card } from '~/shared/components/ui/card';
 import { InfoBox } from '~/shared/components/ui/info-box';
 import { ActionMenu, ActionMenuItem } from '~/shared/components/ui/action-menu';
-import { ChevronDownIcon, InOutIcon, SwapHorizontalIcon, TruckIcon } from '~/shared/components/ui/icons';
+import {
+  ArrowInIcon,
+  ArrowOutIcon,
+  ChevronDownIcon,
+  SwapHorizontalIcon,
+} from '~/shared/components/ui/icons';
 import { formatLocalDate, groupByLocalDay } from '~/shared/lib/date-utils';
+import { formatCurrency } from '~/shared/lib/format-currency';
 import { WarehouseOfflineService } from '../lib/services/warehouse-offline-service';
 import { InventoryOfflineService } from '../lib/services/inventory-offline-service';
 import { WarehouseMovementModal } from '../components/warehouse-movement-modal';
@@ -93,16 +99,6 @@ export function WarehouseMovementsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- load reads storeId/service only
   }, [service]);
 
-  /** Icono por tipo de movimiento: entrada verde, salida naranja, transferencia azul, reversa violeta (plan 2026-09-09, F5). */
-  const MOVEMENT_TYPE_ICON: Record<WarehouseMovementType, { icon: ReactElement; color: string }> = {
-    purchase_in: { icon: <InOutIcon />, color: 'text-success' },
-    sale_out: { icon: <TruckIcon />, color: 'text-warning' },
-    transfer_in: { icon: <SwapHorizontalIcon />, color: 'text-primary' },
-    transfer_out: { icon: <SwapHorizontalIcon />, color: 'text-primary' },
-    // Reversa violeta con el mismo icono de intercambio (D7a/F5).
-    reversal: { icon: <SwapHorizontalIcon />, color: 'text-violet-600' },
-  };
-
   const productName = (id: string) => products.find((p) => p.id === id)?.name ?? id;
   const warehouseName = (id: string) => warehouses.find((w) => w.id === id)?.name ?? id;
   const storeName = (id?: string) =>
@@ -144,8 +140,15 @@ export function WarehouseMovementsPage() {
   async function handleRevert(movement: WarehouseStockMovement) {
     if (!service) return;
     const confirmed = await confirmDialog({
-      title: intl.formatMessage({ id: 'GENERAL.DELETE_CONFIRM_TITLE' }),
-      message: intl.formatMessage({ id: 'WAREHOUSES.REVERSAL_CONFIRM_MESSAGE_A' }),
+      title: intl.formatMessage({ id: 'WAREHOUSES.DELETE_MOVEMENT_TITLE' }),
+      message: intl.formatMessage(
+        { id: 'WAREHOUSES.DELETE_MOVEMENT_CONFIRM' },
+        {
+          product: productName(movement.productId),
+          quantity: movement.quantity,
+          warehouse: warehouseName(movement.warehouseId),
+        },
+      ),
       confirmButtonText: intl.formatMessage({ id: 'GENERAL.YES' }),
       cancelButtonText: intl.formatMessage({ id: 'GENERAL.NO' }),
     });
@@ -236,14 +239,11 @@ export function WarehouseMovementsPage() {
   };
 
   return (
-    <Card>
+    <Card padding="tight">
       <h1 className="mb-4 text-xl font-bold text-text">
         {intl.formatMessage({ id: 'MENU.WAREHOUSE_MOVEMENTS' })}
       </h1>
 
-      <div className="mb-2 text-sm font-semibold text-text">
-        {intl.formatMessage({ id: 'WAREHOUSES.MOVEMENTS_TITLE' })}
-      </div>
       {movementDayGroups.length === 0 && (
         <InfoBox variant="primary" className="text-center">
           {intl.formatMessage({ id: 'WAREHOUSES.NO_MOVEMENTS' })}
@@ -251,8 +251,8 @@ export function WarehouseMovementsPage() {
       )}
       {/* Acordeón agrupado por día — mismo patrón que los historiales de
           Entradas y Créditos: panel por día con la fecha en el header y, al
-          desplegar, las filas de movimientos con icono por tipo, producto,
-          cantidad y almacén origen → destino. */}
+          desplegar, un bloque compacto de 3 filas por movimiento (producto y
+          cantidad; tipo/importe; ruta). */}
       <div className="space-y-2">
         {movementDayGroups.map((dayGroup) => {
           const dayKey = dayGroup.dayKey;
@@ -262,7 +262,7 @@ export function WarehouseMovementsPage() {
               <button
                 type="button"
                 onClick={() => toggleMovementDay(dayKey)}
-                className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left"
+                className="flex w-full items-center justify-between gap-4 px-3 py-3 text-left"
                 data-testid={`mv-day-panel-toggle-${dayKey}`}
                 aria-expanded={isDayExpanded}
               >
@@ -278,60 +278,102 @@ export function WarehouseMovementsPage() {
               </button>
               {isDayExpanded && (
                 <div className="divide-y divide-border border-t border-border">
-                  {dayGroup.items.map((movement) => (
-                    <div key={movement.id} className="flex items-center gap-3 px-4 py-2">
-                      <span
-                        data-testid={`mv-type-icon-${movement.id}`}
-                        className={MOVEMENT_TYPE_ICON[movement.type].color}
-                        title={intl.formatMessage({ id: MOVEMENT_TYPE_LABEL[movement.type] })}
-                      >
-                        {MOVEMENT_TYPE_ICON[movement.type].icon}
-                      </span>
-                      <span className="min-w-0 flex-1 truncate text-sm text-text">
-                        {productName(movement.productId)}
-                      </span>
-                      <span
-                        data-testid={`mv-qty-${movement.id}`}
-                        className="shrink-0 text-sm font-semibold text-text"
-                      >
-                        {movement.quantity}
-                      </span>
-                      <span className="min-w-0 flex-1 truncate text-right text-sm text-text-muted">
-                        {movementRoute(movement)}
-                      </span>
-                      {/* Badge Revertido en la fila original (F5) — derivado en runtime. */}
-                      {reversedIds.has(movement.id) && (
-                        <span
-                          data-testid={`mv-reversal-badge-${movement.id}`}
-                          className="shrink-0 rounded-full bg-violet-100 px-2 py-0.5 text-xs font-semibold text-violet-700"
-                        >
-                          {intl.formatMessage({ id: 'WAREHOUSES.REVERSAL_BADGE' })}
-                        </span>
-                      )}
-                      {isReversible(movement) && (
-                        <ActionMenu
-                          label={`${intl.formatMessage({ id: 'WAREHOUSES.ACTIONS' })} ${productName(movement.productId)}`}
-                          testId={`mv-actions-toggle-${movement.id}`}
-                        >
-                          <ActionMenuItem
-                            intent="edit"
-                            data-testid={`mv-edit-${movement.id}`}
-                            onClick={() => openEdit(movement)}
-                          >
-                            {intl.formatMessage({ id: 'WAREHOUSES.EDIT_ACTION' })}
-                          </ActionMenuItem>
-                          <ActionMenuItem
-                            intent="delete"
-                            separatorBefore
-                            data-testid={`mv-revert-${movement.id}`}
-                            onClick={() => void handleRevert(movement)}
-                          >
-                            {intl.formatMessage({ id: 'WAREHOUSES.REVERT_ACTION' })}
-                          </ActionMenuItem>
-                        </ActionMenu>
-                      )}
-                    </div>
-                  ))}
+                  {dayGroup.items.map((movement) => {
+                    const isPurchase = movement.type === 'purchase_in';
+                    return (
+                      <div key={movement.id} className="flex flex-col gap-1 px-3 py-2">
+                        {/* Fila 1: producto · (cantidad) · badge Revertido · engranaje. */}
+                        <div className="flex items-center gap-2">
+                          <span className="min-w-0 flex-1 truncate text-sm text-text">
+                            {productName(movement.productId)}
+                          </span>
+                          <span className="shrink-0 text-sm font-semibold text-text">
+                            (
+                            <span data-testid={`mv-qty-${movement.id}`}>
+                              {movement.quantity}
+                            </span>
+                            )
+                          </span>
+                          {/* Badge Revertido en la fila original (F5) — derivado en runtime. */}
+                          {reversedIds.has(movement.id) && (
+                            <span
+                              data-testid={`mv-reversal-badge-${movement.id}`}
+                              className="shrink-0 rounded-full bg-violet-100 px-2 py-0.5 text-xs font-semibold text-violet-700"
+                            >
+                              {intl.formatMessage({ id: 'WAREHOUSES.REVERSAL_BADGE' })}
+                            </span>
+                          )}
+                          {isReversible(movement) && (
+                            <ActionMenu
+                              label={`${intl.formatMessage({ id: 'WAREHOUSES.ACTIONS' })} ${productName(movement.productId)}`}
+                              testId={`mv-actions-toggle-${movement.id}`}
+                            >
+                              <ActionMenuItem
+                                intent="edit"
+                                data-testid={`mv-edit-${movement.id}`}
+                                onClick={() => openEdit(movement)}
+                              >
+                                {intl.formatMessage({ id: 'WAREHOUSES.EDIT_ACTION' })}
+                              </ActionMenuItem>
+                              <ActionMenuItem
+                                intent="delete"
+                                separatorBefore
+                                data-testid={`mv-revert-${movement.id}`}
+                                onClick={() => void handleRevert(movement)}
+                              >
+                                {intl.formatMessage({ id: 'WAREHOUSES.REVERT_ACTION' })}
+                              </ActionMenuItem>
+                            </ActionMenu>
+                          )}
+                        </div>
+
+                        {/* Fila 2: tipo — compra con total; salida ←; transferencia/reversa ⇄
+                            (mismo lenguaje que el gear de Almacenes; reversa violeta F5). */}
+                        <div className="flex items-center justify-between gap-2 text-sm">
+                          {isPurchase ? (
+                            <>
+                              <span className="font-medium text-text">
+                                {intl.formatMessage({ id: 'WAREHOUSES.COMPRA' })}
+                              </span>
+                              {movement.costPrice != null && (
+                                <span className="shrink-0 text-sm font-semibold text-text">
+                                  {formatCurrency(movement.quantity * movement.costPrice)}
+                                </span>
+                              )}
+                            </>
+                          ) : (
+                            <span
+                              data-testid={`mv-type-icon-${movement.id}`}
+                              className={
+                                movement.type === 'reversal' ? 'text-violet-600' : 'text-primary'
+                              }
+                              title={intl.formatMessage({ id: MOVEMENT_TYPE_LABEL[movement.type] })}
+                            >
+                              {movement.type === 'sale_out' ? (
+                                <ArrowOutIcon />
+                              ) : (
+                                <SwapHorizontalIcon />
+                              )}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Fila 3: ruta — compra -> almacén; resto, la ruta existente. */}
+                        <div className="flex items-center gap-1 text-xs text-text-muted">
+                          {isPurchase ? (
+                            <>
+                              <ArrowInIcon className="text-primary" />
+                              <span className="min-w-0 truncate">
+                                {warehouseName(movement.warehouseId)}
+                              </span>
+                            </>
+                          ) : (
+                            <span className="min-w-0 truncate">{movementRoute(movement)}</span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>

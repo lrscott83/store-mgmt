@@ -186,6 +186,7 @@ describe('Vista Movimientos de almacén', () => {
     const today = new Date();
     fakeState.warehouses = [
       { id: 'wh-1', name: 'Central', isActive: true, createdDate: new Date(), createdByName: 'x' },
+      { id: 'wh-2', name: 'Anexo', isActive: true, createdDate: new Date(), createdByName: 'x' },
     ];
     fakeState.products = [['prod-1', { id: 'prod-1', name: 'Cerveza' }]];
     fakeState.movements = [
@@ -196,7 +197,12 @@ describe('Vista Movimientos de almacén', () => {
     ];
     renderPage();
     fireEvent.click(screen.getByTestId(`mv-day-panel-toggle-${toLocalDayKey(today)}`));
-    for (const id of ['mv-in', 'mv-out', 'mv-tr-out', 'mv-tr-in']) {
+    // Compra: rótulo 'Compra' en la fila 2 y almacén de entrada en la fila 3
+    // (sin `mv-type-icon`; ese testid es solo para los tipos con icono propio).
+    expect(screen.getByText('Compra')).toBeTruthy();
+    expect(screen.getAllByText('Central')).toHaveLength(2);
+    expect(screen.queryByTestId('mv-type-icon-mv-in')).toBeNull();
+    for (const id of ['mv-out', 'mv-tr-out', 'mv-tr-in']) {
       expect(screen.getByTestId(`mv-type-icon-${id}`)).toBeTruthy();
     }
   });
@@ -258,7 +264,7 @@ describe('Vista Movimientos de almacén', () => {
     mockUser.isOwnerAdmin = true;
   });
 
-  it('U-M4: Revertir confirma con Swal Si/No; No cancela sin llamar al servicio', async () => {
+  it('U-M4: Eliminar confirma con Swal Si/No; No cancela sin llamar al servicio', async () => {
     seedTodayMovements();
     confirmDialogMock.mockResolvedValueOnce(false);
     renderPage();
@@ -266,9 +272,10 @@ describe('Vista Movimientos de almacén', () => {
     fireEvent.click(screen.getByTestId('mv-actions-toggle-mv-out'));
     fireEvent.click(screen.getByTestId('mv-revert-mv-out'));
     await waitFor(() => expect(confirmDialogMock).toHaveBeenCalledTimes(1));
-    // El mensaje de confirmación es el de la reversa (F4).
-    expect(confirmDialogMock.mock.calls[0][0].message).toContain(
-      '¿Está seguro que desea revertir este movimiento?',
+    // La confirmación de eliminación incluye los datos del movimiento.
+    expect(confirmDialogMock.mock.calls[0][0].title).toBe('Eliminar movimiento');
+    expect(confirmDialogMock.mock.calls[0][0].message).toBe(
+      '¿Está seguro de que desea eliminar el movimiento de Cerveza (6) del almacén Central?',
     );
     expect(fakeState.reverseMovementImpl).not.toHaveBeenCalled();
   });
@@ -303,14 +310,43 @@ describe('Vista Movimientos de almacén', () => {
     );
   });
 
-  it('U-M6: fila revertida muestra badge Revertido; fila reversal con icono propio', () => {
+  it('U-M6: fila revertida muestra badge Revertido; fila reversal con icono violeta (E-R10)', () => {
     seedTodayMovements();
     renderPage();
     openToday();
     expect(screen.getByTestId('mv-reversal-badge-mv-other-reverted').textContent).toBe('Revertido');
-    // La fila reversal existe con su icono y NO lleva badge (no es reversible).
-    expect(screen.getByTestId('mv-type-icon-mv-rev')).toBeTruthy();
+    // La fila reversal existe con icono violeta y NO lleva badge (no es reversible).
+    expect(screen.getByTestId('mv-type-icon-mv-rev').className).toContain('text-violet-600');
+    // Los tipos normales conservan el azul del gear de Almacenes.
+    expect(screen.getByTestId('mv-type-icon-mv-out').className).toContain('text-primary');
     expect(screen.queryByTestId('mv-reversal-badge-mv-rev')).toBeNull();
+  });
+
+  it('U-M-R2: mv-qty-{id} contiene solo la cantidad cruda; los paréntesis quedan fuera', () => {
+    const today = new Date();
+    fakeState.warehouses = [
+      { id: 'wh-1', name: 'Central', isActive: true, createdDate: new Date(), createdByName: 'x' },
+    ];
+    fakeState.products = [['prod-1', { id: 'prod-1', name: 'Cerveza' }]];
+    fakeState.movements = [
+      { id: 'mv-dec', warehouseId: 'wh-1', productId: 'prod-1', type: 'purchase_in', quantity: 10.56, costPrice: 2, reason: null, createdDate: today, createdByName: 'x' },
+    ];
+    renderPage();
+    openToday();
+    const qty = screen.getByTestId('mv-qty-mv-dec');
+    // Contrato E2E: `toHaveText('10.56')` / `hasText: /^10\.56$/` sobre el span.
+    expect(qty.textContent).toBe('10.56');
+    // Los paréntesis son texto hermano FUERA del span.
+    expect(qty.parentElement?.textContent).toBe('(10.56)');
+  });
+
+  it('U-M-R3: el engranaje muestra Editar y Eliminar', () => {
+    seedTodayMovements();
+    renderPage();
+    openToday();
+    fireEvent.click(screen.getByTestId('mv-actions-toggle-mv-out'));
+    expect(screen.getByTestId('mv-edit-mv-out').textContent).toBe('Editar');
+    expect(screen.getByTestId('mv-revert-mv-out').textContent).toBe('Eliminar');
   });
 
   it('U-M9: load() refresca el historial tras la reversa (movements re-leído)', async () => {
@@ -398,7 +434,7 @@ describe('Vista Movimientos de almacén', () => {
     expect(fakeState.reverseMovementImpl).toHaveBeenCalledTimes(1);
   });
 
-  it('U-M-R1: la primera línea de cada fila usa el formato unificado (compra/sale_out/transferencia)', () => {
+  it('U-M-R1: el bloque compacto usa el formato unificado (compra/sale_out/transferencia)', () => {
     seedTodayMovements();
     // sale_out con destino de tienda conocido (multi-tienda): resuelve por storeList.
     fakeState.movements.push({
@@ -414,13 +450,16 @@ describe('Vista Movimientos de almacén', () => {
     });
     renderPage();
     openToday();
-    // purchase_in → 'Compra → Central' (las dos filas de compra del seed).
-    expect(screen.getAllByText('Compra → Central')).toHaveLength(2);
+    // purchase_in: rótulo 'Compra' en la fila 2 (las dos filas de compra del seed)
+    // y total (24 × 5) cuando hay costPrice.
+    expect(screen.getAllByText('Compra')).toHaveLength(2);
+    expect(screen.getByText('$120')).toBeTruthy();
     // sale_out con toStoreId → 'Central → Tienda Seleccionada'.
     expect(screen.getByText('Central → Tienda Seleccionada')).toBeTruthy();
     // transfer_in → 'Central → Anexo'.
     expect(screen.getByText('Central → Anexo')).toBeTruthy();
-    // sale_out legacy sin toStoreId (mv-out) y reversal (mv-rev): solo 'Central' sin flecha.
-    expect(screen.getAllByText('Central')).toHaveLength(2);
+    // Fila 3: compras (mv-in, mv-other-reverted), sale_out legacy sin toStoreId
+    // (mv-out) y reversal (mv-rev) muestran solo 'Central', sin flecha.
+    expect(screen.getAllByText('Central')).toHaveLength(4);
   });
 });
