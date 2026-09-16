@@ -24,6 +24,10 @@ function makeOwnerStore(overrides: Partial<OwnerStoreWithPlan> = {}): OwnerStore
     nextDueDate: '2026-11-01',
     modules: [],
     planType: 'Pago',
+    // Canonical plan price (plan 2026-09-15): Pago costs 10 originally, 8 with the
+    // discount — matching the P2 struck-through shape the price tests assert on.
+    planPrice: 10,
+    planCurrentPrice: 8,
     ...overrides,
   };
 }
@@ -355,18 +359,40 @@ describe('MyStoresPage — card rendering', () => {
     expect(screen.queryByTestId('owner-store-price-s1')).toBeNull();
   });
 
-  it('shows the paid plan with the next due date and the struck-through discounted price (P2)', async () => {
-    // Store already ON the paid plan: its snapshot selects the paid module.
+  it('renders the canonical price even when the module snapshot disagrees (plan 2026-09-15)', async () => {
+    // The whole point of the canonical price: the frozen StoreModule snapshot may
+    // carry whatever historical prices it wants — the card shows the plan's
+    // catalog price (original 20 struck through, current 12).
     mockGetMyStores.mockResolvedValue({
       succeeded: true,
       data: [
         makeOwnerStore({
           id: 's1',
-          modules: [
-            { ...makeCatalogModule(), selected: true, currentPrice: 8, price: 10 },
-          ],
+          modules: [{ ...makeCatalogModule(), selected: true, price: 999, currentPrice: 999 }],
+          planPrice: 20,
+          planCurrentPrice: 12,
         }),
       ],
+    } as BaseResponseModel<OwnerStoreWithPlan[]>);
+    const { MyStoresPage } = await import('../my-stores');
+    render(
+      <Wrapper>
+        <MyStoresPage />
+      </Wrapper>,
+    );
+    await waitFor(() => {
+      expect(screen.getByText('Plan: Pago')).toBeInTheDocument();
+    });
+    expect(screen.getByTestId('owner-store-price-original-s1')).toHaveTextContent('20');
+    expect(screen.getByTestId('owner-store-price-s1')).toHaveTextContent('12 USD');
+  });
+
+  it('shows the paid plan with the next due date and the struck-through discounted price (P2)', async () => {
+    // Canonical price arrives serialized per store (plan 2026-09-15) — the card
+    // renders it as-is; no catalog merge participates.
+    mockGetMyStores.mockResolvedValue({
+      succeeded: true,
+      data: [makeOwnerStore({ id: 's1' })],
     } as BaseResponseModel<OwnerStoreWithPlan[]>);
     const { MyStoresPage } = await import('../my-stores');
     render(
@@ -381,14 +407,13 @@ describe('MyStoresPage — card rendering', () => {
     // Discount: original 10 struck through, current 8 USD bold.
     expect(screen.getByTestId('owner-store-price-original-s1')).toHaveTextContent('10');
     expect(screen.getByTestId('owner-store-price-s1')).toHaveTextContent('8 USD');
-    // No discount => no strikethrough element at all (covered by price test shape).
   });
 
   it('paid plan without nextDueDate renders no date line', async () => {
     mockGetMyStores.mockResolvedValue({
       succeeded: true,
       data: [
-        makeOwnerStore({ id: 's1', nextDueDate: null, modules: [{ ...makeCatalogModule(), selected: true }] }),
+        makeOwnerStore({ id: 's1', nextDueDate: null, planPrice: 10, planCurrentPrice: 10 }),
       ],
     } as BaseResponseModel<OwnerStoreWithPlan[]>);
     const { MyStoresPage } = await import('../my-stores');

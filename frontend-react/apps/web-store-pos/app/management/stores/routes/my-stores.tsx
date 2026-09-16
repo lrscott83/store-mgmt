@@ -4,7 +4,6 @@ import { EFeatures, EModules } from '@store-mgmt/domain';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { storeHttpService } from '~/management/stores/lib/services/store-http-service';
-import { mergeStoreModules } from '~/management/stores/lib/store-modules';
 import { groupFeaturesByModuleId } from '~/management/stores/lib/plan-utils';
 import { OwnerStoreCard } from '~/management/stores/components/owner-store-card';
 import { EditStoreModal } from '~/management/stores/components/edit-store-modal';
@@ -15,7 +14,7 @@ import { PlusIcon } from '~/shared/components/ui/icons';
 import { httpErrorKey } from '~/shared/lib/http/http-error';
 import { confirmDialog } from '~/shared/lib/blocking-alert';
 import { showToastSuccess } from '~/shared/lib/toast';
-import type { Feature, Module, OwnerStoreWithPlan, Plan } from '@store-mgmt/domain';
+import type { Feature, OwnerStoreWithPlan, Plan } from '@store-mgmt/domain';
 
 export const clientLoader = featureLoader([EFeatures.Stores]);
 
@@ -37,7 +36,6 @@ export function MyStoresPage() {
   const hasMultiStores = (user?.storeModuleIds ?? []).includes(EModules.MultiStores);
 
   const [stores, setStores] = useState<OwnerStoreWithPlan[]>([]);
-  const [catalog, setCatalog] = useState<Module[]>([]);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [featuresByModuleId, setFeaturesByModuleId] = useState<ReadonlyMap<number, Feature[]>>(
     new Map(),
@@ -54,18 +52,16 @@ export function MyStoresPage() {
   const load = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [storesRes, catalogRes, plansRes, featuresRes] = await Promise.all([
+      const [storesRes, plansRes, featuresRes] = await Promise.all([
         storeHttpService.getMyStores(),
-        storeHttpService.getModulesToStore(),
         storeHttpService.getPlans(),
         storeHttpService.getFeaturesToStore(),
       ]);
-      if (!storesRes.succeeded || !catalogRes.succeeded || !plansRes.succeeded || !featuresRes.succeeded) {
+      if (!storesRes.succeeded || !plansRes.succeeded || !featuresRes.succeeded) {
         setError(intl.formatMessage({ id: 'STORES.ERROR' }));
         return;
       }
       setStores(storesRes.data);
-      setCatalog(catalogRes.data);
       setPlans(plansRes.data);
       setFeaturesByModuleId(groupFeaturesByModuleId(featuresRes.data));
       setError('');
@@ -80,10 +76,11 @@ export function MyStoresPage() {
     load();
   }, [load]);
 
-  /** Merged catalog for one store card — the card's price lines hydrate from it. */
-  const mergedModulesOf = (store: OwnerStoreWithPlan): Module[] =>
-    mergeStoreModules(catalog, store.modules);
-
+  /**
+   * Catalog kept for the EditPlanModal; no longer merged into the cards — the
+   * canonical price (docs/plans/2026-09-15-store-plan-canonical-price-plan.md)
+   * arrives serialized per store and renders as-is.
+   */
   async function handleEditSave(values: { name: string; isActive: boolean }) {
     if (!editingStore) return;
     setModalError('');
@@ -245,7 +242,6 @@ export function MyStoresPage() {
             <OwnerStoreCard
               key={store.id}
               store={store}
-              modules={mergedModulesOf(store)}
               onEdit={(s) => {
                 setModalError('');
                 setEditingStore(s);

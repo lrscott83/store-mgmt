@@ -47,16 +47,16 @@ interface PlanPriceInfo {
 }
 
 /**
- * Store's paid price from its own module snapshot — the SAME criteria the owner's
- * store cards use (owner-store-card.tsx): Σ paid-module currentPrice vs price,
- * discounted when the current total is lower. Null for the free plan (no paid
- * modules) or when the snapshot didn't arrive, so the card shows the plan name only.
+ * Store's paid price — CANONICAL (docs/plans/2026-09-15-store-plan-canonical-price-plan.md):
+ * the backend serializes planCurrentPrice/planPrice (Σ over the plan's member
+ * modules from the LIVE catalog, the same formula GET /v1/plans uses). The card no
+ * longer reads the store's module snapshot, so the card price can never disagree
+ * with the plan view. Null fields (disapproved store / missing plan) hide the price.
  */
 function getPlanPriceInfo(store: Store): PlanPriceInfo | null {
-  const paidModules = store.modules.filter((m) => !m.priceIncluded);
-  if (paidModules.length === 0) return null;
-  const paidTotal = paidModules.reduce((sum, m) => sum + m.currentPrice, 0);
-  const paidOriginalTotal = paidModules.reduce((sum, m) => sum + m.price, 0);
+  if (store.planCurrentPrice === null || store.planCurrentPrice === undefined) return null;
+  const paidTotal = store.planCurrentPrice;
+  const paidOriginalTotal = store.planPrice ?? paidTotal;
   return { paidTotal, paidOriginalTotal, hasDiscount: paidTotal < paidOriginalTotal };
 }
 

@@ -1,12 +1,9 @@
 import { useIntl } from 'react-intl';
-import type { Module, OwnerStoreWithPlan } from '@store-mgmt/domain';
+import type { OwnerStoreWithPlan } from '@store-mgmt/domain';
 import { Card } from '~/shared/components/ui/card';
 import { ActionMenu, ActionMenuItem } from '~/shared/components/ui/action-menu';
 import { formatDateOnly } from '~/shared/lib/date-utils';
 import { formatPlanAmount, formatPlanPrice } from '~/shared/lib/price-utils';
-
-const getIsOnPaidPlan = (modules: Module[]) =>
-  modules.some((m) => !m.priceIncluded && m.selected);
 
 const PLAN_NAME_KEYS: Record<string, string> = {
   Gratis: 'STORES.PLAN.FREE_TAB',
@@ -17,8 +14,6 @@ const PLAN_NAME_KEYS: Record<string, string> = {
 
 interface OwnerStoreCardProps {
   store: OwnerStoreWithPlan;
-  /** Catalog merged with the store's snapshot (mergeStoreModules) — same hydration the plan view uses. */
-  modules: Module[];
   onEdit: (store: OwnerStoreWithPlan) => void;
   onEditPlan: (store: OwnerStoreWithPlan) => void;
 }
@@ -26,27 +21,24 @@ interface OwnerStoreCardProps {
 /**
  * One store card of the owner's "my stores" grid (docs/plans/2026-09-08-owner-stores-cards-plan.md).
  * Header: store name left + gear right. Body: plan type, next billing date (paid
- * plan only) and the paid total with the struck-through original when discounted —
- * the SAME criteria the store plan view's paid tab uses (P2). Inactive stores get
- * the danger tint + "(Inactiva)" badge, mirroring the super-admin store cards.
+ * plan only) and the paid total with the struck-through original when discounted.
+ *
+ * Canonical price (docs/plans/2026-09-15-store-plan-canonical-price-plan.md): the
+ * price lines come from the backend's planCurrentPrice/planPrice — Σ over the
+ * plan's member modules from the LIVE catalog, the same formula the plan view
+ * (GET /v1/plans) uses. The card no longer reads the store's frozen module
+ * snapshot, so a store's card can never disagree with its plan's catalog price.
+ * Null canonical fields (disapproved store / missing plan) render the plan name
+ * only — the backend owns that guard.
  */
-export function OwnerStoreCard({ store, modules, onEdit, onEditPlan }: OwnerStoreCardProps) {
+export function OwnerStoreCard({ store, onEdit, onEditPlan }: OwnerStoreCardProps) {
   const intl = useIntl();
 
-  // Same paid-plan/price criteria as the store plan view (P2): the merged catalog's
-  // paid modules, whose currentPrice/price come from the store's own snapshot.
-  // Price-parity fix (docs/plans/2026-09-15-store-price-parity-plan.md CAUSA-1):
-  // ONLY the modules the store actually has (selected) may enter the sum — the
-  // merge leaves catalog leftovers (selected: false) with catalog prices, and
-  // summing them inflated the card vs the superadmin listing (whose store.modules
-  // snapshot has no leftovers). Disapproved stores arrive as 'Gratis' (backend
-  // guard): never show a price or next-due date for them, even when the merged
-  // catalog still carries paid modules.
-  const isOnPaidPlan = store.planType !== 'Gratis' && getIsOnPaidPlan(modules);
-  const paidModules = modules.filter((m) => !m.priceIncluded && m.selected);
-  const paidTotal = paidModules.reduce((sum, m) => sum + m.currentPrice, 0);
-  const paidOriginalTotal = paidModules.reduce((sum, m) => sum + m.price, 0);
-  const hasDiscount = paidTotal < paidOriginalTotal;
+  const isOnPaidPlan = store.planType !== 'Gratis' && store.planCurrentPrice !== null;
+  const hasDiscount =
+    store.planPrice !== null &&
+    store.planCurrentPrice !== null &&
+    store.planCurrentPrice < store.planPrice;
 
   const cardClass = !store.isActive ? 'bg-danger/10 border border-danger' : '';
 
@@ -108,11 +100,11 @@ export function OwnerStoreCard({ store, modules, onEdit, onEditPlan }: OwnerStor
           <p className="text-sm text-text">
             {hasDiscount && (
               <span className="mr-1 text-danger line-through" data-testid={`owner-store-price-original-${store.id}`}>
-                {formatPlanAmount(paidOriginalTotal)}
+                {formatPlanAmount(store.planPrice!)}
               </span>
             )}
             <span className="font-semibold" data-testid={`owner-store-price-${store.id}`}>
-              {formatPlanPrice(paidTotal)}
+              {formatPlanPrice(store.planCurrentPrice!)}
             </span>
           </p>
         )}

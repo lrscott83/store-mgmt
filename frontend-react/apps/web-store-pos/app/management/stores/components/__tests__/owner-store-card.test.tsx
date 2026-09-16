@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
-import type { Module, OwnerStoreWithPlan } from '@store-mgmt/domain';
+import type { OwnerStoreWithPlan } from '@store-mgmt/domain';
 
 function Wrapper({ children }: { children: React.ReactNode }) {
   return (
@@ -21,26 +21,17 @@ function makeOwnerStore(overrides: Partial<OwnerStoreWithPlan> = {}): OwnerStore
     paymentStartDate: '2026-01-10',
     nextDueDate: '2026-03-10',
     planType: 'Pago',
+    // Canonical plan price (plan 2026-09-15): Pago costs 2,000 originally, the
+    // discount takes it to 2,000 — no strikethrough by default.
+    planPrice: 2000,
+    planCurrentPrice: 2000,
     modules: [],
     ...overrides,
   };
 }
 
-function paidModule(overrides: Partial<Module> = {}): Module {
-  return {
-    id: 2,
-    name: 'Statistics',
-    price: 2000,
-    currentPrice: 2000,
-    priceIncluded: false,
-    discountText: '',
-    selected: true,
-    ...overrides,
-  };
-}
-
 describe('OwnerStoreCard — disapproved stores (planType Gratis)', () => {
-  it('hides price and next-due date on a disapproved store even with paid snapshot modules', async () => {
+  it('hides price and next-due date on a disapproved store (null canonical price)', async () => {
     const { OwnerStoreCard } = await import('../owner-store-card');
     render(
       <Wrapper>
@@ -49,25 +40,27 @@ describe('OwnerStoreCard — disapproved stores (planType Gratis)', () => {
             id: 'ds1',
             approved: false,
             planType: 'Gratis',
+            planPrice: null,
+            planCurrentPrice: null,
             paymentStartDate: '2026-01-10',
             nextDueDate: null,
           })}
-          modules={[paidModule()]}
           onEdit={vi.fn()}
           onEditPlan={vi.fn()}
         />
       </Wrapper>,
     );
+
     // Plan name always renders, even for disapproved stores.
     expect(screen.getByText(/Plan: Gratis/)).toBeInTheDocument();
-    // The paid snapshot must NOT leak a price or next-due date.
+    // The backend nulled the canonical price — no price or next-due date may leak.
     expect(screen.queryByTestId('owner-store-price-ds1')).not.toBeInTheDocument();
     expect(screen.queryByTestId('owner-store-price-original-ds1')).not.toBeInTheDocument();
     expect(screen.queryByTestId('owner-store-next-due-ds1')).not.toBeInTheDocument();
   });
 });
 
-describe('OwnerStoreCard — approved stores (control)', () => {
+describe('OwnerStoreCard — approved stores (canonical price)', () => {
   it('shows price and next-due date on an approved paid store', async () => {
     const { OwnerStoreCard } = await import('../owner-store-card');
     render(
@@ -79,8 +72,9 @@ describe('OwnerStoreCard — approved stores (control)', () => {
             planType: 'Pago',
             paymentStartDate: '2026-01-10',
             nextDueDate: '2026-03-10',
+            planPrice: 2000,
+            planCurrentPrice: 2000,
           })}
-          modules={[paidModule()]}
           onEdit={vi.fn()}
           onEditPlan={vi.fn()}
         />
@@ -91,45 +85,47 @@ describe('OwnerStoreCard — approved stores (control)', () => {
     expect(screen.getByTestId('owner-store-next-due-a1')).toBeInTheDocument();
   });
 
-  it('sums ONLY the store-selected paid modules — catalog leftovers never inflate the price (price-parity plan CAUSA-1)', async () => {
+  it('strikes the original through when the canonical price is discounted', async () => {
     const { OwnerStoreCard } = await import('../owner-store-card');
-    // Merged-catalog shape for a Pago store: Statistics selected @100 (the
-    // store's snapshot) + Warehouses/MultiStores NOT selected with catalog
-    // prices — a Superior-only set the store does NOT have. The card total
-    // must stay 100, not 100 + catalog leftovers.
     render(
       <Wrapper>
         <OwnerStoreCard
-          store={makeOwnerStore({ id: 'a2', planType: 'Pago' })}
-          modules={[
-            paidModule({ id: 2, name: 'Statistics', price: 100, currentPrice: 100, selected: true }),
-            paidModule({ id: 13, name: 'Warehouses', price: 500, currentPrice: 500, selected: false }),
-            paidModule({ id: 14, name: 'MultiStores', price: 500, currentPrice: 500, selected: false }),
-          ]}
+          store={makeOwnerStore({
+            id: 'a4',
+            planType: 'Superior',
+            planPrice: 2000,
+            planCurrentPrice: 1000,
+            nextDueDate: '2026-10-31',
+          })}
           onEdit={vi.fn()}
           onEditPlan={vi.fn()}
         />
       </Wrapper>,
     );
-    // Anchored: '1,100 USD' (catalog leftovers summed in) must NOT pass —
-    // substring matching would let it slip through '100 USD'.
-    expect(screen.getByTestId('owner-store-price-a2')).toHaveTextContent(/^100 USD$/);
+    const original = screen.getByTestId('owner-store-price-original-a4');
+    expect(original).toHaveTextContent('2,000');
+    expect(original.className).toContain('line-through');
+    expect(screen.getByTestId('owner-store-price-a4')).toHaveTextContent('1,000 USD');
   });
 
-  it('renders no price line when no paid module is selected (free store against the full catalog)', async () => {
+  it('renders no price line when the canonical price is null (missing/inactive plan)', async () => {
     const { OwnerStoreCard } = await import('../owner-store-card');
     render(
       <Wrapper>
         <OwnerStoreCard
-          store={makeOwnerStore({ id: 'a3', planType: 'Gratis', nextDueDate: null })}
-          modules={[
-            paidModule({ id: 13, name: 'Warehouses', price: 500, currentPrice: 500, selected: false }),
-          ]}
+          store={makeOwnerStore({
+            id: 'a5',
+            planType: 'Pago',
+            planPrice: null,
+            planCurrentPrice: null,
+          })}
           onEdit={vi.fn()}
           onEditPlan={vi.fn()}
         />
       </Wrapper>,
     );
-    expect(screen.queryByTestId('owner-store-price-a3')).not.toBeInTheDocument();
+    expect(screen.getByText(/Plan: Pago/)).toBeInTheDocument();
+    expect(screen.queryByTestId('owner-store-price-a5')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('owner-store-price-original-a5')).not.toBeInTheDocument();
   });
 });

@@ -100,6 +100,8 @@ function makeStore(overrides: Partial<Store> = {}): Store {
     modules: [],
     isActive: true,
     planType: 'Pago',
+    planPrice: 10,
+    planCurrentPrice: 10,
     ...overrides,
   };
 }

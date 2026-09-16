@@ -29,5 +29,13 @@ namespace Application.Dtos.StoreManagement
         /// from <c>Store.StorePlanId</c>, so the frontend never infers it.
         /// </summary>
         public string PlanType { get; set; }
+        /// <summary>
+        /// CANONICAL plan price (docs/plans/2026-09-15-store-plan-canonical-price-plan.md):
+        /// Σ over the plan's member MODULES from the live catalog with the same formula
+        /// PlanProfile uses for GET /v1/plans — NOT the store's frozen StoreModule
+        /// snapshot. Null when the store is disapproved or its plan is missing/inactive.
+        /// </summary>
+        public float? PlanPrice { get; set; }
+        public float? PlanCurrentPrice { get; set; }
     }
 }

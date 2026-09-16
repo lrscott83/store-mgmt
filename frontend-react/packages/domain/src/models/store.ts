@@ -48,6 +48,13 @@ export interface Store {
   // cards and the plan filter read it; the frontend never infers the active plan
   // from module flags (that heuristic contradicted seeded membership).
   planType: string;
+  // CANONICAL plan price (docs/plans/2026-09-15-store-plan-canonical-price-plan.md):
+  // Σ over the plan's member modules from the LIVE catalog, same formula the plan
+  // view (GET /v1/plans) uses — never the store's frozen module snapshot. Null
+  // when the store is disapproved or its plan is missing/inactive: the card shows
+  // the plan name only.
+  planPrice: number | null;
+  planCurrentPrice: number | null;
   modules: Module[];
   isActive: boolean;
 }
@@ -124,6 +131,12 @@ export interface OwnerStoreWithPlan {
   // Backend-serialized plan name ("Gratis" | "Pago" | "Superior"), same source
   // as StorePlan.planType.
   planType: string;
+  // CANONICAL plan price (docs/plans/2026-09-15-store-plan-canonical-price-plan.md):
+  // Σ over the plan's member modules from the LIVE catalog, same formula the plan
+  // view (GET /v1/plans) uses — never the store's frozen module snapshot. Null
+  // when the store is disapproved or its plan is missing/inactive.
+  planPrice: number | null;
+  planCurrentPrice: number | null;
 }
 
 export interface StoreToCollect {
