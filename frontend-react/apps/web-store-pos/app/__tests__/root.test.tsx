@@ -36,6 +36,17 @@ vi.mock('~/shared/lib/usage/use-store-usage-tracker', () => ({
   useStoreUsageTracker: vi.fn(),
 }));
 
+// client-error-log: root.tsx must install the global hooks (Layout boot) and
+// the ErrorBoundary must write every route error into the diagnostic buffer.
+// The module graph is stubbed here — behavior is unit-tested in
+// shared/lib/diagnostics/__tests__.
+vi.mock('~/shared/lib/diagnostics/install-client-log', () => ({
+  installClientLog: vi.fn(),
+}));
+vi.mock('~/shared/lib/diagnostics/client-log', () => ({
+  logClientError: vi.fn(),
+}));
+
 vi.mock('~/shared/lib/i18n/i18n-provider', () => ({
   I18nProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
@@ -79,6 +90,7 @@ vi.mock('react-toastify', () => ({
 }));
 
 import App, { ErrorBoundary, Layout } from '../root';
+import { logClientError } from '~/shared/lib/diagnostics/client-log';
 
 function mockRouteError(status: number, statusText = '') {
   return { status, statusText, internal: false, data: null };
@@ -308,6 +320,19 @@ describe('ErrorBoundary — view-text-parity: Spanish copy (Angular parity, no i
         'Puede que necesite estar conectado a Internet para hacer esta operación. Por favor, vuelva a intentarlo y si persiste el error contacte al equipo de soporte técnico.',
       ),
     ).toBeInTheDocument();
+  });
+
+  it('logs every route error into the diagnostic buffer (client-error-log wiring)', () => {
+    const error = new Error('route blew up');
+    render(<ErrorBoundary error={error} params={{}} />);
+
+    expect(logClientError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: 'error',
+        message: 'route blew up',
+        location: expect.stringContaining('route blew up'),
+      }),
+    );
   });
 
   it('renders heading "Error" and GENERAL.RESPONSE.ERROR500_MESSAGE details for a non-404 route error', () => {

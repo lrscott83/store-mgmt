@@ -22,10 +22,18 @@ vi.mock('sweetalert2', () => ({
   default: { fire: (...args: unknown[]) => fireMock(...args) },
 }));
 
+// client-error-log: HTTP failures must land in the diagnostic buffer. Mocked here —
+// behavior is unit-tested in shared/lib/diagnostics/__tests__.
+const logClientErrorMock = vi.fn();
+vi.mock('../../diagnostics/client-log', () => ({
+  logClientError: (...args: unknown[]) => logClientErrorMock(...args),
+}));
+
 beforeEach(() => {
   localStorage.clear();
   vi.resetModules();
   fireMock.mockClear();
+  logClientErrorMock.mockClear();
   useLoadingStore.setState({ count: 0, isLoading: false });
 });
 
@@ -407,6 +415,53 @@ describe('api-client (AUTH-06)', () => {
       } catch (e) {
         expect((e as { isNetworkError?: boolean }).isNetworkError).toBeUndefined();
       }
+    });
+  });
+
+  describe('Response interceptor — client-error-log wiring (diagnostics)', () => {
+    it('logs a 500 with method, url and status into the diagnostic buffer', async () => {
+      const { apiClient } = await import('../api-client');
+      const rejected = getResponseInterceptor(apiClient);
+
+      const mockError = new axios.AxiosError('Internal Server Error', '500', undefined, undefined, {
+        status: 500,
+        data: {},
+        headers: {},
+        config: { method: 'get', url: '/v1/stores' } as InternalAxiosRequestConfig,
+        statusText: 'Internal Server Error',
+      });
+
+      await expect(rejected(mockError)).rejects.toBeDefined();
+      expect(logClientErrorMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          level: 'error',
+          message: 'GET /v1/stores → 500',
+          context: { isNetworkError: false },
+        }),
+      );
+    });
+
+    it('logs a network failure with isNetworkError: true', async () => {
+      const { apiClient } = await import('../api-client');
+      const rejected = getResponseInterceptor(apiClient);
+
+      const networkError = new axios.AxiosError(
+        'Network Error',
+        'ERR_NETWORK',
+        undefined,
+        undefined,
+        undefined,
+      );
+      networkError.config = { method: 'post', url: '/v1/usages/store-daily-usage' } as InternalAxiosRequestConfig;
+
+      await expect(rejected(networkError)).rejects.toBeDefined();
+      expect(logClientErrorMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          level: 'error',
+          message: 'POST /v1/usages/store-daily-usage → network-failure',
+          context: { isNetworkError: true },
+        }),
+      );
     });
   });
 

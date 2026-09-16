@@ -202,7 +202,13 @@ test('OwnerAdmin cambia el plan de su tienda vía POST change-plan', async ({
   // assertion that fails if anyone resurrects it.
   await freeHeader.click();
   await expect(freeHeader).toHaveAttribute('aria-expanded', 'true');
-  await expect(freeHeader.getByRole('button', { name: ACTIVATE_TEXT, exact: true })).toBeVisible();
+  // Page-wide on purpose (same scope as Aserción 6 above): the activation
+  // button lives in the panel BODY (plan-panels.tsx:141-149), a sibling of
+  // the header — a header-scoped locator can never match it. After the
+  // accordion click, the FREE panel is the only expanded non-active panel
+  // (the paid one is now active and renders no activation action), so the
+  // page-wide "Activar Plan" IS the free panel's.
+  await expect(page.getByRole('button', { name: ACTIVATE_TEXT, exact: true })).toBeVisible();
   await expect(freeHeader.getByText(ACTIVE_BADGE_TEXT)).toHaveCount(0);
   await expect(paidHeader.getByText(ACTIVE_BADGE_TEXT)).toBeVisible();
 

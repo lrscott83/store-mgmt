@@ -12,6 +12,8 @@ import type { Route } from './+types/root';
 import { I18nProvider } from '~/shared/lib/i18n/i18n-provider';
 import messages from '~/shared/lib/i18n/es';
 import { registerServiceWorker } from '~/shared/lib/pwa/service-worker-registration';
+import { installClientLog } from '~/shared/lib/diagnostics/install-client-log';
+import { logClientError } from '~/shared/lib/diagnostics/client-log';
 import { useStoreUsageTracker } from '~/shared/lib/usage/use-store-usage-tracker';
 import { registerAuthRedirect, willLogoutRedirect } from '~/shared/lib/stores/auth-store';
 import { useLoadingStore } from '~/shared/lib/stores/loading-store';
@@ -29,23 +31,15 @@ import '@store-mgmt/web-common/styles.css';
 import 'react-toastify/ReactToastify.css';
 
 export function Layout({ children }: { children: React.ReactNode }) {
+  // client-error-log: global capture hooks mount BEFORE anything else so even
+  // boot-time errors land in the diagnostic ring buffer (/diagnostics view).
+  installClientLog();
+
   return (
     <html lang="es">
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        {/* Capture `beforeinstallprompt` from an EXTERNAL CLASSIC script that
-            runs DURING head parse — before the deferred `type=module` app
-            bundle (entry.client.tsx) executes. Chrome fires this event once,
-            does not re-dispatch it, and once the service worker + manifest are
-            warm it fires before the bundle runs, so the module-scope listener
-            in pwa-install-prompt.ts misses it and the "Instalar App" button
-            stays disabled. Parking the event on `window.__pwaInstallPrompt`
-            lets `initPwaInstallCapture()` adopt it once the bundle loads.
-            Lives at public/pwa-install-capture.js (not inline) so
-            `script-src` needs no `'unsafe-inline'` — see
-            openspec/changes/content-security-policy/design.md §1 D5. */}
-        <script src="/pwa-install-capture.js"></script>
         {/* Browser tab / bookmark favicon — mirrors Angular index.html's
             `<link rel="icon" type="image/png" href="assets/favicon.png" />`.
             Lives at public/favicon.png. */}
@@ -57,6 +51,24 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <meta name="theme-color" content="#22d3ee" />
         <Meta />
         <Links />
+        {/* Capture `beforeinstallprompt` from an EXTERNAL CLASSIC script that
+            runs during head parse — before the deferred `type=module` app
+            bundle (entry.client.tsx) executes. Chrome fires this event once,
+            does not re-dispatch it, and once the service worker + manifest are
+            warm it fires before the bundle runs, so the module-scope listener
+            in pwa-install-prompt.ts misses it and the "Instalar App" button
+            stays disabled. Parking the event on `window.__pwaInstallPrompt`
+            lets `initPwaInstallCapture()` adopt it once the bundle loads.
+            Lives at public/pwa-install-capture.js (not inline) so
+            `script-src` needs no `'unsafe-inline'` — see
+            openspec/changes/content-security-policy/design.md §1 D5.
+            Positioned: rendered LAST in <head> on purpose — the production
+            build's static HTML hoists modulepreloads/stylesheet links before
+            this tag (React hydration over the served DOM would otherwise see
+            `script` vs `link` at a different index and abort with a #418
+            hydration mismatch in prod, while dev — which serves the exact
+            Layout output — never trips). */}
+        <script src="/pwa-install-capture.js"></script>
       </head>
       <body>
         <I18nProvider>{children}</I18nProvider>
@@ -68,7 +80,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
             not a container prop. */}
         <ToastContainer position="top-right" autoClose={1000} closeButton />
         <ScrollRestoration />
-        <Scripts />
+        {/* SPA mode: the static index.html ALREADY carries the framework
+            shell scripts (context, bootstrap, stream) because the build
+            prerenders this Layout server-side AND hoists `<Scripts/>`'s
+            modulepreload links into <head> — so if the client tried to
+            hydrate `<Scripts/>` here it would expect link children the
+            served body does not have (React #418 hydration mismatch,
+            production only). Render it server-only: the served nodes are
+            left untouched and still execute, the client just does not
+            reclaim them. */}
+        {typeof document === 'undefined' && <Scripts />}
       </body>
     </html>
   );
@@ -138,6 +159,15 @@ export function HydrateFallback() {
 }
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
+  // client-error-log: a route-level error lands in the diagnostic buffer before
+  // any policy decides what to show — this is the only trace a blank-page bug
+  // leaves on a device in the field.
+  logClientError({
+    level: 'error',
+    message: error instanceof Error ? error.message : String(error),
+    location: error instanceof Error ? error.stack : undefined,
+  });
+
   // design D5, seam 2: a decryption failure THROWN during render or in a
   // loader never becomes an unhandled rejection, so the listener above cannot
   // see it — react-router routes it here instead.

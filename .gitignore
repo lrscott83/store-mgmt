@@ -171,3 +171,6 @@ graphify-out/
 
 # Pi harness local state
 .pi/
+
+# temporary diagnostic Playwright specs (never commit)
+frontend-react/e2e/diag-tmp/

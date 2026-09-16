@@ -1,11 +1,11 @@
 import { showUpdateAvailable } from '~/shared/lib/blocking-alert';
 
-// PWA-01/Stage-6-Slice-D: 15-minute periodic `registration.update()` poll, in
+// PWA-01/Stage-6-Slice-D: 5-minute periodic `registration.update()` poll, in
 // addition to the existing update-available confirm/apply flow. Matches
 // Angular's `UpdateService` (SwUpdate → Swal confirm → activateUpdate +
 // reload) plus the periodic-check requirement so a long-lived open tab
 // discovers a new version without a manual reload.
-const UPDATE_POLL_INTERVAL_MS = 15 * 60 * 1000;
+export const UPDATE_POLL_INTERVAL_MS = 5 * 60 * 1000;
 
 export interface RegisterSWOptions {
   onNeedRefresh?: () => void;

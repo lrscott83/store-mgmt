@@ -1,5 +1,6 @@
 ﻿using Application.Abstractions.HttpContext;
 using Application.Abstractions.Messaging;
+using Application.Abstractions.Time;
 using Application.Dtos.Management.Usages;
 using Application.Exceptions;
 using Application.ResponseModels;
@@ -21,15 +22,17 @@ namespace Application.Features.Management.Usages.Queries.GetStoreLastWeekUsages
         private readonly IStoreRepository _storeRepository;
         private readonly IMapper _mapper;
         private readonly IStringLocalizer<I18n> _localizer;
+        private readonly IDateTimeProvider _dateTimeProvider;
 
         public GetStoreLastWeekUsagesQueryHandler(IHttpContextService httpContextService, IStoreUsageRepository storeUsageRepository,
-            IMapper mapper, IStringLocalizer<I18n> localizer, IStoreRepository storeRepository)
+            IMapper mapper, IStringLocalizer<I18n> localizer, IStoreRepository storeRepository, IDateTimeProvider dateTimeProvider)
         {
             _httpContextService = httpContextService;
             _storeUsageRepository = storeUsageRepository;
+            _storeRepository = storeRepository;
             _mapper = mapper;
             _localizer = localizer;
-            _storeRepository = storeRepository;
+            _dateTimeProvider = dateTimeProvider;
         }
 
         public async Task<ResponseResult<StoreUsagesDto>> Handle(GetStoreLastUsagesQuery query, CancellationToken cancellationToken)
@@ -37,33 +40,47 @@ namespace Application.Features.Management.Usages.Queries.GetStoreLastWeekUsages
             if (!_httpContextService.IsSuperAdmin)
                 throw new ApiException(_localizer["UserNotFound"], HttpStatusCode.BadRequest);
 
-            DateTime lastWeekDay = DateTime.UtcNow.Date.AddDays(-1 * query.LastDays);
+            // Dense-bucket contract (usage-dashboard-alignment): EXACTLY LastDays buckets,
+            // one per calendar day from (today - (LastDays-1)) to today inclusive. Days
+            // without usage (including today when nobody has connected yet) get an explicit
+            // 0 and an empty owners list, so the frontend maps buckets 1:1 onto day labels
+            // with no index shift. The window is LastDays days wide (not LastDays+1).
+            DateTime todayUtc = _dateTimeProvider.UtcNow.UtcDateTime.Date;
+            DateTime lastWeekDay = todayUtc.AddDays(-1 * (query.LastDays - 1));
+
             IEnumerable<StoreUsage> storeUsages = await _storeUsageRepository.GetStoresUsagesAfterDateWithOwnerAsync(lastWeekDay);
-            // Deduplicate per store per day in memory (mirrors the repository's legacy
-            // SQL GROUP BY) so the counts stay identical while the navigation chain
-            // Store → Owner → User remains loaded for the owner names.
+            // Deduplicate per store per day in memory so a store with several users on the
+            // same day counts once, while the navigation chain Store → Owner → User stays
+            // loaded for the owner names.
             var storeDayGroups = storeUsages
                 .GroupBy(usage => new { usage.StoreId, usage.Day })
                 .Select(group => group.First())
                 .ToList();
-            var groups = storeDayGroups
+            var byDay = storeDayGroups
                 .GroupBy(usage => usage.Day)
-                .OrderBy(group => group.Key)
-                .ToList();
-            List<int> usagesCount = groups.Select(group => group.Count()).ToList();
-            List<IList<string>> ownerNamesPerDay = groups
-                .Select(group => (IList<string>)group
-                    .Select(usage => usage.Store?.Owner?.User?.FullName)
-                    .Where(name => !string.IsNullOrWhiteSpace(name))
-                    .Distinct()
-                    .OrderBy(name => name)
-                    .ToList())
-                .ToList();
-            while (usagesCount.Count < query.LastDays)
+                .ToDictionary(group => group.Key, group => group.ToList());
+
+            List<int> usagesCount = new List<int>(query.LastDays);
+            List<IList<string>> ownerNamesPerDay = new List<IList<string>>(query.LastDays);
+            for (DateTime day = lastWeekDay; day <= todayUtc; day = day.AddDays(1))
             {
-                usagesCount.Insert(0, 0);
-                ownerNamesPerDay.Insert(0, new List<string>());
+                if (byDay.TryGetValue(day, out var dayUsages))
+                {
+                    usagesCount.Add(dayUsages.Count);
+                    ownerNamesPerDay.Add(dayUsages
+                        .Select(usage => usage.Store?.Owner?.User?.FullName)
+                        .Where(name => !string.IsNullOrWhiteSpace(name))
+                        .Distinct()
+                        .OrderBy(name => name)
+                        .ToList());
+                }
+                else
+                {
+                    usagesCount.Add(0);
+                    ownerNamesPerDay.Add(new List<string>());
+                }
             }
+
             int activeStoreCount = await _storeRepository.GetActiveStoreCountAsync();
             return ResponseResult.Success(new StoreUsagesDto(usagesCount, activeStoreCount)
             {

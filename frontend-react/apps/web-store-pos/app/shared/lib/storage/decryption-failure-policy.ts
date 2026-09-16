@@ -1,6 +1,7 @@
 import { showBlockingError, showDamagedDataRecoveryDialog } from '../blocking-alert';
 import messages from '../i18n/es';
 import { useAuthStore } from '../stores/auth-store';
+import { logClientError } from '../diagnostics/client-log';
 // STATIC, and unavoidably so — a deliberate departure from the plan's
 // "invoke it through a dynamic import" note (§4, Fase 1). The capture has to
 // be SYNCHRONOUS and has to happen BEFORE `logout()`: `logout()` calls
@@ -84,6 +85,11 @@ export function resetDecryptionFailureLatch(): void {
  * also offers the only two things left to do: take a copy of what is still
  * readable, or leave the data alone. See `announceDamagedData`.
  *
+ * Both kinds are recorded in the client-error ring buffer before either exit
+ * closes the session — that entry is the only trace a field device leaves
+ * behind, and it is what the recovery procedure reads back
+ * (`docs/contracts/decryption-failure-recovery.md`, §4).
+ *
  * Returns whether this error was ours. `true` covers the latched case too: the
  * second rejection of one cause IS handled, it just does not speak, and its
  * caller must still stop it from surfacing as an unhandled rejection.
@@ -94,6 +100,21 @@ export function handleDecryptionFailure(error: unknown): boolean {
   if (announced) return true;
   announced = true;
 
+  // client-error-log: a decryption failure is the hardest field bug to
+  // reproduce — it MUST leave a trace in the diagnostic buffer before logout.
+  // It runs for BOTH kinds, and before either exit below, so a `damaged` run
+  // leaves the `Decryption failure (damaged): session ended` entry the
+  // recovery procedure tells the operator to look for.
+  logClientError({
+    level: 'error',
+    message: `Decryption failure (${kind}): session ended`,
+    location: error instanceof Error ? error.stack : undefined,
+  });
+
+  // `damaged` keeps its own exit: `announceDamagedData` shows the
+  // damaged-data popup (the recovery offer when there is still something to
+  // save) and closes the session itself. The single-button popup below is the
+  // `missing-key` statement, and only that one.
   if (kind === 'damaged') {
     announceDamagedData();
     return true;

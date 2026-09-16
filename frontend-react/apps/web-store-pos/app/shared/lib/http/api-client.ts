@@ -3,6 +3,7 @@ import { StorageService } from '../auth/storage-service';
 import { useLoadingStore } from '../stores/loading-store';
 import { showBlockingError } from '../blocking-alert';
 import esMessages from '../i18n/es';
+import { logClientError } from '../diagnostics/client-log';
 import { OFFLINE_SESSION_TOKEN } from '../offline/offline-session';
 
 const API_TIMEOUT = 30000;
@@ -116,6 +117,17 @@ apiClient.interceptors.response.use(
     }
 
     if (axios.isAxiosError(error)) {
+      // client-error-log: every HTTP failure lands in the diagnostic ring buffer
+      // (method + URL + status only — NEVER headers, bodies or tokens).
+      const requestConfig = error.config ?? error.response?.config;
+      logClientError({
+        level: 'error',
+        message: `${requestConfig?.method?.toUpperCase() ?? 'HTTP'} ${
+          requestConfig?.url ?? '(unknown url)'
+        } → ${error.response ? error.response.status : 'network-failure'}`,
+        context: { isNetworkError: !error.response },
+      });
+
       // Angular error-interceptor.service.ts:52-59: `err.status === 0 ||
       // err.name === 'TimeoutError' || err.message?.includes('Network')` never
       // reach a server response. Axios' equivalent — no `error.response` —

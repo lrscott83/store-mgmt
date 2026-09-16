@@ -67,12 +67,19 @@ describe('getDiasSemana — Monday (2026-06-01)', () => {
 });
 
 describe('getDias30', () => {
-  it('returns string labels 1 through 30', async () => {
+  it('returns 30 real date labels (dd-MMM) ending TODAY, oldest first', async () => {
     const { getDias30 } = await import('../dashboard');
     const result = getDias30();
     expect(result).toHaveLength(30);
-    expect(result[0]).toBe('1');
-    expect(result[29]).toBe('30');
+    // Aligned with the backend's dense buckets: last label = today.
+    const MONTHS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+    const now = new Date();
+    const expectedLast = `${now.getDate()}-${MONTHS[now.getMonth()]}`;
+    const dayMinus29 = new Date(now);
+    dayMinus29.setDate(dayMinus29.getDate() - 29);
+    const expectedFirst = `${dayMinus29.getDate()}-${MONTHS[dayMinus29.getMonth()]}`;
+    expect(result[0]).toBe(expectedFirst);
+    expect(result[29]).toBe(expectedLast);
   });
 });
 

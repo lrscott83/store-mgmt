@@ -17,7 +17,7 @@ export interface MenuItem {
    * resellerFeatureLoader still denies it — the menu must not offer a link
    * that 403s). When absent, no extra role restriction applies.
    */
-  rolesOnly?: (user: Pick<UserModel, 'isSuperAdmin' | 'isReSeller'>) => boolean;
+  rolesOnly?: (user: Pick<UserModel, 'isSuperAdmin' | 'isOwnerAdmin' | 'isReSeller'>) => boolean;
   /**
    * Renders a "NEW" badge next to the label so users notice recently added
    * functionality. Remove the flag (and this comment) once the feature is no
@@ -371,6 +371,16 @@ export const MENU_GROUPS: MenuGroup[] = [
         moduleId: EModules.Management,
         helpContent:
           'Configuraciones de la tienda. Administra las funcionalidades activas, módulos habilitados y permisos generales de tu negocio.',
+      },
+      // client-error-log: the diagnostic ring-buffer viewer is for SuperAdmin
+      // or OwnerAdmin only (same set the route's adminLoader admits) — the
+      // rolesOnly gate mirrors the loader so the menu never offers a 403 link.
+      {
+        label: 'MENU.DIAGNOSTICS',
+        path: '/diagnostics',
+        rolesOnly: (user) => user.isSuperAdmin || user.isOwnerAdmin,
+        helpContent:
+          'Diagnóstico. Muestra los errores y eventos registrados en este dispositivo para poder reportarlos. Puedes compartir, copiar o limpiar el registro.',
       },
     ],
   },
