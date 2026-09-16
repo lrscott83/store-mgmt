@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { Currency } from '@store-mgmt/domain';
 import type { Product, ProductCategory, UserModel } from '@store-mgmt/domain';
 import { ProductRepository } from '../product-repository';
 import { ProductCategoryRepository } from '../product-category-repository';
@@ -406,6 +407,31 @@ describe('ProductRepository (React mirror of Angular product.repository.ts looku
       expect(created?.categoryName).toBe('Bebidas');
       expect(created?.createdByName).toBe('jdoe');
     });
+
+    it('stamps Currency.CUP when no currency param is passed (plan default)', () => {
+      const result = repo.addProductData('p1', 'cat-1', 'Ron', 10, 'biz-1', 1, true, true, false);
+      expect(result.succeeded).toBe(true);
+      expect(repo.getProductById('p1')?.currency).toBe(Currency.CUP);
+    });
+
+    it('stores the trailing currency param on the created product', () => {
+      const result = repo.addProductData(
+        'p1',
+        'cat-1',
+        'Ron',
+        10,
+        'biz-1',
+        1,
+        true,
+        true,
+        false,
+        undefined,
+        undefined,
+        Currency.MLC,
+      );
+      expect(result.succeeded).toBe(true);
+      expect(repo.getProductById('p1')?.currency).toBe(Currency.MLC);
+    });
   });
 
   // ─── 3.7 addProduct / addImportedProduct ──────────────────────────────────
@@ -428,6 +454,24 @@ describe('ProductRepository (React mirror of Angular product.repository.ts looku
       expect(stored[0].name).toBe('Ron');
       expect(stored[0].id).toBeTruthy();
     });
+
+    it('passes a trailing currency param through to the stored product', () => {
+      const result = repo.addProduct(
+        'cat-1',
+        'Ron',
+        10,
+        'biz-1',
+        1,
+        true,
+        true,
+        false,
+        undefined,
+        undefined,
+        Currency.EUR,
+      );
+      expect(result.succeeded).toBe(true);
+      expect(readStoredProducts(storeId)[0].currency).toBe(Currency.EUR);
+    });
   });
 
   describe('addImportedProduct — preserves the imported id (product.repository.ts:173-185)', () => {
@@ -446,6 +490,17 @@ describe('ProductRepository (React mirror of Angular product.repository.ts looku
       const result = repo.addImportedProduct(imported);
       expect(result.succeeded).toBe(true);
       expect(repo.getProductById('imported-1')?.name).toBe('Imported');
+    });
+
+    it('preserves the imported product currency (roster import assigns the column)', () => {
+      const imported = makeProduct('imported-1', {
+        categoryId: 'cat-1',
+        name: 'Imported',
+        currency: Currency.USD,
+      });
+      const result = repo.addImportedProduct(imported);
+      expect(result.succeeded).toBe(true);
+      expect(repo.getProductById('imported-1')?.currency).toBe(Currency.USD);
     });
   });
 
@@ -538,6 +593,35 @@ describe('ProductRepository (React mirror of Angular product.repository.ts looku
       expect(updated.updatedByName).toBe('jdoe');
       expect(updated.updatedDate).toBeTruthy();
       expect(byId.get('p2')?.order).toBe(3);
+    });
+
+    it('updates the stored currency when a currency param is passed', () => {
+      seedProducts(storeId, [makeProduct('p1', { categoryId: 'cat-1', currency: Currency.CUP })]);
+      const result = repo.updateProduct(
+        'p1',
+        'cat-1',
+        'Ron',
+        12,
+        '',
+        1,
+        true,
+        true,
+        false,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        Currency.CLA,
+      );
+      expect(result.succeeded).toBe(true);
+      expect(repo.getProductById('p1')?.currency).toBe(Currency.CLA);
+    });
+
+    it('leaves the stored currency untouched when no currency param is passed', () => {
+      seedProducts(storeId, [makeProduct('p1', { categoryId: 'cat-1', currency: Currency.MLC })]);
+      const result = repo.updateProduct('p1', 'cat-1', 'Ron', 12, '', 1, true, true, false);
+      expect(result.succeeded).toBe(true);
+      expect(repo.getProductById('p1')?.currency).toBe(Currency.MLC);
     });
   });
 

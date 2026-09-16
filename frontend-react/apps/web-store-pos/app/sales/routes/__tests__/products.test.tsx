@@ -1386,8 +1386,18 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       await waitFor(() => expect(productServiceSpies.createCsvProducts).toHaveBeenCalledTimes(1));
       // Concrete cost/quantity values (design R3): with real values the equality is no longer
       // undefined-blind — it FAILS if cost/quantity aren't threaded from parser to service.
+      // currency-in-costs-and-prices: this 6-column fixture carries no currency column, so the
+      // parsed row's currency is explicitly undefined (written out for documentation, like
+      // cost/quantity above).
       expect(productServiceSpies.createCsvProducts).toHaveBeenCalledWith([
-        { category: 'Snacks', name: 'Chips', price: 10, cost: 6, quantity: 12 },
+        {
+          category: 'Snacks',
+          name: 'Chips',
+          price: 10,
+          cost: 6,
+          quantity: 12,
+          currency: undefined,
+        },
       ]);
     });
 
@@ -1420,7 +1430,45 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       // 'does not create an entry when quantity is absent' case below, which asserts
       // createInventoryEntry was never called.
       expect(productServiceSpies.createCsvProducts).toHaveBeenCalledWith([
-        { category: 'Snacks', name: 'Chips', price: 10, cost: undefined, quantity: undefined },
+        {
+          category: 'Snacks',
+          name: 'Chips',
+          price: 10,
+          cost: undefined,
+          quantity: undefined,
+          currency: undefined,
+        },
+      ]);
+    });
+
+    it('threads the optional currency column value through to createCsvProducts', async () => {
+      mockCreateCsvProductsOnce([]);
+      render(
+        <Wrapper>
+          <ProductsPage />
+        </Wrapper>,
+      );
+
+      fireEvent.click(screen.getByTestId('import-csv-button'));
+      fireEvent.change(screen.getByTestId('csv-file-input'), {
+        target: {
+          files: [
+            new File(
+              ['name,price,category,cost,quantity,moneda\nChips,10,Snacks,6,12,5'],
+              'products.csv',
+              { type: 'text/csv' },
+            ),
+          ],
+        },
+      });
+      await waitFor(() => expect(screen.getByTestId('csv-import-button')).toBeInTheDocument());
+      fireEvent.click(screen.getByTestId('csv-import-button'));
+
+      await waitFor(() => expect(productServiceSpies.createCsvProducts).toHaveBeenCalledTimes(1));
+      // currency-in-costs-and-prices: the `moneda` column (5) is threaded parser → handler →
+      // service, like cost/quantity (design R3 — a concrete value discriminates threading).
+      expect(productServiceSpies.createCsvProducts).toHaveBeenCalledWith([
+        { category: 'Snacks', name: 'Chips', price: 10, cost: 6, quantity: 12, currency: 5 },
       ]);
     });
 

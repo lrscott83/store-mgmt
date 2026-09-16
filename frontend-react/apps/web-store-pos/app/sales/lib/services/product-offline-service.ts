@@ -309,6 +309,10 @@ export class ProductOfflineService implements ProductService {
           price: csvProduct.price,
           name: productName,
           categoryName,
+          // currency-in-costs-and-prices (plan 2026-09-16): the CSV column wins when present;
+          // absent => the existing product keeps its own currency (the row only refreshes the
+          // sale price, it never resets a stored currency to CUP).
+          currency: csvProduct.currency ?? existingProduct.currency,
         });
         created.push({
           ...csvProduct,
@@ -330,6 +334,11 @@ export class ProductOfflineService implements ProductService {
           true,
           true,
           true,
+          undefined,
+          undefined,
+          // currency-in-costs-and-prices (plan 2026-09-16): CSV column optional, absent =>
+          // DEFAULT_CURRENCY inside addProductData.
+          csvProduct.currency,
         );
         if (result.succeeded)
           created.push({

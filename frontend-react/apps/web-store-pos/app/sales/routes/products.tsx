@@ -347,6 +347,7 @@ export function ProductsPage() {
         price: row.price,
         cost: row.cost,
         quantity: row.quantity,
+        currency: row.currency,
       }));
 
     const result = await productService.createCsvProducts(csvProducts);

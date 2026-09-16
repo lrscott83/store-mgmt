@@ -5,7 +5,14 @@ import type {
   InventoryEntryView,
   OrderItem,
 } from '@store-mgmt/domain';
-import { DataResult, InventoryErrors, ProductErrors, Result, success } from '@store-mgmt/domain';
+import {
+  DataResult,
+  DEFAULT_CURRENCY,
+  InventoryErrors,
+  ProductErrors,
+  Result,
+  success,
+} from '@store-mgmt/domain';
 import { ProductRepository } from '~/sales/lib/repositories/product-repository';
 import { StorageKeys } from '~/shared/lib/storage/storage-keys';
 import { encryptEntity, decryptEntity } from '~/shared/lib/storage/entity-crypto';
@@ -427,7 +434,13 @@ export class InventoryOfflineService {
       const taken = round2(Math.min(remaining, entry.available));
       entry.available = round2(entry.available - taken);
       remaining = round2(remaining - taken);
-      costs.push({ inventoryId: entry.id, costPrice: entry.costPrice, quantity: taken });
+      costs.push({
+        inventoryId: entry.id,
+        costPrice: entry.costPrice,
+        quantity: taken,
+        // currency-in-costs-and-prices (plan 2026-09-16): the cost's own currency.
+        currency: entry.currency ?? DEFAULT_CURRENCY,
+      });
     }
 
     // Persist the mutated map (entries are mutated in-place above)
@@ -558,6 +571,7 @@ export class InventoryOfflineService {
       date,
       order: maxOrder + 1,
       isActive: true,
+      currency: DEFAULT_CURRENCY,
       createdDate: date,
       createdByName: getCurrentUserLogin(),
       updatedDate: undefined,
@@ -577,6 +591,7 @@ export class InventoryOfflineService {
         costPrice: entry.costPrice,
         date: entry.date,
         isActive: entry.isActive,
+        currency: entry.currency,
       },
       true,
       [],

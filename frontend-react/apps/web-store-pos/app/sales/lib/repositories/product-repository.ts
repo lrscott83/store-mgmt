@@ -1,5 +1,5 @@
-import type { Product, WholesaleConfig } from '@store-mgmt/domain';
-import { ProductCategoryErrors, ProductErrors, Result } from '@store-mgmt/domain';
+import type { Currency, Product, WholesaleConfig } from '@store-mgmt/domain';
+import { DEFAULT_CURRENCY, ProductCategoryErrors, ProductErrors, Result } from '@store-mgmt/domain';
 import { StorageKeys } from '~/shared/lib/storage/storage-keys';
 import { getCurrentUserLogin } from '~/shared/lib/auth/current-user';
 import { encryptEntity, decryptEntity } from '~/shared/lib/storage/entity-crypto';
@@ -189,6 +189,7 @@ export class ProductRepository {
     discountFromInvantory: boolean,
     barcode?: string,
     wholesale?: WholesaleConfig,
+    currency?: Currency,
   ): Result {
     const category = this.categoryRepository.getProductCategoryById(categoryId);
     if (!category) return Result.Failure([ProductCategoryErrors.NotExists]);
@@ -211,6 +212,8 @@ export class ProductRepository {
       categoryId,
       categoryName: category.name,
       price,
+      // currency-in-costs-and-prices (plan 2026-09-16): sale price currency; absent => default.
+      currency: currency ?? DEFAULT_CURRENCY,
       businessId,
       isActive,
       createdDate: new Date(),
@@ -224,7 +227,12 @@ export class ProductRepository {
     if (wholesale) {
       newProduct.wholesaleEnabled = true;
       newProduct.wholesalePackSize = wholesale.packSize;
-      newProduct.wholesaleTiers = wholesale.tiers;
+      // currency-in-costs-and-prices (plan 2026-09-16): tier prices share the product's
+      // currency — per-entity homogeneous (plan rule 4).
+      newProduct.wholesaleTiers = wholesale.tiers.map((tier) => ({
+        ...tier,
+        currency: tier.currency ?? DEFAULT_CURRENCY,
+      }));
       newProduct.wholesaleUnitLabel = wholesale.unitLabel;
     }
     this.updateProductsOrderByCategory(products, categoryId, order);
@@ -246,6 +254,7 @@ export class ProductRepository {
     discountFromInvantory: boolean,
     barcode?: string,
     wholesale?: WholesaleConfig,
+    currency?: Currency,
   ): Result {
     return this.addProductData(
       generateId(),
@@ -259,6 +268,7 @@ export class ProductRepository {
       discountFromInvantory,
       barcode,
       wholesale,
+      currency,
     );
   }
 
@@ -282,6 +292,7 @@ export class ProductRepository {
             ...(product.wholesaleUnitLabel ? { unitLabel: product.wholesaleUnitLabel } : {}),
           }
         : undefined,
+      product.currency,
     );
   }
 
@@ -318,6 +329,7 @@ export class ProductRepository {
     updatedDate: Date = new Date(),
     updatedByName: string = getCurrentUserLogin(),
     wholesale?: WholesaleConfig,
+    currency?: Currency,
   ): Result {
     const category = this.categoryRepository.getProductCategoryById(categoryId);
     if (!category) return Result.Failure([ProductCategoryErrors.NotExists]);
@@ -350,10 +362,18 @@ export class ProductRepository {
     product.discountFromInvantory = discountFromInvantory;
     product.updatedDate = updatedDate;
     product.updatedByName = updatedByName;
+    // currency-in-costs-and-prices (plan 2026-09-16): update ONLY when explicitly given (===
+    // undefined leaves the stored currency untouched — e.g. roster re-import without a column).
+    if (currency !== undefined) product.currency = currency;
     if (wholesale !== undefined) {
       product.wholesaleEnabled = true;
       product.wholesalePackSize = wholesale.packSize;
-      product.wholesaleTiers = wholesale.tiers;
+      product.wholesaleTiers = wholesale.tiers.map((tier) => ({
+        ...tier,
+        // currency-in-costs-and-prices (plan 2026-09-16): tier prices share the product's
+        // currency — per-entity homogeneous (plan rule 4).
+        currency: tier.currency ?? DEFAULT_CURRENCY,
+      }));
       product.wholesaleUnitLabel = wholesale.unitLabel;
     }
 
@@ -386,6 +406,7 @@ export class ProductRepository {
             ...(product.wholesaleUnitLabel ? { unitLabel: product.wholesaleUnitLabel } : {}),
           }
         : undefined,
+      product.currency,
     );
   }
 

@@ -1,6 +1,7 @@
 import type { BaseResponseModel, Order, OrderItem } from '@store-mgmt/domain';
 import {
   DataResult,
+  DEFAULT_CURRENCY,
   OrderErrors,
   OrderType,
   PaymentType,
@@ -482,6 +483,9 @@ export class OrderOfflineService {
         // Angular parity (order-offline.service.ts:377): stamps OrderItem.order from the
         // Product's own catalog display-order attribute, NOT the cart array index.
         order: product.order,
+        // currency-in-costs-and-prices (plan 2026-09-16): the sale price's currency —
+        // the wholesale cart pays per-unit prices from the product's own tiers.
+        currency: DEFAULT_CURRENCY,
       };
     });
 
@@ -504,6 +508,7 @@ export class OrderOfflineService {
       isCredit,
       description: details || (isCredit ? client : ''),
       isActive: true,
+      currency: DEFAULT_CURRENCY,
       createdDate: now,
       createdByName: getCurrentUserLogin(),
       updatedDate: undefined,

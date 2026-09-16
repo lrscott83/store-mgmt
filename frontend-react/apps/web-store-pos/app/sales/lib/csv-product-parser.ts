@@ -1,6 +1,11 @@
+import type { Currency } from '@store-mgmt/domain';
+
 export interface ParsedProductRow {
   name: string;
   price: number;
+  // currency-in-costs-and-prices (plan 2026-09-16): optional `moneda`/`currency` column,
+  // normalized to `undefined` by `parseOptionalCurrency` — never an error, never drops a row.
+  currency?: Currency;
   // Required — mirrors Angular's `CsvProduct` model (byte-identical shape:
   // frontend/src/app/_services/csv/models/csv-product.model.ts) and its `validateProducts`
   // check (frontend/src/app/_services/csv/csv-product.service.ts:26-34), which treats
@@ -150,6 +155,23 @@ function parseOptionalQuantity(raw: string): number | undefined {
   return isNaN(value) ? undefined : value;
 }
 
+/**
+ * currency-in-costs-and-prices (plan 2026-09-16): absent, non-numeric, non-integer or
+ * out-of-range (0–6, enum congelado) -> undefined. Full-string `Number()` validation,
+ * same caveat as `parseOptionalCost` — `parseFloat('2CUP')` would be `2`, so the bare
+ * `Number(raw)` gate rejects malformed cells instead of silently accepting them. The
+ * value is cast to `Currency` only AFTER range validation, keeping unknown values at
+ * `undefined` (the consuming sites fall back to `DEFAULT_CURRENCY`).
+ */
+function parseOptionalCurrency(raw: string): Currency | undefined {
+  if (!raw) return undefined;
+  if (isNaN(Number(raw))) return undefined;
+  const value = parseFloat(raw);
+  if (!Number.isInteger(value)) return undefined;
+  if (value < 0 || value > 6) return undefined;
+  return value as Currency;
+}
+
 export function parseCsvProducts(csvText: string): CsvParseResult {
   const products: ParsedProductRow[] = [];
   const errors: CsvRowError[] = [];
@@ -171,6 +193,7 @@ export function parseCsvProducts(csvText: string): CsvParseResult {
   const categoryIdx = indexOfHeader(headers, 'categoria', 'category');
   const costIdx = indexOfHeader(headers, 'costo', 'cost');
   const quantityIdx = indexOfHeader(headers, 'cantidad', 'quantity');
+  const currencyIdx = indexOfHeader(headers, 'moneda', 'currency');
 
   let dataRowNum = 0;
   for (let i = headerIndex + 1; i < rows.length; i++) {
@@ -214,7 +237,10 @@ export function parseCsvProducts(csvText: string): CsvParseResult {
     const cost = parseOptionalCost(costIdx >= 0 ? (fields[costIdx] ?? '') : '');
     const quantity = parseOptionalQuantity(quantityIdx >= 0 ? (fields[quantityIdx] ?? '') : '');
 
-    products.push({ name, price, category, cost, quantity });
+    // --- Optional currency (React-only, currency-in-costs-and-prices plan 2026-09-16) ---
+    const currency = parseOptionalCurrency(currencyIdx >= 0 ? (fields[currencyIdx] ?? '') : '');
+
+    products.push({ name, price, category, cost, quantity, currency });
   }
 
   return { products, errors };

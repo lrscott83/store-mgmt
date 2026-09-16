@@ -4,7 +4,7 @@ import { ProductRepository } from '~/sales/lib/repositories/product-repository';
 import { InventoryOfflineService } from '../inventory-offline-service';
 import { WarehouseOfflineService } from '../warehouse-offline-service';
 import type { WarehouseStockLevel } from '@store-mgmt/domain';
-import { WarehouseErrors } from '@store-mgmt/domain';
+import { Currency, WarehouseErrors } from '@store-mgmt/domain';
 
 const storeId = 'test-store';
 
@@ -452,8 +452,20 @@ describe('WarehouseOfflineService', () => {
       const whA = service.createWarehouse('A').data!;
       const whB = service.createWarehouse('B').data!;
       // Origin: prod-1 @ $10 (10 units). Destination: prod-1 @ $6 (10 units).
-      service.recordMovement({ type: 'purchase_in', warehouseId: whA.id, productId: 'prod-1', quantity: 10, costPrice: 10 });
-      service.recordMovement({ type: 'purchase_in', warehouseId: whB.id, productId: 'prod-1', quantity: 10, costPrice: 6 });
+      service.recordMovement({
+        type: 'purchase_in',
+        warehouseId: whA.id,
+        productId: 'prod-1',
+        quantity: 10,
+        costPrice: 10,
+      });
+      service.recordMovement({
+        type: 'purchase_in',
+        warehouseId: whB.id,
+        productId: 'prod-1',
+        quantity: 10,
+        costPrice: 6,
+      });
 
       const result = service.recordMovement({
         type: 'transfer_out',
@@ -477,8 +489,20 @@ describe('WarehouseOfflineService', () => {
     it('transfer_in to a destination with prior stock recomputes the weighted cost (GAP-3)', () => {
       const whA = service.createWarehouse('A').data!;
       const whB = service.createWarehouse('B').data!;
-      service.recordMovement({ type: 'purchase_in', warehouseId: whA.id, productId: 'prod-1', quantity: 10, costPrice: 10 });
-      service.recordMovement({ type: 'purchase_in', warehouseId: whB.id, productId: 'prod-1', quantity: 10, costPrice: 6 });
+      service.recordMovement({
+        type: 'purchase_in',
+        warehouseId: whA.id,
+        productId: 'prod-1',
+        quantity: 10,
+        costPrice: 10,
+      });
+      service.recordMovement({
+        type: 'purchase_in',
+        warehouseId: whB.id,
+        productId: 'prod-1',
+        quantity: 10,
+        costPrice: 6,
+      });
 
       const result = service.recordMovement({
         type: 'transfer_in',
@@ -591,13 +615,25 @@ describe('WarehouseOfflineService', () => {
   describe('recordMovement — lotes FIFO exactos (D8)', () => {
     it('U-S13c: purchase_in crea un lote nuevo con costo exacto y no recalcula lotes ajenos', () => {
       const wh = service.createWarehouse('A').data!;
-      service.recordMovement({ type: 'purchase_in', warehouseId: wh.id, productId: 'prod-1', quantity: 10, costPrice: 5 });
-      service.recordMovement({ type: 'purchase_in', warehouseId: wh.id, productId: 'prod-1', quantity: 10, costPrice: 10 });
+      service.recordMovement({
+        type: 'purchase_in',
+        warehouseId: wh.id,
+        productId: 'prod-1',
+        quantity: 10,
+        costPrice: 5,
+      });
+      service.recordMovement({
+        type: 'purchase_in',
+        warehouseId: wh.id,
+        productId: 'prod-1',
+        quantity: 10,
+        costPrice: 10,
+      });
       const level = service.getStockLevel(wh.id, 'prod-1')!;
       expect(level.onHand).toBe(20);
       expect(level.lots).toEqual([
-        { costPrice: 5, quantity: 10 },
-        { costPrice: 10, quantity: 10 },
+        { costPrice: 5, quantity: 10, currency: Currency.CUP },
+        { costPrice: 10, quantity: 10, currency: Currency.CUP },
       ]);
       // display ponderado de restantes (F1b): (10×5+10×10)/20 = 7.5
       expect(level.costPrice).toBe(7.5);
@@ -605,8 +641,19 @@ describe('WarehouseOfflineService', () => {
 
     it('U-S13: sale_out persiste costPrice e inventoryEntryId 1:1 en cada fila (D11)', () => {
       const wh = service.createWarehouse('A').data!;
-      service.recordMovement({ type: 'purchase_in', warehouseId: wh.id, productId: 'prod-1', quantity: 24, costPrice: 660 });
-      const result = service.recordMovement({ type: 'sale_out', warehouseId: wh.id, productId: 'prod-1', quantity: 12 });
+      service.recordMovement({
+        type: 'purchase_in',
+        warehouseId: wh.id,
+        productId: 'prod-1',
+        quantity: 24,
+        costPrice: 660,
+      });
+      const result = service.recordMovement({
+        type: 'sale_out',
+        warehouseId: wh.id,
+        productId: 'prod-1',
+        quantity: 12,
+      });
       expect(result.succeeded).toBe(true);
 
       const saleMovements = service.getMovements().filter((m) => m.type === 'sale_out');
@@ -622,10 +669,27 @@ describe('WarehouseOfflineService', () => {
 
     it('U-S13b: sale_out multi-lote crea N filas con costo exacto y enlace 1:1 por fila', () => {
       const wh = service.createWarehouse('A').data!;
-      service.recordMovement({ type: 'purchase_in', warehouseId: wh.id, productId: 'prod-1', quantity: 10, costPrice: 5 });
-      service.recordMovement({ type: 'purchase_in', warehouseId: wh.id, productId: 'prod-1', quantity: 10, costPrice: 10 });
+      service.recordMovement({
+        type: 'purchase_in',
+        warehouseId: wh.id,
+        productId: 'prod-1',
+        quantity: 10,
+        costPrice: 5,
+      });
+      service.recordMovement({
+        type: 'purchase_in',
+        warehouseId: wh.id,
+        productId: 'prod-1',
+        quantity: 10,
+        costPrice: 10,
+      });
       // Salida de 15: consume 10@$5 y 5@$10 → dos filas.
-      const result = service.recordMovement({ type: 'sale_out', warehouseId: wh.id, productId: 'prod-1', quantity: 15 });
+      const result = service.recordMovement({
+        type: 'sale_out',
+        warehouseId: wh.id,
+        productId: 'prod-1',
+        quantity: 15,
+      });
       expect(result.succeeded).toBe(true);
 
       const saleMovements = service.getMovements().filter((m) => m.type === 'sale_out');
@@ -645,14 +709,26 @@ describe('WarehouseOfflineService', () => {
       // Origen queda con el lote $10 reducido a 5.
       const level = service.getStockLevel(wh.id, 'prod-1')!;
       expect(level.onHand).toBe(5);
-      expect(level.lots).toEqual([{ costPrice: 10, quantity: 5 }]);
+      expect(level.lots).toEqual([{ costPrice: 10, quantity: 5, currency: Currency.CUP }]);
     });
 
     it('U-S13d: transfer_out multi-lote acredita el destino por lote con costo exacto (sin mezcla)', () => {
       const whA = service.createWarehouse('A').data!;
       const whB = service.createWarehouse('B').data!;
-      service.recordMovement({ type: 'purchase_in', warehouseId: whA.id, productId: 'prod-1', quantity: 10, costPrice: 5 });
-      service.recordMovement({ type: 'purchase_in', warehouseId: whA.id, productId: 'prod-1', quantity: 10, costPrice: 10 });
+      service.recordMovement({
+        type: 'purchase_in',
+        warehouseId: whA.id,
+        productId: 'prod-1',
+        quantity: 10,
+        costPrice: 5,
+      });
+      service.recordMovement({
+        type: 'purchase_in',
+        warehouseId: whA.id,
+        productId: 'prod-1',
+        quantity: 10,
+        costPrice: 10,
+      });
       const result = service.recordMovement({
         type: 'transfer_out',
         warehouseId: whA.id,
@@ -669,11 +745,13 @@ describe('WarehouseOfflineService', () => {
       expect(transfers[1]).toMatchObject({ quantity: 5, costPrice: 10 });
 
       // Origen queda con 5@$10; destino acredita 10@$5 + 5@$10 separados.
-      expect(service.getStockLevel(whA.id, 'prod-1')!.lots).toEqual([{ costPrice: 10, quantity: 5 }]);
+      expect(service.getStockLevel(whA.id, 'prod-1')!.lots).toEqual([
+        { costPrice: 10, quantity: 5, currency: Currency.CUP },
+      ]);
       const levelB = service.getStockLevel(whB.id, 'prod-1')!;
       expect(levelB.lots).toEqual([
-        { costPrice: 5, quantity: 10 },
-        { costPrice: 10, quantity: 5 },
+        { costPrice: 5, quantity: 10, currency: Currency.CUP },
+        { costPrice: 10, quantity: 5, currency: Currency.CUP },
       ]);
       // Display ponderado del destino: (10×5+5×10)/15 = 6.67
       expect(levelB.costPrice).toBe(6.67);
@@ -681,13 +759,30 @@ describe('WarehouseOfflineService', () => {
 
     it('I-3c: el consumo FIFO descuenta primero el lote más viejo', () => {
       const wh = service.createWarehouse('A').data!;
-      service.recordMovement({ type: 'purchase_in', warehouseId: wh.id, productId: 'prod-1', quantity: 10, costPrice: 5 });
-      service.recordMovement({ type: 'purchase_in', warehouseId: wh.id, productId: 'prod-1', quantity: 10, costPrice: 10 });
-      const result = service.recordMovement({ type: 'sale_out', warehouseId: wh.id, productId: 'prod-1', quantity: 12 });
+      service.recordMovement({
+        type: 'purchase_in',
+        warehouseId: wh.id,
+        productId: 'prod-1',
+        quantity: 10,
+        costPrice: 5,
+      });
+      service.recordMovement({
+        type: 'purchase_in',
+        warehouseId: wh.id,
+        productId: 'prod-1',
+        quantity: 10,
+        costPrice: 10,
+      });
+      const result = service.recordMovement({
+        type: 'sale_out',
+        warehouseId: wh.id,
+        productId: 'prod-1',
+        quantity: 12,
+      });
       expect(result.succeeded).toBe(true);
       const level = service.getStockLevel(wh.id, 'prod-1')!;
       // Se consumieron 10@$5 completos y 2@$10 → quedan 8@$10.
-      expect(level.lots).toEqual([{ costPrice: 10, quantity: 8 }]);
+      expect(level.lots).toEqual([{ costPrice: 10, quantity: 8, currency: Currency.CUP }]);
       expect(level.onHand).toBe(8);
     });
 
@@ -703,7 +798,12 @@ describe('WarehouseOfflineService', () => {
         createdDate: new Date(),
       });
       // Cualquier salida consume el lote sintético 10@$7.
-      const result = service.recordMovement({ type: 'sale_out', warehouseId: wh.id, productId: 'prod-1', quantity: 4 });
+      const result = service.recordMovement({
+        type: 'sale_out',
+        warehouseId: wh.id,
+        productId: 'prod-1',
+        quantity: 4,
+      });
       expect(result.succeeded).toBe(true);
       const level = service.getStockLevel(wh.id, 'prod-1')!;
       expect(level.lots).toEqual([{ costPrice: 7, quantity: 6 }]);
@@ -715,8 +815,20 @@ describe('WarehouseOfflineService', () => {
     it('I-3d: GAP-3 bajo lotes — los números display pineados no cambian (7.33)', () => {
       const whA = service.createWarehouse('A').data!;
       const whB = service.createWarehouse('B').data!;
-      service.recordMovement({ type: 'purchase_in', warehouseId: whA.id, productId: 'prod-1', quantity: 10, costPrice: 10 });
-      service.recordMovement({ type: 'purchase_in', warehouseId: whB.id, productId: 'prod-1', quantity: 10, costPrice: 6 });
+      service.recordMovement({
+        type: 'purchase_in',
+        warehouseId: whA.id,
+        productId: 'prod-1',
+        quantity: 10,
+        costPrice: 10,
+      });
+      service.recordMovement({
+        type: 'purchase_in',
+        warehouseId: whB.id,
+        productId: 'prod-1',
+        quantity: 10,
+        costPrice: 6,
+      });
       const result = service.recordMovement({
         type: 'transfer_out',
         warehouseId: whA.id,
@@ -753,7 +865,12 @@ describe('WarehouseOfflineService', () => {
 
     it('U-S11: no se revierte una reversa → ReversalNotReversible', () => {
       const { wh } = seedPurchased('A', 10, 5);
-      service.recordMovement({ type: 'sale_out', warehouseId: wh.id, productId: 'prod-1', quantity: 3 });
+      service.recordMovement({
+        type: 'sale_out',
+        warehouseId: wh.id,
+        productId: 'prod-1',
+        quantity: 3,
+      });
       const sale = service.getMovements().find((m) => m.type === 'sale_out')!;
       const reversal = service.reverseMovement(sale.id);
       expect(reversal.succeeded).toBe(true);
@@ -765,7 +882,12 @@ describe('WarehouseOfflineService', () => {
 
     it('U-S9: segunda reversa del mismo original → ReversalAlreadyExists', () => {
       const { wh } = seedPurchased('A', 10, 5);
-      service.recordMovement({ type: 'sale_out', warehouseId: wh.id, productId: 'prod-1', quantity: 3 });
+      service.recordMovement({
+        type: 'sale_out',
+        warehouseId: wh.id,
+        productId: 'prod-1',
+        quantity: 3,
+      });
       const sale = service.getMovements().find((m) => m.type === 'sale_out')!;
       expect(service.reverseMovement(sale.id).succeeded).toBe(true);
       const again = service.reverseMovement(sale.id);
@@ -776,7 +898,13 @@ describe('WarehouseOfflineService', () => {
     it('U-S10: transfer_in no es reversible → TransferInNotReversible', () => {
       const whA = service.createWarehouse('A').data!;
       const whB = service.createWarehouse('B').data!;
-      service.recordMovement({ type: 'purchase_in', warehouseId: whA.id, productId: 'prod-1', quantity: 10, costPrice: 5 });
+      service.recordMovement({
+        type: 'purchase_in',
+        warehouseId: whA.id,
+        productId: 'prod-1',
+        quantity: 10,
+        costPrice: 5,
+      });
       service.recordMovement({
         type: 'transfer_in',
         warehouseId: whB.id,
@@ -823,16 +951,30 @@ describe('WarehouseOfflineService', () => {
   describe('reverseMovement — efectos por tipo (lotes exactos, D8)', () => {
     it('U-S1: reversa de purchase_in reduce el lote exacto y recalcula display', () => {
       const wh = service.createWarehouse('A').data!;
-      service.recordMovement({ type: 'purchase_in', warehouseId: wh.id, productId: 'prod-1', quantity: 10, costPrice: 5 });
-      service.recordMovement({ type: 'purchase_in', warehouseId: wh.id, productId: 'prod-1', quantity: 10, costPrice: 10 });
-      const purchase = service.getMovements().find((m) => m.type === 'purchase_in' && m.costPrice === 5)!;
+      service.recordMovement({
+        type: 'purchase_in',
+        warehouseId: wh.id,
+        productId: 'prod-1',
+        quantity: 10,
+        costPrice: 5,
+      });
+      service.recordMovement({
+        type: 'purchase_in',
+        warehouseId: wh.id,
+        productId: 'prod-1',
+        quantity: 10,
+        costPrice: 10,
+      });
+      const purchase = service
+        .getMovements()
+        .find((m) => m.type === 'purchase_in' && m.costPrice === 5)!;
 
       const result = service.reverseMovement(purchase.id, 'error de carga');
       expect(result.succeeded).toBe(true);
 
       const level = service.getStockLevel(wh.id, 'prod-1')!;
       expect(level.onHand).toBe(10);
-      expect(level.lots).toEqual([{ costPrice: 10, quantity: 10 }]);
+      expect(level.lots).toEqual([{ costPrice: 10, quantity: 10, currency: Currency.CUP }]);
       expect(level.costPrice).toBe(10); // display = lote restante exacto
 
       const reversal = service.getMovements().find((m) => m.type === 'reversal')!;
@@ -848,9 +990,21 @@ describe('WarehouseOfflineService', () => {
 
     it('U-S1b: reversa de compra con lote parcialmente consumido devuelve SOLO las restantes (D9)', () => {
       const wh = service.createWarehouse('A').data!;
-      const p1 = service.recordMovement({ type: 'purchase_in', warehouseId: wh.id, productId: 'prod-1', quantity: 10, costPrice: 5 });
+      const p1 = service.recordMovement({
+        type: 'purchase_in',
+        warehouseId: wh.id,
+        productId: 'prod-1',
+        quantity: 10,
+        costPrice: 5,
+      });
       const purchase = p1.data![0];
-      service.recordMovement({ type: 'purchase_in', warehouseId: wh.id, productId: 'prod-1', quantity: 10, costPrice: 10 });
+      service.recordMovement({
+        type: 'purchase_in',
+        warehouseId: wh.id,
+        productId: 'prod-1',
+        quantity: 10,
+        costPrice: 10,
+      });
       // Transfiere 5: consume del lote $5 → quedan 5@$5.
       service.recordMovement({
         type: 'transfer_out',
@@ -865,7 +1019,7 @@ describe('WarehouseOfflineService', () => {
       const level = service.getStockLevel(wh.id, 'prod-1')!;
       // La reversa quita SOLO las 5 restantes del lote $5 (las 5 transferidas
       // ya no están — D9); el lote $10 queda intacto.
-      expect(level.lots).toEqual([{ costPrice: 10, quantity: 10 }]);
+      expect(level.lots).toEqual([{ costPrice: 10, quantity: 10, currency: Currency.CUP }]);
       expect(level.onHand).toBe(10);
       const reversal = service.getMovements().find((m) => m.type === 'reversal')!;
       expect(reversal.quantity).toBe(5);
@@ -874,9 +1028,20 @@ describe('WarehouseOfflineService', () => {
 
     it('U-S1c: reversa de compra con lote totalmente consumido → PurchaseLotConsumed', () => {
       const wh = service.createWarehouse('A').data!;
-      const p1 = service.recordMovement({ type: 'purchase_in', warehouseId: wh.id, productId: 'prod-1', quantity: 10, costPrice: 5 });
+      const p1 = service.recordMovement({
+        type: 'purchase_in',
+        warehouseId: wh.id,
+        productId: 'prod-1',
+        quantity: 10,
+        costPrice: 5,
+      });
       const purchase = p1.data![0];
-      service.recordMovement({ type: 'sale_out', warehouseId: wh.id, productId: 'prod-1', quantity: 10 });
+      service.recordMovement({
+        type: 'sale_out',
+        warehouseId: wh.id,
+        productId: 'prod-1',
+        quantity: 10,
+      });
 
       const result = service.reverseMovement(purchase.id);
       expect(result.succeeded).toBe(false);
@@ -885,10 +1050,21 @@ describe('WarehouseOfflineService', () => {
 
     it('U-S2: reversa de compra sin stock del producto → InsufficientStock', () => {
       const wh = service.createWarehouse('A').data!;
-      const p1 = service.recordMovement({ type: 'purchase_in', warehouseId: wh.id, productId: 'prod-1', quantity: 10, costPrice: 5 });
+      const p1 = service.recordMovement({
+        type: 'purchase_in',
+        warehouseId: wh.id,
+        productId: 'prod-1',
+        quantity: 10,
+        costPrice: 5,
+      });
       const purchase = p1.data![0];
       // Salida total (entrada de tienda creada) → 0 stock.
-      service.recordMovement({ type: 'sale_out', warehouseId: wh.id, productId: 'prod-1', quantity: 10 });
+      service.recordMovement({
+        type: 'sale_out',
+        warehouseId: wh.id,
+        productId: 'prod-1',
+        quantity: 10,
+      });
       const result = service.reverseMovement(purchase.id);
       expect(result.succeeded).toBe(false);
       expect(result.errors[0]).toEqual(WarehouseErrors.PurchaseLotConsumed);
@@ -896,8 +1072,19 @@ describe('WarehouseOfflineService', () => {
 
     it('U-S3: reversa de sale_out con enlace exacto — entrada íntegra se elimina (soft) y onHand sube al costo exacto', () => {
       const wh = service.createWarehouse('A').data!;
-      service.recordMovement({ type: 'purchase_in', warehouseId: wh.id, productId: 'prod-1', quantity: 24, costPrice: 660 });
-      service.recordMovement({ type: 'sale_out', warehouseId: wh.id, productId: 'prod-1', quantity: 12 });
+      service.recordMovement({
+        type: 'purchase_in',
+        warehouseId: wh.id,
+        productId: 'prod-1',
+        quantity: 24,
+        costPrice: 660,
+      });
+      service.recordMovement({
+        type: 'sale_out',
+        warehouseId: wh.id,
+        productId: 'prod-1',
+        quantity: 12,
+      });
       const sale = service.getMovements().find((m) => m.type === 'sale_out')!;
       const entryId = sale.inventoryEntryId!;
 
@@ -907,7 +1094,7 @@ describe('WarehouseOfflineService', () => {
       // Almacén re-acredita el lote exacto.
       const level = service.getStockLevel(wh.id, 'prod-1')!;
       expect(level.onHand).toBe(24);
-      expect(level.lots).toEqual([{ costPrice: 660, quantity: 24 }]);
+      expect(level.lots).toEqual([{ costPrice: 660, quantity: 24, currency: Currency.CUP }]);
 
       // La entrada de tienda queda soft-deleted (isActive=false — no vuelve al
       // ciclo FIFO de getAvailableInventoryCosts, que filtra isActive).
@@ -924,8 +1111,19 @@ describe('WarehouseOfflineService', () => {
 
     it('U-S5/U-S6: sale_out parcialmente consumida bloquea; totalmente consumida bloquea', () => {
       const wh = service.createWarehouse('A').data!;
-      service.recordMovement({ type: 'purchase_in', warehouseId: wh.id, productId: 'prod-1', quantity: 24, costPrice: 660 });
-      service.recordMovement({ type: 'sale_out', warehouseId: wh.id, productId: 'prod-1', quantity: 12 });
+      service.recordMovement({
+        type: 'purchase_in',
+        warehouseId: wh.id,
+        productId: 'prod-1',
+        quantity: 24,
+        costPrice: 660,
+      });
+      service.recordMovement({
+        type: 'sale_out',
+        warehouseId: wh.id,
+        productId: 'prod-1',
+        quantity: 12,
+      });
       const sale = service.getMovements().find((m) => m.type === 'sale_out')!;
 
       // Venta FIFO parcial de 5 sobre la entrada de 12.
@@ -945,7 +1143,13 @@ describe('WarehouseOfflineService', () => {
     it('U-S7: reversa de transfer_out devuelve al origen y resta del destino, lotes exactos en ambos', () => {
       const whA = service.createWarehouse('A').data!;
       const whB = service.createWarehouse('B').data!;
-      service.recordMovement({ type: 'purchase_in', warehouseId: whA.id, productId: 'prod-1', quantity: 10, costPrice: 5 });
+      service.recordMovement({
+        type: 'purchase_in',
+        warehouseId: whA.id,
+        productId: 'prod-1',
+        quantity: 10,
+        costPrice: 5,
+      });
       service.recordMovement({
         type: 'transfer_out',
         warehouseId: whA.id,
@@ -959,7 +1163,9 @@ describe('WarehouseOfflineService', () => {
       expect(result.succeeded).toBe(true);
 
       // Origen recupera 6@$5; destino queda en 0.
-      expect(service.getStockLevel(whA.id, 'prod-1')!.lots).toEqual([{ costPrice: 5, quantity: 10 }]);
+      expect(service.getStockLevel(whA.id, 'prod-1')!.lots).toEqual([
+        { costPrice: 5, quantity: 10, currency: Currency.CUP },
+      ]);
       expect(service.getStockLevel(whB.id, 'prod-1')!.onHand).toBe(0);
       expect(service.getStockLevel(whB.id, 'prod-1')!.lots).toEqual([]);
 
@@ -971,7 +1177,13 @@ describe('WarehouseOfflineService', () => {
     it('U-S8: reversa de transfer_out cuando el destino ya gastó las unidades → InsufficientStock', () => {
       const whA = service.createWarehouse('A').data!;
       const whB = service.createWarehouse('B').data!;
-      service.recordMovement({ type: 'purchase_in', warehouseId: whA.id, productId: 'prod-1', quantity: 10, costPrice: 5 });
+      service.recordMovement({
+        type: 'purchase_in',
+        warehouseId: whA.id,
+        productId: 'prod-1',
+        quantity: 10,
+        costPrice: 5,
+      });
       service.recordMovement({
         type: 'transfer_out',
         warehouseId: whA.id,
@@ -981,7 +1193,12 @@ describe('WarehouseOfflineService', () => {
       });
       const transfer = service.getMovements().find((m) => m.type === 'transfer_out')!;
       // B consume sus 6 (sale_out a tienda).
-      service.recordMovement({ type: 'sale_out', warehouseId: whB.id, productId: 'prod-1', quantity: 6 });
+      service.recordMovement({
+        type: 'sale_out',
+        warehouseId: whB.id,
+        productId: 'prod-1',
+        quantity: 6,
+      });
 
       const result = service.reverseMovement(transfer.id);
       expect(result.succeeded).toBe(false);
@@ -992,7 +1209,13 @@ describe('WarehouseOfflineService', () => {
   describe('reverseMovement — huella legacy (D11)', () => {
     it('U-S4: salida legacy sin enlace — huella única revierte; 0 y >1 coincidencias bloquean', () => {
       const wh = service.createWarehouse('A').data!;
-      service.recordMovement({ type: 'purchase_in', warehouseId: wh.id, productId: 'prod-1', quantity: 10, costPrice: 5 });
+      service.recordMovement({
+        type: 'purchase_in',
+        warehouseId: wh.id,
+        productId: 'prod-1',
+        quantity: 10,
+        costPrice: 5,
+      });
       // Salida legacy: fila sin costPrice ni inventoryEntryId (dato viejo) + entrada manual igual.
       service.addImportedMovement({
         id: 'mv-legacy-sale',
@@ -1053,7 +1276,13 @@ describe('WarehouseOfflineService', () => {
 
     it('U-S6b: entrada encontrada pero isActive=false → SaleOutEntryNotFound', () => {
       const wh = service.createWarehouse('A').data!;
-      service.recordMovement({ type: 'purchase_in', warehouseId: wh.id, productId: 'prod-1', quantity: 10, costPrice: 5 });
+      service.recordMovement({
+        type: 'purchase_in',
+        warehouseId: wh.id,
+        productId: 'prod-1',
+        quantity: 10,
+        costPrice: 5,
+      });
       const entry = inventorySvc.createInventoryEntry('prod-1', 4, 5);
       inventorySvc.deleteInventoryEntry('prod-1', entry!.data!.id);
       service.addImportedMovement({
@@ -1075,8 +1304,19 @@ describe('WarehouseOfflineService', () => {
   describe('deactivateWarehouse — recuento de vivos (D5/D12)', () => {
     it('U-S16: todos los movimientos revertidos + stock 0 → desactiva', () => {
       const wh = service.createWarehouse('A').data!;
-      service.recordMovement({ type: 'purchase_in', warehouseId: wh.id, productId: 'prod-1', quantity: 10, costPrice: 5 });
-      service.recordMovement({ type: 'sale_out', warehouseId: wh.id, productId: 'prod-1', quantity: 10 });
+      service.recordMovement({
+        type: 'purchase_in',
+        warehouseId: wh.id,
+        productId: 'prod-1',
+        quantity: 10,
+        costPrice: 5,
+      });
+      service.recordMovement({
+        type: 'sale_out',
+        warehouseId: wh.id,
+        productId: 'prod-1',
+        quantity: 10,
+      });
       const sale = service.getMovements().find((m) => m.type === 'sale_out')!;
       expect(service.reverseMovement(sale.id).succeeded).toBe(true);
       const purchase = service.getMovements().find((m) => m.type === 'purchase_in')!;
@@ -1089,7 +1329,13 @@ describe('WarehouseOfflineService', () => {
 
     it('U-S16b: stock > 0 aunque todo revertido → bloquea', () => {
       const wh = service.createWarehouse('A').data!;
-      service.recordMovement({ type: 'purchase_in', warehouseId: wh.id, productId: 'prod-1', quantity: 10, costPrice: 5 });
+      service.recordMovement({
+        type: 'purchase_in',
+        warehouseId: wh.id,
+        productId: 'prod-1',
+        quantity: 10,
+        costPrice: 5,
+      });
       const purchase = service.getMovements().find((m) => m.type === 'purchase_in')!;
       expect(service.reverseMovement(purchase.id).succeeded).toBe(true); // reversa total → prod-1 en 0
 
@@ -1109,7 +1355,13 @@ describe('WarehouseOfflineService', () => {
 
     it('U-S17: movimiento vivo → bloquea (regresión del comportamiento actual)', () => {
       const wh = service.createWarehouse('A').data!;
-      service.recordMovement({ type: 'purchase_in', warehouseId: wh.id, productId: 'prod-1', quantity: 10, costPrice: 5 });
+      service.recordMovement({
+        type: 'purchase_in',
+        warehouseId: wh.id,
+        productId: 'prod-1',
+        quantity: 10,
+        costPrice: 5,
+      });
       const result = service.deactivateWarehouse(wh.id);
       expect(result.succeeded).toBe(false);
       expect(result.errors[0]).toEqual(WarehouseErrors.CannotDeactivate);
@@ -1121,22 +1373,50 @@ describe('WarehouseOfflineService', () => {
   describe('integration — costos exactos a la tienda (D8)', () => {
     it('I-3: sale_out multi-lote → dos entradas FIFO para getAvailableInventoryCosts', () => {
       const wh = service.createWarehouse('A').data!;
-      service.recordMovement({ type: 'purchase_in', warehouseId: wh.id, productId: 'prod-1', quantity: 10, costPrice: 5 });
-      service.recordMovement({ type: 'purchase_in', warehouseId: wh.id, productId: 'prod-1', quantity: 10, costPrice: 10 });
-      service.recordMovement({ type: 'sale_out', warehouseId: wh.id, productId: 'prod-1', quantity: 15 });
+      service.recordMovement({
+        type: 'purchase_in',
+        warehouseId: wh.id,
+        productId: 'prod-1',
+        quantity: 10,
+        costPrice: 5,
+      });
+      service.recordMovement({
+        type: 'purchase_in',
+        warehouseId: wh.id,
+        productId: 'prod-1',
+        quantity: 10,
+        costPrice: 10,
+      });
+      service.recordMovement({
+        type: 'sale_out',
+        warehouseId: wh.id,
+        productId: 'prod-1',
+        quantity: 15,
+      });
 
       // Venta FIFO de 12: consume 10@$5 primero, luego 2@$10.
       const costs = inventorySvc.getAvailableInventoryCosts('prod-1', 12);
       expect(costs).toEqual([
-        { inventoryId: expect.any(String), costPrice: 5, quantity: 10 },
-        { inventoryId: expect.any(String), costPrice: 10, quantity: 2 },
+        { inventoryId: expect.any(String), costPrice: 5, quantity: 10, currency: Currency.CUP },
+        { inventoryId: expect.any(String), costPrice: 10, quantity: 2, currency: Currency.CUP },
       ]);
     });
 
     it('I-1: venta tras sale_out+reversa — la entrada restaurada ya no es consumible', () => {
       const wh = service.createWarehouse('A').data!;
-      service.recordMovement({ type: 'purchase_in', warehouseId: wh.id, productId: 'prod-1', quantity: 10, costPrice: 5 });
-      service.recordMovement({ type: 'sale_out', warehouseId: wh.id, productId: 'prod-1', quantity: 6 });
+      service.recordMovement({
+        type: 'purchase_in',
+        warehouseId: wh.id,
+        productId: 'prod-1',
+        quantity: 10,
+        costPrice: 5,
+      });
+      service.recordMovement({
+        type: 'sale_out',
+        warehouseId: wh.id,
+        productId: 'prod-1',
+        quantity: 6,
+      });
       const sale = service.getMovements().find((m) => m.type === 'sale_out')!;
       expect(service.reverseMovement(sale.id).succeeded).toBe(true);
 
@@ -1147,8 +1427,19 @@ describe('WarehouseOfflineService', () => {
 
     it('I-2: reversa bloqueada no altera el FIFO de la entrada original', () => {
       const wh = service.createWarehouse('A').data!;
-      service.recordMovement({ type: 'purchase_in', warehouseId: wh.id, productId: 'prod-1', quantity: 10, costPrice: 5 });
-      service.recordMovement({ type: 'sale_out', warehouseId: wh.id, productId: 'prod-1', quantity: 10 });
+      service.recordMovement({
+        type: 'purchase_in',
+        warehouseId: wh.id,
+        productId: 'prod-1',
+        quantity: 10,
+        costPrice: 5,
+      });
+      service.recordMovement({
+        type: 'sale_out',
+        warehouseId: wh.id,
+        productId: 'prod-1',
+        quantity: 10,
+      });
       const sale = service.getMovements().find((m) => m.type === 'sale_out')!;
       inventorySvc.getAvailableInventoryCosts('prod-1', 4); // consumo parcial
 
@@ -1156,24 +1447,44 @@ describe('WarehouseOfflineService', () => {
       expect(blocked.succeeded).toBe(false);
       // La entrada sigue consumible por 6.
       const costs = inventorySvc.getAvailableInventoryCosts('prod-1', 6);
-      expect(costs).toEqual([{ inventoryId: expect.any(String), costPrice: 5, quantity: 6 }]);
+      expect(costs).toEqual([
+        { inventoryId: expect.any(String), costPrice: 5, quantity: 6, currency: Currency.CUP },
+      ]);
     });
 
     it('I-3e: reversa de compra multi-lote toca solo su lote', () => {
       const wh = service.createWarehouse('A').data!;
-      const p1 = service.recordMovement({ type: 'purchase_in', warehouseId: wh.id, productId: 'prod-1', quantity: 10, costPrice: 5 });
+      const p1 = service.recordMovement({
+        type: 'purchase_in',
+        warehouseId: wh.id,
+        productId: 'prod-1',
+        quantity: 10,
+        costPrice: 5,
+      });
       const purchase5 = p1.data![0];
-      service.recordMovement({ type: 'purchase_in', warehouseId: wh.id, productId: 'prod-1', quantity: 10, costPrice: 10 });
+      service.recordMovement({
+        type: 'purchase_in',
+        warehouseId: wh.id,
+        productId: 'prod-1',
+        quantity: 10,
+        costPrice: 10,
+      });
       // Consume 5 del lote $5 vía transferencia.
       const whB = service.createWarehouse('B').data!;
-      service.recordMovement({ type: 'transfer_out', warehouseId: wh.id, productId: 'prod-1', quantity: 5, toWarehouseId: whB.id });
+      service.recordMovement({
+        type: 'transfer_out',
+        warehouseId: wh.id,
+        productId: 'prod-1',
+        quantity: 5,
+        toWarehouseId: whB.id,
+      });
 
       const result = service.reverseMovement(purchase5.id);
       expect(result.succeeded).toBe(true);
       // La reversa quita SOLO las 5 restantes del lote $5 (las 5 transferidas
       // ya salieron); el lote $10 queda intacto — la reversa es por-lote (D9/D10).
       const level = service.getStockLevel(wh.id, 'prod-1')!;
-      expect(level.lots).toEqual([{ costPrice: 10, quantity: 10 }]);
+      expect(level.lots).toEqual([{ costPrice: 10, quantity: 10, currency: Currency.CUP }]);
       expect(level.onHand).toBe(10);
       const reversal = service.getMovements().find((m) => m.type === 'reversal')!;
       expect(reversal.quantity).toBe(5);

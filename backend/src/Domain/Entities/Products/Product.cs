@@ -1,4 +1,5 @@
 ﻿using Domain.Common.Entities;
+using Domain.Common.Enums;
 using Domain.Common.Events;
 using Domain.Entities.InventoryEntries;
 using Domain.Entities.OrderItems;
@@ -12,6 +13,8 @@ namespace Domain.Entities.Products
         public Guid CategoryId { get; set; }
         public ProductCategory Category { get; set; } = null!;
         public decimal Price { get; set; }
+        /// <summary>Moneda de Price y de los precios mayoristas (plan 2026-09-16). Default CUP.</summary>
+        public Currency Currency { get; set; } = Currency.CUP;
         public int Order { get; set; }
         public bool AvailableToSale { get; set; } = true;
         public bool DiscountFromInventory { get; set; } = true;

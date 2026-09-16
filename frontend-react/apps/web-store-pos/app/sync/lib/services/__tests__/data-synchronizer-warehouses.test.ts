@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { Result } from '@store-mgmt/domain';
+import { Currency, Result } from '@store-mgmt/domain';
 import type {
   ExchangeRate,
   Warehouse,
@@ -379,8 +379,19 @@ describe('DataSerializerService — warehouses roundtrip (warehouses-plan)', () 
     });
 
     const wh = warehouseSvc.createWarehouse('Central').data!;
-    warehouseSvc.recordMovement({ type: 'purchase_in', warehouseId: wh.id, productId: 'prod-1', quantity: 24, costPrice: 660 });
-    const sale = warehouseSvc.recordMovement({ type: 'sale_out', warehouseId: wh.id, productId: 'prod-1', quantity: 12 }).data!;
+    warehouseSvc.recordMovement({
+      type: 'purchase_in',
+      warehouseId: wh.id,
+      productId: 'prod-1',
+      quantity: 24,
+      costPrice: 660,
+    });
+    const sale = warehouseSvc.recordMovement({
+      type: 'sale_out',
+      warehouseId: wh.id,
+      productId: 'prod-1',
+      quantity: 12,
+    }).data!;
     warehouseSvc.reverseMovement(sale[0].id);
 
     const serializer = new DataSerializerService(
@@ -399,7 +410,9 @@ describe('DataSerializerService — warehouses roundtrip (warehouses-plan)', () 
     const parsed = await serializer.import(payload, 'pass');
 
     // Nivel con lotes, salida con costPrice+inventoryEntryId, reversa con enlace.
-    expect(parsed.warehouseStockLevels[0].lots).toEqual([{ costPrice: 660, quantity: 24 }]);
+    expect(parsed.warehouseStockLevels[0].lots).toEqual([
+      { costPrice: 660, quantity: 24, currency: Currency.CUP },
+    ]);
     const saleRow = parsed.warehouseStockMovements.find((m) => m.type === 'sale_out')!;
     expect(saleRow.costPrice).toBe(660);
     expect(saleRow.inventoryEntryId).toBeDefined();
@@ -438,19 +451,23 @@ describe('DataSerializerService — warehouses roundtrip (warehouses-plan)', () 
 
     // Dispositivo A exporta su reversa del MISMO original (distinto id de fila).
     const result = await svc.sync(
-      makeData([], [], [
-        {
-          id: 'rev-remota',
-          warehouseId: 'wh-1',
-          productId: 'prod-1',
-          type: 'reversal',
-          quantity: 10,
-          reason: null,
-          createdDate: new Date(),
-          createdByName: 'A',
-          reversalOfMovementId: 'mv-1',
-        },
-      ]),
+      makeData(
+        [],
+        [],
+        [
+          {
+            id: 'rev-remota',
+            warehouseId: 'wh-1',
+            productId: 'prod-1',
+            type: 'reversal',
+            quantity: 10,
+            reason: null,
+            createdDate: new Date(),
+            createdByName: 'A',
+            reversalOfMovementId: 'mv-1',
+          },
+        ],
+      ),
     );
 
     // Sin error y sin duplicado: la reversa remota se salta (F7.3).

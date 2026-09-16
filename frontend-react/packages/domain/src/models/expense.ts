@@ -1,5 +1,5 @@
 import type { AuditableBaseModel } from './base';
-import type { ExpenseType, PaymentType } from '../enums';
+import type { Currency, ExpenseType, PaymentType } from '../enums';
 
 export interface Expense extends AuditableBaseModel {
   id: string;
@@ -8,4 +8,6 @@ export interface Expense extends AuditableBaseModel {
   date: Date;
   paymentType: PaymentType;
   note: string;
+  /** Moneda de `total` (plan 2026-09-16). Ausente = CUP (DEFAULT_CURRENCY). */
+  currency?: Currency;
 }
