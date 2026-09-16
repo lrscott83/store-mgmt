@@ -164,15 +164,23 @@ test('OwnerAdmin cambia el plan de su tienda vía POST change-plan', async ({
   await expect(paidHeader).toHaveAttribute('aria-expanded', 'true');
   await expect(paidHeader.getByText(ACTIVE_BADGE_TEXT)).toBeVisible();
 
-  // Aserción 5 (REQ-5), en su forma VERDADERA — corregida el 2026-08-08 tras
-  // el primer fallo real contra backend. La US afirmaba que tras activar la
-  // app "refresca la sesión vía getUserByToken()", y de ahí se dedujo un
-  // `GET /v1/auth/me`. Ese /me NO EXISTE: getUserByToken() corta por caché
-  // cuando el perfil guardado coincide con el authToken vigente y retorna sin
-  // tocar el backend (auth-store.ts). El corto es deliberado — el comentario
-  // en auth-store.ts explica que Angular sí disparaba un /me de fondo y que se
-  // quitó porque su 401 destruía la sesión de un usuario offline.
-  loginNetwork.expectMeRequestCount(0);
+  // Aserción 5 (REQ-5), en su forma ACTUAL (actualizada el 2026-09-16).
+  // La versión anterior de esta aserción exigía CERO `GET /v1/auth/me`, y su
+  // comentario daba por bueno el atajo por caché de `getUserByToken()`
+  // (corrección del 2026-08-08, H-17). Lo que nunca se analizó es la
+  // CONSECUENCIA de ese atajo sobre el cambio de plan: sin revalidar, la sesión
+  // del cliente conservaba el plan viejo y el menú seguía mostrando sus
+  // entradas, incluso tras recargar.
+  //
+  // Hoy el cambio de plan refresca la sesión con el refresco suave de
+  // `soft-refresh-session.ts` (`getMe()` + `updateUser`), así que sale
+  // EXACTAMENTE UN `/me`. El conteo es 1 y no "≥1" a propósito: un segundo
+  // `/me` sería un refresco duplicado.
+  //
+  // Lo que NO cambia: `getUserByToken()` conserva su atajo por caché, así que
+  // un `page.reload()` con caché válida sigue emitiendo CERO
+  // `GET /v1/auth/me` (REQ-1 de `openspec/specs/e2e-session-hydration/spec.md`).
+  loginNetwork.expectMeRequestCount(1);
   observer.expectExactlyOneChangePlanPost();
   // T7.1 regression: the old moduleIds PUT activation must not return.
   observer.expectNoStorePut();

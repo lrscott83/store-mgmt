@@ -15,6 +15,7 @@ import { PlusIcon } from '~/shared/components/ui/icons';
 import { httpErrorKey } from '~/shared/lib/http/http-error';
 import { confirmDialog } from '~/shared/lib/blocking-alert';
 import { showToastSuccess } from '~/shared/lib/toast';
+import { softRefreshSession } from '~/shared/lib/stores/soft-refresh-session';
 import type { Feature, Module, OwnerStoreWithPlan, Plan } from '@store-mgmt/domain';
 
 export const clientLoader = featureLoader([EFeatures.Stores]);
@@ -186,13 +187,14 @@ export function MyStoresPage() {
       // the anchor and the next-due pinning. No moduleIds PUT ever fires here.
       await storeHttpService.changeStorePlan(planStore.id, selectedPlan.id);
       setPlanStore(null);
-      // Angular parity: refresh the session after a plan change (store-plan.tsx does
-      // the same) so feature-driven menus reflect the new module set.
-      try {
-        await getUserByToken();
-      } catch {
-        // Non-critical: session refresh failure should not block the save UX.
-      }
+      // Refresh the session after a plan change (store-plan.tsx does the same)
+      // so feature-driven menus reflect the new module set -- and this has to be
+      // the ONLINE refresh: `getUserByToken()` is cache-first by design
+      // (auth-store.ts:160-177) and a plan change issues no new token, so it
+      // returned the cached profile without asking the backend and the menus
+      // kept describing the old plan. See soft-refresh-session.ts.
+      // Best-effort: a refresh failure must not surface as a save error.
+      await softRefreshSession();
       showToastSuccess(intl.formatMessage({ id: 'STORES.UPDATE_SUCCESS' }));
       await load();
     } catch (err) {

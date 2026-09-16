@@ -9,6 +9,7 @@ import { PlanPanels } from '~/management/stores/components/plan-panels';
 import { groupFeaturesByModuleId } from '~/management/stores/lib/plan-utils';
 import { httpErrorKey } from '~/shared/lib/http/http-error';
 import { formatDateOnly } from '~/shared/lib/date-utils';
+import { softRefreshSession } from '~/shared/lib/stores/soft-refresh-session';
 import type { StorePlan, Plan, Feature } from '@store-mgmt/domain';
 
 export const clientLoader = adminFeatureLoader([EFeatures.Stores]);
@@ -31,7 +32,7 @@ export const clientLoader = adminFeatureLoader([EFeatures.Stores]);
 export function StorePlanPage() {
   const intl = useIntl();
   const { id: paramId } = useParams<{ id: string }>();
-  const { user, getUserByToken } = useAuthStore();
+  const { user } = useAuthStore();
 
   const storeId = paramId ?? user?.selectedStoreId ?? '';
 
@@ -91,13 +92,12 @@ export function StorePlanPage() {
       // endpoint carries the target plan id — the backend owns module rewriting,
       // the anchor and the next-due pinning. No store payload ever rides this.
       await storeHttpService.changeStorePlan(storeId, selectedPlan.id);
-      // Angular parity: refresh the user session via the consolidated
-      // getUserByToken() action — no page reload.
-      try {
-        await getUserByToken();
-      } catch {
-        // Non-critical: session refresh failure should not block the save UX
-      }
+      // Refresh the user session ONLINE — no page reload. `getUserByToken()`
+      // cannot do this job: it is cache-first by design (auth-store.ts:160-177)
+      // and a plan change issues no new token, so it never asks the backend and
+      // the menus keep the old plan's entries. See soft-refresh-session.ts.
+      // Best-effort: a refresh failure must not surface as a save error.
+      await softRefreshSession();
       // Re-read the store plan so the panels and the billing banner reflect
       // the newly activated planType (PlanPanels re-expands via its effect).
       const refreshed = await storeHttpService.getStorePlan(storeId);

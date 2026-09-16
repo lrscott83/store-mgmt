@@ -177,6 +177,16 @@ vi.mock('~/shared/lib/stores/auth-store', () => {
 
 // ─── storeHttpService mock ────────────────────────────────────────────────────
 
+// The plan change refreshes the session through the ONLINE soft refresh
+// (soft-refresh-session.ts). Mocked for two reasons: the assertion below is
+// about that refresh, and the real one issues a /me -- which the suite's
+// HTTP blocker would flag as an unmocked request.
+let mockSoftRefreshSession = vi.fn();
+
+vi.mock('~/shared/lib/stores/soft-refresh-session', () => ({
+  softRefreshSession: (...args: unknown[]) => mockSoftRefreshSession(...args),
+}));
+
 let mockGetStorePlan = vi.fn();
 let mockGetPlans = vi.fn();
 let mockGetFeaturesToStore = vi.fn();
@@ -322,7 +332,10 @@ describe('StorePlanPage — immediate activation, no Guardar', () => {
     expect(mockChangeStorePlan).toHaveBeenCalledWith('s1', 2);
     // The plan change rides the dedicated endpoint — never a moduleIds PUT
     expect(mockUpdateStore).not.toHaveBeenCalled();
-    expect(mockGetUserByToken).toHaveBeenCalled();
+    // The session refresh after a plan change is the ONLINE soft refresh --
+    // getUserByToken() would be a no-op here (it is cache-first and no new
+    // token is issued).
+    expect(mockSoftRefreshSession).toHaveBeenCalled();
   });
 
   it('offers no Guardar button anywhere', async () => {
