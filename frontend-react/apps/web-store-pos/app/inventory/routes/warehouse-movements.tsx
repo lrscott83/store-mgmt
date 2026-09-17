@@ -27,6 +27,7 @@ import { WarehouseOfflineService } from '../lib/services/warehouse-offline-servi
 import { InventoryOfflineService } from '../lib/services/inventory-offline-service';
 import { WarehouseMovementModal } from '../components/warehouse-movement-modal';
 import type { WarehouseMovementFields, WarehouseMovementMode } from '../components/warehouse-movement-modal';
+import { remainingPurchaseUnits } from '../lib/warehouse';
 import { ProductRepository } from '~/sales/lib/repositories/product-repository';
 import { ProductCategoryRepository } from '~/sales/lib/repositories/product-category-repository';
 
@@ -169,29 +170,86 @@ export function WarehouseMovementsPage() {
   // ─── Edición = reversa + recreación (F3, por fila D10) ──────────────────────
 
   const [editingMovement, setEditingMovement] = useState<WarehouseStockMovement | null>(null);
+  /**
+   * A9d: error del PASO 2 (recreación) mostrado inline dentro del modal. El paso
+   * 1 (reversa) ya quedó persistido, así que cerrar el modal perdería el trabajo
+   * del usuario sin explicar nada; el mensaje se limpia al reintentar.
+   */
+  const [editError, setEditError] = useState<string | null>(null);
+  /**
+   * Reversa ya aplicada para la edición en curso. Sin esta bandera, un reintento
+   * revertiría OTRA VEZ y descontaría stock dos veces.
+   */
+  const [editReversed, setEditReversed] = useState(false);
+
+  /**
+   * A1: tope editable de la compra — lo que QUEDA de su lote, congelado al abrir
+   * el modal. Se congela porque la reversa modifica el propio nivel: recalcularlo
+   * tras el paso 1 daría 0 y el reintento quedaría bloqueado por el modal.
+   */
+  const editMaxQuantity = useMemo(() => {
+    if (!editingMovement || !service || editingMovement.type !== 'purchase_in') return undefined;
+    const level = service.getStockLevel(editingMovement.warehouseId, editingMovement.productId);
+    return remainingPurchaseUnits(level, editingMovement);
+  }, [editingMovement, service]);
+
+  /**
+   * Valores precargados de edición. Memoizado: el modal reinicia su formulario
+   * cuando cambia la identidad de `initial`, y un literal inline la cambiaba en
+   * cada render.
+   */
+  const editInitial = useMemo(() => {
+    if (!editingMovement) return null;
+    return {
+      // A1: precargar el ORIGINAL en una compra recrearía de más (unidades
+      // fantasma); el punto de partida correcto es lo que queda del lote.
+      quantity:
+        editingMovement.type === 'purchase_in' && editMaxQuantity !== undefined
+          ? editMaxQuantity
+          : editingMovement.quantity,
+      costPrice: editingMovement.costPrice,
+      toWarehouseId: editingMovement.toWarehouseId,
+    };
+  }, [editingMovement, editMaxQuantity]);
 
   function openEdit(movement: WarehouseStockMovement) {
     setEditingMovement(movement);
+    setEditError(null);
+    setEditReversed(false);
+  }
+
+  function closeEdit() {
+    setEditingMovement(null);
+    setEditError(null);
+    setEditReversed(false);
   }
 
   /**
    * F3: la edición NO muta la fila original — compensa (reversa al costo
-   * exacto del lote) y registra el movimiento corregido. Si el paso 2 falla,
-   * la reversa YA quedó persistida (§7.3 del plan): se informa con el error
-   * específico y se recarga el historial (la guía al usuario es el propio
-   * error — p.ej. InsufficientStock para la nueva cantidad).
+   * exacto del lote) y registra el movimiento corregido.
+   *
+   * A9d/A9e: si el paso 2 falla, la reversa YA quedó persistida (§7.3 del plan),
+   * así que el error se muestra DENTRO del modal (que sigue abierto) en lugar de
+   * cerrarlo: el usuario ve el tope y el motivo, corrige y reintenta. El reintento
+   * salta el paso 1 (`editReversed`) para no revertir dos veces.
    */
   function handleEditSubmit(fields: WarehouseMovementFields) {
     if (!service || !editingMovement) return;
     const original = editingMovement;
-    const reversal = service.reverseMovement(original.id);
-    if (!reversal.succeeded) {
-      showBlockingError(
-        intl.formatMessage({ id: 'GENERAL.ERROR' }),
-        reversal.errors[0]?.description ?? '',
-      );
-      return;
+    setEditError(null);
+
+    if (!editReversed) {
+      const reversal = service.reverseMovement(original.id);
+      if (!reversal.succeeded) {
+        showBlockingError(
+          intl.formatMessage({ id: 'GENERAL.ERROR' }),
+          reversal.errors[0]?.description ?? '',
+        );
+        return;
+      }
+      setEditReversed(true);
     }
+
     const recreated = service.recordMovement({
       type: original.type as WarehouseMovementMode,
       warehouseId: original.warehouseId,
@@ -202,16 +260,16 @@ export function WarehouseMovementsPage() {
       toStoreId: original.toStoreId,
       reason: fields.reason,
     });
-    setEditingMovement(null);
     if (!recreated.succeeded) {
-      // La reversa quedó huérfana (no-atómico, §7.3) — el error guía al usuario.
-      showBlockingError(
-        intl.formatMessage({ id: 'GENERAL.ERROR' }),
-        recreated.errors[0]?.description ?? '',
-      );
-      load();
+      // La reversa quedó huérfana (no-atómico, §7.3): el error guía al usuario
+      // sin cerrar el modal. NO se recarga aquí — `load()` reemplaza `movements`
+      // y regenera la compra original como fila vieja, lo que dejaría el modal
+      // apuntando a datos obsoletos en pleno reintento.
+      setEditError(recreated.errors[0]?.description ?? '');
       return;
     }
+
+    closeEdit();
     showToastSuccess(intl.formatMessage({ id: 'WAREHOUSES.MOVEMENT_UPDATED' }));
     load();
   }
@@ -402,13 +460,11 @@ export function WarehouseMovementsPage() {
           )}
           products={products}
           productId={editingMovement.productId}
-          initial={{
-            quantity: editingMovement.quantity,
-            costPrice: editingMovement.costPrice,
-            toWarehouseId: editingMovement.toWarehouseId,
-          }}
+          initial={editInitial}
           titleId="WAREHOUSES.REVERSAL_EDIT_TITLE"
-          onClose={() => setEditingMovement(null)}
+          maxQuantity={editMaxQuantity}
+          errorMessage={editError}
+          onClose={closeEdit}
           onSubmit={handleEditSubmit}
         />
       )}

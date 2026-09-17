@@ -482,18 +482,19 @@ test.describe.serial('Movimientos de almacén — reversa y edición', () => {
       costPrice: 50,
     });
 
-    // Editar: 10@$50 → 15@$70.
+    // Editar: 10@$50 → 6@$70. El tope de la edición es lo que QUEDA del lote
+    // (A1, plan 2026-09-16): una compra intacta admite hasta 10, nunca más.
     await openMovementsToday(page);
     await page.getByTestId(`mv-actions-toggle-${purchaseId}`).click();
     await page.getByTestId(`mv-edit-${purchaseId}`).click();
-    await page.getByTestId('movement-quantity').fill('15');
+    await page.getByTestId('movement-quantity').fill('6');
     await page.getByTestId('movement-cost').fill('70');
     await page.getByRole('button', { name: SAVE }).click();
 
-    // El original lleva badge y el stock neto es 15 (reversa + compra nueva).
+    // El original lleva badge y el stock neto es 6 (reversa + compra nueva).
     await openMovementsToday(page);
     await expect(page.getByTestId(`mv-reversal-badge-${purchaseId}`)).toBeVisible();
-    expect(await onHandOf(page, 'Almacén R5')).toBe('15');
+    expect(await onHandOf(page, 'Almacén R5')).toBe('6');
   });
 
   test('E-R6: edición de Salida consumida bloquea (D3)', async ({ signedInPage }) => {

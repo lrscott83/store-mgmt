@@ -42,6 +42,7 @@ vi.mock('~/shared/lib/toast', () => ({
 const fakeState = vi.hoisted(() => ({
   warehouses: [] as Warehouse[],
   movements: [] as WarehouseStockMovement[],
+  stockLevels: [] as Array<Record<string, unknown>>,
   products: [] as Array<[string, Record<string, unknown>]>,
   reverseMovementImpl: vi.fn() as unknown as ReturnType<typeof vi.fn>,
   recordMovementImpl: vi.fn() as unknown as ReturnType<typeof vi.fn>,
@@ -54,7 +55,12 @@ vi.mock('~/inventory/lib/services/warehouse-offline-service', () => ({
       return fakeState.warehouses;
     }
     getStorageStockLevels() {
-      return [];
+      return fakeState.stockLevels;
+    }
+    getStockLevel(warehouseId: string, productId: string) {
+      return fakeState.stockLevels.find(
+        (l) => l['warehouseId'] === warehouseId && l['productId'] === productId,
+      ) as unknown;
     }
     getStorageMovements() {
       return fakeState.movements;
@@ -102,6 +108,7 @@ describe('Vista Movimientos de almacén', () => {
   beforeEach(() => {
     fakeState.warehouses = [];
     fakeState.movements = [];
+    fakeState.stockLevels = [];
     fakeState.products = [];
     fakeState.reverseMovementImpl.mockReset();
     fakeState.recordMovementImpl.mockReset();
@@ -224,6 +231,17 @@ describe('Vista Movimientos de almacén', () => {
       { id: 'wh-2', name: 'Anexo', isActive: true, createdDate: new Date(), createdByName: 'x' },
     ];
     fakeState.products = [['prod-1', { id: 'prod-1', name: 'Cerveza' }]];
+    // Niveles de stock: la edición de una compra topa con lo que QUEDA de su lote
+    // (A1). El lote de `mv-in` está intacto (24) → tope 24.
+    fakeState.stockLevels = [
+      {
+        warehouseId: 'wh-1',
+        productId: 'prod-1',
+        onHand: 24,
+        costPrice: 5,
+        lots: [{ costPrice: 5, quantity: 24, lotOriginMovementId: 'mv-in' }],
+      },
+    ];
     fakeState.movements = [
       { id: 'mv-in', warehouseId: 'wh-1', productId: 'prod-1', type: 'purchase_in', quantity: 24, reason: null, createdDate: today, createdByName: 'x', costPrice: 5 },
       { id: 'mv-out', warehouseId: 'wh-1', productId: 'prod-1', type: 'sale_out', quantity: 6, reason: null, createdDate: today, createdByName: 'x' },
@@ -382,6 +400,64 @@ describe('Vista Movimientos de almacén', () => {
     expect(modal).toBeTruthy();
     expect((screen.getByTestId('movement-quantity') as HTMLInputElement).value).toBe('24');
     expect((screen.getByTestId('movement-cost') as HTMLInputElement).value).toBe(String(5));
+    // A1/A9e: el tope (lo que queda del lote) se anuncia dentro del modal.
+    expect(screen.getByTestId('movement-max-hint').textContent).toContain('24');
+  });
+
+  it('U-A1-1: editar una compra precarga lo que QUEDA del lote, no la cantidad original', () => {
+    seedTodayMovements();
+    // La compra original fue de 24, pero ya se consumieron 18 → quedan 6.
+    fakeState.stockLevels = [
+      {
+        warehouseId: 'wh-1',
+        productId: 'prod-1',
+        onHand: 6,
+        costPrice: 5,
+        lots: [{ costPrice: 5, quantity: 6, lotOriginMovementId: 'mv-in' }],
+      },
+    ];
+    renderPage();
+    openToday();
+    fireEvent.click(screen.getByTestId('mv-actions-toggle-mv-in'));
+    fireEvent.click(screen.getByTestId('mv-edit-mv-in'));
+    // Precargar 24 devolvería 6 y recrearía 24: 18 unidades fantasma.
+    expect((screen.getByTestId('movement-quantity') as HTMLInputElement).value).toBe('6');
+    expect(screen.getByTestId('movement-max-hint').textContent).toContain('6');
+  });
+
+  it('U-A1-2: guardar por encima del tope queda bloqueado y avisa (A9e)', () => {
+    seedTodayMovements();
+    fakeState.stockLevels = [
+      {
+        warehouseId: 'wh-1',
+        productId: 'prod-1',
+        onHand: 6,
+        costPrice: 5,
+        lots: [{ costPrice: 5, quantity: 6, lotOriginMovementId: 'mv-in' }],
+      },
+    ];
+    renderPage();
+    openToday();
+    fireEvent.click(screen.getByTestId('mv-actions-toggle-mv-in'));
+    fireEvent.click(screen.getByTestId('mv-edit-mv-in'));
+    fireEvent.change(screen.getByTestId('movement-quantity'), { target: { value: '15' } });
+    expect(screen.getByTestId('movement-max-error').textContent).toContain('6');
+    fireEvent.click(screen.getByText('Guardar'));
+    // Guardar está deshabilitado: no se tocó el servicio.
+    expect(fakeState.reverseMovementImpl).not.toHaveBeenCalled();
+    expect(fakeState.recordMovementImpl).not.toHaveBeenCalled();
+  });
+
+  it('U-A1-3: una salida no lleva tope (su límite real lo valida el servicio)', () => {
+    seedTodayMovements();
+    fakeState.stockLevels = [];
+    renderPage();
+    openToday();
+    fireEvent.click(screen.getByTestId('mv-actions-toggle-mv-out'));
+    fireEvent.click(screen.getByTestId('mv-edit-mv-out'));
+    expect((screen.getByTestId('movement-quantity') as HTMLInputElement).value).toBe('6');
+    expect(screen.queryByTestId('movement-max-hint')).toBeNull();
+    expect(screen.queryByTestId('movement-max-error')).toBeNull();
   });
 
   it('U-M7b: guardar la edición ejecuta reversa + recordMovement y recarga', async () => {
@@ -410,7 +486,7 @@ describe('Vista Movimientos de almacén', () => {
     expect(screen.queryByTestId('movement-form-purchase_in')).toBeNull();
   });
 
-  it('U-M7: si recordMovement falla tras la reversa, el error se muestra y la reversa NO se deshace', async () => {
+  it('U-M7: si recordMovement falla tras la reversa, el error se muestra inline y la reversa NO se deshace (A9d)', async () => {
     seedTodayMovements();
     fakeState.reverseMovementImpl.mockReturnValue({ succeeded: true, data: {}, errors: [] });
     fakeState.recordMovementImpl.mockReturnValue({
@@ -422,16 +498,71 @@ describe('Vista Movimientos de almacén', () => {
     openToday();
     fireEvent.click(screen.getByTestId('mv-actions-toggle-mv-in'));
     fireEvent.click(screen.getByTestId('mv-edit-mv-in'));
-    fireEvent.change(screen.getByTestId('movement-quantity'), { target: { value: '99' } });
+    fireEvent.change(screen.getByTestId('movement-quantity'), { target: { value: '15' } });
     fireEvent.click(screen.getByText('Guardar'));
+    // A9d: el error vive DENTRO del modal, que sigue abierto — sin Swal.
     await waitFor(() =>
-      expect(showBlockingErrorMock).toHaveBeenCalledWith(
-        expect.any(String),
+      expect(screen.getByTestId('movement-form-error').textContent).toBe(
         'No hay suficiente stock en el almacén.',
       ),
     );
+    expect(showBlockingErrorMock).not.toHaveBeenCalled();
+    expect(screen.getByTestId('movement-form-purchase_in')).toBeTruthy();
     // La reversa quedó persistida (no-atómico §7.3) — no se llamó dos veces.
     expect(fakeState.reverseMovementImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it('U-A9d-1: tras el fallo del paso 2 el usuario corrige y reintenta sin repetir la reversa', async () => {
+    seedTodayMovements();
+    fakeState.reverseMovementImpl.mockReturnValue({ succeeded: true, data: {}, errors: [] });
+    fakeState.recordMovementImpl
+      .mockReturnValueOnce({
+        succeeded: false,
+        data: undefined,
+        errors: [{ code: 'Warehouse.InsufficientStock', description: 'Falta stock.' }],
+      })
+      .mockReturnValue({ succeeded: true, data: [{ id: 'mv-new' }], errors: [] });
+    renderPage();
+    openToday();
+    fireEvent.click(screen.getByTestId('mv-actions-toggle-mv-in'));
+    fireEvent.click(screen.getByTestId('mv-edit-mv-in'));
+    fireEvent.change(screen.getByTestId('movement-quantity'), { target: { value: '9' } });
+    fireEvent.click(screen.getByText('Guardar'));
+    await waitFor(() => expect(screen.getByTestId('movement-form-error')).toBeTruthy());
+    // Reintento: la reversa NO se repite (descontaría stock dos veces).
+    fireEvent.click(screen.getByText('Guardar'));
+    await waitFor(() => expect(showToastSuccessMock).toHaveBeenCalled());
+    expect(fakeState.reverseMovementImpl).toHaveBeenCalledTimes(1);
+    expect(fakeState.recordMovementImpl).toHaveBeenCalledTimes(2);
+    expect(screen.queryByTestId('movement-form-purchase_in')).toBeNull();
+  });
+
+  it('U-A9e-1: el tope sigue vigente durante el reintento (la reversa no lo baja a 0)', async () => {
+    seedTodayMovements();
+    fakeState.stockLevels = [
+      {
+        warehouseId: 'wh-1',
+        productId: 'prod-1',
+        onHand: 6,
+        costPrice: 5,
+        lots: [{ costPrice: 5, quantity: 6, lotOriginMovementId: 'mv-in' }],
+      },
+    ];
+    fakeState.reverseMovementImpl.mockReturnValue({ succeeded: true, data: {}, errors: [] });
+    fakeState.recordMovementImpl.mockReturnValue({
+      succeeded: false,
+      data: undefined,
+      errors: [{ code: 'Warehouse.InsufficientStock', description: 'Falta stock.' }],
+    });
+    renderPage();
+    openToday();
+    fireEvent.click(screen.getByTestId('mv-actions-toggle-mv-in'));
+    fireEvent.click(screen.getByTestId('mv-edit-mv-in'));
+    fireEvent.click(screen.getByText('Guardar'));
+    await waitFor(() => expect(screen.getByTestId('movement-form-error')).toBeTruthy());
+    // La reversa bajó el nivel real a 0, pero el tope se congeló al abrir (6).
+    expect(screen.getByTestId('movement-max-hint').textContent).toContain('6');
+    expect((screen.getByTestId('movement-quantity') as HTMLInputElement).value).toBe('6');
   });
 
   it('U-M-R1: el bloque compacto usa el formato unificado (compra/sale_out/transferencia)', () => {
