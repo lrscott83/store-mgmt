@@ -409,14 +409,16 @@ describe('ExpensesHistoryPage — strict Angular parity', () => {
     expect(screen.queryByLabelText(/Siguiente/i)).not.toBeInTheDocument();
   });
 
-// payment-methods-percent-tax (plan 2026-09-17): Tarjeta se muestra como
+  // payment-methods-percent-tax (plan 2026-09-17): Tarjeta se muestra como
   // Transferencia (CUP) — el filtro conserva el valor legacy pero su etiqueta cambia.
-  it('shows a single payment-type radio filter (Todas/Efectivo/Transferencia/Zelle)', () => {
-    render(
-      <Wrapper>
-        <ExpensesHistoryPage />
-      </Wrapper>,
-    );
+  it('shows a single payment-type radio filter (Todas/Efectivo/Transferencia/Zelle)', async () => {
+    await act(async () => {
+      render(
+        <Wrapper>
+          <ExpensesHistoryPage />
+        </Wrapper>,
+      );
+    });
     const group = screen.getByRole('radiogroup');
     expect(group).toBeInTheDocument();
     expect(screen.getByText('Todas')).toBeInTheDocument();
