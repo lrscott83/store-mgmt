@@ -77,6 +77,29 @@ export const MENU_GROUPS: MenuGroup[] = [
         helpContent:
           'Administra las funcionalidades disponibles del sistema. Desde aquí puedes activar o desactivar módulos y funciones para las tiendas.',
       },
+      // Billing (Cobros pendientes + Comisiones): routes gated by
+      // resellerFeatureLoader([EFeatures.StorePayment]) — SuperAdmin or
+      // ReSeller only. rolesOnly mirrors that role set so the menu never
+      // offers a link the route guard would deny (OwnerAdmin holding the
+      // feature would pass isUserAuthorized but still 403 on the route).
+      {
+        label: 'MENU.BILLING_COLLECTIONS',
+        path: '/management/stores/collections',
+        featureIds: [EFeatures.StorePayment],
+        moduleId: EModules.Administration,
+        rolesOnly: (user) => user.isSuperAdmin || user.isReSeller,
+        helpContent:
+          'Cobros pendientes. Lista las tiendas con pagos atrasados o por vencer, con el monto y la fecha. Puedes registrar el pago de una tienda para ponerla al día.',
+      },
+      {
+        label: 'MENU.BILLING_COMMISSIONS',
+        path: '/management/stores/commissions',
+        featureIds: [EFeatures.StorePayment],
+        moduleId: EModules.Administration,
+        rolesOnly: (user) => user.isSuperAdmin || user.isReSeller,
+        helpContent:
+          'Comisiones de gestores. Consulta las comisiones acumuladas por mes de cada gestor (reseller) según los pagos registrados de sus tiendas.',
+      },
     ],
   },
   {
@@ -341,29 +364,8 @@ export const MENU_GROUPS: MenuGroup[] = [
         helpContent:
           'Gestiona los empleados de tu tienda. Crea cuentas de usuario, asígnales roles (cajero, bodeguero, admin) y controla qué funcionalidades pueden usar. Desde aquí también puedes exportar el roster (lista de empleados) con una contraseña para activar el acceso sin conexión en otro equipo, e importarlo después en el dispositivo de destino.',
       },
-      // Billing (Cobros pendientes + Comisiones): routes gated by
-      // resellerFeatureLoader([EFeatures.StorePayment]) — SuperAdmin or
-      // ReSeller only. rolesOnly mirrors that role set so the menu never
-      // offers a link the route guard would deny (OwnerAdmin holding the
-      // feature would pass isUserAuthorized but still 403 on the route).
-      {
-        label: 'MENU.BILLING_COLLECTIONS',
-        path: '/management/stores/collections',
-        featureIds: [EFeatures.StorePayment],
-        moduleId: EModules.Management,
-        rolesOnly: (user) => user.isSuperAdmin || user.isReSeller,
-        helpContent:
-          'Cobros pendientes. Lista las tiendas con pagos atrasados o por vencer, con el monto y la fecha. Puedes registrar el pago de una tienda para ponerla al día.',
-      },
-      {
-        label: 'MENU.BILLING_COMMISSIONS',
-        path: '/management/stores/commissions',
-        featureIds: [EFeatures.StorePayment],
-        moduleId: EModules.Management,
-        rolesOnly: (user) => user.isSuperAdmin || user.isReSeller,
-        helpContent:
-          'Comisiones de gestores. Consulta las comisiones acumuladas por mes de cada gestor (reseller) según los pagos registrados de sus tiendas.',
-      },
+      // Billing moved to the ADMIN group (MENU.ADMIN) — SuperAdmin and
+      // ReSeller see Cobros/Comisiones under ADMINISTRACIÓN, not GESTIÓN.
       {
         label: 'MENU.CONFIGURATIONS',
         path: '/management/configurations',
