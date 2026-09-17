@@ -214,7 +214,7 @@ const mockChangeStorePlan = vi.fn();
 // is about that refresh, and the real one issues a /me that the HTTP blocker
 // would flag as an unmocked request. The OTHER mutation flows (create /
 // activate) still refresh through getUserByToken() and keep their own mocks.
-let mockSoftRefreshSession = vi.fn();
+const mockSoftRefreshSession = vi.fn();
 
 vi.mock('~/shared/lib/stores/soft-refresh-session', () => ({
   softRefreshSession: (...args: unknown[]) => mockSoftRefreshSession(...args),

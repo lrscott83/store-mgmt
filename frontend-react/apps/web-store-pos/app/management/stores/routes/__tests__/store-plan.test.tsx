@@ -202,7 +202,7 @@ vi.mock('~/shared/lib/stores/auth-store', () => {
 // (soft-refresh-session.ts). Mocked for two reasons: the assertion below is
 // about that refresh, and the real one issues a /me -- which the suite's
 // HTTP blocker would flag as an unmocked request.
-let mockSoftRefreshSession = vi.fn();
+const mockSoftRefreshSession = vi.fn();
 
 vi.mock('~/shared/lib/stores/soft-refresh-session', () => ({
   softRefreshSession: (...args: unknown[]) => mockSoftRefreshSession(...args),
