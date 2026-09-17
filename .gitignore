@@ -172,5 +172,8 @@ graphify-out/
 # Pi harness local state
 .pi/
 
+# ODD feature tracking workspace (local harness state, never commit)
+odd/
+
 # temporary diagnostic Playwright specs (never commit)
 frontend-react/e2e/diag-tmp/
