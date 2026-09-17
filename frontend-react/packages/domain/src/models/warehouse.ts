@@ -27,6 +27,12 @@ export type WarehouseMovementType =
 export interface WarehouseStockLot {
   costPrice: number;
   quantity: number;
+  /**
+   * Compra que originó la tanda (plan 2026-09-16, A4). Opcional para
+   * compatibilidad con datos anteriores — la reversa lo usa para localizar
+   * la tanda exacta y solo usa el costo como fallback legacy.
+   */
+  lotOriginMovementId?: string;
 }
 
 /** Maestro de almacén — soft-delete vía `isActive`. */

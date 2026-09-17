@@ -1,4 +1,9 @@
-import type { BaseError, WarehouseMovementType, WarehouseStockLot } from '@store-mgmt/domain';
+import type {
+  BaseError,
+  WarehouseMovementType,
+  WarehouseStockLevel,
+  WarehouseStockLot,
+} from '@store-mgmt/domain';
 import { Result, WarehouseErrors } from '@store-mgmt/domain';
 import { round2 } from '~/shared/lib/money';
 
@@ -24,6 +29,10 @@ import { round2 } from '~/shared/lib/money';
  *   sintético al costo promedio vigente (D8).
  * - `reversalDirection(originalType)`: delta inverso del tipo original.
  * - `validateReversalQuantity(quantity)`: misma regla que los movimientos.
+ *
+ * Plan 2026-09-16 (edición de movimientos):
+ * - `remainingPurchaseUnits(level, movement)`: unidades que QUEDAN de una
+ *   compra — extracción exacta del cálculo de `reversePurchase` (A1).
  */
 
 export function movementDirection(type: WarehouseMovementType): 1 | -1 {
@@ -78,7 +87,13 @@ export function splitByFifoLots(
     if (remaining <= 0) break;
     const taken = round2(Math.min(remaining, lot.quantity));
     if (taken <= 0) continue;
-    slices.push({ costPrice: lot.costPrice, quantity: taken });
+    slices.push({
+      costPrice: lot.costPrice,
+      quantity: taken,
+      ...(lot.lotOriginMovementId !== undefined
+        ? { lotOriginMovementId: lot.lotOriginMovementId }
+        : {}),
+    });
     remaining = round2(remaining - taken);
   }
   if (remaining > 0) {
@@ -108,6 +123,34 @@ export function synthesizeLotFromLevel(level: {
 }): WarehouseStockLot[] {
   if (level.onHand <= 0) return [];
   return [{ costPrice: level.costPrice, quantity: round2(level.onHand) }];
+}
+
+/**
+ * Unidades de una COMPRA que quedan vivas en el almacén (plan 2026-09-16, A1).
+ *
+ * Es la MISMA cuenta que usa `WarehouseOfflineService.reversePurchase` para saber
+ * cuánto revertir; está aquí para que la ruta pueda precargar el tope de edición
+ * sin duplicar la regla (fuente única de verdad).
+ *
+ * - Fila SIN costo: FIFO hasta el `onHand` del nivel (A9b).
+ * - Cantidades: por referencia `lotOriginMovementId`; si ninguna tanda la trae
+ *   (datos viejos), por coincidencia de costo.
+ */
+export function remainingPurchaseUnits(
+  level: WarehouseStockLevel | undefined,
+  movement: { id: string; quantity: number; costPrice?: number },
+): number {
+  if (!level || level.onHand <= 0) return 0;
+  if (movement.costPrice === undefined) {
+    return round2(Math.min(movement.quantity, level.onHand));
+  }
+  const lots = level.lots ?? synthesizeLotFromLevel(level);
+  const useOrigin = lots.some((l) => l.lotOriginMovementId !== undefined);
+  const remaining = (useOrigin
+    ? lots.filter((l) => l.lotOriginMovementId === movement.id)
+    : lots.filter((l) => l.costPrice === movement.costPrice)
+  ).reduce((sum, l) => round2(sum + l.quantity), 0);
+  return round2(Math.min(movement.quantity, Math.max(0, remaining)));
 }
 
 /** Delta inverso del tipo original para una reversa (D7a). */

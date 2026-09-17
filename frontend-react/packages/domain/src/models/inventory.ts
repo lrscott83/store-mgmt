@@ -15,6 +15,12 @@ export interface InventoryEntry extends AuditableBaseModel {
   costPrice: number;
   date: Date;
   order: number;
+  /**
+   * Salida de almacén que originó esta entrada (plan 2026-09-16, A8).
+   * Opcional y solo presente en entradas creadas por `sale_out` — esas
+   * entradas NO se pueden editar por CRUD (la salida sí se edita en almacén).
+   */
+  warehouseSaleOutMovementId?: string;
 }
 
 export interface InventoryEntryView {

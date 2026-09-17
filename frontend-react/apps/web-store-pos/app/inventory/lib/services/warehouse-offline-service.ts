@@ -17,6 +17,7 @@ import { ProductRepository } from '~/sales/lib/repositories/product-repository';
 import { InventoryOfflineService } from './inventory-offline-service';
 import {
   displayCost,
+  remainingPurchaseUnits,
   splitByFifoLots,
   synthesizeLotFromLevel,
   validateMovementQuantity,
@@ -275,12 +276,15 @@ export class WarehouseOfflineService {
           // fusionan lotes.
           const level = this.getOrCreateStockLevel(params.warehouseId, params.productId);
           this.ensureLots(level);
-          level.lots!.push({ costPrice, quantity });
+          // A4: la tanda queda referenciada a su movimiento de compra.
+          const purchaseMovementId = generateId();
+          level.lots!.push({ costPrice, quantity, lotOriginMovementId: purchaseMovementId });
           this.refreshLevelTotals(level);
           this.setLocalStorage('warehouse-stock-levels', this.stockLevels!);
           return new DataResultImpl<WarehouseStockMovement[]>(
             [
               this.appendMovement({
+                id: purchaseMovementId,
                 warehouseId: params.warehouseId,
                 productId: params.productId,
                 type: 'purchase_in',
@@ -313,15 +317,28 @@ export class WarehouseOfflineService {
 
           // Una entrada de tienda POR LOTE tocado, al costo exacto del lote —
           // el costo que llega a la tienda nunca es un promedio (D8/D11).
-          const created: { slice: WarehouseStockLot; entryId: string }[] = [];
+          // A8: cada entrada queda sellada con su salida (no editable por CRUD).
+          const created: { slice: WarehouseStockLot; entryId: string; movementId: string }[] = [];
           for (const slice of slices) {
             const entry = this.inventoryService.createInventoryEntry(
               params.productId,
               slice.quantity,
               slice.costPrice,
             );
-            if (!entry || !entry.succeeded) {
+            const movementId = generateId();
+            const marked =
+              entry &&
+              entry.succeeded &&
+              this.inventoryService.markEntryWarehouseOrigin(
+                params.productId,
+                entry.data!.id,
+                movementId,
+              );
+            if (!entry || !entry.succeeded || !marked || !marked.succeeded) {
               // Rollback: entradas ya creadas + nivel intacto en memoria.
+              if (entry && entry.succeeded) {
+                this.inventoryService.deleteInventoryEntry(params.productId, entry.data!.id);
+              }
               for (const done of created) {
                 this.inventoryService.deleteInventoryEntry(params.productId, done.entryId);
               }
@@ -333,15 +350,16 @@ export class WarehouseOfflineService {
                 WarehouseErrors.ProductNotExists,
               ]);
             }
-            created.push({ slice, entryId: entry.data!.id });
+            created.push({ slice, entryId: entry.data!.id, movementId });
           }
 
           this.consumeLots(level, slices);
           this.refreshLevelTotals(level);
           this.setLocalStorage('warehouse-stock-levels', this.stockLevels!);
 
-          const rows = created.map(({ slice, entryId }) =>
+          const rows = created.map(({ slice, entryId, movementId }) =>
             this.appendMovement({
+              id: movementId,
               warehouseId: params.warehouseId,
               productId: params.productId,
               type: 'sale_out',
@@ -415,7 +433,16 @@ export class WarehouseOfflineService {
                 quantity,
                 reason: params.reason ?? null,
                 fromWarehouseId: params.fromWarehouseId,
-                costPrice: slices.length === 1 ? slices[0].costPrice : undefined,
+                // A6: transfer_in multi-tanda persiste su costo ponderado exacto.
+                costPrice: (() => {
+                  let totalQty = 0;
+                  let totalCost = 0;
+                  for (const s of slices) {
+                    totalQty = round2(totalQty + s.quantity);
+                    totalCost = round2(totalCost + s.quantity * s.costPrice);
+                  }
+                  return totalQty > 0 ? round2(totalCost / totalQty) : undefined;
+                })(),
               }),
             ],
             true,
@@ -526,11 +553,13 @@ export class WarehouseOfflineService {
     this.ensureLots(level);
 
     if (movement.costPrice === undefined) {
-      // Compra legacy sin costo en fila: revierte del lote sintético/único
-      // vigente al costo display actual (mejor esfuerzo D8-legacy).
+      // Compra sin costo en fila: revierte al costo promedio del nivel
+      // (plan 2026-09-16, A9b — no al costo de la tanda más vieja).
+      // Descuenta FIFO (las tandas no tienen ese costo) y valora la reversa al promedio.
       const remaining = Math.min(movement.quantity, level.onHand);
-      const cost = level.lots![0]?.costPrice ?? level.costPrice;
-      this.removeLotUnits(level, cost, remaining);
+      const cost = level.costPrice;
+      const slices = splitByFifoLots(level.lots!, remaining);
+      this.consumeLots(level, slices);
       this.refreshLevelTotals(level);
       this.setLocalStorage('warehouse-stock-levels', this.stockLevels!);
       return new DataResultImpl<WarehouseStockMovement>(
@@ -548,17 +577,23 @@ export class WarehouseOfflineService {
       );
     }
 
-    // Unidades restantes del lote a este costo exacto (D9).
-    const remainingInLot = level.lots!
-      .filter((l) => l.costPrice === movement.costPrice)
-      .reduce((sum, l) => round2(sum + l.quantity), 0);
+    // Unidades restantes de ESTA compra (A4): por referencia de origen.
+    // Fallback por costo SOLO para datos viejos (ninguna tanda con referencia).
+    // La cuenta vive en `remainingPurchaseUnits` (plan 2026-09-16, A1) para que
+    // la ruta calcule el tope de edición con la MISMA regla que la reversa.
+    const useOrigin = level.lots!.some((l) => l.lotOriginMovementId !== undefined);
+    const remainingInLot = remainingPurchaseUnits(level, movement);
     if (remainingInLot <= 0) {
       return new DataResultImpl<WarehouseStockMovement>(undefined, false, [
         WarehouseErrors.PurchaseLotConsumed,
       ]);
     }
     const toRevert = Math.min(movement.quantity, remainingInLot);
-    this.removeLotUnits(level, movement.costPrice, toRevert);
+    if (useOrigin) {
+      this.removeLotUnitsByOrigin(level, movement.id, toRevert);
+    } else {
+      this.removeLotUnits(level, movement.costPrice, toRevert);
+    }
     this.refreshLevelTotals(level);
     this.setLocalStorage('warehouse-stock-levels', this.stockLevels!);
     return new DataResultImpl<WarehouseStockMovement>(
@@ -634,6 +669,12 @@ export class WarehouseOfflineService {
         WarehouseErrors.SaleOutEntryNotFound,
       ]);
     }
+    // A8: la entrada espejo no debe haberse editado — la reversa es exacta o se bloquea.
+    if (round2(entry.quantity) !== round2(movement.quantity)) {
+      return new DataResultImpl<WarehouseStockMovement>(undefined, false, [
+        WarehouseErrors.SaleOutEntryModified,
+      ]);
+    }
     if (entry.available < movement.quantity) {
       return new DataResultImpl<WarehouseStockMovement>(undefined, false, [
         WarehouseErrors.SaleOutAlreadyConsumed,
@@ -683,21 +724,54 @@ export class WarehouseOfflineService {
       ]);
     }
     this.ensureLots(target);
-
-    // Resta del destino: exactamente las unidades de este lote.
-    if (cost === undefined) {
-      // Legacy sin costo: descuenta FIFO del destino (mejor esfuerzo).
-      const slices = splitByFifoLots(target.lots!, movement.quantity);
-      this.consumeLots(target, slices);
-    } else {
-      this.removeLotUnits(target, cost, movement.quantity);
-    }
-    this.refreshLevelTotals(target);
-
-    // Re-acredita el lote en el origen al costo exacto.
     const origin = this.getOrCreateStockLevel(movement.warehouseId, movement.productId);
-    this.creditLotUnits(origin, cost ?? target.costPrice, movement.quantity);
-    this.refreshLevelTotals(origin);
+    this.ensureLots(origin);
+
+    // A2 "todo o nada": snapshot en memoria; si algo falla, restaurar y
+    // devolver error sin tocar el storage.
+    const snapTarget = {
+      onHand: target.onHand,
+      costPrice: target.costPrice,
+      lots: target.lots!.map((l) => ({ ...l })),
+      updatedDate: target.updatedDate,
+    };
+    const snapOrigin = {
+      onHand: origin.onHand,
+      costPrice: origin.costPrice,
+      lots: origin.lots!.map((l) => ({ ...l })),
+      updatedDate: origin.updatedDate,
+    };
+    try {
+      // Resta del destino: exactamente las unidades de este lote.
+      if (cost === undefined) {
+        // Sin costo en la fila (datos nuevos siempre lo traen — A6/A7):
+        // descuenta FIFO del destino y acredita al promedio del nivel.
+        const slices = splitByFifoLots(target.lots!, movement.quantity);
+        this.consumeLots(target, slices);
+      } else {
+        this.removeLotUnits(target, cost, movement.quantity);
+      }
+      this.refreshLevelTotals(target);
+
+      // Re-acredita el lote en el origen al costo exacto (A3: al inicio).
+      this.creditLotUnits(origin, cost ?? target.costPrice, movement.quantity);
+      this.refreshLevelTotals(origin);
+    } catch (err) {
+      target.onHand = snapTarget.onHand;
+      target.costPrice = snapTarget.costPrice;
+      target.lots = snapTarget.lots;
+      target.updatedDate = snapTarget.updatedDate;
+      origin.onHand = snapOrigin.onHand;
+      origin.costPrice = snapOrigin.costPrice;
+      origin.lots = snapOrigin.lots;
+      origin.updatedDate = snapOrigin.updatedDate;
+      if (err instanceof Error && err.message === WarehouseErrors.InsufficientStock.description) {
+        return new DataResultImpl<WarehouseStockMovement>(undefined, false, [
+          WarehouseErrors.InsufficientStock,
+        ]);
+      }
+      throw err;
+    }
     this.setLocalStorage('warehouse-stock-levels', this.stockLevels!);
 
     return new DataResultImpl<WarehouseStockMovement>(
@@ -754,8 +828,9 @@ export class WarehouseOfflineService {
 
   /**
    * Re-acredita unidades de una reversa al costo exacto del lote original:
-   * fusiona con un lote existente al mismo costo (restaurando su posición
-   * FIFO) o inserta uno nuevo al final (D8 — la reversa es exacta, no promedia).
+   * fusiona con un lote existente al mismo costo (conserva su posición FIFO)
+   * o inserta la tanda restaurada AL INICIO para que siga cumpliendo FIFO
+   * (plan 2026-09-16, A3 — nunca al final como "lo más nuevo").
    */
   private creditLotUnits(level: WarehouseStockLevel, costPrice: number, quantity: number): void {
     const lots = this.ensureLots(level);
@@ -763,7 +838,7 @@ export class WarehouseOfflineService {
     if (exact) {
       exact.quantity = round2(exact.quantity + quantity);
     } else {
-      lots.push({ costPrice, quantity: round2(quantity) });
+      lots.unshift({ costPrice, quantity: round2(quantity) });
     }
   }
 
@@ -820,6 +895,10 @@ export class WarehouseOfflineService {
       const revived = reviveDate(level, ['createdDate', 'updatedDate']);
       existing.onHand = revived.onHand;
       existing.costPrice = revived.costPrice;
+      // A5: el import de niveles copia también los lotes (onHand == Σ lotes).
+      if (revived.lots !== undefined) {
+        existing.lots = revived.lots.map((l) => ({ ...l }));
+      }
       existing.updatedDate = revived.updatedDate;
       this.setLocalStorage('warehouse-stock-levels', this.stockLevels!);
     }
@@ -833,10 +912,12 @@ export class WarehouseOfflineService {
    */
   addImportedMovement(movement: WarehouseStockMovement): Result {
     const exists = this.getStorageMovements().some((m) => m.id === movement.id);
+    // A9c: el guard también cubre reversas sin `reversalOfMovementId`
+    // (datos nuevos siempre lo traen — una reversa sin referencia no se importa).
     const duplicateReversal =
       movement.type === 'reversal' &&
-      movement.reversalOfMovementId !== undefined &&
-      this.isReversed(movement.reversalOfMovementId);
+      (movement.reversalOfMovementId === undefined ||
+        this.isReversed(movement.reversalOfMovementId));
     if (!exists && !duplicateReversal) {
       const revived = reviveDate(movement, ['createdDate']);
       this.getStorageMovements().push(revived);
@@ -876,7 +957,32 @@ export class WarehouseOfflineService {
     return level;
   }
 
+  /** Quita `quantity` unidades de la tanda originada por `originMovementId` (A4). */
+  private removeLotUnitsByOrigin(
+    level: WarehouseStockLevel,
+    originMovementId: string,
+    quantity: number,
+  ): void {
+    let remaining = round2(quantity);
+    const lots = level.lots!;
+    for (let i = 0; i < lots.length && remaining > 0; i++) {
+      const lot = lots[i];
+      if (lot.lotOriginMovementId !== originMovementId) continue;
+      const take = round2(Math.min(remaining, lot.quantity));
+      lot.quantity = round2(lot.quantity - take);
+      remaining = round2(remaining - take);
+      if (lot.quantity <= 0) {
+        lots.splice(i, 1);
+        i--;
+      }
+    }
+    if (remaining > 0) {
+      throw new Error(WarehouseErrors.InsufficientStock.description);
+    }
+  }
+
   private appendMovement(input: {
+    id?: string;
     warehouseId: string;
     productId: string;
     type: WarehouseMovementType;
@@ -896,7 +1002,7 @@ export class WarehouseOfflineService {
     reversalInventoryEntryId?: string;
   }): WarehouseStockMovement {
     const movement: WarehouseStockMovement = {
-      id: generateId(),
+      id: input.id ?? generateId(),
       warehouseId: input.warehouseId,
       productId: input.productId,
       type: input.type,

@@ -609,6 +609,14 @@ export class InventoryOfflineService {
     const allForProduct = this.getProductInventoriesByProductId(productId);
     const entry = allForProduct.find((e) => e.id === entryId)!;
 
+    // A8 (plan 2026-09-16): las entradas originadas por una salida de almacén
+    // no se editan en la tienda — la salida sí se edita en el almacén.
+    if (entry.warehouseSaleOutMovementId !== undefined) {
+      return new DataResult<InventoryEntryView>(undefined, false, [
+        InventoryErrors.WarehouseEntryNotEditable,
+      ]);
+    }
+
     const updated: InventoryEntry = {
       ...entry,
       quantity,
@@ -773,6 +781,13 @@ export class InventoryOfflineService {
     const oldEntries = this.getProductInventoriesByProductId(oldProductId);
     const entry = oldEntries.find((e) => e.id === entryId)!;
 
+    // A8 (plan 2026-09-16): igual que update() — sin edición de entradas de almacén.
+    if (entry.warehouseSaleOutMovementId !== undefined) {
+      return new DataResult<InventoryEntryView>(undefined, false, [
+        InventoryErrors.WarehouseEntryNotEditable,
+      ]);
+    }
+
     const updated: InventoryEntry = {
       ...entry,
       quantity,
@@ -814,6 +829,28 @@ export class InventoryOfflineService {
       true,
       [],
     );
+  }
+
+  /**
+   * Marca una entrada como originada por una salida de almacén (plan 2026-09-16,
+   * A8). Lo llama `WarehouseOfflineService.sale_out` al crear la entrada espejo;
+   * a partir de ahí `update()`/`updateInventoryEntry()` la rechazan.
+   */
+  markEntryWarehouseOrigin(
+    productId: string,
+    entryId: string,
+    movementId: string,
+  ): Result {
+    const allForProduct = this.getProductInventoriesByProductId(productId);
+    const idx = allForProduct.findIndex((e) => e.id === entryId);
+    if (idx === -1) {
+      return Result.Failure([InventoryErrors.EntryNotExists]);
+    }
+    allForProduct[idx] = { ...allForProduct[idx], warehouseSaleOutMovementId: movementId };
+    const map = this.getStorageInventoriesMap();
+    map.set(productId, allForProduct);
+    this.setInventoriesLocalStorage(map);
+    return Result.Success();
   }
 
   // ─── Query helpers ───────────────────────────────────────────────────────

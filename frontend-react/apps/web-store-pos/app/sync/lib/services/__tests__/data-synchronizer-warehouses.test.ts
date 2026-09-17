@@ -399,7 +399,7 @@ describe('DataSerializerService — warehouses roundtrip (warehouses-plan)', () 
     const parsed = await serializer.import(payload, 'pass');
 
     // Nivel con lotes, salida con costPrice+inventoryEntryId, reversa con enlace.
-    expect(parsed.warehouseStockLevels[0].lots).toEqual([{ costPrice: 660, quantity: 24 }]);
+    expect(parsed.warehouseStockLevels[0].lots).toMatchObject([{ costPrice: 660, quantity: 24 }]);
     const saleRow = parsed.warehouseStockMovements.find((m) => m.type === 'sale_out')!;
     expect(saleRow.costPrice).toBe(660);
     expect(saleRow.inventoryEntryId).toBeDefined();

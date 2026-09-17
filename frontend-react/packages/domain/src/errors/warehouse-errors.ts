@@ -78,6 +78,11 @@ export const WarehouseErrors = {
     description:
       'El lote de la compra ya fue consumido — no quedan unidades que revertir.',
   },
+  SaleOutEntryModified: {
+    code: 'Warehouse.SaleOutEntryModified',
+    description:
+      'La entrada de tienda fue modificada — no se puede revertir de forma exacta.',
+  },
   WarehouseNotActive: {
     code: 'Warehouse.WarehouseNotActive',
     description: 'El almacén involucrado no está activo.',
