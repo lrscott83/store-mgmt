@@ -15,7 +15,7 @@ import { httpErrorKey } from '~/shared/lib/http/http-error';
 import { confirmDialog } from '~/shared/lib/blocking-alert';
 import { showToastSuccess } from '~/shared/lib/toast';
 import { softRefreshSession } from '~/shared/lib/stores/soft-refresh-session';
-import type { Feature, Module, OwnerStoreWithPlan, Plan } from '@store-mgmt/domain';
+import type { Feature, OwnerStoreWithPlan, Plan } from '@store-mgmt/domain';
 
 export const clientLoader = featureLoader([EFeatures.Stores]);
 

@@ -196,6 +196,8 @@ Pasos verificados (2026-09-03) para correr a mano toda la suite, en orden: check
   psql -h localhost -p 5432 -U postgres -c "CREATE DATABASE smca_test;"
   # ignora el error si ya existe
   ```
+
+> ⚠️ **No hace falta verificar que la base exista antes de cada corrida de tests**: los comandos de las secciones siguientes que necesitan la BD de tests se ejecutan directamente. Si la base falta o no hay conexión, la propia suite lo reporta con un error de conexión claro.
 - Dependencias del frontend y navegador de Playwright:
   ```bash
   cd frontend-react
@@ -232,6 +234,7 @@ dotnet test backend/src/SMCA.WebApi.E2ETests/SMCA.WebApi.E2ETests.csproj
 
 - Corre contra PostgreSQL real (`localhost:5432`, base `smca_test`): `WebAppFixture` aplica las migraciones y ejecuta `ResetDataAsync` al iniciar (borra filas de datos, preserva los seeds).
 - ⚠️ **Nunca en paralelo con la suite Playwright**: el `ResetDataAsync` de `WebAppFixture` borraría las filas vivas que los tests del frontend están usando. En secuencia es seguro.
+- ⚠️ **No verifiques que la base `smca_test` exista antes de correr**: ejecuta el comando directamente. `WebAppFixture` aplica las migraciones por sí mismo y el guard de arranque confirma la base; si algo falta, los tests lo reportan.
 
 ### Comando único del backend
 
@@ -241,7 +244,7 @@ Los 3 proyectos de tests (los 2 unitarios + el E2E) en un solo comando, verifica
 dotnet test backend/src/SMCA.sln
 ```
 
-> Nota: corre también el build implícito de todos los proyectos. Si ya hiciste el build de la sección 1, agregar `--no-build` lo acelera.
+> Nota: corre también el build implícito de todos los proyectos. Si ya hiciste el build de la sección 1, agregar `--no-build` lo acelera. Como incluye el proyecto E2E, necesita la BD `smca_test` — no verifiques que exista antes de correr, ejecuta el comando directamente.
 
 ### 4. Frontend React — checks
 
@@ -295,6 +298,7 @@ pnpm exec playwright show-report
 Notas:
 
 - Playwright levanta (o reutiliza) él solo el dev server en `http://localhost:3333` (`webServer` del config, `reuseExistingServer: true`). No hay que levantarlo a mano — y si hay uno corriendo de antes, ojo con su `API_URL` (el guard de arranque lo detecta).
+- La suite necesita el backend corriendo contra la BD de tests — no verifiques que `smca_test` exista antes de correr: levanta el backend con `http-e2e` y ejecuta los comandos directamente; el guard de arranque y los tests reportan cualquier problema de base.
 - `login-offline.spec.ts` es el único spec que corre sin backend levantado.
 - Al terminar, el `globalTeardown` borra automáticamente las filas `e2e-*` de `smca_test`. Si el log dice "0 filas borradas", el backend estaba escribiendo en otra base (p. ej. perfil `http` por error).
 - Cuotas del rate limiter: 40 logins/min y 50 registros/10min por IP (`backend/src/SMCA.WebApi/PolicyCode/RateLimitPolicies.cs`). Dos corridas completas dentro del mismo minuto pueden rozar el techo de login; dejá pasar un minuto entre corridas.
