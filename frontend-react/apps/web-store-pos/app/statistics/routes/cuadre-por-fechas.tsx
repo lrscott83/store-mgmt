@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react';
 import { useIntl, type IntlShape } from 'react-intl';
-import { EFeatures, ExpenseType, PaymentType } from '@store-mgmt/domain';
+import { EFeatures, ExpenseType, PaymentType, SalePaymentMethod } from '@store-mgmt/domain';
 import type { Expense, SaleCredit } from '@store-mgmt/domain';
+import { resolvedOrderPaymentMethod } from '~/shared/lib/payment-method-resolved';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import {
@@ -51,9 +52,11 @@ const EXPENSE_TYPE_KEYS: Record<ExpenseType, string> = {
   [ExpenseType.Otro]: 'EXPENSES.TYPE.OTRO',
 };
 
-const PAYMENT_TYPE_KEYS: Record<PaymentType, string> = {
+// payment-methods-percent-tax (plan 2026-09-17): los históricos Tarjeta se
+// muestran/agrupan como Transferencia (CUP).
+const EXPENSE_PAYMENT_KEYS: Record<PaymentType, string> = {
   [PaymentType.Efectivo]: 'CART.EFECTIVO',
-  [PaymentType.Tarjeta]: 'CART.TARJETA',
+  [PaymentType.Tarjeta]: 'CART.TRANSFERENCIA_CUP',
   [PaymentType.Zelle]: 'CART.ZELLE',
 };
 
@@ -257,7 +260,9 @@ export function CuadrePorFechasPage() {
       .filter((o) => o.paymentType === PaymentType.Efectivo && !o.isCredit)
       .reduce((acc, o) => acc + o.total, 0);
     const salesCardTotal = activeOrders
-      .filter((o) => o.paymentType === PaymentType.Tarjeta && !o.isCredit)
+      .filter(
+        (o) => resolvedOrderPaymentMethod(o) === SalePaymentMethod.Transferencia && !o.isCredit,
+      )
       .reduce((acc, o) => acc + o.total, 0);
 
     let expenses: Expense[] = [];
@@ -580,7 +585,7 @@ export function CuadrePorFechasPage() {
 
               {/* BEGIN CARD PAYMENTS */}
               <ExpansionPanel
-                title="Pago por Tarjeta"
+                title="Pago por Transferencia"
                 amount={formatCurrency(summary.salesCardTotal)}
                 amountClassName={valueClassName(summary.salesCardTotal)}
               >
@@ -628,7 +633,7 @@ export function CuadrePorFechasPage() {
                             </td>
                             <td className="p-1 text-right">
                               <span className="rounded-full bg-success/10 px-2 py-0.5 text-xs font-semibold text-success">
-                                {intl.formatMessage({ id: PAYMENT_TYPE_KEYS[expense.paymentType] })}
+                                {intl.formatMessage({ id: EXPENSE_PAYMENT_KEYS[expense.paymentType] })}
                               </span>
                             </td>
                           </tr>
@@ -890,7 +895,7 @@ function MultiStoreCuadreBody({
       </ExpansionPanel>
 
       <ExpansionPanel
-        title="Pago por Tarjeta"
+        title="Pago por Transferencia"
         amount={formatCurrency(summary.salesCardTotal)}
         amountClassName={valueClassName(summary.salesCardTotal)}
       >
@@ -936,7 +941,7 @@ function MultiStoreCuadreBody({
                     </td>
                     <td className="p-1 text-right">
                       <span className="rounded-full bg-success/10 px-2 py-0.5 text-xs font-semibold text-success">
-                        {intl.formatMessage({ id: PAYMENT_TYPE_KEYS[expense.paymentType] })}
+                        {intl.formatMessage({ id: EXPENSE_PAYMENT_KEYS[expense.paymentType] })}
                       </span>
                     </td>
                   </tr>

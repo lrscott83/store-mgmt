@@ -248,7 +248,7 @@ describe('TodayStatsPage — with Expenses + Credits modules available', () => {
 
   // Pago por Tarjeta panel (user request 2026-09-07): sits right after Resumen
   // Efectivo, sums TODAY's card-paid non-credit sales, always rendered.
-  it('renders Pago por Tarjeta after Resumen Efectivo with today card sales', async () => {
+  it('renders Pago por Transferencia after Resumen Efectivo with today transfer sales', async () => {
     mockGetActiveOrdersInDay.mockReturnValue([
       makeOrder({ id: 'card-1', total: 120, paymentType: PaymentType.Tarjeta, isCredit: false }),
       makeOrder({ id: 'cash-1', total: 80, paymentType: PaymentType.Efectivo, isCredit: false }),
@@ -267,7 +267,7 @@ describe('TodayStatsPage — with Expenses + Credits modules available', () => {
       </Wrapper>,
     );
 
-    const cardPanel = await screen.findByRole('button', { name: /Pago por Tarjeta/ });
+    const cardPanel = await screen.findByRole('button', { name: /Pago por Transferencia/ });
     expect(cardPanel).toBeInTheDocument();
     // Panel amount in the collapsed header: only the 120 card sale counts.
     expect(screen.getAllByText('$120').length).toBeGreaterThan(0);

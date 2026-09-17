@@ -283,6 +283,7 @@ const messages: Record<string, string> = {
   'CART.EFECTIVO': 'Efectivo',
   'CART.TARJETA': 'Tarjeta',
   'CART.ZELLE': 'Zelle',
+  'CART.TRANSFERENCIA_CUP': 'Transferencia (CUP)',
   'CART.CREATE_ORDER': 'Crear pedido',
   'CART.ITEMS': '{count, plural, one {# artículo} other {# artículos}}',
   'CART.CLIENT_NAME_REQUIRED': 'El nombre del cliente es requerido para ventas a crédito',

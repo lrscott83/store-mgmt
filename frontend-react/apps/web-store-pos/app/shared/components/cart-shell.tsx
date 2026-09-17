@@ -1,7 +1,17 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { useIntl } from 'react-intl';
-import { PaymentType } from '@store-mgmt/domain';
 import type { Product } from '@store-mgmt/domain';
+import {
+  SalePaymentMethod,
+  applyPaymentPricing,
+  isCashMethod,
+  paymentMethodOptionsForCurrency,
+  paymentPricingFor,
+  salePaymentMethodLabel,
+  salePaymentMethodToLegacyPaymentType,
+  defaultPaymentMethodForCurrency,
+} from '@store-mgmt/domain';
+import type { SalePaymentMethod as SalePaymentMethodType } from '@store-mgmt/domain';
 import { useCartStore } from '~/shared/lib/stores/cart-store';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { useClickOutside } from '~/shared/lib/hooks/use-click-outside';
@@ -23,7 +33,7 @@ import {
   wholesaleTierUnitPrice,
   wholesaleUnitPlural,
 } from '~/sales/lib/wholesale';
-import { getPaymentTypeIconKind, type PaymentTypeIconKind } from '~/shared/lib/payment-type-icon';
+import { type PaymentTypeIconKind } from '~/shared/lib/payment-type-icon';
 import { getPaymentReturn, getPaymentReturnKind } from '~/shared/lib/payment-return';
 import { validateCartSubmission } from '~/shared/lib/cart-submission-validation';
 import { showBlockingError, showAcknowledgeError } from '~/shared/lib/blocking-alert';
@@ -36,10 +46,21 @@ import { InfoBox } from '~/shared/components/ui/info-box';
 // Zelle removed from the visual options (user request 2026-09-08) — the enum
 // member stays and historical Zelle data still renders (display maps elsewhere
 // keep it). Re-add here when Zelle goes live again.
-const PAYMENT_TYPE_OPTIONS: { type: PaymentType; labelKey: string }[] = [
-  { type: PaymentType.Efectivo, labelKey: 'CART.EFECTIVO' },
-  { type: PaymentType.Tarjeta, labelKey: 'CART.TARJETA' },
-];
+// payment-methods-percent-tax (plan 2026-09-17): las opciones ya no son una
+// constante fija — el catálogo depende de la MONEDA de la venta
+// (paymentMethodOptionsForCurrency) y la Tarjeta se reemplaza por Transferencia.
+
+/** Ícono del método: Efectivo → cash, Zelle → phone, Transferencia → card. */
+function salePaymentMethodIconKind(method: SalePaymentMethodType): PaymentTypeIconKind {
+  switch (method) {
+    case SalePaymentMethod.Efectivo:
+      return 'cash';
+    case SalePaymentMethod.Zelle:
+      return 'phone';
+    default:
+      return 'card';
+  }
+}
 
 function PaymentTypeIcon({ kind }: { kind: PaymentTypeIconKind }) {
   const testId = `payment-type-icon-${kind}`;
@@ -175,10 +196,8 @@ export function CartShell() {
     items,
     orderType,
     orderDescription,
-    paymentType,
     isCredit,
     clientName,
-    setPaymentType,
     setClientName,
     toggleCredit,
     updateQuantity,
@@ -188,6 +207,11 @@ export function CartShell() {
     // MultiMonedas: acción nueva — con fallback CUP para stores sin ella (mocks de test,
     // perfiles persistidos de sesiones previas).
     cartCurrency = () => 0,
+    // payment-methods-percent-tax (plan 2026-09-17): método real de la venta en curso
+    // (persistido con el carrito). Defaults defensivos para mocks de test y perfiles
+    // viejos sin el campo.
+    salePaymentMethod = SalePaymentMethod.Efectivo,
+    setSalePaymentMethod = () => {},
   } = useCartStore();
   const user = useAuthStore((s) => s.user);
   const creditsModuleAvailable = user ? hasCreditsModuleAvailable(user) : false;
@@ -196,13 +220,30 @@ export function CartShell() {
   // Venta mayorista: el badge cuenta PAQUETES (cajas), no unidades. En venta normal
   // sigue contando unidades (cartBadgeCount cae a la suma por producto sin config).
   const itemCount = wholesaleCartDisplay.cartBadgeCount(items);
-  const totalAmount = total();
   // MultiMonedas: el carrito es de una sola moneda (guard de adición), así que el
   // total y el vuelto se formatean SIEMPRE con la moneda de la venta en curso.
   const saleCurrency = cartCurrency();
   const money = (amount: number) => formatMoneyWithCurrency(amount, saleCurrency);
+
+  // payment-methods-percent-tax (plan 2026-09-17): re-pin del método si la moneda de
+  // la venta cambió y el método actual ya no existe en su catálogo (carrito vacío →
+  // siempre se puede elegir; el catálogo de CUP incluye al default Efectivo).
+  const methodOptions = paymentMethodOptionsForCurrency(saleCurrency);
+  useEffect(() => {
+    if (!methodOptions.includes(salePaymentMethod)) {
+      setSalePaymentMethod(defaultPaymentMethodForCurrency(saleCurrency));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [saleCurrency]);
+
+  // El pricing de la combinación (moneda, método) se aplica al total mostrado y al
+  // que se valida contra el pago; createOrder aplica LA MISMA fórmula al persistir.
+  // Con los defaults 0/0 el total ajustado es idéntico al base (no-regresión).
+  const pricing = paymentPricingFor(saleCurrency, salePaymentMethod);
+  const totalAmount = applyPaymentPricing(total(), pricing);
   const paymentReturn = getPaymentReturn(payment, totalAmount);
   const paymentReturnKind = getPaymentReturnKind(paymentReturn);
+  const cashSale = isCashMethod(salePaymentMethod);
 
   function resetTransientFields() {
     setPayment(undefined);
@@ -345,9 +386,12 @@ export function CartShell() {
         items,
         orderType,
         isCredit,
-        paymentType,
+        // Legacy derivado del método real (compatibilidad de datos); el campo
+        // autoritativo es `salePaymentMethod`, último parámetro.
+        salePaymentMethodToLegacyPaymentType(salePaymentMethod, saleCurrency),
         orderDescription,
         clientName.trim(),
+        salePaymentMethod,
       );
       if (!result.succeeded) {
         // Angular createOrder `else` branch (nav-right.component.ts:222-225):
@@ -461,7 +505,10 @@ export function CartShell() {
               </div>
             </div>
 
-            {/* Payment / Vuelto row */}
+            {/* Payment / Vuelto row — payment-methods-percent-tax (plan 2026-09-17):
+              "con cuánto paga" y el vuelto aplican SOLO en efectivo (misma moneda de la
+              venta, sin cambio); en Transferencia/Zelle se ocultan. */}
+            {cashSale ? (
             <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
               <span
                 className={
@@ -489,24 +536,36 @@ export function CartShell() {
                 className="w-36 rounded-md border border-border px-2 py-1 text-xs text-right focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
               />
             </div>
+            ) : (
+              /* Transferencia/Zelle: sin vuelto ni "con cuánto paga" — el cobro no es
+                 en efectivo. Fila informativa para conservar el ritmo visual. */
+              <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
+                <span className="text-xs font-medium text-text-muted">
+                  {salePaymentMethodLabel(salePaymentMethod, saleCurrency)}
+                </span>
+              </div>
+            )}
 
-            {/* Payment-type selector — radio group (Angular mat-radio-group parity), each
-              option with its icon + label */}
+            {/* Payment-method selector — radio group por MONEDA de la venta
+              (payment-methods-percent-tax, plan 2026-09-17): cada método con su ícono +
+              etiqueta ("Transferencia (CUP)" incluye su moneda). Reemplaza al selector
+              fijo Efectivo/Tarjeta. */}
             <div className="border-b border-border px-4 py-3">
-              <div className="flex gap-4" role="radiogroup">
-                {PAYMENT_TYPE_OPTIONS.map(({ type, labelKey }) => {
-                  const kind = getPaymentTypeIconKind(type);
-                  const label = intl.formatMessage({ id: labelKey });
+              <div className="flex flex-wrap gap-4" role="radiogroup">
+                {methodOptions.map((method) => {
+                  const kind = salePaymentMethodIconKind(method);
+                  const label = salePaymentMethodLabel(method, saleCurrency);
                   return (
                     <label
-                      key={type}
+                      key={method}
                       className="flex items-center gap-1.5 cursor-pointer text-xs font-medium text-text"
                     >
                       <input
                         type="radio"
                         name="payment-type"
-                        checked={paymentType === type}
-                        onChange={() => setPaymentType(type)}
+                        data-testid={`payment-method-${method}`}
+                        checked={salePaymentMethod === method}
+                        onChange={() => setSalePaymentMethod(method)}
                         className="text-primary focus:ring-primary"
                       />
                       <PaymentTypeIcon kind={kind} />

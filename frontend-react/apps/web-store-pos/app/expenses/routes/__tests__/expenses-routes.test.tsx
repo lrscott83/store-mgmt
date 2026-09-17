@@ -389,7 +389,9 @@ describe('ExpensesHistoryPage — strict Angular parity', () => {
     expect(screen.queryByLabelText(/Siguiente/i)).not.toBeInTheDocument();
   });
 
-  it('shows a single payment-type radio filter (Todas/Efectivo/Tarjeta/Zelle)', () => {
+  // payment-methods-percent-tax (plan 2026-09-17): Tarjeta se muestra como
+  // Transferencia (CUP) — el filtro conserva el valor legacy pero su etiqueta cambia.
+  it('shows a single payment-type radio filter (Todas/Efectivo/Transferencia/Zelle)', () => {
     render(
       <Wrapper>
         <ExpensesHistoryPage />
@@ -399,7 +401,7 @@ describe('ExpensesHistoryPage — strict Angular parity', () => {
     expect(group).toBeInTheDocument();
     expect(screen.getByText('Todas')).toBeInTheDocument();
     expect(screen.getByText('Efectivo')).toBeInTheDocument();
-    expect(screen.getByText('Tarjeta')).toBeInTheDocument();
+    expect(screen.getByText('Transferencia (CUP)')).toBeInTheDocument();
     expect(screen.getByText('Zelle')).toBeInTheDocument();
   });
 
@@ -415,7 +417,7 @@ describe('ExpensesHistoryPage — strict Angular parity', () => {
     const todasLabel = screen.getByText('Todas').closest('label');
     expect(todasLabel?.querySelector('svg')).toBeNull();
 
-    for (const text of ['Efectivo', 'Tarjeta', 'Zelle']) {
+    for (const text of ['Efectivo', 'Transferencia (CUP)', 'Zelle']) {
       const label = screen.getByText(text).closest('label');
       expect(label?.querySelector('svg')).not.toBeNull();
     }
@@ -539,7 +541,7 @@ describe('ExpensesHistoryPage — strict Angular parity', () => {
     );
     expect(await screen.findByText('(2)')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByLabelText('Tarjeta'));
+    fireEvent.click(screen.getByLabelText('Transferencia (CUP)'));
     expect(await screen.findByText('(1)')).toBeInTheDocument();
     // $25 now appears twice: the header total and the (single) day-panel total.
     expect(screen.getAllByText('$25')).toHaveLength(2);

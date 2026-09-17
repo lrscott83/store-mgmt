@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useIntl } from 'react-intl';
-import { EFeatures, ExpenseType, PaymentType } from '@store-mgmt/domain';
+import { EFeatures, ExpenseType, PaymentType, SalePaymentMethod } from '@store-mgmt/domain';
 import type { Expense, Order, SaleCredit } from '@store-mgmt/domain';
+import { resolvedOrderPaymentMethod } from '~/shared/lib/payment-method-resolved';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import {
@@ -37,9 +38,10 @@ const EXPENSE_TYPE_KEYS: Record<ExpenseType, string> = {
   [ExpenseType.Otro]: 'EXPENSES.TYPE.OTRO',
 };
 
-const PAYMENT_TYPE_KEYS: Record<PaymentType, string> = {
+// Gastos: mismo reemplazo Tarjeta → Transferencia a nivel display.
+const EXPENSE_PAYMENT_KEYS: Record<PaymentType, string> = {
   [PaymentType.Efectivo]: 'CART.EFECTIVO',
-  [PaymentType.Tarjeta]: 'CART.TARJETA',
+  [PaymentType.Tarjeta]: 'CART.TRANSFERENCIA_CUP',
   [PaymentType.Zelle]: 'CART.ZELLE',
 };
 
@@ -119,12 +121,16 @@ export function TodayStatsPage() {
     const activeOrders: Order[] = orderService.getActiveOrdersInDay(new Date());
     setSalesCashTotal(
       activeOrders
-        .filter((o) => o.paymentType === PaymentType.Efectivo && !o.isCredit)
+        .filter((o) => resolvedOrderPaymentMethod(o) === SalePaymentMethod.Efectivo && !o.isCredit)
         .reduce((acc, o) => acc + o.total, 0),
     );
+    // payment-methods-percent-tax: el bloque "Tarjeta" pasa a "Transferencia" —
+    // agrupa los históricos Tarjeta (adaptados a Transferencia-CUP) y las nuevas.
     setSalesCardTotal(
       activeOrders
-        .filter((o) => o.paymentType === PaymentType.Tarjeta && !o.isCredit)
+        .filter(
+          (o) => resolvedOrderPaymentMethod(o) === SalePaymentMethod.Transferencia && !o.isCredit,
+        )
         .reduce((acc, o) => acc + o.total, 0),
     );
 
@@ -229,9 +235,9 @@ export function TodayStatsPage() {
         </ExpansionPanel>
         {/* END CASH */}
 
-        {/* BEGIN CARD PAYMENTS */}
+        {/* BEGIN TRANSFER PAYMENTS (antes "Tarjeta" — históricos incluidos) */}
         <ExpansionPanel
-          title="Pago por Tarjeta"
+          title="Pago por Transferencia"
           amount={formatCurrency(salesCardTotal)}
           amountClassName={valueClassName(salesCardTotal)}
         >
@@ -280,7 +286,7 @@ export function TodayStatsPage() {
                       </td>
                       <td className="p-1 text-right">
                         <span className="rounded-full bg-success/10 px-2 py-0.5 text-xs font-semibold text-success">
-                          {intl.formatMessage({ id: PAYMENT_TYPE_KEYS[expense.paymentType] })}
+                          {intl.formatMessage({ id: EXPENSE_PAYMENT_KEYS[expense.paymentType] })}
                         </span>
                       </td>
                     </tr>

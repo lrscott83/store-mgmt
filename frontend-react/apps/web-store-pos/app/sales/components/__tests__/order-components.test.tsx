@@ -287,7 +287,8 @@ describe('EditOrderModal', () => {
         <EditOrderModal order={order} isOpen={true} onClose={vi.fn()} onUpdate={vi.fn()} />
       </Wrapper>,
     );
-    const tarjetaRadio = screen.getByRole('radio', { name: 'Tarjeta' }) as HTMLInputElement;
+    // El radio se muestra como "Transferencia" (plan 2026-09-17: Tarjeta reemplazada).
+    const tarjetaRadio = screen.getByRole('radio', { name: 'Transferencia' }) as HTMLInputElement;
     expect(tarjetaRadio.checked).toBe(true);
   });
 
@@ -300,8 +301,8 @@ describe('EditOrderModal', () => {
         <EditOrderModal order={order} isOpen={true} onClose={onClose} onUpdate={onUpdate} />
       </Wrapper>,
     );
-    // Zelle removed from the options (user request 2026-09-08) — switch to Tarjeta.
-    fireEvent.click(screen.getByRole('radio', { name: 'Tarjeta' }));
+    // Zelle removed from the options; Tarjeta mostrada como Transferencia (plan 2026-09-17).
+    fireEvent.click(screen.getByRole('radio', { name: 'Transferencia' }));
     fireEvent.click(screen.getByTestId('edit-order-update-button'));
     expect(onUpdate).toHaveBeenCalledWith('o1', PaymentType.Tarjeta);
     expect(onClose).toHaveBeenCalled();

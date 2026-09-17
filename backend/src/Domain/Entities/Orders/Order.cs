@@ -16,6 +16,12 @@ namespace Domain.Entities.Orders
         public decimal Total { get; set; }
         /// <summary>Moneda de Total y de los precios de sus items (plan 2026-09-16). Default CUP.</summary>
         public Currency Currency { get; set; } = Currency.CUP;
+        /// <summary>payment-methods-percent-tax (plan 2026-09-17): forma de pago de la venta. Default Efectivo (histórico sin método).</summary>
+        public SalePaymentMethod SalePaymentMethod { get; set; } = SalePaymentMethod.Efectivo;
+        /// <summary>Porcentaje aplicado al total al crear la venta (auditoría). Default 0 → total sin ajuste.</summary>
+        public decimal Percent { get; set; }
+        /// <summary>Monto fijo sumado al total al crear la venta (auditoría), en la moneda de la venta. Default 0.</summary>
+        public decimal Tax { get; set; }
         public int ItemsCount { get; set; }
         public DateTime Date { get; set; }
         public Guid TenantId { get; set; }

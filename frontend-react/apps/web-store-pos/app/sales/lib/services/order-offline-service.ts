@@ -7,7 +7,12 @@ import {
   PaymentType,
   Result,
   success,
+  applyPaymentPricing,
+  legacyPaymentTypeToSalePaymentMethod,
+  paymentPricingFor,
+  salePaymentMethodToLegacyPaymentType,
 } from '@store-mgmt/domain';
+import type { SalePaymentMethod } from '@store-mgmt/domain';
 import type { CartItem } from '~/shared/lib/stores/cart-store';
 import { StorageKeys } from '~/shared/lib/storage/storage-keys';
 import { encryptEntity, decryptEntity } from '~/shared/lib/storage/entity-crypto';
@@ -445,6 +450,7 @@ export class OrderOfflineService {
     paymentType: PaymentType,
     details?: string,
     client: string = '',
+    salePaymentMethod?: SalePaymentMethod,
   ): Promise<BaseResponseModel<Order>> {
     const now = new Date();
     const orderId = generateId();
@@ -498,20 +504,36 @@ export class OrderOfflineService {
     );
     const itemsCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
 
+    // payment-methods-percent-tax (plan 2026-09-17): el método real de la venta es el
+    // parámetro nuevo cuando llega (flujo del carrito); si no, se deriva del legacy
+    // (Tarjeta → Transferencia-CUP; ausente → Efectivo). El percent/tax de la    // combinación (moneda, método) se aplica al TOTAL persistido y queda en la orden
+    // como auditoría. Con los defaults 0/0 el total es idéntico al cálculo anterior.
+    const orderCurrency = cartItems[0]?.product.currency ?? DEFAULT_CURRENCY;
+    const resolvedMethod =
+      salePaymentMethod !== undefined
+        ? { method: salePaymentMethod, currency: orderCurrency }
+        : legacyPaymentTypeToSalePaymentMethod(paymentType, orderCurrency);
+    const pricing = paymentPricingFor(resolvedMethod.currency, resolvedMethod.method);
+
     const order: Order = {
       id: orderId,
       orderItems,
-      total,
+      total: applyPaymentPricing(total, pricing),
       itemsCount,
       date: now,
       type,
-      paymentType,
+      // Campo legacy derivado del método real (compatibilidad con lectores viejos):
+      // Transferencia en CUP se escribe como Tarjeta; en otras monedas, Efectivo.
+      paymentType: salePaymentMethodToLegacyPaymentType(resolvedMethod.method, resolvedMethod.currency),
       isCredit,
       description: details || (isCredit ? client : ''),
       isActive: true,
       // MultiMonedas: the order's currency is the CART's currency (fixed by the first
       // item's product — the guard forbids mixing currencies, so this is unambiguous).
-      currency: cartItems[0]?.product.currency ?? DEFAULT_CURRENCY,
+      currency: orderCurrency,
+      salePaymentMethod: resolvedMethod.method,
+      percent: pricing.percent,
+      tax: pricing.tax,
       createdDate: now,
       createdByName: getCurrentUserLogin(),
       updatedDate: undefined,
@@ -684,6 +706,18 @@ export class OrderOfflineService {
     if (typeof revived.date === 'string') revived.date = new Date(revived.date);
     if (!revived.isCredit) revived.isCredit = false;
     if (!revived.paymentType) revived.paymentType = PaymentType.Efectivo;
+    // payment-methods-percent-tax (plan 2026-09-17): toda venta sin los campos nuevos
+    // lee sus defaults — método derivado del legacy (Tarjeta → Transferencia-CUP),
+    // percent/tax 0. Efectivo = 0 es falsy, así que la comprobación es por undefined.
+    if (revived.salePaymentMethod === undefined || revived.salePaymentMethod === null) {
+      const derived = legacyPaymentTypeToSalePaymentMethod(
+        revived.paymentType as PaymentType,
+        (revived.currency as number | undefined) ?? DEFAULT_CURRENCY,
+      );
+      revived.salePaymentMethod = derived.method;
+    }
+    if (revived.percent === undefined || revived.percent === null) revived.percent = 0;
+    if (revived.tax === undefined || revived.tax === null) revived.tax = 0;
     return revived as unknown as Order;
   }
 }

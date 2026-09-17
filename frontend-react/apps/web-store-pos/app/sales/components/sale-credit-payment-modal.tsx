@@ -24,7 +24,7 @@ interface SaleCreditPaymentModalProps {
 // stays and existing Zelle credits still display their label.
 const PAYMENT_OPTIONS = [
   { value: PaymentType.Efectivo, label: 'Efectivo' },
-  { value: PaymentType.Tarjeta, label: 'Tarjeta' },
+  { value: PaymentType.Tarjeta, label: 'Transferencia' },
 ];
 
 /**
