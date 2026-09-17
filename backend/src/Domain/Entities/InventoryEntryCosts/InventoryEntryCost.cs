@@ -1,4 +1,5 @@
 ﻿using Domain.Common.Entities;
+using Domain.Common.Enums;
 using Domain.Common.Events;
 using Domain.Entities.InventoryEntries;
 using Domain.Entities.OrderItems;
@@ -10,6 +11,8 @@ namespace Domain.Entities.InventoryEntryCosts
         public Guid InventoryEntryId { get; set; }
         public InventoryEntry InventoryEntry { get; set; } = null!;
         public decimal CostPrice { get; set; }
+        /// <summary>Moneda de CostPrice (plan 2026-09-16). Default CUP.</summary>
+        public Currency Currency { get; set; } = Currency.CUP;
         public int Quantity { get; set; }
         public Guid OrderItemId { get; set; }
         public OrderItem OrderItem { get; set; } = null!;

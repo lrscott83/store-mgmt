@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { Currency } from '@store-mgmt/domain';
 import type { BaseResponseModel, UserModel } from '@store-mgmt/domain';
 import { ProductOfflineService } from '../product-offline-service';
 import { ProductRepository } from '../../repositories/product-repository';
@@ -658,6 +659,72 @@ describe('ProductOfflineService', () => {
       expect(coca.existing).toBe(true);
       expect(fanta.existing).toBe(false);
       expect(productRepository.getProductsByCategoryId(categoryId)).toHaveLength(2);
+    });
+
+    it('stamps DEFAULT_CURRENCY (CUP) on a created product when the row has no currency', async () => {
+      const categoryRepository = new ProductCategoryRepository(storeId);
+      const productRepository = new ProductRepository(storeId, categoryRepository);
+      service = new ProductOfflineService(storeId, productRepository, categoryRepository);
+
+      const result = await service.createCsvProducts([
+        { category: 'Snacks', name: 'Papas', price: 1.5 },
+      ]);
+      const created = unwrap(result).created[0];
+      expect(productRepository.getProductById(created.id)?.currency).toBe(Currency.CUP);
+    });
+
+    it('passes the row currency through to the created product', async () => {
+      const categoryRepository = new ProductCategoryRepository(storeId);
+      const productRepository = new ProductRepository(storeId, categoryRepository);
+      service = new ProductOfflineService(storeId, productRepository, categoryRepository);
+
+      const result = await service.createCsvProducts([
+        { category: 'Snacks', name: 'Papas', price: 1.5, currency: Currency.USD },
+      ]);
+      const created = unwrap(result).created[0];
+      expect(productRepository.getProductById(created.id)?.currency).toBe(Currency.USD);
+    });
+
+    it('a reused product takes the row currency when the CSV column is present (column wins)', async () => {
+      const categoryRepository = new ProductCategoryRepository(storeId);
+      const productRepository = new ProductRepository(storeId, categoryRepository);
+      service = new ProductOfflineService(storeId, productRepository, categoryRepository);
+      const categoryId = categoryRepository.addProductCategoryByName('Bebidas');
+      productRepository.addProduct(categoryId, 'Coca Cola', 1.5, '', 1, true, true, true);
+      const existingId = productRepository.getProductsByCategoryId(categoryId)[0].id;
+
+      const result = await service.createCsvProducts([
+        { category: 'Bebidas', name: 'Coca Cola', price: 2.5, currency: Currency.EUR },
+      ]);
+      expect(unwrap(result).created[0].existing).toBe(true);
+      expect(productRepository.getProductById(existingId)?.currency).toBe(Currency.EUR);
+    });
+
+    it('a reused product keeps its own currency when the CSV column is absent (price refresh only)', async () => {
+      const categoryRepository = new ProductCategoryRepository(storeId);
+      const productRepository = new ProductRepository(storeId, categoryRepository);
+      service = new ProductOfflineService(storeId, productRepository, categoryRepository);
+      const categoryId = categoryRepository.addProductCategoryByName('Bebidas');
+      productRepository.addProduct(
+        categoryId,
+        'Coca Cola',
+        1.5,
+        '',
+        1,
+        true,
+        true,
+        true,
+        undefined,
+        undefined,
+        Currency.MLC,
+      );
+      const existingId = productRepository.getProductsByCategoryId(categoryId)[0].id;
+
+      const result = await service.createCsvProducts([
+        { category: 'Bebidas', name: 'Coca Cola', price: 2.5 },
+      ]);
+      expect(unwrap(result).created[0].existing).toBe(true);
+      expect(productRepository.getProductById(existingId)?.currency).toBe(Currency.MLC);
     });
 
     it('resolves succeeded:true for every import (ADR-1)', async () => {

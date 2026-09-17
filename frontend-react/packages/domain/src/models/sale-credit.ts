@@ -1,5 +1,5 @@
 import type { AuditableBaseModel } from './base';
-import type { PaymentType } from '../enums';
+import type { Currency, PaymentType } from '../enums';
 
 export interface SaleCredit extends AuditableBaseModel {
   id: string;
@@ -12,4 +12,6 @@ export interface SaleCredit extends AuditableBaseModel {
   paidDate: Date;
   paidType: PaymentType;
   note: string;
+  /** Moneda de `total`/`paid` (plan 2026-09-16). Ausente = CUP (DEFAULT_CURRENCY). */
+  currency?: Currency;
 }

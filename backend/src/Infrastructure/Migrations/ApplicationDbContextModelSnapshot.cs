@@ -501,6 +501,9 @@ namespace Infrastructure.Migrations
                     b.Property<DateTimeOffset>("CreatedDate")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<int>("Currency")
+                        .HasColumnType("integer");
+
                     b.Property<DateTime>("Date")
                         .HasColumnType("timestamp with time zone");
 
@@ -550,6 +553,9 @@ namespace Infrastructure.Migrations
 
                     b.Property<DateTimeOffset>("CreatedDate")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Currency")
+                        .HasColumnType("integer");
 
                     b.Property<Guid>("InventoryEntryId")
                         .HasColumnType("uuid");
@@ -803,6 +809,9 @@ namespace Infrastructure.Migrations
                     b.Property<DateTimeOffset>("CreatedDate")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<int>("Currency")
+                        .HasColumnType("integer");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
 
@@ -856,6 +865,9 @@ namespace Infrastructure.Migrations
 
                     b.Property<DateTimeOffset>("CreatedDate")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Currency")
+                        .HasColumnType("integer");
 
                     b.Property<DateTime>("Date")
                         .HasColumnType("timestamp with time zone");
@@ -1285,6 +1297,9 @@ namespace Infrastructure.Migrations
 
                     b.Property<DateTimeOffset>("CreatedDate")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Currency")
+                        .HasColumnType("integer");
 
                     b.Property<bool>("DiscountFromInventory")
                         .HasColumnType("boolean");

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Product, ProductCategory, UserModel, WholesaleConfig } from '@store-mgmt/domain';
+import { Currency } from '@store-mgmt/domain';
 import { ProductRepository } from '../product-repository';
 import { ProductCategoryRepository } from '../product-category-repository';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
@@ -99,7 +100,9 @@ describe('ProductRepository — persistence de la config mayorista', () => {
     const stored = readStoredProducts(storeId)[0];
     expect(stored.wholesaleEnabled).toBe(true);
     expect(stored.wholesalePackSize).toBe(24);
-    expect(stored.wholesaleTiers).toEqual(config.tiers);
+    expect(stored.wholesaleTiers).toEqual(
+      config.tiers.map((t) => ({ ...t, currency: Currency.CUP })),
+    );
   });
 
   it('addProduct persiste la config mayorista (sin barcode)', () => {
@@ -131,7 +134,11 @@ describe('ProductRepository — persistence de la config mayorista', () => {
     expect(result.succeeded).toBe(true);
     const updated = readStoredProducts(storeId)[0];
     expect(updated.wholesaleEnabled).toBe(true);
-    expect(updated.wholesaleTiers?.[1]).toEqual({ minPacks: 11, pricePerUnit: 660 });
+    expect(updated.wholesaleTiers?.[1]).toEqual({
+      minPacks: 11,
+      pricePerUnit: 660,
+      currency: Currency.CUP,
+    });
   });
 
   it('updateProduct sin config no borra la config existente', () => {
@@ -141,6 +148,8 @@ describe('ProductRepository — persistence de la config mayorista', () => {
     const updated = readStoredProducts(storeId)[0];
     expect(updated.price).toBe(710);
     expect(updated.wholesaleEnabled).toBe(true);
-    expect(updated.wholesaleTiers).toEqual(config.tiers);
+    expect(updated.wholesaleTiers).toEqual(
+      config.tiers.map((t) => ({ ...t, currency: Currency.CUP })),
+    );
   });
 });

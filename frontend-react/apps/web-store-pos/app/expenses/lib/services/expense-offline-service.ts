@@ -1,6 +1,6 @@
 import type { BaseResponseModel, Expense } from '@store-mgmt/domain';
 import type { ExpenseType, PaymentType } from '@store-mgmt/domain';
-import { DataResult, ExpenseErrors, Result, success } from '@store-mgmt/domain';
+import { DataResult, DEFAULT_CURRENCY, ExpenseErrors, Result, success } from '@store-mgmt/domain';
 import { StorageKeys } from '~/shared/lib/storage/storage-keys';
 import { encryptEntity } from '~/shared/lib/storage/entity-crypto';
 import { readEntityOrThrow } from '~/shared/lib/storage/read-entity-or-throw';
@@ -165,6 +165,7 @@ export class ExpenseOfflineService {
       paymentType: input.paymentType,
       note: input.note || '',
       isActive: true,
+      currency: DEFAULT_CURRENCY,
       createdDate: now,
       createdByName: getCurrentUserLogin(),
       updatedDate: undefined,

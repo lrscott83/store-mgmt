@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { Currency } from '@store-mgmt/domain';
 import { parseCsvProducts } from '../csv-product-parser';
 
 describe('parseCsvProducts', () => {
@@ -343,6 +344,77 @@ describe('parseCsvProducts', () => {
       const result = parseCsvProducts(csv);
       expect(result.products).toHaveLength(0);
       expect(result.errors[0].errorCode).toBe('MISSING_PRICE');
+    });
+  });
+
+  describe('CSV-09: currency optional column (currency-in-costs-and-prices)', () => {
+    it('parses the Spanish canonical moneda header into the row currency', () => {
+      const csv = ['categoria,nombre,precio,moneda', 'Pizzas,Pizza de Queso,150,5'].join('\n');
+      const result = parseCsvProducts(csv);
+      expect(result.products).toHaveLength(1);
+      expect(result.errors).toHaveLength(0);
+      expect(result.products[0].currency).toBe(Currency.CAD);
+    });
+
+    it('accepts the English currency alias for legacy files', () => {
+      const csv = ['category,name,price,currency', 'Pizzas,Pizza de Queso,150,1'].join('\n');
+      const result = parseCsvProducts(csv);
+      expect(result.products[0].currency).toBe(Currency.USD);
+    });
+
+    it('resolves to undefined when the column is absent entirely (legacy CSVs stay identical)', () => {
+      const csv = [
+        'categoria,nombre,precio,costo,cantidad',
+        'Pizzas,Pizza de Queso,150,120,10',
+      ].join('\n');
+      const result = parseCsvProducts(csv);
+      expect(result.products[0].currency).toBeUndefined();
+      expect(result.errors).toHaveLength(0);
+    });
+
+    it('resolves to undefined when the cell is empty', () => {
+      const csv = ['categoria,nombre,precio,moneda', 'Pizzas,Pizza de Queso,150,'].join('\n');
+      const result = parseCsvProducts(csv);
+      expect(result.products[0].currency).toBeUndefined();
+    });
+
+    it('never fails a row and resolves undefined for a non-numeric cell ("USD")', () => {
+      const csv = ['categoria,nombre,precio,moneda', 'Pizzas,Pizza de Queso,150,USD'].join('\n');
+      const result = parseCsvProducts(csv);
+      expect(result.products).toHaveLength(1);
+      expect(result.errors).toHaveLength(0);
+      expect(result.products[0].currency).toBeUndefined();
+    });
+
+    it('rejects a malformed numeric (full-string validation, "5CUP")', () => {
+      const csv = ['categoria,nombre,precio,moneda', 'Pizzas,Pizza de Queso,150,5CUP'].join('\n');
+      const result = parseCsvProducts(csv);
+      expect(result.products[0].currency).toBeUndefined();
+    });
+
+    it('rejects decimal values (enums are integers)', () => {
+      const csv = ['categoria,nombre,precio,moneda', 'Pizzas,Pizza de Queso,150,2.5'].join('\n');
+      const result = parseCsvProducts(csv);
+      expect(result.products[0].currency).toBeUndefined();
+    });
+
+    it('rejects negative and out-of-range values (enum congelado 0-6), rows still parse', () => {
+      const csv = [
+        'categoria,nombre,precio,moneda',
+        'Pizzas,Pizza de Queso,150,-1',
+        'Confituras,Caramelo,20,7',
+      ].join('\n');
+      const result = parseCsvProducts(csv);
+      expect(result.products).toHaveLength(2);
+      expect(result.errors).toHaveLength(0);
+      expect(result.products[0].currency).toBeUndefined();
+      expect(result.products[1].currency).toBeUndefined();
+    });
+
+    it('is case-insensitive and column-order-independent for the moneda header', () => {
+      const csv = ['MONEDA,categoria,nombre,precio', '4,Pizzas,Pizza de Queso,150'].join('\n');
+      const result = parseCsvProducts(csv);
+      expect(result.products[0].currency).toBe(Currency.MLC);
     });
   });
 });

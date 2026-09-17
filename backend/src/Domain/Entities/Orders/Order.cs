@@ -14,6 +14,8 @@ namespace Domain.Entities.Orders
         public OrderType OrderType { get; set; }
         public string Description { get; set; }
         public decimal Total { get; set; }
+        /// <summary>Moneda de Total y de los precios de sus items (plan 2026-09-16). Default CUP.</summary>
+        public Currency Currency { get; set; } = Currency.CUP;
         public int ItemsCount { get; set; }
         public DateTime Date { get; set; }
         public Guid TenantId { get; set; }

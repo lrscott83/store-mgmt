@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { EModules, OrderErrors, PaymentType, OrderType } from '@store-mgmt/domain';
+import { Currency, EModules, OrderErrors, PaymentType, OrderType } from '@store-mgmt/domain';
 import type {
   BaseResponseModel,
   Order,
@@ -1634,6 +1634,45 @@ describe('OrderOfflineService', () => {
       expect(result.succeeded).toBe(true);
       expect(service.getStorageOrders()).toHaveLength(1);
       expect(findOrder('missing-id')).toBeUndefined();
+    });
+  });
+
+  // currency-in-costs-and-prices (plan 2026-09-16, §5): every factory that builds a money-bearing
+  // entity stamps DEFAULT_CURRENCY (CUP). The mirror coverage for products/entries/warehouse lives
+  // in product-offline-service.test.ts, inventory-offline-service.test.ts and
+  // warehouse-offline-service.test.ts; orders were the missing slice.
+  describe('ORD-20: currency stamping on createOrder (currency-in-costs-and-prices)', () => {
+    it('stamps Currency.CUP on the created Order and on every OrderItem', async () => {
+      const items = makeCartItems([
+        { product: makeProduct({ price: 5 }), quantity: 2 },
+        { product: makeProduct({ id: 'p2', name: 'Fanta', price: 3 }), quantity: 1 },
+      ]);
+
+      const result = await service.createOrder(
+        items,
+        OrderType.Normal,
+        false,
+        PaymentType.Efectivo,
+        undefined,
+        '',
+      );
+
+      expect(result.data?.currency).toBe(Currency.CUP);
+      expect(result.data?.orderItems).toHaveLength(2);
+      for (const item of result.data!.orderItems) {
+        expect(item.currency).toBe(Currency.CUP);
+      }
+    });
+
+    // Additive/optional contract (plan §4.4): the roster import path must round-trip an explicit
+    // currency instead of flattening it to the default.
+    it('keeps an explicit non-default currency on the roster import path', () => {
+      const imported = makeOrder({ id: 'imported-currency', currency: Currency.MLC });
+
+      const result = service.addImportedOrder(imported);
+
+      expect(result.succeeded).toBe(true);
+      expect(findOrder('imported-currency')?.currency).toBe(Currency.MLC);
     });
   });
 

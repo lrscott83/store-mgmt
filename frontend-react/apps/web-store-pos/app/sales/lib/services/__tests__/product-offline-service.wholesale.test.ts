@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { BaseResponseModel, UserModel } from '@store-mgmt/domain';
+import { Currency } from '@store-mgmt/domain';
 import { ProductOfflineService } from '../product-offline-service';
 import { ProductCategoryRepository } from '../../repositories/product-category-repository';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
@@ -72,7 +73,9 @@ describe('ProductOfflineService — roundtrip de la config mayorista', () => {
     expect(product).toBeDefined();
     expect(product!.wholesaleEnabled).toBe(true);
     expect(product!.wholesalePackSize).toBe(24);
-    expect(product!.wholesaleTiers).toEqual([{ minPacks: 1, pricePerUnit: 680 }]);
+    expect(product!.wholesaleTiers).toEqual([
+      { minPacks: 1, pricePerUnit: 680, currency: Currency.CUP },
+    ]);
   });
 
   it('updateProduct con wholesale actualiza la config del producto existente', async () => {
@@ -99,7 +102,9 @@ describe('ProductOfflineService — roundtrip de la config mayorista', () => {
     const fetched = unwrap(await service.getProductById(product.id));
     expect(fetched.wholesaleEnabled).toBe(true);
     expect(fetched.wholesalePackSize).toBe(6);
-    expect(fetched.wholesaleTiers).toEqual([{ minPacks: 1, pricePerUnit: 780 }]);
+    expect(fetched.wholesaleTiers).toEqual([
+      { minPacks: 1, pricePerUnit: 780, currency: Currency.CUP },
+    ]);
   });
 
   it('producto sin config mayorista no expone los campos', async () => {

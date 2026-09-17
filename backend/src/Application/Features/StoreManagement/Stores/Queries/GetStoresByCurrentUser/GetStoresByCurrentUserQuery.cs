@@ -1,4 +1,4 @@
-﻿using Application.Abstractions.HttpContext;
+using Application.Abstractions.HttpContext;
 using Application.Abstractions.Messaging;
 using Application.Dtos.StoreManagement;
 using Application.ResponseModels;
@@ -17,8 +17,10 @@ namespace Application.Features.StoreManagement.Stores.Queries.GetStoresByCurrent
     /// Store listing by role (SuperAdmin sees every store cross-tenant; ReSeller and
     /// OwnerAdmin see their own). Besides mapping the entity, computes each store's
     /// NextPaymentDate with the canonical GetNextDueDate calculation — the super-admin
-    /// store cards show plan + price + next payment date, and the DTO is shared by
-    /// every role's listing.
+    /// store cards show plan + price + next payment date. The card price is the
+    /// CANONICAL plan price (Σ over the plan's member modules from the live catalog,
+    /// same formula PlanProfile uses for GET /v1/plans), memoized per plan id —
+    /// never the store's frozen StoreModule snapshot (plan 2026-09-15).
     /// </summary>
     public class GetStoresByCurrentUserQueryHandler : IQueryHandler<GetStoresByCurrentUserQuery, IEnumerable<StoreDto>>
     {
@@ -27,19 +29,22 @@ namespace Application.Features.StoreManagement.Stores.Queries.GetStoresByCurrent
         private readonly IHttpContextService _httpContextService;
         private readonly IStorePaymentRepository _storePaymentRepository;
         private readonly ISystemConfigurationRepository _systemConfigurationRepository;
+        private readonly IPlanRepository _planRepository;
 
         public GetStoresByCurrentUserQueryHandler(
             IStoreRepository storeRepository,
             IMapper mapper,
             IHttpContextService httpContextService,
             IStorePaymentRepository storePaymentRepository,
-            ISystemConfigurationRepository systemConfigurationRepository)
+            ISystemConfigurationRepository systemConfigurationRepository,
+            IPlanRepository planRepository)
         {
             _storeRepository = storeRepository;
             _mapper = mapper;
             _httpContextService = httpContextService;
             _storePaymentRepository = storePaymentRepository;
             _systemConfigurationRepository = systemConfigurationRepository;
+            _planRepository = planRepository;
         }
 
         public async Task<ResponseResult<IEnumerable<StoreDto>>> Handle(GetStoresByCurrentUserQuery request, CancellationToken cancellationToken)
@@ -54,6 +59,10 @@ namespace Application.Features.StoreManagement.Stores.Queries.GetStoresByCurrent
             // Trial period length is tenant-global: one read up front, shared by every
             // store's nextDueDate calculation below (same shape as GetMyStoresQuery).
             int trialMonths = await _systemConfigurationRepository.GetTestingPeriodInMonthsAsync();
+
+            // Canonical plan prices are a pure function of the plan catalog — memoized
+            // per plan id: one lookup + one summation per DISTINCT plan, not per store.
+            var planPriceCache = new Dictionary<int, (float? Price, float? CurrentPrice)>();
 
             var storeDtos = new List<StoreDto>();
             foreach (var store in stores)
@@ -79,10 +88,44 @@ namespace Application.Features.StoreManagement.Stores.Queries.GetStoresByCurrent
                         lastPaidBeforeDate)
                     : null;
 
+                // Canonical card price (plan 2026-09-15): plan catalog, not the store's
+                // StoreModule snapshot. Disapproved stores expose no price — the same
+                // Approved guard as the payment date above.
+                if (store.Approved)
+                {
+                    (dto.PlanPrice, dto.PlanCurrentPrice) = await GetPlanPriceAsync(store.StorePlanId, planPriceCache);
+                }
+                else
+                {
+                    dto.PlanPrice = null;
+                    dto.PlanCurrentPrice = null;
+                }
+
                 storeDtos.Add(dto);
             }
 
             return ResponseResult.Success((IEnumerable<StoreDto>)storeDtos);
+        }
+
+        /// <summary>
+        /// Σ over the plan's member modules — identical inputs and formula as
+        /// PlanProfile's PlanDto.Price mapping (GET /v1/plans), so the card price and
+        /// the plan-catalog price are equal by construction. Memoized per plan id.
+        /// </summary>
+        private async Task<(float? Price, float? CurrentPrice)> GetPlanPriceAsync(
+            int storePlanId,
+            Dictionary<int, (float? Price, float? CurrentPrice)> cache)
+        {
+            if (cache.TryGetValue(storePlanId, out var cached))
+                return cached;
+
+            var plan = await _planRepository.GetActivePlanWithModulesByIdAsync(storePlanId);
+            (float? Price, float? CurrentPrice) result = plan is null
+                ? (null, null)
+                : PlanPricingUtils.Sum(plan);
+
+            cache[storePlanId] = result;
+            return result;
         }
     }
 }

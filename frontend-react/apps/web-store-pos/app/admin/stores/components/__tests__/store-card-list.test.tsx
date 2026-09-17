@@ -18,6 +18,9 @@ function makeStore(overrides: Partial<Store> = {}): Store {
     nextPaymentDate: null,
     ownerPhone: null,
     planType: 'Pago',
+    // Canonical plan price (plan 2026-09-15): Pago costs 10 originally, 10 now.
+    planPrice: 10,
+    planCurrentPrice: 10,
     modules: [],
     isActive: true,
     ...overrides,
@@ -101,9 +104,8 @@ describe('StoreCardList — card body (plan line, owner, phone, description)', (
               id: 's1',
               planType: 'Superior',
               nextPaymentDate: '2026-10-31',
-              modules: [
-                { id: 2, name: 'Mgmt', price: 20, currentPrice: 10, priceIncluded: false, discountText: '- 50%', selected: true },
-              ],
+              planPrice: 20,
+              planCurrentPrice: 10,
             }),
           ]}
           onEdit={vi.fn()}
@@ -131,9 +133,8 @@ describe('StoreCardList — card body (plan line, owner, phone, description)', (
               id: 's2',
               planType: 'Pago',
               nextPaymentDate: '2026-11-15',
-              modules: [
-                { id: 2, name: 'Mgmt', price: 10, currentPrice: 10, priceIncluded: false, discountText: '', selected: true },
-              ],
+              planPrice: 10,
+              planCurrentPrice: 10,
             }),
           ]}
           onEdit={vi.fn()}
@@ -178,6 +179,10 @@ describe('StoreCardList — card body (plan line, owner, phone, description)', (
               approved: false,
               planType: 'Gratis',
               nextPaymentDate: null,
+              // A stale paid snapshot must not leak: the backend nulls the canonical
+              // price for disapproved stores — the card shows the plan name only.
+              planPrice: null,
+              planCurrentPrice: null,
               modules: [
                 { id: 2, name: 'Mgmt', price: 20, currentPrice: 20, priceIncluded: false, discountText: '', selected: true },
               ],

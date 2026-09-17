@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
-import { useIntl } from 'react-intl';
+import { useIntl, type IntlShape } from 'react-intl';
 import { EFeatures, ExpenseType, PaymentType } from '@store-mgmt/domain';
-import type { Expense, Order, SaleCredit } from '@store-mgmt/domain';
+import type { Expense, SaleCredit } from '@store-mgmt/domain';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import {
@@ -25,6 +25,13 @@ import { ExpenseOfflineService } from '~/expenses/lib/services/expense-offline-s
 import { SaleCreditOfflineService } from '~/sales/lib/services/sale-credit-offline-service';
 import { CategoryStats } from '~/sales/components/category-stats';
 import type { CategoryCartItemsView } from '~/sales/lib/category-cart-items-view';
+import { useMultiStore } from '~/shared/lib/hooks/use-multi-store';
+import { MultiStoreSection } from '~/shared/components/multistore/multi-store-section';
+import {
+  computeStoreRangeSummary,
+  sumRangeSummaries,
+  unwrapStoreDek,
+} from '~/shared/lib/multistore/multi-store-aggregator';
 
 export const clientLoader = featureLoader([EFeatures.Dashboard]);
 
@@ -121,12 +128,17 @@ interface RangeSummary {
  * 1. Date pickers (start/end, both days fully included) + "Generar" button.
  * 2. The dashboard's KPI cards (Ventas, Gastos, Ganancias Bruta, Ganancias — no
  *    "Hoy" labels, no trend rows) + a "Cuadre" card with the same five panels
- *    as "Cuadre del día" (Resumen Efectivo, Gastos, Créditos Por Cobrar,
+ *    as "Cuadre del día" (Resumen Efectivo, Pago por Tarjeta, Gastos, Créditos Por Cobrar,
  *    Créditos Pagados, Ventas), aggregated to the selected range.
  *
  * KPI semantics (user decision, option A):
  * - Ganancias Bruta = Σ order profit in range (NO expenses subtracted).
  * - Ganancias = Ganancias Bruta − Gastos.
+ *
+ * multi-store-panels: el rango de fechas + Generar son GLOBALES (una vez,
+ * fuera de los paneles); KPIs generales agregados fuera; un panel colapsable
+ * por tienda con el mismo cuadre completo de esa tienda. Sin MultiStores la
+ * vista es idéntica a la original.
  */
 export function CuadrePorFechasPage() {
   const intl = useIntl();
@@ -135,11 +147,14 @@ export function CuadrePorFechasPage() {
 
   const hasExpensesModule = user ? hasExpensesModuleAvailable(user) : false;
   const hasCreditsModule = user ? hasCreditsModuleAvailable(user) : false;
+  const { enabled: multiStoreEnabled, stores: multiStoreStores } = useMultiStore();
 
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [rangeError, setRangeError] = useState<string | null>(null);
   const [summary, setSummary] = useState<RangeSummary | null>(null);
+  const [storeSummaries, setStoreSummaries] = useState<Map<string, RangeSummary> | null>(null);
+  const [selectedMultiStoreId, setSelectedMultiStoreId] = useState<string | null>(null);
 
   const startDateInputRef = useRef<HTMLInputElement>(null);
   const endDateInputRef = useRef<HTMLInputElement>(null);
@@ -165,10 +180,10 @@ export function CuadrePorFechasPage() {
     }
   }
 
-  function generate() {
+  function parseRange(): { start: Date; end: Date } | null {
     if (!startDate || !endDate) {
       setRangeError(intl.formatMessage({ id: 'CUADRE_FECHAS.EMPTY_DATES' }));
-      return;
+      return null;
     }
     // dd-mm-yyyy inputs (user request 2026-09-08): parse with parseDashedDate —
     // returns null for incomplete or impossible dates (day 32, month 13, Feb 29
@@ -177,20 +192,55 @@ export function CuadrePorFechasPage() {
     const parsedEnd = parseDashedDate(endDate);
     if (!parsedStart || !parsedEnd) {
       setRangeError(intl.formatMessage({ id: 'CUADRE_FECHAS.INVALID_FORMAT' }));
-      return;
+      return null;
     }
     const start = parsedStart;
     const end = parsedEnd;
     if (start > end) {
       setRangeError(intl.formatMessage({ id: 'CUADRE_FECHAS.INVALID_RANGE' }));
-      return;
+      return null;
     }
     setRangeError(null);
-
     // Both days fully included: [start, end + 1 day). startOfDay re-snaps after
     // addDays so a DST jump cannot shift the exclusive boundary off midnight.
+    return { start, end };
+  }
+
+  function generate() {
+    const parsed = parseRange();
+    if (!parsed) {
+      setStoreSummaries(null);
+      setSummary(null);
+      return;
+    }
+
+    const { start, end } = parsed;
     const rangeStart = startOfDay(start);
     const rangeEnd = startOfDay(addDays(end, 1));
+
+    // ─── multi-store mode: per-store summaries from read-only local data ───
+    if (multiStoreEnabled) {
+      void (async () => {
+        const entries = await Promise.all(
+          multiStoreStores.map(async (store) => {
+            const dek = await unwrapStoreDek(store.id);
+            return [
+              store.id,
+              computeStoreRangeSummary(
+                store.id,
+                dek,
+                rangeStart,
+                rangeEnd,
+                hasExpensesModule,
+                hasCreditsModule,
+              ),
+            ] as const;
+          }),
+        );
+        setStoreSummaries(new Map(entries));
+      })();
+      return;
+    }
 
     const orderService = new OrderOfflineService(storeId);
     const salesTotal = orderService.getActiveOrdersPriceBetweenDates(rangeStart, rangeEnd);
@@ -202,7 +252,7 @@ export function CuadrePorFechasPage() {
     );
     const categories = categoriesResponse.succeeded ? categoriesResponse.data : [];
 
-    const activeOrders: Order[] = orderService.getActiveOrdersBetween(rangeStart, rangeEnd);
+    const activeOrders = orderService.getActiveOrdersBetween(rangeStart, rangeEnd);
     const salesCashTotal = activeOrders
       .filter((o) => o.paymentType === PaymentType.Efectivo && !o.isCredit)
       .reduce((acc, o) => acc + o.total, 0);
@@ -270,6 +320,78 @@ export function CuadrePorFechasPage() {
     ? summary.paidSaleCredits.reduce((acc, c) => acc + c.total, 0)
     : 0;
   const expensesCount = summary ? summary.expenses.length : 0;
+
+  // ─── multi-store mode ────────────────────────────────────────────────────
+  if (multiStoreEnabled) {
+    return (
+      <div className="space-y-6 p-4">
+        <div className="border-b border-gray-200 pb-3">
+          <h1 className="text-2xl font-semibold">
+            {intl.formatMessage({ id: 'CUADRE_FECHAS.HEADER' })}
+          </h1>
+        </div>
+
+        {/* Date range + generate — GLOBAL (outside the panels), same widgets as the single-store view. */}
+        <MultiStoreDateRangeFields
+          intl={intl}
+          startDate={startDate}
+          endDate={endDate}
+          rangeError={rangeError}
+          onStartDateChange={setStartDate}
+          onEndDateChange={setEndDate}
+          openStartPicker={openStartPicker}
+          openEndPicker={openEndPicker}
+          startDateInputRef={startDateInputRef}
+          endDateInputRef={endDateInputRef}
+          onGenerate={generate}
+        />
+
+        {storeSummaries && (
+          <>
+            {/* General (aggregated) KPIs — outside the panels. */}
+            <MultiStoreKpis summaries={[...storeSummaries.values()]} />
+
+            <MultiStoreSection
+              stores={multiStoreStores}
+              selectedStoreId={selectedMultiStoreId ?? null}
+              onSelectedStoreIdChange={setSelectedMultiStoreId}
+              totals={
+                <span className="text-sm">
+                  <span className="text-text-muted">Ganancias: </span>
+                  <span className="font-semibold text-text">
+                    {formatCurrency(sumRangeSummaries([...storeSummaries.values()]).netProfit)}
+                  </span>
+                </span>
+              }
+              renderStoreTotals={(store) => {
+                const s = storeSummaries.get(store.id);
+                return (
+                  <span className="text-xs whitespace-nowrap">
+                    <span className="text-text-muted">Ganancias: </span>
+                    <span className={`font-semibold ${valueClassName(s ? s.netProfit : 0)}`}>
+                      {formatCurrency(s ? s.netProfit : 0)}
+                    </span>
+                  </span>
+                );
+              }}
+            >
+              {(store) => {
+                const s = storeSummaries.get(store.id);
+                if (!s) {
+                  return (
+                    <div className="py-4 text-center text-text-muted">
+                      {intl.formatMessage({ id: 'MULTISTORE.NO_LOCAL_DATA' })}
+                    </div>
+                  );
+                }
+                return <MultiStoreCuadreBody summary={s} intl={intl} hasExpensesModule={hasExpensesModule} hasCreditsModule={hasCreditsModule} />;
+              }}
+            </MultiStoreSection>
+          </>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 p-4">
@@ -557,6 +679,303 @@ export function CuadrePorFechasPage() {
           </Card>
         </>
       )}
+    </div>
+  );
+}
+
+/**
+ * multi-store-panels: the same date-range widget set as the single-store
+ * view, reused for the global (outside-panels) controls.
+ */
+function MultiStoreDateRangeFields({
+  intl,
+  startDate,
+  endDate,
+  rangeError,
+  onStartDateChange,
+  onEndDateChange,
+  openStartPicker,
+  openEndPicker,
+  startDateInputRef,
+  endDateInputRef,
+  onGenerate,
+}: {
+  intl: IntlShape;
+  startDate: string;
+  endDate: string;
+  rangeError: string | null;
+  onStartDateChange: (value: string) => void;
+  onEndDateChange: (value: string) => void;
+  openStartPicker: () => void;
+  openEndPicker: () => void;
+  startDateInputRef: React.RefObject<HTMLInputElement | null>;
+  endDateInputRef: React.RefObject<HTMLInputElement | null>;
+  onGenerate: () => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-end gap-2">
+      <div>
+        <label htmlFor="cuadre-start-date" className="mb-1 block text-xs font-medium text-gray-700">
+          {intl.formatMessage({ id: 'CUADRE_FECHAS.START_DATE' })}
+        </label>
+        <div
+          data-testid="cuadre-start-field"
+          onClick={openStartPicker}
+          className="relative w-32 cursor-pointer rounded border border-gray-300 bg-white focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/30"
+        >
+          <input
+            ref={startDateInputRef}
+            id="cuadre-start-date"
+            data-testid="cuadre-start-date"
+            type="date"
+            aria-label={intl.formatMessage({ id: 'CUADRE_FECHAS.START_DATE' })}
+            className="pointer-events-none absolute inset-0 h-full w-full opacity-0"
+            value={dashedToIsoDate(startDate)}
+            onChange={(e) => onStartDateChange(isoToDashedDate(e.target.value))}
+          />
+          <input
+            type="text"
+            readOnly
+            tabIndex={-1}
+            placeholder="dd-mm-yyyy"
+            aria-hidden="true"
+            data-testid="cuadre-start-display"
+            value={startDate}
+            className="w-full rounded bg-transparent px-2 py-1 text-sm"
+          />
+        </div>
+      </div>
+      <div>
+        <label htmlFor="cuadre-end-date" className="mb-1 block text-xs font-medium text-gray-700">
+          {intl.formatMessage({ id: 'CUADRE_FECHAS.END_DATE' })}
+        </label>
+        <div
+          data-testid="cuadre-end-field"
+          onClick={openEndPicker}
+          className="relative w-32 cursor-pointer rounded border border-gray-300 bg-white focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/30"
+        >
+          <input
+            ref={endDateInputRef}
+            id="cuadre-end-date"
+            data-testid="cuadre-end-date"
+            type="date"
+            aria-label={intl.formatMessage({ id: 'CUADRE_FECHAS.END_DATE' })}
+            className="pointer-events-none absolute inset-0 h-full w-full opacity-0"
+            value={dashedToIsoDate(endDate)}
+            onChange={(e) => onEndDateChange(isoToDashedDate(e.target.value))}
+          />
+          <input
+            type="text"
+            readOnly
+            tabIndex={-1}
+            placeholder="dd-mm-yyyy"
+            aria-hidden="true"
+            data-testid="cuadre-end-display"
+            value={endDate}
+            className="w-full rounded bg-transparent px-2 py-1 text-sm"
+          />
+        </div>
+      </div>
+      <Button
+        variant="primary"
+        data-testid="cuadre-generate"
+        onClick={onGenerate}
+        aria-label={intl.formatMessage({ id: 'CUADRE_FECHAS.GENERATE' })}
+        title={intl.formatMessage({ id: 'CUADRE_FECHAS.GENERATE' })}
+        className="h-8 w-8 shrink-0 justify-center p-0"
+      >
+        <span data-testid="cuadre-generate-icon">
+          <SearchIcon />
+        </span>
+      </Button>
+      {rangeError && (
+        <p data-testid="cuadre-range-error" className="text-sm font-medium text-danger">
+          {rangeError}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** multi-store-panels: aggregated general KPIs — same four cards as the single-store view. */
+function MultiStoreKpis({ summaries }: { summaries: RangeSummary[] }) {
+  const intl = useIntl();
+  const totals = sumRangeSummaries(summaries);
+  return (
+    <div className="grid grid-cols-2 gap-4">
+      <KpiCard
+        title={intl.formatMessage({ id: 'CUADRE_FECHAS.KPI_SALES' })}
+        value={formatCurrency(totals.salesTotal)}
+      />
+      <KpiCard
+        title={intl.formatMessage({ id: 'CUADRE_FECHAS.KPI_EXPENSES' })}
+        value={formatCurrency(totals.expensesTotal)}
+      />
+      <KpiCard
+        title={intl.formatMessage({ id: 'CUADRE_FECHAS.KPI_GROSS_PROFIT' })}
+        value={formatCurrency(totals.grossProfit)}
+      />
+      <KpiCard
+        title={intl.formatMessage({ id: 'CUADRE_FECHAS.KPI_NET_PROFIT' })}
+        value={formatCurrency(totals.netProfit)}
+      />
+    </div>
+  );
+}
+
+/** multi-store-panels: the full cuadre card body for ONE store inside its panel. */
+function MultiStoreCuadreBody({
+  summary,
+  intl,
+  hasExpensesModule,
+  hasCreditsModule,
+}: {
+  summary: RangeSummary;
+  intl: IntlShape;
+  hasExpensesModule: boolean;
+  hasCreditsModule: boolean;
+}) {
+  const cashTotal = summary.salesCashTotal + summary.paidCreditsCashTotal - summary.expensesCashTotal;
+  const ordersItemsCount = summary.categories.reduce((acc, c) => acc + c.itemsCount, 0);
+  const creditsCount = summary.saleCredits.length;
+  const creditsTotal = summary.saleCredits.reduce((acc, c) => acc + c.total, 0);
+  const paidSaleCreditsTotal = summary.paidSaleCredits.reduce((acc, c) => acc + c.total, 0);
+  const expensesCount = summary.expenses.length;
+
+  return (
+    <div className="divide-y divide-border">
+      <ExpansionPanel
+        title="Resumen Efectivo"
+        amount={formatCurrency(cashTotal)}
+        amountClassName={valueClassName(cashTotal)}
+      >
+        <table className="w-full text-sm">
+          <tbody>
+            <tr className="border-b border-border last:border-0">
+              <td className="p-1">
+                <span className="font-bold text-text">Ventas</span>
+              </td>
+              <td className="p-1 text-right">
+                <span className="font-bold text-success whitespace-nowrap">
+                  {formatCurrency(summary.salesCashTotal)}
+                </span>
+              </td>
+            </tr>
+            {hasCreditsModule && (
+              <tr className="border-b border-border last:border-0">
+                <td className="p-1">
+                  <span className="font-bold text-text">Créditos Pagados</span>
+                </td>
+                <td className="p-1 text-right">
+                  <span className="font-bold text-success whitespace-nowrap">
+                    {formatCurrency(summary.paidCreditsCashTotal)}
+                  </span>
+                </td>
+              </tr>
+            )}
+            {hasExpensesModule && (
+              <tr className="border-b border-border last:border-0">
+                <td className="p-1">
+                  <span className="font-bold text-text">Gastos</span>
+                </td>
+                <td className="p-1 text-right">
+                  <span className="font-bold text-danger whitespace-nowrap">
+                    {formatCurrency(summary.expensesCashTotal)}
+                  </span>
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </ExpansionPanel>
+
+      <ExpansionPanel
+        title="Pago por Tarjeta"
+        amount={formatCurrency(summary.salesCardTotal)}
+        amountClassName={valueClassName(summary.salesCardTotal)}
+      >
+        <table className="w-full text-sm">
+          <tbody>
+            <tr className="border-b border-border last:border-0">
+              <td className="p-1">
+                <span className="font-bold text-text">Ventas</span>
+              </td>
+              <td className="p-1 text-right">
+                <span className="font-bold text-success whitespace-nowrap">
+                  {formatCurrency(summary.salesCardTotal)}
+                </span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </ExpansionPanel>
+
+      {hasExpensesModule && (
+        <ExpansionPanel
+          title={`Gastos (${expensesCount})`}
+          amount={formatCurrency(summary.expensesTotal)}
+          amountClassName="text-danger"
+        >
+          {summary.expenses.length === 0 ? (
+            <p className="py-4 text-center text-sm text-text-muted">
+              {intl.formatMessage({ id: 'TODAY_STATS.NO_EXPENSE_FOUND' })}
+            </p>
+          ) : (
+            <table className="w-full text-sm">
+              <tbody>
+                {summary.expenses.map((expense) => (
+                  <tr key={expense.id} className="border-b border-border last:border-0">
+                    <td className="p-1 text-text">
+                      {formatLocalDate(expense.date)} —{' '}
+                      {intl.formatMessage({ id: EXPENSE_TYPE_KEYS[expense.type] })}
+                    </td>
+                    <td className="p-1 text-right text-danger">
+                      <span className="whitespace-nowrap">
+                        {formatCurrency(expense.total)}
+                      </span>
+                    </td>
+                    <td className="p-1 text-right">
+                      <span className="rounded-full bg-success/10 px-2 py-0.5 text-xs font-semibold text-success">
+                        {intl.formatMessage({ id: PAYMENT_TYPE_KEYS[expense.paymentType] })}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </ExpansionPanel>
+      )}
+
+      {hasCreditsModule && (
+        <ExpansionPanel
+          title={`Créditos Por Cobrar (${creditsCount})`}
+          amount={formatCurrency(creditsTotal)}
+          amountClassName="text-danger"
+        >
+          <SaleCreditsTable saleCredits={summary.saleCredits} />
+        </ExpansionPanel>
+      )}
+
+      {hasCreditsModule && (
+        <ExpansionPanel
+          title={`Créditos Pagados (${paidSaleCreditsTotal})`}
+          amount={formatCurrency(paidSaleCreditsTotal)}
+          amountClassName="text-success"
+        >
+          <SaleCreditsTable saleCredits={summary.paidSaleCredits} />
+        </ExpansionPanel>
+      )}
+
+      <ExpansionPanel
+        title={`Ventas (${ordersItemsCount} productos)`}
+        amount={formatCurrency(summary.categories.reduce((acc, c) => acc + c.total, 0))}
+        amountClassName="text-success"
+      >
+        {summary.categories.map((category) => (
+          <CategoryStats key={category.id} category={category} />
+        ))}
+      </ExpansionPanel>
     </div>
   );
 }

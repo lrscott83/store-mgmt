@@ -25,8 +25,11 @@ const STORE_ID = 'store-1';
 const EMPTY_GUID = '00000000-0000-0000-0000-000000000000';
 const STORAGE_KEY = `lizoft.store-daily-usage-${USER_ID}`;
 
+// The buffered day is the LOCAL calendar day (see USAGE-7 below), so this helper must agree
+// with production: `toISOString()` is UTC and flips to tomorrow at 20:00 EDT, which made every
+// `today()` expectation in this file fail in the evening window. `en-CA` yields YYYY-MM-DD.
 function today(): string {
-  return new Date().toISOString().split('T')[0]!;
+  return new Date().toLocaleDateString('en-CA');
 }
 
 // ── USAGE-7 (usage-dashboard-alignment): the buffered day must be the user's

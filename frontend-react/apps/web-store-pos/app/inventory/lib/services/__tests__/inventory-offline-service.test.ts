@@ -3,7 +3,7 @@ import { InventoryOfflineService } from '../inventory-offline-service';
 import { ProductRepository } from '~/sales/lib/repositories/product-repository';
 import { ProductCategoryRepository } from '~/sales/lib/repositories/product-category-repository';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
-import { InventoryErrors, ProductErrors, Result } from '@store-mgmt/domain';
+import { Currency, InventoryErrors, ProductErrors, Result } from '@store-mgmt/domain';
 import type {
   BaseResponseModel,
   InventoryEntry,
@@ -162,8 +162,18 @@ describe('InventoryOfflineService', () => {
       const costs = service.getAvailableInventoryCosts('p1', 7);
 
       expect(costs).toHaveLength(2);
-      expect(costs[0]).toEqual({ inventoryId: 'e1', costPrice: 2.5, quantity: 6 });
-      expect(costs[1]).toEqual({ inventoryId: 'e2', costPrice: 3.0, quantity: 1 });
+      expect(costs[0]).toEqual({
+        inventoryId: 'e1',
+        costPrice: 2.5,
+        quantity: 6,
+        currency: Currency.CUP,
+      });
+      expect(costs[1]).toEqual({
+        inventoryId: 'e2',
+        costPrice: 3.0,
+        quantity: 1,
+        currency: Currency.CUP,
+      });
     });
 
     it('persists deducted available counts to localStorage', () => {
@@ -272,7 +282,9 @@ describe('InventoryOfflineService', () => {
         new ProductRepository(storeId, new ProductCategoryRepository(storeId)),
       );
       const fullCosts = service2.getAvailableInventoryCosts('p1', 6);
-      expect(fullCosts).toEqual([{ inventoryId: 'e1', costPrice: 2.5, quantity: 6 }]);
+      expect(fullCosts).toEqual([
+        { inventoryId: 'e1', costPrice: 2.5, quantity: 6, currency: Currency.CUP },
+      ]);
     });
 
     it('returns [] and does not deduct when eligibility.product.availableToSale is false', () => {
@@ -291,7 +303,9 @@ describe('InventoryOfflineService', () => {
         new ProductRepository(storeId, new ProductCategoryRepository(storeId)),
       );
       const fullCosts = service2.getAvailableInventoryCosts('p1', 6);
-      expect(fullCosts).toEqual([{ inventoryId: 'e1', costPrice: 2.5, quantity: 6 }]);
+      expect(fullCosts).toEqual([
+        { inventoryId: 'e1', costPrice: 2.5, quantity: 6, currency: Currency.CUP },
+      ]);
     });
 
     it('returns [] when isActive/availableToSale are eligible but active stock is insufficient (module enabled + discountFromInvantory)', () => {
@@ -318,7 +332,9 @@ describe('InventoryOfflineService', () => {
         product: { isActive: true, availableToSale: true, discountFromInvantory: true },
         hasInventoryModule: false,
       });
-      expect(costs).toEqual([{ inventoryId: 'e1', costPrice: 2.5, quantity: 2 }]);
+      expect(costs).toEqual([
+        { inventoryId: 'e1', costPrice: 2.5, quantity: 2, currency: Currency.CUP },
+      ]);
     });
 
     it('bypasses the stock-sufficiency check when product.discountFromInvantory is false, even with module enabled', () => {
@@ -330,7 +346,9 @@ describe('InventoryOfflineService', () => {
         product: { isActive: true, availableToSale: true, discountFromInvantory: false },
         hasInventoryModule: true,
       });
-      expect(costs).toEqual([{ inventoryId: 'e1', costPrice: 2.5, quantity: 2 }]);
+      expect(costs).toEqual([
+        { inventoryId: 'e1', costPrice: 2.5, quantity: 2, currency: Currency.CUP },
+      ]);
     });
 
     it('computes costs normally (unchanged from the no-eligibility-arg path) for a fully eligible product with sufficient stock', () => {
@@ -346,8 +364,8 @@ describe('InventoryOfflineService', () => {
         hasInventoryModule: true,
       });
       expect(costs).toEqual([
-        { inventoryId: 'e1', costPrice: 2.5, quantity: 6 },
-        { inventoryId: 'e2', costPrice: 3.0, quantity: 1 },
+        { inventoryId: 'e1', costPrice: 2.5, quantity: 6, currency: Currency.CUP },
+        { inventoryId: 'e2', costPrice: 3.0, quantity: 1, currency: Currency.CUP },
       ]);
     });
   });

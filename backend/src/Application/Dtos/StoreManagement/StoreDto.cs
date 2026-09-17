@@ -24,6 +24,13 @@ namespace Application.Dtos.StoreManagement
         // store cards and the plan filter read it; the frontend never infers the
         // plan from module flags.
         public string? PlanType { get; set; }
+        // CANONICAL plan price (docs/plans/2026-09-15-store-plan-canonical-price-plan.md):
+        // Σ over the plan's member MODULES from the live catalog with the same formula
+        // PlanProfile uses for GET /v1/plans — NOT the store's frozen StoreModule snapshot.
+        // Null when the store is disapproved or its plan is missing/inactive, so the
+        // frontend hides the price row instead of inventing one.
+        public float? PlanPrice { get; set; }
+        public float? PlanCurrentPrice { get; set; }
         public List<ModuleDto> Modules { get; set; } = new();
     }
 }

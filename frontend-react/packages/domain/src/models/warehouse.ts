@@ -1,4 +1,5 @@
 import type { AuditableBaseModel } from './base';
+import type { Currency } from '../enums';
 
 /**
  * Almacenes — portado del modelo de referencia (ECommerce templates,
@@ -27,6 +28,8 @@ export type WarehouseMovementType =
 export interface WarehouseStockLot {
   costPrice: number;
   quantity: number;
+/** Moneda de `costPrice` (plan 2026-09-16). Ausente = CUP (DEFAULT_CURRENCY). */
+  currency?: Currency;
   /**
    * Compra que originó la tanda (plan 2026-09-16, A4). Opcional para
    * compatibilidad con datos anteriores — la reversa lo usa para localizar
@@ -54,6 +57,8 @@ export interface WarehouseStockLevel {
    * `lots` equivalen a un único lote sintético a este costo.
    */
   costPrice: number;
+  /** Moneda de `costPrice` y de los lotes (plan 2026-09-16). Ausente = CUP. */
+  currency?: Currency;
   /** Lotes FIFO con costo exacto. Ausente en niveles legacy (D8: lote sintético). */
   lots?: WarehouseStockLot[];
   createdDate: Date;
@@ -78,6 +83,8 @@ export interface WarehouseStockMovement {
    * solo en filas legacy anteriores al modelo de lotes (fallback al nivel).
    */
   costPrice?: number;
+  /** Moneda de `costPrice` (plan 2026-09-16). Ausente = CUP (DEFAULT_CURRENCY). */
+  currency?: Currency;
   /** Texto libre OPCIONAL en todos los tipos (decisión #6). */
   reason: string | null;
   createdDate: Date;

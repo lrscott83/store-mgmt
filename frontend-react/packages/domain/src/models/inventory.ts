@@ -1,9 +1,12 @@
 import type { AuditableBaseModel } from './base';
+import type { Currency } from '../enums';
 
 export interface InventoryEntryCost {
   inventoryId: string;
   quantity: number;
   costPrice: number;
+  /** Moneda de `costPrice` (plan 2026-09-16). Ausente = CUP (DEFAULT_CURRENCY). */
+  currency?: Currency;
 }
 
 export interface InventoryEntry extends AuditableBaseModel {
@@ -15,6 +18,8 @@ export interface InventoryEntry extends AuditableBaseModel {
   costPrice: number;
   date: Date;
   order: number;
+/** Moneda de `costPrice` (plan 2026-09-16). Ausente = CUP (DEFAULT_CURRENCY). */
+  currency?: Currency;
   /**
    * Salida de almacén que originó esta entrada (plan 2026-09-16, A8).
    * Opcional y solo presente en entradas creadas por `sale_out` — esas
@@ -31,4 +36,6 @@ export interface InventoryEntryView {
   costPrice: number;
   date: Date;
   isActive: boolean;
+  /** Moneda de `costPrice` (plan 2026-09-16). Ausente = CUP (DEFAULT_CURRENCY). */
+  currency?: Currency;
 }

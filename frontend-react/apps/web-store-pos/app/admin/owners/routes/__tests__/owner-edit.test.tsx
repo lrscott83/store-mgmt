@@ -78,6 +78,8 @@ function makeStore(overrides: Partial<import('@store-mgmt/domain').Store> = {}) 
     nextPaymentDate: null,
     ownerPhone: null,
     planType: 'Pago',
+    planPrice: 10,
+    planCurrentPrice: 10,
     modules: [],
     isActive: true,
     ...overrides,

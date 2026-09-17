@@ -1,5 +1,14 @@
 import { describe, it, expect } from 'vitest';
-import { ERoles, EFeatures, EModules, PaymentType, OrderType, ExpenseType } from '../enums';
+import {
+  ERoles,
+  EFeatures,
+  EModules,
+  PaymentType,
+  OrderType,
+  ExpenseType,
+  Currency,
+  DEFAULT_CURRENCY,
+} from '../enums';
 
 describe('ERoles', () => {
   it('SuperAdmin is 1', () => expect(ERoles.SuperAdmin).toBe(1));
@@ -83,4 +92,19 @@ describe('ExpenseType', () => {
   it('Divisa is 9', () => expect(ExpenseType.Divisa).toBe(9));
   it('Impuesto is 10', () => expect(ExpenseType.Impuesto).toBe(10));
   it('Otro is 100', () => expect(ExpenseType.Otro).toBe(100));
+});
+
+describe('Currency (currency-in-costs-and-prices, order FROZEN — serialization is the number)', () => {
+  it('CUP is 0', () => expect(Currency.CUP).toBe(0));
+  it('USD is 1', () => expect(Currency.USD).toBe(1));
+  it('EUR is 2', () => expect(Currency.EUR).toBe(2));
+  it('CLA is 3', () => expect(Currency.CLA).toBe(3));
+  it('MLC is 4', () => expect(Currency.MLC).toBe(4));
+  it('CAD is 5', () => expect(Currency.CAD).toBe(5));
+  it('MXN is 6', () => expect(Currency.MXN).toBe(6));
+});
+
+describe('DEFAULT_CURRENCY', () => {
+  it('resolves to CUP (0) — absent field defaults to CUP everywhere', () =>
+    expect(DEFAULT_CURRENCY).toBe(Currency.CUP));
 });

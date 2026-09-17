@@ -1,4 +1,5 @@
 import type { AuditableBaseModel } from './base';
+import type { Currency } from '../enums';
 
 export interface ProductCategory {
   id: string;
@@ -18,6 +19,8 @@ export interface ProductCategoryView extends ProductCategory {
 export interface WholesaleTier {
   minPacks: number;
   pricePerUnit: number;
+  /** Moneda de `pricePerUnit` (plan 2026-09-16). Ausente = CUP (DEFAULT_CURRENCY). */
+  currency?: Currency;
 }
 
 /** Configuración mayorista de un producto: tamaño de paquete + escalones de precio. */
@@ -38,6 +41,8 @@ export interface Product extends AuditableBaseModel {
   categoryId: string;
   categoryName: string;
   price: number;
+  /** Moneda de `price` y de los precios mayoristas (plan 2026-09-16). Ausente = CUP. */
+  currency?: Currency;
   order: number;
   availableToSale: boolean;
   discountFromInvantory: boolean;

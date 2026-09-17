@@ -1175,6 +1175,12 @@ const messages: Record<string, string> = {
   // Followed by the list of entity names clearStoreData could not remove.
   'ENCRYPTION.RECOVERY_WIPED_PARTIAL':
     'Se borraron los datos de esta tienda, pero no se pudieron borrar las siguientes entidades: ',
+
+  // Multi-store panel views (OwnerAdmin + módulo MultiStores): select global,
+  // paneles colapsables por tienda y estado sin datos locales.
+  'MULTISTORE.ALL_STORES': 'Todas',
+  'MULTISTORE.STORE_LABEL': 'Tienda:',
+  'MULTISTORE.NO_LOCAL_DATA': 'Sin datos de esta tienda en este dispositivo',
 };
 
 export default messages;

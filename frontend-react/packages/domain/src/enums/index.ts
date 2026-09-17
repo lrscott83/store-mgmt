@@ -89,3 +89,23 @@ export enum ExpenseType {
   Impuesto = 10,
   Otro = 100,
 }
+
+/**
+ * currency-in-costs-and-prices (plan 2026-09-16): moneda de los precios y
+ * costos del negocio de la tienda (orders, products, expenses, credits,
+ * inventory, warehouses). Espejo por VALOR del enum C# `Domain.Common.Enums.Currency`
+ * — la serialización es el número, así que este orden queda CONGELADO desde
+ * el día 1: reordenar/insertar valores rompería datos históricos.
+ */
+export enum Currency {
+  CUP = 0,
+  USD = 1,
+  EUR = 2,
+  CLA = 3,
+  MLC = 4,
+  CAD = 5,
+  MXN = 6,
+}
+
+/** Default de toda entidad con precio/costo: ausente del campo = CUP. */
+export const DEFAULT_CURRENCY: Currency = Currency.CUP;

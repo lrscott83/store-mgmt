@@ -7,7 +7,12 @@ import type {
   WarehouseStockLot,
   WarehouseStockMovement,
 } from '@store-mgmt/domain';
-import { DataResult as DataResultImpl, Result, WarehouseErrors } from '@store-mgmt/domain';
+import {
+  DataResult as DataResultImpl,
+  DEFAULT_CURRENCY,
+  Result,
+  WarehouseErrors,
+} from '@store-mgmt/domain';
 import { StorageKeys } from '~/shared/lib/storage/storage-keys';
 import { encryptEntity } from '~/shared/lib/storage/entity-crypto';
 import { readEntityOrThrow } from '~/shared/lib/storage/read-entity-or-throw';
@@ -276,9 +281,15 @@ export class WarehouseOfflineService {
           // fusionan lotes.
           const level = this.getOrCreateStockLevel(params.warehouseId, params.productId);
           this.ensureLots(level);
+// currency-in-costs-and-prices (plan 2026-09-16): the lot's exact cost currency.
           // A4: la tanda queda referenciada a su movimiento de compra.
           const purchaseMovementId = generateId();
-          level.lots!.push({ costPrice, quantity, lotOriginMovementId: purchaseMovementId });
+          level.lots!.push({
+            costPrice,
+            quantity,
+            currency: DEFAULT_CURRENCY,
+            lotOriginMovementId: purchaseMovementId,
+          });
           this.refreshLevelTotals(level);
           this.setLocalStorage('warehouse-stock-levels', this.stockLevels!);
           return new DataResultImpl<WarehouseStockMovement[]>(
@@ -388,7 +399,8 @@ export class WarehouseOfflineService {
           // ponderada (D8; el GAP-3 mezcla-interna desaparece, el display no).
           const target = this.getOrCreateStockLevel(params.toWarehouseId!, params.productId);
           this.ensureLots(target);
-          for (const slice of slices) target.lots!.push({ ...slice });
+          for (const slice of slices)
+            target.lots!.push({ ...slice, currency: slice.currency ?? DEFAULT_CURRENCY });
           this.refreshLevelTotals(target);
           this.setLocalStorage('warehouse-stock-levels', this.stockLevels!);
 
@@ -420,7 +432,8 @@ export class WarehouseOfflineService {
 
           const target = this.getOrCreateStockLevel(params.warehouseId, params.productId);
           this.ensureLots(target);
-          for (const slice of slices) target.lots!.push({ ...slice });
+          for (const slice of slices)
+            target.lots!.push({ ...slice, currency: slice.currency ?? DEFAULT_CURRENCY });
           this.refreshLevelTotals(target);
           this.setLocalStorage('warehouse-stock-levels', this.stockLevels!);
 
@@ -509,7 +522,9 @@ export class WarehouseOfflineService {
       ]);
     }
     if (movement.type === 'transfer_out') {
-      const target = movement.toWarehouseId ? this.getWarehouseById(movement.toWarehouseId) : undefined;
+      const target = movement.toWarehouseId
+        ? this.getWarehouseById(movement.toWarehouseId)
+        : undefined;
       if (!target || !target.isActive) {
         return new DataResultImpl<WarehouseStockMovement>(undefined, false, [
           WarehouseErrors.WarehouseNotActive,
@@ -577,7 +592,7 @@ export class WarehouseOfflineService {
       );
     }
 
-    // Unidades restantes de ESTA compra (A4): por referencia de origen.
+// Unidades restantes de ESTA compra (A4): por referencia de origen.
     // Fallback por costo SOLO para datos viejos (ninguna tanda con referencia).
     // La cuenta vive en `remainingPurchaseUnits` (plan 2026-09-16, A1) para que
     // la ruta calcule el tope de edición con la MISMA regla que la reversa.
@@ -682,10 +697,7 @@ export class WarehouseOfflineService {
     }
 
     // Elimina la entrada (soft-delete) y re-acredita el lote al costo exacto.
-    const deleteResult = this.inventoryService.deleteInventoryEntry(
-      movement.productId,
-      entry.id,
-    );
+    const deleteResult = this.inventoryService.deleteInventoryEntry(movement.productId, entry.id);
     if (!deleteResult.succeeded) {
       return new DataResultImpl<WarehouseStockMovement>(undefined, false, deleteResult.errors);
     }
@@ -951,6 +963,7 @@ export class WarehouseOfflineService {
       productId,
       onHand: 0,
       costPrice: 0,
+      currency: DEFAULT_CURRENCY,
       createdDate: new Date(),
     };
     this.getStorageStockLevels().push(level);
@@ -1014,6 +1027,8 @@ export class WarehouseOfflineService {
       fromWarehouseId: input.fromWarehouseId,
       toStoreId: input.toStoreId,
       costPrice: input.costPrice,
+      // currency-in-costs-and-prices (plan 2026-09-16): movement cost currency.
+      currency: input.costPrice !== undefined ? DEFAULT_CURRENCY : undefined,
       inventoryEntryId: input.inventoryEntryId,
       reversalOfMovementId: input.reversalOfMovementId,
       reversalInventoryEntryId: input.reversalInventoryEntryId,

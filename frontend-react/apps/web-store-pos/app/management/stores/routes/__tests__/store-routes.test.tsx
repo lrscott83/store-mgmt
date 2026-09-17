@@ -20,6 +20,8 @@ function makeStore(overrides: Partial<Store> = {}): Store {
     nextPaymentDate: null,
     ownerPhone: null,
     planType: 'Pago',
+    planPrice: 10,
+    planCurrentPrice: 10,
     modules: [],
     isActive: true,
     ...overrides,

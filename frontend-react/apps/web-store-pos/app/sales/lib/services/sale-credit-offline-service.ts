@@ -1,5 +1,12 @@
 import type { BaseResponseModel, SaleCredit } from '@store-mgmt/domain';
-import { DataResult, PaymentType, Result, SaleCreditErrors, success } from '@store-mgmt/domain';
+import {
+  DataResult,
+  DEFAULT_CURRENCY,
+  PaymentType,
+  Result,
+  SaleCreditErrors,
+  success,
+} from '@store-mgmt/domain';
 import { StorageKeys } from '~/shared/lib/storage/storage-keys';
 import { encryptEntity } from '~/shared/lib/storage/entity-crypto';
 import { readEntityOrThrow } from '~/shared/lib/storage/read-entity-or-throw';
@@ -240,6 +247,7 @@ export class SaleCreditOfflineService {
       paidDate: null as unknown as Date,
       paidType: null as unknown as PaymentType,
       note,
+      currency: DEFAULT_CURRENCY,
       createdDate: now,
       createdByName: getCurrentUserLogin(),
       updatedDate: undefined,

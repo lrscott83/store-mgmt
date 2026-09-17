@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SaleCreditOfflineService } from '../sale-credit-offline-service';
-import { PaymentType } from '@store-mgmt/domain';
+import { Currency, PaymentType } from '@store-mgmt/domain';
 import type { BaseResponseModel, SaleCredit, UserModel } from '@store-mgmt/domain';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { MissingDataKeyError } from '~/shared/lib/storage/entity-crypto';
@@ -297,6 +297,31 @@ describe('SaleCreditOfflineService', () => {
       expect(result).not.toHaveProperty('data');
       expect(result).not.toHaveProperty('message');
       expect(result).not.toHaveProperty('actionCode');
+    });
+  });
+
+  // currency-in-costs-and-prices (plan 2026-09-16, §5): createSaleCredit is a money-bearing factory
+  // and must stamp DEFAULT_CURRENCY (CUP).
+  describe('SC-13: currency stamping on createSaleCredit (currency-in-costs-and-prices)', () => {
+    it('stamps Currency.CUP on the created credit', () => {
+      const credit = createCredit('order-1', 'Juan Perez', 150);
+
+      expect(credit.currency).toBe(Currency.CUP);
+    });
+
+    // Additive/optional contract (plan §4.4): the roster import path must round-trip an explicit
+    // currency instead of flattening it to the default.
+    it('keeps an explicit non-default currency on the roster import path', () => {
+      const imported: SaleCredit = {
+        ...createCredit('order-1', 'Ana', 100),
+        id: 'imported-currency',
+        currency: Currency.EUR,
+      };
+
+      const result = service.addImportedSaleCredit(imported);
+
+      expect(result.succeeded).toBe(true);
+      expect(findCredit('imported-currency')?.currency).toBe(Currency.EUR);
     });
   });
 

@@ -14,6 +14,8 @@ export interface CsvProduct {
   cost?: number;
   /** React-only, OPTIONAL. Integer > 0 expected; absent/invalid -> undefined -> no entry (REQ-3 gates it). */
   quantity?: number;
+  /** Moneda de `price`/`cost` (plan 2026-09-16). Columna opcional del CSV; ausente = CUP. */
+  currency?: import('../enums').Currency;
 }
 
 /**

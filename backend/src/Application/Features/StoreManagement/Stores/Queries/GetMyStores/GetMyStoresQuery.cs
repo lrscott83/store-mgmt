@@ -17,10 +17,12 @@ namespace Application.Features.StoreManagement.Stores.Queries.GetMyStores
 
     /// <summary>
     /// Owner's "my stores" listing: every store the current user owns — active AND
-    /// inactive — with each store's module price snapshot and the calculated next
-    /// billing date. Mirrors GetStoresByCurrentUserQuery's branch-by-role shape:
-    /// SuperAdmin sees everything; an OwnerAdmin sees their own stores. ReSeller and
-    /// StoreUser are rejected, same gate the other store commands use.
+    /// inactive — with the calculated next billing date and the CANONICAL plan price
+    /// (Σ over the plan's member modules from the live catalog, same formula PlanProfile
+    /// uses for GET /v1/plans), memoized per plan id. Mirrors
+    /// GetStoresByCurrentUserQuery's branch-by-role shape: SuperAdmin sees everything;
+    /// an OwnerAdmin sees their own stores. ReSeller and StoreUser are rejected, same
+    /// gate the other store commands use.
     /// </summary>
     public class GetMyStoresQueryHandler : IQueryHandler<GetMyStoresQuery, IEnumerable<OwnerStoreDto>>
     {
@@ -29,6 +31,7 @@ namespace Application.Features.StoreManagement.Stores.Queries.GetMyStores
         private readonly IHttpContextService _httpContextService;
         private readonly IStorePaymentRepository _storePaymentRepository;
         private readonly ISystemConfigurationRepository _systemConfigurationRepository;
+        private readonly IPlanRepository _planRepository;
         private readonly IStringLocalizer<I18n> _localizer;
 
         public GetMyStoresQueryHandler(
@@ -37,6 +40,7 @@ namespace Application.Features.StoreManagement.Stores.Queries.GetMyStores
             IHttpContextService httpContextService,
             IStorePaymentRepository storePaymentRepository,
             ISystemConfigurationRepository systemConfigurationRepository,
+            IPlanRepository planRepository,
             IStringLocalizer<I18n> localizer)
         {
             _storeRepository = storeRepository;
@@ -44,6 +48,7 @@ namespace Application.Features.StoreManagement.Stores.Queries.GetMyStores
             _httpContextService = httpContextService;
             _storePaymentRepository = storePaymentRepository;
             _systemConfigurationRepository = systemConfigurationRepository;
+            _planRepository = planRepository;
             _localizer = localizer;
         }
 
@@ -60,6 +65,10 @@ namespace Application.Features.StoreManagement.Stores.Queries.GetMyStores
             // Trial period length is tenant-global: one read up front, shared by every
             // store's nextDueDate calculation below (GetStorePlanQuery reads it per call).
             int trialMonths = await _systemConfigurationRepository.GetTestingPeriodInMonthsAsync();
+
+            // Canonical plan prices are a pure function of the plan catalog — memoized
+            // per plan id: one lookup + one summation per DISTINCT plan, not per store.
+            var planPriceCache = new Dictionary<int, (float? Price, float? CurrentPrice)>();
 
             var dtos = new List<OwnerStoreDto>();
             foreach (var store in stores)
@@ -85,10 +94,44 @@ namespace Application.Features.StoreManagement.Stores.Queries.GetMyStores
                         store.NextDueDateOverride)
                     : null;
 
+                // Canonical card price (plan 2026-09-15): plan catalog, not the store's
+                // StoreModule snapshot. Disapproved stores expose no price — the same
+                // Approved guard as the payment date above.
+                if (store.Approved)
+                {
+                    (dto.PlanPrice, dto.PlanCurrentPrice) = await GetPlanPriceAsync(store.StorePlanId, planPriceCache);
+                }
+                else
+                {
+                    dto.PlanPrice = null;
+                    dto.PlanCurrentPrice = null;
+                }
+
                 dtos.Add(dto);
             }
 
             return ResponseResult.Success((IEnumerable<OwnerStoreDto>)dtos);
+        }
+
+        /// <summary>
+        /// Σ over the plan's member modules — identical inputs and formula as
+        /// PlanProfile's PlanDto.Price mapping (GET /v1/plans), so the card price and
+        /// the plan-catalog price are equal by construction. Memoized per plan id.
+        /// </summary>
+        private async Task<(float? Price, float? CurrentPrice)> GetPlanPriceAsync(
+            int storePlanId,
+            Dictionary<int, (float? Price, float? CurrentPrice)> cache)
+        {
+            if (cache.TryGetValue(storePlanId, out var cached))
+                return cached;
+
+            var plan = await _planRepository.GetActivePlanWithModulesByIdAsync(storePlanId);
+            (float? Price, float? CurrentPrice) result = plan is null
+                ? (null, null)
+                : PlanPricingUtils.Sum(plan);
+
+            cache[storePlanId] = result;
+            return result;
         }
     }
 }
