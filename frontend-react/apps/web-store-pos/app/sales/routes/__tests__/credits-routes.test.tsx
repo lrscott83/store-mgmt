@@ -1,10 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
-import { PaymentType, SaleCreditErrors } from '@store-mgmt/domain';
+import { EModules, PaymentType, SaleCreditErrors } from '@store-mgmt/domain';
 import type { SaleCredit } from '@store-mgmt/domain';
 import esMessages from '~/shared/lib/i18n/es';
 import { SaleCreditOfflineService } from '~/sales/lib/services/sale-credit-offline-service';
+import { addDays, startOfDay } from '~/shared/lib/date-utils';
+import { readStoreSaleCredits } from '~/shared/lib/multistore/multi-store-aggregator';
 
 // Category-C envelope helper: the Observable/filter siblings resolve BaseResponseModel<SaleCredit[]>.
 function creditsResponse(credits: SaleCredit[] = []) {
@@ -29,10 +31,26 @@ function creditsFailureResponse() {
   });
 }
 
+// Mutable auth state: the default keeps the single-store shape the sibling
+// views rely on; the MultiStores describe flips it to an OwnerAdmin with the
+// MultiStores module so the REAL useMultiStore gate enables.
+const { authStoreState } = vi.hoisted(() => ({
+  authStoreState: {
+    user: { selectedStoreId: 's1' },
+    isAuthenticated: true,
+  } as {
+    user: {
+      selectedStoreId: string;
+      isOwnerAdmin?: boolean;
+      storeModuleIds?: number[];
+      storeList?: Array<{ id: string; name: string; isActive?: boolean }>;
+    };
+    isAuthenticated: boolean;
+  },
+}));
 vi.mock('~/shared/lib/stores/auth-store', () => {
-  const state = { user: { selectedStoreId: 's1' }, isAuthenticated: true };
-  const useAuthStore = vi.fn((selector?: (s: typeof state) => unknown) =>
-    typeof selector === 'function' ? selector(state) : state,
+  const useAuthStore = vi.fn((selector?: (s: typeof authStoreState) => unknown) =>
+    typeof selector === 'function' ? selector(authStoreState) : authStoreState,
   );
   return { useAuthStore };
 });
@@ -48,6 +66,17 @@ vi.mock('~/shared/lib/blocking-alert', () => ({
 vi.mock('~/sales/lib/services/sale-credit-offline-service', () => ({
   SaleCreditOfflineService: vi.fn(),
 }));
+
+// The per-store DEK/read are mocked for determinism; the day grouping stays real.
+vi.mock('~/shared/lib/multistore/multi-store-aggregator', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('~/shared/lib/multistore/multi-store-aggregator')>();
+  return {
+    ...actual,
+    unwrapStoreDek: vi.fn().mockResolvedValue(new Uint8Array([1])),
+    readStoreSaleCredits: vi.fn().mockReturnValue([]),
+  };
+});
 
 function Wrapper({ children }: { children: React.ReactNode }) {
   return (
@@ -350,5 +379,168 @@ describe('SaleCreditsPage (history) — behavioral (Angular parity)', () => {
       expect(screen.getByText(esMessages['SALE_CREDIT.NO_SALE_CREDIT_FOUND'])).toBeInTheDocument();
     });
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('renders the DateRangeFilter and re-filters with an inclusive-end window via filterSaleCredits', async () => {
+    const filter = vi.fn().mockResolvedValue({
+      data: [],
+      succeeded: true,
+      message: '',
+      actionCode: 200,
+      errors: [],
+    });
+    vi.mocked(SaleCreditOfflineService).mockImplementation(
+      () =>
+        ({
+          filterSaleCredits: filter,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        }) as any,
+    );
+
+    render(
+      <Wrapper>
+        <SaleCreditsPage />
+      </Wrapper>,
+    );
+
+    // The date filter renders above the history list; the mount call stays all-nulls.
+    expect(screen.getByTestId('date-range-filter-input')).toBeInTheDocument();
+    await waitFor(() => expect(filter).toHaveBeenCalledWith(null, null, null, null));
+
+    // Pick 3/2/2026 – 17/9/2028 through the popover and apply via the lupa.
+    fireEvent.click(screen.getByTestId('date-range-filter-input'));
+    fireEvent.change(screen.getByTestId('date-range-filter-start'), {
+      target: { value: '2026-02-03' },
+    });
+    fireEvent.change(screen.getByTestId('date-range-filter-end'), {
+      target: { value: '2028-09-17' },
+    });
+    fireEvent.click(screen.getByTestId('date-range-filter-select'));
+    expect(screen.getByTestId('date-range-filter-input')).toHaveValue('3/2/2026 - 17/9/2028');
+    fireEvent.click(screen.getByTestId('date-range-filter-button'));
+
+    // The service's endDate is EXCLUSIVE — the view sails the end window to the
+    // next-day midnight so the selected end day is included.
+    await waitFor(() =>
+      expect(filter).toHaveBeenLastCalledWith(
+        null,
+        null,
+        startOfDay(new Date(2026, 1, 3)),
+        startOfDay(addDays(new Date(2028, 8, 17), 1)),
+      ),
+    );
+  });
+});
+
+describe('SaleCreditsPage (multi-store mode)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // Restore the default (non-admin) auth shape the sibling describes assume.
+    authStoreState.user = { selectedStoreId: 's1' };
+  });
+
+  it('renders the store select + DateRangeFilter and NO outside-panels totals row', async () => {
+    // OwnerAdmin + MultiStores module + 2 active stores → the REAL gate enables.
+    authStoreState.user = {
+      selectedStoreId: 's1',
+      isOwnerAdmin: true,
+      storeModuleIds: [EModules.MultiStores],
+      storeList: [
+        { id: 's1', name: 'Tienda A', isActive: true },
+        { id: 's2', name: 'Tienda B', isActive: true },
+      ],
+    };
+    const filter = vi.fn().mockResolvedValue(creditsResponse([]));
+    vi.mocked(SaleCreditOfflineService).mockImplementation(
+      () =>
+        ({
+          filterSaleCredits: filter,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        }) as any,
+    );
+
+    render(
+      <Wrapper>
+        <SaleCreditsPage />
+      </Wrapper>,
+    );
+
+    expect(await screen.findByTestId('multistore-select')).toBeInTheDocument();
+    // The outside-panels "Créditos" totals row was removed (user decision).
+    expect(screen.queryByTestId('multistore-totals')).not.toBeInTheDocument();
+    expect(screen.getByTestId('date-range-filter-input')).toBeInTheDocument();
+  });
+
+  it('filters each store panel by the applied range: in-range credits kept, out-of-range → NO_CREDITS_IN_RANGE, no data → NO_LOCAL_DATA', async () => {
+    authStoreState.user = {
+      selectedStoreId: 's1',
+      isOwnerAdmin: true,
+      storeModuleIds: [EModules.MultiStores],
+      storeList: [
+        { id: 's1', name: 'Tienda A', isActive: true },
+        { id: 's2', name: 'Tienda B', isActive: true },
+        { id: 's3', name: 'Tienda C', isActive: true },
+      ],
+    };
+    // s1 has one credit INSIDE the range (Mar) + one OUTSIDE (Jun); s2 only an
+    // OUTSIDE one; s3 no local data at all.
+    vi.mocked(readStoreSaleCredits).mockImplementation((storeId) => {
+      if (storeId === 's1') {
+        return [
+          makeCredit({ id: 'c1', date: new Date(2026, 2, 15, 10, 0, 0) }),
+          makeCredit({ id: 'c2', date: new Date(2026, 5, 1, 10, 0, 0) }),
+        ];
+      }
+      if (storeId === 's2') {
+        return [makeCredit({ id: 'c3', date: new Date(2026, 5, 1, 10, 0, 0) })];
+      }
+      return [];
+    });
+    const filter = vi.fn().mockResolvedValue(creditsResponse([]));
+    vi.mocked(SaleCreditOfflineService).mockImplementation(
+      () =>
+        ({
+          filterSaleCredits: filter,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        }) as any,
+    );
+
+    render(
+      <Wrapper>
+        <SaleCreditsPage />
+      </Wrapper>,
+    );
+
+    await screen.findByTestId('multistore-select');
+    fireEvent.click(screen.getByTestId('multistore-panel-toggle-s1'));
+    fireEvent.click(screen.getByTestId('multistore-panel-toggle-s2'));
+    fireEvent.click(screen.getByTestId('multistore-panel-toggle-s3'));
+
+    // BEFORE applying a range: all local data is visible by default (s1's
+    // June credit included; s2 renders its June credit too).
+    await screen.findByTestId('multistore-credit-date-toggle-s1-2026-06-01');
+    expect(screen.getByTestId('multistore-credit-date-toggle-s2-2026-06-01')).toBeInTheDocument();
+
+    // Pick 2026-03-01 → 2026-03-31 and apply it through the lupa.
+    fireEvent.click(screen.getByTestId('date-range-filter-input'));
+    fireEvent.change(screen.getByTestId('date-range-filter-start'), {
+      target: { value: '2026-03-01' },
+    });
+    fireEvent.change(screen.getByTestId('date-range-filter-end'), {
+      target: { value: '2026-03-31' },
+    });
+    fireEvent.click(screen.getByTestId('date-range-filter-select'));
+    fireEvent.click(screen.getByTestId('date-range-filter-button'));
+
+    // s1 keeps only the in-range day; the out-of-range one is filtered out.
+    await waitFor(() => {
+      expect(
+        screen.getByTestId('multistore-credit-date-toggle-s1-2026-03-15'),
+      ).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId('multistore-credit-date-toggle-s1-2026-06-01')).toBeNull();
+    // s2 had local data but nothing in range; s3 never had local data.
+    expect(screen.getByText(esMessages['MULTISTORE.NO_CREDITS_IN_RANGE'])).toBeInTheDocument();
+    expect(screen.getByText(esMessages['MULTISTORE.NO_LOCAL_DATA'])).toBeInTheDocument();
   });
 });

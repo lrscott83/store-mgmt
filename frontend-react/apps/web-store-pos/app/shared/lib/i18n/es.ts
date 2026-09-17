@@ -1181,9 +1181,10 @@ const messages: Record<string, string> = {
 
   // Multi-store panel views (OwnerAdmin + módulo MultiStores): select global,
   // paneles colapsables por tienda y estado sin datos locales.
-  'MULTISTORE.ALL_STORES': 'Todas',
-  'MULTISTORE.STORE_LABEL': 'Tienda:',
+  'MULTISTORE.ALL_STORES': 'Todas las tiendas',
   'MULTISTORE.NO_LOCAL_DATA': 'Sin datos de esta tienda en este dispositivo',
+  'MULTISTORE.NO_CREDITS_IN_RANGE': 'Sin créditos en el rango seleccionado',
+  'MULTISTORE.STORE_SELECT_ARIA': 'Seleccionar tienda',
 };
 
 export default messages;
