@@ -9,9 +9,9 @@ interface StoreCardListProps {
   onEdit: (id: string) => void;
   onApprove: (id: string) => void;
   onDisapprove: (id: string) => void;
-  /** Optional: only consumers wiring the plan toggle (e.g. /admin/stores) pass it;
-   * owner-edit's store tab omits it and never renders "Cambiar plan". */
-  onToggle?: (id: string) => void;
+  /** Optional: only consumers wiring the plan-change popup (e.g. /admin/stores) pass
+   * it; owner-edit's store tab omits it and never renders "Cambiar plan". */
+  onChangePlan?: (id: string) => void;
 }
 
 /**
@@ -118,7 +118,7 @@ export function StoreCardList({
   onEdit,
   onApprove,
   onDisapprove,
-  onToggle,
+  onChangePlan,
 }: StoreCardListProps) {
   const intl = useIntl();
 
@@ -149,8 +149,8 @@ export function StoreCardList({
                   {intl.formatMessage({ id: 'STORES.APPROVE' })}
                 </ActionMenuItem>
               )}
-              {store.isActive && onToggle && (
-                <ActionMenuItem intent="pay" onClick={() => onToggle(store.id)}>
+              {store.isActive && onChangePlan && (
+                <ActionMenuItem intent="pay" onClick={() => onChangePlan(store.id)}>
                   {intl.formatMessage({ id: 'STORES.CHANGE_PLAN' })}
                 </ActionMenuItem>
               )}
