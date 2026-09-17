@@ -1,15 +1,19 @@
 import { useState, useEffect } from 'react';
 import { useIntl } from 'react-intl';
 import type { InventoryEntry, ProductSelectView } from '@store-mgmt/domain';
+import { DEFAULT_CURRENCY } from '@store-mgmt/domain';
 import { Card } from '~/shared/components/ui/card';
 import { Button } from '~/shared/components/ui/button';
 import { CloseIcon, SaveIcon } from '~/shared/components/ui/icons';
 import { createProductService } from '~/sales/lib/services/product-service.factory';
+import { CurrencySelect } from '~/shared/components/multimonedas/currency-select';
 
 export interface EditInventoryEntryInput {
   productId: string;
   quantity: number;
   costPrice: number;
+  /** MultiMonedas: moneda del costo (ausente = CUP). */
+  currency: number;
 }
 
 interface EditInventoryEntryModalProps {
@@ -40,6 +44,8 @@ export function EditInventoryEntryModal({
   const [productId, setProductId] = useState(entry?.productId ?? '');
   const [quantity, setQuantity] = useState(entry?.quantity.toString() ?? '');
   const [costPrice, setCostPrice] = useState(entry?.costPrice.toString() ?? '');
+  // MultiMonedas: moneda del costo de la entrada (edit: la almacenada; create: CUP).
+  const [currency, setCurrency] = useState<number>(entry?.currency ?? DEFAULT_CURRENCY);
   const [validationError, setValidationError] = useState('');
   // Searchable combobox (UX improvement over Angular's plain mat-select): the input holds the
   // typed query, the list filters products while the user types, and selection keeps the id.
@@ -119,7 +125,7 @@ export function EditInventoryEntryModal({
       return;
     }
 
-    onSave({ productId, quantity: qty, costPrice: cost }, entry?.id);
+    onSave({ productId, quantity: qty, costPrice: cost, currency }, entry?.id);
   }
 
   function selectProduct(product: ProductSelectView) {
@@ -282,6 +288,14 @@ export function EditInventoryEntryModal({
                 className={inputClass}
               />
             </div>
+
+            {/* Currency (MultiMonedas): solo se renderiza con el módulo activo */}
+            <CurrencySelect
+              value={currency}
+              onChange={setCurrency}
+              label={intl.formatMessage({ id: 'GENERAL.CURRENCY' })}
+              testId="inventory-entry-currency-select"
+            />
 
             {/* Errors */}
             {(validationError || error) && (

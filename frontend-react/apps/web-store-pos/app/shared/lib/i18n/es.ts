@@ -20,6 +20,9 @@ const messages: Record<string, string> = {
   'GENERAL.CHANGE': 'Cambio',
   'GENERAL.QUANTITY': 'Cantidad',
   'GENERAL.PRICE': 'Precio',
+  // GENERAL.CURRENCY (MultiMonedas) — etiqueta del selector de moneda en formularios
+  // con precio/costo. Visible solo con el módulo MultiMonedas (15).
+  'GENERAL.CURRENCY': 'Moneda',
   'GENERAL.NAME': 'Nombre',
   'GENERAL.ADD': 'Adicionar',
   // GENERAL.NEW — Angular vocabs/es.ts:221, "+ Nuevo" add-row button

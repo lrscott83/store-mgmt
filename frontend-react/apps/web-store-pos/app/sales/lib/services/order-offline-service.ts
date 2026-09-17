@@ -483,9 +483,10 @@ export class OrderOfflineService {
         // Angular parity (order-offline.service.ts:377): stamps OrderItem.order from the
         // Product's own catalog display-order attribute, NOT the cart array index.
         order: product.order,
-        // currency-in-costs-and-prices (plan 2026-09-16): the sale price's currency —
-        // the wholesale cart pays per-unit prices from the product's own tiers.
-        currency: DEFAULT_CURRENCY,
+        // currency-in-costs-and-prices (plan 2026-09-16) + MultiMonedas: the sale price's
+        // currency is the PRODUCT's own currency (the one-currency guard keeps every
+        // cart line homogeneous, so item currency == cart currency).
+        currency: product.currency ?? DEFAULT_CURRENCY,
       };
     });
 
@@ -508,7 +509,9 @@ export class OrderOfflineService {
       isCredit,
       description: details || (isCredit ? client : ''),
       isActive: true,
-      currency: DEFAULT_CURRENCY,
+      // MultiMonedas: the order's currency is the CART's currency (fixed by the first
+      // item's product — the guard forbids mixing currencies, so this is unambiguous).
+      currency: cartItems[0]?.product.currency ?? DEFAULT_CURRENCY,
       createdDate: now,
       createdByName: getCurrentUserLogin(),
       updatedDate: undefined,

@@ -81,6 +81,10 @@ namespace Domain.Common.Enums
         [Description("Recibir")]
         Receive = 42,
 
+        // MultiMonedas
+        [Description("MultiMonedas")]
+        MultiMonedas = 43,
+
         // Reports
         [Description("Reportes del día")]
         TodayReports = 50,

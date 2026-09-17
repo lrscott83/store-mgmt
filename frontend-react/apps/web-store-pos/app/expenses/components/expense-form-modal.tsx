@@ -1,15 +1,18 @@
 import { useState, useEffect } from 'react';
 import { useIntl } from 'react-intl';
 import type { Expense } from '@store-mgmt/domain';
-import { ExpenseType, PaymentType } from '@store-mgmt/domain';
+import { DEFAULT_CURRENCY, ExpenseType, PaymentType } from '@store-mgmt/domain';
 import { Button } from '~/shared/components/ui/button';
 import { CloseIcon, SaveIcon } from '~/shared/components/ui/icons';
+import { CurrencySelect } from '~/shared/components/multimonedas/currency-select';
 
 export interface ExpenseFormInput {
   type: ExpenseType;
   total: number;
   paymentType: PaymentType;
   note: string;
+  /** MultiMonedas: moneda del gasto (ausente = CUP). */
+  currency: number;
 }
 
 interface ExpenseFormModalProps {
@@ -66,6 +69,7 @@ function emptyForm(expense?: Expense): ExpenseFormInput {
       total: expense.total,
       paymentType: expense.paymentType,
       note: expense.note ?? '',
+      currency: expense.currency ?? DEFAULT_CURRENCY,
     };
   }
   return {
@@ -78,6 +82,7 @@ function emptyForm(expense?: Expense): ExpenseFormInput {
     total: NaN,
     paymentType: PaymentType.Efectivo,
     note: '',
+    currency: DEFAULT_CURRENCY,
   };
 }
 
@@ -192,6 +197,14 @@ export function ExpenseFormModal({
               </p>
             )}
           </div>
+
+          {/* Currency (MultiMonedas): solo se renderiza con el módulo activo */}
+          <CurrencySelect
+            value={form.currency}
+            onChange={(currency) => setForm((f) => ({ ...f, currency }))}
+            label={intl.formatMessage({ id: 'GENERAL.CURRENCY' })}
+            testId="expense-currency-select"
+          />
 
           {/* Payment type */}
           <div>

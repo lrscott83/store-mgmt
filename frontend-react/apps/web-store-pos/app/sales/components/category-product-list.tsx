@@ -2,7 +2,7 @@ import { useIntl } from 'react-intl';
 import type { Product } from '@store-mgmt/domain';
 import { InfoBox } from '~/shared/components/ui/info-box';
 import { ActionMenu, ActionMenuItem } from '~/shared/components/ui/action-menu';
-import { formatCurrency } from '~/shared/lib/format-currency';
+import { formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency';
 import { InactiveBadge } from './inactive-badge';
 
 interface CategoryProductListProps {
@@ -66,7 +66,7 @@ interface ProductRowProps {
 
 function ProductRow({ product, onEdit, onDeactivate, onActivate }: ProductRowProps) {
   const intl = useIntl();
-  const formattedPrice = formatCurrency(product.price);
+  const formattedPrice = formatMoneyWithCurrency(product.price, product.currency);
 
   return (
     // The inactive styling (opacity) stays on the NAME/PRICE content, not on the row

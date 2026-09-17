@@ -15,7 +15,7 @@ builder.Host.AddGlobalExceptionHandlers();
 // SERVICES REGISTRATION
 // ============================================================================
 builder.Services
-    .AddApplication()
+    .AddApplication(builder.Configuration)
     .AddInfrastructure(builder.Configuration);
 
 builder.Services.AddEndpointsApiExplorer();

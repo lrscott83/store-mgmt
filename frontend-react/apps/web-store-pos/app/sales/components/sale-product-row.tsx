@@ -4,7 +4,7 @@ import type { Product, Result } from '@store-mgmt/domain';
 import { OrderType } from '@store-mgmt/domain';
 import { ProductErrors } from '@store-mgmt/domain';
 import { showBlockingError } from '~/shared/lib/blocking-alert';
-import { formatCurrency } from '~/shared/lib/format-currency';
+import { formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency';
 
 interface SaleProductRowProps {
   product: Product;
@@ -80,7 +80,7 @@ export function SaleProductRow({
         <p className="truncate text-sm text-text">{product.name}</p>
         {isNormalSale ? (
           <span className="text-sm text-primary">
-            {formatCurrency(product.price)}
+            {formatMoneyWithCurrency(product.price, product.currency)}
             {product.discountFromInvantory && availableQuantity !== undefined && (
               <span className="ml-1 text-xs text-muted">({availableQuantity})</span>
             )}

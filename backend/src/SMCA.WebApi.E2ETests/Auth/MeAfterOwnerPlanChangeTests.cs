@@ -75,7 +75,8 @@ public sealed class MeAfterOwnerPlanChangeTests
     private static readonly int[] SuperiorUniverse =
         [SalesModuleId, InventoryModuleId, SynchronizationModuleId, ReportsModuleId, StatisticsModuleId,
          FreeManagementModuleId, (int)ModuleType.Expenses, BillingModuleId, HistoriesModuleId,
-         (int)ModuleType.Credits, (int)ModuleType.WholesaleSales, WarehousesModuleId, (int)ModuleType.MultiStores];
+         (int)ModuleType.Credits, (int)ModuleType.WholesaleSales, WarehousesModuleId, (int)ModuleType.MultiStores,
+         (int)ModuleType.MultiMonedas];
 
     public MeAfterOwnerPlanChangeTests(WebAppFixture fixture)
     {

@@ -477,7 +477,7 @@ describe('SalePage — Angular parity (sale.component.html)', () => {
       </Wrapper>,
     );
     await screen.findByText('Coca Cola');
-    expect(screen.getByText('$2')).toBeInTheDocument();
+    expect(screen.getByText('2 CUP')).toBeInTheDocument();
     expect(screen.getByText('(10)')).toBeInTheDocument();
   });
 
@@ -516,7 +516,7 @@ describe('SalePage — Angular parity (sale.component.html)', () => {
       </Wrapper>,
     );
     await screen.findByText('Coca Cola');
-    expect(screen.getByText('$2')).toBeInTheDocument();
+    expect(screen.getByText('2 CUP')).toBeInTheDocument();
     expect(screen.queryByText('(10)')).not.toBeInTheDocument();
   });
 

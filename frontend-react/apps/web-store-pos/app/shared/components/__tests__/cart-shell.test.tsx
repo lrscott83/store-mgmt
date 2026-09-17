@@ -188,7 +188,7 @@ describe('CartShell — payment input and Vuelto (change)', () => {
     mockCartState({ items: [{ product, quantity: 1 }], total: vi.fn().mockReturnValue(5) });
     renderCartShell();
     openCart();
-    expect(screen.getByText(/Vuelto:/)).toHaveTextContent('Vuelto: $0');
+    expect(screen.getByText(/Vuelto:/)).toHaveTextContent(/Vuelto:\s+0\s+CUP/);
   });
 
   it('computes Vuelto as payment - total once a payment is typed', () => {
@@ -197,7 +197,7 @@ describe('CartShell — payment input and Vuelto (change)', () => {
     renderCartShell();
     openCart();
     fireEvent.change(screen.getByLabelText('Pago'), { target: { value: '10' } });
-    expect(screen.getByText(/Vuelto:/)).toHaveTextContent('Vuelto: $5');
+    expect(screen.getByText(/Vuelto:/)).toHaveTextContent(/Vuelto:\s+5\s+CUP/);
   });
 
   it('shows a negative Vuelto when payment is less than total', () => {
@@ -206,7 +206,7 @@ describe('CartShell — payment input and Vuelto (change)', () => {
     renderCartShell();
     openCart();
     fireEvent.change(screen.getByLabelText('Pago'), { target: { value: '4' } });
-    expect(screen.getByText(/Vuelto:/)).toHaveTextContent('Vuelto: -$6');
+    expect(screen.getByText(/Vuelto:/)).toHaveTextContent(/Vuelto:\s+-6\s+CUP/);
   });
 });
 
@@ -362,11 +362,11 @@ describe('CartShell — line-item layout (2026-09-06)', () => {
     expect(name).toBeInTheDocument();
     expect(name).not.toHaveTextContent('(10)');
     // Price line: "Precio: " label (es.ts:259) + formatted unit price + " (quantity)".
-    expect(screen.getByText('Precio: $5 (10)')).toBeInTheDocument();
+    expect(screen.getByText(/Precio:\s+5\s+CUP \(10\)/)).toBeInTheDocument();
     // Line subtotal is still present (price × quantity) inside the product row.
     const row = name.closest('li');
     expect(row).not.toBeNull();
-    expect(row).toHaveTextContent('$50');
+    expect(row).toHaveTextContent(/50\s+CUP/);
   });
 
   it('renders the +/- controls as the last element of the row so they align to the right', () => {
@@ -1002,7 +1002,7 @@ describe('CartShell — venta mayorista mostrada en paquetes', () => {
     });
     renderCartShell();
     openCart();
-    expect(screen.getByText('Cajas: 2 · Precio: $15 840')).toBeInTheDocument();
+    expect(screen.getByText(/Cajas: 2 · Precio:\s+15\s+840\s+CUP/)).toBeInTheDocument();
     // Ya no se muestra la cantidad en unidades entre paréntesis.
     expect(screen.queryByText(/\(48\)/)).not.toBeInTheDocument();
   });
@@ -1051,7 +1051,7 @@ describe('CartShell — venta mayorista mostrada en paquetes', () => {
     });
     renderCartShell();
     openCart();
-    expect(screen.getByText('Precio: $5 (10)')).toBeInTheDocument();
+    expect(screen.getByText(/Precio:\s+5\s+CUP \(10\)/)).toBeInTheDocument();
   });
 
   it('el badge de un carrito normal sigue contando unidades', () => {

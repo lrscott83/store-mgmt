@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { Product } from '@store-mgmt/domain';
-import { OrderType, PaymentType } from '@store-mgmt/domain';
+import { Currency, OrderType, PaymentType } from '@store-mgmt/domain';
 import { round2 } from '~/shared/lib/money';
 
 export interface CartItem {
@@ -41,6 +41,9 @@ interface CartState {
   getOrderDescription: () => string | undefined;
   clear: () => void;
   total: () => number;
+  /** Moneda de la venta en curso (MultiMonedas): la fija el primer ítem.
+   *  Carrito vacío → CUP. Campo `currency` ausente = CUP (default del dominio). */
+  cartCurrency: () => number;
   /** 1:1 port of Angular's ShoppingCartService.getCartItemQuantity(productId). */
   getItemQuantity: (productId: string) => number;
 }
@@ -130,6 +133,11 @@ export const useCartStore = create<CartState>()(
             0,
           ),
         );
+      },
+
+      cartCurrency: () => {
+        const first = get().items[0];
+        return first ? (first.product.currency ?? Currency.CUP) : Currency.CUP;
       },
 
       getItemQuantity: (productId: string) => {

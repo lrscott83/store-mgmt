@@ -46,5 +46,8 @@ namespace Domain.Common.Enums
 
         [Description("Múltiples tiendas")]
         MultiStores = 14,
+
+        [Description("Múltiples monedas")]
+        MultiMonedas = 15,
     }
 }

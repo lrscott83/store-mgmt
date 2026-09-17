@@ -146,8 +146,8 @@ export function TodayEntriesPage() {
       new ProductRepository(storeId, new ProductCategoryRepository(storeId)),
     );
     const result = entryId
-      ? svc.update(entryId, data.productId, data.quantity, data.costPrice)
-      : svc.createInventoryEntry(data.productId, data.quantity, data.costPrice);
+      ? svc.update(entryId, data.productId, data.quantity, data.costPrice, data.currency)
+      : svc.createInventoryEntry(data.productId, data.quantity, data.costPrice, data.currency);
 
     // create() returns null (Angular parity) when the product does not exist; treat as a
     // generic failure since there is no DataResult envelope in that branch.

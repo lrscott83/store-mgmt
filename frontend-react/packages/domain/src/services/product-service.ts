@@ -1,6 +1,7 @@
 import type { Product, ProductSelectView, WholesaleConfig } from '../models/product';
 import type { CsvProduct, CsvImportResult } from '../models/csv-product';
 import type { BaseResponseModel } from '../models/base';
+import type { Currency } from '../enums';
 
 /**
  * ProductService — React mirror of Angular's abstract `ProductService`
@@ -51,6 +52,8 @@ export interface ProductService {
     discountFromInvantory: boolean,
     barcode?: string,
     wholesale?: WholesaleConfig,
+    /** MultiMonedas: moneda del precio de venta (ausente = default CUP). */
+    currency?: Currency,
   ): Promise<BaseResponseModel<boolean>>;
 
   updateProduct(
@@ -65,6 +68,8 @@ export interface ProductService {
     discountFromInvantory: boolean,
     barcode?: string,
     wholesale?: WholesaleConfig,
+    /** MultiMonedas: undefined deja la moneda almacenada intacta. */
+    currency?: Currency,
   ): Promise<BaseResponseModel<boolean>>;
 
   getMaxOrderByCategoryId(categoryId: string): Promise<BaseResponseModel<number>>;

@@ -29,7 +29,7 @@ import { validateCartSubmission } from '~/shared/lib/cart-submission-validation'
 import { showBlockingError, showAcknowledgeError } from '~/shared/lib/blocking-alert';
 import { showToastSuccess, showToastError } from '~/shared/lib/toast';
 import { round2 } from '~/shared/lib/money';
-import { formatCurrency } from '~/shared/lib/format-currency';
+import { formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency';
 import { Switch } from '~/shared/components/ui/switch';
 import { InfoBox } from '~/shared/components/ui/info-box';
 
@@ -138,16 +138,19 @@ function getWholesaleConfigSafe(product: Product) {
  *   DEL PAQUETE (unitPrice × packSize).
  * - Venta normal: "Precio: $5 (10)" — precio unitario + unidades, como siempre.
  */
-function formatWholesaleLine(item: { product: Product; quantity: number; price?: number }): string {
+function formatWholesaleLine(
+  item: { product: Product; quantity: number; price?: number },
+  currency: number,
+): string {
   const config = getWholesaleConfigSafe(item.product);
   if (!config) {
-    return `${intlPriceLabel()}${formatCurrency(item.price ?? item.product.price)} (${item.quantity})`;
+    return `${intlPriceLabel()}${formatMoneyWithCurrency(item.price ?? item.product.price, currency)} (${item.quantity})`;
   }
   const packs = wholesaleCartDisplay.packsFromUnits(item.quantity, item.product);
   const packPrice = wholesaleCartDisplay.packPrice(item.product, item.price);
   const unitPlural = wholesaleUnitPlural(item.product.wholesaleUnitLabel?.trim() || 'paquete');
   const capitalized = unitPlural.charAt(0).toUpperCase() + unitPlural.slice(1);
-  return `${capitalized}: ${packs} · ${intlPriceLabel()}${formatCurrency(packPrice)}`;
+  return `${capitalized}: ${packs} · ${intlPriceLabel()}${formatMoneyWithCurrency(packPrice, currency)}`;
 }
 
 /** SHOPPING_CART.PRICE_LABEL necesita intl; helper con lazy access al DOM no funciona —
@@ -182,6 +185,9 @@ export function CartShell() {
     removeItem,
     clear,
     total,
+    // MultiMonedas: acción nueva — con fallback CUP para stores sin ella (mocks de test,
+    // perfiles persistidos de sesiones previas).
+    cartCurrency = () => 0,
   } = useCartStore();
   const user = useAuthStore((s) => s.user);
   const creditsModuleAvailable = user ? hasCreditsModuleAvailable(user) : false;
@@ -191,6 +197,10 @@ export function CartShell() {
   // sigue contando unidades (cartBadgeCount cae a la suma por producto sin config).
   const itemCount = wholesaleCartDisplay.cartBadgeCount(items);
   const totalAmount = total();
+  // MultiMonedas: el carrito es de una sola moneda (guard de adición), así que el
+  // total y el vuelto se formatean SIEMPRE con la moneda de la venta en curso.
+  const saleCurrency = cartCurrency();
+  const money = (amount: number) => formatMoneyWithCurrency(amount, saleCurrency);
   const paymentReturn = getPaymentReturn(payment, totalAmount);
   const paymentReturnKind = getPaymentReturnKind(paymentReturn);
 
@@ -463,7 +473,7 @@ export function CartShell() {
                 }
               >
                 Vuelto: {paymentReturn < 0 ? '-' : ''}
-                {formatCurrency(Math.abs(paymentReturn))}
+                {money(Math.abs(paymentReturn))}
               </span>
               <input
                 type="number"
@@ -556,10 +566,10 @@ export function CartShell() {
                         <p className="truncate text-sm font-medium text-text">
                           {item.product.name}
                         </p>
-                        <p className="text-xs text-text-muted">{formatWholesaleLine(item)}</p>
+                        <p className="text-xs text-text-muted">{formatWholesaleLine(item, saleCurrency)}</p>
                       </div>
                       <p className="text-sm text-text whitespace-nowrap">
-                        {formatCurrency(round2((item.price ?? item.product.price) * item.quantity))}
+                        {money(round2((item.price ?? item.product.price) * item.quantity))}
                       </p>
                       <button
                         type="button"
@@ -619,7 +629,7 @@ export function CartShell() {
       </div>
       {/* Cart total, always visible next to the icon — matches Angular's header getCartTotal() */}
       <span className="text-sm font-medium text-primary whitespace-nowrap">
-        {formatCurrency(totalAmount)}
+        {money(totalAmount)}
       </span>
     </>
   );

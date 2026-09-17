@@ -83,7 +83,7 @@ describe('SaleProductRow — Angular parity (sale-product-row.component.html)', 
         />
       </Wrapper>,
     );
-    expect(screen.getByText('$2')).toBeInTheDocument();
+    expect(screen.getByText('2 CUP')).toBeInTheDocument();
     expect(screen.queryByLabelText('Precio')).not.toBeInTheDocument();
   });
 
@@ -98,7 +98,7 @@ describe('SaleProductRow — Angular parity (sale-product-row.component.html)', 
         />
       </Wrapper>,
     );
-    expect(screen.getByText('$2')).toBeInTheDocument();
+    expect(screen.getByText('2 CUP')).toBeInTheDocument();
     expect(screen.getByText('(12)')).toBeInTheDocument();
   });
 
@@ -113,7 +113,7 @@ describe('SaleProductRow — Angular parity (sale-product-row.component.html)', 
         />
       </Wrapper>,
     );
-    expect(screen.getByText('$2')).toBeInTheDocument();
+    expect(screen.getByText('2 CUP')).toBeInTheDocument();
     expect(screen.queryByText('(12)')).not.toBeInTheDocument();
   });
 
@@ -127,7 +127,7 @@ describe('SaleProductRow — Angular parity (sale-product-row.component.html)', 
         />
       </Wrapper>,
     );
-    expect(screen.getByText('$2')).toBeInTheDocument();
+    expect(screen.getByText('2 CUP')).toBeInTheDocument();
     expect(screen.queryByText(/^\(\d+\)$/)).not.toBeInTheDocument();
   });
 
@@ -141,7 +141,7 @@ describe('SaleProductRow — Angular parity (sale-product-row.component.html)', 
         />
       </Wrapper>,
     );
-    expect(screen.getByText('$2 000')).toBeInTheDocument();
+    expect(screen.getByText('2 000 CUP')).toBeInTheDocument();
   });
 
   it('shows an editable price input for a non-Normal sale (e.g. Mayorista)', () => {
@@ -155,7 +155,7 @@ describe('SaleProductRow — Angular parity (sale-product-row.component.html)', 
       </Wrapper>,
     );
     expect(screen.getByLabelText('Precio')).toBeInTheDocument();
-    expect(screen.queryByText('$2')).not.toBeInTheDocument();
+    expect(screen.queryByText('2 CUP')).not.toBeInTheDocument();
   });
 
   it('quantity input defaults to 1', () => {

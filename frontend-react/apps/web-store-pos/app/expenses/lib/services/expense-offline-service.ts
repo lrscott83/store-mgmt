@@ -17,6 +17,8 @@ interface CreateExpenseInput {
   date: Date;
   paymentType: PaymentType;
   note?: string | null;
+  /** MultiMonedas: moneda del gasto (ausente = CUP). */
+  currency?: number;
 }
 
 /**
@@ -165,7 +167,8 @@ export class ExpenseOfflineService {
       paymentType: input.paymentType,
       note: input.note || '',
       isActive: true,
-      currency: DEFAULT_CURRENCY,
+      // MultiMonedas: el gasto nace con la moneda elegida (ausente = CUP).
+      currency: input.currency ?? DEFAULT_CURRENCY,
       createdDate: now,
       createdByName: getCurrentUserLogin(),
       updatedDate: undefined,
@@ -183,7 +186,7 @@ export class ExpenseOfflineService {
    */
   update(
     id: string,
-    patch: Partial<Pick<Expense, 'type' | 'total' | 'date' | 'paymentType' | 'note'>>,
+    patch: Partial<Pick<Expense, 'type' | 'total' | 'date' | 'paymentType' | 'note' | 'currency'>>,
   ): DataResult<Expense> {
     const existing = this.getStorageExpenses().find((e) => e.id === id);
     if (!existing) {
@@ -194,6 +197,7 @@ export class ExpenseOfflineService {
     if (patch.date !== undefined) existing.date = patch.date;
     if (patch.paymentType !== undefined) existing.paymentType = patch.paymentType;
     if (patch.note !== undefined) existing.note = patch.note || '';
+    if (patch.currency !== undefined) existing.currency = patch.currency;
     existing.updatedDate = new Date();
     existing.updatedByName = getCurrentUserLogin();
     this.setExpensesLocalStorage(this.expenses!);

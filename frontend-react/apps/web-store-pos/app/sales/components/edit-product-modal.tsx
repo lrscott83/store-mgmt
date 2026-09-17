@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { useIntl } from 'react-intl';
 import type { Product, WholesaleConfig } from '@store-mgmt/domain';
+import { DEFAULT_CURRENCY } from '@store-mgmt/domain';
 import { CloseIcon, SaveIcon } from '~/shared/components/ui/icons';
 import { Button } from '~/shared/components/ui/button';
 import { BarcodeInput } from './barcode-input';
 import { validateWholesaleConfig } from '~/sales/lib/wholesale';
 import { WholesaleConfigSection } from './wholesale-config-section';
+import { CurrencySelect } from '~/shared/components/multimonedas/currency-select';
 
 interface EditProductModalProps {
   product: Product;
@@ -42,6 +44,8 @@ export function EditProductModal({ product, onSave, onClose }: EditProductModalP
   );
   const [errors, setErrors] = useState<{ name?: string; price?: string; order?: string }>({});
   const [wholesaleError, setWholesaleError] = useState<string | undefined>(undefined);
+  // MultiMonedas: el producto siempre tiene moneda (ausente = CUP).
+  const [currency, setCurrency] = useState<number>(product.currency ?? DEFAULT_CURRENCY);
 
   function validate(): boolean {
     const newErrors: { name?: string; price?: string; order?: string } = {};
@@ -94,6 +98,7 @@ export function EditProductModal({ product, onSave, onClose }: EditProductModalP
       ...product,
       name: form.name.trim(),
       price: parseFloat(form.price),
+      currency,
       barcode: form.barcode.trim() || undefined,
       order: parseInt(form.order, 10),
       isActive: form.isActive,
@@ -144,6 +149,14 @@ export function EditProductModal({ product, onSave, onClose }: EditProductModalP
             />
             {errors.price && <p className="mt-1 text-xs text-red-500">{errors.price}</p>}
           </div>
+
+          {/* Currency (MultiMonedas): solo se renderiza con el módulo activo */}
+          <CurrencySelect
+            value={currency}
+            onChange={setCurrency}
+            label={intl.formatMessage({ id: 'GENERAL.CURRENCY' })}
+            testId="edit-product-currency-select"
+          />
 
           <BarcodeInput
             value={form.barcode}

@@ -136,6 +136,7 @@ export function ProductsPage() {
   async function handleCreateProduct(data: {
     name: string;
     price: number;
+    currency: number;
     barcode?: string;
     categoryId: string;
     order: number;
@@ -155,6 +156,7 @@ export function ProductsPage() {
       data.discountFromInvantory,
       data.barcode,
       data.wholesale,
+      data.currency,
     );
     if (!result.succeeded) {
       showBlockingError(
@@ -194,6 +196,8 @@ export function ProductsPage() {
             ...(product.wholesaleUnitLabel ? { unitLabel: product.wholesaleUnitLabel } : {}),
           }
         : undefined,
+      // MultiMonedas: la moneda editada viaja con el producto (undefined = mantiene la actual).
+      product.currency,
     );
     if (!result.succeeded) {
       showBlockingError(

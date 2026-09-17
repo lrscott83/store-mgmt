@@ -219,6 +219,15 @@ namespace Infrastructure.Persistence.EntityConfigurations
                       true,
                       true
                   ),
+                  Feature.Create(
+                      (int)FeatureType.MultiMonedas,
+                      FeatureType.MultiMonedas.GetDescription(),
+                      "Funcionalidad para gestionar los precios en múltiples monedas",
+                      (int)ModuleType.MultiMonedas,
+                      76,
+                      true,
+                      true
+                  ),
 
                  // Synchronization
                  Feature.Create(

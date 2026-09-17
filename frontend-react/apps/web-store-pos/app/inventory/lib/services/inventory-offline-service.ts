@@ -552,6 +552,8 @@ export class InventoryOfflineService {
     productId: string,
     quantity: number,
     costPrice: number,
+    /** MultiMonedas: moneda del costo (ausente = CUP). */
+    currency?: number,
   ): DataResult<InventoryEntryView> | null {
     const product = this.productRepository.getProductById(productId);
     if (!product) return null;
@@ -571,7 +573,8 @@ export class InventoryOfflineService {
       date,
       order: maxOrder + 1,
       isActive: true,
-      currency: DEFAULT_CURRENCY,
+      // MultiMonedas: la entrada nace con la moneda elegida (ausente = CUP).
+      currency: currency ?? DEFAULT_CURRENCY,
       createdDate: date,
       createdByName: getCurrentUserLogin(),
       updatedDate: undefined,
@@ -612,6 +615,8 @@ export class InventoryOfflineService {
     productId: string,
     quantity: number,
     costPrice: number,
+    /** MultiMonedas: undefined deja la moneda almacenada intacta. */
+    currency?: number,
   ): DataResult<InventoryEntryView> {
     const guard = this.isNotSoldEntry(productId, entryId);
     if (!guard.succeeded) {
@@ -637,6 +642,7 @@ export class InventoryOfflineService {
       quantity,
       available: quantity,
       costPrice,
+      ...(currency !== undefined ? { currency } : {}),
       updatedDate: new Date(),
       updatedByName: getCurrentUserLogin(),
     };

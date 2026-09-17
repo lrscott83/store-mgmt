@@ -503,8 +503,8 @@ describe('InventoryOfflineService', () => {
       expect(result?.data?.productName).toBe('Product p1');
     });
 
-    it('createInventoryEntry is 3-arity — no categoryId/date parameters accepted', () => {
-      expect(service.createInventoryEntry.length).toBe(3);
+    it('createInventoryEntry is 4-arity (product, quantity, cost, currency opcional MultiMonedas) — no categoryId/date parameters accepted', () => {
+      expect(service.createInventoryEntry.length).toBe(4);
     });
 
     it('derives categoryId internally from productRepository.getStorageProductsMap() (Angular parity, createInventoryEntry:76) — not caller-supplied', () => {

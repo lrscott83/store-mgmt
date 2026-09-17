@@ -63,6 +63,7 @@ namespace Infrastructure.Persistence.EntityConfigurations
                 StorePlanModule.Create((int)StorePlanType.Superior, (int)ModuleType.Credits),
                 StorePlanModule.Create((int)StorePlanType.Superior, (int)ModuleType.Warehouses),
                 StorePlanModule.Create((int)StorePlanType.Superior, (int)ModuleType.MultiStores),
+                StorePlanModule.Create((int)StorePlanType.Superior, (int)ModuleType.MultiMonedas),
 
                 // VIP: todos los módulos AvailableToStore
                 StorePlanModule.Create((int)StorePlanType.VIP, (int)ModuleType.Sales),
@@ -77,7 +78,8 @@ namespace Infrastructure.Persistence.EntityConfigurations
                 StorePlanModule.Create((int)StorePlanType.VIP, (int)ModuleType.Histories),
                 StorePlanModule.Create((int)StorePlanType.VIP, (int)ModuleType.Credits),
                 StorePlanModule.Create((int)StorePlanType.VIP, (int)ModuleType.Warehouses),
-                StorePlanModule.Create((int)StorePlanType.VIP, (int)ModuleType.MultiStores));
+                StorePlanModule.Create((int)StorePlanType.VIP, (int)ModuleType.MultiStores),
+                StorePlanModule.Create((int)StorePlanType.VIP, (int)ModuleType.MultiMonedas));
         }
     }
 }

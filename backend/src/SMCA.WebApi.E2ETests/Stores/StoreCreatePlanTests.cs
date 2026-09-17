@@ -34,6 +34,7 @@ public sealed class StoreCreatePlanTests
     private const int WarehousesModuleId = 13;
     private const int WholesaleSalesModuleId = 12;
     private const int MultiStoresModuleId = 14;
+    private const int MultiMonedasModuleId = 15;
     private const int SuperiorPlanId = (int)Domain.Common.Enums.StorePlanType.Superior;
 
     private static object Body(Guid ownerId, string name, IEnumerable<int> moduleIds) => new
@@ -143,7 +144,7 @@ public sealed class StoreCreatePlanTests
         Guid created = Guid.Empty;
         try
         {
-            var fullCatalogRequest = new[] { 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, WholesaleSalesModuleId, WarehousesModuleId, MultiStoresModuleId };
+            var fullCatalogRequest = new[] { 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, WholesaleSalesModuleId, WarehousesModuleId, MultiStoresModuleId, MultiMonedasModuleId };
             var response = await DbTestHelpers.AuthedClient(_f, adminId, login)
                 .PostAsJsonAsync("/api/v1/stores", Body(owner.OwnerId, $"Store-{Guid.NewGuid():N}", fullCatalogRequest));
             response.StatusCode.Should().Be(HttpStatusCode.Created);
@@ -158,7 +159,7 @@ public sealed class StoreCreatePlanTests
             var planCatalogModuleIds = await db.Set<StorePlanModule>().IgnoreQueryFilters()
                 .Where(spm => spm.PlanId == SuperiorPlanId)
                 .Select(spm => spm.ModuleId).ToListAsync();
-            planCatalogModuleIds.Should().HaveCount(13);
+            planCatalogModuleIds.Should().HaveCount(14);
 
             var storeModuleIds = await db.Set<StoreModule>().IgnoreQueryFilters()
                 .Where(sm => sm.StoreId == created && sm.IsActive)

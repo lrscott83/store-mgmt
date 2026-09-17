@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { useIntl } from 'react-intl';
 import type { ProductCategory, WholesaleConfig } from '@store-mgmt/domain';
+import { DEFAULT_CURRENCY } from '@store-mgmt/domain';
 import { CloseIcon, SaveIcon } from '~/shared/components/ui/icons';
 import { Button } from '~/shared/components/ui/button';
 import { BarcodeInput } from './barcode-input';
 import { validateWholesaleConfig } from '~/sales/lib/wholesale';
 import { WholesaleConfigSection } from './wholesale-config-section';
+import { CurrencySelect } from '~/shared/components/multimonedas/currency-select';
 
 interface CreateProductForm {
   name: string;
@@ -23,6 +25,7 @@ interface CreateProductModalProps {
   onSave: (data: {
     name: string;
     price: number;
+    currency: number;
     barcode?: string;
     categoryId: string;
     order: number;
@@ -57,6 +60,8 @@ export function CreateProductModal({
     discountFromInvantory: true,
   });
   const [wholesale, setWholesale] = useState<WholesaleConfig | undefined>(undefined);
+  // MultiMonedas: CUP salvo que el usuario elija otra (selector visible solo con el módulo).
+  const [currency, setCurrency] = useState<number>(DEFAULT_CURRENCY);
   const [errors, setErrors] = useState<Partial<Record<keyof CreateProductForm, string>>>({});
   const [wholesaleError, setWholesaleError] = useState<string | undefined>(undefined);
 
@@ -113,6 +118,7 @@ export function CreateProductModal({
     onSave({
       name: form.name.trim(),
       price: parseFloat(form.price),
+      currency,
       barcode: form.barcode.trim() || undefined,
       categoryId: category.id,
       order: parseInt(form.order, 10),
@@ -162,6 +168,14 @@ export function CreateProductModal({
             />
             {errors.price && <p className="mt-1 text-xs text-red-500">{errors.price}</p>}
           </div>
+
+          {/* Currency (MultiMonedas): solo se renderiza con el módulo activo */}
+          <CurrencySelect
+            value={currency}
+            onChange={setCurrency}
+            label={intl.formatMessage({ id: 'GENERAL.CURRENCY' })}
+            testId="product-currency-select"
+          />
 
           {/* Barcode */}
           <BarcodeInput

@@ -8,7 +8,7 @@ import type {
   ProductSelectView,
   WholesaleConfig,
 } from '@store-mgmt/domain';
-import { failure, ProductErrors, success } from '@store-mgmt/domain';
+import { Currency, failure, ProductErrors, success } from '@store-mgmt/domain';
 import { ProductRepository } from '../repositories/product-repository';
 import { ProductCategoryRepository } from '../repositories/product-category-repository';
 import { normalizeDisplayName } from '../csv-product-normalizer';
@@ -175,7 +175,8 @@ export class ProductOfflineService implements ProductService {
     return success(productsToSelect);
   }
 
-  /** 1:1 port of Angular `createProduct` (product-offline.service.ts:39-62) — delegates `addProduct`. */
+  /** 1:1 port of Angular `createProduct` (product-offline.service.ts:39-62) — delegates `addProduct`.
+   *  MultiMonedas: `currency` opcional (ausente = default del repositorio). */
   async createProduct(
     categoryId: string,
     name: string,
@@ -187,6 +188,7 @@ export class ProductOfflineService implements ProductService {
     discountFromInvantory: boolean,
     barcode?: string,
     wholesale?: WholesaleConfig,
+    currency?: Currency,
   ): Promise<BaseResponseModel<boolean>> {
     const result = this.productRepository.addProduct(
       categoryId,
@@ -199,11 +201,13 @@ export class ProductOfflineService implements ProductService {
       discountFromInvantory,
       barcode,
       wholesale,
+      currency,
     );
     return result.succeeded ? success(true) : failure(result.errors);
   }
 
-  /** 1:1 port of Angular `updateProduct` (product-offline.service.ts:86-111) — delegates `updateProduct`. */
+  /** 1:1 port of Angular `updateProduct` (product-offline.service.ts:86-111) — delegates `updateProduct`.
+   *  MultiMonedas: `currency` opcional (undefined = deja la almacenada intacta). */
   async updateProduct(
     id: string,
     categoryId: string,
@@ -216,6 +220,7 @@ export class ProductOfflineService implements ProductService {
     discountFromInvantory: boolean,
     barcode?: string,
     wholesale?: WholesaleConfig,
+    currency?: Currency,
   ): Promise<BaseResponseModel<boolean>> {
     const result = this.productRepository.updateProduct(
       id,
@@ -231,6 +236,7 @@ export class ProductOfflineService implements ProductService {
       undefined,
       undefined,
       wholesale,
+      currency,
     );
     return result.succeeded ? success(true) : failure(result.errors);
   }

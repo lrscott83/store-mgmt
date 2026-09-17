@@ -874,7 +874,7 @@ describe('EditInventoryEntryModal — searchable product combobox filters while 
     fireEvent.change(screen.getByLabelText('Cantidad'), { target: { value: '2' } });
     fireEvent.change(screen.getByLabelText('Precio de costo'), { target: { value: '4' } });
     fireEvent.click(screen.getByRole('button', { name: 'Adicionar' }));
-    expect(onSave).toHaveBeenCalledWith({ productId: 'p1', quantity: 2, costPrice: 4 }, undefined);
+    expect(onSave).toHaveBeenCalledWith({ productId: 'p1', quantity: 2, costPrice: 4, currency: 0 }, undefined);
   });
 
   it('selects the highlighted option with Enter and navigates with ArrowDown', async () => {
@@ -897,6 +897,6 @@ describe('EditInventoryEntryModal — searchable product combobox filters while 
     fireEvent.change(screen.getByLabelText('Cantidad'), { target: { value: '5' } });
     fireEvent.change(screen.getByLabelText('Precio de costo'), { target: { value: '1' } });
     fireEvent.click(screen.getByRole('button', { name: 'Adicionar' }));
-    expect(onSave).toHaveBeenCalledWith({ productId: 'p2', quantity: 5, costPrice: 1 }, undefined);
+    expect(onSave).toHaveBeenCalledWith({ productId: 'p2', quantity: 5, costPrice: 1, currency: 0 }, undefined);
   });
 });

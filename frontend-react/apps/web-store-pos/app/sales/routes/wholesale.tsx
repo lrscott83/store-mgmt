@@ -27,6 +27,7 @@ import {
   wholesaleUnits,
 } from '../lib/wholesale';
 import { guardOrderType } from '../lib/order-type-guard';
+import { guardCurrency } from '~/shared/lib/currency-guard';
 import { ScannerModal } from '../components/scanner-modal';
 import type { ProductCategory } from '@store-mgmt/domain';
 
@@ -163,6 +164,10 @@ export function WholesalePage() {
       requested: OrderType.Mayorista,
     });
     if (!typeGuard.succeeded) return typeGuard;
+
+    // Una sola moneda por venta: no se puede mezclar monedas en el mismo carrito.
+    const currencyGuard = guardCurrency({ items: cartItems, requestedProduct: product });
+    if (!currencyGuard.succeeded) return currencyGuard;
 
     // La cantidad mínima de paquetes es el primer rango de la config mayorista.
     const minPacks = getWholesaleMinPacks(product);

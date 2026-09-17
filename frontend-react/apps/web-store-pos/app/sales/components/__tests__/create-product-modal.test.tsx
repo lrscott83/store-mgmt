@@ -218,6 +218,7 @@ describe('CreateProductModal — Angular field set/order parity', () => {
     expect(onSave).toHaveBeenCalledWith({
       name: 'Sprite',
       price: 2.5,
+      currency: 0,
       barcode: undefined,
       categoryId: 'cat-2',
       order: 3,

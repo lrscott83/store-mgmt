@@ -5,6 +5,8 @@ import { EFeatures, OrderType } from '@store-mgmt/domain';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { useCartStore } from '~/shared/lib/stores/cart-store';
+import { guardCurrency } from '~/shared/lib/currency-guard';
+import { showBlockingError } from '~/shared/lib/blocking-alert';
 import { Card } from '~/shared/components/ui/card';
 import { InfoBox } from '~/shared/components/ui/info-box';
 import { hasInventoryModuleAvailable } from '~/shared/lib/auth/authorization-service';
@@ -72,9 +74,22 @@ export function EgressPage() {
     setSelectedCategoryId(category.id);
   }
 
+  // La moneda la fija el primer ítem del carrito (una sola moneda por venta).
+  const cartItems = useCartStore((s) => s.items);
+
   function handleAdded(productId: string, quantity: number, price: number) {
     const product = products.find((p) => p.id === productId);
     if (!product) return;
+    // Una sola moneda por venta: no se puede mezclar monedas en el mismo carrito.
+    // (La salida de inventario comparte carrito con la venta — mismo guard.)
+    const currencyGuard = guardCurrency({ items: cartItems, requestedProduct: product });
+    if (!currencyGuard.succeeded) {
+      showBlockingError(
+        'Error',
+        currencyGuard.errors[0]?.description ?? 'Moneda distinta a la venta en curso.',
+      );
+      return;
+    }
     addItem(product, quantity, orderType, price);
   }
 

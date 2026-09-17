@@ -210,5 +210,14 @@ namespace Domain.Common.Enums
         ConfigurationsAdmin,
 
         #endregion
+
+        #region MultiMonedas features
+
+        [HasRoles(RoleType.OwnerAdmin, RoleType.StoreUser)]
+        [HasFeature(FeatureType.MultiMonedas)]
+        [HasModule(ModuleType.MultiMonedas)]
+        MultiMonedasAdmin,
+
+        #endregion
     }
 }
