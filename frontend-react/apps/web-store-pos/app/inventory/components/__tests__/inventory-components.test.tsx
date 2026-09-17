@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { act, render, screen, fireEvent } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 
@@ -545,12 +545,14 @@ describe('EditInventoryEntryModal — smoke render', () => {
     expect(container.querySelector('[role="dialog"]')).toBeNull();
   });
 
-  it('renders form when open', () => {
-    render(
-      <Wrapper>
-        <EditInventoryEntryModal isOpen={true} onClose={vi.fn()} onSave={vi.fn()} storeId="s1" />
-      </Wrapper>,
-    );
+  it('renders form when open', async () => {
+    await act(async () => {
+      render(
+        <Wrapper>
+          <EditInventoryEntryModal isOpen={true} onClose={vi.fn()} onSave={vi.fn()} storeId="s1" />
+        </Wrapper>,
+      );
+    });
     expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 });
@@ -581,29 +583,33 @@ function makeEntry(overrides: Partial<InventoryEntry> = {}): InventoryEntry {
 }
 
 describe('EditInventoryEntryModal — title/save button toggle by mode (Angular parity)', () => {
-  it('shows the create-mode title and save label when no entry is passed', () => {
-    render(
-      <Wrapper>
-        <EditInventoryEntryModal isOpen onClose={vi.fn()} onSave={vi.fn()} storeId="s1" />
-      </Wrapper>,
-    );
+  it('shows the create-mode title and save label when no entry is passed', async () => {
+    await act(async () => {
+      render(
+        <Wrapper>
+          <EditInventoryEntryModal isOpen onClose={vi.fn()} onSave={vi.fn()} storeId="s1" />
+        </Wrapper>,
+      );
+    });
     expect(screen.getByText('Adicionar Entrada')).toBeInTheDocument();
     expect(screen.queryByText('Editar Entrada')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Adicionar' })).toBeInTheDocument();
   });
 
-  it('shows the edit-mode title and save label when an entry is passed', () => {
-    render(
-      <Wrapper>
-        <EditInventoryEntryModal
-          isOpen
-          onClose={vi.fn()}
-          onSave={vi.fn()}
-          storeId="s1"
-          entry={makeEntry()}
-        />
-      </Wrapper>,
-    );
+  it('shows the edit-mode title and save label when an entry is passed', async () => {
+    await act(async () => {
+      render(
+        <Wrapper>
+          <EditInventoryEntryModal
+            isOpen
+            onClose={vi.fn()}
+            onSave={vi.fn()}
+            storeId="s1"
+            entry={makeEntry()}
+          />
+        </Wrapper>,
+      );
+    });
     expect(screen.getByText('Editar Entrada')).toBeInTheDocument();
     expect(screen.queryByText('Adicionar Entrada')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Actualizar' })).toBeInTheDocument();
@@ -621,27 +627,31 @@ describe('EditInventoryEntryModal — title/save button toggle by mode (Angular 
 // mistranslated the literal template text into a real native `disabled`, breaking selection.
 
 describe('EditInventoryEntryModal — product select is selectable (Angular parity: control disabled:false)', () => {
-  it('does not disable the product select in create mode (no entry passed)', () => {
-    render(
-      <Wrapper>
-        <EditInventoryEntryModal isOpen onClose={vi.fn()} onSave={vi.fn()} storeId="s1" />
-      </Wrapper>,
-    );
+  it('does not disable the product select in create mode (no entry passed)', async () => {
+    await act(async () => {
+      render(
+        <Wrapper>
+          <EditInventoryEntryModal isOpen onClose={vi.fn()} onSave={vi.fn()} storeId="s1" />
+        </Wrapper>,
+      );
+    });
     expect(screen.getByRole('combobox')).not.toBeDisabled();
   });
 
-  it('does not disable the product select in edit mode (entry passed)', () => {
-    render(
-      <Wrapper>
-        <EditInventoryEntryModal
-          isOpen
-          onClose={vi.fn()}
-          onSave={vi.fn()}
-          storeId="s1"
-          entry={makeEntry()}
-        />
-      </Wrapper>,
-    );
+  it('does not disable the product select in edit mode (entry passed)', async () => {
+    await act(async () => {
+      render(
+        <Wrapper>
+          <EditInventoryEntryModal
+            isOpen
+            onClose={vi.fn()}
+            onSave={vi.fn()}
+            storeId="s1"
+            entry={makeEntry()}
+          />
+        </Wrapper>,
+      );
+    });
     expect(screen.getByRole('combobox')).not.toBeDisabled();
   });
 });
@@ -654,12 +664,14 @@ describe('EditInventoryEntryModal — product select is selectable (Angular pari
 // field label instead of using these i18n keys.
 
 describe('EditInventoryEntryModal — validation messages (Angular parity)', () => {
-  it('shows the required-product message using GENERAL.VALIDATION.REQUIRED', () => {
-    render(
-      <Wrapper>
-        <EditInventoryEntryModal isOpen onClose={vi.fn()} onSave={vi.fn()} storeId="s1" />
-      </Wrapper>,
-    );
+  it('shows the required-product message using GENERAL.VALIDATION.REQUIRED', async () => {
+    await act(async () => {
+      render(
+        <Wrapper>
+          <EditInventoryEntryModal isOpen onClose={vi.fn()} onSave={vi.fn()} storeId="s1" />
+        </Wrapper>,
+      );
+    });
     fireEvent.click(screen.getByRole('button', { name: 'Adicionar' }));
     expect(screen.getByText('Producto es requerido')).toBeInTheDocument();
   });
@@ -723,12 +735,14 @@ describe('EditInventoryEntryModal — validation messages (Angular parity)', () 
 // footer close button to GENERAL.CLOSE ("Cerrar"), not GENERAL.CANCEL ("Cancelar").
 
 describe('EditInventoryEntryModal — footer close button label (Angular parity: GENERAL.CLOSE)', () => {
-  it('renders the footer close button as "Cerrar", not "Cancelar"', () => {
-    render(
-      <Wrapper>
-        <EditInventoryEntryModal isOpen onClose={vi.fn()} onSave={vi.fn()} storeId="s1" />
-      </Wrapper>,
-    );
+  it('renders the footer close button as "Cerrar", not "Cancelar"', async () => {
+    await act(async () => {
+      render(
+        <Wrapper>
+          <EditInventoryEntryModal isOpen onClose={vi.fn()} onSave={vi.fn()} storeId="s1" />
+        </Wrapper>,
+      );
+    });
     // The header ✕ button also has aria-label="Cerrar" (GENERAL.CLOSE), so scope
     // this assertion to the footer button's own visible text content.
     expect(screen.getByText('Cerrar')).toBeInTheDocument();
@@ -743,12 +757,14 @@ describe('EditInventoryEntryModal — footer close button label (Angular parity:
 // glyph button (not a literal "✕" text character).
 
 describe('EditInventoryEntryModal — CloseIcon/SaveIcon parity (edit-inventory-entry-modal.component.html:78-85)', () => {
-  it('renders a CloseIcon svg in the header close control, not a literal "✕" character', () => {
-    render(
-      <Wrapper>
-        <EditInventoryEntryModal isOpen onClose={vi.fn()} onSave={vi.fn()} storeId="s1" />
-      </Wrapper>,
-    );
+  it('renders a CloseIcon svg in the header close control, not a literal "✕" character', async () => {
+    await act(async () => {
+      render(
+        <Wrapper>
+          <EditInventoryEntryModal isOpen onClose={vi.fn()} onSave={vi.fn()} storeId="s1" />
+        </Wrapper>,
+      );
+    });
     // Both header and footer close controls share accessible name "Cerrar" —
     // the header one is first in DOM order.
     const [headerClose] = screen.getAllByRole('button', { name: 'Cerrar' });
@@ -756,22 +772,26 @@ describe('EditInventoryEntryModal — CloseIcon/SaveIcon parity (edit-inventory-
     expect(headerClose.querySelector('svg')).not.toBeNull();
   });
 
-  it('renders a CloseIcon svg inside the footer close button', () => {
-    render(
-      <Wrapper>
-        <EditInventoryEntryModal isOpen onClose={vi.fn()} onSave={vi.fn()} storeId="s1" />
-      </Wrapper>,
-    );
+  it('renders a CloseIcon svg inside the footer close button', async () => {
+    await act(async () => {
+      render(
+        <Wrapper>
+          <EditInventoryEntryModal isOpen onClose={vi.fn()} onSave={vi.fn()} storeId="s1" />
+        </Wrapper>,
+      );
+    });
     const [, footerClose] = screen.getAllByRole('button', { name: 'Cerrar' });
     expect(footerClose.querySelector('svg')).not.toBeNull();
   });
 
-  it('renders a SaveIcon svg inside the footer save button', () => {
-    render(
-      <Wrapper>
-        <EditInventoryEntryModal isOpen onClose={vi.fn()} onSave={vi.fn()} storeId="s1" />
-      </Wrapper>,
-    );
+  it('renders a SaveIcon svg inside the footer save button', async () => {
+    await act(async () => {
+      render(
+        <Wrapper>
+          <EditInventoryEntryModal isOpen onClose={vi.fn()} onSave={vi.fn()} storeId="s1" />
+        </Wrapper>,
+      );
+    });
     expect(screen.getByRole('button', { name: 'Adicionar' }).querySelector('svg')).not.toBeNull();
   });
 });
@@ -799,12 +819,14 @@ const THREE_PRODUCTS = {
 describe('EditInventoryEntryModal — searchable product combobox filters while typing', () => {
   // The add-entry popup puts initial focus on the product field so the user can
   // start typing immediately (autoFocus on the combobox input).
-  it('focuses the product combobox when the modal opens', () => {
-    render(
-      <Wrapper>
-        <EditInventoryEntryModal isOpen onClose={vi.fn()} onSave={vi.fn()} storeId="s1" />
-      </Wrapper>,
-    );
+  it('focuses the product combobox when the modal opens', async () => {
+    await act(async () => {
+      render(
+        <Wrapper>
+          <EditInventoryEntryModal isOpen onClose={vi.fn()} onSave={vi.fn()} storeId="s1" />
+        </Wrapper>,
+      );
+    });
     expect(screen.getByRole('combobox')).toHaveFocus();
   });
 
@@ -874,7 +896,10 @@ describe('EditInventoryEntryModal — searchable product combobox filters while 
     fireEvent.change(screen.getByLabelText('Cantidad'), { target: { value: '2' } });
     fireEvent.change(screen.getByLabelText('Precio de costo'), { target: { value: '4' } });
     fireEvent.click(screen.getByRole('button', { name: 'Adicionar' }));
-    expect(onSave).toHaveBeenCalledWith({ productId: 'p1', quantity: 2, costPrice: 4, currency: 0 }, undefined);
+    expect(onSave).toHaveBeenCalledWith(
+      { productId: 'p1', quantity: 2, costPrice: 4, currency: 0 },
+      undefined,
+    );
   });
 
   it('selects the highlighted option with Enter and navigates with ArrowDown', async () => {
@@ -897,6 +922,9 @@ describe('EditInventoryEntryModal — searchable product combobox filters while 
     fireEvent.change(screen.getByLabelText('Cantidad'), { target: { value: '5' } });
     fireEvent.change(screen.getByLabelText('Precio de costo'), { target: { value: '1' } });
     fireEvent.click(screen.getByRole('button', { name: 'Adicionar' }));
-    expect(onSave).toHaveBeenCalledWith({ productId: 'p2', quantity: 5, costPrice: 1, currency: 0 }, undefined);
+    expect(onSave).toHaveBeenCalledWith(
+      { productId: 'p2', quantity: 5, costPrice: 1, currency: 0 },
+      undefined,
+    );
   });
 });

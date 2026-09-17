@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 import type { Product, ProductCategory } from '@store-mgmt/domain';
@@ -253,12 +253,14 @@ describe('SalePage — Angular parity (sale.component.html)', () => {
     );
   });
 
-  it('renders the exact Angular header text SALES.HEADER', () => {
-    render(
-      <Wrapper>
-        <SalePage />
-      </Wrapper>,
-    );
+  it('renders the exact Angular header text SALES.HEADER', async () => {
+    await act(async () => {
+      render(
+        <Wrapper>
+          <SalePage />
+        </Wrapper>,
+      );
+    });
     expect(screen.getByText('Productos para vender')).toBeInTheDocument();
   });
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, within, waitFor } from '@testing-library/react';
+import { act, render, screen, fireEvent, within, waitFor } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 import type {
@@ -878,14 +878,19 @@ describe('TodayEntriesPage — handleSave/handleDeactivate check .succeeded (WU2
         }) as unknown as InstanceType<typeof InventoryOfflineService>,
     );
 
-    render(
-      <Wrapper>
-        <TodayEntriesPage />
-      </Wrapper>,
-    );
+    await act(async () => {
+      render(
+        <Wrapper>
+          <TodayEntriesPage />
+        </Wrapper>,
+      );
+    });
 
-    // First open: fill the form with a product, quantity, and cost.
-    fireEvent.click(screen.getByRole('button', { name: 'Entrada' }));
+    // First open: fill the form with a product, quantity, and cost. The modal's
+    // open-effect loads products asynchronously, so land the click inside act.
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Entrada' }));
+    });
     fireEvent.change(screen.getByRole('combobox'), { target: { value: 'Ron' } });
     fireEvent.click(await screen.findByRole('option', { name: 'Ron' }));
     fireEvent.change(screen.getByLabelText('Cantidad'), { target: { value: '3' } });
@@ -896,7 +901,9 @@ describe('TodayEntriesPage — handleSave/handleDeactivate check .succeeded (WU2
     expect(screen.queryByText('Adicionar')).not.toBeInTheDocument();
 
     // Reopen: the form must be clean (no product, no quantity, no cost).
-    fireEvent.click(screen.getByRole('button', { name: 'Entrada' }));
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Entrada' }));
+    });
     expect(screen.getByRole('combobox')).toHaveValue('');
     expect(screen.getByLabelText('Cantidad')).toHaveValue(null);
     expect(screen.getByLabelText('Precio de costo')).toHaveValue(null);
@@ -1860,21 +1867,25 @@ describe('EgressPage — Mayorista wholesale-sale screen (Angular egress.compone
     addItemMock.mockClear();
   });
 
-  it('renders the Angular header text INVENTORY_EGRESS.HEADER ("Salida")', () => {
-    render(
-      <Wrapper>
-        <EgressPage />
-      </Wrapper>,
-    );
+  it('renders the Angular header text INVENTORY_EGRESS.HEADER ("Salida")', async () => {
+    await act(async () => {
+      render(
+        <Wrapper>
+          <EgressPage />
+        </Wrapper>,
+      );
+    });
     expect(screen.getByText('Salida')).toBeInTheDocument();
   });
 
-  it('renders the full OrderType selector (Angular getOrderTypes(): all 5 types) defaulting to Mayorista', () => {
-    render(
-      <Wrapper>
-        <EgressPage />
-      </Wrapper>,
-    );
+  it('renders the full OrderType selector (Angular getOrderTypes(): all 5 types) defaulting to Mayorista', async () => {
+    await act(async () => {
+      render(
+        <Wrapper>
+          <EgressPage />
+        </Wrapper>,
+      );
+    });
     const select = screen.getByLabelText('Tipo') as HTMLSelectElement;
     expect(select.value).toBe(String(OrderType.Mayorista));
     for (const label of ['Normal', 'Mayorista', 'Merma', 'Ajuste', 'Otro']) {

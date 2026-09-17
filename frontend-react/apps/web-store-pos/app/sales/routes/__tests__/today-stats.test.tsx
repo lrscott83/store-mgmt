@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { act, render, screen, fireEvent, within } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 import { PaymentType, OrderType, ExpenseType, EModules } from '@store-mgmt/domain';
@@ -424,7 +424,7 @@ describe('TodayStatsPage — succeeded:false on each read (silent-failure idiom,
     mockGetActiveOrdersInDay.mockReturnValue([]);
   });
 
-  it('getCategoryCartItemsView succeeded:false: Ventas panel falls back to the 0-productos heading, no error UI', () => {
+  it('getCategoryCartItemsView succeeded:false: Ventas panel falls back to the 0-productos heading, no error UI', async () => {
     mockGetCategoryCartItemsView.mockReturnValue({
       data: null,
       succeeded: false,
@@ -433,11 +433,13 @@ describe('TodayStatsPage — succeeded:false on each read (silent-failure idiom,
       errors: [{ code: 'E01', description: 'failed' }],
     });
 
-    render(
-      <Wrapper>
-        <TodayStatsPage />
-      </Wrapper>,
-    );
+    await act(async () => {
+      render(
+        <Wrapper>
+          <TodayStatsPage />
+        </Wrapper>,
+      );
+    });
 
     expect(screen.getByText('Ventas (0 productos)')).toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();

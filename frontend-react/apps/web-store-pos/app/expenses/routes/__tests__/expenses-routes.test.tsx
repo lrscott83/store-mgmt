@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import { ExpenseType, PaymentType, ExpenseErrors } from '@store-mgmt/domain';
 import type { Expense } from '@store-mgmt/domain';
@@ -74,39 +74,47 @@ describe('TodayExpensesPage — smoke render', () => {
     localStorage.clear();
   });
 
-  it('renders without crashing', () => {
-    render(
-      <Wrapper>
-        <TodayExpensesPage />
-      </Wrapper>,
-    );
+  it('renders without crashing', async () => {
+    await act(async () => {
+      render(
+        <Wrapper>
+          <TodayExpensesPage />
+        </Wrapper>,
+      );
+    });
     expect(document.body).toBeTruthy();
   });
 
-  it('shows the today expenses title', () => {
-    render(
-      <Wrapper>
-        <TodayExpensesPage />
-      </Wrapper>,
-    );
+  it('shows the today expenses title', async () => {
+    await act(async () => {
+      render(
+        <Wrapper>
+          <TodayExpensesPage />
+        </Wrapper>,
+      );
+    });
     expect(screen.getByText(/Gastos del día/i)).toBeInTheDocument();
   });
 
-  it('shows add button', () => {
-    render(
-      <Wrapper>
-        <TodayExpensesPage />
-      </Wrapper>,
-    );
+  it('shows add button', async () => {
+    await act(async () => {
+      render(
+        <Wrapper>
+          <TodayExpensesPage />
+        </Wrapper>,
+      );
+    });
     expect(screen.getByText('Gasto')).toBeInTheDocument();
   });
 
-  it('does not show a running-total banner (Angular parity: expenses-today has none)', () => {
-    render(
-      <Wrapper>
-        <TodayExpensesPage />
-      </Wrapper>,
-    );
+  it('does not show a running-total banner (Angular parity: expenses-today has none)', async () => {
+    await act(async () => {
+      render(
+        <Wrapper>
+          <TodayExpensesPage />
+        </Wrapper>,
+      );
+    });
     // Angular's expenses-today.component.html has NO running-total banner — the
     // React-only banner was removed per the Stage 3 strict-parity decision.
     expect(screen.queryByText(/Total del día/i)).not.toBeInTheDocument();
@@ -333,68 +341,82 @@ describe('ExpensesHistoryPage — strict Angular parity', () => {
     );
   });
 
-  it('renders without crashing', () => {
-    render(
-      <Wrapper>
-        <ExpensesHistoryPage />
-      </Wrapper>,
-    );
+  it('renders without crashing', async () => {
+    await act(async () => {
+      render(
+        <Wrapper>
+          <ExpensesHistoryPage />
+        </Wrapper>,
+      );
+    });
     expect(document.body).toBeTruthy();
   });
 
-  it('shows the history title', () => {
-    render(
-      <Wrapper>
-        <ExpensesHistoryPage />
-      </Wrapper>,
-    );
+  it('shows the history title', async () => {
+    await act(async () => {
+      render(
+        <Wrapper>
+          <ExpensesHistoryPage />
+        </Wrapper>,
+      );
+    });
     expect(screen.getByText(/Historial de Gastos/i)).toBeInTheDocument();
   });
 
-  it('has NO add button', () => {
-    render(
-      <Wrapper>
-        <ExpensesHistoryPage />
-      </Wrapper>,
-    );
+  it('has NO add button', async () => {
+    await act(async () => {
+      render(
+        <Wrapper>
+          <ExpensesHistoryPage />
+        </Wrapper>,
+      );
+    });
     expect(screen.queryByText('Gasto')).not.toBeInTheDocument();
   });
 
-  it('shows the history-specific empty state when there are no expenses', () => {
-    render(
-      <Wrapper>
-        <ExpensesHistoryPage />
-      </Wrapper>,
-    );
+  it('shows the history-specific empty state when there are no expenses', async () => {
+    await act(async () => {
+      render(
+        <Wrapper>
+          <ExpensesHistoryPage />
+        </Wrapper>,
+      );
+    });
     expect(screen.getByText('No se encontró ningún gasto')).toBeInTheDocument();
   });
 
-  it('has NO date-range or expense-type filter controls', () => {
-    render(
-      <Wrapper>
-        <ExpensesHistoryPage />
-      </Wrapper>,
-    );
+  it('has NO date-range or expense-type filter controls', async () => {
+    await act(async () => {
+      render(
+        <Wrapper>
+          <ExpensesHistoryPage />
+        </Wrapper>,
+      );
+    });
     expect(screen.queryByLabelText(/Desde/i)).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/Hasta/i)).not.toBeInTheDocument();
   });
 
-  it('has NO pagination controls', () => {
-    render(
-      <Wrapper>
-        <ExpensesHistoryPage />
-      </Wrapper>,
-    );
+  it('has NO pagination controls', async () => {
+    await act(async () => {
+      render(
+        <Wrapper>
+          <ExpensesHistoryPage />
+        </Wrapper>,
+      );
+    });
     expect(screen.queryByLabelText(/Anterior/i)).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/Siguiente/i)).not.toBeInTheDocument();
   });
 
-  it('shows a single payment-type radio filter (Todas/Efectivo/Tarjeta/Zelle)', () => {
-    render(
-      <Wrapper>
-        <ExpensesHistoryPage />
-      </Wrapper>,
-    );
+  it('shows a single payment-type radio filter (Todas/Efectivo/Tarjeta/Zelle)', async () => {
+    await act(async () => {
+      render(
+        <Wrapper>
+          <ExpensesHistoryPage />
+        </Wrapper>,
+      );
+    });
     const group = screen.getByRole('radiogroup');
     expect(group).toBeInTheDocument();
     expect(screen.getByText('Todas')).toBeInTheDocument();
@@ -405,12 +427,14 @@ describe('ExpensesHistoryPage — strict Angular parity', () => {
 
   // Parity fix (presentation-parity-bucket-e item 1b): expenses.component.html:15-23 shows the
   // payment glyph before each real payment-type label, but the "Todas" (null) option has none.
-  it('shows a PaymentMethodIcon before each real payment-type label, but not before "Todas"', () => {
-    render(
-      <Wrapper>
-        <ExpensesHistoryPage />
-      </Wrapper>,
-    );
+  it('shows a PaymentMethodIcon before each real payment-type label, but not before "Todas"', async () => {
+    await act(async () => {
+      render(
+        <Wrapper>
+          <ExpensesHistoryPage />
+        </Wrapper>,
+      );
+    });
 
     const todasLabel = screen.getByText('Todas').closest('label');
     expect(todasLabel?.querySelector('svg')).toBeNull();

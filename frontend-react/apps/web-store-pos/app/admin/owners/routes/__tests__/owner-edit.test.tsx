@@ -608,9 +608,13 @@ describe('OwnerEditPage — FE-OC3: classified rejections', () => {
       expect(screen.getByLabelText(esMessages['GENERAL.FULL_NAME'])).toBeInTheDocument();
     });
 
-    fireEvent.submit(
-      screen.getByRole('button', { name: esMessages['GENERAL.UPDATE'] }).closest('form')!,
-    );
+    // Submitting rejects asynchronously (updateOwner → alert + isSubmitting state),
+    // so land the submit inside act to flush those updates.
+    await act(async () => {
+      fireEvent.submit(
+        screen.getByRole('button', { name: esMessages['GENERAL.UPDATE'] }).closest('form')!,
+      );
+    });
   }
 
   it('shows OWNER.NOT_FOUND when updateOwner rejects with 404, form stays mounted', async () => {
@@ -863,7 +867,11 @@ describe('OwnerEditPage — Tiendas tab renders grid only (bucket-b WU2)', () =>
       ).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole('button', { name: esMessages['GENERAL.STORES'] }));
+    // Opening the tab resolves listStores asynchronously (stores + loading state),
+    // so land the click inside act to flush those updates.
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: esMessages['GENERAL.STORES'] }));
+    });
 
     return storeHttpService;
   }

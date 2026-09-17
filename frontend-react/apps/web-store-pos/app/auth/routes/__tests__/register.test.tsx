@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { IntlProvider } from 'react-intl';
 import messages from '~/shared/lib/i18n/es';
@@ -364,12 +364,14 @@ describe('RegisterPage — view-text-parity: loading/offline/success copy', () =
       expect(screen.getByRole('button', { name: 'Registrando...' })).toBeInTheDocument();
     });
 
-    resolveRegister!({
-      succeeded: true,
-      data: { login: 'janedoe', authToken: 'token', expiresIn: '2026-08-01T00:00:00Z' },
-      message: '',
-      actionCode: 0,
-      errors: [],
+    await act(async () => {
+      resolveRegister!({
+        succeeded: true,
+        data: { login: 'janedoe', authToken: 'token', expiresIn: '2026-08-01T00:00:00Z' },
+        message: '',
+        actionCode: 0,
+        errors: [],
+      });
     });
   });
 

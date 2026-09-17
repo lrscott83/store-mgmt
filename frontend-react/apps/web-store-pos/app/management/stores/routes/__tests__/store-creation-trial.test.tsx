@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 import type { Store, Owner, UserModel, Plan, PlanModule } from '@store-mgmt/domain';
@@ -210,7 +210,11 @@ async function submitCreateForm(name: string) {
   await waitFor(() => screen.getByLabelText('Nombre'));
   fireEvent.change(screen.getByLabelText('Nombre'), { target: { value: name } });
   fireEvent.change(screen.getByLabelText('Propietario'), { target: { value: 'o1' } });
-  fireEvent.click(screen.getByRole('button', { name: /guardar/i }));
+  // Creating resolves asynchronously (createStore → success state), so land
+  // the submit click inside act to flush those updates.
+  await act(async () => {
+    fireEvent.click(screen.getByRole('button', { name: /guardar/i }));
+  });
 }
 
 // ─── The clock is never seeded from the client ────────────────────────────────
@@ -227,11 +231,13 @@ describe('Store creation — client never sends paymentStartDate (server owns th
 
   it('omits paymentStartDate from the create payload entirely', async () => {
     const { EditStorePage } = await import('../edit-store');
-    render(
-      <Wrapper>
-        <EditStorePage />
-      </Wrapper>,
-    );
+    await act(async () => {
+      render(
+        <Wrapper>
+          <EditStorePage />
+        </Wrapper>,
+      );
+    });
     await submitCreateForm('New Store');
 
     await waitFor(() => expect(mockCreateStore).toHaveBeenCalledTimes(1));
@@ -242,11 +248,13 @@ describe('Store creation — client never sends paymentStartDate (server owns th
 
   it('sends exactly the five data fields plus Superior birth moduleIds — no billing field smuggled in', async () => {
     const { EditStorePage } = await import('../edit-store');
-    render(
-      <Wrapper>
-        <EditStorePage />
-      </Wrapper>,
-    );
+    await act(async () => {
+      render(
+        <Wrapper>
+          <EditStorePage />
+        </Wrapper>,
+      );
+    });
     await submitCreateForm('New Store');
 
     await waitFor(() => expect(mockCreateStore).toHaveBeenCalledTimes(1));
@@ -267,11 +275,13 @@ describe('Store creation — client never sends paymentStartDate (server owns th
 
   it('shows no plan UI and sends the Superior plan birth moduleIds on create', async () => {
     const { EditStorePage } = await import('../edit-store');
-    render(
-      <Wrapper>
-        <EditStorePage />
-      </Wrapper>,
-    );
+    await act(async () => {
+      render(
+        <Wrapper>
+          <EditStorePage />
+        </Wrapper>,
+      );
+    });
     await submitCreateForm('Paid Store');
 
     await waitFor(() => expect(mockCreateStore).toHaveBeenCalledTimes(1));

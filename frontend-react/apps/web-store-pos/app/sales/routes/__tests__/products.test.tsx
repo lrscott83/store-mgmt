@@ -325,31 +325,37 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     unregisterPolicy();
   });
 
-  it('renders the card title "Productos" (PRODUCT.PRODUCTS)', () => {
-    render(
-      <Wrapper>
-        <ProductsPage />
-      </Wrapper>,
-    );
+  it('renders the card title "Productos" (PRODUCT.PRODUCTS)', async () => {
+    await act(async () => {
+      render(
+        <Wrapper>
+          <ProductsPage />
+        </Wrapper>,
+      );
+    });
     expect(screen.getByText('Productos')).toBeInTheDocument();
   });
 
-  it('renders a single header "+ Categoría" FAB (PRODUCT_CATEGORY.NEW_PRODUCT_CATEGORY)', () => {
-    render(
-      <Wrapper>
-        <ProductsPage />
-      </Wrapper>,
-    );
+  it('renders a single header "+ Categoría" FAB (PRODUCT_CATEGORY.NEW_PRODUCT_CATEGORY)', async () => {
+    await act(async () => {
+      render(
+        <Wrapper>
+          <ProductsPage />
+        </Wrapper>,
+      );
+    });
     const button = screen.getByTestId('add-category-button');
     expect(button).toHaveTextContent('Categoría');
   });
 
-  it('shows the category-driven info-box when there are no categories', () => {
-    render(
-      <Wrapper>
-        <ProductsPage />
-      </Wrapper>,
-    );
+  it('shows the category-driven info-box when there are no categories', async () => {
+    await act(async () => {
+      render(
+        <Wrapper>
+          <ProductsPage />
+        </Wrapper>,
+      );
+    });
     // PRODUCT_CATEGORY.NEW_PRODUCT_CATEGORY_ALERT_MESSAGE
     expect(
       screen.getByText('Para adicionar un producto debe primero adicionar una categoría'),
@@ -370,12 +376,14 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     );
   });
 
-  it('renders the "Importar Productos" FAB (PRODUCT_CATEGORY.IMPORT_PRODUCTS)', () => {
-    render(
-      <Wrapper>
-        <ProductsPage />
-      </Wrapper>,
-    );
+  it('renders the "Importar Productos" FAB (PRODUCT_CATEGORY.IMPORT_PRODUCTS)', async () => {
+    await act(async () => {
+      render(
+        <Wrapper>
+          <ProductsPage />
+        </Wrapper>,
+      );
+    });
     const button = screen.getByTestId('import-csv-button');
     expect(button).toHaveTextContent('Importar Productos');
   });
@@ -2022,12 +2030,14 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     expect(screen.getByText('Sprite')).toBeInTheDocument();
   });
 
-  it('renders the "Limpiar" button to the LEFT of "Importar Productos" for an OwnerAdmin', () => {
-    render(
-      <Wrapper>
-        <ProductsPage />
-      </Wrapper>,
-    );
+  it('renders the "Limpiar" button to the LEFT of "Importar Productos" for an OwnerAdmin', async () => {
+    await act(async () => {
+      render(
+        <Wrapper>
+          <ProductsPage />
+        </Wrapper>,
+      );
+    });
 
     const clearButton = screen.getByTestId('clear-data-button');
     const importButton = screen.getByTestId('import-csv-button');
@@ -2037,13 +2047,15 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     expect(clearButton.compareDocumentPosition(importButton)).toBe(4);
   });
 
-  it('hides the "Limpiar" button from a non-owner', () => {
+  it('hides the "Limpiar" button from a non-owner', async () => {
     mockUser.isOwnerAdmin = false;
-    render(
-      <Wrapper>
-        <ProductsPage />
-      </Wrapper>,
-    );
+    await act(async () => {
+      render(
+        <Wrapper>
+          <ProductsPage />
+        </Wrapper>,
+      );
+    });
     expect(screen.queryByTestId('clear-data-button')).not.toBeInTheDocument();
     expect(screen.getByTestId('import-csv-button')).toBeInTheDocument();
   });
