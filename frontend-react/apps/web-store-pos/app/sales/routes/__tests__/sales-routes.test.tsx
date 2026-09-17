@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 import { PaymentType, OrderType } from '@store-mgmt/domain';
@@ -128,12 +128,16 @@ function makeOrder(overrides: Partial<Order> = {}): Order {
 import { SalePage } from '../sale';
 
 describe('SalePage — smoke render', () => {
-  it('renders without crashing', () => {
-    render(
-      <Wrapper>
-        <SalePage />
-      </Wrapper>,
-    );
+  it('renders without crashing', async () => {
+    // The page's load effects resolve mocked services asynchronously; flushing
+    // them inside act keeps their state updates inside an act window.
+    await act(async () => {
+      render(
+        <Wrapper>
+          <SalePage />
+        </Wrapper>,
+      );
+    });
     expect(document.body).toBeTruthy();
   });
 });
@@ -207,15 +211,13 @@ describe('OrdersPage — smoke render', () => {
         ({
           getStorageOrders: vi.fn().mockReturnValue([order]),
           getActiveOrdersInDay: vi.fn().mockReturnValue([]),
-          getCategoryCartItemsView: vi
-            .fn()
-            .mockReturnValue({
-              data: [],
-              succeeded: true,
-              message: '',
-              actionCode: 200,
-              errors: [],
-            }),
+          getCategoryCartItemsView: vi.fn().mockReturnValue({
+            data: [],
+            succeeded: true,
+            message: '',
+            actionCode: 200,
+            errors: [],
+          }),
           deactivateOrder: vi.fn().mockReturnValue({ succeeded: true, errors: [] }),
           updateTodayOrder: vi
             .fn()
@@ -260,31 +262,37 @@ describe('TodayStatsPage — smoke render', () => {
 import { TodaySaleCreditsPage } from '../today-credits';
 
 describe('TodaySaleCreditsPage — smoke render', () => {
-  it('renders without crashing', () => {
-    render(
-      <Wrapper>
-        <TodaySaleCreditsPage />
-      </Wrapper>,
-    );
+  it('renders without crashing', async () => {
+    await act(async () => {
+      render(
+        <Wrapper>
+          <TodaySaleCreditsPage />
+        </Wrapper>,
+      );
+    });
     expect(document.body).toBeTruthy();
   });
 
-  it('shows the Angular header (Créditos del día) and empty state (SALE_CREDIT.NO_SALE_CREDIT_FOUND_IN_DAY)', () => {
-    render(
-      <Wrapper>
-        <TodaySaleCreditsPage />
-      </Wrapper>,
-    );
+  it('shows the Angular header (Créditos del día) and empty state (SALE_CREDIT.NO_SALE_CREDIT_FOUND_IN_DAY)', async () => {
+    await act(async () => {
+      render(
+        <Wrapper>
+          <TodaySaleCreditsPage />
+        </Wrapper>,
+      );
+    });
     expect(screen.getByText('Créditos del día')).toBeInTheDocument();
     expect(screen.getByText('No existe ningún crédito en el día')).toBeInTheDocument();
   });
 
-  it('has no payment-type or isCredit filters (Angular has none on this view)', () => {
-    render(
-      <Wrapper>
-        <TodaySaleCreditsPage />
-      </Wrapper>,
-    );
+  it('has no payment-type or isCredit filters (Angular has none on this view)', async () => {
+    await act(async () => {
+      render(
+        <Wrapper>
+          <TodaySaleCreditsPage />
+        </Wrapper>,
+      );
+    });
     expect(screen.queryByRole('radio')).toBeNull();
   });
 });
@@ -293,32 +301,38 @@ describe('TodaySaleCreditsPage — smoke render', () => {
 import { SaleCreditsPage } from '../credits';
 
 describe('SaleCreditsPage — smoke render', () => {
-  it('renders without crashing', () => {
-    render(
-      <Wrapper>
-        <SaleCreditsPage />
-      </Wrapper>,
-    );
+  it('renders without crashing', async () => {
+    await act(async () => {
+      render(
+        <Wrapper>
+          <SaleCreditsPage />
+        </Wrapper>,
+      );
+    });
     expect(document.body).toBeTruthy();
   });
 
-  it('shows the Angular header (Créditos) with a count badge and empty state (SALE_CREDIT.NO_SALE_CREDIT_FOUND)', () => {
-    render(
-      <Wrapper>
-        <SaleCreditsPage />
-      </Wrapper>,
-    );
+  it('shows the Angular header (Créditos) with a count badge and empty state (SALE_CREDIT.NO_SALE_CREDIT_FOUND)', async () => {
+    await act(async () => {
+      render(
+        <Wrapper>
+          <SaleCreditsPage />
+        </Wrapper>,
+      );
+    });
     expect(screen.getByText('Créditos')).toBeInTheDocument();
     expect(screen.getByText('(0)')).toBeInTheDocument();
     expect(screen.getByText('No se encontró ningún crédito')).toBeInTheDocument();
   });
 
-  it('has no date-range or paid/unpaid filters (Angular has none on this view)', () => {
-    render(
-      <Wrapper>
-        <SaleCreditsPage />
-      </Wrapper>,
-    );
+  it('has no date-range or paid/unpaid filters (Angular has none on this view)', async () => {
+    await act(async () => {
+      render(
+        <Wrapper>
+          <SaleCreditsPage />
+        </Wrapper>,
+      );
+    });
     expect(screen.queryByRole('radio')).toBeNull();
     expect(document.querySelector('input[type="date"]')).toBeNull();
   });

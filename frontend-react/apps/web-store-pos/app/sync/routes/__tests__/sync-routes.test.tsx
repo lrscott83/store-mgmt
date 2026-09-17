@@ -3,6 +3,14 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 
+// Static imports move the heavy export/import module graphs (DataSerializerService
+// + offline services + repos + forms + i18n) into the UNTIMED collect phase:
+// vitest only times test BODIES, so a cold dynamic `await import('../export')`
+// under full parallel load could exceed the 5s testTimeout once. The vi.mock
+// factories above are hoisted, so they still apply to these static imports.
+import { clientLoader as exportClientLoader, ExportPage } from '../export';
+import { clientLoader as importClientLoader, ImportPage } from '../import';
+
 // ─── Auth store mock ──────────────────────────────────────────────────────────
 
 vi.mock('~/shared/lib/stores/auth-store', () => {
@@ -75,10 +83,9 @@ function Wrapper({ children }: { children: React.ReactNode }) {
 
 // ─── Export loader (T-6.1) ────────────────────────────────────────────────────
 
-describe('Export route loader — S-ROUTE-1', () => {
-  it('loader is exported from export.tsx', async () => {
-    const mod = await import('../export');
-    expect(typeof mod.clientLoader).toBe('function');
+describe('Export route loader — S-ROUTE-1', { timeout: 10_000 }, () => {
+  it('loader is exported from export.tsx', () => {
+    expect(typeof exportClientLoader).toBe('function');
   });
 
   it('loader redirects to /login when user lacks EFeatures.Send (40)', async () => {
@@ -109,8 +116,7 @@ describe('Export route loader — S-ROUTE-1', () => {
     (useAuthStore as unknown as { getState: () => typeof restrictedState }).getState = () =>
       restrictedState;
 
-    const { clientLoader } = await import('../export');
-    const result = await clientLoader({ params: { storeId: 'store-s1' } } as never);
+    const result = await exportClientLoader({ params: { storeId: 'store-s1' } } as never);
     expect(result).toBeInstanceOf(Response);
     const res = result as Response;
     expect(res.headers.get('Location')).toBe('/login');
@@ -119,10 +125,9 @@ describe('Export route loader — S-ROUTE-1', () => {
 
 // ─── Import loader (T-6.2) ────────────────────────────────────────────────────
 
-describe('Import route loader — S-ROUTE-2', () => {
-  it('loader is exported from import.tsx', async () => {
-    const mod = await import('../import');
-    expect(typeof mod.clientLoader).toBe('function');
+describe('Import route loader — S-ROUTE-2', { timeout: 10_000 }, () => {
+  it('loader is exported from import.tsx', () => {
+    expect(typeof importClientLoader).toBe('function');
   });
 
   it('loader redirects to /login when user lacks EFeatures.Receive (42)', async () => {
@@ -153,8 +158,7 @@ describe('Import route loader — S-ROUTE-2', () => {
     (useAuthStore as unknown as { getState: () => typeof restrictedState }).getState = () =>
       restrictedState;
 
-    const { clientLoader } = await import('../import');
-    const result = await clientLoader({ params: { storeId: 'store-s1' } } as never);
+    const result = await importClientLoader({ params: { storeId: 'store-s1' } } as never);
     expect(result).toBeInstanceOf(Response);
     const res = result as Response;
     expect(res.headers.get('Location')).toBe('/login');
@@ -169,8 +173,7 @@ describe('ExportPage — smoke render', () => {
     vi.clearAllMocks();
   });
 
-  it('renders export title', async () => {
-    const { default: ExportPage } = await import('../export');
+  it('renders export title', () => {
     render(
       <Wrapper>
         <ExportPage />
@@ -179,9 +182,8 @@ describe('ExportPage — smoke render', () => {
     expect(screen.getByText(/Exportar datos/i)).toBeInTheDocument();
   });
 
-  it('renders default export', async () => {
-    const mod = await import('../export');
-    expect(typeof mod.default).toBe('function');
+  it('renders default export', () => {
+    expect(typeof ExportPage).toBe('function');
   });
 });
 
@@ -228,7 +230,6 @@ describe('ExportPage — delivery (Angular parity: always download, never share)
   });
 
   it('downloads via an anchor and never calls navigator.share', async () => {
-    const { default: ExportPage } = await import('../export');
     render(
       <Wrapper>
         <ExportPage />
@@ -254,8 +255,7 @@ describe('ImportPage — smoke render', () => {
     vi.clearAllMocks();
   });
 
-  it('renders import title', async () => {
-    const { default: ImportPage } = await import('../import');
+  it('renders import title', () => {
     render(
       <Wrapper>
         <ImportPage />
@@ -264,8 +264,7 @@ describe('ImportPage — smoke render', () => {
     expect(screen.getByText(/Importar datos/i)).toBeInTheDocument();
   });
 
-  it('renders default export', async () => {
-    const mod = await import('../import');
-    expect(typeof mod.default).toBe('function');
+  it('renders default export', () => {
+    expect(typeof ImportPage).toBe('function');
   });
 });

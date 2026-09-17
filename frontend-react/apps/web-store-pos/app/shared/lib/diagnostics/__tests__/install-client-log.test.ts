@@ -42,7 +42,9 @@ describe('installClientLog — captura global', () => {
     const { getClientLogs } = await import('../client-log');
     installClientLog();
 
-    const event = new Event('unhandledrejection', { cancelable: true }) as Event & { reason: unknown };
+    const event = new Event('unhandledrejection', { cancelable: true }) as Event & {
+      reason: unknown;
+    };
     event.reason = new Error('promise rejected');
     const claimed = !window.dispatchEvent(event);
 
@@ -115,6 +117,9 @@ describe('installClientLog — seguridad en prerender (regresión de build)', ()
   });
 
   it('es no-op durante el prerender SPA (window undefined): no lanza y no captura', async () => {
+    // El probe imprime a stderr de forma deliberada; el spy solo silencia la
+    // salida. La semántica de captura no cambia (sin window no hay hooks).
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const { installClientLog } = await import('../install-client-log');
     const { getClientLogs } = await import('../client-log');
 
@@ -128,9 +133,14 @@ describe('installClientLog — seguridad en prerender (regresión de build)', ()
     // Sin window no se montan hooks: un console.error no debe quedar en el buffer.
     console.error('prerender probe');
     expect(getClientLogs()).toHaveLength(0);
+    consoleSpy.mockRestore();
   });
 
   it('tras el no-op de prerender, con window presente vuelve a instalar y captura', async () => {
+    // El probe imprime a stderr de forma deliberada; el spy solo silencia la
+    // salida. Debe instalarse ANTES de installClientLog(): el wrapper captura el
+    // spy como `originalConsoleError`, así el mensaje sigue entrando al buffer.
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const { installClientLog, uninstallClientLog } = await import('../install-client-log');
     const { getClientLogs } = await import('../client-log');
 
@@ -144,7 +154,11 @@ describe('installClientLog — seguridad en prerender (regresión de build)', ()
     expect(getClientLogs()).toHaveLength(1);
     expect(getClientLogs()[0].message).toContain('browser probe');
 
+    // Orden importante: primero uninstall (restaura `console.error` al valor que
+    // el wrapper capturó, el spy) y luego mockRestore (vuelve al console.error
+    // original) — al revés dejaría el spy instalado y rompería el próximo spyOn.
     uninstallClientLog();
+    consoleSpy.mockRestore();
   });
 });
 

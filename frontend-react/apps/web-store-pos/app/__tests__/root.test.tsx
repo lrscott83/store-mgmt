@@ -3,6 +3,31 @@ import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { useLoadingStore } from '~/shared/lib/stores/loading-store';
 
+// Framework-mode Layout renders the document shell (`<html>`/`<head>`/`<body>`),
+// which React's DOM-nesting validation flags when mounted inside RTL's jsdom
+// <div>. That is expected in this test file — suppress exactly that one known
+// message and let every other console.error through. The message arrives with
+// %s placeholders unchanged (React does not format before calling
+// console.error), so match the substrings common to both the raw and the
+// formatted form. Test-file-only filter; app/root.tsx is unchanged.
+const originalConsoleError = console.error;
+beforeEach(() => {
+  vi.spyOn(console, 'error').mockImplementation((...args: unknown[]) => {
+    const text = args.map((arg) => String(arg)).join(' ');
+    if (
+      text.includes('cannot be a child of') &&
+      text.includes('This will cause a hydration error')
+    ) {
+      return;
+    }
+    originalConsoleError(...args);
+  });
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
 const mockNavigate = vi.fn();
 const mockRegisterAuthRedirect = vi.fn();
 

@@ -144,7 +144,12 @@ describe('InstallAppButton — Angular app.component pwa-install-btn parity', ()
     const btn = screen.getByRole('button', { name: /instalar app/i });
     await waitFor(() => expect(btn).toBeEnabled());
 
-    fireEvent.click(btn);
+    // Flush the click's prompt()/userChoice promise chain inside act: the
+    // resolved userChoice continuation updates component state after the click,
+    // and that update must land inside an act window.
+    await act(async () => {
+      fireEvent.click(btn);
+    });
     expect(evt.prompt).toHaveBeenCalledTimes(1);
   });
 
