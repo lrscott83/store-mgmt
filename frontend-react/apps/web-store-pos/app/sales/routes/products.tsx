@@ -347,6 +347,9 @@ export function ProductsPage() {
         price: row.price,
         cost: row.cost,
         quantity: row.quantity,
+        // currency-in-costs-and-prices (plan 2026-09-16): data plumbing, NOT a UI change — the CSV
+        // `moneda`/`currency` column has to travel through `CsvProduct` into createCsvProducts, or
+        // the parser's value is dropped and the product falls back to DEFAULT_CURRENCY.
         currency: row.currency,
       }));
 

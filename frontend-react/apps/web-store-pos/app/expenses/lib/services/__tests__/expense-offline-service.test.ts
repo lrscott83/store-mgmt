@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { ExpenseType, PaymentType, type Expense, ExpenseErrors } from '@store-mgmt/domain';
+import { Currency, ExpenseType, PaymentType, type Expense, ExpenseErrors } from '@store-mgmt/domain';
 import { ExpenseOfflineService } from '../expense-offline-service';
 
 const storeId = 'test-store';
@@ -53,6 +53,40 @@ describe('ExpenseOfflineService', () => {
       const r1 = service.create(makeExpense());
       const r2 = service.create(makeExpense());
       expect(r1.data!.id).not.toBe(r2.data!.id);
+    });
+  });
+
+  // ─── currency (currency-in-costs-and-prices, plan 2026-09-16 §5) ───
+  // create() is a money-bearing factory and must stamp DEFAULT_CURRENCY (CUP).
+  describe('currency stamping (currency-in-costs-and-prices)', () => {
+    it('stamps Currency.CUP on the created expense', () => {
+      const result = service.create(makeExpense());
+
+      expect(result.data!.currency).toBe(Currency.CUP);
+    });
+
+    // Additive/optional contract (plan §4.4): the roster import path must round-trip an explicit
+    // currency instead of flattening it to the default.
+    it('keeps an explicit non-default currency on the roster import path', () => {
+      const imported: Expense = {
+        id: 'imported-currency',
+        type: ExpenseType.Comida,
+        total: 75,
+        date: new Date(),
+        paymentType: PaymentType.Efectivo,
+        note: 'imported',
+        isActive: true,
+        currency: Currency.USD,
+        createdDate: new Date(),
+        createdByName: 'import',
+        updatedDate: undefined,
+        updatedByName: undefined,
+      };
+
+      const result = service.addImportedExpense(imported);
+
+      expect(result.succeeded).toBe(true);
+      expect(service.getStorageExpenses()[0].currency).toBe(Currency.USD);
     });
   });
 
