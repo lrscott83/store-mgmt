@@ -111,5 +111,26 @@ export enum Currency {
   MXN = 6,
 }
 
+/**
+ * payment-methods-percent-tax (plan 2026-09-17): forma de pago de una venta.
+ *
+ * Enum CONGELADO por valor desde el día 1 (igual que Currency): la
+ * serialización es el número; reordenar/insertar valores rompería datos
+ * históricos en localStorage y en el backend.
+ *
+ * "Transferencia (X)" NO es un miembro por moneda: es `Transferencia` + la
+ * moneda de la venta (Order.currency). Transferencia (CUP) reemplaza al
+ * histórico PaymentType.Tarjeta.
+ */
+export enum SalePaymentMethod {
+  /** Default: toda venta histórica sin método explícito fue en efectivo. */
+  Efectivo = 0,
+  Zelle = 1,
+  Transferencia = 2,
+}
+
+/** Default de toda entidad con método de pago: ausente del campo = Efectivo. */
+export const DEFAULT_SALE_PAYMENT_METHOD: SalePaymentMethod = SalePaymentMethod.Efectivo;
+
 /** Default de toda entidad con precio/costo: ausente del campo = CUP. */
 export const DEFAULT_CURRENCY: Currency = Currency.CUP;

@@ -81,7 +81,7 @@ vi.mock('~/shared/lib/stores/auth-store', () => {
 
 import { useCartStore } from '~/shared/lib/stores/cart-store';
 import { CartShell } from '../cart-shell';
-import { PaymentType, OrderType, EModules } from '@store-mgmt/domain';
+import { PaymentType, OrderType, EModules, SalePaymentMethod } from '@store-mgmt/domain';
 import type { Product } from '@store-mgmt/domain';
 
 function makeProduct(overrides: Partial<Product> = {}): Product {
@@ -116,6 +116,9 @@ function mockCartState(overrides = {}) {
     orderType: OrderType.Normal,
     orderDescription: '',
     paymentType: PaymentType.Efectivo,
+    // payment-methods-percent-tax: el carrito ahora lee el método real de la venta.
+    salePaymentMethod: SalePaymentMethod.Efectivo,
+    setSalePaymentMethod: vi.fn(),
     isCredit: false,
     clientName: '',
     setPaymentType: vi.fn(),
@@ -217,15 +220,14 @@ describe('CartShell — payment-type selector with icons', () => {
     mockCartState({ items: [], total: vi.fn().mockReturnValue(0) });
   });
 
-  it('renders the payment type options as radio buttons: Efectivo, Tarjeta (Zelle hidden from the UI)', () => {
+  it('renders the CUP payment-method options as radio buttons: Efectivo, Transferencia (CUP) — Tarjeta reemplazada (plan 2026-09-17)', () => {
     renderCartShell();
     openCart();
     expect(screen.getByText('Efectivo')).toBeInTheDocument();
-    expect(screen.getByText('Tarjeta')).toBeInTheDocument();
-    // Zelle removed from the visual options (user request 2026-09-08) — the enum
-    // member stays for historical data, but the selector no longer offers it.
-    expect(screen.queryByText('Zelle')).not.toBeInTheDocument();
-    // Angular uses mat-radio-group — parity means true radio controls, not a button group
+    expect(screen.getByText('Transferencia (CUP)')).toBeInTheDocument();
+    // Tarjeta reemplazada por Transferencia en TODO el selector (datos históricos
+    // Tarjeta se leen como Transferencia-CUP).
+    expect(screen.queryByText('Tarjeta')).not.toBeInTheDocument();
     expect(screen.getAllByRole('radio')).toHaveLength(2);
   });
 

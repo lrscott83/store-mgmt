@@ -1,5 +1,5 @@
 import type { AuditableBaseModel } from './base';
-import type { Currency, OrderType, PaymentType } from '../enums';
+import type { Currency, OrderType, PaymentType, SalePaymentMethod } from '../enums';
 import type { InventoryEntryCost } from './inventory';
 
 export interface OrderItem {
@@ -30,4 +30,13 @@ export interface Order extends AuditableBaseModel {
   description: string;
   /** Moneda de `total` y de los precios de sus items (plan 2026-09-16). Ausente = CUP. */
   currency?: Currency;
+  /**
+   * Forma de pago de la venta (plan 2026-09-17). Ausente = derivar del
+   * `paymentType` legacy (Tarjeta → Transferencia-CUP); sin ninguno = Efectivo.
+   */
+  salePaymentMethod?: SalePaymentMethod;
+  /** Porcentaje aplicado al total al crear la venta (auditoría). Ausente = 0. */
+  percent?: number;
+  /** Monto fijo sumado al total al crear la venta (auditoría). Ausente = 0. */
+  tax?: number;
 }

@@ -12,6 +12,8 @@ export * from './models/warehouse';
 export * from './enums';
 export * from './commons/result';
 export * from './commons/envelope';
+export * from './commons/sale-payment-method-compat';
+export * from './commons/payment-pricing';
 export * from './errors/product-errors';
 export * from './errors/product-category-errors';
 export * from './errors/inventory-errors';

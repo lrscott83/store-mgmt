@@ -416,7 +416,8 @@ describe('OrdersPage — per-day sales summary popup (gear menu)', () => {
     );
 
     // Filter the page to Tarjeta only — the day group still exists (one order).
-    fireEvent.click(screen.getByText('Tarjeta'));
+    // El filtro muestra "Transferencia" (plan 2026-09-17: Tarjeta reemplazada).
+    fireEvent.click(screen.getByText('Transferencia'));
     fireEvent.click(screen.getByTestId('day-actions-toggle-2026-01-01'));
     fireEvent.click(screen.getByTestId('day-summary-button-2026-01-01'));
 

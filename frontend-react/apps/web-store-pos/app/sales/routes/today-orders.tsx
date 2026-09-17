@@ -15,7 +15,7 @@ export const clientLoader = featureLoader([EFeatures.TodayOrders]);
 
 const PAYMENT_TYPE_OPTIONS = [
   { value: PaymentType.Efectivo, label: 'Efectivo' },
-  { value: PaymentType.Tarjeta, label: 'Tarjeta' },
+  { value: PaymentType.Tarjeta, label: 'Transferencia' },
   { value: PaymentType.Zelle, label: 'Zelle' },
 ];
 

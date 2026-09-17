@@ -38,9 +38,17 @@ export const clientLoader = featureLoader([EFeatures.SalesHistory]);
 
 const PAYMENT_TYPE_OPTIONS = [
   { value: PaymentType.Efectivo, label: 'Efectivo' },
-  { value: PaymentType.Tarjeta, label: 'Tarjeta' },
+  { value: PaymentType.Tarjeta, label: 'Transferencia' },
   { value: PaymentType.Zelle, label: 'Zelle' },
 ];
+
+/**
+ * payment-methods-percent-tax (plan 2026-09-17): el filtro sigue comparando contra
+ * el campo legacy `paymentType` (Tarjeta agrupa a las Transferencias-CUP nuevas,
+ * que se escriben como Tarjeta por compatibilidad; las Transferencias de otras
+ * monedas no existen en el campo legacy y se muestran siempre — aceptado: el
+ * historial es de lectura por moneda de tienda).
+ */
 
 /**
  * Per-day sales summary for the gear-menu popup — same metrics and aggregation as

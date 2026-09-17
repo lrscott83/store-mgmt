@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { Product } from '@store-mgmt/domain';
-import { Currency, OrderType, PaymentType } from '@store-mgmt/domain';
+import { Currency, OrderType, PaymentType, SalePaymentMethod } from '@store-mgmt/domain';
 import { round2 } from '~/shared/lib/money';
 
 export interface CartItem {
@@ -24,6 +24,8 @@ interface CartState {
    * `updateOrderDetails` runs), reset to `''` by `clear()` (mirrors clearCart line 163). */
   orderDescription: string | undefined;
   paymentType: PaymentType;
+  /** payment-methods-percent-tax (plan 2026-09-17): método real de la venta en curso. */
+  salePaymentMethod: SalePaymentMethod;
   isCredit: boolean;
   clientName: string;
   addItem: (product: Product, quantity?: number, orderType?: OrderType, price?: number) => void;
@@ -33,6 +35,7 @@ interface CartState {
    * across tiers). qty <= 0 removes the line. */
   updateQuantity: (productId: string, qty: number, price?: number) => void;
   setPaymentType: (type: PaymentType) => void;
+  setSalePaymentMethod: (method: SalePaymentMethod) => void;
   setClientName: (name: string) => void;
   toggleCredit: () => void;
   /** 1:1 port of Angular's ShoppingCartService.updateOrderDetails (shopping-cart.service.ts:38-41). */
@@ -55,6 +58,7 @@ export const useCartStore = create<CartState>()(
       orderType: OrderType.Normal,
       orderDescription: undefined,
       paymentType: PaymentType.Efectivo,
+      salePaymentMethod: SalePaymentMethod.Efectivo,
       isCredit: false,
       clientName: '',
 
@@ -99,6 +103,10 @@ export const useCartStore = create<CartState>()(
         set({ paymentType: type });
       },
 
+      setSalePaymentMethod: (method: SalePaymentMethod) => {
+        set({ salePaymentMethod: method });
+      },
+
       setClientName: (name: string) => {
         set({ clientName: name });
       },
@@ -121,6 +129,7 @@ export const useCartStore = create<CartState>()(
           orderType: OrderType.Normal,
           orderDescription: '',
           paymentType: PaymentType.Efectivo,
+          salePaymentMethod: SalePaymentMethod.Efectivo,
           isCredit: false,
           clientName: '',
         });

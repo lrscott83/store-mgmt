@@ -53,7 +53,7 @@ const EXPENSE_TYPE_KEYS: Record<ExpenseType, string> = {
 
 const PAYMENT_TYPE_KEYS: Record<PaymentType, string> = {
   [PaymentType.Efectivo]: 'CART.EFECTIVO',
-  [PaymentType.Tarjeta]: 'CART.TARJETA',
+  [PaymentType.Tarjeta]: 'CART.TRANSFERENCIA_CUP',
   [PaymentType.Zelle]: 'CART.ZELLE',
 };
 

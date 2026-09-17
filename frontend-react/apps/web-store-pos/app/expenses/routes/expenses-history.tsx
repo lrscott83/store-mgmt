@@ -19,7 +19,7 @@ export const clientLoader = featureLoader([EFeatures.ExpensesHistory]);
 const PAYMENT_TYPE_OPTIONS: { value: PaymentType | null; labelKey: string }[] = [
   { value: null, labelKey: 'GENERAL.ALL' },
   { value: PaymentType.Efectivo, labelKey: 'CART.EFECTIVO' },
-  { value: PaymentType.Tarjeta, labelKey: 'CART.TARJETA' },
+  { value: PaymentType.Tarjeta, labelKey: 'CART.TRANSFERENCIA_CUP' },
   { value: PaymentType.Zelle, labelKey: 'CART.ZELLE' },
 ];
 
