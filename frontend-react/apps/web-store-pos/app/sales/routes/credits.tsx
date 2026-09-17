@@ -172,9 +172,12 @@ export function SaleCreditsPage() {
           {(store) => {
             const credits = filteredStoreCredits.get(store.id) ?? [];
             if (credits.length === 0) {
+              const hasLocalData = (storeCredits.get(store.id)?.length ?? 0) > 0;
               return (
                 <div className="py-4 text-center text-text-muted">
-                  {intl.formatMessage({ id: 'MULTISTORE.NO_LOCAL_DATA' })}
+                  {intl.formatMessage({
+                    id: hasLocalData ? 'MULTISTORE.NO_CREDITS_IN_RANGE' : 'MULTISTORE.NO_LOCAL_DATA',
+                  })}
                 </div>
               );
             }

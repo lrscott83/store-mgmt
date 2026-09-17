@@ -6,6 +6,7 @@ import type { SaleCredit } from '@store-mgmt/domain';
 import esMessages from '~/shared/lib/i18n/es';
 import { SaleCreditOfflineService } from '~/sales/lib/services/sale-credit-offline-service';
 import { addDays, startOfDay } from '~/shared/lib/date-utils';
+import { readStoreSaleCredits } from '~/shared/lib/multistore/multi-store-aggregator';
 
 // Category-C envelope helper: the Observable/filter siblings resolve BaseResponseModel<SaleCredit[]>.
 function creditsResponse(credits: SaleCredit[] = []) {
@@ -414,7 +415,7 @@ describe('SaleCreditsPage (history) — behavioral (Angular parity)', () => {
     fireEvent.change(screen.getByTestId('date-range-filter-end'), {
       target: { value: '2028-09-17' },
     });
-    fireEvent.click(screen.getByTestId('date-range-filter-apply'));
+    fireEvent.click(screen.getByTestId('date-range-filter-select'));
     expect(screen.getByTestId('date-range-filter-input')).toHaveValue('3/2/2026 - 17/9/2028');
     fireEvent.click(screen.getByTestId('date-range-filter-button'));
 
@@ -468,5 +469,78 @@ describe('SaleCreditsPage (multi-store mode)', () => {
     // The outside-panels "Créditos" totals row was removed (user decision).
     expect(screen.queryByTestId('multistore-totals')).not.toBeInTheDocument();
     expect(screen.getByTestId('date-range-filter-input')).toBeInTheDocument();
+  });
+
+  it('filters each store panel by the applied range: in-range credits kept, out-of-range → NO_CREDITS_IN_RANGE, no data → NO_LOCAL_DATA', async () => {
+    authStoreState.user = {
+      selectedStoreId: 's1',
+      isOwnerAdmin: true,
+      storeModuleIds: [EModules.MultiStores],
+      storeList: [
+        { id: 's1', name: 'Tienda A', isActive: true },
+        { id: 's2', name: 'Tienda B', isActive: true },
+        { id: 's3', name: 'Tienda C', isActive: true },
+      ],
+    };
+    // s1 has one credit INSIDE the range (Mar) + one OUTSIDE (Jun); s2 only an
+    // OUTSIDE one; s3 no local data at all.
+    vi.mocked(readStoreSaleCredits).mockImplementation((storeId) => {
+      if (storeId === 's1') {
+        return [
+          makeCredit({ id: 'c1', date: new Date(2026, 2, 15, 10, 0, 0) }),
+          makeCredit({ id: 'c2', date: new Date(2026, 5, 1, 10, 0, 0) }),
+        ];
+      }
+      if (storeId === 's2') {
+        return [makeCredit({ id: 'c3', date: new Date(2026, 5, 1, 10, 0, 0) })];
+      }
+      return [];
+    });
+    const filter = vi.fn().mockResolvedValue(creditsResponse([]));
+    vi.mocked(SaleCreditOfflineService).mockImplementation(
+      () =>
+        ({
+          filterSaleCredits: filter,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        }) as any,
+    );
+
+    render(
+      <Wrapper>
+        <SaleCreditsPage />
+      </Wrapper>,
+    );
+
+    await screen.findByTestId('multistore-select');
+    fireEvent.click(screen.getByTestId('multistore-panel-toggle-s1'));
+    fireEvent.click(screen.getByTestId('multistore-panel-toggle-s2'));
+    fireEvent.click(screen.getByTestId('multistore-panel-toggle-s3'));
+
+    // BEFORE applying a range: all local data is visible by default (s1's
+    // June credit included; s2 renders its June credit too).
+    await screen.findByTestId('multistore-credit-date-toggle-s1-2026-06-01');
+    expect(screen.getByTestId('multistore-credit-date-toggle-s2-2026-06-01')).toBeInTheDocument();
+
+    // Pick 2026-03-01 → 2026-03-31 and apply it through the lupa.
+    fireEvent.click(screen.getByTestId('date-range-filter-input'));
+    fireEvent.change(screen.getByTestId('date-range-filter-start'), {
+      target: { value: '2026-03-01' },
+    });
+    fireEvent.change(screen.getByTestId('date-range-filter-end'), {
+      target: { value: '2026-03-31' },
+    });
+    fireEvent.click(screen.getByTestId('date-range-filter-select'));
+    fireEvent.click(screen.getByTestId('date-range-filter-button'));
+
+    // s1 keeps only the in-range day; the out-of-range one is filtered out.
+    await waitFor(() => {
+      expect(
+        screen.getByTestId('multistore-credit-date-toggle-s1-2026-03-15'),
+      ).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId('multistore-credit-date-toggle-s1-2026-06-01')).toBeNull();
+    // s2 had local data but nothing in range; s3 never had local data.
+    expect(screen.getByText(esMessages['MULTISTORE.NO_CREDITS_IN_RANGE'])).toBeInTheDocument();
+    expect(screen.getByText(esMessages['MULTISTORE.NO_LOCAL_DATA'])).toBeInTheDocument();
   });
 });

@@ -7,6 +7,7 @@ import { MultiStoreSection, MultiStoreTotal } from '../multi-store-section';
 const messages = {
   'MULTISTORE.ALL_STORES': 'Todas las tiendas',
   'MULTISTORE.NO_LOCAL_DATA': 'Sin datos de esta tienda en este dispositivo',
+  'MULTISTORE.STORE_SELECT_ARIA': 'Seleccionar tienda',
 };
 
 const stores = [
@@ -42,6 +43,7 @@ describe('MultiStoreSection', () => {
     const select = screen.getByTestId('multistore-select') as HTMLSelectElement;
     const options = Array.from(select.options).map((o) => o.text);
     expect(options).toEqual(['Todas las tiendas', 'Tienda A', 'Tienda B']);
+    expect(select).toHaveAccessibleName('Seleccionar tienda');
     expect(screen.getByTestId('global-filter')).toBeInTheDocument();
     // The "Tienda:" label was removed from the global controls row.
     expect(screen.queryByText('Tienda:')).toBeNull();

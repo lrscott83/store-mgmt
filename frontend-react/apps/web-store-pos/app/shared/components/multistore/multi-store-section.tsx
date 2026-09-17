@@ -67,6 +67,7 @@ export function MultiStoreSection({
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <select
           data-testid="multistore-select"
+          aria-label={intl.formatMessage({ id: 'MULTISTORE.STORE_SELECT_ARIA' })}
           value={selectedStoreId ?? ''}
           onChange={(e) => onSelectedStoreIdChange(e.target.value === '' ? null : e.target.value)}
           className="rounded border border-border bg-surface px-2 py-1 text-sm"
