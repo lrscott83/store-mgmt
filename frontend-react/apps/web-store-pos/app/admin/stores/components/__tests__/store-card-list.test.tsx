@@ -46,7 +46,7 @@ describe('StoreCardList — renders a Card grid (Req: Card-Grid List Uses Shared
           onEdit={vi.fn()}
           onApprove={vi.fn()}
           onDisapprove={vi.fn()}
-          onToggle={vi.fn()}
+          onChangePlan={vi.fn()}
         />
       </Wrapper>,
     );
@@ -64,7 +64,7 @@ describe('StoreCardList — renders a Card grid (Req: Card-Grid List Uses Shared
           onEdit={vi.fn()}
           onApprove={vi.fn()}
           onDisapprove={vi.fn()}
-          onToggle={vi.fn()}
+          onChangePlan={vi.fn()}
         />
       </Wrapper>,
     );
@@ -80,7 +80,7 @@ describe('StoreCardList — renders a Card grid (Req: Card-Grid List Uses Shared
           onEdit={vi.fn()}
           onApprove={vi.fn()}
           onDisapprove={vi.fn()}
-          onToggle={vi.fn()}
+          onChangePlan={vi.fn()}
         />
       </Wrapper>,
     );
@@ -109,7 +109,7 @@ describe('StoreCardList — card body (plan line, owner, phone, description)', (
           onEdit={vi.fn()}
           onApprove={vi.fn()}
           onDisapprove={vi.fn()}
-          onToggle={vi.fn()}
+          onChangePlan={vi.fn()}
         />
       </Wrapper>,
     );
@@ -139,7 +139,7 @@ describe('StoreCardList — card body (plan line, owner, phone, description)', (
           onEdit={vi.fn()}
           onApprove={vi.fn()}
           onDisapprove={vi.fn()}
-          onToggle={vi.fn()}
+          onChangePlan={vi.fn()}
         />
       </Wrapper>,
     );
@@ -157,7 +157,7 @@ describe('StoreCardList — card body (plan line, owner, phone, description)', (
           onEdit={vi.fn()}
           onApprove={vi.fn()}
           onDisapprove={vi.fn()}
-          onToggle={vi.fn()}
+          onChangePlan={vi.fn()}
         />
       </Wrapper>,
     );
@@ -186,7 +186,7 @@ describe('StoreCardList — card body (plan line, owner, phone, description)', (
           onEdit={vi.fn()}
           onApprove={vi.fn()}
           onDisapprove={vi.fn()}
-          onToggle={vi.fn()}
+          onChangePlan={vi.fn()}
         />
       </Wrapper>,
     );
@@ -208,7 +208,7 @@ describe('StoreCardList — card body (plan line, owner, phone, description)', (
           onEdit={vi.fn()}
           onApprove={vi.fn()}
           onDisapprove={vi.fn()}
-          onToggle={vi.fn()}
+          onChangePlan={vi.fn()}
         />
       </Wrapper>,
     );
@@ -227,7 +227,7 @@ describe('StoreCardList — card body (plan line, owner, phone, description)', (
           onEdit={vi.fn()}
           onApprove={vi.fn()}
           onDisapprove={vi.fn()}
-          onToggle={vi.fn()}
+          onChangePlan={vi.fn()}
         />
       </Wrapper>,
     );
@@ -245,7 +245,7 @@ describe('StoreCardList — empty state', () => {
           onEdit={vi.fn()}
           onApprove={vi.fn()}
           onDisapprove={vi.fn()}
-          onToggle={vi.fn()}
+          onChangePlan={vi.fn()}
         />
       </Wrapper>,
     );
@@ -264,7 +264,7 @@ describe('StoreCardList — gear menu actions wired', () => {
           onEdit={onEdit}
           onApprove={vi.fn()}
           onDisapprove={vi.fn()}
-          onToggle={vi.fn()}
+          onChangePlan={vi.fn()}
         />
       </Wrapper>,
     );
@@ -283,7 +283,7 @@ describe('StoreCardList — gear menu actions wired', () => {
           onEdit={vi.fn()}
           onApprove={onApprove}
           onDisapprove={vi.fn()}
-          onToggle={vi.fn()}
+          onChangePlan={vi.fn()}
         />
       </Wrapper>,
     );
@@ -321,7 +321,7 @@ describe('StoreCardList — Approve XOR Disapprove (Req: Card-Grid List Uses Sha
           onEdit={vi.fn()}
           onApprove={vi.fn()}
           onDisapprove={vi.fn()}
-          onToggle={vi.fn()}
+          onChangePlan={vi.fn()}
         />
       </Wrapper>,
     );
@@ -345,7 +345,7 @@ describe('StoreCardList — Approve XOR Disapprove (Req: Card-Grid List Uses Sha
           onEdit={vi.fn()}
           onApprove={vi.fn()}
           onDisapprove={vi.fn()}
-          onToggle={vi.fn()}
+          onChangePlan={vi.fn()}
         />
       </Wrapper>,
     );
@@ -369,7 +369,7 @@ describe('StoreCardList — state CSS (Req: Store Card Visual Lifecycle State)',
           onEdit={vi.fn()}
           onApprove={vi.fn()}
           onDisapprove={vi.fn()}
-          onToggle={vi.fn()}
+          onChangePlan={vi.fn()}
         />
       </Wrapper>,
     );
@@ -386,7 +386,7 @@ describe('StoreCardList — state CSS (Req: Store Card Visual Lifecycle State)',
           onEdit={vi.fn()}
           onApprove={vi.fn()}
           onDisapprove={vi.fn()}
-          onToggle={vi.fn()}
+          onChangePlan={vi.fn()}
         />
       </Wrapper>,
     );
@@ -404,7 +404,7 @@ describe('StoreCardList — state CSS (Req: Store Card Visual Lifecycle State)',
           onEdit={vi.fn()}
           onApprove={vi.fn()}
           onDisapprove={vi.fn()}
-          onToggle={vi.fn()}
+          onChangePlan={vi.fn()}
         />
       </Wrapper>,
     );
@@ -422,7 +422,7 @@ describe('StoreCardList — state CSS (Req: Store Card Visual Lifecycle State)',
           onEdit={vi.fn()}
           onApprove={vi.fn()}
           onDisapprove={vi.fn()}
-          onToggle={vi.fn()}
+          onChangePlan={vi.fn()}
         />
       </Wrapper>,
     );
@@ -432,9 +432,9 @@ describe('StoreCardList — state CSS (Req: Store Card Visual Lifecycle State)',
   });
 });
 
-describe('StoreCardList — Change Plan gear item (spec store-plan-toggle R3)', () => {
-  it('renders "Cambiar plan" for an active store and calls onToggle with the id', async () => {
-    const onToggle = vi.fn();
+describe('StoreCardList — Change Plan gear item (opens the plan-change popup)', () => {
+  it('renders "Cambiar plan" for an active store and calls onChangePlan with the id', async () => {
+    const onChangePlan = vi.fn();
     const { StoreCardList } = await import('../store-card-list');
     render(
       <Wrapper>
@@ -443,17 +443,17 @@ describe('StoreCardList — Change Plan gear item (spec store-plan-toggle R3)', 
           onEdit={vi.fn()}
           onApprove={vi.fn()}
           onDisapprove={vi.fn()}
-          onToggle={onToggle}
+          onChangePlan={onChangePlan}
         />
       </Wrapper>,
     );
     fireEvent.click(screen.getByTestId('store-actions-toggle-store-t'));
     fireEvent.click(screen.getByRole('menuitem', { name: esMessages['STORES.CHANGE_PLAN'] }));
-    expect(onToggle).toHaveBeenCalledWith('store-t');
+    expect(onChangePlan).toHaveBeenCalledWith('store-t');
   });
 
   it('hides "Cambiar plan" when the store is inactive (spec scenario: Inactive store hides Change Plan)', async () => {
-    const onToggle = vi.fn();
+    const onChangePlan = vi.fn();
     const { StoreCardList } = await import('../store-card-list');
     render(
       <Wrapper>
@@ -462,7 +462,7 @@ describe('StoreCardList — Change Plan gear item (spec store-plan-toggle R3)', 
           onEdit={vi.fn()}
           onApprove={vi.fn()}
           onDisapprove={vi.fn()}
-          onToggle={onToggle}
+          onChangePlan={onChangePlan}
         />
       </Wrapper>,
     );
@@ -483,7 +483,7 @@ describe('StoreCardList — Activate/Deactivate removed (Req: Activate/Deactivat
           onEdit={vi.fn()}
           onApprove={vi.fn()}
           onDisapprove={vi.fn()}
-          onToggle={vi.fn()}
+          onChangePlan={vi.fn()}
         />
       </Wrapper>,
     );

@@ -1,7 +1,21 @@
-import { showBlockingError } from '../blocking-alert';
+import { showBlockingError, showDamagedDataRecoveryDialog } from '../blocking-alert';
 import messages from '../i18n/es';
 import { useAuthStore } from '../stores/auth-store';
 import { logClientError } from '../diagnostics/client-log';
+// STATIC, and unavoidably so — a deliberate departure from the plan's
+// "invoke it through a dynamic import" note (§4, Fase 1). The capture has to
+// be SYNCHRONOUS and has to happen BEFORE `logout()`: `logout()` calls
+// `clearDek()`, so anything loaded later than that could only see raw
+// ciphertext, and `import()` can never hand back a module in time to run
+// before the next statement. The cost is one extra module in the cold-boot
+// graph (@noble/ciphers via entity-crypto; sweetalert2 is already here through
+// `blocking-alert`); the alternative is losing the readable entities this flow
+// exists to save.
+import {
+  collectRecoveryBundle,
+  offerRecoveryAfterDamage,
+  type RecoveryBundle,
+} from './damaged-data-recovery';
 
 // Note for anyone tidying imports: these three are static here, but
 // `auth-store.ts` reaches BACK for `resetDecryptionFailureLatch` through a
@@ -65,6 +79,17 @@ export function resetDecryptionFailureLatch(): void {
  * recovery routes live (sign in online, or import another roster) — and is
  * safe to call from `/login` itself, where it skips the redirect.
  *
+ * The two kinds no longer end the same way once the session is closed. A
+ * missing key is recoverable, so the popup stays the single-button statement
+ * it always was. Damaged bytes are not recoverable by any login, so that popup
+ * also offers the only two things left to do: take a copy of what is still
+ * readable, or leave the data alone. See `announceDamagedData`.
+ *
+ * Both kinds are recorded in the client-error ring buffer before either exit
+ * closes the session — that entry is the only trace a field device leaves
+ * behind, and it is what the recovery procedure reads back
+ * (`docs/contracts/decryption-failure-recovery.md`, §4).
+ *
  * Returns whether this error was ours. `true` covers the latched case too: the
  * second rejection of one cause IS handled, it just does not speak, and its
  * caller must still stop it from surfacing as an unhandled rejection.
@@ -77,21 +102,104 @@ export function handleDecryptionFailure(error: unknown): boolean {
 
   // client-error-log: a decryption failure is the hardest field bug to
   // reproduce — it MUST leave a trace in the diagnostic buffer before logout.
+  // It runs for BOTH kinds, and before either exit below, so a `damaged` run
+  // leaves the `Decryption failure (damaged): session ended` entry the
+  // recovery procedure tells the operator to look for.
   logClientError({
     level: 'error',
     message: `Decryption failure (${kind}): session ended`,
     location: error instanceof Error ? error.stack : undefined,
   });
 
-  showBlockingError(
-    messages['GENERAL.ERROR'],
-    kind === 'missing-key'
-      ? messages['ENCRYPTION.KEY_UNAVAILABLE']
-      : messages['ENCRYPTION.DATA_DAMAGED'],
-  );
+  // `damaged` keeps its own exit: `announceDamagedData` shows the
+  // damaged-data popup (the recovery offer when there is still something to
+  // save) and closes the session itself. The single-button popup below is the
+  // `missing-key` statement, and only that one.
+  if (kind === 'damaged') {
+    announceDamagedData();
+    return true;
+  }
+
+  showBlockingError(messages['GENERAL.ERROR'], messages['ENCRYPTION.KEY_UNAVAILABLE']);
 
   useAuthStore.getState().logout();
   return true;
+}
+
+/**
+ * The `damaged` branch: the truth, plus a way out.
+ *
+ * ORDER IS LOAD-BEARING, and it is why this is not inlined above:
+ *   1. `storeId` is read from the store BEFORE `logout()`, which clears the
+ *      user (`user: null`) and with it the answer to "which store's data?".
+ *   2. the bundle is captured BEFORE `logout()` as well, and this is the
+ *      critical one: the damage is detected while the DEK is still in memory,
+ *      and `logout()` calls `clearDek()`. Capturing after the logout would keep
+ *      only the raw ciphertext and lose every entity that is still readable —
+ *      precisely the data this flow exists to save.
+ *   3. the session still ends immediately and exactly once (the standing rule:
+ *      a device that cannot open its data does not get in). The popup is shown
+ *      afterwards; SweetAlert owns its own DOM node, so it outlives the
+ *      navigation to `/login`.
+ *   4. only a user who asks for recovery — and then confirms a SECOND time —
+ *      ever reaches the wipe.
+ */
+function announceDamagedData(): void {
+  const storeId = useAuthStore.getState().user?.selectedStoreId;
+
+  let bundle: RecoveryBundle | null = null;
+  if (storeId) {
+    try {
+      bundle = collectRecoveryBundle(storeId);
+    } catch {
+      // Defensive, and deliberately not fatal: a capture that throws must not
+      // swallow the sign-out or turn a damaged store into a second, different
+      // failure. With no bundle there is simply nothing to offer, and the user
+      // gets the popup this app has always shown.
+      bundle = null;
+    }
+  }
+
+  useAuthStore.getState().logout();
+
+  if (bundle === null) {
+    // No store to recover (a user without a store, or a capture that failed):
+    // the single-button popup, unchanged.
+    showBlockingError(messages['GENERAL.ERROR'], messages['ENCRYPTION.DATA_DAMAGED']);
+    return;
+  }
+
+  void showDamagedDataRecoveryDialog(
+    messages['GENERAL.ERROR'],
+    messages['ENCRYPTION.DATA_DAMAGED'],
+    {
+      confirmButtonText: messages['ENCRYPTION.RECOVERY_ACTION'],
+      cancelButtonText: messages['ENCRYPTION.RECOVERY_DISMISS'],
+    },
+  ).then((wantsRecovery) => {
+    // "Ahora no" (and the backdrop, and Escape) land here as `false`: nothing
+    // is deleted, which is what the popup text itself promised.
+    if (wantsRecovery) void runRecovery(bundle);
+  });
+}
+
+/**
+ * The recovery the user just asked for. The bundle is already in hand, so
+ * nothing here depends on the DEK that `logout()` just cleared — the file is
+ * written from data captured while the key was still in memory.
+ *
+ * A failure is swallowed: the session is closed, the dialog is gone and the
+ * user is on `/login`, so there is no surface left to report through — and
+ * nothing was deleted, which is what the popup promised. The one thing this
+ * deliberately does NOT do is delete on a partial failure path: the wipe is
+ * the last step of `offerRecoveryAfterDamage`, never reached from here.
+ */
+async function runRecovery(bundle: RecoveryBundle): Promise<void> {
+  try {
+    await offerRecoveryAfterDamage(bundle);
+  } catch {
+    // See the doc comment above.
+  }
 }
 
 /**

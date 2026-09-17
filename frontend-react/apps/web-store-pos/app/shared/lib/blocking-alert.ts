@@ -79,6 +79,41 @@ export function confirmDialog(options: ConfirmDialogOptions): Promise<boolean> {
   }).then((result) => result.isConfirmed);
 }
 
+export interface DamagedDataRecoveryOptions {
+  confirmButtonText: string;
+  cancelButtonText: string;
+}
+
+/**
+ * The popup for unreadable stored data, now with a way out (plan:
+ * docs/plans/2026-09-15-damaged-data-recovery-export-wipe-plan.md §4).
+ *
+ * Same shape as `showBlockingError` above — same `icon: 'error'` and the SAME
+ * message text (`ENCRYPTION.DATA_DAMAGED`) — plus the two explicit buttons the
+ * recovery flow needs, in the style of `confirmDialog` (which is the same
+ * `Swal.fire` shape with `icon: 'question'`).
+ *
+ * Resolves to `true` ONLY when the user asks to recover (`result.isConfirmed`).
+ * Cancel, backdrop click and Escape all resolve to `false`, and mean what the
+ * message already promised: nothing was deleted.
+ */
+export function showDamagedDataRecoveryDialog(
+  title: string,
+  message: string,
+  options: DamagedDataRecoveryOptions,
+): Promise<boolean> {
+  return Swal.fire({
+    title,
+    text: message,
+    icon: 'error',
+    showCancelButton: true,
+    confirmButtonColor: '#3456ff',
+    cancelButtonColor: '#dc3545',
+    confirmButtonText: options.confirmButtonText,
+    cancelButtonText: options.cancelButtonText,
+  }).then((result) => result.isConfirmed);
+}
+
 export interface AcknowledgeErrorOptions {
   title: string;
   message: string;

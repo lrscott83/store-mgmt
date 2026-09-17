@@ -209,6 +209,17 @@ const mockUpdateStore = vi.fn();
 const mockSetStoreActivation = vi.fn();
 const mockChangeStorePlan = vi.fn();
 
+// Plan change refreshes the session through the ONLINE soft refresh
+// (soft-refresh-session.ts). Mocked: the assertion in the plan-activation suite
+// is about that refresh, and the real one issues a /me that the HTTP blocker
+// would flag as an unmocked request. The OTHER mutation flows (create /
+// activate) still refresh through getUserByToken() and keep their own mocks.
+const mockSoftRefreshSession = vi.fn();
+
+vi.mock('~/shared/lib/stores/soft-refresh-session', () => ({
+  softRefreshSession: (...args: unknown[]) => mockSoftRefreshSession(...args),
+}));
+
 vi.mock('~/management/stores/lib/services/store-http-service', () => ({
   storeHttpService: {
     get getMyStores() {
@@ -604,7 +615,7 @@ describe('MyStoresPage — Editar el plan popup', () => {
     expect(mockUpdateStore).not.toHaveBeenCalled();
     // Activation closes the modal and refreshes the session — store-plan parity
     await waitFor(() => {
-      expect(mockGetUserByToken).toHaveBeenCalled();
+      expect(mockSoftRefreshSession).toHaveBeenCalled();
     });
     expect(screen.queryByTestId('owner-store-plan-modal-s1')).not.toBeInTheDocument();
   });

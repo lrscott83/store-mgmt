@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
-import type { Store } from '@store-mgmt/domain';
+import type { Plan, PlanModule, Store } from '@store-mgmt/domain';
 
 // ─── react-router mock ────────────────────────────────────────────────────────
 
@@ -53,6 +53,14 @@ vi.mock('~/shared/lib/i18n/es', () => ({
     'STORES.ACTIVATE_PAID_MESSAGE': '¿Activar plan pago?',
     'STORES.DEACTIVATE_PAID_TITLE': 'Desactivar plan pago',
     'STORES.DEACTIVATE_PAID_MESSAGE': '¿Desactivar plan pago?',
+    'STORES.EDIT_PLAN_TITLE': 'Plan de la tienda',
+    'STORES.PLAN.FREE_TAB': 'Gratis',
+    'STORES.PLAN.PAID_TAB': 'Pago',
+    'STORES.PLAN.SUPERIOR_TAB': 'Superior',
+    'STORES.PLAN.ACTIVATE_PLAN': 'Activar Plan',
+    'STORES.PLAN.NEXT_BILLING_DATE': 'Próximo cobro',
+    'STORES.UPDATE_SUCCESS': 'Actualizado con éxito',
+    'GENERAL.CLOSE': 'Cerrar',
   },
 }));
 
@@ -69,7 +77,9 @@ vi.mock('~/management/stores/lib/services/store-http-service', () => ({
     listStores: vi.fn(),
     approveStore: vi.fn(),
     disapproveStore: vi.fn(),
-    toggleStorePlan: vi.fn(),
+    getPlans: vi.fn(),
+    getFeaturesToStore: vi.fn(),
+    changeStorePlan: vi.fn(),
   },
 }));
 
@@ -80,8 +90,38 @@ vi.mock('~/shared/lib/blocking-alert', () => ({
   confirmDialog: (...args: unknown[]) => mockConfirmDialog(...args),
 }));
 
-beforeEach(() => {
+// ─── soft session refresh + toast mocks (plan activation parity) ─────────────
+
+const mockSoftRefreshSession = vi.fn();
+vi.mock('~/shared/lib/stores/soft-refresh-session', () => ({
+  softRefreshSession: (...args: unknown[]) => mockSoftRefreshSession(...args),
+}));
+
+const mockShowToastSuccess = vi.fn();
+vi.mock('~/shared/lib/toast', () => ({
+  showToastSuccess: (...args: unknown[]) => mockShowToastSuccess(...args),
+}));
+
+beforeEach(async () => {
   vi.clearAllMocks();
+  // Catalog defaults — every page render fetches plans + features alongside the
+  // store list; individual tests override listStores only.
+  const { storeHttpService } =
+    await import('~/management/stores/lib/services/store-http-service');
+  vi.mocked(storeHttpService.getPlans).mockResolvedValue({
+    succeeded: true,
+    data: makePlanCatalog(),
+    message: '',
+    actionCode: 0,
+    errors: [],
+  });
+  vi.mocked(storeHttpService.getFeaturesToStore).mockResolvedValue({
+    succeeded: true,
+    data: [],
+    message: '',
+    actionCode: 0,
+    errors: [],
+  });
 });
 
 function makeStore(overrides: Partial<Store> = {}): Store {
@@ -102,6 +142,102 @@ function makeStore(overrides: Partial<Store> = {}): Store {
     planType: 'Pago',
     ...overrides,
   };
+}
+
+// ─── Plan catalog factories (GET /v1/plans shape) ─────────────────────────────
+
+function makePlanModule(overrides: Partial<PlanModule> = {}): PlanModule {
+  return {
+    moduleId: 1,
+    name: 'Module A',
+    order: 1,
+    priceIncluded: false,
+    price: 10,
+    currentPrice: 8,
+    discountPrice: 0,
+    percentDiscountPrice: 0,
+    discountText: '- 20%',
+    featureDescriptions: [],
+    ...overrides,
+  };
+}
+
+function makePlan(overrides: Partial<Plan> = {}): Plan {
+  return {
+    id: 1,
+    name: 'Pago',
+    order: 2,
+    planType: 'Pago',
+    price: 8,
+    modules: [makePlanModule()],
+    ...overrides,
+  };
+}
+
+/** Real catalog shape (CUMULATIVE): Gratis → Pago → Superior. */
+function makePlanCatalog(): Plan[] {
+  return [
+    makePlan({
+      id: 1,
+      name: 'Gratis',
+      planType: 'Gratis',
+      order: 1,
+      price: 0,
+      modules: [
+        makePlanModule({
+          moduleId: 2,
+          name: 'Free Module',
+          priceIncluded: true,
+          price: 0,
+          currentPrice: 0,
+          discountText: '',
+        }),
+      ],
+    }),
+    makePlan({
+      id: 2,
+      name: 'Pago',
+      planType: 'Pago',
+      order: 2,
+      price: 8,
+      modules: [
+        makePlanModule({
+          moduleId: 2,
+          name: 'Free Module',
+          priceIncluded: true,
+          price: 0,
+          currentPrice: 0,
+          discountText: '',
+        }),
+        makePlanModule(),
+      ],
+    }),
+    makePlan({
+      id: 3,
+      name: 'Superior',
+      planType: 'Superior',
+      order: 3,
+      price: 12,
+      modules: [
+        makePlanModule({
+          moduleId: 2,
+          name: 'Free Module',
+          priceIncluded: true,
+          price: 0,
+          currentPrice: 0,
+          discountText: '',
+        }),
+        makePlanModule(),
+        makePlanModule({
+          moduleId: 3,
+          name: 'Module C',
+          price: 4,
+          currentPrice: 4,
+          discountText: '',
+        }),
+      ],
+    }),
+  ];
 }
 
 function Wrapper({ children }: { children: React.ReactNode }) {
@@ -621,16 +757,16 @@ describe('AdminStoreListPage — plan filter buttons', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// store-plan-toggle R3 — Change Plan action: direction-aware confirm dialog,
-// cancel-no-call, POST + list refresh (spec scenarios: Free→Paid dialog copy,
-// Paid→Free dialog copy, Cancel dialog, List refreshes after toggle)
+// Change Plan → owner my-stores parity: the gear item opens the SAME EditPlanModal
+// popup (plan panels + next billing date) and the activation rides the dedicated
+// change-plan endpoint + session refresh + list re-fetch.
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe('AdminStoreListPage — toggle plan', () => {
+describe('AdminStoreListPage — change plan popup (owner my-stores parity)', () => {
   beforeEach(async () => {
     const { storeHttpService } =
       await import('~/management/stores/lib/services/store-http-service');
-    vi.mocked(storeHttpService.toggleStorePlan).mockResolvedValue({
+    vi.mocked(storeHttpService.changeStorePlan).mockResolvedValue({
       succeeded: true,
       data: true,
       message: '',
@@ -639,13 +775,12 @@ describe('AdminStoreListPage — toggle plan', () => {
     });
   });
 
-  it('Free→Paid store shows "Activar plan pago" dialog copy and re-fetches after confirm', async () => {
-    mockConfirmDialog.mockResolvedValue(true);
+  it('opens the EditPlanModal popup when "Cambiar plan" is clicked (no toggle confirm)', async () => {
     const { storeHttpService } =
       await import('~/management/stores/lib/services/store-http-service');
     vi.mocked(storeHttpService.listStores).mockResolvedValue({
       succeeded: true,
-      data: [makeStore({ id: 's1', name: 'Store One', paymentStartDate: null })],
+      data: [makeStore({ id: 's1', name: 'Store One' })],
       message: '',
       actionCode: 0,
       errors: [],
@@ -657,15 +792,6 @@ describe('AdminStoreListPage — toggle plan', () => {
         <AdminStoreListPage />
       </Wrapper>,
     );
-
-    // Free stores are only visible under the "Gratis" filter.
-    const filterButtons = screen.getAllByRole('button');
-    const gratisButton = filterButtons.find(
-      (btn) => btn.textContent?.includes(esMessages['STORES.FILTER_FREE'])
-    );
-    if (gratisButton) {
-      fireEvent.click(gratisButton);
-    }
 
     await waitFor(() => {
       expect(screen.getByText('Store One')).toBeInTheDocument();
@@ -674,25 +800,19 @@ describe('AdminStoreListPage — toggle plan', () => {
     fireEvent.click(screen.getByTestId('store-actions-toggle-s1'));
     fireEvent.click(screen.getByRole('menuitem', { name: esMessages['STORES.CHANGE_PLAN'] }));
 
-    await waitFor(() => {
-      expect(mockConfirmDialog).toHaveBeenCalledWith({
-        title: esMessages['STORES.ACTIVATE_PAID_TITLE'],
-        message: esMessages['STORES.ACTIVATE_PAID_MESSAGE'],
-        confirmButtonText: esMessages['GENERAL.YES'],
-        cancelButtonText: esMessages['GENERAL.NO'],
-      });
-      expect(storeHttpService.toggleStorePlan).toHaveBeenCalledWith('s1');
-      expect(storeHttpService.listStores).toHaveBeenCalledTimes(2);
-    });
+    // The plan popup — the same testid the owner's my-stores modal renders — opens,
+    // and the old direction-aware toggle confirm never fires.
+    expect(await screen.findByTestId('owner-store-plan-modal-s1')).toBeInTheDocument();
+    expect(mockConfirmDialog).not.toHaveBeenCalled();
+    expect(storeHttpService.changeStorePlan).not.toHaveBeenCalled();
   });
 
-  it('Paid→Free store shows "Desactivar plan pago" dialog copy and re-fetches after confirm', async () => {
-    mockConfirmDialog.mockResolvedValue(true);
+  it('renders the plan catalog panels with the store plan expanded (Pago active badge)', async () => {
     const { storeHttpService } =
       await import('~/management/stores/lib/services/store-http-service');
     vi.mocked(storeHttpService.listStores).mockResolvedValue({
       succeeded: true,
-      data: [makeStore({ id: 's2', name: 'Store Two', paymentStartDate: '2024-01-01' })],
+      data: [makeStore({ id: 's1', name: 'Store One' })],
       message: '',
       actionCode: 0,
       errors: [],
@@ -706,31 +826,26 @@ describe('AdminStoreListPage — toggle plan', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText('Store Two')).toBeInTheDocument();
+      expect(screen.getByText('Store One')).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByTestId('store-actions-toggle-s2'));
+    fireEvent.click(screen.getByTestId('store-actions-toggle-s1'));
     fireEvent.click(screen.getByRole('menuitem', { name: esMessages['STORES.CHANGE_PLAN'] }));
+    const modal = await screen.findByTestId('owner-store-plan-modal-s1');
 
-    await waitFor(() => {
-      expect(mockConfirmDialog).toHaveBeenCalledWith({
-        title: esMessages['STORES.DEACTIVATE_PAID_TITLE'],
-        message: esMessages['STORES.DEACTIVATE_PAID_MESSAGE'],
-        confirmButtonText: esMessages['GENERAL.YES'],
-        cancelButtonText: esMessages['GENERAL.NO'],
-      });
-      expect(storeHttpService.toggleStorePlan).toHaveBeenCalledWith('s2');
-      expect(storeHttpService.listStores).toHaveBeenCalledTimes(2);
-    });
+    // All three catalog plans render; Pago is active so it exposes no Activar Plan.
+    const withinModal = within(modal);
+    expect(withinModal.getByRole('button', { name: /Superior/ })).toBeInTheDocument();
+    expect(withinModal.getByRole('button', { name: /Gratis/ })).toBeInTheDocument();
+    expect(withinModal.getByText(esMessages['STORES.EDIT_PLAN_TITLE'])).toBeInTheDocument();
   });
 
-  it('cancel (false) -> does NOT call toggleStorePlan, list NOT re-fetched', async () => {
-    mockConfirmDialog.mockResolvedValue(false);
+  it('activating another plan calls changeStorePlan with the plan id, refreshes the session and re-fetches the list', async () => {
     const { storeHttpService } =
       await import('~/management/stores/lib/services/store-http-service');
     vi.mocked(storeHttpService.listStores).mockResolvedValue({
       succeeded: true,
-      data: [makeStore({ id: 's3', name: 'Store Three' })],
+      data: [makeStore({ id: 's1', name: 'Store One', planType: 'Pago' })],
       message: '',
       actionCode: 0,
       errors: [],
@@ -744,16 +859,91 @@ describe('AdminStoreListPage — toggle plan', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText('Store Three')).toBeInTheDocument();
+      expect(screen.getByText('Store One')).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByTestId('store-actions-toggle-s3'));
+    fireEvent.click(screen.getByTestId('store-actions-toggle-s1'));
     fireEvent.click(screen.getByRole('menuitem', { name: esMessages['STORES.CHANGE_PLAN'] }));
+    const modal = await screen.findByTestId('owner-store-plan-modal-s1');
+
+    // Superior is collapsed by default (Pago expanded) — open it, then activate.
+    fireEvent.click(within(modal).getByRole('button', { name: /Superior/ }));
+    fireEvent.click(within(modal).getByRole('button', { name: 'Activar Plan' }));
 
     await waitFor(() => {
-      expect(mockConfirmDialog).toHaveBeenCalledTimes(1);
+      expect(storeHttpService.changeStorePlan).toHaveBeenCalledWith('s1', 3);
+      expect(mockSoftRefreshSession).toHaveBeenCalled();
+      expect(mockShowToastSuccess).toHaveBeenCalledWith(esMessages['STORES.UPDATE_SUCCESS']);
+      // Activation closes the modal and re-fetches the store list to reflect the
+      // new planType.
+      expect(storeHttpService.listStores).toHaveBeenCalledTimes(2);
     });
-    expect(storeHttpService.toggleStorePlan).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('owner-store-plan-modal-s1')).not.toBeInTheDocument();
+  });
+
+  it('shows the next billing banner in the popup from the store nextPaymentDate (plan-view parity)', async () => {
+    const { storeHttpService } =
+      await import('~/management/stores/lib/services/store-http-service');
+    vi.mocked(storeHttpService.listStores).mockResolvedValue({
+      succeeded: true,
+      data: [makeStore({ id: 's1', name: 'Store One', planType: 'Pago', nextPaymentDate: '2026-08-01' })],
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
+
+    const { AdminStoreListPage } = await import('../store-list');
+    render(
+      <Wrapper>
+        <AdminStoreListPage />
+      </Wrapper>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Store One')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId('store-actions-toggle-s1'));
+    fireEvent.click(screen.getByRole('menuitem', { name: esMessages['STORES.CHANGE_PLAN'] }));
+
+    expect(await screen.findByTestId('owner-plan-next-billing-date-s1')).toBeInTheDocument();
+  });
+
+  it('keeps the modal open with the inline error when changeStorePlan fails', async () => {
+    const { storeHttpService } =
+      await import('~/management/stores/lib/services/store-http-service');
+    vi.mocked(storeHttpService.listStores).mockResolvedValue({
+      succeeded: true,
+      data: [makeStore({ id: 's1', name: 'Store One', planType: 'Pago' })],
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
+    vi.mocked(storeHttpService.changeStorePlan).mockRejectedValue(new Error('boom'));
+
+    const { AdminStoreListPage } = await import('../store-list');
+    render(
+      <Wrapper>
+        <AdminStoreListPage />
+      </Wrapper>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Store One')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId('store-actions-toggle-s1'));
+    fireEvent.click(screen.getByRole('menuitem', { name: esMessages['STORES.CHANGE_PLAN'] }));
+    const modal = await screen.findByTestId('owner-store-plan-modal-s1');
+
+    fireEvent.click(within(modal).getByRole('button', { name: /Superior/ }));
+    fireEvent.click(within(modal).getByRole('button', { name: 'Activar Plan' }));
+
+    await waitFor(() => {
+      // The modal stays open and PlanPanels renders the inline activation error.
+      expect(screen.getByRole('alert')).toBeInTheDocument();
+    });
+    expect(screen.getByTestId('owner-store-plan-modal-s1')).toBeInTheDocument();
     expect(storeHttpService.listStores).toHaveBeenCalledTimes(1);
   });
 });

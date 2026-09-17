@@ -3,12 +3,16 @@ import { useNavigate } from 'react-router';
 import { useIntl } from 'react-intl';
 import { resellerLoader } from '~/auth/routes/loaders';
 import { storeHttpService } from '~/management/stores/lib/services/store-http-service';
+import { EditPlanModal } from '~/management/stores/components/edit-plan-modal';
+import { groupFeaturesByModuleId } from '~/management/stores/lib/plan-utils';
 import { StoreCardList } from '~/admin/stores/components/store-card-list';
 import { httpErrorKey } from '~/shared/lib/http/http-error';
 import { confirmDialog } from '~/shared/lib/blocking-alert';
+import { softRefreshSession } from '~/shared/lib/stores/soft-refresh-session';
+import { showToastSuccess } from '~/shared/lib/toast';
 import { Button } from '~/shared/components/ui/button';
 import { PlusIcon } from '~/shared/components/ui/icons';
-import type { Store } from '@store-mgmt/domain';
+import type { Feature, Plan, Store } from '@store-mgmt/domain';
 
 export const clientLoader = resellerLoader;
 
@@ -17,25 +21,41 @@ export const clientLoader = resellerLoader;
  * at /admin/stores"). Approve/Disapprove now require confirmation before the HTTP call
  * (Angular parity — store-list.component.ts:132-166,169-203, `Swal.fire({... icon: 'question'
  * ...})`), reusing the existing `confirmDialog` primitive instead of a new modal.
+ * "Cambiar plan" opens the SAME catalog-driven plan popup as the owner's my-stores view
+ * (EditPlanModal + PlanPanels) — the gear item replaced the old Free⇄Paid toggle confirm.
  */
 export function AdminStoreListPage() {
   const navigate = useNavigate();
   const { formatMessage } = useIntl();
   const [stores, setStores] = useState<Store[]>([]);
   const [error, setError] = useState<string | undefined>(undefined);
+  // Plan popup state — same shape as MyStoresPage (owner plan change parity).
+  const [plans, setPlans] = useState<Plan[]>([]);
+  const [featuresByModuleId, setFeaturesByModuleId] = useState<ReadonlyMap<number, Feature[]>>(
+    new Map(),
+  );
+  const [planStore, setPlanStore] = useState<Store | null>(null);
+  const [modalBusy, setModalBusy] = useState(false);
+  const [modalError, setModalError] = useState('');
   // Filter by plan type: 'all' shows all stores, 'not-free' excludes Gratis plan,
   // and specific plan types (VIP, Superior, Pago, Gratis) filter by that plan.
   // Default is 'not-free' to show all paid plans except Gratis.
   const [filter, setFilter] = useState<string>('not-free');
 
-  const loadStores = useCallback(async () => {
+  const load = useCallback(async () => {
     try {
-      const res = await storeHttpService.listStores();
-      if (!res.succeeded) {
+      const [storesRes, plansRes, featuresRes] = await Promise.all([
+        storeHttpService.listStores(),
+        storeHttpService.getPlans(),
+        storeHttpService.getFeaturesToStore(),
+      ]);
+      if (!storesRes.succeeded || !plansRes.succeeded || !featuresRes.succeeded) {
         setError(formatMessage({ id: 'STORES.ERROR' }));
         return;
       }
-      setStores(res.data);
+      setStores(storesRes.data);
+      setPlans(plansRes.data);
+      setFeaturesByModuleId(groupFeaturesByModuleId(featuresRes.data));
       setError(undefined);
     } catch (error) {
       setError(formatMessage({ id: httpErrorKey(error, 'STORES.ERROR') }));
@@ -43,8 +63,8 @@ export function AdminStoreListPage() {
   }, [formatMessage]);
 
   useEffect(() => {
-    loadStores();
-  }, [loadStores]);
+    load();
+  }, [load]);
 
   async function handleApprove(id: string) {
     const confirmed = await confirmDialog({
@@ -56,7 +76,7 @@ export function AdminStoreListPage() {
     if (!confirmed) return;
     try {
       await storeHttpService.approveStore(id);
-      await loadStores();
+      await load();
     } catch (error) {
       setError(formatMessage({ id: httpErrorKey(error, 'STORES.ERROR') }));
     }
@@ -72,34 +92,40 @@ export function AdminStoreListPage() {
     if (!confirmed) return;
     try {
       await storeHttpService.disapproveStore(id);
-      await loadStores();
+      await load();
     } catch (error) {
       setError(formatMessage({ id: httpErrorKey(error, 'STORES.ERROR') }));
     }
   }
 
-  async function handleToggle(id: string) {
+  function openPlanModal(id: string) {
     const store = stores.find((s) => s.id === id);
     if (!store) return;
-    // Direction-aware copy (spec store-plan-toggle R3): Free (null date) →
-    // "Activar plan pago", Paid (non-null date) → "Desactivar plan pago".
-    const activating = store.paymentStartDate === null;
-    const confirmed = await confirmDialog({
-      title: formatMessage({
-        id: activating ? 'STORES.ACTIVATE_PAID_TITLE' : 'STORES.DEACTIVATE_PAID_TITLE',
-      }),
-      message: formatMessage({
-        id: activating ? 'STORES.ACTIVATE_PAID_MESSAGE' : 'STORES.DEACTIVATE_PAID_MESSAGE',
-      }),
-      confirmButtonText: formatMessage({ id: 'GENERAL.YES' }),
-      cancelButtonText: formatMessage({ id: 'GENERAL.NO' }),
-    });
-    if (!confirmed) return;
+    setModalError('');
+    setPlanStore(store);
+  }
+
+  async function handlePlanActivate(selectedPlan: Plan) {
+    if (!planStore || modalBusy) return;
+    setModalError('');
+    setModalBusy(true);
     try {
-      await storeHttpService.toggleStorePlan(id);
-      await loadStores();
+      // SuperAdmin-driven plan change — same contract as the owner's plan popup
+      // (my-stores.tsx handlePlanActivate): the dedicated change-plan endpoint
+      // carries the target plan id, the backend owns module rewriting, the anchor
+      // and the next-due pinning. No moduleIds PUT ever fires here.
+      await storeHttpService.changeStorePlan(planStore.id, selectedPlan.id);
+      setPlanStore(null);
+      // Refresh the session after a plan change so feature-driven menus reflect
+      // the new module set — ONLINE refresh (getUserByToken is cache-first by
+      // design and a plan change issues no new token). Best-effort.
+      await softRefreshSession();
+      showToastSuccess(formatMessage({ id: 'STORES.UPDATE_SUCCESS' }));
+      await load();
     } catch (error) {
-      setError(formatMessage({ id: httpErrorKey(error, 'STORES.ERROR') }));
+      setModalError(formatMessage({ id: httpErrorKey(error, 'STORES.ERROR') }));
+    } finally {
+      setModalBusy(false);
     }
   }
 
@@ -153,7 +179,19 @@ export function AdminStoreListPage() {
         onEdit={(id) => navigate(`/management/stores/edit/${id}`)}
         onApprove={handleApprove}
         onDisapprove={handleDisapprove}
-        onToggle={handleToggle}
+        onChangePlan={openPlanModal}
+      />
+
+      <EditPlanModal
+        open={planStore !== null}
+        storeId={planStore?.id ?? null}
+        plans={plans}
+        storePlanType={planStore?.planType ?? 'Gratis'}
+        featuresByModuleId={featuresByModuleId}
+        nextDueDate={planStore?.nextPaymentDate ?? null}
+        error={modalError}
+        onClose={() => setPlanStore(null)}
+        onActivate={handlePlanActivate}
       />
     </div>
   );

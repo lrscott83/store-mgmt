@@ -464,7 +464,7 @@ describe('Sidebar — billing menu entries (superadmin/reseller only, StorePayme
     vi.clearAllMocks();
   });
 
-  it('SuperAdmin sees "Cobros pendientes" and "Comisiones" in the MANAGEMENT group', () => {
+  it('SuperAdmin sees "Cobros pendientes" and "Comisiones" in the ADMIN group', () => {
     renderSidebar(makeSuperAdmin());
 
     expect(screen.getByText('Cobros pendientes')).toBeInTheDocument();
@@ -473,6 +473,15 @@ describe('Sidebar — billing menu entries (superadmin/reseller only, StorePayme
     const hrefs = screen.getAllByRole('link').map((l) => l.getAttribute('href'));
     expect(hrefs).toContain('/management/stores/collections');
     expect(hrefs).toContain('/management/stores/commissions');
+
+    // Placement: billing lives under ADMINISTRACIÓN — after the last ADMIN item
+    // (Funcionalidades) and before the first SALES item (Catálogo Productos).
+    const linkTexts = screen.getAllByRole('link').map((l) => l.textContent ?? '');
+    const featuresIdx = linkTexts.indexOf('Funcionalidades');
+    const collectionsIdx = linkTexts.indexOf('Cobros pendientes');
+    const productsIdx = linkTexts.indexOf('Catálogo Productos');
+    expect(collectionsIdx).toBeGreaterThan(featuresIdx);
+    expect(collectionsIdx).toBeLessThan(productsIdx);
   });
 
   it('ReSeller with the StorePayment feature sees both billing entries', () => {
