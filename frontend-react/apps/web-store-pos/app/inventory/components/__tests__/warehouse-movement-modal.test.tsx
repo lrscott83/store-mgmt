@@ -232,4 +232,51 @@ describe('WarehouseMovementModal', () => {
       expect.objectContaining({ productId: 'prod-2', quantity: 3 }),
     );
   });
+
+  // ─── A1/A9e: tope de edición de una compra (plan 2026-09-16) ──────────────
+
+  it('U-A1-4: sin maxQuantity el tope no se muestra ni bloquea (create / salida)', () => {
+    renderModal({ productId: 'prod-1', initial: { quantity: 5 } });
+    expect(screen.queryByTestId('movement-max-hint')).toBeNull();
+    expect(screen.queryByTestId('movement-max-error')).toBeNull();
+    fireEvent.change(screen.getByTestId('movement-quantity'), { target: { value: '999' } });
+    expect(screen.queryByTestId('movement-max-error')).toBeNull();
+  });
+
+  it('U-A1-5: muestra el tope y bloquea Guardar por encima de él', () => {
+    const onSubmit = vi.fn();
+    renderModal({
+      onSubmit,
+      productId: 'prod-1',
+      initial: { quantity: 6, costPrice: 5 },
+      maxQuantity: 6,
+    });
+    // El aviso explica el por qué (A9e): es lo que queda de la compra.
+    expect(screen.getByTestId('movement-max-hint').textContent).toContain('6');
+    // Atributo nativo como refuerzo.
+    expect((screen.getByTestId('movement-quantity') as HTMLInputElement).max).toBe('6');
+
+    fireEvent.change(screen.getByTestId('movement-quantity'), { target: { value: '15' } });
+    expect(screen.getByTestId('movement-max-error').textContent).toContain('6');
+    fireEvent.click(screen.getByText('Guardar'));
+    expect(onSubmit).not.toHaveBeenCalled();
+
+    // Dentro del tope vuelve a ser válido.
+    fireEvent.change(screen.getByTestId('movement-quantity'), { target: { value: '6' } });
+    expect(screen.queryByTestId('movement-max-error')).toBeNull();
+    fireEvent.click(screen.getByText('Guardar'));
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ quantity: 6 }));
+  });
+
+  it('U-A9d-2: errorMessage se muestra inline dentro del modal', () => {
+    renderModal({
+      productId: 'prod-1',
+      initial: { quantity: 6, costPrice: 5 },
+      maxQuantity: 6,
+      errorMessage: 'No hay suficiente stock en el almacén.',
+    });
+    expect(screen.getByTestId('movement-form-error').textContent).toBe(
+      'No hay suficiente stock en el almacén.',
+    );
+  });
 });

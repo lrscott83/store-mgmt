@@ -34,6 +34,19 @@ interface WarehouseMovementModalProps {
   initial?: { quantity: number; costPrice?: number; toWarehouseId?: string } | null;
   /** Clave i18n del título — por defecto el del modo; el de edición lo sobreescribe. */
   titleId?: string;
+  /**
+   * Tope de cantidad de la edición (plan 2026-09-16, A1): al editar una COMPRA
+   * el tope es lo que queda de su lote. El modal avisa y bloquea Guardar por
+   * encima del tope; sin tope (salida/transferencia) el servicio es la fuente
+   * de verdad (su límite real depende de ventas y del stock del destino).
+   */
+  maxQuantity?: number;
+  /**
+   * Error del guardado mostrado inline (plan 2026-09-16, A9d): el fallo del
+   * segundo paso de la edición NO cierra el modal — el usuario corrige y
+   * reintenta sin perder el trabajo.
+   */
+  errorMessage?: string | null;
 }
 
 const MODAL_TITLE: Record<WarehouseMovementMode, string> = {
@@ -60,6 +73,8 @@ export function WarehouseMovementModal({
   onSubmit,
   initial = null,
   titleId,
+  maxQuantity,
+  errorMessage = null,
 }: WarehouseMovementModalProps) {
   const intl = useIntl();
   const [selectedProduct, setSelectedProduct] = useState('');
@@ -107,9 +122,12 @@ export function WarehouseMovementModal({
 
   const qty = parseFloat(quantity);
   const validQty = Number.isFinite(qty) && qty > 0;
+  // A1: el tope solo existe al editar una compra (maxQuantity definido).
+  const exceedsMax = maxQuantity !== undefined && validQty && qty > maxQuantity;
   const isValid =
     selectedProduct !== '' &&
     validQty &&
+    !exceedsMax &&
     (mode !== 'purchase_in' ||
       (Number.isFinite(parseFloat(costPrice)) && parseFloat(costPrice) > 0)) &&
     (mode !== 'transfer_out' || toWarehouseId !== '');
@@ -252,16 +270,27 @@ export function WarehouseMovementModal({
             <label htmlFor="movement-quantity" className="mb-1 block text-sm font-medium text-text">
               {intl.formatMessage({ id: 'WAREHOUSES.QUANTITY' })}
             </label>
+            {/* A1: el atributo nativo `max` refuerza el tope; la guarda real es `exceedsMax`. */}
             <input
               id="movement-quantity"
               data-testid="movement-quantity"
               type="number"
               min="0"
+              max={maxQuantity !== undefined ? maxQuantity : undefined}
               step="0.01"
               value={quantity}
               onChange={(e) => setQuantity(e.target.value)}
               className={inputClass}
             />
+            {/* A9e: el usuario debe entender POR QUÉ hay un tope. */}
+            {maxQuantity !== undefined && (
+              <p
+                data-testid="movement-max-hint"
+                className="mt-1 text-xs text-text-muted"
+              >
+                {intl.formatMessage({ id: 'WAREHOUSES.EDIT_REMAINING_HINT' }, { max: maxQuantity })}
+              </p>
+            )}
           </div>
 
           {mode === 'purchase_in' && (
@@ -319,6 +348,22 @@ export function WarehouseMovementModal({
               className={inputClass}
             />
           </div>
+
+          {/* A9d/A9e: error del guardado mostrado DENTRO del modal (sin cerrarlo) +
+              el tope explícito, para que el reintento sea inmediato. */}
+          {exceedsMax && (
+            <p data-testid="movement-max-error" className="text-sm text-danger">
+              {intl.formatMessage(
+                { id: 'WAREHOUSES.EDIT_MAX_EXCEEDED' },
+                { max: maxQuantity ?? 0 },
+              )}
+            </p>
+          )}
+          {errorMessage && (
+            <p data-testid="movement-form-error" className="text-sm text-danger">
+              {errorMessage}
+            </p>
+          )}
         </div>
 
         <div className="mt-4 flex gap-2">

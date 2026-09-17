@@ -631,7 +631,7 @@ describe('WarehouseOfflineService', () => {
       });
       const level = service.getStockLevel(wh.id, 'prod-1')!;
       expect(level.onHand).toBe(20);
-      expect(level.lots).toEqual([
+expect(level.lots).toMatchObject([
         { costPrice: 5, quantity: 10, currency: Currency.CUP },
         { costPrice: 10, quantity: 10, currency: Currency.CUP },
       ]);
@@ -709,7 +709,7 @@ describe('WarehouseOfflineService', () => {
       // Origen queda con el lote $10 reducido a 5.
       const level = service.getStockLevel(wh.id, 'prod-1')!;
       expect(level.onHand).toBe(5);
-      expect(level.lots).toEqual([{ costPrice: 10, quantity: 5, currency: Currency.CUP }]);
+expect(level.lots).toMatchObject([{ costPrice: 10, quantity: 5, currency: Currency.CUP }]);
     });
 
     it('U-S13d: transfer_out multi-lote acredita el destino por lote con costo exacto (sin mezcla)', () => {
@@ -745,11 +745,11 @@ describe('WarehouseOfflineService', () => {
       expect(transfers[1]).toMatchObject({ quantity: 5, costPrice: 10 });
 
       // Origen queda con 5@$10; destino acredita 10@$5 + 5@$10 separados.
-      expect(service.getStockLevel(whA.id, 'prod-1')!.lots).toEqual([
+expect(service.getStockLevel(whA.id, 'prod-1')!.lots).toMatchObject([
         { costPrice: 10, quantity: 5, currency: Currency.CUP },
       ]);
       const levelB = service.getStockLevel(whB.id, 'prod-1')!;
-      expect(levelB.lots).toEqual([
+      expect(levelB.lots).toMatchObject([
         { costPrice: 5, quantity: 10, currency: Currency.CUP },
         { costPrice: 10, quantity: 5, currency: Currency.CUP },
       ]);
@@ -782,7 +782,7 @@ describe('WarehouseOfflineService', () => {
       expect(result.succeeded).toBe(true);
       const level = service.getStockLevel(wh.id, 'prod-1')!;
       // Se consumieron 10@$5 completos y 2@$10 → quedan 8@$10.
-      expect(level.lots).toEqual([{ costPrice: 10, quantity: 8, currency: Currency.CUP }]);
+expect(level.lots).toMatchObject([{ costPrice: 10, quantity: 8, currency: Currency.CUP }]);
       expect(level.onHand).toBe(8);
     });
 
@@ -806,7 +806,7 @@ describe('WarehouseOfflineService', () => {
       });
       expect(result.succeeded).toBe(true);
       const level = service.getStockLevel(wh.id, 'prod-1')!;
-      expect(level.lots).toEqual([{ costPrice: 7, quantity: 6 }]);
+      expect(level.lots).toMatchObject([{ costPrice: 7, quantity: 6 }]);
       const sale = service.getMovements().find((m) => m.type === 'sale_out')!;
       expect(sale.costPrice).toBe(7);
       expect(sale.inventoryEntryId).toBeDefined();
@@ -974,7 +974,7 @@ describe('WarehouseOfflineService', () => {
 
       const level = service.getStockLevel(wh.id, 'prod-1')!;
       expect(level.onHand).toBe(10);
-      expect(level.lots).toEqual([{ costPrice: 10, quantity: 10, currency: Currency.CUP }]);
+      expect(level.lots).toMatchObject([{ costPrice: 10, quantity: 10, currency: Currency.CUP }]);
       expect(level.costPrice).toBe(10); // display = lote restante exacto
 
       const reversal = service.getMovements().find((m) => m.type === 'reversal')!;
@@ -1019,7 +1019,7 @@ describe('WarehouseOfflineService', () => {
       const level = service.getStockLevel(wh.id, 'prod-1')!;
       // La reversa quita SOLO las 5 restantes del lote $5 (las 5 transferidas
       // ya no están — D9); el lote $10 queda intacto.
-      expect(level.lots).toEqual([{ costPrice: 10, quantity: 10, currency: Currency.CUP }]);
+      expect(level.lots).toMatchObject([{ costPrice: 10, quantity: 10, currency: Currency.CUP }]);
       expect(level.onHand).toBe(10);
       const reversal = service.getMovements().find((m) => m.type === 'reversal')!;
       expect(reversal.quantity).toBe(5);
@@ -1094,7 +1094,7 @@ describe('WarehouseOfflineService', () => {
       // Almacén re-acredita el lote exacto.
       const level = service.getStockLevel(wh.id, 'prod-1')!;
       expect(level.onHand).toBe(24);
-      expect(level.lots).toEqual([{ costPrice: 660, quantity: 24, currency: Currency.CUP }]);
+      expect(level.lots).toMatchObject([{ costPrice: 660, quantity: 24, currency: Currency.CUP }]);
 
       // La entrada de tienda queda soft-deleted (isActive=false — no vuelve al
       // ciclo FIFO de getAvailableInventoryCosts, que filtra isActive).
@@ -1163,11 +1163,11 @@ describe('WarehouseOfflineService', () => {
       expect(result.succeeded).toBe(true);
 
       // Origen recupera 6@$5; destino queda en 0.
-      expect(service.getStockLevel(whA.id, 'prod-1')!.lots).toEqual([
+expect(service.getStockLevel(whA.id, 'prod-1')!.lots).toMatchObject([
         { costPrice: 5, quantity: 10, currency: Currency.CUP },
       ]);
       expect(service.getStockLevel(whB.id, 'prod-1')!.onHand).toBe(0);
-      expect(service.getStockLevel(whB.id, 'prod-1')!.lots).toEqual([]);
+      expect(service.getStockLevel(whB.id, 'prod-1')!.lots).toMatchObject([]);
 
       const reversal = service.getMovements().find((m) => m.type === 'reversal')!;
       expect(reversal.costPrice).toBe(5);
@@ -1484,7 +1484,7 @@ describe('WarehouseOfflineService', () => {
       // La reversa quita SOLO las 5 restantes del lote $5 (las 5 transferidas
       // ya salieron); el lote $10 queda intacto — la reversa es por-lote (D9/D10).
       const level = service.getStockLevel(wh.id, 'prod-1')!;
-      expect(level.lots).toEqual([{ costPrice: 10, quantity: 10, currency: Currency.CUP }]);
+      expect(level.lots).toMatchObject([{ costPrice: 10, quantity: 10, currency: Currency.CUP }]);
       expect(level.onHand).toBe(10);
       const reversal = service.getMovements().find((m) => m.type === 'reversal')!;
       expect(reversal.quantity).toBe(5);

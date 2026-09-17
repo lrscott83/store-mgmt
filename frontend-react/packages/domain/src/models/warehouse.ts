@@ -28,8 +28,14 @@ export type WarehouseMovementType =
 export interface WarehouseStockLot {
   costPrice: number;
   quantity: number;
-  /** Moneda de `costPrice` (plan 2026-09-16). Ausente = CUP (DEFAULT_CURRENCY). */
+/** Moneda de `costPrice` (plan 2026-09-16). Ausente = CUP (DEFAULT_CURRENCY). */
   currency?: Currency;
+  /**
+   * Compra que originó la tanda (plan 2026-09-16, A4). Opcional para
+   * compatibilidad con datos anteriores — la reversa lo usa para localizar
+   * la tanda exacta y solo usa el costo como fallback legacy.
+   */
+  lotOriginMovementId?: string;
 }
 
 /** Maestro de almacén — soft-delete vía `isActive`. */

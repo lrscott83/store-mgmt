@@ -634,10 +634,16 @@ const messages: Record<string, string> = {
   'WAREHOUSES.REVERSAL_ENTRY_NOT_FOUND': 'No se encontró la entrada de tienda asociada a la salida.',
   'WAREHOUSES.REVERSAL_LOT_CONSUMED': 'El lote de la compra ya fue consumido — no quedan unidades que revertir.',
   'WAREHOUSES.REVERSAL_EDIT_TITLE': 'Editar movimiento',
+  // Edición de una compra parcialmente consumida (plan 2026-09-16, A1/A9e):
+  // el tope editable es lo que QUEDA del lote, nunca la cantidad original.
+  'WAREHOUSES.EDIT_REMAINING_HINT':
+    'Solo puede editar hasta {max} — es lo que queda de esta compra.',
+  'WAREHOUSES.EDIT_MAX_EXCEEDED':
+    'La cantidad supera lo que queda de esta compra. Solo puede editar hasta {max}.',
   'WAREHOUSES.MOVEMENT_NOT_FOUND': 'El movimiento no existe.',
   'WAREHOUSES.MOVEMENT_UPDATED': 'Movimiento actualizado.',
   'WAREHOUSES.ACTIONS': 'Acciones de',
-  'WAREHOUSES.REVERT_ACTION': 'Revertir',
+  'WAREHOUSES.REVERT_ACTION': 'Eliminar',
   'WAREHOUSES.EDIT_ACTION': 'Editar',
   'WAREHOUSES.COMPRA': 'Compra',
   'WAREHOUSES.EDIT_MOVEMENT': 'Editar movimiento',
