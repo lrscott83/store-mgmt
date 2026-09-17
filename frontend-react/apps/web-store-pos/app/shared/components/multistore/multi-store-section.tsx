@@ -1,10 +1,10 @@
 // multi-store-panels — shared scaffolding for the six multi-store views.
 // Renders the GLOBAL controls the user asked to keep outside the panels:
-// the store select ("Todas" + one option per store), the global-filters slot
-// and the outside-panels totals row, then one compact collapsible panel per
-// store. The per-store collapse state lives HERE (one Set of open store ids),
-// so views only supply per-store content, per-store totals and the
-// outside-panels aggregate totals.
+// the store select ("Todas las tiendas" + one option per store), the
+// global-filters slot and the outside-panels totals row, then one compact
+// collapsible panel per store. The per-store collapse state lives HERE (one
+// Set of open store ids), so views only supply per-store content, per-store
+// totals and the outside-panels aggregate totals.
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { useIntl } from 'react-intl';
@@ -65,22 +65,19 @@ export function MultiStoreSection({
     <div className="space-y-2">
       {/* Global store select + global filters — one row, outside the panels. */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <label className="flex items-center gap-1 text-sm text-text">
-          <span className="whitespace-nowrap">{intl.formatMessage({ id: 'MULTISTORE.STORE_LABEL' })}</span>
-          <select
-            data-testid="multistore-select"
-            value={selectedStoreId ?? ''}
-            onChange={(e) => onSelectedStoreIdChange(e.target.value === '' ? null : e.target.value)}
-            className="rounded border border-border bg-surface px-2 py-1 text-sm"
-          >
-            <option value="">{intl.formatMessage({ id: 'MULTISTORE.ALL_STORES' })}</option>
-            {stores.map((store) => (
-              <option key={store.id} value={store.id}>
-                {store.name}
-              </option>
-            ))}
-          </select>
-        </label>
+        <select
+          data-testid="multistore-select"
+          value={selectedStoreId ?? ''}
+          onChange={(e) => onSelectedStoreIdChange(e.target.value === '' ? null : e.target.value)}
+          className="rounded border border-border bg-surface px-2 py-1 text-sm"
+        >
+          <option value="">{intl.formatMessage({ id: 'MULTISTORE.ALL_STORES' })}</option>
+          {stores.map((store) => (
+            <option key={store.id} value={store.id}>
+              {store.name}
+            </option>
+          ))}
+        </select>
         {filters}
       </div>
 

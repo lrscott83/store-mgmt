@@ -4,10 +4,11 @@ import type { SaleCredit } from '@store-mgmt/domain';
 import { EFeatures } from '@store-mgmt/domain';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
+import { DateRangeFilter } from '~/shared/components/date-range-filter/date-range-filter';
 import { Card } from '~/shared/components/ui/card';
 import { InfoBox } from '~/shared/components/ui/info-box';
 import { ChevronDownIcon } from '~/shared/components/ui/icons';
-import { formatLocalDate, groupByLocalDay } from '~/shared/lib/date-utils';
+import { addDays, formatLocalDate, groupByLocalDay, startOfDay } from '~/shared/lib/date-utils';
 import type { LocalDayGroup } from '~/shared/lib/date-utils';
 import { SaleCreditOfflineService } from '../lib/services/sale-credit-offline-service';
 import { SaleCreditList } from '../components/sale-credit-list';
@@ -26,18 +27,22 @@ import {
 export const clientLoader = featureLoader([EFeatures.CreditSale]);
 
 /**
- * Matches Angular's `sale-credits.component.html` (Créditos): NO filters at
- * all — Angular's `loadSaleCredits()` always calls `filterSaleCredits(null,
- * null, null, null)` (no date-range/paid-state UI exists). Credits grouped
- * by date into an accordion; each date panel wraps `SaleCreditList` with NO
- * `readOnly` prop passed (Angular's `<app-sale-credit-list>` here has no
- * `[readOnly]` binding → default `true`, no edit/pay actions reachable from
- * this view). Header shows count + total of UNPAID credits only.
+ * React port of Angular's `sale-credits.component.html` (Créditos): credits
+ * grouped by date into an accordion; each date panel wraps `SaleCreditList`
+ * with NO `readOnly` prop passed (Angular's `<app-sale-credit-list>` here
+ * has no `[readOnly]` binding → default `true`, no edit/pay actions
+ * reachable from this view). Header shows count + total of UNPAID credits
+ * only. Angular's `loadSaleCredits()` always calls `filterSaleCredits(null,
+ * null, null, null)` (no date-range/paid-state UI exists); the user-added
+ * DateRangeFilter feeds the same service a half-open [start, next-day
+ * midnight) window — with no range picked the call stays all-nulls.
  *
  * multi-store-panels: OwnerAdmin + módulo MultiStores + ≥2 tiendas activas →
  * un panel colapsable por tienda (datos locales del dispositivo, DEK por
- * tienda), select global "Todas"/tienda y totales fuera de los paneles.
- * Sin MultiStores la vista es idéntica a la original.
+ * tienda), select global "Todas las tiendas"/tienda y el filtro de fechas
+ * en la misma fila. La fila de totales fuera de los paneles se eliminó por
+ * decisión del usuario; el rango se aplica a los créditos de cada tienda.
+ * Sin MultiStores la vista es idéntica a la original salvo el filtro.
  */
 export function SaleCreditsPage() {
   const intl = useIntl();
@@ -47,13 +52,21 @@ export function SaleCreditsPage() {
   const { enabled: multiStoreEnabled, stores: multiStoreStores } = useMultiStore();
   const [storeCredits, setStoreCredits] = useState<Map<string, SaleCredit[]>>(new Map());
   const [selectedMultiStoreId, setSelectedMultiStoreId] = useState<string | null>(null);
+  const [dateRange, setDateRange] = useState<{ start: Date | null; end: Date | null }>({
+    start: null,
+    end: null,
+  });
 
   // WU4 (flagged mismatch #4): Angular's SaleCreditsComponent.loadSaleCredits() always
   // calls filterSaleCredits(null, null, null, null) (sale-credits.component.ts:51-52) —
   // rewired here instead of bypassing the service filter with getAll().filter(isActive).
   async function loadSaleCredits() {
     const service = new SaleCreditOfflineService(storeId);
-    const response = await service.filterSaleCredits(null, null, null, null);
+    // The service's endDate is EXCLUSIVE (`c.date < endDate`) — sail the end
+    // window to next-day midnight so the selected end day is included.
+    const start = dateRange.start ? startOfDay(dateRange.start) : null;
+    const end = dateRange.end ? startOfDay(addDays(dateRange.end, 1)) : null;
+    const response = await service.filterSaleCredits(null, null, start, end);
     // SaleCreditOfflineService.filterSaleCredits is a same-tick `Promise.resolve(...)` over
     // local storage — it never actually fails; this guard exists for the type only.
     if (!response.succeeded) return;
@@ -71,8 +84,8 @@ export function SaleCreditsPage() {
 
   useEffect(() => {
     void loadSaleCredits();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadSaleCredits reads only storeId
-  }, [storeId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadSaleCredits reads storeId + dateRange (the primitive bounds below)
+  }, [storeId, dateRange.start, dateRange.end]);
 
   // multi-store-panels: load EVERY store's local credits read-only (per-store DEK).
   useEffect(() => {
@@ -115,21 +128,20 @@ export function SaleCreditsPage() {
 
   // ─── multi-store mode ────────────────────────────────────────────────────
   if (multiStoreEnabled) {
-    const visibleCredits =
-      selectedMultiStoreId === null
-        ? storeCredits
-        : new Map([...storeCredits].filter(([id]) => id === selectedMultiStoreId));
-    const totals = [...visibleCredits.values()].reduce(
-      (acc, credits) => {
-        for (const credit of credits) {
-          if (!credit.isPaid) {
-            acc.count += 1;
-            acc.total += credit.total;
-          }
-        }
-        return acc;
-      },
-      { count: 0, total: 0 },
+    // Date range applied client-side before rendering: end day INCLUSIVE → the
+    // same half-open [start, next-day midnight) window the service gets.
+    const rangeStart = dateRange.start ? startOfDay(dateRange.start) : null;
+    const rangeEnd = dateRange.end ? startOfDay(addDays(dateRange.end, 1)) : null;
+    const filteredStoreCredits = new Map(
+      [...storeCredits].map(([id, credits]) => {
+        const filtered = credits.filter((c) => {
+          const date = new Date(c.date);
+          if (rangeStart && date < rangeStart) return false;
+          if (rangeEnd && date >= rangeEnd) return false;
+          return true;
+        });
+        return [id, filtered] as const;
+      }),
     );
     return (
       <Card padding="tight" title={intl.formatMessage({ id: 'SALE_CREDIT.TITLE' })}>
@@ -137,15 +149,15 @@ export function SaleCreditsPage() {
           stores={multiStoreStores}
           selectedStoreId={selectedMultiStoreId}
           onSelectedStoreIdChange={setSelectedMultiStoreId}
-          totals={
-            <MultiStoreTotal
-              label={intl.formatMessage({ id: 'SALE_CREDIT.TITLE' })}
-              value={totals.total}
-              valueClassName="text-danger"
+          filters={
+            <DateRangeFilter
+              value={dateRange}
+              onApply={setDateRange}
+              className="flex-1 min-w-0"
             />
           }
           renderStoreTotals={(store) => {
-            const credits = storeCredits.get(store.id) ?? [];
+            const credits = filteredStoreCredits.get(store.id) ?? [];
             const unpaid = credits.filter((c) => !c.isPaid);
             const total = unpaid.reduce((t, c) => t + c.total, 0);
             return (
@@ -158,7 +170,7 @@ export function SaleCreditsPage() {
           }}
         >
           {(store) => {
-            const credits = storeCredits.get(store.id) ?? [];
+            const credits = filteredStoreCredits.get(store.id) ?? [];
             if (credits.length === 0) {
               return (
                 <div className="py-4 text-center text-text-muted">
@@ -232,6 +244,10 @@ export function SaleCreditsPage() {
         </div>
       }
     >
+      <div className="mb-3">
+        <DateRangeFilter value={dateRange} onApply={setDateRange} />
+      </div>
+
       {dateSaleCredits.length === 0 && (
         <InfoBox variant="primary" className="mb-6 text-center">
           {/* SALE_CREDIT.NO_SALE_CREDIT_FOUND */}

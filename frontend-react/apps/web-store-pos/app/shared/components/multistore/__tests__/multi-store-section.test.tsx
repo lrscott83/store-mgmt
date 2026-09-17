@@ -5,8 +5,7 @@ import { useState } from 'react';
 import { MultiStoreSection, MultiStoreTotal } from '../multi-store-section';
 
 const messages = {
-  'MULTISTORE.ALL_STORES': 'Todas',
-  'MULTISTORE.STORE_LABEL': 'Tienda:',
+  'MULTISTORE.ALL_STORES': 'Todas las tiendas',
   'MULTISTORE.NO_LOCAL_DATA': 'Sin datos de esta tienda en este dispositivo',
 };
 
@@ -38,12 +37,14 @@ describe('MultiStoreSection', () => {
     localStorage.setItem('language', 'es');
   });
 
-  it('renders the global select with "Todas" + one option per store, and the filters slot outside panels', () => {
+  it('renders the global select with "Todas las tiendas" + one option per store, and the filters slot outside panels', () => {
     render(<Harness />);
     const select = screen.getByTestId('multistore-select') as HTMLSelectElement;
     const options = Array.from(select.options).map((o) => o.text);
-    expect(options).toEqual(['Todas', 'Tienda A', 'Tienda B']);
+    expect(options).toEqual(['Todas las tiendas', 'Tienda A', 'Tienda B']);
     expect(screen.getByTestId('global-filter')).toBeInTheDocument();
+    // The "Tienda:" label was removed from the global controls row.
+    expect(screen.queryByText('Tienda:')).toBeNull();
   });
 
   it('starts with all panels collapsed (totals visible via header only)', () => {
