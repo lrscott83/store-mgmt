@@ -1,5 +1,9 @@
 # store-mgmt — Agent Instructions
 
+## Angular frontend is LEGACY — NON-NEGOTIABLE (user-mandated 2026-09-17)
+
+**The Angular frontend (`frontend/`) is legacy and is NEVER touched.** All changes belong in the React frontend (`frontend-react/`). Do not read, edit, or derive UI decisions from the Angular app — it is frozen. Any work that would modify `frontend/` must stop and ask; the answer will be "work in React".
+
 ## Backend scope rule — NON-NEGOTIABLE (user-mandated 2026-08-08)
 
 **In this backend test-coverage work, the agent may only ADD new E2E tests.** If the work would require modifying **production source code** or **existing E2E tests** (backend), the agent MUST stop and notify the user for review and approval before touching anything. This is not optional, not bypassable, and applies to sub-agents and delegated phases too — any delegation that could reach backend production code or existing E2E tests must carry this rule verbatim in its prompt.
