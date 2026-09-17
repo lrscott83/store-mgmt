@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import { EModules, PaymentType, SaleCreditErrors } from '@store-mgmt/domain';
 import type { SaleCredit } from '@store-mgmt/domain';
@@ -534,13 +534,115 @@ describe('SaleCreditsPage (multi-store mode)', () => {
 
     // s1 keeps only the in-range day; the out-of-range one is filtered out.
     await waitFor(() => {
-      expect(
-        screen.getByTestId('multistore-credit-date-toggle-s1-2026-03-15'),
-      ).toBeInTheDocument();
+      expect(screen.getByTestId('multistore-credit-date-toggle-s1-2026-03-15')).toBeInTheDocument();
     });
     expect(screen.queryByTestId('multistore-credit-date-toggle-s1-2026-06-01')).toBeNull();
     // s2 had local data but nothing in range; s3 never had local data.
     expect(screen.getByText(esMessages['MULTISTORE.NO_CREDITS_IN_RANGE'])).toBeInTheDocument();
     expect(screen.getByText(esMessages['MULTISTORE.NO_LOCAL_DATA'])).toBeInTheDocument();
+  });
+
+  // Header parity (user request): "Créditos (n)" + the unpaid total in red, in
+  // BOTH modes. In multi-store mode the numbers follow the CURRENT filter — the
+  // store select ("Todas" = every store) intersected with the applied range —
+  // so the header can never disagree with the panels below it. Scoped to
+  // `card-header` because per-store panel headers render their own (n) + total.
+  it('header shows the visible stores unpaid count + total and follows the store select', async () => {
+    authStoreState.user = {
+      selectedStoreId: 's1',
+      isOwnerAdmin: true,
+      storeModuleIds: [EModules.MultiStores],
+      storeList: [
+        { id: 's1', name: 'Tienda A', isActive: true },
+        { id: 's2', name: 'Tienda B', isActive: true },
+      ],
+    };
+    vi.mocked(readStoreSaleCredits).mockImplementation((storeId) => {
+      if (storeId === 's1') {
+        return [makeCredit({ id: 'c1', total: 10 }), makeCredit({ id: 'c2', total: 20 })];
+      }
+      return [makeCredit({ id: 'c3', total: 5 })];
+    });
+    vi.mocked(SaleCreditOfflineService).mockImplementation(
+      () =>
+        ({
+          filterSaleCredits: vi.fn().mockResolvedValue(creditsResponse([])),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        }) as any,
+    );
+
+    render(
+      <Wrapper>
+        <SaleCreditsPage />
+      </Wrapper>,
+    );
+
+    await screen.findByTestId('multistore-select');
+    const header = () => document.querySelector('[data-slot="card-header"]') as HTMLElement;
+
+    // "Todas las tiendas": aggregate of every store (2 + 1 unpaid; 30 + 5).
+    await waitFor(() => expect(within(header()).getByText('(3)')).toBeInTheDocument());
+    expect(within(header()).getByText('$35')).toBeInTheDocument();
+
+    // Narrowing to Tienda B narrows the header to that store only (1 unpaid, $5).
+    fireEvent.change(screen.getByTestId('multistore-select'), { target: { value: 's2' } });
+    await waitFor(() => expect(within(header()).getByText('(1)')).toBeInTheDocument());
+    expect(within(header()).getByText('$5')).toBeInTheDocument();
+  });
+
+  it('header follows the applied date range', async () => {
+    authStoreState.user = {
+      selectedStoreId: 's1',
+      isOwnerAdmin: true,
+      storeModuleIds: [EModules.MultiStores],
+      storeList: [
+        { id: 's1', name: 'Tienda A', isActive: true },
+        { id: 's2', name: 'Tienda B', isActive: true },
+      ],
+    };
+    // One unpaid credit in March, one in June.
+    vi.mocked(readStoreSaleCredits).mockImplementation((storeId) => {
+      if (storeId === 's1') {
+        return [
+          makeCredit({ id: 'c1', total: 10, date: new Date(2026, 2, 15, 10, 0, 0) }),
+          makeCredit({ id: 'c2', total: 99, date: new Date(2026, 5, 1, 10, 0, 0) }),
+        ];
+      }
+      return [];
+    });
+    vi.mocked(SaleCreditOfflineService).mockImplementation(
+      () =>
+        ({
+          filterSaleCredits: vi.fn().mockResolvedValue(creditsResponse([])),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        }) as any,
+    );
+
+    render(
+      <Wrapper>
+        <SaleCreditsPage />
+      </Wrapper>,
+    );
+
+    await screen.findByTestId('multistore-select');
+    const header = () => document.querySelector('[data-slot="card-header"]') as HTMLElement;
+
+    // No range applied yet: both credits count.
+    await waitFor(() => expect(within(header()).getByText('(2)')).toBeInTheDocument());
+    expect(within(header()).getByText('$109')).toBeInTheDocument();
+
+    // March only: the June credit leaves the header too.
+    fireEvent.click(screen.getByTestId('date-range-filter-input'));
+    fireEvent.change(screen.getByTestId('date-range-filter-start'), {
+      target: { value: '2026-03-01' },
+    });
+    fireEvent.change(screen.getByTestId('date-range-filter-end'), {
+      target: { value: '2026-03-31' },
+    });
+    fireEvent.click(screen.getByTestId('date-range-filter-select'));
+    fireEvent.click(screen.getByTestId('date-range-filter-button'));
+
+    await waitFor(() => expect(within(header()).getByText('(1)')).toBeInTheDocument());
+    expect(within(header()).getByText('$10')).toBeInTheDocument();
   });
 });

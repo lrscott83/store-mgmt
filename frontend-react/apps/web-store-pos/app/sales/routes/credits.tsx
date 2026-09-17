@@ -43,6 +43,11 @@ export const clientLoader = featureLoader([EFeatures.CreditSale]);
  * en la misma fila. La fila de totales fuera de los paneles se eliminó por
  * decisión del usuario; el rango se aplica a los créditos de cada tienda.
  * Sin MultiStores la vista es idéntica a la original salvo el filtro.
+ *
+ * Header count + total (ambos modos): `CreditsCardTitle` pinta "Créditos (n)"
+ * y el total impago en rojo a la derecha. En MultiStores el n/total reflejan
+ * el filtro vigente — la tienda elegida en el select ("Todas" = todas) por el
+ * rango de fechas aplicado — para que el header coincida con lo visible.
  */
 export function SaleCreditsPage() {
   const intl = useIntl();
@@ -143,18 +148,35 @@ export function SaleCreditsPage() {
         return [id, filtered] as const;
       }),
     );
+    // Header n/total follow the CURRENT filter, not the whole store list: the
+    // store select ("Todas" = every store) intersected with the applied range.
+    // Mirrors MultiStoreSection's own visibleStores rule so header and panels
+    // can never disagree.
+    const visibleStores =
+      selectedMultiStoreId === null
+        ? multiStoreStores
+        : multiStoreStores.filter((s) => s.id === selectedMultiStoreId);
+    const visibleCredits = visibleStores.flatMap((s) => filteredStoreCredits.get(s.id) ?? []);
+    const multiStoreCreditsCount = visibleCredits.reduce(
+      (count, credit) => count + (!credit.isPaid ? 1 : 0),
+      0,
+    );
+    const multiStoreCreditsTotal = visibleCredits.reduce(
+      (total, credit) => total + (!credit.isPaid ? credit.total : 0),
+      0,
+    );
+
     return (
-      <Card padding="tight" title={intl.formatMessage({ id: 'SALE_CREDIT.TITLE' })}>
+      <Card
+        padding="tight"
+        title={<CreditsCardTitle count={multiStoreCreditsCount} total={multiStoreCreditsTotal} />}
+      >
         <MultiStoreSection
           stores={multiStoreStores}
           selectedStoreId={selectedMultiStoreId}
           onSelectedStoreIdChange={setSelectedMultiStoreId}
           filters={
-            <DateRangeFilter
-              value={dateRange}
-              onApply={setDateRange}
-              className="flex-1 min-w-0"
-            />
+            <DateRangeFilter value={dateRange} onApply={setDateRange} className="flex-1 min-w-0" />
           }
           renderStoreTotals={(store) => {
             const credits = filteredStoreCredits.get(store.id) ?? [];
@@ -176,7 +198,9 @@ export function SaleCreditsPage() {
               return (
                 <div className="py-4 text-center text-text-muted">
                   {intl.formatMessage({
-                    id: hasLocalData ? 'MULTISTORE.NO_CREDITS_IN_RANGE' : 'MULTISTORE.NO_LOCAL_DATA',
+                    id: hasLocalData
+                      ? 'MULTISTORE.NO_CREDITS_IN_RANGE'
+                      : 'MULTISTORE.NO_LOCAL_DATA',
                   })}
                 </div>
               );
@@ -230,23 +254,7 @@ export function SaleCreditsPage() {
   }
 
   return (
-    <Card
-      padding="tight"
-      title={
-        <div className="flex items-center justify-between">
-          <span className="flex items-center gap-2">
-            {/* SALE_CREDIT.TITLE */}
-            {intl.formatMessage({ id: 'SALE_CREDIT.TITLE' })}
-            <span className="rounded-full bg-success/10 px-2 py-0.5 text-xs font-semibold text-success">
-              ({creditsCount})
-            </span>
-          </span>
-          <span className="text-sm font-semibold text-danger whitespace-nowrap">
-            {formatCurrency(creditsTotal)}
-          </span>
-        </div>
-      }
-    >
+    <Card padding="tight" title={<CreditsCardTitle count={creditsCount} total={creditsTotal} />}>
       <div className="mb-3">
         <DateRangeFilter value={dateRange} onApply={setDateRange} />
       </div>
@@ -297,6 +305,32 @@ export function SaleCreditsPage() {
         })}
       </div>
     </Card>
+  );
+}
+
+/**
+ * Card header shared by BOTH modes (single-store and MultiStore) so the two
+ * cannot drift: "Créditos (n)" on the left and the unpaid total in red on the
+ * right. `count`/`total` are UNPAID only, matching every other count/total in
+ * this view (day panels and per-store panels). The count keeps the
+ * `rounded-full bg-success/10` pill class — pinned by
+ * `e2e/credits-history.spec.ts`.
+ */
+function CreditsCardTitle({ count, total }: { count: number; total: number }) {
+  const intl = useIntl();
+  return (
+    <div className="flex items-center justify-between">
+      <span className="flex items-center gap-2">
+        {/* SALE_CREDIT.TITLE */}
+        {intl.formatMessage({ id: 'SALE_CREDIT.TITLE' })}
+        <span className="rounded-full bg-success/10 px-2 py-0.5 text-xs font-semibold text-success">
+          ({count})
+        </span>
+      </span>
+      <span className="text-sm font-semibold text-danger whitespace-nowrap">
+        {formatCurrency(total)}
+      </span>
+    </div>
   );
 }
 
