@@ -24,3 +24,21 @@ describe('es.ts — offline provisioning + roster export ids', () => {
     expect(messages[key].length).toBeGreaterThan(0);
   });
 });
+
+// Plan 2026-09-16 (Fase 2, A1/A9e): el tope de edición de una compra necesita
+// las dos caras del mensaje — el aviso permanente y el rechazo al superarlo.
+// Un id ausente renderiza el id crudo en pantalla.
+describe('es.ts — mensajes del tope de edición (A1/A9e)', () => {
+  const requiredKeys = ['WAREHOUSES.EDIT_REMAINING_HINT', 'WAREHOUSES.EDIT_MAX_EXCEEDED'];
+
+  it.each(requiredKeys)('defines a non-empty string for %s', (key) => {
+    expect(typeof messages[key]).toBe('string');
+    expect(messages[key].length).toBeGreaterThan(0);
+  });
+
+  it('ambos mensajes interpolan el tope con el placeholder {max}', () => {
+    for (const key of requiredKeys) {
+      expect(messages[key]).toContain('{max}');
+    }
+  });
+});

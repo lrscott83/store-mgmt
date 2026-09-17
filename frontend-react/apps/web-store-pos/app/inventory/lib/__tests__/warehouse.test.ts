@@ -11,6 +11,7 @@ import {
   validateMovementQuantity,
   validateReversalQuantity,
 } from '../warehouse';
+import { remainingPurchaseUnits } from '../warehouse';
 
 describe('warehouse helpers', () => {
   describe('movementDirection', () => {
@@ -215,6 +216,56 @@ describe('warehouse helpers', () => {
 
     it('synthesizeLotFromLevel with zero onHand returns an empty lot list', () => {
       expect(synthesizeLotFromLevel({ onHand: 0, costPrice: 7.5 })).toEqual([]);
+    });
+  });
+
+  // Plan 2026-09-16 (A1): el tope editable de una compra es lo que QUEDA, y debe
+  // salir de la MISMA regla que usa la reversa (una sola fuente de verdad).
+  describe('remainingPurchaseUnits — tope editable de una compra (A1)', () => {
+    const level = (over: Record<string, unknown> = {}) => ({
+      warehouseId: 'wh-1',
+      productId: 'p-1',
+      onHand: 10,
+      costPrice: 5,
+      ...over,
+    }) as never;
+
+    it('U-A1-6: cuenta solo las tandas con la MISMA referencia de origen', () => {
+      const lots = [
+        { costPrice: 5, quantity: 4, lotOriginMovementId: 'mv-1' },
+        { costPrice: 9, quantity: 6, lotOriginMovementId: 'mv-2' },
+      ];
+      expect(remainingPurchaseUnits(level({ lots }), { id: 'mv-1', quantity: 10, costPrice: 5 })).toBe(4);
+      expect(remainingPurchaseUnits(level({ lots }), { id: 'mv-2', quantity: 10, costPrice: 9 })).toBe(6);
+    });
+
+    it('U-A1-7: nunca supera la cantidad de la fila original', () => {
+      const lots = [{ costPrice: 5, quantity: 40, lotOriginMovementId: 'mv-1' }];
+      expect(remainingPurchaseUnits(level({ lots }), { id: 'mv-1', quantity: 10, costPrice: 5 })).toBe(10);
+    });
+
+    it('U-A1-8: datos viejos SIN referencias → coincidencia exacta por costo', () => {
+      const lots = [
+        { costPrice: 5, quantity: 3 },
+        { costPrice: 7, quantity: 9 },
+      ];
+      expect(remainingPurchaseUnits(level({ lots }), { id: 'mv-old', quantity: 10, costPrice: 5 })).toBe(3);
+    });
+
+    it('U-A1-9: fila sin costo → FIFO hasta el onHand', () => {
+      expect(remainingPurchaseUnits(level({ onHand: 4 }), { id: 'mv-1', quantity: 10 })).toBe(4);
+      expect(remainingPurchaseUnits(level({ onHand: 50 }), { id: 'mv-1', quantity: 10 })).toBe(10);
+    });
+
+    it('U-A1-10: compra ya consumida o nivel inexistente → 0 (tope agotado)', () => {
+      const lots = [{ costPrice: 5, quantity: 0, lotOriginMovementId: 'mv-1' }];
+      expect(remainingPurchaseUnits(level({ lots }), { id: 'mv-1', quantity: 10, costPrice: 5 })).toBe(0);
+      expect(remainingPurchaseUnits(undefined, { id: 'mv-1', quantity: 10, costPrice: 5 })).toBe(0);
+      expect(remainingPurchaseUnits(level({ onHand: 0 }), { id: 'mv-1', quantity: 10, costPrice: 5 })).toBe(0);
+    });
+
+    it('U-A1-11: nivel sin lots cae al lote sintético (legacy) por costo', () => {
+      expect(remainingPurchaseUnits(level({ onHand: 8 }), { id: 'mv-1', quantity: 10, costPrice: 5 })).toBe(8);
     });
   });
 });

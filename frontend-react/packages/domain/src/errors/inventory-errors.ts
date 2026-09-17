@@ -23,4 +23,9 @@ export const InventoryErrors = {
     code: 'Inventory.ProductNotAvailable',
     description: 'El producto no está disponible',
   },
+  WarehouseEntryNotEditable: {
+    code: 'Inventory.WarehouseEntryNotEditable',
+    description:
+      'La entrada proviene de un almacén — no se puede editar en la tienda (edite la salida en el almacén).',
+  },
 } as const satisfies Record<string, BaseError>;
