@@ -1,27 +1,27 @@
 // React.lazy — recharts is NOT imported here, only in chart-core.tsx (STAT-8, CC-6).
 import { lazy, Suspense } from 'react';
-import type { ChartSeriesPoint } from './chart-core';
 
-const SalesChartCore = lazy(() =>
-  import('./chart-core').then((m) => ({ default: m.SalesChartCore })),
+const DonutChartCore = lazy(() =>
+  import('./chart-core').then((m) => ({ default: m.DonutChartCore })),
 );
 
-interface SalesChartProps {
-  data: ChartSeriesPoint[];
+interface DonutChartProps {
+  slices: { id: string; name: string; value: number }[];
   loadingMessage: string;
   emptyMessage: string;
-  /** Formats Y-axis ticks and tooltip values (already currency-aware). */
+  /** Formats amounts (already currency-aware). */
   formatValue: (value: number) => string;
-  seriesName: string;
+  testId?: string;
 }
 
-export function SalesChart({
-  data,
+/** Donut with its percentage legend, lazily loaded (recharts stays in chart-core). */
+export function DonutChart({
+  slices,
   loadingMessage,
   emptyMessage,
   formatValue,
-  seriesName,
-}: SalesChartProps) {
+  testId,
+}: DonutChartProps) {
   return (
     <Suspense
       fallback={
@@ -30,11 +30,11 @@ export function SalesChart({
         </div>
       }
     >
-      <SalesChartCore
-        data={data}
+      <DonutChartCore
+        slices={slices}
         emptyMessage={emptyMessage}
         formatValue={formatValue}
-        seriesName={seriesName}
+        testId={testId}
       />
     </Suspense>
   );

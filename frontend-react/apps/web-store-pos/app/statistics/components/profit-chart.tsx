@@ -1,18 +1,27 @@
 // React.lazy — recharts is NOT imported here, only in chart-core.tsx (STAT-8, CC-6).
 import { lazy, Suspense } from 'react';
-import type { ChartData } from '~/sales/lib/services/order-offline-service';
+import type { ChartSeriesPoint } from './chart-core';
 
 const ProfitChartCore = lazy(() =>
   import('./chart-core').then((m) => ({ default: m.ProfitChartCore })),
 );
 
 interface ProfitChartProps {
-  data: ChartData[];
+  data: ChartSeriesPoint[];
   loadingMessage: string;
   emptyMessage: string;
+  /** Formats Y-axis ticks and tooltip values (already currency-aware). */
+  formatValue: (value: number) => string;
+  seriesName: string;
 }
 
-export function ProfitChart({ data, loadingMessage, emptyMessage }: ProfitChartProps) {
+export function ProfitChart({
+  data,
+  loadingMessage,
+  emptyMessage,
+  formatValue,
+  seriesName,
+}: ProfitChartProps) {
   return (
     <Suspense
       fallback={
@@ -21,7 +30,12 @@ export function ProfitChart({ data, loadingMessage, emptyMessage }: ProfitChartP
         </div>
       }
     >
-      <ProfitChartCore data={data} emptyMessage={emptyMessage} />
+      <ProfitChartCore
+        data={data}
+        emptyMessage={emptyMessage}
+        formatValue={formatValue}
+        seriesName={seriesName}
+      />
     </Suspense>
   );
 }
