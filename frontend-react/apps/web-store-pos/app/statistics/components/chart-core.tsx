@@ -1,57 +1,48 @@
 // IMPORTANT: This is the ONLY file in the project that imports recharts.
-// sales-chart.tsx and profit-chart.tsx use React.lazy to load this file,
-// keeping recharts out of the main/auth/entry bundle (STAT-8, CC-6).
+// sales-chart.tsx / profit-chart.tsx / sparkline.tsx / donut-chart.tsx use
+// React.lazy to load this file, keeping recharts out of the main/auth/entry
+// bundle (STAT-8, CC-6).
 import { useState } from 'react';
 import {
   LineChart,
   Line,
   BarChart,
   Bar,
+  PieChart,
+  Pie,
+  Cell,
   XAxis,
   YAxis,
   Tooltip,
   ResponsiveContainer,
   CartesianGrid,
 } from 'recharts';
-import type { ChartData } from '~/sales/lib/services/order-offline-service';
-import { formatCurrency } from '~/shared/lib/format-currency';
-
-const MONTHS_ES = [
-  'Ene',
-  'Feb',
-  'Mar',
-  'Abr',
-  'May',
-  'Jun',
-  'Jul',
-  'Ago',
-  'Sep',
-  'Oct',
-  'Nov',
-  'Dic',
-] as const;
 
 /**
- * Formats a chart-point `label` Date as `d-MMM` in Spanish, e.g. `3-Jul`.
- * Day without leading zero (3, not 03); abbreviated month name (Jul).
+ * One already-labelled chart point. Labels arrive PRE-FORMATTED by the caller
+ * (dashboard: `formatBucketLabel` — `Lun`, `8`, `Lun 8 – Dom 14`, `Sep`), so no
+ * tickFormatter runs on them (same convention as StoreUsageChartCore below).
  */
-function formatLabel(label: Date): string {
-  const day = label.getDate();
-  const month = MONTHS_ES[label.getMonth()];
-  return `${day}-${month}`;
+export interface ChartSeriesPoint {
+  label: string;
+  value: number;
 }
 
-// ─── Sales Chart (LastMonthSalesComponent — STAT-9) ───────────────────────────
-
-interface SalesChartCoreProps {
-  data: ChartData[];
+interface RangeChartProps {
+  data: ChartSeriesPoint[];
   emptyMessage: string;
+  /** Formats Y-axis ticks and tooltip values (the caller owns the currency rule). */
+  formatValue: (value: number) => string;
+  /** Tooltip series name (e.g. 'Ventas'). */
+  seriesName: string;
 }
 
-export function SalesChartCore({ data, emptyMessage }: SalesChartCoreProps) {
-  const allZero = data.every((p) => p.value === 0);
+// ─── Sales Chart (range — dashboard "Ventas") ─────────────────────────────────
 
-  if (allZero) {
+export function SalesChartCore({ data, emptyMessage, formatValue, seriesName }: RangeChartProps) {
+  const allZero = data.every((point) => point.value === 0);
+
+  if (data.length === 0 || allZero) {
     return (
       <div className="flex items-center justify-center py-10 text-sm text-gray-400">
         {emptyMessage}
@@ -63,11 +54,11 @@ export function SalesChartCore({ data, emptyMessage }: SalesChartCoreProps) {
     <ResponsiveContainer width="100%" height={260}>
       <LineChart data={data} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-        <XAxis dataKey="label" tick={{ fontSize: 10 }} tickFormatter={formatLabel} />
-        <YAxis tick={{ fontSize: 10 }} tickFormatter={(v: number) => formatCurrency(v)} />
+        <XAxis dataKey="label" tick={{ fontSize: 10 }} />
+        <YAxis tick={{ fontSize: 10 }} tickFormatter={(value: number) => formatValue(value)} />
         <Tooltip
-          formatter={(value: number) => [formatCurrency(value), 'Ingresos']}
-          labelFormatter={(label: Date) => formatLabel(label)}
+          formatter={(value: number) => [formatValue(value), seriesName]}
+          labelFormatter={(label: string) => label}
         />
         <Line
           type="monotone"
@@ -75,10 +66,145 @@ export function SalesChartCore({ data, emptyMessage }: SalesChartCoreProps) {
           stroke="#2563eb"
           strokeWidth={2}
           dot={false}
-          name="value"
+          name={seriesName}
         />
       </LineChart>
     </ResponsiveContainer>
+  );
+}
+
+// ─── Profit Chart (range — dashboard "Ganancias") ─────────────────────────────
+
+export function ProfitChartCore({ data, emptyMessage, formatValue, seriesName }: RangeChartProps) {
+  const allZero = data.every((point) => point.value === 0);
+
+  if (data.length === 0 || allZero) {
+    return (
+      <div className="flex items-center justify-center py-10 text-sm text-gray-400">
+        {emptyMessage}
+      </div>
+    );
+  }
+
+  return (
+    <ResponsiveContainer width="100%" height={260}>
+      <BarChart data={data} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+        <XAxis dataKey="label" tick={{ fontSize: 10 }} />
+        <YAxis tick={{ fontSize: 10 }} tickFormatter={(value: number) => formatValue(value)} />
+        <Tooltip
+          formatter={(value: number) => [formatValue(value), seriesName]}
+          labelFormatter={(label: string) => label}
+        />
+        <Bar dataKey="value" fill="#16a34a" name={seriesName} radius={[2, 2, 0, 0]} />
+      </BarChart>
+    </ResponsiveContainer>
+  );
+}
+
+// ─── KPI sparkline (dashboard cards) ──────────────────────────────────────────
+
+interface SparklineCoreProps {
+  values: number[];
+  stroke?: string;
+  testId?: string;
+}
+
+/** Axes-less mini line: the KPI's evolution over the window's buckets. */
+export function SparklineCore({ values, stroke = '#0891b2', testId }: SparklineCoreProps) {
+  const data = values.map((value, index) => ({ index, value }));
+
+  return (
+    <div data-testid={testId} className="h-10 w-full">
+      <ResponsiveContainer width="100%" height={40}>
+        <LineChart data={data} margin={{ top: 2, right: 0, left: 0, bottom: 0 }}>
+          <Line
+            type="monotone"
+            dataKey="value"
+            stroke={stroke}
+            strokeWidth={1.5}
+            dot={false}
+            isAnimationActive={false}
+            name="value"
+          />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+// ─── Donut chart (dashboard breakdowns) ───────────────────────────────────────
+
+const DONUT_COLORS = [
+  '#0891b2',
+  '#2563eb',
+  '#16a34a',
+  '#d97706',
+  '#dc2626',
+  '#7c3aed',
+  '#db2777',
+  '#65a30d',
+] as const;
+
+interface DonutChartCoreProps {
+  slices: { id: string; name: string; value: number }[];
+  emptyMessage: string;
+  formatValue: (value: number) => string;
+  testId?: string;
+}
+
+/**
+ * Donut with a percentage legend BELOW it (cards, never a wide table): each row
+ * shows the slice name, its amount and its share of the total.
+ */
+export function DonutChartCore({ slices, emptyMessage, formatValue, testId }: DonutChartCoreProps) {
+  const total = slices.reduce((sum, slice) => sum + slice.value, 0);
+
+  if (slices.length === 0 || total === 0) {
+    return (
+      <div className="flex items-center justify-center py-10 text-sm text-gray-400">
+        {emptyMessage}
+      </div>
+    );
+  }
+
+  return (
+    <div data-testid={testId}>
+      <ResponsiveContainer width="100%" height={200}>
+        <PieChart>
+          <Pie
+            data={slices}
+            dataKey="value"
+            nameKey="name"
+            innerRadius={45}
+            outerRadius={80}
+            paddingAngle={2}
+          >
+            {slices.map((slice, index) => (
+              <Cell key={slice.id} fill={DONUT_COLORS[index % DONUT_COLORS.length]} />
+            ))}
+          </Pie>
+          <Tooltip formatter={(value: number) => [formatValue(value), '']} />
+        </PieChart>
+      </ResponsiveContainer>
+      <ul className="mt-2 space-y-1">
+        {slices.map((slice, index) => (
+          <li key={slice.id} className="flex items-center justify-between gap-2 text-sm">
+            <span className="flex min-w-0 items-center gap-2">
+              <span
+                aria-hidden="true"
+                className="h-2.5 w-2.5 shrink-0 rounded-full"
+                style={{ backgroundColor: DONUT_COLORS[index % DONUT_COLORS.length] }}
+              />
+              <span className="truncate">{slice.name}</span>
+            </span>
+            <span className="whitespace-nowrap">
+              {formatValue(slice.value)} ({Math.round((slice.value / total) * 100)}%)
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
@@ -86,7 +212,7 @@ export function SalesChartCore({ data, emptyMessage }: SalesChartCoreProps) {
 //
 // Days on X, store-usage count on Y. The labels arrive ALREADY FORMATTED
 // ('Lun'…'Dom' for the 7-day window, '1'…'30' for the 30-day one) — string
-// labels, NOT Dates, so formatLabel must not run on them. A per-day discrete
+// labels, NOT Dates, so no tickFormatter may run on them. A per-day discrete
 // count is the same shape as the profit chart, hence BarChart.
 //
 // Each point carries the owners of the stores used that day (the dashboard
@@ -157,39 +283,5 @@ export function StoreUsageChartCore({
         </div>
       )}
     </div>
-  );
-}
-
-// ─── Profit Chart (LastMonthSaleProfitsComponent — STAT-10/11) ────────────────
-
-interface ProfitChartCoreProps {
-  data: ChartData[];
-  emptyMessage: string;
-}
-
-export function ProfitChartCore({ data, emptyMessage }: ProfitChartCoreProps) {
-  const allZero = data.every((p) => p.value === 0);
-
-  if (allZero) {
-    return (
-      <div className="flex items-center justify-center py-10 text-sm text-gray-400">
-        {emptyMessage}
-      </div>
-    );
-  }
-
-  return (
-    <ResponsiveContainer width="100%" height={260}>
-      <BarChart data={data} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-        <XAxis dataKey="label" tick={{ fontSize: 10 }} tickFormatter={formatLabel} />
-        <YAxis tick={{ fontSize: 10 }} tickFormatter={(v: number) => formatCurrency(v)} />
-        <Tooltip
-          formatter={(value: number) => [formatCurrency(value as number), 'Ganancia bruta']}
-          labelFormatter={(label: Date) => formatLabel(label)}
-        />
-        <Bar dataKey="value" fill="#16a34a" name="value" radius={[2, 2, 0, 0]} />
-      </BarChart>
-    </ResponsiveContainer>
   );
 }

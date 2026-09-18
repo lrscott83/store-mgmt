@@ -5,21 +5,14 @@ import { render, screen, fireEvent } from '@testing-library/react';
  * [FC-C1] Charts de estadísticas — chart-core.tsx — Vitest
  * docs/testing/frontend-coverage/FC-C1.md
  *
- * Tests SalesChartCore and ProfitChartCore with recharts mocked
- * to avoid JSDOM canvas limitations.
+ * Tests the range chart cores (dashboard), the KPI sparkline and the donut with
+ * recharts mocked to avoid JSDOM canvas limitations. StoreUsageChartCore keeps
+ * its own suite (admin dashboard, string labels, no tickFormatter).
  */
 
-// Mock recharts — JSDOM doesn't support canvas/SVG rendering.
-// XAxis renders the tickFormatter output for two sample dates so the
-// internal formatLabel can be asserted; the dates come from `xAxisSamples`
-// (set per test via the hoisted store below).
-const { xAxisSamples, barOnClickPayload } = vi.hoisted(() => ({
-  xAxisSamples: {
-    first: new Date(2026, 6, 3),
-    second: new Date(2026, 2, 15),
-  },
-  // Payload the mocked <Bar> onClick fires with — mutable so tests can exercise
-  // the clicked bar's owner list (empty vs populated).
+// Payload the mocked <Bar> onClick fires with — mutable so tests can exercise
+// the clicked bar's owner list (empty vs populated).
+const { barOnClickPayload } = vi.hoisted(() => ({
   barOnClickPayload: { label: 'Lun', value: 3, owners: ['Ana', 'Beto'] },
 }));
 
@@ -40,18 +33,18 @@ vi.mock('recharts', () => ({
       bar
     </button>
   ),
+  PieChart: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="pie-chart">{children}</div>
+  ),
+  Pie: ({ children }: { children: React.ReactNode }) => <div data-testid="pie">{children}</div>,
+  Cell: () => null,
   XAxis: ({
     dataKey,
     tickFormatter,
   }: {
     dataKey?: string;
     tickFormatter?: (label: Date) => string;
-  }) =>
-    dataKey === 'label' && tickFormatter ? (
-      <span data-testid="x-axis-ticks">
-        {`${tickFormatter(xAxisSamples.first)}|${tickFormatter(xAxisSamples.second)}`}
-      </span>
-    ) : null,
+  }) => (dataKey === 'label' && tickFormatter ? <span data-testid="x-axis-ticks" /> : null),
   YAxis: () => null,
   Tooltip: () => null,
   ResponsiveContainer: ({ children }: { children: React.ReactNode }) => (
@@ -60,83 +53,151 @@ vi.mock('recharts', () => ({
   CartesianGrid: () => null,
 }));
 
-// Mock the lazy import resolution
-vi.mock('~/sales/lib/services/order-offline-service', () => ({
-  // Not actually needed for chart-core tests, but prevents import errors
-}));
+import {
+  SalesChartCore,
+  ProfitChartCore,
+  SparklineCore,
+  DonutChartCore,
+  StoreUsageChartCore,
+} from '../chart-core';
 
-import { SalesChartCore, ProfitChartCore, StoreUsageChartCore } from '../chart-core';
-import type { ChartData } from '~/sales/lib/services/order-offline-service';
+const formatValue = (value: number): string => `${value} CUP`;
 
-describe('chart-core.tsx — SalesChartCore', () => {
-  const sampleData: ChartData[] = [
-    { label: new Date('2026-01-01'), value: 100 },
-    { label: new Date('2026-01-02'), value: 200 },
+describe('chart-core.tsx — range SalesChartCore / ProfitChartCore', () => {
+  const sampleData = [
+    { label: 'Lun', value: 100 },
+    { label: 'Mar', value: 200 },
   ];
 
   it('renders a LineChart when data has non-zero values', () => {
-    render(<SalesChartCore data={sampleData} emptyMessage="Sin datos" />);
+    render(
+      <SalesChartCore
+        data={sampleData}
+        emptyMessage="Sin datos"
+        formatValue={formatValue}
+        seriesName="Ventas"
+      />,
+    );
     expect(screen.getByTestId('line-chart')).toBeTruthy();
     expect(screen.getByTestId('responsive-container')).toBeTruthy();
   });
 
   it('renders empty message when all values are zero', () => {
-    const zeroData: ChartData[] = [
-      { label: new Date('2026-01-01'), value: 0 },
-      { label: new Date('2026-01-02'), value: 0 },
-    ];
-    render(<SalesChartCore data={zeroData} emptyMessage="Sin datos" />);
+    render(
+      <SalesChartCore
+        data={[
+          { label: 'Lun', value: 0 },
+          { label: 'Mar', value: 0 },
+        ]}
+        emptyMessage="Sin datos"
+        formatValue={formatValue}
+        seriesName="Ventas"
+      />,
+    );
     expect(screen.getByText('Sin datos')).toBeTruthy();
     expect(screen.queryByTestId('line-chart')).toBeNull();
   });
 
-  it('renders empty message for empty data array', () => {
-    render(<SalesChartCore data={[]} emptyMessage="Sin datos" />);
+  it('renders empty message for an empty data array', () => {
+    render(
+      <SalesChartCore
+        data={[]}
+        emptyMessage="Sin datos"
+        formatValue={formatValue}
+        seriesName="Ventas"
+      />,
+    );
     expect(screen.getByText('Sin datos')).toBeTruthy();
   });
-});
 
-describe('chart-core.tsx — ProfitChartCore', () => {
-  const sampleData: ChartData[] = [
-    { label: new Date('2026-01-01'), value: 50 },
-    { label: new Date('2026-01-02'), value: 150 },
-  ];
-
-  it('renders a BarChart when data has non-zero values', () => {
-    render(<ProfitChartCore data={sampleData} emptyMessage="Sin datos" />);
+  it('renders a BarChart when profit data has non-zero values', () => {
+    render(
+      <ProfitChartCore
+        data={sampleData}
+        emptyMessage="Sin datos"
+        formatValue={formatValue}
+        seriesName="Ganancia bruta"
+      />,
+    );
     expect(screen.getByTestId('bar-chart')).toBeTruthy();
-    expect(screen.getByTestId('responsive-container')).toBeTruthy();
   });
 
-  it('renders empty message when all values are zero', () => {
-    const zeroData: ChartData[] = [{ label: new Date('2026-01-01'), value: 0 }];
-    render(<ProfitChartCore data={zeroData} emptyMessage="Sin datos" />);
+  it('renders empty message when profit data is all zero', () => {
+    render(
+      <ProfitChartCore
+        data={[{ label: 'Lun', value: 0 }]}
+        emptyMessage="Sin datos"
+        formatValue={formatValue}
+        seriesName="Ganancia bruta"
+      />,
+    );
     expect(screen.getByText('Sin datos')).toBeTruthy();
     expect(screen.queryByTestId('bar-chart')).toBeNull();
   });
+
+  it('passes pre-formatted string labels through untouched (no tickFormatter)', () => {
+    const { container } = render(
+      <SalesChartCore
+        data={sampleData}
+        emptyMessage="Sin datos"
+        formatValue={formatValue}
+        seriesName="Ventas"
+      />,
+    );
+    expect(container.querySelector('[data-testid="x-axis-ticks"]')).toBeNull();
+  });
 });
 
-describe('chart-core.tsx — formatLabel', () => {
-  it('formats dates as d-MMM in Spanish without leading zero (3-Jul, not 03-Jul)', () => {
-    const data: ChartData[] = [{ label: new Date(2026, 6, 3), value: 42 }];
-    const { container, unmount } = render(<SalesChartCore data={data} emptyMessage="Sin datos" />);
-    // formatLabel is internal — verified through the XAxis tickFormatter mock.
-    // 2026-07-03 -> "3-Jul" (day 3, no leading zero; abbreviated Spanish month).
-    expect(container.querySelector('[data-testid="x-axis-ticks"]')?.textContent).toBe(
-      '3-Jul|15-Mar',
-    );
-    unmount();
+describe('chart-core.tsx — SparklineCore', () => {
+  it('renders a mini line without axes for the KPI values', () => {
+    render(<SparklineCore values={[1, 2, 3]} testId="sparkline" />);
+    expect(screen.getByTestId('sparkline')).toBeTruthy();
+    expect(screen.getByTestId('line-chart')).toBeTruthy();
   });
 
-  it('formats ProfitChartCore ticks identically', () => {
-    xAxisSamples.first = new Date(2026, 0, 31);
-    const data: ChartData[] = [{ label: new Date(2026, 0, 31), value: 42 }];
-    const { container, unmount } = render(<ProfitChartCore data={data} emptyMessage="Sin datos" />);
-    expect(container.querySelector('[data-testid="x-axis-ticks"]')?.textContent).toBe(
-      '31-Ene|15-Mar',
+  it('renders an empty mini line when there are no values to plot', () => {
+    render(<SparklineCore values={[]} testId="sparkline-empty" />);
+    expect(screen.getByTestId('sparkline-empty')).toBeTruthy();
+  });
+});
+
+describe('chart-core.tsx — DonutChartCore', () => {
+  const slices = [
+    { id: '1', name: 'Efectivo', value: 75 },
+    { id: '2', name: 'Tarjeta', value: 25 },
+  ];
+
+  it('renders the donut and its percentage legend', () => {
+    render(
+      <DonutChartCore
+        slices={slices}
+        emptyMessage="Sin datos"
+        formatValue={formatValue}
+        testId="donut"
+      />,
     );
-    unmount();
-    xAxisSamples.first = new Date(2026, 6, 3);
+    expect(screen.getByTestId('donut')).toBeTruthy();
+    expect(screen.getByTestId('pie-chart')).toBeTruthy();
+    expect(screen.getByText('Efectivo')).toBeTruthy();
+    expect(screen.getByText('75 CUP (75%)')).toBeTruthy();
+    expect(screen.getByText('25 CUP (25%)')).toBeTruthy();
+  });
+
+  it('renders the empty message when there are no slices', () => {
+    render(<DonutChartCore slices={[]} emptyMessage="Sin datos" formatValue={formatValue} />);
+    expect(screen.getByText('Sin datos')).toBeTruthy();
+    expect(screen.queryByTestId('pie-chart')).toBeNull();
+  });
+
+  it('renders the empty message when every slice is zero', () => {
+    render(
+      <DonutChartCore
+        slices={[{ id: '1', name: 'Efectivo', value: 0 }]}
+        emptyMessage="Sin datos"
+        formatValue={formatValue}
+      />,
+    );
+    expect(screen.getByText('Sin datos')).toBeTruthy();
   });
 });
 

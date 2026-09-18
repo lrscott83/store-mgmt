@@ -24,32 +24,32 @@ test.describe.serial('FC-A5 — Dashboard: métricas con valores', () => {
     await expect(page.getByText(DASHBOARD_HEADER)).toBeVisible();
   });
 
-  test('KPI cards: Ventas Hoy, Gastos Hoy, Créditos, Ganancias son visibles', async ({
+  test('KPI cards: Ventas, Gastos, Créditos, Ganancias son visibles', async ({ signedInPage }) => {
+    const { page } = signedInPage;
+
+    // Ventas KPI card (precise locator — "Ventas" is also the chart section title)
+    await expect(page.getByTestId('kpi-sales')).toBeVisible();
+    // The card shows a value with the currency code (e.g. "0 CUP")
+    await expect(page.getByTestId('kpi-sales-value')).toBeVisible();
+    await expect(page.getByTestId('kpi-sales-value')).toHaveText(/\d/);
+
+    // Gastos KPI card (with expenses module)
+    await expect(page.getByTestId('kpi-expenses')).toBeVisible();
+
+    // Créditos por cobrar KPI card (with credits module)
+    await expect(page.getByTestId('kpi-credits')).toBeVisible();
+
+    // Ganancias KPI card
+    await expect(page.getByTestId('kpi-netProfit')).toBeVisible();
+  });
+
+  test('trend indicators show glyph (▲, ▼, or –) and "vs anterior" text', async ({
     signedInPage,
   }) => {
     const { page } = signedInPage;
 
-    // Ventas Hoy KPI card
-    await expect(page.getByText('Ventas Hoy')).toBeVisible();
-    // Should show a numeric value (e.g. "0.00" or higher)
-    const ventasValue = page.locator('p.text-2xl').filter({ hasText: /\d+\.\d{2}/ });
-    await expect(ventasValue.first()).toBeVisible();
-
-    // Gastos Hoy KPI card (with expenses module)
-    await expect(page.getByText('Gastos Hoy')).toBeVisible();
-
-    // Créditos Por Cobrar KPI card (with credits module)
-    await expect(page.getByText('Créditos Por Cobrar')).toBeVisible();
-
-    // Ganancias Hoy KPI card
-    await expect(page.getByText('Ganancias Hoy')).toBeVisible();
-  });
-
-  test('trend indicators show glyph (▲, ▼, or –) and "vs ayer" text', async ({ signedInPage }) => {
-    const { page } = signedInPage;
-
-    // Each KPI card has a trend line with "vs ayer"
-    const trendTexts = page.locator('small:has-text("vs ayer")');
+    // Each KPI card has a trend line with "vs anterior"
+    const trendTexts = page.locator('small:has-text("vs anterior")');
     await expect(trendTexts.first()).toBeVisible();
 
     // Should have 4 trend indicators (one per KPI card)
@@ -71,8 +71,8 @@ test.describe.serial('FC-A5 — Dashboard: métricas con valores', () => {
     const rateInput = page.locator('input[type="number"][placeholder*="USD"]');
     await expect(rateInput).toBeVisible();
 
-    // All KPI values should show "USD" suffix in the trend text
-    await expect(page.locator('small:has-text("vs ayer")').first()).toBeVisible();
+    // All KPI values should show "vs anterior" trend text
+    await expect(page.locator('small:has-text("vs anterior")').first()).toBeVisible();
   });
 
   test('sales and profit charts render with data or empty state', async ({ signedInPage }) => {
@@ -94,10 +94,10 @@ test.describe.serial('FC-A5 — Dashboard: métricas con valores', () => {
   test('top products lists render', async ({ signedInPage }) => {
     const { page } = signedInPage;
 
-    // Top profit products
-    await expect(page.getByText('Productos mayor ganancias (últimos 30 días)')).toBeVisible();
+    // Top profit products (stable title; the range is a separate element)
+    await expect(page.getByText('Productos mayor ganancias')).toBeVisible();
 
     // Top sold products
-    await expect(page.getByText('Productos más vendidos (últimos 30 días)')).toBeVisible();
+    await expect(page.getByText('Productos más vendidos')).toBeVisible();
   });
 });
