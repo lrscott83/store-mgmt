@@ -462,6 +462,61 @@ export class WarehouseOfflineService {
             [],
           );
         }
+        case 'consumption_out': {
+          // Elaboración (plan 2026-09-04-elaboration-module.md): consumo de
+          // insumos por una elaboración. Descuenta FIFO con costo exacto por
+          // tramo (D8) como sale_out/transfer_out, pero NO crea entrada de
+          // tienda — consumir no es vender.
+          const level = this.getStockLevel(params.warehouseId, params.productId);
+          if (!level || level.onHand < quantity) {
+            return new DataResultImpl<WarehouseStockMovement[]>(undefined, false, [
+              WarehouseErrors.InsufficientStock,
+            ]);
+          }
+          const slices = splitByFifoLots(this.ensureLots(level), quantity);
+          this.consumeLots(level, slices);
+          this.refreshLevelTotals(level);
+          this.setLocalStorage('warehouse-stock-levels', this.stockLevels!);
+
+          const rows = slices.map((slice) =>
+            this.appendMovement({
+              warehouseId: params.warehouseId,
+              productId: params.productId,
+              type: 'consumption_out',
+              quantity: slice.quantity,
+              reason: params.reason ?? null,
+              costPrice: slice.costPrice,
+            }),
+          );
+          return new DataResultImpl<WarehouseStockMovement[]>(rows, true, []);
+        }
+        case 'elaboration_in': {
+          // Elaboración (plan 2026-09-04-elaboration-module.md): alta del
+          // producto terminado en el almacén, valorada al costo real por unidad
+          // que calculó la elaboración (lote nuevo, mismo modelo que
+          // purchase_in). La entrada de tienda vendible la crea
+          // `ElaborationOfflineService` aparte.
+          const costPrice = round2(params.costPrice ?? 0);
+          const level = this.getOrCreateStockLevel(params.warehouseId, params.productId);
+          this.ensureLots(level);
+          level.lots!.push({ costPrice, quantity, currency: DEFAULT_CURRENCY });
+          this.refreshLevelTotals(level);
+          this.setLocalStorage('warehouse-stock-levels', this.stockLevels!);
+          return new DataResultImpl<WarehouseStockMovement[]>(
+            [
+              this.appendMovement({
+                warehouseId: params.warehouseId,
+                productId: params.productId,
+                type: 'elaboration_in',
+                quantity,
+                reason: params.reason ?? null,
+                costPrice,
+              }),
+            ],
+            true,
+            [],
+          );
+        }
         default:
           return new DataResultImpl<WarehouseStockMovement[]>(undefined, false, [
             WarehouseErrors.QuantityInvalid,
