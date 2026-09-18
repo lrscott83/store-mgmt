@@ -21,19 +21,19 @@ import { assertStoresFeature } from './support/store-fixture';
  *   (b) la entrada de menú gateada por el módulo retirado SIGUE visible.
  * Con el arreglo, ambas cosas pasan sin recargar la página.
  *
- * POR QUÉ LAS DIRECCIONES SON SUPERIOR → GRATIS → SUPERIOR
- * El persona `owner-admin` registra su tienda en el plan Superior, que es el
- * único con Almacenes además de VIP
- * (`Plans/StorePlanCatalogTests.cs`: Pago(2) NO incluye el módulo 13). La
- * sesión restaurada (snapshot de `localStorage`) describe ese mismo plan, así
- * que bajar a Gratis tiene un delta observable: el módulo Almacenes (13) y su
- * feature (36) desaparecen del `/me` y el ítem `/inventory/warehouses` debe
- * desaparecer del menú. La vuelta a Superior se afirma en el mismo test, así
- * que las dos direcciones quedan cubiertas.
+ * POR QUÉ LAS DIRECCIONES SON PAGO → GRATIS → PAGO
+ * El persona `owner-admin` registra su tienda en el plan Pago (nacimiento por
+ * defecto desde 2026-09-18, `CreateStoreService:45`). La sesión restaurada
+ * (snapshot de `localStorage`) describe ese mismo plan, así que bajar a Gratis
+ * tiene un delta observable: el módulo Estadísticas (6) y su feature Dashboard
+ * (60) desaparecen del `/me` y el ítem `/stats/dashboard` debe desaparecer del
+ * menú. La vuelta a Pago se afirma en el mismo test, así que las dos
+ * direcciones quedan cubiertas.
  *
- * (Un salto a Pago NO sirve como "subida": el catálogo de ese plan no incluye
- * Almacenes, así que la sesión refrescada tampoco lo tendría y la aserción
- * fallaría por el catálogo, no por el bug.)
+ * (El salto a Superior está fuera del alcance del owner desde 2026-09-18: la
+ * restricción de plan reserva Superior/VIP al SuperAdmin — el backend responde
+ * 403 y el modal del owner filtra esos paneles —, así que la "subida" legal es
+ * a Pago y su módulo exclusivo frente a Gratis es Estadísticas (6).)
  *
  * Literales en castellano copiados de `apps/web-store-pos/app/shared/lib/i18n/es.ts`
  * — nunca importados: el navegador es la caja negra bajo prueba (misma política
@@ -42,11 +42,11 @@ import { assertStoresFeature } from './support/store-fixture';
 const ACTIVATE_TEXT = 'Activar Plan'; // es.ts STORES.PLAN.ACTIVATE_PLAN
 const SIDEBAR_LABEL = 'Navegación principal'; // sidebar.tsx aria-label
 const SIDEBAR_TOGGLE = 'Alternar barra lateral'; // navbar.tsx aria-label
-/** EFeatures.Warehouses — el ítem MENU.WAREHOUSES lo exige (menu-config.ts). */
-const WAREHOUSES_FEATURE_ID = 36;
-/** EModules.Warehouses — el módulo que el plan Gratis no incluye. */
-const WAREHOUSES_MODULE_ID = 13;
-const WAREHOUSES_PATH = '/inventory/warehouses';
+/** EFeatures.Dashboard — el ítem MENU.DASHBOARD lo exige (menu-config.ts). */
+const STATISTICS_FEATURE_ID = 60;
+/** EModules.Statistics — el módulo que el plan Gratis no incluye. */
+const STATISTICS_MODULE_ID = 6;
+const STATISTICS_PATH = '/stats/dashboard';
 
 test.use({ persona: 'owner-admin' });
 
@@ -61,8 +61,8 @@ interface StoredSession {
 }
 
 /** Por href: determinista sin depender de cómo se componga el nombre accesible. */
-function warehousesMenuLink(page: Page): ReturnType<Page['locator']> {
-  return page.locator(`a[href="${WAREHOUSES_PATH}"]`);
+function statisticsMenuLink(page: Page): ReturnType<Page['locator']> {
+  return page.locator(`a[href="${STATISTICS_PATH}"]`);
 }
 
 /** El sidebar arranca colapsado; el toggle solo existe mientras está cerrado. */
@@ -79,15 +79,15 @@ async function storedSession(page: Page): Promise<StoredSession | null> {
   return raw ? (JSON.parse(raw) as StoredSession) : null;
 }
 
-/** Espera a que la sesión del cliente incluya (o no) el módulo Almacenes. */
+/** Espera a que la sesión del cliente incluya (o no) el módulo Estadísticas. */
 async function expectSessionModule(page: Page, present: boolean): Promise<void> {
   await expect
     .poll(
       async () => {
         const stored = await storedSession(page);
         return {
-          feature: stored?.featureIds?.includes(WAREHOUSES_FEATURE_ID) ?? false,
-          module: stored?.storeModuleIds?.includes(WAREHOUSES_MODULE_ID) ?? false,
+          feature: stored?.featureIds?.includes(STATISTICS_FEATURE_ID) ?? false,
+          module: stored?.storeModuleIds?.includes(STATISTICS_MODULE_ID) ?? false,
         };
       },
       { message: 'la sesión del cliente debe revalidarse contra el nuevo plan' },
@@ -110,28 +110,28 @@ test('cambiar el plan refresca los permisos y el menú en ambas direcciones, sin
   // aserciones de abajo fallarían por el motivo equivocado.
   await assertStoresFeature(page);
 
-  // PRECONDICIÓN pineada: la tienda nace en un plan de pago, así que la sesión
-  // trae el módulo Almacenes y su ítem de menú existe.
-  await page.goto('/inventory/available');
+  // PRECONDICIÓN pineada: la tienda nace en Pago (2026-09-18), así que la
+  // sesión trae el módulo Estadísticas y su ítem de menú existe.
+  await page.goto('/stats/dashboard');
   await openSidebar(page);
-  await expect(warehousesMenuLink(page)).toBeVisible();
+  await expect(statisticsMenuLink(page)).toBeVisible();
   await expectSessionModule(page, true);
 
-  // --- Bajada: Superior → Gratis -----------------------------------------
+  // --- Bajada: Pago → Gratis --------------------------------------------
   await page.goto('/management/stores');
   await activatePlan(page, /Gratis/);
 
   // (a) la sesión del cliente se revalidó contra el backend...
   await expectSessionModule(page, false);
-  // (b) ...y el menú dejó de ofrecer Almacenes, SIN recargar la página.
+  // (b) ...y el menú dejó de ofrecer Estadísticas, SIN recargar la página.
   await openSidebar(page);
-  await expect(warehousesMenuLink(page)).toHaveCount(0);
+  await expect(statisticsMenuLink(page)).toHaveCount(0);
 
-  // --- Subida: Gratis → Superior (la dirección inversa) ------------------
+  // --- Subida: Gratis → Pago (la dirección inversa) ---------------------
   await page.goto('/management/stores');
-  await activatePlan(page, /Superior/);
+  await activatePlan(page, /Pago/);
 
   await expectSessionModule(page, true);
   await openSidebar(page);
-  await expect(warehousesMenuLink(page)).toBeVisible();
+  await expect(statisticsMenuLink(page)).toBeVisible();
 });

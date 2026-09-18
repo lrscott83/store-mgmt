@@ -149,10 +149,10 @@ test('E-01..E-05 — cards render plan, next due date and discounted price', asy
   await expect(card).toBeVisible();
   await expect(page.getByTestId(`owner-store-actions-toggle-${selectedStoreId}`)).toBeVisible();
 
-  // E-03: paid plan shape — "Plan: Superior" + next due date + price. The
-  // persona store is created via register (CreateStoreService forces Superior).
+  // E-03: paid plan shape — "Plan: Pago" + next due date + price. The persona
+  // store is created via register (birth plan defaults to Pago, 2026-09-18).
   await expect(page.getByTestId(`owner-store-body-${selectedStoreId}`)).toContainText(
-    'Plan: Superior',
+    'Plan: Pago',
   );
 
   // E-04: next billing date line renders (paid store — the persona seed sets a

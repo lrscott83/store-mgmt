@@ -246,7 +246,7 @@ describe('Store creation — client never sends paymentStartDate (server owns th
     expect(Object.keys(payload)).not.toContain('paymentStartDate');
   });
 
-  it('sends exactly the five data fields plus Superior birth moduleIds — no billing field smuggled in', async () => {
+  it('sends exactly the five data fields plus the birth moduleIds — no billing field smuggled in', async () => {
     const { EditStorePage } = await import('../edit-store');
     await act(async () => {
       render(
@@ -258,10 +258,11 @@ describe('Store creation — client never sends paymentStartDate (server owns th
     await submitCreateForm('New Store');
 
     await waitFor(() => expect(mockCreateStore).toHaveBeenCalledTimes(1));
-    // Plan split: create carries store DATA plus birth provisioning. The store
-    // is created on the Superior plan — the container resolves its member
-    // module ids once from GET /v1/plans and sends them (the backend requires
-    // a non-empty moduleIds and grants exactly those modules).
+    // Plan split: create carries store DATA plus birth provisioning. The birth
+    // plan is Pago (backend default, CreateStoreService) — the payload never
+    // carries a planId — while the module ids stay request-driven: the
+    // container resolves Superior's member ids from GET /v1/plans and sends
+    // them, and the backend grants exactly those modules (Option A).
     expect(Object.keys(mockCreateStore.mock.calls[0][0]).sort()).toEqual([
       'address',
       'approved',
@@ -273,7 +274,7 @@ describe('Store creation — client never sends paymentStartDate (server owns th
     expect(mockCreateStore.mock.calls[0][0].moduleIds).toEqual([2, 3, 4]);
   });
 
-  it('shows no plan UI and sends the Superior plan birth moduleIds on create', async () => {
+  it('shows no plan UI and sends the birth moduleIds on create', async () => {
     const { EditStorePage } = await import('../edit-store');
     await act(async () => {
       render(
