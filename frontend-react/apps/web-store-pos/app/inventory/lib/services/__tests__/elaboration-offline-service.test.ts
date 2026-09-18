@@ -1,6 +1,6 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Elaboration } from '@store-mgmt/domain';
-import { ElaborationErrors, RecipeErrors } from '@store-mgmt/domain';
+import { ElaborationErrors, ProductErrors, RecipeErrors } from '@store-mgmt/domain';
 import { ProductCategoryRepository } from '~/sales/lib/repositories/product-category-repository';
 import { ProductRepository } from '~/sales/lib/repositories/product-repository';
 import { ElaborationOfflineService } from '../elaboration-offline-service';
@@ -229,6 +229,58 @@ describe('ElaborationOfflineService', () => {
       });
       expect(missingWarehouse.succeeded).toBe(false);
       expect(missingWarehouse.errors).toEqual([ElaborationErrors.WarehouseNotExists]);
+    });
+
+    it('rejects duplicate ingredient rows whose COMBINED demand exceeds stock, with zero writes', () => {
+      // Two rows of the SAME productId, 1 each: each passes the per-row check
+      // (1 <= 1.5) but the cumulative demand (2) exceeds the level's 1.5.
+      seedStock('harina', 1.5, 20);
+      const recipe = recipeSvc.addRecipe(
+        recipeInput({
+          components: [
+            { productId: 'harina', qty: 1, scrapPct: 0 },
+            { productId: 'harina', qty: 1, scrapPct: 0 },
+          ],
+        }),
+      ).data!;
+
+      const result = service.confirmElaboration({ recipeId: recipe.id, warehouseId, batches: 1 });
+
+      expect(result.succeeded).toBe(false);
+      expect(result.errors[0].code).toBe(ElaborationErrors.InsufficientStock.code);
+      expect(result.errors[0].description).toContain('Harina');
+      expect(result.errors[0].description).toContain('2');
+      // Zero writes: no record, no sellable entry, no movements, stock untouched.
+      expect(service.getElaborations()).toHaveLength(0);
+      expect(inventorySvc.getProductInventoriesByProductId('pan')).toHaveLength(0);
+      expect(movementsOfType('consumption_out')).toBe(0);
+      expect(movementsOfType('elaboration_in')).toBe(0);
+      expect(warehouseSvc.getMovements()).toHaveLength(1); // only the purchase
+      expect(warehouseSvc.getStockLevel(warehouseId, 'harina')!.onHand).toBe(1.5);
+    });
+
+    it('leaves NO side effects when createInventoryEntry fails after validation', () => {
+      seedStock('harina', 100, 20);
+      seedStock('levadura', 100, 80);
+      seedStock('sal', 100, 15);
+      seedStock('agua', 100, 0.5);
+      const recipe = recipeSvc.addRecipe(recipeInput()).data!;
+      // createInventoryEntry's real failure shape is `null` (missing product).
+      const spy = vi.spyOn(inventorySvc, 'createInventoryEntry').mockReturnValue(null);
+
+      const result = service.confirmElaboration({ recipeId: recipe.id, warehouseId, batches: 1 });
+      spy.mockRestore();
+
+      expect(result.succeeded).toBe(false);
+      expect(result.errors).toEqual([ProductErrors.NotExists]);
+      // No record, no entry, no movements, no net consumption.
+      expect(service.getElaborations()).toHaveLength(0);
+      expect(inventorySvc.getProductInventoriesByProductId('pan')).toHaveLength(0);
+      expect(movementsOfType('consumption_out')).toBe(0);
+      expect(movementsOfType('elaboration_in')).toBe(0);
+      expect(warehouseSvc.getMovements()).toHaveLength(4); // only the purchases
+      expect(warehouseSvc.getStockLevel(warehouseId, 'harina')!.onHand).toBe(100);
+      expect(warehouseSvc.getStockLevel(warehouseId, 'agua')!.onHand).toBe(100);
     });
   });
 

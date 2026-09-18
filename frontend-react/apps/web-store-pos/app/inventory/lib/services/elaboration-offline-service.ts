@@ -53,18 +53,41 @@ export interface ConfirmElaborationParams {
  * on a genuinely empty read, and date revival on load.
  *
  * `confirmElaboration` follows the plan's 6 steps
- * (2026-09-04-elaboration-module.md §Task 4):
+ * (2026-09-04-elaboration-module.md §Task 4), with two correctness guarantees:
+ *
  *  1. Resolve the recipe (missing row → the recipe service's precedent failure
  *     `Recipe.ProductNotExists`) and the warehouse (`Elaboration.WarehouseNotExists`).
- *  2. Read the warehouse's stock levels and validate EVERY component BEFORE any
- *     write (`actualQty <= available`, else a named
- *     `Elaboration.InsufficientStock` failure). Insufficient stock leaves the
- *     store untouched: no movements, no records, no inventory entries.
- *  3. Append one `consumption_out` movement per ingredient (qty = actualQty).
- *  4. Append one `elaboration_in` movement for the finished good (qty = producedQty).
- *  5. Append the immutable `Elaboration` record with its snapshots.
- *  6. Append the finished good's `InventoryEntry` so the sale path discounts
- *     the REAL unit cost from the first sale.
+ *  2. Validate EVERY precondition of EVERY later write BEFORE the first write.
+ *     Consumption is validated CUMULATIVELY per ingredient `productId`: a recipe
+ *     may list the same `productId` more than once and all of those rows draw
+ *     from the SAME warehouse level, so their real quantities are summed and
+ *     checked against that level's RAW `onHand` — the exact value
+ *     `recordMovement('consumption_out')` compares. Comparing a rounded value
+ *     could pass where the movement fails. A shortage returns the named
+ *     `Elaboration.InsufficientStock` failure with zero writes.
+ *  3. Create the finished good's `InventoryEntry` FIRST. Its only failure
+ *     condition is a missing finished product (`getProductById` → `null`); that
+ *     product is validated to exist AND be active in step 2, so the call cannot
+ *     fail after validation. Running it before the movements/record means even an
+ *     injected failure (tests) leaves no movement, no record and no net stock
+ *     change.
+ *  4. Append one `consumption_out` movement per ingredient (qty = actualQty).
+ *     Cumulative stock was validated and every ingredient exists and is active,
+ *     so no row can fail.
+ *  5. Append one `elaboration_in` movement for the finished good (qty = producedQty).
+ *     The finished product exists and is active and `producedQty > 0`, so it
+ *     cannot fail.
+ *  6. Append the immutable `Elaboration` record with its snapshots (pure
+ *     in-memory + storage append).
+ *
+ * All-or-nothing: `InventoryOfflineService.createInventoryEntry` returns `null`
+ * ONLY when the product does not exist (it never returns an unsuccessful
+ * `DataResult`), so validating the finished product up front proves that no
+ * write after the first one can fail. `consumption_out` / `elaboration_in` are
+ * NOT reversible through `WarehouseOfflineService.reverseMovement` (which only
+ * supports purchase_in/sale_out/transfer_out), so ordering the single failable
+ * write first — rather than a compensating rollback — is what keeps a failed
+ * `confirmElaboration` free of movements, records and inventory entries.
  *
  * Costing: the unit cost is
  * `(Σ actualQty × costPrice + laborCost + overhead) / producedQty`, round2,
@@ -147,21 +170,24 @@ export class ElaborationOfflineService {
       (params.actualComponents ?? []).map((component) => [component.productId, component.actualQty]),
     );
 
-    // Step 1/2 — validate EVERY component before ANY write.
+    // Step 2 — build the per-component audit rows and validate EVERY
+    // precondition of EVERY later write BEFORE the first write.
     const components: ElaborationComponentActual[] = [];
     for (const planned of plan.components) {
       const actualQty = round2(actualByProduct.get(planned.productId) ?? planned.theoreticalQty);
       if (!(actualQty >= 0)) {
         return new DataResultImpl<Elaboration>(undefined, false, [RecipeErrors.InvalidQty]);
       }
-      if (!this.productRepository.getProductById(planned.productId)) {
+      const componentProduct = this.productRepository.getProductById(planned.productId);
+      if (!componentProduct) {
         return new DataResultImpl<Elaboration>(undefined, false, [ProductErrors.NotExists]);
       }
-      if (actualQty > planned.available) {
-        const name =
-          this.productRepository.getProductById(planned.productId)?.name ?? planned.productId;
+      // `recordMovement('consumption_out')` fails on an inactive product
+      // (`WarehouseErrors.ProductNotActive`) before mutating; surface it here so
+      // a mid-loop failure cannot leave earlier consumption rows persisted.
+      if (!componentProduct.isActive) {
         return new DataResultImpl<Elaboration>(undefined, false, [
-          elaborationInsufficientStockError(name, planned.available, actualQty),
+          WarehouseErrors.ProductNotActive,
         ]);
       }
       components.push({
@@ -170,6 +196,40 @@ export class ElaborationOfflineService {
         actualQty,
         costPrice: planned.costPrice,
       });
+    }
+
+    // Cumulative stock validation: duplicate ingredient productIds draw from the
+    // SAME warehouse level, so demand is summed per productId and compared
+    // against the level's RAW `onHand` — exactly what
+    // `recordMovement('consumption_out')` checks (`level.onHand < quantity`).
+    const requiredByProduct = new Map<string, number>();
+    for (const component of components) {
+      if (component.actualQty <= 0) continue;
+      requiredByProduct.set(
+        component.productId,
+        round2((requiredByProduct.get(component.productId) ?? 0) + component.actualQty),
+      );
+    }
+    for (const [productId, requiredQty] of requiredByProduct) {
+      const level = this.warehouseService.getStockLevel(params.warehouseId, productId);
+      const available = level ? level.onHand : 0;
+      if (requiredQty > available) {
+        const name = this.productRepository.getProductById(productId)?.name ?? productId;
+        return new DataResultImpl<Elaboration>(undefined, false, [
+          elaborationInsufficientStockError(name, available, requiredQty),
+        ]);
+      }
+    }
+
+    // The finished good must exist AND be active before any write: those are the
+    // only conditions under which `recordMovement('elaboration_in')` or
+    // `InventoryOfflineService.createInventoryEntry` can fail.
+    const finishedProduct = this.productRepository.getProductById(recipe.productId);
+    if (!finishedProduct) {
+      return new DataResultImpl<Elaboration>(undefined, false, [ProductErrors.NotExists]);
+    }
+    if (!finishedProduct.isActive) {
+      return new DataResultImpl<Elaboration>(undefined, false, [WarehouseErrors.ProductNotActive]);
     }
 
     // Real cost snapshot (Costing rule 3): overhead applies to the REAL
@@ -185,7 +245,25 @@ export class ElaborationOfflineService {
     const totalCost = realIngredientsCost + overheadCost + laborCost;
     const unitCost = producedQty > 0 ? round2(totalCost / producedQty) : 0;
 
-    // Step 2 — consume the ingredients (FIFO, exact-lot movements).
+    // All-or-nothing: every step below is proven not to fail. The one failable
+    // write — `createInventoryEntry` (returns `null` only when the product is
+    // missing, never an unsuccessful DataResult) — runs FIRST, so nothing else
+    // is persisted if it does fail. `consumption_out`/`elaboration_in` are not
+    // reversible via `reverseMovement`, so ordering is the guarantee.
+    const entry = this.inventoryService.createInventoryEntry(
+      recipe.productId,
+      producedQty,
+      unitCost,
+    );
+    if (!entry || !entry.succeeded) {
+      return new DataResultImpl<Elaboration>(
+        undefined,
+        false,
+        entry ? entry.errors : [ProductErrors.NotExists],
+      );
+    }
+
+    // Step 3 — consume the ingredients (FIFO, exact-lot movements).
     for (const component of components) {
       if (component.actualQty <= 0) continue;
       const movement = this.warehouseService.recordMovement({
@@ -199,7 +277,7 @@ export class ElaborationOfflineService {
       }
     }
 
-    // Step 3 — record the finished good entering the warehouse.
+    // Step 4 — record the finished good entering the warehouse.
     const producedMovement = this.warehouseService.recordMovement({
       type: 'elaboration_in',
       warehouseId: params.warehouseId,
@@ -211,14 +289,13 @@ export class ElaborationOfflineService {
       return new DataResultImpl<Elaboration>(undefined, false, producedMovement.errors);
     }
 
-    const productName = this.productRepository.getProductById(recipe.productId)?.name ?? '';
     const now = new Date();
     const elaboration: Elaboration = {
       id: generateId(),
       recipeId: recipe.id,
       // The v1 Recipe model has no `name` field, so the snapshot is the finished
       // product's name (recipes snapshot by product; see plan §"Data model").
-      recipeName: productName,
+      recipeName: finishedProduct.name,
       productId: recipe.productId,
       warehouseId: params.warehouseId,
       batches: params.batches,
@@ -233,23 +310,9 @@ export class ElaborationOfflineService {
       createdByName: getCurrentUserLogin(),
     };
 
-    // Step 4 — append the immutable elaboration record.
+    // Step 5 — append the immutable elaboration record (pure in-memory + storage).
     this.getStorageElaborations().push(elaboration);
     this.setElaborationsLocalStorage(this.elaborations!);
-
-    // Step 5 — the sellable store entry, at the REAL unit cost.
-    const entry = this.inventoryService.createInventoryEntry(
-      recipe.productId,
-      producedQty,
-      unitCost,
-    );
-    if (!entry || !entry.succeeded) {
-      return new DataResultImpl<Elaboration>(
-        undefined,
-        false,
-        entry ? entry.errors : [ProductErrors.NotExists],
-      );
-    }
 
     return new DataResultImpl<Elaboration>(elaboration, true, []);
   }
