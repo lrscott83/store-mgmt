@@ -111,6 +111,11 @@ namespace Infrastructure.Migrations
             // Idempotent via ON CONFLICT DO NOTHING on the composite PKs (see MultiPaymentsModuleBackfill).
             migrationBuilder.Sql(MultiPaymentsModuleBackfill.StoreModuleSql);
             migrationBuilder.Sql(MultiPaymentsModuleBackfill.StoreRoleFeatureSql);
+
+            // Explicit-id catalog inserts do not advance the identity sequences; mirror the
+            // VPS script fix-ups (backend/scripts/18-*.sql) so later sequence-based inserts
+            // cannot collide with the seeded rows (review finding R3-SequenceDivergence).
+            migrationBuilder.Sql(MultiPaymentsModuleBackfill.SequenceFixupsSql);
         }
 
         /// <inheritdoc />

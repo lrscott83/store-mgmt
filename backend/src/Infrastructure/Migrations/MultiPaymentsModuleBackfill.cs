@@ -52,5 +52,24 @@ namespace Infrastructure.Migrations
             DELETE FROM "StoreModule" sm
             WHERE sm."ModuleId" = 16;
             """;
+
+        /// <summary>
+        /// Identity sequence fix-ups for Module/Feature: explicit-id catalog inserts do not
+        /// advance the serials, so re-seed them exactly like the VPS script (backend/scripts/18-*.sql).
+        /// </summary>
+        public const string SequenceFixupsSql = """
+            SELECT setval(
+                pg_get_serial_sequence('"Feature"', 'Id'),
+                GREATEST(
+                    (SELECT MAX("Id") FROM "Feature") + 1,
+                    nextval(pg_get_serial_sequence('"Feature"', 'Id'))),
+                false);
+            SELECT setval(
+                pg_get_serial_sequence('"Module"', 'Id'),
+                GREATEST(
+                    (SELECT MAX("Id") FROM "Module") + 1,
+                    nextval(pg_get_serial_sequence('"Module"', 'Id'))),
+                false);
+            """;
     }
 }

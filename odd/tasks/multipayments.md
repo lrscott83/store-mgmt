@@ -78,6 +78,7 @@ Pedido del owner (2026-09-18) tras analizar `docs/contracts/pagos-y-canales-de-p
 - [ ] **T10 — E2E frontend (spec NUEVO).** `frontend-react/e2e/multipayments.spec.ts`: selector de moneda, multi-pago, vuelto, tasas. **AC**: verde contra app+backend reales; ningún spec existente tocado.
 - [ ] **T11 — E2E backend (archivo NUEVO).** Persistencia espejo de `OrderPayment`/`ChannelExchangeRate` + defaults. Add-only. **AC**: verde en `smca_test`.
 - [ ] **T12 — Cierre.** Verificación completa (vitest/typecheck/lint + dotnet build/tests + E2E nuevos), actualizar este doc con evidencia, commits work-unit.
+- [ ] **T13 — Follow-up del review (secuencias EF).** Advisory R3-SequenceDivergence: la migración `20260918131144` no incluye los `setval` de `Feature`/`Module` que sí tiene el script 18 → en DBs frescas aplicadas por `dotnet ef database update` la secuencia puede quedar detrás de los ids sembrados (16/44). Fix pequeño (setval en la migración o migración follow-up) + nota de paridad. No bloqueante.
 
 ## Verificación por tarea
 
@@ -98,7 +99,8 @@ Pedido del owner (2026-09-18) tras analizar `docs/contracts/pagos-y-canales-de-p
 - 2026-09-18: fix de paridad de T1 — `MultiPaymentsModuleBackfill.cs` (backfill `StoreModule`/`StoreRoleFeature` para VIP activas, `ON CONFLICT DO NOTHING`) + llamadas en Up/Down de la migración; build 0 errores.
 - 2026-09-18: RDD — assessment del commit `89c0a24d`: **medium → diferido al slice** (boundary `4b8a54dc`).
 - 2026-09-18: **T2 cerrada** — script `18-20260918-Add-MultiPayments-Module.sql` + `backend/scripts/README.md`; DDL/backfill 1:1 con la migración; idempotencia verificada con psql (2 corridas, exit 0); RDD del slice (2 commits): **medium → diferido al slice**.
+- 2026-09-18: **Review RDD del slice 1: APPROVED + acknowledged (authority burned)** — el lente `review-reliability` corrió tras el reinicio con `opencode-go/deepseek-v4.1-flash` + `variant: low` (workaround del gate free-tier de OpenCode; los intentos previos con big-pickle dieron 403 del gate — incidente upstream #49433). Hallazgos advisory (NO bloqueantes): **R3-MissingCoverage** (persistencia/backfill sin aserción → lo cubre T11) y **R3-SequenceDivergence** (la migración EF no lleva los `setval` de secuencias que sí tiene el script 18 → nuevo T13). Boundary revisado: commit `5f08cdee`.
 
 ## Próximo paso
 
-- T3 — Frontend domain: canales + tasas + conversión (con tests unitarios nuevos; sin tocar E2E).
+- T3 — Frontend domain: canales + tasas + conversión (con tests unitarios nuevos; sin tocar E2E). Follow-up opcional en el mismo lote: T13 (paridad de secuencias en la migración EF).
