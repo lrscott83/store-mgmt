@@ -135,19 +135,29 @@ activated the paid plan.
 - THEN `Store.paymentStartDate` is `null` and the read-only lock (below) does not engage
 
 ### Requirement: Plan Panels Activation Contract (owner plan change)
-(Replaced by SDD change `owner-plan-change`, archived 2026-09-11. Previously "PlanPicker Read-Only
-Lock After Plan Activation" from `store-paid-plan-billing-frontend`: readOnly lock for non-super
-admins on paid stores, activation via `updateStore(moduleIds)` — superseded by owner-driven
-`changeStorePlan`; the owner of a store can now change plans freely.)
 
-Plan activation in the store's plan dialog SHALL use `changeStorePlan(storeId, planId)` — `POST /v1/stores/{id}/change-plan`. There SHALL be no readOnly lock: the owner of the store can change plans, and every non-active plan panel SHALL render an "Activar Plan" button.
+(Replaced by SDD change `owner-plan-change`, archived 2026-09-11. Previously "PlanPicker Read-Only Lock After Plan Activation" from `store-paid-plan-billing-frontend`: readOnly lock for non-super admins on paid stores, activation via `updateStore(moduleIds)` — superseded by owner-driven `changeStorePlan`; the owner of a store can now change plans freely. This delta: `store-default-plan-and-owner-plan-restriction` — free-change narrowed to Gratis/Pago; Superior/VIP reserved for SuperAdmin.)
+
+Plan activation in the store's plan dialog SHALL use `changeStorePlan(storeId, planId)` — `POST /v1/stores/{id}/change-plan`. There SHALL be no readOnly lock: the owner of a store can change plans among Gratis and Pago. The dialog SHALL render ONLY the Gratis and Pago panels when the caller is not a SuperAdmin; Superior and VIP panels SHALL render ONLY for SuperAdmin callers (`edit-plan-modal.tsx:85-91`, `store-plan.tsx:158-164`). Every non-active plan panel SHALL render an "Activar Plan" button.
 
 Plan panel layout: module rows SHALL show module name + "?" help icon only (no per-module price, no discount badge); the plan header price SHALL show the red-strikethrough original followed by the current price, right-aligned ("20 10 USD") when discounted, or the current price alone when there is no discount. Paid plans SHALL render "Incluye todo lo del plan {plan_anterior} y además:" (plan_anterior = immediately preceding plan by `Order`; Gratis keeps "Incluye:"). The help "?" icon SHALL be bigger (h-6 w-6, text-base) and green (text-green-600, border-green-600). The dialog's close button SHALL be right-aligned (X top-right stays).
+
+(Previously: :137-143 stated "the owner of a store can change plans freely" with no panel role filter.)
 
 #### Scenario: Owner activates Pago from the dialog
 - GIVEN the owner of a Gratis store opens the plan dialog
 - WHEN clicking "Activar Plan" on the Pago panel
 - THEN changeStorePlan POST fires; on success the modal closes, session refreshes, card reflects new planType and price
+
+#### Scenario: Non-SuperAdmin sees only Gratis/Pago panels
+- GIVEN an owner (non-SuperAdmin) opens the plan dialog (pins expecting Superior panels — re-anchor: `my-stores.test.tsx:677`, `store-routes.test.tsx:435-450`, `owner-stores.spec.ts:152-156` E-03; `plan-change-permission-refresh.spec.ts:120-136` reworks premise to Pago/Statistics(6) delta)
+- WHEN the dialog renders
+- THEN ONLY Gratis and Pago panels render; Superior and VIP panels MUST NOT appear
+
+#### Scenario: SuperAdmin sees all four panels
+- GIVEN a SuperAdmin opens the plan dialog for any store
+- WHEN the dialog renders
+- THEN Gratis, Pago, Superior, and VIP panels render
 
 #### Scenario: Strikethrough header
 - GIVEN a plan with original total 20 and current 10 (discount)
@@ -163,7 +173,6 @@ Plan panel layout: module rows SHALL show module name + "?" help icon only (no p
 - GIVEN any plan panel
 - WHEN module rows render
 - THEN each row shows only module name + "?" icon (no price, no discount badge)
-
 ### Requirement: REQ-MS-1 — My-Stores View Hides Payment Info for Disapproved Stores
 
 For every store with `Approved == false` returned by `GET /v1/stores/my-stores`, `OwnerStoreDto.PlanType` MUST be `"Gratis"` and `OwnerStoreDto.NextDueDate` MUST be `null`. The owner store card MUST render no price and no due date for such a store (gate key `planType === 'Gratis'`, mirroring `store-plan.tsx`), even when its module snapshot contains paid modules with prices.
