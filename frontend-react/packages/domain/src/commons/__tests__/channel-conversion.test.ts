@@ -32,6 +32,13 @@ describe('divideHalfUp — the single rounding point', () => {
     expect(divideHalfUp(1, 3)).toBe(0);
     expect(divideHalfUp(4, 2)).toBe(2);
   });
+
+  it('rounds negative halves AWAY FROM ZERO (documented contract holds for every sign)', () => {
+    expect(divideHalfUp(-3, 2)).toBe(-2);
+    expect(divideHalfUp(-1, 2)).toBe(-1);
+    expect(divideHalfUp(-1, 3)).toBe(0);
+    expect(divideHalfUp(-4, 2)).toBe(-2);
+  });
 });
 
 describe('resolveChannelRate — cascade exact channel → same currency → USD pivot → error', () => {
@@ -45,6 +52,41 @@ describe('resolveChannelRate — cascade exact channel → same currency → USD
     expect(result.succeeded).toBe(true);
     expect(result.data?.value).toBe(350 * RATE_MICRO);
     expect(result.data?.id).toBeUndefined();
+  });
+
+  it('resolves same-effectiveFrom rows order-independently via createdDate then id', () => {
+    const method = SalePaymentMethod.Transferencia;
+    const olderCreated = {
+      ...makeRate(Currency.CUP, 300, '2026-09-15', method),
+      createdDate: new Date('2026-09-10'),
+    };
+    const newerCreated = {
+      ...makeRate(Currency.CUP, 400, '2026-09-15', method),
+      createdDate: new Date('2026-09-12'),
+    };
+    const forward = resolveChannelRate([olderCreated, newerCreated], method, Currency.CUP, AT);
+    const reverse = resolveChannelRate([newerCreated, olderCreated], method, Currency.CUP, AT);
+    expect(forward.data?.value).toBe(400 * RATE_MICRO);
+    expect(reverse.data?.value).toBe(forward.data?.value);
+
+    const idA = { ...makeRate(Currency.CUP, 300, '2026-09-15', method), id: 'a' };
+    const idB = { ...makeRate(Currency.CUP, 400, '2026-09-15', method), id: 'b' };
+    const byIdForward = resolveChannelRate([idA, idB], method, Currency.CUP, AT);
+    const byIdReverse = resolveChannelRate([idB, idA], method, Currency.CUP, AT);
+    expect(byIdForward.data?.value).toBe(400 * RATE_MICRO);
+    expect(byIdReverse.data?.value).toBe(byIdForward.data?.value);
+
+    const noCreated = makeRate(Currency.CUP, 300, '2026-09-15', method);
+    const withCreated = {
+      ...makeRate(Currency.CUP, 400, '2026-09-15', method),
+      createdDate: new Date('2026-09-11'),
+    };
+    expect(resolveChannelRate([noCreated, withCreated], method, Currency.CUP, AT).data?.value).toBe(
+      400 * RATE_MICRO,
+    );
+    expect(resolveChannelRate([withCreated, noCreated], method, Currency.CUP, AT).data?.value).toBe(
+      400 * RATE_MICRO,
+    );
   });
 
   it('(b) falls back to another channel of the same currency', () => {

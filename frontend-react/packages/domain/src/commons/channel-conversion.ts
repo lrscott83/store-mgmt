@@ -37,15 +37,21 @@ export interface ResolvedChannelRate {
 
 /**
  * HALF-UP integer division — the single rounding point of the module.
- * `2 * r >= denominator` rounds an exact half away from zero.
+ * Rounds HALF-UP AWAY FROM ZERO for every sign: the magnitude is rounded with
+ * `2 * r >= denominator` and the sign is re-applied, so an exact negative half
+ * (-3/2) rounds to -2 — not toward +infinity. A non-positive denominator throws.
  */
 export function divideHalfUp(numerator: number, denominator: number): number {
   if (denominator <= 0) {
     throw new Error('divideHalfUp: denominator must be positive.');
   }
-  const q = Math.floor(numerator / denominator);
-  const r = numerator - q * denominator;
-  return 2 * r >= denominator ? q + 1 : q;
+  const negative = numerator < 0;
+  const magnitude = Math.abs(numerator);
+  const q = Math.floor(magnitude / denominator);
+  const r = magnitude - q * denominator;
+  const rounded = 2 * r >= denominator ? q + 1 : q;
+  if (rounded === 0) return 0;
+  return negative ? -rounded : rounded;
 }
 
 function success<T>(data: T): DataResult<T> {
@@ -77,13 +83,37 @@ function toResolved(rate: ChannelRate): ResolvedChannelRate {
   };
 }
 
+/**
+ * Total order over rate rows, so the winner never depends on caller array order:
+ * (1) `effectiveFrom` ascending (later wins), then (2) `createdDate` ascending
+ * (absent = epoch 0), then (3) `id` lexicographically (absent = empty string).
+ * The maximum wins. `id` is compared by code unit, not locale, to stay stable.
+ */
+function compareRates(a: ChannelRate, b: ChannelRate): number {
+  const byEffectiveFrom = a.effectiveFrom.getTime() - b.effectiveFrom.getTime();
+  if (byEffectiveFrom !== 0) return byEffectiveFrom;
+
+  const aCreated = a.createdDate ? a.createdDate.getTime() : 0;
+  const bCreated = b.createdDate ? b.createdDate.getTime() : 0;
+  if (aCreated !== bCreated) return aCreated - bCreated;
+
+  const aId = a.id ?? '';
+  const bId = b.id ?? '';
+  if (aId === bId) return 0;
+  return aId < bId ? -1 : 1;
+}
+
+/**
+ * Latest row effective at or before `at`, resolved under `compareRates` so two
+ * rows sharing an `effectiveFrom` resolve identically regardless of the order
+ * the caller passes them in. The caller's array is never mutated.
+ */
 function latestAtOrBefore(rates: readonly ChannelRate[], at: Date): ChannelRate | undefined {
   const atTime = at.getTime();
   let best: ChannelRate | undefined;
   for (const row of rates) {
-    const time = row.effectiveFrom.getTime();
-    if (time > atTime) continue;
-    if (!best || time >= best.effectiveFrom.getTime()) best = row;
+    if (row.effectiveFrom.getTime() > atTime) continue;
+    if (!best || compareRates(row, best) > 0) best = row;
   }
   return best;
 }

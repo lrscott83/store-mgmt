@@ -42,6 +42,10 @@ export function applyPayment(
  * applied up to the remaining, and any overflow accumulates as change. `paid`
  * is the sum of all applied amounts; all three results are rounded HALF-UP at
  * 2dp (cents) once at the end.
+ *
+ * One rule for the module: a non-positive payment amount is rejected with the
+ * typed `PaymentTally.NonPositiveAmount` error via `applyPayment` — never
+ * silently ignored.
  */
 export function summarizePayments(
   total: number,
@@ -52,9 +56,7 @@ export function summarizePayments(
   let change = 0;
 
   for (const payment of payments) {
-    const amount = payment.amountInOrderCurrency;
-    if (amount <= 0) continue;
-    const { appliedAmount, changeAmount } = applyPayment(remaining, amount);
+    const { appliedAmount, changeAmount } = applyPayment(remaining, payment.amountInOrderCurrency);
     remaining -= appliedAmount;
     paid += appliedAmount;
     change += changeAmount;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyPayment, summarizePayments } from '../payment-tally';
+import { PaymentTallyErrors, applyPayment, summarizePayments } from '../payment-tally';
 
 describe('applyPayment', () => {
   it('applies the whole incoming amount when it fits under the remaining', () => {
@@ -41,5 +41,17 @@ describe('summarizePayments', () => {
   it('exposes the remaining amount when payments do not cover the total', () => {
     const tally = summarizePayments(1000, [{ amountInOrderCurrency: 250 }]);
     expect(tally).toEqual({ paid: 250, remaining: 750, change: 0 });
+  });
+
+  it('rejects a non-positive payment line with the typed error instead of dropping it', () => {
+    expect(() => summarizePayments(1000, [{ amountInOrderCurrency: 0 }])).toThrow(
+      PaymentTallyErrors.NonPositiveAmount.code,
+    );
+    expect(() =>
+      summarizePayments(1000, [
+        { amountInOrderCurrency: 600 },
+        { amountInOrderCurrency: -50 },
+      ]),
+    ).toThrow(PaymentTallyErrors.NonPositiveAmount.code);
   });
 });
