@@ -65,7 +65,14 @@ export function hasInventoryModuleAvailable(user: UserModel): boolean {
   return isModuleAvailable(user, EModules.Inventory);
 }
 
-/** MultiPayments (module 16) availability — gates the cart currency selector. */
-export function hasMultiPaymentsModuleAvailable(user: UserModel): boolean {
-  return isModuleAvailable(user, EModules.MultiPayments);
+/**
+ * MultiPayments (module 16) availability — gates the cart currency selector.
+ * Defensive for a null user or a malformed `storeModuleIds` (cached profiles from
+ * previous sessions can load without the field). `isModuleAvailable` itself is
+ * left untouched so its behavior for the other modules stays Angular-parity.
+ */
+export function hasMultiPaymentsModuleAvailable(user: UserModel | null): boolean {
+  return (
+    !!user && Array.isArray(user.storeModuleIds) && isModuleAvailable(user, EModules.MultiPayments)
+  );
 }

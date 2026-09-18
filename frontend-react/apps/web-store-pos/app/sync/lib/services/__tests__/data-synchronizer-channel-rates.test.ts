@@ -3,6 +3,7 @@ import { Currency, Result, SalePaymentMethod } from '@store-mgmt/domain';
 import type { ChannelRate } from '@store-mgmt/domain';
 import type { ParsedData } from '../data-serializer-service';
 import { DataSynchronizerService, SynchronizerErrors } from '../data-synchronizer-service';
+import { ChannelRateOfflineService } from '../../../../management/channel-rates/lib/services/channel-rate-offline-service';
 import type {
   CategoryImportRepo,
   ChannelRateImportService,
@@ -266,6 +267,31 @@ describe('DataSynchronizerService — channelRates merge (multipayments T4)', ()
     expect(result.succeeded).toBe(false);
     const err = result.errors.find((e) => e.entity === 'channelRates');
     expect(err?.code).toBe(SynchronizerErrors.ChannelRatesUnexpectedError.code);
+  });
+
+  it('reports ChannelRatesUnexpectedError for an invalid imported row and inserts nothing', async () => {
+    // Drive the real import guard through the merge: value 0 is rejected by
+    // ChannelRateOfflineService.addImportedChannelRate with a failed Result.
+    const channelService = new ChannelRateOfflineService(STORE_ID);
+    const svc = new DataSynchronizerService(
+      STORE_ID,
+      makeCategoryRepo(),
+      makeProductRepo(),
+      makeInventoryService(),
+      makeOrderService(),
+      makeExpenseService(),
+      makeSaleCreditService(),
+      undefined,
+      undefined,
+      channelService,
+    );
+
+    const result = await svc.sync(makeData([makeRate('rate-0', 0)]));
+
+    expect(result.succeeded).toBe(false);
+    const err = result.errors.find((e) => e.entity === 'channelRates');
+    expect(err?.code).toBe(SynchronizerErrors.ChannelRatesUnexpectedError.code);
+    expect(channelService.getStorageChannelRates()).toHaveLength(0);
   });
 
   it('keeps the legacy merge contract when the service is omitted (legacy call sites)', async () => {

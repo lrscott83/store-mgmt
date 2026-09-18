@@ -166,6 +166,21 @@ describe('ChannelRatesPage (multipayments) — register and history', () => {
     expect(screen.getByTestId('channel-rate-empty')).toBeInTheDocument();
   });
 
+  it('clears the success-banner timer on unmount', async () => {
+    const clearSpy = vi.spyOn(globalThis, 'clearTimeout');
+    const { unmount } = renderPage();
+
+    expect(await screen.findByTestId('channel-rate-empty')).toBeInTheDocument();
+    fireEvent.change(screen.getByTestId('channel-rate-value'), { target: { value: '350' } });
+    fireEvent.click(screen.getByTestId('channel-rate-submit'));
+    await screen.findByTestId('channel-rate-saved');
+
+    unmount();
+    expect(clearSpy).toHaveBeenCalled();
+
+    clearSpy.mockRestore();
+  });
+
   it('exposes no delete or update control (append-only by contract)', async () => {
     seedRate();
 

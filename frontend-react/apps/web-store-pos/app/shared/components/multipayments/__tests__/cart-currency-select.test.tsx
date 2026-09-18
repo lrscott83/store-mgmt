@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import { Currency, EModules } from '@store-mgmt/domain';
 import esMessages from '~/shared/lib/i18n/es';
@@ -84,6 +84,20 @@ describe('CartCurrencySelect (module 16 gate)', () => {
     renderSelect(Currency.CUP);
 
     expect(optionLabels()).toEqual(['CUP', 'USD', 'EUR']);
+  });
+
+  it('falls back to CUP and notifies the parent when the value is not among the options', async () => {
+    mockUser = userWith([EModules.MultiPayments]);
+    mockItems = [itemWith(Currency.CUP)];
+    // Persisted EUR with a CUP-only cart: EUR is not an option.
+    const onChange = renderSelect(Currency.EUR);
+
+    expect(optionLabels()).toEqual(['CUP', 'USD']);
+    const select = screen.getByTestId('cart-currency-select') as HTMLSelectElement;
+    expect(select.value).toBe(String(Currency.CUP));
+    await waitFor(() => {
+      expect(onChange).toHaveBeenCalledWith(Currency.CUP);
+    });
   });
 
   it('persists the selected currency for the user', () => {

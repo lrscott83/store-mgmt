@@ -44,7 +44,7 @@ export function applyPayment(
  * 2dp (cents) once at the end.
  *
  * One rule for the module: a non-positive payment amount is rejected with the
- * typed `PaymentTally.NonPositiveAmount` error via `applyPayment` — never
+ * typed `PaymentTallyErrors.NonPositiveAmount` error via `applyPayment` — never
  * silently ignored.
  */
 export function summarizePayments(

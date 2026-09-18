@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useIntl } from 'react-intl';
 import {
   Currency,
@@ -66,6 +66,16 @@ export function ChannelRatesPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
   const [savedMessage, setSavedMessage] = useState(false);
+  const savedMessageTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  // The success banner auto-hides; clear the timer on unmount so it never fires
+  // against an unmounted component.
+  useEffect(
+    () => () => {
+      if (savedMessageTimer.current !== undefined) clearTimeout(savedMessageTimer.current);
+    },
+    [],
+  );
 
   const load = useCallback(() => {
     if (!storeId) return;
@@ -114,7 +124,7 @@ export function ChannelRatesPage() {
     setValueDraft('');
     load();
     setSavedMessage(true);
-    setTimeout(() => setSavedMessage(false), 3000);
+    savedMessageTimer.current = setTimeout(() => setSavedMessage(false), 3000);
   }
 
   return (

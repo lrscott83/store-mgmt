@@ -1,27 +1,21 @@
+import { useEffect } from 'react';
 import { useIntl } from 'react-intl';
-import { Currency, EModules } from '@store-mgmt/domain';
-import type { UserModel } from '@store-mgmt/domain';
+import { Currency } from '@store-mgmt/domain';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { useCartStore } from '~/shared/lib/stores/cart-store';
 import { currencyLabel } from '~/shared/lib/format-money-with-currency';
 import { writeCartCurrencyPreference } from '~/shared/lib/cart-currency-preference';
+import { hasMultiPaymentsModuleAvailable } from '~/shared/lib/auth/authorization-service';
 
 /** Fixed prefix of the options: CUP (default) then USD. Cart currencies append after. */
 const BASE_OPTIONS: { value: Currency; label: string }[] = [
-  { value: Currency.CUP, label: 'CUP' },
-  { value: Currency.USD, label: 'USD' },
+  { value: Currency.CUP, label: currencyLabel(Currency.CUP) },
+  { value: Currency.USD, label: currencyLabel(Currency.USD) },
 ];
 
 interface CurrencyOption {
   value: number;
   label: string;
-}
-
-/** Defensivo: perfiles cacheados de sesiones previas pueden no traer storeModuleIds. */
-export function hasMultiPaymentsAvailable(user: UserModel | null): boolean {
-  return (
-    !!user && Array.isArray(user.storeModuleIds) && user.storeModuleIds.includes(EModules.MultiPayments)
-  );
 }
 
 /**
@@ -58,12 +52,24 @@ export function CartCurrencySelect({ value, onChange, testId }: CartCurrencySele
   const intl = useIntl();
   const user = useAuthStore((s) => s.user);
   const items = useCartStore((s) => s.items);
-  if (!hasMultiPaymentsAvailable(user)) {
+  const available = hasMultiPaymentsModuleAvailable(user);
+
+  const options = available ? buildCurrencyOptions(items) : [];
+  const selected = options.some((option) => option.value === value) ? value : Currency.CUP;
+
+  // The controlled `value` can name a currency that is not among the built
+  // options (e.g. a persisted EUR with a CUP-only cart). The select renders the
+  // fallback, so tell the parent about it — otherwise the visible label and the
+  // priced currency drift apart.
+  useEffect(() => {
+    if (available && selected !== value) {
+      onChange(selected);
+    }
+  }, [available, selected, value, onChange]);
+
+  if (!available) {
     return null;
   }
-
-  const options = buildCurrencyOptions(items);
-  const selected = options.some((option) => option.value === value) ? value : Currency.CUP;
 
   function handleChange(currency: number) {
     writeCartCurrencyPreference(user?.id, currency as Currency);
