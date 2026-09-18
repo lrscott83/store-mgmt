@@ -52,8 +52,10 @@ describe('OrderList — list/table parity sweep (WU6)', () => {
         <OrderList orders={[makeOrder()]} readOnly />
       </Wrapper>,
     );
+    // 2026-09-18: la cabecera tiene una fila intermedia con 3 controles hermanos
+    // [toggle] [gear] [flecha] — el panel es dos niveles arriba del toggle.
     const panel = container.querySelector('[data-testid="order-panel-toggle-order-1"]')
-      ?.parentElement as HTMLElement;
+      ?.parentElement?.parentElement as HTMLElement;
     expect(panel.className).toMatch(/rounded-lg/);
     expect(panel.className).toMatch(/\bborder\b/);
     expect(panel.className).toMatch(/border-border/);
