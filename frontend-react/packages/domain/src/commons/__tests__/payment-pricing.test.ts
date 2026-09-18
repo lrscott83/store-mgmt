@@ -52,10 +52,22 @@ describe('paymentMethodOptionsForCurrency (catálogo §3 del plan)', () => {
 });
 
 describe('paymentPricingFor + applyPaymentPricing (percent/tax, defaults 0/0)', () => {
+  const currencies = Object.values(Currency).filter((v): v is Currency => typeof v === 'number');
+  const methods = Object.values(SalePaymentMethod).filter(
+    (v): v is SalePaymentMethod => typeof v === 'number',
+  );
+
+  it('el barrido cubre todos los miembros numéricos de ambos enums', () => {
+    const numericMemberCount = (e: object) =>
+      Object.keys(e).filter((k) => Number.isNaN(Number(k))).length;
+    expect(currencies).toHaveLength(numericMemberCount(Currency));
+    expect(methods).toHaveLength(numericMemberCount(SalePaymentMethod));
+  });
+
   it('toda combinación sin entrada en la tabla cae en percent 0 / tax 0', () => {
-    for (const c of Object.values(Currency)) {
-      for (const m of Object.values(SalePaymentMethod)) {
-        expect(paymentPricingFor(c, m as SalePaymentMethod)).toEqual({ percent: 0, tax: 0 });
+    for (const c of currencies) {
+      for (const m of methods) {
+        expect(paymentPricingFor(c, m)).toEqual({ percent: 0, tax: 0 });
       }
     }
   });
