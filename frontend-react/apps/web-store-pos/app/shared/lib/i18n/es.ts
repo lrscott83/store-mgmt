@@ -625,6 +625,9 @@ const messages: Record<string, string> = {
   'WAREHOUSES.TYPE_SALE_OUT': 'Salida a tienda',
   'WAREHOUSES.TYPE_TRANSFER_IN': 'Entrada por transferencia',
   'WAREHOUSES.TYPE_TRANSFER_OUT': 'Salida por transferencia',
+  // ─── Módulo Elaboración (17): consumo de insumos y entrada del terminado ──
+  'WAREHOUSES.TYPE_CONSUMPTION_OUT': 'Consumo (elaboración)',
+  'WAREHOUSES.TYPE_ELABORATION_IN': 'Entrada (elaboración)',
   // ─── Plan 2026-09-09: reversa de movimientos (D1-D12, F5/F8) ─────────────
   'WAREHOUSES.TYPE_REVERSAL': 'Reversa',
   'WAREHOUSES.REVERSAL_BADGE': 'Revertido',
