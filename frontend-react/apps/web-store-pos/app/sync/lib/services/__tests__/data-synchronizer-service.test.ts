@@ -367,6 +367,7 @@ function emptyData(): ParsedData {
     warehouses: [],
     warehouseStockLevels: [],
     warehouseStockMovements: [],
+    channelRates: [],
   };
 }
 
@@ -471,6 +472,7 @@ describe('DataSynchronizerService', () => {
         warehouses: [],
         warehouseStockLevels: [],
         warehouseStockMovements: [],
+        channelRates: [],
       };
 
       await svc.sync(data);
@@ -1008,6 +1010,7 @@ describe('DataSynchronizerService', () => {
         warehouses: [],
         warehouseStockLevels: [],
         warehouseStockMovements: [],
+        channelRates: [],
       };
       const result = await svc.sync(data);
       const entities = result.merges.map((r) => r.entity);
@@ -1049,6 +1052,7 @@ describe('DataSynchronizerService', () => {
         warehouses: [],
         warehouseStockLevels: [],
         warehouseStockMovements: [],
+        channelRates: [],
       };
 
       const result = await svc.sync(data);

@@ -17,7 +17,7 @@ describe('clearStoreData', () => {
     vi.restoreAllMocks();
   });
 
-  it('covers exactly the seven business entities', () => {
+  it('covers exactly the eleven business entities', () => {
     expect([...BUSINESS_ENTITY_NAMES]).toEqual([
       'products',
       'product-categories',
@@ -29,6 +29,7 @@ describe('clearStoreData', () => {
       'warehouses',
       'warehouse-stock-levels',
       'warehouse-stock-movements',
+      'channelRates',
     ]);
   });
 

@@ -118,6 +118,7 @@ function makeData(
     warehouses,
     warehouseStockLevels: stockLevels,
     warehouseStockMovements: movements,
+    channelRates: [],
   };
 }
 

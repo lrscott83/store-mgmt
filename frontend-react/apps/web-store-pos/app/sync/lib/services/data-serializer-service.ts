@@ -16,6 +16,7 @@ import type {
   Expense,
   SaleCredit,
   ExchangeRate,
+  ChannelRate,
   Warehouse,
   WarehouseStockLevel,
   WarehouseStockMovement,
@@ -81,6 +82,9 @@ export const EDataFileName = {
   Warehouses: 'warehouses.json',
   WarehouseStockLevels: 'warehouse-stock-levels.json',
   WarehouseStockMovements: 'warehouse-stock-movements.json',
+  // multipayments (T4): the append-only channel-rate register, absent from
+  // legacy archives (parsed as [] on import) and always written by exports.
+  ChannelRates: 'channel-rates.json',
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -175,6 +179,7 @@ export interface ParsedData {
   warehouses: Warehouse[];
   warehouseStockLevels: WarehouseStockLevel[];
   warehouseStockMovements: WarehouseStockMovement[];
+  channelRates: ChannelRate[];
 }
 
 // ---------------------------------------------------------------------------
@@ -205,6 +210,14 @@ export interface SaleCreditReader {
 
 export interface ExchangeRateReader {
   getStorageExchangeRates(): ExchangeRate[];
+}
+
+/**
+ * Channel-rate reader seam (multipayments): the offline service owns the
+ * append-only register; the serializer only reads it for export.
+ */
+export interface ChannelRateReader {
+  getStorageChannelRates(): ChannelRate[];
 }
 
 export interface WarehouseReader {
@@ -262,6 +275,10 @@ export class DataSerializerService {
     // module omit it; exports then write empty entries and imports parse []
     // for archives that carry none.
     private readonly warehouseReader?: WarehouseReader,
+    // Optional (multipayments T4): legacy call sites/tests that predate the
+    // channel-rate register omit it; exports then write an empty entry and
+    // imports parse [] for archives that carry none.
+    private readonly channelRateReader?: ChannelRateReader,
   ) {}
 
   private derivePassword(password: string): string {
@@ -286,6 +303,7 @@ export class DataSerializerService {
     const warehouses = this.warehouseReader?.getStorageWarehouses() ?? [];
     const warehouseStockLevels = this.warehouseReader?.getStorageStockLevels() ?? [];
     const warehouseStockMovements = this.warehouseReader?.getStorageMovements() ?? [];
+    const channelRates = this.channelRateReader?.getStorageChannelRates() ?? [];
 
     // Angular parity (data-serializer.service.ts:83-84): reads the RAW stored
     // JSON string straight from the repository, no re-derivation via
@@ -314,6 +332,7 @@ export class DataSerializerService {
     const warehousesJson = JSON.stringify(warehouses);
     const warehouseStockLevelsJson = JSON.stringify(warehouseStockLevels);
     const warehouseStockMovementsJson = JSON.stringify(warehouseStockMovements);
+    const channelRatesJson = JSON.stringify(channelRates);
 
     // v2 envelope: a fresh salt per export (V2-02), password-only key (V2-03).
     const salt = crypto.getRandomValues(new Uint8Array(V2_SALT_BYTES));
@@ -372,6 +391,9 @@ export class DataSerializerService {
         rawPassword: key,
       },
     );
+    await zipWriter.add(EDataFileName.ChannelRates, new TextReader(channelRatesJson), {
+      rawPassword: key,
+    });
 
     const blob = await zipWriter.close();
     return new Uint8Array(await blob.arrayBuffer());
@@ -508,6 +530,7 @@ export class DataSerializerService {
     const warehouses = this.warehouseReader?.getStorageWarehouses() ?? [];
     const warehouseStockLevels = this.warehouseReader?.getStorageStockLevels() ?? [];
     const warehouseStockMovements = this.warehouseReader?.getStorageMovements() ?? [];
+    const channelRates = this.channelRateReader?.getStorageChannelRates() ?? [];
 
     // Categories and products: read raw JSON and parse
     const categoriesJson = this.categoryRepository.getCategoriesJson() ?? '[]';
@@ -535,6 +558,7 @@ export class DataSerializerService {
       warehouses,
       warehouseStockLevels,
       warehouseStockMovements,
+      channelRates,
     };
   }
 
@@ -582,6 +606,8 @@ export class DataSerializerService {
         EDataFileName.WarehouseStockMovements,
         [],
       ),
+      // Legacy archives carry no channel-rates entry → [].
+      channelRates: parseJson<ChannelRate[]>(contents, EDataFileName.ChannelRates, []),
     };
   }
 }

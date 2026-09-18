@@ -17,7 +17,7 @@ export const StorageKeys = {
 } as const;
 
 /**
- * The seven business entities persisted per store, in the order their storage
+ * The eleven business entities persisted per store, in the order their storage
  * seams landed. Single source of truth: consumed by `entity-migration.ts`
  * (which encrypts them) and `store-data-reset.ts` (which wipes them). A new
  * entity added here reaches both, which is the point — a private copy in
@@ -34,4 +34,6 @@ export const BUSINESS_ENTITY_NAMES = [
   'warehouses',
   'warehouse-stock-levels',
   'warehouse-stock-movements',
+  // multipayments (T4): append-only channel-rate register.
+  'channelRates',
 ] as const;
