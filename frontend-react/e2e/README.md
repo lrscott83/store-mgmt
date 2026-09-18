@@ -53,18 +53,43 @@ Tests end-to-end del frontend React con [Playwright](https://playwright.dev/).
   al puerto HTTPS con un certificado autofirmado que un navegador real rechaza; esta suite no
   configura `ignoreHTTPSErrors`.
 
+## Cache de Vite — borrar antes de correr
+
+**Si reconstruiste un paquete del workspace, borrá el cache de Vite del app antes de correr la suite:**
+
+```bash
+rm -rf apps/web-store-pos/node_modules/.vite
+```
+
+Vite pre-bundlea los paquetes del workspace (`@store-mgmt/domain`, `@store-mgmt/web-common`) en `node_modules/.vite/deps`. Ese cache **no se invalida cuando cambia el `dist` de un paquete enlazado**: la invalidación se dispara por lockfile o por config, no por el contenido de un paquete del propio monorepo. Un `pnpm --filter @store-mgmt/domain build` lo deja obsoleto sin tocar nada más.
+
+Cuando queda viejo, el bundle cacheado no exporta lo que la app importa:
+
+```
+SyntaxError: The requested module '/node_modules/.vite/deps/@store-mgmt_domain.js?v=...'
+does not provide an export named 'Currency'
+```
+
+Y eso no rompe una pantalla: **rompe el grafo de módulos entero, así que la app no renderiza NINGUNA ruta** — ni `/login` ni `/`. Los specs fallan en el fixture con `element(s) not found`, y los 3 retries fallan idéntico. El síntoma se disfraza de "se rompió el auth" o "el backend no responde" cuando no es ninguna de las dos.
+
+**Diagnóstico**: Playwright guarda el trace del primer retry (`retries: 2` + `trace: 'on-first-retry'`). Descomprimí `test-results/<test>-retry1/trace.zip` y buscá `pageError` en `0-trace.trace`: ahí está el `SyntaxError` con el nombre exacto del paquete y del export que falta.
+
+Es cache derivado — se regenera solo en el próximo `pnpm dev`, así que borrarlo no cuesta más que el primer arranque del dev server. Regla práctica: **después de cada build de un paquete del workspace, merge o cambio de branch que toque `packages/`, borralo antes de correr la suite.**
+
 ## Cómo correr
+
+> ⚠️ **Si reconstruiste un paquete del workspace, borrá antes el cache de Vite** (sección anterior). Si no, la app no renderiza ninguna ruta y los specs fallan en el fixture, no en la aserción.
 
 Desde `frontend-react/`:
 
-| Comando                                       | Qué hace                                                                                                                                                                                                                                                                                                           |
-| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `pnpm test:e2e`                               | Corre la suite por defecto (smoke + register REQ-1..REQ-8 + login A1-A7/D1-D6 + login offline S1-03), **excluye** ambos specs de rate-limit. Consume 2 registros + 4 logins reales — ver la advertencia de cuota de login más abajo. `login-offline.spec.ts` no agrega a ese costo: cero peticiones reales de red. |
-| `pnpm test:e2e:rate-limit`                    | Corre AMBOS specs de rate-limit (`register-rate-limit.spec.ts` REQ-9 y `login-rate-limit.spec.ts` REQ-8), filtrados por el tag `@rate-limit`. Agota la cuota de registro (~10 min) y la de login (~1 min) de tu IP — a demanda, no en la corrida por defecto.                                                      |
-| `pnpm test:e2e:api`                           | Chequeo de conectividad con la API, sin navegador (`playwright.api.config.ts`).                                                                                                                                                                                                                                    |
-| `pnpm exec playwright test --ui`              | Modo interactivo (UI) con el test runner                                                                                                                                                                                                                                                                           |
-| `pnpm exec playwright test e2e/smoke.spec.ts` | Corre solo el archivo indicado                                                                                                                                                                                                                                                                                     |
-| `pnpm exec playwright show-report`            | Abre el reporte HTML generado                                                                                                                                                                                                                                                                                      |
+| Comando                                       | Qué hace                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `pnpm test:e2e`                               | Corre **casi toda la carpeta `e2e/`**: no hay `testMatch`, solo `testIgnore`, así que el runner ve **84** specs (87 menos los 3 ignorados: `offline-shell`, `offline-version-check`, `csp-enforcing-export`). `--grep-invert @rate-limit` saca además los bloques taggeados, que viven en **4 archivos**: dos enteros (`register-rate-limit.spec.ts`, `login-rate-limit.spec.ts`) y un bloque en `offline-session-online-ops.spec.ts` y otro en `roster-recovery.spec.ts`. O sea: **82 archivos completos + las partes sin tag de esos 2**. El costo en cuotas escala con toda la suite — ver las advertencias de login y de registro más abajo. |
+| `pnpm test:e2e:rate-limit`                    | Corre **todos los tests taggeados `@rate-limit`**, no solo los dos archivos de rate-limit: son 2 archivos enteros (`register-rate-limit.spec.ts` REQ-9, `login-rate-limit.spec.ts` REQ-8) más un bloque en `offline-session-online-ops.spec.ts` y otro en `roster-recovery.spec.ts`. Agota la cuota de registro (~10 min) y la de login (~1 min) de tu IP — a demanda, no en la corrida por defecto.                                                                                                                                                                                                                                             |
+| `pnpm test:e2e:api`                           | Chequeo de conectividad con la API, sin navegador (`playwright.api.config.ts`).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `pnpm exec playwright test --ui`              | Modo interactivo (UI) con el test runner                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `pnpm exec playwright test e2e/smoke.spec.ts` | Corre solo el archivo indicado                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `pnpm exec playwright show-report`            | Abre el reporte HTML generado                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 
 ## Cómo se levanta el servidor
 
@@ -177,12 +202,9 @@ lo dice explícitamente en vez de dejarte adivinar.
 
 ### Advertencia de datos, sin alarma
 
-Una corrida exitosa de `pnpm test:e2e` deja **3 filas permanentes** (`Owner` + `Store` + `User`,
-este último el StoreUser que la suite de login crea vía UI) en tu base `smca` local;
-`pnpm test:e2e:rate-limit` deja **1 fila más** (la del spec de rate-limit de registro; el de login
-no deja ninguna — ver más abajo). No hay teardown alcanzable desde el navegador. Los logins llevan
-el prefijo `e2e-` + timestamp, así que son greppables y borrables a mano cuando quieras limpiar
-(`smca`, no `smca_test` — no contamina la suite .NET).
+Corriendo con el perfil documentado (`http-e2e`), las filas que la suite crea van a **`smca_test`**, y `globalTeardown` las borra al terminar la corrida: **no queda residuo permanente**. Una corrida real de `smoke + credits-history` terminó con `[e2e teardown] 63 filas e2e-* borradas en "smca_test"`.
+
+La limpieza a mano de la sección anterior solo hace falta si corriste con el perfil equivocado: **`--launch-profile http` escribe en `smca`**, la base de desarrollo, y ahí las filas `e2e-*` sí se acumulan sin que nada las borre (el teardown mira `smca_test`). Los logins llevan el prefijo `e2e-` + timestamp, así que son greppables y borrables cuando quieras limpiar.
 
 ## Suite de login (`login.spec.ts`, `login-rate-limit.spec.ts`)
 
