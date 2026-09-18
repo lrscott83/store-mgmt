@@ -108,6 +108,120 @@ function makeCredit(overrides: Partial<SaleCredit> = {}): SaleCredit {
 import { TodaySaleCreditsPage } from '../today-credits';
 import { SaleCreditsPage } from '../credits';
 
+describe('TodaySaleCreditsPage — header y colores (gear-menu recorte + amarillito)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  function seedTodayCredit(overrides: Partial<SaleCredit> = {}) {
+    vi.mocked(SaleCreditOfflineService).mockImplementation(
+      () =>
+        ({
+          getSaleCreditsInDayObservable: vi.fn().mockReturnValue(creditsResponse([makeCredit({ total: 40, ...overrides })])),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        }) as any,
+    );
+  }
+
+  // BUG de recorte (reproducido en preview móvil 440x784): el menú ⚙ de un crédito se
+  // pinta DENTRO del wrapper overflow-x-auto de la tabla (32px de alto) y el navegador
+  // recorta el popup: el hit-test sobre el menú abierto devolvía el FOOTER de la página.
+  // Fix: el menú no debe vivir bajo ningún ancestro con overflow distinto de visible.
+  it('TC-CLIP: el menú de acciones no vive bajo ningún ancestro con overflow recortable', async () => {
+    seedTodayCredit();
+    render(
+      <Wrapper>
+        <TodaySaleCreditsPage />
+      </Wrapper>,
+    );
+
+    fireEvent.click(await screen.findByTestId(/^sale-credit-actions-toggle-/));
+    const menu = screen.getByRole('menu');
+    let node: HTMLElement | null = menu.parentElement;
+    while (node) {
+      const s = getComputedStyle(node);
+      // jsdom devuelve '' para propiedades no declaradas (el default es visible);
+      // el navegador real devuelve 'visible'.
+      const ov = s.overflow || 'visible';
+      const ovX = s.overflowX || 'visible';
+      const ovY = s.overflowY || 'visible';
+      expect(
+        ov === 'visible' && ovX === 'visible' && ovY === 'visible',
+        `ancestro <${node.tagName.toLowerCase()} class="${node.className}"> recorta el menú (overflow=${ov})`,
+      ).toBe(true);
+      node = node.parentElement;
+    }
+  });
+
+  // Header pedido por el usuario: «Créditos del día (n)» a la izquierda (n = TODOS los
+  // créditos del día) y el valor total a la derecha.
+  it('TC-HEAD: el header muestra «Créditos del día (n)» contando TODOS los créditos y el total a la derecha', async () => {
+    seedTodayCredit({ total: 40 });
+    render(
+      <Wrapper>
+        <TodaySaleCreditsPage />
+      </Wrapper>,
+    );
+
+    const header = () => document.querySelector('[data-slot="card-header"]') as HTMLElement;
+    await screen.findByText('Ana');
+
+    // Crédito UNPAID de 40 → n=1, total $40.
+    expect(within(header()).getByText('(1)')).toBeInTheDocument();
+    expect(within(header()).getByText('$40')).toBeInTheDocument();
+
+    // El título se mantiene «Créditos del día» (protegido por E2E).
+    expect(within(header()).getByText(esMessages['SALE_CREDIT.TODAY_CREDITS'])).toBeInTheDocument();
+  });
+
+  it('TC-HEAD-PAID: el header cuenta y suma TAMBIÉN los créditos ya pagados', async () => {
+    seedTodayCredit({ total: 40, isPaid: true, paid: 40 });
+    render(
+      <Wrapper>
+        <TodaySaleCreditsPage />
+      </Wrapper>,
+    );
+
+    const header = () => document.querySelector('[data-slot="card-header"]') as HTMLElement;
+    await screen.findByText('Ana');
+    expect(within(header()).getByText('(1)')).toBeInTheDocument();
+    expect(within(header()).getByText('$40')).toBeInTheDocument();
+  });
+
+  // Amarillito (text-warning) como la referencia visual del usuario: los totales y
+  // precios de esta vista, no rojo/azul.
+  it('TC-COLOR: el total del header y el precio del crédito van en text-warning', async () => {
+    seedTodayCredit({ total: 40 });
+    render(
+      <Wrapper>
+        <TodaySaleCreditsPage />
+      </Wrapper>,
+    );
+
+    const header = () => document.querySelector('[data-slot="card-header"]') as HTMLElement;
+    await screen.findByText('Ana');
+    // El monto aparece en el header Y en la fila — scope cada aserción.
+    expect(within(header()).getByText('$40')).toHaveClass('text-warning');
+    const rowSpan = within(document.querySelector('tbody') as HTMLElement).getByText('$40');
+    expect(rowSpan).toHaveClass('text-warning');
+  });
+
+  // Crédito PAGADO: la fila ya no distingue pago con verde/rojo — siempre amarillito;
+  // solo la fecha de pago queda en verde.
+  it('TC-COLOR-PAID: un crédito pagado también muestra su precio en text-warning', async () => {
+    seedTodayCredit({ total: 40, isPaid: true, paid: 40, paidDate: new Date(2024, 2, 20) });
+    render(
+      <Wrapper>
+        <TodaySaleCreditsPage />
+      </Wrapper>,
+    );
+
+    await screen.findByText('Ana');
+    const rowSpan = within(document.querySelector('tbody') as HTMLElement).getByText('$40');
+    expect(rowSpan).toHaveClass('text-warning');
+  });
+});
+
 describe('TodaySaleCreditsPage — behavioral (Angular parity)', () => {
   beforeEach(() => {
     vi.clearAllMocks();

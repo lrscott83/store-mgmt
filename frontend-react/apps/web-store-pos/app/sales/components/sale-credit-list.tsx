@@ -51,8 +51,11 @@ export function SaleCreditList({
     return succeeded;
   }
 
+  // SIN wrapper overflow-x-auto: el popup del ActionMenu vive dentro de esta tabla y un
+  // ancestro con overflow lo RECORTA (reproducido en móvil 440px: el hit-test sobre el
+  // menú abierto devolvía el footer de la página). La tabla no necesita scroll horizontal.
   return (
-    <div className="overflow-x-auto">
+    <div>
       <table className="w-full text-sm">
         <tbody>
           {saleCredits.map((saleCredit) => (
@@ -61,9 +64,9 @@ export function SaleCreditList({
                 <span className="text-text">{saleCredit.client}</span>
               </td>
               <td className="p-1 text-right">
-                <span className={saleCredit.isPaid ? 'text-success' : 'text-danger'}>
-                  {formatCurrency(saleCredit.total)}
-                </span>
+                {/* Amarillito para el precio en ambos estados (petición del usuario, como
+                    la referencia visual de ventas del día); solo la fecha de pago es verde. */}
+                <span className="text-warning">{formatCurrency(saleCredit.total)}</span>
               </td>
               <td className="p-1 text-right">
                 {saleCredit.isPaid && (
