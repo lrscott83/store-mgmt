@@ -304,6 +304,8 @@ const messages: Record<string, string> = {
     'La venta no tiene ningún producto. Usted debe adicionar algún producto a la venta para pagar.',
   'SHOPPING_CART.PRINT_INVOICE': 'Imprimir Factura (prueba)',
   'SHOPPING_CART.CLEAR': 'Limpiar',
+  // MultiPayments: etiqueta del selector de moneda del carrito (módulo 16).
+  'SHOPPING_CART.CURRENCY_LABEL': 'Moneda',
   'SHOPPING_CART.DON_NOT_PAY_LESS_THAN_CART_TOTAL':
     'Usted no puede realizar la venta porque el pago es menor que el total.',
   'SHOPPING_CART.DON_NOT_SALE_CREDIT_WITHOUT_CLIENT':

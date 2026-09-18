@@ -1,6 +1,7 @@
 import { useRef, useState, useEffect } from 'react';
 import { useIntl } from 'react-intl';
 import type { Product } from '@store-mgmt/domain';
+import { Currency } from '@store-mgmt/domain';
 import {
   SalePaymentMethod,
   applyPaymentPricing,
@@ -25,6 +26,7 @@ import { ProductCategoryRepository } from '~/sales/lib/repositories/product-cate
 import {
   hasCreditsModuleAvailable,
   hasInventoryModuleAvailable,
+  hasMultiPaymentsModuleAvailable,
 } from '~/shared/lib/auth/authorization-service';
 import { getOrderTypeText } from '~/sales/lib/order-type-utils';
 import { wholesaleCartDisplay } from '~/sales/lib/wholesale-cart-display';
@@ -40,6 +42,8 @@ import { showBlockingError, showAcknowledgeError } from '~/shared/lib/blocking-a
 import { showToastSuccess, showToastError } from '~/shared/lib/toast';
 import { round2 } from '~/shared/lib/money';
 import { formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency';
+import { readCartCurrencyPreference } from '~/shared/lib/cart-currency-preference';
+import { CartCurrencySelect } from '~/shared/components/multipayments/cart-currency-select';
 import { Switch } from '~/shared/components/ui/switch';
 import { InfoBox } from '~/shared/components/ui/info-box';
 
@@ -216,13 +220,22 @@ export function CartShell() {
   const user = useAuthStore((s) => s.user);
   const creditsModuleAvailable = user ? hasCreditsModuleAvailable(user) : false;
   const storeId = user?.selectedStoreId ?? '';
+  // MultiPayments (módulo 16): moneda de la venta elegida por el usuario,
+  // persistida por usuario y reutilizada en la próxima venta. Sin el módulo el
+  // estado queda sin uso y el carrito conserva el comportamiento previo.
+  const multiPaymentsAvailable = user ? hasMultiPaymentsModuleAvailable(user) : false;
+  const [preferredCartCurrency, setPreferredCartCurrency] = useState<Currency>(() =>
+    readCartCurrencyPreference(user?.id),
+  );
 
   // Venta mayorista: el badge cuenta PAQUETES (cajas), no unidades. En venta normal
   // sigue contando unidades (cartBadgeCount cae a la suma por producto sin config).
   const itemCount = wholesaleCartDisplay.cartBadgeCount(items);
   // MultiMonedas: el carrito es de una sola moneda (guard de adición), así que el
   // total y el vuelto se formatean SIEMPRE con la moneda de la venta en curso.
-  const saleCurrency = cartCurrency();
+  // MultiPayments (módulo 16): la moneda de la venta la define la preferencia
+  // persistida del usuario; sin el módulo se conserva EXACTAMENTE cartCurrency().
+  const saleCurrency = multiPaymentsAvailable ? preferredCartCurrency : cartCurrency();
   const money = (amount: number) => formatMoneyWithCurrency(amount, saleCurrency);
 
   // payment-methods-percent-tax (plan 2026-09-17): re-pin del método si la moneda de
@@ -504,6 +517,14 @@ export function CartShell() {
                 </button>
               </div>
             </div>
+
+            {/* MultiPayments: selector de moneda del carrito (módulo 16). El propio
+              componente se oculta sin el módulo, así que ningún flujo existente cambia. */}
+            <CartCurrencySelect
+              value={preferredCartCurrency}
+              onChange={setPreferredCartCurrency}
+              testId="cart-currency-select"
+            />
 
             {/* Payment / Vuelto row — payment-methods-percent-tax (plan 2026-09-17):
               "con cuánto paga" y el vuelto aplican SOLO en efectivo (misma moneda de la

@@ -64,3 +64,8 @@ export function hasCreditsModuleAvailable(user: UserModel): boolean {
 export function hasInventoryModuleAvailable(user: UserModel): boolean {
   return isModuleAvailable(user, EModules.Inventory);
 }
+
+/** MultiPayments (module 16) availability — gates the cart currency selector. */
+export function hasMultiPaymentsModuleAvailable(user: UserModel): boolean {
+  return isModuleAvailable(user, EModules.MultiPayments);
+}
