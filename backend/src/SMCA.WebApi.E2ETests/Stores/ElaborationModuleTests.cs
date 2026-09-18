@@ -21,22 +21,22 @@ namespace SMCA.WebApi.E2ETests.Stores;
 /// elaboration-module — NEW coverage (2026-09-18), purely additive:
 /// NO existing E2E file is modified beyond the three authorized 1:1 expectation updates.
 ///
-/// The Elaboration module (16, features 120 Recipes / 121 Elaborations) is included ONLY
+/// The Elaboration module (17, features 120 Recipes / 121 Elaborations) is included ONLY
 /// in the Superior (3) and VIP (4) plans, and its features are granted ONLY to OwnerAdmin.
 /// This suite pins the FULL chain a user experiences:
 ///
 ///   EM1  OwnerAdmin creates a store inheriting the selected store's module set
-///        {7, 14, 16}: the new store gets active StoreModule(16) and StoreRoleFeature
+///        {7, 14, 17}: the new store gets active StoreModule(17) and StoreRoleFeature
 ///        rows for 120/121 on OwnerAdmin.
-///   EM2  Changing the plan to Superior activates 16/120/121 through the SAME
+///   EM2  Changing the plan to Superior activates 17/120/121 through the SAME
 ///        runtime chain (change-plan → StoreModules → /me).
-///   EM3  Changing the plan to VIP activates 16/120/121 too.
-///   EM4  Changing back Superior → Pago STRIPS 16 (and its 120/121 grants) — the
+///   EM3  Changing the plan to VIP activates 17/120/121 too.
+///   EM4  Changing back Superior → Pago STRIPS 17 (and its 120/121 grants) — the
 ///        module must follow the plan in both directions.
 ///   EM5  Backfill parity: a pre-existing Superior store seeded exactly like
-///        the migration/backfill writes it (StoreModule 16 + StoreRoleFeature 120/121
-///        for OwnerAdmin) exposes 16/120/121 on /me with NO re-register.
-///   EM6  Billing gate: the same store over its due date (Vencido) loses 16/120/121
+///        the migration/backfill writes it (StoreModule 17 + StoreRoleFeature 120/121
+///        for OwnerAdmin) exposes 17/120/121 on /me with NO re-register.
+///   EM6  Billing gate: the same store over its due date (Vencido) loses 17/120/121
 ///        from /me (FilterForBilling keeps only PriceIncluded modules) —
 ///        unpaid stores must not keep the premium module.
 /// </summary>
@@ -46,7 +46,7 @@ public sealed class ElaborationModuleTests
     private readonly AppTestFactory _f;
     public ElaborationModuleTests(WebAppFixture fixture) => _f = fixture.Factory;
 
-    private const int ElaborationModuleId = (int)ModuleType.Elaboration;         // 16
+    private const int ElaborationModuleId = (int)ModuleType.Elaboration;         // 17
     private const int RecipesFeatureId = (int)FeatureType.Recipes;               // 120
     private const int ElaborationsFeatureId = (int)FeatureType.Elaborations;     // 121
     private const int ManagementModuleId = (int)ModuleType.Management;           // 7 (free)
@@ -130,7 +130,7 @@ public sealed class ElaborationModuleTests
         // OwnerAdmin creation contract (OwnerCreateStoreTests): the body ModuleIds are
         // IGNORED — the new store INHERITS the selected store's module set, and the
         // handler gates on MultiStores (14) being active on the selected store. Seed the
-        // selected store with {7, 14, 16}: creating then propagates 16 + features 120/121.
+        // selected store with {7, 14, 17}: creating then propagates 17 + features 120/121.
         var seeded = await SeedOwnerAdminStoreAsync(planId: (int)StorePlanType.Superior);
         try
         {
@@ -266,8 +266,8 @@ public sealed class ElaborationModuleTests
     [Fact]
     public async Task EM5_backfilled_superior_store_exposes_module_and_features_on_me()
     {
-        // Mirror EXACTLY what the EF migration / VPS script 18 backfill writes for an
-        // existing ACTIVE Superior store: StoreModule(16) with the catalog pricing
+        // Mirror EXACTLY what the EF migration / VPS script 19 backfill writes for an
+        // existing ACTIVE Superior store: StoreModule(17) with the catalog pricing
         // (price 3, 100% discount) + StoreRoleFeature 120/121 for OwnerAdmin only.
         var seeded = await SeedOwnerAdminStoreAsync(planId: (int)StorePlanType.Superior);
         try

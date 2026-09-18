@@ -72,7 +72,7 @@ public sealed class StorePlanCatalogTests
             (int)ModuleType.MultiStores,
             // MultiMonedas (2026-09-17): módulo 15 incluido en Superior y VIP.
             (int)ModuleType.MultiMonedas,
-            // Elaboración (2026-09-18): módulo 16 incluido en Superior y VIP.
+            // Elaboración (2026-09-18): módulo 17 incluido en Superior y VIP.
             (int)ModuleType.Elaboration
         };
         superior.Should().BeEquivalentTo(fullCatalog);

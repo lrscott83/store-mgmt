@@ -51,6 +51,6 @@ namespace Domain.Common.Enums
         MultiMonedas = 15,
 
         [Description("Elaboración")]
-        Elaboration = 16,
+        Elaboration = 17,
     }
 }

@@ -35,7 +35,7 @@ public sealed class StoreCreatePlanTests
     private const int WholesaleSalesModuleId = 12;
     private const int MultiStoresModuleId = 14;
     private const int MultiMonedasModuleId = 15;
-    private const int ElaborationModuleId = 16;
+    private const int ElaborationModuleId = 17;
     private const int SuperiorPlanId = (int)Domain.Common.Enums.StorePlanType.Superior;
 
     private static object Body(Guid ownerId, string name, IEnumerable<int> moduleIds) => new

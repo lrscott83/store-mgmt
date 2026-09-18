@@ -4,18 +4,18 @@ using Xunit;
 namespace Application.Tests.Catalog
 {
     /// <summary>
-    /// Elaboration module (16) catalog parity tests. The seed data lives in the EF entity
+    /// Elaboration module (17) catalog parity tests. The seed data lives in the EF entity
     /// configurations and flows to Superior/VIP stores through RegisterCommand, the plan
-    /// catalog and the backfill; these tests freeze the id contract: module 16, features
+    /// catalog and the backfill; these tests freeze the id contract: module 17, features
     /// 120 (Recipes) / 121 (Elaborations), and plan assignment ONLY to Superior (3) and
     /// VIP (4) — never Gratis (1) / Pago (2).
     /// </summary>
     public class ElaborationCatalogTests
     {
         [Fact]
-        public void Elaboration_ModuleId_Is16()
+        public void Elaboration_ModuleId_Is17()
         {
-            Assert.Equal(16, (int)ModuleType.Elaboration);
+            Assert.Equal(17, (int)ModuleType.Elaboration);
         }
 
         [Fact]
@@ -42,7 +42,7 @@ namespace Application.Tests.Catalog
 
         /// <summary>
         /// The plan->module assignment pairs seeded in
-        /// StorePlanModuleEntityTypeConfiguration must be exactly (Superior,16) and (VIP,16).
+        /// StorePlanModuleEntityTypeConfiguration must be exactly (Superior,17) and (VIP,17).
         /// Read via reflection over the HasData rows is not possible without a model build,
         /// so this test pins the store-plan ids the migration/backfill rely on.
         /// </summary>

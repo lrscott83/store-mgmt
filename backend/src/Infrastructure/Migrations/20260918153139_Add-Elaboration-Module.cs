@@ -15,15 +15,15 @@ namespace Infrastructure.Migrations
             migrationBuilder.InsertData(
                 table: "Module",
                 columns: new[] { "Id", "AvailableToStore", "DiscountPrice", "IsActive", "Name", "Order", "PercentDiscountPrice", "Price", "PriceIncluded" },
-                values: new object[] { 16, true, 0f, true, "Elaboración", 130, 100f, 3f, false });
+                values: new object[] { 17, true, 0f, true, "Elaboración", 130, 100f, 3f, false });
 
             migrationBuilder.InsertData(
                 table: "Feature",
                 columns: new[] { "Id", "AvailableToStore", "Description", "IsActive", "ModuleId", "Name", "Order" },
                 values: new object[,]
                 {
-                    { 120, true, "Funcionalidad para gestionar las recetas de elaboración de productos", true, 16, "Recetas", 240 },
-                    { 121, true, "Funcionalidad para registrar elaboraciones con consumo de insumos y costo real", true, 16, "Elaboraciones", 241 }
+                    { 120, true, "Funcionalidad para gestionar las recetas de elaboración de productos", true, 17, "Recetas", 240 },
+                    { 121, true, "Funcionalidad para registrar elaboraciones con consumo de insumos y costo real", true, 17, "Elaboraciones", 241 }
                 });
 
             migrationBuilder.InsertData(
@@ -31,8 +31,8 @@ namespace Infrastructure.Migrations
                 columns: new[] { "ModuleId", "PlanId" },
                 values: new object[,]
                 {
-                    { 16, 3 },
-                    { 16, 4 }
+                    { 17, 3 },
+                    { 17, 4 }
                 });
 
             // Assign the Elaboration module + features 120 (Recipes) and 121 (Elaborations)
@@ -61,17 +61,17 @@ namespace Infrastructure.Migrations
             migrationBuilder.DeleteData(
                 table: "StorePlanModule",
                 keyColumns: new[] { "ModuleId", "PlanId" },
-                keyValues: new object[] { 16, 3 });
+                keyValues: new object[] { 17, 3 });
 
             migrationBuilder.DeleteData(
                 table: "StorePlanModule",
                 keyColumns: new[] { "ModuleId", "PlanId" },
-                keyValues: new object[] { 16, 4 });
+                keyValues: new object[] { 17, 4 });
 
             migrationBuilder.DeleteData(
                 table: "Module",
                 keyColumn: "Id",
-                keyValue: 16);
+                keyValue: 17);
         }
     }
 }

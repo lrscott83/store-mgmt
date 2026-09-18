@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20260918145355_Add-Elaboration-Module")]
+    [Migration("20260918153139_Add-Elaboration-Module")]
     partial class AddElaborationModule
     {
         /// <inheritdoc />
@@ -500,7 +500,7 @@ namespace Infrastructure.Migrations
                             AvailableToStore = true,
                             Description = "Funcionalidad para gestionar las recetas de elaboración de productos",
                             IsActive = true,
-                            ModuleId = 16,
+                            ModuleId = 17,
                             Name = "Recetas",
                             Order = 240
                         },
@@ -510,7 +510,7 @@ namespace Infrastructure.Migrations
                             AvailableToStore = true,
                             Description = "Funcionalidad para registrar elaboraciones con consumo de insumos y costo real",
                             IsActive = true,
-                            ModuleId = 16,
+                            ModuleId = 17,
                             Name = "Elaboraciones",
                             Order = 241
                         });
@@ -842,7 +842,7 @@ namespace Infrastructure.Migrations
                         },
                         new
                         {
-                            Id = 16,
+                            Id = 17,
                             AvailableToStore = true,
                             DiscountPrice = 0f,
                             IsActive = true,
@@ -1240,7 +1240,7 @@ namespace Infrastructure.Migrations
                         new
                         {
                             PlanId = 3,
-                            ModuleId = 16
+                            ModuleId = 17
                         },
                         new
                         {
@@ -1315,7 +1315,7 @@ namespace Infrastructure.Migrations
                         new
                         {
                             PlanId = 4,
-                            ModuleId = 16
+                            ModuleId = 17
                         });
                 });
 
