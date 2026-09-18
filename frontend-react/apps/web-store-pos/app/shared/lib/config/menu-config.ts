@@ -254,6 +254,30 @@ export const MENU_GROUPS: MenuGroup[] = [
     ],
   },
   {
+    // Módulo Elaboración (17, backend) con sus dos features: Recetas (120) y
+    // Elaboraciones (121). Sin iconos (convención del menú).
+    groupLabel: 'MENU.ELABORATION',
+    moduleId: EModules.Elaboration,
+    items: [
+      {
+        label: 'MENU.RECIPES',
+        path: '/inventory/recipes',
+        featureIds: [EFeatures.Recipes],
+        moduleId: EModules.Elaboration,
+        helpContent:
+          'Recetas de elaboración. Define el producto terminado, cuántas unidades produce un lote, los insumos que consume (con su merma) y los costos de mano de obra y gastos indirectos.',
+      },
+      {
+        label: 'MENU.ELABORATIONS',
+        path: '/inventory/elaborations',
+        featureIds: [EFeatures.Elaborations],
+        moduleId: EModules.Elaboration,
+        helpContent:
+          'Registra una elaboración: elige la receta, los lotes y el almacén que aporta los insumos, revisa el consumo teórico y ajústalo con el real. El sistema descuenta los insumos, ingresa el producto terminado y calcula su costo unitario real.',
+      },
+    ],
+  },
+  {
     groupLabel: 'MENU.EXPENSES',
     moduleId: EModules.Expenses,
     items: [
