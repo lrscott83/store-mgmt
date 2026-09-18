@@ -76,7 +76,7 @@ public sealed class MeAfterOwnerPlanChangeTests
         [SalesModuleId, InventoryModuleId, SynchronizationModuleId, ReportsModuleId, StatisticsModuleId,
          FreeManagementModuleId, (int)ModuleType.Expenses, BillingModuleId, HistoriesModuleId,
          (int)ModuleType.Credits, (int)ModuleType.WholesaleSales, WarehousesModuleId, (int)ModuleType.MultiStores,
-         (int)ModuleType.MultiMonedas];
+         (int)ModuleType.MultiMonedas, (int)ModuleType.Elaboration];
 
     public MeAfterOwnerPlanChangeTests(WebAppFixture fixture)
     {

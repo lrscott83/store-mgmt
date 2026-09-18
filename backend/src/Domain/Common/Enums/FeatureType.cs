@@ -133,5 +133,12 @@ namespace Domain.Common.Enums
         //Credits
         [Description("Venta a crédito")]
         CreditSale = 110,
+
+        // Elaboración
+        [Description("Recetas")]
+        Recipes = 120,
+
+        [Description("Elaboraciones")]
+        Elaborations = 121,
     }
 }

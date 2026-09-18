@@ -96,6 +96,7 @@ El `ProductVersion` debe coincidir con el que registro `dotnet ef database updat
 | 13 | `13-20260908-Add-WholesaleSales-And-MultiStores-Modules.sql` | `20260908194626_Add-WholesaleSales-And-MultiStores-Modules` | Módulos 12 (Ventas Mayoristas) y 14 (Múltiples tiendas) + features 38/39 |
 | 14 | `14-20260908-Add-StorePlanModules.sql` | `20260908194919_Add-StorePlanModules` | Tabla StorePlanModule + asignación completa por plan |
 | 15 | `15-20260908-Update-Warehouses-Price.sql` | `20260908195026_Update-Warehouses-Price` | Precio módulo 13: 2→5, 100%→50% + sync snapshots StoreModule |
+| 18 | `18-20260918-Add-Elaboration-Module.sql` | `20260918145355_Add-Elaboration-Module` | Módulo 16 Elaboración (precio 3, 100% desc) + features 120/121 + asignación a Superior/VIP y backfill a tiendas activas existentes |
 
 ### 4. Commit
 

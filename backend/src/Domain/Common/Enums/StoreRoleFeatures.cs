@@ -219,5 +219,19 @@ namespace Domain.Common.Enums
         MultiMonedasAdmin,
 
         #endregion
+
+        #region Elaboración features
+
+        [HasRoles(RoleType.OwnerAdmin)]
+        [HasFeature(FeatureType.Recipes)]
+        [HasModule(ModuleType.Elaboration)]
+        RecipesAdmin,
+
+        [HasRoles(RoleType.OwnerAdmin)]
+        [HasFeature(FeatureType.Elaborations)]
+        [HasModule(ModuleType.Elaboration)]
+        ElaborationsAdmin,
+
+        #endregion
     }
 }

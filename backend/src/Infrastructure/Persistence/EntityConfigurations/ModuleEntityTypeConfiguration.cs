@@ -190,6 +190,17 @@ namespace Infrastructure.Persistence.EntityConfigurations
                     percentDiscountPrice: 100,
                     availableToStore: true,
                     true
+                ),
+                Module.Create(
+                    (int)ModuleType.Elaboration,
+                    ModuleType.Elaboration.GetDescription(),
+                    130,
+                    priceIncluded: false,
+                    3,
+                    discountPrice: 0,
+                    percentDiscountPrice: 100,
+                    availableToStore: true,
+                    true
                 ));
         }
     }
