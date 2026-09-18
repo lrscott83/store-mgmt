@@ -65,7 +65,7 @@ public sealed class StoreCreatePlanTests
             var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
             var store = await db.Set<Store>().IgnoreQueryFilters().SingleAsync(s => s.Id == created);
-            store.StorePlanId.Should().Be(PagoPlanId); // default plan is Superior (3)
+            store.StorePlanId.Should().Be(PagoPlanId); // default plan is Pago (2) since the 2026-09-18 birth-plan change
             store.PaymentStartDate.Should().Be(DateOnly.FromDateTime(DateTime.UtcNow)); // trial clock starts unconditionally
 
             var storeModules = await db.Set<StoreModule>().IgnoreQueryFilters()
