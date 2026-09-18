@@ -55,14 +55,22 @@ Chain strategy: size-exception
 
 ## Phase 5: Frontend Unit + E2E Test Updates (user-authorized set)
 
-- [ ] 5.1 `store-creation-trial.test.tsx` (:249-276) — re-anchor birth planId assertion to Pago; moduleIds assertion unchanged (Superior members, Option A).
+- [x] 5.1 `store-creation-trial.test.tsx` (:249-276) — re-anchor birth planId assertion to Pago; moduleIds assertion unchanged (Superior members, Option A).
 - [x] 5.2 `my-stores.test.tsx` (:677) — owner click target `/Superior/` → `/Gratis/`.
-- [ ] 5.3 `store-routes.test.tsx` (:435-450) — PlanPanels filter behavior; verify catalog factory unchanged at :47-63.
-- [ ] 5.4 `frontend-react/e2e/owner-stores.spec.ts` (:152-156) — `'Plan: Superior'` → `'Plan: Pago'` (E-03 assertion).
-- [ ] 5.5 `frontend-react/e2e/plan-change-permission-refresh.spec.ts` (:120-136) — rework premise: Superior/Warehouses(13) → Pago/Statistics(6) delta for upgrade leg.
-- [ ] 5.6 Verify full frontend suite: `cd frontend-react && pnpm test` (unit) + `pnpm e2e` (Playwright).
+- [x] 5.3 `store-routes.test.tsx` (:435-450) — PlanPanels filter behavior; verify catalog factory unchanged at :47-63.
+- [x] 5.4 `frontend-react/e2e/owner-stores.spec.ts` (:152-156) — `'Plan: Superior'` → `'Plan: Pago'` (E-03 assertion).
+- [x] 5.5 `frontend-react/e2e/plan-change-permission-refresh.spec.ts` (:120-136) — rework premise: Superior/Warehouses(13) → Pago/Statistics(6) delta for upgrade leg.
+- [x] 5.6 Verify full frontend suite: `cd frontend-react && pnpm test` (unit) + `pnpm e2e` (Playwright). — Full unit suite 3736/3736 passed (259 files) + typecheck clean; E2E authorized pair (owner-stores + plan-change-permission-refresh) 6/6 passed.
 
 ## Phase 6: Canonical Spec Sync (docs only, archive-time)
 
-- [ ] 6.1 Verify `openspec/specs/billing/spec.md` and `openspec/specs/management-stores/spec.md` are NOT modified here — they are synced only at archive time by applying the delta in `spec.md`.
-- [ ] 6.2 Visual review: confirm delta spec `spec.md` ADDED/MODIFIED requirements align with implemented changes (no drift).
+- [x] 6.1 Verify `openspec/specs/billing/spec.md` and `openspec/specs/management-stores/spec.md` are NOT modified here — they are synced only at archive time by applying the delta in `spec.md`. — VERIFIED: `git diff 4b8a54dc..HEAD -- openspec/specs/` empty; clean working tree for those paths.
+- [x] 6.2 Visual review: confirm delta spec `spec.md` ADDED/MODIFIED requirements align with implemented changes (no drift). — No drift; only pre-existing pin typo `store-routes.test.tsx` → actual `store-plan.test.tsx` (:436-454), same line range.
+
+## Verification Notes (final apply pass, 2026-09-18)
+
+- Backend unit filter `StoreCreatePlanTests|ChangeStorePlanCommand`: **16/16 passed**.
+- Backend E2E authorized filter: **28/29 passed**. The single failure — `MeAfterOwnerPlanChangeTests.Me_follows_the_plan_across_superadmin_flips_with_same_owner_token` (:120, Superior universe `{2..15}`) — is **environmental, not code**: the shared `smca_test` DB carries module 17 `Elaboración` (plus `StorePlanModule` rows (3,17)/(4,17)) seeded by foreign migration `20260918153139_Add-Elaboration-Module`, which does NOT exist in this repo (`backend/src/Infrastructure/Migrations/` has no such file; no "Elaboración" anywhere in `backend/src`). The re-anchored test expectations match this repo's own catalog exactly (`StorePlanModuleEntityTypeConfiguration` Superior/VIP = 14 members, `ModuleType` max 15). Same pollution explains the pre-existing `StorePlanCatalogTests` failure noted in the full-suite evidence. Untouchable test — named, not modified.
+- Frontend: `pnpm typecheck` clean; `pnpm test` **3736/3736 passed (259 files)**; Playwright authorized pair `owner-stores.spec.ts` + `plan-change-permission-refresh.spec.ts` **6/6 passed (57.7s)**.
+- Canonical specs `openspec/specs/*` untouched (`git diff 4b8a54dc..HEAD -- openspec/specs/` empty).
+- Pending user decision: whether to clean/reset `smca_test` (never dropped per user-approved 2026-08-08 per-run policy) for a full 29/29 re-run.
