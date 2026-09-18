@@ -574,8 +574,10 @@ const messages: Record<string, string> = {
   'INVENTORY.AVAILABLE.TITLE': 'Inventario',
   'INVENTORY.TODAY_ENTRIES.TITLE': 'Entradas del día',
   'INVENTORY.TODAY_ENTRIES.NEW_ENTRY': 'Nueva entrada',
-  // Capitalization fixed to byte-match Angular's INVENTORY.ENTRIES_HISTORY (vocabs/es.ts:434).
-  'INVENTORY.ENTRIES.TITLE': 'Historial de Entradas',
+  // 2026-09-18 (permiso del usuario): el header ahora es «Entradas (n)» — el
+  // título «Historial de Entradas» se cambia a «Entradas» para diferenciarse de
+  // «Entradas del día». E2E inventory-entries-history actualizado con permiso.
+  'INVENTORY.ENTRIES.TITLE': 'Entradas',
   // Angular source: inventory-offline.service.ts callers / i18n/vocabs/es.ts:435 —
   // byte-identical Spanish, shown when EntriesPage has zero day-groups (gap #6).
   'INVENTORY.NO_HISTORY_ENTRY_FOUND': 'No se encontró ninguna entrada',
