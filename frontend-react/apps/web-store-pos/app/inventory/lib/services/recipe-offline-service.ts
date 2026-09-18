@@ -33,7 +33,8 @@ export interface RecipeInput {
  * RecipeOfflineService — recipes (BoM) repository, offline-first per store
  * (localStorage), same persistence shape as ExchangeRateOfflineService /
  * WarehouseOfflineService: encrypted plain-array wire format per store, a
- * per-instance cache reloaded when empty or when the store key changes,
+ * per-instance cache reloaded when empty or when the store key changes, a
+ * read-modify-write refresh from storage at the start of every write,
  * auto-init on a genuinely empty read, and date revival on load.
  *
  * Business rules (plan 2026-09-04-elaboration-module.md §Task 3):
@@ -87,6 +88,7 @@ export class RecipeOfflineService {
   // ─── writes ──────────────────────────────────────────────────────────────
 
   addRecipe(input: RecipeInput): DataResult<Recipe> {
+    this.reloadRecipes();
     const errors = this.validateInput(input);
     if (errors.length === 0 && this.getActiveRecipeForProduct(input.productId)) {
       errors.push(RecipeErrors.DuplicateForProduct);
@@ -113,6 +115,7 @@ export class RecipeOfflineService {
   }
 
   updateRecipe(id: string, input: RecipeInput): DataResult<Recipe> {
+    this.reloadRecipes();
     const existing = this.getRecipeById(id);
     if (!existing) {
       // The domain error family has no `Recipe.NotExists` code; the closest
@@ -151,6 +154,7 @@ export class RecipeOfflineService {
    * active recipe. Elaborations keep their own snapshot, so history is safe.
    */
   deactivateRecipe(id: string): DataResult<Recipe> {
+    this.reloadRecipes();
     const existing = this.getRecipeById(id);
     if (!existing) {
       return new DataResultImpl<Recipe>(undefined, false, [RecipeErrors.ProductNotExists]);
@@ -166,6 +170,7 @@ export class RecipeOfflineService {
 
   /** Import seam — appends a recipe as-is (sync import; mirror of addImportedExchangeRate). */
   addImportedRecipe(recipe: Recipe): Result {
+    this.reloadRecipes();
     const imported = this.reviveRecipeDates(recipe);
     this.getStorageRecipes().push(imported);
     this.setRecipesLocalStorage(this.recipes!);
@@ -174,6 +179,7 @@ export class RecipeOfflineService {
 
   /** Import seam — merges every field onto the recipe with the same id. */
   updateImportedRecipe(recipe: Recipe): Result {
+    this.reloadRecipes();
     const existing = this.getRecipeById(recipe.id);
     if (existing) {
       const imported = this.reviveRecipeDates(recipe);
@@ -228,6 +234,16 @@ export class RecipeOfflineService {
   }
 
   // ─── persistence helpers ────────────────────────────────────────────────
+
+  /**
+   * Reloads the cache from storage before a read-modify-write. Every write
+   * path must start from the freshest persisted state: another instance of
+   * this store may have written since this instance last loaded, and
+   * persisting a stale array would silently drop its rows (lost update).
+   */
+  private reloadRecipes(): void {
+    this.recipes = this.getRecipesFromLocalStorage();
+  }
 
   private setRecipesLocalStorage(recipes: Recipe[]): void {
     localStorage.setItem(this.getStorageKey(), encryptEntity(JSON.stringify(recipes)));

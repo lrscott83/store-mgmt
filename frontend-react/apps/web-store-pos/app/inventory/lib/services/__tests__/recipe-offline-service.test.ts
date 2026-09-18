@@ -266,6 +266,25 @@ describe('RecipeOfflineService', () => {
       ).toBe(true);
       expect(storeB.getStorageRecipes()).toHaveLength(1);
     });
+
+    it('refreshes a non-empty cache before writes so concurrent instances do not lose rows', () => {
+      const writerA = new RecipeOfflineService(storeId, productRepo);
+      const writerB = new RecipeOfflineService(storeId, productRepo);
+
+      expect(writerA.addRecipe(recipeInput()).succeeded).toBe(true);
+      // Warm writerB's cache to a NON-empty, now-stale snapshot.
+      expect(writerB.getStorageRecipes()).toHaveLength(1);
+
+      const writtenByA = writerA.addRecipe(recipeInput({ productId: 'prod-3' }));
+      expect(writtenByA.succeeded).toBe(true);
+
+      expect(writerB.addRecipe(recipeInput({ productId: 'prod-2' })).succeeded).toBe(true);
+
+      const fresh = new RecipeOfflineService(storeId, productRepo);
+      expect(fresh.getStorageRecipes()).toHaveLength(3);
+      // writerB's stale cache must not have dropped writerA's prod-3 row.
+      expect(fresh.getRecipeById(writtenByA.data!.id)).toBeDefined();
+    });
   });
 
   // ─── import seams ───
