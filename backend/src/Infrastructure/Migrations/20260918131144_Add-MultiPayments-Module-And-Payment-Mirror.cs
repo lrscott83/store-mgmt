@@ -105,11 +105,20 @@ namespace Infrastructure.Migrations
                 name: "IX_OrderPayment_TenantId",
                 table: "OrderPayment",
                 column: "TenantId");
+
+            // Assign the MultiPayments module + feature 44 (OwnerAdmin and StoreUser roles)
+            // to every existing ACTIVE store on the VIP (4) plan.
+            // Idempotent via ON CONFLICT DO NOTHING on the composite PKs (see MultiPaymentsModuleBackfill).
+            migrationBuilder.Sql(MultiPaymentsModuleBackfill.StoreModuleSql);
+            migrationBuilder.Sql(MultiPaymentsModuleBackfill.StoreRoleFeatureSql);
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            // Remove per-store rows first (FK order: StoreRoleFeature before StoreModule).
+            migrationBuilder.Sql(MultiPaymentsModuleBackfill.DownSql);
+
             migrationBuilder.DropTable(
                 name: "ChannelExchangeRate");
 

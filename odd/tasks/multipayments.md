@@ -95,6 +95,8 @@ Pedido del owner (2026-09-18) tras analizar `docs/contracts/pagos-y-canales-de-p
 - 2026-09-18: feature doc creado; 0/12 tareas. Limpieza: `openspec/changes/multipayments/` (carpeta vacía de un enrolamiento SDD erróneo) eliminada.
 - 2026-09-18: primer bloqueo E2E resuelto — el owner autorizó 1:1 la actualización de `StorePlanCatalogTests.cs` (VIP 2..16); ningún otro test afectado (verificado).
 - 2026-09-18: **T1 cerrada** — rama `feat/multipayments` (cadena `feature-branch-chain`); migración `20260918131144_Add-MultiPayments-Module-And-Payment-Mirror`; evidencia: `dotnet build` 0 errores + E2E `StorePlanCatalogTests` 1/1 + `has-pending-model-changes` sin drift.
+- 2026-09-18: fix de paridad de T1 — `MultiPaymentsModuleBackfill.cs` (backfill `StoreModule`/`StoreRoleFeature` para VIP activas, `ON CONFLICT DO NOTHING`) + llamadas en Up/Down de la migración; build 0 errores.
+- 2026-09-18: RDD — assessment del commit `89c0a24d`: **medium → diferido al slice** (boundary `4b8a54dc`).
 
 ## Próximo paso
 
