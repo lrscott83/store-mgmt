@@ -194,6 +194,24 @@ describe('ChannelRateOfflineService', () => {
       expect(localStorage.getItem(storageKey)).toBe(rawBefore);
     });
 
+    it('rejects an imported row with an invalid value without writing', () => {
+      const invalidValues = [0, -3, Number.POSITIVE_INFINITY, Number.NaN];
+
+      for (const value of invalidValues) {
+        const result = service.addImportedChannelRate({
+          method: SalePaymentMethod.Efectivo,
+          currency: Currency.CUP,
+          value,
+          effectiveFrom: at('2026-09-01T00:00:00.000Z'),
+        });
+
+        expect(result.succeeded).toBe(false);
+        expect(result.errors).toEqual([ChannelRateOfflineErrors.InvalidValue]);
+      }
+
+      expect(service.getStorageChannelRates()).toEqual([]);
+    });
+
     it('derives a deterministic id when the incoming row has none', () => {
       const row = {
         method: SalePaymentMethod.Transferencia,
@@ -207,7 +225,22 @@ describe('ChannelRateOfflineService', () => {
 
       const rows = service.getStorageChannelRates();
       expect(rows).toHaveLength(1);
-      expect(rows[0].id).toBe('2-4-2026-09-01T00:00:00.000Z');
+      expect(rows[0].id).toBe('2-4-350-2026-09-01T00:00:00.000Z');
+    });
+
+    it('keeps two id-less rows with the same channel + moment but different values', () => {
+      const base = {
+        method: SalePaymentMethod.Transferencia,
+        currency: Currency.MLC,
+        effectiveFrom: at('2026-09-01T00:00:00.000Z'),
+      };
+
+      service.addImportedChannelRate({ ...base, value: 350 });
+      service.addImportedChannelRate({ ...base, value: 400 });
+
+      const rows = service.getStorageChannelRates();
+      expect(rows).toHaveLength(2);
+      expect(rows.map((r) => r.value).sort((a, b) => a - b)).toEqual([350, 400]);
     });
   });
 

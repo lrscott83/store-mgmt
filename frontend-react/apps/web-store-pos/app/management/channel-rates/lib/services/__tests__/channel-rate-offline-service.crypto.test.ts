@@ -102,4 +102,31 @@ describe('channel-rate-offline-service — at-rest encryption seam (entity-at-re
     const rawAfter = localStorage.getItem(storageKey);
     expect(rawAfter).toBe(rawBefore);
   });
+
+  it('a provisioned-but-locked registerRate throws and leaves ciphertext unchanged (by design)', () => {
+    importRoster(v2Bundle(), 500);
+    setDek(new Uint8Array(32).fill(0x07), storeId);
+    const service = new ChannelRateOfflineService(storeId);
+    service.registerRate({
+      method: SalePaymentMethod.Efectivo,
+      currency: Currency.CUP,
+      value: 700,
+      effectiveFrom: new Date('2026-09-01T00:00:00.000Z'),
+    });
+
+    const rawBefore = localStorage.getItem(storageKey);
+    expect(rawBefore!.startsWith('enc:v1:')).toBe(true);
+
+    clearDek(); // lock — roster still provisioned; writing plaintext over ciphertext is impossible
+    expect(() =>
+      service.registerRate({
+        method: SalePaymentMethod.Efectivo,
+        currency: Currency.CUP,
+        value: 800,
+        effectiveFrom: new Date('2026-09-02T00:00:00.000Z'),
+      }),
+    ).toThrow(MissingDataKeyError);
+
+    expect(localStorage.getItem(storageKey)).toBe(rawBefore);
+  });
 });

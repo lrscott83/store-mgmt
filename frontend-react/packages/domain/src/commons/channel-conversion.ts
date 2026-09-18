@@ -56,6 +56,17 @@ function rateNotFound<T>(): DataResult<T> {
   return new DataResult<T>(undefined, false, [ChannelRateErrors.RateNotFound] as BaseError[]);
 }
 
+/**
+ * A stored row is usable only when its `value` is a finite number greater than
+ * zero. The write guards reject such rows, but a row written before those
+ * guards existed (or by a caller that bypassed them) must never reach
+ * `divideHalfUp` as a 0/NaN denominator: the cascade ignores it and falls
+ * through to the typed `ChannelRateErrors.RateNotFound`.
+ */
+function isUsableRate(row: ChannelRate): boolean {
+  return Number.isFinite(row.value) && row.value > 0;
+}
+
 function toResolved(rate: ChannelRate): ResolvedChannelRate {
   return {
     id: rate.id,
@@ -83,7 +94,7 @@ function latestWithCurrency(
   at: Date,
 ): ChannelRate | undefined {
   return latestAtOrBefore(
-    rates.filter((row) => Number(row.currency) === Number(currency)),
+    rates.filter((row) => isUsableRate(row) && Number(row.currency) === Number(currency)),
     at,
   );
 }
@@ -104,7 +115,9 @@ export function resolveChannelRate(
   const exact = latestAtOrBefore(
     rates.filter(
       (row) =>
-        Number(row.method) === Number(method) && Number(row.currency) === Number(currency),
+        isUsableRate(row) &&
+        Number(row.method) === Number(method) &&
+        Number(row.currency) === Number(currency),
     ),
     at,
   );

@@ -214,6 +214,35 @@ describe('DataSynchronizerService — channelRates merge (multipayments T4)', ()
     expect(channel.addImportedChannelRate).not.toHaveBeenCalled();
   });
 
+  it('keeps two id-less rows with the same channel + moment but different values', async () => {
+    const channel = makeChannelService();
+    const svc = new DataSynchronizerService(
+      STORE_ID,
+      makeCategoryRepo(),
+      makeProductRepo(),
+      makeInventoryService(),
+      makeOrderService(),
+      makeExpenseService(),
+      makeSaleCreditService(),
+      undefined,
+      undefined,
+      channel.svc,
+    );
+
+    const base = {
+      method: SalePaymentMethod.Efectivo,
+      currency: Currency.CUP,
+      effectiveFrom: new Date('2026-09-01T00:00:00.000Z'),
+    };
+    const result = await svc.sync(makeData([{ ...base, value: 700 }, { ...base, value: 750 }]));
+
+    expect(result.succeeded).toBe(true);
+    expect(channel.addImportedChannelRate).toHaveBeenCalledTimes(2);
+    expect(channel.stored).toHaveLength(2);
+    const merge = result.merges.find((m) => m.entity === 'channelRates');
+    expect(merge).toEqual({ entity: 'channelRates', inserted: 2, updated: 0 });
+  });
+
   it('reports ChannelRatesUnexpectedError when the write throws (break-only)', async () => {
     const channel = makeChannelService();
     channel.svc.addImportedChannelRate = vi.fn(() => {

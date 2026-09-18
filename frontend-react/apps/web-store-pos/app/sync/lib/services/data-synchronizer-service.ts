@@ -225,8 +225,9 @@ export interface WarehouseImportService {
  * Channel-rate import routes through the offline SERVICE (multipayments T4).
  * APPEND-ONLY: there is no update seam — a row whose id already exists is
  * skipped, never overwritten. The id of an imported row without one is
- * derived by the service (`${method}-${currency}-${effectiveFrom ISO}`), and
- * the synchronizer derives it the same way for its presence pre-check.
+ * derived by the service
+ * (`${method}-${currency}-${value}-${effectiveFrom ISO}`), and the
+ * synchronizer derives it the same way for its presence pre-check.
  */
 export interface ChannelRateImportService {
   getStorageChannelRates(): ChannelRate[];
@@ -245,15 +246,17 @@ interface MergeOutcome {
 /**
  * The id that identifies a channel-rate row for the append-only merge: the
  * row's own id, or the deterministic fallback the offline service derives for
- * an imported row without one. `effectiveFrom` may be a Date (freshly built)
- * or an ISO string (JSON round-trip through an archive), so it is normalized
- * before the ISO stamp — both spellings must resolve to the same id, or a
- * re-import would duplicate a row instead of skipping it.
+ * an imported row without one. The `value` is part of the identity so two
+ * archive rows for the same channel + moment with different values are
+ * preserved instead of collapsing into one. `effectiveFrom` may be a Date
+ * (freshly built) or an ISO string (JSON round-trip through an archive), so it
+ * is normalized before the ISO stamp — both spellings must resolve to the same
+ * id, or a re-import would duplicate a row instead of skipping it.
  */
 function channelRateIdOf(rate: ChannelRate): string {
   return (
     rate.id ??
-    `${rate.method}-${rate.currency}-${new Date(rate.effectiveFrom).toISOString()}`
+    `${rate.method}-${rate.currency}-${rate.value}-${new Date(rate.effectiveFrom).toISOString()}`
   );
 }
 
@@ -862,8 +865,9 @@ export class DataSynchronizerService {
    * Append-only merge: a channel rate whose id is already present is skipped
    * (never duplicated, never updated — filas nunca editadas ni borradas). The
    * id is the row's own id, or the deterministic
-   * `${method}-${currency}-${effectiveFrom ISO}` fallback for imported rows
-   * without one (same derivation as the offline service). Break-only; an
+   * `${method}-${currency}-${value}-${effectiveFrom ISO}` fallback for
+   * imported rows without one (same derivation as the offline service).
+   * Break-only; an
    * unexpected throw yields `ChannelRatesUnexpectedError`.
    */
   private mergeChannelRatesViaService(incoming: ChannelRate[]): MergeOutcome {

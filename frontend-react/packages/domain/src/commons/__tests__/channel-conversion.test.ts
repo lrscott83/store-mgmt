@@ -84,6 +84,31 @@ describe('resolveChannelRate — cascade exact channel → same currency → USD
     expect(pivot.data?.value).toBeGreaterThan(0);
   });
 
+  it('ignores stored rows whose value is not finite and positive, falling through to the typed error', () => {
+    const garbage = [
+      makeRate(Currency.CUP, 0, '2026-09-01', SalePaymentMethod.Transferencia),
+      makeRate(Currency.CUP, Number.NaN, '2026-09-15', SalePaymentMethod.Transferencia),
+      makeRate(Currency.CUP, Number.POSITIVE_INFINITY, '2026-09-16', SalePaymentMethod.Transferencia),
+    ];
+    const result = resolveChannelRate(garbage, SalePaymentMethod.Transferencia, Currency.CUP, AT);
+    expect(result.succeeded).toBe(false);
+    expect(result.errors).toEqual([ChannelRateErrors.RateNotFound]);
+
+    let conversion: ReturnType<typeof convertPaymentAmount> | undefined;
+    expect(() => {
+      conversion = convertPaymentAmount(
+        100,
+        SalePaymentMethod.Transferencia,
+        Currency.CUP,
+        Currency.USD,
+        garbage,
+        AT,
+      );
+    }).not.toThrow();
+    expect(conversion!.succeeded).toBe(false);
+    expect(conversion!.errors).toEqual([ChannelRateErrors.RateNotFound]);
+  });
+
   it('resolveCurrencyRate resolves any method of the currency, else USD pivot, else error', () => {
     const rates = [makeRate(Currency.CUP, 700, '2026-09-01', SalePaymentMethod.Transferencia)];
     expect(resolveCurrencyRate(rates, Currency.CUP, AT).data?.value).toBe(700 * RATE_MICRO);

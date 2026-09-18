@@ -110,12 +110,18 @@ export class ChannelRateOfflineService {
   }
 
   /**
-   * Import seam — appends a row (sync import). Missing ids are derived
-   * deterministically from the channel + effective moment so re-importing the
-   * same archive is a no-op; an id already present is skipped, never
-   * overwritten. Incoming date fields are revived.
+   * Import seam — appends a row (sync import). An invalid `value` (non-finite
+   * or non-positive) is rejected with a failed `Result` and nothing is
+   * written, mirroring `registerRate`. Missing ids are derived
+   * deterministically from the channel + value + effective moment so
+   * re-importing the same archive is a no-op; an id already present is
+   * skipped, never overwritten. Incoming date fields are revived.
    */
   addImportedChannelRate(rate: ChannelRate): Result {
+    if (!Number.isFinite(rate.value) || rate.value <= 0) {
+      return Result.Failure([ChannelRateOfflineErrors.InvalidValue]);
+    }
+
     const revived = this.reviveRateDates(rate);
     const id = revived.id ?? this.deriveRateId(revived);
     const rates = this.getStorageChannelRates();
@@ -128,11 +134,14 @@ export class ChannelRateOfflineService {
 
   /**
    * Deterministic fallback id for rows that arrive without one:
-   * `${method}-${currency}-${effectiveFrom ISO}`. Mirrored by the
-   * synchronizer's pre-check so both agree on what "already present" means.
+   * `${method}-${currency}-${value}-${effectiveFrom ISO}`. The value is part
+   * of the identity so two archive rows for the same channel + moment with
+   * different values are preserved instead of collapsing into one. Mirrored
+   * by the synchronizer's pre-check so both agree on what "already present"
+   * means.
    */
   private deriveRateId(rate: ChannelRate): string {
-    return `${rate.method}-${rate.currency}-${rate.effectiveFrom.toISOString()}`;
+    return `${rate.method}-${rate.currency}-${rate.value}-${rate.effectiveFrom.toISOString()}`;
   }
 
   private setRatesLocalStorage(rates: ChannelRate[]): void {
