@@ -142,10 +142,11 @@ export function resolveCurrencyRate(
 
 /**
  * Converts an amount (integer cents) paid through a channel into the order
- * currency (integer cents). Same-currency conversions apply the resolved rates
- * (algebraically identity); when the currency has no resolvable rate at all
- * the amount is returned unchanged. A cross-currency conversion without a
- * resolvable rate is a typed error — never a silent 1×1.
+ * currency (integer cents). A same-currency conversion applies the SAME
+ * resolved rate on both sides, so it is an exact algebraic identity even when
+ * another method has a newer rate for that currency; when the currency has no
+ * resolvable rate at all the amount is returned unchanged. A cross-currency
+ * conversion without a resolvable rate is a typed error — never a silent 1×1.
  */
 export function convertPaymentAmount(
   amountCents: number,
@@ -156,14 +157,15 @@ export function convertPaymentAmount(
   at: Date,
 ): DataResult<number> {
   const source = resolveChannelRate(rates, method, currency, at);
-  const target = resolveCurrencyRate(rates, toCurrency, at);
 
   if (Number(currency) === Number(toCurrency)) {
-    if (source.succeeded && target.succeeded) {
-      return success(divideHalfUp(amountCents * target.data!.value, source.data!.value));
+    if (source.succeeded) {
+      return success(divideHalfUp(amountCents * source.data!.value, source.data!.value));
     }
     return success(amountCents);
   }
+
+  const target = resolveCurrencyRate(rates, toCurrency, at);
 
   if (!source.succeeded) return rateNotFound<number>();
   if (!target.succeeded) return rateNotFound<number>();

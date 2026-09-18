@@ -145,6 +145,16 @@ describe('convertPaymentAmount — channel conversion with one HALF-UP rounding'
     expect(result.data).toBe(555);
   });
 
+  it('is identity when another method has a newer rate for the same currency', () => {
+    const rates = [
+      makeRate(Currency.EUR, 1.5, '2026-09-01', SalePaymentMethod.Efectivo),
+      makeRate(Currency.EUR, 1.8, '2026-09-10', SalePaymentMethod.Transferencia),
+    ];
+    const result = convertPaymentAmount(555, SalePaymentMethod.Efectivo, Currency.EUR, Currency.EUR, rates, AT);
+    expect(result.succeeded).toBe(true);
+    expect(result.data).toBe(555);
+  });
+
   it('returns a typed error for a cross-currency conversion with no resolvable rate (never 1×1)', () => {
     const result = convertPaymentAmount(100, SalePaymentMethod.Efectivo, Currency.EUR, Currency.CUP, [], AT);
     expect(result.succeeded).toBe(false);
