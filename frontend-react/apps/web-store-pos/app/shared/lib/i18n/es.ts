@@ -306,6 +306,18 @@ const messages: Record<string, string> = {
   'SHOPPING_CART.CLEAR': 'Limpiar',
   // MultiPayments: etiqueta del selector de moneda del carrito (módulo 16).
   'SHOPPING_CART.CURRENCY_LABEL': 'Moneda',
+  // MultiPayments (módulo 16): lista de pagos del carrito (T7).
+  'SHOPPING_CART.MULTI_PAYMENT_TITLE': 'Pagos',
+  'SHOPPING_CART.MULTI_PAYMENT_ADD': 'Agregar pago',
+  'SHOPPING_CART.MULTI_PAYMENT_REMOVE': 'Eliminar',
+  'SHOPPING_CART.MULTI_PAYMENT_METHOD_LABEL': 'Forma de pago',
+  'SHOPPING_CART.MULTI_PAYMENT_CURRENCY_LABEL': 'Moneda',
+  'SHOPPING_CART.MULTI_PAYMENT_AMOUNT_LABEL': 'Monto',
+  'SHOPPING_CART.MULTI_PAYMENT_CONVERTED_LABEL': 'Equivalente',
+  'SHOPPING_CART.MULTI_PAYMENT_PAID_LABEL': 'Total cubierto',
+  'SHOPPING_CART.MULTI_PAYMENT_REMAINING_LABEL': 'Restante por cubrir',
+  'SHOPPING_CART.MULTI_PAYMENT_CHANGE_LABEL': 'Vuelto',
+  'SHOPPING_CART.MULTI_PAYMENT_SETTLE': 'Cobrar',
   'SHOPPING_CART.DON_NOT_PAY_LESS_THAN_CART_TOTAL':
     'Usted no puede realizar la venta porque el pago es menor que el total.',
   'SHOPPING_CART.DON_NOT_SALE_CREDIT_WITHOUT_CLIENT':
