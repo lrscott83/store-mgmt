@@ -68,8 +68,9 @@ export function ChannelRatesPage() {
   const [savedMessage, setSavedMessage] = useState(false);
   const savedMessageTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
-  // The success banner auto-hides; clear the timer on unmount so it never fires
-  // against an unmounted component.
+  // The success banner auto-hides after 3s. A pending timer is cleared before a
+  // new one is scheduled (so a fast second submit cannot leave the earlier
+  // timer alive) and on unmount (so no timer fires against a dead component).
   useEffect(
     () => () => {
       if (savedMessageTimer.current !== undefined) clearTimeout(savedMessageTimer.current);
@@ -124,6 +125,7 @@ export function ChannelRatesPage() {
     setValueDraft('');
     load();
     setSavedMessage(true);
+    if (savedMessageTimer.current !== undefined) clearTimeout(savedMessageTimer.current);
     savedMessageTimer.current = setTimeout(() => setSavedMessage(false), 3000);
   }
 

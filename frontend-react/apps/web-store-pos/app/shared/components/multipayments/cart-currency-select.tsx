@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useIntl } from 'react-intl';
 import { Currency } from '@store-mgmt/domain';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
@@ -25,7 +25,10 @@ interface CurrencyOption {
 function buildCurrencyOptions(items: { product: { currency?: Currency } }[]): CurrencyOption[] {
   const options: CurrencyOption[] = [...BASE_OPTIONS];
   const seen = new Set<number>(options.map((option) => option.value));
-  for (const item of items) {
+  // The store slice is typed as an array, but a malformed persisted/mocked state
+  // can still hand a non-array here; fall back to the fixed prefix rather than
+  // throw, since callers only use the result to pick a visible fallback.
+  for (const item of Array.isArray(items) ? items : []) {
     const currency = item.product.currency ?? Currency.CUP;
     if (!seen.has(currency)) {
       options.push({ value: currency, label: currencyLabel(currency) });
@@ -54,17 +57,27 @@ export function CartCurrencySelect({ value, onChange, testId }: CartCurrencySele
   const items = useCartStore((s) => s.items);
   const available = hasMultiPaymentsModuleAvailable(user);
 
-  const options = available ? buildCurrencyOptions(items) : [];
+  // Built unconditionally (pure computation) because hooks must run on every
+  // render; when the module is absent the early return below discards them.
+  const options = buildCurrencyOptions(items);
   const selected = options.some((option) => option.value === value) ? value : Currency.CUP;
+  const lastEmitted = useRef<Currency | undefined>(undefined);
 
   // The controlled `value` can name a currency that is not among the built
   // options (e.g. a persisted EUR with a CUP-only cart). The select renders the
   // fallback, so tell the parent about it — otherwise the visible label and the
-  // priced currency drift apart.
+  // priced currency drift apart. The ref bounds the notice to once per
+  // divergence: a parent with an unstable `onChange` identity would otherwise
+  // re-run this effect on every render and repeat the call.
   useEffect(() => {
-    if (available && selected !== value) {
-      onChange(selected);
+    if (!available) return;
+    if (selected === value) {
+      lastEmitted.current = undefined;
+      return;
     }
+    if (lastEmitted.current === selected) return;
+    lastEmitted.current = selected;
+    onChange(selected);
   }, [available, selected, value, onChange]);
 
   if (!available) {

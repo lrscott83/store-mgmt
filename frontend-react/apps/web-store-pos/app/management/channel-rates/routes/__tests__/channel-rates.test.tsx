@@ -167,6 +167,7 @@ describe('ChannelRatesPage (multipayments) — register and history', () => {
   });
 
   it('clears the success-banner timer on unmount', async () => {
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
     const clearSpy = vi.spyOn(globalThis, 'clearTimeout');
     const { unmount } = renderPage();
 
@@ -175,10 +176,18 @@ describe('ChannelRatesPage (multipayments) — register and history', () => {
     fireEvent.click(screen.getByTestId('channel-rate-submit'));
     await screen.findByTestId('channel-rate-saved');
 
+    // Pin the actual 3000 ms banner handle, so the assertion fails if the
+    // cleanup regresses (e.g. clears a different/undefined timer).
+    const bannerCallIndex = setTimeoutSpy.mock.calls.findIndex((call) => call[1] === 3000);
+    expect(bannerCallIndex).toBeGreaterThanOrEqual(0);
+    const bannerTimeoutHandle = setTimeoutSpy.mock.results[bannerCallIndex]?.value;
+    expect(bannerTimeoutHandle).toBeDefined();
+
     unmount();
-    expect(clearSpy).toHaveBeenCalled();
+    expect(clearSpy).toHaveBeenCalledWith(bannerTimeoutHandle);
 
     clearSpy.mockRestore();
+    setTimeoutSpy.mockRestore();
   });
 
   it('exposes no delete or update control (append-only by contract)', async () => {
