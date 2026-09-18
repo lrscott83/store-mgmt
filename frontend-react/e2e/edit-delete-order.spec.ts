@@ -121,6 +121,7 @@ test.describe.serial('S2-B2 — Editar y eliminar órdenes', () => {
     await orderToggle.click();
 
     // Click Editar
+    await page.locator('[data-testid^="order-actions-toggle-"]').first().click();
     await page.getByTestId('edit-order-button').click();
 
     // EditOrderModal should open — change payment type to Tarjeta
@@ -150,6 +151,7 @@ test.describe.serial('S2-B2 — Editar y eliminar órdenes', () => {
     await orderToggle.click();
 
     // Click Eliminar
+    await page.locator('[data-testid^="order-actions-toggle-"]').first().click();
     await page.getByTestId('deactivate-order-button').click();
 
     // Confirm dialog should appear

@@ -86,7 +86,7 @@ describe('OrderList', () => {
     expect(screen.getByText('Coca-Cola')).toBeInTheDocument();
   });
 
-  it('does not show edit/delete actions when readOnly (default)', () => {
+  it('does not show the gear action menu when readOnly (default)', () => {
     const orders = [makeOrder({ id: 'o1' })];
     render(
       <Wrapper>
@@ -94,11 +94,12 @@ describe('OrderList', () => {
       </Wrapper>,
     );
     fireEvent.click(screen.getByTestId('order-panel-toggle-o1'));
+    expect(screen.queryByTestId('order-actions-toggle-o1')).toBeNull();
     expect(screen.queryByTestId('edit-order-button')).toBeNull();
     expect(screen.queryByTestId('deactivate-order-button')).toBeNull();
   });
 
-  it('shows edit/delete actions when readOnly is false', () => {
+  it('keeps edit/delete out of the expanded panel until the gear menu is opened', () => {
     const orders = [makeOrder({ id: 'o1' })];
     render(
       <Wrapper>
@@ -111,11 +112,30 @@ describe('OrderList', () => {
       </Wrapper>,
     );
     fireEvent.click(screen.getByTestId('order-panel-toggle-o1'));
+    // The panel is expanded but the menu is closed — no action buttons in the panel.
+    expect(screen.getByText('Coca-Cola')).toBeInTheDocument();
+    expect(screen.queryByTestId('edit-order-button')).toBeNull();
+    expect(screen.queryByTestId('deactivate-order-button')).toBeNull();
+  });
+
+  it('shows Edit and (for an active order) Delete in the gear action menu', () => {
+    const orders = [makeOrder({ id: 'o1' })];
+    render(
+      <Wrapper>
+        <OrderList
+          orders={orders}
+          readOnly={false}
+          onEditOrder={vi.fn()}
+          onDeactivateOrder={vi.fn()}
+        />
+      </Wrapper>,
+    );
+    fireEvent.click(screen.getByTestId('order-actions-toggle-o1'));
     expect(screen.getByTestId('edit-order-button')).toBeInTheDocument();
     expect(screen.getByTestId('deactivate-order-button')).toBeInTheDocument();
   });
 
-  it('calls onEditOrder when Editar is clicked', () => {
+  it('calls onEditOrder when Editar is clicked in the gear menu', () => {
     const onEditOrder = vi.fn();
     const order = makeOrder({ id: 'o1' });
     render(
@@ -128,7 +148,7 @@ describe('OrderList', () => {
         />
       </Wrapper>,
     );
-    fireEvent.click(screen.getByTestId('order-panel-toggle-o1'));
+    fireEvent.click(screen.getByTestId('order-actions-toggle-o1'));
     fireEvent.click(screen.getByTestId('edit-order-button'));
     expect(onEditOrder).toHaveBeenCalledWith(order);
   });
@@ -152,7 +172,7 @@ describe('OrderList', () => {
         />
       </Wrapper>,
     );
-    fireEvent.click(screen.getByTestId('order-panel-toggle-o1'));
+    fireEvent.click(screen.getByTestId('order-actions-toggle-o1'));
     fireEvent.click(screen.getByTestId('deactivate-order-button'));
     expect(confirmDialogMock).toHaveBeenCalledWith({
       title: 'Confirmación para eliminar',
@@ -177,7 +197,7 @@ describe('OrderList', () => {
         />
       </Wrapper>,
     );
-    fireEvent.click(screen.getByTestId('order-panel-toggle-o1'));
+    fireEvent.click(screen.getByTestId('order-actions-toggle-o1'));
     fireEvent.click(screen.getByTestId('deactivate-order-button'));
     await waitFor(() => expect(confirmDialogMock).toHaveBeenCalled());
     expect(onDeactivateOrder).not.toHaveBeenCalled();
@@ -201,7 +221,7 @@ describe('OrderList', () => {
         />
       </Wrapper>,
     );
-    fireEvent.click(screen.getByTestId('order-panel-toggle-o1'));
+    fireEvent.click(screen.getByTestId('order-actions-toggle-o1'));
     fireEvent.click(screen.getByTestId('deactivate-order-button'));
     await waitFor(() =>
       expect(showAcknowledgeErrorMock).toHaveBeenCalledWith({
@@ -225,14 +245,16 @@ describe('OrderList', () => {
         />
       </Wrapper>,
     );
-    fireEvent.click(screen.getByTestId('order-panel-toggle-o1'));
+    fireEvent.click(screen.getByTestId('order-actions-toggle-o1'));
     expect(screen.getByTestId('edit-order-button')).toBeInTheDocument();
     expect(screen.queryByTestId('deactivate-order-button')).toBeNull();
   });
 
   // Parity fix (collapsible-panel-chevron-parity): the order-panel header must render the
   // shared ChevronDownIcon and rotate it (rotate-180) iff the order panel is expanded.
-  it('renders a chevron on the order-panel header that rotates iff the panel is expanded', () => {
+  // The gear action menu sits between the price and the chevron, so the chevron is its own
+  // toggle control (the primary toggle is still `order-panel-toggle-*`).
+  it('renders a chevron in the header that rotates iff the panel is expanded', () => {
     const orders = [makeOrder({ id: 'o1' })];
     render(
       <Wrapper>
@@ -240,8 +262,8 @@ describe('OrderList', () => {
       </Wrapper>,
     );
     const toggle = screen.getByTestId('order-panel-toggle-o1');
-    const svgs = () => Array.from(toggle.querySelectorAll('svg'));
-    const chevron = () => svgs()[svgs().length - 1]; // last svg is the chevron (PaymentTypeIcon is first)
+    const chevronButton = screen.getByTestId('order-panel-chevron-o1');
+    const chevron = () => chevronButton.querySelector('svg');
     expect(chevron()).toBeInTheDocument();
     expect(chevron()?.getAttribute('class') ?? '').not.toContain('rotate-180');
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
