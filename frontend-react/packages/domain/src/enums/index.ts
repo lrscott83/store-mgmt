@@ -44,6 +44,10 @@ export enum EFeatures {
   ExpensesHistory = 102,
   CreditsHistory = 103,
   CreditSale = 110,
+  /** Feature Recetas — espejo de FeatureType.Recipes=120 (backend). */
+  Recipes = 120,
+  /** Feature Elaboraciones — espejo de FeatureType.Elaborations=121 (backend). */
+  Elaborations = 121,
 }
 
 export enum EModules {
@@ -64,6 +68,8 @@ export enum EModules {
   MultiStores = 14,
   /** Módulo MultiMonedas — espejo de ModuleType.MultiMonedas=15 (backend). */
   MultiMonedas = 15,
+  /** Módulo Elaboración — espejo de ModuleType.Elaboration=17 (backend). */
+  Elaboration = 17,
 }
 
 export enum PaymentType {
