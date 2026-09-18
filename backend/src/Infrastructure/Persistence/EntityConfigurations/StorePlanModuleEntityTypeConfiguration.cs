@@ -79,7 +79,9 @@ namespace Infrastructure.Persistence.EntityConfigurations
                 StorePlanModule.Create((int)StorePlanType.VIP, (int)ModuleType.Credits),
                 StorePlanModule.Create((int)StorePlanType.VIP, (int)ModuleType.Warehouses),
                 StorePlanModule.Create((int)StorePlanType.VIP, (int)ModuleType.MultiStores),
-                StorePlanModule.Create((int)StorePlanType.VIP, (int)ModuleType.MultiMonedas));
+                StorePlanModule.Create((int)StorePlanType.VIP, (int)ModuleType.MultiMonedas),
+                // MultiPayments (2026-09-18): module 16 belongs to VIP only.
+                StorePlanModule.Create((int)StorePlanType.VIP, (int)ModuleType.MultiPayments));
         }
     }
 }

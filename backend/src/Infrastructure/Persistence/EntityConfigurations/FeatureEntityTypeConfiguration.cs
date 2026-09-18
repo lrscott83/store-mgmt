@@ -228,6 +228,15 @@ namespace Infrastructure.Persistence.EntityConfigurations
                       true,
                       true
                   ),
+                  Feature.Create(
+                      (int)FeatureType.MultiPayments,
+                      FeatureType.MultiPayments.GetDescription(),
+                      "Funcionalidad para pagar una venta con varios pagos y canales",
+                      (int)ModuleType.MultiPayments,
+                      77,
+                      true,
+                      true
+                  ),
 
                  // Synchronization
                  Feature.Create(

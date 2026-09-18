@@ -2,6 +2,7 @@
 using Domain.Common.Enums;
 using Domain.Common.Events;
 using Domain.Entities.OrderItems;
+using Domain.Entities.OrderPayments;
 using Domain.Entities.Stores;
 
 namespace Domain.Entities.Orders
@@ -11,6 +12,8 @@ namespace Domain.Entities.Orders
         public Guid StoreId { get; set; }
         public Store Store { get; set; } = null!;
         public ICollection<OrderItem> OrderItems { get; set; }
+        /// <summary>Payments recorded for this order (MultiPayments mirror, 0..N).</summary>
+        public ICollection<OrderPayment> Payments { get; set; }
         public OrderType OrderType { get; set; }
         public string Description { get; set; }
         public decimal Total { get; set; }
@@ -36,6 +39,7 @@ namespace Domain.Entities.Orders
             Date = date;
             TenantId = tenantId;
             OrderItems = new List<OrderItem>();
+            Payments = new List<OrderPayment>();
         }
 
         private static Order Create(Guid id, Guid storeId, OrderType orderType, string description, decimal total, int itemsCount, DateTime date, Guid tenantId)
