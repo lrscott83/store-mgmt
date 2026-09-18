@@ -83,6 +83,13 @@ export function StorePlanPage() {
   // store plan at any time; the backend ownership guard is the only authority.
   const isOnPaidPlan = planType !== '' && planType !== 'Gratis';
 
+  // Owner plan restriction (billing/spec.md): the caller matrix reserves
+  // Superior/VIP to SuperAdmin — an OwnerAdmin sees only Gratis/Pago panels
+  // (the backend 403s anything else; the filter keeps the UI honest).
+  const visiblePlans = user?.isSuperAdmin
+    ? plans
+    : plans.filter((p) => p.planType === 'Gratis' || p.planType === 'Pago');
+
   async function handleActivate(selectedPlan: Plan) {
     if (!plan || !storeId) return;
     setActivationError(null);
@@ -156,7 +163,7 @@ export function StorePlanPage() {
       )}
 
       <PlanPanels
-        plans={plans}
+        plans={visiblePlans}
         storePlanType={planType}
         featuresByModuleId={featuresByModuleId}
         onActivate={handleActivate}

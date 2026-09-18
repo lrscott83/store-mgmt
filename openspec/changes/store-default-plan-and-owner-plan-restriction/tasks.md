@@ -49,14 +49,14 @@ Chain strategy: size-exception
 
 ## Phase 4: Frontend — Role Filter
 
-- [ ] 4.1 `frontend-react/apps/web-store-pos/app/management/stores/components/edit-plan-modal.tsx` (:85) — add role check: `visiblePlans` = plans filtered to Gratis/Pago for non-SuperAdmin before `<PlanPanels>`. Verify: `cd frontend-react && pnpm test`
-- [ ] 4.2 `frontend-react/apps/web-store-pos/app/management/stores/routes/store-plan.tsx` (:158-164) — same filter (route reachable by OwnerAdmin via `adminFeatureLoader([Stores])`). Verify: same.
-- [ ] 4.3 Verify `frontend-react/apps/web-store-pos/app/admin/stores/routes/store-list.tsx` (read-only) — SuperAdmin views unaffected (no filter, VIP not in plans list). No code change.
+- [x] 4.1 `frontend-react/apps/web-store-pos/app/management/stores/components/edit-plan-modal.tsx` (:85) — add role check: `visiblePlans` = plans filtered to Gratis/Pago for non-SuperAdmin before `<PlanPanels>`. Verify: `cd frontend-react && pnpm test`
+- [x] 4.2 `frontend-react/apps/web-store-pos/app/management/stores/routes/store-plan.tsx` (:158-164) — same filter (route reachable by OwnerAdmin via `adminFeatureLoader([Stores])`). Verify: same.
+- [x] 4.3 Verify `frontend-react/apps/web-store-pos/app/admin/stores/routes/store-list.tsx` (read-only) — SuperAdmin views unaffected (no filter, VIP not in plans list). No code change.
 
 ## Phase 5: Frontend Unit + E2E Test Updates (user-authorized set)
 
 - [ ] 5.1 `store-creation-trial.test.tsx` (:249-276) — re-anchor birth planId assertion to Pago; moduleIds assertion unchanged (Superior members, Option A).
-- [ ] 5.2 `my-stores.test.tsx` (:677) — owner click target `/Superior/` → `/Pago/`.
+- [x] 5.2 `my-stores.test.tsx` (:677) — owner click target `/Superior/` → `/Gratis/`.
 - [ ] 5.3 `store-routes.test.tsx` (:435-450) — PlanPanels filter behavior; verify catalog factory unchanged at :47-63.
 - [ ] 5.4 `frontend-react/e2e/owner-stores.spec.ts` (:152-156) — `'Plan: Superior'` → `'Plan: Pago'` (E-03 assertion).
 - [ ] 5.5 `frontend-react/e2e/plan-change-permission-refresh.spec.ts` (:120-136) — rework premise: Superior/Warehouses(13) → Pago/Statistics(6) delta for upgrade leg.

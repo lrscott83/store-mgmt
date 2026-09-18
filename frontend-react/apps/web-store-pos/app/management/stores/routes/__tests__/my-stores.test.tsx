@@ -673,8 +673,11 @@ describe('MyStoresPage — Editar el plan popup', () => {
     // Module A (Pago's delta) renders, the Gratis predecessor's module does not.
     expect(screen.getByText('Module A')).toBeInTheDocument();
     expect(screen.queryByText('Free Module')).not.toBeInTheDocument();
-    // And exposes the activation action on another plan — the owner can change
-    fireEvent.click(screen.getByRole('button', { name: /Superior/ }));
+    // Owner plan restriction (billing/spec.md): the owner's modal filters the
+    // catalog to Gratis/Pago — Superior/VIP are SuperAdmin-reserved. The only
+    // non-active panel left is Gratis (downgrade), which exposes the activation.
+    expect(screen.queryByRole('button', { name: /Superior/ })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Gratis/ }));
     expect(
       screen.getByRole('button', { name: esMessages['STORES.PLAN.ACTIVATE_PLAN'] }),
     ).toBeInTheDocument();

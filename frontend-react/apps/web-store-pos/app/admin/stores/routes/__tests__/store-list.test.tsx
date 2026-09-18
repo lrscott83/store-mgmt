@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
-import type { Plan, PlanModule, Store } from '@store-mgmt/domain';
+import type { Plan, PlanModule, Store, UserModel } from '@store-mgmt/domain';
 
 // ─── react-router mock ────────────────────────────────────────────────────────
 
@@ -63,6 +63,23 @@ vi.mock('~/shared/lib/i18n/es', () => ({
     'GENERAL.CLOSE': 'Cerrar',
   },
 }));
+
+// ─── auth-store mock ──────────────────────────────────────────────────────────
+// The admin page's actor is a SuperAdmin; EditPlanModal reads the session for
+// the owner-plan filter, so the modal must see isSuperAdmin: true to keep the
+// Superior panel (SuperAdmin pass-through, task 4.3).
+
+type AdminAuthUser = Pick<UserModel, 'isSuperAdmin'>;
+let mockAdminUser: AdminAuthUser | null = { isSuperAdmin: true };
+
+vi.mock('~/shared/lib/stores/auth-store', () => {
+  const useAuthStore = vi.fn((selector?: (s: unknown) => unknown) => {
+    const state = { user: mockAdminUser, isAuthenticated: true };
+    if (typeof selector === 'function') return selector(state);
+    return state;
+  });
+  return { useAuthStore };
+});
 
 // ─── resellerLoader mock ─────────────────────────────────────────────────────
 
