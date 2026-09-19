@@ -397,4 +397,36 @@ describe('ElaborationsPage — Elaboraciones (feature 121)', () => {
     expect(row.textContent).toContain(formatCurrency(elaboration.totalCost));
     expect(row.textContent).toContain(formatCurrency(elaboration.unitCost));
   });
+
+  it('warns that a negative real quantity is treated as zero while the preview stays non-negative', () => {
+    const { recipeId, warehouseId } = seedWorld(100);
+    renderPage();
+    selectPlan(recipeId, warehouseId);
+
+    expect(screen.queryByTestId('elaboration-negative-warning')).toBeNull();
+
+    fireEvent.change(screen.getByTestId('elaboration-actual-0'), { target: { value: '-5' } });
+
+    expect(screen.getByTestId('elaboration-negative-warning').textContent).toBe(
+      'Las cantidades reales negativas se tratan como cero.',
+    );
+    // The clamp is preserved: harina → 0, only levadura + sal + agua contribute.
+    expect(screen.getByTestId('elaboration-ingredients-cost').textContent).toBe(
+      formatCurrency(5.65),
+    );
+    expect(screen.getByTestId('elaboration-total-cost').textContent).not.toContain('-');
+  });
+
+  it('hides the negative-quantity warning when the value is corrected to a non-negative number', () => {
+    const { recipeId, warehouseId } = seedWorld(100);
+    renderPage();
+    selectPlan(recipeId, warehouseId);
+
+    fireEvent.change(screen.getByTestId('elaboration-actual-0'), { target: { value: '-5' } });
+    expect(screen.getByTestId('elaboration-negative-warning')).toBeTruthy();
+
+    fireEvent.change(screen.getByTestId('elaboration-actual-0'), { target: { value: '3' } });
+
+    expect(screen.queryByTestId('elaboration-negative-warning')).toBeNull();
+  });
 });

@@ -729,6 +729,8 @@ const messages: Record<string, string> = {
   'ELABORATION.INSUFFICIENT_ROW': 'Stock insuficiente',
   'ELABORATION.HISTORY_TITLE': 'Historial de elaboraciones',
   'ELABORATION.NO_HISTORY': 'No hay elaboraciones registradas.',
+  'ELABORATION.NEGATIVE_ACTUAL':
+    'Las cantidades reales negativas se tratan como cero.',
   // Angular INVENTORY_ENTRY.* namespace (vocabs/es.ts:420-426) — today-entries add/edit modal
   // + today-entries empty state (was previously covered by the overloaded INVENTORY.EMPTY_STATE).
   // INVENTORY_ENTRY.TEXT (Angular vocabs/es.ts:421) — used by Swal's DELETE_CONFIRM_MESSAGE_A

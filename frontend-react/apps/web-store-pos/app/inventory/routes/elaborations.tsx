@@ -122,6 +122,18 @@ export function ElaborationsPage() {
     return Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
   }
 
+  // Honest signal for the silent clamp: a typed negative real quantity is
+  // replaced by 0 in the preview and the payload, so the screen must say so.
+  const hasNegativeActual = useMemo(
+    () =>
+      actuals.some((raw) => {
+        if (raw === undefined) return false;
+        const parsed = parseFloat(raw);
+        return Number.isFinite(parsed) && parsed < 0;
+      }),
+    [actuals],
+  );
+
   // Live real-cost preview: the overhead applies to the REAL ingredient cost,
   // exactly like the service's snapshot.
   const realIngredientsCost = plan
@@ -401,6 +413,16 @@ export function ElaborationsPage() {
                     </div>
                   </dl>
                 </div>
+              )}
+
+              {hasNegativeActual && (
+                <p
+                  role="alert"
+                  data-testid="elaboration-negative-warning"
+                  className="text-sm text-danger"
+                >
+                  {intl.formatMessage({ id: 'ELABORATION.NEGATIVE_ACTUAL' })}
+                </p>
               )}
 
               {error && (
