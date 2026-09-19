@@ -686,6 +686,7 @@ const messages: Record<string, string> = {
   'RECIPE.ADD_COMPONENT': 'Añadir componente',
   'RECIPE.REMOVE_COMPONENT': 'Eliminar componente',
   'RECIPE.COMPONENT_QTY': 'Cantidad por unidad',
+  'RECIPE.DUPLICATE_COMPONENT': 'Cada componente debe ser un producto distinto.',
   'RECIPE.SCRAP_PCT': 'Merma (%)',
   'RECIPE.LABOR_COST': 'Mano de obra por lote',
   'RECIPE.OVERHEAD_PCT': 'Gastos indirectos (%)',

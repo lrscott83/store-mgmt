@@ -103,11 +103,22 @@ export function RecipeFormModal({ open, recipe, products, onClose, onSave }: Rec
         scrap <= 100
       );
     });
+  // The same ingredient on two rows is not a valid BoM: the elaboration service
+  // collapses components by productId (last-wins), so the stored cost would
+  // diverge from the preview. Empty rows are ignored here.
+  const seenProductIds = new Set<string>();
+  const hasDuplicateComponents = components.some((row) => {
+    if (row.productId === '') return false;
+    if (seenProductIds.has(row.productId)) return true;
+    seenProductIds.add(row.productId);
+    return false;
+  });
   const isValid =
     productId !== '' &&
     Number.isFinite(output) &&
     output > 0 &&
     componentsValid &&
+    !hasDuplicateComponents &&
     labor >= 0 &&
     overhead >= 0 &&
     overhead <= 100;
@@ -267,6 +278,15 @@ export function RecipeFormModal({ open, recipe, products, onClose, onSave }: Rec
                 </div>
               ))}
             </div>
+            {hasDuplicateComponents && (
+              <p
+                role="alert"
+                data-testid="recipe-duplicate-error"
+                className="mt-2 text-sm text-danger"
+              >
+                {intl.formatMessage({ id: 'RECIPE.DUPLICATE_COMPONENT' })}
+              </p>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-3">

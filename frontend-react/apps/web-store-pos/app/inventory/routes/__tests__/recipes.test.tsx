@@ -234,4 +234,76 @@ describe('RecipesPage — Recetas (feature 120)', () => {
     expect(service.getRecipeById(recipeId)!.isActive).toBe(true);
     expect(showToastSuccessMock).toHaveBeenCalledWith('Receta actualizada.');
   });
+
+  it('blocks saving when the same ingredient is selected on two rows and recovers when fixed', () => {
+    seedProducts();
+    renderPage();
+
+    fireEvent.click(screen.getByTestId('recipe-new'));
+    fireEvent.change(screen.getByTestId('recipe-product'), { target: { value: 'pan' } });
+    fireEvent.change(screen.getByTestId('recipe-output-qty'), { target: { value: '20' } });
+
+    fireEvent.change(screen.getByTestId('recipe-component-product-0'), {
+      target: { value: 'harina' },
+    });
+    fireEvent.change(screen.getByTestId('recipe-component-qty-0'), { target: { value: '3' } });
+
+    fireEvent.click(screen.getByTestId('recipe-add-component'));
+    fireEvent.change(screen.getByTestId('recipe-component-product-1'), {
+      target: { value: 'harina' },
+    });
+    fireEvent.change(screen.getByTestId('recipe-component-qty-1'), { target: { value: '1' } });
+
+    const save = screen.getByTestId('recipe-save') as HTMLButtonElement;
+    expect(save.disabled).toBe(true);
+    expect(screen.getByTestId('recipe-duplicate-error').textContent).toContain(
+      'Cada componente debe ser un producto distinto.',
+    );
+
+    // Fix the second row to a different ingredient → the guard clears.
+    fireEvent.change(screen.getByTestId('recipe-component-product-1'), {
+      target: { value: 'sal' },
+    });
+    expect(save.disabled).toBe(false);
+    expect(screen.queryByTestId('recipe-duplicate-error')).toBeNull();
+  });
+
+  it('preserves an already-duplicated recipe in the edit modal and blocks saving until resolved', () => {
+    const productRepo = seedProducts();
+    const recipeService = new RecipeOfflineService(storeId, productRepo);
+    const result = recipeService.addRecipe({
+      productId: 'pan',
+      outputQty: 20,
+      components: [
+        { productId: 'harina', qty: 3, scrapPct: 2 },
+        { productId: 'harina', qty: 1, scrapPct: 0 },
+      ],
+      laborCost: 50,
+      overheadPct: 10,
+    });
+    expect(result.succeeded).toBe(true);
+    const recipeId = result.data!.id;
+
+    renderPage();
+    fireEvent.click(screen.getByTestId('recipe-category-toggle-cat-elaborados'));
+    fireEvent.click(screen.getByTestId(`recipe-edit-${recipeId}`));
+
+    // Both duplicate rows render with their current selections — options are not filtered.
+    expect((screen.getByTestId('recipe-component-product-0') as HTMLSelectElement).value).toBe(
+      'harina',
+    );
+    expect((screen.getByTestId('recipe-component-product-1') as HTMLSelectElement).value).toBe(
+      'harina',
+    );
+
+    const save = screen.getByTestId('recipe-save') as HTMLButtonElement;
+    expect(save.disabled).toBe(true);
+    expect(screen.getByTestId('recipe-duplicate-error')).toBeTruthy();
+
+    fireEvent.change(screen.getByTestId('recipe-component-product-1'), {
+      target: { value: 'sal' },
+    });
+    expect(save.disabled).toBe(false);
+    expect(screen.queryByTestId('recipe-duplicate-error')).toBeNull();
+  });
 });
