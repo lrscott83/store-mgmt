@@ -2,9 +2,10 @@ using Application.Abstractions.Authentication;
 using Application.Dtos.Authentication;
 using Application.ResponseModels;
 using Application.UnitOfWorks;
+using Domain.Common.Enums;
 using Domain.Common.Results;
-using Domain.Entities.Modules;
 using Domain.Entities.Owners;
+using Domain.Entities.Plans;
 using Domain.Entities.ReSellerOwners;
 using Domain.Entities.ReSellers;
 using Domain.Entities.Stores;
@@ -30,7 +31,7 @@ public abstract class RegisterCommandHandlerTestFixture
     protected readonly Mock<IApplicationUnitOfWork> MockUnitOfWork;
     protected readonly Mock<ICreateOwnerService> MockCreateOwnerService;
     protected readonly Mock<ICreateStoreService> MockCreateStoreService;
-    protected readonly Mock<IModuleRepository> MockModuleRepository;
+    protected readonly Mock<IPlanRepository> MockPlanRepository;
     protected readonly Mock<IReSellerRepository> MockReSellerRepository;
     protected readonly Mock<IReSellerOwnerRepository> MockReSellerOwnerRepository;
     protected readonly Mock<IJwtProvider> MockJwtProvider;
@@ -47,7 +48,10 @@ public abstract class RegisterCommandHandlerTestFixture
     protected readonly User TestUser;
     protected readonly Owner TestOwner;
     protected readonly Store TestStore;
-    protected readonly Module TestModule;
+    protected readonly StorePlan TestPlan;
+
+    /// <summary>Module id seeded into <see cref="TestPlan"/> (the default Superior plan).</summary>
+    protected const int TestPlanModuleId = 1;
 
     protected RegisterCommandHandlerTestFixture()
     {
@@ -55,7 +59,7 @@ public abstract class RegisterCommandHandlerTestFixture
         MockUnitOfWork = new Mock<IApplicationUnitOfWork>();
         MockCreateOwnerService = new Mock<ICreateOwnerService>();
         MockCreateStoreService = new Mock<ICreateStoreService>();
-        MockModuleRepository = new Mock<IModuleRepository>();
+        MockPlanRepository = new Mock<IPlanRepository>();
         MockReSellerRepository = new Mock<IReSellerRepository>();
         MockReSellerOwnerRepository = new Mock<IReSellerOwnerRepository>();
         MockJwtProvider = new Mock<IJwtProvider>();
@@ -77,7 +81,7 @@ public abstract class RegisterCommandHandlerTestFixture
         TestUser = CreateTestUser();
         TestOwner = CreateTestOwner();
         TestStore = CreateTestStore();
-        TestModule = CreateTestModule();
+        TestPlan = CreateTestPlan();
 
         // Default successful setups
         SetupDefaultSuccessfulScenarios();
@@ -93,7 +97,7 @@ public abstract class RegisterCommandHandlerTestFixture
             MockLocalizer.Object,
             MockCreateOwnerService.Object,
             MockCreateStoreService.Object,
-            MockModuleRepository.Object,
+            MockPlanRepository.Object,
             MockJwtProvider.Object,
             MockAuthTokenConfig.Object,
             MockReSellerRepository.Object,
@@ -117,10 +121,10 @@ public abstract class RegisterCommandHandlerTestFixture
                 It.IsAny<string?>()))
             .ReturnsAsync(TestOwner);
 
-        // Module repository returns available modules
-        MockModuleRepository
-            .Setup(x => x.GetAvailableModulesToStore())
-            .ReturnsAsync(new List<Module> { TestModule });
+        // Plan repository returns the default (Superior) plan with its assigned modules
+        MockPlanRepository
+            .Setup(x => x.GetActivePlanWithModulesByIdAsync(It.IsAny<int>()))
+            .ReturnsAsync(TestPlan);
 
         // Store creation succeeds
         MockCreateStoreService
@@ -199,18 +203,11 @@ public abstract class RegisterCommandHandlerTestFixture
         return store;
     }
 
-    private Module CreateTestModule()
+    private StorePlan CreateTestPlan()
     {
-        return Module.Create(
-            id: 1,
-            name: "Sales",
-            order: 1,
-            priceIncluded: true,
-            price: 100f,
-            discountPrice: 10f,
-            percentDiscountPrice: 5f,
-            availableToStore: true,
-            isActive: true);
+        var plan = StorePlan.Create((int)StorePlanType.Superior, "Superior", 3, true);
+        plan.StorePlanModules.Add(StorePlanModule.Create(plan.Id, TestPlanModuleId));
+        return plan;
     }
 
     /// <summary>

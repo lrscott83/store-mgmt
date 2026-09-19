@@ -5,6 +5,7 @@ using Domain.Common.Constants;
 using Domain.Common.Enums;
 using Domain.Entities.Modules;
 using Domain.Entities.Owners;
+using Domain.Entities.Plans;
 using Domain.Entities.ReSellerOwners;
 using Domain.Entities.ReSellers;
 using Domain.Entities.Stores;
@@ -175,7 +176,7 @@ public sealed class AuthRegisterDataAssertionsTests
     }
 
     [Fact]
-    public async Task Register_assigns_all_available_modules_including_paid()
+    public async Task Register_assigns_default_plan_modules()
     {
         Registered? registered = null;
         try
@@ -185,21 +186,18 @@ public sealed class AuthRegisterDataAssertionsTests
             using var scope = _factory.Services.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
-            // Replicates ModuleRepository.GetAvailableModulesToStore (ModuleRepository.cs:17-23):
-            // m.IsActive && m.AvailableToStore && m.Features.Any(f => f.IsActive && f.AvailableToStore).
-            var expectedModuleIds = await db.Set<Module>().AsNoTracking()
-                .Where(m => m.IsActive && m.AvailableToStore
-                    && m.Features.Any(f => f.IsActive && f.AvailableToStore))
-                .Select(m => m.Id)
+            // Registration grants the modules of the DEFAULT plan (Superior, hardcoded in
+            // CreateStoreService), not every catalog module AvailableToStore.
+            var expectedModuleIds = await db.Set<StorePlanModule>().AsNoTracking()
+                .Where(spm => spm.PlanId == (int)StorePlanType.Superior)
+                .Select(spm => spm.ModuleId)
                 .ToListAsync();
 
-            // Paid set: same filter plus !m.PriceIncluded. Precondition guard (CLAUDE.md): the
-            // catalog must contain at least one qualifying paid module, otherwise set equality
-            // would pass vacuously and the H-1 regression would go silent.
+            // Precondition guard (CLAUDE.md): the Superior plan must have modules and at least
+            // one paid module, otherwise set equality would pass vacuously.
+            expectedModuleIds.Should().NotBeEmpty();
             var paidExpectedIds = await db.Set<Module>().AsNoTracking()
-                .Where(m => m.IsActive && m.AvailableToStore
-                    && m.Features.Any(f => f.IsActive && f.AvailableToStore)
-                    && !m.PriceIncluded)
+                .Where(m => expectedModuleIds.Contains(m.Id) && !m.PriceIncluded)
                 .Select(m => m.Id)
                 .ToListAsync();
             paidExpectedIds.Should().NotBeEmpty();
@@ -210,7 +208,9 @@ public sealed class AuthRegisterDataAssertionsTests
                 .ToListAsync();
 
             actualModuleIds.Should().BeEquivalentTo(expectedModuleIds);
-            actualModuleIds.Intersect(paidExpectedIds).Should().NotBeEmpty();
+            // Regression (T14): module 16 (MultiPayments) is VIP-only and must NOT be granted
+            // to a fresh Superior store even though it is AvailableToStore in the catalog.
+            actualModuleIds.Should().NotContain(16);
         }
         finally
         {
