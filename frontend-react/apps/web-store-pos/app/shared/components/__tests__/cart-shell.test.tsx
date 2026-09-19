@@ -96,7 +96,14 @@ vi.mock('~/management/channel-rates/lib/services/channel-rate-offline-service', 
 
 import { useCartStore } from '~/shared/lib/stores/cart-store';
 import { CartShell } from '../cart-shell';
-import { PaymentType, OrderType, EModules, SalePaymentMethod, Currency } from '@store-mgmt/domain';
+import {
+  DEFAULT_PAYMENT_PRICING,
+  PaymentType,
+  OrderType,
+  EModules,
+  SalePaymentMethod,
+  Currency,
+} from '@store-mgmt/domain';
 import type { ChannelRate, Product } from '@store-mgmt/domain';
 import type { MultiPaymentRow } from '~/shared/components/multipayments/multi-payment-list';
 
@@ -1155,17 +1162,18 @@ describe('CartShell — multi-payment list (módulo 16)', () => {
     const args = createOrderMock.mock.calls[0];
     // 7th positional (index 6): the authoritative method, from the FIRST payment.
     expect(args[6]).toBe(SalePaymentMethod.Transferencia);
-    // 8th positional (index 7): the persisted payments (amounts in cents).
+    // 8th positional (index 7): the persisted payments (amounts in order-currency
+    // UNITS, decision A — the same unit as Order.total, NOT integer cents).
     expect(args[7]).toEqual([
       {
         method: SalePaymentMethod.Transferencia,
         currency: Currency.CUP,
-        amount: 500,
+        amount: 5,
         rateApplied: 1,
         rateMethod: null,
         rateCurrency: null,
         rateEffectiveFrom: null,
-        amountInOrderCurrency: 500,
+        amountInOrderCurrency: 5,
       },
     ]);
   });
@@ -1184,5 +1192,25 @@ describe('CartShell — multi-payment list (módulo 16)', () => {
     openCart();
 
     expect(screen.getByText('Registrar').closest('button')).not.toBeDisabled();
+  });
+
+  // Decision 8 (ratified 2026-09-18): with multi-pago active the total the UI displays,
+  // guards and submits is the UNPRICED line sum — a priced payment method must NOT
+  // change it (otherwise the UI and the persisted order would disagree).
+  it('decision 8: with module 16 a priced payment method does not change the multi-pay total (line sum)', () => {
+    const pricingKey = `${Number(Currency.CUP)}|${SalePaymentMethod.Efectivo}`;
+    // total() = 5 (line sum); a priced total would be 10, so a payment of 5 would leave
+    // the sale short and block the submit if the pricing leaked into the multi-pay total.
+    DEFAULT_PAYMENT_PRICING[pricingKey] = { percent: 100, tax: 0 };
+    try {
+      mockMultiPaymentCart({ payments: [paymentRow({ amount: 5 })] });
+      renderCartShell();
+      openCart();
+
+      expect(screen.getByText('Registrar').closest('button')).not.toBeDisabled();
+      expect(screen.getByTestId('multi-payment-remaining')).toHaveTextContent('0');
+    } finally {
+      delete DEFAULT_PAYMENT_PRICING[pricingKey];
+    }
   });
 });

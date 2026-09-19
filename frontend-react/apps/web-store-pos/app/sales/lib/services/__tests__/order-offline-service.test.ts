@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   Currency,
+  DEFAULT_PAYMENT_PRICING,
   EModules,
   OrderErrors,
   PaymentType,
@@ -1704,14 +1705,16 @@ describe('OrderOfflineService', () => {
   describe('ORD-21: payments persistence (multipayments)', () => {
     it('persists the exact payments[] and keeps the legacy fields identical to the no-payments path', async () => {
       const items = makeCartItems([{ product: makeProduct({ price: 5 }), quantity: 2 }]);
+      // Decision A: `OrderPayment` amounts are order-currency UNITS — 6 + 4 = 10 = the
+      // order total (5 × 2), not integer cents.
       const payments: OrderPayment[] = [
-        makePayment({ amount: 600, amountInOrderCurrency: 600 }),
+        makePayment({ amount: 6, amountInOrderCurrency: 6 }),
         makePayment({
           method: SalePaymentMethod.Transferencia,
           currency: Currency.USD,
-          amount: 400,
+          amount: 4,
           rateApplied: 1,
-          amountInOrderCurrency: 400,
+          amountInOrderCurrency: 4,
         }),
       ];
 
@@ -1740,6 +1743,12 @@ describe('OrderOfflineService', () => {
 
       expect(withPayments.payments).toEqual(payments);
       expect(withoutPayments.payments).toBeUndefined();
+
+      // Decision A: the persisted amounts are in the order currency's UNITS, so the
+      // payments' `amountInOrderCurrency` sum matches `Order.total` in that same unit.
+      expect(
+        withPayments.payments!.reduce((sum, payment) => sum + payment.amountInOrderCurrency, 0),
+      ).toBe(withPayments.total);
 
       // The legacy fields must be computed identically with and without payments.
       expect({
@@ -1827,6 +1836,52 @@ describe('OrderOfflineService', () => {
       expect((stored?.payments?.[0].rateEffectiveFrom as Date).toISOString()).toBe(
         '2026-09-18T00:00:00.000Z',
       );
+    });
+
+    // Decision 8 (ratified 2026-09-18): with multi-pago percent/tax DO NOT apply — the
+    // persisted total is the UNPRICED line sum and percent/tax are 0. The legacy
+    // single-payment path keeps applying the (moneda, método) pricing exactly as before.
+    it('decision 8: with payments the total is the unpriced line sum and percent/tax are 0, while the legacy path keeps the pricing', async () => {
+      const pricingKey = `${Number(Currency.CUP)}|${SalePaymentMethod.Efectivo}`;
+      DEFAULT_PAYMENT_PRICING[pricingKey] = { percent: 10, tax: 1 };
+      try {
+        const items = makeCartItems([{ product: makeProduct({ price: 5 }), quantity: 2 }]);
+        const payments: OrderPayment[] = [
+          makePayment({ amount: 10, amountInOrderCurrency: 10 }),
+        ];
+
+        const withPayments = unwrap(
+          await service.createOrder(
+            items,
+            OrderType.Normal,
+            false,
+            PaymentType.Efectivo,
+            undefined,
+            '',
+            undefined,
+            payments,
+          ),
+        );
+        const withoutPayments = unwrap(
+          await service.createOrder(items, OrderType.Normal, false, PaymentType.Efectivo, undefined, ''),
+        );
+
+        // Legacy path: 10 + 10% + 1 = 12, pricing recorded.
+        expect(withoutPayments.total).toBe(12);
+        expect(withoutPayments.percent).toBe(10);
+        expect(withoutPayments.tax).toBe(1);
+
+        // Multi-pago: no pricing — the total is exactly the line sum and the audit
+        // fields are zeroed.
+        expect(withPayments.total).toBe(10);
+        expect(withPayments.percent).toBe(0);
+        expect(withPayments.tax).toBe(0);
+        expect(
+          withPayments.payments!.reduce((sum, payment) => sum + payment.amountInOrderCurrency, 0),
+        ).toBe(withPayments.total);
+      } finally {
+        delete DEFAULT_PAYMENT_PRICING[pricingKey];
+      }
     });
   });
 

@@ -260,8 +260,14 @@ export function CartShell() {
   // El pricing de la combinación (moneda, método) se aplica al total mostrado y al
   // que se valida contra el pago; createOrder aplica LA MISMA fórmula al persistir.
   // Con los defaults 0/0 el total ajustado es idéntico al base (no-regresión).
+  //
+  // Ratified decision 8 (multipayments plan 2026-09-18): while the multi-payment UI is
+  // active (module 16 + items) the sale total is the UNPRICED line sum, so the display,
+  // the coverage guard, the list total and the persisted order all agree. Without module
+  // 16 the priced total stays byte-identical to the legacy behavior.
   const pricing = paymentPricingFor(saleCurrency, salePaymentMethod);
-  const totalAmount = applyPaymentPricing(total(), pricing);
+  const multiPaymentsActive = multiPaymentsAvailable && items.length > 0;
+  const totalAmount = multiPaymentsActive ? total() : applyPaymentPricing(total(), pricing);
   const paymentReturn = getPaymentReturn(payment, totalAmount);
   const paymentReturnKind = getPaymentReturnKind(paymentReturn);
   const cashSale = isCashMethod(salePaymentMethod);

@@ -443,12 +443,13 @@ export class OrderOfflineService {
    * compiles positionally; every value ever supplied at these positions is identical to
    * what Angular's own callers always pass.
    *
-   * MultiPayments (plan 2026-09-18): `payments` is a TRAILING optional param so every
-   * legacy call site stays green. When a non-empty list is supplied it is persisted on
-   * the order (audit trail of the multi-payment sale); the legacy fields
-   * (`paymentType`/`salePaymentMethod`/`percent`/`tax`/`total`/`currency`) are computed
-   * exactly as before, with or without `payments`.
-   */
+    * MultiPayments (plan 2026-09-18): `payments` is a TRAILING optional param so every
+    * legacy call site stays green. When a non-empty list is supplied it is persisted on
+    * the order (audit trail of the multi-payment sale). Ratified decision 8
+    * (multipayments plan 2026-09-18): with multi-pago percent/tax DO NOT apply — the
+    * persisted `total` is the UNPRICED sum of the cart lines and `percent`/`tax` are 0.
+    * WITHOUT `payments` (legacy single-payment path) the pricing behavior is unchanged.
+    */
   createOrder(
     cartItems: CartItem[],
     type: OrderType,
@@ -522,10 +523,16 @@ export class OrderOfflineService {
         : legacyPaymentTypeToSalePaymentMethod(paymentType, orderCurrency);
     const pricing = paymentPricingFor(resolvedMethod.currency, resolvedMethod.method);
 
+    // Ratified decision 8 (multipayments plan 2026-09-18): with multi-pago (a
+    // non-empty `payments` list) percent/tax DO NOT apply — the persisted total is
+    // the UNPRICED line sum and percent/tax are 0. Without `payments` the legacy
+    // single-payment path applies the pricing exactly as before.
+    const hasMultiPayments = payments !== undefined && payments.length > 0;
+
     const order: Order = {
       id: orderId,
       orderItems,
-      total: applyPaymentPricing(total, pricing),
+      total: hasMultiPayments ? total : applyPaymentPricing(total, pricing),
       itemsCount,
       date: now,
       type,
@@ -539,8 +546,10 @@ export class OrderOfflineService {
       // item's product — the guard forbids mixing currencies, so this is unambiguous).
       currency: orderCurrency,
       salePaymentMethod: resolvedMethod.method,
-      percent: pricing.percent,
-      tax: pricing.tax,
+      // Decision 8: with multi-pago percent/tax are dropped (0), so the persisted
+      // pricing audit fields match the unpriced total. Legacy path keeps them.
+      percent: hasMultiPayments ? 0 : pricing.percent,
+      tax: hasMultiPayments ? 0 : pricing.tax,
       // MultiPayments (plan 2026-09-18): only persist a non-empty payment list, so
       // legacy / single-payment sales keep a payment-less order shape.
       ...(payments && payments.length > 0 ? { payments } : {}),

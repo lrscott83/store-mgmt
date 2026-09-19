@@ -5,6 +5,7 @@ import {
   summarizePayments,
 } from '@store-mgmt/domain';
 import type { BaseError, ChannelRate, Currency, OrderPayment } from '@store-mgmt/domain';
+import { round2 } from '~/shared/lib/money';
 import type { MultiPaymentRow } from './multi-payment-list';
 
 /**
@@ -15,11 +16,17 @@ import type { MultiPaymentRow } from './multi-payment-list';
  *
  * Mirrors the list's own evaluation: rows with a non-positive amount are skipped
  * (never sent to the domain tally) and a row that cannot be converted is a typed
- * error — never a silent 0. Unit boundary: rows carry amounts in currency UNITS;
- * `amount`/`amountInOrderCurrency` are persisted as integer CENTS and
- * `rateApplied` is the source channel's moneda-por-USD rate with 6 decimals,
- * matching `OrderPayment`'s contract. A same-currency payment is an exact
- * identity, so its frozen rate is 1 with no provenance.
+ * error — never a silent 0.
+ *
+ * UNIT BOUNDARY (ratified owner decision A, 2026-09-18): rows carry amounts in
+ * currency UNITS. The domain conversion helpers require integer CENTS, so the
+ * math runs in cents internally, but the persisted `OrderPayment` is written
+ * back in UNITS — `amount` is the row's own amount in its currency's units and
+ * `amountInOrderCurrency` is the converted amount in order-currency UNITS (the
+ * same unit as `Order.total`, backend `decimal(18,2)`). `rateApplied` is the
+ * source channel's moneda-por-USD rate with 6 decimals, matching
+ * `OrderPayment`'s contract. A same-currency payment is an exact identity, so its
+ * frozen rate is 1 with no provenance.
  */
 export interface MultiPaymentSettlement {
   /** Usable rows converted to the persisted shape, in order. */
@@ -38,6 +45,9 @@ export function settleMultiPayments(
   at: Date,
 ): MultiPaymentSettlement {
   const orderPayments: OrderPayment[] = [];
+  // Parallel to `orderPayments`: the converted amounts in integer CENTS, kept
+  // internal so the domain tally never receives the persisted UNITS.
+  const convertedCents: number[] = [];
   let firstError: BaseError | null = null;
 
   for (const row of rows) {
@@ -67,18 +77,20 @@ export function settleMultiPayments(
     orderPayments.push({
       method: row.method,
       currency: row.currency,
-      amount: amountCents,
+      // Outbound boundary: persist UNITS, the same unit as Order.total.
+      amount: row.amount,
       rateApplied: rate ? rate.value / RATE_MICRO : 1,
       rateMethod: rate?.method ?? null,
       rateCurrency: rate?.currency ?? null,
       rateEffectiveFrom: rate?.effectiveFrom ?? null,
-      amountInOrderCurrency: conversion.data,
+      amountInOrderCurrency: round2(conversion.data / 100),
     });
+    convertedCents.push(conversion.data);
   }
 
   const summary = summarizePayments(
     Math.round(totalUnits * 100),
-    orderPayments.map((payment) => ({ amountInOrderCurrency: payment.amountInOrderCurrency })),
+    convertedCents.map((amountInOrderCurrency) => ({ amountInOrderCurrency })),
   );
 
   return { orderPayments, remainingCents: summary.remaining, firstError };
