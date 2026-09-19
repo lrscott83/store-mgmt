@@ -77,7 +77,7 @@ podman exec -i smca_postgres_db psql -U postgres -d smca < backend/scripts/19-20
 
 > El script `19` asume que los scripts `12` (StorePlan) y `14` (StorePlanModule) ya están aplicados.
 
-Después de mergear, corre `graphify update .` para refrescar el grafo del repo (el hook de commit normalmente ya lo hace).
+Después de mergear, aplicá la migración en la base de la VPS antes de desplegar.
 
 ### 5. Ver logs del backend
 

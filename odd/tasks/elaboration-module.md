@@ -54,7 +54,7 @@ skills `work-unit-commits` / `chained-pr` por registry antes de planear PRs.
   **deriva de este mismo tracker** —describía el no-op viejo y seguía listando el advisory como abierto—, corregida acá.
 - **Backlog post-módulo — ítem 3 original (smoke manual UI export→import)**: lo hace el usuario.
 - **T8: CERRADA** — commit `7591075a` (solo docs): nota de despliegue en el README (§4: EF `database update` o script
-  `19-20260918-Add-Elaboration-Module.sql`, backup primero, `graphify update .` tras el merge) + checkboxes del plan (T1–T7)
+  `19-20260918-Add-Elaboration-Module.sql`, backup primero) + checkboxes del plan (T1–T7)
   con las notas de realidad (módulo 17, no 12; `entity-migration`/`store-data-reset` sin código nuevo).
   - **Verificación completa observada**: `dotnet build` **0 errores** (189 warnings pre-existentes); Domain **27/27**;
     Application **492/492**; turbo **12/12 workspaces** OK; **backend E2E 538/539**; Playwright ya catalogado (269/11/19).
@@ -143,7 +143,7 @@ skills `work-unit-commits` / `chained-pr` por registry antes de planear PRs.
 - **Revisión nativa RDD del slice backend: CERRADA — APPROVED + acknowledged (`authority: burned`, 2026-09-18)**.
   4/4 lentes admitidas; solo hallazgos advisory no bloqueantes (ver §RDD). La lente `review-reliability`,
   que venía fallando con `opencode_task_output_empty`, aprobó al primer intento en esta sesión.
-- Nada pusheado. Worktree limpio salvo untracked: `graphify-out/` y este archivo.
+- Nada pusheado. Worktree limpio; el tracker ODD ya está versionado.
 
 ## Decisiones ratificadas por el usuario (2026-09-18)
 

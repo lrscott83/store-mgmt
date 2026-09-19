@@ -203,7 +203,7 @@ export type WarehouseMovementType =
 
 - [x] 8.1. Full README verification: `dotnet build` 0 errors; Domain.UnitTests + Application.Tests (grown counts) green; backend E2E green (proves the migration applies); `pnpm turbo run typecheck lint test` all workspaces; `pnpm test:e2e`.
 - [x] 8.2. Update this plan's checkboxes during implementation; commit per work-unit (`feat(elaboration): ...` / backend commit `feat(elaboration): add module, features and migration`).
-- [x] 8.3. Deployment note for the VPS (append to README's migration section): apply via EF (`dotnet ef database update`) OR the script `backend/scripts/12-...sql` — backup first per README §4 warning; `graphify update .` after merge (hook does it on commit anyway).
+- [x] 8.3. Deployment note for the VPS (append to README's migration section): apply via EF (`dotnet ef database update`) OR the script `backend/scripts/12-...sql` — backup first per README's warning.
 
 ## Costing example (pinned as the acceptance math)
 
