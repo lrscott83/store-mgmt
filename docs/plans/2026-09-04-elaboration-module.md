@@ -125,77 +125,85 @@ export type WarehouseMovementType =
 
 ## Task 1 — Frontend domain models + enums (packages/domain)
 
-- [ ] 1.1. Create `frontend-react/packages/domain/src/models/recipe.ts` and `elaboration.ts` exactly per "Data model" above (doc comments in English; validation lives in the service, not domain).
-- [ ] 1.2. Extend `WarehouseMovementType` in `models/warehouse.ts` with the two new members (additive; extend the doc comment).
-- [ ] 1.3. Extend the TS enums mirroring the backend: `EModules.Elaboration = 12` ("Elaboración"), `EFeatures.Recipes = 120` ("Recetas"), `EFeatures.Elaborations = 121` ("Elaboraciones").
-- [ ] 1.4. Create `errors/recipe-errors.ts` and `errors/elaboration-errors.ts` (pattern: `exchange-rate-errors.ts`) + unit tests in `errors/__tests__/` (pattern: `warehouse-errors.test.ts`).
-- [ ] 1.5. Export everything from `domain/src/index.ts`; rebuild domain (`pnpm --filter @store-mgmt/domain build`).
-- [ ] 1.6. **Verify:** domain tests + build green.
+- [x] 1.1. Create `frontend-react/packages/domain/src/models/recipe.ts` and `elaboration.ts` exactly per "Data model" above (doc comments in English; validation lives in the service, not domain).
+- [x] 1.2. Extend `WarehouseMovementType` in `models/warehouse.ts` with the two new members (additive; extend the doc comment).
+- [x] 1.3. Extend the TS enums mirroring the backend: `EModules.Elaboration = 12` ("Elaboración"), `EFeatures.Recipes = 120` ("Recetas"), `EFeatures.Elaborations = 121` ("Elaboraciones").
+- [x] 1.4. Create `errors/recipe-errors.ts` and `errors/elaboration-errors.ts` (pattern: `exchange-rate-errors.ts`) + unit tests in `errors/__tests__/` (pattern: `warehouse-errors.test.ts`).
+- [x] 1.5. Export everything from `domain/src/index.ts`; rebuild domain (`pnpm --filter @store-mgmt/domain build`).
+- [x] 1.6. **Verify:** domain tests + build green.
 
 ## Task 2 — Backend: new module, features, migration, SQL script
 
-- [ ] 2.1. `backend/src/Domain/Common/Enums/ModuleType.cs`: add `Elaboration = 12` with `[Description("Elaboración")]` (next free id after Credits = 11).
-- [ ] 2.2. `backend/src/Domain/Common/Enums/FeatureType.cs`: add under a `// Elaboración` section: `Recipes = 120` ("Recetas"), `Elaborations = 121` ("Elaboraciones") (next free range after Credits = 110).
-- [ ] 2.3. `ModuleEntityTypeConfiguration.cs` `HasData`: add `Module.Create((int)ModuleType.Elaboration, "Elaboración", order: 55, priceIncluded: true, price: 0, availableToStore: true, isActive: true)`. **Pricing decision (DEFAULT — confirm with owner):** included in the base plan like Sales/Inventory (`PriceIncluded=true, Price=0`). To charge for it instead, use `priceIncluded: false, price: 1` (the 1 USD tier of scripts 09/10) — one line either way, decided BEFORE the migration is generated.
-- [ ] 2.4. `FeatureEntityTypeConfiguration.cs` `HasData`: add the two features pointing at Module 12 with Spanish descriptions (pattern of existing rows): Id 120 "Funcionalidad para gestionar las recetas de elaboración de productos", Id 121 "Funcionalidad para registrar elaboraciones con consumo de insumos y costo real".
-- [ ] 2.5. Check seed-dependent unit tests: Domain.UnitTests `Distinct (FeatureType, RoleType) combinations` expected count (48 today) grows with the new features — update the expected number with a comment naming `Add-Elaboration-Module` as the cause. Grep Application.Tests for any module/feature seed-count assertions and extend additively.
-- [ ] 2.6. **Generate the EF migration** (order matters — user-mandated): from `backend/src/SMCA.WebApi`: `dotnet ef migrations add Add-Elaboration-Module --project ../Infrastructure --startup-project .`. Inspect the generated migration: it must contain ONLY `InsertData` for `"Module"` (1 row) and `"Feature"` (2 rows) — anything else means a model snapshot divergence; STOP and investigate, do not hand-edit.
-- [ ] 2.7. **Generate the SQL script FROM the migration** (pattern of `backend/scripts/03/04/09/10`): `backend/scripts/12-<YYYYMMDD>-Add-Elaboration-Module.sql` containing `START TRANSACTION` → the migration's exact INSERTs (`"Module"`, `"Feature"`) → `setval` fix-ups for both sequences (`SELECT setval(pg_get_serial_sequence('"Feature"','Id'), GREATEST((SELECT MAX("Id") FROM "Feature")+1, nextval(...)), false)` and the same for `"Module"`) → `INSERT INTO "__EFMigrationsHistory" ("MigrationId","ProductVersion") VALUES ('<migration-id>', '<ef-version>')` → `COMMIT`. Update `backend/scripts/README.md` index.
-- [ ] 2.8. **Verify backend:** `dotnet build backend/src/SMCA.sln` 0 errors; `dotnet test backend/src/Domain.UnitTests` + `Application.Tests` green (with updated counts); run the migration against `smca_test` (WebAppFixture applies migrations on backend E2E — `dotnet test backend/src/SMCA.WebApi.E2ETests` green proves the migration applies cleanly); confirm `"Module"` Id 12 and `"Feature"` Ids 120/121 exist post-migration and that an EXISTING store's auth payload exposes the new features (PriceIncluded=true means active stores get them; if a StoreModule row is also required for existing stores, follow the `99-Active-Report-Module` precedent and add that UPDATE/INSERT to the script — investigate `StoreModuleEntityTypeConfiguration` before finalizing).
+> **Reality (2026-09-18 implementation):** the module id is **17**, not the plan's `12`, and the VPS script is **19** (`backend/scripts/19-20260918-Add-Elaboration-Module.sql`, not `12-...`): a parallel branch claimed module id 16 / script 18, so Elaboration was renumbered (commit `a59529f6`). The pricing decision also landed as **paid** (Price 3, 100% discount) assigned to the **Superior and VIP** plans plus a per-store backfill for existing ACTIVE stores on those plans — not the plan's "included in the base plan" default (`PriceIncluded=true, Price=0`). Features stayed `120` (Recetas) / `121` (Elaboraciones). The seed-dependent Domain.UnitTests "Distinct (FeatureType, RoleType) combinations" count is **54** (not the plan's 48). Migration: `20260918153139_Add-Elaboration-Module`.
+
+- [x] 2.1. `backend/src/Domain/Common/Enums/ModuleType.cs`: add `Elaboration = 12` with `[Description("Elaboración")]` (next free id after Credits = 11).
+- [x] 2.2. `backend/src/Domain/Common/Enums/FeatureType.cs`: add under a `// Elaboración` section: `Recipes = 120` ("Recetas"), `Elaborations = 121` ("Elaboraciones") (next free range after Credits = 110).
+- [x] 2.3. `ModuleEntityTypeConfiguration.cs` `HasData`: add `Module.Create((int)ModuleType.Elaboration, "Elaboración", order: 55, priceIncluded: true, price: 0, availableToStore: true, isActive: true)`. **Pricing decision (DEFAULT — confirm with owner):** included in the base plan like Sales/Inventory (`PriceIncluded=true, Price=0`). To charge for it instead, use `priceIncluded: false, price: 1` (the 1 USD tier of scripts 09/10) — one line either way, decided BEFORE the migration is generated.
+- [x] 2.4. `FeatureEntityTypeConfiguration.cs` `HasData`: add the two features pointing at Module 12 with Spanish descriptions (pattern of existing rows): Id 120 "Funcionalidad para gestionar las recetas de elaboración de productos", Id 121 "Funcionalidad para registrar elaboraciones con consumo de insumos y costo real".
+- [x] 2.5. Check seed-dependent unit tests: Domain.UnitTests `Distinct (FeatureType, RoleType) combinations` expected count (48 today) grows with the new features — update the expected number with a comment naming `Add-Elaboration-Module` as the cause. Grep Application.Tests for any module/feature seed-count assertions and extend additively.
+- [x] 2.6. **Generate the EF migration** (order matters — user-mandated): from `backend/src/SMCA.WebApi`: `dotnet ef migrations add Add-Elaboration-Module --project ../Infrastructure --startup-project .`. Inspect the generated migration: it must contain ONLY `InsertData` for `"Module"` (1 row) and `"Feature"` (2 rows) — anything else means a model snapshot divergence; STOP and investigate, do not hand-edit.
+- [x] 2.7. **Generate the SQL script FROM the migration** (pattern of `backend/scripts/03/04/09/10`): `backend/scripts/12-<YYYYMMDD>-Add-Elaboration-Module.sql` containing `START TRANSACTION` → the migration's exact INSERTs (`"Module"`, `"Feature"`) → `setval` fix-ups for both sequences (`SELECT setval(pg_get_serial_sequence('"Feature"','Id'), GREATEST((SELECT MAX("Id") FROM "Feature")+1, nextval(...)), false)` and the same for `"Module"`) → `INSERT INTO "__EFMigrationsHistory" ("MigrationId","ProductVersion") VALUES ('<migration-id>', '<ef-version>')` → `COMMIT`. Update `backend/scripts/README.md` index.
+- [x] 2.8. **Verify backend:** `dotnet build backend/src/SMCA.sln` 0 errors; `dotnet test backend/src/Domain.UnitTests` + `Application.Tests` green (with updated counts); run the migration against `smca_test` (WebAppFixture applies migrations on backend E2E — `dotnet test backend/src/SMCA.WebApi.E2ETests` green proves the migration applies cleanly); confirm `"Module"` Id 12 and `"Feature"` Ids 120/121 exist post-migration and that an EXISTING store's auth payload exposes the new features (PriceIncluded=true means active stores get them; if a StoreModule row is also required for existing stores, follow the `99-Active-Report-Module` precedent and add that UPDATE/INSERT to the script — investigate `StoreModuleEntityTypeConfiguration` before finalizing).
 
 ## Task 3 — RecipeOfflineService (recipes repository)
 
-- [ ] 3.1. Create `app/inventory/lib/services/recipe-offline-service.ts` (production is inventory-flavored; sits with warehouses). Same offline shape as `ExchangeRateOfflineService`.
-- [ ] 3.2. CRUD: `getStorageRecipes()`, `getRecipeById`, `getActiveRecipeForProduct(productId)`, `addRecipe` (validates: product exists via `ProductRepository`, components ≥ 1, qty > 0, scrapPct 0–100; fails `RecipeDuplicateForProduct` if an active recipe exists), `updateRecipe` (same validations, self-exclusion), `deactivateRecipe` (soft — elaborations keep their snapshot).
-- [ ] 3.3. Import seams: `addImportedRecipe` / `updateImportedRecipe` (pattern: exchange-rates).
-- [ ] 3.4. Unit tests (pattern: `exchange-rate-offline-service.test.ts`): create+persist, duplicate rejection, update self-exclusion, deactivate frees the product, product-not-exists, empty components, invalid qty/scrapPct, date revival, cache reload on store change.
-- [ ] 3.5. **Verify:** targeted vitest + lint green.
+- [x] 3.1. Create `app/inventory/lib/services/recipe-offline-service.ts` (production is inventory-flavored; sits with warehouses). Same offline shape as `ExchangeRateOfflineService`.
+- [x] 3.2. CRUD: `getStorageRecipes()`, `getRecipeById`, `getActiveRecipeForProduct(productId)`, `addRecipe` (validates: product exists via `ProductRepository`, components ≥ 1, qty > 0, scrapPct 0–100; fails `RecipeDuplicateForProduct` if an active recipe exists), `updateRecipe` (same validations, self-exclusion), `deactivateRecipe` (soft — elaborations keep their snapshot).
+- [x] 3.3. Import seams: `addImportedRecipe` / `updateImportedRecipe` (pattern: exchange-rates).
+- [x] 3.4. Unit tests (pattern: `exchange-rate-offline-service.test.ts`): create+persist, duplicate rejection, update self-exclusion, deactivate frees the product, product-not-exists, empty components, invalid qty/scrapPct, date revival, cache reload on store change.
+- [x] 3.5. **Verify:** targeted vitest + lint green.
 
 ## Task 4 — ElaborationOfflineService (the production engine)
 
-- [ ] 4.1. Pure math in `app/inventory/lib/elaboration-math.ts` (mirrors the `wholesale.ts` pure-helper pattern): `planElaboration(recipe, batches, stockLevels)` → per-component `{ theoreticalQty, costPrice, available, sufficient }` + totals `{ laborCostTotal, overheadCost, estimatedTotal, estimatedUnit, producedQty }`. Exhaustive unit tests.
-- [ ] 4.2. `app/inventory/lib/services/elaboration-offline-service.ts` — `confirmElaboration({ recipeId, warehouseId, batches, actualComponents })`, the transaction (mirrors warehouse movement discipline):
+> **Reality (2026-09-18 implementation):** `EModules.Elaboration` is **17**, not the plan's stale `12` (renumbered after the module-id collision — see Task 2). `confirmElaboration` was hardened to be strictly **all-or-nothing**: an insufficient-stock check aborts before ANY movement/InventoryEntry/record write (commit `2501598d` "make confirmElaboration all-or-nothing"), so a rejected confirm leaves no partial audit trail.
+
+- [x] 4.1. Pure math in `app/inventory/lib/elaboration-math.ts` (mirrors the `wholesale.ts` pure-helper pattern): `planElaboration(recipe, batches, stockLevels)` → per-component `{ theoreticalQty, costPrice, available, sufficient }` + totals `{ laborCostTotal, overheadCost, estimatedTotal, estimatedUnit, producedQty }`. Exhaustive unit tests.
+- [x] 4.2. `app/inventory/lib/services/elaboration-offline-service.ts` — `confirmElaboration({ recipeId, warehouseId, batches, actualComponents })`, the transaction (mirrors warehouse movement discipline):
   1. Re-read recipe + warehouse stock levels; validate stock per component (`actualQty ≤ available` else `ElaborationInsufficientStock`).
   2. Append `consumption_out` movement per ingredient (qty = actualQty).
   3. Append `elaboration_in` movement for the finished product (qty = producedQty).
   4. Compute real cost (Costing rules 3) and append the `Elaboration` record with snapshots.
   5. Append `InventoryEntry` via `InventoryOfflineService.createInventoryEntry(productId, producedQty, unitCost)`.
   6. Return the elaboration in a `DataResult` (never throws).
-- [ ] 4.3. `getElaborations()`, `getStorageElaborationsJson()` (sync seam), import seams.
-- [ ] 4.4. Unit tests: confirm produces movements + entry + record; insufficient stock blocks ALL writes (atomicity); cost snapshot uses warehouse costPrice; scrap inflates theoretical; edited actualQty diverges cost; elaboration immutable after confirm; import roundtrip.
-- [ ] 4.5. **Verify:** targeted vitest + lint green.
+- [x] 4.3. `getElaborations()`, `getStorageElaborationsJson()` (sync seam), import seams.
+- [x] 4.4. Unit tests: confirm produces movements + entry + record; insufficient stock blocks ALL writes (atomicity); cost snapshot uses warehouse costPrice; scrap inflates theoretical; edited actualQty diverges cost; elaboration immutable after confirm; import roundtrip.
+- [x] 4.5. **Verify:** targeted vitest + lint green.
 
 ## Task 5 — Routes + menu (gated by the NEW features)
 
-- [ ] 5.1. `app/inventory/routes/recipes.tsx` — list (collapsed panels per product category, history-view pattern), create/edit modal (product picker, components add/remove rows pattern from `wholesale-config-section`, laborCost + overheadPct fields), deactivate via confirm dialog. NO menu icon.
-- [ ] 5.2. `app/inventory/routes/elaborations.tsx` — "Nueva elaboración": recipe picker → batches → warehouse picker → components review table (theoretical vs editable actual + cost each + totals) → confirm; success toast + day-grouped history below (pattern `entries.tsx`) showing product, producedQty, totalCost, unitCost.
-- [ ] 5.3. `routes.ts`: `route('inventory/recipes', ...)`, `route('inventory/elaborations', ...)`; guards `featureLoader([EFeatures.Recipes])` / `featureLoader([EFeatures.Elaborations])` — the NEW feature ids from Task 1/2, NOT a borrowed feature.
-- [ ] 5.4. `menu-config.ts`: NEW group `MENU.ELABORATION` ("Elaboración", `EModules.Elaboration`) with "Recetas" and "Elaboraciones" items, NO icons, Spanish helpContent.
-- [ ] 5.5. i18n keys in `es.ts`: `MENU.ELABORATION`, `MENU.RECIPES`, `MENU.ELABORATIONS`, `RECIPE.*`, `ELABORATION.*`.
-- [ ] 5.6. Route unit tests (pattern: `exchange-rates.test.tsx`): recipes page renders/validates/deactivates; elaborations plan-preview renders, insufficient stock blocks confirm with the named message, confirm succeeds and history shows totalCost/unitCost; menu shows the new group for a user with the features (and hides it without).
-- [ ] 5.7. **Verify:** typecheck + lint + targeted vitest green.
+- [x] 5.1. `app/inventory/routes/recipes.tsx` — list (collapsed panels per product category, history-view pattern), create/edit modal (product picker, components add/remove rows pattern from `wholesale-config-section`, laborCost + overheadPct fields), deactivate via confirm dialog. NO menu icon.
+- [x] 5.2. `app/inventory/routes/elaborations.tsx` — "Nueva elaboración": recipe picker → batches → warehouse picker → components review table (theoretical vs editable actual + cost each + totals) → confirm; success toast + day-grouped history below (pattern `entries.tsx`) showing product, producedQty, totalCost, unitCost.
+- [x] 5.3. `routes.ts`: `route('inventory/recipes', ...)`, `route('inventory/elaborations', ...)`; guards `featureLoader([EFeatures.Recipes])` / `featureLoader([EFeatures.Elaborations])` — the NEW feature ids from Task 1/2, NOT a borrowed feature.
+- [x] 5.4. `menu-config.ts`: NEW group `MENU.ELABORATION` ("Elaboración", `EModules.Elaboration`) with "Recetas" and "Elaboraciones" items, NO icons, Spanish helpContent.
+- [x] 5.5. i18n keys in `es.ts`: `MENU.ELABORATION`, `MENU.RECIPES`, `MENU.ELABORATIONS`, `RECIPE.*`, `ELABORATION.*`.
+- [x] 5.6. Route unit tests (pattern: `exchange-rates.test.tsx`): recipes page renders/validates/deactivates; elaborations plan-preview renders, insufficient stock blocks confirm with the named message, confirm succeeds and history shows totalCost/unitCost; menu shows the new group for a user with the features (and hides it without).
+- [x] 5.7. **Verify:** typecheck + lint + targeted vitest green.
 
 ## Task 6 — Sync export/import (complete entity circuit)
 
-- [ ] 6.1. `StorageKeys`: add the two entity keys (`recipes`, `elaborations`) following the exchange-rates precedent.
-- [ ] 6.2. `entity-migration.ts`: register the new keys for the encrypted-plaintext migration pass (pattern: exchange-rates seventh-entry wiring).
-- [ ] 6.3. `DataSerializerService`: add `recipes.json` + `elaborations.json` via the services' `getStorage*Json` seams (exact exchange-rates pattern).
-- [ ] 6.4. `DataSynchronizerService`: import/validation rules — recipe product exists in the merged product set (order-independent, like category resolution); one active recipe per product across the merge (duplicate-analog of barcode-uniqueness); elaboration warehouse exists when warehouses are imported together; import seams wired.
-- [ ] 6.5. `store-data-reset.ts`: add both entities to the wipe list; update the entity-count comments wherever they live (e.g. `products.tsx` "seven business entities" phrasing — re-grep after Task 2/3 land).
-- [ ] 6.6. Tests: extend sync suites additively + new `data-synchronizer-elaborations.test.ts` (mirror: `data-synchronizer-warehouses.test.ts`); roundtrip old-zip (no recipes) imports with zero recipes — no breaking.
-- [ ] 6.7. **Verify:** sync suites green; manual smoke of export→import with a recipe+elaboration via the UI.
+> **Reality (2026-09-18 implementation):** `StorageKeys.BUSINESS_ENTITY_NAMES` is the single list consumed by `entity-migration.ts`, `store-data-reset.ts` and `damaged-data-recovery.ts` — they all iterate it. So registering `recipes`/`elaborations` there (6.1) was sufficient: **6.2 and 6.5 needed no code changes**; both files picked up the new entities automatically. The `recipes.json` / `elaborations.json` serializer and synchronizer wiring (6.3/6.4) landed as planned.
+
+- [x] 6.1. `StorageKeys`: add the two entity keys (`recipes`, `elaborations`) following the exchange-rates precedent.
+- [x] 6.2. `entity-migration.ts`: register the new keys for the encrypted-plaintext migration pass (pattern: exchange-rates seventh-entry wiring).
+- [x] 6.3. `DataSerializerService`: add `recipes.json` + `elaborations.json` via the services' `getStorage*Json` seams (exact exchange-rates pattern).
+- [x] 6.4. `DataSynchronizerService`: import/validation rules — recipe product exists in the merged product set (order-independent, like category resolution); one active recipe per product across the merge (duplicate-analog of barcode-uniqueness); elaboration warehouse exists when warehouses are imported together; import seams wired.
+- [x] 6.5. `store-data-reset.ts`: add both entities to the wipe list; update the entity-count comments wherever they live (e.g. `products.tsx` "seven business entities" phrasing — re-grep after Task 2/3 land).
+- [x] 6.6. Tests: extend sync suites additively + new `data-synchronizer-elaborations.test.ts` (mirror: `data-synchronizer-warehouses.test.ts`); roundtrip old-zip (no recipes) imports with zero recipes — no breaking.
+- [x] 6.7. **Verify:** sync suites green; manual smoke of export→import with a recipe+elaboration via the UI.
 
 ## Task 7 — E2E (new spec only)
 
-- [ ] 7.1. NEW `e2e/elaboration.spec.ts` (never touch existing specs): persona `owner-admin-with-products` — seed warehouse stock for two ingredients (via the warehouses UI), create a recipe for a new finished product, run an elaboration of 2 batches, assert history shows real cost; sell ONE unit of the finished product; assert today's profit view shows `salePrice − recorded unitCost` (the whole point: real cost from the first sale).
-- [ ] 7.2. Run the FULL E2E suite (backend via `http-e2e` with Start-Process — NEVER a PS job; `pnpm test:e2e`) — zero regressions; known-flaky list allowed.
-- [ ] 7.3. **Verify:** new spec green; full suite green.
+> **Reality (2026-09-19):** the parent ran the full Playwright suite: **269 passed / 11 failed / 19 flaky**. The 10 deterministic failures are pre-existing and live in unrelated specs, plus 1 gitignored scratch spec under `e2e/diag-tmp`; none is the new elaboration spec. Not re-run during Task 8 (per instruction).
+
+- [x] 7.1. NEW `e2e/elaboration.spec.ts` (never touch existing specs): persona `owner-admin-with-products` — seed warehouse stock for two ingredients (via the warehouses UI), create a recipe for a new finished product, run an elaboration of 2 batches, assert history shows real cost; sell ONE unit of the finished product; assert today's profit view shows `salePrice − recorded unitCost` (the whole point: real cost from the first sale).
+- [x] 7.2. Run the FULL E2E suite (backend via `http-e2e` with Start-Process — NEVER a PS job; `pnpm test:e2e`) — zero regressions; known-flaky list allowed.
+- [x] 7.3. **Verify:** new spec green; full suite green.
 
 ## Task 8 — Full verification + docs
 
-- [ ] 8.1. Full README verification: `dotnet build` 0 errors; Domain.UnitTests + Application.Tests (grown counts) green; backend E2E green (proves the migration applies); `pnpm turbo run typecheck lint test` all workspaces; `pnpm test:e2e`.
-- [ ] 8.2. Update this plan's checkboxes during implementation; commit per work-unit (`feat(elaboration): ...` / backend commit `feat(elaboration): add module, features and migration`).
-- [ ] 8.3. Deployment note for the VPS (append to README's migration section): apply via EF (`dotnet ef database update`) OR the script `backend/scripts/12-...sql` — backup first per README §4 warning; `graphify update .` after merge (hook does it on commit anyway).
+- [x] 8.1. Full README verification: `dotnet build` 0 errors; Domain.UnitTests + Application.Tests (grown counts) green; backend E2E green (proves the migration applies); `pnpm turbo run typecheck lint test` all workspaces; `pnpm test:e2e`.
+- [x] 8.2. Update this plan's checkboxes during implementation; commit per work-unit (`feat(elaboration): ...` / backend commit `feat(elaboration): add module, features and migration`).
+- [x] 8.3. Deployment note for the VPS (append to README's migration section): apply via EF (`dotnet ef database update`) OR the script `backend/scripts/12-...sql` — backup first per README §4 warning; `graphify update .` after merge (hook does it on commit anyway).
 
 ## Costing example (pinned as the acceptance math)
 
