@@ -68,3 +68,48 @@ Los 3 specs pasan hoy en `dev`, cada uno con su causa raíz propia:
 | `users-crud.spec.ts` (Test 2) | **Bug de producción backend**: cláusula circular `u.StoreUser.User != null && u.StoreUser.User.IsActive` en `UserRepository.GetAllUsersByStoreIdIncludingStoreAndRolesAsync` exigía `IsActive==true` incondicionalmente — el GET con `includeInactive=true` nunca devolvía al usuario desactivado, así que tras el DELETE la lista no mostraba el card con "Activar" y el test moría en `userCardActionMenu` | `fix(users)` `ab734930` — cláusula removida (redundante con `(includeInactive \|\| u.IsActive)`) + test nuevo `StoreUsersByStoreIncludeInactiveTests` |
 
 Verificación 2026-09-14 en `dev` (merge `df35d0ff` con main): los 3 specs corren verdes contra backend `http-e2e` real (`smca_test`), teardown limpio. Los fixes se diagnosticaron con los specs temporales `e2e/diag-tmp/diag2..diag9` (gitignored, nunca commitear).
+
+## Corrida completa (2026-09-19, rama `dev`, HEAD del trabajo del módulo de elaboración)
+
+**Status**: ABIERTO — 10 fallos deterministas preexistentes + 1 scratch ya resuelto por borrado. Pendiente de decisión, no bloqueante para el módulo de elaboración.
+
+Corrida completa del suite de Playwright del frontend (`pnpm test:e2e`): **269 passed / 11 failed / 19 flaky / 10 did not run** (≈12.6 min, exit 1). Los 10 fallos que el documento registraba originalmente **NO** son los que fallaron en esta corrida.
+
+### Los 10 specs fallidos (deterministas)
+
+Fallan idéntico al re-ejecutarse en aislamiento, en los 3 reintentos, y sin 429 en el log del backend. Rutas repo-relativas desde `frontend-react/e2e/`:
+
+| Spec (repo-relativo) | Línea |
+|---|---|
+| `frontend-react/e2e/configurations.spec.ts` | 20 |
+| `frontend-react/e2e/csv-import-duplicate-reimport.spec.ts` | 89 |
+| `frontend-react/e2e/dashboard-metrics-values.spec.ts` | 60 |
+| `frontend-react/e2e/edit-delete-order.spec.ts` | 108 |
+| `frontend-react/e2e/mayorista-sale.spec.ts` | 201 |
+| `frontend-react/e2e/orders-history.spec.ts` | 113 |
+| `frontend-react/e2e/owner-plan-change-dialog.spec.ts` | 67 |
+| `frontend-react/e2e/owner-store-create.spec.ts` | 91 |
+| `frontend-react/e2e/store-plan-lock-regression.spec.ts` | 149 |
+| `frontend-react/e2e/wholesale-cart-floor.spec.ts` | 160 |
+
+### El 11º fallo: scratch spec — RESUELTO por borrado
+
+El fallo restante era un spec de scratch **gitignored** bajo `frontend-react/e2e/diag-tmp/` que `playwright.config.ts` no excluía. La carpeta completa (8 archivos, untracked y gitignored — ver `.gitignore:173`) ya fue **eliminada** en esta sesión. Se registra como **resuelto por borrado**, no como un fallo abierto.
+
+### Evidencia de que NO los causó el módulo de elaboración
+
+- Ninguno de los 10 specs, ni ningún support file E2E existente, fue modificado por los commits del módulo: el módulo solo **AGREGÓ** `e2e/elaboration.spec.ts` y `e2e/support/elaboration-flow.ts` (ambos net-new, sin tocar nada preexistente).
+- Ninguna clave i18n agregada por el módulo está duplicada en `es.ts` (una clave duplicada habría sobrescrito el valor previo). Verificado: las 54 claves agregadas por `ddaadcfb` aparecen una sola vez.
+- `owner-plan-change-dialog.spec.ts:67` (aserción en la línea 87) espera el texto `"Plan Gratis"`, que **no** es lo que renderiza la card. La app usa la clave `STORES.PLAN.DISPLAY` = `"Plan: {plan}"` (`owner-store-card.tsx:83`), o sea `"Plan: Gratis"`. El texto literal `"Plan Gratis"` sí existe, pero bajo otra clave (`STORES.FREE_PLAN`), que la card de owner no usa. Los tests preexistentes confirman el render real: `my-stores.test.tsx:367` y `owner-store-card.test.tsx:55` esperan `"Plan: Gratis"`, y el spec que pasa `owner-stores.spec.ts:292` también. La expectativa de este spec está **obsoleta**.
+
+### Lo que NO se hizo (honestidad del registro)
+
+- Estos specs **nunca** se corrieron contra un worktree pre-módulo. Los 9 restantes (todos menos el de i18n obsoleto, ya explicado) son **"muy probablemente preexistentes"**, pero **no están probados** contra un commit anterior. No afirmar prueba donde no la hay.
+
+### Entrada backend/DB — NO es un fallo de Playwright
+
+El único fallo del suite E2E de backend en esta sesión es un asunto **distinto** y no debe confundirse con lo anterior:
+
+- Test: `SMCA.WebApi.E2ETests.Plans.StorePlanCatalogTests.StorePlanModule_seed_matches_documented_plan_matrix`.
+- Causa: la base **compartida** `smca_test` tiene una migración fuera de árbol (`20260918131144_Add-MultiPayments-Module-And-Payment-Mirror`, módulo 16) aplicada por un clon/rama paralelo, que este checkout **no** tiene en código.
+- Remedio: **reconstruir `smca_test` desde este checkout** (aplicar las migraciones de este checkout) antes de correr el suite de backend.
