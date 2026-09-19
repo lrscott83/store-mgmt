@@ -19,13 +19,15 @@ skills `work-unit-commits` / `chained-pr` por registry antes de planear PRs.
     posicional (filas/inputs/badges por índice → insumos duplicados independientes); el efecto de invalidación limpia
     también el error previo; + tests del camino real editado y de la rama de edición de recetas.
   - `4c69992c`: el merge de recetas resuelve "una activa por producto" sobre el **estado final** del lote (order-independent);
-    el merge de elaboraciones degrada a no-op cuando no se inyectó el servicio de almacenes; + tests break-only con fila previa.
+    el merge de elaboraciones degradaba a no-op cuando faltaba el servicio de almacenes (**revertido después**, ver `f413c01d`:
+    ahora devuelve un error explícito `ElaborationsMissingWarehouseService`); + tests break-only con fila previa.
   - Verificado: `app/inventory` **467/467**, `app/sync` **143/143**, typecheck **0**, lint **0**. (El baseline de sync es **139**,
     no 147: 147 incluía `store-data-reset.test.ts` de otra carpeta.)
   - Review `review-fad9d149f17dced5`: **APPROVED + acknowledged** (`authority: burned`). Advisories NUEVOS:
-    `R3-WAREHOUSE-NOOP` (WARNING — el fix de B2 hace que, sin `warehouseService`, un import no vacío de elaboraciones se
-    **descarte en silencio** con `succeeded: true`; el reviewer sostiene que un error de configuración debería surfacearse) y
-    `R3-CLAMP-SILENT` (SUGGESTION — el clamp a 0 no avisa al usuario y el input sigue mostrando el negativo).
+    `R3-WAREHOUSE-NOOP` (WARNING — **RESUELTO** en `f413c01d`: sin `warehouseService`, un import no vacío de elaboraciones ya
+    NO se descarta en silencio; devuelve `Synchronizer.ElaborationsMissingWarehouseService`, error explícito que nombra la
+    dependencia) y
+    `R3-CLAMP-SILENT` (SUGGESTION — **ABIERTO**: el clamp a 0 no avisa al usuario y el input sigue mostrando el negativo).
   - **Residuales conocidos (no resueltos)**: (a) el SERVICIO colapsa `actualComponents` por `productId` (last-wins) → dos filas
     duplicadas con cantidades distintas guardan 2×la última y el preview puede diferir del costo guardado (requiere guard en el
     formulario de recetas o cambio de servicio); (b) el all-or-nothing total de un lote inválido no se implementó porque un test
@@ -44,6 +46,12 @@ skills `work-unit-commits` / `chained-pr` por registry antes de planear PRs.
   receta vieja con duplicados se puede ver y corregir. Verificado: `app/inventory` **469/469**, typecheck 0, lint 0.
   Review `review-e5c615e9c4d593cc`: **APPROVED con CERO hallazgos** (`authority: burned`) — la única revisión del módulo sin advisories.
   Cierra el residual de "preview ≠ costo guardado" para datos NUEVOS (el servicio sigue colapsando duplicados si existieran de antes).
+- **Advisory `R3-WAREHOUSE-NOOP`: RESUELTO** — commit `f413c01d` (2 archivos, +31/−12; sync **143/143**, inventory **469/469**).
+  El merge de elaboraciones ya no descarta en silencio cuando falta el servicio de almacenes: devuelve el error explícito
+  `Synchronizer.ElaborationsMissingWarehouseService` (nombra la dependencia) sin escribir nada; los no-op legítimos (sin
+  servicio de elaboraciones / lote vacío) y la regla de almacén cuando sí está inyectado quedan igual. Review
+  `review-9672680dbe92b66f`: **APPROVED + acknowledged** (`authority: burned`); su único hallazgo (SUGGESTION) fue la
+  **deriva de este mismo tracker** —describía el no-op viejo y seguía listando el advisory como abierto—, corregida acá.
 - **Backlog post-módulo — ítem 3 original (smoke manual UI export→import)**: lo hace el usuario.
 - **T8: CERRADA** — commit `7591075a` (solo docs): nota de despliegue en el README (§4: EF `database update` o script
   `19-20260918-Add-Elaboration-Module.sql`, backup primero, `graphify update .` tras el merge) + checkboxes del plan (T1–T7)
