@@ -1,8 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { Currency, EModules, OrderErrors, PaymentType, OrderType } from '@store-mgmt/domain';
+import {
+  Currency,
+  EModules,
+  OrderErrors,
+  PaymentType,
+  OrderType,
+  SalePaymentMethod,
+} from '@store-mgmt/domain';
 import type {
   BaseResponseModel,
   Order,
+  OrderPayment,
   Product,
   InventoryEntryCost,
   OrderItem,
@@ -138,6 +146,20 @@ function makeOrder(overrides: Partial<Order> = {}): Order {
     createdByName: 'test',
     updatedDate: undefined,
     updatedByName: undefined,
+    ...overrides,
+  };
+}
+
+function makePayment(overrides: Partial<OrderPayment> = {}): OrderPayment {
+  return {
+    method: SalePaymentMethod.Efectivo,
+    currency: Currency.CUP,
+    amount: 1000,
+    rateApplied: 1,
+    rateMethod: null,
+    rateCurrency: null,
+    rateEffectiveFrom: null,
+    amountInOrderCurrency: 1000,
     ...overrides,
   };
 }
@@ -1673,6 +1695,138 @@ describe('OrderOfflineService', () => {
 
       expect(result.succeeded).toBe(true);
       expect(findOrder('imported-currency')?.currency).toBe(Currency.MLC);
+    });
+  });
+
+  // multipayments (plan 2026-09-18, T9): Order.payments[] is an optional, additive
+  // persistence field. Legacy orders (no `payments`) must keep reading without error or
+  // required backfill; a multi-payment order round-trips through the revive path.
+  describe('ORD-21: payments persistence (multipayments)', () => {
+    it('persists the exact payments[] and keeps the legacy fields identical to the no-payments path', async () => {
+      const items = makeCartItems([{ product: makeProduct({ price: 5 }), quantity: 2 }]);
+      const payments: OrderPayment[] = [
+        makePayment({ amount: 600, amountInOrderCurrency: 600 }),
+        makePayment({
+          method: SalePaymentMethod.Transferencia,
+          currency: Currency.USD,
+          amount: 400,
+          rateApplied: 1,
+          amountInOrderCurrency: 400,
+        }),
+      ];
+
+      const withPayments = unwrap(
+        await service.createOrder(
+          items,
+          OrderType.Normal,
+          false,
+          PaymentType.Efectivo,
+          undefined,
+          '',
+          undefined,
+          payments,
+        ),
+      );
+      const withoutPayments = unwrap(
+        await service.createOrder(
+          items,
+          OrderType.Normal,
+          false,
+          PaymentType.Efectivo,
+          undefined,
+          '',
+        ),
+      );
+
+      expect(withPayments.payments).toEqual(payments);
+      expect(withoutPayments.payments).toBeUndefined();
+
+      // The legacy fields must be computed identically with and without payments.
+      expect({
+        total: withPayments.total,
+        itemsCount: withPayments.itemsCount,
+        paymentType: withPayments.paymentType,
+        salePaymentMethod: withPayments.salePaymentMethod,
+        percent: withPayments.percent,
+        tax: withPayments.tax,
+        currency: withPayments.currency,
+      }).toEqual({
+        total: withoutPayments.total,
+        itemsCount: withoutPayments.itemsCount,
+        paymentType: withoutPayments.paymentType,
+        salePaymentMethod: withoutPayments.salePaymentMethod,
+        percent: withoutPayments.percent,
+        tax: withoutPayments.tax,
+        currency: withoutPayments.currency,
+      });
+
+      // Persisted exactly on disk, and a legacy order keeps no `payments` key at all.
+      const stored = JSON.parse(service.getOrdersJson()) as Order[];
+      expect(stored.find((o) => o.id === withPayments.id)?.payments).toEqual(payments);
+      const storedWithout = stored.find((o) => o.id === withoutPayments.id);
+      expect(storedWithout).toBeDefined();
+      expect(storedWithout).not.toHaveProperty('payments');
+    });
+
+    it('reads a legacy order without payments without error (no required backfill)', () => {
+      seedOrders(storeId, [makeOrder({ id: 'legacy-no-payments' })]);
+      const fresh = new OrderOfflineService(storeId);
+
+      let orders: Order[] = [];
+      expect(() => {
+        orders = fresh.getStorageOrders();
+      }).not.toThrow();
+
+      const legacy = orders.find((o) => o.id === 'legacy-no-payments');
+      expect(legacy).toBeDefined();
+      expect(legacy?.payments).toBeUndefined();
+    });
+
+    it('round-trips a multi-payment order through revive (frozen rate moment revived to Date)', async () => {
+      const items = makeCartItems([{ product: makeProduct({ price: 5 }), quantity: 2 }]);
+      const payments: OrderPayment[] = [
+        makePayment({
+          method: SalePaymentMethod.Transferencia,
+          currency: Currency.USD,
+          amount: 500,
+          rateApplied: 700.123456,
+          rateMethod: SalePaymentMethod.Transferencia,
+          rateCurrency: Currency.USD,
+          rateEffectiveFrom: new Date('2026-09-18T00:00:00.000Z'),
+          amountInOrderCurrency: 350061.73,
+        }),
+      ];
+
+      const created = unwrap(
+        await service.createOrder(
+          items,
+          OrderType.Normal,
+          false,
+          PaymentType.Efectivo,
+          undefined,
+          '',
+          undefined,
+          payments,
+        ),
+      );
+
+      const fresh = new OrderOfflineService(storeId);
+      const stored = fresh.getOrderById(created.id);
+
+      expect(stored?.payments).toHaveLength(1);
+      expect(stored?.payments?.[0]).toMatchObject({
+        method: SalePaymentMethod.Transferencia,
+        currency: Currency.USD,
+        amount: 500,
+        rateApplied: 700.123456,
+        rateMethod: SalePaymentMethod.Transferencia,
+        rateCurrency: Currency.USD,
+        amountInOrderCurrency: 350061.73,
+      });
+      expect(stored?.payments?.[0].rateEffectiveFrom).toBeInstanceOf(Date);
+      expect((stored?.payments?.[0].rateEffectiveFrom as Date).toISOString()).toBe(
+        '2026-09-18T00:00:00.000Z',
+      );
     });
   });
 

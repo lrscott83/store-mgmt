@@ -1,4 +1,4 @@
-import type { BaseResponseModel, Order, OrderItem } from '@store-mgmt/domain';
+import type { BaseResponseModel, Order, OrderItem, OrderPayment } from '@store-mgmt/domain';
 import {
   DataResult,
   DEFAULT_CURRENCY,
@@ -442,6 +442,12 @@ export class OrderOfflineService {
    * (`details || (isCredit ? client : '')`) — itself unchanged by this rename — still
    * compiles positionally; every value ever supplied at these positions is identical to
    * what Angular's own callers always pass.
+   *
+   * MultiPayments (plan 2026-09-18): `payments` is a TRAILING optional param so every
+   * legacy call site stays green. When a non-empty list is supplied it is persisted on
+   * the order (audit trail of the multi-payment sale); the legacy fields
+   * (`paymentType`/`salePaymentMethod`/`percent`/`tax`/`total`/`currency`) are computed
+   * exactly as before, with or without `payments`.
    */
   createOrder(
     cartItems: CartItem[],
@@ -451,6 +457,7 @@ export class OrderOfflineService {
     details?: string,
     client: string = '',
     salePaymentMethod?: SalePaymentMethod,
+    payments?: OrderPayment[],
   ): Promise<BaseResponseModel<Order>> {
     const now = new Date();
     const orderId = generateId();
@@ -534,6 +541,9 @@ export class OrderOfflineService {
       salePaymentMethod: resolvedMethod.method,
       percent: pricing.percent,
       tax: pricing.tax,
+      // MultiPayments (plan 2026-09-18): only persist a non-empty payment list, so
+      // legacy / single-payment sales keep a payment-less order shape.
+      ...(payments && payments.length > 0 ? { payments } : {}),
       createdDate: now,
       createdByName: getCurrentUserLogin(),
       updatedDate: undefined,
@@ -718,6 +728,18 @@ export class OrderOfflineService {
     }
     if (revived.percent === undefined || revived.percent === null) revived.percent = 0;
     if (revived.tax === undefined || revived.tax === null) revived.tax = 0;
+    // MultiPayments (plan 2026-09-18): legacy orders have no `payments` — leave it
+    // absent (no required backfill). When present, revive the frozen rate moment so a
+    // JSON round-trip keeps `rateEffectiveFrom` a Date instead of a raw string.
+    if (Array.isArray(revived.payments)) {
+      revived.payments = (revived.payments as OrderPayment[]).map((payment) => {
+        const revivedPayment = { ...payment } as Record<string, unknown>;
+        if (typeof revivedPayment.rateEffectiveFrom === 'string') {
+          revivedPayment.rateEffectiveFrom = new Date(revivedPayment.rateEffectiveFrom);
+        }
+        return revivedPayment;
+      });
+    }
     return revived as unknown as Order;
   }
 }
