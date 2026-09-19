@@ -28,8 +28,10 @@ namespace SMCA.WebApi.E2ETests.Stores;
 ///        + feature 43: visible in DB (StoreModule + StoreRoleFeature) and in
 ///        /me (StoreModuleIds contains 15, FeatureIds contains 43).
 ///   MM2  Changing the plan to Superior activates 15/43 through the SAME
-///        runtime chain (change-plan → StoreModules → /me).
-///   MM3  Changing the plan to VIP activates 15/43 too.
+    ///        runtime chain (change-plan → StoreModules → /me). Since the
+    ///        2026-09-18 caller matrix, the flip runs as SuperAdmin (Superior/VIP
+    ///        are SuperAdmin-reserved); the owner-facing /me still observes it.
+    ///   MM3  Changing the plan to VIP activates 15/43 too (same SuperAdmin flip).
 ///   MM4  Changing back Superior → Pago STRIPS 15 (and its 43 grant) — the
 ///        module must follow the plan in both directions.
 ///   MM5  Backfill parity: a pre-existing Superior store seeded exactly like
@@ -171,10 +173,22 @@ public sealed class MultiMonedasModuleTests
     public async Task MM2_change_plan_to_superior_activates_multimonedas_on_me()
     {
         var seeded = await SeedOwnerAdminStoreAsync(planId: (int)StorePlanType.Pago);
+        var saLogin = $"sa-mm2-{Guid.NewGuid():N}@test.com";
+        var saId = await DbTestHelpers.SeedSuperAdminAsync(_f, saLogin, "Password123");
         try
         {
             var client = OwnerClient(_f, seeded);
-            var r = await client.PostAsJsonAsync(
+
+            // New-rule pin: the owner targeting Superior is 403 (SuperAdmin-reserved plan).
+            var denied = await client.PostAsJsonAsync(
+                $"/api/v1/stores/{seeded.StoreId}/change-plan", PlanBody((int)StorePlanType.Superior));
+            denied.StatusCode.Should().Be(HttpStatusCode.Forbidden,
+                "Superior is SuperAdmin-reserved (caller matrix)");
+
+            // The activation chain itself (plan change → module 15 + feature 43 on /me,
+            // SAME owner token) is exercised by the SuperAdmin performing the flip.
+            var saClient = DbTestHelpers.AuthedClient(_f, saId, saLogin);
+            var r = await saClient.PostAsJsonAsync(
                 $"/api/v1/stores/{seeded.StoreId}/change-plan", PlanBody((int)StorePlanType.Superior));
             r.StatusCode.Should().Be(HttpStatusCode.OK);
 
@@ -187,6 +201,7 @@ public sealed class MultiMonedasModuleTests
         finally
         {
             await AuthzSeed.CleanupStoreGraphAsync(_f, seeded.StoreId, seeded.UserId);
+            await DbTestHelpers.CleanupUserAsync(_f, saId);
         }
     }
 
@@ -194,10 +209,22 @@ public sealed class MultiMonedasModuleTests
     public async Task MM3_change_plan_to_vip_activates_multimonedas_on_me()
     {
         var seeded = await SeedOwnerAdminStoreAsync(planId: (int)StorePlanType.Pago);
+        var saLogin = $"sa-mm3-{Guid.NewGuid():N}@test.com";
+        var saId = await DbTestHelpers.SeedSuperAdminAsync(_f, saLogin, "Password123");
         try
         {
             var client = OwnerClient(_f, seeded);
-            var r = await client.PostAsJsonAsync(
+
+            // New-rule pin: the owner targeting VIP is 403 (SuperAdmin-reserved plan).
+            var denied = await client.PostAsJsonAsync(
+                $"/api/v1/stores/{seeded.StoreId}/change-plan", PlanBody((int)StorePlanType.VIP));
+            denied.StatusCode.Should().Be(HttpStatusCode.Forbidden,
+                "VIP is SuperAdmin-reserved (caller matrix)");
+
+            // The activation chain itself (plan change → module 15 + feature 43 on /me,
+            // SAME owner token) is exercised by the SuperAdmin performing the flip.
+            var saClient = DbTestHelpers.AuthedClient(_f, saId, saLogin);
+            var r = await saClient.PostAsJsonAsync(
                 $"/api/v1/stores/{seeded.StoreId}/change-plan", PlanBody((int)StorePlanType.VIP));
             r.StatusCode.Should().Be(HttpStatusCode.OK);
 
@@ -209,6 +236,7 @@ public sealed class MultiMonedasModuleTests
         finally
         {
             await AuthzSeed.CleanupStoreGraphAsync(_f, seeded.StoreId, seeded.UserId);
+            await DbTestHelpers.CleanupUserAsync(_f, saId);
         }
     }
 

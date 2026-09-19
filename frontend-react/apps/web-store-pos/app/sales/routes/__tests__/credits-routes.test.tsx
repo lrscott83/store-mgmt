@@ -108,6 +108,120 @@ function makeCredit(overrides: Partial<SaleCredit> = {}): SaleCredit {
 import { TodaySaleCreditsPage } from '../today-credits';
 import { SaleCreditsPage } from '../credits';
 
+describe('TodaySaleCreditsPage — header y colores (gear-menu recorte + amarillito)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  function seedTodayCredit(overrides: Partial<SaleCredit> = {}) {
+    vi.mocked(SaleCreditOfflineService).mockImplementation(
+      () =>
+        ({
+          getSaleCreditsInDayObservable: vi.fn().mockReturnValue(creditsResponse([makeCredit({ total: 40, ...overrides })])),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        }) as any,
+    );
+  }
+
+  // BUG de recorte (reproducido en preview móvil 440x784): el menú ⚙ de un crédito se
+  // pinta DENTRO del wrapper overflow-x-auto de la tabla (32px de alto) y el navegador
+  // recorta el popup: el hit-test sobre el menú abierto devolvía el FOOTER de la página.
+  // Fix: el menú no debe vivir bajo ningún ancestro con overflow distinto de visible.
+  it('TC-CLIP: el menú de acciones no vive bajo ningún ancestro con overflow recortable', async () => {
+    seedTodayCredit();
+    render(
+      <Wrapper>
+        <TodaySaleCreditsPage />
+      </Wrapper>,
+    );
+
+    fireEvent.click(await screen.findByTestId(/^sale-credit-actions-toggle-/));
+    const menu = screen.getByRole('menu');
+    let node: HTMLElement | null = menu.parentElement;
+    while (node) {
+      const s = getComputedStyle(node);
+      // jsdom devuelve '' para propiedades no declaradas (el default es visible);
+      // el navegador real devuelve 'visible'.
+      const ov = s.overflow || 'visible';
+      const ovX = s.overflowX || 'visible';
+      const ovY = s.overflowY || 'visible';
+      expect(
+        ov === 'visible' && ovX === 'visible' && ovY === 'visible',
+        `ancestro <${node.tagName.toLowerCase()} class="${node.className}"> recorta el menú (overflow=${ov})`,
+      ).toBe(true);
+      node = node.parentElement;
+    }
+  });
+
+  // Header pedido por el usuario: «Créditos del día (n)» a la izquierda (n = TODOS los
+  // créditos del día) y el valor total a la derecha.
+  it('TC-HEAD: el header muestra «Créditos del día (n)» contando TODOS los créditos y el total a la derecha', async () => {
+    seedTodayCredit({ total: 40 });
+    render(
+      <Wrapper>
+        <TodaySaleCreditsPage />
+      </Wrapper>,
+    );
+
+    const header = () => document.querySelector('[data-slot="card-header"]') as HTMLElement;
+    await screen.findByText('Ana');
+
+    // Crédito UNPAID de 40 → n=1, total $40.
+    expect(within(header()).getByText('(1)')).toBeInTheDocument();
+    expect(within(header()).getByText('$40')).toBeInTheDocument();
+
+    // El título se mantiene «Créditos del día» (protegido por E2E).
+    expect(within(header()).getByText(esMessages['SALE_CREDIT.TODAY_CREDITS'])).toBeInTheDocument();
+  });
+
+  it('TC-HEAD-PAID: el header cuenta y suma TAMBIÉN los créditos ya pagados', async () => {
+    seedTodayCredit({ total: 40, isPaid: true, paid: 40 });
+    render(
+      <Wrapper>
+        <TodaySaleCreditsPage />
+      </Wrapper>,
+    );
+
+    const header = () => document.querySelector('[data-slot="card-header"]') as HTMLElement;
+    await screen.findByText('Ana');
+    expect(within(header()).getByText('(1)')).toBeInTheDocument();
+    expect(within(header()).getByText('$40')).toBeInTheDocument();
+  });
+
+  // Amarillito (text-warning) como la referencia visual del usuario: los totales y
+  // precios de esta vista, no rojo/azul.
+  it('TC-COLOR: el total del header y el precio del crédito van en text-warning', async () => {
+    seedTodayCredit({ total: 40 });
+    render(
+      <Wrapper>
+        <TodaySaleCreditsPage />
+      </Wrapper>,
+    );
+
+    const header = () => document.querySelector('[data-slot="card-header"]') as HTMLElement;
+    await screen.findByText('Ana');
+    // El monto aparece en el header Y en la fila — scope cada aserción.
+    expect(within(header()).getByText('$40')).toHaveClass('text-warning');
+    const rowSpan = within(document.querySelector('tbody') as HTMLElement).getByText('$40');
+    expect(rowSpan).toHaveClass('text-warning');
+  });
+
+  // Crédito PAGADO: la fila ya no distingue pago con verde/rojo — siempre amarillito;
+  // solo la fecha de pago queda en verde.
+  it('TC-COLOR-PAID: un crédito pagado también muestra su precio en text-warning', async () => {
+    seedTodayCredit({ total: 40, isPaid: true, paid: 40, paidDate: new Date(2024, 2, 20) });
+    render(
+      <Wrapper>
+        <TodaySaleCreditsPage />
+      </Wrapper>,
+    );
+
+    await screen.findByText('Ana');
+    const rowSpan = within(document.querySelector('tbody') as HTMLElement).getByText('$40');
+    expect(rowSpan).toHaveClass('text-warning');
+  });
+});
+
 describe('TodaySaleCreditsPage — behavioral (Angular parity)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -429,6 +543,157 @@ describe('SaleCreditsPage (history) — behavioral (Angular parity)', () => {
         startOfDay(addDays(new Date(2028, 8, 17), 1)),
       ),
     );
+  });
+});
+
+describe('SaleCreditsPage (history) — header TODOS + gear/amarillito (petición usuario)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    authStoreState.user = { selectedStoreId: 's1' };
+  });
+
+  function seedHistory(credits: SaleCredit[], pay?: ReturnType<typeof vi.fn>) {
+    vi.mocked(SaleCreditOfflineService).mockImplementation(
+      () =>
+        ({
+          filterSaleCredits: vi.fn().mockResolvedValue(creditsResponse(credits)),
+          updateSaleCredit: vi.fn().mockReturnValue({ data: undefined, succeeded: true, errors: [] }),
+          paidSaleCredit: pay ?? vi.fn().mockReturnValue({ data: undefined, succeeded: true, errors: [] }),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        }) as any,
+    );
+  }
+
+  it('TC-H-ALL: el header cuenta y suma TODOS los créditos (pagados incluidos)', async () => {
+    seedHistory([
+      makeCredit({ id: 'c1', total: 40 }),
+      makeCredit({ id: 'c2', total: 60, isPaid: true, paid: 60, paidDate: new Date(2024, 2, 20) }),
+    ]);
+    render(
+      <Wrapper>
+        <SaleCreditsPage />
+      </Wrapper>,
+    );
+
+    const header = () => document.querySelector('[data-slot="card-header"]') as HTMLElement;
+    // Los paneles de día nacen colapsados — esperar el HEADER, no las filas.
+    await screen.findByText('(2)');
+    expect(within(header()).getByText('$100')).toBeInTheDocument();
+  });
+
+  it('TC-H-COLOR: el total del header, el total del día y los precios de fila van en text-warning', async () => {
+    seedHistory([
+      makeCredit({ id: 'c1', total: 40 }),
+      makeCredit({ id: 'c2', total: 60, isPaid: true, paid: 60, paidDate: new Date(2024, 2, 20) }),
+    ]);
+    render(
+      <Wrapper>
+        <SaleCreditsPage />
+      </Wrapper>,
+    );
+
+    const header = () => document.querySelector('[data-slot="card-header"]') as HTMLElement;
+    await screen.findByText('(2)');
+    // Header total $100 en amarillito.
+    expect(within(header()).getByText('$100')).toHaveClass('text-warning');
+    // Expandir el panel para que existan las filas.
+    fireEvent.click(screen.getByTestId('credit-date-panel-toggle-2024-03-15'));
+    // Precios de fila (pagado y no pagado) en amarillito.
+    const tbody = document.querySelector('tbody') as HTMLElement;
+    expect(await within(tbody).findByText('$40')).toHaveClass('text-warning');
+    expect(within(tbody).getByText('$60')).toHaveClass('text-warning');
+    // Total del panel del día ($100 = TODOS: 40 + 60) también en amarillito.
+    // El span HOJA (sin hijos) evita matchear el contenedor padre (mismo textContent).
+    const dayToggle = screen.getByTestId('credit-date-panel-toggle-2024-03-15');
+    const dayTotal = [...dayToggle.querySelectorAll('span')].find(
+      (s) => s.textContent === '$100' && s.children.length === 0,
+    );
+    expect(dayTotal).toBeDefined();
+    expect(dayTotal).toHaveClass('text-warning');
+  });
+
+  it('TC-H-GEAR: el gear del historial abre el mismo menú y Pagar el mismo popup que en Créditos del día', async () => {
+    seedHistory([makeCredit({ id: 'c1', total: 40 })]);
+    render(
+      <Wrapper>
+        <SaleCreditsPage />
+      </Wrapper>,
+    );
+
+    // Expandir el panel del día para montar la lista.
+    fireEvent.click(await screen.findByTestId('credit-date-panel-toggle-2024-03-15'));
+    fireEvent.click(await screen.findByTestId(/^sale-credit-actions-toggle-/));
+    expect(screen.getByRole('menuitem', { name: 'Editar' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Pagar' }));
+    // Mismo popup que Créditos del día (SaleCreditList comparte ambos modales).
+    expect(await screen.findByText('Venta por Cobrar')).toBeInTheDocument();
+  });
+
+  it('TC-H-PAY: pagar desde el historial llama a paidSaleCredit y recarga la lista', async () => {
+    const pay = vi.fn().mockReturnValue({ data: undefined, succeeded: true, errors: [] });
+    const filter = vi.fn().mockResolvedValue(
+      creditsResponse([makeCredit({ id: 'c1', total: 40 })]),
+    );
+    vi.mocked(SaleCreditOfflineService).mockImplementation(
+      () =>
+        ({
+          filterSaleCredits: filter,
+          paidSaleCredit: pay,
+          updateSaleCredit: vi.fn(),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        }) as any,
+    );
+    render(
+      <Wrapper>
+        <SaleCreditsPage />
+      </Wrapper>,
+    );
+
+    // Expandir el panel del día para montar la lista.
+    fireEvent.click(await screen.findByTestId('credit-date-panel-toggle-2024-03-15'));
+    fireEvent.click(await screen.findByTestId(/^sale-credit-actions-toggle-/));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Pagar' }));
+    fireEvent.click(await screen.findByTestId('sale-credit-payment-submit'));
+
+    await waitFor(() => expect(pay).toHaveBeenCalledWith('c1', PaymentType.Efectivo, ''));
+    // Mount + recarga tras el pago.
+    await waitFor(() => expect(filter).toHaveBeenCalledTimes(2));
+  });
+
+  // Los paneles multi-store del historial permanecen SOLO LECTURA por arquitectura:
+  // no existe camino de escritura para tiendas que no son la seleccionada
+  // (decryptEntityWithDek es READ-ONLY by contract — no hay encryptEntityWithDek).
+  it('TC-H-MS-READONLY: en multi-store los paneles por tienda NO muestran gear (solo lectura por diseño)', async () => {
+    authStoreState.user = {
+      selectedStoreId: 's1',
+      isOwnerAdmin: true,
+      storeModuleIds: [EModules.MultiStores],
+      storeList: [
+        { id: 's1', name: 'Tienda A', isActive: true },
+        { id: 's2', name: 'Tienda B', isActive: true },
+      ],
+    };
+    vi.mocked(readStoreSaleCredits).mockImplementation((storeId) =>
+      storeId === 's1' ? [makeCredit({ id: 'c1', total: 10 })] : [],
+    );
+    vi.mocked(SaleCreditOfflineService).mockImplementation(
+      () =>
+        ({
+          filterSaleCredits: vi.fn().mockResolvedValue(creditsResponse([])),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        }) as any,
+    );
+
+    render(
+      <Wrapper>
+        <SaleCreditsPage />
+      </Wrapper>,
+    );
+
+    await screen.findByTestId('multistore-select');
+    fireEvent.click(screen.getByTestId('multistore-panel-toggle-s1'));
+    fireEvent.click(await screen.findByTestId('multistore-credit-date-toggle-s1-2024-03-15'));
+    expect(screen.queryByTestId(/^sale-credit-actions-toggle-/)).toBeNull();
   });
 });
 

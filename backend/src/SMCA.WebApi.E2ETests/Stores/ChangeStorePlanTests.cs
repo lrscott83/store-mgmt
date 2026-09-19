@@ -21,8 +21,9 @@ namespace SMCA.WebApi.E2ETests.Stores;
 /// E2E tests for the owner-driven plan change (<c>POST /api/v1/stores/{id}/change-plan</c>,
 /// body <c>{ "storePlanId": N }</c>) against real PostgreSQL — the full HTTP matrix from
 /// owner-plan-change T5.1:
-/// - owner of the store switches plan (Gratis → Pago/Superior/VIP): module set becomes
-///   the target plan universe, StorePlanId written, anchor NEVER touched;
+/// - owner of the store switches plan among Gratis/Pago (Superior/VIP are SuperAdmin-
+///   reserved since the 2026-09-18 caller matrix): module set becomes the target plan
+///   universe, StorePlanId written, anchor NEVER touched;
 /// - overdue paid target pins NextDueDateOverride = today (visible via /plan);
 /// - non-owner (another OwnerAdmin) → 403; SuperAdmin may change any store;
 /// - inactive store / inactive owner user / unknown plan → 400;
@@ -94,8 +95,9 @@ public sealed class ChangeStorePlanTests
             paymentStartDate: new DateOnly(2026, 1, 10));
         try
         {
+            // Owner → Pago (the spec's overdue-clock scenario): Superior is SuperAdmin-reserved.
             var r = await DbTestHelpers.AuthedClient(_f, seeded.UserId, seeded.Login)
-                .PostAsJsonAsync($"/api/v1/stores/{seeded.StoreId}/change-plan", PlanBody((int)StorePlanType.Superior));
+                .PostAsJsonAsync($"/api/v1/stores/{seeded.StoreId}/change-plan", PlanBody((int)StorePlanType.Pago));
             r.StatusCode.Should().Be(HttpStatusCode.OK);
 
             using var scope = _f.Services.CreateScope();
@@ -103,7 +105,7 @@ public sealed class ChangeStorePlanTests
             var store = await db.Set<Store>().IgnoreQueryFilters().SingleAsync(s => s.Id == seeded.StoreId);
 
             store.PaymentStartDate.Should().Be(new DateOnly(2026, 1, 10), "anchor untouched");
-            store.StorePlanId.Should().Be((int)StorePlanType.Superior);
+            store.StorePlanId.Should().Be((int)StorePlanType.Pago);
             store.NextDueDateOverride.Should().Be(Today(),
                 "overdue store + paid target → next due pinned to today (grace covers the payment)");
 
@@ -119,14 +121,17 @@ public sealed class ChangeStorePlanTests
     }
 
     [Fact]
-    public async Task Owner_changes_paid_store_to_vip_activates_full_universe()
+    public async Task SuperAdmin_changes_paid_store_to_vip_activates_full_universe()
     {
-        // VIP stays out of the public catalog but is a valid change target.
+        // VIP stays out of the public catalog and is SuperAdmin-reserved (caller matrix):
+        // this test pins the VIP universe mechanics, so the caller is a SuperAdmin.
+        var saLogin = $"sa-vip-{Guid.NewGuid():N}@test.com";
+        var saId = await DbTestHelpers.SeedSuperAdminAsync(_f, saLogin, "Password123");
         var seeded = await SeedOwnerAdminStoreAsync(planId: (int)StorePlanType.Pago,
             paymentStartDate: new DateOnly(2026, 3, 10));
         try
         {
-            var r = await DbTestHelpers.AuthedClient(_f, seeded.UserId, seeded.Login)
+            var r = await DbTestHelpers.AuthedClient(_f, saId, saLogin)
                 .PostAsJsonAsync($"/api/v1/stores/{seeded.StoreId}/change-plan", PlanBody((int)StorePlanType.VIP));
             r.StatusCode.Should().Be(HttpStatusCode.OK);
 
@@ -146,6 +151,7 @@ public sealed class ChangeStorePlanTests
         finally
         {
             await AuthzSeed.CleanupStoreGraphAsync(_f, seeded.StoreId, seeded.UserId);
+            await DbTestHelpers.CleanupUserAsync(_f, saId);
         }
     }
 

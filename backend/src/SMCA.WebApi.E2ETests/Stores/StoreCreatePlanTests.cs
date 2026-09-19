@@ -16,12 +16,13 @@ namespace SMCA.WebApi.E2ETests.Stores;
 
 /// <summary>
 /// E2E tests for the plan dimension of <c>POST /api/v1/stores</c>: every created store
-/// must land on plan Superior (StorePlanId=3) with the trial clock started
+/// must land on plan Pago (StorePlanId=2) with the trial clock started
 /// (PaymentStartDate=today), the exact requested module set with catalog price
 /// snapshots, and the StoreRoleFeatures the real flow generates — including the new
 /// plan modules 12/13/14. Plan 2026-09-08-e2e-plan-gated-modules-auth-roster (Lote 2).
-/// Default plan changed Pago→Superior (2026-09-09): a new store gets the Superior
-/// plan whose StorePlanModule catalog covers all 13 AvailableToStore modules.
+/// Default plan change (2026-09-18, store-default-plan-and-owner-plan-restriction):
+/// birth plan is Pago while the birth module set stays REQUEST-driven (Option A) —
+/// the Superior catalog members are assigned only when the request lists them.
 /// </summary>
 [Collection("e2e")]
 public sealed class StoreCreatePlanTests
@@ -37,6 +38,7 @@ public sealed class StoreCreatePlanTests
     private const int MultiMonedasModuleId = 15;
     private const int ElaborationModuleId = 17;
     private const int SuperiorPlanId = (int)Domain.Common.Enums.StorePlanType.Superior;
+    private const int PagoPlanId = (int)Domain.Common.Enums.StorePlanType.Pago;
 
     private static object Body(Guid ownerId, string name, IEnumerable<int> moduleIds) => new
     {
@@ -65,7 +67,7 @@ public sealed class StoreCreatePlanTests
             var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
             var store = await db.Set<Store>().IgnoreQueryFilters().SingleAsync(s => s.Id == created);
-            store.StorePlanId.Should().Be(SuperiorPlanId); // default plan is Superior (3)
+            store.StorePlanId.Should().Be(PagoPlanId); // default plan is Pago (2) since the 2026-09-18 birth-plan change
             store.PaymentStartDate.Should().Be(DateOnly.FromDateTime(DateTime.UtcNow)); // trial clock starts unconditionally
 
             var storeModules = await db.Set<StoreModule>().IgnoreQueryFilters()
@@ -117,7 +119,7 @@ public sealed class StoreCreatePlanTests
             var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
             var store = await db.Set<Store>().IgnoreQueryFilters().SingleAsync(s => s.Id == created);
-            store.StorePlanId.Should().Be(SuperiorPlanId);
+            store.StorePlanId.Should().Be(PagoPlanId);
 
             var activeModuleIds = await db.Set<StoreModule>().IgnoreQueryFilters()
                 .Where(sm => sm.StoreId == created && sm.IsActive)
@@ -133,12 +135,13 @@ public sealed class StoreCreatePlanTests
     }
 
     [Fact]
-    public async Task Create_store_defaults_to_superior_plan_matching_plan_catalog()
+    public async Task Create_store_defaults_to_pago_but_modules_are_request_driven()
     {
-        // Default plan change (2026-09-09): every created store lands on Superior (3).
-        // The Superior StorePlanModule catalog is exactly the 13 AvailableToStore
-        // modules, so a store created with the full catalog set ends up whose active
-        // modules are precisely its plan's catalog — store plan and assigned modules agree.
+        // Default plan change (2026-09-18, store-default-plan-and-owner-plan-restriction):
+        // every created store births on Pago (2). The birth module set stays REQUEST-driven
+        // (Option A divergence): a request listing the full AvailableToStore set yields a
+        // Pago store whose modules match the request — which agrees with the Superior
+        // catalog (15 with Elaboration), NOT the Pago catalog (11 members). The divergence is pinned.
         var login = $"sa-csc-{Guid.NewGuid():N}@test.com";
         var adminId = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
         var owner = await StoreSeed.SeedOwnerAsync(_f);
@@ -155,17 +158,21 @@ public sealed class StoreCreatePlanTests
             var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
             var store = await db.Set<Store>().IgnoreQueryFilters().SingleAsync(s => s.Id == created);
-            store.StorePlanId.Should().Be(SuperiorPlanId);
+            store.StorePlanId.Should().Be(PagoPlanId);
 
-            var planCatalogModuleIds = await db.Set<StorePlanModule>().IgnoreQueryFilters()
-                .Where(spm => spm.PlanId == SuperiorPlanId)
+            var pagoPlanModuleIds = await db.Set<StorePlanModule>().IgnoreQueryFilters()
+                .Where(spm => spm.PlanId == PagoPlanId)
                 .Select(spm => spm.ModuleId).ToListAsync();
-            planCatalogModuleIds.Should().HaveCount(15);
+            // The Pago catalog keeps its own members: the Elaboration module (17) was
+            // assigned to Superior and VIP only, so Pago stays at 11.
+            pagoPlanModuleIds.Should().HaveCount(11);
 
             var storeModuleIds = await db.Set<StoreModule>().IgnoreQueryFilters()
                 .Where(sm => sm.StoreId == created && sm.IsActive)
                 .Select(sm => sm.ModuleId).ToListAsync();
-            storeModuleIds.Should().BeEquivalentTo(planCatalogModuleIds);
+            // Option A: the birth module set is the REQUEST list (14 incl. MultiMonedas 15),
+            // diverging from the Pago plan catalog (11) — pinned, not equalized.
+            storeModuleIds.Should().BeEquivalentTo(fullCatalogRequest);
         }
         finally
         {
@@ -176,7 +183,7 @@ public sealed class StoreCreatePlanTests
     }
 
     [Fact]
-    public async Task Create_store_free_only_modules_still_plan_superior_with_trial_clock()
+    public async Task Create_store_free_only_modules_still_plan_pago_with_trial_clock()
     {
         var login = $"sa-cf-{Guid.NewGuid():N}@test.com";
         var adminId = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
@@ -194,9 +201,9 @@ public sealed class StoreCreatePlanTests
             var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
             var store = await db.Set<Store>().IgnoreQueryFilters().SingleAsync(s => s.Id == created);
-            // Plan is Superior and the trial clock starts even for free-only module sets —
+            // Plan is Pago and the trial clock starts even for free-only module sets —
             // but PlanType resolves "Free" (no paid module active) until one is added.
-            store.StorePlanId.Should().Be(SuperiorPlanId);
+            store.StorePlanId.Should().Be(PagoPlanId);
             store.PaymentStartDate.Should().Be(DateOnly.FromDateTime(DateTime.UtcNow));
         }
         finally

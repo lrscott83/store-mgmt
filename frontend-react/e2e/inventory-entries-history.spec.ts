@@ -11,7 +11,7 @@ import type { Page } from '@playwright/test';
  * Uses `owner-admin-with-products` persona.
  */
 
-const ENTRIES_HISTORY_HEADER = 'Historial de Entradas'; // INVENTORY.ENTRIES.TITLE
+const ENTRIES_HISTORY_HEADER = 'Entradas'; // INVENTORY.ENTRIES.TITLE (2026-09-18, con permiso del owner)
 const NO_ENTRIES = 'No se encontró ninguna entrada'; // INVENTORY.NO_HISTORY_ENTRY_FOUND
 const TODAY_ENTRIES_HEADER = 'Entradas del día';
 const ENTRY_BUTTON = 'Entrada';

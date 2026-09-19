@@ -94,6 +94,12 @@ internal sealed class ChangeStorePlanCommandHandler : ICommandHandler<ChangeStor
                 throw new ApiException(_localizer["Forbidden"], HttpStatusCode.Forbidden);
         }
 
+        // Caller matrix (billing/spec.md): non-SuperAdmin callers may only target
+        // Gratis or Pago — Superior/VIP are SuperAdmin-reserved.
+        if (!_httpContextService.IsSuperAdmin &&
+            request.StorePlanId is (int)StorePlanType.Superior or (int)StorePlanType.VIP)
+            throw new ApiException(_localizer["Forbidden"], HttpStatusCode.Forbidden);
+
         // Preconditions.
         if (!store.IsActive)
             throw new ApiException(_localizer["StoreInactive"], HttpStatusCode.BadRequest);

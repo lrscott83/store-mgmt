@@ -21,7 +21,8 @@ namespace SMCA.WebApi.E2ETests.Stores;
 // POST /v1/stores admits a second caller class — an OwnerAdmin whose SELECTED store has the
 // MultiStores module (14) active after billing filtering. Contract:
 //   - OwnerAdmin + {7,14} + own/zero-Guid OwnerId → 201, modules inherited from selected store,
-//     Approved forced true, plan Superior, trial clock today, SelectedStoreId NOT repointed.
+//     Approved forced true, plan Pago (birth default since 2026-09-18), trial clock today,
+//     SelectedStoreId NOT repointed.
 //   - OwnerAdmin without 14 (missing OR billing-Vencido) → 403, nothing persisted.
 //   - OwnerAdmin with foreign OwnerId → 403, nothing persisted.
 //   - StoreUser (even holding feature 73) → 403 at handler gate 2, nothing persisted.
@@ -164,7 +165,7 @@ public sealed class OwnerCreateStoreTests
             store.Approved.Should().BeTrue();            // decision 6: forced approved
             store.IsActive.Should().BeTrue();
             store.OwnerId.Should().Be(f.OwnerId);        // derived from the caller
-            store.StorePlanId.Should().Be((int)StorePlanType.Superior);
+            store.StorePlanId.Should().Be((int)StorePlanType.Pago);
             store.PaymentStartDate.Should().Be(DateOnly.FromDateTime(DateTime.UtcNow)); // trial clock today
 
             var moduleIds = await db.Set<StoreModule>().IgnoreQueryFilters()

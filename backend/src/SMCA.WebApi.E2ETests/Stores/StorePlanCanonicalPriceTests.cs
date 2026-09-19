@@ -243,6 +243,8 @@ public sealed class StorePlanCanonicalPriceTests
     public async Task P4_change_plan_updates_card_price_to_target_plan()
     {
         var owner = await AuthzSeed.SeedOwnerAdminAsync(_f, withManagementModule: true);
+        var saLogin = $"admin-{Guid.NewGuid():N}@test.com";
+        var saId = await DbTestHelpers.SeedSuperAdminAsync(_f, saLogin, "Password123");
         try
         {
             Guid storeId;
@@ -261,7 +263,10 @@ public sealed class StorePlanCanonicalPriceTests
             var before = mineBefore.Single(s => s.Id == storeId).PlanCurrentPrice;
             before.Should().NotBeNull();
 
-            var r = await client.PostAsJsonAsync($"/api/v1/stores/{storeId}/change-plan",
+            // Superior is SuperAdmin-reserved (caller matrix) — the flip runs as SA; the
+            // card read stays on the owner's my-stores view, which is what P4 pins.
+            var saClient = DbTestHelpers.AuthedClient(_f, saId, saLogin);
+            var r = await saClient.PostAsJsonAsync($"/api/v1/stores/{storeId}/change-plan",
                 new { storePlanId = (int)StorePlanType.Superior });
             r.StatusCode.Should().Be(HttpStatusCode.OK);
 
@@ -281,6 +286,7 @@ public sealed class StorePlanCanonicalPriceTests
         finally
         {
             await CleanupOwnerGraphAsync(_f, owner.OwnerId, owner.UserId);
+            await DbTestHelpers.CleanupUserAsync(_f, saId);
         }
     }
 

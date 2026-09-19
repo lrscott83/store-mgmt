@@ -55,6 +55,10 @@ export const clientLoader = featureLoader([EFeatures.EntriesHistory]);
  * multi-store-panels: OwnerAdmin + MultiStores + ≥2 tiendas activas → un panel
  * colapsable por tienda con su acordeón por día, totales por tienda en la
  * cabecera y agregado fuera. Sin MultiStores la vista es idéntica.
+ *
+ * Header (2026-09-18): «Entradas (n)» a la izquierda — n = suma de quantities de
+ * las entradas activas según el filtro vigente — y el costo total a la derecha,
+ * en ambos modos. En multi-store el filtro de tienda global define qué cuenta.
  */
 export function EntriesPage() {
   const intl = useIntl();
@@ -130,16 +134,12 @@ export function EntriesPage() {
     });
   }
 
-  const entriesCount = dayGroups.reduce(
-    (count, d) => count + d.items.reduce((c, e) => c + e.quantity, 0),
-    0,
-  );
-  const entriesTotal = dayGroups.reduce(
-    (total, d) => total + d.items.reduce((t, e) => t + round2(e.costPrice * e.quantity), 0),
-    0,
-  );
+  const sumCount = (entries: InventoryEntryView[]) =>
+    entries.reduce((count, e) => count + e.quantity, 0);
+  const sumTotal = (entries: InventoryEntryView[]) =>
+    entries.reduce((total, e) => total + round2(e.costPrice * e.quantity), 0);
 
-  // ─── multi-store mode ────────────────────────────────────────────────────
+  // multi-store mode ───────────────────────────────────────────────────────
   if (multiStoreEnabled) {
     const visibleStoreIds =
       selectedMultiStoreId === null
@@ -147,32 +147,39 @@ export function EntriesPage() {
         : [selectedMultiStoreId];
     const totals = visibleStoreIds.reduce(
       (acc, id) => {
-        for (const entry of storeEntryViews.get(id) ?? []) {
-          acc.count += entry.quantity;
-          acc.total = round2(acc.total + entry.costPrice * entry.quantity);
-        }
+        const entries = storeEntryViews.get(id) ?? [];
+        acc.count += sumCount(entries);
+        acc.total = round2(acc.total + sumTotal(entries));
         return acc;
       },
       { count: 0, total: 0 },
     );
 
     return (
-      <Card padding="tight" title={intl.formatMessage({ id: 'INVENTORY.ENTRIES.TITLE' })}>
+      <Card
+        padding="tight"
+        title={
+          <div className="flex items-center justify-between">
+            <span className="flex items-center gap-2">
+              {intl.formatMessage({ id: 'INVENTORY.ENTRIES.TITLE' })}
+              <span className="rounded-full bg-success/10 px-2 py-0.5 text-xs font-semibold text-success">
+                ({totals.count})
+              </span>
+            </span>
+            <span className="text-sm font-semibold text-primary whitespace-nowrap">
+              {formatCurrency(totals.total)}
+            </span>
+          </div>
+        }
+      >
         <MultiStoreSection
           stores={multiStoreStores}
           selectedStoreId={selectedMultiStoreId}
           onSelectedStoreIdChange={setSelectedMultiStoreId}
-          totals={
-            <MultiStoreTotal
-              label={intl.formatMessage({ id: 'INVENTORY.ENTRIES.TITLE' })}
-              value={totals.total}
-              valueClassName="text-primary"
-            />
-          }
           renderStoreTotals={(store) => {
             const entries = storeEntryViews.get(store.id) ?? [];
-            const total = entries.reduce((t, e) => t + round2(e.costPrice * e.quantity), 0);
-            const count = entries.reduce((c, e) => c + e.quantity, 0);
+            const total = sumTotal(entries);
+            const count = sumCount(entries);
             return (
               <MultiStoreTotal label={`(${count})`} value={total} valueClassName="text-primary" />
             );
@@ -235,6 +242,10 @@ export function EntriesPage() {
       </Card>
     );
   }
+
+  // single-store mode ──────────────────────────────────────────────────────
+  const entriesCount = dayGroups.reduce((count, d) => count + sumCount(d.items), 0);
+  const entriesTotal = round2(dayGroups.reduce((total, d) => total + sumTotal(d.items), 0));
 
   return (
     <Card

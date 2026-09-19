@@ -25,6 +25,11 @@ namespace SMCA.WebApi.E2ETests.Auth;
 /// i.e. no relogin (a plan change never reissues a token, so the token is not the carrier of
 /// the plan: /me recomputes it per request).
 /// <para>
+/// Since the 2026-09-18 caller matrix, Superior/VIP are SuperAdmin-reserved: the B1 upgrade
+/// leg below is therefore driven by a SuperAdmin client, while the OWNER token still proves
+/// the same-token read-back; B3 stays fully owner-driven on the legal Gratis/Pago targets.
+/// </para>
+/// <para>
 /// Gaps closed (docs/plans/2026-09-15-store-plan-change-permission-refresh-plan.md, §7.1 B1/B3):
 /// the only existing plan × /me pair (AuthMePlanModulesTests) drives the change through
 /// SuperAdmin's toggle-plan, never asserts FeatureIds on the way UP, never asserts
@@ -87,16 +92,29 @@ public sealed class MeAfterOwnerPlanChangeTests
     // ── B1: owner change-plan → /me, same token, both directions ─────────────
 
     [Fact]
-    public async Task Owner_change_plan_upgrade_then_downgrade_same_token_me_follows_the_plan()
+    public async Task Me_follows_the_plan_across_superadmin_flips_with_same_owner_token()
     {
         var g = await SeedOwnerStoreAsync(planId: (int)StorePlanType.Pago, withStoreUser: false);
+        var saLogin = $"sa-mepc-{Guid.NewGuid():N}@test.com";
+        var saId = await DbTestHelpers.SeedSuperAdminAsync(_f, saLogin, "Password123");
         try
         {
-            // ONE client, ONE token for the whole test: change-plan → /me → change-plan → /me.
+            // ONE owner client, ONE token for the whole test: /me must follow the plan with
+            // NO relogin (a plan change never reissues the token — /me recomputes per request).
+            // Since 2026-09-18 the caller matrix reserves Superior/VIP to SuperAdmin, so the
+            // flips here are SA-driven; the OWNER token still proves the same-token read-back.
             var client = DbTestHelpers.AuthedClient(_f, g.OwnerUserId, g.OwnerLogin);
 
-            // ── Upgrade Pago → Superior: the plan adds Statistics (6) and Warehouses (13). ──
-            await ChangePlanAsync(client, g.StoreId, StorePlanType.Superior);
+            // New-rule pin: the owner targeting Superior gets 403 (SuperAdmin-reserved plan).
+            var denied = await client.PostAsJsonAsync(
+                $"/api/v1/stores/{g.StoreId}/change-plan", new { storePlanId = (int)StorePlanType.Superior });
+            denied.StatusCode.Should().Be(HttpStatusCode.Forbidden,
+                "Superior/VIP are SuperAdmin-reserved (caller matrix)");
+
+            var saClient = DbTestHelpers.AuthedClient(_f, saId, saLogin);
+
+            // ── Upgrade Pago → Superior (SA): the plan adds Statistics (6) and Warehouses (13). ──
+            await ChangePlanAsync(saClient, g.StoreId, StorePlanType.Superior);
             var upgraded = await MeAsync(client);
 
             upgraded.StoreModuleIds.Should().BeEquivalentTo(SuperiorUniverse,
@@ -128,8 +146,8 @@ public sealed class MeAfterOwnerPlanChangeTests
             upgraded.Roles.SelectMany(r => r.FeatureIds).Should().Contain(DashboardFeatureId);
             upgraded.Roles.Select(r => r.ModuleId).Should().Contain(StatisticsModuleId);
 
-            // ── Downgrade Superior → Gratis, SAME token. ──
-            await ChangePlanAsync(client, g.StoreId, StorePlanType.Gratis);
+            // ── Downgrade Superior → Gratis (SA), SAME owner token. ──
+            await ChangePlanAsync(saClient, g.StoreId, StorePlanType.Gratis);
             var downgraded = await MeAsync(client);
 
             downgraded.StoreModuleIds.Should().BeEquivalentTo(GratisUniverse,
@@ -156,6 +174,7 @@ public sealed class MeAfterOwnerPlanChangeTests
         finally
         {
             await AuthzSeed.CleanupStoreGraphAsync(_f, g.StoreId, g.OwnerUserId);
+            await DbTestHelpers.CleanupUserAsync(_f, saId);
         }
     }
 

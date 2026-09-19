@@ -8,6 +8,7 @@ import { Card } from '~/shared/components/ui/card';
 import { InfoBox } from '~/shared/components/ui/info-box';
 import { SaleCreditOfflineService } from '../lib/services/sale-credit-offline-service';
 import { SaleCreditList } from '../components/sale-credit-list';
+import { formatCurrency } from '~/shared/lib/format-currency';
 
 export const clientLoader = featureLoader([EFeatures.CreditSale]);
 
@@ -60,10 +61,7 @@ export function TodaySaleCreditsPage() {
   return (
     <Card
       padding="tight"
-      title={
-        // SALE_CREDIT.TODAY_CREDITS
-        intl.formatMessage({ id: 'SALE_CREDIT.TODAY_CREDITS' })
-      }
+      title={<TodayCreditsCardTitle count={saleCredits.length} total={saleCredits.reduce((t, c) => t + c.total, 0)} />}
     >
       {saleCredits.length === 0 && (
         <InfoBox variant="primary" className="mb-6 text-center">
@@ -83,3 +81,28 @@ export function TodaySaleCreditsPage() {
 }
 
 export default TodaySaleCreditsPage;
+
+/**
+ * Header pedido por el usuario: «Créditos del día (n)» a la izquierda — n = TODOS los
+ * créditos del día (pagados o no) — y el valor total a la derecha. El total va en
+ * `text-warning` (amarillito), como la referencia visual de ventas del día. El texto
+ * base se mantiene como «Créditos del día» (SALE_CREDIT.TODAY_CREDITS): renombrarlo
+ * rompería los E2E protegidos pay-credit/create-credit.
+ */
+function TodayCreditsCardTitle({ count, total }: { count: number; total: number }) {
+  const intl = useIntl();
+  return (
+    <div className="flex items-center justify-between">
+      <span className="flex items-center gap-2">
+        {/* SALE_CREDIT.TODAY_CREDITS */}
+        {intl.formatMessage({ id: 'SALE_CREDIT.TODAY_CREDITS' })}
+        <span className="rounded-full bg-success/10 px-2 py-0.5 text-xs font-semibold text-success">
+          ({count})
+        </span>
+      </span>
+      <span className="text-sm font-semibold text-warning whitespace-nowrap">
+        {formatCurrency(total)}
+      </span>
+    </div>
+  );
+}

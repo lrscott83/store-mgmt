@@ -34,6 +34,11 @@ namespace SMCA.WebApi.E2ETests.Stores;
 /// needs the Management feature, module 7, which every plan carries) — so the 403s come from the
 /// handler's module gate, not from the authorization filter.
 /// </para>
+/// <para>
+/// Since the 2026-09-18 caller matrix, Superior/VIP are SuperAdmin-reserved: the plan
+/// changes below run as a separate SuperAdmin client, while the OWNER token still proves
+/// the same-token 403 → 201 → 403 flip, plus the new owner→Superior 403 pin.
+/// </para>
 /// </summary>
 [Collection("e2e")]
 public sealed class ChangePlanPermissionFlipTests
@@ -48,11 +53,15 @@ public sealed class ChangePlanPermissionFlipTests
     public async Task Owner_same_token_multistores_gate_flips_403_created_403_across_plan_changes()
     {
         var g = await SeedOwnerStoreAsync(planId: (int)StorePlanType.Pago);
+        var saLogin = $"sa-pf-{Guid.NewGuid():N}@test.com";
+        var saId = await DbTestHelpers.SeedSuperAdminAsync(_f, saLogin, "Password123");
         var createdStores = new List<Guid>();
         try
         {
-            // ONE client, ONE token for the whole test: 403 → plan change → 201 → plan change → 403.
+            // ONE owner client, ONE token for the whole flip: 403 → SA-flip → 201 → SA-flip → 403.
+            // Plan flips are SuperAdmin-only (caller matrix) — a separate SA client performs them.
             var client = DbTestHelpers.AuthedClient(_f, g.UserId, g.Login);
+            var saClient = DbTestHelpers.AuthedClient(_f, saId, saLogin);
 
             // ── 1. Pago(2) has no MultiStores(14) → the second-store creation is forbidden. ──
             var deniedName = $"PF-Denied-{Guid.NewGuid():N}";
@@ -67,13 +76,19 @@ public sealed class ChangePlanPermissionFlipTests
                     .Should().BeFalse("the handler rejects before persisting anything");
             }
 
-            // ── 2. Owner upgrades Pago → Superior: MultiStores (14) joins the module set. ──
-            await ChangePlanAsync(client, g.StoreId, StorePlanType.Superior);
+            // ── 2a. New-rule pin: the OWNER targeting Superior is 403 (unchanged state). ──
+            var ownerDenied = await client.PostAsJsonAsync(
+                $"/api/v1/stores/{g.StoreId}/change-plan", new { storePlanId = (int)StorePlanType.Superior });
+            ownerDenied.StatusCode.Should().Be(HttpStatusCode.Forbidden,
+                "Superior is SuperAdmin-reserved (caller matrix)");
+
+            // ── 2b. SuperAdmin upgrades Pago → Superior: MultiStores (14) joins the module set. ──
+            await ChangePlanAsync(saClient, g.StoreId, StorePlanType.Superior);
 
             var allowedName = $"PF-Allowed-{Guid.NewGuid():N}";
             var allowed = await client.PostAsJsonAsync("/api/v1/stores", OwnerBody(allowedName));
             allowed.StatusCode.Should().Be(HttpStatusCode.Created,
-                "the same token now passes the MultiStores gate — no relogin happened");
+                "the same owner token now passes the MultiStores gate — no relogin happened");
             var body = await allowed.Content.ReadFromJsonAsync<ApiResponse<StoreData>>(ApiResponse.Json);
             body!.Succeeded.Should().BeTrue();
             var createdId = body.Data!.Id;
@@ -89,8 +104,8 @@ public sealed class ChangePlanPermissionFlipTests
                 inherited.Should().Contain(MultiStoresModuleId);
             }
 
-            // ── 3. Downgrade Superior → Pago closes the gate again, SAME token. ──
-            await ChangePlanAsync(client, g.StoreId, StorePlanType.Pago);
+            // ── 3. SuperAdmin downgrades Superior → Pago closes the gate again, SAME owner token. ──
+            await ChangePlanAsync(saClient, g.StoreId, StorePlanType.Pago);
 
             var deniedAgainName = $"PF-Denied2-{Guid.NewGuid():N}";
             var deniedAgain = await client.PostAsJsonAsync("/api/v1/stores", OwnerBody(deniedAgainName));
@@ -111,6 +126,7 @@ public sealed class ChangePlanPermissionFlipTests
             foreach (var id in createdStores)
                 await StoreSeed.CleanupStoreAsync(_f, id);
             await AuthzSeed.CleanupStoreGraphAsync(_f, g.StoreId, g.UserId);
+            await DbTestHelpers.CleanupUserAsync(_f, saId);
         }
     }
 
