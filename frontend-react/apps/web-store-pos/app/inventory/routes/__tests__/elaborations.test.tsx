@@ -120,6 +120,48 @@ function seedWorld(harinaStock: number): SeededWorld {
   return { recipeId: recipe.data!.id, warehouseId };
 }
 
+/** Seeds a world whose recipe lists the SAME ingredient on two separate rows. */
+function seedDuplicateRowWorld(): SeededWorld {
+  const categoryRepo = new ProductCategoryRepository(storeId);
+  categoryRepo.addImportedProductCategory({
+    id: 'cat-1',
+    name: 'Elaborados',
+    order: 1,
+    isActive: true,
+  });
+  const productRepo = new ProductRepository(storeId, categoryRepo);
+  seedProduct(productRepo, 'pan', 'Pan de 500g');
+  seedProduct(productRepo, 'harina', 'Harina');
+
+  const inventoryService = new InventoryOfflineService(storeId, productRepo);
+  const warehouseService = new WarehouseOfflineService(storeId, productRepo, inventoryService);
+  const recipeService = new RecipeOfflineService(storeId, productRepo);
+
+  const warehouseId = warehouseService.createWarehouse('Central').data!.id;
+  const seeded = warehouseService.recordMovement({
+    type: 'purchase_in',
+    warehouseId,
+    productId: 'harina',
+    quantity: 100,
+    costPrice: 20,
+  });
+  expect(seeded.succeeded).toBe(true);
+
+  const recipe = recipeService.addRecipe({
+    productId: 'pan',
+    outputQty: 1,
+    components: [
+      { productId: 'harina', qty: 1, scrapPct: 0 },
+      { productId: 'harina', qty: 2, scrapPct: 0 },
+    ],
+    laborCost: 0,
+    overheadPct: 0,
+  });
+  expect(recipe.succeeded).toBe(true);
+
+  return { recipeId: recipe.data!.id, warehouseId };
+}
+
 function renderPage() {
   return render(
     <IntlProvider locale="es" messages={esMessages}>
@@ -164,7 +206,7 @@ describe('ElaborationsPage — Elaboraciones (feature 121)', () => {
     const plan = screen.getByTestId('elaboration-plan');
     expect(within(plan).getByText('Harina')).toBeTruthy();
     // Acceptance recipe: harina theoretical = 3 × (1 + 2/100) = 3.06.
-    expect(screen.getByTestId('elaboration-row-harina').textContent).toContain('3.06');
+    expect(screen.getByTestId('elaboration-row-0').textContent).toContain('3.06');
     expect(screen.getByTestId('elaboration-produced-qty').textContent).toBe('20');
     // 123.535 / 20 → 6.18.
     expect(screen.getByTestId('elaboration-unit-cost').textContent).toBe(formatCurrency(6.18));
@@ -177,7 +219,7 @@ describe('ElaborationsPage — Elaboraciones (feature 121)', () => {
     selectPlan(recipeId, warehouseId);
 
     // The row flags the shortage before confirming.
-    expect(screen.getByTestId('elaboration-insufficient-harina')).toBeTruthy();
+    expect(screen.getByTestId('elaboration-insufficient-0')).toBeTruthy();
 
     fireEvent.click(screen.getByTestId('elaboration-confirm'));
 
@@ -233,5 +275,126 @@ describe('ElaborationsPage — Elaboraciones (feature 121)', () => {
     expect(
       screen.getByText('No hay almacenes configurados. Cree un almacén para poder elaborar.'),
     ).toBeTruthy();
+  });
+
+  it('clamps a negative real quantity to zero (no negative preview, non-negative actualQty)', async () => {
+    const { recipeId, warehouseId } = seedWorld(100);
+    renderPage();
+    selectPlan(recipeId, warehouseId);
+
+    expect(screen.getByTestId('elaboration-ingredients-cost').textContent).toBe(
+      formatCurrency(66.85),
+    );
+
+    const confirmSpy = vi.spyOn(ElaborationOfflineService.prototype, 'confirmElaboration');
+    try {
+      fireEvent.change(screen.getByTestId('elaboration-actual-0'), { target: { value: '-5' } });
+
+      // Harina clamps to 0 → only levadura + sal + agua contribute (4 + 0.6 + 1.05).
+      expect(screen.getByTestId('elaboration-ingredients-cost').textContent).toBe(
+        formatCurrency(5.65),
+      );
+      expect(screen.getByTestId('elaboration-total-cost').textContent).not.toContain('-');
+
+      fireEvent.click(screen.getByTestId('elaboration-confirm'));
+      await waitFor(() => expect(showToastSuccessMock).toHaveBeenCalled());
+
+      const params = confirmSpy.mock.calls[0][0];
+      for (const component of params.actualComponents ?? []) {
+        expect(component.actualQty).toBeGreaterThanOrEqual(0);
+      }
+      const [elaboration] = buildElaborationService().getStorageElaborations();
+      const harina = elaboration.components.find((component) => component.productId === 'harina');
+      expect(harina?.actualQty).toBe(0);
+      expect(elaboration.totalCost).toBeGreaterThanOrEqual(0);
+    } finally {
+      confirmSpy.mockRestore();
+    }
+  });
+
+  it('keeps duplicate ingredient rows independently editable and sends each row own actualQty', async () => {
+    const { recipeId, warehouseId } = seedDuplicateRowWorld();
+    renderPage();
+    selectPlan(recipeId, warehouseId);
+
+    const first = screen.getByTestId('elaboration-actual-0') as HTMLInputElement;
+    const second = screen.getByTestId('elaboration-actual-1') as HTMLInputElement;
+    expect(first.value).toBe('1');
+    expect(second.value).toBe('2');
+
+    // Editing the first row must not change the second: the rows are independent.
+    fireEvent.change(first, { target: { value: '5' } });
+    expect((screen.getByTestId('elaboration-actual-0') as HTMLInputElement).value).toBe('5');
+    expect((screen.getByTestId('elaboration-actual-1') as HTMLInputElement).value).toBe('2');
+
+    fireEvent.change(second, { target: { value: '7' } });
+    expect((screen.getByTestId('elaboration-actual-0') as HTMLInputElement).value).toBe('5');
+    expect((screen.getByTestId('elaboration-actual-1') as HTMLInputElement).value).toBe('7');
+
+    const confirmSpy = vi.spyOn(ElaborationOfflineService.prototype, 'confirmElaboration');
+    try {
+      fireEvent.click(screen.getByTestId('elaboration-confirm'));
+      await waitFor(() => expect(showToastSuccessMock).toHaveBeenCalled());
+
+      const params = confirmSpy.mock.calls[0][0];
+      expect(params.actualComponents).toHaveLength(2);
+      expect(params.actualComponents?.map((component) => component.productId)).toEqual([
+        'harina',
+        'harina',
+      ]);
+      expect(params.actualComponents?.map((component) => component.actualQty)).toEqual([5, 7]);
+    } finally {
+      confirmSpy.mockRestore();
+    }
+  });
+
+  it('clears a stale error when the selection changes', async () => {
+    const { recipeId, warehouseId } = seedWorld(1);
+    renderPage();
+    selectPlan(recipeId, warehouseId);
+
+    fireEvent.click(screen.getByTestId('elaboration-confirm'));
+    await waitFor(() => {
+      expect(screen.getByTestId('elaboration-error')).toBeTruthy();
+    });
+
+    fireEvent.change(screen.getByTestId('elaboration-batches'), { target: { value: '2' } });
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('elaboration-error')).toBeNull();
+    });
+  });
+
+  it('edits a real quantity: the live preview recomputes and the stored elaboration keeps the real cost', async () => {
+    const { recipeId, warehouseId } = seedWorld(100);
+    renderPage();
+    selectPlan(recipeId, warehouseId);
+
+    expect(screen.getByTestId('elaboration-unit-cost').textContent).toBe(formatCurrency(6.18));
+
+    fireEvent.change(screen.getByTestId('elaboration-actual-0'), { target: { value: '1' } });
+
+    // Harina 1 × 20 = 20, plus 4 + 0.6 + 1.05 → 25.65; overhead 2.565; labor 50.
+    expect(screen.getByTestId('elaboration-ingredients-cost').textContent).toBe(
+      formatCurrency(25.65),
+    );
+    expect(screen.getByTestId('elaboration-total-cost').textContent).toBe(formatCurrency(78.215));
+    expect(screen.getByTestId('elaboration-unit-cost').textContent).toBe(formatCurrency(3.91));
+
+    fireEvent.click(screen.getByTestId('elaboration-confirm'));
+    await waitFor(() => expect(showToastSuccessMock).toHaveBeenCalled());
+
+    const [elaboration] = buildElaborationService().getStorageElaborations();
+    const harina = elaboration.components.find((component) => component.productId === 'harina');
+    expect(harina?.actualQty).toBe(1);
+    expect(elaboration.totalCost).toBeCloseTo(78.215, 6);
+    expect(elaboration.unitCost).toBe(3.91);
+
+    const todayKey = toLocalDayKey(new Date());
+    fireEvent.click(screen.getByTestId(`elaboration-day-toggle-${todayKey}`));
+
+    const row = screen.getByTestId(`elaboration-history-row-${elaboration.id}`);
+    expect(row.textContent).toContain(formatCurrency(elaboration.totalCost));
+    expect(row.textContent).toContain(formatCurrency(elaboration.unitCost));
   });
 });

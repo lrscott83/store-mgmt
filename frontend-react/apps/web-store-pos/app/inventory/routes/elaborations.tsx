@@ -44,8 +44,8 @@ export function ElaborationsPage() {
   const [selectedRecipeId, setSelectedRecipeId] = useState('');
   const [selectedWarehouseId, setSelectedWarehouseId] = useState('');
   const [batches, setBatches] = useState('1');
-  /** Real consumed quantities by ingredient productId; absent → theoretical. */
-  const [actuals, setActuals] = useState<Record<string, string>>({});
+  /** Edited real quantities, index-aligned with `plan.components`; absent → theoretical. */
+  const [actuals, setActuals] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [expandedDayKeys, setExpandedDayKeys] = useState<Set<string>>(new Set());
 
@@ -87,10 +87,12 @@ export function ElaborationsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- load reads the services only
   }, [services]);
 
-  // A new recipe/batches/warehouse invalidates the edited actuals: they default
-  // back to the freshly computed theoretical quantities.
+  // A new recipe/batches/warehouse invalidates the edited actuals and any prior
+  // error: the rows default back to the freshly computed theoretical quantities,
+  // and a stale failure message can no longer describe the new selection.
   useEffect(() => {
-    setActuals({});
+    setActuals([]);
+    setError(null);
   }, [selectedRecipeId, selectedWarehouseId, batches]);
 
   const selectedRecipe = recipes.find((recipe) => recipe.id === selectedRecipeId);
@@ -109,11 +111,15 @@ export function ElaborationsPage() {
     return products.find((product) => product.id === productId)?.name ?? productId;
   }
 
-  function actualQtyOf(productId: string, theoreticalQty: number): number {
-    const raw = actuals[productId];
+  function actualQtyOf(index: number, theoreticalQty: number): number {
+    const raw = actuals[index];
     if (raw === undefined) return theoreticalQty;
     const parsed = parseFloat(raw);
-    return Number.isFinite(parsed) ? parsed : 0;
+    // Clamp negatives: a negative "real" quantity has no physical meaning and
+    // would otherwise surface negative preview costs. The service re-validates
+    // and stays the source of truth (`Elaboration.InvalidQty`), so the preview
+    // must never let a negative value contribute either.
+    return Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
   }
 
   // Live real-cost preview: the overhead applies to the REAL ingredient cost,
@@ -121,8 +127,8 @@ export function ElaborationsPage() {
   const realIngredientsCost = plan
     ? round2(
         plan.components.reduce(
-          (sum, component) =>
-            round2(sum + actualQtyOf(component.productId, component.theoreticalQty) * component.costPrice),
+          (sum, component, index) =>
+            round2(sum + actualQtyOf(index, component.theoreticalQty) * component.costPrice),
           0,
         ),
       )
@@ -150,9 +156,9 @@ export function ElaborationsPage() {
       warehouseId: selectedWarehouseId,
       batches: batchesNum,
       actualComponents: plan
-        ? plan.components.map((component) => ({
+        ? plan.components.map((component, index) => ({
             productId: component.productId,
-            actualQty: actualQtyOf(component.productId, component.theoreticalQty),
+            actualQty: actualQtyOf(index, component.theoreticalQty),
           }))
         : undefined,
     });
@@ -291,22 +297,19 @@ export function ElaborationsPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {plan.components.map((component) => {
-                          const actualQty = actualQtyOf(
-                            component.productId,
-                            component.theoreticalQty,
-                          );
+                        {plan.components.map((component, index) => {
+                          const actualQty = actualQtyOf(index, component.theoreticalQty);
                           return (
                             <tr
-                              key={component.productId}
-                              data-testid={`elaboration-row-${component.productId}`}
+                              key={index}
+                              data-testid={`elaboration-row-${index}`}
                               className="border-b border-border last:border-0"
                             >
                               <td className="py-2 pr-2 text-text">
                                 {productName(component.productId)}
                                 {!component.sufficient && (
                                   <span
-                                    data-testid={`elaboration-insufficient-${component.productId}`}
+                                    data-testid={`elaboration-insufficient-${index}`}
                                     className="ml-2 text-xs font-medium text-danger"
                                   >
                                     {intl.formatMessage({ id: 'ELABORATION.INSUFFICIENT_ROW' })}
@@ -322,16 +325,14 @@ export function ElaborationsPage() {
                                   min="0"
                                   step="0.01"
                                   aria-label={`${intl.formatMessage({ id: 'ELABORATION.ACTUAL' })} ${productName(component.productId)}`}
-                                  data-testid={`elaboration-actual-${component.productId}`}
-                                  value={
-                                    actuals[component.productId] ??
-                                    String(component.theoreticalQty)
-                                  }
+                                  data-testid={`elaboration-actual-${index}`}
+                                  value={actuals[index] ?? String(component.theoreticalQty)}
                                   onChange={(e) =>
-                                    setActuals((prev) => ({
-                                      ...prev,
-                                      [component.productId]: e.target.value,
-                                    }))
+                                    setActuals((prev) => {
+                                      const next = [...prev];
+                                      next[index] = e.target.value;
+                                      return next;
+                                    })
                                   }
                                   className="w-24 rounded border border-border bg-background px-2 py-1 text-right text-sm text-text focus:outline-none focus:ring-2 focus:ring-primary"
                                 />

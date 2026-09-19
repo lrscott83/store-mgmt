@@ -199,4 +199,39 @@ describe('RecipesPage — Recetas (feature 120)', () => {
     renderPage();
     expect(screen.getByText('No hay recetas creadas. Crea una para comenzar.')).toBeTruthy();
   });
+
+  it('edits an existing recipe: the modal prefills, save uses the update path and shows the UPDATED toast', async () => {
+    const { recipeId } = seedRecipe();
+    renderPage();
+
+    fireEvent.click(screen.getByTestId('recipe-category-toggle-cat-elaborados'));
+    fireEvent.click(screen.getByTestId(`recipe-edit-${recipeId}`));
+
+    // The modal opens prefilled from the stored recipe.
+    expect(screen.getByTestId('recipe-modal')).toBeTruthy();
+    expect((screen.getByTestId('recipe-product') as HTMLSelectElement).value).toBe('pan');
+    expect((screen.getByTestId('recipe-output-qty') as HTMLInputElement).value).toBe('20');
+    expect((screen.getByTestId('recipe-component-product-0') as HTMLSelectElement).value).toBe(
+      'harina',
+    );
+    expect((screen.getByTestId('recipe-component-qty-0') as HTMLInputElement).value).toBe('3');
+    expect((screen.getByTestId('recipe-labor-cost') as HTMLInputElement).value).toBe('50');
+    expect((screen.getByTestId('recipe-overhead-pct') as HTMLInputElement).value).toBe('10');
+
+    fireEvent.change(screen.getByTestId('recipe-output-qty'), { target: { value: '30' } });
+    fireEvent.click(screen.getByTestId('recipe-save'));
+
+    const service = new RecipeOfflineService(
+      storeId,
+      new ProductRepository(storeId, new ProductCategoryRepository(storeId)),
+    );
+    await waitFor(() => {
+      expect(service.getRecipeById(recipeId)?.outputQty).toBe(30);
+    });
+
+    // Update path: the same recipe id, no second row, still active.
+    expect(service.getStorageRecipes()).toHaveLength(1);
+    expect(service.getRecipeById(recipeId)!.isActive).toBe(true);
+    expect(showToastSuccessMock).toHaveBeenCalledWith('Receta actualizada.');
+  });
 });
