@@ -15,7 +15,7 @@ import type { Page } from '@playwright/test';
  * Uses `owner-admin-with-products` persona.
  */
 
-const ORDERS_TITLE = 'Historial de Ventas'; // ORDERS.TITLE
+const ORDERS_TITLE = 'Ventas'; // ORDERS.TITLE (renamed from 'Historial de Ventas' — user-approved)
 const NO_ORDERS = 'No se encontró ninguna venta'; // ORDERS.NO_ORDERS_FOUND
 const ALL_PAYMENT = 'Todas';
 const CASH = 'Efectivo';

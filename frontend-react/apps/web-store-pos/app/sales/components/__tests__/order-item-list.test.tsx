@@ -49,7 +49,7 @@ describe('OrderItemList — list/table parity sweep (WU6)', () => {
   it('renders rows without a per-row border', () => {
     const { container } = render(
       <Wrapper>
-        <OrderItemList order={makeOrder()} readOnly />
+        <OrderItemList order={makeOrder()} />
       </Wrapper>,
     );
     const row = container.querySelector('tr') as HTMLElement;
@@ -59,7 +59,7 @@ describe('OrderItemList — list/table parity sweep (WU6)', () => {
   it('renders quantity as plain text, not a chip', () => {
     render(
       <Wrapper>
-        <OrderItemList order={makeOrder()} readOnly />
+        <OrderItemList order={makeOrder()} />
       </Wrapper>,
     );
     const qty = screen.getByText('2');
@@ -71,7 +71,7 @@ describe('OrderItemList — list/table parity sweep (WU6)', () => {
   it('renders the line total using formatCurrency (thousands separator)', () => {
     render(
       <Wrapper>
-        <OrderItemList order={makeOrder()} readOnly />
+        <OrderItemList order={makeOrder()} />
       </Wrapper>,
     );
     expect(screen.getByText('$2 000')).toBeInTheDocument();
@@ -82,7 +82,7 @@ describe('OrderItemList — a price never wraps across lines (no-cut invariant)'
   it('renders the line total inside a whitespace-nowrap span', () => {
     render(
       <Wrapper>
-        <OrderItemList order={makeOrder()} readOnly />
+        <OrderItemList order={makeOrder()} />
       </Wrapper>,
     );
     // getByText normalizes NBSP to a regular space, so the text matcher is the
@@ -111,7 +111,6 @@ describe('OrderItemList — a price never wraps across lines (no-cut invariant)'
               },
             ],
           })}
-          readOnly
         />
       </Wrapper>,
     );

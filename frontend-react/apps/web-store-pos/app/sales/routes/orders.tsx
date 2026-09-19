@@ -269,7 +269,22 @@ export function OrdersPage() {
     );
 
     return (
-      <Card padding="tight" title={intl.formatMessage({ id: 'ORDERS.TITLE' })}>
+      <Card
+        padding="tight"
+        title={
+          <div className="flex items-center justify-between">
+            <span className="flex items-center gap-2">
+              {intl.formatMessage({ id: 'ORDERS.TITLE' })}
+              <span className="rounded-full bg-success/10 px-2 py-0.5 text-xs font-semibold text-success">
+                ({totals.count})
+              </span>
+            </span>
+            <span className="text-sm font-semibold text-primary whitespace-nowrap">
+              {formatCurrency(totals.total)}
+            </span>
+          </div>
+        }
+      >
         <MultiStoreSection
           stores={multiStoreStores}
           selectedStoreId={selectedMultiStoreId}
@@ -333,12 +348,6 @@ export function OrdersPage() {
                 </label>
               </fieldset>
             </>
-          }
-          totals={
-            <MultiStoreTotal
-              label={intl.formatMessage({ id: 'ORDERS.TITLE' })}
-              value={totals.total}
-            />
           }
           renderStoreTotals={(store) => {
             const filtered = multiFilteredOrders(storeOrders.get(store.id) ?? []);

@@ -491,12 +491,14 @@ const messages: Record<string, string> = {
   // GENERAL.ORDER (Angular GENERAL.ORDER — used by edit-product-category-modal's order field)
   'GENERAL.ORDER': 'Orden',
 
-  // Orders (Angular ORDERS.* — vocabs/es.ts. ORDERS.TITLE fixed to the exact Angular
-  // string; ORDERS.TODAY_TITLE/DATE/TOTAL/CREDIT_BADGE/EMPTY_STATE/DEACTIVATE*/DATE_FROM/
+  // Orders (Angular ORDERS.* — vocabs/es.ts. ORDERS.TITLE was the exact Angular string
+  // 'Historial de Ventas'; renamed to 'Ventas' (user-approved) so the header reads
+  // «Ventas (n)» with the total on the right — same pattern as Inventory's «Entradas (n)».
+  // ORDERS.TODAY_TITLE/DATE/TOTAL/CREDIT_BADGE/EMPTY_STATE/DEACTIVATE*/DATE_FROM/
   // DATE_TO are now orphaned — the old React-only Orders/TodayOrders implementation used
   // them, replaced this batch by strict Angular parity. Left in place, not pruned, per
   // established no-instruction-to-prune-orphans precedent).
-  'ORDERS.TITLE': 'Historial de Ventas',
+  'ORDERS.TITLE': 'Ventas',
   'ORDERS.NO_ORDERS_FOUND': 'No se encontró ninguna venta',
   // SALES.ORDERS.REPORT_SUSPECT_WARNING — shown when the per-day inventory-at-sale-price
   // export flags suspect products (entries touched on/after the day, or reconstructed
