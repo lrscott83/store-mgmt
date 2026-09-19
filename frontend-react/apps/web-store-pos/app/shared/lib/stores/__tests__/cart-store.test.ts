@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { Product } from '@store-mgmt/domain';
-import { OrderType, PaymentType } from '@store-mgmt/domain';
+import { Currency, OrderType, PaymentType, SalePaymentMethod } from '@store-mgmt/domain';
 import { useCartStore } from '../cart-store';
 
 // getItemQuantity is a 1:1 port of Angular's ShoppingCartService.getCartItemQuantity
@@ -277,6 +277,38 @@ describe('useCartStore.toggleCredit', () => {
     expect(useCartStore.getState().isCredit).toBe(true);
     useCartStore.getState().toggleCredit();
     expect(useCartStore.getState().isCredit).toBe(false);
+  });
+});
+
+// ─── multi-payment rows (multipayments T7) ─────────────────────────────────────
+
+describe('useCartStore — multi-payment rows (multipayments)', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    useCartStore.getState().clear();
+  });
+
+  it('defaults payments to an empty array', () => {
+    expect(useCartStore.getState().payments).toEqual([]);
+  });
+
+  it('setPayments stores the editable rows', () => {
+    const rows = [
+      { id: 'p1', method: SalePaymentMethod.Efectivo, currency: Currency.CUP, amount: 5 },
+      { id: 'p2', method: SalePaymentMethod.Transferencia, currency: Currency.USD, amount: 2 },
+    ];
+    useCartStore.getState().setPayments(rows);
+    expect(useCartStore.getState().payments).toEqual(rows);
+  });
+
+  it('clear() resets the payments alongside the rest of the cart', () => {
+    useCartStore
+      .getState()
+      .setPayments([
+        { id: 'p1', method: SalePaymentMethod.Efectivo, currency: Currency.CUP, amount: 5 },
+      ]);
+    useCartStore.getState().clear();
+    expect(useCartStore.getState().payments).toEqual([]);
   });
 });
 

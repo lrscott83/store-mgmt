@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { Product } from '@store-mgmt/domain';
 import { Currency, OrderType, PaymentType, SalePaymentMethod } from '@store-mgmt/domain';
+import type { MultiPaymentRow } from '~/shared/components/multipayments/multi-payment-list';
 import { round2 } from '~/shared/lib/money';
 
 export interface CartItem {
@@ -26,6 +27,14 @@ interface CartState {
   paymentType: PaymentType;
   /** payment-methods-percent-tax (plan 2026-09-17): método real de la venta en curso. */
   salePaymentMethod: SalePaymentMethod;
+  /**
+   * multipayments (plan 2026-09-18, T7): filas de pago de la venta en curso, en la
+   * representación editable que consume `MultiPaymentList` (id + método + moneda +
+   * monto). Se persisten con el carrito para no perder el trabajo del vendedor al
+   * recargar; la conversión a `OrderPayment[]` (tasas congeladas / montos en la
+   * moneda de la orden) ocurre en el momento de registrar la venta.
+   */
+  payments: MultiPaymentRow[];
   isCredit: boolean;
   clientName: string;
   addItem: (product: Product, quantity?: number, orderType?: OrderType, price?: number) => void;
@@ -36,6 +45,7 @@ interface CartState {
   updateQuantity: (productId: string, qty: number, price?: number) => void;
   setPaymentType: (type: PaymentType) => void;
   setSalePaymentMethod: (method: SalePaymentMethod) => void;
+  setPayments: (payments: MultiPaymentRow[]) => void;
   setClientName: (name: string) => void;
   toggleCredit: () => void;
   /** 1:1 port of Angular's ShoppingCartService.updateOrderDetails (shopping-cart.service.ts:38-41). */
@@ -59,6 +69,7 @@ export const useCartStore = create<CartState>()(
       orderDescription: undefined,
       paymentType: PaymentType.Efectivo,
       salePaymentMethod: SalePaymentMethod.Efectivo,
+      payments: [],
       isCredit: false,
       clientName: '',
 
@@ -107,6 +118,10 @@ export const useCartStore = create<CartState>()(
         set({ salePaymentMethod: method });
       },
 
+      setPayments: (payments: MultiPaymentRow[]) => {
+        set({ payments });
+      },
+
       setClientName: (name: string) => {
         set({ clientName: name });
       },
@@ -130,6 +145,7 @@ export const useCartStore = create<CartState>()(
           orderDescription: '',
           paymentType: PaymentType.Efectivo,
           salePaymentMethod: SalePaymentMethod.Efectivo,
+          payments: [],
           isCredit: false,
           clientName: '',
         });

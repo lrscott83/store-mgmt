@@ -79,10 +79,26 @@ vi.mock('~/shared/lib/stores/auth-store', () => {
   return { useAuthStore };
 });
 
+// MultiPayments (módulo 16): MultiPaymentList lee el registro de tasas de la tienda.
+// Los tests lo dejan vacío (las rutas misma-moneda no necesitan tasa) y evitan el
+// almacenamiento cifrado real.
+let mockChannelRates: ChannelRate[] = [];
+vi.mock('~/management/channel-rates/lib/services/channel-rate-offline-service', () => ({
+  ChannelRateOfflineService: class {
+    constructor(_storeId: string) {
+      void _storeId;
+    }
+    getStorageChannelRates(): ChannelRate[] {
+      return mockChannelRates;
+    }
+  },
+}));
+
 import { useCartStore } from '~/shared/lib/stores/cart-store';
 import { CartShell } from '../cart-shell';
-import { PaymentType, OrderType, EModules, SalePaymentMethod } from '@store-mgmt/domain';
-import type { Product } from '@store-mgmt/domain';
+import { PaymentType, OrderType, EModules, SalePaymentMethod, Currency } from '@store-mgmt/domain';
+import type { ChannelRate, Product } from '@store-mgmt/domain';
+import type { MultiPaymentRow } from '~/shared/components/multipayments/multi-payment-list';
 
 function makeProduct(overrides: Partial<Product> = {}): Product {
   return {
@@ -1064,5 +1080,109 @@ describe('CartShell — venta mayorista mostrada en paquetes', () => {
     });
     renderCartShell();
     expect(screen.getByTestId('cart-badge')).toHaveTextContent('10');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MultiPayments (módulo 16) — la lista reemplaza el bloque legacy de pago y
+// gobierna el submit de la venta (plan 2026-09-18, T7).
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('CartShell — multi-payment list (módulo 16)', () => {
+  const MULTI_PAYMENTS_STORE_MODULES = [11, EModules.MultiPayments];
+
+  function paymentRow(overrides: Partial<MultiPaymentRow> = {}): MultiPaymentRow {
+    return {
+      id: 'row-1',
+      method: SalePaymentMethod.Efectivo,
+      currency: Currency.CUP,
+      amount: 5,
+      ...overrides,
+    };
+  }
+
+  function mockMultiPaymentCart(overrides = {}) {
+    const product = makeProduct({ price: 5 });
+    mockCartState({
+      items: [{ product, quantity: 1 }],
+      total: vi.fn().mockReturnValue(5),
+      cartCurrency: () => Currency.CUP,
+      payments: [],
+      setPayments: vi.fn(),
+      ...overrides,
+    });
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUser = { selectedStoreId: 's1', storeModuleIds: MULTI_PAYMENTS_STORE_MODULES };
+    mockChannelRates = [];
+    mockProductLookup = {};
+  });
+
+  it('renders the multi-payment list and hides the legacy method radios / amount input', () => {
+    mockMultiPaymentCart({ payments: [paymentRow()] });
+    renderCartShell();
+    openCart();
+
+    expect(screen.getByTestId('multi-payment-list')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Pago')).not.toBeInTheDocument();
+    expect(screen.queryAllByRole('radio')).toHaveLength(0);
+  });
+
+  it('keeps the legacy payment block when module 16 is absent (regression guard)', () => {
+    mockUser = { selectedStoreId: 's1', storeModuleIds: [11] };
+    mockMultiPaymentCart();
+    renderCartShell();
+    openCart();
+
+    expect(screen.queryByTestId('multi-payment-list')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Pago')).toBeInTheDocument();
+    expect(screen.getAllByRole('radio').length).toBeGreaterThan(0);
+  });
+
+  it('submitting with payments passes the converted OrderPayment[] and derives the legacy method from the first payment', async () => {
+    const payments = [
+      paymentRow({ id: 'row-1', method: SalePaymentMethod.Transferencia, amount: 5 }),
+    ];
+    mockMultiPaymentCart({ payments });
+    renderCartShell();
+    openCart();
+
+    fireEvent.click(screen.getByText('Registrar'));
+
+    await waitFor(() => expect(createOrderMock).toHaveBeenCalledTimes(1));
+    const args = createOrderMock.mock.calls[0];
+    // 7th positional (index 6): the authoritative method, from the FIRST payment.
+    expect(args[6]).toBe(SalePaymentMethod.Transferencia);
+    // 8th positional (index 7): the persisted payments (amounts in cents).
+    expect(args[7]).toEqual([
+      {
+        method: SalePaymentMethod.Transferencia,
+        currency: Currency.CUP,
+        amount: 500,
+        rateApplied: 1,
+        rateMethod: null,
+        rateCurrency: null,
+        rateEffectiveFrom: null,
+        amountInOrderCurrency: 500,
+      },
+    ]);
+  });
+
+  it('disables the submit while a paid sale is not covered by the payments', () => {
+    mockMultiPaymentCart({ payments: [paymentRow({ amount: 1 })] });
+    renderCartShell();
+    openCart();
+
+    expect(screen.getByText('Registrar').closest('button')).toBeDisabled();
+  });
+
+  it('enables the submit once the payments cover the total', () => {
+    mockMultiPaymentCart({ payments: [paymentRow({ amount: 5 })] });
+    renderCartShell();
+    openCart();
+
+    expect(screen.getByText('Registrar').closest('button')).not.toBeDisabled();
   });
 });

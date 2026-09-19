@@ -1,6 +1,7 @@
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState, useEffect, useMemo } from 'react';
 import { useIntl } from 'react-intl';
 import type { Product } from '@store-mgmt/domain';
+import type { ChannelRate } from '@store-mgmt/domain';
 import { Currency } from '@store-mgmt/domain';
 import {
   SalePaymentMethod,
@@ -44,6 +45,9 @@ import { round2 } from '~/shared/lib/money';
 import { formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency';
 import { readCartCurrencyPreference } from '~/shared/lib/cart-currency-preference';
 import { CartCurrencySelect } from '~/shared/components/multipayments/cart-currency-select';
+import { MultiPaymentList } from '~/shared/components/multipayments/multi-payment-list';
+import { settleMultiPayments } from '~/shared/components/multipayments/multi-payment-settlement';
+import { ChannelRateOfflineService } from '~/management/channel-rates/lib/services/channel-rate-offline-service';
 import { Switch } from '~/shared/components/ui/switch';
 import { InfoBox } from '~/shared/components/ui/info-box';
 
@@ -216,6 +220,10 @@ export function CartShell() {
     // viejos sin el campo.
     salePaymentMethod = SalePaymentMethod.Efectivo,
     setSalePaymentMethod = () => {},
+    // MultiPayments (módulo 16): filas del multi-pago de la venta en curso.
+    // Defaults defensivos para mocks de test y perfiles persistidos viejos.
+    payments = [],
+    setPayments = () => {},
   } = useCartStore();
   const user = useAuthStore((s) => s.user);
   const creditsModuleAvailable = user ? hasCreditsModuleAvailable(user) : false;
@@ -257,6 +265,38 @@ export function CartShell() {
   const paymentReturn = getPaymentReturn(payment, totalAmount);
   const paymentReturnKind = getPaymentReturnKind(paymentReturn);
   const cashSale = isCashMethod(salePaymentMethod);
+
+  // MultiPayments (módulo 16): las filas se convierten a la moneda del carrito con
+  // el MISMO registro de tasas que usa la lista, para que el bloqueo de "Registrar"
+  // coincida exactamente con el bloqueo de cobro de la propia lista.
+  const multiPaymentRates = useMemo<ChannelRate[]>(() => {
+    if (!multiPaymentsAvailable || typeof window === 'undefined' || !storeId) return [];
+    return new ChannelRateOfflineService(storeId).getStorageChannelRates();
+  }, [multiPaymentsAvailable, storeId]);
+
+  const multiPaymentOrderCurrency = cartCurrency();
+  const multiPaymentSettlement = useMemo(
+    () =>
+      multiPaymentsAvailable
+        ? settleMultiPayments(
+            payments,
+            multiPaymentOrderCurrency,
+            totalAmount,
+            multiPaymentRates,
+            new Date(),
+          )
+        : { orderPayments: [], remainingCents: 0, firstError: null },
+    [multiPaymentsAvailable, payments, multiPaymentOrderCurrency, totalAmount, multiPaymentRates],
+  );
+
+  // El cierre se bloquea mientras la venta no esté cubierta por los pagos (misma
+  // razón que la lista: falta cubrir, o una fila no se pudo convertir). Las ventas
+  // a crédito conservan su camino de validación propio (pueden quedar subpagadas).
+  const multiPaymentBlocked =
+    multiPaymentsAvailable &&
+    items.length > 0 &&
+    !isCredit &&
+    (multiPaymentSettlement.firstError !== null || multiPaymentSettlement.remainingCents > 0);
 
   function resetTransientFields() {
     setPayment(undefined);
@@ -391,6 +431,13 @@ export function CartShell() {
       return;
     }
 
+    // MultiPayments (módulo 16): con filas de pago, el método legacy se deriva del
+    // PRIMER pago (best-effort de compatibilidad con lectores viejos); el dato
+    // autoritativo es la lista `payments` persistida en la orden. Sin filas, todo
+    // queda EXACTAMENTE como antes (método del carrito).
+    const hasMultiPayments = multiPaymentsAvailable && payments.length > 0;
+    const effectiveSalePaymentMethod = hasMultiPayments ? payments[0].method : salePaymentMethod;
+
     setIsSubmitting(true);
     try {
       const storeId = user?.selectedStoreId ?? '';
@@ -400,11 +447,12 @@ export function CartShell() {
         orderType,
         isCredit,
         // Legacy derivado del método real (compatibilidad de datos); el campo
-        // autoritativo es `salePaymentMethod`, último parámetro.
-        salePaymentMethodToLegacyPaymentType(salePaymentMethod, saleCurrency),
+        // autoritativo es `salePaymentMethod`, séptimo parámetro.
+        salePaymentMethodToLegacyPaymentType(effectiveSalePaymentMethod, saleCurrency),
         orderDescription,
         clientName.trim(),
-        salePaymentMethod,
+        effectiveSalePaymentMethod,
+        hasMultiPayments ? multiPaymentSettlement.orderPayments : undefined,
       );
       if (!result.succeeded) {
         // Angular createOrder `else` branch (nav-right.component.ts:222-225):
@@ -510,7 +558,7 @@ export function CartShell() {
                 <button
                   type="button"
                   onClick={handleCreateOrder}
-                  disabled={itemCount === 0 || isSubmitting}
+                  disabled={itemCount === 0 || isSubmitting || multiPaymentBlocked}
                   className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary-hover transition-colors disabled:opacity-50"
                 >
                   {intl.formatMessage({ id: 'SHOPPING_CART.REGISTER' })}
@@ -526,76 +574,91 @@ export function CartShell() {
               testId="cart-currency-select"
             />
 
-            {/* Payment / Vuelto row — payment-methods-percent-tax (plan 2026-09-17):
-              "con cuánto paga" y el vuelto aplican SOLO en efectivo (misma moneda de la
-              venta, sin cambio); en Transferencia/Zelle se ocultan. */}
-            {cashSale ? (
-            <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
-              <span
-                className={
-                  paymentReturnKind === 'positive'
-                    ? 'text-xs font-medium text-success'
-                    : paymentReturnKind === 'negative'
-                      ? 'text-xs font-medium text-danger'
-                      : 'text-xs font-medium text-text-muted'
-                }
-              >
-                Vuelto: {paymentReturn < 0 ? '-' : ''}
-                {money(Math.abs(paymentReturn))}
-              </span>
-              <input
-                type="number"
-                min={0}
-                autoComplete="off"
-                disabled={itemCount === 0}
-                value={payment ?? ''}
-                onChange={(e) =>
-                  setPayment(e.target.value === '' ? undefined : Number(e.target.value))
-                }
-                aria-label={intl.formatMessage({ id: 'GENERAL.PAY' })}
-                placeholder={intl.formatMessage({ id: 'GENERAL.PAY' })}
-                className="w-36 rounded-md border border-border px-2 py-1 text-xs text-right focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
+            {/* MultiPayments (módulo 16): con ítems en el carrito, la lista de pagos
+              reemplaza el bloque legacy de pago (el "con cuánto paga"/vuelto y el
+              selector de método). Sin el módulo, o con el carrito vacío, se renderiza
+              EXACTAMENTE el bloque legacy (los E2E existentes no tienen el módulo). */}
+            {multiPaymentsAvailable && items.length > 0 ? (
+              <MultiPaymentList
+                payments={payments}
+                onChange={setPayments}
+                orderCurrency={multiPaymentOrderCurrency}
+                total={totalAmount}
               />
-            </div>
             ) : (
-              /* Transferencia/Zelle: sin vuelto ni "con cuánto paga" — el cobro no es
-                 en efectivo. Fila informativa para conservar el ritmo visual. */
-              <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
-                <span className="text-xs font-medium text-text-muted">
-                  {salePaymentMethodLabel(salePaymentMethod, saleCurrency)}
-                </span>
-              </div>
-            )}
+              <>
+                {/* Payment / Vuelto row — payment-methods-percent-tax (plan 2026-09-17):
+                  "con cuánto paga" y el vuelto aplican SOLO en efectivo (misma moneda de la
+                  venta, sin cambio); en Transferencia/Zelle se ocultan. */}
+                {cashSale ? (
+                <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
+                  <span
+                    className={
+                      paymentReturnKind === 'positive'
+                        ? 'text-xs font-medium text-success'
+                        : paymentReturnKind === 'negative'
+                          ? 'text-xs font-medium text-danger'
+                          : 'text-xs font-medium text-text-muted'
+                    }
+                  >
+                    Vuelto: {paymentReturn < 0 ? '-' : ''}
+                    {money(Math.abs(paymentReturn))}
+                  </span>
+                  <input
+                    type="number"
+                    min={0}
+                    autoComplete="off"
+                    disabled={itemCount === 0}
+                    value={payment ?? ''}
+                    onChange={(e) =>
+                      setPayment(e.target.value === '' ? undefined : Number(e.target.value))
+                    }
+                    aria-label={intl.formatMessage({ id: 'GENERAL.PAY' })}
+                    placeholder={intl.formatMessage({ id: 'GENERAL.PAY' })}
+                    className="w-36 rounded-md border border-border px-2 py-1 text-xs text-right focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
+                  />
+                </div>
+                ) : (
+                  /* Transferencia/Zelle: sin vuelto ni "con cuánto paga" — el cobro no es
+                     en efectivo. Fila informativa para conservar el ritmo visual. */
+                  <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
+                    <span className="text-xs font-medium text-text-muted">
+                      {salePaymentMethodLabel(salePaymentMethod, saleCurrency)}
+                    </span>
+                  </div>
+                )}
 
-            {/* Payment-method selector — radio group por MONEDA de la venta
-              (payment-methods-percent-tax, plan 2026-09-17): cada método con su ícono +
-              etiqueta ("Transferencia (CUP)" incluye su moneda). Reemplaza al selector
-              fijo Efectivo/Tarjeta. */}
-            <div className="border-b border-border px-4 py-3">
-              <div className="flex flex-wrap gap-4" role="radiogroup">
-                {methodOptions.map((method) => {
-                  const kind = salePaymentMethodIconKind(method);
-                  const label = salePaymentMethodLabel(method, saleCurrency);
-                  return (
-                    <label
-                      key={method}
-                      className="flex items-center gap-1.5 cursor-pointer text-xs font-medium text-text"
-                    >
-                      <input
-                        type="radio"
-                        name="payment-type"
-                        data-testid={`payment-method-${method}`}
-                        checked={salePaymentMethod === method}
-                        onChange={() => setSalePaymentMethod(method)}
-                        className="text-primary focus:ring-primary"
-                      />
-                      <PaymentTypeIcon kind={kind} />
-                      {label}
-                    </label>
-                  );
-                })}
-              </div>
-            </div>
+                {/* Payment-method selector — radio group por MONEDA de la venta
+                  (payment-methods-percent-tax, plan 2026-09-17): cada método con su ícono +
+                  etiqueta ("Transferencia (CUP)" incluye su moneda). Reemplaza al selector
+                  fijo Efectivo/Tarjeta. */}
+                <div className="border-b border-border px-4 py-3">
+                  <div className="flex flex-wrap gap-4" role="radiogroup">
+                    {methodOptions.map((method) => {
+                      const kind = salePaymentMethodIconKind(method);
+                      const label = salePaymentMethodLabel(method, saleCurrency);
+                      return (
+                        <label
+                          key={method}
+                          className="flex items-center gap-1.5 cursor-pointer text-xs font-medium text-text"
+                        >
+                          <input
+                            type="radio"
+                            name="payment-type"
+                            data-testid={`payment-method-${method}`}
+                            checked={salePaymentMethod === method}
+                            onChange={() => setSalePaymentMethod(method)}
+                            className="text-primary focus:ring-primary"
+                          />
+                          <PaymentTypeIcon kind={kind} />
+                          {label}
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              </>
+            )}
 
             {/* Credit toggle + client input — gated by hasCreditsModuleAvailable, matching
               Angular's @if (hasCreditsModuleAvailable) block */}
