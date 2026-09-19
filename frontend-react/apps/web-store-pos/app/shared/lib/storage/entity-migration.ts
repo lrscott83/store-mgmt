@@ -14,7 +14,7 @@
 //
 // NEVER BLOCKS LOGIN: the caller (`auth-store.login` / `authenticateOffline`,
 // both in WU11) wraps this call in `try {} catch {}`. Per-key isolation
-// below means a single quota/storage failure never aborts the other six —
+// below means a single quota/storage failure never aborts the remaining keys —
 // the worst outcome is "still plaintext", never "cannot log in".
 //
 // device-wrapped-dek design §4: guard and scope now derive from the SAME
@@ -69,7 +69,7 @@ export function runEntityMigration(): void {
       // Per-key isolation (entity-migration spec): swallow so the loop
       // continues to the next key. The caller also swallows around the
       // whole call, but keeping isolation at the per-key level is what
-      // lets keys 4-6 still convert when key 3 fails.
+      // lets the remaining keys still convert when one fails.
     }
   }
 }

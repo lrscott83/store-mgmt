@@ -9,6 +9,8 @@ import { ExpenseOfflineService } from '~/expenses/lib/services/expense-offline-s
 import { SaleCreditOfflineService } from '~/sales/lib/services/sale-credit-offline-service';
 import { ExchangeRateOfflineService } from '~/management/exchange-rates/lib/services/exchange-rate-offline-service';
 import { WarehouseOfflineService } from '~/inventory/lib/services/warehouse-offline-service';
+import { RecipeOfflineService } from '~/inventory/lib/services/recipe-offline-service';
+import { ElaborationOfflineService } from '~/inventory/lib/services/elaboration-offline-service';
 import { DataSerializerService } from '~/sync/lib/services/data-serializer-service';
 import { ExportForm } from '~/sync/components/export-form';
 
@@ -34,6 +36,14 @@ export function ExportPage() {
     const creditSvc = new SaleCreditOfflineService(storeId);
     const exchangeRateSvc = new ExchangeRateOfflineService(storeId);
     const warehouseSvc = new WarehouseOfflineService(storeId, productRepo, inventorySvc);
+    const recipeSvc = new RecipeOfflineService(storeId, productRepo);
+    const elaborationSvc = new ElaborationOfflineService(
+      storeId,
+      productRepo,
+      recipeSvc,
+      warehouseSvc,
+      inventorySvc,
+    );
 
     const serializer = new DataSerializerService(
       storeId,
@@ -45,6 +55,8 @@ export function ExportPage() {
       creditSvc,
       exchangeRateSvc,
       warehouseSvc,
+      recipeSvc,
+      elaborationSvc,
     );
 
     const payload = await serializer.export(password);
@@ -92,6 +104,14 @@ export function ExportPage() {
     const creditSvc = new SaleCreditOfflineService(storeId);
     const exchangeRateSvc = new ExchangeRateOfflineService(storeId);
     const warehouseSvc = new WarehouseOfflineService(storeId, productRepo, inventorySvc);
+    const recipeSvc = new RecipeOfflineService(storeId, productRepo);
+    const elaborationSvc = new ElaborationOfflineService(
+      storeId,
+      productRepo,
+      recipeSvc,
+      warehouseSvc,
+      inventorySvc,
+    );
 
     const serializer = new DataSerializerService(
       storeId,
@@ -103,6 +123,8 @@ export function ExportPage() {
       creditSvc,
       exchangeRateSvc,
       warehouseSvc,
+      recipeSvc,
+      elaborationSvc,
     );
 
     const data = await serializer.exportPlainData();

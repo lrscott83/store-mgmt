@@ -17,11 +17,12 @@ export const StorageKeys = {
 } as const;
 
 /**
- * The seven business entities persisted per store, in the order their storage
- * seams landed. Single source of truth: consumed by `entity-migration.ts`
- * (which encrypts them) and `store-data-reset.ts` (which wipes them). A new
- * entity added here reaches both, which is the point — a private copy in
- * either module would let a wipe silently miss one.
+ * The business entities persisted per store, in the order their storage seams
+ * landed. Single source of truth: consumed by `entity-migration.ts` (which
+ * encrypts them), `store-data-reset.ts` (which wipes them) and
+ * `damaged-data-recovery.ts` (which reports them). A new entity added here
+ * reaches all three, which is the point — a private copy in any module would
+ * let a wipe silently miss one.
  */
 export const BUSINESS_ENTITY_NAMES = [
   'products',
@@ -34,4 +35,8 @@ export const BUSINESS_ENTITY_NAMES = [
   'warehouses',
   'warehouse-stock-levels',
   'warehouse-stock-movements',
+  // elaboration-module: recetas + elaboraciones, the two entities the
+  // production module persists offline per store.
+  'recipes',
+  'elaborations',
 ] as const;

@@ -19,6 +19,8 @@ import type {
   Warehouse,
   WarehouseStockLevel,
   WarehouseStockMovement,
+  Recipe,
+  Elaboration,
 } from '@store-mgmt/domain';
 import type { ProductCategoryRepository } from '~/sales/lib/repositories/product-category-repository';
 import type { ProductRepository } from '~/sales/lib/repositories/product-repository';
@@ -81,6 +83,10 @@ export const EDataFileName = {
   Warehouses: 'warehouses.json',
   WarehouseStockLevels: 'warehouse-stock-levels.json',
   WarehouseStockMovements: 'warehouse-stock-movements.json',
+  // elaboration-module: recipes and elaborations, absent from legacy
+  // archives (parsed as [] on import) and always written by exports.
+  Recipes: 'recipes.json',
+  Elaborations: 'elaborations.json',
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -89,7 +95,7 @@ export const EDataFileName = {
 //
 // v2 adds an unencrypted `meta.json` FIRST entry (V2-01) so a password-free
 // central-directory scan can detect the format and validate the store claim
-// before any decryption or write (V2-05). The 7 data entries keep the
+// before any decryption or write (V2-05). The data entries keep the
 // Angular-compatible names and stay AES-encrypted under a password-only Web
 // Crypto PBKDF2 key (V2-03). Legacy v1 archives — which have no meta.json —
 // are still imported via the `password + selectedStoreId` fallback (V2-07).
@@ -175,6 +181,11 @@ export interface ParsedData {
   warehouses: Warehouse[];
   warehouseStockLevels: WarehouseStockLevel[];
   warehouseStockMovements: WarehouseStockMovement[];
+  // elaboration-module: OPTIONAL so the literals built by pre-existing sync
+  // tests/call sites keep compiling. `parseContents` always populates them
+  // (legacy archives → []), so real imports never see `undefined`.
+  recipes?: Recipe[];
+  elaborations?: Elaboration[];
 }
 
 // ---------------------------------------------------------------------------
@@ -213,6 +224,21 @@ export interface WarehouseReader {
   getStorageMovements(): WarehouseStockMovement[];
 }
 
+/**
+ * Recipe read seam — the raw stored-JSON string straight from the offline
+ * service (elaboration-module). Mirrors the exchange-rates reader shape, but
+ * reads the service's already-serialized JSON seam rather than an array (the
+ * recipe service exposes `getStorageRecipesJson`).
+ */
+export interface RecipeReader {
+  getStorageRecipesJson(): string;
+}
+
+/** Elaboration read seam — mirror of {@link RecipeReader}. */
+export interface ElaborationReader {
+  getStorageElaborationsJson(): string;
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -236,9 +262,10 @@ function parseJson<T>(contents: Map<string, string>, name: string, fallback: T):
  *
  * v2 envelope (sync-export-import-v2): a ZIP whose FIRST entry is the
  * unencrypted `meta.json` envelope (formatVersion 2, fresh per-export salt,
- * iterations, storeId, exportedAt) followed by the 7 data entries (the 6
- * Angular-named originals + `exchange-rates.json`, daily-exchange-rate)
- * entries (data.file.model.ts EDataFileName parity) each AES-encrypted under
+ * iterations, storeId, exportedAt) followed by the data entries (the 6
+ * Angular-named originals plus exchange-rates, warehouses and the
+ * elaboration module's recipes/elaborations — data.file.model.ts
+ * EDataFileName parity) each AES-encrypted under
  * the password-only PBKDF2 key described by meta.json. Legacy v1 archives —
  * and real Angular-exported archives, which carry no meta.json — import via
  * the `password + selectedStoreId` fallback. React never imports a real
@@ -262,6 +289,10 @@ export class DataSerializerService {
     // module omit it; exports then write empty entries and imports parse []
     // for archives that carry none.
     private readonly warehouseReader?: WarehouseReader,
+    // Optional (elaboration-module): same legacy-call-site allowance as above;
+    // exports then write `[]` and imports parse [] for archives without them.
+    private readonly recipeReader?: RecipeReader,
+    private readonly elaborationReader?: ElaborationReader,
   ) {}
 
   private derivePassword(password: string): string {
@@ -271,8 +302,8 @@ export class DataSerializerService {
   }
 
   /**
-   * Reads all 7 entities and writes them as a v2 ZIP: an unencrypted
-   * `meta.json` envelope first, then the 7 data entries each
+   * Reads all entities and writes them as a v2 ZIP: an unencrypted
+   * `meta.json` envelope first, then the data entries each
    * AES-encrypted with the per-export password-only key. zip.js's internal
    * PBKDF2-SHA-1 @ 1000-iteration KDF still runs over the per-entry key — it
    * is buried, not replaced (V2-04); the outer Web Crypto KDF dominates the
@@ -314,6 +345,9 @@ export class DataSerializerService {
     const warehousesJson = JSON.stringify(warehouses);
     const warehouseStockLevelsJson = JSON.stringify(warehouseStockLevels);
     const warehouseStockMovementsJson = JSON.stringify(warehouseStockMovements);
+    // elaboration-module: passthrough from the services' own raw-JSON seams.
+    const recipesJson = this.recipeReader?.getStorageRecipesJson() ?? '[]';
+    const elaborationsJson = this.elaborationReader?.getStorageElaborationsJson() ?? '[]';
 
     // v2 envelope: a fresh salt per export (V2-02), password-only key (V2-03).
     const salt = crypto.getRandomValues(new Uint8Array(V2_SALT_BYTES));
@@ -372,13 +406,19 @@ export class DataSerializerService {
         rawPassword: key,
       },
     );
+    await zipWriter.add(EDataFileName.Recipes, new TextReader(recipesJson), {
+      rawPassword: key,
+    });
+    await zipWriter.add(EDataFileName.Elaborations, new TextReader(elaborationsJson), {
+      rawPassword: key,
+    });
 
     const blob = await zipWriter.close();
     return new Uint8Array(await blob.arrayBuffer());
   }
 
   /**
-   * Decrypts and parses all 7 entries. v2 archives (meta.json present)
+   * Decrypts and parses all entries. v2 archives (meta.json present)
    * validate the store claim BEFORE any decryption (WrongStoreError, V2-05);
    * legacy v1 archives (no meta.json — including Angular exports) fall back
    * to `password + selectedStoreId` (V2-07). Throws WrongPasswordError /
@@ -389,7 +429,7 @@ export class DataSerializerService {
     const blob = new Blob([payload]);
     // No reader-level password on purpose: zip.js reads the central directory
     // password-free for ANY archive, which is what lets a mixed v2 ZIP expose
-    // meta.json plaintext while the 7 data entries stay encrypted (V2-01).
+    // meta.json plaintext while the data entries stay encrypted (V2-01).
     const zipReader = new ZipReader(new BlobReader(blob));
 
     let entries: Awaited<ReturnType<typeof zipReader.getEntries>>;
@@ -415,7 +455,7 @@ export class DataSerializerService {
   /**
    * v2 path: reads the plaintext meta.json envelope, validates it, checks the
    * store claim (V2-05 — throws WrongStoreError BEFORE deriving the key or
-   * writing anything), then decrypts the 7 data entries with the derived key
+   * writing anything), then decrypts the data entries with the derived key
    * (V2-06 wrong-password semantics unchanged).
    */
   private async importV2(
@@ -508,6 +548,13 @@ export class DataSerializerService {
     const warehouses = this.warehouseReader?.getStorageWarehouses() ?? [];
     const warehouseStockLevels = this.warehouseReader?.getStorageStockLevels() ?? [];
     const warehouseStockMovements = this.warehouseReader?.getStorageMovements() ?? [];
+    // elaboration-module: parse the services' raw-JSON seams (reader optional).
+    const recipes = this.recipeReader
+      ? (JSON.parse(this.recipeReader.getStorageRecipesJson()) as Recipe[])
+      : [];
+    const elaborations = this.elaborationReader
+      ? (JSON.parse(this.elaborationReader.getStorageElaborationsJson()) as Elaboration[])
+      : [];
 
     // Categories and products: read raw JSON and parse
     const categoriesJson = this.categoryRepository.getCategoriesJson() ?? '[]';
@@ -535,6 +582,8 @@ export class DataSerializerService {
       warehouses,
       warehouseStockLevels,
       warehouseStockMovements,
+      recipes,
+      elaborations,
     };
   }
 
@@ -582,6 +631,9 @@ export class DataSerializerService {
         EDataFileName.WarehouseStockMovements,
         [],
       ),
+      // Legacy archives (v1/Angular) carry no recipes/elaborations → [].
+      recipes: parseJson<Recipe[]>(contents, EDataFileName.Recipes, []),
+      elaborations: parseJson<Elaboration[]>(contents, EDataFileName.Elaborations, []),
     };
   }
 }
