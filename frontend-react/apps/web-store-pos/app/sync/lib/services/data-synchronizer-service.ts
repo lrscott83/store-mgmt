@@ -100,6 +100,11 @@ export const SynchronizerErrors = {
     code: 'Synchronizer.ElaborationsUnexpectedError',
     message: 'Ocurrió un error inesperado al sincronizar las elaboraciones.',
   },
+  ElaborationsMissingWarehouseService: {
+    code: 'Synchronizer.ElaborationsMissingWarehouseService',
+    message:
+      'No se pudieron sincronizar las elaboraciones porque falta el servicio de almacenes requerido para validar el almacén.',
+  },
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -1001,19 +1006,32 @@ export class DataSynchronizerService {
    * unexpected throw yields `ElaborationsUnexpectedError`.
    *
    * The warehouse-existence rule can only be evaluated when the OPTIONAL
-   * `warehouseService` was injected. When it was not (legacy constructor call
-   * sites that predate the warehouses module), the merged warehouse set is
-   * unknown and a naive check would reject EVERY non-empty elaborations import
-   * as `ElaborationsUnexpectedError` — a missing dependency reported as a data
-   * error. That is not a validation failure, so the merge degrades to a
-   * zero-count no-op, the same contract every other optional-service-routed
-   * merge keeps (exchange rates/warehouses/recipes). Whenever the warehouse
-   * service IS injected the rule stays fully enforced.
+   * `warehouseService` was injected. When it was not, the merged warehouse set
+   * is unknown and the rule cannot be evaluated at all; that is a configuration
+   * problem, not a data error and not a success. So when the elaboration
+   * service is present, the warehouse service is MISSING, and the incoming
+   * batch is NON-EMPTY, the merge returns the explicit
+   * `ElaborationsMissingWarehouseService` error (break-only, no writes) rather
+   * than silently discarding every incoming elaboration as a zero-count
+   * success. The `!elaborationService` case keeps its legacy zero-count no-op
+   * contract (call sites that predate the elaborations module), and an empty
+   * batch is still a no-op (nothing to merge is not a failure). Whenever the
+   * warehouse service IS injected the rule stays fully enforced.
    */
   private mergeElaborationsViaService(incoming: Elaboration[]): MergeOutcome {
     const entity = 'elaborations';
-    if (!this.elaborationService || !this.warehouseService || incoming.length === 0) {
+    if (!this.elaborationService || incoming.length === 0) {
       return { merge: { entity, inserted: 0, updated: 0 } };
+    }
+    if (!this.warehouseService) {
+      return {
+        merge: { entity, inserted: 0, updated: 0 },
+        error: {
+          entity,
+          code: SynchronizerErrors.ElaborationsMissingWarehouseService.code,
+          message: SynchronizerErrors.ElaborationsMissingWarehouseService.message,
+        },
+      };
     }
 
     let inserted = 0;

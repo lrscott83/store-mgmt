@@ -516,14 +516,15 @@ describe('DataSynchronizerService — elaborations merge (elaboration-module)', 
     expect(err?.code).toBe(SynchronizerErrors.ElaborationsUnexpectedError.code);
   });
 
-  it('degrades to a zero-count no-op when the elaboration service is injected without the warehouse service (R3-WAREHOUSE)', async () => {
+  it('fails with the explicit missing-warehouse-service error when the warehouse service is not injected (R3-WAREHOUSE-NOOP)', async () => {
     const elaborationSvc = makeElaborationService();
     const svc = makeSynchronizer({ elaborationSvc });
 
     const result = await svc.sync(makeData([], [makeElaboration('el-1', 'wh-1')]));
 
-    expect(result.succeeded).toBe(true);
-    expect(result.errors).toHaveLength(0);
+    expect(result.succeeded).toBe(false);
+    const err = result.errors.find((e) => e.entity === 'elaborations');
+    expect(err?.code).toBe(SynchronizerErrors.ElaborationsMissingWarehouseService.code);
     expect(result.merges.find((m) => m.entity === 'elaborations')).toEqual({
       entity: 'elaborations',
       inserted: 0,
