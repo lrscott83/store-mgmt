@@ -70,7 +70,7 @@ vi.mock('~/shared/lib/i18n/es', () => ({
 // Superior panel (SuperAdmin pass-through, task 4.3).
 
 type AdminAuthUser = Pick<UserModel, 'isSuperAdmin'>;
-let mockAdminUser: AdminAuthUser | null = { isSuperAdmin: true };
+const mockAdminUser: AdminAuthUser | null = { isSuperAdmin: true };
 
 vi.mock('~/shared/lib/stores/auth-store', () => {
   const useAuthStore = vi.fn((selector?: (s: unknown) => unknown) => {
