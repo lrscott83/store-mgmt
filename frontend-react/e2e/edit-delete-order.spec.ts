@@ -124,9 +124,10 @@ test.describe.serial('S2-B2 — Editar y eliminar órdenes', () => {
     await page.locator('[data-testid^="order-actions-toggle-"]').first().click();
     await page.getByTestId('edit-order-button').click();
 
-    // EditOrderModal should open — change payment type to Tarjeta
+    // EditOrderModal should open — change payment type to Transferencia
+    // (payment-methods-percent-tax, 2026-09-17: PaymentType.Tarjeta now renders as "Transferencia").
     await expect(page.getByText('Venta por Cobrar')).toBeVisible();
-    await page.getByRole('dialog').locator('label', { hasText: 'Tarjeta' }).click();
+    await page.getByRole('dialog').locator('label', { hasText: 'Transferencia' }).click();
 
     // Save
     await page.getByRole('button', { name: 'Actualizar' }).click();
