@@ -10,6 +10,11 @@ import type { CartItem } from '~/shared/lib/stores/cart-store';
  * difiere de la de la venta en curso, la adición se bloquea con un error
  * descriptivo que las vistas muestran en popup (showBlockingError). Carrito
  * vacío siempre permite. El campo `currency` ausente = CUP (default del dominio).
+ *
+ * MultiPayments (módulo 16): `allowMixedCurrencies` LIFTA el guard — con el
+ * módulo activo el carrito admite monedas mezcladas porque cada línea se
+ * convierte a la moneda de la venta antes de cobrar (`cart-line-conversion`).
+ * Ausente/false = comportamiento legado EXACTO (una sola moneda por venta).
  */
 export function productCurrency(product: { currency?: number }): number {
   return product.currency ?? Currency.CUP;
@@ -18,8 +23,13 @@ export function productCurrency(product: { currency?: number }): number {
 export function guardCurrency(params: {
   items: CartItem[];
   requestedProduct: { currency?: number };
+  allowMixedCurrencies?: boolean;
 }): Result {
-  const { items, requestedProduct } = params;
+  const { items, requestedProduct, allowMixedCurrencies = false } = params;
+
+  // Módulo 16: mezclar monedas deja de ser un error; la conversión por línea
+  // ocurre en el carrito (cart-shell) al cobrar.
+  if (allowMixedCurrencies) return Result.Success();
 
   const hasItems = items.length > 0;
   if (!hasItems) return Result.Success();

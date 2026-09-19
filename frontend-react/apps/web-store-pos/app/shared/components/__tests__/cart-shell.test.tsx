@@ -1214,3 +1214,168 @@ describe('CartShell — multi-payment list (módulo 16)', () => {
     }
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MultiPayments (módulo 16, T8) — carrito multi-moneda: cada línea se convierte
+// a la moneda de la venta elegida antes de cobrar/registrar.
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('CartShell — mixed-currency cart conversion (módulo 16, T8)', () => {
+  const MULTI_PAYMENTS_STORE_MODULES = [11, EModules.MultiPayments];
+
+  function paymentRow(overrides: Partial<MultiPaymentRow> = {}): MultiPaymentRow {
+    return {
+      id: 'row-1',
+      method: SalePaymentMethod.Efectivo,
+      currency: Currency.USD,
+      amount: 12,
+      ...overrides,
+    };
+  }
+
+  /** La moneda de la venta la fija la preferencia persistida del usuario (T6). */
+  function setSaleCurrencyPreference(currency: Currency) {
+    localStorage.setItem('lizoft.cart-currency-u1', String(currency));
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    mockUser = { id: 'u1', selectedStoreId: 's1', storeModuleIds: MULTI_PAYMENTS_STORE_MODULES };
+    // 350 CUP por 1 USD — CUP→USD resoluble, EUR no.
+    mockChannelRates = [
+      {
+        method: SalePaymentMethod.Efectivo,
+        currency: Currency.CUP,
+        value: 350,
+        effectiveFrom: new Date('2026-09-01T00:00:00.000Z'),
+      },
+    ];
+    mockProductLookup = {};
+  });
+
+  it('T8-01: displays each line and the total converted to the sale currency (USD)', () => {
+    setSaleCurrencyPreference(Currency.USD);
+    const usdProduct = makeProduct({
+      id: 'usd-1',
+      name: 'Cafe',
+      price: 10,
+      currency: Currency.USD,
+    });
+    const cupProduct = makeProduct({
+      id: 'cup-1',
+      name: 'Pan',
+      price: 350,
+      currency: Currency.CUP,
+    });
+    mockCartState({
+      items: [
+        { product: usdProduct, quantity: 1 },
+        { product: cupProduct, quantity: 2 },
+      ],
+      // Raw mixed-unit line sum — deliberately IGNORED once converted.
+      total: vi.fn().mockReturnValue(710),
+      cartCurrency: () => Currency.CUP,
+      payments: [],
+      setPayments: vi.fn(),
+    });
+    renderCartShell();
+    openCart();
+
+    // USD line subtotal is identity; the CUP line (350 CUP × 2) becomes 1 USD × 2.
+    expect(screen.getByText(/^10\s+USD$/)).toBeInTheDocument();
+    expect(screen.getByText(/^2\s+USD$/)).toBeInTheDocument();
+    // Converted total: 10 + 2 = 12 USD (shown in the header and the multi-pay summary).
+    expect(screen.getAllByText(/^12\s+USD$/).length).toBeGreaterThan(0);
+  });
+
+  it('T8-02: submits converted line prices/currency and the converted total in the sale currency', async () => {
+    setSaleCurrencyPreference(Currency.USD);
+    const usdProduct = makeProduct({
+      id: 'usd-1',
+      name: 'Cafe',
+      price: 10,
+      currency: Currency.USD,
+    });
+    const cupProduct = makeProduct({
+      id: 'cup-1',
+      name: 'Pan',
+      price: 350,
+      currency: Currency.CUP,
+    });
+    const cartItems = [
+      { product: usdProduct, quantity: 1 },
+      { product: cupProduct, quantity: 2 },
+    ];
+    mockCartState({
+      items: cartItems,
+      total: vi.fn().mockReturnValue(710),
+      cartCurrency: () => Currency.CUP,
+      payments: [paymentRow({ amount: 12 })],
+      setPayments: vi.fn(),
+    });
+    renderCartShell();
+    openCart();
+    fireEvent.click(screen.getByText('Registrar'));
+
+    await waitFor(() => expect(createOrderMock).toHaveBeenCalledTimes(1));
+    const orderItems = createOrderMock.mock.calls[0][0] as Array<{
+      price: number;
+      product: { id: string; currency: number };
+    }>;
+    expect(orderItems[0].price).toBe(10);
+    expect(orderItems[0].product.currency).toBe(Currency.USD);
+    // 350 CUP → 1 USD (350 CUP por USD).
+    expect(orderItems[1].price).toBe(1);
+    expect(orderItems[1].product.currency).toBe(Currency.USD);
+
+    // The store's cart items are NEVER mutated by the conversion.
+    expect(cartItems[1].product.currency).toBe(Currency.CUP);
+  });
+
+  it('T8-03: blocks the submit and surfaces the typed error when a line cannot be converted', () => {
+    setSaleCurrencyPreference(Currency.USD);
+    mockChannelRates = []; // no CUP rate → CUP→USD is not resolvable
+    const cupProduct = makeProduct({
+      id: 'cup-1',
+      name: 'Pan',
+      price: 350,
+      currency: Currency.CUP,
+    });
+    mockCartState({
+      items: [{ product: cupProduct, quantity: 1 }],
+      total: vi.fn().mockReturnValue(350),
+      cartCurrency: () => Currency.CUP,
+      payments: [],
+      setPayments: vi.fn(),
+    });
+    renderCartShell();
+    openCart();
+
+    const error = screen.getByTestId('cart-line-conversion-error');
+    expect(error).toHaveAttribute('data-error-code', 'ChannelRate.RateNotFound');
+    expect(error).toHaveTextContent(
+      'No existe una tasa de cambio vigente para el canal o la moneda solicitados.',
+    );
+    expect(screen.getByText('Registrar').closest('button')).toBeDisabled();
+  });
+
+  it('T8-04: without module 16 the cart items are passed unchanged (regression guard)', async () => {
+    mockUser = { selectedStoreId: 's1', storeModuleIds: [11] };
+    const product = makeProduct({ id: 'p1', name: 'Coca Cola', price: 5 });
+    mockCartState({
+      items: [{ product, quantity: 2 }],
+      total: vi.fn().mockReturnValue(10),
+      cartCurrency: () => Currency.CUP,
+    });
+    renderCartShell();
+    openCart();
+    fireEvent.click(screen.getByText('Registrar'));
+
+    await waitFor(() => expect(createOrderMock).toHaveBeenCalledTimes(1));
+    const orderItems = createOrderMock.mock.calls[0][0] as Array<{ price?: number }>;
+    // Untouched line: no converted price was stamped.
+    expect(orderItems[0].price).toBeUndefined();
+    expect(screen.queryByTestId('cart-line-conversion-error')).not.toBeInTheDocument();
+  });
+});

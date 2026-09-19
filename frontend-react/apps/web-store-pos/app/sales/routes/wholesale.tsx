@@ -12,7 +12,10 @@ import { showBlockingError, showBlockingInfoHtml } from '~/shared/lib/blocking-a
 import { showToastError, showToastSuccess } from '~/shared/lib/toast';
 import { formatCurrency } from '~/shared/lib/format-currency';
 import { Switch } from '~/shared/components/ui/switch';
-import { hasInventoryModuleAvailable } from '~/shared/lib/auth/authorization-service';
+import {
+  hasInventoryModuleAvailable,
+  hasMultiPaymentsModuleAvailable,
+} from '~/shared/lib/auth/authorization-service';
 import { InventoryOfflineService } from '~/inventory/lib/services/inventory-offline-service';
 import { ProductRepository } from '~/sales/lib/repositories/product-repository';
 import { ProductCategoryRepository } from '~/sales/lib/repositories/product-category-repository';
@@ -166,7 +169,12 @@ export function WholesalePage() {
     if (!typeGuard.succeeded) return typeGuard;
 
     // Una sola moneda por venta: no se puede mezclar monedas en el mismo carrito.
-    const currencyGuard = guardCurrency({ items: cartItems, requestedProduct: product });
+    // MultiPayments (módulo 16): con el módulo se permite mezclar monedas.
+    const currencyGuard = guardCurrency({
+      items: cartItems,
+      requestedProduct: product,
+      allowMixedCurrencies: hasMultiPaymentsModuleAvailable(user),
+    });
     if (!currencyGuard.succeeded) return currencyGuard;
 
     // La cantidad mínima de paquetes es el primer rango de la config mayorista.
