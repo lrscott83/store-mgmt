@@ -405,6 +405,26 @@ namespace Infrastructure.Persistence.EntityConfigurations
                      230,
                      true,
                      true
+                 ),
+
+                // Elaboración
+                Feature.Create(
+                     (int)FeatureType.Recipes,
+                     FeatureType.Recipes.GetDescription(),
+                     "Funcionalidad para gestionar las recetas de elaboración de productos",
+                     (int)ModuleType.Elaboration,
+                     240,
+                     true,
+                     true
+                 ),
+                Feature.Create(
+                     (int)FeatureType.Elaborations,
+                     FeatureType.Elaborations.GetDescription(),
+                     "Funcionalidad para registrar elaboraciones con consumo de insumos y costo real",
+                     (int)ModuleType.Elaboration,
+                     241,
+                     true,
+                     true
                  )
             );
         }

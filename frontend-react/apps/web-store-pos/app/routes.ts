@@ -55,6 +55,9 @@ export default [
     route('inventory/warehouses', 'inventory/routes/warehouses.tsx'),
     // Almacenes — Movimientos (feature 37, vista dedicada)
     route('inventory/warehouse-movements', 'inventory/routes/warehouse-movements.tsx'),
+    // Elaboración (módulo 17) — Recetas (feature 120) y Elaboraciones (feature 121)
+    route('inventory/recipes', 'inventory/routes/recipes.tsx'),
+    route('inventory/elaborations', 'inventory/routes/elaborations.tsx'),
 
     // Expenses
     route('expenses/today', 'expenses/routes/today-expenses.tsx'),

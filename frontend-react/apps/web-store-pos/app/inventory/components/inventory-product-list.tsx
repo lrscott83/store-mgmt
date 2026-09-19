@@ -6,6 +6,13 @@ import { formatCurrency } from '~/shared/lib/format-currency';
 
 interface InventoryProductListProps {
   categories: InventoryCategoryView[];
+  /**
+   * Controlled search (2026-09-18): `available.tsx` lifted the search state up
+   * so its header (n)/total can follow the same filter. Optional for back-compat
+   * — when omitted (e.g. warehouses.tsx) the list owns its own search state.
+   */
+  search?: string;
+  onSearchChange?: (value: string) => void;
 }
 
 /**
@@ -34,9 +41,15 @@ export function filterInventoryCategories(
   }, []);
 }
 
-export function InventoryProductList({ categories }: InventoryProductListProps) {
+export function InventoryProductList({
+  categories,
+  search: controlledSearch,
+  onSearchChange,
+}: InventoryProductListProps) {
   const intl = useIntl();
-  const [search, setSearch] = useState('');
+  const [internalSearch, setInternalSearch] = useState('');
+  const search = controlledSearch ?? internalSearch;
+  const setSearch = onSearchChange ?? setInternalSearch;
   // Angular parity: inventory-available.component.html:19-33 `mat-accordion` with
   // `[expanded]="false"` — categories are collapsed by default, click header to expand.
   const [expandedCategoryIds, setExpandedCategoryIds] = useState<Set<string>>(new Set());

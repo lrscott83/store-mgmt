@@ -191,13 +191,13 @@ describe('OrdersPage — smoke render', () => {
     expect(document.body).toBeTruthy();
   });
 
-  it('shows the Angular header (Historial de Ventas) and empty state', () => {
+  it('shows the header (Ventas) and empty state', () => {
     render(
       <Wrapper>
         <OrdersPage />
       </Wrapper>,
     );
-    expect(screen.getByText('Historial de Ventas')).toBeInTheDocument();
+    expect(screen.getByText('Ventas')).toBeInTheDocument();
     expect(screen.getByText('No se encontró ninguna venta')).toBeInTheDocument();
   });
 

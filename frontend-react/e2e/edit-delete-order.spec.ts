@@ -120,12 +120,15 @@ test.describe.serial('S2-B2 — Editar y eliminar órdenes', () => {
     await expect(orderToggle).toBeVisible();
     await orderToggle.click();
 
-    // Click Editar
-    await page.locator('[data-testid^="order-actions-toggle-"]').first().click();
+    // Click Editar via the header actions gear (owner request 2026-09-18:
+    // actions moved from the expanded panel to the header gear menu)
+    const gearToggle = page.locator('[data-testid^="order-panel-actions-toggle-"]').first();
+    await expect(gearToggle).toBeVisible();
+    await gearToggle.click();
     await page.getByTestId('edit-order-button').click();
 
     // EditOrderModal should open — change payment type to Transferencia
-    // (payment-methods-percent-tax, 2026-09-17: PaymentType.Tarjeta now renders as "Transferencia").
+    // (Tarjeta se muestra como "Transferencia" desde el plan 2026-09-17)
     await expect(page.getByText('Venta por Cobrar')).toBeVisible();
     await page.getByRole('dialog').locator('label', { hasText: 'Transferencia' }).click();
 
@@ -151,8 +154,11 @@ test.describe.serial('S2-B2 — Editar y eliminar órdenes', () => {
     await expect(orderToggle).toBeVisible();
     await orderToggle.click();
 
-    // Click Eliminar
-    await page.locator('[data-testid^="order-actions-toggle-"]').first().click();
+    // Click Eliminar via the header actions gear (owner request 2026-09-18:
+    // actions moved from the expanded panel to the header gear menu)
+    const gearToggle = page.locator('[data-testid^="order-panel-actions-toggle-"]').first();
+    await expect(gearToggle).toBeVisible();
+    await gearToggle.click();
     await page.getByTestId('deactivate-order-button').click();
 
     // Confirm dialog should appear

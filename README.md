@@ -64,6 +64,21 @@ dotnet ef database update --project ../Infrastructure --startup-project . --conn
 > podman exec smca_postgres_db pg_dump -U postgres smca | gzip > ./smca_backup_$(date +%Y%m%d_%H%M%S).sql.gz
 > ```
 
+**Migración del módulo Elaboración (2026-09-18):** agrega Module 17 + features 120/121, los asigna a los planes Superior/VIP y actualiza las tiendas activas existentes de esos planes. Se aplica con cualquiera de las dos vías de arriba (haz backup ANTES):
+
+```bash
+# Opción A — EF
+cd /ruta/al/backend/src/SMCA.WebApi
+dotnet ef database update --project ../Infrastructure --startup-project .
+
+# Opción B — script SQL manual
+podman exec -i smca_postgres_db psql -U postgres -d smca < backend/scripts/19-20260918-Add-Elaboration-Module.sql
+```
+
+> El script `19` asume que los scripts `12` (StorePlan) y `14` (StorePlanModule) ya están aplicados.
+
+Después de mergear, aplicá la migración en la base de la VPS antes de desplegar.
+
 ### 5. Ver logs del backend
 
 ```bash

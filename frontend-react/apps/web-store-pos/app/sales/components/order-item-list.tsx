@@ -4,18 +4,18 @@ import { round2 } from '~/shared/lib/money';
 
 interface OrderItemListProps {
   order: Order;
-  /**
-   * Retained for caller compatibility. The expanded panel no longer hosts the
-   * edit/delete actions — they moved to the collapsed header's gear `ActionMenu`
-   * (`order-list.tsx`), so this prop is no longer read.
-   */
-  readOnly?: boolean;
 }
 
 /**
- * Matches Angular's `order-item-list.component.html` item table (name, quantity,
- * line total). The edit/delete action row that used to live here was moved to
- * the header gear menu; the expanded content is now the item table only.
+ * Matches Angular's `order-item-list.component.html`: the order's item table
+ * (name, quantity, line total). No header row in Angular's markup — table
+ * body only.
+ *
+ * Owner request 2026-09-18 (Ventas del día): the Editar/Eliminar action row
+ * that used to live here moved into the panel header's actions gear
+ * (`order-list.tsx`) — the expanded panel now renders the items table only.
+ * The deactivate confirm/error flow moved with it, unchanged (Angular
+ * order-item-list.component.ts:34-53).
  */
 export function OrderItemList({ order }: OrderItemListProps) {
   return (

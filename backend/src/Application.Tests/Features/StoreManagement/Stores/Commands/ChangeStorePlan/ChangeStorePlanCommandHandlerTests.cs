@@ -26,6 +26,7 @@ namespace Application.Tests.Features.StoreManagement.Stores.Commands.ChangeStore
 /// - Owner of the store changes plan: StorePlanId written, modules = priceIncluded ∪ plan members,
 ///   StoreRoleFeatures regenerated for inserted modules, PaymentStartDate NEVER touched
 /// - Ownership guard: non-owner (another user) → Forbidden; SuperAdmin always allowed
+/// - Plan gate: non-SuperAdmin targeting Superior/VIP → Forbidden (SuperAdmin-reserved plan)
 /// - Preconditions: inactive store / inactive owner user → 400; unknown or inactive plan → 400
 /// - Override rule: paid target + computed nextDue <= today → NextDueDateOverride = today;
 ///   paid target + future due → untouched; Gratis target → cleared
@@ -310,6 +311,40 @@ public class ChangeStorePlanCommandHandlerTests
     }
 
     [Fact]
+    public async Task Handle_ownerTargetsSuperior_throwsForbidden()
+    {
+        var store = CreateStore(paymentStartDate: new DateOnly(2026, 1, 10));
+        store.StorePlanId = 1;
+
+        ArrangeOwnerCaller();
+        ArrangeStoreFetch(store);
+        // No plan fetch is arranged: the gate fires BEFORE the plan lookup, so without
+        // the gate this would throw PlanNotFound (400) — failing this test (RED).
+
+        var act = () => CreateHandler().Handle(new ChangeStorePlanCommand(_storeId, 3), CancellationToken.None);
+
+        await act.Should().ThrowAsync<ApiException>()
+            .Where(e => e.StatusCode == HttpStatusCode.Forbidden);
+        store.StorePlanId.Should().Be(1, "nothing changed");
+    }
+
+    [Fact]
+    public async Task Handle_ownerTargetsVIP_throwsForbidden()
+    {
+        var store = CreateStore(paymentStartDate: new DateOnly(2026, 1, 10));
+        store.StorePlanId = 1;
+
+        ArrangeOwnerCaller();
+        ArrangeStoreFetch(store);
+
+        var act = () => CreateHandler().Handle(new ChangeStorePlanCommand(_storeId, 4), CancellationToken.None);
+
+        await act.Should().ThrowAsync<ApiException>()
+            .Where(e => e.StatusCode == HttpStatusCode.Forbidden);
+        store.StorePlanId.Should().Be(1, "nothing changed");
+    }
+
+    [Fact]
     public async Task Handle_unknownPlan_returns400()
     {
         var store = CreateStore(paymentStartDate: new DateOnly(2026, 1, 10));
@@ -526,7 +561,9 @@ public class ChangeStorePlanCommandHandlerTests
         var paidModule = CreateCatalogModule(2, priceIncluded: false, price: 100f);
         var vipPlan = CreatePlan(4, "VIP", order: 4, paidModule);
 
-        ArrangeOwnerCaller();
+        // VIP is SuperAdmin-reserved (caller matrix) — this test pins the paid OVERRIDE
+        // rule, not the gate, so the caller must be a SuperAdmin.
+        ArrangeSuperAdmin();
         ArrangeStoreFetch(store);
         ArrangePlanFetch(vipPlan);
         ArrangeUniverse(paidModule);
@@ -582,7 +619,9 @@ public class ChangeStorePlanCommandHandlerTests
         var paidModule = CreateCatalogModule(2, priceIncluded: false, price: 100f);
         var superiorPlan = CreatePlan(3, "Superior", order: 3, paidModule);
 
-        ArrangeOwnerCaller();
+        // Superior is SuperAdmin-reserved (caller matrix) — this test pins the override
+        // mechanics, not the gate, so the caller must be a SuperAdmin.
+        ArrangeSuperAdmin();
         ArrangeStoreFetch(store);
         ArrangePlanFetch(superiorPlan);
         ArrangeUniverse(paidModule);

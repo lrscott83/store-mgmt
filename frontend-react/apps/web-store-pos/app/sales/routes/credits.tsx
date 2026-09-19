@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useIntl } from 'react-intl';
-import type { SaleCredit } from '@store-mgmt/domain';
+import type { SaleCredit, PaymentType } from '@store-mgmt/domain';
 import { EFeatures } from '@store-mgmt/domain';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
@@ -29,10 +29,13 @@ export const clientLoader = featureLoader([EFeatures.CreditSale]);
 /**
  * React port of Angular's `sale-credits.component.html` (Créditos): credits
  * grouped by date into an accordion; each date panel wraps `SaleCreditList`
- * with NO `readOnly` prop passed (Angular's `<app-sale-credit-list>` here
- * has no `[readOnly]` binding → default `true`, no edit/pay actions
- * reachable from this view). Header shows count + total of UNPAID credits
- * only. Angular's `loadSaleCredits()` always calls `filterSaleCredits(null,
+ * with `readOnly={false}` + edit/pay handlers (user request 2026-09-18: parity
+ * with today-credits — the SAME Editar/Pagar gear, modals and service calls;
+ * Angular's original had no `[readOnly]` binding here, but the write path is
+ * store-scoped local storage and this view only edits the SELECTED store, so
+ * it is safe). Multi-store panels stay read-only (no write path for non-
+ * selected stores by design). Header shows count + total of ALL credits
+ * (paid included) — user request. Angular's `loadSaleCredits()` always calls `filterSaleCredits(null,
  * null, null, null)` (no date-range/paid-state UI exists); the user-added
  * DateRangeFilter feeds the same service a half-open [start, next-day
  * midnight) window — with no range picked the call stays all-nulls.
@@ -92,6 +95,25 @@ export function SaleCreditsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- loadSaleCredits reads storeId + dateRange (the primitive bounds below)
   }, [storeId, dateRange.start, dateRange.end]);
 
+  // Mismos handlers que today-credits.tsx: el gear del historial edita/paga con el
+  // mismo servicio y recarga la lista. WU2: updateSaleCredit/paidSaleCredit devuelven
+  // un DataResult SYNC que nunca lanza — chequeo `.succeeded`, no try/catch.
+  function handleSave(creditId: string, client: string, note: string): boolean {
+    const service = new SaleCreditOfflineService(storeId);
+    const result = service.updateSaleCredit(creditId, client, note);
+    if (!result.succeeded) return false;
+    void loadSaleCredits();
+    return true;
+  }
+
+  function handlePay(creditId: string, paidType: PaymentType, note: string): boolean {
+    const service = new SaleCreditOfflineService(storeId);
+    const result = service.paidSaleCredit(creditId, paidType, note);
+    if (!result.succeeded) return false;
+    void loadSaleCredits();
+    return true;
+  }
+
   // multi-store-panels: load EVERY store's local credits read-only (per-store DEK).
   useEffect(() => {
     if (!multiStoreEnabled) {
@@ -122,12 +144,11 @@ export function SaleCreditsPage() {
     });
   }
 
-  const creditsCount = dateSaleCredits.reduce(
-    (count, d) => count + d.items.reduce((c, credit) => c + (!credit.isPaid ? 1 : 0), 0),
-    0,
-  );
+  // Header y paneles cuentan/suman TODOS los créditos (pagados incluidos) — petición
+  // del usuario; antes solo se contaban los impagos.
+  const creditsCount = dateSaleCredits.reduce((count, d) => count + d.items.length, 0);
   const creditsTotal = dateSaleCredits.reduce(
-    (total, d) => total + d.items.reduce((t, credit) => t + (!credit.isPaid ? credit.total : 0), 0),
+    (total, d) => total + d.items.reduce((t, credit) => t + credit.total, 0),
     0,
   );
 
@@ -157,14 +178,8 @@ export function SaleCreditsPage() {
         ? multiStoreStores
         : multiStoreStores.filter((s) => s.id === selectedMultiStoreId);
     const visibleCredits = visibleStores.flatMap((s) => filteredStoreCredits.get(s.id) ?? []);
-    const multiStoreCreditsCount = visibleCredits.reduce(
-      (count, credit) => count + (!credit.isPaid ? 1 : 0),
-      0,
-    );
-    const multiStoreCreditsTotal = visibleCredits.reduce(
-      (total, credit) => total + (!credit.isPaid ? credit.total : 0),
-      0,
-    );
+    const multiStoreCreditsCount = visibleCredits.length;
+    const multiStoreCreditsTotal = visibleCredits.reduce((total, credit) => total + credit.total, 0);
 
     return (
       <Card
@@ -180,13 +195,12 @@ export function SaleCreditsPage() {
           }
           renderStoreTotals={(store) => {
             const credits = filteredStoreCredits.get(store.id) ?? [];
-            const unpaid = credits.filter((c) => !c.isPaid);
-            const total = unpaid.reduce((t, c) => t + c.total, 0);
+            const total = credits.reduce((t, c) => t + c.total, 0);
             return (
               <MultiStoreTotal
-                label={`(${unpaid.length})`}
+                label={`(${credits.length})`}
                 value={total}
-                valueClassName="text-danger"
+                valueClassName="text-warning"
               />
             );
           }}
@@ -225,13 +239,12 @@ export function SaleCreditsPage() {
                         aria-expanded={isExpanded}
                       >
                         <span className="flex items-center gap-2 text-xs font-medium text-text">
-                          {formatLocalDate(group.date)} (
-                          {group.items.reduce((count, c) => count + (!c.isPaid ? 1 : 0), 0)})
+                          {formatLocalDate(group.date)} ({group.items.length})
                         </span>
                         <span className="flex items-center gap-2">
-                          <span className="text-xs font-semibold text-danger whitespace-nowrap">
+                          <span className="text-xs font-semibold text-warning whitespace-nowrap">
                             {formatCurrency(
-                              group.items.reduce((t, c) => t + (!c.isPaid ? c.total : 0), 0),
+                              group.items.reduce((t, c) => t + c.total, 0),
                             )}
                           </span>
                           <ChevronDownIcon isExpanded={isExpanded} className="text-text-muted" />
@@ -280,14 +293,13 @@ export function SaleCreditsPage() {
                 aria-expanded={isExpanded}
               >
                 <span className="text-sm font-medium text-text">
-                  {formatLocalDate(dateSaleCredit.date)} (
-                  {dateSaleCredit.items.reduce((count, c) => count + (!c.isPaid ? 1 : 0), 0)})
+                  {formatLocalDate(dateSaleCredit.date)} ({dateSaleCredit.items.length})
                 </span>
                 <span className="flex items-center gap-2">
-                  <span className="text-sm font-semibold text-danger whitespace-nowrap">
+                  <span className="text-sm font-semibold text-warning whitespace-nowrap">
                     {formatCurrency(
                       dateSaleCredit.items.reduce(
-                        (total, c) => total + (!c.isPaid ? c.total : 0),
+                        (total, c) => total + c.total,
                         0,
                       ),
                     )}
@@ -297,7 +309,12 @@ export function SaleCreditsPage() {
               </button>
               {isExpanded && (
                 <div className="border-t border-border px-4 py-3">
-                  <SaleCreditList saleCredits={dateSaleCredit.items} />
+                  <SaleCreditList
+                    saleCredits={dateSaleCredit.items}
+                    readOnly={false}
+                    onSave={handleSave}
+                    onPay={handlePay}
+                  />
                 </div>
               )}
             </div>
@@ -310,11 +327,9 @@ export function SaleCreditsPage() {
 
 /**
  * Card header shared by BOTH modes (single-store and MultiStore) so the two
- * cannot drift: "Créditos (n)" on the left and the unpaid total in red on the
- * right. `count`/`total` are UNPAID only, matching every other count/total in
- * this view (day panels and per-store panels). The count keeps the
- * `rounded-full bg-success/10` pill class — pinned by
- * `e2e/credits-history.spec.ts`.
+ * cannot drift: "Créditos (n)" on the left and the total in amber (text-warning)
+ * on the right. `count`/`total` cover ALL credits (paid included) — user request
+ * 2026-09-18. The count keeps the `rounded-full bg-success/10` pill class.
  */
 function CreditsCardTitle({ count, total }: { count: number; total: number }) {
   const intl = useIntl();
@@ -327,7 +342,7 @@ function CreditsCardTitle({ count, total }: { count: number; total: number }) {
           ({count})
         </span>
       </span>
-      <span className="text-sm font-semibold text-danger whitespace-nowrap">
+      <span className="text-sm font-semibold text-warning whitespace-nowrap">
         {formatCurrency(total)}
       </span>
     </div>

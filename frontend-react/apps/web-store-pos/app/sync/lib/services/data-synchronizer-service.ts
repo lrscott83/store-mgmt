@@ -11,6 +11,8 @@ import type {
   Warehouse,
   WarehouseStockLevel,
   WarehouseStockMovement,
+  Recipe,
+  Elaboration,
 } from '@store-mgmt/domain';
 import type { ParsedData } from './data-serializer-service';
 
@@ -94,6 +96,19 @@ export const SynchronizerErrors = {
   ChannelRatesUnexpectedError: {
     code: 'Synchronizer.ChannelRatesUnexpectedError',
     message: 'Ocurrió un error inesperado al sincronizar el registro de tasas por canal.',
+  },
+  RecipesUnexpectedError: {
+    code: 'Synchronizer.RecipesUnexpectedError',
+    message: 'Ocurrió un error inesperado al sincronizar las recetas.',
+  },
+  ElaborationsUnexpectedError: {
+    code: 'Synchronizer.ElaborationsUnexpectedError',
+    message: 'Ocurrió un error inesperado al sincronizar las elaboraciones.',
+  },
+  ElaborationsMissingWarehouseService: {
+    code: 'Synchronizer.ElaborationsMissingWarehouseService',
+    message:
+      'No se pudieron sincronizar las elaboraciones porque falta el servicio de almacenes requerido para validar el almacén.',
   },
 } as const;
 
@@ -234,6 +249,33 @@ export interface ChannelRateImportService {
   addImportedChannelRate(rate: ChannelRate): Result;
 }
 
+/**
+ * Recipe import routes through the offline SERVICE (elaboration-module),
+ * mirroring the ExchangeRates/Warehouses seam: the service owns the
+ * domain-command layer. Upsert by id; the synchronizer adds the two rules the
+ * plain seam cannot know — the finished product must exist in the MERGED
+ * product set, and at most ONE active recipe may exist per product across the
+ * merge.
+ */
+export interface RecipeImportService {
+  getStorageRecipes(): Recipe[];
+  addImportedRecipe(recipe: Recipe): Result;
+  updateImportedRecipe(recipe: Recipe): Result;
+}
+
+/**
+ * Elaboration import routes through the offline SERVICE (elaboration-module).
+ * Upsert by id; the synchronizer validates that the elaboration's warehouse
+ * exists in the MERGED warehouse set (warehouses are merged before
+ * elaborations, so an elaboration whose warehouse travels in the same zip
+ * resolves).
+ */
+export interface ElaborationImportService {
+  getStorageElaborations(): Elaboration[];
+  addImportedElaboration(elaboration: Elaboration): Result;
+  updateImportedElaboration(elaboration: Elaboration): Result;
+}
+
 // ---------------------------------------------------------------------------
 // Per-type merge outcome (internal)
 // ---------------------------------------------------------------------------
@@ -282,7 +324,7 @@ function channelRateIdOf(rate: ChannelRate): string {
  * - InventoryEntries/Orders/Expenses/SaleCredits: break-only semantics — the
  *   first failed item stops that entity type's loop, but prior successful
  *   writes for that type are NOT reverted.
- * - `sync()` aggregates errors across ALL 7 entity types and continues
+ * - `sync()` aggregates errors across ALL entity types and continues
  *   processing subsequent types even if an earlier type failed (mirrors
  *   Angular's `synchronizeFiles`, which is NOT abort-on-first).
  */
@@ -305,6 +347,10 @@ export class DataSynchronizerService {
     // channel-rate register omit it — the merge then degrades to a zero-count
     // no-op.
     private readonly channelRateService?: ChannelRateImportService,
+    // Optional (elaboration-module): legacy call sites/tests that predate the
+    // module omit it — the merges then degrade to zero-count no-ops.
+    private readonly recipeService?: RecipeImportService,
+    private readonly elaborationService?: ElaborationImportService,
   ) {}
 
   async sync(data: ParsedData): Promise<SyncResult> {
@@ -348,7 +394,15 @@ export class DataSynchronizerService {
       push(this.mergeExchangeRatesViaService(data.exchangeRates));
     }
 
-    // 8-10. Warehouses — routed through the offline SERVICE (warehouses-plan),
+    // 8. Recipes — routed through the offline SERVICE (elaboration-module),
+    // upsert by id, break-only (no revert). Runs AFTER products so the
+    // finished-product check sees the MERGED product set. Only when injected:
+    // legacy constructor call sites keep their entity contract.
+    if (this.recipeService) {
+      push(this.mergeRecipesViaService(data.recipes ?? []));
+    }
+
+    // 9-11. Warehouses — routed through the offline SERVICE (warehouses-plan),
     // upsert by id / (warehouseId, productId), movements append-only; each
     // break-only (no revert). Only when the service was injected: legacy
     // constructor call sites keep the 7-entity merge contract.
@@ -364,6 +418,13 @@ export class DataSynchronizerService {
     // their merge contract.
     if (this.channelRateService) {
       push(this.mergeChannelRatesViaService(data.channelRates));
+    }
+
+    // 12. Elaborations — routed through the offline SERVICE
+    // (elaboration-module), upsert by id, break-only (no revert). Runs AFTER
+    // warehouses so the warehouse check sees the MERGED warehouse set.
+    if (this.elaborationService) {
+      push(this.mergeElaborationsViaService(data.elaborations ?? []));
     }
 
     return { succeeded: errors.length === 0, errors, merges };
@@ -710,6 +771,124 @@ export class DataSynchronizerService {
   }
 
   // ---------------------------------------------------------------------------
+  // Recipes — routed through the offline SERVICE (elaboration-module)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Upsert-by-id merge of the imported recipes, with the two rules the plain
+   * import seam cannot enforce (elaboration-module plan §Task 6.4):
+   *
+   * 1. The finished product must exist in the MERGED product set — the local
+   *    products plus the products imported earlier in this same run (products
+   *    are merged before recipes, so a product travelling in the same zip
+   *    resolves). The check is order-independent within `recipes[]`.
+   * 2. At most ONE ACTIVE recipe per product across the merge — the
+   *    duplicate-analog of the barcode-uniqueness rule. A second active recipe
+   *    for a product already claimed (by a stored active recipe with a
+   *    DIFFERENT id, or by an earlier active recipe in this batch) fails the
+   *    merge; a recipe updating itself is never its own duplicate.
+   *
+   * R3-ORDER fix — the "one active recipe per product" rule is a property of
+   * the FINAL post-merge state, not of the step-by-step state (R3-ORDER). The
+   * claims that may block an activation are seeded from the FINAL active set:
+   * a stored recipe that this same batch deactivates (or moves to another
+   * product) no longer claims its old product, so a batch that DEACTIVATES the
+   * product's current active recipe and ACTIVATES a different recipe for the
+   * same product succeeds regardless of row order. Rows of this batch override
+   * the stored row with the same id and carry its final `isActive`/`productId`,
+   * so the seed skips them and their own processing (below) settles the claim.
+   * The remaining loop is break-only (no revert), like every other
+   * service-routed entity: rows merged before a failure persist (this is what
+   * the existing break-only tests pin). An unexpected throw yields
+   * `RecipesUnexpectedError`. When the service was not injected (legacy
+   * constructor call sites) the merge is a zero-count no-op.
+   */
+  private mergeRecipesViaService(incoming: Recipe[]): MergeOutcome {
+    const entity = 'recipes';
+    if (!this.recipeService || incoming.length === 0) {
+      return { merge: { entity, inserted: 0, updated: 0 } };
+    }
+
+    let inserted = 0;
+    let updated = 0;
+    try {
+      const mergedProductIds = new Set(this.productRepo.getStorageProductsMap().keys());
+      const existing = this.recipeService.getStorageRecipes();
+      // id -> productId, so an update is distinguishable from an insert and a
+      // product reassignment can release the recipe's previous claim.
+      const idToProduct = new Map(existing.map((recipe) => [recipe.id, recipe.productId]));
+      // productId -> id of the single ACTIVE recipe claiming it, seeded from the
+      // FINAL state: a stored recipe overridden by this batch does not claim its
+      // old product (the batch row settles its final product/active state).
+      const incomingIds = new Set(incoming.map((recipe) => recipe.id));
+      const activeByProduct = new Map<string, string>();
+      for (const recipe of existing) {
+        if (incomingIds.has(recipe.id)) continue;
+        if (recipe.isActive) activeByProduct.set(recipe.productId, recipe.id);
+      }
+
+      for (const recipe of incoming) {
+        const isNew = !idToProduct.has(recipe.id);
+        const previousProductId = idToProduct.get(recipe.id);
+        const productExists = mergedProductIds.has(recipe.productId);
+        const activeForProduct = activeByProduct.get(recipe.productId);
+        const duplicateActive =
+          recipe.isActive && activeForProduct !== undefined && activeForProduct !== recipe.id;
+        if (!productExists || duplicateActive) {
+          return {
+            merge: { entity, inserted, updated },
+            error: {
+              entity,
+              code: SynchronizerErrors.RecipesUnexpectedError.code,
+              message: SynchronizerErrors.RecipesUnexpectedError.message,
+            },
+          };
+        }
+
+        const result = isNew
+          ? this.recipeService.addImportedRecipe(recipe)
+          : this.recipeService.updateImportedRecipe(recipe);
+        if (!result.succeeded) {
+          return {
+            merge: { entity, inserted, updated },
+            error: {
+              entity,
+              code: SynchronizerErrors.RecipesUnexpectedError.code,
+              message: SynchronizerErrors.RecipesUnexpectedError.message,
+            },
+          };
+        }
+
+        if (isNew) inserted++;
+        else updated++;
+        // Release the previous product's claim when this recipe moved away.
+        if (
+          previousProductId !== undefined &&
+          previousProductId !== recipe.productId &&
+          activeByProduct.get(previousProductId) === recipe.id
+        ) {
+          activeByProduct.delete(previousProductId);
+        }
+        if (recipe.isActive) activeByProduct.set(recipe.productId, recipe.id);
+        else if (activeByProduct.get(recipe.productId) === recipe.id)
+          activeByProduct.delete(recipe.productId);
+        idToProduct.set(recipe.id, recipe.productId);
+      }
+      return { merge: { entity, inserted, updated } };
+    } catch {
+      // Break-only: no revert — writes already applied before the failure persist.
+      return {
+        merge: { entity, inserted, updated },
+        error: {
+          entity,
+          code: SynchronizerErrors.RecipesUnexpectedError.code,
+          message: SynchronizerErrors.RecipesUnexpectedError.message,
+        },
+      };
+    }
+  }
+
+  // ---------------------------------------------------------------------------
   // Warehouses — routed through the offline SERVICE (warehouses-plan)
   // ---------------------------------------------------------------------------
 
@@ -907,6 +1086,105 @@ export class DataSynchronizerService {
           entity,
           code: SynchronizerErrors.ChannelRatesUnexpectedError.code,
           message: SynchronizerErrors.ChannelRatesUnexpectedError.message,
+        },
+      };
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Elaborations — routed through the offline SERVICE (elaboration-module)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Upsert-by-id merge of the imported elaborations. One rule (plan §Task
+   * 6.4): the elaboration's warehouse must exist in the MERGED warehouse set
+   * — the local warehouses plus the ones imported earlier in this same run
+   * (warehouses are merged before elaborations, so an elaboration whose
+   * warehouse travels in the same zip resolves). Break-only (no revert); an
+   * unexpected throw yields `ElaborationsUnexpectedError`.
+   *
+   * The warehouse-existence rule can only be evaluated when the OPTIONAL
+   * `warehouseService` was injected. When it was not, the merged warehouse set
+   * is unknown and the rule cannot be evaluated at all; that is a configuration
+   * problem, not a data error and not a success. So when the elaboration
+   * service is present, the warehouse service is MISSING, and the incoming
+   * batch is NON-EMPTY, the merge returns the explicit
+   * `ElaborationsMissingWarehouseService` error (break-only, no writes) rather
+   * than silently discarding every incoming elaboration as a zero-count
+   * success. The `!elaborationService` case keeps its legacy zero-count no-op
+   * contract (call sites that predate the elaborations module), and an empty
+   * batch is still a no-op (nothing to merge is not a failure). Whenever the
+   * warehouse service IS injected the rule stays fully enforced.
+   */
+  private mergeElaborationsViaService(incoming: Elaboration[]): MergeOutcome {
+    const entity = 'elaborations';
+    if (!this.elaborationService || incoming.length === 0) {
+      return { merge: { entity, inserted: 0, updated: 0 } };
+    }
+    if (!this.warehouseService) {
+      return {
+        merge: { entity, inserted: 0, updated: 0 },
+        error: {
+          entity,
+          code: SynchronizerErrors.ElaborationsMissingWarehouseService.code,
+          message: SynchronizerErrors.ElaborationsMissingWarehouseService.message,
+        },
+      };
+    }
+
+    let inserted = 0;
+    let updated = 0;
+    try {
+      const mergedWarehouseIds = new Set(
+        (this.warehouseService?.getStorageWarehouses() ?? []).map((warehouse) => warehouse.id),
+      );
+      const existingIds = new Set(
+        this.elaborationService.getStorageElaborations().map((elaboration) => elaboration.id),
+      );
+
+      for (const elaboration of incoming) {
+        if (!mergedWarehouseIds.has(elaboration.warehouseId)) {
+          return {
+            merge: { entity, inserted, updated },
+            error: {
+              entity,
+              code: SynchronizerErrors.ElaborationsUnexpectedError.code,
+              message: SynchronizerErrors.ElaborationsUnexpectedError.message,
+            },
+          };
+        }
+
+        const isNew = !existingIds.has(elaboration.id);
+        const result = isNew
+          ? this.elaborationService.addImportedElaboration(elaboration)
+          : this.elaborationService.updateImportedElaboration(elaboration);
+        if (!result.succeeded) {
+          return {
+            merge: { entity, inserted, updated },
+            error: {
+              entity,
+              code: SynchronizerErrors.ElaborationsUnexpectedError.code,
+              message: SynchronizerErrors.ElaborationsUnexpectedError.message,
+            },
+          };
+        }
+
+        if (isNew) {
+          existingIds.add(elaboration.id);
+          inserted++;
+        } else {
+          updated++;
+        }
+      }
+      return { merge: { entity, inserted, updated } };
+    } catch {
+      // Break-only: no revert — writes already applied before the failure persist.
+      return {
+        merge: { entity, inserted, updated },
+        error: {
+          entity,
+          code: SynchronizerErrors.ElaborationsUnexpectedError.code,
+          message: SynchronizerErrors.ElaborationsUnexpectedError.message,
         },
       };
     }

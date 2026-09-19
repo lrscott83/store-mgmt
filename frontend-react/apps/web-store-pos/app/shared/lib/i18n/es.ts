@@ -215,6 +215,8 @@ const messages: Record<string, string> = {
   'MENU.REPORTS': 'REPORTES',
   'MENU.STATISTICS': 'ESTADÍSTICAS',
   'MENU.MANAGEMENT': 'GESTIÓN',
+  // Módulo Elaboración (17): grupo propio con recetas y elaboraciones.
+  'MENU.ELABORATION': 'ELABORACIÓN',
 
   // Menu items — Admin (Angular MENU.ADMIN.*)
   'MENU.ADMIN_DASHBOARD': 'Dashboard',
@@ -238,6 +240,9 @@ const messages: Record<string, string> = {
   'MENU.WAREHOUSES': 'Gestión de Almacenes',
   'MENU.WAREHOUSES_MODULE': 'ALMACENES',
   'MENU.WAREHOUSE_MOVEMENTS': 'Movimientos',
+  // Módulo Elaboración (17): recetas (BoM) y órdenes de elaboración.
+  'MENU.RECIPES': 'Recetas',
+  'MENU.ELABORATIONS': 'Elaboraciones',
   'MENU.TODAY_ENTRIES': 'Entradas del día',
   'MENU.TODAY_QUANTITIES': 'Cantidades del día',
   'MENU.TODAY_SALES_PROFIT': 'Ganancias del día',
@@ -506,12 +511,14 @@ const messages: Record<string, string> = {
   // GENERAL.ORDER (Angular GENERAL.ORDER — used by edit-product-category-modal's order field)
   'GENERAL.ORDER': 'Orden',
 
-  // Orders (Angular ORDERS.* — vocabs/es.ts. ORDERS.TITLE fixed to the exact Angular
-  // string; ORDERS.TODAY_TITLE/DATE/TOTAL/CREDIT_BADGE/EMPTY_STATE/DEACTIVATE*/DATE_FROM/
+  // Orders (Angular ORDERS.* — vocabs/es.ts. ORDERS.TITLE was the exact Angular string
+  // 'Historial de Ventas'; renamed to 'Ventas' (user-approved) so the header reads
+  // «Ventas (n)» with the total on the right — same pattern as Inventory's «Entradas (n)».
+  // ORDERS.TODAY_TITLE/DATE/TOTAL/CREDIT_BADGE/EMPTY_STATE/DEACTIVATE*/DATE_FROM/
   // DATE_TO are now orphaned — the old React-only Orders/TodayOrders implementation used
   // them, replaced this batch by strict Angular parity. Left in place, not pruned, per
   // established no-instruction-to-prune-orphans precedent).
-  'ORDERS.TITLE': 'Historial de Ventas',
+  'ORDERS.TITLE': 'Ventas',
   'ORDERS.NO_ORDERS_FOUND': 'No se encontró ninguna venta',
   // SALES.ORDERS.REPORT_SUSPECT_WARNING — shown when the per-day inventory-at-sale-price
   // export flags suspect products (entries touched on/after the day, or reconstructed
@@ -589,8 +596,10 @@ const messages: Record<string, string> = {
   'INVENTORY.AVAILABLE.TITLE': 'Inventario',
   'INVENTORY.TODAY_ENTRIES.TITLE': 'Entradas del día',
   'INVENTORY.TODAY_ENTRIES.NEW_ENTRY': 'Nueva entrada',
-  // Capitalization fixed to byte-match Angular's INVENTORY.ENTRIES_HISTORY (vocabs/es.ts:434).
-  'INVENTORY.ENTRIES.TITLE': 'Historial de Entradas',
+  // 2026-09-18 (permiso del usuario): el header ahora es «Entradas (n)» — el
+  // título «Historial de Entradas» se cambia a «Entradas» para diferenciarse de
+  // «Entradas del día». E2E inventory-entries-history actualizado con permiso.
+  'INVENTORY.ENTRIES.TITLE': 'Entradas',
   // Angular source: inventory-offline.service.ts callers / i18n/vocabs/es.ts:435 —
   // byte-identical Spanish, shown when EntriesPage has zero day-groups (gap #6).
   'INVENTORY.NO_HISTORY_ENTRY_FOUND': 'No se encontró ninguna entrada',
@@ -640,6 +649,9 @@ const messages: Record<string, string> = {
   'WAREHOUSES.TYPE_SALE_OUT': 'Salida a tienda',
   'WAREHOUSES.TYPE_TRANSFER_IN': 'Entrada por transferencia',
   'WAREHOUSES.TYPE_TRANSFER_OUT': 'Salida por transferencia',
+  // ─── Módulo Elaboración (17): consumo de insumos y entrada del terminado ──
+  'WAREHOUSES.TYPE_CONSUMPTION_OUT': 'Consumo (elaboración)',
+  'WAREHOUSES.TYPE_ELABORATION_IN': 'Entrada (elaboración)',
   // ─── Plan 2026-09-09: reversa de movimientos (D1-D12, F5/F8) ─────────────
   'WAREHOUSES.TYPE_REVERSAL': 'Reversa',
   'WAREHOUSES.REVERSAL_BADGE': 'Revertido',
@@ -680,6 +692,64 @@ const messages: Record<string, string> = {
   'WAREHOUSES.MODAL_MOVEMENT': 'Movimiento a otro almacén',
   'WAREHOUSES.MODAL_SALE_OUT': 'Salida a tienda',
   'WAREHOUSES.SELECT_PRODUCT': 'Seleccione un producto…',
+  // ─── Módulo Elaboración (17): recetas (BoM) ─────────────────────────────
+  'RECIPE.TITLE': 'Recetas',
+  'RECIPE.NEW': 'Nueva receta',
+  'RECIPE.EDIT': 'Editar receta',
+  'RECIPE.EMPTY': 'No hay recetas creadas. Crea una para comenzar.',
+  'RECIPE.FINISHED_PRODUCT': 'Producto terminado',
+  'RECIPE.SELECT_PRODUCT': 'Seleccione un producto…',
+  'RECIPE.OUTPUT_QTY': 'Rendimiento por lote',
+  'RECIPE.COMPONENTS_TITLE': 'Componentes',
+  'RECIPE.COMPONENT': 'Componente',
+  'RECIPE.ADD_COMPONENT': 'Añadir componente',
+  'RECIPE.REMOVE_COMPONENT': 'Eliminar componente',
+  'RECIPE.COMPONENT_QTY': 'Cantidad por unidad',
+  'RECIPE.DUPLICATE_COMPONENT': 'Cada componente debe ser un producto distinto.',
+  'RECIPE.SCRAP_PCT': 'Merma (%)',
+  'RECIPE.LABOR_COST': 'Mano de obra por lote',
+  'RECIPE.OVERHEAD_PCT': 'Gastos indirectos (%)',
+  'RECIPE.SAVE': 'Guardar',
+  'RECIPE.EDIT_ACTION': 'Editar',
+  'RECIPE.DEACTIVATE': 'Desactivar',
+  'RECIPE.INACTIVE': 'Inactiva',
+  'RECIPE.COMPONENTS_COUNT': '{count, plural, one {# componente} other {# componentes}}',
+  'RECIPE.DEACTIVATE_CONFIRM_TITLE': 'Desactivar receta',
+  'RECIPE.DEACTIVATE_CONFIRM_MESSAGE':
+    '¿Está seguro que desea desactivar esta receta? Las elaboraciones ya registradas conservan su historial.',
+  'RECIPE.DEACTIVATE_CONFIRM_BUTTON': 'Desactivar',
+  'RECIPE.CREATED': 'Receta creada.',
+  'RECIPE.UPDATED': 'Receta actualizada.',
+  'RECIPE.DEACTIVATED': 'Receta desactivada.',
+  // ─── Módulo Elaboración (17): elaboraciones (orden de producción) ───────
+  'ELABORATION.TITLE': 'Nueva elaboración',
+  'ELABORATION.RECIPE': 'Receta',
+  'ELABORATION.SELECT_RECIPE': 'Seleccione una receta…',
+  'ELABORATION.BATCHES': 'Lotes',
+  'ELABORATION.WAREHOUSE': 'Almacén',
+  'ELABORATION.SELECT_WAREHOUSE': 'Seleccione un almacén…',
+  'ELABORATION.COMPONENTS_TITLE': 'Componentes',
+  'ELABORATION.PRODUCT': 'Producto',
+  'ELABORATION.THEORETICAL': 'Teórica',
+  'ELABORATION.ACTUAL': 'Real',
+  'ELABORATION.COST_PRICE': 'Costo unitario',
+  'ELABORATION.LINE_TOTAL': 'Costo total',
+  'ELABORATION.INGREDIENTS_COST': 'Costo de insumos',
+  'ELABORATION.OVERHEAD': 'Gastos indirectos',
+  'ELABORATION.LABOR': 'Mano de obra',
+  'ELABORATION.TOTAL_COST': 'Costo total',
+  'ELABORATION.PRODUCED_QTY': 'Cantidad producida',
+  'ELABORATION.UNIT_COST': 'Costo unitario',
+  'ELABORATION.CONFIRM': 'Confirmar elaboración',
+  'ELABORATION.CONFIRMED': 'Elaboración registrada.',
+  'ELABORATION.NO_RECIPES': 'No hay recetas activas. Cree una receta para poder elaborar.',
+  'ELABORATION.NO_WAREHOUSE':
+    'No hay almacenes configurados. Cree un almacén para poder elaborar.',
+  'ELABORATION.INSUFFICIENT_ROW': 'Stock insuficiente',
+  'ELABORATION.HISTORY_TITLE': 'Historial de elaboraciones',
+  'ELABORATION.NO_HISTORY': 'No hay elaboraciones registradas.',
+  'ELABORATION.NEGATIVE_ACTUAL':
+    'Las cantidades reales negativas se tratan como cero.',
   // Angular INVENTORY_ENTRY.* namespace (vocabs/es.ts:420-426) — today-entries add/edit modal
   // + today-entries empty state (was previously covered by the overloaded INVENTORY.EMPTY_STATE).
   // INVENTORY_ENTRY.TEXT (Angular vocabs/es.ts:421) — used by Swal's DELETE_CONFIRM_MESSAGE_A

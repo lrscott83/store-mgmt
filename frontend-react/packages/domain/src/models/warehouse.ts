@@ -16,13 +16,20 @@ import type { Currency } from '../enums';
  *   D1/D8) — el log permanece íntegro como auditoría.
  */
 
-/** Tipos de movimiento en v1 (sin `adjustment_*` — decisión #2) + reversa (plan 2026-09-09, D7a). */
+/**
+ * Tipos de movimiento en v1 (sin `adjustment_*` — decisión #2) + reversa
+ * (plan 2026-09-09, D7a) + the two Elaboration-module movements:
+ * `consumption_out` (ingredient consumed by an elaboration) and
+ * `elaboration_in` (finished good produced).
+ */
 export type WarehouseMovementType =
   | 'purchase_in'
   | 'sale_out'
   | 'transfer_in'
   | 'transfer_out'
-  | 'reversal';
+  | 'reversal'
+  | 'consumption_out'
+  | 'elaboration_in';
 
 /** Lote de stock con costo exacto — el consumo es FIFO del más viejo al más nuevo (plan 2026-09-09, D8). */
 export interface WarehouseStockLot {

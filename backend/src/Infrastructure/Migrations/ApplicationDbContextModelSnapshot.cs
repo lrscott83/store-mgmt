@@ -548,6 +548,26 @@ namespace Infrastructure.Migrations
                             ModuleId = 11,
                             Name = "Venta a crédito",
                             Order = 230
+                        },
+                        new
+                        {
+                            Id = 120,
+                            AvailableToStore = true,
+                            Description = "Funcionalidad para gestionar las recetas de elaboración de productos",
+                            IsActive = true,
+                            ModuleId = 17,
+                            Name = "Recetas",
+                            Order = 240
+                        },
+                        new
+                        {
+                            Id = 121,
+                            AvailableToStore = true,
+                            Description = "Funcionalidad para registrar elaboraciones con consumo de insumos y costo real",
+                            IsActive = true,
+                            ModuleId = 17,
+                            Name = "Elaboraciones",
+                            Order = 241
                         });
                 });
 
@@ -885,6 +905,18 @@ namespace Infrastructure.Migrations
                             Order = 126,
                             PercentDiscountPrice = 50f,
                             Price = 10f,
+                            PriceIncluded = false
+                        },
+                        new
+                        {
+                            Id = 17,
+                            AvailableToStore = true,
+                            DiscountPrice = 0f,
+                            IsActive = true,
+                            Name = "Elaboración",
+                            Order = 130,
+                            PercentDiscountPrice = 100f,
+                            Price = 3f,
                             PriceIncluded = false
                         });
                 });
@@ -1334,6 +1366,11 @@ namespace Infrastructure.Migrations
                         },
                         new
                         {
+                            PlanId = 3,
+                            ModuleId = 17
+                        },
+                        new
+                        {
                             PlanId = 4,
                             ModuleId = 2
                         },
@@ -1406,6 +1443,11 @@ namespace Infrastructure.Migrations
                         {
                             PlanId = 4,
                             ModuleId = 16
+                        },
+                        new
+                        {
+                            PlanId = 4,
+                            ModuleId = 17
                         });
                 });
 

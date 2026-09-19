@@ -17,7 +17,8 @@ describe('clearStoreData', () => {
     vi.restoreAllMocks();
   });
 
-  it('covers exactly the eleven business entities', () => {
+  it('covers exactly the thirteen business entities', () => {
+    // elaboration-module: recipes + elaborations joined the registry.
     expect([...BUSINESS_ENTITY_NAMES]).toEqual([
       'products',
       'product-categories',
@@ -30,7 +31,20 @@ describe('clearStoreData', () => {
       'warehouse-stock-levels',
       'warehouse-stock-movements',
       'channelRates',
+      'recipes',
+      'elaborations',
     ]);
+  });
+
+  it('clears the elaboration module entities (recipes, elaborations)', () => {
+    localStorage.setItem(StorageKeys.entityKey('recipes', STORE_A), '["r1"]');
+    localStorage.setItem(StorageKeys.entityKey('elaborations', STORE_A), '["e1"]');
+
+    const failedEntities = clearStoreData(STORE_A);
+
+    expect(failedEntities).toEqual([]);
+    expect(localStorage.getItem(StorageKeys.entityKey('recipes', STORE_A))).toBeNull();
+    expect(localStorage.getItem(StorageKeys.entityKey('elaborations', STORE_A))).toBeNull();
   });
 
   it('removes every business-entity key of the given store', () => {

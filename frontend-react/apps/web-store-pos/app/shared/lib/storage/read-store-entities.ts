@@ -11,6 +11,13 @@
 // NEVER THROWS — a store without a local wrap, with an unreadable key, or
 // with corrupt data simply yields no rows (the views render "sin datos"),
 // mirroring dek-bootstrap's silent-failure discipline (design F6).
+//
+// PAYLOAD SHAPES (entries-multistore-integration, bug 2026-09-18): the per-
+// store entities are NOT stored uniformly. Orders/credits/expenses save flat
+// arrays, but inventory-entries/products/product-categories serialize a MAP
+// keyed by product/category id ([[id, value], ...] after JSON). readStoreEntities
+// normalizes both: a map-shaped array yields its VALUES; a flat array passes
+// through; anything else is treated as no data.
 import { readDeviceDekTable } from './device-dek-table';
 import { getDeviceKey } from './device-key-store';
 import { unwrapDekFromDevice } from './dek-bootstrap';
@@ -46,9 +53,31 @@ export async function unwrapStoreDekForStore(storeId: string): Promise<Uint8Arra
 }
 
 /**
+ * True when `parsed` is an array of [key, value] PAIRS — i.e. a serialized
+ * Map (`Array.from(map)` shape) rather than a flat entity array. Every pair
+ * element must be a 2-tuple whose first item is a string key; a flat array of
+ * entities never satisfies this (entities are objects, not 2-element arrays).
+ */
+function isMapShapedArray(parsed: unknown[]): boolean {
+  return (
+    parsed.length > 0 &&
+    parsed.every(
+      (item) =>
+        Array.isArray(item) &&
+        item.length === 2 &&
+        typeof item[0] === 'string',
+    )
+  );
+}
+
+/**
  * Reads a raw business-entity payload for ANY store from local storage and
  * decrypts it with the given explicit DEK. Never throws: absent key, corrupt
  * JSON, or an encrypted payload without a DEK all yield `[]`.
+ *
+ * Accepts BOTH storage shapes the app produces: flat arrays (orders,
+ * saleCredits, expenses) and serialized maps ([[id, value], ...] —
+ * inventory-entries, products, product-categories), yielding the entities.
  */
 export function readStoreEntities<T>(entity: string, storeId: string, dek: Uint8Array | null): T[] {
   let raw: string | null;
@@ -70,7 +99,13 @@ export function readStoreEntities<T>(entity: string, storeId: string, dek: Uint8
 
   try {
     const parsed: unknown = JSON.parse(plaintext);
-    return Array.isArray(parsed) ? (parsed as T[]) : [];
+    if (!Array.isArray(parsed)) return [];
+    // Map-shaped payloads ([id, entities[]]) yield the VALUES, flattened one
+    // level: inventory-entries/products/product-categories each map an id to
+    // an ARRAY of entities (order items map to a single entity each).
+    return (
+      isMapShapedArray(parsed) ? parsed.map((pair) => pair[1]).flat() : parsed
+    ) as T[];
   } catch {
     return [];
   }

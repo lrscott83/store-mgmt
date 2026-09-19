@@ -44,6 +44,9 @@ const MOVEMENT_TYPE_LABEL: Record<WarehouseMovementType, string> = {
   transfer_out: 'WAREHOUSES.TYPE_TRANSFER_OUT',
   // Reversa — compensa una fila anterior (plan 2026-09-09, D7a/F5).
   reversal: 'WAREHOUSES.TYPE_REVERSAL',
+  // Elaboración (módulo 17): insumo consumido y terminado producido.
+  consumption_out: 'WAREHOUSES.TYPE_CONSUMPTION_OUT',
+  elaboration_in: 'WAREHOUSES.TYPE_ELABORATION_IN',
 };
 
 /**

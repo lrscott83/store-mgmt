@@ -399,7 +399,7 @@ export function ProductsPage() {
   }
 
   // --- Clear all data ---
-  // catalog-show-all-and-clear-data §D5/D6/D9, revised by §Finding 1. Wipes the seven business
+  // catalog-show-all-and-clear-data §D5/D6/D9, revised by §Finding 1. Wipes the business
   // entities of the ACTIVE store; never touches token/AUTH_MODEL/currentUser/roster/DEK, so
   // the session survives and the device keeps offline access.
   //

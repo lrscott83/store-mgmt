@@ -4,6 +4,7 @@ import { Button } from '~/shared/components/ui/button';
 import { CloseIcon } from '~/shared/components/ui/icons';
 import { PlanPanels } from './plan-panels';
 import { formatDateOnly } from '~/shared/lib/date-utils';
+import { useAuthStore } from '~/shared/lib/stores/auth-store';
 
 interface EditPlanModalProps {
   open: boolean;
@@ -45,6 +46,12 @@ export function EditPlanModal({
   onActivate,
 }: EditPlanModalProps) {
   const intl = useIntl();
+  const { user } = useAuthStore();
+  // Caller matrix (billing/spec.md): non-SuperAdmin callers may only target
+  // Gratis or Pago — Superior/VIP are SuperAdmin-reserved (backend enforces it).
+  const visiblePlans = user?.isSuperAdmin
+    ? plans
+    : plans.filter((p) => p.planType === 'Gratis' || p.planType === 'Pago');
 
   if (!open || !storeId) return null;
 
@@ -83,7 +90,7 @@ export function EditPlanModal({
         )}
 
         <PlanPanels
-          plans={plans}
+          plans={visiblePlans}
           storePlanType={storePlanType}
           featuresByModuleId={featuresByModuleId}
           onActivate={onActivate}
