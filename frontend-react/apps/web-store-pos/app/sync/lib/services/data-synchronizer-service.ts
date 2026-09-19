@@ -736,8 +736,18 @@ export class DataSynchronizerService {
    *    DIFFERENT id, or by an earlier active recipe in this batch) fails the
    *    merge; a recipe updating itself is never its own duplicate.
    *
-   * Break-only (no revert), like every other service-routed entity: rows
-   * merged before the failure persist. An unexpected throw yields
+   * R3-ORDER fix — the "one active recipe per product" rule is a property of
+   * the FINAL post-merge state, not of the step-by-step state (R3-ORDER). The
+   * claims that may block an activation are seeded from the FINAL active set:
+   * a stored recipe that this same batch deactivates (or moves to another
+   * product) no longer claims its old product, so a batch that DEACTIVATES the
+   * product's current active recipe and ACTIVATES a different recipe for the
+   * same product succeeds regardless of row order. Rows of this batch override
+   * the stored row with the same id and carry its final `isActive`/`productId`,
+   * so the seed skips them and their own processing (below) settles the claim.
+   * The remaining loop is break-only (no revert), like every other
+   * service-routed entity: rows merged before a failure persist (this is what
+   * the existing break-only tests pin). An unexpected throw yields
    * `RecipesUnexpectedError`. When the service was not injected (legacy
    * constructor call sites) the merge is a zero-count no-op.
    */
@@ -755,9 +765,13 @@ export class DataSynchronizerService {
       // id -> productId, so an update is distinguishable from an insert and a
       // product reassignment can release the recipe's previous claim.
       const idToProduct = new Map(existing.map((recipe) => [recipe.id, recipe.productId]));
-      // productId -> id of the single ACTIVE recipe claiming it.
+      // productId -> id of the single ACTIVE recipe claiming it, seeded from the
+      // FINAL state: a stored recipe overridden by this batch does not claim its
+      // old product (the batch row settles its final product/active state).
+      const incomingIds = new Set(incoming.map((recipe) => recipe.id));
       const activeByProduct = new Map<string, string>();
       for (const recipe of existing) {
+        if (incomingIds.has(recipe.id)) continue;
         if (recipe.isActive) activeByProduct.set(recipe.productId, recipe.id);
       }
 
@@ -984,13 +998,21 @@ export class DataSynchronizerService {
    * — the local warehouses plus the ones imported earlier in this same run
    * (warehouses are merged before elaborations, so an elaboration whose
    * warehouse travels in the same zip resolves). Break-only (no revert); an
-   * unexpected throw yields `ElaborationsUnexpectedError`. When the service
-   * was not injected (legacy constructor call sites) the merge is a
-   * zero-count no-op.
+   * unexpected throw yields `ElaborationsUnexpectedError`.
+   *
+   * The warehouse-existence rule can only be evaluated when the OPTIONAL
+   * `warehouseService` was injected. When it was not (legacy constructor call
+   * sites that predate the warehouses module), the merged warehouse set is
+   * unknown and a naive check would reject EVERY non-empty elaborations import
+   * as `ElaborationsUnexpectedError` — a missing dependency reported as a data
+   * error. That is not a validation failure, so the merge degrades to a
+   * zero-count no-op, the same contract every other optional-service-routed
+   * merge keeps (exchange rates/warehouses/recipes). Whenever the warehouse
+   * service IS injected the rule stays fully enforced.
    */
   private mergeElaborationsViaService(incoming: Elaboration[]): MergeOutcome {
     const entity = 'elaborations';
-    if (!this.elaborationService || incoming.length === 0) {
+    if (!this.elaborationService || !this.warehouseService || incoming.length === 0) {
       return { merge: { entity, inserted: 0, updated: 0 } };
     }
 

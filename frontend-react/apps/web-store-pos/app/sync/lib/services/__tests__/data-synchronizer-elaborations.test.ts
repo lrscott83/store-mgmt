@@ -354,6 +354,83 @@ describe('DataSynchronizerService — recipes merge (elaboration-module)', () =>
     const err = result.errors.find((e) => e.entity === 'recipes');
     expect(err?.code).toBe(SynchronizerErrors.RecipesUnexpectedError.code);
   });
+
+  it('replaces the active recipe for a product regardless of row order (R3-ORDER)', async () => {
+    const stateOf = (svc: RecipeOfflineService) =>
+      svc
+        .getStorageRecipes()
+        .map((recipe) => ({
+          id: recipe.id,
+          productId: recipe.productId,
+          isActive: recipe.isActive,
+        }))
+        .sort((a, b) => a.id.localeCompare(b.id));
+
+    // Order A — deactivation row first, then the activation row.
+    const deactivateThenActivate = makeRecipeService();
+    deactivateThenActivate.addImportedRecipe(makeRecipe('rec-old', 'prod-1', true));
+    const svcOrderA = makeSynchronizer({
+      productRepo: makeProductRepo([makeProduct('prod-1')]),
+      recipeSvc: deactivateThenActivate,
+    });
+    const resultA = await svcOrderA.sync(
+      makeData([
+        makeRecipe('rec-old', 'prod-1', false),
+        makeRecipe('rec-new', 'prod-1', true),
+      ]),
+    );
+
+    // Order B — the same batch with the activation row first.
+    localStorage.clear();
+    const activateThenDeactivate = makeRecipeService();
+    activateThenDeactivate.addImportedRecipe(makeRecipe('rec-old', 'prod-1', true));
+    const svcOrderB = makeSynchronizer({
+      productRepo: makeProductRepo([makeProduct('prod-1')]),
+      recipeSvc: activateThenDeactivate,
+    });
+    const resultB = await svcOrderB.sync(
+      makeData([
+        makeRecipe('rec-new', 'prod-1', true),
+        makeRecipe('rec-old', 'prod-1', false),
+      ]),
+    );
+
+    expect(resultA.succeeded).toBe(true);
+    expect(resultB.succeeded).toBe(true);
+    expect(stateOf(deactivateThenActivate)).toEqual(stateOf(activateThenDeactivate));
+    expect(stateOf(deactivateThenActivate)).toEqual([
+      { id: 'rec-new', productId: 'prod-1', isActive: true },
+      { id: 'rec-old', productId: 'prod-1', isActive: false },
+    ]);
+  });
+
+  it('keeps rows merged before a throwing write (break-only partial persistence)', async () => {
+    const recipeSvc = makeRecipeService();
+    const originalAdd = recipeSvc.addImportedRecipe.bind(recipeSvc);
+    recipeSvc.addImportedRecipe = (recipe) => {
+      if (recipe.id === 'rec-2') throw new Error('storage exploded');
+      return originalAdd(recipe);
+    };
+    const svc = makeSynchronizer({
+      productRepo: makeProductRepo([makeProduct('prod-1'), makeProduct('prod-2')]),
+      recipeSvc,
+    });
+
+    const result = await svc.sync(
+      makeData([
+        makeRecipe('rec-1', 'prod-1', true),
+        makeRecipe('rec-2', 'prod-2', true),
+      ]),
+    );
+
+    expect(result.succeeded).toBe(false);
+    expect(recipeSvc.getStorageRecipes().map((recipe) => recipe.id)).toEqual(['rec-1']);
+    expect(result.merges.find((m) => m.entity === 'recipes')).toEqual({
+      entity: 'recipes',
+      inserted: 1,
+      updated: 0,
+    });
+  });
 });
 
 describe('DataSynchronizerService — elaborations merge (elaboration-module)', () => {
@@ -437,6 +514,48 @@ describe('DataSynchronizerService — elaborations merge (elaboration-module)', 
     expect(result.succeeded).toBe(false);
     const err = result.errors.find((e) => e.entity === 'elaborations');
     expect(err?.code).toBe(SynchronizerErrors.ElaborationsUnexpectedError.code);
+  });
+
+  it('degrades to a zero-count no-op when the elaboration service is injected without the warehouse service (R3-WAREHOUSE)', async () => {
+    const elaborationSvc = makeElaborationService();
+    const svc = makeSynchronizer({ elaborationSvc });
+
+    const result = await svc.sync(makeData([], [makeElaboration('el-1', 'wh-1')]));
+
+    expect(result.succeeded).toBe(true);
+    expect(result.errors).toHaveLength(0);
+    expect(result.merges.find((m) => m.entity === 'elaborations')).toEqual({
+      entity: 'elaborations',
+      inserted: 0,
+      updated: 0,
+    });
+    expect(elaborationSvc.getStorageElaborations()).toHaveLength(0);
+  });
+
+  it('keeps rows merged before a throwing write (break-only partial persistence)', async () => {
+    const warehouseSvc = makeWarehouseService();
+    warehouseSvc.addImportedWarehouse(makeWarehouse('wh-1', 'Central'));
+    const elaborationSvc = makeElaborationService();
+    const originalAdd = elaborationSvc.addImportedElaboration.bind(elaborationSvc);
+    elaborationSvc.addImportedElaboration = (elaboration) => {
+      if (elaboration.id === 'el-2') throw new Error('storage exploded');
+      return originalAdd(elaboration);
+    };
+    const svc = makeSynchronizer({ warehouseSvc, elaborationSvc });
+
+    const result = await svc.sync(
+      makeData([], [makeElaboration('el-1', 'wh-1'), makeElaboration('el-2', 'wh-1')]),
+    );
+
+    expect(result.succeeded).toBe(false);
+    expect(elaborationSvc.getStorageElaborations().map((elaboration) => elaboration.id)).toEqual([
+      'el-1',
+    ]);
+    expect(result.merges.find((m) => m.entity === 'elaborations')).toEqual({
+      entity: 'elaborations',
+      inserted: 1,
+      updated: 0,
+    });
   });
 });
 
