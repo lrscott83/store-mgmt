@@ -1,7 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
-import { ExpenseType, PaymentType, ExpenseErrors } from '@store-mgmt/domain';
+import { EModules, ExpenseType, PaymentType, ExpenseErrors } from '@store-mgmt/domain';
 import type { Expense } from '@store-mgmt/domain';
 import esMessages from '~/shared/lib/i18n/es';
 import { ExpenseOfflineService } from '~/expenses/lib/services/expense-offline-service';
@@ -31,13 +31,46 @@ function expensesFailureResponse() {
 
 // ─── Global mocks ────────────────────────────────────────────────────────────
 
+// --- Mutable auth state (multi-store-panels): single-store by default;
+// the multistore describe flips it to a MultiStores OwnerAdmin so the REAL
+// useMultiStore gate decides the mode. Restored after each test. ---
+const { authStoreState } = vi.hoisted(() => ({
+  authStoreState: {
+    user: { selectedStoreId: 's1' },
+    isAuthenticated: true,
+  } as {
+    user: {
+      selectedStoreId: string;
+      isOwnerAdmin?: boolean;
+      storeModuleIds?: number[];
+      storeList?: Array<{ id: string; name: string; isActive?: boolean }>;
+    };
+    isAuthenticated: boolean;
+  },
+}));
+
 vi.mock('~/shared/lib/stores/auth-store', () => {
-  const state = { user: { selectedStoreId: 's1' }, isAuthenticated: true };
-  const useAuthStore = vi.fn((selector?: (s: typeof state) => unknown) => {
-    if (typeof selector === 'function') return selector(state);
-    return state;
-  });
+  const useAuthStore = vi.fn(
+    (selector?: (s: typeof authStoreState) => unknown) =>
+      typeof selector === 'function' ? selector(authStoreState) : authStoreState,
+  );
   return { useAuthStore };
+});
+
+// multi-store-panels: per-store expense fixture shared by the aggregator read
+// path (multi-store mode). The single-store mode never calls these.
+const { storeExpensesFixture } = vi.hoisted(() => ({
+  storeExpensesFixture: {} as Record<string, Expense[]>,
+}));
+
+vi.mock('~/shared/lib/multistore/multi-store-aggregator', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('~/shared/lib/multistore/multi-store-aggregator')>();
+  return {
+    ...actual,
+    unwrapStoreDek: vi.fn().mockResolvedValue(new Uint8Array([1])),
+    readStoreExpenses: vi.fn((storeId: string) => storeExpensesFixture[storeId] ?? []),
+  };
 });
 
 vi.mock('~/expenses/lib/services/expense-offline-service', () => ({
@@ -360,7 +393,9 @@ describe('ExpensesHistoryPage — strict Angular parity', () => {
         </Wrapper>,
       );
     });
-    expect(screen.getByText(/Historial de Gastos/i)).toBeInTheDocument();
+    // 2026-09-20 (owner): el header del historial muestra solo «Gastos».
+    expect(screen.getByText('Gastos')).toBeInTheDocument();
+    expect(screen.queryByText(/Historial de Gastos/i)).not.toBeInTheDocument();
   });
 
   it('has NO add button', async () => {
@@ -677,5 +712,161 @@ describe('ExpensesHistoryPage — filterExpensesObservable succeeded:false (sile
     });
     expect(screen.queryByText(`$${day1.total}.00`)).not.toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+});
+
+// ─── ExpensesHistoryPage — multi-store-panels ────────────────────────────────
+// OwnerAdmin + MultiStores + ≥2 tiendas activas → filtros GLOBALES fuera de
+// los paneles, un panel colapsable por tienda con acordeón por día y totales
+// fuera de los paneles. Sin MultiStores la vista es idéntica a la original
+// (los describes anteriores pinchan ese modo con este mismo archivo).
+describe('ExpensesHistoryPage — modo multistore (paneles por tienda)', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    for (const key of Object.keys(storeExpensesFixture)) delete storeExpensesFixture[key];
+    authStoreState.user = {
+      selectedStoreId: 's1',
+      isOwnerAdmin: true,
+      storeModuleIds: [EModules.MultiStores],
+      storeList: [
+        { id: 's1', name: 'Tienda Uno', isActive: true },
+        { id: 's2', name: 'Tienda Dos', isActive: true },
+      ],
+    };
+  });
+
+  afterEach(() => {
+    authStoreState.user = { selectedStoreId: 's1' };
+  });
+
+  it('MS-1: muestra el select global de tiendas y un panel colapsable por tienda, con totales por tienda y global fuera de los paneles', async () => {
+    storeExpensesFixture.s1 = [
+      makeExpense({ id: 'a', date: new Date('2024-03-15T09:00:00.000'), total: 10 }),
+      makeExpense({ id: 'b', date: new Date('2024-03-15T11:00:00.000'), total: 5 }),
+    ];
+    storeExpensesFixture.s2 = [
+      makeExpense({ id: 'c', date: new Date('2024-03-16T09:00:00.000'), total: 7 }),
+    ];
+
+    await act(async () => {
+      render(
+        <Wrapper>
+          <ExpensesHistoryPage />
+        </Wrapper>,
+      );
+    });
+
+    // El header global solo dice «Gastos» (sin «Historial de»).
+    expect(screen.getByText('Gastos')).toBeInTheDocument();
+    expect(screen.queryByText(/Historial de Gastos/i)).not.toBeInTheDocument();
+
+    // Select global con «Todas las tiendas» + una opción por tienda.
+    expect(screen.getByTestId('multistore-select')).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Todas las tiendas' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Tienda Uno' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Tienda Dos' })).toBeInTheDocument();
+
+    // Un panel por tienda, colapsado por defecto, con su total al lado del nombre
+    // (el nombre aparece en el <option> y en el header del panel).
+    expect(screen.getByTestId('multistore-panel-toggle-s1')).toBeInTheDocument();
+    expect(screen.getByTestId('multistore-panel-toggle-s2')).toBeInTheDocument();
+    expect(screen.getAllByText('Tienda Uno').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Tienda Dos').length).toBeGreaterThan(0);
+    expect(screen.getByText('$15')).toBeInTheDocument(); // total tienda s1
+    expect(screen.getByText('$7')).toBeInTheDocument(); // total tienda s2
+
+    // Global fuera de los paneles: 3 gastos, $22.
+    expect(screen.getByText('(3)')).toBeInTheDocument();
+    expect(screen.getByText('$22')).toBeInTheDocument();
+
+    // El filtro de método de pago es GLOBAL (fuera de los paneles).
+    expect(
+      screen.getAllByRole('radio', { name: /Efectivo/ }).length,
+    ).toBeGreaterThanOrEqual(1);
+    // Nada expandido aún: no hay filas de gastos en el DOM.
+    expect(screen.queryByTestId('expense-row-a')).not.toBeInTheDocument();
+  });
+
+  it('MS-2: expandir un panel muestra los gastos agrupados por día de ESA tienda', async () => {
+    storeExpensesFixture.s1 = [
+      makeExpense({ id: 'a', date: new Date('2024-03-15T09:00:00.000'), total: 10 }),
+    ];
+    storeExpensesFixture.s2 = [
+      makeExpense({ id: 'c', date: new Date('2024-03-16T09:00:00.000'), total: 7 }),
+    ];
+
+    await act(async () => {
+      render(
+        <Wrapper>
+          <ExpensesHistoryPage />
+        </Wrapper>,
+      );
+    });
+
+    fireEvent.click(screen.getByTestId('multistore-panel-toggle-s1'));
+    // El acordeón por día vive DENTRO del panel de la tienda, también colapsado.
+    fireEvent.click(screen.getByTestId('multistore-expense-day-panel-toggle-s1-2024-03-15'));
+    expect(screen.getByTestId('expense-row-a')).toBeInTheDocument();
+    // El gasto de la otra tienda no aparece dentro del panel de s1.
+    expect(screen.queryByTestId('expense-row-c')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('multistore-panel-toggle-s2'));
+    fireEvent.click(screen.getByTestId('multistore-expense-day-panel-toggle-s2-2024-03-16'));
+    expect(screen.getByTestId('expense-row-c')).toBeInTheDocument();
+  });
+
+  it('MS-3: el filtro global de método de pago filtra dentro de los paneles y actualiza totales', async () => {
+    storeExpensesFixture.s1 = [
+      makeExpense({ id: 'a', total: 10, paymentType: PaymentType.Efectivo }),
+      makeExpense({ id: 'b', total: 5, paymentType: PaymentType.Tarjeta }),
+    ];
+    storeExpensesFixture.s2 = [
+      makeExpense({ id: 'c', total: 7, paymentType: PaymentType.Efectivo }),
+    ];
+
+    await act(async () => {
+      render(
+        <Wrapper>
+          <ExpensesHistoryPage />
+        </Wrapper>,
+      );
+    });
+
+    // Solo hay UN radio group global (el filtro vive fuera de los paneles).
+    const efectivoRadios = screen.getAllByRole('radio', { name: /Efectivo/ });
+    expect(efectivoRadios).toHaveLength(1);
+    fireEvent.click(efectivoRadios[0]);
+
+    // Global: quedan 2 de 3 ($17) — el header y el total por tienda de s2.
+    await waitFor(() => {
+      expect(screen.getByText('(2)')).toBeInTheDocument();
+      expect(screen.getByText('$17')).toBeInTheDocument();
+    });
+
+    // Expandir s1 (tienda + día): solo el gasto en efectivo; s2 no cambió ($7).
+    fireEvent.click(screen.getByTestId('multistore-panel-toggle-s1'));
+    fireEvent.click(screen.getByTestId('multistore-expense-day-panel-toggle-s1-2024-03-15'));
+    expect(screen.getByTestId('expense-row-a')).toBeInTheDocument();
+    expect(screen.queryByTestId('expense-row-b')).not.toBeInTheDocument();
+    expect(screen.getByText('$7')).toBeInTheDocument();
+  });
+
+  it('MS-4: una tienda sin datos en el dispositivo muestra el estado vacío del panel', async () => {
+    storeExpensesFixture.s1 = [
+      makeExpense({ id: 'a', date: new Date('2024-03-15T09:00:00.000'), total: 10 }),
+    ];
+
+    await act(async () => {
+      render(
+        <Wrapper>
+          <ExpensesHistoryPage />
+        </Wrapper>,
+      );
+    });
+
+    fireEvent.click(screen.getByTestId('multistore-panel-toggle-s2'));
+    expect(
+      screen.getByText('Sin datos de esta tienda en este dispositivo'),
+    ).toBeInTheDocument();
   });
 });
