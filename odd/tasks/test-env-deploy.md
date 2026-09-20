@@ -43,6 +43,31 @@ Deploy automatizado del stack de test (espejo de producción) en el VPS: backup 
 - Blobs verificados en LF (`git ls-files --eol` → `i/lf`) pese a `core.autocrlf=true` en Windows: el clon Linux recibe LF.
 - Pendiente: corrida end-to-end real en el VPS (no hay podman en local).
 
+## Actualización 2026-09-20 — Angular y LB fuera del stack test
+
+Contexto: la primera corrida real en el VPS falló solo en `frontend` y `nginx`.
+El build del Angular no generaba la imagen `smca-test_frontend` (el `podman run`
+moría con `short-name ... did not resolve`); `nginx` caía por `depends_on:
+frontend`. `postgres`, `api`, `pgadmin` y `web-store-pos` levantaron OK.
+
+Decisión (opción A, elegida por el usuario): el `frontend` (Angular, legacy) NO
+se levanta más, y con él se va el `nginx` LB — que existía solo para servir
+Angular y no arrancaría sin el upstream `frontend`. El único entrypoint web es el
+React (`web-store-pos`, :8095), autosuficiente: sirve el SPA y proxya `/api` →
+`api:8000` con `frontend-react/deploy/nginx.conf`. Producción intacta
+(`loadbalancer/nginx.conf` no se tocó).
+
+Regla dura reforzada: NADA del stack test puede apuntar a producción. El build
+del React hornea `API_URL=/api` (same-origin, `frontend-react/Dockerfile` ARG por
+defecto) → su propio nginx → `api:8000` (servicio test). Sin URLs absolutas a prod.
+
+- [x] T6 Remover `frontend` y `nginx` de `docker-compose.test.yml`; ajustar el
+  smoke test y `deploy-state.txt` en `scripts/deploy-test.sh` (fuera `LB_PORT`).
+- Verificación observada: YAML `services: [api, postgres, pgadmin, web-store-pos]`;
+  `bash -n scripts/deploy-test.sh` → exit 0; cero refs funcionales a `LB_PORT`,
+  `8093`, `smca_test_frontend`, `smca_test_nginx`; blobs en LF.
+- Pendiente: re-subir `scripts/deploy-test.sh` al VPS y re-correr.
+
 ## Siguiente paso (usuario)
 
-- Crear rama `test`; commitear compose + script + gitignore (NO `.env-test`); subir `deploy-test.sh` y `.env` (renombrado y completado con los secretos de producción) al VPS (`/home/malayo/test-deploy/`).
+- Pushear el compose + script actualizados a la rama `test` (el script clona el compose de ahí) y re-subir `deploy-test.sh` + `.env` al VPS (`/home/malayo/lizo/test-deploy/`).

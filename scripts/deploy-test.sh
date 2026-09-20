@@ -44,7 +44,6 @@ TEST_DB_NAME="${TEST_DB_NAME:-smca_test}"
 BACKEND_IMAGE="${BACKEND_IMAGE:-localhost/store-mgmt_backend_test:latest}"
 KEEP_BACKUPS="${KEEP_BACKUPS:-7}"
 SMOKE_TIMEOUT_SECONDS="${SMOKE_TIMEOUT_SECONDS:-600}"
-LB_PORT="${LB_PORT:-8093}"
 REACT_PORT="${REACT_PORT:-8095}"
 PUSH_TAG="${PUSH_TAG:-0}"
 
@@ -225,17 +224,19 @@ compose up -d --build 2>&1 | tee -a "$LOG_FILE"
 log "test stack deployed"
 
 # --- STEP 7: smoke test -------------------------------------------------------
+# The Angular frontend and its load balancer no longer exist, so there is no
+# :8093 entrypoint. The React SPA is self-sufficient: it serves `/` and proxies
+# `/api` to the test backend, so both checks go through :$REACT_PORT.
 log "STEP 7 — smoke test (timeout ${SMOKE_TIMEOUT_SECONDS}s)"
 DEADLINE=$((SECONDS + SMOKE_TIMEOUT_SECONDS))
-until curl -fsS "http://localhost:$LB_PORT/api/v1/ping" >/dev/null 2>&1 \
-   && curl -fsS "http://localhost:$LB_PORT/" >/dev/null 2>&1 \
+until curl -fsS "http://localhost:$REACT_PORT/api/v1/ping" >/dev/null 2>&1 \
    && curl -fsS "http://localhost:$REACT_PORT/" >/dev/null 2>&1; do
   if [ "$SECONDS" -ge "$DEADLINE" ]; then
-    die "smoke test timed out — check: podman logs smca_test_backend"
+    die "smoke test timed out — check: podman logs smca_test_backend smca_test_web_pos"
   fi
   sleep 10
 done
-log "smoke test ok: /api/v1/ping, :$LB_PORT (LB), :$REACT_PORT (React)"
+log "smoke test ok: / (SPA) and /api/v1/ping (same-origin proxy) on :$REACT_PORT"
 
 # --- STEP 8: git tag + deploy state -------------------------------------------
 TAG_NAME="test-deploy-$(date +%Y%m%d_%H%M%S)"
@@ -252,7 +253,6 @@ BRANCH=$BRANCH
 DATE=$(date '+%Y-%m-%d %H:%M:%S')
 BACKUP=$BACKUP_FILE
 IMAGE=${BACKEND_IMAGE%:*}:$SHORT_SHA
-LB_URL=http://localhost:$LB_PORT
 REACT_URL=http://localhost:$REACT_PORT
 EOF
 log "deploy state written to $SCRIPT_DIR/deploy-state.txt"
