@@ -9,35 +9,39 @@ import { InfoBox } from '~/shared/components/ui/info-box';
 import { OrderOfflineService } from '../lib/services/order-offline-service';
 import { OrderList } from '../components/order-list';
 import { EditOrderModal } from '../components/edit-order-modal';
+import {
+  collectOrderPaymentMethodKeys,
+  matchesOrderPaymentFilter,
+  paymentMethodKeyToLabel,
+} from '~/shared/lib/payment-filter-options';
 import { formatCurrency } from '~/shared/lib/format-currency';
 
 export const clientLoader = featureLoader([EFeatures.TodayOrders]);
 
-const PAYMENT_TYPE_OPTIONS = [
-  { value: PaymentType.Efectivo, label: 'Efectivo' },
-  { value: PaymentType.Tarjeta, label: 'Transferencia' },
-  { value: PaymentType.Zelle, label: 'Zelle' },
-];
-
 /**
- * Matches Angular's `today-orders.component.html` (Ventas del día): same
- * payment-type + isCredit radio filters as Orders history, but NOT grouped
- * by date (all today's orders in one flat accordion), and `OrderList` is
- * rendered with `readOnly={false}` so each order panel shows Editar/Eliminar.
+ * Filtro de método de pago DINÁMICO (2026-09-19): las opciones se calculan de
+ * las ventas activas del día — solo aparecen los métodos realmente presentes
+ * (Efectivo/Zelle/"Transferencia (CUP|USD|…)"), resueltos por
+ * `payment-filter-options` (el legacy Tarjeta se muestra y filtra como
+ * Transferencia). Con "Todas" siempre primero. El estado guarda la CLAVE
+ * (efectivo | zelle | transferencia-<moneda>); si los datos cambian y la
+ * clave activa deja de existir, se resetea a null (Todas).
  */
 export function TodayOrdersPage() {
   const intl = useIntl();
   const storeId = useAuthStore((s) => s.user?.selectedStoreId ?? '');
   const [orders, setOrders] = useState<Order[]>([]);
-  const [paymentType, setPaymentType] = useState<PaymentType | null>(null);
+  const [paymentKey, setPaymentKey] = useState<string | null>(null);
   const [isCredit, setIsCredit] = useState<number>(-1);
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
 
+  // Active orders of the day, credit-filtered only — the payment filter is
+  // applied on render against the loaded set so the options and the visible
+  // rows always come from the same data (no double loading pass).
   function loadTodayOrders() {
     const service = new OrderOfflineService(storeId);
     const filtered = service
       .getActiveOrdersInDay(new Date())
-      .filter((o) => !paymentType || paymentType === o.paymentType)
       .filter(
         (o) => isCredit === -1 || (isCredit === 1 && o.isCredit) || (isCredit === 0 && !o.isCredit),
       )
@@ -48,7 +52,7 @@ export function TodayOrdersPage() {
   useEffect(() => {
     loadTodayOrders();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- loadTodayOrders reads only the listed deps
-  }, [storeId, paymentType, isCredit]);
+  }, [storeId, isCredit]);
 
   // Angular's OrderOfflineService.updateTodayOrder/deactivateOrder return a Result/DataResult
   // that reports `succeeded: false` on not-found rather than throwing — mirrored here via a
@@ -69,8 +73,12 @@ export function TodayOrdersPage() {
     return true;
   }
 
-  const ordersItemsCount = orders.reduce((count, o) => count + o.itemsCount, 0);
-  const ordersTotal = orders.reduce((total, o) => total + o.total, 0);
+  const paymentOptions = collectOrderPaymentMethodKeys(orders);
+  const paymentActive = paymentKey !== null && paymentOptions.includes(paymentKey) ? paymentKey : null;
+  const visibleOrders = orders.filter((o) => !paymentActive || matchesOrderPaymentFilter(o, paymentActive));
+
+  const ordersItemsCount = visibleOrders.reduce((count, o) => count + o.itemsCount, 0);
+  const ordersTotal = visibleOrders.reduce((total, o) => total + o.total, 0);
 
   return (
     <Card
@@ -95,22 +103,22 @@ export function TodayOrdersPage() {
           <input
             type="radio"
             name="paymentType"
-            checked={paymentType === null}
-            onChange={() => setPaymentType(null)}
+            checked={paymentActive === null}
+            onChange={() => setPaymentKey(null)}
             className="accent-primary"
           />
           Todas
         </label>
-        {PAYMENT_TYPE_OPTIONS.map((opt) => (
-          <label key={opt.value} className="flex items-center gap-1 text-sm text-text">
+        {paymentOptions.map((key) => (
+          <label key={key} className="flex items-center gap-1 text-sm text-text">
             <input
               type="radio"
               name="paymentType"
-              checked={paymentType === opt.value}
-              onChange={() => setPaymentType(opt.value)}
+              checked={paymentActive === key}
+              onChange={() => setPaymentKey(key)}
               className="accent-primary"
             />
-            {opt.label}
+            {paymentMethodKeyToLabel(key)}
           </label>
         ))}
       </fieldset>
@@ -148,7 +156,7 @@ export function TodayOrdersPage() {
         </label>
       </fieldset>
 
-      {orders.length === 0 && (
+      {visibleOrders.length === 0 && (
         <InfoBox variant="primary" className="mb-6 text-center">
           {/* TODAY_STATS.NO_ORDER_FOUND (Angular reuses this key here, not TODAY_ORDERS.NO_ORDER_FOUND) */}
           {intl.formatMessage({ id: 'TODAY_STATS.NO_ORDER_FOUND' })}
@@ -156,7 +164,7 @@ export function TodayOrdersPage() {
       )}
 
       <OrderList
-        orders={orders}
+        orders={visibleOrders}
         readOnly={false}
         onEditOrder={setEditingOrder}
         onDeactivateOrder={handleDeactivate}

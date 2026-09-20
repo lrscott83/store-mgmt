@@ -182,4 +182,26 @@ describe('OrdersPage — header «Ventas (n)» + total, línea de totales elimin
     expect(panel2.textContent).toContain('(0)');
     expect(panel2.textContent).toContain('$0');
   });
+
+  it('OS-5: CON MultiStores — opciones de pago = métodos presentes en el conjunto visible del filtro de tienda', async () => {
+    enableMultiStores();
+    storeOrdersFixture.s1 = [makeOrder({ id: 'o1', paymentType: PaymentType.Efectivo })];
+    storeOrdersFixture.s2 = [makeOrder({ id: 'o2', paymentType: PaymentType.Zelle })];
+
+    render(
+      <Wrapper>
+        <OrdersPage />
+      </Wrapper>,
+    );
+    await screen.findByTestId('multistore-panel-toggle-s1');
+
+    // Todas las tiendas: Efectivo (s1) y Zelle (s2) están presentes.
+    expect(screen.getByText('Efectivo')).toBeInTheDocument();
+    expect(screen.getByText('Zelle')).toBeInTheDocument();
+
+    // Filtrar s2 (solo Zelle): Efectivo desaparece de las opciones.
+    fireEvent.change(screen.getByTestId('multistore-select'), { target: { value: 's2' } });
+    expect(screen.getByText('Zelle')).toBeInTheDocument();
+    expect(screen.queryByText('Efectivo')).not.toBeInTheDocument();
+  });
 });

@@ -19,7 +19,6 @@ const ORDERS_TITLE = 'Ventas'; // ORDERS.TITLE (renamed from 'Historial de Venta
 const NO_ORDERS = 'No se encontró ninguna venta'; // ORDERS.NO_ORDERS_FOUND
 const ALL_PAYMENT = 'Todas';
 const CASH = 'Efectivo';
-const CARD = 'Tarjeta';
 const CREDIT_FILTER = 'Créditos';
 const PAID_FILTER = 'Pagadas';
 const DAY_SUMMARY = 'Resumen de ventas del día'; // SALES.ORDERS.DAY_SALES_SUMMARY
@@ -45,10 +44,12 @@ async function seedSale(page: Page, storeId: string): Promise<void> {
       if (!sellableProduct) return;
       const [productId, product] = sellableProduct;
 
-      // Create an order
+      // Create an order — PLAIN ARRAY (the app's orders storage format; the
+      // service reads JSON.parse(json) as Order[], same seam as
+      // payment-methods.spec.ts seedPlainOrders).
       const orderKey = `lizoft.store-orders-${sid}`;
       const rawOrders = localStorage.getItem(orderKey);
-      let ordersEntries: [string, Record<string, unknown>][] = [];
+      let ordersEntries: Record<string, unknown>[] = [];
       if (rawOrders) {
         try {
           ordersEntries = JSON.parse(rawOrders);
@@ -79,7 +80,7 @@ async function seedSale(page: Page, storeId: string): Promise<void> {
         createdByName: 'e2e-seed',
       };
 
-      ordersEntries.push([order.id, order]);
+      ordersEntries.push(order);
       localStorage.setItem(orderKey, JSON.stringify(ordersEntries));
     },
     { storeId },
@@ -118,15 +119,11 @@ test.describe.serial('FC-A3 — Historial de Órdenes', () => {
     await page.goto('/sales/orders');
     await page.waitForLoadState('networkidle');
 
-    // Filter by Efectivo
+    // Filtro dinámico (2026-09-19): con una sola venta en Efectivo, la única
+    // opción de método ofrecida es Efectivo — filtrar y volver a Todas.
     await page.getByLabel(CASH).click();
     await page.waitForTimeout(500); // Wait for filter to apply
 
-    // Filter by Tarjeta
-    await page.getByLabel(CARD).click();
-    await page.waitForTimeout(500);
-
-    // Filter back to Todas
     await page.getByLabel(ALL_PAYMENT).first().click();
     await page.waitForTimeout(500);
   });

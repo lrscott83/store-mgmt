@@ -1,13 +1,19 @@
 import { useState, useEffect } from 'react';
 import { useIntl } from 'react-intl';
 import type { Expense } from '@store-mgmt/domain';
-import { EFeatures, PaymentType } from '@store-mgmt/domain';
+import { EFeatures, PaymentType, SalePaymentMethod } from '@store-mgmt/domain';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { Card } from '~/shared/components/ui/card';
 import { InfoBox } from '~/shared/components/ui/info-box';
 import { ChevronDownIcon, PaymentMethodIcon } from '~/shared/components/ui/icons';
 import { getPaymentTypeIconKind } from '~/shared/lib/payment-type-icon';
+import {
+  collectExpensePaymentMethodKeys,
+  matchesExpensePaymentFilter,
+  paymentMethodKeyToLabel,
+  paymentMethodKeyToSalePaymentMethod,
+} from '~/shared/lib/payment-filter-options';
 import { formatLocalDate, groupByLocalDay } from '~/shared/lib/date-utils';
 import type { LocalDayGroup } from '~/shared/lib/date-utils';
 import { ExpenseOfflineService } from '../lib/services/expense-offline-service';
@@ -16,12 +22,25 @@ import { formatCurrency } from '~/shared/lib/format-currency';
 
 export const clientLoader = featureLoader([EFeatures.ExpensesHistory]);
 
-const PAYMENT_TYPE_OPTIONS: { value: PaymentType | null; labelKey: string }[] = [
-  { value: null, labelKey: 'GENERAL.ALL' },
-  { value: PaymentType.Efectivo, labelKey: 'CART.EFECTIVO' },
-  { value: PaymentType.Tarjeta, labelKey: 'CART.TRANSFERENCIA_CUP' },
-  { value: PaymentType.Zelle, labelKey: 'CART.ZELLE' },
-];
+/**
+ * Filtro de método de pago DINÁMICO (2026-09-19): las opciones se derivan de
+ * los gastos cargados — solo aparecen los métodos realmente presentes
+ * ("Transferencia (CUP)" para el legacy Tarjeta, etc.) vía
+ * `payment-filter-options`, con "Todas" primero. El estado guarda la CLAVE;
+ * si deja de existir en los datos se resetea a null (Todas).
+ */
+
+/** Glyph legacy equivalente para el icono del radio (mismos SVG que hoy). */
+function legacyKindFor(saleMethod: SalePaymentMethod): PaymentType {
+  switch (saleMethod) {
+    case SalePaymentMethod.Transferencia:
+      return PaymentType.Tarjeta;
+    case SalePaymentMethod.Zelle:
+      return PaymentType.Zelle;
+    default:
+      return PaymentType.Efectivo;
+  }
+}
 
 /**
  * Matches Angular's `expenses.component.html`/`.ts` (Historial de Gastos).
@@ -29,10 +48,10 @@ const PAYMENT_TYPE_OPTIONS: { value: PaymentType | null; labelKey: string }[] = 
  * Angular's `loadExpenses()` always calls `loadExpensesFiltered(this.expenseType, ...)` with
  * `expenseType` permanently `null` (no UI control ever sets it — dead capability, confirmed:
  * `filterExpensesObservable`'s `expenseType`/date-range params have no wired control anywhere
- * in the template). Only the `paymentType` radio group is live. React mirrors this exactly:
- * a single payment-type filter, no date-range or expense-type filtering, and — critically —
- * no date bound at all (Angular's `loadExpensesFiltered(..., null, null)` = unbounded,
- * all-time history), not React's old 30-day rolling window.
+ * in the template). Only the `paymentType` radio group is live. React mirrors the live
+ * capability with the 2026-09-19 dynamic options: all expenses are loaded once (unbounded,
+ * all-time history) and the payment filter is applied on render from the SAME data that
+ * feeds the options — no double loading pass, options and rows never diverge.
  *
  * Read-only history (decision doc, L4 map gap #3 / #19 precedent): Angular's
  * `expenses.component.html:43` `<app-expense-list>` passes NO `[readOnly]` override, so
@@ -46,22 +65,17 @@ export function ExpensesHistoryPage() {
   const intl = useIntl();
   const storeId = useAuthStore((s) => s.user?.selectedStoreId ?? '');
 
-  const [paymentType, setPaymentType] = useState<PaymentType | null>(null);
+  const [paymentKey, setPaymentKey] = useState<string | null>(null);
   const [dayGroups, setDayGroups] = useState<LocalDayGroup<Expense>[]>([]);
   const [expandedDayIds, setExpandedDayIds] = useState<Set<string>>(new Set());
 
-  // Angular parity (expenses.component.ts `loadExpenses` → `loadExpensesFiltered`): always calls
-  // `filterExpensesObservable(this.expenseType=null, paymentType, null, null)` — only `paymentType`
-  // is ever wired by the UI (expenseType/date-range params are dead capability). React mirrors this
-  // via the category-C async envelope and unwraps `.data`, replacing the old inline `getAll`+filter.
+  // Angular parity (expenses.component.ts `loadExpenses` → `loadExpensesFiltered`): unbounded,
+  // all-time load — only the radio filter is wired by the UI (expenseType/date-range params are
+  // dead capability). React loads ALL expenses once and applies the payment filter on render
+  // (dynamic options + rows from the same dataset).
   async function loadExpenses() {
     const svc = new ExpenseOfflineService(storeId);
-    const response = await svc.filterExpensesObservable(
-      undefined,
-      paymentType ?? undefined,
-      undefined,
-      undefined,
-    );
+    const response = await svc.filterExpensesObservable(undefined, undefined, undefined, undefined);
     // ExpenseOfflineService.filterExpensesObservable is a same-tick `Promise.resolve(success(...))`
     // over local storage — it never actually fails; this guard exists for the type only.
     if (!response.succeeded) return;
@@ -80,8 +94,8 @@ export function ExpensesHistoryPage() {
 
   useEffect(() => {
     void loadExpenses();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadExpenses reads only the listed deps
-  }, [storeId, paymentType]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadExpenses reads only storeId
+  }, [storeId]);
 
   function toggleDayPanel(dayId: string) {
     setExpandedDayIds((prev) => {
@@ -92,8 +106,21 @@ export function ExpensesHistoryPage() {
     });
   }
 
-  const expensesCount = dayGroups.reduce((count, d) => count + d.items.length, 0);
-  const expensesTotal = dayGroups.reduce(
+  const allExpenses = dayGroups.flatMap((g) => g.items);
+  const paymentOptions = collectExpensePaymentMethodKeys(allExpenses);
+  const paymentActive =
+    paymentKey !== null && paymentOptions.includes(paymentKey) ? paymentKey : null;
+  const visibleDayGroups: LocalDayGroup<Expense>[] = paymentActive
+    ? dayGroups
+        .map((g) => ({
+          ...g,
+          items: g.items.filter((e) => matchesExpensePaymentFilter(e, paymentActive)),
+        }))
+        .filter((g) => g.items.length > 0)
+    : dayGroups;
+
+  const expensesCount = visibleDayGroups.reduce((count, d) => count + d.items.length, 0);
+  const expensesTotal = visibleDayGroups.reduce(
     (total, d) => total + d.items.reduce((t, e) => t + e.total, 0),
     0,
   );
@@ -116,40 +143,49 @@ export function ExpensesHistoryPage() {
       }
     >
       <div className="space-y-4">
-        {/* Payment-type filter — Angular's single mat-radio-group (Todas/Efectivo/Tarjeta/Zelle) */}
+        {/* Payment-type filter — dynamic options from the loaded expenses
+            (Angular's mat-radio-group, options now reflect the actual data). */}
         <div
           role="radiogroup"
           aria-label={intl.formatMessage({ id: 'EXPENSES.FORM.PAYMENT_TYPE' })}
           className="flex flex-wrap gap-4"
         >
-          {PAYMENT_TYPE_OPTIONS.map((opt) => (
-            <label key={opt.value ?? 'all'} className="flex items-center gap-1.5 text-sm text-text">
+          <label className="flex items-center gap-1.5 text-sm text-text">
+            <input
+              type="radio"
+              name="expense-payment-type-filter"
+              checked={paymentActive === null}
+              onChange={() => setPaymentKey(null)}
+              className="text-primary focus:ring-primary"
+            />
+            {intl.formatMessage({ id: 'GENERAL.ALL' })}
+          </label>
+          {paymentOptions.map((key) => (
+            <label key={key} className="flex items-center gap-1.5 text-sm text-text">
               <input
                 type="radio"
                 name="expense-payment-type-filter"
-                checked={paymentType === opt.value}
-                onChange={() => setPaymentType(opt.value)}
+                checked={paymentActive === key}
+                onChange={() => setPaymentKey(key)}
                 className="text-primary focus:ring-primary"
               />
-              {opt.value != null && (
-                <PaymentMethodIcon
-                  kind={getPaymentTypeIconKind(opt.value)}
-                  className="text-success"
-                />
-              )}
-              {intl.formatMessage({ id: opt.labelKey })}
+              <PaymentMethodIcon
+                kind={getPaymentTypeIconKind(legacyKindFor(paymentMethodKeyToSalePaymentMethod(key)))}
+                className="text-success"
+              />
+              {paymentMethodKeyToLabel(key)}
             </label>
           ))}
         </div>
 
-        {dayGroups.length === 0 && (
+        {visibleDayGroups.length === 0 && (
           <InfoBox variant="primary" className="text-center">
             {intl.formatMessage({ id: 'EXPENSES.HISTORY.EMPTY_STATE' })}
           </InfoBox>
         )}
 
         <div className="space-y-2">
-          {dayGroups.map((dayGroup) => {
+          {visibleDayGroups.map((dayGroup) => {
             const dayId = dayGroup.dayKey;
             const isExpanded = expandedDayIds.has(dayId);
             return (

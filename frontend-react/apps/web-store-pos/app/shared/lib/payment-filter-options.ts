@@ -1,0 +1,103 @@
+import { Currency, SalePaymentMethod, salePaymentMethodLabel } from '@store-mgmt/domain';
+import type { Expense, Order } from '@store-mgmt/domain';
+import {
+  resolvedExpensePaymentMethod,
+  resolvedOrderPaymentMethod,
+} from '~/shared/lib/payment-method-resolved';
+
+/**
+ * Filtros de método de pago DINÁMICOS (2026-09-19): las vistas de ventas y
+ * gastos muestran solo los métodos que realmente aparecen en sus datos, en
+ * vez de una lista fija. Una "clave" identifica un método+moneda:
+ *
+ *   efectivo | zelle | transferencia-<valorCurrency>
+ *
+ * Las claves van ordenadas por grupo (Efectivo, Zelle, Transferencia por
+ * moneda ascendente) para una lista estable en la UI. El método real se
+ * resuelve con `payment-method-resolved`, que ya traduce el legacy
+ * `paymentType` (Tarjeta → Transferencia-CUP, Zelle → Zelle, ausente →
+ * Efectivo) y respeta el `salePaymentMethod` autoritativo de las órdenes.
+ */
+
+/** Orden de presentación de los grupos de método en el filtro. */
+function methodRank(method: SalePaymentMethod): number {
+  switch (method) {
+    case SalePaymentMethod.Efectivo:
+      return 0;
+    case SalePaymentMethod.Zelle:
+      return 1;
+    default:
+      return 2;
+  }
+}
+
+/** Clave de filtro de una entidad resuelta (método + moneda de los datos). */
+function entityToKey(method: SalePaymentMethod, currency: Currency | number): string {
+  return method === SalePaymentMethod.Transferencia
+    ? `transferencia-${Number(currency)}`
+    : method === SalePaymentMethod.Zelle
+      ? 'zelle'
+      : 'efectivo';
+}
+
+/** Claves únicas presentes en las órdenes, ordenadas para la UI. */
+export function collectOrderPaymentMethodKeys(orders: Order[]): string[] {
+  const keys = new Set<string>();
+  for (const order of orders) {
+    keys.add(
+      entityToKey(resolvedOrderPaymentMethod(order), order.currency ?? Currency.CUP),
+    );
+  }
+  return sortKeys([...keys]);
+}
+
+/** Claves únicas presentes en los gastos (legacy: siempre CUP), ordenadas. */
+export function collectExpensePaymentMethodKeys(expenses: Expense[]): string[] {
+  const keys = new Set<string>();
+  for (const expense of expenses) {
+    keys.add(entityToKey(resolvedExpensePaymentMethod(expense), Currency.CUP));
+  }
+  return sortKeys([...keys]);
+}
+
+function sortKeys(keys: string[]): string[] {
+  return keys.sort((a, b) => {
+    const [methodA, curA] = parseKey(a);
+    const [methodB, curB] = parseKey(b);
+    if (methodA !== methodB) return methodRank(methodA) - methodRank(methodB);
+    return curA - curB;
+  });
+}
+
+function parseKey(key: string): [SalePaymentMethod, number] {
+  if (key === 'zelle') return [SalePaymentMethod.Zelle, 0];
+  if (key.startsWith('transferencia-')) {
+    return [SalePaymentMethod.Transferencia, Number(key.slice('transferencia-'.length)) || 0];
+  }
+  return [SalePaymentMethod.Efectivo, 0];
+}
+
+/** ¿La orden cae bajo la clave de filtro dada? */
+export function matchesOrderPaymentFilter(order: Order, key: string): boolean {
+  return entityToKey(resolvedOrderPaymentMethod(order), order.currency ?? Currency.CUP) === key;
+}
+
+/** ¿El gasto cae bajo la clave de filtro dada? */
+export function matchesExpensePaymentFilter(expense: Expense, key: string): boolean {
+  return entityToKey(resolvedExpensePaymentMethod(expense), Currency.CUP) === key;
+}
+
+/** Etiqueta visible de una clave: "Efectivo", "Zelle", "Transferencia (CUP)"… */
+export function paymentMethodKeyToLabel(key: string): string {
+  const [method, currency] = parseKey(key);
+  return salePaymentMethodLabel(method, currency);
+}
+
+/**
+ * SalePaymentMethod de una clave — para elegir el icono del radio en la UI
+ * (gastos reutiliza los glyph legacy: Efectivo→cash, Transferencia→card,
+ * Zelle→phone).
+ */
+export function paymentMethodKeyToSalePaymentMethod(key: string): SalePaymentMethod {
+  return parseKey(key)[0];
+}

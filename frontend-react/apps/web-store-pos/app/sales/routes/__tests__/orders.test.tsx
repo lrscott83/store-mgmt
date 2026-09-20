@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
-import { OrderType, PaymentType } from '@store-mgmt/domain';
+import { Currency, OrderType, PaymentType, SalePaymentMethod } from '@store-mgmt/domain';
 import type { InventoryEntry, Order, OrderItem, Product } from '@store-mgmt/domain';
 import { toLocalDayKey } from '~/shared/lib/date-utils';
 import { OrdersPage } from '../orders';
@@ -416,8 +416,9 @@ describe('OrdersPage — per-day sales summary popup (gear menu)', () => {
     );
 
     // Filter the page to Tarjeta only — the day group still exists (one order).
-    // El filtro muestra "Transferencia" (plan 2026-09-17: Tarjeta reemplazada).
-    fireEvent.click(screen.getByText('Transferencia'));
+    // El filtro muestra "Transferencia (CUP)" (plan 2026-09-17: Tarjeta reemplazada;
+    // 2026-09-19: opciones dinámicas — la etiqueta incluye la moneda).
+    fireEvent.click(screen.getByText('Transferencia (CUP)'));
     fireEvent.click(screen.getByTestId('day-actions-toggle-2026-01-01'));
     fireEvent.click(screen.getByTestId('day-summary-button-2026-01-01'));
 
@@ -448,5 +449,62 @@ describe('OrdersPage — per-day sales summary popup (gear menu)', () => {
     expect(closeButtons.length).toBeGreaterThanOrEqual(1);
     fireEvent.click(closeButtons[0]);
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+});
+
+// --- Filtro dinámico de métodos de pago (2026-09-19) ---
+
+describe('OrdersPage — filtro dinámico de métodos de pago', () => {
+  it('sin ventas muestra solo Todas (ninguna opción de método)', () => {
+    fixtures.orders = [];
+    render(
+      <Wrapper>
+        <OrdersPage />
+      </Wrapper>,
+    );
+    expect(screen.getAllByText('Todas').length).toBe(2);
+    expect(screen.queryByText('Efectivo')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Transferencia/)).not.toBeInTheDocument();
+  });
+
+  it('solo ofrece los métodos presentes: legacy Tarjeta → Transferencia (CUP) y filtra por ella', () => {
+    fixtures.orders = [
+      makeOrder({ id: 'o1', paymentType: PaymentType.Efectivo, total: 100, date: new Date(2026, 0, 1, 12, 0, 0) }),
+      makeOrder({ id: 'o2', paymentType: PaymentType.Tarjeta, total: 50, date: new Date(2026, 0, 2, 12, 0, 0) }),
+    ];
+
+    render(
+      <Wrapper>
+        <OrdersPage />
+      </Wrapper>,
+    );
+
+    expect(screen.getByText('Efectivo')).toBeInTheDocument();
+    expect(screen.getByText('Transferencia (CUP)')).toBeInTheDocument();
+    expect(screen.queryByText('Zelle')).not.toBeInTheDocument();
+
+    // Filtrar por Transferencia (CUP) deja solo la venta Tarjeta: (1) y $50
+    // (el texto también aparece en el panel del día, de ahí getAllByText).
+    fireEvent.click(screen.getByText('Transferencia (CUP)'));
+    expect(screen.getAllByText('(1)').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('$50').length).toBeGreaterThan(0);
+  });
+
+  it('salePaymentMethod Transferencia en USD → opción Transferencia (USD)', () => {
+    fixtures.orders = [
+      makeOrder({
+        id: 'o1',
+        salePaymentMethod: SalePaymentMethod.Transferencia,
+        currency: Currency.USD,
+        date: new Date(2026, 0, 1, 12, 0, 0),
+      }),
+    ];
+
+    render(
+      <Wrapper>
+        <OrdersPage />
+      </Wrapper>,
+    );
+    expect(screen.getByText('Transferencia (USD)')).toBeInTheDocument();
   });
 });

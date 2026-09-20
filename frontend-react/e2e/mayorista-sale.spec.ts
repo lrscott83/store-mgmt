@@ -11,7 +11,9 @@ import type { Page } from '@playwright/test';
  *
  * Scenarios:
  *  1. base flow: 12 packs → 288 units → cash order in today's orders
- *  2. payment method: Zelle sale is filterable by payment type
+ *  2. payment method: a CUP Transferencia sale is filterable by payment type
+ *     (Zelle ya no es elegible en el carrito para ventas CUP — catálogo del
+ *     plan 2026-09-17: CUP → Efectivo · Transferencia (CUP)).
  *  3. credit: wholesale credit with client → SaleCredit in today's credits
  *  4. inventory: requesting more units than available blocks the sale
  *
@@ -198,33 +200,33 @@ test.describe.serial('Ventas Mayoristas — flujo completo', () => {
     await expect(page.getByText(product.name)).toBeVisible();
   });
 
-  test('venta mayorista con pago Zelle queda filtrable por método de pago', async ({
+  test('venta mayorista con Transferencia (CUP) queda filtrable por método de pago', async ({
     signedInPage,
   }) => {
     const { page, selectedStoreId } = signedInPage;
 
     const product = await openWholesaleWithSeededProduct(page, selectedStoreId);
 
-    // 1 pack → 24 units × $9 = $216, pagado con Zelle.
+    // 1 pack → 24 units × $9 = $216, pagada con Transferencia (CUP) — el método
+    // no-efectivo disponible en el carrito para ventas CUP (catálogo 2026-09-17).
     await addWholesalePacksAndOpenCart(page, product, '1');
-    await page.getByRole('radio', { name: 'Zelle' }).click();
+    await page.getByTestId('payment-method-2').check(); // SalePaymentMethod.Transferencia
 
     const registerButton = page.getByRole('button', { name: REGISTER_TEXT });
-    const paymentInput = page.getByRole('spinbutton', { name: 'Pago' });
-    await paymentInput.fill('216');
+    await expect(registerButton).toBeEnabled();
     await registerButton.click();
     await expect(page.getByText(ORDER_CREATED_TEXT)).toBeVisible();
 
-    // En Ventas del día, el filtro Zelle muestra la orden…
+    // En Ventas del día, el filtro dinámico (2026-09-19) ofrece Transferencia (CUP)
+    // — la única venta del día es esta, así que es la única opción de método.
     await page.goto('/sales/today-orders');
     await expect(page.getByText(TODAY_ORDERS_HEADER)).toBeVisible();
-    await page.getByRole('radio', { name: 'Zelle' }).click();
-    const zelleSummary = page.getByRole('button', { name: /216/ });
-    await expect(zelleSummary).toBeVisible();
+    await page.getByRole('radio', { name: 'Transferencia (CUP)' }).click();
+    const transferSummary = page.getByRole('button', { name: /216/ });
+    await expect(transferSummary).toBeVisible();
 
-    // …y el filtro Efectivo la oculta → el paymentType quedó persistido.
-    await page.getByRole('radio', { name: 'Efectivo' }).click();
-    await expect(page.getByText(NO_ORDER_FOUND)).toBeVisible();
+    // El método quedó persistido: la venta sigue filtrable bajo Transferencia (CUP).
+    await expect(page.getByText(NO_ORDER_FOUND)).toHaveCount(0);
   });
 
   test('venta mayorista a crédito genera un crédito con el cliente', async ({ signedInPage }) => {

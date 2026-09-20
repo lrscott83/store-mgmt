@@ -409,9 +409,24 @@ describe('ExpensesHistoryPage — strict Angular parity', () => {
     expect(screen.queryByLabelText(/Siguiente/i)).not.toBeInTheDocument();
   });
 
-  // payment-methods-percent-tax (plan 2026-09-17): Tarjeta se muestra como
-  // Transferencia (CUP) — el filtro conserva el valor legacy pero su etiqueta cambia.
-  it('shows a single payment-type radio filter (Todas/Efectivo/Transferencia/Zelle)', async () => {
+  // Filtro DINÁMICO (2026-09-19): las opciones salen de los gastos cargados —
+  // con datos Efectivo/Tarjeta/Zelle se ofrecen las tres etiquetas resueltas.
+  it('shows the dynamic payment-type options present in the data (Todas + Efectivo/Transferencia (CUP)/Zelle)', async () => {
+    vi.mocked(ExpenseOfflineService).mockImplementation(
+      () =>
+        ({
+          filterExpensesObservable: vi.fn().mockReturnValue(
+            expensesResponse([
+              makeExpense({ id: 'a', paymentType: PaymentType.Efectivo }),
+              makeExpense({ id: 'b', paymentType: PaymentType.Tarjeta }),
+              makeExpense({ id: 'c', paymentType: PaymentType.Zelle }),
+            ]),
+          ),
+          create: vi.fn(),
+          update: vi.fn(),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        }) as any,
+    );
     await act(async () => {
       render(
         <Wrapper>
@@ -427,9 +442,40 @@ describe('ExpensesHistoryPage — strict Angular parity', () => {
     expect(screen.getByText('Zelle')).toBeInTheDocument();
   });
 
+  // Sin gastos no se ofrece NINGUNA opción de método (solo Todas).
+  it('offers no payment-method options when there are no expenses', async () => {
+    await act(async () => {
+      render(
+        <Wrapper>
+          <ExpensesHistoryPage />
+        </Wrapper>,
+      );
+    });
+    expect(screen.getByText('Todas')).toBeInTheDocument();
+    expect(screen.queryByText('Efectivo')).not.toBeInTheDocument();
+    expect(screen.queryByText('Transferencia (CUP)')).not.toBeInTheDocument();
+    expect(screen.queryByText('Zelle')).not.toBeInTheDocument();
+  });
+
   // Parity fix (presentation-parity-bucket-e item 1b): expenses.component.html:15-23 shows the
   // payment glyph before each real payment-type label, but the "Todas" (null) option has none.
-  it('shows a PaymentMethodIcon before each real payment-type label, but not before "Todas"', async () => {
+  // Dinámico (2026-09-19): los glyph se mantienen sobre las opciones presentes en los datos.
+  it('shows a PaymentMethodIcon before each present payment-type label, but not before "Todas"', async () => {
+    vi.mocked(ExpenseOfflineService).mockImplementation(
+      () =>
+        ({
+          filterExpensesObservable: vi.fn().mockReturnValue(
+            expensesResponse([
+              makeExpense({ id: 'a', paymentType: PaymentType.Efectivo }),
+              makeExpense({ id: 'b', paymentType: PaymentType.Tarjeta }),
+              makeExpense({ id: 'c', paymentType: PaymentType.Zelle }),
+            ]),
+          ),
+          create: vi.fn(),
+          update: vi.fn(),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        }) as any,
+    );
     await act(async () => {
       render(
         <Wrapper>
@@ -445,6 +491,37 @@ describe('ExpensesHistoryPage — strict Angular parity', () => {
       const label = screen.getByText(text).closest('label');
       expect(label?.querySelector('svg')).not.toBeNull();
     }
+  });
+
+  // Dinámico: filtrar por Transferencia (CUP) deja solo los gastos legacy Tarjeta.
+  it('filters by Transferencia (CUP) leaving only legacy-Tarjeta expenses', async () => {
+    vi.mocked(ExpenseOfflineService).mockImplementation(
+      () =>
+        ({
+          filterExpensesObservable: vi.fn().mockReturnValue(
+            expensesResponse([
+              makeExpense({ id: 'a', paymentType: PaymentType.Efectivo, total: 10 }),
+              makeExpense({ id: 'b', paymentType: PaymentType.Tarjeta, total: 15 }),
+              makeExpense({ id: 'c', paymentType: PaymentType.Zelle, total: 5 }),
+            ]),
+          ),
+          create: vi.fn(),
+          update: vi.fn(),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        }) as any,
+    );
+    await act(async () => {
+      render(
+        <Wrapper>
+          <ExpensesHistoryPage />
+        </Wrapper>,
+      );
+    });
+
+    fireEvent.click(screen.getByText('Transferencia (CUP)'));
+    // Solo el gasto Tarjeta (15): header (1) y total $15 (también en el panel del día).
+    expect(screen.getAllByText('(1)').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('$15').length).toBeGreaterThan(0);
   });
 
   it('groups expenses by day (collapsed by default), shows per-day count + total, and never renders edit/delete', async () => {

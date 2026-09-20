@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useIntl } from 'react-intl';
 import type { InventoryEntry, Order } from '@store-mgmt/domain';
-import { EFeatures, PaymentType } from '@store-mgmt/domain';
+import { EFeatures } from '@store-mgmt/domain';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { Card } from '~/shared/components/ui/card';
@@ -23,6 +23,11 @@ import { OrderList } from '../components/order-list';
 import { DaySalesSummaryModal } from '../components/day-sales-summary-modal';
 import type { DaySalesSummary } from '../components/day-sales-summary-modal';
 import { formatCurrency } from '~/shared/lib/format-currency';
+import {
+  collectOrderPaymentMethodKeys,
+  matchesOrderPaymentFilter,
+  paymentMethodKeyToLabel,
+} from '~/shared/lib/payment-filter-options';
 import { useMultiStore } from '~/shared/lib/hooks/use-multi-store';
 import {
   MultiStoreSection,
@@ -36,21 +41,14 @@ import {
 
 export const clientLoader = featureLoader([EFeatures.SalesHistory]);
 
-const PAYMENT_TYPE_OPTIONS = [
-  { value: PaymentType.Efectivo, label: 'Efectivo' },
-  { value: PaymentType.Tarjeta, label: 'Transferencia' },
-  { value: PaymentType.Zelle, label: 'Zelle' },
-];
-
 /**
- * payment-methods-percent-tax (plan 2026-09-17): el filtro sigue comparando contra
- * el campo legacy `paymentType` (Tarjeta agrupa a las Transferencias-CUP nuevas,
- * que se escriben como Tarjeta por compatibilidad; las Transferencias de otras
- * monedas no existen en el campo legacy y se muestran siempre — aceptado: el
- * historial es de lectura por moneda de tienda).
- */
-
-/**
+ * Filtro de método de pago DINÁMICO (2026-09-19): las opciones se derivan de
+ * las órdenes visibles de la vista (single-store: todo el historial; multi-
+ * store: el conjunto del filtro de tienda vigente) — solo aparecen los
+ * métodos realmente presentes, con etiquetas "Transferencia (CUP|USD|…)"
+ * vía `payment-filter-options` (legacy Tarjeta → Transferencia). El estado
+ * guarda la CLAVE; si deja de existir en los datos se resetea a "Todas".
+ *
  * Per-day sales summary for the gear-menu popup — same metrics and aggregation as
  * reports/today's `computeTodayReport` (today-report.tsx), scoped to ONE local day.
  * Uses `getOrdersInDay` (which honors its date param, unlike `getActiveOrdersInDay`
@@ -134,7 +132,7 @@ export function OrdersPage() {
   const storeId = useAuthStore((s) => s.user?.selectedStoreId ?? '');
   const [groups, setGroups] = useState<LocalDayGroup<Order>[]>([]);
   const [expandedDateIds, setExpandedDateIds] = useState<Set<string>>(new Set());
-  const [paymentType, setPaymentType] = useState<PaymentType | null>(null);
+  const [paymentKey, setPaymentKey] = useState<string | null>(null);
   const [isCredit, setIsCredit] = useState<number>(-1);
   const [daySummary, setDaySummary] = useState<DaySalesSummary | null>(null);
   const { enabled: multiStoreEnabled, stores: multiStoreStores } = useMultiStore();
@@ -146,7 +144,6 @@ export function OrdersPage() {
     const filtered = service
       .getStorageOrders()
       .filter((o) => o.isActive)
-      .filter((o) => !paymentType || paymentType === o.paymentType)
       .filter(
         (o) => isCredit === -1 || (isCredit === 1 && o.isCredit) || (isCredit === 0 && !o.isCredit),
       );
@@ -162,7 +159,7 @@ export function OrdersPage() {
   useEffect(() => {
     loadOrders();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- loadOrders reads only the listed deps
-  }, [storeId, paymentType, isCredit]);
+  }, [storeId, isCredit]);
 
   // multi-store-panels: raw per-store orders (read-only, per-store DEK);
   // the global payment/credit filters apply across all stores below.
@@ -185,14 +182,6 @@ export function OrdersPage() {
       cancelled = true;
     };
   }, [multiStoreEnabled, multiStoreStores]);
-
-  const multiFilteredOrders = (orders: Order[]): Order[] =>
-    orders
-      .filter((o) => o.isActive)
-      .filter((o) => !paymentType || paymentType === o.paymentType)
-      .filter(
-        (o) => isCredit === -1 || (isCredit === 1 && o.isCredit) || (isCredit === 0 && !o.isCredit),
-      );
 
   function toggleDatePanel(dateId: string) {
     setExpandedDateIds((prev) => {
@@ -245,11 +234,13 @@ export function OrdersPage() {
     [intl],
   );
 
-  const ordersCount = groups.reduce((count, g) => count + g.items.length, 0);
-  const ordersTotal = groups.reduce(
-    (total, g) => total + g.items.reduce((t, o) => t + o.total, 0),
-    0,
-  );
+  /** Base (activo + crédito) — el filtro de pago se aplica aparte por clave. */
+  const multiBaseFilteredOrders = (orders: Order[]): Order[] =>
+    orders
+      .filter((o) => o.isActive)
+      .filter(
+        (o) => isCredit === -1 || (isCredit === 1 && o.isCredit) || (isCredit === 0 && !o.isCredit),
+      );
 
   // ─── multi-store mode ────────────────────────────────────────────────────
   if (multiStoreEnabled) {
@@ -257,15 +248,54 @@ export function OrdersPage() {
       selectedMultiStoreId === null
         ? multiStoreStores.map((s) => s.id)
         : [selectedMultiStoreId];
+
+    // Opciones dinámicas: métodos presentes en el conjunto visible por el
+    // filtro de tienda (con "Todas las tiendas" agrega todas).
+    const baseOrders = visibleStoreIds.flatMap((id) => multiBaseFilteredOrders(storeOrders.get(id) ?? []));
+    const paymentOptions = collectOrderPaymentMethodKeys(baseOrders);
+    const paymentActive =
+      paymentKey !== null && paymentOptions.includes(paymentKey) ? paymentKey : null;
+    const visibleOrders = (orders: Order[]): Order[] =>
+      multiBaseFilteredOrders(orders).filter(
+        (o) => !paymentActive || matchesOrderPaymentFilter(o, paymentActive),
+      );
+
     const totals = visibleStoreIds.reduce(
       (acc, id) => {
-        for (const order of multiFilteredOrders(storeOrders.get(id) ?? [])) {
+        for (const order of visibleOrders(storeOrders.get(id) ?? [])) {
           acc.count += 1;
           acc.total = round2(acc.total + order.total);
         }
         return acc;
       },
       { count: 0, total: 0 },
+    );
+
+    const paymentFieldset = (
+      <fieldset className="flex flex-wrap items-center gap-4">
+        <label className="flex items-center gap-1 text-sm text-text">
+          <input
+            type="radio"
+            name="multistore-paymentType"
+            checked={paymentActive === null}
+            onChange={() => setPaymentKey(null)}
+            className="accent-primary"
+          />
+          Todas
+        </label>
+        {paymentOptions.map((key) => (
+          <label key={key} className="flex items-center gap-1 text-sm text-text">
+            <input
+              type="radio"
+              name="multistore-paymentType"
+              checked={paymentActive === key}
+              onChange={() => setPaymentKey(key)}
+              className="accent-primary"
+            />
+            {paymentMethodKeyToLabel(key)}
+          </label>
+        ))}
+      </fieldset>
     );
 
     return (
@@ -291,30 +321,7 @@ export function OrdersPage() {
           onSelectedStoreIdChange={setSelectedMultiStoreId}
           filters={
             <>
-              <fieldset className="flex flex-wrap items-center gap-4">
-                <label className="flex items-center gap-1 text-sm text-text">
-                  <input
-                    type="radio"
-                    name="multistore-paymentType"
-                    checked={paymentType === null}
-                    onChange={() => setPaymentType(null)}
-                    className="accent-primary"
-                  />
-                  Todas
-                </label>
-                {PAYMENT_TYPE_OPTIONS.map((opt) => (
-                  <label key={opt.value} className="flex items-center gap-1 text-sm text-text">
-                    <input
-                      type="radio"
-                      name="multistore-paymentType"
-                      checked={paymentType === opt.value}
-                      onChange={() => setPaymentType(opt.value)}
-                      className="accent-primary"
-                    />
-                    {opt.label}
-                  </label>
-                ))}
-              </fieldset>
+              {paymentFieldset}
               <fieldset className="flex flex-wrap items-center gap-4">
                 <label className="flex items-center gap-1 text-sm text-text">
                   <input
@@ -350,13 +357,13 @@ export function OrdersPage() {
             </>
           }
           renderStoreTotals={(store) => {
-            const filtered = multiFilteredOrders(storeOrders.get(store.id) ?? []);
+            const filtered = visibleOrders(storeOrders.get(store.id) ?? []);
             const total = filtered.reduce((t, o) => t + o.total, 0);
             return <MultiStoreTotal label={`(${filtered.length})`} value={total} />;
           }}
         >
           {(store) => {
-            const filtered = multiFilteredOrders(storeOrders.get(store.id) ?? []);
+            const filtered = visibleOrders(storeOrders.get(store.id) ?? []);
             if (filtered.length === 0) {
               return (
                 <div className="py-4 text-center text-text-muted">
@@ -444,6 +451,29 @@ export function OrdersPage() {
     );
   }
 
+  // ─── single-store mode ───────────────────────────────────────────────────
+  // Opciones dinámicas de las órdenes cargadas (activo + crédito); el filtro
+  // de pago se aplica en render para que opciones y filas salgan del mismo
+  // conjunto de datos.
+  const allOrders = groups.flatMap((g) => g.items);
+  const paymentOptions = collectOrderPaymentMethodKeys(allOrders);
+  const paymentActive =
+    paymentKey !== null && paymentOptions.includes(paymentKey) ? paymentKey : null;
+  const visibleGroups: LocalDayGroup<Order>[] = paymentActive
+    ? groups
+        .map((g) => ({
+          ...g,
+          items: g.items.filter((o) => matchesOrderPaymentFilter(o, paymentActive)),
+        }))
+        .filter((g) => g.items.length > 0)
+    : groups;
+
+  const ordersCount = visibleGroups.reduce((count, g) => count + g.items.length, 0);
+  const ordersTotal = visibleGroups.reduce(
+    (total, g) => total + g.items.reduce((t, o) => t + o.total, 0),
+    0,
+  );
+
   return (
     <Card
       padding="tight"
@@ -467,22 +497,22 @@ export function OrdersPage() {
           <input
             type="radio"
             name="paymentType"
-            checked={paymentType === null}
-            onChange={() => setPaymentType(null)}
+            checked={paymentActive === null}
+            onChange={() => setPaymentKey(null)}
             className="accent-primary"
           />
           Todas
         </label>
-        {PAYMENT_TYPE_OPTIONS.map((opt) => (
-          <label key={opt.value} className="flex items-center gap-1 text-sm text-text">
+        {paymentOptions.map((key) => (
+          <label key={key} className="flex items-center gap-1 text-sm text-text">
             <input
               type="radio"
               name="paymentType"
-              checked={paymentType === opt.value}
-              onChange={() => setPaymentType(opt.value)}
+              checked={paymentActive === key}
+              onChange={() => setPaymentKey(key)}
               className="accent-primary"
             />
-            {opt.label}
+            {paymentMethodKeyToLabel(key)}
           </label>
         ))}
       </fieldset>
@@ -520,7 +550,7 @@ export function OrdersPage() {
         </label>
       </fieldset>
 
-      {groups.length === 0 && (
+      {visibleGroups.length === 0 && (
         <InfoBox variant="primary" className="mb-6 text-center">
           {/* ORDERS.NO_ORDERS_FOUND */}
           {intl.formatMessage({ id: 'ORDERS.NO_ORDERS_FOUND' })}
@@ -528,7 +558,7 @@ export function OrdersPage() {
       )}
 
       <div className="space-y-2">
-        {groups.map((g) => {
+        {visibleGroups.map((g) => {
           const dateId = g.dayKey;
           const isExpanded = expandedDateIds.has(dateId);
           return (
