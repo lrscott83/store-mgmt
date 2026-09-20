@@ -430,7 +430,10 @@ export function CuadrePorFechasPage() {
         {storeSummaries && (
           <>
             {/* General (aggregated) KPIs — outside the panels. */}
-            <MultiStoreKpis summaries={[...storeSummaries.values()]} />
+            <MultiStoreKpis
+              summaries={[...storeSummaries.values()]}
+              multiMonedas={multiMonedas}
+            />
 
             <MultiStoreSection
               stores={multiStoreStores}
@@ -440,7 +443,11 @@ export function CuadrePorFechasPage() {
                 <span className="text-sm">
                   <span className="text-text-muted">Ganancias: </span>
                   <span className="font-semibold text-text">
-                    {formatCurrency(sumRangeSummaries([...storeSummaries.values()]).netProfit)}
+                    <CurrencyTotalAmount
+                      legacyTotal={sumRangeSummaries([...storeSummaries.values()]).netProfit}
+                      entries={[...storeSummaries.values()].flatMap(netProfitEntriesOf)}
+                      multiMonedas={multiMonedas}
+                    />
                   </span>
                 </span>
               }
@@ -450,7 +457,11 @@ export function CuadrePorFechasPage() {
                   <span className="text-xs whitespace-nowrap">
                     <span className="text-text-muted">Ganancias: </span>
                     <span className={`font-semibold ${valueClassName(s ? s.netProfit : 0)}`}>
-                      {formatCurrency(s ? s.netProfit : 0)}
+                      <CurrencyTotalAmount
+                        legacyTotal={s ? s.netProfit : 0}
+                        entries={s ? netProfitEntriesOf(s) : []}
+                        multiMonedas={multiMonedas}
+                      />
                     </span>
                   </span>
                 );
@@ -972,27 +983,74 @@ function MultiStoreDateRangeFields({
   );
 }
 
+/** Per-currency expense entries of one store's range summary. */
+function expensesEntriesOf(summary: RangeSummary): CurrencyAmount[] {
+  return summary.expenses.map((e) => ({ amount: e.total, currency: e.currency }));
+}
+
+/** Per-currency net-profit entries of one store: gross profit minus expenses, per currency. */
+function netProfitEntriesOf(summary: RangeSummary): CurrencyAmount[] {
+  return [
+    ...summary.grossProfitEntries,
+    ...expensesEntriesOf(summary).map((e) => ({ ...e, amount: -e.amount })),
+  ];
+}
+
 /** multi-store-panels: aggregated general KPIs — same four cards as the single-store view. */
-function MultiStoreKpis({ summaries }: { summaries: RangeSummary[] }) {
+function MultiStoreKpis({
+  summaries,
+  multiMonedas,
+}: {
+  summaries: RangeSummary[];
+  multiMonedas: boolean;
+}) {
   const intl = useIntl();
   const totals = sumRangeSummaries(summaries);
+  const salesEntries = summaries.flatMap((s) => s.salesEntries);
+  const expensesEntries = summaries.flatMap(expensesEntriesOf);
+  const grossProfitEntries = summaries.flatMap((s) => s.grossProfitEntries);
+  const netProfitEntries = summaries.flatMap(netProfitEntriesOf);
   return (
     <div className="grid grid-cols-2 gap-4">
       <KpiCard
         title={intl.formatMessage({ id: 'CUADRE_FECHAS.KPI_SALES' })}
-        value={formatCurrency(totals.salesTotal)}
+        value={
+          <CurrencyTotalAmount
+            legacyTotal={totals.salesTotal}
+            entries={salesEntries}
+            multiMonedas={multiMonedas}
+          />
+        }
       />
       <KpiCard
         title={intl.formatMessage({ id: 'CUADRE_FECHAS.KPI_EXPENSES' })}
-        value={formatCurrency(totals.expensesTotal)}
+        value={
+          <CurrencyTotalAmount
+            legacyTotal={totals.expensesTotal}
+            entries={expensesEntries}
+            multiMonedas={multiMonedas}
+          />
+        }
       />
       <KpiCard
         title={intl.formatMessage({ id: 'CUADRE_FECHAS.KPI_GROSS_PROFIT' })}
-        value={formatCurrency(totals.grossProfit)}
+        value={
+          <CurrencyTotalAmount
+            legacyTotal={totals.grossProfit}
+            entries={grossProfitEntries}
+            multiMonedas={multiMonedas}
+          />
+        }
       />
       <KpiCard
         title={intl.formatMessage({ id: 'CUADRE_FECHAS.KPI_NET_PROFIT' })}
-        value={formatCurrency(totals.netProfit)}
+        value={
+          <CurrencyTotalAmount
+            legacyTotal={totals.netProfit}
+            entries={netProfitEntries}
+            multiMonedas={multiMonedas}
+          />
+        }
       />
     </div>
   );

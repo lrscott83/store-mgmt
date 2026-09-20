@@ -4,6 +4,7 @@ import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 import { Currency, EModules, ExpenseType, OrderType, PaymentType } from '@store-mgmt/domain';
 import type { Expense, Order, OrderItem, SaleCredit } from '@store-mgmt/domain';
+import { round2 } from '~/shared/lib/money';
 import { TodayStatsPage } from '../today-stats';
 
 const auth = vi.hoisted(() => ({
@@ -193,5 +194,99 @@ describe('TodayStatsPage — MultiMonedas per-currency net', () => {
     expect((await screen.findAllByText('20 USD')).length).toBeGreaterThan(0);
     expect(screen.getAllByText('3 EUR').length).toBeGreaterThan(0);
     expect(screen.queryByText('$23')).toBeNull();
+  });
+});
+
+// ─── "Ventas" shared-source equivalence (R3-003) ────────────────────────────
+// `getCategoryCartItemsView()` builds its category totals from the SAME active
+// order items (round2(Σ round2(price×qty))) the per-currency `salesEntries` use.
+// These tests pin that relationship: the gate-ON per-currency "Ventas" total is
+// numerically equal to the gate-OFF legacy scalar, and both follow the ITEM sum
+// (not `order.total`, which may include percent/tax).
+
+/** Mirrors the service: category total = round2(Σ round2(price×qty)) over items. */
+function categoriesFromOrders(orders: Order[]) {
+  const items = orders.flatMap((order) => order.orderItems);
+  const total = round2(items.reduce((sum, item) => sum + round2(item.price * item.quantity), 0));
+  const itemsCount = items.reduce((sum, item) => sum + item.quantity, 0);
+  return [{ id: 'cat1', name: 'Bebidas', order: 1, total, itemsCount, productItems: [] }];
+}
+
+/** Parses a rendered money string ("$1 000.50", "30 USD") back to a number. */
+function parseAmount(text: string): number {
+  return Number(text.replace(/\u00A0/g, '').replace(/[^0-9.-]/g, ''));
+}
+
+/** The "Ventas" panel amount: gate-OFF one scalar, gate-ON primary + chips summed. */
+function ventasTotal(): number {
+  const button = screen.getByRole('button', { name: /Ventas \(\d+ productos\)/ });
+  const amountSpan = button.querySelector('span.whitespace-nowrap.text-success') as HTMLElement;
+  const leaves = [...amountSpan.querySelectorAll('span')].filter((s) => s.children.length === 0);
+  const texts =
+    leaves.length > 0 ? leaves.map((s) => s.textContent ?? '') : [amountSpan.textContent ?? ''];
+  return texts.reduce((sum, text) => sum + parseAmount(text), 0);
+}
+
+describe('TodayStatsPage — "Ventas" shared-source equivalence (gate ON vs OFF)', () => {
+  beforeEach(() => {
+    auth.state.user = { selectedStoreId: 's1', storeModuleIds: [] };
+    fixtures.activeOrders = [];
+    fixtures.categories = [];
+    fixtures.expenses = [];
+    fixtures.unpaidCredits = [];
+    fixtures.paidCredits = [];
+  });
+
+  it('gate ON per-currency "Ventas" equals the gate-OFF legacy sales total', () => {
+    const orders = [
+      makeOrder({
+        id: 'usd',
+        total: 30,
+        currency: Currency.USD,
+        orderItems: [makeItem({ price: 30, quantity: 1, currency: Currency.USD })],
+      }),
+      makeOrder({
+        id: 'eur',
+        total: 5,
+        currency: Currency.EUR,
+        orderItems: [makeItem({ price: 5, quantity: 1, currency: Currency.EUR })],
+      }),
+    ];
+    fixtures.activeOrders = orders;
+    fixtures.categories = categoriesFromOrders(orders);
+
+    const first = renderPage();
+    const legacy = ventasTotal();
+    first.unmount();
+
+    auth.state.user.storeModuleIds = [EModules.MultiMonedas];
+    renderPage();
+    const perCurrency = ventasTotal();
+
+    expect(legacy).toBe(35); // category total = 30 + 5
+    expect(perCurrency).toBe(legacy); // numeric equality across the two paths
+  });
+
+  it('"Ventas" follows the ITEM sum, not order.total (gate OFF and ON)', () => {
+    const order = makeOrder({
+      id: 'o1',
+      total: 100, // differs from the items' price×qty sum (30)
+      currency: Currency.USD,
+      orderItems: [makeItem({ price: 30, quantity: 1, currency: Currency.USD })],
+    });
+    fixtures.activeOrders = [order];
+    fixtures.categories = categoriesFromOrders([order]);
+
+    const first = renderPage();
+    const legacy = ventasTotal();
+    first.unmount();
+
+    auth.state.user.storeModuleIds = [EModules.MultiMonedas];
+    renderPage();
+    const perCurrency = ventasTotal();
+
+    expect(legacy).toBe(30); // item sum, not order.total (100)
+    expect(perCurrency).toBe(30);
+    expect(perCurrency).not.toBe(100);
   });
 });
