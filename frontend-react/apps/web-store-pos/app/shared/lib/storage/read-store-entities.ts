@@ -21,7 +21,7 @@
 import { readDeviceDekTable } from './device-dek-table';
 import { getDeviceKey } from './device-key-store';
 import { unwrapDekFromDevice } from './dek-bootstrap';
-import { getDek } from './data-key-store';
+import { getDek, getDekStoreId } from './data-key-store';
 import { decryptEntityWithDek } from './entity-crypto';
 import { StorageKeys } from './storage-keys';
 
@@ -32,6 +32,19 @@ import { StorageKeys } from './storage-keys';
  * device key is unavailable (IndexedDB failure, private browsing).
  */
 export async function unwrapStoreDekForStore(storeId: string): Promise<Uint8Array | null> {
+  // The in-memory DEK is authoritative for the store it belongs to: it is the
+  // EXACT key the single-store services use to read/write that store's data
+  // (data-key-store binds it to `getDekStoreId()`). The device table's
+  // `storeId` is only the label of the ACTIVE wrap and can legitimately differ
+  // from the session's store — `dek-bootstrap.test.ts` writes such a divergent
+  // table to prove its early-return, and `dek-provisioning.ts:430-436` documents
+  // the session-scopes-by-`getDekStoreId()` vs reload-scopes-by-`table.storeId`
+  // split. Resolving this store's DEK from the table alone made multi-store mode
+  // read the SELECTED store with a null DEK, so every panel rendered "sin datos"
+  // while single-store mode (which uses this same in-memory DEK) worked.
+  const activeDek = getDek();
+  if (activeDek !== null && getDekStoreId() === storeId) return activeDek;
+
   const table = readDeviceDekTable();
   if (!table) return null;
   // The selected store's DEK is already in memory — use it directly instead
