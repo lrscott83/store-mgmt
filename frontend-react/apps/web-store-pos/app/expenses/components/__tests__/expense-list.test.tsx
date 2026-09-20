@@ -48,9 +48,7 @@ describe('ExpenseList — list/table parity sweep (WU4)', () => {
         <ExpenseList expenses={[makeExpense()]} readOnly onEdit={vi.fn()} onDelete={vi.fn()} />
       </Wrapper>,
     );
-    const row = container.querySelector(
-      '[class*="items-center"][class*="justify-between"]',
-    ) as HTMLElement;
+    const row = container.querySelector('[data-testid="expense-row-exp-1"]') as HTMLElement;
     expect(row.className).toMatch(/\bp-2\b/);
     expect(row.className).not.toMatch(/px-4 py-3/);
   });
@@ -90,5 +88,63 @@ describe('ExpenseList — list/table parity sweep (WU4)', () => {
       </Wrapper>,
     );
     expect(screen.getByText('$2 000')).toBeInTheDocument();
+  });
+});
+
+// Layout 3 columnas (petición del owner): motivo alineado a la IZQUIERDA,
+// modo de pago en el CENTRO (alineado a la izquierda dentro de su columna) y
+// precio alineado a la DERECHA — estructura, no texto.
+describe('ExpenseList — row layout (motivo izq / pago centro / precio der)', () => {
+  it('renders a 3-column grid: reason | payment | price', () => {
+    const { container } = render(
+      <Wrapper>
+        <ExpenseList expenses={[makeExpense()]} readOnly onEdit={vi.fn()} onDelete={vi.fn()} />
+      </Wrapper>,
+    );
+    const row = container.querySelector('[data-testid="expense-row-exp-1"]') as HTMLElement;
+    expect(row).not.toBeNull();
+    expect(row.className).toContain('grid');
+    expect(row.className).toContain('grid-cols-3');
+  });
+
+  it('aligns the reason left, the payment center-left and the price right', () => {
+    render(
+      <Wrapper>
+        <ExpenseList expenses={[makeExpense()]} readOnly onEdit={vi.fn()} onDelete={vi.fn()} />
+      </Wrapper>,
+    );
+    const row = screen.getByTestId('expense-row-exp-1');
+    const reason = screen.getByText('Salario');
+    const payment = screen.getByText('Efectivo');
+    const price = screen.getByText('$2 000');
+
+    expect(reason.className).toMatch(/text-left/);
+    expect(payment.className).toMatch(/text-left/);
+    expect(price.className).toMatch(/text-right/);
+
+    // Orden visual dentro de la fila: motivo → pago → precio.
+    const order = [reason, payment, price].map((el) => row.compareDocumentPosition(el));
+    expect(order[0] & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(order[1] & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('keeps the row compact (p-2) and the actions gear outside the grid', () => {
+    const { container } = render(
+      <Wrapper>
+        <ExpenseList
+          expenses={[makeExpense()]}
+          readOnly={false}
+          onEdit={vi.fn()}
+          onDelete={vi.fn()}
+        />
+      </Wrapper>,
+    );
+    const row = container.querySelector('[data-testid="expense-row-exp-1"]') as HTMLElement;
+    expect(row.className).toMatch(/\bp-2\b/);
+    // El gear vive FUERA de la fila de 3 columnas (no desplaza las columnas).
+    expect(row.querySelector('[data-testid="expense-actions-toggle-exp-1"]')).toBeNull();
+    expect(
+      container.querySelector('[data-testid="expense-actions-toggle-exp-1"]'),
+    ).not.toBeNull();
   });
 });
