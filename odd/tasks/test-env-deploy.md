@@ -68,6 +68,28 @@ defecto) → su propio nginx → `api:8000` (servicio test). Sin URLs absolutas 
   `8093`, `smca_test_frontend`, `smca_test_nginx`; blobs en LF.
 - Pendiente: re-subir `scripts/deploy-test.sh` al VPS y re-correr.
 
+## Actualización 2026-09-20 (2) — Dominio test cableado al React de test
+
+El entorno de test se sirve en `vdt.playground.sceiba.net`; producción en
+`pos.playground.sceiba.net`. El routing de dominios NO vive en el repo: lo hace
+HAProxy en el VPS (`/etc/haproxy/haproxy.cfg`, TLS terminado ahí, certs en
+`/etc/haproxy/*.pem`). El repo no contiene ninguna config de proxy por dominio
+(verificado: los nginx del repo son internos a contenedores, sin `server_name`).
+
+- [x] T7 Apuntar `vdt` al React de test. Cambio en el VPS (fuera del repo):
+  `backend vdt_backend` → `server vdt 127.0.0.1:8095 check` (antes `:8083`, el LB
+  de prod que servía Angular). `pos_backend` → `127.0.0.1:8085` (React prod)
+  intacto. El routing ya era separado (`use_backend vdt_backend if host_vdt`,
+  `use_backend pos_backend if host_pos`).
+- Verificación observada: `haproxy -c -f` válido; `systemctl reload haproxy`;
+  `curl -sI https://vdt.playground.sceiba.net/` → HTTP/2 200;
+  `curl -s https://vdt.playground.sceiba.net/api/v1/ping` → `{"data":"pong",...}`
+  (backend de test); login OK en navegador con un usuario del dump de prod.
+- Efecto colateral: `smca_nginx` (:8083) + `smca_frontend` (Angular) de prod
+  quedan sin dominio. Limpieza pendiente — decisión de prod, no se toca sin OK.
+
 ## Siguiente paso (usuario)
 
-- Pushear el compose + script actualizados a la rama `test` (el script clona el compose de ahí) y re-subir `deploy-test.sh` + `.env` al VPS (`/home/malayo/lizo/test-deploy/`).
+- Hecho 2026-09-20: compose + script + tracker commiteados en la rama `test` (`59d6183a`).
+- Próximo objetivo: mecanismo de **deploy a producción** análogo al de test, para
+  actualizar prod una vez validado en test.
