@@ -828,7 +828,9 @@ const messages: Record<string, string> = {
   'EXPENSES.ADD_BUTTON': 'Gasto',
 
   // Expenses — History (Angular EXPENSE.EXPENSES_HISTORY/NO_EXPENSE_FOUND, vocabs/es.ts).
-  'EXPENSES.HISTORY.TITLE': 'Historial de Gastos',
+  // 2026-09-20 (owner): el historial muestra solo «Gastos» — «Historial de»
+  // era redundante (el menú ya lo llama «Gastos», MENU.EXPENSES_HISTORY).
+  'EXPENSES.HISTORY.TITLE': 'Gastos',
   // Angular EXPENSE.NO_EXPENSE_FOUND has a source typo ('enxontró' instead of 'encontró').
   // Corrected here per policy #511 (Angular bugs are FIXED, not replicated). History-specific
   // empty state, distinct from the Today page's EXPENSES.EMPTY_STATE.
