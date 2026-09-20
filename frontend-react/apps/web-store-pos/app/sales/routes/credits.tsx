@@ -4,6 +4,8 @@ import type { SaleCredit, PaymentType } from '@store-mgmt/domain';
 import { EFeatures } from '@store-mgmt/domain';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
+import { CurrencyTotalAmount } from '~/shared/components/multimonedas/currency-total-amount';
+import { hasMultiMonedasAvailable } from '~/shared/components/multimonedas/currency-select';
 import { DateRangeFilter } from '~/shared/components/date-range-filter/date-range-filter';
 import { Card } from '~/shared/components/ui/card';
 import { InfoBox } from '~/shared/components/ui/info-box';
@@ -12,7 +14,7 @@ import { addDays, formatLocalDate, groupByLocalDay, startOfDay } from '~/shared/
 import type { LocalDayGroup } from '~/shared/lib/date-utils';
 import { SaleCreditOfflineService } from '../lib/services/sale-credit-offline-service';
 import { SaleCreditList } from '../components/sale-credit-list';
-import { formatCurrency } from '~/shared/lib/format-currency';
+import type { CurrencyAmount } from '~/shared/lib/currency-totals';
 import { useMultiStore } from '~/shared/lib/hooks/use-multi-store';
 import {
   MultiStoreSection,
@@ -54,7 +56,9 @@ export const clientLoader = featureLoader([EFeatures.CreditSale]);
  */
 export function SaleCreditsPage() {
   const intl = useIntl();
-  const storeId = useAuthStore((s) => s.user?.selectedStoreId ?? '');
+  const user = useAuthStore((s) => s.user);
+  const storeId = user?.selectedStoreId ?? '';
+  const multiMonedas = hasMultiMonedasAvailable(user);
   const [dateSaleCredits, setDateSaleCredits] = useState<LocalDayGroup<SaleCredit>[]>([]);
   const [expandedDateIds, setExpandedDateIds] = useState<Set<string>>(new Set());
   const { enabled: multiStoreEnabled, stores: multiStoreStores } = useMultiStore();
@@ -151,6 +155,9 @@ export function SaleCreditsPage() {
     (total, d) => total + d.items.reduce((t, credit) => t + credit.total, 0),
     0,
   );
+  const creditsTotalEntries = dateSaleCredits.flatMap((d) =>
+    d.items.map((credit) => ({ amount: credit.total, currency: credit.currency })),
+  );
 
   // ─── multi-store mode ────────────────────────────────────────────────────
   if (multiStoreEnabled) {
@@ -180,11 +187,22 @@ export function SaleCreditsPage() {
     const visibleCredits = visibleStores.flatMap((s) => filteredStoreCredits.get(s.id) ?? []);
     const multiStoreCreditsCount = visibleCredits.length;
     const multiStoreCreditsTotal = visibleCredits.reduce((total, credit) => total + credit.total, 0);
+    const multiStoreCreditsEntries = visibleCredits.map((credit) => ({
+      amount: credit.total,
+      currency: credit.currency,
+    }));
 
     return (
       <Card
         padding="tight"
-        title={<CreditsCardTitle count={multiStoreCreditsCount} total={multiStoreCreditsTotal} />}
+        title={
+          <CreditsCardTitle
+            count={multiStoreCreditsCount}
+            total={multiStoreCreditsTotal}
+            entries={multiStoreCreditsEntries}
+            multiMonedas={multiMonedas}
+          />
+        }
       >
         <MultiStoreSection
           stores={multiStoreStores}
@@ -243,9 +261,14 @@ export function SaleCreditsPage() {
                         </span>
                         <span className="flex items-center gap-2">
                           <span className="text-xs font-semibold text-warning whitespace-nowrap">
-                            {formatCurrency(
-                              group.items.reduce((t, c) => t + c.total, 0),
-                            )}
+                            <CurrencyTotalAmount
+                              legacyTotal={group.items.reduce((t, c) => t + c.total, 0)}
+                              entries={group.items.map((credit) => ({
+                                amount: credit.total,
+                                currency: credit.currency,
+                              }))}
+                              multiMonedas={multiMonedas}
+                            />
                           </span>
                           <ChevronDownIcon isExpanded={isExpanded} className="text-text-muted" />
                         </span>
@@ -267,8 +290,17 @@ export function SaleCreditsPage() {
   }
 
   return (
-    <Card padding="tight" title={<CreditsCardTitle count={creditsCount} total={creditsTotal} />}>
-      <div className="mb-3">
+    <Card
+      padding="tight"
+      title={
+        <CreditsCardTitle
+          count={creditsCount}
+          total={creditsTotal}
+          entries={creditsTotalEntries}
+          multiMonedas={multiMonedas}
+        />
+      }
+    >      <div className="mb-3">
         <DateRangeFilter value={dateRange} onApply={setDateRange} />
       </div>
 
@@ -297,12 +329,14 @@ export function SaleCreditsPage() {
                 </span>
                 <span className="flex items-center gap-2">
                   <span className="text-sm font-semibold text-warning whitespace-nowrap">
-                    {formatCurrency(
-                      dateSaleCredit.items.reduce(
-                        (total, c) => total + c.total,
-                        0,
-                      ),
-                    )}
+                    <CurrencyTotalAmount
+                      legacyTotal={dateSaleCredit.items.reduce((total, c) => total + c.total, 0)}
+                      entries={dateSaleCredit.items.map((credit) => ({
+                        amount: credit.total,
+                        currency: credit.currency,
+                      }))}
+                      multiMonedas={multiMonedas}
+                    />
                   </span>
                   <ChevronDownIcon isExpanded={isExpanded} className="text-text-muted" />
                 </span>
@@ -331,7 +365,17 @@ export function SaleCreditsPage() {
  * on the right. `count`/`total` cover ALL credits (paid included) — user request
  * 2026-09-18. The count keeps the `rounded-full bg-success/10` pill class.
  */
-function CreditsCardTitle({ count, total }: { count: number; total: number }) {
+function CreditsCardTitle({
+  count,
+  total,
+  entries,
+  multiMonedas,
+}: {
+  count: number;
+  total: number;
+  entries: readonly CurrencyAmount[];
+  multiMonedas: boolean;
+}) {
   const intl = useIntl();
   return (
     <div className="flex items-center justify-between">
@@ -343,7 +387,7 @@ function CreditsCardTitle({ count, total }: { count: number; total: number }) {
         </span>
       </span>
       <span className="text-sm font-semibold text-warning whitespace-nowrap">
-        {formatCurrency(total)}
+        <CurrencyTotalAmount legacyTotal={total} entries={entries} multiMonedas={multiMonedas} />
       </span>
     </div>
   );

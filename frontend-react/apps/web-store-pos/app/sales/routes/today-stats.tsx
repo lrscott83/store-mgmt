@@ -5,6 +5,8 @@ import type { Expense, Order, SaleCredit } from '@store-mgmt/domain';
 import { resolvedOrderPaymentMethod } from '~/shared/lib/payment-method-resolved';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
+import { CurrencyTotalAmount } from '~/shared/components/multimonedas/currency-total-amount';
+import { hasMultiMonedasAvailable } from '~/shared/components/multimonedas/currency-select';
 import {
   hasCreditsModuleAvailable,
   hasExpensesModuleAvailable,
@@ -12,6 +14,8 @@ import {
 import { Card } from '~/shared/components/ui/card';
 import { ChevronDownIcon } from '~/shared/components/ui/icons';
 import { formatCurrency } from '~/shared/lib/format-currency';
+import { round2 } from '~/shared/lib/money';
+import type { CurrencyAmount } from '~/shared/lib/currency-totals';
 import { formatLocalDate } from '~/shared/lib/date-utils';
 import { OrderOfflineService } from '../lib/services/order-offline-service';
 import { ExpenseOfflineService } from '~/expenses/lib/services/expense-offline-service';
@@ -63,8 +67,8 @@ function ExpansionPanel({
   amountClassName,
   children,
 }: {
-  title: string;
-  amount: string;
+  title: React.ReactNode;
+  amount: React.ReactNode;
   amountClassName: string;
   children: React.ReactNode;
 }) {
@@ -100,10 +104,12 @@ export function TodayStatsPage() {
   const intl = useIntl();
   const user = useAuthStore((s) => s.user);
   const storeId = user?.selectedStoreId ?? '';
+  const multiMonedas = hasMultiMonedasAvailable(user);
 
   const hasExpensesModule = user ? hasExpensesModuleAvailable(user) : false;
   const hasCreditsModule = user ? hasCreditsModuleAvailable(user) : false;
 
+  const [activeOrders, setActiveOrders] = useState<Order[]>([]);
   const [categories, setCategories] = useState<CategoryCartItemsView[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [saleCredits, setSaleCredits] = useState<SaleCredit[]>([]);
@@ -118,16 +124,17 @@ export function TodayStatsPage() {
     const categoriesResponse = orderService.getCategoryCartItemsView(new Date());
     if (categoriesResponse.succeeded) setCategories(categoriesResponse.data);
 
-    const activeOrders: Order[] = orderService.getActiveOrdersInDay(new Date());
+    const todayOrders: Order[] = orderService.getActiveOrdersInDay(new Date());
+    setActiveOrders(todayOrders);
     setSalesCashTotal(
-      activeOrders
+      todayOrders
         .filter((o) => resolvedOrderPaymentMethod(o) === SalePaymentMethod.Efectivo && !o.isCredit)
         .reduce((acc, o) => acc + o.total, 0),
     );
     // payment-methods-percent-tax: el bloque "Tarjeta" pasa a "Transferencia" —
     // agrupa los históricos Tarjeta (adaptados a Transferencia-CUP) y las nuevas.
     setSalesCardTotal(
-      activeOrders
+      todayOrders
         .filter(
           (o) => resolvedOrderPaymentMethod(o) === SalePaymentMethod.Transferencia && !o.isCredit,
         )
@@ -174,6 +181,55 @@ export function TodayStatsPage() {
   const creditsTotal = saleCredits.reduce((acc, c) => acc + c.total, 0);
   const total = ordersTotal + paidSaleCreditsTotal - creditsTotal - expensesTotal;
 
+  // ─── Per-currency entries (only rendered when MultiMonedas is active) ──────
+  // Every amount carries its own currency; the net `total` is combined PER
+  // currency (each component grouped by currency, then added/subtracted), never
+  // as a mixed sum. Reuses the shared grouping/order helpers via the component.
+  const salesEntries: CurrencyAmount[] = activeOrders.flatMap((order) =>
+    order.orderItems.map((item) => ({
+      amount: round2(item.price * item.quantity),
+      currency: item.currency ?? order.currency,
+    })),
+  );
+  const expensesEntries: CurrencyAmount[] = expenses.map((e) => ({
+    amount: e.total,
+    currency: e.currency,
+  }));
+  const creditsEntries: CurrencyAmount[] = saleCredits.map((c) => ({
+    amount: c.total,
+    currency: c.currency,
+  }));
+  const paidCreditsEntries: CurrencyAmount[] = paidSaleCredits.map((c) => ({
+    amount: c.total,
+    currency: c.currency,
+  }));
+  const cashSalesEntries: CurrencyAmount[] = activeOrders
+    .filter((o) => resolvedOrderPaymentMethod(o) === SalePaymentMethod.Efectivo && !o.isCredit)
+    .map((o) => ({ amount: o.total, currency: o.currency }));
+  const paidCreditsCashEntries: CurrencyAmount[] = paidSaleCredits
+    .filter((c) => c.paidType === PaymentType.Efectivo)
+    .map((c) => ({ amount: c.total, currency: c.currency }));
+  const expensesCashEntries: CurrencyAmount[] = expenses
+    .filter((e) => e.paymentType === PaymentType.Efectivo)
+    .map((e) => ({ amount: e.total, currency: e.currency }));
+  const transferEntries: CurrencyAmount[] = activeOrders
+    .filter(
+      (o) => resolvedOrderPaymentMethod(o) === SalePaymentMethod.Transferencia && !o.isCredit,
+    )
+    .map((o) => ({ amount: o.total, currency: o.currency }));
+
+  const cashEntries: CurrencyAmount[] = [
+    ...cashSalesEntries,
+    ...paidCreditsCashEntries,
+    ...expensesCashEntries.map((e) => ({ ...e, amount: -e.amount })),
+  ];
+  const netEntries: CurrencyAmount[] = [
+    ...salesEntries,
+    ...paidCreditsEntries,
+    ...creditsEntries.map((e) => ({ ...e, amount: -e.amount })),
+    ...expensesEntries.map((e) => ({ ...e, amount: -e.amount })),
+  ];
+
   return (
     <Card
       padding="tight"
@@ -182,7 +238,11 @@ export function TodayStatsPage() {
           {/* TODAY_STATS.HEADER */}
           <span>{intl.formatMessage({ id: 'TODAY_STATS.HEADER' })}</span>
           <span className={`text-lg font-bold whitespace-nowrap ${valueClassName(total)}`}>
-            {formatCurrency(total)}
+            <CurrencyTotalAmount
+              legacyTotal={total}
+              entries={netEntries}
+              multiMonedas={multiMonedas}
+            />
           </span>
         </div>
       }
@@ -191,7 +251,13 @@ export function TodayStatsPage() {
         {/* BEGIN CASH */}
         <ExpansionPanel
           title="Resumen Efectivo"
-          amount={formatCurrency(cashTotal)}
+          amount={
+            <CurrencyTotalAmount
+              legacyTotal={cashTotal}
+              entries={cashEntries}
+              multiMonedas={multiMonedas}
+            />
+          }
           amountClassName={valueClassName(cashTotal)}
         >
           <table className="w-full text-sm">
@@ -202,7 +268,11 @@ export function TodayStatsPage() {
                 </td>
                 <td className="p-1 text-right">
                   <span className="font-bold text-success whitespace-nowrap">
-                    {formatCurrency(salesCashTotal)}
+                    <CurrencyTotalAmount
+                      legacyTotal={salesCashTotal}
+                      entries={cashSalesEntries}
+                      multiMonedas={multiMonedas}
+                    />
                   </span>
                 </td>
               </tr>
@@ -213,7 +283,11 @@ export function TodayStatsPage() {
                   </td>
                   <td className="p-1 text-right">
                     <span className="font-bold text-success whitespace-nowrap">
-                      {formatCurrency(paidCreditsCashTotal)}
+                      <CurrencyTotalAmount
+                        legacyTotal={paidCreditsCashTotal}
+                        entries={paidCreditsCashEntries}
+                        multiMonedas={multiMonedas}
+                      />
                     </span>
                   </td>
                 </tr>
@@ -225,7 +299,11 @@ export function TodayStatsPage() {
                   </td>
                   <td className="p-1 text-right">
                     <span className="font-bold text-danger whitespace-nowrap">
-                      {formatCurrency(expensesCashTotal)}
+                      <CurrencyTotalAmount
+                        legacyTotal={expensesCashTotal}
+                        entries={expensesCashEntries}
+                        multiMonedas={multiMonedas}
+                      />
                     </span>
                   </td>
                 </tr>
@@ -238,7 +316,13 @@ export function TodayStatsPage() {
         {/* BEGIN TRANSFER PAYMENTS (antes "Tarjeta" — históricos incluidos) */}
         <ExpansionPanel
           title="Pago por Transferencia"
-          amount={formatCurrency(salesCardTotal)}
+          amount={
+            <CurrencyTotalAmount
+              legacyTotal={salesCardTotal}
+              entries={transferEntries}
+              multiMonedas={multiMonedas}
+            />
+          }
           amountClassName={valueClassName(salesCardTotal)}
         >
           <table className="w-full text-sm">
@@ -249,7 +333,11 @@ export function TodayStatsPage() {
                 </td>
                 <td className="p-1 text-right">
                   <span className="font-bold text-success whitespace-nowrap">
-                    {formatCurrency(salesCardTotal)}
+                    <CurrencyTotalAmount
+                      legacyTotal={salesCardTotal}
+                      entries={transferEntries}
+                      multiMonedas={multiMonedas}
+                    />
                   </span>
                 </td>
               </tr>
@@ -262,7 +350,13 @@ export function TodayStatsPage() {
         {hasExpensesModule && (
           <ExpansionPanel
             title={`Gastos (${expensesCount})`}
-            amount={formatCurrency(expensesTotal)}
+            amount={
+              <CurrencyTotalAmount
+                legacyTotal={expensesTotal}
+                entries={expensesEntries}
+                multiMonedas={multiMonedas}
+              />
+            }
             amountClassName="text-danger"
           >
             {expenses.length === 0 ? (
@@ -302,7 +396,13 @@ export function TodayStatsPage() {
         {hasCreditsModule && (
           <ExpansionPanel
             title={`Créditos Por Cobrar (${creditsCount})`}
-            amount={formatCurrency(creditsTotal)}
+            amount={
+              <CurrencyTotalAmount
+                legacyTotal={creditsTotal}
+                entries={creditsEntries}
+                multiMonedas={multiMonedas}
+              />
+            }
             amountClassName="text-danger"
           >
             <SaleCreditsTable saleCredits={saleCredits} />
@@ -315,8 +415,28 @@ export function TodayStatsPage() {
             verbatim, not a bug fix. */}
         {hasCreditsModule && (
           <ExpansionPanel
-            title={`Créditos Pagados (${paidSaleCreditsTotal})`}
-            amount={formatCurrency(paidSaleCreditsTotal)}
+            title={
+              multiMonedas ? (
+                <>
+                  Créditos Pagados (
+                  <CurrencyTotalAmount
+                    legacyTotal={paidSaleCreditsTotal}
+                    entries={paidCreditsEntries}
+                    multiMonedas={multiMonedas}
+                  />
+                  )
+                </>
+              ) : (
+                `Créditos Pagados (${paidSaleCreditsTotal})`
+              )
+            }
+            amount={
+              <CurrencyTotalAmount
+                legacyTotal={paidSaleCreditsTotal}
+                entries={paidCreditsEntries}
+                multiMonedas={multiMonedas}
+              />
+            }
             amountClassName="text-success"
           >
             <SaleCreditsTable saleCredits={paidSaleCredits} />
@@ -327,7 +447,13 @@ export function TodayStatsPage() {
         {/* BEGIN SALES */}
         <ExpansionPanel
           title={`Ventas (${ordersItemsCount} productos)`}
-          amount={formatCurrency(ordersTotal)}
+          amount={
+            <CurrencyTotalAmount
+              legacyTotal={ordersTotal}
+              entries={salesEntries}
+              multiMonedas={multiMonedas}
+            />
+          }
           amountClassName="text-success"
         >
           {categories.map((category) => (

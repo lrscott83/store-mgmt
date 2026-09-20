@@ -4,6 +4,8 @@ import type { InventoryEntry, Order } from '@store-mgmt/domain';
 import { EFeatures } from '@store-mgmt/domain';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
+import { CurrencyTotalAmount } from '~/shared/components/multimonedas/currency-total-amount';
+import { hasMultiMonedasAvailable } from '~/shared/components/multimonedas/currency-select';
 import { Card } from '~/shared/components/ui/card';
 import { InfoBox } from '~/shared/components/ui/info-box';
 import { BarChartIcon, ChevronDownIcon, DownloadIcon } from '~/shared/components/ui/icons';
@@ -22,7 +24,6 @@ import { ProductCategoryRepository } from '../lib/repositories/product-category-
 import { OrderList } from '../components/order-list';
 import { DaySalesSummaryModal } from '../components/day-sales-summary-modal';
 import type { DaySalesSummary } from '../components/day-sales-summary-modal';
-import { formatCurrency } from '~/shared/lib/format-currency';
 import {
   collectOrderPaymentMethodKeys,
   matchesOrderPaymentFilter,
@@ -129,7 +130,9 @@ function computeMultiStoreDaySummary(orders: Order[], dateId: string): DaySalesS
  */
 export function OrdersPage() {
   const intl = useIntl();
-  const storeId = useAuthStore((s) => s.user?.selectedStoreId ?? '');
+  const user = useAuthStore((s) => s.user);
+  const storeId = user?.selectedStoreId ?? '';
+  const multiMonedas = hasMultiMonedasAvailable(user);
   const [groups, setGroups] = useState<LocalDayGroup<Order>[]>([]);
   const [expandedDateIds, setExpandedDateIds] = useState<Set<string>>(new Set());
   const [paymentKey, setPaymentKey] = useState<string | null>(null);
@@ -271,6 +274,13 @@ export function OrdersPage() {
       { count: 0, total: 0 },
     );
 
+    const totalEntries = visibleStoreIds.flatMap((id) =>
+      visibleOrders(storeOrders.get(id) ?? []).map((order) => ({
+        amount: order.total,
+        currency: order.currency,
+      })),
+    );
+
     const paymentFieldset = (
       <fieldset className="flex flex-wrap items-center gap-4">
         <label className="flex items-center gap-1 text-sm text-text">
@@ -310,7 +320,11 @@ export function OrdersPage() {
               </span>
             </span>
             <span className="text-sm font-semibold text-primary whitespace-nowrap">
-              {formatCurrency(totals.total)}
+              <CurrencyTotalAmount
+                legacyTotal={totals.total}
+                entries={totalEntries}
+                multiMonedas={multiMonedas}
+              />
             </span>
           </div>
         }
@@ -394,7 +408,14 @@ export function OrdersPage() {
                           </span>
                           <span className="flex items-center gap-2">
                             <span className="text-xs font-semibold text-text whitespace-nowrap">
-                              {formatCurrency(g.items.reduce((t, o) => t + o.total, 0))}
+                              <CurrencyTotalAmount
+                                legacyTotal={g.items.reduce((t, o) => t + o.total, 0)}
+                                entries={g.items.map((order) => ({
+                                  amount: order.total,
+                                  currency: order.currency,
+                                }))}
+                                multiMonedas={multiMonedas}
+                              />
                             </span>
                             <ChevronDownIcon isExpanded={isExpanded} className="text-text-muted" />
                           </span>
@@ -473,6 +494,9 @@ export function OrdersPage() {
     (total, g) => total + g.items.reduce((t, o) => t + o.total, 0),
     0,
   );
+  const totalEntries = visibleGroups.flatMap((g) =>
+    g.items.map((order) => ({ amount: order.total, currency: order.currency })),
+  );
 
   return (
     <Card
@@ -487,7 +511,11 @@ export function OrdersPage() {
             </span>
           </span>
           <span className="text-sm font-semibold text-text whitespace-nowrap">
-            {formatCurrency(ordersTotal)}
+            <CurrencyTotalAmount
+              legacyTotal={ordersTotal}
+              entries={totalEntries}
+              multiMonedas={multiMonedas}
+            />
           </span>
         </div>
       }
@@ -576,7 +604,14 @@ export function OrdersPage() {
                   </span>
                   <span className="flex items-center gap-2">
                     <span className="text-sm font-semibold text-text whitespace-nowrap">
-                      {formatCurrency(g.items.reduce((t, o) => t + o.total, 0))}
+                      <CurrencyTotalAmount
+                        legacyTotal={g.items.reduce((t, o) => t + o.total, 0)}
+                        entries={g.items.map((order) => ({
+                          amount: order.total,
+                          currency: order.currency,
+                        }))}
+                        multiMonedas={multiMonedas}
+                      />
                     </span>
                     <ChevronDownIcon isExpanded={isExpanded} className="text-text-muted" />
                   </span>

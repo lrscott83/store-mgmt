@@ -32,6 +32,7 @@ import type {
   CategoryCartItemsView,
   ProductCartItemsView,
 } from '~/sales/lib/category-cart-items-view';
+import type { CurrencyAmount } from '~/shared/lib/currency-totals';
 import type { InventoryCategoryView } from '~/inventory/lib/services/inventory-offline-service';
 import { readStoreEntities, unwrapStoreDekForStore } from '../storage/read-store-entities';
 
@@ -485,6 +486,11 @@ export interface StoreRangeSummary {
   salesCardTotal: number;
   expensesCashTotal: number;
   paidCreditsCashTotal: number;
+  /** Per-currency entries — only rendered when MultiMonedas is active. */
+  salesEntries: CurrencyAmount[];
+  grossProfitEntries: CurrencyAmount[];
+  salesCashEntries: CurrencyAmount[];
+  salesCardEntries: CurrencyAmount[];
 }
 
 function getOrderItemsTotal(items: OrderItem[]): number {
@@ -569,6 +575,23 @@ export function computeStoreRangeSummary(
     .filter((o) => o.paymentType === PaymentTypeEnum.Tarjeta && !o.isCredit)
     .reduce((acc, o) => acc + o.total, 0);
 
+  const salesEntries: CurrencyAmount[] = activeOrders.map((o) => ({
+    amount: o.total,
+    currency: o.currency,
+  }));
+  const grossProfitEntries: CurrencyAmount[] = activeOrders.flatMap((o) =>
+    o.orderItems.map((item) => ({
+      amount: calculateOrderProfit(item).profit,
+      currency: item.currency ?? o.currency,
+    })),
+  );
+  const salesCashEntries: CurrencyAmount[] = activeOrders
+    .filter((o) => o.paymentType === PaymentTypeEnum.Efectivo && !o.isCredit)
+    .map((o) => ({ amount: o.total, currency: o.currency }));
+  const salesCardEntries: CurrencyAmount[] = activeOrders
+    .filter((o) => o.paymentType === PaymentTypeEnum.Tarjeta && !o.isCredit)
+    .map((o) => ({ amount: o.total, currency: o.currency }));
+
   let expenses: Expense[] = [];
   let expensesTotal = 0;
   let expensesCashTotal = 0;
@@ -606,6 +629,10 @@ export function computeStoreRangeSummary(
     salesCardTotal,
     expensesCashTotal,
     paidCreditsCashTotal,
+    salesEntries,
+    grossProfitEntries,
+    salesCashEntries,
+    salesCardEntries,
   };
 }
 
