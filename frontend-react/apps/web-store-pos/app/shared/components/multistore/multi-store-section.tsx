@@ -33,10 +33,12 @@ export interface MultiStoreSectionProps {
 }
 
 /**
- * Space: panels use compact chrome (px-2/py-2 header, px-2 body — half the
- * regular day-panel padding px-4/py-3) so more content fits left-to-right;
+ * Space: panels use compact chrome (px-1/py-2 header, px-1 body — a quarter of
+ * the regular day-panel padding px-4/py-3) so more content fits left-to-right;
  * the wrapper adds no horizontal padding of its own.
  */
+export const MULTISTORE_FULL_BLEED = '-mx-2 md:-mx-12';
+
 export function MultiStoreSection({
   stores,
   selectedStoreId,
@@ -97,7 +99,7 @@ export function MultiStoreSection({
               <button
                 type="button"
                 onClick={() => toggleStore(store.id)}
-                className="flex w-full items-center justify-between gap-2 px-2 py-2 text-left"
+                className="flex w-full items-center justify-between gap-2 px-1 py-2 text-left"
                 data-testid={`multistore-panel-toggle-${store.id}`}
                 aria-expanded={isOpen}
               >
@@ -115,7 +117,7 @@ export function MultiStoreSection({
                 </span>
               </button>
               {isOpen && (
-                <div className="border-t border-border px-2 py-2">{children(store)}</div>
+                <div className="border-t border-border px-1 py-2">{children(store)}</div>
               )}
             </div>
           );

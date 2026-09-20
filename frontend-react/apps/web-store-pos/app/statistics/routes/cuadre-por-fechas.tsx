@@ -31,7 +31,7 @@ import { SaleCreditOfflineService } from '~/sales/lib/services/sale-credit-offli
 import { CategoryStats } from '~/sales/components/category-stats';
 import type { CategoryCartItemsView } from '~/sales/lib/category-cart-items-view';
 import { useMultiStore } from '~/shared/lib/hooks/use-multi-store';
-import { MultiStoreSection } from '~/shared/components/multistore/multi-store-section';
+import { MultiStoreSection, MULTISTORE_FULL_BLEED } from '~/shared/components/multistore/multi-store-section';
 import {
   computeStoreRangeSummary,
   sumRangeSummaries,
@@ -405,7 +405,7 @@ export function CuadrePorFechasPage() {
   // ─── multi-store mode ────────────────────────────────────────────────────
   if (multiStoreEnabled) {
     return (
-      <div className="space-y-6 p-4">
+      <div className={`space-y-6 p-4 ${MULTISTORE_FULL_BLEED}`}>
         <div className="border-b border-gray-200 pb-3">
           <h1 className="text-2xl font-semibold">
             {intl.formatMessage({ id: 'CUADRE_FECHAS.HEADER' })}

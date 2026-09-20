@@ -81,10 +81,10 @@ describe('MultiStoreSection', () => {
     expect(screen.getByTestId('multistore-totals')).toHaveTextContent('Total');
   });
 
-  it('panels use compact chrome (px-2 py-2 header) — the space requirement', () => {
+  it('panels use compact chrome (px-1 py-2 header) — maximize the space requirement', () => {
     const { container } = render(<Harness />);
     const toggle = container.querySelector('[data-testid="multistore-panel-toggle-s1"]');
-    expect(toggle?.className).toContain('px-2');
+    expect(toggle?.className).toContain('px-1');
     expect(toggle?.className).toContain('py-2');
   });
 
