@@ -101,9 +101,16 @@ export function MultiStoreSection({
                 data-testid={`multistore-panel-toggle-${store.id}`}
                 aria-expanded={isOpen}
               >
-                <span className="truncate text-sm font-semibold text-text">{store.name}</span>
-                <span className="flex items-center gap-2">
-                  <span className="text-sm whitespace-nowrap">{renderStoreTotals(store)}</span>
+                {/* Layout del header (petición del owner): la cantidad/total de la
+                    tienda va DESPUÉS del nombre, al lado izquierdo — no alineada
+                    a la derecha; el chevron queda solo a la derecha. */}
+                <span className="flex min-w-0 items-center gap-2">
+                  <span className="truncate text-sm font-semibold text-text">{store.name}</span>
+                  <span className="flex items-center whitespace-nowrap text-sm">
+                    {renderStoreTotals(store)}
+                  </span>
+                </span>
+                <span className="flex items-center">
                   <ChevronDownIcon isExpanded={isOpen} className="text-text-muted" />
                 </span>
               </button>
