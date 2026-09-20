@@ -68,13 +68,15 @@ namespace Application.Features.Authentication.Commands.Register
                 request.CellPhone, request.Email, "Nombre de la tienda: " + request.StoreName);
 
             // Create Store
-            // Self-registered stores start on the default plan (Superior, hardcoded in
+            // Self-registered stores start on the default birth plan (Pago, hardcoded in
             // CreateStoreService): grant exactly that plan's modules, NOT every catalog module
-            // AvailableToStore. This keeps VIP-only modules (e.g. MultiPayments) out.
+            // AvailableToStore. Keeps plan/module coherence (store pays for what it gets) and
+            // keeps Superior/VIP-only modules (Warehouses 13, MultiStores 14, MultiMonedas 15,
+            // Elaboración 17, MultiPayments 16) out of a Pago store.
             StorePlan? defaultPlan;
             try
             {
-                defaultPlan = await _planRepository.GetActivePlanWithModulesByIdAsync((int)StorePlanType.Superior);
+                defaultPlan = await _planRepository.GetActivePlanWithModulesByIdAsync((int)StorePlanType.Pago);
             }
             catch (Exception ex)
             {
@@ -86,7 +88,7 @@ namespace Application.Features.Authentication.Commands.Register
             if (defaultPlan is null)
             {
                 return ResponseResult.Failure<AuthDto>(
-                    new Error("Register.PlanLoadFailed", "The default plan (Superior) is not active or does not exist."),
+                    new Error("Register.PlanLoadFailed", "The default plan (Pago) is not active or does not exist."),
                     (int)HttpStatusCode.InternalServerError);
             }
 

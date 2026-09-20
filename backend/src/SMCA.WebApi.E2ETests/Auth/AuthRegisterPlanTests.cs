@@ -66,8 +66,12 @@ public sealed class AuthRegisterPlanTests
                 .Where(sm => sm.StoreId == registered.StoreId && sm.IsActive)
                 .Select(sm => sm.ModuleId).ToListAsync();
 
-            // ALL AvailableToStore modules are assigned — including the new 12/13/14.
-            activeModuleIds.Should().Contain(new[] { WholesaleSalesModuleId, WarehousesModuleId, MultiStoresModuleId });
+            // The Pago plan universe is assigned at registration (plan/module coherence:
+            // birth plan Pago → Pago's own modules). WholesaleSales (12) is IN the Pago
+            // catalog; Warehouses (13), MultiStores (14), MultiMonedas (15) and Elaboration
+            // (17) are Superior/VIP-only and must NOT be granted.
+            activeModuleIds.Should().Contain(WholesaleSalesModuleId);
+            activeModuleIds.Should().NotContain(new[] { WarehousesModuleId, MultiStoresModuleId, 15, 17 });
             activeModuleIds.Should().NotContain(1); // Administration never goes to a store
         }
         finally
@@ -84,16 +88,15 @@ public sealed class AuthRegisterPlanTests
         {
             registered = await RegisterAsync($"Store-{Guid.NewGuid():N}");
 
+            // The Pago plan catalog does NOT include Warehouses (13) — a fresh registered
+            // store has no StoreModule(13). The catalog snapshot itself is pinned by
+            // StorePlanCatalogTests; this test now guards the absence (register must not
+            // leak Superior-only modules) instead of its price snapshot.
             using var scope = _factory.Services.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-            var warehouses = await db.Set<StoreModule>().IgnoreQueryFilters()
-                .SingleAsync(sm => sm.StoreId == registered.StoreId && sm.ModuleId == WarehousesModuleId);
-
-            // Post Update-Warehouses-Price catalog snapshot: Price 5, 50% discount (effective 2.5).
-            warehouses.Price.Should().Be(5f);
-            warehouses.ModulePrice.Should().Be(5f);
-            warehouses.ModulePercentDiscountPrice.Should().Be(50f);
-            warehouses.ModulePriceIncluded.Should().BeFalse();
+            (await db.Set<StoreModule>().IgnoreQueryFilters()
+                .SingleOrDefaultAsync(sm => sm.StoreId == registered.StoreId && sm.ModuleId == WarehousesModuleId))
+                .Should().BeNull("Warehouses (13) is Superior/VIP-only and must not reach a Pago store at registration");
         }
         finally
         {
@@ -115,12 +118,14 @@ public sealed class AuthRegisterPlanTests
                 .Where(srf => srf.StoreId == registered.StoreId && srf.IsActive)
                 .Select(srf => srf.FeatureId).Distinct().ToListAsync();
 
-            // Mapped features of the assigned modules are present for this owner (Warehouses
-            // 36/37, Statistics 60, Billing 90, ...). StorePayment (91) is SuperAdmin/ReSeller-
-            // only in StoreRoleFeatures (StorePaymentAdmin), so no OwnerAdmin row exists for it.
-            // 38/39 have no StoreRoleFeatures mapping at all (production gap, asserted as-is).
-            srfFeatureIds.Should().Contain(new[] { 36, 37, 60, 90 });
-            srfFeatureIds.Should().NotContain(new[] { 38, 39, 91 });
+            // Mapped features of the assigned (Pago) modules are present for this owner:
+            // Statistics 60, Billing 90, WholesaleSales 59, ... Warehouses 36/37 are
+            // Superior-only and must NOT be granted. StorePayment (91) is SuperAdmin/
+            // ReSeller-only in StoreRoleFeatures (StorePaymentAdmin), so no OwnerAdmin row
+            // exists for it. 38/39 have no StoreRoleFeatures mapping at all (production
+            // gap, asserted as-is). Elaboration 120/121 is Superior/VIP-only too.
+            srfFeatureIds.Should().Contain(new[] { 60, 90 });
+            srfFeatureIds.Should().NotContain(new[] { 36, 37, 38, 39, 91, 120, 121 });
         }
         finally
         {
@@ -136,14 +141,16 @@ public sealed class AuthRegisterPlanTests
         {
             registered = await RegisterAsync($"Store-{Guid.NewGuid():N}");
 
-            // The freshly-registered owner's /me carries the full module set (all
-            // assigned, trial period → nothing filtered).
+            // The freshly-registered owner's /me carries the Pago plan module set (all
+            // assigned, trial period → nothing filtered). WholesaleSales (12) is in the
+            // Pago catalog; the Superior-only modules (13/14) must be absent.
             var me = await DbTestHelpers.AuthedClient(_factory, registered.UserId, registered.Login)
                 .GetAsync("/api/v1/auth/me");
             me.StatusCode.Should().Be(HttpStatusCode.OK);
             var body = await me.Content.ReadFromJsonAsync<ApiResponse<CurrentUserDto>>(ApiResponse.Json);
             body!.Succeeded.Should().BeTrue();
-            body.Data!.StoreModuleIds.Should().Contain(new[] { WholesaleSalesModuleId, WarehousesModuleId, MultiStoresModuleId });
+            body.Data!.StoreModuleIds.Should().Contain(WholesaleSalesModuleId);
+            body.Data.StoreModuleIds.Should().NotContain(new[] { WarehousesModuleId, MultiStoresModuleId });
             body.Data.PlanType.Should().Be("Paid");
             body.Data.IsInTrial.Should().BeTrue(); // billable amount > 0 (paid modules at catalog price)
             body.Data.PaymentStatus.Should().Be("AlDia");

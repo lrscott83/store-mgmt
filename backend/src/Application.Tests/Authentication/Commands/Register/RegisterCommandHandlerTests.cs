@@ -420,7 +420,7 @@ public class RegisterCommandHandlerTests : RegisterCommandHandlerTestFixture
 
         // Assert
         MockPlanRepository.Verify(x => x.GetActivePlanWithModulesByIdAsync(
-            (int)StorePlanType.Superior),
+            (int)StorePlanType.Pago),
             Times.Once);
     }
 

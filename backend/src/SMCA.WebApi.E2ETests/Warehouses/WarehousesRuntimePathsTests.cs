@@ -14,7 +14,10 @@ namespace SMCA.WebApi.E2ETests.Warehouses;
 
 /// <summary>
 /// WM-TE3 (spec warehouses-module-assignment): runtime paths assign the Warehouses module
-/// and its OwnerAdmin features with no code change — self-registration and the plan toggle.
+/// and its OwnerAdmin features with no code change — plan elevation to Superior/VIP and
+/// the plan toggle. Self-registration births the store on plan Pago (2026-09-18) whose
+/// catalog does NOT include module 13, so the register→elevate→assign chain is the
+/// runtime path under test (user decision 2026-09-19).
 /// </summary>
 [Collection("e2e")]
 public sealed class WarehousesRuntimePathsTests
@@ -26,9 +29,13 @@ public sealed class WarehousesRuntimePathsTests
     [Fact]
     public async Task Register_assigns_warehouses_module_and_owner_features()
     {
-        // WMA-3a: self-registration assigns ALL available modules — module 13 must land on the store
-        // with OwnerAdmin features 36/37.
+        // WMA-3a (repointed 2026-09-19): registration births the store on plan Pago, whose
+        // catalog has NO module 13. The runtime chain under test is: register (no 13) →
+        // SuperAdmin elevates the plan to Superior → change-plan assigns module 13 with
+        // OwnerAdmin features 36/37 through the SAME ApplyPlanModules chain.
         var login = $"wh-reg-{Guid.NewGuid():N}@test.com";
+        var saLogin = $"wh-sa-{Guid.NewGuid():N}@test.com";
+        var saId = await DbTestHelpers.SeedSuperAdminAsync(_f, saLogin, "Password123");
         Guid tenantId = Guid.Empty;
         try
         {
@@ -51,9 +58,21 @@ public sealed class WarehousesRuntimePathsTests
                 .AsNoTracking().FirstAsync(s => s.Name.StartsWith("WH-Reg-Store"));
             tenantId = store.TenantId;
 
+            // Precondition: a fresh Pago store must NOT carry the Superior-only module 13.
+            (await db.Set<StoreModule>().IgnoreQueryFilters()
+                .AsNoTracking().FirstOrDefaultAsync(x => x.StoreId == store.Id && x.ModuleId == 13))
+                .Should().BeNull("plan Pago does not include the Warehouses module");
+
+            // Elevation by SuperAdmin (the only caller allowed to target Superior).
+            var user = await DbTestHelpers.GetUserByLoginAsync(_f, login);
+            user.Should().NotBeNull();
+            var elevate = await DbTestHelpers.AuthedClient(_f, saId, saLogin)
+                .PostAsJsonAsync($"/api/v1/stores/{store.Id}/change-plan", new { storePlanId = (int)Domain.Common.Enums.StorePlanType.Superior });
+            elevate.StatusCode.Should().Be(HttpStatusCode.OK);
+
             var sm = await db.Set<StoreModule>().IgnoreQueryFilters()
                 .AsNoTracking().FirstOrDefaultAsync(x => x.StoreId == store.Id && x.ModuleId == 13);
-            sm.Should().NotBeNull("AvailableToStore=true modules are auto-assigned at registration");
+            sm.Should().NotBeNull("the plan change assigns module 13 through the runtime chain");
             sm!.IsActive.Should().BeTrue();
 
             var srfs = await db.Set<StoreRoleFeature>().IgnoreQueryFilters().AsNoTracking()
@@ -63,13 +82,9 @@ public sealed class WarehousesRuntimePathsTests
         }
         finally
         {
-            if (tenantId == Guid.Empty)
-            {
-                var created = await DbTestHelpers.GetUserByLoginAsync(_f, login);
-                if (created is not null) tenantId = created.TenantId;
-            }
             if (tenantId != Guid.Empty)
                 await DbTestHelpers.CleanupTenantCascadeAsync(_f, tenantId);
+            await DbTestHelpers.CleanupUserAsync(_f, saId);
         }
     }
 

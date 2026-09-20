@@ -186,10 +186,11 @@ public sealed class AuthRegisterDataAssertionsTests
             using var scope = _factory.Services.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
-            // Registration grants the modules of the DEFAULT plan (Superior, hardcoded in
-            // CreateStoreService), not every catalog module AvailableToStore.
+            // Registration grants the modules of the DEFAULT birth plan (Pago — coherent
+            // with the plan Pago hardcoded in CreateStoreService since 2026-09-18; aligned
+            // 2026-09-19 user decision, was incorrectly reading the Superior plan).
             var expectedModuleIds = await db.Set<StorePlanModule>().AsNoTracking()
-                .Where(spm => spm.PlanId == (int)StorePlanType.Superior)
+                .Where(spm => spm.PlanId == (int)StorePlanType.Pago)
                 .Select(spm => spm.ModuleId)
                 .ToListAsync();
 
@@ -208,9 +209,10 @@ public sealed class AuthRegisterDataAssertionsTests
                 .ToListAsync();
 
             actualModuleIds.Should().BeEquivalentTo(expectedModuleIds);
-            // Regression (T14): module 16 (MultiPayments) is VIP-only and must NOT be granted
-            // to a fresh Superior store even though it is AvailableToStore in the catalog.
-            actualModuleIds.Should().NotContain(16);
+            // Superior/VIP-only modules must NOT be granted to a fresh Pago store:
+            // Warehouses (13), MultiStores (14), MultiMonedas (15), MultiPayments (16, VIP
+            // only) and Elaboration (17).
+            actualModuleIds.Should().NotContain(new[] { 13, 14, 15, 16, 17 });
         }
         finally
         {

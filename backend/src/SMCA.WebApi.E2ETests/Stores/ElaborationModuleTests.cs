@@ -28,9 +28,12 @@ namespace SMCA.WebApi.E2ETests.Stores;
 ///   EM1  OwnerAdmin creates a store inheriting the selected store's module set
 ///        {7, 14, 17}: the new store gets active StoreModule(17) and StoreRoleFeature
 ///        rows for 120/121 on OwnerAdmin.
-///   EM2  Changing the plan to Superior activates 17/120/121 through the SAME
-///        runtime chain (change-plan → StoreModules → /me).
-///   EM3  Changing the plan to VIP activates 17/120/121 too.
+///   EM2  OwnerAdmin CANNOT elevate the plan to Superior (403 — SuperAdmin-reserved
+///        since the 2026-09-18 caller matrix, user decision 2026-09-19); the SuperAdmin
+///        change activates 17/120/121 through the SAME runtime chain
+///        (change-plan → StoreModules → /me).
+///   EM3  OwnerAdmin CANNOT elevate to VIP (403) either; the SuperAdmin change
+///        activates 17/120/121 too.
 ///   EM4  Changing back Superior → Pago STRIPS 17 (and its 120/121 grants) — the
 ///        module must follow the plan in both directions.
 ///   EM5  Backfill parity: a pre-existing Superior store seeded exactly like
@@ -192,12 +195,29 @@ public sealed class ElaborationModuleTests
     [Fact]
     public async Task EM2_change_plan_to_superior_activates_elaboration_on_me()
     {
+        // Plan caller matrix: ONLY a SuperAdmin may change a store to Superior/VIP.
+        // The OwnerAdmin attempt must fail with 403 and leave the store untouched on Pago;
+        // the SuperAdmin then performs the change and Elaboration (17) + features (120/121)
+        // flow through the SAME runtime chain (change-plan → StoreModules → /me).
         var seeded = await SeedOwnerAdminStoreAsync(planId: (int)StorePlanType.Pago);
+        var saLogin = $"em-sa-{Guid.NewGuid():N}@test.com";
+        var saId = await DbTestHelpers.SeedSuperAdminAsync(_f, saLogin, "Password123");
         try
         {
             var client = OwnerClient(_f, seeded);
-            var r = await client.PostAsJsonAsync(
+
+            // OwnerAdmin cannot elevate to Superior — the guard rejects it.
+            var ownerAttempt = await client.PostAsJsonAsync(
                 $"/api/v1/stores/{seeded.StoreId}/change-plan", PlanBody((int)StorePlanType.Superior));
+            ownerAttempt.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+
+            var meAfterOwnerAttempt = await MeAsync(client);
+            meAfterOwnerAttempt.StoreModuleIds.Should().NotContain(ElaborationModuleId,
+                "the 403 must leave the store untouched on Pago");
+
+            // SuperAdmin performs the elevation: Elaboration flows with the plan.
+            var r = await DbTestHelpers.AuthedClient(_f, saId, saLogin)
+                .PostAsJsonAsync($"/api/v1/stores/{seeded.StoreId}/change-plan", PlanBody((int)StorePlanType.Superior));
             r.StatusCode.Should().Be(HttpStatusCode.OK);
 
             var me = await MeAsync(client);
@@ -209,18 +229,33 @@ public sealed class ElaborationModuleTests
         finally
         {
             await AuthzSeed.CleanupStoreGraphAsync(_f, seeded.StoreId, seeded.UserId);
+            await DbTestHelpers.CleanupUserAsync(_f, saId);
         }
     }
 
     [Fact]
     public async Task EM3_change_plan_to_vip_activates_elaboration_on_me()
     {
+        // Same caller matrix as EM2, with the VIP target.
         var seeded = await SeedOwnerAdminStoreAsync(planId: (int)StorePlanType.Pago);
+        var saLogin = $"em-sa-{Guid.NewGuid():N}@test.com";
+        var saId = await DbTestHelpers.SeedSuperAdminAsync(_f, saLogin, "Password123");
         try
         {
             var client = OwnerClient(_f, seeded);
-            var r = await client.PostAsJsonAsync(
+
+            // OwnerAdmin cannot elevate to VIP — the guard rejects it.
+            var ownerAttempt = await client.PostAsJsonAsync(
                 $"/api/v1/stores/{seeded.StoreId}/change-plan", PlanBody((int)StorePlanType.VIP));
+            ownerAttempt.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+
+            var meAfterOwnerAttempt = await MeAsync(client);
+            meAfterOwnerAttempt.StoreModuleIds.Should().NotContain(ElaborationModuleId,
+                "the 403 must leave the store untouched on Pago");
+
+            // SuperAdmin performs the elevation: Elaboration flows with the plan.
+            var r = await DbTestHelpers.AuthedClient(_f, saId, saLogin)
+                .PostAsJsonAsync($"/api/v1/stores/{seeded.StoreId}/change-plan", PlanBody((int)StorePlanType.VIP));
             r.StatusCode.Should().Be(HttpStatusCode.OK);
 
             var me = await MeAsync(client);
@@ -231,6 +266,7 @@ public sealed class ElaborationModuleTests
         finally
         {
             await AuthzSeed.CleanupStoreGraphAsync(_f, seeded.StoreId, seeded.UserId);
+            await DbTestHelpers.CleanupUserAsync(_f, saId);
         }
     }
 

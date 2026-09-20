@@ -8,7 +8,7 @@ namespace Application.Tests.Authentication.Commands.Register;
 
 /// <summary>
 /// Tests for RegisterCommandHandler covering default-plan module assignment.
-/// Self-registration grants exactly the modules assigned to the default (Superior)
+/// Self-registration grants exactly the modules assigned to the default birth (Pago)
 /// plan, not every catalog module AvailableToStore.
 /// </summary>
 public class RegisterCommandHandlerModuleTests : RegisterCommandHandlerTestFixture
@@ -246,7 +246,7 @@ public class RegisterCommandHandlerModuleTests : RegisterCommandHandlerTestFixtu
 
         // Assert
         MockPlanRepository.Verify(
-            x => x.GetActivePlanWithModulesByIdAsync((int)StorePlanType.Superior),
+            x => x.GetActivePlanWithModulesByIdAsync((int)StorePlanType.Pago),
             Times.Once);
     }
 

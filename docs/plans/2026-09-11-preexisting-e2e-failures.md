@@ -98,6 +98,35 @@ El fallo restante era un spec de scratch **gitignored** bajo `frontend-react/e2e
 
 ### Evidencia de que NO los causó el módulo de elaboración
 
+> **Actualización (2026-09-19, checkout `main` @ `2a073d4b`):** los 10 fallos frontend de esta lista fueron verificados y **casi todos ya no aplican** — fueron resueltos por tareas posteriores (mismos specs corregidos con permiso del owner: seed de `orders-history` al formato real del servicio, repunto Zelle→Transferencia de `mayorista-sale`, gear de Ventas del día en `edit-delete-order`, filtro dinámico de métodos de pago, etc.). La corrida backend E2E de hoy dio **542/544** con **2 fallos reales vivos**: `ElaborationModuleTests.EM2/EM3` (causa raíz identificada abajo). La checklist viva está en la sección siguiente.
+
+### Checklist de verificación backend (2026-09-19)
+
+| Check | Resultado |
+|---|---|
+| `dotnet build backend/src/SMCA.sln` | 0 errores (tras matar el backend dev PID 26180 que bloqueaba las DLLs) |
+| Domain.UnitTests | 27/27 |
+| Application.Tests | 494/494 |
+| SMCA.WebApi.E2ETests (base `smca_test` reconstruida desde este checkout) | 542/544 — fallan solo `ElaborationModuleTests.EM2/EM3` |
+| `pnpm turbo run typecheck lint test` | 12/12 tareas, 3982/3982 tests, typecheck/lint limpios |
+
+**EM2/EM3 — causa raíz (producción, no del spec):** el handler `ChangeStorePlanCommand` (restricción de planes del 2026-09-18) devuelve 403 a cualquier no-SuperAdmin que intente cambiar a Superior/VIP, pero los tests EM2/EM3 cambiaban el plan como OwnerAdmin. **RESUELTO (2026-09-19):** decisión del owner — el comportamiento correcto ES el guard (solo SuperAdmin eleva a Superior/VIP), los specs estaban obsoletos. Con permiso del owner, EM2/EM3 reescritos: OwnerAdmin intenta Superior/VIP → 403 y la tienda queda intacta en Pago; el SuperAdmin hace el cambio → 200 y Elaboración (17) + features 120/121 fluyen por la misma cadena runtime (change-plan → StoreModules → /me).
+
+### Fix de producción: registro con módulos del plan Pago (2026-09-19)
+
+**Problema:** `RegisterCommand` cargaba los módulos del plan **Superior** (comentario obsoleto que decía "default plan hardcoded in CreateStoreService"), pero desde el 2026-09-18 `CreateStoreService` fija el birth plan **Pago**. Resultado: la tienda registrada nacía con plan Pago y módulos de Superior (11 + Warehouses 13, MultiStores 14, MultiMonedas 15, Elaboración 17) — incoherencia plan/módulos. Los E2E del registro no lo detectaban porque solo asertaban la presencia de 12/13/14.
+
+**Fix:** `RegisterCommand` ahora carga `GetActivePlanWithModulesByIdAsync((int)StorePlanType.Pago)` — la tienda nace con plan Pago y exactamente los 11 módulos de Pago.
+
+**Specs actualizados con permiso del owner:**
+- `AuthRegisterDataAssertionsTests.Register_assigns_default_plan_modules`: conjunto esperado = catálogo Pago; Superior/VIP-only (13/14/15/16/17) deben estar ausentes.
+- `AuthRegisterPlanTests`: (1) nacimiento con Pago → 12 presente, 13/14/15/17 ausentes; (2) el test del snapshot de precio de Warehouses se reorienta a guard de ausencia (el snapshot de catálogo lo fija `StorePlanCatalogTests`); (3) `/me` → 12 presente, 13/14 ausentes; (4) features del registro → 60/90 presentes, 36/37/120/121 ausentes.
+- `WarehousesRuntimePathsTests.Register_assigns_warehouses_module_and_owner_features`: reorientado a la cadena real registro (sin 13) → SuperAdmin eleva a Superior → change-plan asigna 13 + features 36/37 por runtime.
+
+**Unit tests alineados:** `RegisterCommandHandlerTests.Handle_ShouldCallPlanRepository_GetActivePlanWithModulesByIdAsync` y `RegisterCommandHandlerModuleTests.Handle_ShouldExtractModuleIdsFromDefaultPlan` verificaban que el handler llama con Superior — actualizados a Pago.
+
+**Verificación final (2026-09-19):** Domain.UnitTests 27/27 · Application.Tests 494/494 · **SMCA.WebApi.E2ETests 544/544** · frontend `pnpm turbo run typecheck lint test` 12/12 tareas, 3982/3982 tests, typecheck/lint limpios.
+
 - Ninguno de los 10 specs, ni ningún support file E2E existente, fue modificado por los commits del módulo: el módulo solo **AGREGÓ** `e2e/elaboration.spec.ts` y `e2e/support/elaboration-flow.ts` (ambos net-new, sin tocar nada preexistente).
 - Ninguna clave i18n agregada por el módulo está duplicada en `es.ts` (una clave duplicada habría sobrescrito el valor previo). Verificado: las 54 claves agregadas por `ddaadcfb` aparecen una sola vez.
 - `owner-plan-change-dialog.spec.ts:67` (aserción en la línea 87) espera el texto `"Plan Gratis"`, que **no** es lo que renderiza la card. La app usa la clave `STORES.PLAN.DISPLAY` = `"Plan: {plan}"` (`owner-store-card.tsx:83`), o sea `"Plan: Gratis"`. El texto literal `"Plan Gratis"` sí existe, pero bajo otra clave (`STORES.FREE_PLAN`), que la card de owner no usa. Los tests preexistentes confirman el render real: `my-stores.test.tsx:367` y `owner-store-card.test.tsx:55` esperan `"Plan: Gratis"`, y el spec que pasa `owner-stores.spec.ts:292` también. La expectativa de este spec está **obsoleta**.
