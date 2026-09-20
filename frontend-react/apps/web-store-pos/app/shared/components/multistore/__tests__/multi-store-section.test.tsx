@@ -87,4 +87,31 @@ describe('MultiStoreSection', () => {
     expect(toggle?.className).toContain('px-2');
     expect(toggle?.className).toContain('py-2');
   });
+
+  // Layout del header del panel (petición del owner): la cantidad/total de la
+  // tienda va DESPUÉS del nombre (lado izquierdo), no alineada a la derecha.
+  it('shows the per-store totals right after the store name (left side), not right-aligned', () => {
+    render(<Harness />);
+    const toggle = screen.getByTestId('multistore-panel-toggle-s1');
+    const nameSpan = [...toggle.querySelectorAll('span')].find(
+      (s) => s.textContent === 'Tienda A',
+    );
+    expect(nameSpan).toBeDefined();
+    // Los totales vienen inmediatamente después del nombre, en el MISMO grupo izquierdo.
+    const totalsSpan = nameSpan!.nextElementSibling;
+    expect(totalsSpan?.textContent).toBe('(Tienda A)');
+    expect(totalsSpan!.parentElement).toBe(nameSpan!.parentElement);
+    // El grupo izquierdo NO contiene el chevron (ese vive solo a la derecha).
+    expect(nameSpan!.parentElement!.querySelector('svg')).toBeNull();
+  });
+
+  it('keeps the chevron alone on the right side of the panel header', () => {
+    const { container } = render(<Harness />);
+    const toggle = container.querySelector(
+      '[data-testid="multistore-panel-toggle-s1"]',
+    ) as HTMLElement;
+    const rightGroup = toggle.lastElementChild as HTMLElement;
+    expect(rightGroup.querySelector('svg')).not.toBeNull();
+    expect(rightGroup.textContent).not.toContain('Tienda A');
+  });
 });

@@ -62,6 +62,15 @@ const PAYMENT_TYPE_KEYS: Record<PaymentType, string> = {
 // (:68). The date is never user-editable in either mode, so it's intentionally absent from
 // ExpenseFormInput; callers set it themselves (create: `new Date()`; update: omitted, so the
 // existing record's date is preserved by ExpenseOfflineService.update's `{...existing, ...patch}`).
+// Todos los tipos de pago posibles (petición del owner, 2026-09-20): Efectivo,
+// Transferencia (CUP) y Zelle. Zelle vuelve al select (el enum siempre existió;
+// la retirada visual del 2026-09-08 queda revertida aquí).
+const PAYMENT_TYPE_OPTIONS: PaymentType[] = [
+  PaymentType.Efectivo,
+  PaymentType.Tarjeta,
+  PaymentType.Zelle,
+];
+
 function emptyForm(expense?: Expense): ExpenseFormInput {
   if (expense) {
     return {
@@ -218,8 +227,9 @@ export function ExpenseFormModal({
               }
               className="w-full rounded border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             >
-{/* Zelle removed from the options (user request 2026-09-08) — enum member stays. */}
-              {([PaymentType.Efectivo, PaymentType.Tarjeta] as PaymentType[]).map((pt) => (
+            {/* Todos los tipos de pago posibles (2026-09-20): el select guarda el
+                PaymentType legacy; la etiqueta de Tarjeta ya es "Transferencia (CUP)". */}
+            {PAYMENT_TYPE_OPTIONS.map((pt) => (
                 <option key={pt} value={pt}>
                   {intl.formatMessage({ id: PAYMENT_TYPE_KEYS[pt] })}
                 </option>
