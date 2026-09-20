@@ -103,6 +103,7 @@ describe('Import flow — full success', () => {
       warehouses: [],
       warehouseStockLevels: [],
       warehouseStockMovements: [],
+      channelRates: [],
     };
 
     const result = await synchronizer.sync(data);
@@ -136,6 +137,7 @@ describe('Import flow — full success', () => {
       warehouses: [],
       warehouseStockLevels: [],
       warehouseStockMovements: [],
+      channelRates: [],
     };
 
     await synchronizer.sync(data);
@@ -188,6 +190,7 @@ describe('Import flow — partial errors', () => {
       warehouses: [],
       warehouseStockLevels: [],
       warehouseStockMovements: [],
+      channelRates: [],
     };
 
     const result = await synchronizer.sync(data);
@@ -239,6 +242,7 @@ describe('Import flow — partial errors', () => {
       warehouses: [],
       warehouseStockLevels: [],
       warehouseStockMovements: [],
+      channelRates: [],
     };
 
     const result = await synchronizer.sync(data);

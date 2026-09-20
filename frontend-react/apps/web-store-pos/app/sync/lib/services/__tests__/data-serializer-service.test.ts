@@ -60,12 +60,14 @@ const ANGULAR_ENTRY_NAMES = [
 
 // daily-exchange-rate: the seventh data entry added on top of Angular's six.
 // warehouses-plan: three more entries (warehouses, stock levels, movements).
+// multipayments T4: the append-only channel-rate register (channel-rates.json).
 const ALL_ENTRY_NAMES = [
   ...ANGULAR_ENTRY_NAMES,
   'exchange-rates.json',
   'warehouses.json',
   'warehouse-stock-levels.json',
   'warehouse-stock-movements.json',
+  'channel-rates.json',
   // elaboration-module: recipes + elaborations.
   'recipes.json',
   'elaborations.json',
@@ -470,7 +472,7 @@ describe('DataSerializerService', () => {
   // -------------------------------------------------------------------------
 
   describe('T2 — v2 envelope: meta.json + all data entries', () => {
-    it('produces meta.json plus exactly the 12 data entries', async () => {
+    it('produces meta.json plus exactly the 13 data entries', async () => {
       const svc = makeService();
       const payload = await svc.export(PASSWORD);
       const { entries } = await readRawEntriesV2(payload, PASSWORD);
@@ -480,7 +482,7 @@ describe('DataSerializerService', () => {
 
     // parity-audit-remediation Slice 2: naming-only alignment with Angular's
     // EDataFileName enum (data.file.model.ts:6-13) — PascalCase members, same string values.
-    it("EDataFileName mirrors Angular's PascalCase member names with unchanged string values, plus the daily-exchange-rate seventh entry, the three warehouses entries and the two elaboration entries", () => {
+    it("EDataFileName mirrors Angular's PascalCase member names with unchanged string values, plus the daily-exchange-rate seventh entry, the three warehouses entries, the multipayments channel-rates entry and the two elaboration entries", () => {
       expect(EDataFileName).toEqual({
         Categories: 'categories.json',
         Products: 'products.json',
@@ -492,6 +494,7 @@ describe('DataSerializerService', () => {
         Warehouses: 'warehouses.json',
         WarehouseStockLevels: 'warehouse-stock-levels.json',
         WarehouseStockMovements: 'warehouse-stock-movements.json',
+        ChannelRates: 'channel-rates.json',
         Recipes: 'recipes.json',
         Elaborations: 'elaborations.json',
       });

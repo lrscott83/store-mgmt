@@ -26,6 +26,11 @@ namespace Infrastructure.Persistence.EntityConfigurations
                  .WithOne(e => e.Order)
                  .HasForeignKey(e => e.OrderId)
                  .OnDelete(DeleteBehavior.Restrict);
+
+            builder.HasMany(c => c.Payments)
+                 .WithOne(e => e.Order)
+                 .HasForeignKey(e => e.OrderId)
+                 .OnDelete(DeleteBehavior.Restrict);
         }
     }
 }

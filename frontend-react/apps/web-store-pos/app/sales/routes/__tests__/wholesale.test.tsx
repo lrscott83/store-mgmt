@@ -67,6 +67,9 @@ vi.mock('~/shared/lib/toast', () => ({
 const hasInventoryModuleMock = vi.hoisted(() => vi.fn(() => false));
 vi.mock('~/shared/lib/auth/authorization-service', () => ({
   hasInventoryModuleAvailable: () => hasInventoryModuleMock(),
+  // MultiPayments (módulo 16, T8): wholesale.tsx also consults the module gate for
+  // the currency guard. Off here, so the legacy one-currency behavior is preserved.
+  hasMultiPaymentsModuleAvailable: () => false,
 }));
 
 const inventoryServiceMock = vi.hoisted(() => vi.fn());

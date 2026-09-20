@@ -11,7 +11,10 @@ import { Switch } from '~/shared/components/ui/switch';
 import { ScanBarcodeIcon } from '~/shared/components/ui/icons';
 import { showBlockingError } from '~/shared/lib/blocking-alert';
 import { showToastError, showToastSuccess } from '~/shared/lib/toast';
-import { hasInventoryModuleAvailable } from '~/shared/lib/auth/authorization-service';
+import {
+  hasInventoryModuleAvailable,
+  hasMultiPaymentsModuleAvailable,
+} from '~/shared/lib/auth/authorization-service';
 import { InventoryOfflineService } from '~/inventory/lib/services/inventory-offline-service';
 import { ProductRepository } from '~/sales/lib/repositories/product-repository';
 import { ProductCategoryRepository } from '~/sales/lib/repositories/product-category-repository';
@@ -209,8 +212,13 @@ export function SalePage() {
     });
     if (!typeGuard.succeeded) return typeGuard;
     // Una sola moneda por venta: el popup de moneda va después del de tipo de venta.
+    // MultiPayments (módulo 16): con el módulo se permite mezclar monedas.
     const requested = displayedProducts.find((p) => p.id === productId);
-    const currencyGuard = guardCurrency({ items: cartItems, requestedProduct: requested ?? {} });
+    const currencyGuard = guardCurrency({
+      items: cartItems,
+      requestedProduct: requested ?? {},
+      allowMixedCurrencies: hasMultiPaymentsModuleAvailable(user),
+    });
     if (!currencyGuard.succeeded) return currencyGuard;
     return availabilityGate(requested, productId, quantity);
   }
@@ -232,7 +240,12 @@ export function SalePage() {
       return typeGuard;
     }
     // Una sola moneda por venta: no se puede mezclar monedas en el mismo carrito.
-    const currencyGuard = guardCurrency({ items: cartItems, requestedProduct: product });
+    // MultiPayments (módulo 16): con el módulo se permite mezclar monedas.
+    const currencyGuard = guardCurrency({
+      items: cartItems,
+      requestedProduct: product,
+      allowMixedCurrencies: hasMultiPaymentsModuleAvailable(user),
+    });
     if (!currencyGuard.succeeded) {
       return currencyGuard;
     }

@@ -1,6 +1,8 @@
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState, useEffect, useMemo } from 'react';
 import { useIntl } from 'react-intl';
 import type { Product } from '@store-mgmt/domain';
+import type { ChannelRate } from '@store-mgmt/domain';
+import { Currency } from '@store-mgmt/domain';
 import {
   SalePaymentMethod,
   applyPaymentPricing,
@@ -25,6 +27,7 @@ import { ProductCategoryRepository } from '~/sales/lib/repositories/product-cate
 import {
   hasCreditsModuleAvailable,
   hasInventoryModuleAvailable,
+  hasMultiPaymentsModuleAvailable,
 } from '~/shared/lib/auth/authorization-service';
 import { getOrderTypeText } from '~/sales/lib/order-type-utils';
 import { wholesaleCartDisplay } from '~/sales/lib/wholesale-cart-display';
@@ -40,6 +43,12 @@ import { showBlockingError, showAcknowledgeError } from '~/shared/lib/blocking-a
 import { showToastSuccess, showToastError } from '~/shared/lib/toast';
 import { round2 } from '~/shared/lib/money';
 import { formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency';
+import { readCartCurrencyPreference } from '~/shared/lib/cart-currency-preference';
+import { CartCurrencySelect } from '~/shared/components/multipayments/cart-currency-select';
+import { MultiPaymentList } from '~/shared/components/multipayments/multi-payment-list';
+import { settleMultiPayments } from '~/shared/components/multipayments/multi-payment-settlement';
+import { convertCartLines } from '~/shared/components/multipayments/cart-line-conversion';
+import { ChannelRateOfflineService } from '~/management/channel-rates/lib/services/channel-rate-offline-service';
 import { Switch } from '~/shared/components/ui/switch';
 import { InfoBox } from '~/shared/components/ui/info-box';
 
@@ -212,17 +221,30 @@ export function CartShell() {
     // viejos sin el campo.
     salePaymentMethod = SalePaymentMethod.Efectivo,
     setSalePaymentMethod = () => {},
+    // MultiPayments (módulo 16): filas del multi-pago de la venta en curso.
+    // Defaults defensivos para mocks de test y perfiles persistidos viejos.
+    payments = [],
+    setPayments = () => {},
   } = useCartStore();
   const user = useAuthStore((s) => s.user);
   const creditsModuleAvailable = user ? hasCreditsModuleAvailable(user) : false;
   const storeId = user?.selectedStoreId ?? '';
+  // MultiPayments (módulo 16): moneda de la venta elegida por el usuario,
+  // persistida por usuario y reutilizada en la próxima venta. Sin el módulo el
+  // estado queda sin uso y el carrito conserva el comportamiento previo.
+  const multiPaymentsAvailable = user ? hasMultiPaymentsModuleAvailable(user) : false;
+  const [preferredCartCurrency, setPreferredCartCurrency] = useState<Currency>(() =>
+    readCartCurrencyPreference(user?.id),
+  );
 
   // Venta mayorista: el badge cuenta PAQUETES (cajas), no unidades. En venta normal
   // sigue contando unidades (cartBadgeCount cae a la suma por producto sin config).
   const itemCount = wholesaleCartDisplay.cartBadgeCount(items);
   // MultiMonedas: el carrito es de una sola moneda (guard de adición), así que el
   // total y el vuelto se formatean SIEMPRE con la moneda de la venta en curso.
-  const saleCurrency = cartCurrency();
+  // MultiPayments (módulo 16): la moneda de la venta la define la preferencia
+  // persistida del usuario; sin el módulo se conserva EXACTAMENTE cartCurrency().
+  const saleCurrency = multiPaymentsAvailable ? preferredCartCurrency : cartCurrency();
   const money = (amount: number) => formatMoneyWithCurrency(amount, saleCurrency);
 
   // payment-methods-percent-tax (plan 2026-09-17): re-pin del método si la moneda de
@@ -239,11 +261,72 @@ export function CartShell() {
   // El pricing de la combinación (moneda, método) se aplica al total mostrado y al
   // que se valida contra el pago; createOrder aplica LA MISMA fórmula al persistir.
   // Con los defaults 0/0 el total ajustado es idéntico al base (no-regresión).
+  //
+  // Ratified decision 8 (multipayments plan 2026-09-18): while the multi-payment UI is
+  // active (module 16 + items) the sale total is the UNPRICED line sum, so the display,
+  // the coverage guard, the list total and the persisted order all agree. Without module
+  // 16 the priced total stays byte-identical to the legacy behavior.
   const pricing = paymentPricingFor(saleCurrency, salePaymentMethod);
-  const totalAmount = applyPaymentPricing(total(), pricing);
+  const multiPaymentsActive = multiPaymentsAvailable && items.length > 0;
+
+  // MultiPayments (módulo 16): las filas se convierten a la moneda de la venta con
+  // el MISMO registro de tasas que usa la lista, para que el bloqueo de "Registrar"
+  // coincida exactamente con el bloqueo de cobro de la propia lista.
+  const multiPaymentRates = useMemo<ChannelRate[]>(() => {
+    if (!multiPaymentsAvailable || typeof window === 'undefined' || !storeId) return [];
+    return new ChannelRateOfflineService(storeId).getStorageChannelRates();
+  }, [multiPaymentsAvailable, storeId]);
+
+  // MultiPayments (módulo 16, T8): cada línea del carrito se convierte a la moneda
+  // de la venta elegida (una tasa por moneda, no por canal). Sin el módulo el
+  // resultado queda sin uso y el total conserva EXACTAMENTE el camino legado.
+  const lineConversion = useMemo(
+    () => convertCartLines(items, saleCurrency, multiPaymentRates, new Date()),
+    [items, saleCurrency, multiPaymentRates],
+  );
+
+  // Decision 8 + T8: con el multi-pago activo el total de la venta es la suma de
+  // las líneas CONVERTIDAS a la moneda de la venta; sin el módulo se conserva el
+  // total con pricing previo, byte-idéntico al comportamiento legado.
+  const totalAmount = multiPaymentsActive
+    ? lineConversion.total
+    : applyPaymentPricing(total(), pricing);
   const paymentReturn = getPaymentReturn(payment, totalAmount);
   const paymentReturnKind = getPaymentReturnKind(paymentReturn);
   const cashSale = isCashMethod(salePaymentMethod);
+
+  // T6 reconciliation: con el multi-pago activo los pagos se liquidan en la MISMA
+  // moneda de la venta (saleCurrency), de modo que la lista, la liquidación y el
+  // total coinciden. Sin el módulo el valor no se usa (la lista no se monta).
+  const multiPaymentOrderCurrency = saleCurrency;
+  const multiPaymentSettlement = useMemo(
+    () =>
+      multiPaymentsAvailable
+        ? settleMultiPayments(
+            payments,
+            multiPaymentOrderCurrency,
+            totalAmount,
+            multiPaymentRates,
+            new Date(),
+          )
+        : { orderPayments: [], remainingCents: 0, firstError: null },
+    [multiPaymentsAvailable, payments, multiPaymentOrderCurrency, totalAmount, multiPaymentRates],
+  );
+
+  // El cierre se bloquea mientras la venta no esté cubierta por los pagos (misma
+  // razón que la lista: falta cubrir, o una fila no se pudo convertir) o mientras
+  // alguna línea del carrito no pueda convertirse a la moneda de la venta (T8).
+  // Las ventas a crédito conservan su camino de validación propio (pueden quedar
+  // subpagadas).
+  // Un error de conversión de línea es un bloqueo duro (también en ventas a crédito:
+  // sin convertir la línea no hay precio persistible en la moneda de la venta).
+  const lineConversionBlocked = multiPaymentsActive && lineConversion.firstError !== null;
+  const multiPaymentBlocked =
+    multiPaymentsAvailable &&
+    items.length > 0 &&
+    (lineConversionBlocked ||
+      (!isCredit &&
+        (multiPaymentSettlement.firstError !== null || multiPaymentSettlement.remainingCents > 0)));
 
   function resetTransientFields() {
     setPayment(undefined);
@@ -378,20 +461,55 @@ export function CartShell() {
       return;
     }
 
+    // MultiPayments (módulo 16): con filas de pago, el método legacy se deriva del
+    // PRIMER pago (best-effort de compatibilidad con lectores viejos); el dato
+    // autoritativo es la lista `payments` persistida en la orden. Sin filas, todo
+    // queda EXACTAMENTE como antes (método del carrito).
+    const hasMultiPayments = multiPaymentsAvailable && payments.length > 0;
+    const effectiveSalePaymentMethod = hasMultiPayments ? payments[0].method : salePaymentMethod;
+
+    // T8 (defensivo): aunque el botón ya está deshabilitado, un submit programático
+    // con una línea no convertible no debe crear la venta.
+    if (lineConversionBlocked && lineConversion.firstError) {
+      showBlockingError(
+        intl.formatMessage({ id: 'GENERAL.RESPONSE.ERROR_TITLE' }),
+        lineConversion.firstError.description,
+      );
+      return;
+    }
+
+    // T8: con el multi-pago activo las líneas se persisten YA convertidas a la
+    // moneda de la venta — `price` convertido y `product.currency = saleCurrency`,
+    // de modo que el `OrderItem.currency`, la `orderCurrency` derivada y el total
+    // del `createOrder` quedan en `saleCurrency` sin tocar el carrito del store.
+    // Sin el módulo se pasan los ítems sin cambios (byte-idéntico).
+    const orderCartItems = multiPaymentsActive
+      ? items.map((item, index) => {
+          const line = lineConversion.lines[index];
+          if (!line || line.convertedUnitPrice === null) return item;
+          return {
+            ...item,
+            price: line.convertedUnitPrice,
+            product: { ...item.product, currency: saleCurrency as Currency },
+          };
+        })
+      : items;
+
     setIsSubmitting(true);
     try {
       const storeId = user?.selectedStoreId ?? '';
       const orderService = new OrderOfflineService(storeId);
       const result = await orderService.createOrder(
-        items,
+        orderCartItems,
         orderType,
         isCredit,
         // Legacy derivado del método real (compatibilidad de datos); el campo
-        // autoritativo es `salePaymentMethod`, último parámetro.
-        salePaymentMethodToLegacyPaymentType(salePaymentMethod, saleCurrency),
+        // autoritativo es `salePaymentMethod`, séptimo parámetro.
+        salePaymentMethodToLegacyPaymentType(effectiveSalePaymentMethod, saleCurrency),
         orderDescription,
         clientName.trim(),
-        salePaymentMethod,
+        effectiveSalePaymentMethod,
+        hasMultiPayments ? multiPaymentSettlement.orderPayments : undefined,
       );
       if (!result.succeeded) {
         // Angular createOrder `else` branch (nav-right.component.ts:222-225):
@@ -497,7 +615,7 @@ export function CartShell() {
                 <button
                   type="button"
                   onClick={handleCreateOrder}
-                  disabled={itemCount === 0 || isSubmitting}
+                  disabled={itemCount === 0 || isSubmitting || multiPaymentBlocked}
                   className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary-hover transition-colors disabled:opacity-50"
                 >
                   {intl.formatMessage({ id: 'SHOPPING_CART.REGISTER' })}
@@ -505,76 +623,115 @@ export function CartShell() {
               </div>
             </div>
 
-            {/* Payment / Vuelto row — payment-methods-percent-tax (plan 2026-09-17):
-              "con cuánto paga" y el vuelto aplican SOLO en efectivo (misma moneda de la
-              venta, sin cambio); en Transferencia/Zelle se ocultan. */}
-            {cashSale ? (
-            <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
-              <span
-                className={
-                  paymentReturnKind === 'positive'
-                    ? 'text-xs font-medium text-success'
-                    : paymentReturnKind === 'negative'
-                      ? 'text-xs font-medium text-danger'
-                      : 'text-xs font-medium text-text-muted'
-                }
-              >
-                Vuelto: {paymentReturn < 0 ? '-' : ''}
-                {money(Math.abs(paymentReturn))}
-              </span>
-              <input
-                type="number"
-                min={0}
-                autoComplete="off"
-                disabled={itemCount === 0}
-                value={payment ?? ''}
-                onChange={(e) =>
-                  setPayment(e.target.value === '' ? undefined : Number(e.target.value))
-                }
-                aria-label={intl.formatMessage({ id: 'GENERAL.PAY' })}
-                placeholder={intl.formatMessage({ id: 'GENERAL.PAY' })}
-                className="w-36 rounded-md border border-border px-2 py-1 text-xs text-right focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
+            {/* MultiPayments: selector de moneda del carrito (módulo 16). El propio
+              componente se oculta sin el módulo, así que ningún flujo existente cambia. */}
+            <CartCurrencySelect
+              value={preferredCartCurrency}
+              onChange={setPreferredCartCurrency}
+              testId="cart-currency-select"
+            />
+
+            {/* MultiPayments (módulo 16): con ítems en el carrito, la lista de pagos
+              reemplaza el bloque legacy de pago (el "con cuánto paga"/vuelto y el
+              selector de método). Sin el módulo, o con el carrito vacío, se renderiza
+              EXACTAMENTE el bloque legacy (los E2E existentes no tienen el módulo). */}
+            {multiPaymentsAvailable && items.length > 0 ? (
+              <MultiPaymentList
+                payments={payments}
+                onChange={setPayments}
+                orderCurrency={multiPaymentOrderCurrency}
+                total={totalAmount}
               />
-            </div>
             ) : (
-              /* Transferencia/Zelle: sin vuelto ni "con cuánto paga" — el cobro no es
-                 en efectivo. Fila informativa para conservar el ritmo visual. */
-              <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
-                <span className="text-xs font-medium text-text-muted">
-                  {salePaymentMethodLabel(salePaymentMethod, saleCurrency)}
-                </span>
-              </div>
+              <>
+                {/* Payment / Vuelto row — payment-methods-percent-tax (plan 2026-09-17):
+                  "con cuánto paga" y el vuelto aplican SOLO en efectivo (misma moneda de la
+                  venta, sin cambio); en Transferencia/Zelle se ocultan. */}
+                {cashSale ? (
+                <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
+                  <span
+                    className={
+                      paymentReturnKind === 'positive'
+                        ? 'text-xs font-medium text-success'
+                        : paymentReturnKind === 'negative'
+                          ? 'text-xs font-medium text-danger'
+                          : 'text-xs font-medium text-text-muted'
+                    }
+                  >
+                    Vuelto: {paymentReturn < 0 ? '-' : ''}
+                    {money(Math.abs(paymentReturn))}
+                  </span>
+                  <input
+                    type="number"
+                    min={0}
+                    autoComplete="off"
+                    disabled={itemCount === 0}
+                    value={payment ?? ''}
+                    onChange={(e) =>
+                      setPayment(e.target.value === '' ? undefined : Number(e.target.value))
+                    }
+                    aria-label={intl.formatMessage({ id: 'GENERAL.PAY' })}
+                    placeholder={intl.formatMessage({ id: 'GENERAL.PAY' })}
+                    className="w-36 rounded-md border border-border px-2 py-1 text-xs text-right focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
+                  />
+                </div>
+                ) : (
+                  /* Transferencia/Zelle: sin vuelto ni "con cuánto paga" — el cobro no es
+                     en efectivo. Fila informativa para conservar el ritmo visual. */
+                  <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
+                    <span className="text-xs font-medium text-text-muted">
+                      {salePaymentMethodLabel(salePaymentMethod, saleCurrency)}
+                    </span>
+                  </div>
+                )}
+
+                {/* Payment-method selector — radio group por MONEDA de la venta
+                  (payment-methods-percent-tax, plan 2026-09-17): cada método con su ícono +
+                  etiqueta ("Transferencia (CUP)" incluye su moneda). Reemplaza al selector
+                  fijo Efectivo/Tarjeta. */}
+                <div className="border-b border-border px-4 py-3">
+                  <div className="flex flex-wrap gap-4" role="radiogroup">
+                    {methodOptions.map((method) => {
+                      const kind = salePaymentMethodIconKind(method);
+                      const label = salePaymentMethodLabel(method, saleCurrency);
+                      return (
+                        <label
+                          key={method}
+                          className="flex items-center gap-1.5 cursor-pointer text-xs font-medium text-text"
+                        >
+                          <input
+                            type="radio"
+                            name="payment-type"
+                            data-testid={`payment-method-${method}`}
+                            checked={salePaymentMethod === method}
+                            onChange={() => setSalePaymentMethod(method)}
+                            className="text-primary focus:ring-primary"
+                          />
+                          <PaymentTypeIcon kind={kind} />
+                          {label}
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              </>
             )}
 
-            {/* Payment-method selector — radio group por MONEDA de la venta
-              (payment-methods-percent-tax, plan 2026-09-17): cada método con su ícono +
-              etiqueta ("Transferencia (CUP)" incluye su moneda). Reemplaza al selector
-              fijo Efectivo/Tarjeta. */}
-            <div className="border-b border-border px-4 py-3">
-              <div className="flex flex-wrap gap-4" role="radiogroup">
-                {methodOptions.map((method) => {
-                  const kind = salePaymentMethodIconKind(method);
-                  const label = salePaymentMethodLabel(method, saleCurrency);
-                  return (
-                    <label
-                      key={method}
-                      className="flex items-center gap-1.5 cursor-pointer text-xs font-medium text-text"
-                    >
-                      <input
-                        type="radio"
-                        name="payment-type"
-                        data-testid={`payment-method-${method}`}
-                        checked={salePaymentMethod === method}
-                        onChange={() => setSalePaymentMethod(method)}
-                        className="text-primary focus:ring-primary"
-                      />
-                      <PaymentTypeIcon kind={kind} />
-                      {label}
-                    </label>
-                  );
-                })}
+            {/* T8: si alguna línea no se puede convertir a la moneda de la venta, se
+              muestra el error tipado y "Registrar" queda bloqueado (multiPaymentBlocked).
+              Sin el módulo 16 este aviso nunca aparece. */}
+            {multiPaymentsActive && lineConversion.firstError && (
+              <div className="border-b border-border px-4 py-2">
+                <p
+                  role="alert"
+                  data-testid="cart-line-conversion-error"
+                  data-error-code={lineConversion.firstError.code}
+                  className="text-xs text-danger"
+                >
+                  {lineConversion.firstError.description}
+                </p>
               </div>
-            </div>
+            )}
 
             {/* Credit toggle + client input — gated by hasCreditsModuleAvailable, matching
               Angular's @if (hasCreditsModuleAvailable) block */}
@@ -619,67 +776,80 @@ export function CartShell() {
                 </div>
               ) : (
                 <ul className="divide-y divide-border">
-                  {items.map((item) => (
-                    <li key={item.product.id} className="flex items-center gap-2 pl-4 pr-1 py-2">
-                      <div className="flex-1 min-w-0">
-                        <p className="truncate text-sm font-medium text-text">
-                          {item.product.name}
-                        </p>
-                        <p className="text-xs text-text-muted">{formatWholesaleLine(item, saleCurrency)}</p>
-                      </div>
-                      <p className="text-sm text-text whitespace-nowrap">
-                        {money(round2((item.price ?? item.product.price) * item.quantity))}
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => removeItem(item.product.id)}
-                        className="text-border hover:text-danger transition-colors"
-                        aria-label={intl.formatMessage(
-                          { id: 'CART.REMOVE_ITEM' },
-                          { name: item.product.name },
-                        )}
-                      >
-                        <svg
-                          className="h-4 w-4"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M6 18L18 6M6 6l12 12"
-                          />
-                        </svg>
-                      </button>
-                      {/* Quantity controls — always flush to the right edge (pr-1) */}
-                      <div className="flex items-center gap-1">
+                  {items.map((item, index) => {
+                    // T8: con el multi-pago activo la línea se muestra convertida a la
+                    // moneda de la venta; sin el módulo se conserva el cálculo legado.
+                    const convertedUnitPrice = multiPaymentsActive
+                      ? (lineConversion.lines[index]?.convertedUnitPrice ?? null)
+                      : null;
+                    const displayItem =
+                      convertedUnitPrice !== null ? { ...item, price: convertedUnitPrice } : item;
+                    const lineTotal =
+                      convertedUnitPrice !== null
+                        ? round2(convertedUnitPrice * item.quantity)
+                        : round2((item.price ?? item.product.price) * item.quantity);
+                    return (
+                      <li key={item.product.id} className="flex items-center gap-2 pl-4 pr-1 py-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="truncate text-sm font-medium text-text">
+                            {item.product.name}
+                          </p>
+                          <p className="text-xs text-text-muted">
+                            {formatWholesaleLine(displayItem, saleCurrency)}
+                          </p>
+                        </div>
+                        <p className="text-sm text-text whitespace-nowrap">{money(lineTotal)}</p>
                         <button
                           type="button"
-                          onClick={() => handleQuantityChange(item.product.id, item.quantity, -1)}
-                          className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-white text-2xl leading-none"
+                          onClick={() => removeItem(item.product.id)}
+                          className="text-border hover:text-danger transition-colors"
                           aria-label={intl.formatMessage(
-                            { id: 'CART.DECREASE_QUANTITY' },
+                            { id: 'CART.REMOVE_ITEM' },
                             { name: item.product.name },
                           )}
                         >
-                          −
+                          <svg
+                            className="h-4 w-4"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M6 18L18 6M6 6l12 12"
+                            />
+                          </svg>
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => handleQuantityChange(item.product.id, item.quantity, 1)}
-                          className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-white text-2xl leading-none"
-                          aria-label={intl.formatMessage(
-                            { id: 'CART.INCREASE_QUANTITY' },
-                            { name: item.product.name },
-                          )}
-                        >
-                          +
-                        </button>
-                      </div>
-                    </li>
-                  ))}
+                        {/* Quantity controls — always flush to the right edge (pr-1) */}
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => handleQuantityChange(item.product.id, item.quantity, -1)}
+                            className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-white text-2xl leading-none"
+                            aria-label={intl.formatMessage(
+                              { id: 'CART.DECREASE_QUANTITY' },
+                              { name: item.product.name },
+                            )}
+                          >
+                            −
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleQuantityChange(item.product.id, item.quantity, 1)}
+                            className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-white text-2xl leading-none"
+                            aria-label={intl.formatMessage(
+                              { id: 'CART.INCREASE_QUANTITY' },
+                              { name: item.product.name },
+                            )}
+                          >
+                            +
+                          </button>
+                        </div>
+                      </li>
+                    );
+                  })}
                 </ul>
               )}
             </div>

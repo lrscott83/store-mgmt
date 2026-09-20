@@ -60,8 +60,9 @@ public sealed class StorePlanCatalogTests
             (int)ModuleType.Credits
         });
 
-        // Superior(3) and VIP(4): the full AvailableToStore catalog {2..14}
-        var fullCatalog = new[]
+        // Superior(3): the full AvailableToStore catalog {2..15}.
+        // MultiPayments (16) is VIP-only (2026-09-18).
+        var superiorCatalog = new[]
         {
             (int)ModuleType.Sales, (int)ModuleType.Inventory,
             (int)ModuleType.Synchronization, (int)ModuleType.Reports,
@@ -75,7 +76,23 @@ public sealed class StorePlanCatalogTests
             // Elaboración (2026-09-18): módulo 17 incluido en Superior y VIP.
             (int)ModuleType.Elaboration
         };
-        superior.Should().BeEquivalentTo(fullCatalog);
-        vip.Should().BeEquivalentTo(fullCatalog);
+        superior.Should().BeEquivalentTo(superiorCatalog);
+
+        // VIP(4): full AvailableToStore catalog {2..15} + MultiPayments (2026-09-18, module 16)
+        // + Elaboration (module 17).
+        var vipCatalog = new[]
+        {
+            (int)ModuleType.Sales, (int)ModuleType.Inventory,
+            (int)ModuleType.Synchronization, (int)ModuleType.Reports,
+            (int)ModuleType.Statistics, (int)ModuleType.Management,
+            (int)ModuleType.WholesaleSales, (int)ModuleType.Expenses,
+            (int)ModuleType.Billing, (int)ModuleType.Histories,
+            (int)ModuleType.Credits, (int)ModuleType.Warehouses,
+            (int)ModuleType.MultiStores,
+            (int)ModuleType.MultiMonedas,
+            (int)ModuleType.MultiPayments,
+            (int)ModuleType.Elaboration
+        };
+        vip.Should().BeEquivalentTo(vipCatalog);
     }
 }

@@ -107,6 +107,12 @@ export default [
       id: 'management-exchange-rates',
     }),
 
+    // Management - Channel rates (multipayments): append-only register of the
+    // rate per channel (method + currency); same guard as Configurations.
+    route('management/channel-rates', 'management/channel-rates/routes/channel-rates.tsx', {
+      id: 'management-channel-rates',
+    }),
+
     // Management â€” Users
     route('management/users', 'management/users/routes/user-list.tsx'),
     // storeId is optional: matches both /create (from user list) and /create/:storeId

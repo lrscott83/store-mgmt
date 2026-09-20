@@ -192,6 +192,17 @@ namespace Infrastructure.Persistence.EntityConfigurations
                     true
                 ),
                 Module.Create(
+                    (int)ModuleType.MultiPayments,
+                    ModuleType.MultiPayments.GetDescription(),
+                    126,
+                    priceIncluded: false,
+                    10,
+                    discountPrice: 0,
+                    percentDiscountPrice: 50,
+                    availableToStore: true,
+                    true
+                ),
+                Module.Create(
                     (int)ModuleType.Elaboration,
                     ModuleType.Elaboration.GetDescription(),
                     130,

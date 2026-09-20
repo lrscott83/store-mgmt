@@ -1,27 +1,30 @@
 using Application.Features.Authentication.Commands.Register;
-using Domain.Entities.Modules;
+using Domain.Common.Enums;
+using Domain.Entities.Plans;
 using FluentAssertions;
 using Moq;
 
 namespace Application.Tests.Authentication.Commands.Register;
 
 /// <summary>
-/// Tests for RegisterCommandHandler covering module availability scenarios.
+/// Tests for RegisterCommandHandler covering default-plan module assignment.
+/// Self-registration grants exactly the modules assigned to the default (Superior)
+/// plan, not every catalog module AvailableToStore.
 /// </summary>
 public class RegisterCommandHandlerModuleTests : RegisterCommandHandlerTestFixture
 {
-    #region Empty Modules Tests
+    #region Empty Plan Tests
 
     [Fact]
-    public async Task Handle_WithNoAvailableModules_ShouldSucceed()
+    public async Task Handle_WithDefaultPlanWithoutModules_ShouldSucceed()
     {
         // Arrange
         var handler = CreateHandler();
         var command = CreateValidCommand();
 
-        MockModuleRepository
-            .Setup(x => x.GetAvailableModulesToStore())
-            .ReturnsAsync(new List<Module>());
+        MockPlanRepository
+            .Setup(x => x.GetActivePlanWithModulesByIdAsync(It.IsAny<int>()))
+            .ReturnsAsync(CreatePlan());
 
         // Act
         var result = await handler.Handle(command, CancellationToken.None);
@@ -31,15 +34,15 @@ public class RegisterCommandHandlerModuleTests : RegisterCommandHandlerTestFixtu
     }
 
     [Fact]
-    public async Task Handle_WithNoAvailableModules_ShouldCreateStoreWithEmptyModuleList()
+    public async Task Handle_WithDefaultPlanWithoutModules_ShouldCreateStoreWithEmptyModuleList()
     {
         // Arrange
         var handler = CreateHandler();
         var command = CreateValidCommand();
 
-        MockModuleRepository
-            .Setup(x => x.GetAvailableModulesToStore())
-            .ReturnsAsync(new List<Module>());
+        MockPlanRepository
+            .Setup(x => x.GetActivePlanWithModulesByIdAsync(It.IsAny<int>()))
+            .ReturnsAsync(CreatePlan());
 
         List<int>? capturedModuleIds = null;
         MockCreateStoreService
@@ -70,16 +73,15 @@ public class RegisterCommandHandlerModuleTests : RegisterCommandHandlerTestFixtu
     #region Single Module Tests
 
     [Fact]
-    public async Task Handle_WithSingleModule_ShouldCreateStoreWithOneModule()
+    public async Task Handle_WithSinglePlanModule_ShouldCreateStoreWithOneModule()
     {
         // Arrange
         var handler = CreateHandler();
         var command = CreateValidCommand();
-        var singleModule = CreateModule(id: 5, name: "Sales Only");
 
-        MockModuleRepository
-            .Setup(x => x.GetAvailableModulesToStore())
-            .ReturnsAsync(new List<Module> { singleModule });
+        MockPlanRepository
+            .Setup(x => x.GetActivePlanWithModulesByIdAsync(It.IsAny<int>()))
+            .ReturnsAsync(CreatePlan(5));
 
         List<int>? capturedModuleIds = null;
         MockCreateStoreService
@@ -111,23 +113,15 @@ public class RegisterCommandHandlerModuleTests : RegisterCommandHandlerTestFixtu
     #region Multiple Modules Tests
 
     [Fact]
-    public async Task Handle_WithMultipleModules_ShouldCreateStoreWithAllModules()
+    public async Task Handle_WithMultiplePlanModules_ShouldCreateStoreWithAllPlanModules()
     {
         // Arrange
         var handler = CreateHandler();
         var command = CreateValidCommand();
-        
-        var modules = new List<Module>
-        {
-            CreateModule(id: 1, name: "Sales"),
-            CreateModule(id: 2, name: "Inventory"),
-            CreateModule(id: 3, name: "Reports"),
-            CreateModule(id: 4, name: "Customers")
-        };
 
-        MockModuleRepository
-            .Setup(x => x.GetAvailableModulesToStore())
-            .ReturnsAsync(modules);
+        MockPlanRepository
+            .Setup(x => x.GetActivePlanWithModulesByIdAsync(It.IsAny<int>()))
+            .ReturnsAsync(CreatePlan(1, 2, 3, 4));
 
         List<int>? capturedModuleIds = null;
         MockCreateStoreService
@@ -155,22 +149,15 @@ public class RegisterCommandHandlerModuleTests : RegisterCommandHandlerTestFixtu
     }
 
     [Fact]
-    public async Task Handle_WithMultipleModules_ShouldPreserveModuleOrder()
+    public async Task Handle_WithMultiplePlanModules_ShouldPreservePlanModuleOrder()
     {
         // Arrange
         var handler = CreateHandler();
         var command = CreateValidCommand();
-        
-        var modules = new List<Module>
-        {
-            CreateModule(id: 10, name: "First Module"),
-            CreateModule(id: 20, name: "Second Module"),
-            CreateModule(id: 30, name: "Third Module")
-        };
 
-        MockModuleRepository
-            .Setup(x => x.GetAvailableModulesToStore())
-            .ReturnsAsync(modules);
+        MockPlanRepository
+            .Setup(x => x.GetActivePlanWithModulesByIdAsync(It.IsAny<int>()))
+            .ReturnsAsync(CreatePlan(30, 10, 20));
 
         List<int>? capturedModuleIds = null;
         MockCreateStoreService
@@ -188,26 +175,26 @@ public class RegisterCommandHandlerModuleTests : RegisterCommandHandlerTestFixtu
             .ReturnsAsync(TestStore);
 
         // Act
-        var result = await handler.Handle(command, CancellationToken.None);
+        await handler.Handle(command, CancellationToken.None);
 
         // Assert
         capturedModuleIds.Should().NotBeNull();
-        capturedModuleIds.Should().BeInAscendingOrder();
+        capturedModuleIds.Should().Equal(30, 10, 20);
     }
 
     #endregion
 
-    #region Module Repository Error Tests
+    #region Plan Repository Error Tests
 
     [Fact]
-    public async Task Handle_WhenModuleRepositoryThrows_ShouldReturnFailure()
+    public async Task Handle_WhenPlanRepositoryThrows_ShouldReturnFailure()
     {
         // Arrange
         var handler = CreateHandler();
         var command = CreateValidCommand();
 
-        MockModuleRepository
-            .Setup(x => x.GetAvailableModulesToStore())
+        MockPlanRepository
+            .Setup(x => x.GetActivePlanWithModulesByIdAsync(It.IsAny<int>()))
             .ThrowsAsync(new InvalidOperationException("Database error"));
 
         // Act
@@ -215,80 +202,67 @@ public class RegisterCommandHandlerModuleTests : RegisterCommandHandlerTestFixtu
 
         // Assert
         result.Succeeded.Should().BeFalse();
+        result.Errors.Should().NotBeEmpty();
+        result.Errors.First().Code.Should().Be("Register.PlanLoadFailed");
     }
 
-    #endregion
-
-    #region Module IDs Extraction Tests
-
     [Fact]
-    public async Task Handle_ShouldExtractModuleIdsFromRepository()
+    public async Task Handle_WhenDefaultPlanIsNull_ShouldReturnFailure()
     {
         // Arrange
         var handler = CreateHandler();
         var command = CreateValidCommand();
-        
-        var modules = new List<Module>
-        {
-            CreateModule(id: 7, name: "Module A"),
-            CreateModule(id: 8, name: "Module B")
-        };
 
-        MockModuleRepository
-            .Setup(x => x.GetAvailableModulesToStore())
-            .ReturnsAsync(modules);
-
-        // Act
-        await handler.Handle(command, CancellationToken.None);
-
-        // Assert
-        MockModuleRepository.Verify(x => x.GetAvailableModulesToStore(), Times.Once);
-    }
-
-    [Fact]
-    public async Task Handle_ShouldConvertModulesToHashSet()
-    {
-        // Arrange
-        var handler = CreateHandler();
-        var command = CreateValidCommand();
-        
-        var modules = new List<Module>
-        {
-            CreateModule(id: 1, name: "Sales"),
-            CreateModule(id: 2, name: "Inventory"),
-            CreateModule(id: 3, name: "Reports")
-        };
-
-        MockModuleRepository
-            .Setup(x => x.GetAvailableModulesToStore())
-            .ReturnsAsync(modules);
+        MockPlanRepository
+            .Setup(x => x.GetActivePlanWithModulesByIdAsync(It.IsAny<int>()))
+            .ReturnsAsync((StorePlan?)null);
 
         // Act
         var result = await handler.Handle(command, CancellationToken.None);
 
         // Assert
-        result.Succeeded.Should().BeTrue();
-        // HashSet should remove duplicates if any, and allow fast lookup
+        result.Succeeded.Should().BeFalse();
+        result.Errors.Should().NotBeEmpty();
+        result.Errors.First().Code.Should().Be("Register.PlanLoadFailed");
+    }
+
+    #endregion
+
+    #region Plan Module IDs Extraction Tests
+
+    [Fact]
+    public async Task Handle_ShouldExtractModuleIdsFromDefaultPlan()
+    {
+        // Arrange
+        var handler = CreateHandler();
+        var command = CreateValidCommand();
+
+        MockPlanRepository
+            .Setup(x => x.GetActivePlanWithModulesByIdAsync(It.IsAny<int>()))
+            .ReturnsAsync(CreatePlan(7, 8));
+
+        // Act
+        await handler.Handle(command, CancellationToken.None);
+
+        // Assert
+        MockPlanRepository.Verify(
+            x => x.GetActivePlanWithModulesByIdAsync((int)StorePlanType.Superior),
+            Times.Once);
     }
 
     #endregion
 
     #region Helper Methods
 
-    private Module CreateModule(int id, string name)
+    private static StorePlan CreatePlan(params int[] moduleIds)
     {
-        var module = Module.Create(
-            id: id,
-            name: name,
-            order: id,
-            priceIncluded: true,
-            price: 100f,
-            discountPrice: 10f,
-            percentDiscountPrice: 5f,
-            availableToStore: true,
-            isActive: true);
+        var plan = StorePlan.Create((int)StorePlanType.Superior, "Superior", 3, true);
+        foreach (int moduleId in moduleIds)
+        {
+            plan.StorePlanModules.Add(StorePlanModule.Create(plan.Id, moduleId));
+        }
 
-        return module;
+        return plan;
     }
 
     #endregion

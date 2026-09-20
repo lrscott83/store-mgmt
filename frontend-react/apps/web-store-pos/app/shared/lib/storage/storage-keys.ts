@@ -35,6 +35,8 @@ export const BUSINESS_ENTITY_NAMES = [
   'warehouses',
   'warehouse-stock-levels',
   'warehouse-stock-movements',
+  // multipayments (T4): append-only channel-rate register.
+  'channelRates',
   // elaboration-module: recetas + elaboraciones, the two entities the
   // production module persists offline per store.
   'recipes',

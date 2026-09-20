@@ -79,10 +79,33 @@ vi.mock('~/shared/lib/stores/auth-store', () => {
   return { useAuthStore };
 });
 
+// MultiPayments (módulo 16): MultiPaymentList lee el registro de tasas de la tienda.
+// Los tests lo dejan vacío (las rutas misma-moneda no necesitan tasa) y evitan el
+// almacenamiento cifrado real.
+let mockChannelRates: ChannelRate[] = [];
+vi.mock('~/management/channel-rates/lib/services/channel-rate-offline-service', () => ({
+  ChannelRateOfflineService: class {
+    constructor(_storeId: string) {
+      void _storeId;
+    }
+    getStorageChannelRates(): ChannelRate[] {
+      return mockChannelRates;
+    }
+  },
+}));
+
 import { useCartStore } from '~/shared/lib/stores/cart-store';
 import { CartShell } from '../cart-shell';
-import { PaymentType, OrderType, EModules, SalePaymentMethod } from '@store-mgmt/domain';
-import type { Product } from '@store-mgmt/domain';
+import {
+  DEFAULT_PAYMENT_PRICING,
+  PaymentType,
+  OrderType,
+  EModules,
+  SalePaymentMethod,
+  Currency,
+} from '@store-mgmt/domain';
+import type { ChannelRate, Product } from '@store-mgmt/domain';
+import type { MultiPaymentRow } from '~/shared/components/multipayments/multi-payment-list';
 
 function makeProduct(overrides: Partial<Product> = {}): Product {
   return {
@@ -1064,5 +1087,295 @@ describe('CartShell — venta mayorista mostrada en paquetes', () => {
     });
     renderCartShell();
     expect(screen.getByTestId('cart-badge')).toHaveTextContent('10');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MultiPayments (módulo 16) — la lista reemplaza el bloque legacy de pago y
+// gobierna el submit de la venta (plan 2026-09-18, T7).
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('CartShell — multi-payment list (módulo 16)', () => {
+  const MULTI_PAYMENTS_STORE_MODULES = [11, EModules.MultiPayments];
+
+  function paymentRow(overrides: Partial<MultiPaymentRow> = {}): MultiPaymentRow {
+    return {
+      id: 'row-1',
+      method: SalePaymentMethod.Efectivo,
+      currency: Currency.CUP,
+      amount: 5,
+      ...overrides,
+    };
+  }
+
+  function mockMultiPaymentCart(overrides = {}) {
+    const product = makeProduct({ price: 5 });
+    mockCartState({
+      items: [{ product, quantity: 1 }],
+      total: vi.fn().mockReturnValue(5),
+      cartCurrency: () => Currency.CUP,
+      payments: [],
+      setPayments: vi.fn(),
+      ...overrides,
+    });
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUser = { selectedStoreId: 's1', storeModuleIds: MULTI_PAYMENTS_STORE_MODULES };
+    mockChannelRates = [];
+    mockProductLookup = {};
+  });
+
+  it('renders the multi-payment list and hides the legacy method radios / amount input', () => {
+    mockMultiPaymentCart({ payments: [paymentRow()] });
+    renderCartShell();
+    openCart();
+
+    expect(screen.getByTestId('multi-payment-list')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Pago')).not.toBeInTheDocument();
+    expect(screen.queryAllByRole('radio')).toHaveLength(0);
+  });
+
+  it('keeps the legacy payment block when module 16 is absent (regression guard)', () => {
+    mockUser = { selectedStoreId: 's1', storeModuleIds: [11] };
+    mockMultiPaymentCart();
+    renderCartShell();
+    openCart();
+
+    expect(screen.queryByTestId('multi-payment-list')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Pago')).toBeInTheDocument();
+    expect(screen.getAllByRole('radio').length).toBeGreaterThan(0);
+  });
+
+  it('submitting with payments passes the converted OrderPayment[] and derives the legacy method from the first payment', async () => {
+    const payments = [
+      paymentRow({ id: 'row-1', method: SalePaymentMethod.Transferencia, amount: 5 }),
+    ];
+    mockMultiPaymentCart({ payments });
+    renderCartShell();
+    openCart();
+
+    fireEvent.click(screen.getByText('Registrar'));
+
+    await waitFor(() => expect(createOrderMock).toHaveBeenCalledTimes(1));
+    const args = createOrderMock.mock.calls[0];
+    // 7th positional (index 6): the authoritative method, from the FIRST payment.
+    expect(args[6]).toBe(SalePaymentMethod.Transferencia);
+    // 8th positional (index 7): the persisted payments (amounts in order-currency
+    // UNITS, decision A — the same unit as Order.total, NOT integer cents).
+    expect(args[7]).toEqual([
+      {
+        method: SalePaymentMethod.Transferencia,
+        currency: Currency.CUP,
+        amount: 5,
+        rateApplied: 1,
+        rateMethod: null,
+        rateCurrency: null,
+        rateEffectiveFrom: null,
+        amountInOrderCurrency: 5,
+      },
+    ]);
+  });
+
+  it('disables the submit while a paid sale is not covered by the payments', () => {
+    mockMultiPaymentCart({ payments: [paymentRow({ amount: 1 })] });
+    renderCartShell();
+    openCart();
+
+    expect(screen.getByText('Registrar').closest('button')).toBeDisabled();
+  });
+
+  it('enables the submit once the payments cover the total', () => {
+    mockMultiPaymentCart({ payments: [paymentRow({ amount: 5 })] });
+    renderCartShell();
+    openCart();
+
+    expect(screen.getByText('Registrar').closest('button')).not.toBeDisabled();
+  });
+
+  // Decision 8 (ratified 2026-09-18): with multi-pago active the total the UI displays,
+  // guards and submits is the UNPRICED line sum — a priced payment method must NOT
+  // change it (otherwise the UI and the persisted order would disagree).
+  it('decision 8: with module 16 a priced payment method does not change the multi-pay total (line sum)', () => {
+    const pricingKey = `${Number(Currency.CUP)}|${SalePaymentMethod.Efectivo}`;
+    // total() = 5 (line sum); a priced total would be 10, so a payment of 5 would leave
+    // the sale short and block the submit if the pricing leaked into the multi-pay total.
+    DEFAULT_PAYMENT_PRICING[pricingKey] = { percent: 100, tax: 0 };
+    try {
+      mockMultiPaymentCart({ payments: [paymentRow({ amount: 5 })] });
+      renderCartShell();
+      openCart();
+
+      expect(screen.getByText('Registrar').closest('button')).not.toBeDisabled();
+      expect(screen.getByTestId('multi-payment-remaining')).toHaveTextContent('0');
+    } finally {
+      delete DEFAULT_PAYMENT_PRICING[pricingKey];
+    }
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MultiPayments (módulo 16, T8) — carrito multi-moneda: cada línea se convierte
+// a la moneda de la venta elegida antes de cobrar/registrar.
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('CartShell — mixed-currency cart conversion (módulo 16, T8)', () => {
+  const MULTI_PAYMENTS_STORE_MODULES = [11, EModules.MultiPayments];
+
+  function paymentRow(overrides: Partial<MultiPaymentRow> = {}): MultiPaymentRow {
+    return {
+      id: 'row-1',
+      method: SalePaymentMethod.Efectivo,
+      currency: Currency.USD,
+      amount: 12,
+      ...overrides,
+    };
+  }
+
+  /** La moneda de la venta la fija la preferencia persistida del usuario (T6). */
+  function setSaleCurrencyPreference(currency: Currency) {
+    localStorage.setItem('lizoft.cart-currency-u1', String(currency));
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    mockUser = { id: 'u1', selectedStoreId: 's1', storeModuleIds: MULTI_PAYMENTS_STORE_MODULES };
+    // 350 CUP por 1 USD — CUP→USD resoluble, EUR no.
+    mockChannelRates = [
+      {
+        method: SalePaymentMethod.Efectivo,
+        currency: Currency.CUP,
+        value: 350,
+        effectiveFrom: new Date('2026-09-01T00:00:00.000Z'),
+      },
+    ];
+    mockProductLookup = {};
+  });
+
+  it('T8-01: displays each line and the total converted to the sale currency (USD)', () => {
+    setSaleCurrencyPreference(Currency.USD);
+    const usdProduct = makeProduct({
+      id: 'usd-1',
+      name: 'Cafe',
+      price: 10,
+      currency: Currency.USD,
+    });
+    const cupProduct = makeProduct({
+      id: 'cup-1',
+      name: 'Pan',
+      price: 350,
+      currency: Currency.CUP,
+    });
+    mockCartState({
+      items: [
+        { product: usdProduct, quantity: 1 },
+        { product: cupProduct, quantity: 2 },
+      ],
+      // Raw mixed-unit line sum — deliberately IGNORED once converted.
+      total: vi.fn().mockReturnValue(710),
+      cartCurrency: () => Currency.CUP,
+      payments: [],
+      setPayments: vi.fn(),
+    });
+    renderCartShell();
+    openCart();
+
+    // USD line subtotal is identity; the CUP line (350 CUP × 2) becomes 1 USD × 2.
+    expect(screen.getByText(/^10\s+USD$/)).toBeInTheDocument();
+    expect(screen.getByText(/^2\s+USD$/)).toBeInTheDocument();
+    // Converted total: 10 + 2 = 12 USD (shown in the header and the multi-pay summary).
+    expect(screen.getAllByText(/^12\s+USD$/).length).toBeGreaterThan(0);
+  });
+
+  it('T8-02: submits converted line prices/currency and the converted total in the sale currency', async () => {
+    setSaleCurrencyPreference(Currency.USD);
+    const usdProduct = makeProduct({
+      id: 'usd-1',
+      name: 'Cafe',
+      price: 10,
+      currency: Currency.USD,
+    });
+    const cupProduct = makeProduct({
+      id: 'cup-1',
+      name: 'Pan',
+      price: 350,
+      currency: Currency.CUP,
+    });
+    const cartItems = [
+      { product: usdProduct, quantity: 1 },
+      { product: cupProduct, quantity: 2 },
+    ];
+    mockCartState({
+      items: cartItems,
+      total: vi.fn().mockReturnValue(710),
+      cartCurrency: () => Currency.CUP,
+      payments: [paymentRow({ amount: 12 })],
+      setPayments: vi.fn(),
+    });
+    renderCartShell();
+    openCart();
+    fireEvent.click(screen.getByText('Registrar'));
+
+    await waitFor(() => expect(createOrderMock).toHaveBeenCalledTimes(1));
+    const orderItems = createOrderMock.mock.calls[0][0] as Array<{
+      price: number;
+      product: { id: string; currency: number };
+    }>;
+    expect(orderItems[0].price).toBe(10);
+    expect(orderItems[0].product.currency).toBe(Currency.USD);
+    // 350 CUP → 1 USD (350 CUP por USD).
+    expect(orderItems[1].price).toBe(1);
+    expect(orderItems[1].product.currency).toBe(Currency.USD);
+
+    // The store's cart items are NEVER mutated by the conversion.
+    expect(cartItems[1].product.currency).toBe(Currency.CUP);
+  });
+
+  it('T8-03: blocks the submit and surfaces the typed error when a line cannot be converted', () => {
+    setSaleCurrencyPreference(Currency.USD);
+    mockChannelRates = []; // no CUP rate → CUP→USD is not resolvable
+    const cupProduct = makeProduct({
+      id: 'cup-1',
+      name: 'Pan',
+      price: 350,
+      currency: Currency.CUP,
+    });
+    mockCartState({
+      items: [{ product: cupProduct, quantity: 1 }],
+      total: vi.fn().mockReturnValue(350),
+      cartCurrency: () => Currency.CUP,
+      payments: [],
+      setPayments: vi.fn(),
+    });
+    renderCartShell();
+    openCart();
+
+    const error = screen.getByTestId('cart-line-conversion-error');
+    expect(error).toHaveAttribute('data-error-code', 'ChannelRate.RateNotFound');
+    expect(error).toHaveTextContent(
+      'No existe una tasa de cambio vigente para el canal o la moneda solicitados.',
+    );
+    expect(screen.getByText('Registrar').closest('button')).toBeDisabled();
+  });
+
+  it('T8-04: without module 16 the cart items are passed unchanged (regression guard)', async () => {
+    mockUser = { selectedStoreId: 's1', storeModuleIds: [11] };
+    const product = makeProduct({ id: 'p1', name: 'Coca Cola', price: 5 });
+    mockCartState({
+      items: [{ product, quantity: 2 }],
+      total: vi.fn().mockReturnValue(10),
+      cartCurrency: () => Currency.CUP,
+    });
+    renderCartShell();
+    openCart();
+    fireEvent.click(screen.getByText('Registrar'));
+
+    await waitFor(() => expect(createOrderMock).toHaveBeenCalledTimes(1));
+    const orderItems = createOrderMock.mock.calls[0][0] as Array<{ price?: number }>;
+    // Untouched line: no converted price was stamped.
+    expect(orderItems[0].price).toBeUndefined();
+    expect(screen.queryByTestId('cart-line-conversion-error')).not.toBeInTheDocument();
   });
 });

@@ -8,6 +8,7 @@ import { OrderOfflineService } from '~/sales/lib/services/order-offline-service'
 import { ExpenseOfflineService } from '~/expenses/lib/services/expense-offline-service';
 import { SaleCreditOfflineService } from '~/sales/lib/services/sale-credit-offline-service';
 import { ExchangeRateOfflineService } from '~/management/exchange-rates/lib/services/exchange-rate-offline-service';
+import { ChannelRateOfflineService } from '~/management/channel-rates/lib/services/channel-rate-offline-service';
 import { WarehouseOfflineService } from '~/inventory/lib/services/warehouse-offline-service';
 import { RecipeOfflineService } from '~/inventory/lib/services/recipe-offline-service';
 import { ElaborationOfflineService } from '~/inventory/lib/services/elaboration-offline-service';
@@ -35,6 +36,7 @@ export function ExportPage() {
     const expenseSvc = new ExpenseOfflineService(storeId);
     const creditSvc = new SaleCreditOfflineService(storeId);
     const exchangeRateSvc = new ExchangeRateOfflineService(storeId);
+    const channelRateSvc = new ChannelRateOfflineService(storeId);
     const warehouseSvc = new WarehouseOfflineService(storeId, productRepo, inventorySvc);
     const recipeSvc = new RecipeOfflineService(storeId, productRepo);
     const elaborationSvc = new ElaborationOfflineService(
@@ -55,6 +57,7 @@ export function ExportPage() {
       creditSvc,
       exchangeRateSvc,
       warehouseSvc,
+      channelRateSvc,
       recipeSvc,
       elaborationSvc,
     );
@@ -103,6 +106,7 @@ export function ExportPage() {
     const expenseSvc = new ExpenseOfflineService(storeId);
     const creditSvc = new SaleCreditOfflineService(storeId);
     const exchangeRateSvc = new ExchangeRateOfflineService(storeId);
+    const channelRateSvc = new ChannelRateOfflineService(storeId);
     const warehouseSvc = new WarehouseOfflineService(storeId, productRepo, inventorySvc);
     const recipeSvc = new RecipeOfflineService(storeId, productRepo);
     const elaborationSvc = new ElaborationOfflineService(
@@ -123,6 +127,7 @@ export function ExportPage() {
       creditSvc,
       exchangeRateSvc,
       warehouseSvc,
+      channelRateSvc,
       recipeSvc,
       elaborationSvc,
     );

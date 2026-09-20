@@ -37,9 +37,11 @@ The E2E suites are the only safety nets against a real system: the backend suite
 1. A request to delete two tests from `Billing/StoreActivationTests.cs` as "states that cease to exist" did not survive reading the code: both seed the store directly into the database and exercise the **update** path against a legacy row, which remains live. Asking preserved coverage that would otherwise have been deleted on a false premise.
 2. The E2E suite caught a production bug the unit tests structurally could not see: `BillingService` resolved the store with a bare `FindAsync`, so `store.StoreModules` was always empty and `PlanType` always returned `"Free"` for every store in the system. The unit test mocked the repository and hand-populated `store.StoreModules`, reproducing a world the database never produced. 303 integration tests outweighed 315 unit tests.
 
-## Planning workflow — SDD pipeline, artifacts in `openspec/` (user-mandated 2026-09-05)
+## Planning workflow — ODD by default; SDD only on explicit request (user-mandated 2026-09-18; supersedes the 2026-09-05 SDD mandate)
 
-**The SDD pipeline is the planning workflow in this project.** Use the `sdd-*` skills and subagents for planning new changes (explore → propose → spec → design → tasks → apply → verify → archive). The session artifact store is `both`: artifacts live in engram AND as files under `openspec/changes/<change-name>/`.
+**ODD (Organic Driven Development) is the default workflow in this project, for every request.** Explore proportionately before changing code; keep small, understood work small (direct inline or delegated direct); for substantial authorized work, create ONE feature document at `odd/tasks/<feature-name>.md` with its Engram mirror (`odd/<feature-name>/tasks`) before the first write; close each task with a work-unit commit plus observed proof. Size, ambiguity, or risk alone never selects SDD.
+
+**SDD is a branch inside ODD, entered only on an explicit request or an accepted proposal — no silent SDD enrollment.** Direct and delegated work never creates `openspec/` state or runs `sdd-*` phases. When SDD is selected, use the `sdd-*` skills and subagents (explore → propose → spec → design → tasks → apply → verify → archive) and the session artifact store is `both`: artifacts live in engram AND as files under `openspec/changes/<change-name>/`.
 
 Existing `openspec/changes/archive/**` folders were produced by earlier pipelines — the original SDD pipeline and the Superpowers era (2026-08-12 → 2026-09-05, whose design/plan files are named `superpowers-design.md` / `superpowers-plan.md`). They are history — read them, never regenerate them.
 

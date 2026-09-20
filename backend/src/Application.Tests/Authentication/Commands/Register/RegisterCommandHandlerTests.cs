@@ -1,7 +1,9 @@
 using Application.Dtos.Authentication;
 using Application.Features.Authentication.Commands.Login;
 using Application.ResponseModels;
+using Domain.Common.Enums;
 using Domain.Common.Results;
+using Domain.Entities.Plans;
 using Domain.Entities.ReSellerOwners;
 using Domain.Entities.ReSellers;
 using Domain.Interfaces.Repositories;
@@ -332,15 +334,15 @@ public class RegisterCommandHandlerTests : RegisterCommandHandlerTestFixture
     }
 
     [Fact]
-    public async Task Handle_ShouldReturnSuccess_WhenNoModulesAvailableButSaveSucceeds()
+    public async Task Handle_ShouldReturnSuccess_WhenPlanHasNoModulesButSaveSucceeds()
     {
         // Arrange
         var handler = CreateHandler();
         var command = CreateValidCommand();
 
-        MockModuleRepository
-            .Setup(x => x.GetAvailableModulesToStore())
-            .ReturnsAsync(new List<Domain.Entities.Modules.Module>());
+        MockPlanRepository
+            .Setup(x => x.GetActivePlanWithModulesByIdAsync(It.IsAny<int>()))
+            .ReturnsAsync(StorePlan.Create((int)StorePlanType.Superior, "Superior", 3, true));
 
         // Act
         var result = await handler.Handle(command, CancellationToken.None);
@@ -407,7 +409,7 @@ public class RegisterCommandHandlerTests : RegisterCommandHandlerTestFixture
     }
 
     [Fact]
-    public async Task Handle_ShouldCallModuleRepository_GetAvailableModulesToStore()
+    public async Task Handle_ShouldCallPlanRepository_GetActivePlanWithModulesByIdAsync()
     {
         // Arrange
         var handler = CreateHandler();
@@ -417,7 +419,8 @@ public class RegisterCommandHandlerTests : RegisterCommandHandlerTestFixture
         await handler.Handle(command, CancellationToken.None);
 
         // Assert
-        MockModuleRepository.Verify(x => x.GetAvailableModulesToStore(),
+        MockPlanRepository.Verify(x => x.GetActivePlanWithModulesByIdAsync(
+            (int)StorePlanType.Superior),
             Times.Once);
     }
 
@@ -439,7 +442,7 @@ public class RegisterCommandHandlerTests : RegisterCommandHandlerTestFixture
             It.IsAny<string?>(),
             It.Is<string>(s => s.Contains("prueba")),
             true, // all creation paths force approved=true (2026-09-10)
-            It.Is<List<int>>(list => list.Contains(TestModule.Id))),
+            It.Is<List<int>>(list => list.Contains(TestPlanModuleId))),
             Times.Once);
     }
 

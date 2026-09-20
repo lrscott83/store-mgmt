@@ -30,6 +30,8 @@ export enum EFeatures {
   Receive = 42,
   /** Feature MultiMonedas — espejo de FeatureType.MultiMonedas=43 (backend). */
   MultiMonedas = 43,
+  /** Feature MultiPayments — espejo de FeatureType.MultiPayments=44 (backend). */
+  MultiPayments = 44,
   TodayReports = 50,
   Dashboard = 60,
   Profile = 70,
@@ -68,6 +70,8 @@ export enum EModules {
   MultiStores = 14,
   /** Módulo MultiMonedas — espejo de ModuleType.MultiMonedas=15 (backend). */
   MultiMonedas = 15,
+  /** Módulo MultiPayments — espejo de ModuleType.MultiPayments=16 (backend). */
+  MultiPayments = 16,
   /** Módulo Elaboración — espejo de ModuleType.Elaboration=17 (backend). */
   Elaboration = 17,
 }

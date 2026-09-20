@@ -66,6 +66,54 @@ namespace Infrastructure.Migrations
                     b.ToTable("RefreshTokens", (string)null);
                 });
 
+            modelBuilder.Entity("Domain.Entities.ChannelExchangeRates.ChannelExchangeRate", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Currency")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("EffectiveFrom")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("Method")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("StoreId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("UpdatedDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("Value")
+                        .HasColumnType("decimal(18,6)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StoreId");
+
+                    b.HasIndex("TenantId");
+
+                    b.ToTable("ChannelExchangeRate");
+                });
+
             modelBuilder.Entity("Domain.Entities.Features.Feature", b =>
                 {
                     b.Property<int>("Id")
@@ -320,6 +368,16 @@ namespace Infrastructure.Migrations
                             ModuleId = 15,
                             Name = "MultiMonedas",
                             Order = 76
+                        },
+                        new
+                        {
+                            Id = 44,
+                            AvailableToStore = true,
+                            Description = "Funcionalidad para pagar una venta con varios pagos y canales",
+                            IsActive = true,
+                            ModuleId = 16,
+                            Name = "MultiPayments",
+                            Order = 77
                         },
                         new
                         {
@@ -839,6 +897,18 @@ namespace Infrastructure.Migrations
                         },
                         new
                         {
+                            Id = 16,
+                            AvailableToStore = true,
+                            DiscountPrice = 0f,
+                            IsActive = true,
+                            Name = "Múltiples pagos",
+                            Order = 126,
+                            PercentDiscountPrice = 50f,
+                            Price = 10f,
+                            PriceIncluded = false
+                        },
+                        new
+                        {
                             Id = 17,
                             AvailableToStore = true,
                             DiscountPrice = 0f,
@@ -906,6 +976,66 @@ namespace Infrastructure.Migrations
                     b.HasIndex("TenantId");
 
                     b.ToTable("OrderItem");
+                });
+
+            modelBuilder.Entity("Domain.Entities.OrderPayments.OrderPayment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("AmountInOrderCurrency")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<Guid>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Currency")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("Method")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("RateApplied")
+                        .HasColumnType("decimal(18,6)");
+
+                    b.Property<int?>("RateCurrency")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("RateEffectiveFrom")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("RateMethod")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("UpdatedDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrderId");
+
+                    b.HasIndex("TenantId");
+
+                    b.ToTable("OrderPayment");
                 });
 
             modelBuilder.Entity("Domain.Entities.Orders.Order", b =>
@@ -1308,6 +1438,11 @@ namespace Infrastructure.Migrations
                         {
                             PlanId = 4,
                             ModuleId = 15
+                        },
+                        new
+                        {
+                            PlanId = 4,
+                            ModuleId = 16
                         },
                         new
                         {
@@ -2193,6 +2328,17 @@ namespace Infrastructure.Migrations
                     b.ToTable("OutboxMessage");
                 });
 
+            modelBuilder.Entity("Domain.Entities.ChannelExchangeRates.ChannelExchangeRate", b =>
+                {
+                    b.HasOne("Domain.Entities.Stores.Store", "Store")
+                        .WithMany()
+                        .HasForeignKey("StoreId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Store");
+                });
+
             modelBuilder.Entity("Domain.Entities.Features.Feature", b =>
                 {
                     b.HasOne("Domain.Entities.Modules.Module", "Module")
@@ -2259,6 +2405,17 @@ namespace Infrastructure.Migrations
                     b.Navigation("Order");
 
                     b.Navigation("Product");
+                });
+
+            modelBuilder.Entity("Domain.Entities.OrderPayments.OrderPayment", b =>
+                {
+                    b.HasOne("Domain.Entities.Orders.Order", "Order")
+                        .WithMany("Payments")
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Order");
                 });
 
             modelBuilder.Entity("Domain.Entities.Orders.Order", b =>
@@ -2527,6 +2684,8 @@ namespace Infrastructure.Migrations
             modelBuilder.Entity("Domain.Entities.Orders.Order", b =>
                 {
                     b.Navigation("OrderItems");
+
+                    b.Navigation("Payments");
                 });
 
             modelBuilder.Entity("Domain.Entities.Owners.Owner", b =>

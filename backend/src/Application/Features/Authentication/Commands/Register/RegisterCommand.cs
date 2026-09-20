@@ -3,9 +3,10 @@ using Application.Abstractions.Messaging;
 using Application.Dtos.Authentication;
 using Application.ResponseModels;
 using Application.UnitOfWorks;
+using Domain.Common.Enums;
 using Domain.Common.Results;
-using Domain.Entities.Modules;
 using Domain.Entities.Owners;
+using Domain.Entities.Plans;
 using Domain.Entities.ReSellerOwners;
 using Domain.Entities.ReSellers;
 using Domain.Interfaces.Repositories;
@@ -28,7 +29,7 @@ namespace Application.Features.Authentication.Commands.Register
         private readonly IApplicationUnitOfWork _applicationUnitOfWork;
         private readonly ICreateOwnerService _createOwnerService;
         private readonly ICreateStoreService _createStoreService;
-        private readonly IModuleRepository _moduleRepository;
+        private readonly IPlanRepository _planRepository;
         private readonly IReSellerRepository _reSellerRepository;
         private readonly IReSellerOwnerRepository _reSellerOwnerRepository;
         private readonly IJwtProvider _jwtProvider;
@@ -41,7 +42,7 @@ namespace Application.Features.Authentication.Commands.Register
             IStringLocalizer<I18n> localizer,
             ICreateOwnerService createOwnerService,
             ICreateStoreService createStoreService,
-            IModuleRepository moduleRepository,
+            IPlanRepository planRepository,
             IJwtProvider jwtProvider,
             IAuthTokenConfig authTokenConfig,
             IReSellerRepository reSellerRepository,
@@ -52,7 +53,7 @@ namespace Application.Features.Authentication.Commands.Register
             _localizer = localizer;
             _createOwnerService = createOwnerService;
             _createStoreService = createStoreService;
-            _moduleRepository = moduleRepository;
+            _planRepository = planRepository;
             _jwtProvider = jwtProvider;
             _authTokenConfig = authTokenConfig;
             _reSellerRepository = reSellerRepository;
@@ -67,22 +68,33 @@ namespace Application.Features.Authentication.Commands.Register
                 request.CellPhone, request.Email, "Nombre de la tienda: " + request.StoreName);
 
             // Create Store
-            IEnumerable<Module> availableModules;
+            // Self-registered stores start on the default plan (Superior, hardcoded in
+            // CreateStoreService): grant exactly that plan's modules, NOT every catalog module
+            // AvailableToStore. This keeps VIP-only modules (e.g. MultiPayments) out.
+            StorePlan? defaultPlan;
             try
             {
-                availableModules = await _moduleRepository.GetAvailableModulesToStore();
+                defaultPlan = await _planRepository.GetActivePlanWithModulesByIdAsync((int)StorePlanType.Superior);
             }
             catch (Exception ex)
             {
                 return ResponseResult.Failure<AuthDto>(
-                    new Error("Register.ModuleLoadFailed", "Failed to load available modules: " + ex.Message),
+                    new Error("Register.PlanLoadFailed", "Failed to load the default plan: " + ex.Message),
                     (int)HttpStatusCode.InternalServerError);
             }
-            HashSet<int> availableModuleIds = availableModules.Select(f => f.Id).ToHashSet();
+
+            if (defaultPlan is null)
+            {
+                return ResponseResult.Failure<AuthDto>(
+                    new Error("Register.PlanLoadFailed", "The default plan (Superior) is not active or does not exist."),
+                    (int)HttpStatusCode.InternalServerError);
+            }
+
+            List<int> planModuleIds = defaultPlan.StorePlanModules.Select(spm => spm.ModuleId).ToList();
             // Self-registered stores are approved immediately so they are usable without an admin
             // act (product decision 2026-09-10): all creation paths force approved=true.
             var store = await _createStoreService.CreateStoreAsync(owner.Id, owner.TenantId, request.StoreName, null,
-                "Tienda de prueba", true, availableModuleIds.ToList());
+                "Tienda de prueba", true, planModuleIds);
 
             // FIX: Add null check to prevent NullReferenceException
             if (owner.User == null)

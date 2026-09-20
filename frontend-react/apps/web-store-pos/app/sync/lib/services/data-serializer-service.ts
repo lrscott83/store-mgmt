@@ -16,6 +16,7 @@ import type {
   Expense,
   SaleCredit,
   ExchangeRate,
+  ChannelRate,
   Warehouse,
   WarehouseStockLevel,
   WarehouseStockMovement,
@@ -83,6 +84,9 @@ export const EDataFileName = {
   Warehouses: 'warehouses.json',
   WarehouseStockLevels: 'warehouse-stock-levels.json',
   WarehouseStockMovements: 'warehouse-stock-movements.json',
+  // multipayments (T4): the append-only channel-rate register, absent from
+  // legacy archives (parsed as [] on import) and always written by exports.
+  ChannelRates: 'channel-rates.json',
   // elaboration-module: recipes and elaborations, absent from legacy
   // archives (parsed as [] on import) and always written by exports.
   Recipes: 'recipes.json',
@@ -181,6 +185,7 @@ export interface ParsedData {
   warehouses: Warehouse[];
   warehouseStockLevels: WarehouseStockLevel[];
   warehouseStockMovements: WarehouseStockMovement[];
+  channelRates: ChannelRate[];
   // elaboration-module: OPTIONAL so the literals built by pre-existing sync
   // tests/call sites keep compiling. `parseContents` always populates them
   // (legacy archives → []), so real imports never see `undefined`.
@@ -216,6 +221,14 @@ export interface SaleCreditReader {
 
 export interface ExchangeRateReader {
   getStorageExchangeRates(): ExchangeRate[];
+}
+
+/**
+ * Channel-rate reader seam (multipayments): the offline service owns the
+ * append-only register; the serializer only reads it for export.
+ */
+export interface ChannelRateReader {
+  getStorageChannelRates(): ChannelRate[];
 }
 
 export interface WarehouseReader {
@@ -289,6 +302,10 @@ export class DataSerializerService {
     // module omit it; exports then write empty entries and imports parse []
     // for archives that carry none.
     private readonly warehouseReader?: WarehouseReader,
+    // Optional (multipayments T4): legacy call sites/tests that predate the
+    // channel-rate register omit it; exports then write an empty entry and
+    // imports parse [] for archives that carry none.
+    private readonly channelRateReader?: ChannelRateReader,
     // Optional (elaboration-module): same legacy-call-site allowance as above;
     // exports then write `[]` and imports parse [] for archives without them.
     private readonly recipeReader?: RecipeReader,
@@ -317,6 +334,7 @@ export class DataSerializerService {
     const warehouses = this.warehouseReader?.getStorageWarehouses() ?? [];
     const warehouseStockLevels = this.warehouseReader?.getStorageStockLevels() ?? [];
     const warehouseStockMovements = this.warehouseReader?.getStorageMovements() ?? [];
+    const channelRates = this.channelRateReader?.getStorageChannelRates() ?? [];
 
     // Angular parity (data-serializer.service.ts:83-84): reads the RAW stored
     // JSON string straight from the repository, no re-derivation via
@@ -345,6 +363,7 @@ export class DataSerializerService {
     const warehousesJson = JSON.stringify(warehouses);
     const warehouseStockLevelsJson = JSON.stringify(warehouseStockLevels);
     const warehouseStockMovementsJson = JSON.stringify(warehouseStockMovements);
+    const channelRatesJson = JSON.stringify(channelRates);
     // elaboration-module: passthrough from the services' own raw-JSON seams.
     const recipesJson = this.recipeReader?.getStorageRecipesJson() ?? '[]';
     const elaborationsJson = this.elaborationReader?.getStorageElaborationsJson() ?? '[]';
@@ -406,6 +425,9 @@ export class DataSerializerService {
         rawPassword: key,
       },
     );
+    await zipWriter.add(EDataFileName.ChannelRates, new TextReader(channelRatesJson), {
+      rawPassword: key,
+    });
     await zipWriter.add(EDataFileName.Recipes, new TextReader(recipesJson), {
       rawPassword: key,
     });
@@ -548,6 +570,7 @@ export class DataSerializerService {
     const warehouses = this.warehouseReader?.getStorageWarehouses() ?? [];
     const warehouseStockLevels = this.warehouseReader?.getStorageStockLevels() ?? [];
     const warehouseStockMovements = this.warehouseReader?.getStorageMovements() ?? [];
+    const channelRates = this.channelRateReader?.getStorageChannelRates() ?? [];
     // elaboration-module: parse the services' raw-JSON seams (reader optional).
     const recipes = this.recipeReader
       ? (JSON.parse(this.recipeReader.getStorageRecipesJson()) as Recipe[])
@@ -582,6 +605,7 @@ export class DataSerializerService {
       warehouses,
       warehouseStockLevels,
       warehouseStockMovements,
+      channelRates,
       recipes,
       elaborations,
     };
@@ -631,6 +655,8 @@ export class DataSerializerService {
         EDataFileName.WarehouseStockMovements,
         [],
       ),
+      // Legacy archives carry no channel-rates entry → [].
+      channelRates: parseJson<ChannelRate[]>(contents, EDataFileName.ChannelRates, []),
       // Legacy archives (v1/Angular) carry no recipes/elaborations → [].
       recipes: parseJson<Recipe[]>(contents, EDataFileName.Recipes, []),
       elaborations: parseJson<Elaboration[]>(contents, EDataFileName.Elaborations, []),

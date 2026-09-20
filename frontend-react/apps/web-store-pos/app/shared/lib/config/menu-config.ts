@@ -381,6 +381,14 @@ export const MENU_GROUPS: MenuGroup[] = [
           'Registro diario del cambio de USD a MN. Cada día se añade un registro con el valor del día anterior (por defecto 1). Puedes editar el valor de cualquier día: escribe cuántos pesos (MN) equivale 1 USD en esa fecha y pulsa Guardar.',
       },
       {
+        label: 'MENU.CHANNEL_RATES',
+        path: '/management/channel-rates',
+        featureIds: [EFeatures.Configurations],
+        moduleId: EModules.Management,
+        helpContent:
+          'Tasas por canal. Registra cuántas unidades de cada moneda equivalen a 1 USD para cada método de pago (efectivo, Zelle, transferencia), con la fecha desde la que rige. El historial es de solo lectura: cada cambio crea un registro nuevo y no se puede editar ni eliminar.',
+      },
+      {
         label: 'MENU.USERS',
         path: '/management/users',
         featureIds: [EFeatures.Users],

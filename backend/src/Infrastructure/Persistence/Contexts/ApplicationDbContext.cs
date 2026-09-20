@@ -20,6 +20,8 @@ using Domain.Entities.StorePayments;
 using Domain.Entities.SystemConfigurations;
 using Domain.Entities.Orders;
 using Domain.Entities.OrderItems;
+using Domain.Entities.OrderPayments;
+using Domain.Entities.ChannelExchangeRates;
 using Domain.Entities.ProductCategories;
 using Domain.Entities.Products;
 using Domain.Entities.InventoryEntryCosts;
@@ -91,10 +93,12 @@ namespace Infrastructure.Persistence.Contexts
         {
             AddConfiguration(builder);
 
-            //All Decimals will have 18,6 Range
+            //All Decimals will have 18,6 Range unless the entity configuration
+            //explicitly sets a column type (e.g. money mirror columns at decimal(18,2)).
             foreach (var property in builder.Model.GetEntityTypes()
             .SelectMany(t => t.GetProperties())
-            .Where(p => p.ClrType == typeof(decimal) || p.ClrType == typeof(decimal?)))
+            .Where(p => (p.ClrType == typeof(decimal) || p.ClrType == typeof(decimal?))
+                        && p.GetColumnType() == null))
             {
                 property.SetColumnType("decimal(18,6)");
             }
@@ -128,6 +132,7 @@ namespace Infrastructure.Persistence.Contexts
             builder.ApplyConfiguration(new ReSellerOwnerEntityTypeConfiguration(this));
             builder.ApplyConfiguration(new OrderItemEntityTypeConfiguration(this));
             builder.ApplyConfiguration(new OrderEntityTypeConfiguration(this));
+            builder.ApplyConfiguration(new OrderPaymentEntityTypeConfiguration(this));
             builder.ApplyConfiguration(new ProductCategoryEntityTypeConfiguration(this));
             builder.ApplyConfiguration(new ProductEntityTypeConfiguration(this));
             builder.ApplyConfiguration(new InventoryEntryEntityTypeConfiguration(this));
@@ -136,6 +141,7 @@ namespace Infrastructure.Persistence.Contexts
             builder.ApplyConfiguration(new RefreshTokenEntityTypeConfiguration(this));
             builder.ApplyConfiguration(new StorePlanEntityTypeConfiguration(this));
             builder.ApplyConfiguration(new StorePlanModuleEntityTypeConfiguration(this));
+            builder.ApplyConfiguration(new ChannelExchangeRateEntityTypeConfiguration(this));
 
         }
         internal DbSet<Tenant> Tenant { get; set; }
@@ -155,6 +161,7 @@ namespace Infrastructure.Persistence.Contexts
         internal DbSet<SystemConfiguration> SystemConfiguration { get; set; }
         internal DbSet<Order> Order { get; set; }
         internal DbSet<OrderItem> OrderItem { get; set; }
+        internal DbSet<OrderPayment> OrderPayment { get; set; }
         internal DbSet<ProductCategory> ProductCategory { get; set; }
         internal DbSet<Product> Product { get; set; }
         internal DbSet<InventoryEntry> InventoryEntry { get; set; }
@@ -163,5 +170,6 @@ namespace Infrastructure.Persistence.Contexts
         internal DbSet<RefreshToken> RefreshTokens { get; set; }
         internal DbSet<StorePlan> StorePlan { get; set; }
         internal DbSet<StorePlanModule> StorePlanModule { get; set; }
+        internal DbSet<ChannelExchangeRate> ChannelExchangeRate { get; set; }
     }
 }

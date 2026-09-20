@@ -85,6 +85,10 @@ namespace Domain.Common.Enums
         [Description("MultiMonedas")]
         MultiMonedas = 43,
 
+        // MultiPayments
+        [Description("MultiPayments")]
+        MultiPayments = 44,
+
         // Reports
         [Description("Reportes del día")]
         TodayReports = 50,

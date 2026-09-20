@@ -1,6 +1,7 @@
 import type { AuditableBaseModel } from './base';
 import type { Currency, OrderType, PaymentType, SalePaymentMethod } from '../enums';
 import type { InventoryEntryCost } from './inventory';
+import type { OrderPayment } from './order-payment';
 
 export interface OrderItem {
   productId: string;
@@ -39,4 +40,11 @@ export interface Order extends AuditableBaseModel {
   percent?: number;
   /** Monto fijo sumado al total al crear la venta (auditoría). Ausente = 0. */
   tax?: number;
+  /**
+   * MultiPayments (plan 2026-09-18): the payment lines of the sale. Optional on
+   * purpose — legacy orders persisted before the feature have no `payments` and
+   * every read path MUST tolerate its absence (no required backfill). Empty/absent
+   * means "single legacy payment" described by `paymentType`/`salePaymentMethod`.
+   */
+  payments?: OrderPayment[];
 }

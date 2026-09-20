@@ -9,7 +9,10 @@ import { guardCurrency } from '~/shared/lib/currency-guard';
 import { showBlockingError } from '~/shared/lib/blocking-alert';
 import { Card } from '~/shared/components/ui/card';
 import { InfoBox } from '~/shared/components/ui/info-box';
-import { hasInventoryModuleAvailable } from '~/shared/lib/auth/authorization-service';
+import {
+  hasInventoryModuleAvailable,
+  hasMultiPaymentsModuleAvailable,
+} from '~/shared/lib/auth/authorization-service';
 import { InventoryOfflineService } from '~/inventory/lib/services/inventory-offline-service';
 import { ProductRepository } from '~/sales/lib/repositories/product-repository';
 import { ProductCategoryRepository } from '~/sales/lib/repositories/product-category-repository';
@@ -82,7 +85,12 @@ export function EgressPage() {
     if (!product) return;
     // Una sola moneda por venta: no se puede mezclar monedas en el mismo carrito.
     // (La salida de inventario comparte carrito con la venta — mismo guard.)
-    const currencyGuard = guardCurrency({ items: cartItems, requestedProduct: product });
+    // MultiPayments (módulo 16): con el módulo se permite mezclar monedas.
+    const currencyGuard = guardCurrency({
+      items: cartItems,
+      requestedProduct: product,
+      allowMixedCurrencies: hasMultiPaymentsModuleAvailable(user),
+    });
     if (!currencyGuard.succeeded) {
       showBlockingError(
         'Error',

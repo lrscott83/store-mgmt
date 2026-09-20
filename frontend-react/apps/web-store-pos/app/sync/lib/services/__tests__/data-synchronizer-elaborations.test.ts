@@ -136,6 +136,7 @@ function makeData(recipes: Recipe[] = [], elaborations: Elaboration[] = []): Par
     warehouses: [],
     warehouseStockLevels: [],
     warehouseStockMovements: [],
+    channelRates: [],
     recipes,
     elaborations,
   };
@@ -190,6 +191,7 @@ function makeSynchronizer(opts: {
     makeSaleCreditService(),
     undefined,
     opts.warehouseSvc,
+    undefined,
     opts.recipeSvc,
     opts.elaborationSvc,
   );
@@ -257,6 +259,7 @@ describe('DataSynchronizerService — recipes merge (elaboration-module)', () =>
       makeOrderService(),
       makeExpenseService(),
       makeSaleCreditService(),
+      undefined,
       undefined,
       undefined,
       recipeSvc,
@@ -590,6 +593,7 @@ describe('DataSerializerService — recipes + elaborations roundtrip (elaboratio
       { getStorageSaleCredits: () => [] },
       { getStorageExchangeRates: () => [] },
       warehouseSvc,
+      undefined,
       recipeSvc,
       elaborationSvc,
     );

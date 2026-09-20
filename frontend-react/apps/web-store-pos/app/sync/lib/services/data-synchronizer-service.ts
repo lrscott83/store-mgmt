@@ -1,5 +1,6 @@
 import { Result } from '@store-mgmt/domain';
 import type {
+  ChannelRate,
   ExchangeRate,
   Expense,
   InventoryEntry,
@@ -91,6 +92,10 @@ export const SynchronizerErrors = {
   WarehouseMovementsUnexpectedError: {
     code: 'Synchronizer.WarehouseMovementsUnexpectedError',
     message: 'Ocurrió un error inesperado al sincronizar los movimientos de almacén.',
+  },
+  ChannelRatesUnexpectedError: {
+    code: 'Synchronizer.ChannelRatesUnexpectedError',
+    message: 'Ocurrió un error inesperado al sincronizar el registro de tasas por canal.',
   },
   RecipesUnexpectedError: {
     code: 'Synchronizer.RecipesUnexpectedError',
@@ -232,6 +237,19 @@ export interface WarehouseImportService {
 }
 
 /**
+ * Channel-rate import routes through the offline SERVICE (multipayments T4).
+ * APPEND-ONLY: there is no update seam — a row whose id already exists is
+ * skipped, never overwritten. The id of an imported row without one is
+ * derived by the service
+ * (`${method}-${currency}-${value}-${effectiveFrom ISO}`), and the
+ * synchronizer derives it the same way for its presence pre-check.
+ */
+export interface ChannelRateImportService {
+  getStorageChannelRates(): ChannelRate[];
+  addImportedChannelRate(rate: ChannelRate): Result;
+}
+
+/**
  * Recipe import routes through the offline SERVICE (elaboration-module),
  * mirroring the ExchangeRates/Warehouses seam: the service owns the
  * domain-command layer. Upsert by id; the synchronizer adds the two rules the
@@ -265,6 +283,23 @@ export interface ElaborationImportService {
 interface MergeOutcome {
   merge: EntityMergeResult;
   error?: SyncEntityError;
+}
+
+/**
+ * The id that identifies a channel-rate row for the append-only merge: the
+ * row's own id, or the deterministic fallback the offline service derives for
+ * an imported row without one. The `value` is part of the identity so two
+ * archive rows for the same channel + moment with different values are
+ * preserved instead of collapsing into one. `effectiveFrom` may be a Date
+ * (freshly built) or an ISO string (JSON round-trip through an archive), so it
+ * is normalized before the ISO stamp — both spellings must resolve to the same
+ * id, or a re-import would duplicate a row instead of skipping it.
+ */
+function channelRateIdOf(rate: ChannelRate): string {
+  return (
+    rate.id ??
+    `${rate.method}-${rate.currency}-${rate.value}-${new Date(rate.effectiveFrom).toISOString()}`
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -308,6 +343,10 @@ export class DataSynchronizerService {
     // Optional (warehouses-plan): legacy call sites/tests that predate the
     // module omit it — the merges then degrade to zero-count no-ops.
     private readonly warehouseService?: WarehouseImportService,
+    // Optional (multipayments T4): legacy call sites/tests that predate the
+    // channel-rate register omit it — the merge then degrades to a zero-count
+    // no-op.
+    private readonly channelRateService?: ChannelRateImportService,
     // Optional (elaboration-module): legacy call sites/tests that predate the
     // module omit it — the merges then degrade to zero-count no-ops.
     private readonly recipeService?: RecipeImportService,
@@ -371,6 +410,14 @@ export class DataSynchronizerService {
       push(this.mergeWarehousesViaService(data.warehouses));
       push(this.mergeWarehouseStockLevelsViaService(data.warehouseStockLevels));
       push(this.mergeWarehouseMovementsViaService(data.warehouseStockMovements));
+    }
+
+    // 11. ChannelRates — routed through the offline SERVICE (multipayments T4),
+    // append-only (id-presence decides add-vs-skip), break-only (no revert).
+    // Only when the service was injected: legacy constructor call sites keep
+    // their merge contract.
+    if (this.channelRateService) {
+      push(this.mergeChannelRatesViaService(data.channelRates));
     }
 
     // 12. Elaborations — routed through the offline SERVICE
@@ -988,6 +1035,57 @@ export class DataSynchronizerService {
           entity,
           code: SynchronizerErrors.WarehouseMovementsUnexpectedError.code,
           message: SynchronizerErrors.WarehouseMovementsUnexpectedError.message,
+        },
+      };
+    }
+  }
+
+  /**
+   * Append-only merge: a channel rate whose id is already present is skipped
+   * (never duplicated, never updated — filas nunca editadas ni borradas). The
+   * id is the row's own id, or the deterministic
+   * `${method}-${currency}-${value}-${effectiveFrom ISO}` fallback for
+   * imported rows without one (same derivation as the offline service).
+   * Break-only; an
+   * unexpected throw yields `ChannelRatesUnexpectedError`.
+   */
+  private mergeChannelRatesViaService(incoming: ChannelRate[]): MergeOutcome {
+    const entity = 'channelRates';
+    if (!this.channelRateService || incoming.length === 0) {
+      return { merge: { entity, inserted: 0, updated: 0 } };
+    }
+
+    let inserted = 0;
+    try {
+      const existingIds = new Set(
+        this.channelRateService.getStorageChannelRates().map((r) => channelRateIdOf(r)),
+      );
+      for (const rate of incoming) {
+        const id = channelRateIdOf(rate);
+        if (existingIds.has(id)) continue;
+        existingIds.add(id);
+        inserted++;
+        const result = this.channelRateService.addImportedChannelRate(rate);
+        if (!result.succeeded) {
+          return {
+            merge: { entity, inserted, updated: 0 },
+            error: {
+              entity,
+              code: SynchronizerErrors.ChannelRatesUnexpectedError.code,
+              message: SynchronizerErrors.ChannelRatesUnexpectedError.message,
+            },
+          };
+        }
+      }
+      return { merge: { entity, inserted, updated: 0 } };
+    } catch {
+      // Break-only: no revert — writes already applied before the failure persist.
+      return {
+        merge: { entity, inserted, updated: 0 },
+        error: {
+          entity,
+          code: SynchronizerErrors.ChannelRatesUnexpectedError.code,
+          message: SynchronizerErrors.ChannelRatesUnexpectedError.message,
         },
       };
     }

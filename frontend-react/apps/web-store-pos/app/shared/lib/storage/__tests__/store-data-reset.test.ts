@@ -17,7 +17,7 @@ describe('clearStoreData', () => {
     vi.restoreAllMocks();
   });
 
-  it('covers exactly the twelve business entities', () => {
+  it('covers exactly the thirteen business entities', () => {
     // elaboration-module: recipes + elaborations joined the registry.
     expect([...BUSINESS_ENTITY_NAMES]).toEqual([
       'products',
@@ -30,6 +30,7 @@ describe('clearStoreData', () => {
       'warehouses',
       'warehouse-stock-levels',
       'warehouse-stock-movements',
+      'channelRates',
       'recipes',
       'elaborations',
     ]);
