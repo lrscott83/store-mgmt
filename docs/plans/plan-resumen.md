@@ -21,17 +21,14 @@
 
 ### P0 — Correctitud de datos e invariantes (alto impacto, desbloqueado)
 
-- [ ] **Totales por moneda fuera del dashboard (MultiMonedas §6).**
-  Hoy el agrupado por moneda solo existe en el dashboard; ventas del día, órdenes
-  y créditos siguen sumando monedas distintas como si fueran una sola (números
-  incorrectos visibles al usuario).
-  Fuente: `docs/plans/2026-09-17-multimonedas-module-plan.md` §6.
-  Evidencia: `app/sales/routes/today-stats.tsx:14,185,330`,
-  `app/sales/routes/orders.tsx:313,490`, `app/sales/routes/today-orders.tsx:96`,
-  `app/sales/routes/credits.tsx:346` usan `formatCurrency` sobre sumas mixtas;
-  `app/shared/lib/currency-totals.ts` solo se importa bajo `app/statistics/**`.
-  Nota: la regla canónica acordada es **USD → EUR → CUP → mayor monto** (ver
-  §6 de `2026-09-17-multimonedas-module-plan.md`, pendiente de actualizar su redacción).
+- [x] **Totales por moneda fuera del dashboard (MultiMonedas §6).** — HECHO (2026-09-20, sin commit)
+  Las 5 vistas agrupan por moneda (total primario + chips) con el gate `hasMultiMonedasAvailable`;
+  sin el módulo la salida es idéntica. Nuevo componente compartido
+  `app/shared/components/multimonedas/currency-total-amount.tsx`; reutiliza `currency-totals`.
+  Fuente: `docs/plans/2026-09-17-multimonedas-module-plan.md` §6; tracker `odd/tasks/multicurrency-view-totals.md`.
+  Revisión RDD: `review-reliability` **aprobada** (lineage `review-0f25edfbdaddef0b`, authority burned).
+  3 hallazgos no bloqueantes pendientes (ver «Follow-ups» abajo).
+  Pendiente: **commit** (decisión del usuario).
 
 - [ ] **Invariante de sesión autenticada — ruta `/unlock-data`.**
   Una sesión válida pero bloqueada aún aterriza en `/login?unlock=1`. El diseño
