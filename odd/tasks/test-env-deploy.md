@@ -88,6 +88,34 @@ HAProxy en el VPS (`/etc/haproxy/haproxy.cfg`, TLS terminado ahí, certs en
 - Efecto colateral: `smca_nginx` (:8083) + `smca_frontend` (Angular) de prod
   quedan sin dominio. Limpieza pendiente — decisión de prod, no se toca sin OK.
 
+## Actualización 2026-09-20 (3) — Modo por defecto sin tocar producción + rollback de test
+
+Pedido del usuario: por defecto el deploy de test NO debe hacer el backup de
+producción ni montar esa BD; debe respaldar la BD de TEST antes de correr los
+scripts y hacer rollback ante cualquier fallo. El comportamiento anterior queda
+detrás de un parámetro nuevo.
+
+Cambios en `scripts/deploy-test.sh`:
+
+- Nuevo default: no se toca producción. Se conserva `smca_test`, se hace
+  `pg_dump` de `smca_test` a `backups/smca_test_backup_*.sql.gz` ANTES de aplicar
+  scripts, y ese dump es la fuente de rollback.
+- Nuevo parámetro `--from-prod`: hace el backup de producción (`smca_backup_*.sql.gz`,
+  solo lectura), recrea `smca_test` desde ese dump y lo usa como fuente de rollback.
+- Rollback ante fallo en: script SQL, build de la imagen, `compose up` y smoke test
+  (restaura la BD de test y re-tag `:previous` como `:latest` cuando aplica).
+- `--keep-db` queda como no-op deprecado (conservar la BD de test ahora es el default).
+- Rotación de backups por familia (`smca_backup_*` y `smca_test_backup_*`, retención 7).
+- `deploy-state.txt` ahora incluye `MODE=keep-test-db|from-prod`.
+
+- [x] T8 Reescribir el flujo de `scripts/deploy-test.sh` (default sin prod + rollback de test + flag `--from-prod`).
+- [x] T9 Documentar el default y `--from-prod` en `scripts/README.md` (sección de test: qué hace, flags, rollback, salidas).
+- Verificación observada: `bash -n scripts/deploy-test.sh` → exit 0 (bash 5.0.17);
+  blobs en LF (worktree e índice, 0 pares CRLF); `--keep-db` ya no tiene lógica de
+  drop/create; los únicos accesos a `PROD_DB_CONTAINER`/`pg_dump` de prod viven en
+  la rama `--from-prod`.
+- Pendiente: subir el script al VPS y correr ambas rutas (default y `--from-prod`).
+
 ## Siguiente paso (usuario)
 
 - Hecho 2026-09-20: compose + script + tracker commiteados en la rama `test` (`59d6183a`).

@@ -15,17 +15,19 @@ contenedores, sin `server_name`.
 
 ## 1. Deploy de TEST (`deploy-test.sh`)
 
-### Qué hace
+### Qué hace (default: no toca producción)
 
-1. **Backup de la BD de producción** (`pg_dump`, solo lectura) → `./backups`.
-2. Clona/actualiza las fuentes de la rama `test` → `./test-store-mgmt`.
-3. Recrea la BD `smca_test` desde ese dump.
-4. Aplica los scripts SQL pendientes de `backend/scripts`.
+1. Clona/actualiza las fuentes de la rama `test` → `./test-store-mgmt`.
+2. Levanta el Postgres de test y **conserva** la BD `smca_test` actual.
+3. **Backup de la BD de TEST** (`pg_dump smca_test`) → `./backups` **antes** de correr scripts.
+4. Aplica los scripts SQL pendientes de `backend/scripts`; **si falla uno, restaura `smca_test`** desde ese backup.
 5. Buildea la imagen `localhost/store-mgmt_backend_test:latest`.
 6. Levanta el stack aislado (`podman-compose -p smca-test`).
-7. Smoke test y tag git.
+7. Smoke test; **si falla, rollback** (BD de test + imagen `:previous`) y redeploy.
+8. Tag git y `deploy-state.txt`.
 
-**Producción solo se LEE.** Nada del stack de test apunta a producción.
+**Por defecto producción NO se toca** (ni `pg_dump` ni el contenedor). El backup y
+montaje de la BD de producción quedan detrás de `--from-prod`.
 
 ### Stack de test
 
@@ -60,15 +62,30 @@ producción** (la BD clonada los necesita para validar logins y desencriptar dat
 
 ```bash
 cd /home/malayo/lizo/test-deploy
-./deploy-test.sh              # deploy completo
-./deploy-test.sh --keep-db    # conserva la BD de test actual (no recarga el dump)
+./deploy-test.sh                # deploy completo SIN tocar producción
+./deploy-test.sh --from-prod    # además: backup de prod y recrea smca_test desde ese dump
+./deploy-test.sh --help
 ```
+
+### Flags
+
+| Flag | Qué hace |
+|---|---|
+| `--from-prod` | Hace el backup de la BD de producción (solo lectura) y **recrea `smca_test` desde ese dump**. Es el comportamiento que antes era el default. |
+| `--keep-db` | Deprecado, no-op: conservar la BD de test ya es el default. |
+| `--help` | Ayuda. |
+
+### Rollback
+
+Si falla un script SQL, el build de la imagen, `compose up` o el smoke test, el
+script **restaura `smca_test`** desde el backup tomado al inicio (y re-tagea
+`:previous` como `:latest` cuando la imagen ya se había buildeado).
 
 ### Salidas
 
 - `./logs/` — log por corrida
-- `./backups/` — dumps de producción (retención: 7)
-- `./deploy-state.txt` — commit, tag, backup e URLs de la última corrida
+- `./backups/` — `smca_test_backup_*.sql.gz` (default) y `smca_backup_*.sql.gz` (`--from-prod`); retención: 7 por familia
+- `./deploy-state.txt` — commit, tag, `MODE`, backup e URLs de la última corrida
 
 ---
 
