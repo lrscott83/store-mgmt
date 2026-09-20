@@ -4,6 +4,8 @@ import type { Order } from '@store-mgmt/domain';
 import { EFeatures, PaymentType } from '@store-mgmt/domain';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
+import { CurrencyTotalAmount } from '~/shared/components/multimonedas/currency-total-amount';
+import { hasMultiMonedasAvailable } from '~/shared/components/multimonedas/currency-select';
 import { Card } from '~/shared/components/ui/card';
 import { InfoBox } from '~/shared/components/ui/info-box';
 import { OrderOfflineService } from '../lib/services/order-offline-service';
@@ -14,7 +16,6 @@ import {
   matchesOrderPaymentFilter,
   paymentMethodKeyToLabel,
 } from '~/shared/lib/payment-filter-options';
-import { formatCurrency } from '~/shared/lib/format-currency';
 
 export const clientLoader = featureLoader([EFeatures.TodayOrders]);
 
@@ -29,7 +30,9 @@ export const clientLoader = featureLoader([EFeatures.TodayOrders]);
  */
 export function TodayOrdersPage() {
   const intl = useIntl();
-  const storeId = useAuthStore((s) => s.user?.selectedStoreId ?? '');
+  const user = useAuthStore((s) => s.user);
+  const storeId = user?.selectedStoreId ?? '';
+  const multiMonedas = hasMultiMonedasAvailable(user);
   const [orders, setOrders] = useState<Order[]>([]);
   const [paymentKey, setPaymentKey] = useState<string | null>(null);
   const [isCredit, setIsCredit] = useState<number>(-1);
@@ -93,7 +96,14 @@ export function TodayOrdersPage() {
             </span>
           </span>
           <span className="text-sm font-semibold text-primary whitespace-nowrap">
-            {formatCurrency(ordersTotal)}
+            <CurrencyTotalAmount
+              legacyTotal={ordersTotal}
+              entries={visibleOrders.map((order) => ({
+                amount: order.total,
+                currency: order.currency,
+              }))}
+              multiMonedas={multiMonedas}
+            />
           </span>
         </div>
       }

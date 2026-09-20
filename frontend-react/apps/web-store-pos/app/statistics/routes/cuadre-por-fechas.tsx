@@ -5,6 +5,8 @@ import type { Expense, SaleCredit } from '@store-mgmt/domain';
 import { resolvedOrderPaymentMethod } from '~/shared/lib/payment-method-resolved';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
+import { CurrencyTotalAmount } from '~/shared/components/multimonedas/currency-total-amount';
+import { hasMultiMonedasAvailable } from '~/shared/components/multimonedas/currency-select';
 import {
   hasCreditsModuleAvailable,
   hasExpensesModuleAvailable,
@@ -13,6 +15,8 @@ import { Card } from '~/shared/components/ui/card';
 import { Button } from '~/shared/components/ui/button';
 import { ChevronDownIcon, SearchIcon } from '~/shared/components/ui/icons';
 import { formatCurrency } from '~/shared/lib/format-currency';
+import type { CurrencyAmount } from '~/shared/lib/currency-totals';
+import { calculateOrderProfit } from '~/inventory/lib/profit-calculator';
 import {
   formatLocalDate,
   addDays,
@@ -73,8 +77,8 @@ function ExpansionPanel({
   amountClassName,
   children,
 }: {
-  title: string;
-  amount: string;
+  title: React.ReactNode;
+  amount: React.ReactNode;
   amountClassName: string;
   children: React.ReactNode;
 }) {
@@ -102,7 +106,7 @@ function ExpansionPanel({
 /**
  * KPI card — dashboard.tsx's KpiCard without the trend row (no "Hoy", no ▲/▼).
  */
-function KpiCard({ title, value }: { title: string; value: string }) {
+function KpiCard({ title, value }: { title: string; value: React.ReactNode }) {
   return (
     <div className="rounded border bg-white p-4 shadow-sm">
       <h5 className="text-sm font-medium text-gray-700">{title}</h5>
@@ -124,6 +128,11 @@ interface RangeSummary {
   salesCardTotal: number;
   expensesCashTotal: number;
   paidCreditsCashTotal: number;
+  /** Per-currency entries — only rendered when MultiMonedas is active. */
+  salesEntries: CurrencyAmount[];
+  grossProfitEntries: CurrencyAmount[];
+  salesCashEntries: CurrencyAmount[];
+  salesCardEntries: CurrencyAmount[];
 }
 
 /**
@@ -150,6 +159,7 @@ export function CuadrePorFechasPage() {
 
   const hasExpensesModule = user ? hasExpensesModuleAvailable(user) : false;
   const hasCreditsModule = user ? hasCreditsModuleAvailable(user) : false;
+  const multiMonedas = hasMultiMonedasAvailable(user);
   const { enabled: multiStoreEnabled, stores: multiStoreStores } = useMultiStore();
 
   const [startDate, setStartDate] = useState('');
@@ -265,6 +275,27 @@ export function CuadrePorFechasPage() {
       )
       .reduce((acc, o) => acc + o.total, 0);
 
+    // Per-currency entries (rendered only with MultiMonedas active): every amount
+    // keeps its own currency, so no view ever sums different currencies.
+    const salesEntries: CurrencyAmount[] = activeOrders.map((o) => ({
+      amount: o.total,
+      currency: o.currency,
+    }));
+    const grossProfitEntries: CurrencyAmount[] = activeOrders.flatMap((o) =>
+      o.orderItems.map((item) => ({
+        amount: calculateOrderProfit(item).profit,
+        currency: item.currency ?? o.currency,
+      })),
+    );
+    const salesCashEntries: CurrencyAmount[] = activeOrders
+      .filter((o) => o.paymentType === PaymentType.Efectivo && !o.isCredit)
+      .map((o) => ({ amount: o.total, currency: o.currency }));
+    const salesCardEntries: CurrencyAmount[] = activeOrders
+      .filter(
+        (o) => resolvedOrderPaymentMethod(o) === SalePaymentMethod.Transferencia && !o.isCredit,
+      )
+      .map((o) => ({ amount: o.total, currency: o.currency }));
+
     let expenses: Expense[] = [];
     let expensesTotal = 0;
     let expensesCashTotal = 0;
@@ -304,6 +335,10 @@ export function CuadrePorFechasPage() {
       salesCardTotal,
       expensesCashTotal,
       paidCreditsCashTotal,
+      salesEntries,
+      grossProfitEntries,
+      salesCashEntries,
+      salesCardEntries,
     });
   }
 
@@ -325,6 +360,47 @@ export function CuadrePorFechasPage() {
     ? summary.paidSaleCredits.reduce((acc, c) => acc + c.total, 0)
     : 0;
   const expensesCount = summary ? summary.expenses.length : 0;
+
+  // Per-currency entries for the single-store view (used only with MultiMonedas).
+  const expensesEntries: CurrencyAmount[] = summary
+    ? summary.expenses.map((e) => ({ amount: e.total, currency: e.currency }))
+    : [];
+  const creditsEntries: CurrencyAmount[] = summary
+    ? summary.saleCredits.map((c) => ({ amount: c.total, currency: c.currency }))
+    : [];
+  const paidCreditsEntries: CurrencyAmount[] = summary
+    ? summary.paidSaleCredits.map((c) => ({ amount: c.total, currency: c.currency }))
+    : [];
+  const expensesCashEntries: CurrencyAmount[] = summary
+    ? summary.expenses
+        .filter((e) => e.paymentType === PaymentType.Efectivo)
+        .map((e) => ({ amount: e.total, currency: e.currency }))
+    : [];
+  const paidCreditsCashEntries: CurrencyAmount[] = summary
+    ? summary.paidSaleCredits
+        .filter((c) => c.paidType === PaymentType.Efectivo)
+        .map((c) => ({ amount: c.total, currency: c.currency }))
+    : [];
+  const salesEntries: CurrencyAmount[] = summary ? summary.salesEntries : [];
+  const totalEntries: CurrencyAmount[] = summary
+    ? [
+        ...summary.salesEntries,
+        ...paidCreditsEntries,
+        ...creditsEntries.map((e) => ({ ...e, amount: -e.amount })),
+        ...expensesEntries.map((e) => ({ ...e, amount: -e.amount })),
+      ]
+    : [];
+  const netProfitEntries: CurrencyAmount[] = summary
+    ? [
+        ...summary.grossProfitEntries,
+        ...expensesEntries.map((e) => ({ ...e, amount: -e.amount })),
+      ]
+    : [];
+  const cashEntries: CurrencyAmount[] = [
+    ...(summary ? summary.salesCashEntries : []),
+    ...paidCreditsCashEntries,
+    ...expensesCashEntries.map((e) => ({ ...e, amount: -e.amount })),
+  ];
 
   // ─── multi-store mode ────────────────────────────────────────────────────
   if (multiStoreEnabled) {
@@ -503,21 +579,45 @@ export function CuadrePorFechasPage() {
           <div className="grid grid-cols-2 gap-4">
             <KpiCard
               title={intl.formatMessage({ id: 'CUADRE_FECHAS.KPI_SALES' })}
-              value={formatCurrency(summary.salesTotal)}
+              value={
+                <CurrencyTotalAmount
+                  legacyTotal={summary.salesTotal}
+                  entries={salesEntries}
+                  multiMonedas={multiMonedas}
+                />
+              }
             />
             {hasExpensesModule && (
               <KpiCard
                 title={intl.formatMessage({ id: 'CUADRE_FECHAS.KPI_EXPENSES' })}
-                value={formatCurrency(summary.expensesTotal)}
+                value={
+                  <CurrencyTotalAmount
+                    legacyTotal={summary.expensesTotal}
+                    entries={expensesEntries}
+                    multiMonedas={multiMonedas}
+                  />
+                }
               />
             )}
             <KpiCard
               title={intl.formatMessage({ id: 'CUADRE_FECHAS.KPI_GROSS_PROFIT' })}
-              value={formatCurrency(summary.grossProfit)}
+              value={
+                <CurrencyTotalAmount
+                  legacyTotal={summary.grossProfit}
+                  entries={summary.grossProfitEntries}
+                  multiMonedas={multiMonedas}
+                />
+              }
             />
             <KpiCard
               title={intl.formatMessage({ id: 'CUADRE_FECHAS.KPI_NET_PROFIT' })}
-              value={formatCurrency(summary.netProfit)}
+              value={
+                <CurrencyTotalAmount
+                  legacyTotal={summary.netProfit}
+                  entries={netProfitEntries}
+                  multiMonedas={multiMonedas}
+                />
+              }
             />
           </div>
 
@@ -530,7 +630,11 @@ export function CuadrePorFechasPage() {
                   {intl.formatMessage({ id: 'CUADRE_FECHAS.CUADRE' })}
                 </span>
                 <span className={`text-lg font-bold whitespace-nowrap ${valueClassName(total)}`}>
-                  {formatCurrency(total)}
+                  <CurrencyTotalAmount
+                    legacyTotal={total}
+                    entries={totalEntries}
+                    multiMonedas={multiMonedas}
+                  />
                 </span>
               </div>
             }
@@ -539,7 +643,13 @@ export function CuadrePorFechasPage() {
               {/* BEGIN CASH */}
               <ExpansionPanel
                 title="Resumen Efectivo"
-                amount={formatCurrency(cashTotal)}
+                amount={
+                  <CurrencyTotalAmount
+                    legacyTotal={cashTotal}
+                    entries={cashEntries}
+                    multiMonedas={multiMonedas}
+                  />
+                }
                 amountClassName={valueClassName(cashTotal)}
               >
                 <table className="w-full text-sm">
@@ -550,7 +660,11 @@ export function CuadrePorFechasPage() {
                       </td>
                       <td className="p-1 text-right">
                         <span className="font-bold text-success whitespace-nowrap">
-                          {formatCurrency(summary.salesCashTotal)}
+                          <CurrencyTotalAmount
+                            legacyTotal={summary.salesCashTotal}
+                            entries={summary.salesCashEntries}
+                            multiMonedas={multiMonedas}
+                          />
                         </span>
                       </td>
                     </tr>
@@ -561,7 +675,11 @@ export function CuadrePorFechasPage() {
                         </td>
                         <td className="p-1 text-right">
                           <span className="font-bold text-success whitespace-nowrap">
-                            {formatCurrency(summary.paidCreditsCashTotal)}
+                            <CurrencyTotalAmount
+                              legacyTotal={summary.paidCreditsCashTotal}
+                              entries={paidCreditsCashEntries}
+                              multiMonedas={multiMonedas}
+                            />
                           </span>
                         </td>
                       </tr>
@@ -573,7 +691,11 @@ export function CuadrePorFechasPage() {
                         </td>
                         <td className="p-1 text-right">
                           <span className="font-bold text-danger whitespace-nowrap">
-                            {formatCurrency(summary.expensesCashTotal)}
+                            <CurrencyTotalAmount
+                              legacyTotal={summary.expensesCashTotal}
+                              entries={expensesCashEntries}
+                              multiMonedas={multiMonedas}
+                            />
                           </span>
                         </td>
                       </tr>
@@ -586,7 +708,13 @@ export function CuadrePorFechasPage() {
               {/* BEGIN CARD PAYMENTS */}
               <ExpansionPanel
                 title="Pago por Transferencia"
-                amount={formatCurrency(summary.salesCardTotal)}
+                amount={
+                  <CurrencyTotalAmount
+                    legacyTotal={summary.salesCardTotal}
+                    entries={summary.salesCardEntries}
+                    multiMonedas={multiMonedas}
+                  />
+                }
                 amountClassName={valueClassName(summary.salesCardTotal)}
               >
                 <table className="w-full text-sm">
@@ -597,7 +725,11 @@ export function CuadrePorFechasPage() {
                       </td>
                       <td className="p-1 text-right">
                         <span className="font-bold text-success whitespace-nowrap">
-                          {formatCurrency(summary.salesCardTotal)}
+                          <CurrencyTotalAmount
+                            legacyTotal={summary.salesCardTotal}
+                            entries={summary.salesCardEntries}
+                            multiMonedas={multiMonedas}
+                          />
                         </span>
                       </td>
                     </tr>
@@ -610,7 +742,13 @@ export function CuadrePorFechasPage() {
               {hasExpensesModule && (
                 <ExpansionPanel
                   title={`Gastos (${expensesCount})`}
-                  amount={formatCurrency(summary.expensesTotal)}
+                  amount={
+                    <CurrencyTotalAmount
+                      legacyTotal={summary.expensesTotal}
+                      entries={expensesEntries}
+                      multiMonedas={multiMonedas}
+                    />
+                  }
                   amountClassName="text-danger"
                 >
                   {summary.expenses.length === 0 ? (
@@ -649,7 +787,13 @@ export function CuadrePorFechasPage() {
               {hasCreditsModule && (
                 <ExpansionPanel
                   title={`Créditos Por Cobrar (${creditsCount})`}
-                  amount={formatCurrency(creditsTotal)}
+                  amount={
+                    <CurrencyTotalAmount
+                      legacyTotal={creditsTotal}
+                      entries={creditsEntries}
+                      multiMonedas={multiMonedas}
+                    />
+                  }
                   amountClassName="text-danger"
                 >
                   <SaleCreditsTable saleCredits={summary.saleCredits} />
@@ -660,8 +804,28 @@ export function CuadrePorFechasPage() {
               {/* BEGIN PAID CREDITS — literal "(total)" in the header slot, Angular parity. */}
               {hasCreditsModule && (
                 <ExpansionPanel
-                  title={`Créditos Pagados (${paidSaleCreditsTotal})`}
-                  amount={formatCurrency(paidSaleCreditsTotal)}
+                  title={
+                    multiMonedas ? (
+                      <>
+                        Créditos Pagados (
+                        <CurrencyTotalAmount
+                          legacyTotal={paidSaleCreditsTotal}
+                          entries={paidCreditsEntries}
+                          multiMonedas={multiMonedas}
+                        />
+                        )
+                      </>
+                    ) : (
+                      `Créditos Pagados (${paidSaleCreditsTotal})`
+                    )
+                  }
+                  amount={
+                    <CurrencyTotalAmount
+                      legacyTotal={paidSaleCreditsTotal}
+                      entries={paidCreditsEntries}
+                      multiMonedas={multiMonedas}
+                    />
+                  }
                   amountClassName="text-success"
                 >
                   <SaleCreditsTable saleCredits={summary.paidSaleCredits} />
@@ -672,7 +836,13 @@ export function CuadrePorFechasPage() {
               {/* BEGIN SALES */}
               <ExpansionPanel
                 title={`Ventas (${ordersItemsCount} productos)`}
-                amount={formatCurrency(summary.categories.reduce((acc, c) => acc + c.total, 0))}
+                amount={
+                  <CurrencyTotalAmount
+                    legacyTotal={summary.categories.reduce((acc, c) => acc + c.total, 0)}
+                    entries={salesEntries}
+                    multiMonedas={multiMonedas}
+                  />
+                }
                 amountClassName="text-success"
               >
                 {summary.categories.map((category) => (
