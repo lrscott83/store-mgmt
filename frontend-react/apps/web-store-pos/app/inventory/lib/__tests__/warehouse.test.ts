@@ -2,11 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { WarehouseErrors } from '@store-mgmt/domain';
 import {
   applyMovement,
+  attributePurchaseOutflow,
   computeWeightedCost,
   displayCost,
   movementDirection,
   reversalDirection,
   splitByFifoLots,
+  summarizeOrderImpact,
   synthesizeLotFromLevel,
   validateMovementQuantity,
   validateReversalQuantity,
@@ -266,6 +268,167 @@ describe('warehouse helpers', () => {
 
     it('U-A1-11: nivel sin lots cae al lote sintético (legacy) por costo', () => {
       expect(remainingPurchaseUnits(level({ onHand: 8 }), { id: 'mv-1', quantity: 10, costPrice: 5 })).toBe(8);
+    });
+  });
+
+  // ─── Fase 3: atribución compra → salida + impacto en órdenes ───────────────
+  describe('attributePurchaseOutflow', () => {
+    const notReversed = () => false;
+
+    function saleOut(over: Record<string, unknown> = {}) {
+      return {
+        id: 's1',
+        warehouseId: 'wh-1',
+        productId: 'p-1',
+        type: 'sale_out',
+        quantity: 4,
+        costPrice: 5,
+        reason: null,
+        createdDate: new Date(),
+        createdByName: 'x',
+        ...over,
+      } as never;
+    }
+    function purchase(over: Record<string, unknown> = {}) {
+      return {
+        id: 'mv-1',
+        warehouseId: 'wh-1',
+        productId: 'p-1',
+        type: 'purchase_in',
+        quantity: 10,
+        costPrice: 5,
+        reason: null,
+        createdDate: new Date(),
+        createdByName: 'x',
+        ...over,
+      } as never;
+    }
+
+    it('U-P1: usa la referencia determinista lotOriginMovementId', () => {
+      const result = attributePurchaseOutflow(
+        purchase(),
+        [saleOut({ id: 's1', lotOriginMovementId: 'mv-1' }), saleOut({ id: 's2', lotOriginMovementId: 'mv-2' })],
+        notReversed,
+      );
+      expect(result.succeeded).toBe(true);
+      expect(result.saleOutMovements.map((m) => m.id)).toEqual(['s1']);
+    });
+
+    it('U-P2: fallback por costo EXACTO cuando no hay referencias (datos viejos)', () => {
+      const result = attributePurchaseOutflow(
+        purchase(),
+        [saleOut({ id: 's1' }), saleOut({ id: 's2', costPrice: 9 })],
+        notReversed,
+      );
+      expect(result.succeeded).toBe(true);
+      expect(result.saleOutMovements.map((m) => m.id)).toEqual(['s1']);
+    });
+
+    it('U-P3: dos compras vivas al mismo costo sin referencias → ambiguo', () => {
+      const result = attributePurchaseOutflow(
+        purchase(),
+        [purchase({ id: 'mv-1' }), purchase({ id: 'mv-2' }), saleOut({ id: 's1' })],
+        notReversed,
+      );
+      expect(result.succeeded).toBe(false);
+      expect(result.ambiguous).toBe(true);
+    });
+
+    it('U-P4: una compra revertida no cuenta para la ambigüedad', () => {
+      const result = attributePurchaseOutflow(
+        purchase(),
+        [purchase({ id: 'mv-1' }), purchase({ id: 'mv-2' }), saleOut({ id: 's1' })],
+        (id) => id === 'mv-2',
+      );
+      expect(result.succeeded).toBe(true);
+      expect(result.saleOutMovements.map((m) => m.id)).toEqual(['s1']);
+    });
+
+    it('U-P5: filas revertidas se excluyen del conjunto', () => {
+      const result = attributePurchaseOutflow(
+        purchase(),
+        [saleOut({ id: 's1', lotOriginMovementId: 'mv-1' })],
+        (id) => id === 's1',
+      );
+      expect(result.succeeded).toBe(true);
+      expect(result.saleOutMovements).toEqual([]);
+    });
+
+    it('U-P6 (R3-2): mezcla referencia + legacy → atribuye la UNION (sin descartar)', () => {
+      const result = attributePurchaseOutflow(
+        purchase(),
+        [
+          saleOut({ id: 's-ref', lotOriginMovementId: 'mv-1' }),
+          saleOut({ id: 's-legacy' }), // sin referencia, mismo costo 5
+        ],
+        notReversed,
+      );
+      expect(result.succeeded).toBe(true);
+      expect(result.saleOutMovements.map((m) => m.id).sort()).toEqual(['s-legacy', 's-ref']);
+    });
+
+    it('U-P7 (R3-2): una fila que reclama OTRA compra no entra por costo', () => {
+      const result = attributePurchaseOutflow(
+        purchase(),
+        [
+          saleOut({ id: 's-ref', lotOriginMovementId: 'mv-1' }),
+          saleOut({ id: 's-other', lotOriginMovementId: 'mv-2' }), // mismo costo, otra compra
+          saleOut({ id: 's-legacy' }),
+        ],
+        notReversed,
+      );
+      expect(result.succeeded).toBe(true);
+      expect(result.saleOutMovements.map((m) => m.id).sort()).toEqual(['s-legacy', 's-ref']);
+    });
+
+    it('U-P8 (R3-2): con filas legacy y dos compras vivas al mismo costo → ambiguo', () => {
+      const result = attributePurchaseOutflow(
+        purchase(),
+        [
+          purchase({ id: 'mv-1' }),
+          purchase({ id: 'mv-2' }),
+          saleOut({ id: 's-ref', lotOriginMovementId: 'mv-1' }),
+          saleOut({ id: 's-legacy' }),
+        ],
+        notReversed,
+      );
+      expect(result.succeeded).toBe(false);
+      expect(result.ambiguous).toBe(true);
+    });
+  });
+
+  describe('summarizeOrderImpact', () => {
+    function order(id: string, isActive: boolean, costs: Array<{ inventoryId: string; quantity: number }>) {
+      return {
+        id,
+        isActive,
+        orderItems: [
+          {
+            productId: 'p-1',
+            productName: 'X',
+            categoryId: 'c',
+            categoryName: 'C',
+            name: 'X',
+            quantity: 1,
+            price: 5,
+            productBusinessId: 'b',
+            productCosts: costs.map((c) => ({ ...c, costPrice: 5 })),
+            order: 0,
+          },
+        ],
+      } as never;
+    }
+
+    it('U-O1: cuenta órdenes activas/unidades y separa las desactivadas', () => {
+      const impact = summarizeOrderImpact(
+        [
+          order('o1', true, [{ inventoryId: 'e1', quantity: 2 }]),
+          order('o2', true, [{ inventoryId: 'e2', quantity: 5 }]),
+          order('o3', false, [{ inventoryId: 'e1', quantity: 3 }]),
+        ] as never,
+        new Set(['e1']),
+      );
+      expect(impact).toEqual({ activeOrders: 1, deactivatedOrders: 1, soldUnits: 2 });
     });
   });
 });

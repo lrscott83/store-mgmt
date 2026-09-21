@@ -111,4 +111,12 @@ export interface WarehouseStockMovement {
   inventoryEntryId?: string;
   /** reversal de sale_out → entrada de tienda restaurada/eliminada (D11). */
   reversalInventoryEntryId?: string;
+  /**
+   * Compra (`purchase_in`) que originó el lote consumido por esta fila
+   * (plan 2026-09-16, Fase 3). Solo se escribe en `sale_out` cuando el lote
+   * tocado traía `lotOriginMovementId`; es la referencia determinista
+   * `compra → salida` que usa la propagación de costo. Opcional para
+   * compatibilidad con filas anteriores — sin ella se cae al fallback por costo.
+   */
+  lotOriginMovementId?: string;
 }

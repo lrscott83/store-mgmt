@@ -673,6 +673,14 @@ const messages: Record<string, string> = {
     'La cantidad supera lo que queda de esta compra. Solo puede editar hasta {max}.',
   'WAREHOUSES.MOVEMENT_NOT_FOUND': 'El movimiento no existe.',
   'WAREHOUSES.MOVEMENT_UPDATED': 'Movimiento actualizado.',
+  // ─── Fase 3: propagación del costo al editar una compra (plan 2026-09-16) ──
+  'WAREHOUSES.PROPAGATION_TITLE': 'Propagar costo de la compra',
+  'WAREHOUSES.PROPAGATION_CONFIRM':
+    'Esta compra tiene {soldUnits} unidades ya vendidas en {sales} venta(s) y {storeUnits} unidades en tienda sin vender. Se actualizará su costo de {from} a {to}.',
+  'WAREHOUSES.PROPAGATION_LEFT_OUT':
+    '{count} venta(s) anulada(s) no se actualizarán.',
+  'WAREHOUSES.PROPAGATION_COST_ONLY_HINT':
+    'Esta compra no tiene unidades en el almacén; solo se corregirá el costo de lo ya vendido.',
   'WAREHOUSES.ACTIONS': 'Acciones de',
   'WAREHOUSES.REVERT_ACTION': 'Eliminar',
   'WAREHOUSES.EDIT_ACTION': 'Editar',
