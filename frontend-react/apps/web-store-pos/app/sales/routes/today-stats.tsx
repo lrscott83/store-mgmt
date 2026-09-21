@@ -185,6 +185,13 @@ export function TodayStatsPage() {
   // Every amount carries its own currency; the net `total` is combined PER
   // currency (each component grouped by currency, then added/subtracted), never
   // as a mixed sum. Reuses the shared grouping/order helpers via the component.
+  // "Ventas" has ONE source: the active orders' ITEMS (price × qty). The legacy
+  // scalar `ordersTotal` comes from `getCategoryCartItemsView()`, which itself
+  // sums `getActiveOrdersInDay(date).flatMap(order => order.orderItems)` with
+  // `round2(Σ round2(price×qty))`; these per-currency entries are the same items.
+  // So the gate-ON "Ventas" per-currency total matches the gate-OFF scalar
+  // (differing at most by rounding grouping) — "Ventas" follows the ITEM sum,
+  // NOT `order.total` (which may include percent/tax).
   const salesEntries: CurrencyAmount[] = activeOrders.flatMap((order) =>
     order.orderItems.map((item) => ({
       amount: round2(item.price * item.quantity),

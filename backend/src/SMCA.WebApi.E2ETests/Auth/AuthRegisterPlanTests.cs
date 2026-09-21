@@ -119,13 +119,13 @@ public sealed class AuthRegisterPlanTests
                 .Select(srf => srf.FeatureId).Distinct().ToListAsync();
 
             // Mapped features of the assigned (Pago) modules are present for this owner:
-            // Statistics 60, Billing 90, WholesaleSales 59, ... Warehouses 36/37 are
+            // Statistics 60, Billing 90, WholesaleSales 39, ... Warehouses 36/37 are
             // Superior-only and must NOT be granted. StorePayment (91) is SuperAdmin/
             // ReSeller-only in StoreRoleFeatures (StorePaymentAdmin), so no OwnerAdmin row
-            // exists for it. 38/39 have no StoreRoleFeatures mapping at all (production
-            // gap, asserted as-is). Elaboration 120/121 is Superior/VIP-only too.
-            srfFeatureIds.Should().Contain(new[] { 60, 90 });
-            srfFeatureIds.Should().NotContain(new[] { 36, 37, 38, 39, 91, 120, 121 });
+            // exists for it. MultiStores (38) is not in the Pago plan, so it is absent too.
+            // Elaboration 120/121 is Superior/VIP-only.
+            srfFeatureIds.Should().Contain(new[] { 39, 60, 90 });
+            srfFeatureIds.Should().NotContain(new[] { 36, 37, 38, 91, 120, 121 });
         }
         finally
         {

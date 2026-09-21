@@ -248,11 +248,9 @@ public sealed class ExportOfflineRosterPlanTests
             {
                 FreeManagementModuleId, WarehousesModuleId, MultiStoresModuleId
             });
-            // FeatureIds follow the StoreRoleFeatures mapping: Warehouses 36/37 are mapped;
-            // OwnerStores (38) has no StoreRoleFeatures entry yet (production gap, asserted
-            // as current behavior).
-            ownerEntry.FeatureIds.Should().Contain(new[] { WarehousesFeatureId });
-            ownerEntry.FeatureIds.Should().NotContain(MultiStoresFeatureId);
+            // FeatureIds follow the StoreRoleFeatures mapping: Warehouses (36/37) and
+            // OwnerStores (38) are mapped (store-role-features-completeness fix, 2026-09-20).
+            ownerEntry.FeatureIds.Should().Contain(new[] { WarehousesFeatureId, MultiStoresFeatureId });
         }
         finally
         {

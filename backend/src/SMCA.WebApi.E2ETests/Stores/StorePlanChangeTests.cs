@@ -83,8 +83,9 @@ public sealed class StorePlanChangeTests
             var srfFeatureIds = await db.Set<StoreRoleFeature>().IgnoreQueryFilters()
                 .Where(srf => srf.StoreId == seeded.StoreId && srf.IsActive)
                 .Select(srf => srf.FeatureId).Distinct().ToListAsync();
-            srfFeatureIds.Should().Contain(new[] { 36, 37, 60 }); // Warehouses + Statistics mapped
-            srfFeatureIds.Should().NotContain(new[] { 38, 39 });  // not mapped (production gap)
+            // Warehouses (36/37), MultiStores (38), WholesaleSales (39) and Statistics (60)
+            // are all mapped (store-role-features-completeness production fix, 2026-09-20).
+            srfFeatureIds.Should().Contain(new[] { 36, 37, 38, 39, 60 });
         }
         finally
         {
@@ -256,8 +257,8 @@ public sealed class StorePlanChangeTests
             var srfFeatureIds = await db.Set<StoreRoleFeature>().IgnoreQueryFilters()
                 .Where(srf => srf.StoreId == seeded.StoreId && srf.IsActive)
                 .Select(srf => srf.FeatureId).Distinct().ToListAsync();
-            srfFeatureIds.Should().Contain(new[] { 36, 37 });
-            srfFeatureIds.Should().NotContain(39); // WholesaleSales feature not mapped (production gap)
+            // Warehouses (36/37) and WholesaleSales (39) are mapped (2026-09-20 fix).
+            srfFeatureIds.Should().Contain(new[] { 36, 37, 39 });
         }
         finally
         {

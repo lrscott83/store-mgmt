@@ -4,6 +4,7 @@ import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 import { Currency, EModules, OrderType, PaymentType } from '@store-mgmt/domain';
 import type { Expense, Order, SaleCredit } from '@store-mgmt/domain';
+import type { StoreRangeSummary } from '~/shared/lib/multistore/multi-store-aggregator';
 import { CuadrePorFechasPage } from '../cuadre-por-fechas';
 
 const auth = vi.hoisted(() => ({
@@ -17,6 +18,29 @@ vi.mock('~/shared/lib/stores/auth-store', () => ({
     typeof selector === 'function' ? selector(auth.state) : auth.state,
   ),
 }));
+
+// Multi-store gate — OFF by default (matches the real hook for a non-owner), ON per test.
+const multiStore = vi.hoisted(() => ({
+  enabled: false,
+  stores: [] as { id: string; name: string }[],
+}));
+vi.mock('~/shared/lib/hooks/use-multi-store', () => ({
+  useMultiStore: () => ({ enabled: multiStore.enabled, stores: multiStore.stores }),
+}));
+
+// Per-store summaries returned by the read-only aggregator (no real storage/DEK touched).
+const storeSummaries = vi.hoisted(() => ({
+  byStore: {} as Record<string, unknown>,
+}));
+vi.mock('~/shared/lib/multistore/multi-store-aggregator', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('~/shared/lib/multistore/multi-store-aggregator')>();
+  return {
+    ...actual,
+    unwrapStoreDek: vi.fn().mockResolvedValue(new Uint8Array([1])),
+    computeStoreRangeSummary: vi.fn((storeId: string) => storeSummaries.byStore[storeId]),
+  };
+});
 
 const fixtures = vi.hoisted(() => ({
   ordersBetween: [] as Order[],
@@ -93,6 +117,9 @@ function generate() {
 
 describe('CuadrePorFechasPage — MultiMonedas totals', () => {
   beforeEach(() => {
+    multiStore.enabled = false;
+    multiStore.stores = [];
+    storeSummaries.byStore = {};
     auth.state.user = { selectedStoreId: 's1', storeModuleIds: [] };
     fixtures.ordersBetween = [];
     fixtures.salesTotal = 0;
@@ -130,5 +157,84 @@ describe('CuadrePorFechasPage — MultiMonedas totals', () => {
     expect(screen.getAllByText('30 USD').length).toBeGreaterThan(0);
     expect(screen.getAllByText('5 EUR').length).toBeGreaterThan(0);
     expect(screen.queryByText('$35')).toBeNull();
+  });
+});
+
+function makeStoreSummary(overrides: Partial<StoreRangeSummary> = {}): StoreRangeSummary {
+  return {
+    salesTotal: 0,
+    expensesTotal: 0,
+    grossProfit: 0,
+    netProfit: 0,
+    categories: [],
+    expenses: [],
+    saleCredits: [],
+    paidSaleCredits: [],
+    salesCashTotal: 0,
+    salesCardTotal: 0,
+    expensesCashTotal: 0,
+    paidCreditsCashTotal: 0,
+    salesEntries: [],
+    grossProfitEntries: [],
+    salesCashEntries: [],
+    salesCardEntries: [],
+    ...overrides,
+  };
+}
+
+describe('CuadrePorFechasPage — MultiMonedas in multi-store mode', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    multiStore.enabled = true;
+    multiStore.stores = [
+      { id: 's1', name: 'Tienda A' },
+      { id: 's2', name: 'Tienda B' },
+    ];
+    storeSummaries.byStore = {};
+    auth.state.user = { selectedStoreId: 's1', storeModuleIds: [] };
+  });
+
+  function seedTwoStores() {
+    storeSummaries.byStore = {
+      s1: makeStoreSummary({
+        salesTotal: 30,
+        grossProfit: 10,
+        netProfit: 10,
+        salesEntries: [{ amount: 30, currency: Currency.USD }],
+        grossProfitEntries: [{ amount: 10, currency: Currency.USD }],
+      }),
+      s2: makeStoreSummary({
+        salesTotal: 5,
+        grossProfit: 3,
+        netProfit: 3,
+        salesEntries: [{ amount: 5, currency: Currency.EUR }],
+        grossProfitEntries: [{ amount: 3, currency: Currency.EUR }],
+      }),
+    };
+  }
+
+  it('gate OFF: aggregate KPIs keep the legacy mixed totals ($35 / $13)', async () => {
+    seedTwoStores();
+    renderPage();
+    generate();
+    await waitFor(() => expect(screen.getByText('Ganancias Bruta')).toBeTruthy());
+    // Aggregate sales = 30 + 5 = $35; gross/net = 10 + 3 = $13 (never a mixed display here).
+    expect(screen.getAllByText('$35').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('$13').length).toBeGreaterThan(0);
+  });
+
+  it('gate ON: aggregate KPIs and per-store totals are per currency, never mixed', async () => {
+    auth.state.user.storeModuleIds = [EModules.MultiMonedas];
+    seedTwoStores();
+    renderPage();
+    generate();
+    await waitFor(() => expect(screen.getByText('Ganancias Bruta')).toBeTruthy());
+    // Sales KPI: USD 30 primary + EUR 5 chip. Gross/Net + per-store "Ganancias": USD 10 / EUR 3.
+    expect(screen.getAllByText('30 USD').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('5 EUR').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('10 USD').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('3 EUR').length).toBeGreaterThan(0);
+    expect(screen.queryByText('$35')).toBeNull();
+    expect(screen.queryByText('$13')).toBeNull();
   });
 });
