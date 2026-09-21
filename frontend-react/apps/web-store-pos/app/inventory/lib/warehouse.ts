@@ -1,8 +1,10 @@
 import type {
   BaseError,
+  Order,
   WarehouseMovementType,
   WarehouseStockLevel,
   WarehouseStockLot,
+  WarehouseStockMovement,
 } from '@store-mgmt/domain';
 import { Result, WarehouseErrors } from '@store-mgmt/domain';
 import { round2 } from '~/shared/lib/money';
@@ -163,6 +165,109 @@ export function reversalDirection(
 /** Misma regla de cantidad para las reversas (D7a/decisión #7). */
 export function validateReversalQuantity(quantity: number): Result {
   return validateMovementQuantity(quantity);
+}
+
+/**
+ * Atribución de las filas `sale_out` a una COMPRA (plan 2026-09-16, Fase 3).
+ * Puro (sin I/O): recibe los movimientos y un predicado `isReversed`.
+ */
+export interface PurchaseOutflowAttribution {
+  succeeded: boolean;
+  /** Filas de salida a tienda vivas atribuidas a la compra. */
+  saleOutMovements: WarehouseStockMovement[];
+  /** true = no se puede decidir (varias compras al mismo costo sin referencia). */
+  ambiguous: boolean;
+}
+
+/**
+ * Devuelve las filas `sale_out` vivas atribuibles a `purchase`:
+ * 1. Ruta determinista: `m.lotOriginMovementId === purchase.id` (campo nuevo).
+ * 2. Fallback legacy por costo EXACTO — solo si ninguna fila trae referencia y
+ *    no hay más de una compra viva del mismo producto a ese costo (si la hay,
+ *    la atribución es ambigua y se bloquea: `PurchasePropagationAmbiguous`).
+ */
+export function attributePurchaseOutflow(
+  purchase: Pick<WarehouseStockMovement, 'id' | 'productId' | 'costPrice'>,
+  movements: WarehouseStockMovement[],
+  isReversed: (movementId: string) => boolean,
+): PurchaseOutflowAttribution {
+  const liveSaleOuts = movements.filter(
+    (m) => m.type === 'sale_out' && m.productId === purchase.productId && !isReversed(m.id),
+  );
+
+  const referenced = liveSaleOuts.filter((m) => m.lotOriginMovementId === purchase.id);
+  if (referenced.length > 0) {
+    return { succeeded: true, saleOutMovements: referenced, ambiguous: false };
+  }
+
+  if (purchase.costPrice === undefined) {
+    return { succeeded: true, saleOutMovements: [], ambiguous: false };
+  }
+
+  const livePurchasesAtCost = movements.filter(
+    (m) =>
+      m.type === 'purchase_in' &&
+      m.productId === purchase.productId &&
+      m.costPrice !== undefined &&
+      round2(m.costPrice) === round2(purchase.costPrice as number) &&
+      !isReversed(m.id),
+  );
+  if (livePurchasesAtCost.length > 1) {
+    return { succeeded: false, saleOutMovements: [], ambiguous: true };
+  }
+
+  const legacy = liveSaleOuts.filter(
+    (m) =>
+      m.costPrice !== undefined &&
+      round2(m.costPrice) === round2(purchase.costPrice as number),
+  );
+  return { succeeded: true, saleOutMovements: legacy, ambiguous: false };
+}
+
+/** Impacto de una corrección de costo sobre las órdenes (Fase 3). */
+export interface PurchaseOrderImpact {
+  /**
+   * Órdenes ACTIVAS afectadas — solo estas se actualizan (decisión ratificada
+   * 2026-09-20, #2). Las desactivadas se cuentan pero se dejan intactas.
+   */
+  activeOrders: number;
+  /** Órdenes desactivadas con líneas afectadas (excluidas del update). */
+  deactivatedOrders: number;
+  /** Unidades vendidas (en órdenes activas) que referencian las entradas dadas. */
+  soldUnits: number;
+}
+
+/**
+ * Cuenta las órdenes afectadas por una corrección de costo, sin mutarlas.
+ * Puro (sin I/O): recibe las órdenes y el conjunto de `inventoryId` de las
+ * entradas de tienda a corregir.
+ */
+export function summarizeOrderImpact(
+  orders: Order[],
+  inventoryIds: ReadonlySet<string>,
+): PurchaseOrderImpact {
+  let activeOrders = 0;
+  let deactivatedOrders = 0;
+  let soldUnits = 0;
+  for (const order of orders) {
+    let touched = false;
+    let quantity = 0;
+    for (const item of order.orderItems) {
+      for (const cost of item.productCosts) {
+        if (!inventoryIds.has(cost.inventoryId)) continue;
+        touched = true;
+        quantity += cost.quantity;
+      }
+    }
+    if (!touched) continue;
+    if (order.isActive) {
+      activeOrders += 1;
+      soldUnits = round2(soldUnits + quantity);
+    } else {
+      deactivatedOrders += 1;
+    }
+  }
+  return { activeOrders, deactivatedOrders, soldUnits };
 }
 
 export type { BaseError };

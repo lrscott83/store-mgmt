@@ -24,7 +24,9 @@ import {
 import { formatLocalDate, groupByLocalDay } from '~/shared/lib/date-utils';
 import { formatCurrency } from '~/shared/lib/format-currency';
 import { WarehouseOfflineService } from '../lib/services/warehouse-offline-service';
+import type { PurchasePropagationPreview } from '../lib/services/warehouse-offline-service';
 import { InventoryOfflineService } from '../lib/services/inventory-offline-service';
+import { OrderOfflineService } from '~/sales/lib/services/order-offline-service';
 import { WarehouseMovementModal } from '../components/warehouse-movement-modal';
 import type { WarehouseMovementFields, WarehouseMovementMode } from '../components/warehouse-movement-modal';
 import { remainingPurchaseUnits } from '../lib/warehouse';
@@ -85,6 +87,8 @@ export function WarehouseMovementsPage() {
               storeId,
               new ProductRepository(storeId, new ProductCategoryRepository(storeId)),
             ),
+            // Fase 3: propagación de costo a las ventas activas.
+            new OrderOfflineService(storeId),
           )
         : null,
     [storeId],
@@ -196,6 +200,9 @@ export function WarehouseMovementsPage() {
     return remainingPurchaseUnits(level, editingMovement);
   }, [editingMovement, service]);
 
+  /** Fase 3: una compra sin remanente en almacén solo corrige el costo de lo vendido. */
+  const editCostOnly = editMaxQuantity === 0;
+
   /**
    * Valores precargados de edición. Memoizado: el modal reinicia su formulario
    * cuando cambia la identidad de `initial`, y un literal inline la cambiaba en
@@ -228,18 +235,20 @@ export function WarehouseMovementsPage() {
   }
 
   /**
-   * F3: la edición NO muta la fila original — compensa (reversa al costo
-   * exacto del lote) y registra el movimiento corregido.
-   *
-   * A9d/A9e: si el paso 2 falla, la reversa YA quedó persistida (§7.3 del plan),
-   * así que el error se muestra DENTRO del modal (que sigue abierto) en lugar de
-   * cerrarlo: el usuario ve el tope y el motivo, corrige y reintenta. El reintento
-   * salta el paso 1 (`editReversed`) para no revertir dos veces.
+   * Fase 3: al editar una COMPRA el costo se propaga a las ventas ya hechas y al
+   * stock en tienda, de forma ATÓMICA (`applyPurchaseCostEdit`). Si hay unidades
+   * fuera del almacén, se confirma con detalle antes de aplicar. Las salidas y
+   * transferencias conservan el flujo reversa + recreación por pasos.
    */
   function handleEditSubmit(fields: WarehouseMovementFields) {
     if (!service || !editingMovement) return;
     const original = editingMovement;
     setEditError(null);
+
+    if (original.type === 'purchase_in') {
+      void applyPurchaseCostEdit(original, fields);
+      return;
+    }
 
     if (!editReversed) {
       const reversal = service.reverseMovement(original.id);
@@ -269,6 +278,63 @@ export function WarehouseMovementsPage() {
       // y regenera la compra original como fila vieja, lo que dejaría el modal
       // apuntando a datos obsoletos en pleno reintento.
       setEditError(recreated.errors[0]?.description ?? '');
+      return;
+    }
+
+    closeEdit();
+    showToastSuccess(intl.formatMessage({ id: 'WAREHOUSES.MOVEMENT_UPDATED' }));
+    load();
+  }
+
+  /** Detalle de la confirmación de propagación (Fase 3). */
+  function propagationMessage(preview: PurchasePropagationPreview): string {
+    const base = intl.formatMessage(
+      { id: 'WAREHOUSES.PROPAGATION_CONFIRM' },
+      {
+        soldUnits: preview.soldUnits,
+        sales: preview.activeOrders,
+        storeUnits: preview.storeUnits,
+        from: formatCurrency(preview.from),
+        to: formatCurrency(preview.to),
+      },
+    );
+    if (preview.deactivatedOrders > 0) {
+      return `${base} ${intl.formatMessage(
+        { id: 'WAREHOUSES.PROPAGATION_LEFT_OUT' },
+        { count: preview.deactivatedOrders },
+      )}`;
+    }
+    return base;
+  }
+
+  async function applyPurchaseCostEdit(
+    original: WarehouseStockMovement,
+    fields: WarehouseMovementFields,
+  ) {
+    if (!service) return;
+    const newCostPrice = fields.costPrice ?? original.costPrice ?? 0;
+
+    const preview = service.getPurchasePropagationPreview(original.id, newCostPrice);
+    if (!preview.succeeded) {
+      showBlockingError(
+        intl.formatMessage({ id: 'GENERAL.ERROR' }),
+        preview.errors[0]?.description ?? '',
+      );
+      return;
+    }
+    if (preview.data!.hasOutflow) {
+      const confirmed = await confirmDialog({
+        title: intl.formatMessage({ id: 'WAREHOUSES.PROPAGATION_TITLE' }),
+        message: propagationMessage(preview.data!),
+        confirmButtonText: intl.formatMessage({ id: 'GENERAL.YES' }),
+        cancelButtonText: intl.formatMessage({ id: 'GENERAL.NO' }),
+      });
+      if (!confirmed) return;
+    }
+
+    const result = service.applyPurchaseCostEdit(original.id, fields.quantity, newCostPrice);
+    if (!result.succeeded) {
+      setEditError(result.errors[0]?.description ?? '');
       return;
     }
 
@@ -466,6 +532,7 @@ export function WarehouseMovementsPage() {
           initial={editInitial}
           titleId="WAREHOUSES.REVERSAL_EDIT_TITLE"
           maxQuantity={editMaxQuantity}
+          costOnly={editCostOnly}
           errorMessage={editError}
           onClose={closeEdit}
           onSubmit={handleEditSubmit}

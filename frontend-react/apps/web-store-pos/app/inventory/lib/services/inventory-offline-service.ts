@@ -874,6 +874,39 @@ export class InventoryOfflineService {
     return Result.Success();
   }
 
+  /**
+   * Corrige SOLO el `costPrice` de una entrada originada por una salida de
+   * almacén (plan 2026-09-16, Fase 3 — propagación del costo de una compra).
+   *
+   * Omite a propósito el bloqueo A8 de `update()`: la entrada sigue sellada
+   * (`warehouseSaleOutMovementId` intacto) y su cantidad/categoría no cambian;
+   * el costo lo dirige la edición del movimiento de compra. `update()` del CRUD
+   * sigue rechazando estas entradas para ediciones del usuario.
+   */
+  updateWarehouseOriginEntryCost(
+    productId: string,
+    entryId: string,
+    costPrice: number,
+    currency?: number,
+  ): Result {
+    const allForProduct = this.getProductInventoriesByProductId(productId);
+    const idx = allForProduct.findIndex((e) => e.id === entryId);
+    if (idx === -1) {
+      return Result.Failure([InventoryErrors.EntryNotExists]);
+    }
+    allForProduct[idx] = {
+      ...allForProduct[idx],
+      costPrice,
+      ...(currency !== undefined ? { currency } : {}),
+      updatedDate: new Date(),
+      updatedByName: getCurrentUserLogin(),
+    };
+    const map = this.getStorageInventoriesMap();
+    map.set(productId, allForProduct);
+    this.setInventoriesLocalStorage(map);
+    return Result.Success();
+  }
+
   // ─── Query helpers ───────────────────────────────────────────────────────
 
   /**

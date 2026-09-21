@@ -665,6 +665,56 @@ export class OrderOfflineService {
   }
 
   /**
+   * Cost-propagation seam (plan 2026-09-16, Fase 3): corrige el `costPrice` de las
+   * líneas `productCosts` que referencian alguna de las entradas dadas.
+   *
+   * Decisión ratificada (2026-09-20, #2): SOLO se actualizan órdenes ACTIVAS; las
+   * desactivadas se cuentan pero se dejan intactas (sus unidades ya se devolvieron
+   * al stock en `deactivateOrder`). No toca `quantity` ni líneas ajenas.
+   *
+   * Cambio LOCAL únicamente (decisión #3): no viaja por import/export — el merge
+   * estrecho de `updateImportedOrder` no transporta `productCosts`.
+   */
+  updateProductCostsByInventoryIds(
+    costsByInventoryId: ReadonlyMap<string, number>,
+  ): { activeOrders: number; deactivatedOrders: number; updatedLines: number } {
+    let activeOrders = 0;
+    let deactivatedOrders = 0;
+    let updatedLines = 0;
+
+    for (const order of this.getStorageOrders()) {
+      let touched = false;
+      for (const item of order.orderItems) {
+        for (const cost of item.productCosts) {
+          const nextCost = costsByInventoryId.get(cost.inventoryId);
+          if (nextCost === undefined) continue;
+          touched = true;
+          if (order.isActive) {
+            cost.costPrice = nextCost;
+            updatedLines += 1;
+          }
+        }
+      }
+      if (!touched) continue;
+      if (order.isActive) activeOrders += 1;
+      else deactivatedOrders += 1;
+    }
+
+    if (updatedLines > 0) this.setOrdersLocalStorage(this.orders!);
+    return { activeOrders, deactivatedOrders, updatedLines };
+  }
+
+  /**
+   * Restaura el arreglo completo de órdenes desde un snapshot (rollback de la
+   * edición de costo atómica, plan 2026-09-16 Fase 3). Solo lo usa
+   * `WarehouseOfflineService` como parte de su transacción "todo o nada".
+   */
+  restoreOrdersSnapshot(orders: Order[]): void {
+    this.orders = orders;
+    this.setOrdersLocalStorage(orders);
+  }
+
+  /**
    * 1:1 port of Angular `getOrdersJson` (order-offline.service.ts:416-418) — falsy-check
    * fallback (`||`), NOT nullish (`??`): an empty-string stored value also falls back to
    * `"[]"`, matching Angular exactly. At-rest encryption seam: decrypted immediately at

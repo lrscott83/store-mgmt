@@ -1,6 +1,8 @@
 import type {
   BaseError,
   DataResult,
+  InventoryEntry,
+  Order,
   Warehouse,
   WarehouseMovementType,
   WarehouseStockLevel,
@@ -21,9 +23,11 @@ import { round2 } from '~/shared/lib/money';
 import { ProductRepository } from '~/sales/lib/repositories/product-repository';
 import { InventoryOfflineService } from './inventory-offline-service';
 import {
+  attributePurchaseOutflow,
   displayCost,
   remainingPurchaseUnits,
   splitByFifoLots,
+  summarizeOrderImpact,
   synthesizeLotFromLevel,
   validateMovementQuantity,
 } from '../warehouse';
@@ -47,6 +51,66 @@ function reviveDate<T>(value: T, fields: (keyof T & string)[]): T {
  * `purchase_in`; `sale_out` usa el costo promedio del almacén; las
  * transferencias propagan el costo del origen (decisión #4).
  */
+/** Resumen del impacto de una corrección de costo sobre las órdenes. */
+export interface ProductCostCorrectionResult {
+  activeOrders: number;
+  deactivatedOrders: number;
+  updatedLines: number;
+}
+
+/**
+ * Puerto mínimo de órdenes que consume la propagación de costo (Fase 3). Lo
+ * implementa estructuralmente `OrderOfflineService`. Es OPCIONAL en el
+ * constructor para no romper las construcciones existentes (tests de almacén);
+ * sin él, la propagación no toca ventas pero sí el stock en tienda.
+ */
+export interface PurchaseCostOrderPort {
+  getStorageOrders(): Order[];
+  updateProductCostsByInventoryIds(
+    costsByInventoryId: ReadonlyMap<string, number>,
+  ): ProductCostCorrectionResult;
+  restoreOrdersSnapshot(orders: Order[]): void;
+}
+
+/** Vistazo previo (solo lectura) para la confirmación con detalle. */
+export interface PurchasePropagationPreview {
+  /** true = la compra tiene unidades fuera del almacén que corregir. */
+  hasOutflow: boolean;
+  saleOutMovements: number;
+  storeEntries: number;
+  activeOrders: number;
+  deactivatedOrders: number;
+  soldUnits: number;
+  storeUnits: number;
+  from: number;
+  to: number;
+}
+
+/** Resultado de aplicar la edición de costo de una compra. */
+export interface PurchaseCostEditOutcome {
+  /** true = no había remanente en almacén; solo se corrigió el costo de lo vendido. */
+  costOnly: boolean;
+  storeEntries: number;
+  activeOrders: number;
+  deactivatedOrders: number;
+  /** Id de la compra recreada (solo en la ruta con reversa). */
+  createdMovementId?: string;
+}
+
+/** Salidas a tienda atribuidas a una compra + sus entradas espejo resueltas. */
+interface ResolvedPurchaseOutflow {
+  movements: WarehouseStockMovement[];
+  entries: InventoryEntry[];
+}
+
+/** Snapshot en memoria para el rollback de la edición atómica. */
+interface PurchaseEditSnapshot {
+  levels: WarehouseStockLevel[];
+  entriesByProduct: Map<string, InventoryEntry[]>;
+  movements: WarehouseStockMovement[];
+  orders: Order[] | undefined;
+}
+
 export interface RecordWarehouseMovementParams {
   type: WarehouseMovementType;
   /** Almacén origen (sale_out/transfer_out) o destino (purchase_in/transfer_in). */
@@ -100,6 +164,7 @@ export class WarehouseOfflineService {
     private readonly storeId: string,
     private readonly productRepository: ProductRepository,
     private readonly inventoryService: InventoryOfflineService,
+    private readonly orderPort?: PurchaseCostOrderPort,
   ) {}
 
   // ─── warehouses ──────────────────────────────────────────────────────────
@@ -379,6 +444,8 @@ export class WarehouseOfflineService {
               costPrice: slice.costPrice,
               inventoryEntryId: entryId,
               toStoreId: params.toStoreId,
+              // Fase 3: referencia determinista compra → salida (si el lote la traía).
+              lotOriginMovementId: slice.lotOriginMovementId,
             }),
           );
           return new DataResultImpl<WarehouseStockMovement[]>(rows, true, []);
@@ -856,6 +923,294 @@ export class WarehouseOfflineService {
     );
   }
 
+  // ─── Edición de costo de compras + propagación (plan 2026-09-16, Fase 3) ──
+
+  /**
+   * Vistazo previo (solo lectura) de lo que la edición del costo de una compra
+   * afectaría FUERA del almacén: las ventas que consumieron sus unidades y el
+   * stock que sigue en tienda. `hasOutflow` decide si la UI pide confirmación.
+   */
+  getPurchasePropagationPreview(
+    purchaseId: string,
+    newCostPrice: number,
+  ): DataResult<PurchasePropagationPreview> {
+    const purchase = this.getStorageMovements().find((m) => m.id === purchaseId);
+    if (!purchase) {
+      return new DataResultImpl<PurchasePropagationPreview>(undefined, false, [
+        WarehouseErrors.MovementNotFound,
+      ]);
+    }
+    if (purchase.type !== 'purchase_in') {
+      return new DataResultImpl<PurchasePropagationPreview>(undefined, false, [
+        WarehouseErrors.QuantityInvalid,
+      ]);
+    }
+
+    const resolved = this.resolvePurchaseOutflow(purchase);
+    if (!resolved.succeeded) {
+      return new DataResultImpl<PurchasePropagationPreview>(undefined, false, resolved.errors);
+    }
+    const { movements, entries } = resolved.data!;
+    const entryIds = new Set(entries.map((e) => e.id));
+    const orders = this.orderPort?.getStorageOrders() ?? [];
+    const impact = summarizeOrderImpact(orders, entryIds);
+
+    return new DataResultImpl<PurchasePropagationPreview>(
+      {
+        hasOutflow: movements.length > 0,
+        saleOutMovements: movements.length,
+        storeEntries: entries.length,
+        activeOrders: impact.activeOrders,
+        deactivatedOrders: impact.deactivatedOrders,
+        soldUnits: impact.soldUnits,
+        storeUnits: round2(entries.reduce((sum, e) => round2(sum + e.available), 0)),
+        from: round2(purchase.costPrice ?? 0),
+        to: round2(newCostPrice),
+      },
+      true,
+      [],
+    );
+  }
+
+  /**
+   * Edición atómica del costo de una compra (Fase 3): reversa + recreación del
+   * remanente del almacén — o SOLO corrección de costo si no queda remanente
+   * (decisión ratificada 2026-09-20, #1) — y propagación del costo nuevo a las
+   * entradas de tienda y a las órdenes ACTIVAS que consumieron esas unidades
+   * (decisión #2). "Todo o nada": ante cualquier fallo restaura los snapshots en
+   * memoria y no deja escritura parcial.
+   *
+   * Corrección LOCAL únicamente (decisión #3): no viaja por import/export.
+   */
+  applyPurchaseCostEdit(
+    purchaseId: string,
+    newQuantity: number,
+    newCostPrice: number,
+  ): DataResult<PurchaseCostEditOutcome> {
+    const purchase = this.getStorageMovements().find((m) => m.id === purchaseId);
+    if (!purchase) {
+      return new DataResultImpl<PurchaseCostEditOutcome>(undefined, false, [
+        WarehouseErrors.MovementNotFound,
+      ]);
+    }
+    if (purchase.type !== 'purchase_in') {
+      return new DataResultImpl<PurchaseCostEditOutcome>(undefined, false, [
+        WarehouseErrors.QuantityInvalid,
+      ]);
+    }
+    if (!(round2(newCostPrice) > 0)) {
+      return new DataResultImpl<PurchaseCostEditOutcome>(undefined, false, [
+        WarehouseErrors.QuantityInvalid,
+      ]);
+    }
+    const warehouse = this.getWarehouseById(purchase.warehouseId);
+    if (!warehouse || !warehouse.isActive) {
+      return new DataResultImpl<PurchaseCostEditOutcome>(undefined, false, [
+        WarehouseErrors.WarehouseNotActive,
+      ]);
+    }
+    const product = this.productRepository.getProductById(purchase.productId);
+    if (!product) {
+      return new DataResultImpl<PurchaseCostEditOutcome>(undefined, false, [
+        WarehouseErrors.ProductNotExists,
+      ]);
+    }
+    if (!product.isActive) {
+      return new DataResultImpl<PurchaseCostEditOutcome>(undefined, false, [
+        WarehouseErrors.ProductNotActive,
+      ]);
+    }
+
+    const resolved = this.resolvePurchaseOutflow(purchase);
+    if (!resolved.succeeded) {
+      return new DataResultImpl<PurchaseCostEditOutcome>(undefined, false, resolved.errors);
+    }
+    const { movements, entries } = resolved.data!;
+
+    const level = this.getStockLevel(purchase.warehouseId, purchase.productId);
+    const remaining = remainingPurchaseUnits(level, purchase);
+    const costOnly = remaining <= 0;
+
+    if (costOnly && movements.length === 0) {
+      return new DataResultImpl<PurchaseCostEditOutcome>(undefined, false, [
+        WarehouseErrors.PurchasePropagationNoOutflow,
+      ]);
+    }
+    if (!costOnly) {
+      const qtyOk = validateMovementQuantity(newQuantity);
+      if (!qtyOk.succeeded) {
+        return new DataResultImpl<PurchaseCostEditOutcome>(undefined, false, qtyOk.errors);
+      }
+      if (round2(newQuantity) > round2(remaining + 1e-9)) {
+        return new DataResultImpl<PurchaseCostEditOutcome>(undefined, false, [
+          WarehouseErrors.QuantityInvalid,
+        ]);
+      }
+    }
+
+    const snapshot = this.snapshotPurchaseEdit(purchase.productId);
+
+    try {
+      let createdMovementId: string | undefined;
+
+      // (c) Almacén: reversa + recreación del remanente (salvo corrección pura).
+      if (!costOnly) {
+        const reversal = this.reverseMovement(purchaseId);
+        if (!reversal.succeeded) {
+          this.restorePurchaseEdit(snapshot);
+          return new DataResultImpl<PurchaseCostEditOutcome>(undefined, false, reversal.errors);
+        }
+        const recreated = this.recordMovement({
+          type: 'purchase_in',
+          warehouseId: purchase.warehouseId,
+          productId: purchase.productId,
+          quantity: newQuantity,
+          costPrice: newCostPrice,
+        });
+        if (!recreated.succeeded) {
+          this.restorePurchaseEdit(snapshot);
+          return new DataResultImpl<PurchaseCostEditOutcome>(undefined, false, recreated.errors);
+        }
+        createdMovementId = recreated.data?.[0]?.id;
+      }
+
+      // (b) Stock en tienda: corrige el costo de cada entrada espejo.
+      for (const entry of entries) {
+        const updated = this.inventoryService.updateWarehouseOriginEntryCost(
+          purchase.productId,
+          entry.id,
+          round2(newCostPrice),
+        );
+        if (!updated.succeeded) {
+          this.restorePurchaseEdit(snapshot);
+          return new DataResultImpl<PurchaseCostEditOutcome>(undefined, false, updated.errors);
+        }
+      }
+
+      // (a) Ventas ACTIVAS: corrige el snapshot de costo por entrada.
+      const costs = new Map(entries.map((e) => [e.id, round2(newCostPrice)] as const));
+      const impact = this.orderPort
+        ? this.orderPort.updateProductCostsByInventoryIds(costs)
+        : { activeOrders: 0, deactivatedOrders: 0, updatedLines: 0 };
+
+      return new DataResultImpl<PurchaseCostEditOutcome>(
+        {
+          costOnly,
+          storeEntries: entries.length,
+          activeOrders: impact.activeOrders,
+          deactivatedOrders: impact.deactivatedOrders,
+          createdMovementId,
+        },
+        true,
+        [],
+      );
+    } catch (err) {
+      this.restorePurchaseEdit(snapshot);
+      if (err instanceof Error) {
+        return new DataResultImpl<PurchaseCostEditOutcome>(undefined, false, [
+          { code: 'Warehouse.PurchaseCostEditFailed', description: err.message },
+        ]);
+      }
+      throw err;
+    }
+  }
+
+  /** Atribuye las salidas a tienda de una compra y resuelve sus entradas espejo. */
+  private resolvePurchaseOutflow(purchase: WarehouseStockMovement): DataResult<ResolvedPurchaseOutflow> {
+    const attribution = attributePurchaseOutflow(
+      purchase,
+      this.getStorageMovements(),
+      (id) => this.isReversed(id),
+    );
+    if (!attribution.succeeded) {
+      return new DataResultImpl<ResolvedPurchaseOutflow>(undefined, false, [
+        WarehouseErrors.PurchasePropagationAmbiguous,
+      ]);
+    }
+    const entries: InventoryEntry[] = [];
+    for (const movement of attribution.saleOutMovements) {
+      const resolved = this.resolveSaleOutEntry(movement);
+      if (!resolved.succeeded) {
+        return new DataResultImpl<ResolvedPurchaseOutflow>(undefined, false, resolved.errors);
+      }
+      entries.push(resolved.data!);
+    }
+    return new DataResultImpl<ResolvedPurchaseOutflow>(
+      { movements: attribution.saleOutMovements, entries },
+      true,
+      [],
+    );
+  }
+
+  /**
+   * Localiza y valida la entrada espejo de una fila `sale_out` (enlace exacto o
+   * huella legacy), SIN exigir que no haya sido consumida: para la propagación
+   * el consumo es lo esperado (son justamente las unidades vendidas).
+   */
+  private resolveSaleOutEntry(movement: WarehouseStockMovement): DataResult<InventoryEntry> {
+    const entries = this.inventoryService.getProductInventoriesByProductId(movement.productId);
+    let entryId = movement.inventoryEntryId;
+    if (!entryId) {
+      const day = new Date(movement.createdDate).toDateString();
+      const candidates = entries.filter(
+        (e) =>
+          e.isActive &&
+          e.quantity === movement.quantity &&
+          round2(e.costPrice) === round2(movement.costPrice ?? e.costPrice) &&
+          new Date(e.createdDate).toDateString() === day,
+      );
+      if (candidates.length === 0) {
+        return new DataResultImpl<InventoryEntry>(undefined, false, [
+          WarehouseErrors.SaleOutEntryNotFound,
+        ]);
+      }
+      if (candidates.length > 1) {
+        return new DataResultImpl<InventoryEntry>(undefined, false, [
+          WarehouseErrors.SaleOutAmbiguousEntry,
+        ]);
+      }
+      entryId = candidates[0].id;
+    }
+    const entry = entries.find((e) => e.id === entryId);
+    if (!entry || !entry.isActive) {
+      return new DataResultImpl<InventoryEntry>(undefined, false, [
+        WarehouseErrors.SaleOutEntryNotFound,
+      ]);
+    }
+    if (round2(entry.quantity) !== round2(movement.quantity)) {
+      return new DataResultImpl<InventoryEntry>(undefined, false, [
+        WarehouseErrors.SaleOutEntryModified,
+      ]);
+    }
+    return new DataResultImpl<InventoryEntry>(entry, true, []);
+  }
+
+  private snapshotPurchaseEdit(productId: string): PurchaseEditSnapshot {
+    return {
+      levels: structuredClone(this.getStorageStockLevels()),
+      entriesByProduct: new Map([
+        [
+          productId,
+          structuredClone(this.inventoryService.getProductInventoriesByProductId(productId)),
+        ],
+      ]),
+      movements: structuredClone(this.getStorageMovements()),
+      orders: this.orderPort ? structuredClone(this.orderPort.getStorageOrders()) : undefined,
+    };
+  }
+
+  /** Restaura el estado previo de almacén/entradas/órdenes ("todo o nada", A2). */
+  private restorePurchaseEdit(snapshot: PurchaseEditSnapshot): void {
+    this.stockLevels = snapshot.levels;
+    this.setLocalStorage('warehouse-stock-levels', this.stockLevels);
+    this.movements = snapshot.movements;
+    this.setLocalStorage('warehouse-stock-movements', this.movements);
+    for (const [productId, entries] of snapshot.entriesByProduct) {
+      this.inventoryService.addImportedEntries(productId, entries);
+    }
+    if (snapshot.orders) this.orderPort?.restoreOrdersSnapshot(snapshot.orders);
+  }
+
   // ─── lotes — helpers internos (D8) ────────────────────────────────────────
 
   /** Nivel legacy sin lots → un único lote sintético al costo promedio vigente (D8). */
@@ -1068,6 +1423,8 @@ export class WarehouseOfflineService {
     reversalOfMovementId?: string;
     /** reversal de sale_out → entrada restaurada/eliminada (D11). */
     reversalInventoryEntryId?: string;
+    /** sale_out → compra que originó el lote consumido (Fase 3). */
+    lotOriginMovementId?: string;
   }): WarehouseStockMovement {
     const movement: WarehouseStockMovement = {
       id: input.id ?? generateId(),
@@ -1087,6 +1444,7 @@ export class WarehouseOfflineService {
       inventoryEntryId: input.inventoryEntryId,
       reversalOfMovementId: input.reversalOfMovementId,
       reversalInventoryEntryId: input.reversalInventoryEntryId,
+      lotOriginMovementId: input.lotOriginMovementId,
     };
     this.getStorageMovements().push(movement);
     this.setLocalStorage('warehouse-stock-movements', this.movements!);

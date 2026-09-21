@@ -47,6 +47,12 @@ interface WarehouseMovementModalProps {
    * reintenta sin perder el trabajo.
    */
   errorMessage?: string | null;
+  /**
+   * Fase 3: una compra sin remanente en el almacén solo corrige el costo de lo
+   * ya vendido. La cantidad deja de ser editable (0 en el almacén) y se oculta
+   * el campo; el costo sigue editable.
+   */
+  costOnly?: boolean;
 }
 
 const MODAL_TITLE: Record<WarehouseMovementMode, string> = {
@@ -75,6 +81,7 @@ export function WarehouseMovementModal({
   titleId,
   maxQuantity,
   errorMessage = null,
+  costOnly = false,
 }: WarehouseMovementModalProps) {
   const intl = useIntl();
   const [selectedProduct, setSelectedProduct] = useState('');
@@ -120,13 +127,14 @@ export function WarehouseMovementModal({
 
   if (!open) return null;
 
-  const qty = parseFloat(quantity);
+  const qty = costOnly ? 0 : parseFloat(quantity);
   const validQty = Number.isFinite(qty) && qty > 0;
-  // A1: el tope solo existe al editar una compra (maxQuantity definido).
-  const exceedsMax = maxQuantity !== undefined && validQty && qty > maxQuantity;
+  // A1: el tope solo existe al editar una compra (maxQuantity definido). En
+  // modo costOnly no hay cantidad que topar (el almacén está en 0).
+  const exceedsMax = maxQuantity !== undefined && !costOnly && validQty && qty > maxQuantity;
   const isValid =
     selectedProduct !== '' &&
-    validQty &&
+    (costOnly || validQty) &&
     !exceedsMax &&
     (mode !== 'purchase_in' ||
       (Number.isFinite(parseFloat(costPrice)) && parseFloat(costPrice) > 0)) &&
@@ -266,32 +274,46 @@ export function WarehouseMovementModal({
             )}
           </div>
 
-          <div>
-            <label htmlFor="movement-quantity" className="mb-1 block text-sm font-medium text-text">
-              {intl.formatMessage({ id: 'WAREHOUSES.QUANTITY' })}
-            </label>
-            {/* A1: el atributo nativo `max` refuerza el tope; la guarda real es `exceedsMax`. */}
-            <input
-              id="movement-quantity"
-              data-testid="movement-quantity"
-              type="number"
-              min="0"
-              max={maxQuantity !== undefined ? maxQuantity : undefined}
-              step="0.01"
-              value={quantity}
-              onChange={(e) => setQuantity(e.target.value)}
-              className={inputClass}
-            />
-            {/* A9e: el usuario debe entender POR QUÉ hay un tope. */}
-            {maxQuantity !== undefined && (
-              <p
-                data-testid="movement-max-hint"
-                className="mt-1 text-xs text-text-muted"
+          {costOnly ? (
+            // Fase 3: sin remanente en el almacén no hay cantidad que editar —
+            // solo se corrige el costo de las unidades ya vendidas / en tienda.
+            <p data-testid="movement-cost-only-hint" className="text-xs text-text-muted">
+              {intl.formatMessage({ id: 'WAREHOUSES.PROPAGATION_COST_ONLY_HINT' })}
+            </p>
+          ) : (
+            <div>
+              <label
+                htmlFor="movement-quantity"
+                className="mb-1 block text-sm font-medium text-text"
               >
-                {intl.formatMessage({ id: 'WAREHOUSES.EDIT_REMAINING_HINT' }, { max: maxQuantity })}
-              </p>
-            )}
-          </div>
+                {intl.formatMessage({ id: 'WAREHOUSES.QUANTITY' })}
+              </label>
+              {/* A1: el atributo nativo `max` refuerza el tope; la guarda real es `exceedsMax`. */}
+              <input
+                id="movement-quantity"
+                data-testid="movement-quantity"
+                type="number"
+                min="0"
+                max={maxQuantity !== undefined ? maxQuantity : undefined}
+                step="0.01"
+                value={quantity}
+                onChange={(e) => setQuantity(e.target.value)}
+                className={inputClass}
+              />
+              {/* A9e: el usuario debe entender POR QUÉ hay un tope. */}
+              {maxQuantity !== undefined && (
+                <p
+                  data-testid="movement-max-hint"
+                  className="mt-1 text-xs text-text-muted"
+                >
+                  {intl.formatMessage(
+                    { id: 'WAREHOUSES.EDIT_REMAINING_HINT' },
+                    { max: maxQuantity },
+                  )}
+                </p>
+              )}
+            </div>
+          )}
 
           {mode === 'purchase_in' && (
             <div>
@@ -378,7 +400,7 @@ export function WarehouseMovementModal({
             onClick={() =>
               onSubmit({
                 productId: selectedProduct,
-                quantity: qty,
+                quantity: costOnly ? 0 : qty,
                 costPrice:
                   mode === 'purchase_in' && Number.isFinite(parseFloat(costPrice))
                     ? parseFloat(costPrice)

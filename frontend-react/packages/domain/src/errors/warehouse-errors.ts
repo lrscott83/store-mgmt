@@ -87,4 +87,15 @@ export const WarehouseErrors = {
     code: 'Warehouse.WarehouseNotActive',
     description: 'El almacén involucrado no está activo.',
   },
+  // ─── Plan 2026-09-16, Fase 3: propagación del costo al editar una compra ──
+  PurchasePropagationAmbiguous: {
+    code: 'Warehouse.PurchasePropagationAmbiguous',
+    description:
+      'Hay varias compras con el mismo costo y sin referencia de origen — no se puede propagar el costo automáticamente.',
+  },
+  PurchasePropagationNoOutflow: {
+    code: 'Warehouse.PurchasePropagationNoOutflow',
+    description:
+      'La compra no tiene unidades fuera del almacén cuyo costo se pueda corregir.',
+  },
 } as const satisfies Record<string, BaseError>;
