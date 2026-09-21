@@ -492,10 +492,9 @@ describe('ExpensesHistoryPage — strict Angular parity', () => {
     expect(screen.queryByText('Zelle')).not.toBeInTheDocument();
   });
 
-  // Parity fix (presentation-parity-bucket-e item 1b): expenses.component.html:15-23 shows the
-  // payment glyph before each real payment-type label, but the "Todas" (null) option has none.
-  // Dinámico (2026-09-19): los glyph se mantienen sobre las opciones presentes en los datos.
-  it('shows a PaymentMethodIcon before each present payment-type label, but not before "Todas"', async () => {
+  // Text-only (petición 2026-09-21): las formas de pago ya no muestran ícono — solo el
+  // texto de la etiqueta, ni en las opciones ni en "Todas".
+  it('renders payment-type filter labels as text-only, with no icon SVG before them', async () => {
     vi.mocked(ExpenseOfflineService).mockImplementation(
       () =>
         ({
@@ -524,7 +523,7 @@ describe('ExpensesHistoryPage — strict Angular parity', () => {
 
     for (const text of ['Efectivo', 'Transferencia (CUP)', 'Zelle']) {
       const label = screen.getByText(text).closest('label');
-      expect(label?.querySelector('svg')).not.toBeNull();
+      expect(label?.querySelector('svg')).toBeNull();
     }
   });
 

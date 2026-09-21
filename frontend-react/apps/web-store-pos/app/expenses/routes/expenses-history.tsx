@@ -1,18 +1,16 @@
 import { useState, useEffect } from 'react';
 import { useIntl } from 'react-intl';
 import type { Expense } from '@store-mgmt/domain';
-import { EFeatures, PaymentType, SalePaymentMethod } from '@store-mgmt/domain';
+import { EFeatures } from '@store-mgmt/domain';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { Card } from '~/shared/components/ui/card';
 import { InfoBox } from '~/shared/components/ui/info-box';
-import { ChevronDownIcon, PaymentMethodIcon } from '~/shared/components/ui/icons';
-import { getPaymentTypeIconKind } from '~/shared/lib/payment-type-icon';
+import { ChevronDownIcon } from '~/shared/components/ui/icons';
 import {
   collectExpensePaymentMethodKeys,
   matchesExpensePaymentFilter,
   paymentMethodKeyToLabel,
-  paymentMethodKeyToSalePaymentMethod,
 } from '~/shared/lib/payment-filter-options';
 import { formatLocalDate, groupByLocalDay } from '~/shared/lib/date-utils';
 import type { LocalDayGroup } from '~/shared/lib/date-utils';
@@ -38,18 +36,6 @@ export const clientLoader = featureLoader([EFeatures.ExpensesHistory]);
  * `payment-filter-options`, con "Todas" primero. El estado guarda la CLAVE;
  * si deja de existir en los datos se resetea a null (Todas).
  */
-
-/** Glyph legacy equivalente para el icono del radio (mismos SVG que hoy). */
-function legacyKindFor(saleMethod: SalePaymentMethod): PaymentType {
-  switch (saleMethod) {
-    case SalePaymentMethod.Transferencia:
-      return PaymentType.Tarjeta;
-    case SalePaymentMethod.Zelle:
-      return PaymentType.Zelle;
-    default:
-      return PaymentType.Efectivo;
-  }
-}
 
 /**
  * Matches Angular's `expenses.component.html`/`.ts` (Historial de Gastos).
@@ -224,12 +210,6 @@ export function ExpensesHistoryPage() {
                     onChange={() => setPaymentKey(key)}
                     className="text-primary focus:ring-primary"
                   />
-                  <PaymentMethodIcon
-                    kind={getPaymentTypeIconKind(
-                      legacyKindFor(paymentMethodKeyToSalePaymentMethod(key)),
-                    )}
-                    className="text-success"
-                  />
                   {paymentMethodKeyToLabel(key)}
                 </label>
               ))}
@@ -364,10 +344,6 @@ export function ExpensesHistoryPage() {
                 checked={paymentActive === key}
                 onChange={() => setPaymentKey(key)}
                 className="text-primary focus:ring-primary"
-              />
-              <PaymentMethodIcon
-                kind={getPaymentTypeIconKind(legacyKindFor(paymentMethodKeyToSalePaymentMethod(key)))}
-                className="text-success"
               />
               {paymentMethodKeyToLabel(key)}
             </label>

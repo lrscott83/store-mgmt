@@ -13,7 +13,6 @@ import {
   salePaymentMethodToLegacyPaymentType,
   defaultPaymentMethodForCurrency,
 } from '@store-mgmt/domain';
-import type { SalePaymentMethod as SalePaymentMethodType } from '@store-mgmt/domain';
 import { useCartStore } from '~/shared/lib/stores/cart-store';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { useClickOutside } from '~/shared/lib/hooks/use-click-outside';
@@ -36,7 +35,6 @@ import {
   wholesaleTierUnitPrice,
   wholesaleUnitPlural,
 } from '~/sales/lib/wholesale';
-import { type PaymentTypeIconKind } from '~/shared/lib/payment-type-icon';
 import { getPaymentReturn, getPaymentReturnKind } from '~/shared/lib/payment-return';
 import { validateCartSubmission } from '~/shared/lib/cart-submission-validation';
 import { showBlockingError, showAcknowledgeError } from '~/shared/lib/blocking-alert';
@@ -58,92 +56,6 @@ import { InfoBox } from '~/shared/components/ui/info-box';
 // payment-methods-percent-tax (plan 2026-09-17): las opciones ya no son una
 // constante fija — el catálogo depende de la MONEDA de la venta
 // (paymentMethodOptionsForCurrency) y la Tarjeta se reemplaza por Transferencia.
-
-/** Ícono del método: Efectivo → cash, Zelle → phone, Transferencia → card. */
-function salePaymentMethodIconKind(method: SalePaymentMethodType): PaymentTypeIconKind {
-  switch (method) {
-    case SalePaymentMethod.Efectivo:
-      return 'cash';
-    case SalePaymentMethod.Zelle:
-      return 'phone';
-    default:
-      return 'card';
-  }
-}
-
-function PaymentTypeIcon({ kind }: { kind: PaymentTypeIconKind }) {
-  const testId = `payment-type-icon-${kind}`;
-  if (kind === 'cash') {
-    return (
-      <svg
-        data-testid={testId}
-        className="h-4 w-4"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={2}
-          d="M3 6h18M3 6v12a1 1 0 001 1h16a1 1 0 001-1V6M3 6l2-3h14l2 3M12 10a2.5 2.5 0 100 5 2.5 2.5 0 000-5z"
-        />
-      </svg>
-    );
-  }
-  if (kind === 'card') {
-    return (
-      <svg
-        data-testid={testId}
-        className="h-4 w-4"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={2}
-          d="M3 6h18a1 1 0 011 1v10a1 1 0 01-1 1H3a1 1 0 01-1-1V7a1 1 0 011-1zM2 10h20M6 15h4"
-        />
-      </svg>
-    );
-  }
-  if (kind === 'phone') {
-    return (
-      <svg
-        data-testid={testId}
-        className="h-4 w-4"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={2}
-          d="M7 3h10a1 1 0 011 1v16a1 1 0 01-1 1H7a1 1 0 01-1-1V4a1 1 0 011-1zM11 18h2"
-        />
-      </svg>
-    );
-  }
-  return (
-    <svg
-      data-testid={testId}
-      className="h-4 w-4"
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8V6m0 12v-2m0-8c1.11 0 2.08.402 2.599 1M9.401 15c.52.598 1.489 1 2.599 1"
-      />
-    </svg>
-  );
-}
 
 /**
  * Config mayorista del producto (para el paso de +/- en paquetes) sin depender
@@ -686,13 +598,12 @@ export function CartShell() {
                 )}
 
                 {/* Payment-method selector — radio group por MONEDA de la venta
-                  (payment-methods-percent-tax, plan 2026-09-17): cada método con su ícono +
-                  etiqueta ("Transferencia (CUP)" incluye su moneda). Reemplaza al selector
-                  fijo Efectivo/Tarjeta. */}
+                  (payment-methods-percent-tax, plan 2026-09-17): cada método con su
+                  etiqueta ("Transferencia (CUP)" incluye su moneda), solo texto sin ícono
+                  (petición 2026-09-21). Reemplaza al selector fijo Efectivo/Tarjeta. */}
                 <div className="border-b border-border px-4 py-3">
                   <div className="flex flex-wrap gap-4" role="radiogroup">
                     {methodOptions.map((method) => {
-                      const kind = salePaymentMethodIconKind(method);
                       const label = salePaymentMethodLabel(method, saleCurrency);
                       return (
                         <label
@@ -707,7 +618,6 @@ export function CartShell() {
                             onChange={() => setSalePaymentMethod(method)}
                             className="text-primary focus:ring-primary"
                           />
-                          <PaymentTypeIcon kind={kind} />
                           {label}
                         </label>
                       );

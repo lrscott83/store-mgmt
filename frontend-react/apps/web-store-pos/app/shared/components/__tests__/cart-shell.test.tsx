@@ -254,13 +254,16 @@ describe('CartShell — payment-type selector with icons', () => {
     expect(screen.getAllByRole('radio')).toHaveLength(2);
   });
 
-  it('renders a distinct inline SVG icon per payment type option', () => {
+  it('renders payment-method options as text-only radios (no per-type SVG icon, 2026-09-21)', () => {
     renderCartShell();
     openCart();
-    expect(screen.getByTestId('payment-type-icon-cash')).toBeInTheDocument();
-    expect(screen.getByTestId('payment-type-icon-card')).toBeInTheDocument();
-    // Zelle (phone icon) is no longer offered in the selector.
+    // Text-only: no icons in the selector at all — neither cash nor card nor phone.
+    expect(screen.queryByTestId('payment-type-icon-cash')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('payment-type-icon-card')).not.toBeInTheDocument();
     expect(screen.queryByTestId('payment-type-icon-phone')).not.toBeInTheDocument();
+    // The labels themselves are still there.
+    expect(screen.getByText('Efectivo')).toBeInTheDocument();
+    expect(screen.getByText('Transferencia (CUP)')).toBeInTheDocument();
   });
 });
 
