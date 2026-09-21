@@ -10,9 +10,10 @@ import { Card } from '~/shared/components/ui/card';
 import { InfoBox } from '~/shared/components/ui/info-box';
 import { BarChartIcon, ChevronDownIcon, DownloadIcon } from '~/shared/components/ui/icons';
 import { ActionMenu, ActionMenuItem } from '~/shared/components/ui/action-menu';
-import { formatLocalDate, fromLocalDayKey, groupByLocalDay } from '~/shared/lib/date-utils';
+import { addDays, formatLocalDate, fromLocalDayKey, groupByLocalDay, startOfDay } from '~/shared/lib/date-utils';
 import type { LocalDayGroup } from '~/shared/lib/date-utils';
 import { showBlockingInfo } from '~/shared/lib/blocking-alert';
+import { DateRangeFilter } from '~/shared/components/date-range-filter/date-range-filter';
 import { InventoryOfflineService } from '~/inventory/lib/services/inventory-offline-service';
 import { generateProductRowsForDate } from '~/reports/lib/pdf/generate-product-rows-for-date';
 import { exportInventoryTodaySalePdf } from '~/reports/lib/pdf/inventory-today-sale-pdf';
@@ -138,6 +139,10 @@ export function OrdersPage() {
   const [expandedDateIds, setExpandedDateIds] = useState<Set<string>>(new Set());
   const [paymentKey, setPaymentKey] = useState<string | null>(null);
   const [isCredit, setIsCredit] = useState<number>(-1);
+  const [dateRange, setDateRange] = useState<{ start: Date | null; end: Date | null }>({
+    start: null,
+    end: null,
+  });
   const [daySummary, setDaySummary] = useState<DaySalesSummary | null>(null);
   const { enabled: multiStoreEnabled, stores: multiStoreStores } = useMultiStore();
   const [storeOrders, setStoreOrders] = useState<Map<string, Order[]>>(new Map());
@@ -145,12 +150,22 @@ export function OrdersPage() {
 
   function loadOrders() {
     const service = new OrderOfflineService(storeId);
+    // Date-range (2026-09-21): same half-open [start, next-day midnight) window
+    // the credits view feeds its service — end day INCLUSIVE.
+    const start = dateRange.start ? startOfDay(dateRange.start) : null;
+    const end = dateRange.end ? startOfDay(addDays(dateRange.end, 1)) : null;
     const filtered = service
       .getStorageOrders()
       .filter((o) => o.isActive)
       .filter(
         (o) => isCredit === -1 || (isCredit === 1 && o.isCredit) || (isCredit === 0 && !o.isCredit),
-      );
+      )
+      .filter((o) => {
+        const date = new Date(o.date);
+        if (start && date < start) return false;
+        if (end && date >= end) return false;
+        return true;
+      });
     setGroups(
       groupByLocalDay(
         filtered,
@@ -162,8 +177,8 @@ export function OrdersPage() {
 
   useEffect(() => {
     loadOrders();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadOrders reads only the listed deps
-  }, [storeId, isCredit]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadOrders reads storeId, isCredit and the dateRange bounds
+  }, [storeId, isCredit, dateRange.start, dateRange.end]);
 
   // multi-store-panels: raw per-store orders (read-only, per-store DEK);
   // the global payment/credit filters apply across all stores below.
@@ -248,6 +263,17 @@ export function OrdersPage() {
 
   // ─── multi-store mode ────────────────────────────────────────────────────
   if (multiStoreEnabled) {
+    // Date range applied client-side before rendering: end day INCLUSIVE → the
+    // same half-open [start, next-day midnight) window the single-store load uses.
+    const rangeStart = dateRange.start ? startOfDay(dateRange.start) : null;
+    const rangeEnd = dateRange.end ? startOfDay(addDays(dateRange.end, 1)) : null;
+    const rangeFilter = (o: Order): boolean => {
+      const date = new Date(o.date);
+      if (rangeStart && date < rangeStart) return false;
+      if (rangeEnd && date >= rangeEnd) return false;
+      return true;
+    };
+
     const visibleStoreIds =
       selectedMultiStoreId === null
         ? multiStoreStores.map((s) => s.id)
@@ -256,11 +282,11 @@ export function OrdersPage() {
     // Opciones dinámicas: métodos presentes en el conjunto visible por el
     // filtro de tienda (con "Todas las tiendas" agrega todas).
     const baseOrders = visibleStoreIds.flatMap((id) => multiBaseFilteredOrders(storeOrders.get(id) ?? []));
-    const paymentOptions = collectOrderPaymentMethodKeys(baseOrders);
+    const paymentOptions = collectOrderPaymentMethodKeys(baseOrders.filter(rangeFilter));
     const paymentActive =
       paymentKey !== null && paymentOptions.includes(paymentKey) ? paymentKey : null;
     const visibleOrders = (orders: Order[]): Order[] =>
-      multiBaseFilteredOrders(orders).filter(
+      multiBaseFilteredOrders(orders).filter(rangeFilter).filter(
         (o) => !paymentActive || matchesOrderPaymentFilter(o, paymentActive),
       );
 
@@ -336,7 +362,17 @@ export function OrdersPage() {
           selectedStoreId={selectedMultiStoreId}
           onSelectedStoreIdChange={setSelectedMultiStoreId}
           filters={
-            <>
+            <div className="flex flex-1 min-w-0 flex-col gap-2">
+              {/* Fila 1: tienda (select del componente compartido) + rango de fechas
+                  alineado a la derecha; filas 2/3: método de pago y pagadas/créditos
+                  (petición 2026-09-21). */}
+              <div className="flex flex-wrap items-center justify-end">
+                <DateRangeFilter
+                  value={dateRange}
+                  onApply={setDateRange}
+                  className="w-64 max-w-full"
+                />
+              </div>
               {paymentFieldset}
               <fieldset className="flex flex-wrap items-center gap-4">
                 <label className="flex items-center gap-1 text-sm text-text">
@@ -370,7 +406,7 @@ export function OrdersPage() {
                   <span className="text-warning">Créditos</span>
                 </label>
               </fieldset>
-            </>
+            </div>
           }
           renderStoreCount={(store) => {
             const filtered = visibleOrders(storeOrders.get(store.id) ?? []);
@@ -526,6 +562,12 @@ export function OrdersPage() {
         </div>
       }
     >
+      {/* Fila 1: rango de fechas alineado a la derecha (petición 2026-09-21);
+          filas 2/3: método de pago y pagadas/créditos. */}
+      <div className="mb-3 flex justify-end">
+        <DateRangeFilter value={dateRange} onApply={setDateRange} className="w-64 max-w-full" />
+      </div>
+
       <fieldset className="mb-3 flex flex-wrap gap-4">
         <label className="flex items-center gap-1 text-sm text-text">
           <input
