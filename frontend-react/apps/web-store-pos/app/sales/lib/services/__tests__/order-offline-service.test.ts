@@ -1660,6 +1660,63 @@ describe('OrderOfflineService', () => {
     });
   });
 
+  describe('ORD-21: updateProductCostsByInventoryIds (cost propagation, plan 2026-09-16 Fase 3)', () => {
+    function costItem(inventoryId: string, costPrice: number, qty: number): OrderItem {
+      return {
+        productId: 'p1',
+        productName: 'Coca Cola',
+        categoryId: 'cat1',
+        categoryName: 'Cat',
+        name: 'Coca Cola',
+        quantity: qty,
+        price: 5,
+        productBusinessId: 'biz1',
+        productCosts: [{ inventoryId, costPrice, quantity: qty }],
+        order: 0,
+      };
+    }
+
+    it('updates ONLY lines referencing the given inventory ids in ACTIVE orders', () => {
+      seedOrders(storeId, [
+        makeOrder({ id: 'active-1', isActive: true, orderItems: [costItem('e1', 5, 2)] }),
+        makeOrder({ id: 'active-2', isActive: true, orderItems: [costItem('e2', 9, 1)] }),
+      ]);
+      service = new OrderOfflineService(storeId);
+
+      const result = service.updateProductCostsByInventoryIds(new Map([['e1', 7]]));
+
+      expect(result).toEqual({ activeOrders: 1, deactivatedOrders: 0, updatedLines: 1 });
+      expect(findOrder('active-1')!.orderItems[0].productCosts[0].costPrice).toBe(7);
+      expect(findOrder('active-2')!.orderItems[0].productCosts[0].costPrice).toBe(9);
+    });
+
+    it('leaves DEACTIVATED orders untouched but counts them (ratified decision #2)', () => {
+      seedOrders(storeId, [
+        makeOrder({ id: 'inactive-1', isActive: false, orderItems: [costItem('e1', 5, 2)] }),
+      ]);
+      service = new OrderOfflineService(storeId);
+
+      const result = service.updateProductCostsByInventoryIds(new Map([['e1', 7]]));
+
+      expect(result).toEqual({ activeOrders: 0, deactivatedOrders: 1, updatedLines: 0 });
+      expect(findOrder('inactive-1')!.orderItems[0].productCosts[0].costPrice).toBe(5);
+    });
+
+    it('restoreOrdersSnapshot restores the whole array (atomic rollback, decision #3)', () => {
+      seedOrders(storeId, [
+        makeOrder({ id: 'active-1', isActive: true, orderItems: [costItem('e1', 5, 2)] }),
+      ]);
+      service = new OrderOfflineService(storeId);
+      const snapshot = structuredClone(service.getStorageOrders());
+
+      service.updateProductCostsByInventoryIds(new Map([['e1', 7]]));
+      expect(findOrder('active-1')!.orderItems[0].productCosts[0].costPrice).toBe(7);
+
+      service.restoreOrdersSnapshot(snapshot);
+      expect(findOrder('active-1')!.orderItems[0].productCosts[0].costPrice).toBe(5);
+    });
+  });
+
   // currency-in-costs-and-prices (plan 2026-09-16, §5): every factory that builds a money-bearing
   // entity stamps DEFAULT_CURRENCY (CUP). The mirror coverage for products/entries/warehouse lives
   // in product-offline-service.test.ts, inventory-offline-service.test.ts and
