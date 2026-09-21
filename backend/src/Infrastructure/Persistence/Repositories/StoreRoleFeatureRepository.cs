@@ -44,7 +44,13 @@ namespace Infrastructure.Persistence.Repositories
             return await _storeRoleFeature
                 .Where(srf => srf.IsActive && srf.Store.IsActive && srf.Role.IsActive && srf.Feature.IsActive
                     && srf.Feature.Module.IsActive && storeModuleIds.Contains(srf.Feature.Module.Id)
-                    && srf.Role.UserRoles.Any(ur => ur.IsActive && ur.User.IsActive && ur.UserId == userId))
+                    && srf.Role.UserRoles.Any(ur => ur.IsActive && ur.User.IsActive && ur.UserId == userId)
+                    // StoreUser-role features additionally require an ACTIVE StoreUser
+                    // membership for (store, userId). OwnerAdmin has no StoreUser row, so
+                    // the gate must apply only to the StoreUser role — otherwise every
+                    // owner role would be dropped.
+                    && (srf.RoleId != (int)RoleType.StoreUser
+                        || srf.Store.StoreUsers.Any(su => su.UserId == userId && su.IsActive)))
                 .Include(srf => srf.Role)
                 .Include(srf => srf.Feature).ThenInclude(f => f.Module)
                 .Include(srf => srf.Store)

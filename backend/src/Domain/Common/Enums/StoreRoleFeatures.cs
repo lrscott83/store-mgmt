@@ -233,5 +233,29 @@ namespace Domain.Common.Enums
         ElaborationsAdmin,
 
         #endregion
+
+        #region WholesaleSales features
+
+        // WholesaleSales (feature 39, module 12) is the wholesale flavour of the normal
+        // sale: /sales/wholesale is gated by EFeatures.Sale and is performed by both the
+        // owner and store users. Mirror SaleAdmin so both roles receive the feature.
+        [HasRoles(RoleType.OwnerAdmin, RoleType.StoreUser)]
+        [HasFeature(FeatureType.WholesaleSales)]
+        [HasModule(ModuleType.WholesaleSales)]
+        WholesaleSalesAdmin,
+
+        #endregion
+
+        #region MultiStores features
+
+        // OwnerStores (feature 38, module 14) is the owner-scoped "Mis tiendas" capability:
+        // the store switcher is owner-only (isOwnerAdmin) and Management/Stores is
+        // OwnerAdmin-only. Mirror StoresAdmin — no StoreUser role.
+        [HasRoles(RoleType.OwnerAdmin)]
+        [HasFeature(FeatureType.OwnerStores)]
+        [HasModule(ModuleType.MultiStores)]
+        MultiStoresAdmin,
+
+        #endregion
     }
 }

@@ -83,6 +83,21 @@ Prior art with the same trap already documented in production code: `Application
 
 When an E2E test returns an empty collection or a "not applicable" state, assert the **precondition** first — is the data you seeded actually there? — before blaming the behavior under test. A test that asserts a filtered effect without pinning the state that triggers the filter cannot distinguish "filtered correctly" from "found nothing".
 
+### Every store module must have a `StoreRoleFeatures` mapping
+
+Every store module that carries store-level features MUST have a `StoreRoleFeatures` enum entry
+(`[HasFeature(...)]` + `[HasModule(...)]`). `AllowedFeaturesService` resolves `FeatureIds` only
+through that enum, and `StoreRoleFeatureGenerator` silently drops unmapped feature ids — so a module
+without an entry is invisible in `/me` `FeatureIds` and in the offline roster even when the module is
+active for the store. WholesaleSales (module 12 → feature 39) and MultiStores (module 14 → feature 38)
+were missing until 2026-09-20; fixed by adding the two entries plus the data backfill migration
+`20260920120000_Backfill-WholesaleSales-MultiStores-RoleFeatures` (script
+`backend/scripts/20-20260920-Backfill-WholesaleSales-MultiStores-RoleFeatures.sql`).
+
+Related: `/me` `Roles` excludes a store user whose `StoreUser.IsActive` is false —
+`GetStoreRoleFeaturesByUserIdAsync` gates the StoreUser role on an active `StoreUser` row for
+`(store, userId)` (OwnerAdmin has no `StoreUser` row and is unaffected).
+
 ## Running the tests
 
 Requires PostgreSQL on `localhost:5432`, database `smca_test`. `WebAppFixture` applies the migrations itself.
