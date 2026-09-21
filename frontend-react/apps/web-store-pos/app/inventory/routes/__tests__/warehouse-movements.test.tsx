@@ -4,6 +4,7 @@ import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 import type { Warehouse, WarehouseStockMovement } from '@store-mgmt/domain';
 import { toLocalDayKey } from '~/shared/lib/date-utils';
+import { validateMovementQuantity } from '~/inventory/lib/warehouse';
 
 // ─── mock auth-store (mismo patrón que warehouses.test.tsx) ─────────────────
 const mockUser = vi.hoisted(() => ({
@@ -672,5 +673,115 @@ describe('Vista Movimientos de almacén', () => {
     fireEvent.click(screen.getByText('Guardar'));
     // confirmDialog (mock) resuelve true → aplica la corrección de solo costo.
     await waitFor(() => expect(fakeState.applyCostEditImpl).toHaveBeenCalledWith('mv-in', 0, 9));
+  });
+
+  it('U-M8: el acordeón por día muestra muchas reversas intercaladas con sus badges', () => {
+    const today = new Date();
+    fakeState.warehouses = [
+      { id: 'wh-1', name: 'Central', isActive: true, createdDate: new Date(), createdByName: 'x' },
+      { id: 'wh-2', name: 'Anexo', isActive: true, createdDate: new Date(), createdByName: 'x' },
+    ];
+    fakeState.products = [['prod-1', { id: 'prod-1', name: 'Cerveza' }]];
+    fakeState.stockLevels = [
+      { warehouseId: 'wh-1', productId: 'prod-1', onHand: 0, costPrice: 5, lots: [] },
+    ];
+    fakeState.movements = [
+      { id: 'mv-p1', warehouseId: 'wh-1', productId: 'prod-1', type: 'purchase_in', quantity: 10, costPrice: 5, reason: null, createdDate: today, createdByName: 'x' },
+      { id: 'rev-1', warehouseId: 'wh-1', productId: 'prod-1', type: 'reversal', quantity: 10, reason: null, createdDate: today, createdByName: 'x', reversalOfMovementId: 'mv-p1' },
+      { id: 'mv-p2', warehouseId: 'wh-1', productId: 'prod-1', type: 'purchase_in', quantity: 8, costPrice: 6, reason: null, createdDate: today, createdByName: 'x' },
+      { id: 'mv-s1', warehouseId: 'wh-1', productId: 'prod-1', type: 'sale_out', quantity: 4, reason: null, createdDate: today, createdByName: 'x', lotOriginMovementId: 'mv-p2' },
+      { id: 'rev-2', warehouseId: 'wh-1', productId: 'prod-1', type: 'reversal', quantity: 4, reason: null, createdDate: today, createdByName: 'x', reversalOfMovementId: 'mv-s1', reversalInventoryEntryId: 'e1' },
+      { id: 'mv-ti', warehouseId: 'wh-1', productId: 'prod-1', type: 'transfer_in', quantity: 2, reason: null, createdDate: today, createdByName: 'x', fromWarehouseId: 'wh-2', toWarehouseId: 'wh-1' },
+    ];
+    renderPage();
+    openToday();
+
+    // El header del día cuenta TODAS las filas (6), intercaladas.
+    expect(screen.getByTestId(`mv-day-panel-toggle-${toLocalDayKey(today)}`).textContent).toContain('(6)');
+
+    // Cada original revertida lleva badge; las filas de reversa no.
+    expect(screen.getByTestId('mv-reversal-badge-mv-p1')).toBeTruthy();
+    expect(screen.getByTestId('mv-reversal-badge-mv-s1')).toBeTruthy();
+    expect(screen.queryByTestId('mv-reversal-badge-rev-1')).toBeNull();
+    expect(screen.queryByTestId('mv-reversal-badge-rev-2')).toBeNull();
+
+    // Ambas filas de reversa existen con su icono violeta.
+    expect(screen.getByTestId('mv-qty-rev-1')).toBeTruthy();
+    expect(screen.getByTestId('mv-qty-rev-2')).toBeTruthy();
+    expect(screen.getByTestId('mv-type-icon-rev-1').className).toContain('text-violet-600');
+    expect(screen.getByTestId('mv-type-icon-rev-2').className).toContain('text-violet-600');
+
+    // El gear solo aparece en la compra NO revertida.
+    expect(screen.queryByTestId('mv-actions-toggle-mv-p1')).toBeNull();
+    expect(screen.queryByTestId('mv-actions-toggle-mv-s1')).toBeNull();
+    expect(screen.getByTestId('mv-actions-toggle-mv-p2')).toBeTruthy();
+  });
+
+  it('U-C1: el modal de edición precarga los valores del original por tipo', () => {
+    seedTodayMovements();
+    // Compra con remanente 6 → precarga el remanente y su costo.
+    fakeState.stockLevels = [
+      { warehouseId: 'wh-1', productId: 'prod-1', onHand: 6, costPrice: 5, lots: [{ costPrice: 5, quantity: 6, lotOriginMovementId: 'mv-in' }] },
+    ];
+    // Transferencia hacia wh-2 con destino precargable.
+    fakeState.movements.push({
+      id: 'mv-tr', warehouseId: 'wh-1', productId: 'prod-1', type: 'transfer_out', quantity: 3,
+      reason: null, createdDate: new Date(), createdByName: 'x', toWarehouseId: 'wh-2',
+    });
+    renderPage();
+    openToday();
+
+    // purchase_in: cantidad = lo que queda (6), costo = original (5), campo de costo visible.
+    fireEvent.click(screen.getByTestId('mv-actions-toggle-mv-in'));
+    fireEvent.click(screen.getByTestId('mv-edit-mv-in'));
+    expect((screen.getByTestId('movement-quantity') as HTMLInputElement).value).toBe('6');
+    expect((screen.getByTestId('movement-cost') as HTMLInputElement).value).toBe('5');
+    fireEvent.click(screen.getByText('Cancelar'));
+
+    // sale_out: cantidad = original (6); sin campo de costo (solo compras).
+    fireEvent.click(screen.getByTestId('mv-actions-toggle-mv-out'));
+    fireEvent.click(screen.getByTestId('mv-edit-mv-out'));
+    expect((screen.getByTestId('movement-quantity') as HTMLInputElement).value).toBe('6');
+    expect(screen.queryByTestId('movement-cost')).toBeNull();
+    fireEvent.click(screen.getByText('Cancelar'));
+
+    // transfer_out: cantidad = original (3) y destino precargado.
+    fireEvent.click(screen.getByTestId('mv-actions-toggle-mv-tr'));
+    fireEvent.click(screen.getByTestId('mv-edit-mv-tr'));
+    expect((screen.getByTestId('movement-quantity') as HTMLInputElement).value).toBe('3');
+    expect((screen.getByTestId('movement-target') as HTMLSelectElement).value).toBe('wh-2');
+  });
+
+  it('U-C2: la validación por modo coincide con el validador existente (validateMovementQuantity)', () => {
+    seedTodayMovements();
+    renderPage();
+    openToday();
+
+    const quantityVerdicts: Array<{ value: string; valid: boolean }> = [
+      { value: '0', valid: false },
+      { value: '-1', valid: false },
+      { value: '0.01', valid: true },
+      { value: '5', valid: true },
+    ];
+
+    for (const mode of [
+      { action: 'mv-in', form: 'purchase_in' },
+      { action: 'mv-out', form: 'sale_out' },
+    ]) {
+      fireEvent.click(screen.getByTestId(`mv-actions-toggle-${mode.action}`));
+      fireEvent.click(screen.getByTestId(`mv-edit-${mode.action}`));
+      // El costo solo aplica a compras; se completa válido para aislar la cantidad.
+      if (mode.form === 'purchase_in') {
+        fireEvent.change(screen.getByTestId('movement-cost'), { target: { value: '5' } });
+      }
+      for (const { value, valid } of quantityVerdicts) {
+        fireEvent.change(screen.getByTestId('movement-quantity'), { target: { value } });
+        // Misma regla que el validador del servicio (fuente de verdad).
+        expect(validateMovementQuantity(Number(value)).succeeded).toBe(valid);
+        const save = screen.getByRole('button', { name: 'Guardar' }) as HTMLButtonElement;
+        expect(save.disabled).toBe(!valid);
+      }
+      fireEvent.click(screen.getByText('Cancelar'));
+    }
   });
 });
