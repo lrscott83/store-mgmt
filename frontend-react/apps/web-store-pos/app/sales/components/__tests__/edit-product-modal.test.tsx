@@ -1,8 +1,9 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 import type { Product } from '@store-mgmt/domain';
+import { EModules } from '@store-mgmt/domain';
 import { EditProductModal } from '../edit-product-modal';
 
 // Scanner camera lib — mocked so opening the modal never loads the real @zxing/browser
@@ -290,6 +291,85 @@ describe('EditProductModal — footer icons/labels parity', () => {
     ) as HTMLElement;
     expect(saveButton.className).toContain('rounded-full');
     expect(closeButton.className).toContain('rounded-full');
+  });
+});
+
+// MultiMonedas gate (module 15): CurrencySelect reads the auth user's storeModuleIds.
+// Without the module nothing renders and the product keeps its stored currency (or CUP).
+let mockUser: unknown = null;
+vi.mock('~/shared/lib/stores/auth-store', () => ({
+  useAuthStore: (selector?: (s: { user: unknown }) => unknown) =>
+    typeof selector === 'function' ? selector({ user: mockUser }) : { user: mockUser },
+}));
+
+describe('EditProductModal — MultiMonedas gate (module 15)', () => {
+  beforeEach(() => {
+    mockUser = null;
+  });
+
+  function userWithModule() {
+    return { id: 'u1', storeModuleIds: [EModules.MultiMonedas] };
+  }
+
+  it('does not render the currency select when the store has no MultiMonedas module', () => {
+    render(
+      <Wrapper>
+        <EditProductModal product={makeProduct()} onSave={vi.fn()} onClose={vi.fn()} />
+      </Wrapper>,
+    );
+    expect(screen.queryByTestId('edit-product-currency-select')).not.toBeInTheDocument();
+  });
+
+  it('saves the stored currency (default CUP) unchanged when MultiMonedas is absent', () => {
+    const onSave = vi.fn();
+    render(
+      <Wrapper>
+        <EditProductModal
+          product={makeProduct({ currency: 1 })}
+          onSave={onSave}
+          onClose={vi.fn()}
+        />
+      </Wrapper>,
+    );
+    fireEvent.click(screen.getByTestId('edit-product-submit'));
+
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ currency: 1 }));
+  });
+
+  it('renders the currency select (CUP preselected) when the store HAS the MultiMonedas module', () => {
+    mockUser = userWithModule();
+    render(
+      <Wrapper>
+        <EditProductModal
+          product={makeProduct({ currency: undefined })}
+          onSave={vi.fn()}
+          onClose={vi.fn()}
+        />
+      </Wrapper>,
+    );
+    const select = screen.getByTestId('edit-product-currency-select');
+    expect(select).toBeInTheDocument();
+    expect((select as HTMLSelectElement).value).toBe('0'); // legacy product → CUP preselected
+  });
+
+  it('saves the newly chosen currency when MultiMonedas is active', () => {
+    mockUser = userWithModule();
+    const onSave = vi.fn();
+    render(
+      <Wrapper>
+        <EditProductModal
+          product={makeProduct({ currency: 0 })}
+          onSave={onSave}
+          onClose={vi.fn()}
+        />
+      </Wrapper>,
+    );
+    fireEvent.change(screen.getByTestId('edit-product-currency-select'), {
+      target: { value: '1' }, // USD
+    });
+    fireEvent.click(screen.getByTestId('edit-product-submit'));
+
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ currency: 1 }));
   });
 });
 
