@@ -379,17 +379,19 @@ export function WholesalePage() {
             />
           </div>
 
-          {/* Filtro por categorías — tabs con el pseudo-tab "Todas", igual que /sales/new.
-              Solo categorías con productos mayoristas. */}
-          <div className="mb-3 flex flex-wrap gap-2">
+          {/* Filtro por categorías — tabs con el pseudo-tab "Todas", igual que /sales/new:
+              una sola fila con scroll horizontal (no-scrollbar) y los mismos botones
+              (px-1 py-2 text-sm, primario activo / primario-light inactivo). Solo
+              categorías con productos mayoristas. */}
+          <div className="no-scrollbar mb-3 flex gap-1 overflow-x-auto pb-1">
             <button
               type="button"
               onClick={() => setSelectedCategoryId(ALL_CATEGORIES_ID)}
               aria-pressed={selectedCategoryId === ALL_CATEGORIES_ID}
-              className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
+              className={`whitespace-nowrap rounded-md px-1 py-2 text-sm font-medium transition-colors ${
                 selectedCategoryId === ALL_CATEGORIES_ID
                   ? 'bg-primary text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  : 'bg-primary-light text-primary hover:bg-primary/20'
               }`}
               data-testid="wholesale-category-all"
             >
@@ -401,10 +403,10 @@ export function WholesalePage() {
                 type="button"
                 onClick={() => setSelectedCategoryId(category.id)}
                 aria-pressed={selectedCategoryId === category.id}
-                className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
+                className={`whitespace-nowrap rounded-md px-1 py-2 text-sm font-medium transition-colors ${
                   selectedCategoryId === category.id
                     ? 'bg-primary text-white'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    : 'bg-primary-light text-primary hover:bg-primary/20'
                 }`}
                 data-testid={`wholesale-category-${category.id}`}
               >
