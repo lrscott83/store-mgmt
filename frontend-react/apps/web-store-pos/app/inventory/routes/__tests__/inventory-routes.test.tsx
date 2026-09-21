@@ -978,12 +978,28 @@ function mockEntries(entries: InventoryEntryView[]) {
     () =>
       ({
         getActiveInventoryEntriesStorage: vi.fn().mockReturnValue(entries),
+        // Same semantics as the real filterInventoryEntries (active entries only,
+        // half-open [start, end) window) so the view's date-range wiring is
+        // exercised against a faithful double.
+        filterInventoryEntries: vi
+          .fn()
+          .mockImplementation(
+            (_productId?: string, start?: Date, end?: Date) =>
+              Promise.resolve({
+                succeeded: true,
+                data: entries.filter((v) => {
+                  if (start && new Date(v.date) < start) return false;
+                  if (end && new Date(v.date) >= end) return false;
+                  return true;
+                }),
+              }),
+          ),
       }) as unknown as InstanceType<typeof InventoryOfflineService>,
   );
 }
 
 describe('EntriesPage — day grouping (Angular parity)', () => {
-  it('shows the grand entries count and total in the header', () => {
+  it('shows the grand entries count and total in the header', async () => {
     mockEntries([...dayOneEntries, ...dayTwoEntries]);
     render(
       <Wrapper>
@@ -991,44 +1007,44 @@ describe('EntriesPage — day grouping (Angular parity)', () => {
       </Wrapper>,
     );
     // count = 2+1+5 = 8; total = 2*3 + 1*10 + 5*2 = 6+10+10 = 26 (MultiMonedas format)
-    expect(screen.getByText('(8)')).toBeInTheDocument();
+    expect(await screen.findByText('(8)')).toBeInTheDocument();
     expect(screen.getByText('26 CUP')).toBeInTheDocument();
   });
 
-  it('groups entries into one panel per calendar day with the correct per-day total', () => {
+  it('groups entries into one panel per calendar day with the correct per-day total', async () => {
     mockEntries([...dayOneEntries, ...dayTwoEntries]);
     render(
       <Wrapper>
         <EntriesPage />
       </Wrapper>,
     );
-    const toggles = screen.getAllByTestId(/entry-day-panel-toggle-/);
+    const toggles = await screen.findAllByTestId(/entry-day-panel-toggle-/);
     expect(toggles).toHaveLength(2);
     // day 1 total = 6+10 = 16; day 2 total = 10 (MultiMonedas format)
     expect(screen.getByText('16 CUP')).toBeInTheDocument();
     expect(screen.getByText('10 CUP')).toBeInTheDocument();
   });
 
-  it('sorts day panels ascending (oldest day first)', () => {
+  it('sorts day panels ascending (oldest day first)', async () => {
     mockEntries([...dayOneEntries, ...dayTwoEntries]);
     render(
       <Wrapper>
         <EntriesPage />
       </Wrapper>,
     );
-    const toggles = screen.getAllByTestId(/entry-day-panel-toggle-/);
+    const toggles = await screen.findAllByTestId(/entry-day-panel-toggle-/);
     expect(toggles[0].getAttribute('data-testid')).toBe('entry-day-panel-toggle-2026-06-30');
     expect(toggles[1].getAttribute('data-testid')).toBe('entry-day-panel-toggle-2026-07-01');
   });
 
-  it('sorts entries within a day ascending by time', () => {
+  it('sorts entries within a day ascending by time', async () => {
     mockEntries([...dayOneEntries, ...dayTwoEntries]);
     const { container } = render(
       <Wrapper>
         <EntriesPage />
       </Wrapper>,
     );
-    fireEvent.click(screen.getByTestId('entry-day-panel-toggle-2026-06-30'));
+    fireEvent.click(await screen.findByTestId('entry-day-panel-toggle-2026-06-30'));
     const text = container.textContent ?? '';
     // Product B (08:00) must render before Product A (10:00) once expanded.
     expect(text.indexOf('Product B')).toBeLessThan(text.indexOf('Product A'));
@@ -1044,13 +1060,17 @@ describe('EntriesPage — day grouping (Angular parity)', () => {
     expect(screen.getByText('No se encontró ninguna entrada')).toBeInTheDocument();
   });
 
-  it('renders no product-name filter, no date-range filter, and no payment-type radio', () => {
+  it('renders the user-requested date-range filter, but no product-name filter and no payment-type radio', () => {
     mockEntries([...dayOneEntries, ...dayTwoEntries]);
     render(
       <Wrapper>
         <EntriesPage />
       </Wrapper>,
     );
+    // Date-range filter present (user request 2026-09-21) — closed popover, so the
+    // Desde/Hasta labels only appear once the input is clicked.
+    expect(screen.getByTestId('date-range-filter-input')).toBeInTheDocument();
+    expect(screen.getByTestId('date-range-filter-button')).toBeInTheDocument();
     expect(screen.queryByPlaceholderText('Buscar')).not.toBeInTheDocument();
     expect(screen.queryByText('Desde')).not.toBeInTheDocument();
     expect(screen.queryByText('Hasta')).not.toBeInTheDocument();
@@ -1059,14 +1079,14 @@ describe('EntriesPage — day grouping (Angular parity)', () => {
 
   // Parity fix (collapsible-panel-chevron-parity): the day-panel header must render the
   // shared ChevronDownIcon and rotate it (rotate-180) iff the panel is expanded.
-  it('renders a chevron on the day-panel header that rotates iff the panel is expanded', () => {
+  it('renders a chevron on the day-panel header that rotates iff the panel is expanded', async () => {
     mockEntries([...dayOneEntries]);
     render(
       <Wrapper>
         <EntriesPage />
       </Wrapper>,
     );
-    const toggle = screen.getByTestId('entry-day-panel-toggle-2026-06-30');
+    const toggle = await screen.findByTestId('entry-day-panel-toggle-2026-06-30');
     const svgClass = () => toggle.querySelector('svg')?.getAttribute('class') ?? '';
     expect(toggle.querySelector('svg')).toBeInTheDocument();
     expect(svgClass()).not.toContain('rotate-180');
@@ -1080,7 +1100,7 @@ describe('EntriesPage — day grouping (Angular parity)', () => {
   // Local-day grouping parity (orders.tsx local-grouping pattern): a 23:00-local entry must
   // group under ITS OWN local day — at a negative UTC offset the UTC key would have keyed it to
   // the NEXT day while it renders as the current one.
-  it('groups entries by LOCAL calendar day — a late-evening entry stays on its own local day', () => {
+  it('groups entries by LOCAL calendar day — a late-evening entry stays on its own local day', async () => {
     const late: InventoryEntryView = {
       id: 'e-late',
       productId: 'p-late',
@@ -1097,7 +1117,7 @@ describe('EntriesPage — day grouping (Angular parity)', () => {
       </Wrapper>,
     );
 
-    const toggles = screen.getAllByTestId(/entry-day-panel-toggle-/);
+    const toggles = await screen.findAllByTestId(/entry-day-panel-toggle-/);
     expect(toggles).toHaveLength(1);
     expect(toggles[0].getAttribute('data-testid')).toBe('entry-day-panel-toggle-2026-06-30');
   });
@@ -1125,14 +1145,14 @@ describe('EntriesPage — read-only history (Angular parity, diff-matrix #19)', 
     expect(screen.queryByRole('button', { name: 'Entrada' })).not.toBeInTheDocument();
   });
 
-  it('renders no row-level edit/deactivate actions once a day panel is expanded', () => {
+  it('renders no row-level edit/deactivate actions once a day panel is expanded', async () => {
     mockEntries([...dayOneEntries, ...dayTwoEntries]);
     render(
       <Wrapper>
         <EntriesPage />
       </Wrapper>,
     );
-    fireEvent.click(screen.getByTestId('entry-day-panel-toggle-2026-06-30'));
+    fireEvent.click(await screen.findByTestId('entry-day-panel-toggle-2026-06-30'));
     expect(screen.queryByText('Editar')).not.toBeInTheDocument();
     expect(screen.queryByText('Eliminar')).not.toBeInTheDocument();
     // Data still renders.

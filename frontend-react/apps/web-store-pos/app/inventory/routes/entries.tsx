@@ -11,8 +11,9 @@ import { ProductCategoryRepository } from '~/sales/lib/repositories/product-cate
 import { Card } from '~/shared/components/ui/card';
 import { InfoBox } from '~/shared/components/ui/info-box';
 import { ChevronDownIcon } from '~/shared/components/ui/icons';
-import { formatLocalDate, groupByLocalDay } from '~/shared/lib/date-utils';
+import { formatLocalDate, groupByLocalDay, addDays, startOfDay } from '~/shared/lib/date-utils';
 import type { LocalDayGroup } from '~/shared/lib/date-utils';
+import { DateRangeFilter } from '~/shared/components/date-range-filter/date-range-filter';
 import { EntryList } from '../components/entry-list';
 import { round2 } from '~/shared/lib/money';
 import { CurrencyTotalAmount } from '~/shared/components/multimonedas/currency-total-amount';
@@ -77,8 +78,14 @@ export function EntriesPage() {
     new Map(),
   );
   const [selectedMultiStoreId, setSelectedMultiStoreId] = useState<string | null>(null);
+  // User-requested date range (2026-09-21) — same shared DateRangeFilter as credits:
+  // half-open [start, next-day midnight) window, end day INCLUSIVE.
+  const [dateRange, setDateRange] = useState<{ start: Date | null; end: Date | null }>({
+    start: null,
+    end: null,
+  });
 
-  function loadEntries() {
+  async function loadEntries() {
     const productRepository = new ProductRepository(
       storeId,
       new ProductCategoryRepository(storeId),
@@ -86,8 +93,17 @@ export function EntriesPage() {
     const svc = new InventoryOfflineService(storeId, productRepository);
     const products = [...productRepository.getStorageProductsMap().values()];
     const productMap = new Map(products.map((p) => [p.id, p.name]));
-    const all = svc.getActiveInventoryEntriesStorage();
-    const enriched = all.map((e) => ({
+    // The date range rides the service's own filter entry point — the SAME one Angular's
+    // loadEntriesFiltered ultimately used. filterInventoryEntries' endDate is EXCLUSIVE
+    // (`v.date < end`), so sail the end window to next-day midnight to include the
+    // selected end day. No range picked → all-nulls (Angular parity default).
+    const start = dateRange.start ? startOfDay(dateRange.start) : undefined;
+    const end = dateRange.end ? startOfDay(addDays(dateRange.end, 1)) : undefined;
+    const response = await svc.filterInventoryEntries(undefined, start, end);
+    // filterInventoryEntries is a same-tick Promise over local storage — it never
+    // actually fails; this guard exists for the type only.
+    if (!response.succeeded) return;
+    const enriched = response.data.map((e) => ({
       ...e,
       productName: productMap.get(e.productId) ?? e.productName,
     }));
@@ -103,9 +119,9 @@ export function EntriesPage() {
   }
 
   useEffect(() => {
-    loadEntries();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadEntries reads only storeId
-  }, [storeId]);
+    void loadEntries();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadEntries reads storeId + the primitive date bounds
+  }, [storeId, dateRange.start, dateRange.end]);
 
   // multi-store-panels: per-store active entry views (read-only, per-store DEK).
   useEffect(() => {
@@ -155,9 +171,24 @@ export function EntriesPage() {
       selectedMultiStoreId === null
         ? multiStoreStores.map((s) => s.id)
         : [selectedMultiStoreId];
+    // Date range applied client-side before rendering (per-store local data): end day
+    // INCLUSIVE → the same half-open [start, next-day midnight) window the single-store
+    // service gets. Header AND panels follow the same filtered map.
+    const rangeStart = dateRange.start ? startOfDay(dateRange.start) : null;
+    const rangeEnd = dateRange.end ? startOfDay(addDays(dateRange.end, 1)) : null;
+    const inRange = (entries: InventoryEntryView[]) =>
+      entries.filter((e) => {
+        const date = new Date(e.date);
+        if (rangeStart && date < rangeStart) return false;
+        if (rangeEnd && date >= rangeEnd) return false;
+        return true;
+      });
+    const filteredStoreEntries = new Map(
+      [...storeEntryViews].map(([id, entries]) => [id, inRange(entries)] as const),
+    );
     const totals = visibleStoreIds.reduce(
       (acc, id) => {
-        const entries = storeEntryViews.get(id) ?? [];
+        const entries = filteredStoreEntries.get(id) ?? [];
         acc.count += sumCount(entries);
         acc.total = round2(acc.total + sumTotal(entries));
         return acc;
@@ -180,7 +211,9 @@ export function EntriesPage() {
             <span className="text-sm font-semibold text-primary whitespace-nowrap">
               <CurrencyTotalAmount
                 legacyTotal={totals.total}
-                entries={visibleStoreIds.flatMap((id) => entryAmounts(storeEntryViews.get(id) ?? []))}
+                entries={visibleStoreIds.flatMap((id) =>
+                  entryAmounts(filteredStoreEntries.get(id) ?? []),
+                )}
                 multiMonedas
               />
             </span>
@@ -191,8 +224,11 @@ export function EntriesPage() {
           stores={multiStoreStores}
           selectedStoreId={selectedMultiStoreId}
           onSelectedStoreIdChange={setSelectedMultiStoreId}
+          filters={
+            <DateRangeFilter value={dateRange} onApply={setDateRange} className="flex-1 min-w-0" />
+          }
           renderStoreTotals={(store) => {
-            const entries = storeEntryViews.get(store.id) ?? [];
+            const entries = filteredStoreEntries.get(store.id) ?? [];
             const total = sumTotal(entries);
             const count = sumCount(entries);
             return (
@@ -206,11 +242,16 @@ export function EntriesPage() {
           }}
         >
           {(store) => {
-            const entries = storeEntryViews.get(store.id) ?? [];
+            const entries = filteredStoreEntries.get(store.id) ?? [];
             if (entries.length === 0) {
+              const hasLocalData = (storeEntryViews.get(store.id)?.length ?? 0) > 0;
               return (
                 <div className="py-4 text-center text-text-muted">
-                  {intl.formatMessage({ id: 'MULTISTORE.NO_LOCAL_DATA' })}
+                  {intl.formatMessage({
+                    id: hasLocalData
+                      ? 'MULTISTORE.NO_ENTRIES_IN_RANGE'
+                      : 'MULTISTORE.NO_LOCAL_DATA',
+                  })}
                 </div>
               );
             }
@@ -230,8 +271,8 @@ export function EntriesPage() {
                         data-testid={`multistore-entry-day-toggle-${store.id}-${dayId}`}
                         aria-expanded={isExpanded}
                       >
-                        <span className="text-xs font-medium text-text">
-                          {formatLocalDate(dayGroup.date)}
+                        <span className="flex items-center gap-2 text-xs font-medium text-text">
+                          {formatLocalDate(dayGroup.date)} ({dayGroup.items.length})
                         </span>
                         <span className="flex items-center gap-2">
                         <span className="text-xs font-semibold text-primary whitespace-nowrap">
@@ -290,6 +331,11 @@ export function EntriesPage() {
         </div>
       }
     >
+      {/* User-requested date range (2026-09-21) — right-aligned, like credits. */}
+      <div className="mb-3 flex justify-end">
+        <DateRangeFilter value={dateRange} onApply={setDateRange} className="w-full sm:w-72" />
+      </div>
+
       <div className="space-y-4">
         {dayGroups.length === 0 && (
           <InfoBox variant="primary" className="text-center">
@@ -311,7 +357,7 @@ export function EntriesPage() {
                   aria-expanded={isExpanded}
                 >
                   <span className="text-sm font-medium text-text">
-                    {formatLocalDate(dayGroup.date)}
+                    {formatLocalDate(dayGroup.date)} ({dayGroup.items.length})
                   </span>
                   <span className="flex items-center gap-2">
                     <span className="text-sm font-semibold text-primary whitespace-nowrap">

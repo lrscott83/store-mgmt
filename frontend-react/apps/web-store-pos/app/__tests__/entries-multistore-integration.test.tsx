@@ -32,7 +32,7 @@ import { writeDeviceDekTable } from '~/shared/lib/storage/device-dek-table';
 // siguen BLOQUEADAS (sin red real); solo se silencia el reporte del tail.
 import { allowUnmockedHttpReporting } from '~/shared/lib/testing/block-real-http';
 allowUnmockedHttpReporting();
-import { toLocalDayKey } from '~/shared/lib/date-utils';
+import { addDays, toLocalDayKey } from '~/shared/lib/date-utils';
 import { EntriesPage } from '~/inventory/routes/entries';
 import { InventoryAvailablePage } from '~/inventory/routes/available';
 
@@ -93,6 +93,14 @@ function renderEntries() {
 }
 
 const todayKey = toLocalDayKey(new Date());
+
+/** Local `YYYY-MM-DD` — the format the native date inputs read/write (DateRangeFilter). */
+function toIsoLocal(date: Date): string {
+  const d = new Date(date);
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${month}-${day}`;
+}
 
 // ─── read-store-entities: el lector multi-tienda entiende el formato real ─────
 
@@ -390,5 +398,139 @@ describe('Entradas (Historial) — flujo real sin mocks de datos', () => {
       .getByTestId(`multistore-panel-toggle-${STORE_ID}`)
       .closest('.rounded-lg');
     expect(within(panel as HTMLElement).getAllByText('270 CUP').length).toBeGreaterThan(0);
+  });
+
+  // ─── Filtro por rango de fechas + contador de productos por día (2026-09-21) ──
+
+  it('DR-1: SIN MultiStores — el filtro de rango acota los días visibles al rango aplicado', async () => {
+    seedSession(ownerUser([STORE_ID], ['Tienda A'], false));
+    await seedCatalogAndTodayEntry('Cerveza');
+
+    renderEntries();
+    await screen.findByTestId(`entry-day-panel-toggle-${todayKey}`);
+
+    // Aplicar rango = SOLO HOY (desde y hasta el día de hoy).
+    const input = screen.getByTestId('date-range-filter-input');
+    fireEvent.click(input);
+    const isoToday = toIsoLocal(new Date());
+    fireEvent.change(screen.getByTestId('date-range-filter-start'), {
+      target: { value: isoToday },
+    });
+    fireEvent.change(screen.getByTestId('date-range-filter-end'), {
+      target: { value: isoToday },
+    });
+    fireEvent.click(screen.getByTestId('date-range-filter-select'));
+    fireEvent.click(screen.getByTestId('date-range-filter-button'));
+
+    // El día de hoy sigue visible y con su contador (1 producto).
+    await waitFor(() => {
+      expect(screen.getByTestId(`entry-day-panel-toggle-${todayKey}`)).toBeInTheDocument();
+    });
+    expect(
+      within(screen.getByTestId(`entry-day-panel-toggle-${todayKey}`)).getByText(/\(1\)$/),
+    ).toBeInTheDocument();
+
+    // Rango SOLO AYER → hoy desaparece y la vista muestra el mensaje vacío.
+    fireEvent.click(input);
+    const isoYesterday = toIsoLocal(addDays(new Date(), -1));
+    fireEvent.change(screen.getByTestId('date-range-filter-start'), {
+      target: { value: isoYesterday },
+    });
+    fireEvent.change(screen.getByTestId('date-range-filter-end'), {
+      target: { value: isoYesterday },
+    });
+    fireEvent.click(screen.getByTestId('date-range-filter-select'));
+    fireEvent.click(screen.getByTestId('date-range-filter-button'));
+    await waitFor(() => {
+      expect(screen.queryByTestId(`entry-day-panel-toggle-${todayKey}`)).not.toBeInTheDocument();
+    });
+    expect(screen.getByText('No se encontró ninguna entrada')).toBeInTheDocument();
+  });
+
+  it('DR-2: SIN MultiStores — cada día muestra su contador de productos entre paréntesis', async () => {
+    seedSession(ownerUser([STORE_ID], ['Tienda A'], false));
+    await seedCatalogAndTodayEntry('Cerveza');
+
+    renderEntries();
+
+    const dayToggle = await screen.findByTestId(`entry-day-panel-toggle-${todayKey}`);
+    // Tras la fecha: la cantidad de PRODUCTOS del día (1 entrada — el (10) del header
+    // es la SUMA de quantities, el contador del día es nº de entradas).
+    expect(within(dayToggle).getByText(/\(1\)$/)).toBeInTheDocument();
+  });
+
+  it('DR-3: CON MultiStores — el filtro de fechas vive en la MISMA fila que el select de tiendas', async () => {
+    seedSession(ownerUser([STORE_ID, 's2'], ['Tienda A', 'Tienda B'], true));
+    await seedCatalogAndTodayEntry('Cerveza');
+
+    renderEntries();
+    await screen.findByTestId(`multistore-panel-toggle-${STORE_ID}`);
+
+    const storeSelect = screen.getByTestId('multistore-select');
+    const dateInput = screen.getByTestId('date-range-filter-input');
+    // Misma fila contenedora: el padre del select contiene también el filtro de fechas.
+    expect(storeSelect.parentElement).toContainElement(dateInput);
+  });
+
+  it('DR-4: CON MultiStores — el rango aplicado acota los días DENTRO del panel de la tienda', async () => {
+    seedSession(ownerUser([STORE_ID, 's2'], ['Tienda A', 'Tienda B'], true));
+    await seedCatalogAndTodayEntry('Cerveza');
+    // Entrada de AYER AÑADIDA al payload existente (formato mapa serializado real,
+    // mismo patrón IT-13 — no se reemplaza la entrada de hoy).
+    const yesterday = addDays(new Date(), -1);
+    const yesterdayKey = toLocalDayKey(yesterday);
+    const storedRaw = localStorage.getItem(
+      StorageKeys.entityKey('inventory-entries', STORE_ID),
+    )!;
+    const payload = JSON.parse(
+      decryptEntityWithDek(storedRaw, getDek())!,
+    ) as Array<[string, Array<Record<string, unknown>>]>;
+    const [, entries] = payload[0];
+    entries.push({
+      ...entries[0],
+      id: 'entry-yesterday',
+      date: yesterday.toISOString(),
+      createdDate: yesterday.toISOString(),
+    });
+    localStorage.setItem(
+      StorageKeys.entityKey('inventory-entries', STORE_ID),
+      encryptEntity(JSON.stringify(payload)),
+    );
+
+    renderEntries();
+    const panelToggle = await screen.findByTestId(`multistore-panel-toggle-${STORE_ID}`);
+    fireEvent.click(panelToggle);
+    await waitFor(() => {
+      expect(
+        screen.getByTestId(`multistore-entry-day-toggle-${STORE_ID}-${todayKey}`),
+      ).toBeInTheDocument();
+    });
+    expect(
+      screen.getByTestId(`multistore-entry-day-toggle-${STORE_ID}-${yesterdayKey}`),
+    ).toBeInTheDocument();
+
+    // Rango = SOLO HOY → el día de ayer desaparece del panel.
+    const input = screen.getByTestId('date-range-filter-input');
+    fireEvent.click(input);
+    const isoToday = toIsoLocal(new Date());
+    fireEvent.change(screen.getByTestId('date-range-filter-start'), {
+      target: { value: isoToday },
+    });
+    fireEvent.change(screen.getByTestId('date-range-filter-end'), {
+      target: { value: isoToday },
+    });
+    fireEvent.click(screen.getByTestId('date-range-filter-select'));
+    fireEvent.click(screen.getByTestId('date-range-filter-button'));
+    await waitFor(() => {
+      expect(
+        screen.queryByTestId(`multistore-entry-day-toggle-${STORE_ID}-${yesterdayKey}`),
+      ).not.toBeInTheDocument();
+    });
+    // El día de hoy sigue con su contador (1 producto).
+    expect(
+      within(
+        screen.getByTestId(`multistore-entry-day-toggle-${STORE_ID}-${todayKey}`),
+      ).getByText(/\(1\)$/),
+    ).toBeInTheDocument();
   });
 });

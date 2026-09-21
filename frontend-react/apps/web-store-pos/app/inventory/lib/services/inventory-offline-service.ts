@@ -1124,12 +1124,9 @@ export class InventoryOfflineService {
     // auto-init below survives only for its honest case — no stored value at
     // all, i.e. a genuinely new store.
     const storageKey = this.getStorageKey();
-    const storedRaw = localStorage.getItem(storageKey);
-    console.log('[AVAIL-DIAG] getInventoriesFromLocalStorage:read', {
-      storageKey,
-      hasStoredValue: storedRaw !== null,
-      storedLength: storedRaw ? storedRaw.length : 0,
-    });
+    // [AVAIL-DIAG] diagnostics: hasStoredValue is derived from readEntityOrThrow's
+    // result (null = absent) instead of a separate localStorage.getItem — the extra
+    // raw read broke the "getItem hit once per reload" cache contract (WU1 test).
     const stored = readEntityOrThrow(storageKey, (json) => {
       if (!json || json === '{}') return null;
       const inventoryMap = new Map<string, InventoryEntry[]>(JSON.parse(json));
@@ -1139,6 +1136,11 @@ export class InventoryOfflineService {
         });
       });
       return inventoryMap;
+    });
+    console.log('[AVAIL-DIAG] getInventoriesFromLocalStorage:read', {
+      storageKey,
+      hasStoredValue: stored !== null,
+      storedLength: stored ? stored.size : 0,
     });
     if (stored) {
       console.log('[AVAIL-DIAG] getInventoriesFromLocalStorage:parsed', {
