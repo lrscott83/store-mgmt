@@ -98,4 +98,9 @@ export const WarehouseErrors = {
     description:
       'La compra no tiene unidades fuera del almacén cuyo costo se pueda corregir.',
   },
+  PurchaseAlreadyReversed: {
+    code: 'Warehouse.PurchaseAlreadyReversed',
+    description:
+      'La compra ya fue revertida — no se puede volver a editar su costo.',
+  },
 } as const satisfies Record<string, BaseError>;

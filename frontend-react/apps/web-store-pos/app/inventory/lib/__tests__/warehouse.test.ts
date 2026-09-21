@@ -353,6 +353,48 @@ describe('warehouse helpers', () => {
       expect(result.succeeded).toBe(true);
       expect(result.saleOutMovements).toEqual([]);
     });
+
+    it('U-P6 (R3-2): mezcla referencia + legacy → atribuye la UNION (sin descartar)', () => {
+      const result = attributePurchaseOutflow(
+        purchase(),
+        [
+          saleOut({ id: 's-ref', lotOriginMovementId: 'mv-1' }),
+          saleOut({ id: 's-legacy' }), // sin referencia, mismo costo 5
+        ],
+        notReversed,
+      );
+      expect(result.succeeded).toBe(true);
+      expect(result.saleOutMovements.map((m) => m.id).sort()).toEqual(['s-legacy', 's-ref']);
+    });
+
+    it('U-P7 (R3-2): una fila que reclama OTRA compra no entra por costo', () => {
+      const result = attributePurchaseOutflow(
+        purchase(),
+        [
+          saleOut({ id: 's-ref', lotOriginMovementId: 'mv-1' }),
+          saleOut({ id: 's-other', lotOriginMovementId: 'mv-2' }), // mismo costo, otra compra
+          saleOut({ id: 's-legacy' }),
+        ],
+        notReversed,
+      );
+      expect(result.succeeded).toBe(true);
+      expect(result.saleOutMovements.map((m) => m.id).sort()).toEqual(['s-legacy', 's-ref']);
+    });
+
+    it('U-P8 (R3-2): con filas legacy y dos compras vivas al mismo costo → ambiguo', () => {
+      const result = attributePurchaseOutflow(
+        purchase(),
+        [
+          purchase({ id: 'mv-1' }),
+          purchase({ id: 'mv-2' }),
+          saleOut({ id: 's-ref', lotOriginMovementId: 'mv-1' }),
+          saleOut({ id: 's-legacy' }),
+        ],
+        notReversed,
+      );
+      expect(result.succeeded).toBe(false);
+      expect(result.ambiguous).toBe(true);
+    });
   });
 
   describe('summarizeOrderImpact', () => {

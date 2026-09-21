@@ -180,11 +180,19 @@ export interface PurchaseOutflowAttribution {
 }
 
 /**
- * Devuelve las filas `sale_out` vivas atribuibles a `purchase`:
+ * Devuelve las filas `sale_out` vivas atribuibles a `purchase`, como la UNION de:
  * 1. Ruta determinista: `m.lotOriginMovementId === purchase.id` (campo nuevo).
- * 2. Fallback legacy por costo EXACTO — solo si ninguna fila trae referencia y
- *    no hay más de una compra viva del mismo producto a ese costo (si la hay,
- *    la atribución es ambigua y se bloquea: `PurchasePropagationAmbiguous`).
+ * 2. Filas legacy SIN referencia de origen (`lotOriginMovementId === undefined`)
+ *    cuyo costo coincide EXACTO con el de la compra.
+ *
+ * Ambas fuentes se suman: durante la transición pre/post-deploy una compra puede
+ * tener filas con referencia Y filas legacy, y NINGUNA puede descartarse en
+ * silencio. Las filas que reclaman OTRA compra (`lotOriginMovementId` distinto)
+ * nunca entran por costo.
+ *
+ * Ambigüedad: si hay filas legacy que deben atribuirse por costo y existe más de
+ * una compra viva del mismo producto a ese costo, no se puede decidir → se
+ * bloquea (`ambiguous: true`, `PurchasePropagationAmbiguous`), en vez de adivinar.
  */
 export function attributePurchaseOutflow(
   purchase: Pick<WarehouseStockMovement, 'id' | 'productId' | 'costPrice'>,
@@ -196,12 +204,20 @@ export function attributePurchaseOutflow(
   );
 
   const referenced = liveSaleOuts.filter((m) => m.lotOriginMovementId === purchase.id);
-  if (referenced.length > 0) {
-    return { succeeded: true, saleOutMovements: referenced, ambiguous: false };
-  }
 
-  if (purchase.costPrice === undefined) {
-    return { succeeded: true, saleOutMovements: [], ambiguous: false };
+  const legacyCandidates =
+    purchase.costPrice === undefined
+      ? []
+      : liveSaleOuts.filter(
+          (m) =>
+            m.lotOriginMovementId === undefined &&
+            m.costPrice !== undefined &&
+            round2(m.costPrice) === round2(purchase.costPrice as number),
+        );
+
+  // Sin filas legacy no hay nada que desambiguar por costo.
+  if (legacyCandidates.length === 0) {
+    return { succeeded: true, saleOutMovements: referenced, ambiguous: false };
   }
 
   const livePurchasesAtCost = movements.filter(
@@ -216,12 +232,14 @@ export function attributePurchaseOutflow(
     return { succeeded: false, saleOutMovements: [], ambiguous: true };
   }
 
-  const legacy = liveSaleOuts.filter(
-    (m) =>
-      m.costPrice !== undefined &&
-      round2(m.costPrice) === round2(purchase.costPrice as number),
-  );
-  return { succeeded: true, saleOutMovements: legacy, ambiguous: false };
+  const seen = new Set(referenced.map((m) => m.id));
+  const union = [...referenced];
+  for (const movement of legacyCandidates) {
+    if (seen.has(movement.id)) continue;
+    seen.add(movement.id);
+    union.push(movement);
+  }
+  return { succeeded: true, saleOutMovements: union, ambiguous: false };
 }
 
 /** Impacto de una corrección de costo sobre las órdenes (Fase 3). */

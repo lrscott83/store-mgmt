@@ -56,7 +56,6 @@ function makeOrderPort(): FakeOrderPort {
     },
     updateProductCostsByInventoryIds(costs) {
       port.updateCalls.push(costs);
-      if (port.throwOnUpdate) throw new Error('order update boom');
       let activeOrders = 0;
       let deactivatedOrders = 0;
       let updatedLines = 0;
@@ -77,6 +76,9 @@ function makeOrderPort(): FakeOrderPort {
         if (order.isActive) activeOrders += 1;
         else deactivatedOrders += 1;
       }
+      // Simula un fallo DESPUÉS de mutar la línea de la orden (R3-3), para que el
+      // rollback tenga que deshacer una mutación real, no un no-op.
+      if (port.throwOnUpdate) throw new Error('order update boom');
       return { activeOrders, deactivatedOrders, updatedLines };
     },
     restoreOrdersSnapshot(orders) {
@@ -321,7 +323,56 @@ describe('WarehouseOfflineService — Fase 3 (propagación de costo)', () => {
       .getProductInventoriesByProductId('prod-1')
       .find((e) => e.id === entryId)!;
     expect(entry.costPrice).toBe(5);
+    // La orden también se restauró: el fake MUTÓ la línea a 7 antes de fallar.
+    expect(orderPort.orders[0].orderItems[0].productCosts[0].costPrice).toBe(5);
     expect(orderPort.restoreCalls).toBeGreaterThan(0);
+  });
+
+  it('U-F3-9 (R3-1): un segundo submit del mismo id (ya revertido) falla y no re-aplica', () => {
+    const wh = warehouse();
+    const purchaseId = purchase(wh.id, 10, 5);
+    const sale = saleOut(wh.id, 6);
+    const entryId = sale[0].inventoryEntryId!;
+    orderPort.orders = [makeOrder('o1', true, [orderItem(entryId, 5, 2)])];
+
+    // Primera edición: éxito → la compra original queda revertida.
+    expect(service.applyPurchaseCostEdit(purchaseId, 4, 7).succeeded).toBe(true);
+    expect(service.isReversed(purchaseId)).toBe(true);
+    expect(orderPort.orders[0].orderItems[0].productCosts[0].costPrice).toBe(7);
+
+    // Segundo submit (mismo id) → rechazado, sin tocar tienda ni ventas.
+    const second = service.applyPurchaseCostEdit(purchaseId, 4, 9);
+    expect(second.succeeded).toBe(false);
+    expect(second.errors[0]).toEqual(WarehouseErrors.PurchaseAlreadyReversed);
+
+    const preview = service.getPurchasePropagationPreview(purchaseId, 9);
+    expect(preview.succeeded).toBe(false);
+    expect(preview.errors[0]).toEqual(WarehouseErrors.PurchaseAlreadyReversed);
+
+    const entry = inventorySvc
+      .getProductInventoriesByProductId('prod-1')
+      .find((e) => e.id === entryId)!;
+    expect(entry.costPrice).toBe(7);
+    expect(orderPort.orders[0].orderItems[0].productCosts[0].costPrice).toBe(7);
+  });
+
+  it('U-F3-10 (R3-3): en modo costOnly una cantidad distinta de 0 se rechaza', () => {
+    const wh = warehouse();
+    const purchaseId = purchase(wh.id, 10, 5);
+    const sale = saleOut(wh.id, 10); // consume el lote completo → costOnly
+    const entryId = sale[0].inventoryEntryId!;
+    orderPort.orders = [makeOrder('o1', true, [orderItem(entryId, 5, 4)])];
+
+    const result = service.applyPurchaseCostEdit(purchaseId, 5, 9);
+
+    expect(result.succeeded).toBe(false);
+    expect(result.errors[0]).toEqual(WarehouseErrors.QuantityInvalid);
+    // Nada se propagó.
+    const entry = inventorySvc
+      .getProductInventoriesByProductId('prod-1')
+      .find((e) => e.id === entryId)!;
+    expect(entry.costPrice).toBe(5);
+    expect(orderPort.orders[0].orderItems[0].productCosts[0].costPrice).toBe(5);
   });
 
   it('U-F3-8: updateWarehouseOriginEntryCost corrige el costo sin abrir la puerta del CRUD (A8)', () => {

@@ -945,6 +945,12 @@ export class WarehouseOfflineService {
         WarehouseErrors.QuantityInvalid,
       ]);
     }
+    // R3-1: una compra ya revertida no se vuelve a editar (evita re-propagar).
+    if (this.isReversed(purchaseId)) {
+      return new DataResultImpl<PurchasePropagationPreview>(undefined, false, [
+        WarehouseErrors.PurchaseAlreadyReversed,
+      ]);
+    }
 
     const resolved = this.resolvePurchaseOutflow(purchase);
     if (!resolved.succeeded) {
@@ -998,6 +1004,13 @@ export class WarehouseOfflineService {
         WarehouseErrors.QuantityInvalid,
       ]);
     }
+    // R3-1: tras una edición exitosa la compra original queda revertida; volver a
+    // enviar el mismo id re-aplicaría la corrección (doble escritura silenciosa).
+    if (this.isReversed(purchaseId)) {
+      return new DataResultImpl<PurchaseCostEditOutcome>(undefined, false, [
+        WarehouseErrors.PurchaseAlreadyReversed,
+      ]);
+    }
     if (!(round2(newCostPrice) > 0)) {
       return new DataResultImpl<PurchaseCostEditOutcome>(undefined, false, [
         WarehouseErrors.QuantityInvalid,
@@ -1031,12 +1044,20 @@ export class WarehouseOfflineService {
     const remaining = remainingPurchaseUnits(level, purchase);
     const costOnly = remaining <= 0;
 
-    if (costOnly && movements.length === 0) {
-      return new DataResultImpl<PurchaseCostEditOutcome>(undefined, false, [
-        WarehouseErrors.PurchasePropagationNoOutflow,
-      ]);
-    }
-    if (!costOnly) {
+    if (costOnly) {
+      // R3-3: en modo costOnly el almacén está en 0 y el llamador no debe enviar
+      // cantidad. Se RECHAZA una cantidad inconsistente (≠ 0) en vez de ignorarla.
+      if (round2(newQuantity) !== 0) {
+        return new DataResultImpl<PurchaseCostEditOutcome>(undefined, false, [
+          WarehouseErrors.QuantityInvalid,
+        ]);
+      }
+      if (movements.length === 0) {
+        return new DataResultImpl<PurchaseCostEditOutcome>(undefined, false, [
+          WarehouseErrors.PurchasePropagationNoOutflow,
+        ]);
+      }
+    } else {
       const qtyOk = validateMovementQuantity(newQuantity);
       if (!qtyOk.succeeded) {
         return new DataResultImpl<PurchaseCostEditOutcome>(undefined, false, qtyOk.errors);
