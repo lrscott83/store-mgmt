@@ -121,7 +121,7 @@ describe('Inventario Disponible — DEK de la tienda seleccionada bajo etiqueta 
     await waitFor(() => {
       expect(screen.getByText('(10)')).toBeInTheDocument();
     });
-    expect(screen.getAllByText('$250').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('250 CUP').length).toBeGreaterThan(0);
   });
 
   it('IV-DEK-2: CON MultiStores el panel de la tienda seleccionada DEBE mostrar su inventario (no "sin datos")', async () => {

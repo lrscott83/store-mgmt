@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 import type { InventoryEntryView } from '@store-mgmt/domain';
+import { Currency } from '@store-mgmt/domain';
 import { EntryList } from '../entry-list';
 
 function Wrapper({ children }: { children: React.ReactNode }) {
@@ -51,17 +52,49 @@ describe('EntryList — list/table parity sweep (WU5)', () => {
     expect(tbody.className).not.toMatch(/divide-y/);
   });
 
-  it('renders the cost price using formatCurrency (thousands separator)', () => {
+  it('renders the cost price in the entry currency without a $ prefix (thousands separator kept)', () => {
     render(
       <Wrapper>
         <EntryList
-          entries={[makeEntry({ costPrice: 2000 })]}
+          entries={[makeEntry({ costPrice: 2000, currency: Currency.CUP })]}
           isOwnerAdmin
           onEdit={vi.fn()}
           onDeactivate={vi.fn()}
         />
       </Wrapper>,
     );
-    expect(screen.getByText('$2 000')).toBeInTheDocument();
+    // textContent (not getByText): the NBSP grouping must survive verbatim.
+    const costCell = screen.getByText('Coca Cola').closest('tr')!.children[2]!;
+    expect(costCell.textContent).toBe('2\u00A0000\u00A0CUP');
+  });
+
+  it('renders foreign-currency costs with their code (no $ prefix)', () => {
+    render(
+      <Wrapper>
+        <EntryList
+          entries={[makeEntry({ costPrice: 23456.7, currency: Currency.USD })]}
+          isOwnerAdmin
+          onEdit={vi.fn()}
+          onDeactivate={vi.fn()}
+        />
+      </Wrapper>,
+    );
+    const costCell = screen.getByText('Coca Cola').closest('tr')!.children[2]!;
+    expect(costCell.textContent).toBe('23\u00A0456.70\u00A0USD');
+  });
+
+  it('falls back to CUP when the entry has no stored currency (legacy data)', () => {
+    render(
+      <Wrapper>
+        <EntryList
+          entries={[makeEntry({ costPrice: 50, currency: undefined })]}
+          isOwnerAdmin
+          onEdit={vi.fn()}
+          onDeactivate={vi.fn()}
+        />
+      </Wrapper>,
+    );
+    const costCell = screen.getByText('Coca Cola').closest('tr')!.children[2]!;
+    expect(costCell.textContent).toBe('50\u00A0CUP');
   });
 });

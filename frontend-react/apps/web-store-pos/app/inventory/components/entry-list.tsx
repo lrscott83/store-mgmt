@@ -1,7 +1,7 @@
 import { useIntl } from 'react-intl';
 import type { InventoryEntryView } from '@store-mgmt/domain';
 import { ActionMenu, ActionMenuItem } from '~/shared/components/ui/action-menu';
-import { formatCurrency } from '~/shared/lib/format-currency';
+import { formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency';
 
 interface EntryListProps {
   entries: InventoryEntryView[];
@@ -54,7 +54,13 @@ export function EntryList({
               <td className="p-2 font-medium text-text">{entry.productName || entry.productId}</td>
               <td className="p-2 text-right text-text-muted">{entry.quantity}</td>
               {isOwnerAdmin && (
-                <td className="p-2 text-right text-success">{formatCurrency(entry.costPrice)}</td>
+                <td className="p-2 text-right text-success">
+                  {/* MultiMonedas: cost in the ENTRY's currency, no $ prefix — same
+                      `formatMoneyWithCurrency(price, currency)` display as product prices
+                      (sale-product-row/category-product-list). NBSP thousands grouping is
+                      preserved; absent currency falls back to CUP. */}
+                  {formatMoneyWithCurrency(entry.costPrice, entry.currency)}
+                </td>
               )}
               {showActions && (
                 <td className="p-2 text-right">

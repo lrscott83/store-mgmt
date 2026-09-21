@@ -15,7 +15,9 @@ import { formatLocalDate, groupByLocalDay } from '~/shared/lib/date-utils';
 import type { LocalDayGroup } from '~/shared/lib/date-utils';
 import { EntryList } from '../components/entry-list';
 import { round2 } from '~/shared/lib/money';
-import { formatCurrency } from '~/shared/lib/format-currency';
+import { CurrencyTotalAmount } from '~/shared/components/multimonedas/currency-total-amount';
+import { nonEmptyCurrencyRows } from '~/shared/lib/currency-totals';
+import type { CurrencyAmount } from '~/shared/lib/currency-totals';
 import { useMultiStore } from '~/shared/lib/hooks/use-multi-store';
 import {
   MultiStoreSection,
@@ -140,6 +142,13 @@ export function EntriesPage() {
   const sumTotal = (entries: InventoryEntryView[]) =>
     entries.reduce((total, e) => total + round2(e.costPrice * e.quantity), 0);
 
+  /** Per-currency split of an entries' total — each amount keeps its entry currency.
+   *  Empty input → one 0 CUP row (headers show `0 CUP`, never the legacy `$0`). */
+  const entryAmounts = (entries: InventoryEntryView[]): CurrencyAmount[] =>
+    nonEmptyCurrencyRows(
+      entries.map((e) => ({ amount: e.costPrice * e.quantity, currency: e.currency })),
+    );
+
   // multi-store mode ───────────────────────────────────────────────────────
   if (multiStoreEnabled) {
     const visibleStoreIds =
@@ -169,7 +178,11 @@ export function EntriesPage() {
               </span>
             </span>
             <span className="text-sm font-semibold text-primary whitespace-nowrap">
-              {formatCurrency(totals.total)}
+              <CurrencyTotalAmount
+                legacyTotal={totals.total}
+                entries={visibleStoreIds.flatMap((id) => entryAmounts(storeEntryViews.get(id) ?? []))}
+                multiMonedas
+              />
             </span>
           </div>
         }
@@ -183,7 +196,12 @@ export function EntriesPage() {
             const total = sumTotal(entries);
             const count = sumCount(entries);
             return (
-              <MultiStoreTotal label={`(${count})`} value={total} valueClassName="text-primary" />
+              <MultiStoreTotal
+                label={`(${count})`}
+                value={total}
+                valueClassName="text-primary"
+                entries={entryAmounts(entries)}
+              />
             );
           }}
         >
@@ -216,16 +234,18 @@ export function EntriesPage() {
                           {formatLocalDate(dayGroup.date)}
                         </span>
                         <span className="flex items-center gap-2">
-                          <span className="text-xs font-semibold text-primary whitespace-nowrap">
-                            {formatCurrency(
-                              round2(
-                                dayGroup.items.reduce(
-                                  (total, e) => total + e.costPrice * e.quantity,
-                                  0,
-                                ),
+                        <span className="text-xs font-semibold text-primary whitespace-nowrap">
+                          <CurrencyTotalAmount
+                            legacyTotal={round2(
+                              dayGroup.items.reduce(
+                                (total, e) => total + e.costPrice * e.quantity,
+                                0,
                               ),
                             )}
-                          </span>
+                            entries={entryAmounts(dayGroup.items)}
+                            multiMonedas
+                          />
+                        </span>
                           <ChevronDownIcon isExpanded={isExpanded} className="text-text-muted" />
                         </span>
                       </button>
@@ -261,7 +281,11 @@ export function EntriesPage() {
             </span>
           </span>
           <span className="text-sm font-semibold text-primary whitespace-nowrap">
-            {formatCurrency(entriesTotal)}
+            <CurrencyTotalAmount
+              legacyTotal={entriesTotal}
+              entries={entryAmounts(dayGroups.flatMap((d) => d.items))}
+              multiMonedas
+            />
           </span>
         </div>
       }
@@ -291,11 +315,13 @@ export function EntriesPage() {
                   </span>
                   <span className="flex items-center gap-2">
                     <span className="text-sm font-semibold text-primary whitespace-nowrap">
-                      {formatCurrency(
-                        round2(
+                      <CurrencyTotalAmount
+                        legacyTotal={round2(
                           dayGroup.items.reduce((total, e) => total + e.costPrice * e.quantity, 0),
-                        ),
-                      )}
+                        )}
+                        entries={entryAmounts(dayGroup.items)}
+                        multiMonedas
+                      />
                     </span>
                     <ChevronDownIcon isExpanded={isExpanded} className="text-text-muted" />
                   </span>

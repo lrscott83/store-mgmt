@@ -2,7 +2,9 @@ import { useState } from 'react';
 import { useIntl } from 'react-intl';
 import { ChevronDownIcon } from '~/shared/components/ui/icons';
 import type { InventoryCategoryView } from '../lib/services/inventory-offline-service';
-import { formatCurrency } from '~/shared/lib/format-currency';
+import { formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency';
+import { CurrencyTotalAmount } from '~/shared/components/multimonedas/currency-total-amount';
+import { nonEmptyCurrencyRows } from '~/shared/lib/currency-totals';
 
 interface InventoryProductListProps {
   categories: InventoryCategoryView[];
@@ -105,7 +107,13 @@ export function InventoryProductList({
                   {/* Category total inventory value — Angular's mat-expansion-panel-header
                       category.totalCostPrice chip (inventory-available.component.html:26). */}
                   <span className="text-sm font-semibold text-primary whitespace-nowrap">
-                    {formatCurrency(cat.totalCostPrice)}
+                    <CurrencyTotalAmount
+                      legacyTotal={cat.totalCostPrice}
+                      entries={nonEmptyCurrencyRows(
+                        cat.totalCostPriceEntries ?? [{ amount: cat.totalCostPrice }],
+                      )}
+                      multiMonedas
+                    />
                   </span>
                   <ChevronDownIcon isExpanded={isExpanded} className="text-text-muted" />
                 </span>
@@ -124,10 +132,10 @@ export function InventoryProductList({
                             product.costPrice / product.costPrice*product.quantity currency cells
                             (inventory-product-list.component.html:20-29). */}
                         <p className="text-sm font-semibold text-success whitespace-nowrap">
-                          {formatCurrency(p.avgCostPrice)}
+                          {formatMoneyWithCurrency(p.avgCostPrice, p.currency)}
                         </p>
                         <p className="text-sm font-semibold text-primary whitespace-nowrap">
-                          {formatCurrency(p.avgCostPrice * p.totalAvailable)}
+                          {formatMoneyWithCurrency(p.avgCostPrice * p.totalAvailable, p.currency)}
                         </p>
                       </div>
                     </div>

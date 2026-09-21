@@ -227,16 +227,16 @@ describe('InventoryProductList — weighted avg cost + total value (Angular pari
     expect(screen.getByText('Snacks (8)')).toBeInTheDocument();
   });
 
-  it('shows the category total inventory value ($ prefix, matching Angular currency pipe)', () => {
+  it('shows the category total inventory value (currency suffix, no $ prefix)', () => {
     render(
       <Wrapper>
         <InventoryProductList categories={MOCK_CATEGORIES} />
       </Wrapper>,
     );
-    expect(screen.getByText('$35')).toBeInTheDocument();
-    // $40 appears twice: the Snacks category total AND Papas Lays' product total value
+    expect(screen.getByText('35 CUP')).toBeInTheDocument();
+    // 40 CUP appears twice: the Snacks category total AND Papas Lays' product total value
     // (5 * 8 = 40) — same numeric coincidence documented in the test below.
-    expect(screen.getAllByText('$40').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('40 CUP').length).toBeGreaterThanOrEqual(1);
   });
 
   it('shows each product weighted-average unit cost (category expanded)', () => {
@@ -246,9 +246,9 @@ describe('InventoryProductList — weighted avg cost + total value (Angular pari
       </Wrapper>,
     );
     fireEvent.click(screen.getByTestId('inventory-category-toggle-cat1'));
-    // Coca Cola: avgCostPrice=2 -> $2; Fanta: avgCostPrice=3 -> $3
-    expect(screen.getByText('$2')).toBeInTheDocument();
-    expect(screen.getByText('$3')).toBeInTheDocument();
+    // Coca Cola: avgCostPrice=2 -> 2 CUP; Fanta: avgCostPrice=3 -> 3 CUP
+    expect(screen.getByText('2 CUP')).toBeInTheDocument();
+    expect(screen.getByText('3 CUP')).toBeInTheDocument();
   });
 
   it('shows each product total value (avgCostPrice · totalAvailable, category expanded)', () => {
@@ -259,11 +259,11 @@ describe('InventoryProductList — weighted avg cost + total value (Angular pari
     );
     fireEvent.click(screen.getByTestId('inventory-category-toggle-cat1'));
     fireEvent.click(screen.getByTestId('inventory-category-toggle-cat2'));
-    // Coca Cola: 2 * 10 = $20; Fanta: 3 * 5 = $15; Papas Lays: 5 * 8 = $40
-    expect(screen.getByText('$20')).toBeInTheDocument();
-    expect(screen.getByText('$15')).toBeInTheDocument();
-    // $40 also appears as the Snacks category total (same numeric value, expected coincidence)
-    expect(screen.getAllByText('$40').length).toBeGreaterThanOrEqual(1);
+    // Coca Cola: 2 * 10 = 20 CUP; Fanta: 3 * 5 = 15 CUP; Papas Lays: 5 * 8 = 40 CUP
+    expect(screen.getByText('20 CUP')).toBeInTheDocument();
+    expect(screen.getByText('15 CUP')).toBeInTheDocument();
+    // 40 CUP also appears as the Snacks category total (same numeric value, expected coincidence)
+    expect(screen.getAllByText('40 CUP').length).toBeGreaterThanOrEqual(1);
   });
 });
 
@@ -283,9 +283,10 @@ describe('InventoryProductList — Disponible row cleanup (Angular parity)', () 
     expect(screen.queryByText('Bebidas', { selector: 'p' })).not.toBeInTheDocument();
     expect(screen.queryByText('INVENTORY.ENTRY.AVAILABLE')).not.toBeInTheDocument();
     expect(screen.queryByText(esMessages['INVENTORY.ENTRY.AVAILABLE'])).not.toBeInTheDocument();
-    // Currency cells (avg cost, total value) still render.
-    expect(screen.getByText('$2')).toBeInTheDocument();
-    expect(screen.getByText('$20')).toBeInTheDocument();
+    // Currency cells (avg cost, total value) still render — MultiMonedas format
+    // (currency suffix, NBSP thousands, no $ prefix).
+    expect(screen.getByText('2 CUP')).toBeInTheDocument();
+    expect(screen.getByText('20 CUP')).toBeInTheDocument();
   });
 });
 
@@ -481,8 +482,9 @@ describe('EntryList — isOwnerAdmin gating (Angular parity)', () => {
         <EntryList entries={MOCK_ENTRIES} isOwnerAdmin />
       </Wrapper>,
     );
-    // The cost-price cell renders the formatted VALUE (there is no header label to assert).
-    expect(screen.getByText('$0.80')).toBeInTheDocument();
+    // The cost-price cell renders the formatted VALUE (there is no header label to assert)
+    // — MultiMonedas format: currency suffix, no $ prefix.
+    expect(screen.getByText('0.80 CUP')).toBeInTheDocument();
   });
 
   it('shows actions only when isOwnerAdmin is true AND readOnly is false', () => {

@@ -40,6 +40,16 @@ export function resolveCurrency(currency?: Currency): Currency {
 }
 
 /**
+ * Non-empty rows for display: an empty aggregation (no money at all) shows as a
+ * single 0 CUP row instead of falling back to the legacy `$`-prefixed total.
+ * Pass its result to `CurrencyTotalAmount`/`MultiStoreTotal` whenever the rows
+ * come from a possibly-empty list (headers follow filters).
+ */
+export function nonEmptyCurrencyRows(entries: readonly CurrencyAmount[]): CurrencyAmount[] {
+  return entries.length > 0 ? [...entries] : [{ amount: 0 }];
+}
+
+/**
  * Sums amounts by currency (`currency ?? DEFAULT_CURRENCY`). Each currency gets
  * its own row; rows keep first-seen order — run them through
  * {@link orderCurrencyTotals} for the agreed display order.

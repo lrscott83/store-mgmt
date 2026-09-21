@@ -210,8 +210,8 @@ describe('Entradas (Historial) — flujo real sin mocks de datos', () => {
     });
     // Cantidad de PRODUCTOS (suma de quantities de las entradas activas).
     expect(screen.getByText('(10)')).toBeInTheDocument();
-    // Costo total a la derecha: 10 × $25 = $250.
-    expect(screen.getAllByText('$250').length).toBeGreaterThan(0);
+    // Costo total a la derecha: 10 × 25 CUP = 250 CUP.
+    expect(screen.getAllByText('250 CUP').length).toBeGreaterThan(0);
     // La línea duplicada "Historial de Entradas" (label + total bajo el filtro) ya NO existe.
     expect(screen.queryByText(/Historial de Entradas/)).not.toBeInTheDocument();
   });
@@ -223,15 +223,15 @@ describe('Entradas (Historial) — flujo real sin mocks de datos', () => {
     renderEntries();
 
     const dayToggle = await screen.findByTestId(`entry-day-panel-toggle-${todayKey}`);
-    expect(within(dayToggle).getByText('$250')).toBeInTheDocument();
+    expect(within(dayToggle).getByText('250 CUP')).toBeInTheDocument();
     fireEvent.click(dayToggle);
     await waitFor(() => {
       expect(screen.getByText('Cerveza')).toBeInTheDocument();
     });
-    // Datos de la entrada en la fila: cantidad y costo unitario (10 × $25).
+    // Datos de la entrada en la fila: cantidad y costo unitario (10 × 25 CUP).
     expect(screen.getByText('10')).toBeInTheDocument();
-    expect(screen.getByText('$25')).toBeInTheDocument();
-    expect(screen.getAllByText('$250').length).toBeGreaterThan(0);
+    expect(screen.getByText('25 CUP')).toBeInTheDocument();
+    expect(screen.getAllByText('250 CUP').length).toBeGreaterThan(0);
   });
 
   it('IT-7: CON MultiStores — el panel de la tienda muestra las entradas del formato real de la app (mapa serializado)', async () => {
@@ -251,7 +251,7 @@ describe('Entradas (Historial) — flujo real sin mocks de datos', () => {
       .getByTestId(`multistore-panel-toggle-${STORE_ID}`)
       .closest('.rounded-lg');
     expect(panel).not.toBeNull();
-    expect(within(panel as HTMLElement).getAllByText('$250').length).toBeGreaterThan(0);
+    expect(within(panel as HTMLElement).getAllByText('250 CUP').length).toBeGreaterThan(0);
     // El select global muestra ambas tiendas.
     expect(screen.getByTestId('multistore-select')).toBeInTheDocument();
   });
@@ -270,7 +270,7 @@ describe('Entradas (Historial) — flujo real sin mocks de datos', () => {
       expect(screen.getAllByText('(10)').length).toBeGreaterThan(0);
     });
     expect(screen.getByText('Entradas')).toBeInTheDocument();
-    expect(screen.getAllByText('$250').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('250 CUP').length).toBeGreaterThan(0);
   });
 
   it('IT-9: CON MultiStores — tienda sin datos locales muestra "sin datos" y la que tiene, muestra los suyos', async () => {
@@ -327,7 +327,7 @@ describe('Entradas (Historial) — flujo real sin mocks de datos', () => {
     await waitFor(() => {
       expect(screen.getByText('Cerveza (10)')).toBeInTheDocument();
     });
-    expect(screen.getByText('$25')).toBeInTheDocument();
+    expect(screen.getByText('25 CUP')).toBeInTheDocument();
   });
 
   it('IT-12: CON MultiStores — desactivar el filtro a una sola tienda muestra solo su panel y sus totales', async () => {
@@ -342,10 +342,10 @@ describe('Entradas (Historial) — flujo real sin mocks de datos', () => {
       expect(screen.getByTestId(`multistore-panel-toggle-${STORE_ID}`)).toBeInTheDocument();
     });
     expect(screen.queryByTestId('multistore-panel-toggle-s2')).not.toBeInTheDocument();
-    // El header refleja SOLO la tienda filtrada (10 × $25 = $250). El label
+    // El header refleja SOLO la tienda filtrada (10 × 25 CUP = 250 CUP). El label
     // (10) también existe en el header del panel — usar getAllByText.
     expect(screen.getAllByText('(10)').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('$250').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('250 CUP').length).toBeGreaterThan(0);
   });
 
   it('IT-13: CON MultiStores — entrada de AYER no se mezcla: cada día se agrupa con su propio total', async () => {
@@ -385,10 +385,10 @@ describe('Entradas (Historial) — flujo real sin mocks de datos', () => {
     });
     const yesterdayKey = toLocalDayKey(yesterday);
     expect(screen.getByTestId(`multistore-entry-day-toggle-${STORE_ID}-${yesterdayKey}`)).toBeInTheDocument();
-    // Total del panel: hoy $250 + ayer $20 = $270.
+    // Total del panel: hoy 250 CUP + ayer 20 CUP = 270 CUP.
     const panel = screen
       .getByTestId(`multistore-panel-toggle-${STORE_ID}`)
       .closest('.rounded-lg');
-    expect(within(panel as HTMLElement).getAllByText('$270').length).toBeGreaterThan(0);
+    expect(within(panel as HTMLElement).getAllByText('270 CUP').length).toBeGreaterThan(0);
   });
 });

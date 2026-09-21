@@ -280,16 +280,17 @@ describe('InventoryAvailablePage — header total inventory value', () => {
     );
 
     // 60 + 40 = 100 — loadData is now async (WU10), await the resolved effect.
-    expect(await screen.findByText('$100')).toBeInTheDocument();
+    // MultiMonedas format: currency suffix, no $ prefix.
+    expect(await screen.findByText('100 CUP')).toBeInTheDocument();
   });
 
-  it('shows $0 when there is no inventory yet', () => {
+  it('shows 0 CUP when there is no inventory yet', () => {
     render(
       <Wrapper>
         <InventoryAvailablePage />
       </Wrapper>,
     );
-    expect(screen.getByText('$0')).toBeInTheDocument();
+    expect(screen.getByText('0 CUP')).toBeInTheDocument();
   });
 });
 
@@ -989,9 +990,9 @@ describe('EntriesPage — day grouping (Angular parity)', () => {
         <EntriesPage />
       </Wrapper>,
     );
-    // count = 2+1+5 = 8; total = 2*3 + 1*10 + 5*2 = 6+10+10 = 26
+    // count = 2+1+5 = 8; total = 2*3 + 1*10 + 5*2 = 6+10+10 = 26 (MultiMonedas format)
     expect(screen.getByText('(8)')).toBeInTheDocument();
-    expect(screen.getByText('$26')).toBeInTheDocument();
+    expect(screen.getByText('26 CUP')).toBeInTheDocument();
   });
 
   it('groups entries into one panel per calendar day with the correct per-day total', () => {
@@ -1003,9 +1004,9 @@ describe('EntriesPage — day grouping (Angular parity)', () => {
     );
     const toggles = screen.getAllByTestId(/entry-day-panel-toggle-/);
     expect(toggles).toHaveLength(2);
-    // day 1 total = 6+10 = 16; day 2 total = 10
-    expect(screen.getByText('$16')).toBeInTheDocument();
-    expect(screen.getByText('$10')).toBeInTheDocument();
+    // day 1 total = 6+10 = 16; day 2 total = 10 (MultiMonedas format)
+    expect(screen.getByText('16 CUP')).toBeInTheDocument();
+    expect(screen.getByText('10 CUP')).toBeInTheDocument();
   });
 
   it('sorts day panels ascending (oldest day first)', () => {

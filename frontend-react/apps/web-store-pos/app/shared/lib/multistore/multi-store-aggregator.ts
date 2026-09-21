@@ -23,7 +23,7 @@ import type {
   OrderItem,
   SaleCredit,
 } from '@store-mgmt/domain';
-import { PaymentType as PaymentTypeEnum } from '@store-mgmt/domain';
+import { DEFAULT_CURRENCY, PaymentType as PaymentTypeEnum } from '@store-mgmt/domain';
 import { addDays, groupByLocalDay, localDayRange } from '~/shared/lib/date-utils';
 import type { LocalDayGroup } from '~/shared/lib/date-utils';
 import { calculateOrderProfit } from '~/inventory/lib/profit-calculator';
@@ -203,6 +203,7 @@ export function readStoreInventoryCategories(
       available: number;
       costPrice: number;
       isActive: boolean;
+      currency?: number;
     }
   >('inventory-entries', storeId, dek);
 
@@ -227,6 +228,7 @@ export function readStoreInventoryCategories(
     }
 
     const products: InventoryCategoryView['products'] = [];
+    const currencyTotals = new Map<number, number>();
     let categoryName: string | undefined;
     productGroups.forEach((productEntries, productId) => {
       // Divergence (see doc): orphan product/category rows are skipped, never thrown.
@@ -243,6 +245,14 @@ export function readStoreInventoryCategories(
         (sum, e) => sum + e.available * e.costPrice,
         0,
       );
+      // Currency-in-costs (plan 2026-09-16): a product's entries share its
+      // currency; per-product totals group by that currency so category
+      // totals never mix currencies (mirrors the service's view-model).
+      const productCurrency = Number(productEntries[0].currency ?? DEFAULT_CURRENCY);
+      currencyTotals.set(
+        productCurrency,
+        (currencyTotals.get(productCurrency) ?? 0) + weightedCostSum,
+      );
       products.push({
         productId,
         productName: String(product.name),
@@ -250,6 +260,7 @@ export function readStoreInventoryCategories(
         categoryName: String(categoriesMap.get(categoryId)?.name ?? ''),
         totalAvailable,
         avgCostPrice: round2(weightedCostSum / totalAvailable),
+        currency: productCurrency as CurrencyAmount['currency'],
       });
     });
 
@@ -264,6 +275,10 @@ export function readStoreInventoryCategories(
       categoryName: categoryName ?? '',
       totalQuantity,
       totalCostPrice,
+      totalCostPriceEntries: Array.from(currencyTotals, ([currency, amount]) => ({
+        amount,
+        currency: currency as CurrencyAmount['currency'],
+      })),
       products,
     });
   });

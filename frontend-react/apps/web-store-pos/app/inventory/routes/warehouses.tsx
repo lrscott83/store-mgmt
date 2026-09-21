@@ -5,7 +5,8 @@ import type {
   Warehouse,
   WarehouseStockLevel,
 } from '@store-mgmt/domain';
-import { EFeatures } from '@store-mgmt/domain';
+import { DEFAULT_CURRENCY, EFeatures } from '@store-mgmt/domain';
+import type { Currency } from '@store-mgmt/domain';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { Card } from '~/shared/components/ui/card';
@@ -206,42 +207,50 @@ export function WarehousesPage() {
       const group = byCategory.get(categoryId);
       if (group) group.push(level);
       else byCategory.set(categoryId, [level]);
-    }
-
-    const q = search.trim().toLowerCase();
-    const views: InventoryCategoryView[] = [];
-    byCategory.forEach((catLevels, categoryId) => {
-      const categoryName = categories.get(categoryId)?.name ?? '';
-      const items = catLevels.map((level) => {
-        const product = products.find((p) => p.id === level.productId)!;
-        return {
+    }      const q = search.trim().toLowerCase();
+      const views: InventoryCategoryView[] = [];
+      byCategory.forEach((catLevels, categoryId) => {
+        const categoryName = categories.get(categoryId)?.name ?? '';
+        const items = catLevels.map((level) => ({
           productId: level.productId,
-          productName: product.name,
+          productName: products.find((p) => p.id === level.productId)!.name,
           categoryId,
           categoryName,
           totalAvailable: level.onHand,
           avgCostPrice: level.costPrice,
-        };
+          // currency-in-costs (plan 2026-09-16): the level's own currency (absent = CUP).
+          currency: level.currency ?? DEFAULT_CURRENCY,
+        }));
+        const categoryMatches = categoryName.toLowerCase().includes(q);
+        const filteredItems = q
+          ? categoryMatches
+            ? items
+            : items.filter((p) => p.productName.toLowerCase().includes(q))
+          : items;
+        if (filteredItems.length === 0) return;
+        const currencyTotals = new Map<Currency, number>();
+        for (const p of filteredItems) {
+          currencyTotals.set(
+            p.currency,
+            (currencyTotals.get(p.currency) ?? 0) + p.avgCostPrice * p.totalAvailable,
+          );
+        }
+        views.push({
+          categoryId,
+          categoryName,
+          totalQuantity: filteredItems.reduce((sum, p) => sum + p.totalAvailable, 0),
+          totalCostPrice: filteredItems.reduce(
+            (sum, p) => sum + p.avgCostPrice * p.totalAvailable,
+            0,
+          ),
+          totalCostPriceEntries: Array.from(currencyTotals, ([currency, amount]) => ({
+            amount,
+            currency,
+          })),
+          products: filteredItems,
+        });
       });
-      const categoryMatches = categoryName.toLowerCase().includes(q);
-      const filteredItems = q
-        ? categoryMatches
-          ? items
-          : items.filter((p) => p.productName.toLowerCase().includes(q))
-        : items;
-      if (filteredItems.length === 0) return;
-      views.push({
-        categoryId,
-        categoryName,
-        totalQuantity: filteredItems.reduce((sum, p) => sum + p.totalAvailable, 0),
-        totalCostPrice: filteredItems.reduce(
-          (sum, p) => sum + p.avgCostPrice * p.totalAvailable,
-          0,
-        ),
-        products: filteredItems,
-      });
-    });
-    return views;
+      return views;
   }
 
   const isSearching = search.trim() !== '';

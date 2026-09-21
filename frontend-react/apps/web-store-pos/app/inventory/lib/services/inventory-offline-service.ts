@@ -1,10 +1,12 @@
 import type {
   BaseResponseModel,
+  Currency,
   InventoryEntry,
   InventoryEntryCost,
   InventoryEntryView,
   OrderItem,
 } from '@store-mgmt/domain';
+import type { CurrencyAmount } from '~/shared/lib/currency-totals';
 import {
   DataResult,
   DEFAULT_CURRENCY,
@@ -65,6 +67,12 @@ export interface InventoryProductStock {
    * (frontend/src/app/application/entries/inventory-offline.service.ts:341-349).
    */
   avgCostPrice: number;
+  /**
+   * Currency of this product's cost (currency-in-costs-and-prices, plan
+   * 2026-09-16): every entry of a product shares the product's currency, so the
+   * weighted average carries it. Absent (legacy rows/factories) = CUP.
+   */
+  currency?: Currency;
 }
 
 export interface InventoryCategoryView {
@@ -80,6 +88,14 @@ export interface InventoryCategoryView {
    * Mirrors Angular's getTotalCostPrice (inventory-offline.service.ts:325-331).
    */
   totalCostPrice: number;
+  /**
+   * Same total split by currency (currency-in-costs-and-prices, plan 2026-09-16):
+   * one row per currency present in the category's product costs. Currencies are
+   * NEVER summed together; `amount` of a row is Σ available·costPrice of the
+   * products whose cost is in that currency. Absent (legacy factories) = treat
+   * the whole `totalCostPrice` as CUP.
+   */
+  totalCostPriceEntries?: CurrencyAmount[];
   products: InventoryProductStock[];
 }
 
@@ -230,6 +246,7 @@ export class InventoryOfflineService {
       }
 
       const products: InventoryProductStock[] = [];
+      const currencyTotals = new Map<Currency, number>();
       let categoryName: string | undefined;
       productGroups.forEach((productEntries, productId) => {
         // Pre-existing divergences (out of GATE-B scope, previously ratified): skip when the
@@ -251,6 +268,13 @@ export class InventoryOfflineService {
           (sum, e) => sum + e.available * e.costPrice,
           0,
         );
+        const productCurrency = productEntries[0].currency ?? DEFAULT_CURRENCY;
+        // Per-product total (Σ available·costPrice — equals avgCostPrice·totalAvailable)
+        // grouped by the product's own currency: category totals never mix currencies.
+        currencyTotals.set(
+          productCurrency,
+          (currencyTotals.get(productCurrency) ?? 0) + weightedCostSum,
+        );
         products.push({
           productId,
           productName: product.name,
@@ -258,6 +282,7 @@ export class InventoryOfflineService {
           categoryName,
           totalAvailable,
           avgCostPrice: weightedCostSum / totalAvailable,
+          currency: productCurrency,
         });
       });
 
@@ -268,6 +293,10 @@ export class InventoryOfflineService {
         categoryName: categoryName!,
         totalQuantity: products.reduce((sum, p) => sum + p.totalAvailable, 0),
         totalCostPrice: products.reduce((sum, p) => sum + p.avgCostPrice * p.totalAvailable, 0),
+        totalCostPriceEntries: Array.from(currencyTotals, ([currency, amount]) => ({
+          amount,
+          currency,
+        })),
         products,
       });
     });

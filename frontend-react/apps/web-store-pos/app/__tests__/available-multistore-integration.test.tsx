@@ -134,8 +134,8 @@ describe('Inventario Disponible — flujo real sin mocks de datos', () => {
     });
     // Cantidad disponible de PRODUCTOS (suma de available de las entradas activas).
     expect(screen.getByText('(10)')).toBeInTheDocument();
-    // Costo total a la derecha: 10 × $25 = $250.
-    expect(screen.getAllByText('$250').length).toBeGreaterThan(0);
+    // Costo total a la derecha: 10 × 25 CUP = 250 CUP.
+    expect(screen.getAllByText('250 CUP').length).toBeGreaterThan(0);
   });
 
   it('IV-2: SIN MultiStores — la entrada creada HOY deja el producto disponible con nombre, cantidad, costo promedio y total', async () => {
@@ -153,9 +153,9 @@ describe('Inventario Disponible — flujo real sin mocks de datos', () => {
     await waitFor(() => {
       expect(screen.getByText('Cerveza (10)')).toBeInTheDocument();
     });
-    // Datos del producto en la fila: costo promedio y valor total ($25 / $250).
-    expect(screen.getByText('$25')).toBeInTheDocument();
-    expect(screen.getAllByText('$250').length).toBeGreaterThan(0);
+    // Datos del producto en la fila: costo promedio y valor total (25 CUP / 250 CUP).
+    expect(screen.getByText('25 CUP')).toBeInTheDocument();
+    expect(screen.getAllByText('250 CUP').length).toBeGreaterThan(0);
   });
 
   it('IV-3: SIN MultiStores — el buscador actualiza el (n) y el costo total del header según el filtro', async () => {
@@ -176,7 +176,7 @@ describe('Inventario Disponible — flujo real sin mocks de datos', () => {
     });
     fireEvent.change(search, { target: { value: 'Ron' } });
     await waitFor(() => {
-      // Sin coincidencias → (0) y total $0 en el header.
+      // Sin coincidencias → (0) y total 0 CUP en el header.
       expect(screen.getByText('(0)')).toBeInTheDocument();
     });
     expect(screen.getByText('No existe ningún producto disponible en la categoría')).toBeInTheDocument();
@@ -202,11 +202,11 @@ describe('Inventario Disponible — flujo real sin mocks de datos', () => {
     await waitFor(() => {
       expect(screen.getByText('Cerveza (10)')).toBeInTheDocument();
     });
-    // Total de la tienda en su cabecera: 10 × $25.
+    // Total de la tienda en su cabecera: 10 × 25 CUP.
     const panel = screen
       .getByTestId(`multistore-panel-toggle-${STORE_ID}`)
       .closest('.rounded-lg');
-    expect(within(panel as HTMLElement).getAllByText('$250').length).toBeGreaterThan(0);
+    expect(within(panel as HTMLElement).getAllByText('250 CUP').length).toBeGreaterThan(0);
   });
 
   it('IV-5: CON MultiStores — el header sigue el filtro de tienda: (n) y total solo de la tienda filtrada', async () => {
@@ -219,22 +219,22 @@ describe('Inventario Disponible — flujo real sin mocks de datos', () => {
       </Wrapper>,
     );
 
-    // Filtrar a la tienda con datos: el header cuenta SOLO lo suyo (10 / $250).
+    // Filtrar a la tienda con datos: el header cuenta SOLO lo suyo (10 / 250 CUP).
     fireEvent.change(await screen.findByTestId('multistore-select'), {
       target: { value: STORE_ID },
     });
     await waitFor(() => {
       expect(screen.getAllByText('(10)').length).toBeGreaterThan(0);
     });
-    expect(screen.getAllByText('$250').length).toBeGreaterThan(0);
-    // Filtrar a la tienda sin datos: el header baja a (0) / $0.
+    expect(screen.getAllByText('250 CUP').length).toBeGreaterThan(0);
+    // Filtrar a la tienda sin datos: el header baja a (0) / 0 CUP.
     fireEvent.change(screen.getByTestId('multistore-select'), {
       target: { value: 's2' },
     });
     await waitFor(() => {
       expect(screen.getAllByText('(0)').length).toBeGreaterThan(0);
     });
-    expect(screen.getAllByText('$0').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('0 CUP').length).toBeGreaterThan(0);
   });
 
   it('IV-6: CON MultiStores — tienda sin datos locales muestra "sin datos" y la que tiene muestra el producto', async () => {
@@ -297,7 +297,7 @@ describe('Inventario Disponible — flujo real sin mocks de datos', () => {
     seedSession(ownerUser([STORE_ID], ['Tienda A'], false));
     await seedCatalogAndTodayEntry('Cerveza');
 
-    // Segundo producto con su propia entrada (5 × $40 = $200) vía servicios reales.
+    // Segundo producto con su propia entrada (5 × 40 CUP = 200 CUP) vía servicios reales.
     const categorySvc = new ProductCategoryOfflineService(STORE_ID);
     await categorySvc.createProductCategory('Carnes', 2, true);
     const catRepo = categorySvc['categoryRepository'];
@@ -315,16 +315,16 @@ describe('Inventario Disponible — flujo real sin mocks de datos', () => {
       </Wrapper>,
     );
 
-    // Header agregado: (10 + 5) = (15) disponibles, total $250 + $200 = $450.
+    // Header agregado: (10 + 5) = (15) disponibles, total 250 CUP + 200 CUP = 450 CUP.
     await waitFor(() => {
       expect(screen.getByText('(15)')).toBeInTheDocument();
     });
-    expect(screen.getAllByText('$450').length).toBeGreaterThan(0);
-    // El buscador filtra: solo Cerveza → (10) y $250.
+    expect(screen.getAllByText('450 CUP').length).toBeGreaterThan(0);
+    // El buscador filtra: solo Cerveza → (10) y 250 CUP.
     fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'Cerveza' } });
     await waitFor(() => {
       expect(screen.getByText('(10)')).toBeInTheDocument();
     });
-    expect(screen.getAllByText('$250').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('250 CUP').length).toBeGreaterThan(0);
   });
 });

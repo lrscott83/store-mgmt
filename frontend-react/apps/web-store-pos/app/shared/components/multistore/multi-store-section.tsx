@@ -12,6 +12,8 @@ import type { StoreSummary } from '@store-mgmt/domain';
 import { ChevronDownIcon } from '~/shared/components/ui/icons';
 import { formatCurrency } from '~/shared/lib/format-currency';
 import { formatLocalDate } from '~/shared/lib/date-utils';
+import { CurrencyTotalAmount } from '~/shared/components/multimonedas/currency-total-amount';
+import type { CurrencyAmount } from '~/shared/lib/currency-totals';
 
 export interface MultiStoreSectionProps {
   stores: StoreSummary[];
@@ -141,16 +143,30 @@ export function MultiStoreTotal({
   label,
   value,
   valueClassName = 'text-text',
+  entries,
 }: {
   /** Optional — omit for count/total-only chips (e.g. "(3) 12.50 USD"). */
   label?: string;
   value: number;
   valueClassName?: string;
+  /**
+   * Per-currency split (MultiMonedas) — when present, the value renders via
+   * `CurrencyTotalAmount`: one amount per currency, never mixed (single-currency
+   * case renders exactly like `formatMoneyWithCurrency(value, currency)`).
+   * Omit to keep the legacy single-`formatCurrency` output.
+   */
+  entries?: CurrencyAmount[];
 }) {
   return (
     <span className="flex items-center gap-1 whitespace-nowrap">
       {label !== undefined && <span className="text-text-muted">{label}</span>}
-      <span className={`font-semibold ${valueClassName}`}>{formatCurrency(value)}</span>
+      <span className={`font-semibold ${valueClassName}`}>
+        {entries ? (
+          <CurrencyTotalAmount legacyTotal={value} entries={entries} multiMonedas />
+        ) : (
+          formatCurrency(value)
+        )}
+      </span>
     </span>
   );
 }

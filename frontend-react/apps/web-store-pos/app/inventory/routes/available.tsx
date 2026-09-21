@@ -10,7 +10,10 @@ import type { InventoryCategoryView } from '../lib/services/inventory-offline-se
 import { ProductRepository } from '~/sales/lib/repositories/product-repository';
 import { ProductCategoryRepository } from '~/sales/lib/repositories/product-category-repository';
 import { InventoryProductList, filterInventoryCategories } from '../components/inventory-product-list';
-import { formatCurrency } from '~/shared/lib/format-currency';
+import { formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency';
+import { CurrencyTotalAmount } from '~/shared/components/multimonedas/currency-total-amount';
+import { nonEmptyCurrencyRows } from '~/shared/lib/currency-totals';
+import type { CurrencyAmount } from '~/shared/lib/currency-totals';
 import { round2 } from '~/shared/lib/money';
 import { useMultiStore } from '~/shared/lib/hooks/use-multi-store';
 import {
@@ -121,7 +124,11 @@ export function InventoryAvailablePage() {
               </span>
             </span>
             <span className="text-lg font-bold text-primary whitespace-nowrap">
-              {formatCurrency(grandTotal)}
+              <CurrencyTotalAmount
+                legacyTotal={grandTotal}
+                entries={nonEmptyCurrencyRows(visibleCats.flatMap((cat) => catCostEntries(cat)))}
+                multiMonedas
+              />
             </span>
           </div>
         }
@@ -146,7 +153,12 @@ export function InventoryAvailablePage() {
             const total = round2Sum(cats.map((cat) => cat.totalCostPrice));
             const count = cats.reduce((sum, cat) => sum + cat.totalQuantity, 0);
             return (
-              <MultiStoreTotal label={`(${count})`} value={total} valueClassName="text-primary" />
+              <MultiStoreTotal
+                label={`(${count})`}
+                value={total}
+                valueClassName="text-primary"
+                entries={nonEmptyCurrencyRows(cats.flatMap((cat) => catCostEntries(cat)))}
+              />
             );
           }}
         >
@@ -190,7 +202,11 @@ export function InventoryAvailablePage() {
             </span>
           </span>
           <span className="text-lg font-bold text-primary whitespace-nowrap">
-            {formatCurrency(totalInventoryValue)}
+            <CurrencyTotalAmount
+              legacyTotal={totalInventoryValue}
+              entries={nonEmptyCurrencyRows(filtered.flatMap((cat) => catCostEntries(cat)))}
+              multiMonedas
+            />
           </span>
         </div>
       }
@@ -213,6 +229,15 @@ export function InventoryAvailablePage() {
 /** Σ of values rounded to 2 decimals (same money discipline as the day panels). */
 function round2Sum(values: number[]): number {
   return round2(values.reduce((sum, v) => sum + v, 0));
+}
+
+/**
+ * Category's cost split by currency for display (MultiMonedas): uses the
+ * service's per-currency rows; absent (legacy factories) = whole total as CUP
+ * (the domain default — pre-multimoneda data was always CUP).
+ */
+function catCostEntries(cat: InventoryCategoryView): CurrencyAmount[] {
+  return nonEmptyCurrencyRows(cat.totalCostPriceEntries ?? [{ amount: cat.totalCostPrice }]);
 }
 
 /**
@@ -258,7 +283,11 @@ function MultiStoreCategoryList({
               </h3>
               <span className="flex items-center gap-2">
                 <span className="text-xs font-semibold text-primary whitespace-nowrap">
-                  {formatCurrency(cat.totalCostPrice)}
+                  <CurrencyTotalAmount
+                    legacyTotal={cat.totalCostPrice}
+                    entries={cat.totalCostPriceEntries ?? [{ amount: cat.totalCostPrice }]}
+                    multiMonedas
+                  />
                 </span>
                 <ChevronDownIcon isExpanded={isExpanded} className="text-text-muted" />
               </span>
@@ -275,10 +304,10 @@ function MultiStoreCategoryList({
                     </span>
                     <span className="flex items-center gap-3 text-right">
                       <span className="text-xs font-semibold text-success whitespace-nowrap">
-                        {formatCurrency(p.avgCostPrice)}
+                        {formatMoneyWithCurrency(p.avgCostPrice, p.currency)}
                       </span>
                       <span className="text-xs font-semibold text-primary whitespace-nowrap">
-                        {formatCurrency(p.avgCostPrice * p.totalAvailable)}
+                        {formatMoneyWithCurrency(p.avgCostPrice * p.totalAvailable, p.currency)}
                       </span>
                     </span>
                   </div>
