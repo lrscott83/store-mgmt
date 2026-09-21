@@ -8,7 +8,6 @@ using Domain.Entities.Owners;
 using Domain.Entities.StoreModules;
 using Domain.Entities.Stores;
 using Domain.Entities.StoreUsers;
-using Domain.Entities.UserRoles;
 using Domain.Entities.Users;
 using FluentAssertions;
 using Infrastructure.Persistence.Contexts;
@@ -50,21 +49,19 @@ public sealed class AuthMePlanModulesGapTests
             var before = await MeAsync(f.UserId, f.Login);
             before.Data!.Roles.Should().Contain(r => r.StoreId == f.StoreId);
 
-            // Deactivate the store-user membership AND its role assignment directly in the
-            // DB (NoTracking-safe ExecuteUpdateAsync — no production endpoint flips a
-            // StoreUser row). The load-bearing filter for /me Roles is the ACTIVE UserRole:
-            // GetStoreRoleFeaturesByUserIdAsync requires `ur.IsActive`; it does NOT consult
-            // StoreUser.IsActive. Both rows are flipped so the scenario represents a
-            // deactivated store user end to end.
+            // Deactivate ONLY the StoreUser membership, leaving the UserRole active, directly
+            // in the DB (NoTracking-safe ExecuteUpdateAsync — no production endpoint flips a
+            // StoreUser row). This proves the load-bearing filter for /me Roles now consults
+            // StoreUser.IsActive: GetStoreRoleFeaturesByUserIdAsync requires an active
+            // StoreUser row for StoreUser-role features, so a deactivated store user drops
+            // out of Roles even while the UserRole row stays active. OwnerAdmin is unaffected
+            // by this gate because it has no StoreUser row.
             using (var scope = _f.Services.CreateScope())
             {
                 var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
                 await db.Set<StoreUser>().IgnoreQueryFilters()
                     .Where(su => su.UserId == f.UserId)
                     .ExecuteUpdateAsync(s => s.SetProperty(su => su.IsActive, false));
-                await db.Set<UserRole>().IgnoreQueryFilters()
-                    .Where(ur => ur.UserId == f.UserId && ur.RoleId == (int)RoleType.StoreUser)
-                    .ExecuteUpdateAsync(s => s.SetProperty(ur => ur.IsActive, false));
             }
 
             var after = await MeAsync(f.UserId, f.Login);

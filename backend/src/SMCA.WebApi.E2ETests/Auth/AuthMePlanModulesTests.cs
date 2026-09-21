@@ -126,12 +126,13 @@ public sealed class AuthMePlanModulesTests
                 FreeManagementModuleId, StatisticsModuleId,
                 WholesaleSalesModuleId, WarehousesModuleId, MultiStoresModuleId
             });
-            // FeatureIds follow StoreRoleFeatures mapping: Warehouses features 36/37 are mapped,
-            // but WholesaleSales (39) and OwnerStores (38) have NO StoreRoleFeatures entry yet
-            // (production gap — asserted as current behavior; adding the mapping is a
-            // production change requiring user approval).
-            body.Data.FeatureIds.Should().Contain(new[] { WarehousesFeatureId });
-            body.Data.FeatureIds.Should().NotContain(new[] { WholesaleSalesFeatureId, MultiStoresFeatureId });
+            // FeatureIds follow StoreRoleFeatures mapping: Warehouses (36/37), WholesaleSales
+            // (39) and OwnerStores (38) all have entries, so their store features reach
+            // FeatureIds (store-role-features-completeness production fix, 2026-09-20).
+            body.Data.FeatureIds.Should().Contain(new[]
+            {
+                WarehousesFeatureId, WholesaleSalesFeatureId, MultiStoresFeatureId
+            });
             body.Data.PlanType.Should().Be("Paid");
         }
         finally

@@ -38,6 +38,8 @@ public sealed class ExportOfflineRosterPlanGapTests
     private const int MultiStoresModuleId = 14;
     private const int WarehousesFeatureId = 36;
     private const int WarehouseStockMovementsFeatureId = 37;
+    private const int MultiStoresFeatureId = 38;
+    private const int WholesaleSalesFeatureId = 39;
 
     // ── Edge Cases ─────────────────────────────────────────────────────────
 
@@ -68,12 +70,14 @@ public sealed class ExportOfflineRosterPlanGapTests
             });
 
             // FeatureIds for the OwnerAdmin resolve through the StoreRoleFeatures enum
-            // mapping: Warehouses has entries (features 36/37); WholesaleSales (39) and
-            // MultiStores (38) have NO StoreRoleFeatures enum entry yet, so they never
-            // reach FeatureIds (production gap documented by Auth/ExportOfflineRosterPlanTests;
-            // adding the mapping is a production change requiring user approval).
-            ownerEntry.FeatureIds.Should().Contain(new[] { WarehousesFeatureId, WarehouseStockMovementsFeatureId });
-            ownerEntry.FeatureIds.Should().NotContain(new[] { 38, 39 });
+            // mapping: Warehouses (36/37), WholesaleSales (39) and MultiStores (38) all
+            // have StoreRoleFeatures entries, so every active plan module's features reach
+            // FeatureIds (store-role-features-completeness production fix, 2026-09-20).
+            ownerEntry.FeatureIds.Should().Contain(new[]
+            {
+                WarehousesFeatureId, WarehouseStockMovementsFeatureId,
+                MultiStoresFeatureId, WholesaleSalesFeatureId
+            });
 
             ownerEntry.PaymentStatus.Should().BeOneOf("AlDia", "PorVencer");
         }
