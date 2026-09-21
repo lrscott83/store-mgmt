@@ -19,6 +19,7 @@ import { useMultiStore } from '~/shared/lib/hooks/use-multi-store';
 import {
   MultiStoreSection,
   MultiStoreTotal,
+  MULTISTORE_FULL_BLEED,
 } from '~/shared/components/multistore/multi-store-section';
 import {
   groupSaleCreditsByDay,
@@ -195,6 +196,7 @@ export function SaleCreditsPage() {
     return (
       <Card
         padding="tight"
+        className={MULTISTORE_FULL_BLEED}
         title={
           <CreditsCardTitle
             count={multiStoreCreditsCount}

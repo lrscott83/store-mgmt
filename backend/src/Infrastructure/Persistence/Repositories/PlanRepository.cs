@@ -16,8 +16,10 @@ namespace Infrastructure.Persistence.Repositories
 
         public async Task<IEnumerable<StorePlan>> GetActivePlansIncludingModulesForCatalogAsync()
         {
+            // Plan 2026-09-21: serves EVERY active plan — VIP included. Caller-based
+            // VIP visibility is decided by GetPlansQueryHandler (SuperAdmin only).
             return await _plans
-                .Where(p => p.IsActive && p.Id != (int)StorePlanType.VIP)
+                .Where(p => p.IsActive)
                 .Include(p => p.StorePlanModules)
                     .ThenInclude(spm => spm.Module)
                         .ThenInclude(m => m.Features)

@@ -39,13 +39,15 @@ public class PlanRepositoryTests
     }
 
     [Fact]
-    public async Task GetActivePlansIncludingModulesForCatalogAsync_ExcludesVip()
+    public async Task GetActivePlansIncludingModulesForCatalogAsync_IncludesVip()
     {
+        // Plan 2026-09-21: the catalog serves EVERY active plan — VIP included.
+        // Caller-based VIP visibility is decided by GetPlansQueryHandler, not here.
         var (context, repository) = CreateContextWithSeededPlans();
 
         var plans = await repository.GetActivePlansIncludingModulesForCatalogAsync();
 
-        plans.Select(p => p.Id).Should().NotContain((int)StorePlanType.VIP);
+        plans.Select(p => p.Id).Should().Contain((int)StorePlanType.VIP);
         context.Dispose();
     }
 
@@ -57,7 +59,8 @@ public class PlanRepositoryTests
         var plans = await repository.GetActivePlansIncludingModulesForCatalogAsync();
 
         plans.Select(p => p.Id).Should().Equal(
-            (int)StorePlanType.Gratis, (int)StorePlanType.Pago, (int)StorePlanType.Superior);
+            (int)StorePlanType.Gratis, (int)StorePlanType.Pago, (int)StorePlanType.Superior,
+            (int)StorePlanType.VIP);
         context.Dispose();
     }
 

@@ -33,6 +33,7 @@ import { useMultiStore } from '~/shared/lib/hooks/use-multi-store';
 import {
   MultiStoreSection,
   MultiStoreTotal,
+  MULTISTORE_FULL_BLEED,
 } from '~/shared/components/multistore/multi-store-section';
 import {
   groupOrdersByDay,
@@ -311,6 +312,7 @@ export function OrdersPage() {
     return (
       <Card
         padding="tight"
+        className={MULTISTORE_FULL_BLEED}
         title={
           <div className="flex items-center justify-between">
             <span className="flex items-center gap-2">

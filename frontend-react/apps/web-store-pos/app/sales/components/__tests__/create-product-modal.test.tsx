@@ -1,8 +1,9 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 import type { ProductCategory } from '@store-mgmt/domain';
+import { EModules } from '@store-mgmt/domain';
 import { CreateProductModal } from '../create-product-modal';
 
 // Scanner camera lib — mocked so opening the modal never loads the real @zxing/browser
@@ -38,6 +39,18 @@ function Wrapper({ children }: { children: React.ReactNode }) {
 
 function makeCategory(overrides: Partial<ProductCategory> = {}): ProductCategory {
   return { id: 'cat-1', name: 'Bebidas', order: 1, isActive: true, ...overrides };
+}
+
+// MultiMonedas gate (module 15): CurrencySelect reads the auth user's storeModuleIds.
+// Without the module nothing renders and the product is born in CUP (domain default).
+let mockUser: unknown = null;
+vi.mock('~/shared/lib/stores/auth-store', () => ({
+  useAuthStore: (selector?: (s: { user: unknown }) => unknown) =>
+    typeof selector === 'function' ? selector({ user: mockUser }) : { user: mockUser },
+}));
+
+function userWithModule() {
+  return { id: 'u1', storeModuleIds: [EModules.MultiMonedas] };
 }
 
 describe('CreateProductModal — name field autofocus', () => {
@@ -440,6 +453,85 @@ describe('CreateProductModal — price min(0) and order pattern parity (Angular 
     fireEvent.click(screen.getByTestId('create-product-submit'));
 
     expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ order: 9 }));
+  });
+});
+
+describe('CreateProductModal — MultiMonedas gate (module 15)', () => {
+  beforeEach(() => {
+    mockUser = null;
+  });
+
+  it('does not render the currency select when the store has no MultiMonedas module', () => {
+    render(
+      <Wrapper>
+        <CreateProductModal
+          category={makeCategory()}
+          defaultOrder={1}
+          onSave={vi.fn()}
+          onClose={vi.fn()}
+        />
+      </Wrapper>,
+    );
+    expect(screen.queryByTestId('product-currency-select')).not.toBeInTheDocument();
+  });
+
+  it('saves the product in CUP (default) when MultiMonedas is absent', () => {
+    const onSave = vi.fn();
+    render(
+      <Wrapper>
+        <CreateProductModal
+          category={makeCategory()}
+          defaultOrder={1}
+          onSave={onSave}
+          onClose={vi.fn()}
+        />
+      </Wrapper>,
+    );
+    fireEvent.change(screen.getByTestId('product-name-input'), { target: { value: 'Sprite' } });
+    fireEvent.change(screen.getByTestId('product-price-input'), { target: { value: '2.5' } });
+    fireEvent.click(screen.getByTestId('create-product-submit'));
+
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ currency: 0 }));
+  });
+
+  it('renders the currency select (CUP first) when the store HAS the MultiMonedas module', () => {
+    mockUser = userWithModule();
+    render(
+      <Wrapper>
+        <CreateProductModal
+          category={makeCategory()}
+          defaultOrder={1}
+          onSave={vi.fn()}
+          onClose={vi.fn()}
+        />
+      </Wrapper>,
+    );
+    const select = screen.getByTestId('product-currency-select');
+    expect(select).toBeInTheDocument();
+    expect((select as HTMLSelectElement).value).toBe('0'); // CUP preselected
+    const options = Array.from(select.querySelectorAll('option')).map((o) => o.textContent);
+    expect(options[0]).toBe('CUP');
+  });
+
+  it('saves the chosen currency when MultiMonedas is active', () => {
+    mockUser = userWithModule();
+    const onSave = vi.fn();
+    render(
+      <Wrapper>
+        <CreateProductModal
+          category={makeCategory()}
+          defaultOrder={1}
+          onSave={onSave}
+          onClose={vi.fn()}
+        />
+      </Wrapper>,
+    );
+    fireEvent.change(screen.getByTestId('product-name-input'), { target: { value: 'Sprite' } });
+    fireEvent.change(screen.getByTestId('product-price-input'), { target: { value: '2.5' } });
+    fireEvent.change(screen.getByTestId('product-currency-select'), { target: { value: '1' } }); // USD
+    fireEvent.click(screen.getByTestId('create-product-submit'));
+
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ currency: 1 }));
   });
 });
 

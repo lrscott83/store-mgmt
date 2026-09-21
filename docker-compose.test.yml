@@ -1,6 +1,10 @@
 version: '3.8'
 
-# Test-environment mirror of docker-compose.yml (production).
+# Test-environment mirror of docker-compose.yml (production), WITHOUT the legacy
+# Angular frontend: the `frontend` service and the `nginx` load balancer were
+# removed on purpose (Angular is dead). The only web entrypoint is the React SPA
+# (`web-store-pos`), which serves itself and proxies /api to the test `api`
+# service — nothing in this stack points at production.
 # - Always run it isolated:
 #     podman-compose -p smca-test -f docker-compose.test.yml <cmd>
 # - Its environment variables come from the `.env` at the root of this checkout
@@ -10,24 +14,6 @@ version: '3.8'
 #   production project, and never reuse the production backend image tag.
 
 services:
-  frontend:
-    container_name: smca_test_frontend
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    depends_on:
-      - api
-    restart: always
-
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080"]
-      interval: 30s
-      timeout: 10s
-      retries: 10
-      start_period: 120s
-    networks:
-      - smca_test_network
-
   api:
     container_name: smca_test_backend
     image: localhost/store-mgmt_backend_test:latest
@@ -106,18 +92,6 @@ services:
       - pgadmin-test-data:/var/lib/pgadmin
     depends_on:
       - postgres
-    networks:
-      - smca_test_network
-
-  nginx:
-    build: loadbalancer
-    container_name: smca_test_nginx
-    restart: always
-    ports:
-      - "8093:8083"
-    depends_on:
-      - frontend
-      - api
     networks:
       - smca_test_network
 

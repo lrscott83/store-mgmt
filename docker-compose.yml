@@ -1,24 +1,12 @@
 version: '3.8'
 
+# PRODUCTION stack. The legacy Angular frontend (`frontend`) and its load
+# balancer (`nginx`) were removed on purpose: Angular is dead and the React SPA
+# (`web-store-pos`) is self-sufficient — it serves itself and proxies /api to
+# `api:8000` with its own nginx. `frontend/` and `loadbalancer/` stay in the
+# repo untouched (frozen legacy), only their services are gone.
+
 services:
-  frontend:
-    container_name: smca_frontend
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    depends_on:
-      - api
-    restart: always
-
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080"]
-      interval: 30s
-      timeout: 10s
-      retries: 10
-      start_period: 120s
-    networks:
-      - postgres_network
-
   api:
     container_name: smca_backend
     image: localhost/store-mgmt_backend:latest
@@ -98,18 +86,6 @@ services:
       - postgres
     networks:
       - postgres_network
-  nginx:
-    build: loadbalancer
-    container_name: smca_nginx
-    restart: always
-    ports:
-      - "8083:8083"
-    depends_on:
-      - frontend
-      - api
-    networks:
-      - postgres_network
-
   web-store-pos:
     build:
       context: ./frontend-react

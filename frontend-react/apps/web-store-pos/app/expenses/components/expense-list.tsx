@@ -54,19 +54,25 @@ export function ExpenseList({ expenses, readOnly = false, onEdit, onDelete }: Ex
   return (
     <div className="bg-surface">
       {expenses.map((expense) => (
-        <div key={expense.id} className="flex items-center justify-between p-2">
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-text-muted">
-                {intl.formatMessage({ id: EXPENSE_TYPE_KEYS[expense.type] })}
-              </span>
-              <span className="text-sm font-semibold text-danger">
-                {formatCurrency(expense.total)}
-              </span>
-              <span className="text-xs font-semibold text-success">
-                {intl.formatMessage({ id: PAYMENT_TYPE_KEYS[expense.paymentType] })}
-              </span>
-            </div>
+        <div className="flex items-center p-2">
+          {/* Layout 3 columnas (petición del owner): motivo a la izquierda, modo
+              de pago en el centro (alineado a la izquierda) y precio a la derecha. */}
+          <div
+            data-testid={`expense-row-${expense.id}`}
+            className="grid flex-1 grid-cols-3 items-center p-2"
+          >
+            {/* Columna 1 — motivo, alineado a la izquierda. */}
+            <span className="truncate text-left text-xs text-text-muted">
+              {intl.formatMessage({ id: EXPENSE_TYPE_KEYS[expense.type] })}
+            </span>
+            {/* Columna 2 — modo de pago, centro y alineado a la izquierda. */}
+            <span className="text-left text-xs font-semibold text-success">
+              {intl.formatMessage({ id: PAYMENT_TYPE_KEYS[expense.paymentType] })}
+            </span>
+            {/* Columna 3 — precio, alineado a la derecha. */}
+            <span className="text-right text-sm font-semibold text-danger">
+              {formatCurrency(expense.total)}
+            </span>
           </div>
 
           {!readOnly && (

@@ -43,6 +43,81 @@ Deploy automatizado del stack de test (espejo de producción) en el VPS: backup 
 - Blobs verificados en LF (`git ls-files --eol` → `i/lf`) pese a `core.autocrlf=true` en Windows: el clon Linux recibe LF.
 - Pendiente: corrida end-to-end real en el VPS (no hay podman en local).
 
+## Actualización 2026-09-20 — Angular y LB fuera del stack test
+
+Contexto: la primera corrida real en el VPS falló solo en `frontend` y `nginx`.
+El build del Angular no generaba la imagen `smca-test_frontend` (el `podman run`
+moría con `short-name ... did not resolve`); `nginx` caía por `depends_on:
+frontend`. `postgres`, `api`, `pgadmin` y `web-store-pos` levantaron OK.
+
+Decisión (opción A, elegida por el usuario): el `frontend` (Angular, legacy) NO
+se levanta más, y con él se va el `nginx` LB — que existía solo para servir
+Angular y no arrancaría sin el upstream `frontend`. El único entrypoint web es el
+React (`web-store-pos`, :8095), autosuficiente: sirve el SPA y proxya `/api` →
+`api:8000` con `frontend-react/deploy/nginx.conf`. Producción intacta
+(`loadbalancer/nginx.conf` no se tocó).
+
+Regla dura reforzada: NADA del stack test puede apuntar a producción. El build
+del React hornea `API_URL=/api` (same-origin, `frontend-react/Dockerfile` ARG por
+defecto) → su propio nginx → `api:8000` (servicio test). Sin URLs absolutas a prod.
+
+- [x] T6 Remover `frontend` y `nginx` de `docker-compose.test.yml`; ajustar el
+  smoke test y `deploy-state.txt` en `scripts/deploy-test.sh` (fuera `LB_PORT`).
+- Verificación observada: YAML `services: [api, postgres, pgadmin, web-store-pos]`;
+  `bash -n scripts/deploy-test.sh` → exit 0; cero refs funcionales a `LB_PORT`,
+  `8093`, `smca_test_frontend`, `smca_test_nginx`; blobs en LF.
+- Pendiente: re-subir `scripts/deploy-test.sh` al VPS y re-correr.
+
+## Actualización 2026-09-20 (2) — Dominio test cableado al React de test
+
+El entorno de test se sirve en `vdt.playground.sceiba.net`; producción en
+`pos.playground.sceiba.net`. El routing de dominios NO vive en el repo: lo hace
+HAProxy en el VPS (`/etc/haproxy/haproxy.cfg`, TLS terminado ahí, certs en
+`/etc/haproxy/*.pem`). El repo no contiene ninguna config de proxy por dominio
+(verificado: los nginx del repo son internos a contenedores, sin `server_name`).
+
+- [x] T7 Apuntar `vdt` al React de test. Cambio en el VPS (fuera del repo):
+  `backend vdt_backend` → `server vdt 127.0.0.1:8095 check` (antes `:8083`, el LB
+  de prod que servía Angular). `pos_backend` → `127.0.0.1:8085` (React prod)
+  intacto. El routing ya era separado (`use_backend vdt_backend if host_vdt`,
+  `use_backend pos_backend if host_pos`).
+- Verificación observada: `haproxy -c -f` válido; `systemctl reload haproxy`;
+  `curl -sI https://vdt.playground.sceiba.net/` → HTTP/2 200;
+  `curl -s https://vdt.playground.sceiba.net/api/v1/ping` → `{"data":"pong",...}`
+  (backend de test); login OK en navegador con un usuario del dump de prod.
+- Efecto colateral: `smca_nginx` (:8083) + `smca_frontend` (Angular) de prod
+  quedan sin dominio. Limpieza pendiente — decisión de prod, no se toca sin OK.
+
+## Actualización 2026-09-20 (3) — Modo por defecto sin tocar producción + rollback de test
+
+Pedido del usuario: por defecto el deploy de test NO debe hacer el backup de
+producción ni montar esa BD; debe respaldar la BD de TEST antes de correr los
+scripts y hacer rollback ante cualquier fallo. El comportamiento anterior queda
+detrás de un parámetro nuevo.
+
+Cambios en `scripts/deploy-test.sh`:
+
+- Nuevo default: no se toca producción. Se conserva `smca_test`, se hace
+  `pg_dump` de `smca_test` a `backups/smca_test_backup_*.sql.gz` ANTES de aplicar
+  scripts, y ese dump es la fuente de rollback.
+- Nuevo parámetro `--from-prod`: hace el backup de producción (`smca_backup_*.sql.gz`,
+  solo lectura), recrea `smca_test` desde ese dump y lo usa como fuente de rollback.
+- Rollback ante fallo en: script SQL, build de la imagen, `compose up` y smoke test
+  (restaura la BD de test y re-tag `:previous` como `:latest` cuando aplica).
+- `--keep-db` queda como no-op deprecado (conservar la BD de test ahora es el default).
+- Rotación de backups por familia (`smca_backup_*` y `smca_test_backup_*`, retención 7).
+- `deploy-state.txt` ahora incluye `MODE=keep-test-db|from-prod`.
+
+- [x] T8 Reescribir el flujo de `scripts/deploy-test.sh` (default sin prod + rollback de test + flag `--from-prod`).
+- [x] T9 Documentar el default y `--from-prod` en `scripts/README.md` (sección de test: qué hace, flags, rollback, salidas).
+- Verificación observada: `bash -n scripts/deploy-test.sh` → exit 0 (bash 5.0.17);
+  blobs en LF (worktree e índice, 0 pares CRLF); `--keep-db` ya no tiene lógica de
+  drop/create; los únicos accesos a `PROD_DB_CONTAINER`/`pg_dump` de prod viven en
+  la rama `--from-prod`.
+- Pendiente: subir el script al VPS y correr ambas rutas (default y `--from-prod`).
+
 ## Siguiente paso (usuario)
 
-- Crear rama `test`; commitear compose + script + gitignore (NO `.env-test`); subir `deploy-test.sh` y `.env` (renombrado y completado con los secretos de producción) al VPS (`/home/malayo/test-deploy/`).
+- Hecho 2026-09-20: compose + script + tracker commiteados en la rama `test` (`59d6183a`).
+- Próximo objetivo: mecanismo de **deploy a producción** análogo al de test, para
+  actualizar prod una vez validado en test.

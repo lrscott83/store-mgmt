@@ -16,6 +16,7 @@ import { useMultiStore } from '~/shared/lib/hooks/use-multi-store';
 import {
   MultiStoreSection,
   MultiStoreTotal,
+  MULTISTORE_FULL_BLEED,
 } from '~/shared/components/multistore/multi-store-section';
 import {
   readStoreInventoryCategories,
@@ -110,6 +111,7 @@ export function InventoryAvailablePage() {
     return (
       <Card
         padding="tight"
+        className={MULTISTORE_FULL_BLEED}
         title={
           <div className="flex items-center justify-between">
             <span className="flex items-center gap-2">
@@ -247,7 +249,7 @@ function MultiStoreCategoryList({
             <button
               type="button"
               onClick={() => toggleCategory(cat.categoryId)}
-              className="flex w-full items-center justify-between px-2 py-2 text-left"
+              className="flex w-full items-center justify-between px-1 py-2 text-left"
               data-testid={`multistore-inventory-category-toggle-${cat.categoryId}`}
               aria-expanded={isExpanded}
             >
@@ -266,7 +268,7 @@ function MultiStoreCategoryList({
                 {cat.products.map((p) => (
                   <div
                     key={p.productId}
-                    className="flex items-center justify-between px-2 py-1.5"
+                    className="flex items-center justify-between px-1 py-1.5"
                   >
                     <span className="text-xs font-medium text-text">
                       {p.productName} ({p.totalAvailable})

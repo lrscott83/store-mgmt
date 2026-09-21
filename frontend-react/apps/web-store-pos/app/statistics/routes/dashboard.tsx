@@ -5,7 +5,7 @@ import { DEFAULT_CURRENCY, EFeatures } from '@store-mgmt/domain';
 import { featureLoader } from '~/auth/routes/loaders';
 import { DateRangeFilter } from '~/shared/components/date-range-filter/date-range-filter';
 import { hasMultiMonedasAvailable } from '~/shared/components/multimonedas/currency-select';
-import { MultiStoreSection } from '~/shared/components/multistore/multi-store-section';
+import { MultiStoreSection, MULTISTORE_FULL_BLEED } from '~/shared/components/multistore/multi-store-section';
 import {
   hasCreditsModuleAvailable,
   hasExpensesModuleAvailable,
@@ -231,7 +231,7 @@ export function DashboardPage() {
   // ─── Multi-store mode ──────────────────────────────────────────────────────
   if (multiStoreEnabled) {
     return (
-      <div className="space-y-6 p-4">
+      <div className={`space-y-6 p-4 ${MULTISTORE_FULL_BLEED}`}>
         {header}
         <div className="flex flex-wrap items-center gap-4">
           {dateFilter}
