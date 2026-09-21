@@ -43,24 +43,51 @@ export async function unwrapStoreDekForStore(storeId: string): Promise<Uint8Arra
   // read the SELECTED store with a null DEK, so every panel rendered "sin datos"
   // while single-store mode (which uses this same in-memory DEK) worked.
   const activeDek = getDek();
-  if (activeDek !== null && getDekStoreId() === storeId) return activeDek;
+  if (activeDek !== null && getDekStoreId() === storeId) {
+    console.log('[AVAIL-DIAG] unwrapStoreDekForStore:in-memory-dek', {
+      storeId,
+      dek: 'present',
+    });
+    return activeDek;
+  }
 
   const table = readDeviceDekTable();
-  if (!table) return null;
+  if (!table) {
+    console.log('[AVAIL-DIAG] unwrapStoreDekForStore:no-table', { storeId, dek: 'null' });
+    return null;
+  }
   // The selected store's DEK is already in memory — use it directly instead
   // of re-deriving from its device wrap.
-  if (storeId === table.storeId) return getDek();
+  if (storeId === table.storeId) {
+    console.log('[AVAIL-DIAG] unwrapStoreDekForStore:table-active-dek', {
+      storeId,
+      dek: getDek() ? 'present' : 'null',
+    });
+    return getDek();
+  }
 
   const wrap = table.stores?.[storeId]?.device;
-  if (!wrap) return null;
+  if (!wrap) {
+    console.log('[AVAIL-DIAG] unwrapStoreDekForStore:no-wrap', { storeId, dek: 'null' });
+    return null;
+  }
 
   const deviceKey = await getDeviceKey();
-  if (!deviceKey) return null;
+  if (!deviceKey) {
+    console.log('[AVAIL-DIAG] unwrapStoreDekForStore:no-device-key', { storeId, dek: 'null' });
+    return null;
+  }
 
   try {
-    return await unwrapDekFromDevice(wrap, deviceKey);
-  } catch {
+    const unwrapped = await unwrapDekFromDevice(wrap, deviceKey);
+    console.log('[AVAIL-DIAG] unwrapStoreDekForStore:unwrap-branch', {
+      storeId,
+      dek: unwrapped ? 'present' : 'null',
+    });
+    return unwrapped;
+  } catch (error) {
     // corrupt wrap / unusable key — same silent-failure class as bootstrap
+    console.log('[AVAIL-DIAG] unwrapStoreDekForStore:unwrap-threw', { storeId, error });
     return null;
   }
 }
@@ -93,33 +120,54 @@ function isMapShapedArray(parsed: unknown[]): boolean {
  * inventory-entries, products, product-categories), yielding the entities.
  */
 export function readStoreEntities<T>(entity: string, storeId: string, dek: Uint8Array | null): T[] {
+  const storageKey = StorageKeys.entityKey(entity, storeId);
   let raw: string | null;
   try {
-    raw = localStorage.getItem(StorageKeys.entityKey(entity, storeId));
-  } catch {
+    raw = localStorage.getItem(storageKey);
+  } catch (error) {
+    console.log('[AVAIL-DIAG] readStoreEntities:getItem-threw', { storageKey, error });
     return [];
   }
+  console.log('[AVAIL-DIAG] readStoreEntities:read', {
+    storageKey,
+    hasStoredValue: raw !== null,
+    dek: dek ? 'present' : 'null',
+  });
   if (!raw) return [];
 
   let plaintext: string | null;
   try {
     plaintext = decryptEntityWithDek(raw, dek);
-  } catch {
+  } catch (error) {
     // MissingExplicitDekError or a GCM tag failure — degrade to "no data"
+    console.log('[AVAIL-DIAG] readStoreEntities:decrypt-threw', { storageKey, error });
     return [];
   }
+  console.log('[AVAIL-DIAG] readStoreEntities:decrypt', {
+    storageKey,
+    hasPlaintext: !!plaintext,
+  });
   if (!plaintext) return [];
 
   try {
     const parsed: unknown = JSON.parse(plaintext);
-    if (!Array.isArray(parsed)) return [];
+    if (!Array.isArray(parsed)) {
+      console.log('[AVAIL-DIAG] readStoreEntities:not-array', { storageKey });
+      return [];
+    }
     // Map-shaped payloads ([id, entities[]]) yield the VALUES, flattened one
     // level: inventory-entries/products/product-categories each map an id to
     // an ARRAY of entities (order items map to a single entity each).
-    return (
-      isMapShapedArray(parsed) ? parsed.map((pair) => pair[1]).flat() : parsed
-    ) as T[];
-  } catch {
+    const mapShaped = isMapShapedArray(parsed);
+    const result = (mapShaped ? parsed.map((pair) => pair[1]).flat() : parsed) as T[];
+    console.log('[AVAIL-DIAG] readStoreEntities:parsed', {
+      storageKey,
+      shape: mapShaped ? 'map-shaped' : 'flat',
+      count: result.length,
+    });
+    return result;
+  } catch (error) {
+    console.log('[AVAIL-DIAG] readStoreEntities:parse-threw', { storageKey, error });
     return [];
   }
 }

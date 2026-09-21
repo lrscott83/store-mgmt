@@ -1014,7 +1014,6 @@ export class DataSynchronizerService {
       for (const movement of incoming) {
         if (existingIds.has(movement.id)) continue;
         existingIds.add(movement.id);
-        inserted++;
         const result = this.warehouseService.addImportedMovement(movement);
         if (!result.succeeded) {
           return {
@@ -1025,6 +1024,13 @@ export class DataSynchronizerService {
               message: SynchronizerErrors.WarehouseMovementsUnexpectedError.message,
             },
           };
+        }
+        // A9a: `addImportedMovement` salta en silencio una reversa duplicada
+        // (su original ya tiene reversa local, o la fila no trae
+        // `reversalOfMovementId`). Solo cuenta como insertada si la fila quedó
+        // realmente en el storage; contar por el pre-check de id inflaba el total.
+        if (this.warehouseService.getStorageMovements().some((m) => m.id === movement.id)) {
+          inserted++;
         }
       }
       return { merge: { entity, inserted, updated: 0 } };

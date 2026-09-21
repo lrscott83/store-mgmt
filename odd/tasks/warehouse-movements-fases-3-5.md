@@ -12,24 +12,32 @@ Fases 1-2 ya implementadas (ver `odd/tasks/warehouse-movements-fase2-ui.md`). Pe
 
 ## Tareas
 
-- [ ] **F3.1 — Mini-diseño (obligatorio antes de implementar).** Documentar el vínculo
+- [x] **F3.1 — Mini-diseño (obligatorio antes de implementar).** Documentar el vínculo
   **venta ↔ entrada de tienda ↔ compra**: cómo se identifica qué ventas y qué stock en tienda
   provienen de una compra, apoyándose en `lotOriginMovementId` (A4), `inventoryEntryId` /
   `reversalInventoryEntryId` de la salida, y el snapshot de costos (`productCosts`) de las órdenes
   (`order-offline-service`). Entregable: `odd/tasks/warehouse-cost-propagation-design.md`.
-- [ ] **F3.2 — Implementar propagación (B7/§2.3).** Al editar el costo de una compra ya usada:
+- [x] **F3.2 — Implementar propagación (B7/§2.3).** Al editar el costo de una compra ya usada:
   validar qué quedó afectado, avisar (confirmación con detalle) y **actualizar el costo** en
   (a) las ventas ya hechas que usaron esas unidades y (b) el stock que sigue en tienda de esa compra.
-- [ ] **F3.3 — Pruebas de Fase 3**: unit + **E2E NUEVO** (compra → salida a tienda → venta → editar
+- [x] **F3.3 — Pruebas de Fase 3**: unit + **E2E NUEVO** (compra → salida a tienda → venta → editar
   costo → verificar venta y stock en tienda con el costo nuevo).
-- [ ] **F4 — Tests faltantes (A10)**: E2E nuevos E-R7b, E-R13, E-R15, E-R16; unitarios U-S14, U-S19,
+- [x] **F4 — Tests faltantes (A10)**: E2E nuevos E-R7b, E-R13, E-R15, E-R16; unitarios U-S14, U-S19,
   U-M8, U-C1, U-C2, I-3f, I-4, I-4c, I-4e, I-5.
-- [ ] **F4b — A9a**: el contador de importación cuenta como insertados los duplicados saltados
+- [x] **F4b — A9a**: el contador de importación cuenta como insertados los duplicados saltados
   (`data-synchronizer-service.ts`).
-- [ ] **F5 — Verificación final**: `pnpm vitest run`, `pnpm typecheck`, `pnpm lint` verdes; E2E solo
+- [x] **F5 — Verificación final**: `pnpm vitest run`, `pnpm typecheck`, `pnpm lint` verdes; E2E solo
   si el entorno está disponible; confirmar que no se tocó ningún spec E2E existente.
 
+## Verificación (2026-09-21)
+
+- `pnpm test`: web-store-pos **290 files / 4044 tests** verdes; domain 177; web-common 11. Sin fallos.
+- `pnpm typecheck`: 5/5 tasks OK. `pnpm lint`: 4/4 tasks OK.
+- E2E nuevos agregados (`frontend-react/e2e/warehouse-movements-fase4.spec.ts`) pero **no ejecutados**:
+  el backend E2E (`localhost:5019`) no está disponible. Ningún spec E2E existente fue modificado.
+
 ## Restricciones (plan §0 + AGENTS.md)
+
 
 - **E2E existentes intocables** (`frontend-react/e2e/**`); agregar tests NUEVOS permitido.
 - **Backend intocable**; feature 100% frontend (localStorage cifrado por tienda).

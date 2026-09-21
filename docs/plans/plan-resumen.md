@@ -45,14 +45,14 @@
 
 ### P1 — Features pendientes acordadas (desbloqueadas)
 
-- [ ] **Warehouse movements — Fases 3-5.**
+- [x] **Warehouse movements — Fases 3-5.** — HECHO (2026-09-21)
   Fuente: `docs/plans/2026-09-16-warehouse-movements-plan.md`.
-  Evidencia: sin propagación de costo (`app/inventory/routes/warehouse-movements.tsx:239-278`
-  solo revierte y recrea); tests nombrados `E-R7b`, `E-R13`, `E-R15`, `E-R16`, `U-S14`,
-  `U-S19`, `U-M8`, `U-C1`, `U-C2`, `I-3f`, `I-4c`, `I-4e`, `I-5` ausentes;
-  A9a: `app/sync/lib/services/data-synchronizer-service.ts:1011-1018` cuenta filas
-  saltadas por duplicado como insertadas.
-  (Fases 1-2 verificadas en verde: `odd/tasks/warehouse-movements-fase2-ui.md`.)
+  **Fase 3** (propagación de costo) + **Fase 4** (tests faltantes) + **F4b** (A9a) + **Fase 5**
+  (verificación) implementadas. Diseño: `odd/tasks/warehouse-cost-propagation-design.md`; tracker:
+  `odd/tasks/warehouse-movements-fases-3-5.md`. Commits `7106ecfc`, `81ccd8e5`, `ea112c23`,
+  `cb919fc8`, `c3f65c35` (pusheados). Checks: `pnpm test` 4044 verdes, typecheck y lint OK.
+  Revisión RDD aprobada. Pendiente menor: R3-001 (el contador A9a relee movimientos por iteración →
+  O(N²) en imports grandes). Los E2E nuevos no se ejecutaron (backend `:5019` caído).
 
 - [ ] **PWA offline shell — restos.**
   Fuente: `docs/plans/2026-07-27-pwa-offline-shell-frontend-plan.md` (cambio activo
