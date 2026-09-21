@@ -39,6 +39,7 @@ const PLAN_NAME_KEYS: Record<string, string> = {
   Gratis: 'STORES.PLAN.FREE_TAB',
   Pago: 'STORES.PLAN.PAID_TAB',
   Superior: 'STORES.PLAN.SUPERIOR_TAB',
+  VIP: 'STORES.PLAN.VIP_TAB',
 };
 
 export function PlanPanels({

@@ -87,4 +87,69 @@ public class GetPlansQueryHandlerTests
 
         _planRepository.Verify(x => x.GetActivePlansIncludingModulesForCatalogAsync(), Times.Never);
     }
+
+    // ─── Plan 2026-09-21: VIP visibility by caller ────────────────────────────
+    // The repository now serves every active plan; the handler keeps VIP out of
+    // the non-SuperAdmin catalog (owners still see Gratis/Pago/Superior only).
+
+    [Fact]
+    public async Task Handle_SuperAdmin_CatalogIncludesVip()
+    {
+        _httpContextService.Setup(x => x.IsSuperAdminOrOwnerAdmin).Returns(true);
+        _httpContextService.Setup(x => x.IsSuperAdmin).Returns(true);
+        var plans = new List<StorePlan>
+        {
+            StorePlan.Create((int)StorePlanType.Gratis, "Gratis", 1, true),
+            StorePlan.Create((int)StorePlanType.Pago, "Pago", 2, true),
+            StorePlan.Create((int)StorePlanType.Superior, "Superior", 3, true),
+            StorePlan.Create((int)StorePlanType.VIP, "VIP", 4, true),
+        };
+        _planRepository
+            .Setup(x => x.GetActivePlansIncludingModulesForCatalogAsync())
+            .ReturnsAsync(plans);
+        _mapper
+            .Setup(x => x.Map<IEnumerable<PlanDto>>(It.IsAny<IEnumerable<StorePlan>>()))
+            .Returns((IEnumerable<StorePlan> source) => source.Select(p => new PlanDto
+            {
+                Id = p.Id,
+                Name = p.Name,
+                Order = p.Order,
+            }));
+
+        var result = await _handler.Handle(new GetPlansQuery(), CancellationToken.None);
+
+        result.Succeeded.Should().BeTrue();
+        result.Data!.Select(p => p.Name).Should().ContainInOrder("Gratis", "Pago", "Superior", "VIP");
+    }
+
+    [Fact]
+    public async Task Handle_OwnerAdmin_CatalogExcludesVip()
+    {
+        _httpContextService.Setup(x => x.IsSuperAdminOrOwnerAdmin).Returns(true);
+        _httpContextService.Setup(x => x.IsSuperAdmin).Returns(false);
+        var plans = new List<StorePlan>
+        {
+            StorePlan.Create((int)StorePlanType.Gratis, "Gratis", 1, true),
+            StorePlan.Create((int)StorePlanType.Pago, "Pago", 2, true),
+            StorePlan.Create((int)StorePlanType.Superior, "Superior", 3, true),
+            StorePlan.Create((int)StorePlanType.VIP, "VIP", 4, true),
+        };
+        _planRepository
+            .Setup(x => x.GetActivePlansIncludingModulesForCatalogAsync())
+            .ReturnsAsync(plans);
+        _mapper
+            .Setup(x => x.Map<IEnumerable<PlanDto>>(It.IsAny<IEnumerable<StorePlan>>()))
+            .Returns((IEnumerable<StorePlan> source) => source.Select(p => new PlanDto
+            {
+                Id = p.Id,
+                Name = p.Name,
+                Order = p.Order,
+            }));
+
+        var result = await _handler.Handle(new GetPlansQuery(), CancellationToken.None);
+
+        result.Succeeded.Should().BeTrue();
+        result.Data!.Select(p => p.Name).Should().ContainInOrder("Gratis", "Pago", "Superior");
+        result.Data!.Select(p => p.Name).Should().NotContain("VIP");
+    }
 }

@@ -305,3 +305,82 @@ describe('PlanPanels — ACTIVATE-3: activation error surfaces inline', () => {
     expect(screen.getByText('No se pudo activar el plan')).toBeInTheDocument();
   });
 });
+
+// ─── Plan 2026-09-21: SuperAdmin catalog with VIP (4 plans) ─────────────────
+
+/**
+ * Full SuperAdmin catalog: the 3 existing plans plus VIP. Superior and VIP
+ * carry the real module ids 15 (Múltiples monedas), 16 and 17 — the same ids
+ * the backend seed and GET /v1/plans serve.
+ */
+function makeSuperAdminCatalog(): Plan[] {
+  return [
+    makePlan({
+      id: 1,
+      name: 'Gratis',
+      planType: 'Gratis',
+      order: 1,
+      price: 0,
+      modules: [makePlanModule({ moduleId: 1, name: 'Ventas', order: 1 })],
+    }),
+    makePlan({
+      id: 2,
+      name: 'Pago',
+      planType: 'Pago',
+      order: 2,
+      price: 1500,
+      modules: [
+        makePlanModule({ moduleId: 1, name: 'Ventas', order: 1 }),
+        makePlanModule({ moduleId: 2, name: 'Reportes', order: 2, priceIncluded: false, price: 2000, currentPrice: 1500 }),
+      ],
+    }),
+    makePlan({
+      id: 3,
+      name: 'Superior',
+      planType: 'Superior',
+      order: 3,
+      price: 2000,
+      modules: [
+        makePlanModule({ moduleId: 1, name: 'Ventas', order: 1 }),
+        makePlanModule({ moduleId: 2, name: 'Reportes', order: 2 }),
+        makePlanModule({ moduleId: 3, name: 'Créditos', order: 3, priceIncluded: false, price: 500, currentPrice: 500 }),
+        makePlanModule({ moduleId: 15, name: 'Múltiples monedas', order: 15, priceIncluded: false, price: 300, currentPrice: 300 }),
+      ],
+    }),
+    makePlan({
+      id: 4,
+      name: 'VIP',
+      planType: 'VIP',
+      order: 4,
+      price: 2600,
+      modules: [
+        makePlanModule({ moduleId: 1, name: 'Ventas', order: 1 }),
+        makePlanModule({ moduleId: 2, name: 'Reportes', order: 2 }),
+        makePlanModule({ moduleId: 3, name: 'Créditos', order: 3 }),
+        makePlanModule({ moduleId: 15, name: 'Múltiples monedas', order: 15 }),
+        makePlanModule({ moduleId: 16, name: 'Pagos multicanal', order: 16, priceIncluded: false, price: 600, currentPrice: 600 }),
+        makePlanModule({ moduleId: 17, name: 'Elaboración', order: 17, priceIncluded: false, price: 100, currentPrice: 100 }),
+      ],
+    }),
+  ];
+}
+
+describe('PlanPanels — SUPERADMIN-1: VIP panel renders with the real catalog', () => {
+  it('renders the VIP panel labeled "VIP" (STORES.PLAN.VIP_TAB) for the SuperAdmin catalog', async () => {
+    await renderPanels({ plans: makeSuperAdminCatalog(), storePlanType: 'Superior' });
+    const vipHeader = screen.getByRole('button', { name: /^VIP/ });
+    expect(vipHeader).toBeInTheDocument();
+    await expand('VIP');
+    // VIP delta vs Superior: only its exclusive modules.
+    expect(screen.getByText('Pagos multicanal')).toBeInTheDocument();
+    expect(screen.getByText('Elaboración')).toBeInTheDocument();
+    expect(screen.queryByText('Múltiples monedas')).not.toBeInTheDocument();
+  });
+
+  it('lists "Múltiples monedas" (module 15) in the Superior panel delta', async () => {
+    await renderPanels({ plans: makeSuperAdminCatalog(), storePlanType: 'Gratis' });
+    await expand('Superior');
+    expect(screen.getByText('Múltiples monedas')).toBeInTheDocument();
+    expect(screen.getByText('Créditos')).toBeInTheDocument();
+  });
+});
