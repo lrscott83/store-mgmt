@@ -1,8 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useIntl } from 'react-intl';
-import { EFeatures, ExpenseType, PaymentType, SalePaymentMethod } from '@store-mgmt/domain';
+import {
+  EFeatures,
+  ExpenseType,
+  PaymentType,
+  salePaymentMethodLabel,
+  SalePaymentMethod,
+} from '@store-mgmt/domain';
 import type { Expense, Order, SaleCredit } from '@store-mgmt/domain';
-import { resolvedOrderPaymentMethod } from '~/shared/lib/payment-method-resolved';
+import { resolvedExpensePaymentMethod, resolvedOrderPaymentMethod } from '~/shared/lib/payment-method-resolved';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { CurrencyTotalAmount } from '~/shared/components/multimonedas/currency-total-amount';
@@ -43,12 +49,6 @@ const EXPENSE_TYPE_KEYS: Record<ExpenseType, string> = {
 };
 
 // Gastos: mismo reemplazo Tarjeta → Transferencia a nivel display.
-const EXPENSE_PAYMENT_KEYS: Record<PaymentType, string> = {
-  [PaymentType.Efectivo]: 'CART.EFECTIVO',
-  [PaymentType.Tarjeta]: 'CART.TRANSFERENCIA_CUP',
-  [PaymentType.Zelle]: 'CART.ZELLE',
-};
-
 function valueClassName(value: number): string {
   return value > 0 ? 'text-success' : value < 0 ? 'text-danger' : 'text-text';
 }
@@ -387,7 +387,10 @@ export function TodayStatsPage() {
                       </td>
                       <td className="p-1 text-right">
                         <span className="rounded-full bg-success/10 px-2 py-0.5 text-xs font-semibold text-success">
-                          {intl.formatMessage({ id: EXPENSE_PAYMENT_KEYS[expense.paymentType] })}
+                          {salePaymentMethodLabel(
+                            resolvedExpensePaymentMethod(expense),
+                            expense.currency ?? 0,
+                          )}
                         </span>
                       </td>
                     </tr>

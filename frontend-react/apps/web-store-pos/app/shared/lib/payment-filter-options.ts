@@ -51,11 +51,13 @@ export function collectOrderPaymentMethodKeys(orders: Order[]): string[] {
   return sortKeys([...keys]);
 }
 
-/** Claves únicas presentes en los gastos (legacy: siempre CUP), ordenadas. */
+/** Claves únicas presentes en los gastos (con la moneda real del gasto), ordenadas. */
 export function collectExpensePaymentMethodKeys(expenses: Expense[]): string[] {
   const keys = new Set<string>();
   for (const expense of expenses) {
-    keys.add(entityToKey(resolvedExpensePaymentMethod(expense), Currency.CUP));
+    keys.add(
+      entityToKey(resolvedExpensePaymentMethod(expense), expense.currency ?? Currency.CUP),
+    );
   }
   return sortKeys([...keys]);
 }
@@ -82,9 +84,11 @@ export function matchesOrderPaymentFilter(order: Order, key: string): boolean {
   return entityToKey(resolvedOrderPaymentMethod(order), order.currency ?? Currency.CUP) === key;
 }
 
-/** ¿El gasto cae bajo la clave de filtro dada? */
+/** ¿El gasto cae bajo la clave de filtro dada? (con la moneda real del gasto) */
 export function matchesExpensePaymentFilter(expense: Expense, key: string): boolean {
-  return entityToKey(resolvedExpensePaymentMethod(expense), Currency.CUP) === key;
+  return (
+    entityToKey(resolvedExpensePaymentMethod(expense), expense.currency ?? Currency.CUP) === key
+  );
 }
 
 /** Etiqueta visible de una clave: "Efectivo", "Zelle", "Transferencia (CUP)"… */

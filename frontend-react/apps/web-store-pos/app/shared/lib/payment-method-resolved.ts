@@ -1,9 +1,12 @@
 import type { Expense, Order, SaleCredit } from '@store-mgmt/domain';
 import {
+  Currency,
   DEFAULT_CURRENCY,
   DEFAULT_SALE_PAYMENT_METHOD,
+  PaymentType,
   SalePaymentMethod,
   legacyPaymentTypeToSalePaymentMethod,
+  salePaymentMethodToLegacyPaymentType,
 } from '@store-mgmt/domain';
 
 /**
@@ -25,11 +28,35 @@ export function resolvedOrderPaymentMethod(
     .method;
 }
 
-export function resolvedExpensePaymentMethod(expense: Pick<Expense, 'paymentType'>): SalePaymentMethod {
+export function resolvedExpensePaymentMethod(
+  expense: Pick<Expense, 'paymentType' | 'salePaymentMethod' | 'currency'>,
+): SalePaymentMethod {
+  if (expense.salePaymentMethod !== undefined && expense.salePaymentMethod !== null) {
+    return expense.salePaymentMethod;
+  }
   if (expense.paymentType === undefined || expense.paymentType === null) {
     return DEFAULT_SALE_PAYMENT_METHOD;
   }
-  return legacyPaymentTypeToSalePaymentMethod(expense.paymentType).method;
+  return legacyPaymentTypeToSalePaymentMethod(
+    expense.paymentType,
+    expense.currency ?? DEFAULT_CURRENCY,
+  ).method;
+}
+
+/**
+ * payment-methods-percent-tax (plan 2026-09-17): el pago resuelto de una
+ * entidad con su TIPO LEGACY espejo (para no perder lecturas viejas):
+ * Transferencia → Tarjeta (compat Efectivo en moneda no CUP), Zelle → Zelle,
+ * Efectivo → Efectivo. Espejo exacto de `salePaymentMethodToLegacyPaymentType`.
+ */
+export function legacyPaymentTypeForResolvedMethod(
+  method: SalePaymentMethod,
+  currency: Currency | number = Currency.CUP,
+): PaymentType {
+  if (method === SalePaymentMethod.Transferencia && Number(currency) !== Number(Currency.CUP)) {
+    return PaymentType.Efectivo;
+  }
+  return salePaymentMethodToLegacyPaymentType(method);
 }
 
 export function resolvedCreditPaidMethod(credit: Pick<SaleCredit, 'paidType'>): SalePaymentMethod {

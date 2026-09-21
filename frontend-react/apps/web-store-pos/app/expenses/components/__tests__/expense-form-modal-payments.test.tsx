@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
-import { Currency, ExpenseType, PaymentType } from '@store-mgmt/domain';
+import { Currency, ExpenseType, PaymentType, SalePaymentMethod } from '@store-mgmt/domain';
 import type { Expense, UserModel } from '@store-mgmt/domain';
 import { EModules } from '@store-mgmt/domain';
 import esMessages from '~/shared/lib/i18n/es';
@@ -51,10 +51,10 @@ beforeEach(() => {
   useAuthStore.setState({ user: makeUser([2, 3]), isAuthenticated: true });
 });
 
-// ─── Todos los tipos de pago posibles ────────────────────────────────────────
+// ─── Formas de pago según módulo MultiMonedas (2026-09-21) ───────────────────
 
-describe('ExpenseFormModal — todos los tipos de pago posibles', () => {
-  it('ofrece los 3 tipos de pago en el select (Efectivo, Transferencia (CUP), Zelle)', () => {
+describe('ExpenseFormModal — formas de pago (MultiMonedas)', () => {
+  it('SIN MultiMonedas: solo Efectivo y Transferencia (CUP) — sin Zelle', () => {
     render(
       <Wrapper>
         <ExpenseFormModal isOpen onClose={() => {}} onSave={() => {}} />
@@ -63,21 +63,64 @@ describe('ExpenseFormModal — todos los tipos de pago posibles', () => {
     // El tipo de pago es el SEGUNDO combobox del formulario (el primero es Tipo de gasto).
     const paymentSelect = screen.getAllByRole('combobox')[1] as HTMLSelectElement;
     const labels = [...paymentSelect.options].map((o) => o.textContent);
-    expect(labels).toEqual(['Efectivo', 'Transferencia (CUP)', 'Zelle']);
+    expect(labels).toEqual(['Efectivo', 'Transferencia (CUP)']);
   });
 
-  it('persiste Zelle al guardar un gasto nuevo con ese tipo de pago', () => {
+  it('CON MultiMonedas y moneda CUP: Efectivo y Transferencia (CUP)', () => {
+    useAuthStore.setState({
+      user: makeUser([2, 3, EModules.MultiMonedas]),
+      isAuthenticated: true,
+    });
+    render(
+      <Wrapper>
+        <ExpenseFormModal isOpen onClose={() => {}} onSave={() => {}} />
+      </Wrapper>,
+    );
+    // Con MultiMonedas hay 3 comboboxes (Tipo, Moneda, Pago) — el de pago es el ÚLTIMO.
+    const paymentSelect = screen.getAllByRole('combobox')[2] as HTMLSelectElement;
+    const labels = [...paymentSelect.options].map((o) => o.textContent);
+    expect(labels).toEqual(['Efectivo', 'Transferencia (CUP)']);
+  });
+
+  it('CON MultiMonedas y moneda USD: catálogo completo (Efectivo, Zelle, Transferencia (USD))', () => {
+    useAuthStore.setState({
+      user: makeUser([2, 3, EModules.MultiMonedas]),
+      isAuthenticated: true,
+    });
+    render(
+      <Wrapper>
+        <ExpenseFormModal isOpen onClose={() => {}} onSave={() => {}} />
+      </Wrapper>,
+    );
+    const currencySelect = screen.getByTestId('expense-currency-select') as HTMLSelectElement;
+    fireEvent.change(currencySelect, { target: { value: String(Currency.USD) } });
+    // Con MultiMonedas hay 3 comboboxes (Tipo, Moneda, Pago) — el de pago es el ÚLTIMO.
+    const paymentSelect = screen.getAllByRole('combobox')[2] as HTMLSelectElement;
+    const labels = [...paymentSelect.options].map((o) => o.textContent);
+    expect(labels).toEqual(['Efectivo', 'Zelle', 'Transferencia (USD)']);
+  });
+
+  it('persiste el MÉTODO real (salePaymentMethod) y el legacy espejo al guardar', () => {
     const onSave = vi.fn();
+    useAuthStore.setState({
+      user: makeUser([2, 3, EModules.MultiMonedas]),
+      isAuthenticated: true,
+    });
     render(
       <Wrapper>
         <ExpenseFormModal isOpen onClose={() => {}} onSave={onSave} />
       </Wrapper>,
     );
-    const paymentSelect = screen.getAllByRole('combobox')[1] as HTMLSelectElement;
-    fireEvent.change(paymentSelect, { target: { value: String(PaymentType.Zelle) } });
+    const currencySelect = screen.getByTestId('expense-currency-select') as HTMLSelectElement;
+    fireEvent.change(currencySelect, { target: { value: String(Currency.USD) } });
+    // Con MultiMonedas hay 3 comboboxes (Tipo, Moneda, Pago) — el de pago es el ÚLTIMO.
+    const paymentSelect = screen.getAllByRole('combobox')[2] as HTMLSelectElement;
+    fireEvent.change(paymentSelect, { target: { value: String(SalePaymentMethod.Zelle) } });
     fireEvent.change(screen.getByLabelText('Total'), { target: { value: '15' } });
     fireEvent.click(screen.getByText('Adicionar'));
     expect(onSave).toHaveBeenCalledTimes(1);
+    expect(onSave.mock.calls[0][0].salePaymentMethod).toBe(SalePaymentMethod.Zelle);
+    // Legacy espejo: Zelle sigue siendo Zelle en el campo de compatibilidad.
     expect(onSave.mock.calls[0][0].paymentType).toBe(PaymentType.Zelle);
   });
 
@@ -88,7 +131,7 @@ describe('ExpenseFormModal — todos los tipos de pago posibles', () => {
       </Wrapper>,
     );
     const paymentSelect = screen.getAllByRole('combobox')[1] as HTMLSelectElement;
-    expect(paymentSelect.value).toBe(String(PaymentType.Zelle));
+    expect(paymentSelect.value).toBe(String(SalePaymentMethod.Zelle));
   });
 
   it('edit-mode: un gasto guardado con Tarjeta muestra Transferencia (CUP) seleccionado', () => {
@@ -98,8 +141,26 @@ describe('ExpenseFormModal — todos los tipos de pago posibles', () => {
       </Wrapper>,
     );
     const paymentSelect = screen.getAllByRole('combobox')[1] as HTMLSelectElement;
-    expect(paymentSelect.value).toBe(String(PaymentType.Tarjeta));
+    expect(paymentSelect.value).toBe(String(SalePaymentMethod.Transferencia));
     expect(screen.getByText('Transferencia (CUP)')).toBeInTheDocument();
+  });
+
+  it('edit-mode: gasto con método guardado fuera del catálogo (Zelle, moneda CUP) sigue visible', () => {
+    render(
+      <Wrapper>
+        <ExpenseFormModal
+          isOpen
+          onClose={() => {}}
+          onSave={() => {}}
+          expense={makeExpense(PaymentType.Zelle)}
+        />
+      </Wrapper>,
+    );
+    const paymentSelect = screen.getAllByRole('combobox')[1] as HTMLSelectElement;
+    const labels = [...paymentSelect.options].map((o) => o.textContent);
+    // Catálogo sin MultiMonedas + Zelle histórico conservado al final.
+    expect(labels).toEqual(['Efectivo', 'Transferencia (CUP)', 'Zelle']);
+    expect(paymentSelect.value).toBe(String(SalePaymentMethod.Zelle));
   });
 });
 

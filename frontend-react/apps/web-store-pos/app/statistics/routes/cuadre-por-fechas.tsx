@@ -1,8 +1,17 @@
 import { useRef, useState } from 'react';
 import { useIntl, type IntlShape } from 'react-intl';
-import { EFeatures, ExpenseType, PaymentType, SalePaymentMethod } from '@store-mgmt/domain';
+import {
+  EFeatures,
+  ExpenseType,
+  PaymentType,
+  salePaymentMethodLabel,
+  SalePaymentMethod,
+} from '@store-mgmt/domain';
 import type { Expense, SaleCredit } from '@store-mgmt/domain';
-import { resolvedOrderPaymentMethod } from '~/shared/lib/payment-method-resolved';
+import {
+  resolvedExpensePaymentMethod,
+  resolvedOrderPaymentMethod,
+} from '~/shared/lib/payment-method-resolved';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { CurrencyTotalAmount } from '~/shared/components/multimonedas/currency-total-amount';
@@ -58,12 +67,6 @@ const EXPENSE_TYPE_KEYS: Record<ExpenseType, string> = {
 
 // payment-methods-percent-tax (plan 2026-09-17): los históricos Tarjeta se
 // muestran/agrupan como Transferencia (CUP).
-const EXPENSE_PAYMENT_KEYS: Record<PaymentType, string> = {
-  [PaymentType.Efectivo]: 'CART.EFECTIVO',
-  [PaymentType.Tarjeta]: 'CART.TRANSFERENCIA_CUP',
-  [PaymentType.Zelle]: 'CART.ZELLE',
-};
-
 function valueClassName(value: number): string {
   return value > 0 ? 'text-success' : value < 0 ? 'text-danger' : 'text-text';
 }
@@ -784,7 +787,10 @@ export function CuadrePorFechasPage() {
                             </td>
                             <td className="p-1 text-right">
                               <span className="rounded-full bg-success/10 px-2 py-0.5 text-xs font-semibold text-success">
-                                {intl.formatMessage({ id: EXPENSE_PAYMENT_KEYS[expense.paymentType] })}
+                                {salePaymentMethodLabel(
+                                  resolvedExpensePaymentMethod(expense),
+                                  expense.currency ?? 0,
+                                )}
                               </span>
                             </td>
                           </tr>
@@ -1171,7 +1177,10 @@ function MultiStoreCuadreBody({
                     </td>
                     <td className="p-1 text-right">
                       <span className="rounded-full bg-success/10 px-2 py-0.5 text-xs font-semibold text-success">
-                        {intl.formatMessage({ id: EXPENSE_PAYMENT_KEYS[expense.paymentType] })}
+                        {salePaymentMethodLabel(
+                          resolvedExpensePaymentMethod(expense),
+                          expense.currency ?? 0,
+                        )}
                       </span>
                     </td>
                   </tr>

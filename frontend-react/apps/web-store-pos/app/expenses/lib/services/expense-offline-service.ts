@@ -1,6 +1,14 @@
 import type { BaseResponseModel, Expense } from '@store-mgmt/domain';
 import type { ExpenseType, PaymentType } from '@store-mgmt/domain';
-import { DataResult, DEFAULT_CURRENCY, ExpenseErrors, Result, success } from '@store-mgmt/domain';
+import {
+  DataResult,
+  DEFAULT_CURRENCY,
+  DEFAULT_SALE_PAYMENT_METHOD,
+  ExpenseErrors,
+  Result,
+  success,
+  SalePaymentMethod,
+} from '@store-mgmt/domain';
 import { StorageKeys } from '~/shared/lib/storage/storage-keys';
 import { encryptEntity } from '~/shared/lib/storage/entity-crypto';
 import { readEntityOrThrow } from '~/shared/lib/storage/read-entity-or-throw';
@@ -16,6 +24,8 @@ interface CreateExpenseInput {
   total: number;
   date: Date;
   paymentType: PaymentType;
+  /** Forma de pago autoritativa (2026-09-21); default Efectivo. */
+  salePaymentMethod?: SalePaymentMethod;
   note?: string | null;
   /** MultiMonedas: moneda del gasto (ausente = CUP). */
   currency?: number;
@@ -165,6 +175,9 @@ export class ExpenseOfflineService {
       total: input.total,
       date: input.date,
       paymentType: input.paymentType,
+      // Forma de pago autoritativa (2026-09-21): presente en gastos nuevos;
+      // default Efectivo (ausente del input = Efectivo, igual que las órdenes).
+      salePaymentMethod: input.salePaymentMethod ?? DEFAULT_SALE_PAYMENT_METHOD,
       note: input.note || '',
       isActive: true,
       // MultiMonedas: el gasto nace con la moneda elegida (ausente = CUP).
@@ -186,7 +199,18 @@ export class ExpenseOfflineService {
    */
   update(
     id: string,
-    patch: Partial<Pick<Expense, 'type' | 'total' | 'date' | 'paymentType' | 'note' | 'currency'>>,
+    patch: Partial<
+      Pick<
+        Expense,
+        | 'type'
+        | 'total'
+        | 'date'
+        | 'paymentType'
+        | 'salePaymentMethod'
+        | 'note'
+        | 'currency'
+      >
+    >,
   ): DataResult<Expense> {
     const existing = this.getStorageExpenses().find((e) => e.id === id);
     if (!existing) {
@@ -196,6 +220,7 @@ export class ExpenseOfflineService {
     if (patch.total !== undefined) existing.total = patch.total;
     if (patch.date !== undefined) existing.date = patch.date;
     if (patch.paymentType !== undefined) existing.paymentType = patch.paymentType;
+    if (patch.salePaymentMethod !== undefined) existing.salePaymentMethod = patch.salePaymentMethod;
     if (patch.note !== undefined) existing.note = patch.note || '';
     if (patch.currency !== undefined) existing.currency = patch.currency;
     existing.updatedDate = new Date();

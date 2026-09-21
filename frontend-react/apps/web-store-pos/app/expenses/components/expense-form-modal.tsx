@@ -1,19 +1,19 @@
 import { useState, useEffect } from 'react';
 import { useIntl } from 'react-intl';
 import type { Expense } from '@store-mgmt/domain';
-import { DEFAULT_CURRENCY, ExpenseType, PaymentType } from '@store-mgmt/domain';
+import {
+  DEFAULT_CURRENCY,
+  ExpenseType,
+  PaymentType,
+  SalePaymentMethod,
+  legacyPaymentTypeToSalePaymentMethod,
+  paymentMethodOptionsForCurrency,
+  salePaymentMethodLabel,
+} from '@store-mgmt/domain';
 import { Button } from '~/shared/components/ui/button';
 import { CloseIcon, SaveIcon } from '~/shared/components/ui/icons';
-import { CurrencySelect } from '~/shared/components/multimonedas/currency-select';
-
-export interface ExpenseFormInput {
-  type: ExpenseType;
-  total: number;
-  paymentType: PaymentType;
-  note: string;
-  /** MultiMonedas: moneda del gasto (ausente = CUP). */
-  currency: number;
-}
+import { CurrencySelect, hasMultiMonedasAvailable } from '~/shared/components/multimonedas/currency-select';
+import { useAuthStore } from '~/shared/lib/stores/auth-store';
 
 interface ExpenseFormModalProps {
   isOpen: boolean;
@@ -21,6 +21,50 @@ interface ExpenseFormModalProps {
   onSave: (data: ExpenseFormInput, id?: string) => void;
   expense?: Expense;
   error?: string;
+}
+
+/**
+ * Estado inicial: el select de formas de pago abre en el método REAL resuelto
+ * del gasto (legacy Tarjeta → Transferencia-CUP, Zelle → Zelle, ausente →
+ * Efectivo), para que un gasto histórico guardado con Zelle se recargue como
+ * Zelle aunque ese modo quede fuera del catálogo del plan.
+ */
+function emptyForm(expense?: Expense): ExpenseFormInput {
+  if (expense) {
+    const legacy =
+      expense.paymentType === undefined || expense.paymentType === null
+        ? PaymentType.Efectivo
+        : expense.paymentType;
+    const resolved =
+      expense.salePaymentMethod ?? legacyPaymentTypeToSalePaymentMethod(legacy).method;
+    return {
+      type: expense.type,
+      total: expense.total,
+      salePaymentMethod: resolved,
+      // Legacy espejo: Efectivo→Efectivo, Zelle→Zelle, resto→Tarjeta.
+      paymentType:
+        resolved === SalePaymentMethod.Zelle
+          ? PaymentType.Zelle
+          : resolved === SalePaymentMethod.Transferencia
+            ? PaymentType.Tarjeta
+            : PaymentType.Efectivo,
+      note: expense.note ?? '',
+      currency: expense.currency ?? DEFAULT_CURRENCY,
+    };
+  }
+  return {
+    // Angular parity (edit-expense-modal.component.ts:60): create-mode default type is
+    // ExpenseType.Salario, not Otro.
+    type: ExpenseType.Salario,
+    // Angular parity (edit-expense-modal.component.ts:88-92): total is Validators.required —
+    // there is no valid default total on create, so it starts as NaN (invalid) until the user
+    // types a value. `0` typed explicitly stays valid via the existing `>=0` check below.
+    total: NaN,
+    salePaymentMethod: SalePaymentMethod.Efectivo,
+    paymentType: PaymentType.Efectivo,
+    note: '',
+    currency: DEFAULT_CURRENCY,
+  };
 }
 
 const EXPENSE_TYPES = [
@@ -51,48 +95,50 @@ const EXPENSE_TYPE_KEYS: Record<ExpenseType, string> = {
   [ExpenseType.Otro]: 'EXPENSES.TYPE.OTRO',
 };
 
-const PAYMENT_TYPE_KEYS: Record<PaymentType, string> = {
-  [PaymentType.Efectivo]: 'CART.EFECTIVO',
-  [PaymentType.Tarjeta]: 'CART.TRANSFERENCIA_CUP',
-  [PaymentType.Zelle]: 'CART.ZELLE',
-};
+/** Opción del select de formas de pago: método real (persistido) + etiqueta visible. */
+export interface ExpensePaymentOption {
+  method: SalePaymentMethod;
+  label: string;
+}
+
+/**
+ * Catálogo de formas de pago del modal de gastos (petición del owner, 2026-09-21):
+ *
+ * - Sin MultiMonedas (plan Pago y Free): SOLO Efectivo y Transferencia (CUP) —
+ *   Zelle oculto; los dos métodos del plan de pagos de la venta en CUP
+ *   (paymentMethodOptionsForCurrency(CUP)).
+ * - Con MultiMonedas: todas las formas de pago configuradas de la tienda — por
+ *   la moneda del gasto (catálogo de payment-pricing), con etiqueta con moneda.
+ */
+export function expensePaymentOptionsFor(
+  currency: number,
+  hasMultiMonedas: boolean,
+): ExpensePaymentOption[] {
+  const methods = paymentMethodOptionsForCurrency(currency);
+  const filtered = hasMultiMonedas ? methods : methods.filter((m) => m !== SalePaymentMethod.Zelle);
+  return filtered.map((method) => ({
+    method,
+    label: salePaymentMethodLabel(method, currency),
+  }));
+}
 
 // Angular parity: edit-expense-modal has NO date field — create always uses `new Date()`
 // (edit-expense-modal.component.ts:60), update always reuses `this.expense.date` unchanged
 // (:68). The date is never user-editable in either mode, so it's intentionally absent from
 // ExpenseFormInput; callers set it themselves (create: `new Date()`; update: omitted, so the
 // existing record's date is preserved by ExpenseOfflineService.update's `{...existing, ...patch}`).
-// Todos los tipos de pago posibles (petición del owner, 2026-09-20): Efectivo,
-// Transferencia (CUP) y Zelle. Zelle vuelve al select (el enum siempre existió;
-// la retirada visual del 2026-09-08 queda revertida aquí).
-const PAYMENT_TYPE_OPTIONS: PaymentType[] = [
-  PaymentType.Efectivo,
-  PaymentType.Tarjeta,
-  PaymentType.Zelle,
-];
 
-function emptyForm(expense?: Expense): ExpenseFormInput {
-  if (expense) {
-    return {
-      type: expense.type,
-      total: expense.total,
-      paymentType: expense.paymentType,
-      note: expense.note ?? '',
-      currency: expense.currency ?? DEFAULT_CURRENCY,
-    };
-  }
-  return {
-    // Angular parity (edit-expense-modal.component.ts:60): create-mode default type is
-    // ExpenseType.Salario, not Otro.
-    type: ExpenseType.Salario,
-    // Angular parity (edit-expense-modal.component.ts:88-92): total is Validators.required —
-    // there is no valid default total on create, so it starts as NaN (invalid) until the user
-    // types a value. `0` typed explicitly stays valid via the existing `>=0` check below.
-    total: NaN,
-    paymentType: PaymentType.Efectivo,
-    note: '',
-    currency: DEFAULT_CURRENCY,
-  };
+/** Forma de pago del input: método real (autoritativo) + tipo legacy (compat de datos). */
+export interface ExpenseFormInput {
+  type: ExpenseType;
+  total: number;
+  /** Método real elegido — se persiste en `Expense.salePaymentMethod` (2026-09-21). */
+  salePaymentMethod: SalePaymentMethod;
+  /** Tipo legacy espejo — Efectivo/Tarjeta para lecturas viejas. Zelle ya no se emite. */
+  paymentType: PaymentType;
+  note: string;
+  /** MultiMonedas: moneda del gasto (ausente = CUP). */
+  currency: number;
 }
 
 export function ExpenseFormModal({
@@ -103,6 +149,8 @@ export function ExpenseFormModal({
   error,
 }: ExpenseFormModalProps) {
   const intl = useIntl();
+  const user = useAuthStore((s) => s.user);
+  const hasMultiMonedas = hasMultiMonedasAvailable(user);
   const [form, setForm] = useState<ExpenseFormInput>(() => emptyForm(expense));
   // Angular parity: isControlInvalid(name, validator) only reports an error once the
   // control is `dirty || touched` (edit-expense-modal.component.ts:118-125) — a fresh
@@ -122,6 +170,20 @@ export function ExpenseFormModal({
   // (edit-expense-modal.component.ts:88-92). Only a negative/NaN total is invalid.
   const isValid = Number.isFinite(form.total) && form.total >= 0;
   const showError = !isValid && touched;
+  // Catálogo de formas de pago (petición 2026-09-21): según la MONEDA elegida
+  // del gasto; sin MultiMonedas el catálogo sale de CUP sin Zelle. Si el método
+  // guardado del gasto no está en el catálogo de esta moneda (datos históricos),
+  // se mantiene visible al final para que el select no pierda su valor.
+  const catalogOptions = expensePaymentOptionsFor(form.currency, hasMultiMonedas);
+  const paymentOptions = catalogOptions.some((o) => o.method === form.salePaymentMethod)
+    ? catalogOptions
+    : [
+        ...catalogOptions,
+        {
+          method: form.salePaymentMethod,
+          label: salePaymentMethodLabel(form.salePaymentMethod, form.currency),
+        },
+      ];
 
   function handleSubmit() {
     // Angular parity (edit-expense-modal.component.ts:52-56): onSubmit() always runs on
@@ -215,23 +277,35 @@ export function ExpenseFormModal({
             testId="expense-currency-select"
           />
 
-          {/* Payment type */}
+          {/* Payment type — formas de pago configuradas (2026-09-21): por moneda
+              (con MultiMonedas) o Efectivo + Transferencia (CUP) sin Zelle (sin
+              MultiMonedas). El select guarda el MÉTODO real; paymentType queda
+              espejado a legacy. Si el método guardado del gasto no está en el
+              catálogo de esta moneda, se mantiene visible al final. */}
           <div>
             <label className="mb-1 block text-sm font-medium text-text">
               {intl.formatMessage({ id: 'EXPENSES.FORM.PAYMENT_TYPE' })}
             </label>
             <select
-              value={form.paymentType}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, paymentType: Number(e.target.value) as PaymentType }))
-              }
+              value={form.salePaymentMethod}
+              onChange={(e) => {
+                const method = Number(e.target.value) as SalePaymentMethod;
+                setForm((f) => ({
+                  ...f,
+                  salePaymentMethod: method,
+                  paymentType:
+                    method === SalePaymentMethod.Zelle
+                      ? PaymentType.Zelle
+                      : method === SalePaymentMethod.Transferencia
+                        ? PaymentType.Tarjeta
+                        : PaymentType.Efectivo,
+                }));
+              }}
               className="w-full rounded border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             >
-            {/* Todos los tipos de pago posibles (2026-09-20): el select guarda el
-                PaymentType legacy; la etiqueta de Tarjeta ya es "Transferencia (CUP)". */}
-            {PAYMENT_TYPE_OPTIONS.map((pt) => (
-                <option key={pt} value={pt}>
-                  {intl.formatMessage({ id: PAYMENT_TYPE_KEYS[pt] })}
+              {paymentOptions.map((option) => (
+                <option key={option.method} value={option.method}>
+                  {option.label}
                 </option>
               ))}
             </select>

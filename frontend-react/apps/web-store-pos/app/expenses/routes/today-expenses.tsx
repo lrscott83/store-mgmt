@@ -66,6 +66,7 @@ export function TodayExpensesPage() {
           type: data.type,
           total: data.total,
           paymentType: data.paymentType,
+          salePaymentMethod: data.salePaymentMethod,
           note: data.note,
           currency: data.currency,
         })
@@ -75,6 +76,7 @@ export function TodayExpensesPage() {
           total: data.total,
           date: new Date(),
           paymentType: data.paymentType,
+          salePaymentMethod: data.salePaymentMethod,
           note: data.note,
           currency: data.currency,
         });

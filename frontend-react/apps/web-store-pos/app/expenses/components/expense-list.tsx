@@ -1,6 +1,7 @@
 import { useIntl } from 'react-intl';
 import type { Expense } from '@store-mgmt/domain';
-import { ExpenseType, PaymentType } from '@store-mgmt/domain';
+import { ExpenseType, salePaymentMethodLabel } from '@store-mgmt/domain';
+import { resolvedExpensePaymentMethod } from '~/shared/lib/payment-method-resolved';
 import { InfoBox } from '~/shared/components/ui/info-box';
 import { ActionMenu, ActionMenuItem } from '~/shared/components/ui/action-menu';
 import { formatCurrency } from '~/shared/lib/format-currency';
@@ -17,12 +18,6 @@ const EXPENSE_TYPE_KEYS: Record<ExpenseType, string> = {
   [ExpenseType.Divisa]: 'EXPENSES.TYPE.DIVISA',
   [ExpenseType.Impuesto]: 'EXPENSES.TYPE.IMPUESTO',
   [ExpenseType.Otro]: 'EXPENSES.TYPE.OTRO',
-};
-
-const PAYMENT_TYPE_KEYS: Record<PaymentType, string> = {
-  [PaymentType.Efectivo]: 'CART.EFECTIVO',
-  [PaymentType.Tarjeta]: 'CART.TRANSFERENCIA_CUP',
-  [PaymentType.Zelle]: 'CART.ZELLE',
 };
 
 interface ExpenseListProps {
@@ -67,7 +62,10 @@ export function ExpenseList({ expenses, readOnly = false, onEdit, onDelete }: Ex
             </span>
             {/* Columna 2 — modo de pago, centro y alineado a la izquierda. */}
             <span className="text-left text-xs font-semibold text-success">
-              {intl.formatMessage({ id: PAYMENT_TYPE_KEYS[expense.paymentType] })}
+              {salePaymentMethodLabel(
+                resolvedExpensePaymentMethod(expense),
+                expense.currency ?? 0,
+              )}
             </span>
             {/* Columna 3 — precio, alineado a la derecha. */}
             <span className="text-right text-sm font-semibold text-danger">
