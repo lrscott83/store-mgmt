@@ -20,34 +20,17 @@ export function useMultiStore(): MultiStoreState {
 
   return useMemo(() => {
     if (!user) {
-      console.log('[AVAIL-DIAG] useMultiStore', { branch: 'no-user', enabled: false, storesCount: 0 });
       return { enabled: false, stores: [] };
     }
     const isActiveStore = (store: StoreSummary): boolean => store.isActive !== false;
     if (!isOwnerAdmin(user)) {
-      console.log('[AVAIL-DIAG] useMultiStore', {
-        branch: 'not-owner-admin',
-        enabled: false,
-        storesCount: 0,
-      });
       return { enabled: false, stores: [] };
     }
     if (!isModuleAvailable(user, EModules.MultiStores)) {
-      console.log('[AVAIL-DIAG] useMultiStore', {
-        branch: 'no-multistores-module',
-        enabled: false,
-        storesCount: 0,
-      });
       return { enabled: false, stores: [] };
     }
 
     const activeStores = (user.storeList ?? []).filter(isActiveStore);
-    console.log('[AVAIL-DIAG] useMultiStore', {
-      branch: 'computed',
-      enabled: activeStores.length >= 2,
-      storesCount: activeStores.length,
-      storeIds: activeStores.map((s) => s.id),
-    });
     return { enabled: activeStores.length >= 2, stores: activeStores };
   }, [user]);
 }

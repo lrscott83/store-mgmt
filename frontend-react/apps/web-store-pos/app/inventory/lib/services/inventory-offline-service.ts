@@ -179,21 +179,12 @@ export class InventoryOfflineService {
    */
   getStorageInventoriesMap(): Map<string, InventoryEntry[]> {
     const storageKey = this.getCurrentStorageKey();
-    console.log('[AVAIL-DIAG] getStorageInventoriesMap:enter', {
-      storageKey,
-      cachedSize: this.inventories ? this.inventories.size : null,
-      lastInventoriesKey: this.lastInventoriesKey,
-    });
     if (
       !this.inventories ||
       this.inventories.size === 0 ||
       storageKey !== this.lastInventoriesKey
     ) {
       this.inventories = this.getInventoriesFromLocalStorage();
-      console.log('[AVAIL-DIAG] getStorageInventoriesMap:reloaded', {
-        storageKey,
-        size: this.inventories.size,
-      });
     }
     return this.inventories;
   }
@@ -237,11 +228,6 @@ export class InventoryOfflineService {
     const categoriesMap = this.productRepository.getCategoryRepository().getStorageCategoriesMap();
     const activeEntries = this.getStorageActiveInventoryEntries();
 
-    console.log('[AVAIL-DIAG] getInventoryCategoriesView:inputs', {
-      productMapSize: productMap.size,
-      categoriesMapSize: categoriesMap.size,
-      activeEntriesLength: activeEntries.length,
-    });
 
     // Group by entry.categoryId (Angular 291), then by entry.productId within each category
     // group (Angular 294) — mirrors Angular's structure literally.
@@ -252,10 +238,6 @@ export class InventoryOfflineService {
       else categoryGroups.set(entry.categoryId, [entry]);
     }
 
-    console.log('[AVAIL-DIAG] getInventoryCategoriesView:categoryGroups', {
-      groupCount: categoryGroups.size,
-      categoryIds: Array.from(categoryGroups.keys()),
-    });
 
     const inventoryCategories: InventoryCategoryView[] = [];
     categoryGroups.forEach((categoryEntries, categoryId) => {
@@ -266,12 +248,6 @@ export class InventoryOfflineService {
         else productGroups.set(entry.productId, [entry]);
       }
 
-      console.log('[AVAIL-DIAG] getInventoryCategoriesView:category-group', {
-        categoryId,
-        entriesCount: categoryEntries.length,
-        productGroupCount: productGroups.size,
-        productIds: Array.from(productGroups.keys()),
-      });
 
       const products: InventoryProductStock[] = [];
       const currencyTotals = new Map<Currency, number>();
@@ -282,25 +258,10 @@ export class InventoryOfflineService {
         // bug for Σavailable === 0 — diff-matrix #4).
         const product = productMap.get(productId);
         const totalAvailable = productEntries.reduce((sum, e) => sum + e.available, 0);
-        console.log('[AVAIL-DIAG] getInventoryCategoriesView:product', {
-          categoryId,
-          productId,
-          productFound: !!product,
-          totalAvailable,
-        });
         if (!product) {
-          console.log('[AVAIL-DIAG] getInventoryCategoriesView:skip product-missing', {
-            categoryId,
-            productId,
-          });
           return;
         }
         if (totalAvailable === 0) {
-          console.log('[AVAIL-DIAG] getInventoryCategoriesView:skip zero-available', {
-            categoryId,
-            productId,
-            totalAvailable,
-          });
           return;
         }
 
@@ -308,11 +269,6 @@ export class InventoryOfflineService {
           // Angular parity (getInventoryCategoriesView:308) + gate #1052: UNGUARDED — throws
           // here when categoryId has no matching category, mirroring Angular's own unguarded
           // `storageCategoriesMap.get(item.categoryId).name` read literally.
-          console.log('[AVAIL-DIAG] getInventoryCategoriesView:category-name-lookup', {
-            categoryId,
-            categoriesMapHasCategoryId: categoriesMap.has(categoryId),
-            categoriesMapKeys: Array.from(categoriesMap.keys()),
-          });
           categoryName = categoriesMap.get(categoryId)!.name;
         }
 
@@ -353,9 +309,6 @@ export class InventoryOfflineService {
       });
     });
 
-    console.log('[AVAIL-DIAG] getInventoryCategoriesView:result', {
-      inventoryCategoriesLength: inventoryCategories.length,
-    });
     return success(inventoryCategories);
   }
 
@@ -1124,7 +1077,6 @@ export class InventoryOfflineService {
     // auto-init below survives only for its honest case — no stored value at
     // all, i.e. a genuinely new store.
     const storageKey = this.getStorageKey();
-    // [AVAIL-DIAG] diagnostics: hasStoredValue is derived from readEntityOrThrow's
     // result (null = absent) instead of a separate localStorage.getItem — the extra
     // raw read broke the "getItem hit once per reload" cache contract (WU1 test).
     const stored = readEntityOrThrow(storageKey, (json) => {
@@ -1137,20 +1089,10 @@ export class InventoryOfflineService {
       });
       return inventoryMap;
     });
-    console.log('[AVAIL-DIAG] getInventoriesFromLocalStorage:read', {
-      storageKey,
-      hasStoredValue: stored !== null,
-      storedLength: stored ? stored.size : 0,
-    });
     if (stored) {
-      console.log('[AVAIL-DIAG] getInventoriesFromLocalStorage:parsed', {
-        storageKey,
-        size: stored.size,
-      });
       return stored;
     }
 
-    console.log('[AVAIL-DIAG] getInventoriesFromLocalStorage:auto-init-empty', { storageKey });
     const inventories = new Map<string, InventoryEntry[]>();
     this.setInventoriesLocalStorage(inventories);
     return inventories;

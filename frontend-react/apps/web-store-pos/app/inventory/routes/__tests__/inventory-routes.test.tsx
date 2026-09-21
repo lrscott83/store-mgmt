@@ -37,6 +37,9 @@ vi.mock('~/inventory/lib/services/inventory-offline-service', () => ({
   InventoryOfflineService: vi.fn().mockImplementation(() => ({
     getActiveInventoryEntriesStorage: vi.fn().mockReturnValue([]),
     getInventoryEntriesInDay: vi.fn().mockReturnValue(bm([])),
+    // EntriesPage's loadEntries awaits this unconditionally (date-range filter);
+    // without it the default double leaves a rejected floating promise behind.
+    filterInventoryEntries: vi.fn().mockResolvedValue(bm([])),
     getInventoryCategoriesView: vi.fn().mockReturnValue(bm([])),
     getAvailableQuantity: vi.fn().mockReturnValue({ hasEntries: false, available: 0 }),
     createInventoryEntry: vi.fn(),
@@ -916,13 +919,18 @@ describe('TodayEntriesPage — handleSave/handleDeactivate check .succeeded (WU2
 import { EntriesPage } from '../entries';
 
 describe('EntriesPage — smoke render', () => {
-  it('renders without crashing', () => {
+  it('renders without crashing', async () => {
+    // Own queued double: earlier tests may leave unconsumed mockImplementationOnce
+    // entries in the queue, so the module default isn't guaranteed to serve this
+    // construction. mockEntries provides filterInventoryEntries, which loadEntries
+    // awaits unconditionally (date-range filter).
+    mockEntries([]);
     render(
       <Wrapper>
         <EntriesPage />
       </Wrapper>,
     );
-    expect(document.body).toBeTruthy();
+    await waitFor(() => expect(document.body).toBeTruthy());
   });
 });
 
