@@ -372,10 +372,14 @@ export function OrdersPage() {
               </fieldset>
             </>
           }
+          renderStoreCount={(store) => {
+            const filtered = visibleOrders(storeOrders.get(store.id) ?? []);
+            return `(${filtered.length})`;
+          }}
           renderStoreTotals={(store) => {
             const filtered = visibleOrders(storeOrders.get(store.id) ?? []);
             const total = filtered.reduce((t, o) => t + o.total, 0);
-            return <MultiStoreTotal label={`(${filtered.length})`} value={total} />;
+            return <MultiStoreTotal value={total} />;
           }}
         >
           {(store) => {

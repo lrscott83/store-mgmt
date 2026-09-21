@@ -235,10 +235,16 @@ export function ExpensesHistoryPage() {
               ))}
             </div>
           }
+          renderStoreCount={(store) => {
+            const filtered = visibleExpenses(storeExpenses.get(store.id) ?? []);
+            return `(${filtered.length})`;
+          }}
           renderStoreTotals={(store) => {
             const filtered = visibleExpenses(storeExpenses.get(store.id) ?? []);
             const total = filtered.reduce((t, e) => t + e.total, 0);
-            return <MultiStoreTotal label={`(${filtered.length})`} value={total} />;
+            // Color del precio de ESTA vista: rojo (text-danger), igual que los
+            // demás precios de gastos (header y paneles por día).
+            return <MultiStoreTotal value={total} valueClassName="text-danger" />;
           }}
         >
           {(store) => {

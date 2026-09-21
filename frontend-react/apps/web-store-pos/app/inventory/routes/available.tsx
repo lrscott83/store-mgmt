@@ -205,6 +205,11 @@ export function InventoryAvailablePage() {
               className="w-full max-w-xs rounded border border-border px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             />
           }
+          renderStoreCount={(store) => {
+            const cats = filterInventoryCategories(storeCategories.get(store.id) ?? [], search);
+            const count = cats.reduce((sum, cat) => sum + cat.totalQuantity, 0);
+            return `(${count})`;
+          }}
           renderStoreTotals={(store) => {
             const cats = filterInventoryCategories(storeCategories.get(store.id) ?? [], search);
             console.log('[AVAIL-DIAG] render:multi-store store-totals', {
@@ -212,10 +217,8 @@ export function InventoryAvailablePage() {
               filteredCount: cats.length,
             });
             const total = round2Sum(cats.map((cat) => cat.totalCostPrice));
-            const count = cats.reduce((sum, cat) => sum + cat.totalQuantity, 0);
             return (
               <MultiStoreTotal
-                label={`(${count})`}
                 value={total}
                 valueClassName="text-primary"
                 entries={nonEmptyCurrencyRows(cats.flatMap((cat) => catCostEntries(cat)))}

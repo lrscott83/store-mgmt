@@ -227,14 +227,15 @@ export function EntriesPage() {
           filters={
             <DateRangeFilter value={dateRange} onApply={setDateRange} className="flex-1 min-w-0" />
           }
+          renderStoreCount={(store) => {
+            const entries = filteredStoreEntries.get(store.id) ?? [];
+            return `(${sumCount(entries)})`;
+          }}
           renderStoreTotals={(store) => {
             const entries = filteredStoreEntries.get(store.id) ?? [];
-            const total = sumTotal(entries);
-            const count = sumCount(entries);
             return (
               <MultiStoreTotal
-                label={`(${count})`}
-                value={total}
+                value={sumTotal(entries)}
                 valueClassName="text-primary"
                 entries={entryAmounts(entries)}
               />

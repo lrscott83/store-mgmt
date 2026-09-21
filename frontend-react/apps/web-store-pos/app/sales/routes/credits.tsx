@@ -213,16 +213,14 @@ export function SaleCreditsPage() {
           filters={
             <DateRangeFilter value={dateRange} onApply={setDateRange} className="flex-1 min-w-0" />
           }
+          renderStoreCount={(store) => {
+            const credits = filteredStoreCredits.get(store.id) ?? [];
+            return `(${credits.length})`;
+          }}
           renderStoreTotals={(store) => {
             const credits = filteredStoreCredits.get(store.id) ?? [];
             const total = credits.reduce((t, c) => t + c.total, 0);
-            return (
-              <MultiStoreTotal
-                label={`(${credits.length})`}
-                value={total}
-                valueClassName="text-warning"
-              />
-            );
+            return <MultiStoreTotal value={total} valueClassName="text-warning" />;
           }}
         >
           {(store) => {

@@ -30,8 +30,18 @@ export interface MultiStoreSectionProps {
   /** Outside-panels aggregate totals — visible with every store selected or filtered. */
   totals?: ReactNode;
   children: (store: StoreSummary) => ReactNode;
-  /** Per-store totals shown in the panel header, next to the store name. */
-  renderStoreTotals: (store: StoreSummary) => ReactNode;
+  /**
+   * Per-store COUNT shown in the panel header right after the store name
+   * (left side) — e.g. `(3)`. Optional: views without a count omit it.
+   */
+  renderStoreCount?: (store: StoreSummary) => ReactNode;
+  /**
+   * Per-store PRICE/total shown in the panel header RIGHT-ALIGNED, next to the
+   * chevron (petición del owner 2026-09-21 — antes iba junto al nombre). The
+   * COLOR is each view's own price color (expenses = red like the rest of its
+   * prices; the other views keep theirs).
+   */
+  renderStoreTotals?: (store: StoreSummary) => ReactNode;
 }
 
 /**
@@ -48,6 +58,7 @@ export function MultiStoreSection({
   filters,
   totals,
   children,
+  renderStoreCount,
   renderStoreTotals,
 }: MultiStoreSectionProps) {
   const intl = useIntl();
@@ -105,16 +116,24 @@ export function MultiStoreSection({
                 data-testid={`multistore-panel-toggle-${store.id}`}
                 aria-expanded={isOpen}
               >
-                {/* Layout del header (petición del owner): la cantidad/total de la
-                    tienda va DESPUÉS del nombre, al lado izquierdo — no alineada
-                    a la derecha; el chevron queda solo a la derecha. */}
+                {/* Layout del header (petición del owner 2026-09-21, sustituye la
+                    anterior): el CONTADOR va junto al nombre (izquierda) y el
+                    PRECIO queda alineado a la derecha, junto al chevron. El
+                    color del precio lo decide cada vista. */}
                 <span className="flex min-w-0 items-center gap-2">
                   <span className="truncate text-sm font-semibold text-text">{store.name}</span>
-                  <span className="flex items-center whitespace-nowrap text-sm">
-                    {renderStoreTotals(store)}
-                  </span>
+                  {renderStoreCount !== undefined && (
+                    <span className="flex items-center whitespace-nowrap text-sm">
+                      {renderStoreCount(store)}
+                    </span>
+                  )}
                 </span>
-                <span className="flex items-center">
+                <span className="flex items-center gap-2">
+                  {renderStoreTotals !== undefined && (
+                    <span className="flex items-center whitespace-nowrap text-sm">
+                      {renderStoreTotals(store)}
+                    </span>
+                  )}
                   <ChevronDownIcon isExpanded={isOpen} className="text-text-muted" />
                 </span>
               </button>

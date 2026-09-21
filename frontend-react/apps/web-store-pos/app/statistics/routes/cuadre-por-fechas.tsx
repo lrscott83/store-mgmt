@@ -453,6 +453,8 @@ export function CuadrePorFechasPage() {
               }
               renderStoreTotals={(store) => {
                 const s = storeSummaries.get(store.id);
+                // Right-aligned per the header-layout rule (petición 2026-09-21);
+                // the semantic color stays this view's own (valueClassName).
                 return (
                   <span className="text-xs whitespace-nowrap">
                     <span className="text-text-muted">Ganancias: </span>

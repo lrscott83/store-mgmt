@@ -25,7 +25,8 @@ function Harness() {
         onSelectedStoreIdChange={setSelected}
         filters={<input data-testid="global-filter" placeholder="filtro global" />}
         totals={<MultiStoreTotal label="Total" value={123.45} />}
-        renderStoreTotals={(store) => <span>({store.name})</span>}
+        renderStoreCount={(store) => <span>#{store.name}</span>}
+        renderStoreTotals={() => <span>$123.45</span>}
       >
         {(store) => <div data-testid={`content-${store.id}`}>contenido {store.name}</div>}
       </MultiStoreSection>
@@ -90,28 +91,34 @@ describe('MultiStoreSection', () => {
 
   // Layout del header del panel (petición del owner): la cantidad/total de la
   // tienda va DESPUÉS del nombre (lado izquierdo), no alineada a la derecha.
-  it('shows the per-store totals right after the store name (left side), not right-aligned', () => {
+  it('shows the per-store COUNT right after the store name (left side) and the PRICE right-aligned', () => {
     render(<Harness />);
     const toggle = screen.getByTestId('multistore-panel-toggle-s1');
     const nameSpan = [...toggle.querySelectorAll('span')].find(
       (s) => s.textContent === 'Tienda A',
     );
     expect(nameSpan).toBeDefined();
-    // Los totales vienen inmediatamente después del nombre, en el MISMO grupo izquierdo.
-    const totalsSpan = nameSpan!.nextElementSibling;
-    expect(totalsSpan?.textContent).toBe('(Tienda A)');
-    expect(totalsSpan!.parentElement).toBe(nameSpan!.parentElement);
+    // El CONTADOR viene inmediatamente después del nombre, en el MISMO grupo izquierdo.
+    const countSpan = nameSpan!.nextElementSibling;
+    expect(countSpan?.textContent).toBe('#Tienda A');
+    expect(countSpan!.parentElement).toBe(nameSpan!.parentElement);
     // El grupo izquierdo NO contiene el chevron (ese vive solo a la derecha).
     expect(nameSpan!.parentElement!.querySelector('svg')).toBeNull();
+
+    // El PRECIO vive en el grupo derecho, junto al chevron.
+    const rightGroup = toggle.lastElementChild as HTMLElement;
+    expect(rightGroup.textContent).toContain('$123.45');
+    expect(rightGroup.querySelector('svg')).not.toBeNull();
   });
 
-  it('keeps the chevron alone on the right side of the panel header', () => {
+  it('keeps the chevron on the right side of the panel header (with the price)', () => {
     const { container } = render(<Harness />);
     const toggle = container.querySelector(
       '[data-testid="multistore-panel-toggle-s1"]',
     ) as HTMLElement;
     const rightGroup = toggle.lastElementChild as HTMLElement;
     expect(rightGroup.querySelector('svg')).not.toBeNull();
+    // El nombre de la tienda ya no viaja en el grupo derecho (solo precio + chevron).
     expect(rightGroup.textContent).not.toContain('Tienda A');
   });
 });
