@@ -403,3 +403,4 @@ function MultiStoreCategoryList({
     </div>
   );
 }
+export default InventoryAvailablePage;
