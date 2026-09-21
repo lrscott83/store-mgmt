@@ -206,9 +206,24 @@ export function readStoreInventoryCategories(
     }
   >('inventory-entries', storeId, dek);
 
+  console.log('[AVAIL-DIAG] readStoreInventoryCategories:raw', {
+    storeId,
+    dek: dek ? 'present' : 'null',
+    rawProductsLength: rawProducts.length,
+    rawCategoriesLength: rawCategories.length,
+    rawEntriesLength: rawEntries.length,
+  });
+
   const productMap = new Map(rawProducts.map((p) => [p.id, p]));
   const categoriesMap = new Map(rawCategories.map((c) => [c.id, c]));
   const activeEntries = rawEntries.filter((e) => e.isActive);
+
+  console.log('[AVAIL-DIAG] readStoreInventoryCategories:inputs', {
+    storeId,
+    productMapSize: productMap.size,
+    categoriesMapSize: categoriesMap.size,
+    activeEntriesLength: activeEntries.length,
+  });
 
   const categoryGroups = new Map<string, typeof rawEntries>();
   for (const entry of activeEntries) {
@@ -216,6 +231,12 @@ export function readStoreInventoryCategories(
     if (group) group.push(entry);
     else categoryGroups.set(entry.categoryId, [entry]);
   }
+
+  console.log('[AVAIL-DIAG] readStoreInventoryCategories:categoryGroups', {
+    storeId,
+    groupCount: categoryGroups.size,
+    categoryIds: Array.from(categoryGroups.keys()),
+  });
 
   const inventoryCategories: InventoryCategoryView[] = [];
   categoryGroups.forEach((categoryEntries, categoryId) => {
@@ -226,17 +247,55 @@ export function readStoreInventoryCategories(
       else productGroups.set(entry.productId, [entry]);
     }
 
+    console.log('[AVAIL-DIAG] readStoreInventoryCategories:category-group', {
+      storeId,
+      categoryId,
+      entriesCount: categoryEntries.length,
+      productGroupCount: productGroups.size,
+      productIds: Array.from(productGroups.keys()),
+    });
+
     const products: InventoryCategoryView['products'] = [];
     let categoryName: string | undefined;
     productGroups.forEach((productEntries, productId) => {
       // Divergence (see doc): orphan product/category rows are skipped, never thrown.
       const product = productMap.get(productId);
-      if (!product) return;
       const totalAvailable = productEntries.reduce((sum, e) => sum + e.available, 0);
-      if (totalAvailable === 0) return;
+      console.log('[AVAIL-DIAG] readStoreInventoryCategories:product', {
+        storeId,
+        categoryId,
+        productId,
+        productFound: !!product,
+        totalAvailable,
+        categoriesMapHasCategoryId: categoriesMap.has(categoryId),
+      });
+      if (!product) {
+        console.log('[AVAIL-DIAG] readStoreInventoryCategories:skip product-missing', {
+          storeId,
+          categoryId,
+          productId,
+        });
+        return;
+      }
+      if (totalAvailable === 0) {
+        console.log('[AVAIL-DIAG] readStoreInventoryCategories:skip zero-available', {
+          storeId,
+          categoryId,
+          productId,
+          totalAvailable,
+        });
+        return;
+      }
       if (categoryName === undefined) {
         const category = categoriesMap.get(categoryId);
-        if (!category) return;
+        if (!category) {
+          console.log('[AVAIL-DIAG] readStoreInventoryCategories:skip category-missing', {
+            storeId,
+            categoryId,
+            categoriesMapKeys: Array.from(categoriesMap.keys()),
+          });
+          return;
+        }
         categoryName = String(category.name);
       }
       const weightedCostSum = productEntries.reduce(
@@ -268,6 +327,10 @@ export function readStoreInventoryCategories(
     });
   });
 
+  console.log('[AVAIL-DIAG] readStoreInventoryCategories:result', {
+    storeId,
+    inventoryCategoriesLength: inventoryCategories.length,
+  });
   return inventoryCategories;
 }
 

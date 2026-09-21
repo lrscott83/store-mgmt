@@ -43,6 +43,7 @@ export const clientLoader = featureLoader([EFeatures.Available]);
  */
 export function InventoryAvailablePage() {
   const intl = useIntl();
+  const user = useAuthStore((s) => s.user);
   const storeId = useAuthStore((s) => s.user?.selectedStoreId ?? '');
   const [categories, setCategories] = useState<InventoryCategoryView[]>([]);
   const { enabled: multiStoreEnabled, stores: multiStoreStores } = useMultiStore();
@@ -55,11 +56,24 @@ export function InventoryAvailablePage() {
   // que la recibe como prop controlada (back-compat: opcional, defaults internos).
   const [search, setSearch] = useState('');
 
+  console.log('[AVAIL-DIAG] render:start', {
+    storeId,
+    userId: user?.id,
+    multiStoreEnabled,
+    multiStoreCount: multiStoreStores.length,
+    multiStoreIds: multiStoreStores.map((s) => s.id),
+  });
+
   useEffect(() => {
+    console.log('[AVAIL-DIAG] single-store effect:start', { storeId });
     const inventorySvc = new InventoryOfflineService(
       storeId,
       new ProductRepository(storeId, new ProductCategoryRepository(storeId)),
     );
+    console.log('[AVAIL-DIAG] single-store effect:service-built', {
+      storeId,
+      repositories: 'ProductRepository+ProductCategoryRepository',
+    });
 
     // WU3 (category B): getInventoryCategoriesView now returns
     // BaseResponseModel<InventoryCategoryView[]> (was a bare array) — unwrap `.data`.
@@ -67,7 +81,18 @@ export function InventoryAvailablePage() {
     // groups its own active entries and sources product/category names internally (via
     // ProductRepository / ProductRepository.getCategoryRepository()), so the category/product
     // fetching this page used to do purely to build the `enriched` array is no longer needed.
-    const response = inventorySvc.getInventoryCategoriesView();
+    let response: ReturnType<typeof inventorySvc.getInventoryCategoriesView>;
+    try {
+      response = inventorySvc.getInventoryCategoriesView();
+    } catch (error) {
+      console.log('[AVAIL-DIAG] single-store effect:getInventoryCategoriesView THREW', error);
+      throw error;
+    }
+    console.log('[AVAIL-DIAG] single-store effect:response', {
+      succeeded: response.succeeded,
+      dataLength: response.data?.length,
+      errors: response.errors,
+    });
     // InventoryOfflineService.getInventoryCategoriesView is a sync local-storage read that
     // never actually fails; this guard exists for the type only.
     if (!response.succeeded) return;
@@ -76,7 +101,13 @@ export function InventoryAvailablePage() {
 
   // multi-store-panels: per-store category views from read-only local data.
   useEffect(() => {
+    console.log('[AVAIL-DIAG] multi-store effect:start', {
+      multiStoreEnabled,
+      storeCount: multiStoreStores.length,
+      storeIds: multiStoreStores.map((s) => s.id),
+    });
     if (!multiStoreEnabled) {
+      console.log('[AVAIL-DIAG] multi-store effect:disabled -> clearing storeCategories');
       setStoreCategories(new Map());
       return;
     }
@@ -85,15 +116,36 @@ export function InventoryAvailablePage() {
       const entries = await Promise.all(
         multiStoreStores.map(async (store) => {
           const dek = await unwrapStoreDek(store.id);
-          return [store.id, readStoreInventoryCategories(store.id, dek)] as const;
+          console.log('[AVAIL-DIAG] multi-store effect:store-dek', {
+            storeId: store.id,
+            dek: dek ? 'present' : 'null',
+          });
+          const storeInventoryCategories = readStoreInventoryCategories(store.id, dek);
+          console.log('[AVAIL-DIAG] multi-store effect:store-categories', {
+            storeId: store.id,
+            categoriesCount: storeInventoryCategories.length,
+          });
+          return [store.id, storeInventoryCategories] as const;
         }),
       );
-      if (!cancelled) setStoreCategories(new Map(entries));
+      if (!cancelled) {
+        const nextStoreCategories = new Map(entries);
+        console.log('[AVAIL-DIAG] multi-store effect:storeCategories set', {
+          size: nextStoreCategories.size,
+        });
+        setStoreCategories(nextStoreCategories);
+      }
     })();
     return () => {
       cancelled = true;
     };
   }, [multiStoreEnabled, multiStoreStores]);
+
+  console.log('[AVAIL-DIAG] render:branch-decision', {
+    multiStoreEnabled,
+    categoriesLength: categories.length,
+    storeCategoriesSize: storeCategories.size,
+  });
 
   // ─── multi-store mode ────────────────────────────────────────────────────
   if (multiStoreEnabled) {
@@ -105,6 +157,11 @@ export function InventoryAvailablePage() {
       acc.push(...filterInventoryCategories(storeCategories.get(id) ?? [], search));
       return acc;
     }, []);
+    console.log('[AVAIL-DIAG] render:multi-store', {
+      visibleStoreIds,
+      visibleCatsLength: visibleCats.length,
+      storeCategoriesSize: storeCategories.size,
+    });
     const grandTotal = round2Sum(visibleCats.map((cat) => cat.totalCostPrice));
     const grandCount = visibleCats.reduce((sum, cat) => sum + cat.totalQuantity, 0);
 
@@ -143,6 +200,10 @@ export function InventoryAvailablePage() {
           }
           renderStoreTotals={(store) => {
             const cats = filterInventoryCategories(storeCategories.get(store.id) ?? [], search);
+            console.log('[AVAIL-DIAG] render:multi-store store-totals', {
+              storeId: store.id,
+              filteredCount: cats.length,
+            });
             const total = round2Sum(cats.map((cat) => cat.totalCostPrice));
             const count = cats.reduce((sum, cat) => sum + cat.totalQuantity, 0);
             return (
@@ -152,7 +213,16 @@ export function InventoryAvailablePage() {
         >
           {(store) => {
             const cats = filterInventoryCategories(storeCategories.get(store.id) ?? [], search);
-            if ((storeCategories.get(store.id) ?? []).length === 0) {
+            const storeCats = storeCategories.get(store.id) ?? [];
+            console.log('[AVAIL-DIAG] render:multi-store store-panel', {
+              storeId: store.id,
+              storeCategoriesCount: storeCats.length,
+              filteredCount: cats.length,
+            });
+            if (storeCats.length === 0) {
+              console.log('[AVAIL-DIAG] render:multi-store empty-state MULTISTORE.NO_LOCAL_DATA', {
+                storeId: store.id,
+              });
               return (
                 <div className="py-4 text-center text-text-muted">
                   {intl.formatMessage({ id: 'MULTISTORE.NO_LOCAL_DATA' })}
@@ -160,6 +230,10 @@ export function InventoryAvailablePage() {
               );
             }
             if (cats.length === 0) {
+              console.log(
+                '[AVAIL-DIAG] render:multi-store empty-state INVENTORY.CATEGORY_PRODUCT_NO_FOUND',
+                { storeId: store.id },
+              );
               return (
                 <div className="py-4 text-center text-text-muted">
                   {intl.formatMessage({ id: 'INVENTORY.CATEGORY_PRODUCT_NO_FOUND' })}
@@ -175,8 +249,17 @@ export function InventoryAvailablePage() {
 
   // ─── single-store mode ───────────────────────────────────────────────────
   const filtered = filterInventoryCategories(categories, search);
+  console.log('[AVAIL-DIAG] render:single-store', {
+    multiStoreEnabled,
+    categoriesLength: categories.length,
+    filteredLength: filtered.length,
+  });
   const totalInventoryValue = round2Sum(filtered.map((cat) => cat.totalCostPrice));
   const availableCount = filtered.reduce((sum, cat) => sum + cat.totalQuantity, 0);
+
+  console.log('[AVAIL-DIAG] render:single-store empty-state', {
+    isEmpty: categories.length === 0,
+  });
 
   return (
     <Card

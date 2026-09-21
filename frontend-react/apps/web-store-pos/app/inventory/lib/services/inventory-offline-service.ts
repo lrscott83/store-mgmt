@@ -162,12 +162,22 @@ export class InventoryOfflineService {
    * (Angular's `synchronizeInventoryEntries` reads it the same way).
    */
   getStorageInventoriesMap(): Map<string, InventoryEntry[]> {
+    const storageKey = this.getCurrentStorageKey();
+    console.log('[AVAIL-DIAG] getStorageInventoriesMap:enter', {
+      storageKey,
+      cachedSize: this.inventories ? this.inventories.size : null,
+      lastInventoriesKey: this.lastInventoriesKey,
+    });
     if (
       !this.inventories ||
       this.inventories.size === 0 ||
-      this.getCurrentStorageKey() !== this.lastInventoriesKey
+      storageKey !== this.lastInventoriesKey
     ) {
       this.inventories = this.getInventoriesFromLocalStorage();
+      console.log('[AVAIL-DIAG] getStorageInventoriesMap:reloaded', {
+        storageKey,
+        size: this.inventories.size,
+      });
     }
     return this.inventories;
   }
@@ -211,6 +221,12 @@ export class InventoryOfflineService {
     const categoriesMap = this.productRepository.getCategoryRepository().getStorageCategoriesMap();
     const activeEntries = this.getStorageActiveInventoryEntries();
 
+    console.log('[AVAIL-DIAG] getInventoryCategoriesView:inputs', {
+      productMapSize: productMap.size,
+      categoriesMapSize: categoriesMap.size,
+      activeEntriesLength: activeEntries.length,
+    });
+
     // Group by entry.categoryId (Angular 291), then by entry.productId within each category
     // group (Angular 294) — mirrors Angular's structure literally.
     const categoryGroups = new Map<string, InventoryEntry[]>();
@@ -219,6 +235,11 @@ export class InventoryOfflineService {
       if (group) group.push(entry);
       else categoryGroups.set(entry.categoryId, [entry]);
     }
+
+    console.log('[AVAIL-DIAG] getInventoryCategoriesView:categoryGroups', {
+      groupCount: categoryGroups.size,
+      categoryIds: Array.from(categoryGroups.keys()),
+    });
 
     const inventoryCategories: InventoryCategoryView[] = [];
     categoryGroups.forEach((categoryEntries, categoryId) => {
@@ -229,6 +250,13 @@ export class InventoryOfflineService {
         else productGroups.set(entry.productId, [entry]);
       }
 
+      console.log('[AVAIL-DIAG] getInventoryCategoriesView:category-group', {
+        categoryId,
+        entriesCount: categoryEntries.length,
+        productGroupCount: productGroups.size,
+        productIds: Array.from(productGroups.keys()),
+      });
+
       const products: InventoryProductStock[] = [];
       let categoryName: string | undefined;
       productGroups.forEach((productEntries, productId) => {
@@ -236,14 +264,38 @@ export class InventoryOfflineService {
         // product no longer exists, and skip fully-depleted products (avoids Angular's own NaN
         // bug for Σavailable === 0 — diff-matrix #4).
         const product = productMap.get(productId);
-        if (!product) return;
         const totalAvailable = productEntries.reduce((sum, e) => sum + e.available, 0);
-        if (totalAvailable === 0) return;
+        console.log('[AVAIL-DIAG] getInventoryCategoriesView:product', {
+          categoryId,
+          productId,
+          productFound: !!product,
+          totalAvailable,
+        });
+        if (!product) {
+          console.log('[AVAIL-DIAG] getInventoryCategoriesView:skip product-missing', {
+            categoryId,
+            productId,
+          });
+          return;
+        }
+        if (totalAvailable === 0) {
+          console.log('[AVAIL-DIAG] getInventoryCategoriesView:skip zero-available', {
+            categoryId,
+            productId,
+            totalAvailable,
+          });
+          return;
+        }
 
         if (categoryName === undefined) {
           // Angular parity (getInventoryCategoriesView:308) + gate #1052: UNGUARDED — throws
           // here when categoryId has no matching category, mirroring Angular's own unguarded
           // `storageCategoriesMap.get(item.categoryId).name` read literally.
+          console.log('[AVAIL-DIAG] getInventoryCategoriesView:category-name-lookup', {
+            categoryId,
+            categoriesMapHasCategoryId: categoriesMap.has(categoryId),
+            categoriesMapKeys: Array.from(categoriesMap.keys()),
+          });
           categoryName = categoriesMap.get(categoryId)!.name;
         }
 
@@ -272,6 +324,9 @@ export class InventoryOfflineService {
       });
     });
 
+    console.log('[AVAIL-DIAG] getInventoryCategoriesView:result', {
+      inventoryCategoriesLength: inventoryCategories.length,
+    });
     return success(inventoryCategories);
   }
 
@@ -1039,7 +1094,14 @@ export class InventoryOfflineService {
     // design D4: an unreadable store propagates and is never written over. The
     // auto-init below survives only for its honest case — no stored value at
     // all, i.e. a genuinely new store.
-    const stored = readEntityOrThrow(this.getStorageKey(), (json) => {
+    const storageKey = this.getStorageKey();
+    const storedRaw = localStorage.getItem(storageKey);
+    console.log('[AVAIL-DIAG] getInventoriesFromLocalStorage:read', {
+      storageKey,
+      hasStoredValue: storedRaw !== null,
+      storedLength: storedRaw ? storedRaw.length : 0,
+    });
+    const stored = readEntityOrThrow(storageKey, (json) => {
       if (!json || json === '{}') return null;
       const inventoryMap = new Map<string, InventoryEntry[]>(JSON.parse(json));
       inventoryMap.forEach((entries) => {
@@ -1049,8 +1111,15 @@ export class InventoryOfflineService {
       });
       return inventoryMap;
     });
-    if (stored) return stored;
+    if (stored) {
+      console.log('[AVAIL-DIAG] getInventoriesFromLocalStorage:parsed', {
+        storageKey,
+        size: stored.size,
+      });
+      return stored;
+    }
 
+    console.log('[AVAIL-DIAG] getInventoriesFromLocalStorage:auto-init-empty', { storageKey });
     const inventories = new Map<string, InventoryEntry[]>();
     this.setInventoriesLocalStorage(inventories);
     return inventories;
