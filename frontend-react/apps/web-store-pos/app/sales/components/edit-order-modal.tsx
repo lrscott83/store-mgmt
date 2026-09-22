@@ -1,11 +1,26 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useIntl } from 'react-intl';
 import type { Order } from '@store-mgmt/domain';
-import { PaymentType } from '@store-mgmt/domain';
+import {
+  Currency,
+  PaymentType,
+  SalePaymentMethod,
+  legacyPaymentTypeToSalePaymentMethod,
+  paymentMethodOptionsForCurrency,
+  salePaymentMethodLabel,
+  salePaymentMethodToLegacyPaymentType,
+} from '@store-mgmt/domain';
 import { Card } from '~/shared/components/ui/card';
 import { Button } from '~/shared/components/ui/button';
 import { CloseIcon, EditIcon } from '~/shared/components/ui/icons';
 import { showBlockingError } from '~/shared/lib/blocking-alert';
+import { useAuthStore } from '~/shared/lib/stores/auth-store';
+import { hasMultiMonedasAvailable } from '~/shared/components/multimonedas/currency-select';
+import {
+  DEFAULT_ENABLED_PAYMENT_METHODS,
+  StorePaymentMethodsConfigService,
+  applyStorePaymentMethodsConfig,
+} from '~/shared/lib/payment-methods/store-payment-methods-config-service';
 
 interface EditOrderModalProps {
   order: Order;
@@ -16,15 +31,21 @@ interface EditOrderModalProps {
   onUpdate: (orderId: string, paymentType: PaymentType) => boolean;
 }
 
-// Angular's PaymentTypeUtils.getPaymentTypes() maps enum keys to labels as-is
-// (no translation applied in the template) — keep the raw Spanish-adjacent
-// enum member names, same as sale-credit-payment-modal / order-list precedent.
-// Zelle removed from the options (user request 2026-09-08) — the enum member
-// stays and existing Zelle orders still display their label.
-const PAYMENT_OPTIONS = [
-  { value: PaymentType.Efectivo, label: 'Efectivo' },
-  { value: PaymentType.Tarjeta, label: 'Transferencia' },
-];
+/** Opción del radio: método real + valor legacy persistido + etiqueta visible. */
+interface PaymentOption {
+  method: SalePaymentMethod;
+  value: PaymentType;
+  label: string;
+}
+
+/**
+ * Compone el catálogo de formas de pago de la orden (store-payment-methods-config,
+ * 2026-09-22): catálogo por moneda → gate MultiMonedas → config por-tienda.
+ * `value` es SIEMPRE el legacy con mapping CUP (Transferencia→Tarjeta en
+ * cualquier moneda, igual que el ofrecimiento incondicional de hoy). Si el
+ * método del estado actual (orden histórica) quedó fuera del catálogo, se
+ * mantiene visible al final para que el radio nunca pierda su valor.
+ */
 
 /**
  * Matches Angular's `edit-order-modal.component.html` 1:1: title is literally
@@ -35,9 +56,44 @@ const PAYMENT_OPTIONS = [
  */
 export function EditOrderModal({ order, isOpen, onClose, onUpdate }: EditOrderModalProps) {
   const intl = useIntl();
+  const user = useAuthStore((s) => s.user);
+  const storeId = user?.selectedStoreId ?? '';
+  const orderCurrency = order?.currency ?? Currency.CUP;
   const [paymentType, setPaymentType] = useState<PaymentType>(
     order.paymentType ?? PaymentType.Efectivo,
   );
+
+  // store-payment-methods-config: métodos habilitados de la tienda activa
+  // (default: todos on — no-regresión). SSR: sin window se usa el default y la
+  // hidratación lee localStorage. Instancia fresca por memo (cache por instancia).
+  const enabledMethods = useMemo(() => {
+    if (typeof window === 'undefined' || !storeId) {
+      return [...DEFAULT_ENABLED_PAYMENT_METHODS];
+    }
+    return new StorePaymentMethodsConfigService(storeId).getEnabledMethods(storeId);
+  }, [storeId]);
+
+  const paymentOptions = useMemo<PaymentOption[]>(() => {
+    const base = paymentMethodOptionsForCurrency(orderCurrency);
+    const planGate = hasMultiMonedasAvailable(user)
+      ? base
+      : base.filter((m) => m !== SalePaymentMethod.Zelle);
+    const catalog = applyStorePaymentMethodsConfig(planGate, enabledMethods).map((method) => ({
+      method,
+      value: salePaymentMethodToLegacyPaymentType(method, Currency.CUP),
+      label: salePaymentMethodLabel(method, orderCurrency),
+    }));
+    const current = legacyPaymentTypeToSalePaymentMethod(paymentType, orderCurrency).method;
+    if (catalog.some((o) => o.method === current)) return catalog;
+    return [
+      ...catalog,
+      {
+        method: current,
+        value: salePaymentMethodToLegacyPaymentType(current, Currency.CUP),
+        label: salePaymentMethodLabel(current, orderCurrency),
+      },
+    ];
+  }, [orderCurrency, paymentType, user, enabledMethods]);
 
   if (!isOpen) return null;
 
@@ -84,7 +140,7 @@ export function EditOrderModal({ order, isOpen, onClose, onUpdate }: EditOrderMo
           }
         >
           <fieldset className="space-y-2">
-            {PAYMENT_OPTIONS.map((opt) => (
+            {paymentOptions.map((opt) => (
               <label key={opt.value} className="flex items-center gap-2 text-sm text-text">
                 <input
                   type="radio"

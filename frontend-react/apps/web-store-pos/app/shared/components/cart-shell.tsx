@@ -11,7 +11,6 @@ import {
   paymentPricingFor,
   salePaymentMethodLabel,
   salePaymentMethodToLegacyPaymentType,
-  defaultPaymentMethodForCurrency,
 } from '@store-mgmt/domain';
 import { useCartStore } from '~/shared/lib/stores/cart-store';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
@@ -42,6 +41,12 @@ import { showToastSuccess, showToastError } from '~/shared/lib/toast';
 import { round2 } from '~/shared/lib/money';
 import { formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency';
 import { readCartCurrencyPreference } from '~/shared/lib/cart-currency-preference';
+import { hasMultiMonedasAvailable } from '~/shared/components/multimonedas/currency-select';
+import {
+  DEFAULT_ENABLED_PAYMENT_METHODS,
+  StorePaymentMethodsConfigService,
+  applyStorePaymentMethodsConfig,
+} from '~/shared/lib/payment-methods/store-payment-methods-config-service';
 import { CartCurrencySelect } from '~/shared/components/multipayments/cart-currency-select';
 import { MultiPaymentList } from '~/shared/components/multipayments/multi-payment-list';
 import { settleMultiPayments } from '~/shared/components/multipayments/multi-payment-settlement';
@@ -159,16 +164,32 @@ export function CartShell() {
   const saleCurrency = multiPaymentsAvailable ? preferredCartCurrency : cartCurrency();
   const money = (amount: number) => formatMoneyWithCurrency(amount, saleCurrency);
 
-  // payment-methods-percent-tax (plan 2026-09-17): re-pin del método si la moneda de
-  // la venta cambió y el método actual ya no existe en su catálogo (carrito vacío →
-  // siempre se puede elegir; el catálogo de CUP incluye al default Efectivo).
-  const methodOptions = paymentMethodOptionsForCurrency(saleCurrency);
+  // payment-methods-percent-tax (plan 2026-09-17) + store-payment-methods-config
+  // (2026-09-22): el catálogo de métodos de la venta = moneda → gate de plan
+  // (sin MultiMonedas no hay Zelle) → config por-tienda (métodos deshabilitados
+  // fuera; Efectivo siempre). Config leída de localStorage (instancia fresca por
+  // memo); SSR: sin window se usa el default y la hidratación lee localStorage.
+  const paymentConfigEnabledMethods = useMemo(() => {
+    if (typeof window === 'undefined' || !storeId) {
+      return [...DEFAULT_ENABLED_PAYMENT_METHODS];
+    }
+    return new StorePaymentMethodsConfigService(storeId).getEnabledMethods(storeId);
+  }, [storeId]);
+
+  const methodOptions = useMemo(() => {
+    const base = paymentMethodOptionsForCurrency(saleCurrency);
+    const planGate = hasMultiMonedasAvailable(user)
+      ? base
+      : base.filter((m) => m !== SalePaymentMethod.Zelle);
+    return applyStorePaymentMethodsConfig(planGate, paymentConfigEnabledMethods);
+  }, [saleCurrency, user, paymentConfigEnabledMethods]);
+
   useEffect(() => {
     if (!methodOptions.includes(salePaymentMethod)) {
-      setSalePaymentMethod(defaultPaymentMethodForCurrency(saleCurrency));
+      setSalePaymentMethod(methodOptions[0] ?? SalePaymentMethod.Efectivo);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [saleCurrency]);
+  }, [methodOptions]);
 
   // El pricing de la combinación (moneda, método) se aplica al total mostrado y al
   // que se valida contra el pago; createOrder aplica LA MISMA fórmula al persistir.

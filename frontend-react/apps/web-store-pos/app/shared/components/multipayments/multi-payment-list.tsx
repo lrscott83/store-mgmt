@@ -2,7 +2,6 @@ import { useMemo } from 'react';
 import { useIntl } from 'react-intl';
 import {
   convertPaymentAmount,
-  defaultPaymentMethodForCurrency,
   paymentMethodOptionsForCurrency,
   salePaymentMethodLabel,
   summarizePayments,
@@ -14,6 +13,12 @@ import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { hasMultiPaymentsModuleAvailable } from '~/shared/lib/auth/authorization-service';
 import { currencyLabel, formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency';
 import { ChannelRateOfflineService } from '~/management/channel-rates/lib/services/channel-rate-offline-service';
+import { hasMultiMonedasAvailable } from '~/shared/components/multimonedas/currency-select';
+import {
+  DEFAULT_ENABLED_PAYMENT_METHODS,
+  StorePaymentMethodsConfigService,
+  applyStorePaymentMethodsConfig,
+} from '~/shared/lib/payment-methods/store-payment-methods-config-service';
 
 /**
  * multipayments (T7) — controlled multi-payment list. Self-contained: it owns
@@ -98,6 +103,16 @@ export function MultiPaymentList({
   const storeId = user?.selectedStoreId ?? '';
   const available = hasMultiPaymentsModuleAvailable(user);
 
+  // store-payment-methods-config: métodos habilitados de la tienda activa
+  // (default: todos on — no-regresión). SSR: sin window se usa el default y la
+  // hidratación lee localStorage. Instancia fresca por memo (cache por instancia).
+  const enabledMethods = useMemo(() => {
+    if (typeof window === 'undefined' || !storeId) {
+      return [...DEFAULT_ENABLED_PAYMENT_METHODS];
+    }
+    return new StorePaymentMethodsConfigService(storeId).getEnabledMethods(storeId);
+  }, [storeId]);
+
   // Rates are read once per store. Skipped during SSR/empty store, where there
   // is no local register to read from.
   const rates = useMemo<ChannelRate[]>(() => {
@@ -166,6 +181,22 @@ export function MultiPaymentList({
     return '';
   }
 
+  /**
+   * Catálogo de métodos de una fila: catálogo por moneda → gate de plan
+   * (sin MultiMonedas no hay Zelle) → config por-tienda (métodos que la tienda
+   * deshabilitó fuera). Efectivo queda siempre: si el resultado fuera vacío
+   * (MLC/CLA con Transferencia desactivada), se ofrece Efectivo para que el
+   * select de la fila siga siendo válido.
+   */
+  function methodOptionsFor(currency: Currency): SalePaymentMethod[] {
+    const base = paymentMethodOptionsForCurrency(currency);
+    const planGate = hasMultiMonedasAvailable(user)
+      ? base
+      : base.filter((m) => m !== SalePaymentMethod.Zelle);
+    const composed = applyStorePaymentMethodsConfig(planGate, enabledMethods);
+    return composed.length > 0 ? composed : [SalePaymentMethod.Efectivo];
+  }
+
   function updateRow(id: string, patch: Partial<MultiPaymentRow>) {
     onChange(payments.map((row) => (row.id === id ? { ...row, ...patch } : row)));
   }
@@ -173,7 +204,8 @@ export function MultiPaymentList({
   function changeCurrency(id: string, currency: Currency) {
     // A currency change re-pins the method to that currency's first option so
     // the row never keeps a method its new channel cannot offer.
-    updateRow(id, { currency, method: defaultPaymentMethodForCurrency(currency) });
+    const options = methodOptionsFor(currency);
+    updateRow(id, { currency, method: options[0] ?? SalePaymentMethod.Efectivo });
   }
 
   function removeRow(id: string) {
@@ -181,11 +213,12 @@ export function MultiPaymentList({
   }
 
   function addRow() {
+    const options = methodOptionsFor(orderCurrency);
     onChange([
       ...payments,
       {
         id: newRowId(),
-        method: defaultPaymentMethodForCurrency(orderCurrency),
+        method: options[0] ?? SalePaymentMethod.Efectivo,
         currency: orderCurrency,
         amount: 0,
       },
@@ -204,7 +237,7 @@ export function MultiPaymentList({
       <div className="space-y-2" data-testid="multi-payment-rows">
         {evaluated.map((entry) => {
           const { row } = entry;
-          const methodOptions = paymentMethodOptionsForCurrency(row.currency);
+          const methodOptions = methodOptionsFor(row.currency);
           return (
             <div
               key={row.id}

@@ -1,9 +1,11 @@
-import { afterEach, describe, it, expect, vi } from 'vitest';
+import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 import type { SaleCredit } from '@store-mgmt/domain';
-import { PaymentType } from '@store-mgmt/domain';
+import { Currency, EModules, PaymentType, SalePaymentMethod } from '@store-mgmt/domain';
+import { useAuthStore } from '~/shared/lib/stores/auth-store';
+import { StorePaymentMethodsConfigService } from '~/shared/lib/payment-methods/store-payment-methods-config-service';
 
 // Angular's sale-credit-payment-modal.component.ts:52-78 uses SweetAlert2 for BOTH the
 // payment confirm step AND the failure error dialog — mock the shared wrapper module so
@@ -549,5 +551,70 @@ describe('SaleCreditPaymentModal', () => {
       // distinctive card path, not the `payments`/cash glyph ("3 6h18M3 6v12") nor SaveIcon.
       expect(path).toContain('M2 10h20M6 15h4');
     });
+  });
+});
+
+// ─── Config por-tienda en el modal de pago de créditos (store-payment-methods-
+//     config, 2026-09-22) — catálogo = moneda → gate MultiMonedas → config ─────
+describe('SaleCreditPaymentModal — método de pago según config de tienda', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+  });
+
+  afterEach(() => {
+    localStorage.clear();
+    useAuthStore.setState({ user: null });
+  });
+
+  function renderCreditPayment(creditOverrides: Partial<SaleCredit> = {}) {
+    render(
+      <Wrapper>
+        <SaleCreditPaymentModal
+          saleCredit={makeCredit(creditOverrides)}
+          isOpen={true}
+          onClose={vi.fn()}
+          onConfirm={vi.fn()}
+        />
+      </Wrapper>,
+    );
+  }
+
+  function optionLabels(): string[] {
+    return Array.from(screen.getAllByRole('option')).map((o) => o.textContent ?? '');
+  }
+
+  it('USD + MultiMonedas sin config: catálogo completo con Zelle (default no-regresión)', () => {
+    useAuthStore.setState({
+      user: { id: 'u1', selectedStoreId: 's1', storeModuleIds: [EModules.MultiMonedas] } as never,
+    });
+    renderCreditPayment({ currency: Currency.USD });
+    expect(optionLabels()).toEqual(['Efectivo', 'Zelle', 'Transferencia (USD)']);
+  });
+
+  it('USD + MultiMonedas + Zelle desactivado en config: el select pierde Zelle', () => {
+    new StorePaymentMethodsConfigService('s1').setMethodEnabled(
+      's1',
+      SalePaymentMethod.Zelle,
+      false,
+    );
+    useAuthStore.setState({
+      user: { id: 'u1', selectedStoreId: 's1', storeModuleIds: [EModules.MultiMonedas] } as never,
+    });
+    renderCreditPayment({ currency: Currency.USD });
+    expect(optionLabels()).toEqual(['Efectivo', 'Transferencia (USD)']);
+  });
+
+  it('CUP + Transferencia desactivada en config: queda solo Efectivo', () => {
+    new StorePaymentMethodsConfigService('s1').setMethodEnabled(
+      's1',
+      SalePaymentMethod.Transferencia,
+      false,
+    );
+    useAuthStore.setState({
+      user: { id: 'u1', selectedStoreId: 's1', storeModuleIds: [EModules.MultiMonedas] } as never,
+    });
+    renderCreditPayment();
+    expect(optionLabels()).toEqual(['Efectivo']);
   });
 });

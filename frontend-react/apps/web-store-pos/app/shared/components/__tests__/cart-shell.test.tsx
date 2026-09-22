@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
+import { StorePaymentMethodsConfigService } from '~/shared/lib/payment-methods/store-payment-methods-config-service';
 
 // Mock useCartStore
 vi.mock('~/shared/lib/stores/cart-store', () => ({
@@ -1380,5 +1381,93 @@ describe('CartShell — mixed-currency cart conversion (módulo 16, T8)', () => 
     // Untouched line: no converted price was stamped.
     expect(orderItems[0].price).toBeUndefined();
     expect(screen.queryByTestId('cart-line-conversion-error')).not.toBeInTheDocument();
+  });
+});
+
+// ─── Config por-tienda en el catálogo del carrito (store-payment-methods-config,
+//     2026-09-22) — catálogo = moneda → gate MultiMonedas → config ─────────────
+
+describe('CartShell — método de pago según config de tienda', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    mockUser = { selectedStoreId: 's1', storeModuleIds: [11, EModules.MultiMonedas] };
+  });
+
+  function renderUsdSale() {
+    mockCartState({
+      items: [],
+      total: vi.fn().mockReturnValue(0),
+      cartCurrency: () => Currency.USD,
+    });
+    renderCartShell();
+    openCart();
+  }
+
+  it('USD + MultiMonedas sin config: catálogo completo con Zelle (default no-regresión)', () => {
+    renderUsdSale();
+    expect(screen.getByText('Zelle')).toBeInTheDocument();
+    expect(screen.getByText('Transferencia (USD)')).toBeInTheDocument();
+    expect(screen.getAllByRole('radio')).toHaveLength(3);
+  });
+
+  it('USD + MultiMonedas + Zelle desactivado en config: el radio Zelle desaparece', () => {
+    new StorePaymentMethodsConfigService('s1').setMethodEnabled(
+      's1',
+      SalePaymentMethod.Zelle,
+      false,
+    );
+    renderUsdSale();
+    expect(screen.queryByText('Zelle')).not.toBeInTheDocument();
+    expect(screen.getByText('Transferencia (USD)')).toBeInTheDocument();
+    expect(screen.getAllByRole('radio')).toHaveLength(2);
+  });
+
+  it('Zelle reactivado en config: el radio Zelle vuelve', () => {
+    const svc = new StorePaymentMethodsConfigService('s1');
+    svc.setMethodEnabled('s1', SalePaymentMethod.Zelle, false);
+    svc.setMethodEnabled('s1', SalePaymentMethod.Zelle, true);
+    renderUsdSale();
+    expect(screen.getByText('Zelle')).toBeInTheDocument();
+    expect(screen.getAllByRole('radio')).toHaveLength(3);
+  });
+
+  it('re-pinea a Efectivo cuando el método seleccionado se desactivó en config', () => {
+    new StorePaymentMethodsConfigService('s1').setMethodEnabled(
+      's1',
+      SalePaymentMethod.Zelle,
+      false,
+    );
+    const setSalePaymentMethod = vi.fn();
+    mockCartState({
+      items: [],
+      total: vi.fn().mockReturnValue(0),
+      cartCurrency: () => Currency.USD,
+      salePaymentMethod: SalePaymentMethod.Zelle,
+      setSalePaymentMethod,
+    });
+    renderCartShell();
+    openCart();
+    // Zelle fuera del catálogo → el select vuelve al primer método disponible.
+    expect(setSalePaymentMethod).toHaveBeenCalledWith(SalePaymentMethod.Efectivo);
+  });
+
+  it('CUP sin MultiMonedas + Transferencia desactivada: queda solo Efectivo', () => {
+    new StorePaymentMethodsConfigService('s1').setMethodEnabled(
+      's1',
+      SalePaymentMethod.Transferencia,
+      false,
+    );
+    mockUser = { selectedStoreId: 's1', storeModuleIds: [11] };
+    mockCartState({
+      items: [],
+      total: vi.fn().mockReturnValue(0),
+      cartCurrency: () => Currency.CUP,
+    });
+    renderCartShell();
+    openCart();
+    expect(screen.queryByText('Transferencia (CUP)')).not.toBeInTheDocument();
+    expect(screen.getByText('Efectivo')).toBeInTheDocument();
+    expect(screen.getAllByRole('radio')).toHaveLength(1);
   });
 });

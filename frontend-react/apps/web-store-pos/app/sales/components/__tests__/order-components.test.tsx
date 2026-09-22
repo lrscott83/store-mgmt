@@ -1,9 +1,11 @@
-import { afterEach, describe, it, expect, vi } from 'vitest';
+import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 import type { Order } from '@store-mgmt/domain';
-import { PaymentType, OrderType } from '@store-mgmt/domain';
+import { Currency, EModules, PaymentType, OrderType, SalePaymentMethod } from '@store-mgmt/domain';
+import { useAuthStore } from '~/shared/lib/stores/auth-store';
+import { StorePaymentMethodsConfigService } from '~/shared/lib/payment-methods/store-payment-methods-config-service';
 
 // Angular's order-item-list.component.ts:35-44 (deactivateOrder confirm) and :49-53
 // (edit-order-modal's Swal error branch) both use SweetAlert2 — mock the shared wrapper
@@ -354,8 +356,10 @@ describe('EditOrderModal', () => {
         <EditOrderModal order={order} isOpen={true} onClose={vi.fn()} onUpdate={vi.fn()} />
       </Wrapper>,
     );
-    // El radio se muestra como "Transferencia" (plan 2026-09-17: Tarjeta reemplazada).
-    const tarjetaRadio = screen.getByRole('radio', { name: 'Transferencia' }) as HTMLInputElement;
+    // El radio se muestra como "Transferencia (CUP)" (plan 2026-09-17: Tarjeta reemplazada).
+    const tarjetaRadio = screen.getByRole('radio', {
+      name: 'Transferencia (CUP)',
+    }) as HTMLInputElement;
     expect(tarjetaRadio.checked).toBe(true);
   });
 
@@ -368,8 +372,8 @@ describe('EditOrderModal', () => {
         <EditOrderModal order={order} isOpen={true} onClose={onClose} onUpdate={onUpdate} />
       </Wrapper>,
     );
-    // Zelle removed from the options; Tarjeta mostrada como Transferencia (plan 2026-09-17).
-    fireEvent.click(screen.getByRole('radio', { name: 'Transferencia' }));
+    // Zelle removed from the options; Tarjeta mostrada como Transferencia (CUP).
+    fireEvent.click(screen.getByRole('radio', { name: 'Transferencia (CUP)' }));
     fireEvent.click(screen.getByTestId('edit-order-update-button'));
     expect(onUpdate).toHaveBeenCalledWith('o1', PaymentType.Tarjeta);
     expect(onClose).toHaveBeenCalled();
@@ -458,5 +462,71 @@ describe('EditOrderModal', () => {
       // EditIcon's distinctive path opening — SaveIcon's path starts "M5 21h14a2...".
       expect(path).toContain('16.862 4.487');
     });
+  });
+});
+
+// ─── Config por-tienda en el modal de edición de órdenes (store-payment-methods-
+//     config, 2026-09-22) — catálogo = moneda → gate MultiMonedas → config ─────
+describe('EditOrderModal — método de pago según config de tienda', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+  });
+
+  afterEach(() => {
+    localStorage.clear();
+    useAuthStore.setState({ user: null });
+  });
+
+  function renderEditOrderModal(orderOverrides: Partial<Order> = {}) {
+    render(
+      <Wrapper>
+        <EditOrderModal order={makeOrder(orderOverrides)} isOpen={true} onClose={vi.fn()} onUpdate={vi.fn()} />
+      </Wrapper>,
+    );
+  }
+
+  it('Tarjeta histórico + Transferencia desactivada en config: radio sentinel al final, checked', () => {
+    new StorePaymentMethodsConfigService('s1').setMethodEnabled(
+      's1',
+      SalePaymentMethod.Transferencia,
+      false,
+    );
+    useAuthStore.setState({
+      user: { id: 'u1', selectedStoreId: 's1', storeModuleIds: [EModules.MultiMonedas] } as never,
+    });
+    renderEditOrderModal({ paymentType: PaymentType.Tarjeta });
+    const radioNames = (): string[] =>
+      Array.from(screen.getAllByRole('radio')).map(
+        (r) => (r as HTMLInputElement).labels?.[0]?.textContent?.trim() ?? '',
+      );
+    expect(radioNames()).toEqual(['Efectivo', 'Transferencia (CUP)']);
+    const sentinel = screen.getByRole('radio', { name: 'Transferencia (CUP)' }) as HTMLInputElement;
+    expect(sentinel.checked).toBe(true);
+  });
+
+  it('USD + MultiMonedas sin config: catálogo completo con Zelle (default no-regresión)', () => {
+    useAuthStore.setState({
+      user: { id: 'u1', selectedStoreId: 's1', storeModuleIds: [EModules.MultiMonedas] } as never,
+    });
+    renderEditOrderModal({ currency: Currency.USD });
+    expect(screen.getByRole('radio', { name: 'Efectivo' })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'Zelle' })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'Transferencia (USD)' })).toBeInTheDocument();
+  });
+
+  it('USD + Zelle desactivado en config: el radio Zelle desaparece', () => {
+    new StorePaymentMethodsConfigService('s1').setMethodEnabled(
+      's1',
+      SalePaymentMethod.Zelle,
+      false,
+    );
+    useAuthStore.setState({
+      user: { id: 'u1', selectedStoreId: 's1', storeModuleIds: [EModules.MultiMonedas] } as never,
+    });
+    renderEditOrderModal({ currency: Currency.USD });
+    expect(screen.queryByRole('radio', { name: 'Zelle' })).toBeNull();
+    expect(screen.getByRole('radio', { name: 'Efectivo' })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'Transferencia (USD)' })).toBeInTheDocument();
   });
 });
