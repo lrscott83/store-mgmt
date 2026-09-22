@@ -21,11 +21,12 @@ interface SaleCreditListProps {
 /**
  * Matches Angular's `sale-credit-list.component.html`: a bare table (no
  * header row) — client, total (colored by `getSaleCreditClassName`: success
- * when paid, danger otherwise), paid date label (only when `isPaid`), and an
- * optional actions column (settings menu: Editar always, Pagar only when
- * `!saleCredit.paid`). Angular opens both `EditSaleCreditModalComponent` and
- * `SaleCreditPaymentModalComponent` from THIS component (not the parent
- * page) — mirrored here by owning both modals' state locally.
+ * when paid; amber `text-warning` when unpaid, the view's price color), paid
+ * date label (only when `isPaid`), and an optional actions column (settings
+ * menu: Editar always, Pagar only when `!saleCredit.paid`). Angular opens both
+ * `EditSaleCreditModalComponent` and `SaleCreditPaymentModalComponent` from
+ * THIS component (not the parent page) — mirrored here by owning both modals'
+ * state locally.
  */
 export function SaleCreditList({
   saleCredits,
@@ -64,9 +65,10 @@ export function SaleCreditList({
                 <span className="text-text">{saleCredit.client}</span>
               </td>
               <td className="p-1 text-right">
-                {/* Amarillito para el precio en ambos estados (petición del usuario, como
-                    la referencia visual de ventas del día); solo la fecha de pago es verde. */}
-                <span className="text-warning">{formatCurrency(saleCredit.total)}</span>
+                {/* Paid credits show their total in green; unpaid keep the amber (text-warning). */}
+                <span className={saleCredit.isPaid ? 'text-success' : 'text-warning'}>
+                  {formatCurrency(saleCredit.total)}
+                </span>
               </td>
               <td className="p-1 text-right">
                 {saleCredit.isPaid && (

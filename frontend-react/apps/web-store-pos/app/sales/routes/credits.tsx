@@ -29,6 +29,9 @@ import {
 
 export const clientLoader = featureLoader([EFeatures.CreditSale]);
 
+/** Estado de pago del filtro de radios debajo del rango de fechas (regla verde/ámbar). */
+type CreditPaidFilterValue = 'all' | 'pending' | 'paid';
+
 /**
  * React port of Angular's `sale-credits.component.html` (Créditos): credits
  * grouped by date into an accordion; each date panel wraps `SaleCreditList`
@@ -37,8 +40,10 @@ export const clientLoader = featureLoader([EFeatures.CreditSale]);
  * Angular's original had no `[readOnly]` binding here, but the write path is
  * store-scoped local storage and this view only edits the SELECTED store, so
  * it is safe). Multi-store panels stay read-only (no write path for non-
- * selected stores by design). Header shows count + total of ALL credits
- * (paid included) — user request. Angular's `loadSaleCredits()` always calls `filterSaleCredits(null,
+ * selected stores by design). Header shows count of ALL visible credits and the
+ * total of the UNPAID ones only (`!isPaid`) — user request 2026-09-22 (reverts
+ * the 2026-09-18 paid+unpaid decision; parity with Angular's original
+ * `groupSaleCredits`, which summed `!isPaid` per day). Angular's `loadSaleCredits()` always calls `filterSaleCredits(null,
  * null, null, null)` (no date-range/paid-state UI exists); the user-added
  * DateRangeFilter feeds the same service a half-open [start, next-day
  * midnight) window — with no range picked the call stays all-nulls.
@@ -51,9 +56,11 @@ export const clientLoader = featureLoader([EFeatures.CreditSale]);
  * Sin MultiStores la vista es idéntica a la original salvo el filtro.
  *
  * Header count + total (ambos modos): `CreditsCardTitle` pinta "Créditos (n)"
- * y el total impago en rojo a la derecha. En MultiStores el n/total reflejan
- * el filtro vigente — la tienda elegida en el select ("Todas" = todas) por el
- * rango de fechas aplicado — para que el header coincida con lo visible.
+ * (n = TODOS los créditos visibles) y el total de los IMPAGOS a la derecha —
+ * ámbar (text-warning) cuando > 0, verde (text-success) cuando 0. En
+ * MultiStores el n/total reflejan el filtro vigente — la tienda elegida en el
+ * select ("Todas" = todas), el rango de fechas aplicado y la fila de radios
+ * de estado de pago — para que el header coincida con lo visible.
  */
 export function SaleCreditsPage() {
   const intl = useIntl();
@@ -69,6 +76,7 @@ export function SaleCreditsPage() {
     start: null,
     end: null,
   });
+  const [creditFilter, setCreditFilter] = useState<CreditPaidFilterValue>('all');
 
   // WU4 (flagged mismatch #4): Angular's SaleCreditsComponent.loadSaleCredits() always
   // calls filterSaleCredits(null, null, null, null) (sale-credits.component.ts:51-52) —
@@ -83,12 +91,20 @@ export function SaleCreditsPage() {
     // SaleCreditOfflineService.filterSaleCredits is a same-tick `Promise.resolve(...)` over
     // local storage — it never actually fails; this guard exists for the type only.
     if (!response.succeeded) return;
-    // creditsCount/creditsTotal count UNPAID credits only (!isPaid) — matches Angular's
+    // Paid-state radios filter CLIENT-SIDE before day-grouping, so the groups (and
+    // everything derived from them — header count/total, day totals) only contain
+    // matching credits. creditsCount counts what the groups show (ALL credits under
+    // "Todos"); creditsTotal sums UNPAID credits only (!isPaid) — matches Angular's
     // SaleCreditsComponent.groupSaleCredits exactly. groupByLocalDay returns newest-first;
     // reverse to preserve Angular's ASCENDING day order (SaleCreditsComponent), oldest first.
+    const visible = response.data.filter((credit) => {
+      if (creditFilter === 'pending') return !credit.isPaid;
+      if (creditFilter === 'paid') return credit.isPaid;
+      return true;
+    });
     setDateSaleCredits(
       groupByLocalDay(
-        response.data,
+        visible,
         (c) => new Date(c.date),
         (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
       ).reverse(),
@@ -98,7 +114,7 @@ export function SaleCreditsPage() {
   useEffect(() => {
     void loadSaleCredits();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- loadSaleCredits reads storeId + dateRange (the primitive bounds below)
-  }, [storeId, dateRange.start, dateRange.end]);
+  }, [storeId, dateRange.start, dateRange.end, creditFilter]);
 
   // Mismos handlers que today-credits.tsx: el gear del historial edita/paga con el
   // mismo servicio y recarga la lista. WU2: updateSaleCredit/paidSaleCredit devuelven
@@ -149,15 +165,18 @@ export function SaleCreditsPage() {
     });
   }
 
-  // Header y paneles cuentan/suman TODOS los créditos (pagados incluidos) — petición
-  // del usuario; antes solo se contaban los impagos.
+  // Header: count = TODOS los créditos visibles (filtro de estado + rango); el total
+  // suma SOLO los impagos (!isPaid), verde cuando 0 — petición del usuario 2026-09-22.
   const creditsCount = dateSaleCredits.reduce((count, d) => count + d.items.length, 0);
   const creditsTotal = dateSaleCredits.reduce(
-    (total, d) => total + d.items.reduce((t, credit) => t + credit.total, 0),
+    (total, d) =>
+      total + d.items.reduce((t, credit) => t + (credit.isPaid ? 0 : credit.total), 0),
     0,
   );
   const creditsTotalEntries = dateSaleCredits.flatMap((d) =>
-    d.items.map((credit) => ({ amount: credit.total, currency: credit.currency })),
+    d.items
+      .filter((credit) => !credit.isPaid)
+      .map((credit) => ({ amount: credit.total, currency: credit.currency })),
   );
 
   // ─── multi-store mode ────────────────────────────────────────────────────
@@ -172,26 +191,33 @@ export function SaleCreditsPage() {
           const date = new Date(c.date);
           if (rangeStart && date < rangeStart) return false;
           if (rangeEnd && date >= rangeEnd) return false;
+          if (creditFilter === 'pending' && c.isPaid) return false;
+          if (creditFilter === 'paid' && !c.isPaid) return false;
           return true;
         });
         return [id, filtered] as const;
       }),
     );
     // Header n/total follow the CURRENT filter, not the whole store list: the
-    // store select ("Todas" = every store) intersected with the applied range.
-    // Mirrors MultiStoreSection's own visibleStores rule so header and panels
-    // can never disagree.
+    // store select ("Todas" = every store) intersected with the applied range
+    // and the paid-state radios. Mirrors MultiStoreSection's own visibleStores
+    // rule so header and panels can never disagree.
     const visibleStores =
       selectedMultiStoreId === null
         ? multiStoreStores
         : multiStoreStores.filter((s) => s.id === selectedMultiStoreId);
     const visibleCredits = visibleStores.flatMap((s) => filteredStoreCredits.get(s.id) ?? []);
     const multiStoreCreditsCount = visibleCredits.length;
-    const multiStoreCreditsTotal = visibleCredits.reduce((total, credit) => total + credit.total, 0);
-    const multiStoreCreditsEntries = visibleCredits.map((credit) => ({
-      amount: credit.total,
-      currency: credit.currency,
-    }));
+    const multiStoreCreditsTotal = visibleCredits.reduce(
+      (total, credit) => total + (credit.isPaid ? 0 : credit.total),
+      0,
+    );
+    const multiStoreCreditsEntries = visibleCredits
+      .filter((credit) => !credit.isPaid)
+      .map((credit) => ({
+        amount: credit.total,
+        currency: credit.currency,
+      }));
 
     return (
       <Card
@@ -211,7 +237,50 @@ export function SaleCreditsPage() {
           selectedStoreId={selectedMultiStoreId}
           onSelectedStoreIdChange={setSelectedMultiStoreId}
           filters={
-            <DateRangeFilter value={dateRange} onApply={setDateRange} className="flex-1 min-w-0" />
+            <>
+              <DateRangeFilter
+                value={dateRange}
+                onApply={setDateRange}
+                className="flex-1 min-w-0"
+              />
+              {/* Paid-state radios — full-width row under the store select + date range. */}
+              <div
+                role="radiogroup"
+                aria-label={intl.formatMessage({ id: 'SALE_CREDIT.FILTER_LABEL' })}
+                className="flex w-full flex-wrap gap-4"
+              >
+                <label className="flex items-center gap-1.5 text-sm text-text">
+                  <input
+                    type="radio"
+                    name="multistore-credit-paid-filter"
+                    checked={creditFilter === 'all'}
+                    onChange={() => setCreditFilter('all')}
+                    className="text-primary focus:ring-primary"
+                  />
+                  {intl.formatMessage({ id: 'SALE_CREDIT.FILTER_ALL' })}
+                </label>
+                <label className="flex items-center gap-1.5 text-sm text-text">
+                  <input
+                    type="radio"
+                    name="multistore-credit-paid-filter"
+                    checked={creditFilter === 'pending'}
+                    onChange={() => setCreditFilter('pending')}
+                    className="text-primary focus:ring-primary"
+                  />
+                  {intl.formatMessage({ id: 'SALE_CREDIT.FILTER_TO_PAY' })}
+                </label>
+                <label className="flex items-center gap-1.5 text-sm text-text">
+                  <input
+                    type="radio"
+                    name="multistore-credit-paid-filter"
+                    checked={creditFilter === 'paid'}
+                    onChange={() => setCreditFilter('paid')}
+                    className="text-primary focus:ring-primary"
+                  />
+                  {intl.formatMessage({ id: 'SALE_CREDIT.FILTER_PAID' })}
+                </label>
+              </div>
+            </>
           }
           renderStoreCount={(store) => {
             const credits = filteredStoreCredits.get(store.id) ?? [];
@@ -219,8 +288,13 @@ export function SaleCreditsPage() {
           }}
           renderStoreTotals={(store) => {
             const credits = filteredStoreCredits.get(store.id) ?? [];
-            const total = credits.reduce((t, c) => t + c.total, 0);
-            return <MultiStoreTotal value={total} valueClassName="text-warning" />;
+            const total = credits.reduce((t, c) => t + (c.isPaid ? 0 : c.total), 0);
+            return (
+              <MultiStoreTotal
+                value={total}
+                valueClassName={total === 0 ? 'text-success' : 'text-warning'}
+              />
+            );
           }}
         >
           {(store) => {
@@ -247,6 +321,10 @@ export function SaleCreditsPage() {
                 {dayGroups.map((group) => {
                   const dateId = group.dayKey;
                   const isExpanded = expandedDateIds.has(`${store.id}:${dateId}`);
+                  const dayTotal = group.items.reduce(
+                    (t, c) => t + (c.isPaid ? 0 : c.total),
+                    0,
+                  );
                   return (
                     <div key={dateId} className="rounded border border-border">
                       <button
@@ -260,13 +338,17 @@ export function SaleCreditsPage() {
                           {formatLocalDate(group.date)} ({group.items.length})
                         </span>
                         <span className="flex items-center gap-2">
-                          <span className="text-xs font-semibold text-warning whitespace-nowrap">
+                          <span
+                            className={`text-xs font-semibold whitespace-nowrap ${dayTotal === 0 ? 'text-success' : 'text-warning'}`}
+                          >
                             <CurrencyTotalAmount
-                              legacyTotal={group.items.reduce((t, c) => t + c.total, 0)}
-                              entries={group.items.map((credit) => ({
-                                amount: credit.total,
-                                currency: credit.currency,
-                              }))}
+                              legacyTotal={dayTotal}
+                              entries={group.items
+                                .filter((credit) => !credit.isPaid)
+                                .map((credit) => ({
+                                  amount: credit.total,
+                                  currency: credit.currency,
+                                }))}
                               multiMonedas={multiMonedas}
                             />
                           </span>
@@ -304,6 +386,43 @@ export function SaleCreditsPage() {
         <DateRangeFilter value={dateRange} onApply={setDateRange} />
       </div>
 
+      <div
+        role="radiogroup"
+        aria-label={intl.formatMessage({ id: 'SALE_CREDIT.FILTER_LABEL' })}
+        className="mb-3 flex flex-wrap gap-4"
+      >
+        <label className="flex items-center gap-1.5 text-sm text-text">
+          <input
+            type="radio"
+            name="credit-paid-filter"
+            checked={creditFilter === 'all'}
+            onChange={() => setCreditFilter('all')}
+            className="text-primary focus:ring-primary"
+          />
+          {intl.formatMessage({ id: 'SALE_CREDIT.FILTER_ALL' })}
+        </label>
+        <label className="flex items-center gap-1.5 text-sm text-text">
+          <input
+            type="radio"
+            name="credit-paid-filter"
+            checked={creditFilter === 'pending'}
+            onChange={() => setCreditFilter('pending')}
+            className="text-primary focus:ring-primary"
+          />
+          {intl.formatMessage({ id: 'SALE_CREDIT.FILTER_TO_PAY' })}
+        </label>
+        <label className="flex items-center gap-1.5 text-sm text-text">
+          <input
+            type="radio"
+            name="credit-paid-filter"
+            checked={creditFilter === 'paid'}
+            onChange={() => setCreditFilter('paid')}
+            className="text-primary focus:ring-primary"
+          />
+          {intl.formatMessage({ id: 'SALE_CREDIT.FILTER_PAID' })}
+        </label>
+      </div>
+
       {dateSaleCredits.length === 0 && (
         <InfoBox variant="primary" className="mb-6 text-center">
           {/* SALE_CREDIT.NO_SALE_CREDIT_FOUND */}
@@ -315,6 +434,10 @@ export function SaleCreditsPage() {
         {dateSaleCredits.map((dateSaleCredit) => {
           const dateId = dateSaleCredit.dayKey;
           const isExpanded = expandedDateIds.has(dateId);
+          const dayTotal = dateSaleCredit.items.reduce(
+            (t, c) => t + (c.isPaid ? 0 : c.total),
+            0,
+          );
           return (
             <div key={dateId} className="rounded-lg border border-border bg-surface">
               <button
@@ -328,13 +451,17 @@ export function SaleCreditsPage() {
                   {formatLocalDate(dateSaleCredit.date)} ({dateSaleCredit.items.length})
                 </span>
                 <span className="flex items-center gap-2">
-                  <span className="text-sm font-semibold text-warning whitespace-nowrap">
+                  <span
+                    className={`text-sm font-semibold whitespace-nowrap ${dayTotal === 0 ? 'text-success' : 'text-warning'}`}
+                  >
                     <CurrencyTotalAmount
-                      legacyTotal={dateSaleCredit.items.reduce((total, c) => total + c.total, 0)}
-                      entries={dateSaleCredit.items.map((credit) => ({
-                        amount: credit.total,
-                        currency: credit.currency,
-                      }))}
+                      legacyTotal={dayTotal}
+                      entries={dateSaleCredit.items
+                        .filter((credit) => !credit.isPaid)
+                        .map((credit) => ({
+                          amount: credit.total,
+                          currency: credit.currency,
+                        }))}
                       multiMonedas={multiMonedas}
                     />
                   </span>
@@ -361,9 +488,11 @@ export function SaleCreditsPage() {
 
 /**
  * Card header shared by BOTH modes (single-store and MultiStore) so the two
- * cannot drift: "Créditos (n)" on the left and the total in amber (text-warning)
- * on the right. `count`/`total` cover ALL credits (paid included) — user request
- * 2026-09-18. The count keeps the `rounded-full bg-success/10` pill class.
+ * cannot drift: "Créditos (n)" on the left and the total on the right. `count`
+ * covers ALL visible credits (paid included); `total` covers UNPAID credits
+ * only (!isPaid) — user request 2026-09-22 — amber (text-warning) when > 0,
+ * green (text-success) when 0. The count keeps the `rounded-full bg-success/10`
+ * pill class.
  */
 function CreditsCardTitle({
   count,
@@ -386,7 +515,9 @@ function CreditsCardTitle({
           ({count})
         </span>
       </span>
-      <span className="text-sm font-semibold text-warning whitespace-nowrap">
+      <span
+        className={`text-sm font-semibold whitespace-nowrap ${total === 0 ? 'text-success' : 'text-warning'}`}
+      >
         <CurrencyTotalAmount legacyTotal={total} entries={entries} multiMonedas={multiMonedas} />
       </span>
     </div>

@@ -63,4 +63,24 @@ describe('SaleCreditList — list/table parity sweep (WU5)', () => {
     );
     expect(screen.getByText('$2 000')).toBeInTheDocument();
   });
+
+  // credits-paid-green-filter (2026-09-22): row total is GREEN when paid, AMBER
+  // (text-warning) when not.
+  it('colors the total green (text-success) when the credit is paid', () => {
+    render(
+      <Wrapper>
+        <SaleCreditList saleCredits={[makeSaleCredit({ isPaid: true })]} readOnly />
+      </Wrapper>,
+    );
+    expect(screen.getByText('$2 000')).toHaveClass('text-success');
+  });
+
+  it('keeps the total amber (text-warning) when the credit is not paid', () => {
+    render(
+      <Wrapper>
+        <SaleCreditList saleCredits={[makeSaleCredit({ isPaid: false })]} readOnly />
+      </Wrapper>,
+    );
+    expect(screen.getByText('$2 000')).toHaveClass('text-warning');
+  });
 });
