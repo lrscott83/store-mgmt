@@ -5,8 +5,13 @@ import { PaperclipIcon, CloseIcon } from '~/shared/components/ui/icons';
 import type { ParsedProductRow } from '../lib/csv-product-parser';
 import { parseCsvProducts } from '../lib/csv-product-parser';
 import { showBlockingError } from '~/shared/lib/blocking-alert';
+import { hasMultiMonedasAvailable } from '~/shared/components/multimonedas/currency-select';
+import { useAuthStore } from '~/shared/lib/stores/auth-store';
 
-// Was byte-identical to Angular's `sampleData` (csv-product-importer-modal.component.ts:27-30).
+// MultiMonedas CSV (2026-09-22): el template muestra las columnas de moneda
+// (`precio_moneda`, `precio_costo`) SOLO con el módulo activo — sin él, el
+// import descarta toda moneda (todo nace CUP) y el template se lo dice al
+// usuario en vez de provocar columnas que no hacen nada.
 // DIVERGES DELIBERATELY (decision #15, csv-import-cost-quantity-entries, 2026-08-04): the
 // template advertises the 5-column React shape. A 3-column Angular-era file still imports
 // unchanged (headers matched by name, decision #4). Do not restore the 3-column template.
@@ -15,10 +20,20 @@ import { showBlockingError } from '~/shared/lib/blocking-alert';
 // template a user downloads must match what they type back. The parser matches headers by
 // name and accepts both this Spanish set and the legacy English set
 // (category,name,price,cost,quantity), so old files keep importing unchanged.
-const SAMPLE_DATA = `categoria,nombre,precio,costo,cantidad
+// Template base (sin MultiMonedas): 5 columnas — el import descarta toda
+// moneda sin el módulo, así que el template no las anuncia.
+const SAMPLE_DATA_BASE = `categoria,nombre,precio,costo,cantidad
 Pizzas,Pizza con Queso,150,100,10
 Pizzas,Pizza Especial,200,140,5
 Confituras,Caramelo,20,12,50`;
+
+// Template con MultiMonedas (2026-09-22): `precio_moneda` y `precio_costo` al
+// lado de `cantidad` — monedas por NOMBRE case-insensitive (usd == USD),
+// vacía = CUP.
+const SAMPLE_DATA_MULTI = `categoria,nombre,precio,precio_moneda,costo,precio_costo,cantidad
+Pizzas,Pizza con Queso,150,USD,100,USD,10
+Pizzas,Pizza Especial,200,usd,140,usd,5
+Confituras,Caramelo,20,cup,12,cup,50`;
 
 // Small inline download glyph — Angular renders <mat-icon>file_download</mat-icon>; there is no
 // shared DownloadIcon in the icon set, so it is inlined here (same precedent as the cart SVG).
@@ -60,10 +75,14 @@ export function CsvProductImporterModal({ onImport, onClose }: CsvProductImporte
   const inputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [showRequired, setShowRequired] = useState(false);
+  // MultiMonedas CSV (2026-09-22): mismo gate que CurrencySelect — con el
+  // módulo el template anuncia `precio_moneda`/`precio_costo`; sin él no.
+  const multiMonedas = hasMultiMonedasAvailable(useAuthStore((s) => s.user));
+  const sampleData = multiMonedas ? SAMPLE_DATA_MULTI : SAMPLE_DATA_BASE;
 
   // Angular downloadSample() (component.ts:80-88): blob of sampleData -> productos_ejemplo.csv.
   function downloadSample() {
-    const blob = new Blob([SAMPLE_DATA], { type: 'text/csv' });
+    const blob = new Blob([sampleData], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -138,7 +157,7 @@ export function CsvProductImporterModal({ onImport, onClose }: CsvProductImporte
             <p className="mb-2 text-sm text-muted">Estructura requerida del archivo (.csv):</p>
             <div className="rounded-md bg-gray-100 p-3">
               <pre className="mb-0 overflow-x-auto text-xs text-text">
-                <code>{SAMPLE_DATA}</code>
+                <code>{sampleData}</code>
               </pre>
             </div>
 

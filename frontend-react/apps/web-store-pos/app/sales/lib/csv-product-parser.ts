@@ -1,4 +1,4 @@
-import type { Currency } from '@store-mgmt/domain';
+import { Currency } from '@store-mgmt/domain';
 
 export interface ParsedProductRow {
   name: string;
@@ -17,6 +17,12 @@ export interface ParsedProductRow {
   category: string;
   cost?: number;
   quantity?: number;
+  /**
+   * MultiMonedas CSV (2026-09-22): moneda del COSTO (columna `precio_costo`),
+   * parseada case-insensitivamente por NOMBRE vía `parseCurrencyByName`.
+   * Desconocida/ausente -> undefined -> CUP (dominio default).
+   */
+  costCurrency?: Currency;
 }
 
 export type CsvRowErrorCode =
@@ -172,6 +178,27 @@ function parseOptionalCurrency(raw: string): Currency | undefined {
   return value as Currency;
 }
 
+/**
+ * MultiMonedas CSV (2026-09-22): columnas de moneda por NOMBRE
+ * (`precio_moneda`/`precio_costo`), validadas SIN distinción de mayúsculas:
+ * "usd" -> Currency.USD. Acepta el código exacto (usd/Usd/USD) o el nombre
+ * del miembro del enum ("Currency.USD"). Desconocida -> undefined -> CUP
+ * (dominio default) — nunca un error, nunca descarta la fila, igual que la
+ * columna numérica previa.
+ */
+export function parseCurrencyByName(raw: string): Currency | undefined {
+  const normalized = raw.trim().toUpperCase();
+  if (!normalized) return undefined;
+  const direct = (Currency as unknown as Record<string, Currency | undefined>)[normalized];
+  if (direct !== undefined) return direct;
+  const dotted = normalized.split('.');
+  if (dotted.length === 2) {
+    const member = (Currency as unknown as Record<string, Currency | undefined>)[dotted[1]!];
+    if (member !== undefined) return member;
+  }
+  return undefined;
+}
+
 export function parseCsvProducts(csvText: string): CsvParseResult {
   const products: ParsedProductRow[] = [];
   const errors: CsvRowError[] = [];
@@ -194,6 +221,13 @@ export function parseCsvProducts(csvText: string): CsvParseResult {
   const costIdx = indexOfHeader(headers, 'costo', 'cost');
   const quantityIdx = indexOfHeader(headers, 'cantidad', 'quantity');
   const currencyIdx = indexOfHeader(headers, 'moneda', 'currency');
+  // MultiMonedas CSV (2026-09-22): las DOS columnas nuevas viven "al lado de
+  // cantidad" — `precio_moneda` (moneda del precio) y `precio_costo` (moneda
+  // del costo). El alias `moneda` legacy sigue resolviendo `currency` (compat
+  // con el plan 2026-09-16) y NO matchea `precio_moneda` porque indexOfHeader
+  // compara la celda completa.
+  const priceCurrencyIdx = indexOfHeader(headers, 'precio_moneda', 'price_currency');
+  const costCurrencyIdx = indexOfHeader(headers, 'precio_costo', 'cost_currency');
 
   let dataRowNum = 0;
   for (let i = headerIndex + 1; i < rows.length; i++) {
@@ -240,7 +274,14 @@ export function parseCsvProducts(csvText: string): CsvParseResult {
     // --- Optional currency (React-only, currency-in-costs-and-prices plan 2026-09-16) ---
     const currency = parseOptionalCurrency(currencyIdx >= 0 ? (fields[currencyIdx] ?? '') : '');
 
-    products.push({ name, price, category, cost, quantity, currency });
+    // --- MultiMonedas CSV (2026-09-22): monedas por NOMBRE, case-insensitive ---
+    const priceCurrency = parseCurrencyByName(priceCurrencyIdx >= 0 ? (fields[priceCurrencyIdx] ?? '') : '');
+    const costCurrency = parseCurrencyByName(costCurrencyIdx >= 0 ? (fields[costCurrencyIdx] ?? '') : '');
+    // La columna legacy `moneda` alimenta el precio SOLO si la nueva
+    // `precio_moneda` no vino — ambas describen el precio.
+    const resolvedCurrency = priceCurrency ?? currency;
+
+    products.push({ name, price, category, cost, quantity, currency: resolvedCurrency, costCurrency });
   }
 
   return { products, errors };

@@ -1,0 +1,10 @@
+{
+  "masterSecret": "kat-current-dek-kek-master-secret",
+  "storeA": "a1a1a1a1-a1a1-a1a1-a1a1-a1a1a1a1a1a1",
+  "storeB": "b2b2b2b2-b2b2-b2b2-b2b2-b2b2b2b2b2b2",
+  "currentDek": "ur7oDqhQdpfyDX80Sp5yCz5eK4Ci4PdxhnifrUeuyVo=",
+  "targetDek": "KXhgRKaXOPtUpsAaLBrwFY7EwoZy8kDESiRa2hY3TZY=",
+  "wrappedDek": "rd7dl\u002B\u002BJ4/ofrc1PS8rsrMXaWegTf8HcHgJrt4wHzbs6U/FSULrr0gGqibGmnHzU",
+  "wrapSalt": "\u002BYwq/0c1/5/1QX6mIB0iOg==",
+  "wrapIv": "8ypBevyTJdd3xVJF"
+}

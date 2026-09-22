@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Currency } from '@store-mgmt/domain';
-import { parseCsvProducts } from '../csv-product-parser';
+import { parseCsvProducts, parseCurrencyByName } from '../csv-product-parser';
 
 describe('parseCsvProducts', () => {
   describe('CSV-01: valid rows are parsed correctly', () => {
@@ -416,5 +416,84 @@ describe('parseCsvProducts', () => {
       const result = parseCsvProducts(csv);
       expect(result.products[0].currency).toBe(Currency.MLC);
     });
+  });
+});
+
+// ─── MultiMonedas CSV (2026-09-22): monedas por NOMBRE case-insensitive ───
+
+describe('parseCurrencyByName', () => {
+  it('resuelve cualquier combinación de mayúsculas/minúsculas: "usd" es USD', () => {
+    expect(parseCurrencyByName('usd')).toBe(Currency.USD);
+    expect(parseCurrencyByName('Usd')).toBe(Currency.USD);
+    expect(parseCurrencyByName('USD')).toBe(Currency.USD);
+    expect(parseCurrencyByName(' usd ')).toBe(Currency.USD);
+  });
+
+  it('resuelve las 7 monedas y acepta el formato "Currency.X"', () => {
+    expect(parseCurrencyByName('cup')).toBe(Currency.CUP);
+    expect(parseCurrencyByName('eur')).toBe(Currency.EUR);
+    expect(parseCurrencyByName('cla')).toBe(Currency.CLA);
+    expect(parseCurrencyByName('mlc')).toBe(Currency.MLC);
+    expect(parseCurrencyByName('cad')).toBe(Currency.CAD);
+    expect(parseCurrencyByName('mxn')).toBe(Currency.MXN);
+    expect(parseCurrencyByName('Currency.USD')).toBe(Currency.USD);
+  });
+
+  it('valores desconocidos o vacíos dan undefined (nunca un error)', () => {
+    expect(parseCurrencyByName('usdt')).toBeUndefined();
+    expect(parseCurrencyByName('dolar')).toBeUndefined();
+    expect(parseCurrencyByName('')).toBeUndefined();
+    expect(parseCurrencyByName('123')).toBeUndefined();
+  });
+});
+
+describe('parseCsvProducts — columnas precio_moneda / precio_costo (MultiMonedas CSV)', () => {
+  it('parsea precio_moneda y precio_costo case-insensitivamente (usd -> USD)', () => {
+    const csv = [
+      'categoria,nombre,precio,precio_moneda,costo,precio_costo,cantidad',
+      'Snacks,Chips,10,usd,6,Usd,12',
+      'Snacks,Soda,5,USD,2,usd,7',
+    ].join('\n');
+    const result = parseCsvProducts(csv);
+    expect(result.products).toHaveLength(2);
+    expect(result.errors).toHaveLength(0);
+    expect(result.products[0].currency).toBe(Currency.USD);
+    expect(result.products[0].costCurrency).toBe(Currency.USD);
+    expect(result.products[1].currency).toBe(Currency.USD);
+    expect(result.products[1].costCurrency).toBe(Currency.USD);
+  });
+
+  it('columna ausente o vacía -> undefined -> CUP (dominio default), la fila nunca se descarta', () => {
+    const csv = [
+      'categoria,nombre,precio,precio_moneda,costo,precio_costo,cantidad',
+      'Snacks,Chips,10,,6,,12',
+      'Snacks,Soda,5,MONEDA_RARA,2,???',
+    ].join('\n');
+    const result = parseCsvProducts(csv);
+    expect(result.products).toHaveLength(2);
+    expect(result.errors).toHaveLength(0);
+    expect(result.products[0].currency).toBeUndefined();
+    expect(result.products[0].costCurrency).toBeUndefined();
+    expect(result.products[1].currency).toBeUndefined();
+    expect(result.products[1].costCurrency).toBeUndefined();
+  });
+
+  it('el alias legacy `moneda` numérico sigue alimentando el precio cuando no hay precio_moneda', () => {
+    const csv = ['categoria,nombre,precio,costo,cantidad,moneda', 'Snacks,Chips,10,6,12,1'].join(
+      '\n',
+    );
+    const result = parseCsvProducts(csv);
+    expect(result.products[0].currency).toBe(Currency.USD);
+    expect(result.products[0].costCurrency).toBeUndefined();
+  });
+
+  it('precio_moneda y precio_costo pueden diferir (precio USD, costo CUP)', () => {
+    const csv = [
+      'categoria,nombre,precio,precio_moneda,costo,precio_costo,cantidad',
+      'Snacks,Chips,10,usd,6,cup,12',
+    ].join('\n');
+    const result = parseCsvProducts(csv);
+    expect(result.products[0].currency).toBe(Currency.USD);
+    expect(result.products[0].costCurrency).toBe(Currency.CUP);
   });
 });

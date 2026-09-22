@@ -10,6 +10,7 @@ import type {
 import { EFeatures } from '@store-mgmt/domain';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
+import { hasMultiMonedasAvailable } from '~/shared/components/multimonedas/currency-select';
 import { Button } from '~/shared/components/ui/button';
 import { Card } from '~/shared/components/ui/card';
 import { InfoBox } from '~/shared/components/ui/info-box';
@@ -49,6 +50,9 @@ export function ProductsPage() {
   // The wipe is irreversible and local-only, so this is a render guard, not an
   // authorization boundary — there is no server call to protect.
   const isOwner = useAuthStore((s) => (s.user ? isOwnerAdmin(s.user) : false));
+  // MultiMonedas CSV (2026-09-22): el import acepta monedas de precio y costo
+  // SOLO con el módulo activo (mismo gate que los selectores del dominio).
+  const multiMonedas = hasMultiMonedasAvailable(useAuthStore((s) => s.user));
   const clearCart = useCartStore((s) => s.clear);
 
   const [categories, setCategories] = useState<ProductCategoryView[]>([]);
@@ -343,6 +347,10 @@ export function ProductsPage() {
   // reused product's sale price, so the handler does NOT repeat it. There are no duplicate
   // failures, so the "ya existen" dialog is gone.
   async function handleCsvImport(rows: ParsedProductRow[]) {
+    // MultiMonedas CSV (2026-09-22): sin el módulo, TODAS las monedas del CSV
+    // (precio y costo) se descartan y todo nace CUP; con el módulo viajan
+    // intactas. La decisión vive en la VISTA — el parser no conoce la sesión.
+    const currenciesAllowed = multiMonedas;
     const csvProducts: CsvProduct[] = rows
       .filter((row) => row.category)
       .map((row) => ({
@@ -354,7 +362,11 @@ export function ProductsPage() {
         // currency-in-costs-and-prices (plan 2026-09-16): data plumbing, NOT a UI change — the CSV
         // `moneda`/`currency` column has to travel through `CsvProduct` into createCsvProducts, or
         // the parser's value is dropped and the product falls back to DEFAULT_CURRENCY.
-        currency: row.currency,
+        currency: currenciesAllowed ? row.currency : undefined,
+        // MultiMonedas CSV (2026-09-22): la moneda del COSTO (columna
+        // `precio_costo`) también viaja al CsvProduct y alimenta la moneda de
+        // las entradas de inventario. Sin el módulo: undefined -> CUP.
+        costCurrency: currenciesAllowed ? row.costCurrency : undefined,
       }));
 
     const result = await productService.createCsvProducts(csvProducts);
@@ -376,7 +388,7 @@ export function ProductsPage() {
       // a negative-quantity row slip through to createInventoryEntry.
       if (!product.quantity || product.quantity <= 0) continue;
       const costPrice = product.cost ?? product.price; // decision #7/#16: 0 is a valid cost
-      const entry = inventoryService.createInventoryEntry(product.id, product.quantity, costPrice);
+      const entry = inventoryService.createInventoryEntry(product.id, product.quantity, costPrice, product.costCurrency);
       // R2: the primitive returns bare `null` (product not found) or a DataResult that may not
       // have succeeded — the optional chain absorbs both, so neither inflates the count. Same
       // idiom as today-entries.tsx:148.

@@ -1,35 +1,39 @@
-// seamless-store-switch (docs/plans/2026-09-10-seamless-store-switch-plan.md)
-// — the ONE switch flow both UIs (StoreSwitcher, Configurations select) run.
+// seamless-store-switch (docs/plans/2026-09-10-seamless-store-switch-plan.md,
+// extended by the switch-back-logout fix) — the ONE switch flow both UIs
+// (StoreSwitcher, Configurations select) run.
 //
-// Replaces the old "persist + logout" behaviour: the user stays logged in, the
-// session is refreshed for the NEW store, and the page does a hard reload that
-// boots directly into it. The reload recovers the new store's DEK from this
-// device's per-store wrap table without any password — which is exactly why
-// the per-store wraps are provisioned at LOGIN (dek-provisioning.ts
-// `provisionStoreDekWraps`): by switch time the password is long gone from
-// memory, so nothing can be unwrapped then. If this device has no wrap for the
-// target store (granted after this device's last login, provisioning failure,
-// or a pre-v2 table), the helper falls back to the legacy logout flow — the
-// next login provisions the wrap and the next switch is seamless.
+// v2 — the switch-back logout fix: the old flow logged the user out whenever
+// the device held no per-store wrap for the TARGET store (step 3's
+// `retargetDeviceWrapStore` returning false). That was reachable on the exact
+// timeline the bug report describes: create store B AFTER login on a device
+// whose table predates B → A→B logs the user out → re-login on B (table
+// rewritten for B, `stores[B]` only) → B→A has no wrap for A → LOGGED OUT
+// AGAIN. The server can break that cycle outright: it derives every store's
+// DEK from the master secret (HKDF(masterSecret, storeId)), so `PUT
+// /v1/stores/switch` persists the selection AND returns the TARGET store's
+// DEK wrapped under the CURRENT store's DEK — a key the client already holds
+// in memory. The client unwraps it, retargets the device wrap table for the
+// target store, and reloads. The per-store table still wins when the server
+// wrap is absent (legacy backend, offline mode), and the legacy logout now
+// remains only for the genuinely irrecoverable cases.
 import type { UserModel } from '@store-mgmt/domain';
 import { useAuthStore } from './auth-store';
 import { authHttpService } from '../http/auth-http-service';
 import { storeHttpService } from '~/management/stores/lib/services/store-http-service';
-import { retargetDeviceWrapStore } from '../storage/device-dek-table';
+import { retargetDeviceWrapStore, writeDeviceDekTable, readDeviceDekTable } from '../storage/device-dek-table';
+import { unwrapDekWithDek } from '../offline/dek-unwrap';
+import { getDek } from '../storage/data-key-store';
+import { getOrCreateDeviceKey } from '../storage/device-key-store';
+import { wrapDekForDevice } from '../storage/dek-bootstrap';
 
-/**
- * Switches the session to `storeId`. Throws only when the backend refuses or
- * is unreachable at step 1, so the caller can keep its existing error UI with
- * the session untouched and internally consistent (still the old store on
- * both sides). Resolves after either (a) refreshing state + reloading the
- * page, or (b) logging out (fallback).
- */
 export async function switchToStore(storeId: string): Promise<void> {
-  // 1. Persist the selection server-side. Throws on network failure.
-  const setResponse = await storeHttpService.setMyStore(storeId);
-  if (!setResponse.succeeded) {
+  // 1. Persist the selection server-side AND get the target DEK wrapped
+  //    under the current DEK. Throws on network failure.
+  const switchResponse = await storeHttpService.switchMyStore(storeId);
+  if (!switchResponse.succeeded || !switchResponse.data) {
     throw new Error('STORE_SWITCH_REJECTED');
   }
+  const { wrappedDek, wrapSalt, wrapIv } = switchResponse.data;
 
   // 2. Fresh /me — the backend now answers with the NEW store's
   //    modules/features/roles (GetMeQuery reads SelectedStoreId server-side),
@@ -47,14 +51,50 @@ export async function switchToStore(storeId: string): Promise<void> {
   }
 
   // 3. Point the ACTIVE device wrap at the new store BEFORE any state is
-  //    rewritten: on reload, bootstrapDeviceDek recovers table.device's bytes
-  //    and scopes them by table.storeId — with this retarget those are the
-  //    NEW store's key under the NEW store's label. Without a provisioned
-  //    wrap this returns false WITHOUT writing, and a reload would boot the
-  //    new session with the old store's key — the cross-store split the DEK
-  //    code exists to prevent — so the fallback MUST be a logout: the next
-  //    login resolves the new store's key properly.
-  const retargeted = retargetDeviceWrapStore(storeId);
+  //    rewritten. Three recovery routes, best first:
+  //
+  //    a. The server wrap (v2): the response carries the TARGET store's DEK
+  //       wrapped under the CURRENT store's DEK, which the client holds in
+  //       memory. Unwrap it, then write it as the target's per-store wrap AND
+  //       retarget the active entry — the post-reload bootstrap recovers the
+  //       new store's key with NO password on ANY device, including one whose
+  //       per-store table predates the target store (the logout scenario).
+  //
+  //    b. The per-store table (v1 behaviour): a wrap provisioned at a login
+  //       that postdates the store's creation.
+  //
+  //    c. Legacy logout: only when neither source can produce the target's
+  //       key — a reload would boot the new session with the OLD store's key
+  //       (the cross-store split the DEK code exists to prevent).
+  let retargeted = false;
+  try {
+    const currentDek = getDek();
+    if (currentDek && wrappedDek && wrapSalt && wrapIv) {
+      const targetDek = await unwrapDekWithDek(currentDek, { wrappedDek, wrapSalt, wrapIv });
+      const table = readDeviceDekTable();
+      const deviceKey = await getOrCreateDeviceKey();
+      if (table && deviceKey) {
+        table.stores = table.stores ?? {};
+        table.stores[storeId] = { device: await wrapDekForDevice(targetDek, deviceKey) };
+        table.formatVersion = 2;
+        writeDeviceDekTable(table);
+        // MANDATORY after the write: point `device` + `storeId` at the NEW
+        // entry. Without this the post-reload bootstrap recovers the OLD
+        // `table.device` bytes (the CURRENT store's key) scoped by the NEW
+        // `table.storeId` — the cross-store split this code exists to
+        // prevent — and the unlock gate expels the session to the login
+        // form. retargetDeviceWrapStore copies the just-written entry into
+        // the active pair atomically.
+        retargeted = retargetDeviceWrapStore(storeId);
+      }
+    }
+  } catch {
+    // Malformed/unopenable server wrap — fall through to the device table.
+  }
+
+  if (!retargeted) {
+    retargeted = retargetDeviceWrapStore(storeId);
+  }
   if (!retargeted) {
     useAuthStore.getState().logout();
     return;
