@@ -22,14 +22,18 @@ import { E2E_API_URL } from './support/backend-url';
  * the real backend); assertions follow the byte pattern of owner-stores.spec.ts
  * and store-create-security.spec.ts so CI can execute it unchanged.
  *
- * The button's NEGATIVE case (owner WITHOUT MultiStores → button hidden) is NOT
- * E2E here by design: the owner-admin persona is born with every
- * availableToStore module (register delivers all, incl. 14) and the auth-store
- * treats a valid cached session as authoritative, so degrading the store via
- * direct DB seeding would NOT refresh the session's storeModuleIds until the
- * user re-mints — a flaky, CI-uncertain assertion. That gate is pinned
- * deterministically in vitest (my-stores.test.tsx create-store flow: hidden
- * without 14, visible with 14).
+ * SETUP (2026-09-22, owner-authorized): the persona's store is born on the Pago
+ * plan WITHOUT MultiStores (14) — registration no longer delivers every
+ * availableToStore module, which left MC-01/MC-02 failing on a stale
+ * precondition (not an app bug). Both tests seed module 14 into the selected
+ * store via direct DB (store-fixture.ts H-15 precedent) and refresh the cached
+ * session through a REAL GET /v1/auth/me (billing only trims on Vencido; the
+ * store stays AlDia, so 14 survives /me's billing filter). Assertions are
+ * untouched.
+ *
+ * The button's NEGATIVE case (owner WITHOUT MultiStores → button hidden) stays
+ * out of E2E by design: that gate is pinned deterministically in vitest
+ * (my-stores.test.tsx create-store flow: hidden without 14, visible with 14).
  *
  * Cost: one real login per test (owner-admin persona), under the LoginPolicy
  * ceiling. Direct-DB reads follow the owner-stores.spec.ts pattern.
@@ -70,16 +74,78 @@ async function readMyStores(page: Page): Promise<Array<{ id: string; name: strin
   return body.data ?? [];
 }
 
+const MODULE_MULTISTORES = 14;
+
+async function withDb<T>(fn: (client: Client) => Promise<T>): Promise<T> {
+  const client = new Client({ connectionString: process.env['E2E_DB_URL'] ?? DEFAULT_DB_URL });
+  try {
+    await client.connect();
+    return await fn(client);
+  } finally {
+    await client.end();
+  }
+}
+
+/** Inserts the MultiStores module row for the store if missing (idempotent). */
+async function seedMultiStoresModule(storeId: string): Promise<void> {
+  await withDb(async (client) => {
+    await client.query(
+      `INSERT INTO "StoreModule"
+         ("StoreId", "ModuleId", "ModulePriceIncluded", "Price", "ModulePrice",
+          "ModuleDiscountPrice", "ModulePercentDiscountPrice", "TenantId", "IsActive",
+          "CreatedDate", "CreatedBy", "UpdatedDate", "UpdatedBy")
+       SELECT s."Id", 14, m."PriceIncluded", m."Price", m."Price",
+              m."DiscountPrice", m."PercentDiscountPrice", s."TenantId", true,
+              now(), '00000000-0000-0000-0000-000000000000', NULL, NULL
+         FROM "Module" m, "Store" s
+        WHERE m."Id" = $2 AND s."Id" = $1
+          AND NOT EXISTS (
+            SELECT 1 FROM "StoreModule" sm
+             WHERE sm."StoreId" = $1 AND sm."ModuleId" = $2
+          )`,
+      [storeId, MODULE_MULTISTORES],
+    );
+  });
+}
+
+/**
+ * Refreshes the session profile through a REAL GET /v1/auth/me and rewrites
+ * localStorage.currentUser — the auth-store's own update contract (updateUser
+ * preserves expiresIn and rewrites TOKEN/CURRENT_USER/AUTH_MODEL).
+ */
+async function refreshSessionFromMe(page: Page): Promise<void> {
+  const token = await readBearerToken(page);
+  const response = await page.request.get(`${E2E_API_URL}/v1/auth/me`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok()) {
+    throw new Error(`refreshSessionFromMe: GET /v1/auth/me failed (${response.status()})`);
+  }
+  const body = (await response.json()) as { data?: unknown };
+  if (!body.data) {
+    throw new Error('refreshSessionFromMe: /v1/auth/me returned no data payload');
+  }
+  await page.evaluate((profile) => {
+    window.localStorage.setItem('currentUser', JSON.stringify(profile));
+    window.localStorage.setItem('current-store-id', (profile as { selectedStoreId?: string }).selectedStoreId ?? '');
+  }, body.data);
+  await page.reload();
+}
+
 test('MC-01 — the + Tienda button shows only with MultiStores on the selected store', async ({
   signedInPage,
 }) => {
   const { page, selectedStoreId } = signedInPage;
   await assertStoresFeature(page);
 
-  // The owner-admin persona's store is on the PAID plan at birth with every
-  // availableToStore module (register delivers them all, incl. 14) and the
-  // billing state is AlDia — so the auth store's storeModuleIds must contain 14,
-  // the same shape store-switcher.tsx/configurations.tsx gate on.
+  // SETUP (owner-authorized 2026-09-22): the persona's store is born on the
+  // Pago plan WITHOUT MultiStores (14) — registration no longer delivers every
+  // module. Seed 14 by direct DB + refresh the cached session via a real /me
+  // so the auth store's storeModuleIds contains 14, the same shape
+  // store-switcher.tsx/configurations.tsx gate on. Assertions untouched.
+  await seedMultiStoresModule(selectedStoreId);
+  await refreshSessionFromMe(page);
+
   await page.goto('/management/my-stores');
 
   await expect(page.getByTestId(`owner-store-card-${selectedStoreId}`)).toBeVisible();
@@ -94,14 +160,23 @@ test('MC-02 — creating a store posts the owner-branch contract and inherits mo
   const { page, selectedStoreId } = signedInPage;
   await assertStoresFeature(page);
 
+  // SETUP (same as MC-01 — serial mode): seed 14 + refresh the session before
+  // reading the module set, so the inheritance pin below runs against a set
+  // that actually includes MultiStores.
+  await seedMultiStoresModule(selectedStoreId);
+  await refreshSessionFromMe(page);
+
   const selectedStoreModuleIds = await readStoreModules(selectedStoreId);
-  // Own store on the paid plan owns every availableToStore module incl. MultiStores (14).
+  // The seeded selected store owns every availableToStore module incl. MultiStores (14).
   expect(selectedStoreModuleIds).toContain(14);
 
   // Intercept ALL /v1/stores traffic to capture the create POST (byte pattern of
-  // store-create-security.spec.ts).
+  // store-create-security.spec.ts). RegExp, NOT the `**/v1/stores/**` glob: the
+  // create POST URL has NOTHING after /v1/stores and a trailing `/**` glob
+  // requires a `/` — the POST was never captured and the poll below timed out
+  // on null (latent plumbing bug: MC-02 used to die earlier, on toContain(14)).
   const capturedRequests: Array<{ method: string; url: string; postData?: string }> = [];
-  await page.route('**/v1/stores/**', (route) => {
+  await page.route(/\/v1\/stores(?:\/|$)/, (route) => {
     capturedRequests.push({
       method: route.request().method(),
       url: route.request().url(),
