@@ -953,7 +953,7 @@ describe('MyStoresPage — session refresh after store mutations (store-list-act
     );
   }
 
-  it('refreshes the session (getUserByToken) after a successful store creation', async () => {
+  it('refreshes the session ONLINE (softRefreshSession) after a successful store creation', async () => {
     await renderPage();
     await waitFor(() => {
       expect(screen.getByText('Alpha')).toBeInTheDocument();
@@ -969,15 +969,18 @@ describe('MyStoresPage — session refresh after store mutations (store-list-act
     await waitFor(() => {
       expect(mockCreateStore).toHaveBeenCalledTimes(1);
     });
-    // The new store must appear in the session's storeList without a relogin.
+    // The refresh must be the ONLINE one (softRefreshSession → GET /me): the
+    // cache-first getUserByToken returned the stale profile without asking
+    // the backend, so the new store never reached the switcher's storeList.
     await waitFor(() => {
-      expect(mockGetUserByToken).toHaveBeenCalledTimes(1);
+      expect(mockSoftRefreshSession).toHaveBeenCalledTimes(1);
     });
+    expect(mockGetUserByToken).not.toHaveBeenCalled();
     // The refresh happens before the list reload.
     expect(mockGetMyStores).toHaveBeenCalledTimes(2);
   });
 
-  it('refreshes the session (getUserByToken) after a successful deactivation', async () => {
+  it('refreshes the session ONLINE (softRefreshSession) after a successful deactivation', async () => {
     await renderPage();
     await waitFor(() => {
       expect(screen.getByText('Alpha')).toBeInTheDocument();
@@ -995,17 +998,19 @@ describe('MyStoresPage — session refresh after store mutations (store-list-act
       expect(mockSetStoreActivation).toHaveBeenCalledWith('s1', false);
     });
     await waitFor(() => {
-      expect(mockGetUserByToken).toHaveBeenCalledTimes(1);
+      expect(mockSoftRefreshSession).toHaveBeenCalledTimes(1);
     });
+    expect(mockGetUserByToken).not.toHaveBeenCalled();
     expect(mockGetMyStores).toHaveBeenCalledTimes(2);
   });
 
-  it('deactivating the CURRENT store: a session rejection on refresh still logs out (not swallowed)', async () => {
-    // The owner deactivates the very store their session is on: the next /me
-    // is a Store.Inactive verdict. getUserByToken resolves null AFTER its own
-    // logout() ran (auth-store's isSessionRejection branch) — the page must
-    // treat that as "session ended", not as a silent no-op.
-    mockGetUserByToken.mockResolvedValue(null);
+  it('deactivating the CURRENT store: the online refresh is best-effort — a failure never logs out or breaks the save', async () => {
+    // The owner deactivates the very store their session is on. The refresh is
+    // now softRefreshSession (soft-refresh-session.ts), which is best-effort BY
+    // CONTRACT: its own try/catch resolves false and never runs logout() — a
+    // network failure leaves the cached session untouched (the pre-existing
+    // stale behaviour, not a new failure). The save flow must stay green.
+    mockSoftRefreshSession.mockRejectedValue(new Error('network down'));
     await renderPage();
     await waitFor(() => {
       expect(screen.getByText('Alpha')).toBeInTheDocument();
@@ -1020,16 +1025,18 @@ describe('MyStoresPage — session refresh after store mutations (store-list-act
     await waitFor(() => {
       expect(mockSetStoreActivation).toHaveBeenCalledWith('s1', false);
     });
-    // The refresh still fired (the verdict is the store's own /me to deliver).
+    // The refresh still fired (best-effort: fire-and-forget, failure swallowed
+    // by the helper itself — the page's own try/catch is belt and braces).
     await waitFor(() => {
-      expect(mockGetUserByToken).toHaveBeenCalledTimes(1);
+      expect(mockSoftRefreshSession).toHaveBeenCalledTimes(1);
     });
+    expect(mockShowToastSuccess).toHaveBeenCalledWith(esMessages['STORES.UPDATE_SUCCESS']);
   });
 
   it('a network failure on the session refresh does not break the save flow', async () => {
     // Offline-resilient parity with handlePlanActivate: the refresh is
     // best-effort — its failure must not surface as a save error.
-    mockGetUserByToken.mockRejectedValue(new Error('network down'));
+    mockSoftRefreshSession.mockRejectedValue(new Error('network down'));
     await renderPage();
     await waitFor(() => {
       expect(screen.getByText('Alpha')).toBeInTheDocument();

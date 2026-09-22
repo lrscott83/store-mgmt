@@ -31,7 +31,7 @@ export const clientLoader = featureLoader([EFeatures.Stores]);
  */
 export function MyStoresPage() {
   const intl = useIntl();
-  const { user, getUserByToken } = useAuthStore();
+  const { user } = useAuthStore();
   // Gate MultiStores (módulo 14): solo los propietarios con el módulo activo en
   // la tienda seleccionada (patrón store-switcher) pueden crear otra tienda.
   const hasMultiStores = (user?.storeModuleIds ?? []).includes(EModules.MultiStores);
@@ -125,7 +125,7 @@ export function MyStoresPage() {
         // catch sees anything, so the verdict stands and the save flow stays
         // green for the store itself.
         try {
-          await getUserByToken();
+          await softRefreshSession();
         } catch {
           // Non-critical: a network failure on the refresh must not surface
           // as a save error.
@@ -158,9 +158,16 @@ export function MyStoresPage() {
       });
       // store-list-active-stores: refresh the session so the new store
       // lands in the session's storeList (switcher + Configuraciones
-      // selects) without a relogin. Best-effort like handlePlanActivate.
+      // selects) without a relogin. This has to be the ONLINE refresh:
+      // `getUserByToken()` is cache-first by design (auth-store.ts:160-177)
+      // and a store creation issues no new token, so it returned the cached
+      // profile without asking the backend and the switcher kept describing
+      // the old storeList until a re-login. See soft-refresh-session.ts.
+      // Best-effort like handlePlanActivate: the page-level guard is belt and
+      // braces — softRefreshSession already swallows network failures (resolves
+      // false), this keeps the save flow green even if that contract changes.
       try {
-        await getUserByToken();
+        await softRefreshSession();
       } catch {
         // Non-critical: session refresh failure should not block the save UX.
       }
