@@ -174,7 +174,7 @@ describe('TodaySaleCreditsPage — header y colores (gear-menu recorte + amarill
     expect(within(header()).getByText(esMessages['SALE_CREDIT.TODAY_CREDITS'])).toBeInTheDocument();
   });
 
-  it('TC-HEAD-PAID: el header cuenta y suma TAMBIÉN los créditos ya pagados', async () => {
+  it('TC-HEAD-PAID: el header cuenta TODOS los créditos pero el total suma solo los impagos (pagado → $0 verde)', async () => {
     seedTodayCredit({ total: 40, isPaid: true, paid: 40 });
     render(
       <Wrapper>
@@ -185,7 +185,9 @@ describe('TodaySaleCreditsPage — header y colores (gear-menu recorte + amarill
     const header = () => document.querySelector('[data-slot="card-header"]') as HTMLElement;
     await screen.findByText('Ana');
     expect(within(header()).getByText('(1)')).toBeInTheDocument();
-    expect(within(header()).getByText('$40')).toBeInTheDocument();
+    // Total = solo impagos: el crédito está PAGADO → $0, en verde.
+    const headerTotal = within(header()).getByText('$0');
+    expect(headerTotal).toHaveClass('text-success');
   });
 
   // Amarillito (text-warning) como la referencia visual del usuario: los totales y
@@ -206,9 +208,9 @@ describe('TodaySaleCreditsPage — header y colores (gear-menu recorte + amarill
     expect(rowSpan).toHaveClass('text-warning');
   });
 
-  // Crédito PAGADO: la fila ya no distingue pago con verde/rojo — siempre amarillito;
-  // solo la fecha de pago queda en verde.
-  it('TC-COLOR-PAID: un crédito pagado también muestra su precio en text-warning', async () => {
+  // Verde/ámbar según estado (petición 2026-09-22): crédito PAGADO → total de la fila
+  // en verde; NO pagado → ámbar. Solo la fecha de pago queda en verde en ambos casos.
+  it('TC-COLOR-PAID: un crédito pagado muestra su precio en text-success', async () => {
     seedTodayCredit({ total: 40, isPaid: true, paid: 40, paidDate: new Date(2024, 2, 20) });
     render(
       <Wrapper>
@@ -218,7 +220,7 @@ describe('TodaySaleCreditsPage — header y colores (gear-menu recorte + amarill
 
     await screen.findByText('Ana');
     const rowSpan = within(document.querySelector('tbody') as HTMLElement).getByText('$40');
-    expect(rowSpan).toHaveClass('text-warning');
+    expect(rowSpan).toHaveClass('text-success');
   });
 });
 
@@ -564,7 +566,7 @@ describe('SaleCreditsPage (history) — header TODOS + gear/amarillito (petició
     );
   }
 
-  it('TC-H-ALL: el header cuenta y suma TODOS los créditos (pagados incluidos)', async () => {
+  it('TC-H-ALL: el header cuenta TODOS los créditos visibles y suma solo los impagos', async () => {
     seedHistory([
       makeCredit({ id: 'c1', total: 40 }),
       makeCredit({ id: 'c2', total: 60, isPaid: true, paid: 60, paidDate: new Date(2024, 2, 20) }),
@@ -578,10 +580,11 @@ describe('SaleCreditsPage (history) — header TODOS + gear/amarillito (petició
     const header = () => document.querySelector('[data-slot="card-header"]') as HTMLElement;
     // Los paneles de día nacen colapsados — esperar el HEADER, no las filas.
     await screen.findByText('(2)');
-    expect(within(header()).getByText('$100')).toBeInTheDocument();
+    // Count = 2 (todos); total = SOLO impagos: 40 (c2 pagado no suma).
+    expect(within(header()).getByText('$40')).toBeInTheDocument();
   });
 
-  it('TC-H-COLOR: el total del header, el total del día y los precios de fila van en text-warning', async () => {
+  it('TC-H-COLOR: header/día en ámbar si total>0, fila verde si pagado, ámbar si no', async () => {
     seedHistory([
       makeCredit({ id: 'c1', total: 40 }),
       makeCredit({ id: 'c2', total: 60, isPaid: true, paid: 60, paidDate: new Date(2024, 2, 20) }),
@@ -594,19 +597,19 @@ describe('SaleCreditsPage (history) — header TODOS + gear/amarillito (petició
 
     const header = () => document.querySelector('[data-slot="card-header"]') as HTMLElement;
     await screen.findByText('(2)');
-    // Header total $100 en amarillito.
-    expect(within(header()).getByText('$100')).toHaveClass('text-warning');
+    // Header total $40 (solo impagos) en ámbar (40 > 0).
+    expect(within(header()).getByText('$40')).toHaveClass('text-warning');
     // Expandir el panel para que existan las filas.
     fireEvent.click(screen.getByTestId('credit-date-panel-toggle-2024-03-15'));
-    // Precios de fila (pagado y no pagado) en amarillito.
+    // Precio de fila: NO pagado en ámbar, PAGADO en verde.
     const tbody = document.querySelector('tbody') as HTMLElement;
     expect(await within(tbody).findByText('$40')).toHaveClass('text-warning');
-    expect(within(tbody).getByText('$60')).toHaveClass('text-warning');
-    // Total del panel del día ($100 = TODOS: 40 + 60) también en amarillito.
+    expect(within(tbody).getByText('$60')).toHaveClass('text-success');
+    // Total del panel del día ($40 = SOLO impagos: 40 + 0) también en ámbar.
     // El span HOJA (sin hijos) evita matchear el contenedor padre (mismo textContent).
     const dayToggle = screen.getByTestId('credit-date-panel-toggle-2024-03-15');
     const dayTotal = [...dayToggle.querySelectorAll('span')].find(
-      (s) => s.textContent === '$100' && s.children.length === 0,
+      (s) => s.textContent === '$40' && s.children.length === 0,
     );
     expect(dayTotal).toBeDefined();
     expect(dayTotal).toHaveClass('text-warning');
@@ -909,5 +912,181 @@ describe('SaleCreditsPage (multi-store mode)', () => {
 
     await waitFor(() => expect(within(header()).getByText('(1)')).toBeInTheDocument());
     expect(within(header()).getByText('$10')).toBeInTheDocument();
+  });
+});
+
+describe('SaleCreditsPage — filtro por estado de pago (credits-paid-green-filter T4/T5)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    authStoreState.user = { selectedStoreId: 's1' };
+  });
+
+  function seedHistory(credits: SaleCredit[]) {
+    vi.mocked(SaleCreditOfflineService).mockImplementation(
+      () =>
+        ({
+          filterSaleCredits: vi.fn().mockResolvedValue(creditsResponse(credits)),
+          updateSaleCredit: vi.fn().mockReturnValue({ data: undefined, succeeded: true, errors: [] }),
+          paidSaleCredit: vi.fn().mockReturnValue({ data: undefined, succeeded: true, errors: [] }),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        }) as any,
+    );
+  }
+
+  // Same-day mixed credits: c1 unpaid 40 + c2 paid 60 (both 2024-03-15).
+  function mixedCredits(): SaleCredit[] {
+    return [
+      makeCredit({ id: 'c1', total: 40 }),
+      makeCredit({ id: 'c2', total: 60, isPaid: true, paid: 60, paidDate: new Date(2024, 2, 20) }),
+    ];
+  }
+
+  it('T4-TODOS: radios Todos/Por Pagar/Pagados con Todos marcado por defecto; count=todos, total=impagos', async () => {
+    seedHistory(mixedCredits());
+    render(
+      <Wrapper>
+        <SaleCreditsPage />
+      </Wrapper>,
+    );
+
+    const header = () => document.querySelector('[data-slot="card-header"]') as HTMLElement;
+    await screen.findByText('(2)');
+
+    // La fila de radios está debajo del filtro de fechas.
+    expect(screen.getByRole('radiogroup')).toBeInTheDocument();
+    const todos = screen.getByRole('radio', { name: 'Todos' }) as HTMLInputElement;
+    const porPagar = screen.getByRole('radio', { name: 'Por Pagar' }) as HTMLInputElement;
+    const pagados = screen.getByRole('radio', { name: 'Pagados' }) as HTMLInputElement;
+    expect(todos.checked).toBe(true);
+    expect(porPagar.checked).toBe(false);
+    expect(pagados.checked).toBe(false);
+
+    // Todos (default): count = 2 créditos, total = solo el impago ($40).
+    expect(within(header()).getByText('(2)')).toBeInTheDocument();
+    expect(within(header()).getByText('$40')).toBeInTheDocument();
+  });
+
+  it('T4-POR-PAGAR: el radio Por Pagar deja solo créditos impagos y count/total lo siguen', async () => {
+    seedHistory(mixedCredits());
+    render(
+      <Wrapper>
+        <SaleCreditsPage />
+      </Wrapper>,
+    );
+
+    const header = () => document.querySelector('[data-slot="card-header"]') as HTMLElement;
+    await screen.findByText('(2)');
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Por Pagar' }));
+
+    await waitFor(() => expect(within(header()).getByText('(1)')).toBeInTheDocument());
+    expect(within(header()).getByText('$40')).toBeInTheDocument();
+    // El panel del día (conteo (1)) solo muestra el crédito impago (c1): el pagado no existe.
+    const dayToggle = screen.getByTestId('credit-date-panel-toggle-2024-03-15');
+    expect(dayToggle.textContent).toContain('(1)');
+    fireEvent.click(dayToggle);
+    expect(await screen.findByTestId('sale-credit-actions-toggle-c1')).toBeInTheDocument();
+    expect(screen.queryByTestId('sale-credit-actions-toggle-c2')).toBeNull();
+  });
+
+  it('T4-PAGADOS: el radio Pagados deja solo pagados; total 0 en VERDE y fila verde', async () => {
+    seedHistory(mixedCredits());
+    render(
+      <Wrapper>
+        <SaleCreditsPage />
+      </Wrapper>,
+    );
+
+    const header = () => document.querySelector('[data-slot="card-header"]') as HTMLElement;
+    await screen.findByText('(2)');
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Pagados' }));
+
+    await waitFor(() => expect(within(header()).getByText('(1)')).toBeInTheDocument());
+    // Total = 0 (el único visible está pagado) → text-success.
+    expect(within(header()).getByText('$0')).toHaveClass('text-success');
+    // El panel del día (con el crédito pagado) también suma 0 → verde.
+    const dayToggle = screen.getByTestId('credit-date-panel-toggle-2024-03-15');
+    expect(dayToggle.textContent).toContain('(1)');
+    const dayTotal = [...dayToggle.querySelectorAll('span')].find(
+      (s) => s.textContent === '$0' && s.children.length === 0,
+    );
+    expect(dayTotal).toBeDefined();
+    expect(dayTotal).toHaveClass('text-success');
+    // La fila pagada se pinta en verde.
+    fireEvent.click(dayToggle);
+    const tbody = document.querySelector('tbody') as HTMLElement;
+    expect(await within(tbody).findByText('$60')).toHaveClass('text-success');
+  });
+
+  it('T4-VOLVER: re-seleccionar Todos restaura count y total completos', async () => {
+    seedHistory(mixedCredits());
+    render(
+      <Wrapper>
+        <SaleCreditsPage />
+      </Wrapper>,
+    );
+
+    const header = () => document.querySelector('[data-slot="card-header"]') as HTMLElement;
+    await screen.findByText('(2)');
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Pagados' }));
+    await waitFor(() => expect(within(header()).getByText('(1)')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Todos' }));
+    await waitFor(() => expect(within(header()).getByText('(2)')).toBeInTheDocument());
+    expect(within(header()).getByText('$40')).toBeInTheDocument();
+  });
+
+  it('T4-MS: en multi-store los radios filtran los paneles y el header (todos/pendientes/pagados)', async () => {
+    authStoreState.user = {
+      selectedStoreId: 's1',
+      isOwnerAdmin: true,
+      storeModuleIds: [EModules.MultiStores],
+      storeList: [
+        { id: 's1', name: 'Tienda A', isActive: true },
+        { id: 's2', name: 'Tienda B', isActive: true },
+      ],
+    };
+    // s1: un impago de 10 y un pagado de 20 (mismo día).
+    vi.mocked(readStoreSaleCredits).mockImplementation((storeId) =>
+      storeId === 's1'
+        ? [
+            makeCredit({ id: 'c1', total: 10 }),
+            makeCredit({ id: 'c2', total: 20, isPaid: true, paid: 20, paidDate: new Date(2024, 2, 20) }),
+          ]
+        : [],
+    );
+    vi.mocked(SaleCreditOfflineService).mockImplementation(
+      () =>
+        ({
+          filterSaleCredits: vi.fn().mockResolvedValue(creditsResponse([])),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        }) as any,
+    );
+
+    render(
+      <Wrapper>
+        <SaleCreditsPage />
+      </Wrapper>,
+    );
+
+    await screen.findByTestId('multistore-select');
+    const header = () => document.querySelector('[data-slot="card-header"]') as HTMLElement;
+    fireEvent.click(screen.getByTestId('multistore-panel-toggle-s1'));
+
+    // Todos (default): count 2, total = solo impagos ($10).
+    await waitFor(() => expect(within(header()).getByText('(2)')).toBeInTheDocument());
+    expect(within(header()).getByText('$10')).toBeInTheDocument();
+
+    // Por Pagar: solo el impago.
+    fireEvent.click(screen.getByRole('radio', { name: 'Por Pagar' }));
+    await waitFor(() => expect(within(header()).getByText('(1)')).toBeInTheDocument());
+    expect(within(header()).getByText('$10')).toBeInTheDocument();
+
+    // Pagados: solo el pagado → total 0 verde.
+    fireEvent.click(screen.getByRole('radio', { name: 'Pagados' }));
+    await waitFor(() => expect(within(header()).getByText('(1)')).toBeInTheDocument());
+    expect(within(header()).getByText('$0')).toHaveClass('text-success');
   });
 });

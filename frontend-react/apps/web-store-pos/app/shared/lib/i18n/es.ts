@@ -587,6 +587,12 @@ const messages: Record<string, string> = {
     'Usted está segura(o) que desea pagar este crédito por venta?',
   'SALE_CREDIT.NO_SALE_CREDIT_FOUND_IN_DAY': 'No existe ningún crédito en el día',
   'SALE_CREDIT.NO_SALE_CREDIT_FOUND': 'No se encontró ningún crédito',
+  // 2026-09-22 (credits-paid-green-filter): filtro de radios por estado de pago en el
+  // historial de créditos — textos exactos pedidos por el usuario.
+  'SALE_CREDIT.FILTER_LABEL': 'Filtrar por estado de pago',
+  'SALE_CREDIT.FILTER_ALL': 'Todos',
+  'SALE_CREDIT.FILTER_TO_PAY': 'Por Pagar',
+  'SALE_CREDIT.FILTER_PAID': 'Pagados',
 
   // Inventory
   // TITLE values corrected to byte-match Angular's INVENTORY.INVENTORY ('Inventario') and
@@ -1084,6 +1090,15 @@ const messages: Record<string, string> = {
   'STORE_SELECTOR.SWITCH_ERROR': 'No se pudo cambiar la tienda.',
   'STORE_SELECTOR.CURRENT_STORE': 'La tienda seleccionada es: {store}',
   'CONFIGURATIONS.STORE_LABEL': 'Tienda activa',
+
+  // Payment-methods config (store-payment-methods-config, 2026-09-22):
+  // per-store toggles deciding which plan-catalogue methods the store accepts.
+  'CONFIGURATIONS.PAYMENT_METHODS.TITLE': 'Formas de pago',
+  'CONFIGURATIONS.PAYMENT_METHODS.EFECTIVO': 'Efectivo',
+  'CONFIGURATIONS.PAYMENT_METHODS.ZELLE': 'Zelle',
+  'CONFIGURATIONS.PAYMENT_METHODS.TRANSFERENCIA': 'Transferencia',
+  'CONFIGURATIONS.PAYMENT_METHODS.ALWAYS_ON': 'Siempre habilitado',
+  'CONFIGURATIONS.PAYMENT_METHODS.SAVED': 'Guardado',
 
   // Billing — payment status banner (neutral Latin American Spanish, no voseo)
   'BILLING.TRIAL_NOTICE':

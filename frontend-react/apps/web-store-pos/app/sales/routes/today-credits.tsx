@@ -61,7 +61,12 @@ export function TodaySaleCreditsPage() {
   return (
     <Card
       padding="tight"
-      title={<TodayCreditsCardTitle count={saleCredits.length} total={saleCredits.reduce((t, c) => t + c.total, 0)} />}
+      title={
+        <TodayCreditsCardTitle
+          count={saleCredits.length}
+          total={saleCredits.reduce((t, c) => t + (c.isPaid ? 0 : c.total), 0)}
+        />
+      }
     >
       {saleCredits.length === 0 && (
         <InfoBox variant="primary" className="mb-6 text-center">
@@ -84,10 +89,11 @@ export default TodaySaleCreditsPage;
 
 /**
  * Header pedido por el usuario: «Créditos del día (n)» a la izquierda — n = TODOS los
- * créditos del día (pagados o no) — y el valor total a la derecha. El total va en
- * `text-warning` (amarillito), como la referencia visual de ventas del día. El texto
- * base se mantiene como «Créditos del día» (SALE_CREDIT.TODAY_CREDITS): renombrarlo
- * rompería los E2E protegidos pay-credit/create-credit.
+ * créditos del día (pagados o no) — y el valor total a la derecha. El total suma SOLO
+ * los créditos por pagar (`!isPaid`); se pinta en `text-warning` (ámbar) cuando es > 0
+ * y en `text-success` (verde) cuando es 0. El texto base se mantiene como «Créditos del
+ * día» (SALE_CREDIT.TODAY_CREDITS): renombrarlo rompería los E2E protegidos
+ * pay-credit/create-credit.
  */
 function TodayCreditsCardTitle({ count, total }: { count: number; total: number }) {
   const intl = useIntl();
@@ -100,7 +106,9 @@ function TodayCreditsCardTitle({ count, total }: { count: number; total: number 
           ({count})
         </span>
       </span>
-      <span className="text-sm font-semibold text-warning whitespace-nowrap">
+      <span
+        className={`text-sm font-semibold whitespace-nowrap ${total === 0 ? 'text-success' : 'text-warning'}`}
+      >
         {formatCurrency(total)}
       </span>
     </div>

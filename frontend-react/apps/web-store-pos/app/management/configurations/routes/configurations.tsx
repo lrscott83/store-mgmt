@@ -1,7 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useIntl } from 'react-intl';
-import { EFeatures, EModules } from '@store-mgmt/domain';
+import { EFeatures, EModules, SalePaymentMethod } from '@store-mgmt/domain';
 import { adminFeatureLoader } from '~/auth/routes/loaders';
+import { Switch } from '~/shared/components/ui/switch';
+import {
+  DEFAULT_ENABLED_PAYMENT_METHODS,
+  StorePaymentMethodsConfigService,
+} from '~/shared/lib/payment-methods/store-payment-methods-config-service';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { switchToStore } from '~/shared/lib/stores/switch-store';
 
@@ -17,6 +22,82 @@ export const clientLoader = adminFeatureLoader([EFeatures.Configurations]);
  * fallback offers exactly the current store — it self-heals on the next
  * successful /me.
  */
+/**
+ * store-payment-methods-config (2026-09-22): "Formas de pago" — per-store
+ * toggles that decide which plan-catalogue methods the store accepts at the
+ * 5 consumption sites. Independent of the MultiStores module (every owner
+ * configures the CURRENT store); the storeId comes from the page's active
+ * store. Efectivo is always on (Switch disabled), matching the service's
+ * no-op rule; toggling Zelle/Transferencia persists immediately and shows
+ * the saved indicator until the store changes.
+ */
+export function PaymentMethodsConfigSection({ storeId }: { storeId: string }) {
+  const intl = useIntl();
+  // SSR: no window on the server → render the default catalogue; hydration
+  // reads the store's config from localStorage afterwards.
+  const configService = useMemo(() => {
+    if (typeof window === 'undefined' || !storeId) return null;
+    return new StorePaymentMethodsConfigService(storeId);
+  }, [storeId]);
+
+  const [enabledMethods, setEnabledMethods] = useState<SalePaymentMethod[]>(() => [
+    ...DEFAULT_ENABLED_PAYMENT_METHODS,
+  ]);
+  const [showSaved, setShowSaved] = useState(false);
+
+  useEffect(() => {
+    setShowSaved(false);
+    if (!configService) {
+      setEnabledMethods([...DEFAULT_ENABLED_PAYMENT_METHODS]);
+      return;
+    }
+    setEnabledMethods(configService.getEnabledMethods(storeId));
+  }, [configService, storeId]);
+
+  function handleToggle(method: SalePaymentMethod, enabled: boolean) {
+    if (!configService) return;
+    configService.setMethodEnabled(storeId, method, enabled);
+    setEnabledMethods(configService.getEnabledMethods(storeId));
+    setShowSaved(true);
+  }
+
+  return (
+    <div data-testid="payment-methods-config" className="mt-8">
+      <h2 className="mb-2 text-base font-semibold text-gray-800">
+        {intl.formatMessage({ id: 'CONFIGURATIONS.PAYMENT_METHODS.TITLE' })}
+      </h2>
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <Switch
+            checked
+            disabled
+            onChange={() => {}}
+            label={intl.formatMessage({ id: 'CONFIGURATIONS.PAYMENT_METHODS.EFECTIVO' })}
+          />
+          <span className="text-xs text-text-muted">
+            {intl.formatMessage({ id: 'CONFIGURATIONS.PAYMENT_METHODS.ALWAYS_ON' })}
+          </span>
+        </div>
+        <Switch
+          checked={enabledMethods.includes(SalePaymentMethod.Zelle)}
+          onChange={(enabled) => handleToggle(SalePaymentMethod.Zelle, enabled)}
+          label={intl.formatMessage({ id: 'CONFIGURATIONS.PAYMENT_METHODS.ZELLE' })}
+        />
+        <Switch
+          checked={enabledMethods.includes(SalePaymentMethod.Transferencia)}
+          onChange={(enabled) => handleToggle(SalePaymentMethod.Transferencia, enabled)}
+          label={intl.formatMessage({ id: 'CONFIGURATIONS.PAYMENT_METHODS.TRANSFERENCIA' })}
+        />
+      </div>
+      {showSaved && (
+        <p className="mt-2 text-xs text-text-muted" data-testid="payment-methods-saved">
+          {intl.formatMessage({ id: 'CONFIGURATIONS.PAYMENT_METHODS.SAVED' })}
+        </p>
+      )}
+    </div>
+  );
+}
+
 export function ConfigurationsPage() {
   const intl = useIntl();
   const { user } = useAuthStore();
@@ -112,6 +193,11 @@ export function ConfigurationsPage() {
           )}
         </div>
       )}
+
+      {/* Formas de pago (store-payment-methods-config): per-store toggles for
+          the CURRENT store — independent of MultiStores, like the rest of the
+          page's per-store settings. */}
+      <PaymentMethodsConfigSection storeId={user?.selectedStoreId ?? ''} />
     </div>
   );
 }

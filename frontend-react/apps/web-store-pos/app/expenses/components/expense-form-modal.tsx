@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useIntl } from 'react-intl';
 import type { Expense } from '@store-mgmt/domain';
 import {
@@ -10,6 +10,11 @@ import {
   paymentMethodOptionsForCurrency,
   salePaymentMethodLabel,
 } from '@store-mgmt/domain';
+import {
+  DEFAULT_ENABLED_PAYMENT_METHODS,
+  StorePaymentMethodsConfigService,
+  applyStorePaymentMethodsConfig,
+} from '~/shared/lib/payment-methods/store-payment-methods-config-service';
 import { Button } from '~/shared/components/ui/button';
 import { CloseIcon, SaveIcon } from '~/shared/components/ui/icons';
 import { CurrencySelect, hasMultiMonedasAvailable } from '~/shared/components/multimonedas/currency-select';
@@ -102,21 +107,25 @@ export interface ExpensePaymentOption {
 }
 
 /**
- * Catálogo de formas de pago del modal de gastos (petición del owner, 2026-09-21):
+ * Catálogo de formas de pago del modal de gastos (2026-09-21 + config 2026-09-22):
  *
  * - Sin MultiMonedas (plan Pago y Free): SOLO Efectivo y Transferencia (CUP) —
  *   Zelle oculto; los dos métodos del plan de pagos de la venta en CUP
  *   (paymentMethodOptionsForCurrency(CUP)).
  * - Con MultiMonedas: todas las formas de pago configuradas de la tienda — por
  *   la moneda del gasto (catálogo de payment-pricing), con etiqueta con moneda.
+ * - Sobre el gate de plan se aplica la config por-tienda
+ *   (applyStorePaymentMethodsConfig): métodos que la tienda deshabilitó
+ *   desaparecen; Efectivo queda siempre (no desactivables).
  */
 export function expensePaymentOptionsFor(
   currency: number,
   hasMultiMonedas: boolean,
+  enabledMethods: readonly SalePaymentMethod[],
 ): ExpensePaymentOption[] {
   const methods = paymentMethodOptionsForCurrency(currency);
   const filtered = hasMultiMonedas ? methods : methods.filter((m) => m !== SalePaymentMethod.Zelle);
-  return filtered.map((method) => ({
+  return applyStorePaymentMethodsConfig(filtered, enabledMethods).map((method) => ({
     method,
     label: salePaymentMethodLabel(method, currency),
   }));
@@ -151,6 +160,17 @@ export function ExpenseFormModal({
   const intl = useIntl();
   const user = useAuthStore((s) => s.user);
   const hasMultiMonedas = hasMultiMonedasAvailable(user);
+  // store-payment-methods-config: métodos habilitados de la TIENDA activa
+  // (default: todos on — no-regresión). SSR: sin window se rinde el default y
+  // la hidratación lee localStorage. Instancia fresca por memo: el servicio
+  // cachea por instancia, pero aquí solo se re-computa al cambiar de tienda.
+  const enabledMethods = useMemo(() => {
+    const storeId = user?.selectedStoreId;
+    if (typeof window === 'undefined' || !storeId) {
+      return [...DEFAULT_ENABLED_PAYMENT_METHODS];
+    }
+    return new StorePaymentMethodsConfigService(storeId).getEnabledMethods(storeId);
+  }, [user?.selectedStoreId]);
   const [form, setForm] = useState<ExpenseFormInput>(() => emptyForm(expense));
   // Angular parity: isControlInvalid(name, validator) only reports an error once the
   // control is `dirty || touched` (edit-expense-modal.component.ts:118-125) — a fresh
@@ -174,7 +194,7 @@ export function ExpenseFormModal({
   // del gasto; sin MultiMonedas el catálogo sale de CUP sin Zelle. Si el método
   // guardado del gasto no está en el catálogo de esta moneda (datos históricos),
   // se mantiene visible al final para que el select no pierda su valor.
-  const catalogOptions = expensePaymentOptionsFor(form.currency, hasMultiMonedas);
+  const catalogOptions = expensePaymentOptionsFor(form.currency, hasMultiMonedas, enabledMethods);
   const paymentOptions = catalogOptions.some((o) => o.method === form.salePaymentMethod)
     ? catalogOptions
     : [

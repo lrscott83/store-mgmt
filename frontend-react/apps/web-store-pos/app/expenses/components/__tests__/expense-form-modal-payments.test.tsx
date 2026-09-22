@@ -5,6 +5,7 @@ import { Currency, ExpenseType, PaymentType, SalePaymentMethod } from '@store-mg
 import type { Expense, UserModel } from '@store-mgmt/domain';
 import { EModules } from '@store-mgmt/domain';
 import esMessages from '~/shared/lib/i18n/es';
+import { StorePaymentMethodsConfigService } from '~/shared/lib/payment-methods/store-payment-methods-config-service';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { ExpenseFormModal } from '../expense-form-modal';
 
@@ -48,6 +49,9 @@ function makeExpense(paymentType: PaymentType): Expense {
 }
 
 beforeEach(() => {
+  // store-payment-methods-config: la config se persiste en localStorage y la
+  // tienda default del fixture es 's1' — reset entre tests para no filtrar.
+  localStorage.clear();
   useAuthStore.setState({ user: makeUser([2, 3]), isAuthenticated: true });
 });
 
@@ -159,6 +163,118 @@ describe('ExpenseFormModal — formas de pago (MultiMonedas)', () => {
     const paymentSelect = screen.getAllByRole('combobox')[1] as HTMLSelectElement;
     const labels = [...paymentSelect.options].map((o) => o.textContent);
     // Catálogo sin MultiMonedas + Zelle histórico conservado al final.
+    expect(labels).toEqual(['Efectivo', 'Transferencia (CUP)', 'Zelle']);
+    expect(paymentSelect.value).toBe(String(SalePaymentMethod.Zelle));
+  });
+});
+
+// ─── Config por-tienda (store-payment-methods-config, 2026-09-22) ────────────
+
+describe('ExpenseFormModal — formas de pago (store-payment-methods-config)', () => {
+  it('Zelle desactivado en config: desaparece del catálogo USD (MultiMonedas)', () => {
+    new StorePaymentMethodsConfigService('s1').setMethodEnabled(
+      's1',
+      SalePaymentMethod.Zelle,
+      false,
+    );
+    useAuthStore.setState({
+      user: makeUser([2, 3, EModules.MultiMonedas]),
+      isAuthenticated: true,
+    });
+    render(
+      <Wrapper>
+        <ExpenseFormModal isOpen onClose={() => {}} onSave={() => {}} />
+      </Wrapper>,
+    );
+    const currencySelect = screen.getByTestId('expense-currency-select') as HTMLSelectElement;
+    fireEvent.change(currencySelect, { target: { value: String(Currency.USD) } });
+    const paymentSelect = screen.getAllByRole('combobox')[2] as HTMLSelectElement;
+    const labels = [...paymentSelect.options].map((o) => o.textContent);
+    expect(labels).toEqual(['Efectivo', 'Transferencia (USD)']);
+  });
+
+  it('Zelle reactivado en config: vuelve al catálogo USD (MultiMonedas)', () => {
+    new StorePaymentMethodsConfigService('s1').setMethodEnabled(
+      's1',
+      SalePaymentMethod.Zelle,
+      false,
+    );
+    new StorePaymentMethodsConfigService('s1').setMethodEnabled(
+      's1',
+      SalePaymentMethod.Zelle,
+      true,
+    );
+    useAuthStore.setState({
+      user: makeUser([2, 3, EModules.MultiMonedas]),
+      isAuthenticated: true,
+    });
+    render(
+      <Wrapper>
+        <ExpenseFormModal isOpen onClose={() => {}} onSave={() => {}} />
+      </Wrapper>,
+    );
+    const currencySelect = screen.getByTestId('expense-currency-select') as HTMLSelectElement;
+    fireEvent.change(currencySelect, { target: { value: String(Currency.USD) } });
+    const paymentSelect = screen.getAllByRole('combobox')[2] as HTMLSelectElement;
+    const labels = [...paymentSelect.options].map((o) => o.textContent);
+    expect(labels).toEqual(['Efectivo', 'Zelle', 'Transferencia (USD)']);
+  });
+
+  it('Transferencia desactivada en config: catálogo USD sin Transferencia, Efectivo siempre', () => {
+    new StorePaymentMethodsConfigService('s1').setMethodEnabled(
+      's1',
+      SalePaymentMethod.Transferencia,
+      false,
+    );
+    useAuthStore.setState({
+      user: makeUser([2, 3, EModules.MultiMonedas]),
+      isAuthenticated: true,
+    });
+    render(
+      <Wrapper>
+        <ExpenseFormModal isOpen onClose={() => {}} onSave={() => {}} />
+      </Wrapper>,
+    );
+    const currencySelect = screen.getByTestId('expense-currency-select') as HTMLSelectElement;
+    fireEvent.change(currencySelect, { target: { value: String(Currency.USD) } });
+    const paymentSelect = screen.getAllByRole('combobox')[2] as HTMLSelectElement;
+    const labels = [...paymentSelect.options].map((o) => o.textContent);
+    expect(labels).toEqual(['Efectivo', 'Zelle']);
+  });
+
+  it('TODOS desactivados: queda solo Efectivo (no desactivable)', () => {
+    const svc = new StorePaymentMethodsConfigService('s1');
+    svc.setMethodEnabled('s1', SalePaymentMethod.Zelle, false);
+    svc.setMethodEnabled('s1', SalePaymentMethod.Transferencia, false);
+    render(
+      <Wrapper>
+        <ExpenseFormModal isOpen onClose={() => {}} onSave={() => {}} />
+      </Wrapper>,
+    );
+    const paymentSelect = screen.getAllByRole('combobox')[1] as HTMLSelectElement;
+    const labels = [...paymentSelect.options].map((o) => o.textContent);
+    expect(labels).toEqual(['Efectivo']);
+  });
+
+  it('edit-mode: gasto histórico Zelle SE MANTIENE visible aunque la config lo desactive', () => {
+    new StorePaymentMethodsConfigService('s1').setMethodEnabled(
+      's1',
+      SalePaymentMethod.Zelle,
+      false,
+    );
+    render(
+      <Wrapper>
+        <ExpenseFormModal
+          isOpen
+          onClose={() => {}}
+          onSave={() => {}}
+          expense={makeExpense(PaymentType.Zelle)}
+        />
+      </Wrapper>,
+    );
+    const paymentSelect = screen.getAllByRole('combobox')[1] as HTMLSelectElement;
+    const labels = [...paymentSelect.options].map((o) => o.textContent);
+    // Catálogo sin MultiMonedas + config sin Zelle + Zelle histórico al final.
     expect(labels).toEqual(['Efectivo', 'Transferencia (CUP)', 'Zelle']);
     expect(paymentSelect.value).toBe(String(SalePaymentMethod.Zelle));
   });

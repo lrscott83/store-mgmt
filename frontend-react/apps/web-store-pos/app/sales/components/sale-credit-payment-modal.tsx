@@ -1,12 +1,27 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useIntl } from 'react-intl';
 import type { SaleCredit } from '@store-mgmt/domain';
-import { PaymentType } from '@store-mgmt/domain';
+import {
+  Currency,
+  PaymentType,
+  SalePaymentMethod,
+  legacyPaymentTypeToSalePaymentMethod,
+  paymentMethodOptionsForCurrency,
+  salePaymentMethodLabel,
+  salePaymentMethodToLegacyPaymentType,
+} from '@store-mgmt/domain';
 import { Card } from '~/shared/components/ui/card';
 import { Button } from '~/shared/components/ui/button';
 import { CloseIcon, PaymentIcon } from '~/shared/components/ui/icons';
 import { confirmDialog, showBlockingError } from '~/shared/lib/blocking-alert';
 import { formatCurrency } from '~/shared/lib/format-currency';
+import { useAuthStore } from '~/shared/lib/stores/auth-store';
+import { hasMultiMonedasAvailable } from '~/shared/components/multimonedas/currency-select';
+import {
+  DEFAULT_ENABLED_PAYMENT_METHODS,
+  StorePaymentMethodsConfigService,
+  applyStorePaymentMethodsConfig,
+} from '~/shared/lib/payment-methods/store-payment-methods-config-service';
 
 interface SaleCreditPaymentModalProps {
   saleCredit: SaleCredit;
@@ -17,15 +32,21 @@ interface SaleCreditPaymentModalProps {
   onConfirm: (creditId: string, paidType: PaymentType, note: string) => boolean;
 }
 
-// Angular's PaymentTypeUtils.getPaymentTypes() maps enum keys to labels as-is
-// (no translation applied in the template) — same raw enum-member-name
-// precedent as order-list / edit-order-modal.
-// Zelle removed from the options (user request 2026-09-08) — the enum member
-// stays and existing Zelle credits still display their label.
-const PAYMENT_OPTIONS = [
-  { value: PaymentType.Efectivo, label: 'Efectivo' },
-  { value: PaymentType.Tarjeta, label: 'Transferencia' },
-];
+/** Opción del select: método real + valor legacy persistido + etiqueta visible. */
+interface PaymentOption {
+  method: SalePaymentMethod;
+  value: PaymentType;
+  label: string;
+}
+
+/**
+ * Compone el catálogo de formas de pago del crédito (store-payment-methods-config,
+ * 2026-09-22): catálogo por moneda → gate MultiMonedas → config por-tienda.
+ * `value` es SIEMPRE el legacy con mapping CUP (Transferencia→Tarjeta en
+ * cualquier moneda, igual que el ofrecimiento incondicional de hoy). Si el
+ * método del estado actual quedó fuera del catálogo (datos históricos), se
+ * mantiene visible al final para que el select nunca pierda su valor.
+ */
 
 /**
  * Matches Angular's `sale-credit-payment-modal.component.html` 1:1: title is
@@ -45,8 +66,43 @@ export function SaleCreditPaymentModal({
   onConfirm,
 }: SaleCreditPaymentModalProps) {
   const intl = useIntl();
+  const user = useAuthStore((s) => s.user);
+  const storeId = user?.selectedStoreId ?? '';
+  const saleCreditCurrency = saleCredit?.currency ?? Currency.CUP;
   const [paymentType, setPaymentType] = useState<PaymentType>(PaymentType.Efectivo);
   const [note, setNote] = useState('');
+
+  // store-payment-methods-config: métodos habilitados de la tienda activa
+  // (default: todos on — no-regresión). SSR: sin window se usa el default y la
+  // hidratación lee localStorage. Instancia fresca por memo (cache por instancia).
+  const enabledMethods = useMemo(() => {
+    if (typeof window === 'undefined' || !storeId) {
+      return [...DEFAULT_ENABLED_PAYMENT_METHODS];
+    }
+    return new StorePaymentMethodsConfigService(storeId).getEnabledMethods(storeId);
+  }, [storeId]);
+
+  const paymentOptions = useMemo<PaymentOption[]>(() => {
+    const base = paymentMethodOptionsForCurrency(saleCreditCurrency);
+    const planGate = hasMultiMonedasAvailable(user)
+      ? base
+      : base.filter((m) => m !== SalePaymentMethod.Zelle);
+    const catalog = applyStorePaymentMethodsConfig(planGate, enabledMethods).map((method) => ({
+      method,
+      value: salePaymentMethodToLegacyPaymentType(method, Currency.CUP),
+      label: salePaymentMethodLabel(method, saleCreditCurrency),
+    }));
+    const current = legacyPaymentTypeToSalePaymentMethod(paymentType, saleCreditCurrency).method;
+    if (catalog.some((o) => o.method === current)) return catalog;
+    return [
+      ...catalog,
+      {
+        method: current,
+        value: salePaymentMethodToLegacyPaymentType(current, Currency.CUP),
+        label: salePaymentMethodLabel(current, saleCreditCurrency),
+      },
+    ];
+  }, [saleCreditCurrency, paymentType, user, enabledMethods]);
 
   if (!isOpen) return null;
 
@@ -123,7 +179,7 @@ export function SaleCreditPaymentModal({
               onChange={(e) => setPaymentType(Number(e.target.value) as PaymentType)}
               className="w-full rounded border border-border px-3 py-2 text-sm text-text focus:outline-none focus:ring-2 focus:ring-primary"
             >
-              {PAYMENT_OPTIONS.map((opt) => (
+              {paymentOptions.map((opt) => (
                 <option key={opt.value} value={opt.value}>
                   {opt.label}
                 </option>

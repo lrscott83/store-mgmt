@@ -1,7 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
+import { SalePaymentMethod } from '@store-mgmt/domain';
 import esMessages from '~/shared/lib/i18n/es';
+import { StorePaymentMethodsConfigService } from '~/shared/lib/payment-methods/store-payment-methods-config-service';
 
 // ─── adminFeatureLoader mock ──────────────────────────────────────────────────
 
@@ -148,6 +150,7 @@ describe('ConfigurationsPage — exports', () => {
 describe('ConfigurationsPage — store select (from user.storeList)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorage.clear();
     restoreDefaultUser();
     vi.mocked(storeHttpService.setMyStore).mockResolvedValue({
       succeeded: true,
@@ -336,6 +339,7 @@ describe('ConfigurationsPage — store select (from user.storeList)', () => {
 describe('ConfigurationsPage — MultiStores gate', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorage.clear();
     restoreDefaultUser();
   });
 
@@ -361,5 +365,144 @@ describe('ConfigurationsPage — MultiStores gate', () => {
     );
 
     expect(await screen.findByLabelText('Tienda activa')).toBeInTheDocument();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PAYMENT METHODS CONFIG — "Formas de pago" (store-payment-methods-config)
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('ConfigurationsPage — payment methods config section', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    restoreDefaultUser();
+  });
+
+  it('renders the section WITHOUT MultiStores; Efectivo fixed on with the always-on note', async () => {
+    mockAuthState(buildUser({ storeModuleIds: [7] }));
+    const { ConfigurationsPage } = await import('../configurations');
+    render(
+      <Wrapper>
+        <ConfigurationsPage />
+      </Wrapper>,
+    );
+
+    expect(
+      await screen.findByRole('heading', { name: 'Formas de pago' }),
+    ).toBeInTheDocument();
+    const efectivo = screen.getByRole('switch', { name: 'Efectivo' });
+    expect(efectivo).toBeDisabled();
+    expect(efectivo).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByText('Siempre habilitado')).toBeInTheDocument();
+    // Default store: every method on (no-regression) — including without the
+    // MultiStores module: the section configures the CURRENT store.
+    expect(screen.getByRole('switch', { name: 'Zelle' })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+    expect(screen.getByRole('switch', { name: 'Transferencia' })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+    expect(storeHttpService.listStores).not.toHaveBeenCalled();
+  });
+
+  it('persists disabling Zelle to the store config and shows the saved indicator', async () => {
+    const { ConfigurationsPage } = await import('../configurations');
+    render(
+      <Wrapper>
+        <ConfigurationsPage />
+      </Wrapper>,
+    );
+
+    const zelle = await screen.findByRole('switch', { name: 'Zelle' });
+    fireEvent.click(zelle);
+
+    expect(await screen.findByTestId('payment-methods-saved')).toHaveTextContent(
+      'Guardado',
+    );
+    expect(screen.getByRole('switch', { name: 'Zelle' })).toHaveAttribute(
+      'aria-checked',
+      'false',
+    );
+    // Persisted: a FRESH service instance (no shared cache) reads the update.
+    expect(
+      new StorePaymentMethodsConfigService('s1').getEnabledMethods('s1'),
+    ).toEqual([
+      SalePaymentMethod.Efectivo,
+      SalePaymentMethod.Transferencia,
+    ]);
+  });
+
+  it('loads a previously disabled Zelle as off and re-enables it on toggle', async () => {
+    new StorePaymentMethodsConfigService('s1').setMethodEnabled(
+      's1',
+      SalePaymentMethod.Zelle,
+      false,
+    );
+    const { ConfigurationsPage } = await import('../configurations');
+    render(
+      <Wrapper>
+        <ConfigurationsPage />
+      </Wrapper>,
+    );
+
+    expect(await screen.findByRole('switch', { name: 'Zelle' })).toHaveAttribute(
+      'aria-checked',
+      'false',
+    );
+    fireEvent.click(screen.getByRole('switch', { name: 'Zelle' }));
+
+    expect(screen.getByRole('switch', { name: 'Zelle' })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+    expect(
+      new StorePaymentMethodsConfigService('s1').getEnabledMethods('s1'),
+    ).toEqual([
+      SalePaymentMethod.Efectivo,
+      SalePaymentMethod.Zelle,
+      SalePaymentMethod.Transferencia,
+    ]);
+  });
+
+  it('config follows the ACTIVE store: toggling s1 leaves s2 untouched and clears the indicator', async () => {
+    const { ConfigurationsPage } = await import('../configurations');
+    const view = render(
+      <Wrapper>
+        <ConfigurationsPage />
+      </Wrapper>,
+    );
+
+    fireEvent.click(await screen.findByRole('switch', { name: 'Zelle' }));
+    expect(await screen.findByTestId('payment-methods-saved')).toBeInTheDocument();
+
+    // Switch the active store (MultiStores user) → section binds to s2.
+    mockAuthState(
+      buildUser({
+        selectedStoreId: 's2',
+        roles: [{ storeId: 's2', storeName: 'Tienda B', moduleId: 14, featureIds: [38] }],
+      }),
+    );
+    view.rerender(
+      <Wrapper>
+        <ConfigurationsPage />
+      </Wrapper>,
+    );
+
+    // s2 reads its own default (Zelle on); s1 keeps its disabled Zelle;
+    // the saved indicator resets with the store.
+    expect(await screen.findByRole('switch', { name: 'Zelle' })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+    expect(screen.queryByTestId('payment-methods-saved')).not.toBeInTheDocument();
+    expect(
+      new StorePaymentMethodsConfigService('s1').getEnabledMethods('s1'),
+    ).not.toContain(SalePaymentMethod.Zelle);
+    expect(
+      new StorePaymentMethodsConfigService('s2').getEnabledMethods('s2'),
+    ).toContain(SalePaymentMethod.Zelle);
   });
 });
