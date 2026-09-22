@@ -13,6 +13,7 @@ import type {
   Product,
   ProductCategory,
 } from '@store-mgmt/domain';
+import { Currency, EModules } from '@store-mgmt/domain';
 
 // --- Mutable in-memory fixtures, controlled per-test ---
 let mockCategories: ProductCategory[] = [];
@@ -22,6 +23,8 @@ const mockUser = vi.hoisted(() => ({
   selectedStoreId: 's1',
   login: 'jdoe',
   isOwnerAdmin: true,
+  // MultiMonedas CSV gate: [] default — los tests del import lo activan.
+  storeModuleIds: [] as number[],
 }));
 
 const logoutMock = vi.hoisted(() => vi.fn());
@@ -303,6 +306,8 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     showToastSuccessMock.mockClear();
     showToastErrorMock.mockClear();
     mockUser.isOwnerAdmin = true;
+    // MultiMonedas CSV gate: default SIN módulo (las monedas del CSV se descartan).
+    mockUser.storeModuleIds = [];
     // Restored per-test: the logout test below empties it to reproduce the post-logout render.
     mockUser.selectedStoreId = 's1';
     // mockReset (not mockClear) so a queued mockImplementationOnce throw from the cart-failure
@@ -1355,6 +1360,8 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
         price: number;
         cost?: number;
         quantity?: number;
+        currency?: number;
+        costCurrency?: number;
         existing?: boolean;
       }[],
       failed: {
@@ -1409,6 +1416,112 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       ]);
     });
 
+    // ─── MultiMonedas CSV (2026-09-22): gate de monedas por módulo ───
+    function makeCsvFileWithCurrencies(): File {
+      return new File(
+        ['categoria,nombre,precio,precio_moneda,costo,precio_costo,cantidad\nSnacks,Chips,10,usd,6,usd,12'],
+        'products.csv',
+        { type: 'text/csv' },
+      );
+    }
+
+    it('CON MultiMonedas: las monedas del CSV viajan a createCsvProducts y a la entrada de inventario', async () => {
+      mockUser.storeModuleIds = [EModules.MultiMonedas];
+      mockCreateCsvProductsOnce([
+        {
+          id: 'p1',
+          category: 'Snacks',
+          name: 'Chips',
+          price: 10,
+          cost: 6,
+          quantity: 12,
+          currency: Currency.USD,
+          costCurrency: Currency.USD,
+        },
+      ]);
+      render(
+        <Wrapper>
+          <ProductsPage />
+        </Wrapper>,
+      );
+
+      fireEvent.click(screen.getByTestId('import-csv-button'));
+      fireEvent.change(screen.getByTestId('csv-file-input'), {
+        target: { files: [makeCsvFileWithCurrencies()] },
+      });
+      await waitFor(() => expect(screen.getByTestId('csv-import-button')).toBeInTheDocument());
+      fireEvent.click(screen.getByTestId('csv-import-button'));
+
+      await waitFor(() => expect(productServiceSpies.createCsvProducts).toHaveBeenCalledTimes(1));
+      // "usd" en el CSV es USD (case-insensitive) — precio y costo viajan con su moneda.
+      expect(productServiceSpies.createCsvProducts).toHaveBeenCalledWith([
+        {
+          category: 'Snacks',
+          name: 'Chips',
+          price: 10,
+          cost: 6,
+          quantity: 12,
+          currency: Currency.USD,
+          costCurrency: Currency.USD,
+        },
+      ]);
+      // La entrada de inventario nace con la moneda del COSTO (columna precio_costo).
+      await waitFor(() =>
+        expect(inventoryServiceSpies.createInventoryEntry).toHaveBeenCalledWith(
+          'p1',
+          12,
+          6,
+          Currency.USD,
+        ),
+      );
+    });
+
+    it('SIN MultiMonedas: las monedas del CSV se descartan — producto y entrada nacen CUP', async () => {
+      // storeModuleIds = [] (default del beforeEach).
+      mockCreateCsvProductsOnce([
+        {
+          id: 'p1',
+          category: 'Snacks',
+          name: 'Chips',
+          price: 10,
+          cost: 6,
+          quantity: 12,
+          currency: undefined,
+          costCurrency: undefined,
+        },
+      ]);
+      render(
+        <Wrapper>
+          <ProductsPage />
+        </Wrapper>,
+      );
+
+      fireEvent.click(screen.getByTestId('import-csv-button'));
+      fireEvent.change(screen.getByTestId('csv-file-input'), {
+        target: { files: [makeCsvFileWithCurrencies()] },
+      });
+      await waitFor(() => expect(screen.getByTestId('csv-import-button')).toBeInTheDocument());
+      fireEvent.click(screen.getByTestId('csv-import-button'));
+
+      await waitFor(() => expect(productServiceSpies.createCsvProducts).toHaveBeenCalledTimes(1));
+      // El CSV dice usd, pero sin el módulo la vista descarta ambas monedas.
+      expect(productServiceSpies.createCsvProducts).toHaveBeenCalledWith([
+        {
+          category: 'Snacks',
+          name: 'Chips',
+          price: 10,
+          cost: 6,
+          quantity: 12,
+          currency: undefined,
+          costCurrency: undefined,
+        },
+      ]);
+      // La entrada nace sin moneda -> CUP dentro del servicio.
+      await waitFor(() =>
+        expect(inventoryServiceSpies.createInventoryEntry).toHaveBeenCalledWith('p1', 12, 6, undefined),
+      );
+    });
+
     it('filters out rows without a category before calling createCsvProducts (Angular validateProducts parity)', async () => {
       render(
         <Wrapper>
@@ -1450,6 +1563,9 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     });
 
     it('threads the optional currency column value through to createCsvProducts', async () => {
+      // MultiMonedas CSV (2026-09-22): este test ejercita el PLUMBING de la columna
+      // de moneda, que ahora vive detras del gate del modulo (15).
+      mockUser.storeModuleIds = [EModules.MultiMonedas];
       mockCreateCsvProductsOnce([]);
       render(
         <Wrapper>
@@ -1476,7 +1592,15 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       // currency-in-costs-and-prices: the `moneda` column (5) is threaded parser → handler →
       // service, like cost/quantity (design R3 — a concrete value discriminates threading).
       expect(productServiceSpies.createCsvProducts).toHaveBeenCalledWith([
-        { category: 'Snacks', name: 'Chips', price: 10, cost: 6, quantity: 12, currency: 5 },
+        {
+          category: 'Snacks',
+          name: 'Chips',
+          price: 10,
+          cost: 6,
+          quantity: 12,
+          currency: 5,
+          costCurrency: undefined,
+        },
       ]);
     });
 
@@ -1570,7 +1694,7 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       await waitFor(() =>
         expect(inventoryServiceSpies.createInventoryEntry).toHaveBeenCalledTimes(1),
       );
-      expect(inventoryServiceSpies.createInventoryEntry).toHaveBeenCalledWith('p1', 12, 6);
+      expect(inventoryServiceSpies.createInventoryEntry).toHaveBeenCalledWith('p1', 12, 6, undefined);
     });
 
     it('falls back to price when cost is absent (decision #7)', async () => {
@@ -1593,7 +1717,7 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       await waitFor(() =>
         expect(inventoryServiceSpies.createInventoryEntry).toHaveBeenCalledTimes(1),
       );
-      expect(inventoryServiceSpies.createInventoryEntry).toHaveBeenCalledWith('p2', 5, 10);
+      expect(inventoryServiceSpies.createInventoryEntry).toHaveBeenCalledWith('p2', 5, 10, undefined);
     });
 
     // Decision #16: cost="0" is a VALID explicit zero, never a fallback trigger. `?? ` handles
@@ -1618,7 +1742,7 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       await waitFor(() =>
         expect(inventoryServiceSpies.createInventoryEntry).toHaveBeenCalledTimes(1),
       );
-      expect(inventoryServiceSpies.createInventoryEntry).toHaveBeenCalledWith('p8', 5, 0);
+      expect(inventoryServiceSpies.createInventoryEntry).toHaveBeenCalledWith('p8', 5, 0, undefined);
     });
 
     it('does not create an entry when quantity is absent, zero, or negative', async () => {
@@ -1801,8 +1925,8 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       );
       expect(showToastSuccessMock).toHaveBeenCalledTimes(1);
       expect(inventoryServiceSpies.createInventoryEntry).toHaveBeenCalledTimes(2);
-      expect(inventoryServiceSpies.createInventoryEntry).toHaveBeenNthCalledWith(1, 'p10', 10, 120);
-      expect(inventoryServiceSpies.createInventoryEntry).toHaveBeenNthCalledWith(2, 'p11', 5, 150);
+      expect(inventoryServiceSpies.createInventoryEntry).toHaveBeenNthCalledWith(1, 'p10', 10, 120, undefined);
+      expect(inventoryServiceSpies.createInventoryEntry).toHaveBeenNthCalledWith(2, 'p11', 5, 150, undefined);
 
       // No duplicate dialog anymore.
       expect(showBlockingInfoMock).not.toHaveBeenCalled();

@@ -14,8 +14,16 @@ export interface CsvProduct {
   cost?: number;
   /** React-only, OPTIONAL. Integer > 0 expected; absent/invalid -> undefined -> no entry (REQ-3 gates it). */
   quantity?: number;
-  /** Moneda de `price`/`cost` (plan 2026-09-16). Columna opcional del CSV; ausente = CUP. */
+  /** Moneda de `price` (plan 2026-09-16). Columna opcional del CSV; ausente = CUP. */
   currency?: import('../enums').Currency;
+  /**
+   * MultiMonedas CSV (2026-09-22): moneda de `cost` — la nueva columna
+   * `precio_costo` del template. Opcional; ausente = CUP (dominio default).
+   * El parser la valida case-insensitivamente por NOMBRE ("usd" -> USD) vía
+   * `parseCurrencyByName`; la columna `moneda`/`currency` numérica previa
+   * (plan 2026-09-16) sigue parseándose para `currency` (compat).
+   */
+  costCurrency?: import('../enums').Currency;
 }
 
 /**

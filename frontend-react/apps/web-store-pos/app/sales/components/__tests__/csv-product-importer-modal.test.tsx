@@ -1,9 +1,10 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 import { CsvProductImporterModal } from '../csv-product-importer-modal';
 import * as csvParser from '../../lib/csv-product-parser';
+import { EModules } from '@store-mgmt/domain';
 
 // Angular's handleError (component.ts:71-78) opens a blocking Swal error dialog, mirrored here
 // via showBlockingError — assert the wrapper call, not inline DOM text.
@@ -11,6 +12,22 @@ const showBlockingErrorMock = vi.fn();
 vi.mock('~/shared/lib/blocking-alert', () => ({
   showBlockingError: (...args: unknown[]) => showBlockingErrorMock(...args),
 }));
+
+// MultiMonedas CSV (2026-09-22): el template depende del gate del módulo (15).
+const mockUser = vi.hoisted(() => ({ storeModuleIds: [] as number[] }));
+vi.mock('~/shared/lib/stores/auth-store', () => {
+  const state = { user: mockUser, isAuthenticated: true };
+  return {
+    useAuthStore: vi.fn((selector?: (s: typeof state) => unknown) =>
+      typeof selector === 'function' ? selector(state) : state,
+    ),
+  };
+});
+
+// Reset del gate MultiMonedas: la mutacion de un test no debe fugarse al siguiente.
+beforeEach(() => {
+  mockUser.storeModuleIds = [];
+});
 
 function Wrapper({ children }: { children: React.ReactNode }) {
   return (
@@ -49,6 +66,35 @@ describe('CsvProductImporterModal — Angular structure/sample parity', () => {
     // sampleData is a single <code> node — assert on its text content.
     expect(screen.getByText(/Pizzas,Pizza con Queso,150/)).toBeInTheDocument();
     expect(screen.getByText('Descargar Ejemplo')).toBeInTheDocument();
+  });
+
+  // MultiMonedas CSV (2026-09-22): el template del importador depende del gate
+  // del módulo (15) — las columnas de moneda solo se anuncian con él activo.
+  describe('CsvProductImporterModal — template MultiMonedas (2026-09-22)', () => {
+    it('SIN MultiMonedas: el template NO anuncia precio_moneda/precio_costo', () => {
+      mockUser.storeModuleIds = [];
+      render(
+        <Wrapper>
+          <CsvProductImporterModal onImport={vi.fn()} onClose={vi.fn()} />
+        </Wrapper>,
+      );
+      expect(screen.getByText(/categoria,nombre,precio,costo,cantidad/)).toBeInTheDocument();
+      expect(screen.queryByText(/precio_moneda/)).not.toBeInTheDocument();
+    });
+
+    it('CON MultiMonedas: el template anuncia precio_moneda y precio_costo al lado de cantidad', () => {
+      mockUser.storeModuleIds = [EModules.MultiMonedas];
+      render(
+        <Wrapper>
+          <CsvProductImporterModal onImport={vi.fn()} onClose={vi.fn()} />
+        </Wrapper>,
+      );
+      expect(
+        screen.getByText(/categoria,nombre,precio,precio_moneda,costo,precio_costo,cantidad/),
+      ).toBeInTheDocument();
+      // Ejemplo con moneda minúscula: el parser la acepta case-insensitive.
+      expect(screen.getByText(/Pizzas,Pizza con Queso,150,USD,100,USD,10/)).toBeInTheDocument();
+    });
   });
 
   // REQ-7: the sample template gains cost/quantity columns with concrete non-blank values on
