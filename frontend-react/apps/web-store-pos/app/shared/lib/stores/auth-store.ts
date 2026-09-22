@@ -250,11 +250,27 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       // /v1/auth/me returns no expiresIn; preserve the current session expiry
       // (or stamp a fresh one) so a refresh-after-edit never logs the user out.
       const expiresIn = user.expiresIn || state.user?.expiresIn || Date.now() + THIRTY_FIVE_DAYS_MS;
-      const updatedUser: UserModel = { ...user, expiresIn, password: '' };
+      // switch-back-logout fix (2026-09-22): `/v1/auth/me` returns NO authToken
+      // either, so the pre-fix line replaced state.user with a token-less
+      // profile. The NEXT updateUser (in-session store switch, or any later
+      // refresh) then persisted `authToken: state.user?.authToken` = undefined
+      // into AUTH_MODEL — and after the switch's reload, getMe left without a
+      // bearer, answered 401 and the session died at the login form. ALWAYS
+      // resolve the token: incoming user → current state → persisted AUTH_MODEL.
+      let persistedAuthToken: string | undefined;
+      try {
+        persistedAuthToken = (JSON.parse(localStorage.getItem(StorageKeys.AUTH_MODEL) ?? '{}') as {
+          authToken?: string;
+        }).authToken;
+      } catch {
+        persistedAuthToken = undefined;
+      }
+      const authToken = user.authToken || state.user?.authToken || persistedAuthToken || '';
+      const updatedUser: UserModel = { ...user, authToken, expiresIn, password: '' };
       StorageService.setCurrentUser(updatedUser);
       localStorage.setItem(
         StorageKeys.AUTH_MODEL,
-        JSON.stringify({ authToken: state.user?.authToken, expiresIn }),
+        JSON.stringify({ authToken, expiresIn }),
       );
       return { user: updatedUser };
     });

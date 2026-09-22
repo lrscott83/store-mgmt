@@ -9,6 +9,7 @@ import type {
   OwnerStoreWithPlan,
   StoreToCollect,
   ReSellerCommission,
+  SwitchMyStoreResult,
 } from '@store-mgmt/domain';
 import { apiClient } from '~/shared/lib/http/api-client';
 
@@ -82,6 +83,22 @@ export const storeHttpService = {
    */
   async setMyStore(storeId: string): Promise<BaseResponseModel<boolean>> {
     const response = await apiClient.put<BaseResponseModel<boolean>>('/v1/stores', { storeId });
+    return response.data;
+  },
+
+  /**
+   * seamless-store-switch v2 — the in-session switch (PUT /v1/stores/switch,
+   * SwitchMyStoreCommand): persists the selection AND returns the target
+   * store's DEK wrapped under the current store's DEK, so the switch recovers
+   * the new store's key with no password on any device.
+   */
+  async switchMyStore(
+    storeId: string,
+  ): Promise<BaseResponseModel<SwitchMyStoreResult>> {
+    const response = await apiClient.put<BaseResponseModel<SwitchMyStoreResult>>(
+      '/v1/stores/switch',
+      { storeId },
+    );
     return response.data;
   },
 

@@ -12,6 +12,7 @@ using Application.Features.StoreManagement.Stores.Commands.CreateStore;
 using Application.Features.StoreManagement.Stores.Commands.DeleteStore;
 using Application.Features.StoreManagement.Stores.Commands.DisapproveStore;
 using Application.Features.StoreManagement.Stores.Commands.SetMyStore;
+using Application.Features.StoreManagement.Stores.Commands.SwitchMyStore;
 using Application.Features.StoreManagement.Stores.Commands.SetStoreActivation;
 using Application.Features.StoreManagement.Stores.Commands.UpdateStore;
 using Application.Features.StoreManagement.Stores.Queries.GetMyStores;
@@ -41,6 +42,22 @@ namespace SMCA.WebApi.Controllers.v1
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
         public async Task<IActionResult> SetMyStoreIdAsync([FromBody] SetMyStoreCommand command)
+        {
+            return Ok(await Sender.Send(command));
+        }
+
+        /// <summary>
+        /// In-session store switch (seamless-store-switch v2): persists the
+        /// selection and returns the TARGET store's DEK wrapped under the
+        /// CURRENT store's DEK, so the client can adopt the new store's key
+        /// without a password and without logging out.
+        /// </summary>
+        [HttpPut("switch")]
+        [ProducesResponseType(typeof(ResponseResult<SwitchMyStoreResult>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        public async Task<IActionResult> SwitchMyStoreAsync([FromBody] SwitchMyStoreCommand command)
         {
             return Ok(await Sender.Send(command));
         }

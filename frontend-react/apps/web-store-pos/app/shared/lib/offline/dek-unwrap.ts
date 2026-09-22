@@ -100,3 +100,34 @@ export async function wrapDekWithPassword(
 
   return { wrappedDek, wrapSalt, wrapIv };
 }
+
+/**
+ * seamless-store-switch v2 — unwrap a server-issued wrap whose KEK is the
+ * CURRENT store's DEK (not a password). The backend's `SwitchMyStoreResult`
+ * wraps the TARGET store's DEK under the CURRENT store's DEK, so an in-session
+ * switch can recover the new store's key with no password on any device — even
+ * one whose per-store device wrap table predates the target store. The KEK
+ * input mirrors the backend line byte for byte: `WrapDek(UTF8(Base64(currentDek)),
+ * targetDek)` — PBKDF2 over the UTF-8 bytes of the current DEK's base64 TEXT.
+ * Same failure vocabulary as `unwrapDek` above: any failure → `DekUnwrapError`.
+ */
+export async function unwrapDekWithDek(
+  dek: Uint8Array,
+  entry: WrappedDekEntry,
+): Promise<Uint8Array> {
+  try {
+    const kekMaterial = base64FromBytes(dek);
+    const kekBase64 = await pbkdf2Base64(kekMaterial, entry.wrapSalt, DEK_WRAP_ITERATIONS);
+    const kek = bytesFromBase64(kekBase64);
+    const iv = bytesFromBase64(entry.wrapIv);
+    const wrapped = bytesFromBase64(entry.wrappedDek);
+    const targetDek = aesGcmDecrypt(kek, iv, wrapped);
+    if (targetDek.length !== 32) {
+      throw new DekUnwrapError();
+    }
+    return targetDek;
+  } catch (err) {
+    if (err instanceof DekUnwrapError) throw err;
+    throw new DekUnwrapError();
+  }
+}
