@@ -1,6 +1,6 @@
 # Feature: remove-almacenes-from-gratis-pago — limpieza de módulo 13 en tiendas no Superior/VIP
 
-**Estado**: EN PROGRESO · **Rama**: qa (local) · **Creado**: 2026-09-23
+**Estado**: COMPLETADO (verificado, commits locales en qa, sin push) · **Rama**: qa (local) · **Creado**: 2026-09-23
 
 ## Objetivo
 
@@ -82,14 +82,16 @@ FUERA DE SCOPE (reglas no negociables del repo):
 
 ## Checklist
 
-- [ ] T0 — Investigación: causa raíz identificada y documentada arriba (2026-09-23, evidencia en
+- [x] T0 — Investigación: causa raíz identificada y documentada arriba (2026-09-23, evidencia en
   `WarehousesModuleBackfill.cs` vs `MultiMonedasModuleBackfill.cs`, `StorePlanModuleEntityTypeConfiguration.cs`,
   `WholesaleSalesPagoRemoval.cs`).
-- [ ] T1 — Clase compartida `WarehousesPlanCleanup.cs` (constantes + CleanupSql + DownSql no-op).
-- [ ] T2 — Migración EF `RemoveWarehousesFromGratisPago` (data-only, Up=`CleanupSql`, Down=`DownSql`).
-- [ ] T3 — Script VPS `backend/scripts/22-20260923-Remove-Warehouses-From-Gratis-Pago.sql` con parity.
-- [ ] T4 — Verificación: build + suite de tests existente (migración aplicada por WebAppFixture en
-  `smca_test`) + verificación SELECT; commits de unidad de trabajo.
+- [x] T1 — Clase compartida `WarehousesPlanCleanup.cs` (constantes + CleanupSql + DownSql no-op).
+- [x] T2 — Migración EF `20260923215148_RemoveWarehousesFromGratisPago` (data-only, Up=`CleanupSql`,
+  Down=`DownSql`; snapshot de modelo sin cambios — migración data-only).
+- [x] T3 — Script VPS `backend/scripts/22-20260923-Remove-Warehouses-From-Gratis-Pago.sql` con parity
+  (texto idéntico al `CleanupSql`, registro EF, SELECT de verificación).
+- [x] T4 — Verificación: build OK + suite completa verde + migración aplicada en `smca_test` (ver
+  "Progreso y evidencia" abajo); 2 commits de unidad de trabajo en `qa`.
 
 ## Criterios de aceptación
 
@@ -114,11 +116,27 @@ FUERA DE SCOPE (reglas no negociables del repo):
 
 - T0: evidencia en la sección Causa raíz (2026-09-23). Exploración read-only del orquestador: seeds de
   planes, migraciones 05-09 / 08-09 / 23-09, `WholesaleSalesPagoRemoval.cs`, script 21, README raíz + scripts.
-- T1-T4: pendientes de implementar (escritura directa inline — cambio mecánico de parity con precedente
-  verificado, un solo feature pequeño; sin delegación necesaria).
+- T1-T4: implementados por el orquestador (escritura directa inline — cambio mecánico de parity con
+  precedente verificado, un solo feature pequeño; sin delegación necesaria).
 - Decisión del usuario (2026-09-23, vía pregunta): NO crear test E2E nuevo — solo migración + script.
+- Verificación ejecutada (2026-09-23):
+  - `dotnet build src/SMCA.WebApi/SMCA.WebApi.csproj` → **Build succeeded**, 0 errores.
+  - `dotnet test src/SMCA.sln` → **Domain.UnitTests 27/27 PASSED**, **Application.Tests 503/503 PASSED**,
+    **SMCA.WebApi.E2ETests 556/556 PASSED** (WebAppFixture aplicó la migración nueva contra `smca_test`
+    real al arrancar; ningún test E2E existente fue tocado).
+  - `dotnet ef migrations list --connection .../smca_test` → `20260923215148_RemoveWarehousesFromGratisPago`
+    listada **sin `(Pending)`** (aplicada).
+- Commits de unidad de trabajo (rama `qa`, local):
+  - `f922e35c` `docs(odd): track remove-almacenes-from-gratis-pago feature plan`
+  - `21ea7ed0` `feat(plan): remove Warehouses module from Gratis/Pago stores (migration, VPS script)`
+  - (este commit) `docs(odd): mark remove-almacenes-from-gratis-pago completed with verification evidence`
+- RDD: runtime OpenCode no elegible para revisión inmutable (mismo resultado registrado en
+  cart-wholesale-by-order-type); no se ejecuta assess con un agente no elegible.
+- Nota de entorno: se detuvo el dev server `SMCA.WebApi` (PID 11092) que bloqueaba el build — atención si
+  se necesita relanzar (`dotnet run --project backend/src/SMCA.WebApi`) para pruebas manuales/E2E frontend.
 
 ## Siguiente paso
 
-Implementar T1→T4, correr checks aplicables, commits de unidad de trabajo en `qa` (sin push — política
-ordinaria del repo; push/PR quedan a decisión del usuario).
+Push/PR a decisión del usuario (política ordinaria del repo). Pendiente opcional (NO parte de esta
+feature, requiere decisión de negocio): cerrar vías administrativas (PUT/POST/toggle) que puedan
+reintroducir módulo 13 en tiendas no Superior/VIP.
