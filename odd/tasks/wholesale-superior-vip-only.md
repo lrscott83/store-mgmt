@@ -171,8 +171,10 @@ las vías administrativas (respuesta a pregunta del mismo día: "Cerrar también
 - (2026-09-23) E2E frontend ESCRITOS (NO CORRIDOS por indicación del usuario): fixture nuevo
   `store-wholesale-fixture.ts`, 3 specs adaptados (mayorista-sale, wholesale-cart-floor, wholesale-scanner)
   + spec nuevo `wholesale-plan-gate.spec.ts` (Pago no ve menú + no entra, sin /login; Superior ve y entra).
-- PENDIENTE: commitear frontend (work-unit en rama feature); push/PR decisión del usuario; E2E frontend
-  quedan SIN ejecutar por decisión explícita del usuario ("no verifiques los tests e2e al respecto").
+- (2026-09-23) Frontend COMMITEADO como work-unit `b3aab43e` (ramas: feature y luego dev).
+- (2026-09-23) TODO EL CAMBIO movido a la rama local `dev` (fast-forward desde `833769a0`) y PUSHEADO a
+  `origin/dev` por decisión del usuario; rama local `feat/wholesale-superior-vip-only` ELIMINADA.
+- E2E frontend quedan SIN ejecutar por decisión explícita del usuario ("no verifiques los tests e2e al respecto").
 
 ## Verification Evidence
 - (2026-09-23) `dotnet build src/SMCA.WebApi` → 0 errores (warnings preexistentes).
