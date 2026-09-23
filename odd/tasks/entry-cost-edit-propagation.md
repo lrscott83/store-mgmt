@@ -304,8 +304,22 @@ Specs E2E nuevas se corren individualmente durante desarrollo:
 - [x] T1 — Candado de Costo en modal (`38a8d84`) — verificado: `inventory-components` + `inventory-routes` = 106 tests, sin type errors.
 - [x] T2 — Propagación en edición de tienda (`2bf0693e`) — verificado: `inventory-routes` + `inventory-components` = 107 tests, sin type errors.
 - [x] T3 — Import/export propaga el costo (`95198955`) — verificado: `order-offline-service` + `inventory-offline-service` = 265 tests; `data-serializer` + `data-synchronizer` = 125 tests, sin type errors.
-- [ ] T4 — E2E nuevas (pendiente)
-- [ ] T5 — Cierre documental (pendiente)
+- [x] T4 — E2E nuevas (`93b318ea`) — 5 pruebas nuevas, corridas en verde: `entry-cost-guard` (E-CG-1/E-CG-2), `entry-cost-propagation` (E-CP-1/E-CP-2), `entry-cost-sync-roundtrip` (E-CS-1). Ningún spec ni support existente fue modificado (solo 3 archivos NUEVOS).
+- [x] T5 — Cierre documental (este commit).
+
+**Verificación final (2026-09-23)**
+- `pnpm exec playwright test e2e/entry-cost-guard.spec.ts e2e/entry-cost-propagation.spec.ts e2e/entry-cost-sync-roundtrip.spec.ts` → **5 passed** (teardown borró 174 filas `e2e-*` de `smca_test`, confirmando la base correcta).
+- `pnpm turbo run typecheck lint test` (frontend-react) → **11/12 tareas**, 4166/4167 tests; el único fallo es **preexistente** y no relacionado: `app/sales/routes/__tests__/sales-routes.test.tsx:336` (`SaleCreditsPage`, filtros de rango/fecha). Ese archivo **mockea** `order-offline-service` (línea 55), por lo que el cambio de T3 es inerte ahí.
+- Backend: sin cambios. No se tocó `backend/`, ni `frontend/` (Angular), ni specs/support E2E existentes.
+
+**Entrega**: sin PR — 7 commits en la rama `test` (3 docs + 3 feat/test + este cierre).
+
+**Contrato E2E cubierto**
+- **E-CG-1**: una entrada de almacén muestra el mensaje del almacén, el costo está deshabilitado y no se guarda.
+- **E-CG-2**: una entrada normal SÍ permite editar el costo.
+- **E-CP-1**: editar el costo de una entrada de tienda sin ventas guarda directo y se refleja.
+- **E-CP-2**: una entrada con ventas es rechazada y su costo no cambia.
+- **E-CS-1**: la corrección de costo viaja por export→import y actualiza una orden que ya existía en otro dispositivo (dos contextos de navegador).
 
 **Notas de T1**:
 - `getActiveInventoryEntriesStorage()` proyecta a `InventoryEntryView` y **descarta**
@@ -318,5 +332,5 @@ Specs E2E nuevas se corren individualmente durante desarrollo:
 
 ## 14. Próximo paso
 
-Iniciar **T2** (propagación en la edición de tienda) en la misma rama `test`. Sin PR:
-el usuario pidió solo commits en esta rama.
+Feature cerrada en la rama `test`. Sin PR por pedido del usuario. Pendiente de decisión del usuario:
+merge manual, o abrir PR más adelante.
