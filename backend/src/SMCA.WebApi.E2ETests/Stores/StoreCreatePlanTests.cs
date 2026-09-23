@@ -100,35 +100,33 @@ public sealed class StoreCreatePlanTests
     }
 
     [Fact]
-    public async Task Create_store_with_all_paid_modules_including_new_12_14()
+    public async Task Create_store_rejects_wholesale_sales_module_for_pago_birth()
     {
+        // wholesale-superior-vip-only (2026-09-23): every store born via POST /v1/stores
+        // lands on Pago (CreateStoreService hardcodes StorePlanType.Pago), and WholesaleSales
+        // (12) is reserved for Superior/VIP. Requesting 12 must be REJECTED with 400
+        // (fail-closed) — the closure test for the administrative POST path.
         var login = $"sa-ca-{Guid.NewGuid():N}@test.com";
         var adminId = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
         var owner = await StoreSeed.SeedOwnerAsync(_f);
-        Guid created = Guid.Empty;
         try
         {
             var response = await DbTestHelpers.AuthedClient(_f, adminId, login)
                 .PostAsJsonAsync("/api/v1/stores",
                     Body(owner.OwnerId, $"Store-{Guid.NewGuid():N}",
                         new[] { 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, WholesaleSalesModuleId, WarehousesModuleId, MultiStoresModuleId }));
-            response.StatusCode.Should().Be(HttpStatusCode.Created);
-            created = (await response.Content.ReadFromJsonAsync<ApiResponse<StoreData>>(ApiResponse.Json))!.Data!.Id;
+            response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+            var b = await response.Content.ReadFromJsonAsync<ApiResponse<object>>(ApiResponse.Json);
+            b!.Errors.Should().Contain(e => e.Code == "ModuleIds");
 
+            // No store may be left behind by the rejected request.
             using var scope = _f.Services.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-
-            var store = await db.Set<Store>().IgnoreQueryFilters().SingleAsync(s => s.Id == created);
-            store.StorePlanId.Should().Be(PagoPlanId);
-
-            var activeModuleIds = await db.Set<StoreModule>().IgnoreQueryFilters()
-                .Where(sm => sm.StoreId == created && sm.IsActive)
-                .Select(sm => sm.ModuleId).ToListAsync();
-            activeModuleIds.Should().BeEquivalentTo(new[] { 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14 });
+            (await db.Set<Store>().IgnoreQueryFilters().AnyAsync(s => s.OwnerId == owner.OwnerId))
+                .Should().BeFalse("the rejected create must not persist any store");
         }
         finally
         {
-            if (created != Guid.Empty) await StoreSeed.CleanupStoreAsync(_f, created);
             await StoreSeed.CleanupOwnerAsync(_f, owner.OwnerId, owner.UserId);
             await DbTestHelpers.CleanupUserAsync(_f, adminId);
         }
@@ -139,16 +137,19 @@ public sealed class StoreCreatePlanTests
     {
         // Default plan change (2026-09-18, store-default-plan-and-owner-plan-restriction):
         // every created store births on Pago (2). The birth module set stays REQUEST-driven
-        // (Option A divergence): a request listing the full AvailableToStore set yields a
-        // Pago store whose modules match the request — which agrees with the Superior
-        // catalog (15 with Elaboration), NOT the Pago catalog (11 members). The divergence is pinned.
+        // (Option A divergence): a request listing the full AvailableToStore set minus
+        // WholesaleSales yields a Pago store whose modules match the request — which agrees
+        // with the Superior catalog (15 with Elaboration), NOT the Pago catalog (10 members
+        // since wholesale-superior-vip-only removed module 12 on 2026-09-23). The divergence is pinned.
         var login = $"sa-csc-{Guid.NewGuid():N}@test.com";
         var adminId = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
         var owner = await StoreSeed.SeedOwnerAsync(_f);
         Guid created = Guid.Empty;
         try
         {
-            var fullCatalogRequest = new[] { 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, WholesaleSalesModuleId, WarehousesModuleId, MultiStoresModuleId, MultiMonedasModuleId, ElaborationModuleId };
+            // WholesaleSales (12) is excluded from the request: it is reserved for Superior/VIP
+            // and POST /v1/stores births on Pago, so requesting it is rejected (400).
+            var fullCatalogRequest = new[] { 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, WarehousesModuleId, MultiStoresModuleId, MultiMonedasModuleId, ElaborationModuleId };
             var response = await DbTestHelpers.AuthedClient(_f, adminId, login)
                 .PostAsJsonAsync("/api/v1/stores", Body(owner.OwnerId, $"Store-{Guid.NewGuid():N}", fullCatalogRequest));
             response.StatusCode.Should().Be(HttpStatusCode.Created);
@@ -163,15 +164,15 @@ public sealed class StoreCreatePlanTests
             var pagoPlanModuleIds = await db.Set<StorePlanModule>().IgnoreQueryFilters()
                 .Where(spm => spm.PlanId == PagoPlanId)
                 .Select(spm => spm.ModuleId).ToListAsync();
-            // The Pago catalog keeps its own members: the Elaboration module (17) was
-            // assigned to Superior and VIP only, so Pago stays at 11.
-            pagoPlanModuleIds.Should().HaveCount(11);
+            // The Pago catalog keeps its own members: WholesaleSales (12) and Elaboration (17)
+            // are Superior/VIP-only, so Pago stays at 10.
+            pagoPlanModuleIds.Should().HaveCount(10);
 
             var storeModuleIds = await db.Set<StoreModule>().IgnoreQueryFilters()
                 .Where(sm => sm.StoreId == created && sm.IsActive)
                 .Select(sm => sm.ModuleId).ToListAsync();
-            // Option A: the birth module set is the REQUEST list (14 incl. MultiMonedas 15),
-            // diverging from the Pago plan catalog (11) — pinned, not equalized.
+            // Option A: the birth module set is the REQUEST list (13 incl. MultiMonedas 15),
+            // diverging from the Pago plan catalog (10) — pinned, not equalized.
             storeModuleIds.Should().BeEquivalentTo(fullCatalogRequest);
         }
         finally

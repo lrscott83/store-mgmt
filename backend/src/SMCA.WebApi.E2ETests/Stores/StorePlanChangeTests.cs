@@ -43,7 +43,7 @@ public sealed class StorePlanChangeTests
     // ── Happy Path: toggle-plan ────────────────────────────────────────────
 
     [Fact]
-    public async Task Toggle_free_to_paid_activates_new_modules_12_13_14_with_catalog_prices()
+    public async Task Toggle_free_to_paid_activates_paid_modules_excluding_wholesale_sales()
     {
         var saLogin = $"sa-{Guid.NewGuid():N}@test.com";
         var saId = await DbTestHelpers.SeedSuperAdminAsync(_f, saLogin, "Password123");
@@ -67,11 +67,14 @@ public sealed class StorePlanChangeTests
             var activeModules = await db.Set<StoreModule>().IgnoreQueryFilters()
                 .Where(sm => sm.StoreId == seeded.StoreId && sm.IsActive).ToListAsync();
 
-            // ALL paid catalog modules activate, including the new 12/13/14.
+            // ALL paid catalog modules activate EXCEPT WholesaleSales (12) — reserved for
+            // Superior/VIP since wholesale-superior-vip-only (2026-09-23). The Free→Paid
+            // toggle lands on Pago, so 12 must never be inserted/reactivated here.
             activeModules.Select(sm => sm.ModuleId).Should().Contain(new[]
             {
-                StatisticsModuleId, WarehousesModuleId, WholesaleSalesModuleId, MultiStoresModuleId
+                StatisticsModuleId, WarehousesModuleId, MultiStoresModuleId
             });
+            activeModules.Select(sm => sm.ModuleId).Should().NotContain(WholesaleSalesModuleId);
 
             // Warehouses snapshot carries the CURRENT catalog price (5 / 50%), not the
             // legacy 2 / 100% from before Update-Warehouses-Price.
@@ -83,9 +86,11 @@ public sealed class StorePlanChangeTests
             var srfFeatureIds = await db.Set<StoreRoleFeature>().IgnoreQueryFilters()
                 .Where(srf => srf.StoreId == seeded.StoreId && srf.IsActive)
                 .Select(srf => srf.FeatureId).Distinct().ToListAsync();
-            // Warehouses (36/37), MultiStores (38), WholesaleSales (39) and Statistics (60)
+            // Warehouses (36/37), MultiStores (38) and Statistics (60)
             // are all mapped (store-role-features-completeness production fix, 2026-09-20).
-            srfFeatureIds.Should().Contain(new[] { 36, 37, 38, 39, 60 });
+            // Wholesale Sales (39) must NOT be present: module 12 never activates on Pago.
+            srfFeatureIds.Should().Contain(new[] { 36, 37, 38, 60 });
+            srfFeatureIds.Should().NotContain(39);
         }
         finally
         {
@@ -234,11 +239,13 @@ public sealed class StorePlanChangeTests
         var seeded = await SeedStoreAsync(paidModules: [], paymentStartDate: null);
         try
         {
-            // Upgrade: add Warehouses (13) + WholesaleSales (12) to the free set.
+            // Upgrade: add Warehouses (13) + MultiStores (14) to the free set. WholesaleSales
+            // (12) is deliberately absent — reserved for Superior/VIP since
+            // wholesale-superior-vip-only (2026-09-23), so a Pago store cannot request it.
             var r = await DbTestHelpers.AuthedClient(_f, saId, saLogin)
                 .PutAsJsonAsync($"/api/v1/stores/{seeded.StoreId}",
                     Body(seeded.StoreId, $"Store-{Guid.NewGuid():N}",
-                        new[] { FreeManagementModuleId, WarehousesModuleId, WholesaleSalesModuleId }));
+                        new[] { FreeManagementModuleId, WarehousesModuleId, MultiStoresModuleId }));
             r.StatusCode.Should().Be(HttpStatusCode.OK);
 
             using var scope = _f.Services.CreateScope();
@@ -252,13 +259,45 @@ public sealed class StorePlanChangeTests
 
             var active = await db.Set<StoreModule>().IgnoreQueryFilters()
                 .Where(sm => sm.StoreId == seeded.StoreId && sm.IsActive).Select(sm => sm.ModuleId).ToListAsync();
-            active.Should().BeEquivalentTo(new[] { FreeManagementModuleId, WarehousesModuleId, WholesaleSalesModuleId });
+            active.Should().BeEquivalentTo(new[] { FreeManagementModuleId, WarehousesModuleId, MultiStoresModuleId });
 
             var srfFeatureIds = await db.Set<StoreRoleFeature>().IgnoreQueryFilters()
                 .Where(srf => srf.StoreId == seeded.StoreId && srf.IsActive)
                 .Select(srf => srf.FeatureId).Distinct().ToListAsync();
-            // Warehouses (36/37) and WholesaleSales (39) are mapped (2026-09-20 fix).
-            srfFeatureIds.Should().Contain(new[] { 36, 37, 39 });
+            // Warehouses (36/37) and MultiStores (38) are mapped (2026-09-20 fix).
+            srfFeatureIds.Should().Contain(new[] { 36, 37, 38 });
+        }
+        finally
+        {
+            await CleanupAsync(seeded);
+            await DbTestHelpers.CleanupUserAsync(_f, saId);
+        }
+    }
+
+    [Fact]
+    public async Task Update_module_set_rejects_wholesale_sales_for_pago_store()
+    {
+        // wholesale-superior-vip-only (2026-09-23): a Pago store must not receive module 12
+        // through the PUT module-set replacement — fail-closed 400 with the ModuleIds error.
+        var saLogin = $"sa-{Guid.NewGuid():N}@test.com";
+        var saId = await DbTestHelpers.SeedSuperAdminAsync(_f, saLogin, "Password123");
+        var seeded = await SeedStoreAsync(paidModules: [], paymentStartDate: null);
+        try
+        {
+            var r = await DbTestHelpers.AuthedClient(_f, saId, saLogin)
+                .PutAsJsonAsync($"/api/v1/stores/{seeded.StoreId}",
+                    Body(seeded.StoreId, $"Store-{Guid.NewGuid():N}",
+                        new[] { FreeManagementModuleId, WarehousesModuleId, WholesaleSalesModuleId }));
+            r.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+            var b = await r.Content.ReadFromJsonAsync<ApiResponse<object>>(ApiResponse.Json);
+            b!.Errors.Should().Contain(e => e.Code == "ModuleIds");
+
+            // The failed update must not mutate the store's modules.
+            using var scope = _f.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var active = await db.Set<StoreModule>().IgnoreQueryFilters()
+                .Where(sm => sm.StoreId == seeded.StoreId && sm.IsActive).Select(sm => sm.ModuleId).ToListAsync();
+            active.Should().BeEquivalentTo(new[] { FreeManagementModuleId });
         }
         finally
         {

@@ -163,13 +163,16 @@ public sealed class AuthMePlanModulesTests
             var before = await MeAsync(seeded.UserId, login);
             before.Data!.StoreModuleIds.Should().BeEquivalentTo(new[] { FreeManagementModuleId });
 
-            // SuperAdmin toggles the store to Paid — activates ALL paid catalog modules.
+            // SuperAdmin toggles the store to Paid — activates ALL paid catalog modules
+            // EXCEPT WholesaleSales (12), reserved for Superior/VIP since
+            // wholesale-superior-vip-only (2026-09-23).
             var toggle = await DbTestHelpers.AuthedClient(_f, saId, saLogin)
                 .PostAsync($"/api/v1/stores/{seeded.StoreId}/toggle-plan", null);
             toggle.StatusCode.Should().Be(HttpStatusCode.OK);
 
             var after = await MeAsync(seeded.UserId, login);
-            after.Data!.StoreModuleIds.Should().Contain(new[] { StatisticsModuleId, WarehousesModuleId, WholesaleSalesModuleId, MultiStoresModuleId });
+            after.Data!.StoreModuleIds.Should().Contain(new[] { StatisticsModuleId, WarehousesModuleId, MultiStoresModuleId });
+            after.Data!.StoreModuleIds.Should().NotContain(WholesaleSalesModuleId);
             after.Data.PlanType.Should().Be("Paid");
             // owner-plan-change: legacy null anchor stays null (the toggle never fabricates
             // a clock), so the store is NOT in trial.

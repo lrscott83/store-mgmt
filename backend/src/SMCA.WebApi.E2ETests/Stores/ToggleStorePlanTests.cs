@@ -49,6 +49,11 @@ public sealed class ToggleStorePlanTests
 
     private static DateOnly Today() => DateOnly.FromDateTime(DateTime.UtcNow);
 
+    // wholesale-superior-vip-only (2026-09-23): WholesaleSales (12) is reserved for
+    // Superior/VIP and must never activate through the Pago-targeting toggle.
+    private const int WholesaleSalesModuleId = (int)Domain.Common.Enums.ModuleType.WholesaleSales;
+    private const int WholesaleSalesFeatureId = 39;
+
     /// <summary>
     /// Pins a seeded store's StorePlanId (owner-plan-change: direction derives from it).
     /// ExecuteUpdateAsync bypasses the NoTracking trap (CLAUDE.md gotcha).
@@ -133,7 +138,8 @@ public sealed class ToggleStorePlanTests
 
             // owner-plan-change: StorePlanId flips to Pago; the anchor stays NULL (legacy
             // free store) — the toggle never fabricates a clock; ALL paid catalog modules
-            // activate; the free Management module stays active.
+            // activate EXCEPT WholesaleSales (reserved for Superior/VIP — the Free→Paid
+            // toggle lands on Pago); the free Management module stays active.
             var store = await LoadStoreAsync(fx.StoreId);
             store.PaymentStartDate.Should().BeNull("the anchor is sacred — never fabricated");
             store.StorePlanId.Should().Be((int)Domain.Common.Enums.StorePlanType.Pago);
@@ -141,12 +147,17 @@ public sealed class ToggleStorePlanTests
 
             var paidCatalogIds = await PaidCatalogModuleIdsAsync();
             paidCatalogIds.Should().NotBeEmpty("the seed catalog must contain paid modules");
+            paidCatalogIds.Should().Contain(WholesaleSalesModuleId,
+                "the paid catalog still lists 12 — the toggle must skip it on Pago");
+            var expectedPaidIds = paidCatalogIds.Where(id => id != WholesaleSalesModuleId).ToList();
 
             var storeModules = await LoadStoreModulesAsync(fx.StoreId);
-            storeModules.Where(sm => paidCatalogIds.Contains(sm.ModuleId))
+            storeModules.Where(sm => expectedPaidIds.Contains(sm.ModuleId))
                 .Should().OnlyContain(sm => sm.IsActive);
-            storeModules.Count(sm => paidCatalogIds.Contains(sm.ModuleId))
-                .Should().Be(paidCatalogIds.Count);
+            storeModules.Count(sm => expectedPaidIds.Contains(sm.ModuleId))
+                .Should().Be(expectedPaidIds.Count);
+            storeModules.Where(sm => sm.ModuleId == WholesaleSalesModuleId)
+                .Should().BeEmpty("the Free→Paid toggle never creates module 12");
             storeModules.Single(sm => sm.ModuleId == BillingSeed.ManagementModuleId).IsActive.Should().BeTrue();
 
             // R12 (Free→Paid): the store DTO keeps the null anchor (legacy free store).
@@ -243,11 +254,16 @@ public sealed class ToggleStorePlanTests
             storeAfterRoundTrip.PaymentStartDate.Should().BeNull("null anchor stays null across the whole trip");
             storeAfterRoundTrip.StorePlanId.Should().Be((int)Domain.Common.Enums.StorePlanType.Pago);
 
+            // Leg 3 expected set: every paid catalog module EXCEPT WholesaleSales (12) —
+            // reserved for Superior/VIP, so the Pago-targeting toggle never restores it.
             var paidCatalogIds = await PaidCatalogModuleIdsAsync();
+            var expectedPaidIds = paidCatalogIds.Where(id => id != WholesaleSalesModuleId).ToList();
             var storeModules = await LoadStoreModulesAsync(fx.StoreId);
-            storeModules.Where(sm => paidCatalogIds.Contains(sm.ModuleId))
+            storeModules.Where(sm => expectedPaidIds.Contains(sm.ModuleId))
                 .Should().OnlyContain(sm => sm.IsActive);
-            storeModules.Where(sm => paidCatalogIds.Contains(sm.ModuleId))
+            storeModules.Where(sm => sm.ModuleId == WholesaleSalesModuleId)
+                .Should().BeEmpty("module 12 is never inserted or reactivated by the Pago toggle");
+            storeModules.Where(sm => expectedPaidIds.Contains(sm.ModuleId))
                 .GroupBy(sm => sm.ModuleId)
                 .Should().OnlyContain(g => g.Count() == 1, "reactivation must not duplicate StoreModule rows");
 
@@ -258,15 +274,17 @@ public sealed class ToggleStorePlanTests
             // Paid→Free→Paid round trip — is documented as a finding in verify-report.md.
             var activeSrfCount = await CountActiveRoleFeaturesAsync(fx.StoreId);
             var paidFeatureIds = await PaidCatalogFeatureIdsAsync(paidCatalogIds);
-            activeSrfCount.Should().Be(paidFeatureIds.Count, "each paid feature must be restored exactly once");
+            var expectedSrfFeatureIds = paidFeatureIds.Where(id => id != WholesaleSalesFeatureId).ToList();
+            activeSrfCount.Should().Be(expectedSrfFeatureIds.Count,
+                "each reactivated paid feature must be restored exactly once (WholesaleSales 39 excluded)");
 
             using var scope = _f.Services.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
             var activeSrfFeatureIds = await db.Set<StoreRoleFeature>().IgnoreQueryFilters()
                 .Where(srf => srf.StoreId == fx.StoreId && srf.IsActive)
                 .Select(srf => srf.FeatureId).ToListAsync();
-            activeSrfFeatureIds.Should().BeEquivalentTo(paidFeatureIds,
-                "every paid feature must regain at least one active StoreRoleFeature");
+            activeSrfFeatureIds.Should().BeEquivalentTo(expectedSrfFeatureIds,
+                "every reactivated paid feature must regain at least one active StoreRoleFeature; 39 never does");
         }
         finally
         {

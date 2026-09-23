@@ -19,9 +19,10 @@ namespace SMCA.WebApi.E2ETests.Auth;
 
 /// <summary>
 /// E2E tests for the plan dimension of self-registration (<c>POST /api/v1/auth/register</c>):
-/// the auto-created store must land on plan Pago with ALL AvailableToStore modules —
-/// including the new WholesaleSales (12), Warehouses (13) and MultiStores (14) — with
-/// catalog price snapshots and the full StoreRoleFeature set for the owner.
+/// the auto-created store must land on plan Pago with the Pago catalog modules and catalog
+/// price snapshots plus the mapped StoreRoleFeatures. Since wholesale-superior-vip-only
+/// (2026-09-23), WholesaleSales (12) was REMOVED from the Pago catalog — registration must
+/// never grant it; Warehouses (13) and MultiStores (14) remain Superior/VIP-only.
 /// Extends AuthRegisterDataAssertionsTests (which covers the general module-equivalence
 /// assertions) with the plan/module-12-13-14 specifics.
 /// Plan 2026-09-08-e2e-plan-gated-modules-auth-roster (Lote 2).
@@ -67,10 +68,11 @@ public sealed class AuthRegisterPlanTests
                 .Select(sm => sm.ModuleId).ToListAsync();
 
             // The Pago plan universe is assigned at registration (plan/module coherence:
-            // birth plan Pago → Pago's own modules). WholesaleSales (12) is IN the Pago
-            // catalog; Warehouses (13), MultiStores (14), MultiMonedas (15) and Elaboration
-            // (17) are Superior/VIP-only and must NOT be granted.
-            activeModuleIds.Should().Contain(WholesaleSalesModuleId);
+            // birth plan Pago → Pago's own modules). WholesaleSales (12) was REMOVED from
+            // the Pago catalog (wholesale-superior-vip-only, 2026-09-23), so it is NOT
+            // granted; Warehouses (13), MultiStores (14), MultiMonedas (15) and Elaboration
+            // (17) are Superior/VIP-only and must NOT be granted either.
+            activeModuleIds.Should().NotContain(WholesaleSalesModuleId);
             activeModuleIds.Should().NotContain(new[] { WarehousesModuleId, MultiStoresModuleId, 15, 17 });
             activeModuleIds.Should().NotContain(1); // Administration never goes to a store
         }
@@ -119,13 +121,14 @@ public sealed class AuthRegisterPlanTests
                 .Select(srf => srf.FeatureId).Distinct().ToListAsync();
 
             // Mapped features of the assigned (Pago) modules are present for this owner:
-            // Statistics 60, Billing 90, WholesaleSales 39, ... Warehouses 36/37 are
-            // Superior-only and must NOT be granted. StorePayment (91) is SuperAdmin/
-            // ReSeller-only in StoreRoleFeatures (StorePaymentAdmin), so no OwnerAdmin row
-            // exists for it. MultiStores (38) is not in the Pago plan, so it is absent too.
-            // Elaboration 120/121 is Superior/VIP-only.
-            srfFeatureIds.Should().Contain(new[] { 39, 60, 90 });
-            srfFeatureIds.Should().NotContain(new[] { 36, 37, 38, 91, 120, 121 });
+            // Statistics 60, Billing 90. WholesaleSales 39 is ABSENT: module 12 was removed
+            // from the Pago catalog (wholesale-superior-vip-only, 2026-09-23). Warehouses
+            // 36/37 are Superior-only and must NOT be granted. StorePayment (91) is
+            // SuperAdmin/ReSeller-only in StoreRoleFeatures (StorePaymentAdmin), so no
+            // OwnerAdmin row exists for it. MultiStores (38) is not in the Pago plan, so it
+            // is absent too. Elaboration 120/121 is Superior/VIP-only.
+            srfFeatureIds.Should().Contain(new[] { 60, 90 });
+            srfFeatureIds.Should().NotContain(new[] { 36, 37, 38, 39, 91, 120, 121 });
         }
         finally
         {
@@ -142,15 +145,15 @@ public sealed class AuthRegisterPlanTests
             registered = await RegisterAsync($"Store-{Guid.NewGuid():N}");
 
             // The freshly-registered owner's /me carries the Pago plan module set (all
-            // assigned, trial period → nothing filtered). WholesaleSales (12) is in the
-            // Pago catalog; the Superior-only modules (13/14) must be absent.
+            // assigned, trial period → nothing filtered). WholesaleSales (12) was removed
+            // from the Pago catalog (wholesale-superior-vip-only, 2026-09-23); the
+            // Superior-only modules (13/14) must be absent too.
             var me = await DbTestHelpers.AuthedClient(_factory, registered.UserId, registered.Login)
                 .GetAsync("/api/v1/auth/me");
             me.StatusCode.Should().Be(HttpStatusCode.OK);
             var body = await me.Content.ReadFromJsonAsync<ApiResponse<CurrentUserDto>>(ApiResponse.Json);
             body!.Succeeded.Should().BeTrue();
-            body.Data!.StoreModuleIds.Should().Contain(WholesaleSalesModuleId);
-            body.Data.StoreModuleIds.Should().NotContain(new[] { WarehousesModuleId, MultiStoresModuleId });
+            body.Data!.StoreModuleIds.Should().NotContain(new[] { WholesaleSalesModuleId, WarehousesModuleId, MultiStoresModuleId });
             body.Data.PlanType.Should().Be("Paid");
             body.Data.IsInTrial.Should().BeTrue(); // billable amount > 0 (paid modules at catalog price)
             body.Data.PaymentStatus.Should().Be("AlDia");
