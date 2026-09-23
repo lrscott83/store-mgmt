@@ -158,9 +158,30 @@ las vías administrativas (respuesta a pregunta del mismo día: "Cerrar también
   NO compila en la base — `SwitchMyStoreCommandHandlerTests.cs:99` asigna `store.Id = id;` y `Entity<Guid>.Id` es
   init-only. Bloquea `dotnet test src/SMCA.sln` (solo Application.Tests), no el proyecto E2E. No se toca sin OK.
 - (2026-09-23) E2E completo: `Passed! Failed: 0, Passed: 556, Total: 556` (suite completa, 3m 3s).
-- PENDIENTE: commitear backend (WU-1/WU-2/E2E); frontend enums/menu/loader; E2E frontend; checks; commits finales.
+- (2026-09-23) Backend COMMITEADO en rama `feat/wholesale-superior-vip-only` (3 work-units, sin push):
+  `c6396984` (seed+migration+script+snapshot), `06aa3061` (cierres POST/PUT/toggle+herencia+i18n),
+  `ad3ba5d0` (13 tests adaptados + 3 nuevos).
+- (2026-09-23) Frontend enums (`EModules.WholesaleSales=12` / `EFeatures.WholesaleSales=39`) +
+  test nuevo `wholesale-enums.test.ts`; `menu-config.ts` item WHOLESALE → featureIds [39] + moduleId 12;
+  loader custom en `wholesale.tsx` (módulo 12 para TODOS los roles; sin módulo → bootstrap DEK + redirect home
+  sin logout; no-auth → logout + /login).
+- (2026-09-23) TEST UNITARIO NUEVO del loader `wholesale-loader.test.ts` (5 tests): con módulo 12 → null;
+  SuperAdmin sin 12 → redirect home (NO bypass de rol); OwnerAdmin sin 12 → redirect home sin logout
+  (invariante auth-redirect); orden bootstrap DEK ANTES de resolveUserHomePath; no-auth → logout + /login.
+- (2026-09-23) E2E frontend ESCRITOS (NO CORRIDOS por indicación del usuario): fixture nuevo
+  `store-wholesale-fixture.ts`, 3 specs adaptados (mayorista-sale, wholesale-cart-floor, wholesale-scanner)
+  + spec nuevo `wholesale-plan-gate.spec.ts` (Pago no ve menú + no entra, sin /login; Superior ve y entra).
+- PENDIENTE: commitear frontend (work-unit en rama feature); push/PR decisión del usuario; E2E frontend
+  quedan SIN ejecutar por decisión explícita del usuario ("no verifiques los tests e2e al respecto").
 
 ## Verification Evidence
 - (2026-09-23) `dotnet build src/SMCA.WebApi` → 0 errores (warnings preexistentes).
 - (2026-09-23) `dotnet build src/SMCA.WebApi.E2ETests` → 0 errores.
-- (pending) resultados de `dotnet test`, `pnpm typecheck/lint/test`, `pnpm test:e2e` por task.
+- (2026-09-23) E2E backend: `Failed: 0, Passed: 556, Total: 556`; Domain.UnitTests 27/27.
+- (2026-09-23) `pnpm --filter @store-mgmt/domain test` → 22 files / 180 tests OK (incl. wholesale-enums).
+- (2026-09-23) `pnpm --filter @store-mgmt/web-store-pos exec vitest run ...wholesale-loader.test.ts` → 5/5 OK.
+- (2026-09-23) `pnpm turbo run typecheck lint` → 9/9 OK (web-store-pos typegen+tsc incluido).
+- (2026-09-23) `pnpm turbo run test` → 4173 OK / 2 fallos CLASIFICADOS: `sales-routes.test.tsx:336`
+  pre-existente (falla también sin mis cambios, verificado con stash) y `user-routes.test.tsx` flaky por
+  contención (pasa aislado 28/28 con mis cambios).
+- (2026-09-23) E2E frontend: PENDIENTE (NO ejecutados por decisión del usuario).

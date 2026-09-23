@@ -25,6 +25,8 @@ export enum EFeatures {
   Warehouses = 36,
   /** Movimientos de almacén — espejo de FeatureType.WarehouseStockMovements=37 (backend). */
   WarehouseStockMovements = 37,
+  /** Feature Ventas Mayoristas — espejo de FeatureType.WholesaleSales=39 (backend). */
+  WholesaleSales = 39,
   Send = 40,
   Download = 41,
   Receive = 42,
@@ -64,6 +66,8 @@ export enum EModules {
   Billing = 9,
   Histories = 10,
   Credits = 11,
+  /** Módulo Ventas Mayoristas — espejo de ModuleType.WholesaleSales=12 (backend). */
+  WholesaleSales = 12,
   /** Módulo Almacenes — espejo de ModuleType.Warehouses=13 (backend). */
   Warehouses = 13,
   /** Módulo MultiStores — espejo de ModuleType.MultiStores=14 (backend). */

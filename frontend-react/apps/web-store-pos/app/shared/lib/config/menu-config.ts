@@ -125,8 +125,8 @@ export const MENU_GROUPS: MenuGroup[] = [
       {
         label: 'MENU.WHOLESALE',
         path: '/sales/wholesale',
-        featureIds: [EFeatures.Sale],
-        moduleId: EModules.Sales,
+        featureIds: [EFeatures.WholesaleSales],
+        moduleId: EModules.WholesaleSales,
         isNew: true,
         helpContent:
           'Venta por mayor. Elige la cantidad en paquetes (cajas), el precio por unidad baja según los rangos configurados en el producto y la venta se descuenta del inventario en unidades. Ej: 12 cajas × 24 unidades × 660.',
