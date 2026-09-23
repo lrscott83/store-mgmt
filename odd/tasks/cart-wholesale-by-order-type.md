@@ -71,6 +71,8 @@ FUERA DE SCOPE (reglas no negociables del repo):
 - Commits (rama `qa`, sin push — política ordinaria del repo):
   - `f0f66a5e` — docs(odd): track cart-wholesale-by-order-type feature plan
   - `496b4544` — fix(cart): keep normal-sale behavior for wholesale-enabled products (171+/19-)
+  - `73590f39` — docs(odd): mark cart-wholesale-by-order-type completed with verification evidence
+- RDD (receipt-driven development): `gentle-ai review assess --cwd . --agent opencode --base-ref 39e39d88 --committed-only --json` devolvió `risk: high` / `review_due_reason: high_risk` por `unassessable` — **el runtime OpenCode actual no es elegible para immutable receipt review** (soportados: claude-code, codex); no se ofreció `next_transition.command`. Resultado registrado: **unavailable**; modo RDD sigue ON (decisión del usuario), sin START ni review lanzado.
 
 ## Siguiente paso
 
