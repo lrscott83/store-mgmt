@@ -41,4 +41,12 @@ export const BUSINESS_ENTITY_NAMES = [
   // production module persists offline per store.
   'recipes',
   'elaborations',
+  // store-payment-methods-config (2026-09-22): per-store payment-methods
+  // config, persisted with the same `entityKey` convention as the rest.
+  // Registered here on 2026-09-23: its absence let one damaged entry keep a
+  // store locked out — the damaged-data recovery dialog could not remove it,
+  // so the store failed to boot on every attempt. Being on this list is what
+  // makes `entity-migration` encrypt it, `store-data-reset` wipe it and
+  // `damaged-data-recovery` report it.
+  'storePaymentMethods',
 ] as const;

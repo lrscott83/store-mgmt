@@ -97,6 +97,16 @@ export function resetDecryptionFailureLatch(): void {
 export function handleDecryptionFailure(error: unknown): boolean {
   const kind = classifyDecryptionFailure(error);
   if (kind === null) return false;
+  // TEMP DIAGNOSTIC (2026-09-23, switch-logout investigation): remove once the
+  // root cause is confirmed. `latched: true` means this failure was already
+  // announced once and therefore does NOT sign the user out again.
+  console.error('[decryption-failure] handled', {
+    kind,
+    name: (error as { name?: string } | null)?.name,
+    message: (error as Error | null)?.message,
+    latched: announced,
+    stack: (error as Error | null)?.stack,
+  });
   if (announced) return true;
   announced = true;
 

@@ -16,24 +16,54 @@
 // target store, and reloads. The per-store table still wins when the server
 // wrap is absent (legacy backend, offline mode), and the legacy logout now
 // remains only for the genuinely irrecoverable cases.
+//
+// non-atomic-switch fix (2026-09-23): the switch used to rewrite the session
+// (`updateUser`) while the in-memory DEK still belonged to the PREVIOUS store,
+// and only the trailing reload re-scoped it. In that window every store-scoped
+// read ran with the wrong key — `storePaymentMethods` got written/read under
+// the old store's DEK, leaving one store permanently unreadable and, once the
+// navbar's CartShell read it, expelling the session on every boot. The DEK is
+// now re-scoped to the target BEFORE `updateUser`, so the session and the key
+// never disagree.
+//
+// TEMP DIAGNOSTIC (2026-09-23, switch-logout investigation): every step and
+// every sign-out decision below logs to the console with the `[switch-store]`
+// prefix, so a field reproduction shows exactly which branch ended the
+// session. Remove once the root cause is confirmed.
 import type { UserModel } from '@store-mgmt/domain';
 import { useAuthStore } from './auth-store';
 import { authHttpService } from '../http/auth-http-service';
 import { storeHttpService } from '~/management/stores/lib/services/store-http-service';
 import { retargetDeviceWrapStore, writeDeviceDekTable, readDeviceDekTable } from '../storage/device-dek-table';
 import { unwrapDekWithDek } from '../offline/dek-unwrap';
-import { getDek } from '../storage/data-key-store';
+import { getDek, getDekStoreId, setDek, clearDek } from '../storage/data-key-store';
 import { getOrCreateDeviceKey } from '../storage/device-key-store';
-import { wrapDekForDevice } from '../storage/dek-bootstrap';
+import { wrapDekForDevice, bootstrapDeviceDek } from '../storage/dek-bootstrap';
 
 export async function switchToStore(storeId: string): Promise<void> {
+  console.info('[switch-store] START', {
+    targetStoreId: storeId,
+    selectedStoreId: useAuthStore.getState().user?.selectedStoreId,
+    dekStoreId: getDekStoreId(),
+    hasDekInMemory: getDek() !== null,
+  });
+
   // 1. Persist the selection server-side AND get the target DEK wrapped
   //    under the current DEK. Throws on network failure.
   const switchResponse = await storeHttpService.switchMyStore(storeId);
   if (!switchResponse.succeeded || !switchResponse.data) {
+    console.error('[switch-store] switchMyStore REJECTED', {
+      succeeded: switchResponse.succeeded,
+      hasData: switchResponse.data !== null,
+      errors: switchResponse.errors,
+    });
     throw new Error('STORE_SWITCH_REJECTED');
   }
   const { wrappedDek, wrapSalt, wrapIv } = switchResponse.data;
+  console.info('[switch-store] switchMyStore OK', {
+    changed: switchResponse.data.changed,
+    hasServerWrap: Boolean(wrappedDek && wrapSalt && wrapIv),
+  });
 
   // 2. Fresh /me — the backend now answers with the NEW store's
   //    modules/features/roles (GetMeQuery reads SelectedStoreId server-side),
@@ -45,7 +75,17 @@ export async function switchToStore(storeId: string): Promise<void> {
   let freshUser: UserModel;
   try {
     freshUser = await authHttpService.getMe();
-  } catch {
+    console.info('[switch-store] getMe OK', {
+      selectedStoreId: freshUser.selectedStoreId,
+      isActive: freshUser.isActive,
+    });
+  } catch (err) {
+    console.error('[switch-store] getMe FAILED -> logout', {
+      name: (err as Error | null)?.name,
+      message: (err as Error | null)?.message,
+      status: (err as { response?: { status?: number } } | null)?.response?.status,
+      error: err,
+    });
     useAuthStore.getState().logout();
     return;
   }
@@ -73,6 +113,12 @@ export async function switchToStore(storeId: string): Promise<void> {
       const targetDek = await unwrapDekWithDek(currentDek, { wrappedDek, wrapSalt, wrapIv });
       const table = readDeviceDekTable();
       const deviceKey = await getOrCreateDeviceKey();
+      console.info('[switch-store] server wrap unwrapped', {
+        hasTable: table !== null,
+        hasDeviceKey: deviceKey !== null,
+        activeTableStoreId: table?.storeId,
+        storesInTable: table ? Object.keys(table.stores ?? {}) : [],
+      });
       if (table && deviceKey) {
         table.stores = table.stores ?? {};
         table.stores[storeId] = { device: await wrapDekForDevice(targetDek, deviceKey) };
@@ -86,16 +132,47 @@ export async function switchToStore(storeId: string): Promise<void> {
         // form. retargetDeviceWrapStore copies the just-written entry into
         // the active pair atomically.
         retargeted = retargetDeviceWrapStore(storeId);
+        console.info('[switch-store] retarget via server wrap', { retargeted });
+        if (retargeted) {
+          // non-atomic-switch fix: the in-memory DEK moves to the target store
+          // HERE, before `updateUser` rewrites the session. The reload is no
+          // longer the only point where the key changes.
+          setDek(targetDek, storeId);
+          console.info('[switch-store] in-memory DEK re-scoped to target');
+        }
       }
+    } else {
+      console.warn('[switch-store] server wrap NOT usable', {
+        hasDekInMemory: currentDek !== null,
+        hasServerWrap: Boolean(wrappedDek && wrapSalt && wrapIv),
+      });
     }
-  } catch {
+  } catch (err) {
     // Malformed/unopenable server wrap — fall through to the device table.
+    console.warn('[switch-store] server wrap unwrap FAILED -> per-store table fallback', err);
   }
 
   if (!retargeted) {
     retargeted = retargetDeviceWrapStore(storeId);
+    console.info('[switch-store] retarget via per-store table', { retargeted });
+    if (retargeted) {
+      // Same reason as the server-wrap branch: the session and the key must
+      // never disagree. This wrap is only recoverable through the device key,
+      // so bootstrap re-opens it from the (already retargeted) active entry.
+      clearDek();
+      await bootstrapDeviceDek();
+      console.info('[switch-store] in-memory DEK re-scoped from device table', {
+        dekStoreId: getDekStoreId(),
+      });
+    }
   }
   if (!retargeted) {
+    const table = readDeviceDekTable();
+    console.error('[switch-store] NO WRAP FOR TARGET -> logout', {
+      targetStoreId: storeId,
+      activeTableStoreId: table?.storeId,
+      storesInTable: table ? Object.keys(table.stores ?? {}) : [],
+    });
     useAuthStore.getState().logout();
     return;
   }
@@ -104,6 +181,9 @@ export async function switchToStore(storeId: string): Promise<void> {
   //    password and rewrites TOKEN/CURRENT_USER/AUTH_MODEL), then the hard
   //    refresh the user asked for: every loader, the store switcher's cached
   //    roles and all module gates re-derive from the new store.
+  console.info('[switch-store] updateUser + reload', {
+    newSelectedStoreId: freshUser.selectedStoreId,
+  });
   useAuthStore.getState().updateUser(freshUser);
   window.location.reload();
 }
