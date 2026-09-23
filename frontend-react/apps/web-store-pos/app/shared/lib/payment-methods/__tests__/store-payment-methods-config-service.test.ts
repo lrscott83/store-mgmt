@@ -6,6 +6,7 @@ import {
   StorePaymentMethodsConfigService,
   applyStorePaymentMethodsConfig,
 } from '../store-payment-methods-config-service';
+import type { StorePaymentMethodsConfig } from '../store-payment-methods-config-service';
 import { EntityUnreadableError } from '~/shared/lib/storage/read-entity-or-throw';
 import { StorageKeys } from '~/shared/lib/storage/storage-keys';
 
@@ -158,6 +159,70 @@ describe('StorePaymentMethodsConfigService — read seam', () => {
       // expected
     }
     expect(localStorage.getItem(storageKey(S1))).toBe('not-json');
+  });
+});
+
+describe('StorePaymentMethodsConfigService — backup seams (store-payment-methods-backup)', () => {
+  const CONFIG: StorePaymentMethodsConfig = {
+    enabledMethods: [SalePaymentMethod.Efectivo, SalePaymentMethod.Transferencia],
+  };
+
+  it('getStorageStorePaymentMethods returns null on an absent key and does NOT auto-initialise', () => {
+    const service = new StorePaymentMethodsConfigService(S1);
+    expect(service.getStorageStorePaymentMethods()).toBeNull();
+    // The read seam must not persist the default (auto-init is reserved for
+    // getConfig) — the export side relies on an absent key meaning "never
+    // configured", which an auto-init write would destroy.
+    expect(localStorage.getItem(storageKey(S1))).toBeNull();
+  });
+
+  it('getStorageStorePaymentMethods returns the persisted config when present, without touching it', () => {
+    const service = new StorePaymentMethodsConfigService(S1);
+    service.setMethodEnabled(S1, SalePaymentMethod.Zelle, false);
+    expect(service.getStorageStorePaymentMethods()).toEqual({
+      enabledMethods: [SalePaymentMethod.Efectivo, SalePaymentMethod.Transferencia],
+    });
+    expect(service.getStorageStorePaymentMethods(S2)).toBeNull();
+  });
+
+  it('setConfigFromBackup persists the config encrypted and a fresh instance reads it back', () => {
+    const service = new StorePaymentMethodsConfigService(S1);
+    service.setConfigFromBackup(CONFIG);
+
+    const stored = localStorage.getItem(storageKey(S1)) as string;
+    // No DEK/roster in unit tests -> plaintext passthrough of the JSON.
+    expect(JSON.parse(stored)).toEqual(CONFIG);
+
+    // Fresh instance: both the raw seam and the auto-initing getter see it.
+    const fresh = new StorePaymentMethodsConfigService(S1);
+    expect(fresh.getStorageStorePaymentMethods()).toEqual(CONFIG);
+    expect(fresh.getConfig()).toEqual(CONFIG);
+  });
+
+  it('setConfigFromBackup refreshes the in-memory cache of the same instance', () => {
+    const service = new StorePaymentMethodsConfigService(S1);
+    // Cache the default first (auto-init persists it).
+    service.getConfig();
+    service.setConfigFromBackup(CONFIG);
+    expect(service.getConfig()).toEqual(CONFIG);
+    expect(service.getEnabledMethods()).toEqual([
+      SalePaymentMethod.Efectivo,
+      SalePaymentMethod.Transferencia,
+    ]);
+  });
+
+  it('setConfigFromBackup is per-store: another store is untouched', () => {
+    const service = new StorePaymentMethodsConfigService(S1);
+    service.setConfigFromBackup(CONFIG, S2);
+    expect(service.getStorageStorePaymentMethods(S1)).toBeNull();
+    expect(service.getStorageStorePaymentMethods(S2)).toEqual(CONFIG);
+  });
+
+  it('setImportedStorePaymentMethods satisfies the import seam: persists and returns a success Result', () => {
+    const service = new StorePaymentMethodsConfigService(S1);
+    const result = service.setImportedStorePaymentMethods(CONFIG);
+    expect(result.succeeded).toBe(true);
+    expect(service.getStorageStorePaymentMethods()).toEqual(CONFIG);
   });
 });
 

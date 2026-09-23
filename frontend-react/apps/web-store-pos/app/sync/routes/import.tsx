@@ -12,6 +12,7 @@ import { ChannelRateOfflineService } from '~/management/channel-rates/lib/servic
 import { WarehouseOfflineService } from '~/inventory/lib/services/warehouse-offline-service';
 import { RecipeOfflineService } from '~/inventory/lib/services/recipe-offline-service';
 import { ElaborationOfflineService } from '~/inventory/lib/services/elaboration-offline-service';
+import { StorePaymentMethodsConfigService } from '~/shared/lib/payment-methods/store-payment-methods-config-service';
 import { DataSerializerService } from '~/sync/lib/services/data-serializer-service';
 import { DataSynchronizerService } from '~/sync/lib/services/data-synchronizer-service';
 import { ImportForm } from '~/sync/components/import-form';
@@ -64,6 +65,10 @@ export function ImportPage() {
       warehouseSvc,
       inventorySvc,
     );
+    // store-payment-methods-backup: serves BOTH the serializer's read seam
+    // (getStoredConfig, exported only when the store has a config) and the
+    // synchronizer's write seam (setConfigFromBackup, wholesale overwrite).
+    const storePaymentMethodsSvc = new StorePaymentMethodsConfigService(storeId);
 
     const serializer = new DataSerializerService(
       storeId,
@@ -78,6 +83,7 @@ export function ImportPage() {
       channelRateSvc,
       recipeSvc,
       elaborationSvc,
+      storePaymentMethodsSvc,
     );
 
     // Read file bytes
@@ -118,6 +124,7 @@ export function ImportPage() {
       channelRateSvc,
       recipeSvc,
       elaborationSvc,
+      storePaymentMethodsSvc,
     );
 
     return synchronizer.sync(parsedData);

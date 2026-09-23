@@ -1,5 +1,6 @@
 import type { SalePaymentMethod } from '@store-mgmt/domain';
 import { SalePaymentMethod as PaymentMethodEnum } from '@store-mgmt/domain';
+import { Result } from '@store-mgmt/domain';
 import { StorageKeys } from '~/shared/lib/storage/storage-keys';
 import { encryptEntity } from '~/shared/lib/storage/entity-crypto';
 import { readEntityOrThrow } from '~/shared/lib/storage/read-entity-or-throw';
@@ -117,10 +118,57 @@ export class StorePaymentMethodsConfigService {
     );
   }
 
-  private getConfigFromLocalStorage(storeId: string): StorePaymentMethodsConfig {
-    const stored = readEntityOrThrow(this.getStorageKey(storeId), (json) =>
+  /**
+   * Backup read seam (store-payment-methods-backup): returns the stored
+   * config WITHOUT auto-initialising — an absent key yields `null` (store
+   * never configured), never the default. Structurally satisfies the
+   * serializer's `StorePaymentMethodsReader` (the serializer uses it to decide
+   * whether the backup must carry the entry at all).
+   */
+  getStorageStorePaymentMethods(
+    storeId: string = this.storeId,
+  ): StorePaymentMethodsConfig | null {
+    return this.readConfigFromLocalStorage(storeId);
+  }
+
+  /**
+   * Backup write seam (store-payment-methods-backup): persists the imported
+   * config as-is (encrypted wire format), bypassing the auto-init path —
+   * an archive's config replaces the local one wholesale. Also refreshes the
+   * in-memory cache so subsequent `getConfig()` calls see the imported value.
+   */
+  setConfigFromBackup(
+    config: StorePaymentMethodsConfig,
+    storeId: string = this.storeId,
+  ): void {
+    this.setConfigLocalStorage(storeId, config);
+    this.config = config;
+    this.lastConfigKey = this.getCurrentStorageKey(storeId);
+  }
+
+  /**
+   * Import seam (store-payment-methods-backup): Result-returning wrapper over
+   * {@link setConfigFromBackup} that structurally satisfies the synchronizer's
+   * `StorePaymentMethodsImportService`. A throw while persisting becomes a
+   * failed Result (the synchronizer maps it to StorePaymentMethodsUnexpectedError).
+   */
+  setImportedStorePaymentMethods(config: StorePaymentMethodsConfig): Result {
+    try {
+      this.setConfigFromBackup(config);
+      return Result.Success();
+    } catch {
+      return Result.Failure([]);
+    }
+  }
+
+  private readConfigFromLocalStorage(storeId: string): StorePaymentMethodsConfig | null {
+    return readEntityOrThrow(this.getStorageKey(storeId), (json) =>
       json ? (JSON.parse(json) as StorePaymentMethodsConfig) : null,
     );
+  }
+
+  private getConfigFromLocalStorage(storeId: string): StorePaymentMethodsConfig {
+    const stored = this.readConfigFromLocalStorage(storeId);
     if (stored) return stored;
 
     // Absent key -> auto-init with the default (no-regression).
