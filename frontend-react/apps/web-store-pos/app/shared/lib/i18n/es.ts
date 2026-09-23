@@ -311,6 +311,10 @@ const messages: Record<string, string> = {
   'SHOPPING_CART.CLEAR': 'Limpiar',
   // MultiPayments: etiqueta del selector de moneda del carrito (módulo 16).
   'SHOPPING_CART.CURRENCY_LABEL': 'Moneda',
+  // T4 (payment-channels-and-multipayment): el cambio de moneda se bloquea cuando
+  // alguna línea del carrito no puede convertirse a la moneda destino.
+  'SHOPPING_CART.CURRENCY_CHANGE_BLOCKED':
+    'No se puede cambiar la moneda a {currency}: el producto "{product}" está en {fromCurrency} y no tiene una tasa de cambio vigente.',
   // MultiPayments (módulo 16): lista de pagos del carrito (T7).
   'SHOPPING_CART.MULTI_PAYMENT_TITLE': 'Pagos',
   'SHOPPING_CART.MULTI_PAYMENT_ADD': 'Agregar pago',

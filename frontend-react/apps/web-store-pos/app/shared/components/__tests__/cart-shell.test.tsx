@@ -1337,7 +1337,7 @@ describe('CartShell — mixed-currency cart conversion (módulo 16, T8)', () => 
     expect(cartItems[1].product.currency).toBe(Currency.CUP);
   });
 
-  it('T8-03: blocks the submit and surfaces the typed error when a line cannot be converted', () => {
+  it('T8-03 (T4): a sale currency that cannot convert the cart falls back to the native currency at load — never "0 USD"', () => {
     setSaleCurrencyPreference(Currency.USD);
     mockChannelRates = []; // no CUP rate → CUP→USD is not resolvable
     const cupProduct = makeProduct({
@@ -1356,12 +1356,11 @@ describe('CartShell — mixed-currency cart conversion (módulo 16, T8)', () => 
     renderCartShell();
     openCart();
 
-    const error = screen.getByTestId('cart-line-conversion-error');
-    expect(error).toHaveAttribute('data-error-code', 'ChannelRate.RateNotFound');
-    expect(error).toHaveTextContent(
-      'No existe una tasa de cambio vigente para el canal o la moneda solicitados.',
-    );
-    expect(screen.getByText('Registrar').closest('button')).toBeDisabled();
+    // T4 load-time fallback: sale currency = native CUP, so there is no conversion
+    // error and the total is the native amount — never a "0 USD".
+    expect(screen.queryByTestId('cart-line-conversion-error')).not.toBeInTheDocument();
+    expect(screen.queryByText(/^0\s+USD$/)).not.toBeInTheDocument();
+    expect(screen.getAllByText(/350\s+CUP/).length).toBeGreaterThan(0);
   });
 
   it('T8-04: without module 16 the cart items are passed unchanged (regression guard)', async () => {
@@ -1523,5 +1522,155 @@ describe('CartShell — T3: selector de moneda en la fila del encabezado', () =>
     expect(screen.getByText('Venta actual')).toBeInTheDocument();
     expect(screen.getByText('Limpiar')).toBeInTheDocument();
     expect(screen.getByText('Registrar')).toBeInTheDocument();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// T4 — el cambio de moneda se bloquea si alguna línea no puede convertirse.
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('CartShell — T4: bloqueo del cambio de moneda', () => {
+  const MULTI_PAYMENTS_STORE_MODULES = [11, EModules.MultiPayments];
+
+  function setSaleCurrencyPreference(currency: Currency) {
+    localStorage.setItem('lizoft.cart-currency-u1', String(currency));
+  }
+
+  function cupRate(): ChannelRate {
+    return {
+      method: SalePaymentMethod.Efectivo,
+      currency: Currency.CUP,
+      value: 350,
+      effectiveFrom: new Date('2026-09-01T00:00:00.000Z'),
+    };
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    mockUser = { id: 'u1', selectedStoreId: 's1', storeModuleIds: MULTI_PAYMENTS_STORE_MODULES };
+    mockChannelRates = [];
+    mockProductLookup = {};
+  });
+
+  it('T4-01: con una línea sin tasa, elegir otra moneda no cambia el select y muestra el aviso', () => {
+    const cupProduct = makeProduct({
+      id: 'cup-1',
+      name: 'Pan',
+      price: 350,
+      currency: Currency.CUP,
+    });
+    mockCartState({
+      items: [{ product: cupProduct, quantity: 1 }],
+      total: vi.fn().mockReturnValue(350),
+      cartCurrency: () => Currency.CUP,
+      payments: [],
+      setPayments: vi.fn(),
+    });
+    renderCartShell();
+    openCart();
+
+    const select = screen.getByTestId('cart-currency-select') as HTMLSelectElement;
+    expect(select.value).toBe(String(Currency.CUP));
+
+    fireEvent.change(select, { target: { value: String(Currency.USD) } });
+
+    // Rejected: the selector stays on CUP and nothing is persisted.
+    expect(select.value).toBe(String(Currency.CUP));
+    expect(localStorage.getItem('lizoft.cart-currency-u1')).toBeNull();
+    // Clear message naming the culprit line and currencies.
+    const alert = screen.getByTestId('cart-currency-change-error');
+    expect(alert).toHaveTextContent('USD');
+    expect(alert).toHaveTextContent('Pan');
+    expect(alert).toHaveTextContent('CUP');
+    // Total never renders "0 <currency>".
+    expect(screen.queryByText(/^0\s+USD$/)).not.toBeInTheDocument();
+    expect(screen.getAllByText(/350\s+CUP/).length).toBeGreaterThan(0);
+  });
+
+  it('T4-02: con tasa disponible el cambio se permite y convierte', () => {
+    mockChannelRates = [cupRate()];
+    const cupProduct = makeProduct({
+      id: 'cup-1',
+      name: 'Pan',
+      price: 350,
+      currency: Currency.CUP,
+    });
+    mockCartState({
+      items: [{ product: cupProduct, quantity: 1 }],
+      total: vi.fn().mockReturnValue(350),
+      cartCurrency: () => Currency.CUP,
+      payments: [],
+      setPayments: vi.fn(),
+    });
+    renderCartShell();
+    openCart();
+
+    const select = screen.getByTestId('cart-currency-select') as HTMLSelectElement;
+    fireEvent.change(select, { target: { value: String(Currency.USD) } });
+
+    expect(select.value).toBe(String(Currency.USD));
+    expect(localStorage.getItem('lizoft.cart-currency-u1')).toBe(String(Currency.USD));
+    // 350 CUP / 350 = 1 USD, shown in the total and the line.
+    expect(screen.getAllByText(/^1\s+USD$/).length).toBeGreaterThan(0);
+    expect(screen.queryByTestId('cart-currency-change-error')).not.toBeInTheDocument();
+  });
+
+  it('T4-03: una preferencia persistida que no convierte cae a la moneda nativa al cargar (nunca "0 USD")', () => {
+    setSaleCurrencyPreference(Currency.USD);
+    mockChannelRates = [];
+    const cupProduct = makeProduct({
+      id: 'cup-1',
+      name: 'Pan',
+      price: 350,
+      currency: Currency.CUP,
+    });
+    mockCartState({
+      items: [{ product: cupProduct, quantity: 1 }],
+      total: vi.fn().mockReturnValue(350),
+      cartCurrency: () => Currency.CUP,
+      payments: [],
+      setPayments: vi.fn(),
+    });
+    renderCartShell();
+    openCart();
+
+    expect(screen.queryByTestId('cart-line-conversion-error')).not.toBeInTheDocument();
+    expect(screen.queryByText(/^0\s+USD$/)).not.toBeInTheDocument();
+    const select = screen.getByTestId('cart-currency-select') as HTMLSelectElement;
+    expect(select.value).toBe(String(Currency.CUP));
+    expect(screen.getAllByText(/350\s+CUP/).length).toBeGreaterThan(0);
+  });
+
+  it('T4-04: un carrito mixto que la moneda nativa no puede convertir conserva el bloqueo duro', () => {
+    const usdProduct = makeProduct({
+      id: 'usd-1',
+      name: 'Cafe',
+      price: 10,
+      currency: Currency.USD,
+    });
+    const eurProduct = makeProduct({
+      id: 'eur-1',
+      name: 'Vino',
+      price: 5,
+      currency: Currency.EUR,
+    });
+    mockCartState({
+      items: [
+        { product: usdProduct, quantity: 1 },
+        { product: eurProduct, quantity: 1 },
+      ],
+      total: vi.fn().mockReturnValue(15),
+      cartCurrency: () => Currency.USD,
+      payments: [],
+      setPayments: vi.fn(),
+    });
+    renderCartShell();
+    openCart();
+
+    // Native USD cannot convert the EUR line (no rate) → hard block stays.
+    const error = screen.getByTestId('cart-line-conversion-error');
+    expect(error).toHaveAttribute('data-error-code', 'ChannelRate.RateNotFound');
+    expect(screen.getByText('Registrar').closest('button')).toBeDisabled();
   });
 });

@@ -28,10 +28,22 @@ function itemWith(currency?: Currency) {
   return { product: { currency } };
 }
 
-function renderSelect(value: Currency, onChange = vi.fn()) {
+function renderSelect(
+  value: Currency,
+  onChange = vi.fn(),
+  props: {
+    canChange?: (currency: Currency) => boolean;
+    onRejected?: (currency: Currency) => void;
+  } = {},
+) {
   render(
     <IntlProvider messages={esMessages} locale="es" defaultLocale="es">
-      <CartCurrencySelect value={value} onChange={onChange} testId="cart-currency-select" />
+      <CartCurrencySelect
+        value={value}
+        onChange={onChange}
+        testId="cart-currency-select"
+        {...props}
+      />
     </IntlProvider>,
   );
   return onChange;
@@ -108,5 +120,45 @@ describe('CartCurrencySelect (module 16 gate)', () => {
 
     expect(localStorage.getItem(`lizoft.cart-currency-${USER_ID}`)).toBe('1');
     expect(onChange).toHaveBeenCalledWith(Currency.USD);
+  });
+});
+
+describe('CartCurrencySelect — T4: guard de cambio', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    mockUser = userWith([EModules.MultiPayments]);
+    mockItems = [];
+  });
+
+  it('T4-SEL-01: rechaza el cambio cuando canChange devuelve false (no persiste, no notifica, avisa)', () => {
+    const onChange = vi.fn();
+    const onRejected = vi.fn();
+    const canChange = vi.fn().mockReturnValue(false);
+    renderSelect(Currency.CUP, onChange, { canChange, onRejected });
+
+    fireEvent.change(screen.getByTestId('cart-currency-select'), {
+      target: { value: String(Currency.USD) },
+    });
+
+    expect(canChange).toHaveBeenCalledWith(Currency.USD);
+    expect(onRejected).toHaveBeenCalledWith(Currency.USD);
+    expect(onChange).not.toHaveBeenCalled();
+    expect(localStorage.getItem(`lizoft.cart-currency-${USER_ID}`)).toBeNull();
+    const select = screen.getByTestId('cart-currency-select') as HTMLSelectElement;
+    expect(select.value).toBe(String(Currency.CUP));
+  });
+
+  it('T4-SEL-02: procede cuando canChange devuelve true (persiste y notifica)', () => {
+    const onChange = vi.fn();
+    const canChange = vi.fn().mockReturnValue(true);
+    renderSelect(Currency.CUP, onChange, { canChange });
+
+    fireEvent.change(screen.getByTestId('cart-currency-select'), {
+      target: { value: String(Currency.USD) },
+    });
+
+    expect(canChange).toHaveBeenCalledWith(Currency.USD);
+    expect(onChange).toHaveBeenCalledWith(Currency.USD);
+    expect(localStorage.getItem(`lizoft.cart-currency-${USER_ID}`)).toBe(String(Currency.USD));
   });
 });

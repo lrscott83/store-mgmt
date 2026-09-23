@@ -43,6 +43,15 @@ interface CartCurrencySelectProps {
   value: Currency;
   onChange: (currency: Currency) => void;
   testId?: string;
+  /**
+   * Optional guard evaluated BEFORE the preference is written. Return false to
+   * reject the change: the selector stays on the current currency, nothing is
+   * persisted, and `onRejected` (if provided) is notified. Absent = the change
+   * always proceeds, preserving the pre-T4 behavior for standalone callers.
+   */
+  canChange?: (currency: Currency) => boolean;
+  /** Called with the rejected target currency when `canChange` returns false. */
+  onRejected?: (currency: Currency) => void;
 }
 
 /**
@@ -56,7 +65,13 @@ interface CartCurrencySelectProps {
  * full-width row of its own. On narrow screens the header wraps, keeping the
  * control usable.
  */
-export function CartCurrencySelect({ value, onChange, testId }: CartCurrencySelectProps) {
+export function CartCurrencySelect({
+  value,
+  onChange,
+  testId,
+  canChange,
+  onRejected,
+}: CartCurrencySelectProps) {
   const intl = useIntl();
   const user = useAuthStore((s) => s.user);
   const items = useCartStore((s) => s.items);
@@ -90,8 +105,15 @@ export function CartCurrencySelect({ value, onChange, testId }: CartCurrencySele
   }
 
   function handleChange(currency: number) {
-    writeCartCurrencyPreference(user?.id, currency as Currency);
-    onChange(currency as Currency);
+    const next = currency as Currency;
+    // T4: reject the change BEFORE persisting or notifying the parent, so the
+    // selector stays on the current currency and the preference is untouched.
+    if (canChange && !canChange(next)) {
+      onRejected?.(next);
+      return;
+    }
+    writeCartCurrencyPreference(user?.id, next);
+    onChange(next);
   }
 
   return (
