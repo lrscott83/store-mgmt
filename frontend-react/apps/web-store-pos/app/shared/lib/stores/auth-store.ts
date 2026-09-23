@@ -6,7 +6,7 @@ import { StorageService } from '../auth/storage-service';
 // `storage/`, NOT `offline/` — a STATIC import here is legal by
 // construction. `logout()` is synchronous and must call `clearDek()`
 // synchronously, so a dynamic import is not an option for that call site.
-import { clearDek } from '../storage/data-key-store';
+import { clearDek, getDekStoreId } from '../storage/data-key-store';
 // Static, and NOT from `auth-http-service`: tests mock that module, and Vitest
 // throws on a named export a mock factory omits. `getUserByToken` imports the
 // service dynamically inside a try, so such a throw is swallowed as if it were
@@ -479,6 +479,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   logout: () => {
+    // TEMP DIAGNOSTIC (2026-09-23, switch-logout investigation): records WHO
+    // ended the session and in which state — remove once the root cause is
+    // confirmed. `origin` names the caller through the stack.
+    console.warn('[auth-logout] called', {
+      selectedStoreId: get().user?.selectedStoreId,
+      dekStoreId: getDekStoreId(),
+      origin: new Error('logout-origin').stack,
+    });
     // Decision 1 (auth-service-parity, Slice 3): mirror Angular's logout() —
     // remove ONLY the AUTH_MODEL key. `token` and `currentUser` intentionally
     // stay stale (Angular 1:1 parity, not a bug).

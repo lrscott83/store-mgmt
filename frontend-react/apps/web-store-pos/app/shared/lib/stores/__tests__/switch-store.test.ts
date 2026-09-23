@@ -14,8 +14,12 @@ const mockLogout = vi.hoisted(() => vi.fn());
 const mockUpdateUser = vi.hoisted(() => vi.fn());
 const mockUnwrapDekWithDek = vi.hoisted(() => vi.fn());
 const mockGetDek = vi.hoisted(() => vi.fn());
+const mockGetDekStoreId = vi.hoisted(() => vi.fn());
+const mockSetDek = vi.hoisted(() => vi.fn());
+const mockClearDek = vi.hoisted(() => vi.fn());
 const mockGetOrCreateDeviceKey = vi.hoisted(() => vi.fn());
 const mockWrapDekForDevice = vi.hoisted(() => vi.fn());
+const mockBootstrapDeviceDek = vi.hoisted(() => vi.fn());
 const mockWriteTable = vi.hoisted(() => vi.fn());
 
 // Paths are ALIAS-based on purpose: vi.mock matches RESOLVED module ids, and
@@ -26,6 +30,7 @@ vi.mock('../auth-store', () => ({
     getState: () => ({
       logout: mockLogout,
       updateUser: mockUpdateUser,
+      user: { selectedStoreId: 's1' },
     }),
   },
 }));
@@ -54,6 +59,9 @@ vi.mock('~/shared/lib/offline/dek-unwrap', () => ({
 
 vi.mock('~/shared/lib/storage/data-key-store', () => ({
   getDek: mockGetDek,
+  getDekStoreId: mockGetDekStoreId,
+  setDek: mockSetDek,
+  clearDek: mockClearDek,
 }));
 
 vi.mock('~/shared/lib/storage/device-key-store', () => ({
@@ -62,6 +70,7 @@ vi.mock('~/shared/lib/storage/device-key-store', () => ({
 
 vi.mock('~/shared/lib/storage/dek-bootstrap', () => ({
   wrapDekForDevice: mockWrapDekForDevice,
+  bootstrapDeviceDek: mockBootstrapDeviceDek,
 }));
 
 import { switchToStore } from '../switch-store';
@@ -115,9 +124,11 @@ describe('switchToStore — seamless-store-switch v2 flow', () => {
     });
     mockGetMe.mockResolvedValue(freshUser());
     mockGetDek.mockReturnValue(new Uint8Array(32).fill(7));
+    mockGetDekStoreId.mockReturnValue('s1');
     mockUnwrapDekWithDek.mockResolvedValue(new Uint8Array(32).fill(9));
     mockGetOrCreateDeviceKey.mockResolvedValue({} as CryptoKey);
     mockWrapDekForDevice.mockResolvedValue({ wrappedDek: 'x', wrapIv: 'y' });
+    mockBootstrapDeviceDek.mockResolvedValue(undefined);
     // readDeviceDekTable is aliased to mockRetarget's mock; give it a table.
     mockRetarget.mockImplementation(() => ({
       formatVersion: 2,
@@ -144,6 +155,21 @@ describe('switchToStore — seamless-store-switch v2 flow', () => {
     expect(mockLogout).not.toHaveBeenCalled();
   });
 
+  it('re-scopes the in-memory DEK to the target store BEFORE updateUser (non-atomic-switch fix)', async () => {
+    await switchToStore('s2');
+
+    // La llave en memoria debe pasar a la tienda destino con el unwrap del
+    // server wrap, y ANTES de que `updateUser` cambie la sesión: si no, el
+    // re-render que dispara `updateUser` lee entidades por-tienda con la llave
+    // de la tienda ANTERIOR (el hueco que dejó `storePaymentMethods` ilegible).
+    expect(mockSetDek).toHaveBeenCalledTimes(1);
+    expect(mockSetDek.mock.calls[0][1]).toBe('s2');
+    expect(mockSetDek.mock.invocationCallOrder[0]).toBeLessThan(
+      mockUpdateUser.mock.invocationCallOrder[0],
+    );
+    expect(mockClearDek).not.toHaveBeenCalled();
+  });
+
   it('falls back to the per-store device table when the server wrap cannot be adopted (no DEK in memory)', async () => {
     mockGetDek.mockReturnValue(null);
     mockRetarget.mockReset();
@@ -156,6 +182,8 @@ describe('switchToStore — seamless-store-switch v2 flow', () => {
     expect(mockLogout).toHaveBeenCalledTimes(1);
     expect(mockUpdateUser).not.toHaveBeenCalled();
     expect(mockReload).not.toHaveBeenCalled();
+    expect(mockSetDek).not.toHaveBeenCalled();
+    expect(mockClearDek).not.toHaveBeenCalled();
   });
 
   it('falls back to retargetDeviceWrapStore when the server wrap unwrap fails', async () => {
@@ -171,6 +199,27 @@ describe('switchToStore — seamless-store-switch v2 flow', () => {
     expect(mockLogout).not.toHaveBeenCalled();
     expect(mockUpdateUser).toHaveBeenCalledTimes(1);
     expect(mockReload).toHaveBeenCalledTimes(1);
+  });
+
+  it('re-scopes the DEK via clearDek + bootstrap when the per-store table is the fallback', async () => {
+    mockUnwrapDekWithDek.mockRejectedValue(new Error('bad wrap'));
+    mockRetarget.mockReset();
+    mockRetarget
+      .mockReturnValueOnce({})
+      .mockReturnValueOnce(true);
+
+    await switchToStore('s2');
+
+    // Misma garantía que en la rama del server wrap: la llave en memoria debe
+    // quedar en la tienda destino antes de que la sesión cambie. Aquí solo es
+    // recuperable por la device key, así que se re-abre con bootstrap.
+    expect(mockClearDek).toHaveBeenCalledTimes(1);
+    expect(mockBootstrapDeviceDek).toHaveBeenCalledTimes(1);
+    expect(mockSetDek).not.toHaveBeenCalled();
+    expect(mockClearDek.mock.invocationCallOrder[0]).toBeLessThan(
+      mockUpdateUser.mock.invocationCallOrder[0],
+    );
+    expect(mockLogout).not.toHaveBeenCalled();
   });
 
   it('throws WITHOUT calling getMe when switchMyStore answers succeeded:false', async () => {
