@@ -773,6 +773,8 @@ const messages: Record<string, string> = {
   'INVENTORY_ENTRY.NO_ENTRY_FOUND_IN_DAY': 'No existe ninguna entrada en el día',
   'INVENTORY_ENTRY.NEW_INVENTORY_ENTRY': 'Adicionar Entrada',
   'INVENTORY_ENTRY.EDIT_INVENTORY_ENTRY': 'Editar Entrada',
+  'INVENTORY_ENTRY.WAREHOUSE_COST_NOT_EDITABLE':
+    'El costo de esta entrada se actualiza en el almacén, no se puede editar en la tienda.',
   // Angular source: inventory-today-quantities.component.html + i18n/vocabs/es.ts
   // INVENTORY.TODAY_QUANTITIES/NO_PRODUCTS/PRODUCT/BEGINNING/ENTRIES/AVAILABLE/SOLD/ENDING —
   // Spanish text byte-identical to Angular.

@@ -69,6 +69,11 @@ export function TodayEntriesPage() {
     const all = svc.getActiveInventoryEntriesStorage();
     const found = all.find((e) => e.id === entry.id);
     if (found) {
+      // A8: getActiveInventoryEntriesStorage() projects to InventoryEntryView and drops the
+      // warehouse seal, so read the full stored entry to preserve it for the modal.
+      const stored = [...svc.getStorageInventoriesMap().values()]
+        .flat()
+        .find((e) => e.id === entry.id);
       // InventoryEntryView has different shape; reconstruct minimal InventoryEntry
       setEditingEntry({
         id: entry.id,
@@ -84,6 +89,8 @@ export function TodayEntriesPage() {
         createdByName: '',
         updatedDate: new Date(),
         updatedByName: '',
+        // A8: preserve the warehouse-origin seal so the modal can lock the store edit.
+        warehouseSaleOutMovementId: stored?.warehouseSaleOutMovementId,
       });
     }
     setIsModalOpen(true);

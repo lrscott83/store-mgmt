@@ -3,6 +3,7 @@ import { act, render, screen, fireEvent, within, waitFor } from '@testing-librar
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 import type {
+  InventoryEntry,
   InventoryEntryView,
   Order,
   OrderItem,
@@ -1981,5 +1982,75 @@ describe('EgressPage — Mayorista wholesale-sale screen (Angular egress.compone
       OrderType.Merma,
       expect.any(Number),
     );
+  });
+});
+
+// ─── TodayEntriesPage — handleEdit preserves the warehouse-origin seal (A8) ────
+//
+// InventoryEntryView carries no `warehouseSaleOutMovementId`; handleEdit rebuilds the full
+// InventoryEntry from getActiveInventoryEntriesStorage(). The warehouse seal must survive that
+// rebuild, otherwise the modal would let the store edit a warehouse-origin entry.
+
+describe('TodayEntriesPage — handleEdit preserves the warehouse-origin seal (A8)', () => {
+  it('opens the edit modal with the warehouse cost lock when the stored entry carries the seal', async () => {
+    const todayEntries: InventoryEntryView[] = [
+      {
+        id: 'e1',
+        productId: 'p1',
+        productName: 'Ron',
+        quantity: 5,
+        costPrice: 3,
+        date: new Date(),
+        isActive: true,
+      },
+    ];
+    const storedEntry: InventoryEntry = {
+      id: 'e1',
+      productId: 'p1',
+      categoryId: 'cat1',
+      quantity: 5,
+      available: 5,
+      costPrice: 3,
+      date: new Date(),
+      order: 0,
+      isActive: true,
+      createdDate: new Date(),
+      createdByName: 'test',
+      updatedDate: new Date(),
+      updatedByName: 'test',
+      warehouseSaleOutMovementId: 'mv-1',
+    };
+    vi.mocked(InventoryOfflineService).mockImplementation(
+      () =>
+        ({
+          getInventoryEntriesInDay: vi.fn().mockReturnValue(bm(todayEntries)),
+          // Faithful double: the real projection returns InventoryEntryView[] and DROPS the
+          // warehouse seal; only getStorageInventoriesMap() exposes the full stored entry.
+          getActiveInventoryEntriesStorage: vi.fn().mockReturnValue([
+            {
+              id: 'e1',
+              productId: 'p1',
+              productName: '',
+              quantity: 5,
+              costPrice: 3,
+              date: new Date(),
+              isActive: true,
+            },
+          ]),
+          getStorageInventoriesMap: vi.fn().mockReturnValue(new Map([['p1', [storedEntry]]])),
+        }) as unknown as InstanceType<typeof InventoryOfflineService>,
+    );
+
+    render(
+      <Wrapper>
+        <TodayEntriesPage />
+      </Wrapper>,
+    );
+
+    fireEvent.click(screen.getByTestId('entry-actions-toggle-e1'));
+    fireEvent.click(screen.getByText('Editar'));
+
+    expect(await screen.findByTestId('entry-warehouse-cost-message')).toBeInTheDocument();
+    expect(screen.getByLabelText('Precio de costo')).toBeDisabled();
   });
 });
