@@ -648,7 +648,7 @@ describe('Vista Movimientos de almacén', () => {
     fireEvent.click(screen.getByText('Guardar'));
     await waitFor(() => expect(confirmDialogMock).toHaveBeenCalledTimes(1));
     expect(confirmDialogMock.mock.calls[0][0].title).toBe('Propagar costo de la compra');
-    expect(confirmDialogMock.mock.calls[0][0].message).toContain('de 5 CUP a 7 CUP');
+    expect(confirmDialogMock.mock.calls[0][0].message).toContain('de 5\u00A0CUP a 7\u00A0CUP');
     expect(fakeState.applyCostEditImpl).not.toHaveBeenCalled();
   });
 

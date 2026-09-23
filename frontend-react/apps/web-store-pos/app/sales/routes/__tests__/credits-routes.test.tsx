@@ -166,7 +166,7 @@ describe('TodaySaleCreditsPage — header y colores (gear-menu recorte + amarill
     const header = () => document.querySelector('[data-slot="card-header"]') as HTMLElement;
     await screen.findByText('Ana');
 
-    // Crédito UNPAID de 40 → n=1, total 40 CUP.
+    // Crédito UNPAID de 40 → n=1, total 40\u00A0CUP.
     expect(within(header()).getByText('(1)')).toBeInTheDocument();
     expect(within(header()).getByText('40 CUP')).toBeInTheDocument();
 
@@ -174,7 +174,7 @@ describe('TodaySaleCreditsPage — header y colores (gear-menu recorte + amarill
     expect(within(header()).getByText(esMessages['SALE_CREDIT.TODAY_CREDITS'])).toBeInTheDocument();
   });
 
-  it('TC-HEAD-PAID: el header cuenta TODOS los créditos pero el total suma solo los impagos (pagado → 0 CUP verde)', async () => {
+  it('TC-HEAD-PAID: el header cuenta TODOS los créditos pero el total suma solo los impagos (pagado → 0\u00A0CUP verde)', async () => {
     seedTodayCredit({ total: 40, isPaid: true, paid: 40 });
     render(
       <Wrapper>
@@ -185,7 +185,7 @@ describe('TodaySaleCreditsPage — header y colores (gear-menu recorte + amarill
     const header = () => document.querySelector('[data-slot="card-header"]') as HTMLElement;
     await screen.findByText('Ana');
     expect(within(header()).getByText('(1)')).toBeInTheDocument();
-    // Total = solo impagos: el crédito está PAGADO → 0, CUP en verde.
+    // Total = solo impagos: el crédito está PAGADO → 0,\u00A0CUP en verde.
     const headerTotal = within(header()).getByText('0 CUP');
     expect(headerTotal).toHaveClass('text-success');
   });
@@ -391,7 +391,7 @@ describe('SaleCreditsPage (history) — behavioral (Angular parity)', () => {
     );
 
     // Header unpaid-count badge + total appear once the async filter resolves. The total
-    // (40 CUP) shows twice — the card header and the single day-panel — so match all.
+    // (40\u00A0CUP) shows twice — the card header and the single day-panel — so match all.
     expect(await screen.findByText('(1)')).toBeInTheDocument();
     expect(screen.getAllByText('40 CUP').length).toBeGreaterThan(0);
     // Angular parity: history always calls the filter with four nulls.
@@ -597,7 +597,7 @@ describe('SaleCreditsPage (history) — header TODOS + gear/amarillito (petició
 
     const header = () => document.querySelector('[data-slot="card-header"]') as HTMLElement;
     await screen.findByText('(2)');
-    // Header total 40 CUP (solo impagos) en ámbar (40 > 0).
+    // Header total 40\u00A0CUP (solo impagos) en ámbar (40 > 0).
     expect(within(header()).getByText('40 CUP')).toHaveClass('text-warning');
     // Expandir el panel para que existan las filas.
     fireEvent.click(screen.getByTestId('credit-date-panel-toggle-2024-03-15'));
@@ -605,7 +605,7 @@ describe('SaleCreditsPage (history) — header TODOS + gear/amarillito (petició
     const tbody = document.querySelector('tbody') as HTMLElement;
     expect(await within(tbody).findByText('40 CUP')).toHaveClass('text-warning');
     expect(within(tbody).getByText('60 CUP')).toHaveClass('text-success');
-    // Total del panel del día (40 CUP = SOLO impagos: 40 + 0) también en ámbar.
+    // Total del panel del día (40\u00A0CUP = SOLO impagos: 40 + 0) también en ámbar.
     // El span HOJA (sin hijos) evita matchear el contenedor padre (mismo textContent).
     const dayToggle = screen.getByTestId('credit-date-panel-toggle-2024-03-15');
     const dayTotal = [...dayToggle.querySelectorAll('span')].find(
@@ -852,7 +852,7 @@ describe('SaleCreditsPage (multi-store mode)', () => {
     await waitFor(() => expect(within(header()).getByText('(3)')).toBeInTheDocument());
     expect(within(header()).getByText('35 CUP')).toBeInTheDocument();
 
-    // Narrowing to Tienda B narrows the header to that store only (1 unpaid, 5 CUP).
+    // Narrowing to Tienda B narrows the header to that store only (1 unpaid, 5\u00A0CUP).
     fireEvent.change(screen.getByTestId('multistore-select'), { target: { value: 's2' } });
     await waitFor(() => expect(within(header()).getByText('(1)')).toBeInTheDocument());
     expect(within(header()).getByText('5 CUP')).toBeInTheDocument();
@@ -961,7 +961,7 @@ describe('SaleCreditsPage — filtro por estado de pago (credits-paid-green-filt
     expect(porPagar.checked).toBe(false);
     expect(pagados.checked).toBe(false);
 
-    // Todos (default): count = 2 créditos, total = solo el impago (40 CUP).
+    // Todos (default): count = 2 créditos, total = solo el impago (40\u00A0CUP).
     expect(within(header()).getByText('(2)')).toBeInTheDocument();
     expect(within(header()).getByText('40 CUP')).toBeInTheDocument();
   });
@@ -1075,7 +1075,7 @@ describe('SaleCreditsPage — filtro por estado de pago (credits-paid-green-filt
     const header = () => document.querySelector('[data-slot="card-header"]') as HTMLElement;
     fireEvent.click(screen.getByTestId('multistore-panel-toggle-s1'));
 
-    // Todos (default): count 2, total = solo impagos (10 CUP).
+    // Todos (default): count 2, total = solo impagos (10\u00A0CUP).
     await waitFor(() => expect(within(header()).getByText('(2)')).toBeInTheDocument());
     expect(within(header()).getByText('10 CUP')).toBeInTheDocument();
 

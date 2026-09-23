@@ -188,7 +188,7 @@ describe('CuadrePorFechasPage', () => {
     });
 
     // KPI values: Ventas 1000, Gastos 80, Ganancias Bruta 300 (sales profit only),
-    // Ganancias 220 (gross − expenses). getAllByText: the 80 CUP expense also
+    // Ganancias 220 (gross − expenses). getAllByText: the 80\u00A0CUP expense also
     // renders inside the collapsed Gastos panel header. NBSP is normalized to a
     // plain space by getByText.
     expect(screen.getAllByText('1 000 CUP').length).toBeGreaterThan(0);

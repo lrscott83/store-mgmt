@@ -95,8 +95,12 @@ public class SwitchMyStoreCommandHandlerTests
 
     private static Store StoreWithId(Guid id)
     {
+        // Entity<TId>.Id es init-only: Store.Create no acepta Id explícito, así
+        // que se fija por reflexión (el handler compara Ids de tiendas).
         var store = Store.Create($"Tienda {id:N}", Guid.NewGuid(), true, Guid.NewGuid());
-        store.Id = id;
+        typeof(Domain.Common.Entities.Entity<Guid>)
+            .GetProperty(nameof(Domain.Common.Entities.Entity<Guid>.Id))
+            ?.SetValue(store, id);
         return store;
     }
 

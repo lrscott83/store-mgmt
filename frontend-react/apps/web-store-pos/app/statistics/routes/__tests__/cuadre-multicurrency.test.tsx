@@ -130,7 +130,7 @@ describe('CuadrePorFechasPage — MultiMonedas totals', () => {
     fixtures.paidCredits = [];
   });
 
-  it('gate OFF: keeps the legacy mixed total (35 CUP)', async () => {
+  it('gate OFF: keeps the legacy mixed total (35\u00A0CUP)', async () => {
     fixtures.salesTotal = 35;
     fixtures.categories = [
       { id: 'cat1', name: 'Bebidas', order: 1, total: 35, itemsCount: 2, productItems: [] },
@@ -213,12 +213,12 @@ describe('CuadrePorFechasPage — MultiMonedas in multi-store mode', () => {
     };
   }
 
-  it('gate OFF: aggregate KPIs keep the legacy mixed totals (35 CUP / 13 CUP)', async () => {
+  it('gate OFF: aggregate KPIs keep the legacy mixed totals (35\u00A0CUP / 13\u00A0CUP)', async () => {
     seedTwoStores();
     renderPage();
     generate();
     await waitFor(() => expect(screen.getByText('Ganancias Bruta')).toBeTruthy());
-    // Aggregate sales = 30 + 5 = 35 CUP; gross/net = 10 + 3 = 13 CUP (never a mixed display here).
+    // Aggregate sales = 30 + 5 = 35\u00A0CUP; gross/net = 10 + 3 = 13\u00A0CUP (never a mixed display here).
     expect(screen.getAllByText('35 CUP').length).toBeGreaterThan(0);
     expect(screen.getAllByText('13 CUP').length).toBeGreaterThan(0);
   });

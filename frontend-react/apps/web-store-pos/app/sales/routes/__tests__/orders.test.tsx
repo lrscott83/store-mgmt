@@ -483,7 +483,7 @@ describe('OrdersPage — filtro dinámico de métodos de pago', () => {
     expect(screen.getByText('Transferencia (CUP)')).toBeInTheDocument();
     expect(screen.queryByText('Zelle')).not.toBeInTheDocument();
 
-    // Filtrar por Transferencia (CUP) deja solo la venta Tarjeta: (1) y 50 CUP
+    // Filtrar por Transferencia (CUP) deja solo la venta Tarjeta: (1) y 50\u00A0CUP
     // (el texto también aparece en el panel del día, de ahí getAllByText).
     fireEvent.click(screen.getByText('Transferencia (CUP)'));
     expect(screen.getAllByText('(1)').length).toBeGreaterThan(0);

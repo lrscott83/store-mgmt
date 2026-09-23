@@ -571,7 +571,7 @@ describe('TodayStatsPage — money never wraps (no-cut invariant)', () => {
       </Wrapper>,
     );
     fireEvent.click(await screen.findByRole('button', { name: /Resumen Efectivo/ }));
-    // Ventas row: 23 CUP 456.70 (NBSP normalized to space by getByText). The
+    // Ventas row: 23\u00A0CUP 456.70 (NBSP normalized to space by getByText). The
     // same figure renders ONLY inside the cash table (cash uses paymentType
     // filters: only the Efectivo order counts).
     const ventas = screen.getAllByText('23 456.70 CUP');
@@ -590,7 +590,7 @@ describe('TodayStatsPage — money never wraps (no-cut invariant)', () => {
       </Wrapper>,
     );
     fireEvent.click(await screen.findByRole('button', { name: /Gastos \(1\)/ }));
-    // 1 CUP 234.50 renders in the collapsed panel header AND the expanded row —
+    // 1\u00A0CUP 234.50 renders in the collapsed panel header AND the expanded row —
     // every occurrence must carry the guard.
     const amounts = screen.getAllByText('1 234.50 CUP');
     expect(amounts.length).toBeGreaterThan(0);

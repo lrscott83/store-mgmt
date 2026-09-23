@@ -189,7 +189,7 @@ describe('TodayStatsPage — MultiMonedas per-currency net', () => {
 
     renderPage();
 
-    // Net: USD 30 − 10 = 20 (primary), EUR 5 − 2 = 3 (chip). Never the mixed 23 CUP.
+    // Net: USD 30 − 10 = 20 (primary), EUR 5 − 2 = 3 (chip). Never the mixed 23\u00A0CUP.
     // The EUR 3 also appears in the cash panel (EUR 5 sales − EUR 2 expenses).
     expect((await screen.findAllByText('20 USD')).length).toBeGreaterThan(0);
     expect(screen.getAllByText('3 EUR').length).toBeGreaterThan(0);

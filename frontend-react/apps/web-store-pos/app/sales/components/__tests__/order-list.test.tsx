@@ -155,7 +155,7 @@ describe('OrderList — money never wraps (no-cut invariant)', () => {
     const totals = screen.getAllByText('46 913.40 CUP');
     expect(totals.length).toBeGreaterThan(0);
     for (const el of totals) {
-      expect(el.className, 'every 46 CUP 913.40 must carry whitespace-nowrap').toMatch(
+      expect(el.className, 'every 46\u00A0CUP 913.40 must carry whitespace-nowrap').toMatch(
         /whitespace-nowrap/,
       );
     }

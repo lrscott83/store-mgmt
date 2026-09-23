@@ -133,7 +133,7 @@ describe('OrdersPage — header «Ventas (n)» + total, línea de totales elimin
     );
     await screen.findByTestId('multistore-panel-toggle-s1');
 
-    // Header shows the aggregate of every active store (3 orders, 350 CUP).
+    // Header shows the aggregate of every active store (3 orders, 350\u00A0CUP).
     expect(screen.getAllByText('(3)').length).toBeGreaterThan(0);
     expect(screen.getAllByText('350 CUP').length).toBeGreaterThan(0);
     // The totals row under the store filter is REMOVED.
@@ -157,7 +157,7 @@ describe('OrdersPage — header «Ventas (n)» + total, línea de totales elimin
 
     fireEvent.change(screen.getByTestId('multistore-select'), { target: { value: 's2' } });
 
-    // Only store 2 is counted now: 1 order, 50 CUP.
+    // Only store 2 is counted now: 1 order, 50\u00A0CUP.
     expect(screen.getAllByText('(1)').length).toBeGreaterThan(0);
     expect(screen.getAllByText('50 CUP').length).toBeGreaterThan(0);
   });
@@ -174,7 +174,7 @@ describe('OrdersPage — header «Ventas (n)» + total, línea de totales elimin
     );
     await screen.findByTestId('multistore-panel-toggle-s1');
 
-    // Store panel headers keep their per-store counts/totals (s1: 1/100, CUP s2: 0/0 CUP).
+    // Store panel headers keep their per-store counts/totals (s1: 1/100,\u00A0CUP s2: 0/0\u00A0CUP).
     const panel1 = screen.getByTestId('multistore-panel-toggle-s1');
     expect(panel1.textContent).toContain('(1)');
     expect(panel1.textContent).toContain('100\u00A0CUP');

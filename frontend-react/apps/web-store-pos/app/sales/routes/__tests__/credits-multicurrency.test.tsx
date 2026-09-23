@@ -91,7 +91,7 @@ describe('SaleCreditsPage — MultiMonedas header + day totals', () => {
     credits.items = [];
   });
 
-  it('gate OFF: keeps the legacy mixed total (75 CUP)', async () => {
+  it('gate OFF: keeps the legacy mixed total (75\u00A0CUP)', async () => {
     credits.items = [
       makeCredit({ id: 'usd', total: 30, currency: Currency.USD }),
       makeCredit({ id: 'eur', total: 45, currency: Currency.EUR }),
@@ -135,10 +135,10 @@ describe('SaleCreditsPage — MultiMonedas header in multi-store mode', () => {
     );
   }
 
-  it('gate OFF: keeps the legacy aggregate header total across stores (75 CUP)', async () => {
+  it('gate OFF: keeps the legacy aggregate header total across stores (75\u00A0CUP)', async () => {
     seedTwoStores();
     renderPage();
-    // Header outside the panels aggregates every visible store: 30 + 45 = 75 CUP.
+    // Header outside the panels aggregates every visible store: 30 + 45 = 75\u00A0CUP.
     expect(await screen.findByText('75 CUP')).toBeInTheDocument();
   });
 

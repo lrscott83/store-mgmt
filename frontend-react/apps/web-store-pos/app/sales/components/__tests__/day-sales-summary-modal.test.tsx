@@ -14,7 +14,7 @@ function Wrapper({ children }: { children: React.ReactNode }) {
 
 // money-never-wraps — the per-day Resumen de ventas modal (opened from the
 // sales-history day gear menu) shows four money metrics in a 4-column grid;
-// on narrow screens a grouped amount like 1 CUP 234 567.89 must never split
+// on narrow screens a grouped amount like 1\u00A0CUP 234 567.89 must never split
 // across lines. formatCurrency groups thousands with U+00A0 (NBSP) and the
 // modal wraps every metric value in whitespace-nowrap. Pinned per user
 // report: amounts were being cut when the day panel expanded.

@@ -142,7 +142,7 @@ describe('OrdersPage — MultiMonedas header in multi-store mode', () => {
     );
   }
 
-  it('gate OFF: keeps the legacy aggregate header total across stores (35 CUP)', async () => {
+  it('gate OFF: keeps the legacy aggregate header total across stores (35\u00A0CUP)', async () => {
     seedTwoStores();
     renderPage();
     expect(await screen.findByText('35 CUP')).toBeInTheDocument();

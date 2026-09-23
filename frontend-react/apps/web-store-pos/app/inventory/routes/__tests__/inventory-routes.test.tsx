@@ -1578,7 +1578,7 @@ describe('InventoryTodaySalesProfitPage — product inclusion filter (Angular pa
       </Wrapper>,
     );
 
-    // Product row renders: name, sold=5, amount=50 CUP and profit=50 CUP (no cost, since no
+    // Product row renders: name, sold=5, amount=50\u00A0CUP and profit=50\u00A0CUP (no cost, since no
     // productCosts were recorded) — proves the discountFromInvantory=false product was NOT
     // excluded and its sale is fully counted. Amounts render via formatCurrency ("50 CUP",
     // no trailing .00).
@@ -1752,7 +1752,7 @@ describe('InventoryTodaySalesProfitPage — entry-only rows (gap #4)', () => {
     expect(row).not.toBeNull();
     // sold = 0
     expect(row).toHaveTextContent('0');
-    // avg unitCost = ((10*2) + (10*4)) / 20 = 3 CUP (informational only)
+    // avg unitCost = ((10*2) + (10*4)) / 20 = 3\u00A0CUP (informational only)
     expect(row).toHaveTextContent('3 CUP');
 
     // Totals unaffected: nothing was sold, so sold/amount/cost/profit all stay at 0.
@@ -1798,7 +1798,7 @@ describe('InventoryTodaySalesProfitPage — non-mutating FIFO cost (gap #3c, del
       quantity: 3,
       price: 10,
       productBusinessId: 'biz-1',
-      // FIFO breakdown recorded at sale time: 2 units @ 2 CUP + 1 unit @ 3 CUP = totalCost 7.
+      // FIFO breakdown recorded at sale time: 2 units @ 2\u00A0CUP + 1 unit @ 3\u00A0CUP = totalCost 7.
       productCosts: [
         { inventoryId: 'e1', costPrice: 2, quantity: 2 },
         { inventoryId: 'e2', costPrice: 3, quantity: 1 },

@@ -559,7 +559,7 @@ describe('ExpensesHistoryPage — strict Angular parity', () => {
     });
 
     fireEvent.click(screen.getByText('Transferencia (CUP)'));
-    // Solo el gasto Tarjeta (15): header (1) y total 15 CUP (también en el panel del día).
+    // Solo el gasto Tarjeta (15): header (1) y total 15\u00A0CUP (también en el panel del día).
     expect(screen.getAllByText('(1)').length).toBeGreaterThan(0);
     expect(screen.getAllByText('15 CUP').length).toBeGreaterThan(0);
   });
@@ -684,7 +684,7 @@ describe('ExpensesHistoryPage — strict Angular parity', () => {
 
     fireEvent.click(screen.getByLabelText('Transferencia (CUP)'));
     expect(await screen.findByText('(1)')).toBeInTheDocument();
-    // 25 CUP now appears twice: the header total and the (single) day-panel total.
+    // 25\u00A0CUP now appears twice: the header total and the (single) day-panel total.
     expect(screen.getAllByText('25 CUP')).toHaveLength(2);
   });
 
@@ -731,7 +731,7 @@ describe('ExpensesHistoryPage — strict Angular parity', () => {
     fireEvent.click(screen.getByTestId('date-range-filter-select'));
     fireEvent.click(screen.getByTestId('date-range-filter-button'));
 
-    // Solo el gasto del 15/03 (el del 16 queda fuera): header (1) y 10 CUP.
+    // Solo el gasto del 15/03 (el del 16 queda fuera): header (1) y 10\u00A0CUP.
     expect(await screen.findAllByText('(1)').then((els) => els.length)).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText('10 CUP').length).toBeGreaterThan(0);
     expect(screen.queryByText('25 CUP')).not.toBeInTheDocument();
@@ -830,7 +830,7 @@ describe('ExpensesHistoryPage — modo multistore (paneles por tienda)', () => {
     expect(screen.getByText('15 CUP')).toBeInTheDocument(); // total tienda s1
     expect(screen.getByText('7 CUP')).toBeInTheDocument(); // total tienda s2
 
-    // Global fuera de los paneles: 3 gastos, 22 CUP.
+    // Global fuera de los paneles: 3 gastos, 22\u00A0CUP.
     expect(screen.getByText('(3)')).toBeInTheDocument();
     expect(screen.getByText('22 CUP')).toBeInTheDocument();
 
@@ -868,7 +868,7 @@ describe('ExpensesHistoryPage — modo multistore (paneles por tienda)', () => {
     expect(row).not.toBeNull();
     expect(row!.contains(rangeInput)).toBe(true);
 
-    // Sin rango: (3) gastos, 22 CUP global.
+    // Sin rango: (3) gastos, 22\u00A0CUP global.
     expect(screen.getByText('(3)')).toBeInTheDocument();
     expect(screen.getByText('22 CUP')).toBeInTheDocument();
 
@@ -883,7 +883,7 @@ describe('ExpensesHistoryPage — modo multistore (paneles por tienda)', () => {
     fireEvent.click(screen.getByTestId('date-range-filter-select'));
     fireEvent.click(screen.getByTestId('date-range-filter-button'));
 
-    // Header global (1) + panel de Tienda Uno (1); 10 CUP en global y panel de s1.
+    // Header global (1) + panel de Tienda Uno (1); 10\u00A0CUP en global y panel de s1.
     expect(screen.getAllByText('(1)').length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText('10 CUP').length).toBeGreaterThanOrEqual(1);
     expect(screen.queryByText('(3)')).not.toBeInTheDocument();
@@ -940,13 +940,13 @@ describe('ExpensesHistoryPage — modo multistore (paneles por tienda)', () => {
     expect(efectivoRadios).toHaveLength(1);
     fireEvent.click(efectivoRadios[0]);
 
-    // Global: quedan 2 de 3 (17 CUP) — el header y el total por tienda de s2.
+    // Global: quedan 2 de 3 (17\u00A0CUP) — el header y el total por tienda de s2.
     await waitFor(() => {
       expect(screen.getByText('(2)')).toBeInTheDocument();
       expect(screen.getByText('17 CUP')).toBeInTheDocument();
     });
 
-    // Expandir s1 (tienda + día): solo el gasto en efectivo; s2 no cambió (7 CUP).
+    // Expandir s1 (tienda + día): solo el gasto en efectivo; s2 no cambió (7\u00A0CUP).
     fireEvent.click(screen.getByTestId('multistore-panel-toggle-s1'));
     fireEvent.click(screen.getByTestId('multistore-expense-day-panel-toggle-s1-2024-03-15'));
     expect(screen.getByTestId('expense-row-a')).toBeInTheDocument();
