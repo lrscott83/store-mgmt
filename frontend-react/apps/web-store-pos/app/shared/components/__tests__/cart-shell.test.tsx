@@ -636,6 +636,7 @@ describe('CartShell — wholesale cart floor rule + tier repricing', () => {
       total: vi.fn().mockReturnValue(216),
       removeItem,
       updateQuantity,
+      orderType: OrderType.Mayorista,
     });
 
     renderCartShell();
@@ -665,6 +666,7 @@ describe('CartShell — wholesale cart floor rule + tier repricing', () => {
       total: vi.fn().mockReturnValue(1080),
       removeItem,
       updateQuantity,
+      orderType: OrderType.Mayorista,
     });
 
     renderCartShell();
@@ -685,6 +687,7 @@ describe('CartShell — wholesale cart floor rule + tier repricing', () => {
       items: [{ product, quantity: 288, price: 8 }],
       total: vi.fn().mockReturnValue(2304),
       updateQuantity,
+      orderType: OrderType.Mayorista,
     });
 
     renderCartShell();
@@ -703,6 +706,7 @@ describe('CartShell — wholesale cart floor rule + tier repricing', () => {
       items: [{ product, quantity: 240, price: 9 }],
       total: vi.fn().mockReturnValue(2160),
       updateQuantity,
+      orderType: OrderType.Mayorista,
     });
 
     renderCartShell();
@@ -721,6 +725,7 @@ describe('CartShell — wholesale cart floor rule + tier repricing', () => {
       items: [{ product, quantity: 264, price: 8 }],
       total: vi.fn().mockReturnValue(2112),
       updateQuantity,
+      orderType: OrderType.Mayorista,
     });
 
     renderCartShell();
@@ -1018,6 +1023,7 @@ describe('CartShell — venta mayorista mostrada en paquetes', () => {
     mockCartState({
       items: [{ product: beer, quantity: 72 }],
       total: vi.fn().mockReturnValue(47520),
+      orderType: OrderType.Mayorista,
     });
     renderCartShell();
     expect(screen.getByTestId('cart-badge')).toHaveTextContent('3');
@@ -1028,6 +1034,7 @@ describe('CartShell — venta mayorista mostrada en paquetes', () => {
     mockCartState({
       items: [{ product: beer, quantity: 48, price: 660 }],
       total: vi.fn().mockReturnValue(31680),
+      orderType: OrderType.Mayorista,
     });
     renderCartShell();
     openCart();
@@ -1043,6 +1050,7 @@ describe('CartShell — venta mayorista mostrada en paquetes', () => {
       items: [{ product: beer, quantity: 48 }],
       total: vi.fn().mockReturnValue(31680),
       updateQuantity,
+      orderType: OrderType.Mayorista,
     });
 
     renderCartShell();
@@ -1061,6 +1069,7 @@ describe('CartShell — venta mayorista mostrada en paquetes', () => {
       items: [{ product: beer, quantity: 48 }],
       total: vi.fn().mockReturnValue(31680),
       updateQuantity,
+      orderType: OrderType.Mayorista,
     });
 
     renderCartShell();
@@ -1091,6 +1100,116 @@ describe('CartShell — venta mayorista mostrada en paquetes', () => {
     });
     renderCartShell();
     expect(screen.getByTestId('cart-badge')).toHaveTextContent('10');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Venta NORMAL con producto mayorista (cart-wholesale-by-order-type, 2026-09-23):
+// el modo lo define el orderType del carrito, no la config del producto — un
+// producto mayorista vendido en venta normal se comporta como retail (unidades,
+// precio unitario, paso ±1, sin piso de paquetes ni re-tier).
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('CartShell — venta NORMAL con producto mayorista', () => {
+  /** Producto mayorista: packSize 24, rangos 1→$9, 11→$8, retail $10. */
+  const wholesaleBeer = makeProduct({
+    id: 'beer-1',
+    name: 'Cerveza',
+    price: 10,
+    wholesaleEnabled: true,
+    wholesalePackSize: 24,
+    wholesaleTiers: [
+      { minPacks: 1, pricePerUnit: 9 },
+      { minPacks: 11, pricePerUnit: 8 },
+    ],
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUser = { selectedStoreId: 's1', storeModuleIds: [11] };
+    mockProductLookup = {};
+    localStorage.clear();
+  });
+
+  it('el badge cuenta UNIDADES: 1 unidad del producto mayorista → badge 1 y "Registrar" habilitado', () => {
+    mockCartState({
+      items: [{ product: wholesaleBeer, quantity: 1 }],
+      total: vi.fn().mockReturnValue(10),
+    });
+    renderCartShell();
+    expect(screen.getByTestId('cart-badge')).toHaveTextContent('1');
+    openCart();
+    expect(screen.getByText('Registrar').closest('button')).not.toBeDisabled();
+  });
+
+  it('la línea muestra el formato retail "Precio: $10 (1)", no "Cajas: 0"', () => {
+    mockCartState({
+      items: [{ product: wholesaleBeer, quantity: 1 }],
+      total: vi.fn().mockReturnValue(10),
+    });
+    renderCartShell();
+    openCart();
+    expect(screen.getByText(/Precio:\s+10\s+CUP \(1\)/)).toBeInTheDocument();
+    expect(screen.queryByText(/Cajas:/)).not.toBeInTheDocument();
+  });
+
+  it('+ mueve la cantidad de a 1 unidad SIN precio mayorista (sin re-tier)', async () => {
+    mockProductLookup = { 'beer-1': wholesaleBeer };
+    const updateQuantity = vi.fn();
+    mockCartState({
+      items: [{ product: wholesaleBeer, quantity: 1 }],
+      total: vi.fn().mockReturnValue(10),
+      updateQuantity,
+    });
+
+    renderCartShell();
+    openCart();
+    fireEvent.click(screen.getByLabelText('Aumentar cantidad de Cerveza'));
+
+    // 1 + 1 = 2 unidades; sin tercer argumento (no se re-tier el precio).
+    await waitFor(() => expect(updateQuantity).toHaveBeenCalledWith('beer-1', 2));
+    expect(updateQuantity.mock.calls[0].length).toBe(2);
+  });
+
+  it('− mueve la cantidad de a 1 unidad; al llegar a 0 la línea se elimina (qty <= 0 del store)', async () => {
+    mockProductLookup = { 'beer-1': wholesaleBeer };
+    const updateQuantity = vi.fn();
+    const removeItem = vi.fn();
+    mockCartState({
+      items: [{ product: wholesaleBeer, quantity: 1 }],
+      total: vi.fn().mockReturnValue(10),
+      updateQuantity,
+      removeItem,
+    });
+
+    renderCartShell();
+    openCart();
+    fireEvent.click(screen.getByLabelText('Disminuir cantidad de Cerveza'));
+
+    // 1 - 1 = 0 → updateQuantity(id, 0): la implementación del store elimina la
+    // línea (qty <= 0 → removeItem), sin piso de paquetes ni re-tier.
+    await waitFor(() => expect(updateQuantity).toHaveBeenCalledWith('beer-1', 0));
+    expect(updateQuantity.mock.calls[0].length).toBe(2);
+    expect(removeItem).not.toHaveBeenCalled();
+    expect(showBlockingErrorMock).not.toHaveBeenCalled();
+  });
+
+  it('el MISMO producto en venta MAYORISTA conserva el paso por paquetes con re-tier', async () => {
+    mockProductLookup = { 'beer-1': wholesaleBeer };
+    const updateQuantity = vi.fn();
+    mockCartState({
+      items: [{ product: wholesaleBeer, quantity: 24, price: 9 }],
+      total: vi.fn().mockReturnValue(216),
+      updateQuantity,
+      orderType: OrderType.Mayorista,
+    });
+
+    renderCartShell();
+    openCart();
+    fireEvent.click(screen.getByLabelText('Aumentar cantidad de Cerveza'));
+
+    // 24 + 24 = 48 unidades = 2 paquetes; tier 1 → $9.
+    await waitFor(() => expect(updateQuantity).toHaveBeenCalledWith('beer-1', 48, 9));
   });
 });
 

@@ -1,4 +1,4 @@
-import type { Product } from '@store-mgmt/domain';
+import { OrderType, type Product } from '@store-mgmt/domain';
 import type { CartItem } from '~/shared/lib/stores/cart-store';
 import { getWholesaleConfig, resolveWholesalePrice } from './wholesale';
 
@@ -38,10 +38,17 @@ export const wholesaleCartDisplay = {
   },
 
   /**
-   * Conteo para el badge del carrito: paquetes en venta mayorista, unidades en
-   * venta normal (producto sin config mayorista).
+   * Conteo para el badge del carrito — el modo lo define el orderType de la
+   * venta, no la config del producto (cart-wholesale-by-order-type 2026-09-23):
+   * - Venta MAYORISTA: paquetes para productos con config mayorista; unidades
+   *   para productos sin config (fallback conservado).
+   * - Venta NORMAL (cualquier otro orderType): SIEMPRE unidades, sin importar
+   *   la config mayorista del producto.
    */
-  cartBadgeCount(items: CartItem[]): number {
+  cartBadgeCount(items: CartItem[], orderType: OrderType): number {
+    if (orderType !== OrderType.Mayorista) {
+      return items.reduce((sum, item) => sum + item.quantity, 0);
+    }
     return items.reduce((sum, item) => {
       const config = getWholesaleConfig(item.product);
       if (!config) return sum + item.quantity;
