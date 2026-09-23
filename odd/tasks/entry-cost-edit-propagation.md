@@ -302,8 +302,8 @@ Specs E2E nuevas se corren individualmente durante desarrollo:
 ## 13. Progreso
 
 - [x] T1 — Candado de Costo en modal (`38a8d84`) — verificado: `inventory-components` + `inventory-routes` = 106 tests, sin type errors.
-- [ ] T2 — Propagación en edición de tienda (pendiente)
-- [ ] T3 — Import/export propaga el costo (desbloqueada; decisión §9a aplicada)
+- [x] T2 — Propagación en edición de tienda (`2bf0693e`) — verificado: `inventory-routes` + `inventory-components` = 107 tests, sin type errors.
+- [x] T3 — Import/export propaga el costo (`95198955`) — verificado: `order-offline-service` + `inventory-offline-service` = 265 tests; `data-serializer` + `data-synchronizer` = 125 tests, sin type errors.
 - [ ] T4 — E2E nuevas (pendiente)
 - [ ] T5 — Cierre documental (pendiente)
 
