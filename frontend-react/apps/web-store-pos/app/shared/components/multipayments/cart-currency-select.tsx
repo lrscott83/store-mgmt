@@ -50,6 +50,11 @@ interface CartCurrencySelectProps {
  * module (module 16). Without the module nothing renders and the cart keeps its
  * pre-MultiPayments behavior (the first item's currency). The selected value is
  * persisted per user so it survives reloads and is reused on the next sale.
+ *
+ * Layout: compact inline control (label + select in one row) so the cart can
+ * place it in the header toolbar next to "Limpiar"/"Registrar" without a
+ * full-width row of its own. On narrow screens the header wraps, keeping the
+ * control usable.
  */
 export function CartCurrencySelect({ value, onChange, testId }: CartCurrencySelectProps) {
   const intl = useIntl();
@@ -90,15 +95,15 @@ export function CartCurrencySelect({ value, onChange, testId }: CartCurrencySele
   }
 
   return (
-    <div className="border-b border-border px-4 py-3">
-      <label className="block text-xs font-medium text-gray-600 mb-1">
+    <div className="flex items-center gap-1">
+      <label className="whitespace-nowrap text-xs font-medium text-text-muted">
         {intl.formatMessage({ id: 'SHOPPING_CART.CURRENCY_LABEL' })}
       </label>
       <select
         value={selected}
         onChange={(e) => handleChange(Number(e.target.value))}
         data-testid={testId ?? 'cart-currency-select'}
-        className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-cyan-500"
+        className="rounded-md border border-border bg-surface px-2 py-1 text-xs text-text focus:outline-none focus:ring-1 focus:ring-primary"
       >
         {options.map((option) => (
           <option key={option.value} value={option.value}>

@@ -531,12 +531,20 @@ export function CartShell() {
               right — matching Angular's nav-right header row (both mat-fab buttons live at
               the top, disabled when the cart is empty). React closes the panel via
               click-outside (useClickOutside), so no explicit close button is needed. */}
-            <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-3">
               <div>
                 <h3 className="text-sm font-semibold text-text">Venta actual</h3>
                 <span className="text-xs text-text-muted">{getOrderTypeText(orderType)}</span>
               </div>
               <div className="flex items-center gap-2">
+                {/* MultiPayments: selector de moneda del carrito (módulo 16), en la
+                  misma fila del encabezado y ANTES de "Limpiar". El propio
+                  componente se oculta sin el módulo, así que ningún flujo existente cambia. */}
+                <CartCurrencySelect
+                  value={preferredCartCurrency}
+                  onChange={setPreferredCartCurrency}
+                  testId="cart-currency-select"
+                />
                 <button
                   type="button"
                   onClick={handleClear}
@@ -555,14 +563,6 @@ export function CartShell() {
                 </button>
               </div>
             </div>
-
-            {/* MultiPayments: selector de moneda del carrito (módulo 16). El propio
-              componente se oculta sin el módulo, así que ningún flujo existente cambia. */}
-            <CartCurrencySelect
-              value={preferredCartCurrency}
-              onChange={setPreferredCartCurrency}
-              testId="cart-currency-select"
-            />
 
             {/* MultiPayments (módulo 16): con ítems en el carrito, la lista de pagos
               reemplaza el bloque legacy de pago (el "con cuánto paga"/vuelto y el

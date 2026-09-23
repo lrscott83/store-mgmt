@@ -1471,3 +1471,57 @@ describe('CartShell — método de pago según config de tienda', () => {
     expect(screen.getAllByRole('radio')).toHaveLength(1);
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// T3 — el selector "Moneda" sube a la fila del encabezado, antes de "Limpiar".
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('CartShell — T3: selector de moneda en la fila del encabezado', () => {
+  const MULTI_PAYMENTS_STORE_MODULES = [11, EModules.MultiPayments];
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    mockUser = { id: 'u1', selectedStoreId: 's1', storeModuleIds: MULTI_PAYMENTS_STORE_MODULES };
+    mockChannelRates = [];
+    mockProductLookup = {};
+    mockCartState({
+      items: [],
+      total: vi.fn().mockReturnValue(0),
+      cartCurrency: () => Currency.CUP,
+      payments: [],
+      setPayments: vi.fn(),
+    });
+  });
+
+  it('T3-01: el selector vive en la fila del encabezado, en el mismo grupo y antes de "Limpiar"', () => {
+    renderCartShell();
+    openCart();
+
+    const select = screen.getByTestId('cart-currency-select');
+    const limpiar = screen.getByText('Limpiar').closest('button');
+    expect(limpiar).not.toBeNull();
+
+    // Same toolbar group as "Limpiar"/"Registrar" — same visual row.
+    expect(limpiar!.parentElement).toContainElement(select);
+    expect(select.parentElement?.parentElement).toBe(limpiar!.parentElement);
+    // Rendered BEFORE "Limpiar" in DOM order.
+    expect(
+      select.compareDocumentPosition(limpiar!) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    // Inside the header row that also holds "Venta actual" (no row of its own).
+    const headerRow = screen.getByText('Venta actual').parentElement?.parentElement;
+    expect(headerRow).toContainElement(select);
+  });
+
+  it('T3-02: sin el módulo 16 el selector no existe y el encabezado sigue intacto', () => {
+    mockUser = { selectedStoreId: 's1', storeModuleIds: [11] };
+    renderCartShell();
+    openCart();
+
+    expect(screen.queryByTestId('cart-currency-select')).not.toBeInTheDocument();
+    expect(screen.getByText('Venta actual')).toBeInTheDocument();
+    expect(screen.getByText('Limpiar')).toBeInTheDocument();
+    expect(screen.getByText('Registrar')).toBeInTheDocument();
+  });
+});
