@@ -2054,3 +2054,115 @@ describe('TodayEntriesPage — handleEdit preserves the warehouse-origin seal (A
     expect(screen.getByLabelText('Precio de costo')).toBeDisabled();
   });
 });
+
+// ─── TodayEntriesPage — cost-edit propagation to sale snapshots (T2) ───────────
+//
+// After a store inventory entry's cost edit SUCCEEDS, the new cost must be pushed to the
+// sale snapshots that reference the entry, reusing the EXISTING
+// OrderOfflineService.updateProductCostsByInventoryIds seam (warehouse parity). The seam
+// itself is untouched and still only mutates ACTIVE orders.
+
+describe('TodayEntriesPage — cost-edit propagation to sale snapshots (T2)', () => {
+  beforeEach(() => {
+    mockEgressProducts = [makeEgressProduct({ id: 'p1', name: 'Ron' })];
+    mockEgressCategories = [makeCategory({ id: 'cat-1' })];
+  });
+
+  it('propagates the edited cost via updateProductCostsByInventoryIds, mapping the entry id to the new cost', async () => {
+    const entryId = 'e1';
+    const newCost = 7.5;
+    const todayEntries: InventoryEntryView[] = [
+      {
+        id: entryId,
+        productId: 'p1',
+        productName: 'Ron',
+        quantity: 5,
+        costPrice: 3,
+        date: new Date(),
+        isActive: true,
+      },
+    ];
+    const viewEntry: InventoryEntryView = { ...todayEntries[0] };
+    // Faithful double: the full stored entry has NO warehouseSaleOutMovementId, so the
+    // modal stays editable (only warehouse-origin entries are sealed).
+    const storedEntry: InventoryEntry = {
+      id: entryId,
+      productId: 'p1',
+      categoryId: 'cat-1',
+      quantity: 5,
+      available: 5,
+      costPrice: 3,
+      date: new Date(),
+      order: 0,
+      isActive: true,
+      createdDate: new Date(),
+      createdByName: 'test',
+      updatedDate: new Date(),
+      updatedByName: 'test',
+    };
+
+    const updateMock = vi.fn().mockReturnValue({
+      succeeded: true,
+      errors: [],
+      data: { ...viewEntry, costPrice: newCost },
+    });
+    vi.mocked(InventoryOfflineService).mockImplementation(
+      () =>
+        ({
+          getActiveInventoryEntriesStorage: vi.fn().mockReturnValue([viewEntry]),
+          getInventoryEntriesInDay: vi.fn().mockReturnValue(bm(todayEntries)),
+          getStorageInventoriesMap: vi.fn().mockReturnValue(new Map([['p1', [storedEntry]]])),
+          getInventoryCategoriesView: vi.fn().mockReturnValue(bm([])),
+          getAvailableQuantity: vi.fn().mockReturnValue({ hasEntries: false, available: 0 }),
+          createInventoryEntry: vi.fn(),
+          update: updateMock,
+          deleteInventoryEntry: vi.fn(),
+          isNotSoldEntry: vi.fn().mockReturnValue({ succeeded: true, errors: [] }),
+        }) as unknown as InstanceType<typeof InventoryOfflineService>,
+    );
+
+    // The shared module mock (top of file) replaces OrderOfflineService with a vi.fn() whose
+    // instances are plain object literals — the seam is therefore absent from the mocked
+    // prototype, so seed it before spying. The instance returned below is created with
+    // Object.create(prototype) so the call really resolves through the prototype (not an own
+    // property), mirroring the production `new OrderOfflineService(storeId).method()` shape.
+    OrderOfflineService.prototype.updateProductCostsByInventoryIds = () => ({
+      activeOrders: 0,
+      deactivatedOrders: 0,
+      updatedLines: 0,
+    });
+    const spy = vi
+      .spyOn(OrderOfflineService.prototype, 'updateProductCostsByInventoryIds')
+      .mockReturnValue({ activeOrders: 0, deactivatedOrders: 0, updatedLines: 0 });
+    vi.mocked(OrderOfflineService).mockImplementationOnce(() => {
+      const instance = Object.create(OrderOfflineService.prototype) as Record<string, unknown>;
+      instance.getStorageOrders = vi.fn().mockReturnValue([]);
+      instance.getActiveOrdersInDay = vi.fn().mockReturnValue([]);
+      return instance as unknown as InstanceType<typeof OrderOfflineService>;
+    });
+
+    try {
+      render(
+        <Wrapper>
+          <TodayEntriesPage />
+        </Wrapper>,
+      );
+
+      fireEvent.click(screen.getByTestId(`entry-actions-toggle-${entryId}`));
+      fireEvent.click(screen.getByText('Editar'));
+
+      const costInput = await screen.findByLabelText('Precio de costo');
+      fireEvent.change(costInput, { target: { value: String(newCost) } });
+      fireEvent.click(screen.getByText('Actualizar'));
+
+      expect(updateMock).toHaveBeenCalledWith(entryId, 'p1', 5, newCost, expect.any(Number));
+      expect(spy).toHaveBeenCalledTimes(1);
+      const costs = spy.mock.calls[0][0];
+      expect([...costs.entries()]).toEqual([[entryId, newCost]]);
+    } finally {
+      spy.mockRestore();
+      delete (OrderOfflineService.prototype as unknown as Record<string, unknown>)
+        .updateProductCostsByInventoryIds;
+    }
+  });
+});

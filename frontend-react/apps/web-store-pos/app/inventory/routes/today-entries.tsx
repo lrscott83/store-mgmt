@@ -8,6 +8,7 @@ import { isOwnerAdmin as checkIsOwnerAdmin } from '~/shared/lib/auth/authorizati
 import { InventoryOfflineService } from '../lib/services/inventory-offline-service';
 import { ProductRepository } from '~/sales/lib/repositories/product-repository';
 import { ProductCategoryRepository } from '~/sales/lib/repositories/product-category-repository';
+import { OrderOfflineService } from '~/sales/lib/services/order-offline-service';
 import { Card } from '~/shared/components/ui/card';
 import { InfoBox } from '~/shared/components/ui/info-box';
 import { Button } from '~/shared/components/ui/button';
@@ -161,6 +162,15 @@ export function TodayEntriesPage() {
     if (!result || !result.succeeded) {
       setModalError(result?.errors[0]?.description ?? intl.formatMessage({ id: 'GENERAL.ERROR' }));
       return;
+    }
+
+    // Store entry cost edit propagation: only after the edit SUCCEEDS, push the new cost
+    // into the sale snapshots (orderItem.productCosts[].costPrice) that reference this
+    // entry — mirroring the warehouse seam. Edits only: a create has no prior sale to fix.
+    if (entryId) {
+      new OrderOfflineService(storeId).updateProductCostsByInventoryIds(
+        new Map([[entryId, data.costPrice]]),
+      );
     }
 
     loadEntries();
