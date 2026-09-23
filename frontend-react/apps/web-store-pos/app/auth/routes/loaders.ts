@@ -1,8 +1,8 @@
 import { redirect } from 'react-router';
 import type { LoaderFunctionArgs } from 'react-router';
-import type { UserModel } from '@store-mgmt/domain';
+import type { EModules, UserModel } from '@store-mgmt/domain';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
-import { isUserAuthorized } from '~/shared/lib/auth/authorization-service';
+import { isModuleAvailable, isUserAuthorized } from '~/shared/lib/auth/authorization-service';
 import { resolveUserHomePath } from '~/shared/lib/auth/user-home';
 import { preloadHeavyChunks } from '~/shared/lib/pwa/preload-heavy-chunks';
 
@@ -136,6 +136,26 @@ export function adminFeatureLoader(featureIds: number[]) {
     const adminResult = await adminLoader();
     if (adminResult) return adminResult;
     return featureGate(featureIds)({ params } as LoaderFunctionArgs);
+  };
+}
+
+/**
+ * Feature gate PLUS an all-modules gate: same admin + feature checks as
+ * `adminFeatureLoader`, and the route is reachable only when the user's store
+ * has EVERY required module. Used by "Canales de pago" (D11 — MultiPayments,
+ * module 16, on top of Configurations).
+ */
+export function adminFeatureModuleLoader(featureIds: number[], moduleIds: EModules[]) {
+  return async ({ params }: LoaderFunctionArgs): Promise<Response | null> => {
+    const adminResult = await adminLoader();
+    if (adminResult) return adminResult;
+    const featureResult = await featureGate(featureIds)({ params } as LoaderFunctionArgs);
+    if (featureResult) return featureResult;
+    const { user } = getAuthState();
+    if (!user || !moduleIds.every((id) => isModuleAvailable(user, id))) {
+      return denyAccess();
+    }
+    return null;
   };
 }
 

@@ -3,11 +3,14 @@ import { useIntl } from 'react-intl';
 import {
   Currency,
   EFeatures,
+  EModules,
   SalePaymentMethod,
+  defaultPaymentMethodForCurrency,
+  isValidChannel,
   salePaymentMethodLabel,
   type ChannelRate,
 } from '@store-mgmt/domain';
-import { adminFeatureLoader } from '~/auth/routes/loaders';
+import { adminFeatureModuleLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { Card } from '~/shared/components/ui/card';
 import { Button } from '~/shared/components/ui/button';
@@ -16,9 +19,13 @@ import { fromLocalDayKey, toLocalDayKey } from '~/shared/lib/date-utils';
 import { ChannelRateOfflineService } from '../lib/services/channel-rate-offline-service';
 
 // multipayments — same guard as the Configurations feature and the daily
-// exchange-rate register: OwnerAdmin / SuperAdmin bypass plus the feature
-// gate for the rest.
-export const clientLoader = adminFeatureLoader([EFeatures.Configurations]);
+// exchange-rate register (OwnerAdmin / SuperAdmin plus the feature gate), AND
+// the MultiPayments module gate (D11): without module 16 the page does not
+// exist, so the route is not reachable even by direct URL.
+export const clientLoader = adminFeatureModuleLoader(
+  [EFeatures.Configurations],
+  [EModules.MultiPayments],
+);
 
 const METHOD_OPTIONS: { value: SalePaymentMethod; labelId: string }[] = [
   { value: SalePaymentMethod.Efectivo, labelId: 'CHANNEL_RATES.METHOD_EFECTIVO' },
@@ -88,6 +95,19 @@ export function ChannelRatesPage() {
     load();
   }, [load]);
 
+  // Only real channels are offered: the method selector is limited to the
+  // methods that exist for the chosen currency, so Zelle+CUP or Efectivo+MLC
+  // can never be picked.
+  const methodOptions = METHOD_OPTIONS.filter((option) => isValidChannel(option.value, currency));
+
+  function handleCurrencyChange(next: Currency) {
+    setCurrency(next);
+    // Re-pin the method when the new currency does not support the current one.
+    setMethod((current) =>
+      isValidChannel(current, next) ? current : defaultPaymentMethodForCurrency(next),
+    );
+  }
+
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(undefined);
@@ -102,6 +122,13 @@ export function ChannelRatesPage() {
     const effectiveFrom = fromLocalDayKey(effectiveFromDraft);
     if (Number.isNaN(effectiveFrom.getTime())) {
       setError(intl.formatMessage({ id: 'CHANNEL_RATES.INVALID_DATE' }));
+      return;
+    }
+
+    // Defensive guard: the selector already offers only real channels, but no
+    // caller may register a pair that does not exist.
+    if (!isValidChannel(method, currency)) {
+      setError(intl.formatMessage({ id: 'CHANNEL_RATES.INVALID_CHANNEL' }));
       return;
     }
 
@@ -164,7 +191,7 @@ export function ChannelRatesPage() {
               className="w-full rounded-md border border-border px-3 py-2 text-sm"
               data-testid="channel-rate-method"
             >
-              {METHOD_OPTIONS.map((option) => (
+              {methodOptions.map((option) => (
                 <option key={option.value} value={option.value}>
                   {intl.formatMessage({ id: option.labelId })}
                 </option>
@@ -182,7 +209,7 @@ export function ChannelRatesPage() {
             <select
               id="channel-rate-currency"
               value={currency}
-              onChange={(e) => setCurrency(Number(e.target.value) as Currency)}
+              onChange={(e) => handleCurrencyChange(Number(e.target.value) as Currency)}
               className="w-full rounded-md border border-border px-3 py-2 text-sm"
               data-testid="channel-rate-currency"
             >

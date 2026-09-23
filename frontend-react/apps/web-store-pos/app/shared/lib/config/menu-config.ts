@@ -6,6 +6,13 @@ export interface MenuItem {
   path: string;
   featureIds?: number[];
   moduleId?: number;
+  /**
+   * Additional module gate (AND): when present, the item is offered only if the
+   * user's store has EVERY listed module. Kept separate from `moduleId` (the
+   * group's module association) so items without this field keep their exact
+   * current behavior.
+   */
+  moduleIds?: EModules[];
   /** When true NavLink uses end prop so it only matches exact path */
   exact?: boolean;
   /** Brief help text shown in the ? tooltip dialog next to the menu item */
@@ -385,6 +392,9 @@ export const MENU_GROUPS: MenuGroup[] = [
         path: '/management/channel-rates',
         featureIds: [EFeatures.Configurations],
         moduleId: EModules.Management,
+        // D11: channels (method + currency) and their equivalence exist only
+        // with the MultiPayments module; without it the page is not offered.
+        moduleIds: [EModules.MultiPayments],
         helpContent:
           'Tasas por canal. Registra cuántas unidades de cada moneda equivalen a 1 USD para cada método de pago (efectivo, Zelle, transferencia), con la fecha desde la que rige. El historial es de solo lectura: cada cambio crea un registro nuevo y no se puede editar ni eliminar.',
       },

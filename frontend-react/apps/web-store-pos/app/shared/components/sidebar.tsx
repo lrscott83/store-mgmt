@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useIntl } from 'react-intl';
 import { NavLink } from 'react-router';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
-import { isUserAuthorized } from '~/shared/lib/auth/authorization-service';
+import { isModuleAvailable, isUserAuthorized } from '~/shared/lib/auth/authorization-service';
 import { MENU_GROUPS } from '~/shared/lib/config/menu-config';
 import { HelpDialog } from '~/shared/components/ui/help-dialog';
 import type { MenuItem } from '~/shared/lib/config/menu-config';
@@ -25,6 +25,11 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       // role that featureIds alone would admit (billing: SuperAdmin/ReSeller
       // only) must not render for that role at all.
       if (item.rolesOnly && !item.rolesOnly(user)) return false;
+      // Additional module gate (menu-config moduleIds): every listed module
+      // must be available in the user's store, on top of the feature check.
+      if (item.moduleIds && !item.moduleIds.every((id) => isModuleAvailable(user, id))) {
+        return false;
+      }
       if (!item.featureIds || item.featureIds.length === 0) return true;
       return isUserAuthorized(user, item.featureIds, user.selectedStoreId || undefined);
     }),

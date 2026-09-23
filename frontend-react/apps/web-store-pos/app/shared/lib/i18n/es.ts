@@ -1033,6 +1033,8 @@ const messages: Record<string, string> = {
   'CHANNEL_RATES.REGISTER': 'Registrar tasa',
   'CHANNEL_RATES.SAVED': 'Tasa registrada correctamente.',
   'CHANNEL_RATES.INVALID_DATE': 'La fecha de vigencia es obligatoria.',
+  'CHANNEL_RATES.INVALID_CHANNEL':
+    'Ese canal no existe: elige una combinación válida de método y moneda.',
   'CHANNEL_RATES.HISTORY_TITLE': 'Historial de tasas',
   'CHANNEL_RATES.CHANNEL_COLUMN': 'Canal',
   'CHANNEL_RATES.CURRENCY_COLUMN': 'Moneda',
