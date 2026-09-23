@@ -127,10 +127,14 @@ test.describe.serial('FC-A4 — Historial de Créditos', () => {
     await page.goto('/sales/credits');
     await page.waitForLoadState('networkidle');
 
-    // Total should show $ prefix
-    const totalElement = page.locator('.text-danger.font-semibold').first();
+    // Unpaid total > 0 renders amber (text-warning) — owner request 2026-09-22
+    // (df1fd1f7). The count badge next to it is bg-success/10 + text-success,
+    // never text-warning, so the class pair is unique to the amount.
+    const totalElement = page.locator('.text-warning.font-semibold').first();
     await expect(totalElement).toBeVisible();
     const totalText = await totalElement.textContent();
+    // Legacy path (no MultiMonedas module for this persona): CurrencyTotalAmount
+    // degrades to formatCurrency, which renders a `$`-prefixed amount.
     expect(totalText).toMatch(/^\$/);
   });
 });

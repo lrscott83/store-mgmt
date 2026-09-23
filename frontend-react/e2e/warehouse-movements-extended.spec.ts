@@ -341,7 +341,7 @@ test.describe.serial('Movimientos de almacenes — cobertura extendida', () => {
     // The store entry was created with the warehouse cost (660).
     await page.goto('/inventory/today-entries');
     await expect(page.getByText(TODAY_ENTRIES_TITLE)).toBeVisible();
-    await expect(page.getByText('$660')).toBeVisible();
+    await expect(page.getByText(/660\s*CUP/)).toBeVisible();
 
     // Sell 1 unit: profit = price(10) − warehouse FIFO cost(660) = −650.
     await page.goto('/sales/new');

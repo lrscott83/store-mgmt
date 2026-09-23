@@ -168,7 +168,7 @@ test.describe.serial('wholesale cart — floor del menor rango y re-precificaci�
     // $5 × 24 = $120.
     await addPacksAndOpenCart(page, product.id, '12');
     await expect(page.getByText(/Paquetes: 12/)).toBeVisible();
-    await expect(page.getByText(/Precio: \$120/)).toBeVisible();
+    await expect(page.getByText(/Precio:\s*120\s*CUP/)).toBeVisible();
 
     // − → 11 paquetes cae al rango 5 ($6/ud): precio de paquete $6 × 24 = $144.
     const decrease = page.getByRole('button', { name: /disminuir cantidad de/i });

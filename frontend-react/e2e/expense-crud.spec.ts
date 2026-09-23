@@ -16,7 +16,7 @@ const NEW_EXPENSE_TITLE = 'Adicionar Gasto';
 const EDIT_EXPENSE_TITLE = 'Editar Gastos';
 const EXPENSE_BUTTON = 'Gasto';
 const INSERT_BUTTON = 'Adicionar';
-const HISTORY_HEADER = 'Historial de Gastos';
+const HISTORY_HEADER = 'Gastos'; // EXPENSES.HISTORY.TITLE — shortened by owner 2026-09-20 (es.ts:847)
 const DELETE_CONFIRM = '¿Está seguro que desea eliminar este gasto?';
 
 async function createExpense(page: Page, total: string, note: string): Promise<void> {
@@ -99,7 +99,10 @@ test.describe.serial('S4-A1/A2/A3 — Gastos: editar, eliminar, historial', () =
 
     // Navigate to history
     await page.goto('/expenses/expenses');
-    await expect(page.getByText(HISTORY_HEADER)).toBeVisible();
+    // Heading role, not getByText: the card title renders as the page's only
+    // <h3> ("Gastos (n)", card.tsx:60), while the sidebar's «Gastos» menu item
+    // is a <button> — plain text matching would hit both and fail strict mode.
+    await expect(page.getByRole('heading', { name: HISTORY_HEADER })).toBeVisible();
 
     // A day panel should be visible
     const dayToggle = page.locator('[data-testid^="expense-day-panel-toggle-"]').first();
