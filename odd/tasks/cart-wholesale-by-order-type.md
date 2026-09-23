@@ -1,6 +1,6 @@
 # Feature: cart-wholesale-by-order-type — gate del comportamiento mayorista del carrito por tipo de venta
 
-**Estado**: EN PROGRESO · **Rama**: qa (local) · **Creado**: 2026-09-23
+**Estado**: COMPLETADO (verificado, commit local, sin push) · **Rama**: qa (local) · **Creado**: 2026-09-23
 
 ## Objetivo
 
@@ -42,11 +42,11 @@ FUERA DE SCOPE (reglas no negociables del repo):
 ## Checklist
 
 - [x] T0 — Investigación: causa raíz identificada y documentada arriba (2026-09-23).
-- [ ] T1 — `wholesale-cart-display.cartBadgeCount` recibe el `orderType` y cuenta unidades cuando la venta NO es Mayorista (producto con config mayorista incluido).
-- [ ] T2 — `CartShell.formatWholesaleLine` recibe el `orderType` y muestra la línea retail (precio unitario + cantidad) cuando la venta NO es Mayorista.
-- [ ] T3 — `CartShell.handleQuantityChange`: el paso de +/−, la regla de piso y el re-tier de precio solo aplican cuando `orderType === OrderType.Mayorista`; en Normal el paso es 1, sin re-tier ni piso.
-- [ ] T4 — Tests unit: (a) badge/display/paso en venta Normal con producto mayorista → unidades/precio retail/paso 1; (b) venta Mayorista conserva paquetes/paso packSize/re-tier/piso; (c) ajustar firmas existentes de `cartBadgeCount` en wholesale.test.ts.
-- [ ] T5 — Verificación: tests dirigidos, typecheck y lint del app; commit de unidad de trabajo.
+- [x] T1 — `wholesale-cart-display.cartBadgeCount` recibe el `orderType` y cuenta unidades cuando la venta NO es Mayorista (producto con config mayorista incluido).
+- [x] T2 — `CartShell.formatWholesaleLine` recibe el `orderType` y muestra la línea retail (precio unitario + cantidad) cuando la venta NO es Mayorista.
+- [x] T3 — `CartShell.handleQuantityChange`: el paso de +/−, la regla de piso y el re-tier de precio solo aplican cuando `orderType === OrderType.Mayorista`; en Normal el paso es 1, sin re-tier ni piso.
+- [x] T4 — Tests unit: (a) badge/display/paso en venta Normal con producto mayorista → unidades/precio retail/paso 1; (b) venta Mayorista conserva paquetes/paso packSize/re-tier/piso; (c) ajustar firmas existentes de `cartBadgeCount` en wholesale.test.ts.
+- [x] T5 — Verificación: tests dirigidos, typecheck y lint del app; commit de unidad de trabajo.
 
 ## Criterios de aceptación
 
@@ -62,7 +62,16 @@ FUERA DE SCOPE (reglas no negociables del repo):
 ## Progreso y evidencia
 
 - T0: evidencia en investigación — `cart-shell.tsx:282-347`, `:88-101`, `:159`; `wholesale-cart-display.ts:21-50`; `sale.tsx:256`; `wholesale.tsx:229`.
+- T1-T4: implementadas (escritor delegado; el server se reinició a mitad de la delegación, se revisó el diff contra el contrato y se completó la verificación desde el orquestador).
+- T5: verificación observada (2026-09-23):
+  - `pnpm exec vitest run cart-shell.test.tsx wholesale.test.ts sale.test.tsx wholesale.test.tsx`: 4 files / 175 tests passed.
+  - `pnpm vitest run` (suite completa del app, con `NODE_OPTIONS=--max-old-space-size=8192`): 298 files / 4203 tests passed. El OOM inicial era solo del heap por defecto (límite del entorno, no del cambio).
+  - `pnpm typecheck`: pass — requirió reconstruir el `dist/` desactualizado del paquete `@store-mgmt/domain` (condición preexistente del merge test→qa: enums `WholesaleSales` ya en el source, ausentes en el dist compilado; los archivos con errores NO eran los tocados).
+  - `pnpm lint`: pass.
+- Commits (rama `qa`, sin push — política ordinaria del repo):
+  - `f0f66a5e` — docs(odd): track cart-wholesale-by-order-type feature plan
+  - `496b4544` — fix(cart): keep normal-sale behavior for wholesale-enabled products (171+/19-)
 
 ## Siguiente paso
 
-Delegar implementación (T1-T4) a un writer acotado; luego verificación + commit de unidad de trabajo (`fix(cart): ...`). Sin push ni PR (decisión del usuario bajo política ordinaria del repo).
+Sin push ni PR (decisión del usuario bajo política ordinaria del repo). Pendiente: notificar al usuario el resultado (reporte en español) y esperar su decisión sobre push/PR y sobre una posible prueba manual en qa.
