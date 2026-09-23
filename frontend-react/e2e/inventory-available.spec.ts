@@ -82,8 +82,9 @@ test.describe.serial('S3-A1 — Ver stock por categoría', () => {
     await page.goto('/inventory/available');
     await expect(page.getByText(AVAILABLE_HEADER)).toBeVisible();
 
-    // The total inventory value should be visible (starts with $)
-    await expect(page.locator('text=/^\\$[\\d,.]+$/').first()).toBeVisible();
+    // The total inventory value should be visible (formatMoneyWithCurrency → "400 CUP",
+    // NBSP between amount and code — `\s` matches '\u00A0', csv-import pattern)
+    await expect(page.getByText(/400\s*CUP/).first()).toBeVisible();
 
     // Find and expand the first category
     const categoryToggle = page.locator('[data-testid^="inventory-category-toggle-"]').first();

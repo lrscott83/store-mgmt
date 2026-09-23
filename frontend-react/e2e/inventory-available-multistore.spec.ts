@@ -34,7 +34,7 @@ const SECOND_STORE_ID = 'e2e-second-store';
 const SECOND_STORE_NAME = 'Tienda B E2E';
 
 /**
- * Seeds one active inventory entry (50 × $8) for the store's first sellable
+ * Seeds one active inventory entry (50 × 8 CUP) for the store's first sellable
  * product — same shape `inventory-available.spec.ts` uses (plaintext write, the
  * only encryption-free path available in a restored persona context).
  */
@@ -145,7 +145,7 @@ test('MA-01 — con MultiStores el Inventario Disponible se agrupa por tienda y 
   await expect(ownPanel).toBeVisible();
   await expect(page.getByTestId(`multistore-panel-toggle-${SECOND_STORE_ID}`)).toBeVisible();
 
-  // The selected store's panel shows its inventory: category (50) and $400 total.
+  // The selected store's panel shows its inventory: category (50) and 400 CUP total.
   await ownPanel.click();
   const categoryToggle = page
     .locator('[data-testid^="multistore-inventory-category-toggle-"]')
@@ -153,7 +153,7 @@ test('MA-01 — con MultiStores el Inventario Disponible se agrupa por tienda y 
   await expect(categoryToggle).toBeVisible();
   await expect(categoryToggle).toContainText('(50)');
   await categoryToggle.click();
-  await expect(page.getByText('400 CUP').first()).toBeVisible();
+  await expect(page.getByText(/400\s*CUP/).first()).toBeVisible();
 
   // The store with no local data shows the explicit empty message.
   await page.getByTestId(`multistore-panel-toggle-${SECOND_STORE_ID}`).click();

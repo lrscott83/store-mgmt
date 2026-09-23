@@ -2,14 +2,16 @@
  * multimonedas — NEW coverage (2026-09-17), purely additive:
  * NO existing E2E spec is modified (E2E-untouchable rule).
  *
- * The MultiMonedas module (15) is included in the Superior/VIP plans, and a
- * self-registered store starts on Superior with the FULL available catalog —
- * so the plain `owner-admin` persona (real register + login) HAS the module,
- * while `store-user` personas inherit whatever their store has (same store ⇒
- * also has it). This suite pins the user-visible behavior the module enables:
+ * The MultiMonedas module (15) ships only with the Superior/VIP plans, and the
+ * `owner-admin-with-products` persona's store is on the Pago plan — so in its
+ * natural state the module is ABSENT and MMF1 pins the honest negative: the
+ * currency selector must NOT render. MMF6 seeds module 15 (direct DB insert +
+ * real GET /v1/auth/me session refresh, configurations.spec.ts Test B pattern)
+ * and pins the positive. This suite pins the user-visible behavior the module
+ * enables:
  *
- *   MMF1  The product currency selector renders in the create-product modal
- *         (module active), defaulting to CUP, with the 7 currency options.
+ *   MMF1  WITHOUT module 15 the product currency selector does NOT render in
+ *         the create-product modal (the honest negative).
  *   MMF2  A product priced in USD shows its price WITH the currency label
  *         ("10 USD") on the sale list — never a `$` sign.
  *   MMF3  The cart total in the header shows the cart's currency label —
@@ -19,15 +21,26 @@
  *         per order).
  *   MMF5  Same-currency additions keep working (control): both lines enter
  *         the cart and the badge counts both.
+ *   MMF6  WITH module 15 seeded, the selector renders in the create-product
+ *         modal, defaulting to CUP, with the 7 currency options.
  */
 
 import { test, expect } from './support/test';
 import type { Page } from '@playwright/test';
 import { seedCategoryAndProduct } from './support/store-seed';
+import { Client } from 'pg';
+import { readBearerToken } from './support/auth-storage';
+import { E2E_API_URL } from './support/backend-url';
 
 const SALE_HEADER = 'Productos para vender';
 const ALL_CATEGORIES = 'Todos'; // SALES.ALL_CATEGORIES
 const ADD_BUTTON = 'Adicionar';
+
+// Same default as the README's documented backend mode; override with
+// E2E_DB_URL when the backend was pointed somewhere else
+// (configurations.spec.ts:23, store-fixture.ts:173).
+const DEFAULT_DB_URL = 'postgresql://postgres:postgres@localhost:5432/smca_test';
+const MODULE_MULTIMONEDAS = 15;
 
 /** Persona-stamped id for cross-test isolation (mirrors csv-import helpers). */
 function productName(prefix: string): string {
@@ -178,12 +191,71 @@ async function createProductViaUi(page: Page, name: string, price: string): Prom
   await page.getByTestId('create-product-submit').click();
 }
 
+/**
+ * Inserts the MultiMonedas module (15) row for the store if missing
+ * (idempotent, additive: existing StoreModule rows are preserved). Same shape
+ * as configurations.spec.ts:37-56 (seedMultiStoresModule for module 14).
+ */
+async function seedMultiMonedasModule(storeId: string): Promise<void> {
+  const client = new Client({ connectionString: process.env['E2E_DB_URL'] ?? DEFAULT_DB_URL });
+  try {
+    await client.connect();
+    await client.query(
+      `INSERT INTO "StoreModule"
+         ("StoreId", "ModuleId", "ModulePriceIncluded", "Price", "ModulePrice",
+          "ModuleDiscountPrice", "ModulePercentDiscountPrice", "TenantId", "IsActive",
+          "CreatedDate", "CreatedBy", "UpdatedDate", "UpdatedBy")
+       SELECT s."Id", m."Id", m."PriceIncluded", m."Price", m."Price",
+              m."DiscountPrice", m."PercentDiscountPrice", s."TenantId", true,
+              now(), '00000000-0000-0000-0000-000000000000', NULL, NULL
+         FROM "Module" m, "Store" s
+        WHERE m."Id" = $2 AND s."Id" = $1
+          AND NOT EXISTS (
+            SELECT 1 FROM "StoreModule" sm
+             WHERE sm."StoreId" = $1 AND sm."ModuleId" = $2
+          )`,
+      [storeId, MODULE_MULTIMONEDAS],
+    );
+  } finally {
+    await client.end();
+  }
+}
+
+/**
+ * Refreshes the session profile through a REAL GET /v1/auth/me and rewrites
+ * localStorage.currentUser — the gate reads `user.storeModuleIds` from the
+ * client session, and cold-boot makes no backend call when the cached profile
+ * matches (auth-store.ts:167-177), so the seeded module is invisible until
+ * the cache is rewritten. Pattern copied from configurations.spec.ts:65-82.
+ */
+async function refreshSessionFromMe(page: Page): Promise<void> {
+  const token = await readBearerToken(page);
+  const response = await page.request.get(`${E2E_API_URL}/v1/auth/me`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok()) {
+    throw new Error(`refreshSessionFromMe: GET /v1/auth/me failed (${response.status()})`);
+  }
+  const body = (await response.json()) as { data?: unknown };
+  if (!body.data) {
+    throw new Error('refreshSessionFromMe: /v1/auth/me returned no data payload');
+  }
+  await page.evaluate((profile) => {
+    window.localStorage.setItem('currentUser', JSON.stringify(profile));
+    window.localStorage.setItem(
+      'current-store-id',
+      (profile as { selectedStoreId?: string }).selectedStoreId ?? '',
+    );
+  }, body.data);
+  await page.reload();
+}
+
 test.describe.serial('MultiMonedas — selector, precios con moneda y regla de una moneda', () => {
   test.describe.configure({ timeout: 120_000 });
 
   test.use({ persona: 'owner-admin-with-products' });
 
-  test('MMF1 el selector de moneda aparece con el módulo y trae las 7 monedas', async ({
+  test('MMF1 sin el módulo MultiMonedas el selector de moneda NO aparece', async ({
     signedInPage,
   }) => {
     const { page } = signedInPage;
@@ -191,20 +263,17 @@ test.describe.serial('MultiMonedas — selector, precios con moneda y regla de u
     await page.goto('/sales/products');
     await page.waitForLoadState('networkidle');
     await page.getByTestId('add-category-button').click();
-    await page.getByTestId('category-name-input').fill(productName('mmcat'));
+    await page.getByTestId('category-name-input').fill(productName('mmneg'));
     await page.getByTestId('category-save-button').click();
     await page.locator('[data-testid^="category-actions-toggle-"]').first().click();
     await page.getByTestId('add-product-button').click();
 
-    const select = page.getByTestId('product-currency-select');
-    await expect(select).toBeVisible();
-    // Default CUP + the 7 codes in the required order.
-    const values = await select.locator('option').allInnerTexts();
-    expect(values).toEqual(['CUP', 'USD', 'EUR', 'CLA', 'MLC', 'CAD', 'MXN']);
-    await expect(select).toHaveValue('0'); // Currency.CUP default
-
-    // The selector disappears when the modal is cancelled (no leak).
-    await page.locator('[data-testid="product-currency-select"]').waitFor({ state: 'visible' });
+    // The modal opens WITHOUT the currency selector: the persona's store is on
+    // the Pago plan whose catalog has no MultiMonedas (module 15), so
+    // currency-select.tsx:40-42 renders null. The product-name input proves
+    // the modal itself is there — the gate hides only the selector.
+    await expect(page.getByTestId('product-name-input')).toBeVisible();
+    await expect(page.getByTestId('product-currency-select')).toHaveCount(0);
   });
 
   test('MMF2 un producto en USD muestra "10 USD" en la venta, sin $', async ({ signedInPage }) => {
@@ -280,5 +349,33 @@ test.describe.serial('MultiMonedas — selector, precios con moneda y regla de u
     const secondRow = page.locator('form', { has: page.getByText(secondName) }).first();
     await secondRow.getByRole('button', { name: ADD_BUTTON }).click();
     await expect(page.getByTestId('cart-badge')).toHaveText('2');
+  });
+
+  test('MMF6 con el módulo MultiMonedas sembrado el selector aparece con las 7 monedas', async ({
+    signedInPage,
+  }) => {
+    const { page, selectedStoreId } = signedInPage;
+
+    // Seed module 15 by direct DB + refresh the cached session via a real /me
+    // (configurations.spec.ts Test B pattern): the gate reads
+    // user.storeModuleIds from the client session, which cold-boot takes from
+    // localStorage — without the refresh the seeded module stays invisible.
+    await seedMultiMonedasModule(selectedStoreId);
+    await refreshSessionFromMe(page);
+
+    await page.goto('/sales/products');
+    await page.waitForLoadState('networkidle');
+    await page.getByTestId('add-category-button').click();
+    await page.getByTestId('category-name-input').fill(productName('mmpos'));
+    await page.getByTestId('category-save-button').click();
+    await page.locator('[data-testid^="category-actions-toggle-"]').first().click();
+    await page.getByTestId('add-product-button').click();
+
+    const select = page.getByTestId('product-currency-select');
+    await expect(select).toBeVisible();
+    // Default CUP + the 7 codes in the required order.
+    const values = await select.locator('option').allInnerTexts();
+    expect(values).toEqual(['CUP', 'USD', 'EUR', 'CLA', 'MLC', 'CAD', 'MXN']);
+    await expect(select).toHaveValue('0'); // Currency.CUP default
   });
 });

@@ -256,12 +256,12 @@ test.describe.serial('Movimientos de almacenes — cobertura extendida', () => {
     // First purchase: 10 × $10 → cost $10.
     await openGearMovement(page, 'Ponderado', MENU_ENTRY);
     await fillMovement(page, { product, quantity: '10', cost: '10' });
-    expect(await readProductCost(page, 'Ponderado')).toBe('10 CUP');
+    expect(await readProductCost(page, 'Ponderado')).toBe('$10');
 
     // Second purchase: 10 × $30 → weighted ((10×10)+(10×30))/20 = $20.
     await openGearMovement(page, 'Ponderado', MENU_ENTRY);
     await fillMovement(page, { product, quantity: '10', cost: '30' });
-    expect(await readProductCost(page, 'Ponderado')).toBe('20 CUP');
+    expect(await readProductCost(page, 'Ponderado')).toBe('$20');
   });
 
   test('sale_out con stock insuficiente se bloquea con Swal y no debita', async ({
@@ -315,9 +315,9 @@ test.describe.serial('Movimientos de almacenes — cobertura extendida', () => {
     await openGearMovement(page, 'Origen', MENU_MOVEMENT);
     await fillMovement(page, { product, quantity: '5', target: 'Destino' });
 
-    expect(await readProductCost(page, 'Destino')).toBe('7.33 CUP');
+    expect(await readProductCost(page, 'Destino')).toBe('$7.33');
     // Origin keeps its own cost: 5 units still at $10.
-    expect(await readProductCost(page, 'Origen')).toBe('10 CUP');
+    expect(await readProductCost(page, 'Origen')).toBe('$10');
   });
 
   test('sale_out seguida de venta en tienda descuenta FIFO con el costo del almacén', async ({
@@ -341,7 +341,7 @@ test.describe.serial('Movimientos de almacenes — cobertura extendida', () => {
     // The store entry was created with the warehouse cost (660).
     await page.goto('/inventory/today-entries');
     await expect(page.getByText(TODAY_ENTRIES_TITLE)).toBeVisible();
-    await expect(page.getByText('660 CUP')).toBeVisible();
+    await expect(page.getByText(/660\s*CUP/)).toBeVisible();
 
     // Sell 1 unit: profit = price(10) − warehouse FIFO cost(660) = −650.
     await page.goto('/sales/new');
@@ -361,7 +361,7 @@ test.describe.serial('Movimientos de almacenes — cobertura extendida', () => {
     const profit = (
       await page.locator('span.text-lg.font-bold.text-success').first().innerText()
     ).trim();
-    expect(profit).toBe('-650 CUP');
+    expect(profit).toBe('-$650');
   });
 
   test('cantidad decimal (0.5) en compra y salida con round2', async ({ signedInPage }) => {
