@@ -1,4 +1,5 @@
 ﻿using Application.Abstractions.HttpContext;
+using Domain.Common.Enums;
 using Domain.Entities.Modules;
 using Domain.Interfaces.Repositories;
 using FluentValidation;
@@ -43,6 +44,15 @@ namespace Application.Features.StoreManagement.Stores.Commands.CreateStore
                     .NotNull().WithMessage(_localizer["IsRequired", "{PropertyName}"])
                     .NotEmpty().WithMessage(_localizer["IsRequired", "{PropertyName}"])
                     .MustAsync(AvailableModuleIdsToStore).WithMessage(_localizer["ModuleNotAvailableToStore", "{PropertyName}"]);
+
+                // WholesaleSales (12) is reserved for Superior/VIP plans (wholesale-superior-vip-only,
+                // 2026-09-23): every store created through POST /v1/stores is born on Pago
+                // (CreateStoreService hardcodes StorePlanType.Pago), so requesting 12 here can
+                // never be honored. Reject with a clear message (fail-closed, no silent drop).
+                RuleFor(x => x.ModuleIds)
+                    .Must(moduleIds => moduleIds is null || !moduleIds.Contains((int)ModuleType.WholesaleSales))
+                    .WithMessage(_localizer["ModuleNotAvailableForPagoPlan", "{PropertyName}"])
+                    .When(x => x.ModuleIds is not null);
             });
         }
 

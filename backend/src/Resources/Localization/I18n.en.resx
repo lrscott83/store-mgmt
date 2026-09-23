@@ -396,6 +396,9 @@
   <data name="ModuleNotFound" xml:space="preserve">
     <value>Module not found</value>
   </data>
+  <data name="ModuleNotAvailableForPagoPlan" xml:space="preserve">
+    <value>Wholesale Sales is reserved for the Superior and VIP plans; the Paid plan cannot include it</value>
+  </data>
   <data name="MotorVehicleRecordNotFound" xml:space="preserve">
     <value>Motor Vehicle Record not found</value>
   </data>
