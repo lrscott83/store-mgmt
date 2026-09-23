@@ -48,7 +48,7 @@ import {
   applyStorePaymentMethodsConfig,
 } from '~/shared/lib/payment-methods/store-payment-methods-config-service';
 import { CartCurrencySelect } from '~/shared/components/multipayments/cart-currency-select';
-import { MultiPaymentList } from '~/shared/components/multipayments/multi-payment-list';
+import { MultiPaymentList, createPaymentRow } from '~/shared/components/multipayments/multi-payment-list';
 import { settleMultiPayments } from '~/shared/components/multipayments/multi-payment-settlement';
 import { convertCartLines } from '~/shared/components/multipayments/cart-line-conversion';
 import { ChannelRateOfflineService } from '~/management/channel-rates/lib/services/channel-rate-offline-service';
@@ -296,6 +296,32 @@ export function CartShell() {
         : { orderPayments: [], remainingCents: 0, firstError: null },
     [multiPaymentsAvailable, payments, multiPaymentOrderCurrency, totalAmount, multiPaymentRates],
   );
+
+  // T5 (payment-channels-and-multipayment): cuando el bloque de multipago pasa a
+  // ser relevante (carrito con ítems + módulo 16) y aún no hay filas, se siembra
+  // UNA fila Efectivo por el total de la venta — misma moneda ⇒ sin conversión y
+  // sin mensaje de tasa. La siembra ocurre SOLO en la transición a "activo" (ref):
+  // así no pelea con las ediciones del usuario (ni re-siembra si borra todas las
+  // filas) y el guard sigue coherente (si el usuario baja el monto, queda en
+  // subpago y "Registrar" se bloquea). Al vaciarse el carrito se limpian las filas
+  // para que la próxima venta arranque de cero.
+  const multiPaymentsSeededRef = useRef(false);
+  useEffect(() => {
+    if (!multiPaymentsActive) {
+      multiPaymentsSeededRef.current = false;
+      if (payments.length > 0) setPayments([]);
+      return;
+    }
+    if (multiPaymentsSeededRef.current) return;
+    multiPaymentsSeededRef.current = true;
+    if (payments.length === 0) {
+      setPayments([
+        createPaymentRow(SalePaymentMethod.Efectivo, saleCurrency, totalAmount),
+      ]);
+    }
+    // Intencional: solo la transición a activo dispara la siembra.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [multiPaymentsActive]);
 
   // El cierre se bloquea mientras la venta no esté cubierta por los pagos (misma
   // razón que la lista: falta cubrir, o una fila no se pudo convertir) o mientras

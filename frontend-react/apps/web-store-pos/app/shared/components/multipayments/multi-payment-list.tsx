@@ -79,11 +79,24 @@ const CURRENCY_OPTIONS: Currency[] = [
   Currency.MXN,
 ];
 
-function newRowId(): string {
+/** Stable row id, exported so the caller can seed the default row. */
+export function newPaymentRowId(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID();
   }
   return `payment-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+/**
+ * Builds a payment row with a fresh id. Exported so the cart can seed the
+ * default Efectivo row without duplicating the id strategy.
+ */
+export function createPaymentRow(
+  method: SalePaymentMethod,
+  currency: Currency,
+  amount: number,
+): MultiPaymentRow {
+  return { id: newPaymentRowId(), method, currency, amount };
 }
 
 /**
@@ -217,7 +230,7 @@ export function MultiPaymentList({
     onChange([
       ...payments,
       {
-        id: newRowId(),
+        id: newPaymentRowId(),
         method: options[0] ?? SalePaymentMethod.Efectivo,
         currency: orderCurrency,
         amount: 0,
@@ -370,14 +383,18 @@ export function MultiPaymentList({
         </div>
       </dl>
 
-      <p
-        className={blocked ? 'text-xs text-red-600' : 'text-xs text-text-muted'}
-        role={blocked ? 'alert' : undefined}
-        data-testid="multi-payment-block-reason"
-        data-block-reason={blockReason}
-      >
-        {blockMessage()}
-      </p>
+      {/* T5: el motivo de bloqueo solo se pinta cuando hay un bloqueo real
+        (subpago o error de conversión); sin bloqueo no se renderiza vacío. */}
+      {blocked && (
+        <p
+          className="text-xs text-red-600"
+          role="alert"
+          data-testid="multi-payment-block-reason"
+          data-block-reason={blockReason}
+        >
+          {blockMessage()}
+        </p>
+      )}
 
       <button
         type="button"

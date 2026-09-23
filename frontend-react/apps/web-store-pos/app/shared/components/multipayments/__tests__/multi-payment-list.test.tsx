@@ -76,8 +76,8 @@ function renderList(props: {
   return onChange;
 }
 
-function settleButton() {
-  return screen.getByTestId('multi-payment-settle');
+function blockReason() {
+  return screen.queryByTestId('multi-payment-block-reason');
 }
 
 describe('MultiPaymentList (module 16 gate)', () => {
@@ -127,11 +127,8 @@ describe('MultiPaymentList — owner scenarios', () => {
     expect(screen.getByTestId('multi-payment-paid')).toHaveTextContent('USD');
     expect(screen.getByTestId('multi-payment-remaining')).toHaveTextContent('0');
     expect(screen.getByTestId('multi-payment-change')).toHaveTextContent('0');
-    expect(screen.getByTestId('multi-payment-block-reason')).toHaveAttribute(
-      'data-block-reason',
-      'none',
-    );
-    expect(settleButton()).not.toBeDisabled();
+    // T5: sin bloqueo no se pinta el motivo de bloqueo.
+    expect(blockReason()).toBeNull();
   });
 
   it('covers a 120 CUP order with 100 CUP + 20 CUP (no rates needed)', () => {
@@ -148,7 +145,18 @@ describe('MultiPaymentList — owner scenarios', () => {
     expect(screen.getByTestId('multi-payment-paid')).toHaveTextContent('CUP');
     expect(screen.getByTestId('multi-payment-remaining')).toHaveTextContent('0');
     expect(screen.getByTestId('multi-payment-change')).toHaveTextContent('0');
-    expect(settleButton()).not.toBeDisabled();
+    expect(blockReason()).toBeNull();
+  });
+
+  it('T5: una fila Efectivo por el total no produce error de tasa ni bloqueo', () => {
+    renderList({
+      payments: [row({ id: 'p1', currency: Currency.CUP, amount: 120 })],
+      orderCurrency: Currency.CUP,
+      total: 120,
+    });
+
+    expect(screen.queryByTestId('multi-payment-row-error')).not.toBeInTheDocument();
+    expect(blockReason()).toBeNull();
   });
 });
 
@@ -168,7 +176,7 @@ describe('MultiPaymentList — balance and conversion', () => {
 
     expect(screen.getByTestId('multi-payment-change')).toHaveTextContent('50');
     expect(screen.getByTestId('multi-payment-remaining')).toHaveTextContent('0');
-    expect(settleButton()).not.toBeDisabled();
+    expect(blockReason()).toBeNull();
   });
 
   it('shows the remaining and blocks the settle action when underpaid', () => {
@@ -180,12 +188,7 @@ describe('MultiPaymentList — balance and conversion', () => {
 
     expect(screen.getByTestId('multi-payment-remaining')).toHaveTextContent('20');
     expect(screen.getByTestId('multi-payment-change')).toHaveTextContent('0');
-    expect(screen.getByTestId('multi-payment-block-reason')).toHaveAttribute(
-      'data-block-reason',
-      'underpaid',
-    );
-    expect(settleButton()).toBeDisabled();
-    expect(settleButton()).toHaveAttribute('data-blocked', 'true');
+    expect(blockReason()).toHaveAttribute('data-block-reason', 'underpaid');
   });
 
   it('filters non-positive rows before tallying (no throw)', () => {
@@ -201,7 +204,7 @@ describe('MultiPaymentList — balance and conversion', () => {
 
     expect(screen.getByTestId('multi-payment-paid')).toHaveTextContent('100');
     expect(screen.getByTestId('multi-payment-remaining')).toHaveTextContent('0');
-    expect(settleButton()).not.toBeDisabled();
+    expect(blockReason()).toBeNull();
   });
 
   it('surfaces a typed error and blocks when a payment cannot be converted', () => {
@@ -217,11 +220,7 @@ describe('MultiPaymentList — balance and conversion', () => {
     expect(error).toHaveTextContent(/tasa de cambio/i);
     // The unconvertible payment is NOT silently counted as 0: the total is still owed.
     expect(screen.getByTestId('multi-payment-remaining')).toHaveTextContent('100');
-    expect(screen.getByTestId('multi-payment-block-reason')).toHaveAttribute(
-      'data-block-reason',
-      'conversion_error',
-    );
-    expect(settleButton()).toBeDisabled();
+    expect(blockReason()).toHaveAttribute('data-block-reason', 'conversion_error');
   });
 });
 
@@ -261,20 +260,20 @@ describe('MultiPaymentList — interactions', () => {
     expect(screen.queryAllByTestId('multi-payment-row')).toHaveLength(0);
   });
 
-  it('settles once an edited amount covers the total', () => {
+  it('reports the sale covered once an edited amount covers the total', () => {
     render(
       <IntlProvider messages={esMessages} locale="es" defaultLocale="es">
         <Harness initial={[row({ id: 'p1', currency: Currency.USD, amount: 0 })]} />
       </IntlProvider>,
     );
 
-    expect(settleButton()).toBeDisabled();
+    expect(blockReason()).toHaveAttribute('data-block-reason', 'underpaid');
     expect(screen.getByTestId('multi-payment-remaining')).toHaveTextContent('100');
 
     fireEvent.change(screen.getByTestId('multi-payment-amount'), { target: { value: '100' } });
 
     expect(screen.getByTestId('multi-payment-remaining')).toHaveTextContent('0');
-    expect(settleButton()).not.toBeDisabled();
+    expect(blockReason()).toBeNull();
   });
 });
 

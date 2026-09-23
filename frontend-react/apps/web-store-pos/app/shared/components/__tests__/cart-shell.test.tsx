@@ -1198,6 +1198,31 @@ describe('CartShell — multi-payment list (módulo 16)', () => {
     expect(screen.getByText('Registrar').closest('button')).not.toBeDisabled();
   });
 
+  it('T5: siembra una fila Efectivo por el total cuando no hay pagos', async () => {
+    const setPayments = vi.fn();
+    mockMultiPaymentCart({ payments: [], setPayments });
+    renderCartShell();
+    openCart();
+
+    await waitFor(() => expect(setPayments).toHaveBeenCalledTimes(1));
+    const rows = setPayments.mock.calls[0][0] as MultiPaymentRow[];
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      method: SalePaymentMethod.Efectivo,
+      currency: Currency.CUP,
+      amount: 5,
+    });
+  });
+
+  it('T5: no re-siembra cuando ya hay filas', () => {
+    const setPayments = vi.fn();
+    mockMultiPaymentCart({ payments: [paymentRow({ amount: 5 })], setPayments });
+    renderCartShell();
+    openCart();
+
+    expect(setPayments).not.toHaveBeenCalled();
+  });
+
   // Decision 8 (ratified 2026-09-18): with multi-pago active the total the UI displays,
   // guards and submits is the UNPRICED line sum — a priced payment method must NOT
   // change it (otherwise the UI and the persisted order would disagree).
