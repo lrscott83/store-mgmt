@@ -36,8 +36,8 @@ test.describe.serial('S2-F1 — Reporte del día', () => {
     // The header should be visible
     await expect(page.getByText(STATS_HEADER, { exact: true })).toBeVisible();
 
-    // The total should be visible (starts with $)
-    await expect(page.locator('text=/^\\$[\\d,.]+$/').first()).toBeVisible();
+    // The total should be visible (amount + currency code, e.g. "1 234 CUP")
+    await expect(page.getByText(/^[\d.,]+\u00A0?CUP$/).first()).toBeVisible();
   });
 
   test('el panel Resumen Efectivo se puede expandir', async ({ signedInPage }) => {

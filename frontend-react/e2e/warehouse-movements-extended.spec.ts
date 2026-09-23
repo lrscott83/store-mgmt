@@ -256,12 +256,12 @@ test.describe.serial('Movimientos de almacenes — cobertura extendida', () => {
     // First purchase: 10 × $10 → cost $10.
     await openGearMovement(page, 'Ponderado', MENU_ENTRY);
     await fillMovement(page, { product, quantity: '10', cost: '10' });
-    expect(await readProductCost(page, 'Ponderado')).toBe('$10');
+    expect(await readProductCost(page, 'Ponderado')).toBe('10\u00A0CUP');
 
     // Second purchase: 10 × $30 → weighted ((10×10)+(10×30))/20 = $20.
     await openGearMovement(page, 'Ponderado', MENU_ENTRY);
     await fillMovement(page, { product, quantity: '10', cost: '30' });
-    expect(await readProductCost(page, 'Ponderado')).toBe('$20');
+    expect(await readProductCost(page, 'Ponderado')).toBe('20\u00A0CUP');
   });
 
   test('sale_out con stock insuficiente se bloquea con Swal y no debita', async ({
@@ -315,9 +315,9 @@ test.describe.serial('Movimientos de almacenes — cobertura extendida', () => {
     await openGearMovement(page, 'Origen', MENU_MOVEMENT);
     await fillMovement(page, { product, quantity: '5', target: 'Destino' });
 
-    expect(await readProductCost(page, 'Destino')).toBe('$7.33');
+    expect(await readProductCost(page, 'Destino')).toBe('7.33\u00A0CUP');
     // Origin keeps its own cost: 5 units still at $10.
-    expect(await readProductCost(page, 'Origen')).toBe('$10');
+    expect(await readProductCost(page, 'Origen')).toBe('10\u00A0CUP');
   });
 
   test('sale_out seguida de venta en tienda descuenta FIFO con el costo del almacén', async ({
@@ -361,7 +361,7 @@ test.describe.serial('Movimientos de almacenes — cobertura extendida', () => {
     const profit = (
       await page.locator('span.text-lg.font-bold.text-success').first().innerText()
     ).trim();
-    expect(profit).toBe('-$650');
+    expect(profit).toBe('-650\u00A0CUP');
   });
 
   test('cantidad decimal (0.5) en compra y salida con round2', async ({ signedInPage }) => {

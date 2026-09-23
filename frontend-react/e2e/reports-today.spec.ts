@@ -49,8 +49,8 @@ test.describe.serial('FC-A2 — Reporte del día', () => {
     await page.goto('/reports/today');
     await page.waitForLoadState('networkidle');
 
-    // Revenue, Cost, and Profit should show $ prefix
-    const revenueValue = page.locator('text=$').first();
+    // Revenue, Cost, and Profit should show amount + currency code (e.g. "500 CUP")
+    const revenueValue = page.getByText(/^[\d.,]+\u00A0?CUP$/).first();
     await expect(revenueValue).toBeVisible();
 
     // All metric values should be visible (even if 0)
