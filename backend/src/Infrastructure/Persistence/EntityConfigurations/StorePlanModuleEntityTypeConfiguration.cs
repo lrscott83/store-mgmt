@@ -36,14 +36,15 @@ namespace Infrastructure.Persistence.EntityConfigurations
                 StorePlanModule.Create((int)StorePlanType.Gratis, (int)ModuleType.Reports),
                 StorePlanModule.Create((int)StorePlanType.Gratis, (int)ModuleType.Management),
 
-                // Pago: Gratis + Estadísticas, Ventas Mayoristas, Gastos, Facturación, Historiales, Créditos
+                // Pago: Gratis + Estadísticas, Gastos, Facturación, Historiales, Créditos.
+                // WholesaleSales (12) was REMOVED from Pago (2026-09-23): it is now
+                // reserved for Superior (3) and VIP (4) only (wholesale-superior-vip-only).
                 StorePlanModule.Create((int)StorePlanType.Pago, (int)ModuleType.Sales),
                 StorePlanModule.Create((int)StorePlanType.Pago, (int)ModuleType.Inventory),
                 StorePlanModule.Create((int)StorePlanType.Pago, (int)ModuleType.Synchronization),
                 StorePlanModule.Create((int)StorePlanType.Pago, (int)ModuleType.Reports),
                 StorePlanModule.Create((int)StorePlanType.Pago, (int)ModuleType.Statistics),
                 StorePlanModule.Create((int)StorePlanType.Pago, (int)ModuleType.Management),
-                StorePlanModule.Create((int)StorePlanType.Pago, (int)ModuleType.WholesaleSales),
                 StorePlanModule.Create((int)StorePlanType.Pago, (int)ModuleType.Expenses),
                 StorePlanModule.Create((int)StorePlanType.Pago, (int)ModuleType.Billing),
                 StorePlanModule.Create((int)StorePlanType.Pago, (int)ModuleType.Histories),
