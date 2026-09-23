@@ -1,5 +1,10 @@
 import { test, expect } from './support/test';
 import type { Page } from '@playwright/test';
+import {
+  applyWholesaleSnapshot,
+  mintWholesaleSuperiorOwner,
+  type WholesaleSnapshot,
+} from './support/store-wholesale-fixture';
 
 /**
  * wholesale-cart-floor — E2E (2026-09-07)
@@ -11,7 +16,9 @@ import type { Page } from '@playwright/test';
  * 2. When ± moves the pack count across tiers, the line's unit price is
  *    recalculated to the applicable tier's price.
  *
- * Uses the `owner-admin-with-products` persona; wholesale config is seeded
+ * Uses the NEW private Superior-owner persona (store-wholesale-fixture.ts:
+ * plan-upgraded store with module 12/feature 39 — wholesale is Superior/VIP
+ * only as of 2026-09-23); wholesale config is seeded
  * via the localStorage seam (same as mayorista-sale.spec.ts):
  * packSize 24, tiers minPacks 5 → $6, minPacks 12 → $5, retail $10.
  *
@@ -26,6 +33,8 @@ const WHOLESALE_HEADER = 'Ventas Mayoristas'; // SALES.WHOLESALE.HEADER
 const ADDED_TEXT = 'adicionado a la venta mayorista'; // SALES.WHOLESALE.ADDED
 const EMPTY_CART_TEXT =
   'La venta no tiene ningún producto. Usted debe adicionar algún producto a la venta para pagar.'; // SHOPPING_CART.DON_NOT_PAY_EMPTY_CART
+
+let wholesaleOwner: WholesaleSnapshot;
 
 /**
  * Seeds wholesale config (packSize 24, minPacks 5 → $6, minPacks 12 → $5)
@@ -129,12 +138,18 @@ async function addPacksAndOpenCart(page: Page, productId: string, packs: string)
 test.describe.serial('wholesale cart — floor del menor rango y re-precificación por rango', () => {
   test.describe.configure({ timeout: 120_000 });
 
-  test.use({ persona: 'owner-admin-with-products' });
+  // Mint the private Superior owner once (2 registrations + 3-4 logins + 1
+  // plaintext product seed); snapshots are replayed per test, zero logins.
+  test.beforeAll(async ({ browser }) => {
+    test.setTimeout(90_000);
+    wholesaleOwner = await mintWholesaleSuperiorOwner(browser);
+  });
 
   test('− no baja del menor rango: al quedar por debajo, la línea se elimina del carrito', async ({
-    signedInPage,
+    page,
   }) => {
-    const { page, selectedStoreId } = signedInPage;
+    await applyWholesaleSnapshot(page, wholesaleOwner);
+    const selectedStoreId = wholesaleOwner.selectedStoreId;
 
     const product = await openWholesaleSeeded(page, selectedStoreId);
 
@@ -158,9 +173,10 @@ test.describe.serial('wholesale cart — floor del menor rango y re-precificaci�
   });
 
   test('± cruza de rango y el precio de la línea se recalcula al rango aplicable', async ({
-    signedInPage,
+    page,
   }) => {
-    const { page, selectedStoreId } = signedInPage;
+    await applyWholesaleSnapshot(page, wholesaleOwner);
+    const selectedStoreId = wholesaleOwner.selectedStoreId;
 
     const product = await openWholesaleSeeded(page, selectedStoreId);
 

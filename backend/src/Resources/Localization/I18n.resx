@@ -177,6 +177,9 @@
   <data name="ModuleNotAvailableToStore" xml:space="preserve">
     <value>Modulo no disponible para la tienda</value>
   </data>
+  <data name="ModuleNotAvailableForPagoPlan" xml:space="preserve">
+    <value>Ventas Mayoristas está reservada para los planes Superior y VIP; el plan Pago no puede incluirla</value>
+  </data>
   <data name="ModuleNotFound" xml:space="preserve">
     <value>Modulo no encontrado</value>
   </data>

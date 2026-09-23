@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
+import { redirect } from 'react-router';
 import { useIntl } from 'react-intl';
 import type { Product } from '@store-mgmt/domain';
-import { EFeatures, OrderType, ProductErrors, Result } from '@store-mgmt/domain';
-import { featureLoader } from '~/auth/routes/loaders';
+import { EModules, OrderType, ProductErrors, Result } from '@store-mgmt/domain';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { useCartStore } from '~/shared/lib/stores/cart-store';
 import { Card } from '~/shared/components/ui/card';
@@ -15,7 +15,9 @@ import { Switch } from '~/shared/components/ui/switch';
 import {
   hasInventoryModuleAvailable,
   hasMultiPaymentsModuleAvailable,
+  isModuleAvailable,
 } from '~/shared/lib/auth/authorization-service';
+import { resolveUserHomePath } from '~/shared/lib/auth/user-home';
 import { InventoryOfflineService } from '~/inventory/lib/services/inventory-offline-service';
 import { ProductRepository } from '~/sales/lib/repositories/product-repository';
 import { ProductCategoryRepository } from '~/sales/lib/repositories/product-category-repository';
@@ -34,8 +36,31 @@ import { guardCurrency } from '~/shared/lib/currency-guard';
 import { ScannerModal } from '../components/scanner-modal';
 import type { ProductCategory } from '@store-mgmt/domain';
 
-// Mismo guard que la venta normal: feature Ventas.
-export const clientLoader = featureLoader([EFeatures.Sale]);
+// Ventas Mayoristas es SOLO Superior/VIP (wholesale-superior-vip-only, 2026-09-23).
+// El gate es el MÓDULO 12 en `storeModuleIds`, para TODOS los roles — el
+// `featureLoader([EFeatures.Sale])` anterior bypassaba a SuperAdmin/OwnerAdmin
+// (loaders.ts:116) y por tanto admitía a un OwnerAdmin de tienda Pago que entrara
+// por URL. Un usuario VÁLIDO sin el módulo NO es expulsado (invariante
+// docs/contracts/authenticated-session-redirect.md): se redirige a su home, sin
+// logout. Solo un usuario NO autenticado va a /login (mismo contrato que
+// authLoader/featureLoader).
+export const clientLoader = async (): Promise<Response | null> => {
+  const { user, isAuthenticated } = useAuthStore.getState();
+  if (!user || !isAuthenticated) {
+    useAuthStore.getState().logout();
+    return redirect('/login');
+  }
+  if (!isModuleAvailable(user, EModules.WholesaleSales)) {
+    // resolveUserHomePath reads business-entity storage seams (device-wrap
+    // design §3) — recover the DEK silently first, same as guestOnlyLoader
+    // (loaders.ts:72). Dynamic import keeps this route free of static
+    // offline/ imports (D1/D4 pattern).
+    const { bootstrapDeviceDek } = await import('~/shared/lib/storage/dek-bootstrap');
+    await bootstrapDeviceDek();
+    return redirect(await resolveUserHomePath(user));
+  }
+  return null;
+};
 
 /**
  * Ventas Mayoristas — misma venta que la normal, pero la cantidad se pide por PAQUETES

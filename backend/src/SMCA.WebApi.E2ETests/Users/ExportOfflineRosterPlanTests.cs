@@ -178,9 +178,13 @@ public sealed class ExportOfflineRosterPlanTests
             var body = await ExportRosterAsync(seeded.UserId, login, seeded.StoreId);
             var storeUser = body.Data!.Users.Single(u => !u.IsOwnerAdmin);
 
-            // Free→Paid reactivates ALL paid catalog modules (not only the seeded ones):
-            // expect Management (free) + every paid AvailableToStore module, without duplicates.
-            var expectedPaid = await PaidCatalogModuleIdsAsync();
+            // Free→Paid reactivates ALL paid catalog modules (not only the seeded ones) EXCEPT
+            // WholesaleSales (12) — reserved for Superior/VIP since wholesale-superior-vip-only
+            // (2026-09-23): expect Management (free) + every paid module minus 12, no duplicates.
+            var expectedPaid = (await PaidCatalogModuleIdsAsync())
+                .Where(id => id != WholesaleSalesModuleId)
+                .ToList();
+            storeUser.StoreModuleIds.Should().NotContain(WholesaleSalesModuleId);
             storeUser.StoreModuleIds.Should().BeEquivalentTo(
                 new[] { FreeManagementModuleId }.Concat(expectedPaid));
             var duplicated = storeUser.StoreModuleIds

@@ -49,13 +49,15 @@ public sealed class StorePlanCatalogTests
             (int)ModuleType.Management
         });
 
-        // Pago(2): Gratis + Statistics, WholesaleSales, Expenses, Billing, Histories, Credits
+        // Pago(2): Gratis + Statistics, Expenses, Billing, Histories, Credits.
+        // WholesaleSales (12) was REMOVED from Pago (wholesale-superior-vip-only, 2026-09-23):
+        // it is now reserved for Superior (3) and VIP (4) only.
         pago.Should().BeEquivalentTo(new[]
         {
             (int)ModuleType.Sales, (int)ModuleType.Inventory,
             (int)ModuleType.Synchronization, (int)ModuleType.Reports,
             (int)ModuleType.Management, (int)ModuleType.Statistics,
-            (int)ModuleType.WholesaleSales, (int)ModuleType.Expenses,
+            (int)ModuleType.Expenses,
             (int)ModuleType.Billing, (int)ModuleType.Histories,
             (int)ModuleType.Credits
         });
@@ -94,5 +96,13 @@ public sealed class StorePlanCatalogTests
             (int)ModuleType.Elaboration
         };
         vip.Should().BeEquivalentTo(vipCatalog);
+
+        // wholesale-superior-vip-only (2026-09-23): WholesaleSales (12) is reserved for
+        // Superior (3) and VIP (4); Gratis (1) and Pago (2) never list it. Explicit
+        // assertions so the business rule survives future seed edits.
+        gratis.Should().NotContain((int)ModuleType.WholesaleSales);
+        pago.Should().NotContain((int)ModuleType.WholesaleSales);
+        superior.Should().Contain((int)ModuleType.WholesaleSales);
+        vip.Should().Contain((int)ModuleType.WholesaleSales);
     }
 }

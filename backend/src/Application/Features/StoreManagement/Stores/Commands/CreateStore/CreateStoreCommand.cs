@@ -95,6 +95,13 @@ namespace Application.Features.StoreManagement.Stores.Commands.CreateStore
                 // Inheritance (user decision 3): the new store copies the SELECTED store's module set.
                 var inheritedModules = await _storeModuleRepository.GetStoreModulesByIdAsync(selectedStoreId);
                 moduleIds = inheritedModules.Select(sm => sm.ModuleId).ToList();
+                // WholesaleSales (12) is reserved for Superior/VIP plans (wholesale-superior-vip-only,
+                // 2026-09-23). The new store is born on Pago, so an inherited module 12 (from a
+                // Superior/VIP selected store) must NOT be copied — the closure that removed 12
+                // from Pago would otherwise be bypassed through this branch. Filtering (not 400:
+                // the caller never asked for 12; this is server-side derivation) keeps MultiStores
+                // creation working for Superior/VIP owners.
+                moduleIds = moduleIds.Where(id => id != (int)ModuleType.WholesaleSales).ToList();
                 if (moduleIds.Count == 0)
                     throw new ApiException(_localizer["NotAuthorized"], HttpStatusCode.Forbidden);
 

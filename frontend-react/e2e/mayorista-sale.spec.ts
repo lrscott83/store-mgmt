@@ -1,5 +1,10 @@
 import { test, expect } from './support/test';
 import type { Page } from '@playwright/test';
+import {
+  applyWholesaleSnapshot,
+  mintWholesaleSuperiorOwner,
+  type WholesaleSnapshot,
+} from './support/store-wholesale-fixture';
 
 /**
  * Ventas Mayoristas — E2E Playwright (plan 2026-09-04-wholesale-sales-plan.md)
@@ -17,9 +22,11 @@ import type { Page } from '@playwright/test';
  *  3. credit: wholesale credit with client → SaleCredit in today's credits
  *  4. inventory: requesting more units than available blocks the sale
  *
- * Uses the `owner-admin-with-products` persona (existing product is seeded
- * plaintext in localStorage) and seeds the wholesale config + inventory via
- * page.evaluate — same seam create-sale.spec.ts uses.
+ * Uses the NEW private Superior-owner persona (store-wholesale-fixture.ts:
+ * plan-upgraded store with module 12/feature 39 — wholesale is Superior/VIP
+ * only as of 2026-09-23) whose seeded product is plaintext in localStorage,
+ * and seeds the wholesale config + inventory via page.evaluate — same seam
+ * create-sale.spec.ts uses.
  *
  * Product seed: retail price $10, wholesale packSize 24, tiers
  * minPacks 1 → $9, minPacks 11 → $8. 12 packs → 288 units at $8 → $2,304;
@@ -159,15 +166,23 @@ async function addWholesalePacksAndOpenCart(
   await badge.locator('..').click();
 }
 
+let wholesaleOwner: WholesaleSnapshot;
+
 test.describe.serial('Ventas Mayoristas — flujo completo', () => {
   test.describe.configure({ timeout: 120_000 });
 
-  test.use({ persona: 'owner-admin-with-products' });
+  // Mint the private Superior owner once (2 registrations + 3-4 logins + 1
+  // plaintext product seed); snapshots are replayed per test, zero logins.
+  test.beforeAll(async ({ browser }) => {
+    test.setTimeout(90_000);
+    wholesaleOwner = await mintWholesaleSuperiorOwner(browser);
+  });
 
   test('configurar producto mayorista y vender 12 paquetes como 288 unidades', async ({
-    signedInPage,
+    page,
   }) => {
-    const { page, selectedStoreId } = signedInPage;
+    await applyWholesaleSnapshot(page, wholesaleOwner);
+    const selectedStoreId = wholesaleOwner.selectedStoreId;
 
     const product = await openWholesaleWithSeededProduct(page, selectedStoreId);
 
@@ -201,9 +216,10 @@ test.describe.serial('Ventas Mayoristas — flujo completo', () => {
   });
 
   test('venta mayorista con Transferencia (CUP) queda filtrable por método de pago', async ({
-    signedInPage,
+    page,
   }) => {
-    const { page, selectedStoreId } = signedInPage;
+    await applyWholesaleSnapshot(page, wholesaleOwner);
+    const selectedStoreId = wholesaleOwner.selectedStoreId;
 
     const product = await openWholesaleWithSeededProduct(page, selectedStoreId);
 
@@ -229,8 +245,9 @@ test.describe.serial('Ventas Mayoristas — flujo completo', () => {
     await expect(page.getByText(NO_ORDER_FOUND)).toHaveCount(0);
   });
 
-  test('venta mayorista a crédito genera un crédito con el cliente', async ({ signedInPage }) => {
-    const { page, selectedStoreId } = signedInPage;
+  test('venta mayorista a crédito genera un crédito con el cliente', async ({ page }) => {
+    await applyWholesaleSnapshot(page, wholesaleOwner);
+    const selectedStoreId = wholesaleOwner.selectedStoreId;
 
     const product = await openWholesaleWithSeededProduct(page, selectedStoreId);
 
@@ -253,9 +270,10 @@ test.describe.serial('Ventas Mayoristas — flujo completo', () => {
   });
 
   test('solicitar más unidades de las disponibles bloquea la venta mayorista', async ({
-    signedInPage,
+    page,
   }) => {
-    const { page, selectedStoreId } = signedInPage;
+    await applyWholesaleSnapshot(page, wholesaleOwner);
+    const selectedStoreId = wholesaleOwner.selectedStoreId;
 
     // Solo 100 unidades disponibles: 12 paquetes (288 unidades) no caben.
     const product = await openWholesaleWithSeededProduct(page, selectedStoreId, 100);
@@ -271,9 +289,10 @@ test.describe.serial('Ventas Mayoristas — flujo completo', () => {
   });
 
   test('el icono de info abre el popup readonly con los rangos y precios', async ({
-    signedInPage,
+    page,
   }) => {
-    const { page, selectedStoreId } = signedInPage;
+    await applyWholesaleSnapshot(page, wholesaleOwner);
+    const selectedStoreId = wholesaleOwner.selectedStoreId;
 
     const product = await openWholesaleWithSeededProduct(page, selectedStoreId);
 
@@ -292,9 +311,10 @@ test.describe.serial('Ventas Mayoristas — flujo completo', () => {
   });
 
   test('una cantidad menor al primer rango se bloquea con el error de mínimo', async ({
-    signedInPage,
+    page,
   }) => {
-    const { page, selectedStoreId } = signedInPage;
+    await applyWholesaleSnapshot(page, wholesaleOwner);
+    const selectedStoreId = wholesaleOwner.selectedStoreId;
 
     // Primer rango en 6 paquetes ($6/ud): 3 paquetes no alcanzan el mínimo.
     const product = await openWholesaleWithSeededProduct(page, selectedStoreId, 1000, [

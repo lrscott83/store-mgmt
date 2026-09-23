@@ -1,5 +1,10 @@
 import { test, expect } from './support/test';
 import type { Page } from '@playwright/test';
+import {
+  applyWholesaleSnapshot,
+  mintWholesaleSuperiorOwner,
+  type WholesaleSnapshot,
+} from './support/store-wholesale-fixture';
 
 /**
  * wholesale-scanner — E2E (React-only feature, no Angular correlate)
@@ -21,7 +26,9 @@ import type { Page } from '@playwright/test';
  * with NO manual form, and the "Todos" search-scope switch restricts the
  * name search to the selected category when OFF.
  *
- * Uses the `owner-admin-with-products` persona: seeded category + product
+ * Uses the NEW private Superior-owner persona (store-wholesale-fixture.ts:
+ * plan-upgraded store with module 12/feature 39 — wholesale is Superior/VIP
+ * only as of 2026-09-23): seeded category + product
  * in plaintext localStorage, same seam as mayorista-sale.spec.ts.
  */
 
@@ -124,13 +131,21 @@ async function openWholesaleSeeded(
   return product;
 }
 
+let wholesaleOwner: WholesaleSnapshot;
+
 test.describe('wholesale-scanner — modal redesign y filtro Todos en venta mayorista', () => {
   test.describe.configure({ timeout: 120_000 });
 
-  test.use({ persona: 'owner-admin-with-products' });
+  // Mint the private Superior owner once (2 registrations + 3-4 logins + 1
+  // plaintext product seed); snapshots are replayed per test, zero logins.
+  test.beforeAll(async ({ browser }) => {
+    test.setTimeout(90_000);
+    wholesaleOwner = await mintWholesaleSuperiorOwner(browser);
+  });
 
-  test('the wholesale scanner entry point opens the redesigned modal', async ({ signedInPage }) => {
-    const { page, selectedStoreId } = signedInPage;
+  test('the wholesale scanner entry point opens the redesigned modal', async ({ page }) => {
+    await applyWholesaleSnapshot(page, wholesaleOwner);
+    const selectedStoreId = wholesaleOwner.selectedStoreId;
 
     await openWholesaleSeeded(page, selectedStoreId);
 
@@ -161,9 +176,10 @@ test.describe('wholesale-scanner — modal redesign y filtro Todos en venta mayo
   });
 
   test('el switch "Todos" ON busca en todas las categorías; OFF restringe a la seleccionada', async ({
-    signedInPage,
+    page,
   }) => {
-    const { page, selectedStoreId } = signedInPage;
+    await applyWholesaleSnapshot(page, wholesaleOwner);
+    const selectedStoreId = wholesaleOwner.selectedStoreId;
 
     const product = await openWholesaleSeeded(page, selectedStoreId);
 

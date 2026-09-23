@@ -128,8 +128,8 @@ internal sealed class ToggleStorePlanCommandHandler : ICommandHandler<ToggleStor
 
     /// <summary>
     /// Free -&gt; Paid: keep the anchor untouched, pin the override per the owner-plan-change
-    /// rule (paid target while overdue → today), activate ALL paid modules (PriceIncluded=false),
-    /// and generate/activate their StoreRoleFeatures.
+    /// rule (paid target while overdue → today), activate ALL paid modules (PriceIncluded=false)
+    /// EXCEPT WholesaleSales, and generate/activate their StoreRoleFeatures.
     /// </summary>
     private async Task ApplyFreeToPaid(Store store)
     {
@@ -137,8 +137,11 @@ internal sealed class ToggleStorePlanCommandHandler : ICommandHandler<ToggleStor
         await ApplyOverrideRule(store);
 
         IEnumerable<StoreModule> existingModules = await _storeModuleRepository.GetStoreModulesByIdAsync(store.Id);
+        // WholesaleSales (12) is reserved for Superior/VIP plans (wholesale-superior-vip-only,
+        // 2026-09-23): the Free→Paid toggle lands on Pago, so module 12 (and therefore its
+        // feature 39 via StoreRoleFeatureGenerator) must never be inserted or reactivated here.
         IEnumerable<Module> paidModules = (await _moduleRepository.GetAvailableModulesToStore())
-            .Where(m => !m.PriceIncluded)
+            .Where(m => !m.PriceIncluded && m.Id != (int)ModuleType.WholesaleSales)
             .ToList();
 
         List<int> insertedModuleIds = new();

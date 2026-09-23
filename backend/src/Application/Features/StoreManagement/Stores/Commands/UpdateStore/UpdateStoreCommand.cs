@@ -79,6 +79,23 @@ namespace Application.Features.StoreManagement.Stores.Commands.UpdateStore
             if (store is null)
                 throw new ValidationException { Errors = new List<Error> { new Error("Id", _localizer["StoreNotFound"]) } };
 
+            // WholesaleSales (12) is reserved for Superior/VIP plans (wholesale-superior-vip-only,
+            // 2026-09-23): a store that is or will be on any other plan must never receive module 12
+            // through the manual module-set replacement. The effective plan after this request is
+            // request.PlanId when present (plan activation may happen in the same PUT), otherwise the
+            // store's current plan. Fail-closed 400 — no silent drop.
+            var effectivePlanId = request.PlanId ?? store.StorePlanId;
+            if (request.ModuleIds is not null
+                && request.ModuleIds.Contains((int)ModuleType.WholesaleSales)
+                && effectivePlanId != (int)StorePlanType.Superior
+                && effectivePlanId != (int)StorePlanType.VIP)
+            {
+                throw new ValidationException
+                {
+                    Errors = new List<Error> { new Error("ModuleIds", _localizer["ModuleNotAvailableForPagoPlan"]) }
+                };
+            }
+
             // DG-7 one-way plan lock (owner-plan-change): a non-SuperAdmin caller must not
             // change the module set of ANY store — free or paid. Module mutations now have
             // dedicated paths (ChangeStorePlan / ToggleStorePlan); UpdateStore only keeps a
