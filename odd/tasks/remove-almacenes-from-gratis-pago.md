@@ -130,8 +130,10 @@ FUERA DE SCOPE (reglas no negociables del repo):
   - `f922e35c` `docs(odd): track remove-almacenes-from-gratis-pago feature plan`
   - `21ea7ed0` `feat(plan): remove Warehouses module from Gratis/Pago stores (migration, VPS script)`
   - (este commit) `docs(odd): mark remove-almacenes-from-gratis-pago completed with verification evidence`
-- RDD: runtime OpenCode no elegible para revisión inmutable (mismo resultado registrado en
-  cart-wholesale-by-order-type); no se ejecuta assess con un agente no elegible.
+- RDD: `gentle-ai review assess --agent opencode` → `gentle-ai.review-assessment/v1` `risk: high` con
+  `unassessable`: el runtime OpenCode NO es elegible para revisión inmutable (runtimes soportados:
+  claude-code, codex). Mismo resultado registrado en cart-wholesale-by-order-type; no hay revisión de
+  recibo posible en esta sesión — no se inventa aprobación ni se baja la tier.
 - Nota de entorno: se detuvo el dev server `SMCA.WebApi` (PID 11092) que bloqueaba el build — atención si
   se necesita relanzar (`dotnet run --project backend/src/SMCA.WebApi`) para pruebas manuales/E2E frontend.
 
