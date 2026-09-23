@@ -1,19 +1,24 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useIntl } from 'react-intl';
 import {
   convertPaymentAmount,
+  channelKey,
+  isValidChannel,
   paymentMethodOptionsForCurrency,
   salePaymentMethodLabel,
   summarizePayments,
   Currency,
+  PAYMENT_CHANNELS,
   SalePaymentMethod,
 } from '@store-mgmt/domain';
-import type { BaseError, ChannelRate } from '@store-mgmt/domain';
+import type { BaseError, ChannelRate, PaymentChannel } from '@store-mgmt/domain';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { hasMultiPaymentsModuleAvailable } from '~/shared/lib/auth/authorization-service';
 import { currencyLabel, formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency';
 import { ChannelRateOfflineService } from '~/management/channel-rates/lib/services/channel-rate-offline-service';
 import { hasMultiMonedasAvailable } from '~/shared/components/multimonedas/currency-select';
+import { Modal } from '~/shared/components/ui/modal';
+import { TrashIcon } from '~/shared/components/ui/icons';
 import {
   DEFAULT_ENABLED_PAYMENT_METHODS,
   StorePaymentMethodsConfigService,
@@ -115,6 +120,10 @@ export function MultiPaymentList({
   const user = useAuthStore((s) => s.user);
   const storeId = user?.selectedStoreId ?? '';
   const available = hasMultiPaymentsModuleAvailable(user);
+  // T6: the "Agregar pago" popup picks a channel from the canonical catalogue;
+  // `addChannelKey` is the `channelKey` of the pending selection.
+  const [addOpen, setAddOpen] = useState(false);
+  const [addChannelKey, setAddChannelKey] = useState('');
 
   // store-payment-methods-config: métodos habilitados de la tienda activa
   // (default: todos on — no-regresión). SSR: sin window se usa el default y la
@@ -125,6 +134,19 @@ export function MultiPaymentList({
     }
     return new StorePaymentMethodsConfigService(storeId).getEnabledMethods(storeId);
   }, [storeId]);
+
+  // T6: canales válidos ofrecidos por el popup = catálogo canónico del dominio
+  // (`PAYMENT_CHANNELS`) → gate de plan (sin MultiMonedas no hay Zelle) →
+  // config por-tienda (métodos que la tienda deshabilitó fuera). Así el popup
+  // nunca puede agregar una combinación que no exista (p. ej. Zelle+CUP).
+  const channels = useMemo<PaymentChannel[]>(() => {
+    const planGated = PAYMENT_CHANNELS.filter(
+      (channel) => hasMultiMonedasAvailable(user) || channel.method !== SalePaymentMethod.Zelle,
+    );
+    return planGated.filter(
+      (channel) => applyStorePaymentMethodsConfig([channel.method], enabledMethods).length > 0,
+    );
+  }, [user, enabledMethods]);
 
   // Rates are read once per store. Skipped during SSR/empty store, where there
   // is no local register to read from.
@@ -225,17 +247,31 @@ export function MultiPaymentList({
     onChange(payments.filter((row) => row.id !== id));
   }
 
-  function addRow() {
-    const options = methodOptionsFor(orderCurrency);
-    onChange([
-      ...payments,
-      {
-        id: newPaymentRowId(),
-        method: options[0] ?? SalePaymentMethod.Efectivo,
-        currency: orderCurrency,
-        amount: 0,
-      },
-    ]);
+  /**
+   * T6: opens the channel popup. The pending selection defaults to the first
+   * valid channel of the catalogue for the current sale context.
+   */
+  function openAddDialog() {
+    const first = channels[0];
+    setAddChannelKey(first ? channelKey(first.method, first.currency) : '');
+    setAddOpen(true);
+  }
+
+  /**
+   * T6: appends the chosen channel. Starting amount = the remaining amount to
+   * cover (in sale-currency units) when the channel is in the sale currency;
+   * otherwise 0, because a cross-currency amount cannot be prefilled without a
+   * rate. The user edits it afterwards.
+   */
+  function confirmAddChannel() {
+    const selected =
+      channels.find((channel) => channelKey(channel.method, channel.currency) === addChannelKey) ??
+      channels[0];
+    if (!selected || !isValidChannel(selected.method, selected.currency)) return;
+    const sameCurrency = Number(selected.currency) === Number(orderCurrency);
+    const startingAmount = sameCurrency && summary.remaining > 0 ? summary.remaining / 100 : 0;
+    onChange([...payments, createPaymentRow(selected.method, selected.currency, startingAmount)]);
+    setAddOpen(false);
   }
 
   return (
@@ -322,10 +358,11 @@ export function MultiPaymentList({
                 <button
                   type="button"
                   onClick={() => removeRow(row.id)}
-                  className="rounded-md border border-border px-2 py-1 text-xs text-red-600"
+                  aria-label={intl.formatMessage({ id: 'SHOPPING_CART.MULTI_PAYMENT_REMOVE' })}
+                  className="rounded-md border border-border p-1 text-red-600 hover:bg-surface-hover"
                   data-testid="multi-payment-remove"
                 >
-                  {intl.formatMessage({ id: 'SHOPPING_CART.MULTI_PAYMENT_REMOVE' })}
+                  <TrashIcon className="h-4 w-4" />
                 </button>
               </div>
 
@@ -346,7 +383,7 @@ export function MultiPaymentList({
 
       <button
         type="button"
-        onClick={addRow}
+        onClick={openAddDialog}
         className="rounded-md border border-border px-3 py-1 text-xs text-text"
         data-testid="multi-payment-add"
       >
@@ -395,6 +432,51 @@ export function MultiPaymentList({
           {blockMessage()}
         </p>
       )}
+
+      <Modal
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        title={intl.formatMessage({ id: 'SHOPPING_CART.MULTI_PAYMENT_ADD_TITLE' })}
+        testId="multi-payment-add-dialog"
+      >
+        {channels.length === 0 ? (
+          <p className="text-sm text-text-muted" data-testid="multi-payment-add-empty">
+            {intl.formatMessage({ id: 'SHOPPING_CART.MULTI_PAYMENT_ADD_NO_CHANNELS' })}
+          </p>
+        ) : (
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-text-muted">
+              {intl.formatMessage({ id: 'SHOPPING_CART.MULTI_PAYMENT_ADD_CHANNEL_LABEL' })}
+            </span>
+            <select
+              value={addChannelKey}
+              onChange={(e) => setAddChannelKey(e.target.value)}
+              className="w-full rounded-md border border-border px-2 py-1 text-sm"
+              data-testid="multi-payment-add-channel"
+            >
+              {channels.map((channel) => (
+                <option
+                  key={channelKey(channel.method, channel.currency)}
+                  value={channelKey(channel.method, channel.currency)}
+                >
+                  {salePaymentMethodLabel(channel.method, channel.currency)}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+        <div className="mt-3 flex justify-end">
+          <button
+            type="button"
+            onClick={confirmAddChannel}
+            disabled={channels.length === 0}
+            className="rounded-md bg-cyan-600 px-3 py-1.5 text-xs font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+            data-testid="multi-payment-add-confirm"
+          >
+            {intl.formatMessage({ id: 'SHOPPING_CART.MULTI_PAYMENT_ADD_CONFIRM' })}
+          </button>
+        </div>
+      </Modal>
 
       <button
         type="button"

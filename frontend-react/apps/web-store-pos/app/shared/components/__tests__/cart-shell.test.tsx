@@ -1223,6 +1223,15 @@ describe('CartShell — multi-payment list (módulo 16)', () => {
     expect(setPayments).not.toHaveBeenCalled();
   });
 
+  it('T6: "Agregar pago" abre el popup de canales', () => {
+    mockMultiPaymentCart({ payments: [paymentRow({ amount: 5 })] });
+    renderCartShell();
+    openCart();
+
+    fireEvent.click(screen.getByTestId('multi-payment-add'));
+    expect(screen.getByTestId('multi-payment-add-dialog')).toBeInTheDocument();
+  });
+
   // Decision 8 (ratified 2026-09-18): with multi-pago active the total the UI displays,
   // guards and submits is the UNPRICED line sum — a priced payment method must NOT
   // change it (otherwise the UI and the persisted order would disagree).
