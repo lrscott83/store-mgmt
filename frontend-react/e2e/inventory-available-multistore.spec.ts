@@ -153,7 +153,7 @@ test('MA-01 — con MultiStores el Inventario Disponible se agrupa por tienda y 
   await expect(categoryToggle).toBeVisible();
   await expect(categoryToggle).toContainText('(50)');
   await categoryToggle.click();
-  await expect(page.getByText('$400').first()).toBeVisible();
+  await expect(page.getByText('400 CUP').first()).toBeVisible();
 
   // The store with no local data shows the explicit empty message.
   await page.getByTestId(`multistore-panel-toggle-${SECOND_STORE_ID}`).click();

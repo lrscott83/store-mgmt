@@ -22,7 +22,7 @@ import {
 import { ActionMenu, ActionMenuItem } from '~/shared/components/ui/action-menu';
 import { showBlockingError } from '~/shared/lib/blocking-alert';
 import { showToastSuccess } from '~/shared/lib/toast';
-import { formatCurrency } from '~/shared/lib/format-currency';
+import { formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency';
 
 import { InventoryOfflineService } from '../lib/services/inventory-offline-service';
 import { WarehouseOfflineService } from '../lib/services/warehouse-offline-service';
@@ -328,7 +328,7 @@ export function WarehousesPage() {
             data-testid="warehouses-total-cost"
             className="whitespace-nowrap text-sm font-semibold text-primary"
           >
-            {formatCurrency(grandTotalCost)}
+            {formatMoneyWithCurrency(grandTotalCost)}
           </span>
         </div>
 
@@ -372,7 +372,7 @@ export function WarehousesPage() {
                     </span>
                     <span className="flex shrink-0 items-center gap-2">
                       <span className="whitespace-nowrap text-sm font-semibold text-primary">
-                        {formatCurrency(totalCostOf(warehouse.id))}
+                        {formatMoneyWithCurrency(totalCostOf(warehouse.id))}
                       </span>
                       <ChevronDownIcon isExpanded={isExpanded} className="text-text-muted" />
                     </span>
@@ -483,7 +483,7 @@ export function WarehousesPage() {
                               </h2>
                               <span className="flex items-center gap-2">
                                 <span className="whitespace-nowrap text-sm font-semibold text-primary">
-                                  {formatCurrency(cat.totalCostPrice)}
+                                  {formatMoneyWithCurrency(cat.totalCostPrice)}
                                 </span>
                                 <ChevronDownIcon
                                   isExpanded={catExpanded}
@@ -509,13 +509,13 @@ export function WarehousesPage() {
                                         data-testid={`warehouse-product-cost-${warehouse.id}-${p.productId}`}
                                         className="whitespace-nowrap text-sm font-semibold text-success"
                                       >
-                                        {formatCurrency(p.avgCostPrice)}
+                                        {formatMoneyWithCurrency(p.avgCostPrice, p.currency)}
                                       </p>
                                       <p
                                         data-testid={`warehouse-product-total-${warehouse.id}-${p.productId}`}
                                         className="whitespace-nowrap text-sm font-semibold text-primary"
                                       >
-                                        {formatCurrency(p.avgCostPrice * p.totalAvailable)}
+                                        {formatMoneyWithCurrency(p.avgCostPrice * p.totalAvailable, p.currency)}
                                       </p>
                                     </div>
                                   </div>

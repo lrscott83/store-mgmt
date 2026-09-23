@@ -2,7 +2,7 @@ import { useIntl } from 'react-intl';
 import { Button } from '~/shared/components/ui/button';
 import { CloseIcon } from '~/shared/components/ui/icons';
 import { formatLocalDate } from '~/shared/lib/date-utils';
-import { formatCurrency } from '~/shared/lib/format-currency';
+import { formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency';
 
 export interface DaySalesSummary {
   /** Local midnight of the summary's calendar day. */
@@ -64,7 +64,7 @@ export function DaySalesSummaryModal({ summary, onClose }: DaySalesSummaryModalP
           </div>
           <div className="rounded bg-gray-50 p-3 text-center">
             <div className="text-2xl font-bold text-green-700 whitespace-nowrap">
-              {formatCurrency(summary.totalRevenue)}
+              {formatMoneyWithCurrency(summary.totalRevenue)}
             </div>
             <div className="mt-1 text-xs text-gray-500">
               {intl.formatMessage({ id: 'REPORTS.SALES_SUMMARY.TOTAL_REVENUE' })}
@@ -72,7 +72,7 @@ export function DaySalesSummaryModal({ summary, onClose }: DaySalesSummaryModalP
           </div>
           <div className="rounded bg-gray-50 p-3 text-center">
             <div className="text-2xl font-bold text-red-600 whitespace-nowrap">
-              {formatCurrency(summary.totalCost)}
+              {formatMoneyWithCurrency(summary.totalCost)}
             </div>
             <div className="mt-1 text-xs text-gray-500">
               {intl.formatMessage({ id: 'REPORTS.SALES_SUMMARY.TOTAL_COST' })}
@@ -80,7 +80,7 @@ export function DaySalesSummaryModal({ summary, onClose }: DaySalesSummaryModalP
           </div>
           <div className="rounded bg-gray-50 p-3 text-center">
             <div className="text-2xl font-bold text-blue-700 whitespace-nowrap">
-              {formatCurrency(summary.totalProfit)}
+              {formatMoneyWithCurrency(summary.totalProfit)}
             </div>
             <div className="mt-1 text-xs text-gray-500">
               {intl.formatMessage({ id: 'REPORTS.SALES_SUMMARY.TOTAL_PROFIT' })}

@@ -23,7 +23,7 @@ import {
 import { Card } from '~/shared/components/ui/card';
 import { Button } from '~/shared/components/ui/button';
 import { ChevronDownIcon, SearchIcon } from '~/shared/components/ui/icons';
-import { formatCurrency } from '~/shared/lib/format-currency';
+import { formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency';
 import type { CurrencyAmount } from '~/shared/lib/currency-totals';
 import { calculateOrderProfit } from '~/inventory/lib/profit-calculator';
 import {
@@ -782,7 +782,7 @@ export function CuadrePorFechasPage() {
                             </td>
                             <td className="p-1 text-right text-danger">
                               <span className="whitespace-nowrap">
-                                {formatCurrency(expense.total)}
+                                {formatMoneyWithCurrency(expense.total, expense.currency)}
                               </span>
                             </td>
                             <td className="p-1 text-right">
@@ -1087,7 +1087,7 @@ function MultiStoreCuadreBody({
     <div className="divide-y divide-border">
       <ExpansionPanel
         title="Resumen Efectivo"
-        amount={formatCurrency(cashTotal)}
+        amount={formatMoneyWithCurrency(cashTotal)}
         amountClassName={valueClassName(cashTotal)}
       >
         <table className="w-full text-sm">
@@ -1098,7 +1098,7 @@ function MultiStoreCuadreBody({
               </td>
               <td className="p-1 text-right">
                 <span className="font-bold text-success whitespace-nowrap">
-                  {formatCurrency(summary.salesCashTotal)}
+                  {formatMoneyWithCurrency(summary.salesCashTotal)}
                 </span>
               </td>
             </tr>
@@ -1109,7 +1109,7 @@ function MultiStoreCuadreBody({
                 </td>
                 <td className="p-1 text-right">
                   <span className="font-bold text-success whitespace-nowrap">
-                    {formatCurrency(summary.paidCreditsCashTotal)}
+                    {formatMoneyWithCurrency(summary.paidCreditsCashTotal)}
                   </span>
                 </td>
               </tr>
@@ -1121,7 +1121,7 @@ function MultiStoreCuadreBody({
                 </td>
                 <td className="p-1 text-right">
                   <span className="font-bold text-danger whitespace-nowrap">
-                    {formatCurrency(summary.expensesCashTotal)}
+                    {formatMoneyWithCurrency(summary.expensesCashTotal)}
                   </span>
                 </td>
               </tr>
@@ -1132,7 +1132,7 @@ function MultiStoreCuadreBody({
 
       <ExpansionPanel
         title="Pago por Transferencia"
-        amount={formatCurrency(summary.salesCardTotal)}
+        amount={formatMoneyWithCurrency(summary.salesCardTotal)}
         amountClassName={valueClassName(summary.salesCardTotal)}
       >
         <table className="w-full text-sm">
@@ -1143,7 +1143,7 @@ function MultiStoreCuadreBody({
               </td>
               <td className="p-1 text-right">
                 <span className="font-bold text-success whitespace-nowrap">
-                  {formatCurrency(summary.salesCardTotal)}
+                  {formatMoneyWithCurrency(summary.salesCardTotal)}
                 </span>
               </td>
             </tr>
@@ -1154,7 +1154,7 @@ function MultiStoreCuadreBody({
       {hasExpensesModule && (
         <ExpansionPanel
           title={`Gastos (${expensesCount})`}
-          amount={formatCurrency(summary.expensesTotal)}
+          amount={formatMoneyWithCurrency(summary.expensesTotal)}
           amountClassName="text-danger"
         >
           {summary.expenses.length === 0 ? (
@@ -1172,7 +1172,7 @@ function MultiStoreCuadreBody({
                     </td>
                     <td className="p-1 text-right text-danger">
                       <span className="whitespace-nowrap">
-                        {formatCurrency(expense.total)}
+                        {formatMoneyWithCurrency(expense.total, expense.currency)}
                       </span>
                     </td>
                     <td className="p-1 text-right">
@@ -1194,7 +1194,7 @@ function MultiStoreCuadreBody({
       {hasCreditsModule && (
         <ExpansionPanel
           title={`Créditos Por Cobrar (${creditsCount})`}
-          amount={formatCurrency(creditsTotal)}
+          amount={formatMoneyWithCurrency(creditsTotal)}
           amountClassName="text-danger"
         >
           <SaleCreditsTable saleCredits={summary.saleCredits} />
@@ -1204,7 +1204,7 @@ function MultiStoreCuadreBody({
       {hasCreditsModule && (
         <ExpansionPanel
           title={`Créditos Pagados (${paidSaleCreditsTotal})`}
-          amount={formatCurrency(paidSaleCreditsTotal)}
+          amount={formatMoneyWithCurrency(paidSaleCreditsTotal)}
           amountClassName="text-success"
         >
           <SaleCreditsTable saleCredits={summary.paidSaleCredits} />
@@ -1213,7 +1213,9 @@ function MultiStoreCuadreBody({
 
       <ExpansionPanel
         title={`Ventas (${ordersItemsCount} productos)`}
-        amount={formatCurrency(summary.categories.reduce((acc, c) => acc + c.total, 0))}
+        amount={formatMoneyWithCurrency(
+          summary.categories.reduce((acc, c) => acc + c.total, 0),
+        )}
         amountClassName="text-success"
       >
         {summary.categories.map((category) => (
@@ -1240,7 +1242,7 @@ function SaleCreditsTable({ saleCredits }: { saleCredits: SaleCredit[] }) {
               <span
                 className={`whitespace-nowrap ${saleCredit.isPaid ? 'text-success' : 'text-danger'}`}
               >
-                {formatCurrency(saleCredit.total)}
+                {formatMoneyWithCurrency(saleCredit.total, saleCredit.currency)}
               </span>
             </td>
             <td className="p-1 text-right">

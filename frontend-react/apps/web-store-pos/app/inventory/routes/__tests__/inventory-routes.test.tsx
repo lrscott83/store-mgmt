@@ -1578,20 +1578,20 @@ describe('InventoryTodaySalesProfitPage — product inclusion filter (Angular pa
       </Wrapper>,
     );
 
-    // Product row renders: name, sold=5, amount=$50 and profit=$50 (no cost, since no
+    // Product row renders: name, sold=5, amount=50 CUP and profit=50 CUP (no cost, since no
     // productCosts were recorded) — proves the discountFromInvantory=false product was NOT
-    // excluded and its sale is fully counted. Amounts render via formatCurrency ("$50",
+    // excluded and its sale is fully counted. Amounts render via formatCurrency ("50 CUP",
     // no trailing .00).
     // Scoped to the desktop table — the mobile card view (md:hidden) renders the same
     // product text a second time.
     const row = within(screen.getByRole('table')).getByText(/Ron/).closest('tr');
     expect(row).not.toBeNull();
     expect(row).toHaveTextContent('5'); // sold
-    expect(row).toHaveTextContent('$50'); // amount (5 * price 10)
-    expect(row).toHaveTextContent('$0'); // unitCost/totalCost (no productCosts)
+    expect(row).toHaveTextContent('50 CUP'); // amount (5 * price 10)
+    expect(row).toHaveTextContent('0 CUP'); // unitCost/totalCost (no productCosts)
     // Total row reflects the same values since it's the only product/sale today.
     const totalRow = screen.getByText('Total').closest('tr');
-    expect(totalRow).toHaveTextContent('$50');
+    expect(totalRow).toHaveTextContent('50 CUP');
   });
 });
 
@@ -1752,12 +1752,12 @@ describe('InventoryTodaySalesProfitPage — entry-only rows (gap #4)', () => {
     expect(row).not.toBeNull();
     // sold = 0
     expect(row).toHaveTextContent('0');
-    // avg unitCost = ((10*2) + (10*4)) / 20 = $3 (informational only)
-    expect(row).toHaveTextContent('$3');
+    // avg unitCost = ((10*2) + (10*4)) / 20 = 3 CUP (informational only)
+    expect(row).toHaveTextContent('3 CUP');
 
     // Totals unaffected: nothing was sold, so sold/amount/cost/profit all stay at 0.
     const totalRow = screen.getByText('Total').closest('tr');
-    expect(totalRow).toHaveTextContent('$0');
+    expect(totalRow).toHaveTextContent('0 CUP');
   });
 });
 
@@ -1798,7 +1798,7 @@ describe('InventoryTodaySalesProfitPage — non-mutating FIFO cost (gap #3c, del
       quantity: 3,
       price: 10,
       productBusinessId: 'biz-1',
-      // FIFO breakdown recorded at sale time: 2 units @ $2 + 1 unit @ $3 = totalCost 7.
+      // FIFO breakdown recorded at sale time: 2 units @ 2 CUP + 1 unit @ 3 CUP = totalCost 7.
       productCosts: [
         { inventoryId: 'e1', costPrice: 2, quantity: 2 },
         { inventoryId: 'e2', costPrice: 3, quantity: 1 },
@@ -1840,9 +1840,9 @@ describe('InventoryTodaySalesProfitPage — non-mutating FIFO cost (gap #3c, del
     // product text a second time.
     const row = within(screen.getByRole('table')).getByText(/Ron/).closest('tr');
     expect(row).toHaveTextContent('3'); // sold
-    expect(row).toHaveTextContent('$30'); // amount (3 * price 10)
-    expect(row).toHaveTextContent('$7'); // totalCost (FIFO: 2*2 + 1*3)
-    expect(row).toHaveTextContent('$23'); // profit (30 - 7)
+    expect(row).toHaveTextContent('30 CUP'); // amount (3 * price 10)
+    expect(row).toHaveTextContent('7 CUP'); // totalCost (FIFO: 2*2 + 1*3)
+    expect(row).toHaveTextContent('23 CUP'); // profit (30 - 7)
   });
 
   it('is idempotent: rendering the page twice with the same fixtures yields identical totals and never mutates the source order/entries (no double-deduct, unlike Angular)', () => {

@@ -74,7 +74,7 @@ describe('OrderItemList — list/table parity sweep (WU6)', () => {
         <OrderItemList order={makeOrder()} />
       </Wrapper>,
     );
-    expect(screen.getByText('$2 000')).toBeInTheDocument();
+    expect(screen.getByText('2 000 CUP')).toBeInTheDocument();
   });
 });
 
@@ -87,7 +87,7 @@ describe('OrderItemList — a price never wraps across lines (no-cut invariant)'
     );
     // getByText normalizes NBSP to a regular space, so the text matcher is the
     // pre-NBSP shape; the structural assertion below is the actual invariant.
-    const total = screen.getByText('$2 000');
+    const total = screen.getByText('2 000 CUP');
     expect(total.className).toMatch(/whitespace-nowrap/);
   });
 
@@ -117,7 +117,7 @@ describe('OrderItemList — a price never wraps across lines (no-cut invariant)'
     // 2 × 23 456.70 = 46 913.40 — getByText normalizes the DOM's NBSP to a
     // regular space, so the matcher uses the plain-space shape; the byte-level
     // NBSP guarantee itself is pinned in format-currency.test.ts.
-    const total = screen.getByText('$46 913.40');
+    const total = screen.getByText('46 913.40 CUP');
     expect(total.className).toMatch(/whitespace-nowrap/);
   });
 });

@@ -293,7 +293,7 @@ describe('TodaySaleCreditsPage — smoke render', () => {
         </Wrapper>,
       );
     });
-    expect(screen.queryByRole('radio')).toBeNull();
+    expect(screen.queryByRole('radio')).toBeNull(); // sin filtros (Angular parity)
   });
 });
 
@@ -333,7 +333,7 @@ describe('SaleCreditsPage — smoke render', () => {
         </Wrapper>,
       );
     });
-    expect(screen.queryByRole('radio')).toBeNull();
+    expect(screen.getAllByRole('radio').length).toBeGreaterThan(0); // 2026-09-23
     expect(document.querySelector('input[type="date"]')).toBeNull();
   });
 });

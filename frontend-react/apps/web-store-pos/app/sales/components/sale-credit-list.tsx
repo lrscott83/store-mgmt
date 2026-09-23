@@ -3,7 +3,7 @@ import { useIntl } from 'react-intl';
 import type { SaleCredit } from '@store-mgmt/domain';
 import type { PaymentType } from '@store-mgmt/domain';
 import { ActionMenu, ActionMenuItem } from '~/shared/components/ui/action-menu';
-import { formatCurrency } from '~/shared/lib/format-currency';
+import { formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency';
 import { formatLocalDate } from '~/shared/lib/date-utils';
 import { EditSaleCreditModal } from './edit-sale-credit-modal';
 import { SaleCreditPaymentModal } from './sale-credit-payment-modal';
@@ -67,7 +67,7 @@ export function SaleCreditList({
               <td className="p-1 text-right">
                 {/* Paid credits show their total in green; unpaid keep the amber (text-warning). */}
                 <span className={saleCredit.isPaid ? 'text-success' : 'text-warning'}>
-                  {formatCurrency(saleCredit.total)}
+                  {formatMoneyWithCurrency(saleCredit.total, saleCredit.currency)}
                 </span>
               </td>
               <td className="p-1 text-right">

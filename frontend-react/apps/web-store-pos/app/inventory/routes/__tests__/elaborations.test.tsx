@@ -3,7 +3,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 import { toLocalDayKey } from '~/shared/lib/date-utils';
-import { formatCurrency } from '~/shared/lib/format-currency';
+import { formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency';
 import { ProductCategoryRepository } from '~/sales/lib/repositories/product-category-repository';
 import { ProductRepository } from '~/sales/lib/repositories/product-repository';
 import { ElaborationOfflineService } from '../../lib/services/elaboration-offline-service';
@@ -209,7 +209,7 @@ describe('ElaborationsPage — Elaboraciones (feature 121)', () => {
     expect(screen.getByTestId('elaboration-row-0').textContent).toContain('3.06');
     expect(screen.getByTestId('elaboration-produced-qty').textContent).toBe('20');
     // 123.535 / 20 → 6.18.
-    expect(screen.getByTestId('elaboration-unit-cost').textContent).toBe(formatCurrency(6.18));
+    expect(screen.getByTestId('elaboration-unit-cost').textContent).toBe(formatMoneyWithCurrency(6.18));
   });
 
   it('blocks the confirm on insufficient stock and shows the NAMED message', async () => {
@@ -254,8 +254,8 @@ describe('ElaborationsPage — Elaboraciones (feature 121)', () => {
 
     const row = screen.getByTestId(`elaboration-history-row-${elaboration.id}`);
     expect(row.textContent).toContain('Pan de 500g');
-    expect(row.textContent).toContain(formatCurrency(elaboration.totalCost));
-    expect(row.textContent).toContain(formatCurrency(elaboration.unitCost));
+    expect(row.textContent).toContain(formatMoneyWithCurrency(elaboration.totalCost));
+    expect(row.textContent).toContain(formatMoneyWithCurrency(elaboration.unitCost));
   });
 
   it('shows the warehouse-required empty state when no warehouse exists', () => {
@@ -283,7 +283,7 @@ describe('ElaborationsPage — Elaboraciones (feature 121)', () => {
     selectPlan(recipeId, warehouseId);
 
     expect(screen.getByTestId('elaboration-ingredients-cost').textContent).toBe(
-      formatCurrency(66.85),
+      formatMoneyWithCurrency(66.85),
     );
 
     const confirmSpy = vi.spyOn(ElaborationOfflineService.prototype, 'confirmElaboration');
@@ -292,7 +292,7 @@ describe('ElaborationsPage — Elaboraciones (feature 121)', () => {
 
       // Harina clamps to 0 → only levadura + sal + agua contribute (4 + 0.6 + 1.05).
       expect(screen.getByTestId('elaboration-ingredients-cost').textContent).toBe(
-        formatCurrency(5.65),
+        formatMoneyWithCurrency(5.65),
       );
       expect(screen.getByTestId('elaboration-total-cost').textContent).not.toContain('-');
 
@@ -370,16 +370,16 @@ describe('ElaborationsPage — Elaboraciones (feature 121)', () => {
     renderPage();
     selectPlan(recipeId, warehouseId);
 
-    expect(screen.getByTestId('elaboration-unit-cost').textContent).toBe(formatCurrency(6.18));
+    expect(screen.getByTestId('elaboration-unit-cost').textContent).toBe(formatMoneyWithCurrency(6.18));
 
     fireEvent.change(screen.getByTestId('elaboration-actual-0'), { target: { value: '1' } });
 
     // Harina 1 × 20 = 20, plus 4 + 0.6 + 1.05 → 25.65; overhead 2.565; labor 50.
     expect(screen.getByTestId('elaboration-ingredients-cost').textContent).toBe(
-      formatCurrency(25.65),
+      formatMoneyWithCurrency(25.65),
     );
-    expect(screen.getByTestId('elaboration-total-cost').textContent).toBe(formatCurrency(78.215));
-    expect(screen.getByTestId('elaboration-unit-cost').textContent).toBe(formatCurrency(3.91));
+    expect(screen.getByTestId('elaboration-total-cost').textContent).toBe(formatMoneyWithCurrency(78.215));
+    expect(screen.getByTestId('elaboration-unit-cost').textContent).toBe(formatMoneyWithCurrency(3.91));
 
     fireEvent.click(screen.getByTestId('elaboration-confirm'));
     await waitFor(() => expect(showToastSuccessMock).toHaveBeenCalled());
@@ -394,8 +394,8 @@ describe('ElaborationsPage — Elaboraciones (feature 121)', () => {
     fireEvent.click(screen.getByTestId(`elaboration-day-toggle-${todayKey}`));
 
     const row = screen.getByTestId(`elaboration-history-row-${elaboration.id}`);
-    expect(row.textContent).toContain(formatCurrency(elaboration.totalCost));
-    expect(row.textContent).toContain(formatCurrency(elaboration.unitCost));
+    expect(row.textContent).toContain(formatMoneyWithCurrency(elaboration.totalCost));
+    expect(row.textContent).toContain(formatMoneyWithCurrency(elaboration.unitCost));
   });
 
   it('warns that a negative real quantity is treated as zero while the preview stays non-negative', () => {
@@ -412,7 +412,7 @@ describe('ElaborationsPage — Elaboraciones (feature 121)', () => {
     );
     // The clamp is preserved: harina → 0, only levadura + sal + agua contribute.
     expect(screen.getByTestId('elaboration-ingredients-cost').textContent).toBe(
-      formatCurrency(5.65),
+      formatMoneyWithCurrency(5.65),
     );
     expect(screen.getByTestId('elaboration-total-cost').textContent).not.toContain('-');
   });

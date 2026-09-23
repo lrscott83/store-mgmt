@@ -4,7 +4,7 @@ import type { Order } from '@store-mgmt/domain';
 import { ChevronDownIcon } from '~/shared/components/ui/icons';
 import { ActionMenu, ActionMenuItem } from '~/shared/components/ui/action-menu';
 import { confirmDialog, showAcknowledgeError } from '~/shared/lib/blocking-alert';
-import { formatCurrency } from '~/shared/lib/format-currency';
+import { formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency';
 import { round2 } from '~/shared/lib/money';
 import { OrderItemList } from './order-item-list';
 
@@ -127,7 +127,7 @@ export function OrderList({
                   {formatTime(order.date)} ({getOrderItemsCount(order)})
                 </span>
                 <span className="text-sm font-semibold text-text whitespace-nowrap">
-                  {formatCurrency(getOrderTotal(order))}
+                  {formatMoneyWithCurrency(getOrderTotal(order), order.currency)}
                 </span>
               </button>
               {!readOnly && (

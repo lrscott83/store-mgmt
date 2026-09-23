@@ -130,7 +130,7 @@ describe('CuadrePorFechasPage — MultiMonedas totals', () => {
     fixtures.paidCredits = [];
   });
 
-  it('gate OFF: keeps the legacy mixed total ($35)', async () => {
+  it('gate OFF: keeps the legacy mixed total (35 CUP)', async () => {
     fixtures.salesTotal = 35;
     fixtures.categories = [
       { id: 'cat1', name: 'Bebidas', order: 1, total: 35, itemsCount: 2, productItems: [] },
@@ -138,7 +138,7 @@ describe('CuadrePorFechasPage — MultiMonedas totals', () => {
     renderPage();
     generate();
     await waitFor(() => expect(screen.getByTestId('cuadre-card-title')).toBeTruthy());
-    expect(screen.getAllByText('$35').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('35 CUP').length).toBeGreaterThan(0);
   });
 
   it('gate ON: the Cuadre total is per currency, never mixed', async () => {
@@ -156,7 +156,7 @@ describe('CuadrePorFechasPage — MultiMonedas totals', () => {
     await waitFor(() => expect(screen.getByTestId('cuadre-card-title')).toBeTruthy());
     expect(screen.getAllByText('30 USD').length).toBeGreaterThan(0);
     expect(screen.getAllByText('5 EUR').length).toBeGreaterThan(0);
-    expect(screen.queryByText('$35')).toBeNull();
+    expect(screen.queryByText('35 CUP')).toBeNull();
   });
 });
 
@@ -213,14 +213,14 @@ describe('CuadrePorFechasPage — MultiMonedas in multi-store mode', () => {
     };
   }
 
-  it('gate OFF: aggregate KPIs keep the legacy mixed totals ($35 / $13)', async () => {
+  it('gate OFF: aggregate KPIs keep the legacy mixed totals (35 CUP / 13 CUP)', async () => {
     seedTwoStores();
     renderPage();
     generate();
     await waitFor(() => expect(screen.getByText('Ganancias Bruta')).toBeTruthy());
-    // Aggregate sales = 30 + 5 = $35; gross/net = 10 + 3 = $13 (never a mixed display here).
-    expect(screen.getAllByText('$35').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('$13').length).toBeGreaterThan(0);
+    // Aggregate sales = 30 + 5 = 35 CUP; gross/net = 10 + 3 = 13 CUP (never a mixed display here).
+    expect(screen.getAllByText('35 CUP').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('13 CUP').length).toBeGreaterThan(0);
   });
 
   it('gate ON: aggregate KPIs and per-store totals are per currency, never mixed', async () => {
@@ -234,7 +234,7 @@ describe('CuadrePorFechasPage — MultiMonedas in multi-store mode', () => {
     expect(screen.getAllByText('5 EUR').length).toBeGreaterThan(0);
     expect(screen.getAllByText('10 USD').length).toBeGreaterThan(0);
     expect(screen.getAllByText('3 EUR').length).toBeGreaterThan(0);
-    expect(screen.queryByText('$35')).toBeNull();
-    expect(screen.queryByText('$13')).toBeNull();
+    expect(screen.queryByText('35 CUP')).toBeNull();
+    expect(screen.queryByText('13 CUP')).toBeNull();
   });
 });

@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react';
-import { formatCurrency } from '~/shared/lib/format-currency';
+import { DEFAULT_CURRENCY } from '@store-mgmt/domain';
 import { formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency';
 import {
   groupAmountsByCurrency,
@@ -32,10 +32,14 @@ export function CurrencyTotalAmount({
   entries,
   multiMonedas,
 }: CurrencyTotalAmountProps): ReactElement {
-  if (!multiMonedas) return <>{formatCurrency(legacyTotal)}</>;
+  // Petición 2026-09-23: la moneda SIEMPRE se muestra en las vistas de tienda —
+  // gate OFF degrada a `formatMoneyWithCurrency` (total único como CUP) en vez
+  // del `$` legacy. Solo un agregado vacío conserva el fallback legacy.
+  if (!multiMonedas)
+    return <>{formatMoneyWithCurrency(legacyTotal, DEFAULT_CURRENCY)}</>;
 
   const totals = orderCurrencyTotals(groupAmountsByCurrency(entries));
-  if (totals.length === 0) return <>{formatCurrency(legacyTotal)}</>;
+  if (totals.length === 0) return <>{formatMoneyWithCurrency(legacyTotal, DEFAULT_CURRENCY)}</>;
 
   const [primary, ...rest] = totals;
   return (

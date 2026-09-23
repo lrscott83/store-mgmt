@@ -17,7 +17,7 @@ import type { LocalDayGroup } from '~/shared/lib/date-utils';
 import { DateRangeFilter } from '~/shared/components/date-range-filter/date-range-filter';
 import { ExpenseOfflineService } from '../lib/services/expense-offline-service';
 import { ExpenseList } from '../components/expense-list';
-import { formatCurrency } from '~/shared/lib/format-currency';
+import { formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency';
 import { useMultiStore } from '~/shared/lib/hooks/use-multi-store';
 import {
   MultiStoreSection,
@@ -198,7 +198,7 @@ export function ExpensesHistoryPage() {
               </span>
             </span>
             <span className="text-sm font-semibold text-danger whitespace-nowrap">
-              {formatCurrency(totals.total)}
+              {formatMoneyWithCurrency(totals.total)}
             </span>
           </div>
         }
@@ -294,7 +294,9 @@ export function ExpensesHistoryPage() {
                         </span>
                         <span className="flex items-center gap-2">
                           <span className="text-xs font-semibold text-danger whitespace-nowrap">
-                            {formatCurrency(dayGroup.items.reduce((total, e) => total + e.total, 0))}
+                            {formatMoneyWithCurrency(
+                              dayGroup.items.reduce((total, e) => total + e.total, 0),
+                            )}
                           </span>
                           <ChevronDownIcon isExpanded={isExpanded} className="text-text-muted" />
                         </span>
@@ -346,7 +348,7 @@ export function ExpensesHistoryPage() {
             </span>
           </span>
           <span className="text-sm font-semibold text-danger whitespace-nowrap">
-            {formatCurrency(expensesTotal)}
+            {formatMoneyWithCurrency(expensesTotal)}
           </span>
         </div>
       }
@@ -413,7 +415,7 @@ export function ExpensesHistoryPage() {
                   </span>
                   <span className="flex items-center gap-2">
                     <span className="text-sm font-semibold text-danger whitespace-nowrap">
-                      {formatCurrency(dayGroup.items.reduce((total, e) => total + e.total, 0))}
+                      {formatMoneyWithCurrency(dayGroup.items.reduce((total, e) => total + e.total, 0))}
                     </span>
                     <ChevronDownIcon isExpanded={isExpanded} className="text-text-muted" />
                   </span>

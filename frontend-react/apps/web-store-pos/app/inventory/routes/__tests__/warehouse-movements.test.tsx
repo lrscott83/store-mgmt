@@ -612,7 +612,7 @@ describe('Vista Movimientos de almacén', () => {
     // purchase_in: rótulo 'Compra' en la fila 2 (las dos filas de compra del seed)
     // y total (24 × 5) cuando hay costPrice.
     expect(screen.getAllByText('Compra')).toHaveLength(2);
-    expect(screen.getByText('$120')).toBeTruthy();
+    expect(screen.getByText('120 CUP')).toBeTruthy();
     // sale_out con toStoreId → 'Central → Tienda Seleccionada'.
     expect(screen.getByText('Central → Tienda Seleccionada')).toBeTruthy();
     // transfer_in → 'Central → Anexo'.
@@ -648,7 +648,7 @@ describe('Vista Movimientos de almacén', () => {
     fireEvent.click(screen.getByText('Guardar'));
     await waitFor(() => expect(confirmDialogMock).toHaveBeenCalledTimes(1));
     expect(confirmDialogMock.mock.calls[0][0].title).toBe('Propagar costo de la compra');
-    expect(confirmDialogMock.mock.calls[0][0].message).toContain('de $5 a $7');
+    expect(confirmDialogMock.mock.calls[0][0].message).toContain('de 5 CUP a 7 CUP');
     expect(fakeState.applyCostEditImpl).not.toHaveBeenCalled();
   });
 

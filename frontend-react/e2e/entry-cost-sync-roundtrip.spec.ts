@@ -407,7 +407,7 @@ test.describe.serial('Corrección de costo que viaja por export → import', () 
       // B importa el respaldo #1: ahora tiene la orden con el costo VIEJO.
       await importBackup(deviceB, BACKUP_PASSWORD, zipWithOldCost);
       expect(await orderCostById(deviceB, selectedStoreId, orderId)).toBe(OLD_COST);
-      await assertProfitCostShown(deviceB, product, '$50');
+      await assertProfitCostShown(deviceB, product, '50 CUP');
 
       // --- A corrige el costo de la compra 50 → 70 con propagación ---
       await openMovementsToday(deviceA);
@@ -427,7 +427,7 @@ test.describe.serial('Corrección de costo que viaja por export → import', () 
       // --- B importa el respaldo #2: la orden que YA tenía recibe el costo NUEVO ---
       await importBackup(deviceB, BACKUP_PASSWORD, zipWithNewCost);
       expect(await orderCostById(deviceB, selectedStoreId, orderId)).toBe(NEW_COST);
-      await assertProfitCostShown(deviceB, product, '$70');
+      await assertProfitCostShown(deviceB, product, '70 CUP');
     } finally {
       await contextB.close();
     }

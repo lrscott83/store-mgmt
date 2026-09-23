@@ -3,7 +3,7 @@ import type { HookData, UserOptions } from 'jspdf-autotable';
 import messages from '~/shared/lib/i18n/es';
 import { showToastSuccess } from '~/shared/lib/toast';
 import { toLocalDayKey } from '~/shared/lib/date-utils';
-import { formatCurrency } from '~/shared/lib/format-currency';
+import { formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency';
 
 /**
  * One row of the 13-column per-product inventory-at-sale-price ledger.
@@ -102,13 +102,13 @@ function toRowValues(row: InventoryTodaySaleRow): (string | number)[] {
     row.entrada,
     row.disponible,
     row.vendido,
-    formatCurrency(row.precioVenta),
-    formatCurrency(row.importeVenta),
-    formatCurrency(row.costoUnitario),
-    formatCurrency(row.costoTotal),
-    formatCurrency(row.cpVenta),
+    formatMoneyWithCurrency(row.precioVenta),
+    formatMoneyWithCurrency(row.importeVenta),
+    formatMoneyWithCurrency(row.costoUnitario),
+    formatMoneyWithCurrency(row.costoTotal),
+    formatMoneyWithCurrency(row.cpVenta),
     row.final,
-    formatCurrency(row.importeFinal),
+    formatMoneyWithCurrency(row.importeFinal),
   ];
 }
 

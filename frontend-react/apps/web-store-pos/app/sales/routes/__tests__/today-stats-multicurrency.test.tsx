@@ -158,7 +158,7 @@ describe('TodayStatsPage — MultiMonedas per-currency net', () => {
       { id: 'cat1', name: 'Bebidas', order: 1, total: 35, itemsCount: 2, productItems: [] },
     ];
     renderPage();
-    expect((await screen.findAllByText('$35')).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText('35 CUP')).length).toBeGreaterThan(0);
   });
 
   it('gate ON: the net total is combined PER currency (USD 30−10=20, EUR 5−2=3)', async () => {
@@ -189,11 +189,11 @@ describe('TodayStatsPage — MultiMonedas per-currency net', () => {
 
     renderPage();
 
-    // Net: USD 30 − 10 = 20 (primary), EUR 5 − 2 = 3 (chip). Never the mixed $23.
+    // Net: USD 30 − 10 = 20 (primary), EUR 5 − 2 = 3 (chip). Never the mixed 23 CUP.
     // The EUR 3 also appears in the cash panel (EUR 5 sales − EUR 2 expenses).
     expect((await screen.findAllByText('20 USD')).length).toBeGreaterThan(0);
     expect(screen.getAllByText('3 EUR').length).toBeGreaterThan(0);
-    expect(screen.queryByText('$23')).toBeNull();
+    expect(screen.queryByText('23 CUP')).toBeNull();
   });
 });
 
@@ -212,7 +212,7 @@ function categoriesFromOrders(orders: Order[]) {
   return [{ id: 'cat1', name: 'Bebidas', order: 1, total, itemsCount, productItems: [] }];
 }
 
-/** Parses a rendered money string ("$1 000.50", "30 USD") back to a number. */
+/** Parses a rendered money string ("1 000.50 CUP", "30 USD") back to a number. */
 function parseAmount(text: string): number {
   return Number(text.replace(/\u00A0/g, '').replace(/[^0-9.-]/g, ''));
 }

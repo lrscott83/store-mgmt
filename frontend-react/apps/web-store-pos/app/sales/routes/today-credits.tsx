@@ -8,7 +8,7 @@ import { Card } from '~/shared/components/ui/card';
 import { InfoBox } from '~/shared/components/ui/info-box';
 import { SaleCreditOfflineService } from '../lib/services/sale-credit-offline-service';
 import { SaleCreditList } from '../components/sale-credit-list';
-import { formatCurrency } from '~/shared/lib/format-currency';
+import { formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency';
 
 export const clientLoader = featureLoader([EFeatures.CreditSale]);
 
@@ -109,7 +109,7 @@ function TodayCreditsCardTitle({ count, total }: { count: number; total: number 
       <span
         className={`text-sm font-semibold whitespace-nowrap ${total === 0 ? 'text-success' : 'text-warning'}`}
       >
-        {formatCurrency(total)}
+        {formatMoneyWithCurrency(total)}
       </span>
     </div>
   );

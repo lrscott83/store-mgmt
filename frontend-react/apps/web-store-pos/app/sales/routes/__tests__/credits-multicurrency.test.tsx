@@ -91,13 +91,13 @@ describe('SaleCreditsPage — MultiMonedas header + day totals', () => {
     credits.items = [];
   });
 
-  it('gate OFF: keeps the legacy mixed total ($75)', async () => {
+  it('gate OFF: keeps the legacy mixed total (75 CUP)', async () => {
     credits.items = [
       makeCredit({ id: 'usd', total: 30, currency: Currency.USD }),
       makeCredit({ id: 'eur', total: 45, currency: Currency.EUR }),
     ];
     renderPage();
-    expect((await screen.findAllByText('$75')).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText('75 CUP')).length).toBeGreaterThan(0);
   });
 
   it('gate ON: header and day totals are per currency, never mixed', async () => {
@@ -110,7 +110,7 @@ describe('SaleCreditsPage — MultiMonedas header + day totals', () => {
     // Header (and the single day panel) both render the per-currency breakdown.
     expect((await screen.findAllByText('30 USD')).length).toBeGreaterThan(0);
     expect(screen.getAllByText('45 EUR').length).toBeGreaterThan(0);
-    expect(screen.queryByText('$75')).toBeNull();
+    expect(screen.queryByText('75 CUP')).toBeNull();
   });
 });
 
@@ -135,11 +135,11 @@ describe('SaleCreditsPage — MultiMonedas header in multi-store mode', () => {
     );
   }
 
-  it('gate OFF: keeps the legacy aggregate header total across stores ($75)', async () => {
+  it('gate OFF: keeps the legacy aggregate header total across stores (75 CUP)', async () => {
     seedTwoStores();
     renderPage();
-    // Header outside the panels aggregates every visible store: 30 + 45 = $75.
-    expect(await screen.findByText('$75')).toBeInTheDocument();
+    // Header outside the panels aggregates every visible store: 30 + 45 = 75 CUP.
+    expect(await screen.findByText('75 CUP')).toBeInTheDocument();
   });
 
   it('gate ON: the aggregate header total is per currency, never mixed', async () => {
@@ -149,6 +149,6 @@ describe('SaleCreditsPage — MultiMonedas header in multi-store mode', () => {
     // Cross-store aggregation still groups by currency: USD 30 primary + EUR 45 chip.
     expect(await screen.findByText('30 USD')).toBeInTheDocument();
     expect(screen.getByText('45 EUR')).toBeInTheDocument();
-    expect(screen.queryByText('$75')).toBeNull();
+    expect(screen.queryByText('75 CUP')).toBeNull();
   });
 });

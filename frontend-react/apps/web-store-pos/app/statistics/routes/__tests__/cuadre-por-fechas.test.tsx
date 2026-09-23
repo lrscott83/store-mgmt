@@ -188,13 +188,13 @@ describe('CuadrePorFechasPage', () => {
     });
 
     // KPI values: Ventas 1000, Gastos 80, Ganancias Bruta 300 (sales profit only),
-    // Ganancias 220 (gross − expenses). getAllByText: the $80 expense also
+    // Ganancias 220 (gross − expenses). getAllByText: the 80 CUP expense also
     // renders inside the collapsed Gastos panel header. NBSP is normalized to a
     // plain space by getByText.
-    expect(screen.getAllByText('$1 000').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('$80').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('$300').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('$220').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('1 000 CUP').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('80 CUP').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('300 CUP').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('220 CUP').length).toBeGreaterThan(0);
   });
 
   it('calls the range services with an inclusive [start, end+1day) window', async () => {
@@ -271,7 +271,7 @@ describe('CuadrePorFechasPage', () => {
     // Pago por Transferencia sits right after Resumen Efectivo (user request 2026-09-07)
     // and sums the range's card-paid non-credit sales (120).
     expect(screen.getByRole('button', { name: /Pago por Transferencia/ })).toBeTruthy();
-    expect(screen.getAllByText('$120').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('120 CUP').length).toBeGreaterThan(0);
     expect(screen.getByText('Gastos (1)')).toBeTruthy();
     expect(screen.getByText('Créditos Por Cobrar (1)')).toBeTruthy();
     // Angular parity: the paid-credits panel "(...)" slot shows the currency SUM

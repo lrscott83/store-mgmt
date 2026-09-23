@@ -74,7 +74,7 @@ describe('OrderList', () => {
       </Wrapper>,
     );
     expect(screen.getByTestId('order-panel-toggle-o1')).toBeInTheDocument();
-    expect(screen.getByText('$100')).toBeInTheDocument(); // getOrderTotal from orderItems, not order.total
+    expect(screen.getByText('100 CUP')).toBeInTheDocument(); // getOrderTotal from orderItems, not order.total
   });
 
   it('expands a panel on click and reveals order items', () => {
@@ -127,7 +127,7 @@ describe('OrderList', () => {
     expect(kids.indexOf(gearWrapper)).toBeGreaterThan(kids.indexOf(toggle));
     expect(kids.indexOf(gearWrapper)).toBeLessThan(kids.indexOf(chevronBtn));
     // El precio vive dentro del toggle: el gear le sigue en la fila.
-    expect(toggle.textContent).toContain('$100');
+    expect(toggle.textContent).toContain('100\u00A0CUP');
     // El menú nace cerrado: sin opciones hasta abrir el gear.
     expect(screen.queryByTestId('edit-order-button')).toBeNull();
   });

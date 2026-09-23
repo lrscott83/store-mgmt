@@ -78,7 +78,7 @@ describe('OrderList — list/table parity sweep (WU6)', () => {
         <OrderList orders={[makeOrder({ total: 2000 })]} readOnly />
       </Wrapper>,
     );
-    expect(screen.getByText('$2 000')).toBeInTheDocument();
+    expect(screen.getByText('2 000 CUP')).toBeInTheDocument();
   });
 
   it('still expands to show order items on toggle click', () => {
@@ -119,7 +119,7 @@ describe('OrderList — money never wraps (no-cut invariant)', () => {
     );
     // Header total comes from getOrderTotal = Σ round2(price × qty).
     // 2 × 61 728.39 = 123 456.78 — NBSP-grouped by the formatter.
-    const header = screen.getByText('$123 456.78');
+    const header = screen.getByText('123 456.78 CUP');
     expect(header.className).toMatch(/whitespace-nowrap/);
   });
 
@@ -152,10 +152,10 @@ describe('OrderList — money never wraps (no-cut invariant)', () => {
     fireEvent.click(screen.getByTestId('order-panel-toggle-order-1'));
     // 2 × 23 456.70 = 46 913.40 — appears BOTH in the collapsed header total
     // and the expanded line total; every occurrence must carry the guard.
-    const totals = screen.getAllByText('$46 913.40');
+    const totals = screen.getAllByText('46 913.40 CUP');
     expect(totals.length).toBeGreaterThan(0);
     for (const el of totals) {
-      expect(el.className, 'every $46 913.40 must carry whitespace-nowrap').toMatch(
+      expect(el.className, 'every 46 CUP 913.40 must carry whitespace-nowrap').toMatch(
         /whitespace-nowrap/,
       );
     }

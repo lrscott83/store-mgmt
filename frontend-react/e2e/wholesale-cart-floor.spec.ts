@@ -168,18 +168,18 @@ test.describe.serial('wholesale cart — floor del menor rango y re-precificaci�
     // $5 × 24 = $120.
     await addPacksAndOpenCart(page, product.id, '12');
     await expect(page.getByText(/Paquetes: 12/)).toBeVisible();
-    await expect(page.getByText(/Precio: \$120/)).toBeVisible();
+    await expect(page.getByText(/Precio: 120\u00A0CUP/)).toBeVisible();
 
     // − → 11 paquetes cae al rango 5 ($6/ud): precio de paquete $6 × 24 = $144.
     const decrease = page.getByRole('button', { name: /disminuir cantidad de/i });
     await decrease.click();
     await expect(page.getByText(/Paquetes: 11/)).toBeVisible();
-    await expect(page.getByText(/Precio: \$144/)).toBeVisible();
+    await expect(page.getByText(/Precio: 144\u00A0CUP/)).toBeVisible();
 
     // + → 12 paquetes vuelve al rango 12 ($5/ud): precio de paquete $120.
     const increase = page.getByRole('button', { name: /aumentar cantidad de/i });
     await increase.click();
     await expect(page.getByText(/Paquetes: 12/)).toBeVisible();
-    await expect(page.getByText(/Precio: \$120/)).toBeVisible();
+    await expect(page.getByText(/Precio: 120\u00A0CUP/)).toBeVisible();
   });
 });
