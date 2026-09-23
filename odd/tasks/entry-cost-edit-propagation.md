@@ -255,9 +255,9 @@ la orden de B **retrocede** al costo viejo.
 ## 10. Estimación y estrategia de entrega
 
 - **Forecast** (líneas de autor, incluye tests): **~450–650**. Supera el presupuesto de ~400.
-- **Estrategia de entrega**: `ask-on-risk` (default). Al confirmarse el forecast > 400, se pedirá al
-  usuario la estrategia de cadena (`stacked-to-main` o `feature-branch-chain`).
-- **Estrategia de cadena**: **pendiente de elección** (se pedirá antes del primer PR si aplica).
+- **Estrategia de entrega**: **sin PR** — el usuario pidió solo commits en la rama actual (`test`).
+  Se trabaja task-by-task con commits de unidad de trabajo (Conventional Commits). No hay estrategia
+  de cadena. La revisión de riesgo `ask-on-risk` queda sin efecto al no haber PR.
 - **TDD**: no hay configuración explícita de TDD habilitada en el proyecto; se resuelve como
   **modo estándar** (tests nuevos junto al código, checks funcionales por tarea: `pnpm turbo run
   typecheck lint test` + Playwright). Si el usuario habilita TDD estricto, se ajusta antes de T1.
@@ -301,15 +301,22 @@ Specs E2E nuevas se corren individualmente durante desarrollo:
 
 ## 13. Progreso
 
-- [ ] T1 — Candado de Costo en modal (pendiente)
+- [x] T1 — Candado de Costo en modal (`38a8d84`) — verificado: `inventory-components` + `inventory-routes` = 106 tests, sin type errors.
 - [ ] T2 — Propagación en edición de tienda (pendiente)
 - [ ] T3 — Import/export propaga el costo (desbloqueada; decisión §9a aplicada)
 - [ ] T4 — E2E nuevas (pendiente)
 - [ ] T5 — Cierre documental (pendiente)
 
-**Verificación**: sin ejecutar todavía.
+**Notas de T1**:
+- `getActiveInventoryEntriesStorage()` proyecta a `InventoryEntryView` y **descarta**
+  `warehouseSaleOutMovementId`; el route ahora lee la entrada completa desde
+  `getStorageInventoriesMap()` para preservar el sello. Hallazgo relevante para T4.
+- Fallo preexistente (no introducido por T1, confirmado con árbol limpio): test de
+  `sales-routes.test.tsx` (`SaleCreditsPage … has no date-range or paid/unpaid filters`).
+- RDD está en **on** (global); la revisión nativa de OpenCode V2 no está disponible por contrato,
+  no se inició ningún lifecycle de review.
 
 ## 14. Próximo paso
 
-Iniciar **T1** en una rama de feature. Antes del primer PR (forecast > 400 líneas, estrategia
-`ask-on-risk`), se pedirá la estrategia de cadena (`stacked-to-main` o `feature-branch-chain`).
+Iniciar **T2** (propagación en la edición de tienda) en la misma rama `test`. Sin PR:
+el usuario pidió solo commits en esta rama.
