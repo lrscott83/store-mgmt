@@ -477,17 +477,6 @@ export function MultiPaymentList({
           </button>
         </div>
       </Modal>
-
-      <button
-        type="button"
-        disabled={blocked}
-        data-testid="multi-payment-settle"
-        data-blocked={blocked ? 'true' : 'false'}
-        data-block-reason={blockReason}
-        className="w-full rounded-md bg-cyan-600 px-3 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        {intl.formatMessage({ id: 'SHOPPING_CART.MULTI_PAYMENT_SETTLE' })}
-      </button>
     </div>
   );
 }

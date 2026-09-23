@@ -311,6 +311,16 @@ describe('MultiPaymentList — interactions', () => {
     expect(screen.getByTestId('multi-payment-remaining')).toHaveTextContent('0');
     expect(screen.getByTestId('multi-payment-change')).toHaveTextContent('50');
   });
+
+  it('T7: no renderiza el botón "Cobrar"', () => {
+    render(
+      <IntlProvider messages={esMessages} locale="es" defaultLocale="es">
+        <Harness initial={[row({ id: 'p1', currency: Currency.USD, amount: 100 })]} />
+      </IntlProvider>,
+    );
+
+    expect(screen.queryByTestId('multi-payment-settle')).not.toBeInTheDocument();
+  });
 });
 
 // ─── Config por-tienda (store-payment-methods-config, 2026-09-22): catálogo de

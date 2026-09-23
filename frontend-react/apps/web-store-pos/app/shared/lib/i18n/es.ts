@@ -331,7 +331,6 @@ const messages: Record<string, string> = {
   'SHOPPING_CART.MULTI_PAYMENT_ADD_CHANNEL_LABEL': 'Canal de pago',
   'SHOPPING_CART.MULTI_PAYMENT_ADD_CONFIRM': 'Agregar',
   'SHOPPING_CART.MULTI_PAYMENT_ADD_NO_CHANNELS': 'No hay canales de pago disponibles.',
-  'SHOPPING_CART.MULTI_PAYMENT_SETTLE': 'Cobrar',
   'SHOPPING_CART.DON_NOT_PAY_LESS_THAN_CART_TOTAL':
     'Usted no puede realizar la venta porque el pago es menor que el total.',
   'SHOPPING_CART.DON_NOT_SALE_CREDIT_WITHOUT_CLIENT':
