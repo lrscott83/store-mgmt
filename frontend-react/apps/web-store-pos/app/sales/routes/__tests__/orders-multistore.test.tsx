@@ -204,4 +204,41 @@ describe('OrdersPage — header «Ventas (n)» + total, línea de totales elimin
     expect(screen.getByText('Zelle')).toBeInTheDocument();
     expect(screen.queryByText('Efectivo')).not.toBeInTheDocument();
   });
+
+  it('OS-6: CON MultiStores — tres filas de filtros: tienda + rango (derecha), métodos de pago, y pagadas/créditos', async () => {
+    enableMultiStores();
+    storeOrdersFixture.s1 = [makeOrder({ id: 'o1' })];
+
+    render(
+      <Wrapper>
+        <OrdersPage />
+      </Wrapper>,
+    );
+    await screen.findByTestId('multistore-panel-toggle-s1');
+
+    // Fila 1: el rango de fechas comparte la fila con el select de tiendas
+    // (ambos son hijos directos del mismo contenedor flex-wrap) y el
+    // contenedor del rango queda empujado a la derecha (justify-end).
+    const rangeInput = screen.getByTestId('date-range-filter-input');
+    const rangeRow = rangeInput.closest('.justify-end');
+    expect(rangeRow).not.toBeNull();
+    const select = screen.getByTestId('multistore-select');
+    expect(select.parentElement).not.toBeNull();
+    // El select NO está dentro de la fila del rango: fila aparte del layout.
+    expect(rangeRow!.contains(select)).toBe(false);
+
+    // Las filas 2 (métodos de pago) y 3 (pagadas/créditos) son de ancho
+    // completo (w-full), cada una con sus radios.
+    const paymentRadio = screen.getByRole('radio', { name: 'Efectivo' });
+    const paymentRow = paymentRadio.closest('.w-full');
+    expect(paymentRow).not.toBeNull();
+    const creditRadio = screen.getByRole('radio', { name: 'Créditos' });
+    const creditRow = creditRadio.closest('.w-full');
+    expect(creditRow).not.toBeNull();
+    // Pagadas y Créditos comparten fila entre sí.
+    expect(creditRow!.contains(screen.getByRole('radio', { name: 'Pagadas' }))).toBe(true);
+    // Las tres filas son hermanas distintas (no una columna anidada en otra).
+    expect(paymentRow).not.toBe(creditRow);
+    expect(paymentRow!.contains(rangeInput)).toBe(false);
+  });
 });

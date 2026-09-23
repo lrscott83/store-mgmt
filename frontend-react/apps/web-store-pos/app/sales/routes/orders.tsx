@@ -362,51 +362,55 @@ export function OrdersPage() {
           selectedStoreId={selectedMultiStoreId}
           onSelectedStoreIdChange={setSelectedMultiStoreId}
           filters={
-            <div className="flex flex-1 min-w-0 flex-col gap-2">
-              {/* Fila 1: tienda (select del componente compartido) + rango de fechas
-                  alineado a la derecha; filas 2/3: método de pago y pagadas/créditos
-                  (petición 2026-09-21). */}
-              <div className="flex flex-wrap items-center justify-end">
+            // Petición 2026-09-23: tres filas de filtros — fila 1: tienda
+            // (select del componente compartido) + rango de fechas alineado a
+            // la derecha; fila 2: método de pago; fila 3: pagadas/créditos.
+            // Cada fila es w-full para que flex-wrap del componente compartido
+            // la baje a SU propia línea debajo del select.
+            <>
+              <div className="flex w-full flex-wrap items-center justify-end">
                 <DateRangeFilter
                   value={dateRange}
                   onApply={setDateRange}
                   className="w-64 max-w-full"
                 />
               </div>
-              {paymentFieldset}
-              <fieldset className="flex flex-wrap items-center gap-4">
-                <label className="flex items-center gap-1 text-sm text-text">
-                  <input
-                    type="radio"
-                    name="multistore-isCredit"
-                    checked={isCredit === -1}
-                    onChange={() => setIsCredit(-1)}
-                    className="accent-primary"
-                  />
-                  Todas
-                </label>
-                <label className="flex items-center gap-1 text-sm text-text">
-                  <input
-                    type="radio"
-                    name="multistore-isCredit"
-                    checked={isCredit === 0}
-                    onChange={() => setIsCredit(0)}
-                    className="accent-primary"
-                  />
-                  Pagadas
-                </label>
-                <label className="flex items-center gap-1 text-sm text-text">
-                  <input
-                    type="radio"
-                    name="multistore-isCredit"
-                    checked={isCredit === 1}
-                    onChange={() => setIsCredit(1)}
-                    className="accent-primary"
-                  />
-                  <span className="text-warning">Créditos</span>
-                </label>
-              </fieldset>
-            </div>
+              <div className="w-full">{paymentFieldset}</div>
+              <div className="w-full">
+                <fieldset className="flex flex-wrap items-center gap-4">
+                  <label className="flex items-center gap-1 text-sm text-text">
+                    <input
+                      type="radio"
+                      name="multistore-isCredit"
+                      checked={isCredit === -1}
+                      onChange={() => setIsCredit(-1)}
+                      className="accent-primary"
+                    />
+                    Todas
+                  </label>
+                  <label className="flex items-center gap-1 text-sm text-text">
+                    <input
+                      type="radio"
+                      name="multistore-isCredit"
+                      checked={isCredit === 0}
+                      onChange={() => setIsCredit(0)}
+                      className="accent-primary"
+                    />
+                    Pagadas
+                  </label>
+                  <label className="flex items-center gap-1 text-sm text-text">
+                    <input
+                      type="radio"
+                      name="multistore-isCredit"
+                      checked={isCredit === 1}
+                      onChange={() => setIsCredit(1)}
+                      className="accent-primary"
+                    />
+                    <span className="text-warning">Créditos</span>
+                  </label>
+                </fieldset>
+              </div>
+            </>
           }
           renderStoreCount={(store) => {
             const filtered = visibleOrders(storeOrders.get(store.id) ?? []);
