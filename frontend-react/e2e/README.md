@@ -2,6 +2,8 @@
 
 Tests end-to-end del frontend React con [Playwright](https://playwright.dev/).
 
+> **¿Quieres correr los tests?** Los pasos de ejecución están en el README raíz del proyecto ([Suite de tests — ejecución manual](../../README.md)). Este README es el detalle operativo de la suite (configuración, diagnósticos, limpieza y documentación por spec), no la guía de ejecución.
+
 ## Prerrequisitos
 
 - `pnpm install` (ya trae `@playwright/test` como devDependency en la raíz).

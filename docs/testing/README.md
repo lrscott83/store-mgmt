@@ -1,5 +1,7 @@
 # Testing — etapas
 
+> **¿Quieres correr los tests?** Los pasos de ejecución están en el README raíz del proyecto ([Suite de tests — ejecución manual](../../README.md)). Este README y sus subcarpetas son la especificación de cobertura por etapas: qué se prueba y dónde vive cada test, no cómo ejecutarlo.
+
 Índice de las etapas de cobertura E2E del producto. Cada etapa vive en su propia carpeta, con un plan general y un fichero por User Story.
 
 ## Regla del proyecto (innegociable)

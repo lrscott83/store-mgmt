@@ -30,6 +30,8 @@ import type {
 } from '../data-serializer-service';
 import { ProductCategoryRepository } from '~/sales/lib/repositories/product-category-repository';
 import { ProductRepository } from '~/sales/lib/repositories/product-repository';
+import type { StorePaymentMethodsConfig } from '~/shared/lib/payment-methods/store-payment-methods-config-service';
+import { StorePaymentMethodsConfigService } from '~/shared/lib/payment-methods/store-payment-methods-config-service';
 import type {
   ProductCategory,
   Product,
@@ -39,6 +41,7 @@ import type {
   SaleCredit,
   ExchangeRate,
 } from '@store-mgmt/domain';
+import { SalePaymentMethod } from '@store-mgmt/domain';
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -208,6 +211,10 @@ function makeService(
     expenses?: Expense[];
     saleCredits?: SaleCredit[];
     exchangeRates?: ExchangeRate[];
+    // store-payment-methods-backup: undefined = no reader at all (legacy
+    // call-site shape); null = reader present, key absent (no entry); config =
+    // reader present with a stored config (entry written).
+    storePaymentMethods?: StorePaymentMethodsConfig | null;
   },
   storeId: string = STORE_ID,
 ): DataSerializerService {
@@ -230,6 +237,13 @@ function makeService(
   const expenseReader: ExpenseReader = { getStorageExpenses: () => exps };
   const saleCreditReader: SaleCreditReader = { getStorageSaleCredits: () => creds };
   const exchangeRateReader: ExchangeRateReader = { getStorageExchangeRates: () => rates };
+  const storePaymentMethodsReader =
+    overrides?.storePaymentMethods !== undefined
+      ? new StorePaymentMethodsConfigService(storeId)
+      : undefined;
+  if (storePaymentMethodsReader && overrides?.storePaymentMethods) {
+    storePaymentMethodsReader.setConfigFromBackup(overrides.storePaymentMethods);
+  }
 
   return new DataSerializerService(
     storeId,
@@ -240,6 +254,11 @@ function makeService(
     expenseReader,
     saleCreditReader,
     exchangeRateReader,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    storePaymentMethodsReader,
   );
 }
 
@@ -482,7 +501,7 @@ describe('DataSerializerService', () => {
 
     // parity-audit-remediation Slice 2: naming-only alignment with Angular's
     // EDataFileName enum (data.file.model.ts:6-13) — PascalCase members, same string values.
-    it("EDataFileName mirrors Angular's PascalCase member names with unchanged string values, plus the daily-exchange-rate seventh entry, the three warehouses entries, the multipayments channel-rates entry and the two elaboration entries", () => {
+    it("EDataFileName mirrors Angular's PascalCase member names with unchanged string values, plus the daily-exchange-rate seventh entry, the three warehouses entries, the multipayments channel-rates entry, the two elaboration entries and the store-payment-methods entry", () => {
       expect(EDataFileName).toEqual({
         Categories: 'categories.json',
         Products: 'products.json',
@@ -497,6 +516,7 @@ describe('DataSerializerService', () => {
         ChannelRates: 'channel-rates.json',
         Recipes: 'recipes.json',
         Elaborations: 'elaborations.json',
+        StorePaymentMethods: 'store-payment-methods.json',
       });
     });
 
@@ -956,6 +976,85 @@ describe('DataSerializerService', () => {
       const parsed = await makeService().import(v1Payload, PASSWORD);
       expect(parsed.exchangeRates).toEqual([]);
       expect(parsed.categories).toHaveLength(1);
+    });
+  });
+
+  describe('T9 — store payment-methods config entry (store-payment-methods-backup)', () => {
+    const CONFIG: StorePaymentMethodsConfig = {
+      enabledMethods: [SalePaymentMethod.Efectivo, SalePaymentMethod.Transferencia],
+    };
+
+    it('export writes store-payment-methods.json when the store has a config, and import parses it back', async () => {
+      const svc = makeService({ categories: [], products: [], storePaymentMethods: CONFIG });
+      const payload = await svc.export(PASSWORD);
+
+      const { entries } = await readRawEntriesV2(payload, PASSWORD);
+      const paymentEntry = entries.find(
+        (e) => !e.directory && e.filename === EDataFileName.StorePaymentMethods,
+      );
+      expect(paymentEntry).toBeDefined();
+
+      const parsed = await svc.import(payload, PASSWORD);
+      expect(parsed.storePaymentMethods).toEqual(CONFIG);
+    });
+
+    it('export with NO config carries no store-payment-methods.json entry (absent = default)', async () => {
+      // Reader present (StorePaymentMethodsConfigService) but key absent.
+      const svc = makeService({
+        categories: [],
+        products: [],
+        storePaymentMethods: null,
+      });
+      const payload = await svc.export(PASSWORD);
+
+      const { entries } = await readRawEntriesV2(payload, PASSWORD);
+      const names = entries.map((e) => e.filename);
+      expect(names).not.toContain(EDataFileName.StorePaymentMethods);
+
+      const parsed = await svc.import(payload, PASSWORD);
+      expect(parsed.storePaymentMethods).toBeUndefined();
+    });
+
+    it('legacy call-site shape (no reader) writes no entry and imports leave the field undefined', async () => {
+      const svc = makeService({ categories: [], products: [] });
+      const payload = await svc.export(PASSWORD);
+      const { entries } = await readRawEntriesV2(payload, PASSWORD);
+      expect(entries.map((e) => e.filename)).not.toContain(EDataFileName.StorePaymentMethods);
+
+      const parsed = await svc.import(payload, PASSWORD);
+      expect(parsed.storePaymentMethods).toBeUndefined();
+    });
+
+    it('a legacy v1 archive (no entry) imports with storePaymentMethods undefined — not [] and not a default', async () => {
+      const v1Payload = await buildLegacyV1Zip(makeV1Payloads(), PASSWORD + STORE_ID);
+      const parsed = await makeService().import(v1Payload, PASSWORD);
+      expect(parsed.storePaymentMethods).toBeUndefined();
+      expect(parsed.categories).toHaveLength(1);
+    });
+
+    it('exportPlainData returns the parsed config object when present', async () => {
+      const withConfig = makeService({ categories: [], products: [], storePaymentMethods: CONFIG });
+      const plain = await withConfig.exportPlainData();
+      expect(plain.storePaymentMethods).toEqual(CONFIG);
+    });
+
+    it('exportPlainData omits the field when the store has no config', async () => {
+      const withoutConfig = makeService({
+        categories: [],
+        products: [],
+        storePaymentMethods: null,
+      });
+      const plainAbsent = await withoutConfig.exportPlainData();
+      expect(plainAbsent.storePaymentMethods).toBeUndefined();
+    });
+
+    it('a present-but-corrupt entry throws CorruptFileError (absent stays silent, corrupt is loud)', async () => {
+      const v2Payload = await buildV2ZipWithIterations(
+        { ...makeV1Payloads(), [EDataFileName.StorePaymentMethods]: '{not-json' },
+        PASSWORD,
+        V2_ITERATIONS,
+      );
+      await expect(makeService().import(v2Payload, PASSWORD)).rejects.toThrow(CorruptFileError);
     });
   });
 });

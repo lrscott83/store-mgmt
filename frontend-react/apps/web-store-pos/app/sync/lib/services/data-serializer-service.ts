@@ -23,6 +23,7 @@ import type {
   Recipe,
   Elaboration,
 } from '@store-mgmt/domain';
+import type { StorePaymentMethodsConfig } from '~/shared/lib/payment-methods/store-payment-methods-config-service';
 import type { ProductCategoryRepository } from '~/sales/lib/repositories/product-category-repository';
 import type { ProductRepository } from '~/sales/lib/repositories/product-repository';
 
@@ -91,6 +92,10 @@ export const EDataFileName = {
   // archives (parsed as [] on import) and always written by exports.
   Recipes: 'recipes.json',
   Elaborations: 'elaborations.json',
+  // store-payment-methods-backup: the per-store payment-methods config, absent
+  // from legacy archives. Unlike the list entries it is written ONLY when the
+  // store actually has a config (absent = store never configured = default).
+  StorePaymentMethods: 'store-payment-methods.json',
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -191,6 +196,12 @@ export interface ParsedData {
   // (legacy archives → []), so real imports never see `undefined`.
   recipes?: Recipe[];
   elaborations?: Elaboration[];
+  // store-payment-methods-backup: OPTIONAL — populated ONLY when the archive
+  // carries the entry, left `undefined` otherwise. Absent must stay
+  // distinguishable from present so an import of an older backup never
+  // touches the local config (absent → no-op, unlike the list entries whose
+  // absent → [] is a legitimate empty merge).
+  storePaymentMethods?: StorePaymentMethodsConfig;
 }
 
 // ---------------------------------------------------------------------------
@@ -252,6 +263,16 @@ export interface ElaborationReader {
   getStorageElaborationsJson(): string;
 }
 
+/**
+ * Store payment-methods config read seam (store-payment-methods-backup): the
+ * offline service owns the per-store config; the serializer only reads it for
+ * export. `null` means the key is absent (store never configured) — the entry
+ * is then NOT written, because absent config is semantically "default".
+ */
+export interface StorePaymentMethodsReader {
+  getStorageStorePaymentMethods(): StorePaymentMethodsConfig | null;
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -263,6 +284,27 @@ function parseJson<T>(contents: Map<string, string>, name: string, fallback: T):
     return JSON.parse(raw) as T;
   } catch {
     throw new CorruptFileError(`Invalid JSON in ${name}`);
+  }
+}
+
+/**
+ * Parses the store-payment-methods entry distinguishing ABSENT from PRESENT
+ * (store-payment-methods-backup): an archive that never carries the entry
+ * (legacy) yields `undefined` — the import must then leave the local config
+ * untouched — while a present entry yields the config object. Unlike the list
+ * entries, `[]` would be a wrong "absent" spelling: it is a valid config
+ * shape here neither semantically nor structurally, and a present-but-invalid
+ * entry must still fail loudly via `CorruptFileError`.
+ */
+function parseOptionalStorePaymentMethods(
+  contents: Map<string, string>,
+): StorePaymentMethodsConfig | undefined {
+  const raw = contents.get(EDataFileName.StorePaymentMethods);
+  if (raw === undefined) return undefined;
+  try {
+    return JSON.parse(raw) as StorePaymentMethodsConfig;
+  } catch {
+    throw new CorruptFileError(`Invalid JSON in ${EDataFileName.StorePaymentMethods}`);
   }
 }
 
@@ -310,6 +352,11 @@ export class DataSerializerService {
     // exports then write `[]` and imports parse [] for archives without them.
     private readonly recipeReader?: RecipeReader,
     private readonly elaborationReader?: ElaborationReader,
+    // Optional (store-payment-methods-backup): legacy call sites/tests that
+    // predate the config omit it; exports then write NO entry and imports leave
+    // the field `undefined` for archives that carry none (absent = do not touch
+    // the local config on import).
+    private readonly storePaymentMethodsReader?: StorePaymentMethodsReader,
   ) {}
 
   private derivePassword(password: string): string {
@@ -367,6 +414,12 @@ export class DataSerializerService {
     // elaboration-module: passthrough from the services' own raw-JSON seams.
     const recipesJson = this.recipeReader?.getStorageRecipesJson() ?? '[]';
     const elaborationsJson = this.elaborationReader?.getStorageElaborationsJson() ?? '[]';
+    // store-payment-methods-backup: absent key (store never configured) →
+    // NO entry — "absent" in the archive means "default" on import, so a
+    // null reader result must stay byte-absent rather than become an empty
+    // object in the zip.
+    const storePaymentMethods =
+      this.storePaymentMethodsReader?.getStorageStorePaymentMethods() ?? null;
 
     // v2 envelope: a fresh salt per export (V2-02), password-only key (V2-03).
     const salt = crypto.getRandomValues(new Uint8Array(V2_SALT_BYTES));
@@ -434,6 +487,13 @@ export class DataSerializerService {
     await zipWriter.add(EDataFileName.Elaborations, new TextReader(elaborationsJson), {
       rawPassword: key,
     });
+    if (storePaymentMethods) {
+      await zipWriter.add(
+        EDataFileName.StorePaymentMethods,
+        new TextReader(JSON.stringify(storePaymentMethods)),
+        { rawPassword: key },
+      );
+    }
 
     const blob = await zipWriter.close();
     return new Uint8Array(await blob.arrayBuffer());
@@ -578,6 +638,11 @@ export class DataSerializerService {
     const elaborations = this.elaborationReader
       ? (JSON.parse(this.elaborationReader.getStorageElaborationsJson()) as Elaboration[])
       : [];
+    // store-payment-methods-backup: parse the single config object, or leave
+    // it undefined when the store has none (absent = default, same semantics
+    // as the ZIP entry).
+    const storePaymentMethods =
+      this.storePaymentMethodsReader?.getStorageStorePaymentMethods() ?? undefined;
 
     // Categories and products: read raw JSON and parse
     const categoriesJson = this.categoryRepository.getCategoriesJson() ?? '[]';
@@ -608,6 +673,7 @@ export class DataSerializerService {
       channelRates,
       recipes,
       elaborations,
+      storePaymentMethods,
     };
   }
 
@@ -660,6 +726,9 @@ export class DataSerializerService {
       // Legacy archives (v1/Angular) carry no recipes/elaborations → [].
       recipes: parseJson<Recipe[]>(contents, EDataFileName.Recipes, []),
       elaborations: parseJson<Elaboration[]>(contents, EDataFileName.Elaborations, []),
+      // store-payment-methods-backup: absent entry → `undefined` (legacy
+      // archive: import must NOT touch the local config); present → config.
+      storePaymentMethods: parseOptionalStorePaymentMethods(contents),
     };
   }
 }

@@ -15,6 +15,7 @@ import type {
   Elaboration,
 } from '@store-mgmt/domain';
 import type { ParsedData } from './data-serializer-service';
+import type { StorePaymentMethodsConfig } from '~/shared/lib/payment-methods/store-payment-methods-config-service';
 
 // ---------------------------------------------------------------------------
 // Result types
@@ -109,6 +110,11 @@ export const SynchronizerErrors = {
     code: 'Synchronizer.ElaborationsMissingWarehouseService',
     message:
       'No se pudieron sincronizar las elaboraciones porque falta el servicio de almacenes requerido para validar el almacén.',
+  },
+  StorePaymentMethodsUnexpectedError: {
+    code: 'Synchronizer.StorePaymentMethodsUnexpectedError',
+    message:
+      'Ocurrió un error inesperado al sincronizar la configuración de métodos de pago.',
   },
 } as const;
 
@@ -276,6 +282,20 @@ export interface ElaborationImportService {
   updateImportedElaboration(elaboration: Elaboration): Result;
 }
 
+/**
+ * Store payment-methods config import routes through the offline SERVICE
+ * (store-payment-methods-backup). Unlike every other entity it is a SINGLE
+ * per-store object, not a list: the merge is a wholesale overwrite of the
+ * local config (an archive's config replaces the device's — that is the whole
+ * point of carrying it in the backup). A `storePaymentMethods` value of
+ * `undefined` in the parsed data (legacy archive) is handled BEFORE this seam
+ * is reached: the synchronizer skips the merge entirely, so an older backup
+ * never touches the local config.
+ */
+export interface StorePaymentMethodsImportService {
+  setImportedStorePaymentMethods(config: StorePaymentMethodsConfig): Result;
+}
+
 // ---------------------------------------------------------------------------
 // Per-type merge outcome (internal)
 // ---------------------------------------------------------------------------
@@ -351,6 +371,10 @@ export class DataSynchronizerService {
     // module omit it — the merges then degrade to zero-count no-ops.
     private readonly recipeService?: RecipeImportService,
     private readonly elaborationService?: ElaborationImportService,
+    // Optional (store-payment-methods-backup): legacy call sites/tests that
+    // predate the config omit it — the merge then degrades to a no-op even
+    // when the archive carries the entry.
+    private readonly storePaymentMethodsService?: StorePaymentMethodsImportService,
   ) {}
 
   async sync(data: ParsedData): Promise<SyncResult> {
@@ -425,6 +449,17 @@ export class DataSynchronizerService {
     // warehouses so the warehouse check sees the MERGED warehouse set.
     if (this.elaborationService) {
       push(this.mergeElaborationsViaService(data.elaborations ?? []));
+    }
+
+    // 13. StorePaymentMethods — routed through the offline SERVICE
+    // (store-payment-methods-backup), wholesale overwrite of the single
+    // per-store config object. `undefined` in the parsed data (legacy archive
+    // without the entry) is a TRUE no-op: the merge is not even pushed, so the
+    // local config is left untouched and no storePaymentMethods outcome
+    // appears in the result. Only present config is merged, and only when the
+    // service was injected (legacy constructor call sites).
+    if (this.storePaymentMethodsService && data.storePaymentMethods !== undefined) {
+      push(this.mergeStorePaymentMethodsViaService(data.storePaymentMethods));
     }
 
     return { succeeded: errors.length === 0, errors, merges };
@@ -1191,6 +1226,54 @@ export class DataSynchronizerService {
           entity,
           code: SynchronizerErrors.ElaborationsUnexpectedError.code,
           message: SynchronizerErrors.ElaborationsUnexpectedError.message,
+        },
+      };
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // StorePaymentMethods — routed through the offline SERVICE
+  // (store-payment-methods-backup)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Wholesale-overwrite merge of the single per-store payment-methods config.
+   * There is no add-vs-update axis (the object has no id): a present config
+   * either persists (counted as one inserted outcome) or fails. An unexpected
+   * throw — or a failed Result from the service — yields
+   * `StorePaymentMethodsUnexpectedError`. `undefined` in the parsed data never
+   * reaches this method (the `sync()` gate skips the merge), so a legacy
+   * archive can never clobber the local config.
+   */
+  private mergeStorePaymentMethodsViaService(
+    config: StorePaymentMethodsConfig,
+  ): MergeOutcome {
+    const entity = 'storePaymentMethods';
+    if (!this.storePaymentMethodsService) {
+      return { merge: { entity, inserted: 0, updated: 0 } };
+    }
+
+    try {
+      const result = this.storePaymentMethodsService.setImportedStorePaymentMethods(config);
+      if (!result.succeeded) {
+        return {
+          merge: { entity, inserted: 1, updated: 0 },
+          error: {
+            entity,
+            code: SynchronizerErrors.StorePaymentMethodsUnexpectedError.code,
+            message: SynchronizerErrors.StorePaymentMethodsUnexpectedError.message,
+          },
+        };
+      }
+      return { merge: { entity, inserted: 1, updated: 0 } };
+    } catch {
+      // The service writes a single key atomically; nothing to revert.
+      return {
+        merge: { entity, inserted: 1, updated: 0 },
+        error: {
+          entity,
+          code: SynchronizerErrors.StorePaymentMethodsUnexpectedError.code,
+          message: SynchronizerErrors.StorePaymentMethodsUnexpectedError.message,
         },
       };
     }
