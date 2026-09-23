@@ -647,10 +647,18 @@ export class OrderOfflineService {
 
   /**
    * order-sync-import-parity: 1:1 port of Angular's `updateImportedOrder`
-   * (order-offline.service.ts:438-449) — NARROW 4-field merge on the existing record by
-   * id: overwrites ONLY `date` (revived)/`isActive`/`updatedDate`/`updatedByName`; leaves
-   * `total`/`orderItems`/`isCredit`/`paymentType`/`description` and every other field
-   * untouched. No-op when the id is absent. Always returns `Result.Success()`.
+   * (order-offline.service.ts:438-449) — narrow merge on the existing record by id:
+   * overwrites `date` (revived)/`isActive`/`updatedDate`/`updatedByName`; leaves
+   * `total`/`isCredit`/`paymentType`/`description` and every other field untouched.
+   *
+   * Decision §9a (user-ratified 2026-09-23, last import wins): the imported sale cost
+   * snapshots are ALSO propagated — each local item's `productCosts` is REPLACED by the
+   * imported item's `productCosts`. Items are matched by ARRAY INDEX (order items are
+   * immutable and the ZIP preserves array order), NOT by productId, because one product
+   * may legitimately appear more than once in an order. When the imported and local item
+   * counts differ, the `productCosts` merge is SKIPPED entirely (safe fallback — the local
+   * order's `productCosts` are left untouched). No-op when the id is absent. Always
+   * returns `Result.Success()`.
    */
   updateImportedOrder(importedOrder: Order): Result {
     const order = this.getStorageOrders().find((o) => o.id === importedOrder.id);
@@ -659,6 +667,17 @@ export class OrderOfflineService {
       order.isActive = importedOrder.isActive;
       order.updatedDate = importedOrder.updatedDate;
       order.updatedByName = importedOrder.updatedByName;
+      // Decision §9a (last import wins): propagate sale cost snapshots by array index.
+      if (importedOrder.orderItems?.length === order.orderItems.length) {
+        importedOrder.orderItems.forEach((importedItem, index) => {
+          const localItem = order.orderItems[index];
+          // Never wipe with an absent array: an old ZIP without `productCosts` must leave
+          // the local snapshot intact.
+          if (localItem && Array.isArray(importedItem.productCosts)) {
+            localItem.productCosts = importedItem.productCosts;
+          }
+        });
+      }
       this.setOrdersLocalStorage(this.orders!);
     }
     return Result.Success();

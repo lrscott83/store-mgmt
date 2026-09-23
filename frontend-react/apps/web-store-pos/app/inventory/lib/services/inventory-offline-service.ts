@@ -975,11 +975,11 @@ export class InventoryOfflineService {
   /**
    * WU2 (category D, NEW method): 1:1 port of Angular's `updateImportedEntries`
    * (inventory-offline.service.ts:498-517) — merges each incoming entry into the existing
-   * productId bucket by id (updating available/isActive/updatedDate/updatedByName),
-   * appending any incoming entry with no existing match. When no bucket previously existed,
-   * this is equivalent to setting it directly (Angular's `this.inventories.has(productId)`
-   * branch — both paths converge to the same result when the existing bucket is empty).
-   * Always Result.Success() per Angular.
+   * productId bucket by id (updating available/isActive/updatedDate/updatedByName, plus
+   * `costPrice` when the incoming entry carries it), appending any incoming entry with no
+   * existing match. When no bucket previously existed, this is equivalent to setting it
+   * directly (Angular's `this.inventories.has(productId)` branch — both paths converge to
+   * the same result when the existing bucket is empty). Always Result.Success() per Angular.
    */
   public updateImportedEntries(productId: string, entries: InventoryEntry[]): Result {
     const currentEntries = [...this.getProductInventoriesByProductId(productId)];
@@ -992,6 +992,11 @@ export class InventoryOfflineService {
           isActive: entry.isActive,
           updatedDate: entry.updatedDate,
           updatedByName: entry.updatedByName,
+          // Decision §9a (last import wins): apply the imported costPrice only when the
+          // incoming entry actually carries it, so older ZIPs without the field never wipe
+          // the local cost. `currency` is intentionally NOT merged (warehouse correction
+          // preserves it).
+          ...(entry.costPrice !== undefined ? { costPrice: entry.costPrice } : {}),
         };
       } else {
         currentEntries.push(entry);
