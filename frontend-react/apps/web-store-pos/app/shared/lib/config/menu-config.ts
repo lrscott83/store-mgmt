@@ -228,6 +228,28 @@ export const MENU_GROUPS: MenuGroup[] = [
     ],
   },
   {
+    groupLabel: 'MENU.EXPENSES',
+    moduleId: EModules.Expenses,
+    items: [
+      {
+        label: 'MENU.TODAY_EXPENSES',
+        path: '/expenses/today',
+        featureIds: [EFeatures.TodayExpenses],
+        moduleId: EModules.Expenses,
+        helpContent:
+          'Registra gastos del día. Documenta los gastos operativos como salario, transporte, alquiler, agua, luz, etc. Cada gasto debe incluir tipo, monto y descripción.',
+      },
+      {
+        label: 'MENU.EXPENSES_HISTORY',
+        path: '/expenses/expenses',
+        featureIds: [EFeatures.ExpensesHistory],
+        moduleId: EModules.Expenses,
+        helpContent:
+          'Historial de gastos. Consulta todos los gastos registrados con filtros por fecha y tipo. Puedes generar reportes y exportar la información.',
+      },
+    ],
+  },
+  {
     // Módulo Almacenes (ModuleType 13, backend) con sus dos features:
     // Gestión de Almacenes (36) y Movimientos de almacén (37).
     groupLabel: 'MENU.WAREHOUSES_MODULE',
@@ -274,28 +296,6 @@ export const MENU_GROUPS: MenuGroup[] = [
         moduleId: EModules.Elaboration,
         helpContent:
           'Registra una elaboración: elige la receta, los lotes y el almacén que aporta los insumos, revisa el consumo teórico y ajústalo con el real. El sistema descuenta los insumos, ingresa el producto terminado y calcula su costo unitario real.',
-      },
-    ],
-  },
-  {
-    groupLabel: 'MENU.EXPENSES',
-    moduleId: EModules.Expenses,
-    items: [
-      {
-        label: 'MENU.TODAY_EXPENSES',
-        path: '/expenses/today',
-        featureIds: [EFeatures.TodayExpenses],
-        moduleId: EModules.Expenses,
-        helpContent:
-          'Registra gastos del día. Documenta los gastos operativos como salario, transporte, alquiler, agua, luz, etc. Cada gasto debe incluir tipo, monto y descripción.',
-      },
-      {
-        label: 'MENU.EXPENSES_HISTORY',
-        path: '/expenses/expenses',
-        featureIds: [EFeatures.ExpensesHistory],
-        moduleId: EModules.Expenses,
-        helpContent:
-          'Historial de gastos. Consulta todos los gastos registrados con filtros por fecha y tipo. Puedes generar reportes y exportar la información.',
       },
     ],
   },
