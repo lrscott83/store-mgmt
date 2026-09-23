@@ -59,6 +59,11 @@
 ## TDD
 Modo efectivo: no configurado explícitamente en el proyecto/sesión (desconocido) → checks funcionales ordinarios. Runner: vitest v3 (`vitest run <pattern>` en `apps/web-store-pos`). Evidencia: 54 tests en serializer + synchronizer, suite completa del service, eslint `--max-warnings=0` limpio.
 
+## RDD (work-unit 9c984521)
+- `gentle-ai review assess --base-ref 4e187368 --committed-only --json` → `review_due: true` (`high_risk`, motivo `unassessable`: runtime OpenCode no elegible para review inmutables).
+- Preflight STATUS (`gentle-ai.review-integration/v2 --agent opencode`) → `failure/v2` `immutable_review_transport_unsupported`, `next_action: stop`, `retry_safe: false`.
+- Resultado por task: **unavailable** (limitación del runtime cliente; no es defecto de Gentle AI → sin handoff). El boundary revisado NO avanza (sigue en 4e187368). No se deshabilitó RDD; sigue on (global). Un review en runtime elegible (claude-code/codex) queda pendiente si el usuario lo decide.
+
 ## Progreso / evidencia
 - T1 (2026-09-23): `store-payment-methods-config-service.ts` — añadidos `getStorageStorePaymentMethods` (lectura sin auto-init, satisface `StorePaymentMethodsReader`), `setConfigFromBackup` (escritura cifrada sin auto-init) y `setImportedStorePaymentMethods` (seam de import que devuelve `Result`). `data-serializer-service.ts` — `EDataFileName.StorePaymentMethods = 'store-payment-methods.json'`, entrada escrita SOLO si el reader devuelve config no-null; `parseContents` deja el campo `undefined` si la entrada no existe; `exportPlainData` lo incluye parseado o `undefined`.
 - T2 (2026-09-23): `data-synchronizer-service.ts` — `StorePaymentMethodsImportService` (opcional en constructor), merge de sobrescritura total; `undefined` en el batch → no-op verdadero (ni siquiera se registra outcome).
