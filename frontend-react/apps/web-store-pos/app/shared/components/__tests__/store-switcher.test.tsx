@@ -394,3 +394,29 @@ describe('StoreSwitcher — switching stores', () => {
     expect(mockLogout).not.toHaveBeenCalled();
   });
 });
+
+describe('StoreSwitcher — nombres completos en el popup (2026-09-23)', () => {
+  it('no trunca los nombres: sin truncate, popup que crece a lo ancho hasta un tope', async () => {
+    const longName = 'Tienda con un nombre muy largo para comprobar que no se corta 9999';
+    defaultOwnerUser.storeList = [
+      { id: 's1', name: longName, isActive: true },
+      { id: 's2', name: 'Otra', isActive: true },
+    ];
+    render(
+      <Wrapper>
+        <StoreSwitcher />
+      </Wrapper>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Cambiar tienda' }));
+
+    const item = await screen.findByText(longName);
+    // El nombre completo está en el DOM y su span NO tiene truncate.
+    expect(item.className).not.toMatch(/truncate/);
+    expect(item.className).toMatch(/whitespace-normal/);
+    // El popup crece con el contenido (w-max) con mínimo y máximo razonables.
+    const popup = item.closest('div.absolute');
+    expect(popup?.className).toMatch(/w-max/);
+    expect(popup?.className).toMatch(/min-w-56/);
+    expect(popup?.className).toMatch(/max-w-72/);
+  });
+});

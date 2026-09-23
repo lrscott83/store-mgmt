@@ -114,7 +114,7 @@ export function StoreSwitcher() {
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 top-full z-50 mt-1 w-56 rounded-xl border border-gray-200 bg-white py-1 shadow-lg">
+        <div className="absolute right-0 top-full z-50 mt-1 w-max min-w-56 max-w-72 rounded-xl border border-gray-200 bg-white py-1 shadow-lg">
           {offerStores.length === 0 ? (
             <p className="px-4 py-3 text-sm text-gray-500">
               {intl.formatMessage({ id: 'STORE_SELECTOR.EMPTY' })}
@@ -131,7 +131,10 @@ export function StoreSwitcher() {
                       disabled={isSwitching || isCurrent}
                       className="flex w-full items-center justify-between gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors disabled:cursor-default disabled:text-gray-400"
                     >
-                      <span className="truncate">{store.name}</span>
+                      {/* Nombres COMPLETOS (petición 2026-09-23): sin truncate —
+                          el popup crece a lo ancho (w-max) hasta un tope y el
+                          nombre raramente excedido envuelve en dos líneas. */}
+                      <span className="whitespace-normal text-left">{store.name}</span>
                       {isCurrent && (
                         <span className="shrink-0 rounded-full bg-cyan-100 px-2 py-0.5 text-xs font-medium text-cyan-700">
                           {intl.formatMessage({ id: 'STORE_SELECTOR.CURRENT' })}
