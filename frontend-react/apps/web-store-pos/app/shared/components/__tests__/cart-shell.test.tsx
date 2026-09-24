@@ -1748,3 +1748,77 @@ describe('CartShell — T4: bloqueo del cambio de moneda', () => {
     expect(screen.getByText('Registrar').closest('button')).toBeDisabled();
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// T17 — "Limpiar" vuelve la moneda de la venta a CUP y descarta el aviso.
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('CartShell — T17: Limpiar reinicia la moneda a CUP', () => {
+  const MULTI_PAYMENTS_STORE_MODULES = [11, EModules.MultiPayments];
+
+  function setSaleCurrencyPreference(currency: Currency) {
+    localStorage.setItem('lizoft.cart-currency-u1', String(currency));
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    mockUser = { id: 'u1', selectedStoreId: 's1', storeModuleIds: MULTI_PAYMENTS_STORE_MODULES };
+    mockChannelRates = [];
+    mockProductLookup = {};
+  });
+
+  it('T17-01: tras "Limpiar" el selector vuelve a CUP y la preferencia se persiste en CUP', () => {
+    setSaleCurrencyPreference(Currency.USD);
+    mockChannelRates = [
+      {
+        method: SalePaymentMethod.Efectivo,
+        currency: Currency.CUP,
+        value: 350,
+        effectiveFrom: new Date('2026-09-01T00:00:00.000Z'),
+      },
+    ];
+    const cupProduct = makeProduct({ id: 'cup-1', name: 'Pan', price: 350, currency: Currency.CUP });
+    mockCartState({
+      items: [{ product: cupProduct, quantity: 1 }],
+      total: vi.fn().mockReturnValue(350),
+      cartCurrency: () => Currency.CUP,
+      payments: [],
+      setPayments: vi.fn(),
+    });
+    renderCartShell();
+    openCart();
+
+    const select = screen.getByTestId('cart-currency-select') as HTMLSelectElement;
+    expect(select.value).toBe(String(Currency.USD));
+
+    fireEvent.click(screen.getByText('Limpiar'));
+
+    expect(select.value).toBe(String(Currency.CUP));
+    expect(localStorage.getItem('lizoft.cart-currency-u1')).toBe(String(Currency.CUP));
+    expect(screen.queryByTestId('cart-currency-change-error')).not.toBeInTheDocument();
+  });
+
+  it('T17-02: tras "Limpiar" el aviso de cambio bloqueado desaparece', () => {
+    const cupProduct = makeProduct({ id: 'cup-1', name: 'Pan', price: 350, currency: Currency.CUP });
+    mockCartState({
+      items: [{ product: cupProduct, quantity: 1 }],
+      total: vi.fn().mockReturnValue(350),
+      cartCurrency: () => Currency.CUP,
+      payments: [],
+      setPayments: vi.fn(),
+    });
+    renderCartShell();
+    openCart();
+
+    // No rate → choosing USD is rejected and the alert appears.
+    fireEvent.change(screen.getByTestId('cart-currency-select'), {
+      target: { value: String(Currency.USD) },
+    });
+    expect(screen.getByTestId('cart-currency-change-error')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('Limpiar'));
+
+    expect(screen.queryByTestId('cart-currency-change-error')).not.toBeInTheDocument();
+  });
+});

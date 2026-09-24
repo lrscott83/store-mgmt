@@ -40,7 +40,7 @@ import { showBlockingError, showAcknowledgeError } from '~/shared/lib/blocking-a
 import { showToastSuccess, showToastError } from '~/shared/lib/toast';
 import { round2 } from '~/shared/lib/money';
 import { currencyLabel, formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency';
-import { readCartCurrencyPreference } from '~/shared/lib/cart-currency-preference';
+import { readCartCurrencyPreference, writeCartCurrencyPreference } from '~/shared/lib/cart-currency-preference';
 import { hasMultiMonedasAvailable } from '~/shared/components/multimonedas/currency-select';
 import {
   DEFAULT_ENABLED_PAYMENT_METHODS,
@@ -346,6 +346,14 @@ export function CartShell() {
   function handleClear() {
     clear();
     resetTransientFields();
+    // T17: "Limpiar" returns the sale currency to CUP and dismisses any pending
+    // currency-change notice, so the next sale starts clean. Without module 16
+    // the selector is not rendered, so only the module path is touched.
+    if (multiPaymentsAvailable) {
+      setPreferredCartCurrency(Currency.CUP);
+      setCurrencyChangeError(null);
+      writeCartCurrencyPreference(user?.id, Currency.CUP);
+    }
   }
 
   // 1:1 port of Angular's NavRightComponent.increaseProduct/decreaseProduct ->
