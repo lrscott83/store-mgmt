@@ -165,6 +165,11 @@ export class InventoryOfflineService {
           costPrice: entry.costPrice,
           date: entry.date,
           isActive: entry.isActive,
+          // csv-import-currency-matrix (2026-09-24): map the entry's cost currency into the
+          // view. Predates the 2026-09-16 currency plan: the view silently dropped
+          // `currency`, so entry-list / today-entries / entries totals displayed every cost
+          // as CUP (and the edit modal defaulted to CUP) even when storage held USD.
+          currency: entry.currency,
         });
       }
     }
@@ -701,6 +706,10 @@ export class InventoryOfflineService {
         costPrice: updated.costPrice,
         date: updated.date,
         isActive: updated.isActive,
+        // csv-import-currency-matrix (2026-09-24): the InventoryEntryView contract carries
+        // `currency` (same projection as getActiveInventoryEntriesStorage) — dropping it here
+        // would re-open the CUP display/overwrite family of bugs for update() consumers.
+        currency: updated.currency,
       },
       true,
       [],
@@ -883,6 +892,10 @@ export class InventoryOfflineService {
         costPrice: updated.costPrice,
         date: updated.date,
         isActive: updated.isActive,
+        // csv-import-currency-matrix (2026-09-24): same InventoryEntryView currency contract
+        // as update()/getActiveInventoryEntriesStorage — `updated` spreads `...entry`, so the
+        // stored currency survives the product move.
+        currency: updated.currency,
       },
       true,
       [],

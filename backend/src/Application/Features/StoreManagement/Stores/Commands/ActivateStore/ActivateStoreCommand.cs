@@ -47,6 +47,9 @@ namespace Application.Features.StoreManagement.Stores.Commands.ActivateStore
                 throw new ApiException(_localizer["UserNotFound"], HttpStatusCode.BadRequest);
 
             var store = await _storeByIdService.GetStoreByIdIncludingModulesAsync(request.Id);
+            if (store is null)
+                throw new ApiException(_localizer["StoreNotFound"], HttpStatusCode.NotFound);
+
             store.IsActive = true;
             await _storeRepository.UpdateAsync(store);
             return ResponseResult.Success(await _applicationUnitOfWork.SaveChangesAsync(cancellationToken) > 0);

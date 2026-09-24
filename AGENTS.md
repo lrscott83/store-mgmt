@@ -1,8 +1,12 @@
 # store-mgmt — Agent Instructions
 
-## Angular frontend is LEGACY — NON-NEGOTIABLE (user-mandated 2026-09-17)
+## Angular frontend is LEGACY — NON-NEGOTIABLE (user-mandated 2026-09-17; reinforced 2026-09-24)
 
-**The Angular frontend (`frontend/`) is legacy and is NEVER touched.** All changes belong in the React frontend (`frontend-react/`). Do not read, edit, or derive UI decisions from the Angular app — it is frozen. Any work that would modify `frontend/` must stop and ask; the answer will be "work in React".
+**The Angular frontend (`frontend/`) is legacy and is NEVER touched — and NEVER read or inspected.** All changes belong in the React frontend (`frontend-react/`). Do not read, edit, search, or derive ANY decision, context, or parity conclusion from the Angular app — it is frozen. "Angular parity" is NOT an authorized reason to open it.
+
+This applies to tool results too: codegraph and other search tools may index both trees; when Angular `frontend/` source appears in a result set, IGNORE it — do not read it, do not quote it, do not cite it as evidence, and do not compare React behavior against it. If React behavior seems to diverge from Angular, reason from React code + tests + specs, never from the legacy app.
+
+Any work that would modify `frontend/` must stop and ask; the answer will be "work in React".
 
 ## Backend scope rule — NON-NEGOTIABLE (user-mandated 2026-08-08)
 

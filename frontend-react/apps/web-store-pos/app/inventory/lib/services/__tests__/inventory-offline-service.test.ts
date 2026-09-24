@@ -742,6 +742,20 @@ describe('InventoryOfflineService', () => {
       const all = service.getActiveInventoryEntriesStorage();
       expect(all.every((v) => v.id !== 'e2')).toBe(true);
     });
+
+    it('carries the stored cost currency into the view (csv-import-currency-matrix, 2026-09-24: the view previously dropped currency, so UIs showed CUP for non-CUP costs)', () => {
+      const map = new Map<string, InventoryEntry[]>();
+      map.set('p1', [
+        makeEntry('e1', 'p1', { costPrice: 6, quantity: 12, currency: Currency.USD }),
+        makeEntry('e2', 'p1', { costPrice: 4, quantity: 5, order: 1 }),
+      ]);
+      seedInventory(storeId, map);
+
+      const all = service.getActiveInventoryEntriesStorage();
+      expect(all.find((v) => v.id === 'e1')?.currency).toBe(Currency.USD);
+      expect(all.find((v) => v.id === 'e2')?.currency).toBeUndefined();
+      expect(all.find((v) => v.id === 'e1')?.costPrice).toBe(6);
+    });
   });
 
   // WU3 (category B) + Fase 4 (GATE-B — Angular-exact rename+zero-arg+category-repo sourcing):
