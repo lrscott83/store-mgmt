@@ -298,7 +298,7 @@ export function MultiPaymentList({
 
   return (
     <div
-      className="border-b border-border px-4 py-3 space-y-3"
+      className="border-b border-border px-2 py-2 space-y-2"
       data-testid={testId ?? 'multi-payment-list'}
     >
       <h3 className="text-sm font-semibold text-text">
@@ -312,11 +312,11 @@ export function MultiPaymentList({
           return (
             <div
               key={row.id}
-              className="rounded-md border border-border p-2 space-y-2"
+              className="rounded-md border border-border p-2 space-y-1"
               data-testid="multi-payment-row"
             >
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                <label className="block">
+              <div className="flex items-end gap-1.5">
+                <label className="block min-w-0 flex-1">
                   <span className="mb-1 block text-xs font-medium text-text-muted">
                     {intl.formatMessage({ id: 'SHOPPING_CART.MULTI_PAYMENT_METHOD_LABEL' })}
                   </span>
@@ -336,7 +336,7 @@ export function MultiPaymentList({
                   </select>
                 </label>
 
-                <label className="block">
+                <label className="block w-20 shrink-0">
                   <span className="mb-1 block text-xs font-medium text-text-muted">
                     {intl.formatMessage({ id: 'SHOPPING_CART.MULTI_PAYMENT_CURRENCY_LABEL' })}
                   </span>
@@ -354,7 +354,7 @@ export function MultiPaymentList({
                   </select>
                 </label>
 
-                <label className="block">
+                <label className="block w-20 shrink-0">
                   <span className="mb-1 block text-xs font-medium text-text-muted">
                     {intl.formatMessage({ id: 'SHOPPING_CART.MULTI_PAYMENT_AMOUNT_LABEL' })}
                   </span>
@@ -369,14 +369,12 @@ export function MultiPaymentList({
                     data-testid="multi-payment-amount"
                   />
                 </label>
-              </div>
 
-              <div className="flex items-center justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => removeRow(row.id)}
                   aria-label={intl.formatMessage({ id: 'SHOPPING_CART.MULTI_PAYMENT_REMOVE' })}
-                  className="rounded-md border border-border p-1 text-red-600 hover:bg-surface-hover"
+                  className="shrink-0 rounded-md border border-border p-1 text-red-600 hover:bg-surface-hover"
                   data-testid="multi-payment-remove"
                 >
                   <TrashIcon className="h-4 w-4" />

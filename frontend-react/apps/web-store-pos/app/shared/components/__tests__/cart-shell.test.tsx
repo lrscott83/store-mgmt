@@ -1546,7 +1546,9 @@ describe('CartShell — T3: selector de moneda en la fila del encabezado', () =>
 
     // Same toolbar group as "Limpiar"/"Registrar" — same visual row.
     expect(limpiar!.parentElement).toContainElement(select);
-    expect(select.parentElement?.parentElement).toBe(limpiar!.parentElement);
+    // T15: the select has no wrapper of its own any more (the visible label was
+    // removed); it is a direct child of the toolbar group.
+    expect(select.parentElement).toBe(limpiar!.parentElement);
     // Rendered BEFORE "Limpiar" in DOM order.
     expect(
       select.compareDocumentPosition(limpiar!) & Node.DOCUMENT_POSITION_FOLLOWING,
@@ -1554,6 +1556,35 @@ describe('CartShell — T3: selector de moneda en la fila del encabezado', () =>
     // Inside the header row that also holds "Venta actual" (no row of its own).
     const headerRow = screen.getByText('Venta actual').parentElement?.parentElement;
     expect(headerRow).toContainElement(select);
+  });
+
+  it('T15-01: el selector no muestra label visible, pero conserva su nombre accesible', () => {
+    renderCartShell();
+    openCart();
+
+    const select = screen.getByLabelText('Moneda');
+    expect(select).toBe(screen.getByTestId('cart-currency-select'));
+    // The visible label text is gone from the header.
+    expect(screen.queryByText('Moneda')).not.toBeInTheDocument();
+  });
+
+  it('T15-02: el encabezado es una sola fila con el select y los botones a la derecha', () => {
+    renderCartShell();
+    openCart();
+
+    const headerRow = screen.getByText('Venta actual').parentElement?.parentElement;
+    expect(headerRow).not.toBeNull();
+    // Single row: no wrap on the header toolbar.
+    expect(headerRow!.className).not.toContain('flex-wrap');
+
+    const select = screen.getByTestId('cart-currency-select');
+    const limpiar = screen.getByText('Limpiar').closest('button');
+    const registrar = screen.getByText('Registrar').closest('button');
+    const toolbar = select.parentElement;
+    expect(toolbar).toBe(limpiar!.parentElement);
+    expect(toolbar).toBe(registrar!.parentElement);
+    // The toolbar group (select + both buttons) is the rightmost element of the row.
+    expect(headerRow!.lastElementChild).toBe(toolbar);
   });
 
   it('T3-02: sin el módulo 16 el selector no existe y el encabezado sigue intacto', () => {
