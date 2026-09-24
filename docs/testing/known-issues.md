@@ -13,6 +13,7 @@ Resumen de los que siguen (8 de los 11 deterministas de la corrida; los 3 resuel
 | # | Test | Estado de la causa raíz |
 |---|---|---|
 | 1 | `valid-session-navigation` 12 | 🔶 **Causa corregida 2026-09-24** — unlock gate de cifrado at-rest (no era el crash del Grupo A); sigue fallando |
+| 1b | `valid-session-navigation` 6 | ✅ **Resuelto 2026-09-24** — spec alineado con el 12 con permiso del usuario: pinea `/login?unlock=1` sin logout + re-login |
 | 2 | `valid-session-navigation` 10 | ⏸ **Anotado** — la app se comporta bien; apunta a lentitud del entorno |
 | 3 | `valid-session-navigation` 11 | ⏸ **Anotado** — ídem |
 | 4 | `multipayments` T10.2 | ⏸ **Anotado** — el spec fue reescribirse en dev; hay que correr la versión nueva antes de concluir |
