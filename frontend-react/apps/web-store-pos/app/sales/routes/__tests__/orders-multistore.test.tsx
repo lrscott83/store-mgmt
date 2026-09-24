@@ -217,16 +217,16 @@ describe('OrdersPage — header «Ventas (n)» + total, línea de totales elimin
     );
     await screen.findByTestId('multistore-panel-toggle-s1');
 
-    // Fila 1: el rango de fechas comparte la fila con el select de tiendas
-    // (ambos son hijos directos del mismo contenedor flex-wrap) y el
-    // contenedor del rango queda empujado a la derecha (justify-end).
+    // Fila 1: el rango de fechas comparte la fila con el select de tiendas —
+    // hijo DIRECTO del mismo contenedor flex (sin wrapper w-full) y estirado
+    // hacia la derecha (flex-1, patrón de credits.tsx).
     const rangeInput = screen.getByTestId('date-range-filter-input');
-    const rangeRow = rangeInput.closest('.justify-end');
-    expect(rangeRow).not.toBeNull();
+    const rangeRoot = rangeInput.parentElement;
     const select = screen.getByTestId('multistore-select');
     expect(select.parentElement).not.toBeNull();
-    // El select NO está dentro de la fila del rango: fila aparte del layout.
-    expect(rangeRow!.contains(select)).toBe(false);
+    expect(rangeRoot).not.toBeNull();
+    expect(rangeRoot!.parentElement).toBe(select.parentElement);
+    expect(rangeRoot).toHaveClass('flex-1');
 
     // Las filas 2 (métodos de pago) y 3 (pagadas/créditos) son de ancho
     // completo (w-full), cada una con sus radios.

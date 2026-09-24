@@ -859,13 +859,16 @@ describe('ExpensesHistoryPage — modo multistore (paneles por tienda)', () => {
       );
     });
 
-    // Misma fila: el select de tiendas y el rango comparten el contenedor flex;
-    // ml-auto empuja el rango a la derecha.
+    // Misma fila: el rango es hijo DIRECTO del mismo contenedor flex que el
+    // select de tiendas (sin wrapper w-full que lo baje a otra línea) y se
+    // estira hacia la derecha (flex-1 — patrón de credits.tsx).
     const rangeInput = screen.getByTestId('date-range-filter-input');
-    const filterRoot = rangeInput.closest('.ml-auto');
-    expect(filterRoot).not.toBeNull();
+    const rangeRoot = rangeInput.parentElement;
     const row = screen.getByTestId('multistore-select').parentElement;
     expect(row).not.toBeNull();
+    expect(rangeRoot).not.toBeNull();
+    expect(rangeRoot!.parentElement).toBe(row);
+    expect(rangeRoot).toHaveClass('flex-1');
     expect(row!.contains(rangeInput)).toBe(true);
 
     // Sin rango: (3) gastos, 22\u00A0CUP global.

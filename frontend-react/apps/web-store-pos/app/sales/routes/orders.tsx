@@ -362,19 +362,18 @@ export function OrdersPage() {
           selectedStoreId={selectedMultiStoreId}
           onSelectedStoreIdChange={setSelectedMultiStoreId}
           filters={
-            // Petición 2026-09-23: tres filas de filtros — fila 1: tienda
-            // (select del componente compartido) + rango de fechas alineado a
-            // la derecha; fila 2: método de pago; fila 3: pagadas/créditos.
-            // Cada fila es w-full para que flex-wrap del componente compartido
-            // la baje a SU propia línea debajo del select.
+            // Petición 2026-09-24: tres filas de filtros — fila 1: tienda
+            // (select del componente compartido) + rango de fechas en la MISMA
+            // fila, estirado hacia la derecha (mismo patrón flex-1 que
+            // credits.tsx); fila 2: método de pago; fila 3: pagadas/créditos.
+            // Las filas 2 y 3 son w-full para que flex-wrap del componente
+            // compartido las baje a su propia línea debajo del select.
             <>
-              <div className="flex w-full flex-wrap items-center justify-end">
-                <DateRangeFilter
-                  value={dateRange}
-                  onApply={setDateRange}
-                  className="w-64 max-w-full"
-                />
-              </div>
+              <DateRangeFilter
+                value={dateRange}
+                onApply={setDateRange}
+                className="flex-1 min-w-0"
+              />
               <div className="w-full">{paymentFieldset}</div>
               <div className="w-full">
                 <fieldset className="flex flex-wrap items-center gap-4">

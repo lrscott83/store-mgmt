@@ -208,15 +208,20 @@ export function ExpensesHistoryPage() {
           selectedStoreId={selectedMultiStoreId}
           onSelectedStoreIdChange={setSelectedMultiStoreId}
           filters={
-            // Petición 2026-09-23: el rango de fechas comparte la MISMA fila que
-            // el select de tiendas, alineado a la derecha; el filtro de método
-            // de pago queda en su propia fila debajo (MultiStoreSection lo
-            // envuelve — flex-wrap — así que este bloque ocupa fila entera).
-            <div className="flex w-full flex-wrap items-center gap-x-4 gap-y-2">
+            // Petición 2026-09-24: fila 1 — el rango de fechas comparte la MISMA
+            // fila que el select de tiendas, estirado hacia la derecha (el mismo
+            // patrón flex-1 de credits.tsx); fila 2 — método de pago (w-full,
+            // MultiStoreSection la baja a su propia línea con flex-wrap).
+            <>
+              <DateRangeFilter
+                value={dateRange}
+                onApply={setDateRange}
+                className="flex-1 min-w-0"
+              />
               <div
                 role="radiogroup"
                 aria-label={intl.formatMessage({ id: 'EXPENSES.FORM.PAYMENT_TYPE' })}
-                className="flex flex-wrap gap-4"
+                className="flex w-full flex-wrap gap-4"
               >
                 <label className="flex items-center gap-1.5 text-sm text-text">
                   <input
@@ -241,12 +246,7 @@ export function ExpensesHistoryPage() {
                   </label>
                 ))}
               </div>
-              <DateRangeFilter
-                value={dateRange}
-                onApply={setDateRange}
-                className="ml-auto w-full sm:w-72"
-              />
-            </div>
+            </>
           }
           renderStoreCount={(store) => {
             const filtered = visibleExpenses(storeExpenses.get(store.id) ?? []);
