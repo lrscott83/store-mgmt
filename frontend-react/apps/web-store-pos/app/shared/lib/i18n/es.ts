@@ -271,7 +271,7 @@ const messages: Record<string, string> = {
   // Owner's "my stores" cards listing (owner-stores-cards plan, 2026-09-08)
   'MENU.MY_STORES': 'Mis tiendas',
   'MENU.EXCHANGE_RATES': 'Cambio USD a MN',
-  'MENU.CHANNEL_RATES': 'Tasas por canal',
+  'MENU.CHANNEL_RATES': 'Tasas de Cambio',
   'MENU.USERS': 'Empleados',
   'MENU.BILLING_COLLECTIONS': 'Cobros pendientes',
   'MENU.BILLING_COMMISSIONS': 'Comisiones',
@@ -1024,10 +1024,16 @@ const messages: Record<string, string> = {
   'EXCHANGE_RATES.NO_RECORDS': 'No hay registros todavía.',
 
   // Channel rates — append-only register per channel (method + currency),
-  // multipayments. A new effective moment is a new row; no edit/delete.
-  'CHANNEL_RATES.TITLE': 'Tasas por canal',
+  // multipayments. A new effective moment is a new row; registration happens
+  // through the `+ Tasa` popup only, and the view shows "Tasas Vigentes" (the
+  // rate in force per channel) plus the full history (T22, 2026-09-24).
+  'CHANNEL_RATES.TITLE': 'Tasas de Cambio',
   'CHANNEL_RATES.INFO':
     'Registra cuántas unidades de una moneda equivalen a 1 USD para cada método de pago, con la fecha desde la que rige la tasa. El registro es de solo lectura: cada cambio crea una fila nueva y el historial no se edita ni se elimina.',
+  'CHANNEL_RATES.ADD_RATE': 'Tasa',
+  'CHANNEL_RATES.HELP_LABEL': '¿Qué significa el valor de la tasa?',
+  'CHANNEL_RATES.HELP':
+    'Cada valor indica cuántas unidades de la moneda del canal equivalen a 1 USD. Por ejemplo, un valor de 700 en Efectivo (CUP) significa que 1 USD = 700 CUP.',
   'CHANNEL_RATES.FORM_TITLE': 'Registrar tasa',
   'CHANNEL_RATES.METHOD_LABEL': 'Método de pago',
   'CHANNEL_RATES.CURRENCY_LABEL': 'Moneda',
@@ -1038,6 +1044,8 @@ const messages: Record<string, string> = {
   'CHANNEL_RATES.INVALID_DATE': 'La fecha de vigencia es obligatoria.',
   'CHANNEL_RATES.INVALID_CHANNEL':
     'Ese canal no existe: elige una combinación válida de método y moneda.',
+  'CHANNEL_RATES.CURRENT_TITLE': 'Tasas Vigentes',
+  'CHANNEL_RATES.NO_CURRENT_RECORDS': 'No hay tasas vigentes todavía.',
   'CHANNEL_RATES.HISTORY_TITLE': 'Historial de tasas',
   'CHANNEL_RATES.CHANNEL_COLUMN': 'Canal',
   'CHANNEL_RATES.CURRENCY_COLUMN': 'Moneda',
@@ -1047,6 +1055,8 @@ const messages: Record<string, string> = {
   'CHANNEL_RATES.NO_RECORDS': 'No hay tasas registradas todavía.',
   'CHANNEL_RATES.STATUS_COLUMN': 'Estado',
   'CHANNEL_RATES.ACTIONS_COLUMN': 'Acciones',
+  'CHANNEL_RATES.DETAILS_COLUMN': '?',
+  'CHANNEL_RATES.DETAILS_LABEL': 'Ver detalles',
   'CHANNEL_RATES.ACTIVE_STATUS': 'Activa',
   'CHANNEL_RATES.INACTIVE_STATUS': 'Inactiva',
   'CHANNEL_RATES.DEACTIVATE': 'Desactivar',

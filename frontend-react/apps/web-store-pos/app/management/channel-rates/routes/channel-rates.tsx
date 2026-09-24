@@ -1,10 +1,11 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { Fragment, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useIntl } from 'react-intl';
 import {
   Currency,
   EFeatures,
   EModules,
   SalePaymentMethod,
+  channelKey,
   defaultPaymentMethodForCurrency,
   isValidChannel,
   type ChannelRate,
@@ -13,7 +14,9 @@ import { adminFeatureModuleLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { Card } from '~/shared/components/ui/card';
 import { Button } from '~/shared/components/ui/button';
-import { currencyLabel, formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency';
+import { Modal } from '~/shared/components/ui/modal';
+import { HelpIcon, PlusIcon } from '~/shared/components/ui/icons';
+import { currencyLabel } from '~/shared/lib/format-money-with-currency';
 import { fromLocalDayKey, toLocalDayKey } from '~/shared/lib/date-utils';
 import { ChannelRateOfflineService } from '../lib/services/channel-rate-offline-service';
 import { channelLabel } from '../lib/channel-label';
@@ -56,10 +59,27 @@ function sortByRecency(rates: ChannelRate[]): ChannelRate[] {
 }
 
 /**
- * Channel-rates register (multipayments). Append-only by contract: a new
+ * The rate currently in force per channel (T22, card 1). One row per
+ * `(method, currency)`: the most recent row for that channel by the same
+ * recency order the history uses. A deactivated newest row stays listed (with an
+ * "Inactiva" state and a Reactivar control) so the channel's toggle is always
+ * reachable; the append-only history keeps every row.
+ */
+function latestPerChannel(records: ChannelRate[]): ChannelRate[] {
+  const byChannel = new Map<string, ChannelRate>();
+  for (const record of records) {
+    const key = channelKey(record.method, record.currency);
+    if (!byChannel.has(key)) byChannel.set(key, record);
+  }
+  return [...byChannel.values()];
+}
+
+/**
+ * "Tasas de Cambio" register (multipayments). Append-only by contract: a new
  * effective moment is a NEW row, and historical rows are never edited or
- * deleted, so this view has no update/delete controls. All Spanish copy comes
- * from i18n keys.
+ * deleted. Registration happens only through the `+ Tasa` popup; the view shows
+ * the rates currently in force (card 1) and the full history (card 2). All
+ * Spanish copy comes from i18n keys.
  */
 export function ChannelRatesPage() {
   const intl = useIntl();
@@ -67,6 +87,9 @@ export function ChannelRatesPage() {
   const storeId = useAuthStore((s) => s.user?.selectedStoreId ?? '');
 
   const [records, setRecords] = useState<ChannelRate[]>([]);
+  const [formOpen, setFormOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
   const [method, setMethod] = useState<SalePaymentMethod>(SalePaymentMethod.Efectivo);
   const [currency, setCurrency] = useState<Currency>(Currency.CUP);
   const [valueDraft, setValueDraft] = useState('');
@@ -96,6 +119,9 @@ export function ChannelRatesPage() {
     load();
   }, [load]);
 
+  // Card 1: the rate in force per channel (one row per channel).
+  const currentRates = useMemo(() => latestPerChannel(records), [records]);
+
   // Only real channels are offered: the method selector is limited to the
   // methods that exist for the chosen currency, so Zelle+CUP or Efectivo+MLC
   // can never be picked.
@@ -107,6 +133,30 @@ export function ChannelRatesPage() {
     setMethod((current) =>
       isValidChannel(current, next) ? current : defaultPaymentMethodForCurrency(next),
     );
+  }
+
+  function openRegisterDialog() {
+    setError(undefined);
+    setFormOpen(true);
+  }
+
+  function toggleDetails(key: string) {
+    setExpandedRows((prev) => ({ ...prev, [key]: !prev[key] }));
+  }
+
+  /** Details + dates of a row, as the `?` paragraph of both tables. */
+  function detailsText(record: ChannelRate): string {
+    const created = record.createdDate ? toLocalDayKey(record.createdDate) : '—';
+    const status = formatMessage(
+      record.isActive === false ? 'CHANNEL_RATES.INACTIVE_STATUS' : 'CHANNEL_RATES.ACTIVE_STATUS',
+    );
+    return [
+      channelLabel(record.method, record.currency, formatMessage),
+      `${formatMessage('CHANNEL_RATES.VALUE_LABEL')}: ${record.value}`,
+      `${formatMessage('CHANNEL_RATES.EFFECTIVE_FROM_LABEL')}: ${toLocalDayKey(record.effectiveFrom)}`,
+      `${formatMessage('CHANNEL_RATES.CREATED_DATE_COLUMN')}: ${created}`,
+      `${formatMessage('CHANNEL_RATES.STATUS_COLUMN')}: ${status}`,
+    ].join(' · ');
   }
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -152,6 +202,7 @@ export function ChannelRatesPage() {
 
     setValueDraft('');
     load();
+    setFormOpen(false);
     setSavedMessage(true);
     if (savedMessageTimer.current !== undefined) clearTimeout(savedMessageTimer.current);
     savedMessageTimer.current = setTimeout(() => setSavedMessage(false), 3000);
@@ -174,8 +225,43 @@ export function ChannelRatesPage() {
   }
 
   return (
-    <div className="space-y-4 p-4">
-      <h1 className="text-xl font-semibold">{intl.formatMessage({ id: 'CHANNEL_RATES.TITLE' })}</h1>
+    <div className="space-y-3 p-2 sm:p-4">
+      <div className="flex items-center justify-between gap-2">
+        <h1 className="text-lg font-semibold sm:text-xl">
+          {intl.formatMessage({ id: 'CHANNEL_RATES.TITLE' })}
+        </h1>
+        <div className="flex shrink-0 items-center gap-2">
+          <Button
+            variant="fab"
+            onClick={openRegisterDialog}
+            className="px-3 py-2 sm:px-5 sm:py-3"
+            data-testid="channel-rate-add"
+          >
+            <PlusIcon className="h-4 w-4" />
+            {intl.formatMessage({ id: 'CHANNEL_RATES.ADD_RATE' })}
+          </Button>
+          <button
+            type="button"
+            onClick={() => setHelpOpen((open) => !open)}
+            aria-label={intl.formatMessage({ id: 'CHANNEL_RATES.HELP_LABEL' })}
+            title={intl.formatMessage({ id: 'CHANNEL_RATES.HELP' })}
+            className="rounded p-1 text-text-muted hover:bg-surface-hover"
+            data-testid="channel-rate-help"
+          >
+            <HelpIcon />
+          </button>
+        </div>
+      </div>
+
+      {helpOpen && (
+        <p
+          role="note"
+          className="rounded-md bg-gray-50 p-2 text-sm text-text-muted"
+          data-testid="channel-rate-help-text"
+        >
+          {intl.formatMessage({ id: 'CHANNEL_RATES.HELP' })}
+        </p>
+      )}
 
       {savedMessage && (
         <p role="status" className="text-sm text-success" data-testid="channel-rate-saved">
@@ -189,7 +275,170 @@ export function ChannelRatesPage() {
         </p>
       )}
 
-      <Card title={intl.formatMessage({ id: 'CHANNEL_RATES.FORM_TITLE' })}>
+      <Card title={intl.formatMessage({ id: 'CHANNEL_RATES.CURRENT_TITLE' })} padding="tight">
+        {currentRates.length === 0 ? (
+          <p className="p-2 text-sm text-text-muted" data-testid="channel-rate-current-empty">
+            {intl.formatMessage({ id: 'CHANNEL_RATES.NO_CURRENT_RECORDS' })}
+          </p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr className="border-b border-border text-xs text-text-muted">
+                  <th className="px-2 py-1.5">
+                    {intl.formatMessage({ id: 'CHANNEL_RATES.CHANNEL_COLUMN' })}
+                  </th>
+                  <th className="px-2 py-1.5">
+                    {intl.formatMessage({ id: 'CHANNEL_RATES.VALUE_COLUMN' })}
+                  </th>
+                  <th className="px-2 py-1.5">
+                    {intl.formatMessage({ id: 'CHANNEL_RATES.STATUS_COLUMN' })}
+                  </th>
+                  <th className="px-2 py-1.5">
+                    {intl.formatMessage({ id: 'CHANNEL_RATES.ACTIONS_COLUMN' })}
+                  </th>
+                  <th className="px-2 py-1.5">
+                    {intl.formatMessage({ id: 'CHANNEL_RATES.DETAILS_COLUMN' })}
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {currentRates.map((record, index) => {
+                  const rowKey = record.id ?? String(index);
+                  const inactive = record.isActive === false;
+                  const detailsKey = `current-${rowKey}`;
+                  return (
+                    <Fragment key={rowKey}>
+                      <tr
+                        data-testid={`channel-rate-current-row-${rowKey}`}
+                        className={inactive ? 'opacity-60' : undefined}
+                      >
+                        <td className="px-2 py-1.5 text-text">
+                          {channelLabel(record.method, record.currency, formatMessage)}
+                        </td>
+                        <td className="px-2 py-1.5 text-text">{record.value}</td>
+                        <td
+                          className="px-2 py-1.5 whitespace-nowrap text-text"
+                          data-testid={`channel-rate-current-status-${rowKey}`}
+                        >
+                          {intl.formatMessage({
+                            id: inactive
+                              ? 'CHANNEL_RATES.INACTIVE_STATUS'
+                              : 'CHANNEL_RATES.ACTIVE_STATUS',
+                          })}
+                        </td>
+                        <td className="px-2 py-1.5 whitespace-nowrap">
+                          <Button
+                            variant="outline"
+                            className="px-3 py-1"
+                            onClick={() => handleToggleActive(record)}
+                            data-testid={`channel-rate-current-toggle-${rowKey}`}
+                          >
+                            {intl.formatMessage({
+                              id: inactive
+                                ? 'CHANNEL_RATES.REACTIVATE'
+                                : 'CHANNEL_RATES.DEACTIVATE',
+                            })}
+                          </Button>
+                        </td>
+                        <td className="px-2 py-1.5 whitespace-nowrap">
+                          <button
+                            type="button"
+                            onClick={() => toggleDetails(detailsKey)}
+                            aria-label={intl.formatMessage({ id: 'CHANNEL_RATES.DETAILS_LABEL' })}
+                            className="rounded p-1 text-text-muted hover:bg-surface-hover"
+                            data-testid={`channel-rate-current-details-${rowKey}`}
+                          >
+                            <HelpIcon className="h-4 w-4" />
+                          </button>
+                        </td>
+                      </tr>
+                      {expandedRows[detailsKey] && (
+                        <tr data-testid={`channel-rate-current-detail-${rowKey}`}>
+                          <td colSpan={5} className="px-2 pb-2 text-xs text-text-muted">
+                            {detailsText(record)}
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+
+      <Card title={intl.formatMessage({ id: 'CHANNEL_RATES.HISTORY_TITLE' })} padding="tight">
+        {records.length === 0 ? (
+          <p className="p-2 text-sm text-text-muted" data-testid="channel-rate-empty">
+            {intl.formatMessage({ id: 'CHANNEL_RATES.NO_RECORDS' })}
+          </p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr className="border-b border-border text-xs text-text-muted">
+                  <th className="px-2 py-1.5">
+                    {intl.formatMessage({ id: 'CHANNEL_RATES.CHANNEL_COLUMN' })}
+                  </th>
+                  <th className="px-2 py-1.5">
+                    {intl.formatMessage({ id: 'CHANNEL_RATES.VALUE_COLUMN' })}
+                  </th>
+                  <th className="px-2 py-1.5">
+                    {intl.formatMessage({ id: 'CHANNEL_RATES.DETAILS_COLUMN' })}
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {records.map((record, index) => {
+                  const rowKey = record.id ?? String(index);
+                  const inactive = record.isActive === false;
+                  const detailsKey = `history-${rowKey}`;
+                  return (
+                    <Fragment key={rowKey}>
+                      <tr
+                        data-testid={`channel-rate-row-${rowKey}`}
+                        className={inactive ? 'opacity-60' : undefined}
+                      >
+                        <td className="px-2 py-1.5 text-text">
+                          {channelLabel(record.method, record.currency, formatMessage)}
+                        </td>
+                        <td className="px-2 py-1.5 text-text">{record.value}</td>
+                        <td className="px-2 py-1.5 whitespace-nowrap">
+                          <button
+                            type="button"
+                            onClick={() => toggleDetails(detailsKey)}
+                            aria-label={intl.formatMessage({ id: 'CHANNEL_RATES.DETAILS_LABEL' })}
+                            className="rounded p-1 text-text-muted hover:bg-surface-hover"
+                            data-testid={`channel-rate-details-${rowKey}`}
+                          >
+                            <HelpIcon className="h-4 w-4" />
+                          </button>
+                        </td>
+                      </tr>
+                      {expandedRows[detailsKey] && (
+                        <tr data-testid={`channel-rate-detail-${rowKey}`}>
+                          <td colSpan={3} className="px-2 pb-2 text-xs text-text-muted">
+                            {detailsText(record)}
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+
+      <Modal
+        open={formOpen}
+        onClose={() => setFormOpen(false)}
+        title={intl.formatMessage({ id: 'CHANNEL_RATES.FORM_TITLE' })}
+        testId="channel-rate-add-dialog"
+      >
         <p className="mb-4 text-sm text-text-muted">
           {intl.formatMessage({ id: 'CHANNEL_RATES.INFO' })}
         </p>
@@ -285,88 +534,7 @@ export function ChannelRatesPage() {
             </Button>
           </div>
         </form>
-      </Card>
-
-      <Card title={intl.formatMessage({ id: 'CHANNEL_RATES.HISTORY_TITLE' })} padding="tight">
-        {records.length === 0 ? (
-          <p className="p-2 text-sm text-text-muted" data-testid="channel-rate-empty">
-            {intl.formatMessage({ id: 'CHANNEL_RATES.NO_RECORDS' })}
-          </p>
-        ) : (
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="border-b border-border text-xs text-text-muted">
-                <th className="px-3 py-2">{intl.formatMessage({ id: 'CHANNEL_RATES.CHANNEL_COLUMN' })}</th>
-                <th className="px-3 py-2">{intl.formatMessage({ id: 'CHANNEL_RATES.CURRENCY_COLUMN' })}</th>
-                <th className="px-3 py-2">{intl.formatMessage({ id: 'CHANNEL_RATES.VALUE_COLUMN' })}</th>
-                <th className="px-3 py-2">
-                  {intl.formatMessage({ id: 'CHANNEL_RATES.EFFECTIVE_FROM_COLUMN' })}
-                </th>
-                <th className="px-3 py-2">
-                  {intl.formatMessage({ id: 'CHANNEL_RATES.CREATED_DATE_COLUMN' })}
-                </th>
-                <th className="px-3 py-2">
-                  {intl.formatMessage({ id: 'CHANNEL_RATES.STATUS_COLUMN' })}
-                </th>
-                <th className="px-3 py-2">
-                  {intl.formatMessage({ id: 'CHANNEL_RATES.ACTIONS_COLUMN' })}
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {records.map((record, index) => {
-                const rowKey = record.id ?? String(index);
-                const inactive = record.isActive === false;
-                return (
-                  <tr
-                    key={rowKey}
-                    data-testid={`channel-rate-row-${rowKey}`}
-                    className={inactive ? 'opacity-60' : undefined}
-                  >
-                    <td className="px-3 py-2 text-text">
-                      {channelLabel(record.method, record.currency, formatMessage)}
-                    </td>
-                    <td className="px-3 py-2 text-text">{currencyLabel(record.currency)}</td>
-                    <td className="px-3 py-2 whitespace-nowrap text-text">
-                      {formatMoneyWithCurrency(record.value, record.currency)}
-                    </td>
-                    <td className="px-3 py-2 whitespace-nowrap text-text">
-                      {toLocalDayKey(record.effectiveFrom)}
-                    </td>
-                    <td className="px-3 py-2 whitespace-nowrap text-text">
-                      {record.createdDate ? toLocalDayKey(record.createdDate) : ''}
-                    </td>
-                    <td
-                      className="px-3 py-2 whitespace-nowrap text-text"
-                      data-testid={`channel-rate-status-${rowKey}`}
-                    >
-                      {intl.formatMessage({
-                        id: inactive
-                          ? 'CHANNEL_RATES.INACTIVE_STATUS'
-                          : 'CHANNEL_RATES.ACTIVE_STATUS',
-                      })}
-                    </td>
-                    <td className="px-3 py-2 whitespace-nowrap">
-                      <Button
-                        variant="outline"
-                        className="px-3 py-1"
-                        onClick={() => handleToggleActive(record)}
-                        data-testid={`channel-rate-toggle-${rowKey}`}
-                      >
-                        {intl.formatMessage({
-                          id: inactive
-                            ? 'CHANNEL_RATES.REACTIVATE'
-                            : 'CHANNEL_RATES.DEACTIVATE',
-                        })}
-                      </Button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
-      </Card>
+      </Modal>
     </div>
   );
 }
