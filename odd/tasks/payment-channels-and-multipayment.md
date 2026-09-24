@@ -154,6 +154,8 @@ Cada tarea cierra con: tests que la cubren + `<comando>: <resultado observado>` 
   **AC:** ✅ **2/2 passed** en la re-corrida del orquestador (51.1s, teardown `57 filas e2e-* borradas`); el bloqueo por subpago se conserva intacto; ningún otro E2E existente fue modificado.
 - [x] **T12** — Verificación final (alcance ajustado por el usuario). **Ruta:** spot check del orquestador.
   **AC:** ✅ E2E del módulo verdes (T10 **7/7** + T11 **2/2**). **Por instrucción explícita del usuario (2026-09-24) NO se corrió la suite amplia** (`pnpm test` completo, subset de regresión E2E y E2E de backend): "hay que hacer arreglos" ajenos al módulo, y se asume que la parte del módulo está bien.
+- [x] **T13** — Estadísticas: normalizar el método en los paneles (`today-stats.tsx` y `statistics/cuadre-por-fechas.tsx`) para que una venta registrada con Zelle cuente en el panel de Transferencia (CUP), igual que en el resto del historial. **Ruta:** delegada (writer). Commit `25552677`. *Extensión de T9 pedida explícitamente por el usuario (2026-09-24).*
+  **AC:** ✅ ambos paneles bucketizan por `normalizedOrderPaymentMethod`; una venta Zelle se suma al panel de Transferencia y nunca al de Efectivo; el total general no cambia (misma base, solo cambió el predicado de reparto); **ningún E2E existente fue modificado**.
 
 ## E2E existentes que habría que modificar (AUTORIZADO — D8)
 
@@ -200,7 +202,7 @@ Cada tarea cierra con: tests que la cubren + `<comando>: <resultado observado>` 
 - [x] "Agregar pago" abre un popup; cada fila tiene botón de eliminar; moneda y monto editables con recálculo — T6 + E2E `multipayments-cart-v2`.
 - [x] El botón "Cobrar" ya no existe — T7 + E2E `multipayments.spec.ts` T10.2.
 - [x] Se puede borrar el "0" en Cantidad, Precio y Monto, con validación posterior — T8.
-- [x] Historial: Efectivo → "Efectivo"; Transferencia y Zelle → "Transferencia (CUP)" — T9 + E2E `payment-history-normalization`. **Límite:** los paneles de estadísticas no se normalizaron (ver §Límites conocidos).
+- [x] Historial: Efectivo → "Efectivo"; Transferencia y Zelle → "Transferencia (CUP)" — T9 + T13 + E2E `payment-history-normalization`. **Límite restante:** el cuadre multi-tienda (ver §Límites conocidos).
 - [x] La página de Configuraciones y su servicio de config quedan **sin cambios** — D1; verificado por alcance de archivos en cada commit.
 - [x] E2E nuevos + `multipayments.spec.ts` verdes (7/7 y 2/2) — T10, T11, T12.
 - [x] Ningún E2E existente modificado fuera de `multipayments.spec.ts` — `git status --porcelain -- frontend-react/e2e/`.
@@ -209,7 +211,8 @@ Cada tarea cierra con: tests que la cubren + `<comando>: <resultado observado>` 
 
 ## Límites conocidos (informar, no ocultar)
 
-- **`today-stats.tsx` y `statistics/cuadre-por-fechas.tsx` no se normalizaron**: siguen agregando por `resolvedOrderPaymentMethod`, así que una venta vieja de Zelle no se suma al bucket de Transferencia en esos paneles. Quedó fuera de las 4 superficies del AC de T9 — pendiente de confirmar contigo si quieres extenderlo.
+- **Estadísticas de una sola tienda — CERRADO en T13**: `today-stats.tsx` y `statistics/routes/cuadre-por-fechas.tsx` ya bucketizan por `normalizedOrderPaymentMethod`, así que una venta Zelle cuenta en Transferencia (CUP).
+- **Estadísticas multi-tienda — GAP ABIERTO (pendiente de tu decisión)**: `app/shared/lib/multistore/multi-store-aggregator.ts` → `computeStoreRangeSummary()` (`salesCashTotal` / `salesCardTotal`) agrupa por el `paymentType` legacy **crudo** y no usa ningún resolver: hoy una venta Zelle no entra ni en Efectivo ni en Transferencia en el cuadre multi-tienda (solo suma al total). Alinearlo es una decisión aparte — single-store y multi-store ni comparten el predicado hoy.
 - La **suite amplia de tests** (`pnpm test` completo, subset de regresión E2E, E2E de backend) **no se corrió** en T12 por tu instrucción expresa (2026-09-24).
 - El único E2E existente modificado es `multipayments.spec.ts` (autorizado, D8).
 - No se hizo commit/push de nada fuera de la rama `dev`.
@@ -221,6 +224,7 @@ Cada tarea cierra con: tests que la cubren + `<comando>: <resultado observado>` 
 - 2026-09-23: **tercer ajuste**: se cierra la última decisión abierta (D11 — sin el módulo 16 la página "Canales de pago" se oculta y su ruta queda gateada). Verificado que ningún E2E existente navega a esa ruta salvo `multipayments.spec.ts` (tienda con módulo 16) ni afirma su entrada de menú. **Documento cerrado, sin decisiones pendientes.** Sin cambios de código todavía.
 - 2026-09-23: **implementación** (usuario: "dale con la implementación"). T1+T2 → commits `f193ca3b`, `c5060045`. Decisión **D12** aprobada explícitamente por el usuario: el gate de la ruta sin el módulo 16 usa el mecanismo existente del app (cierra sesión → `/login`). T3+T4 → commits `e45c1673`, `c641287b`. T5+T6+T7 → commits `64e56aac`, `b19e388b`, `4ada96db`. Se actualizó un test **unitario** existente (`cart-shell.test.tsx` T8-03) porque su comportamiento pinneado cambió por diseño en T4 — es Vitest, no E2E; **ningún E2E existente fue tocado**.
 - 2026-09-24: T8+T9 → commits `006d74d5`, `13885099`. Dos reinicios del runtime interrumpieron la delegación E2E a mitad: T11 quedó commiteado (`090ad7e3`) y los 4 specs de T10 quedaron escritos sin verificar → una delegación fresca los verificó, corrigió una aserción inválida y los commiteó (`ac6d25b2`). **Módulo completo: T1–T12.** T12 cerrado con el E2E del módulo (7/7 + 2/2); la suite amplia no se corrió por tu instrucción expresa del 2026-09-24.
+- 2026-09-24 (cont.): push de `dev` → `origin/dev` (`7fff2871..2b5d8bfd`). Luego, pedido del usuario: **T13 — normalización del método en los paneles de estadísticas** (commit `25552677`), con la suite de los 4 archivos de stats en **51/51** y cero cambios en E2E. Queda abierto el **cuadre multi-tienda** (ver §Límites conocidos).
 
 ## Verification evidence
 
@@ -237,3 +241,5 @@ Cada tarea cierra con: tests que la cubren + `<comando>: <resultado observado>` 
 - T11 — **spot check del orquestador**, `pnpm exec playwright test e2e/multipayments.spec.ts --reporter=list` (desde `frontend-react/`): **2 passed (51.1s)** · teardown `[e2e teardown] 57 filas e2e-* borradas en "smca_test"`.
 - T12 — entorno: `Test-NetConnection localhost -Port 5019` → **True**; `-Port 5432` → **True**. Suite amplia **NO corrida** por instrucción explícita del usuario.
 - Integridad E2E — `git status --porcelain -- frontend-react/e2e/`: solo los **4 specs nuevos** (T10) + `multipayments.spec.ts` (el único existente autorizado, T11). Cero cambios en `e2e/support/*` y en el resto de specs.
+- T13 — `pnpm --filter @store-mgmt/web-store-pos exec vitest run app/sales/routes/__tests__/today-stats.test.tsx app/sales/routes/__tests__/today-stats-multicurrency.test.tsx app/statistics/routes/__tests__/cuadre-por-fechas.test.tsx app/statistics/routes/__tests__/cuadre-multicurrency.test.tsx`: 4 files passed, **51/51 tests**. `pnpm typecheck` 5/5 · `pnpm lint` 4/4. **Spot check del orquestador** (re-run de `today-stats.test.tsx`): **23/23 passed**.
+- T13 — integridad E2E: `git status --porcelain -- frontend-react/e2e/` → **vacío**. Impacto sobre `e2e/payment-methods.spec.ts` (lectura estática; backend 5019 detenido): **no se rompe** — su aserción usa `Pago por Transferencia` / `Resumen Efectivo` y el spec nunca siembra una venta Zelle, mientras que `normalizedOrderPaymentMethod` solo reescribe Zelle→Transferencia y devuelve lo mismo que el resolver viejo para Efectivo/Tarjeta/Transferencia. (Veredicto por lectura, no por corrida — backend detenido. Se re-confirmará visualmente cuando vuelvas a levantar el backend.)
