@@ -119,6 +119,11 @@ Expected values:
     auth re-mock into the describes that follow.
   - Checks (2026-09-24): focused vitest green — inventory-routes (57) + inventory-offline-service +
     csv-import-currency-integration (264) = 444 tests, 0 type errors; `pnpm typecheck` clean (exit 0).
+  - Commit: `91a705b4` on `qa` — `fix(inventory): keep stored cost currency when editing an entry (modal defaulted CUP over USD)`
+    (4 files, +136/-6: today-entries.tsx + service view pair + regression test + this doc).
+  - RDD assess (`--base-ref 36ecca3e --committed-only --json`): `risk: high` (`unassessable`), `review_due: true` /
+    `high_risk` — same terminal state as `77b2d0a2`/`36ecca3e`; formal review still not executable in this runtime
+    (claude-code/codex only), switch untouched (global `on`).
 - [x] T3 — Verify + close
   - Focused vitest (6 files: integration + inventory service + inventory routes + parser + product service +
     products view): 609 passed / 0 failed, 0 type errors.
