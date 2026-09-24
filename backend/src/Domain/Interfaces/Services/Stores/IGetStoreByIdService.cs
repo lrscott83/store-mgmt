@@ -4,6 +4,6 @@ namespace Domain.Interfaces.Services.Stores
 {
     public interface IGetStoreByIdService
     {
-        Task<Store> GetStoreByIdIncludingModulesAsync(Guid id);
+        Task<Store?> GetStoreByIdIncludingModulesAsync(Guid id);
     }
 }

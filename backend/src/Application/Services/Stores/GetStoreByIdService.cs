@@ -18,7 +18,7 @@ namespace Application.Services.Stores
             _storeRepository = storeRepository;
         }
 
-        public async Task<Store> GetStoreByIdIncludingModulesAsync(Guid id)
+        public async Task<Store?> GetStoreByIdIncludingModulesAsync(Guid id)
         {
             return _httpContextService.IsSuperAdmin && _httpContextService.TenantId == DataUtils.DefaultTenant.Id.ToString()
                 ? await _storeRepository.GetStoreByIdIncludingModulesIgnoreQueryFiltersAsync(id)

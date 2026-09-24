@@ -8,10 +8,10 @@ namespace Domain.Interfaces.Repositories
         Task<IEnumerable<Store>> GetAllStoresIncludingOwnerAndIgnoreQueryFiltersAsync(Guid? excludeStoreId = null);
         Task<IEnumerable<Store>> GetStoresAsync(bool includeInactive);
         Task<bool> IsUniqueNameAsync(string name);
-        Task<Store> GetStoreByIdIgnoreQueryFiltersAsync(Guid id);
+        Task<Store?> GetStoreByIdIgnoreQueryFiltersAsync(Guid id);
         Task<Store?> GetStoreByIdAsync(Guid id);
-        Task<Store> GetStoreByIdIncludingModulesIgnoreQueryFiltersAsync(Guid id);
-        Task<Store> GetStoreByIdIncludingModulesAsync(Guid id);
+        Task<Store?> GetStoreByIdIncludingModulesIgnoreQueryFiltersAsync(Guid id);
+        Task<Store?> GetStoreByIdIncludingModulesAsync(Guid id);
         Task<IEnumerable<Store>> GetActiveStoresByUserIdAsync(Guid userId, Guid? excludeStoreId = null);
         Task<IEnumerable<Store>> GetActiveStoresByUserIdAndIgnoreQueryFiltersAsync(Guid userId, Guid? excludeStoreId = null);
         /// <summary>

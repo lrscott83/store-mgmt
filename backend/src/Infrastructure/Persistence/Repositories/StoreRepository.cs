@@ -115,7 +115,7 @@ namespace Infrastructure.Persistence.Repositories
             return await query.ToListAsync();
         }
 
-        public async Task<Store> GetStoreByIdIgnoreQueryFiltersAsync(Guid id)
+        public async Task<Store?> GetStoreByIdIgnoreQueryFiltersAsync(Guid id)
         {
             return await _stores.Where(s => s.Id == id).IgnoreQueryFilters().FirstOrDefaultAsync();
         }
@@ -125,7 +125,7 @@ namespace Infrastructure.Persistence.Repositories
             return await _stores.Where(s => s.Id == id).FirstOrDefaultAsync();
         }
 
-        public async Task<Store> GetStoreByIdIncludingModulesAsync(Guid id)
+        public async Task<Store?> GetStoreByIdIncludingModulesAsync(Guid id)
         {
             return await _stores.Where(s => s.Id == id)
                 .Include(s => s.Owner)
@@ -135,7 +135,7 @@ namespace Infrastructure.Persistence.Repositories
                 .FirstOrDefaultAsync();
         }
 
-        public async Task<Store> GetStoreByIdIncludingModulesIgnoreQueryFiltersAsync(Guid id)
+        public async Task<Store?> GetStoreByIdIncludingModulesIgnoreQueryFiltersAsync(Guid id)
         {
             return await _stores.Where(s => s.Id == id)
                 .Include(s => s.Owner)
