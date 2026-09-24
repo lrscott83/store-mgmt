@@ -124,6 +124,12 @@ Expected values:
   - RDD assess (`--base-ref 36ecca3e --committed-only --json`): `risk: high` (`unassessable`), `review_due: true` /
     `high_risk` — same terminal state as `77b2d0a2`/`36ecca3e`; formal review still not executable in this runtime
     (claude-code/codex only), switch untouched (global `on`).
+  - Adjacent review (2026-09-24, user decision: "Dejarlo como está"): `getInventoryEntriesView()` `availableEntries`
+    (inventory-offline-service.ts:400) drops `currency`, but it has NO production consumers — only its own tests
+    (inventory-offline-service.test.ts:1142-1201); the real cart-costing path `getAvailableInventoryCosts()` already
+    carries `currency: entry.currency ?? DEFAULT_CURRENCY` (:484). Left untouched — YAGNI. Investigation was 100%
+    React-only after the user reinforced that legacy Angular `frontend/` is never read/inspected (AGENTS.md,
+    2026-09-24).
 - [x] T3 — Verify + close
   - Focused vitest (6 files: integration + inventory service + inventory routes + parser + product service +
     products view): 609 passed / 0 failed, 0 type errors.
