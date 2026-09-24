@@ -82,7 +82,7 @@ describe('CsvProductImporterModal — Angular structure/sample parity', () => {
       expect(screen.queryByText(/precio_moneda/)).not.toBeInTheDocument();
     });
 
-    it('CON MultiMonedas: el template anuncia precio_moneda y precio_costo al lado de cantidad', () => {
+    it('CON MultiMonedas: anuncia precio_moneda/precio_costo y el ejemplo usa CUP en todas las filas (2026-09-24)', () => {
       mockUser.storeModuleIds = [EModules.MultiMonedas];
       render(
         <Wrapper>
@@ -92,8 +92,19 @@ describe('CsvProductImporterModal — Angular structure/sample parity', () => {
       expect(
         screen.getByText(/categoria,nombre,precio,precio_moneda,costo,precio_costo,cantidad/),
       ).toBeInTheDocument();
-      // Ejemplo con moneda minúscula: el parser la acepta case-insensitive.
-      expect(screen.getByText(/Pizzas,Pizza con Queso,150,USD,100,USD,10/)).toBeInTheDocument();
+      // Requisito 2026-09-24: con el módulo activo el ejemplo NO mezcla USD — todas
+      // las celdas de moneda van en CUP (el parser acepta `cup` case-insensitive).
+      const sample = screen.getByText(/Pizzas,Pizza con Queso/).textContent ?? '';
+      const rows = sample.trim().split('\n').slice(1);
+      expect(rows).toHaveLength(3);
+      for (const row of rows) {
+        const cells = row.split(',');
+        expect(cells).toHaveLength(7);
+        const priceCurrency = cells[3];
+        const costCurrency = cells[5];
+        expect(priceCurrency).toBe('cup');
+        expect(costCurrency).toBe('cup');
+      }
     });
   });
 
