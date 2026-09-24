@@ -16,7 +16,7 @@
       "outputs": []
     },
     "test": {
-      "dependsOn": ["^test"],
+      "dependsOn": ["^build", "^test"],
       "env": ["TZ"],
       "outputs": []
     },
