@@ -107,6 +107,11 @@ test.describe.serial('channel-rates catalogue (módulo 16) — solo canales real
 
     await page.goto(CHANNEL_RATES_PATH);
     await page.waitForLoadState('networkidle');
+
+    // T22: registration lives in the `+ Tasa` popup (the inline card is gone),
+    // so the form is only reachable after opening it.
+    await page.getByTestId('channel-rate-add').click();
+    await expect(page.getByTestId('channel-rate-add-dialog')).toBeVisible();
     await expect(page.getByTestId('channel-rate-value')).toBeVisible();
 
     // CUP offers only Efectivo + Transferencia (no Zelle).

@@ -200,6 +200,9 @@ test.describe.serial('multipayments cart v2 (módulo 16) — fila por defecto, p
     // A CUP channel rate so a row-currency edit converts (100 CUP per 1 USD).
     await page.goto('/management/channel-rates');
     await page.waitForLoadState('networkidle');
+    // T22: registration lives in the `+ Tasa` popup (the inline card is gone).
+    await page.getByTestId('channel-rate-add').click();
+    await expect(page.getByTestId('channel-rate-add-dialog')).toBeVisible();
     await expect(page.getByTestId('channel-rate-value')).toBeVisible();
     await page.getByTestId('channel-rate-currency').selectOption('0'); // CUP
     await page.getByTestId('channel-rate-method').selectOption('0'); // Efectivo
@@ -213,8 +216,9 @@ test.describe.serial('multipayments cart v2 (módulo 16) — fila por defecto, p
     // ── default: ONE Efectivo row for the sale total, no rate message ──────────
     const rows = page.getByTestId(ROWS);
     await expect(rows).toHaveCount(1);
-    await expect(rows.nth(0).getByTestId('multi-payment-method')).toHaveValue('0'); // Efectivo
-    await expect(rows.nth(0).getByTestId('multi-payment-currency')).toHaveValue('0'); // CUP
+    // T21: one channel select per row, value = channelKey `${currency}|${method}`
+    // — the default row is Efectivo (CUP) = '0|0'.
+    await expect(rows.nth(0).getByTestId('multi-payment-channel')).toHaveValue('0|0');
     await expect(rows.nth(0).getByTestId('multi-payment-amount')).toHaveValue('10');
     await expect(page.getByTestId('multi-payment-paid')).toHaveText(/10\s*CUP/);
     await expect(page.getByTestId('multi-payment-remaining')).toHaveText(/^0\s*CUP$/);
@@ -250,18 +254,20 @@ test.describe.serial('multipayments cart v2 (módulo 16) — fila por defecto, p
     await expect(page.getByTestId('multi-payment-remaining')).toHaveText(/^0\s*CUP$/);
     await expect(page.getByRole('button', { name: REGISTER_TEXT })).toBeEnabled();
 
-    // ── currency edit recalculates (4 USD = 400 CUP at 100 CUP/USD) ───────────
+    // ── channel edit recalculates (4 USD = 400 CUP at 100 CUP/USD) ────────────
     // The domain tally applies each payment only up to the remaining total
     // (`applyPayment` → min(remaining, incoming)): 6 CUP + min(4 CUP, 400 CUP)
     // keeps `paid` at the 10 CUP total and surfaces the 396 CUP overpayment as
     // `change`. That overflow IS the proof the 4 USD row converted (identity
     // would leave change at 0).
-    await rows.nth(1).getByTestId('multi-payment-currency').selectOption('1'); // USD
-    await expect(rows.nth(1).getByTestId('multi-payment-method')).toHaveValue('0'); // re-pinned Efectivo
+    // T21: the single channel select switches the row to a USD channel ('1|0' =
+    // Efectivo (USD)); going back to the CUP Efectivo channel zeroes `change`.
+    await rows.nth(1).getByTestId('multi-payment-channel').selectOption('1|0'); // Efectivo (USD)
+    await expect(rows.nth(1).getByTestId('multi-payment-channel')).toHaveValue('1|0');
     await expect(page.getByTestId('multi-payment-paid')).toHaveText(/^10\s*CUP$/);
     await expect(page.getByTestId('multi-payment-remaining')).toHaveText(/^0\s*CUP$/);
     await expect(page.getByTestId('multi-payment-change')).toHaveText(/^396\s*CUP$/);
-    await rows.nth(1).getByTestId('multi-payment-currency').selectOption('0'); // back to CUP
+    await rows.nth(1).getByTestId('multi-payment-channel').selectOption('0|0'); // Efectivo (CUP)
     await expect(page.getByTestId('multi-payment-paid')).toHaveText(/^10\s*CUP$/);
     await expect(page.getByTestId('multi-payment-change')).toHaveText(/^0\s*CUP$/);
 

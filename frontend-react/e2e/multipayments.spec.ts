@@ -328,6 +328,9 @@ test.describe.serial('multipayments (módulo 16) — selector, tasas, multi-pago
     // choosing the channel explicitly (Efectivo + CUP).
     await page.goto('/management/channel-rates');
     await page.waitForLoadState('networkidle');
+    // T22: registration lives in the `+ Tasa` popup (the inline card is gone).
+    await page.getByTestId('channel-rate-add').click();
+    await expect(page.getByTestId('channel-rate-add-dialog')).toBeVisible();
     await expect(page.getByTestId('channel-rate-value')).toBeVisible();
     await page.getByTestId('channel-rate-currency').selectOption(String(0)); // Currency.CUP
     await page.getByTestId('channel-rate-method').selectOption(String(0)); // Efectivo
@@ -393,6 +396,9 @@ test.describe.serial('multipayments (módulo 16) — selector, tasas, multi-pago
     // selector's default.
     await page.goto('/management/channel-rates');
     await page.waitForLoadState('networkidle');
+    // T22: registration lives in the `+ Tasa` popup (the inline card is gone).
+    await page.getByTestId('channel-rate-add').click();
+    await expect(page.getByTestId('channel-rate-add-dialog')).toBeVisible();
     await expect(page.getByTestId('channel-rate-value')).toBeVisible();
     await page.getByTestId('channel-rate-currency').selectOption(String(0)); // Currency.CUP
     await page.getByTestId('channel-rate-method').selectOption(String(0)); // Efectivo
@@ -407,8 +413,9 @@ test.describe.serial('multipayments (módulo 16) — selector, tasas, multi-pago
     // sale currency (CUP), with NO rate message — the row is identity.
     const rows = page.getByTestId('multi-payment-row');
     await expect(rows).toHaveCount(1);
-    await expect(rows.nth(0).getByTestId('multi-payment-method')).toHaveValue(String(0)); // Efectivo
-    await expect(rows.nth(0).getByTestId('multi-payment-currency')).toHaveValue(String(0)); // CUP
+    // T21: each row picks its channel with ONE select, value = channelKey
+    // `${currency}|${method}` — the default is Efectivo + CUP ('0|0').
+    await expect(rows.nth(0).getByTestId('multi-payment-channel')).toHaveValue('0|0');
     await expect(rows.nth(0).getByTestId('multi-payment-amount')).toHaveValue('10');
     await expect(page.getByTestId('multi-payment-block-reason')).toHaveCount(0);
     await expect(page.getByTestId('multi-payment-row-error')).toHaveCount(0);
