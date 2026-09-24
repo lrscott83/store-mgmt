@@ -171,8 +171,8 @@ migrada) es la fuente autoritativa**, no el enum/código:
 
 ### T3 — DONE (commits rehechos tras corrección)
 
-- Commit work-unit: historia local reescrita (reset --soft sobre `e6ef35e1`);
-  el archivo + este doc quedan en UN commit limpio — identidad registrada abajo.
+- Commit work-unit: `cb331091` `test(e2e): cover every real plan-change transition with exact target modules/features`
+  (historía reescrita sobre `e6ef35e1`; archivo + doc, sin no-ops, 9 casos).
 - Push: decisión del usuario (preguntado al reportar; aún no pusheado).
 
 ## PRÓXIMO PASO (anotado en memoria)
