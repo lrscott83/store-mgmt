@@ -57,6 +57,7 @@ const INACTIVE_TAG = '(Inactivo)'; // WAREHOUSES.INACTIVE (rendered "(Inactivo)"
 const IMPORT_SUCCESS = 'Los datos se importaron correctamente.'; // SYNC.IMPORT_SUCCESS
 const ORDER_CREATED = 'La venta fue creada satisfactoriamente.'; // ORDERS.CREATED (create-sale pattern)
 const BACKUP_PASSWORD = 'WarehouseE2E-123';
+const SALE_PAYMENT_LABEL = 'Pago'; // /sales/new payment input (inventory-profit.spec.ts:66)
 const PROFIT_HEADER = 'Ganancias del Día'; // INVENTORY.PROFIT.TITLE
 const ALL_CATEGORIES = 'Todos'; // /sales/new category filter (inventory-profit.spec.ts:17)
 
@@ -418,7 +419,8 @@ async function createSaleOfFirstProduct(page: Page): Promise<void> {
   await addBtn.click();
   await expect(page.getByTestId('cart-badge')).toHaveText('1');
   await page.getByTestId('cart-badge').locator('..').click();
-  await page.getByTestId('multi-payment-amount').fill('10');
+  const paymentInput = page.getByRole('spinbutton', { name: SALE_PAYMENT_LABEL });
+  await paymentInput.fill('10');
   await page.getByRole('button', { name: 'Registrar' }).click();
   await expect(page.getByText(ORDER_CREATED)).toBeVisible();
 }

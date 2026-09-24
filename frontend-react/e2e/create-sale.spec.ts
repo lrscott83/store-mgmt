@@ -157,7 +157,8 @@ test.describe.serial('S2-B1 — Crear venta', () => {
     await expect(registerButton).toBeEnabled();
 
     // Fill payment amount (≥ product price of $10)
-    await page.getByTestId('multi-payment-amount').fill('10');
+    const paymentInput = page.getByRole('spinbutton', { name: 'Pago' });
+    await paymentInput.fill('10');
 
     // Submit the sale
     await registerButton.click();
@@ -212,7 +213,8 @@ test.describe.serial('S2-B1 — Crear venta', () => {
     await expect(badge).toHaveText('1');
 
     // Fill payment and submit
-    await page.getByTestId('multi-payment-amount').fill('10');
+    const paymentInput = page.getByRole('spinbutton', { name: 'Pago' });
+    await paymentInput.fill('10');
 
     const registerButton = page.getByRole('button', { name: REGISTER_TEXT });
     await expect(registerButton).toBeEnabled();
@@ -232,7 +234,8 @@ test.describe.serial('S2-B1 — Crear venta', () => {
     await addProductAndOpenCart(page, selectedStoreId);
     const registerButton = page.getByRole('button', { name: REGISTER_TEXT });
     await expect(registerButton).toBeEnabled();
-    await page.getByTestId('multi-payment-amount').fill('10');
+    const paymentInput = page.getByRole('spinbutton', { name: 'Pago' });
+    await paymentInput.fill('10');
     await registerButton.click();
     await expect(page.getByText(ORDER_CREATED_TEXT)).toBeVisible();
 

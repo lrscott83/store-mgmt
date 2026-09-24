@@ -41,6 +41,7 @@ const SAVE = 'Guardar'; // WAREHOUSES.SAVE
 const TODAY_ENTRIES_TITLE = 'Entradas del día'; // INVENTORY.TODAY_ENTRIES.TITLE
 const ORDER_CREATED = 'La venta fue creada satisfactoriamente.'; // ORDERS.CREATED
 const BACKUP_PASSWORD = 'MovementReversalE2E-123';
+const SALE_PAYMENT_LABEL = 'Pago';
 const ALL_CATEGORIES = 'Todos';
 const IMPORT_SUCCESS = 'Los datos se importaron correctamente.'; // SYNC.IMPORT_SUCCESS
 const CANNOT_DEACTIVATE = 'No se puede desactivar un almacén con stock o movimientos.';
@@ -308,7 +309,7 @@ async function createSaleOfFirstProduct(page: Page): Promise<void> {
   await addBtn.click();
   await expect(page.getByTestId('cart-badge')).toHaveText('1');
   await page.getByTestId('cart-badge').locator('..').click();
-  await page.getByTestId('multi-payment-amount').fill('10');
+  await page.getByRole('spinbutton', { name: SALE_PAYMENT_LABEL }).fill('10');
   await page.getByRole('button', { name: 'Registrar' }).click();
   await expect(page.getByText(ORDER_CREATED)).toBeVisible();
 }
