@@ -139,8 +139,7 @@ test.describe.serial('FC-A1 — Egreso de inventario (venta mayorista)', () => {
     await expect(registerButton).toBeEnabled();
 
     // Fill payment amount
-    const paymentInput = page.getByRole('spinbutton', { name: 'Pago' });
-    await paymentInput.fill('10');
+    await page.getByTestId('multi-payment-amount').fill('10');
 
     // Submit the sale
     await registerButton.click();
@@ -168,8 +167,7 @@ test.describe.serial('FC-A1 — Egreso de inventario (venta mayorista)', () => {
     // Register the sale
     const registerButton = page.getByRole('button', { name: REGISTER_TEXT });
     await expect(registerButton).toBeEnabled();
-    const paymentInput = page.getByRole('spinbutton', { name: 'Pago' });
-    await paymentInput.fill('10');
+    await page.getByTestId('multi-payment-amount').fill('10');
     await registerButton.click();
     await expect(page.getByText(ORDER_CREATED_TEXT)).toBeVisible();
 
@@ -222,8 +220,7 @@ test.describe.serial('FC-A1 — Egreso de inventario (venta mayorista)', () => {
     // Register
     const registerButton = page.getByRole('button', { name: REGISTER_TEXT });
     await expect(registerButton).toBeEnabled();
-    const paymentInput = page.getByRole('spinbutton', { name: 'Pago' });
-    await paymentInput.fill('10');
+    await page.getByTestId('multi-payment-amount').fill('10');
     await registerButton.click();
     await expect(page.getByText(ORDER_CREATED_TEXT)).toBeVisible();
   });

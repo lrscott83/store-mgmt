@@ -25,7 +25,6 @@ import type { Page } from '@playwright/test';
 const NEW_WAREHOUSE = 'Nuevo almacén'; // WAREHOUSES.NEW_WAREHOUSE
 const SAVE = 'Guardar'; // WAREHOUSES.SAVE
 const ALL_CATEGORIES = 'Todos';
-const SALE_PAYMENT_LABEL = 'Pago';
 const ORDER_CREATED = 'La venta fue creada satisfactoriamente.'; // ORDERS.CREATED
 const PROPAGATION_TITLE = 'Propagar costo de la compra'; // WAREHOUSES.PROPAGATION_TITLE
 const PROPAGATION_DETAIL = 'ya vendidas en'; // WAREHOUSES.PROPAGATION_CONFIRM fragment
@@ -214,7 +213,7 @@ async function createSaleOfFirstProduct(page: Page): Promise<void> {
   await addBtn.click();
   await expect(page.getByTestId('cart-badge')).toHaveText('1');
   await page.getByTestId('cart-badge').locator('..').click();
-  await page.getByRole('spinbutton', { name: SALE_PAYMENT_LABEL }).fill('10');
+  await page.getByTestId('multi-payment-amount').fill('10');
   await page.getByRole('button', { name: 'Registrar' }).click();
   await expect(page.getByText(ORDER_CREATED)).toBeVisible();
 }

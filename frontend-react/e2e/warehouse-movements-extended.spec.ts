@@ -34,7 +34,6 @@ const MENU_SALE_OUT = 'Salida'; // WAREHOUSES.MENU_SALE_OUT (gear item, sale_out
 const INSUFFICIENT_STOCK = 'No hay suficiente stock en el almacén.'; // Warehouse.InsufficientStock
 const TODAY_ENTRIES_TITLE = 'Entradas del día'; // INVENTORY.TODAY_ENTRIES.TITLE
 const ORDER_CREATED = 'La venta fue creada satisfactoriamente.'; // SHOPPING_CART.ORDER_CREATED
-const SALE_PAYMENT_LABEL = 'Pago'; // GENERAL.PAY (cart-shell.tsx:420 aria-label)
 const PROFIT_HEADER = 'Ganancias del Día'; // INVENTORY.PROFIT.TITLE
 const ALL_CATEGORIES = 'Todos'; // SALES.ALL_CATEGORIES
 const REGISTER = 'Registrar'; // SHOPPING_CART.REGISTER
@@ -352,7 +351,7 @@ test.describe.serial('Movimientos de almacenes — cobertura extendida', () => {
     await addBtn.click();
     await expect(page.getByTestId('cart-badge')).toHaveText('1');
     await page.getByTestId('cart-badge').locator('..').click();
-    await page.getByRole('spinbutton', { name: SALE_PAYMENT_LABEL }).fill('10');
+    await page.getByTestId('multi-payment-amount').fill('10');
     await page.getByRole('button', { name: REGISTER }).click();
     await expect(page.getByText(ORDER_CREATED)).toBeVisible();
 

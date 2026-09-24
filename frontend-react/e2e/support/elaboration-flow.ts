@@ -234,8 +234,7 @@ export async function sellOneUnit(
   await expect(page.getByTestId('cart-badge')).toHaveText('1');
 
   await page.getByTestId('cart-badge').locator('..').click();
-  const paymentInput = page.getByRole('spinbutton', { name: 'Pago' });
-  await paymentInput.fill(paymentAmount);
+  await page.getByTestId('multi-payment-amount').fill(paymentAmount);
   await page.getByRole('button', { name: 'Registrar' }).click();
   await expect(page.getByText('La venta fue creada satisfactoriamente.')).toBeVisible();
 }

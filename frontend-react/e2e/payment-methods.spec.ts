@@ -177,17 +177,18 @@ test.describe.serial('PM — Formas de pago, percent y tax en el carrito', () =>
 
     await addProductAndOpenCart(page, selectedStoreId);
 
-    const efectivo = page.getByTestId('payment-method-0'); // SalePaymentMethod.Efectivo
-    const transferencia = page.getByTestId('payment-method-2'); // SalePaymentMethod.Transferencia
-    await expect(efectivo).toBeVisible();
-    await expect(efectivo).toBeChecked();
-    await expect(transferencia).toBeVisible();
-
-    const group = page.getByRole('radiogroup');
-    await expect(group.getByText('Transferencia (CUP)')).toBeVisible();
-    await expect(group.getByText('Efectivo')).toBeVisible();
+    // T21: el pago se elige con un único select de canal por fila; sin el módulo
+    // 16 la lista es una sola fila y para una venta CUP ofrece exactamente
+    // Efectivo y Transferencia (CUP).
+    const channelSelect = page.getByTestId('multi-payment-channel');
+    await expect(channelSelect).toBeVisible();
+    // Default: Efectivo (CUP) — channelKey = `${currency}|${method}` = '0|0'
+    await expect(channelSelect).toHaveValue('0|0');
+    await expect(channelSelect.locator('option')).toHaveCount(2);
+    await expect(channelSelect).toContainText('Transferencia (CUP)');
+    await expect(channelSelect).toContainText('Efectivo');
     // Tarjeta ya no existe como opción
-    await expect(group.getByText(/^Tarjeta$/)).toHaveCount(0);
+    await expect(channelSelect).not.toContainText('Tarjeta');
   });
 
   test('PMF2 — venta con defaults: total sin regresión y agrupada como Efectivo en el cuadre', async ({
@@ -200,8 +201,7 @@ test.describe.serial('PM — Formas de pago, percent y tax en el carrito', () =>
     // Producto sembrado = 10; percent=0 y tax=0 → total 10 (sin regresión)
     const registerButton = page.getByRole('button', { name: REGISTER_TEXT });
     await expect(registerButton).toBeEnabled();
-    const paymentInput = page.getByRole('spinbutton', { name: 'Pago' });
-    await paymentInput.fill('10');
+    await page.getByTestId('multi-payment-amount').fill('10');
     await registerButton.click();
     await expect(page.getByText(ORDER_CREATED_TEXT)).toBeVisible();
 
@@ -235,8 +235,8 @@ test.describe.serial('PM — Formas de pago, percent y tax en el carrito', () =>
 
     await addProductAndOpenCart(page, selectedStoreId);
 
-    // Elegir "Transferencia (CUP)" — el cobro no es en efectivo (sin input de pago)
-    await page.getByTestId('payment-method-2').check();
+    // Elegir "Transferencia (CUP)" en el canal de la única fila de pago
+    await page.getByTestId('multi-payment-channel').selectOption('0|2');
 
     const registerButton = page.getByRole('button', { name: REGISTER_TEXT });
     await expect(registerButton).toBeEnabled();

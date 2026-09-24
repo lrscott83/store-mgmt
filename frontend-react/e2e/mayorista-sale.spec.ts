@@ -195,8 +195,7 @@ test.describe.serial('Ventas Mayoristas — flujo completo', () => {
     await addWholesalePacksAndOpenCart(page, product, '12');
     const registerButton = page.getByRole('button', { name: REGISTER_TEXT });
     await expect(registerButton).toBeEnabled();
-    const paymentInput = page.getByRole('spinbutton', { name: 'Pago' });
-    await paymentInput.fill('2304');
+    await page.getByTestId('multi-payment-amount').fill('2304');
     await registerButton.click();
 
     // Success toast — order created.
@@ -226,7 +225,7 @@ test.describe.serial('Ventas Mayoristas — flujo completo', () => {
     // 1 pack → 24 units × $9 = $216, pagada con Transferencia (CUP) — el método
     // no-efectivo disponible en el carrito para ventas CUP (catálogo 2026-09-17).
     await addWholesalePacksAndOpenCart(page, product, '1');
-    await page.getByTestId('payment-method-2').check(); // SalePaymentMethod.Transferencia
+    await page.getByTestId('multi-payment-channel').selectOption('0|2'); // Transferencia (CUP)
 
     const registerButton = page.getByRole('button', { name: REGISTER_TEXT });
     await expect(registerButton).toBeEnabled();

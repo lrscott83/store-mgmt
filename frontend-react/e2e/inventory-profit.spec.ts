@@ -82,8 +82,7 @@ async function createSale(page: Page, storeId: string): Promise<void> {
   await addBtn.click();
   await expect(page.getByTestId('cart-badge')).toHaveText('1');
   await page.getByTestId('cart-badge').locator('..').click();
-  const paymentInput = page.getByRole('spinbutton', { name: 'Pago' });
-  await paymentInput.fill('10');
+  await page.getByTestId('multi-payment-amount').fill('10');
   await page.getByRole('button', { name: 'Registrar' }).click();
   await expect(page.getByText(ORDER_CREATED)).toBeVisible();
 }
