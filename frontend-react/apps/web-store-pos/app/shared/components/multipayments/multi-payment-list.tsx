@@ -235,11 +235,22 @@ export function MultiPaymentList({
    * the first option so the select never lies about the row's state.
    */
   function rowChannelOptions(row: MultiPaymentRow): PaymentChannel[] {
-    const hasCurrent = channels.some((channel) =>
+    // T22/A1: without the MultiPayments module the store has no channel-rates
+    // page, so a foreign-currency channel could never be made convertible and
+    // picking one is a dead end. Offer only channels in the sale's own currency.
+    // With the module the full reachable set stays available (the user can
+    // register the missing rate).
+    const reachable = available
+      ? channels
+      : channels.filter((channel) => Number(channel.currency) === Number(orderCurrency));
+    const hasCurrent = reachable.some((channel) =>
       isSameChannel(channel, row.method, row.currency),
     );
-    if (hasCurrent) return channels;
-    return [{ method: row.method, currency: row.currency }, ...channels];
+    if (hasCurrent) return reachable;
+    // With the module a legacy/config-hidden row channel stays selectable so the
+    // select never lies about the row. Without the module only the sale-currency
+    // set is offered (the restriction is the point of A1).
+    return available ? [{ method: row.method, currency: row.currency }, ...reachable] : reachable;
   }
 
   function updateRow(id: string, patch: Partial<MultiPaymentRow>) {

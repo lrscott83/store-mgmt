@@ -6,6 +6,7 @@ import { Currency } from '@store-mgmt/domain';
 import {
   SalePaymentMethod,
   applyPaymentPricing,
+  defaultPaymentMethodForCurrency,
   paymentPricingFor,
   salePaymentMethodToLegacyPaymentType,
 } from '@store-mgmt/domain';
@@ -265,13 +266,16 @@ export function CartShell() {
   );
 
   // T5/T21: cuando la lista de pagos pasa a ser relevante (carrito con ítems) y
-  // aún no hay filas, se siembra UNA fila Efectivo por el total de la venta —
-  // misma moneda ⇒ sin conversión y sin mensaje de tasa. Aplica en ambos modos
-  // (con y sin módulo 16). La siembra ocurre SOLO en la transición a "activo"
-  // (ref): así no pelea con las ediciones del usuario (ni re-siembra si borra
-  // todas las filas) y el guard sigue coherente (si el usuario baja el monto,
-  // queda en subpago y "Registrar" se bloquea). Al vaciarse el carrito se limpian
-  // las filas para que la próxima venta arranque de cero.
+  // aún no hay filas, se siembra UNA fila por el total de la venta con el PRIMER
+  // canal válido del catálogo para la moneda de la venta (T22/A2) — misma moneda
+  // ⇒ sin conversión y sin mensaje de tasa. Para CUP/USD/EUR/CAD/MXN es Efectivo;
+  // para MLC/CLA es Transferencia (Efectivo no existe en esas monedas, así que
+  // sembrarlo dejaría un canal fuera de catálogo). Aplica en ambos modos (con y
+  // sin módulo 16). La siembra ocurre SOLO en la transición a "activo" (ref):
+  // así no pelea con las ediciones del usuario (ni re-siembra si borra todas las
+  // filas) y el guard sigue coherente (si el usuario baja el monto, queda en
+  // subpago y "Registrar" se bloquea). Al vaciarse el carrito se limpian las filas
+  // para que la próxima venta arranque de cero.
   const multiPaymentsSeededRef = useRef(false);
   useEffect(() => {
     if (!paymentListActive) {
@@ -283,7 +287,7 @@ export function CartShell() {
     multiPaymentsSeededRef.current = true;
     if (payments.length === 0) {
       setPayments([
-        createPaymentRow(SalePaymentMethod.Efectivo, saleCurrency, totalAmount),
+        createPaymentRow(defaultPaymentMethodForCurrency(saleCurrency), saleCurrency, totalAmount),
       ]);
     }
     // Intencional: solo la transición a activo dispara la siembra.

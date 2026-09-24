@@ -268,6 +268,29 @@ describe('CartShell — la lista de pagos es la UI de pago (T21)', () => {
     expect(labels).toContain('Efectivo');
     expect(labels).toContain('Transferencia (CUP)');
   });
+
+  it('T22/A2: siembra el primer canal del catálogo de la venta (MLC → Transferencia)', async () => {
+    const setPayments = vi.fn();
+    const product = makeProduct();
+    mockCartState({
+      items: [{ product, quantity: 1 }],
+      total: vi.fn().mockReturnValue(5),
+      cartCurrency: () => Currency.MLC,
+      payments: [],
+      setPayments,
+    });
+    renderCartShell();
+    openCart();
+
+    await waitFor(() => expect(setPayments).toHaveBeenCalledTimes(1));
+    const rows = setPayments.mock.calls[0][0] as MultiPaymentRow[];
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      method: SalePaymentMethod.Transferencia,
+      currency: Currency.MLC,
+      amount: 5,
+    });
+  });
 });
 
 describe('CartShell — credit toggle + client input gated by credits module', () => {

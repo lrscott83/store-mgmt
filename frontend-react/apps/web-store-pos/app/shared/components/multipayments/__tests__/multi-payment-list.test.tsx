@@ -125,6 +125,21 @@ describe('MultiPaymentList — modo según el módulo 16 (T21)', () => {
     expect(screen.queryByTestId('multi-payment-add')).not.toBeInTheDocument();
     expect(screen.queryByTestId('multi-payment-remove')).not.toBeInTheDocument();
   });
+
+  it('T22/A1: sin el módulo 16 el select de canal solo ofrece la moneda de la venta', () => {
+    mockUser = userWithStoreModules([2, 3]);
+    // Sale currency CUP, but the row carries a foreign USD channel: without the
+    // module there is no channel-rates page, so only CUP channels may be offered.
+    renderList({
+      payments: [row({ id: 'p1', currency: Currency.USD, amount: 100 })],
+      orderCurrency: Currency.CUP,
+      total: 100,
+    });
+
+    const select = screen.getByTestId('multi-payment-channel') as HTMLSelectElement;
+    const labels = [...select.options].map((option) => option.textContent ?? '');
+    expect(labels).toEqual(['Efectivo', 'Transferencia (CUP)']);
+  });
 });
 
 describe('MultiPaymentList — owner scenarios', () => {
