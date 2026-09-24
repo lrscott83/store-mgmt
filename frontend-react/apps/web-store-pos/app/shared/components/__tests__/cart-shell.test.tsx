@@ -127,20 +127,6 @@ function makeProduct(overrides: Partial<Product> = {}): Product {
   };
 }
 
-/**
- * T21: fila de pago del carrito. Con el bloque legacy eliminado, cualquier test
- * que espere "Registrar" habilitado debe sembrar una fila que cubra el total.
- */
-function paymentRowOf(amount: number, overrides: Partial<MultiPaymentRow> = {}): MultiPaymentRow {
-  return {
-    id: `row-${amount}-${overrides.id ?? ''}`,
-    method: SalePaymentMethod.Efectivo,
-    currency: Currency.CUP,
-    amount,
-    ...overrides,
-  };
-}
-
 function renderCartShell() {
   return render(
     <IntlProvider messages={esMessages} locale="es" defaultLocale="es">
@@ -353,8 +339,6 @@ describe('CartShell — Limpiar / Registrar buttons', () => {
     mockCartState({
       items: [{ product, quantity: 1 }],
       total: vi.fn().mockReturnValue(5),
-      payments: [paymentRowOf(5)],
-      setPayments: vi.fn(),
     });
     renderCartShell();
     openCart();
@@ -369,8 +353,6 @@ describe('CartShell — Limpiar / Registrar buttons', () => {
       items: [{ product, quantity: 1 }],
       total: vi.fn().mockReturnValue(5),
       clear,
-      payments: [paymentRowOf(5)],
-      setPayments: vi.fn(),
     });
     renderCartShell();
     openCart();
@@ -868,8 +850,6 @@ describe('CartShell — createOrder validations (Registrar)', () => {
       items: [{ product, quantity: 1 }],
       total: vi.fn().mockReturnValue(5),
       clear,
-      payments: [paymentRowOf(5)],
-      setPayments: vi.fn(),
     });
     renderCartShell();
     openCart();
@@ -904,8 +884,6 @@ describe('CartShell — createOrder validations (Registrar)', () => {
       items: [{ product, quantity: 1 }],
       total: vi.fn().mockReturnValue(5),
       clear,
-      payments: [paymentRowOf(5)],
-      setPayments: vi.fn(),
     });
     createOrderMock.mockResolvedValueOnce({
       data: null,
@@ -948,8 +926,6 @@ describe('CartShell — createOrder validations (Registrar)', () => {
       items: [{ product, quantity: 1 }],
       total: vi.fn().mockReturnValue(5),
       clear,
-      payments: [paymentRowOf(5)],
-      setPayments: vi.fn(),
     });
     createOrderMock.mockRejectedValueOnce(new Error('raw boom, do not leak me'));
     renderCartShell();
@@ -976,8 +952,6 @@ describe('CartShell — createOrder validations (Registrar)', () => {
       items: [{ product, quantity: 1 }],
       total: vi.fn().mockReturnValue(5),
       orderDescription: 'entrega tarde',
-      payments: [paymentRowOf(5)],
-      setPayments: vi.fn(),
     });
     renderCartShell();
     openCart();
@@ -994,8 +968,6 @@ describe('CartShell — createOrder validations (Registrar)', () => {
       items: [{ product, quantity: 1 }],
       total: vi.fn().mockReturnValue(5),
       orderDescription: '',
-      payments: [paymentRowOf(5)],
-      setPayments: vi.fn(),
     });
     renderCartShell();
     openCart();
@@ -1183,8 +1155,6 @@ describe('CartShell — venta NORMAL con producto mayorista', () => {
     mockCartState({
       items: [{ product: wholesaleBeer, quantity: 1 }],
       total: vi.fn().mockReturnValue(10),
-      payments: [paymentRowOf(10)],
-      setPayments: vi.fn(),
     });
     renderCartShell();
     expect(screen.getByTestId('cart-badge')).toHaveTextContent('1');
@@ -1621,8 +1591,6 @@ describe('CartShell — mixed-currency cart conversion (módulo 16, T8)', () => 
       items: [{ product, quantity: 2 }],
       total: vi.fn().mockReturnValue(10),
       cartCurrency: () => Currency.CUP,
-      payments: [paymentRowOf(10)],
-      setPayments: vi.fn(),
     });
     renderCartShell();
     openCart();
