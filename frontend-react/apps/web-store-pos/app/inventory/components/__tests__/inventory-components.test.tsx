@@ -930,3 +930,63 @@ describe('EditInventoryEntryModal — searchable product combobox filters while 
     );
   });
 });
+
+// ─── EditInventoryEntryModal — warehouse-origin cost lock (A8, plan 2026-09-16) ──
+//
+// An entry originated by a warehouse sale-out (it carries `warehouseSaleOutMovementId`) is
+// sealed in the store: cost, product and quantity come from the warehouse, so the form locks
+// them, explains why, and never saves. A normal entry is untouched.
+
+describe('EditInventoryEntryModal — warehouse-origin cost lock (A8)', () => {
+  it('locks cost/product/quantity, shows the warehouse message and never saves', async () => {
+    const onSave = vi.fn();
+    await act(async () => {
+      render(
+        <Wrapper>
+          <EditInventoryEntryModal
+            isOpen
+            onClose={vi.fn()}
+            onSave={onSave}
+            storeId="s1"
+            entry={makeEntry({ warehouseSaleOutMovementId: 'mv-1' })}
+          />
+        </Wrapper>,
+      );
+    });
+    expect(screen.getByLabelText('Precio de costo')).toBeDisabled();
+    expect(screen.getByLabelText('Cantidad')).toBeDisabled();
+    expect(screen.getByRole('combobox')).toBeDisabled();
+    expect(screen.getByTestId('entry-warehouse-cost-message')).toHaveTextContent(
+      'El costo de esta entrada se actualiza en el almacén, no se puede editar en la tienda.',
+    );
+    const save = screen.getByRole('button', { name: 'Actualizar' });
+    expect(save).toBeDisabled();
+    fireEvent.click(save);
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
+  it('leaves a normal entry editable: no message, cost enabled, save calls onSave', async () => {
+    const onSave = vi.fn();
+    await act(async () => {
+      render(
+        <Wrapper>
+          <EditInventoryEntryModal
+            isOpen
+            onClose={vi.fn()}
+            onSave={onSave}
+            storeId="s1"
+            entry={makeEntry()}
+          />
+        </Wrapper>,
+      );
+    });
+    expect(screen.getByLabelText('Precio de costo')).not.toBeDisabled();
+    expect(screen.getByLabelText('Cantidad')).not.toBeDisabled();
+    expect(screen.queryByTestId('entry-warehouse-cost-message')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Actualizar' }));
+    expect(onSave).toHaveBeenCalledWith(
+      { productId: 'p1', quantity: 5, costPrice: 2, currency: 0 },
+      'e1',
+    );
+  });
+});

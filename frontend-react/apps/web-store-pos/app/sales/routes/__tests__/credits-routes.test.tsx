@@ -166,15 +166,15 @@ describe('TodaySaleCreditsPage — header y colores (gear-menu recorte + amarill
     const header = () => document.querySelector('[data-slot="card-header"]') as HTMLElement;
     await screen.findByText('Ana');
 
-    // Crédito UNPAID de 40 → n=1, total $40.
+    // Crédito UNPAID de 40 → n=1, total 40\u00A0CUP.
     expect(within(header()).getByText('(1)')).toBeInTheDocument();
-    expect(within(header()).getByText('$40')).toBeInTheDocument();
+    expect(within(header()).getByText('40 CUP')).toBeInTheDocument();
 
     // El título se mantiene «Créditos del día» (protegido por E2E).
     expect(within(header()).getByText(esMessages['SALE_CREDIT.TODAY_CREDITS'])).toBeInTheDocument();
   });
 
-  it('TC-HEAD-PAID: el header cuenta TODOS los créditos pero el total suma solo los impagos (pagado → $0 verde)', async () => {
+  it('TC-HEAD-PAID: el header cuenta TODOS los créditos pero el total suma solo los impagos (pagado → 0\u00A0CUP verde)', async () => {
     seedTodayCredit({ total: 40, isPaid: true, paid: 40 });
     render(
       <Wrapper>
@@ -185,8 +185,8 @@ describe('TodaySaleCreditsPage — header y colores (gear-menu recorte + amarill
     const header = () => document.querySelector('[data-slot="card-header"]') as HTMLElement;
     await screen.findByText('Ana');
     expect(within(header()).getByText('(1)')).toBeInTheDocument();
-    // Total = solo impagos: el crédito está PAGADO → $0, en verde.
-    const headerTotal = within(header()).getByText('$0');
+    // Total = solo impagos: el crédito está PAGADO → 0,\u00A0CUP en verde.
+    const headerTotal = within(header()).getByText('0 CUP');
     expect(headerTotal).toHaveClass('text-success');
   });
 
@@ -203,8 +203,8 @@ describe('TodaySaleCreditsPage — header y colores (gear-menu recorte + amarill
     const header = () => document.querySelector('[data-slot="card-header"]') as HTMLElement;
     await screen.findByText('Ana');
     // El monto aparece en el header Y en la fila — scope cada aserción.
-    expect(within(header()).getByText('$40')).toHaveClass('text-warning');
-    const rowSpan = within(document.querySelector('tbody') as HTMLElement).getByText('$40');
+    expect(within(header()).getByText('40 CUP')).toHaveClass('text-warning');
+    const rowSpan = within(document.querySelector('tbody') as HTMLElement).getByText('40 CUP');
     expect(rowSpan).toHaveClass('text-warning');
   });
 
@@ -219,7 +219,7 @@ describe('TodaySaleCreditsPage — header y colores (gear-menu recorte + amarill
     );
 
     await screen.findByText('Ana');
-    const rowSpan = within(document.querySelector('tbody') as HTMLElement).getByText('$40');
+    const rowSpan = within(document.querySelector('tbody') as HTMLElement).getByText('40 CUP');
     expect(rowSpan).toHaveClass('text-success');
   });
 });
@@ -391,9 +391,9 @@ describe('SaleCreditsPage (history) — behavioral (Angular parity)', () => {
     );
 
     // Header unpaid-count badge + total appear once the async filter resolves. The total
-    // ($40) shows twice — the card header and the single day-panel — so match all.
+    // (40\u00A0CUP) shows twice — the card header and the single day-panel — so match all.
     expect(await screen.findByText('(1)')).toBeInTheDocument();
-    expect(screen.getAllByText('$40').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('40 CUP').length).toBeGreaterThan(0);
     // Angular parity: history always calls the filter with four nulls.
     expect(filter).toHaveBeenCalledWith(null, null, null, null);
   });
@@ -581,7 +581,7 @@ describe('SaleCreditsPage (history) — header TODOS + gear/amarillito (petició
     // Los paneles de día nacen colapsados — esperar el HEADER, no las filas.
     await screen.findByText('(2)');
     // Count = 2 (todos); total = SOLO impagos: 40 (c2 pagado no suma).
-    expect(within(header()).getByText('$40')).toBeInTheDocument();
+    expect(within(header()).getByText('40 CUP')).toBeInTheDocument();
   });
 
   it('TC-H-COLOR: header/día en ámbar si total>0, fila verde si pagado, ámbar si no', async () => {
@@ -597,19 +597,19 @@ describe('SaleCreditsPage (history) — header TODOS + gear/amarillito (petició
 
     const header = () => document.querySelector('[data-slot="card-header"]') as HTMLElement;
     await screen.findByText('(2)');
-    // Header total $40 (solo impagos) en ámbar (40 > 0).
-    expect(within(header()).getByText('$40')).toHaveClass('text-warning');
+    // Header total 40\u00A0CUP (solo impagos) en ámbar (40 > 0).
+    expect(within(header()).getByText('40 CUP')).toHaveClass('text-warning');
     // Expandir el panel para que existan las filas.
     fireEvent.click(screen.getByTestId('credit-date-panel-toggle-2024-03-15'));
     // Precio de fila: NO pagado en ámbar, PAGADO en verde.
     const tbody = document.querySelector('tbody') as HTMLElement;
-    expect(await within(tbody).findByText('$40')).toHaveClass('text-warning');
-    expect(within(tbody).getByText('$60')).toHaveClass('text-success');
-    // Total del panel del día ($40 = SOLO impagos: 40 + 0) también en ámbar.
+    expect(await within(tbody).findByText('40 CUP')).toHaveClass('text-warning');
+    expect(within(tbody).getByText('60 CUP')).toHaveClass('text-success');
+    // Total del panel del día (40\u00A0CUP = SOLO impagos: 40 + 0) también en ámbar.
     // El span HOJA (sin hijos) evita matchear el contenedor padre (mismo textContent).
     const dayToggle = screen.getByTestId('credit-date-panel-toggle-2024-03-15');
     const dayTotal = [...dayToggle.querySelectorAll('span')].find(
-      (s) => s.textContent === '$40' && s.children.length === 0,
+      (s) => s.textContent === '40\u00A0CUP' && s.children.length === 0,
     );
     expect(dayTotal).toBeDefined();
     expect(dayTotal).toHaveClass('text-warning');
@@ -850,12 +850,12 @@ describe('SaleCreditsPage (multi-store mode)', () => {
 
     // "Todas las tiendas": aggregate of every store (2 + 1 unpaid; 30 + 5).
     await waitFor(() => expect(within(header()).getByText('(3)')).toBeInTheDocument());
-    expect(within(header()).getByText('$35')).toBeInTheDocument();
+    expect(within(header()).getByText('35 CUP')).toBeInTheDocument();
 
-    // Narrowing to Tienda B narrows the header to that store only (1 unpaid, $5).
+    // Narrowing to Tienda B narrows the header to that store only (1 unpaid, 5\u00A0CUP).
     fireEvent.change(screen.getByTestId('multistore-select'), { target: { value: 's2' } });
     await waitFor(() => expect(within(header()).getByText('(1)')).toBeInTheDocument());
-    expect(within(header()).getByText('$5')).toBeInTheDocument();
+    expect(within(header()).getByText('5 CUP')).toBeInTheDocument();
   });
 
   it('header follows the applied date range', async () => {
@@ -897,7 +897,7 @@ describe('SaleCreditsPage (multi-store mode)', () => {
 
     // No range applied yet: both credits count.
     await waitFor(() => expect(within(header()).getByText('(2)')).toBeInTheDocument());
-    expect(within(header()).getByText('$109')).toBeInTheDocument();
+    expect(within(header()).getByText('109 CUP')).toBeInTheDocument();
 
     // March only: the June credit leaves the header too.
     fireEvent.click(screen.getByTestId('date-range-filter-input'));
@@ -911,7 +911,7 @@ describe('SaleCreditsPage (multi-store mode)', () => {
     fireEvent.click(screen.getByTestId('date-range-filter-button'));
 
     await waitFor(() => expect(within(header()).getByText('(1)')).toBeInTheDocument());
-    expect(within(header()).getByText('$10')).toBeInTheDocument();
+    expect(within(header()).getByText('10 CUP')).toBeInTheDocument();
   });
 });
 
@@ -961,9 +961,9 @@ describe('SaleCreditsPage — filtro por estado de pago (credits-paid-green-filt
     expect(porPagar.checked).toBe(false);
     expect(pagados.checked).toBe(false);
 
-    // Todos (default): count = 2 créditos, total = solo el impago ($40).
+    // Todos (default): count = 2 créditos, total = solo el impago (40\u00A0CUP).
     expect(within(header()).getByText('(2)')).toBeInTheDocument();
-    expect(within(header()).getByText('$40')).toBeInTheDocument();
+    expect(within(header()).getByText('40 CUP')).toBeInTheDocument();
   });
 
   it('T4-POR-PAGAR: el radio Por Pagar deja solo créditos impagos y count/total lo siguen', async () => {
@@ -980,7 +980,7 @@ describe('SaleCreditsPage — filtro por estado de pago (credits-paid-green-filt
     fireEvent.click(screen.getByRole('radio', { name: 'Por Pagar' }));
 
     await waitFor(() => expect(within(header()).getByText('(1)')).toBeInTheDocument());
-    expect(within(header()).getByText('$40')).toBeInTheDocument();
+    expect(within(header()).getByText('40 CUP')).toBeInTheDocument();
     // El panel del día (conteo (1)) solo muestra el crédito impago (c1): el pagado no existe.
     const dayToggle = screen.getByTestId('credit-date-panel-toggle-2024-03-15');
     expect(dayToggle.textContent).toContain('(1)');
@@ -1004,19 +1004,19 @@ describe('SaleCreditsPage — filtro por estado de pago (credits-paid-green-filt
 
     await waitFor(() => expect(within(header()).getByText('(1)')).toBeInTheDocument());
     // Total = 0 (el único visible está pagado) → text-success.
-    expect(within(header()).getByText('$0')).toHaveClass('text-success');
+    expect(within(header()).getByText('0 CUP')).toHaveClass('text-success');
     // El panel del día (con el crédito pagado) también suma 0 → verde.
     const dayToggle = screen.getByTestId('credit-date-panel-toggle-2024-03-15');
     expect(dayToggle.textContent).toContain('(1)');
     const dayTotal = [...dayToggle.querySelectorAll('span')].find(
-      (s) => s.textContent === '$0' && s.children.length === 0,
+      (s) => s.textContent === '0\u00A0CUP' && s.children.length === 0,
     );
     expect(dayTotal).toBeDefined();
     expect(dayTotal).toHaveClass('text-success');
     // La fila pagada se pinta en verde.
     fireEvent.click(dayToggle);
     const tbody = document.querySelector('tbody') as HTMLElement;
-    expect(await within(tbody).findByText('$60')).toHaveClass('text-success');
+    expect(await within(tbody).findByText('60 CUP')).toHaveClass('text-success');
   });
 
   it('T4-VOLVER: re-seleccionar Todos restaura count y total completos', async () => {
@@ -1035,7 +1035,7 @@ describe('SaleCreditsPage — filtro por estado de pago (credits-paid-green-filt
 
     fireEvent.click(screen.getByRole('radio', { name: 'Todos' }));
     await waitFor(() => expect(within(header()).getByText('(2)')).toBeInTheDocument());
-    expect(within(header()).getByText('$40')).toBeInTheDocument();
+    expect(within(header()).getByText('40 CUP')).toBeInTheDocument();
   });
 
   it('T4-MS: en multi-store los radios filtran los paneles y el header (todos/pendientes/pagados)', async () => {
@@ -1075,18 +1075,18 @@ describe('SaleCreditsPage — filtro por estado de pago (credits-paid-green-filt
     const header = () => document.querySelector('[data-slot="card-header"]') as HTMLElement;
     fireEvent.click(screen.getByTestId('multistore-panel-toggle-s1'));
 
-    // Todos (default): count 2, total = solo impagos ($10).
+    // Todos (default): count 2, total = solo impagos (10\u00A0CUP).
     await waitFor(() => expect(within(header()).getByText('(2)')).toBeInTheDocument());
-    expect(within(header()).getByText('$10')).toBeInTheDocument();
+    expect(within(header()).getByText('10 CUP')).toBeInTheDocument();
 
     // Por Pagar: solo el impago.
     fireEvent.click(screen.getByRole('radio', { name: 'Por Pagar' }));
     await waitFor(() => expect(within(header()).getByText('(1)')).toBeInTheDocument());
-    expect(within(header()).getByText('$10')).toBeInTheDocument();
+    expect(within(header()).getByText('10 CUP')).toBeInTheDocument();
 
     // Pagados: solo el pagado → total 0 verde.
     fireEvent.click(screen.getByRole('radio', { name: 'Pagados' }));
     await waitFor(() => expect(within(header()).getByText('(1)')).toBeInTheDocument());
-    expect(within(header()).getByText('$0')).toHaveClass('text-success');
+    expect(within(header()).getByText('0 CUP')).toHaveClass('text-success');
   });
 });

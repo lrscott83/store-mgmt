@@ -8,9 +8,9 @@
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { useIntl } from 'react-intl';
-import type { StoreSummary } from '@store-mgmt/domain';
+import { DEFAULT_CURRENCY, type StoreSummary } from '@store-mgmt/domain';
 import { ChevronDownIcon } from '~/shared/components/ui/icons';
-import { formatCurrency } from '~/shared/lib/format-currency';
+import { formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency';
 import { formatLocalDate } from '~/shared/lib/date-utils';
 import { CurrencyTotalAmount } from '~/shared/components/multimonedas/currency-total-amount';
 import type { CurrencyAmount } from '~/shared/lib/currency-totals';
@@ -183,7 +183,9 @@ export function MultiStoreTotal({
         {entries ? (
           <CurrencyTotalAmount legacyTotal={value} entries={entries} multiMonedas />
         ) : (
-          formatCurrency(value)
+          // Moneda siempre visible (petición 2026-09-23): el fallback sin
+          // entradas muestra el total como CUP en vez del `$` legacy.
+          formatMoneyWithCurrency(value, DEFAULT_CURRENCY)
         )}
       </span>
     </span>
@@ -206,7 +208,9 @@ export function MultiStoreDateTotal({
       <span className="text-text">
         {formatLocalDate(date)}{count !== undefined ? ` (${count})` : ''}
       </span>
-      <span className={`font-semibold ${valueClassName}`}>{formatCurrency(value)}</span>
+      <span className={`font-semibold ${valueClassName}`}>
+        {formatMoneyWithCurrency(value, DEFAULT_CURRENCY)}
+      </span>
     </span>
   );
 }

@@ -87,7 +87,7 @@ describe('ExpenseList — list/table parity sweep (WU4)', () => {
         />
       </Wrapper>,
     );
-    expect(screen.getByText('$2 000')).toBeInTheDocument();
+    expect(screen.getByText('2 000 CUP')).toBeInTheDocument();
   });
 });
 
@@ -116,7 +116,7 @@ describe('ExpenseList — row layout (motivo izq / pago centro / precio der)', (
     const row = screen.getByTestId('expense-row-exp-1');
     const reason = screen.getByText('Salario');
     const payment = screen.getByText('Efectivo');
-    const price = screen.getByText('$2 000');
+    const price = screen.getByText('2 000 CUP');
 
     expect(reason.className).toMatch(/text-left/);
     expect(payment.className).toMatch(/text-left/);

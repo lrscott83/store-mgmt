@@ -113,7 +113,7 @@ describe('OrdersPage — header «Ventas (n)» + total, línea de totales elimin
 
     expect(screen.getByText('Ventas')).toBeInTheDocument();
     expect(screen.getByText('(2)')).toBeInTheDocument();
-    expect(screen.getByText('$250')).toBeInTheDocument();
+    expect(screen.getByText('250 CUP')).toBeInTheDocument();
     // The old totals row under the store filter does not exist in this mode.
     expect(screen.queryByTestId('multistore-totals')).not.toBeInTheDocument();
   });
@@ -133,9 +133,9 @@ describe('OrdersPage — header «Ventas (n)» + total, línea de totales elimin
     );
     await screen.findByTestId('multistore-panel-toggle-s1');
 
-    // Header shows the aggregate of every active store (3 orders, $350).
+    // Header shows the aggregate of every active store (3 orders, 350\u00A0CUP).
     expect(screen.getAllByText('(3)').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('$350').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('350 CUP').length).toBeGreaterThan(0);
     // The totals row under the store filter is REMOVED.
     expect(screen.queryByTestId('multistore-totals')).not.toBeInTheDocument();
   });
@@ -157,9 +157,9 @@ describe('OrdersPage — header «Ventas (n)» + total, línea de totales elimin
 
     fireEvent.change(screen.getByTestId('multistore-select'), { target: { value: 's2' } });
 
-    // Only store 2 is counted now: 1 order, $50.
+    // Only store 2 is counted now: 1 order, 50\u00A0CUP.
     expect(screen.getAllByText('(1)').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('$50').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('50 CUP').length).toBeGreaterThan(0);
   });
 
   it('OS-4: CON MultiStores — cada panel mantiene (n) + total de esa tienda en su cabecera', async () => {
@@ -174,13 +174,13 @@ describe('OrdersPage — header «Ventas (n)» + total, línea de totales elimin
     );
     await screen.findByTestId('multistore-panel-toggle-s1');
 
-    // Store panel headers keep their per-store counts/totals (s1: 1/$100, s2: 0/$0).
+    // Store panel headers keep their per-store counts/totals (s1: 1/100,\u00A0CUP s2: 0/0\u00A0CUP).
     const panel1 = screen.getByTestId('multistore-panel-toggle-s1');
     expect(panel1.textContent).toContain('(1)');
-    expect(panel1.textContent).toContain('$100');
+    expect(panel1.textContent).toContain('100\u00A0CUP');
     const panel2 = screen.getByTestId('multistore-panel-toggle-s2');
     expect(panel2.textContent).toContain('(0)');
-    expect(panel2.textContent).toContain('$0');
+    expect(panel2.textContent).toContain('0\u00A0CUP');
   });
 
   it('OS-5: CON MultiStores — opciones de pago = métodos presentes en el conjunto visible del filtro de tienda', async () => {
@@ -204,5 +204,42 @@ describe('OrdersPage — header «Ventas (n)» + total, línea de totales elimin
     fireEvent.change(screen.getByTestId('multistore-select'), { target: { value: 's2' } });
     expect(screen.getByText('Transferencia (CUP)')).toBeInTheDocument();
     expect(screen.queryByText('Efectivo')).not.toBeInTheDocument();
+  });
+
+  it('OS-6: CON MultiStores — tres filas de filtros: tienda + rango (derecha), métodos de pago, y pagadas/créditos', async () => {
+    enableMultiStores();
+    storeOrdersFixture.s1 = [makeOrder({ id: 'o1' })];
+
+    render(
+      <Wrapper>
+        <OrdersPage />
+      </Wrapper>,
+    );
+    await screen.findByTestId('multistore-panel-toggle-s1');
+
+    // Fila 1: el rango de fechas comparte la fila con el select de tiendas —
+    // hijo DIRECTO del mismo contenedor flex (sin wrapper w-full) y estirado
+    // hacia la derecha (flex-1, patrón de credits.tsx).
+    const rangeInput = screen.getByTestId('date-range-filter-input');
+    const rangeRoot = rangeInput.parentElement;
+    const select = screen.getByTestId('multistore-select');
+    expect(select.parentElement).not.toBeNull();
+    expect(rangeRoot).not.toBeNull();
+    expect(rangeRoot!.parentElement).toBe(select.parentElement);
+    expect(rangeRoot).toHaveClass('flex-1');
+
+    // Las filas 2 (métodos de pago) y 3 (pagadas/créditos) son de ancho
+    // completo (w-full), cada una con sus radios.
+    const paymentRadio = screen.getByRole('radio', { name: 'Efectivo' });
+    const paymentRow = paymentRadio.closest('.w-full');
+    expect(paymentRow).not.toBeNull();
+    const creditRadio = screen.getByRole('radio', { name: 'Créditos' });
+    const creditRow = creditRadio.closest('.w-full');
+    expect(creditRow).not.toBeNull();
+    // Pagadas y Créditos comparten fila entre sí.
+    expect(creditRow!.contains(screen.getByRole('radio', { name: 'Pagadas' }))).toBe(true);
+    // Las tres filas son hermanas distintas (no una columna anidada en otra).
+    expect(paymentRow).not.toBe(creditRow);
+    expect(paymentRow!.contains(rangeInput)).toBe(false);
   });
 });

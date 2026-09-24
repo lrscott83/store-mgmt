@@ -301,8 +301,8 @@ test.describe.serial('Ventas Mayoristas — flujo completo', () => {
     const popup = page.locator('.swal2-popup');
     await expect(page.getByText('Rangos de precio mayorista')).toBeVisible();
     await expect(popup.getByText(/Unidades por paquete: 24/)).toBeVisible();
-    await expect(popup.getByText(/Desde 1 paquetes: \$9 por unidad/)).toBeVisible();
-    await expect(popup.getByText(/Desde 11 paquetes: \$8 por unidad/)).toBeVisible();
+    await expect(popup.getByText(/Desde 1 paquetes: 9\u00A0CUP por unidad/)).toBeVisible();
+    await expect(popup.getByText(/Desde 11 paquetes: 8\u00A0CUP por unidad/)).toBeVisible();
 
     // Cerrar el popup para liberar el puntero (patrón del test de mínimo).
     await page.locator('.swal2-confirm').click();

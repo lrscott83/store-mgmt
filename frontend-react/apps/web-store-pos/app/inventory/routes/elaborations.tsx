@@ -10,7 +10,7 @@ import { Button } from '~/shared/components/ui/button';
 import { ChevronDownIcon, SaveIcon } from '~/shared/components/ui/icons';
 import { showToastSuccess } from '~/shared/lib/toast';
 import { round2 } from '~/shared/lib/money';
-import { formatCurrency } from '~/shared/lib/format-currency';
+import { formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency';
 import { formatLocalDate, groupByLocalDay } from '~/shared/lib/date-utils';
 import type { LocalDayGroup } from '~/shared/lib/date-utils';
 import { ProductRepository } from '~/sales/lib/repositories/product-repository';
@@ -350,10 +350,10 @@ export function ElaborationsPage() {
                                 />
                               </td>
                               <td className="py-2 pr-2 text-right text-text">
-                                {formatCurrency(component.costPrice)}
+                                {formatMoneyWithCurrency(component.costPrice)}
                               </td>
                               <td className="py-2 text-right text-text">
-                                {formatCurrency(round2(actualQty * component.costPrice))}
+                                {formatMoneyWithCurrency(round2(actualQty * component.costPrice))}
                               </td>
                             </tr>
                           );
@@ -368,7 +368,7 @@ export function ElaborationsPage() {
                         {intl.formatMessage({ id: 'ELABORATION.INGREDIENTS_COST' })}
                       </dt>
                       <dd data-testid="elaboration-ingredients-cost" className="text-text">
-                        {formatCurrency(realIngredientsCost)}
+                        {formatMoneyWithCurrency(realIngredientsCost)}
                       </dd>
                     </div>
                     <div className="flex justify-between">
@@ -376,7 +376,7 @@ export function ElaborationsPage() {
                         {intl.formatMessage({ id: 'ELABORATION.OVERHEAD' })}
                       </dt>
                       <dd data-testid="elaboration-overhead-cost" className="text-text">
-                        {formatCurrency(realOverheadCost)}
+                        {formatMoneyWithCurrency(realOverheadCost)}
                       </dd>
                     </div>
                     <div className="flex justify-between">
@@ -384,7 +384,7 @@ export function ElaborationsPage() {
                         {intl.formatMessage({ id: 'ELABORATION.LABOR' })}
                       </dt>
                       <dd data-testid="elaboration-labor-cost" className="text-text">
-                        {formatCurrency(realLaborCost)}
+                        {formatMoneyWithCurrency(realLaborCost)}
                       </dd>
                     </div>
                     <div className="flex justify-between border-t border-border pt-1 font-semibold">
@@ -392,7 +392,7 @@ export function ElaborationsPage() {
                         {intl.formatMessage({ id: 'ELABORATION.TOTAL_COST' })}
                       </dt>
                       <dd data-testid="elaboration-total-cost" className="text-primary">
-                        {formatCurrency(realTotalCost)}
+                        {formatMoneyWithCurrency(realTotalCost)}
                       </dd>
                     </div>
                     <div className="flex justify-between">
@@ -408,7 +408,7 @@ export function ElaborationsPage() {
                         {intl.formatMessage({ id: 'ELABORATION.UNIT_COST' })}
                       </dt>
                       <dd data-testid="elaboration-unit-cost" className="text-success">
-                        {formatCurrency(realUnitCost)}
+                        {formatMoneyWithCurrency(realUnitCost)}
                       </dd>
                     </div>
                   </dl>
@@ -495,10 +495,10 @@ export function ElaborationsPage() {
                               {elaboration.producedQty}
                             </span>
                             <span className="text-primary">
-                              {formatCurrency(elaboration.totalCost)}
+                              {formatMoneyWithCurrency(elaboration.totalCost)}
                             </span>
                             <span className="text-success">
-                              {formatCurrency(elaboration.unitCost)}
+                              {formatMoneyWithCurrency(elaboration.unitCost)}
                             </span>
                           </span>
                         </div>

@@ -8,6 +8,7 @@ import { isOwnerAdmin as checkIsOwnerAdmin } from '~/shared/lib/auth/authorizati
 import { InventoryOfflineService } from '../lib/services/inventory-offline-service';
 import { ProductRepository } from '~/sales/lib/repositories/product-repository';
 import { ProductCategoryRepository } from '~/sales/lib/repositories/product-category-repository';
+import { OrderOfflineService } from '~/sales/lib/services/order-offline-service';
 import { Card } from '~/shared/components/ui/card';
 import { InfoBox } from '~/shared/components/ui/info-box';
 import { Button } from '~/shared/components/ui/button';
@@ -69,6 +70,11 @@ export function TodayEntriesPage() {
     const all = svc.getActiveInventoryEntriesStorage();
     const found = all.find((e) => e.id === entry.id);
     if (found) {
+      // A8: getActiveInventoryEntriesStorage() projects to InventoryEntryView and drops the
+      // warehouse seal, so read the full stored entry to preserve it for the modal.
+      const stored = [...svc.getStorageInventoriesMap().values()]
+        .flat()
+        .find((e) => e.id === entry.id);
       // InventoryEntryView has different shape; reconstruct minimal InventoryEntry
       setEditingEntry({
         id: entry.id,
@@ -84,6 +90,11 @@ export function TodayEntriesPage() {
         createdByName: '',
         updatedDate: new Date(),
         updatedByName: '',
+        // A8: preserve the warehouse-origin seal so the modal can lock the store edit.
+        warehouseSaleOutMovementId: stored?.warehouseSaleOutMovementId,
+        // csv-import-currency-matrix (2026-09-24): preserve the stored cost currency too —
+        // without it the modal initialized CUP and SAVING the entry overwrote a USD cost to CUP.
+        currency: stored?.currency,
       });
     }
     setIsModalOpen(true);
@@ -154,6 +165,15 @@ export function TodayEntriesPage() {
     if (!result || !result.succeeded) {
       setModalError(result?.errors[0]?.description ?? intl.formatMessage({ id: 'GENERAL.ERROR' }));
       return;
+    }
+
+    // Store entry cost edit propagation: only after the edit SUCCEEDS, push the new cost
+    // into the sale snapshots (orderItem.productCosts[].costPrice) that reference this
+    // entry — mirroring the warehouse seam. Edits only: a create has no prior sale to fix.
+    if (entryId) {
+      new OrderOfflineService(storeId).updateProductCostsByInventoryIds(
+        new Map([[entryId, data.costPrice]]),
+      );
     }
 
     loadEntries();

@@ -1,5 +1,5 @@
 import type { CategoryCartItemsView } from '../lib/category-cart-items-view';
-import { formatCurrency } from '~/shared/lib/format-currency';
+import { formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency';
 
 interface CategoryStatsProps {
   category: CategoryCartItemsView;
@@ -27,7 +27,9 @@ export function CategoryStats({ category }: CategoryStatsProps) {
               <span className="font-bold text-success">({category.itemsCount})</span>
             </td>
             <td className="p-1 text-right">
-              <span className="font-bold text-success">{formatCurrency(category.total)}</span>
+              <span className="font-bold text-success">
+                {formatMoneyWithCurrency(category.total)}
+              </span>
             </td>
           </tr>
           {category.productItems.map((product) => (
@@ -39,7 +41,9 @@ export function CategoryStats({ category }: CategoryStatsProps) {
                 <span className="font-bold text-success">({product.itemsCount})</span>
               </td>
               <td className="p-1 text-right">
-                <span className="font-bold text-success">{formatCurrency(product.total)}</span>
+                <span className="font-bold text-success">
+                  {formatMoneyWithCurrency(product.total)}
+                </span>
               </td>
             </tr>
           ))}

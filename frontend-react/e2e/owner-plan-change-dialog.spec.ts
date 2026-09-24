@@ -84,7 +84,7 @@ test('OwnerAdmin cambia el plan de su tienda desde el dialog (POST change-plan, 
 
   // Free shape on the card (E-03 free half): plan label, no date line.
   await expect(page.getByTestId(`owner-store-body-${selectedStoreId}`)).toContainText(
-    'Plan Gratis',
+    'Plan: Gratis',
   );
 
   // Open the plan popup: gear → "Editar el plan".
@@ -155,7 +155,7 @@ test('OwnerAdmin cambia el plan de su tienda desde el dialog (POST change-plan, 
   // load()).
   await expect(modal).not.toBeVisible();
   await expect(page.getByTestId(`owner-store-body-${selectedStoreId}`)).toContainText(
-    'Plan de Pago',
+    'Plan: Pago',
     { timeout: 30_000 },
   );
   await expect(page.getByTestId(`owner-store-price-${selectedStoreId}`)).toBeVisible();

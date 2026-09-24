@@ -420,7 +420,7 @@ describe('ExpensesHistoryPage — strict Angular parity', () => {
     expect(screen.getByText('No se encontró ningún gasto')).toBeInTheDocument();
   });
 
-  it('has NO date-range or expense-type filter controls', async () => {
+  it('has a date-range filter (2026-09-23, right-aligned) but no expense-type filter control', async () => {
     await act(async () => {
       render(
         <Wrapper>
@@ -428,6 +428,12 @@ describe('ExpensesHistoryPage — strict Angular parity', () => {
         </Wrapper>,
       );
     });
+    // Mismo DateRangeFilter compartido que entries/credits…
+    expect(screen.getByTestId('date-range-filter-input')).toBeInTheDocument();
+    expect(screen.getByTestId('date-range-filter-button')).toBeInTheDocument();
+    // …alineado a la derecha (contenedor justify-end).
+    expect(screen.getByTestId('date-range-filter-input').closest('.justify-end')).not.toBeNull();
+    // Los inputs Desde/Hasta viven en el popover, cerrado por defecto.
     expect(screen.queryByLabelText(/Desde/i)).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/Hasta/i)).not.toBeInTheDocument();
   });
@@ -553,9 +559,9 @@ describe('ExpensesHistoryPage — strict Angular parity', () => {
     });
 
     fireEvent.click(screen.getByText('Transferencia (CUP)'));
-    // Solo el gasto Tarjeta (15): header (1) y total $15 (también en el panel del día).
+    // Solo el gasto Tarjeta (15): header (1) y total 15\u00A0CUP (también en el panel del día).
     expect(screen.getAllByText('(1)').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('$15').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('15 CUP').length).toBeGreaterThan(0);
   });
 
   it('groups expenses by day (collapsed by default), shows per-day count + total, and never renders edit/delete', async () => {
@@ -581,7 +587,7 @@ describe('ExpensesHistoryPage — strict Angular parity', () => {
     // Overall header count/total (all-time, unbounded — no 30-day window).
     // loadExpenses is now async (filterExpensesObservable) — wait for the grouped data to render.
     expect(await screen.findByText('(3)')).toBeInTheDocument();
-    expect(screen.getByText('$30')).toBeInTheDocument();
+    expect(screen.getByText('30 CUP')).toBeInTheDocument();
 
     // Day panels present; content collapsed by default.
     expect(screen.getByText('15/03/2024 (2)')).toBeInTheDocument();
@@ -678,8 +684,58 @@ describe('ExpensesHistoryPage — strict Angular parity', () => {
 
     fireEvent.click(screen.getByLabelText('Transferencia (CUP)'));
     expect(await screen.findByText('(1)')).toBeInTheDocument();
-    // $25 now appears twice: the header total and the (single) day-panel total.
-    expect(screen.getAllByText('$25')).toHaveLength(2);
+    // 25\u00A0CUP now appears twice: the header total and the (single) day-panel total.
+    expect(screen.getAllByText('25 CUP')).toHaveLength(2);
+  });
+
+  it('date-range filter (2026-09-23): limits the history to the selected range, end day INCLUSIVE', async () => {
+    const inRange = makeExpense({ id: 'a', date: new Date('2024-03-15T10:00:00.000'), total: 10 });
+    const outOfRange = makeExpense({ id: 'b', date: new Date('2024-03-16T11:00:00.000'), total: 25 });
+    vi.mocked(ExpenseOfflineService).mockImplementation(
+      () =>
+        ({
+          // Mirror the REAL filterExpensesObservable: RAW comparisons with an
+          // EXCLUSIVE end (half-open [start, end)) — the page sails the end
+          // window to next-day midnight so the picked end day is included.
+          filterExpensesObservable: vi.fn(
+            (_t: unknown, _p: unknown, start?: Date, end?: Date) =>
+              expensesResponse(
+                [inRange, outOfRange].filter(
+                  (e) => (!start || new Date(e.date) >= start) && (!end || new Date(e.date) < end),
+                ),
+              ),
+          ),
+          create: vi.fn(),
+          update: vi.fn(),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        }) as any,
+    );
+
+    await act(async () => {
+      render(
+        <Wrapper>
+          <ExpensesHistoryPage />
+        </Wrapper>,
+      );
+    });
+    expect(await screen.findByText('(2)')).toBeInTheDocument();
+
+    // Popover: 15/03 → 15/03, Seleccionar, y aplicar con la lupa.
+    fireEvent.click(screen.getByTestId('date-range-filter-input'));
+    fireEvent.change(screen.getByTestId('date-range-filter-start'), {
+      target: { value: '2024-03-15' },
+    });
+    fireEvent.change(screen.getByTestId('date-range-filter-end'), {
+      target: { value: '2024-03-15' },
+    });
+    fireEvent.click(screen.getByTestId('date-range-filter-select'));
+    fireEvent.click(screen.getByTestId('date-range-filter-button'));
+
+    // Solo el gasto del 15/03 (el del 16 queda fuera): header (1) y 10\u00A0CUP.
+    expect(await screen.findAllByText('(1)').then((els) => els.length)).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('10 CUP').length).toBeGreaterThan(0);
+    expect(screen.queryByText('25 CUP')).not.toBeInTheDocument();
+    expect(screen.queryByText('(2)')).not.toBeInTheDocument();
   });
 });
 
@@ -771,12 +827,12 @@ describe('ExpensesHistoryPage — modo multistore (paneles por tienda)', () => {
     expect(screen.getByTestId('multistore-panel-toggle-s2')).toBeInTheDocument();
     expect(screen.getAllByText('Tienda Uno').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Tienda Dos').length).toBeGreaterThan(0);
-    expect(screen.getByText('$15')).toBeInTheDocument(); // total tienda s1
-    expect(screen.getByText('$7')).toBeInTheDocument(); // total tienda s2
+    expect(screen.getByText('15 CUP')).toBeInTheDocument(); // total tienda s1
+    expect(screen.getByText('7 CUP')).toBeInTheDocument(); // total tienda s2
 
-    // Global fuera de los paneles: 3 gastos, $22.
+    // Global fuera de los paneles: 3 gastos, 22\u00A0CUP.
     expect(screen.getByText('(3)')).toBeInTheDocument();
-    expect(screen.getByText('$22')).toBeInTheDocument();
+    expect(screen.getByText('22 CUP')).toBeInTheDocument();
 
     // El filtro de método de pago es GLOBAL (fuera de los paneles).
     expect(
@@ -784,6 +840,57 @@ describe('ExpensesHistoryPage — modo multistore (paneles por tienda)', () => {
     ).toBeGreaterThanOrEqual(1);
     // Nada expandido aún: no hay filas de gastos en el DOM.
     expect(screen.queryByTestId('expense-row-a')).not.toBeInTheDocument();
+  });
+
+  it('MS-5: el rango de fechas comparte fila con el select de tiendas (a la derecha) y filtra dentro de los paneles', async () => {
+    storeExpensesFixture.s1 = [
+      makeExpense({ id: 'a', date: new Date('2024-03-15T09:00:00.000'), total: 10 }),
+      makeExpense({ id: 'b', date: new Date('2024-03-16T11:00:00.000'), total: 5 }),
+    ];
+    storeExpensesFixture.s2 = [
+      makeExpense({ id: 'c', date: new Date('2024-03-16T09:00:00.000'), total: 7 }),
+    ];
+
+    await act(async () => {
+      render(
+        <Wrapper>
+          <ExpensesHistoryPage />
+        </Wrapper>,
+      );
+    });
+
+    // Misma fila: el rango es hijo DIRECTO del mismo contenedor flex que el
+    // select de tiendas (sin wrapper w-full que lo baje a otra línea) y se
+    // estira hacia la derecha (flex-1 — patrón de credits.tsx).
+    const rangeInput = screen.getByTestId('date-range-filter-input');
+    const rangeRoot = rangeInput.parentElement;
+    const row = screen.getByTestId('multistore-select').parentElement;
+    expect(row).not.toBeNull();
+    expect(rangeRoot).not.toBeNull();
+    expect(rangeRoot!.parentElement).toBe(row);
+    expect(rangeRoot).toHaveClass('flex-1');
+    expect(row!.contains(rangeInput)).toBe(true);
+
+    // Sin rango: (3) gastos, 22\u00A0CUP global.
+    expect(screen.getByText('(3)')).toBeInTheDocument();
+    expect(screen.getByText('22 CUP')).toBeInTheDocument();
+
+    // Aplico 15/03 → 15/03 (día final INCLUYENTE): solo el gasto del 15/03.
+    fireEvent.click(rangeInput);
+    fireEvent.change(screen.getByTestId('date-range-filter-start'), {
+      target: { value: '2024-03-15' },
+    });
+    fireEvent.change(screen.getByTestId('date-range-filter-end'), {
+      target: { value: '2024-03-15' },
+    });
+    fireEvent.click(screen.getByTestId('date-range-filter-select'));
+    fireEvent.click(screen.getByTestId('date-range-filter-button'));
+
+    // Header global (1) + panel de Tienda Uno (1); 10\u00A0CUP en global y panel de s1.
+    expect(screen.getAllByText('(1)').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('10 CUP').length).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByText('(3)')).not.toBeInTheDocument();
+    expect(screen.queryByText('22 CUP')).not.toBeInTheDocument();
   });
 
   it('MS-2: expandir un panel muestra los gastos agrupados por día de ESA tienda', async () => {
@@ -836,18 +943,18 @@ describe('ExpensesHistoryPage — modo multistore (paneles por tienda)', () => {
     expect(efectivoRadios).toHaveLength(1);
     fireEvent.click(efectivoRadios[0]);
 
-    // Global: quedan 2 de 3 ($17) — el header y el total por tienda de s2.
+    // Global: quedan 2 de 3 (17\u00A0CUP) — el header y el total por tienda de s2.
     await waitFor(() => {
       expect(screen.getByText('(2)')).toBeInTheDocument();
-      expect(screen.getByText('$17')).toBeInTheDocument();
+      expect(screen.getByText('17 CUP')).toBeInTheDocument();
     });
 
-    // Expandir s1 (tienda + día): solo el gasto en efectivo; s2 no cambió ($7).
+    // Expandir s1 (tienda + día): solo el gasto en efectivo; s2 no cambió (7\u00A0CUP).
     fireEvent.click(screen.getByTestId('multistore-panel-toggle-s1'));
     fireEvent.click(screen.getByTestId('multistore-expense-day-panel-toggle-s1-2024-03-15'));
     expect(screen.getByTestId('expense-row-a')).toBeInTheDocument();
     expect(screen.queryByTestId('expense-row-b')).not.toBeInTheDocument();
-    expect(screen.getByText('$7')).toBeInTheDocument();
+    expect(screen.getByText('7 CUP')).toBeInTheDocument();
   });
 
   it('MS-4: una tienda sin datos en el dispositivo muestra el estado vacío del panel', async () => {

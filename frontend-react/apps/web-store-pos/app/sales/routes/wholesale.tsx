@@ -10,7 +10,7 @@ import { InfoBox } from '~/shared/components/ui/info-box';
 import { HelpIcon, ScanBarcodeIcon } from '~/shared/components/ui/icons';
 import { showBlockingError, showBlockingInfoHtml } from '~/shared/lib/blocking-alert';
 import { showToastError, showToastSuccess } from '~/shared/lib/toast';
-import { formatCurrency } from '~/shared/lib/format-currency';
+import { formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency';
 import { Switch } from '~/shared/components/ui/switch';
 import {
   hasInventoryModuleAvailable,
@@ -164,7 +164,7 @@ export function WholesalePage() {
                   { id: 'SALES.WHOLESALE.TIERS_POPUP_FROM' },
                   {
                     min: tier.minPacks,
-                    price: formatCurrency(tier.pricePerUnit),
+                    price: formatMoneyWithCurrency(tier.pricePerUnit),
                     unit: unitPlural,
                   },
                 )
@@ -338,7 +338,7 @@ export function WholesalePage() {
       showToastSuccess(
         intl.formatMessage(
           { id: 'SALES.WHOLESALE.SCANNER_ADDED' },
-          { name: product.name, packs, units, price: formatCurrency(unitPrice) },
+          { name: product.name, packs, units, price: formatMoneyWithCurrency(unitPrice) },
         ),
       );
     });
@@ -476,8 +476,8 @@ export function WholesalePage() {
                           className="text-xs text-primary"
                           data-testid={`wholesale-quote-${product.id}`}
                         >
-                          {packs} × {packSize} × {formatCurrency(unitPrice)} ={' '}
-                          {formatCurrency(total)}
+                          {packs} × {packSize} × {formatMoneyWithCurrency(unitPrice)} ={' '}
+                          {formatMoneyWithCurrency(total)}
                         </p>
                       )}
                     </div>

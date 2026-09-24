@@ -450,7 +450,7 @@ test.describe.serial('Almacenes — flujo completo', () => {
 
     // Stock visible: on-hand 24 y costo 660 en la fila del producto.
     expect(await onHandCell(page, 'Almacén Central')).toBe('24');
-    expect(await costCell(page, 'Almacén Central')).toBe('$660');
+    expect(await costCell(page, 'Almacén Central')).toBe('660 CUP');
   });
 
   test('salida a tienda debita el almacén y crea una entrada en Entradas del día', async ({
@@ -537,7 +537,7 @@ test.describe.serial('Almacenes — flujo completo', () => {
 
     // B recibe 10 con el costo propagado (660).
     expect(await onHandCell(page, 'Almacén B')).toBe('10');
-    expect(await costCell(page, 'Almacén B')).toBe('$660');
+    expect(await costCell(page, 'Almacén B')).toBe('660 CUP');
   });
 
   test('desactivar almacén con stock se bloquea y almacén vacío sí se desactiva', async ({
@@ -640,7 +640,7 @@ test.describe.serial('Almacenes — flujo completo', () => {
     const card = warehouseCard(page, 'Backup');
     await expect(card).toBeVisible();
     expect(await onHandCell(page, 'Backup')).toBe('24');
-    expect(await costCell(page, 'Backup')).toBe('$660');
+    expect(await costCell(page, 'Backup')).toBe('660 CUP');
 
     // Movimientos: el merge append-only restauró exactamente el exportado (sin duplicar).
     await openMovementsToday(page);
@@ -693,7 +693,7 @@ test.describe.serial('Almacenes — flujo completo', () => {
 
     // today-sales-profit: margen total = 10 − 660 = −650 → "-$650".
     const profit = await readTotalProfit(page);
-    expect(profit).toBe('-$650');
+    expect(profit).toBe('-650 CUP');
   });
 
   test('un usuario de tienda (StoreUser) no ve Almacenes y la ruta lo desloguea', async ({

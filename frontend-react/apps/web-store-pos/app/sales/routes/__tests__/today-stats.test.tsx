@@ -174,7 +174,7 @@ describe('TodayStatsPage (Angular today-stats.component.html 1:1 port)', () => {
       </Wrapper>,
     );
     // salesCashTotal = 100 only (excludes card payment + credit sale)
-    expect(screen.getAllByText('$100').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('100 CUP').length).toBeGreaterThan(0);
   });
 
   it('renders a Ventas ({itemsCount} productos) panel using getCategoryCartItemsView totals', () => {
@@ -215,7 +215,7 @@ describe('TodayStatsPage (Angular today-stats.component.html 1:1 port)', () => {
         <TodayStatsPage />
       </Wrapper>,
     );
-    expect(screen.getAllByText('$2 000').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('2 000 CUP').length).toBeGreaterThan(0);
   });
 });
 
@@ -276,14 +276,14 @@ describe('TodayStatsPage — with Expenses + Credits modules available', () => {
     const cardPanel = await screen.findByRole('button', { name: /Pago por Transferencia/ });
     expect(cardPanel).toBeInTheDocument();
     // Panel amount in the collapsed header: only the 120 card sale counts.
-    expect(screen.getAllByText('$120').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('120 CUP').length).toBeGreaterThan(0);
 
     // Expanded: the Ventas row shows the same card total.
     fireEvent.click(cardPanel);
     const ventasRow = within(cardPanel.parentElement as HTMLElement).getAllByText('Ventas');
     expect(ventasRow.length).toBeGreaterThan(0);
     expect(
-      within(cardPanel.parentElement as HTMLElement).getAllByText('$120').length,
+      within(cardPanel.parentElement as HTMLElement).getAllByText('120 CUP').length,
     ).toBeGreaterThan(0);
   });
 
@@ -337,7 +337,7 @@ describe('TodayStatsPage — with Expenses + Credits modules available', () => {
     const row = screen.getByText('Otro').closest('tr');
     expect(row).not.toBeNull();
     expect((row as HTMLElement).querySelector('svg')).toBeNull();
-    const totalWrapper = within(row as HTMLElement).getByText('$15');
+    const totalWrapper = within(row as HTMLElement).getByText('15 CUP');
     expect(totalWrapper.firstChild?.nodeName.toLowerCase()).not.toBe('svg');
   });
 
@@ -576,7 +576,7 @@ describe('TodayStatsPage — money never wraps (no-cut invariant)', () => {
     // promises — findByText waits for the async state to settle. getByText
     // normalizes the DOM's NBSP to a regular space, so matchers use the
     // plain-space shape.
-    const header = await screen.findByText('-$87 654.30');
+    const header = await screen.findByText('-87 654.30 CUP');
     expect(header.className).toMatch(/whitespace-nowrap/);
   });
 
@@ -589,9 +589,9 @@ describe('TodayStatsPage — money never wraps (no-cut invariant)', () => {
     await screen.findByRole('button', { name: /Gastos \(1\)/ });
     // Collapsed panels: each amount renders once in its header. getAllByText
     // keeps this robust if a figure ever appears in more than one spot.
-    const gastos = screen.getAllByText('$1 234.50'); // expensesTotal
-    const unpaid = screen.getAllByText('$98 765.40'); // creditsTotal
-    const paid = screen.getAllByText('$12 345.60'); // paidSaleCreditsTotal
+    const gastos = screen.getAllByText('1 234.50 CUP'); // expensesTotal
+    const unpaid = screen.getAllByText('98 765.40 CUP'); // creditsTotal
+    const paid = screen.getAllByText('12 345.60 CUP'); // paidSaleCreditsTotal
     for (const el of [...gastos, ...unpaid, ...paid]) {
       expect(el.className, 'panel amount must carry whitespace-nowrap').toMatch(
         /whitespace-nowrap/,
@@ -606,10 +606,10 @@ describe('TodayStatsPage — money never wraps (no-cut invariant)', () => {
       </Wrapper>,
     );
     fireEvent.click(await screen.findByRole('button', { name: /Resumen Efectivo/ }));
-    // Ventas row: $23 456.70 (NBSP normalized to space by getByText). The
+    // Ventas row: 23\u00A0CUP 456.70 (NBSP normalized to space by getByText). The
     // same figure renders ONLY inside the cash table (cash uses paymentType
     // filters: only the Efectivo order counts).
-    const ventas = screen.getAllByText('$23 456.70');
+    const ventas = screen.getAllByText('23 456.70 CUP');
     expect(ventas.length).toBeGreaterThan(0);
     for (const el of ventas) {
       expect(el.className, 'cash Ventas amount must carry whitespace-nowrap').toMatch(
@@ -625,9 +625,9 @@ describe('TodayStatsPage — money never wraps (no-cut invariant)', () => {
       </Wrapper>,
     );
     fireEvent.click(await screen.findByRole('button', { name: /Gastos \(1\)/ }));
-    // $1 234.50 renders in the collapsed panel header AND the expanded row —
+    // 1\u00A0CUP 234.50 renders in the collapsed panel header AND the expanded row —
     // every occurrence must carry the guard.
-    const amounts = screen.getAllByText('$1 234.50');
+    const amounts = screen.getAllByText('1 234.50 CUP');
     expect(amounts.length).toBeGreaterThan(0);
     for (const el of amounts) {
       expect(el.className, 'Gastos amount must carry whitespace-nowrap').toMatch(
@@ -643,7 +643,7 @@ describe('TodayStatsPage — money never wraps (no-cut invariant)', () => {
       </Wrapper>,
     );
     fireEvent.click(await screen.findByRole('button', { name: /Créditos Por Cobrar \(1\)/ }));
-    const unpaid = screen.getAllByText('$98 765.40');
+    const unpaid = screen.getAllByText('98 765.40 CUP');
     expect(unpaid.length).toBeGreaterThan(0);
     for (const el of unpaid) {
       expect(el.className, 'Créditos Por Cobrar amount must carry whitespace-nowrap').toMatch(
@@ -654,7 +654,7 @@ describe('TodayStatsPage — money never wraps (no-cut invariant)', () => {
     // Angular parity: this panel's "(...)" slot shows the currency SUM, not a
     // count — paidSaleCreditsTotal = 12345.6 renders raw via template literal.
     fireEvent.click(await screen.findByRole('button', { name: /Créditos Pagados \(12345\.6\)/ }));
-    const paid = screen.getAllByText('$12 345.60');
+    const paid = screen.getAllByText('12 345.60 CUP');
     for (const el of paid) {
       expect(el.className, 'Créditos Pagados amount must carry whitespace-nowrap').toMatch(
         /whitespace-nowrap/,

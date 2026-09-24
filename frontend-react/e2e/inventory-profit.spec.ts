@@ -113,7 +113,7 @@ test.describe.serial('S3-D1/D2 — Ganancias del día', () => {
     // A table with profit data should be visible
     await expect(page.locator('table')).toBeVisible();
 
-    // The total profit should be visible (starts with $)
-    await expect(page.locator('text=/^\\$[\\d,.]+$/').first()).toBeVisible();
+    // The total profit should be visible (amount + currency code, e.g. "500 CUP")
+    await expect(page.getByText(/^[\d.,]+\u00A0?CUP$/).first()).toBeVisible();
   });
 });

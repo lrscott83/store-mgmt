@@ -4,6 +4,7 @@ import type { InventoryEntry, ProductSelectView } from '@store-mgmt/domain';
 import { DEFAULT_CURRENCY } from '@store-mgmt/domain';
 import { Card } from '~/shared/components/ui/card';
 import { Button } from '~/shared/components/ui/button';
+import { InfoBox } from '~/shared/components/ui/info-box';
 import { CloseIcon, SaveIcon } from '~/shared/components/ui/icons';
 import { createProductService } from '~/sales/lib/services/product-service.factory';
 import { CurrencySelect } from '~/shared/components/multimonedas/currency-select';
@@ -35,6 +36,10 @@ export function EditInventoryEntryModal({
   error,
 }: EditInventoryEntryModalProps) {
   const intl = useIntl();
+  // A8 (plan 2026-09-16): entries originated by a warehouse sale-out are sealed in the store —
+  // the cost, product and quantity are updated from the warehouse. Same guard the offline
+  // service applies in update()/updateWithProduct().
+  const isWarehouseOrigin = entry?.warehouseSaleOutMovementId !== undefined;
   // Angular parity (Flag #4): the product dropdown is loaded via
   // createProductService(storeId).getProductsToSelect() (ProductSelectView = { id, fullName }),
   // exactly as Angular's EditInventoryEntryModalComponent does. Angular has NO category
@@ -87,6 +92,9 @@ export function EditInventoryEntryModal({
   if (!isOpen) return null;
 
   function handleSave() {
+    // Defense in depth: the offline service already rejects this, but never let the store
+    // save a warehouse-origin entry from here.
+    if (isWarehouseOrigin) return;
     setValidationError('');
     const qty = parseInt(quantity, 10);
     const cost = parseFloat(costPrice);
@@ -154,7 +162,7 @@ export function EditInventoryEntryModal({
   }
 
   const inputClass =
-    'w-full rounded border border-border px-3 py-2 text-sm text-text focus:outline-none focus:ring-2 focus:ring-primary';
+    'w-full rounded border border-border px-3 py-2 text-sm text-text focus:outline-none focus:ring-2 focus:ring-primary disabled:cursor-not-allowed disabled:bg-surface-hover disabled:opacity-60';
   const labelClass = 'mb-1 block text-sm font-medium text-text';
 
   return (
@@ -189,6 +197,16 @@ export function EditInventoryEntryModal({
           }
         >
           <div className="space-y-3">
+            {/* Warehouse-origin entries are sealed in the store (A8): show why the cost
+                cannot be edited here. */}
+            {isWarehouseOrigin && (
+              <div data-testid="entry-warehouse-cost-message">
+                <InfoBox variant="info">
+                  {intl.formatMessage({ id: 'INVENTORY_ENTRY.WAREHOUSE_COST_NOT_EDITABLE' })}
+                </InfoBox>
+              </div>
+            )}
+
             {/* Product (searchable combobox — filters while the user types) */}
             <div className="relative">
               <label htmlFor="entry-product" className={labelClass}>
@@ -200,6 +218,7 @@ export function EditInventoryEntryModal({
                 role="combobox"
                 autoComplete="off"
                 autoFocus
+                disabled={isWarehouseOrigin}
                 value={query}
                 onChange={(e) => {
                   setQuery(e.target.value);
@@ -267,6 +286,7 @@ export function EditInventoryEntryModal({
                 type="number"
                 min="1"
                 step="1"
+                disabled={isWarehouseOrigin}
                 value={quantity}
                 onChange={(e) => setQuantity(e.target.value)}
                 className={inputClass}
@@ -283,6 +303,7 @@ export function EditInventoryEntryModal({
                 type="number"
                 min="0"
                 step="0.01"
+                disabled={isWarehouseOrigin}
                 value={costPrice}
                 onChange={(e) => setCostPrice(e.target.value)}
                 className={inputClass}
@@ -310,7 +331,7 @@ export function EditInventoryEntryModal({
               <CloseIcon />
               {intl.formatMessage({ id: 'GENERAL.CLOSE' })}
             </Button>
-            <Button variant="fab" onClick={handleSave}>
+            <Button variant="fab" onClick={handleSave} disabled={isWarehouseOrigin}>
               <SaveIcon />
               {/* Angular parity: edit-inventory-entry-modal.component.html:84 toggles between
                   GENERAL.INSERT (create) and GENERAL.UPDATE (edit) — was hardcoded to

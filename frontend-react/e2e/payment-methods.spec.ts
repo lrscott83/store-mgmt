@@ -208,10 +208,10 @@ test.describe.serial('PM — Formas de pago, percent y tax en el carrito', () =>
     // El Cuadre del día agrupa la venta en Efectivo con $10
     await page.goto('/sales/today-stats');
     await page.waitForLoadState('networkidle');
-    await expect(page.getByRole('button', { name: CASH_PANEL })).toContainText('$10');
+    await expect(page.getByRole('button', { name: CASH_PANEL })).toContainText('10 CUP');
   });
 
-  test('PMF3 — orden con percent=1 y tax=10 muestra el total ajustado $12.10 en el cuadre', async ({
+  test('PMF3 — orden con percent=1 y tax=10 muestra el total ajustado 12.10 CUP en el cuadre', async ({
     signedInPage,
   }) => {
     const { page, selectedStoreId } = signedInPage;
@@ -225,7 +225,7 @@ test.describe.serial('PM — Formas de pago, percent y tax en el carrito', () =>
 
     await page.goto('/sales/today-stats');
     await page.waitForLoadState('networkidle');
-    await expect(page.getByRole('button', { name: CASH_PANEL })).toContainText('$12.10');
+    await expect(page.getByRole('button', { name: CASH_PANEL })).toContainText('12.10 CUP');
   });
 
   test('PMF4 — venta con Transferencia (CUP) elegida se agrupa en Pago por Transferencia', async ({
@@ -245,8 +245,8 @@ test.describe.serial('PM — Formas de pago, percent y tax en el carrito', () =>
 
     await page.goto('/sales/today-stats');
     await page.waitForLoadState('networkidle');
-    await expect(page.getByRole('button', { name: TRANSFER_PANEL })).toContainText('$10');
-    await expect(page.getByRole('button', { name: CASH_PANEL })).toContainText('$0');
+    await expect(page.getByRole('button', { name: TRANSFER_PANEL })).toContainText('10 CUP');
+    await expect(page.getByRole('button', { name: CASH_PANEL })).toContainText('0 CUP');
   });
 
   test('PMF5 — orden histórica con Tarjeta (paymentType=2) se agrupa como Transferencia', async ({
@@ -262,8 +262,8 @@ test.describe.serial('PM — Formas de pago, percent y tax en el carrito', () =>
 
     await page.goto('/sales/today-stats');
     await page.waitForLoadState('networkidle');
-    await expect(page.getByRole('button', { name: TRANSFER_PANEL })).toContainText('$10');
-    await expect(page.getByRole('button', { name: CASH_PANEL })).toContainText('$0');
+    await expect(page.getByRole('button', { name: TRANSFER_PANEL })).toContainText('10 CUP');
+    await expect(page.getByRole('button', { name: CASH_PANEL })).toContainText('0 CUP');
   });
 
   test('PMF6 — orden antigua sin método se interpreta como Efectivo (default histórico)', async ({
@@ -278,7 +278,7 @@ test.describe.serial('PM — Formas de pago, percent y tax en el carrito', () =>
 
     await page.goto('/sales/today-stats');
     await page.waitForLoadState('networkidle');
-    await expect(page.getByRole('button', { name: CASH_PANEL })).toContainText('$10');
-    await expect(page.getByRole('button', { name: TRANSFER_PANEL })).toContainText('$0');
+    await expect(page.getByRole('button', { name: CASH_PANEL })).toContainText('10 CUP');
+    await expect(page.getByRole('button', { name: TRANSFER_PANEL })).toContainText('0 CUP');
   });
 });

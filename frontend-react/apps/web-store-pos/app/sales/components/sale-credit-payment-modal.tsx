@@ -14,7 +14,7 @@ import { Card } from '~/shared/components/ui/card';
 import { Button } from '~/shared/components/ui/button';
 import { CloseIcon, PaymentIcon } from '~/shared/components/ui/icons';
 import { confirmDialog, showBlockingError } from '~/shared/lib/blocking-alert';
-import { formatCurrency } from '~/shared/lib/format-currency';
+import { formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { hasMultiMonedasAvailable } from '~/shared/components/multimonedas/currency-select';
 import {
@@ -166,7 +166,7 @@ export function SaleCreditPaymentModal({
         >
           <div className="mb-3 space-y-1 text-sm text-text">
             <p>Cliente: {saleCredit?.client || 'N/A'}</p>
-            <p>Pagar: {formatCurrency(saleCredit?.total ?? 0)}</p>
+            <p>Pagar: {formatMoneyWithCurrency(saleCredit?.total ?? 0, saleCredit?.currency)}</p>
           </div>
 
           <div className="mb-4">

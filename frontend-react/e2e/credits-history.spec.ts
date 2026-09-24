@@ -38,9 +38,14 @@ async function seedCreditSale(page: Page, storeId: string): Promise<void> {
       const [productId, product] = sellableProduct;
 
       // Create a credit sale
-      const creditKey = `lizoft.store-sale-credits-${sid}`;
+      // StorageKeys.entityKey('saleCredits', sid) — the entity name is
+      // 'saleCredits' (camelCase), NOT 'sale-credits'; the old key here was
+      // never read by SaleCreditOfflineService, so the view always showed 0.
+      const creditKey = `lizoft.store-saleCredits-${sid}`;
+      // SaleCreditOfflineService persists a FLAT SaleCredit[] (createSaleCredit
+      // pushes into getStorageSaleCredits() — never key→value pairs).
       const rawCredits = localStorage.getItem(creditKey);
-      let creditsEntries: [string, Record<string, unknown>][] = [];
+      let creditsEntries: Record<string, unknown>[] = [];
       if (rawCredits) {
         try {
           creditsEntries = JSON.parse(rawCredits);
@@ -54,17 +59,22 @@ async function seedCreditSale(page: Page, storeId: string): Promise<void> {
         orderId: crypto.randomUUID(),
         productId,
         productName: product['name'],
+        client: 'Cliente E2E',
         total: Number(product['price']) || 10,
+        paid: 0,
         paidAmount: 0,
         isPaid: false,
         date: new Date().toISOString(),
-        clientName: 'Cliente E2E',
+        paidDate: null,
+        paidType: null,
+        note: '',
+        currency: 0,
         isActive: true,
         createdDate: new Date().toISOString(),
         createdByName: 'e2e-seed',
       };
 
-      creditsEntries.push([credit.id, credit]);
+      creditsEntries.push(credit);
       localStorage.setItem(creditKey, JSON.stringify(creditsEntries));
     },
     { storeId },
@@ -127,10 +137,14 @@ test.describe.serial('FC-A4 — Historial de Créditos', () => {
     await page.goto('/sales/credits');
     await page.waitForLoadState('networkidle');
 
-    // Total should show $ prefix
-    const totalElement = page.locator('.text-danger.font-semibold').first();
+    // Unpaid total > 0 renders amber (text-warning) — owner request 2026-09-22
+    // (df1fd1f7). The count badge next to it is bg-success/10 + text-success,
+    // never text-warning, so the class pair is unique to the amount.
+    const totalElement = page.locator('.text-warning.font-semibold').first();
     await expect(totalElement).toBeVisible();
     const totalText = await totalElement.textContent();
-    expect(totalText).toMatch(/^\$/);
+    // Legacy path (no MultiMonedas module for this persona): CurrencyTotalAmount
+    // degrades to formatMoneyWithCurrency, which renders the currency code.
+    expect(totalText).toMatch(/[\d.,]+\u00A0?CUP$/);
   });
 });

@@ -4,7 +4,7 @@ import { ExpenseType, salePaymentMethodLabel } from '@store-mgmt/domain';
 import { resolvedExpensePaymentMethod } from '~/shared/lib/payment-method-resolved';
 import { InfoBox } from '~/shared/components/ui/info-box';
 import { ActionMenu, ActionMenuItem } from '~/shared/components/ui/action-menu';
-import { formatCurrency } from '~/shared/lib/format-currency';
+import { formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency';
 
 const EXPENSE_TYPE_KEYS: Record<ExpenseType, string> = {
   [ExpenseType.Salario]: 'EXPENSES.TYPE.SALARIO',
@@ -69,7 +69,7 @@ export function ExpenseList({ expenses, readOnly = false, onEdit, onDelete }: Ex
             </span>
             {/* Columna 3 — precio, alineado a la derecha. */}
             <span className="text-right text-sm font-semibold text-danger">
-              {formatCurrency(expense.total)}
+              {formatMoneyWithCurrency(expense.total, expense.currency)}
             </span>
           </div>
 

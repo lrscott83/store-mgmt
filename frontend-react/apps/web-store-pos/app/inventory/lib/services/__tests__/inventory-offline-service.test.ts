@@ -742,6 +742,20 @@ describe('InventoryOfflineService', () => {
       const all = service.getActiveInventoryEntriesStorage();
       expect(all.every((v) => v.id !== 'e2')).toBe(true);
     });
+
+    it('carries the stored cost currency into the view (csv-import-currency-matrix, 2026-09-24: the view previously dropped currency, so UIs showed CUP for non-CUP costs)', () => {
+      const map = new Map<string, InventoryEntry[]>();
+      map.set('p1', [
+        makeEntry('e1', 'p1', { costPrice: 6, quantity: 12, currency: Currency.USD }),
+        makeEntry('e2', 'p1', { costPrice: 4, quantity: 5, order: 1 }),
+      ]);
+      seedInventory(storeId, map);
+
+      const all = service.getActiveInventoryEntriesStorage();
+      expect(all.find((v) => v.id === 'e1')?.currency).toBe(Currency.USD);
+      expect(all.find((v) => v.id === 'e2')?.currency).toBeUndefined();
+      expect(all.find((v) => v.id === 'e1')?.costPrice).toBe(6);
+    });
   });
 
   // WU3 (category B) + Fase 4 (GATE-B — Angular-exact rename+zero-arg+category-repo sourcing):
@@ -1445,6 +1459,37 @@ describe('InventoryOfflineService', () => {
       expect(result).toEqual(Result.Success());
       const stored = service.getProductInventoriesByProductId('p1');
       expect(stored.map((e) => e.id)).toEqual(['e1']);
+    });
+  });
+
+  // Decision §9a (user-ratified 2026-09-23, last import wins): updateImportedEntries also
+  // applies the imported costPrice when the incoming entry carries one.
+  describe('updateImportedEntries costPrice propagation (decision §9a)', () => {
+    it('applies the imported costPrice to an existing entry', () => {
+      const map = new Map<string, InventoryEntry[]>();
+      map.set('p1', [makeEntry('e1', 'p1', { costPrice: 2.5, available: 5 })]);
+      seedInventory(storeId, map);
+
+      const incoming = [makeEntry('e1', 'p1', { costPrice: 9.9, available: 3 })];
+      const result = service.updateImportedEntries('p1', incoming);
+
+      expect(result).toEqual(Result.Success());
+      const stored = service.getProductInventoriesByProductId('p1');
+      expect(stored.find((e) => e.id === 'e1')?.costPrice).toBe(9.9);
+    });
+
+    it('preserves the local costPrice when the incoming entry has none (older ZIP)', () => {
+      const map = new Map<string, InventoryEntry[]>();
+      map.set('p1', [makeEntry('e1', 'p1', { costPrice: 7, available: 5 })]);
+      seedInventory(storeId, map);
+
+      const incoming = makeEntry('e1', 'p1', { available: 1 });
+      delete (incoming as { costPrice?: number }).costPrice;
+
+      service.updateImportedEntries('p1', [incoming]);
+
+      const stored = service.getProductInventoriesByProductId('p1');
+      expect(stored.find((e) => e.id === 'e1')?.costPrice).toBe(7);
     });
   });
 

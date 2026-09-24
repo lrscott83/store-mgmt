@@ -61,7 +61,7 @@ describe('SaleCreditList — list/table parity sweep (WU5)', () => {
         <SaleCreditList saleCredits={[makeSaleCredit({ total: 2000 })]} readOnly />
       </Wrapper>,
     );
-    expect(screen.getByText('$2 000')).toBeInTheDocument();
+    expect(screen.getByText('2 000 CUP')).toBeInTheDocument();
   });
 
   // credits-paid-green-filter (2026-09-22): row total is GREEN when paid, AMBER
@@ -72,7 +72,7 @@ describe('SaleCreditList — list/table parity sweep (WU5)', () => {
         <SaleCreditList saleCredits={[makeSaleCredit({ isPaid: true })]} readOnly />
       </Wrapper>,
     );
-    expect(screen.getByText('$2 000')).toHaveClass('text-success');
+    expect(screen.getByText('2 000 CUP')).toHaveClass('text-success');
   });
 
   it('keeps the total amber (text-warning) when the credit is not paid', () => {
@@ -81,6 +81,6 @@ describe('SaleCreditList — list/table parity sweep (WU5)', () => {
         <SaleCreditList saleCredits={[makeSaleCredit({ isPaid: false })]} readOnly />
       </Wrapper>,
     );
-    expect(screen.getByText('$2 000')).toHaveClass('text-warning');
+    expect(screen.getByText('2 000 CUP')).toHaveClass('text-warning');
   });
 });

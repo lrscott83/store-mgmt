@@ -339,9 +339,9 @@ describe('OrdersPage — per-day sales summary popup (gear menu)', () => {
     expect(within(dialog).getByText('Resumen de ventas del 01/01/2026')).toBeInTheDocument();
     // Revenue: 2*10 + 1*5 = 25; Cost: 2*4 + 1*1 = 9; Profit: 16.
     expect(within(dialog).getByText('2')).toBeInTheDocument();
-    expect(within(dialog).getByText('$25')).toBeInTheDocument();
-    expect(within(dialog).getByText('$9')).toBeInTheDocument();
-    expect(within(dialog).getByText('$16')).toBeInTheDocument();
+    expect(within(dialog).getByText('25 CUP')).toBeInTheDocument();
+    expect(within(dialog).getByText('9 CUP')).toBeInTheDocument();
+    expect(within(dialog).getByText('16 CUP')).toBeInTheDocument();
   });
 
   it('excludes inactive orders from the day summary (isActive filter, matching the today report)', () => {
@@ -376,9 +376,9 @@ describe('OrdersPage — per-day sales summary popup (gear menu)', () => {
 
     const dialog = screen.getByRole('dialog');
     expect(within(dialog).getByText('1')).toBeInTheDocument();
-    expect(within(dialog).getByText('$10')).toBeInTheDocument();
-    expect(within(dialog).getByText('$4')).toBeInTheDocument();
-    expect(within(dialog).getByText('$6')).toBeInTheDocument();
+    expect(within(dialog).getByText('10 CUP')).toBeInTheDocument();
+    expect(within(dialog).getByText('4 CUP')).toBeInTheDocument();
+    expect(within(dialog).getByText('6 CUP')).toBeInTheDocument();
   });
 
   it('ignores the page payment filter — the popup reports the whole day, like the today report', () => {
@@ -425,9 +425,9 @@ describe('OrdersPage — per-day sales summary popup (gear menu)', () => {
     const dialog = screen.getByRole('dialog');
     // Both orders of the day: revenue 10 + 20 = 30, cost 3 + 8 = 11, profit 19.
     expect(within(dialog).getByText('2')).toBeInTheDocument();
-    expect(within(dialog).getByText('$30')).toBeInTheDocument();
-    expect(within(dialog).getByText('$11')).toBeInTheDocument();
-    expect(within(dialog).getByText('$19')).toBeInTheDocument();
+    expect(within(dialog).getByText('30 CUP')).toBeInTheDocument();
+    expect(within(dialog).getByText('11 CUP')).toBeInTheDocument();
+    expect(within(dialog).getByText('19 CUP')).toBeInTheDocument();
   });
 
   it('closes the popup via the close buttons', () => {
@@ -483,11 +483,11 @@ describe('OrdersPage — filtro dinámico de métodos de pago', () => {
     expect(screen.getByText('Transferencia (CUP)')).toBeInTheDocument();
     expect(screen.queryByText('Zelle')).not.toBeInTheDocument();
 
-    // Filtrar por Transferencia (CUP) deja solo la venta Tarjeta: (1) y $50
+    // Filtrar por Transferencia (CUP) deja solo la venta Tarjeta: (1) y 50\u00A0CUP
     // (el texto también aparece en el panel del día, de ahí getAllByText).
     fireEvent.click(screen.getByText('Transferencia (CUP)'));
     expect(screen.getAllByText('(1)').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('$50').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('50 CUP').length).toBeGreaterThan(0);
   });
 
   it('T9: salePaymentMethod Transferencia en USD se presenta como Transferencia (CUP)', () => {

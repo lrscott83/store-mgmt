@@ -1660,6 +1660,125 @@ describe('OrderOfflineService', () => {
     });
   });
 
+  // Decision §9a (user-ratified 2026-09-23, last import wins): updateImportedOrder also
+  // replaces each item's productCosts from the imported order, matched by ARRAY INDEX.
+  describe('ORD-22: updateImportedOrder propagates imported productCosts (decision §9a)', () => {
+    it('replaces the local productCosts of every item with the imported ones when item counts match', () => {
+      const seeded = makeOrder({
+        id: 'o1',
+        orderItems: [
+          orderItemFor('p1', 'Coca Cola', { price: 5, qty: 2, costPrice: 1 }),
+          orderItemFor('p2', 'Fanta', { price: 3, qty: 1, costPrice: 2 }),
+        ],
+      });
+      seedOrders(storeId, [seeded]);
+      service = new OrderOfflineService(storeId);
+
+      const imported = makeOrder({
+        id: 'o1',
+        orderItems: [
+          orderItemFor('p1', 'Coca Cola', { price: 5, qty: 2, costPrice: 11 }),
+          orderItemFor('p2', 'Fanta', { price: 3, qty: 1, costPrice: 22 }),
+        ],
+      });
+
+      service.updateImportedOrder(imported);
+
+      const stored = findOrder('o1');
+      expect(stored?.orderItems[0].productCosts).toEqual(imported.orderItems[0].productCosts);
+      expect(stored?.orderItems[1].productCosts).toEqual(imported.orderItems[1].productCosts);
+      expect(stored?.orderItems[0].productCosts[0].costPrice).toBe(11);
+      expect(stored?.orderItems[1].productCosts[0].costPrice).toBe(22);
+    });
+
+    it('still narrow-merges the 4 audit fields and leaves total/isCredit/paymentType/description untouched', () => {
+      const seeded = makeOrder({
+        id: 'o1',
+        total: 500,
+        orderItems: [orderItemFor('p1', 'Coca Cola', { price: 5, qty: 2, costPrice: 1 })],
+        isCredit: true,
+        paymentType: PaymentType.Efectivo,
+        description: 'original description',
+      });
+      seedOrders(storeId, [seeded]);
+      service = new OrderOfflineService(storeId);
+
+      const updatedDate = new Date('2024-07-01T00:00:00.000Z');
+      const imported = makeOrder({
+        id: 'o1',
+        date: '2024-07-02T00:00:00.000Z' as unknown as Date,
+        isActive: false,
+        updatedDate,
+        updatedByName: 'jdoe',
+        total: 999,
+        orderItems: [orderItemFor('p1', 'Coca Cola', { price: 5, qty: 2, costPrice: 9 })],
+        isCredit: false,
+        paymentType: PaymentType.Tarjeta,
+        description: 'new description',
+      });
+
+      service.updateImportedOrder(imported);
+
+      const stored = findOrder('o1');
+      expect(stored?.date.toISOString()).toBe('2024-07-02T00:00:00.000Z');
+      expect(stored?.isActive).toBe(false);
+      expect(stored?.updatedDate).toEqual(updatedDate);
+      expect(stored?.updatedByName).toBe('jdoe');
+      expect(stored?.total).toBe(500);
+      expect(stored?.isCredit).toBe(true);
+      expect(stored?.paymentType).toBe(PaymentType.Efectivo);
+      expect(stored?.description).toBe('original description');
+      expect(stored?.orderItems[0].productCosts[0].costPrice).toBe(9);
+    });
+
+    it('leaves productCosts untouched when the imported order has a different number of items', () => {
+      const seeded = makeOrder({
+        id: 'o1',
+        orderItems: [
+          orderItemFor('p1', 'Coca Cola', { price: 5, qty: 2, costPrice: 1 }),
+          orderItemFor('p2', 'Fanta', { price: 3, qty: 1, costPrice: 2 }),
+        ],
+      });
+      seedOrders(storeId, [seeded]);
+      service = new OrderOfflineService(storeId);
+
+      const imported = makeOrder({
+        id: 'o1',
+        isActive: false,
+        orderItems: [orderItemFor('p1', 'Coca Cola', { price: 5, qty: 2, costPrice: 99 })],
+      });
+
+      service.updateImportedOrder(imported);
+
+      const stored = findOrder('o1');
+      expect(stored?.orderItems).toEqual(seeded.orderItems);
+      expect(stored?.orderItems[0].productCosts[0].costPrice).toBe(1);
+      expect(stored?.orderItems[1].productCosts[0].costPrice).toBe(2);
+      expect(stored?.isActive).toBe(false); // the 4-field merge still ran
+    });
+
+    it('keeps the local productCosts when the imported item carries no productCosts array', () => {
+      const seeded = makeOrder({
+        id: 'o1',
+        orderItems: [orderItemFor('p1', 'Coca Cola', { price: 5, qty: 2, costPrice: 1 })],
+      });
+      seedOrders(storeId, [seeded]);
+      service = new OrderOfflineService(storeId);
+
+      const imported = makeOrder({
+        id: 'o1',
+        orderItems: [orderItemFor('p1', 'Coca Cola', { price: 5, qty: 2, costPrice: 1 })],
+      });
+      // An old ZIP with no snapshot array must not wipe the local snapshot.
+      imported.orderItems[0].productCosts = undefined as unknown as OrderItem['productCosts'];
+
+      service.updateImportedOrder(imported);
+
+      const stored = findOrder('o1');
+      expect(stored?.orderItems[0].productCosts[0].costPrice).toBe(1);
+    });
+  });
+
   describe('ORD-21: updateProductCostsByInventoryIds (cost propagation, plan 2026-09-16 Fase 3)', () => {
     function costItem(inventoryId: string, costPrice: number, qty: number): OrderItem {
       return {

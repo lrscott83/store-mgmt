@@ -52,6 +52,7 @@ public class CreateStoreCommandValidatorOwnerTests
         SetupLocalizer("OwnerNotFound");
         SetupLocalizer("ModuleNotAvailableToStore");
         SetupLocalizer("UserAlreadyExists");
+        SetupLocalizer("ModuleNotAvailableForPagoPlan");
 
         _validator = new CreateStoreCommandValidator(
             _mockLocalizer.Object,

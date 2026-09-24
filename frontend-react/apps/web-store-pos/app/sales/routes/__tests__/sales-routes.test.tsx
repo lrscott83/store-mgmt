@@ -293,7 +293,7 @@ describe('TodaySaleCreditsPage — smoke render', () => {
         </Wrapper>,
       );
     });
-    expect(screen.queryByRole('radio')).toBeNull();
+    expect(screen.queryByRole('radio')).toBeNull(); // sin filtros (Angular parity)
   });
 });
 
@@ -325,7 +325,7 @@ describe('SaleCreditsPage — smoke render', () => {
     expect(screen.getByText('No se encontró ningún crédito')).toBeInTheDocument();
   });
 
-  it('has no date-range or paid/unpaid filters (Angular has none on this view)', async () => {
+  it('renders the date-range filter and the paid-state filter radios (credits-paid-green-filter contract)', async () => {
     await act(async () => {
       render(
         <Wrapper>
@@ -333,7 +333,7 @@ describe('SaleCreditsPage — smoke render', () => {
         </Wrapper>,
       );
     });
-    expect(screen.queryByRole('radio')).toBeNull();
-    expect(document.querySelector('input[type="date"]')).toBeNull();
+    expect(screen.getByTestId('date-range-filter-input')).toBeInTheDocument();
+    expect(screen.getAllByRole('radio')).toHaveLength(3);
   });
 });

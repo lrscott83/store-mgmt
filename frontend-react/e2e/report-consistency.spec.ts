@@ -101,8 +101,8 @@ test.describe.serial('S4-C1 — Reporte del día: consistencia', () => {
     await page.goto('/sales/today-stats');
     await expect(page.getByText(REPORT_HEADER)).toBeVisible();
 
-    // The report should show a total (starts with $)
-    await expect(page.locator('text=/^\\$[\\d,.]+$/').first()).toBeVisible();
+    // The report should show a total (amount + currency code, e.g. "1 000 CUP")
+    await expect(page.getByText(/^[\d.,]+\u00A0?CUP$/).first()).toBeVisible();
 
     // Expand the "Resumen Efectivo" panel to verify cash data
     const cashPanel = page.getByRole('button', { name: /Resumen Efectivo/ });

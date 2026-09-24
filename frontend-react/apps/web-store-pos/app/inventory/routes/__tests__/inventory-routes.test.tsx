@@ -3,13 +3,14 @@ import { act, render, screen, fireEvent, within, waitFor } from '@testing-librar
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 import type {
+  InventoryEntry,
   InventoryEntryView,
   Order,
   OrderItem,
   Product,
   ProductCategory,
 } from '@store-mgmt/domain';
-import { PaymentType, OrderType } from '@store-mgmt/domain';
+import { Currency, PaymentType, OrderType } from '@store-mgmt/domain';
 import { OrderOfflineService } from '~/sales/lib/services/order-offline-service';
 import { InventoryOfflineService } from '~/inventory/lib/services/inventory-offline-service';
 import type { InventoryCategoryView } from '~/inventory/lib/services/inventory-offline-service';
@@ -1577,20 +1578,20 @@ describe('InventoryTodaySalesProfitPage — product inclusion filter (Angular pa
       </Wrapper>,
     );
 
-    // Product row renders: name, sold=5, amount=$50 and profit=$50 (no cost, since no
+    // Product row renders: name, sold=5, amount=50\u00A0CUP and profit=50\u00A0CUP (no cost, since no
     // productCosts were recorded) — proves the discountFromInvantory=false product was NOT
-    // excluded and its sale is fully counted. Amounts render via formatCurrency ("$50",
+    // excluded and its sale is fully counted. Amounts render via formatCurrency ("50 CUP",
     // no trailing .00).
     // Scoped to the desktop table — the mobile card view (md:hidden) renders the same
     // product text a second time.
     const row = within(screen.getByRole('table')).getByText(/Ron/).closest('tr');
     expect(row).not.toBeNull();
     expect(row).toHaveTextContent('5'); // sold
-    expect(row).toHaveTextContent('$50'); // amount (5 * price 10)
-    expect(row).toHaveTextContent('$0'); // unitCost/totalCost (no productCosts)
+    expect(row).toHaveTextContent('50 CUP'); // amount (5 * price 10)
+    expect(row).toHaveTextContent('0 CUP'); // unitCost/totalCost (no productCosts)
     // Total row reflects the same values since it's the only product/sale today.
     const totalRow = screen.getByText('Total').closest('tr');
-    expect(totalRow).toHaveTextContent('$50');
+    expect(totalRow).toHaveTextContent('50 CUP');
   });
 });
 
@@ -1751,12 +1752,12 @@ describe('InventoryTodaySalesProfitPage — entry-only rows (gap #4)', () => {
     expect(row).not.toBeNull();
     // sold = 0
     expect(row).toHaveTextContent('0');
-    // avg unitCost = ((10*2) + (10*4)) / 20 = $3 (informational only)
-    expect(row).toHaveTextContent('$3');
+    // avg unitCost = ((10*2) + (10*4)) / 20 = 3\u00A0CUP (informational only)
+    expect(row).toHaveTextContent('3 CUP');
 
     // Totals unaffected: nothing was sold, so sold/amount/cost/profit all stay at 0.
     const totalRow = screen.getByText('Total').closest('tr');
-    expect(totalRow).toHaveTextContent('$0');
+    expect(totalRow).toHaveTextContent('0 CUP');
   });
 });
 
@@ -1797,7 +1798,7 @@ describe('InventoryTodaySalesProfitPage — non-mutating FIFO cost (gap #3c, del
       quantity: 3,
       price: 10,
       productBusinessId: 'biz-1',
-      // FIFO breakdown recorded at sale time: 2 units @ $2 + 1 unit @ $3 = totalCost 7.
+      // FIFO breakdown recorded at sale time: 2 units @ 2\u00A0CUP + 1 unit @ 3\u00A0CUP = totalCost 7.
       productCosts: [
         { inventoryId: 'e1', costPrice: 2, quantity: 2 },
         { inventoryId: 'e2', costPrice: 3, quantity: 1 },
@@ -1839,9 +1840,9 @@ describe('InventoryTodaySalesProfitPage — non-mutating FIFO cost (gap #3c, del
     // product text a second time.
     const row = within(screen.getByRole('table')).getByText(/Ron/).closest('tr');
     expect(row).toHaveTextContent('3'); // sold
-    expect(row).toHaveTextContent('$30'); // amount (3 * price 10)
-    expect(row).toHaveTextContent('$7'); // totalCost (FIFO: 2*2 + 1*3)
-    expect(row).toHaveTextContent('$23'); // profit (30 - 7)
+    expect(row).toHaveTextContent('30 CUP'); // amount (3 * price 10)
+    expect(row).toHaveTextContent('7 CUP'); // totalCost (FIFO: 2*2 + 1*3)
+    expect(row).toHaveTextContent('23 CUP'); // profit (30 - 7)
   });
 
   it('is idempotent: rendering the page twice with the same fixtures yields identical totals and never mutates the source order/entries (no double-deduct, unlike Angular)', () => {
@@ -1981,5 +1982,281 @@ describe('EgressPage — Mayorista wholesale-sale screen (Angular egress.compone
       OrderType.Merma,
       expect.any(Number),
     );
+  });
+});
+
+// ─── TodayEntriesPage — handleEdit preserves the warehouse-origin seal (A8) ────
+//
+// InventoryEntryView carries no `warehouseSaleOutMovementId`; handleEdit rebuilds the full
+// InventoryEntry from getActiveInventoryEntriesStorage(). The warehouse seal must survive that
+// rebuild, otherwise the modal would let the store edit a warehouse-origin entry.
+
+describe('TodayEntriesPage — handleEdit preserves the warehouse-origin seal (A8)', () => {
+  it('opens the edit modal with the warehouse cost lock when the stored entry carries the seal', async () => {
+    const todayEntries: InventoryEntryView[] = [
+      {
+        id: 'e1',
+        productId: 'p1',
+        productName: 'Ron',
+        quantity: 5,
+        costPrice: 3,
+        date: new Date(),
+        isActive: true,
+      },
+    ];
+    const storedEntry: InventoryEntry = {
+      id: 'e1',
+      productId: 'p1',
+      categoryId: 'cat1',
+      quantity: 5,
+      available: 5,
+      costPrice: 3,
+      date: new Date(),
+      order: 0,
+      isActive: true,
+      createdDate: new Date(),
+      createdByName: 'test',
+      updatedDate: new Date(),
+      updatedByName: 'test',
+      warehouseSaleOutMovementId: 'mv-1',
+    };
+    vi.mocked(InventoryOfflineService).mockImplementation(
+      () =>
+        ({
+          getInventoryEntriesInDay: vi.fn().mockReturnValue(bm(todayEntries)),
+          // Faithful double: the real projection returns InventoryEntryView[] and DROPS the
+          // warehouse seal; only getStorageInventoriesMap() exposes the full stored entry.
+          getActiveInventoryEntriesStorage: vi.fn().mockReturnValue([
+            {
+              id: 'e1',
+              productId: 'p1',
+              productName: '',
+              quantity: 5,
+              costPrice: 3,
+              date: new Date(),
+              isActive: true,
+            },
+          ]),
+          getStorageInventoriesMap: vi.fn().mockReturnValue(new Map([['p1', [storedEntry]]])),
+        }) as unknown as InstanceType<typeof InventoryOfflineService>,
+    );
+
+    render(
+      <Wrapper>
+        <TodayEntriesPage />
+      </Wrapper>,
+    );
+
+    fireEvent.click(screen.getByTestId('entry-actions-toggle-e1'));
+    fireEvent.click(screen.getByText('Editar'));
+
+    expect(await screen.findByTestId('entry-warehouse-cost-message')).toBeInTheDocument();
+    expect(screen.getByLabelText('Precio de costo')).toBeDisabled();
+  });
+});
+
+// ─── TodayEntriesPage — editing a multi-currency entry keeps its stored cost currency (csv-import-currency-matrix) ────
+//
+// handleEdit rebuilds the modal's InventoryEntry from the STORED entry (the view drops the
+// full shape). Before 2026-09-24 the rebuilt entry carried NO `currency`, so the modal
+// initialized CUP and SAVING the entry called update(..., currency: CUP), overwriting a USD
+// cost to CUP. The fix preserves `stored.currency`; this test locks the save-path contract:
+// update() must receive the STORED currency (USD), not the CUP default.
+
+describe('TodayEntriesPage — editing keeps the stored cost currency (csv-import-currency-matrix)', () => {
+  it('passes the STORED currency (USD) to update() when saving an edited USD entry', async () => {
+    const todayEntries: InventoryEntryView[] = [
+      {
+        id: 'e1',
+        productId: 'p1',
+        productName: 'Ron',
+        quantity: 5,
+        costPrice: 6,
+        date: new Date(),
+        isActive: true,
+        // Faithful double: the real projection carries `currency` since the 2026-09-24 mapper fix.
+        currency: Currency.USD,
+      },
+    ];
+    const storedEntry: InventoryEntry = {
+      id: 'e1',
+      productId: 'p1',
+      categoryId: 'cat-1',
+      quantity: 5,
+      available: 5,
+      costPrice: 6,
+      date: new Date(),
+      order: 0,
+      isActive: true,
+      createdDate: new Date(),
+      createdByName: 'test',
+      updatedDate: new Date(),
+      updatedByName: 'test',
+      currency: Currency.USD,
+    };
+    const updateMock = vi.fn().mockReturnValue({ succeeded: true, errors: [], data: todayEntries[0] });
+    vi.mocked(InventoryOfflineService).mockImplementation(
+      () =>
+        ({
+          getInventoryEntriesInDay: vi.fn().mockReturnValue(bm(todayEntries)),
+          getActiveInventoryEntriesStorage: vi.fn().mockReturnValue([todayEntries[0]]),
+          getStorageInventoriesMap: vi.fn().mockReturnValue(new Map([['p1', [storedEntry]]])),
+          getInventoryCategoriesView: vi.fn().mockReturnValue(bm([])),
+          getAvailableQuantity: vi.fn().mockReturnValue({ hasEntries: false, available: 0 }),
+          createInventoryEntry: vi.fn(),
+          update: updateMock,
+          deleteInventoryEntry: vi.fn(),
+          isNotSoldEntry: vi.fn().mockReturnValue({ succeeded: true, errors: [] }),
+        }) as unknown as InstanceType<typeof InventoryOfflineService>,
+    );
+
+    // handleSave's cost-edit propagation calls OrderOfflineService after a SUCCEEDED update;
+    // the shared module mock's plain instances lack the seam, so seed the real prototype and
+    // make the next construction resolve through it (T2 pattern).
+    OrderOfflineService.prototype.updateProductCostsByInventoryIds = () => ({
+      activeOrders: 0,
+      deactivatedOrders: 0,
+      updatedLines: 0,
+    });
+    vi.mocked(OrderOfflineService).mockImplementationOnce(() => {
+      const instance = Object.create(OrderOfflineService.prototype) as Record<string, unknown>;
+      instance.getStorageOrders = vi.fn().mockReturnValue([]);
+      instance.getActiveOrdersInDay = vi.fn().mockReturnValue([]);
+      return instance as unknown as InstanceType<typeof OrderOfflineService>;
+    });
+
+    try {
+      render(
+        <Wrapper>
+          <TodayEntriesPage />
+        </Wrapper>,
+      );
+
+      fireEvent.click(screen.getByTestId('entry-actions-toggle-e1'));
+      fireEvent.click(screen.getByText('Editar'));
+
+      const costInput = await screen.findByLabelText('Precio de costo');
+      expect(costInput).toHaveValue(6);
+      fireEvent.click(screen.getByText('Actualizar'));
+
+      // The 5th argument is the currency the modal passes through — MUST be the stored USD,
+      // never the CUP default (Currency.CUP = 0).
+      expect(updateMock).toHaveBeenCalledWith('e1', 'p1', 5, 6, Currency.USD);
+    } finally {
+      delete (OrderOfflineService.prototype as unknown as Record<string, unknown>)
+        .updateProductCostsByInventoryIds;
+    }
+  });
+});
+
+// ─── TodayEntriesPage — cost-edit propagation to sale snapshots (T2) ───────────
+//
+// After a store inventory entry's cost edit SUCCEEDS, the new cost must be pushed to the
+// sale snapshots that reference the entry, reusing the EXISTING
+// OrderOfflineService.updateProductCostsByInventoryIds seam (warehouse parity). The seam
+// itself is untouched and still only mutates ACTIVE orders.
+
+describe('TodayEntriesPage — cost-edit propagation to sale snapshots (T2)', () => {
+  beforeEach(() => {
+    mockEgressProducts = [makeEgressProduct({ id: 'p1', name: 'Ron' })];
+    mockEgressCategories = [makeCategory({ id: 'cat-1' })];
+  });
+
+  it('propagates the edited cost via updateProductCostsByInventoryIds, mapping the entry id to the new cost', async () => {
+    const entryId = 'e1';
+    const newCost = 7.5;
+    const todayEntries: InventoryEntryView[] = [
+      {
+        id: entryId,
+        productId: 'p1',
+        productName: 'Ron',
+        quantity: 5,
+        costPrice: 3,
+        date: new Date(),
+        isActive: true,
+      },
+    ];
+    const viewEntry: InventoryEntryView = { ...todayEntries[0] };
+    // Faithful double: the full stored entry has NO warehouseSaleOutMovementId, so the
+    // modal stays editable (only warehouse-origin entries are sealed).
+    const storedEntry: InventoryEntry = {
+      id: entryId,
+      productId: 'p1',
+      categoryId: 'cat-1',
+      quantity: 5,
+      available: 5,
+      costPrice: 3,
+      date: new Date(),
+      order: 0,
+      isActive: true,
+      createdDate: new Date(),
+      createdByName: 'test',
+      updatedDate: new Date(),
+      updatedByName: 'test',
+    };
+
+    const updateMock = vi.fn().mockReturnValue({
+      succeeded: true,
+      errors: [],
+      data: { ...viewEntry, costPrice: newCost },
+    });
+    vi.mocked(InventoryOfflineService).mockImplementation(
+      () =>
+        ({
+          getActiveInventoryEntriesStorage: vi.fn().mockReturnValue([viewEntry]),
+          getInventoryEntriesInDay: vi.fn().mockReturnValue(bm(todayEntries)),
+          getStorageInventoriesMap: vi.fn().mockReturnValue(new Map([['p1', [storedEntry]]])),
+          getInventoryCategoriesView: vi.fn().mockReturnValue(bm([])),
+          getAvailableQuantity: vi.fn().mockReturnValue({ hasEntries: false, available: 0 }),
+          createInventoryEntry: vi.fn(),
+          update: updateMock,
+          deleteInventoryEntry: vi.fn(),
+          isNotSoldEntry: vi.fn().mockReturnValue({ succeeded: true, errors: [] }),
+        }) as unknown as InstanceType<typeof InventoryOfflineService>,
+    );
+
+    // The shared module mock (top of file) replaces OrderOfflineService with a vi.fn() whose
+    // instances are plain object literals — the seam is therefore absent from the mocked
+    // prototype, so seed it before spying. The instance returned below is created with
+    // Object.create(prototype) so the call really resolves through the prototype (not an own
+    // property), mirroring the production `new OrderOfflineService(storeId).method()` shape.
+    OrderOfflineService.prototype.updateProductCostsByInventoryIds = () => ({
+      activeOrders: 0,
+      deactivatedOrders: 0,
+      updatedLines: 0,
+    });
+    const spy = vi
+      .spyOn(OrderOfflineService.prototype, 'updateProductCostsByInventoryIds')
+      .mockReturnValue({ activeOrders: 0, deactivatedOrders: 0, updatedLines: 0 });
+    vi.mocked(OrderOfflineService).mockImplementationOnce(() => {
+      const instance = Object.create(OrderOfflineService.prototype) as Record<string, unknown>;
+      instance.getStorageOrders = vi.fn().mockReturnValue([]);
+      instance.getActiveOrdersInDay = vi.fn().mockReturnValue([]);
+      return instance as unknown as InstanceType<typeof OrderOfflineService>;
+    });
+
+    try {
+      render(
+        <Wrapper>
+          <TodayEntriesPage />
+        </Wrapper>,
+      );
+
+      fireEvent.click(screen.getByTestId(`entry-actions-toggle-${entryId}`));
+      fireEvent.click(screen.getByText('Editar'));
+
+      const costInput = await screen.findByLabelText('Precio de costo');
+      fireEvent.change(costInput, { target: { value: String(newCost) } });
+      fireEvent.click(screen.getByText('Actualizar'));
+
+      expect(updateMock).toHaveBeenCalledWith(entryId, 'p1', 5, newCost, expect.any(Number));
+      expect(spy).toHaveBeenCalledTimes(1);
+      const costs = spy.mock.calls[0][0];
+      expect([...costs.entries()]).toEqual([[entryId, newCost]]);
+    } finally {
+      spy.mockRestore();
+      delete (OrderOfflineService.prototype as unknown as Record<string, unknown>)
+        .updateProductCostsByInventoryIds;
+    }
   });
 });

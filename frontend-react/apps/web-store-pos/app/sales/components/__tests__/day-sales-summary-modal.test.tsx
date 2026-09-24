@@ -14,7 +14,7 @@ function Wrapper({ children }: { children: React.ReactNode }) {
 
 // money-never-wraps — the per-day Resumen de ventas modal (opened from the
 // sales-history day gear menu) shows four money metrics in a 4-column grid;
-// on narrow screens a grouped amount like $1 234 567.89 must never split
+// on narrow screens a grouped amount like 1\u00A0CUP 234 567.89 must never split
 // across lines. formatCurrency groups thousands with U+00A0 (NBSP) and the
 // modal wraps every metric value in whitespace-nowrap. Pinned per user
 // report: amounts were being cut when the day panel expanded.
@@ -35,9 +35,9 @@ describe('DaySalesSummaryModal — money never wraps (no-cut invariant)', () => 
     );
     expect(screen.getByText('42')).toBeInTheDocument();
     // getByText normalizes NBSP → space, so matchers use the plain-space shape.
-    expect(screen.getByText('$1 234 567.89')).toBeInTheDocument();
-    expect(screen.getByText('$234 567.89')).toBeInTheDocument();
-    expect(screen.getByText('$999 999.99')).toBeInTheDocument();
+    expect(screen.getByText('1 234 567.89 CUP')).toBeInTheDocument();
+    expect(screen.getByText('234 567.89 CUP')).toBeInTheDocument();
+    expect(screen.getByText('999 999.99 CUP')).toBeInTheDocument();
   });
 
   it('renders every money metric inside a whitespace-nowrap element', () => {
@@ -46,7 +46,7 @@ describe('DaySalesSummaryModal — money never wraps (no-cut invariant)', () => 
         <DaySalesSummaryModal summary={summary} onClose={vi.fn()} />
       </Wrapper>,
     );
-    for (const text of ['$1 234 567.89', '$234 567.89', '$999 999.99']) {
+    for (const text of ['1 234 567.89 CUP', '234 567.89 CUP', '999 999.99 CUP']) {
       const el = screen.getByText(text);
       expect(el.className, `${text} must carry whitespace-nowrap`).toMatch(/whitespace-nowrap/);
     }
@@ -60,7 +60,7 @@ describe('DaySalesSummaryModal — money never wraps (no-cut invariant)', () => 
     );
     // Byte-level: the rendered DOM textContent carries U+00A0, not a regular
     // space — the browser has no break opportunity inside the amount.
-    const revenue = screen.getByText('$1 234 567.89');
-    expect(revenue.textContent).toContain('$1\u00A0234\u00A0567.89');
+    const revenue = screen.getByText('1 234 567.89 CUP');
+    expect(revenue.textContent).toContain('1\u00A0234\u00A0567.89\u00A0CUP');
   });
 });

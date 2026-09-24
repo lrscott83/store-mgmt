@@ -19,7 +19,7 @@ import {
 } from '~/shared/lib/auth/authorization-service';
 import { Card } from '~/shared/components/ui/card';
 import { ChevronDownIcon } from '~/shared/components/ui/icons';
-import { formatCurrency } from '~/shared/lib/format-currency';
+import { formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency';
 import { round2 } from '~/shared/lib/money';
 import type { CurrencyAmount } from '~/shared/lib/currency-totals';
 import { formatLocalDate } from '~/shared/lib/date-utils';
@@ -388,7 +388,9 @@ export function TodayStatsPage() {
                         {/* Angular renders this via <app-expense-list>, whose payment marker is
                             `<i class="bi …">` — but the bootstrap-icons font is imported nowhere
                             (styles.scss/index.html/angular.json), so no glyph renders. No icon. */}
-                        <span className="whitespace-nowrap">{formatCurrency(expense.total)}</span>
+                        <span className="whitespace-nowrap">
+                          {formatMoneyWithCurrency(expense.total, expense.currency)}
+                        </span>
                       </td>
                       <td className="p-1 text-right">
                         <span className="rounded-full bg-success/10 px-2 py-0.5 text-xs font-semibold text-success">
@@ -499,7 +501,7 @@ function SaleCreditsTable({ saleCredits }: { saleCredits: SaleCredit[] }) {
               <span
                 className={`whitespace-nowrap ${saleCredit.isPaid ? 'text-success' : 'text-danger'}`}
               >
-                {formatCurrency(saleCredit.total)}
+                {formatMoneyWithCurrency(saleCredit.total, saleCredit.currency)}
               </span>
             </td>
             <td className="p-1 text-right">

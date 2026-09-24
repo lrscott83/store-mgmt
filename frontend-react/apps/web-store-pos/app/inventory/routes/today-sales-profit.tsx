@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useIntl } from 'react-intl';
-import { EFeatures } from '@store-mgmt/domain';
+import { Currency, EFeatures } from '@store-mgmt/domain';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { Card } from '~/shared/components/ui/card';
@@ -12,7 +12,7 @@ import { ProductCategoryRepository } from '~/sales/lib/repositories/product-cate
 import { OrderOfflineService } from '~/sales/lib/services/order-offline-service';
 import { calculateOrderProfit } from '../lib/profit-calculator';
 import { round2 } from '~/shared/lib/money';
-import { formatCurrency } from '~/shared/lib/format-currency';
+import { formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency';
 
 export const clientLoader = featureLoader([EFeatures.InventoryTodaySaleProfit]);
 
@@ -49,6 +49,8 @@ interface ProductProfitRow {
   unitCost: number;
   totalCost: number;
   profit: number;
+  /** Moneda del precio de venta del producto (ausente = CUP). */
+  currency?: Currency;
 }
 
 interface CategoryGroup {
@@ -159,6 +161,7 @@ export function InventoryTodaySalesProfitPage() {
         unitCost,
         totalCost,
         profit,
+        currency: prod.currency,
       };
     });
 
@@ -215,7 +218,7 @@ export function InventoryTodaySalesProfitPage() {
         <div className="flex items-center justify-between">
           <span>{intl.formatMessage({ id: 'INVENTORY.PROFIT.TITLE' })}</span>
           <span className="text-lg font-bold text-success whitespace-nowrap">
-            {formatCurrency(totals.profit)}
+            {formatMoneyWithCurrency(totals.profit)}
           </span>
         </div>
       }
@@ -266,21 +269,25 @@ export function InventoryTodaySalesProfitPage() {
                         {product.sold}
                       </td>
                       <td className="px-4 py-3 text-right text-text-muted">
-                        <div className="whitespace-nowrap">{formatCurrency(product.salePrice)}</div>
+                        <div className="whitespace-nowrap">
+                          {formatMoneyWithCurrency(product.salePrice, product.currency)}
+                        </div>
                         <div className="whitespace-nowrap text-xs text-text-muted/70">
-                          {formatCurrency(product.amount)}
+                          {formatMoneyWithCurrency(product.amount, product.currency)}
                         </div>
                       </td>
                       <td className="px-4 py-3 text-right text-text-muted">
-                        <div className="whitespace-nowrap">{formatCurrency(product.unitCost)}</div>
+                        <div className="whitespace-nowrap">
+                          {formatMoneyWithCurrency(product.unitCost, product.currency)}
+                        </div>
                         <div className="whitespace-nowrap text-xs text-text-muted/70">
-                          {formatCurrency(product.totalCost)}
+                          {formatMoneyWithCurrency(product.totalCost, product.currency)}
                         </div>
                       </td>
                       <td
                         className={`px-4 py-3 text-right font-semibold whitespace-nowrap ${profitClass(product.profit)}`}
                       >
-                        {formatCurrency(product.profit)}
+                        {formatMoneyWithCurrency(product.profit, product.currency)}
                       </td>
                     </tr>
                   )),
@@ -293,15 +300,15 @@ export function InventoryTodaySalesProfitPage() {
                   </td>
                   <td className="px-4 py-3 text-right text-text">{totals.sold}</td>
                   <td className="px-4 py-3 text-right text-text whitespace-nowrap">
-                    {formatCurrency(totals.amount)}
+                    {formatMoneyWithCurrency(totals.amount)}
                   </td>
                   <td className="px-4 py-3 text-right text-text whitespace-nowrap">
-                    {formatCurrency(totals.cost)}
+                    {formatMoneyWithCurrency(totals.cost)}
                   </td>
                   <td
                     className={`px-4 py-3 text-right whitespace-nowrap ${profitClass(totals.profit)}`}
                   >
-                    {formatCurrency(totals.profit)}
+                    {formatMoneyWithCurrency(totals.profit)}
                   </td>
                 </tr>
               </tfoot>
@@ -333,10 +340,10 @@ export function InventoryTodaySalesProfitPage() {
                       {intl.formatMessage({ id: 'INVENTORY.PROFIT.PRICE' })}
                     </p>
                     <p className="text-text whitespace-nowrap">
-                      {formatCurrency(product.salePrice)}
+                      {formatMoneyWithCurrency(product.salePrice, product.currency)}
                     </p>
                     <p className="text-text-muted/70 whitespace-nowrap">
-                      {formatCurrency(product.amount)}
+                      {formatMoneyWithCurrency(product.amount, product.currency)}
                     </p>
                   </div>
                   <div>
@@ -344,10 +351,10 @@ export function InventoryTodaySalesProfitPage() {
                       {intl.formatMessage({ id: 'INVENTORY.PROFIT.COST' })}
                     </p>
                     <p className="text-text whitespace-nowrap">
-                      {formatCurrency(product.unitCost)}
+                      {formatMoneyWithCurrency(product.unitCost, product.currency)}
                     </p>
                     <p className="text-text-muted/70 whitespace-nowrap">
-                      {formatCurrency(product.totalCost)}
+                      {formatMoneyWithCurrency(product.totalCost, product.currency)}
                     </p>
                   </div>
                   <div>
@@ -355,7 +362,7 @@ export function InventoryTodaySalesProfitPage() {
                       {intl.formatMessage({ id: 'INVENTORY.PROFIT.PROFIT' })}
                     </p>
                     <p className={`font-semibold whitespace-nowrap ${profitClass(product.profit)}`}>
-                      {formatCurrency(product.profit)}
+                      {formatMoneyWithCurrency(product.profit, product.currency)}
                     </p>
                   </div>
                 </div>

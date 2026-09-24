@@ -1,5 +1,5 @@
 import type { Order } from '@store-mgmt/domain';
-import { formatCurrency } from '~/shared/lib/format-currency';
+import { formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency';
 import { round2 } from '~/shared/lib/money';
 
 interface OrderItemListProps {
@@ -34,7 +34,7 @@ export function OrderItemList({ order }: OrderItemListProps) {
                   </td>
                   <td className="p-2 text-right">
                     <span className="font-semibold text-text whitespace-nowrap">
-                      {formatCurrency(round2(item.price * item.quantity))}
+                      {formatMoneyWithCurrency(round2(item.price * item.quantity))}
                     </span>
                   </td>
                 </tr>

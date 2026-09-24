@@ -264,6 +264,29 @@ describe('StorePaymentMethodsConfigService — read seam', () => {
   });
 });
 
+describe('StorePaymentMethodsConfigService — missing data key (Grupo A)', () => {
+  const ENCRYPTED = 'enc:v1:AAECAwQFBgcICQoLDA0ODw==';
+
+  it('falls back to the default catalogue when the stored config is encrypted and no DEK is in memory', () => {
+    localStorage.setItem(storageKey(S1), ENCRYPTED);
+    const service = new StorePaymentMethodsConfigService(S1);
+    expect(service.getConfig()).toEqual(DEFAULT_STORE_PAYMENT_METHODS_CONFIG);
+    expect(service.getEnabledMethods()).toEqual([...DEFAULT_ENABLED_PAYMENT_METHODS]);
+  });
+
+  it('does NOT overwrite or delete the stored bytes when falling back', () => {
+    localStorage.setItem(storageKey(S1), ENCRYPTED);
+    new StorePaymentMethodsConfigService(S1).getConfig();
+    expect(localStorage.getItem(storageKey(S1))).toBe(ENCRYPTED);
+  });
+
+  it('auto-init still persists the default when the key is genuinely absent (unchanged)', () => {
+    const service = new StorePaymentMethodsConfigService(S1);
+    expect(service.getConfig()).toEqual(DEFAULT_STORE_PAYMENT_METHODS_CONFIG);
+    expect(localStorage.getItem(storageKey(S1))).not.toBeNull();
+  });
+});
+
 describe('StorePaymentMethodsConfigService — backup seams (store-payment-methods-backup)', () => {
   const LEGACY_CONFIG: StorePaymentMethodsConfig = {
     enabledMethods: [SalePaymentMethod.Efectivo, SalePaymentMethod.Transferencia],

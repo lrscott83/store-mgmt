@@ -207,9 +207,9 @@ describe('WarehousesPage', () => {
     expect(screen.getByTestId('warehouse-toggle-Central').textContent).toContain('(34)');
     // format-currency usa NBSP (U+00A0) como separador de miles — el header del
     // almacén y el resumen global muestran el mismo monto.
-    expect(screen.getByTestId('warehouses-total-cost').textContent).toBe('$16\u00A0840');
+    expect(screen.getByTestId('warehouses-total-cost').textContent).toBe('16\u00A0840\u00A0CUP');
     const headerCost = screen.getByTestId('warehouse-toggle-Central').textContent ?? '';
-    expect(headerCost).toContain('$16\u00A0840');
+    expect(headerCost).toContain('16\u00A0840\u00A0CUP');
   });
 
   it('shows zeroed counters for an empty warehouse (WUI-1-b)', async () => {
@@ -218,7 +218,7 @@ describe('WarehousesPage', () => {
     ];
     renderPage();
     expect(screen.getByTestId('warehouse-toggle-Vacío').textContent).toContain('(0)');
-    expect(screen.getAllByText('$0')).toHaveLength(2); // header del almacén + resumen global
+    expect(screen.getAllByText('0 CUP')).toHaveLength(2); // header del almacén + resumen global
   });
 
   it('renders the gear with Entrada/Movimiento/Salida and Editar/Desactivar, no flat buttons (WUI-2-a)', async () => {
@@ -247,12 +247,12 @@ describe('WarehousesPage', () => {
       const bebidasHeader = screen.getByTestId('warehouse-category-toggle-wh-1-cat-1');
       expect(bebidasHeader.textContent).toContain('Bebidas');
       expect(bebidasHeader.textContent).toContain('(24)');
-      expect(bebidasHeader.textContent).toContain('$15\u00A0840'); // 24 × 660
+      expect(bebidasHeader.textContent).toContain('15\u00A0840\u00A0CUP'); // 24 × 660
 
       const lacteosHeader = screen.getByTestId('warehouse-category-toggle-wh-1-cat-2');
       expect(lacteosHeader.textContent).toContain('Lácteos');
       expect(lacteosHeader.textContent).toContain('(10)');
-      expect(lacteosHeader.textContent).toContain('$1\u00A0000'); // 10 × 100
+      expect(lacteosHeader.textContent).toContain('1\u00A0000\u00A0CUP'); // 10 × 100
     });
 
     it('shows product rows with quantity and costs, same layout as Disponible (WUI-4-b)', async () => {
@@ -274,13 +274,13 @@ describe('WarehousesPage', () => {
       expect(screen.getByTestId('warehouse-product-row-wh-1-prod-2').textContent).toContain('(10)');
 
       // Costo promedio y total por producto (mismo diseño que Disponible).
-      expect(screen.getByTestId('warehouse-product-cost-wh-1-prod-1').textContent).toBe('$660');
+      expect(screen.getByTestId('warehouse-product-cost-wh-1-prod-1').textContent).toBe('660\u00A0CUP');
       expect(screen.getByTestId('warehouse-product-total-wh-1-prod-1').textContent).toBe(
-        '$15\u00A0840',
+        '15\u00A0840\u00A0CUP',
       );
-      expect(screen.getByTestId('warehouse-product-cost-wh-1-prod-2').textContent).toBe('$100');
+      expect(screen.getByTestId('warehouse-product-cost-wh-1-prod-2').textContent).toBe('100\u00A0CUP');
       expect(screen.getByTestId('warehouse-product-total-wh-1-prod-2').textContent).toBe(
-        '$1\u00A0000',
+        '1\u00A0000\u00A0CUP',
       );
     });
 

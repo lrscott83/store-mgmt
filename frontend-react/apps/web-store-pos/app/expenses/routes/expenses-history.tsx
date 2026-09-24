@@ -12,11 +12,12 @@ import {
   matchesExpensePaymentFilter,
   paymentMethodKeyToLabel,
 } from '~/shared/lib/payment-filter-options';
-import { formatLocalDate, groupByLocalDay } from '~/shared/lib/date-utils';
+import { formatLocalDate, groupByLocalDay, addDays, startOfDay } from '~/shared/lib/date-utils';
 import type { LocalDayGroup } from '~/shared/lib/date-utils';
+import { DateRangeFilter } from '~/shared/components/date-range-filter/date-range-filter';
 import { ExpenseOfflineService } from '../lib/services/expense-offline-service';
 import { ExpenseList } from '../components/expense-list';
-import { formatCurrency } from '~/shared/lib/format-currency';
+import { formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency';
 import { useMultiStore } from '~/shared/lib/hooks/use-multi-store';
 import {
   MultiStoreSection,
@@ -63,6 +64,13 @@ export function ExpensesHistoryPage() {
   const [paymentKey, setPaymentKey] = useState<string | null>(null);
   const [dayGroups, setDayGroups] = useState<LocalDayGroup<Expense>[]>([]);
   const [expandedDayIds, setExpandedDayIds] = useState<Set<string>>(new Set());
+  // Filtro de rango de fechas (2026-09-23) — el mismo DateRangeFilter compartido
+  // de entries/credits: ventana half-open [start, medianoche siguiente), día
+  // final INCLUYENTE. Sin rango → all-time history (paridad Angular).
+  const [dateRange, setDateRange] = useState<{ start: Date | null; end: Date | null }>({
+    start: null,
+    end: null,
+  });
   // multi-store-panels: OwnerAdmin + MultiStores + ≥2 tiendas activas → el
   // filtro de método de pago es GLOBAL fuera de los paneles, un panel
   // colapsable por tienda con su acordeón por día y totales fuera de los
@@ -77,7 +85,12 @@ export function ExpensesHistoryPage() {
   // (dynamic options + rows from the same dataset).
   async function loadExpenses() {
     const svc = new ExpenseOfflineService(storeId);
-    const response = await svc.filterExpensesObservable(undefined, undefined, undefined, undefined);
+    // Rango del usuario (2026-09-23): filterExpensesObservable compara RAW
+    // (endDate EXCLUYENTE) — navegar el fin a medianoche del día siguiente
+    // para incluir el día seleccionado. Sin rango → all-time (paridad).
+    const start = dateRange.start ? startOfDay(dateRange.start) : undefined;
+    const end = dateRange.end ? startOfDay(addDays(dateRange.end, 1)) : undefined;
+    const response = await svc.filterExpensesObservable(undefined, undefined, start, end);
     // ExpenseOfflineService.filterExpensesObservable is a same-tick `Promise.resolve(success(...))`
     // over local storage — it never actually fails; this guard exists for the type only.
     if (!response.succeeded) return;
@@ -96,8 +109,8 @@ export function ExpensesHistoryPage() {
 
   useEffect(() => {
     void loadExpenses();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadExpenses reads only storeId
-  }, [storeId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadExpenses reads storeId + the primitive date bounds
+  }, [storeId, dateRange.start, dateRange.end]);
 
   function toggleDayPanel(dayId: string) {
     setExpandedDayIds((prev) => {
@@ -135,23 +148,32 @@ export function ExpensesHistoryPage() {
 
   // ─── multi-store mode ────────────────────────────────────────────────────
   if (multiStoreEnabled) {
+    // Rango aplicado también a los datos por tienda (lectura local): ventana
+    // half-open [start, medianoche siguiente), día final INCLUYENTE — mismas
+    // reglas que el modo single-store y que entries.tsx.
+    const rangeStart = dateRange.start ? startOfDay(dateRange.start) : null;
+    const rangeEnd = dateRange.end ? startOfDay(addDays(dateRange.end, 1)) : null;
+    const inDateRange = (e: Expense): boolean =>
+      (!rangeStart || new Date(e.date) >= rangeStart) &&
+      (!rangeEnd || new Date(e.date) < rangeEnd);
+
     const visibleStoreIds =
       selectedMultiStoreId === null
         ? multiStoreStores.map((s) => s.id)
         : [selectedMultiStoreId];
 
     // Opciones dinámicas: métodos presentes en el conjunto visible por el
-    // filtro de tienda (con "Todas las tiendas" agrega todas).
+    // filtro de tienda Y de fechas (con "Todas las tiendas" agrega todas).
     const baseExpenses = visibleStoreIds.flatMap((id) =>
-      multiActiveExpenses(storeExpenses.get(id) ?? []),
+      multiActiveExpenses(storeExpenses.get(id) ?? []).filter(inDateRange),
     );
     const paymentOptions = collectExpensePaymentMethodKeys(baseExpenses);
     const paymentActive =
       paymentKey !== null && paymentOptions.includes(paymentKey) ? paymentKey : null;
     const visibleExpenses = (expenses: Expense[]): Expense[] =>
-      multiActiveExpenses(expenses).filter(
-        (e) => !paymentActive || matchesExpensePaymentFilter(e, paymentActive),
-      );
+      multiActiveExpenses(expenses)
+        .filter(inDateRange)
+        .filter((e) => !paymentActive || matchesExpensePaymentFilter(e, paymentActive));
 
     const totals = visibleStoreIds.reduce(
       (acc, id) => {
@@ -176,7 +198,7 @@ export function ExpensesHistoryPage() {
               </span>
             </span>
             <span className="text-sm font-semibold text-danger whitespace-nowrap">
-              {formatCurrency(totals.total)}
+              {formatMoneyWithCurrency(totals.total)}
             </span>
           </div>
         }
@@ -186,34 +208,45 @@ export function ExpensesHistoryPage() {
           selectedStoreId={selectedMultiStoreId}
           onSelectedStoreIdChange={setSelectedMultiStoreId}
           filters={
-            <div
-              role="radiogroup"
-              aria-label={intl.formatMessage({ id: 'EXPENSES.FORM.PAYMENT_TYPE' })}
-              className="flex flex-wrap gap-4"
-            >
-              <label className="flex items-center gap-1.5 text-sm text-text">
-                <input
-                  type="radio"
-                  name="multistore-expense-payment-type-filter"
-                  checked={paymentActive === null}
-                  onChange={() => setPaymentKey(null)}
-                  className="text-primary focus:ring-primary"
-                />
-                {intl.formatMessage({ id: 'GENERAL.ALL' })}
-              </label>
-              {paymentOptions.map((key) => (
-                <label key={key} className="flex items-center gap-1.5 text-sm text-text">
+            // Petición 2026-09-24: fila 1 — el rango de fechas comparte la MISMA
+            // fila que el select de tiendas, estirado hacia la derecha (el mismo
+            // patrón flex-1 de credits.tsx); fila 2 — método de pago (w-full,
+            // MultiStoreSection la baja a su propia línea con flex-wrap).
+            <>
+              <DateRangeFilter
+                value={dateRange}
+                onApply={setDateRange}
+                className="flex-1 min-w-0"
+              />
+              <div
+                role="radiogroup"
+                aria-label={intl.formatMessage({ id: 'EXPENSES.FORM.PAYMENT_TYPE' })}
+                className="flex w-full flex-wrap gap-4"
+              >
+                <label className="flex items-center gap-1.5 text-sm text-text">
                   <input
                     type="radio"
                     name="multistore-expense-payment-type-filter"
-                    checked={paymentActive === key}
-                    onChange={() => setPaymentKey(key)}
+                    checked={paymentActive === null}
+                    onChange={() => setPaymentKey(null)}
                     className="text-primary focus:ring-primary"
                   />
-                  {paymentMethodKeyToLabel(key)}
+                  {intl.formatMessage({ id: 'GENERAL.ALL' })}
                 </label>
-              ))}
-            </div>
+                {paymentOptions.map((key) => (
+                  <label key={key} className="flex items-center gap-1.5 text-sm text-text">
+                    <input
+                      type="radio"
+                      name="multistore-expense-payment-type-filter"
+                      checked={paymentActive === key}
+                      onChange={() => setPaymentKey(key)}
+                      className="text-primary focus:ring-primary"
+                    />
+                    {paymentMethodKeyToLabel(key)}
+                  </label>
+                ))}
+              </div>
+            </>
           }
           renderStoreCount={(store) => {
             const filtered = visibleExpenses(storeExpenses.get(store.id) ?? []);
@@ -261,7 +294,9 @@ export function ExpensesHistoryPage() {
                         </span>
                         <span className="flex items-center gap-2">
                           <span className="text-xs font-semibold text-danger whitespace-nowrap">
-                            {formatCurrency(dayGroup.items.reduce((total, e) => total + e.total, 0))}
+                            {formatMoneyWithCurrency(
+                              dayGroup.items.reduce((total, e) => total + e.total, 0),
+                            )}
                           </span>
                           <ChevronDownIcon isExpanded={isExpanded} className="text-text-muted" />
                         </span>
@@ -313,12 +348,18 @@ export function ExpensesHistoryPage() {
             </span>
           </span>
           <span className="text-sm font-semibold text-danger whitespace-nowrap">
-            {formatCurrency(expensesTotal)}
+            {formatMoneyWithCurrency(expensesTotal)}
           </span>
         </div>
       }
     >
       <div className="space-y-4">
+        {/* Filtro de rango de fechas (2026-09-23) — alineado a la derecha,
+            igual que en entries y credits. */}
+        <div className="flex justify-end">
+          <DateRangeFilter value={dateRange} onApply={setDateRange} className="w-full sm:w-72" />
+        </div>
+
         {/* Payment-type filter — dynamic options from the loaded expenses
             (Angular's mat-radio-group, options now reflect the actual data). */}
         <div
@@ -374,7 +415,7 @@ export function ExpensesHistoryPage() {
                   </span>
                   <span className="flex items-center gap-2">
                     <span className="text-sm font-semibold text-danger whitespace-nowrap">
-                      {formatCurrency(dayGroup.items.reduce((total, e) => total + e.total, 0))}
+                      {formatMoneyWithCurrency(dayGroup.items.reduce((total, e) => total + e.total, 0))}
                     </span>
                     <ChevronDownIcon isExpanded={isExpanded} className="text-text-muted" />
                   </span>

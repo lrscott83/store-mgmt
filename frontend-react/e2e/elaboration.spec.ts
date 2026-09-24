@@ -58,9 +58,9 @@ test.describe.serial('Elaboración — costo real descontado en la primera venta
 
     const FINISHED_PRICE = 25;
     const PAYMENT = '25';
-    const EXPECTED_TOTAL_COST = '$100';
-    const EXPECTED_UNIT_COST = '$5';
-    const EXPECTED_PROFIT = '$20';
+    const EXPECTED_TOTAL_COST = '100 CUP';
+    const EXPECTED_UNIT_COST = '5 CUP';
+    const EXPECTED_PROFIT = '20 CUP';
 
     // ── Step 2 (part 1): the three products the recipe needs. ──────────────
     // Ingredients (any price) + the new finished product at $25.

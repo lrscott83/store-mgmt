@@ -2,7 +2,7 @@ import { useRef, useState, useEffect, useMemo } from 'react';
 import { useIntl } from 'react-intl';
 import type { Product } from '@store-mgmt/domain';
 import type { ChannelRate } from '@store-mgmt/domain';
-import { Currency } from '@store-mgmt/domain';
+import { Currency, OrderType } from '@store-mgmt/domain';
 import {
   SalePaymentMethod,
   applyPaymentPricing,
@@ -71,16 +71,19 @@ function getWholesaleConfigSafe(product: Product) {
 }
 
 /**
- * Línea de precio del carrito:
+ * Línea de precio del carrito — el modo lo define el orderType del carrito
+ * (cart-wholesale-by-order-type 2026-09-23):
  * - Venta mayorista: "Cajas: 2 · Precio: $15 840" — cantidad en PAQUETES y el precio
  *   DEL PAQUETE (unitPrice × packSize).
- * - Venta normal: "Precio: $5 (10)" — precio unitario + unidades, como siempre.
+ * - Venta normal: "Precio: $5 (10)" — precio unitario + unidades, como siempre,
+ *   incluso para productos con config mayorista.
  */
 function formatWholesaleLine(
   item: { product: Product; quantity: number; price?: number },
   currency: number,
+  orderType: OrderType,
 ): string {
-  const config = getWholesaleConfigSafe(item.product);
+  const config = orderType === OrderType.Mayorista ? getWholesaleConfigSafe(item.product) : undefined;
   if (!config) {
     return `${intlPriceLabel()}${formatMoneyWithCurrency(item.price ?? item.product.price, currency)} (${item.quantity})`;
   }
@@ -151,7 +154,7 @@ export function CartShell() {
 
   // Venta mayorista: el badge cuenta PAQUETES (cajas), no unidades. En venta normal
   // sigue contando unidades (cartBadgeCount cae a la suma por producto sin config).
-  const itemCount = wholesaleCartDisplay.cartBadgeCount(items);
+  const itemCount = wholesaleCartDisplay.cartBadgeCount(items, orderType);
 
   // T21: las filas se convierten a la moneda de la venta con el MISMO registro de
   // tasas que usa la lista, para que el bloqueo de "Registrar" coincida exactamente
@@ -334,10 +337,16 @@ export function CartShell() {
   // possibly-stale one cached on the cart item) exactly like Angular's
   // productService.getProductById inside addCartItem.
   async function handleQuantityChange(productId: string, currentQuantity: number, delta: number) {
-    // Venta mayorista: los botones +/- trabajan en PAQUETES, no unidades. El paso es
-    // packSize (24 unidades por click) para productos con config mayorista; en normal, 1.
+    // Solo en venta MAYORISTA (orderType del carrito) los botones +/- trabajan en
+    // PAQUETES: el paso es packSize (24 unidades por click) para productos con
+    // config mayorista; en venta normal (o sin config) el paso es 1 unidad.
+    // cart-wholesale-by-order-type 2026-09-23: el modo lo define el carrito, no
+    // la config del producto.
     const stepProduct = items.find((i) => i.product.id === productId)?.product;
-    const config = stepProduct ? getWholesaleConfigSafe(stepProduct) : undefined;
+    const config =
+      orderType === OrderType.Mayorista && stepProduct
+        ? getWholesaleConfigSafe(stepProduct)
+        : undefined;
     const step = config ? config.packSize : 1;
     const deltaUnits = delta * step;
 
@@ -736,7 +745,7 @@ export function CartShell() {
                             {item.product.name}
                           </p>
                           <p className="text-xs text-text-muted">
-                            {formatWholesaleLine(displayItem, saleCurrency)}
+                            {formatWholesaleLine(displayItem, saleCurrency, orderType)}
                           </p>
                         </div>
                         <p className="text-sm text-text whitespace-nowrap">{money(lineTotal)}</p>

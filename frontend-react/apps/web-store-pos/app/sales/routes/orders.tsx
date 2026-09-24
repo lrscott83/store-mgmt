@@ -362,51 +362,54 @@ export function OrdersPage() {
           selectedStoreId={selectedMultiStoreId}
           onSelectedStoreIdChange={setSelectedMultiStoreId}
           filters={
-            <div className="flex flex-1 min-w-0 flex-col gap-2">
-              {/* Fila 1: tienda (select del componente compartido) + rango de fechas
-                  alineado a la derecha; filas 2/3: método de pago y pagadas/créditos
-                  (petición 2026-09-21). */}
-              <div className="flex flex-wrap items-center justify-end">
-                <DateRangeFilter
-                  value={dateRange}
-                  onApply={setDateRange}
-                  className="w-64 max-w-full"
-                />
+            // Petición 2026-09-24: tres filas de filtros — fila 1: tienda
+            // (select del componente compartido) + rango de fechas en la MISMA
+            // fila, estirado hacia la derecha (mismo patrón flex-1 que
+            // credits.tsx); fila 2: método de pago; fila 3: pagadas/créditos.
+            // Las filas 2 y 3 son w-full para que flex-wrap del componente
+            // compartido las baje a su propia línea debajo del select.
+            <>
+              <DateRangeFilter
+                value={dateRange}
+                onApply={setDateRange}
+                className="flex-1 min-w-0"
+              />
+              <div className="w-full">{paymentFieldset}</div>
+              <div className="w-full">
+                <fieldset className="flex flex-wrap items-center gap-4">
+                  <label className="flex items-center gap-1 text-sm text-text">
+                    <input
+                      type="radio"
+                      name="multistore-isCredit"
+                      checked={isCredit === -1}
+                      onChange={() => setIsCredit(-1)}
+                      className="accent-primary"
+                    />
+                    Todas
+                  </label>
+                  <label className="flex items-center gap-1 text-sm text-text">
+                    <input
+                      type="radio"
+                      name="multistore-isCredit"
+                      checked={isCredit === 0}
+                      onChange={() => setIsCredit(0)}
+                      className="accent-primary"
+                    />
+                    Pagadas
+                  </label>
+                  <label className="flex items-center gap-1 text-sm text-text">
+                    <input
+                      type="radio"
+                      name="multistore-isCredit"
+                      checked={isCredit === 1}
+                      onChange={() => setIsCredit(1)}
+                      className="accent-primary"
+                    />
+                    <span className="text-warning">Créditos</span>
+                  </label>
+                </fieldset>
               </div>
-              {paymentFieldset}
-              <fieldset className="flex flex-wrap items-center gap-4">
-                <label className="flex items-center gap-1 text-sm text-text">
-                  <input
-                    type="radio"
-                    name="multistore-isCredit"
-                    checked={isCredit === -1}
-                    onChange={() => setIsCredit(-1)}
-                    className="accent-primary"
-                  />
-                  Todas
-                </label>
-                <label className="flex items-center gap-1 text-sm text-text">
-                  <input
-                    type="radio"
-                    name="multistore-isCredit"
-                    checked={isCredit === 0}
-                    onChange={() => setIsCredit(0)}
-                    className="accent-primary"
-                  />
-                  Pagadas
-                </label>
-                <label className="flex items-center gap-1 text-sm text-text">
-                  <input
-                    type="radio"
-                    name="multistore-isCredit"
-                    checked={isCredit === 1}
-                    onChange={() => setIsCredit(1)}
-                    className="accent-primary"
-                  />
-                  <span className="text-warning">Créditos</span>
-                </label>
-              </fieldset>
-            </div>
+            </>
           }
           renderStoreCount={(store) => {
             const filtered = visibleOrders(storeOrders.get(store.id) ?? []);

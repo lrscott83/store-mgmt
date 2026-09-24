@@ -22,7 +22,7 @@ import {
   SwapHorizontalIcon,
 } from '~/shared/components/ui/icons';
 import { formatLocalDate, groupByLocalDay } from '~/shared/lib/date-utils';
-import { formatCurrency } from '~/shared/lib/format-currency';
+import { formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency';
 import { WarehouseOfflineService } from '../lib/services/warehouse-offline-service';
 import type { PurchasePropagationPreview } from '../lib/services/warehouse-offline-service';
 import { InventoryOfflineService } from '../lib/services/inventory-offline-service';
@@ -294,8 +294,8 @@ export function WarehouseMovementsPage() {
         soldUnits: preview.soldUnits,
         sales: preview.activeOrders,
         storeUnits: preview.storeUnits,
-        from: formatCurrency(preview.from),
-        to: formatCurrency(preview.to),
+        from: formatMoneyWithCurrency(preview.from),
+        to: formatMoneyWithCurrency(preview.to),
       },
     );
     if (preview.deactivatedOrders > 0) {
@@ -464,7 +464,10 @@ export function WarehouseMovementsPage() {
                               </span>
                               {movement.costPrice != null && (
                                 <span className="shrink-0 text-sm font-semibold text-text">
-                                  {formatCurrency(movement.quantity * movement.costPrice)}
+                                  {formatMoneyWithCurrency(
+                                    movement.quantity * movement.costPrice,
+                                    movement.currency,
+                                  )}
                                 </span>
                               )}
                             </>

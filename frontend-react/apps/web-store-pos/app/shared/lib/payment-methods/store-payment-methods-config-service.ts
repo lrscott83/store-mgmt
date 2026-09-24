@@ -304,7 +304,23 @@ export class StorePaymentMethodsConfigService {
   }
 
   private getConfigFromLocalStorage(storeId: string): StorePaymentMethodsConfig {
-    const stored = this.readConfigFromLocalStorage(storeId);
+    let stored: StorePaymentMethodsConfig | null;
+    try {
+      stored = this.readConfigFromLocalStorage(storeId);
+    } catch (err) {
+      // Bug real confirmado 2026-09-24 (known-issues Grupo A): this read runs
+      // during render (CartShell useMemo), so a MissingDataKeyError (encrypted
+      // value, no DEK in memory) would crash the whole UI via the React error
+      // boundary and preempt the async announce-once + logout policy
+      // (decryption-failure-policy D5), which stays intact. Fall back to the
+      // default WITHOUT persisting (encryptEntity needs the same missing key)
+      // and without touching the stored bytes. Any other error (e.g.
+      // EntityUnreadableError on damaged bytes) still propagates.
+      if ((err as { name?: string })?.name === 'MissingDataKeyError') {
+        return { ...DEFAULT_STORE_PAYMENT_METHODS_CONFIG };
+      }
+      throw err;
+    }
     if (stored) return stored;
 
     // Absent key -> auto-init with the default (no-regression).
