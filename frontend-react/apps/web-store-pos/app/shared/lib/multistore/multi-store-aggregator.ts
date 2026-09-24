@@ -23,7 +23,12 @@ import type {
   OrderItem,
   SaleCredit,
 } from '@store-mgmt/domain';
-import { DEFAULT_CURRENCY, PaymentType as PaymentTypeEnum } from '@store-mgmt/domain';
+import {
+  DEFAULT_CURRENCY,
+  PaymentType as PaymentTypeEnum,
+  SalePaymentMethod,
+} from '@store-mgmt/domain';
+import { normalizedOrderPaymentMethod } from '~/shared/lib/payment-method-resolved';
 import { addDays, groupByLocalDay, localDayRange } from '~/shared/lib/date-utils';
 import type { LocalDayGroup } from '~/shared/lib/date-utils';
 import { calculateOrderProfit } from '~/inventory/lib/profit-calculator';
@@ -596,8 +601,14 @@ export function computeStoreRangeSummary(
   const salesCashTotal = activeOrders
     .filter((o) => o.paymentType === PaymentTypeEnum.Efectivo && !o.isCredit)
     .reduce((acc, o) => acc + o.total, 0);
+  // T14 (payment-channels-and-multipayment): mirror the single-store cuadre
+  // (statistics/routes/cuadre-por-fechas.tsx) — a sale recorded as Zelle counts
+  // in the Transferencia panel instead of in neither. Cash keeps the raw legacy
+  // predicate, identical in both views.
   const salesCardTotal = activeOrders
-    .filter((o) => o.paymentType === PaymentTypeEnum.Tarjeta && !o.isCredit)
+    .filter(
+      (o) => normalizedOrderPaymentMethod(o) === SalePaymentMethod.Transferencia && !o.isCredit,
+    )
     .reduce((acc, o) => acc + o.total, 0);
 
   const salesEntries: CurrencyAmount[] = activeOrders.map((o) => ({
@@ -614,7 +625,9 @@ export function computeStoreRangeSummary(
     .filter((o) => o.paymentType === PaymentTypeEnum.Efectivo && !o.isCredit)
     .map((o) => ({ amount: o.total, currency: o.currency }));
   const salesCardEntries: CurrencyAmount[] = activeOrders
-    .filter((o) => o.paymentType === PaymentTypeEnum.Tarjeta && !o.isCredit)
+    .filter(
+      (o) => normalizedOrderPaymentMethod(o) === SalePaymentMethod.Transferencia && !o.isCredit,
+    )
     .map((o) => ({ amount: o.total, currency: o.currency }));
 
   let expenses: Expense[] = [];
