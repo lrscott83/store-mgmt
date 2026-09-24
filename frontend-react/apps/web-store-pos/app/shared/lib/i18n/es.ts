@@ -1107,12 +1107,10 @@ const messages: Record<string, string> = {
   'STORE_SELECTOR.CURRENT_STORE': 'La tienda seleccionada es: {store}',
   'CONFIGURATIONS.STORE_LABEL': 'Tienda activa',
 
-  // Payment-methods config (store-payment-methods-config, 2026-09-22):
-  // per-store toggles deciding which plan-catalogue methods the store accepts.
-  'CONFIGURATIONS.PAYMENT_METHODS.TITLE': 'Formas de pago',
-  'CONFIGURATIONS.PAYMENT_METHODS.EFECTIVO': 'Efectivo',
-  'CONFIGURATIONS.PAYMENT_METHODS.ZELLE': 'Zelle',
-  'CONFIGURATIONS.PAYMENT_METHODS.TRANSFERENCIA': 'Transferencia',
+  // Payment config (store-payment-methods-config, 2026-09-22; per-channel T20,
+  // 2026-09-24): per-store toggles over the canonical channel catalogue. Channel
+  // names come from `CHANNEL_RATES.METHOD_*` via the shared `channelLabel`.
+  'CONFIGURATIONS.PAYMENT_METHODS.TITLE': 'Métodos de pago',
   'CONFIGURATIONS.PAYMENT_METHODS.ALWAYS_ON': 'Siempre habilitado',
   'CONFIGURATIONS.PAYMENT_METHODS.SAVED': 'Guardado',
 

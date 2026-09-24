@@ -20,9 +20,11 @@ import { hasMultiMonedasAvailable } from '~/shared/components/multimonedas/curre
 import { Modal } from '~/shared/components/ui/modal';
 import { TrashIcon } from '~/shared/components/ui/icons';
 import {
-  DEFAULT_ENABLED_PAYMENT_METHODS,
+  DEFAULT_ENABLED_CHANNEL_KEYS,
   StorePaymentMethodsConfigService,
   applyStorePaymentMethodsConfig,
+  channelEnabled,
+  enabledMethodsForCurrency,
 } from '~/shared/lib/payment-methods/store-payment-methods-config-service';
 
 /**
@@ -139,28 +141,28 @@ export function MultiPaymentList({
   // finito y, al confirmar (blur), un borrador vacío/inválido vuelve al último válido.
   const [amountDrafts, setAmountDrafts] = useState<Record<string, string>>({});
 
-  // store-payment-methods-config: métodos habilitados de la tienda activa
+  // store-payment-methods-config: canales habilitados de la tienda activa
   // (default: todos on — no-regresión). SSR: sin window se usa el default y la
   // hidratación lee localStorage. Instancia fresca por memo (cache por instancia).
-  const enabledMethods = useMemo(() => {
+  const enabledChannels = useMemo(() => {
     if (typeof window === 'undefined' || !storeId) {
-      return [...DEFAULT_ENABLED_PAYMENT_METHODS];
+      return [...DEFAULT_ENABLED_CHANNEL_KEYS];
     }
-    return new StorePaymentMethodsConfigService(storeId).getEnabledMethods(storeId);
+    return new StorePaymentMethodsConfigService(storeId).getEnabledChannels(storeId);
   }, [storeId]);
 
   // T6: canales válidos ofrecidos por el popup = catálogo canónico del dominio
   // (`PAYMENT_CHANNELS`) → gate de plan (sin MultiMonedas no hay Zelle) →
-  // config por-tienda (métodos que la tienda deshabilitó fuera). Así el popup
+  // config por-tienda (canales que la tienda deshabilitó fuera). Así el popup
   // nunca puede agregar una combinación que no exista (p. ej. Zelle+CUP).
   const channels = useMemo<PaymentChannel[]>(() => {
     const planGated = PAYMENT_CHANNELS.filter(
       (channel) => hasMultiMonedasAvailable(user) || channel.method !== SalePaymentMethod.Zelle,
     );
-    return planGated.filter(
-      (channel) => applyStorePaymentMethodsConfig([channel.method], enabledMethods).length > 0,
+    return planGated.filter((channel) =>
+      channelEnabled(enabledChannels, channel.method, channel.currency),
     );
-  }, [user, enabledMethods]);
+  }, [user, enabledChannels]);
 
   // Rates are read once per store. Skipped during SSR/empty store, where there
   // is no local register to read from.
@@ -236,7 +238,10 @@ export function MultiPaymentList({
     const planGate = hasMultiMonedasAvailable(user)
       ? base
       : base.filter((m) => m !== SalePaymentMethod.Zelle);
-    const composed = applyStorePaymentMethodsConfig(planGate, enabledMethods);
+    const composed = applyStorePaymentMethodsConfig(
+      planGate,
+      enabledMethodsForCurrency(enabledChannels, currency),
+    );
     return composed.length > 0 ? composed : [SalePaymentMethod.Efectivo];
   }
 

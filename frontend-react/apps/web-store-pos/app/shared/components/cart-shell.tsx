@@ -43,9 +43,10 @@ import { currencyLabel, formatMoneyWithCurrency } from '~/shared/lib/format-mone
 import { readCartCurrencyPreference, writeCartCurrencyPreference } from '~/shared/lib/cart-currency-preference';
 import { hasMultiMonedasAvailable } from '~/shared/components/multimonedas/currency-select';
 import {
-  DEFAULT_ENABLED_PAYMENT_METHODS,
+  DEFAULT_ENABLED_CHANNEL_KEYS,
   StorePaymentMethodsConfigService,
   applyStorePaymentMethodsConfig,
+  enabledMethodsForCurrency,
 } from '~/shared/lib/payment-methods/store-payment-methods-config-service';
 import { CartCurrencySelect } from '~/shared/components/multipayments/cart-currency-select';
 import { MultiPaymentList, createPaymentRow } from '~/shared/components/multipayments/multi-payment-list';
@@ -224,15 +225,16 @@ export function CartShell() {
   }
 
   // payment-methods-percent-tax (plan 2026-09-17) + store-payment-methods-config
-  // (2026-09-22): el catálogo de métodos de la venta = moneda → gate de plan
-  // (sin MultiMonedas no hay Zelle) → config por-tienda (métodos deshabilitados
-  // fuera; Efectivo siempre). Config leída de localStorage (instancia fresca por
-  // memo); SSR: sin window se usa el default y la hidratación lee localStorage.
-  const paymentConfigEnabledMethods = useMemo(() => {
+  // (2026-09-22, per-channel T20 2026-09-24): el catálogo de métodos de la venta
+  // = moneda → gate de plan (sin MultiMonedas no hay Zelle) → config por-tienda
+  // (canales deshabilitados fuera para ESA moneda; Efectivo siempre). La config
+  // se lee de localStorage (instancia fresca por memo); SSR: sin window se usan
+  // todos los canales y la hidratación lee localStorage.
+  const paymentConfigEnabledChannels = useMemo(() => {
     if (typeof window === 'undefined' || !storeId) {
-      return [...DEFAULT_ENABLED_PAYMENT_METHODS];
+      return [...DEFAULT_ENABLED_CHANNEL_KEYS];
     }
-    return new StorePaymentMethodsConfigService(storeId).getEnabledMethods(storeId);
+    return new StorePaymentMethodsConfigService(storeId).getEnabledChannels(storeId);
   }, [storeId]);
 
   const methodOptions = useMemo(() => {
@@ -240,8 +242,11 @@ export function CartShell() {
     const planGate = hasMultiMonedasAvailable(user)
       ? base
       : base.filter((m) => m !== SalePaymentMethod.Zelle);
-    return applyStorePaymentMethodsConfig(planGate, paymentConfigEnabledMethods);
-  }, [saleCurrency, user, paymentConfigEnabledMethods]);
+    return applyStorePaymentMethodsConfig(
+      planGate,
+      enabledMethodsForCurrency(paymentConfigEnabledChannels, saleCurrency),
+    );
+  }, [saleCurrency, user, paymentConfigEnabledChannels]);
 
   useEffect(() => {
     if (!methodOptions.includes(salePaymentMethod)) {

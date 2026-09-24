@@ -15,9 +15,10 @@ import { showBlockingError } from '~/shared/lib/blocking-alert';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { normalizedOrderPaymentMethod } from '~/shared/lib/payment-method-resolved';
 import {
-  DEFAULT_ENABLED_PAYMENT_METHODS,
+  DEFAULT_ENABLED_CHANNEL_KEYS,
   StorePaymentMethodsConfigService,
   applyStorePaymentMethodsConfig,
+  enabledMethodsForCurrency,
 } from '~/shared/lib/payment-methods/store-payment-methods-config-service';
 
 interface EditOrderModalProps {
@@ -63,20 +64,20 @@ export function EditOrderModal({ order, isOpen, onClose, onUpdate }: EditOrderMo
     salePaymentMethodToLegacyPaymentType(normalizedOrderPaymentMethod(order), Currency.CUP),
   );
 
-  // store-payment-methods-config: métodos habilitados de la tienda activa
+  // store-payment-methods-config: canales habilitados de la tienda activa
   // (default: todos on — no-regresión). SSR: sin window se usa el default y la
   // hidratación lee localStorage. Instancia fresca por memo (cache por instancia).
-  const enabledMethods = useMemo(() => {
+  const enabledChannels = useMemo(() => {
     if (typeof window === 'undefined' || !storeId) {
-      return [...DEFAULT_ENABLED_PAYMENT_METHODS];
+      return [...DEFAULT_ENABLED_CHANNEL_KEYS];
     }
-    return new StorePaymentMethodsConfigService(storeId).getEnabledMethods(storeId);
+    return new StorePaymentMethodsConfigService(storeId).getEnabledChannels(storeId);
   }, [storeId]);
 
   const paymentOptions = useMemo<PaymentOption[]>(() => {
     const catalog = applyStorePaymentMethodsConfig(
       [SalePaymentMethod.Efectivo, SalePaymentMethod.Transferencia],
-      enabledMethods,
+      enabledMethodsForCurrency(enabledChannels, Currency.CUP),
     ).map((method) => ({
       method,
       value: salePaymentMethodToLegacyPaymentType(method, Currency.CUP),
@@ -92,7 +93,7 @@ export function EditOrderModal({ order, isOpen, onClose, onUpdate }: EditOrderMo
         label: salePaymentMethodLabel(current, Currency.CUP),
       },
     ];
-  }, [order, enabledMethods]);
+  }, [order, enabledChannels]);
 
   if (!isOpen) return null;
 

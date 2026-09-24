@@ -18,9 +18,10 @@ import { formatCurrency } from '~/shared/lib/format-currency';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { hasMultiMonedasAvailable } from '~/shared/components/multimonedas/currency-select';
 import {
-  DEFAULT_ENABLED_PAYMENT_METHODS,
+  DEFAULT_ENABLED_CHANNEL_KEYS,
   StorePaymentMethodsConfigService,
   applyStorePaymentMethodsConfig,
+  enabledMethodsForCurrency,
 } from '~/shared/lib/payment-methods/store-payment-methods-config-service';
 
 interface SaleCreditPaymentModalProps {
@@ -72,14 +73,14 @@ export function SaleCreditPaymentModal({
   const [paymentType, setPaymentType] = useState<PaymentType>(PaymentType.Efectivo);
   const [note, setNote] = useState('');
 
-  // store-payment-methods-config: métodos habilitados de la tienda activa
+  // store-payment-methods-config: canales habilitados de la tienda activa
   // (default: todos on — no-regresión). SSR: sin window se usa el default y la
   // hidratación lee localStorage. Instancia fresca por memo (cache por instancia).
-  const enabledMethods = useMemo(() => {
+  const enabledChannels = useMemo(() => {
     if (typeof window === 'undefined' || !storeId) {
-      return [...DEFAULT_ENABLED_PAYMENT_METHODS];
+      return [...DEFAULT_ENABLED_CHANNEL_KEYS];
     }
-    return new StorePaymentMethodsConfigService(storeId).getEnabledMethods(storeId);
+    return new StorePaymentMethodsConfigService(storeId).getEnabledChannels(storeId);
   }, [storeId]);
 
   const paymentOptions = useMemo<PaymentOption[]>(() => {
@@ -87,7 +88,10 @@ export function SaleCreditPaymentModal({
     const planGate = hasMultiMonedasAvailable(user)
       ? base
       : base.filter((m) => m !== SalePaymentMethod.Zelle);
-    const catalog = applyStorePaymentMethodsConfig(planGate, enabledMethods).map((method) => ({
+    const catalog = applyStorePaymentMethodsConfig(
+      planGate,
+      enabledMethodsForCurrency(enabledChannels, saleCreditCurrency),
+    ).map((method) => ({
       method,
       value: salePaymentMethodToLegacyPaymentType(method, Currency.CUP),
       label: salePaymentMethodLabel(method, saleCreditCurrency),
@@ -102,7 +106,7 @@ export function SaleCreditPaymentModal({
         label: salePaymentMethodLabel(current, saleCreditCurrency),
       },
     ];
-  }, [saleCreditCurrency, paymentType, user, enabledMethods]);
+  }, [saleCreditCurrency, paymentType, user, enabledChannels]);
 
   if (!isOpen) return null;
 
