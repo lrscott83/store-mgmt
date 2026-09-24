@@ -91,10 +91,34 @@ Expected values:
   `inventory-offline-service.test.ts` INV-07 (view carries the stored currency; absent stays undefined). The
   integration test read-back was switched from the raw inventory map to the VIEW so the matrix locks the
   display contract too (deleting the view `currency` map line fails the cells).
-  KNOWN ADJACENT, NOT TOUCHED (needs user decision): `today-entries.tsx` edit-modal reconstruction
-  (`handleEdit`, ~line 79) rebuilds the entry from the view WITHOUT `currency`, so editing a USD entry opens the
-  modal defaulting to CUP and `update(...)` would overwrite the stored cost currency to CUP. Same family, but it
-  is the EDIT path, not the import path — deferred, flagged for user approval.
+  KNOWN ADJACENT, APPROVED AND FIXED in T4 below: the `today-entries.tsx` edit-modal
+  reconstruction (`handleEdit`) rebuilt the entry from the view WITHOUT `currency`, so editing a USD entry opened
+  the modal defaulting to CUP and `update(...)` would overwrite the stored cost currency to CUP (user approval:
+  question tool, 2026-09-24 — "Sí, arréglalo").
+- [x] T4 — Edit-modal cost currency fix (user-approved production change + regression test)
+  - Root cause: `today-entries.tsx handleEdit` (~line 79) reconstructs the modal's `InventoryEntry` from the view
+    (plus `stored` for the warehouse seal) but omitted `currency`; the modal's `currency` state initializes
+    `entry?.currency ?? DEFAULT_CURRENCY`, so a USD entry opened on CUP and saving called
+    `svc.update(entryId, productId, quantity, costPrice, CUP)` — overwriting USD -> CUP in storage.
+  - Fix (today-entries.tsx): add `currency: stored?.currency` to the reconstruction (same `stored` fetch the A8
+    warehouse seal already used). The modal is conditionally MOUNTED per open, so the `useState` initializer
+    re-runs with the fresh entry every time — no sync effect needed.
+  - Contract uniformity (inventory-offline-service.ts): the `update()` AND `updateInventoryEntry()` DataResult
+    views also dropped `currency`; both now return `currency: updated.currency` so EVERY `InventoryEntryView`
+    projection carries the currency (create already did; getActiveInventoryEntriesStorage fixed in T2).
+    `update()` itself already preserved stored currency when `currency === undefined`; the overwrite only happened
+    when the modal passed an explicit CUP default.
+  - Regression test (inventory-routes.test.tsx, new describe): "editing keeps the stored cost currency" — mocks the
+    service with a stored USD entry, opens the edit modal, saves, asserts `update()` was called with
+    `Currency.USD` as the 5th argument (fails as CUP=0 without the fix). Follows the T2 test's OrderOfflineService
+    seam pattern (prototype seed + `mockImplementationOnce(Object.create(...))`) because handleSave's cost-edit
+    propagation calls it after a succeeded update.
+    NOTE: asserting the modal's CurrencySelect select directly is impossible in this file —
+    `CurrencySelect` renders null when the auth-store user lacks `EModules.MultiMonedas`, and the file's global
+    auth mock has `storeModuleIds: []`; the save-path assertion locks the same behavior without leaking an
+    auth re-mock into the describes that follow.
+  - Checks (2026-09-24): focused vitest green — inventory-routes (57) + inventory-offline-service +
+    csv-import-currency-integration (264) = 444 tests, 0 type errors; `pnpm typecheck` clean (exit 0).
 - [x] T3 — Verify + close
   - Focused vitest (6 files: integration + inventory service + inventory routes + parser + product service +
     products view): 609 passed / 0 failed, 0 type errors.
@@ -112,7 +136,8 @@ Expected values:
 
 - T1: delegated writer (single non-trivial file). Fallback INLINE if the runtime rejects sub-agents (observed in this
   environment on 2026-09-24: `OpenCode's free tier can only be used from within OpenCode`), recorded honestly here.
-- T2-T3: inline (targeted verification + commit; no new source design).
+- T2-T4: inline (targeted verification + commits; no new source design — each fix was a targeted 1-line-class change
+  plus its regression test).
 
 ## TDD mode
 

@@ -10,7 +10,7 @@ import type {
   Product,
   ProductCategory,
 } from '@store-mgmt/domain';
-import { PaymentType, OrderType } from '@store-mgmt/domain';
+import { Currency, PaymentType, OrderType } from '@store-mgmt/domain';
 import { OrderOfflineService } from '~/sales/lib/services/order-offline-service';
 import { InventoryOfflineService } from '~/inventory/lib/services/inventory-offline-service';
 import type { InventoryCategoryView } from '~/inventory/lib/services/inventory-offline-service';
@@ -2052,6 +2052,100 @@ describe('TodayEntriesPage — handleEdit preserves the warehouse-origin seal (A
 
     expect(await screen.findByTestId('entry-warehouse-cost-message')).toBeInTheDocument();
     expect(screen.getByLabelText('Precio de costo')).toBeDisabled();
+  });
+});
+
+// ─── TodayEntriesPage — editing a multi-currency entry keeps its stored cost currency (csv-import-currency-matrix) ────
+//
+// handleEdit rebuilds the modal's InventoryEntry from the STORED entry (the view drops the
+// full shape). Before 2026-09-24 the rebuilt entry carried NO `currency`, so the modal
+// initialized CUP and SAVING the entry called update(..., currency: CUP), overwriting a USD
+// cost to CUP. The fix preserves `stored.currency`; this test locks the save-path contract:
+// update() must receive the STORED currency (USD), not the CUP default.
+
+describe('TodayEntriesPage — editing keeps the stored cost currency (csv-import-currency-matrix)', () => {
+  it('passes the STORED currency (USD) to update() when saving an edited USD entry', async () => {
+    const todayEntries: InventoryEntryView[] = [
+      {
+        id: 'e1',
+        productId: 'p1',
+        productName: 'Ron',
+        quantity: 5,
+        costPrice: 6,
+        date: new Date(),
+        isActive: true,
+        // Faithful double: the real projection carries `currency` since the 2026-09-24 mapper fix.
+        currency: Currency.USD,
+      },
+    ];
+    const storedEntry: InventoryEntry = {
+      id: 'e1',
+      productId: 'p1',
+      categoryId: 'cat-1',
+      quantity: 5,
+      available: 5,
+      costPrice: 6,
+      date: new Date(),
+      order: 0,
+      isActive: true,
+      createdDate: new Date(),
+      createdByName: 'test',
+      updatedDate: new Date(),
+      updatedByName: 'test',
+      currency: Currency.USD,
+    };
+    const updateMock = vi.fn().mockReturnValue({ succeeded: true, errors: [], data: todayEntries[0] });
+    vi.mocked(InventoryOfflineService).mockImplementation(
+      () =>
+        ({
+          getInventoryEntriesInDay: vi.fn().mockReturnValue(bm(todayEntries)),
+          getActiveInventoryEntriesStorage: vi.fn().mockReturnValue([todayEntries[0]]),
+          getStorageInventoriesMap: vi.fn().mockReturnValue(new Map([['p1', [storedEntry]]])),
+          getInventoryCategoriesView: vi.fn().mockReturnValue(bm([])),
+          getAvailableQuantity: vi.fn().mockReturnValue({ hasEntries: false, available: 0 }),
+          createInventoryEntry: vi.fn(),
+          update: updateMock,
+          deleteInventoryEntry: vi.fn(),
+          isNotSoldEntry: vi.fn().mockReturnValue({ succeeded: true, errors: [] }),
+        }) as unknown as InstanceType<typeof InventoryOfflineService>,
+    );
+
+    // handleSave's cost-edit propagation calls OrderOfflineService after a SUCCEEDED update;
+    // the shared module mock's plain instances lack the seam, so seed the real prototype and
+    // make the next construction resolve through it (T2 pattern).
+    OrderOfflineService.prototype.updateProductCostsByInventoryIds = () => ({
+      activeOrders: 0,
+      deactivatedOrders: 0,
+      updatedLines: 0,
+    });
+    vi.mocked(OrderOfflineService).mockImplementationOnce(() => {
+      const instance = Object.create(OrderOfflineService.prototype) as Record<string, unknown>;
+      instance.getStorageOrders = vi.fn().mockReturnValue([]);
+      instance.getActiveOrdersInDay = vi.fn().mockReturnValue([]);
+      return instance as unknown as InstanceType<typeof OrderOfflineService>;
+    });
+
+    try {
+      render(
+        <Wrapper>
+          <TodayEntriesPage />
+        </Wrapper>,
+      );
+
+      fireEvent.click(screen.getByTestId('entry-actions-toggle-e1'));
+      fireEvent.click(screen.getByText('Editar'));
+
+      const costInput = await screen.findByLabelText('Precio de costo');
+      expect(costInput).toHaveValue(6);
+      fireEvent.click(screen.getByText('Actualizar'));
+
+      // The 5th argument is the currency the modal passes through — MUST be the stored USD,
+      // never the CUP default (Currency.CUP = 0).
+      expect(updateMock).toHaveBeenCalledWith('e1', 'p1', 5, 6, Currency.USD);
+    } finally {
+      delete (OrderOfflineService.prototype as unknown as Record<string, unknown>)
+        .updateProductCostsByInventoryIds;
+    }
   });
 });
 

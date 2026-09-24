@@ -706,6 +706,10 @@ export class InventoryOfflineService {
         costPrice: updated.costPrice,
         date: updated.date,
         isActive: updated.isActive,
+        // csv-import-currency-matrix (2026-09-24): the InventoryEntryView contract carries
+        // `currency` (same projection as getActiveInventoryEntriesStorage) — dropping it here
+        // would re-open the CUP display/overwrite family of bugs for update() consumers.
+        currency: updated.currency,
       },
       true,
       [],
@@ -888,6 +892,10 @@ export class InventoryOfflineService {
         costPrice: updated.costPrice,
         date: updated.date,
         isActive: updated.isActive,
+        // csv-import-currency-matrix (2026-09-24): same InventoryEntryView currency contract
+        // as update()/getActiveInventoryEntriesStorage — `updated` spreads `...entry`, so the
+        // stored currency survives the product move.
+        currency: updated.currency,
       },
       true,
       [],

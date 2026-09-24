@@ -92,6 +92,9 @@ export function TodayEntriesPage() {
         updatedByName: '',
         // A8: preserve the warehouse-origin seal so the modal can lock the store edit.
         warehouseSaleOutMovementId: stored?.warehouseSaleOutMovementId,
+        // csv-import-currency-matrix (2026-09-24): preserve the stored cost currency too —
+        // without it the modal initialized CUP and SAVING the entry overwrote a USD cost to CUP.
+        currency: stored?.currency,
       });
     }
     setIsModalOpen(true);
