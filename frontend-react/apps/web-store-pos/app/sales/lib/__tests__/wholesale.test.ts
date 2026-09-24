@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Product, WholesaleConfig } from '@store-mgmt/domain';
+import { OrderType, type Product, type WholesaleConfig } from '@store-mgmt/domain';
 import {
   getWholesaleConfig,
   getWholesaleMinPacks,
@@ -494,7 +494,7 @@ describe('wholesaleCartDisplay — presentación del carrito en paquetes', () =>
         quantity: 12,
       }, // 2 packs de 6
     ];
-    expect(wholesaleCartDisplay.cartBadgeCount(items)).toBe(5);
+    expect(wholesaleCartDisplay.cartBadgeCount(items, OrderType.Mayorista)).toBe(5);
   });
 
   it('el badge de un carrito normal sigue siendo la suma de unidades', () => {
@@ -502,10 +502,26 @@ describe('wholesaleCartDisplay — presentación del carrito en paquetes', () =>
       { product: makeProduct({ id: 'n1', price: 10 }), quantity: 3 },
       { product: makeProduct({ id: 'n2', price: 10 }), quantity: 4 },
     ];
-    expect(wholesaleCartDisplay.cartBadgeCount(items)).toBe(7);
+    expect(wholesaleCartDisplay.cartBadgeCount(items, OrderType.Mayorista)).toBe(7);
+  });
+
+  // cart-wholesale-by-order-type (2026-09-23): el modo lo define el orderType de
+  // la venta, no la config del producto. En venta NORMAL el badge SIEMPRE cuenta
+  // unidades, incluso para un producto con config mayorista.
+  it('venta NORMAL con producto mayorista: el badge cuenta UNIDADES (1 unidad → 1)', () => {
+    const items = [{ product: beer, quantity: 1 }];
+    expect(wholesaleCartDisplay.cartBadgeCount(items, OrderType.Normal)).toBe(1);
+  });
+
+  it('venta NORMAL con producto normal: el badge cuenta unidades (3 + 4 → 7)', () => {
+    const items = [
+      { product: makeProduct({ id: 'n1', price: 10 }), quantity: 3 },
+      { product: makeProduct({ id: 'n2', price: 10 }), quantity: 4 },
+    ];
+    expect(wholesaleCartDisplay.cartBadgeCount(items, OrderType.Normal)).toBe(7);
   });
 
   it('carrito vacío → badge 0', () => {
-    expect(wholesaleCartDisplay.cartBadgeCount([])).toBe(0);
+    expect(wholesaleCartDisplay.cartBadgeCount([], OrderType.Mayorista)).toBe(0);
   });
 });
