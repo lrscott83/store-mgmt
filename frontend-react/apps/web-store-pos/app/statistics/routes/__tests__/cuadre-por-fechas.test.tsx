@@ -309,9 +309,9 @@ describe('CuadrePorFechasPage', () => {
     });
 
     const transferPanel = screen.getByRole('button', { name: /Pago por Transferencia/ });
-    expect(transferPanel).toHaveTextContent('$70');
+    expect(transferPanel).toHaveTextContent('70 CUP');
     // Zelle must NOT leak into the cash panel.
-    expect(screen.getByRole('button', { name: /Resumen Efectivo/ })).toHaveTextContent('$0');
+    expect(screen.getByRole('button', { name: /Resumen Efectivo/ })).toHaveTextContent('0 CUP');
     expect(screen.queryByText(/Zelle/)).toBeNull();
   });
 

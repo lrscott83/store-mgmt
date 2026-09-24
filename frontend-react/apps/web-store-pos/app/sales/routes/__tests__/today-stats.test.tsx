@@ -309,9 +309,9 @@ describe('TodayStatsPage — with Expenses + Credits modules available', () => {
     );
 
     const cardPanel = await screen.findByRole('button', { name: /Pago por Transferencia/ });
-    expect(cardPanel).toHaveTextContent('$70');
+    expect(cardPanel).toHaveTextContent('70 CUP');
     // Zelle must NOT leak into the cash panel.
-    expect(screen.getByRole('button', { name: /Resumen Efectivo/ })).toHaveTextContent('$0');
+    expect(screen.getByRole('button', { name: /Resumen Efectivo/ })).toHaveTextContent('0 CUP');
     // No standalone Zelle bucket remains.
     expect(screen.queryByText(/Zelle/)).toBeNull();
   });
