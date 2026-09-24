@@ -52,7 +52,7 @@ Los deltas se aplican sobre el archivo actual, que contiene cambios
 - [x] Efecto T5: siembra `createPaymentRow(Efectivo, saleCurrency, totalAmount)` en la transición a activo
 - [x] `cart-shell.test.tsx` verde (5 antes rojos + resto del archivo)
 - [x] Suite `pnpm test` verde en todos los paquetes
-- [x] Commit `fix(cart): restore multipayments wiring lost in merge 0efb01d6` (`ad9f9b34`)
+- [x] Commit `fix(cart): restore multipayments wiring lost in merge 0efb01d6` (`ad9f9b34` → amend `35f0f29b`)
 
 ## Verificación
 
@@ -68,3 +68,13 @@ pnpm test                                                                   # su
 - El E2E intocable `multipayments-currency-block.spec.ts` pinna el comportamiento
   canónico (fallback a nativo al cargar; bloqueo con aviso al cambiar) — el código,
   no los tests, estaba mal.
+
+## Assessment RDD (protocolo ODD)
+
+`gentle-ai review assess --cwd . --base-ref 0efb01d6 --committed-only` → `high`
+(`unassessable`): el runtime activo (opencode) NO es elegible para review inmutable
+(solo claude-code, codex); el engine propone `gentle-ai review mode disable --scope clone`.
+No se tocó el switch (decisión del usuario). Verificación funcional completa del
+work unit: `cart-shell.test.tsx` 79/79, `pnpm test` 298 files / 4237 tests,
+typecheck sin errores, eslint limpio. Los commits `517ef148` (turbo fix) y
+`35f0f29b` (restauración) están en `origin/qa`.
