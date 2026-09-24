@@ -490,7 +490,7 @@ describe('OrdersPage — filtro dinámico de métodos de pago', () => {
     expect(screen.getAllByText('$50').length).toBeGreaterThan(0);
   });
 
-  it('salePaymentMethod Transferencia en USD → opción Transferencia (USD)', () => {
+  it('T9: salePaymentMethod Transferencia en USD se presenta como Transferencia (CUP)', () => {
     fixtures.orders = [
       makeOrder({
         id: 'o1',
@@ -505,6 +505,7 @@ describe('OrdersPage — filtro dinámico de métodos de pago', () => {
         <OrdersPage />
       </Wrapper>,
     );
-    expect(screen.getByText('Transferencia (USD)')).toBeInTheDocument();
+    expect(screen.getByText('Transferencia (CUP)')).toBeInTheDocument();
+    expect(screen.queryByText('Transferencia (USD)')).not.toBeInTheDocument();
   });
 });

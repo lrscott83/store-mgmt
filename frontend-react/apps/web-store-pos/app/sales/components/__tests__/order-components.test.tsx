@@ -505,17 +505,30 @@ describe('EditOrderModal — método de pago según config de tienda', () => {
     expect(sentinel.checked).toBe(true);
   });
 
-  it('USD + MultiMonedas sin config: catálogo completo con Zelle (default no-regresión)', () => {
+  it('T9: una orden en USD se edita con el catálogo normalizado (Efectivo + Transferencia (CUP))', () => {
     useAuthStore.setState({
       user: { id: 'u1', selectedStoreId: 's1', storeModuleIds: [EModules.MultiMonedas] } as never,
     });
     renderEditOrderModal({ currency: Currency.USD });
     expect(screen.getByRole('radio', { name: 'Efectivo' })).toBeInTheDocument();
-    expect(screen.getByRole('radio', { name: 'Zelle' })).toBeInTheDocument();
-    expect(screen.getByRole('radio', { name: 'Transferencia (USD)' })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'Transferencia (CUP)' })).toBeInTheDocument();
+    expect(screen.queryByRole('radio', { name: 'Zelle' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('radio', { name: 'Transferencia (USD)' })).not.toBeInTheDocument();
   });
 
-  it('USD + Zelle desactivado en config: el radio Zelle desaparece', () => {
+  it('T9: una orden Zelle se muestra con Transferencia (CUP) seleccionada', () => {
+    useAuthStore.setState({
+      user: { id: 'u1', selectedStoreId: 's1', storeModuleIds: [EModules.MultiMonedas] } as never,
+    });
+    renderEditOrderModal({ paymentType: PaymentType.Zelle, currency: Currency.USD });
+    const transferencia = screen.getByRole('radio', {
+      name: 'Transferencia (CUP)',
+    }) as HTMLInputElement;
+    expect(transferencia.checked).toBe(true);
+    expect(screen.queryByRole('radio', { name: 'Zelle' })).toBeNull();
+  });
+
+  it('T9: Zelle desactivado en config no altera el catálogo normalizado (sin Zelle)', () => {
     new StorePaymentMethodsConfigService('s1').setMethodEnabled(
       's1',
       SalePaymentMethod.Zelle,
@@ -527,6 +540,6 @@ describe('EditOrderModal — método de pago según config de tienda', () => {
     renderEditOrderModal({ currency: Currency.USD });
     expect(screen.queryByRole('radio', { name: 'Zelle' })).toBeNull();
     expect(screen.getByRole('radio', { name: 'Efectivo' })).toBeInTheDocument();
-    expect(screen.getByRole('radio', { name: 'Transferencia (USD)' })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'Transferencia (CUP)' })).toBeInTheDocument();
   });
 });

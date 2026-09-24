@@ -79,7 +79,7 @@ describe('TodayOrdersPage — filtro dinámico de métodos de pago', () => {
     expect(screen.queryByText('Zelle')).not.toBeInTheDocument();
   });
 
-  it('solo muestra los métodos presentes: Efectivo + Zelle → sin Transferencia', () => {
+  it('T9: Efectivo + Zelle → Zelle se presenta como Transferencia (CUP)', () => {
     fixtures.todayOrders = [
       makeOrder({ id: 'o1', paymentType: PaymentType.Efectivo }),
       makeOrder({ id: 'o2', paymentType: PaymentType.Zelle }),
@@ -91,8 +91,8 @@ describe('TodayOrdersPage — filtro dinámico de métodos de pago', () => {
     );
     expect(screen.getAllByText('Todas').length).toBe(2);
     expect(screen.getByText('Efectivo')).toBeInTheDocument();
-    expect(screen.getByText('Zelle')).toBeInTheDocument();
-    expect(screen.queryByText('Transferencia')).not.toBeInTheDocument();
+    expect(screen.getByText('Transferencia (CUP)')).toBeInTheDocument();
+    expect(screen.queryByText('Zelle')).not.toBeInTheDocument();
   });
 
   it('legacy Tarjeta se ofrece y filtra como Transferencia (CUP)', () => {
@@ -110,7 +110,7 @@ describe('TodayOrdersPage — filtro dinámico de métodos de pago', () => {
     expect(screen.getByText('(1)')).toBeInTheDocument();
   });
 
-  it('filtrar por Zelle oculta las ventas en Efectivo (header (1))', () => {
+  it('T9: filtrar por Transferencia (CUP) oculta las ventas en Efectivo (header (1))', () => {
     fixtures.todayOrders = [
       makeOrder({ id: 'o1', paymentType: PaymentType.Efectivo, total: 100 }),
       makeOrder({ id: 'o2', paymentType: PaymentType.Zelle, total: 50 }),
@@ -120,11 +120,11 @@ describe('TodayOrdersPage — filtro dinámico de métodos de pago', () => {
         <TodayOrdersPage />
       </Wrapper>,
     );
-    fireEvent.click(screen.getByText('Zelle'));
+    fireEvent.click(screen.getByText('Transferencia (CUP)'));
     expect(screen.getByText('(1)')).toBeInTheDocument();
   });
 
-  it('salePaymentMethod autoritativo: venta Transferencia-USD → opción Transferencia (USD)', () => {
+  it('T9: salePaymentMethod Transferencia-USD se presenta como Transferencia (CUP)', () => {
     fixtures.todayOrders = [
       makeOrder({
         id: 'o1',
@@ -137,7 +137,8 @@ describe('TodayOrdersPage — filtro dinámico de métodos de pago', () => {
         <TodayOrdersPage />
       </Wrapper>,
     );
-    expect(screen.getByText('Transferencia (USD)')).toBeInTheDocument();
+    expect(screen.getByText('Transferencia (CUP)')).toBeInTheDocument();
+    expect(screen.queryByText('Transferencia (USD)')).not.toBeInTheDocument();
   });
 
   it('resetea el filtro a Todas cuando los datos cambian y el método ya no existe', () => {
@@ -147,10 +148,10 @@ describe('TodayOrdersPage — filtro dinámico de métodos de pago', () => {
         <TodayOrdersPage />
       </Wrapper>,
     );
-    fireEvent.click(screen.getByText('Zelle'));
+    fireEvent.click(screen.getByText('Transferencia (CUP)'));
     expect(screen.getByText('(1)')).toBeInTheDocument();
 
-    // Los datos cambian: ya no hay ventas Zelle — el filtro activo deja de existir.
+    // Los datos cambian: ya no hay ventas Zelle/Transferencia — el filtro activo deja de existir.
     fixtures.todayOrders = [makeOrder({ id: 'o2', paymentType: PaymentType.Efectivo })];
     rerender(
       <Wrapper>

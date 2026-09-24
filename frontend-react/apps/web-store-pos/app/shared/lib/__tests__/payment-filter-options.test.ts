@@ -59,17 +59,17 @@ describe('collectOrderPaymentMethodKeys', () => {
     ]);
   });
 
-  it('salePaymentMethod autoritativo: Transferencia en USD → transferencia-1', () => {
+  it('salePaymentMethod autoritativo: Transferencia en USD → transferencia-0 (normalizado a CUP, T9)', () => {
     expect(
       collectOrderPaymentMethodKeys([
         makeOrder({ paymentType: PaymentType.Efectivo, salePaymentMethod: SalePaymentMethod.Transferencia, currency: Currency.USD }),
       ]),
-    ).toEqual(['transferencia-1']);
+    ).toEqual(['transferencia-0']);
   });
 
-  it('Zelle → zelle', () => {
+  it('Zelle → transferencia-0 (normalizado a Transferencia (CUP), T9)', () => {
     expect(collectOrderPaymentMethodKeys([makeOrder({ paymentType: PaymentType.Zelle })])).toEqual([
-      'zelle',
+      'transferencia-0',
     ]);
   });
 
@@ -79,7 +79,7 @@ describe('collectOrderPaymentMethodKeys', () => {
     expect(collectOrderPaymentMethodKeys([ghost])).toEqual(['efectivo']);
   });
 
-  it('deduplica y ordena: efectivo, zelle, transferencia por moneda', () => {
+  it('T9: deduplica y ordena colapsando Transferencia/Zelle en una sola clave', () => {
     const keys = collectOrderPaymentMethodKeys([
       makeOrder({ id: 'a', salePaymentMethod: SalePaymentMethod.Transferencia, currency: Currency.EUR }),
       makeOrder({ id: 'b', paymentType: PaymentType.Zelle }),
@@ -87,7 +87,7 @@ describe('collectOrderPaymentMethodKeys', () => {
       makeOrder({ id: 'd', paymentType: PaymentType.Tarjeta }),
       makeOrder({ id: 'e', salePaymentMethod: SalePaymentMethod.Transferencia, currency: Currency.USD }),
     ]);
-    expect(keys).toEqual(['efectivo', 'zelle', 'transferencia-0', 'transferencia-1', 'transferencia-2']);
+    expect(keys).toEqual(['efectivo', 'transferencia-0']);
   });
 });
 
@@ -113,12 +113,13 @@ describe('matchesOrderPaymentFilter', () => {
     expect(matchesOrderPaymentFilter(order, 'efectivo')).toBe(false);
   });
 
-  it('salePaymentMethod gana sobre el legacy', () => {
+  it('salePaymentMethod gana sobre el legacy y Zelle se normaliza a transferencia-0 (T9)', () => {
     const order = makeOrder({
       paymentType: PaymentType.Efectivo,
       salePaymentMethod: SalePaymentMethod.Zelle,
     });
-    expect(matchesOrderPaymentFilter(order, 'zelle')).toBe(true);
+    expect(matchesOrderPaymentFilter(order, 'transferencia-0')).toBe(true);
+    expect(matchesOrderPaymentFilter(order, 'zelle')).toBe(false);
     expect(matchesOrderPaymentFilter(order, 'efectivo')).toBe(false);
   });
 });

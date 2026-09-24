@@ -28,6 +28,21 @@ export function resolvedOrderPaymentMethod(
     .method;
 }
 
+/**
+ * T9 (payment-channels-and-multipayment) — normalización de PRESENTACIÓN de una
+ * orden ya REGISTRADA. Efectivo se mantiene; Transferencia y Zelle se presentan
+ * como Transferencia (CUP): el histórico no distinguía la moneda del canal y el
+ * usuario pidió colapsarlas (D2). NO reescribe datos persistidos ni toca
+ * `salePaymentMethodLabel`; es resolución de lectura para historial, órdenes de
+ * hoy, filtros y modal de edición. Gastos y carrito NO pasan por aquí.
+ */
+export function normalizedOrderPaymentMethod(
+  order: Pick<Order, 'salePaymentMethod' | 'paymentType' | 'currency'>,
+): SalePaymentMethod {
+  const method = resolvedOrderPaymentMethod(order);
+  return method === SalePaymentMethod.Zelle ? SalePaymentMethod.Transferencia : method;
+}
+
 export function resolvedExpensePaymentMethod(
   expense: Pick<Expense, 'paymentType' | 'salePaymentMethod' | 'currency'>,
 ): SalePaymentMethod {

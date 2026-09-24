@@ -195,13 +195,14 @@ describe('OrdersPage — header «Ventas (n)» + total, línea de totales elimin
     );
     await screen.findByTestId('multistore-panel-toggle-s1');
 
-    // Todas las tiendas: Efectivo (s1) y Zelle (s2) están presentes.
+    // T9: Efectivo (s1) y Transferencia (CUP) (s2, Zelle normalizado) están presentes.
     expect(screen.getByText('Efectivo')).toBeInTheDocument();
-    expect(screen.getByText('Zelle')).toBeInTheDocument();
+    expect(screen.getByText('Transferencia (CUP)')).toBeInTheDocument();
+    expect(screen.queryByText('Zelle')).not.toBeInTheDocument();
 
-    // Filtrar s2 (solo Zelle): Efectivo desaparece de las opciones.
+    // Filtrar s2 (solo Transferencia (CUP)): Efectivo desaparece de las opciones.
     fireEvent.change(screen.getByTestId('multistore-select'), { target: { value: 's2' } });
-    expect(screen.getByText('Zelle')).toBeInTheDocument();
+    expect(screen.getByText('Transferencia (CUP)')).toBeInTheDocument();
     expect(screen.queryByText('Efectivo')).not.toBeInTheDocument();
   });
 });
