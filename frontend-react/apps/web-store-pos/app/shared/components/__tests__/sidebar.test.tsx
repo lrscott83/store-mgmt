@@ -3,7 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { IntlProvider } from 'react-intl';
 import type { UserModel } from '@store-mgmt/domain';
-import { EFeatures } from '@store-mgmt/domain';
+import { EFeatures, EModules } from '@store-mgmt/domain';
 import esMessages from '~/shared/lib/i18n/es';
 
 // Mock useAuthStore
@@ -516,6 +516,39 @@ describe('Sidebar — billing menu entries (superadmin/reseller only, StorePayme
     expect(collections?.getAttribute('href')).toBe('/management/stores/collections');
     expect(commissions).not.toBeUndefined();
     expect(commissions?.getAttribute('href')).toBe('/management/stores/commissions');
+  });
+});
+
+describe('Sidebar — channel-rates entry requires the MultiPayments module (D11)', () => {
+  const makeOwnerWithConfigurations = (storeModuleIds: number[]): UserModel => ({
+    ...makeSuperAdmin(),
+    login: 'owner@test.com',
+    fullName: 'Owner Admin',
+    isSuperAdmin: false,
+    isOwnerAdmin: true,
+    featureIds: [EFeatures.Configurations],
+    storeModuleIds,
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('offers "Tasas por canal" when module 16 is available', () => {
+    renderSidebar(makeOwnerWithConfigurations([EModules.MultiPayments]));
+    expect(screen.getByText('Tasas por canal')).toBeInTheDocument();
+  });
+
+  it('hides "Tasas por canal" when module 16 is missing', () => {
+    renderSidebar(makeOwnerWithConfigurations([]));
+    expect(screen.queryByText('Tasas por canal')).not.toBeInTheDocument();
+  });
+
+  it('leaves the other Management entries unaffected without module 16', () => {
+    renderSidebar(makeOwnerWithConfigurations([]));
+    // Both also require only Configurations (74) and carry no module gate.
+    expect(screen.getByText('Cambio USD a MN')).toBeInTheDocument();
+    expect(screen.getByText('Configuraciones')).toBeInTheDocument();
   });
 });
 

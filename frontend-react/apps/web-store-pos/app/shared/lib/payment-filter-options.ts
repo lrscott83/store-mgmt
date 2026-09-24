@@ -1,8 +1,8 @@
 import { Currency, SalePaymentMethod, salePaymentMethodLabel } from '@store-mgmt/domain';
 import type { Expense, Order } from '@store-mgmt/domain';
 import {
+  normalizedOrderPaymentMethod,
   resolvedExpensePaymentMethod,
-  resolvedOrderPaymentMethod,
 } from '~/shared/lib/payment-method-resolved';
 
 /**
@@ -17,6 +17,11 @@ import {
  * resuelve con `payment-method-resolved`, que ya traduce el legacy
  * `paymentType` (Tarjeta → Transferencia-CUP, Zelle → Zelle, ausente →
  * Efectivo) y respeta el `salePaymentMethod` autoritativo de las órdenes.
+ *
+ * T9 (payment-channels-and-multipayment): en las ÓRDENES ya registradas la
+ * clave se NORMALIZA — Efectivo se mantiene y Transferencia/Zelle (en
+ * cualquier moneda) caen en `transferencia-0` ("Transferencia (CUP)"). Los
+ * gastos conservan su clave real (Zelle y Transferencia con su moneda).
  */
 
 /** Orden de presentación de los grupos de método en el filtro. */
@@ -40,13 +45,16 @@ function entityToKey(method: SalePaymentMethod, currency: Currency | number): st
       : 'efectivo';
 }
 
+/** Clave de filtro de una orden REGISTRADA normalizada (T9). */
+function orderToKey(order: Order): string {
+  return entityToKey(normalizedOrderPaymentMethod(order), Currency.CUP);
+}
+
 /** Claves únicas presentes en las órdenes, ordenadas para la UI. */
 export function collectOrderPaymentMethodKeys(orders: Order[]): string[] {
   const keys = new Set<string>();
   for (const order of orders) {
-    keys.add(
-      entityToKey(resolvedOrderPaymentMethod(order), order.currency ?? Currency.CUP),
-    );
+    keys.add(orderToKey(order));
   }
   return sortKeys([...keys]);
 }
@@ -79,9 +87,9 @@ function parseKey(key: string): [SalePaymentMethod, number] {
   return [SalePaymentMethod.Efectivo, 0];
 }
 
-/** ¿La orden cae bajo la clave de filtro dada? */
+/** ¿La orden cae bajo la clave de filtro dada? (normalizada, T9) */
 export function matchesOrderPaymentFilter(order: Order, key: string): boolean {
-  return entityToKey(resolvedOrderPaymentMethod(order), order.currency ?? Currency.CUP) === key;
+  return orderToKey(order) === key;
 }
 
 /** ¿El gasto cae bajo la clave de filtro dada? (con la moneda real del gasto) */

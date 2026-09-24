@@ -5,8 +5,6 @@ import {
   Currency,
   PaymentType,
   SalePaymentMethod,
-  legacyPaymentTypeToSalePaymentMethod,
-  paymentMethodOptionsForCurrency,
   salePaymentMethodLabel,
   salePaymentMethodToLegacyPaymentType,
 } from '@store-mgmt/domain';
@@ -15,7 +13,7 @@ import { Button } from '~/shared/components/ui/button';
 import { CloseIcon, EditIcon } from '~/shared/components/ui/icons';
 import { showBlockingError } from '~/shared/lib/blocking-alert';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
-import { hasMultiMonedasAvailable } from '~/shared/components/multimonedas/currency-select';
+import { normalizedOrderPaymentMethod } from '~/shared/lib/payment-method-resolved';
 import {
   DEFAULT_ENABLED_PAYMENT_METHODS,
   StorePaymentMethodsConfigService,
@@ -39,12 +37,13 @@ interface PaymentOption {
 }
 
 /**
- * Compone el catálogo de formas de pago de la orden (store-payment-methods-config,
- * 2026-09-22): catálogo por moneda → gate MultiMonedas → config por-tienda.
- * `value` es SIEMPRE el legacy con mapping CUP (Transferencia→Tarjeta en
- * cualquier moneda, igual que el ofrecimiento incondicional de hoy). Si el
- * método del estado actual (orden histórica) quedó fuera del catálogo, se
- * mantiene visible al final para que el radio nunca pierda su valor.
+ * Compone el catálogo de formas de pago de la orden. T9
+ * (payment-channels-and-multipayment): una orden ya REGISTRADA se edita con el
+ * catálogo NORMALIZADO — Efectivo y Transferencia (CUP); Zelle y las
+ * Transferencias de otras monedas se presentan como Transferencia (CUP). Se
+ * conserva el gate por config de tienda (Transferencia desactivable; Efectivo
+ * siempre). Si el método actual quedara fuera del catálogo, se mantiene visible
+ * al final para que el radio nunca pierda su valor.
  */
 
 /**
@@ -58,9 +57,10 @@ export function EditOrderModal({ order, isOpen, onClose, onUpdate }: EditOrderMo
   const intl = useIntl();
   const user = useAuthStore((s) => s.user);
   const storeId = user?.selectedStoreId ?? '';
-  const orderCurrency = order?.currency ?? Currency.CUP;
-  const [paymentType, setPaymentType] = useState<PaymentType>(
-    order.paymentType ?? PaymentType.Efectivo,
+  // T9: el valor legacy del radio se expresa SIEMPRE contra CUP (el catálogo
+  // normalizado) — así el método normalizado coincide con una opción del radio.
+  const [paymentType, setPaymentType] = useState<PaymentType>(() =>
+    salePaymentMethodToLegacyPaymentType(normalizedOrderPaymentMethod(order), Currency.CUP),
   );
 
   // store-payment-methods-config: métodos habilitados de la tienda activa
@@ -74,26 +74,25 @@ export function EditOrderModal({ order, isOpen, onClose, onUpdate }: EditOrderMo
   }, [storeId]);
 
   const paymentOptions = useMemo<PaymentOption[]>(() => {
-    const base = paymentMethodOptionsForCurrency(orderCurrency);
-    const planGate = hasMultiMonedasAvailable(user)
-      ? base
-      : base.filter((m) => m !== SalePaymentMethod.Zelle);
-    const catalog = applyStorePaymentMethodsConfig(planGate, enabledMethods).map((method) => ({
+    const catalog = applyStorePaymentMethodsConfig(
+      [SalePaymentMethod.Efectivo, SalePaymentMethod.Transferencia],
+      enabledMethods,
+    ).map((method) => ({
       method,
       value: salePaymentMethodToLegacyPaymentType(method, Currency.CUP),
-      label: salePaymentMethodLabel(method, orderCurrency),
+      label: salePaymentMethodLabel(method, Currency.CUP),
     }));
-    const current = legacyPaymentTypeToSalePaymentMethod(paymentType, orderCurrency).method;
+    const current = normalizedOrderPaymentMethod(order);
     if (catalog.some((o) => o.method === current)) return catalog;
     return [
       ...catalog,
       {
         method: current,
         value: salePaymentMethodToLegacyPaymentType(current, Currency.CUP),
-        label: salePaymentMethodLabel(current, orderCurrency),
+        label: salePaymentMethodLabel(current, Currency.CUP),
       },
     ];
-  }, [orderCurrency, paymentType, user, enabledMethods]);
+  }, [order, enabledMethods]);
 
   if (!isOpen) return null;
 

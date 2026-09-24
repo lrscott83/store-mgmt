@@ -334,3 +334,105 @@ describe('SaleProductRow — Angular parity (sale-product-row.component.html)', 
     }
   });
 });
+
+describe('SaleProductRow — T8: borrar el 0 en los inputs numéricos', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('Cantidad se puede vaciar y re-escribir sin que se re-pinte el 0', () => {
+    const onAdded = vi.fn();
+    render(
+      <Wrapper>
+        <SaleProductRow
+          product={makeProduct({ id: 'prod-9', price: 3 })}
+          orderType={OrderType.Normal}
+          onAdded={onAdded}
+        />
+      </Wrapper>,
+    );
+    const quantity = screen.getByLabelText('Cantidad') as HTMLInputElement;
+
+    fireEvent.change(quantity, { target: { value: '' } });
+    // El campo queda vacío (no se re-pinta 0).
+    expect(quantity).toHaveValue(null);
+
+    fireEvent.change(quantity, { target: { value: '3' } });
+    expect(quantity).toHaveValue(3);
+
+    fireEvent.click(screen.getByRole('button', { name: /adicionar/i }));
+    expect(onAdded).toHaveBeenCalledWith('prod-9', 3, 3);
+  });
+
+  it('Cantidad vacía + blur vuelve al último válido', () => {
+    render(
+      <Wrapper>
+        <SaleProductRow product={makeProduct()} orderType={OrderType.Normal} onAdded={vi.fn()} />
+      </Wrapper>,
+    );
+    const quantity = screen.getByLabelText('Cantidad') as HTMLInputElement;
+
+    fireEvent.change(quantity, { target: { value: '5' } });
+    fireEvent.change(quantity, { target: { value: '' } });
+    fireEvent.blur(quantity);
+
+    expect(quantity).toHaveValue(5);
+  });
+
+  it('Cantidad vacía + Agregar usa el último válido (no un 0 basura)', () => {
+    const onAdded = vi.fn();
+    render(
+      <Wrapper>
+        <SaleProductRow
+          product={makeProduct({ id: 'prod-9', price: 3 })}
+          orderType={OrderType.Normal}
+          onAdded={onAdded}
+        />
+      </Wrapper>,
+    );
+    fireEvent.change(screen.getByLabelText('Cantidad'), { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: /adicionar/i }));
+
+    expect(onAdded).toHaveBeenCalledWith('prod-9', 1, 3);
+  });
+
+  it('Precio (venta no Normal) se puede vaciar, re-escribir y confirmar', () => {
+    const onAdded = vi.fn();
+    render(
+      <Wrapper>
+        <SaleProductRow
+          product={makeProduct({ id: 'prod-9', price: 3 })}
+          orderType={OrderType.Mayorista}
+          onAdded={onAdded}
+        />
+      </Wrapper>,
+    );
+    const price = screen.getByLabelText('Precio') as HTMLInputElement;
+
+    fireEvent.change(price, { target: { value: '' } });
+    expect(price).toHaveValue(null);
+
+    fireEvent.change(price, { target: { value: '7' } });
+    fireEvent.click(screen.getByRole('button', { name: /adicionar/i }));
+
+    expect(onAdded).toHaveBeenCalledWith('prod-9', 1, 7);
+  });
+
+  it('Precio vacío + blur vuelve al último válido', () => {
+    render(
+      <Wrapper>
+        <SaleProductRow
+          product={makeProduct({ price: 3 })}
+          orderType={OrderType.Mayorista}
+          onAdded={vi.fn()}
+        />
+      </Wrapper>,
+    );
+    const price = screen.getByLabelText('Precio') as HTMLInputElement;
+
+    fireEvent.change(price, { target: { value: '' } });
+    fireEvent.blur(price);
+
+    expect(price).toHaveValue(3);
+  });
+});

@@ -6,6 +6,16 @@ import { ProductErrors } from '@store-mgmt/domain';
 import { showBlockingError } from '~/shared/lib/blocking-alert';
 import { formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency';
 
+/**
+ * T8: parsea el borrador de un input numérico. Vacío o no finito → undefined,
+ * para que el valor confirmado conserve el último válido en vez de un 0 basura.
+ */
+function parseNumericDraft(draft: string): number | undefined {
+  if (draft.trim() === '') return undefined;
+  const parsed = Number(draft);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
 interface SaleProductRowProps {
   product: Product;
   orderType: OrderType;
@@ -43,10 +53,44 @@ export function SaleProductRow({
 
   const [quantity, setQuantity] = useState(1);
   const [price, setPrice] = useState(product.price);
+  // T8: el input muestra un BORRADOR de texto para poder vaciar el campo (borrar
+  // el "0") mientras se escribe; el valor confirmado (`quantity`/`price`) solo se
+  // actualiza con un número finito y, al confirmar (blur o agregar), un borrador
+  // vacío/inválido vuelve al último válido.
+  const [quantityDraft, setQuantityDraft] = useState('1');
+  const [priceDraft, setPriceDraft] = useState(String(product.price));
+
+  function changeQuantity(raw: string) {
+    setQuantityDraft(raw);
+    const parsed = parseNumericDraft(raw);
+    if (parsed !== undefined) setQuantity(parsed);
+  }
+
+  function commitQuantity(): number {
+    const next = parseNumericDraft(quantityDraft) ?? quantity;
+    setQuantity(next);
+    setQuantityDraft(String(next));
+    return next;
+  }
+
+  function changePrice(raw: string) {
+    setPriceDraft(raw);
+    const parsed = parseNumericDraft(raw);
+    if (parsed !== undefined) setPrice(parsed);
+  }
+
+  function commitPrice(): number {
+    const next = parseNumericDraft(priceDraft) ?? price;
+    setPrice(next);
+    setPriceDraft(String(next));
+    return next;
+  }
 
   function handleAddToCart() {
+    const effectiveQuantity = commitQuantity();
+    const effectivePrice = commitPrice();
     if (checkAvailability) {
-      const result = checkAvailability(product.id, quantity);
+      const result = checkAvailability(product.id, effectiveQuantity);
       if (!result.succeeded) {
         // Angular: Swal.fire({ title: GENERAL.RESPONSE.ERROR_TITLE, text: message,
         // icon: 'error' }) — blocking, aborts the add (sale-product-row.component.ts:58-73).
@@ -70,8 +114,8 @@ export function SaleProductRow({
       }
     }
 
-    const effectivePrice = isNormalSale ? product.price : price;
-    onAdded(product.id, quantity, effectivePrice);
+    const finalPrice = isNormalSale ? product.price : effectivePrice;
+    onAdded(product.id, effectiveQuantity, finalPrice);
   }
 
   return (
@@ -91,8 +135,9 @@ export function SaleProductRow({
             <input
               type="number"
               min={0}
-              value={price}
-              onChange={(e) => setPrice(Number(e.target.value))}
+              value={priceDraft}
+              onChange={(e) => changePrice(e.target.value)}
+              onBlur={() => commitPrice()}
               className="w-24 rounded-md border border-border px-2 py-1 text-sm text-text focus:outline-none focus:ring-1 focus:ring-primary"
             />
           </label>
@@ -105,8 +150,9 @@ export function SaleProductRow({
           type="number"
           min={0}
           step="any"
-          value={quantity}
-          onChange={(e) => setQuantity(Number(e.target.value))}
+          value={quantityDraft}
+          onChange={(e) => changeQuantity(e.target.value)}
+          onBlur={() => commitQuantity()}
           className="w-16 rounded-md border border-border px-2 py-1 text-sm text-text focus:outline-none focus:ring-1 focus:ring-primary"
         />
       </label>

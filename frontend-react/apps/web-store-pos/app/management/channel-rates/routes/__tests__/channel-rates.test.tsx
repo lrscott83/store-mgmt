@@ -1,7 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
-import { Currency, EFeatures, SalePaymentMethod, type UserModel } from '@store-mgmt/domain';
+import {
+  Currency,
+  EFeatures,
+  EModules,
+  SalePaymentMethod,
+  type UserModel,
+} from '@store-mgmt/domain';
 import esMessages from '~/shared/lib/i18n/es';
 import {
   ChannelRateOfflineErrors,
@@ -64,6 +70,7 @@ vi.mock('~/shared/lib/stores/auth-store', () => {
 // `vi.importActual`.
 vi.mock('~/auth/routes/loaders', () => ({
   adminFeatureLoader: () => vi.fn().mockResolvedValue(null),
+  adminFeatureModuleLoader: () => vi.fn().mockResolvedValue(null),
 }));
 
 // ─── Harness ──────────────────────────────────────────────────────────────────
@@ -104,20 +111,98 @@ describe('ChannelRatesPage (multipayments) — gating', () => {
     ).toBeInTheDocument();
   });
 
-  it('the real adminFeatureLoader admits owner/admin and denies non-admins', async () => {
+  it('the real adminFeatureModuleLoader admits owner/admin WITH module 16 and denies without it', async () => {
     const real = await vi.importActual<typeof import('~/auth/routes/loaders')>(
       '~/auth/routes/loaders',
     );
-    const loader = real.adminFeatureLoader([EFeatures.Configurations]);
+    const loader = real.adminFeatureModuleLoader(
+      [EFeatures.Configurations],
+      [EModules.MultiPayments],
+    );
 
-    mockUser = makeUser({ isSuperAdmin: false, isOwnerAdmin: false, isReSeller: false });
-    const denied = await loader({ params: {} } as never);
-    expect(denied).toBeInstanceOf(Response);
-    expect((denied as Response).headers.get('Location')).toBe('/login');
+    // Non-admin is denied by the role gate even with the module present.
+    mockUser = makeUser({
+      isSuperAdmin: false,
+      isOwnerAdmin: false,
+      isReSeller: false,
+      storeModuleIds: [EModules.MultiPayments],
+    });
+    const deniedRole = await loader({ params: {} } as never);
+    expect(deniedRole).toBeInstanceOf(Response);
+    expect((deniedRole as Response).headers.get('Location')).toBe('/login');
 
-    mockUser = makeUser();
+    // Owner/admin WITHOUT module 16 is denied (D11).
+    mockUser = makeUser({ storeModuleIds: [] });
+    const deniedModule = await loader({ params: {} } as never);
+    expect(deniedModule).toBeInstanceOf(Response);
+    expect((deniedModule as Response).headers.get('Location')).toBe('/login');
+
+    // Owner/admin WITH module 16 is admitted.
+    mockUser = makeUser({ storeModuleIds: [EModules.MultiPayments] });
     const allowed = await loader({ params: {} } as never);
     expect(allowed).toBeNull();
+  });
+});
+
+describe('ChannelRatesPage (multipayments) — real channels only', () => {
+  function optionValues(testId: string): string[] {
+    return Array.from(screen.getByTestId(testId).querySelectorAll('option')).map(
+      (option) => option.getAttribute('value') ?? '',
+    );
+  }
+
+  it('offers only the methods that exist for CUP (no Zelle)', async () => {
+    renderPage();
+
+    await screen.findByTestId('channel-rate-method');
+    expect(optionValues('channel-rate-method')).toEqual([
+      String(SalePaymentMethod.Efectivo),
+      String(SalePaymentMethod.Transferencia),
+    ]);
+    expect(optionValues('channel-rate-method')).not.toContain(String(SalePaymentMethod.Zelle));
+  });
+
+  it('re-pins the method when the new currency does not support it (MLC → Transferencia)', async () => {
+    renderPage();
+
+    fireEvent.change(await screen.findByTestId('channel-rate-currency'), {
+      target: { value: String(Currency.MLC) },
+    });
+
+    const methodSelect = screen.getByTestId('channel-rate-method') as HTMLSelectElement;
+    expect(methodSelect.value).toBe(String(SalePaymentMethod.Transferencia));
+    expect(optionValues('channel-rate-method')).toEqual([String(SalePaymentMethod.Transferencia)]);
+  });
+
+  it('registers a valid channel (Transferencia + MLC) and shows it in the history', async () => {
+    renderPage();
+
+    fireEvent.change(await screen.findByTestId('channel-rate-currency'), {
+      target: { value: String(Currency.MLC) },
+    });
+    fireEvent.change(screen.getByTestId('channel-rate-value'), { target: { value: '350' } });
+    fireEvent.click(screen.getByTestId('channel-rate-submit'));
+
+    await waitFor(() => {
+      expect(screen.getAllByTestId(/^channel-rate-row-/)).toHaveLength(1);
+    });
+
+    const stored = new ChannelRateOfflineService(storeId).getStorageChannelRates();
+    expect(stored).toHaveLength(1);
+    expect(stored[0].method).toBe(SalePaymentMethod.Transferencia);
+    expect(stored[0].currency).toBe(Currency.MLC);
+  });
+
+  it('keeps rendering legacy rows whose channel is no longer in the catalogue', async () => {
+    // Zelle+CUP does not exist in the catalogue but may already be stored.
+    seedRate({ method: SalePaymentMethod.Zelle, currency: Currency.CUP, value: 1 });
+
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getAllByTestId(/^channel-rate-row-/)).toHaveLength(1);
+    });
+    expect(screen.getByText('Zelle')).toBeInTheDocument();
   });
 });
 

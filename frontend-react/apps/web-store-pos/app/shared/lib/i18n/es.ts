@@ -311,6 +311,10 @@ const messages: Record<string, string> = {
   'SHOPPING_CART.CLEAR': 'Limpiar',
   // MultiPayments: etiqueta del selector de moneda del carrito (módulo 16).
   'SHOPPING_CART.CURRENCY_LABEL': 'Moneda',
+  // T4 (payment-channels-and-multipayment): el cambio de moneda se bloquea cuando
+  // alguna línea del carrito no puede convertirse a la moneda destino.
+  'SHOPPING_CART.CURRENCY_CHANGE_BLOCKED':
+    'No se puede cambiar la moneda a {currency}: el producto "{product}" está en {fromCurrency} y no tiene una tasa de cambio vigente.',
   // MultiPayments (módulo 16): lista de pagos del carrito (T7).
   'SHOPPING_CART.MULTI_PAYMENT_TITLE': 'Pagos',
   'SHOPPING_CART.MULTI_PAYMENT_ADD': 'Agregar pago',
@@ -322,7 +326,11 @@ const messages: Record<string, string> = {
   'SHOPPING_CART.MULTI_PAYMENT_PAID_LABEL': 'Total cubierto',
   'SHOPPING_CART.MULTI_PAYMENT_REMAINING_LABEL': 'Restante por cubrir',
   'SHOPPING_CART.MULTI_PAYMENT_CHANGE_LABEL': 'Vuelto',
-  'SHOPPING_CART.MULTI_PAYMENT_SETTLE': 'Cobrar',
+  // T6 (payment-channels-and-multipayment): popup de "Agregar pago".
+  'SHOPPING_CART.MULTI_PAYMENT_ADD_TITLE': 'Agregar pago',
+  'SHOPPING_CART.MULTI_PAYMENT_ADD_CHANNEL_LABEL': 'Canal de pago',
+  'SHOPPING_CART.MULTI_PAYMENT_ADD_CONFIRM': 'Agregar',
+  'SHOPPING_CART.MULTI_PAYMENT_ADD_NO_CHANNELS': 'No hay canales de pago disponibles.',
   'SHOPPING_CART.DON_NOT_PAY_LESS_THAN_CART_TOTAL':
     'Usted no puede realizar la venta porque el pago es menor que el total.',
   'SHOPPING_CART.DON_NOT_SALE_CREDIT_WITHOUT_CLIENT':
@@ -1035,6 +1043,8 @@ const messages: Record<string, string> = {
   'CHANNEL_RATES.REGISTER': 'Registrar tasa',
   'CHANNEL_RATES.SAVED': 'Tasa registrada correctamente.',
   'CHANNEL_RATES.INVALID_DATE': 'La fecha de vigencia es obligatoria.',
+  'CHANNEL_RATES.INVALID_CHANNEL':
+    'Ese canal no existe: elige una combinación válida de método y moneda.',
   'CHANNEL_RATES.HISTORY_TITLE': 'Historial de tasas',
   'CHANNEL_RATES.CHANNEL_COLUMN': 'Canal',
   'CHANNEL_RATES.CURRENCY_COLUMN': 'Moneda',

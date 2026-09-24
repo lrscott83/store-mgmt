@@ -18,6 +18,7 @@ export * from './commons/result';
 export * from './commons/envelope';
 export * from './commons/sale-payment-method-compat';
 export * from './commons/payment-pricing';
+export * from './commons/payment-channel';
 export * from './commons/channel-conversion';
 export * from './commons/payment-tally';
 export * from './errors/product-errors';

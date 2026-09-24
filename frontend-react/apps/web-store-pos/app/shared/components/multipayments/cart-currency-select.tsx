@@ -43,6 +43,15 @@ interface CartCurrencySelectProps {
   value: Currency;
   onChange: (currency: Currency) => void;
   testId?: string;
+  /**
+   * Optional guard evaluated BEFORE the preference is written. Return false to
+   * reject the change: the selector stays on the current currency, nothing is
+   * persisted, and `onRejected` (if provided) is notified. Absent = the change
+   * always proceeds, preserving the pre-T4 behavior for standalone callers.
+   */
+  canChange?: (currency: Currency) => boolean;
+  /** Called with the rejected target currency when `canChange` returns false. */
+  onRejected?: (currency: Currency) => void;
 }
 
 /**
@@ -50,8 +59,19 @@ interface CartCurrencySelectProps {
  * module (module 16). Without the module nothing renders and the cart keeps its
  * pre-MultiPayments behavior (the first item's currency). The selected value is
  * persisted per user so it survives reloads and is reused on the next sale.
+ *
+ * Layout: compact inline control (label + select in one row) so the cart can
+ * place it in the header toolbar next to "Limpiar"/"Registrar" without a
+ * full-width row of its own. On narrow screens the header wraps, keeping the
+ * control usable.
  */
-export function CartCurrencySelect({ value, onChange, testId }: CartCurrencySelectProps) {
+export function CartCurrencySelect({
+  value,
+  onChange,
+  testId,
+  canChange,
+  onRejected,
+}: CartCurrencySelectProps) {
   const intl = useIntl();
   const user = useAuthStore((s) => s.user);
   const items = useCartStore((s) => s.items);
@@ -85,20 +105,27 @@ export function CartCurrencySelect({ value, onChange, testId }: CartCurrencySele
   }
 
   function handleChange(currency: number) {
-    writeCartCurrencyPreference(user?.id, currency as Currency);
-    onChange(currency as Currency);
+    const next = currency as Currency;
+    // T4: reject the change BEFORE persisting or notifying the parent, so the
+    // selector stays on the current currency and the preference is untouched.
+    if (canChange && !canChange(next)) {
+      onRejected?.(next);
+      return;
+    }
+    writeCartCurrencyPreference(user?.id, next);
+    onChange(next);
   }
 
   return (
-    <div className="border-b border-border px-4 py-3">
-      <label className="block text-xs font-medium text-gray-600 mb-1">
+    <div className="flex items-center gap-1">
+      <label className="whitespace-nowrap text-xs font-medium text-text-muted">
         {intl.formatMessage({ id: 'SHOPPING_CART.CURRENCY_LABEL' })}
       </label>
       <select
         value={selected}
         onChange={(e) => handleChange(Number(e.target.value))}
         data-testid={testId ?? 'cart-currency-select'}
-        className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-cyan-500"
+        className="rounded-md border border-border bg-surface px-2 py-1 text-xs text-text focus:outline-none focus:ring-1 focus:ring-primary"
       >
         {options.map((option) => (
           <option key={option.value} value={option.value}>

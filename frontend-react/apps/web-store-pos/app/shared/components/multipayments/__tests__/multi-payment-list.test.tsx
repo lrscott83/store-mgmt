@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { useState } from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
-import { Currency, EModules, SalePaymentMethod } from '@store-mgmt/domain';
+import { Currency, EModules, SalePaymentMethod, channelKey } from '@store-mgmt/domain';
 import type { ChannelRate } from '@store-mgmt/domain';
 import esMessages from '~/shared/lib/i18n/es';
 import { StorePaymentMethodsConfigService } from '~/shared/lib/payment-methods/store-payment-methods-config-service';
@@ -76,8 +76,8 @@ function renderList(props: {
   return onChange;
 }
 
-function settleButton() {
-  return screen.getByTestId('multi-payment-settle');
+function blockReason() {
+  return screen.queryByTestId('multi-payment-block-reason');
 }
 
 describe('MultiPaymentList (module 16 gate)', () => {
@@ -127,11 +127,8 @@ describe('MultiPaymentList — owner scenarios', () => {
     expect(screen.getByTestId('multi-payment-paid')).toHaveTextContent('USD');
     expect(screen.getByTestId('multi-payment-remaining')).toHaveTextContent('0');
     expect(screen.getByTestId('multi-payment-change')).toHaveTextContent('0');
-    expect(screen.getByTestId('multi-payment-block-reason')).toHaveAttribute(
-      'data-block-reason',
-      'none',
-    );
-    expect(settleButton()).not.toBeDisabled();
+    // T5: sin bloqueo no se pinta el motivo de bloqueo.
+    expect(blockReason()).toBeNull();
   });
 
   it('covers a 120 CUP order with 100 CUP + 20 CUP (no rates needed)', () => {
@@ -148,7 +145,18 @@ describe('MultiPaymentList — owner scenarios', () => {
     expect(screen.getByTestId('multi-payment-paid')).toHaveTextContent('CUP');
     expect(screen.getByTestId('multi-payment-remaining')).toHaveTextContent('0');
     expect(screen.getByTestId('multi-payment-change')).toHaveTextContent('0');
-    expect(settleButton()).not.toBeDisabled();
+    expect(blockReason()).toBeNull();
+  });
+
+  it('T5: una fila Efectivo por el total no produce error de tasa ni bloqueo', () => {
+    renderList({
+      payments: [row({ id: 'p1', currency: Currency.CUP, amount: 120 })],
+      orderCurrency: Currency.CUP,
+      total: 120,
+    });
+
+    expect(screen.queryByTestId('multi-payment-row-error')).not.toBeInTheDocument();
+    expect(blockReason()).toBeNull();
   });
 });
 
@@ -168,7 +176,7 @@ describe('MultiPaymentList — balance and conversion', () => {
 
     expect(screen.getByTestId('multi-payment-change')).toHaveTextContent('50');
     expect(screen.getByTestId('multi-payment-remaining')).toHaveTextContent('0');
-    expect(settleButton()).not.toBeDisabled();
+    expect(blockReason()).toBeNull();
   });
 
   it('shows the remaining and blocks the settle action when underpaid', () => {
@@ -180,12 +188,7 @@ describe('MultiPaymentList — balance and conversion', () => {
 
     expect(screen.getByTestId('multi-payment-remaining')).toHaveTextContent('20');
     expect(screen.getByTestId('multi-payment-change')).toHaveTextContent('0');
-    expect(screen.getByTestId('multi-payment-block-reason')).toHaveAttribute(
-      'data-block-reason',
-      'underpaid',
-    );
-    expect(settleButton()).toBeDisabled();
-    expect(settleButton()).toHaveAttribute('data-blocked', 'true');
+    expect(blockReason()).toHaveAttribute('data-block-reason', 'underpaid');
   });
 
   it('filters non-positive rows before tallying (no throw)', () => {
@@ -201,7 +204,7 @@ describe('MultiPaymentList — balance and conversion', () => {
 
     expect(screen.getByTestId('multi-payment-paid')).toHaveTextContent('100');
     expect(screen.getByTestId('multi-payment-remaining')).toHaveTextContent('0');
-    expect(settleButton()).not.toBeDisabled();
+    expect(blockReason()).toBeNull();
   });
 
   it('surfaces a typed error and blocks when a payment cannot be converted', () => {
@@ -217,11 +220,7 @@ describe('MultiPaymentList — balance and conversion', () => {
     expect(error).toHaveTextContent(/tasa de cambio/i);
     // The unconvertible payment is NOT silently counted as 0: the total is still owed.
     expect(screen.getByTestId('multi-payment-remaining')).toHaveTextContent('100');
-    expect(screen.getByTestId('multi-payment-block-reason')).toHaveAttribute(
-      'data-block-reason',
-      'conversion_error',
-    );
-    expect(settleButton()).toBeDisabled();
+    expect(blockReason()).toHaveAttribute('data-block-reason', 'conversion_error');
   });
 });
 
@@ -245,7 +244,7 @@ describe('MultiPaymentList — interactions', () => {
     );
   }
 
-  it('adds and removes payment rows', () => {
+  it('opens the channel popup and adds a row on confirm', () => {
     render(
       <IntlProvider messages={esMessages} locale="es" defaultLocale="es">
         <Harness initial={[]} />
@@ -255,26 +254,104 @@ describe('MultiPaymentList — interactions', () => {
     expect(screen.queryAllByTestId('multi-payment-row')).toHaveLength(0);
 
     fireEvent.click(screen.getByTestId('multi-payment-add'));
+    // T6: "Agregar pago" abre un popup, no inserta una fila en blanco.
+    expect(screen.getByTestId('multi-payment-add-dialog')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('multi-payment-add-confirm'));
     expect(screen.getAllByTestId('multi-payment-row')).toHaveLength(1);
+    expect(screen.queryByTestId('multi-payment-add-dialog')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId('multi-payment-remove'));
     expect(screen.queryAllByTestId('multi-payment-row')).toHaveLength(0);
   });
 
-  it('settles once an edited amount covers the total', () => {
+  it('reports the sale covered once an edited amount covers the total', () => {
     render(
       <IntlProvider messages={esMessages} locale="es" defaultLocale="es">
         <Harness initial={[row({ id: 'p1', currency: Currency.USD, amount: 0 })]} />
       </IntlProvider>,
     );
 
-    expect(settleButton()).toBeDisabled();
+    expect(blockReason()).toHaveAttribute('data-block-reason', 'underpaid');
     expect(screen.getByTestId('multi-payment-remaining')).toHaveTextContent('100');
 
     fireEvent.change(screen.getByTestId('multi-payment-amount'), { target: { value: '100' } });
 
     expect(screen.getByTestId('multi-payment-remaining')).toHaveTextContent('0');
-    expect(settleButton()).not.toBeDisabled();
+    expect(blockReason()).toBeNull();
+  });
+
+  it('deleting the last row leaves the guard underpaid (no rows)', () => {
+    render(
+      <IntlProvider messages={esMessages} locale="es" defaultLocale="es">
+        <Harness initial={[row({ id: 'p1', currency: Currency.USD, amount: 100 })]} />
+      </IntlProvider>,
+    );
+
+    expect(blockReason()).toBeNull();
+    fireEvent.click(screen.getByTestId('multi-payment-remove'));
+
+    expect(screen.queryAllByTestId('multi-payment-row')).toHaveLength(0);
+    expect(blockReason()).toHaveAttribute('data-block-reason', 'underpaid');
+  });
+
+  it('recalculates paid/remaining/change when the amount changes', () => {
+    render(
+      <IntlProvider messages={esMessages} locale="es" defaultLocale="es">
+        <Harness initial={[row({ id: 'p1', currency: Currency.USD, amount: 50 })]} />
+      </IntlProvider>,
+    );
+
+    expect(screen.getByTestId('multi-payment-paid')).toHaveTextContent('50');
+    expect(screen.getByTestId('multi-payment-remaining')).toHaveTextContent('50');
+
+    fireEvent.change(screen.getByTestId('multi-payment-amount'), { target: { value: '150' } });
+
+    expect(screen.getByTestId('multi-payment-paid')).toHaveTextContent('100');
+    expect(screen.getByTestId('multi-payment-remaining')).toHaveTextContent('0');
+    expect(screen.getByTestId('multi-payment-change')).toHaveTextContent('50');
+  });
+
+  it('T7: no renderiza el botón "Cobrar"', () => {
+    render(
+      <IntlProvider messages={esMessages} locale="es" defaultLocale="es">
+        <Harness initial={[row({ id: 'p1', currency: Currency.USD, amount: 100 })]} />
+      </IntlProvider>,
+    );
+
+    expect(screen.queryByTestId('multi-payment-settle')).not.toBeInTheDocument();
+  });
+
+  it('T8: el Monto se puede vaciar y re-escribir sin re-pintar el 0', () => {
+    render(
+      <IntlProvider messages={esMessages} locale="es" defaultLocale="es">
+        <Harness initial={[row({ id: 'p1', currency: Currency.USD, amount: 50 })]} />
+      </IntlProvider>,
+    );
+    const amount = screen.getByTestId('multi-payment-amount') as HTMLInputElement;
+
+    fireEvent.change(amount, { target: { value: '' } });
+    expect(amount).toHaveValue(null);
+
+    fireEvent.change(amount, { target: { value: '75' } });
+    expect(amount).toHaveValue(75);
+    // El recálculo sigue en vivo para valores válidos.
+    expect(screen.getByTestId('multi-payment-paid')).toHaveTextContent('75');
+  });
+
+  it('T8: Monto vacío + blur vuelve al último válido', () => {
+    render(
+      <IntlProvider messages={esMessages} locale="es" defaultLocale="es">
+        <Harness initial={[row({ id: 'p1', currency: Currency.USD, amount: 50 })]} />
+      </IntlProvider>,
+    );
+    const amount = screen.getByTestId('multi-payment-amount') as HTMLInputElement;
+
+    fireEvent.change(amount, { target: { value: '80' } });
+    fireEvent.change(amount, { target: { value: '' } });
+    fireEvent.blur(amount);
+
+    expect(amount).toHaveValue(80);
   });
 });
 
@@ -364,7 +441,7 @@ describe('MultiPaymentList — métodos según config de tienda', () => {
     ]);
   });
 
-  it('addRow re-pinea al primer método del catálogo del pedido bajo config', () => {
+  it('el popup bajo config solo ofrece canales con métodos habilitados', () => {
     new StorePaymentMethodsConfigService(STORE_ID).setMethodEnabled(
       STORE_ID,
       SalePaymentMethod.Transferencia,
@@ -388,12 +465,93 @@ describe('MultiPaymentList — métodos según config de tienda', () => {
       </IntlProvider>,
     );
     fireEvent.click(screen.getByTestId('multi-payment-add'));
+
+    const channelSelect = screen.getByTestId('multi-payment-add-channel') as HTMLSelectElement;
+    const labels = [...channelSelect.options].map((o) => o.textContent);
+    // Transferencia desactivada: sus canales salen; Efectivo (siempre) queda.
+    expect(labels).not.toContain('Transferencia (CUP)');
+    expect(labels).not.toContain('Transferencia (USD)');
+    expect(labels.every((label) => label === 'Efectivo')).toBe(true);
+
+    fireEvent.click(screen.getByTestId('multi-payment-add-confirm'));
     const added = screen.getAllByTestId('multi-payment-row')[0];
     const methodSelect = added.querySelector(
       '[data-testid="multi-payment-method"]',
     ) as HTMLSelectElement;
     // CUP + config sin Transferencia → la fila nueva cae a Efectivo.
-    expect([...methodSelect.options].map((o) => o.textContent)).toEqual(['Efectivo']);
     expect(methodSelect.value).toBe(String(SalePaymentMethod.Efectivo));
+  });
+});
+
+// ─── T6: popup de "Agregar pago" — solo canales válidos, fila con el canal
+//     elegido y monto inicial sensato ────────────────────────────────────────
+
+describe('MultiPaymentList — popup de canales (T6)', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    mockUser = userWithStoreModules([EModules.MultiPayments, EModules.MultiMonedas]);
+    mockRates = [];
+  });
+
+  it('ofrece solo canales válidos del catálogo (método + moneda)', () => {
+    renderList({ payments: [], orderCurrency: Currency.USD, total: 100 });
+    fireEvent.click(screen.getByTestId('multi-payment-add'));
+
+    const channelSelect = screen.getByTestId('multi-payment-add-channel') as HTMLSelectElement;
+    const labels = [...channelSelect.options].map((o) => o.textContent);
+    // Catálogo real, sin combinaciones inexistentes.
+    expect(labels).toEqual([
+      'Efectivo',
+      'Transferencia (CUP)',
+      'Efectivo',
+      'Zelle',
+      'Transferencia (USD)',
+      'Efectivo',
+      'Transferencia (CLA)',
+      'Transferencia (MLC)',
+      'Efectivo',
+      'Efectivo',
+    ]);
+    expect(labels).not.toContain('Zelle (CUP)');
+    expect(labels).not.toContain('Efectivo (MLC)');
+  });
+
+  it('confirmar agrega la fila con el canal elegido y el restante como monto', () => {
+    const onChange = vi.fn();
+    renderList({ payments: [], orderCurrency: Currency.USD, total: 100, onChange });
+    fireEvent.click(screen.getByTestId('multi-payment-add'));
+
+    fireEvent.change(screen.getByTestId('multi-payment-add-channel'), {
+      target: { value: channelKey(SalePaymentMethod.Transferencia, Currency.USD) },
+    });
+    fireEvent.click(screen.getByTestId('multi-payment-add-confirm'));
+
+    expect(onChange).toHaveBeenCalledTimes(1);
+    const added = onChange.mock.calls[0][0] as MultiPaymentRow[];
+    expect(added).toHaveLength(1);
+    expect(added[0]).toMatchObject({
+      method: SalePaymentMethod.Transferencia,
+      currency: Currency.USD,
+      // Misma moneda que la venta → arranca con el restante por cubrir.
+      amount: 100,
+    });
+  });
+
+  it('un canal de otra moneda arranca en 0 (no hay tasa para prellenar)', () => {
+    const onChange = vi.fn();
+    renderList({ payments: [], orderCurrency: Currency.USD, total: 100, onChange });
+    fireEvent.click(screen.getByTestId('multi-payment-add'));
+
+    fireEvent.change(screen.getByTestId('multi-payment-add-channel'), {
+      target: { value: channelKey(SalePaymentMethod.Efectivo, Currency.CUP) },
+    });
+    fireEvent.click(screen.getByTestId('multi-payment-add-confirm'));
+
+    const added = onChange.mock.calls[0][0] as MultiPaymentRow[];
+    expect(added[0]).toMatchObject({
+      method: SalePaymentMethod.Efectivo,
+      currency: Currency.CUP,
+      amount: 0,
+    });
   });
 });
