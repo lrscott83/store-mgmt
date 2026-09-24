@@ -14,11 +14,21 @@ import { plantRoster, KAT_PASSWORD } from './support/roster-fixture';
  * dispositivo} × {reload, /login, /register}. "Sin clave de dispositivo" =
  * IndexedDB destruido con la tabla de wraps en localStorage intacta — el
  * estado que dispara el par de síntomas reportado.
+ *
+ * La ÚNICA celda donde el reload NO mantiene la vista es offline/sin clave
+ * (test 12): el authLoader redirige a /login?unlock=1 ANTES de pintar cuando
+ * needsUnlock && hasUnreadableCiphertext (design §5, auth/routes/loaders.ts:
+ * 36-38) — es el unlock gate de cifrado at-rest, una redirección SIN logout.
+ * El test 12 pinea ese comportamiento diseñado: el roster y la tabla de
+ * wraps sobreviven, y el re-login offline restaura el home. La invariante
+ * "recargar mantiene la sesión visible" queda cubierta por las otras tres
+ * celdas de reload (tests 1, 6 y 7).
  */
 
 const HOME_URL = /\/sales\/products$/;
 const USER_MENU = 'Menú de usuario';
 const DEVICE_KEY_DB = 'lizoft-device-key';
+const DEVICE_DEK_TABLE = 'lizoft.device-dek';
 
 interface SnapshotEntries {
   origin: string;
@@ -55,8 +65,10 @@ async function registerAndLoginOnline(page: Page): Promise<TestIdentity> {
   return identity;
 }
 
-/** Login offline por roster (cero HTTP); termina en /sales/products. */
-async function loginOfflineByRoster(page: Page): Promise<void> {
+/** Login offline por roster (cero HTTP); termina en /sales/products.
+ * Devuelve el login plantado para que un test pueda volver a autenticar
+ * después de un unlock gate. */
+async function loginOfflineByRoster(page: Page): Promise<string> {
   const loginPage = new LoginPage(page);
   await loginPage.goto();
   const login = `e2e-nav-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -64,6 +76,7 @@ async function loginOfflineByRoster(page: Page): Promise<void> {
   await loginPage.fill({ login, password: KAT_PASSWORD });
   await loginPage.submit();
   await page.waitForURL(HOME_URL);
+  return login;
 }
 
 /** Sesión autenticada + provisionada, lista para restaurar en un contexto
@@ -230,15 +243,39 @@ test.describe('offline — sin clave de dispositivo', () => {
     await page.waitForURL(HOME_URL, { timeout: 15_000 });
   });
 
-  test('12. offline/sin clave: recargar la vista mantiene la sesión', async ({ browser }) => {
+  test('12. offline/sin clave: recargar con ciphertext ilegible va a /login?unlock=1 SIN logout', async ({ browser }) => {
     const page = await browser.newPage();
-    await loginOfflineByRoster(page);
+    const login = await loginOfflineByRoster(page);
     await deleteDeviceKeyDatabase(page);
 
+    // El auto-init del home (carrito) deja entidades `lizoft.store-*` cifradas
+    // sin poder leerlas (IndexedDB destruido), por eso el unlock gate aplica.
     await page.reload();
+    // authLoader redirige ANTES de pintar (auth/routes/loaders.ts:36-38) —
+    // es el unlock gate de cifrado at-rest, con sesión y roster intactos.
+    await expect(page).toHaveURL(/\/login\?unlock=1$/);
+
+    // La sesión NO se cerró: ni el roster ni la tabla de wraps fueron
+    // borrados (denyAccess() es lo único que los limpia).
+    const lockedState = await page.evaluate(
+      (dekTableKey) => ({
+        roster: window.localStorage.getItem('lizoft.offline-roster') !== null,
+        dekTable: window.localStorage.getItem(dekTableKey) !== null,
+      }),
+      DEVICE_DEK_TABLE,
+    );
+    expect(lockedState.roster).toBe(true);
+    expect(lockedState.dekTable).toBe(true);
+
+    // Y sigue siendo recuperable: el re-login offline por roster con la
+    // contraseña KAT desenvuelve la DEK y devuelve al home (el unlock gate
+    // redirige a /login?unlock=1 precisamente para permitir este re-login).
+    const loginPage = new LoginPage(page);
+    await loginPage.fill({ login, password: KAT_PASSWORD });
+    await loginPage.submit();
+    await page.waitForURL(HOME_URL, { timeout: 15_000 });
     await expect(page.getByRole('button', { name: USER_MENU })).toBeVisible({
       timeout: 15_000,
     });
-    await expect(page).toHaveURL(HOME_URL);
   });
 });
