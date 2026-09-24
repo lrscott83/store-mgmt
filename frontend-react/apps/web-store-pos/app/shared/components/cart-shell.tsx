@@ -7,7 +7,10 @@ import {
   SalePaymentMethod,
   applyPaymentPricing,
   defaultPaymentMethodForCurrency,
+  isCashMethod,
+  paymentMethodOptionsForCurrency,
   paymentPricingFor,
+  salePaymentMethodLabel,
   salePaymentMethodToLegacyPaymentType,
 } from '@store-mgmt/domain';
 import { useCartStore } from '~/shared/lib/stores/cart-store';
@@ -32,12 +35,20 @@ import {
   wholesaleTierUnitPrice,
   wholesaleUnitPlural,
 } from '~/sales/lib/wholesale';
+import { getPaymentReturn, getPaymentReturnKind } from '~/shared/lib/payment-return';
 import { validateCartSubmission } from '~/shared/lib/cart-submission-validation';
 import { showBlockingError, showAcknowledgeError } from '~/shared/lib/blocking-alert';
 import { showToastSuccess, showToastError } from '~/shared/lib/toast';
 import { round2 } from '~/shared/lib/money';
 import { currencyLabel, formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency';
 import { readCartCurrencyPreference, writeCartCurrencyPreference } from '~/shared/lib/cart-currency-preference';
+import { hasMultiMonedasAvailable } from '~/shared/components/multimonedas/currency-select';
+import {
+  DEFAULT_ENABLED_CHANNEL_KEYS,
+  StorePaymentMethodsConfigService,
+  applyStorePaymentMethodsConfig,
+  enabledMethodsForCurrency,
+} from '~/shared/lib/payment-methods/store-payment-methods-config-service';
 import { CartCurrencySelect } from '~/shared/components/multipayments/cart-currency-select';
 import { MultiPaymentList, createPaymentRow } from '~/shared/components/multipayments/multi-payment-list';
 import { settleMultiPayments } from '~/shared/components/multipayments/multi-payment-settlement';
@@ -105,8 +116,9 @@ export function CartShell() {
   const [isOpen, setIsOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   // UI-only state, NOT persisted to the order — matches Angular's NavRightComponent
-  // field `mustGenerateFacture`, which lives on the component, not the
+  // fields `payment` and `mustGenerateFacture`, which live on the component, not the
   // shopping-cart service or the created Order.
+  const [payment, setPayment] = useState<number | undefined>(undefined);
   const [mustGenerateFacture, setMustGenerateFacture] = useState(false);
   const cartRef = useRef<HTMLDivElement>(null);
 
@@ -130,6 +142,7 @@ export function CartShell() {
     // (persistido con el carrito). Defaults defensivos para mocks de test y perfiles
     // viejos sin el campo.
     salePaymentMethod = SalePaymentMethod.Efectivo,
+    setSalePaymentMethod = () => {},
     // MultiPayments (módulo 16): filas del multi-pago de la venta en curso.
     // Defaults defensivos para mocks de test y perfiles persistidos viejos.
     payments = [],
@@ -156,14 +169,13 @@ export function CartShell() {
   // sigue contando unidades (cartBadgeCount cae a la suma por producto sin config).
   const itemCount = wholesaleCartDisplay.cartBadgeCount(items, orderType);
 
-  // T21: las filas se convierten a la moneda de la venta con el MISMO registro de
-  // tasas que usa la lista, para que el bloqueo de "Registrar" coincida exactamente
-  // con el bloqueo de cobro de la propia lista. Se lee siempre (el registro es un
-  // almacén local por tienda; sin tasas las rutas misma-moneda no las necesitan).
+  // MultiPayments (módulo 16): las filas se convierten a la moneda de la venta con
+  // el MISMO registro de tasas que usa la lista, para que el bloqueo de "Registrar"
+  // coincida exactamente con el bloqueo de cobro de la propia lista.
   const multiPaymentRates = useMemo<ChannelRate[]>(() => {
-    if (typeof window === 'undefined' || !storeId) return [];
+    if (!multiPaymentsAvailable || typeof window === 'undefined' || !storeId) return [];
     return new ChannelRateOfflineService(storeId).getStorageChannelRates();
-  }, [storeId]);
+  }, [multiPaymentsAvailable, storeId]);
 
   // MultiMonedas: la moneda NATIVA del carrito la fija el primer ítem (CUP si está
   // vacío), igual que `cartCurrency()`. Es el fallback seguro: la primera línea es
@@ -216,6 +228,37 @@ export function CartShell() {
     setPreferredCartCurrency(next);
   }
 
+  // payment-methods-percent-tax (plan 2026-09-17) + store-payment-methods-config
+  // (2026-09-22, per-channel T20 2026-09-24): el catálogo de métodos de la venta
+  // = moneda → gate de plan (sin MultiMonedas no hay Zelle) → config por-tienda
+  // (canales deshabilitados fuera para ESA moneda; Efectivo siempre). La config
+  // se lee de localStorage (instancia fresca por memo); SSR: sin window se usan
+  // todos los canales y la hidratación lee localStorage.
+  const paymentConfigEnabledChannels = useMemo(() => {
+    if (typeof window === 'undefined' || !storeId) {
+      return [...DEFAULT_ENABLED_CHANNEL_KEYS];
+    }
+    return new StorePaymentMethodsConfigService(storeId).getEnabledChannels(storeId);
+  }, [storeId]);
+
+  const methodOptions = useMemo(() => {
+    const base = paymentMethodOptionsForCurrency(saleCurrency);
+    const planGate = hasMultiMonedasAvailable(user)
+      ? base
+      : base.filter((m) => m !== SalePaymentMethod.Zelle);
+    return applyStorePaymentMethodsConfig(
+      planGate,
+      enabledMethodsForCurrency(paymentConfigEnabledChannels, saleCurrency),
+    );
+  }, [saleCurrency, user, paymentConfigEnabledChannels]);
+
+  useEffect(() => {
+    if (!methodOptions.includes(salePaymentMethod)) {
+      setSalePaymentMethod(methodOptions[0] ?? SalePaymentMethod.Efectivo);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [methodOptions]);
+
   // El pricing de la combinación (moneda, método) se aplica al total mostrado y al
   // que se valida contra el pago; createOrder aplica LA MISMA fórmula al persistir.
   // Con los defaults 0/0 el total ajustado es idéntico al base (no-regresión).
@@ -226,14 +269,6 @@ export function CartShell() {
   // 16 the priced total stays byte-identical to the legacy behavior.
   const pricing = paymentPricingFor(saleCurrency, salePaymentMethod);
   const multiPaymentsActive = multiPaymentsAvailable && items.length > 0;
-
-  // T21: la lista de pagos es la UI de pago SIEMPRE. Con ítems en el carrito está
-  // activa en ambos modos; sin el módulo 16 se limita a una sola fila.
-  const paymentListActive = items.length > 0;
-  const activePayments = useMemo(
-    () => (multiPaymentsAvailable ? payments : payments.slice(0, 1)),
-    [multiPaymentsAvailable, payments],
-  );
 
   // MultiPayments (módulo 16, T8): cada línea del carrito se convierte a la moneda
   // de la venta elegida (una tasa por moneda, no por canal). Sin el módulo el
@@ -249,39 +284,42 @@ export function CartShell() {
   const totalAmount = multiPaymentsActive
     ? lineConversion.total
     : applyPaymentPricing(total(), pricing);
+  const paymentReturn = getPaymentReturn(payment, totalAmount);
+  const paymentReturnKind = getPaymentReturnKind(paymentReturn);
+  const cashSale = isCashMethod(salePaymentMethod);
 
-  // T6/T21: los pagos se liquidan en la MISMA moneda de la venta (saleCurrency),
-  // de modo que la lista, la liquidación y el total coinciden. Activo siempre que
-  // haya ítems (sin módulo 16, con la única fila visible).
+  // T6 reconciliation: con el multi-pago activo los pagos se liquidan en la MISMA
+  // moneda de la venta (saleCurrency), de modo que la lista, la liquidación y el
+  // total coinciden. Sin el módulo el valor no se usa (la lista no se monta).
   const multiPaymentOrderCurrency = saleCurrency;
   const multiPaymentSettlement = useMemo(
     () =>
-      paymentListActive
+      multiPaymentsAvailable
         ? settleMultiPayments(
-            activePayments,
+            payments,
             multiPaymentOrderCurrency,
             totalAmount,
             multiPaymentRates,
             new Date(),
           )
         : { orderPayments: [], remainingCents: 0, firstError: null },
-    [paymentListActive, activePayments, multiPaymentOrderCurrency, totalAmount, multiPaymentRates],
+    [multiPaymentsAvailable, payments, multiPaymentOrderCurrency, totalAmount, multiPaymentRates],
   );
 
-  // T5/T21: cuando la lista de pagos pasa a ser relevante (carrito con ítems) y
-  // aún no hay filas, se siembra UNA fila por el total de la venta con el PRIMER
-  // canal válido del catálogo para la moneda de la venta (T22/A2) — misma moneda
-  // ⇒ sin conversión y sin mensaje de tasa. Para CUP/USD/EUR/CAD/MXN es Efectivo;
-  // para MLC/CLA es Transferencia (Efectivo no existe en esas monedas, así que
-  // sembrarlo dejaría un canal fuera de catálogo). Aplica en ambos modos (con y
-  // sin módulo 16). La siembra ocurre SOLO en la transición a "activo" (ref):
-  // así no pelea con las ediciones del usuario (ni re-siembra si borra todas las
-  // filas) y el guard sigue coherente (si el usuario baja el monto, queda en
-  // subpago y "Registrar" se bloquea). Al vaciarse el carrito se limpian las filas
-  // para que la próxima venta arranque de cero.
+  // T5 (payment-channels-and-multipayment): cuando el bloque de multipago pasa a
+  // ser relevante (carrito con ítems + módulo 16) y aún no hay filas, se siembra
+  // UNA fila por el total de la venta con el PRIMER canal válido del catálogo para
+  // la moneda de la venta (T22/A2) — misma moneda ⇒ sin conversión y sin mensaje de
+  // tasa. Para CUP/USD/EUR/CAD/MXN es Efectivo; para MLC/CLA es Transferencia
+  // (Efectivo no existe en esas monedas, así que sembrarlo dejaría un canal fuera
+  // de catálogo). La siembra ocurre SOLO en la transición a "activo" (ref): así no
+  // pelea con las ediciones del usuario (ni re-siembra si borra todas las filas) y
+  // el guard sigue coherente (si el usuario baja el monto, queda en subpago y
+  // "Registrar" se bloquea). Al vaciarse el carrito se limpian las filas para que
+  // la próxima venta arranque de cero.
   const multiPaymentsSeededRef = useRef(false);
   useEffect(() => {
-    if (!paymentListActive) {
+    if (!multiPaymentsActive) {
       multiPaymentsSeededRef.current = false;
       if (payments.length > 0) setPayments([]);
       return;
@@ -295,7 +333,7 @@ export function CartShell() {
     }
     // Intencional: solo la transición a activo dispara la siembra.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [paymentListActive]);
+  }, [multiPaymentsActive]);
 
   // El cierre se bloquea mientras la venta no esté cubierta por los pagos (misma
   // razón que la lista: falta cubrir, o una fila no se pudo convertir) o mientras
@@ -306,12 +344,14 @@ export function CartShell() {
   // sin convertir la línea no hay precio persistible en la moneda de la venta).
   const lineConversionBlocked = multiPaymentsActive && lineConversion.firstError !== null;
   const multiPaymentBlocked =
-    paymentListActive &&
+    multiPaymentsAvailable &&
+    items.length > 0 &&
     (lineConversionBlocked ||
       (!isCredit &&
         (multiPaymentSettlement.firstError !== null || multiPaymentSettlement.remainingCents > 0)));
 
   function resetTransientFields() {
+    setPayment(undefined);
     setMustGenerateFacture(false);
   }
 
@@ -424,9 +464,7 @@ export function CartShell() {
     // not an inline banner.
     const validationError = validateCartSubmission({
       itemCount,
-      // T21: el bloque legacy "Pago" ya no existe; el guard de cobertura lo lleva
-      // la lista de pagos (multiPaymentBlocked), no este validador.
-      payment: undefined,
+      payment,
       total: totalAmount,
       isCredit,
       client: clientName,
@@ -459,12 +497,12 @@ export function CartShell() {
       return;
     }
 
-    // T21: con filas de pago (siempre que haya ítems, en ambos modos), el método
-    // legacy se deriva del PRIMER pago (best-effort de compatibilidad con lectores
-    // viejos); el dato autoritativo es la lista `payments` persistida en la orden.
-    // Sin filas, todo queda como antes (método del carrito).
-    const hasPayments = paymentListActive && activePayments.length > 0;
-    const effectiveSalePaymentMethod = hasPayments ? activePayments[0].method : salePaymentMethod;
+    // MultiPayments (módulo 16): con filas de pago, el método legacy se deriva del
+    // PRIMER pago (best-effort de compatibilidad con lectores viejos); el dato
+    // autoritativo es la lista `payments` persistida en la orden. Sin filas, todo
+    // queda EXACTAMENTE como antes (método del carrito).
+    const hasMultiPayments = multiPaymentsAvailable && payments.length > 0;
+    const effectiveSalePaymentMethod = hasMultiPayments ? payments[0].method : salePaymentMethod;
 
     // T8 (defensivo): aunque el botón ya está deshabilitado, un submit programático
     // con una línea no convertible no debe crear la venta.
@@ -507,7 +545,7 @@ export function CartShell() {
         orderDescription,
         clientName.trim(),
         effectiveSalePaymentMethod,
-        hasPayments ? multiPaymentSettlement.orderPayments : undefined,
+        hasMultiPayments ? multiPaymentSettlement.orderPayments : undefined,
       );
       if (!result.succeeded) {
         // Angular createOrder `else` branch (nav-right.component.ts:222-225):
@@ -653,18 +691,88 @@ export function CartShell() {
               </div>
             )}
 
-            {/* T21: la lista de pagos es la UI de pago SIEMPRE. Con ítems en el
-              carrito se renderiza en ambos modos: con el módulo 16 como editor de
-              N filas; sin el módulo, la misma lista limitada a una sola fila (sin
-              "Agregar pago" ni eliminar). El bloque legacy de pago (radios de
-              forma de pago + campo "Pago") fue eliminado. */}
-            {paymentListActive && (
+            {/* MultiPayments (módulo 16): con ítems en el carrito, la lista de pagos
+              reemplaza el bloque legacy de pago (el "con cuánto paga"/vuelto y el
+              selector de método). Sin el módulo, o con el carrito vacío, se renderiza
+              EXACTAMENTE el bloque legacy (los E2E existentes no tienen el módulo). */}
+            {multiPaymentsAvailable && items.length > 0 ? (
               <MultiPaymentList
-                payments={activePayments}
+                payments={payments}
                 onChange={setPayments}
                 orderCurrency={multiPaymentOrderCurrency}
                 total={totalAmount}
               />
+            ) : (
+              <>
+                {/* Payment / Vuelto row — payment-methods-percent-tax (plan 2026-09-17):
+                  "con cuánto paga" y el vuelto aplican SOLO en efectivo (misma moneda de la
+                  venta, sin cambio); en Transferencia/Zelle se ocultan. */}
+                {cashSale ? (
+                <div className="flex items-center justify-between gap-2 border-b border-border px-2 py-3">
+                  <span
+                    className={
+                      paymentReturnKind === 'positive'
+                        ? 'text-xs font-medium text-success'
+                        : paymentReturnKind === 'negative'
+                          ? 'text-xs font-medium text-danger'
+                          : 'text-xs font-medium text-text-muted'
+                    }
+                  >
+                    Vuelto: {paymentReturn < 0 ? '-' : ''}
+                    {money(Math.abs(paymentReturn))}
+                  </span>
+                  <input
+                    type="number"
+                    min={0}
+                    autoComplete="off"
+                    disabled={itemCount === 0}
+                    value={payment ?? ''}
+                    onChange={(e) =>
+                      setPayment(e.target.value === '' ? undefined : Number(e.target.value))
+                    }
+                    aria-label={intl.formatMessage({ id: 'GENERAL.PAY' })}
+                    placeholder={intl.formatMessage({ id: 'GENERAL.PAY' })}
+                    className="w-36 rounded-md border border-border px-2 py-1 text-xs text-right focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
+                  />
+                </div>
+                ) : (
+                  /* Transferencia/Zelle: sin vuelto ni "con cuánto paga" — el cobro no es
+                     en efectivo. Fila informativa para conservar el ritmo visual. */
+                  <div className="flex items-center justify-between gap-2 border-b border-border px-2 py-3">
+                    <span className="text-xs font-medium text-text-muted">
+                      {salePaymentMethodLabel(salePaymentMethod, saleCurrency)}
+                    </span>
+                  </div>
+                )}
+
+                {/* Payment-method selector — radio group por MONEDA de la venta
+                  (payment-methods-percent-tax, plan 2026-09-17): cada método con su
+                  etiqueta ("Transferencia (CUP)" incluye su moneda), solo texto sin ícono
+                  (petición 2026-09-21). Reemplaza al selector fijo Efectivo/Tarjeta. */}
+                <div className="border-b border-border px-2 py-3">
+                  <div className="flex flex-wrap gap-4" role="radiogroup">
+                    {methodOptions.map((method) => {
+                      const label = salePaymentMethodLabel(method, saleCurrency);
+                      return (
+                        <label
+                          key={method}
+                          className="flex items-center gap-1.5 cursor-pointer text-xs font-medium text-text"
+                        >
+                          <input
+                            type="radio"
+                            name="payment-type"
+                            data-testid={`payment-method-${method}`}
+                            checked={salePaymentMethod === method}
+                            onChange={() => setSalePaymentMethod(method)}
+                            className="text-primary focus:ring-primary"
+                          />
+                          {label}
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              </>
             )}
 
             {/* T8: si alguna línea no se puede convertir a la moneda de la venta, se

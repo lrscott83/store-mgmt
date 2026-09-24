@@ -204,92 +204,82 @@ describe('CartShell — header (Venta actual + order type)', () => {
   });
 });
 
-describe('CartShell — la lista de pagos es la UI de pago (T21)', () => {
+describe('CartShell — payment input and Vuelto (change)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    localStorage.clear();
-    mockUser = { id: 'u1', selectedStoreId: 's1', storeModuleIds: [11] };
+    mockUser = { selectedStoreId: 's1', storeModuleIds: [11] };
   });
 
-  it('con el carrito vacío no hay bloque de pago (ni lista ni "Pago")', () => {
+  it('disables the payment input when the cart is empty', () => {
     mockCartState({ items: [], total: vi.fn().mockReturnValue(0) });
     renderCartShell();
     openCart();
-    expect(screen.queryByTestId('multi-payment-list')).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('Pago')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Pago')).toBeDisabled();
   });
 
-  it('con ítems renderiza la lista de pagos y YA NO el bloque legacy ("Pago" ni radios)', () => {
+  it('enables the payment input when the cart has items', () => {
     const product = makeProduct();
-    mockCartState({
-      items: [{ product, quantity: 1 }],
-      total: vi.fn().mockReturnValue(5),
-      payments: [paymentRowOf(5)],
-      setPayments: vi.fn(),
-    });
+    mockCartState({ items: [{ product, quantity: 1 }], total: vi.fn().mockReturnValue(5) });
     renderCartShell();
     openCart();
-    expect(screen.getByTestId('multi-payment-list')).toBeInTheDocument();
-    expect(screen.queryByLabelText('Pago')).not.toBeInTheDocument();
-    expect(screen.queryAllByRole('radio')).toHaveLength(0);
+    expect(screen.getByLabelText('Pago')).not.toBeDisabled();
   });
 
-  it('sin el módulo 16 la lista se limita a UNA fila, sin "Agregar pago" ni eliminar', () => {
+  it('shows Vuelto: $0 when no payment has been entered', () => {
     const product = makeProduct();
-    mockCartState({
-      items: [{ product, quantity: 1 }],
-      total: vi.fn().mockReturnValue(5),
-      payments: [paymentRowOf(5)],
-      setPayments: vi.fn(),
-    });
+    mockCartState({ items: [{ product, quantity: 1 }], total: vi.fn().mockReturnValue(5) });
     renderCartShell();
     openCart();
-    expect(screen.getAllByTestId('multi-payment-row')).toHaveLength(1);
-    expect(screen.getByTestId('multi-payment-channel')).toBeInTheDocument();
-    expect(screen.queryByTestId('multi-payment-add')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('multi-payment-remove')).not.toBeInTheDocument();
+    expect(screen.getByText(/Vuelto:/)).toHaveTextContent(/Vuelto:\s+0\s+CUP/);
   });
 
-  it('la fila elige el canal con un único select (método + moneda), no dos', () => {
+  it('computes Vuelto as payment - total once a payment is typed', () => {
     const product = makeProduct();
-    mockCartState({
-      items: [{ product, quantity: 1 }],
-      total: vi.fn().mockReturnValue(5),
-      payments: [paymentRowOf(5)],
-      setPayments: vi.fn(),
-    });
+    mockCartState({ items: [{ product, quantity: 1 }], total: vi.fn().mockReturnValue(5) });
     renderCartShell();
     openCart();
-    expect(screen.queryByTestId('multi-payment-method')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('multi-payment-currency')).not.toBeInTheDocument();
-    const select = screen.getByTestId('multi-payment-channel') as HTMLSelectElement;
-    expect(select.value).toBe(channelKey(SalePaymentMethod.Efectivo, Currency.CUP));
-    const labels = [...select.options].map((option) => option.textContent ?? '');
-    expect(labels).toContain('Efectivo');
-    expect(labels).toContain('Transferencia (CUP)');
+    fireEvent.change(screen.getByLabelText('Pago'), { target: { value: '10' } });
+    expect(screen.getByText(/Vuelto:/)).toHaveTextContent(/Vuelto:\s+5\s+CUP/);
   });
 
-  it('T22/A2: siembra el primer canal del catálogo de la venta (MLC → Transferencia)', async () => {
-    const setPayments = vi.fn();
+  it('shows a negative Vuelto when payment is less than total', () => {
     const product = makeProduct();
-    mockCartState({
-      items: [{ product, quantity: 1 }],
-      total: vi.fn().mockReturnValue(5),
-      cartCurrency: () => Currency.MLC,
-      payments: [],
-      setPayments,
-    });
+    mockCartState({ items: [{ product, quantity: 1 }], total: vi.fn().mockReturnValue(10) });
     renderCartShell();
     openCart();
+    fireEvent.change(screen.getByLabelText('Pago'), { target: { value: '4' } });
+    expect(screen.getByText(/Vuelto:/)).toHaveTextContent(/Vuelto:\s+-6\s+CUP/);
+  });
+});
 
-    await waitFor(() => expect(setPayments).toHaveBeenCalledTimes(1));
-    const rows = setPayments.mock.calls[0][0] as MultiPaymentRow[];
-    expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({
-      method: SalePaymentMethod.Transferencia,
-      currency: Currency.MLC,
-      amount: 5,
-    });
+describe('CartShell — payment-type selector with icons', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUser = { selectedStoreId: 's1', storeModuleIds: [11] };
+    mockCartState({ items: [], total: vi.fn().mockReturnValue(0) });
+  });
+
+  it('renders the CUP payment-method options as radio buttons: Efectivo, Transferencia (CUP) — Tarjeta reemplazada (plan 2026-09-17)', () => {
+    renderCartShell();
+    openCart();
+    expect(screen.getByText('Efectivo')).toBeInTheDocument();
+    expect(screen.getByText('Transferencia (CUP)')).toBeInTheDocument();
+    // Tarjeta reemplazada por Transferencia en TODO el selector (datos históricos
+    // Tarjeta se leen como Transferencia-CUP).
+    expect(screen.queryByText('Tarjeta')).not.toBeInTheDocument();
+    expect(screen.getAllByRole('radio')).toHaveLength(2);
+  });
+
+  it('renders payment-method options as text-only radios (no per-type SVG icon, 2026-09-21)', () => {
+    renderCartShell();
+    openCart();
+    // Text-only: no icons in the selector at all — neither cash nor card nor phone.
+    expect(screen.queryByTestId('payment-type-icon-cash')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('payment-type-icon-card')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('payment-type-icon-phone')).not.toBeInTheDocument();
+    // The labels themselves are still there.
+    expect(screen.getByText('Efectivo')).toBeInTheDocument();
+    expect(screen.getByText('Transferencia (CUP)')).toBeInTheDocument();
   });
 });
 
@@ -851,25 +841,24 @@ describe('CartShell — createOrder validations (Registrar)', () => {
     });
   });
 
-  // T21 (reemplaza la validación legacy de "Pago"): la cobertura la gobierna la
-  // lista de pagos. Una fila que no cubre el total bloquea "Registrar".
-  it('CART-06 (T21): "Registrar" queda bloqueado cuando la lista de pagos está subpagada', () => {
+  // T4 (Angular parity, nav-right.component.ts:177): blocking info Swal, not an inline banner.
+  it('CART-06: shows DON_NOT_PAY_LESS_THAN_CART_TOTAL via showAcknowledgeError (icon info) when payment is less than total', async () => {
     const product = makeProduct();
-    mockCartState({
-      items: [{ product, quantity: 1 }],
-      total: vi.fn().mockReturnValue(10),
-      payments: [paymentRowOf(4)],
-      setPayments: vi.fn(),
-    });
+    mockCartState({ items: [{ product, quantity: 1 }], total: vi.fn().mockReturnValue(10) });
     renderCartShell();
     openCart();
 
-    expect(screen.getByText('Registrar').closest('button')).toBeDisabled();
-    expect(screen.getByTestId('multi-payment-block-reason')).toHaveAttribute(
-      'data-block-reason',
-      'underpaid',
-    );
-    expect(showAcknowledgeErrorMock).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText('Pago'), { target: { value: '4' } });
+    fireEvent.click(screen.getByText('Registrar'));
+
+    await waitFor(() => {
+      expect(showAcknowledgeErrorMock).toHaveBeenCalledWith({
+        title: 'Información',
+        message: 'Usted no puede realizar la venta porque el pago es menor que el total.',
+        confirmButtonText: 'Ok',
+        icon: 'info',
+      });
+    });
   });
 
   it('CART-07: closes the cart popup, shows the ORDER_CREATED success toast (with "Éxito" title), and clears the cart on a valid submission', async () => {
@@ -1321,17 +1310,54 @@ describe('CartShell — multi-payment list (módulo 16)', () => {
     expect(screen.queryAllByRole('radio')).toHaveLength(0);
   });
 
-  it('T21: sin el módulo 16 la misma lista aparece limitada a una fila (sin add/remove)', () => {
+  it('keeps the legacy payment block when module 16 is absent (regression guard)', () => {
     mockUser = { selectedStoreId: 's1', storeModuleIds: [11] };
+    mockMultiPaymentCart();
+    renderCartShell();
+    openCart();
+
+    expect(screen.queryByTestId('multi-payment-list')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Pago')).toBeInTheDocument();
+    expect(screen.getAllByRole('radio').length).toBeGreaterThan(0);
+  });
+
+  it('each row picks its channel with a single select (method + currency), not two', () => {
     mockMultiPaymentCart({ payments: [paymentRow({ amount: 5 })] });
     renderCartShell();
     openCart();
 
-    expect(screen.getByTestId('multi-payment-list')).toBeInTheDocument();
-    expect(screen.getAllByTestId('multi-payment-row')).toHaveLength(1);
-    expect(screen.queryByTestId('multi-payment-add')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('multi-payment-remove')).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('Pago')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('multi-payment-method')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('multi-payment-currency')).not.toBeInTheDocument();
+    const select = screen.getByTestId('multi-payment-channel') as HTMLSelectElement;
+    expect(select.value).toBe(channelKey(SalePaymentMethod.Efectivo, Currency.CUP));
+    const labels = [...select.options].map((option) => option.textContent ?? '');
+    expect(labels).toContain('Efectivo');
+    expect(labels).toContain('Transferencia (CUP)');
+  });
+
+  it('T22/A2: siembra el primer canal del catálogo de la venta (MLC → Transferencia)', async () => {
+    const setPayments = vi.fn();
+    mockUser = { id: 'u1', selectedStoreId: 's1', storeModuleIds: MULTI_PAYMENTS_STORE_MODULES };
+    localStorage.setItem('lizoft.cart-currency-u1', String(Currency.MLC));
+    const product = makeProduct({ price: 5, currency: Currency.MLC });
+    mockCartState({
+      items: [{ product, quantity: 1 }],
+      total: vi.fn().mockReturnValue(5),
+      cartCurrency: () => Currency.MLC,
+      payments: [],
+      setPayments,
+    });
+    renderCartShell();
+    openCart();
+
+    await waitFor(() => expect(setPayments).toHaveBeenCalledTimes(1));
+    const rows = setPayments.mock.calls[0][0] as MultiPaymentRow[];
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      method: SalePaymentMethod.Transferencia,
+      currency: Currency.MLC,
+      amount: 5,
+    });
   });
 
   it('submitting with payments passes the converted OrderPayment[] and derives the legacy method from the first payment', async () => {
@@ -1610,80 +1636,91 @@ describe('CartShell — mixed-currency cart conversion (módulo 16, T8)', () => 
   });
 });
 
-// ─── Config por-tienda en el carrito (T20/T21): el select de CANAL de la fila
-//     refleja el catálogo válido filtrado por el gate de plan + la config ────────
+// ─── Config por-tienda en el catálogo del carrito (store-payment-methods-config,
+//     2026-09-22) — catálogo = moneda → gate MultiMonedas → config ─────────────
 
-describe('CartShell — canal de pago según config de tienda', () => {
+describe('CartShell — método de pago según config de tienda', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
-    mockUser = { id: 'u1', selectedStoreId: 's1', storeModuleIds: [11, EModules.MultiMonedas] };
-    mockChannelRates = [];
+    mockUser = { selectedStoreId: 's1', storeModuleIds: [11, EModules.MultiMonedas] };
   });
 
-  function channelLabels(): string[] {
-    const select = screen.getByTestId('multi-payment-channel') as HTMLSelectElement;
-    return [...select.options].map((option) => option.textContent ?? '');
-  }
-
-  it('USD + MultiMonedas sin config: el catálogo completo incluye Zelle', () => {
-    const product = makeProduct({ price: 5, currency: Currency.USD });
+  function renderUsdSale() {
     mockCartState({
-      items: [{ product, quantity: 1 }],
-      total: vi.fn().mockReturnValue(5),
+      items: [],
+      total: vi.fn().mockReturnValue(0),
       cartCurrency: () => Currency.USD,
-      payments: [paymentRowOf(5, { currency: Currency.USD })],
-      setPayments: vi.fn(),
     });
     renderCartShell();
     openCart();
-    const labels = channelLabels();
-    expect(labels).toContain('Efectivo');
-    expect(labels).toContain('Zelle');
-    expect(labels).toContain('Transferencia (USD)');
+  }
+
+  it('USD + MultiMonedas sin config: catálogo completo con Zelle (default no-regresión)', () => {
+    renderUsdSale();
+    expect(screen.getByText('Zelle')).toBeInTheDocument();
+    expect(screen.getByText('Transferencia (USD)')).toBeInTheDocument();
+    expect(screen.getAllByRole('radio')).toHaveLength(3);
   });
 
-  it('USD + MultiMonedas + Zelle desactivado en config: el canal Zelle desaparece', () => {
+  it('USD + MultiMonedas + Zelle desactivado en config: el radio Zelle desaparece', () => {
     new StorePaymentMethodsConfigService('s1').setMethodEnabled(
       's1',
       SalePaymentMethod.Zelle,
       false,
     );
-    const product = makeProduct({ price: 5, currency: Currency.USD });
+    renderUsdSale();
+    expect(screen.queryByText('Zelle')).not.toBeInTheDocument();
+    expect(screen.getByText('Transferencia (USD)')).toBeInTheDocument();
+    expect(screen.getAllByRole('radio')).toHaveLength(2);
+  });
+
+  it('Zelle reactivado en config: el radio Zelle vuelve', () => {
+    const svc = new StorePaymentMethodsConfigService('s1');
+    svc.setMethodEnabled('s1', SalePaymentMethod.Zelle, false);
+    svc.setMethodEnabled('s1', SalePaymentMethod.Zelle, true);
+    renderUsdSale();
+    expect(screen.getByText('Zelle')).toBeInTheDocument();
+    expect(screen.getAllByRole('radio')).toHaveLength(3);
+  });
+
+  it('re-pinea a Efectivo cuando el método seleccionado se desactivó en config', () => {
+    new StorePaymentMethodsConfigService('s1').setMethodEnabled(
+      's1',
+      SalePaymentMethod.Zelle,
+      false,
+    );
+    const setSalePaymentMethod = vi.fn();
     mockCartState({
-      items: [{ product, quantity: 1 }],
-      total: vi.fn().mockReturnValue(5),
+      items: [],
+      total: vi.fn().mockReturnValue(0),
       cartCurrency: () => Currency.USD,
-      payments: [paymentRowOf(5, { currency: Currency.USD })],
-      setPayments: vi.fn(),
+      salePaymentMethod: SalePaymentMethod.Zelle,
+      setSalePaymentMethod,
     });
     renderCartShell();
     openCart();
-    const labels = channelLabels();
-    expect(labels).not.toContain('Zelle');
-    expect(labels).toContain('Transferencia (USD)');
+    // Zelle fuera del catálogo → el select vuelve al primer método disponible.
+    expect(setSalePaymentMethod).toHaveBeenCalledWith(SalePaymentMethod.Efectivo);
   });
 
-  it('CUP sin MultiMonedas + Transferencia desactivada: el canal Transferencia sale', () => {
+  it('CUP sin MultiMonedas + Transferencia desactivada: queda solo Efectivo', () => {
     new StorePaymentMethodsConfigService('s1').setMethodEnabled(
       's1',
       SalePaymentMethod.Transferencia,
       false,
     );
-    mockUser = { id: 'u1', selectedStoreId: 's1', storeModuleIds: [11] };
-    const product = makeProduct({ price: 5, currency: Currency.CUP });
+    mockUser = { selectedStoreId: 's1', storeModuleIds: [11] };
     mockCartState({
-      items: [{ product, quantity: 1 }],
-      total: vi.fn().mockReturnValue(5),
+      items: [],
+      total: vi.fn().mockReturnValue(0),
       cartCurrency: () => Currency.CUP,
-      payments: [paymentRowOf(5)],
-      setPayments: vi.fn(),
     });
     renderCartShell();
     openCart();
-    const labels = channelLabels();
-    expect(labels).not.toContain('Transferencia (CUP)');
-    expect(labels).toContain('Efectivo');
+    expect(screen.queryByText('Transferencia (CUP)')).not.toBeInTheDocument();
+    expect(screen.getByText('Efectivo')).toBeInTheDocument();
+    expect(screen.getAllByRole('radio')).toHaveLength(1);
   });
 });
 

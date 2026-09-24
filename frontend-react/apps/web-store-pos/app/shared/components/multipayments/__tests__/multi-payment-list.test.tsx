@@ -80,65 +80,37 @@ function blockReason() {
   return screen.queryByTestId('multi-payment-block-reason');
 }
 
-describe('MultiPaymentList — modo según el módulo 16 (T21)', () => {
+describe('MultiPaymentList (module 16 gate)', () => {
   beforeEach(() => {
     localStorage.clear();
     mockUser = userWithStoreModules([EModules.MultiPayments]);
     mockRates = [];
   });
 
-  it('con el módulo 16 ofrece agregar y eliminar (N filas)', () => {
-    renderList({ payments: [row({ id: 'p1', amount: 100 })], total: 120 });
-
-    expect(screen.getByTestId('multi-payment-list')).toBeInTheDocument();
-    expect(screen.getByTestId('multi-payment-add')).toBeInTheDocument();
-    expect(screen.getAllByTestId('multi-payment-remove')).toHaveLength(1);
-  });
-
-  it('sin el módulo 16 la lista es de un solo elemento: sin agregar ni eliminar', () => {
+  it('renders nothing without the MultiPayments module', () => {
     mockUser = userWithStoreModules([2, 3]);
     renderList({ payments: [row({ id: 'p1', amount: 100 })], total: 120 });
 
-    expect(screen.getByTestId('multi-payment-list')).toBeInTheDocument();
-    expect(screen.getAllByTestId('multi-payment-row')).toHaveLength(1);
-    expect(screen.getAllByTestId('multi-payment-channel')).toHaveLength(1);
-    expect(screen.queryByTestId('multi-payment-add')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('multi-payment-remove')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('multi-payment-list')).not.toBeInTheDocument();
   });
 
-  it('sin el módulo 16 solo se muestra la PRIMERA fila (las demás quedan inertes)', () => {
-    mockUser = userWithStoreModules([2, 3]);
-    renderList({
-      payments: [row({ id: 'p1', amount: 100 }), row({ id: 'p2', amount: 20 })],
-      total: 120,
-    });
-
-    expect(screen.getAllByTestId('multi-payment-row')).toHaveLength(1);
-    expect(screen.getAllByTestId('multi-payment-channel')).toHaveLength(1);
-  });
-
-  it('un usuario nulo usa el modo de una sola fila (sin add/remove)', () => {
+  it('renders nothing for a null user or a user without storeModuleIds', () => {
     mockUser = null;
     renderList({ payments: [row({ id: 'p1', amount: 100 })], total: 120 });
+    expect(screen.queryByTestId('multi-payment-list')).not.toBeInTheDocument();
 
-    expect(screen.getByTestId('multi-payment-list')).toBeInTheDocument();
-    expect(screen.queryByTestId('multi-payment-add')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('multi-payment-remove')).not.toBeInTheDocument();
+    mockUser = { id: 'u1', selectedStoreId: STORE_ID };
+    renderList({ payments: [row({ id: 'p1', amount: 100 })], total: 120 });
+    expect(screen.queryByTestId('multi-payment-list')).not.toBeInTheDocument();
   });
 
-  it('T22/A1: sin el módulo 16 el select de canal solo ofrece la moneda de la venta', () => {
-    mockUser = userWithStoreModules([2, 3]);
-    // Sale currency CUP, but the row carries a foreign USD channel: without the
-    // module there is no channel-rates page, so only CUP channels may be offered.
-    renderList({
-      payments: [row({ id: 'p1', currency: Currency.USD, amount: 100 })],
-      orderCurrency: Currency.CUP,
-      total: 100,
-    });
+  it('with the module renders N rows and offers add and remove', () => {
+    renderList({ payments: [row({ id: 'p1', amount: 100 }), row({ id: 'p2', amount: 20 })], total: 120 });
 
-    const select = screen.getByTestId('multi-payment-channel') as HTMLSelectElement;
-    const labels = [...select.options].map((option) => option.textContent ?? '');
-    expect(labels).toEqual(['Efectivo', 'Transferencia (CUP)']);
+    expect(screen.getByTestId('multi-payment-list')).toBeInTheDocument();
+    expect(screen.getAllByTestId('multi-payment-row')).toHaveLength(2);
+    expect(screen.getByTestId('multi-payment-add')).toBeInTheDocument();
+    expect(screen.getAllByTestId('multi-payment-remove')).toHaveLength(2);
   });
 });
 

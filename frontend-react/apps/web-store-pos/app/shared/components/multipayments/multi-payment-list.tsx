@@ -35,13 +35,10 @@ import {
  * `summarizePayments`) and `cents / 100` converts on the way out when
  * formatting. No other money math happens here.
  *
- * Module 16 mode: with the MultiPayments module the list is free — N rows,
- * "Agregar pago" opens the channel popup and every row is deletable. Without
- * the module the SAME list is the payment UI limited to a single element: the
- * first row only (the cart seeds it), with no add button and no delete button.
- * Non-positive rows are filtered out before the tally because
- * `summarizePayments` rejects them (typed `PaymentTallyErrors.NonPositiveAmount`)
- * instead of ignoring them.
+ * Module 16 gate: without the MultiPayments module the component renders
+ * nothing, mirroring `CartCurrencySelect`. Non-positive rows are filtered out
+ * before the tally because `summarizePayments` rejects them (typed
+ * `PaymentTallyErrors.NonPositiveAmount`) instead of ignoring them.
  */
 
 /** One editable payment row. Amount is in `currency` units, NOT cents. */
@@ -111,11 +108,9 @@ export function createPaymentRow(
 }
 
 /**
- * The payment list. Each row is a channel (method + currency) plus an amount,
+ * Controlled multi-payment list (module 16). Renders nothing without the
+ * module; with it, each row is a channel (method + currency) plus an amount,
  * converted to the order currency through the frozen channel-rate cascade.
- * With the MultiPayments module it is the multi-payment editor (N rows, add,
- * delete); without it, the same list becomes the sale's single payment element
- * (one row, no add, no delete).
  */
 export function MultiPaymentList({
   payments,
@@ -128,9 +123,6 @@ export function MultiPaymentList({
   const user = useAuthStore((s) => s.user);
   const storeId = user?.selectedStoreId ?? '';
   const available = hasMultiPaymentsModuleAvailable(user);
-  // T21: without the MultiPayments module the list is the single payment
-  // element — only the first row is used and add/delete are not offered.
-  const singleRow = !available;
   // T6: the "Agregar pago" popup picks a channel from the canonical catalogue;
   // `addChannelKey` is the `channelKey` of the pending selection.
   const [addOpen, setAddOpen] = useState(false);
@@ -170,15 +162,9 @@ export function MultiPaymentList({
     return new ChannelRateOfflineService(storeId).getStorageChannelRates();
   }, [storeId]);
 
-  // T21: single mode edits only the first row; the rest (if any) stay inert.
-  const visiblePayments = useMemo(
-    () => (singleRow ? payments.slice(0, 1) : payments),
-    [singleRow, payments],
-  );
-
   const evaluated = useMemo<EvaluatedRow[]>(() => {
     const at = new Date();
-    return visiblePayments.map<EvaluatedRow>((row) => {
+    return payments.map<EvaluatedRow>((row) => {
       if (!Number.isFinite(row.amount) || row.amount <= 0) {
         return { row, convertedCents: null, skipped: true, error: null };
       }
@@ -197,7 +183,7 @@ export function MultiPaymentList({
       }
       return { row, convertedCents: result.data, skipped: false, error: null };
     });
-  }, [visiblePayments, orderCurrency, rates]);
+  }, [payments, orderCurrency, rates]);
 
   const totalCents = Math.round(total * 100);
   const tallyInput = evaluated
@@ -217,6 +203,10 @@ export function MultiPaymentList({
   const blocked = hasConversionError || underpaid;
   const blockReason = hasConversionError ? 'conversion_error' : underpaid ? 'underpaid' : 'none';
 
+  if (!available) {
+    return null;
+  }
+
   const money = (units: number) => formatMoneyWithCurrency(units, orderCurrency);
 
   function blockMessage(): string {
@@ -228,36 +218,25 @@ export function MultiPaymentList({
   }
 
   /**
-   * T21: channels a row can pick. The same reachable set the popup offers —
+   * Channels a row can pick. The same reachable set the popup offers —
    * canonical catalogue → plan gate (no MultiMonedas ⇒ no Zelle) → per-store
    * enabled channels (T20) → valid channels only. A row whose current channel
    * is not in the list (e.g. a pre-existing or legacy row) keeps its value as
    * the first option so the select never lies about the row's state.
    */
   function rowChannelOptions(row: MultiPaymentRow): PaymentChannel[] {
-    // T22/A1: without the MultiPayments module the store has no channel-rates
-    // page, so a foreign-currency channel could never be made convertible and
-    // picking one is a dead end. Offer only channels in the sale's own currency.
-    // With the module the full reachable set stays available (the user can
-    // register the missing rate).
-    const reachable = available
-      ? channels
-      : channels.filter((channel) => Number(channel.currency) === Number(orderCurrency));
-    const hasCurrent = reachable.some((channel) =>
+    const hasCurrent = channels.some((channel) =>
       isSameChannel(channel, row.method, row.currency),
     );
-    if (hasCurrent) return reachable;
-    // With the module a legacy/config-hidden row channel stays selectable so the
-    // select never lies about the row. Without the module only the sale-currency
-    // set is offered (the restriction is the point of A1).
-    return available ? [{ method: row.method, currency: row.currency }, ...reachable] : reachable;
+    if (hasCurrent) return channels;
+    return [{ method: row.method, currency: row.currency }, ...channels];
   }
 
   function updateRow(id: string, patch: Partial<MultiPaymentRow>) {
-    onChange(visiblePayments.map((row) => (row.id === id ? { ...row, ...patch } : row)));
+    onChange(payments.map((row) => (row.id === id ? { ...row, ...patch } : row)));
   }
 
-  /** T21: the single select sets the whole channel (method + currency at once). */
+  /** The single select sets the whole channel (method + currency at once). */
   function changeChannel(id: string, key: string) {
     const [currencyRaw, methodRaw] = key.split('|');
     updateRow(id, {
@@ -368,17 +347,15 @@ export function MultiPaymentList({
                   />
                 </label>
 
-                {!singleRow && (
-                  <button
-                    type="button"
-                    onClick={() => removeRow(row.id)}
-                    aria-label={intl.formatMessage({ id: 'SHOPPING_CART.MULTI_PAYMENT_REMOVE' })}
-                    className="shrink-0 rounded-md border border-border p-1 text-red-600 hover:bg-surface-hover"
-                    data-testid="multi-payment-remove"
-                  >
-                    <TrashIcon className="h-4 w-4" />
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={() => removeRow(row.id)}
+                  aria-label={intl.formatMessage({ id: 'SHOPPING_CART.MULTI_PAYMENT_REMOVE' })}
+                  className="shrink-0 rounded-md border border-border p-1 text-red-600 hover:bg-surface-hover"
+                  data-testid="multi-payment-remove"
+                >
+                  <TrashIcon className="h-4 w-4" />
+                </button>
               </div>
 
               {entry.error && (
@@ -396,16 +373,14 @@ export function MultiPaymentList({
         })}
       </div>
 
-      {!singleRow && (
-        <button
-          type="button"
-          onClick={openAddDialog}
-          className="rounded-md border border-border px-3 py-1 text-xs text-text"
-          data-testid="multi-payment-add"
-        >
-          {intl.formatMessage({ id: 'SHOPPING_CART.MULTI_PAYMENT_ADD' })}
-        </button>
-      )}
+      <button
+        type="button"
+        onClick={openAddDialog}
+        className="rounded-md border border-border px-3 py-1 text-xs text-text"
+        data-testid="multi-payment-add"
+      >
+        {intl.formatMessage({ id: 'SHOPPING_CART.MULTI_PAYMENT_ADD' })}
+      </button>
 
       <dl
         className="grid grid-cols-3 gap-2 rounded-md bg-gray-50 p-2 text-sm"
