@@ -413,10 +413,39 @@ describe('StoreSwitcher — nombres completos en el popup (2026-09-23)', () => {
     // El nombre completo está en el DOM y su span NO tiene truncate.
     expect(item.className).not.toMatch(/truncate/);
     expect(item.className).toMatch(/whitespace-normal/);
-    // El popup crece con el contenido (w-max) con mínimo y máximo razonables.
-    const popup = item.closest('div.absolute');
-    expect(popup?.className).toMatch(/w-max/);
-    expect(popup?.className).toMatch(/min-w-56/);
-    expect(popup?.className).toMatch(/max-w-72/);
+    // En desktop (sm:+) el popup crece con el contenido (w-max) con mínimo y
+    // máximo razonables; en móvil es un panel fijo a lo ancho bajo el header.
+    const popup = item.closest('[class*="sm:absolute"]');
+    expect(popup?.className).toMatch(/sm:w-max/);
+    expect(popup?.className).toMatch(/sm:min-w-56/);
+    expect(popup?.className).toMatch(/sm:max-w-72/);
+  });
+});
+
+describe('StoreSwitcher — anclaje móvil del popup (2026-09-24)', () => {
+  it('mobile-first: panel fixed a lo ancho bajo el header, nunca recortado a la izquierda', async () => {
+    defaultOwnerUser.storeList = [
+      { id: 's1', name: 'Tienda A', isActive: true },
+      { id: 's2', name: 'Otra', isActive: true },
+    ];
+    render(
+      <Wrapper>
+        <StoreSwitcher />
+      </Wrapper>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Cambiar tienda' }));
+
+    const item = await screen.findByText('Tienda A');
+    const popup = item.closest('[class*="fixed"]');
+    // Base (móvil): anclado a viewport bajo el header, ocupando el ancho con
+    // márgenes — el popup no puede salirse por la izquierda ni por la derecha.
+    expect(popup?.className).toMatch(/fixed/);
+    expect(popup?.className).toMatch(/inset-x-3/);
+    expect(popup?.className).toMatch(/top-14/);
+    // sm:+ restaura el dropdown compacto anclado al botón.
+    expect(popup?.className).toMatch(/sm:absolute/);
+    expect(popup?.className).toMatch(/sm:right-0/);
+    expect(popup?.className).toMatch(/sm:top-full/);
+    expect(popup?.className).toMatch(/sm:inset-x-auto/);
   });
 });

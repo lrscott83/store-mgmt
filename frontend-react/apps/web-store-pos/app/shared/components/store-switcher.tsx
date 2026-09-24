@@ -114,7 +114,13 @@ export function StoreSwitcher() {
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 top-full z-50 mt-1 w-max min-w-56 max-w-72 rounded-xl border border-gray-200 bg-white py-1 shadow-lg">
+        // Mobile-first (fix 2026-09-24): anclado `fixed` bajo el header
+        // (top-14 = h-14) ocupando el ancho del viewport — el popup NUNCA se
+        // sale de pantalla. En desktop (sm:) vuelve a `absolute right-0` sobre
+        // el botón, donde el ancho w-max sí cabe (el botón está lejos del borde
+        // derecho del viewport, así que right-0 + w-max se extendía fuera de
+        // pantalla y el overflow-hidden del layout lo recortaba en móvil).
+        <div className="fixed inset-x-3 top-14 z-50 rounded-xl border border-gray-200 bg-white py-1 shadow-lg sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:mt-1 sm:w-max sm:min-w-56 sm:max-w-72">
           {offerStores.length === 0 ? (
             <p className="px-4 py-3 text-sm text-gray-500">
               {intl.formatMessage({ id: 'STORE_SELECTOR.EMPTY' })}
