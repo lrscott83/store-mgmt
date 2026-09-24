@@ -99,10 +99,14 @@ Expected values:
   - Focused vitest (6 files: integration + inventory service + inventory routes + parser + product service +
     products view): 609 passed / 0 failed, 0 type errors.
   - `pnpm typecheck` (frontend-react/apps/web-store-pos) -> clean (exit 0).
-  - Commit: `test(import): cover MultiMonedas currency matrix for CSV product import (creation/update + inventory entries)`
-    + mapper fix `fix(inventory): carry entry cost currency through InventoryEntryView (UI showed CUP for USD costs)`
-    — see commit ids below.
-  - RDD assess of the commit (runtime: unassessable -> record `review_due`/`unavailable` outcome; never infer low risk).
+  - Commit: `77b2d0a2` on `qa` — `fix(inventory): carry entry cost currency through InventoryEntryView (import entries displayed CUP for USD costs)`
+    (4 files, +526; includes the matrix test file + mapper fix + INV-07 regression unit test + this doc).
+  - RDD assess (`gentle-ai review assess --cwd . --agent opencode --base-ref 36ecca3e --committed-only --json`):
+    `risk: high` (`unassessable` — active runtime is NOT eligible for immutable receipt review; supported:
+    claude-code, codex), `review_due: true` / `high_risk`, `changed_paths: 0` on the base-diff probe. Same
+    terminal state as `36ecca3e`: review is DUE but NOT executable in this runtime; if a formal RDD review is
+    wanted, run it in claude-code or codex. The RDD switch was NOT touched (global `on` left as-is by the user's
+    standing choice).
 
 ## Route
 
