@@ -321,6 +321,38 @@ describe('MultiPaymentList — interactions', () => {
 
     expect(screen.queryByTestId('multi-payment-settle')).not.toBeInTheDocument();
   });
+
+  it('T8: el Monto se puede vaciar y re-escribir sin re-pintar el 0', () => {
+    render(
+      <IntlProvider messages={esMessages} locale="es" defaultLocale="es">
+        <Harness initial={[row({ id: 'p1', currency: Currency.USD, amount: 50 })]} />
+      </IntlProvider>,
+    );
+    const amount = screen.getByTestId('multi-payment-amount') as HTMLInputElement;
+
+    fireEvent.change(amount, { target: { value: '' } });
+    expect(amount).toHaveValue(null);
+
+    fireEvent.change(amount, { target: { value: '75' } });
+    expect(amount).toHaveValue(75);
+    // El recálculo sigue en vivo para valores válidos.
+    expect(screen.getByTestId('multi-payment-paid')).toHaveTextContent('75');
+  });
+
+  it('T8: Monto vacío + blur vuelve al último válido', () => {
+    render(
+      <IntlProvider messages={esMessages} locale="es" defaultLocale="es">
+        <Harness initial={[row({ id: 'p1', currency: Currency.USD, amount: 50 })]} />
+      </IntlProvider>,
+    );
+    const amount = screen.getByTestId('multi-payment-amount') as HTMLInputElement;
+
+    fireEvent.change(amount, { target: { value: '80' } });
+    fireEvent.change(amount, { target: { value: '' } });
+    fireEvent.blur(amount);
+
+    expect(amount).toHaveValue(80);
+  });
 });
 
 // ─── Config por-tienda (store-payment-methods-config, 2026-09-22): catálogo de

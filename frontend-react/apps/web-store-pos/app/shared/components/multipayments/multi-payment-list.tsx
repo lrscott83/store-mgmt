@@ -93,6 +93,16 @@ export function newPaymentRowId(): string {
 }
 
 /**
+ * T8: parsea el borrador de un input numérico. Vacío o no finito → undefined,
+ * para que el monto confirmado conserve el último válido en vez de un 0 basura.
+ */
+function parseNumericDraft(draft: string): number | undefined {
+  if (draft.trim() === '') return undefined;
+  const parsed = Number(draft);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+/**
  * Builds a payment row with a fresh id. Exported so the cart can seed the
  * default Efectivo row without duplicating the id strategy.
  */
@@ -124,6 +134,10 @@ export function MultiPaymentList({
   // `addChannelKey` is the `channelKey` of the pending selection.
   const [addOpen, setAddOpen] = useState(false);
   const [addChannelKey, setAddChannelKey] = useState('');
+  // T8: borradores de texto del monto por fila. Permiten vaciar el campo (borrar
+  // el "0") mientras se escribe; el monto confirmado solo cambia con un número
+  // finito y, al confirmar (blur), un borrador vacío/inválido vuelve al último válido.
+  const [amountDrafts, setAmountDrafts] = useState<Record<string, string>>({});
 
   // store-payment-methods-config: métodos habilitados de la tienda activa
   // (default: todos on — no-regresión). SSR: sin window se usa el default y la
@@ -247,6 +261,20 @@ export function MultiPaymentList({
     onChange(payments.filter((row) => row.id !== id));
   }
 
+  /** T8: el monto se edita libremente; el valor confirmado sigue al borrador válido. */
+  function changeAmount(id: string, raw: string) {
+    setAmountDrafts((prev) => ({ ...prev, [id]: raw }));
+    const parsed = parseNumericDraft(raw);
+    if (parsed !== undefined) updateRow(id, { amount: parsed });
+  }
+
+  function commitAmount(row: MultiPaymentRow) {
+    const draft = amountDrafts[row.id];
+    if (draft === undefined) return;
+    const next = parseNumericDraft(draft) ?? row.amount;
+    setAmountDrafts((prev) => ({ ...prev, [row.id]: String(next) }));
+  }
+
   /**
    * T6: opens the channel popup. The pending selection defaults to the first
    * valid channel of the catalogue for the current sale context.
@@ -340,8 +368,9 @@ export function MultiPaymentList({
                     type="number"
                     min="0"
                     step="0.01"
-                    value={row.amount}
-                    onChange={(e) => updateRow(row.id, { amount: Number(e.target.value) })}
+                    value={amountDrafts[row.id] ?? String(row.amount)}
+                    onChange={(e) => changeAmount(row.id, e.target.value)}
+                    onBlur={() => commitAmount(row)}
                     className="w-full rounded-md border border-border px-2 py-1 text-sm"
                     data-testid="multi-payment-amount"
                   />
