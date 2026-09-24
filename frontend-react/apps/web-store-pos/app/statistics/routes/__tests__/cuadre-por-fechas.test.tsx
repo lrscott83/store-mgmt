@@ -3,7 +3,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
-import { ExpenseType, OrderType, PaymentType, EModules } from '@store-mgmt/domain';
+import { ExpenseType, OrderType, PaymentType, EModules, SalePaymentMethod } from '@store-mgmt/domain';
 import type { Expense, Order, SaleCredit } from '@store-mgmt/domain';
 
 // --- Mocks (mutable state — set per-test via mockAuthState.user.storeModuleIds) ---
@@ -283,6 +283,36 @@ describe('CuadrePorFechasPage', () => {
     // default, matching today-stats' Angular mat-expansion-panel parity).
     fireEvent.click(screen.getByText('Ventas (2 productos)'));
     expect(screen.getByTestId('category-stats-cat-1')).toBeTruthy();
+  });
+
+  // T13 (payment-channels-and-multipayment): the panels bucket by the NORMALIZED
+  // method, so a sale recorded with Zelle is summed into "Pago por Transferencia"
+  // (Transferencia (CUP)) — the same normalization the rest of the history uses.
+  it('T13: a Zelle sale is summed into Pago por Transferencia (normalized)', async () => {
+    mockGetActiveOrdersBetween.mockReturnValue([
+      makeOrder({
+        id: 'zelle-1',
+        total: 70,
+        salePaymentMethod: SalePaymentMethod.Zelle,
+        paymentType: PaymentType.Zelle,
+        isCredit: false,
+      }),
+    ]);
+
+    renderPage();
+    fireEvent.change(screen.getByTestId('cuadre-start-date'), { target: { value: '2026-09-01' } });
+    fireEvent.change(screen.getByTestId('cuadre-end-date'), { target: { value: '2026-09-07' } });
+    fireEvent.click(screen.getByTestId('cuadre-generate'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('cuadre-card-title')).toBeTruthy();
+    });
+
+    const transferPanel = screen.getByRole('button', { name: /Pago por Transferencia/ });
+    expect(transferPanel).toHaveTextContent('70 CUP');
+    // Zelle must NOT leak into the cash panel.
+    expect(screen.getByRole('button', { name: /Resumen Efectivo/ })).toHaveTextContent('0 CUP');
+    expect(screen.queryByText(/Zelle/)).toBeNull();
   });
 
   describe('native date picker over dd-mm-yyyy display + compact controls (2026-09-08 follow-up)', () => {

@@ -1,10 +1,14 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { Currency, SalePaymentMethod, salePaymentMethodLabel } from '@store-mgmt/domain';
+import { Currency, PAYMENT_CHANNELS, SalePaymentMethod, salePaymentMethodLabel } from '@store-mgmt/domain';
 import {
+  ALL_CHANNEL_KEYS,
+  DEFAULT_ENABLED_CHANNEL_KEYS,
   DEFAULT_ENABLED_PAYMENT_METHODS,
   DEFAULT_STORE_PAYMENT_METHODS_CONFIG,
   StorePaymentMethodsConfigService,
   applyStorePaymentMethodsConfig,
+  enabledMethodsForCurrency,
+  resolveEnabledChannelKeys,
 } from '../store-payment-methods-config-service';
 import type { StorePaymentMethodsConfig } from '../store-payment-methods-config-service';
 import { EntityUnreadableError } from '~/shared/lib/storage/read-entity-or-throw';
@@ -22,12 +26,18 @@ beforeEach(() => {
 });
 
 describe('StorePaymentMethodsConfigService — default / auto-init', () => {
-  it('returns the default (all methods on) when the key is absent', () => {
+  it('returns the default (every channel on) when the key is absent', () => {
     const service = new StorePaymentMethodsConfigService(S1);
     expect(service.getConfig()).toEqual(DEFAULT_STORE_PAYMENT_METHODS_CONFIG);
+    expect(service.getEnabledChannels()).toEqual([...ALL_CHANNEL_KEYS]);
   });
 
-  it('DEFAULT has Efectivo, Zelle and Transferencia (no-regression)', () => {
+  it('DEFAULT_ENABLED_CHANNEL_KEYS covers the whole canonical catalogue', () => {
+    expect([...DEFAULT_ENABLED_CHANNEL_KEYS]).toEqual([...ALL_CHANNEL_KEYS]);
+    expect(DEFAULT_ENABLED_CHANNEL_KEYS).toHaveLength(PAYMENT_CHANNELS.length);
+  });
+
+  it('legacy DEFAULT_ENABLED_PAYMENT_METHODS stays Efectivo, Zelle, Transferencia', () => {
     expect([...DEFAULT_ENABLED_PAYMENT_METHODS]).toEqual([
       SalePaymentMethod.Efectivo,
       SalePaymentMethod.Zelle,
@@ -44,17 +54,19 @@ describe('StorePaymentMethodsConfigService — default / auto-init', () => {
   });
 });
 
-describe('StorePaymentMethodsConfigService — set/get round-trip', () => {
-  it('disables and re-enables a method', () => {
+describe('StorePaymentMethodsConfigService — per-channel set/get round-trip', () => {
+  it('disables and re-enables a single channel without touching its siblings', () => {
     const service = new StorePaymentMethodsConfigService(S1);
-    service.setMethodEnabled(S1, SalePaymentMethod.Zelle, false);
+    service.setChannelEnabled(S1, SalePaymentMethod.Zelle, Currency.USD, false);
+    expect(service.getEnabledChannels()).not.toContain('1|1');
+    expect(service.getEnabledChannels()).toContain('1|2');
     expect(service.getEnabledMethods()).toEqual([
       SalePaymentMethod.Efectivo,
       SalePaymentMethod.Transferencia,
     ]);
-    expect(service.getConfig().enabledMethods).not.toContain(SalePaymentMethod.Zelle);
 
-    service.setMethodEnabled(S1, SalePaymentMethod.Zelle, true);
+    service.setChannelEnabled(S1, SalePaymentMethod.Zelle, Currency.USD, true);
+    expect(service.getEnabledChannels()).toEqual([...ALL_CHANNEL_KEYS]);
     expect(service.getEnabledMethods()).toEqual([
       SalePaymentMethod.Efectivo,
       SalePaymentMethod.Zelle,
@@ -62,30 +74,153 @@ describe('StorePaymentMethodsConfigService — set/get round-trip', () => {
     ]);
   });
 
-  it('persists the change to localStorage (encrypted wire format)', () => {
+  it('persists the change as the per-channel shape (encrypted wire format)', () => {
     const service = new StorePaymentMethodsConfigService(S1);
-    service.setMethodEnabled(S1, SalePaymentMethod.Transferencia, false);
+    service.setChannelEnabled(S1, SalePaymentMethod.Zelle, Currency.USD, false);
     const stored = localStorage.getItem(storageKey(S1)) as string;
     // No DEK/roster in unit tests -> plaintext passthrough of the JSON.
-    expect(JSON.parse(stored)).toEqual({
-      enabledMethods: [SalePaymentMethod.Efectivo, SalePaymentMethod.Zelle],
-    });
+    const parsed = JSON.parse(stored) as StorePaymentMethodsConfig;
+    expect(parsed.enabledChannels).not.toContain('1|1');
+    expect(parsed.enabledChannels).toHaveLength(ALL_CHANNEL_KEYS.length - 1);
+    expect(parsed.enabledMethods).toBeUndefined();
   });
 
   it('a fresh service instance reads the same persisted state for the store', () => {
-    new StorePaymentMethodsConfigService(S1).setMethodEnabled(
+    new StorePaymentMethodsConfigService(S1).setChannelEnabled(
       S1,
       SalePaymentMethod.Zelle,
+      Currency.USD,
       false,
     );
     const second = new StorePaymentMethodsConfigService(S1);
-    expect(second.getEnabledMethods()).toEqual([
+    expect(second.getEnabledChannels()).not.toContain('1|1');
+  });
+
+  it('is idempotent: toggling to the already-stored state writes nothing new', () => {
+    const service = new StorePaymentMethodsConfigService(S1);
+    service.setChannelEnabled(S1, SalePaymentMethod.Zelle, Currency.USD, false);
+    const afterFirstWrite = localStorage.getItem(storageKey(S1));
+    service.setChannelEnabled(S1, SalePaymentMethod.Zelle, Currency.USD, false);
+    expect(localStorage.getItem(storageKey(S1))).toBe(afterFirstWrite);
+  });
+
+  it('disabling only Transferencia (USD) leaves Transferencia (CUP) enabled', () => {
+    const service = new StorePaymentMethodsConfigService(S1);
+    service.setChannelEnabled(S1, SalePaymentMethod.Transferencia, Currency.USD, false);
+    expect(service.getEnabledMethodsForCurrency(Currency.CUP)).toEqual([
+      SalePaymentMethod.Efectivo,
+      SalePaymentMethod.Transferencia,
+    ]);
+    expect(service.getEnabledMethodsForCurrency(Currency.USD)).toEqual([
+      SalePaymentMethod.Efectivo,
+      SalePaymentMethod.Zelle,
+    ]);
+  });
+});
+
+describe('StorePaymentMethodsConfigService — legacy shape compatibility', () => {
+  it('reads an old enabledMethods config as the equivalent channels', () => {
+    localStorage.setItem(
+      storageKey(S1),
+      JSON.stringify({
+        enabledMethods: [SalePaymentMethod.Efectivo, SalePaymentMethod.Transferencia],
+      }),
+    );
+    const service = new StorePaymentMethodsConfigService(S1);
+    expect(service.isChannelEnabled(SalePaymentMethod.Zelle, Currency.USD)).toBe(false);
+    expect(service.isChannelEnabled(SalePaymentMethod.Transferencia, Currency.USD)).toBe(true);
+    expect(service.getEnabledMethodsForCurrency(Currency.USD)).toEqual([
       SalePaymentMethod.Efectivo,
       SalePaymentMethod.Transferencia,
     ]);
   });
 
-  it('is idempotent: toggling to the already-stored state writes nothing new', () => {
+  it('lets enabledChannels win over a lingering enabledMethods field', () => {
+    const config = {
+      enabledMethods: [SalePaymentMethod.Efectivo, SalePaymentMethod.Zelle, SalePaymentMethod.Transferencia],
+      enabledChannels: ['0|0'],
+    } satisfies StorePaymentMethodsConfig;
+    expect(resolveEnabledChannelKeys(config)).toEqual(['0|0']);
+  });
+
+  it('an explicit empty enabledMethods resolves to no channels (except Efectivo)', () => {
+    const service = new StorePaymentMethodsConfigService(S1);
+    service.setConfigFromBackup({ enabledMethods: [] });
+    expect(service.getEnabledChannels()).toEqual([]);
+    expect(service.getEnabledMethodsForCurrency(Currency.CUP)).toEqual([]);
+    expect(service.isChannelEnabled(SalePaymentMethod.Efectivo, Currency.CUP)).toBe(true);
+  });
+
+  it('an empty config object falls back to every channel on', () => {
+    const service = new StorePaymentMethodsConfigService(S1);
+    service.setConfigFromBackup({});
+    expect(service.getEnabledChannels()).toEqual([...ALL_CHANNEL_KEYS]);
+  });
+
+  it('migrates a legacy config to the channel shape on the first toggle', () => {
+    localStorage.setItem(
+      storageKey(S1),
+      JSON.stringify({
+        enabledMethods: [SalePaymentMethod.Efectivo, SalePaymentMethod.Transferencia],
+      }),
+    );
+    const service = new StorePaymentMethodsConfigService(S1);
+    service.setChannelEnabled(S1, SalePaymentMethod.Zelle, Currency.USD, true);
+    const parsed = JSON.parse(localStorage.getItem(storageKey(S1)) as string) as StorePaymentMethodsConfig;
+    expect(parsed.enabledMethods).toBeUndefined();
+    expect(parsed.enabledChannels).toContain('1|1');
+  });
+});
+
+describe('StorePaymentMethodsConfigService — Efectivo always on', () => {
+  it('disabling an Efectivo channel is a no-op (never stored as off)', () => {
+    const service = new StorePaymentMethodsConfigService(S1);
+    service.setChannelEnabled(S1, SalePaymentMethod.Efectivo, Currency.USD, false);
+    expect(service.getEnabledChannels()).toEqual([...ALL_CHANNEL_KEYS]);
+    expect(service.isChannelEnabled(SalePaymentMethod.Efectivo, Currency.USD)).toBe(true);
+  });
+
+  it('does not write anything when toggling Efectivo on an absent key', () => {
+    const service = new StorePaymentMethodsConfigService(S1);
+    service.setChannelEnabled(S1, SalePaymentMethod.Efectivo, Currency.CUP, false);
+    // The no-op must not even trigger the auto-init write.
+    expect(localStorage.getItem(storageKey(S1))).toBeNull();
+  });
+
+  it('setMethodEnabled(Efectivo) is also a no-op', () => {
+    const service = new StorePaymentMethodsConfigService(S1);
+    service.setMethodEnabled(S1, SalePaymentMethod.Efectivo, false);
+    expect(localStorage.getItem(storageKey(S1))).toBeNull();
+  });
+});
+
+describe('enabledMethodsForCurrency (pure)', () => {
+  it('returns the per-currency methods of the enabled channels', () => {
+    expect(enabledMethodsForCurrency([...ALL_CHANNEL_KEYS], Currency.USD)).toEqual([
+      SalePaymentMethod.Efectivo,
+      SalePaymentMethod.Zelle,
+      SalePaymentMethod.Transferencia,
+    ]);
+    expect(enabledMethodsForCurrency([...ALL_CHANNEL_KEYS], Currency.MLC)).toEqual([
+      SalePaymentMethod.Transferencia,
+    ]);
+    expect(enabledMethodsForCurrency(['0|0'], Currency.USD)).toEqual([]);
+  });
+});
+
+describe('StorePaymentMethodsConfigService — legacy method-level compat', () => {
+  it('setMethodEnabled disables every channel of the method', () => {
+    const service = new StorePaymentMethodsConfigService(S1);
+    service.setMethodEnabled(S1, SalePaymentMethod.Transferencia, false);
+    expect(service.getEnabledMethodsForCurrency(Currency.CUP)).toEqual([SalePaymentMethod.Efectivo]);
+    expect(service.getEnabledMethodsForCurrency(Currency.MLC)).toEqual([]);
+    expect(service.getEnabledMethods()).toEqual([
+      SalePaymentMethod.Efectivo,
+      SalePaymentMethod.Zelle,
+    ]);
+  });
+
+  it('setMethodEnabled is idempotent', () => {
     const service = new StorePaymentMethodsConfigService(S1);
     service.setMethodEnabled(S1, SalePaymentMethod.Zelle, false);
     const afterFirstWrite = localStorage.getItem(storageKey(S1));
@@ -94,52 +229,19 @@ describe('StorePaymentMethodsConfigService — set/get round-trip', () => {
   });
 });
 
-describe('StorePaymentMethodsConfigService — Efectivo always on', () => {
-  it('disabling Efectivo is a no-op (never stored as off)', () => {
-    const service = new StorePaymentMethodsConfigService(S1);
-    service.setMethodEnabled(S1, SalePaymentMethod.Efectivo, false);
-    expect(service.getEnabledMethods()).toEqual([
-      SalePaymentMethod.Efectivo,
-      SalePaymentMethod.Zelle,
-      SalePaymentMethod.Transferencia,
-    ]);
-  });
-
-  it('does not write anything when toggling Efectivo on an absent key', () => {
-    const service = new StorePaymentMethodsConfigService(S1);
-    service.setMethodEnabled(S1, SalePaymentMethod.Efectivo, false);
-    // The no-op must not even trigger the auto-init write.
-    expect(localStorage.getItem(storageKey(S1))).toBeNull();
-  });
-});
-
 describe('StorePaymentMethodsConfigService — per-store isolation + cache reload', () => {
   it('isolates configs per store', () => {
     const service = new StorePaymentMethodsConfigService(S1);
-    service.setMethodEnabled(S1, SalePaymentMethod.Zelle, false);
+    service.setChannelEnabled(S1, SalePaymentMethod.Zelle, Currency.USD, false);
     expect(service.getConfig(S2)).toEqual(DEFAULT_STORE_PAYMENT_METHODS_CONFIG);
   });
 
   it('reloads the per-instance cache when the requested store key changes', () => {
     const service = new StorePaymentMethodsConfigService(S1);
-    // Cache s1 (default).
-    expect(service.getEnabledMethods(S1)).toEqual([
-      SalePaymentMethod.Efectivo,
-      SalePaymentMethod.Zelle,
-      SalePaymentMethod.Transferencia,
-    ]);
-    // Another store's config mutates s2 independently.
-    service.setMethodEnabled(S2, SalePaymentMethod.Zelle, false);
-    // Same instance, s1 requested again -> key changed inside, cache reloaded.
-    expect(service.getEnabledMethods(S1)).toEqual([
-      SalePaymentMethod.Efectivo,
-      SalePaymentMethod.Zelle,
-      SalePaymentMethod.Transferencia,
-    ]);
-    expect(service.getEnabledMethods(S2)).toEqual([
-      SalePaymentMethod.Efectivo,
-      SalePaymentMethod.Transferencia,
-    ]);
+    expect(service.getEnabledChannels(S1)).toEqual([...ALL_CHANNEL_KEYS]);
+    service.setChannelEnabled(S2, SalePaymentMethod.Zelle, Currency.USD, false);
+    expect(service.getEnabledChannels(S1)).toEqual([...ALL_CHANNEL_KEYS]);
+    expect(service.getEnabledChannels(S2)).not.toContain('1|1');
   });
 });
 
@@ -186,66 +288,72 @@ describe('StorePaymentMethodsConfigService — missing data key (Grupo A)', () =
 });
 
 describe('StorePaymentMethodsConfigService — backup seams (store-payment-methods-backup)', () => {
-  const CONFIG: StorePaymentMethodsConfig = {
+  const LEGACY_CONFIG: StorePaymentMethodsConfig = {
     enabledMethods: [SalePaymentMethod.Efectivo, SalePaymentMethod.Transferencia],
+  };
+  const CHANNEL_CONFIG: StorePaymentMethodsConfig = {
+    enabledChannels: ['0|0', '0|2'],
   };
 
   it('getStorageStorePaymentMethods returns null on an absent key and does NOT auto-initialise', () => {
     const service = new StorePaymentMethodsConfigService(S1);
     expect(service.getStorageStorePaymentMethods()).toBeNull();
-    // The read seam must not persist the default (auto-init is reserved for
-    // getConfig) — the export side relies on an absent key meaning "never
-    // configured", which an auto-init write would destroy.
     expect(localStorage.getItem(storageKey(S1))).toBeNull();
   });
 
   it('getStorageStorePaymentMethods returns the persisted config when present, without touching it', () => {
     const service = new StorePaymentMethodsConfigService(S1);
-    service.setMethodEnabled(S1, SalePaymentMethod.Zelle, false);
-    expect(service.getStorageStorePaymentMethods()).toEqual({
-      enabledMethods: [SalePaymentMethod.Efectivo, SalePaymentMethod.Transferencia],
-    });
+    service.setChannelEnabled(S1, SalePaymentMethod.Zelle, Currency.USD, false);
+    const stored = service.getStorageStorePaymentMethods() as StorePaymentMethodsConfig;
+    expect(stored.enabledChannels).not.toContain('1|1');
     expect(service.getStorageStorePaymentMethods(S2)).toBeNull();
   });
 
-  it('setConfigFromBackup persists the config encrypted and a fresh instance reads it back', () => {
+  it('imports an OLD backup carrying enabledMethods and resolves it', () => {
     const service = new StorePaymentMethodsConfigService(S1);
-    service.setConfigFromBackup(CONFIG);
-
-    const stored = localStorage.getItem(storageKey(S1)) as string;
-    // No DEK/roster in unit tests -> plaintext passthrough of the JSON.
-    expect(JSON.parse(stored)).toEqual(CONFIG);
-
-    // Fresh instance: both the raw seam and the auto-initing getter see it.
-    const fresh = new StorePaymentMethodsConfigService(S1);
-    expect(fresh.getStorageStorePaymentMethods()).toEqual(CONFIG);
-    expect(fresh.getConfig()).toEqual(CONFIG);
-  });
-
-  it('setConfigFromBackup refreshes the in-memory cache of the same instance', () => {
-    const service = new StorePaymentMethodsConfigService(S1);
-    // Cache the default first (auto-init persists it).
-    service.getConfig();
-    service.setConfigFromBackup(CONFIG);
-    expect(service.getConfig()).toEqual(CONFIG);
-    expect(service.getEnabledMethods()).toEqual([
+    const result = service.setImportedStorePaymentMethods(LEGACY_CONFIG);
+    expect(result.succeeded).toBe(true);
+    expect(service.getStorageStorePaymentMethods()).toEqual(LEGACY_CONFIG);
+    expect(service.getEnabledMethodsForCurrency(Currency.USD)).toEqual([
       SalePaymentMethod.Efectivo,
       SalePaymentMethod.Transferencia,
     ]);
   });
 
-  it('setConfigFromBackup is per-store: another store is untouched', () => {
+  it('round-trips the NEW channel shape through setConfigFromBackup + fresh read', () => {
     const service = new StorePaymentMethodsConfigService(S1);
-    service.setConfigFromBackup(CONFIG, S2);
-    expect(service.getStorageStorePaymentMethods(S1)).toBeNull();
-    expect(service.getStorageStorePaymentMethods(S2)).toEqual(CONFIG);
+    service.setConfigFromBackup(CHANNEL_CONFIG);
+
+    const stored = localStorage.getItem(storageKey(S1)) as string;
+    // No DEK/roster in unit tests -> plaintext passthrough of the JSON.
+    expect(JSON.parse(stored)).toEqual(CHANNEL_CONFIG);
+
+    const fresh = new StorePaymentMethodsConfigService(S1);
+    expect(fresh.getStorageStorePaymentMethods()).toEqual(CHANNEL_CONFIG);
+    expect(fresh.getConfig()).toEqual(CHANNEL_CONFIG);
+    expect(fresh.getEnabledChannels()).toEqual(['0|0', '0|2']);
   });
 
-  it('setImportedStorePaymentMethods satisfies the import seam: persists and returns a success Result', () => {
+  it('setConfigFromBackup refreshes the in-memory cache of the same instance', () => {
     const service = new StorePaymentMethodsConfigService(S1);
-    const result = service.setImportedStorePaymentMethods(CONFIG);
+    service.getConfig();
+    service.setConfigFromBackup(CHANNEL_CONFIG);
+    expect(service.getConfig()).toEqual(CHANNEL_CONFIG);
+    expect(service.getEnabledChannels()).toEqual(['0|0', '0|2']);
+  });
+
+  it('setConfigFromBackup is per-store: another store is untouched', () => {
+    const service = new StorePaymentMethodsConfigService(S1);
+    service.setConfigFromBackup(CHANNEL_CONFIG, S2);
+    expect(service.getStorageStorePaymentMethods(S1)).toBeNull();
+    expect(service.getStorageStorePaymentMethods(S2)).toEqual(CHANNEL_CONFIG);
+  });
+
+  it('setImportedStorePaymentMethods persists and returns a success Result', () => {
+    const service = new StorePaymentMethodsConfigService(S1);
+    const result = service.setImportedStorePaymentMethods(CHANNEL_CONFIG);
     expect(result.succeeded).toBe(true);
-    expect(service.getStorageStorePaymentMethods()).toEqual(CONFIG);
+    expect(service.getStorageStorePaymentMethods()).toEqual(CHANNEL_CONFIG);
   });
 });
 
@@ -290,17 +398,17 @@ describe('applyStorePaymentMethodsConfig (compositor)', () => {
     );
   });
 
-  it('respects the currency catalogue for USD (Efectivo, Zelle, Transferencia)', () => {
+  it('respects the per-currency catalogue for USD (Efectivo, Zelle, Transferencia)', () => {
     const usdBase = [
       SalePaymentMethod.Efectivo,
       SalePaymentMethod.Zelle,
       SalePaymentMethod.Transferencia,
     ];
     expect(
-      applyStorePaymentMethodsConfig(usdBase, [
-        SalePaymentMethod.Efectivo,
-        SalePaymentMethod.Transferencia,
-      ]),
+      applyStorePaymentMethodsConfig(
+        usdBase,
+        enabledMethodsForCurrency(['1|0', '1|2'], Currency.USD),
+      ),
     ).toEqual([SalePaymentMethod.Efectivo, SalePaymentMethod.Transferencia]);
   });
 

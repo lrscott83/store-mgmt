@@ -29,10 +29,12 @@ Confituras,Caramelo,20,12,50`;
 
 // Template con MultiMonedas (2026-09-22): `precio_moneda` y `precio_costo` al
 // lado de `cantidad` — monedas por NOMBRE case-insensitive (usd == USD),
-// vacía = CUP.
+// vacía = CUP. Desde 2026-09-24 el ejemplo pone CUP en TODAS las filas: el
+// módulo permite monedas mixtas, pero el template no debe sugerir USD como
+// valor esperado — el usuario escribe la moneda que le corresponda.
 const SAMPLE_DATA_MULTI = `categoria,nombre,precio,precio_moneda,costo,precio_costo,cantidad
-Pizzas,Pizza con Queso,150,USD,100,USD,10
-Pizzas,Pizza Especial,200,usd,140,usd,5
+Pizzas,Pizza con Queso,150,cup,100,cup,10
+Pizzas,Pizza Especial,200,cup,140,cup,5
 Confituras,Caramelo,20,cup,12,cup,50`;
 
 // Small inline download glyph — Angular renders <mat-icon>file_download</mat-icon>; there is no

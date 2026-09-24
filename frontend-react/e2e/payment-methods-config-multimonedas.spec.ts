@@ -34,7 +34,7 @@ import {
  * payment-catalog read so the payment combobox index (2) is guaranteed.
  */
 
-test.describe.serial('T7 — Formas de pago con MultiMonedas: Zelle en USD', () => {
+test.describe.serial('T7 — Métodos de pago con MultiMonedas: Zelle en USD', () => {
   test.describe.configure({ timeout: 180_000 });
   // One test on purpose (same pattern as store-plan-activation.spec.ts:11-15):
   // the mint costs 2 registrations + 3 logins and its identity is private —
@@ -53,15 +53,16 @@ test.describe.serial('T7 — Formas de pago con MultiMonedas: Zelle en USD', () 
     await page.goto('/management/configurations');
     const section = page.getByTestId('payment-methods-config');
     await expect(section).toBeVisible();
-    await expect(section.getByRole('heading', { name: 'Formas de pago' })).toBeVisible();
+    await expect(section.getByRole('heading', { name: 'Métodos de pago' })).toBeVisible();
 
-    const efectivo = page.getByRole('switch', { name: 'Efectivo' });
+    // T20: per-channel catalogue — Efectivo is labelled with its currency.
+    const efectivo = page.getByRole('switch', { name: 'Efectivo (CUP)' });
     await expect(efectivo).toBeVisible();
     await expect(efectivo).toBeDisabled();
     await expect(efectivo).toHaveAttribute('aria-checked', 'true');
-    await expect(section.getByText('Siempre habilitado')).toBeVisible();
+    await expect(section.getByText('Siempre habilitado').first()).toBeVisible();
 
-    const zelle = page.getByRole('switch', { name: 'Zelle' });
+    const zelle = page.getByRole('switch', { name: 'Zelle (USD)' });
     await expect(zelle).toBeVisible();
     await expect(zelle).toBeEnabled();
     await expect(zelle).toHaveAttribute('aria-checked', 'true');

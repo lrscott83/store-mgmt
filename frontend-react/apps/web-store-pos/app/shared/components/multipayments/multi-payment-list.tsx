@@ -4,7 +4,6 @@ import {
   convertPaymentAmount,
   channelKey,
   isValidChannel,
-  paymentMethodOptionsForCurrency,
   salePaymentMethodLabel,
   summarizePayments,
   Currency,
@@ -14,15 +13,15 @@ import {
 import type { BaseError, ChannelRate, PaymentChannel } from '@store-mgmt/domain';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { hasMultiPaymentsModuleAvailable } from '~/shared/lib/auth/authorization-service';
-import { currencyLabel, formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency';
+import { formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency';
 import { ChannelRateOfflineService } from '~/management/channel-rates/lib/services/channel-rate-offline-service';
 import { hasMultiMonedasAvailable } from '~/shared/components/multimonedas/currency-select';
 import { Modal } from '~/shared/components/ui/modal';
 import { TrashIcon } from '~/shared/components/ui/icons';
 import {
-  DEFAULT_ENABLED_PAYMENT_METHODS,
+  DEFAULT_ENABLED_CHANNEL_KEYS,
   StorePaymentMethodsConfigService,
-  applyStorePaymentMethodsConfig,
+  channelEnabled,
 } from '~/shared/lib/payment-methods/store-payment-methods-config-service';
 
 /**
@@ -73,16 +72,10 @@ interface EvaluatedRow {
   error: BaseError | null;
 }
 
-/** All currencies offered per channel, mirroring the rate register's catalogue. */
-const CURRENCY_OPTIONS: Currency[] = [
-  Currency.CUP,
-  Currency.USD,
-  Currency.EUR,
-  Currency.MLC,
-  Currency.CLA,
-  Currency.CAD,
-  Currency.MXN,
-];
+/** Matches a row's channel against a catalogue entry (numeric-safe). */
+function isSameChannel(channel: PaymentChannel, method: SalePaymentMethod, currency: Currency): boolean {
+  return channel.method === method && Number(channel.currency) === Number(currency);
+}
 
 /** Stable row id, exported so the caller can seed the default row. */
 export function newPaymentRowId(): string {
@@ -139,28 +132,28 @@ export function MultiPaymentList({
   // finito y, al confirmar (blur), un borrador vacío/inválido vuelve al último válido.
   const [amountDrafts, setAmountDrafts] = useState<Record<string, string>>({});
 
-  // store-payment-methods-config: métodos habilitados de la tienda activa
+  // store-payment-methods-config: canales habilitados de la tienda activa
   // (default: todos on — no-regresión). SSR: sin window se usa el default y la
   // hidratación lee localStorage. Instancia fresca por memo (cache por instancia).
-  const enabledMethods = useMemo(() => {
+  const enabledChannels = useMemo(() => {
     if (typeof window === 'undefined' || !storeId) {
-      return [...DEFAULT_ENABLED_PAYMENT_METHODS];
+      return [...DEFAULT_ENABLED_CHANNEL_KEYS];
     }
-    return new StorePaymentMethodsConfigService(storeId).getEnabledMethods(storeId);
+    return new StorePaymentMethodsConfigService(storeId).getEnabledChannels(storeId);
   }, [storeId]);
 
   // T6: canales válidos ofrecidos por el popup = catálogo canónico del dominio
   // (`PAYMENT_CHANNELS`) → gate de plan (sin MultiMonedas no hay Zelle) →
-  // config por-tienda (métodos que la tienda deshabilitó fuera). Así el popup
+  // config por-tienda (canales que la tienda deshabilitó fuera). Así el popup
   // nunca puede agregar una combinación que no exista (p. ej. Zelle+CUP).
   const channels = useMemo<PaymentChannel[]>(() => {
     const planGated = PAYMENT_CHANNELS.filter(
       (channel) => hasMultiMonedasAvailable(user) || channel.method !== SalePaymentMethod.Zelle,
     );
-    return planGated.filter(
-      (channel) => applyStorePaymentMethodsConfig([channel.method], enabledMethods).length > 0,
+    return planGated.filter((channel) =>
+      channelEnabled(enabledChannels, channel.method, channel.currency),
     );
-  }, [user, enabledMethods]);
+  }, [user, enabledChannels]);
 
   // Rates are read once per store. Skipped during SSR/empty store, where there
   // is no local register to read from.
@@ -216,12 +209,6 @@ export function MultiPaymentList({
 
   const money = (units: number) => formatMoneyWithCurrency(units, orderCurrency);
 
-  function convertedLabel(entry: EvaluatedRow): string {
-    if (entry.convertedCents !== null) return money(entry.convertedCents / 100);
-    if (entry.skipped) return '—';
-    return '';
-  }
-
   function blockMessage(): string {
     if (hasConversionError) return firstError?.description ?? '';
     if (underpaid) {
@@ -231,30 +218,31 @@ export function MultiPaymentList({
   }
 
   /**
-   * Catálogo de métodos de una fila: catálogo por moneda → gate de plan
-   * (sin MultiMonedas no hay Zelle) → config por-tienda (métodos que la tienda
-   * deshabilitó fuera). Efectivo queda siempre: si el resultado fuera vacío
-   * (MLC/CLA con Transferencia desactivada), se ofrece Efectivo para que el
-   * select de la fila siga siendo válido.
+   * Channels a row can pick. The same reachable set the popup offers —
+   * canonical catalogue → plan gate (no MultiMonedas ⇒ no Zelle) → per-store
+   * enabled channels (T20) → valid channels only. A row whose current channel
+   * is not in the list (e.g. a pre-existing or legacy row) keeps its value as
+   * the first option so the select never lies about the row's state.
    */
-  function methodOptionsFor(currency: Currency): SalePaymentMethod[] {
-    const base = paymentMethodOptionsForCurrency(currency);
-    const planGate = hasMultiMonedasAvailable(user)
-      ? base
-      : base.filter((m) => m !== SalePaymentMethod.Zelle);
-    const composed = applyStorePaymentMethodsConfig(planGate, enabledMethods);
-    return composed.length > 0 ? composed : [SalePaymentMethod.Efectivo];
+  function rowChannelOptions(row: MultiPaymentRow): PaymentChannel[] {
+    const hasCurrent = channels.some((channel) =>
+      isSameChannel(channel, row.method, row.currency),
+    );
+    if (hasCurrent) return channels;
+    return [{ method: row.method, currency: row.currency }, ...channels];
   }
 
   function updateRow(id: string, patch: Partial<MultiPaymentRow>) {
     onChange(payments.map((row) => (row.id === id ? { ...row, ...patch } : row)));
   }
 
-  function changeCurrency(id: string, currency: Currency) {
-    // A currency change re-pins the method to that currency's first option so
-    // the row never keeps a method its new channel cannot offer.
-    const options = methodOptionsFor(currency);
-    updateRow(id, { currency, method: options[0] ?? SalePaymentMethod.Efectivo });
+  /** The single select sets the whole channel (method + currency at once). */
+  function changeChannel(id: string, key: string) {
+    const [currencyRaw, methodRaw] = key.split('|');
+    updateRow(id, {
+      method: Number(methodRaw) as SalePaymentMethod,
+      currency: Number(currencyRaw) as Currency,
+    });
   }
 
   function removeRow(id: string) {
@@ -304,7 +292,7 @@ export function MultiPaymentList({
 
   return (
     <div
-      className="border-b border-border px-4 py-3 space-y-3"
+      className="border-b border-border px-2 py-2 space-y-2"
       data-testid={testId ?? 'multi-payment-list'}
     >
       <h3 className="text-sm font-semibold text-text">
@@ -314,53 +302,36 @@ export function MultiPaymentList({
       <div className="space-y-2" data-testid="multi-payment-rows">
         {evaluated.map((entry) => {
           const { row } = entry;
-          const methodOptions = methodOptionsFor(row.currency);
+          const channelOptions = rowChannelOptions(row);
           return (
             <div
               key={row.id}
-              className="rounded-md border border-border p-2 space-y-2"
+              className="rounded-md border border-border p-2 space-y-1"
               data-testid="multi-payment-row"
             >
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                <label className="block">
+              <div className="flex items-end gap-1.5">
+                <label className="block min-w-0 flex-1">
                   <span className="mb-1 block text-xs font-medium text-text-muted">
-                    {intl.formatMessage({ id: 'SHOPPING_CART.MULTI_PAYMENT_METHOD_LABEL' })}
+                    {intl.formatMessage({ id: 'SHOPPING_CART.MULTI_PAYMENT_ADD_CHANNEL_LABEL' })}
                   </span>
                   <select
-                    value={row.method}
-                    onChange={(e) =>
-                      updateRow(row.id, { method: Number(e.target.value) as SalePaymentMethod })
-                    }
+                    value={channelKey(row.method, row.currency)}
+                    onChange={(e) => changeChannel(row.id, e.target.value)}
                     className="w-full rounded-md border border-border px-2 py-1 text-sm"
-                    data-testid="multi-payment-method"
+                    data-testid="multi-payment-channel"
                   >
-                    {methodOptions.map((method) => (
-                      <option key={method} value={method}>
-                        {salePaymentMethodLabel(method, row.currency)}
+                    {channelOptions.map((channel) => (
+                      <option
+                        key={channelKey(channel.method, channel.currency)}
+                        value={channelKey(channel.method, channel.currency)}
+                      >
+                        {salePaymentMethodLabel(channel.method, channel.currency)}
                       </option>
                     ))}
                   </select>
                 </label>
 
-                <label className="block">
-                  <span className="mb-1 block text-xs font-medium text-text-muted">
-                    {intl.formatMessage({ id: 'SHOPPING_CART.MULTI_PAYMENT_CURRENCY_LABEL' })}
-                  </span>
-                  <select
-                    value={row.currency}
-                    onChange={(e) => changeCurrency(row.id, Number(e.target.value) as Currency)}
-                    className="w-full rounded-md border border-border px-2 py-1 text-sm"
-                    data-testid="multi-payment-currency"
-                  >
-                    {CURRENCY_OPTIONS.map((currency) => (
-                      <option key={currency} value={currency}>
-                        {currencyLabel(currency)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label className="block">
+                <label className="block w-20 shrink-0">
                   <span className="mb-1 block text-xs font-medium text-text-muted">
                     {intl.formatMessage({ id: 'SHOPPING_CART.MULTI_PAYMENT_AMOUNT_LABEL' })}
                   </span>
@@ -375,20 +346,12 @@ export function MultiPaymentList({
                     data-testid="multi-payment-amount"
                   />
                 </label>
-              </div>
 
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-xs text-text-muted" data-testid="multi-payment-converted">
-                  <span className="font-medium">
-                    {intl.formatMessage({ id: 'SHOPPING_CART.MULTI_PAYMENT_CONVERTED_LABEL' })}
-                  </span>{' '}
-                  {convertedLabel(entry)}
-                </p>
                 <button
                   type="button"
                   onClick={() => removeRow(row.id)}
                   aria-label={intl.formatMessage({ id: 'SHOPPING_CART.MULTI_PAYMENT_REMOVE' })}
-                  className="rounded-md border border-border p-1 text-red-600 hover:bg-surface-hover"
+                  className="shrink-0 rounded-md border border-border p-1 text-red-600 hover:bg-surface-hover"
                   data-testid="multi-payment-remove"
                 >
                   <TrashIcon className="h-4 w-4" />

@@ -80,6 +80,23 @@ describe('DataSerializerService — channelRates entry (multipayments T4)', () =
     expect(parsed.channelRates[1].value).toBe(1);
   });
 
+  it('preserves the isActive flag across export → import (T19b)', async () => {
+    const { serializer, channelRateSvc } = makeSerializerWithRealServices();
+    const registered = channelRateSvc.registerRate({
+      method: SalePaymentMethod.Efectivo,
+      currency: Currency.CUP,
+      value: 700,
+      effectiveFrom: new Date('2026-09-01T00:00:00.000Z'),
+    });
+    channelRateSvc.setChannelRateActive(registered.data!.id!, false);
+
+    const payload = await serializer.export(PASSWORD);
+    const parsed = await serializer.import(payload, PASSWORD);
+
+    expect(parsed.channelRates).toHaveLength(1);
+    expect(parsed.channelRates[0].isActive).toBe(false);
+  });
+
   it('an export with no channel rates still carries an empty channel-rates.json entry', async () => {
     const { serializer } = makeSerializerWithRealServices();
 

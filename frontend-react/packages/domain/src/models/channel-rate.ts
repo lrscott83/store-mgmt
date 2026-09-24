@@ -7,6 +7,12 @@ import type { Currency, SalePaymentMethod } from '../enums';
  * `commons/channel-conversion.ts` normalizes it to millionths (value * 1e6).
  *
  * Rows are never edited or deleted: a new effective moment means a new row.
+ *
+ * `isActive` (T19b) is OPTIONAL for backwards compatibility: rows written
+ * before the deactivation feature existed — and old backups — carry no field
+ * and are treated as ACTIVE. An explicit `false` removes the row from the
+ * conversion cascade (`commons/channel-conversion.ts`) while keeping it in the
+ * history and in the backup; reactivating writes it back to `true`.
  */
 export interface ChannelRate {
   id?: string;
@@ -16,4 +22,6 @@ export interface ChannelRate {
   value: number;
   effectiveFrom: Date;
   createdDate?: Date;
+  /** Absent ⇒ active (backwards compatible). `false` ⇒ excluded from conversion. */
+  isActive?: boolean;
 }

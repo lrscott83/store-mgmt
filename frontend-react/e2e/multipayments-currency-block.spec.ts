@@ -228,6 +228,9 @@ test.describe.serial('multipayments currency block (módulo 16) — cambio bloqu
     // the cart opens in USD and the line converts to 0.10 USD.
     await page.goto('/management/channel-rates');
     await page.waitForLoadState('networkidle');
+    // T22: registration lives in the `+ Tasa` popup (the inline card is gone).
+    await page.getByTestId('channel-rate-add').click();
+    await expect(page.getByTestId('channel-rate-add-dialog')).toBeVisible();
     await expect(page.getByTestId('channel-rate-value')).toBeVisible();
     await page.getByTestId('channel-rate-currency').selectOption('0'); // CUP
     await page.getByTestId('channel-rate-method').selectOption('0'); // Efectivo

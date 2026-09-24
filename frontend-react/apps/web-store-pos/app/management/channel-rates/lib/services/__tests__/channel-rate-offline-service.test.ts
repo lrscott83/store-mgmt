@@ -75,6 +75,75 @@ describe('ChannelRateOfflineService', () => {
     });
   });
 
+  describe('setChannelRateActive (T19b — activate/deactivate)', () => {
+    it('deactivates a row so the cascade skips it and reactivating restores it', () => {
+      register(service, { value: 700, effectiveFrom: at('2026-09-01T00:00:00.000Z') });
+      const newest = register(service, {
+        value: 900,
+        effectiveFrom: at('2026-09-10T00:00:00.000Z'),
+      });
+
+      const deactivated = service.setChannelRateActive(newest.data!.id!, false);
+      expect(deactivated.succeeded).toBe(true);
+
+      // The newest row is inactive → the older active row wins.
+      const afterDeactivate = service.getRateAt(
+        SalePaymentMethod.Efectivo,
+        Currency.CUP,
+        at('2026-09-20T00:00:00.000Z'),
+      );
+      expect(afterDeactivate.succeeded).toBe(true);
+      expect(afterDeactivate.data?.value).toBe(700 * 1_000_000);
+      expect(service.getStorageChannelRates().find((r) => r.id === newest.data!.id)?.isActive).toBe(
+        false,
+      );
+
+      const reactivated = service.setChannelRateActive(newest.data!.id!, true);
+      expect(reactivated.succeeded).toBe(true);
+      expect(
+        service.getRateAt(SalePaymentMethod.Efectivo, Currency.CUP, at('2026-09-20T00:00:00.000Z'))
+          .data?.value,
+      ).toBe(900 * 1_000_000);
+    });
+
+    it('deactivating the only row makes the channel unresolvable, and reactivating restores it', () => {
+      const only = register(service, { value: 700 });
+
+      expect(service.setChannelRateActive(only.data!.id!, false).succeeded).toBe(true);
+      expect(service.getRateAt(SalePaymentMethod.Efectivo, Currency.CUP, at('2026-09-05T00:00:00.000Z')).succeeded).toBe(
+        false,
+      );
+
+      expect(service.setChannelRateActive(only.data!.id!, true).succeeded).toBe(true);
+      expect(service.getRateAt(SalePaymentMethod.Efectivo, Currency.CUP, at('2026-09-05T00:00:00.000Z')).data?.value).toBe(
+        700 * 1_000_000,
+      );
+    });
+
+    it('fails on an unknown id and writes nothing', () => {
+      register(service);
+      const rawBefore = localStorage.getItem(storageKey);
+
+      const missing = service.setChannelRateActive('does-not-exist', false);
+
+      expect(missing.succeeded).toBe(false);
+      expect(missing.errors).toEqual([ChannelRateOfflineErrors.RateNotFound]);
+      expect(localStorage.getItem(storageKey)).toBe(rawBefore);
+    });
+
+    it('keeps the rest of a deactivated row untouched (id, value, moment)', () => {
+      const row = register(service, { value: 720, effectiveFrom: at('2026-09-01T00:00:00.000Z') });
+
+      service.setChannelRateActive(row.data!.id!, false);
+
+      const stored = service.getStorageChannelRates()[0];
+      expect(stored.id).toBe(row.data!.id);
+      expect(stored.value).toBe(720);
+      expect(stored.effectiveFrom.toISOString()).toBe('2026-09-01T00:00:00.000Z');
+      expect(stored.isActive).toBe(false);
+    });
+  });
+
   describe('getRateAt (tasa vigente por momento)', () => {
     it('picks the row in force at `at`, not the newest overall', () => {
       register(service, { value: 700, effectiveFrom: at('2026-09-01T00:00:00.000Z') });
@@ -174,6 +243,29 @@ describe('ChannelRateOfflineService', () => {
       expect(rows[0].effectiveFrom).toBeInstanceOf(Date);
       expect(rows[0].effectiveFrom.toISOString()).toBe('2026-09-01T00:00:00.000Z');
       expect(rows[0].createdDate).toBeInstanceOf(Date);
+    });
+
+    it('preserves isActive on an imported row and never resolves an inactive one (T19b)', () => {
+      service.addImportedChannelRate({
+        id: 'imported-inactive',
+        method: SalePaymentMethod.Transferencia,
+        currency: Currency.MLC,
+        value: 350,
+        effectiveFrom: at('2026-09-01T00:00:00.000Z'),
+        isActive: false,
+      });
+
+      const rows = service.getStorageChannelRates();
+      expect(rows).toHaveLength(1);
+      expect(rows[0].isActive).toBe(false);
+
+      // The inactive imported row is stored but excluded from the cascade.
+      const resolved = service.getRateAt(
+        SalePaymentMethod.Transferencia,
+        Currency.MLC,
+        at('2026-09-05T00:00:00.000Z'),
+      );
+      expect(resolved.succeeded).toBe(false);
     });
 
     it('skips an id that is already present — no duplicate, no overwrite', () => {

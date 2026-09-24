@@ -11,9 +11,10 @@ import {
   salePaymentMethodLabel,
 } from '@store-mgmt/domain';
 import {
-  DEFAULT_ENABLED_PAYMENT_METHODS,
+  DEFAULT_ENABLED_CHANNEL_KEYS,
   StorePaymentMethodsConfigService,
   applyStorePaymentMethodsConfig,
+  enabledMethodsForCurrency,
 } from '~/shared/lib/payment-methods/store-payment-methods-config-service';
 import { Button } from '~/shared/components/ui/button';
 import { CloseIcon, SaveIcon } from '~/shared/components/ui/icons';
@@ -115,16 +116,17 @@ export interface ExpensePaymentOption {
  * - Con MultiMonedas: todas las formas de pago configuradas de la tienda — por
  *   la moneda del gasto (catálogo de payment-pricing), con etiqueta con moneda.
  * - Sobre el gate de plan se aplica la config por-tienda
- *   (applyStorePaymentMethodsConfig): métodos que la tienda deshabilitó
- *   desaparecen; Efectivo queda siempre (no desactivables).
+ *   (applyStorePaymentMethodsConfig): los canales que la tienda deshabilitó para
+ *   la moneda del gasto desaparecen; Efectivo queda siempre (no desactivable).
  */
 export function expensePaymentOptionsFor(
   currency: number,
   hasMultiMonedas: boolean,
-  enabledMethods: readonly SalePaymentMethod[],
+  enabledChannelKeys: readonly string[],
 ): ExpensePaymentOption[] {
   const methods = paymentMethodOptionsForCurrency(currency);
   const filtered = hasMultiMonedas ? methods : methods.filter((m) => m !== SalePaymentMethod.Zelle);
+  const enabledMethods = enabledMethodsForCurrency(enabledChannelKeys, currency);
   return applyStorePaymentMethodsConfig(filtered, enabledMethods).map((method) => ({
     method,
     label: salePaymentMethodLabel(method, currency),
@@ -160,16 +162,16 @@ export function ExpenseFormModal({
   const intl = useIntl();
   const user = useAuthStore((s) => s.user);
   const hasMultiMonedas = hasMultiMonedasAvailable(user);
-  // store-payment-methods-config: métodos habilitados de la TIENDA activa
+  // store-payment-methods-config: canales habilitados de la TIENDA activa
   // (default: todos on — no-regresión). SSR: sin window se rinde el default y
   // la hidratación lee localStorage. Instancia fresca por memo: el servicio
   // cachea por instancia, pero aquí solo se re-computa al cambiar de tienda.
-  const enabledMethods = useMemo(() => {
+  const enabledChannels = useMemo(() => {
     const storeId = user?.selectedStoreId;
     if (typeof window === 'undefined' || !storeId) {
-      return [...DEFAULT_ENABLED_PAYMENT_METHODS];
+      return [...DEFAULT_ENABLED_CHANNEL_KEYS];
     }
-    return new StorePaymentMethodsConfigService(storeId).getEnabledMethods(storeId);
+    return new StorePaymentMethodsConfigService(storeId).getEnabledChannels(storeId);
   }, [user?.selectedStoreId]);
   const [form, setForm] = useState<ExpenseFormInput>(() => emptyForm(expense));
   // Angular parity: isControlInvalid(name, validator) only reports an error once the
@@ -194,7 +196,7 @@ export function ExpenseFormModal({
   // del gasto; sin MultiMonedas el catálogo sale de CUP sin Zelle. Si el método
   // guardado del gasto no está en el catálogo de esta moneda (datos históricos),
   // se mantiene visible al final para que el select no pierda su valor.
-  const catalogOptions = expensePaymentOptionsFor(form.currency, hasMultiMonedas, enabledMethods);
+  const catalogOptions = expensePaymentOptionsFor(form.currency, hasMultiMonedas, enabledChannels);
   const paymentOptions = catalogOptions.some((o) => o.method === form.salePaymentMethod)
     ? catalogOptions
     : [

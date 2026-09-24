@@ -7,10 +7,10 @@ import {
 /**
  * store-payment-methods-config (T7, 2026-09-22) — owner-admin persona:
  *
- * The owner toggles per-store payment methods (Transferencia / Zelle) on
- * `/management/configurations` ("Formas de pago" section). The config is
- * consumed by the expense create/edit modal: a disabled method leaves the
- * payment select, re-enabling restores it. Efectivo is always on and is NOT
+ * The owner toggles per-store payment channels (Transferencia / Zelle, one per
+ * currency) on `/management/configurations` ("Métodos de pago" section). The
+ * config is consumed by the expense create/edit modal: a disabled channel leaves
+ * the payment select, re-enabling restores it. Efectivo is always on and is NOT
  * toggleable.
  *
  * Persona: `owner-admin` — a self-registered owner whose store is on the Pago
@@ -25,7 +25,7 @@ import {
 
 test.use({ persona: 'owner-admin' });
 
-test.describe.serial('T7 — Formas de pago: config + consumo en modal de gasto', () => {
+test.describe.serial('T7 — Métodos de pago: config + consumo en modal de gasto', () => {
   test.describe.configure({ timeout: 120_000 });
 
   test('la sección renderiza con Efectivo fijo y toggles Zelle/Transferencia', async ({
@@ -38,17 +38,35 @@ test.describe.serial('T7 — Formas de pago: config + consumo en modal de gasto'
     // Section + heading (CONFIGURATIONS.PAYMENT_METHODS.TITLE)
     const section = page.getByTestId('payment-methods-config');
     await expect(section).toBeVisible();
-    await expect(section.getByRole('heading', { name: 'Formas de pago' })).toBeVisible();
+    await expect(section.getByRole('heading', { name: 'Métodos de pago' })).toBeVisible();
 
-    // Efectivo: fixed, always on, NOT toggleable (Switch disabled).
-    const efectivo = page.getByRole('switch', { name: 'Efectivo' });
-    await expect(efectivo).toBeVisible();
-    await expect(efectivo).toBeDisabled();
-    await expect(efectivo).toHaveAttribute('aria-checked', 'true');
-    await expect(section.getByText('Siempre habilitado')).toBeVisible();
+    // T20: the section lists EVERY channel of the canonical catalogue, each with
+    // a currency-qualified label. Efectivo (one per currency) is fixed, always on
+    // and NOT toggleable (Switch disabled), with the "Siempre habilitado" note.
+    const cashChannels = [
+      'Efectivo (CUP)',
+      'Efectivo (USD)',
+      'Efectivo (EUR)',
+      'Efectivo (CAD)',
+      'Efectivo (MXN)',
+    ];
+    for (const name of cashChannels) {
+      const sw = page.getByRole('switch', { name });
+      await expect(sw).toBeVisible();
+      await expect(sw).toBeDisabled();
+      await expect(sw).toHaveAttribute('aria-checked', 'true');
+    }
+    await expect(section.getByText('Siempre habilitado')).toHaveCount(cashChannels.length);
 
-    // Zelle + Transferencia: toggleable, default ON (no-regression default).
-    for (const name of ['Zelle', 'Transferencia']) {
+    // The non-cash channels are toggleable and default ON (no-regression default).
+    const toggleableChannels = [
+      'Transferencia (CUP)',
+      'Zelle (USD)',
+      'Transferencia (USD)',
+      'Transferencia (MLC)',
+      'Transferencia (CLA)',
+    ];
+    for (const name of toggleableChannels) {
       const sw = page.getByRole('switch', { name });
       await expect(sw).toBeVisible();
       await expect(sw).toBeEnabled();
@@ -69,7 +87,7 @@ test.describe.serial('T7 — Formas de pago: config + consumo en modal de gasto'
     signedInPage,
   }) => {
     const { page } = signedInPage;
-    const transferencia = page.getByRole('switch', { name: 'Transferencia' });
+    const transferencia = page.getByRole('switch', { name: 'Transferencia (CUP)' });
 
     // OFF → saved indicator + the modal stops offering Transferencia.
     await page.goto('/management/configurations');

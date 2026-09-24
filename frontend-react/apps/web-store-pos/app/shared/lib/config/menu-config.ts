@@ -396,7 +396,7 @@ export const MENU_GROUPS: MenuGroup[] = [
         // with the MultiPayments module; without it the page is not offered.
         moduleIds: [EModules.MultiPayments],
         helpContent:
-          'Tasas por canal. Registra cuántas unidades de cada moneda equivalen a 1 USD para cada método de pago (efectivo, Zelle, transferencia), con la fecha desde la que rige. El historial es de solo lectura: cada cambio crea un registro nuevo y no se puede editar ni eliminar.',
+          'Tasas de Cambio. Registra cuántas unidades de cada moneda equivalen a 1 USD para cada método de pago (efectivo, Zelle, transferencia), con la fecha desde la que rige. El historial es de solo lectura: cada cambio crea un registro nuevo y no se puede editar ni eliminar.',
       },
       {
         label: 'MENU.USERS',

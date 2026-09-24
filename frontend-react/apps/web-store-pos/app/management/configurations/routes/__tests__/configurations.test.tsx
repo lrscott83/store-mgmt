@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
-import { SalePaymentMethod } from '@store-mgmt/domain';
+import { Currency, SalePaymentMethod } from '@store-mgmt/domain';
 import esMessages from '~/shared/lib/i18n/es';
 import { StorePaymentMethodsConfigService } from '~/shared/lib/payment-methods/store-payment-methods-config-service';
 
@@ -389,26 +389,28 @@ describe('ConfigurationsPage — payment methods config section', () => {
     );
 
     expect(
-      await screen.findByRole('heading', { name: 'Formas de pago' }),
+      await screen.findByRole('heading', { name: 'Métodos de pago' }),
     ).toBeInTheDocument();
-    const efectivo = screen.getByRole('switch', { name: 'Efectivo' });
-    expect(efectivo).toBeDisabled();
-    expect(efectivo).toHaveAttribute('aria-checked', 'true');
-    expect(screen.getByText('Siempre habilitado')).toBeInTheDocument();
-    // Default store: every method on (no-regression) — including without the
+    // Every Efectivo channel is fixed on and disabled (one per catalogue currency).
+    const efectivoCup = screen.getByRole('switch', { name: 'Efectivo (CUP)' });
+    expect(efectivoCup).toBeDisabled();
+    expect(efectivoCup).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('switch', { name: 'Efectivo (USD)' })).toBeDisabled();
+    expect(screen.getAllByText('Siempre habilitado').length).toBeGreaterThan(0);
+    // Default store: every channel on (no-regression) — including without the
     // MultiStores module: the section configures the CURRENT store.
-    expect(screen.getByRole('switch', { name: 'Zelle' })).toHaveAttribute(
+    expect(screen.getByRole('switch', { name: 'Zelle (USD)' })).toHaveAttribute(
       'aria-checked',
       'true',
     );
-    expect(screen.getByRole('switch', { name: 'Transferencia' })).toHaveAttribute(
+    expect(screen.getByRole('switch', { name: 'Transferencia (CUP)' })).toHaveAttribute(
       'aria-checked',
       'true',
     );
     expect(storeHttpService.listStores).not.toHaveBeenCalled();
   });
 
-  it('persists disabling Zelle to the store config and shows the saved indicator', async () => {
+  it('lists the full canonical channel catalogue (method + currency)', async () => {
     const { ConfigurationsPage } = await import('../configurations');
     render(
       <Wrapper>
@@ -416,15 +418,44 @@ describe('ConfigurationsPage — payment methods config section', () => {
       </Wrapper>,
     );
 
-    const zelle = await screen.findByRole('switch', { name: 'Zelle' });
+    await screen.findByRole('switch', { name: 'Efectivo (CUP)' });
+    for (const name of [
+      'Transferencia (CUP)',
+      'Efectivo (USD)',
+      'Zelle (USD)',
+      'Transferencia (USD)',
+      'Transferencia (MLC)',
+      'Transferencia (CLA)',
+      'Efectivo (EUR)',
+      'Efectivo (CAD)',
+      'Efectivo (MXN)',
+    ]) {
+      expect(screen.getByRole('switch', { name })).toBeInTheDocument();
+    }
+  });
+
+  it('persists disabling Zelle (USD) to the store config and shows the saved indicator', async () => {
+    const { ConfigurationsPage } = await import('../configurations');
+    render(
+      <Wrapper>
+        <ConfigurationsPage />
+      </Wrapper>,
+    );
+
+    const zelle = await screen.findByRole('switch', { name: 'Zelle (USD)' });
     fireEvent.click(zelle);
 
     expect(await screen.findByTestId('payment-methods-saved')).toHaveTextContent(
       'Guardado',
     );
-    expect(screen.getByRole('switch', { name: 'Zelle' })).toHaveAttribute(
+    expect(screen.getByRole('switch', { name: 'Zelle (USD)' })).toHaveAttribute(
       'aria-checked',
       'false',
+    );
+    // Only that channel changed: Transferencia (USD) stays on.
+    expect(screen.getByRole('switch', { name: 'Transferencia (USD)' })).toHaveAttribute(
+      'aria-checked',
+      'true',
     );
     // Persisted: a FRESH service instance (no shared cache) reads the update.
     expect(
@@ -435,10 +466,11 @@ describe('ConfigurationsPage — payment methods config section', () => {
     ]);
   });
 
-  it('loads a previously disabled Zelle as off and re-enables it on toggle', async () => {
-    new StorePaymentMethodsConfigService('s1').setMethodEnabled(
+  it('loads a previously disabled Zelle (USD) as off and re-enables it on toggle', async () => {
+    new StorePaymentMethodsConfigService('s1').setChannelEnabled(
       's1',
       SalePaymentMethod.Zelle,
+      Currency.USD,
       false,
     );
     const { ConfigurationsPage } = await import('../configurations');
@@ -448,13 +480,13 @@ describe('ConfigurationsPage — payment methods config section', () => {
       </Wrapper>,
     );
 
-    expect(await screen.findByRole('switch', { name: 'Zelle' })).toHaveAttribute(
+    expect(await screen.findByRole('switch', { name: 'Zelle (USD)' })).toHaveAttribute(
       'aria-checked',
       'false',
     );
-    fireEvent.click(screen.getByRole('switch', { name: 'Zelle' }));
+    fireEvent.click(screen.getByRole('switch', { name: 'Zelle (USD)' }));
 
-    expect(screen.getByRole('switch', { name: 'Zelle' })).toHaveAttribute(
+    expect(screen.getByRole('switch', { name: 'Zelle (USD)' })).toHaveAttribute(
       'aria-checked',
       'true',
     );
@@ -475,7 +507,7 @@ describe('ConfigurationsPage — payment methods config section', () => {
       </Wrapper>,
     );
 
-    fireEvent.click(await screen.findByRole('switch', { name: 'Zelle' }));
+    fireEvent.click(await screen.findByRole('switch', { name: 'Zelle (USD)' }));
     expect(await screen.findByTestId('payment-methods-saved')).toBeInTheDocument();
 
     // Switch the active store (MultiStores user) → section binds to s2.
@@ -493,7 +525,7 @@ describe('ConfigurationsPage — payment methods config section', () => {
 
     // s2 reads its own default (Zelle on); s1 keeps its disabled Zelle;
     // the saved indicator resets with the store.
-    expect(await screen.findByRole('switch', { name: 'Zelle' })).toHaveAttribute(
+    expect(await screen.findByRole('switch', { name: 'Zelle (USD)' })).toHaveAttribute(
       'aria-checked',
       'true',
     );

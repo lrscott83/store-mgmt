@@ -103,6 +103,15 @@ describe('MultiPaymentList (module 16 gate)', () => {
     renderList({ payments: [row({ id: 'p1', amount: 100 })], total: 120 });
     expect(screen.queryByTestId('multi-payment-list')).not.toBeInTheDocument();
   });
+
+  it('with the module renders N rows and offers add and remove', () => {
+    renderList({ payments: [row({ id: 'p1', amount: 100 }), row({ id: 'p2', amount: 20 })], total: 120 });
+
+    expect(screen.getByTestId('multi-payment-list')).toBeInTheDocument();
+    expect(screen.getAllByTestId('multi-payment-row')).toHaveLength(2);
+    expect(screen.getByTestId('multi-payment-add')).toBeInTheDocument();
+    expect(screen.getAllByTestId('multi-payment-remove')).toHaveLength(2);
+  });
 });
 
 describe('MultiPaymentList — owner scenarios', () => {
@@ -355,18 +364,43 @@ describe('MultiPaymentList — interactions', () => {
   });
 });
 
-// ─── Config por-tienda (store-payment-methods-config, 2026-09-22): catálogo de
-//     cada fila = moneda → gate MultiMonedas → config ──────────────────────────
+// ─── Config por-tienda (T20, 2026-09-24): el select de CANAL de cada fila =
+//     catálogo canónico (válido) → gate MultiMonedas → config por-tienda ─────────
 
-describe('MultiPaymentList — métodos según config de tienda', () => {
+describe('MultiPaymentList — canales según config de tienda', () => {
   beforeEach(() => {
     localStorage.clear();
     mockUser = userWithStoreModules([EModules.MultiPayments]);
     mockRates = [];
   });
 
-  function firstRowOptionLabels(): string[] {
-    const first = screen.getAllByTestId('multi-payment-method')[0] as HTMLSelectElement;
+  /** Every valid channel (plan-gated + enabled) in catalogue order, with Zelle out. */
+  const CHANNELS_NO_ZELLE = [
+    'Efectivo',
+    'Transferencia (CUP)',
+    'Efectivo',
+    'Transferencia (USD)',
+    'Efectivo',
+    'Transferencia (CLA)',
+    'Transferencia (MLC)',
+    'Efectivo',
+    'Efectivo',
+  ];
+  const CHANNELS_WITH_ZELLE = [
+    'Efectivo',
+    'Transferencia (CUP)',
+    'Efectivo',
+    'Zelle',
+    'Transferencia (USD)',
+    'Efectivo',
+    'Transferencia (CLA)',
+    'Transferencia (MLC)',
+    'Efectivo',
+    'Efectivo',
+  ];
+
+  function firstRowChannelLabels(): string[] {
+    const first = screen.getAllByTestId('multi-payment-channel')[0] as HTMLSelectElement;
     return [...first.options].map((o) => o.textContent ?? '');
   }
 
@@ -376,7 +410,7 @@ describe('MultiPaymentList — métodos según config de tienda', () => {
       orderCurrency: Currency.USD,
       total: 100,
     });
-    expect(firstRowOptionLabels()).toEqual(['Efectivo', 'Transferencia (USD)']);
+    expect(firstRowChannelLabels()).toEqual(CHANNELS_NO_ZELLE);
   });
 
   it('USD + MultiMonedas sin config: catálogo completo con Zelle (default)', () => {
@@ -386,7 +420,7 @@ describe('MultiPaymentList — métodos según config de tienda', () => {
       orderCurrency: Currency.USD,
       total: 100,
     });
-    expect(firstRowOptionLabels()).toEqual(['Efectivo', 'Zelle', 'Transferencia (USD)']);
+    expect(firstRowChannelLabels()).toEqual(CHANNELS_WITH_ZELLE);
   });
 
   it('USD + MultiMonedas + Zelle desactivado en config: la fila pierde Zelle', () => {
@@ -401,30 +435,29 @@ describe('MultiPaymentList — métodos según config de tienda', () => {
       orderCurrency: Currency.USD,
       total: 100,
     });
-    expect(firstRowOptionLabels()).toEqual(['Efectivo', 'Transferencia (USD)']);
+    const labels = firstRowChannelLabels();
+    expect(labels).toEqual(CHANNELS_NO_ZELLE);
+    expect(labels).not.toContain('Zelle');
   });
 
-  it('MLC con Transferencia desactivada en config: fallback Efectivo (select válido)', () => {
+  it('Transferencia desactivada en config: sus canales salen del select', () => {
     new StorePaymentMethodsConfigService(STORE_ID).setMethodEnabled(
       STORE_ID,
       SalePaymentMethod.Transferencia,
       false,
     );
     renderList({
-      payments: [row({ id: 'p1', currency: Currency.MLC, amount: 100 })],
-      orderCurrency: Currency.MLC,
+      payments: [row({ id: 'p1', currency: Currency.CUP, amount: 100 })],
+      orderCurrency: Currency.CUP,
       total: 100,
     });
-    // Catálogo MLC = solo Transferencia → config lo desactiva → Efectivo siempre.
-    expect(firstRowOptionLabels()).toEqual(['Efectivo']);
+    const labels = firstRowChannelLabels();
+    expect(labels).not.toContain('Transferencia (CUP)');
+    expect(labels).not.toContain('Transferencia (MLC)');
+    expect(labels).toContain('Efectivo');
   });
 
-  it('changeCurrency re-pinea al primer método del nuevo catálogo bajo config', () => {
-    new StorePaymentMethodsConfigService(STORE_ID).setMethodEnabled(
-      STORE_ID,
-      SalePaymentMethod.Transferencia,
-      false,
-    );
+  it('el select de canal fija método Y moneda a la vez', () => {
     const onChange = vi.fn();
     renderList({
       payments: [row({ id: 'p1', currency: Currency.USD, amount: 0 })],
@@ -432,12 +465,11 @@ describe('MultiPaymentList — métodos según config de tienda', () => {
       total: 100,
       onChange,
     });
-    fireEvent.change(screen.getAllByTestId('multi-payment-currency')[0], {
-      target: { value: String(Currency.CUP) },
+    fireEvent.change(screen.getAllByTestId('multi-payment-channel')[0], {
+      target: { value: channelKey(SalePaymentMethod.Transferencia, Currency.CUP) },
     });
-    // CUP sin Transferencia (config) → Efectivo, no Transferencia.
     expect(onChange).toHaveBeenCalledWith([
-      { id: 'p1', method: SalePaymentMethod.Efectivo, currency: Currency.CUP, amount: 0 },
+      { id: 'p1', method: SalePaymentMethod.Transferencia, currency: Currency.CUP, amount: 0 },
     ]);
   });
 
@@ -475,11 +507,11 @@ describe('MultiPaymentList — métodos según config de tienda', () => {
 
     fireEvent.click(screen.getByTestId('multi-payment-add-confirm'));
     const added = screen.getAllByTestId('multi-payment-row')[0];
-    const methodSelect = added.querySelector(
-      '[data-testid="multi-payment-method"]',
+    const channel = added.querySelector(
+      '[data-testid="multi-payment-channel"]',
     ) as HTMLSelectElement;
-    // CUP + config sin Transferencia → la fila nueva cae a Efectivo.
-    expect(methodSelect.value).toBe(String(SalePaymentMethod.Efectivo));
+    // El primer canal del popup (CUP) es Efectivo(CUP) bajo esta config.
+    expect(channel.value).toBe(channelKey(SalePaymentMethod.Efectivo, Currency.CUP));
   });
 });
 
@@ -553,5 +585,30 @@ describe('MultiPaymentList — popup de canales (T6)', () => {
       currency: Currency.CUP,
       amount: 0,
     });
+  });
+});
+
+// ─── T16: la fila de pago ya no muestra el texto "Equivalente" ─────────────
+
+describe('MultiPaymentList — T16: sin texto "Equivalente"', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    mockUser = userWithStoreModules([EModules.MultiPayments]);
+    mockRates = [];
+  });
+
+  it('T16-01: ninguna fila de pago renderiza un texto "Equivalente…"', () => {
+    mockRates = [cupRate(700)];
+    renderList({
+      payments: [
+        row({ id: 'p1', currency: Currency.USD, amount: 100 }),
+        row({ id: 'p2', currency: Currency.CUP, amount: 14000 }),
+      ],
+      orderCurrency: Currency.USD,
+      total: 120,
+    });
+
+    expect(screen.queryByText(/Equivalente/)).not.toBeInTheDocument();
+    expect(screen.queryByTestId('multi-payment-converted')).not.toBeInTheDocument();
   });
 });

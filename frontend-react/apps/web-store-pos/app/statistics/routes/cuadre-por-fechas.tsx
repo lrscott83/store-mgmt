@@ -9,8 +9,8 @@ import {
 } from '@store-mgmt/domain';
 import type { Expense, SaleCredit } from '@store-mgmt/domain';
 import {
+  normalizedOrderPaymentMethod,
   resolvedExpensePaymentMethod,
-  resolvedOrderPaymentMethod,
 } from '~/shared/lib/payment-method-resolved';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
@@ -274,7 +274,8 @@ export function CuadrePorFechasPage() {
       .reduce((acc, o) => acc + o.total, 0);
     const salesCardTotal = activeOrders
       .filter(
-        (o) => resolvedOrderPaymentMethod(o) === SalePaymentMethod.Transferencia && !o.isCredit,
+        (o) =>
+          normalizedOrderPaymentMethod(o) === SalePaymentMethod.Transferencia && !o.isCredit,
       )
       .reduce((acc, o) => acc + o.total, 0);
 
@@ -295,7 +296,8 @@ export function CuadrePorFechasPage() {
       .map((o) => ({ amount: o.total, currency: o.currency }));
     const salesCardEntries: CurrencyAmount[] = activeOrders
       .filter(
-        (o) => resolvedOrderPaymentMethod(o) === SalePaymentMethod.Transferencia && !o.isCredit,
+        (o) =>
+          normalizedOrderPaymentMethod(o) === SalePaymentMethod.Transferencia && !o.isCredit,
       )
       .map((o) => ({ amount: o.total, currency: o.currency }));
 

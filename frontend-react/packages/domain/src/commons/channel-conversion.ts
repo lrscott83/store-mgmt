@@ -63,14 +63,16 @@ function rateNotFound<T>(): DataResult<T> {
 }
 
 /**
- * A stored row is usable only when its `value` is a finite number greater than
- * zero. The write guards reject such rows, but a row written before those
+ * A stored row is usable only when it is not deactivated (`isActive !== false`
+ * — absent means active, T19b) and its `value` is a finite number greater than
+ * zero. The write guards reject bad values, but a row written before those
  * guards existed (or by a caller that bypassed them) must never reach
- * `divideHalfUp` as a 0/NaN denominator: the cascade ignores it and falls
- * through to the typed `ChannelRateErrors.RateNotFound`.
+ * `divideHalfUp` as a 0/NaN denominator; an inactive row must never resolve at
+ * all. Both are ignored and fall through to the typed
+ * `ChannelRateErrors.RateNotFound`.
  */
 function isUsableRate(row: ChannelRate): boolean {
-  return Number.isFinite(row.value) && row.value > 0;
+  return row.isActive !== false && Number.isFinite(row.value) && row.value > 0;
 }
 
 function toResolved(rate: ChannelRate): ResolvedChannelRate {

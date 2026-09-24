@@ -8,7 +8,7 @@ import {
   SalePaymentMethod,
 } from '@store-mgmt/domain';
 import type { Expense, Order, SaleCredit } from '@store-mgmt/domain';
-import { resolvedExpensePaymentMethod, resolvedOrderPaymentMethod } from '~/shared/lib/payment-method-resolved';
+import { normalizedOrderPaymentMethod, resolvedExpensePaymentMethod } from '~/shared/lib/payment-method-resolved';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { CurrencyTotalAmount } from '~/shared/components/multimonedas/currency-total-amount';
@@ -128,15 +128,20 @@ export function TodayStatsPage() {
     setActiveOrders(todayOrders);
     setSalesCashTotal(
       todayOrders
-        .filter((o) => resolvedOrderPaymentMethod(o) === SalePaymentMethod.Efectivo && !o.isCredit)
+        .filter(
+          (o) => normalizedOrderPaymentMethod(o) === SalePaymentMethod.Efectivo && !o.isCredit,
+        )
         .reduce((acc, o) => acc + o.total, 0),
     );
     // payment-methods-percent-tax: el bloque "Tarjeta" pasa a "Transferencia" —
     // agrupa los históricos Tarjeta (adaptados a Transferencia-CUP) y las nuevas.
+    // T13: se agrupa por el método NORMALIZADO, así una venta registrada con
+    // Zelle cae en Transferencia (CUP) igual que en el resto del historial.
     setSalesCardTotal(
       todayOrders
         .filter(
-          (o) => resolvedOrderPaymentMethod(o) === SalePaymentMethod.Transferencia && !o.isCredit,
+          (o) =>
+            normalizedOrderPaymentMethod(o) === SalePaymentMethod.Transferencia && !o.isCredit,
         )
         .reduce((acc, o) => acc + o.total, 0),
     );
@@ -211,7 +216,7 @@ export function TodayStatsPage() {
     currency: c.currency,
   }));
   const cashSalesEntries: CurrencyAmount[] = activeOrders
-    .filter((o) => resolvedOrderPaymentMethod(o) === SalePaymentMethod.Efectivo && !o.isCredit)
+    .filter((o) => normalizedOrderPaymentMethod(o) === SalePaymentMethod.Efectivo && !o.isCredit)
     .map((o) => ({ amount: o.total, currency: o.currency }));
   const paidCreditsCashEntries: CurrencyAmount[] = paidSaleCredits
     .filter((c) => c.paidType === PaymentType.Efectivo)
@@ -221,7 +226,7 @@ export function TodayStatsPage() {
     .map((e) => ({ amount: e.total, currency: e.currency }));
   const transferEntries: CurrencyAmount[] = activeOrders
     .filter(
-      (o) => resolvedOrderPaymentMethod(o) === SalePaymentMethod.Transferencia && !o.isCredit,
+      (o) => normalizedOrderPaymentMethod(o) === SalePaymentMethod.Transferencia && !o.isCredit,
     )
     .map((o) => ({ amount: o.total, currency: o.currency }));
 

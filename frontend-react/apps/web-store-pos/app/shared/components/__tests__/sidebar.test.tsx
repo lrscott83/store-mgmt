@@ -534,14 +534,14 @@ describe('Sidebar — channel-rates entry requires the MultiPayments module (D11
     vi.clearAllMocks();
   });
 
-  it('offers "Tasas por canal" when module 16 is available', () => {
+  it('offers "Tasas de Cambio" when module 16 is available', () => {
     renderSidebar(makeOwnerWithConfigurations([EModules.MultiPayments]));
-    expect(screen.getByText('Tasas por canal')).toBeInTheDocument();
+    expect(screen.getByText('Tasas de Cambio')).toBeInTheDocument();
   });
 
-  it('hides "Tasas por canal" when module 16 is missing', () => {
+  it('hides "Tasas de Cambio" when module 16 is missing', () => {
     renderSidebar(makeOwnerWithConfigurations([]));
-    expect(screen.queryByText('Tasas por canal')).not.toBeInTheDocument();
+    expect(screen.queryByText('Tasas de Cambio')).not.toBeInTheDocument();
   });
 
   it('leaves the other Management entries unaffected without module 16', () => {
