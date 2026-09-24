@@ -39,7 +39,7 @@ import { validateCartSubmission } from '~/shared/lib/cart-submission-validation'
 import { showBlockingError, showAcknowledgeError } from '~/shared/lib/blocking-alert';
 import { showToastSuccess, showToastError } from '~/shared/lib/toast';
 import { round2 } from '~/shared/lib/money';
-import { formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency';
+import { currencyLabel, formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency';
 import { readCartCurrencyPreference } from '~/shared/lib/cart-currency-preference';
 import { hasMultiMonedasAvailable } from '~/shared/components/multimonedas/currency-select';
 import {
@@ -48,7 +48,7 @@ import {
   applyStorePaymentMethodsConfig,
 } from '~/shared/lib/payment-methods/store-payment-methods-config-service';
 import { CartCurrencySelect } from '~/shared/components/multipayments/cart-currency-select';
-import { MultiPaymentList } from '~/shared/components/multipayments/multi-payment-list';
+import { MultiPaymentList, createPaymentRow } from '~/shared/components/multipayments/multi-payment-list';
 import { settleMultiPayments } from '~/shared/components/multipayments/multi-payment-settlement';
 import { convertCartLines } from '~/shared/components/multipayments/cart-line-conversion';
 import { ChannelRateOfflineService } from '~/management/channel-rates/lib/services/channel-rate-offline-service';
@@ -156,17 +156,75 @@ export function CartShell() {
   const [preferredCartCurrency, setPreferredCartCurrency] = useState<Currency>(() =>
     readCartCurrencyPreference(user?.id),
   );
+  // T4: último cambio de moneda rechazado (línea/moneda culpable) para el aviso.
+  const [currencyChangeError, setCurrencyChangeError] = useState<{
+    productName: string;
+    fromCurrency: Currency;
+    toCurrency: Currency;
+  } | null>(null);
 
-  // El badge cuenta según el MODO de la venta (orderType del carrito): en venta
-  // mayorista cuenta PAQUETES (cajas); en venta normal, unidades (cart-wholesale-
-  // by-order-type 2026-09-23 — antes el conteo dependía de la config del producto).
+  // Venta mayorista: el badge cuenta PAQUETES (cajas), no unidades. En venta normal
+  // sigue contando unidades (cartBadgeCount cae a la suma por producto sin config).
   const itemCount = wholesaleCartDisplay.cartBadgeCount(items, orderType);
-  // MultiMonedas: el carrito es de una sola moneda (guard de adición), así que el
-  // total y el vuelto se formatean SIEMPRE con la moneda de la venta en curso.
+
+  // MultiPayments (módulo 16): las filas se convierten a la moneda de la venta con
+  // el MISMO registro de tasas que usa la lista, para que el bloqueo de "Registrar"
+  // coincida exactamente con el bloqueo de cobro de la propia lista.
+  const multiPaymentRates = useMemo<ChannelRate[]>(() => {
+    if (!multiPaymentsAvailable || typeof window === 'undefined' || !storeId) return [];
+    return new ChannelRateOfflineService(storeId).getStorageChannelRates();
+  }, [multiPaymentsAvailable, storeId]);
+
+  // MultiMonedas: la moneda NATIVA del carrito la fija el primer ítem (CUP si está
+  // vacío), igual que `cartCurrency()`. Es el fallback seguro: la primera línea es
+  // identidad contra su propia moneda, así que el total nunca queda en 0.
+  const nativeCurrency = cartCurrency() as Currency;
+
+  // T4 (load-time): si la preferencia persistida no puede convertir TODAS las
+  // líneas (p. ej. una preferencia vieja o tasas que cambiaron), la venta cae a la
+  // moneda nativa del carrito en vez de dejar el total en 0 / pintar el error.
+  const preferredConversion = useMemo(
+    () => convertCartLines(items, preferredCartCurrency, multiPaymentRates, new Date()),
+    [items, preferredCartCurrency, multiPaymentRates],
+  );
+  const preferredCurrencyUnconvertible =
+    multiPaymentsAvailable &&
+    items.length > 0 &&
+    preferredCartCurrency !== nativeCurrency &&
+    preferredConversion.firstError !== null;
+
   // MultiPayments (módulo 16): la moneda de la venta la define la preferencia
-  // persistida del usuario; sin el módulo se conserva EXACTAMENTE cartCurrency().
-  const saleCurrency = multiPaymentsAvailable ? preferredCartCurrency : cartCurrency();
+  // persistida del usuario, salvo el fallback de T4; sin el módulo se conserva
+  // EXACTAMENTE cartCurrency().
+  const saleCurrency: Currency = !multiPaymentsAvailable
+    ? nativeCurrency
+    : preferredCurrencyUnconvertible
+      ? nativeCurrency
+      : preferredCartCurrency;
   const money = (amount: number) => formatMoneyWithCurrency(amount, saleCurrency);
+
+  // T4: el cambio de moneda solo procede si TODAS las líneas convierten a la
+  // moneda destino. Si alguna no puede, se rechaza (el select se queda donde está,
+  // la preferencia no se escribe) y se expone la línea/moneda culpable.
+  function canChangeCartCurrency(next: Currency): boolean {
+    const conversion = convertCartLines(items, next, multiPaymentRates, new Date());
+    const failedLine = conversion.lines.find((line) => line.error !== null);
+    if (failedLine) {
+      const item = items.find((i) => i.product.id === failedLine.productId);
+      setCurrencyChangeError({
+        productName: item?.product.name ?? '',
+        fromCurrency: failedLine.fromCurrency,
+        toCurrency: next,
+      });
+      return false;
+    }
+    setCurrencyChangeError(null);
+    return true;
+  }
+
+  function handleCurrencyChange(next: Currency) {
+    setPreferredCartCurrency(next);
+  }
 
   // payment-methods-percent-tax (plan 2026-09-17) + store-payment-methods-config
   // (2026-09-22): el catálogo de métodos de la venta = moneda → gate de plan
@@ -206,14 +264,6 @@ export function CartShell() {
   const pricing = paymentPricingFor(saleCurrency, salePaymentMethod);
   const multiPaymentsActive = multiPaymentsAvailable && items.length > 0;
 
-  // MultiPayments (módulo 16): las filas se convierten a la moneda de la venta con
-  // el MISMO registro de tasas que usa la lista, para que el bloqueo de "Registrar"
-  // coincida exactamente con el bloqueo de cobro de la propia lista.
-  const multiPaymentRates = useMemo<ChannelRate[]>(() => {
-    if (!multiPaymentsAvailable || typeof window === 'undefined' || !storeId) return [];
-    return new ChannelRateOfflineService(storeId).getStorageChannelRates();
-  }, [multiPaymentsAvailable, storeId]);
-
   // MultiPayments (módulo 16, T8): cada línea del carrito se convierte a la moneda
   // de la venta elegida (una tasa por moneda, no por canal). Sin el módulo el
   // resultado queda sin uso y el total conserva EXACTAMENTE el camino legado.
@@ -249,6 +299,32 @@ export function CartShell() {
         : { orderPayments: [], remainingCents: 0, firstError: null },
     [multiPaymentsAvailable, payments, multiPaymentOrderCurrency, totalAmount, multiPaymentRates],
   );
+
+  // T5 (payment-channels-and-multipayment): cuando el bloque de multipago pasa a
+  // ser relevante (carrito con ítems + módulo 16) y aún no hay filas, se siembra
+  // UNA fila Efectivo por el total de la venta — misma moneda ⇒ sin conversión y
+  // sin mensaje de tasa. La siembra ocurre SOLO en la transición a "activo" (ref):
+  // así no pelea con las ediciones del usuario (ni re-siembra si borra todas las
+  // filas) y el guard sigue coherente (si el usuario baja el monto, queda en
+  // subpago y "Registrar" se bloquea). Al vaciarse el carrito se limpian las filas
+  // para que la próxima venta arranque de cero.
+  const multiPaymentsSeededRef = useRef(false);
+  useEffect(() => {
+    if (!multiPaymentsActive) {
+      multiPaymentsSeededRef.current = false;
+      if (payments.length > 0) setPayments([]);
+      return;
+    }
+    if (multiPaymentsSeededRef.current) return;
+    multiPaymentsSeededRef.current = true;
+    if (payments.length === 0) {
+      setPayments([
+        createPaymentRow(SalePaymentMethod.Efectivo, saleCurrency, totalAmount),
+      ]);
+    }
+    // Intencional: solo la transición a activo dispara la siembra.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [multiPaymentsActive]);
 
   // El cierre se bloquea mientras la venta no esté cubierta por los pagos (misma
   // razón que la lista: falta cubrir, o una fila no se pudo convertir) o mientras
@@ -541,12 +617,21 @@ export function CartShell() {
               right — matching Angular's nav-right header row (both mat-fab buttons live at
               the top, disabled when the cart is empty). React closes the panel via
               click-outside (useClickOutside), so no explicit close button is needed. */}
-            <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-3">
               <div>
                 <h3 className="text-sm font-semibold text-text">Venta actual</h3>
                 <span className="text-xs text-text-muted">{getOrderTypeText(orderType)}</span>
               </div>
               <div className="flex items-center gap-2">
+                {/* MultiPayments: selector de moneda del carrito (módulo 16), en la
+                  misma fila del encabezado y ANTES de "Limpiar". El propio
+                  componente se oculta sin el módulo, así que ningún flujo existente cambia. */}
+                <CartCurrencySelect
+                  value={saleCurrency}
+                  onChange={handleCurrencyChange}
+                  canChange={canChangeCartCurrency}
+                  testId="cart-currency-select"
+                />
                 <button
                   type="button"
                   onClick={handleClear}
@@ -566,13 +651,26 @@ export function CartShell() {
               </div>
             </div>
 
-            {/* MultiPayments: selector de moneda del carrito (módulo 16). El propio
-              componente se oculta sin el módulo, así que ningún flujo existente cambia. */}
-            <CartCurrencySelect
-              value={preferredCartCurrency}
-              onChange={setPreferredCartCurrency}
-              testId="cart-currency-select"
-            />
+            {/* T4: aviso cuando el cambio de moneda se rechazó porque una línea no
+              puede convertirse. Sin el módulo 16 el aviso nunca aparece. */}
+            {currencyChangeError && (
+              <div className="border-b border-border px-4 py-2">
+                <p
+                  role="alert"
+                  data-testid="cart-currency-change-error"
+                  className="text-xs text-danger"
+                >
+                  {intl.formatMessage(
+                    { id: 'SHOPPING_CART.CURRENCY_CHANGE_BLOCKED' },
+                    {
+                      currency: currencyLabel(currencyChangeError.toCurrency),
+                      product: currencyChangeError.productName,
+                      fromCurrency: currencyLabel(currencyChangeError.fromCurrency),
+                    },
+                  )}
+                </p>
+              </div>
+            )}
 
             {/* MultiPayments (módulo 16): con ítems en el carrito, la lista de pagos
               reemplaza el bloque legacy de pago (el "con cuánto paga"/vuelto y el
