@@ -38,6 +38,7 @@ Estado actual verificado en código:
 | D9 | Venta sin MultiPayments pero con MultiMonedas (15) | **Se mantiene como hoy**: **un solo** método de pago, elegido **en la venta** entre los configurados en Configuraciones. No se toca |
 | D10 | Con MultiPayments (16) activo | **Todo (canales método + moneda y su equivalencia) vive en la vista "Canales de pago"** |
 | D11 | Página "Canales de pago" sin MultiPayments (16) | **Se oculta**: la página (canales + equivalencia) existe **solo con el módulo 16 activo** |
+| D12 | Mecanismo del gate de la ruta sin módulo 16 | **Aprobado explícitamente**: usa el mecanismo existente del app (cierra sesión → `/login`), consistente con los demás gates de feature |
 
 Decisiones heredadas que se mantienen (no se re-abren):
 
@@ -129,30 +130,30 @@ Normalización **en el camino de lectura de órdenes registradas** (historial, �
 
 Cada tarea cierra con: tests que la cubren + `<comando>: <resultado observado>` + commit en `dev`. Ruta declarada por tarea (inline = orquestador; delegada = un writer acotado).
 
-- [ ] **T1** — Dominio: enumeración canónica de canales + `channelKey` + `isValidChannel`. **Ruta:** delegada (writer) — toca el paquete de dominio compartido + tests.
-  **AC:** por cada `Currency` se enumeran exactamente los canales de la tabla de diseño; `channelKey` es estable y sin colisiones; `isValidChannel` rechaza combinaciones inexistentes (Zelle+CUP, Efectivo+MLC).
-- [ ] **T2** — Página "Canales de pago": selector limitado a canales reales + gate por módulo 16 en la página completa. **Ruta:** delegada (writer).
-  **AC:** no se puede registrar un canal inexistente; el historial sigue mostrando lo ya registrado; **sin el módulo 16 la página no se ofrece** (se oculta del menú y la ruta queda gateada) — D11.
-- [ ] **T3** — Carrito: "Moneda" a la fila del encabezado, antes de "Limpiar". **Ruta:** delegada (writer).
-  **AC:** mismo renglón, antes de "Limpiar"; sigue gated por módulo 16; el resto del carrito sin cambios.
-- [ ] **T4** — Carrito: bloquear el cambio de moneda cuando alguna línea no convierte (arregla "0 USD"). **Ruta:** delegada (writer).
-  **AC:** con una línea sin tasa, el select no cambia y aparece un aviso claro; el total nunca se pinta "0 <moneda>"; con tasa disponible el cambio se permite y convierte.
-- [ ] **T5** — Multipago: fila por defecto Efectivo con el monto total; sin mensaje de tasa por defecto. **Ruta:** delegada (writer).
-  **AC:** carrito con ítems ⇒ exactamente 1 fila Efectivo con el total; sin texto de tasa; "Registrar" habilitado cuando cubre.
-- [ ] **T6** — Multipago: "Agregar pago" con popup + eliminar por fila + edición moneda/monto con recálculo. **Ruta:** delegada (writer).
-  **AC:** el popup ofrece solo canales válidos; agregar crea la fila con el canal elegido; el botón de papelera la elimina; editar moneda/monto recalcula pagado/restante/vuelto y el guard.
-- [ ] **T7** — Multipago: eliminar el botón "Cobrar". **Ruta:** inline (cambio acotado ya entendido).
-  **AC:** `multi-payment-settle` no existe; el registro de la venta sigue por "Registrar".
-- [ ] **T8** — Inputs numéricos: permitir borrar el 0 (Cantidad, Precio, Monto) con validación posterior. **Ruta:** delegada (writer).
-  **AC:** se puede vaciar el campo y escribir; al confirmar, un valor inválido no persiste basura (vuelve al último válido o 0 según corresponda).
-- [ ] **T9** — Historial: normalización de ventas ya registradas (Efectivo / Transferencia (CUP)). **Ruta:** delegada (writer).
-  **AC:** en historial, órdenes de hoy, filtros y modal de edición: Efectivo → "Efectivo"; Transferencia y Zelle → "Transferencia (CUP)"; los datos persistidos no se reescriben; `salePaymentMethodLabel` intacto.
-- [ ] **T10** — E2E NUEVOS (frontend, add-only): 4 specs (ver §E2E). **Ruta:** delegada (writer) por spec o por par.
-  **AC:** todos verdes con el backend `:5019` (perfil `http-e2e`) y el teardown reportando las filas `e2e-*` borradas.
-- [ ] **T11** — E2E EXISTENTE `multipayments.spec.ts` (T10.1 + T10.2): actualizar según la propuesta autorizada. **Ruta:** delegada (writer).
-  **AC:** los dos casos fijan el comportamiento nuevo; el bloqueo por subpago se conserva intacto; ningún otro E2E existente modificado (`git status`).
-- [ ] **T12** — Verificación final: `pnpm test`, `pnpm typecheck`, `pnpm lint`, E2E nuevos + el actualizado, y re-corrida de los E2E de backend existentes que cubren la superficie servidor (sin cambios). **Ruta:** delegada (fresh worker) + spot check del orquestador.
-  **AC:** todo verde, evidencia `<comando>: <resultado>` en este documento.
+- [x] **T1** — Dominio: enumeración canónica de canales + `channelKey` + `isValidChannel`. **Ruta:** delegada (writer). Commit `f193ca3b` (`packages/domain/src/commons/payment-channel.ts` + tests + `index.ts`).
+  **AC:** ✅ por cada `Currency` se enumeran exactamente los canales de la tabla de diseño; `channelKey` estable y sin colisiones; `isValidChannel` rechaza Zelle+CUP y Efectivo+MLC.
+- [x] **T2** — Página "Canales de pago": selector limitado a canales reales + gate por módulo 16 en la página completa. **Ruta:** delegada (writer). Commit `c5060045` (nuevo `adminFeatureModuleLoader` + `MenuItem.moduleIds`).
+  **AC:** ✅ el selector solo ofrece métodos válidos para la moneda elegida (re-pin al cambiar de moneda) + guard defensivo en el submit; el historial sigue pintando las filas guardadas (incluidas las legadas inválidas); **sin el módulo 16 la página se oculta del menú y la ruta queda gateada** (D11, mecanismo aprobado en D12).
+- [x] **T3** — Carrito: "Moneda" a la fila del encabezado, antes de "Limpiar". **Ruta:** delegada (writer). Commit `e45c1673`.
+  **AC:** ✅ mismo renglón (con `flex-wrap` para pantallas angostas), antes de "Limpiar"/"Registrar"; sigue gated por módulo 16; el resto del carrito sin cambios; conserva `data-testid="cart-currency-select"`.
+- [x] **T4** — Carrito: bloquear el cambio de moneda cuando alguna línea no convierte (arregla "0 USD"). **Ruta:** delegada (writer). Commit `c641287b`.
+  **AC:** ✅ con una línea sin tasa el select no cambia, la preferencia no se escribe y aparece un aviso claro (`cart-currency-change-error`, i18n `SHOPPING_CART.CURRENCY_CHANGE_BLOCKED`, nombra el producto y las dos monedas); el total nunca se pinta "0 <moneda>"; con tasa disponible el cambio procede y convierte. **Extra acordado:** al cargar con una moneda persistida que no convierte, el carrito cae a la moneda nativa (primer ítem) en lugar de mostrar el error o un total en 0.
+- [x] **T5** — Multipago: fila por defecto Efectivo con el monto total; sin mensaje de tasa por defecto. **Ruta:** delegada (writer). Commit `64e56aac`.
+  **AC:** ✅ se siembra **una** fila Efectivo con el total al activarse el bloque (ref `multiPaymentsSeededRef`; no pisa la edición del usuario; al vaciar el carrito se limpia); `multi-payment-block-reason` solo se renderiza cuando hay bloqueo real; sin texto de tasa por defecto.
+- [x] **T6** — Multipago: "Agregar pago" con popup + eliminar por fila + edición moneda/monto con recálculo. **Ruta:** delegada (writer). Commit `b19e388b`.
+  **AC:** ✅ `multi-payment-add` abre un modal que ofrece solo canales válidos (catálogo T1 + gate de plan + config de la tienda); la fila nueva arranca con el restante en unidades de la moneda de la venta cuando el canal es de esa moneda, si no en 0; botón de papelera por fila (incluida la Efectivo por defecto; borrar todo deja la lista vacía y el guard bloquea el registro); moneda y monto editables con recálculo en vivo.
+- [x] **T7** — Multipago: eliminar el botón "Cobrar". **Ruta:** delegada (writer). Commit `4ada96db`.
+  **AC:** ✅ `multi-payment-settle` eliminado y su clave i18n `SHOPPING_CART.MULTI_PAYMENT_SETTLE` retirada; el registro sigue por "Registrar".
+- [x] **T8** — Inputs numéricos: permitir borrar el 0 (Cantidad, Precio, Monto) con validación posterior. **Ruta:** delegada (writer). Commit `006d74d5`.
+  **AC:** ✅ patrón de borrador + commit en blur/submit en los 3 campos; el campo se puede vaciar y reescribir; al confirmar, un valor vacío/inválido cae al último válido en vez de ensuciar el estado.
+- [x] **T9** — Historial: normalización de ventas ya registradas (Efectivo / Transferencia (CUP)). **Ruta:** delegada (writer). Commit `13885099`. Seam: `normalizedOrderPaymentMethod` en `shared/lib/payment-method-resolved.ts`, consumido por `payment-filter-options.ts` y `edit-order-modal.tsx`.
+  **AC:** ✅ historial, órdenes de hoy, filtros y modal de edición muestran solo "Efectivo" y "Transferencia (CUP)"; una venta Zelle se muestra como "Transferencia (CUP)"; los datos persistidos no se reescriben; `salePaymentMethodLabel` intacto (el modal de gastos y el carrito siguen mostrando Zelle como Zelle). **Límite deliberado:** `today-stats.tsx` y `statistics/cuadre-por-fechas.tsx` NO se normalizaron (fuera de las 4 superficies del AC) — ver §Límites conocidos.
+- [x] **T10** — E2E NUEVOS (frontend, add-only): 4 specs. **Ruta:** delegada (writer). Commit `ac6d25b2`.
+  **AC:** ✅ los 4 specs verdes: `channel-rates-catalogue` 2/2, `multipayments-cart-v2` 1/1, `multipayments-currency-block` 1/1, `payment-history-normalization` 3/3 → **7/7 en una sola corrida (42.3s)**, teardown `278 filas e2e-* borradas`. Se corrigió una aserción **inválida** en `multipayments-cart-v2` (esperaba `paid=406`; producción topa `paid` en el total y el exceso sale como `change`) — arreglo del test, no debilitamiento; no había bug de producción.
+- [x] **T11** — E2E EXISTENTE `multipayments.spec.ts` (T10.1 + T10.2): actualizado según la propuesta autorizada. **Ruta:** delegada (writer). Commit `090ad7e3` (+95/−29, único archivo tocado).
+  **AC:** ✅ **2/2 passed** en la re-corrida del orquestador (51.1s, teardown `57 filas e2e-* borradas`); el bloqueo por subpago se conserva intacto; ningún otro E2E existente fue modificado.
+- [x] **T12** — Verificación final (alcance ajustado por el usuario). **Ruta:** spot check del orquestador.
+  **AC:** ✅ E2E del módulo verdes (T10 **7/7** + T11 **2/2**). **Por instrucción explícita del usuario (2026-09-24) NO se corrió la suite amplia** (`pnpm test` completo, subset de regresión E2E y E2E de backend): "hay que hacer arreglos" ajenos al módulo, y se asume que la parte del módulo está bien.
 
 ## E2E existentes que habría que modificar (AUTORIZADO — D8)
 
@@ -191,26 +192,48 @@ Cada tarea cierra con: tests que la cubren + `<comando>: <resultado observado>` 
 
 ## Acceptance criteria
 
-- [ ] La página "Canales de pago" solo permite registrar **canales reales (método + moneda)** y mantiene su historial.
-- [ ] La página "Canales de pago" (canales + equivalencia) solo existe con el módulo 16 activo: se oculta del menú y su ruta queda gateada sin él (D11).
-- [ ] El selector "Moneda" está en la fila del encabezado, antes de "Limpiar", y sigue gated por módulo 16.
-- [ ] Cambiar de moneda sin tasa disponible queda **bloqueado** con aviso; el total nunca se pinta "0 <moneda>".
-- [ ] Por defecto hay **una fila Efectivo con el monto total** y **no** aparece el mensaje de tasa.
-- [ ] "Agregar pago" abre un popup; cada fila tiene botón de eliminar; moneda y monto editables con recálculo.
-- [ ] El botón "Cobrar" ya no existe.
-- [ ] Se puede borrar el "0" en Cantidad, Precio y Monto, con validación posterior.
-- [ ] Historial: Efectivo → "Efectivo"; Transferencia y Zelle → "Transferencia (CUP)".
-- [ ] La página de Configuraciones y su servicio de config quedan **sin cambios**.
-- [ ] `pnpm test`, `pnpm typecheck`, `pnpm lint` verdes; E2E nuevos + `multipayments.spec.ts` verdes; E2E de backend existentes re-corridos sin cambios.
-- [ ] Ningún E2E existente modificado fuera de `multipayments.spec.ts`.
-- [ ] Sin el módulo 16 y con MultiMonedas: la venta mantiene el flujo actual — **un solo** método de pago, elegido entre los configurados en Configuraciones (sin regresión).
+- [x] La página "Canales de pago" solo permite registrar **canales reales (método + moneda)** y mantiene su historial — T2 + E2E `channel-rates-catalogue`.
+- [x] La página "Canales de pago" (canales + equivalencia) solo existe con el módulo 16 activo: se oculta del menú y su ruta queda gateada sin él (D11) — T2 + E2E `channel-rates-catalogue`.
+- [x] El selector "Moneda" está en la fila del encabezado, antes de "Limpiar", y sigue gated por módulo 16 — T3.
+- [x] Cambiar de moneda sin tasa disponible queda **bloqueado** con aviso; el total nunca se pinta "0 <moneda>" — T4 + E2E `multipayments-currency-block`.
+- [x] Por defecto hay **una fila Efectivo con el monto total** y **no** aparece el mensaje de tasa — T5 + E2E `multipayments-cart-v2`.
+- [x] "Agregar pago" abre un popup; cada fila tiene botón de eliminar; moneda y monto editables con recálculo — T6 + E2E `multipayments-cart-v2`.
+- [x] El botón "Cobrar" ya no existe — T7 + E2E `multipayments.spec.ts` T10.2.
+- [x] Se puede borrar el "0" en Cantidad, Precio y Monto, con validación posterior — T8.
+- [x] Historial: Efectivo → "Efectivo"; Transferencia y Zelle → "Transferencia (CUP)" — T9 + E2E `payment-history-normalization`. **Límite:** los paneles de estadísticas no se normalizaron (ver §Límites conocidos).
+- [x] La página de Configuraciones y su servicio de config quedan **sin cambios** — D1; verificado por alcance de archivos en cada commit.
+- [x] E2E nuevos + `multipayments.spec.ts` verdes (7/7 y 2/2) — T10, T11, T12.
+- [x] Ningún E2E existente modificado fuera de `multipayments.spec.ts` — `git status --porcelain -- frontend-react/e2e/`.
+- [~] Sin el módulo 16 y con MultiMonedas: la venta mantiene el flujo actual — un solo método de pago, elegido entre los configurados en Configuraciones (sin regresión). **No re-verificada en esta corrida**: es comportamiento preexistente que el módulo NO tocó (ningún archivo del bloque legacy del carrito fue modificado), y su verificación habría requerido el subset de regresión E2E que el usuario pidió no correr.
+- [~] `pnpm test` / suite amplia verde: **no corrida** por instrucción del usuario. Cada tarea sí reportó sus propios `pnpm typecheck` (5/5) y `pnpm lint` (4/4) verdes, y la suite de la app quedó en 4215 passed / 1 failed (el preexistente `sales-routes`).
+
+## Límites conocidos (informar, no ocultar)
+
+- **`today-stats.tsx` y `statistics/cuadre-por-fechas.tsx` no se normalizaron**: siguen agregando por `resolvedOrderPaymentMethod`, así que una venta vieja de Zelle no se suma al bucket de Transferencia en esos paneles. Quedó fuera de las 4 superficies del AC de T9 — pendiente de confirmar contigo si quieres extenderlo.
+- La **suite amplia de tests** (`pnpm test` completo, subset de regresión E2E, E2E de backend) **no se corrió** en T12 por tu instrucción expresa (2026-09-24).
+- El único E2E existente modificado es `multipayments.spec.ts` (autorizado, D8).
+- No se hizo commit/push de nada fuera de la rama `dev`.
 
 ## Progress
 
 - 2026-09-23: exploración completa (2 mapeos delegados + verificación puntual). Causas raíz de los 5 problemas reportados identificadas en código. Decisiones D1–D8 cerradas con el usuario.
 - 2026-09-23: **documento ajustado** tras la revisión del usuario: se retira todo el alcance de la página de Configuraciones (D1: todo vive en "Canales de pago"), se confirma entrega por commits en `dev` (D7), se confirma la autorización de E2E existentes (D8) y el alcance de specs existentes baja de 4 a **1** (`multipayments.spec.ts`). Sin cambios de código todavía.
 - 2026-09-23: **tercer ajuste**: se cierra la última decisión abierta (D11 — sin el módulo 16 la página "Canales de pago" se oculta y su ruta queda gateada). Verificado que ningún E2E existente navega a esa ruta salvo `multipayments.spec.ts` (tienda con módulo 16) ni afirma su entrada de menú. **Documento cerrado, sin decisiones pendientes.** Sin cambios de código todavía.
+- 2026-09-23: **implementación** (usuario: "dale con la implementación"). T1+T2 → commits `f193ca3b`, `c5060045`. Decisión **D12** aprobada explícitamente por el usuario: el gate de la ruta sin el módulo 16 usa el mecanismo existente del app (cierra sesión → `/login`). T3+T4 → commits `e45c1673`, `c641287b`. T5+T6+T7 → commits `64e56aac`, `b19e388b`, `4ada96db`. Se actualizó un test **unitario** existente (`cart-shell.test.tsx` T8-03) porque su comportamiento pinneado cambió por diseño en T4 — es Vitest, no E2E; **ningún E2E existente fue tocado**.
+- 2026-09-24: T8+T9 → commits `006d74d5`, `13885099`. Dos reinicios del runtime interrumpieron la delegación E2E a mitad: T11 quedó commiteado (`090ad7e3`) y los 4 specs de T10 quedaron escritos sin verificar → una delegación fresca los verificó, corrigió una aserción inválida y los commiteó (`ac6d25b2`). **Módulo completo: T1–T12.** T12 cerrado con el E2E del módulo (7/7 + 2/2); la suite amplia no se corrió por tu instrucción expresa del 2026-09-24.
 
 ## Verification evidence
 
-- (pendiente — se completa tarea por tarea con `<comando>: <resultado>`)
+- T1 — `pnpm --filter @store-mgmt/domain exec vitest run src/commons/__tests__/payment-channel.test.ts`: 1 file passed, **9/9 tests passed**.
+- T2 — `pnpm --filter @store-mgmt/web-store-pos exec vitest run app/management/channel-rates/routes/__tests__/channel-rates.test.tsx app/shared/components/__tests__/sidebar.test.tsx`: 2 files passed, **60/60 tests passed**.
+- T1+T2 — `pnpm typecheck`: 5/5 tasks successful (0 errors). `pnpm lint`: 4/4 tasks successful (`--max-warnings=0`).
+- Suite completa (referencia T1+T2) — `pnpm test`: 4188/4189 passed. **1 fallo preexistente y ajeno**: `app/sales/routes/__tests__/sales-routes.test.tsx:336` ("SaleCreditsPage has no radio filters") — verificado por el writer con stash del trabajo y reproducción idéntica en árbol limpio; se re-confirma en T12.
+- Nota de entorno: los tests de la app consumen el `dist/` compilado de `@store-mgmt/domain`; un export nuevo requiere `pnpm --filter @store-mgmt/domain build` antes de correr los tests de la app.
+- T3+T4 — `pnpm --filter @store-mgmt/web-store-pos exec vitest run app/shared/components/__tests__/cart-shell.test.tsx app/shared/components/multipayments/__tests__/cart-currency-select.test.tsx`: 2 files passed, **78/78 tests**. `pnpm typecheck` 5/5 · `pnpm lint` 4/4. **Spot check del orquestador** (re-run de `cart-shell.test.tsx`): **70/70 passed**, 0 type errors.
+- T5+T6+T7 — `pnpm --filter @store-mgmt/web-store-pos exec vitest run app/shared/components/multipayments/__tests__/multi-payment-list.test.tsx app/shared/components/__tests__/cart-shell.test.tsx`: 2 files passed, **97/97 tests**. `pnpm typecheck` 5/5 · `pnpm lint` 4/4. Suite completa: **4207 passed, 1 failed** (el preexistente de `sales-routes`).
+- T8 — `pnpm --filter @store-mgmt/web-store-pos exec vitest run app/sales/components/__tests__/sale-product-row.test.tsx app/shared/components/multipayments/__tests__/multi-payment-list.test.tsx`: 2 files passed, **48/48**. `pnpm typecheck` 5/5 · `pnpm lint` 4/4.
+- T9 — `pnpm --filter @store-mgmt/web-store-pos exec vitest run app/shared/lib/__tests__/payment-filter-options.test.ts app/sales/routes/__tests__/today-orders-payment-filter.test.tsx app/sales/routes/__tests__/orders.test.tsx app/sales/routes/__tests__/orders-multistore.test.tsx app/sales/components/__tests__/order-components.test.tsx`: 5 files passed, **63/63**. Suite de la app (referencia): 4215 passed, 1 failed (el preexistente).
+- T10 — `pnpm exec playwright test e2e/channel-rates-catalogue.spec.ts e2e/multipayments-cart-v2.spec.ts e2e/multipayments-currency-block.spec.ts e2e/payment-history-normalization.spec.ts --reporter=list` (desde `frontend-react/`): **7 passed (42.3s)** · teardown `[e2e teardown] 278 filas e2e-* borradas en "smca_test"`.
+- T11 — **spot check del orquestador**, `pnpm exec playwright test e2e/multipayments.spec.ts --reporter=list` (desde `frontend-react/`): **2 passed (51.1s)** · teardown `[e2e teardown] 57 filas e2e-* borradas en "smca_test"`.
+- T12 — entorno: `Test-NetConnection localhost -Port 5019` → **True**; `-Port 5432` → **True**. Suite amplia **NO corrida** por instrucción explícita del usuario.
+- Integridad E2E — `git status --porcelain -- frontend-react/e2e/`: solo los **4 specs nuevos** (T10) + `multipayments.spec.ts` (el único existente autorizado, T11). Cero cambios en `e2e/support/*` y en el resto de specs.
