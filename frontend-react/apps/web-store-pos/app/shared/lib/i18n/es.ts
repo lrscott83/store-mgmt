@@ -319,8 +319,6 @@ const messages: Record<string, string> = {
   'SHOPPING_CART.MULTI_PAYMENT_TITLE': 'Pagos',
   'SHOPPING_CART.MULTI_PAYMENT_ADD': 'Agregar pago',
   'SHOPPING_CART.MULTI_PAYMENT_REMOVE': 'Eliminar',
-  'SHOPPING_CART.MULTI_PAYMENT_METHOD_LABEL': 'Forma de pago',
-  'SHOPPING_CART.MULTI_PAYMENT_CURRENCY_LABEL': 'Moneda',
   'SHOPPING_CART.MULTI_PAYMENT_AMOUNT_LABEL': 'Monto',
   'SHOPPING_CART.MULTI_PAYMENT_PAID_LABEL': 'Total cubierto',
   'SHOPPING_CART.MULTI_PAYMENT_REMAINING_LABEL': 'Restante por cubrir',
@@ -345,8 +343,6 @@ const messages: Record<string, string> = {
   'CART.INCREASE_QUANTITY': 'Aumentar cantidad de {name}',
   'CART.REMOVE_ITEM': 'Eliminar {name}',
 
-  // GENERAL.PAY — Angular's mat-form-field label for the cart's payment/tendered-amount input.
-  'GENERAL.PAY': 'Pago',
   // GENERAL.EXPENSE (Angular vocabs/es.ts:225) — the {name} interpolated into
   // GENERAL.DELETE_CONFIRM_MESSAGE by expense-list.component.ts:56 (onDeleteExpense).
   'GENERAL.EXPENSE': 'Gasto',
