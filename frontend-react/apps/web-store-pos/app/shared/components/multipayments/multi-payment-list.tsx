@@ -216,12 +216,6 @@ export function MultiPaymentList({
 
   const money = (units: number) => formatMoneyWithCurrency(units, orderCurrency);
 
-  function convertedLabel(entry: EvaluatedRow): string {
-    if (entry.convertedCents !== null) return money(entry.convertedCents / 100);
-    if (entry.skipped) return '—';
-    return '';
-  }
-
   function blockMessage(): string {
     if (hasConversionError) return firstError?.description ?? '';
     if (underpaid) {
@@ -377,13 +371,7 @@ export function MultiPaymentList({
                 </label>
               </div>
 
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-xs text-text-muted" data-testid="multi-payment-converted">
-                  <span className="font-medium">
-                    {intl.formatMessage({ id: 'SHOPPING_CART.MULTI_PAYMENT_CONVERTED_LABEL' })}
-                  </span>{' '}
-                  {convertedLabel(entry)}
-                </p>
+              <div className="flex items-center justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => removeRow(row.id)}

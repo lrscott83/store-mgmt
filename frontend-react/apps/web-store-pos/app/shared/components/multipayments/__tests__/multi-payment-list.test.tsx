@@ -555,3 +555,28 @@ describe('MultiPaymentList — popup de canales (T6)', () => {
     });
   });
 });
+
+// ─── T16: la fila de pago ya no muestra el texto "Equivalente" ─────────────
+
+describe('MultiPaymentList — T16: sin texto "Equivalente"', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    mockUser = userWithStoreModules([EModules.MultiPayments]);
+    mockRates = [];
+  });
+
+  it('T16-01: ninguna fila de pago renderiza un texto "Equivalente…"', () => {
+    mockRates = [cupRate(700)];
+    renderList({
+      payments: [
+        row({ id: 'p1', currency: Currency.USD, amount: 100 }),
+        row({ id: 'p2', currency: Currency.CUP, amount: 14000 }),
+      ],
+      orderCurrency: Currency.USD,
+      total: 120,
+    });
+
+    expect(screen.queryByText(/Equivalente/)).not.toBeInTheDocument();
+    expect(screen.queryByTestId('multi-payment-converted')).not.toBeInTheDocument();
+  });
+});
