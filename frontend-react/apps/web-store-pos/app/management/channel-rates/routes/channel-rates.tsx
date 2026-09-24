@@ -7,7 +7,6 @@ import {
   SalePaymentMethod,
   defaultPaymentMethodForCurrency,
   isValidChannel,
-  salePaymentMethodLabel,
   type ChannelRate,
 } from '@store-mgmt/domain';
 import { adminFeatureModuleLoader } from '~/auth/routes/loaders';
@@ -17,6 +16,7 @@ import { Button } from '~/shared/components/ui/button';
 import { currencyLabel, formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency';
 import { fromLocalDayKey, toLocalDayKey } from '~/shared/lib/date-utils';
 import { ChannelRateOfflineService } from '../lib/services/channel-rate-offline-service';
+import { channelLabel } from '../lib/channel-label';
 
 // multipayments — same guard as the Configurations feature and the daily
 // exchange-rate register (OwnerAdmin / SuperAdmin plus the feature gate), AND
@@ -27,10 +27,10 @@ export const clientLoader = adminFeatureModuleLoader(
   [EModules.MultiPayments],
 );
 
-const METHOD_OPTIONS: { value: SalePaymentMethod; labelId: string }[] = [
-  { value: SalePaymentMethod.Efectivo, labelId: 'CHANNEL_RATES.METHOD_EFECTIVO' },
-  { value: SalePaymentMethod.Zelle, labelId: 'CHANNEL_RATES.METHOD_ZELLE' },
-  { value: SalePaymentMethod.Transferencia, labelId: 'CHANNEL_RATES.METHOD_TRANSFERENCIA' },
+const METHOD_OPTIONS: SalePaymentMethod[] = [
+  SalePaymentMethod.Efectivo,
+  SalePaymentMethod.Zelle,
+  SalePaymentMethod.Transferencia,
 ];
 
 const CURRENCY_OPTIONS: Currency[] = [
@@ -63,6 +63,7 @@ function sortByRecency(rates: ChannelRate[]): ChannelRate[] {
  */
 export function ChannelRatesPage() {
   const intl = useIntl();
+  const formatMessage = useCallback((id: string) => intl.formatMessage({ id }), [intl]);
   const storeId = useAuthStore((s) => s.user?.selectedStoreId ?? '');
 
   const [records, setRecords] = useState<ChannelRate[]>([]);
@@ -98,7 +99,7 @@ export function ChannelRatesPage() {
   // Only real channels are offered: the method selector is limited to the
   // methods that exist for the chosen currency, so Zelle+CUP or Efectivo+MLC
   // can never be picked.
-  const methodOptions = METHOD_OPTIONS.filter((option) => isValidChannel(option.value, currency));
+  const methodOptions = METHOD_OPTIONS.filter((option) => isValidChannel(option, currency));
 
   function handleCurrencyChange(next: Currency) {
     setCurrency(next);
@@ -192,8 +193,8 @@ export function ChannelRatesPage() {
               data-testid="channel-rate-method"
             >
               {methodOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {intl.formatMessage({ id: option.labelId })}
+                <option key={option} value={option}>
+                  {channelLabel(option, currency, formatMessage)}
                 </option>
               ))}
             </select>
@@ -294,7 +295,7 @@ export function ChannelRatesPage() {
               {records.map((record, index) => (
                 <tr key={record.id ?? index} data-testid={`channel-rate-row-${record.id ?? index}`}>
                   <td className="px-3 py-2 text-text">
-                    {salePaymentMethodLabel(record.method, record.currency)}
+                    {channelLabel(record.method, record.currency, formatMessage)}
                   </td>
                   <td className="px-3 py-2 text-text">{currencyLabel(record.currency)}</td>
                   <td className="px-3 py-2 whitespace-nowrap text-text">

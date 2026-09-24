@@ -202,7 +202,26 @@ describe('ChannelRatesPage (multipayments) — real channels only', () => {
     await waitFor(() => {
       expect(screen.getAllByTestId(/^channel-rate-row-/)).toHaveLength(1);
     });
-    expect(screen.getByText('Zelle')).toBeInTheDocument();
+    expect(screen.getByText('Zelle (CUP)')).toBeInTheDocument();
+  });
+
+  it('always shows the currency in the channel name, in the selector and the history (T19a)', async () => {
+    seedRate({ method: SalePaymentMethod.Efectivo, currency: Currency.USD, value: 720 });
+
+    renderPage();
+
+    // Selector at the default CUP currency names both existing channels with it.
+    const options = Array.from(
+      screen.getByTestId('channel-rate-method').querySelectorAll('option'),
+    ).map((option) => option.textContent);
+    expect(options).toEqual(['Efectivo (CUP)', 'Transferencia (CUP)']);
+
+    // The stored USD row is distinguishable from a CUP one at a glance.
+    await waitFor(() => {
+      expect(screen.getAllByTestId(/^channel-rate-row-/)).toHaveLength(1);
+    });
+    expect(screen.getByText('Efectivo (USD)')).toBeInTheDocument();
+    expect(screen.queryByText('Efectivo')).not.toBeInTheDocument();
   });
 });
 
