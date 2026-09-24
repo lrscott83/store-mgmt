@@ -256,22 +256,37 @@ test.describe.serial('offline — dispositivo intacto', () => {
 test.describe('offline — sin clave de dispositivo', () => {
   test.describe.configure({ timeout: 120_000 });
 
-  test('10. offline/sin clave: ir a /login redirige al home del rol', async ({ browser }) => {
+  test('10. offline/sin clave: ir a /login aterriza en el unlock con la sesión intacta', async ({
+    browser,
+  }) => {
     const page = await browser.newPage();
     await loginOfflineByRoster(page);
     await deleteDeviceKeyDatabase(page);
 
     await page.goto('/login');
-    await page.waitForURL(HOME_URL, { timeout: 15_000 });
+    // El gate de cifrado at-rest (needsUnlock && hasUnreadableCiphertext —
+    // loaders.ts:79-81) detiene al usuario autenticado en el PROPIO login:
+    // el formulario ES el prompt de unlock (login-offline.spec.ts F4). La
+    // redirección al home solo ocurre sin ciphertext ilegible; aquí la sesión
+    // offline dejó config de pagos auto-iniciada cifrada, así que el gate
+    // aplica. AUTORIZACIÓN 2026-09-24: test realineado a este diseño.
+    await expect(page).toHaveURL(/\/login$/);
+    // La sesión NO se cerró: denyAccess() es lo único que limpia AUTH_MODEL.
+    expect(await readAuthModel(page)).not.toBeNull();
   });
 
-  test('11. offline/sin clave: ir a /register redirige al home del rol', async ({ browser }) => {
+  test('11. offline/sin clave: ir a /register aterriza en el unlock con la sesión intacta', async ({
+    browser,
+  }) => {
     const page = await browser.newPage();
     await loginOfflineByRoster(page);
     await deleteDeviceKeyDatabase(page);
 
     await page.goto('/register');
-    await page.waitForURL(HOME_URL, { timeout: 15_000 });
+    // Mismo gate que el test 10 (guestOnlyLoader comparte la decisión): sin
+    // redirección al home y sin logout, con la sesión intacta.
+    await expect(page).toHaveURL(/\/register$/);
+    expect(await readAuthModel(page)).not.toBeNull();
   });
 
   test('12. offline/sin clave: recargar con ciphertext ilegible va a /login?unlock=1 SIN logout', async ({ browser }) => {
