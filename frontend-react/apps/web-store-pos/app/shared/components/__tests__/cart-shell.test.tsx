@@ -1194,6 +1194,8 @@ describe('CartShell — venta NORMAL con producto mayorista', () => {
     mockCartState({
       items: [{ product: wholesaleBeer, quantity: 1 }],
       total: vi.fn().mockReturnValue(10),
+      payments: [paymentRowOf(10)],
+      setPayments: vi.fn(),
     });
     renderCartShell();
     expect(screen.getByTestId('cart-badge')).toHaveTextContent('1');
