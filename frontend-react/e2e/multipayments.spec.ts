@@ -10,15 +10,20 @@
  * direct-DB precondition fixture, refreshes the client session from
  * `/v1/auth/me`, and then exercises the real cart.
  *
- * Coverage (plan: selector de moneda, multi-pago, vuelto, tasas):
- *   T10.1  gate precondition + currency selector (CUP/USD) + a CUP line into a
- *          USD sale WITHOUT a rate is a typed conversion error that blocks the
- *          sale (`cart-line-conversion-error`, "Registrar" disabled) + the
- *          chosen currency survives a reload (per-user preference).
- *   T10.2  a registered CUP channel rate converts the CUP line into the USD
- *          sale; two payments (USD + CUP) cover the total and the sale
- *          registers; overpaying shows positive `multi-payment-change`; and an
- *          underpaid sale is blocked (`data-block-reason="underpaid"`).
+ * Coverage (payment-channels-and-multipayment, T11 — behavior updated 2026-09-23):
+ *   T10.1  gate precondition + currency selector (CUP/USD). Choosing a currency
+ *          that cannot convert is now BLOCKED: the select stays on CUP, a clear
+ *          `cart-currency-change-error` alert appears, and the header total
+ *          never becomes "0 USD". Registering the channel rate makes the change
+ *          proceed (0.10 USD) and the allowed choice survives a reload.
+ *   T10.2  the multipayment block now starts from the DEFAULT single Efectivo
+ *          row (amount = sale total), "Agregar pago" opens the channel POPUP,
+ *          rows are located per-row (the testids match more than one element)
+ *          and "Cobrar" (`multi-payment-settle`) no longer exists. A registered
+ *          CUP rate converts the CUP line into the USD sale; two channels cover
+ *          the total and the sale registers; overpaying shows positive
+ *          `multi-payment-change`; an underpaid sale is still blocked
+ *          (`data-block-reason="underpaid"`).
  *
  * Private identity is mandatory (server-side mutation rule, e2e/README.md
  * §"Specs que mutan estado server-side"). Login budget: 1 register + 2 real
@@ -42,7 +47,9 @@ const ALL_CATEGORIES = 'Todos';
 const ADD_BUTTON = 'Adicionar';
 
 const CART_CURRENCY_SELECT = 'cart-currency-select';
+const CART_CURRENCY_CHANGE_ERROR = 'cart-currency-change-error';
 const CART_LINE_ERROR = 'cart-line-conversion-error';
+const MULTI_PAYMENT_SETTLE = 'multi-payment-settle';
 
 /** Unique product/category name per run (mirrors multimonedas.spec helpers). */
 function productName(prefix: string): string {
@@ -250,7 +257,7 @@ let storeId = '';
 test.describe.serial('multipayments (módulo 16) — selector, tasas, multi-pago y vuelto', () => {
   test.describe.configure({ timeout: 180_000 });
 
-  test('T10.1 — el módulo habilita el selector de moneda y una línea CUP sin tasa bloquea la venta USD', async ({
+  test('T10.1 — el selector bloquea un cambio de moneda sin tasa y lo permite tras registrarla', async ({
     page,
   }) => {
     identity = newTestIdentity();
@@ -305,16 +312,43 @@ test.describe.serial('multipayments (módulo 16) — selector, tasas, multi-pago
     const options = await currencySelect.locator('option').allInnerTexts();
     expect(options).toEqual(['CUP', 'USD']);
 
-    // 2) Selecting USD drives the sale currency. With NO channel rate
-    // registered, converting the CUP line to USD is a typed error that blocks
-    // the sale — never a silent 0.
+    // 2) Selecting USD with NO channel rate registered is now BLOCKED (T4/D3):
+    // the select stays on CUP, a clear alert appears, and the total never falls
+    // to "0 USD".
+    const headerTotal = page.locator('span.text-primary.whitespace-nowrap');
+    await expect(headerTotal).toHaveText(/10\s*CUP/);
     await currencySelect.selectOption(String(1)); // Currency.USD
-    await expect(page.getByTestId(CART_LINE_ERROR)).toBeVisible();
-    await expect(page.getByTestId(CART_LINE_ERROR)).toHaveAttribute('data-error-code', /RateNotFound/);
-    await expect(page.getByRole('button', { name: REGISTER_TEXT })).toBeDisabled();
+    await expect(page.getByTestId(CART_CURRENCY_CHANGE_ERROR)).toBeVisible();
+    await expect(currencySelect).toHaveValue(String(0)); // stayed on CUP
+    await expect(page.getByTestId(CART_LINE_ERROR)).toHaveCount(0);
+    await expect(headerTotal).toHaveText(/10\s*CUP/);
+    await expect(headerTotal).not.toHaveText(/0\s*USD/);
 
-    // 3) The choice persists across a reload (per-user preference). The cart
-    // itself is persisted too (zustand/persist `lizoft-cart`), so after the
+    // 3) Register the CUP channel rate (100 CUP per 1 USD) through the real UI,
+    // choosing the channel explicitly (Efectivo + CUP).
+    await page.goto('/management/channel-rates');
+    await page.waitForLoadState('networkidle');
+    await expect(page.getByTestId('channel-rate-value')).toBeVisible();
+    await page.getByTestId('channel-rate-currency').selectOption(String(0)); // Currency.CUP
+    await page.getByTestId('channel-rate-method').selectOption(String(0)); // Efectivo
+    await page.getByTestId('channel-rate-value').fill('100');
+    await page.getByTestId('channel-rate-submit').click();
+    await expect(page.getByTestId('channel-rate-saved')).toBeVisible();
+
+    // 4) Back in the cart the change IS allowed now and converts (10 CUP = 0.10 USD).
+    await page.goto('/sales/new');
+    await page.waitForLoadState('networkidle');
+    await expect(page.getByText(SALE_HEADER)).toBeVisible();
+    await openCartPanel(page);
+    await expect(page.getByTestId(CART_CURRENCY_CHANGE_ERROR)).toHaveCount(0);
+    const selectWithRate = page.getByTestId(CART_CURRENCY_SELECT);
+    await selectWithRate.selectOption(String(1)); // USD
+    await expect(page.getByTestId(CART_LINE_ERROR)).toHaveCount(0);
+    await expect(selectWithRate).toHaveValue(String(1));
+    await expect(page.locator('span.text-primary.whitespace-nowrap')).toHaveText(/0\.10\s*USD/);
+
+    // 5) The allowed choice persists across a reload (per-user preference). The
+    // cart itself is persisted too (zustand/persist `lizoft-cart`), so after the
     // reload it still holds the line added above — reopen it rather than adding
     // a second one; the point here is the persisted currency preference.
     await page.reload();
@@ -323,12 +357,23 @@ test.describe.serial('multipayments (módulo 16) — selector, tasas, multi-pago
     await expect(page.getByTestId(CART_CURRENCY_SELECT)).toHaveValue(String(1));
   });
 
-  test('T10.2 — tasa CUP, multi-pago, vuelto y bloqueo por subpago', async ({ page }) => {
+  test('T10.2 — fila por defecto, segundo canal por el popup, recálculo y bloqueo por subpago', async ({
+    page,
+  }) => {
     const loginPage = new LoginPage(page);
     await loginPage.goto();
     await loginPage.fill(identity);
     await loginPage.submit();
     await page.waitForURL(/\/sales\/products$/);
+    storeId = await readSelectedStoreId(page);
+
+    // Re-pin the module precondition through the real API before resetting the
+    // DEK. `enableMultiPaymentsModule` is idempotent (it returns early when the
+    // module is already present) and its round-trip also lets the fresh login's
+    // session settle before the DEK reset reloads the app — without it the
+    // reload's clientLoader can run against a half-hydrated session and bounce
+    // to /login.
+    await enableMultiPaymentsModule(page, storeId);
 
     // This fresh context's real login left the store DEK in memory (and wrote
     // ciphertext entities). Reset to plaintext BEFORE seeding anything — the
@@ -343,10 +388,14 @@ test.describe.serial('multipayments (módulo 16) — selector, tasas, multi-pago
       );
     }
 
-    // Register a CUP channel rate (100 CUP per 1 USD) through the real UI.
+    // Register a CUP channel rate (100 CUP per 1 USD) through the real UI,
+    // choosing the channel explicitly (Efectivo + CUP) instead of trusting the
+    // selector's default.
     await page.goto('/management/channel-rates');
     await page.waitForLoadState('networkidle');
     await expect(page.getByTestId('channel-rate-value')).toBeVisible();
+    await page.getByTestId('channel-rate-currency').selectOption(String(0)); // Currency.CUP
+    await page.getByTestId('channel-rate-method').selectOption(String(0)); // Efectivo
     await page.getByTestId('channel-rate-value').fill('100');
     await page.getByTestId('channel-rate-submit').click();
     await expect(page.getByTestId('channel-rate-saved')).toBeVisible();
@@ -354,19 +403,34 @@ test.describe.serial('multipayments (módulo 16) — selector, tasas, multi-pago
     await seedProduct(page, 'MPT2');
     await addFirstProductAndOpenCart(page, storeId);
 
+    // T5: default state is exactly ONE Efectivo row for the sale total, in the
+    // sale currency (CUP), with NO rate message — the row is identity.
+    const rows = page.getByTestId('multi-payment-row');
+    await expect(rows).toHaveCount(1);
+    await expect(rows.nth(0).getByTestId('multi-payment-method')).toHaveValue(String(0)); // Efectivo
+    await expect(rows.nth(0).getByTestId('multi-payment-currency')).toHaveValue(String(0)); // CUP
+    await expect(rows.nth(0).getByTestId('multi-payment-amount')).toHaveValue('10');
+    await expect(page.getByTestId('multi-payment-block-reason')).toHaveCount(0);
+    await expect(page.getByTestId('multi-payment-row-error')).toHaveCount(0);
+
+    // T7: the dead "Cobrar" button no longer exists.
+    await expect(page.getByTestId(MULTI_PAYMENT_SETTLE)).toHaveCount(0);
+
     // USD sale with the registered rate: the 10 CUP line converts to 0.10 USD.
     await page.getByTestId(CART_CURRENCY_SELECT).selectOption(String(1)); // USD
     await expect(page.getByTestId(CART_LINE_ERROR)).toHaveCount(0);
     await expect(page.locator('span.text-primary.whitespace-nowrap')).toHaveText(/0\.10\s*USD/);
 
-    // Multi-pago: a USD line (0.05) + a CUP line (5 → 0.05 USD) cover 0.10 USD.
+    // Multi-pago: the default Efectivo row (5 CUP) + a second channel added
+    // through the POPUP (Transferencia (CUP), 5 CUP) cover 0.10 USD.
+    await rows.nth(0).getByTestId('multi-payment-amount').fill('5');
     await page.getByTestId('multi-payment-add').click();
-    await page.getByTestId('multi-payment-amount').fill('0.05');
-    await page.getByTestId('multi-payment-add').click();
+    await expect(page.getByTestId('multi-payment-add-dialog')).toBeVisible();
+    await page.getByTestId('multi-payment-add-channel').selectOption('0|2'); // Transferencia (CUP)
+    await page.getByTestId('multi-payment-add-confirm').click();
+    await expect(page.getByTestId('multi-payment-add-dialog')).toHaveCount(0);
 
-    const rows = page.getByTestId('multi-payment-row');
     await expect(rows).toHaveCount(2);
-    await rows.nth(1).getByTestId('multi-payment-currency').selectOption(String(0)); // CUP
     await rows.nth(1).getByTestId('multi-payment-amount').fill('5');
 
     await expect(page.getByTestId('multi-payment-paid')).toHaveText(/0\.10\s*USD/);
@@ -380,15 +444,17 @@ test.describe.serial('multipayments (módulo 16) — selector, tasas, multi-pago
     // Vuelto: a single USD line above the total is allowed and shows change.
     await addFirstProductAndOpenCart(page, storeId);
     await page.getByTestId(CART_CURRENCY_SELECT).selectOption(String(1)); // USD
-    await page.getByTestId('multi-payment-add').click();
-    await page.getByTestId('multi-payment-amount').fill('0.15');
+    const changeRows = page.getByTestId('multi-payment-row');
+    await expect(changeRows).toHaveCount(1);
+    await changeRows.nth(0).getByTestId('multi-payment-amount').fill('0.15');
 
     await expect(page.getByTestId('multi-payment-change')).toHaveText(/0\.05\s*USD/);
     await expect(page.getByTestId('multi-payment-remaining')).toHaveText(/^0\s*USD$/);
     await expect(page.getByRole('button', { name: REGISTER_TEXT })).toBeEnabled();
 
-    // Underpaid: the sale is blocked and the reason is surfaced.
-    await page.getByTestId('multi-payment-amount').fill('0.05');
+    // Underpaid: the sale is blocked and the reason is surfaced — INVARIANT,
+    // kept intact by the rewrite.
+    await changeRows.nth(0).getByTestId('multi-payment-amount').fill('0.05');
     await expect(page.getByRole('button', { name: REGISTER_TEXT })).toBeDisabled();
     await expect(page.getByTestId('multi-payment-block-reason')).toHaveAttribute(
       'data-block-reason',
