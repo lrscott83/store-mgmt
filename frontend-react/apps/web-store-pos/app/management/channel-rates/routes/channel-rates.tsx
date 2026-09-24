@@ -157,6 +157,22 @@ export function ChannelRatesPage() {
     savedMessageTimer.current = setTimeout(() => setSavedMessage(false), 3000);
   }
 
+  // Deactivate/reactivate a stored row (T19b). Registration stays append-only;
+  // this only flips the usability flag, so the row leaves the conversion
+  // cascade (or re-enters it) while remaining visible in the history.
+  function handleToggleActive(record: ChannelRate) {
+    if (!record.id) return;
+    setError(undefined);
+    const svc = new ChannelRateOfflineService(storeId);
+    const nextActive = record.isActive === false;
+    const result = svc.setChannelRateActive(record.id, nextActive);
+    if (!result.succeeded) {
+      setError(intl.formatMessage({ id: 'CHANNEL_RATES.TOGGLE_ERROR' }));
+      return;
+    }
+    load();
+  }
+
   return (
     <div className="space-y-4 p-4">
       <h1 className="text-xl font-semibold">{intl.formatMessage({ id: 'CHANNEL_RATES.TITLE' })}</h1>
@@ -289,26 +305,64 @@ export function ChannelRatesPage() {
                 <th className="px-3 py-2">
                   {intl.formatMessage({ id: 'CHANNEL_RATES.CREATED_DATE_COLUMN' })}
                 </th>
+                <th className="px-3 py-2">
+                  {intl.formatMessage({ id: 'CHANNEL_RATES.STATUS_COLUMN' })}
+                </th>
+                <th className="px-3 py-2">
+                  {intl.formatMessage({ id: 'CHANNEL_RATES.ACTIONS_COLUMN' })}
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {records.map((record, index) => (
-                <tr key={record.id ?? index} data-testid={`channel-rate-row-${record.id ?? index}`}>
-                  <td className="px-3 py-2 text-text">
-                    {channelLabel(record.method, record.currency, formatMessage)}
-                  </td>
-                  <td className="px-3 py-2 text-text">{currencyLabel(record.currency)}</td>
-                  <td className="px-3 py-2 whitespace-nowrap text-text">
-                    {formatMoneyWithCurrency(record.value, record.currency)}
-                  </td>
-                  <td className="px-3 py-2 whitespace-nowrap text-text">
-                    {toLocalDayKey(record.effectiveFrom)}
-                  </td>
-                  <td className="px-3 py-2 whitespace-nowrap text-text">
-                    {record.createdDate ? toLocalDayKey(record.createdDate) : ''}
-                  </td>
-                </tr>
-              ))}
+              {records.map((record, index) => {
+                const rowKey = record.id ?? String(index);
+                const inactive = record.isActive === false;
+                return (
+                  <tr
+                    key={rowKey}
+                    data-testid={`channel-rate-row-${rowKey}`}
+                    className={inactive ? 'opacity-60' : undefined}
+                  >
+                    <td className="px-3 py-2 text-text">
+                      {channelLabel(record.method, record.currency, formatMessage)}
+                    </td>
+                    <td className="px-3 py-2 text-text">{currencyLabel(record.currency)}</td>
+                    <td className="px-3 py-2 whitespace-nowrap text-text">
+                      {formatMoneyWithCurrency(record.value, record.currency)}
+                    </td>
+                    <td className="px-3 py-2 whitespace-nowrap text-text">
+                      {toLocalDayKey(record.effectiveFrom)}
+                    </td>
+                    <td className="px-3 py-2 whitespace-nowrap text-text">
+                      {record.createdDate ? toLocalDayKey(record.createdDate) : ''}
+                    </td>
+                    <td
+                      className="px-3 py-2 whitespace-nowrap text-text"
+                      data-testid={`channel-rate-status-${rowKey}`}
+                    >
+                      {intl.formatMessage({
+                        id: inactive
+                          ? 'CHANNEL_RATES.INACTIVE_STATUS'
+                          : 'CHANNEL_RATES.ACTIVE_STATUS',
+                      })}
+                    </td>
+                    <td className="px-3 py-2 whitespace-nowrap">
+                      <Button
+                        variant="outline"
+                        className="px-3 py-1"
+                        onClick={() => handleToggleActive(record)}
+                        data-testid={`channel-rate-toggle-${rowKey}`}
+                      >
+                        {intl.formatMessage({
+                          id: inactive
+                            ? 'CHANNEL_RATES.REACTIVATE'
+                            : 'CHANNEL_RATES.DEACTIVATE',
+                        })}
+                      </Button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}

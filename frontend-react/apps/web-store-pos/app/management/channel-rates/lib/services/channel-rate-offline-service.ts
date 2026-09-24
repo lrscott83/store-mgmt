@@ -22,6 +22,10 @@ export const ChannelRateOfflineErrors = {
     code: 'ChannelRate.InvalidValue',
     description: 'El valor de la tasa debe ser un número mayor que cero.',
   },
+  RateNotFound: {
+    code: 'ChannelRate.RowNotFound',
+    description: 'No se encontró la tasa solicitada.',
+  },
 } as const satisfies Record<string, BaseError>;
 
 /** Input of `registerRate` — the service assigns the id and the audit date. */
@@ -93,6 +97,27 @@ export class ChannelRateOfflineService {
     this.getStorageChannelRates().push(rate);
     this.setRatesLocalStorage(this.rates!);
     return new DataResult<ChannelRate>(rate, true, []);
+  }
+
+  /**
+   * Sets the active state of a stored row by id (T19b). This is the ONE
+   * mutation of the register, and it is deliberately narrow: it changes only
+   * `isActive`, never the channel, value or effective moment — the append-only
+   * contract protects a rate's economic content, not a reversible usability
+   * flag. A row written before this field existed carries no `isActive` and is
+   * treated as active; reactivating writes `isActive: true` explicitly. An
+   * unknown id writes nothing and returns a failed `Result`.
+   */
+  setChannelRateActive(id: string, isActive: boolean): Result {
+    const rates = this.getStorageChannelRates();
+    const index = rates.findIndex((rate) => rate.id === id);
+    if (index < 0) {
+      return Result.Failure([ChannelRateOfflineErrors.RateNotFound]);
+    }
+
+    rates[index] = { ...rates[index], isActive };
+    this.setRatesLocalStorage(rates);
+    return Result.Success();
   }
 
   /**

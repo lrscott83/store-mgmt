@@ -308,3 +308,59 @@ describe('ChannelRatesPage (multipayments) — register and history', () => {
     expect(screen.queryByTestId(/delete|edit/)).not.toBeInTheDocument();
   });
 });
+
+describe('ChannelRatesPage (multipayments) — activate/deactivate (T19b)', () => {
+  it('deactivates a row from its toggle, marking it inactive but keeping it in the history', async () => {
+    seedRate({ value: 700 });
+
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getAllByTestId(/^channel-rate-row-/)).toHaveLength(1);
+    });
+    expect(screen.getByText('Activa')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId(/^channel-rate-toggle-/));
+
+    await waitFor(() => {
+      expect(screen.getByText('Inactiva')).toBeInTheDocument();
+    });
+    // Still visible in the append-only history.
+    expect(screen.getAllByTestId(/^channel-rate-row-/)).toHaveLength(1);
+    expect(screen.getByRole('button', { name: 'Reactivar' })).toBeInTheDocument();
+    expect(new ChannelRateOfflineService(storeId).getStorageChannelRates()[0].isActive).toBe(false);
+  });
+
+  it('reactivates a deactivated row', async () => {
+    const row = seedRate();
+    new ChannelRateOfflineService(storeId).setChannelRateActive(row.data!.id!, false);
+
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('Inactiva')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId(/^channel-rate-toggle-/));
+
+    await waitFor(() => {
+      expect(screen.getByText('Activa')).toBeInTheDocument();
+    });
+    expect(new ChannelRateOfflineService(storeId).getStorageChannelRates()[0].isActive).toBe(true);
+  });
+
+  it('treats a stored row without isActive as active (backwards compatible)', async () => {
+    seedRate();
+
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getAllByTestId(/^channel-rate-row-/)).toHaveLength(1);
+    });
+    expect(screen.getByText('Activa')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Desactivar' })).toBeInTheDocument();
+    expect(
+      new ChannelRateOfflineService(storeId).getStorageChannelRates()[0].isActive,
+    ).toBeUndefined();
+  });
+});

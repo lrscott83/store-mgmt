@@ -294,6 +294,41 @@ describe('DataSynchronizerService — channelRates merge (multipayments T4)', ()
     expect(channelService.getStorageChannelRates()).toHaveLength(0);
   });
 
+  it('carries isActive through the import seam: a deactivated row stays inactive (T19b)', async () => {
+    const channelService = new ChannelRateOfflineService(STORE_ID);
+    const svc = new DataSynchronizerService(
+      STORE_ID,
+      makeCategoryRepo(),
+      makeProductRepo(),
+      makeInventoryService(),
+      makeOrderService(),
+      makeExpenseService(),
+      makeSaleCreditService(),
+      undefined,
+      undefined,
+      channelService,
+    );
+
+    const result = await svc.sync(
+      makeData([
+        { ...makeRate('rate-active', 700), isActive: true },
+        { ...makeRate('rate-inactive', 900, '2026-09-10T00:00:00.000Z'), isActive: false },
+      ]),
+    );
+
+    expect(result.succeeded).toBe(true);
+    const stored = channelService.getStorageChannelRates();
+    expect(stored).toHaveLength(2);
+    expect(stored.find((r) => r.id === 'rate-inactive')?.isActive).toBe(false);
+    // The deactivated row is out of the cascade, so the older active row wins.
+    const resolved = channelService.getRateAt(
+      SalePaymentMethod.Efectivo,
+      Currency.CUP,
+      new Date('2026-09-20T00:00:00.000Z'),
+    );
+    expect(resolved.data?.value).toBe(700 * 1_000_000);
+  });
+
   it('keeps the legacy merge contract when the service is omitted (legacy call sites)', async () => {
     const svc = new DataSynchronizerService(
       STORE_ID,
