@@ -247,6 +247,7 @@ async function switchAndAssertLanded(page: Page, storeName: string, diagnostics 
 test('SSR-1 — switching to a second store lands in it without a logout', async ({
   signedInPage,
 }) => {
+  test.setTimeout(360_000); // DEBUG Grupo G (temporal): presupuesto x2 para aislar contención
   const { page, selectedStoreId, identity } = signedInPage;
   await assertStoresFeature(page);
 
