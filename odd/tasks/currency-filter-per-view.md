@@ -101,8 +101,15 @@ Runners: `pnpm test`, `pnpm typecheck`, `pnpm lint` desde `frontend-react/`.
   `app/sales/lib/category-cart-items-view.ts` (`buildCategoryCartItemsView`) y los tres
   llamadores delegan en él. `order-offline-service.ts` adelgaza ~80 líneas.
   **Commit `02f1afb7`** (refactor separado de la feature).
-- [ ] **T4** `orders`: idem, incluyendo el modo multi-store (paneles por tienda).
-- [ ] **T5** `credits`: idem, incluyendo el modo multi-store.
+- [x] **T4** `orders`: idem, incluyendo el modo multi-store (paneles por tienda).
+  → `app/sales/routes/orders.tsx`. Filtra filas, total del header, totales por día, totales por
+  panel y el agregado fuera de los paneles. **Commit `a69adb23`.**
+- [x] **T5** `credits`: idem, incluyendo el modo multi-store.
+  → `app/sales/routes/credits.tsx`. `CreditsCardTitle` pasa a recibir `currency` en vez de
+  `entries`/`multiMonedas`; los paneles por tienda se filtran con un `Map` ya filtrado.
+  **Commit `a69adb23`.**
+  `MultiStoreTotal` (compartido con gastos) ganó un prop opcional aditivo `currency?: Currency`;
+  ningún llamador existente se ve afectado (lista completa verificada).
 - [ ] **T6** `cuadre-por-fechas`: idem en KPIs y tarjeta Cuadre (single + multi-store).
 - [ ] **T7** `expenses-history`: **arreglar** los totales para que respeten `Expense.currency`
   (hoy suman monedas distintas y las etiquetan CUP: header, totales por día, y los dos del modo
@@ -160,10 +167,25 @@ Estrategia de entrega: pendiente de elección del owner (ver "Estado").
   **70 archivos / 1458 tests verdes**, `pnpm typecheck` limpio, `eslint --max-warnings=0` limpio.
   Los tests `*-multicurrency.test.tsx` de las dos vistas se actualizaron a propósito (fijaban los
   chips que esta feature elimina); con el módulo OFF la salida es idéntica.
-- **Pendiente**: T4–T14. Siguiente tarea natural: T4 (`orders`, incluye modo multi-store).
+- 2026-09-25: **T4 y T5 implementadas** (commit `a69adb23`), incluyendo ambos modos
+  multi-store. `pnpm typecheck` limpio; `pnpm eslint --max-warnings=0` limpio.
+  Lección registrada: el writer reportó "todo verde" y una corrida del orquestador falló. La
+  investigación mostró que el fallo era **flakiness preexistente por timeout** (ver Hallazgos),
+  no una regresión — pero el chequeo del orquestador es lo que lo demostró.
+- **Pendiente**: T6–T14. Siguiente tarea natural: T6 (`cuadre-por-fechas`).
 
 ## Hallazgos colaterales registrados (no bloquean)
 
+- **La suite tiene flakiness PREEXISTENTE por timeout.** El timeout por defecto de vitest es
+  5000 ms. Los specs "factory"
+  (`app/sales/lib/services/__tests__/product-{service,category-service}.factory.test.ts`) usan
+  `vi.resetModules()` + `vi.mock` + `import()` dinámico, así que su PRIMER test
+  (`FACT-01` / `CAT-FACT-01`) paga la resolución completa del grafo y bajo carga revienta los
+  5 s. Evidencia: en HEAD limpio pasan; con el mismo árbol pasan en una corrida y fallan en otra;
+  el set de fallos de la suite completa **cambia en cada corrida** (`user-routes`, `my-stores`,
+  `auth-store.offline`) con archivos que no tocan ventas. No lo introdujo esta feature.
+  **No se toca ninguno de esos tests**: son existentes. Un arreglo legítimo sería subir el
+  timeout de esos specs, pero eso requiere autorización explícita del owner.
 - `frontend/` (Angular) nunca se leyó en esta investigación: la decisión de layout de
   `7f0544c6` se tomó mirando Angular, y eso no es una razón autorizada en este proyecto.
 - `resolveCurrency` (`currency ?? CUP`) hace que una entidad **sin moneda** sea
