@@ -22,4 +22,6 @@ Ninguna — no requiere cambio.
 
 ✅ **Sin acción** — pasan solos; no requiere permiso.
 
-- *Actualizado: 2026-09-24.*
+> **Re-verificado 2026-09-24:** en verde en solitario contra el backend real (`:5019`, BD `smca_test`) junto con `plan-catalog-superadmin` — **16/16 (~31 s)**.
+
+- _Actualizado: 2026-09-24 (re-verificación)._
