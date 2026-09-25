@@ -97,6 +97,21 @@ Resumen de la corrida (los 3 resueltos en la primera tanda se eliminaron de la l
 
 ---
 
+## Corrida completa del 2026-09-25 — verificación de estabilidad (suite por defecto, sin rate-limit)
+
+Contexto: backend real `:5019` (BD `smca_test`, confirmada por el teardown en ambas corridas), dev server `:3333`, suite por defecto `pnpm test:e2e` (340 tests, excluye `@rate-limit`).
+
+| Corrida | Workers                              | Resultado                           | Duración | Flaky            |
+| ------- | ------------------------------------ | ----------------------------------- | -------- | ---------------- |
+| 1       | 8 (default de esta máquina, 16 CPUs) | 317 passed + 23 flaky, **0 failed** | 12.0 min | 23 (en 18 specs) |
+| 2       | 4                                    | 336 passed + 4 flaky, **0 failed**  | 7.7 min  | 4 (en 4 specs)   |
+
+- **Cero rate-limits reales**: ni un 429 en el log de ninguna corrida — las únicas 2 menciones de "429" son el flag `--grep-invert @rate-limit` del comando y el contador `[429/340]` de progreso. Las cuotas (40 logins/min, 50 registros/10 min) no se agotaron con la suite por defecto.
+- **Causa raíz del flakiness (confirmada por contraste)**: contención de recursos por número de workers — 8 workers contra un único dev server + backend + PostgreSQL flakean ~23 tests al azar (nunca los mismos dos veces, y todos pasan al reintento y en solitario); con 4 workers el flakiness cae a ~4 y la corrida es 4 minutos más rápida.
+- **Recomendación operativa**: correr la suite completa con `--workers=4` (o menos) en esta máquina; los reintentos (`retries: 2`) absorben el resto. Sin cambios en la app ni en los tests.
+
+---
+
 ## Estado de decisiones pendientes (2026-09-24)
 
 _Sin decisiones pendientes._ Todas las entradas de la corrida del 2026-09-24 quedaron cerradas: entrada 1, anotadas 2/3/4 y Grupos B, C y D; el Grupo E no requiere acción.
