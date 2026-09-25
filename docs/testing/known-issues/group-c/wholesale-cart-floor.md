@@ -14,12 +14,12 @@ La vista de venta mayorista ya **no aparece** para la persona que usa el test, a
 
 ✅ **Confirmada** — la feature "mayoristas solo para planes Superior/VIP" (módulo 12, traída de dev) dejó fuera a la persona del test, que fue creada **antes** de esa regla. No es un bug de la app: la app hace exactamente lo que la nueva regla dice.
 
-## Propuesta de solución (requiere permiso)
+## Solución aplicada
 
-Sembrar el módulo 12 en la persona del spec, igual que hicieron los specs nuevos que llegaron de dev.
+El spec usa la persona privada Superior del fixture `store-wholesale-fixture.ts` (módulo 12 + feature 39, minteada una vez y replicada por snapshot), igual que los specs nuevos que llegaron de dev. De paso, dos aserciones internas quedaron alineadas al formato real del carrito (`Precio: 144/120 CUP`) — el spec viejo nunca las había ejercido porque moría antes en el gate del menú.
 
 ## Estado
 
-⏸ **Pendiente de decisión** — requiere autorización explícita (test E2E intocable).
+✅ **Resuelto 2026-09-24** — con autorización explícita del usuario. Verificado: 2/2 en verde contra el backend real (`:5019`, BD `smca_test`).
 
-- *Actualizado: 2026-09-24.*
+- _Actualizado: 2026-09-24 (cierre)._

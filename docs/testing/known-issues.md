@@ -21,7 +21,7 @@ Resumen de la corrida (los 3 resueltos en la primera tanda se eliminaron de la l
 | 4   | `multipayments` T10.2         | ✅ **Resuelto 2026-09-24** — spec reescrito por dev verificado 2/2; el núcleo queda pineado en el test de integración sin navegador                |
 | 5   | `owner-plan-change-dialog`    | ✅ **Resuelto 2026-09-24** — defecto del test corregido con autorización (aserción del ancla compara la fecha serializada)                         |
 | 6   | `store-plan-lock-regression`  | ✅ **Resuelto 2026-09-24** — mismo defecto, corregido igual con autorización                                                                       |
-| 7   | `wholesale-cart-floor`        | ✅ **Confirmada** — spec obsoleto por feature "mayoristas solo Superior/VIP"                                                                       |
+| 7   | `wholesale-cart-floor`        | ✅ **Resuelto 2026-09-24** — spec actualizado con autorización: persona privada Superior (módulo 12 + feature 39)                                  |
 | 8   | `configurations` FC-B2        | ✅ **Confirmada** — locator frágil del test (la app está bien)                                                                                     |
 
 ---
@@ -71,14 +71,14 @@ Resumen de la corrida (los 3 resueltos en la primera tanda se eliminaron de la l
 - **Causa raíz:** ✅ confirmada — el test guarda la fecha antes y la lee después, y las compara con `toBe` (igualdad estricta de objeto); dos objetos de fecha con el mismo valor nunca pasan esa comparación. La base de datos devuelve fechas como objetos, no como texto, y el test las declara como texto.
 - **Aplicada (2026-09-24, con autorización explícita del usuario):** la aserción del ancla compara el **texto** de la fecha (`toISOString()` de ambos lados). Cero cambios en la app. Verificado: los 2 specs en verde contra el backend real (`:5019`, BD `smca_test`, teardown "54 filas e2e-\* borradas").
 
-## Grupo C — Spec obsoleto por una feature nueva (1)
+## Grupo C — Spec obsoleto por una feature nueva (1 — resuelto 2026-09-24)
 
 **Test:** `wholesale-cart-floor`.
 
 - **Qué prueba:** en la venta mayorista, el precio por escalones de cantidad nunca debe bajar del precio del escalón más bajo (protección del piso de precio en el carrito).
 - **Qué falla:** la vista de venta mayorista ya **no aparece** para la persona que usa el test, así que "Ventas Mayoristas" nunca se encuentra en pantalla.
 - **Causa raíz:** ✅ confirmada — la feature "mayoristas solo para planes Superior/VIP" (módulo 12, traída de dev) dejó fuera a la persona del test, que fue creada antes de esa regla. No es un bug de la app: la app hace exactamente lo que la nueva regla dice.
-- **Propuesta (requiere permiso):** sembrar el módulo 12 en la persona del spec, igual que hicieron los specs nuevos que llegaron de dev.
+- **Aplicada (2026-09-24, con autorización explícita del usuario):** el spec usa la persona privada Superior del fixture `store-wholesale-fixture.ts` (módulo 12 + feature 39), minteada una vez y replicada por snapshot — el mismo patrón de los specs nuevos de dev. De paso, dos aserciones internas quedaron alineadas al formato real del carrito (`Precio: N CUP`): el spec viejo nunca las había ejercido porque moría antes en el gate del menú. Verificado: 2/2 en verde contra el backend real (`:5019`, BD `smca_test`).
 
 ## Grupo D — Locator frágil del test (1)
 
@@ -97,10 +97,10 @@ Resumen de la corrida (los 3 resueltos en la primera tanda se eliminaron de la l
 
 ## Estado de decisiones pendientes (2026-09-24)
 
-| Decisión                                                                                  | Dueño                          |
-| ----------------------------------------------------------------------------------------- | ------------------------------ |
-| Ajustes de tests de los Grupos C y D (2 aserciones en 2 specs, sin correr suite completa) | Pendiente de permiso explícito |
+| Decisión                                                                     | Dueño                          |
+| ---------------------------------------------------------------------------- | ------------------------------ |
+| Ajuste de test del Grupo D (1 aserción en 1 spec, sin correr suite completa) | Pendiente de permiso explícito |
 
-_Cerradas en esta fecha (segunda tanda):_ la decisión sobre el test 12 (el spec pinea el diseño del gate con autorización del usuario), los tests 10/11 (ídem) y el T10.2 (spec reescrito verificado + núcleo pineado en integración) — detalle en las entradas 1, 2 y 3. En la tercera tanda se cerró el Grupo B: los 2 specs comparan la fecha ancla serializada y pasan contra el backend real.
+_Cerradas en esta fecha (segunda tanda):_ la decisión sobre el test 12 (el spec pinea el diseño del gate con autorización del usuario), los tests 10/11 (ídem) y el T10.2 (spec reescrito verificado + núcleo pineado en integración) — detalle en las entradas 1, 2 y 3. En la tercera tanda se cerró el Grupo B (los 2 specs comparan la fecha ancla serializada) y en la cuarta el Grupo C (el spec usa la persona privada Superior del fixture de dev y pasa 2/2).
 
-_Actualizado por última vez: 2026-09-24 (tercera actualización: cierre de la entrada 1, de las anotadas 2, 3 y 4, y del Grupo B)._
+_Actualizado por última vez: 2026-09-24 (cuarta actualización: cierre de la entrada 1, de las anotadas 2, 3 y 4, del Grupo B y del Grupo C)._
