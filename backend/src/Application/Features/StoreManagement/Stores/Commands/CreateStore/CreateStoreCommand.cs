@@ -26,6 +26,7 @@ namespace Application.Features.StoreManagement.Stores.Commands.CreateStore
         private readonly IApplicationUnitOfWork _applicationUnitOfWork;
         private readonly IOwnerRepository _ownerRepository;
         private readonly IStoreModuleRepository _storeModuleRepository;
+        private readonly IPlanRepository _planRepository;
         private readonly IBillingService _billingService;
         private readonly IHttpContextService _httpContextService;
         private readonly IMapper _mapper;
@@ -36,6 +37,7 @@ namespace Application.Features.StoreManagement.Stores.Commands.CreateStore
             IApplicationUnitOfWork applicationUnitOfWork,
             IOwnerRepository ownerRepository,
             IStoreModuleRepository storeModuleRepository,
+            IPlanRepository planRepository,
             IBillingService billingService,
             IHttpContextService httpContextService,
             IMapper mapper,
@@ -44,6 +46,7 @@ namespace Application.Features.StoreManagement.Stores.Commands.CreateStore
         {
             _applicationUnitOfWork = applicationUnitOfWork;
             _storeModuleRepository = storeModuleRepository;
+            _planRepository = planRepository;
             _billingService = billingService;
             _httpContextService = httpContextService;
             _ownerRepository = ownerRepository;
@@ -92,16 +95,20 @@ namespace Application.Features.StoreManagement.Stores.Commands.CreateStore
                 if (!StoreBillingUtils.FilterForBilling(storeModules, billing).Contains((int)ModuleType.MultiStores))
                     throw new ApiException(_localizer["NotAuthorized"], HttpStatusCode.Forbidden);
 
-                // Inheritance (user decision 3): the new store copies the SELECTED store's module set.
+                // Inheritance (user decision 3): the new store copies the SELECTED store's module set,
+                // then is clamped to the ACTIVE Pago plan catalog (strict birth invariant,
+                // 2026-09-25, store-birth-pago-only): a store born through POST /v1/stores is
+                // born on Pago, so Superior/VIP-only members (12..17 -- WholesaleSales,
+                // Warehouses, MultiStores, MultiMonedas, MultiPayments, Elaboration) inherited
+                // from a Superior/VIP selected store are never copied. Filtering (not 400: the
+                // caller never asked for them; this is server-side derivation) keeps MultiStores
+                // creation working for Superior/VIP owners, one generation deep.
+                var pagoPlan = await _planRepository.GetActivePlanWithModulesByIdAsync((int)StorePlanType.Pago);
+                var pagoCatalog = (pagoPlan?.StorePlanModules ?? Enumerable.Empty<Domain.Entities.Plans.StorePlanModule>())
+                    .Select(spm => spm.ModuleId)
+                    .ToHashSet();
                 var inheritedModules = await _storeModuleRepository.GetStoreModulesByIdAsync(selectedStoreId);
-                moduleIds = inheritedModules.Select(sm => sm.ModuleId).ToList();
-                // WholesaleSales (12) is reserved for Superior/VIP plans (wholesale-superior-vip-only,
-                // 2026-09-23). The new store is born on Pago, so an inherited module 12 (from a
-                // Superior/VIP selected store) must NOT be copied — the closure that removed 12
-                // from Pago would otherwise be bypassed through this branch. Filtering (not 400:
-                // the caller never asked for 12; this is server-side derivation) keeps MultiStores
-                // creation working for Superior/VIP owners.
-                moduleIds = moduleIds.Where(id => id != (int)ModuleType.WholesaleSales).ToList();
+                moduleIds = inheritedModules.Select(sm => sm.ModuleId).Where(id => pagoCatalog.Contains(id)).ToList();
                 if (moduleIds.Count == 0)
                     throw new ApiException(_localizer["NotAuthorized"], HttpStatusCode.Forbidden);
 

@@ -30,8 +30,8 @@ namespace SMCA.WebApi.E2ETests.Stores;
 ///        EQUALS the catalog in DB (exact), lands on Pago with the trial clock, and /me as
 ///        the owner exposes the exact same universe (StoreModuleIds) — no Superior/VIP-only
 ///        feature, paid plan + trial flags.
-///   BP3  Lands in slice B (owner branch): OwnerAdmin creation from a Superior selected store
-///        {7, 14, 15} — the child inherits ONLY the Pago-catalog member (7).
+///   BP3  OwnerAdmin creation from a Superior selected store {7, 14, 15}: the child inherits
+///        ONLY the Pago-catalog member (7) — 14/15 and features 38/43 never reach it.
 /// </summary>
 [Collection("e2e")]
 public sealed class StoreBirthPagoOnlyTests
@@ -146,6 +146,67 @@ public sealed class StoreBirthPagoOnlyTests
             if (created != Guid.Empty)
                 await AuthzSeed.CleanupStoreGraphAsync(_f, created, owner.UserId);
             await DbTestHelpers.CleanupUserAsync(_f, adminId);
+        }
+    }
+
+    [Fact]
+    public async Task BP3_owner_create_clamps_inheritance_to_pago_catalog()
+    {
+        var seeded = await AuthzSeed.SeedOwnerAdminAsync(_f, withManagementModule: true);
+        Guid created = Guid.Empty;
+        try
+        {
+            // Elevate the selected store to Superior and seed 14 + 15 (MM1 pattern): the
+            // owner-branch gate still passes on 14, but the child receives ONLY the Pago member.
+            using (var scope = _f.Services.CreateScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                await db.Set<Store>().IgnoreQueryFilters()
+                    .Where(s => s.Id == seeded.StoreId)
+                    .ExecuteUpdateAsync(s => s.SetProperty(x => x.StorePlanId, SuperiorPlanId));
+                db.Set<StoreModule>().Add(StoreModule.Create(
+                    seeded.StoreId, MultiStoresModuleId, price: 5, modulePriceIncluded: false,
+                    modulePrice: 5, moduleDiscountPrice: 0, modulePercentDiscountPrice: 50, seeded.TenantId));
+                db.Set<StoreModule>().Add(StoreModule.Create(
+                    seeded.StoreId, MultiMonedasModuleId, price: 3, modulePriceIncluded: false,
+                    modulePrice: 3, moduleDiscountPrice: 0, modulePercentDiscountPrice: 100, seeded.TenantId));
+                await db.SaveChangesAsync();
+            }
+
+            var body = new
+            {
+                OwnerId = Guid.Empty,
+                Name = $"BP3-{Guid.NewGuid():N}",
+                Address = "",
+                Description = "",
+                Approved = true,
+                ModuleIds = Array.Empty<int>(), // ignored for OwnerAdmin: modules inherit
+            };
+            var create = await DbTestHelpers.AuthedClient(_f, seeded.UserId, seeded.Login)
+                .PostAsJsonAsync("/api/v1/stores", body);
+            create.StatusCode.Should().Be(HttpStatusCode.Created);
+            created = (await create.Content.ReadFromJsonAsync<ApiResponse<StoreData>>(ApiResponse.Json))!.Data!.Id;
+
+            using var scope2 = _f.Services.CreateScope();
+            var db2 = scope2.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+            var childModuleIds = await db2.Set<StoreModule>().IgnoreQueryFilters()
+                .Where(sm => sm.StoreId == created && sm.IsActive)
+                .Select(sm => sm.ModuleId).ToListAsync();
+            childModuleIds.Should().BeEquivalentTo(new[] { ManagementModuleId },
+                "the child inherits ONLY the Pago-catalog member (7); 14/15 are Superior/VIP-only");
+            (await db2.Set<StoreModule>().IgnoreQueryFilters().CountAsync(sm =>
+                sm.StoreId == created && (sm.ModuleId == MultiStoresModuleId || sm.ModuleId == MultiMonedasModuleId)))
+                .Should().Be(0);
+            (await db2.Set<StoreRoleFeature>().IgnoreQueryFilters().CountAsync(srf =>
+                srf.StoreId == created &&
+                (srf.FeatureId == MultiStoresFeatureId || srf.FeatureId == MultiMonedasFeatureId)))
+                .Should().Be(0, "features 38/43 must not be granted to the child");
+        }
+        finally
+        {
+            if (created != Guid.Empty) await StoreSeed.CleanupStoreAsync(_f, created);
+            await AuthzSeed.CleanupStoreGraphAsync(_f, seeded.StoreId, seeded.UserId);
         }
     }
 

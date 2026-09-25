@@ -94,14 +94,17 @@ public sealed class ChangePlanPermissionFlipTests
             var createdId = body.Data!.Id;
             createdStores.Add(createdId);
 
-            // The created store inherits the selected store's module set, which now contains 14.
+            // The created store inherits the selected store's module set CLAMPED to the active
+            // Pago catalog (strict birth invariant, 2026-09-25): MultiStores (14), Superior/VIP-only,
+            // never reaches the child — the gate passes on 14, the inheritance drops it.
             using (var scope = _f.Services.CreateScope())
             {
                 var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
                 var inherited = await db.Set<StoreModule>().IgnoreQueryFilters()
                     .Where(sm => sm.StoreId == createdId && sm.IsActive)
                     .Select(sm => sm.ModuleId).ToListAsync();
-                inherited.Should().Contain(MultiStoresModuleId);
+                inherited.Should().NotContain(MultiStoresModuleId);
+                inherited.Should().Contain(FreeManagementModuleId); // the Pago member still propagates
             }
 
             // ── 3. SuperAdmin downgrades Superior → Pago closes the gate again, SAME owner token. ──
