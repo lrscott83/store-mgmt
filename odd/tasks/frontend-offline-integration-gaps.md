@@ -2,7 +2,7 @@
 
 **Objective:** Close the real coverage gaps in the React frontend offline services/repositories integration suite (Vitest, real `localStorage`, no mocks) and replace `docs/testing/integration-tests/README.md` with an accurate coverage matrix that lists what each test proves per service/repository. No online/API service is in scope.
 
-**Status:** IN PROGRESS — tasks T0–T4. Work-unit commits on `qa`; push remains user decision.
+**Status:** DONE — T0–T4 completos. Commits en `qa`: `aae6d30d` (T1 crypto), `32298f53` (T2 units), `94c34797` (T3 docs). Push pendiente de decisión del usuario.
 
 ## Problem
 
@@ -31,7 +31,7 @@ User request 2026-09-25: "suite completa de tests para el frontend de react para
 - [x] T1 — Delegated writer: 6 crypto tests for B (verify data-serializer surface first; skip if no encrypted writes, report decision). **5 files created (22 tests), data-serializer SKIPPED by evidence. Commit `aae6d30d`.**
 - [x] T2 — Delegated writer: 5 unit tests for A. **5 files created (66 tests). Commit `32298f53`. Discovery: `decryption-failure-policy.test.tsx` already existed (29 tests) — writer covered only the untested `logClientError` seam without touching the existing suite.**
 - [x] T3 — Refresh `docs/testing/integration-tests/README.md` with real census + coverage matrix. **Rewritten: real counts, what-each-test-proves matrix, known issues, data-serializer verdict.**
-- [ ] T4 — Checks (targeted vitest per new file, `pnpm --filter @store-mgmt/web-store-pos typecheck`, lint) + work-unit commits on `qa` + closing report.
+- [x] T4 — Checks (targeted vitest per new file, `pnpm --filter @store-mgmt/web-store-pos typecheck`, lint) + work-unit commits on `qa` + closing report. **All green; docs commit `94c34797`. DONE.**
 
 ## Route plan (per task; delivery budget advisory)
 
@@ -47,25 +47,11 @@ All tasks delegated (writer trigger: 2+ non-trivial files). Sequential writers, 
 
 ## Progress
 
-- T0 committed? No (doc+mirror only, tracked with final docs commit).
-- **T1 DONE (delegated writer, gate PASS, commit `aae6d30d`):** 5 NEW crypto test files → 22 tests:
-  - `warehouse-offline-service.crypto.test.ts` (4): plaintext mode; enc:v1: round-trip on all 3 entity keys; locked read throws `MissingDataKeyError` (ciphertext byte-identical); locked write stops on encrypt seam.
-  - `recipe-offline-service.crypto.test.ts` (4): plaintext round-trip; ciphertext fresh-instance round-trip; locked read throws preserves ciphertext; locked mutation blocked by read-before-write guard.
-  - `elaboration-offline-service.crypto.test.ts` (4): confirmElaboration plaintext; ciphertext snapshot round-trip; locked read throws on both readers; locked confirmElaboration blocked before persist.
-  - `exchange-rate-offline-service.crypto.test.ts` (5): plaintext; ciphertext round-trip (day keys + `value`); empty-payload short-circuit persists plaintext `'[]'`; locked reads throw; locked writes throw, ciphertext intact.
-  - `store-payment-methods-config-service.crypto.test.ts` (5): plaintext; ciphertext round-trip disabled channel; backup seam ciphertext; **locked `getConfig()` degrades to default** (deliberate divergence pinned) while reader propagates `MissingDataKeyError`; locked write throws.
-  - **data-serializer-service SKIPPED (evidence):** no entity-crypto/DEK/localStorage write path; export uses PBKDF2-SHA256 + zip.js `rawPassword` (different mechanism); at-rest encrypted writes belong to the 5 covered services. No file created.
-  - Checks: 5/5 file runs PASS, full suite 308 files/4592 tests PASS, typecheck 0, lint 0, `git status` shows ONLY new files. Parent spot-check re-ran exchange-rate crypto test: 5/5 PASS.
-- **T2 DONE (delegated writer, gate PASS, commit `32298f53`):** 5 NEW unit test files → 66 tests:
-  - `decryption-failure-policy.client-log.test.ts` (9): the `logClientError` seam below `if (announced) return true;` latch — repeat failures swallowed with NO client-log trace. Discovery: brief was wrong — `decryption-failure-policy.test.tsx` already existed (459 LOC, 29 tests); writer did NOT duplicate, covered only the untested seam, existing suite untouched.
-  - `storage-keys.test.ts` (13): key namespace contract, stable strings pinned.
-  - `exchange-rate-daily.test.ts` (19): real localStorage store, real dynamic service import, no DEK → plaintext.
-  - `offline-session.test.ts` (6): constants/shape; `*.purity.test.ts` convention.
-  - `use-pwa-install.test.ts` (19): hook lifecycle (initial, prompt capture, install trigger, appinstalled, listener cleanup); real `pwa-install-prompt` store, only browser surface stubbed.
-  - Checks: 5/5 file runs PASS (66), full suite 313 files/4658 tests PASS (delta exactly 66), typecheck 0, lint 0, `git status` only new files. Parent spot-check re-ran exchange-rate-daily: 19/19 PASS.
-  - **Known flake profile (NOT reproduced, NOT fixed — needs auth to touch existing tests):** under machine load, `decryption-failure-policy.test.tsx` cold import and `sync-routes.test.tsx` share timeout blew 5000ms `testTimeout`; full green run does not reproduce.
-- **T3 DONE (inline):** `docs/testing/integration-tests/README.md` rewritten as real census + coverage matrix (module tables with real counts, what-each-test-proves per service, known issues: duplicate expense test + flake profile, data-serializer verdict).
-- T4 pending: final diff check + docs commit + closing report.
+- **ALL TASKS DONE. Commits on `qa` (push pending user decision):**
+  - `aae6d30d` — T1: 5 crypto test files (22 tests).
+  - `32298f53` — T2: 5 unit test files (66 tests).
+  - `94c34797` — T3: docs matrix refresh + feature doc.
+  - Full suite: 313 files / 4658 tests PASS, typecheck 0, lint 0, no existing test/E2E modified (verified via `git diff --cached --stat HEAD`).
 
 ## Key references
 
