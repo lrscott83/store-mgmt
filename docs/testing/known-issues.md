@@ -105,12 +105,41 @@ Contexto: backend real `:5019` (BD `smca_test`, confirmada por el teardown en am
 | ------- | ------------------------------------ | ----------------------------------- | -------- | ---------------- |
 | 1       | 8 (default de esta máquina, 16 CPUs) | 317 passed + 23 flaky, **0 failed** | 12.0 min | 23 (en 18 specs) |
 | 2       | 4                                    | 336 passed + 4 flaky, **0 failed**  | 7.7 min  | 4 (en 4 specs)   |
+| 3       | 3                                    | 338 passed + 2 flaky, **0 failed**  | 7.3 min  | 2 (en 2 specs)   |
 
 - **Cero rate-limits reales**: ni un 429 en el log de ninguna corrida — las únicas 2 menciones de "429" son el flag `--grep-invert @rate-limit` del comando y el contador `[429/340]` de progreso. Las cuotas (40 logins/min, 50 registros/10 min) no se agotaron con la suite por defecto.
 - **Causa raíz del flakiness (confirmada por contraste)**: contención de recursos por número de workers — 8 workers contra un único dev server + backend + PostgreSQL flakean ~23 tests al azar (nunca los mismos dos veces, y todos pasan al reintento y en solitario); con 4 workers el flakiness cae a ~4 y la corrida es 4 minutos más rápida.
-- **Recomendación operativa**: correr la suite completa con `--workers=4` (o menos) en esta máquina; los reintentos (`retries: 2`) absorben el resto. Sin cambios en la app ni en los tests.
+- **Recomendación operativa**: correr la suite completa con `--workers=4` (o menos) en esta máquina; los reintentos (`retries: 2`) absorben el resto. Sin cambios en la app ni en los tests. La corrida 3 (3 workers, 7.3 min, 2 flaky) confirma la tendencia monótona 23 → 4 → 2; el readme ya recomienda `--workers=4` como default operativo.
 
 ---
+
+## Flaky con recurrencia — dossier de causa raíz (2026-09-25)
+
+Los demás flaky de las tres corridas son tests distintos al azar (contención pura: pasan al
+reintento y en solitario). Dos specs recayeron en más de una corrida; para cada uno: cómo
+verificarlo primero, el modo de fallo observado (literal del log) y la hipótesis a confirmar.
+
+### 1. `store-plan-activation` — flaky en las corridas 2 y 3 consecutivas
+
+- **Cómo verificar primero** (en este orden, sin correr la suite):
+  1. En solitario: `cd frontend-react && pnpm exec playwright test e2e/store-plan-activation.spec.ts --workers=1` → debe pasar (verifica que no sea determinista).
+  2. En la BD tras cualquier corrida: `psql -h localhost -p 5432 -U postgres -d smca_test -c "SELECT \"Login\" FROM \"User\" WHERE \"Login\" LIKE 'e2e-%';"` (vacía fuera de corridas; el teardown borra `e2e-*`).
+  3. En una corrida completa con 4 workers: observar si el fallo repite con el mismo modo de abajo.
+- **Modo de fallo (literal, corridas 2 y 3):** el propio fixture aborta en la precondición, ANTES de que el test haga nada: `store-fixture: degradeStoreToFreePlan(<storeId>) precondition mismatch — expected paymentStartDate to remain non-null after degrading to the free plan (the Store row is untouched by the direct-DB seed), observed null.` (`support/store-fixture.ts:155`, invocado desde `store-plan-activation.spec.ts:85`).
+- **Qué NO es:** no es timing de render ni contención de red — es un estado de BD ya presente al arrancar: la fila de la tienda de la persona compartida `owner-admin` llegó con `PaymentStartDate = null`.
+- **Hipótesis (por confirmar):** `owner-admin` es persona COMPARTIDA (varios specs la usan en workers paralelos). `store-plan-lock-regression.spec.ts` —el otro spec de plan que la usa— siembra la fecha con `setPaymentStartDateDirect()`: `UPDATE "Store" SET "PaymentStartDate" = NULL` (mitad 1 "legacy", `store-plan-lock-regression.spec.ts:76-90`). Si ese UPDATE corre mientras `store-plan-activation` está entre su arranque y su `degradeStoreToFreePlan`, la precondición encuentra la fecha ya nula. Es la única escritura conocida de `NULL` sobre esa columna accesible por los specs.
+- **Solución candidata (una vez confirmada la ventana, requiere permiso — test E2E):** que la regresión use una persona privada (patrón `mintWholesaleSuperiorOwner` de `store-wholesale-fixture.ts`) o que el fixture `degradeStoreToFreePlan` siembre la fecha no-nula él mismo antes de verificar (0 cambios de app). No tocar nada hasta confirmar la ventana de solapamiento en el log.
+
+### 2. `auth-me-session-rejection` (setup: mint SuperAdmin / casos 3a-5-6) — flaky en las corridas 1 y 3
+
+- **Cómo verificar primero** (en este orden):
+  1. En solitario: `cd frontend-react && pnpm exec playwright test e2e/auth-me-session-rejection.spec.ts --workers=1` → pasó 2026-09-24 (16/16 junto con `plan-catalog-superadmin` y `auth-me-deleted-user`, ~31 s).
+  2. En la corrida completa: confirmar que el modo de fallo sea timeout de navegación/setup (ver abajo) y que el reintento pase.
+  3. Backend vivo en `:5019` con BD `smca_test` (guard de arranque en el log del backend).
+- **Modo de fallo (literal, corrida 3):** `Fixture "onlineLockedSnapshot" timeout of 30000ms exceeded during setup` — no es el setup de este spec sino el fixture worker-scoped de `valid-session-navigation.spec.ts:95` (mint que corre en otro worker); y `page.waitForURL: Test ended` en `registerAndLoginOnline` (`valid-session-navigation.spec.ts:69`). En la corrida 3, `auth-me-session-rejection` 3a falló en `toHaveURL` y pasó al reintento.
+- **Qué NO es:** no es rate-limit (cero 429 en las tres corridas) ni defecto de la lógica de sesión (los 16 tests de la familia pasan en solitario).
+- **Hipótesis (por confirmar):** contención de arranque en frío — los mints de registro+login en frío compiten con los primeros arranques del dev server (compilación de módulos pesados) y los 30 s del fixture setup se quedan cortos bajo contención. La evidencia: el timeout es del SETUP (fase de arranque), el reintento pasa siempre, y la familia pasa en solitario.
+- **Solución candidata (requiere permiso — test E2E):** subir el timeout del fixture `onlineLockedSnapshot` de 30 000 a 60 000 ms (una línea en `valid-session-navigation.spec.ts`). No tocar nada hasta confirmar que el modo de fallo repite.
 
 ## Estado de decisiones pendientes (2026-09-24)
 
