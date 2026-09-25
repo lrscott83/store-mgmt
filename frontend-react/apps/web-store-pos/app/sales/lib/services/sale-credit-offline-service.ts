@@ -223,13 +223,13 @@ export class SaleCreditOfflineService {
   }
 
   /**
-   * WU2 (category D): 1:1 port of Angular's `createSaleCredit`
-   * (sale-credit-offline.service.ts:41-65) — renamed from `createFromOrder`
-   * (flagged mismatch #5). Always succeeds, returns SYNC `DataResult<SaleCredit>`
-   * (`new DataResult(credit, true, [])`) — never throws.
+   * Creates the credit of a credit sale. Always succeeds, returns SYNC
+   * `DataResult<SaleCredit>` (`new DataResult(credit, true, [])`) — never throws.
    *
-   * MultiMonedas: `currency` is the React-only 5th argument (the 4-arg original has no such
-   * parameter); it defaults to `DEFAULT_CURRENCY` so every legacy call site keeps CUP.
+   * MultiMonedas: `currency` is the currency of the SALE, threaded through from
+   * `createOrder`'s `orderCurrency` (the cart's currency). It is OPTIONAL and defaults
+   * to `DEFAULT_CURRENCY` (CUP), so call sites that do not know the sale's currency —
+   * e.g. an import — keep producing CUP credits.
    */
   createSaleCredit(
     orderId: string,
