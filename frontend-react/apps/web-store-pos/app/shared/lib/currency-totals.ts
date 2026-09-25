@@ -94,3 +94,16 @@ function priorityRank(currency: Currency): number {
   const index = CURRENCY_PRIORITY.indexOf(currency);
   return index === -1 ? CURRENCY_PRIORITY.length : index;
 }
+
+/**
+ * Distinct currencies of `entries` in the agreed display order.
+ *
+ * Call this on the view's **UNFILTERED** data set: the filter's option list must
+ * not depend on the filter's own selection, or picking a currency would shrink
+ * the list and hide the control the user needs to switch back. Reuses
+ * {@link groupAmountsByCurrency} + {@link orderCurrencyTotals}, so the order is
+ * exactly USD → EUR → CUP → rest by amount DESC.
+ */
+export function presentCurrencies(entries: readonly CurrencyAmount[]): Currency[] {
+  return orderCurrencyTotals(groupAmountsByCurrency(entries)).map((total) => total.currency);
+}
