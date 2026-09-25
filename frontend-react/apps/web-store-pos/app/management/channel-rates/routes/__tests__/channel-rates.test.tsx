@@ -184,10 +184,11 @@ describe('ChannelRatesPage (multipayments) — header and registration popup (T2
     expect(new ChannelRateOfflineService(storeId).getStorageChannelRates()[0].value).toBe(350);
   });
 
-  it('the header `?` explains that each value is 1 USD in the channel currency', () => {
+  it('the header `?` opens a popup explaining that each value is 1 USD in the channel currency', () => {
     renderPage();
 
     fireEvent.click(screen.getByTestId('channel-rate-help'));
+    expect(screen.getByTestId('channel-rate-help-dialog')).toBeInTheDocument();
     expect(screen.getByTestId('channel-rate-help-text')).toHaveTextContent('1 USD');
   });
 });
@@ -350,7 +351,7 @@ describe('ChannelRatesPage (multipayments) — register and history', () => {
     setTimeoutSpy.mockRestore();
   });
 
-  it('exposes no delete or update control (append-only by contract)', async () => {
+  it('exposes deactivation (append-only) but no physical delete or edit control', async () => {
     seedRate();
 
     renderPage();
@@ -359,9 +360,11 @@ describe('ChannelRatesPage (multipayments) — register and history', () => {
       expect(screen.getAllByTestId(/^channel-rate-row-/)).toHaveLength(1);
     });
 
-    expect(screen.queryByRole('button', { name: /eliminar/i })).not.toBeInTheDocument();
+    // The delete-styled control DEACTIVATES (append-only by contract); nothing
+    // edits or physically removes a row.
+    expect(screen.getByRole('button', { name: 'Desactivar' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /editar/i })).not.toBeInTheDocument();
-    expect(screen.queryByTestId(/delete|edit/)).not.toBeInTheDocument();
+    expect(screen.queryByTestId(/edit/)).not.toBeInTheDocument();
   });
 });
 
@@ -399,7 +402,7 @@ describe('ChannelRatesPage (multipayments) — T22 view shape', () => {
     expect(screen.queryByText('Registrado')).not.toBeInTheDocument();
   });
 
-  it('the `?` column of the history reveals the row details and dates as a paragraph', async () => {
+  it('the `?` column of the history opens a popup with the row details and dates', async () => {
     seedRate({ value: 700, effectiveFrom: new Date(2026, 8, 1) });
 
     renderPage();
@@ -411,7 +414,9 @@ describe('ChannelRatesPage (multipayments) — T22 view shape', () => {
     const detailsButton = within(row).getByRole('button', { name: 'Ver detalles' });
     fireEvent.click(detailsButton);
 
-    const details = screen.getByTestId(/^channel-rate-detail-/);
+    // The details open in a popup, not an inline expansion.
+    const dialog = screen.getByTestId('channel-rate-details-dialog');
+    const details = within(dialog).getByTestId('channel-rate-details-text');
     expect(details).toHaveTextContent('Efectivo (CUP)');
     expect(details).toHaveTextContent('Vigente desde');
     expect(details).toHaveTextContent('Registrado');
@@ -431,56 +436,67 @@ describe('ChannelRatesPage (multipayments) — T22 view shape', () => {
   });
 });
 
-describe('ChannelRatesPage (multipayments) — activate/deactivate (T19b)', () => {
-  it('deactivates a row from its toggle, marking it inactive but keeping it in the history', async () => {
+describe('ChannelRatesPage (multipayments) — deactivate (T19b)', () => {
+  it('deactivates the current row via the trash icon + confirmation popup, and the channel shows its latest active rate', async () => {
+    // Two rows for the same channel: the newest (720) is in force.
+    seedRate({ value: 700, effectiveFrom: new Date(2026, 8, 1) });
+    seedRate({ value: 720, effectiveFrom: new Date(2026, 8, 10) });
+
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getAllByTestId(/^channel-rate-current-row-/)).toHaveLength(1);
+    });
+    const inForceRow = screen.getAllByTestId(/^channel-rate-current-row-/)[0];
+    expect(inForceRow).toHaveTextContent('720');
+
+    // The trash icon opens the confirmation popup (not an inline toggle).
+    const trash = within(inForceRow).getByRole('button', { name: 'Desactivar' });
+    fireEvent.click(trash);
+    expect(screen.getByTestId('confirm-dialog-confirm')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('confirm-dialog-confirm'));
+
+    // The channel now resolves to its LATEST ACTIVE rate: the older 700 row.
+    await waitFor(() => {
+      const rows = screen.getAllByTestId(/^channel-rate-current-row-/);
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toHaveTextContent('700');
+    });
+    // History keeps both rows; the deactivated one is inactive in storage.
+    expect(screen.getAllByTestId(/^channel-rate-row-/)).toHaveLength(2);
+    const stored = new ChannelRateOfflineService(storeId).getStorageChannelRates();
+    expect(stored.find((row) => row.value === 720)?.isActive).toBe(false);
+    expect(stored.find((row) => row.value === 700)?.isActive).toBeUndefined();
+  });
+
+  it('a row deactivated before render leaves "Tasas Vigentes" but stays in history', async () => {
+    const row = seedRate({ value: 700 });
+    new ChannelRateOfflineService(storeId).setChannelRateActive(row.data!.id!, false);
+
+    renderPage();
+
+    // "Tasas Vigentes" shows active rows only, so the channel is absent…
+    expect(await screen.findByTestId('channel-rate-current-empty')).toBeInTheDocument();
+    // …while the append-only history still lists the row.
+    expect(screen.getAllByTestId(/^channel-rate-row-/)).toHaveLength(1);
+    expect(screen.getByText('700')).toBeInTheDocument();
+  });
+
+  it('treats a stored row without isActive as active (backwards compatible)', async () => {
     seedRate({ value: 700 });
 
     renderPage();
 
     await waitFor(() => {
-      expect(screen.getAllByTestId(/^channel-rate-row-/)).toHaveLength(1);
+      expect(screen.getAllByTestId(/^channel-rate-current-row-/)).toHaveLength(1);
     });
-    expect(screen.getByText('Activa')).toBeInTheDocument();
-
-    fireEvent.click(screen.getByTestId(/^channel-rate-current-toggle-/));
-
-    await waitFor(() => {
-      expect(screen.getByText('Inactiva')).toBeInTheDocument();
-    });
-    // Still visible in the append-only history.
-    expect(screen.getAllByTestId(/^channel-rate-row-/)).toHaveLength(1);
-    expect(screen.getByRole('button', { name: 'Reactivar' })).toBeInTheDocument();
-    expect(new ChannelRateOfflineService(storeId).getStorageChannelRates()[0].isActive).toBe(false);
-  });
-
-  it('reactivates a deactivated row', async () => {
-    const row = seedRate();
-    new ChannelRateOfflineService(storeId).setChannelRateActive(row.data!.id!, false);
-
-    renderPage();
-
-    await waitFor(() => {
-      expect(screen.getByText('Inactiva')).toBeInTheDocument();
-    });
-
-    fireEvent.click(screen.getByTestId(/^channel-rate-current-toggle-/));
-
-    await waitFor(() => {
-      expect(screen.getByText('Activa')).toBeInTheDocument();
-    });
-    expect(new ChannelRateOfflineService(storeId).getStorageChannelRates()[0].isActive).toBe(true);
-  });
-
-  it('treats a stored row without isActive as active (backwards compatible)', async () => {
-    seedRate();
-
-    renderPage();
-
-    await waitFor(() => {
-      expect(screen.getAllByTestId(/^channel-rate-row-/)).toHaveLength(1);
-    });
-    expect(screen.getByText('Activa')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Desactivar' })).toBeInTheDocument();
+    // Active by default: it appears in "Tasas Vigentes" with the trash control.
+    const row = screen.getAllByTestId(/^channel-rate-current-row-/)[0];
+    expect(row).toHaveTextContent('700');
+    expect(within(row).getByRole('button', { name: 'Desactivar' })).toBeInTheDocument();
+    // No status column is rendered anywhere in the table.
+    expect(screen.queryByText('Estado')).not.toBeInTheDocument();
     expect(
       new ChannelRateOfflineService(storeId).getStorageChannelRates()[0].isActive,
     ).toBeUndefined();

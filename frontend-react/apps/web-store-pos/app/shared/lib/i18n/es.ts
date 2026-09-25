@@ -1066,6 +1066,9 @@ const messages: Record<string, string> = {
   'CHANNEL_RATES.DEACTIVATE': 'Desactivar',
   'CHANNEL_RATES.REACTIVATE': 'Reactivar',
   'CHANNEL_RATES.TOGGLE_ERROR': 'No se pudo actualizar el estado de la tasa.',
+  'CHANNEL_RATES.DEACTIVATE_CONFIRM_TITLE': 'Desactivar tasa',
+  'CHANNEL_RATES.DEACTIVATE_CONFIRM_MESSAGE':
+    'La tasa dejará de usarse en las conversiones. Se mostrará la última tasa activa de ese canal y la fila se conserva en el historial.',
   'CHANNEL_RATES.METHOD_EFECTIVO': 'Efectivo',
   'CHANNEL_RATES.METHOD_ZELLE': 'Zelle',
   'CHANNEL_RATES.METHOD_TRANSFERENCIA': 'Transferencia',
