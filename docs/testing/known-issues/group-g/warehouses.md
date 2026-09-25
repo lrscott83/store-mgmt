@@ -8,22 +8,28 @@ Que un usuario de tienda (StoreUser) no ve el módulo Almacenes —el enlace no 
 
 ## Qué pasa
 
-Falló en **3 de las 5 corridas completas** del 2026-09-25 (corridas 2, 4 y 5) y **pasó al reintento** siempre. Es el flaky residual más recurrente. En solitario nunca falló.
+Falló en **3 de las 5 corridas completas** del 2026-09-25 (corridas 2, 4 y 5) y **pasó al reintento** siempre. En solitario nunca falló.
 
-**El problema en simple:** el test necesita preparar la sesión de dos usuarios (dueño y usuario de tienda) antes de empezar. Con toda la suite corriendo a la vez, esa preparación a veces se pasa del tiempo máximo (120 segundos) y el test aborta antes de hacer nada; al reintentarlo, el entorno ya está caliente y pasa. Lo que el test verifica (el deslogueo y el menú) nunca falló por sí mismo.
+**El problema en simple (medido en los logs, idéntico en las 3 corridas):** el test entra con el usuario de tienda a la pantalla de inicio y espera a que aparezca el enlace "Catálogo Productos" del menú. Desecha la espera a los **15 segundos** sin encontrarlo. No es la preparación de la sesión (esa no falló en ninguna de las 3 corridas) — es que el menú no terminó de pintar a tiempo. Al reintentar el test, el menú sí aparece y todo pasa.
 
 ## Causa probable
 
-Contención del arranque: la preparación de la persona compartida compite con todos los demás tests por el mismo servidor. No es rate-limit (cero 429 en las cinco corridas) ni un defecto del gate de Almacenes.
+Espera corta del test (15 s) sobre un menú que, con la suite a full, a veces tarda más en pintar. También cabe que el menú tenga una condición de carrera propia (el rol del usuario de tienda llega tarde y el enlace se descarta). Hace falta distinguirlo: si el enlace nunca llega (no está en el HTML al vencer el timeout), es lógica; si llega tarde, es tiempo.
+
+## Tiempos que usa
+
+- Preparación de la sesión (dueño + usuario de tienda): presupuestada con los **120 s** del test (nunca venció).
+- La espera que vence: **15 s** — la aserción del enlace "Catálogo Productos" (`getByRole('link', { name: 'Catálogo Productos' })`, `toBeVisible` con el default de 15 s).
+- Reintento: 2 (config); en las 3 corridas pasó al primero.
 
 ## Cómo verificarlo
 
 1. Correrlo solo: `pnpm exec playwright test e2e/warehouses.spec.ts --workers=1` → debe pasar.
-2. En la próxima corrida completa, anotar **dónde** falla si vuelve: en la preparación (mensaje "while setting up \"signedInPage\"") o en una aserción de la pantalla. Son causas distintas: la primera es del entorno; la segunda apuntaría al test y requeriría decidir con tu permiso.
+2. En la próxima corrida completa, capturar el **HTML del menú** al vencer los 15 s (trace ya queda con `trace: 'on-first-retry'`): si el enlace NO está en el HTML es lógica/condición de carrera (requeriría permiso para tocar el test); si el menú estaba incompleto por tiempo, es la espera corta.
 
-## Propuesta de solución (si se confirma el modo de preparación)
+## Propuesta de solución (si se confirma)
 
-El mismo tratamiento que ya funcionó en el Grupo F: más tiempo a la preparación de la persona o menos workers. Si el modo fuera de aserción, se propondría el ajuste puntual de esa espera (con tu permiso).
+Si fue tiempo: alargar esa espera puntual a 30 s (una línea, con tu permiso). Si fue lógica: decidir primero qué debe pasar. En ambos casos es cambio de test E2E y requiere tu permiso explícito.
 
 ## Estado
 

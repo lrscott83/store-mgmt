@@ -10,11 +10,17 @@ Que la ruta "crear tienda" **no crea nada**: un dueño que entra a `/management/
 
 Falló en **2 de las 5 corridas completas** del 2026-09-25 (corridas 1 y 5) y **pasó al reintento** siempre. En solitario nunca falló.
 
-**El problema en simple:** igual que el resto de flaky residuales — la preparación de la sesión del dueño (crear usuario y abrir sesión) se pasa del tiempo máximo cuando toda la suite corre a la vez, y el test aborta antes de empezar; al reintentarlo pasa. Las aserciones de seguridad (ruta, formulario, verbo PUT) nunca fallaron por sí mismas.
+**El problema en simple (medido en los logs):** en la corrida 1 el test murió **preparando la sesión** — el mensaje exacto es `Test timeout of 120000ms exceeded while setting up "signedInPage"` (se agotaron los 120 s del test mientras el mint de la persona hacia registro + login; la última espera visible era la navegación del login del usuario de tienda). Las aserciones de seguridad (ruta, formulario, verbo PUT) nunca fallaron por sí mismas.
 
 ## Causa probable
 
 Contención del arranque, no un defecto de seguridad ni del test: el modo de fallo observado es siempre "se acabó el tiempo preparando la sesión", nunca una aserción incumplida.
+
+## Tiempos que usa
+
+- Preparación de la sesión (`signedInPage` — mint de persona compartida): corre **dentro del presupuesto de 120 s** del test (`describe.configure({ timeout: 120_000 })`); no tiene reloj aparte.
+- Esperas internas del mint (registro, login, navegaciones): **30 s** cada una (default de Playwright; ninguna venció sola — venció la suma).
+- Reintento: 2 (config); pasó al primero en ambas corridas.
 
 ## Cómo verificarlo
 
@@ -23,7 +29,7 @@ Contención del arranque, no un defecto de seguridad ni del test: el modo de fal
 
 ## Propuesta de solución (si se confirma)
 
-Mismo tratamiento que el Grupo F: más tiempo a la preparación de la persona o menos workers. No requiere cambios en la app.
+Más presupuesto para este test (120 → 180 s, como ya usa `auth-me-session-rejection`) o menos workers. Es cambio de test E2E y requiere tu permiso explícito; no requiere cambios en la app.
 
 ## Estado
 
