@@ -31,9 +31,11 @@ describe('EFeatures', () => {
   it('TodayStats is 23', () => expect(EFeatures.TodayStats).toBe(23));
   it('Available is 30', () => expect(EFeatures.Available).toBe(30));
   it('Entries is 31', () => expect(EFeatures.Entries).toBe(31));
+  it('TodayInventoryStats is 32', () => expect(EFeatures.TodayInventoryStats).toBe(32));
   it('Egress is 33', () => expect(EFeatures.Egress).toBe(33));
   it('InventoryTodayQuantities is 34', () => expect(EFeatures.InventoryTodayQuantities).toBe(34));
   it('InventoryTodaySaleProfit is 35', () => expect(EFeatures.InventoryTodaySaleProfit).toBe(35));
+  it('OwnerStores is 38', () => expect(EFeatures.OwnerStores).toBe(38));
   it('Send is 40', () => expect(EFeatures.Send).toBe(40));
   it('Download is 41', () => expect(EFeatures.Download).toBe(41));
   it('Receive is 42', () => expect(EFeatures.Receive).toBe(42));
@@ -64,6 +66,12 @@ describe('EModules', () => {
   it('Billing is 9', () => expect(EModules.Billing).toBe(9));
   it('Histories is 10', () => expect(EModules.Histories).toBe(10));
   it('Credits is 11', () => expect(EModules.Credits).toBe(11));
+  it('WholesaleSales is 12', () => expect(EModules.WholesaleSales).toBe(12));
+  it('Warehouses is 13', () => expect(EModules.Warehouses).toBe(13));
+  it('MultiStores is 14', () => expect(EModules.MultiStores).toBe(14));
+  it('MultiMonedas is 15', () => expect(EModules.MultiMonedas).toBe(15));
+  it('MultiPayments is 16', () => expect(EModules.MultiPayments).toBe(16));
+  it('Elaboration is 17', () => expect(EModules.Elaboration).toBe(17));
 });
 
 describe('PaymentType', () => {

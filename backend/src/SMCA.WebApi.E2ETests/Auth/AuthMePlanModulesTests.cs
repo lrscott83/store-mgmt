@@ -415,13 +415,13 @@ public sealed class AuthMePlanModulesTests
     private static List<int> FeaturesForModule(int moduleId) => moduleId switch
     {
         2 => [20, 21, 22, 23],                     // Sales
-        3 => [30, 31, 32, 33, 34, 35],             // Inventory
+        3 => [30, 31, 32, 33, 34, 35],                 // Inventory (+Egress, backfill 2026-09-25)
         4 => [40, 41, 42],                         // Synchronization
         5 => [50],                                 // Reports
         6 => [60],                                 // Statistics
         7 => [70, 72, 73, 74],                     // Management
         8 => [80],                                 // Expenses
-        9 => [90, 91],                             // Billing
+        9 => [90],                                 // Billing
         10 => [100, 101, 102, 103],                // Histories
         11 => [110],                               // Credits
         12 => [39],                                // WholesaleSales
