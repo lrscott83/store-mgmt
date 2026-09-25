@@ -24,9 +24,9 @@ namespace SMCA.WebApi.E2ETests.Stores;
 /// The MultiMonedas module (15, feature 43) is included ONLY in the Superior (3)
 /// and VIP (4) plans. This suite pins the FULL chain a user experiences:
 ///
-///   MM1  Registering a store with the plan catalog (Superior) grants module 15
-///        + feature 43: visible in DB (StoreModule + StoreRoleFeature) and in
-///        /me (StoreModuleIds contains 15, FeatureIds contains 43).
+///   MM1  OwnerAdmin creating a store from a Superior selected store {7,14,15}:
+///        the child INHERITS only the Pago-catalog member (7) — 15/43 never reach it
+///        (strict birth invariant, 2026-09-25, store-birth-pago-only).
 ///   MM2  Changing the plan to Superior activates 15/43 through the SAME
     ///        runtime chain (change-plan → StoreModules → /me). Since the
     ///        2026-09-18 caller matrix, the flip runs as SuperAdmin (Superior/VIP
@@ -111,12 +111,14 @@ public sealed class MultiMonedasModuleTests
         => DbTestHelpers.AuthedClient(f, s.UserId, s.Login);
 
     [Fact]
-    public async Task MM1_created_store_inherits_multimonedas_from_selected_store()
+    public async Task MM1_created_store_clamps_inheritance_to_pago_catalog()
     {
         // OwnerAdmin creation contract (OwnerCreateStoreTests): the body ModuleIds are
         // IGNORED — the new store INHERITS the selected store's module set, and the
-        // handler gates on MultiStores (14) being active on the selected store. Seed the
-        // selected store with {7, 14, 15}: creating then propagates 15 + feature 43.
+        // handler gates on MultiStores (14) being active on the selected store. Strict birth
+        // invariant (2026-09-25, store-birth-pago-only): the inherited set is CLAMPED to the
+        // active Pago catalog. Seed the selected store with {7, 14, 15} (Superior): creating
+        // now propagates ONLY 7 — 15 and feature 43 never reach the child.
         var seeded = await SeedOwnerAdminStoreAsync(planId: (int)StorePlanType.Superior);
         try
         {
@@ -151,12 +153,17 @@ public sealed class MultiMonedasModuleTests
                 using var scope = _f.Services.CreateScope();
                 var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
+                var childModuleIds = await db.Set<StoreModule>().IgnoreQueryFilters()
+                    .Where(sm => sm.StoreId == newStoreId && sm.IsActive)
+                    .Select(sm => sm.ModuleId).ToListAsync();
+                childModuleIds.Should().BeEquivalentTo(new[] { 7 /* Management */ },
+                    "the child inherits ONLY the Pago-catalog member (7); 14/15 are Superior/VIP-only");
                 (await db.Set<StoreModule>().IgnoreQueryFilters().CountAsync(sm =>
                     sm.StoreId == newStoreId && sm.ModuleId == MultiMonedasModuleId && sm.IsActive))
-                    .Should().Be(1, "the inherited module set must contain MultiMonedas");
+                    .Should().Be(0, "MultiMonedas (15) must NOT reach the child");
                 (await db.Set<StoreRoleFeature>().IgnoreQueryFilters().CountAsync(srf =>
                     srf.StoreId == newStoreId && srf.FeatureId == MultiMonedasFeatureId))
-                    .Should().BeGreaterThan(0, "feature 43 must be granted to the registered roles");
+                    .Should().Be(0, "feature 43 must not be granted to the child");
             }
             finally
             {

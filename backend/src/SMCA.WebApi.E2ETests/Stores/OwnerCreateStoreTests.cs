@@ -20,7 +20,8 @@ namespace SMCA.WebApi.E2ETests.Stores;
 // Owner store-creation matrix (user-approved 2026-09-09, owner-multistores-store-creation):
 // POST /v1/stores admits a second caller class — an OwnerAdmin whose SELECTED store has the
 // MultiStores module (14) active after billing filtering. Contract:
-//   - OwnerAdmin + {7,14} + own/zero-Guid OwnerId → 201, modules inherited from selected store,
+//   - OwnerAdmin + {7,14} + own/zero-Guid OwnerId → 201, modules inherited from the selected
+//     store CLAMPED to the active Pago catalog (7 only — strict birth invariant, 2026-09-25),
 //     Approved forced true, plan Pago (birth default since 2026-09-18), trial clock today,
 //     SelectedStoreId NOT repointed.
 //   - OwnerAdmin without 14 (missing OR billing-Vencido) → 403, nothing persisted.
@@ -170,7 +171,7 @@ public sealed class OwnerCreateStoreTests
 
             var moduleIds = await db.Set<StoreModule>().IgnoreQueryFilters()
                 .Where(m => m.StoreId == created).Select(m => m.ModuleId).OrderBy(m => m).ToListAsync();
-            moduleIds.Should().Equal(ManagementModuleId, MultiStoresModuleId); // inheritance pin (7, 14)
+            moduleIds.Should().Equal(ManagementModuleId); // strict birth invariant: the child inherits only the Pago-catalog member (7); MultiStores (14) is Superior/VIP-only
 
             (await db.Set<StoreRoleFeature>().IgnoreQueryFilters().AnyAsync(srf => srf.StoreId == created)).Should().BeTrue();
 

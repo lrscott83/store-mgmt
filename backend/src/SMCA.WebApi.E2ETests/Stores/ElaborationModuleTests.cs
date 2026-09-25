@@ -25,9 +25,9 @@ namespace SMCA.WebApi.E2ETests.Stores;
 /// in the Superior (3) and VIP (4) plans, and its features are granted ONLY to OwnerAdmin.
 /// This suite pins the FULL chain a user experiences:
 ///
-///   EM1  OwnerAdmin creates a store inheriting the selected store's module set
-///        {7, 14, 17}: the new store gets active StoreModule(17) and StoreRoleFeature
-///        rows for 120/121 on OwnerAdmin.
+///   EM1  OwnerAdmin creates a store from a Superior selected store {7,14,17}: the child
+///        INHERITS only the Pago-catalog member (7) — 17/120/121 never reach it (strict
+///        birth invariant, 2026-09-25, store-birth-pago-only).
 ///   EM2  OwnerAdmin CANNOT elevate the plan to Superior (403 — SuperAdmin-reserved
 ///        since the 2026-09-18 caller matrix, user decision 2026-09-19); the SuperAdmin
 ///        change activates 17/120/121 through the SAME runtime chain
@@ -128,12 +128,14 @@ public sealed class ElaborationModuleTests
     }
 
     [Fact]
-    public async Task EM1_created_store_inherits_elaboration_from_selected_store()
+    public async Task EM1_created_store_clamps_inheritance_to_pago_catalog()
     {
         // OwnerAdmin creation contract (OwnerCreateStoreTests): the body ModuleIds are
         // IGNORED — the new store INHERITS the selected store's module set, and the
-        // handler gates on MultiStores (14) being active on the selected store. Seed the
-        // selected store with {7, 14, 17}: creating then propagates 17 + features 120/121.
+        // handler gates on MultiStores (14) being active on the selected store. Strict birth
+        // invariant (2026-09-25, store-birth-pago-only): the inherited set is CLAMPED to the
+        // active Pago catalog. Seed the selected store with {7, 14, 17}: creating now
+        // propagates ONLY 7 — 17 and features 120/121 never reach the child.
         var seeded = await SeedOwnerAdminStoreAsync(planId: (int)StorePlanType.Superior);
         try
         {
@@ -168,9 +170,14 @@ public sealed class ElaborationModuleTests
                 using var scope = _f.Services.CreateScope();
                 var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
+                var childModuleIds = await db.Set<StoreModule>().IgnoreQueryFilters()
+                    .Where(sm => sm.StoreId == newStoreId && sm.IsActive)
+                    .Select(sm => sm.ModuleId).ToListAsync();
+                childModuleIds.Should().BeEquivalentTo(new[] { 7 /* Management */ },
+                    "the child inherits ONLY the Pago-catalog member (7); 14/17 are Superior/VIP-only");
                 (await db.Set<StoreModule>().IgnoreQueryFilters().CountAsync(sm =>
                     sm.StoreId == newStoreId && sm.ModuleId == ElaborationModuleId && sm.IsActive))
-                    .Should().Be(1, "the inherited module set must contain Elaboration");
+                    .Should().Be(0, "Elaboration (17) must NOT reach the child");
 
                 var grantedFeatureIds = await db.Set<StoreRoleFeature>().IgnoreQueryFilters()
                     .Where(srf => srf.StoreId == newStoreId
@@ -178,8 +185,8 @@ public sealed class ElaborationModuleTests
                     .Select(srf => srf.FeatureId)
                     .Distinct()
                     .ToListAsync();
-                grantedFeatureIds.Should().Contain(new[] { RecipesFeatureId, ElaborationsFeatureId },
-                    "features 120/121 must be granted to OwnerAdmin on the registered store");
+                grantedFeatureIds.Should().NotContain(new[] { RecipesFeatureId, ElaborationsFeatureId },
+                    "features 120/121 must not be granted to the child");
             }
             finally
             {

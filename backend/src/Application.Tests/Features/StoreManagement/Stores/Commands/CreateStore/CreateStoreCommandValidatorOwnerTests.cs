@@ -2,6 +2,7 @@ using Application.Abstractions.HttpContext;
 using Application.Features.StoreManagement.Stores.Commands.CreateStore;
 using Domain.Entities.Modules;
 using Domain.Entities.Owners;
+using Domain.Entities.Plans;
 using Domain.Interfaces.Repositories;
 using FluentAssertions;
 using Microsoft.Extensions.Localization;
@@ -20,6 +21,7 @@ public class CreateStoreCommandValidatorOwnerTests
     private readonly Mock<IOwnerRepository> _mockOwnerRepository;
     private readonly Mock<IStoreRepository> _mockStoreRepository;
     private readonly Mock<IModuleRepository> _mockModuleRepository;
+    private readonly Mock<IPlanRepository> _mockPlanRepository;
     private readonly Mock<IHttpContextService> _mockHttpContextService;
     private readonly Mock<IStringLocalizer<I18n>> _mockLocalizer;
     private readonly CreateStoreCommandValidator _validator;
@@ -31,6 +33,7 @@ public class CreateStoreCommandValidatorOwnerTests
         _mockOwnerRepository = new Mock<IOwnerRepository>();
         _mockStoreRepository = new Mock<IStoreRepository>();
         _mockModuleRepository = new Mock<IModuleRepository>();
+        _mockPlanRepository = new Mock<IPlanRepository>();
         _mockHttpContextService = new Mock<IHttpContextService>();
         _mockLocalizer = new Mock<IStringLocalizer<I18n>>();
 
@@ -47,6 +50,13 @@ public class CreateStoreCommandValidatorOwnerTests
                 Module.Create(1, "Module 1", 1, true, 0, true, true),
                 Module.Create(2, "Module 2", 2, true, 0, true, true),
             });
+        // Active Pago plan catalog mirrors the available set above: { 1, 2 }.
+        var pagoPlan = StorePlan.Create((int)Domain.Common.Enums.StorePlanType.Pago, "Pago", 2, true);
+        pagoPlan.StorePlanModules.Add(StorePlanModule.Create((int)Domain.Common.Enums.StorePlanType.Pago, 1));
+        pagoPlan.StorePlanModules.Add(StorePlanModule.Create((int)Domain.Common.Enums.StorePlanType.Pago, 2));
+        _mockPlanRepository
+            .Setup(x => x.GetActivePlanWithModulesByIdAsync((int)Domain.Common.Enums.StorePlanType.Pago))
+            .ReturnsAsync(pagoPlan);
 
         SetupLocalizer("IsRequired");
         SetupLocalizer("OwnerNotFound");
@@ -59,6 +69,7 @@ public class CreateStoreCommandValidatorOwnerTests
             _mockOwnerRepository.Object,
             _mockStoreRepository.Object,
             _mockModuleRepository.Object,
+            _mockPlanRepository.Object,
             _mockHttpContextService.Object);
     }
 
@@ -87,6 +98,7 @@ public class CreateStoreCommandValidatorOwnerTests
         result.IsValid.Should().BeTrue();
         _mockOwnerRepository.Verify(x => x.GetByIdAsync(It.IsAny<Guid>()), Times.Never);
         _mockModuleRepository.Verify(x => x.GetAvailableModulesToStore(), Times.Never);
+        _mockPlanRepository.Verify(x => x.GetActivePlanWithModulesByIdAsync(It.IsAny<int>()), Times.Never);
     }
 
     [Fact]
@@ -160,6 +172,36 @@ public class CreateStoreCommandValidatorOwnerTests
         result.IsValid.Should().BeTrue();
         _mockOwnerRepository.Verify(x => x.GetByIdAsync(_existingOwnerId), Times.Once);
         _mockModuleRepository.Verify(x => x.GetAvailableModulesToStore(), Times.Once);
+        _mockPlanRepository.Verify(x => x.GetActivePlanWithModulesByIdAsync((int)Domain.Common.Enums.StorePlanType.Pago), Times.Once);
+    }
+
+    [Theory]
+    [InlineData(12)] // WholesaleSales
+    [InlineData(13)] // Warehouses
+    [InlineData(14)] // MultiStores
+    [InlineData(15)] // MultiMonedas
+    [InlineData(16)] // MultiPayments
+    [InlineData(17)] // Elaboration
+    public async Task Validate_non_owner_superior_only_module_is_rejected_by_pago_catalog(int superiorOnlyModuleId)
+    {
+        ArrangeRole(isOwnerAdmin: false);
+
+        var result = await _validator.ValidateAsync(CreateCommand(_existingOwnerId, new List<int> { 1, superiorOnlyModuleId }));
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain(e => e.PropertyName == nameof(CreateStoreCommand.ModuleIds)
+            && e.ErrorMessage.Contains("ModuleNotAvailableForPagoPlan"));
+    }
+
+    [Fact]
+    public async Task Validate_non_owner_all_pago_catalog_modules_are_valid()
+    {
+        ArrangeRole(isOwnerAdmin: false);
+
+        var result = await _validator.ValidateAsync(CreateCommand(_existingOwnerId, new List<int> { 1, 2 }));
+
+        result.IsValid.Should().BeTrue();
+        result.Errors.Should().BeEmpty();
     }
 
     [Fact]

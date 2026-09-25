@@ -10,6 +10,7 @@ using Domain.Common.Utils;
 using Domain.Entities.Billing;
 using Domain.Entities.Modules;
 using Domain.Entities.Owners;
+using Domain.Entities.Plans;
 using Domain.Entities.StoreModules;
 using Domain.Entities.Stores;
 using Domain.Interfaces.Repositories;
@@ -34,6 +35,7 @@ public class CreateStoreCommandHandlerTests
     private readonly Mock<IApplicationUnitOfWork> _mockUnitOfWork;
     private readonly Mock<IOwnerRepository> _mockOwnerRepository;
     private readonly Mock<IStoreModuleRepository> _mockStoreModuleRepository;
+    private readonly Mock<IPlanRepository> _mockPlanRepository;
     private readonly Mock<IBillingService> _mockBillingService;
     private readonly Mock<IHttpContextService> _mockHttpContextService;
     private readonly Mock<IMapper> _mockMapper;
@@ -49,6 +51,7 @@ public class CreateStoreCommandHandlerTests
         _mockUnitOfWork = new Mock<IApplicationUnitOfWork>();
         _mockOwnerRepository = new Mock<IOwnerRepository>();
         _mockStoreModuleRepository = new Mock<IStoreModuleRepository>();
+        _mockPlanRepository = new Mock<IPlanRepository>();
         _mockBillingService = new Mock<IBillingService>();
         _mockHttpContextService = new Mock<IHttpContextService>();
         _mockMapper = new Mock<IMapper>();
@@ -60,10 +63,20 @@ public class CreateStoreCommandHandlerTests
         _mockHttpContextService.Setup(x => x.UserExternalId).Returns(_callerUserId.ToString());
         _mockHttpContextService.Setup(x => x.StoreId).Returns(_callerStoreId.ToString());
 
+        // Active Pago plan catalog (strict birth invariant): the Pago loanable members this
+        // fixture pins are { 7, 8, 9, 10, 11 } — Superior/VIP-only members are NOT in it.
+        var pagoPlan = StorePlan.Create((int)StorePlanType.Pago, "Pago", 2, true);
+        foreach (var moduleId in new[] { 7, 8, 9, 10, 11 })
+            pagoPlan.StorePlanModules.Add(StorePlanModule.Create((int)StorePlanType.Pago, moduleId));
+        _mockPlanRepository
+            .Setup(x => x.GetActivePlanWithModulesByIdAsync((int)StorePlanType.Pago))
+            .ReturnsAsync(pagoPlan);
+
         _handler = new CreateStoreCommandHandler(
             _mockUnitOfWork.Object,
             _mockOwnerRepository.Object,
             _mockStoreModuleRepository.Object,
+            _mockPlanRepository.Object,
             _mockBillingService.Object,
             _mockHttpContextService.Object,
             _mockMapper.Object,
@@ -242,6 +255,8 @@ public class CreateStoreCommandHandlerTests
 
         result.Succeeded.Should().BeTrue();
         _mockOwnerRepository.Verify(x => x.GetOwnerIncludingUserByIdAsync(owner.Id, CancellationToken.None), Times.Once);
+        // Strict birth invariant: MultiStores (14) is Superior/VIP-only, so the inherited
+        // module set is clamped to the active Pago catalog -> only 7 reaches the service.
         _mockCreateStoreService.Verify(x => x.CreateStoreAsync(
             owner.Id,
             owner.TenantId,
@@ -249,7 +264,29 @@ public class CreateStoreCommandHandlerTests
             "Address 1",
             null,
             true, // Owner decision 6: owner-created stores are approved immediately.
-            It.Is<List<int>>(m => m.SequenceEqual(new List<int> { 7, (int)ModuleType.MultiStores }))),
+            It.Is<List<int>>(m => m.SequenceEqual(new List<int> { 7 }))),
+            Times.Once);
+        _mockPlanRepository.Verify(x => x.GetActivePlanWithModulesByIdAsync((int)StorePlanType.Pago), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_owner_admin_filters_superior_only_modules_from_inherited_set()
+    {
+        ArrangeRoles(isSuperAdmin: false, isOwnerAdmin: true);
+        var owner = ArrangeCallerOwner();
+        ArrangeAvailableModulesAlDia();
+        // Selected store is a Superior/VIP store carrying every Superior/VIP-only member.
+        ArrangeSelectedStoreModules(7, (int)ModuleType.WholesaleSales, (int)ModuleType.Warehouses,
+            (int)ModuleType.MultiStores, (int)ModuleType.MultiMonedas, (int)ModuleType.MultiPayments,
+            (int)ModuleType.Elaboration);
+        ArrangeStoreCreation(owner, out _);
+
+        var result = await _handler.Handle(CreateOwnerCommand(), CancellationToken.None);
+
+        result.Succeeded.Should().BeTrue();
+        _mockCreateStoreService.Verify(x => x.CreateStoreAsync(
+            owner.Id, owner.TenantId, "New Store", "Address 1", null, true,
+            It.Is<List<int>>(m => m.SequenceEqual(new List<int> { 7 }))),
             Times.Once);
     }
 
