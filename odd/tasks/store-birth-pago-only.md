@@ -2,7 +2,7 @@
 
 **Objective:** Enforce the strict birth invariant — a store created through ANY backend path lands with EXACTLY the active Pago plan catalog modules and never with Superior/VIP-only modules (12, 13, 14, 15, 16, 17).
 
-**Status:** IN PROGRESS — T1/T2 production + test updates authorized (2026-09-25).
+**Status:** DONE — closed 2026-09-25. Commits: `84d68ddc` (slice A), `7897a38f` (slice B) on `qa`, local == origin/qa (push remains user decision).
 
 ## Problem
 
@@ -46,12 +46,12 @@ User decision 2026-09-25 (strict invariant): "tienda recién creada = solo módu
 ## Tasks
 
 - [x] T0 — Authorize + inventory blast radius (user-approved 2026-09-25; all 11 files).
-- [ ] T1 — Validator: active-Pago-catalog rule (admin path) + `CreateStoreCommandValidatorOwnerTests` update.
-- [ ] T2 — Handler: owner-branch inheritance clamp to Pago catalog + `CreateStoreCommandHandlerTests` update.
-- [ ] T3 — E2E updates (admin path): `StoreCreatePlanTests` ×2, `WarehousesCreateStoreTests`.
-- [ ] T4 — E2E updates (owner path): `MultiMonedasModuleTests.MM1`, `ElaborationModuleTests.EM1`, `OwnerCreateStoreTests.OC04`, `ChangePlanPermissionFlipTests`.
-- [ ] T5 — New `StoreBirthPagoOnlyTests.cs` (admin 400 sweep, admin happy path + /me, owner clamp).
-- [ ] T6 — Build + filtered runs (unit + E2E) + commit slices + close.
+- [x] T1 — Validator: active-Pago-catalog rule (admin path) + `CreateStoreCommandValidatorOwnerTests` update.
+- [x] T2 — Handler: owner-branch inheritance clamp to Pago catalog + `CreateStoreCommandHandlerTests` update.
+- [x] T3 — E2E updates (admin path): `StoreCreatePlanTests` ×2, `WarehousesCreateStoreTests`.
+- [x] T4 — E2E updates (owner path): `MultiMonedasModuleTests.MM1`, `ElaborationModuleTests.EM1`, `OwnerCreateStoreTests.OC04`, `ChangePlanPermissionFlipTests`.
+- [x] T5 — New `StoreBirthPagoOnlyTests.cs` (admin 400 sweep, admin happy path + /me, owner clamp).
+- [x] T6 — Build + filtered runs (unit + E2E) + commit slices + close.
 
 ## Route plan (per task; delivery budget advisory)
 
@@ -69,12 +69,18 @@ User decision 2026-09-25 (strict invariant): "tienda recién creada = solo módu
 
 ## Progress
 
-- T0 done. Commits: (0 so far).
+- T0 done. Commits: `84d68ddc` slice A (validator + unit validator + StoreCreatePlanTests + WarehousesCreateStoreTests + BP1/BP2, + feature doc), `7897a38f` slice B (handler + unit handler + MM1/EM1/OC04/CPF flips + BP3). Both fully green before commit.
 
 ## Verification evidence
 
-- (pending; record per task, per commit, and final run)
+- Build `SMCA.sln`: 0 errors (20 pre-existing nullable warnings, none from feature files).
+- Unit `--filter "FullyQualifiedName~CreateStore"`: **58/58 PASS** (post-slice-B tree; includes plan-mock catalog handler/validator updates).
+- E2E slice A filter (`StoreCreatePlanTests|WarehousesCreateStoreTests|StoreBirthPagoOnlyTests`): **14/14 PASS** (post-slice-A commit; BP1 ×6, BP2, Warehouses reshape, StoreCreatePlan ×6).
+- E2E slice B filter (`MultiMonedasModuleTests|ElaborationModuleTests|OwnerCreateStoreTests|ChangePlanPermissionFlipTests|StoreBirthPagoOnlyTests`): **28/28 PASS** (post-slice-B; includes MM1/EM1/OC04/CPF flips + BP3).
+- Note: `Create_store_module_ids_duplicates_return_500_pk_collision` intentionally triggers a PK collision and logs an ERR-level stack trace (expected by-design logging, test passes).
 
 ## RDD
 
-- Native review assess per work-unit commit when RDD on; prior session established OpenCode runtime review transport is unavailable (`immutable_review_transport_unsupported`); record outcome honestly per commit.
+- Assess per work-unit commit (`--agent opencode --base-ref c5e95406 --committed-only --json`): returned `gentle-ai.review-assessment/v1` `risk: high`, `review_due: true`, reason `unassessable` — "active runtime is not eligible for immutable receipt review; supported runtimes: claude-code, codex".
+- Preflight STATUS per RDD (not-lowered tier): `gentle-ai.review-integration.failure/v2` `code: immutable_review_transport_unsupported`, `next_action: stop`, `mutation_outcome: not_started`, `retry_safe: false`.
+- Honest outcome: OpenCode runtime cannot run native RDD review → reviewed boundary does NOT advance for `84d68ddc` nor `7897a38f`; both commits remain due/high-risk until reviewable in a supported runtime or the user disables the switch. No GitHub mutation, no authority created. This is a runtime limitation, not a Gentle AI defect.
