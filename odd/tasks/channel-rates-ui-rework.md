@@ -2,7 +2,7 @@
 
 **Objective:** Rework the `management/channel-rates` view per the user's 5 requested UI changes: every info trigger opens a popup (never inline expansion); the header info icon sits next to the header text (not right-aligned); "Tasas Vigentes" drops the status column and shows active rows only; the Desactivar button becomes a delete icon with a confirmation popup that deactivates; the table then shows the latest active rate of that channel; the deactivate column header carries no text.
 
-**Status:** DONE — work-unit committed. Commits: `77fff0f9` (branch sync origin/test → qa + push, user-requested), `59d596ad` (feature work-unit) on `qa`. Push remains user decision.
+**Status:** DONE — work-unit committed and pushed. Commits: `77fff0f9` (branch sync origin/test → qa + push, user-requested), `59d596ad` (feature work-unit), `f05c2adf` (docs follow-up) on `qa` — all pushed to `origin/qa` (user-authorized 2026-09-25).
 
 ## Problem
 
