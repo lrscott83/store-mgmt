@@ -104,6 +104,7 @@ import {
   EModules,
   SalePaymentMethod,
   Currency,
+  channelKey,
 } from '@store-mgmt/domain';
 import type { ChannelRate, Product } from '@store-mgmt/domain';
 import type { MultiPaymentRow } from '~/shared/components/multipayments/multi-payment-list';
@@ -335,7 +336,10 @@ describe('CartShell — Limpiar / Registrar buttons', () => {
 
   it('enables both buttons when the cart has items', () => {
     const product = makeProduct();
-    mockCartState({ items: [{ product, quantity: 1 }], total: vi.fn().mockReturnValue(5) });
+    mockCartState({
+      items: [{ product, quantity: 1 }],
+      total: vi.fn().mockReturnValue(5),
+    });
     renderCartShell();
     openCart();
     expect(screen.getByText('Limpiar').closest('button')).not.toBeDisabled();
@@ -345,7 +349,11 @@ describe('CartShell — Limpiar / Registrar buttons', () => {
   it('clears the cart when "Limpiar" is clicked', () => {
     const product = makeProduct();
     const clear = vi.fn();
-    mockCartState({ items: [{ product, quantity: 1 }], total: vi.fn().mockReturnValue(5), clear });
+    mockCartState({
+      items: [{ product, quantity: 1 }],
+      total: vi.fn().mockReturnValue(5),
+      clear,
+    });
     renderCartShell();
     openCart();
     fireEvent.click(screen.getByText('Limpiar'));
@@ -838,7 +846,11 @@ describe('CartShell — createOrder validations (Registrar)', () => {
   it('CART-07: closes the cart popup, shows the ORDER_CREATED success toast (with "Éxito" title), and clears the cart on a valid submission', async () => {
     const product = makeProduct();
     const clear = vi.fn();
-    mockCartState({ items: [{ product, quantity: 1 }], total: vi.fn().mockReturnValue(5), clear });
+    mockCartState({
+      items: [{ product, quantity: 1 }],
+      total: vi.fn().mockReturnValue(5),
+      clear,
+    });
     renderCartShell();
     openCart();
     expect(screen.getByText('Venta actual')).toBeInTheDocument();
@@ -868,7 +880,11 @@ describe('CartShell — createOrder validations (Registrar)', () => {
   it('CART-08: shows the ORDER_NOT_CREATED error toast (with "Error" title) when createOrder resolves succeeded:false, without closing the cart or clearing it', async () => {
     const product = makeProduct();
     const clear = vi.fn();
-    mockCartState({ items: [{ product, quantity: 1 }], total: vi.fn().mockReturnValue(5), clear });
+    mockCartState({
+      items: [{ product, quantity: 1 }],
+      total: vi.fn().mockReturnValue(5),
+      clear,
+    });
     createOrderMock.mockResolvedValueOnce({
       data: null,
       succeeded: false,
@@ -906,7 +922,11 @@ describe('CartShell — createOrder validations (Registrar)', () => {
   it("CART-09 (T2.0 finding): a thrown/rejected createOrder shows NO toast (mirrors Angular's absent error handler) and leaks no raw err.message", async () => {
     const product = makeProduct();
     const clear = vi.fn();
-    mockCartState({ items: [{ product, quantity: 1 }], total: vi.fn().mockReturnValue(5), clear });
+    mockCartState({
+      items: [{ product, quantity: 1 }],
+      total: vi.fn().mockReturnValue(5),
+      clear,
+    });
     createOrderMock.mockRejectedValueOnce(new Error('raw boom, do not leak me'));
     renderCartShell();
     openCart();
@@ -1269,6 +1289,45 @@ describe('CartShell — multi-payment list (módulo 16)', () => {
     expect(screen.queryByTestId('multi-payment-list')).not.toBeInTheDocument();
     expect(screen.getByLabelText('Pago')).toBeInTheDocument();
     expect(screen.getAllByRole('radio').length).toBeGreaterThan(0);
+  });
+
+  it('each row picks its channel with a single select (method + currency), not two', () => {
+    mockMultiPaymentCart({ payments: [paymentRow({ amount: 5 })] });
+    renderCartShell();
+    openCart();
+
+    expect(screen.queryByTestId('multi-payment-method')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('multi-payment-currency')).not.toBeInTheDocument();
+    const select = screen.getByTestId('multi-payment-channel') as HTMLSelectElement;
+    expect(select.value).toBe(channelKey(SalePaymentMethod.Efectivo, Currency.CUP));
+    const labels = [...select.options].map((option) => option.textContent ?? '');
+    expect(labels).toContain('Efectivo');
+    expect(labels).toContain('Transferencia (CUP)');
+  });
+
+  it('T22/A2: siembra el primer canal del catálogo de la venta (MLC → Transferencia)', async () => {
+    const setPayments = vi.fn();
+    mockUser = { id: 'u1', selectedStoreId: 's1', storeModuleIds: MULTI_PAYMENTS_STORE_MODULES };
+    localStorage.setItem('lizoft.cart-currency-u1', String(Currency.MLC));
+    const product = makeProduct({ price: 5, currency: Currency.MLC });
+    mockCartState({
+      items: [{ product, quantity: 1 }],
+      total: vi.fn().mockReturnValue(5),
+      cartCurrency: () => Currency.MLC,
+      payments: [],
+      setPayments,
+    });
+    renderCartShell();
+    openCart();
+
+    await waitFor(() => expect(setPayments).toHaveBeenCalledTimes(1));
+    const rows = setPayments.mock.calls[0][0] as MultiPaymentRow[];
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      method: SalePaymentMethod.Transferencia,
+      currency: Currency.MLC,
+      amount: 5,
+    });
   });
 
   it('submitting with payments passes the converted OrderPayment[] and derives the legacy method from the first payment', async () => {
@@ -1665,7 +1724,9 @@ describe('CartShell — T3: selector de moneda en la fila del encabezado', () =>
 
     // Same toolbar group as "Limpiar"/"Registrar" — same visual row.
     expect(limpiar!.parentElement).toContainElement(select);
-    expect(select.parentElement?.parentElement).toBe(limpiar!.parentElement);
+    // T15: the select has no wrapper of its own any more (the visible label was
+    // removed); it is a direct child of the toolbar group.
+    expect(select.parentElement).toBe(limpiar!.parentElement);
     // Rendered BEFORE "Limpiar" in DOM order.
     expect(
       select.compareDocumentPosition(limpiar!) & Node.DOCUMENT_POSITION_FOLLOWING,
@@ -1673,6 +1734,35 @@ describe('CartShell — T3: selector de moneda en la fila del encabezado', () =>
     // Inside the header row that also holds "Venta actual" (no row of its own).
     const headerRow = screen.getByText('Venta actual').parentElement?.parentElement;
     expect(headerRow).toContainElement(select);
+  });
+
+  it('T15-01: el selector no muestra label visible, pero conserva su nombre accesible', () => {
+    renderCartShell();
+    openCart();
+
+    const select = screen.getByLabelText('Moneda');
+    expect(select).toBe(screen.getByTestId('cart-currency-select'));
+    // The visible label text is gone from the header.
+    expect(screen.queryByText('Moneda')).not.toBeInTheDocument();
+  });
+
+  it('T15-02: el encabezado es una sola fila con el select y los botones a la derecha', () => {
+    renderCartShell();
+    openCart();
+
+    const headerRow = screen.getByText('Venta actual').parentElement?.parentElement;
+    expect(headerRow).not.toBeNull();
+    // Single row: no wrap on the header toolbar.
+    expect(headerRow!.className).not.toContain('flex-wrap');
+
+    const select = screen.getByTestId('cart-currency-select');
+    const limpiar = screen.getByText('Limpiar').closest('button');
+    const registrar = screen.getByText('Registrar').closest('button');
+    const toolbar = select.parentElement;
+    expect(toolbar).toBe(limpiar!.parentElement);
+    expect(toolbar).toBe(registrar!.parentElement);
+    // The toolbar group (select + both buttons) is the rightmost element of the row.
+    expect(headerRow!.lastElementChild).toBe(toolbar);
   });
 
   it('T3-02: sin el módulo 16 el selector no existe y el encabezado sigue intacto', () => {
@@ -1834,5 +1924,79 @@ describe('CartShell — T4: bloqueo del cambio de moneda', () => {
     const error = screen.getByTestId('cart-line-conversion-error');
     expect(error).toHaveAttribute('data-error-code', 'ChannelRate.RateNotFound');
     expect(screen.getByText('Registrar').closest('button')).toBeDisabled();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// T17 — "Limpiar" vuelve la moneda de la venta a CUP y descarta el aviso.
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('CartShell — T17: Limpiar reinicia la moneda a CUP', () => {
+  const MULTI_PAYMENTS_STORE_MODULES = [11, EModules.MultiPayments];
+
+  function setSaleCurrencyPreference(currency: Currency) {
+    localStorage.setItem('lizoft.cart-currency-u1', String(currency));
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    mockUser = { id: 'u1', selectedStoreId: 's1', storeModuleIds: MULTI_PAYMENTS_STORE_MODULES };
+    mockChannelRates = [];
+    mockProductLookup = {};
+  });
+
+  it('T17-01: tras "Limpiar" el selector vuelve a CUP y la preferencia se persiste en CUP', () => {
+    setSaleCurrencyPreference(Currency.USD);
+    mockChannelRates = [
+      {
+        method: SalePaymentMethod.Efectivo,
+        currency: Currency.CUP,
+        value: 350,
+        effectiveFrom: new Date('2026-09-01T00:00:00.000Z'),
+      },
+    ];
+    const cupProduct = makeProduct({ id: 'cup-1', name: 'Pan', price: 350, currency: Currency.CUP });
+    mockCartState({
+      items: [{ product: cupProduct, quantity: 1 }],
+      total: vi.fn().mockReturnValue(350),
+      cartCurrency: () => Currency.CUP,
+      payments: [],
+      setPayments: vi.fn(),
+    });
+    renderCartShell();
+    openCart();
+
+    const select = screen.getByTestId('cart-currency-select') as HTMLSelectElement;
+    expect(select.value).toBe(String(Currency.USD));
+
+    fireEvent.click(screen.getByText('Limpiar'));
+
+    expect(select.value).toBe(String(Currency.CUP));
+    expect(localStorage.getItem('lizoft.cart-currency-u1')).toBe(String(Currency.CUP));
+    expect(screen.queryByTestId('cart-currency-change-error')).not.toBeInTheDocument();
+  });
+
+  it('T17-02: tras "Limpiar" el aviso de cambio bloqueado desaparece', () => {
+    const cupProduct = makeProduct({ id: 'cup-1', name: 'Pan', price: 350, currency: Currency.CUP });
+    mockCartState({
+      items: [{ product: cupProduct, quantity: 1 }],
+      total: vi.fn().mockReturnValue(350),
+      cartCurrency: () => Currency.CUP,
+      payments: [],
+      setPayments: vi.fn(),
+    });
+    renderCartShell();
+    openCart();
+
+    // No rate → choosing USD is rejected and the alert appears.
+    fireEvent.change(screen.getByTestId('cart-currency-select'), {
+      target: { value: String(Currency.USD) },
+    });
+    expect(screen.getByTestId('cart-currency-change-error')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('Limpiar'));
+
+    expect(screen.queryByTestId('cart-currency-change-error')).not.toBeInTheDocument();
   });
 });

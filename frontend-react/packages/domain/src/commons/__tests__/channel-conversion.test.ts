@@ -250,3 +250,68 @@ describe('convertLineAmount — channel-independent currency conversion (RF-09)'
     expect(missing.errors).toEqual([ChannelRateErrors.RateNotFound]);
   });
 });
+
+describe('isActive (T19b) — inactive rows never resolve, absent means active', () => {
+  it('skips a deactivated row and resolves the newest ACTIVE row instead', () => {
+    const rates = [
+      { ...makeRate(Currency.CUP, 700, '2026-09-01', SalePaymentMethod.Efectivo), id: 'old' },
+      {
+        ...makeRate(Currency.CUP, 900, '2026-09-10', SalePaymentMethod.Efectivo),
+        id: 'new',
+        isActive: false,
+      },
+    ];
+
+    const result = resolveChannelRate(rates, SalePaymentMethod.Efectivo, Currency.CUP, AT);
+    expect(result.succeeded).toBe(true);
+    expect(result.data?.value).toBe(700 * RATE_MICRO);
+    expect(result.data?.id).toBe('old');
+  });
+
+  it('treats a row WITHOUT isActive as active (backwards compatible)', () => {
+    const legacy = [{ ...makeRate(Currency.CUP, 700, '2026-09-01'), id: 'legacy' }];
+    expect(
+      resolveChannelRate(legacy, SalePaymentMethod.Efectivo, Currency.CUP, AT).data?.value,
+    ).toBe(700 * RATE_MICRO);
+
+    const explicitTrue = legacy.map((row) => ({ ...row, isActive: true }));
+    expect(
+      resolveChannelRate(explicitTrue, SalePaymentMethod.Efectivo, Currency.CUP, AT).data?.value,
+    ).toBe(700 * RATE_MICRO);
+  });
+
+  it('excludes an inactive row from the same-currency fallback and the currency cascade', () => {
+    const onlyInactive = [
+      {
+        ...makeRate(Currency.CUP, 700, '2026-09-01', SalePaymentMethod.Transferencia),
+        isActive: false,
+      },
+    ];
+
+    // Efectivo+CUP: exact is missing, the same-currency fallback must skip the
+    // inactive row. CUP has no USD pivot, so the cascade is a typed error.
+    expect(resolveChannelRate(onlyInactive, SalePaymentMethod.Efectivo, Currency.CUP, AT).succeeded).toBe(
+      false,
+    );
+    expect(resolveCurrencyRate(onlyInactive, Currency.CUP, AT).succeeded).toBe(false);
+
+    const conversion = convertLineAmount(1000, Currency.CUP, Currency.USD, onlyInactive, AT);
+    expect(conversion.succeeded).toBe(false);
+    expect(conversion.errors).toEqual([ChannelRateErrors.RateNotFound]);
+  });
+
+  it('an inactive row of one method does not block an active row of another method', () => {
+    const rates = [
+      {
+        ...makeRate(Currency.CUP, 900, '2026-09-10', SalePaymentMethod.Transferencia),
+        isActive: false,
+      },
+      makeRate(Currency.CUP, 700, '2026-09-01', SalePaymentMethod.Efectivo),
+    ];
+
+    const result = resolveChannelRate(rates, SalePaymentMethod.Transferencia, Currency.CUP, AT);
+    expect(result.succeeded).toBe(true);
+    expect(result.data?.value).toBe(700 * RATE_MICRO);
+    expect(result.data?.method).toBe(SalePaymentMethod.Efectivo);
+  });
+});

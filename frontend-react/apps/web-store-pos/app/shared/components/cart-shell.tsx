@@ -6,6 +6,7 @@ import { Currency, OrderType } from '@store-mgmt/domain';
 import {
   SalePaymentMethod,
   applyPaymentPricing,
+  defaultPaymentMethodForCurrency,
   isCashMethod,
   paymentMethodOptionsForCurrency,
   paymentPricingFor,
@@ -40,12 +41,13 @@ import { showBlockingError, showAcknowledgeError } from '~/shared/lib/blocking-a
 import { showToastSuccess, showToastError } from '~/shared/lib/toast';
 import { round2 } from '~/shared/lib/money';
 import { currencyLabel, formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency';
-import { readCartCurrencyPreference } from '~/shared/lib/cart-currency-preference';
+import { readCartCurrencyPreference, writeCartCurrencyPreference } from '~/shared/lib/cart-currency-preference';
 import { hasMultiMonedasAvailable } from '~/shared/components/multimonedas/currency-select';
 import {
-  DEFAULT_ENABLED_PAYMENT_METHODS,
+  DEFAULT_ENABLED_CHANNEL_KEYS,
   StorePaymentMethodsConfigService,
   applyStorePaymentMethodsConfig,
+  enabledMethodsForCurrency,
 } from '~/shared/lib/payment-methods/store-payment-methods-config-service';
 import { CartCurrencySelect } from '~/shared/components/multipayments/cart-currency-select';
 import { MultiPaymentList, createPaymentRow } from '~/shared/components/multipayments/multi-payment-list';
@@ -227,15 +229,16 @@ export function CartShell() {
   }
 
   // payment-methods-percent-tax (plan 2026-09-17) + store-payment-methods-config
-  // (2026-09-22): el catálogo de métodos de la venta = moneda → gate de plan
-  // (sin MultiMonedas no hay Zelle) → config por-tienda (métodos deshabilitados
-  // fuera; Efectivo siempre). Config leída de localStorage (instancia fresca por
-  // memo); SSR: sin window se usa el default y la hidratación lee localStorage.
-  const paymentConfigEnabledMethods = useMemo(() => {
+  // (2026-09-22, per-channel T20 2026-09-24): el catálogo de métodos de la venta
+  // = moneda → gate de plan (sin MultiMonedas no hay Zelle) → config por-tienda
+  // (canales deshabilitados fuera para ESA moneda; Efectivo siempre). La config
+  // se lee de localStorage (instancia fresca por memo); SSR: sin window se usan
+  // todos los canales y la hidratación lee localStorage.
+  const paymentConfigEnabledChannels = useMemo(() => {
     if (typeof window === 'undefined' || !storeId) {
-      return [...DEFAULT_ENABLED_PAYMENT_METHODS];
+      return [...DEFAULT_ENABLED_CHANNEL_KEYS];
     }
-    return new StorePaymentMethodsConfigService(storeId).getEnabledMethods(storeId);
+    return new StorePaymentMethodsConfigService(storeId).getEnabledChannels(storeId);
   }, [storeId]);
 
   const methodOptions = useMemo(() => {
@@ -243,8 +246,11 @@ export function CartShell() {
     const planGate = hasMultiMonedasAvailable(user)
       ? base
       : base.filter((m) => m !== SalePaymentMethod.Zelle);
-    return applyStorePaymentMethodsConfig(planGate, paymentConfigEnabledMethods);
-  }, [saleCurrency, user, paymentConfigEnabledMethods]);
+    return applyStorePaymentMethodsConfig(
+      planGate,
+      enabledMethodsForCurrency(paymentConfigEnabledChannels, saleCurrency),
+    );
+  }, [saleCurrency, user, paymentConfigEnabledChannels]);
 
   useEffect(() => {
     if (!methodOptions.includes(salePaymentMethod)) {
@@ -302,12 +308,15 @@ export function CartShell() {
 
   // T5 (payment-channels-and-multipayment): cuando el bloque de multipago pasa a
   // ser relevante (carrito con ítems + módulo 16) y aún no hay filas, se siembra
-  // UNA fila Efectivo por el total de la venta — misma moneda ⇒ sin conversión y
-  // sin mensaje de tasa. La siembra ocurre SOLO en la transición a "activo" (ref):
-  // así no pelea con las ediciones del usuario (ni re-siembra si borra todas las
-  // filas) y el guard sigue coherente (si el usuario baja el monto, queda en
-  // subpago y "Registrar" se bloquea). Al vaciarse el carrito se limpian las filas
-  // para que la próxima venta arranque de cero.
+  // UNA fila por el total de la venta con el PRIMER canal válido del catálogo para
+  // la moneda de la venta (T22/A2) — misma moneda ⇒ sin conversión y sin mensaje de
+  // tasa. Para CUP/USD/EUR/CAD/MXN es Efectivo; para MLC/CLA es Transferencia
+  // (Efectivo no existe en esas monedas, así que sembrarlo dejaría un canal fuera
+  // de catálogo). La siembra ocurre SOLO en la transición a "activo" (ref): así no
+  // pelea con las ediciones del usuario (ni re-siembra si borra todas las filas) y
+  // el guard sigue coherente (si el usuario baja el monto, queda en subpago y
+  // "Registrar" se bloquea). Al vaciarse el carrito se limpian las filas para que
+  // la próxima venta arranque de cero.
   const multiPaymentsSeededRef = useRef(false);
   useEffect(() => {
     if (!multiPaymentsActive) {
@@ -319,7 +328,7 @@ export function CartShell() {
     multiPaymentsSeededRef.current = true;
     if (payments.length === 0) {
       setPayments([
-        createPaymentRow(SalePaymentMethod.Efectivo, saleCurrency, totalAmount),
+        createPaymentRow(defaultPaymentMethodForCurrency(saleCurrency), saleCurrency, totalAmount),
       ]);
     }
     // Intencional: solo la transición a activo dispara la siembra.
@@ -349,6 +358,14 @@ export function CartShell() {
   function handleClear() {
     clear();
     resetTransientFields();
+    // T17: "Limpiar" returns the sale currency to CUP and dismisses any pending
+    // currency-change notice, so the next sale starts clean. Without module 16
+    // the selector is not rendered, so only the module path is touched.
+    if (multiPaymentsAvailable) {
+      setPreferredCartCurrency(Currency.CUP);
+      setCurrencyChangeError(null);
+      writeCartCurrencyPreference(user?.id, Currency.CUP);
+    }
   }
 
   // 1:1 port of Angular's NavRightComponent.increaseProduct/decreaseProduct ->
@@ -607,7 +624,7 @@ export function CartShell() {
           mirroring Angular's `.pc-h-dropdown { left:0; right:0 }` under the sm breakpoint.
           sm+: narrow 20rem dropdown anchored to the right. */}
         {isOpen && (
-          <div className="absolute left-0 right-0 top-full mt-2 w-auto rounded-xl border border-border bg-surface shadow-card z-50 sm:left-auto sm:right-0 sm:w-80">
+          <div className="absolute left-0 right-0 top-full mt-2 w-auto rounded-xl border border-border bg-surface shadow-card z-50 sm:left-auto sm:right-0 sm:w-96">
             {/* Header: "Venta actual" (hardcoded, matches Angular) + LIVE order type subtitle.
               Angular's NavRightComponent binds this to shoppingCartService.getOrderType()
               (nav-right.component.ts:427-429, nav-right.component.html:96) — NOT a fixed
@@ -617,12 +634,14 @@ export function CartShell() {
               right — matching Angular's nav-right header row (both mat-fab buttons live at
               the top, disabled when the cart is empty). React closes the panel via
               click-outside (useClickOutside), so no explicit close button is needed. */}
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-3">
-              <div>
-                <h3 className="text-sm font-semibold text-text">Venta actual</h3>
-                <span className="text-xs text-text-muted">{getOrderTypeText(orderType)}</span>
+            <div className="flex items-center justify-between gap-2 border-b border-border px-2 py-2">
+              <div className="min-w-0">
+                <h3 className="truncate text-sm font-semibold text-text">Venta actual</h3>
+                <span className="block truncate text-xs text-text-muted">
+                  {getOrderTypeText(orderType)}
+                </span>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex shrink-0 items-center gap-1.5">
                 {/* MultiPayments: selector de moneda del carrito (módulo 16), en la
                   misma fila del encabezado y ANTES de "Limpiar". El propio
                   componente se oculta sin el módulo, así que ningún flujo existente cambia. */}
@@ -654,7 +673,7 @@ export function CartShell() {
             {/* T4: aviso cuando el cambio de moneda se rechazó porque una línea no
               puede convertirse. Sin el módulo 16 el aviso nunca aparece. */}
             {currencyChangeError && (
-              <div className="border-b border-border px-4 py-2">
+              <div className="border-b border-border px-2 py-2">
                 <p
                   role="alert"
                   data-testid="cart-currency-change-error"
@@ -689,7 +708,7 @@ export function CartShell() {
                   "con cuánto paga" y el vuelto aplican SOLO en efectivo (misma moneda de la
                   venta, sin cambio); en Transferencia/Zelle se ocultan. */}
                 {cashSale ? (
-                <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
+                <div className="flex items-center justify-between gap-2 border-b border-border px-2 py-3">
                   <span
                     className={
                       paymentReturnKind === 'positive'
@@ -719,7 +738,7 @@ export function CartShell() {
                 ) : (
                   /* Transferencia/Zelle: sin vuelto ni "con cuánto paga" — el cobro no es
                      en efectivo. Fila informativa para conservar el ritmo visual. */
-                  <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
+                  <div className="flex items-center justify-between gap-2 border-b border-border px-2 py-3">
                     <span className="text-xs font-medium text-text-muted">
                       {salePaymentMethodLabel(salePaymentMethod, saleCurrency)}
                     </span>
@@ -730,7 +749,7 @@ export function CartShell() {
                   (payment-methods-percent-tax, plan 2026-09-17): cada método con su
                   etiqueta ("Transferencia (CUP)" incluye su moneda), solo texto sin ícono
                   (petición 2026-09-21). Reemplaza al selector fijo Efectivo/Tarjeta. */}
-                <div className="border-b border-border px-4 py-3">
+                <div className="border-b border-border px-2 py-3">
                   <div className="flex flex-wrap gap-4" role="radiogroup">
                     {methodOptions.map((method) => {
                       const label = salePaymentMethodLabel(method, saleCurrency);
@@ -760,7 +779,7 @@ export function CartShell() {
               muestra el error tipado y "Registrar" queda bloqueado (multiPaymentBlocked).
               Sin el módulo 16 este aviso nunca aparece. */}
             {multiPaymentsActive && lineConversion.firstError && (
-              <div className="border-b border-border px-4 py-2">
+              <div className="border-b border-border px-2 py-2">
                 <p
                   role="alert"
                   data-testid="cart-line-conversion-error"
@@ -775,7 +794,7 @@ export function CartShell() {
             {/* Credit toggle + client input — gated by hasCreditsModuleAvailable, matching
               Angular's @if (hasCreditsModuleAvailable) block */}
             {creditsModuleAvailable && (
-              <div className="flex items-center gap-2 border-b border-border px-4 py-3">
+              <div className="flex items-center gap-2 border-b border-border px-2 py-3">
                 <Switch
                   checked={isCredit}
                   onChange={() => toggleCredit()}
@@ -795,7 +814,7 @@ export function CartShell() {
 
             {/* Print-invoice toggle — UI-only, no print behavior (Angular's
               generateTicket/generateFacture are disabled no-ops) */}
-            <div className="flex items-center gap-2 border-b border-border px-4 py-3">
+            <div className="flex items-center gap-2 border-b border-border px-2 py-3">
               <Switch
                 checked={mustGenerateFacture}
                 onChange={(v) => setMustGenerateFacture(v)}
@@ -808,7 +827,7 @@ export function CartShell() {
               {items.length === 0 ? (
                 // Angular shows the empty-cart notice inside an alert-light-primary box;
                 // InfoBox is React's design-system equivalent of that info banner.
-                <div className="px-4 py-4">
+                <div className="px-2 py-4">
                   <InfoBox variant="primary">
                     {intl.formatMessage({ id: 'SHOPPING_CART.DON_NOT_PAY_EMPTY_CART' })}
                   </InfoBox>
@@ -828,7 +847,7 @@ export function CartShell() {
                         ? round2(convertedUnitPrice * item.quantity)
                         : round2((item.price ?? item.product.price) * item.quantity);
                     return (
-                      <li key={item.product.id} className="flex items-center gap-2 pl-4 pr-1 py-2">
+                      <li key={item.product.id} className="flex items-center gap-2 pl-2 pr-1 py-2">
                         <div className="flex-1 min-w-0">
                           <p className="truncate text-sm font-medium text-text">
                             {item.product.name}

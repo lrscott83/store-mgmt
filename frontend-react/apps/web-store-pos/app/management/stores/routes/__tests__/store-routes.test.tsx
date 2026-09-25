@@ -192,6 +192,10 @@ vi.mock('react-router', () => ({
 
 vi.mock('~/auth/routes/loaders', () => ({
   adminFeatureLoader: () => vi.fn().mockResolvedValue(null),
+  // S2-03 revisited (2026-09-25): the create route uses ownerStoresGate, which
+  // redirects owners without MultiStores. Component tests here render the page
+  // directly, so the mock passes through (these users are SuperAdmin anyway).
+  ownerStoresGate: () => vi.fn().mockResolvedValue(null),
 }));
 
 // ─── authHttpService mock (post-edit /me refresh) ─────────────────────────────

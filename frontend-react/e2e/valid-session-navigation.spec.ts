@@ -4,6 +4,7 @@ import { RegisterPage } from './support/register-page';
 import { LoginPage } from './support/login-page';
 import { newTestIdentity, type TestIdentity } from './support/identity';
 import { plantRoster, KAT_PASSWORD } from './support/roster-fixture';
+import { readAuthModel } from './support/auth-storage';
 
 /**
  * Sesión válida OwnerAdmin (online y offline): ir a /login o /register debe
@@ -15,14 +16,23 @@ import { plantRoster, KAT_PASSWORD } from './support/roster-fixture';
  * IndexedDB destruido con la tabla de wraps en localStorage intacta — el
  * estado que dispara el par de síntomas reportado.
  *
- * La ÚNICA celda donde el reload NO mantiene la vista es offline/sin clave
- * (test 12): el authLoader redirige a /login?unlock=1 ANTES de pintar cuando
- * needsUnlock && hasUnreadableCiphertext (design §5, auth/routes/loaders.ts:
+ * La celda donde el reload NO mantiene la vista es "sin clave de dispositivo"
+ * (tests 6 y 12): el authLoader redirige a /login?unlock=1 ANTES de pintar
+ * cuando needsUnlock && hasUnreadableCiphertext (design §5, auth/routes/loaders.ts:
  * 36-38) — es el unlock gate de cifrado at-rest, una redirección SIN logout.
- * El test 12 pinea ese comportamiento diseñado: el roster y la tabla de
- * wraps sobreviven, y el re-login offline restaura el home. La invariante
- * "recargar mantiene la sesión visible" queda cubierta por las otras tres
- * celdas de reload (tests 1, 6 y 7).
+ * Los tests 6 (online) y 12 (offline) pinean ese comportamiento diseñado:
+ * el re-login restaura el home y la sesión sobrevive. La invariante "recargar
+ * mantiene la sesión visible" queda cubierta por las celdas intactas (tests 1 y 7).
+ *
+ * NOTA (2026-09-24, autorización explícita del usuario): el test 6 pinneaba el
+ * comportamiento PREVIO del backend (el login online no dejaba wraps de
+ * dispositivo, así que el gate no disparaba y el reload mantenía la vista).
+ * Hoy el backend devuelve `storeDekWraps` en el login online igual que en el
+ * offline (LoginCommand.TryBuildLoginDekWrapsAsync), así que la tabla de wraps
+ * de `lizoft.device-dek` existe en AMBOS flujos y el gate dispara igual. El
+ * test quedó alineado con el 12 y su known-issue queda RESUELTO (la ficha
+ * `docs/testing/known-issues/group-a/valid-session-navigation-6.md` se retiró
+ * del repo al cerrarse).
  */
 
 const HOME_URL = /\/sales\/products$/;
@@ -94,7 +104,11 @@ const localTest = test.extend<{}, { onlineLockedSnapshot: SnapshotEntries }>({
       await context.close();
       await use({ origin, localStorage });
     },
-    { scope: 'worker' },
+    // 60s (Grupo F, autorización 2026-09-25): el mint en frío (registro + login
+    // reales) puede superar los 30s por defecto cuando la suite completa compite
+    // por el mismo dev server + backend; el reintento siempre pasaba porque el
+    // entorno ya estaba caliente.
+    { scope: 'worker', timeout: 60_000 },
   ],
 });
 
@@ -175,17 +189,38 @@ localTest.describe('online — sin clave de dispositivo', () => {
     },
   );
 
-  localTest('6. online/sin clave: recargar la vista mantiene la sesión', async ({ browser }) => {
-    const page = await browser.newPage();
-    await registerAndLoginOnline(page);
-    await deleteDeviceKeyDatabase(page);
+  localTest(
+    '6. online/sin clave: recargar con ciphertext ilegible va a /login?unlock=1 SIN logout',
+    async ({ browser }) => {
+      const page = await browser.newPage();
+      const identity = await registerAndLoginOnline(page);
+      await deleteDeviceKeyDatabase(page);
 
-    await page.reload();
-    await expect(page.getByRole('button', { name: USER_MENU })).toBeVisible({
-      timeout: 15_000,
-    });
-    await expect(page).toHaveURL(HOME_URL);
-  });
+      // El login online dejó la tabla de wraps de dispositivo (`lizoft.device-dek`,
+      // provisionada desde `storeDekWraps`) y el auto-init del home dejó entidades
+      // `lizoft.store-*` cifradas: al recargar sin DEK (IndexedDB destruido), el
+      // authLoader redirige ANTES de pintar (loaders.ts:36-38) — el unlock gate de
+      // cifrado at-rest, SIN logout (la excepción legítima del contrato
+      // authenticated-session-redirect.md; misma familia que el test 12 offline).
+      await page.reload();
+      await expect(page).toHaveURL(/\/login\?unlock=1$/);
+
+      // La sesión NO se cerró: denyAccess() es lo único que limpia AUTH_MODEL,
+      // y el gate es una redirección sin logout (la clave de AUTH_MODEL lleva
+      // prefijo de versión, por eso se busca por el sufijo estable).
+      expect(await readAuthModel(page)).not.toBeNull();
+
+      // Y sigue siendo recuperable: el re-login online re-provisiona la tabla de
+      // wraps (el password solo está en mano aquí) y devuelve al home.
+      const loginPage = new LoginPage(page);
+      await loginPage.fill(identity);
+      await loginPage.submit();
+      await page.waitForURL(HOME_URL, { timeout: 15_000 });
+      await expect(page.getByRole('button', { name: USER_MENU })).toBeVisible({
+        timeout: 15_000,
+      });
+    },
+  );
 });
 
 // ---------------------------------------------------------------------
@@ -225,25 +260,42 @@ test.describe.serial('offline — dispositivo intacto', () => {
 test.describe('offline — sin clave de dispositivo', () => {
   test.describe.configure({ timeout: 120_000 });
 
-  test('10. offline/sin clave: ir a /login redirige al home del rol', async ({ browser }) => {
+  test('10. offline/sin clave: ir a /login aterriza en el unlock con la sesión intacta', async ({
+    browser,
+  }) => {
     const page = await browser.newPage();
     await loginOfflineByRoster(page);
     await deleteDeviceKeyDatabase(page);
 
     await page.goto('/login');
-    await page.waitForURL(HOME_URL, { timeout: 15_000 });
+    // El gate de cifrado at-rest (needsUnlock && hasUnreadableCiphertext —
+    // loaders.ts:79-81) detiene al usuario autenticado en el PROPIO login:
+    // el formulario ES el prompt de unlock (login-offline.spec.ts F4). La
+    // redirección al home solo ocurre sin ciphertext ilegible; aquí la sesión
+    // offline dejó config de pagos auto-iniciada cifrada, así que el gate
+    // aplica. AUTORIZACIÓN 2026-09-24: test realineado a este diseño.
+    await expect(page).toHaveURL(/\/login$/);
+    // La sesión NO se cerró: denyAccess() es lo único que limpia AUTH_MODEL.
+    expect(await readAuthModel(page)).not.toBeNull();
   });
 
-  test('11. offline/sin clave: ir a /register redirige al home del rol', async ({ browser }) => {
+  test('11. offline/sin clave: ir a /register aterriza en el unlock con la sesión intacta', async ({
+    browser,
+  }) => {
     const page = await browser.newPage();
     await loginOfflineByRoster(page);
     await deleteDeviceKeyDatabase(page);
 
     await page.goto('/register');
-    await page.waitForURL(HOME_URL, { timeout: 15_000 });
+    // Mismo gate que el test 10 (guestOnlyLoader comparte la decisión): sin
+    // redirección al home y sin logout, con la sesión intacta.
+    await expect(page).toHaveURL(/\/register$/);
+    expect(await readAuthModel(page)).not.toBeNull();
   });
 
-  test('12. offline/sin clave: recargar con ciphertext ilegible va a /login?unlock=1 SIN logout', async ({ browser }) => {
+  test('12. offline/sin clave: recargar con ciphertext ilegible va a /login?unlock=1 SIN logout', async ({
+    browser,
+  }) => {
     const page = await browser.newPage();
     const login = await loginOfflineByRoster(page);
     await deleteDeviceKeyDatabase(page);

@@ -1,47 +1,118 @@
-import type { SalePaymentMethod } from '@store-mgmt/domain';
-import { SalePaymentMethod as PaymentMethodEnum } from '@store-mgmt/domain';
+import type { Currency, SalePaymentMethod } from '@store-mgmt/domain';
+import {
+  PAYMENT_CHANNELS,
+  SalePaymentMethod as PaymentMethodEnum,
+  channelKey,
+} from '@store-mgmt/domain';
 import { Result } from '@store-mgmt/domain';
 import { StorageKeys } from '~/shared/lib/storage/storage-keys';
 import { encryptEntity } from '~/shared/lib/storage/entity-crypto';
 import { readEntityOrThrow } from '~/shared/lib/storage/read-entity-or-throw';
 
 /**
- * Per-store payment-methods config (store-payment-methods-config, 2026-09-22):
- * which of the plan-catalogue payment methods the store actually accepts.
- * Persisted in the FRONTEND only (localStorage, ChannelRateOfflineService
- * pattern) — no backend, no sync/export participation; config is local per
- * device, exactly like channel-rates.
+ * Per-store payment configuration (store-payment-methods-config, 2026-09-22;
+ * per-channel since payment-channels-and-multipayment T20, 2026-09-24).
  *
- * Semantics:
- * - Efectivo is ALWAYS on and is never stored as disabled: toggling it is a
- *   no-op, and `applyStorePaymentMethodsConfig` forces it back in regardless
- *   of `enabledMethods` (no-regression rule, keeps the vuelto/isCashMethod
- *   flow intact).
- * - Absent key (store never configured) auto-inits to the DEFAULT (all
- *   methods on) — byte-identical to the pre-config catalogue.
- * - Plan/module rules are applied ON TOP at the consumption sites (the
- *   `hasMultiMonedas` gate); this service can only REMOVE methods.
+ * A CHANNEL is a (method, currency) pair of the canonical catalogue
+ * (`PAYMENT_CHANNELS`), persisted as its stable `channelKey`. A store turns
+ * individual channels on/off, and a sale method is offered per currency only
+ * when at least one enabled channel uses it for that currency.
+ *
+ * Shape compatibility:
+ * - `enabledChannels` (new, T20) is the source of truth when present.
+ * - `enabledMethods` (legacy, currency-agnostic) stays readable for data and
+ *   backups written before T20; it resolves to every channel whose method it
+ *   lists. It is only consulted when `enabledChannels` is absent.
+ * - Neither field present (store never configured) resolves to the default:
+ *   every channel on — byte-identical to the pre-config catalogue.
+ *
+ * Efectivo is ALWAYS on: it can never be disabled, and the compositor forces it
+ * back in regardless of the stored config (no-regression rule, keeps the
+ * vuelto/isCashMethod flow intact).
+ *
+ * Persisted in the FRONTEND only (localStorage, ChannelRateOfflineService
+ * pattern) and it participates in the sync/backup round-trip. Plan/module rules
+ * are applied ON TOP at the consumption sites (the `hasMultiMonedas` gate); this
+ * service can only REMOVE channels.
  */
 export interface StorePaymentMethodsConfig {
-  /** Methods the store accepts. Efectivo is always implied on top. */
-  enabledMethods: SalePaymentMethod[];
+  /** Legacy shape: methods the store accepted, currency-agnostic. Read-only compat. */
+  enabledMethods?: SalePaymentMethod[];
+  /** Per-channel shape: `channelKey` of every enabled channel. Wins over `enabledMethods`. */
+  enabledChannels?: string[];
 }
 
-/** Default catalogue: all methods on (no-regression for unconfigured stores). */
+/** Every channel key of the canonical catalogue, in catalogue order. */
+export const ALL_CHANNEL_KEYS: readonly string[] = PAYMENT_CHANNELS.map((channel) =>
+  channelKey(channel.method, channel.currency),
+);
+
+/**
+ * Legacy method default, kept for the currency-agnostic compatibility query
+ * (`getEnabledMethods`). New configs persist channels instead.
+ */
 export const DEFAULT_ENABLED_PAYMENT_METHODS: readonly SalePaymentMethod[] = [
   PaymentMethodEnum.Efectivo,
   PaymentMethodEnum.Zelle,
   PaymentMethodEnum.Transferencia,
 ];
 
+/** Default: every channel on (no-regression for unconfigured stores). */
+export const DEFAULT_ENABLED_CHANNEL_KEYS: readonly string[] = ALL_CHANNEL_KEYS;
+
 export const DEFAULT_STORE_PAYMENT_METHODS_CONFIG: StorePaymentMethodsConfig = {
-  enabledMethods: [...DEFAULT_ENABLED_PAYMENT_METHODS],
+  enabledChannels: [...DEFAULT_ENABLED_CHANNEL_KEYS],
 };
 
 /**
- * Composition helper: keeps Efectivo unconditionally (it can never be
- * disabled) and drops every other method the store disabled. `baseMethods` is
- * the plan gate output at each consumption site.
+ * Resolves the enabled channel keys of a stored config, applying the compat
+ * rule: `enabledChannels` wins when present; otherwise the equivalent channels
+ * of the legacy `enabledMethods` are derived; otherwise the default (all on).
+ */
+export function resolveEnabledChannelKeys(config: StorePaymentMethodsConfig): string[] {
+  if (Array.isArray(config.enabledChannels)) return [...config.enabledChannels];
+  if (Array.isArray(config.enabledMethods)) {
+    const methods = config.enabledMethods;
+    return PAYMENT_CHANNELS.filter((channel) => methods.includes(channel.method)).map((channel) =>
+      channelKey(channel.method, channel.currency),
+    );
+  }
+  return [...DEFAULT_ENABLED_CHANNEL_KEYS];
+}
+
+/**
+ * Methods enabled for a currency: a method is present when at least one enabled
+ * channel uses it for that currency. Efectivo is NOT forced here — the
+ * compositor (`applyStorePaymentMethodsConfig`) keeps it.
+ */
+export function enabledMethodsForCurrency(
+  enabledChannelKeys: readonly string[],
+  currency: Currency | number,
+): SalePaymentMethod[] {
+  const keys = new Set(enabledChannelKeys);
+  return PAYMENT_CHANNELS.filter(
+    (channel) =>
+      Number(channel.currency) === Number(currency) &&
+      keys.has(channelKey(channel.method, channel.currency)),
+  ).map((channel) => channel.method);
+}
+
+/** True when a channel is enabled. Efectivo channels are ALWAYS enabled. */
+export function channelEnabled(
+  enabledChannelKeys: readonly string[],
+  method: SalePaymentMethod,
+  currency: Currency | number,
+): boolean {
+  if (method === PaymentMethodEnum.Efectivo) return true;
+  return enabledChannelKeys.includes(channelKey(method, currency));
+}
+
+/**
+ * Composition helper: keeps Efectivo unconditionally (it can never be disabled)
+ * and drops every method the store disabled for the relevant currency.
+ * `baseMethods` is the per-currency plan-gate output at each consumption site
+ * and `enabledMethods` is the per-currency enabled list
+ * (`enabledMethodsForCurrency`).
  */
 export function applyStorePaymentMethodsConfig(
   baseMethods: readonly SalePaymentMethod[],
@@ -53,15 +124,22 @@ export function applyStorePaymentMethodsConfig(
   );
 }
 
+/** Set equality for channel-key lists (order-insensitive). */
+function sameKeySet(a: readonly string[], b: readonly string[]): boolean {
+  if (a.length !== b.length) return false;
+  const set = new Set(a);
+  return b.every((key) => set.has(key));
+}
+
 /**
- * Per-store persistence of the payment-methods config, mirroring the
+ * Per-store persistence of the payment config, mirroring the
  * `ChannelRateOfflineService` shape: encrypted wire format via
  * `StorageKeys` + `encryptEntity` + `readEntityOrThrow`, per-instance cache
  * reloaded when the store key changes, auto-init on a genuinely empty read
  * (absent key -> persist the default -> return it).
  *
- * The constructor storeId is the convenience default for the methods'
- * `storeId` parameter (callers usually act on their own store only).
+ * The constructor storeId is the convenience default for the methods' `storeId`
+ * parameter (callers usually act on their own store only).
  */
 export class StorePaymentMethodsConfigService {
   private config: StorePaymentMethodsConfig | null = null;
@@ -79,15 +157,73 @@ export class StorePaymentMethodsConfigService {
     return this.config;
   }
 
-  getEnabledMethods(storeId: string = this.storeId): SalePaymentMethod[] {
-    return [...this.getConfig(storeId).enabledMethods];
+  /** Resolved enabled channel keys for the store. */
+  getEnabledChannels(storeId: string = this.storeId): string[] {
+    return resolveEnabledChannelKeys(this.getConfig(storeId));
+  }
+
+  /** Per-channel resolution: methods enabled for a currency. */
+  getEnabledMethodsForCurrency(
+    currency: Currency | number,
+    storeId: string = this.storeId,
+  ): SalePaymentMethod[] {
+    return enabledMethodsForCurrency(this.getEnabledChannels(storeId), currency);
+  }
+
+  /** True when the (method, currency) channel is enabled. Efectivo is always on. */
+  isChannelEnabled(
+    method: SalePaymentMethod,
+    currency: Currency | number,
+    storeId: string = this.storeId,
+  ): boolean {
+    return channelEnabled(this.getEnabledChannels(storeId), method, currency);
   }
 
   /**
-   * Enables/disables a method for the store. Efectivo cannot be disabled:
-   * toggling it is a no-op (it is never stored as off, the compositor forces
-   * it on anyway). `false` removes the method from `enabledMethods`; `true`
-   * adds it back. Idempotent.
+   * Legacy currency-agnostic query: methods with at least one enabled channel,
+   * in canonical order. Kept for compatibility checks; consumers working per
+   * currency must use `getEnabledMethodsForCurrency`.
+   */
+  getEnabledMethods(storeId: string = this.storeId): SalePaymentMethod[] {
+    const keys = new Set(this.getEnabledChannels(storeId));
+    return [...DEFAULT_ENABLED_PAYMENT_METHODS].filter((method) =>
+      PAYMENT_CHANNELS.some(
+        (channel) =>
+          channel.method === method &&
+          keys.has(channelKey(channel.method, channel.currency)),
+      ),
+    );
+  }
+
+  /**
+   * Enables/disables a single channel. Efectivo cannot be disabled: toggling a
+   * cash channel is a no-op (never stored as off, the compositor forces it on
+   * anyway). Writes the per-channel shape (migrating any legacy
+   * `enabledMethods`) in canonical catalogue order. Idempotent.
+   */
+  setChannelEnabled(
+    storeId: string,
+    method: SalePaymentMethod,
+    currency: Currency | number,
+    enabled: boolean,
+  ): void {
+    if (method === PaymentMethodEnum.Efectivo) return;
+    const current = this.getEnabledChannels(storeId);
+    const key = channelKey(method, currency);
+    const hasChannel = current.includes(key);
+    if (enabled === hasChannel) return;
+
+    const next = enabled
+      ? [...current, key]
+      : current.filter((candidate) => candidate !== key);
+    this.persistChannels(storeId, next);
+  }
+
+  /**
+   * Legacy method-level convenience: disables EVERY channel of the method (or
+   * re-enables them for their valid currencies). Efectivo is a no-op. Kept so
+   * callers/tests written against the pre-channel shape keep working; new UI
+   * toggles individual channels through `setChannelEnabled`.
    */
   setMethodEnabled(
     storeId: string,
@@ -95,35 +231,22 @@ export class StorePaymentMethodsConfigService {
     enabled: boolean,
   ): void {
     if (method === PaymentMethodEnum.Efectivo) return;
-    const current = this.getConfig(storeId).enabledMethods;
-    const hasMethod = current.includes(method);
-    if (enabled === hasMethod) return;
-
-    const enabledMethods = enabled
-      ? [...current, method]
-      : current.filter((m) => m !== method);
-    // Canonical order (default catalogue order), so re-enabling a method
-    // restores its original position and storage stays stable. The
-    // compositor only checks membership, but deterministic bytes are easier
-    // to reason about.
-    const ordered = [...DEFAULT_ENABLED_PAYMENT_METHODS].filter((m) =>
-      enabledMethods.includes(m),
+    const current = this.getEnabledChannels(storeId);
+    const methodKeys = PAYMENT_CHANNELS.filter((channel) => channel.method === method).map(
+      (channel) => channelKey(channel.method, channel.currency),
     );
-    const next: StorePaymentMethodsConfig = { enabledMethods: ordered };
-    this.config = next;
-    this.lastConfigKey = this.getCurrentStorageKey(storeId);
-    localStorage.setItem(
-      this.getStorageKey(storeId),
-      encryptEntity(JSON.stringify(next)),
-    );
+    const next = enabled
+      ? [...current, ...methodKeys.filter((key) => !current.includes(key))]
+      : current.filter((key) => !methodKeys.includes(key));
+    if (sameKeySet(current, next)) return;
+    this.persistChannels(storeId, next);
   }
 
   /**
-   * Backup read seam (store-payment-methods-backup): returns the stored
-   * config WITHOUT auto-initialising — an absent key yields `null` (store
-   * never configured), never the default. Structurally satisfies the
-   * serializer's `StorePaymentMethodsReader` (the serializer uses it to decide
-   * whether the backup must carry the entry at all).
+   * Backup read seam (store-payment-methods-backup): returns the stored config
+   * WITHOUT auto-initialising — an absent key yields `null` (store never
+   * configured), never the default. Structurally satisfies the serializer's
+   * `StorePaymentMethodsReader`.
    */
   getStorageStorePaymentMethods(
     storeId: string = this.storeId,
@@ -133,9 +256,11 @@ export class StorePaymentMethodsConfigService {
 
   /**
    * Backup write seam (store-payment-methods-backup): persists the imported
-   * config as-is (encrypted wire format), bypassing the auto-init path —
-   * an archive's config replaces the local one wholesale. Also refreshes the
+   * config as-is (encrypted wire format), bypassing the auto-init path — an
+   * archive's config replaces the local one wholesale. Also refreshes the
    * in-memory cache so subsequent `getConfig()` calls see the imported value.
+   * An old archive carrying `enabledMethods` imports unchanged and resolves
+   * through the compat rule.
    */
   setConfigFromBackup(
     config: StorePaymentMethodsConfig,
@@ -150,7 +275,7 @@ export class StorePaymentMethodsConfigService {
    * Import seam (store-payment-methods-backup): Result-returning wrapper over
    * {@link setConfigFromBackup} that structurally satisfies the synchronizer's
    * `StorePaymentMethodsImportService`. A throw while persisting becomes a
-   * failed Result (the synchronizer maps it to StorePaymentMethodsUnexpectedError).
+   * failed Result.
    */
   setImportedStorePaymentMethods(config: StorePaymentMethodsConfig): Result {
     try {
@@ -159,6 +284,17 @@ export class StorePaymentMethodsConfigService {
     } catch {
       return Result.Failure([]);
     }
+  }
+
+  private persistChannels(storeId: string, channelKeys: readonly string[]): void {
+    const ordered = ALL_CHANNEL_KEYS.filter((key) => channelKeys.includes(key));
+    const next: StorePaymentMethodsConfig = { enabledChannels: ordered };
+    this.config = next;
+    this.lastConfigKey = this.getCurrentStorageKey(storeId);
+    localStorage.setItem(
+      this.getStorageKey(storeId),
+      encryptEntity(JSON.stringify(next)),
+    );
   }
 
   private readConfigFromLocalStorage(storeId: string): StorePaymentMethodsConfig | null {
@@ -188,7 +324,9 @@ export class StorePaymentMethodsConfigService {
     if (stored) return stored;
 
     // Absent key -> auto-init with the default (no-regression).
-    const fresh: StorePaymentMethodsConfig = { ...DEFAULT_STORE_PAYMENT_METHODS_CONFIG };
+    const fresh: StorePaymentMethodsConfig = {
+      enabledChannels: [...DEFAULT_ENABLED_CHANNEL_KEYS],
+    };
     this.setConfigLocalStorage(storeId, fresh);
     return fresh;
   }

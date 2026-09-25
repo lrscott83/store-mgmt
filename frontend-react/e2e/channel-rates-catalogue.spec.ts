@@ -107,22 +107,30 @@ test.describe.serial('channel-rates catalogue (módulo 16) — solo canales real
 
     await page.goto(CHANNEL_RATES_PATH);
     await page.waitForLoadState('networkidle');
+
+    // T22: registration lives in the `+ Tasa` popup (the inline card is gone),
+    // so the form is only reachable after opening it.
+    await page.getByTestId('channel-rate-add').click();
+    await expect(page.getByTestId('channel-rate-add-dialog')).toBeVisible();
     await expect(page.getByTestId('channel-rate-value')).toBeVisible();
 
     // CUP offers only Efectivo + Transferencia (no Zelle).
-    expect(await optionTexts(page, 'channel-rate-method')).toEqual(['Efectivo', 'Transferencia']);
+    expect(await optionTexts(page, 'channel-rate-method')).toEqual([
+      'Efectivo (CUP)',
+      'Transferencia (CUP)',
+    ]);
 
     // USD offers Efectivo + Zelle + Transferencia.
     await page.getByTestId('channel-rate-currency').selectOption('1'); // USD
     expect(await optionTexts(page, 'channel-rate-method')).toEqual([
-      'Efectivo',
-      'Zelle',
-      'Transferencia',
+      'Efectivo (USD)',
+      'Zelle (USD)',
+      'Transferencia (USD)',
     ]);
 
     // MLC moves only by Transferencia (Efectivo is not a channel there).
     await page.getByTestId('channel-rate-currency').selectOption('4'); // MLC
-    expect(await optionTexts(page, 'channel-rate-method')).toEqual(['Transferencia']);
+    expect(await optionTexts(page, 'channel-rate-method')).toEqual(['Transferencia (MLC)']);
 
     // Register a rate for a NAMED channel: Transferencia (CUP).
     await page.getByTestId('channel-rate-currency').selectOption('0'); // CUP

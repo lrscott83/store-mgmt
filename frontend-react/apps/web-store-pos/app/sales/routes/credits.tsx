@@ -33,18 +33,18 @@ export const clientLoader = featureLoader([EFeatures.CreditSale]);
 type CreditPaidFilterValue = 'all' | 'pending' | 'paid';
 
 /**
- * React port of Angular's `sale-credits.component.html` (Créditos): credits
+ * Vista de créditos (Créditos): credits
  * grouped by date into an accordion; each date panel wraps `SaleCreditList`
- * with `readOnly={false}` + edit/pay handlers (user request 2026-09-18: parity
- * with today-credits — the SAME Editar/Pagar gear, modals and service calls;
- * Angular's original had no `[readOnly]` binding here, but the write path is
- * store-scoped local storage and this view only edits the SELECTED store, so
- * it is safe). Multi-store panels stay read-only (no write path for non-
- * selected stores by design). Header shows count of ALL visible credits and the
- * total of the UNPAID ones only (`!isPaid`) — user request 2026-09-22 (reverts
- * the 2026-09-18 paid+unpaid decision; parity with Angular's original
- * `groupSaleCredits`, which summed `!isPaid` per day). Angular's `loadSaleCredits()` always calls `filterSaleCredits(null,
- * null, null, null)` (no date-range/paid-state UI exists); the user-added
+ * with `readOnly={false}` + edit/pay handlers (user request 2026-09-18:
+ * the SAME Editar/Pagar gear, modals and service calls as the today-credits
+ * view; the write path is store-scoped local storage and this view only edits
+ * the SELECTED store, so editing is safe here). Multi-store panels stay read-only
+ * (no write path for non-selected stores by design). Header shows count of ALL
+ * visible credits and the total of the UNPAID ones only (`!isPaid`) — user
+ * request 2026-09-22 (reverts the 2026-09-18 paid+unpaid decision; sums
+ * `!isPaid` per day). `loadSaleCredits()` always goes through the service filter
+ * `filterSaleCredits(null,
+ * null, null, null)` (no date-range/paid-state args); the user-added
  * DateRangeFilter feeds the same service a half-open [start, next-day
  * midnight) window — with no range picked the call stays all-nulls.
  *
@@ -78,9 +78,8 @@ export function SaleCreditsPage() {
   });
   const [creditFilter, setCreditFilter] = useState<CreditPaidFilterValue>('all');
 
-  // WU4 (flagged mismatch #4): Angular's SaleCreditsComponent.loadSaleCredits() always
-  // calls filterSaleCredits(null, null, null, null) (sale-credits.component.ts:51-52) —
-  // rewired here instead of bypassing the service filter with getAll().filter(isActive).
+  // Goes through the service filter — `filterSaleCredits(null, null, null, null)` —
+  // instead of bypassing it with getAll().filter(isActive).
   async function loadSaleCredits() {
     const service = new SaleCreditOfflineService(storeId);
     // The service's endDate is EXCLUSIVE (`c.date < endDate`) — sail the end
@@ -94,9 +93,8 @@ export function SaleCreditsPage() {
     // Paid-state radios filter CLIENT-SIDE before day-grouping, so the groups (and
     // everything derived from them — header count/total, day totals) only contain
     // matching credits. creditsCount counts what the groups show (ALL credits under
-    // "Todos"); creditsTotal sums UNPAID credits only (!isPaid) — matches Angular's
-    // SaleCreditsComponent.groupSaleCredits exactly. groupByLocalDay returns newest-first;
-    // reverse to preserve Angular's ASCENDING day order (SaleCreditsComponent), oldest first.
+    // "Todos"); creditsTotal sums UNPAID credits only (!isPaid). groupByLocalDay returns
+    // newest-first; reverse it so days render ASCENDING, oldest first.
     const visible = response.data.filter((credit) => {
       if (creditFilter === 'pending') return !credit.isPaid;
       if (creditFilter === 'paid') return credit.isPaid;

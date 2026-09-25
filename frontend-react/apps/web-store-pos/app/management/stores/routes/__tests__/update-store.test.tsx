@@ -133,6 +133,10 @@ vi.mock('react-router', () => ({
 
 vi.mock('~/auth/routes/loaders', () => ({
   adminFeatureLoader: () => vi.fn().mockResolvedValue(null),
+  // S2-03 revisited (2026-09-25): the create route uses ownerStoresGate; the
+  // update route reuses EditStorePage with allowCreate={false} and its loader
+  // still tests through adminFeatureLoader. Mock passes through.
+  ownerStoresGate: () => vi.fn().mockResolvedValue(null),
 }));
 
 // ─── localStorage mock (BaseRepository — kept transitionally) ─────────────────

@@ -1,10 +1,18 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useIntl } from 'react-intl';
-import { EFeatures, EModules, SalePaymentMethod } from '@store-mgmt/domain';
+import {
+  EFeatures,
+  EModules,
+  PAYMENT_CHANNELS,
+  SalePaymentMethod,
+  channelKey,
+} from '@store-mgmt/domain';
 import { adminFeatureLoader } from '~/auth/routes/loaders';
 import { Switch } from '~/shared/components/ui/switch';
+import { channelLabel } from '~/management/channel-rates/lib/channel-label';
+import { currencyLabel } from '~/shared/lib/format-money-with-currency';
 import {
-  DEFAULT_ENABLED_PAYMENT_METHODS,
+  DEFAULT_ENABLED_CHANNEL_KEYS,
   StorePaymentMethodsConfigService,
 } from '~/shared/lib/payment-methods/store-payment-methods-config-service';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
@@ -23,14 +31,25 @@ export const clientLoader = adminFeatureLoader([EFeatures.Configurations]);
  * successful /me.
  */
 /**
- * store-payment-methods-config (2026-09-22): "Formas de pago" — per-store
- * toggles that decide which plan-catalogue methods the store accepts at the
- * 5 consumption sites. Independent of the MultiStores module (every owner
- * configures the CURRENT store); the storeId comes from the page's active
- * store. Efectivo is always on (Switch disabled), matching the service's
- * no-op rule; toggling Zelle/Transferencia persists immediately and shows
- * the saved indicator until the store changes.
+ * store-payment-methods-config (2026-09-22) → per-channel (T20, 2026-09-24):
+ * "Métodos de pago" — per-store toggles over the FULL canonical channel
+ * catalogue (method + currency). Independent of the MultiStores module (every
+ * owner configures the CURRENT store); the storeId comes from the page's active
+ * store. Efectivo channels are always on (Switch disabled), matching the
+ * service's no-op rule; toggling any other channel persists immediately and
+ * shows the saved indicator until the store changes.
  */
+interface ConfigChannel {
+  method: SalePaymentMethod;
+  currency: number;
+  key: string;
+}
+
+interface ConfigChannelGroup {
+  currency: number;
+  channels: ConfigChannel[];
+}
+
 export function PaymentMethodsConfigSection({ storeId }: { storeId: string }) {
   const intl = useIntl();
   // SSR: no window on the server → render the default catalogue; hydration
@@ -40,54 +59,88 @@ export function PaymentMethodsConfigSection({ storeId }: { storeId: string }) {
     return new StorePaymentMethodsConfigService(storeId);
   }, [storeId]);
 
-  const [enabledMethods, setEnabledMethods] = useState<SalePaymentMethod[]>(() => [
-    ...DEFAULT_ENABLED_PAYMENT_METHODS,
+  const [enabledChannels, setEnabledChannels] = useState<string[]>(() => [
+    ...DEFAULT_ENABLED_CHANNEL_KEYS,
   ]);
   const [showSaved, setShowSaved] = useState(false);
 
   useEffect(() => {
     setShowSaved(false);
     if (!configService) {
-      setEnabledMethods([...DEFAULT_ENABLED_PAYMENT_METHODS]);
+      setEnabledChannels([...DEFAULT_ENABLED_CHANNEL_KEYS]);
       return;
     }
-    setEnabledMethods(configService.getEnabledMethods(storeId));
+    setEnabledChannels(configService.getEnabledChannels(storeId));
   }, [configService, storeId]);
 
-  function handleToggle(method: SalePaymentMethod, enabled: boolean) {
+  // Canonical catalogue grouped by currency, in catalogue order.
+  const channelGroups = useMemo<ConfigChannelGroup[]>(() => {
+    const groups: ConfigChannelGroup[] = [];
+    for (const channel of PAYMENT_CHANNELS) {
+      const currency = Number(channel.currency);
+      let group = groups.find((candidate) => candidate.currency === currency);
+      if (!group) {
+        group = { currency, channels: [] };
+        groups.push(group);
+      }
+      group.channels.push({
+        method: channel.method,
+        currency,
+        key: channelKey(channel.method, currency),
+      });
+    }
+    return groups;
+  }, []);
+
+  function handleToggle(method: SalePaymentMethod, currency: number, enabled: boolean) {
     if (!configService) return;
-    configService.setMethodEnabled(storeId, method, enabled);
-    setEnabledMethods(configService.getEnabledMethods(storeId));
+    configService.setChannelEnabled(storeId, method, currency, enabled);
+    setEnabledChannels(configService.getEnabledChannels(storeId));
     setShowSaved(true);
   }
 
   return (
     <div data-testid="payment-methods-config" className="mt-8">
-      <h2 className="mb-2 text-base font-semibold text-gray-800">
+      <h2 className="mb-3 text-base font-semibold text-gray-800">
         {intl.formatMessage({ id: 'CONFIGURATIONS.PAYMENT_METHODS.TITLE' })}
       </h2>
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <Switch
-            checked
-            disabled
-            onChange={() => {}}
-            label={intl.formatMessage({ id: 'CONFIGURATIONS.PAYMENT_METHODS.EFECTIVO' })}
-          />
-          <span className="text-xs text-text-muted">
-            {intl.formatMessage({ id: 'CONFIGURATIONS.PAYMENT_METHODS.ALWAYS_ON' })}
-          </span>
-        </div>
-        <Switch
-          checked={enabledMethods.includes(SalePaymentMethod.Zelle)}
-          onChange={(enabled) => handleToggle(SalePaymentMethod.Zelle, enabled)}
-          label={intl.formatMessage({ id: 'CONFIGURATIONS.PAYMENT_METHODS.ZELLE' })}
-        />
-        <Switch
-          checked={enabledMethods.includes(SalePaymentMethod.Transferencia)}
-          onChange={(enabled) => handleToggle(SalePaymentMethod.Transferencia, enabled)}
-          label={intl.formatMessage({ id: 'CONFIGURATIONS.PAYMENT_METHODS.TRANSFERENCIA' })}
-        />
+      <div className="space-y-4">
+        {channelGroups.map((group) => (
+          <div key={group.currency}>
+            <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-text-muted">
+              {currencyLabel(group.currency)}
+            </p>
+            <div className="space-y-2">
+              {group.channels.map((channel) => {
+                const isCash = channel.method === SalePaymentMethod.Efectivo;
+                return (
+                  <div
+                    key={channel.key}
+                    className="flex items-center justify-between gap-2"
+                  >
+                    <Switch
+                      checked={isCash || enabledChannels.includes(channel.key)}
+                      disabled={isCash}
+                      onChange={(enabled) =>
+                        handleToggle(channel.method, channel.currency, enabled)
+                      }
+                      label={channelLabel(channel.method, channel.currency, (id) =>
+                        intl.formatMessage({ id }),
+                      )}
+                    />
+                    {isCash && (
+                      <span className="text-xs text-text-muted">
+                        {intl.formatMessage({
+                          id: 'CONFIGURATIONS.PAYMENT_METHODS.ALWAYS_ON',
+                        })}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </div>
       {showSaved && (
         <p className="mt-2 text-xs text-text-muted" data-testid="payment-methods-saved">

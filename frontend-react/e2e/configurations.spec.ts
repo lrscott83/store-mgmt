@@ -76,7 +76,10 @@ async function refreshSessionFromMe(page: Page): Promise<void> {
   }
   await page.evaluate((profile) => {
     window.localStorage.setItem('currentUser', JSON.stringify(profile));
-    window.localStorage.setItem('current-store-id', (profile as { selectedStoreId?: string }).selectedStoreId ?? '');
+    window.localStorage.setItem(
+      'current-store-id',
+      (profile as { selectedStoreId?: string }).selectedStoreId ?? '',
+    );
   }, body.data);
   await page.reload();
 }
@@ -84,7 +87,9 @@ async function refreshSessionFromMe(page: Page): Promise<void> {
 test.describe('FC-B2 — Configurations', () => {
   test.describe.configure({ timeout: 120_000 });
 
-  test('sin MultiStores la página muestra el heading y NO el selector de tienda activa', async ({ signedInPage }) => {
+  test('sin MultiStores la página muestra el heading y NO el selector de tienda activa', async ({
+    signedInPage,
+  }) => {
     const { page } = signedInPage;
 
     await page.goto('/management/configurations');
@@ -101,7 +106,9 @@ test.describe('FC-B2 — Configurations', () => {
     await expect(page.locator('body')).toContainText(/\w+/);
   });
 
-  test('con MultiStores el selector de tienda activa se renderiza con opciones', async ({ signedInPage }) => {
+  test('con MultiStores el selector de tienda activa se renderiza con opciones', async ({
+    signedInPage,
+  }) => {
     const { page, selectedStoreId } = signedInPage;
 
     // Seed module 14 by direct DB + refresh the cached session via a real /me
@@ -116,6 +123,10 @@ test.describe('FC-B2 — Configurations', () => {
 
     const storeSelect = page.getByLabel('Tienda activa');
     await expect(storeSelect).toBeVisible();
-    await expect(storeSelect.locator('option').first()).toBeVisible();
+    // <option> elements are "hidden" by definition (Playwright never grants
+    // visibility to a collapsed select's options) — assert existence + the
+    // default selection instead (Grupo D fix, 2026-09-24, con autorización).
+    await expect(storeSelect.locator('option')).not.toHaveCount(0);
+    await expect(storeSelect).toHaveValue(selectedStoreId);
   });
 });

@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { useIntl } from 'react-intl';
-import { EFeatures, success } from '@store-mgmt/domain';
-import { adminFeatureLoader } from '~/auth/routes/loaders';
+import { success } from '@store-mgmt/domain';
+import { ownerStoresGate } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { hasOwnersAvailableFeature } from '~/shared/lib/auth/authorization-service';
 import { storeHttpService } from '~/management/stores/lib/services/store-http-service';
@@ -10,7 +10,7 @@ import { StoreForm } from '~/management/stores/components/store-form';
 import { httpErrorKey } from '~/shared/lib/http/http-error';
 import type { Store, Owner, Plan } from '@store-mgmt/domain';
 
-export const clientLoader = adminFeatureLoader([EFeatures.Stores]);
+export const clientLoader = ownerStoresGate();
 
 interface EditStorePageProps {
   /**

@@ -43,7 +43,7 @@ test.describe('T7 — gate de plan encima de la config (tienda Pago, sin MultiMo
     // Precondition pinning: the Pago store's config page still renders the
     // Zelle toggle AND it is ON (default catalogue — no-regression default).
     await page.goto('/management/configurations');
-    const zelleToggle = page.getByRole('switch', { name: 'Zelle' });
+    const zelleToggle = page.getByRole('switch', { name: 'Zelle (USD)' });
     await expect(zelleToggle).toBeVisible();
     await expect(zelleToggle).toHaveAttribute('aria-checked', 'true');
 

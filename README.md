@@ -15,11 +15,13 @@ gunzip -c ./smca_backup_YYYYMMDD_HHMMSS.sql.gz | podman exec -i smca_postgres_db
 ### 2. Cambiar password del usuario admin
 
 **Desde la app web (recomendado):**
+
 1. Logueate como admin
 2. Ve a `/profile/change-password`
 3. Cambia la contraseña
 
 **Desde la BD directamente:**
+
 ```bash
 podman exec -it smca_postgres_db psql -U postgres -d smca -c "UPDATE \"User\" SET \"Password\" = \$\$HASH_ARGON2ID\$\$ WHERE \"Login\" = 'admin';"
 
@@ -38,12 +40,14 @@ Las que NO aparezcan en esa lista son las que faltan correr.
 ### 4. Ejecutar migraciones
 
 **Opción A — Con Entity Framework (recomendado si el backend está desplegado):**
+
 ```bash
 cd /ruta/al/backend/src/SMCA.WebApi
 dotnet ef database update --project ../Infrastructure --startup-project .
 ```
 
 **Opción B — Con scripts SQL manuales (si EF no está disponible en el VPS):**
+
 ```bash
 # Listar scripts disponibles
 ls backend/scripts/
@@ -53,6 +57,7 @@ podman exec -i smca_postgres_db psql -U postgres -d smca < backend/scripts/08-20
 ```
 
 **Opción C — Aplicar todas las migraciones pendientes de una:**
+
 ```bash
 # Desde el directorio del backend
 cd /ruta/al/backend/src/SMCA.WebApi
@@ -60,6 +65,7 @@ dotnet ef database update --project ../Infrastructure --startup-project . --conn
 ```
 
 > ⚠️ **IMPORTANTE:** Siempre haz backup ANTES de ejecutar migraciones:
+>
 > ```bash
 > podman exec smca_postgres_db pg_dump -U postgres smca | gzip > ./smca_backup_$(date +%Y%m%d_%H%M%S).sql.gz
 > ```
@@ -99,6 +105,7 @@ podman logs --tail 50 smca_backend 2>&1 | tail -50
 ```
 
 **Nombres de containers:**
+
 - Backend API: `smca_backend`
 - Base de datos: `smca_postgres_db`
 
@@ -112,22 +119,26 @@ podman ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
 ⚠️ **Úsalo solo en producción cuando necesites empezar de cero** (problemas con el wizard de setup, datos corruptos, etc.)
 
 **Antes de ejecutar, haz un backup:**
+
 ```bash
 podman exec smca_postgres_db pg_dump -U postgres smca | gzip > ./smca_backup_$(date +%Y%m%d_%H%M%S).sql.gz
 ```
 
 **Paso 1: Ejecutar la limpieza**
+
 ```bash
 # IMPORTANTE: Usa la misma conexión/sesión para todos los scripts
 podman exec -i smca_postgres_db psql -U postgres -d smca < backend/scripts/09-delete-all-stores-users.sql
 ```
 
 **Paso 2: Verificar el resultado**
+
 ```bash
 podman exec -i smca_postgres_db psql -U postgres -d smca < backend/scripts/11-verify-cleanup.sql
 ```
 
 **Si necesitas revertir (deshacer la limpieza):**
+
 ```bash
 # ⚠️ Solo funciona si la conexión del paso 1 sigue abierta
 # (las tablas temporales se borran al cerrar la conexión)
@@ -136,19 +147,21 @@ podman exec -i smca_postgres_db psql -U postgres -d smca < backend/scripts/10-re
 
 **¿Qué hace cada script?**
 
-| Script | Función |
-|---|---|
-| `09-delete-all-stores-users.sql` | Crea respaldos en tablas temporales, borra todos los datos (respeta Module, Feature, Role, Tenant, SystemConfiguration) |
-| `10-revert-delete-stores-users.sql` | Restaura todos los datos desde las tablas temporales (solo funciona en la misma conexión) |
-| `11-verify-cleanup.sql` | Verifica el estado de la BD, muestra conteos de todas las tablas |
+| Script                              | Función                                                                                                                 |
+| ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `09-delete-all-stores-users.sql`    | Crea respaldos en tablas temporales, borra todos los datos (respeta Module, Feature, Role, Tenant, SystemConfiguration) |
+| `10-revert-delete-stores-users.sql` | Restaura todos los datos desde las tablas temporales (solo funciona en la misma conexión)                               |
+| `11-verify-cleanup.sql`             | Verifica el estado de la BD, muestra conteos de todas las tablas                                                        |
 
 **¿Qué se conserva?**
+
 - Tablas Module, Feature, Role, Tenant (seed data)
 - Tabla StorePaymentStatus (catálogo de estados)
 - Tabla SystemConfiguration (configuraciones del sistema)
 - Migraciones aplicadas (`__EFMigrationsHistory`)
 
 **¿Qué se borra?**
+
 - Todas las tablas: User, Owner, Store, ReSeller, UserRole, StoreUser, StoreModule, StoreRoleFeature, StorePayment, StoreUsage, ProductCategory, Product, Order, OrderItem, InventoryEntry, InventoryEntryCost, RefreshTokens, ReSellerOwner, OutboxMessage
 
 ---
@@ -158,6 +171,7 @@ podman exec -i smca_postgres_db psql -U postgres -d smca < backend/scripts/10-re
 **Backend apunta a BD de testing (smca_test) en vez de producción (smca):**
 
 El archivo `appsettings.E2E.json` sobreescribe la conexión en cualquier entorno. Si existe en el VPS:
+
 ```bash
 # Verificar
 podman exec -it smca_backend ls /app/appsettings.E2E.json
@@ -170,6 +184,7 @@ podman restart smca_backend
 ```
 
 **Verificar la conexión del backend a la BD:**
+
 ```bash
 # Testear conexión desde el contenedor del backend
 podman exec -it smca_backend pg_isready -h smca_postgres_db -p 5432
@@ -180,13 +195,13 @@ podman exec -it smca_backend cat /app/appsettings.json | grep -A2 ConnectionStri
 
 ### 8. Conexión a la BD (referencia)
 
-| Campo | Valor |
-|---|---|
+| Campo     | Valor              |
+| --------- | ------------------ |
 | Container | `smca_postgres_db` |
-| DB | `smca` |
-| User | `postgres` |
-| Password | `postgres` |
-| Port | `5432` |
+| DB        | `smca`             |
+| User      | `postgres`         |
+| Password  | `postgres`         |
+| Port      | `5432`             |
 
 ```bash
 # Conectar desde el host
@@ -213,6 +228,7 @@ Pasos verificados (2026-09-03) para correr a mano toda la suite, en orden: check
   ```
 
 > ⚠️ **No hace falta verificar que la base exista antes de cada corrida de tests**: los comandos de las secciones siguientes que necesitan la BD de tests se ejecutan directamente. Si la base falta o no hay conexión, la propia suite lo reporta con un error de conexión claro.
+
 - Dependencias del frontend y navegador de Playwright:
   ```bash
   cd frontend-react
@@ -299,7 +315,8 @@ dotnet run --project backend/src/SMCA.WebApi --launch-profile http-e2e
 **Paso 2 — correr la suite** (desde `frontend-react/`):
 
 ```bash
-pnpm test:e2e                # suite por defecto (excluye los specs de rate-limit)
+pnpm test:e2e --workers=4   # suite por defecto, SIN los specs de rate-limit; 4 workers es el
+                            # recomendado en esta máquina (verificado 2026-09-25, docs/testing/known-issues.md)
 pnpm test:e2e:rate-limit     # on demand: specs de rate-limit (agotan cuotas de registro/login)
 pnpm test:e2e:api            # solo chequeo de conectividad con la API, sin navegador
 
@@ -316,7 +333,8 @@ Notas:
 - La suite necesita el backend corriendo contra la BD de tests — no verifiques que `smca_test` exista antes de correr: levanta el backend con `http-e2e` y ejecuta los comandos directamente; el guard de arranque y los tests reportan cualquier problema de base.
 - `login-offline.spec.ts` es el único spec que corre sin backend levantado.
 - Al terminar, el `globalTeardown` borra automáticamente las filas `e2e-*` de `smca_test`. Si el log dice "0 filas borradas", el backend estaba escribiendo en otra base (p. ej. perfil `http` por error).
-- Cuotas del rate limiter: 40 logins/min y 50 registros/10min por IP (`backend/src/SMCA.WebApi/PolicyCode/RateLimitPolicies.cs`). Dos corridas completas dentro del mismo minuto pueden rozar el techo de login; dejá pasar un minuto entre corridas.
+- Cuotas del rate limiter: 40 logins/min y 50 registros/10min por IP (`backend/src/SMCA.WebApi/PolicyCode/RateLimitPolicies.cs`). Dos corridas completas dentro del mismo minuto pueden rozar el techo de login; dejá pasar un minuto entre corridas. Verificado 2026-09-25: tres corridas completas de la suite por defecto (340 tests, 8/4/3 workers) sin un solo 429.
+- Workers: la suite corre `fullyParallel`; con 8 workers en esta máquina (16 CPUs) flakean ~23 tests por contención contra el único dev server + backend + PostgreSQL. Con **4 workers** el flakiness cae a ~2-4, la suite corre en ~8 min y sigue 0 failed (los `retries: 2` del config absorben el resto). Detalle y causa raíz en `docs/testing/known-issues.md`.
 
 ### Recorrido completo (resumen)
 

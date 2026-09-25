@@ -10,3 +10,4 @@ playwright-report/
 test-results/
 blob-report/
 !.env.example
+/e2e-mr-*.zip

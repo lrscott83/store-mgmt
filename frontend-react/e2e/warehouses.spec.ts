@@ -732,7 +732,9 @@ test.describe.serial('Almacenes — flujo completo', () => {
     await loginPage.fill(identity);
     await loginPage.submit();
     await expect(storeUserPage.getByRole('link', { name: 'Catálogo Productos' })).toBeVisible({
-      timeout: 15_000,
+      // 30s (Grupo G, autorización 2026-09-25): el snapshot del fallo mostró la
+      // página aún en boot ("Cargando...", sin menú) a los 15s bajo contención.
+      timeout: 30_000,
     });
 
     // El ítem de menú 🏬 Almacenes NO aparece para el StoreUser (Warehouses es

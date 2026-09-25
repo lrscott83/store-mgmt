@@ -33,6 +33,7 @@ import {
   adminFeatureLoader,
   superAdminLoader,
   resellerFeatureLoader,
+  ownerStoresGate,
 } from '../loaders';
 import { importRoster } from '~/shared/lib/offline/roster-store';
 import { getDek, setDek, clearDek } from '~/shared/lib/storage/data-key-store';
@@ -527,6 +528,48 @@ describe('Route Loaders (AUTH-04)', () => {
       setAuthState(makeUser({ isSuperAdmin: true, featureIds: [73] }));
       const loader = adminFeatureLoader([73]);
       const result = await loader({ params: {} } as never);
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('ownerStoresGate — S2-03 revisited (2026-09-25)', () => {
+    it('redirects unauthenticated user to /login', async () => {
+      setAuthState(null);
+      const loader = ownerStoresGate();
+      const result = await loader();
+      expect(result).toBeInstanceOf(Response);
+      expect((result as Response).headers.get('Location')).toBe('/login');
+    });
+
+    it('redirects non-admin authenticated user to /login', async () => {
+      setAuthState(makeUser({ isSuperAdmin: false, isOwnerAdmin: false }));
+      const loader = ownerStoresGate();
+      const result = await loader();
+      expect(result).toBeInstanceOf(Response);
+      expect((result as Response).headers.get('Location')).toBe('/login');
+    });
+
+    it('redirects owner WITHOUT MultiStores to /management/my-stores (session alive)', async () => {
+      setAuthState(makeUser({ isSuperAdmin: false, isOwnerAdmin: true, featureIds: [] }));
+      const loader = ownerStoresGate();
+      const result = await loader();
+      expect(result).toBeInstanceOf(Response);
+      expect((result as Response).headers.get('Location')).toBe('/management/my-stores');
+    });
+
+    it('returns null for owner WITH MultiStores (even without any feature)', async () => {
+      setAuthState(
+        makeUser({ isSuperAdmin: false, isOwnerAdmin: true, featureIds: [], storeModuleIds: [14] }),
+      );
+      const loader = ownerStoresGate();
+      const result = await loader();
+      expect(result).toBeNull();
+    });
+
+    it('returns null for SuperAdmin even WITHOUT MultiStores', async () => {
+      setAuthState(makeUser({ isSuperAdmin: true, featureIds: [] }));
+      const loader = ownerStoresGate();
+      const result = await loader();
       expect(result).toBeNull();
     });
   });

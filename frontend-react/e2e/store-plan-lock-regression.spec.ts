@@ -5,6 +5,10 @@ import { assertStoresFeature, degradeStoreToFreePlan } from './support/store-fix
 import { E2E_API_URL } from './support/backend-url';
 import { readBearerToken } from './support/auth-storage';
 import { installPlanChangeObserver } from './support/plan-change-observer';
+import { newTestIdentity } from './support/identity';
+import { RegisterPage } from './support/register-page';
+import { LoginPage } from './support/login-page';
+import { readSelectedStoreId } from './support/session';
 
 /**
  * [S2-02 → owner-plan-change] Regresión DG-7, repurposada (authorized update,
@@ -32,17 +36,19 @@ import { installPlanChangeObserver } from './support/plan-change-observer';
  * Un solo `test()` que camina la matriz completa (design.md §2 — nunca
  * partirlo: partir gasta un login que el techo no tiene).
  *
- * Costo: UN login real (el mint de `owner-admin` en su propio worker), el
- * mismo presupuesto que `store-plan-activation.spec.ts`. No guarda nada por la
- * vía vieja: el único PUT al store es el que prohíbe este spec.
+ * Costo: 1 registro + 1 login propios — persona PRIVADA (Grupo F, autorización
+ * 2026-09-25): este spec siembra la fecha ancla directo en BD (mitad "legacy"
+ * de la matriz), y la persona compartida `owner-admin` es la MISMA tienda que
+ * usa `store-plan-activation.spec.ts` en otro worker; ese solapamiento producía
+ * el flaky de precondición (ficha group-f). Con tienda propia, nadie más toca
+ * esta fila. No guarda nada por la vía vieja: el único PUT al store es el que
+ * prohíbe este spec.
  */
 const ACTIVATE_TEXT = 'Activar Plan'; // es.ts STORES.PLAN.ACTIVATE_PLAN (owner-plan-change)
 const ACTIVE_BADGE_TEXT = 'Activo'; // es.ts STORES.PLAN.ACTIVE_BADGE
 
-test.use({ persona: 'owner-admin' });
-
-// Serial + timeout generoso: el primer (único) test paga un mint, una siembra
-// directa a BD, dos pins por API, una activación real y un pin de BD final.
+// Serial + timeout generoso: el único test paga registro+login propios, una
+// siembra directa a BD, dos pins por API, una activación real y un pin de BD final.
 test.describe.configure({ mode: 'serial', timeout: 120_000 });
 
 // Mismo default que el modo de backend documentado; override con E2E_DB_URL
@@ -80,7 +86,7 @@ async function setPaymentStartDateDirect(storeId: string, value: string | null):
   } catch (cause) {
     throw new Error(
       `store-plan-lock-regression: setPaymentStartDateDirect(${storeId}, ${value}) failed — ` +
-      `the paymentStartDate seed did not happen: ${cause instanceof Error ? cause.message : String(cause)}`,
+        `the paymentStartDate seed did not happen: ${cause instanceof Error ? cause.message : String(cause)}`,
     );
   } finally {
     await client.end();
@@ -95,10 +101,10 @@ async function readStoreAnchorRow(
   const client = new Client({ connectionString });
   try {
     await client.connect();
-    const result = await client.query<{ PaymentStartDate: string | null; StorePlanId: string | null }>(
-      'SELECT "PaymentStartDate", "StorePlanId" FROM "Store" WHERE "Id" = $1',
-      [storeId],
-    );
+    const result = await client.query<{
+      PaymentStartDate: string | null;
+      StorePlanId: string | null;
+    }>('SELECT "PaymentStartDate", "StorePlanId" FROM "Store" WHERE "Id" = $1', [storeId]);
     if (result.rowCount !== 1) {
       throw new Error(
         `store-plan-lock-regression: expected exactly 1 Store row for ${storeId}, ` +
@@ -147,9 +153,24 @@ async function assertPlanPaymentStartDateIs(
 }
 
 test('el cambio de plan del owner va por change-plan, nunca por PUT; el ancla paymentStartDate queda intacta', async ({
-  signedInPage,
+  page,
 }) => {
-  const { page, selectedStoreId } = signedInPage;
+  // Persona PRIVADA (Grupo F, autorización 2026-09-25): registro + login
+  // propios de este spec — la tienda es EXCLUSIVA, así que el seed directo de
+  // la fecha ancla (mitad "legacy") nunca se solapa con otro spec sobre la
+  // misma fila (la causa del flaky de precondición).
+  const identity = newTestIdentity();
+  const registerPage = new RegisterPage(page);
+  await registerPage.goto();
+  await registerPage.fillValidForm(identity);
+  await registerPage.acceptTerms.check();
+  await registerPage.submit();
+  await page.waitForURL(/\/login$/);
+  const loginPage = new LoginPage(page);
+  await loginPage.fill(identity);
+  await loginPage.submit();
+  await page.waitForURL(/\/sales\/products$/);
+  const selectedStoreId = await readSelectedStoreId(page);
 
   // REQ-13/D9 — antes que nada: un logout silencioso (H-7/H-8) no puede
   // convertirse en fallos confusos aguas abajo.
@@ -226,7 +247,11 @@ test('el cambio de plan del owner va por change-plan, nunca por PUT; el ancla pa
   // Anchor sacred: the change-plan POST did not touch the anchor — same value
   // as before, still non-null (the fixture pinned it non-null).
   const anchorAfter = await readStoreAnchorRow(selectedStoreId);
-  expect(anchorAfter.paymentStartDate).toBe(anchorBefore.paymentStartDate);
+  // Compare serialized: the DB returns Date objects and `toBe` is object
+  // identity — two Dates with the same instant never pass it (Grupo B fix).
+  expect(anchorAfter.paymentStartDate?.toISOString?.() ?? anchorAfter.paymentStartDate).toBe(
+    anchorBefore.paymentStartDate?.toISOString?.() ?? anchorBefore.paymentStartDate,
+  );
   expect(anchorAfter.paymentStartDate).not.toBeNull();
 
   // Reflection without reload: after the POST the page re-reads the store

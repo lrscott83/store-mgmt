@@ -2,7 +2,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { act, render, screen, fireEvent, within } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
-import { PaymentType, OrderType, ExpenseType, EModules } from '@store-mgmt/domain';
+import {
+  PaymentType,
+  OrderType,
+  ExpenseType,
+  EModules,
+  SalePaymentMethod,
+} from '@store-mgmt/domain';
 import type { Order, Expense, SaleCredit } from '@store-mgmt/domain';
 
 // --- Mocks (mutable state — set per-test via mockAuthState.user.storeModuleIds) ---
@@ -279,6 +285,35 @@ describe('TodayStatsPage — with Expenses + Credits modules available', () => {
     expect(
       within(cardPanel.parentElement as HTMLElement).getAllByText('120 CUP').length,
     ).toBeGreaterThan(0);
+  });
+
+  // T13 (payment-channels-and-multipayment): the panels bucket by the NORMALIZED
+  // method, so a sale recorded with Zelle counts in "Pago por Transferencia"
+  // (Transferencia (CUP)) instead of a bucket of its own, and never as cash.
+  it('T13: a Zelle sale is bucketed in Pago por Transferencia, not in Efectivo', async () => {
+    mockGetExpensesInDayObservable.mockResolvedValue(expensesEnvelope([]));
+    mockGetActiveOrdersInDay.mockReturnValue([
+      makeOrder({
+        id: 'zelle-1',
+        total: 70,
+        salePaymentMethod: SalePaymentMethod.Zelle,
+        paymentType: PaymentType.Zelle,
+        isCredit: false,
+      }),
+    ]);
+
+    render(
+      <Wrapper>
+        <TodayStatsPage />
+      </Wrapper>,
+    );
+
+    const cardPanel = await screen.findByRole('button', { name: /Pago por Transferencia/ });
+    expect(cardPanel).toHaveTextContent('70 CUP');
+    // Zelle must NOT leak into the cash panel.
+    expect(screen.getByRole('button', { name: /Resumen Efectivo/ })).toHaveTextContent('0 CUP');
+    // No standalone Zelle bucket remains.
+    expect(screen.queryByText(/Zelle/)).toBeNull();
   });
 
   // Parity fix (react-list-table-parity follow-up): Angular renders the expenses breakdown via

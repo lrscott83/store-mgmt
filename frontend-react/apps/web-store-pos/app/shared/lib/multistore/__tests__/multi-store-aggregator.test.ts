@@ -324,6 +324,30 @@ describe('multi-store-aggregator — cuadre per store', () => {
     expect(summary.expensesTotal).toBe(20);
     expect(summary.netProfit).toBe(summary.grossProfit - 20);
   });
+
+  it('range summary: a Zelle sale counts in the Transferencia panel (single-store parity)', () => {
+    seedEncrypted('orders', 'store-a', DEK_A, [
+      makeOrder('o1', { total: 100, paymentType: PaymentType.Efectivo, date: new Date('2026-02-02T10:00:00') }),
+      makeOrder('o2', { total: 50, paymentType: PaymentType.Zelle, date: new Date('2026-02-02T11:00:00') }),
+      makeOrder('o3', { total: 25, paymentType: PaymentType.Tarjeta, date: new Date('2026-02-02T12:00:00') }),
+    ]);
+
+    const summary = computeStoreRangeSummary(
+      'store-a',
+      DEK_A,
+      new Date('2026-02-01T00:00:00'),
+      new Date('2026-02-05T00:00:00'),
+      false,
+      false,
+    );
+
+    // Zelle + Tarjeta both collapse to Transferencia; cash stays Efectivo-only.
+    expect(summary.salesCashTotal).toBe(100);
+    expect(summary.salesCardTotal).toBe(75);
+    expect(summary.salesCardEntries.reduce((acc, e) => acc + e.amount, 0)).toBe(75);
+    // General total unchanged: every active sale counted exactly once.
+    expect(summary.salesTotal).toBe(175);
+  });
 });
 
 describe('multi-store-aggregator — aggregation helpers', () => {

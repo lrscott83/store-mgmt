@@ -1,6 +1,7 @@
 import { redirect } from 'react-router';
 import type { LoaderFunctionArgs } from 'react-router';
-import type { EModules, UserModel } from '@store-mgmt/domain';
+import { EModules } from '@store-mgmt/domain';
+import type { UserModel } from '@store-mgmt/domain';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { isModuleAvailable, isUserAuthorized } from '~/shared/lib/auth/authorization-service';
 import { resolveUserHomePath } from '~/shared/lib/auth/user-home';
@@ -136,6 +137,34 @@ export function adminFeatureLoader(featureIds: number[]) {
     const adminResult = await adminLoader();
     if (adminResult) return adminResult;
     return featureGate(featureIds)({ params } as LoaderFunctionArgs);
+  };
+}
+
+/**
+ * Owner gate for the CREATE route (`/management/stores/create`): same admin
+ * role checks as `adminLoader` (store-users/resellers are logged out), and
+ * for OWNERS the deciding capability is the MultiStores module (14) —
+ * creating a store is a multi-store capability. An owner WITHOUT it is
+ * redirected to `/management/my-stores` (their own stores, where nothing
+ * can be created for them), keeping the session alive. Replaces the
+ * Angular-parity behavior of landing on the edit form of their own store
+ * (S2-03 revisited, 2026-09-25).
+ *
+ * NOTE there is deliberately NO feature gate here: the old
+ * `adminFeatureLoader([Stores])` step logged owners out when they lacked the
+ * Stores feature even though their destination (`my-stores`) allows them —
+ * the module check below is the real capability decision.
+ */
+export function ownerStoresGate() {
+  return async (): Promise<Response | null> => {
+    const adminResult = await adminLoader();
+    if (adminResult) return adminResult;
+    const { user } = getAuthState();
+    // SuperAdmin keeps the create route (it is an admin capability).
+    if (user && !user.isSuperAdmin && !isModuleAvailable(user, EModules.MultiStores)) {
+      return redirect('/management/my-stores');
+    }
+    return null;
   };
 }
 
