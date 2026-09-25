@@ -62,7 +62,8 @@ assert-antes → desactivar → assert-después.
     helpers existentes); `ExecuteUpdateAsync` para mutaciones (gotcha NoTracking).
 - [x] T3 (verificación) — `dotnet test` filtrando la clase nueva: **2/2 PASS**
   (error previo del gate de coherencia corregido — ver detalles abajo).
-- [ ] T4 (commits + RDD) — work-unit commit en `qa`; assessment RDD del commit.
+- [x] T4 (commits + RDD) — work-unit commit `544f16f9` en `qa`;
+  assessment RDD → `unavailable` (ver evidencia abajo).
 
 ## Rutas de implementación
 
@@ -93,3 +94,16 @@ assert-antes → desactivar → assert-después.
   ausente tras desactivar) no cambió y pasa.
 - Pendiente T4: commit work-unit + assessment RDD del commit. Push/PR: decisión del
   usuario.
+
+## T4 — commit + RDD (completa)
+
+- Commit work-unit: `544f16f9` `test(e2e): cover module/feature deactivation invariant
+  in /auth/me` (2 archivos, 502 inserciones; estela `qa`, base previa `1ee4ee25`).
+- Assessment RDD (`gentle-ai review assess --agent opencode --base-ref 1ee4ee25
+  --committed-only`): `risk: high`, reason `unassessable` — el runtime OpenCode no es
+  elegible para immutable receipt review; `review_due: true` → outcome **unavailable**.
+- Preflight STATUS (mismos selectores): `immutable_review_transport_unsupported`,
+  `next_action: stop`, `mutation_outcome: not_started` — limitación de capability del
+  runtime (soportados: claude-code, codex), NO un defecto de Gentle AI; sin handoff de
+  defecto. Boundary RDD **no avanza**.
+- Entrega (push/PR) sigue siendo decisión del usuario; commit local ya registrado en `qa`.
