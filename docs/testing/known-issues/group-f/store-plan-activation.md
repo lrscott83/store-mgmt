@@ -1,65 +1,33 @@
-# Test E2E `store-plan-activation` — Grupo F (flaky recurrente)
+# Test E2E `store-plan-activation` — Grupo F (flaky en corridas completas)
 
-> Entrada autocontenida. **Fuente:** `docs/testing/known-issues.md` → Corrida completa del 2026-09-25 — verificación de estabilidad. Los tests E2E existentes no se tocan sin autorización explícita del usuario (regla innegociable del proyecto).
+> Entrada autocontenida. **Fuente:** `docs/testing/known-issues.md` → Corrida completa del 2026-09-25. Los tests E2E existentes no se tocan sin autorización explícita del usuario (regla innegociable del proyecto).
 
 ## Qué prueba
 
-Que un OwnerAdmin cambia el plan de su tienda por el camino correcto — **un solo POST `/v1/stores/{id}/change-plan` con body `{ storePlanId }`, nunca el PUT viejo con `moduleIds`** (regresión T7.1) — y que el plan queda activo y reflejado en la UI. Es el test de la línea 63 del spec (`store-plan-activation.spec.ts`); el segundo test del spec (fallo de red, línea 247) **no** ha sido flaky.
+Que el dueño cambia el plan de su tienda por el camino correcto (el botón del diálogo hace un POST de cambio de plan, nunca una edición directa) y que la pantalla refleja el plan nuevo.
 
-## Dónde y cuándo falló (corridas del 2026-09-25)
+## Qué pasa
 
-| Corrida | Workers | Resultado del test        |
-| ------- | ------- | ------------------------- |
-| 2       | 4       | Flaky — pasó al reintento |
-| 3       | 3       | Flaky — pasó al reintento |
+En las corridas completas del 2026-09-25 falló 2 veces (corridas con 4 y con 3 workers) y **pasó al reintento**. En solitario nunca se le ha visto fallar.
 
-Es el **único** test flaky en dos corridas consecutivas. En solitario no se ha visto fallar (no es determinista).
+**El problema en simple:** antes de empezar, el test deja su tienda en plan Gratis y comprueba que la fecha de inicio de pago sigue puesta. En esas dos corridas, cuando el test arrancó, la fecha **ya estaba borrada** en la base de datos, así que el test abortó antes de hacer nada. Al reintentarlo la fecha ya estaba bien y pasó.
 
-## Cómo verificar primero (en este orden, sin asumir nada)
+## Causa probable (por confirmar)
 
-1. **En solitario:** `cd frontend-react && pnpm exec playwright test e2e/store-plan-activation.spec.ts --workers=1` → debe pasar (confirma que no es determinista).
-2. **BD limpia fuera de corridas:** `psql -h localhost -p 5432 -U postgres -d smca_test -c "SELECT \"Login\" FROM \"User\" WHERE \"Login\" LIKE 'e2e-%';"` → vacía (el `globalTeardown` borra las filas `e2e-*`; el log de teardown de cada corrida lo confirma).
-3. **Backend correcto:** `:5019` con `smca_test` (línea `[E2E Guard] ConnectionStrings:Application -> Database=smca_test` del log del backend).
-4. **En la próxima corrida completa:** observar si el fallo repite con el MISMO modo de abajo (precondición nula) y anotar qué otros tests de la persona `owner-admin` corrían en paralelo en ese momento.
+Otro test (`store-plan-lock-regression`) usa **la misma tienda compartida** y, como parte de su prueba, borra y restaura esa fecha directamente en la base de datos. La suite corre varios tests a la vez: si el borrado del uno cae justo cuando el otro revisa su fecha, el segundo aborta. Es la única explicación que encaja con todo lo observado: solo falla en la suite completa y el reintento siempre pasa.
 
-## Modo de fallo (literal del log, idéntico en las corridas 2 y 3)
+## Cómo verificarlo
 
-El **fixture de precondición aborta ANTES de que el test haga nada**:
+1. Correrlo solo: `pnpm exec playwright test e2e/store-plan-activation.spec.ts` → debe pasar.
+2. Correr juntos los dos tests de plan varias veces con 2 workers y ver si el fallo se repite: `pnpm exec playwright test e2e/store-plan-activation.spec.ts e2e/store-plan-lock-regression.spec.ts --workers=2`.
+3. En la próxima corrida completa, anotar si vuelve a fallar con el mismo mensaje.
 
-```
-Error: store-fixture: degradeStoreToFreePlan(<storeId>) precondition mismatch —
-expected paymentStartDate to remain non-null after degrading to the free plan
-(the Store row is untouched by the direct-DB seed), observed null.
-S2-02 depends on this staying non-null.
-    at support\store-fixture.ts:155
-    at store-plan-activation.spec.ts:85
-```
+## Propuesta de solución (requiere permiso — test E2E)
 
-Es decir: la fila de la tienda de la persona llegó con `PaymentStartDate = NULL` cuando el fixture esperaba no-nulo.
-
-## Qué NO es
-
-- **No es timing de render ni contención de red**: el fallo es un estado de BD ya presente al arrancar, no un timeout de UI.
-- **No es rate-limit**: cero 429 en las tres corridas.
-- **No es determinista**: pasa al reintento y en solitario.
-
-## Hipótesis (por confirmar — ventana de solapamiento)
-
-`owner-admin` es persona **compartida**: varios specs la usan en workers paralelos. `store-plan-lock-regression.spec.ts` —el otro spec de plan que la usa— siembra la fecha **directo en BD** con `setPaymentStartDateDirect()`: `UPDATE "Store" SET "PaymentStartDate" = NULL` (mitad 1 "legacy" de su matriz, `store-plan-lock-regression.spec.ts:76-90`) y después la restaura. Es la única escritura conocida de `NULL` sobre esa columna alcanzable por los specs.
-
-Si ese UPDATE cae en la ventana entre el arranque de `store-plan-activation` y su `degradeStoreToFreePlan`, la precondición encuentra la fecha ya nula → aborta → reintento (ya con la fecha restaurada por el otro test) pasa. Explica por qué es flaky solo bajo paralelismo y por qué el reintento siempre pasa.
-
-**Para confirmar:** correr en paralelo solo los dos specs (`pnpm exec playwright test e2e/store-plan-activation.spec.ts e2e/store-plan-lock-regression.spec.ts --workers=2`) varias veces y ver si el modo se reproduce; o correlacionar en el log de la próxima corrida completa qué test corría simultáneo.
-
-## Propuesta de solución (una vez confirmada; requiere permiso — test E2E)
-
-- **Opción A:** que `store-plan-lock-regression` use una **persona privada** minteada para sí (patrón `mintWholesaleSuperiorOwner` de `support/store-wholesale-fixture.ts`) — elimina el solapamiento de raíz; costo: 1 login más por corrida.
-- **Opción B:** que `degradeStoreToFreePlan` **siembre él mismo** la fecha no-nula antes de verificarla (en vez de asumirla) — 1 línea de fixture, cero cambios de app, no elimina el solapamiento pero lo hace irrelevante.
-
-Cero cambios en la app en ambas opciones. No tocar nada hasta confirmar la ventana.
+Que `store-plan-lock-regression` use **su propia tienda de prueba** en vez de la compartida. Cero cambios en la app.
 
 ## Estado
 
-⏸ **Hipótesis por confirmar** — el test y el fixture quedan intocables hasta confirmar la ventana de solapamiento.
+⏸ **Por confirmar** — el test queda intocable hasta reproducir el fallo como se describe arriba.
 
 - _Actualizado: 2026-09-25._
