@@ -220,6 +220,19 @@ namespace Domain.Common.Enums
 
         #endregion
 
+        #region MultiPayments features
+
+        // MultiPayments (feature 44, module 16) is VIP-only: module 16 is assigned only
+        // to the VIP plan (StorePlanModuleEntityTypeConfiguration), so the generator
+        // materializes 44 solely for VIP stores. Both the owner and store users of a
+        // VIP store pay a sale with several payment channels, so mirror SaleAdmin.
+        [HasRoles(RoleType.OwnerAdmin, RoleType.StoreUser)]
+        [HasFeature(FeatureType.MultiPayments)]
+        [HasModule(ModuleType.MultiPayments)]
+        MultiPaymentsAdmin,
+
+        #endregion
+
         #region Elaboración features
 
         [HasRoles(RoleType.OwnerAdmin)]

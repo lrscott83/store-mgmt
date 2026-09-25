@@ -63,6 +63,34 @@ Reglas de alineación (referencia: `PlanChangeMatrixTests.FeaturesByModule` L108
 - Outcome: **unavailable** — el boundary NO avanza; RDD sigue `on` (global, decidido por el usuario). Mismo escenario que memoria #1342 (work-unit 9c984521) y aquí documentado para este commit.
 - Sin handoff de defecto: limitación documentada del runtime, no defecto de Gentle AI.
 
+## Fase 2 — Decisión de negocio 33/91 + 44 en mapping (autorizada 2026-09-25)
+
+**Autorización del usuario (2026-09-25, segunda)**: (a) añadir 44 al enum `StoreRoleFeatures` "como se debe" (PRODUCCIÓN); (b) actualizar las BD locales `smca` (prod) y `smca_test` (test) a catálogo completo; (c) entregar evidencia de que los tests que esperaban la BD rota ya no pasan con 33/91 presentes.
+
+### T5 — Entrada 44 (MultiPayments) en StoreRoleFeatures (PRODUCCIÓN, autorizado)
+- `backend/src/Domain/Common/Enums/StoreRoleFeatures.cs`: nueva región `MultiPayments features` con `MultiPaymentsAdmin` = `[HasRoles(OwnerAdmin, StoreUser)] [HasFeature(FeatureType.MultiPayments)] [HasModule(ModuleType.MultiPayments)]`. Comentario: 44 es VIP-only (módulo 16 solo en plan VIP).
+- ANTES: feature 44 existía en BD (smca_test) pero sin entrada enum → `StoreRoleFeatureGenerator` la descartaba (L19-21). AHORA el generador la materializa para tiendas VIP.
+
+### T6 — Backfill catálogo en BD locales (ambiente, autorizado)
+- `smca` (prod local, 127.0.0.1): faltaban módulos 15/16/17 + features 43/44/91/120/121 + planmodule 3+15, 3+17, 4+15, 4+16, 4+17. Insertados (idempotente `ON CONFLICT DO NOTHING`, script `C:\Users\Appollo\AppData\Local\Temp\opencode\backfill_catalog.sql`).
+- `smca_test` (localhost:5432): faltaban SOLO features 33 y 91 (módulos y planmodule ya completos). Insertados 33/91.
+- Resultado verificado en ambas: `modules=17, features=42`; key features 33/43/44/91/120/121 presentes (query `q_key_features.sql`).
+
+### T7 — Evidencia: tests tras insertar 33/91 y añadir 44 (2026-09-25)
+- `FeatureSeedCoherenceTests` (canary): **PASS** — ya no hay drift seed↔BD (era el único test que fallaba intencionalmente por 33/91 ausentes).
+- `PlanChangeMatrixTests`: **5/9 FAIL** — el mapa `FeaturesByModule` (L98-126) sigue calibrado contra la BD rota. El runner lee `StoreRoleFeature` REAL de la BD tras el change-plan (L210-215):
+  - `SuperAdmin_upgrades_pago_to_vip` → esperado 32, actual 33 (**+44** MultiPayments ahora materializado por el enum).
+  - `SuperAdmin_upgrades_gratis_to_superior` → esperado 32, actual 33 (**+91** StorePayment).
+  - `Owner_upgrades_gratis_to_pago` → esperado 25, actual 26 (**+91**).
+  - `SuperAdmin_upgrades_superior_to_vip` → FAIL (mismo patrón).
+  - `SuperAdmin_upgrades_gratis_to_vip` → esperado 32, actual 34 (**+44, +91**).
+  - Los 4 downgrades pasan. Es la evidencia pedida: los tests que congelaron la realidad vieja ya no pasan.
+- Helpers alineados (29 tests de `AuthMePlanModulesTests`, `ExportOfflineRosterPlanTests`, `StorePlanChangeTests`): **PASS** — alimentan el generador con sus propios featureIds (no leen la BD); el canary es quien valida seed↔BD.
+
+### Pendiente (requiere autorización — E2E existentes intocables)
+- Re-calibrar `PlanChangeMatrixTests.FeaturesByModule`: Billing `[90]` → decidir +91; `MultiPayments []` → `[44]`; revisar Inventory +33 (Egress es OwnerAdmin/Inventory, en /me del owner SÍ debe aparecer).
+- Decidir si los 3 helpers re-incluyen 33 (Egress) en Inventory ahora que la BD lo tiene; 91 (StorePayment) es SuperAdmin/ReSeller → NO afecta al owner (helpers de owner), confirmar.
+
 ## Rutas / decisiones
 
 - Rama: `feat/e2e-drift-canary` (creada desde `qa`; push/PR siguen siendo decisión del usuario).
