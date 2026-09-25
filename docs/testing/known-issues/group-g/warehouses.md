@@ -8,7 +8,7 @@ Que un usuario de tienda (StoreUser) no ve el módulo Almacenes —el enlace no 
 
 ## Qué pasa
 
-Falló en **3 de las 5 corridas completas** del 2026-09-25 (corridas 2, 4 y 5) y **pasó al reintento** siempre. En solitario nunca falló.
+Falló en **4 de las 6 corridas completas** del 2026-09-25 (corridas 2, 4, 5 y 6) y **pasó al reintento** siempre. En solitario nunca falló.
 
 **El problema en simple (medido en los logs, idéntico en las 3 corridas):** el test entra con el usuario de tienda a la pantalla de inicio y espera a que aparezca el enlace "Catálogo Productos" del menú. Desecha la espera a los **15 segundos** sin encontrarlo. No es la preparación de la sesión (esa no falló en ninguna de las 3 corridas) — es que el menú no terminó de pintar a tiempo. Al reintentar el test, el menú sí aparece y todo pasa.
 
@@ -35,4 +35,4 @@ Si fue tiempo: alargar esa espera puntual a 30 s (una línea, con tu permiso). S
 
 ⏸ **En observación** — el reintento lo absorbe; se sigue en la próxima corrida completa.
 
-- _Actualizado: 2026-09-25._
+- _Actualizado: 2026-09-25 (corrida 6 añadida)._
