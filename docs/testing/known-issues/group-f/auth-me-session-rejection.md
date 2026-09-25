@@ -27,6 +27,6 @@ La preparación compartida (el fixture que acuña la sesión en frío, en `valid
 
 ## Estado
 
-🔶 **Fix aplicado — pendiente de confirmar en la próxima corrida completa.**
+✅ **Resuelto y confirmado (2026-09-25)** — en la corrida completa siguiente (4 workers: 338 passed + 2 flaky ajenos, 0 failed, 6.5 min) el spec pasó limpio y el mensaje "Fixture ... timeout of 30000ms" registró **cero apariciones** en todo el log.
 
-- _Actualizado: 2026-09-25._
+- _Actualizado: 2026-09-25 (cierre)._
