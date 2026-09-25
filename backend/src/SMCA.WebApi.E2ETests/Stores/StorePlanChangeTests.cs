@@ -470,13 +470,13 @@ public sealed class StorePlanChangeTests
     private static List<int> FeaturesForModule(int moduleId) => moduleId switch
     {
         2 => [20, 21, 22, 23],
-        3 => [30, 31, 32, 33, 34, 35],
+        3 => [30, 31, 32, 34, 35],
         4 => [40, 41, 42],
         5 => [50],
         6 => [60],
         7 => [70, 72, 73, 74],
         8 => [80],
-        9 => [90, 91],
+        9 => [90],
         10 => [100, 101, 102, 103],
         11 => [110],
         12 => [39],
