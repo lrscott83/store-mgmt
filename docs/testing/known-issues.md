@@ -101,11 +101,14 @@ Resumen de la corrida (los 3 resueltos en la primera tanda se eliminaron de la l
 
 Contexto: backend real `:5019` (BD `smca_test`, confirmada por el teardown en ambas corridas), dev server `:3333`, suite por defecto `pnpm test:e2e` (340 tests, excluye `@rate-limit`).
 
-| Corrida | Workers                              | Resultado                           | Duración | Flaky            |
-| ------- | ------------------------------------ | ----------------------------------- | -------- | ---------------- |
-| 1       | 8 (default de esta máquina, 16 CPUs) | 317 passed + 23 flaky, **0 failed** | 12.0 min | 23 (en 18 specs) |
-| 2       | 4                                    | 336 passed + 4 flaky, **0 failed**  | 7.7 min  | 4 (en 4 specs)   |
-| 3       | 3                                    | 338 passed + 2 flaky, **0 failed**  | 7.3 min  | 2 (en 2 specs)   |
+| Corrida | Workers                              | Resultado                           | Duración | Flaky                 |
+| ------- | ------------------------------------ | ----------------------------------- | -------- | --------------------- | --- | --- | --------------------- | ---------------------------------- | ------- | -------------- |
+| 1       | 8 (default de esta máquina, 16 CPUs) | 317 passed + 23 flaky, **0 failed** | 12.0 min | 23 (en 18 specs)      |
+| 2       | 4                                    | 336 passed + 4 flaky, **0 failed**  | 7.7 min  | 4 (en 4 specs)        |
+| 3       | 3                                    | 338 passed + 2 flaky, **0 failed**  | 7.3 min  | 2 (en 2 specs)        |
+| 4       | 4                                    | 337 passed + 3 flaky, **0 failed**  | 8.3 min  | 3 (en 3 specs)        |
+| 5       | 4                                    | 338 passed + 2 flaky, **0 failed**  | 6.5 min  | 2 (en 2 specs)        |     | 6   | 4 (post-merge dev+qa) | 338 passed + 2 flaky, **0 failed** | 9.2 min | 2 (en 2 specs) |
+| 7       | 4 (validación Grupo G; 339 tests)    | 338 passed + 1 flaky, **0 failed**  | 8.4 min  | 1 (SWR-1, esporádico) |
 
 - **Cero rate-limits reales**: ni un 429 en el log de ninguna corrida — las únicas 2 menciones de "429" son el flag `--grep-invert @rate-limit` del comando y el contador `[429/340]` de progreso. Las cuotas (40 logins/min, 50 registros/10 min) no se agotaron con la suite por defecto.
 - **Causa raíz del flakiness (confirmada por contraste)**: contención de recursos por número de workers — 8 workers contra un único dev server + backend + PostgreSQL flakean ~23 tests al azar (nunca los mismos dos veces, y todos pasan al reintento y en solitario); con 4 workers el flakiness cae a ~4 y la corrida es 4 minutos más rápida.
@@ -113,20 +116,18 @@ Contexto: backend real `:5019` (BD `smca_test`, confirmada por el teardown en am
 
 ---
 
-## Flaky recurrentes — Grupo G (fichas por test)
+## Flaky recurrentes — Grupo G (cerrado 2026-09-25)
 
-De los 34 flaky de las cinco primeras corridas (23 + 4 + 2 + 3 + 2), 29 fueron tests distintos al azar — contención pura: pasan al reintento y en solitario. Dos specs recayeron en más de una corrida y tienen ficha autocontenida:
+De los 38 flaky de las seis corridas (23 + 4 + 2 + 3 + 2 + 2), 33 fueron tests distintos al azar — contención pura: pasan al reintento y en solitario. Los dos specs con recurrencia quedaron resueltos con autorización del usuario y sus fichas se retiraron (nota de cierre en [`group-g/README.md`](group-g/README.md)):
 
-| Ficha                                                                  | Test                                                 | Recurrencia                                                                                              |
-| ---------------------------------------------------------------------- | ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| [`group-g/warehouses.md`](group-g/warehouses.md)                       | `warehouses` (StoreUser sin Almacenes)               | Corridas 2, 4 y 5 — aserción: el enlace "Catálogo Productos" no aparece en 15 s (modo idéntico en las 3) |
-| [`group-g/store-create-security.md`](group-g/store-create-security.md) | `store-create-security` (ruta de creación = edición) | Corridas 1 y 5 — corrida 1: timeout de 120 s preparando la sesión; corrida 5: ídem                       |
+- **`warehouses` — StoreUser sin Almacenes** (flaky en 4 de 6 corridas: el boot del StoreUser no terminaba bajo contención y la espera del enlace "Catálogo Productos" vencía): el test estaba **duplicado** por `create-store-user.spec.ts` — mismo flujo línea por línea — y fue retirado; el gating del menú de Almacenes sigue pineado por el test anterior del mismo spec.
+- **`store-switch-back-logout` SSR-1** (flaky en 2 de 6 corridas): el setup podía avanzar con el nombre de la tienda **vacío** → `storeRow('')` generaba una regex vacía que casaba con TODOS los botones (strict mode violation). Endurecido con reintentos acotados del refresh de sesión y fallo ruidoso si el nombre no llega; el timeout x2 temporal se retiró — la causa nunca fue el tiempo.
 
-⏸ En observación, con modos DISTINTOS: `store-create-security` es de preparación (entorno); `warehouses` es de aserción y apunta a una espera corta o condición de carrera propia del test.
+Ambos specs verificados en verde en solitario tras los cambios (12/12). **Validado en la corrida 7** (4 workers): los tres modos de fallo cerrados (precondición del plan, fixture de 30 s, strict mode de SSR) registraron **cero apariciones**, `warehouses` ya no aparece (test retirado, 339 tests en la suite) y SSR-1 pasó limpio. El único flaky de la corrida (`store-switcher-refresh` SWR-1) es esporádico — segunda aparición en 7 corridas, sin modo propio, absorbido por el reintento.
 
 ### Cerrados antes (Grupo F, retirado)
 
-`store-plan-activation` (causa confirmada: `roster-export` anula la fecha de pago de la tienda compartida por BD directa y no la restaura; corregido con tienda privada) y `auth-me-session-rejection` (fixture de sesión en frío a 60 s) — **ambos confirmados limpios en la corrida final** (cero apariciones de sus modos de fallo). Detalle de la investigación en el historial de commits de `docs/testing/`.
+`store-plan-activation` (causa confirmada: `roster-export` anula la fecha de pago de la tienda compartida por BD directa y no la restaura; corregido con tienda privada) y `auth-me-session-rejection` (fixture de sesión en frío a 60 s) — **ambos confirmados limpios en la corrida final** (cero apariciones de sus modos de fallo). `store-create-security` (flaky de preparación en las corridas 1 y 5) quedó **superado por el rediseño del spec**: S2-03 se reescribió con la app (owner sin MultiStores → my-stores) y pasó 2/2 en la corrida 6 — su ficha se retiró. Detalle de las investigaciones en el historial de commits de `docs/testing/`.
 
 ## Estado de decisiones pendientes (2026-09-24)
 
