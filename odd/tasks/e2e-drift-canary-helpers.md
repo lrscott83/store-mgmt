@@ -61,6 +61,7 @@ Reglas de alineación (referencia: `PlanChangeMatrixTests.FeaturesByModule` L108
 - `gentle-ai review assess --cwd . --agent opencode --base-ref qa --committed-only --json` → `review_due: true` (`high_risk` / `unassessable`: runtime OpenCode no elegible para immutable receipt review; soportados claude-code/codex).
 - STATUS preflight → `gentle-ai.review-integration.failure/v2`, `immutable_review_transport_unsupported`, `next_action: stop`, `retry_safe: false`.
 - Outcome: **unavailable** — el boundary NO avanza; RDD sigue `on` (global, decidido por el usuario). Mismo escenario que memoria #1342 (work-unit 9c984521) y aquí documentado para este commit.
+- Commit T8 `41a039fc` (2026-09-25): `gentle-ai review assess --cwd . --agent opencode --base-ref 331ac947 --committed-only --json` → `review_due: true` (`high_risk` / `unassessable`, runtime no elegible; candidate `consumed: false`). STATUS preflight → mismo `failure/v2`, `immutable_review_transport_unsupported`, `next_action: stop`, `retry_safe: false`. Outcome: **unavailable**; boundary NO avanza; RDD sigue `on`. Sin handoff (limitación de runtime, no defecto de Gentle AI).
 - Sin handoff de defecto: limitación documentada del runtime, no defecto de Gentle AI.
 
 ## Fase 2 — Decisión de negocio 33/91 + 44 en mapping (autorizada 2026-09-25)
