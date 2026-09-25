@@ -112,3 +112,4 @@ Evidencia T8 (2026-09-25): filtered set completo → `Failed: 0, Passed: 38, Tot
 - Rama: `feat/e2e-drift-canary` (creada desde `qa`; push/PR siguen siendo decisión del usuario).
 - RDD: global `on` — tras commit, el orquestador corre `gentle-ai review assess` sobre el rango commiteado y sigue el tier.
 - Dependencias de BD: PostgreSQL local `localhost:5432`, DB `smca_test` (la migra `WebAppFixture`).
+- Pendiente resuelto 2026-09-25: `docs/plans/2026-09-24-revisar-e2e-expectativa-contra-bd.md` corregido (commit `7ca652fc`) — marcado resuelto para BD locales, VPS pendiente de confirmar.
