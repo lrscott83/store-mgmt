@@ -55,6 +55,14 @@ Reglas de alineación (referencia: `PlanChangeMatrixTests.FeaturesByModule` L108
 - Canary: `FeatureSeedCoherenceTests.cs` (74 líneas, `[Collection("e2e")]`); usa `db.GetService<IDesignTimeModel>().Model...GetSeedData()` (EF8 lanza `InvalidOperationException` sobre `db.Model` optimizado). Solo lectura.
 - `git diff --check`: exit 0. Diff rastreado: 3 archivos, 6 inserciones, 6 eliminaciones + 1 archivo nuevo.
 
+## RDD (2026-09-25)
+
+- Commit evaluado: `16d23091aae066bbe09dff35544501c875d298a4` (base-ref: `qa`, `--committed-only`).
+- `gentle-ai review assess --cwd . --agent opencode --base-ref qa --committed-only --json` → `review_due: true` (`high_risk` / `unassessable`: runtime OpenCode no elegible para immutable receipt review; soportados claude-code/codex).
+- STATUS preflight → `gentle-ai.review-integration.failure/v2`, `immutable_review_transport_unsupported`, `next_action: stop`, `retry_safe: false`.
+- Outcome: **unavailable** — el boundary NO avanza; RDD sigue `on` (global, decidido por el usuario). Mismo escenario que memoria #1342 (work-unit 9c984521) y aquí documentado para este commit.
+- Sin handoff de defecto: limitación documentada del runtime, no defecto de Gentle AI.
+
 ## Rutas / decisiones
 
 - Rama: `feat/e2e-drift-canary` (creada desde `qa`; push/PR siguen siendo decisión del usuario).
