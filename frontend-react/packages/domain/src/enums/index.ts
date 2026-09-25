@@ -19,12 +19,16 @@ export enum EFeatures {
   TodayStats = 23,
   Available = 30,
   Entries = 31,
+  /** Cuadre del día — espejo de FeatureType.TodayInventoryStats=32 (backend). */
+  TodayInventoryStats = 32,
   Egress = 33,
   InventoryTodayQuantities = 34,
   InventoryTodaySaleProfit = 35,
   Warehouses = 36,
   /** Movimientos de almacén — espejo de FeatureType.WarehouseStockMovements=37 (backend). */
   WarehouseStockMovements = 37,
+  /** Mis tiendas — espejo de FeatureType.OwnerStores=38 (backend). */
+  OwnerStores = 38,
   /** Feature Ventas Mayoristas — espejo de FeatureType.WholesaleSales=39 (backend). */
   WholesaleSales = 39,
   Send = 40,
