@@ -1,4 +1,4 @@
-import type { BaseResponseModel, SaleCredit } from '@store-mgmt/domain';
+import type { BaseResponseModel, Currency, SaleCredit } from '@store-mgmt/domain';
 import {
   DataResult,
   DEFAULT_CURRENCY,
@@ -227,12 +227,16 @@ export class SaleCreditOfflineService {
    * (sale-credit-offline.service.ts:41-65) — renamed from `createFromOrder`
    * (flagged mismatch #5). Always succeeds, returns SYNC `DataResult<SaleCredit>`
    * (`new DataResult(credit, true, [])`) — never throws.
+   *
+   * MultiMonedas: `currency` is the React-only 5th argument (the 4-arg original has no such
+   * parameter); it defaults to `DEFAULT_CURRENCY` so every legacy call site keeps CUP.
    */
   createSaleCredit(
     orderId: string,
     client: string,
     total: number,
     note: string,
+    currency: Currency = DEFAULT_CURRENCY,
   ): DataResult<SaleCredit> {
     const now = new Date();
     const credit: SaleCredit = {
@@ -247,7 +251,7 @@ export class SaleCreditOfflineService {
       paidDate: null as unknown as Date,
       paidType: null as unknown as PaymentType,
       note,
-      currency: DEFAULT_CURRENCY,
+      currency,
       createdDate: now,
       createdByName: getCurrentUserLogin(),
       updatedDate: undefined,

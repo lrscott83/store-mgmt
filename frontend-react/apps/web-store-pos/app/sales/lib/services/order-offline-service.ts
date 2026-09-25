@@ -529,10 +529,14 @@ export class OrderOfflineService {
     // single-payment path applies the pricing exactly as before.
     const hasMultiPayments = payments !== undefined && payments.length > 0;
 
+    // Hoisted once so the persisted order total and the credit amount are the SAME number:
+    // the credit is what gets collected later, so it must carry the sale's final price.
+    const orderTotal = hasMultiPayments ? total : applyPaymentPricing(total, pricing);
+
     const order: Order = {
       id: orderId,
       orderItems,
-      total: hasMultiPayments ? total : applyPaymentPricing(total, pricing),
+      total: orderTotal,
       itemsCount,
       date: now,
       type,
@@ -565,9 +569,9 @@ export class OrderOfflineService {
     this.setOrdersLocalStorage(this.orders!);
 
     if (isCredit) {
-      // Angular always passes '' for note (order-offline.service.ts:63); the returned
-      // DataResult is ignored, mirroring Angular's own fire-and-forget call.
-      this.creditService.createSaleCredit(orderId, client, total, '');
+      // The returned DataResult is ignored (fire-and-forget). `note` is always ''. The credit
+      // carries the sale's currency and its FINAL total, not the unpriced line sum.
+      this.creditService.createSaleCredit(orderId, client, orderTotal, '', orderCurrency);
     }
 
     return Promise.resolve(success(order));
