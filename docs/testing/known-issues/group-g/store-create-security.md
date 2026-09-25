@@ -33,6 +33,6 @@ Más presupuesto para este test (120 → 180 s, como ya usa `auth-me-session-rej
 
 ## Estado
 
-⏸ **En observación** — el reintento lo absorbe; se sigue en la próxima corrida completa.
+🔶 **Superado por el rediseño del spec (2026-09-25)** — al reescribir S2-03 (autorización del usuario: la app redirige al owner sin MultiStores a my-stores) se descubrió un defecto estructural del spec: los dos `test.use` a nivel de fichero se acumulaban (el último ganaba para TODOS los tests) y el Test 1 corría como `store-user`. El spec quedó reestructurado (un `describe` por test con su persona dentro) y pasó 2/2 en solitario. La causa del flaky (mint de dos personas en la preparación) cambia de forma con el rediseño — se observa en la próxima corrida completa.
 
-- _Actualizado: 2026-09-25._
+- _Actualizado: 2026-09-25 (rediseño)._

@@ -113,20 +113,25 @@ Contexto: backend real `:5019` (BD `smca_test`, confirmada por el teardown en am
 
 ---
 
-## Flaky recurrentes — Grupo F (fichas por test)
+## Flaky recurrentes — Grupo G (fichas por test)
 
-De los 32 flaky de las cuatro primeras corridas (23 + 4 + 2 + 3), 28 fueron tests distintos al azar — contención pura: pasan al reintento y en solitario. Dos specs recayeron en más de una corrida y tienen ficha autocontenida con el modo de fallo, la causa y la solución:
+De los 34 flaky de las cinco primeras corridas (23 + 4 + 2 + 3 + 2), 29 fueron tests distintos al azar — contención pura: pasan al reintento y en solitario. Dos specs recayeron en más de una corrida y tienen ficha autocontenida:
 
-| Ficha | Test | Recurrencia |
-| ------------------------------------------------------------------------------ | ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- || [`group-f/store-plan-activation.md`](group-f/store-plan-activation.md) | `store-plan-activation` (POST change-plan) | Corridas 2, 3 y 5 — precondición de BD ya nula al arrancar; **causa confirmada**: `roster-export` anula la fecha de la tienda compartida por BD directa y no la restaura (corre alfabéticamente antes) |
-| [`group-f/auth-me-session-rejection.md`](group-f/auth-me-session-rejection.md) | `auth-me-session-rejection` (setup/mints de arranque) | Corridas 1 y 3 — timeouts de setup/navegación en arranque en frío (contención; el reintento siempre pasa) |
+| Ficha                                                                  | Test                                                 | Recurrencia                                                                                              |
+| ---------------------------------------------------------------------- | ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| [`group-g/warehouses.md`](group-g/warehouses.md)                       | `warehouses` (StoreUser sin Almacenes)               | Corridas 2, 4 y 5 — aserción: el enlace "Catálogo Productos" no aparece en 15 s (modo idéntico en las 3) |
+| [`group-g/store-create-security.md`](group-g/store-create-security.md) | `store-create-security` (ruta de creación = edición) | Corridas 1 y 5 — corrida 1: timeout de 120 s preparando la sesión; corrida 5: ídem                       |
 
-**Soluciones aplicadas 2026-09-25 (con autorización del usuario):** `store-plan-lock-regression` y `store-plan-activation` usan cada uno su propia tienda (persona privada; la causa real del segundo fue `roster-export`, no la regresión) y el fixture de sesión en frío pasa de 30 a 60 s. Specs afectados verificados en solitario en verde (2/2 + 12/12 + 12/12). **Confirmado en la corrida final del 2026-09-25** (4 workers: 338 passed + 2 flaky ajenos, 0 failed, 6.5 min): ambos modos de fallo con **cero apariciones** en el log y ambos specs limpios — Grupo F cerrado.
+⏸ En observación, con modos DISTINTOS: `store-create-security` es de preparación (entorno); `warehouses` es de aserción y apunta a una espera corta o condición de carrera propia del test.
+
+### Cerrados antes (Grupo F, retirado)
+
+`store-plan-activation` (causa confirmada: `roster-export` anula la fecha de pago de la tienda compartida por BD directa y no la restaura; corregido con tienda privada) y `auth-me-session-rejection` (fixture de sesión en frío a 60 s) — **ambos confirmados limpios en la corrida final** (cero apariciones de sus modos de fallo). Detalle de la investigación en el historial de commits de `docs/testing/`.
 
 ## Estado de decisiones pendientes (2026-09-24)
 
 _Sin decisiones pendientes._ Todas las entradas de la corrida del 2026-09-24 quedaron cerradas: entrada 1, anotadas 2/3/4 y Grupos B, C y D; el Grupo E no requiere acción.
 
-Historial: en la segunda tanda se cerró la decisión del test 12 (el spec pinea el diseño del gate con autorización del usuario), los tests 10/11 (ídem) y el T10.2 (spec reescrito verificado + núcleo pineado en integración) — detalle en las entradas 1, 2 y 3. En la tercera tanda se cerró el Grupo B (los 2 specs comparan la fecha ancla serializada), en la cuarta el Grupo C (el spec usa la persona privada Superior del fixture de dev y pasa 2/2) y en la quinta el Grupo D (aserción por valor/selección).
+Historial: en la segunda tanda se cerró la decisión del test 12 (el spec pinea el diseño del gate con autorización del usuario), los tests 10/11 (ídem) y el T10.2 (spec reescrito verificado + núcleo pineado en integración) — detalle en las entradas 1, 2 y 3. En la tercera tanda se cerró el Grupo B (los 2 specs comparan la fecha ancla serializada), en la cuarta el Grupo C (el spec usa la persona privada Superior del fixture de dev y pasa 2/2) y en la quinta el Grupo D (aserción por valor/selección). El Grupo E (plan-catalog-superadmin y auth-me-\*, solo carga de la suite) quedó verificado en verde en solitario (16/16) y sin retries en la última corrida completa; su ficha se retiró. El Grupo F se retiró al confirmarse sus dos fixes en la corrida final.
 
 _Actualizado por última vez: 2026-09-24 (quinta actualización: corrida del 2026-09-24 cerrada por completo)._
