@@ -1,6 +1,11 @@
 import { test, expect } from './support/test';
+import type { Browser, Page } from '@playwright/test';
 import { assertStoresFeature, degradeStoreToFreePlan } from './support/store-fixture';
 import { installPlanChangeObserver } from './support/plan-change-observer';
+import { newTestIdentity } from './support/identity';
+import { RegisterPage } from './support/register-page';
+import { LoginPage } from './support/login-page';
+import { readSelectedStoreId } from './support/session';
 
 /**
  * [S2-01 → owner-plan-change] DG-7, repurposada (authorized update, T7.2):
@@ -33,7 +38,67 @@ const STORES_OFFLINE_TEXT = 'Sin conexión. Se requiere conexión a internet.'; 
 // predecessor (Gratis) in the includes line (es.ts INCLUDES_PREVIOUS_PLAN).
 const PAID_INCLUDES_PREVIOUS_TEXT = 'Incluye todo lo del plan Gratis y además:';
 
-test.use({ persona: 'owner-admin' });
+// SIN persona compartida (Grupo F, autorización 2026-09-25): cada test mintea
+// su PROPIA tienda (registro + login en un contexto desechable y restauración
+// con costo 0 /me). Motivo: la persona compartida `owner-admin` es UNA tienda
+// por worker, y `roster-export.spec.ts` anula su `PaymentStartDate` por BD
+// directa (support/roster-expiry-seed.ts:35) SIN restaurarla — si este spec
+// cae después en el mismo worker, su precondición encuentra la fecha ya nula
+// (el flaky de las corridas 2, 3 y 5). Con tienda exclusiva, nadie más toca
+// esa fila.
+
+/**
+ * Sesión privada de owner con tienda EXCLUSIVA: registro + login reales en un
+ * contexto desechable; devuelve el localStorage capturado para restaurar.
+ */
+async function mintPrivateOwnerSession(browser: Browser): Promise<{
+  localStorage: Array<{ name: string; value: string }>;
+  selectedStoreId: string;
+}> {
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  const identity = newTestIdentity();
+  const registerPage = new RegisterPage(page);
+  await registerPage.goto();
+  await registerPage.fillValidForm(identity);
+  await registerPage.acceptTerms.check();
+  await registerPage.submit();
+  await page.waitForURL(/\/login$/);
+  const loginPage = new LoginPage(page);
+  await loginPage.fill(identity);
+  await loginPage.submit();
+  await page.waitForURL(/\/sales\/products$/);
+  const selectedStoreId = await readSelectedStoreId(page);
+  const state = await context.storageState();
+  const origin = new URL(page.url()).origin;
+  // Misma regla de honestidad de session.ts/store-wholesale-fixture: sin la
+  // mitad DEK de localStorage y sin entidades cifradas (el contexto que
+  // restaura no tiene DEK en memoria).
+  const localStorage = (state.origins.find((o) => o.origin === origin)?.localStorage ?? []).filter(
+    (entry) =>
+      entry.name !== 'lizoft.device-dek' &&
+      !(entry.name.startsWith('lizoft.store-') && entry.value.startsWith('enc:v1:')),
+  );
+  await context.close();
+  return { localStorage, selectedStoreId };
+}
+
+/**
+ * Restaura la sesión privada sobre la página del test: login público →
+ * escribir localStorage → ir al home. Costo 0 /me (la hidratación en frío
+ * lee localStorage; el login real ya ocurrió en el mint) — el conteo exacto
+ * de `loginNetwork.expectMeRequestCount(1)` se mantiene intacto.
+ */
+async function restorePrivateOwnerSession(
+  page: Page,
+  session: { localStorage: Array<{ name: string; value: string }> },
+): Promise<void> {
+  await page.goto('/login');
+  await page.evaluate((entries) => {
+    for (const { name, value } of entries) window.localStorage.setItem(name, value);
+  }, session.localStorage);
+  await page.goto('/sales/products');
+}
 
 // SERIAL, and this is a budget constraint, not a style choice. The persona
 // cache is scoped PER WORKER (session.ts:187), so two tests spread across two
@@ -61,10 +126,14 @@ test.use({ persona: 'owner-admin' });
 test.describe.configure({ mode: 'serial', timeout: 120_000 });
 
 test('OwnerAdmin cambia el plan de su tienda vía POST change-plan', async ({
-  signedInPage,
+  page,
+  browser,
   loginNetwork,
 }) => {
-  const { page, selectedStoreId } = signedInPage;
+  // Tienda PRIVADA: mint en contexto desechable + restauración (0 /me).
+  const privateSession = await mintPrivateOwnerSession(browser);
+  const selectedStoreId = privateSession.selectedStoreId;
+  await restorePrivateOwnerSession(page, privateSession);
 
   // REQ-13/D9 — asserted BEFORE anything else: turns a silent logout
   // (H-7/H-8, adminFeatureLoader without the Stores feature) into a
@@ -245,9 +314,13 @@ test('OwnerAdmin cambia el plan de su tienda vía POST change-plan', async ({
  * declared.
  */
 test('fallo de carga por red muestra el mensaje de conexión y no monta los paneles', async ({
-  signedInPage,
+  page,
+  browser,
 }) => {
-  const { page } = signedInPage;
+  // Tienda PRIVADA: mint propio — el test de arriba ya no depende de lo que
+  // otros specs del mismo worker hicieron con la tienda compartida.
+  const privateSession = await mintPrivateOwnerSession(browser);
+  await restorePrivateOwnerSession(page, privateSession);
 
   await page.route('**/v1/Features/available', (route) => route.abort());
   await page.goto('/management/stores');

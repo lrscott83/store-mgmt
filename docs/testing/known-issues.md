@@ -115,13 +115,13 @@ Contexto: backend real `:5019` (BD `smca_test`, confirmada por el teardown en am
 
 ## Flaky recurrentes — Grupo F (fichas por test)
 
-De los 29 flaky de las tres corridas (23 + 4 + 2), 25 fueron tests distintos al azar — contención pura: pasan al reintento y en solitario. Dos specs recayeron en más de una corrida y tienen ficha autocontenida con el modo de fallo literal, los pasos de verificación previa, la hipótesis por confirmar y la solución candidata:
+De los 32 flaky de las cuatro primeras corridas (23 + 4 + 2 + 3), 28 fueron tests distintos al azar — contención pura: pasan al reintento y en solitario. Dos specs recayeron en más de una corrida y tienen ficha autocontenida con el modo de fallo, la causa y la solución:
 
 | Ficha | Test | Recurrencia |
-| ------------------------------------------------------------------------------ | ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- || [`group-f/store-plan-activation.md`](group-f/store-plan-activation.md) | `store-plan-activation` (POST change-plan) | Corridas 2 y 3 — precondición de BD ya nula al arrancar (solapamiento con el seed directo de `store-plan-lock-regression` sobre la persona compartida) |
+| ------------------------------------------------------------------------------ | ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- || [`group-f/store-plan-activation.md`](group-f/store-plan-activation.md) | `store-plan-activation` (POST change-plan) | Corridas 2, 3 y 5 — precondición de BD ya nula al arrancar; **causa confirmada**: `roster-export` anula la fecha de la tienda compartida por BD directa y no la restaura (corre alfabéticamente antes) |
 | [`group-f/auth-me-session-rejection.md`](group-f/auth-me-session-rejection.md) | `auth-me-session-rejection` (setup/mints de arranque) | Corridas 1 y 3 — timeouts de setup/navegación en arranque en frío (contención; el reintento siempre pasa) |
 
-**Soluciones aplicadas 2026-09-25 (con autorización del usuario):** `store-plan-lock-regression` usa ahora su propia tienda (persona privada) y el fixture de sesión en frío pasa de 30 a 60 s. Ambos specs afectados verificados en solitario en verde. 🔶 Pendiente: confirmar en la próxima corrida completa que los dos flaky desaparecen.
+**Soluciones aplicadas 2026-09-25 (con autorización del usuario):** `store-plan-lock-regression` y `store-plan-activation` usan cada uno su propia tienda (persona privada; la causa real del segundo fue `roster-export`, no la regresión) y el fixture de sesión en frío pasa de 30 a 60 s. Specs afectados verificados en solitario en verde (2/2 + 12/12 + 12/12). Resultado de la corrida de confirmación (4 workers, 337 passed + 3 flaky, 0 failed): el fix del fixture sostuvo (cero timeouts de setup, auth-me ya no flaky); el flaky de `store-plan-activation` se explicó y corrigió después con la causa real. 🔶 Pendiente: la próxima corrida completa sin ninguno de los dos modos de fallo.
 
 ## Estado de decisiones pendientes (2026-09-24)
 
