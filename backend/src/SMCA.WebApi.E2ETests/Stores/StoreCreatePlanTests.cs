@@ -17,12 +17,12 @@ namespace SMCA.WebApi.E2ETests.Stores;
 /// <summary>
 /// E2E tests for the plan dimension of <c>POST /api/v1/stores</c>: every created store
 /// must land on plan Pago (StorePlanId=2) with the trial clock started
-/// (PaymentStartDate=today), the exact requested module set with catalog price
-/// snapshots, and the StoreRoleFeatures the real flow generates — including the new
-/// plan modules 12/13/14. Plan 2026-09-08-e2e-plan-gated-modules-auth-roster (Lote 2).
-/// Default plan change (2026-09-18, store-default-plan-and-owner-plan-restriction):
-/// birth plan is Pago while the birth module set stays REQUEST-driven (Option A) —
-/// the Superior catalog members are assigned only when the request lists them.
+/// (PaymentStartDate=today), the requested module set with catalog price
+/// snapshots, and the StoreRoleFeatures the real flow generates. Strict birth invariant
+/// (2026-09-25, store-birth-pago-only): the birth module set is clamped to the ACTIVE
+/// Pago plan catalog — Superior/VIP-only members (12..17) are rejected 400 and the
+/// 2026-09-18 Option A REQUEST-driven divergence is closed. The exhaustive 12..17 sweep
+/// lives in StoreBirthPagoOnlyTests; this file pins the plan/price/feature shape on Pago members.
 /// </summary>
 [Collection("e2e")]
 public sealed class StoreCreatePlanTests
@@ -57,9 +57,11 @@ public sealed class StoreCreatePlanTests
         Guid created = Guid.Empty;
         try
         {
+            // Request = Pago members only (strict birth invariant): Management (7, free) +
+            // Statistics (6, paid). Warehouses (13) is Superior/VIP-only since 2026-09-25.
             var response = await DbTestHelpers.AuthedClient(_f, adminId, login)
                 .PostAsJsonAsync("/api/v1/stores",
-                    Body(owner.OwnerId, $"Store-{Guid.NewGuid():N}", new[] { FreeManagementModuleId, StatisticsModuleId, WarehousesModuleId }));
+                    Body(owner.OwnerId, $"Store-{Guid.NewGuid():N}", new[] { FreeManagementModuleId, StatisticsModuleId }));
             response.StatusCode.Should().Be(HttpStatusCode.Created);
             created = (await response.Content.ReadFromJsonAsync<ApiResponse<StoreData>>(ApiResponse.Json))!.Data!.Id;
 
@@ -74,22 +76,15 @@ public sealed class StoreCreatePlanTests
                 .Where(sm => sm.StoreId == created && sm.IsActive).ToListAsync();
             storeModules.Select(sm => sm.ModuleId).Should().BeEquivalentTo(new[]
             {
-                FreeManagementModuleId, StatisticsModuleId, WarehousesModuleId
+                FreeManagementModuleId, StatisticsModuleId
             });
-
-            // Catalog price snapshots: Warehouses carries the post-Update-Warehouses-Price
-            // catalog values (Price=5, PercentDiscount=50 → effective 2.5).
-            var warehouses = storeModules.Single(sm => sm.ModuleId == WarehousesModuleId);
-            warehouses.Price.Should().Be(5f);
-            warehouses.ModulePercentDiscountPrice.Should().Be(50f);
-            warehouses.ModulePriceIncluded.Should().BeFalse();
 
             // StoreRoleFeatures rows exist for the mapped features of the requested modules.
             var srfFeatureIds = await db.Set<StoreRoleFeature>().IgnoreQueryFilters()
                 .Where(srf => srf.StoreId == created && srf.IsActive)
                 .Select(srf => srf.FeatureId).Distinct().ToListAsync();
-            srfFeatureIds.Should().Contain(new[] { 60, 36, 37 }); // Statistics + Warehouses features
-            srfFeatureIds.Should().NotContain(new[] { 38, 39 }); // not mapped in StoreRoleFeatures (production gap)
+            srfFeatureIds.Should().Contain(60); // Statistics feature
+            srfFeatureIds.Should().NotContain(new[] { 36, 37, 38, 39 }); // Warehouses/MultiStores/WholesaleSales are not requested
         }
         finally
         {
@@ -102,10 +97,11 @@ public sealed class StoreCreatePlanTests
     [Fact]
     public async Task Create_store_rejects_wholesale_sales_module_for_pago_birth()
     {
-        // wholesale-superior-vip-only (2026-09-23): every store born via POST /v1/stores
-        // lands on Pago (CreateStoreService hardcodes StorePlanType.Pago), and WholesaleSales
-        // (12) is reserved for Superior/VIP. Requesting 12 must be REJECTED with 400
-        // (fail-closed) — the closure test for the administrative POST path.
+        // Strict birth invariant (2026-09-25, store-birth-pago-only): every store born via
+        // POST /v1/stores lands on Pago (CreateStoreService hardcodes StorePlanType.Pago), so a
+        // request naming ANY Superior/VIP-only member is rejected 400 (ModuleNotAvailableForPagoPlan,
+        // fail-closed). WholesaleSales (12) is the closure case kept here; the exhaustive 12..17
+        // sweep lives in StoreBirthPagoOnlyTests.
         var login = $"sa-ca-{Guid.NewGuid():N}@test.com";
         var adminId = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
         var owner = await StoreSeed.SeedOwnerAsync(_f);
@@ -133,47 +129,43 @@ public sealed class StoreCreatePlanTests
     }
 
     [Fact]
-    public async Task Create_store_defaults_to_pago_but_modules_are_request_driven()
+    public async Task Create_store_with_full_pago_catalog_births_exact_request_set()
     {
-        // Default plan change (2026-09-18, store-default-plan-and-owner-plan-restriction):
-        // every created store births on Pago (2). The birth module set stays REQUEST-driven
-        // (Option A divergence): a request listing the full AvailableToStore set minus
-        // WholesaleSales yields a Pago store whose modules match the request — which agrees
-        // with the Superior catalog (15 with Elaboration), NOT the Pago catalog (10 members
-        // since wholesale-superior-vip-only removed module 12 on 2026-09-23). The divergence is pinned.
+        // Strict birth invariant (2026-09-25, store-birth-pago-only): every created store
+        // births on Pago (2) and the birth module set EQUALS the active Pago plan catalog —
+        // the 2026-09-18 Option A request-driven divergence (Superior members honored on a
+        // Pago birth) is closed. The full catalog request yields exactly the catalog set.
         var login = $"sa-csc-{Guid.NewGuid():N}@test.com";
         var adminId = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
         var owner = await StoreSeed.SeedOwnerAsync(_f);
         Guid created = Guid.Empty;
         try
         {
-            // WholesaleSales (12) is excluded from the request: it is reserved for Superior/VIP
-            // and POST /v1/stores births on Pago, so requesting it is rejected (400).
-            var fullCatalogRequest = new[] { 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, WarehousesModuleId, MultiStoresModuleId, MultiMonedasModuleId, ElaborationModuleId };
-            var response = await DbTestHelpers.AuthedClient(_f, adminId, login)
-                .PostAsJsonAsync("/api/v1/stores", Body(owner.OwnerId, $"Store-{Guid.NewGuid():N}", fullCatalogRequest));
-            response.StatusCode.Should().Be(HttpStatusCode.Created);
-            created = (await response.Content.ReadFromJsonAsync<ApiResponse<StoreData>>(ApiResponse.Json))!.Data!.Id;
+            // The full Pago catalog (10 members) — read from StorePlanModule, the SAME source
+            // the validator uses, so the pin stays honest if the catalog ever changes.
+            using (var scope = _f.Services.CreateScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                var catalog = await db.Set<StorePlanModule>().IgnoreQueryFilters()
+                    .Where(spm => spm.PlanId == PagoPlanId)
+                    .Select(spm => spm.ModuleId).ToListAsync();
+                catalog.Should().HaveCount(10,
+                    "Pago is 10 members (WholesaleSales 12 removed 2026-09-23; 13..17 are Superior/VIP-only)");
 
-            using var scope = _f.Services.CreateScope();
-            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                var response = await DbTestHelpers.AuthedClient(_f, adminId, login)
+                    .PostAsJsonAsync("/api/v1/stores", Body(owner.OwnerId, $"Store-{Guid.NewGuid():N}", catalog));
+                response.StatusCode.Should().Be(HttpStatusCode.Created);
+                created = (await response.Content.ReadFromJsonAsync<ApiResponse<StoreData>>(ApiResponse.Json))!.Data!.Id;
 
-            var store = await db.Set<Store>().IgnoreQueryFilters().SingleAsync(s => s.Id == created);
-            store.StorePlanId.Should().Be(PagoPlanId);
+                var store = await db.Set<Store>().IgnoreQueryFilters().SingleAsync(s => s.Id == created);
+                store.StorePlanId.Should().Be(PagoPlanId);
 
-            var pagoPlanModuleIds = await db.Set<StorePlanModule>().IgnoreQueryFilters()
-                .Where(spm => spm.PlanId == PagoPlanId)
-                .Select(spm => spm.ModuleId).ToListAsync();
-            // The Pago catalog keeps its own members: WholesaleSales (12) and Elaboration (17)
-            // are Superior/VIP-only, so Pago stays at 10.
-            pagoPlanModuleIds.Should().HaveCount(10);
-
-            var storeModuleIds = await db.Set<StoreModule>().IgnoreQueryFilters()
-                .Where(sm => sm.StoreId == created && sm.IsActive)
-                .Select(sm => sm.ModuleId).ToListAsync();
-            // Option A: the birth module set is the REQUEST list (13 incl. MultiMonedas 15),
-            // diverging from the Pago plan catalog (10) — pinned, not equalized.
-            storeModuleIds.Should().BeEquivalentTo(fullCatalogRequest);
+                var storeModuleIds = await db.Set<StoreModule>().IgnoreQueryFilters()
+                    .Where(sm => sm.StoreId == created && sm.IsActive)
+                    .Select(sm => sm.ModuleId).ToListAsync();
+                // Divergence closed: the birth module set equals the Pago catalog exactly.
+                storeModuleIds.Should().BeEquivalentTo(catalog);
+            }
         }
         finally
         {

@@ -13,14 +13,17 @@ namespace Application.Features.StoreManagement.Stores.Commands.CreateStore
         private readonly IOwnerRepository _ownerRepository;
         private readonly IStoreRepository _storeRepository;
         private readonly IModuleRepository _moduleRepository;
+        private readonly IPlanRepository _planRepository;
         private readonly IHttpContextService _httpContextService;
         private readonly IStringLocalizer<I18n> _localizer;
         public CreateStoreCommandValidator(IStringLocalizer<I18n> localizer, IOwnerRepository ownerRepository, 
-            IStoreRepository storeRepository, IModuleRepository moduleRepository, IHttpContextService httpContextService)
+            IStoreRepository storeRepository, IModuleRepository moduleRepository, IPlanRepository planRepository,
+            IHttpContextService httpContextService)
         {
             _ownerRepository = ownerRepository;
             _storeRepository = storeRepository;
             _moduleRepository = moduleRepository;
+            _planRepository = planRepository;
             _httpContextService = httpContextService;
             _localizer = localizer;
 
@@ -45,12 +48,14 @@ namespace Application.Features.StoreManagement.Stores.Commands.CreateStore
                     .NotEmpty().WithMessage(_localizer["IsRequired", "{PropertyName}"])
                     .MustAsync(AvailableModuleIdsToStore).WithMessage(_localizer["ModuleNotAvailableToStore", "{PropertyName}"]);
 
-                // WholesaleSales (12) is reserved for Superior/VIP plans (wholesale-superior-vip-only,
-                // 2026-09-23): every store created through POST /v1/stores is born on Pago
-                // (CreateStoreService hardcodes StorePlanType.Pago), so requesting 12 here can
-                // never be honored. Reject with a clear message (fail-closed, no silent drop).
+                // Strict birth invariant (2026-09-25, store-birth-pago-only): every store
+                // born through POST /v1/stores lands on plan Pago (CreateStoreService hardcodes
+                // StorePlanType.Pago), so a request may only name modules of the ACTIVE Pago
+                // plan catalog. Superior/VIP-only modules (12..17 -- WholesaleSales, Warehouses,
+                // MultiStores, MultiMonedas, MultiPayments, Elaboration) can never be honored at
+                // birth. Reject with a clear message (fail-closed, no silent drop).
                 RuleFor(x => x.ModuleIds)
-                    .Must(moduleIds => moduleIds is null || !moduleIds.Contains((int)ModuleType.WholesaleSales))
+                    .MustAsync(AllInActivePagoPlanCatalog)
                     .WithMessage(_localizer["ModuleNotAvailableForPagoPlan", "{PropertyName}"])
                     .When(x => x.ModuleIds is not null);
             });
@@ -71,6 +76,17 @@ namespace Application.Features.StoreManagement.Stores.Commands.CreateStore
             IEnumerable<Module> availableModules = await _moduleRepository.GetAvailableModulesToStore();
             HashSet<int> availableModuleIds = availableModules.Select(f => f.Id).ToHashSet();
             return moduleIds.All(availableModuleIds.Contains);
+        }
+
+        private async Task<bool> AllInActivePagoPlanCatalog(List<int> moduleIds, CancellationToken cancellationToken)
+        {
+            var pagoPlan = await _planRepository.GetActivePlanWithModulesByIdAsync((int)Domain.Common.Enums.StorePlanType.Pago);
+            if (pagoPlan is null)
+                return false; // fail-closed: no active Pago catalog -> no modules allowed at birth
+            var catalog = (pagoPlan.StorePlanModules ?? Enumerable.Empty<Domain.Entities.Plans.StorePlanModule>())
+                .Select(spm => spm.ModuleId)
+                .ToHashSet();
+            return moduleIds.All(catalog.Contains);
         }
 
     }
