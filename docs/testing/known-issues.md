@@ -22,7 +22,7 @@ Resumen de la corrida (los 3 resueltos en la primera tanda se eliminaron de la l
 | 5   | `owner-plan-change-dialog`    | ✅ **Resuelto 2026-09-24** — defecto del test corregido con autorización (aserción del ancla compara la fecha serializada)                         |
 | 6   | `store-plan-lock-regression`  | ✅ **Resuelto 2026-09-24** — mismo defecto, corregido igual con autorización                                                                       |
 | 7   | `wholesale-cart-floor`        | ✅ **Resuelto 2026-09-24** — spec actualizado con autorización: persona privada Superior (módulo 12 + feature 39)                                  |
-| 8   | `configurations` FC-B2        | ✅ **Confirmada** — locator frágil del test (la app está bien)                                                                                     |
+| 8   | `configurations` FC-B2        | ✅ **Resuelto 2026-09-24** — locator frágil corregido con autorización (afirma por valor/selección)                                                |
 
 ---
 
@@ -80,27 +80,27 @@ Resumen de la corrida (los 3 resueltos en la primera tanda se eliminaron de la l
 - **Causa raíz:** ✅ confirmada — la feature "mayoristas solo para planes Superior/VIP" (módulo 12, traída de dev) dejó fuera a la persona del test, que fue creada antes de esa regla. No es un bug de la app: la app hace exactamente lo que la nueva regla dice.
 - **Aplicada (2026-09-24, con autorización explícita del usuario):** el spec usa la persona privada Superior del fixture `store-wholesale-fixture.ts` (módulo 12 + feature 39), minteada una vez y replicada por snapshot — el mismo patrón de los specs nuevos de dev. De paso, dos aserciones internas quedaron alineadas al formato real del carrito (`Precio: N CUP`): el spec viejo nunca las había ejercido porque moría antes en el gate del menú. Verificado: 2/2 en verde contra el backend real (`:5019`, BD `smca_test`).
 
-## Grupo D — Locator frágil del test (1)
+## Grupo D — Locator frágil del test (1 — resuelto 2026-09-24)
 
 **Test:** `configurations` FC-B2.
 
 - **Qué prueba:** que el selector "Tienda activa" de la pantalla de configuración lista las tiendas cuando hay varias (MultiStores).
 - **Qué falla:** el test afirma que la **opción** dentro del selector "es visible". Los navegadores consideran las opciones de un desplegable "ocultas" por definición (solo son visibles al abrir el desplegable), así que Playwright lo rechaza siempre — el log confirma 13 veces que la opción existe y tiene el nombre correcto de la tienda.
 - **Causa raíz:** ✅ confirmada — la app está bien; el locator del test elige un tipo de aserción (visibilidad de una `<option>`) que Playwright no concede.
-- **Propuesta (requiere permiso):** afirmar por valor/selección (`toHaveValue` / `selectOption`) en vez de visibilidad de la opción.
+- **Aplicada (2026-09-24, con autorización explícita del usuario):** la aserción afirma que el selector tiene opciones y que el valor seleccionado es la tienda de la persona (`toHaveValue`), en vez de visibilidad de la `<option>` — los navegadores no conceden visibilidad a las opciones de un desplegable colapsado. Verificado: 2/2 en verde contra el backend real (`:5019`, BD `smca_test`).
 
 ## Grupo E — Solo carga de la suite (2, sin acción)
 
 **Tests:** `plan-catalog-superadmin` (PCF2) y los setups de `auth-me-*`. **Pasan en solitario** — eran timeouts por la carga de la suite completa. Sin defecto de app ni de test; no requieren cambio.
 
+> **Re-verificado 2026-09-24:** los 3 specs del grupo corren en verde en solitario contra el backend real (`:5019`, BD `smca_test`) — `plan-catalog-superadmin` + `auth-me-session-rejection` + `auth-me-deleted-user`, **16/16 (~31 s)**.
+
 ---
 
 ## Estado de decisiones pendientes (2026-09-24)
 
-| Decisión                                                                     | Dueño                          |
-| ---------------------------------------------------------------------------- | ------------------------------ |
-| Ajuste de test del Grupo D (1 aserción en 1 spec, sin correr suite completa) | Pendiente de permiso explícito |
+_Sin decisiones pendientes._ Todas las entradas de la corrida del 2026-09-24 quedaron cerradas: entrada 1, anotadas 2/3/4 y Grupos B, C y D; el Grupo E no requiere acción.
 
-_Cerradas en esta fecha (segunda tanda):_ la decisión sobre el test 12 (el spec pinea el diseño del gate con autorización del usuario), los tests 10/11 (ídem) y el T10.2 (spec reescrito verificado + núcleo pineado en integración) — detalle en las entradas 1, 2 y 3. En la tercera tanda se cerró el Grupo B (los 2 specs comparan la fecha ancla serializada) y en la cuarta el Grupo C (el spec usa la persona privada Superior del fixture de dev y pasa 2/2).
+Historial: en la segunda tanda se cerró la decisión del test 12 (el spec pinea el diseño del gate con autorización del usuario), los tests 10/11 (ídem) y el T10.2 (spec reescrito verificado + núcleo pineado en integración) — detalle en las entradas 1, 2 y 3. En la tercera tanda se cerró el Grupo B (los 2 specs comparan la fecha ancla serializada), en la cuarta el Grupo C (el spec usa la persona privada Superior del fixture de dev y pasa 2/2) y en la quinta el Grupo D (aserción por valor/selección).
 
-_Actualizado por última vez: 2026-09-24 (cuarta actualización: cierre de la entrada 1, de las anotadas 2, 3 y 4, del Grupo B y del Grupo C)._
+_Actualizado por última vez: 2026-09-24 (quinta actualización: corrida del 2026-09-24 cerrada por completo)._
