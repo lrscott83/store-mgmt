@@ -1,8 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useIntl } from 'react-intl';
-import { EFeatures } from '@store-mgmt/domain';
+import type { Currency } from '@store-mgmt/domain';
+import { DEFAULT_CURRENCY, EFeatures } from '@store-mgmt/domain';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
+import { hasMultiMonedasAvailable } from '~/shared/components/multimonedas/currency-select';
+import { CurrencyFilter } from '~/shared/components/multimonedas/currency-filter';
+import { useCurrencyFilter } from '~/shared/components/multimonedas/use-currency-filter';
+import { presentCurrencies, resolveCurrency } from '~/shared/lib/currency-totals';
 import { Card } from '~/shared/components/ui/card';
 import { ChevronDownIcon } from '~/shared/components/ui/icons';
 import { InventoryOfflineService } from '../lib/services/inventory-offline-service';
@@ -11,9 +16,6 @@ import { ProductRepository } from '~/sales/lib/repositories/product-repository';
 import { ProductCategoryRepository } from '~/sales/lib/repositories/product-category-repository';
 import { InventoryProductList, filterInventoryCategories } from '../components/inventory-product-list';
 import { formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency';
-import { CurrencyTotalAmount } from '~/shared/components/multimonedas/currency-total-amount';
-import { nonEmptyCurrencyRows } from '~/shared/lib/currency-totals';
-import type { CurrencyAmount } from '~/shared/lib/currency-totals';
 import { round2 } from '~/shared/lib/money';
 import { useMultiStore } from '~/shared/lib/hooks/use-multi-store';
 import {
@@ -46,7 +48,9 @@ export const clientLoader = featureLoader([EFeatures.Available]);
  */
 export function InventoryAvailablePage() {
   const intl = useIntl();
-  const storeId = useAuthStore((s) => s.user?.selectedStoreId ?? '');
+  const user = useAuthStore((s) => s.user);
+  const storeId = user?.selectedStoreId ?? '';
+  const multiMonedas = hasMultiMonedasAvailable(user);
   const [categories, setCategories] = useState<InventoryCategoryView[]>([]);
   const { enabled: multiStoreEnabled, stores: multiStoreStores } = useMultiStore();
   const [storeCategories, setStoreCategories] = useState<Map<string, InventoryCategoryView[]>>(
@@ -105,16 +109,53 @@ export function InventoryAvailablePage() {
   }, [multiStoreEnabled, multiStoreStores]);
 
 
+  // Filtro de moneda (currency-filter-per-view): las opciones se derivan del
+  // conjunto SIN filtrar por moneda (single-store: las categorías cargadas;
+  // multi-store: las categorías leídas de cada tienda), para que el filtro no
+  // desaparezca al elegir una moneda y se pueda volver a las demás. El hook vive
+  // al tope del componente porque el modo multi-store es un return temprano.
+  // Cada producto tiene UNA moneda (`ProductRepository` fuerza que todas las
+  // entradas de un producto compartan la suya), así que el costo total por
+  // producto es la fila con la que se derivan las monedas presentes.
+  const allCategories = multiStoreEnabled
+    ? [...storeCategories.values()].flat()
+    : categories;
+  const currencyOptions = presentCurrencies(
+    allCategories.flatMap((cat) =>
+      cat.products.map((p) => ({
+        amount: p.avgCostPrice * p.totalAvailable,
+        currency: p.currency,
+      })),
+    ),
+  );
+  const { visible: currencyFilterVisible, currency, setCurrency } =
+    useCurrencyFilter(currencyOptions);
+  // Tres casos (misma regla que credits/expenses): filtro visible → la elegida;
+  // módulo activo con una sola moneda presente → esa; módulo inactivo → CUP,
+  // salida idéntica a la de hoy.
+  const displayCurrency =
+    currencyFilterVisible && currency !== null
+      ? currency
+      : multiMonedas
+        ? (currencyOptions[0] ?? DEFAULT_CURRENCY)
+        : DEFAULT_CURRENCY;
+  /** Moneda activa del filtro (null cuando está oculto → no se filtra). */
+  const activeCurrency = currencyFilterVisible && currency !== null ? currency : null;
+
+
   // ─── multi-store mode ────────────────────────────────────────────────────
   if (multiStoreEnabled) {
     const visibleStoreIds =
       selectedMultiStoreId === null
         ? multiStoreStores.map((s) => s.id)
         : [selectedMultiStoreId];
-    const visibleCats = visibleStoreIds.reduce<InventoryCategoryView[]>((acc, id) => {
-      acc.push(...filterInventoryCategories(storeCategories.get(id) ?? [], search));
-      return acc;
-    }, []);
+    const visibleCats = filterCategoriesByCurrency(
+      visibleStoreIds.reduce<InventoryCategoryView[]>((acc, id) => {
+        acc.push(...filterInventoryCategories(storeCategories.get(id) ?? [], search));
+        return acc;
+      }, []),
+      activeCurrency,
+    );
     const grandTotal = round2Sum(visibleCats.map((cat) => cat.totalCostPrice));
     const grandCount = visibleCats.reduce((sum, cat) => sum + cat.totalQuantity, 0);
 
@@ -131,11 +172,7 @@ export function InventoryAvailablePage() {
               </span>
             </span>
             <span className="text-lg font-bold text-primary whitespace-nowrap">
-              <CurrencyTotalAmount
-                legacyTotal={grandTotal}
-                entries={nonEmptyCurrencyRows(visibleCats.flatMap((cat) => catCostEntries(cat)))}
-                multiMonedas
-              />
+              {formatMoneyWithCurrency(grandTotal, displayCurrency)}
             </span>
           </div>
         }
@@ -145,35 +182,50 @@ export function InventoryAvailablePage() {
           selectedStoreId={selectedMultiStoreId}
           onSelectedStoreIdChange={setSelectedMultiStoreId}
           filters={
-            <input
-              role="searchbox"
-              data-testid="multistore-inventory-search"
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder={intl.formatMessage({ id: 'GENERAL.SEARCH' })}
-              className="w-full max-w-xs rounded border border-border px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-            />
+            <>
+              <input
+                role="searchbox"
+                data-testid="multistore-inventory-search"
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder={intl.formatMessage({ id: 'GENERAL.SEARCH' })}
+                className="w-full max-w-xs rounded border border-border px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+              {/* Fila propia de moneda debajo de la búsqueda (se auto-oculta). */}
+              <div className="flex w-full justify-center">
+                <CurrencyFilter
+                  currencies={currencyOptions}
+                  value={currency ?? currencyOptions[0] ?? DEFAULT_CURRENCY}
+                  onChange={setCurrency}
+                />
+              </div>
+            </>
           }
           renderStoreCount={(store) => {
-            const cats = filterInventoryCategories(storeCategories.get(store.id) ?? [], search);
+            const cats = filterCategoriesByCurrency(
+              filterInventoryCategories(storeCategories.get(store.id) ?? [], search),
+              activeCurrency,
+            );
             const count = cats.reduce((sum, cat) => sum + cat.totalQuantity, 0);
             return `(${count})`;
           }}
           renderStoreTotals={(store) => {
-            const cats = filterInventoryCategories(storeCategories.get(store.id) ?? [], search);
+            const cats = filterCategoriesByCurrency(
+              filterInventoryCategories(storeCategories.get(store.id) ?? [], search),
+              activeCurrency,
+            );
             const total = round2Sum(cats.map((cat) => cat.totalCostPrice));
             return (
-              <MultiStoreTotal
-                value={total}
-                valueClassName="text-primary"
-                entries={nonEmptyCurrencyRows(cats.flatMap((cat) => catCostEntries(cat)))}
-              />
+              <MultiStoreTotal value={total} valueClassName="text-primary" currency={displayCurrency} />
             );
           }}
         >
           {(store) => {
-            const cats = filterInventoryCategories(storeCategories.get(store.id) ?? [], search);
+            const cats = filterCategoriesByCurrency(
+              filterInventoryCategories(storeCategories.get(store.id) ?? [], search),
+              activeCurrency,
+            );
             const storeCats = storeCategories.get(store.id) ?? [];
             if (storeCats.length === 0) {
               return (
@@ -192,7 +244,13 @@ export function InventoryAvailablePage() {
                 </div>
               );
             }
-            return <MultiStoreCategoryList categories={cats} autoExpand={search.trim() !== ''} />;
+            return (
+              <MultiStoreCategoryList
+                categories={cats}
+                autoExpand={search.trim() !== ''}
+                currency={displayCurrency}
+              />
+            );
           }}
         </MultiStoreSection>
       </Card>
@@ -200,7 +258,10 @@ export function InventoryAvailablePage() {
   }
 
   // ─── single-store mode ───────────────────────────────────────────────────
-  const filtered = filterInventoryCategories(categories, search);
+  const filtered = filterCategoriesByCurrency(
+    filterInventoryCategories(categories, search),
+    activeCurrency,
+  );
   const totalInventoryValue = round2Sum(filtered.map((cat) => cat.totalCostPrice));
   const availableCount = filtered.reduce((sum, cat) => sum + cat.totalQuantity, 0);
 
@@ -217,11 +278,7 @@ export function InventoryAvailablePage() {
             </span>
           </span>
           <span className="text-lg font-bold text-primary whitespace-nowrap">
-            <CurrencyTotalAmount
-              legacyTotal={totalInventoryValue}
-              entries={nonEmptyCurrencyRows(filtered.flatMap((cat) => catCostEntries(cat)))}
-              multiMonedas
-            />
+            {formatMoneyWithCurrency(totalInventoryValue, displayCurrency)}
           </span>
         </div>
       }
@@ -235,7 +292,19 @@ export function InventoryAvailablePage() {
           {intl.formatMessage({ id: 'INVENTORY.NO_ENTRY_FOUND' })}
         </div>
       ) : (
-        <InventoryProductList categories={categories} search={search} onSearchChange={setSearch} />
+        <InventoryProductList
+          categories={filtered}
+          search={search}
+          onSearchChange={setSearch}
+          currency={displayCurrency}
+          filterSlot={
+            <CurrencyFilter
+              currencies={currencyOptions}
+              value={currency ?? currencyOptions[0] ?? DEFAULT_CURRENCY}
+              onChange={setCurrency}
+            />
+          }
+        />
       )}
     </Card>
   );
@@ -247,12 +316,30 @@ function round2Sum(values: number[]): number {
 }
 
 /**
- * Category's cost split by currency for display (MultiMonedas): uses the
- * service's per-currency rows; absent (legacy factories) = whole total as CUP
- * (the domain default — pre-multimoneda data was always CUP).
+ * Filtro de moneda de la vista (currency-filter-per-view): deja solo los
+ * productos de la moneda elegida (cada producto tiene UNA sola moneda) y
+ * recalcula los totales de cada categoría desde esos productos con la MISMA
+ * fórmula del servicio (sin redondeos nuevos). Las categorías sin productos de
+ * esa moneda desaparecen. Sin moneda (`null` = filtro oculto) no toca nada.
  */
-function catCostEntries(cat: InventoryCategoryView): CurrencyAmount[] {
-  return nonEmptyCurrencyRows(cat.totalCostPriceEntries ?? [{ amount: cat.totalCostPrice }]);
+function filterCategoriesByCurrency(
+  categories: InventoryCategoryView[],
+  currency: Currency | null,
+): InventoryCategoryView[] {
+  if (currency === null) return categories;
+  return categories.reduce<InventoryCategoryView[]>((acc, cat) => {
+    const products = cat.products.filter((p) => resolveCurrency(p.currency) === currency);
+    if (products.length === 0) return acc;
+    const totalCostPrice = products.reduce((sum, p) => sum + p.avgCostPrice * p.totalAvailable, 0);
+    acc.push({
+      ...cat,
+      products,
+      totalQuantity: products.reduce((sum, p) => sum + p.totalAvailable, 0),
+      totalCostPrice,
+      totalCostPriceEntries: [{ amount: totalCostPrice, currency }],
+    });
+    return acc;
+  }, []);
 }
 
 /**
@@ -265,9 +352,11 @@ function catCostEntries(cat: InventoryCategoryView): CurrencyAmount[] {
 function MultiStoreCategoryList({
   categories,
   autoExpand = false,
+  currency,
 }: {
   categories: InventoryCategoryView[];
   autoExpand?: boolean;
+  currency: Currency;
 }) {
   const [expandedCategoryIds, setExpandedCategoryIds] = useState<Set<string>>(new Set());
 
@@ -298,11 +387,7 @@ function MultiStoreCategoryList({
               </h3>
               <span className="flex items-center gap-2">
                 <span className="text-xs font-semibold text-primary whitespace-nowrap">
-                  <CurrencyTotalAmount
-                    legacyTotal={cat.totalCostPrice}
-                    entries={cat.totalCostPriceEntries ?? [{ amount: cat.totalCostPrice }]}
-                    multiMonedas
-                  />
+                  {formatMoneyWithCurrency(cat.totalCostPrice, currency)}
                 </span>
                 <ChevronDownIcon isExpanded={isExpanded} className="text-text-muted" />
               </span>
