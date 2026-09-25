@@ -2,7 +2,7 @@
 
 **Objective:** Close the real coverage gaps in the React frontend offline services/repositories integration suite (Vitest, real `localStorage`, no mocks) and replace `docs/testing/integration-tests/README.md` with an accurate coverage matrix that lists what each test proves per service/repository. No online/API service is in scope.
 
-**Status:** DONE — T0–T4 completos. Commits en `qa`: `aae6d30d` (T1 crypto), `32298f53` (T2 units), `94c34797` (T3 docs). Push pendiente de decisión del usuario.
+**Status:** DONE + PUSHED to `origin/qa` (`33d0993e..f20c1cf5`, user-authorized 2026-09-25). Commits: `aae6d30d` (T1 crypto), `32298f53` (T2 units), `94c34797` (T3 docs), `f20c1cf5` (doc DONE).
 
 ## Problem
 
