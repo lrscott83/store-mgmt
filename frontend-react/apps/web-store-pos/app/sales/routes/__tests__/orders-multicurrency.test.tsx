@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 import { Currency, EModules, OrderType, PaymentType } from '@store-mgmt/domain';
@@ -91,7 +91,7 @@ function renderPage() {
   );
 }
 
-describe('OrdersPage — MultiMonedas history total', () => {
+describe('OrdersPage — filtro de moneda (MultiMonedas)', () => {
   beforeEach(() => {
     multiStore.enabled = false;
     multiStore.stores = [];
@@ -99,29 +99,58 @@ describe('OrdersPage — MultiMonedas history total', () => {
     fixtures.orders = [];
   });
 
-  it('gate OFF: keeps the legacy mixed total', () => {
+  it('gate OFF: mantiene el total mezclado legacy y sin filtro', () => {
     fixtures.orders = [
       makeOrder({ id: 'usd', total: 30, currency: Currency.USD }),
       makeOrder({ id: 'eur', total: 5, currency: Currency.EUR }),
     ];
     renderPage();
     expect(screen.getAllByText('35 CUP').length).toBeGreaterThan(0);
+    expect(screen.queryByTestId('currency-filter-select')).not.toBeInTheDocument();
   });
 
-  it('gate ON: primary + chips, never the mixed sum', () => {
+  it('gate ON + 2 monedas: muestra el filtro y solo la moneda por defecto (USD)', () => {
     auth.state.user.storeModuleIds = [EModules.MultiMonedas];
     fixtures.orders = [
       makeOrder({ id: 'usd', total: 30, currency: Currency.USD }),
       makeOrder({ id: 'eur', total: 5, currency: Currency.EUR }),
     ];
     renderPage();
+    expect(screen.getByTestId('currency-filter-select')).toBeInTheDocument();
     expect(screen.getAllByText('30 USD').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('5 EUR').length).toBeGreaterThan(0);
+    // La moneda no elegida no se mezcla: ni chips ni suma combinada.
+    expect(screen.queryByText('5 EUR')).toBeNull();
     expect(screen.queryByText('35 CUP')).toBeNull();
+  });
+
+  it('gate ON + 2 monedas: cambiar el select cambia los datos y el filtro sigue visible', () => {
+    auth.state.user.storeModuleIds = [EModules.MultiMonedas];
+    fixtures.orders = [
+      makeOrder({ id: 'usd', total: 30, currency: Currency.USD }),
+      makeOrder({ id: 'eur', total: 5, currency: Currency.EUR }),
+    ];
+    renderPage();
+    fireEvent.change(screen.getByTestId('currency-filter-select'), {
+      target: { value: String(Currency.EUR) },
+    });
+    expect(screen.getAllByText('5 EUR').length).toBeGreaterThan(0);
+    expect(screen.queryByText('30 USD')).toBeNull();
+    expect(screen.getByTestId('currency-filter-select')).toBeInTheDocument();
+  });
+
+  it('gate ON + 1 moneda: sin filtro y sin filtrar (todos los datos visibles)', () => {
+    auth.state.user.storeModuleIds = [EModules.MultiMonedas];
+    fixtures.orders = [
+      makeOrder({ id: 'usd-1', total: 30, currency: Currency.USD }),
+      makeOrder({ id: 'usd-2', total: 5, currency: Currency.USD }),
+    ];
+    renderPage();
+    expect(screen.queryByTestId('currency-filter-select')).not.toBeInTheDocument();
+    expect(screen.getAllByText('35 USD').length).toBeGreaterThan(0);
   });
 });
 
-describe('OrdersPage — MultiMonedas header in multi-store mode', () => {
+describe('OrdersPage — filtro de moneda en modo multi-store', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     multiStore.enabled = true;
@@ -142,19 +171,34 @@ describe('OrdersPage — MultiMonedas header in multi-store mode', () => {
     );
   }
 
-  it('gate OFF: keeps the legacy aggregate header total across stores (35\u00A0CUP)', async () => {
+  it('gate OFF: mantiene el total agregado legacy entre tiendas (35\u00A0CUP) y sin filtro', async () => {
     seedTwoStores();
     renderPage();
     expect(await screen.findByText('35 CUP')).toBeInTheDocument();
+    expect(screen.queryByTestId('currency-filter-select')).not.toBeInTheDocument();
   });
 
-  it('gate ON: the aggregate header total is per currency, never mixed', async () => {
+  it('gate ON + 2 monedas: el agregado y los paneles quedan en la moneda por defecto (USD)', async () => {
     auth.state.user.storeModuleIds = [EModules.MultiMonedas];
     seedTwoStores();
     renderPage();
-    // Cross-store aggregation still groups by currency: USD 30 primary + EUR 5 chip.
-    expect(await screen.findByText('30 USD')).toBeInTheDocument();
-    expect(screen.getByText('5 EUR')).toBeInTheDocument();
+    await screen.findByTestId('currency-filter-select');
+    // Solo se ve USD: la tienda con EUR queda vacía (0 USD), nunca la suma 35 CUP.
+    expect(screen.getAllByText('30 USD').length).toBeGreaterThan(0);
+    expect(screen.queryByText('5 EUR')).toBeNull();
     expect(screen.queryByText('35 CUP')).toBeNull();
+  });
+
+  it('gate ON + 2 monedas: cambiar el select cambia el agregado y los paneles', async () => {
+    auth.state.user.storeModuleIds = [EModules.MultiMonedas];
+    seedTwoStores();
+    renderPage();
+    await screen.findByTestId('currency-filter-select');
+    fireEvent.change(screen.getByTestId('currency-filter-select'), {
+      target: { value: String(Currency.EUR) },
+    });
+    expect(screen.getAllByText('5 EUR').length).toBeGreaterThan(0);
+    expect(screen.queryByText('30 USD')).toBeNull();
+    expect(screen.getByTestId('currency-filter-select')).toBeInTheDocument();
   });
 });

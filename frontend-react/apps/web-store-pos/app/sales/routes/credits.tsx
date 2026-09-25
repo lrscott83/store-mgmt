@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useIntl } from 'react-intl';
-import type { SaleCredit, PaymentType } from '@store-mgmt/domain';
-import { EFeatures } from '@store-mgmt/domain';
+import type { SaleCredit, PaymentType, Currency } from '@store-mgmt/domain';
+import { DEFAULT_CURRENCY, EFeatures } from '@store-mgmt/domain';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
-import { CurrencyTotalAmount } from '~/shared/components/multimonedas/currency-total-amount';
 import { hasMultiMonedasAvailable } from '~/shared/components/multimonedas/currency-select';
+import { CurrencyFilter } from '~/shared/components/multimonedas/currency-filter';
+import { useCurrencyFilter } from '~/shared/components/multimonedas/use-currency-filter';
+import { presentCurrencies, resolveCurrency } from '~/shared/lib/currency-totals';
+import { formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency';
 import { DateRangeFilter } from '~/shared/components/date-range-filter/date-range-filter';
 import { Card } from '~/shared/components/ui/card';
 import { InfoBox } from '~/shared/components/ui/info-box';
@@ -14,7 +17,6 @@ import { addDays, formatLocalDate, groupByLocalDay, startOfDay } from '~/shared/
 import type { LocalDayGroup } from '~/shared/lib/date-utils';
 import { SaleCreditOfflineService } from '../lib/services/sale-credit-offline-service';
 import { SaleCreditList } from '../components/sale-credit-list';
-import type { CurrencyAmount } from '~/shared/lib/currency-totals';
 import { useMultiStore } from '~/shared/lib/hooks/use-multi-store';
 import {
   MultiStoreSection,
@@ -163,18 +165,46 @@ export function SaleCreditsPage() {
     });
   }
 
-  // Header: count = TODOS los créditos visibles (filtro de estado + rango); el total
+  // Filtro de moneda: opciones del conjunto SIN filtrar por moneda (single-store:
+  // los créditos cargados; multi-store: los créditos leídos de cada tienda). El hook
+  // vive al tope del componente porque el modo multi-store es un return temprano.
+  const currencyOptions = presentCurrencies(
+    multiStoreEnabled
+      ? [...storeCredits.values()]
+          .flat()
+          .filter((c) => c.isActive)
+          .map((c) => ({ amount: c.total, currency: c.currency }))
+      : dateSaleCredits.flatMap((d) =>
+          d.items.map((c) => ({ amount: c.total, currency: c.currency })),
+        ),
+  );
+  const { visible: currencyFilterVisible, currency, setCurrency } =
+    useCurrencyFilter(currencyOptions);
+  // Con el módulo activo, una sola moneda presente conserva su código; sin el
+  // módulo, el total mezclado sigue rotulándose CUP.
+  const displayCurrency =
+    currencyFilterVisible && currency !== null
+      ? currency
+      : multiMonedas
+        ? (currencyOptions[0] ?? DEFAULT_CURRENCY)
+        : DEFAULT_CURRENCY;
+
+  /** Aplica el filtro de moneda a las filas (no-op cuando el filtro está oculto). */
+  const filterCreditsByCurrency = (credits: SaleCredit[]): SaleCredit[] =>
+    currencyFilterVisible && currency !== null
+      ? credits.filter((c) => resolveCurrency(c.currency) === currency)
+      : credits;
+
+  // Header: count = TODOS los créditos visibles (estado + rango + moneda); el total
   // suma SOLO los impagos (!isPaid), verde cuando 0 — petición del usuario 2026-09-22.
-  const creditsCount = dateSaleCredits.reduce((count, d) => count + d.items.length, 0);
-  const creditsTotal = dateSaleCredits.reduce(
+  const visibleDateSaleCredits = dateSaleCredits
+    .map((d) => ({ ...d, items: filterCreditsByCurrency(d.items) }))
+    .filter((d) => d.items.length > 0);
+  const creditsCount = visibleDateSaleCredits.reduce((count, d) => count + d.items.length, 0);
+  const creditsTotal = visibleDateSaleCredits.reduce(
     (total, d) =>
       total + d.items.reduce((t, credit) => t + (credit.isPaid ? 0 : credit.total), 0),
     0,
-  );
-  const creditsTotalEntries = dateSaleCredits.flatMap((d) =>
-    d.items
-      .filter((credit) => !credit.isPaid)
-      .map((credit) => ({ amount: credit.total, currency: credit.currency })),
   );
 
   // ─── multi-store mode ────────────────────────────────────────────────────
@@ -196,26 +226,29 @@ export function SaleCreditsPage() {
         return [id, filtered] as const;
       }),
     );
+    // Filtro de moneda ENCIMA de rango/estado: cada panel por tienda y el
+    // agregado del header quedan en una sola moneda.
+    const currencyFilteredStoreCredits = new Map(
+      [...filteredStoreCredits].map(
+        ([id, credits]) => [id, filterCreditsByCurrency(credits)] as const,
+      ),
+    );
     // Header n/total follow the CURRENT filter, not the whole store list: the
-    // store select ("Todas" = every store) intersected with the applied range
-    // and the paid-state radios. Mirrors MultiStoreSection's own visibleStores
-    // rule so header and panels can never disagree.
+    // store select ("Todas" = every store) intersected with the applied range,
+    // the paid-state radios and the currency filter. Mirrors MultiStoreSection's
+    // own visibleStores rule so header and panels can never disagree.
     const visibleStores =
       selectedMultiStoreId === null
         ? multiStoreStores
         : multiStoreStores.filter((s) => s.id === selectedMultiStoreId);
-    const visibleCredits = visibleStores.flatMap((s) => filteredStoreCredits.get(s.id) ?? []);
-    const multiStoreCreditsCount = visibleCredits.length;
-    const multiStoreCreditsTotal = visibleCredits.reduce(
+    const multiStoreVisibleCredits = visibleStores.flatMap(
+      (s) => currencyFilteredStoreCredits.get(s.id) ?? [],
+    );
+    const multiStoreCreditsCount = multiStoreVisibleCredits.length;
+    const multiStoreCreditsTotal = multiStoreVisibleCredits.reduce(
       (total, credit) => total + (credit.isPaid ? 0 : credit.total),
       0,
     );
-    const multiStoreCreditsEntries = visibleCredits
-      .filter((credit) => !credit.isPaid)
-      .map((credit) => ({
-        amount: credit.total,
-        currency: credit.currency,
-      }));
 
     return (
       <Card
@@ -225,8 +258,7 @@ export function SaleCreditsPage() {
           <CreditsCardTitle
             count={multiStoreCreditsCount}
             total={multiStoreCreditsTotal}
-            entries={multiStoreCreditsEntries}
-            multiMonedas={multiMonedas}
+            currency={displayCurrency}
           />
         }
       >
@@ -278,25 +310,34 @@ export function SaleCreditsPage() {
                   {intl.formatMessage({ id: 'SALE_CREDIT.FILTER_PAID' })}
                 </label>
               </div>
+              {/* Fila de moneda (se auto-oculta sin el módulo o con 1 moneda). */}
+              <div className="flex w-full justify-center">
+                <CurrencyFilter
+                  currencies={currencyOptions}
+                  value={currency ?? currencyOptions[0] ?? DEFAULT_CURRENCY}
+                  onChange={setCurrency}
+                />
+              </div>
             </>
           }
           renderStoreCount={(store) => {
-            const credits = filteredStoreCredits.get(store.id) ?? [];
+            const credits = currencyFilteredStoreCredits.get(store.id) ?? [];
             return `(${credits.length})`;
           }}
           renderStoreTotals={(store) => {
-            const credits = filteredStoreCredits.get(store.id) ?? [];
+            const credits = currencyFilteredStoreCredits.get(store.id) ?? [];
             const total = credits.reduce((t, c) => t + (c.isPaid ? 0 : c.total), 0);
             return (
               <MultiStoreTotal
                 value={total}
                 valueClassName={total === 0 ? 'text-success' : 'text-warning'}
+                currency={displayCurrency}
               />
             );
           }}
         >
           {(store) => {
-            const credits = filteredStoreCredits.get(store.id) ?? [];
+            const credits = currencyFilteredStoreCredits.get(store.id) ?? [];
             if (credits.length === 0) {
               const hasLocalData = (storeCredits.get(store.id)?.length ?? 0) > 0;
               return (
@@ -339,16 +380,7 @@ export function SaleCreditsPage() {
                           <span
                             className={`text-xs font-semibold whitespace-nowrap ${dayTotal === 0 ? 'text-success' : 'text-warning'}`}
                           >
-                            <CurrencyTotalAmount
-                              legacyTotal={dayTotal}
-                              entries={group.items
-                                .filter((credit) => !credit.isPaid)
-                                .map((credit) => ({
-                                  amount: credit.total,
-                                  currency: credit.currency,
-                                }))}
-                              multiMonedas={multiMonedas}
-                            />
+                            {formatMoneyWithCurrency(dayTotal, displayCurrency)}
                           </span>
                           <ChevronDownIcon isExpanded={isExpanded} className="text-text-muted" />
                         </span>
@@ -376,8 +408,7 @@ export function SaleCreditsPage() {
         <CreditsCardTitle
           count={creditsCount}
           total={creditsTotal}
-          entries={creditsTotalEntries}
-          multiMonedas={multiMonedas}
+          currency={displayCurrency}
         />
       }
     >      <div className="mb-3">
@@ -421,7 +452,16 @@ export function SaleCreditsPage() {
         </label>
       </div>
 
-      {dateSaleCredits.length === 0 && (
+      {/* Fila propia de moneda debajo de los filtros existentes (se auto-oculta). */}
+      <div className="mb-3">
+        <CurrencyFilter
+          currencies={currencyOptions}
+          value={currency ?? currencyOptions[0] ?? DEFAULT_CURRENCY}
+          onChange={setCurrency}
+        />
+      </div>
+
+      {visibleDateSaleCredits.length === 0 && (
         <InfoBox variant="primary" className="mb-6 text-center">
           {/* SALE_CREDIT.NO_SALE_CREDIT_FOUND */}
           {intl.formatMessage({ id: 'SALE_CREDIT.NO_SALE_CREDIT_FOUND' })}
@@ -429,7 +469,7 @@ export function SaleCreditsPage() {
       )}
 
       <div className="space-y-2">
-        {dateSaleCredits.map((dateSaleCredit) => {
+        {visibleDateSaleCredits.map((dateSaleCredit) => {
           const dateId = dateSaleCredit.dayKey;
           const isExpanded = expandedDateIds.has(dateId);
           const dayTotal = dateSaleCredit.items.reduce(
@@ -452,16 +492,7 @@ export function SaleCreditsPage() {
                   <span
                     className={`text-sm font-semibold whitespace-nowrap ${dayTotal === 0 ? 'text-success' : 'text-warning'}`}
                   >
-                    <CurrencyTotalAmount
-                      legacyTotal={dayTotal}
-                      entries={dateSaleCredit.items
-                        .filter((credit) => !credit.isPaid)
-                        .map((credit) => ({
-                          amount: credit.total,
-                          currency: credit.currency,
-                        }))}
-                      multiMonedas={multiMonedas}
-                    />
+                    {formatMoneyWithCurrency(dayTotal, displayCurrency)}
                   </span>
                   <ChevronDownIcon isExpanded={isExpanded} className="text-text-muted" />
                 </span>
@@ -495,13 +526,11 @@ export function SaleCreditsPage() {
 function CreditsCardTitle({
   count,
   total,
-  entries,
-  multiMonedas,
+  currency,
 }: {
   count: number;
   total: number;
-  entries: readonly CurrencyAmount[];
-  multiMonedas: boolean;
+  currency: Currency;
 }) {
   const intl = useIntl();
   return (
@@ -516,7 +545,7 @@ function CreditsCardTitle({
       <span
         className={`text-sm font-semibold whitespace-nowrap ${total === 0 ? 'text-success' : 'text-warning'}`}
       >
-        <CurrencyTotalAmount legacyTotal={total} entries={entries} multiMonedas={multiMonedas} />
+        {formatMoneyWithCurrency(total, currency)}
       </span>
     </div>
   );

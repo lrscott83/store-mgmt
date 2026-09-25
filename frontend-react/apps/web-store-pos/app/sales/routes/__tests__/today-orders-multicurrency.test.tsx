@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 import { Currency, EModules, OrderType, PaymentType } from '@store-mgmt/domain';
@@ -55,7 +55,7 @@ function renderPage() {
   );
 }
 
-describe('TodayOrdersPage — MultiMonedas header total', () => {
+describe('TodayOrdersPage — filtro de moneda (MultiMonedas)', () => {
   beforeEach(() => {
     auth.state.user = { selectedStoreId: 's1', storeModuleIds: [] };
     fixtures.todayOrders = [];
@@ -68,18 +68,47 @@ describe('TodayOrdersPage — MultiMonedas header total', () => {
     ];
     renderPage();
     expect(screen.getByText('35 CUP')).toBeInTheDocument();
+    expect(screen.queryByTestId('currency-filter-select')).not.toBeInTheDocument();
   });
 
-  it('gate ON: primary + chips, never the mixed sum', () => {
+  it('gate ON + 2 monedas: muestra el filtro y solo la moneda por defecto (USD)', () => {
     auth.state.user.storeModuleIds = [EModules.MultiMonedas];
     fixtures.todayOrders = [
       makeOrder({ id: 'usd', total: 30, currency: Currency.USD }),
       makeOrder({ id: 'eur', total: 5, currency: Currency.EUR }),
     ];
     renderPage();
+    expect(screen.getByTestId('currency-filter-select')).toBeInTheDocument();
     expect(screen.getByText('30 USD')).toBeInTheDocument();
-    expect(screen.getByText('5 EUR')).toBeInTheDocument();
+    // La moneda no elegida no se mezcla: no hay chips ni suma combinada.
+    expect(screen.queryByText('5 EUR')).toBeNull();
     expect(screen.queryByText('35 CUP')).toBeNull();
+  });
+
+  it('gate ON + 2 monedas: cambiar el select cambia los datos y el filtro sigue visible', () => {
+    auth.state.user.storeModuleIds = [EModules.MultiMonedas];
+    fixtures.todayOrders = [
+      makeOrder({ id: 'usd', total: 30, currency: Currency.USD }),
+      makeOrder({ id: 'eur', total: 5, currency: Currency.EUR }),
+    ];
+    renderPage();
+    fireEvent.change(screen.getByTestId('currency-filter-select'), {
+      target: { value: String(Currency.EUR) },
+    });
+    expect(screen.getByText('5 EUR')).toBeInTheDocument();
+    expect(screen.queryByText('30 USD')).toBeNull();
+    expect(screen.getByTestId('currency-filter-select')).toBeInTheDocument();
+  });
+
+  it('gate ON + 1 moneda: sin filtro y sin filtrar (todos los datos visibles)', () => {
+    auth.state.user.storeModuleIds = [EModules.MultiMonedas];
+    fixtures.todayOrders = [
+      makeOrder({ id: 'usd-1', total: 30, currency: Currency.USD }),
+      makeOrder({ id: 'usd-2', total: 5, currency: Currency.USD }),
+    ];
+    renderPage();
+    expect(screen.queryByTestId('currency-filter-select')).not.toBeInTheDocument();
+    expect(screen.getByText('35 USD')).toBeInTheDocument();
   });
 
   it('gate ON with a single CUP currency shows the code, not the symbol', () => {
@@ -87,6 +116,6 @@ describe('TodayOrdersPage — MultiMonedas header total', () => {
     fixtures.todayOrders = [makeOrder({ id: 'cup', total: 100 })];
     renderPage();
     expect(screen.getByText('100 CUP')).toBeInTheDocument();
-    // 2026-09-23: el total con moneda existe por diseño — sin aserción de ausencia.
+    expect(screen.queryByTestId('currency-filter-select')).not.toBeInTheDocument();
   });
 });

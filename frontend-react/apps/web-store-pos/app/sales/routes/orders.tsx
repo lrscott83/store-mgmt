@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useIntl } from 'react-intl';
 import type { InventoryEntry, Order } from '@store-mgmt/domain';
-import { EFeatures } from '@store-mgmt/domain';
+import { DEFAULT_CURRENCY, EFeatures } from '@store-mgmt/domain';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
-import { CurrencyTotalAmount } from '~/shared/components/multimonedas/currency-total-amount';
 import { hasMultiMonedasAvailable } from '~/shared/components/multimonedas/currency-select';
+import { CurrencyFilter } from '~/shared/components/multimonedas/currency-filter';
+import { useCurrencyFilter } from '~/shared/components/multimonedas/use-currency-filter';
+import { presentCurrencies, resolveCurrency } from '~/shared/lib/currency-totals';
+import { formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency';
 import { Card } from '~/shared/components/ui/card';
 import { InfoBox } from '~/shared/components/ui/info-box';
 import { BarChartIcon, ChevronDownIcon, DownloadIcon } from '~/shared/components/ui/icons';
@@ -202,6 +205,36 @@ export function OrdersPage() {
     };
   }, [multiStoreEnabled, multiStoreStores]);
 
+  // Filtro de moneda: las opciones se derivan del conjunto SIN filtrar por
+  // moneda (single-store: el historial cargado; multi-store: los pedidos
+  // leídos de cada tienda), para que el filtro no desaparezca al elegir una
+  // moneda y se pueda volver a las demás. El hook vive en el tope del
+  // componente porque el modo multi-store es un return temprano.
+  const currencyOptions = presentCurrencies(
+    multiStoreEnabled
+      ? [...storeOrders.values()]
+          .flat()
+          .filter((o) => o.isActive)
+          .map((o) => ({ amount: o.total, currency: o.currency }))
+      : groups.flatMap((g) => g.items.map((o) => ({ amount: o.total, currency: o.currency }))),
+  );
+  const { visible: currencyFilterVisible, currency, setCurrency } =
+    useCurrencyFilter(currencyOptions);
+  // Con el módulo activo, una sola moneda presente conserva su código; sin el
+  // módulo, el total mezclado sigue rotulándose CUP.
+  const displayCurrency =
+    currencyFilterVisible && currency !== null
+      ? currency
+      : multiMonedas
+        ? (currencyOptions[0] ?? DEFAULT_CURRENCY)
+        : DEFAULT_CURRENCY;
+
+  /** Aplica el filtro de moneda a las filas (no-op cuando el filtro está oculto). */
+  const filterOrdersByCurrency = (orders: Order[]): Order[] =>
+    currencyFilterVisible && currency !== null
+      ? orders.filter((o) => resolveCurrency(o.currency) === currency)
+      : orders;
+
   function toggleDatePanel(dateId: string) {
     setExpandedDateIds((prev) => {
       const next = new Set(prev);
@@ -289,23 +322,20 @@ export function OrdersPage() {
       multiBaseFilteredOrders(orders).filter(rangeFilter).filter(
         (o) => !paymentActive || matchesOrderPaymentFilter(o, paymentActive),
       );
+    // El filtro de moneda se aplica ENCIMA de los demás filtros, así cada panel
+    // por tienda y el agregado de fuera de los paneles quedan en una sola moneda.
+    const currencyVisibleOrders = (orders: Order[]): Order[] =>
+      filterOrdersByCurrency(visibleOrders(orders));
 
     const totals = visibleStoreIds.reduce(
       (acc, id) => {
-        for (const order of visibleOrders(storeOrders.get(id) ?? [])) {
+        for (const order of currencyVisibleOrders(storeOrders.get(id) ?? [])) {
           acc.count += 1;
           acc.total = round2(acc.total + order.total);
         }
         return acc;
       },
       { count: 0, total: 0 },
-    );
-
-    const totalEntries = visibleStoreIds.flatMap((id) =>
-      visibleOrders(storeOrders.get(id) ?? []).map((order) => ({
-        amount: order.total,
-        currency: order.currency,
-      })),
     );
 
     const paymentFieldset = (
@@ -348,11 +378,7 @@ export function OrdersPage() {
               </span>
             </span>
             <span className="text-sm font-semibold text-primary whitespace-nowrap">
-              <CurrencyTotalAmount
-                legacyTotal={totals.total}
-                entries={totalEntries}
-                multiMonedas={multiMonedas}
-              />
+              {formatMoneyWithCurrency(totals.total, displayCurrency)}
             </span>
           </div>
         }
@@ -409,20 +435,28 @@ export function OrdersPage() {
                   </label>
                 </fieldset>
               </div>
+              {/* Fila 4: filtro de moneda (se auto-oculta sin el módulo o con 1 moneda). */}
+              <div className="flex w-full justify-center">
+                <CurrencyFilter
+                  currencies={currencyOptions}
+                  value={currency ?? currencyOptions[0] ?? DEFAULT_CURRENCY}
+                  onChange={setCurrency}
+                />
+              </div>
             </>
           }
           renderStoreCount={(store) => {
-            const filtered = visibleOrders(storeOrders.get(store.id) ?? []);
+            const filtered = currencyVisibleOrders(storeOrders.get(store.id) ?? []);
             return `(${filtered.length})`;
           }}
           renderStoreTotals={(store) => {
-            const filtered = visibleOrders(storeOrders.get(store.id) ?? []);
+            const filtered = currencyVisibleOrders(storeOrders.get(store.id) ?? []);
             const total = filtered.reduce((t, o) => t + o.total, 0);
-            return <MultiStoreTotal value={total} />;
+            return <MultiStoreTotal value={total} currency={displayCurrency} />;
           }}
         >
           {(store) => {
-            const filtered = visibleOrders(storeOrders.get(store.id) ?? []);
+            const filtered = currencyVisibleOrders(storeOrders.get(store.id) ?? []);
             if (filtered.length === 0) {
               return (
                 <div className="py-4 text-center text-text-muted">
@@ -453,14 +487,10 @@ export function OrdersPage() {
                           </span>
                           <span className="flex items-center gap-2">
                             <span className="text-xs font-semibold text-text whitespace-nowrap">
-                              <CurrencyTotalAmount
-                                legacyTotal={g.items.reduce((t, o) => t + o.total, 0)}
-                                entries={g.items.map((order) => ({
-                                  amount: order.total,
-                                  currency: order.currency,
-                                }))}
-                                multiMonedas={multiMonedas}
-                              />
+                              {formatMoneyWithCurrency(
+                                g.items.reduce((t, o) => t + o.total, 0),
+                                displayCurrency,
+                              )}
                             </span>
                             <ChevronDownIcon isExpanded={isExpanded} className="text-text-muted" />
                           </span>
@@ -525,7 +555,7 @@ export function OrdersPage() {
   const paymentOptions = collectOrderPaymentMethodKeys(allOrders);
   const paymentActive =
     paymentKey !== null && paymentOptions.includes(paymentKey) ? paymentKey : null;
-  const visibleGroups: LocalDayGroup<Order>[] = paymentActive
+  const paymentFilteredGroups: LocalDayGroup<Order>[] = paymentActive
     ? groups
         .map((g) => ({
           ...g,
@@ -533,14 +563,15 @@ export function OrdersPage() {
         }))
         .filter((g) => g.items.length > 0)
     : groups;
+  // Filtro de moneda sobre las filas: cada día queda en una sola moneda.
+  const visibleGroups: LocalDayGroup<Order>[] = paymentFilteredGroups
+    .map((g) => ({ ...g, items: filterOrdersByCurrency(g.items) }))
+    .filter((g) => g.items.length > 0);
 
   const ordersCount = visibleGroups.reduce((count, g) => count + g.items.length, 0);
   const ordersTotal = visibleGroups.reduce(
     (total, g) => total + g.items.reduce((t, o) => t + o.total, 0),
     0,
-  );
-  const totalEntries = visibleGroups.flatMap((g) =>
-    g.items.map((order) => ({ amount: order.total, currency: order.currency })),
   );
 
   return (
@@ -556,11 +587,7 @@ export function OrdersPage() {
             </span>
           </span>
           <span className="text-sm font-semibold text-text whitespace-nowrap">
-            <CurrencyTotalAmount
-              legacyTotal={ordersTotal}
-              entries={totalEntries}
-              multiMonedas={multiMonedas}
-            />
+            {formatMoneyWithCurrency(ordersTotal, displayCurrency)}
           </span>
         </div>
       }
@@ -629,6 +656,15 @@ export function OrdersPage() {
         </label>
       </fieldset>
 
+      {/* Fila propia de moneda debajo de los filtros existentes (se auto-oculta). */}
+      <div className="mb-4">
+        <CurrencyFilter
+          currencies={currencyOptions}
+          value={currency ?? currencyOptions[0] ?? DEFAULT_CURRENCY}
+          onChange={setCurrency}
+        />
+      </div>
+
       {visibleGroups.length === 0 && (
         <InfoBox variant="primary" className="mb-6 text-center">
           {/* ORDERS.NO_ORDERS_FOUND */}
@@ -655,14 +691,10 @@ export function OrdersPage() {
                   </span>
                   <span className="flex items-center gap-2">
                     <span className="text-sm font-semibold text-text whitespace-nowrap">
-                      <CurrencyTotalAmount
-                        legacyTotal={g.items.reduce((t, o) => t + o.total, 0)}
-                        entries={g.items.map((order) => ({
-                          amount: order.total,
-                          currency: order.currency,
-                        }))}
-                        multiMonedas={multiMonedas}
-                      />
+                      {formatMoneyWithCurrency(
+                        g.items.reduce((t, o) => t + o.total, 0),
+                        displayCurrency,
+                      )}
                     </span>
                     <ChevronDownIcon isExpanded={isExpanded} className="text-text-muted" />
                   </span>
