@@ -117,12 +117,11 @@ Contexto: backend real `:5019` (BD `smca_test`, confirmada por el teardown en am
 
 De los 29 flaky de las tres corridas (23 + 4 + 2), 25 fueron tests distintos al azar — contención pura: pasan al reintento y en solitario. Dos specs recayeron en más de una corrida y tienen ficha autocontenida con el modo de fallo literal, los pasos de verificación previa, la hipótesis por confirmar y la solución candidata:
 
-| Ficha                                                                          | Test                                                  | Recurrencia                                                                                                                                                       |
-| ------------------------------------------------------------------------------ | ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [`group-f/store-plan-activation.md`](group-f/store-plan-activation.md)         | `store-plan-activation` (POST change-plan)            | Corridas 2 y 3 — precondición de BD ya nula al arrancar (hipótesis: solapamiento con el seed directo de `store-plan-lock-regression` sobre la persona compartida) |
-| [`group-f/auth-me-session-rejection.md`](group-f/auth-me-session-rejection.md) | `auth-me-session-rejection` (setup/mints de arranque) | Corridas 1 y 3 — timeouts de setup/navegación en arranque en frío (hipótesis: contención; el reintento siempre pasa)                                              |
+| Ficha | Test | Recurrencia |
+| ------------------------------------------------------------------------------ | ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- || [`group-f/store-plan-activation.md`](group-f/store-plan-activation.md) | `store-plan-activation` (POST change-plan) | Corridas 2 y 3 — precondición de BD ya nula al arrancar (solapamiento con el seed directo de `store-plan-lock-regression` sobre la persona compartida) |
+| [`group-f/auth-me-session-rejection.md`](group-f/auth-me-session-rejection.md) | `auth-me-session-rejection` (setup/mints de arranque) | Corridas 1 y 3 — timeouts de setup/navegación en arranque en frío (contención; el reintento siempre pasa) |
 
-Ambos quedan ⏸ intocables hasta confirmar la hipótesis — cada ficha dice cómo verificarlo primero.
+**Soluciones aplicadas 2026-09-25 (con autorización del usuario):** `store-plan-lock-regression` usa ahora su propia tienda (persona privada) y el fixture de sesión en frío pasa de 30 a 60 s. Ambos specs afectados verificados en solitario en verde. 🔶 Pendiente: confirmar en la próxima corrida completa que los dos flaky desaparecen.
 
 ## Estado de decisiones pendientes (2026-09-24)
 

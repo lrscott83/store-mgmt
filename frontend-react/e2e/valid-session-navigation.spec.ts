@@ -104,7 +104,11 @@ const localTest = test.extend<{}, { onlineLockedSnapshot: SnapshotEntries }>({
       await context.close();
       await use({ origin, localStorage });
     },
-    { scope: 'worker' },
+    // 60s (Grupo F, autorización 2026-09-25): el mint en frío (registro + login
+    // reales) puede superar los 30s por defecto cuando la suite completa compite
+    // por el mismo dev server + backend; el reintento siempre pasaba porque el
+    // entorno ya estaba caliente.
+    { scope: 'worker', timeout: 60_000 },
   ],
 });
 
@@ -289,7 +293,9 @@ test.describe('offline — sin clave de dispositivo', () => {
     expect(await readAuthModel(page)).not.toBeNull();
   });
 
-  test('12. offline/sin clave: recargar con ciphertext ilegible va a /login?unlock=1 SIN logout', async ({ browser }) => {
+  test('12. offline/sin clave: recargar con ciphertext ilegible va a /login?unlock=1 SIN logout', async ({
+    browser,
+  }) => {
     const page = await browser.newPage();
     const login = await loginOfflineByRoster(page);
     await deleteDeviceKeyDatabase(page);
