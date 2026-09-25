@@ -98,27 +98,34 @@ async function refreshSessionFromMe(page: Page): Promise<void> {
   }
   await page.evaluate((profile) => {
     window.localStorage.setItem('currentUser', JSON.stringify(profile));
-    window.localStorage.setItem('current-store-id', (profile as { selectedStoreId?: string }).selectedStoreId ?? '');
+    window.localStorage.setItem(
+      'current-store-id',
+      (profile as { selectedStoreId?: string }).selectedStoreId ?? '',
+    );
   }, body.data);
   await page.reload();
 }
 
 /** Reads this device's per-store DEK wrap keys (DIAGNOSTICS ONLY, read-only). */
 async function readDekTableDiagnostics(page: Page): Promise<string> {
-  return page.evaluate(({ dekKey, authSuffix }) => {
-    const raw = window.localStorage.getItem(dekKey);
-    if (!raw) return 'no device-dek table';
-    try {
-      const table = JSON.parse(raw) as { storeId?: string; stores?: Record<string, unknown> };
-      const storeKeys = table.stores ? Object.keys(table.stores) : [];
-      const authKey =
-        Object.keys(window.localStorage).find((k) => k.endsWith(authSuffix)) ?? '(auth key not found)';
-      const authPresent = window.localStorage.getItem(authKey) !== null;
-      return `table.storeId=${table.storeId ?? '?'} stores=[${storeKeys.join(',')}] authModel=${authPresent ? 'present' : 'REMOVED'}`;
-    } catch {
-      return 'device-dek table unreadable';
-    }
-  }, { dekKey: DEVICE_DEK_KEY, authSuffix: AUTH_MODEL_SUFFIX });
+  return page.evaluate(
+    ({ dekKey, authSuffix }) => {
+      const raw = window.localStorage.getItem(dekKey);
+      if (!raw) return 'no device-dek table';
+      try {
+        const table = JSON.parse(raw) as { storeId?: string; stores?: Record<string, unknown> };
+        const storeKeys = table.stores ? Object.keys(table.stores) : [];
+        const authKey =
+          Object.keys(window.localStorage).find((k) => k.endsWith(authSuffix)) ??
+          '(auth key not found)';
+        const authPresent = window.localStorage.getItem(authKey) !== null;
+        return `table.storeId=${table.storeId ?? '?'} stores=[${storeKeys.join(',')}] authModel=${authPresent ? 'present' : 'REMOVED'}`;
+      } catch {
+        return 'device-dek table unreadable';
+      }
+    },
+    { dekKey: DEVICE_DEK_KEY, authSuffix: AUTH_MODEL_SUFFIX },
+  );
 }
 
 /** Creates a store through the real UI flow and returns its name+id. */
@@ -132,16 +139,19 @@ async function createStoreViaUi(page: Page, name: string): Promise<{ id: string;
   const token = await readBearerToken(page);
   let id = '';
   await expect
-    .poll(async () => {
-      const response = await page.request.get(`${E2E_API_URL}/v1/stores/my-stores`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!response.ok()) return null;
-      const body = (await response.json()) as { data?: Array<{ id: string; name: string }> };
-      const found = (body.data ?? []).find((s) => s.name === name);
-      if (found) id = found.id;
-      return found ?? null;
-    }, { timeout: 20_000, message: `store "${name}" never appeared in GET /v1/stores my-stores` })
+    .poll(
+      async () => {
+        const response = await page.request.get(`${E2E_API_URL}/v1/stores/my-stores`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!response.ok()) return null;
+        const body = (await response.json()) as { data?: Array<{ id: string; name: string }> };
+        const found = (body.data ?? []).find((s) => s.name === name);
+        if (found) id = found.id;
+        return found ?? null;
+      },
+      { timeout: 20_000, message: `store "${name}" never appeared in GET /v1/stores my-stores` },
+    )
     .toBeTruthy();
   return { id, name };
 }
@@ -149,7 +159,9 @@ async function createStoreViaUi(page: Page, name: string): Promise<{ id: string;
 /** The logged-out state, detected by the app's own login form heading. */
 async function isLoggedOut(page: Page): Promise<boolean> {
   try {
-    await page.getByRole('heading', { name: 'Inicia sesión en tu cuenta' }).waitFor({ timeout: 1_000 });
+    await page
+      .getByRole('heading', { name: 'Inicia sesión en tu cuenta' })
+      .waitFor({ timeout: 1_000 });
     return true;
   } catch {
     return false;
@@ -182,27 +194,38 @@ async function reloginViaUi(page: Page, login: string, password: string): Promis
   await page.goto('/');
   if (!(await isLoggedOut(page))) {
     // Still signed in — force the legacy state the login flow starts from.
-    await page.evaluate(({ dekKey, authSuffix }) => {
-      const authKey =
-        Object.keys(window.localStorage).find((k) => k.endsWith(authSuffix)) ?? null;
-      if (authKey) window.localStorage.removeItem(authKey);
-      window.localStorage.removeItem(dekKey);
-    }, { dekKey: DEVICE_DEK_KEY, authSuffix: AUTH_MODEL_SUFFIX });
+    await page.evaluate(
+      ({ dekKey, authSuffix }) => {
+        const authKey =
+          Object.keys(window.localStorage).find((k) => k.endsWith(authSuffix)) ?? null;
+        if (authKey) window.localStorage.removeItem(authKey);
+        window.localStorage.removeItem(dekKey);
+      },
+      { dekKey: DEVICE_DEK_KEY, authSuffix: AUTH_MODEL_SUFFIX },
+    );
   }
   // Unauthenticated `/` is the public landing — the form lives at /login.
   await page.goto('/login');
-  await expect(page.getByRole('heading', { name: 'Inicia sesión en tu cuenta' })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole('heading', { name: 'Inicia sesión en tu cuenta' })).toBeVisible({
+    timeout: 15_000,
+  });
   await page.getByRole('textbox', { name: 'Usuario' }).fill(login);
   await page.getByRole('textbox', { name: 'Contraseña' }).fill(password);
   await page.getByRole('button', { name: 'Iniciar sesión' }).click();
-  await expect(page.getByRole('button', { name: 'Cambiar tienda' })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole('button', { name: 'Cambiar tienda' })).toBeVisible({
+    timeout: 30_000,
+  });
 }
 
 /**
  * Switches to `storeName` through the switcher popup and asserts the reload
  * lands BACK in the app (never the login form) with `storeName` as current.
  */
-async function switchAndAssertLanded(page: Page, storeName: string, diagnostics = ''): Promise<void> {
+async function switchAndAssertLanded(
+  page: Page,
+  storeName: string,
+  diagnostics = '',
+): Promise<void> {
   await openSwitcherPopup(page);
   await storeRow(page, storeName).click();
   // THE CONTRACT UNDER TEST: a switch is a hard reload INTO the app — the
@@ -220,26 +243,36 @@ async function switchAndAssertLanded(page: Page, storeName: string, diagnostics 
     // DIAGNOSTICS: dump the LIVE post-switch state so a failure pinpoints
     // which piece (session vs DEK table vs unlock gate) expelled the user.
     const liveUrl = page.url();
-    const liveState = await page.evaluate(({ dekKey, authSuffix }) => {
-      const raw = window.localStorage.getItem(dekKey);
-      let table = 'no table';
-      if (raw) {
-        try {
-          const t = JSON.parse(raw) as { storeId?: string; dekSource?: string; stores?: Record<string, unknown> };
-          table = `storeId=${t.storeId ?? '?'} dekSource=${t.dekSource ?? '?'} stores=[${t.stores ? Object.keys(t.stores).join(',') : ''}]`;
-        } catch {
-          table = 'unreadable';
+    const liveState = await page.evaluate(
+      ({ dekKey, authSuffix }) => {
+        const raw = window.localStorage.getItem(dekKey);
+        let table = 'no table';
+        if (raw) {
+          try {
+            const t = JSON.parse(raw) as {
+              storeId?: string;
+              dekSource?: string;
+              stores?: Record<string, unknown>;
+            };
+            table = `storeId=${t.storeId ?? '?'} dekSource=${t.dekSource ?? '?'} stores=[${t.stores ? Object.keys(t.stores).join(',') : ''}]`;
+          } catch {
+            table = 'unreadable';
+          }
         }
-      }
-      const authKey = Object.keys(window.localStorage).find((k) => k.endsWith(authSuffix)) ?? null;
-      return `dekTable=[${table}] authModel=${authKey ? 'present' : 'REMOVED'} userRaw=${window.localStorage.getItem('currentUser') ? 'present' : 'ABSENT'}`;
-    }, { dekKey: DEVICE_DEK_KEY, authSuffix: AUTH_MODEL_SUFFIX });
+        const authKey =
+          Object.keys(window.localStorage).find((k) => k.endsWith(authSuffix)) ?? null;
+        return `dekTable=[${table}] authModel=${authKey ? 'present' : 'REMOVED'} userRaw=${window.localStorage.getItem('currentUser') ? 'present' : 'ABSENT'}`;
+      },
+      { dekKey: DEVICE_DEK_KEY, authSuffix: AUTH_MODEL_SUFFIX },
+    );
     throw new Error(
       `switch to "${storeName}" ended logged out. url=${liveUrl} LIVE post-switch state: ${liveState}. ` +
-      (diagnostics ? `Pre-switch: ${diagnostics}.` : ''),
+        (diagnostics ? `Pre-switch: ${diagnostics}.` : ''),
     );
   }
-  await expect(page.getByRole('button', { name: 'Cambiar tienda' })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole('button', { name: 'Cambiar tienda' })).toBeVisible({
+    timeout: 30_000,
+  });
   await openSwitcherPopup(page);
   await expect(storeRow(page, storeName).getByText('Actual')).toBeVisible();
 }
@@ -247,7 +280,6 @@ async function switchAndAssertLanded(page: Page, storeName: string, diagnostics 
 test('SSR-1 — switching to a second store lands in it without a logout', async ({
   signedInPage,
 }) => {
-  test.setTimeout(360_000); // DEBUG Grupo G (temporal): presupuesto x2 para aislar contención
   const { page, selectedStoreId, identity } = signedInPage;
   await assertStoresFeature(page);
 
@@ -263,16 +295,28 @@ test('SSR-1 — switching to a second store lands in it without a logout', async
   // Re-login via the REAL UI: re-provisions per-store wraps for BOTH stores.
   await reloginViaUi(page, identity.login, identity.password);
 
-  // The login store (A) must be offered before switching away.
-  const loginStoreName = await page.evaluate(() => {
-    const profile = JSON.parse(window.localStorage.getItem('currentUser') ?? '{}') as {
-      roles?: Array<{ storeId: string; storeName?: string }>;
-      selectedStoreId?: string;
-    };
-    return (
-      profile.roles?.find((r) => r.storeId === profile.selectedStoreId)?.storeName ?? ''
+  // The login store (A) must be offered before switching away. HARDENED
+  // (Grupo G, 2026-09-25): a cold `currentUser` can arrive without the role's
+  // `storeName` — an empty name fed `storeRow()` an empty regex, which matched
+  // EVERY button and blew up strict mode (the flaky). If the name is missing,
+  // re-run the /me refresh (bounded retries) instead of proceeding blind.
+  let loginStoreName = '';
+  for (let attempt = 0; attempt < 3 && !loginStoreName; attempt++) {
+    if (attempt > 0) await refreshSessionFromMe(page);
+    loginStoreName = await page.evaluate(() => {
+      const profile = JSON.parse(window.localStorage.getItem('currentUser') ?? '{}') as {
+        roles?: Array<{ storeId: string; storeName?: string }>;
+        selectedStoreId?: string;
+      };
+      return profile.roles?.find((r) => r.storeId === profile.selectedStoreId)?.storeName ?? '';
+    });
+  }
+  if (!loginStoreName) {
+    throw new Error(
+      'store-switch-back-logout: the login store name never arrived in currentUser.roles ' +
+        'after 3 /me refreshes — the switcher precondition is unavailable, not slow.',
     );
-  });
+  }
   await openSwitcherPopup(page);
   await expect(storeRow(page, loginStoreName)).toBeVisible();
   await page.mouse.click(10, 10); // close the popup (click outside)
@@ -303,9 +347,7 @@ test('SSR-2 — switching BACK to the login store does NOT log the user out', as
       roles?: Array<{ storeId: string; storeName?: string }>;
       selectedStoreId?: string;
     };
-    return (
-      profile.roles?.find((r) => r.storeId === profile.selectedStoreId)?.storeName ?? ''
-    );
+    return profile.roles?.find((r) => r.storeId === profile.selectedStoreId)?.storeName ?? '';
   });
 
   // A -> B (works today).
@@ -355,9 +397,7 @@ test('SSR-3 — create-after-login timeline: NEITHER switch logs out (server-iss
       roles?: Array<{ storeId: string; storeName?: string }>;
       selectedStoreId?: string;
     };
-    return (
-      profile.roles?.find((r) => r.storeId === profile.selectedStoreId)?.storeName ?? ''
-    );
+    return profile.roles?.find((r) => r.storeId === profile.selectedStoreId)?.storeName ?? '';
   });
 
   // A -> B with NO device wrap for B: must stay logged in now.

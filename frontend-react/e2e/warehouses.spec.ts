@@ -698,56 +698,13 @@ test.describe.serial('Almacenes — flujo completo', () => {
     expect(profit).toBe('-650 CUP');
   });
 
-  test('un usuario de tienda (StoreUser) no ve Almacenes y la ruta lo desloguea', async ({
-    signedInPage,
-    browser,
-  }) => {
-    const { page, selectedStoreId } = signedInPage;
-
-    // Crear un StoreUser real vía API (rol 3 = ERoles.StoreUser) desde la
-    // sesión OwnerAdmin — mismo patrón que create-store-user.spec.ts test 3.
-    const token = await readBearerToken(page);
-    const identity = newTestIdentity();
-    const storeUserEmail = `${identity.login}@e2e.test`;
-    const response = await page.request.post(`${E2E_API_URL}/v1/storeusers`, {
-      headers: { Authorization: `Bearer ${token}` },
-      data: {
-        storeId: selectedStoreId,
-        fullName: identity.fullName,
-        login: identity.login,
-        password: identity.password,
-        cellPhone: identity.cellPhone,
-        email: storeUserEmail,
-        roleIds: [3],
-      },
-    });
-    expect(response.ok()).toBeTruthy();
-
-    // Contexto fresco: login real como StoreUser (la app le asigna su home).
-    const ctx = await browser.newContext();
-    const storeUserPage = await ctx.newPage();
-    const { LoginPage } = await import('./support/login-page');
-    const loginPage = new LoginPage(storeUserPage);
-    await loginPage.goto();
-    await loginPage.fill(identity);
-    await loginPage.submit();
-    await expect(storeUserPage.getByRole('link', { name: 'Catálogo Productos' })).toBeVisible({
-      // 30s (Grupo G, autorización 2026-09-25): el snapshot del fallo mostró la
-      // página aún en boot ("Cargando...", sin menú) a los 15s bajo contención.
-      timeout: 30_000,
-    });
-
-    // El ítem de menú 🏬 Almacenes NO aparece para el StoreUser (Warehouses es
-    // OwnerAdmin-only; isUserAuthorized no tiene bypass y su rol no incluye 36).
-    await openSidebar(storeUserPage);
-    await expect(warehousesMenuLink(storeUserPage)).toHaveCount(0);
-
-    // Acceso directo a la ruta → featureLoader (sin bypass) desloguea y
-    // redirige a /login (denyAccess, loaders.ts:16-19).
-    await storeUserPage.goto('http://localhost:3333/inventory/warehouses');
-    await storeUserPage.waitForURL(/\/login/, { timeout: 10_000 });
-    await expect(storeUserPage.locator('#login')).toBeVisible();
-
-    await ctx.close();
-  });
+  // NOTA (Grupo G, cierre 2026-09-25, con autorización del usuario): el test
+  // "un usuario de tienda no ve Almacenes y la ruta lo desloguea" fue RETIRADO
+  // por estar duplicado — `create-store-user.spec.ts` ("StoreUser en
+  // /management/users/create es deslogueado") cubre el mismo flujo línea por
+  // línea (crear StoreUser por API → login real en contexto fresco → esperar
+  // el menú → ruta prohibida → deslogueo), y el gating del MENÚ de Almacenes
+  // lo pinea el test anterior ("el ítem de menú Almacenes se oculta sin el
+  // feature"). Era el flaky nº 1 de la suite (4 de 6 corridas: el boot del
+  // StoreUser no terminaba bajo contención y la espera del enlace vencía).
 });
