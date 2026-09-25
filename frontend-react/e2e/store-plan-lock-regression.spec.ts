@@ -80,7 +80,7 @@ async function setPaymentStartDateDirect(storeId: string, value: string | null):
   } catch (cause) {
     throw new Error(
       `store-plan-lock-regression: setPaymentStartDateDirect(${storeId}, ${value}) failed — ` +
-      `the paymentStartDate seed did not happen: ${cause instanceof Error ? cause.message : String(cause)}`,
+        `the paymentStartDate seed did not happen: ${cause instanceof Error ? cause.message : String(cause)}`,
     );
   } finally {
     await client.end();
@@ -95,10 +95,10 @@ async function readStoreAnchorRow(
   const client = new Client({ connectionString });
   try {
     await client.connect();
-    const result = await client.query<{ PaymentStartDate: string | null; StorePlanId: string | null }>(
-      'SELECT "PaymentStartDate", "StorePlanId" FROM "Store" WHERE "Id" = $1',
-      [storeId],
-    );
+    const result = await client.query<{
+      PaymentStartDate: string | null;
+      StorePlanId: string | null;
+    }>('SELECT "PaymentStartDate", "StorePlanId" FROM "Store" WHERE "Id" = $1', [storeId]);
     if (result.rowCount !== 1) {
       throw new Error(
         `store-plan-lock-regression: expected exactly 1 Store row for ${storeId}, ` +
@@ -226,7 +226,11 @@ test('el cambio de plan del owner va por change-plan, nunca por PUT; el ancla pa
   // Anchor sacred: the change-plan POST did not touch the anchor — same value
   // as before, still non-null (the fixture pinned it non-null).
   const anchorAfter = await readStoreAnchorRow(selectedStoreId);
-  expect(anchorAfter.paymentStartDate).toBe(anchorBefore.paymentStartDate);
+  // Compare serialized: the DB returns Date objects and `toBe` is object
+  // identity — two Dates with the same instant never pass it (Grupo B fix).
+  expect(anchorAfter.paymentStartDate?.toISOString?.() ?? anchorAfter.paymentStartDate).toBe(
+    anchorBefore.paymentStartDate?.toISOString?.() ?? anchorBefore.paymentStartDate,
+  );
   expect(anchorAfter.paymentStartDate).not.toBeNull();
 
   // Reflection without reload: after the POST the page re-reads the store

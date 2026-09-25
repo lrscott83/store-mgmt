@@ -48,10 +48,10 @@ async function readStorePlanRow(
   const client = new Client({ connectionString });
   try {
     await client.connect();
-    const result = await client.query<{ PaymentStartDate: string | null; StorePlanId: string | null }>(
-      'SELECT "PaymentStartDate", "StorePlanId" FROM "Store" WHERE "Id" = $1',
-      [storeId],
-    );
+    const result = await client.query<{
+      PaymentStartDate: string | null;
+      StorePlanId: string | null;
+    }>('SELECT "PaymentStartDate", "StorePlanId" FROM "Store" WHERE "Id" = $1', [storeId]);
     if (result.rowCount !== 1) {
       throw new Error(`owner-plan-change-dialog: expected exactly 1 Store row for ${storeId}`);
     }
@@ -147,7 +147,11 @@ test('OwnerAdmin cambia el plan de su tienda desde el dialog (POST change-plan, 
   // PaymentStartDate is unchanged by the change-plan POST (design.md: the
   // anchor is never modified; only the payment registration may advance it).
   const after = await readStorePlanRow(selectedStoreId);
-  expect(after.paymentStartDate).toBe(before.paymentStartDate);
+  // Compare serialized: the DB returns Date objects and `toBe` is object
+  // identity — two Dates with the same instant never pass it (Grupo B fix).
+  expect(after.paymentStartDate?.toISOString?.() ?? after.paymentStartDate).toBe(
+    before.paymentStartDate?.toISOString?.() ?? before.paymentStartDate,
+  );
 
   // ── Reflection without reload ─────────────────────────────────────────────
   // The modal closes and the card repaints as PAID: plan label + price line

@@ -14,12 +14,12 @@ Que el cambio de plan de una tienda se hace por el camino correcto (cambio de pl
 
 ✅ **Confirmada — mismo defecto que `owner-plan-change-dialog`** — el test compara los objetos de fecha con `toBe` (igualdad estricta de objeto); dos objetos de fecha con el mismo valor nunca pasan esa comparación. La base de datos devuelve fechas como objetos, no como texto, y el test las declara como texto.
 
-## Propuesta de solución (requiere permiso)
+## Solución aplicada
 
-Comparar el **texto** de la fecha (`toISOString()` de ambos lados). Zero cambios en la app — 2 líneas por test.
+La aserción del ancla compara el **texto** de la fecha (`toISOString()` de ambos lados). Cero cambios en la app.
 
 ## Estado
 
-⏸ **Pendiente de decisión** — requiere autorización explícita (test E2E intocable).
+✅ **Resuelto 2026-09-24** — con autorización explícita del usuario (solo los 2 specs del Grupo B). Verificado en verde contra el backend real (`:5019`, BD `smca_test`).
 
-- *Actualizado: 2026-09-24.*
+- _Actualizado: 2026-09-24 (cierre)._

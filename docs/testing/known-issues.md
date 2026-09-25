@@ -19,8 +19,8 @@ Resumen de la corrida (los 3 resueltos en la primera tanda se eliminaron de la l
 | 2   | `valid-session-navigation` 10 | ✅ **Resuelto 2026-09-24** — la ficha anotada culpaba al entorno; la causa era el unlock gate (`guestOnlyLoader`); pineado con autorización        |
 | 3   | `valid-session-navigation` 11 | ✅ **Resuelto 2026-09-24** — ídem (mismo gate, formulario de registro)                                                                             |
 | 4   | `multipayments` T10.2         | ✅ **Resuelto 2026-09-24** — spec reescrito por dev verificado 2/2; el núcleo queda pineado en el test de integración sin navegador                |
-| 5   | `owner-plan-change-dialog`    | ✅ **Confirmada** — defecto del test (compara fechas con el comparador equivocado)                                                                 |
-| 6   | `store-plan-lock-regression`  | ✅ **Confirmada** — mismo defecto del test                                                                                                         |
+| 5   | `owner-plan-change-dialog`    | ✅ **Resuelto 2026-09-24** — defecto del test corregido con autorización (aserción del ancla compara la fecha serializada)                         |
+| 6   | `store-plan-lock-regression`  | ✅ **Resuelto 2026-09-24** — mismo defecto, corregido igual con autorización                                                                       |
 | 7   | `wholesale-cart-floor`        | ✅ **Confirmada** — spec obsoleto por feature "mayoristas solo Superior/VIP"                                                                       |
 | 8   | `configurations` FC-B2        | ✅ **Confirmada** — locator frágil del test (la app está bien)                                                                                     |
 
@@ -62,14 +62,14 @@ Resumen de la corrida (los 3 resueltos en la primera tanda se eliminaron de la l
 
 ---
 
-## Grupo B — Defecto del test: comparar fechas con el comparador equivocado (2)
+## Grupo B — Defecto del test: comparar fechas con el comparador equivocado (2 — resuelto 2026-09-24)
 
 **Tests:** `owner-plan-change-dialog` y `store-plan-lock-regression`.
 
 - **Qué prueban:** que el cambio de plan de una tienda se hace por el camino correcto (cambio de plan, nunca una edición directa) y que la fecha ancla del plan (de donde se calcula la fecha de vencimiento) **queda intacta** después del cambio.
 - **Qué falla:** la comparación de la fecha dice "esperado: 2026-09-23T04:00:00.000Z / recibido: serializa al mismo string" — es decir, **las dos fechas son la misma**, pero el test las compara con el comparador más estricto, que para fechas dice "diferentes" aunque el valor sea idéntico. La lógica de negocio funciona; el test no puede verlo.
 - **Causa raíz:** ✅ confirmada — el test guarda la fecha antes y la lee después, y las compara con `toBe` (igualdad estricta de objeto); dos objetos de fecha con el mismo valor nunca pasan esa comparación. La base de datos devuelve fechas como objetos, no como texto, y el test las declara como texto.
-- **Propuesta (requiere permiso, 2 líneas por test):** comparar el **texto** de la fecha (`toISOString()` de ambos lados). Cero cambios en la app.
+- **Aplicada (2026-09-24, con autorización explícita del usuario):** la aserción del ancla compara el **texto** de la fecha (`toISOString()` de ambos lados). Cero cambios en la app. Verificado: los 2 specs en verde contra el backend real (`:5019`, BD `smca_test`, teardown "54 filas e2e-\* borradas").
 
 ## Grupo C — Spec obsoleto por una feature nueva (1)
 
@@ -97,10 +97,10 @@ Resumen de la corrida (los 3 resueltos en la primera tanda se eliminaron de la l
 
 ## Estado de decisiones pendientes (2026-09-24)
 
-| Decisión                                                                                     | Dueño                          |
-| -------------------------------------------------------------------------------------------- | ------------------------------ |
-| Ajustes de tests de los Grupos B, C y D (4 aserciones en 4 specs, sin correr suite completa) | Pendiente de permiso explícito |
+| Decisión                                                                                  | Dueño                          |
+| ----------------------------------------------------------------------------------------- | ------------------------------ |
+| Ajustes de tests de los Grupos C y D (2 aserciones en 2 specs, sin correr suite completa) | Pendiente de permiso explícito |
 
-_Cerradas en esta fecha (segunda tanda):_ la decisión sobre el test 12 (el spec pinea el diseño del gate con autorización del usuario), los tests 10/11 (ídem) y el T10.2 (spec reescrito verificado + núcleo pineado en integración) — detalle en las entradas 1, 2 y 3.
+_Cerradas en esta fecha (segunda tanda):_ la decisión sobre el test 12 (el spec pinea el diseño del gate con autorización del usuario), los tests 10/11 (ídem) y el T10.2 (spec reescrito verificado + núcleo pineado en integración) — detalle en las entradas 1, 2 y 3. En la tercera tanda se cerró el Grupo B: los 2 specs comparan la fecha ancla serializada y pasan contra el backend real.
 
-_Actualizado por última vez: 2026-09-24 (segunda actualización: cierre de la entrada 1 y de las anotadas 2, 3 y 4)._
+_Actualizado por última vez: 2026-09-24 (tercera actualización: cierre de la entrada 1, de las anotadas 2, 3 y 4, y del Grupo B)._
