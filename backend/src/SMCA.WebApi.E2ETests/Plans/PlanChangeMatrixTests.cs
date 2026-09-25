@@ -95,20 +95,19 @@ public sealed class PlanChangeMatrixTests
         (int)ModuleType.Elaboration,
     ];
 
-    // ── Module → features that the LIVE Feature table exposes as AvailableToStore ──
-    // AUTHORITATIVE SOURCE is the migrated DB (verified via SQL 2026-09-24), NOT the
-    // code enum/config: the live table lacks Egress(33) and StorePayment(91) even
-    // though the code seed defines them (seed/migration drift in the repo — reported,
-    // not fixed here). MultiPayments(16) HAS feature 44 in the table, but there is no
-    // StoreRoleFeatures enum entry for it, so StoreRoleFeatureGenerator drops it
-    // (Domain/Entities/Tenants/StoreRoleFeatureGenerator.cs lines 19-21): the map below
-    // mirrors what the generator can actually materialise. Every listed feature
-    // includes OwnerAdmin in [HasRoles], so the owner's /me FeatureIds receives it.
+    // ── Module → features the LIVE Feature table exposes as AvailableToStore ──
+    // Calibrated against the corrected catalog (backfill 2026-09-25): both local DBs now
+    // carry all 42 features, including Egress(33), StorePayment(91) and MultiPayments(44).
+    // The map mirrors what StoreRoleFeatureGenerator materialises for the OWNER's /me:
+    // every listed feature includes OwnerAdmin in [HasRoles]. StorePayment(91) is
+    // SuperAdmin/ReSeller-only — the owner never receives it, so it is deliberately
+    // absent here (the change-plan still creates its rows when Billing is inserted; the
+    // DB assertion below filters OwnerAdmin rows to match /me).
 
     private static readonly Dictionary<int, int[]> FeaturesByModule = new()
     {
         [(int)ModuleType.Sales] = [(int)FeatureType.Products, (int)FeatureType.Sale, (int)FeatureType.TodayOrders, (int)FeatureType.TodayOrdersStats],
-        [(int)ModuleType.Inventory] = [(int)FeatureType.Available, (int)FeatureType.Entries, (int)FeatureType.TodayInventoryStats, (int)FeatureType.InventoryTodayQuantities, (int)FeatureType.InventoryTodaySaleProfit],
+        [(int)ModuleType.Inventory] = [(int)FeatureType.Available, (int)FeatureType.Entries, (int)FeatureType.TodayInventoryStats, (int)FeatureType.Egress, (int)FeatureType.InventoryTodayQuantities, (int)FeatureType.InventoryTodaySaleProfit],
         [(int)ModuleType.Synchronization] = [(int)FeatureType.Send, (int)FeatureType.Download, (int)FeatureType.Receive],
         [(int)ModuleType.Reports] = [(int)FeatureType.TodayReports],
         [(int)ModuleType.Statistics] = [(int)FeatureType.Dashboard],
@@ -121,7 +120,7 @@ public sealed class PlanChangeMatrixTests
         [(int)ModuleType.Warehouses] = [(int)FeatureType.Warehouses, (int)FeatureType.WarehouseStockMovements],
         [(int)ModuleType.MultiStores] = [(int)FeatureType.OwnerStores],
         [(int)ModuleType.MultiMonedas] = [(int)FeatureType.MultiMonedas],
-        [(int)ModuleType.MultiPayments] = [], // feature 44 exists but has no StoreRoleFeatures entry → generator drops it
+        [(int)ModuleType.MultiPayments] = [(int)FeatureType.MultiPayments],
         [(int)ModuleType.Elaboration] = [(int)FeatureType.Recipes, (int)FeatureType.Elaborations],
     };
 
@@ -207,8 +206,13 @@ public sealed class PlanChangeMatrixTests
                 UniverseOf(to),
                 "the change must leave EXACTLY the target plan universe — old-plan extras retired");
 
+            // OwnerAdmin-scoped read: the change-plan materialises rows for every role a
+            // feature's enum entry declares. StorePayment(91) is SuperAdmin/ReSeller-only,
+            // so its rows exist after Billing is inserted but the OWNER's /me never sees
+            // them — the DB expectation must match the owner's /me, not the raw table.
             var activeFeatureIds = await db.Set<StoreRoleFeature>().IgnoreQueryFilters()
-                .Where(srf => srf.StoreId == seeded.StoreId && srf.IsActive)
+                .Where(srf => srf.StoreId == seeded.StoreId && srf.IsActive
+                    && srf.RoleId == (int)RoleType.OwnerAdmin)
                 .Select(srf => srf.FeatureId).Distinct().ToListAsync();
             activeFeatureIds.Should().BeEquivalentTo(
                 MappedFeaturesOf(UniverseOf(to)),
@@ -238,7 +242,7 @@ public sealed class PlanChangeMatrixTests
             var roleModuleIds = me.Roles.Select(r => r.ModuleId).Distinct().ToList();
             roleModuleIds.Should().Contain(
                 UniverseOf(to).Where(m => MappedFeaturesOf([m]).Length > 0),
-                "every target module that carries features appears in roles (MultiPayments has none)");
+                "every target module that carries features appears in roles");
             if (retiredModuleIds.Length > 0)
                 roleModuleIds.Should().NotContain(retiredModuleIds);
 

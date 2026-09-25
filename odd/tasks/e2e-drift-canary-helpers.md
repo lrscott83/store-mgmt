@@ -91,6 +91,21 @@ Reglas de alineación (referencia: `PlanChangeMatrixTests.FeaturesByModule` L108
 - Re-calibrar `PlanChangeMatrixTests.FeaturesByModule`: Billing `[90]` → decidir +91; `MultiPayments []` → `[44]`; revisar Inventory +33 (Egress es OwnerAdmin/Inventory, en /me del owner SÍ debe aparecer).
 - Decidir si los 3 helpers re-incluyen 33 (Egress) en Inventory ahora que la BD lo tiene; 91 (StorePayment) es SuperAdmin/ReSeller → NO afecta al owner (helpers de owner), confirmar.
 
+### T8 — Re-calibración matrix + helpers (autorizada 2026-09-25, tercera)
+
+**Autorización del usuario**: "Sí, matrix + helpers (Recommended)" — actualizar `PlanChangeMatrixTests.FeaturesByModule` Y los 3 helpers.
+
+Decisión de calibración (validada contra el mecanismo real del change-plan y las roles del enum `StoreRoleFeatures`):
+- `PlanChangeMatrixTests.FeaturesByModule`:
+  - Inventory: `[30,31,32,34,35]` → `[30,31,32,33,34,35]` — Egress(33) ya vive en BD y `EgressAdmin` es OwnerAdmin → el owner SÍ lo ve en `/me`.
+  - Billing: **permanece `[90]`** — `StorePaymentAdmin`(91) es SOLO SuperAdmin/ReSeller; el change-plan lo materializa al insertar Billing, pero el owner jamás lo recibe. Meter 91 al mapa rompería la aserción `/me` (`me.FeatureIds.Should().Contain(...)`).
+  - MultiPayments: `[]` → `[44]` — `MultiPaymentsAdmin` (OwnerAdmin+StoreUser) materializa 44 en tiendas VIP.
+  - Fix estructural añadido: la lectura DB del runner (`activeFeatureIds`, L210-215) ahora **filtra `RoleId == (int)RoleType.OwnerAdmin`** — antes leía TODAS las roles; las filas SuperAdmin/ReSeller de 91 aparecían tras insertar Billing. El DB scoped al owner coincide con `/me`.
+- Los 3 helpers (`AuthMePlanModulesTests`, `ExportOfflineRosterPlanTests`, `StorePlanChangeTests`): Inventory `[30,31,32,34,35]` → `[30,31,32,33,34,35]`. Billing permanece `[90]` (los 3 son owner-delegación: `SeedOwnerAdminWithModulesAsync` + `UserRole` OwnerAdmin). NO se añadió 91 en ningún helper.
+- No se tocó `FeatureSeedCoherenceTests` (canary) — ya pasa.
+
+Evidencia T8 (2026-09-25): filtered set completo → `Failed: 0, Passed: 38, Total: 38` (9 matrix + 1 canary + 28 helpers). Los 5 fallos previos quedan verdes con la BD corregida (17 módulos/42 features/44 en VIP).
+
 ## Rutas / decisiones
 
 - Rama: `feat/e2e-drift-canary` (creada desde `qa`; push/PR siguen siendo decisión del usuario).
