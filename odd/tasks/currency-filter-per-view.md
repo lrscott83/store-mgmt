@@ -85,9 +85,22 @@ Runners: `pnpm test`, `pnpm typecheck`, `pnpm lint` desde `frontend-react/`.
   → **22 tests passed, Type Errors: no errors**. `pnpm typecheck` exit 0. `pnpm eslint` exit 0.
   Corrección del orquestador sobre el entregable: el hook declaraba `currencies: Currency[]` con
   un cast desde `readonly`; se cambió a `readonly Currency[]` y se eliminó el cast.
-- [ ] **T2** `today-stats`: reemplazar `CurrencyTotalAmount` por el helper normal + filtro
+- [x] **T2** `today-stats`: reemplazar `CurrencyTotalAmount` por el helper normal + filtro
   (filas y totales).
-- [ ] **T3** `today-orders`: idem.
+  → `app/sales/routes/today-stats.tsx`. Las filas de "Ventas" por categoría se reagrupan desde
+  los ítems YA filtrados por moneda, usando el builder compartido; `CategoryStats` recibe un
+  prop `currency?: number` aditivo (sin él, CUP). **Commit `959f5725`.**
+- [x] **T3** `today-orders`: idem.
+  → `app/sales/routes/today-orders.tsx`. Filtro centrado debajo de sus dos fieldsets existentes.
+  **Commit `959f5725`.**
+  Nota: `today-stats` no tenía filtros previos, así que su fila del filtro es el primer elemento
+  del cuerpo.
+  **Limpieza obligada (no estaba en el plan):** el writer introdujo una copia local de la
+  agregación categoría→producto. Se descubrió que esa misma agregación ya estaba duplicada en
+  **dos** métodos del servicio → **tres copias**. Se extrajo a
+  `app/sales/lib/category-cart-items-view.ts` (`buildCategoryCartItemsView`) y los tres
+  llamadores delegan en él. `order-offline-service.ts` adelgaza ~80 líneas.
+  **Commit `02f1afb7`** (refactor separado de la feature).
 - [ ] **T4** `orders`: idem, incluyendo el modo multi-store (paneles por tienda).
 - [ ] **T5** `credits`: idem, incluyendo el modo multi-store.
 - [ ] **T6** `cuadre-por-fechas`: idem en KPIs y tarjeta Cuadre (single + multi-store).
@@ -142,6 +155,12 @@ Estrategia de entrega: pendiente de elección del owner (ver "Estado").
   `dev`**, PR y push después (los controla el owner). Cadena cacheada: `stacked-to-main`.
 - 2026-09-25: **T1 implementada** (commit `cc6009db`). Infra compartida lista; ninguna vista
   migrada todavía.
+- 2026-09-25: **T2 y T3 implementadas** (commits `959f5725` + refactor `02f1afb7`).
+  Evidencia: `app/sales` + `app/statistics` + `app/shared/components/multimonedas` →
+  **70 archivos / 1458 tests verdes**, `pnpm typecheck` limpio, `eslint --max-warnings=0` limpio.
+  Los tests `*-multicurrency.test.tsx` de las dos vistas se actualizaron a propósito (fijaban los
+  chips que esta feature elimina); con el módulo OFF la salida es idéntica.
+- **Pendiente**: T4–T14. Siguiente tarea natural: T4 (`orders`, incluye modo multi-store).
 
 ## Hallazgos colaterales registrados (no bloquean)
 
