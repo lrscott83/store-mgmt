@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 import { Currency, EModules, ExpenseType, OrderType, PaymentType } from '@store-mgmt/domain';
@@ -129,7 +129,7 @@ function renderPage() {
   );
 }
 
-describe('TodayStatsPage — MultiMonedas per-currency net', () => {
+describe('TodayStatsPage — filtro de moneda (MultiMonedas)', () => {
   beforeEach(() => {
     auth.state.user = { selectedStoreId: 's1', storeModuleIds: [] };
     fixtures.activeOrders = [];
@@ -159,9 +159,10 @@ describe('TodayStatsPage — MultiMonedas per-currency net', () => {
     ];
     renderPage();
     expect((await screen.findAllByText('35 CUP')).length).toBeGreaterThan(0);
+    expect(screen.queryByTestId('currency-filter-select')).not.toBeInTheDocument();
   });
 
-  it('gate ON: the net total is combined PER currency (USD 30−10=20, EUR 5−2=3)', async () => {
+  it('gate ON + 2 monedas: filtro visible y solo la moneda por defecto (USD)', async () => {
     auth.state.user.storeModuleIds = [
       EModules.MultiMonedas,
       EModules.Expenses,
@@ -189,11 +190,72 @@ describe('TodayStatsPage — MultiMonedas per-currency net', () => {
 
     renderPage();
 
-    // Net: USD 30 − 10 = 20 (primary), EUR 5 − 2 = 3 (chip). Never the mixed 23\u00A0CUP.
-    // The EUR 3 also appears in the cash panel (EUR 5 sales − EUR 2 expenses).
+    // Neto USD = 30 (ventas) − 10 (crédito) = 20; el gasto EUR queda fuera.
+    expect(await screen.findByTestId('currency-filter-select')).toBeInTheDocument();
     expect((await screen.findAllByText('20 USD')).length).toBeGreaterThan(0);
-    expect(screen.getAllByText('3 EUR').length).toBeGreaterThan(0);
+    // La moneda no elegida no aparece: ni chips ni suma mezclada.
+    expect(screen.queryByText('3 EUR')).toBeNull();
+    expect(screen.queryByText('5 EUR')).toBeNull();
+    expect(screen.queryByText('35 CUP')).toBeNull();
     expect(screen.queryByText('23 CUP')).toBeNull();
+  });
+
+  it('gate ON + 2 monedas: cambiar el select cambia filas y totales', async () => {
+    auth.state.user.storeModuleIds = [
+      EModules.MultiMonedas,
+      EModules.Expenses,
+      EModules.Credits,
+    ];
+    fixtures.activeOrders = [
+      makeOrder({
+        id: 'usd',
+        total: 30,
+        currency: Currency.USD,
+        orderItems: [makeItem({ price: 30, currency: Currency.USD })],
+      }),
+      makeOrder({
+        id: 'eur',
+        total: 5,
+        currency: Currency.EUR,
+        orderItems: [makeItem({ price: 5, currency: Currency.EUR })],
+      }),
+    ];
+    fixtures.categories = [
+      { id: 'cat1', name: 'Bebidas', order: 1, total: 35, itemsCount: 2, productItems: [] },
+    ];
+    fixtures.expenses = [makeExpense({ id: 'e1', total: 2, currency: Currency.EUR })];
+    fixtures.unpaidCredits = [makeCredit({ id: 'c1', total: 10, currency: Currency.USD })];
+
+    renderPage();
+    expect(await screen.findByTestId('currency-filter-select')).toBeInTheDocument();
+    expect((await screen.findAllByText('20 USD')).length).toBeGreaterThan(0);
+
+    fireEvent.change(screen.getByTestId('currency-filter-select'), {
+      target: { value: String(Currency.EUR) },
+    });
+
+    // EUR: neto 5 − 2 = 3; el filtro sigue visible tras elegir.
+    expect((await screen.findAllByText('3 EUR')).length).toBeGreaterThan(0);
+    expect(screen.queryByText('20 USD')).toBeNull();
+    expect(screen.getByTestId('currency-filter-select')).toBeInTheDocument();
+  });
+
+  it('gate ON + 1 moneda: sin filtro y sin filtrar', async () => {
+    auth.state.user.storeModuleIds = [EModules.MultiMonedas];
+    fixtures.activeOrders = [
+      makeOrder({
+        id: 'usd',
+        total: 30,
+        currency: Currency.USD,
+        orderItems: [makeItem({ price: 30, currency: Currency.USD })],
+      }),
+    ];
+    fixtures.categories = [
+      { id: 'cat1', name: 'Bebidas', order: 1, total: 30, itemsCount: 1, productItems: [] },
+    ];
+    renderPage();
+    expect(screen.queryByTestId('currency-filter-select')).not.toBeInTheDocument();
+    expect((await screen.findAllByText('30 USD')).length).toBeGreaterThan(0);
   });
 });
 
@@ -237,7 +299,7 @@ describe('TodayStatsPage — "Ventas" shared-source equivalence (gate ON vs OFF)
     fixtures.paidCredits = [];
   });
 
-  it('gate ON per-currency "Ventas" equals the gate-OFF legacy sales total', () => {
+  it('gate ON + 2 monedas: "Ventas" sigue el filtro y la suma de ÍTEMS', () => {
     const orders = [
       makeOrder({
         id: 'usd',
@@ -255,16 +317,16 @@ describe('TodayStatsPage — "Ventas" shared-source equivalence (gate ON vs OFF)
     fixtures.activeOrders = orders;
     fixtures.categories = categoriesFromOrders(orders);
 
-    const first = renderPage();
-    const legacy = ventasTotal();
-    first.unmount();
-
     auth.state.user.storeModuleIds = [EModules.MultiMonedas];
     renderPage();
-    const perCurrency = ventasTotal();
 
-    expect(legacy).toBe(35); // category total = 30 + 5
-    expect(perCurrency).toBe(legacy); // numeric equality across the two paths
+    // Moneda por defecto USD: solo los ítems USD (30), nunca el mezclado 35.
+    expect(ventasTotal()).toBe(30);
+
+    fireEvent.change(screen.getByTestId('currency-filter-select'), {
+      target: { value: String(Currency.EUR) },
+    });
+    expect(ventasTotal()).toBe(5);
   });
 
   it('"Ventas" follows the ITEM sum, not order.total (gate OFF and ON)', () => {
