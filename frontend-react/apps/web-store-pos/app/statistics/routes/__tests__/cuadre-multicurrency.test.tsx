@@ -139,9 +139,11 @@ describe('CuadrePorFechasPage — MultiMonedas totals', () => {
     generate();
     await waitFor(() => expect(screen.getByTestId('cuadre-card-title')).toBeTruthy());
     expect(screen.getAllByText('35 CUP').length).toBeGreaterThan(0);
+    // Sin el módulo no hay filtro de moneda.
+    expect(screen.queryByTestId('currency-filter')).toBeNull();
   });
 
-  it('gate ON: the Cuadre total is per currency, never mixed', async () => {
+  it('gate ON + 2 monedas: el filtro aparece y la vista queda en la moneda elegida', async () => {
     auth.state.user.storeModuleIds = [EModules.MultiMonedas];
     fixtures.salesTotal = 35;
     fixtures.ordersBetween = [
@@ -154,9 +156,41 @@ describe('CuadrePorFechasPage — MultiMonedas totals', () => {
     renderPage();
     generate();
     await waitFor(() => expect(screen.getByTestId('cuadre-card-title')).toBeTruthy());
+
+    // Filtro visible; moneda inicial = primera del orden acordado (USD).
+    expect(screen.getByTestId('currency-filter')).toBeTruthy();
     expect(screen.getAllByText('30 USD').length).toBeGreaterThan(0);
+    expect(screen.queryByText('5 EUR')).toBeNull();
+    // Las opciones NO se recalculan con el filtro aplicado: siguen presentes las dos.
+    const select = screen.getByTestId('currency-filter-select') as HTMLSelectElement;
+    expect(select.options.length).toBe(2);
+
+    // Cambiar a EUR vuelve a mostrar la otra moneda sin perder el filtro.
+    fireEvent.change(select, { target: { value: String(Currency.EUR) } });
     expect(screen.getAllByText('5 EUR').length).toBeGreaterThan(0);
-    expect(screen.queryByText('35 CUP')).toBeNull();
+    expect(screen.queryByText('30 USD')).toBeNull();
+    expect(screen.getByTestId('currency-filter')).toBeTruthy();
+  });
+
+  it('gate ON + 1 moneda: sin filtro y se muestra la moneda real', async () => {
+    auth.state.user.storeModuleIds = [EModules.MultiMonedas];
+    fixtures.salesTotal = 30;
+    fixtures.ordersBetween = [makeOrder({ id: 'usd', total: 30, currency: Currency.USD })];
+    renderPage();
+    generate();
+    await waitFor(() => expect(screen.getByTestId('cuadre-card-title')).toBeTruthy());
+
+    expect(screen.queryByTestId('currency-filter')).toBeNull();
+    expect(screen.getAllByText('30 USD').length).toBeGreaterThan(0);
+  });
+
+  it('la grilla de KPIs es de 4 columnas en desktop y 2 en móvil', async () => {
+    renderPage();
+    generate();
+    await waitFor(() => expect(screen.getByTestId('cuadre-kpi-grid')).toBeTruthy());
+    const grid = screen.getByTestId('cuadre-kpi-grid');
+    expect(grid.className).toContain('grid-cols-2');
+    expect(grid.className).toContain('lg:grid-cols-4');
   });
 });
 
@@ -170,6 +204,7 @@ function makeStoreSummary(overrides: Partial<StoreRangeSummary> = {}): StoreRang
     expenses: [],
     saleCredits: [],
     paidSaleCredits: [],
+    orders: [],
     salesCashTotal: 0,
     salesCardTotal: 0,
     expensesCashTotal: 0,
@@ -218,23 +253,33 @@ describe('CuadrePorFechasPage — MultiMonedas in multi-store mode', () => {
     renderPage();
     generate();
     await waitFor(() => expect(screen.getByText('Ganancias Bruta')).toBeTruthy());
-    // Aggregate sales = 30 + 5 = 35\u00A0CUP; gross/net = 10 + 3 = 13\u00A0CUP (never a mixed display here).
     expect(screen.getAllByText('35 CUP').length).toBeGreaterThan(0);
     expect(screen.getAllByText('13 CUP').length).toBeGreaterThan(0);
+    expect(screen.queryByTestId('currency-filter')).toBeNull();
   });
 
-  it('gate ON: aggregate KPIs and per-store totals are per currency, never mixed', async () => {
+  it('gate ON + 2 monedas: agregado y paneles en UNA moneda (sin mezclar)', async () => {
     auth.state.user.storeModuleIds = [EModules.MultiMonedas];
     seedTwoStores();
     renderPage();
     generate();
     await waitFor(() => expect(screen.getByText('Ganancias Bruta')).toBeTruthy());
-    // Sales KPI: USD 30 primary + EUR 5 chip. Gross/Net + per-store "Ganancias": USD 10 / EUR 3.
+
+    // Filtro visible; por defecto USD: el agregado solo muestra el total USD (30) y
+    // la ganancia (10). Nada de EUR ni del mezclado 35/13 CUP.
+    expect(screen.getByTestId('currency-filter')).toBeTruthy();
     expect(screen.getAllByText('30 USD').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('5 EUR').length).toBeGreaterThan(0);
     expect(screen.getAllByText('10 USD').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('3 EUR').length).toBeGreaterThan(0);
+    expect(screen.queryByText('5 EUR')).toBeNull();
     expect(screen.queryByText('35 CUP')).toBeNull();
     expect(screen.queryByText('13 CUP')).toBeNull();
+
+    // Cambiar a EUR deja el agregado y los paneles solo en EUR.
+    fireEvent.change(screen.getByTestId('currency-filter-select'), {
+      target: { value: String(Currency.EUR) },
+    });
+    expect(screen.getAllByText('5 EUR').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('3 EUR').length).toBeGreaterThan(0);
+    expect(screen.queryByText('30 USD')).toBeNull();
   });
 });

@@ -512,6 +512,12 @@ export interface StoreRangeSummary {
   expenses: Expense[];
   saleCredits: SaleCredit[];
   paidSaleCredits: SaleCredit[];
+  /**
+   * Órdenes activas del rango SIN agregar (currency-filter-per-view): al filtrar
+   * por moneda las filas de categorías se reagrupan desde estas órdenes con el
+   * mismo builder compartido.
+   */
+  orders: Order[];
   salesCashTotal: number;
   salesCardTotal: number;
   expensesCashTotal: number;
@@ -663,6 +669,7 @@ export function computeStoreRangeSummary(
     expenses,
     saleCredits,
     paidSaleCredits,
+    orders: activeOrders,
     salesCashTotal,
     salesCardTotal,
     expensesCashTotal,
