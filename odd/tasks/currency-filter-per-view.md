@@ -126,10 +126,21 @@ Runners: `pnpm test`, `pnpm typecheck`, `pnpm lint` desde `frontend-react/`.
   elegida; módulo ON con una moneda → **esa** (el fix, sin filtro); módulo OFF → CUP, byte-idéntico
   (fijado por test). Test nuevo `expenses-history-multicurrency.test.tsx` (7 tests); **ningún test
   existente modificado**. **Commit `8c0ce6c4`.**
-- [ ] **T8** `today-credits`: hoy suma todo como CUP sin mirar la moneda. Aplicar el mismo
+- [x] **T8** `today-credits`: hoy suma todo como CUP sin mirar la moneda. Aplicar el mismo
   tratamiento que `credits`.
-- [ ] **T9** Inventario (`available`, `entries`): aplicar el filtro y **quitar el
+  → Sumaba los créditos impagos del día y los rotulaba CUP sin gate ni moneda alguna. Test nuevo
+  `today-credits-multicurrency.test.tsx` (5 tests); ningún test existente modificado.
+  **Commit `371cd755`.**
+- [x] **T9** Inventario (`available`, `entries`): aplicar el filtro y **quitar el
   `multiMonedas={true}` hardcodeado** que hoy se salta el gate del módulo.
+  → Ambas vistas pasaban `multiMonedas` literal `true`, saltándose el gate. Ahora usan el gate
+  real y el patrón establecido. `inventory-product-list` ganó dos props **aditivas** opcionales
+  (`currency`, `filterSlot`); su único llamador de producción es `available`. Test nuevo
+  `inventory-multicurrency.test.tsx` (9 tests).
+  Salida idéntica sin el módulo, verificada contra las aserciones existentes (`100 CUP`, `26 CUP`,
+  `16 CUP`) que siguen pasando sin cambios. **Caveat registrado**: el helper multi-moneda mostraba
+  intermedios sin redondear y ahora se muestra el agregado ya redondeado; con dinero a 2 decimales
+  coinciden. **Commit `bb4a9921`.**
 - [ ] **T10** Reportes: agregar `currency` a las filas del generador del PDF, aplicar el filtro a
   la página y hacer que el **PDF respete la moneda elegida** (resumen y filas).
 - [ ] **T11** Dashboard — UI de KPIs: grilla `grid-cols-2 lg:grid-cols-4`; reemplazar el `+` por
@@ -189,7 +200,11 @@ Estrategia de entrega: pendiente de elección del owner (ver "Estado").
   sentido filtrar un total mal calculado. T6 además corrigió la misma clase de bug en la mitad
   agregada multi-store del cuadre y arregló el reporte del owner de los 4 KPIs por fila.
   Evidencia: `app/statistics` 8/122 + `multistore` verdes; `app/expenses` 8/161 verdes.
-- **Pendiente**: T8–T14. Siguiente: T8 (`today-credits`) y T9 (inventario).
+- 2026-09-25: **T8 y T9 implementadas** (commits `371cd755` y `bb4a9921`). Evidencia:
+  `app/inventory` 23/520 + `app/sales` 59/1332 → juntos 82 archivos / 1852 tests verdes,
+  sin errores de tipos.
+- **Pendiente**: T10 (reportes + PDF), T11/T12 (dashboard), T13 (canales de pago + doble conteo),
+  T14 (checks).
 
 ## Hallazgos colaterales registrados (no bloquean)
 
