@@ -110,10 +110,22 @@ Runners: `pnpm test`, `pnpm typecheck`, `pnpm lint` desde `frontend-react/`.
   **Commit `a69adb23`.**
   `MultiStoreTotal` (compartido con gastos) ganó un prop opcional aditivo `currency?: Currency`;
   ningún llamador existente se ve afectado (lista completa verificada).
-- [ ] **T6** `cuadre-por-fechas`: idem en KPIs y tarjeta Cuadre (single + multi-store).
-- [ ] **T7** `expenses-history`: **arreglar** los totales para que respeten `Expense.currency`
+- [x] **T6** `cuadre-por-fechas`: idem en KPIs y tarjeta Cuadre (single + multi-store).
+  → `app/statistics/routes/cuadre-por-fechas.tsx`. Cero `CurrencyTotalAmount` restante.
+  **Grillas de KPIs** (`:632` y `:1037`) pasan a `grid-cols-2 lg:grid-cols-4` — es el arreglo del
+  reporte del owner ("4 KPIs por fila en desktop"); el `grid-cols-2` previo se justificaba con
+  paridad Angular y el comentario obsoleto se reescribió. **Commit `39eba2b8`.**
+  Bug corregido de paso: la mitad agregada multi-store sumaba órdenes, gastos y créditos pagados
+  **sin mirar la moneda** (`multi-store-aggregator.ts:607-650`) y combinaba esas sumas mezcladas.
+  Ahora cada panel recibe un resumen ya filtrado a una moneda. `StoreRangeSummary` ganó un campo
+  aditivo `orders` para reusar el builder compartido. **Commit `39eba2b8`.**
+- [x] **T7** `expenses-history`: **arreglar** los totales para que respeten `Expense.currency`
   (hoy suman monedas distintas y las etiquetan CUP: header, totales por día, y los dos del modo
   multi-store) + aplicar el filtro.
+  → Todos los totales resuelven la moneda del gasto. Tres casos explícitos: filtro visible → la
+  elegida; módulo ON con una moneda → **esa** (el fix, sin filtro); módulo OFF → CUP, byte-idéntico
+  (fijado por test). Test nuevo `expenses-history-multicurrency.test.tsx` (7 tests); **ningún test
+  existente modificado**. **Commit `8c0ce6c4`.**
 - [ ] **T8** `today-credits`: hoy suma todo como CUP sin mirar la moneda. Aplicar el mismo
   tratamiento que `credits`.
 - [ ] **T9** Inventario (`available`, `entries`): aplicar el filtro y **quitar el
@@ -172,7 +184,12 @@ Estrategia de entrega: pendiente de elección del owner (ver "Estado").
   Lección registrada: el writer reportó "todo verde" y una corrida del orquestador falló. La
   investigación mostró que el fallo era **flakiness preexistente por timeout** (ver Hallazgos),
   no una regresión — pero el chequeo del orquestador es lo que lo demostró.
-- **Pendiente**: T6–T14. Siguiente tarea natural: T6 (`cuadre-por-fechas`).
+- 2026-09-25: **T6 y T7 implementadas** (commits `39eba2b8` y `8c0ce6c4`). T7 adelantada sobre T6
+  por criterio: tenía un bug de correctitud (suma de monedas distintas rotulada CUP), y no tiene
+  sentido filtrar un total mal calculado. T6 además corrigió la misma clase de bug en la mitad
+  agregada multi-store del cuadre y arregló el reporte del owner de los 4 KPIs por fila.
+  Evidencia: `app/statistics` 8/122 + `multistore` verdes; `app/expenses` 8/161 verdes.
+- **Pendiente**: T8–T14. Siguiente: T8 (`today-credits`) y T9 (inventario).
 
 ## Hallazgos colaterales registrados (no bloquean)
 
