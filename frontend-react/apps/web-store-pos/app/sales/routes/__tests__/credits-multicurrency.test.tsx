@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 import { Currency, EModules, PaymentType } from '@store-mgmt/domain';
@@ -83,7 +83,7 @@ function renderPage() {
   );
 }
 
-describe('SaleCreditsPage — MultiMonedas header + day totals', () => {
+describe('SaleCreditsPage — filtro de moneda (MultiMonedas)', () => {
   beforeEach(() => {
     multiStore.enabled = false;
     multiStore.stores = [];
@@ -91,30 +91,58 @@ describe('SaleCreditsPage — MultiMonedas header + day totals', () => {
     credits.items = [];
   });
 
-  it('gate OFF: keeps the legacy mixed total (75\u00A0CUP)', async () => {
+  it('gate OFF: mantiene el total mezclado legacy (75\u00A0CUP) y sin filtro', async () => {
     credits.items = [
       makeCredit({ id: 'usd', total: 30, currency: Currency.USD }),
       makeCredit({ id: 'eur', total: 45, currency: Currency.EUR }),
     ];
     renderPage();
     expect((await screen.findAllByText('75 CUP')).length).toBeGreaterThan(0);
+    expect(screen.queryByTestId('currency-filter-select')).not.toBeInTheDocument();
   });
 
-  it('gate ON: header and day totals are per currency, never mixed', async () => {
+  it('gate ON + 2 monedas: header y total del día quedan en la moneda por defecto (USD)', async () => {
     auth.state.user.storeModuleIds = [EModules.MultiMonedas];
     credits.items = [
       makeCredit({ id: 'usd', total: 30, currency: Currency.USD }),
       makeCredit({ id: 'eur', total: 45, currency: Currency.EUR }),
     ];
     renderPage();
-    // Header (and the single day panel) both render the per-currency breakdown.
-    expect((await screen.findAllByText('30 USD')).length).toBeGreaterThan(0);
-    expect(screen.getAllByText('45 EUR').length).toBeGreaterThan(0);
+    expect(await screen.findByTestId('currency-filter-select')).toBeInTheDocument();
+    expect(screen.getAllByText('30 USD').length).toBeGreaterThan(0);
+    expect(screen.queryByText('45 EUR')).toBeNull();
     expect(screen.queryByText('75 CUP')).toBeNull();
+  });
+
+  it('gate ON + 2 monedas: cambiar el select cambia los datos y el filtro sigue visible', async () => {
+    auth.state.user.storeModuleIds = [EModules.MultiMonedas];
+    credits.items = [
+      makeCredit({ id: 'usd', total: 30, currency: Currency.USD }),
+      makeCredit({ id: 'eur', total: 45, currency: Currency.EUR }),
+    ];
+    renderPage();
+    await screen.findByTestId('currency-filter-select');
+    fireEvent.change(screen.getByTestId('currency-filter-select'), {
+      target: { value: String(Currency.EUR) },
+    });
+    expect(screen.getAllByText('45 EUR').length).toBeGreaterThan(0);
+    expect(screen.queryByText('30 USD')).toBeNull();
+    expect(screen.getByTestId('currency-filter-select')).toBeInTheDocument();
+  });
+
+  it('gate ON + 1 moneda: sin filtro y sin filtrar (todos los datos visibles)', async () => {
+    auth.state.user.storeModuleIds = [EModules.MultiMonedas];
+    credits.items = [
+      makeCredit({ id: 'usd-1', total: 30, currency: Currency.USD }),
+      makeCredit({ id: 'usd-2', total: 45, currency: Currency.USD }),
+    ];
+    renderPage();
+    expect((await screen.findAllByText('75 USD')).length).toBeGreaterThan(0);
+    expect(screen.queryByTestId('currency-filter-select')).not.toBeInTheDocument();
   });
 });
 
-describe('SaleCreditsPage — MultiMonedas header in multi-store mode', () => {
+describe('SaleCreditsPage — filtro de moneda en modo multi-store', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     multiStore.enabled = true;
@@ -135,20 +163,33 @@ describe('SaleCreditsPage — MultiMonedas header in multi-store mode', () => {
     );
   }
 
-  it('gate OFF: keeps the legacy aggregate header total across stores (75\u00A0CUP)', async () => {
+  it('gate OFF: mantiene el total agregado legacy entre tiendas (75\u00A0CUP) y sin filtro', async () => {
     seedTwoStores();
     renderPage();
-    // Header outside the panels aggregates every visible store: 30 + 45 = 75\u00A0CUP.
     expect(await screen.findByText('75 CUP')).toBeInTheDocument();
+    expect(screen.queryByTestId('currency-filter-select')).not.toBeInTheDocument();
   });
 
-  it('gate ON: the aggregate header total is per currency, never mixed', async () => {
+  it('gate ON + 2 monedas: el agregado y los paneles quedan en la moneda por defecto (USD)', async () => {
     auth.state.user.storeModuleIds = [EModules.MultiMonedas];
     seedTwoStores();
     renderPage();
-    // Cross-store aggregation still groups by currency: USD 30 primary + EUR 45 chip.
-    expect(await screen.findByText('30 USD')).toBeInTheDocument();
-    expect(screen.getByText('45 EUR')).toBeInTheDocument();
+    await screen.findByTestId('currency-filter-select');
+    expect(screen.getAllByText('30 USD').length).toBeGreaterThan(0);
+    expect(screen.queryByText('45 EUR')).toBeNull();
     expect(screen.queryByText('75 CUP')).toBeNull();
+  });
+
+  it('gate ON + 2 monedas: cambiar el select cambia el agregado y los paneles', async () => {
+    auth.state.user.storeModuleIds = [EModules.MultiMonedas];
+    seedTwoStores();
+    renderPage();
+    await screen.findByTestId('currency-filter-select');
+    fireEvent.change(screen.getByTestId('currency-filter-select'), {
+      target: { value: String(Currency.EUR) },
+    });
+    expect(screen.getAllByText('45 EUR').length).toBeGreaterThan(0);
+    expect(screen.queryByText('30 USD')).toBeNull();
+    expect(screen.getByTestId('currency-filter-select')).toBeInTheDocument();
   });
 });
