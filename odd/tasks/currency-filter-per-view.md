@@ -148,9 +148,26 @@ Runners: `pnpm test`, `pnpm typecheck`, `pnpm lint` desde `frontend-react/`.
   por moneda + desglose por canales) en un solo popup.
 - [ ] **T12** Dashboard — filtro + chips: filtro global de moneda; widgets siguen el filtro;
   chips informativos con la moneda filtrada marcada activa.
-- [ ] **T13** Dashboard / multi-store: desglose de modos de pago por **canal real** (quitar
+- [x] **T13** Dashboard / multi-store: desglose de modos de pago por **canal real** (quitar
   `Tarjeta`) y corregir el **doble conteo** de una transferencia en USD (hoy entra en el cubo de
   efectivo Y en el de transferencia: `multi-store-aggregator.ts:602/625` vs `:610/629`).
+  → `paymentBreakdown` agrupa por `normalizedOrderPaymentMethod` (la convención que ya usaban
+  today-stats, cuadre y los filtros de órdenes) y los labels salen de `SalePaymentMethod`:
+  **`Tarjeta` es inalcanzable**. Consecuencia declarada: `Zelle` se funde en `Transferencia`,
+  igual que en las otras vistas. El cubo de efectivo y el de transferencia de multi-store
+  derivan ahora de **una sola** resolución → mutuamente excluyentes.
+  Bug demostrado **antes** de arreglar: el test de regresión reportó `expected 300 to be 100`
+  (100 de efectivo + 200 de una transferencia USD contada otra vez como transferencia).
+  Se reutilizó `CART.EFECTIVO` y `CHANNEL_RATES.METHOD_TRANSFERENCIA`; sin claves nuevas.
+  **Commit `35d55af3`.** Auditoría: `today-stats` ya resolvía el efectivo por canal real; créditos
+  y gastos son inmunes (un crédito no tiene campo de canal real y ambos escriben su espejo legacy
+  sin mirar la moneda).
+- [x] **T13b** (hallazgo de la auditoría de T13, no estaba en el plan): la ruta **single-store** de
+  `cuadre-por-fechas` tenía el **mismo** doble conteo (`:287`, `:309` usaban el `paymentType`
+  legacy mientras el lado de transferencias ya usaba el canal real). Dejarlo habría dejado
+  single-store y multi-store resolviendo el efectivo **distinto**. Arreglado con la misma
+  resolución. Demostrado antes de arreglar: `expected '400 CUP' to be '100 CUP'`.
+  **Commit `d9412068`.**
 - [ ] **T14** Checks verdes + evidencia: `pnpm test`, `pnpm typecheck`, `pnpm lint`.
 
 ## Criterios de aceptación
@@ -203,8 +220,11 @@ Estrategia de entrega: pendiente de elección del owner (ver "Estado").
 - 2026-09-25: **T8 y T9 implementadas** (commits `371cd755` y `bb4a9921`). Evidencia:
   `app/inventory` 23/520 + `app/sales` 59/1332 → juntos 82 archivos / 1852 tests verdes,
   sin errores de tipos.
-- **Pendiente**: T10 (reportes + PDF), T11/T12 (dashboard), T13 (canales de pago + doble conteo),
-  T14 (checks).
+- 2026-09-25: **T13 y T13b implementadas** (commits `35d55af3` y `d9412068`). El bug de `Tarjeta`
+  está cerrado y **los dos dobles conteos** de transferencias USD también (multi-store y
+  single-store). El writer demostró ambos bugs con una aserción antes de arreglarlos.
+- **Pendiente**: T10 (reportes + PDF), T11/T12 (dashboard: grilla, icono `(i)`, popup fusionado,
+  filtro), T14 (checks).
 
 ## Hallazgos colaterales registrados (no bloquean)
 
