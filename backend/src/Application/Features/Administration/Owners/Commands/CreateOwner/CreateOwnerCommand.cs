@@ -14,11 +14,15 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Localization;
 using Resources;
 using System.Net;
+using System.Text.Json.Serialization;
 
 namespace Application.Features.Administration.Owners.Commands.CreateOwner
 {
+    // ReSellerId carries a property-level converter so an empty/whitespace JSON string binds to
+    // null ("no Gestor") instead of failing the WHOLE body. Kept at property level on purpose:
+    // a global JsonSerializerOptions change would loosen every Guid? in the API.
     public sealed record CreateOwnerCommand(string Login, string Password, string FullName, string Cellphone,
-        Guid? ReSellerId, string? Email, string? Description) : ICommand<OwnerDto> { }
+        [property: JsonConverter(typeof(NullableGuidJsonConverter))] Guid? ReSellerId, string? Email, string? Description) : ICommand<OwnerDto> { }
 
     public class CreateOwnerCommandHandler : ICommandHandler<CreateOwnerCommand, OwnerDto>
     {
