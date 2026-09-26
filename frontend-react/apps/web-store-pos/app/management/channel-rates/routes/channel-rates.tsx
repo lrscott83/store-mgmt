@@ -18,8 +18,8 @@ import { Modal } from '~/shared/components/ui/modal';
 import { HelpIcon, PlusIcon } from '~/shared/components/ui/icons';
 import { currencyLabel } from '~/shared/lib/format-money-with-currency';
 import { fromLocalDayKey, toLocalDayKey } from '~/shared/lib/date-utils';
+import { channelLabel } from '~/shared/lib/payment-methods/channel-label';
 import { ChannelRateOfflineService } from '../lib/services/channel-rate-offline-service';
-import { channelLabel } from '../lib/channel-label';
 
 // multipayments — same guard as the Configurations feature and the daily
 // exchange-rate register (OwnerAdmin / SuperAdmin plus the feature gate), AND
