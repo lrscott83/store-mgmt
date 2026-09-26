@@ -604,18 +604,20 @@ export function computeStoreRangeSummary(
     });
   });
 
-  const salesCashTotal = activeOrders
-    .filter((o) => o.paymentType === PaymentTypeEnum.Efectivo && !o.isCredit)
-    .reduce((acc, o) => acc + o.total, 0);
-  // T14 (payment-channels-and-multipayment): mirror the single-store cuadre
-  // (statistics/routes/cuadre-por-fechas.tsx) — a sale recorded as Zelle counts
-  // in the Transferencia panel instead of in neither. Cash keeps the raw legacy
-  // predicate, identical in both views.
-  const salesCardTotal = activeOrders
-    .filter(
-      (o) => normalizedOrderPaymentMethod(o) === SalePaymentMethod.Transferencia && !o.isCredit,
-    )
-    .reduce((acc, o) => acc + o.total, 0);
+  // T13 (currency-filter-per-view): cash and transfer come from the SAME
+  // real-channel resolution (`normalizedOrderPaymentMethod`) so they are mutually
+  // exclusive. A USD transfer carries legacy `paymentType = Efectivo`
+  // (sale-payment-method-compat.ts:47), so the old legacy cash predicate counted
+  // it in BOTH buckets. Under the normalized convention Zelle collapses into
+  // Transferencia; cash stays Efectivo-only.
+  const cashOrders = activeOrders.filter(
+    (o) => normalizedOrderPaymentMethod(o) === SalePaymentMethod.Efectivo && !o.isCredit,
+  );
+  const transferOrders = activeOrders.filter(
+    (o) => normalizedOrderPaymentMethod(o) === SalePaymentMethod.Transferencia && !o.isCredit,
+  );
+  const salesCashTotal = cashOrders.reduce((acc, o) => acc + o.total, 0);
+  const salesCardTotal = transferOrders.reduce((acc, o) => acc + o.total, 0);
 
   const salesEntries: CurrencyAmount[] = activeOrders.map((o) => ({
     amount: o.total,
@@ -627,14 +629,14 @@ export function computeStoreRangeSummary(
       currency: item.currency ?? o.currency,
     })),
   );
-  const salesCashEntries: CurrencyAmount[] = activeOrders
-    .filter((o) => o.paymentType === PaymentTypeEnum.Efectivo && !o.isCredit)
-    .map((o) => ({ amount: o.total, currency: o.currency }));
-  const salesCardEntries: CurrencyAmount[] = activeOrders
-    .filter(
-      (o) => normalizedOrderPaymentMethod(o) === SalePaymentMethod.Transferencia && !o.isCredit,
-    )
-    .map((o) => ({ amount: o.total, currency: o.currency }));
+  const salesCashEntries: CurrencyAmount[] = cashOrders.map((o) => ({
+    amount: o.total,
+    currency: o.currency,
+  }));
+  const salesCardEntries: CurrencyAmount[] = transferOrders.map((o) => ({
+    amount: o.total,
+    currency: o.currency,
+  }));
 
   let expenses: Expense[] = [];
   let expensesTotal = 0;

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { useIntl } from 'react-intl';
 import type { Currency, Expense } from '@store-mgmt/domain';
-import { DEFAULT_CURRENCY, PaymentType } from '@store-mgmt/domain';
+import { DEFAULT_CURRENCY, SalePaymentMethod } from '@store-mgmt/domain';
 import { Modal } from '~/shared/components/ui/modal';
 import { addDays, formatLocalDate } from '~/shared/lib/date-utils';
 import { currencyLabel } from '~/shared/lib/format-money-with-currency';
@@ -126,10 +126,13 @@ const CREDITS_TITLE = 'Créditos por cobrar';
 const ALL_ORDER_TYPES_NOTE =
   'Incluye todos los tipos de venta (normal, mayorista, merma, ajuste, otro)';
 
+// Labels of the REAL sale channel (`SalePaymentMethod`). The breakdown groups by
+// `normalizedOrderPaymentMethod`, which collapses Zelle into Transferencia, so the
+// Zelle entry is kept for completeness but unreachable; `Tarjeta` no longer exists.
 const PAYMENT_LABEL_IDS: Record<number, string> = {
-  [PaymentType.Efectivo]: 'CART.EFECTIVO',
-  [PaymentType.Tarjeta]: 'CART.TARJETA',
-  [PaymentType.Zelle]: 'CART.ZELLE',
+  [SalePaymentMethod.Efectivo]: 'CART.EFECTIVO',
+  [SalePaymentMethod.Zelle]: 'CART.ZELLE',
+  [SalePaymentMethod.Transferencia]: 'CHANNEL_RATES.METHOD_TRANSFERENCIA',
 };
 
 /** Zero-valued fallback group so the cards render without data (all "0"). */
@@ -199,8 +202,8 @@ export function DashboardMetricsBody({
     (definition) => definition.key !== 'expenses' || hasExpensesModule,
   );
 
-  const paymentLabel = (paymentType: PaymentType): string =>
-    intl.formatMessage({ id: PAYMENT_LABEL_IDS[paymentType] ?? 'CART.EFECTIVO' });
+  const paymentLabel = (method: SalePaymentMethod): string =>
+    intl.formatMessage({ id: PAYMENT_LABEL_IDS[method] ?? 'CART.EFECTIVO' });
 
   function formatKpiValue(definition: KpiDefinition, group: CurrencyRangeMetrics): string {
     const value = definition.valueOf(group);

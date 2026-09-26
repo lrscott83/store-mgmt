@@ -434,7 +434,9 @@ describe('DashboardPage — popups', () => {
     const popup = screen.getByTestId('dashboard-popup');
     expect(popup).toHaveTextContent('Método de pago — CUP');
     expect(popup).toHaveTextContent('Efectivo');
-    expect(popup).toHaveTextContent('Tarjeta');
+    // Real channel: legacy Tarjeta resolves to Transferencia — never "Tarjeta".
+    expect(popup).toHaveTextContent('Transferencia');
+    expect(popup).not.toHaveTextContent('Tarjeta');
     expect(popup).toHaveTextContent('100.00 CUP (67%)');
   });
 

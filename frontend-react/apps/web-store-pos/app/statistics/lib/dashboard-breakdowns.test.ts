@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Order, OrderItem } from '@store-mgmt/domain';
-import { Currency, OrderType, PaymentType } from '@store-mgmt/domain';
+import { Currency, OrderType, PaymentType, SalePaymentMethod } from '@store-mgmt/domain';
 import {
   categoryBreakdown,
   formatBucketLabel,
@@ -46,13 +46,13 @@ function makeOrder(id: string, overrides: Partial<Order> = {}): Order {
   } as Order;
 }
 
-const PAYMENT_LABELS: Partial<Record<PaymentType, string>> = {
-  [PaymentType.Efectivo]: 'Efectivo',
-  [PaymentType.Tarjeta]: 'Tarjeta',
+const PAYMENT_LABELS: Partial<Record<SalePaymentMethod, string>> = {
+  [SalePaymentMethod.Efectivo]: 'Efectivo',
+  [SalePaymentMethod.Transferencia]: 'Transferencia',
 };
 
-function labelOf(type: PaymentType): string {
-  return PAYMENT_LABELS[type] ?? 'Otro';
+function labelOf(method: SalePaymentMethod): string {
+  return PAYMENT_LABELS[method] ?? 'Otro';
 }
 
 describe('dashboard-breakdowns — currency presence and order', () => {
@@ -71,7 +71,7 @@ describe('dashboard-breakdowns — currency presence and order', () => {
 });
 
 describe('dashboard-breakdowns — payment and category splits', () => {
-  it('splits one currency by payment type, ignoring the other currency', () => {
+  it('splits one currency by REAL channel, ignoring the other currency', () => {
     const orders = [
       makeOrder('o1', { paymentType: PaymentType.Efectivo, total: 100 }),
       makeOrder('o2', { paymentType: PaymentType.Tarjeta, total: 50 }),
@@ -79,9 +79,43 @@ describe('dashboard-breakdowns — payment and category splits', () => {
       makeOrder('usd', { paymentType: PaymentType.Efectivo, total: 999, currency: Currency.USD }),
     ];
     const slices = paymentBreakdown(orders, Currency.CUP, labelOf);
+    // Legacy Tarjeta resolves to Transferencia (real channel), not "Tarjeta".
     expect(slices).toEqual([
-      { id: String(PaymentType.Efectivo), name: 'Efectivo', value: 125 },
-      { id: String(PaymentType.Tarjeta), name: 'Tarjeta', value: 50 },
+      { id: String(SalePaymentMethod.Efectivo), name: 'Efectivo', value: 125 },
+      { id: String(SalePaymentMethod.Transferencia), name: 'Transferencia', value: 50 },
+    ]);
+  });
+
+  it('labels a CUP transfer as Transferencia (never Tarjeta) and collapses Zelle', () => {
+    const orders = [
+      makeOrder('transfer-cup', {
+        // Legacy field lies (CUP transfer mirrors Tarjeta normally), real field wins.
+        paymentType: PaymentType.Tarjeta,
+        salePaymentMethod: SalePaymentMethod.Transferencia,
+        total: 200,
+      }),
+      makeOrder('zelle', { paymentType: PaymentType.Zelle, total: 40 }),
+    ];
+    const slices = paymentBreakdown(orders, Currency.CUP, labelOf);
+    expect(slices).toEqual([
+      { id: String(SalePaymentMethod.Transferencia), name: 'Transferencia', value: 240 },
+    ]);
+    expect(slices.some((slice) => slice.name === 'Tarjeta')).toBe(false);
+  });
+
+  it('does NOT label a USD transfer as Efectivo: real channel wins within its currency', () => {
+    const orders = [
+      makeOrder('usd-transfer', {
+        // A USD transfer writes legacy `paymentType = Efectivo` (compat :47).
+        paymentType: PaymentType.Efectivo,
+        salePaymentMethod: SalePaymentMethod.Transferencia,
+        currency: Currency.USD,
+        total: 30,
+      }),
+    ];
+    const slices = paymentBreakdown(orders, Currency.USD, labelOf);
+    expect(slices).toEqual([
+      { id: String(SalePaymentMethod.Transferencia), name: 'Transferencia', value: 30 },
     ]);
   });
 

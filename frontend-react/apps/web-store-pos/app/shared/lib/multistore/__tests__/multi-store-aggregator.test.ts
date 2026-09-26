@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { Order, SaleCredit, Expense } from '@store-mgmt/domain';
-import { PaymentType } from '@store-mgmt/domain';
+import { Currency, PaymentType, SalePaymentMethod } from '@store-mgmt/domain';
 import { encryptEntity } from '../../storage/entity-crypto';
 import { setDek, clearDek } from '../../storage/data-key-store';
 import {
@@ -347,6 +347,39 @@ describe('multi-store-aggregator — cuadre per store', () => {
     expect(summary.salesCardEntries.reduce((acc, e) => acc + e.amount, 0)).toBe(75);
     // General total unchanged: every active sale counted exactly once.
     expect(summary.salesTotal).toBe(175);
+  });
+  it('counts a USD transfer once, in the transfer bucket — never as cash', () => {
+    seedEncrypted('orders', 'store-a', DEK_A, [
+      makeOrder('cash-cup', {
+        total: 100,
+        paymentType: PaymentType.Efectivo,
+        date: new Date('2026-02-02T10:00:00'),
+      }),
+      makeOrder('transfer-usd', {
+        total: 200,
+        // A USD transfer mirrors legacy `paymentType = Efectivo` (compat :47).
+        paymentType: PaymentType.Efectivo,
+        salePaymentMethod: SalePaymentMethod.Transferencia,
+        currency: Currency.USD,
+        date: new Date('2026-02-02T11:00:00'),
+      }),
+    ]);
+
+    const summary = computeStoreRangeSummary(
+      'store-a',
+      DEK_A,
+      new Date('2026-02-01T00:00:00'),
+      new Date('2026-02-05T00:00:00'),
+      false,
+      false,
+    );
+
+    expect(summary.salesCashTotal).toBe(100); // USD transfer is NOT cash
+    expect(summary.salesCardTotal).toBe(200); // …it is a transfer
+    // Buckets are mutually exclusive → the USD transfer is summed exactly once.
+    expect(summary.salesCashTotal + summary.salesCardTotal).toBe(summary.salesTotal);
+    expect(summary.salesCashEntries.reduce((acc, e) => acc + e.amount, 0)).toBe(100);
+    expect(summary.salesCardEntries.reduce((acc, e) => acc + e.amount, 0)).toBe(200);
   });
 });
 
