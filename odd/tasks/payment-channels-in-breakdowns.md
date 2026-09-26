@@ -65,13 +65,23 @@ Runners: `pnpm test`, `pnpm typecheck`, `pnpm lint` desde `frontend-react/`.
 
 ## Tareas
 
-- [ ] **T1** Mover `channelLabel` a una ubicación compartida (`app/shared/lib/payment-methods/`),
+- [x] **T1** Mover `channelLabel` a una ubicación compartida (`app/shared/lib/payment-methods/`),
   actualizando sus 2 consumidores (`channel-rates.tsx`, `configurations.tsx`). Refactor puro, mismo
   comportamiento. Motivo: las vistas de ventas/estadísticas no deben importar de una carpeta de
   `management`.
-- [ ] **T2** `today-stats`: los desgloses de pago pasan a ser por **canal de la moneda mostrada**,
+  → Movido. Git detecta el rename (test al 100 %, fuente al 63 % porque cambió solo el comentario
+  de ruta). Los dos consumidores importan la copia compartida con salida idéntica.
+  **Commit `0d5b8ee`**(ver abajo).
+- [x] **T2** `today-stats`: los desgloses de pago pasan a ser por **canal de la moneda mostrada**,
   derivados de `paymentMethodOptionsForCurrency` + `resolvedOrderPaymentMethod`, rotulados con
   `channelLabel`. Con MultiMonedas OFF → los 2 canales de CUP.
+  → Paneles derivados del catálogo de `displayCurrency`; cada orden clasificada por
+  `resolvedOrderPaymentMethod`; rótulos con `channelLabel`. CUP → `Efectivo (CUP)` +
+  `Transferencia (CUP)` (montos idénticos a antes); USD → 3 canales con Zelle separado.
+  Guarda para datos históricos, documentada en el código: si el canal real de una orden no existe
+  en el catálogo de la moneda mostrada (venta Zelle con MultiMonedas OFF y CUP en pantalla), cae a
+  la forma normalizada para que **ninguna orden salga de la partición**.
+  Evidencia: `app/sales` 59/1335 + `app/management` 23/339 verdes; typecheck y eslint limpios.
 - [ ] **T3** `cuadre-por-fechas` single-store: idem.
 - [ ] **T4** `cuadre-por-fechas` multi-store + `multi-store-aggregator`: el resumen por tienda debe
   exponer el desglose por canal para que los paneles multi-store muestren los canales de la moneda.
