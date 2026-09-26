@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { Order, Product, InventoryEntry, InventoryEntryView } from '@store-mgmt/domain';
-import { OrderType, PaymentType, success, failure } from '@store-mgmt/domain';
+import { Currency, OrderType, PaymentType, success, failure } from '@store-mgmt/domain';
 import type { InventoryCategoryView } from '~/inventory/lib/services/inventory-offline-service';
 import { generateProductRows } from './generate-product-rows';
 
@@ -25,7 +25,7 @@ function makeProduct(overrides: Partial<Product> = {}): Product {
 }
 
 function makeOrderItem(
-  overrides: Partial<{ productId: string; quantity: number; price: number }> = {},
+  overrides: Partial<{ productId: string; quantity: number; price: number; currency: Currency }> = {},
 ) {
   return {
     productId: 'p1',
@@ -279,5 +279,60 @@ describe('generateProductRows', () => {
 
     expect(rows).toHaveLength(2);
     expect(rows.map((r) => r.productId)).toEqual(['p1', 'p2']);
+  });
+
+  it("ROW-06: the row carries the SALE's currency from the order item", () => {
+    const products = [makeProduct({ currency: Currency.CUP })];
+    const order = makeOrder([
+      makeOrderItem({ quantity: 1, price: 10, currency: Currency.USD }),
+    ]);
+
+    const rows = generateProductRows(
+      { getAvailableProducts: () => products },
+      { getActiveOrdersInDay: () => [order] },
+      {
+        getInventoryEntriesInDay: () => success([]),
+        getInventoryCategoriesView: () => success([]),
+        getProductInventoriesByProductId: () => [],
+      },
+      TODAY,
+    );
+
+    expect(rows[0].currency).toBe(Currency.USD);
+  });
+
+  it("ROW-07: without sales today the row falls back to the PRODUCT's own currency", () => {
+    const products = [makeProduct({ currency: Currency.EUR })];
+
+    const rows = generateProductRows(
+      { getAvailableProducts: () => products },
+      { getActiveOrdersInDay: () => [] },
+      {
+        getInventoryEntriesInDay: () => success([]),
+        getInventoryCategoriesView: () => success([]),
+        getProductInventoriesByProductId: () => [],
+      },
+      TODAY,
+    );
+
+    expect(rows[0].currency).toBe(Currency.EUR);
+  });
+
+  it('ROW-08: absent currency everywhere resolves to the domain default CUP (never invented)', () => {
+    const products = [makeProduct()];
+    const order = makeOrder([makeOrderItem({ quantity: 1, price: 10 })]);
+
+    const rows = generateProductRows(
+      { getAvailableProducts: () => products },
+      { getActiveOrdersInDay: () => [order] },
+      {
+        getInventoryEntriesInDay: () => success([]),
+        getInventoryCategoriesView: () => success([]),
+        getProductInventoriesByProductId: () => [],
+      },
+      TODAY,
+    );
+
+    expect(rows[0].currency).toBe(Currency.CUP);
   });
 });

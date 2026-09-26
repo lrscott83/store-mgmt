@@ -28,7 +28,7 @@ import {
   PaymentType as PaymentTypeEnum,
   SalePaymentMethod,
 } from '@store-mgmt/domain';
-import { normalizedOrderPaymentMethod } from '~/shared/lib/payment-method-resolved';
+import { resolvedOrderPaymentMethod } from '~/shared/lib/payment-method-resolved';
 import { addDays, groupByLocalDay, localDayRange } from '~/shared/lib/date-utils';
 import type { LocalDayGroup } from '~/shared/lib/date-utils';
 import { calculateOrderProfit } from '~/inventory/lib/profit-calculator';
@@ -512,6 +512,12 @@ export interface StoreRangeSummary {
   expenses: Expense[];
   saleCredits: SaleCredit[];
   paidSaleCredits: SaleCredit[];
+  /**
+   * Órdenes activas del rango SIN agregar (currency-filter-per-view): al filtrar
+   * por moneda las filas de categorías se reagrupan desde estas órdenes con el
+   * mismo builder compartido.
+   */
+  orders: Order[];
   salesCashTotal: number;
   salesCardTotal: number;
   expensesCashTotal: number;
@@ -598,18 +604,22 @@ export function computeStoreRangeSummary(
     });
   });
 
-  const salesCashTotal = activeOrders
-    .filter((o) => o.paymentType === PaymentTypeEnum.Efectivo && !o.isCredit)
-    .reduce((acc, o) => acc + o.total, 0);
-  // T14 (payment-channels-and-multipayment): mirror the single-store cuadre
-  // (statistics/routes/cuadre-por-fechas.tsx) — a sale recorded as Zelle counts
-  // in the Transferencia panel instead of in neither. Cash keeps the raw legacy
-  // predicate, identical in both views.
-  const salesCardTotal = activeOrders
-    .filter(
-      (o) => normalizedOrderPaymentMethod(o) === SalePaymentMethod.Transferencia && !o.isCredit,
-    )
-    .reduce((acc, o) => acc + o.total, 0);
+  // T13 (currency-filter-per-view) + owner correction (2026-09-26): this is a
+  // TWO-way cash / non-cash split, NOT a channel breakdown. The buckets partition
+  // the active NON-credit orders exactly once: cash = resolved Efectivo, transfer
+  // = every other resolved channel (`Zelle` and `Transferencia` included). Using a
+  // bare `resolved === Transferencia` on the transfer side would drop Zelle, so the
+  // transfer side is the COMPLEMENT of cash. A USD transfer carries legacy
+  // `paymentType = Efectivo` (sale-payment-method-compat.ts:47), but its resolved
+  // channel is Transferencia, so it is never double-counted as cash.
+  const cashOrders = activeOrders.filter(
+    (o) => !o.isCredit && resolvedOrderPaymentMethod(o) === SalePaymentMethod.Efectivo,
+  );
+  const transferOrders = activeOrders.filter(
+    (o) => !o.isCredit && resolvedOrderPaymentMethod(o) !== SalePaymentMethod.Efectivo,
+  );
+  const salesCashTotal = cashOrders.reduce((acc, o) => acc + o.total, 0);
+  const salesCardTotal = transferOrders.reduce((acc, o) => acc + o.total, 0);
 
   const salesEntries: CurrencyAmount[] = activeOrders.map((o) => ({
     amount: o.total,
@@ -621,14 +631,14 @@ export function computeStoreRangeSummary(
       currency: item.currency ?? o.currency,
     })),
   );
-  const salesCashEntries: CurrencyAmount[] = activeOrders
-    .filter((o) => o.paymentType === PaymentTypeEnum.Efectivo && !o.isCredit)
-    .map((o) => ({ amount: o.total, currency: o.currency }));
-  const salesCardEntries: CurrencyAmount[] = activeOrders
-    .filter(
-      (o) => normalizedOrderPaymentMethod(o) === SalePaymentMethod.Transferencia && !o.isCredit,
-    )
-    .map((o) => ({ amount: o.total, currency: o.currency }));
+  const salesCashEntries: CurrencyAmount[] = cashOrders.map((o) => ({
+    amount: o.total,
+    currency: o.currency,
+  }));
+  const salesCardEntries: CurrencyAmount[] = transferOrders.map((o) => ({
+    amount: o.total,
+    currency: o.currency,
+  }));
 
   let expenses: Expense[] = [];
   let expensesTotal = 0;
@@ -663,6 +673,7 @@ export function computeStoreRangeSummary(
     expenses,
     saleCredits,
     paidSaleCredits,
+    orders: activeOrders,
     salesCashTotal,
     salesCardTotal,
     expensesCashTotal,

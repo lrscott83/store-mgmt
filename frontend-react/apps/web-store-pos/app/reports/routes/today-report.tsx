@@ -1,8 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useIntl } from 'react-intl';
-import { EFeatures } from '@store-mgmt/domain';
+import type { Currency } from '@store-mgmt/domain';
+import { DEFAULT_CURRENCY, EFeatures } from '@store-mgmt/domain';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
+import { hasMultiMonedasAvailable } from '~/shared/components/multimonedas/currency-select';
+import { CurrencyFilter } from '~/shared/components/multimonedas/currency-filter';
+import { useCurrencyFilter } from '~/shared/components/multimonedas/use-currency-filter';
+import { presentCurrencies, resolveCurrency } from '~/shared/lib/currency-totals';
 import { OrderOfflineService } from '~/sales/lib/services/order-offline-service';
 import { InventoryOfflineService } from '~/inventory/lib/services/inventory-offline-service';
 import { ProductRepository } from '~/sales/lib/repositories/product-repository';
@@ -37,11 +42,21 @@ interface TodayReportSummary {
  * inventory-product-list.component.ts (per-product available table) — moved here
  * (not a data-layer service) since Angular has no shared aggregation service for
  * this route either.
+ *
+ * `currency` (currency-filter-per-view): when given, only orders of that currency
+ * contribute — the summary never mixes currencies. Absent = the legacy mixed sum
+ * (module OFF / filter hidden), byte-identical to the previous behaviour.
  */
-function computeTodayReport(storeId: string, date: Date = new Date()): TodayReportSummary {
+function computeTodayReport(
+  storeId: string,
+  date: Date = new Date(),
+  currency?: Currency,
+): TodayReportSummary {
   const orderService = new OrderOfflineService(storeId);
 
-  const orders = orderService.getActiveOrdersInDay(date);
+  const orders = orderService
+    .getActiveOrdersInDay(date)
+    .filter((order) => currency === undefined || resolveCurrency(order.currency) === currency);
 
   let totalRevenue = 0;
   let totalCost = 0;
@@ -65,14 +80,47 @@ function computeTodayReport(storeId: string, date: Date = new Date()): TodayRepo
   };
 }
 
+/**
+ * Currency options for the filter, derived from the UNFILTERED set (today's active
+ * orders) so the filter never disappears once a currency is selected. Reuses the
+ * shared `presentCurrencies` (USD → EUR → CUP → rest by amount DESC).
+ */
+function getTodayReportCurrencies(storeId: string, date: Date = new Date()): Currency[] {
+  const orders = new OrderOfflineService(storeId).getActiveOrdersInDay(date);
+  return presentCurrencies(orders.map((order) => ({ amount: order.total, currency: order.currency })));
+}
+
 export function TodayReportPage() {
   const intl = useIntl();
-  const storeId = useAuthStore((s) => s.user?.selectedStoreId ?? '');
+  const user = useAuthStore((s) => s.user);
+  const storeId = user?.selectedStoreId ?? '';
+  const multiMonedas = hasMultiMonedasAvailable(user);
   const [report, setReport] = useState<TodayReportSummary | null>(null);
+  const [currencyOptions, setCurrencyOptions] = useState<Currency[]>([]);
+
+  // Filtro de moneda (currency-filter-per-view): las opciones salen del conjunto
+  // SIN filtrar (las órdenes activas de hoy) para que al elegir una moneda el
+  // filtro no desaparezca. Con el módulo MultiMonedas inactivo o una sola moneda
+  // no se filtra nada.
+  const { visible: currencyFilterVisible, currency, setCurrency } =
+    useCurrencyFilter(currencyOptions);
+  const selectedCurrency = currencyFilterVisible && currency !== null ? currency : undefined;
+  // Moneda del display: la elegida con el filtro visible; con el módulo activo y
+  // una sola moneda, esa moneda (el arreglo, sin filtro); si no, CUP (el total
+  // mezclado del gate OFF conserva su rótulo actual).
+  const displayCurrency: Currency = currencyFilterVisible && currency !== null
+    ? currency
+    : multiMonedas
+      ? (currencyOptions[0] ?? DEFAULT_CURRENCY)
+      : DEFAULT_CURRENCY;
+
+  useEffect(() => {
+    setCurrencyOptions(getTodayReportCurrencies(storeId));
+  }, [storeId]);
 
   const loadReport = useCallback(() => {
-    setReport(computeTodayReport(storeId));
-  }, [storeId]);
+    setReport(computeTodayReport(storeId, new Date(), selectedCurrency));
+  }, [storeId, selectedCurrency]);
 
   useEffect(() => {
     loadReport();
@@ -91,8 +139,14 @@ export function TodayReportPage() {
     const inventoryService = new InventoryOfflineService(storeId, productRepository);
 
     const rows = generateProductRows(productRepository, orderService, inventoryService);
-    await exportInventoryTodaySalePdf(rows);
-  }, [storeId]);
+    // Decision 8 (el PDF respeta el filtro): con el filtro visible, el PDF lleva
+    // SOLO las filas de la moneda elegida. Nunca se convierte: cada fila tiene su
+    // moneda real y una fila de otra moneda se descarta.
+    const pdfRows = selectedCurrency
+      ? rows.filter((row) => row.currency === selectedCurrency)
+      : rows;
+    await exportInventoryTodaySalePdf(pdfRows);
+  }, [storeId, selectedCurrency]);
 
   const summary = report ?? {
     date: new Date(),
@@ -120,6 +174,16 @@ export function TodayReportPage() {
         </Button>
       </div>
 
+      {/* Fila propia de moneda debajo del botón/filtros existentes (se auto-oculta):
+          gobierna el resumen y el PDF descargado. */}
+      <div>
+        <CurrencyFilter
+          currencies={currencyOptions}
+          value={currency ?? currencyOptions[0] ?? DEFAULT_CURRENCY}
+          onChange={setCurrency}
+        />
+      </div>
+
       {/* Sales Summary Section */}
       <section className="rounded border bg-white p-4 shadow-sm">
         <h2 className="mb-4 text-base font-semibold text-gray-700">
@@ -134,7 +198,7 @@ export function TodayReportPage() {
           </div>
           <div className="rounded bg-gray-50 p-3 text-center">
             <div className="text-2xl font-bold text-green-700 whitespace-nowrap">
-              {formatMoneyWithCurrency(summary.totalRevenue)}
+              {formatMoneyWithCurrency(summary.totalRevenue, displayCurrency)}
             </div>
             <div className="mt-1 text-xs text-gray-500">
               {intl.formatMessage({ id: 'REPORTS.SALES_SUMMARY.TOTAL_REVENUE' })}
@@ -142,7 +206,7 @@ export function TodayReportPage() {
           </div>
           <div className="rounded bg-gray-50 p-3 text-center">
             <div className="text-2xl font-bold text-red-600 whitespace-nowrap">
-              {formatMoneyWithCurrency(summary.totalCost)}
+              {formatMoneyWithCurrency(summary.totalCost, displayCurrency)}
             </div>
             <div className="mt-1 text-xs text-gray-500">
               {intl.formatMessage({ id: 'REPORTS.SALES_SUMMARY.TOTAL_COST' })}
@@ -150,7 +214,7 @@ export function TodayReportPage() {
           </div>
           <div className="rounded bg-gray-50 p-3 text-center">
             <div className="text-2xl font-bold text-blue-700 whitespace-nowrap">
-              {formatMoneyWithCurrency(summary.totalProfit)}
+              {formatMoneyWithCurrency(summary.totalProfit, displayCurrency)}
             </div>
             <div className="mt-1 text-xs text-gray-500">
               {intl.formatMessage({ id: 'REPORTS.SALES_SUMMARY.TOTAL_PROFIT' })}

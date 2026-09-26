@@ -1,20 +1,22 @@
 import { useRef, useState } from 'react';
 import { useIntl, type IntlShape } from 'react-intl';
 import {
+  DEFAULT_CURRENCY,
   EFeatures,
   ExpenseType,
   PaymentType,
   salePaymentMethodLabel,
   SalePaymentMethod,
 } from '@store-mgmt/domain';
-import type { Expense, SaleCredit } from '@store-mgmt/domain';
+import type { Currency, Expense, Order, SaleCredit } from '@store-mgmt/domain';
 import {
   normalizedOrderPaymentMethod,
   resolvedExpensePaymentMethod,
 } from '~/shared/lib/payment-method-resolved';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
-import { CurrencyTotalAmount } from '~/shared/components/multimonedas/currency-total-amount';
+import { CurrencyFilter } from '~/shared/components/multimonedas/currency-filter';
+import { useCurrencyFilter } from '~/shared/components/multimonedas/use-currency-filter';
 import { hasMultiMonedasAvailable } from '~/shared/components/multimonedas/currency-select';
 import {
   hasCreditsModuleAvailable,
@@ -24,6 +26,7 @@ import { Card } from '~/shared/components/ui/card';
 import { Button } from '~/shared/components/ui/button';
 import { ChevronDownIcon, SearchIcon } from '~/shared/components/ui/icons';
 import { formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency';
+import { presentCurrencies, resolveCurrency } from '~/shared/lib/currency-totals';
 import type { CurrencyAmount } from '~/shared/lib/currency-totals';
 import { calculateOrderProfit } from '~/inventory/lib/profit-calculator';
 import {
@@ -39,8 +42,13 @@ import { ExpenseOfflineService } from '~/expenses/lib/services/expense-offline-s
 import { SaleCreditOfflineService } from '~/sales/lib/services/sale-credit-offline-service';
 import { CategoryStats } from '~/sales/components/category-stats';
 import type { CategoryCartItemsView } from '~/sales/lib/category-cart-items-view';
+import { buildCategoryCartItemsView } from '~/sales/lib/category-cart-items-view';
 import { useMultiStore } from '~/shared/lib/hooks/use-multi-store';
-import { MultiStoreSection, MULTISTORE_FULL_BLEED } from '~/shared/components/multistore/multi-store-section';
+import {
+  MultiStoreSection,
+  MultiStoreTotal,
+  MULTISTORE_FULL_BLEED,
+} from '~/shared/components/multistore/multi-store-section';
 import {
   computeStoreRangeSummary,
   sumRangeSummaries,
@@ -127,6 +135,12 @@ interface RangeSummary {
   expenses: Expense[];
   saleCredits: SaleCredit[];
   paidSaleCredits: SaleCredit[];
+  /**
+   * Órdenes activas del rango SIN agregar (currency-filter-per-view): al filtrar
+   * por moneda las filas de categorías se reagrupan desde estas órdenes con el
+   * mismo builder compartido, igual que en today-stats.
+   */
+  orders: Order[];
   salesCashTotal: number;
   salesCardTotal: number;
   expensesCashTotal: number;
@@ -270,7 +284,9 @@ export function CuadrePorFechasPage() {
 
     const activeOrders = orderService.getActiveOrdersBetween(rangeStart, rangeEnd);
     const salesCashTotal = activeOrders
-      .filter((o) => o.paymentType === PaymentType.Efectivo && !o.isCredit)
+      .filter(
+        (o) => normalizedOrderPaymentMethod(o) === SalePaymentMethod.Efectivo && !o.isCredit,
+      )
       .reduce((acc, o) => acc + o.total, 0);
     const salesCardTotal = activeOrders
       .filter(
@@ -292,7 +308,9 @@ export function CuadrePorFechasPage() {
       })),
     );
     const salesCashEntries: CurrencyAmount[] = activeOrders
-      .filter((o) => o.paymentType === PaymentType.Efectivo && !o.isCredit)
+      .filter(
+        (o) => normalizedOrderPaymentMethod(o) === SalePaymentMethod.Efectivo && !o.isCredit,
+      )
       .map((o) => ({ amount: o.total, currency: o.currency }));
     const salesCardEntries: CurrencyAmount[] = activeOrders
       .filter(
@@ -336,6 +354,7 @@ export function CuadrePorFechasPage() {
       expenses,
       saleCredits,
       paidSaleCredits,
+      orders: activeOrders,
       salesCashTotal,
       salesCardTotal,
       expensesCashTotal,
@@ -347,68 +366,63 @@ export function CuadrePorFechasPage() {
     });
   }
 
-  const total = summary
-    ? summary.categories.reduce((acc, c) => acc + c.total, 0) +
-      summary.paidSaleCredits.reduce((acc, c) => acc + c.total, 0) -
-      summary.saleCredits.reduce((acc, c) => acc + c.total, 0) -
-      summary.expenses.reduce((acc, e) => acc + e.total, 0)
-    : 0;
-  const cashTotal = summary
-    ? summary.salesCashTotal + summary.paidCreditsCashTotal - summary.expensesCashTotal
-    : 0;
-  const ordersItemsCount = summary
-    ? summary.categories.reduce((acc, c) => acc + c.itemsCount, 0)
-    : 0;
-  const creditsCount = summary ? summary.saleCredits.length : 0;
-  const creditsTotal = summary ? summary.saleCredits.reduce((acc, c) => acc + c.total, 0) : 0;
-  const paidSaleCreditsTotal = summary
-    ? summary.paidSaleCredits.reduce((acc, c) => acc + c.total, 0)
-    : 0;
-  const expensesCount = summary ? summary.expenses.length : 0;
+  // ─── Filtro de moneda (currency-filter-per-view) ───────────────────────────
+  // Las opciones salen del conjunto SIN filtrar por moneda (single-store: el
+  // resumen generado; multi-store: los resúmenes por tienda) para que el filtro
+  // no desaparezca al elegir una y se pueda volver a las demás. El hook vive
+  // antes del return temprano del modo multi-store.
+  const currencyOptions = presentCurrencies(
+    storeSummaries
+      ? [...storeSummaries.values()].flatMap(summaryCurrencyAmounts)
+      : summary
+        ? summaryCurrencyAmounts(summary)
+        : [],
+  );
+  const { visible: currencyFilterVisible, currency, setCurrency } =
+    useCurrencyFilter(currencyOptions);
+  // Tres casos explícitos, igual que en las demás vistas migradas:
+  // filtro visible → la moneda elegida; módulo ON con una sola moneda → esa
+  // moneda (sin filtro); módulo OFF → CUP (salida idéntica a la de hoy).
+  const displayCurrency =
+    currencyFilterVisible && currency !== null
+      ? currency
+      : multiMonedas
+        ? (currencyOptions[0] ?? DEFAULT_CURRENCY)
+        : DEFAULT_CURRENCY;
+  const selectedCurrency = currencyFilterVisible ? currency : null;
+  const visibleSummary =
+    summary && selectedCurrency !== null
+      ? filterSummaryByCurrency(summary, selectedCurrency)
+      : summary;
 
-  // Per-currency entries for the single-store view (used only with MultiMonedas).
-  const expensesEntries: CurrencyAmount[] = summary
-    ? summary.expenses.map((e) => ({ amount: e.total, currency: e.currency }))
-    : [];
-  const creditsEntries: CurrencyAmount[] = summary
-    ? summary.saleCredits.map((c) => ({ amount: c.total, currency: c.currency }))
-    : [];
-  const paidCreditsEntries: CurrencyAmount[] = summary
-    ? summary.paidSaleCredits.map((c) => ({ amount: c.total, currency: c.currency }))
-    : [];
-  const expensesCashEntries: CurrencyAmount[] = summary
-    ? summary.expenses
-        .filter((e) => e.paymentType === PaymentType.Efectivo)
-        .map((e) => ({ amount: e.total, currency: e.currency }))
-    : [];
-  const paidCreditsCashEntries: CurrencyAmount[] = summary
-    ? summary.paidSaleCredits
-        .filter((c) => c.paidType === PaymentType.Efectivo)
-        .map((c) => ({ amount: c.total, currency: c.currency }))
-    : [];
-  const salesEntries: CurrencyAmount[] = summary ? summary.salesEntries : [];
-  const totalEntries: CurrencyAmount[] = summary
-    ? [
-        ...summary.salesEntries,
-        ...paidCreditsEntries,
-        ...creditsEntries.map((e) => ({ ...e, amount: -e.amount })),
-        ...expensesEntries.map((e) => ({ ...e, amount: -e.amount })),
-      ]
-    : [];
-  const netProfitEntries: CurrencyAmount[] = summary
-    ? [
-        ...summary.grossProfitEntries,
-        ...expensesEntries.map((e) => ({ ...e, amount: -e.amount })),
-      ]
-    : [];
-  const cashEntries: CurrencyAmount[] = [
-    ...(summary ? summary.salesCashEntries : []),
-    ...paidCreditsCashEntries,
-    ...expensesCashEntries.map((e) => ({ ...e, amount: -e.amount })),
-  ];
+  const total = visibleSummary
+    ? visibleSummary.categories.reduce((acc, c) => acc + c.total, 0) +
+      visibleSummary.paidSaleCredits.reduce((acc, c) => acc + c.total, 0) -
+      visibleSummary.saleCredits.reduce((acc, c) => acc + c.total, 0) -
+      visibleSummary.expenses.reduce((acc, e) => acc + e.total, 0)
+    : 0;
+  const cashTotal = visibleSummary
+    ? visibleSummary.salesCashTotal +
+      visibleSummary.paidCreditsCashTotal -
+      visibleSummary.expensesCashTotal
+    : 0;
+  const ordersItemsCount = visibleSummary
+    ? visibleSummary.categories.reduce((acc, c) => acc + c.itemsCount, 0)
+    : 0;
+  const creditsCount = visibleSummary ? visibleSummary.saleCredits.length : 0;
+  const creditsTotal = visibleSummary
+    ? visibleSummary.saleCredits.reduce((acc, c) => acc + c.total, 0)
+    : 0;
+  const paidSaleCreditsTotal = visibleSummary
+    ? visibleSummary.paidSaleCredits.reduce((acc, c) => acc + c.total, 0)
+    : 0;
+  const expensesCount = visibleSummary ? visibleSummary.expenses.length : 0;
 
   // ─── multi-store mode ────────────────────────────────────────────────────
   if (multiStoreEnabled) {
+    const visibleStoreSummaries = [...(storeSummaries?.values() ?? [])].map((s) =>
+      selectedCurrency !== null ? filterSummaryByCurrency(s, selectedCurrency) : s,
+    );
     return (
       <div className={`space-y-6 p-4 ${MULTISTORE_FULL_BLEED}`}>
         <div className="border-b border-gray-200 pb-3">
@@ -432,43 +446,45 @@ export function CuadrePorFechasPage() {
           onGenerate={generate}
         />
 
+        {/* Fila propia de moneda debajo de los filtros existentes (se auto-oculta
+            sin el módulo o con una sola moneda). */}
+        <div className="flex w-full justify-center">
+          <CurrencyFilter
+            currencies={currencyOptions}
+            value={currency ?? currencyOptions[0] ?? DEFAULT_CURRENCY}
+            onChange={setCurrency}
+          />
+        </div>
+
         {storeSummaries && (
           <>
             {/* General (aggregated) KPIs — outside the panels. */}
-            <MultiStoreKpis
-              summaries={[...storeSummaries.values()]}
-              multiMonedas={multiMonedas}
-            />
+            <MultiStoreKpis summaries={visibleStoreSummaries} currency={displayCurrency} />
 
             <MultiStoreSection
               stores={multiStoreStores}
               selectedStoreId={selectedMultiStoreId ?? null}
               onSelectedStoreIdChange={setSelectedMultiStoreId}
               totals={
-                <span className="text-sm">
-                  <span className="text-text-muted">Ganancias: </span>
-                  <span className="font-semibold text-text">
-                    <CurrencyTotalAmount
-                      legacyTotal={sumRangeSummaries([...storeSummaries.values()]).netProfit}
-                      entries={[...storeSummaries.values()].flatMap(netProfitEntriesOf)}
-                      multiMonedas={multiMonedas}
-                    />
-                  </span>
-                </span>
+                <MultiStoreTotal
+                  label="Ganancias:"
+                  value={sumRangeSummaries(visibleStoreSummaries).netProfit}
+                  currency={displayCurrency}
+                />
               }
               renderStoreTotals={(store) => {
                 const s = storeSummaries.get(store.id);
+                const netProfit =
+                  s && selectedCurrency !== null
+                    ? filterSummaryByCurrency(s, selectedCurrency).netProfit
+                    : (s?.netProfit ?? 0);
                 // Right-aligned per the header-layout rule (petición 2026-09-21);
                 // the semantic color stays this view's own (valueClassName).
                 return (
                   <span className="text-xs whitespace-nowrap">
                     <span className="text-text-muted">Ganancias: </span>
-                    <span className={`font-semibold ${valueClassName(s ? s.netProfit : 0)}`}>
-                      <CurrencyTotalAmount
-                        legacyTotal={s ? s.netProfit : 0}
-                        entries={s ? netProfitEntriesOf(s) : []}
-                        multiMonedas={multiMonedas}
-                      />
+                    <span className={`font-semibold ${valueClassName(netProfit)}`}>
+                      {formatMoneyWithCurrency(netProfit, displayCurrency)}
                     </span>
                   </span>
                 );
@@ -483,7 +499,17 @@ export function CuadrePorFechasPage() {
                     </div>
                   );
                 }
-                return <MultiStoreCuadreBody summary={s} intl={intl} hasExpensesModule={hasExpensesModule} hasCreditsModule={hasCreditsModule} />;
+                const storeSummary =
+                  selectedCurrency !== null ? filterSummaryByCurrency(s, selectedCurrency) : s;
+                return (
+                  <MultiStoreCuadreBody
+                    summary={storeSummary}
+                    currency={displayCurrency}
+                    intl={intl}
+                    hasExpensesModule={hasExpensesModule}
+                    hasCreditsModule={hasCreditsModule}
+                  />
+                );
               }}
             </MultiStoreSection>
           </>
@@ -590,52 +616,41 @@ export function CuadrePorFechasPage() {
         )}
       </div>
 
-      {summary && (
+      {/* Fila propia de moneda debajo de los filtros existentes (se auto-oculta
+          sin el módulo o con una sola moneda). */}
+      <div>
+        <CurrencyFilter
+          currencies={currencyOptions}
+          value={currency ?? currencyOptions[0] ?? DEFAULT_CURRENCY}
+          onChange={setCurrency}
+        />
+      </div>
+
+      {visibleSummary && (
         <>
           {/* KPI cards — same card chrome as the dashboard, no trend row.
-              Layout: grid-cols-2 like the dashboard's two-per-row layout. */}
-          <div className="grid grid-cols-2 gap-4">
+              Grilla: 4 por fila en desktop, 2 en móvil/tablet (petición del
+              owner 2026-09-25). El `grid-cols-2` anterior salió de una
+              justificación de paridad con Angular — motivo NO válido en este
+              proyecto (la app Angular está congelada). */}
+          <div data-testid="cuadre-kpi-grid" className="grid grid-cols-2 gap-4 lg:grid-cols-4">
             <KpiCard
               title={intl.formatMessage({ id: 'CUADRE_FECHAS.KPI_SALES' })}
-              value={
-                <CurrencyTotalAmount
-                  legacyTotal={summary.salesTotal}
-                  entries={salesEntries}
-                  multiMonedas={multiMonedas}
-                />
-              }
+              value={formatMoneyWithCurrency(visibleSummary.salesTotal, displayCurrency)}
             />
             {hasExpensesModule && (
               <KpiCard
                 title={intl.formatMessage({ id: 'CUADRE_FECHAS.KPI_EXPENSES' })}
-                value={
-                  <CurrencyTotalAmount
-                    legacyTotal={summary.expensesTotal}
-                    entries={expensesEntries}
-                    multiMonedas={multiMonedas}
-                  />
-                }
+                value={formatMoneyWithCurrency(visibleSummary.expensesTotal, displayCurrency)}
               />
             )}
             <KpiCard
               title={intl.formatMessage({ id: 'CUADRE_FECHAS.KPI_GROSS_PROFIT' })}
-              value={
-                <CurrencyTotalAmount
-                  legacyTotal={summary.grossProfit}
-                  entries={summary.grossProfitEntries}
-                  multiMonedas={multiMonedas}
-                />
-              }
+              value={formatMoneyWithCurrency(visibleSummary.grossProfit, displayCurrency)}
             />
             <KpiCard
               title={intl.formatMessage({ id: 'CUADRE_FECHAS.KPI_NET_PROFIT' })}
-              value={
-                <CurrencyTotalAmount
-                  legacyTotal={summary.netProfit}
-                  entries={netProfitEntries}
-                  multiMonedas={multiMonedas}
-                />
-              }
+              value={formatMoneyWithCurrency(visibleSummary.netProfit, displayCurrency)}
             />
           </div>
 
@@ -648,11 +663,7 @@ export function CuadrePorFechasPage() {
                   {intl.formatMessage({ id: 'CUADRE_FECHAS.CUADRE' })}
                 </span>
                 <span className={`text-lg font-bold whitespace-nowrap ${valueClassName(total)}`}>
-                  <CurrencyTotalAmount
-                    legacyTotal={total}
-                    entries={totalEntries}
-                    multiMonedas={multiMonedas}
-                  />
+                  {formatMoneyWithCurrency(total, displayCurrency)}
                 </span>
               </div>
             }
@@ -661,13 +672,7 @@ export function CuadrePorFechasPage() {
               {/* BEGIN CASH */}
               <ExpansionPanel
                 title="Resumen Efectivo"
-                amount={
-                  <CurrencyTotalAmount
-                    legacyTotal={cashTotal}
-                    entries={cashEntries}
-                    multiMonedas={multiMonedas}
-                  />
-                }
+                amount={formatMoneyWithCurrency(cashTotal, displayCurrency)}
                 amountClassName={valueClassName(cashTotal)}
               >
                 <table className="w-full text-sm">
@@ -678,11 +683,10 @@ export function CuadrePorFechasPage() {
                       </td>
                       <td className="p-1 text-right">
                         <span className="font-bold text-success whitespace-nowrap">
-                          <CurrencyTotalAmount
-                            legacyTotal={summary.salesCashTotal}
-                            entries={summary.salesCashEntries}
-                            multiMonedas={multiMonedas}
-                          />
+                          {formatMoneyWithCurrency(
+                            visibleSummary.salesCashTotal,
+                            displayCurrency,
+                          )}
                         </span>
                       </td>
                     </tr>
@@ -693,11 +697,10 @@ export function CuadrePorFechasPage() {
                         </td>
                         <td className="p-1 text-right">
                           <span className="font-bold text-success whitespace-nowrap">
-                            <CurrencyTotalAmount
-                              legacyTotal={summary.paidCreditsCashTotal}
-                              entries={paidCreditsCashEntries}
-                              multiMonedas={multiMonedas}
-                            />
+                            {formatMoneyWithCurrency(
+                              visibleSummary.paidCreditsCashTotal,
+                              displayCurrency,
+                            )}
                           </span>
                         </td>
                       </tr>
@@ -709,11 +712,10 @@ export function CuadrePorFechasPage() {
                         </td>
                         <td className="p-1 text-right">
                           <span className="font-bold text-danger whitespace-nowrap">
-                            <CurrencyTotalAmount
-                              legacyTotal={summary.expensesCashTotal}
-                              entries={expensesCashEntries}
-                              multiMonedas={multiMonedas}
-                            />
+                            {formatMoneyWithCurrency(
+                              visibleSummary.expensesCashTotal,
+                              displayCurrency,
+                            )}
                           </span>
                         </td>
                       </tr>
@@ -726,14 +728,8 @@ export function CuadrePorFechasPage() {
               {/* BEGIN CARD PAYMENTS */}
               <ExpansionPanel
                 title="Pago por Transferencia"
-                amount={
-                  <CurrencyTotalAmount
-                    legacyTotal={summary.salesCardTotal}
-                    entries={summary.salesCardEntries}
-                    multiMonedas={multiMonedas}
-                  />
-                }
-                amountClassName={valueClassName(summary.salesCardTotal)}
+                amount={formatMoneyWithCurrency(visibleSummary.salesCardTotal, displayCurrency)}
+                amountClassName={valueClassName(visibleSummary.salesCardTotal)}
               >
                 <table className="w-full text-sm">
                   <tbody>
@@ -743,11 +739,10 @@ export function CuadrePorFechasPage() {
                       </td>
                       <td className="p-1 text-right">
                         <span className="font-bold text-success whitespace-nowrap">
-                          <CurrencyTotalAmount
-                            legacyTotal={summary.salesCardTotal}
-                            entries={summary.salesCardEntries}
-                            multiMonedas={multiMonedas}
-                          />
+                          {formatMoneyWithCurrency(
+                            visibleSummary.salesCardTotal,
+                            displayCurrency,
+                          )}
                         </span>
                       </td>
                     </tr>
@@ -760,23 +755,17 @@ export function CuadrePorFechasPage() {
               {hasExpensesModule && (
                 <ExpansionPanel
                   title={`Gastos (${expensesCount})`}
-                  amount={
-                    <CurrencyTotalAmount
-                      legacyTotal={summary.expensesTotal}
-                      entries={expensesEntries}
-                      multiMonedas={multiMonedas}
-                    />
-                  }
+                  amount={formatMoneyWithCurrency(visibleSummary.expensesTotal, displayCurrency)}
                   amountClassName="text-danger"
                 >
-                  {summary.expenses.length === 0 ? (
+                  {visibleSummary.expenses.length === 0 ? (
                     <p className="py-4 text-center text-sm text-text-muted">
                       {intl.formatMessage({ id: 'TODAY_STATS.NO_EXPENSE_FOUND' })}
                     </p>
                   ) : (
                     <table className="w-full text-sm">
                       <tbody>
-                        {summary.expenses.map((expense) => (
+                        {visibleSummary.expenses.map((expense) => (
                           <tr key={expense.id} className="border-b border-border last:border-0">
                             <td className="p-1 text-text">
                               {formatLocalDate(expense.date)} —{' '}
@@ -808,16 +797,10 @@ export function CuadrePorFechasPage() {
               {hasCreditsModule && (
                 <ExpansionPanel
                   title={`Créditos Por Cobrar (${creditsCount})`}
-                  amount={
-                    <CurrencyTotalAmount
-                      legacyTotal={creditsTotal}
-                      entries={creditsEntries}
-                      multiMonedas={multiMonedas}
-                    />
-                  }
+                  amount={formatMoneyWithCurrency(creditsTotal, displayCurrency)}
                   amountClassName="text-danger"
                 >
-                  <SaleCreditsTable saleCredits={summary.saleCredits} />
+                  <SaleCreditsTable saleCredits={visibleSummary.saleCredits} />
                 </ExpansionPanel>
               )}
               {/* END CREDITS */}
@@ -826,30 +809,14 @@ export function CuadrePorFechasPage() {
               {hasCreditsModule && (
                 <ExpansionPanel
                   title={
-                    multiMonedas ? (
-                      <>
-                        Créditos Pagados (
-                        <CurrencyTotalAmount
-                          legacyTotal={paidSaleCreditsTotal}
-                          entries={paidCreditsEntries}
-                          multiMonedas={multiMonedas}
-                        />
-                        )
-                      </>
-                    ) : (
-                      `Créditos Pagados (${paidSaleCreditsTotal})`
-                    )
+                    multiMonedas
+                      ? `Créditos Pagados (${formatMoneyWithCurrency(paidSaleCreditsTotal, displayCurrency)})`
+                      : `Créditos Pagados (${paidSaleCreditsTotal})`
                   }
-                  amount={
-                    <CurrencyTotalAmount
-                      legacyTotal={paidSaleCreditsTotal}
-                      entries={paidCreditsEntries}
-                      multiMonedas={multiMonedas}
-                    />
-                  }
+                  amount={formatMoneyWithCurrency(paidSaleCreditsTotal, displayCurrency)}
                   amountClassName="text-success"
                 >
-                  <SaleCreditsTable saleCredits={summary.paidSaleCredits} />
+                  <SaleCreditsTable saleCredits={visibleSummary.paidSaleCredits} />
                 </ExpansionPanel>
               )}
               {/* END PAID CREDITS */}
@@ -857,17 +824,18 @@ export function CuadrePorFechasPage() {
               {/* BEGIN SALES */}
               <ExpansionPanel
                 title={`Ventas (${ordersItemsCount} productos)`}
-                amount={
-                  <CurrencyTotalAmount
-                    legacyTotal={summary.categories.reduce((acc, c) => acc + c.total, 0)}
-                    entries={salesEntries}
-                    multiMonedas={multiMonedas}
-                  />
-                }
+                amount={formatMoneyWithCurrency(
+                  visibleSummary.categories.reduce((acc, c) => acc + c.total, 0),
+                  displayCurrency,
+                )}
                 amountClassName="text-success"
               >
-                {summary.categories.map((category) => (
-                  <CategoryStats key={category.id} category={category} />
+                {visibleSummary.categories.map((category) => (
+                  <CategoryStats
+                    key={category.id}
+                    category={category}
+                    currency={displayCurrency}
+                  />
                 ))}
               </ExpansionPanel>
               {/* END SALES */}
@@ -993,74 +961,99 @@ function MultiStoreDateRangeFields({
   );
 }
 
-/** Per-currency expense entries of one store's range summary. */
-function expensesEntriesOf(summary: RangeSummary): CurrencyAmount[] {
-  return summary.expenses.map((e) => ({ amount: e.total, currency: e.currency }));
+/**
+ * Monedas presentes en un resumen SIN filtrar (currency-filter-per-view). Se
+ * derivan de las entradas por moneda ya calculadas más los gastos/créditos
+ * (cada uno con su `currency`), nunca de un subconjunto filtrado.
+ */
+function summaryCurrencyAmounts(summary: RangeSummary): CurrencyAmount[] {
+  return [
+    ...summary.salesEntries,
+    ...summary.grossProfitEntries,
+    ...summary.expenses.map((e) => ({ amount: e.total, currency: e.currency })),
+    ...summary.saleCredits.map((c) => ({ amount: c.total, currency: c.currency })),
+    ...summary.paidSaleCredits.map((c) => ({ amount: c.total, currency: c.currency })),
+  ];
 }
 
-/** Per-currency net-profit entries of one store: gross profit minus expenses, per currency. */
-function netProfitEntriesOf(summary: RangeSummary): CurrencyAmount[] {
-  return [
-    ...summary.grossProfitEntries,
-    ...expensesEntriesOf(summary).map((e) => ({ ...e, amount: -e.amount })),
-  ];
+/**
+ * Resumen acotado a UNA moneda (currency-filter-per-view): filtra las filas
+ * (órdenes, gastos, créditos) y recalcula cada cifra desde las entradas/arrays
+ * ya existentes — no cambia cómo se calcula el dinero, solo qué moneda se
+ * muestra. Las filas de categorías se reagrupan con el builder compartido
+ * (misma agregación `round2(Σ round2(price×qty))`) sobre las órdenes filtradas.
+ */
+function filterSummaryByCurrency(summary: RangeSummary, currency: Currency): RangeSummary {
+  const matches = (value?: Currency) => resolveCurrency(value) === currency;
+  const orders = summary.orders.filter((o) => matches(o.currency));
+  const expenses = summary.expenses.filter((e) => matches(e.currency));
+  const saleCredits = summary.saleCredits.filter((c) => matches(c.currency));
+  const paidSaleCredits = summary.paidSaleCredits.filter((c) => matches(c.currency));
+  const salesEntries = summary.salesEntries.filter((e) => matches(e.currency));
+  const grossProfitEntries = summary.grossProfitEntries.filter((e) => matches(e.currency));
+  const salesCashEntries = summary.salesCashEntries.filter((e) => matches(e.currency));
+  const salesCardEntries = summary.salesCardEntries.filter((e) => matches(e.currency));
+
+  const sum = (entries: readonly CurrencyAmount[]) =>
+    entries.reduce((acc, e) => acc + e.amount, 0);
+  const expensesTotal = expenses.reduce((acc, e) => acc + e.total, 0);
+  const grossProfit = sum(grossProfitEntries);
+
+  return {
+    salesTotal: sum(salesEntries),
+    expensesTotal,
+    grossProfit,
+    netProfit: grossProfit - expensesTotal,
+    categories: buildCategoryCartItemsView(
+      orders.flatMap((o) => o.orderItems),
+      [],
+    ),
+    expenses,
+    saleCredits,
+    paidSaleCredits,
+    orders,
+    salesCashTotal: sum(salesCashEntries),
+    salesCardTotal: sum(salesCardEntries),
+    expensesCashTotal: expenses
+      .filter((e) => e.paymentType === PaymentType.Efectivo)
+      .reduce((acc, e) => acc + e.total, 0),
+    paidCreditsCashTotal: paidSaleCredits
+      .filter((c) => c.paidType === PaymentType.Efectivo)
+      .reduce((acc, c) => acc + c.total, 0),
+    salesEntries,
+    grossProfitEntries,
+    salesCashEntries,
+    salesCardEntries,
+  };
 }
 
 /** multi-store-panels: aggregated general KPIs — same four cards as the single-store view. */
 function MultiStoreKpis({
   summaries,
-  multiMonedas,
+  currency,
 }: {
   summaries: RangeSummary[];
-  multiMonedas: boolean;
+  currency: Currency;
 }) {
   const intl = useIntl();
   const totals = sumRangeSummaries(summaries);
-  const salesEntries = summaries.flatMap((s) => s.salesEntries);
-  const expensesEntries = summaries.flatMap(expensesEntriesOf);
-  const grossProfitEntries = summaries.flatMap((s) => s.grossProfitEntries);
-  const netProfitEntries = summaries.flatMap(netProfitEntriesOf);
   return (
-    <div className="grid grid-cols-2 gap-4">
+    <div data-testid="cuadre-kpi-grid" className="grid grid-cols-2 gap-4 lg:grid-cols-4">
       <KpiCard
         title={intl.formatMessage({ id: 'CUADRE_FECHAS.KPI_SALES' })}
-        value={
-          <CurrencyTotalAmount
-            legacyTotal={totals.salesTotal}
-            entries={salesEntries}
-            multiMonedas={multiMonedas}
-          />
-        }
+        value={formatMoneyWithCurrency(totals.salesTotal, currency)}
       />
       <KpiCard
         title={intl.formatMessage({ id: 'CUADRE_FECHAS.KPI_EXPENSES' })}
-        value={
-          <CurrencyTotalAmount
-            legacyTotal={totals.expensesTotal}
-            entries={expensesEntries}
-            multiMonedas={multiMonedas}
-          />
-        }
+        value={formatMoneyWithCurrency(totals.expensesTotal, currency)}
       />
       <KpiCard
         title={intl.formatMessage({ id: 'CUADRE_FECHAS.KPI_GROSS_PROFIT' })}
-        value={
-          <CurrencyTotalAmount
-            legacyTotal={totals.grossProfit}
-            entries={grossProfitEntries}
-            multiMonedas={multiMonedas}
-          />
-        }
+        value={formatMoneyWithCurrency(totals.grossProfit, currency)}
       />
       <KpiCard
         title={intl.formatMessage({ id: 'CUADRE_FECHAS.KPI_NET_PROFIT' })}
-        value={
-          <CurrencyTotalAmount
-            legacyTotal={totals.netProfit}
-            entries={netProfitEntries}
-            multiMonedas={multiMonedas}
-          />
-        }
+        value={formatMoneyWithCurrency(totals.netProfit, currency)}
       />
     </div>
   );
@@ -1069,11 +1062,14 @@ function MultiStoreKpis({
 /** multi-store-panels: the full cuadre card body for ONE store inside its panel. */
 function MultiStoreCuadreBody({
   summary,
+  currency,
   intl,
   hasExpensesModule,
   hasCreditsModule,
 }: {
   summary: RangeSummary;
+  /** Moneda resuelta del panel (currency-filter-per-view): nunca se rota CUP por defecto. */
+  currency: Currency;
   intl: IntlShape;
   hasExpensesModule: boolean;
   hasCreditsModule: boolean;
@@ -1089,7 +1085,7 @@ function MultiStoreCuadreBody({
     <div className="divide-y divide-border">
       <ExpansionPanel
         title="Resumen Efectivo"
-        amount={formatMoneyWithCurrency(cashTotal)}
+        amount={formatMoneyWithCurrency(cashTotal, currency)}
         amountClassName={valueClassName(cashTotal)}
       >
         <table className="w-full text-sm">
@@ -1100,7 +1096,7 @@ function MultiStoreCuadreBody({
               </td>
               <td className="p-1 text-right">
                 <span className="font-bold text-success whitespace-nowrap">
-                  {formatMoneyWithCurrency(summary.salesCashTotal)}
+                  {formatMoneyWithCurrency(summary.salesCashTotal, currency)}
                 </span>
               </td>
             </tr>
@@ -1111,7 +1107,7 @@ function MultiStoreCuadreBody({
                 </td>
                 <td className="p-1 text-right">
                   <span className="font-bold text-success whitespace-nowrap">
-                    {formatMoneyWithCurrency(summary.paidCreditsCashTotal)}
+                    {formatMoneyWithCurrency(summary.paidCreditsCashTotal, currency)}
                   </span>
                 </td>
               </tr>
@@ -1123,7 +1119,7 @@ function MultiStoreCuadreBody({
                 </td>
                 <td className="p-1 text-right">
                   <span className="font-bold text-danger whitespace-nowrap">
-                    {formatMoneyWithCurrency(summary.expensesCashTotal)}
+                    {formatMoneyWithCurrency(summary.expensesCashTotal, currency)}
                   </span>
                 </td>
               </tr>
@@ -1134,7 +1130,7 @@ function MultiStoreCuadreBody({
 
       <ExpansionPanel
         title="Pago por Transferencia"
-        amount={formatMoneyWithCurrency(summary.salesCardTotal)}
+        amount={formatMoneyWithCurrency(summary.salesCardTotal, currency)}
         amountClassName={valueClassName(summary.salesCardTotal)}
       >
         <table className="w-full text-sm">
@@ -1145,7 +1141,7 @@ function MultiStoreCuadreBody({
               </td>
               <td className="p-1 text-right">
                 <span className="font-bold text-success whitespace-nowrap">
-                  {formatMoneyWithCurrency(summary.salesCardTotal)}
+                  {formatMoneyWithCurrency(summary.salesCardTotal, currency)}
                 </span>
               </td>
             </tr>
@@ -1156,7 +1152,7 @@ function MultiStoreCuadreBody({
       {hasExpensesModule && (
         <ExpansionPanel
           title={`Gastos (${expensesCount})`}
-          amount={formatMoneyWithCurrency(summary.expensesTotal)}
+          amount={formatMoneyWithCurrency(summary.expensesTotal, currency)}
           amountClassName="text-danger"
         >
           {summary.expenses.length === 0 ? (
@@ -1196,7 +1192,7 @@ function MultiStoreCuadreBody({
       {hasCreditsModule && (
         <ExpansionPanel
           title={`Créditos Por Cobrar (${creditsCount})`}
-          amount={formatMoneyWithCurrency(creditsTotal)}
+          amount={formatMoneyWithCurrency(creditsTotal, currency)}
           amountClassName="text-danger"
         >
           <SaleCreditsTable saleCredits={summary.saleCredits} />
@@ -1206,7 +1202,7 @@ function MultiStoreCuadreBody({
       {hasCreditsModule && (
         <ExpansionPanel
           title={`Créditos Pagados (${paidSaleCreditsTotal})`}
-          amount={formatMoneyWithCurrency(paidSaleCreditsTotal)}
+          amount={formatMoneyWithCurrency(paidSaleCreditsTotal, currency)}
           amountClassName="text-success"
         >
           <SaleCreditsTable saleCredits={summary.paidSaleCredits} />
@@ -1217,11 +1213,12 @@ function MultiStoreCuadreBody({
         title={`Ventas (${ordersItemsCount} productos)`}
         amount={formatMoneyWithCurrency(
           summary.categories.reduce((acc, c) => acc + c.total, 0),
+          currency,
         )}
         amountClassName="text-success"
       >
         {summary.categories.map((category) => (
-          <CategoryStats key={category.id} category={category} />
+          <CategoryStats key={category.id} category={category} currency={currency} />
         ))}
       </ExpansionPanel>
     </div>

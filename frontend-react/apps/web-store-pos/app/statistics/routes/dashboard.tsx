@@ -5,6 +5,8 @@ import { DEFAULT_CURRENCY, EFeatures } from '@store-mgmt/domain';
 import { featureLoader } from '~/auth/routes/loaders';
 import { DateRangeFilter } from '~/shared/components/date-range-filter/date-range-filter';
 import { hasMultiMonedasAvailable } from '~/shared/components/multimonedas/currency-select';
+import { CurrencyFilter } from '~/shared/components/multimonedas/currency-filter';
+import { useCurrencyFilter } from '~/shared/components/multimonedas/use-currency-filter';
 import { MultiStoreSection, MULTISTORE_FULL_BLEED } from '~/shared/components/multistore/multi-store-section';
 import {
   hasCreditsModuleAvailable,
@@ -12,6 +14,7 @@ import {
 } from '~/shared/lib/auth/authorization-service';
 import { addDays, startOfDay } from '~/shared/lib/date-utils';
 import { formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency';
+import { presentCurrencies } from '~/shared/lib/currency-totals';
 import { useMultiStore } from '~/shared/lib/hooks/use-multi-store';
 import { unwrapStoreDek } from '~/shared/lib/multistore/multi-store-aggregator';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
@@ -135,6 +138,56 @@ export function DashboardPage() {
     [storeMetrics],
   );
 
+  /**
+   * Global currency filter (currency-filter-per-view). Options come from the
+   * UNFILTERED metrics, so picking one currency never shrinks the list and the
+   * user can always switch back. Per-currency range groups lead; credit-only
+   * currencies are appended so the Créditos card can be isolated too.
+   */
+  const currencyOptions = useMemo(() => {
+    const source = multiStoreEnabled ? general : singleMetrics;
+    if (!source) return [];
+    const seen = new Set<Currency>();
+    const entries: { amount: number; currency: Currency }[] = [];
+    for (const group of source.groups) {
+      if (seen.has(group.currency)) continue;
+      seen.add(group.currency);
+      entries.push({ amount: group.salesTotal, currency: group.currency });
+    }
+    for (const total of source.creditsReceivable) {
+      if (seen.has(total.currency)) continue;
+      seen.add(total.currency);
+      entries.push({ amount: total.amount, currency: total.currency });
+    }
+    return presentCurrencies(entries);
+  }, [multiStoreEnabled, general, singleMetrics]);
+
+  const {
+    visible: currencyFilterVisible,
+    currency: selectedCurrency,
+    setCurrency: setFilterCurrency,
+  } = useCurrencyFilter(currencyOptions);
+
+  /**
+   * Sales total a store/general view header must show: the selected currency's
+   * group when the filter is on, otherwise the primary group (pre-filter
+   * behaviour).
+   */
+  function salesTotalFor(
+    metrics: DashboardRangeMetrics | undefined,
+    currency: Currency | null,
+  ): { amount: number; currency: Currency } {
+    if (!metrics) return { amount: 0, currency: currency ?? DEFAULT_CURRENCY };
+    if (currency !== null) {
+      const group = metrics.groups.find((entry) => entry.currency === currency);
+      return { amount: group?.salesTotal ?? 0, currency };
+    }
+    return {
+      amount: metrics.primary?.salesTotal ?? 0,
+      currency: metrics.primary?.currency ?? DEFAULT_CURRENCY,
+    };
+  }
+
   // ─── Filter + legacy currency handlers ─────────────────────────────────────
 
   function handleApply(range: DateFilterValue) {
@@ -179,6 +232,7 @@ export function DashboardPage() {
     hasCreditsModule,
     formatAmount,
     rangeLabel,
+    selectedCurrency,
     loadingMessage: loadingMsg,
     emptyMessage: emptyMsg,
   };
@@ -228,6 +282,18 @@ export function DashboardPage() {
 
   const dateFilter = <DateRangeFilter value={appliedRange} onApply={handleApply} />;
 
+  // Own centered row below the existing filters; self-hides without the module
+  // or with fewer than two currencies (CurrencyFilter also guards).
+  const currencyFilterRow = currencyFilterVisible && selectedCurrency !== null && (
+    <div className="flex w-full justify-center">
+      <CurrencyFilter
+        currencies={currencyOptions}
+        value={selectedCurrency}
+        onChange={setFilterCurrency}
+      />
+    </div>
+  );
+
   // ─── Multi-store mode ──────────────────────────────────────────────────────
   if (multiStoreEnabled) {
     return (
@@ -237,6 +303,7 @@ export function DashboardPage() {
           {dateFilter}
           {legacyCurrencySelector}
         </div>
+        {currencyFilterRow}
 
         {general !== null && multiLoaded && (
           <DashboardMetricsBody metrics={general} {...bodyProps} />
@@ -251,21 +318,18 @@ export function DashboardPage() {
             general !== null ? (
               <span className="text-xs text-text-muted">
                 {intl.formatMessage({ id: 'STATISTICS.SALES.TITLE' })}:{' '}
-                {formatAmount(
-                  general.primary?.salesTotal ?? 0,
-                  general.primary?.currency ?? DEFAULT_CURRENCY,
-                )}
+                {(() => {
+                  const total = salesTotalFor(general, selectedCurrency);
+                  return formatAmount(total.amount, total.currency);
+                })()}
               </span>
             ) : undefined
           }
           renderStoreTotals={(store) => {
-            const metrics = storeMetrics.get(store.id);
+            const total = salesTotalFor(storeMetrics.get(store.id), selectedCurrency);
             return (
               <span className="text-xs font-semibold text-text">
-                {formatAmount(
-                  metrics?.primary?.salesTotal ?? 0,
-                  metrics?.primary?.currency ?? DEFAULT_CURRENCY,
-                )}
+                {formatAmount(total.amount, total.currency)}
               </span>
             );
           }}
@@ -294,6 +358,7 @@ export function DashboardPage() {
         {dateFilter}
         {legacyCurrencySelector}
       </div>
+      {currencyFilterRow}
 
       {singleMetrics === null ? (
         <p className="text-sm text-gray-500">{loadingMsg}</p>

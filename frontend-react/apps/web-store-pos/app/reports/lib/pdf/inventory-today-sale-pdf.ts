@@ -1,5 +1,6 @@
 import type { jsPDF } from 'jspdf';
 import type { HookData, UserOptions } from 'jspdf-autotable';
+import type { Currency } from '@store-mgmt/domain';
 import messages from '~/shared/lib/i18n/es';
 import { showToastSuccess } from '~/shared/lib/toast';
 import { toLocalDayKey } from '~/shared/lib/date-utils';
@@ -20,6 +21,15 @@ export interface InventoryTodaySaleRow {
   productId: string;
   /** Col 1 — Producto */
   productName: string;
+  /**
+   * Currency of every money column in this row (currency-filter-per-view). Resolved
+   * per row by the generators: the sale's currency when the product sold today
+   * (`OrderItem.currency`, stamped from the product), otherwise the product's own
+   * `Product.currency` — absent = CUP. Used to label each money cell, never a
+   * hardcoded CUP. Rows of another currency are filtered out upstream, never
+   * converted (the system has no conversion table).
+   */
+  currency: Currency;
   /** Col 2 — U (hardcoded literal, NOT a product unit-of-measure field — Angular parity) */
   unit: string;
   /** Col 3 — Inicio = available + vendido - entrada */
@@ -102,13 +112,13 @@ function toRowValues(row: InventoryTodaySaleRow): (string | number)[] {
     row.entrada,
     row.disponible,
     row.vendido,
-    formatMoneyWithCurrency(row.precioVenta),
-    formatMoneyWithCurrency(row.importeVenta),
-    formatMoneyWithCurrency(row.costoUnitario),
-    formatMoneyWithCurrency(row.costoTotal),
-    formatMoneyWithCurrency(row.cpVenta),
+    formatMoneyWithCurrency(row.precioVenta, row.currency),
+    formatMoneyWithCurrency(row.importeVenta, row.currency),
+    formatMoneyWithCurrency(row.costoUnitario, row.currency),
+    formatMoneyWithCurrency(row.costoTotal, row.currency),
+    formatMoneyWithCurrency(row.cpVenta, row.currency),
     row.final,
-    formatMoneyWithCurrency(row.importeFinal),
+    formatMoneyWithCurrency(row.importeFinal, row.currency),
   ];
 }
 

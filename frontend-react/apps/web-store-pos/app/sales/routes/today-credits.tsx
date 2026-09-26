@@ -1,9 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useIntl } from 'react-intl';
-import type { SaleCredit, PaymentType } from '@store-mgmt/domain';
-import { EFeatures } from '@store-mgmt/domain';
+import type { SaleCredit, PaymentType, Currency } from '@store-mgmt/domain';
+import { DEFAULT_CURRENCY, EFeatures } from '@store-mgmt/domain';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
+import { hasMultiMonedasAvailable } from '~/shared/components/multimonedas/currency-select';
+import { CurrencyFilter } from '~/shared/components/multimonedas/currency-filter';
+import { useCurrencyFilter } from '~/shared/components/multimonedas/use-currency-filter';
+import { presentCurrencies, resolveCurrency } from '~/shared/lib/currency-totals';
 import { Card } from '~/shared/components/ui/card';
 import { InfoBox } from '~/shared/components/ui/info-box';
 import { SaleCreditOfflineService } from '../lib/services/sale-credit-offline-service';
@@ -20,7 +24,9 @@ export const clientLoader = featureLoader([EFeatures.CreditSale]);
  */
 export function TodaySaleCreditsPage() {
   const intl = useIntl();
-  const storeId = useAuthStore((s) => s.user?.selectedStoreId ?? '');
+  const user = useAuthStore((s) => s.user);
+  const storeId = user?.selectedStoreId ?? '';
+  const multiMonedas = hasMultiMonedasAvailable(user);
   const [saleCredits, setSaleCredits] = useState<SaleCredit[]>([]);
 
   // WU4 (flagged mismatch #2): Angular's real call pattern
@@ -58,17 +64,51 @@ export function TodaySaleCreditsPage() {
     return true;
   }
 
+  // Filtro de moneda (currency-filter-per-view): las opciones se derivan del
+  // conjunto SIN filtrar por moneda (los créditos del día cargados), para que el
+  // filtro no desaparezca al elegir una moneda y se pueda volver a las demás.
+  const currencyOptions = presentCurrencies(
+    saleCredits.map((c) => ({ amount: c.total, currency: c.currency })),
+  );
+  const { visible: currencyFilterVisible, currency, setCurrency } =
+    useCurrencyFilter(currencyOptions);
+  // Tres casos (misma regla que credits/expenses): filtro visible → la elegida;
+  // módulo activo con una sola moneda presente → esa; módulo inactivo → CUP,
+  // salida idéntica a la de hoy (el total mezclado sigue rotulándose CUP).
+  const displayCurrency =
+    currencyFilterVisible && currency !== null
+      ? currency
+      : multiMonedas
+        ? (currencyOptions[0] ?? DEFAULT_CURRENCY)
+        : DEFAULT_CURRENCY;
+
+  /** Aplica el filtro de moneda a las filas (no-op cuando el filtro está oculto). */
+  const visibleCredits =
+    currencyFilterVisible && currency !== null
+      ? saleCredits.filter((c) => resolveCurrency(c.currency) === currency)
+      : saleCredits;
+
   return (
     <Card
       padding="tight"
       title={
         <TodayCreditsCardTitle
-          count={saleCredits.length}
-          total={saleCredits.reduce((t, c) => t + (c.isPaid ? 0 : c.total), 0)}
+          count={visibleCredits.length}
+          total={visibleCredits.reduce((t, c) => t + (c.isPaid ? 0 : c.total), 0)}
+          currency={displayCurrency}
         />
       }
     >
-      {saleCredits.length === 0 && (
+      {/* Fila propia de moneda (se auto-oculta sin el módulo o con 1 moneda). */}
+      <div className="mb-3">
+        <CurrencyFilter
+          currencies={currencyOptions}
+          value={currency ?? currencyOptions[0] ?? DEFAULT_CURRENCY}
+          onChange={setCurrency}
+        />
+      </div>
+
+      {visibleCredits.length === 0 && (
         <InfoBox variant="primary" className="mb-6 text-center">
           {/* SALE_CREDIT.NO_SALE_CREDIT_FOUND_IN_DAY */}
           {intl.formatMessage({ id: 'SALE_CREDIT.NO_SALE_CREDIT_FOUND_IN_DAY' })}
@@ -76,7 +116,7 @@ export function TodaySaleCreditsPage() {
       )}
 
       <SaleCreditList
-        saleCredits={saleCredits}
+        saleCredits={visibleCredits}
         readOnly={false}
         onSave={handleSave}
         onPay={handlePay}
@@ -95,7 +135,15 @@ export default TodaySaleCreditsPage;
  * día» (SALE_CREDIT.TODAY_CREDITS): renombrarlo rompería los E2E protegidos
  * pay-credit/create-credit.
  */
-function TodayCreditsCardTitle({ count, total }: { count: number; total: number }) {
+function TodayCreditsCardTitle({
+  count,
+  total,
+  currency,
+}: {
+  count: number;
+  total: number;
+  currency: Currency;
+}) {
   const intl = useIntl();
   return (
     <div className="flex items-center justify-between">
@@ -109,7 +157,7 @@ function TodayCreditsCardTitle({ count, total }: { count: number; total: number 
       <span
         className={`text-sm font-semibold whitespace-nowrap ${total === 0 ? 'text-success' : 'text-warning'}`}
       >
-        {formatMoneyWithCurrency(total)}
+        {formatMoneyWithCurrency(total, currency)}
       </span>
     </div>
   );
