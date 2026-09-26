@@ -2,6 +2,8 @@
 
 - Status: done
 - Date: 2026-09-26
+- Commit: `ded38c80` on `qa` — "fix(owners): accept empty reSellerId string on owner create"
+  (4 files, +441/-1: command, converter, new E2E test file, this doc)
 - Route: delegated direct (one writer: converter + command attribute + new backend E2E tests)
 - Authorization: user approved — "dale, cubre con tests haciendo TDD, pero adiciona los
   tests e2e necesarios para cubrir esto solo en el backend". Production backend
@@ -122,6 +124,11 @@ applied here; the 400 above disproves it.
   — `Expected srfFeatureIds {...} to not contain {36, 37, 38, 39, 91, 120, 121},
   but found {91}`. Reproduced with these changes stashed (`git stash -u`), so it
   is not caused by this work unit. NOT modified.
+- Parent spot check (independent re-run, not delegated): `dotnet test
+  backend/src/SMCA.WebApi.E2ETests/SMCA.WebApi.E2ETests.csproj --filter
+  "FullyQualifiedName~OwnersCreateReSellerIdBindingTests"` → `Passed: 5, Total: 5`,
+  0 failed. Confirms the delegated GREEN result on the committed tree. Target
+  framework net8.0 (so `Utf8JsonReader.TryGetGuid` is available).
 
 ## Acceptance criteria
 
