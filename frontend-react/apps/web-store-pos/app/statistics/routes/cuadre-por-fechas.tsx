@@ -5,7 +5,6 @@ import {
   EFeatures,
   ExpenseType,
   PaymentType,
-  salePaymentMethodLabel,
   SalePaymentMethod,
 } from '@store-mgmt/domain';
 import type { Currency, Expense, Order, SaleCredit } from '@store-mgmt/domain';
@@ -13,6 +12,7 @@ import {
   normalizedOrderPaymentMethod,
   resolvedExpensePaymentMethod,
 } from '~/shared/lib/payment-method-resolved';
+import { channelLabel } from '~/shared/lib/payment-methods/channel-label';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { CurrencyFilter } from '~/shared/components/multimonedas/currency-filter';
@@ -778,9 +778,10 @@ export function CuadrePorFechasPage() {
                             </td>
                             <td className="p-1 text-right">
                               <span className="rounded-full bg-success/10 px-2 py-0.5 text-xs font-semibold text-success">
-                                {salePaymentMethodLabel(
+                                {channelLabel(
                                   resolvedExpensePaymentMethod(expense),
                                   expense.currency ?? 0,
+                                  (id) => intl.formatMessage({ id }),
                                 )}
                               </span>
                             </td>
@@ -1175,9 +1176,10 @@ function MultiStoreCuadreBody({
                     </td>
                     <td className="p-1 text-right">
                       <span className="rounded-full bg-success/10 px-2 py-0.5 text-xs font-semibold text-success">
-                        {salePaymentMethodLabel(
+                        {channelLabel(
                           resolvedExpensePaymentMethod(expense),
                           expense.currency ?? 0,
+                          (id) => intl.formatMessage({ id }),
                         )}
                       </span>
                     </td>
