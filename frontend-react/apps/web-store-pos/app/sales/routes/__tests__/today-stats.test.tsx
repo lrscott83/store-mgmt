@@ -145,7 +145,7 @@ describe('TodayStatsPage (Angular today-stats.component.html 1:1 port)', () => {
     expect(screen.getByText('Cuadre del día')).toBeInTheDocument();
   });
 
-  it('renders an Efectivo (CUP) panel with a Ventas row (Gastos row hidden — module unavailable)', () => {
+  it('renders a Resumen Efectivo panel with a Ventas row (Gastos row hidden — module unavailable)', () => {
     mockGetActiveOrdersInDay.mockReturnValue([
       makeOrder({ paymentType: PaymentType.Efectivo, isCredit: false, total: 100 }),
     ]);
@@ -154,9 +154,9 @@ describe('TodayStatsPage (Angular today-stats.component.html 1:1 port)', () => {
         <TodayStatsPage />
       </Wrapper>,
     );
-    expect(screen.getByText('Efectivo (CUP)')).toBeInTheDocument();
+    expect(screen.getByText('Resumen Efectivo')).toBeInTheDocument();
     // Panel body (the "Ventas" row) is collapsed by default — expand it first.
-    fireEvent.click(screen.getByRole('button', { name: /Efectivo \(CUP\)/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Resumen Efectivo/ }));
     expect(screen.getByText('Ventas')).toBeInTheDocument();
     // No expenses module available in default mock user -> Gastos row and panel hidden
     expect(screen.queryByText('Gastos')).toBeNull();
@@ -252,10 +252,9 @@ describe('TodayStatsPage — with Expenses + Credits modules available', () => {
     expect(await screen.findByText('Créditos Pagados (60)')).toBeInTheDocument();
   });
 
-  // Panel de Transferencia (antes "Pago por Tarjeta"/"Pago por Transferencia"):
-  // ahora rotulado con su moneda, sits right after Efectivo (CUP), sums TODAY's
-  // transfer non-credit sales, always rendered.
-  it('renders Transferencia (CUP) after Efectivo (CUP) with today transfer sales', async () => {
+  // Pago por Tarjeta panel (user request 2026-09-07): sits right after Resumen
+  // Efectivo, sums TODAY's card-paid non-credit sales, always rendered.
+  it('renders Pago por Transferencia after Resumen Efectivo with today transfer sales', async () => {
     mockGetActiveOrdersInDay.mockReturnValue([
       makeOrder({ id: 'card-1', total: 120, paymentType: PaymentType.Tarjeta, isCredit: false }),
       makeOrder({ id: 'cash-1', total: 80, paymentType: PaymentType.Efectivo, isCredit: false }),
@@ -274,7 +273,7 @@ describe('TodayStatsPage — with Expenses + Credits modules available', () => {
       </Wrapper>,
     );
 
-    const cardPanel = await screen.findByRole('button', { name: /Transferencia \(CUP\)/ });
+    const cardPanel = await screen.findByRole('button', { name: /Pago por Transferencia/ });
     expect(cardPanel).toBeInTheDocument();
     // Panel amount in the collapsed header: only the 120 card sale counts.
     expect(screen.getAllByText('120 CUP').length).toBeGreaterThan(0);
@@ -288,14 +287,10 @@ describe('TodayStatsPage — with Expenses + Credits modules available', () => {
     ).toBeGreaterThan(0);
   });
 
-  // payment-channels-in-breakdowns (T2): los paneles ya NO se fijan a dos; salen
-  // del catálogo de la moneda mostrada. Con MultiMonedas OFF (esta suite) la
-  // moneda mostrada es CUP, cuyo catálogo es [Efectivo, Transferencia]: una venta
-  // Zelle histórica resuelve a un canal que CUP NO tiene, así que cae al puente
-  // normalizado (Zelle → Transferencia) para no perderse del desglose. Con
-  // MultiMonedas ON + USD la venta Zelle sí tiene panel propio (ver
-  // today-stats-multicurrency.test.tsx).
-  it('T2: con MultiMonedas OFF una venta Zelle histórica cae en Transferencia (CUP), nunca en Efectivo', async () => {
+  // T13 (payment-channels-and-multipayment): the panels bucket by the NORMALIZED
+  // method, so a sale recorded with Zelle counts in "Pago por Transferencia"
+  // (Transferencia (CUP)) instead of a bucket of its own, and never as cash.
+  it('T13: a Zelle sale is bucketed in Pago por Transferencia, not in Efectivo', async () => {
     mockGetExpensesInDayObservable.mockResolvedValue(expensesEnvelope([]));
     mockGetActiveOrdersInDay.mockReturnValue([
       makeOrder({
@@ -313,11 +308,11 @@ describe('TodayStatsPage — with Expenses + Credits modules available', () => {
       </Wrapper>,
     );
 
-    const cardPanel = await screen.findByRole('button', { name: /Transferencia \(CUP\)/ });
+    const cardPanel = await screen.findByRole('button', { name: /Pago por Transferencia/ });
     expect(cardPanel).toHaveTextContent('70 CUP');
-    // Zelle no se filtra al panel de efectivo.
-    expect(screen.getByRole('button', { name: /Efectivo \(CUP\)/ })).toHaveTextContent('0 CUP');
-    // Sin panel Zelle propio: el catálogo de CUP no tiene ese canal.
+    // Zelle must NOT leak into the cash panel.
+    expect(screen.getByRole('button', { name: /Resumen Efectivo/ })).toHaveTextContent('0 CUP');
+    // No standalone Zelle bucket remains.
     expect(screen.queryByText(/Zelle/)).toBeNull();
   });
 
@@ -610,7 +605,7 @@ describe('TodayStatsPage — money never wraps (no-cut invariant)', () => {
         <TodayStatsPage />
       </Wrapper>,
     );
-    fireEvent.click(await screen.findByRole('button', { name: /Efectivo \(CUP\)/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /Resumen Efectivo/ }));
     // Ventas row: 23\u00A0CUP 456.70 (NBSP normalized to space by getByText). The
     // same figure renders ONLY inside the cash table (cash uses paymentType
     // filters: only the Efectivo order counts).

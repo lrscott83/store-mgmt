@@ -1,21 +1,15 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useIntl } from 'react-intl';
 import {
   DEFAULT_CURRENCY,
   EFeatures,
   ExpenseType,
   PaymentType,
-  paymentMethodOptionsForCurrency,
   salePaymentMethodLabel,
   SalePaymentMethod,
 } from '@store-mgmt/domain';
 import type { Currency, Expense, Order, SaleCredit } from '@store-mgmt/domain';
-import {
-  normalizedOrderPaymentMethod,
-  resolvedExpensePaymentMethod,
-  resolvedOrderPaymentMethod,
-} from '~/shared/lib/payment-method-resolved';
-import { channelLabel } from '~/shared/lib/payment-methods/channel-label';
+import { normalizedOrderPaymentMethod, resolvedExpensePaymentMethod } from '~/shared/lib/payment-method-resolved';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { hasMultiMonedasAvailable } from '~/shared/components/multimonedas/currency-select';
@@ -115,15 +109,13 @@ function ExpansionPanel({
 
 /**
  * 1:1 port of Angular's `today-stats.component.html` ("Cuadre del día"): a card with the
- * running total in the toolbar, and an accordion of collapsed-by-default panels — one
- * payment-channel panel per channel of the shown currency (always; the Efectivo panel is
- * the compound cash summary), Gastos (if hasExpensesModuleAvailable), Créditos Por Cobrar
- * (if hasCreditsModuleAvailable), Créditos Pagados (if hasCreditsModuleAvailable), and
- * Ventas (always, rendering one CategoryStats row per category).
+ * running total in the toolbar, and an accordion of collapsed-by-default panels — Resumen
+ * Efectivo (always), Gastos (if hasExpensesModuleAvailable), Créditos Por Cobrar (if
+ * hasCreditsModuleAvailable), Créditos Pagados (if hasCreditsModuleAvailable), and Ventas
+ * (always, rendering one CategoryStats row per category).
  */
 export function TodayStatsPage() {
   const intl = useIntl();
-  const formatMessage = useCallback((id: string) => intl.formatMessage({ id }), [intl]);
   const user = useAuthStore((s) => s.user);
   const storeId = user?.selectedStoreId ?? '';
   const multiMonedas = hasMultiMonedasAvailable(user);
@@ -155,9 +147,12 @@ export function TodayStatsPage() {
 
     const todayOrders: Order[] = orderService.getActiveOrdersInDay(new Date());
     setActiveOrders(todayOrders);
-    // El desglose de pago se agrupa en el render, por CANAL de la moneda
-    // mostrada (payment-channels-in-breakdowns, T2): ver `paymentChannels` y
-    // `panelMethodOf`. Los totales siguen al filtro de moneda, como antes.
+    // payment-methods-percent-tax: el bloque "Tarjeta" pasa a "Transferencia" —
+    // agrupa los históricos Tarjeta (adaptados a Transferencia-CUP) y las nuevas.
+    // T13: se agrupa por el método NORMALIZADO, así una venta registrada con
+    // Zelle cae en Transferencia (CUP) igual que en el resto del historial.
+    // (Los totales de efectivo/transferencia se derivan en el render, ya que
+    // siguen al filtro de moneda.)
 
     if (hasExpensesModule) {
       // Angular parity (today-stats.component.ts:79): loads today's expenses via
@@ -237,43 +232,20 @@ export function TodayStatsPage() {
     amount: c.total,
     currency: c.currency,
   }));
-  // ─── Desglose de pago por CANAL (payment-channels-in-breakdowns, T2) ───────
-  // Un canal es un par (método, moneda). Los paneles salen del catálogo de la
-  // moneda que la vista está mostrando (`paymentMethodOptionsForCurrency`), y
-  // cada orden se clasifica por su canal real (`resolvedOrderPaymentMethod`), así
-  // una venta Zelle cae en su propio panel en vez de dentro de Transferencia.
-  const paymentChannels = paymentMethodOptionsForCurrency(displayCurrency);
-
-  // Método de panel de una orden: el canal real resuelto si existe para la
-  // moneda mostrada; si no (dato histórico: p.ej. una venta Zelle con
-  // MultiMonedas OFF, donde la moneda mostrada es CUP y CUP no tiene canal
-  // Zelle), se conserva la forma normalizada —Zelle → Transferencia— para que
-  // ninguna orden quede fuera del desglose.
-  const panelMethodOf = (order: Order): SalePaymentMethod | null => {
-    const resolved = resolvedOrderPaymentMethod(order);
-    if (paymentChannels.includes(resolved)) return resolved;
-    const normalized = normalizedOrderPaymentMethod(order);
-    return paymentChannels.includes(normalized) ? normalized : null;
-  };
-
-  // Una orden no a crédito cuenta exactamente en un canal (partición exacta).
-  const salesAmountByMethod = new Map<SalePaymentMethod, number>(
-    paymentChannels.map((method) => [method, 0]),
-  );
-  for (const order of visibleOrders) {
-    if (order.isCredit) continue;
-    const method = panelMethodOf(order);
-    if (method === null) continue;
-    salesAmountByMethod.set(method, (salesAmountByMethod.get(method) ?? 0) + order.total);
-  }
-  const salesCashTotal = salesAmountByMethod.get(SalePaymentMethod.Efectivo) ?? 0;
-
+  const cashSalesEntries: CurrencyAmount[] = visibleOrders
+    .filter((o) => normalizedOrderPaymentMethod(o) === SalePaymentMethod.Efectivo && !o.isCredit)
+    .map((o) => ({ amount: o.total, currency: o.currency }));
   const paidCreditsCashEntries: CurrencyAmount[] = visiblePaidSaleCredits
     .filter((c) => c.paidType === PaymentType.Efectivo)
     .map((c) => ({ amount: c.total, currency: c.currency }));
   const expensesCashEntries: CurrencyAmount[] = visibleExpenses
     .filter((e) => e.paymentType === PaymentType.Efectivo)
     .map((e) => ({ amount: e.total, currency: e.currency }));
+  const transferEntries: CurrencyAmount[] = visibleOrders
+    .filter(
+      (o) => normalizedOrderPaymentMethod(o) === SalePaymentMethod.Transferencia && !o.isCredit,
+    )
+    .map((o) => ({ amount: o.total, currency: o.currency }));
 
   const visibleCategories = selectedCurrency
     ? buildCategoryCartItemsView(
@@ -282,6 +254,8 @@ export function TodayStatsPage() {
       )
     : categories;
 
+  const salesCashTotal = cashSalesEntries.reduce((acc, e) => acc + e.amount, 0);
+  const salesCardTotal = transferEntries.reduce((acc, e) => acc + e.amount, 0);
   const expensesCashTotal = expensesCashEntries.reduce((acc, e) => acc + e.amount, 0);
   const paidCreditsCashTotal = paidCreditsCashEntries.reduce((acc, e) => acc + e.amount, 0);
 
@@ -316,63 +290,75 @@ export function TodayStatsPage() {
         />
       </div>
       <div className="divide-y divide-border">
-        {/* BEGIN PAYMENT CHANNELS — un panel por canal de la moneda mostrada,
-            rotulado SIEMPRE con su moneda. El panel de Efectivo conserva su
-            resumen compuesto (Ventas + Créditos Pagados − Gastos); el resto de
-            canales solo muestran Ventas. */}
-        {paymentChannels.map((method) => {
-          const isCash = method === SalePaymentMethod.Efectivo;
-          const salesTotal = salesAmountByMethod.get(method) ?? 0;
-          const panelAmount = isCash ? cashTotal : salesTotal;
-          return (
-            <ExpansionPanel
-              key={method}
-              title={channelLabel(method, displayCurrency, formatMessage)}
-              amount={formatMoneyWithCurrency(panelAmount, displayCurrency)}
-              amountClassName={valueClassName(panelAmount)}
-            >
-              <table className="w-full text-sm">
-                <tbody>
-                  <tr className="border-b border-border last:border-0">
-                    <td className="p-1">
-                      <span className="font-bold text-text">Ventas</span>
-                    </td>
-                    <td className="p-1 text-right">
-                      <span className="font-bold text-success whitespace-nowrap">
-                        {formatMoneyWithCurrency(salesTotal, displayCurrency)}
-                      </span>
-                    </td>
-                  </tr>
-                  {isCash && hasCreditsModule && (
-                    <tr className="border-b border-border last:border-0">
-                      <td className="p-1">
-                        <span className="font-bold text-text">Créditos Pagados</span>
-                      </td>
-                      <td className="p-1 text-right">
-                        <span className="font-bold text-success whitespace-nowrap">
-                          {formatMoneyWithCurrency(paidCreditsCashTotal, displayCurrency)}
-                        </span>
-                      </td>
-                    </tr>
-                  )}
-                  {isCash && hasExpensesModule && (
-                    <tr className="border-b border-border last:border-0">
-                      <td className="p-1">
-                        <span className="font-bold text-text">Gastos</span>
-                      </td>
-                      <td className="p-1 text-right">
-                        <span className="font-bold text-danger whitespace-nowrap">
-                          {formatMoneyWithCurrency(expensesCashTotal, displayCurrency)}
-                        </span>
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </ExpansionPanel>
-          );
-        })}
-        {/* END PAYMENT CHANNELS */}
+        {/* BEGIN CASH */}
+        <ExpansionPanel
+          title="Resumen Efectivo"
+          amount={formatMoneyWithCurrency(cashTotal, displayCurrency)}
+          amountClassName={valueClassName(cashTotal)}
+        >
+          <table className="w-full text-sm">
+            <tbody>
+              <tr className="border-b border-border last:border-0">
+                <td className="p-1">
+                  <span className="font-bold text-text">Ventas</span>
+                </td>
+                <td className="p-1 text-right">
+                  <span className="font-bold text-success whitespace-nowrap">
+                    {formatMoneyWithCurrency(salesCashTotal, displayCurrency)}
+                  </span>
+                </td>
+              </tr>
+              {hasCreditsModule && (
+                <tr className="border-b border-border last:border-0">
+                  <td className="p-1">
+                    <span className="font-bold text-text">Créditos Pagados</span>
+                  </td>
+                  <td className="p-1 text-right">
+                    <span className="font-bold text-success whitespace-nowrap">
+                      {formatMoneyWithCurrency(paidCreditsCashTotal, displayCurrency)}
+                    </span>
+                  </td>
+                </tr>
+              )}
+              {hasExpensesModule && (
+                <tr className="border-b border-border last:border-0">
+                  <td className="p-1">
+                    <span className="font-bold text-text">Gastos</span>
+                  </td>
+                  <td className="p-1 text-right">
+                    <span className="font-bold text-danger whitespace-nowrap">
+                      {formatMoneyWithCurrency(expensesCashTotal, displayCurrency)}
+                    </span>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </ExpansionPanel>
+        {/* END CASH */}
+
+        {/* BEGIN TRANSFER PAYMENTS (antes "Tarjeta" — históricos incluidos) */}
+        <ExpansionPanel
+          title="Pago por Transferencia"
+          amount={formatMoneyWithCurrency(salesCardTotal, displayCurrency)}
+          amountClassName={valueClassName(salesCardTotal)}
+        >
+          <table className="w-full text-sm">
+            <tbody>
+              <tr className="border-b border-border last:border-0">
+                <td className="p-1">
+                  <span className="font-bold text-text">Ventas</span>
+                </td>
+                <td className="p-1 text-right">
+                  <span className="font-bold text-success whitespace-nowrap">
+                    {formatMoneyWithCurrency(salesCardTotal, displayCurrency)}
+                  </span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </ExpansionPanel>
+        {/* END CARD PAYMENTS */}
 
         {/* BEGIN EXPENSES */}
         {hasExpensesModule && (
