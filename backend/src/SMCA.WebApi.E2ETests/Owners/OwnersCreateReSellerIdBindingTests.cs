@@ -168,22 +168,33 @@ public sealed class OwnersCreateReSellerIdBindingTests
         }
     }
 
-    // The working path must survive the fix: a valid Guid of a REAL seeded ReSeller still
-    // returns 201 AND still persists the ReSellerOwner link row.
+    // A REAL seeded ReSeller row still produces a persisted ReSellerOwner link row, and the link
+    // is the one that belongs to the creating GESTOR — never the one named in the body.
+    // <para>
+    // The actor here is a complete Gestor: User + UserRole(ReSeller) + a ReSeller row for that same
+    // user, which is the only shape production produces (CreateReSellerCommand always writes User,
+    // ReSeller and UserRole together). A ReSeller role WITHOUT the ReSeller row is a half-Gestor
+    // that cannot exist outside a fixture, so the body value must not be able to stand in for it:
+    // ignoring the body is what stops a Gestor from pushing the new owner onto another Gestor's
+    // list, where the owner would be invisible to the one who created it.
+    // </para>
     [Fact]
-    public async Task Create_owner_as_reseller_with_valid_resellerId_persists_reseller_owner_link()
+    public async Task Create_owner_as_real_gestor_links_the_actor_own_reseller_and_ignores_the_body_resellerId()
     {
         var actor = await DbTestHelpers.SeedUserWithRoleAsync(_f, (int)RoleType.ReSeller);
         var reSellerUser = await DbTestHelpers.SeedUserWithRoleAsync(_f, (int)RoleType.ReSeller);
         var login = NewLogin();
-        Guid reSellerId = Guid.Empty;
+        Guid actorReSellerId = Guid.Empty;
+        Guid otherReSellerId = Guid.Empty;
         Guid tenantId = Guid.Empty;
         try
         {
-            reSellerId = await SeedReSellerAsync(reSellerUser.UserId, "E2E Linked ReSeller");
+            actorReSellerId = await SeedReSellerAsync(actor.UserId, "E2E Actor ReSeller");
+            otherReSellerId = await SeedReSellerAsync(reSellerUser.UserId, "E2E Other ReSeller");
+            actorReSellerId.Should().NotBe(otherReSellerId);
 
             var body = Body(login);
-            body["reSellerId"] = reSellerId;
+            body["reSellerId"] = otherReSellerId;
 
             var r = await DbTestHelpers.AuthedClient(_f, actor.UserId, actor.Login)
                 .PostAsJsonAsync("/api/v1/Owners", body);
@@ -201,11 +212,13 @@ public sealed class OwnersCreateReSellerIdBindingTests
             var link = await db.Set<ReSellerOwner>().IgnoreQueryFilters()
                 .SingleOrDefaultAsync(x => x.OwnerId == ownerId);
             link.Should().NotBeNull();
-            link!.ReSellerId.Should().Be(reSellerId);
+            link!.ReSellerId.Should().Be(actorReSellerId);
+            link.ReSellerId.Should().NotBe(otherReSellerId);
         }
         finally
         {
-            await DeleteReSellerRowsAsync(reSellerId, tenantId);
+            await DeleteReSellerRowsAsync(otherReSellerId, Guid.Empty);
+            await DeleteReSellerRowsAsync(actorReSellerId, tenantId);
             if (tenantId != Guid.Empty) await DbTestHelpers.CleanupTenantCascadeAsync(_f, tenantId);
             await DbTestHelpers.CleanupUserAsync(_f, reSellerUser.UserId);
             await DbTestHelpers.CleanupUserAsync(_f, actor.UserId);
