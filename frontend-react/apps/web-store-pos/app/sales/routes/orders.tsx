@@ -228,6 +228,8 @@ export function OrdersPage() {
       : multiMonedas
         ? (currencyOptions[0] ?? DEFAULT_CURRENCY)
         : DEFAULT_CURRENCY;
+  /** Moneda del filtro visible, o undefined cuando no se filtra (gate OFF / 1 moneda). */
+  const selectedCurrency = currencyFilterVisible && currency !== null ? currency : undefined;
 
   /** Aplica el filtro de moneda a las filas (no-op cuando el filtro está oculto). */
   const filterOrdersByCurrency = (orders: Order[]): Order[] =>
@@ -281,9 +283,15 @@ export function OrdersPage() {
           ),
         );
       }
-      await exportInventoryTodaySalePdf(rows, `${dateId}_ipv.pdf`);
+      // El PDF de reportes respeta el filtro de moneda (decision 8): cada fila
+      // trae su moneda real; con el filtro visible se descartan las demás — sin
+      // conversión. Sin filtro (gate OFF / una moneda) se exporta todo, como hoy.
+      const pdfRows = selectedCurrency
+        ? rows.filter((row) => row.currency === selectedCurrency)
+        : rows;
+      await exportInventoryTodaySalePdf(pdfRows, `${dateId}_ipv.pdf`);
     },
-    [intl],
+    [intl, selectedCurrency],
   );
 
   /** Base (activo + crédito) — el filtro de pago se aplica aparte por clave. */

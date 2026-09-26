@@ -2,6 +2,7 @@ import type { InventoryEntry, Order, Product } from '@store-mgmt/domain';
 import { isInLocalDay, localDayRange } from '~/shared/lib/date-utils';
 import type { InventoryTodaySaleRow } from './inventory-today-sale-pdf';
 import { round2 } from '~/shared/lib/money';
+import { resolveCurrency } from '~/shared/lib/currency-totals';
 
 /**
  * Input bundle for {@link generateProductRowsForDate}. The caller (the
@@ -200,6 +201,11 @@ export function generateProductRowsForDate(
         ? soldItems.reduce((total, oi) => total + oi.price, 0) / soldItems.length
         : 0;
     const importeVenta = round2(vendido * precioVenta);
+    // Currency of the row (currency-filter-per-view): the sale's currency is the
+    // real source of the sale columns — `OrderItem.currency`, stamped from the
+    // product at sale time (`order-offline-service.ts:426-429`); without a sale
+    // today the product's own `Product.currency` governs the row. Absent = CUP.
+    const currency = resolveCurrency(soldItems[0]?.currency ?? prod.currency);
 
     const entries = inventories.get(prod.id) ?? [];
     const entriesAtDay = reconstructEntriesAtDay(entries, day, consumedAfterByEntry);
@@ -237,6 +243,7 @@ export function generateProductRowsForDate(
     return {
       productId: prod.id,
       productName: prod.name,
+      currency,
       unit: 'U',
       inicio,
       entrada,

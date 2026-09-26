@@ -8,6 +8,7 @@ import type {
 import type { InventoryCategoryView } from '~/inventory/lib/services/inventory-offline-service';
 import type { InventoryTodaySaleRow } from './inventory-today-sale-pdf';
 import { round2 } from '~/shared/lib/money';
+import { resolveCurrency } from '~/shared/lib/currency-totals';
 
 /**
  * Narrow dependency slices — only the methods `generateProductRows` actually calls.
@@ -78,6 +79,14 @@ export function generateProductRows(
         ? orderItems.reduce((total, oi) => total + oi.price, 0) / orderItems.length
         : 0;
     const importeVenta = round2(vendido * precioVenta);
+    // Currency of the row (currency-filter-per-view): the SALE's currency is the
+    // real source of precioVenta/importeVenta — `OrderItem.currency`, stamped from
+    // the product at sale time (`order-offline-service.ts:426-429`). The COST
+    // columns come from the product's inventory entries; a row is one product, so
+    // when there is no sale today we fall back to `Product.currency`. Both sources
+    // describe the same product and carry the same code on a sold row. Absent =
+    // CUP (domain default) — never an invented currency.
+    const currency = resolveCurrency(orderItems[0]?.currency ?? prod.currency);
     let costoUnitario = 0;
     if (productAvailableEntries.length > 0) {
       costoUnitario =
@@ -92,6 +101,7 @@ export function generateProductRows(
     return {
       productId: prod.id,
       productName: prod.name,
+      currency,
       unit: 'U',
       inicio,
       entrada: entryQuantity,
