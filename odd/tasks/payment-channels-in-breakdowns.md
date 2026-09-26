@@ -71,7 +71,7 @@ Runners: `pnpm test`, `pnpm typecheck`, `pnpm lint` desde `frontend-react/`.
   `management`.
   → Movido. Git detecta el rename (test al 100 %, fuente al 63 % porque cambió solo el comentario
   de ruta). Los dos consumidores importan la copia compartida con salida idéntica.
-  **Commit `0d5b8ee`**(ver abajo).
+  **Commit `aab58bf6`.**
 - [x] **T2** `today-stats`: los desgloses de pago pasan a ser por **canal de la moneda mostrada**,
   derivados de `paymentMethodOptionsForCurrency` + `resolvedOrderPaymentMethod`, rotulados con
   `channelLabel`. Con MultiMonedas OFF → los 2 canales de CUP.
