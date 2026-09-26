@@ -42,9 +42,12 @@ pantalla obliga a leer chips cuando lo que se quiere es enfocarse.
    moneda filtrada marcada como activa) y los widgets siguen el filtro global.
 10. **KPIs**: icono de info `(i)` en el header del KPI, alineado a la derecha. Su tap abre **una
     sola vista** con el total por cada moneda **y** el desglose por canales de pago.
-    El botón `+` **desaparece**.
+    El botón `+` **desaparece**. **Solo el `(i)` abre ese popup** — el valor del KPI NO es
+    clickable (corrección del owner, 2026-09-26; ver "Correcciones post-entrega").
 11. **Modos de pago**: el desglose debe usar el **canal real** (`salePaymentMethod` vía
     `resolvedOrderPaymentMethod`), nunca el `paymentType` legacy → **`Tarjeta` no debe aparecer**.
+    **`Zelle` es un canal propio y NO se funde con `Transferencia`** (corrección del owner,
+    2026-09-26: *"Zelle es un canal de pago como otro cualquiera"*).
 12. **Grilla de KPIs**: 4 por fila en desktop, 2 en móvil. (Hubo `lg:grid-cols-4` en `a2f5cd80`;
     `7f0544c6` lo quitó alegando paridad con Angular, motivo **inválido** por regla del proyecto.)
 
@@ -203,8 +206,36 @@ Runners: `pnpm test`, `pnpm typecheck`, `pnpm lint` desde `frontend-react/`.
 ## Estado final de la feature
 
 **T1–T14 COMPLETAS** (más T13b, hallazgo colateral). Todas las decisiones del owner implementadas
-y verificadas. Pendiente solo lo que el owner controla: **push y PR** (nada pusheado desde la
-sesión; cadena cacheada `stacked-to-main`).
+y verificadas.
+
+## Correcciones post-entrega (2026-09-26, reportadas por el owner)
+
+El owner reportó que en su entorno seguía viendo 2 KPIs por fila y el botón `+`. **Causa: los
+commits de T6–T14 estaban solo en local**, y el entorno de test (`vdt.playground.sceiba.net`)
+despliega desde el REMOTO (ver `odd/tasks/test-env-deploy.md`) → no los tenía. No era un fallo del
+código, era un fallo de entrega: **sin push, el trabajo no existe para el owner.**
+
+Además, el owner rechazó dos decisiones que el orquestador tomó por su cuenta:
+
+1. **Zelle fundido con Transferencia.** T13 usó `normalizedOrderPaymentMethod` (que colapsa
+   Zelle → Transferencia) "por consistencia" con today-stats/cuadre. **La decisión 11 de ESTE
+   documento ya decía `resolvedOrderPaymentMethod`.** El orquestador se desvió de su propio plan
+   escrito. Arreglado: Zelle vuelve a ser un slice propio. Commit `63b0a72a`.
+   En el resumen multi-store (que es un split de DOS vías efectivo/tarjeta, no un desglose de
+   canales) el lado no-efectivo pasa a ser el **complemento** de efectivo en vez de
+   `=== Transferencia`; con la igualdad ingenua **cada orden Zelle habría desaparecido de ambos
+   cubos**. Los cubos siguen particionando las órdenes exactamente una vez.
+   **Pendiente de decisión del owner**: el cubo `salesCardTotal` se rotula "Pago por Transferencia"
+   pero incluye Zelle (ya lo hacía antes). El rótulo es impreciso.
+   **Auditoría sin tocar** (decisión del owner): `today-stats.tsx:236,246`,
+   `cuadre-por-fechas.tsx:288,294,312,318`, `payment-filter-options.ts:50`,
+   `edit-order-modal.tsx:64,86` siguen colapsando Zelle.
+2. **El valor del KPI abría el popup fusionado.** El owner pidió que **solo el `(i)`** lo abra.
+   Arreglado. Commit `63b0a72a`.
+
+**Lección**: (a) el trabajo sin push no llega al owner, y "verificado en local" no es "entregado";
+(b) el orquestador se desvió de una decisión escrita en su propio documento para "mejorar la
+consistencia" — la consistencia no autoriza a cambiar un requisito fijado por el owner.
 
 ## Criterios de aceptación
 
