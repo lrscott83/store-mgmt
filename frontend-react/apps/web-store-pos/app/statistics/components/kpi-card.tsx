@@ -22,18 +22,19 @@ interface KpiCardProps {
   sparklineValues: number[];
   sparklineColor?: string;
   testId: string;
-  /** Opens the merged breakdown popup — shared by the value text and the (i) icon. */
+  /** Opens the merged breakdown popup — triggered ONLY by the (i) icon now. */
   onOpenDetail: () => void;
   onOpenTrend: () => void;
 }
 
 /**
  * One dashboard KPI card: title with a right-aligned `(i)` info button, the
- * value (tap → merged breakdown popup), the KPI sparkline and the underlined
+ * value (plain text, non-interactive), the KPI sparkline and the underlined
  * "vs anterior" trend (tap → comparison popup).
  *
- * The `(i)` replaces the old `+` button and opens ONE popup that carries both the
- * per-currency totals and the per-KPI detail. There is no `InfoIcon` in
+ * The `(i)` is the ONLY trigger for the merged breakdown popup (owner's
+ * correction 2026-09-26: "solo quiero que el (i) abra esa vista"); the value no
+ * longer opens anything. There is no `InfoIcon` in
  * `~/shared/components/ui/icons`; `HelpIcon` is the circle glyph that file
  * offers, so it is reused here as the info affordance.
  */
@@ -64,14 +65,9 @@ export function KpiCard({
         </button>
       </div>
       <div className="mt-1 flex items-baseline gap-1">
-        <button
-          type="button"
-          onClick={onOpenDetail}
-          className="text-left"
-          data-testid={`${testId}-value`}
-        >
-          <p className="text-2xl font-bold text-gray-900">{valueText}</p>
-        </button>
+        <p className="text-2xl font-bold text-gray-900" data-testid={`${testId}-value`}>
+          {valueText}
+        </p>
       </div>
       <KpiSparkline
         values={sparklineValues}

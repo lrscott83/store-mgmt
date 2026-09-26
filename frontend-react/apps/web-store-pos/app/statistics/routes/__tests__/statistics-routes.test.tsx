@@ -429,7 +429,7 @@ describe('DashboardPage — popups', () => {
     resetAllMocks();
   });
 
-  it('tapping the Ventas value opens the payment-method detail popup', () => {
+  it('the (i) opens the payment-method detail popup', () => {
     mockOrderService.getStorageOrders.mockReturnValue([
       makeOrder('o1', { total: 100, paymentType: PaymentType.Efectivo }),
       makeOrder('o2', { total: 50, paymentType: PaymentType.Tarjeta, date: daysAgo(1) }),
@@ -440,7 +440,7 @@ describe('DashboardPage — popups', () => {
         <DashboardPage />
       </Wrapper>,
     );
-    fireEvent.click(screen.getByTestId('kpi-sales-value'));
+    fireEvent.click(screen.getByTestId('kpi-sales-info'));
 
     const popup = screen.getByTestId('dashboard-popup');
     expect(popup).toHaveTextContent('Método de pago — CUP');
@@ -449,6 +449,18 @@ describe('DashboardPage — popups', () => {
     expect(popup).toHaveTextContent('Transferencia');
     expect(popup).not.toHaveTextContent('Tarjeta');
     expect(popup).toHaveTextContent('100.00 CUP (67%)');
+  });
+
+  it('tapping the KPI value does NOT open the popup — only the (i) does', () => {
+    render(
+      <Wrapper>
+        <DashboardPage />
+      </Wrapper>,
+    );
+    fireEvent.click(screen.getByTestId('kpi-sales-value'));
+    expect(screen.queryByTestId('dashboard-popup')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('kpi-sales-info'));
+    expect(screen.getByTestId('dashboard-popup')).toBeInTheDocument();
   });
 
   it('the trend popup explains the comparison and shows the previous range dates', () => {
@@ -477,7 +489,7 @@ describe('DashboardPage — popups', () => {
         <DashboardPage />
       </Wrapper>,
     );
-    fireEvent.click(screen.getByTestId('kpi-expenses-value'));
+    fireEvent.click(screen.getByTestId('kpi-expenses-info'));
     const popup = screen.getByTestId('dashboard-popup');
     expect(popup).toHaveTextContent('Gastos del rango');
     expect(popup).toHaveTextContent('Transporte');
@@ -493,7 +505,7 @@ describe('DashboardPage — popups', () => {
         <DashboardPage />
       </Wrapper>,
     );
-    fireEvent.click(screen.getByTestId('kpi-credits-value'));
+    fireEvent.click(screen.getByTestId('kpi-credits-info'));
     const popup = screen.getByTestId('dashboard-popup');
     expect(popup).toHaveTextContent('Créditos sin pagar');
     expect(popup).toHaveTextContent('Ana');
@@ -506,7 +518,7 @@ describe('DashboardPage — popups', () => {
         <DashboardPage />
       </Wrapper>,
     );
-    fireEvent.click(screen.getByTestId('kpi-sales-value'));
+    fireEvent.click(screen.getByTestId('kpi-sales-info'));
     expect(screen.getByTestId('dashboard-popup')).toBeInTheDocument();
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(screen.queryByTestId('dashboard-popup')).not.toBeInTheDocument();

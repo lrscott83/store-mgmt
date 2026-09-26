@@ -28,7 +28,7 @@ import {
   PaymentType as PaymentTypeEnum,
   SalePaymentMethod,
 } from '@store-mgmt/domain';
-import { normalizedOrderPaymentMethod } from '~/shared/lib/payment-method-resolved';
+import { resolvedOrderPaymentMethod } from '~/shared/lib/payment-method-resolved';
 import { addDays, groupByLocalDay, localDayRange } from '~/shared/lib/date-utils';
 import type { LocalDayGroup } from '~/shared/lib/date-utils';
 import { calculateOrderProfit } from '~/inventory/lib/profit-calculator';
@@ -604,17 +604,19 @@ export function computeStoreRangeSummary(
     });
   });
 
-  // T13 (currency-filter-per-view): cash and transfer come from the SAME
-  // real-channel resolution (`normalizedOrderPaymentMethod`) so they are mutually
-  // exclusive. A USD transfer carries legacy `paymentType = Efectivo`
-  // (sale-payment-method-compat.ts:47), so the old legacy cash predicate counted
-  // it in BOTH buckets. Under the normalized convention Zelle collapses into
-  // Transferencia; cash stays Efectivo-only.
+  // T13 (currency-filter-per-view) + owner correction (2026-09-26): this is a
+  // TWO-way cash / non-cash split, NOT a channel breakdown. The buckets partition
+  // the active NON-credit orders exactly once: cash = resolved Efectivo, transfer
+  // = every other resolved channel (`Zelle` and `Transferencia` included). Using a
+  // bare `resolved === Transferencia` on the transfer side would drop Zelle, so the
+  // transfer side is the COMPLEMENT of cash. A USD transfer carries legacy
+  // `paymentType = Efectivo` (sale-payment-method-compat.ts:47), but its resolved
+  // channel is Transferencia, so it is never double-counted as cash.
   const cashOrders = activeOrders.filter(
-    (o) => normalizedOrderPaymentMethod(o) === SalePaymentMethod.Efectivo && !o.isCredit,
+    (o) => !o.isCredit && resolvedOrderPaymentMethod(o) === SalePaymentMethod.Efectivo,
   );
   const transferOrders = activeOrders.filter(
-    (o) => normalizedOrderPaymentMethod(o) === SalePaymentMethod.Transferencia && !o.isCredit,
+    (o) => !o.isCredit && resolvedOrderPaymentMethod(o) !== SalePaymentMethod.Efectivo,
   );
   const salesCashTotal = cashOrders.reduce((acc, o) => acc + o.total, 0);
   const salesCardTotal = transferOrders.reduce((acc, o) => acc + o.total, 0);

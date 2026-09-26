@@ -133,8 +133,8 @@ const ALL_ORDER_TYPES_NOTE =
   'Incluye todos los tipos de venta (normal, mayorista, merma, ajuste, otro)';
 
 // Labels of the REAL sale channel (`SalePaymentMethod`). The breakdown groups by
-// `normalizedOrderPaymentMethod`, which collapses Zelle into Transferencia, so the
-// Zelle entry is kept for completeness but unreachable; `Tarjeta` no longer exists.
+// `resolvedOrderPaymentMethod`, so Zelle is a slice of its own: Efectivo, Zelle
+// and Transferencia. `Tarjeta` is not a channel and has no entry.
 const PAYMENT_LABEL_IDS: Record<number, string> = {
   [SalePaymentMethod.Efectivo]: 'CART.EFECTIVO',
   [SalePaymentMethod.Zelle]: 'CART.ZELLE',

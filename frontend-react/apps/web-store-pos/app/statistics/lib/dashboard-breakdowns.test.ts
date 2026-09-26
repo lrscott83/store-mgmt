@@ -48,6 +48,7 @@ function makeOrder(id: string, overrides: Partial<Order> = {}): Order {
 
 const PAYMENT_LABELS: Partial<Record<SalePaymentMethod, string>> = {
   [SalePaymentMethod.Efectivo]: 'Efectivo',
+  [SalePaymentMethod.Zelle]: 'Zelle',
   [SalePaymentMethod.Transferencia]: 'Transferencia',
 };
 
@@ -86,7 +87,7 @@ describe('dashboard-breakdowns — payment and category splits', () => {
     ]);
   });
 
-  it('labels a CUP transfer as Transferencia (never Tarjeta) and collapses Zelle', () => {
+  it('labels a CUP transfer as Transferencia (never Tarjeta) and keeps Zelle as its own slice', () => {
     const orders = [
       makeOrder('transfer-cup', {
         // Legacy field lies (CUP transfer mirrors Tarjeta normally), real field wins.
@@ -97,9 +98,24 @@ describe('dashboard-breakdowns — payment and category splits', () => {
       makeOrder('zelle', { paymentType: PaymentType.Zelle, total: 40 }),
     ];
     const slices = paymentBreakdown(orders, Currency.CUP, labelOf);
+    // Owner's correction (2026-09-26): Zelle is a channel like any other —
+    // it is NOT collapsed into Transferencia.
     expect(slices).toEqual([
-      { id: String(SalePaymentMethod.Transferencia), name: 'Transferencia', value: 240 },
+      { id: String(SalePaymentMethod.Transferencia), name: 'Transferencia', value: 200 },
+      { id: String(SalePaymentMethod.Zelle), name: 'Zelle', value: 40 },
     ]);
+    expect(slices.some((slice) => slice.name === 'Tarjeta')).toBe(false);
+  });
+
+  it('Zelle never reaches Tarjeta: three channels stay three slices', () => {
+    const orders = [
+      makeOrder('cash', { salePaymentMethod: SalePaymentMethod.Efectivo, total: 10 }),
+      makeOrder('zelle', { salePaymentMethod: SalePaymentMethod.Zelle, total: 20 }),
+      makeOrder('transfer', { salePaymentMethod: SalePaymentMethod.Transferencia, total: 30 }),
+    ];
+    const slices = paymentBreakdown(orders, Currency.CUP, labelOf);
+    expect(slices.map((slice) => slice.name)).toEqual(['Transferencia', 'Zelle', 'Efectivo']);
+    expect(slices.map((slice) => slice.value)).toEqual([30, 20, 10]);
     expect(slices.some((slice) => slice.name === 'Tarjeta')).toBe(false);
   });
 
