@@ -284,7 +284,9 @@ export function CuadrePorFechasPage() {
 
     const activeOrders = orderService.getActiveOrdersBetween(rangeStart, rangeEnd);
     const salesCashTotal = activeOrders
-      .filter((o) => o.paymentType === PaymentType.Efectivo && !o.isCredit)
+      .filter(
+        (o) => normalizedOrderPaymentMethod(o) === SalePaymentMethod.Efectivo && !o.isCredit,
+      )
       .reduce((acc, o) => acc + o.total, 0);
     const salesCardTotal = activeOrders
       .filter(
@@ -306,7 +308,9 @@ export function CuadrePorFechasPage() {
       })),
     );
     const salesCashEntries: CurrencyAmount[] = activeOrders
-      .filter((o) => o.paymentType === PaymentType.Efectivo && !o.isCredit)
+      .filter(
+        (o) => normalizedOrderPaymentMethod(o) === SalePaymentMethod.Efectivo && !o.isCredit,
+      )
       .map((o) => ({ amount: o.total, currency: o.currency }));
     const salesCardEntries: CurrencyAmount[] = activeOrders
       .filter(
