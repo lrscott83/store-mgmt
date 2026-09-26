@@ -1,5 +1,4 @@
-import { PlusIcon } from '~/shared/components/ui/icons';
-import type { CurrencyTotal } from '~/shared/lib/currency-totals';
+import { HelpIcon } from '~/shared/components/ui/icons';
 import { KpiSparkline } from './sparkline';
 
 /** Trend color of "vs anterior" — 1:1 with the original dashboard's getTrendClass. */
@@ -17,28 +16,30 @@ export function getTrendGlyph(actual: number, previous: number): string {
 interface KpiCardProps {
   title: string;
   valueText: string;
-  /** Ordered per-currency totals — the "+" renders only when there are 2+ currencies. */
-  currencyTotals: CurrencyTotal[];
-  /** Values driving the trend glyph/color (primary currency). */
+  /** Values driving the trend glyph/color (selected currency). */
   actual: number;
   previous: number;
   sparklineValues: number[];
   sparklineColor?: string;
   testId: string;
+  /** Opens the merged breakdown popup — shared by the value text and the (i) icon. */
   onOpenDetail: () => void;
   onOpenTrend: () => void;
-  onOpenCurrencies: () => void;
 }
 
 /**
- * One dashboard KPI card: title, primary-currency value (tap → detail popup),
- * a "+" when 2+ currencies are present (tap → per-currency amounts), the KPI
- * sparkline and the underlined "vs anterior" trend (tap → comparison popup).
+ * One dashboard KPI card: title with a right-aligned `(i)` info button, the
+ * value (tap → merged breakdown popup), the KPI sparkline and the underlined
+ * "vs anterior" trend (tap → comparison popup).
+ *
+ * The `(i)` replaces the old `+` button and opens ONE popup that carries both the
+ * per-currency totals and the per-KPI detail. There is no `InfoIcon` in
+ * `~/shared/components/ui/icons`; `HelpIcon` is the circle glyph that file
+ * offers, so it is reused here as the info affordance.
  */
 export function KpiCard({
   title,
   valueText,
-  currencyTotals,
   actual,
   previous,
   sparklineValues,
@@ -46,11 +47,22 @@ export function KpiCard({
   testId,
   onOpenDetail,
   onOpenTrend,
-  onOpenCurrencies,
 }: KpiCardProps) {
   return (
     <div className="rounded border bg-white p-4 shadow-sm" data-testid={testId}>
-      <h5 className="text-sm font-medium text-gray-700">{title}</h5>
+      <div className="flex items-start justify-between gap-2">
+        <h5 className="text-sm font-medium text-gray-700">{title}</h5>
+        <button
+          type="button"
+          onClick={onOpenDetail}
+          aria-label={`Ver desglose de ${title}`}
+          title="Ver desglose por moneda y método de pago"
+          data-testid={`${testId}-info`}
+          className="shrink-0 rounded-full p-0.5 text-text-muted hover:bg-surface-hover hover:text-text"
+        >
+          <HelpIcon />
+        </button>
+      </div>
       <div className="mt-1 flex items-baseline gap-1">
         <button
           type="button"
@@ -60,17 +72,6 @@ export function KpiCard({
         >
           <p className="text-2xl font-bold text-gray-900">{valueText}</p>
         </button>
-        {currencyTotals.length > 1 && (
-          <button
-            type="button"
-            onClick={onOpenCurrencies}
-            aria-label={title}
-            data-testid={`${testId}-currencies`}
-            className="rounded-full border border-border px-2 text-sm font-bold text-text-muted hover:bg-surface-hover"
-          >
-            <PlusIcon className="inline h-3.5 w-3.5" />
-          </button>
-        )}
       </div>
       <KpiSparkline
         values={sparklineValues}
