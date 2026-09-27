@@ -52,8 +52,15 @@ public sealed class OwnersDeletePaymentsGuardTests
         var seeded = await SeedOwnerGraphAsync(withPayment: true);
         try
         {
-            var r = await DbTestHelpers.AuthedClient(_f, saId, saLogin)
-                .DeleteAsync($"/api/v1/Owners/{seeded.OwnerId}");
+            // Hostile header on purpose: it proves the culture is PINNED, not merely defaulted.
+            // With "en" also listed in SupportedCultures/SupportedUICultures this request would
+            // resolve through I18n.en.resx and answer in English; restricting the lists to "es"
+            // alone makes the header unresolvable, so the default culture wins. A test that
+            // omitted the header could not tell those two configurations apart.
+            var client = DbTestHelpers.AuthedClient(_f, saId, saLogin);
+            client.DefaultRequestHeaders.Add("Accept-Language", "en");
+
+            var r = await client.DeleteAsync($"/api/v1/Owners/{seeded.OwnerId}");
 
             r.StatusCode.Should().Be(HttpStatusCode.Conflict,
                 "an owner with payments must be deactivated, not deleted");
@@ -63,14 +70,26 @@ public sealed class OwnersDeletePaymentsGuardTests
             b.ActionCode.Should().Be((int)HttpStatusCode.Conflict);
             b.Errors.Should().NotBeEmpty();
 
-            // Readable, specific reason — not the middleware's generic 500 text. The E2E host
-            // resolves I18n.en.resx (AppExtensions.cs sets the default request culture to "en"),
-            // so the message is asserted in English on purpose.
+            // Readable, specific reason — not the middleware's generic failure text. The API is
+            // pinned to Spanish (UseLocalizationExtension allows "es" only), and there is no
+            // I18n.es.resx, so IStringLocalizer falls back to the neutral I18n.resx whose values
+            // are Spanish. The message is therefore asserted in Spanish on purpose.
+            //
+            // The exact string is pinned, not a substring. A substring cannot be used safely here:
+            // "Desactívelo" carries an accented "í" (U+00ED), so a lowered "desactiv" does NOT
+            // match "desactívelo" — a substring assertion silently rots on the accent. Exact
+            // equality states the whole product contract and fails loudly on any drift.
+            //
+            // The generic-failure guard stays ENGLISH on purpose, and for a different reason:
+            // ErrorHandlerMiddleware emits that text as a hardcoded literal
+            // ("An unexpected error occurred. Please try again later." at
+            // ErrorHandlerMiddleware.cs:82), NOT through IStringLocalizer, so pinning the culture
+            // cannot change it. Asserting Spanish here would guard against nothing.
             var description = b.Errors[0].Description;
             description.Should().NotBeNullOrWhiteSpace();
             description.Should().NotContain("An unexpected error occurred");
-            description!.ToLowerInvariant().Should().Contain("payment");
-            description.ToLowerInvariant().Should().Contain("deactiv");
+            description.Should().Be(
+                "El propietario tiene pagos registrados y no se puede eliminar. Desactívelo en su lugar.");
 
             using var scope = _f.Services.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();

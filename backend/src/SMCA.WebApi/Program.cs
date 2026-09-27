@@ -172,6 +172,12 @@ app.UseSerilogRequestLogging();
 
 app.UseRouting();
 
+// Pin the request culture to Spanish. Must run after UseRouting and BEFORE the error
+// handler so ValidationException/ApiException messages are formatted under the resolved
+// culture. Without this call AddLocalizationExtension's options are never applied and
+// IStringLocalizer falls back to the host's regional settings.
+app.UseLocalizationExtension();
+
 
 //app.UseStatusCodePages();
 //app.UseStaticFiles();   
