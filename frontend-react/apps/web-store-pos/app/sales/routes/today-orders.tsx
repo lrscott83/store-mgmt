@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useIntl } from 'react-intl';
 import type { Order } from '@store-mgmt/domain';
-import { EFeatures, PaymentType } from '@store-mgmt/domain';
+import { DEFAULT_CURRENCY, EFeatures, PaymentType } from '@store-mgmt/domain';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
-import { CurrencyTotalAmount } from '~/shared/components/multimonedas/currency-total-amount';
 import { hasMultiMonedasAvailable } from '~/shared/components/multimonedas/currency-select';
+import { CurrencyFilter } from '~/shared/components/multimonedas/currency-filter';
+import { useCurrencyFilter } from '~/shared/components/multimonedas/use-currency-filter';
+import { presentCurrencies, resolveCurrency } from '~/shared/lib/currency-totals';
+import { formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency';
 import { Card } from '~/shared/components/ui/card';
 import { InfoBox } from '~/shared/components/ui/info-box';
 import { OrderOfflineService } from '../lib/services/order-offline-service';
@@ -78,7 +81,31 @@ export function TodayOrdersPage() {
 
   const paymentOptions = collectOrderPaymentMethodKeys(orders);
   const paymentActive = paymentKey !== null && paymentOptions.includes(paymentKey) ? paymentKey : null;
-  const visibleOrders = orders.filter((o) => !paymentActive || matchesOrderPaymentFilter(o, paymentActive));
+  const paymentFilteredOrders = orders.filter(
+    (o) => !paymentActive || matchesOrderPaymentFilter(o, paymentActive),
+  );
+
+  // Filtro de moneda: las opciones se derivan del conjunto SIN filtrar por moneda
+  // (solo por método de pago), para que el filtro no desaparezca al elegir una
+  // moneda y no haya forma de volver a las demás.
+  const currencyOptions = presentCurrencies(
+    paymentFilteredOrders.map((o) => ({ amount: o.total, currency: o.currency })),
+  );
+  const { visible: currencyFilterVisible, currency, setCurrency } =
+    useCurrencyFilter(currencyOptions);
+  // Con el módulo activo, una sola moneda presente conserva su código (comportamiento
+  // previo); sin el módulo, el total mezclado sigue rotulándose CUP.
+  const displayCurrency =
+    currencyFilterVisible && currency !== null
+      ? currency
+      : multiMonedas
+        ? (currencyOptions[0] ?? DEFAULT_CURRENCY)
+        : DEFAULT_CURRENCY;
+
+  const visibleOrders =
+    currencyFilterVisible && currency !== null
+      ? paymentFilteredOrders.filter((o) => resolveCurrency(o.currency) === currency)
+      : paymentFilteredOrders;
 
   const ordersItemsCount = visibleOrders.reduce((count, o) => count + o.itemsCount, 0);
   const ordersTotal = visibleOrders.reduce((total, o) => total + o.total, 0);
@@ -96,14 +123,7 @@ export function TodayOrdersPage() {
             </span>
           </span>
           <span className="text-sm font-semibold text-primary whitespace-nowrap">
-            <CurrencyTotalAmount
-              legacyTotal={ordersTotal}
-              entries={visibleOrders.map((order) => ({
-                amount: order.total,
-                currency: order.currency,
-              }))}
-              multiMonedas={multiMonedas}
-            />
+            {formatMoneyWithCurrency(ordersTotal, displayCurrency)}
           </span>
         </div>
       }
@@ -165,6 +185,12 @@ export function TodayOrdersPage() {
           <span className="text-warning">Créditos</span>
         </label>
       </fieldset>
+
+      <CurrencyFilter
+        currencies={currencyOptions}
+        value={currency ?? currencyOptions[0] ?? DEFAULT_CURRENCY}
+        onChange={setCurrency}
+      />
 
       {visibleOrders.length === 0 && (
         <InfoBox variant="primary" className="mb-6 text-center">

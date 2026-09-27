@@ -348,13 +348,17 @@ namespace Infrastructure.Persistence.EntityConfigurations
                      true,
                      true
                  ),
+                // StorePayment (91) is SuperAdmin/ReSeller-only (StorePaymentAdmin) — not a store
+                // capability. AvailableToStore=false keeps the StoreRoleFeature generator from
+                // materialising its SuperAdmin/ReSeller rows inside every new store (decisión
+                // del usuario 2026-09-26; registra los pagos desde /admin, no desde la tienda).
                 Feature.Create(
                      (int)FeatureType.StorePayment,
                      FeatureType.StorePayment.GetDescription(),
                      "Funcionalidad para registrar pagos de tiendas",
                      (int)ModuleType.Billing,
                      191,
-                     true,
+                     false,
                      true
                  ),
 

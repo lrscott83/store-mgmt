@@ -3,6 +3,8 @@ import { formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency
 
 interface CategoryStatsProps {
   category: CategoryCartItemsView;
+  /** Moneda con la que formatear los montos; ausente = CUP (DEFAULT_CURRENCY). */
+  currency?: number;
 }
 
 /**
@@ -11,8 +13,12 @@ interface CategoryStatsProps {
  * followed by one row per product in `category.productItems` (same column layout).
  * No i18n keys here — Angular's template has zero static Spanish text, only
  * currency-formatted numbers and the category/product names themselves.
+ *
+ * `currency` es opcional (currency-filter-per-view): las vistas que filtran por
+ * moneda lo pasan con la moneda elegida para que las filas muestren solo esa
+ * moneda; los llamadores que no lo pasan mantienen el CUP por defecto.
  */
-export function CategoryStats({ category }: CategoryStatsProps) {
+export function CategoryStats({ category, currency }: CategoryStatsProps) {
   if (!category) return null;
 
   return (
@@ -28,7 +34,7 @@ export function CategoryStats({ category }: CategoryStatsProps) {
             </td>
             <td className="p-1 text-right">
               <span className="font-bold text-success">
-                {formatMoneyWithCurrency(category.total)}
+                {formatMoneyWithCurrency(category.total, currency)}
               </span>
             </td>
           </tr>
@@ -42,7 +48,7 @@ export function CategoryStats({ category }: CategoryStatsProps) {
               </td>
               <td className="p-1 text-right">
                 <span className="font-bold text-success">
-                  {formatMoneyWithCurrency(product.total)}
+                  {formatMoneyWithCurrency(product.total, currency)}
                 </span>
               </td>
             </tr>

@@ -7,8 +7,10 @@ import { switchToStore } from '~/shared/lib/stores/switch-store';
 
 /**
  * Owner-only store switcher shown in the navbar before the tutorial link.
- * Visible ONLY for owners whose selected store has the MultiStores module
- * (module 14). Opens a popup listing the owner's ACTIVE stores; selecting a
+ * Visible for owners whose session offers ≥2 stores (their own active stores
+ * plus the current one), or whose selected store has the MultiStores module
+ * (14) — the historical gate, kept for legacy/offline sessions without a
+ * usable storeList. Opens a popup listing the owner's ACTIVE stores; selecting a
  * different store stays logged in: the selection persists server-side, the
  * session refreshes for the new store and the page hard-reloads into it —
  * the new store's DEK comes from the per-store device wrap provisioned at
@@ -37,24 +39,39 @@ export function StoreSwitcher() {
   if (!user?.isOwnerAdmin) {
     return null;
   }
-  // Gate MultiStores (módulo 14): el propietario solo puede cambiar de tienda si
-  // su tienda seleccionada tiene el módulo activo (storeModuleIds del user,
-  // online vía auth/me y offline vía roster).
-  if (!user.storeModuleIds.includes(EModules.MultiStores)) {
+
+  // Tiendas ofertables por la sesión: las activas + la actual (aunque esté
+  // inactiva — nunca strand al usuario). Legacy entries sin `isActive` (un /me
+  // cacheado antes de que existiera el campo) NO son conocidamente activas —
+  // ofrecerlas podría strand al usuario en una tienda de la que ya no puede
+  // salir, así que se saltan hasta el próximo /me que self-healée la cache.
+  // Es la MISMA lista que alimenta el popup: el botón solo existe para
+  // alcanzar el popup.
+  const activeStores = (user.storeList ?? []).filter(
+    (store) => store.id === user.selectedStoreId || store.isActive === true,
+  );
+
+  // Gate de visibilidad (decisión del propietario 2026-09-26, solución A):
+  // el botón aparece si la sesión ofrece ≥2 tiendas — cualquier owner-admin
+  // con 2+ tiendas puede cambiar de tienda, independientemente del módulo
+  // MultiStores (14) de la tienda seleccionada — O si la tienda seleccionada
+  // tiene 14 (gate histórico: sesiones legacy/offline sin storeList utilizable
+  // y owners con 14 y una sola tienda, sin regresión). Antes el gate era SOLO
+  // 14 en la tienda ACTUAL: al clampear la herencia al catálogo Pago activo
+  // (2026-09-25) la hija nace sin 14 y el owner quedaba atrapado en ella sin
+  // "Cambiar tienda" para volver a la padre. El backend (SetMyStoreCommand)
+  // nunca exigió 14: solo pide que la destino esté entre las tiendas activas
+  // del usuario.
+  const canSwitchStores =
+    activeStores.length > 1 ||
+    user.storeModuleIds.includes(EModules.MultiStores);
+  if (!canSwitchStores) {
     return null;
   }
 
   /** Nombre de la tienda seleccionada actualmente (roles del user cacheado). */
   const currentStoreName =
     user.roles.find((r) => r.storeId === user.selectedStoreId)?.storeName ?? '';
-
-  // Active stores from the session's list. Legacy entries without `isActive`
-  // (a /me cached before the field shipped) are NOT known-active — offering
-  // them could strand the user on a store they can no longer switch away
-  // from, so they are skipped until the next /me self-heals the cache.
-  const activeStores = (user.storeList ?? []).filter(
-    (store) => store.id === user.selectedStoreId || store.isActive === true,
-  );
 
   // Fallback for sessions without a usable storeList (undefined or every
   // entry lacking isActive): offer exactly the current store so the popup

@@ -1,5 +1,7 @@
 import { useState } from 'react';
+import type { ReactNode } from 'react';
 import { useIntl } from 'react-intl';
+import type { Currency } from '@store-mgmt/domain';
 import { ChevronDownIcon } from '~/shared/components/ui/icons';
 import type { InventoryCategoryView } from '../lib/services/inventory-offline-service';
 import { formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency';
@@ -15,6 +17,19 @@ interface InventoryProductListProps {
    */
   search?: string;
   onSearchChange?: (value: string) => void;
+  /**
+   * currency-filter-per-view: currency of the category totals when the view
+   * works one currency at a time (available.tsx passes the resolved selection).
+   * Omitted → legacy behaviour (`CurrencyTotalAmount` with the hardcoded
+   * multiMonedas gate) so every existing caller stays byte-identical.
+   */
+  currency?: Currency;
+  /**
+   * currency-filter-per-view: extra control rendered as its own row right AFTER
+   * the search, so the currency selector sits below the existing filter.
+   * Omitted → nothing rendered (back-compat).
+   */
+  filterSlot?: ReactNode;
 }
 
 /**
@@ -47,6 +62,8 @@ export function InventoryProductList({
   categories,
   search: controlledSearch,
   onSearchChange,
+  currency,
+  filterSlot,
 }: InventoryProductListProps) {
   const intl = useIntl();
   const [internalSearch, setInternalSearch] = useState('');
@@ -82,6 +99,9 @@ export function InventoryProductList({
         />
       </div>
 
+      {/* Fila propia de moneda debajo del filtro existente (se auto-oculta). */}
+      {filterSlot}
+
       {filtered.length === 0 ? (
         <div className="py-8 text-center text-text-muted">
           {intl.formatMessage({ id: 'INVENTORY.CATEGORY_PRODUCT_NO_FOUND' })}
@@ -105,15 +125,21 @@ export function InventoryProductList({
                 </h2>
                 <span className="flex items-center gap-2">
                   {/* Category total inventory value — Angular's mat-expansion-panel-header
-                      category.totalCostPrice chip (inventory-available.component.html:26). */}
+                      category.totalCostPrice chip (inventory-available.component.html:26).
+                      Con `currency` (vista filtrada) se usa el formateador normal de una
+                      sola moneda; sin él se conserva el comportamiento legacy. */}
                   <span className="text-sm font-semibold text-primary whitespace-nowrap">
-                    <CurrencyTotalAmount
-                      legacyTotal={cat.totalCostPrice}
-                      entries={nonEmptyCurrencyRows(
-                        cat.totalCostPriceEntries ?? [{ amount: cat.totalCostPrice }],
-                      )}
-                      multiMonedas
-                    />
+                    {currency !== undefined ? (
+                      formatMoneyWithCurrency(cat.totalCostPrice, currency)
+                    ) : (
+                      <CurrencyTotalAmount
+                        legacyTotal={cat.totalCostPrice}
+                        entries={nonEmptyCurrencyRows(
+                          cat.totalCostPriceEntries ?? [{ amount: cat.totalCostPrice }],
+                        )}
+                        multiMonedas
+                      />
+                    )}
                   </span>
                   <ChevronDownIcon isExpanded={isExpanded} className="text-text-muted" />
                 </span>

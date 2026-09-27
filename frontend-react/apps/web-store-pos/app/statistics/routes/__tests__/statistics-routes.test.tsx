@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 import type { Expense, Order, OrderItem, SaleCredit } from '@store-mgmt/domain';
@@ -310,6 +310,17 @@ describe('DashboardPage — KPI cards', () => {
     expect(screen.queryByText(/Hoy/)).not.toBeInTheDocument();
   });
 
+  it('lays the KPI grid out 4 per row on desktop and 2 on mobile (lg:grid-cols-4)', () => {
+    render(
+      <Wrapper>
+        <DashboardPage />
+      </Wrapper>,
+    );
+    const grid = screen.getByTestId('kpi-sales').parentElement;
+    expect(grid?.className).toContain('grid-cols-2');
+    expect(grid?.className).toContain('lg:grid-cols-4');
+  });
+
   it('hides Gastos/Créditos when their modules are off', () => {
     mockUser = makeUser([]);
     render(
@@ -418,7 +429,7 @@ describe('DashboardPage — popups', () => {
     resetAllMocks();
   });
 
-  it('tapping the Ventas value opens the payment-method detail popup', () => {
+  it('the (i) opens the payment-method detail popup', () => {
     mockOrderService.getStorageOrders.mockReturnValue([
       makeOrder('o1', { total: 100, paymentType: PaymentType.Efectivo }),
       makeOrder('o2', { total: 50, paymentType: PaymentType.Tarjeta, date: daysAgo(1) }),
@@ -429,13 +440,27 @@ describe('DashboardPage — popups', () => {
         <DashboardPage />
       </Wrapper>,
     );
-    fireEvent.click(screen.getByTestId('kpi-sales-value'));
+    fireEvent.click(screen.getByTestId('kpi-sales-info'));
 
     const popup = screen.getByTestId('dashboard-popup');
     expect(popup).toHaveTextContent('Método de pago — CUP');
     expect(popup).toHaveTextContent('Efectivo');
-    expect(popup).toHaveTextContent('Tarjeta');
+    // Real channel: legacy Tarjeta resolves to Transferencia — never "Tarjeta".
+    expect(popup).toHaveTextContent('Transferencia');
+    expect(popup).not.toHaveTextContent('Tarjeta');
     expect(popup).toHaveTextContent('100.00 CUP (67%)');
+  });
+
+  it('tapping the KPI value does NOT open the popup — only the (i) does', () => {
+    render(
+      <Wrapper>
+        <DashboardPage />
+      </Wrapper>,
+    );
+    fireEvent.click(screen.getByTestId('kpi-sales-value'));
+    expect(screen.queryByTestId('dashboard-popup')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('kpi-sales-info'));
+    expect(screen.getByTestId('dashboard-popup')).toBeInTheDocument();
   });
 
   it('the trend popup explains the comparison and shows the previous range dates', () => {
@@ -464,7 +489,7 @@ describe('DashboardPage — popups', () => {
         <DashboardPage />
       </Wrapper>,
     );
-    fireEvent.click(screen.getByTestId('kpi-expenses-value'));
+    fireEvent.click(screen.getByTestId('kpi-expenses-info'));
     const popup = screen.getByTestId('dashboard-popup');
     expect(popup).toHaveTextContent('Gastos del rango');
     expect(popup).toHaveTextContent('Transporte');
@@ -480,7 +505,7 @@ describe('DashboardPage — popups', () => {
         <DashboardPage />
       </Wrapper>,
     );
-    fireEvent.click(screen.getByTestId('kpi-credits-value'));
+    fireEvent.click(screen.getByTestId('kpi-credits-info'));
     const popup = screen.getByTestId('dashboard-popup');
     expect(popup).toHaveTextContent('Créditos sin pagar');
     expect(popup).toHaveTextContent('Ana');
@@ -493,7 +518,7 @@ describe('DashboardPage — popups', () => {
         <DashboardPage />
       </Wrapper>,
     );
-    fireEvent.click(screen.getByTestId('kpi-sales-value'));
+    fireEvent.click(screen.getByTestId('kpi-sales-info'));
     expect(screen.getByTestId('dashboard-popup')).toBeInTheDocument();
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(screen.queryByTestId('dashboard-popup')).not.toBeInTheDocument();
@@ -506,7 +531,7 @@ describe('DashboardPage — currency rule (MultiMonedas)', () => {
     resetAllMocks();
   });
 
-  it('with 2+ currencies shows the "+" and lists every currency without conversion', () => {
+  it('with 2+ currencies the (i) opens one popup with every currency total and its channel detail', () => {
     mockUser = makeUser([...MODULES_WITH_EXPENSES_AND_CREDITS, EModules.MultiMonedas]);
     mockOrderService.getStorageOrders.mockReturnValue([
       makeOrder('cup', { total: 100 }),
@@ -519,21 +544,26 @@ describe('DashboardPage — currency rule (MultiMonedas)', () => {
       </Wrapper>,
     );
 
-    // USD wins the priority even with a smaller amount.
+    // The global filter defaults to the first of the agreed order (USD), so the
+    // KPI value shows USD only.
     expect(screen.getByTestId('kpi-sales-value')).toHaveTextContent('50 USD');
-    const plus = screen.getByTestId('kpi-sales-currencies');
-    expect(plus).toBeInTheDocument();
+    // The old "+" is gone; the info icon replaces it and opens the merged popup.
+    expect(screen.queryByTestId('kpi-sales-currencies')).not.toBeInTheDocument();
+    const info = screen.getByTestId('kpi-sales-info');
+    expect(info).toHaveAttribute('aria-label', 'Ver desglose de Ventas');
 
-    fireEvent.click(plus);
+    fireEvent.click(info);
     const popup = screen.getByTestId('dashboard-popup');
-    expect(popup).toHaveTextContent('USD');
+    // Per-currency totals first (one card per currency, label once) …
+    expect(popup).toHaveTextContent('Método de pago — USD');
+    expect(popup).toHaveTextContent('Ventas');
     expect(popup).toHaveTextContent('50 USD');
-    expect(popup).toHaveTextContent('CUP');
+    expect(popup).toHaveTextContent('Método de pago — CUP');
     expect(popup).toHaveTextContent('100 CUP');
     expect(popup).toHaveTextContent('sin conversión');
   });
 
-  it('with a single currency there is no "+"', () => {
+  it('with a single currency there is no "+" and no currency filter', () => {
     mockUser = makeUser([...MODULES_WITH_EXPENSES_AND_CREDITS, EModules.MultiMonedas]);
     mockOrderService.getStorageOrders.mockReturnValue([makeOrder('cup', { total: 100 })]);
 
@@ -545,6 +575,63 @@ describe('DashboardPage — currency rule (MultiMonedas)', () => {
 
     expect(screen.getByTestId('kpi-sales-value')).toHaveTextContent('100 CUP');
     expect(screen.queryByTestId('kpi-sales-currencies')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('currency-filter')).not.toBeInTheDocument();
+  });
+});
+
+describe('DashboardPage — global currency filter (MultiMonedas)', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    resetAllMocks();
+  });
+
+  it('defaults to the first of the agreed order and filters every widget to the pick', () => {
+    mockUser = makeUser([...MODULES_WITH_EXPENSES_AND_CREDITS, EModules.MultiMonedas]);
+    mockOrderService.getStorageOrders.mockReturnValue([
+      makeOrder('cup', {
+        total: 100,
+        orderItems: [makeItem({ price: 100, quantity: 1, categoryName: 'Bebidas' })],
+      }),
+      makeOrder('usd', {
+        total: 50,
+        currency: Currency.USD,
+        date: daysAgo(1),
+        orderItems: [makeItem({ price: 50, quantity: 1, categoryName: 'Licores' })],
+      }),
+    ]);
+
+    render(
+      <Wrapper>
+        <DashboardPage />
+      </Wrapper>,
+    );
+
+    const select = screen.getByTestId('currency-filter-select') as HTMLSelectElement;
+    // First of the agreed order = USD (present, even with a smaller amount).
+    expect(select.value).toBe(String(Currency.USD));
+    expect(screen.getByTestId('kpi-sales-value')).toHaveTextContent('50 USD');
+
+    fireEvent.change(select, { target: { value: String(Currency.CUP) } });
+
+    expect(screen.getByTestId('kpi-sales-value')).toHaveTextContent('100 CUP');
+    // The options do NOT shrink with the selection: USD is still offered.
+    expect(select.value).toBe(String(Currency.CUP));
+    expect(within(select).getByText('USD')).toBeInTheDocument();
+    // The donut/tables follow the global filter.
+    expect(screen.getAllByTestId('donut')[0]).toHaveTextContent('donut(1)');
+  });
+
+  it('stays hidden without the MultiMonedas module and keeps the legacy selector', () => {
+    mockOrderService.getStorageOrders.mockReturnValue([makeOrder('cup', { total: 100 })]);
+
+    render(
+      <Wrapper>
+        <DashboardPage />
+      </Wrapper>,
+    );
+
+    expect(screen.queryByTestId('currency-filter')).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/moneda/i)).toBeInTheDocument();
   });
 });
 
@@ -617,7 +704,7 @@ describe('DashboardPage — charts, donuts and tables', () => {
     expect(screen.getAllByText('60.00 CUP').length).toBeGreaterThanOrEqual(2);
   });
 
-  it('currency chips appear only when the orders mix 2+ currencies', () => {
+  it('currency chips are informative indicators, shown only with 2+ currencies', () => {
     mockUser = makeUser([...MODULES_WITH_EXPENSES_AND_CREDITS, EModules.MultiMonedas]);
     mockOrderService.getStorageOrders.mockReturnValue([
       makeOrder('cup', { total: 100 }),
@@ -628,8 +715,9 @@ describe('DashboardPage — charts, donuts and tables', () => {
         <DashboardPage />
       </Wrapper>,
     );
-    const chips = screen.getAllByRole('button', { name: /^(USD|CUP)$/ });
-    expect(chips.length).toBeGreaterThanOrEqual(4); // 2 donut cards + 2 tables
+    // 2 donut cards + 2 tables, one chip group each. They are not buttons anymore.
+    expect(screen.getAllByTestId('currency-chips')).toHaveLength(4);
+    expect(screen.queryByRole('button', { name: /^(USD|CUP)$/ })).not.toBeInTheDocument();
     unmount();
 
     resetAllMocks();
@@ -640,7 +728,7 @@ describe('DashboardPage — charts, donuts and tables', () => {
         <DashboardPage />
       </Wrapper>,
     );
-    expect(screen.queryByRole('button', { name: /^(USD|CUP)$/ })).not.toBeInTheDocument();
+    expect(screen.queryByTestId('currency-chips')).not.toBeInTheDocument();
   });
 });
 

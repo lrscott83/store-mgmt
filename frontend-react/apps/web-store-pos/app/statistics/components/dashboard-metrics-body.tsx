@@ -2,10 +2,11 @@ import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { useIntl } from 'react-intl';
 import type { Currency, Expense } from '@store-mgmt/domain';
-import { DEFAULT_CURRENCY, PaymentType } from '@store-mgmt/domain';
+import { DEFAULT_CURRENCY } from '@store-mgmt/domain';
 import { Modal } from '~/shared/components/ui/modal';
 import { addDays, formatLocalDate } from '~/shared/lib/date-utils';
 import { currencyLabel } from '~/shared/lib/format-money-with-currency';
+import { channelLabel } from '~/shared/lib/payment-methods/channel-label';
 import type { CurrencyTotal } from '~/shared/lib/currency-totals';
 import type {
   CurrencyRangeBucket,
@@ -35,8 +36,14 @@ import { SalesChart } from './sales-chart';
  * renders one `DashboardRangeMetrics` snapshot.
  *
  * All amounts follow the currency rule: values are grouped per currency and the
- * primary follows the display order (USD → EUR → CUP → highest amount). With 2+
- * currencies the card shows a "+" that opens the full per-currency breakdown.
+ * primary follows the display order (USD → EUR → CUP → highest amount). The card
+ * header carries an `(i)` that opens ONE popup with every per-currency total plus
+ * the per-KPI detail (the `+` and the separate `currencies` popup are gone).
+ *
+ * `selectedCurrency` is the global dashboard filter: when non-null every KPI,
+ * chart, donut and table is restricted to that currency. It is null without the
+ * MultiMonedas module or with a single currency, and the body then behaves
+ * exactly as before (primary group).
  */
 
 type KpiKey =
@@ -126,12 +133,6 @@ const CREDITS_TITLE = 'Créditos por cobrar';
 const ALL_ORDER_TYPES_NOTE =
   'Incluye todos los tipos de venta (normal, mayorista, merma, ajuste, otro)';
 
-const PAYMENT_LABEL_IDS: Record<number, string> = {
-  [PaymentType.Efectivo]: 'CART.EFECTIVO',
-  [PaymentType.Tarjeta]: 'CART.TARJETA',
-  [PaymentType.Zelle]: 'CART.ZELLE',
-};
-
 /** Zero-valued fallback group so the cards render without data (all "0"). */
 function emptyGroup(): CurrencyRangeMetrics {
   return {
@@ -163,6 +164,8 @@ export interface DashboardMetricsBodyProps {
   formatAmount: (amount: number, currency: Currency) => string;
   /** `8/9 – 14/9` label of the selected range (tables subtitle). */
   rangeLabel: string;
+  /** Global currency filter selection; null when hidden (module off / 1 currency). */
+  selectedCurrency: Currency | null;
   loadingMessage: string;
   emptyMessage: string;
 }
@@ -173,48 +176,43 @@ export function DashboardMetricsBody({
   hasCreditsModule,
   formatAmount,
   rangeLabel,
+  selectedCurrency,
   loadingMessage,
   emptyMessage,
 }: DashboardMetricsBodyProps) {
   const intl = useIntl();
   const [popup, setPopup] = useState<{
     key: KpiKey;
-    kind: 'detail' | 'trend' | 'currencies';
+    kind: 'detail' | 'trend';
   } | null>(null);
-  const [breakdownSelection, setBreakdownSelection] = useState<Currency | null>(null);
 
-  const primary = metrics.primary ?? emptyGroup();
+  // Selected currency group when the global filter is on; otherwise the primary
+  // group (first of the display order) — the pre-filter behaviour.
+  const primary =
+    selectedCurrency !== null
+      ? (metrics.groups.find((group) => group.currency === selectedCurrency) ?? {
+          ...emptyGroup(),
+          currency: selectedCurrency,
+        })
+      : (metrics.primary ?? emptyGroup());
   const primaryCurrency = primary.currency;
   const daysInWindow = localDaySpan(metrics.window);
 
-  // Currency chips of the order breakdowns (donuts/tables): display order, only
-  // currencies actually present in the window's orders.
+  // Currencies present in the window's orders (donut/table chips). The global
+  // filter, when visible, marks its own currency active; the chips are purely
+  // informative — they no longer switch a local breakdown currency.
   const breakdownCurrencies = orderCurrencies(metrics.orders);
-  const activeBreakdownCurrency =
-    breakdownSelection !== null && breakdownCurrencies.includes(breakdownSelection)
-      ? breakdownSelection
-      : (breakdownCurrencies[0] ?? primaryCurrency);
+  const widgetCurrency = selectedCurrency ?? breakdownCurrencies[0] ?? primaryCurrency;
 
   const definitions = KPI_DEFINITIONS.filter(
     (definition) => definition.key !== 'expenses' || hasExpensesModule,
   );
-
-  const paymentLabel = (paymentType: PaymentType): string =>
-    intl.formatMessage({ id: PAYMENT_LABEL_IDS[paymentType] ?? 'CART.EFECTIVO' });
 
   function formatKpiValue(definition: KpiDefinition, group: CurrencyRangeMetrics): string {
     const value = definition.valueOf(group);
     if (definition.kind === 'money') return formatAmount(value, group.currency);
     if (definition.kind === 'percent') return `${value.toFixed(2)} %`;
     return value.toFixed(2);
-  }
-
-  function currencyTotalsOf(definition: KpiDefinition): CurrencyTotal[] {
-    return metrics.groups.map((group) => ({
-      currency: group.currency,
-      label: currencyLabel(group.currency),
-      amount: definition.valueOf(group),
-    }));
   }
 
   function previousValueOf(definition: KpiDefinition): number {
@@ -229,7 +227,8 @@ export function DashboardMetricsBody({
     return series.buckets.map(definition.bucketValueOf);
   }
 
-  const creditsCurrency = metrics.creditsReceivablePrimary?.currency ?? primaryCurrency;
+  const creditsCurrency =
+    selectedCurrency ?? metrics.creditsReceivablePrimary?.currency ?? primaryCurrency;
   const creditsSeries = metrics.creditsSeries.find((entry) => entry.currency === creditsCurrency);
   const creditsValues = creditsSeries
     ? creditsSeries.buckets.map((bucket) => bucket.balance)
@@ -257,7 +256,6 @@ export function DashboardMetricsBody({
         ? CREDITS_TITLE
         : (KPI_DEFINITIONS.find((definition) => definition.key === popup.key)?.title ?? '');
     if (popup.kind === 'trend') return `${title} — vs anterior`;
-    if (popup.kind === 'currencies') return `${title} — monedas`;
     return title;
   }
 
@@ -299,12 +297,18 @@ export function DashboardMetricsBody({
 
     if (popup.key === 'sales') {
       return metrics.groups.map((group) => {
-        const slices = paymentBreakdown(metrics.orders, group.currency, paymentLabel);
+        const slices = paymentBreakdown(metrics.orders, group.currency, (method) =>
+          channelLabel(method, group.currency, (id) => intl.formatMessage({ id })),
+        );
         return (
           <PopupCard
             key={group.currency}
             title={`Método de pago — ${currencyLabel(group.currency)}`}
           >
+            <AmountRow
+              label={definitionOf('sales').title}
+              value={formatAmount(group.salesTotal, group.currency)}
+            />
             {slices.length === 0 ? (
               <p className="text-sm text-text-muted">{emptyMessage}</p>
             ) : (
@@ -492,26 +496,6 @@ export function DashboardMetricsBody({
     );
   }
 
-  function currenciesContent(): ReactNode {
-    if (!popup) return null;
-    const totals =
-      popup.key === 'credits'
-        ? metrics.creditsReceivable
-        : currencyTotalsOf(definitionOf(popup.key));
-    return (
-      <div className="space-y-2 text-sm">
-        <p>Montos por moneda del periodo (sin conversión; las monedas no se suman entre sí).</p>
-        {totals.map((total) => (
-          <AmountRow
-            key={total.currency}
-            label={total.label}
-            value={formatAmount(total.amount, total.currency)}
-          />
-        ))}
-      </div>
-    );
-  }
-
   function definitionOf(key: KpiKey): KpiDefinition {
     return KPI_DEFINITIONS.find((entry) => entry.key === key) ?? KPI_DEFINITIONS[0];
   }
@@ -522,14 +506,17 @@ export function DashboardMetricsBody({
 
   return (
     <div className="space-y-6">
-      {/* KPI cards — two columns, mobile friendly. */}
-      <div className="grid grid-cols-2 gap-4">
+      {/*
+        KPI cards — 4 per row on desktop, 2 on mobile/tablet. The earlier
+        `grid-cols-2` came from a commit that justified it with Angular parity,
+        which this project does not accept as a reason (owner decision 12).
+      */}
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {definitions.map((definition) => (
           <KpiCard
             key={definition.key}
             title={definition.title}
             valueText={formatKpiValue(definition, primary)}
-            currencyTotals={currencyTotalsOf(definition)}
             actual={definition.valueOf(primary)}
             previous={previousValueOf(definition)}
             sparklineValues={sparklineValuesOf(definition)}
@@ -537,7 +524,6 @@ export function DashboardMetricsBody({
             testId={`kpi-${definition.key}`}
             onOpenDetail={() => setPopup({ key: definition.key, kind: 'detail' })}
             onOpenTrend={() => setPopup({ key: definition.key, kind: 'trend' })}
-            onOpenCurrencies={() => setPopup({ key: definition.key, kind: 'currencies' })}
           />
         ))}
         {hasCreditsModule && (
@@ -547,7 +533,6 @@ export function DashboardMetricsBody({
               amountOf(metrics.creditsReceivable, creditsCurrency),
               creditsCurrency,
             )}
-            currencyTotals={metrics.creditsReceivable}
             actual={amountOf(metrics.creditsReceivable, creditsCurrency)}
             previous={creditsPrevious}
             sparklineValues={creditsValues}
@@ -555,7 +540,6 @@ export function DashboardMetricsBody({
             testId="kpi-credits"
             onOpenDetail={() => setPopup({ key: 'credits', kind: 'detail' })}
             onOpenTrend={() => setPopup({ key: 'credits', kind: 'trend' })}
-            onOpenCurrencies={() => setPopup({ key: 'credits', kind: 'currencies' })}
           />
         )}
       </div>
@@ -593,24 +577,22 @@ export function DashboardMetricsBody({
         />
       </section>
 
-      {/* Donuts — per currency, with the chips inside each card. */}
+      {/* Donuts — the global currency filter (or the first present currency). */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <section className="rounded border bg-white p-4 shadow-sm">
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
             <h5 className="text-base font-semibold text-gray-700">
               Distribución por método de pago
             </h5>
-            <CurrencyChips
-              currencies={breakdownCurrencies}
-              value={activeBreakdownCurrency}
-              onChange={setBreakdownSelection}
-            />
+            <CurrencyChips currencies={breakdownCurrencies} value={widgetCurrency} />
           </div>
           <DonutChart
-            slices={paymentBreakdown(metrics.orders, activeBreakdownCurrency, paymentLabel)}
+            slices={paymentBreakdown(metrics.orders, widgetCurrency, (method) =>
+              channelLabel(method, widgetCurrency, (id) => intl.formatMessage({ id })),
+            )}
             loadingMessage={loadingMessage}
             emptyMessage={emptyMessage}
-            formatValue={(value) => formatAmount(value, activeBreakdownCurrency)}
+            formatValue={(value) => formatAmount(value, widgetCurrency)}
             testId="donut-payment"
           />
         </section>
@@ -618,17 +600,13 @@ export function DashboardMetricsBody({
         <section className="rounded border bg-white p-4 shadow-sm">
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
             <h5 className="text-base font-semibold text-gray-700">Distribución por categoría</h5>
-            <CurrencyChips
-              currencies={breakdownCurrencies}
-              value={activeBreakdownCurrency}
-              onChange={setBreakdownSelection}
-            />
+            <CurrencyChips currencies={breakdownCurrencies} value={widgetCurrency} />
           </div>
           <DonutChart
-            slices={categoryBreakdown(metrics.orders, activeBreakdownCurrency)}
+            slices={categoryBreakdown(metrics.orders, widgetCurrency)}
             loadingMessage={loadingMessage}
             emptyMessage={emptyMessage}
-            formatValue={(value) => formatAmount(value, activeBreakdownCurrency)}
+            formatValue={(value) => formatAmount(value, widgetCurrency)}
             testId="donut-category"
           />
         </section>
@@ -639,20 +617,18 @@ export function DashboardMetricsBody({
         <TopProductsCard
           title="Productos mayor ganancias"
           rangeLabel={rangeLabel}
-          currency={activeBreakdownCurrency}
+          currency={widgetCurrency}
           currencies={breakdownCurrencies}
-          onCurrencyChange={setBreakdownSelection}
-          rows={topProductsByProfit(metrics.orders, activeBreakdownCurrency)}
-          formatValue={(value) => formatAmount(value, activeBreakdownCurrency)}
+          rows={topProductsByProfit(metrics.orders, widgetCurrency)}
+          formatValue={(value) => formatAmount(value, widgetCurrency)}
           emptyMessage={emptyMessage}
         />
         <TopProductsCard
           title="Productos más vendidos"
           rangeLabel={rangeLabel}
-          currency={activeBreakdownCurrency}
+          currency={widgetCurrency}
           currencies={breakdownCurrencies}
-          onCurrencyChange={setBreakdownSelection}
-          rows={topProductsByQuantity(metrics.orders, activeBreakdownCurrency)}
+          rows={topProductsByQuantity(metrics.orders, widgetCurrency)}
           formatValue={(value) => value.toFixed(2)}
           emptyMessage={emptyMessage}
         />
@@ -664,9 +640,17 @@ export function DashboardMetricsBody({
         title={popupTitle()}
         testId="dashboard-popup"
       >
-        {popup?.kind === 'detail' && detailContent()}
+        {popup?.kind === 'detail' && (
+          <>
+            {metrics.groups.length > 1 && (
+              <p className="mb-3 text-sm text-text-muted">
+                Montos por moneda del periodo (sin conversión; las monedas no se suman entre sí).
+              </p>
+            )}
+            {detailContent()}
+          </>
+        )}
         {popup?.kind === 'trend' && trendContent()}
-        {popup?.kind === 'currencies' && currenciesContent()}
       </Modal>
     </div>
   );
@@ -702,32 +686,39 @@ function AmountRow({
   );
 }
 
+/**
+ * Informative currency indicators (owner decision 9): every currency present is
+ * listed and the one the dashboard is currently showing is marked active. They
+ * are deliberately NOT interactive — the global `CurrencyFilter` owns the
+ * selection now.
+ */
 function CurrencyChips({
   currencies,
   value,
-  onChange,
 }: {
   currencies: readonly Currency[];
   value: Currency;
-  onChange: (currency: Currency) => void;
 }) {
   if (currencies.length < 2) return null;
   return (
-    <div className="flex flex-wrap gap-1" role="group" aria-label="Moneda">
+    <div
+      className="flex flex-wrap gap-1"
+      role="group"
+      aria-label="Moneda"
+      data-testid="currency-chips"
+    >
       {currencies.map((currency) => (
-        <button
+        <span
           key={currency}
-          type="button"
-          onClick={() => onChange(currency)}
-          aria-pressed={currency === value}
+          aria-current={currency === value ? 'true' : undefined}
           className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${
             currency === value
               ? 'border-cyan-600 bg-cyan-50 text-cyan-700'
-              : 'border-border text-text-muted hover:bg-surface-hover'
+              : 'border-border text-text-muted'
           }`}
         >
           {currencyLabel(currency)}
-        </button>
+        </span>
       ))}
     </div>
   );
@@ -738,7 +729,6 @@ function TopProductsCard({
   rangeLabel,
   currency,
   currencies,
-  onCurrencyChange,
   rows,
   formatValue,
   emptyMessage,
@@ -747,7 +737,6 @@ function TopProductsCard({
   rangeLabel: string;
   currency: Currency;
   currencies: readonly Currency[];
-  onCurrencyChange: (currency: Currency) => void;
   rows: { id: string; name: string; value: number }[];
   formatValue: (value: number) => string;
   emptyMessage: string;
@@ -759,7 +748,7 @@ function TopProductsCard({
           {title}
           <span className="text-xs font-normal text-text-muted">{rangeLabel}</span>
         </h5>
-        <CurrencyChips currencies={currencies} value={currency} onChange={onCurrencyChange} />
+        <CurrencyChips currencies={currencies} value={currency} />
       </div>
       {rows.length === 0 ? (
         <p className="py-2 text-sm text-text-muted">{emptyMessage}</p>

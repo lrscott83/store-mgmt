@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useIntl } from 'react-intl';
 import type { InventoryEntryView } from '@store-mgmt/domain';
-import { EFeatures } from '@store-mgmt/domain';
+import { DEFAULT_CURRENCY, EFeatures } from '@store-mgmt/domain';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { isOwnerAdmin as checkIsOwnerAdmin } from '~/shared/lib/auth/authorization-service';
@@ -11,14 +11,16 @@ import { ProductCategoryRepository } from '~/sales/lib/repositories/product-cate
 import { Card } from '~/shared/components/ui/card';
 import { InfoBox } from '~/shared/components/ui/info-box';
 import { ChevronDownIcon } from '~/shared/components/ui/icons';
+import { hasMultiMonedasAvailable } from '~/shared/components/multimonedas/currency-select';
+import { CurrencyFilter } from '~/shared/components/multimonedas/currency-filter';
+import { useCurrencyFilter } from '~/shared/components/multimonedas/use-currency-filter';
+import { presentCurrencies, resolveCurrency } from '~/shared/lib/currency-totals';
 import { formatLocalDate, groupByLocalDay, addDays, startOfDay } from '~/shared/lib/date-utils';
 import type { LocalDayGroup } from '~/shared/lib/date-utils';
 import { DateRangeFilter } from '~/shared/components/date-range-filter/date-range-filter';
 import { EntryList } from '../components/entry-list';
 import { round2 } from '~/shared/lib/money';
-import { CurrencyTotalAmount } from '~/shared/components/multimonedas/currency-total-amount';
-import { nonEmptyCurrencyRows } from '~/shared/lib/currency-totals';
-import type { CurrencyAmount } from '~/shared/lib/currency-totals';
+import { formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency';
 import { useMultiStore } from '~/shared/lib/hooks/use-multi-store';
 import {
   MultiStoreSection,
@@ -68,6 +70,7 @@ export function EntriesPage() {
   const intl = useIntl();
   const user = useAuthStore((s) => s.user);
   const storeId = user?.selectedStoreId ?? '';
+  const multiMonedas = hasMultiMonedasAvailable(user);
   // Angular parity: entry-list.component.ts:32 isOwnerAdmin() (currentUser.isOwnerAdmin) —
   // gates the cost-price column inside EntryList (diff-matrix #6, L5 map).
   const isOwnerAdmin = user ? checkIsOwnerAdmin(user) : false;
@@ -158,12 +161,39 @@ export function EntriesPage() {
   const sumTotal = (entries: InventoryEntryView[]) =>
     entries.reduce((total, e) => total + round2(e.costPrice * e.quantity), 0);
 
-  /** Per-currency split of an entries' total — each amount keeps its entry currency.
-   *  Empty input → one 0 CUP row (headers show `0 CUP`, never the legacy `$0`). */
-  const entryAmounts = (entries: InventoryEntryView[]): CurrencyAmount[] =>
-    nonEmptyCurrencyRows(
-      entries.map((e) => ({ amount: e.costPrice * e.quantity, currency: e.currency })),
-    );
+  // Filtro de moneda (currency-filter-per-view): las opciones se derivan del
+  // conjunto SIN filtrar por moneda (single-store: las entradas cargadas;
+  // multi-store: las entradas leídas de cada tienda), para que el filtro no
+  // desaparezca al elegir una moneda. El hook vive al tope del componente
+  // porque el modo multi-store es un return temprano.
+  const currencyOptions = presentCurrencies(
+    multiStoreEnabled
+      ? [...storeEntryViews.values()]
+          .flat()
+          .map((e) => ({ amount: e.costPrice * e.quantity, currency: e.currency }))
+      : dayGroups.flatMap((d) =>
+          d.items.map((e) => ({ amount: e.costPrice * e.quantity, currency: e.currency })),
+        ),
+  );
+  const { visible: currencyFilterVisible, currency, setCurrency } =
+    useCurrencyFilter(currencyOptions);
+  // Tres casos (misma regla que credits/expenses): filtro visible → la elegida;
+  // módulo activo con una sola moneda presente → esa; módulo inactivo → CUP,
+  // salida idéntica a la de hoy.
+  const displayCurrency =
+    currencyFilterVisible && currency !== null
+      ? currency
+      : multiMonedas
+        ? (currencyOptions[0] ?? DEFAULT_CURRENCY)
+        : DEFAULT_CURRENCY;
+  /** Moneda activa del filtro (null cuando está oculto → no se filtra). */
+  const activeCurrency = currencyFilterVisible && currency !== null ? currency : null;
+
+  /** Aplica el filtro de moneda a las filas (no-op cuando el filtro está oculto). */
+  const filterEntriesByCurrency = (entries: InventoryEntryView[]): InventoryEntryView[] =>
+    activeCurrency === null
+      ? entries
+      : entries.filter((e) => resolveCurrency(e.currency) === activeCurrency);
 
   // multi-store mode ───────────────────────────────────────────────────────
   if (multiStoreEnabled) {
@@ -173,7 +203,8 @@ export function EntriesPage() {
         : [selectedMultiStoreId];
     // Date range applied client-side before rendering (per-store local data): end day
     // INCLUSIVE → the same half-open [start, next-day midnight) window the single-store
-    // service gets. Header AND panels follow the same filtered map.
+    // service gets. Header AND panels follow the same filtered map. El filtro de moneda
+    // se aplica ENCIMA del rango, así cada panel y el header quedan en una sola moneda.
     const rangeStart = dateRange.start ? startOfDay(dateRange.start) : null;
     const rangeEnd = dateRange.end ? startOfDay(addDays(dateRange.end, 1)) : null;
     const inRange = (entries: InventoryEntryView[]) =>
@@ -184,7 +215,9 @@ export function EntriesPage() {
         return true;
       });
     const filteredStoreEntries = new Map(
-      [...storeEntryViews].map(([id, entries]) => [id, inRange(entries)] as const),
+      [...storeEntryViews].map(
+        ([id, entries]) => [id, filterEntriesByCurrency(inRange(entries))] as const,
+      ),
     );
     const totals = visibleStoreIds.reduce(
       (acc, id) => {
@@ -209,13 +242,7 @@ export function EntriesPage() {
               </span>
             </span>
             <span className="text-sm font-semibold text-primary whitespace-nowrap">
-              <CurrencyTotalAmount
-                legacyTotal={totals.total}
-                entries={visibleStoreIds.flatMap((id) =>
-                  entryAmounts(filteredStoreEntries.get(id) ?? []),
-                )}
-                multiMonedas
-              />
+              {formatMoneyWithCurrency(totals.total, displayCurrency)}
             </span>
           </div>
         }
@@ -225,7 +252,17 @@ export function EntriesPage() {
           selectedStoreId={selectedMultiStoreId}
           onSelectedStoreIdChange={setSelectedMultiStoreId}
           filters={
-            <DateRangeFilter value={dateRange} onApply={setDateRange} className="flex-1 min-w-0" />
+            <>
+              <DateRangeFilter value={dateRange} onApply={setDateRange} className="flex-1 min-w-0" />
+              {/* Fila propia de moneda debajo del rango de fechas (se auto-oculta). */}
+              <div className="flex w-full justify-center">
+                <CurrencyFilter
+                  currencies={currencyOptions}
+                  value={currency ?? currencyOptions[0] ?? DEFAULT_CURRENCY}
+                  onChange={setCurrency}
+                />
+              </div>
+            </>
           }
           renderStoreCount={(store) => {
             const entries = filteredStoreEntries.get(store.id) ?? [];
@@ -237,7 +274,7 @@ export function EntriesPage() {
               <MultiStoreTotal
                 value={sumTotal(entries)}
                 valueClassName="text-primary"
-                entries={entryAmounts(entries)}
+                currency={displayCurrency}
               />
             );
           }}
@@ -277,16 +314,15 @@ export function EntriesPage() {
                         </span>
                         <span className="flex items-center gap-2">
                         <span className="text-xs font-semibold text-primary whitespace-nowrap">
-                          <CurrencyTotalAmount
-                            legacyTotal={round2(
+                          {formatMoneyWithCurrency(
+                            round2(
                               dayGroup.items.reduce(
                                 (total, e) => total + e.costPrice * e.quantity,
                                 0,
                               ),
-                            )}
-                            entries={entryAmounts(dayGroup.items)}
-                            multiMonedas
-                          />
+                            ),
+                            displayCurrency,
+                          )}
                         </span>
                           <ChevronDownIcon isExpanded={isExpanded} className="text-text-muted" />
                         </span>
@@ -308,8 +344,14 @@ export function EntriesPage() {
   }
 
   // single-store mode ──────────────────────────────────────────────────────
-  const entriesCount = dayGroups.reduce((count, d) => count + sumCount(d.items), 0);
-  const entriesTotal = round2(dayGroups.reduce((total, d) => total + sumTotal(d.items), 0));
+  // Filtro de moneda sobre las filas: cada día queda en una sola moneda.
+  const visibleDayGroups: LocalDayGroup<InventoryEntryView>[] = dayGroups
+    .map((d) => ({ ...d, items: filterEntriesByCurrency(d.items) }))
+    .filter((d) => d.items.length > 0);
+  const entriesCount = visibleDayGroups.reduce((count, d) => count + sumCount(d.items), 0);
+  const entriesTotal = round2(
+    visibleDayGroups.reduce((total, d) => total + sumTotal(d.items), 0),
+  );
 
   return (
     <Card
@@ -323,11 +365,7 @@ export function EntriesPage() {
             </span>
           </span>
           <span className="text-sm font-semibold text-primary whitespace-nowrap">
-            <CurrencyTotalAmount
-              legacyTotal={entriesTotal}
-              entries={entryAmounts(dayGroups.flatMap((d) => d.items))}
-              multiMonedas
-            />
+            {formatMoneyWithCurrency(entriesTotal, displayCurrency)}
           </span>
         </div>
       }
@@ -337,15 +375,24 @@ export function EntriesPage() {
         <DateRangeFilter value={dateRange} onApply={setDateRange} className="w-full sm:w-72" />
       </div>
 
+      {/* Fila propia de moneda debajo del rango de fechas (se auto-oculta). */}
+      <div className="mb-4">
+        <CurrencyFilter
+          currencies={currencyOptions}
+          value={currency ?? currencyOptions[0] ?? DEFAULT_CURRENCY}
+          onChange={setCurrency}
+        />
+      </div>
+
       <div className="space-y-4">
-        {dayGroups.length === 0 && (
+        {visibleDayGroups.length === 0 && (
           <InfoBox variant="primary" className="text-center">
             {intl.formatMessage({ id: 'INVENTORY.NO_HISTORY_ENTRY_FOUND' })}
           </InfoBox>
         )}
 
         <div className="space-y-2">
-          {dayGroups.map((dayGroup) => {
+          {visibleDayGroups.map((dayGroup) => {
             const dayId = dayGroup.dayKey;
             const isExpanded = expandedDayIds.has(dayId);
             return (
@@ -362,13 +409,12 @@ export function EntriesPage() {
                   </span>
                   <span className="flex items-center gap-2">
                     <span className="text-sm font-semibold text-primary whitespace-nowrap">
-                      <CurrencyTotalAmount
-                        legacyTotal={round2(
+                      {formatMoneyWithCurrency(
+                        round2(
                           dayGroup.items.reduce((total, e) => total + e.costPrice * e.quantity, 0),
-                        )}
-                        entries={entryAmounts(dayGroup.items)}
-                        multiMonedas
-                      />
+                        ),
+                        displayCurrency,
+                      )}
                     </span>
                     <ChevronDownIcon isExpanded={isExpanded} className="text-text-muted" />
                   </span>

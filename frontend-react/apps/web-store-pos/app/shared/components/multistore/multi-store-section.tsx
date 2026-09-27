@@ -8,7 +8,7 @@
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { useIntl } from 'react-intl';
-import { DEFAULT_CURRENCY, type StoreSummary } from '@store-mgmt/domain';
+import { DEFAULT_CURRENCY, type Currency, type StoreSummary } from '@store-mgmt/domain';
 import { ChevronDownIcon } from '~/shared/components/ui/icons';
 import { formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency';
 import { formatLocalDate } from '~/shared/lib/date-utils';
@@ -163,6 +163,7 @@ export function MultiStoreTotal({
   value,
   valueClassName = 'text-text',
   entries,
+  currency,
 }: {
   /** Optional — omit for count/total-only chips (e.g. "(3) 12.50 USD"). */
   label?: string;
@@ -175,6 +176,12 @@ export function MultiStoreTotal({
    * Omit to keep the legacy single-`formatCurrency` output.
    */
   entries?: CurrencyAmount[];
+  /**
+   * Currency of `value` when it is a single-currency amount. `currency-filter-per-view`
+   * views pass the selected currency so a filtered panel total keeps its code; the
+   * legacy callers omit it and keep the CUP fallback.
+   */
+  currency?: Currency;
 }) {
   return (
     <span className="flex items-center gap-1 whitespace-nowrap">
@@ -185,7 +192,7 @@ export function MultiStoreTotal({
         ) : (
           // Moneda siempre visible (petición 2026-09-23): el fallback sin
           // entradas muestra el total como CUP en vez del `$` legacy.
-          formatMoneyWithCurrency(value, DEFAULT_CURRENCY)
+          formatMoneyWithCurrency(value, currency ?? DEFAULT_CURRENCY)
         )}
       </span>
     </span>

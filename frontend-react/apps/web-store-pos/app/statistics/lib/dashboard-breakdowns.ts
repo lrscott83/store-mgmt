@@ -11,9 +11,10 @@
 //
 // Currency rule: every helper that aggregates money filters by ONE currency —
 // amounts of different currencies are never summed (moneda plan §2).
-import type { Currency, Order, PaymentType } from '@store-mgmt/domain';
+import type { Currency, Order, SalePaymentMethod } from '@store-mgmt/domain';
 import { calculateOrderProfit } from '~/inventory/lib/profit-calculator';
 import { addDays } from '~/shared/lib/date-utils';
+import { resolvedOrderPaymentMethod } from '~/shared/lib/payment-method-resolved';
 import { orderCurrencyTotals, resolveCurrency } from '~/shared/lib/currency-totals';
 import type { RangeBucket, RangeGranularity } from './dashboard-range-aggregator';
 import { round2 } from '~/shared/lib/money';
@@ -53,22 +54,27 @@ export function orderCurrencies(orders: readonly Order[]): Currency[] {
 }
 
 /**
- * Method-of-payment split of ONE currency's sales. `labelOf` localizes the
- * payment type (the view owns the intl keys) — the helper stays pure.
+ * Method-of-payment split of ONE currency's sales, grouped by the REAL channel
+ * (`resolvedOrderPaymentMethod`): `Efectivo`, `Zelle` and `Transferencia` are
+ * each their own slice — the owner's correction (2026-09-26) that Zelle is a
+ * payment channel like any other. `labelOf` localizes the resolved method (the
+ * view owns the intl keys) — the helper stays pure. `Tarjeta` is not a channel
+ * (the enum has no such member), so it is unreachable.
  */
 export function paymentBreakdown(
   orders: readonly Order[],
   currency: Currency,
-  labelOf: (paymentType: PaymentType) => string,
+  labelOf: (method: SalePaymentMethod) => string,
 ): BreakdownSlice[] {
-  const totals = new Map<PaymentType, number>();
+  const totals = new Map<SalePaymentMethod, number>();
   for (const order of ordersOfCurrency(orders, currency)) {
-    totals.set(order.paymentType, (totals.get(order.paymentType) ?? 0) + order.total);
+    const method = resolvedOrderPaymentMethod(order);
+    totals.set(method, (totals.get(method) ?? 0) + order.total);
   }
   return [...totals.entries()]
-    .map(([paymentType, value]) => ({
-      id: String(paymentType),
-      name: labelOf(paymentType),
+    .map(([method, value]) => ({
+      id: String(method),
+      name: labelOf(method),
       value: round2(value),
     }))
     .sort((a, b) => b.value - a.value);

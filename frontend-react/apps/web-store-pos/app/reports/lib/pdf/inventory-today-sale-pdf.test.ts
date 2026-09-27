@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { Currency } from '@store-mgmt/domain';
 import messages from '~/shared/lib/i18n/es';
 import { toLocalDayKey } from '~/shared/lib/date-utils';
 import type { InventoryTodaySaleRow } from './inventory-today-sale-pdf';
@@ -34,6 +35,9 @@ function makeRow(overrides: Partial<InventoryTodaySaleRow> = {}): InventoryToday
   return {
     productId: 'p1',
     productName: 'Ron',
+    // Default fixture currency is CUP so the pre-existing display assertions
+    // (PDF-05) stay byte-identical; the multi-currency test overrides it.
+    currency: Currency.CUP,
     unit: 'U',
     inicio: 8,
     entrada: 5,
@@ -175,6 +179,21 @@ describe('exportInventoryTodaySalePdf', () => {
     const [, options] = mockAutoTable.mock.calls[0];
     expect(options.body).toEqual([
       ['Vodka', 'U', 1, 2, 3, 4, '10\u00A0CUP', '30\u00A0CUP', '16\u00A0CUP', '48\u00A0CUP', '1.60\u00A0CUP', 10, '160\u00A0CUP'],
+    ]);
+  });
+
+  it("PDF-05b: labels every money cell with the ROW's own currency (never a hardcoded CUP)", async () => {
+    const { exportInventoryTodaySalePdf } = await import('./inventory-today-sale-pdf');
+
+    await exportInventoryTodaySalePdf([
+      makeRow({ currency: Currency.USD, productName: 'Ron USD' }),
+      makeRow({ currency: Currency.EUR, productName: 'Ron EUR' }),
+    ]);
+
+    const [, options] = mockAutoTable.mock.calls[0];
+    expect(options.body).toEqual([
+      ['Ron USD', 'U', 8, 5, 13, 3, '10\u00A0USD', '30\u00A0USD', '16\u00A0USD', '48\u00A0USD', '1.60\u00A0USD', 10, '160\u00A0USD'],
+      ['Ron EUR', 'U', 8, 5, 13, 3, '10\u00A0EUR', '30\u00A0EUR', '16\u00A0EUR', '48\u00A0EUR', '1.60\u00A0EUR', 10, '160\u00A0EUR'],
     ]);
   });
 

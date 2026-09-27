@@ -13,8 +13,10 @@ import { E2E_API_URL } from './support/backend-url';
  * Covers the MultiStores gate on the SELECTED store (billing-filtered
  * storeModuleIds — store-switcher parity), the name-only CreateStoreModal and
  * the owner-branch contract: body ownerId is the zero-Guid, approved=true,
- * moduleIds=[] — the backend derives the caller's own owner and inherits the
- * selected store's modules.
+ * moduleIds=[] — the backend derives the caller's own owner and births the
+ * store on the ACTIVE Pago plan catalog (2026-09-26 birth contract, decisión
+ * del propietario: TODA tienda nace con los módulos del plan Pago, siempre;
+ * la tienda seleccionada es irrelevante para el nacimiento).
  *
  * Matrix MC-01, MC-02, MC-04. NEVER touches existing specs (CLAUDE.md E2E
  * rule) — this is a brand-new file. Analysis-based: the FE E2E suite is NOT
@@ -72,6 +74,16 @@ async function readMyStores(page: Page): Promise<Array<{ id: string; name: strin
   }
   const body = (await response.json()) as { data?: Array<{ id: string; name: string }> };
   return body.data ?? [];
+}
+
+/** Reads the ACTIVE Pago plan (PlanId=2) catalog straight from the DB. */
+async function readPagoPlanModuleIds(): Promise<number[]> {
+  return withDb(async (client) => {
+    const result = await client.query(
+      'SELECT "ModuleId" FROM "StorePlanModule" WHERE "PlanId" = 2 ORDER BY "ModuleId"',
+    );
+    return result.rows.map((r) => r.ModuleId as number);
+  });
 }
 
 const MODULE_MULTISTORES = 14;
@@ -154,7 +166,7 @@ test('MC-01 — the + Tienda button shows only with MultiStores on the selected 
   await expect(createButton).toContainText('Tienda');
 });
 
-test('MC-02 — creating a store posts the owner-branch contract and inherits modules', async ({
+test('MC-02 — creating a store posts the owner-branch contract and is born with the Pago plan modules', async ({
   signedInPage,
 }) => {
   const { page, selectedStoreId } = signedInPage;
@@ -166,9 +178,10 @@ test('MC-02 — creating a store posts the owner-branch contract and inherits mo
   await seedMultiStoresModule(selectedStoreId);
   await refreshSessionFromMe(page);
 
-  const selectedStoreModuleIds = await readStoreModules(selectedStoreId);
-  // The seeded selected store owns every availableToStore module incl. MultiStores (14).
-  expect(selectedStoreModuleIds).toContain(14);
+  // Precondition pin: the seed landed on the selected store (the create-button
+  // gate runs against this set — MC-01 pins it). The BIRTH contract below no
+  // longer derives anything from this set.
+  expect(await readStoreModules(selectedStoreId)).toContain(14);
 
   // Intercept ALL /v1/stores traffic to capture the create POST (byte pattern of
   // store-create-security.spec.ts). RegExp, NOT the `**/v1/stores/**` glob: the
@@ -199,7 +212,8 @@ test('MC-02 — creating a store posts the owner-branch contract and inherits mo
   await page.getByTestId('owner-store-create-save').click();
 
   // The POST arrives with the owner-branch contract payload: zero-Guid ownerId
-  // (server derives), approved=true and NO moduleIds (server inherits).
+  // (server derives), approved=true and NO moduleIds (server assigns the Pago
+  // plan modules — 2026-09-26 birth contract).
   await expect
     .poll(() => {
       const create = capturedRequests
@@ -232,8 +246,13 @@ test('MC-02 — creating a store posts the owner-branch contract and inherits mo
   const created = (await readMyStores(page)).find((s) => s.name === newName);
   expect(created).toBeTruthy();
   if (!created) return; // unreachable — guard for the type checker
-  // Inherited the SELECTED store's full module set (incl. MultiStores 14).
-  expect(await readStoreModules(created.id)).toEqual(selectedStoreModuleIds);
+  // BIRTH CONTRACT (decisión del propietario 2026-09-26): every new store is
+  // born with the ACTIVE Pago plan catalog — nothing is inherited from the
+  // selected store. The catalog is read straight from the DB and 14 is pinned
+  // absent explicitly (MultiStores is Superior/VIP-only).
+  const createdModuleIds = await readStoreModules(created.id);
+  expect(createdModuleIds).toEqual(await readPagoPlanModuleIds());
+  expect(createdModuleIds).not.toContain(MODULE_MULTISTORES);
 });
 
 test('MC-04 — the owner-branch 403 pins: a non-owner body is rejected by the API', async ({

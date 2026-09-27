@@ -1,12 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 import { Currency, EModules, PaymentType } from '@store-mgmt/domain';
 import type { SaleCredit } from '@store-mgmt/domain';
-import { readStoreSaleCredits } from '~/shared/lib/multistore/multi-store-aggregator';
-import { SaleCreditsPage } from '../credits';
+import { TodaySaleCreditsPage } from '../today-credits';
 
+// Mutable auth state: storeModuleIds toggles the MultiMonedas gate per test.
 const auth = vi.hoisted(() => ({
   state: {
     user: { selectedStoreId: 's1', storeModuleIds: [] as number[] },
@@ -19,19 +19,10 @@ vi.mock('~/shared/lib/stores/auth-store', () => ({
   ),
 }));
 
-// Multi-store gate — OFF by default (matches the real hook for a non-owner), ON per test.
-const multiStore = vi.hoisted(() => ({
-  enabled: false,
-  stores: [] as { id: string; name: string }[],
-}));
-vi.mock('~/shared/lib/hooks/use-multi-store', () => ({
-  useMultiStore: () => ({ enabled: multiStore.enabled, stores: multiStore.stores }),
-}));
-
 const credits = vi.hoisted(() => ({ items: [] as SaleCredit[] }));
 vi.mock('~/sales/lib/services/sale-credit-offline-service', () => ({
   SaleCreditOfflineService: vi.fn().mockImplementation(() => ({
-    filterSaleCredits: vi.fn().mockResolvedValue({
+    getSaleCreditsInDayObservable: vi.fn().mockResolvedValue({
       data: credits.items,
       succeeded: true,
       message: '',
@@ -40,16 +31,6 @@ vi.mock('~/sales/lib/services/sale-credit-offline-service', () => ({
     }),
   })),
 }));
-
-vi.mock('~/shared/lib/multistore/multi-store-aggregator', async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import('~/shared/lib/multistore/multi-store-aggregator')>();
-  return {
-    ...actual,
-    unwrapStoreDek: vi.fn().mockResolvedValue(new Uint8Array([1])),
-    readStoreSaleCredits: vi.fn().mockReturnValue([]),
-  };
-});
 
 vi.mock('~/shared/lib/blocking-alert', () => ({
   showBlockingError: vi.fn(),
@@ -78,15 +59,15 @@ function makeCredit(overrides: Partial<SaleCredit> = {}): SaleCredit {
 function renderPage() {
   return render(
     <IntlProvider messages={esMessages} locale="es" defaultLocale="es">
-      <SaleCreditsPage />
+      <TodaySaleCreditsPage />
     </IntlProvider>,
   );
 }
 
-describe('SaleCreditsPage — filtro de moneda (MultiMonedas)', () => {
+const header = () => document.querySelector('[data-slot="card-header"]') as HTMLElement;
+
+describe('TodaySaleCreditsPage — filtro de moneda (MultiMonedas)', () => {
   beforeEach(() => {
-    multiStore.enabled = false;
-    multiStore.stores = [];
     auth.state.user = { selectedStoreId: 's1', storeModuleIds: [] };
     credits.items = [];
   });
@@ -97,11 +78,15 @@ describe('SaleCreditsPage — filtro de moneda (MultiMonedas)', () => {
       makeCredit({ id: 'eur', total: 45, currency: Currency.EUR }),
     ];
     renderPage();
-    expect((await screen.findAllByText('75 CUP')).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText('Ana')).length).toBeGreaterThan(0);
+    expect(within(header()).getByText('75 CUP')).toBeInTheDocument();
     expect(screen.queryByTestId('currency-filter-select')).not.toBeInTheDocument();
+    // Filas: cada crédito conserva su propia moneda.
+    expect(screen.getByText('30 USD')).toBeInTheDocument();
+    expect(screen.getByText('45 EUR')).toBeInTheDocument();
   });
 
-  it('gate ON + 2 monedas: header y total del día quedan en la moneda por defecto (USD)', async () => {
+  it('gate ON + 2 monedas: header y filas quedan en la moneda por defecto (USD)', async () => {
     auth.state.user.storeModuleIds = [EModules.MultiMonedas];
     credits.items = [
       makeCredit({ id: 'usd', total: 30, currency: Currency.USD }),
@@ -109,7 +94,7 @@ describe('SaleCreditsPage — filtro de moneda (MultiMonedas)', () => {
     ];
     renderPage();
     expect(await screen.findByTestId('currency-filter-select')).toBeInTheDocument();
-    expect(screen.getAllByText('30 USD').length).toBeGreaterThan(0);
+    expect(within(header()).getByText('30 USD')).toBeInTheDocument();
     expect(screen.queryByText('45 EUR')).toBeNull();
     expect(screen.queryByText('75 CUP')).toBeNull();
   });
@@ -125,7 +110,7 @@ describe('SaleCreditsPage — filtro de moneda (MultiMonedas)', () => {
     fireEvent.change(screen.getByTestId('currency-filter-select'), {
       target: { value: String(Currency.EUR) },
     });
-    expect(screen.getAllByText('45 EUR').length).toBeGreaterThan(0);
+    expect(within(header()).getByText('45 EUR')).toBeInTheDocument();
     expect(screen.queryByText('30 USD')).toBeNull();
     expect(screen.getByTestId('currency-filter-select')).toBeInTheDocument();
   });
@@ -137,59 +122,23 @@ describe('SaleCreditsPage — filtro de moneda (MultiMonedas)', () => {
       makeCredit({ id: 'usd-2', total: 45, currency: Currency.USD }),
     ];
     renderPage();
-    expect((await screen.findAllByText('75 USD')).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText('Ana')).length).toBeGreaterThan(0);
+    expect(within(header()).getByText('75 USD')).toBeInTheDocument();
     expect(screen.queryByTestId('currency-filter-select')).not.toBeInTheDocument();
   });
-});
 
-describe('SaleCreditsPage — filtro de moneda en modo multi-store', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    multiStore.enabled = true;
-    multiStore.stores = [
-      { id: 's1', name: 'Tienda A' },
-      { id: 's2', name: 'Tienda B' },
+  it('gate ON + 2 monedas: el header cuenta TODOS los visibles y suma solo los impagos de esa moneda', async () => {
+    auth.state.user.storeModuleIds = [EModules.MultiMonedas];
+    credits.items = [
+      makeCredit({ id: 'usd', total: 30, currency: Currency.USD }),
+      makeCredit({ id: 'usd-paid', total: 20, isPaid: true, paid: 20, currency: Currency.USD }),
+      makeCredit({ id: 'eur', total: 45, currency: Currency.EUR }),
     ];
-    auth.state.user = { selectedStoreId: 's1', storeModuleIds: [] };
-    credits.items = [];
-    vi.mocked(readStoreSaleCredits).mockReturnValue([]);
-  });
-
-  function seedTwoStores() {
-    vi.mocked(readStoreSaleCredits).mockImplementation((storeId) =>
-      storeId === 's1'
-        ? [makeCredit({ id: 'c1', total: 30, currency: Currency.USD })]
-        : [makeCredit({ id: 'c2', total: 45, currency: Currency.EUR })],
-    );
-  }
-
-  it('gate OFF: mantiene el total agregado legacy entre tiendas (75\u00A0CUP) y sin filtro', async () => {
-    seedTwoStores();
-    renderPage();
-    expect(await screen.findByText('75 CUP')).toBeInTheDocument();
-    expect(screen.queryByTestId('currency-filter-select')).not.toBeInTheDocument();
-  });
-
-  it('gate ON + 2 monedas: el agregado y los paneles quedan en la moneda por defecto (USD)', async () => {
-    auth.state.user.storeModuleIds = [EModules.MultiMonedas];
-    seedTwoStores();
     renderPage();
     await screen.findByTestId('currency-filter-select');
-    expect(screen.getAllByText('30 USD').length).toBeGreaterThan(0);
-    expect(screen.queryByText('45 EUR')).toBeNull();
-    expect(screen.queryByText('75 CUP')).toBeNull();
-  });
-
-  it('gate ON + 2 monedas: cambiar el select cambia el agregado y los paneles', async () => {
-    auth.state.user.storeModuleIds = [EModules.MultiMonedas];
-    seedTwoStores();
-    renderPage();
-    await screen.findByTestId('currency-filter-select');
-    fireEvent.change(screen.getByTestId('currency-filter-select'), {
-      target: { value: String(Currency.EUR) },
-    });
-    expect(screen.getAllByText('45 EUR').length).toBeGreaterThan(0);
-    expect(screen.queryByText('30 USD')).toBeNull();
-    expect(screen.getByTestId('currency-filter-select')).toBeInTheDocument();
+    expect((await screen.findAllByText('Ana')).length).toBeGreaterThan(0);
+    // USD por defecto: 2 créditos visibles (uno pagado) y el total solo suma el impago (30).
+    expect(within(header()).getByText('(2)')).toBeInTheDocument();
+    expect(within(header()).getByText('30 USD')).toBeInTheDocument();
   });
 });

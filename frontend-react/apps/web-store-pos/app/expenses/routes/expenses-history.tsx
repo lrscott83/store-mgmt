@@ -1,9 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useIntl } from 'react-intl';
 import type { Expense } from '@store-mgmt/domain';
-import { EFeatures } from '@store-mgmt/domain';
+import { DEFAULT_CURRENCY, EFeatures } from '@store-mgmt/domain';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
+import { hasMultiMonedasAvailable } from '~/shared/components/multimonedas/currency-select';
+import { CurrencyFilter } from '~/shared/components/multimonedas/currency-filter';
+import { useCurrencyFilter } from '~/shared/components/multimonedas/use-currency-filter';
+import { presentCurrencies, resolveCurrency } from '~/shared/lib/currency-totals';
 import { Card } from '~/shared/components/ui/card';
 import { InfoBox } from '~/shared/components/ui/info-box';
 import { ChevronDownIcon } from '~/shared/components/ui/icons';
@@ -59,7 +63,9 @@ export const clientLoader = featureLoader([EFeatures.ExpensesHistory]);
  */
 export function ExpensesHistoryPage() {
   const intl = useIntl();
-  const storeId = useAuthStore((s) => s.user?.selectedStoreId ?? '');
+  const user = useAuthStore((s) => s.user);
+  const storeId = user?.selectedStoreId ?? '';
+  const multiMonedas = hasMultiMonedasAvailable(user);
 
   const [paymentKey, setPaymentKey] = useState<string | null>(null);
   const [dayGroups, setDayGroups] = useState<LocalDayGroup<Expense>[]>([]);
@@ -143,6 +149,36 @@ export function ExpensesHistoryPage() {
     };
   }, [multiStoreEnabled, multiStoreStores]);
 
+  // Filtro de moneda (currency-filter-per-view): las opciones se derivan del
+  // conjunto SIN filtrar por moneda (single-store: el historial cargado;
+  // multi-store: los gastos leídos de cada tienda — solo activos), para que el
+  // filtro no desaparezca al elegir una moneda y se pueda volver a las demás.
+  // El hook vive antes del return temprano del modo multi-store.
+  const currencyOptions = presentCurrencies(
+    multiStoreEnabled
+      ? [...storeExpenses.values()]
+          .flat()
+          .filter((e) => e.isActive)
+          .map((e) => ({ amount: e.total, currency: e.currency }))
+      : dayGroups.flatMap((g) => g.items.map((e) => ({ amount: e.total, currency: e.currency }))),
+  );
+  const { visible: currencyFilterVisible, currency, setCurrency } =
+    useCurrencyFilter(currencyOptions);
+  // Con el módulo activo, una sola moneda presente conserva su código; sin el
+  // módulo, el total mezclado sigue rotulándose CUP (salida idéntica a la de hoy).
+  const displayCurrency =
+    currencyFilterVisible && currency !== null
+      ? currency
+      : multiMonedas
+        ? (currencyOptions[0] ?? DEFAULT_CURRENCY)
+        : DEFAULT_CURRENCY;
+
+  /** Aplica el filtro de moneda a las filas (no-op cuando el filtro está oculto). */
+  const filterExpensesByCurrency = (expenses: Expense[]): Expense[] =>
+    currencyFilterVisible && currency !== null
+      ? expenses.filter((e) => resolveCurrency(e.currency) === currency)
+      : expenses;
+
   /** Base activo — el filtro de pago se aplica aparte por clave. */
   const multiActiveExpenses = (expenses: Expense[]): Expense[] => expenses.filter((e) => e.isActive);
 
@@ -174,10 +210,14 @@ export function ExpensesHistoryPage() {
       multiActiveExpenses(expenses)
         .filter(inDateRange)
         .filter((e) => !paymentActive || matchesExpensePaymentFilter(e, paymentActive));
+    // El filtro de moneda se aplica ENCIMA de los demás, así cada panel por
+    // tienda y el agregado de fuera de los paneles quedan en una sola moneda.
+    const currencyVisibleExpenses = (expenses: Expense[]): Expense[] =>
+      filterExpensesByCurrency(visibleExpenses(expenses));
 
     const totals = visibleStoreIds.reduce(
       (acc, id) => {
-        for (const expense of visibleExpenses(storeExpenses.get(id) ?? [])) {
+        for (const expense of currencyVisibleExpenses(storeExpenses.get(id) ?? [])) {
           acc.count += 1;
           acc.total += expense.total;
         }
@@ -198,7 +238,7 @@ export function ExpensesHistoryPage() {
               </span>
             </span>
             <span className="text-sm font-semibold text-danger whitespace-nowrap">
-              {formatMoneyWithCurrency(totals.total)}
+              {formatMoneyWithCurrency(totals.total, displayCurrency)}
             </span>
           </div>
         }
@@ -246,22 +286,32 @@ export function ExpensesHistoryPage() {
                   </label>
                 ))}
               </div>
+              {/* Fila propia de moneda debajo de los filtros existentes (se auto-oculta). */}
+              <div className="flex w-full justify-center">
+                <CurrencyFilter
+                  currencies={currencyOptions}
+                  value={currency ?? currencyOptions[0] ?? DEFAULT_CURRENCY}
+                  onChange={setCurrency}
+                />
+              </div>
             </>
           }
           renderStoreCount={(store) => {
-            const filtered = visibleExpenses(storeExpenses.get(store.id) ?? []);
+            const filtered = currencyVisibleExpenses(storeExpenses.get(store.id) ?? []);
             return `(${filtered.length})`;
           }}
           renderStoreTotals={(store) => {
-            const filtered = visibleExpenses(storeExpenses.get(store.id) ?? []);
+            const filtered = currencyVisibleExpenses(storeExpenses.get(store.id) ?? []);
             const total = filtered.reduce((t, e) => t + e.total, 0);
             // Color del precio de ESTA vista: rojo (text-danger), igual que los
             // demás precios de gastos (header y paneles por día).
-            return <MultiStoreTotal value={total} valueClassName="text-danger" />;
+            return (
+              <MultiStoreTotal value={total} currency={displayCurrency} valueClassName="text-danger" />
+            );
           }}
         >
           {(store) => {
-            const filtered = visibleExpenses(storeExpenses.get(store.id) ?? []);
+            const filtered = currencyVisibleExpenses(storeExpenses.get(store.id) ?? []);
             if (filtered.length === 0) {
               return (
                 <div className="py-4 text-center text-text-muted">
@@ -296,6 +346,7 @@ export function ExpensesHistoryPage() {
                           <span className="text-xs font-semibold text-danger whitespace-nowrap">
                             {formatMoneyWithCurrency(
                               dayGroup.items.reduce((total, e) => total + e.total, 0),
+                              displayCurrency,
                             )}
                           </span>
                           <ChevronDownIcon isExpanded={isExpanded} className="text-text-muted" />
@@ -321,7 +372,7 @@ export function ExpensesHistoryPage() {
   const paymentOptions = collectExpensePaymentMethodKeys(allExpenses);
   const paymentActive =
     paymentKey !== null && paymentOptions.includes(paymentKey) ? paymentKey : null;
-  const visibleDayGroups: LocalDayGroup<Expense>[] = paymentActive
+  const paymentFilteredDayGroups: LocalDayGroup<Expense>[] = paymentActive
     ? dayGroups
         .map((g) => ({
           ...g,
@@ -329,6 +380,10 @@ export function ExpensesHistoryPage() {
         }))
         .filter((g) => g.items.length > 0)
     : dayGroups;
+  // Filtro de moneda sobre las filas: cada día queda en una sola moneda.
+  const visibleDayGroups: LocalDayGroup<Expense>[] = paymentFilteredDayGroups
+    .map((g) => ({ ...g, items: filterExpensesByCurrency(g.items) }))
+    .filter((g) => g.items.length > 0);
 
   const expensesCount = visibleDayGroups.reduce((count, d) => count + d.items.length, 0);
   const expensesTotal = visibleDayGroups.reduce(
@@ -348,7 +403,7 @@ export function ExpensesHistoryPage() {
             </span>
           </span>
           <span className="text-sm font-semibold text-danger whitespace-nowrap">
-            {formatMoneyWithCurrency(expensesTotal)}
+            {formatMoneyWithCurrency(expensesTotal, displayCurrency)}
           </span>
         </div>
       }
@@ -391,6 +446,15 @@ export function ExpensesHistoryPage() {
           ))}
         </div>
 
+        {/* Fila propia de moneda debajo de los filtros existentes (se auto-oculta). */}
+        <div>
+          <CurrencyFilter
+            currencies={currencyOptions}
+            value={currency ?? currencyOptions[0] ?? DEFAULT_CURRENCY}
+            onChange={setCurrency}
+          />
+        </div>
+
         {visibleDayGroups.length === 0 && (
           <InfoBox variant="primary" className="text-center">
             {intl.formatMessage({ id: 'EXPENSES.HISTORY.EMPTY_STATE' })}
@@ -415,7 +479,10 @@ export function ExpensesHistoryPage() {
                   </span>
                   <span className="flex items-center gap-2">
                     <span className="text-sm font-semibold text-danger whitespace-nowrap">
-                      {formatMoneyWithCurrency(dayGroup.items.reduce((total, e) => total + e.total, 0))}
+                      {formatMoneyWithCurrency(
+                        dayGroup.items.reduce((total, e) => total + e.total, 0),
+                        displayCurrency,
+                      )}
                     </span>
                     <ChevronDownIcon isExpanded={isExpanded} className="text-text-muted" />
                   </span>
