@@ -183,6 +183,49 @@ the 581 baseline. The known pre-existing failure
 (`Auth/AuthRegisterPlanTests.Register_generates_store_role_features_for_mapped_plan_features`)
 was not touched and did not run.
 
+## Parent verification and a pre-existing E2E fragility
+
+The parent re-ran the Owners filter independently rather than trusting the delegated report.
+The first parent run returned **Failed 1 / Passed 49 / Total 50**, so the result was not
+accepted at face value. Investigating that produced a finding that is NOT caused by this
+change but must be recorded:
+
+Running the E2E suite repeatedly against the shared `smca_test` database eventually poisons
+it. A test's `finally` cleanup fails with
+
+```
+Npgsql.PostgresException 23503: update or delete on table "Store"
+violates foreign key constraint "FK_StorePayment_Store_StoreId" on table "StorePayment"
+```
+
+leaving rows alive. The next test then dies on
+`23505: duplicate key value violates unique constraint "IX_User_Login"`. Observed
+consequence: two runs where all 50 tests failed, and one run where the single failure was
+the pre-existing `OwnersDeleteReferencesTests.Delete_owner_with_own_reseller_links_returns_500`.
+The failure is in a **Billing-domain FK constraint** and in a test this change never touches,
+so it is a cleanup-fragility defect in the existing suite, not a regression from this change.
+
+The baseline was measured to rule this in or out: commit `4c645423` (before this unit) was
+checked out detached and the filter run 5 times — `Total tests: 46 / Passed: 46` every time.
+The +4 tests added by this unit increase run volume and therefore exposure to the dirty
+database, but the defect itself predates the change.
+
+One self-inflicted measurement error is also recorded: after returning from the detached
+baseline checkout, runs were issued with `--no-build`, so a stale test DLL was executed and
+three "46/46" results were actually the BASELINE binary, not this change. Those results were
+discarded. The authoritative number is the final parent run, on a correctly built tree at
+`a0c93d9c` on `qa`:
+
+```
+discovered -> Total tests: 50
+passed     ->      Passed: 50
+failed     ->
+```
+
+**Lesson for future E2E runs in this repo:** never compare runs across a `git checkout` with
+`--no-build`; and treat repeated back-to-back E2E runs against `smca_test` as producing
+non-deterministic results once the database accumulates residue.
+
 ## Acceptance criteria
 
 1. A ReSeller actor POSTs to `/api/v1/owners` with no `reSellerId` → 201, a
