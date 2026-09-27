@@ -134,11 +134,48 @@ describe('StoreSwitcher — owner gate', () => {
     expect(screen.queryByRole('button', { name: 'Cambiar tienda' })).not.toBeInTheDocument();
   });
 
-  it('renders nothing when the owner lacks the MultiStores module (14)', () => {
+  it('renders the switcher for an owner with 2+ active stores even WITHOUT MultiStores (14) — gate A (2026-09-26)', () => {
+    // Hijas nacidas tras el clamp 2026-09-25 NO llevan 14; el owner de 2+
+    // tiendas debe poder volver a la padre desde cualquiera de ellas.
     mockAuthState(
       buildOwnerUser({
         storeModuleIds: [7],
         roles: [{ storeId: 's1', storeName: 'Tienda A', moduleId: 7, featureIds: [70] }],
+      }),
+    );
+    render(
+      <Wrapper>
+        <StoreSwitcher />
+      </Wrapper>,
+    );
+    expect(screen.getByRole('button', { name: 'Cambiar tienda' })).toBeInTheDocument();
+  });
+
+  it('renders nothing for a single-store owner without MultiStores (14) — legacy gate intact', () => {
+    mockAuthState(
+      buildOwnerUser({
+        storeModuleIds: [7],
+        roles: [{ storeId: 's1', storeName: 'Tienda A', moduleId: 7, featureIds: [70] }],
+        storeList: [
+          { id: 's1', name: 'Tienda A', isActive: true },
+          { id: 's3', name: 'Tienda C', isActive: false },
+        ],
+      }),
+    );
+    render(
+      <Wrapper>
+        <StoreSwitcher />
+      </Wrapper>,
+    );
+    expect(screen.queryByRole('button', { name: 'Cambiar tienda' })).not.toBeInTheDocument();
+  });
+
+  it('renders nothing for a single-store legacy session without storeList and without 14', () => {
+    mockAuthState(
+      buildOwnerUser({
+        storeModuleIds: [7],
+        roles: [{ storeId: 's1', storeName: 'Tienda A', moduleId: 7, featureIds: [70] }],
+        storeList: undefined,
       }),
     );
     render(
