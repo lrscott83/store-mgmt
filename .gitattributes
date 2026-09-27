@@ -1,0 +1,5 @@
+# Git hooks are shell scripts. They must reach disk with LF endings on every
+# platform, otherwise Git-for-Windows runs a script whose final line has no
+# newline and sh misparses it. Scoped to .githooks/ on purpose: a blanket rule
+# here would silently rewrite line endings across the whole repository.
+.githooks/* text eol=lf
