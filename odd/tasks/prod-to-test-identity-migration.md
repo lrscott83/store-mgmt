@@ -65,7 +65,7 @@ include or skip them without editing SQL by hand.
 | `RefreshTokens` | **Never.** `RefreshTokens.Token` stores the RAW refresh token in plaintext with a 35-day expiry. Copying it hands over live production sessions. It is session state with zero migration value. |
 | `OutboxMessage` | Unscoped queue; stale rows would fire. |
 | `StoreUsage` | Usage/quota metering. Carries plaintext client IP addresses. Include only if a migrated store must not be blocked by a prod-level usage limit — and note it copies real IPs. |
-| `Module`, `Feature`, `Role`, `StorePlan`, `StorePlanModule`, `StorePaymentStatus`, `SystemConfiguration` | Catalog. Not copied: `Database.MigrateAsync()` rebuilds it identically on the test DB. Copying it from prod would make the two databases drift and would make "what is catalog vs what is data" unknowable. |
+| `Module`, `Feature`, `Role`, `StorePlan`, `StorePlanModule`, `StorePaymentStatus`, `SystemConfiguration` | Catalog. Not copied: `Database.Migrate()` rebuilds it identically on the test DB. Copying it from prod would make the two databases drift and would make "what is catalog vs what is data" unknowable. |
 | `Tenant` | Seeded row. Test already has Default Tenant. |
 | The seeded superadmin `User` + its `UserRole` | **Must survive untouched.** The load script must not delete, truncate, or overwrite it. The maintainer said the migrated rows are NEW rows added on top of what test already has. |
 
@@ -117,10 +117,109 @@ User
 ```
 
 `StorePlan`, `Role` and `Feature` are catalog and already exist on the test database after
-`Database.MigrateAsync()`, so they are not inserted here.
+`Database.Migrate()`, so they are not inserted here.
+
+**NAME CORRECTION (2026-09-27).** Earlier drafts of this document named
+`Database.MigrateAsync()`. No such call exists in this codebase. The real path is
+`MigrationExtensions.ApplyMigrations()`, which calls the **synchronous** `Database.Migrate()`,
+and `Program.cs` invokes it as `app.ApplyMigrations()`. That call sits inside
+`if (app.Environment.IsDevelopment())`, so **an API started with any other
+`ASPNETCORE_ENVIRONMENT` migrates nothing on startup.** For a VPS or a container this is a real
+operational gap, not a wording issue, and the README now says so.
 
 Loading must run inside ONE transaction, so a failure leaves the target database exactly as
 it was rather than half-populated.
+
+## What verification added, and what it corrected
+
+An independent verification pass ran after the first implementation landed
+(`ae793c19`). It confirmed eight items as correct — the load order, the 34 `Restrict` foreign
+keys, the `ON CONFLICT DO NOTHING` choice, the column lists, the `User.Id` AAD constraint, the
+exclusion of `RefreshTokens`, the secrets pre-flight, and the read-only extract — and found nine
+defects. Four of them are premises this document got wrong, and they are recorded here because
+the wrong premise is what produced the wrong code.
+
+### 1. `TenantId` is NOT a foreign key
+
+The earlier drafts treated tenant scoping as database-enforced. It is not. No `HasForeignKey`
+in `ApplicationDbContextModelSnapshot.cs` names `Domain.Entities.Tenants.Tenant` as a principal
+table — `TenantId` is a plain non-nullable `Guid` column on all 12 migrated tables. Tenant
+scoping is applied in the **query layer** instead:
+`HasQueryFilter(x => _context.IsSuperAdmin || x.TenantId == _context.TenantId)` on each of the
+12 entities, with `HttpContextService` reading `TenantId` from a JWT claim.
+
+Consequence: a row carrying a second tenant's id loads without complaint and then becomes
+**unreachable** — it is in the table and no ordinary request returns it. No FK, no orphan check,
+and no row count can see it. Fixed by a per-tenant inventory in `01-extract.sql` (Section A2) and
+a `RAISE EXCEPTION` guard over all 12 staging tables in `02-load.sql`, plus Query 8 in
+`03-verify.sql`.
+
+### 2. A skipped row is NOT caught by a foreign key
+
+The earlier README claimed a skipped parent row is safe because its children would then have no
+parent and the FK would roll the transaction back. That is true only for a row that **has** a
+dependent among the nine loaded tables. A production `User` with no `Owner`, no `ReSeller`, no
+`StoreUser` and no `UserRole` — a registered, never-approved account — has no dependents, so
+nothing fires, the transaction commits, `psql` exits `0`, and the account simply does not exist
+in test. Two tables are worse, because what disappears is a link: `ReSellerOwner.OwnerId` and
+`StoreUser.UserId` each carry their own unique index on top of the composite primary key.
+
+Fixed by a named not-landed report (login, store name, Gestor, role — not a bare count) and a
+`present_rows <> staged_rows` assertion that refuses to `COMMIT`, overridable only with the
+documented `-v allow_resume=1`.
+
+### 3. An empty staging table is indistinguishable from a clean load of zero rows
+
+The count comparison would report `0 = 0` and pass. Fixed with a second guard requiring all nine
+mandatory staging tables to be non-empty. The three optional tables are deliberately excluded: a
+store with no products really does produce an empty `11-product.csv`.
+
+### 4. A flag tested by presence is not a boolean
+
+`\if :{?load_product}` asks whether the variable is **set**, not what it holds, so
+`-v load_product=0`, `=false` and `=off` all turned the block ON. Fixed by resolving each flag to
+a real boolean in SQL (`SELECT ... \gset` over a value test) and letting `\if` read only that.
+
+### 5. A `sed` fallback that reported a false pass
+
+`00-preflight-secrets.sh` fell back to matching the leaf key name in the raw JSON when neither
+`jq` nor `python3` worked. A leaf-name match discards the path the key sits under, so it can
+capture a **different** secret that shares the leaf name, or stop at the first quote of a value
+containing an escaped quote — either way printing `MATCH` for two different secrets. Fixed by
+deleting the fallback and making a working JSON reader mandatory: the probe prints
+`UNVERIFIABLE (no JSON reader available)` and exits `2`, distinct from `1`, so "could not check"
+never looks like "found a problem".
+
+### 6. CSV header drift was undetectable
+
+`COPY ... HEADER true` reads and discards the header line without comparing it to the target
+column list. Fixed with a **conditional** `HEADER MATCH` (PostgreSQL 17+, detected at runtime via
+`current_setting('server_version_num')`), falling back to `HEADER true` with a printed warning, so
+the server requirement is not raised silently.
+
+### 7. The CSVs were world-readable
+
+`01-extract.sql` cannot fix this itself: it runs inside a `READ ONLY` transaction, where a `SET`
+is rejected, and the files are written by `psql` — a different process that inherits the calling
+shell's `umask`. Fixed by documenting `umask 077` plus `rm -f prod-to-test/data/*.csv` as explicit
+required lines in the script header and in README section 5, rather than as a SQL statement that
+would have been rejected.
+
+### 8. The blanket `DELETE FROM "User"` rollback destroyed seeded rows
+
+The rollback in the earlier README deleted every row of every table. That destroys the seeded
+superadmin (`38b96d85-…`), the seeded "Admin Owner" `Owner` (whose `Id` **is** the Default Tenant
+id `b58bf718-…`), and the seeded "Default Store" (`0ed24a91-…`). `HasData` rows are written by a
+**migration**: once that migration is recorded as applied, restarting the application will not
+restore a deleted seed. Fixed by scoping the rollback to the migrated ids, re-read from the same
+CSVs into temp tables — which is also why section 12 must not shred the CSVs until the rollback
+window closes.
+
+### 9. The verification script could not see a missing link
+
+`03-verify.sql`'s orphan check asks whether a link's parents exist; it can never report a link
+that does not exist. Added Query 9 (Gestors with zero owner links) and Query 8 (tenant
+integrity, which no FK can check).
 
 ## Deliverables
 
@@ -144,7 +243,8 @@ idempotent, `ON CONFLICT DO NOTHING`, and a trailing verification `SELECT`.
   command.** These scripts are delivered for the maintainer to run by hand on the VPS. The
   database is not reachable from here and attempting it is out of scope.
 - **Do NOT create, alter or drop any database object.** No migrations, no schema changes.
-  The target schema is created by `Database.MigrateAsync()` as a separate, prior step.
+  The target schema is created by `Database.Migrate()` as a separate, prior step — and that call
+  is gated on `IsDevelopment()`, so it is not automatic on a VPS.
 - The Angular `frontend/` is frozen — never read it.
 - Do not touch `frontend-react/` — no application code changes in this task.
 - No AI attribution in any commit; the `commit-msg` hook now blocks it.
@@ -162,3 +262,16 @@ idempotent, `ON CONFLICT DO NOTHING`, and a trailing verification `SELECT`.
 8. Optional business-data tables are behind individually switchable flags, off by default.
 9. Every table named in the load order exists in the real model with the columns assumed.
 10. Nothing in this change touches Angular, `frontend-react/`, the API, or the E2E suite.
+11. The load refuses to `COMMIT` when any staged row did not land, and names every such row.
+    `-v allow_resume=1` is the only way past it, and only for a genuine re-run.
+12. The load refuses to `COMMIT` when a staged row carries a `TenantId` other than the Default
+    Tenant, naming the offending table, row count and tenant ids.
+13. The load refuses to `COMMIT` when any of the nine mandatory staging tables is empty.
+14. Optional-block flags are evaluated by value, so `0`, `false`, `off`, `no` and empty all mean
+    off.
+15. `00-preflight-secrets.sh` exits `2` rather than guessing when no working JSON reader exists,
+    and never falls back to a leaf-key text match.
+16. Every `\copy` uses `HEADER MATCH` where the server supports it (PostgreSQL 17+) and says so
+    out loud where it does not.
+17. The documented rollback deletes only the migrated ids, and the README names the seeded rows a
+    blanket `DELETE` would destroy.

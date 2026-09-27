@@ -31,6 +31,12 @@
 --            grants is a store whose owner logs in and sees nothing.
 --   Query 7  Price snapshots. Confirms StoreModule kept the amount the
 --            store was actually charged.
+--   Query 8  Tenant integrity. Every count must be 0. TenantId is NOT a
+--            foreign key, so nothing else in this file can catch a loaded
+--            row that points at a tenant which does not exist.
+--   Query 9  Gestor / owner links. The orphan check in Query 4 only sees
+--            the links that ARE there; 9a sees the ones that are missing,
+--            which is the exact failure a dropped ReSellerOwner row causes.
 -- =====================================================
 
 \set ON_ERROR_STOP on
@@ -224,5 +230,119 @@ SELECT sm."StoreId",
 FROM "StoreModule" sm
 LEFT JOIN "Module" m ON m."Id" = sm."ModuleId"
 ORDER BY sm."StoreId", sm."ModuleId";
+
+-- =====================================================
+-- Query 8 - tenant integrity of every loaded row
+-- =====================================================
+-- TenantId is NOT a foreign key in this model. No HasForeignKey in
+-- ApplicationDbContextModelSnapshot.cs names Tenant as a principal table, so
+-- Postgres never rejects a row for a tenant that does not exist, and the
+-- orphan check in Query 4 cannot see it either - that check looks at real
+-- parents, and here the missing thing is the tenant the query filter
+-- compares against.
+--
+-- Such a row is invisible in practice: every query runs through
+-- HasQueryFilter(x => _context.IsSuperAdmin || x.TenantId == _context.TenantId)
+-- and HttpContextService reads TenantId from a JWT claim, so a row carrying
+-- an unknown tenant id is returned to nobody at all. This is why the count
+-- of such rows must be exactly 0, and why 02-load.sql refuses to commit one.
+--
+-- A row that points at a tenant which DOES exist is fine, whatever that
+-- tenant is. This check asks only whether the tenant is known.
+\echo '=== 8. Tenant integrity (every count must be 0) ==='
+WITH tenant_checks(check_name, unknown_tenant_rows) AS (
+    SELECT 'User with unknown TenantId',                     COUNT(*) FROM "User" u
+      WHERE NOT EXISTS (SELECT 1 FROM "Tenant" t WHERE t."Id" = u."TenantId")
+    UNION ALL SELECT 'Owner with unknown TenantId',           COUNT(*) FROM "Owner" o
+      WHERE NOT EXISTS (SELECT 1 FROM "Tenant" t WHERE t."Id" = o."TenantId")
+    UNION ALL SELECT 'ReSeller with unknown TenantId',        COUNT(*) FROM "ReSeller" r
+      WHERE NOT EXISTS (SELECT 1 FROM "Tenant" t WHERE t."Id" = r."TenantId")
+    UNION ALL SELECT 'ReSellerOwner with unknown TenantId',   COUNT(*) FROM "ReSellerOwner" ro
+      WHERE NOT EXISTS (SELECT 1 FROM "Tenant" t WHERE t."Id" = ro."TenantId")
+    UNION ALL SELECT 'Store with unknown TenantId',           COUNT(*) FROM "Store" s
+      WHERE NOT EXISTS (SELECT 1 FROM "Tenant" t WHERE t."Id" = s."TenantId")
+    UNION ALL SELECT 'StoreModule with unknown TenantId',     COUNT(*) FROM "StoreModule" sm
+      WHERE NOT EXISTS (SELECT 1 FROM "Tenant" t WHERE t."Id" = sm."TenantId")
+    UNION ALL SELECT 'StoreRoleFeature with unknown TenantId', COUNT(*) FROM "StoreRoleFeature" srf
+      WHERE NOT EXISTS (SELECT 1 FROM "Tenant" t WHERE t."Id" = srf."TenantId")
+    UNION ALL SELECT 'StoreUser with unknown TenantId',       COUNT(*) FROM "StoreUser" su
+      WHERE NOT EXISTS (SELECT 1 FROM "Tenant" t WHERE t."Id" = su."TenantId")
+    UNION ALL SELECT 'UserRole with unknown TenantId',        COUNT(*) FROM "UserRole" ur
+      WHERE NOT EXISTS (SELECT 1 FROM "Tenant" t WHERE t."Id" = ur."TenantId")
+    UNION ALL SELECT 'ProductCategory with unknown TenantId', COUNT(*) FROM "ProductCategory" pc
+      WHERE NOT EXISTS (SELECT 1 FROM "Tenant" t WHERE t."Id" = pc."TenantId")
+    UNION ALL SELECT 'Product with unknown TenantId',         COUNT(*) FROM "Product" p
+      WHERE NOT EXISTS (SELECT 1 FROM "Tenant" t WHERE t."Id" = p."TenantId")
+    UNION ALL SELECT 'ChannelExchangeRate with unknown TenantId', COUNT(*) FROM "ChannelExchangeRate" cer
+      WHERE NOT EXISTS (SELECT 1 FROM "Tenant" t WHERE t."Id" = cer."TenantId")
+)
+SELECT * FROM (
+    SELECT 1 AS ord, check_name, unknown_tenant_rows
+    FROM tenant_checks
+    UNION ALL
+    SELECT 0, 'TOTAL ROWS WITH AN UNKNOWN TENANT (must be 0)', COALESCE(SUM(unknown_tenant_rows), 0)
+    FROM tenant_checks
+) AS tenant_report
+ORDER BY ord, check_name;
+
+\echo '=== 8b. Tenant distribution (informational) ==='
+-- Which tenant the rows actually belong to. More than one row here after a
+-- prod-to-test load means the source was not single-tenant.
+SELECT t."Id" AS tenant_id,
+       COALESCE(t."Name", '<no Tenant row>') AS tenant_name,
+       (SELECT COUNT(*) FROM "User" u WHERE u."TenantId" = t."Id") AS users,
+       (SELECT COUNT(*) FROM "Store" s WHERE s."TenantId" = t."Id") AS stores
+FROM "Tenant" t
+ORDER BY users DESC, t."Id";
+
+-- =====================================================
+-- Query 9 - Gestor / owner links
+-- =====================================================
+-- ReSellerOwner is the link a Gestor uses to see the owners it manages, and
+-- it is the one table whose damage is completely invisible to Query 4: the
+-- orphan check asks whether a link's parents exist, never whether a link
+-- exists at all. ReSellerOwner.OwnerId also carries its own unique index on
+-- top of the (ReSellerId, OwnerId) primary key, so 02-load.sql's bare
+-- ON CONFLICT DO NOTHING drops a migrated link whenever that owner is already
+-- linked to a different Gestor. The Owner survives, the Gestor loses it, and
+-- no orphan is created anywhere.
+--
+-- 9a is therefore a real check. 9b is the same data as a distribution.
+-- 9c is informational: an Owner with no Gestor is not automatically wrong
+-- (the seeded Default Store owner has none by construction), but a store
+-- whose owner is in that list has nobody who can administer it.
+\echo '=== 9a. Gestors with zero owner links (expected: no rows) ==='
+SELECT r."Id"        AS reseller_id,
+       r."UserId"    AS user_id,
+       u."Login"     AS gestor_login,
+       r."Approved"  AS approved,
+       COALESCE(r."Description", '<null>') AS description
+FROM "ReSeller" r
+LEFT JOIN "User" u ON u."Id" = r."UserId"
+WHERE NOT EXISTS (SELECT 1 FROM "ReSellerOwner" ro WHERE ro."ReSellerId" = r."Id")
+ORDER BY r."Id";
+
+\echo '=== 9b. Owners visible per Gestor (owners = 0 is a failure) ==='
+SELECT r."Id"                                    AS reseller_id,
+       COALESCE(u."Login", '<no User row>')      AS gestor_login,
+       COUNT(ro."OwnerId")                       AS owners,
+       COALESCE(string_agg(o."Description", ' | ' ORDER BY o."Description"), '<none>')
+                                                   AS owner_descriptions
+FROM "ReSeller" r
+LEFT JOIN "User" u ON u."Id" = r."UserId"
+LEFT JOIN "ReSellerOwner" ro ON ro."ReSellerId" = r."Id"
+LEFT JOIN "Owner" o ON o."Id" = ro."OwnerId"
+GROUP BY r."Id", u."Login"
+ORDER BY owners ASC, r."Id";
+
+\echo '=== 9c. Owners with no Gestor link (informational) ==='
+SELECT o."Id"    AS owner_id,
+       o."UserId" AS user_id,
+       COALESCE(u."Login", '<no User row>') AS user_login,
+       (SELECT COUNT(*) FROM "Store" s WHERE s."OwnerId" = o."Id") AS stores_owned
+FROM "Owner" o
+LEFT JOIN "User" u ON u."Id" = o."UserId"
+WHERE NOT EXISTS (SELECT 1 FROM "ReSellerOwner" ro WHERE ro."OwnerId" = o."Id")
+ORDER BY stores_owned DESC, o."Id";
 
 COMMIT;

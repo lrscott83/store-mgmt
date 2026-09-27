@@ -54,15 +54,24 @@
 #   0  both keys present on both sides and identical  -> continue
 #   1  a key differs, a key is missing on either side, or a source spec
 #      could not be read                              -> STOP
-#   2  bad usage (wrong number of arguments, or an argument that looks
-#      like an option)                                -> STOP
+#   2  the check could not be performed: bad usage (wrong number of
+#      arguments, or an argument that looks like an option), or no
+#      working JSON reader on this host                -> STOP
 #
-# Requirements: /bin/sh (no bashisms), and one of `jq` or `python3` for
+# 2 is deliberately distinct from 1. 1 means "a difference was found". 2
+# means "no verdict was reached". A gate that cannot check must not look
+# like a gate that passed.
+#
+# Requirements: /bin/sh (no bashisms), AND one of `jq` or `python3` for
 #   reading JSON. Each is probed before use, so an install shim that cannot
-#   actually run does not count. Without a working reader, this script falls
-#   back to a text match on the leaf key name and says so on stderr. Treat
-#   that warning as a reason to install jq rather than as a pass.
-#
+#   actually run does not count. A working reader is MANDATORY: with neither
+#   reader available this script prints UNVERIFIABLE and exits 2. It does not
+#   fall back to matching the leaf key name in the raw text, because a leaf
+#   name match discards the path it sits under and cannot tell one secret
+#   from another: it can capture the value of a *different* key that happens
+#   to share the leaf name, or stop at the first quote of a value that
+#   contains an escaped quote. Either way it would print MATCH for two
+#   different secrets, and a green MATCH is worse than no answer at all.
 # Two config files with the same pepper and the same master secret are the
 # only acceptable state. Anything else produces a migrated user who is
 # rejected with Auth.InvalidCredentials, or a POS that silently falls back to
@@ -70,6 +79,11 @@
 # why the check refuses instead of warning.
 # =====================================================
 
+# This script creates no files, so this umask governs nothing it produces.
+# It is kept as a default for anything a future edit might add, and it is
+# NOT what protects the CSV files: those are written by psql, a different
+# process, in the shell that invokes it. `umask 077` belongs in THAT shell
+# before the psql call. See prod-to-test/README.md section 5.
 umask 077
 
 set -eu
@@ -99,6 +113,22 @@ if command -v python3 >/dev/null 2>&1 && python3 -c 'import json' >/dev/null 2>&
     HAVE_PYTHON3=yes
 fi
 
+# A working reader is required, not optional. An earlier version of this
+# script fell back to a sed match on the leaf key name when neither reader
+# worked. That fallback reported MATCH for two different secrets, so it
+# removed the reason for a human to look; see the header. The gate refuses
+# instead, and exit 2 says "could not check" rather than "found a problem".
+if [ "$HAVE_JQ" != yes ] && [ "$HAVE_PYTHON3" != yes ]; then
+    printf '%s: UNVERIFIABLE (no JSON reader available).\n' "$PROG" >&2
+    printf '%s: neither jq nor a usable python3 was found, so neither setting\n' "$PROG" >&2
+    printf '%s: could be read at all. This check will not guess from the raw\n' "$PROG" >&2
+    printf '%s: text, because a leaf-key text match cannot tell one secret from\n' "$PROG" >&2
+    printf '%s: another and would report a false pass.\n' "$PROG" >&2
+    printf '%s: Install jq on this host and run this script again:\n' "$PROG" >&2
+    printf '%s:   apt-get install -y jq   (or your distribution'"'"'s equivalent)\n' "$PROG" >&2
+    exit 2
+fi
+
 # ---------------------------------------------------------------------
 # extract_json <dotted.path> <file> [file...]
 # Prints the string value at the dotted path, merged across the files in the
@@ -117,22 +147,46 @@ extract_json() {
     done
 
     if [ "$HAVE_JQ" = yes ]; then
-        jq -s -er --arg p "$_path" \
-            'reduce .[] as $d ({}; . * $d) | getpath($p | split(".")) | select(type == "string") | select(length > 0)' \
-            "$@" || return 1
+        # cat first, so a UTF-8 BOM can be removed: jq rejects a BOM, and the
+        # python3 branch reads with encoding="utf-8-sig", so both readers must
+        # accept the same input. `jq -s` slurps every input into one array, so
+        # a concatenated stream is equivalent to a list of file arguments.
+        # The BOM is stripped from the start of any line, not only the first,
+        # because in a layered config the file that carries the value may not
+        # be the first one. A sed that does not understand \xHH simply fails
+        # to match, which leaves the input untouched: a degraded strip, not a
+        # corrupted read.
+        cat "$@" \
+            | sed 's/^\xEF\xBB\xBF//' \
+            | jq -s -er --arg p "$_path" \
+                'reduce .[] as $d ({}; . * $d) | getpath($p | split(".")) | select(type == "string") | select(length > 0)' \
+            || return 1
         return 0
     fi
 
-    if [ "$HAVE_PYTHON3" = yes ]; then
-        python3 - "$_path" "$@" <<'PY' || return 1
+    # Deep merge, to match jq's `*`: for two objects jq merges recursively, so
+    # {"a":{"x":1}} * {"a":{"y":2}} is {"a":{"x":1,"y":2}}. A shallow
+    # update() would drop "x" and the two readers would disagree about the
+    # effective value of a layered appsettings.
+    python3 - "$_path" "$@" <<'PY' || return 1
 import json
 import sys
+
+
+def deep_merge(base, overlay):
+    for key, value in overlay.items():
+        if isinstance(value, dict) and isinstance(base.get(key), dict):
+            deep_merge(base[key], value)
+        else:
+            base[key] = value
+    return base
+
 
 path = sys.argv[1].split(".")
 merged = {}
 for name in sys.argv[2:]:
     with open(name, "r", encoding="utf-8-sig") as handle:
-        merged.update(json.load(handle))
+        deep_merge(merged, json.load(handle))
 node = merged
 for segment in path:
     if not isinstance(node, dict) or segment not in node:
@@ -143,17 +197,6 @@ if not isinstance(node, str) or node == "":
 sys.stdout.write(node)
 PY
         return 0
-    fi
-
-    printf '%s: no working JSON reader found (no jq, no usable python3).\n' "$PROG" >&2
-    printf '%s: falling back to a text match on the leaf key name. This is a weaker check.\n' \
-        "$PROG" >&2
-    printf '%s: install jq on this host to make this check trustworthy.\n' "$PROG" >&2
-    _leaf=${_path##*.}
-    _last=''
-    for _f in "$@"; do _last=$_f; done
-    sed -n "s/.*\"$_leaf\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*/\1/p" "$_last" | tail -n 1
-    return 0
 }
 
 # ---------------------------------------------------------------------
@@ -173,9 +216,26 @@ read_source() {
             ;;
         file:*)
             _files=${_spec#file:}
-            # Intentional word splitting: the spec is a comma separated list.
+            if [ -z "$_files" ]; then
+                # Without this, an empty list would reach extract_json with no
+                # file argument at all, and jq would read stdin and hang.
+                printf '%s: the file: spec is empty; name at least one path.\n' "$PROG" >&2
+                return 0
+            fi
+            # Split on commas ONLY. Globbing is off and IFS is set to the
+            # comma, so a path containing a space stays one path instead of
+            # being reported as unreadable. This uses "set --", so it must
+            # run after $_spec/_path/_var have been read out of "$@".
+            # It is safe in practice because read_source is only ever called
+            # inside a command substitution, which is a subshell.
+            _IFS_SAVE=$IFS
+            IFS=,
+            set -f
             # shellcheck disable=SC2086
-            extract_json "$_path" $(printf '%s' "$_files" | tr ',' ' ') || true
+            set -- $_files
+            set +f
+            IFS=$_IFS_SAVE
+            extract_json "$_path" "$@" || true
             ;;
         *)
             # A bare name is accepted when it really is a readable file, so
