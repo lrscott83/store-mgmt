@@ -25,6 +25,15 @@ namespace SMCA.WebApi.E2ETests.Owners;
 /// JsonConverter on CreateOwnerCommand.ReSellerId must map "" to null while still rejecting
 /// a non-empty, non-Guid string as 400 — the fix must not become a silent swallow.
 /// </para>
+/// <para>
+/// Every actor here is a COMPLETE Gestor: User + UserRole(ReSeller) + a ReSeller row for that same
+/// user, which is the only shape production produces (CreateReSellerCommand always writes User,
+/// ReSeller and UserRole together). DbTestHelpers.SeedUserWithRoleAsync(ReSeller) alone writes
+/// User + UserRole and no ReSeller row — a half-Gestor the API can only be fed by a fixture, and
+/// one that made CreateOwnerCommandHandler silently skip the actor-Gestor link (its
+/// CreateReSellerOwnerForActor returns early when no ReSeller row exists). Binding the field is
+/// orthogonal to the actor's completeness, so the actor must not be the thing under test.
+/// </para>
 /// </summary>
 [Collection("e2e")]
 public sealed class OwnersCreateReSellerIdBindingTests
@@ -89,9 +98,12 @@ public sealed class OwnersCreateReSellerIdBindingTests
     {
         var actor = await DbTestHelpers.SeedUserWithRoleAsync(_f, (int)RoleType.ReSeller);
         var login = NewLogin();
+        Guid actorReSellerId = Guid.Empty;
         Guid tenantId = Guid.Empty;
         try
         {
+            actorReSellerId = await SeedReSellerAsync(actor.UserId, "E2E Gestor Actor");
+
             var body = Body(login);
             body["reSellerId"] = "";
 
@@ -107,6 +119,7 @@ public sealed class OwnersCreateReSellerIdBindingTests
         }
         finally
         {
+            await DeleteReSellerRowsAsync(actorReSellerId, tenantId);
             if (tenantId != Guid.Empty) await DbTestHelpers.CleanupTenantCascadeAsync(_f, tenantId);
             await DbTestHelpers.CleanupUserAsync(_f, actor.UserId);
         }
@@ -118,9 +131,12 @@ public sealed class OwnersCreateReSellerIdBindingTests
     {
         var actor = await DbTestHelpers.SeedUserWithRoleAsync(_f, (int)RoleType.ReSeller);
         var login = NewLogin();
+        Guid actorReSellerId = Guid.Empty;
         Guid tenantId = Guid.Empty;
         try
         {
+            actorReSellerId = await SeedReSellerAsync(actor.UserId, "E2E Gestor Actor");
+
             var body = Body(login);
             body.Should().NotContainKey("reSellerId");
 
@@ -135,6 +151,7 @@ public sealed class OwnersCreateReSellerIdBindingTests
         }
         finally
         {
+            await DeleteReSellerRowsAsync(actorReSellerId, tenantId);
             if (tenantId != Guid.Empty) await DbTestHelpers.CleanupTenantCascadeAsync(_f, tenantId);
             await DbTestHelpers.CleanupUserAsync(_f, actor.UserId);
         }
@@ -146,9 +163,12 @@ public sealed class OwnersCreateReSellerIdBindingTests
     {
         var actor = await DbTestHelpers.SeedUserWithRoleAsync(_f, (int)RoleType.ReSeller);
         var login = NewLogin();
+        Guid actorReSellerId = Guid.Empty;
         Guid tenantId = Guid.Empty;
         try
         {
+            actorReSellerId = await SeedReSellerAsync(actor.UserId, "E2E Gestor Actor");
+
             var body = Body(login);
             body["reSellerId"] = null;
 
@@ -163,6 +183,7 @@ public sealed class OwnersCreateReSellerIdBindingTests
         }
         finally
         {
+            await DeleteReSellerRowsAsync(actorReSellerId, tenantId);
             if (tenantId != Guid.Empty) await DbTestHelpers.CleanupTenantCascadeAsync(_f, tenantId);
             await DbTestHelpers.CleanupUserAsync(_f, actor.UserId);
         }
@@ -170,60 +191,18 @@ public sealed class OwnersCreateReSellerIdBindingTests
 
     // A REAL seeded ReSeller row still produces a persisted ReSellerOwner link row, and the link
     // is the one that belongs to the creating GESTOR — never the one named in the body.
-    // <para>
+    //
+    // This case used to live here as Create_owner_as_real_gestor_links_the_actor_own_reseller_and_ignores_the_body_resellerId
+    // and was an exact duplicate of OwnersCreateGestorAutoAssignTests.Create_owner_as_reseller_ignores_body_resellerId_and_links_the_actor_gestor
+    // (same setup, same body, same three assertions). The surviving coverage is that one; keeping
+    // both meant the same contract was paid for twice on every run.
+    //
     // The actor here is a complete Gestor: User + UserRole(ReSeller) + a ReSeller row for that same
     // user, which is the only shape production produces (CreateReSellerCommand always writes User,
     // ReSeller and UserRole together). A ReSeller role WITHOUT the ReSeller row is a half-Gestor
     // that cannot exist outside a fixture, so the body value must not be able to stand in for it:
     // ignoring the body is what stops a Gestor from pushing the new owner onto another Gestor's
     // list, where the owner would be invisible to the one who created it.
-    // </para>
-    [Fact]
-    public async Task Create_owner_as_real_gestor_links_the_actor_own_reseller_and_ignores_the_body_resellerId()
-    {
-        var actor = await DbTestHelpers.SeedUserWithRoleAsync(_f, (int)RoleType.ReSeller);
-        var reSellerUser = await DbTestHelpers.SeedUserWithRoleAsync(_f, (int)RoleType.ReSeller);
-        var login = NewLogin();
-        Guid actorReSellerId = Guid.Empty;
-        Guid otherReSellerId = Guid.Empty;
-        Guid tenantId = Guid.Empty;
-        try
-        {
-            actorReSellerId = await SeedReSellerAsync(actor.UserId, "E2E Actor ReSeller");
-            otherReSellerId = await SeedReSellerAsync(reSellerUser.UserId, "E2E Other ReSeller");
-            actorReSellerId.Should().NotBe(otherReSellerId);
-
-            var body = Body(login);
-            body["reSellerId"] = otherReSellerId;
-
-            var r = await DbTestHelpers.AuthedClient(_f, actor.UserId, actor.Login)
-                .PostAsJsonAsync("/api/v1/Owners", body);
-
-            r.StatusCode.Should().Be(HttpStatusCode.Created);
-            var b = await r.Content.ReadFromJsonAsync<ApiResponse<OwnerDto>>(ApiResponse.Json);
-            b!.Succeeded.Should().BeTrue();
-            Guid ownerId = b.Data!.Id;
-            ownerId.Should().NotBeEmpty();
-
-            tenantId = await TenantOfCreatedOwnerAsync(login);
-
-            using var scope = _f.Services.CreateScope();
-            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-            var link = await db.Set<ReSellerOwner>().IgnoreQueryFilters()
-                .SingleOrDefaultAsync(x => x.OwnerId == ownerId);
-            link.Should().NotBeNull();
-            link!.ReSellerId.Should().Be(actorReSellerId);
-            link.ReSellerId.Should().NotBe(otherReSellerId);
-        }
-        finally
-        {
-            await DeleteReSellerRowsAsync(otherReSellerId, Guid.Empty);
-            await DeleteReSellerRowsAsync(actorReSellerId, tenantId);
-            if (tenantId != Guid.Empty) await DbTestHelpers.CleanupTenantCascadeAsync(_f, tenantId);
-            await DbTestHelpers.CleanupUserAsync(_f, reSellerUser.UserId);
-            await DbTestHelpers.CleanupUserAsync(_f, actor.UserId);
-        }
-    }
 
     // Sanity guard: an invalid, NON-EMPTY string must still be rejected as 400. If the fix
     // swallowed every non-Guid string this would go green and the endpoint would silently
@@ -233,20 +212,29 @@ public sealed class OwnersCreateReSellerIdBindingTests
     {
         var actor = await DbTestHelpers.SeedUserWithRoleAsync(_f, (int)RoleType.ReSeller);
         var login = NewLogin();
+        Guid actorReSellerId = Guid.Empty;
         try
         {
+            actorReSellerId = await SeedReSellerAsync(actor.UserId, "E2E Gestor Actor");
+
             var body = Body(login);
             body["reSellerId"] = "not-a-guid";
 
             var r = await DbTestHelpers.AuthedClient(_f, actor.UserId, actor.Login)
                 .PostAsJsonAsync("/api/v1/Owners", body);
 
+            // Fails at DESERIALIZATION — the body never binds, so the handler guard (and the
+            // actor-Gestor link) never run. A complete Gestor actor must not change that.
             r.StatusCode.Should().Be(HttpStatusCode.BadRequest);
             var raw = await r.Content.ReadAsStringAsync();
             raw.Should().Contain("reSellerId");
 
             (await DbTestHelpers.GetUserByLoginAsync(_f, login)).Should().BeNull();
         }
-        finally { await DbTestHelpers.CleanupUserAsync(_f, actor.UserId); }
+        finally
+        {
+            await DeleteReSellerRowsAsync(actorReSellerId, Guid.Empty);
+            await DbTestHelpers.CleanupUserAsync(_f, actor.UserId);
+        }
     }
 }

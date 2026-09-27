@@ -456,6 +456,9 @@
   <data name="PlanLocked" xml:space="preserve">
     <value>The store plan is locked. Only a SuperAdmin can change the store's modules.</value>
   </data>
+  <data name="OwnerHasPayments" xml:space="preserve">
+    <value>The owner has recorded payments and cannot be deleted. Deactivate it instead.</value>
+  </data>
   <data name="OwnerUserInactive" xml:space="preserve">
     <value>The owner user is inactive</value>
   </data>
