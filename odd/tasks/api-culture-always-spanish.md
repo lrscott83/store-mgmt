@@ -1,11 +1,16 @@
 # api-culture-always-spanish
 
-- Status: in_progress
+- Status: closed
 - Date: 2026-09-27
-- Route: delegated direct (one writer)
-- TDD: ENABLED. The natural RED→GREEN is available here: change the assertion to demand
-  Spanish, observe it fail (the API currently answers English), then wire the middleware
-  and observe it pass. Never invent output.
+- Route: delegated direct (one writer) for the culture wiring; direct inline for the two
+  authorized E2E assertion fixes, which were mechanical and fully understood.
+- TDD: ENABLED and used. RED was observed before the production change: the Spanish
+  assertion failed against the English response (`Failed: 1, Passed: 50, Total: 51`), then
+  GREEN was observed after wiring the middleware (`Failed: 0, Passed: 51, Total: 51`).
+- Commits: `36499fc1` (culture wiring + the authorized E2E file), plus the follow-up work-unit
+  commit for the two `ToggleStorePlanTests` assertion fixes authorized after the fact.
+- TDD note: the follow-up commit was a deliberate post-hoc assertion change with the user's
+  explicit authorization, not a new RED→GREEN cycle. The failures were already observed.
 
 ## Objective
 
@@ -162,5 +167,89 @@ across a `git checkout` while using `--no-build`.
 
 Backend production: `SMCA.WebApi/Program.cs`, and the two
 `UseLocalizationExtension` definitions in `SMCA.WebApi/Extensions/ServiceExtensions.cs` and
-`WebApi/Extensions/AppExtensions.cs`. E2E: `Owners/OwnersDeletePaymentsGuardTests.cs` only.
+`WebApi/Extensions/AppExtensions.cs`. E2E: `Owners/OwnersDeletePaymentsGuardTests.cs` only,
+plus the follow-up `Stores/ToggleStorePlanTests.cs` authorization recorded below.
 Nothing else.
+
+---
+
+# Follow-up: the two tests the culture change broke
+
+The culture change made two existing tests in `Stores/ToggleStorePlanTests.cs` fail. They
+asserted the English substring `"inactive"` resolved from `I18n.en.resx`; with the culture
+pinned to Spanish they now receive `"La tienda está inactiva"` and
+`"El usuario propietario está inactivo"`. Both still assert `400`, which never changed.
+
+**The subagent stopped and reported instead of touching that file** — correct, it was outside
+the authorized scope. The user then authorized updating them.
+
+| Test | Was | Now |
+| --- | --- | --- |
+| `Toggle_inactive_store_returns_400` | `Contains("inactive")` | `Contains("inactiva")` |
+| `Toggle_with_inactive_owner_user_returns_400` | `Contains("inactive")` | `Contains("inactivo")` |
+
+The accent-free stems were chosen deliberately: the accented `í` in `está` is a
+source-encoding hazard, and the distinct `a`/`o` endings are what stop either test from
+passing on the other's message. A bare `"inactiv"` prefix would wrongly satisfy both, so the
+new assertions are strictly stronger than the ones they replace.
+
+Note this file already mixed languages — `Toggle_unowned_store_returns_400` and
+`Toggle_unknown_store_returns_400` asserted the Spanish `"Tienda no encontrada"`. The two
+English assertions were the outliers, and the Spanish culture pinned them to the rest of the
+file.
+
+# Verification record — observed, not predicted
+
+| Run | Result |
+| --- | --- |
+| E2E Owners filter | `Total 51 / Passed 51 / Failed 0` (parent-verified) |
+| `ToggleStorePlanTests` | `Total 10 / Passed 10 / Failed 0` (parent-verified) |
+| `Application.Tests` | `Total 511 / Passed 511 / Failed 0` |
+| Full E2E, run 1 | `Total 586 / Passed 578 / Failed 8` |
+| Full E2E, run 2 | `Total 586 / Passed 579 / Failed 7` |
+
+**The full-suite number is noisy and cannot be read as a regression count.** Six failures are
+stable across every run and are the pre-existing module-18 / feature-91 plan-matrix family:
+
+- `PlanChangeMatrixTests.SuperAdmin_upgrades_gratis_to_superior_store_keeps_superior_modules_and_features`
+- `PlanChangeMatrixTests.SuperAdmin_downgrades_vip_to_superior_store_keeps_superior_modules_and_features`
+- `StorePlanCatalogTests.StorePlanModule_seed_matches_documented_plan_matrix`
+- `FeatureSeedCoherenceTests.Seed_features_available_to_store_exist_active_and_available_in_database`
+- `MeAfterOwnerPlanChangeTests.Me_follows_the_plan_across_superadmin_flips_with_same_owner_token`
+- `MeModuleFeatureDeactivationTests.Me_deactivated_module_disappears_from_me_keeping_others_intact`
+
+The remaining one or two differ between runs and are the documented `smca_test` residue, not
+product failures. Every one of them passes in isolation:
+
+- `UsersRolesTests` → `Total 11 / Passed 11`
+- `AuthLoginDekWrapTests` → `Total 6 / Passed 6` (run-1 failure was `23503` on
+  `FK_StoreModule_Store_StoreId`, "Key (StoreId) is not present in table Store" — a previous
+  test's cleanup deleted the store this test's seeder then attached to)
+- `AuthMeDeactivationTests` → `Total 2 / Passed 2` (its name contains "inactive" but it
+  asserts only the 404 status and call count; it never touches message text, so the culture
+  pin cannot affect it)
+
+This flakiness is pre-existing and is the same family already recorded in
+`owner-delete-payments-409.md`. It is not fixed here.
+
+# Corrections to the earlier baseline claims
+
+Two numbers in this document and in the delegation brief were wrong and are corrected here:
+
+1. **The full E2E suite is 586 tests, not 581.** The subagent measured a real HEAD baseline of
+   `6 failed / 580 passed / 586` by stashing the change and rebuilding — the old 581 figure
+   predated this unit.
+2. **`AuthRegisterPlanTests.Register_generates_store_role_features_for_mapped_plan_features`
+   now PASSES on `qa`.** It was listed as a known pre-existing failure; it is not one. The
+   outstanding feature-91 work is the plan-matrix family above, which is a different set of
+   tests.
+
+# Still open for the user to decide (not actioned)
+
+- `backend/src/WebApi/` and `backend/src/WebApiTest/` are both absent from `SMCA.sln` and are
+  unreachable dead weight. Their localization copies were aligned so they can no longer
+  contradict the live API, but **deleting the projects was not authorized and was not done**.
+- `I18n.en.resx` is retained and is now never selected. Keeping it is harmless and reversible.
+- `WebApiTest/Extensions/ServiceExtensions.cs` is a third copy of `UseLocalizationExtension`
+  whose only call site (`WebApiTest/Program.cs:118`) is commented out. It already said `es`
+  and was left untouched.
