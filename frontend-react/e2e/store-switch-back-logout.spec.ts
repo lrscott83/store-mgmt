@@ -106,6 +106,52 @@ async function refreshSessionFromMe(page: Page): Promise<void> {
   await page.reload();
 }
 
+/**
+ * Re-aims the BACKEND's persisted SelectedStoreId at the snapshot store when a
+ * previous serial test left it pointing elsewhere.
+ *
+ * ROOT CAUSE (2026-09-26, owner-authorized fix): the switch flow now PERSISTS
+ * the selection server-side (PUT /v1/stores → SetMyStoreCommand), and SSR-1 —
+ * the serial test that runs right before SSR-2/SSR-3 in this file's worker —
+ * ends with store B persisted. Each serial test then restores the persona
+ * snapshot (localStorage still says A) and refreshes/re-logs in, but the
+ * BACKEND answers /me with B — so the hydrated session carries B's modules
+ * (no MultiStores 14) and the "+ Tienda" button (my-stores.tsx gates on
+ * user.storeModuleIds) never renders. Deterministic, and it survives retries
+ * because the persisted selection is exactly what every retry re-serves.
+ * Isolated runs never see it: nothing switched before them.
+ *
+ * The fix uses the app's own endpoint — PUT /v1/stores with the session's
+ * real Bearer, the same call configurations.tsx's store select makes. The
+ * backend only requires the target to be one of the user's active stores
+ * (SetMyStoreCommand — NO module gate), so it works for any owner persona.
+ * Runs BEFORE the /me refresh (or re-login), so the fresh profile describes
+ * the snapshot store again. Idempotent when the store already matches
+ * (isolated runs): an extra SetMyStore is harmless. Re-runs on retries too.
+ */
+async function realignBackendSelectedStore(
+  page: Page,
+  selectedStoreId: string,
+): Promise<void> {
+  const token = await readBearerToken(page);
+  if (!token) {
+    throw new Error(
+      'realignBackendSelectedStore: no Bearer token in localStorage — expected an ' +
+        'already-authenticated session (signedInPage) before the realign.',
+    );
+  }
+  const response = await page.request.put(`${E2E_API_URL}/v1/stores`, {
+    headers: { Authorization: `Bearer ${token}` },
+    data: { storeId: selectedStoreId },
+  });
+  if (!response.ok()) {
+    throw new Error(
+      `realignBackendSelectedStore: PUT /v1/stores failed (${response.status()}) — the ` +
+        'backend selection could not be re-aimed at the snapshot store.',
+    );
+  }
+}
+
 /** Reads this device's per-store DEK wrap keys (DIAGNOSTICS ONLY, read-only). */
 async function readDekTableDiagnostics(page: Page): Promise<string> {
   return page.evaluate(
@@ -332,6 +378,12 @@ test('SSR-2 — switching BACK to the login store does NOT log the user out', as
   await assertStoresFeature(page);
 
   // SETUP (same as SSR-1 — serial mode, fresh per test).
+  // Realign BEFORE refreshing: SSR-1 (the serial test right before this one)
+  // ends with store B persisted server-side, so /me would answer with B's
+  // modules and the "+ Tienda" button would never render (root cause
+  // 2026-09-26, see realignBackendSelectedStore). No-op when A already
+  // matches (isolated runs).
+  await realignBackendSelectedStore(page, selectedStoreId);
   await seedMultiStoresModule(selectedStoreId);
   await refreshSessionFromMe(page);
 
@@ -385,6 +437,11 @@ test('SSR-3 — create-after-login timeline: NEITHER switch logs out (server-iss
   // for B must still switch seamlessly — no logout, no re-auth, on BOTH
   // directions. Before the fix the first A -> B hit the legacy no-wrap
   // fallback and logged the user out (the exact reported pain).
+  // Realign BEFORE the re-login: SSR-1/SSR-2 leave store B persisted
+  // server-side, and the real login would mint the session in B — its module
+  // set lacks MultiStores 14 and "+ Tienda" never renders (same root cause as
+  // SSR-2, see realignBackendSelectedStore).
+  await realignBackendSelectedStore(page, selectedStoreId);
   await seedMultiStoresModule(selectedStoreId);
   await reloginViaUi(page, identity.login, identity.password);
 
