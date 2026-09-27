@@ -1,0 +1,7 @@
+# The CSV files produced by 01-extract.sql live here.
+#
+# They contain real production Argon2id password hashes, offline pre-hash
+# envelopes, names, e-mail addresses and phone numbers. They must never be
+# committed. This file exists only so the directory is present in git.
+*
+!.gitignore
