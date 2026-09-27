@@ -9,7 +9,7 @@ import {
 } from '@store-mgmt/domain';
 import { adminFeatureLoader } from '~/auth/routes/loaders';
 import { Switch } from '~/shared/components/ui/switch';
-import { channelLabel } from '~/management/channel-rates/lib/channel-label';
+import { channelLabel } from '~/shared/lib/payment-methods/channel-label';
 import { currencyLabel } from '~/shared/lib/format-money-with-currency';
 import {
   DEFAULT_ENABLED_CHANNEL_KEYS,

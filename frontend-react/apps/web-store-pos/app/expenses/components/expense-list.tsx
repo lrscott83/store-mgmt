@@ -1,7 +1,8 @@
 import { useIntl } from 'react-intl';
 import type { Expense } from '@store-mgmt/domain';
-import { ExpenseType, salePaymentMethodLabel } from '@store-mgmt/domain';
+import { ExpenseType } from '@store-mgmt/domain';
 import { resolvedExpensePaymentMethod } from '~/shared/lib/payment-method-resolved';
+import { channelLabel } from '~/shared/lib/payment-methods/channel-label';
 import { InfoBox } from '~/shared/components/ui/info-box';
 import { ActionMenu, ActionMenuItem } from '~/shared/components/ui/action-menu';
 import { formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency';
@@ -62,9 +63,8 @@ export function ExpenseList({ expenses, readOnly = false, onEdit, onDelete }: Ex
             </span>
             {/* Columna 2 — modo de pago, centro y alineado a la izquierda. */}
             <span className="text-left text-xs font-semibold text-success">
-              {salePaymentMethodLabel(
-                resolvedExpensePaymentMethod(expense),
-                expense.currency ?? 0,
+              {channelLabel(resolvedExpensePaymentMethod(expense), expense.currency ?? 0, (id) =>
+                intl.formatMessage({ id }),
               )}
             </span>
             {/* Columna 3 — precio, alineado a la derecha. */}

@@ -2,10 +2,11 @@ import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { useIntl } from 'react-intl';
 import type { Currency, Expense } from '@store-mgmt/domain';
-import { DEFAULT_CURRENCY, SalePaymentMethod } from '@store-mgmt/domain';
+import { DEFAULT_CURRENCY } from '@store-mgmt/domain';
 import { Modal } from '~/shared/components/ui/modal';
 import { addDays, formatLocalDate } from '~/shared/lib/date-utils';
 import { currencyLabel } from '~/shared/lib/format-money-with-currency';
+import { channelLabel } from '~/shared/lib/payment-methods/channel-label';
 import type { CurrencyTotal } from '~/shared/lib/currency-totals';
 import type {
   CurrencyRangeBucket,
@@ -132,15 +133,6 @@ const CREDITS_TITLE = 'Créditos por cobrar';
 const ALL_ORDER_TYPES_NOTE =
   'Incluye todos los tipos de venta (normal, mayorista, merma, ajuste, otro)';
 
-// Labels of the REAL sale channel (`SalePaymentMethod`). The breakdown groups by
-// `resolvedOrderPaymentMethod`, so Zelle is a slice of its own: Efectivo, Zelle
-// and Transferencia. `Tarjeta` is not a channel and has no entry.
-const PAYMENT_LABEL_IDS: Record<number, string> = {
-  [SalePaymentMethod.Efectivo]: 'CART.EFECTIVO',
-  [SalePaymentMethod.Zelle]: 'CART.ZELLE',
-  [SalePaymentMethod.Transferencia]: 'CHANNEL_RATES.METHOD_TRANSFERENCIA',
-};
-
 /** Zero-valued fallback group so the cards render without data (all "0"). */
 function emptyGroup(): CurrencyRangeMetrics {
   return {
@@ -215,9 +207,6 @@ export function DashboardMetricsBody({
   const definitions = KPI_DEFINITIONS.filter(
     (definition) => definition.key !== 'expenses' || hasExpensesModule,
   );
-
-  const paymentLabel = (method: SalePaymentMethod): string =>
-    intl.formatMessage({ id: PAYMENT_LABEL_IDS[method] ?? 'CART.EFECTIVO' });
 
   function formatKpiValue(definition: KpiDefinition, group: CurrencyRangeMetrics): string {
     const value = definition.valueOf(group);
@@ -308,7 +297,9 @@ export function DashboardMetricsBody({
 
     if (popup.key === 'sales') {
       return metrics.groups.map((group) => {
-        const slices = paymentBreakdown(metrics.orders, group.currency, paymentLabel);
+        const slices = paymentBreakdown(metrics.orders, group.currency, (method) =>
+          channelLabel(method, group.currency, (id) => intl.formatMessage({ id })),
+        );
         return (
           <PopupCard
             key={group.currency}
@@ -596,7 +587,9 @@ export function DashboardMetricsBody({
             <CurrencyChips currencies={breakdownCurrencies} value={widgetCurrency} />
           </div>
           <DonutChart
-            slices={paymentBreakdown(metrics.orders, widgetCurrency, paymentLabel)}
+            slices={paymentBreakdown(metrics.orders, widgetCurrency, (method) =>
+              channelLabel(method, widgetCurrency, (id) => intl.formatMessage({ id })),
+            )}
             loadingMessage={loadingMessage}
             emptyMessage={emptyMessage}
             formatValue={(value) => formatAmount(value, widgetCurrency)}

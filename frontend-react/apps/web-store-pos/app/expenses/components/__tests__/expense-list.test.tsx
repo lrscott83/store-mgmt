@@ -69,7 +69,7 @@ describe('ExpenseList — list/table parity sweep (WU4)', () => {
       </Wrapper>,
     );
     const typeText = screen.getByText('Salario');
-    const paymentText = screen.getByText('Efectivo');
+    const paymentText = screen.getByText('Efectivo (CUP)');
     expect(typeText.className).not.toMatch(/rounded-full/);
     expect(paymentText.className).not.toMatch(/rounded-full/);
     expect(paymentText.className).toMatch(/font-semibold/);
@@ -115,7 +115,7 @@ describe('ExpenseList — row layout (motivo izq / pago centro / precio der)', (
     );
     const row = screen.getByTestId('expense-row-exp-1');
     const reason = screen.getByText('Salario');
-    const payment = screen.getByText('Efectivo');
+    const payment = screen.getByText('Efectivo (CUP)');
     const price = screen.getByText('2 000 CUP');
 
     expect(reason.className).toMatch(/text-left/);
