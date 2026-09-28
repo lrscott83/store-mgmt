@@ -13,6 +13,8 @@ import type {
   StoreModulePricingPayload,
   StoreModulePricingResult,
   StoreModulePricingReadResult,
+  ModuleCatalogPricingPayload,
+  ModuleCatalogPricingResult,
 } from '@store-mgmt/domain';
 import { apiClient } from '~/shared/lib/http/api-client';
 
@@ -207,6 +209,30 @@ export const storeHttpService = {
 
   async getModulesToStore(): Promise<BaseResponseModel<Module[]>> {
     const response = await apiClient.get<BaseResponseModel<Module[]>>('/v1/modules/ToStore');
+    return response.data;
+  },
+
+  /**
+   * SuperAdmin authors the GLOBAL module catalog prices (PUT /v1/modules/pricing): the
+   * base price, the flat discount and the percent discount of every module in one save.
+   *
+   * Distinct from `updateStoreModulePricing`: that one writes frozen per-store copies on
+   * `StoreModule` rows and never reads the catalog as a store's price, so editing the
+   * catalog can never silently reprice a store. The payload is the COMPLETE table the
+   * editor showed — `GET /v1/modules/ToStore` already returns exactly the active,
+   * AvailableToStore universe, and a module id the backend does not know aborts the WHOLE
+   * save rather than applying it partially. SuperAdmin-only (403 for everyone else).
+   *
+   * Returns the saved state of every submitted row plus the total over the whole table,
+   * with `currentPrice` recomputed by the backend's shared formula.
+   */
+  async updateModulePricing(
+    modules: ModuleCatalogPricingPayload[],
+  ): Promise<BaseResponseModel<ModuleCatalogPricingResult>> {
+    const response = await apiClient.put<BaseResponseModel<ModuleCatalogPricingResult>>(
+      '/v1/modules/pricing',
+      { modules },
+    );
     return response.data;
   },
 

@@ -230,6 +230,45 @@ export interface StoreModulePricingReadResult {
   totalCurrentPrice: number;
 }
 
+/**
+ * One row of the GLOBAL module catalog pricing save (PUT /v1/modules/pricing). Only the
+ * three editable catalog price fields travel: the endpoint writes `Price`,
+ * `DiscountPrice` and `PercentDiscountPrice` and nothing else, so a structural flag can
+ * never be smuggled in through the payload.
+ *
+ * There is no `isSelected` here, unlike the per-store payload: the catalog save carries
+ * no tick — every submitted row is priced, and a module omitted from the table is simply
+ * not part of this edit (the catalog table the page shows is already the complete
+ * saveable universe, `GET /v1/modules/ToStore`).
+ */
+export interface ModuleCatalogPricingPayload {
+  moduleId: number;
+  price: number;
+  discountPrice: number;
+  percentDiscountPrice: number;
+}
+
+/**
+ * Saved state of one catalog row, echoed back by the save. Distinct from
+ * `ModuleCatalogPricingPayload` because it adds the module `name` (so the echo can
+ * identify the row) and the server-computed `currentPrice`.
+ */
+export interface ModuleCatalogPricingRow extends ModuleCatalogPricingPayload {
+  name: string;
+  currentPrice: number;
+}
+
+/**
+ * Result of the catalog pricing save: the echoed state of every submitted row plus the
+ * ungrouped total over the whole table. `totalCurrentPrice` is the backend's own float32
+ * `CurrentPriceServiceUtils` arithmetic, so compare it with an epsilon against the
+ * browser total — see the drift note in `module-pricing.ts`.
+ */
+export interface ModuleCatalogPricingResult {
+  modules: ModuleCatalogPricingRow[];
+  totalCurrentPrice: number;
+}
+
 export interface ReSellerCommission {
   year: number;
   month: number;

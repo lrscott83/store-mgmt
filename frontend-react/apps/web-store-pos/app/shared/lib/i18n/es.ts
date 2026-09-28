@@ -229,6 +229,7 @@ const messages: Record<string, string> = {
   'MENU.OWNERS': 'Propietarios',
   'MENU.RESELLERS': 'Gestores',
   'MENU.FEATURES': 'Funcionalidades',
+  'MENU.MODULES': 'Módulos',
 
   // Menu items — Sales (Angular MENU.SALE_MGMT.*)
   'MENU.PRODUCTS': 'Catálogo Productos',
@@ -1105,6 +1106,26 @@ const messages: Record<string, string> = {
   'STORES.MODULE_PRICING.TOTAL': 'Total',
   'STORES.MODULE_PRICING.SERVER_TOTAL_NOTE':
     'Total guardado por el servidor. Se recalcula al editar cualquier valor.',
+
+  // SuperAdmin GLOBAL module catalog pricing (/admin/modules). Distinct from
+  // STORES.MODULE_PRICING.* above, which prices one STORE's frozen copies. Grouping reuses
+  // the STORES.PLAN.*_TAB names; the last bucket holds modules no loaded plan claims.
+  'MODULE_CATALOG.TITLE': 'Precios de los módulos',
+  'MODULE_CATALOG.HINT':
+    'Edita el precio, el descuento y el descuento porcentual de cada módulo del catálogo. Si un módulo tiene descuento, su precio base aparece tachado y el precio final se recalcula mientras escribes. El total del plan suma los precios finales de sus módulos.',
+  'MODULE_CATALOG.LOADING': 'Cargando módulos...',
+  'MODULE_CATALOG.EMPTY': 'No hay módulos disponibles en el catálogo.',
+  'MODULE_CATALOG.NO_PLAN_GROUP': 'Otros planes',
+  'MODULE_CATALOG.COLUMN_MODULE': 'Módulo',
+  'MODULE_CATALOG.COLUMN_PRICE': 'Precio',
+  'MODULE_CATALOG.COLUMN_PERCENT_DISCOUNT': '% Descuento',
+  'MODULE_CATALOG.COLUMN_DISCOUNT': 'Descuento',
+  'MODULE_CATALOG.COLUMN_CURRENT': 'Precio final',
+  'MODULE_CATALOG.GROUP_TOTAL': 'Total del plan',
+  'MODULE_CATALOG.SAVE': 'Guardar',
+  'MODULE_CATALOG.SAVING': 'Guardando...',
+  'MODULE_CATALOG.SAVE_SUCCESS': 'Precios de los módulos actualizados correctamente.',
+  'MODULE_CATALOG.ERROR': 'No se pudieron guardar los precios de los módulos. Intente de nuevo.',
 
   // Super-admin store cards (2026-09-10): owner contact + description labels.
   // The plan line reuses the STORES.PLAN.*_TAB names; the phone renders as a tel: link.
