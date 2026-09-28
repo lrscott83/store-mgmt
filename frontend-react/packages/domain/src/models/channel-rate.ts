@@ -18,8 +18,10 @@ export interface ChannelRate {
   id?: string;
   method: SalePaymentMethod;
   currency: Currency;
-  /** Units of `currency` per 1 USD (moneda-por-USD). */
-  value: number;
+  /** Buy value: units of `currency` per 1 USD (bank buys currency). */
+  buyValue: number;
+  /** Sell value: units of `currency` per 1 USD (bank sells currency). */
+  sellValue: number;
   effectiveFrom: Date;
   createdDate?: Date;
   /** Absent ⇒ active (backwards compatible). `false` ⇒ excluded from conversion. */

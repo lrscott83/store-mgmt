@@ -24,10 +24,12 @@ export const RATE_MICRO = 1_000_000;
 /** Synthetic pivot value for USD when no persisted row resolves. */
 const USD_PIVOT_MICRO = 1_000_000;
 
-/** A rate ready for integer math: `value` is always integer millionths. */
+/** A rate ready for integer math: `buyValue` and `sellValue` are always integer millionths. */
 export interface ResolvedChannelRate {
-  /** Moneda-por-USD in integer millionths (value * 1e6). */
-  value: number;
+  /** Buy value in integer millionths (buyValue * 1e6). */
+  buyValue: number;
+  /** Sell value in integer millionths (sellValue * 1e6). */
+  sellValue: number;
   /** Channel method that resolved the rate; absent on a currency-only USD pivot. */
   method?: SalePaymentMethod;
   currency: Currency;
@@ -72,7 +74,13 @@ function rateNotFound<T>(): DataResult<T> {
  * `ChannelRateErrors.RateNotFound`.
  */
 function isUsableRate(row: ChannelRate): boolean {
-  return row.isActive !== false && Number.isFinite(row.value) && row.value > 0;
+  return (
+    row.isActive !== false &&
+    Number.isFinite(row.buyValue) &&
+    row.buyValue > 0 &&
+    Number.isFinite(row.sellValue) &&
+    row.sellValue > 0
+  );
 }
 
 function toResolved(rate: ChannelRate): ResolvedChannelRate {
@@ -80,7 +88,8 @@ function toResolved(rate: ChannelRate): ResolvedChannelRate {
     id: rate.id,
     method: rate.method,
     currency: rate.currency,
-    value: Math.round(rate.value * RATE_MICRO),
+    buyValue: Math.round(rate.buyValue * RATE_MICRO),
+    sellValue: Math.round(rate.sellValue * RATE_MICRO),
     effectiveFrom: rate.effectiveFrom,
   };
 }
@@ -201,20 +210,28 @@ export function convertPaymentAmount(
   rates: readonly ChannelRate[],
   at: Date,
 ): DataResult<number> {
-  const source = resolveChannelRate(rates, method, currency, at);
-
   if (Number(currency) === Number(toCurrency)) {
-    if (source.succeeded) {
-      return success(divideHalfUp(amountCents * source.data!.value, source.data!.value));
-    }
     return success(amountCents);
   }
 
+  const source = resolveChannelRate(rates, method, currency, at);
   const target = resolveCurrencyRate(rates, toCurrency, at);
 
   if (!source.succeeded) return rateNotFound<number>();
   if (!target.succeeded) return rateNotFound<number>();
-  return success(divideHalfUp(amountCents * target.data!.value, source.data!.value));
+
+  // Cross-currency conversion via USD pivot:
+  // - Converting FROM a non-USD currency: divide by buyValue (bank buys the source currency)
+  // - Converting TO a non-USD currency: multiply by sellValue (bank sells the target currency)
+  const amountInUsd = Number(currency) === Number(Currency.USD)
+    ? amountCents
+    : divideHalfUp(amountCents * RATE_MICRO, source.data!.buyValue);
+
+  const result = Number(toCurrency) === Number(Currency.USD)
+    ? amountInUsd
+    : divideHalfUp(amountInUsd * target.data!.sellValue, RATE_MICRO);
+
+  return success(result);
 }
 
 /**
@@ -229,17 +246,26 @@ export function convertLineAmount(
   rates: readonly ChannelRate[],
   at: Date,
 ): DataResult<number> {
-  const source = resolveCurrencyRate(rates, fromCurrency, at);
-  const target = resolveCurrencyRate(rates, toCurrency, at);
-
   if (Number(fromCurrency) === Number(toCurrency)) {
-    if (source.succeeded && target.succeeded) {
-      return success(divideHalfUp(amountCents * target.data!.value, source.data!.value));
-    }
     return success(amountCents);
   }
 
+  const source = resolveCurrencyRate(rates, fromCurrency, at);
+  const target = resolveCurrencyRate(rates, toCurrency, at);
+
   if (!source.succeeded) return rateNotFound<number>();
   if (!target.succeeded) return rateNotFound<number>();
-  return success(divideHalfUp(amountCents * target.data!.value, source.data!.value));
+
+  // Cross-currency conversion via USD pivot:
+  // - Converting FROM a non-USD currency: divide by buyValue (bank buys the source currency)
+  // - Converting TO a non-USD currency: multiply by sellValue (bank sells the target currency)
+  const amountInUsd = Number(fromCurrency) === Number(Currency.USD)
+    ? amountCents
+    : divideHalfUp(amountCents * RATE_MICRO, source.data!.buyValue);
+
+  const result = Number(toCurrency) === Number(Currency.USD)
+    ? amountInUsd
+    : divideHalfUp(amountInUsd * target.data!.sellValue, RATE_MICRO);
+
+  return success(result);
 }
