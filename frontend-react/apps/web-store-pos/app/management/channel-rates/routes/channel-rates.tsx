@@ -98,7 +98,8 @@ export function ChannelRatesPage() {
   const [deactivateTarget, setDeactivateTarget] = useState<ChannelRate | null>(null);
   const [method, setMethod] = useState<SalePaymentMethod>(SalePaymentMethod.Efectivo);
   const [currency, setCurrency] = useState<Currency>(Currency.CUP);
-  const [valueDraft, setValueDraft] = useState('');
+  const [buyValueDraft, setBuyValueDraft] = useState('');
+  const [sellValueDraft, setSellValueDraft] = useState('');
   const [effectiveFromDraft, setEffectiveFromDraft] = useState(() => toLocalDayKey(new Date()));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
@@ -159,7 +160,8 @@ export function ChannelRatesPage() {
     );
     return [
       channelLabel(record.method, record.currency, formatMessage),
-      `${formatMessage('CHANNEL_RATES.VALUE_LABEL')}: ${record.value}`,
+      `${formatMessage('CHANNEL_RATES.BUY_VALUE_LABEL')}: ${record.buyValue}`,
+      `${formatMessage('CHANNEL_RATES.SELL_VALUE_LABEL')}: ${record.sellValue}`,
       `${formatMessage('CHANNEL_RATES.EFFECTIVE_FROM_LABEL')}: ${toLocalDayKey(record.effectiveFrom)}`,
       `${formatMessage('CHANNEL_RATES.CREATED_DATE_COLUMN')}: ${created}`,
       `${formatMessage('CHANNEL_RATES.STATUS_COLUMN')}: ${status}`,
@@ -192,12 +194,13 @@ export function ChannelRatesPage() {
 
     setSaving(true);
     const svc = new ChannelRateOfflineService(storeId);
-    // The service is the write guard (value must be finite and > 0); on failure
+    // The service is the write guard (buyValue/sellValue must be finite and > 0); on failure
     // it returns a failed DataResult and writes nothing.
     const result = svc.registerRate({
       method,
       currency,
-      value: Number(valueDraft),
+      buyValue: Number(buyValueDraft),
+      sellValue: Number(sellValueDraft),
       effectiveFrom,
     });
     setSaving(false);
@@ -207,7 +210,8 @@ export function ChannelRatesPage() {
       return;
     }
 
-    setValueDraft('');
+    setBuyValueDraft('');
+    setSellValueDraft('');
     load();
     setFormOpen(false);
     setSavedMessage(true);
@@ -286,7 +290,10 @@ export function ChannelRatesPage() {
                     {intl.formatMessage({ id: 'CHANNEL_RATES.CHANNEL_COLUMN' })}
                   </th>
                   <th className="px-2 py-1.5">
-                    {intl.formatMessage({ id: 'CHANNEL_RATES.VALUE_COLUMN' })}
+                    {intl.formatMessage({ id: 'CHANNEL_RATES.BUY_VALUE_COLUMN' })}
+                  </th>
+                  <th className="px-2 py-1.5">
+                    {intl.formatMessage({ id: 'CHANNEL_RATES.SELL_VALUE_COLUMN' })}
                   </th>
                   {/* Deactivate column: no header text by design. */}
                   <th className="px-2 py-1.5" />
@@ -306,7 +313,8 @@ export function ChannelRatesPage() {
                       <td className="px-2 py-1.5 text-text">
                         {channelLabel(record.method, record.currency, formatMessage)}
                       </td>
-                      <td className="px-2 py-1.5 text-text">{record.value}</td>
+                      <td className="px-2 py-1.5 text-text">{record.buyValue}</td>
+                      <td className="px-2 py-1.5 text-text">{record.sellValue}</td>
                       <td className="px-2 py-1.5 whitespace-nowrap">
                         <button
                           type="button"
@@ -354,7 +362,10 @@ export function ChannelRatesPage() {
                     {intl.formatMessage({ id: 'CHANNEL_RATES.CHANNEL_COLUMN' })}
                   </th>
                   <th className="px-2 py-1.5">
-                    {intl.formatMessage({ id: 'CHANNEL_RATES.VALUE_COLUMN' })}
+                    {intl.formatMessage({ id: 'CHANNEL_RATES.BUY_VALUE_COLUMN' })}
+                  </th>
+                  <th className="px-2 py-1.5">
+                    {intl.formatMessage({ id: 'CHANNEL_RATES.SELL_VALUE_COLUMN' })}
                   </th>
                   <th className="px-2 py-1.5">
                     {intl.formatMessage({ id: 'CHANNEL_RATES.DETAILS_COLUMN' })}
@@ -374,7 +385,8 @@ export function ChannelRatesPage() {
                       <td className="px-2 py-1.5 text-text">
                         {channelLabel(record.method, record.currency, formatMessage)}
                       </td>
-                      <td className="px-2 py-1.5 text-text">{record.value}</td>
+                      <td className="px-2 py-1.5 text-text">{record.buyValue}</td>
+                      <td className="px-2 py-1.5 text-text">{record.sellValue}</td>
                       <td className="px-2 py-1.5 whitespace-nowrap">
                         <button
                           type="button"
@@ -453,20 +465,51 @@ export function ChannelRatesPage() {
 
           <div>
             <label
-              htmlFor="channel-rate-value"
-              className="mb-1 block text-xs font-medium text-text-muted"
+              htmlFor="channel-rate-buy-value"
+              className="mb-1 flex items-center gap-1 text-xs font-medium text-text-muted"
             >
-              {intl.formatMessage({ id: 'CHANNEL_RATES.VALUE_LABEL' })}
+              {intl.formatMessage({ id: 'CHANNEL_RATES.BUY_VALUE_LABEL' })}
+              <span
+                title={intl.formatMessage({ id: 'CHANNEL_RATES.BUY_VALUE_HELP' })}
+                className="cursor-help text-text-muted hover:text-text"
+              >
+                <HelpIcon className="h-3.5 w-3.5" />
+              </span>
             </label>
             <input
-              id="channel-rate-value"
+              id="channel-rate-buy-value"
               type="number"
               min="0"
               step="0.01"
-              value={valueDraft}
-              onChange={(e) => setValueDraft(e.target.value)}
+              value={buyValueDraft}
+              onChange={(e) => setBuyValueDraft(e.target.value)}
               className="w-full rounded-md border border-border px-3 py-2 text-sm"
-              data-testid="channel-rate-value"
+              data-testid="channel-rate-buy-value"
+            />
+          </div>
+
+          <div>
+            <label
+              htmlFor="channel-rate-sell-value"
+              className="mb-1 flex items-center gap-1 text-xs font-medium text-text-muted"
+            >
+              {intl.formatMessage({ id: 'CHANNEL_RATES.SELL_VALUE_LABEL' })}
+              <span
+                title={intl.formatMessage({ id: 'CHANNEL_RATES.SELL_VALUE_HELP' })}
+                className="cursor-help text-text-muted hover:text-text"
+              >
+                <HelpIcon className="h-3.5 w-3.5" />
+              </span>
+            </label>
+            <input
+              id="channel-rate-sell-value"
+              type="number"
+              min="0"
+              step="0.01"
+              value={sellValueDraft}
+              onChange={(e) => setSellValueDraft(e.target.value)}
+              className="w-full rounded-md border border-border px-3 py-2 text-sm"
+              data-testid="channel-rate-sell-value"
             />
           </div>
 
