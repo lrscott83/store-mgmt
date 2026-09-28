@@ -40,6 +40,15 @@ test.describe('register — rate limit (REQ-9)', { tag: '@rate-limit' }, () => {
     const registerPage = new RegisterPage(page);
 
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      // Auto-login (2026-09-28): attempt 1's successful registration leaves an
+      // authenticated session behind, and `/register`'s guestOnlyLoader would
+      // bounce an authenticated visitor AWAY from the form — every later attempt
+      // would then fail on a form that is not there. Clearing the session first
+      // keeps each attempt a genuine anonymous registration submission (the
+      // first one starts on the blank page, where localStorage is inaccessible).
+      if (attempt > 1) {
+        await page.evaluate(() => window.localStorage.clear());
+      }
       await registerPage.goto();
       // Attempt 1 is a fresh registration (201, 1 real DB row). Every
       // attempt after that reuses the SAME login on purpose: a 400-by-

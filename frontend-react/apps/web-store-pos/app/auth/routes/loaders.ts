@@ -188,6 +188,27 @@ export function adminFeatureModuleLoader(featureIds: number[], moduleIds: EModul
   };
 }
 
+/**
+ * Owner gate for a module-scoped view (Catálogo Web, módulo 18): the session
+ * must be an OwnerAdmin AND the selected store must have the module. Unlike
+ * `featureLoader` — whose owner/SuperAdmin bypass would let any owner into the
+ * route — the module here is the real capability decision, mirroring the
+ * backend's [HasPermission(StoreRoleFeatures.WebCatalogAdmin)] (módulo 18 +
+ * feature 122 + rol OwnerAdmin).
+ */
+export function ownerModuleLoader(moduleId: EModules) {
+  return async (): Promise<Response | null> => {
+    const { user, isAuthenticated } = getAuthState();
+    if (!user || !isAuthenticated) {
+      return denyAccess();
+    }
+    if (!user.isOwnerAdmin || !isModuleAvailable(user, moduleId)) {
+      return denyAccess();
+    }
+    return null;
+  };
+}
+
 export async function superAdminLoader(): Promise<Response | null> {
   const { user, isAuthenticated } = getAuthState();
   if (!user || !isAuthenticated) {

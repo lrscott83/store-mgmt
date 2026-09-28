@@ -1,6 +1,6 @@
 import { test, expect } from './support/test';
 import { RegisterPage } from './support/register-page';
-import { LoginPage } from './support/login-page';
+import { readAuthModel } from './support/auth-storage';
 import { newTestIdentity } from './support/identity';
 
 // Literal Spanish copy asserted below, cited from
@@ -15,6 +15,10 @@ const OFFLINE_BANNER_TEXT = 'Estás sin conexión. Se requiere conexión para re
 // The client's generic fallback (register.tsx:135). REQ-6 must prove the
 // banner is NOT this — that would mean `description` arrived `undefined`.
 const GENERIC_VALIDATION_ERROR_TEXT = 'Error de validación. Por favor, revise sus datos.'; // es.ts:125
+// The unlock gate's own copy (AUTH.UNLOCK_REQUIRED, es.ts:129): the screen a
+// device with an unrecoverable key is parked on after a reload.
+const UNLOCK_REQUIRED_TEXT =
+  'Ingresa tu contraseña para desbloquear los datos de este dispositivo.';
 
 test.describe('register — client-side validation (REQ-1..REQ-5, REQ-7)', () => {
   test('REQ-1: submit stays disabled until terms are accepted', async ({ page }) => {
@@ -129,7 +133,7 @@ test.describe.serial('register — one real registration + one duplicate 400 (RE
   // created that login.
   const identity = newTestIdentity();
 
-  test('REQ-8: a successful registration lands on /login, unauthenticated', async ({
+  test('REQ-8: a successful registration signs the owner in and lands on /sales/products', async ({
     page,
     registerNetwork,
   }) => {
@@ -149,14 +153,43 @@ test.describe.serial('register — one real registration + one duplicate 400 (RE
     // `waitForResponse()` before this line is even reached.
     expect(response.status).toBe(201);
 
-    await expect(page).toHaveURL(/\/login$/);
-    // REQ-8's second half — no authenticated session was created by a
-    // registration alone. `/login`'s own `guestOnlyLoader` (auth/routes/
-    // loaders.ts:42-59) redirects an ALREADY-authenticated visitor away to
-    // their home path; landing here and seeing the login form is proof, not
-    // an assumption, that no session exists.
-    await expect(page.locator('input#login')).toBeVisible();
-    await expect(page.locator('input#password')).toBeVisible();
+    // REQ-8 (reversed 2026-09-28, owner request): a registration no longer
+    // parks the owner on the login form — it opens the session.
+    //
+    // F-2 is merged in here: a brand-new store has no products, so
+    // `resolveUserHomePath` answers `/sales/products` (user-home.ts:24-25) —
+    // the same destination the old register-then-login-manually flow asserted.
+    // That manual login step is gone because the registration itself now opens
+    // the session.
+    await expect(page).toHaveURL(/\/sales\/products$/, { timeout: 20_000 });
+    await expect(page.locator('input#login')).toHaveCount(0);
+
+    // The session is REAL, not just a URL: AUTH_MODEL holds a live token.
+    const auth = await readAuthModel(page);
+    expect(auth?.authToken).toBeTruthy();
+    expect(auth?.expiresIn ?? 0).toBeGreaterThan(Date.now());
+
+    // …and so is the store's KEY. This is the assertion that discriminates the
+    // auto-login design from the naive one: the register response's own token
+    // carries no DEK wrap (AuthDto leaves WrappedDek/WrapSalt/WrapIv empty on
+    // that path), so a session opened from it alone would come back from this
+    // reload parked on the unlock screen — or logged out. Only the login
+    // response's wrap lets the device-key wrap below recover the key silently.
+    await page.reload();
+    await expect(page).toHaveURL(/\/sales\/products$/);
+    await expect(page.getByText(UNLOCK_REQUIRED_TEXT)).not.toBeVisible();
+
+    // Write-path proof: a category is encrypted with the store key on the way
+    // in, so creating one here fails loudly (MissingDataKeyError, then the
+    // decryption-failure policy) if the auto-login left the device keyless —
+    // a much stronger statement than "the URL looked right".
+    const categoryName = `E2E registro ${identity.login}`;
+    await page.getByTestId('add-category-button').click();
+    await expect(page.getByTestId('category-name-input')).toBeVisible();
+    await page.getByTestId('category-name-input').fill(categoryName);
+    await page.getByTestId('category-save-button').click();
+    await expect(page.getByTestId('category-name-input')).toHaveCount(0);
+    await expect(page.getByText(categoryName)).toBeVisible();
   });
 
   test('REQ-6: an empty email reaches the API; the literal 400 text is shown', async ({
@@ -194,35 +227,13 @@ test.describe.serial('register — one real registration + one duplicate 400 (RE
   });
 });
 
-// ── F-2: destination after registration + login ────────────────────────
-
-test.describe.serial('register → login lands on /sales/products (F-2)', () => {
-  const identity = newTestIdentity();
-
-  test('F-2: newly registered OwnerAdmin lands on /sales/products', async ({
-    page,
-    registerNetwork,
-  }) => {
-    // Step 1: Register.
-    const registerPage = new RegisterPage(page);
-    await registerPage.goto();
-    await registerPage.fillValidForm(identity);
-    await registerPage.acceptTerms.check();
-    await registerPage.submit();
-
-    const response = await registerNetwork.waitForResponse();
-    expect(response.status).toBe(201);
-
-    // Landed on /login.
-    await expect(page).toHaveURL(/\/login$/);
-
-    // Step 2: Login with the registered credentials.
-    const loginPage = new LoginPage(page);
-    await loginPage.fill(identity);
-    await loginPage.submit();
-
-    // F-2: A newly registered store has no products, so
-    // resolveUserHomePath returns /sales/products (user-home.ts:24-25).
-    await expect(page).toHaveURL(/\/sales\/products/, { timeout: 15_000 });
-  });
-});
+// ── F-2: destination after registration ────────────────────────────────
+//
+// MERGED into REQ-8 above (2026-09-28). F-2 asserted that a newly registered
+// OwnerAdmin ends up on `/sales/products` — the same destination, still
+// asserted there, now reached without the manual login step that this block's
+// "Step 2" used to perform (it is unreachable: the registration already opens
+// the session, and `/register`'s `guestOnlyLoader` would bounce an
+// authenticated visitor away from the form). Nothing F-2 verified was dropped:
+// the destination assertion moved, and REQ-8 gained the session-is-real and
+// key-is-usable proofs this block never had.

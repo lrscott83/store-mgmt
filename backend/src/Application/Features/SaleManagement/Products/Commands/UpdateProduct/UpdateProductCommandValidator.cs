@@ -1,4 +1,6 @@
-﻿using Domain.Interfaces.Repositories;
+﻿using Domain.Common.Catalog;
+using Domain.Common.Limits;
+using Domain.Interfaces.Repositories;
 using FluentValidation;
 using Microsoft.Extensions.Localization;
 using Resources;
@@ -39,12 +41,28 @@ namespace Application.Features.SaleManagement.Products.Commands.UpdateProduct
               .NotNull().WithMessage(_localizer["IsRequired", "{PropertyName}"]);
 
             RuleFor(x => x.AvailableToSale)
-              .NotNull().WithMessage(_localizer["IsRequired", "{PropertyName}"]);
+              .NotNull().WithMessage(_localizer["IsRequired", "{PropertyName}"]);            RuleFor(x => x.DiscountFromInventory)
+                .NotNull().WithMessage(_localizer["IsRequired", "{PropertyName}"]);
 
-            RuleFor(x => x.DiscountFromInventory)
-              .NotNull().WithMessage(_localizer["IsRequired", "{PropertyName}"]);
+            // Catálogo web (plan 2026-09-27). Opcionales: solo se validan cuando vienen.
+            RuleFor(x => x.Description)
+                .MaximumLength(ProductEntityLimits.DescriptionMaxLength)
+                .WithMessage(_localizer["CatalogDescriptionTooLong", "{PropertyName}", ProductEntityLimits.DescriptionMaxLength]);
 
+            RuleFor(x => x.PercentDiscountPrice)
+                .InclusiveBetween(0, CatalogScales.MAX_PERCENT_SCALED)
+                .WithMessage(_localizer["CatalogPercentDiscountRange", "{PropertyName}"])
+                .When(x => x.PercentDiscountPrice.HasValue);
 
+            RuleFor(x => x.DiscountPrice)
+                .GreaterThanOrEqualTo(0)
+                .WithMessage(_localizer["CatalogDiscountPriceRange", "{PropertyName}"])
+                .When(x => x.DiscountPrice.HasValue);
+
+            RuleFor(x => x.Image)
+                .MaximumLength(ProductEntityLimits.ImagePathMaxLength)
+                .WithMessage(_localizer["CatalogImagePathTooLong", "{PropertyName}", ProductEntityLimits.ImagePathMaxLength])
+                .When(x => !string.IsNullOrEmpty(x.Image));
         }
 
         private async Task<bool> ProductExists(Guid productId, CancellationToken cancellationToken)

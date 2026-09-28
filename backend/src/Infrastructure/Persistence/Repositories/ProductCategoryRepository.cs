@@ -32,6 +32,14 @@ namespace Infrastructure.Persistence.Repositories
                 .ToListAsync(); 
         }
 
+        public async Task<IList<ProductCategory>> GetByStoreIdAsync(Guid storeId)
+        {
+            return await _productCategories
+                .Where(category => category.StoreId == storeId)
+                .OrderBy(category => category.Order).ThenBy(category => category.Name)
+                .ToListAsync();
+        }
+
         public async Task<bool> HasAnyAvailableCategoryByStoreId(Guid id)
         {
             return await _productCategories.AnyAsync(c => c.StoreId == id && c.IsActive);

@@ -429,6 +429,17 @@ namespace Infrastructure.Persistence.EntityConfigurations
                      241,
                      true,
                      true
+                 ),
+
+                // Catálogo web
+                Feature.Create(
+                     (int)FeatureType.WebCatalog,
+                     FeatureType.WebCatalog.GetDescription(),
+                     "Funcionalidad para publicar y sincronizar el catálogo web de la tienda",
+                     (int)ModuleType.WebCatalog,
+                     250,
+                     true,
+                     true
                  )
             );
         }

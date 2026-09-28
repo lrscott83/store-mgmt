@@ -35,7 +35,9 @@ namespace Application.Features.SaleManagement.Products.Queries.HasAnyAvailableTo
 
         public async Task<ResponseResult<bool>> Handle(HasAnyAvailableToSaleProductQuery query, CancellationToken cancellationToken)
         {
-            if (!string.IsNullOrEmpty(_httpContextService.StoreId))
+            // Guarda invertida (ver CreateProductCategoryCommand): con la sesión normal este
+            // endpoint devolvía 400 "Tienda no encontrada" en vez del booleano.
+            if (string.IsNullOrEmpty(_httpContextService.StoreId))
                 throw new ApiException(_localizer["StoreNotFound"], HttpStatusCode.BadRequest);
 
             Store store = await _storeRepository.GetByIdAsync(_httpContextService.StoreId.ToGuid());

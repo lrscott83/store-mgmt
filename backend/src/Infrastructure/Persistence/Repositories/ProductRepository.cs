@@ -64,6 +64,17 @@ namespace Infrastructure.Persistence.Repositories
                .ToListAsync();
         }
 
+        public async Task<IList<Product>> GetProductsForCatalogSyncAsync(Guid storeId)
+        {
+            return await _products
+                .Where(product => product.Category.StoreId == storeId)
+                .Include(product => product.Category)
+                .Include(product => product.Images)
+                .OrderBy(product => product.Category.Order)
+                .ThenBy(product => product.Order)
+                .ToListAsync();
+        }
+
         public async Task<bool> HasAnyAvailableToSaleProductByStoreId(Guid id)
         {
             return await _products.AnyAsync(product => product.IsActive && product.AvailableToSale

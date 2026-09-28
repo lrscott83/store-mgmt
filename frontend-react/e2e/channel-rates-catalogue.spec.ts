@@ -18,7 +18,6 @@
 
 import { test, expect } from './support/test';
 import type { Page } from '@playwright/test';
-import { LoginPage } from './support/login-page';
 import { RegisterPage } from './support/register-page';
 import { newTestIdentity } from './support/identity';
 import { readSelectedStoreId } from './support/session';
@@ -83,11 +82,8 @@ test.describe.serial('channel-rates catalogue (módulo 16) — solo canales real
     await registerPage.fillValidForm(identity);
     await registerPage.acceptTerms.check();
     await registerPage.submit();
-    await page.waitForURL(/\/login$/);
-
-    const loginPage = new LoginPage(page);
-    await loginPage.fill(identity);
-    await loginPage.submit();
+    // Auto-login (2026-09-28): the registration opens the session itself, so the
+    // explicit login that used to sit here is gone.
     await page.waitForURL(/\/sales\/products$/);
     const storeId = await readSelectedStoreId(page);
 

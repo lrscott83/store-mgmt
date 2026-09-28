@@ -3,6 +3,7 @@ using Application.Abstractions.Messaging;
 using Application.Exceptions;
 using Application.ResponseModels;
 using Application.UnitOfWorks;
+using Domain.Common.Catalog;
 using Domain.Common.Extensions;
 using Domain.Entities.ProductCategories;
 using Domain.Entities.Stores;
@@ -39,14 +40,24 @@ namespace Application.Features.SaleManagement.ProductCategories.Commands.CreateP
 
         public async Task<ResponseResult<bool>> Handle(CreateProductCategoryCommand request, CancellationToken cancellationToken)
         {
-            if (!string.IsNullOrEmpty(_httpContextService.StoreId))
+            // Sin tienda seleccionada no hay dónde crear la categoría: se avisa ANTES de tocar la
+            // BD. La condición estaba invertida (`!IsNullOrEmpty`), así que este endpoint fallaba
+            // SIEMPRE con una sesión normal (y pasaba de largo cuando no había tienda, para caer
+            // después en el `store == null`).
+            if (string.IsNullOrEmpty(_httpContextService.StoreId))
                 throw new ApiException(_localizer["StoreNotFound"], HttpStatusCode.BadRequest);
 
             Store store = await _storeRepository.GetByIdAsync(_httpContextService.StoreId.ToGuid());
             if (store == null)
                 throw new ApiException(_localizer["StoreNotFound"], HttpStatusCode.BadRequest);
 
-            ProductCategory category = ProductCategory.Create(store.Id, request.Name, request.Order, _httpContextService.TenantId.ToGuid());
+            // Slug público de la categoría en el catálogo web (plan 2026-09-27, D4): se deriva del
+            // nombre y ante colisión dentro de la tienda se añade -2, -3, ...
+            string slug = SlugNormalizer.MakeUnique(
+                SlugNormalizer.Normalize(request.Name),
+                candidate => _productCategoryRepository.Where(c => c.StoreId == store.Id && c.Slug == candidate).Any());
+
+            ProductCategory category = ProductCategory.Create(store.Id, request.Name, request.Order, _httpContextService.TenantId.ToGuid(), slug);
             await _productCategoryRepository.AddAsync(category);
             return ResponseResult.Success(await _applicationUnitOfWork.SaveChangesAsync(cancellationToken) > 0);
         }

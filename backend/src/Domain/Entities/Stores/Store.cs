@@ -43,6 +43,16 @@ namespace Domain.Entities.Stores
         public int StorePlanId { get; set; }
         public StorePlan StorePlan { get; set; } = null!;
 
+        // --- Catálogo web (módulo WebCatalog, plan 2026-09-27) ---
+
+        /// <summary>
+         /// Slug público de la tienda en /catalog/&lt;slug&gt;. Único global; null mientras la tienda
+        /// no haya abierto/usado nunca el catálogo web.
+        /// </summary>
+        public string? CatalogSlug { get; set; }
+        /// <summary>Fecha de la última sincronización del catálogo (solo diagnóstico).</summary>
+        public DateTime? CatalogSyncedAt { get; set; }
+
         private Store(Guid id, Guid ownerId, string name, bool approved, Guid tenantId, DateOnly? paymentStartDate = null,
             string? address = null, string? description = null, int storePlanId = (int)StorePlanType.Pago) 
             : base (id)

@@ -66,12 +66,8 @@ export async function mintMultiMonedasOwner(
   await registerPage.fillValidForm(identity);
   await registerPage.acceptTerms.check();
   await registerPage.submit();
-  await page.waitForURL(/\/login$/);
-
-  // 2. Login as the owner; the store id comes from the session (selectedStoreId).
-  const loginPage = new LoginPage(page);
-  await loginPage.fill(identity);
-  await loginPage.submit();
+  // 2. The registration already opened the owner session (auto-login,
+  //    2026-09-28); the store id comes from it.
   await page.waitForURL(/\/sales\/products$/);
   const storeId = await readSelectedStoreId(page);
 

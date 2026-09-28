@@ -58,19 +58,15 @@ async function deleteDeviceKeyDatabase(page: Page): Promise<void> {
   );
 }
 
-/** Registro real + login real por UI; termina en /sales/products. */
-async function registerAndLoginOnline(page: Page): Promise<TestIdentity> {
+/** Registro real por UI; el registro ya deja la sesión iniciada (auto-login
+ * 2026-09-28) y termina en /sales/products. */
+async function registerOnline(page: Page): Promise<TestIdentity> {
   const identity = newTestIdentity();
   const registerPage = new RegisterPage(page);
   await registerPage.goto();
   await registerPage.fillValidForm(identity);
   await registerPage.acceptTerms.check();
   await registerPage.submit();
-  await page.waitForURL(/\/login$/);
-
-  const loginPage = new LoginPage(page);
-  await loginPage.fill(identity);
-  await loginPage.submit();
   await page.waitForURL(HOME_URL);
   return identity;
 }
@@ -97,7 +93,7 @@ const localTest = test.extend<{}, { onlineLockedSnapshot: SnapshotEntries }>({
     async ({ browser }, use) => {
       const context = await browser.newContext();
       const page = await context.newPage();
-      await registerAndLoginOnline(page);
+      await registerOnline(page);
       const origin = new URL(page.url()).origin;
       const state = await context.storageState();
       const localStorage = state.origins.find((o) => o.origin === origin)?.localStorage ?? [];
@@ -122,7 +118,7 @@ test.describe.serial('online — dispositivo intacto', () => {
 
   test('1. online/intacto: recargar la vista mantiene la sesión', async ({ browser }) => {
     page = await browser.newPage();
-    await registerAndLoginOnline(page);
+    await registerOnline(page);
 
     await page.reload();
     await expect(page.getByRole('button', { name: USER_MENU })).toBeVisible({
@@ -193,7 +189,7 @@ localTest.describe('online — sin clave de dispositivo', () => {
     '6. online/sin clave: recargar con ciphertext ilegible va a /login?unlock=1 SIN logout',
     async ({ browser }) => {
       const page = await browser.newPage();
-      const identity = await registerAndLoginOnline(page);
+      const identity = await registerOnline(page);
       await deleteDeviceKeyDatabase(page);
 
       // El login online dejó la tabla de wraps de dispositivo (`lizoft.device-dek`,

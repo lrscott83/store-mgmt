@@ -1,8 +1,13 @@
 import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { useIntl } from 'react-intl';
+import { LoadingOverlay } from '@store-mgmt/web-common/client';
 import { ConnectivityService } from '~/shared/lib/auth/connectivity-service';
 import { authHttpService } from '~/shared/lib/http/auth-http-service';
+import { useAuthStore } from '~/shared/lib/stores/auth-store';
+import { resolveUserHomePath } from '~/shared/lib/auth/user-home';
+import { armTracking } from '~/shared/lib/usage/store-usage-tracker';
+import { preloadHeavyChunks } from '~/shared/lib/pwa/preload-heavy-chunks';
 import { Button } from '~/shared/components/ui/button';
 import { EyeIcon, EyeOffIcon, LockOpenIcon } from '~/shared/components/ui/icons';
 import { showBlockingError } from '~/shared/lib/blocking-alert';
@@ -35,6 +40,9 @@ export default function RegisterPage() {
   const intl = useIntl();
   const [searchParams] = useSearchParams();
   const code = searchParams.get('code') ?? undefined;
+  // Same convention as login.tsx: the action comes from the hook (not
+  // `getState()`), so the harnesses can mock this module wholesale.
+  const { login: signIn } = useAuthStore();
 
   const [form, setForm] = useState<FormState>({
     fullName: '',
@@ -48,6 +56,11 @@ export default function RegisterPage() {
   const [errors, setErrors] = useState<FormErrors>({});
   const [isOffline, setIsOffline] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  // Covers ONLY the post-registration leg (sign-in -> /me -> DEK -> home), so
+  // the button's "Registrando..." copy keeps its existing meaning while the
+  // request is in flight. Mirrors login.tsx's AUTH-FLICKER overlay: the form
+  // must not flash back between the individual steps.
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [accepted, setAccepted] = useState(false);
   // Angular register.component.html:100-103,122-125: a SINGLE showPassword
   // boolean drives BOTH the password and confirm-password fields — two
@@ -117,7 +130,38 @@ export default function RegisterPage() {
         code,
       });
       if (response.succeeded) {
-        navigate('/login');
+        // Auto-login (product decision 2026-09-28): a registration now leaves the
+        // owner signed in instead of parking them on /login.
+        //
+        // The register response's OWN token cannot do this job: `AuthDto` leaves
+        // `wrappedDek`/`wrapSalt`/`wrapIv` empty on the register path ("Only the
+        // login path populates them") and a brand-new device has neither a device
+        // key wrap nor a roster, so `resolveDekForLogin` would find NO source and
+        // throw `DekUnwrapError`. Without the store's DEK every encrypted screen
+        // fails and the decryption-failure policy logs the owner straight back
+        // out — the exact opposite of what is wanted here. The login response is
+        // what carries the wrap (built with the password pre-hash that only the
+        // login validation computes), so the session is opened through the very
+        // same path the login screen uses.
+        setIsSubmitting(true);
+        try {
+          const user = await signIn(form.login, form.password);
+          // Parity with login.tsx: arm the usage tracker and warm the heavy
+          // route chunks before landing on the home view.
+          armTracking();
+          preloadHeavyChunks();
+          navigate(await resolveUserHomePath(user));
+        } catch {
+          // The account EXISTS (the 201 already happened): this must never read as
+          // a failed registration. /login is the honest destination — it is where
+          // the key-recovery routes live when the session cannot be opened.
+          setIsSubmitting(false);
+          showBlockingError(
+            intl.formatMessage({ id: 'GENERAL.RESPONSE.ERROR_TITLE' }),
+            intl.formatMessage({ id: 'REGISTRATION.AUTO_LOGIN_FAILED' }),
+          );
+          navigate('/login');
+        }
       }
     } catch (err: unknown) {
       // Backend contract: AuthController.RegisterAsync returns Created(...) on success and
@@ -150,6 +194,12 @@ export default function RegisterPage() {
     } finally {
       setIsLoading(false);
     }
+  }
+
+  // While the post-registration leg runs, show ONLY the overlay — never the
+  // form — so the just-filled fields cannot flash back before the home view.
+  if (isSubmitting) {
+    return <LoadingOverlay label={intl.formatMessage({ id: 'GENERAL.LOADING' })} />;
   }
 
   return (

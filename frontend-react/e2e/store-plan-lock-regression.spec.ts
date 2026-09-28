@@ -7,7 +7,6 @@ import { readBearerToken } from './support/auth-storage';
 import { installPlanChangeObserver } from './support/plan-change-observer';
 import { newTestIdentity } from './support/identity';
 import { RegisterPage } from './support/register-page';
-import { LoginPage } from './support/login-page';
 import { readSelectedStoreId } from './support/session';
 
 /**
@@ -165,10 +164,8 @@ test('el cambio de plan del owner va por change-plan, nunca por PUT; el ancla pa
   await registerPage.fillValidForm(identity);
   await registerPage.acceptTerms.check();
   await registerPage.submit();
-  await page.waitForURL(/\/login$/);
-  const loginPage = new LoginPage(page);
-  await loginPage.fill(identity);
-  await loginPage.submit();
+  // Auto-login (2026-09-28): the registration opens the session itself, so the
+  // explicit login that used to sit here is gone.
   await page.waitForURL(/\/sales\/products$/);
   const selectedStoreId = await readSelectedStoreId(page);
 

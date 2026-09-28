@@ -47,12 +47,13 @@ test('cambiar contraseña cierra sesión y la nueva funciona', async ({ page }) 
   await registerPage.fillValidForm(identity);
   await registerPage.acceptTerms.check();
   await registerPage.submit();
-  await page.waitForURL(/\/login$/);
+  // Auto-login (2026-09-28): the registration signs this fresh owner in and
+  // lands on their home (a new store has no sellable products). `loginPage`
+  // stays declared — the test logs in again from scratch after the password
+  // change below, which is where its assertions live.
+  await page.waitForURL(/\/sales\/products$/); // fresh owner's home (no products)
 
   const loginPage = new LoginPage(page);
-  await loginPage.fill(identity);
-  await loginPage.submit();
-  await page.waitForURL(/\/sales\/products$/); // fresh owner's home (no products)
 
   // Navigate to change password page.
   await page.goto('/profile/change-password');

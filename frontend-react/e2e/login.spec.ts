@@ -1,7 +1,7 @@
 import type { Frame, Page, Request } from '@playwright/test';
 import { test, expect } from './support/test';
 import { LoginPage } from './support/login-page';
-import { RegisterPage } from './support/register-page';
+import { E2E_API_URL } from './support/backend-url';
 import { newTestIdentity, type TestIdentity } from './support/identity';
 import { restoreSignedInSession, createStoreUserViaUi } from './support/session';
 import {
@@ -116,14 +116,26 @@ test.describe.serial('login — authenticated flows (A1-A3, A6-A7, D1, D3-D6)', 
     async ({ page, loginNetwork, personaCache }) => {
       ownerIdentity = newTestIdentity();
 
-      const registerPage = new RegisterPage(page);
-      await registerPage.goto();
-      await registerPage.fillValidForm(ownerIdentity);
-      await registerPage.acceptTerms.check();
-      await registerPage.submit();
-      await page.waitForURL(/\/login$/);
+      // Mint the account through the API (2026-09-28). The UI registration can no
+      // longer serve as setup here: it now signs the new owner in, and this
+      // page's `loginNetwork` observer asserts EXACTLY ONE POST /v1/auth/login
+      // (expectLoginThenMe) — the auto-login's own login request would break the
+      // very claim this test makes. Minting keeps this page anonymous until the
+      // login under test, with no detour through the register form.
+      const registerResponse = await page.request.post(`${E2E_API_URL}/v1/auth/register`, {
+        data: {
+          fullName: ownerIdentity.fullName,
+          login: ownerIdentity.login,
+          email: '',
+          cellPhone: ownerIdentity.cellPhone,
+          storeName: ownerIdentity.storeName,
+          password: ownerIdentity.password,
+        },
+      });
+      expect(registerResponse.status()).toBe(201);
 
       const loginPage = new LoginPage(page);
+      await loginPage.goto();
       await loginPage.fill(ownerIdentity);
       const submitted = loginPage.submit();
 

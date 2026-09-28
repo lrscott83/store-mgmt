@@ -268,11 +268,8 @@ test.describe.serial('multipayments (módulo 16) — selector, tasas, multi-pago
     await registerPage.fillValidForm(identity);
     await registerPage.acceptTerms.check();
     await registerPage.submit();
-    await page.waitForURL(/\/login$/);
-
-    const loginPage = new LoginPage(page);
-    await loginPage.fill(identity);
-    await loginPage.submit();
+    // Auto-login (2026-09-28): the registration opens the session itself, so the
+    // explicit login that used to sit here is gone.
     await page.waitForURL(/\/sales\/products$/);
     storeId = await readSelectedStoreId(page);
 

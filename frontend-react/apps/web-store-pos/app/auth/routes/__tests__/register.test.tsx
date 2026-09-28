@@ -37,9 +37,37 @@ vi.mock('~/shared/lib/blocking-alert', () => ({
   showBlockingError: vi.fn(),
 }));
 
+// ─── Auth store mock (auto-login after registration, 2026-09-28) ────────────
+//
+// A successful registration now opens the session through the store's own
+// `login` (the register response's token carries no DEK wrap, so it cannot
+// start a usable session on its own). Without this mock every test that
+// resolves a successful register would run the REAL store — real /me and DEK
+// provisioning — instead of asserting the call-site.
+const mockSignIn = vi.fn();
+vi.mock('~/shared/lib/stores/auth-store', () => ({
+  useAuthStore: () => ({ login: mockSignIn }),
+}));
+
+// Home resolution is a real async service lookup (product repository over the
+// encrypted local store). Stubbed so the destination is deterministic here;
+// the real resolver has its own suite (user-home.test.ts).
+vi.mock('~/shared/lib/auth/user-home', () => ({
+  resolveUserHomePath: vi.fn().mockResolvedValue('/sales/products'),
+}));
+
+vi.mock('~/shared/lib/usage/store-usage-tracker', () => ({
+  armTracking: vi.fn(),
+}));
+
+vi.mock('~/shared/lib/pwa/preload-heavy-chunks', () => ({
+  preloadHeavyChunks: vi.fn(),
+}));
+
 import { authHttpService } from '~/shared/lib/http/auth-http-service';
 import { ConnectivityService } from '~/shared/lib/auth/connectivity-service';
 import { showBlockingError } from '~/shared/lib/blocking-alert';
+import { armTracking } from '~/shared/lib/usage/store-usage-tracker';
 import RegisterPage from '../register';
 import type { BaseResponseModel, RegisterAuthModel } from '@store-mgmt/domain';
 
@@ -73,10 +101,34 @@ function renderRegister(initialEntries: string[] = ['/register']) {
   );
 }
 
+// ─── Auto-login fixtures (2026-09-28) ───────────────────────────────────────
+
+/** Resolves the register call the way the backend does on success (HTTP 201). */
+function stubSuccessfulRegister() {
+  vi.mocked(authHttpService.register).mockResolvedValue({
+    succeeded: true,
+    data: { login: 'janedoe', authToken: 'token', expiresIn: '2026-08-01T00:00:00Z' },
+    message: '',
+    actionCode: 0,
+    errors: [],
+  });
+}
+
+/** The store's `login` action resolves with the hydrated user. */
+function stubSuccessfulSignIn() {
+  mockSignIn.mockResolvedValue({
+    id: 'user-1',
+    login: 'janedoe',
+    fullName: 'Jane Doe',
+    selectedStoreId: 'store-1',
+  });
+}
+
 describe('RegisterPage — auth-http-register-parity call-site', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(ConnectivityService.isOnline).mockReturnValue(true);
+    stubSuccessfulSignIn();
   });
 
   it('renders login and storeName inputs', () => {
@@ -145,21 +197,19 @@ describe('RegisterPage — auth-http-register-parity call-site', () => {
     expect(mockNavigate).not.toHaveBeenCalled();
   });
 
-  it('succeeded:true navigates to /login', async () => {
-    vi.mocked(authHttpService.register).mockResolvedValue({
-      succeeded: true,
-      data: { login: 'janedoe', authToken: 'token', expiresIn: '2026-08-01T00:00:00Z' },
-      message: '',
-      actionCode: 0,
-      errors: [],
-    });
+  it('succeeded:true signs the new owner in and navigates to their home view, never to /login (auto-login, 2026-09-28)', async () => {
+    stubSuccessfulRegister();
     renderRegister();
     fillRequiredFields();
     fireEvent.click(screen.getByRole('button', { name: 'Registrar' }));
 
     await waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith('/login');
+      expect(mockNavigate).toHaveBeenCalledWith('/sales/products');
     });
+    // The session is opened with the credentials just typed — this is what makes
+    // the new device able to decrypt its own store.
+    expect(mockSignIn).toHaveBeenCalledWith('janedoe', 'Passw0rd!');
+    expect(mockNavigate).not.toHaveBeenCalledWith('/login');
   });
 
   it('blocks submit on password/passwordConfirmation mismatch — register() never called', async () => {
@@ -347,6 +397,7 @@ describe('RegisterPage — view-text-parity: loading/offline/success copy', () =
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(ConnectivityService.isOnline).mockReturnValue(true);
+    stubSuccessfulSignIn();
   });
 
   it('shows "Registrando..." on the submit button while loading (AUTH.REGISTERING)', async () => {
@@ -416,24 +467,100 @@ describe('RegisterPage — view-text-parity: loading/offline/success copy', () =
     });
   });
 
-  it('navigates straight to /login on success and never renders the interim REGISTRATION.SUCCESS_REDIRECT screen (Angular has no such screen)', async () => {
-    vi.mocked(authHttpService.register).mockResolvedValue({
-      succeeded: true,
-      data: { login: 'janedoe', authToken: 'token', expiresIn: '2026-08-01T00:00:00Z' },
-      message: '',
-      actionCode: 0,
-      errors: [],
+  it('opens the session and lands on the owner home view, and never renders the interim REGISTRATION.SUCCESS_REDIRECT screen (Angular has no such screen)', async () => {
+    stubSuccessfulRegister();
+    renderRegister();
+    fillRequiredFields();
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar' }));
+
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith('/sales/products');
+    });
+    expect(
+      screen.queryByText('Cuenta creada. Redirigiendo al inicio de sesión…'),
+    ).not.toBeInTheDocument();
+  });
+});
+
+// ─── Auto-login after registration (product decision 2026-09-28) ────────────
+//
+// A registration now leaves the owner signed in. The register response's own
+// token cannot do that on its own (`AuthDto` leaves the DEK wraps empty on this
+// path), so the session is opened through the store's `login` — the same path
+// the login screen uses, and the one that carries the wrap a brand-new device
+// needs to read its store. Losing that leg must never look like a failed
+// registration: the account exists by then.
+describe('RegisterPage — auto-login after a successful registration (2026-09-28)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(ConnectivityService.isOnline).mockReturnValue(true);
+  });
+
+  it('signs in with the typed credentials, arms the usage tracker and lands on the home view', async () => {
+    stubSuccessfulRegister();
+    stubSuccessfulSignIn();
+    renderRegister();
+    fillRequiredFields();
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar' }));
+
+    await waitFor(() => {
+      expect(mockSignIn).toHaveBeenCalledWith('janedoe', 'Passw0rd!');
+    });
+    expect(armTracking).toHaveBeenCalledTimes(1);
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith('/sales/products');
+    });
+  });
+
+  it('a failing sign-in keeps the account and sends the owner to /login with the honest message', async () => {
+    stubSuccessfulRegister();
+    // A locked/corrupt key is the realistic failure: DekUnwrapError means the
+    // store's DEK could not be opened, and /login is where recovery lives.
+    mockSignIn.mockRejectedValue(new Error('DekUnwrapError'));
+    renderRegister();
+    fillRequiredFields();
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar' }));
+
+    await waitFor(() => {
+      expect(vi.mocked(showBlockingError)).toHaveBeenCalledWith(
+        messages['GENERAL.RESPONSE.ERROR_TITLE'],
+        messages['REGISTRATION.AUTO_LOGIN_FAILED'],
+      );
+    });
+    expect(mockNavigate).toHaveBeenCalledWith('/login');
+    // The registration SUCCEEDED (HTTP 201 already happened) — its failure copy
+    // must never be shown, or the owner would think the account was not created.
+    expect(vi.mocked(showBlockingError)).not.toHaveBeenCalledWith(
+      messages['GENERAL.RESPONSE.ERROR_TITLE'],
+      messages['REGISTRATION.UNEXPECTED_ERROR'],
+    );
+  });
+
+  it('does not attempt a sign-in when the registration itself is rejected', async () => {
+    vi.mocked(authHttpService.register).mockRejectedValue({
+      response: {
+        status: 400,
+        data: {
+          succeeded: false,
+          data: null,
+          message: null,
+          actionCode: 400,
+          errors: [{ code: 'Login', description: 'Login already exists' }],
+        },
+      },
     });
     renderRegister();
     fillRequiredFields();
     fireEvent.click(screen.getByRole('button', { name: 'Registrar' }));
 
     await waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith('/login');
+      expect(vi.mocked(showBlockingError)).toHaveBeenCalledWith(
+        messages['GENERAL.RESPONSE.ERROR_TITLE'],
+        'Login already exists',
+      );
     });
-    expect(
-      screen.queryByText('Cuenta creada. Redirigiendo al inicio de sesión…'),
-    ).not.toBeInTheDocument();
+    expect(mockSignIn).not.toHaveBeenCalled();
+    expect(mockNavigate).not.toHaveBeenCalled();
   });
 });
 

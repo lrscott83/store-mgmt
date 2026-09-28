@@ -24,6 +24,7 @@ using Domain.Entities.OrderPayments;
 using Domain.Entities.ChannelExchangeRates;
 using Domain.Entities.ProductCategories;
 using Domain.Entities.Products;
+using Domain.Entities.WebCatalog;
 using Domain.Entities.InventoryEntryCosts;
 using Domain.Entities.InventoryEntries;
 using Domain.Entities.Authentication;
@@ -135,6 +136,10 @@ namespace Infrastructure.Persistence.Contexts
             builder.ApplyConfiguration(new OrderPaymentEntityTypeConfiguration(this));
             builder.ApplyConfiguration(new ProductCategoryEntityTypeConfiguration(this));
             builder.ApplyConfiguration(new ProductEntityTypeConfiguration(this));
+            builder.ApplyConfiguration(new ProductImageEntityTypeConfiguration(this));
+            builder.ApplyConfiguration(new CatalogCategoryEntityTypeConfiguration(this));
+            builder.ApplyConfiguration(new CatalogProductEntityTypeConfiguration(this));
+            builder.ApplyConfiguration(new CatalogProductImageEntityTypeConfiguration(this));
             builder.ApplyConfiguration(new InventoryEntryEntityTypeConfiguration(this));
             builder.ApplyConfiguration(new InventoryEntryCostEntityTypeConfiguration(this));
             builder.ApplyConfiguration(new StoreUsageEntityTypeConfiguration(this));
@@ -164,6 +169,10 @@ namespace Infrastructure.Persistence.Contexts
         internal DbSet<OrderPayment> OrderPayment { get; set; }
         internal DbSet<ProductCategory> ProductCategory { get; set; }
         internal DbSet<Product> Product { get; set; }
+        internal DbSet<ProductImage> ProductImage { get; set; }
+        internal DbSet<CatalogCategory> CatalogCategory { get; set; }
+        internal DbSet<CatalogProduct> CatalogProduct { get; set; }
+        internal DbSet<CatalogProductImage> CatalogProductImage { get; set; }
         internal DbSet<InventoryEntry> InventoryEntry { get; set; }
         internal DbSet<InventoryEntryCost> InventoryEntryCost { get; set; }
         internal DbSet<StoreUsage> StoreUsage { get; set; }

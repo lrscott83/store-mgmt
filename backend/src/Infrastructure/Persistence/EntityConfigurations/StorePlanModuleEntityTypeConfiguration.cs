@@ -66,6 +66,7 @@ namespace Infrastructure.Persistence.EntityConfigurations
                 StorePlanModule.Create((int)StorePlanType.Superior, (int)ModuleType.MultiStores),
                 StorePlanModule.Create((int)StorePlanType.Superior, (int)ModuleType.MultiMonedas),
                 StorePlanModule.Create((int)StorePlanType.Superior, (int)ModuleType.Elaboration),
+                StorePlanModule.Create((int)StorePlanType.Superior, (int)ModuleType.WebCatalog),
 
                 // VIP: todos los módulos AvailableToStore
                 StorePlanModule.Create((int)StorePlanType.VIP, (int)ModuleType.Sales),
