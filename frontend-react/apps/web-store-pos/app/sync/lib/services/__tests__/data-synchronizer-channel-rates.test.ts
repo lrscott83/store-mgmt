@@ -148,7 +148,7 @@ describe('DataSynchronizerService — channelRates merge (multipayments T4)', ()
     expect(result.succeeded).toBe(true);
     expect(channel.addImportedChannelRate).not.toHaveBeenCalled();
     expect(channel.stored).toHaveLength(1);
-    expect(channel.stored[0].value).toBe(700);
+    expect(channel.stored[0].buyValue).toBe(700);
     const merge = result.merges.find((m) => m.entity === 'channelRates');
     expect(merge).toEqual({ entity: 'channelRates', inserted: 0, updated: 0 });
   });
@@ -157,7 +157,7 @@ describe('DataSynchronizerService — channelRates merge (multipayments T4)', ()
     const row: ChannelRate = {
       method: SalePaymentMethod.Transferencia,
       currency: Currency.MLC,
-      value: 350,
+      buyValue: 350, sellValue: 350,
       effectiveFrom: new Date('2026-09-01T00:00:00.000Z'),
     };
     const channel = makeChannelService([row]);
@@ -189,7 +189,7 @@ describe('DataSynchronizerService — channelRates merge (multipayments T4)', ()
     const stored: ChannelRate = {
       method: SalePaymentMethod.Efectivo,
       currency: Currency.CUP,
-      value: 700,
+      buyValue: 700, sellValue: 700,
       effectiveFrom: new Date('2026-09-01T00:00:00.000Z'),
     };
     const channel = makeChannelService([stored]);
@@ -236,7 +236,7 @@ describe('DataSynchronizerService — channelRates merge (multipayments T4)', ()
       currency: Currency.CUP,
       effectiveFrom: new Date('2026-09-01T00:00:00.000Z'),
     };
-    const result = await svc.sync(makeData([{ ...base, value: 700 }, { ...base, value: 750 }]));
+    const result = await svc.sync(makeData([{ ...base, buyValue: 700, sellValue: 700 }, { ...base, buyValue: 750, sellValue: 750 }]));
 
     expect(result.succeeded).toBe(true);
     expect(channel.addImportedChannelRate).toHaveBeenCalledTimes(2);
@@ -327,7 +327,7 @@ describe('DataSynchronizerService — channelRates merge (multipayments T4)', ()
       Currency.CUP,
       new Date('2026-09-20T00:00:00.000Z'),
     );
-    expect(resolved.data?.value).toBe(700 * 1_000_000);
+    expect(resolved.data?.buyValue).toBe(700 * 1_000_000);
   });
 
   it('keeps the legacy merge contract when the service is omitted (legacy call sites)', async () => {

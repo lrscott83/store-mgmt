@@ -30,7 +30,7 @@ function cupEfectivo720(effectiveFrom: Date = TODAY): ChannelRate {
   return {
     method: SalePaymentMethod.Efectivo,
     currency: Currency.CUP,
-    value: 720,
+    buyValue: 720, sellValue: 720,
     effectiveFrom,
   };
 }
@@ -40,7 +40,7 @@ function usdEfectivo720(): ChannelRate {
   return {
     method: SalePaymentMethod.Efectivo,
     currency: Currency.USD,
-    value: 720,
+    buyValue: 720, sellValue: 720,
     effectiveFrom: TODAY,
   };
 }

@@ -6,12 +6,13 @@ import { convertCartLines } from '../cart-line-conversion';
 
 const AT = new Date('2026-09-18T12:00:00.000Z');
 
-/** Rate row: `value` is units of `currency` per 1 USD. */
+/** Rate row: `buyValue`/`sellValue` are units of `currency` per 1 USD. */
 function rate(currency: Currency, value: number): ChannelRate {
   return {
     method: SalePaymentMethod.Efectivo,
     currency,
-    value,
+    buyValue: value,
+    sellValue: value,
     effectiveFrom: new Date('2026-09-01T00:00:00.000Z'),
   };
 }
