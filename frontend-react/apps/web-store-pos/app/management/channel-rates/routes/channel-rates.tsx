@@ -409,28 +409,6 @@ export function ChannelRatesPage() {
         <form onSubmit={handleSubmit} className="grid gap-4 sm:grid-cols-2">
           <div>
             <label
-              htmlFor="channel-rate-method"
-              className="mb-1 block text-xs font-medium text-text-muted"
-            >
-              {intl.formatMessage({ id: 'CHANNEL_RATES.METHOD_LABEL' })}
-            </label>
-            <select
-              id="channel-rate-method"
-              value={method}
-              onChange={(e) => setMethod(Number(e.target.value) as SalePaymentMethod)}
-              className="w-full rounded-md border border-border px-3 py-2 text-sm"
-              data-testid="channel-rate-method"
-            >
-              {methodOptions.map((option) => (
-                <option key={option} value={option}>
-                  {channelLabel(option, currency, formatMessage)}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label
               htmlFor="channel-rate-currency"
               className="mb-1 block text-xs font-medium text-text-muted"
             >
@@ -446,6 +424,28 @@ export function ChannelRatesPage() {
               {CURRENCY_OPTIONS.map((option) => (
                 <option key={option} value={option}>
                   {currencyLabel(option)}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label
+              htmlFor="channel-rate-method"
+              className="mb-1 block text-xs font-medium text-text-muted"
+            >
+              {intl.formatMessage({ id: 'CHANNEL_RATES.METHOD_LABEL' })}
+            </label>
+            <select
+              id="channel-rate-method"
+              value={method}
+              onChange={(e) => setMethod(Number(e.target.value) as SalePaymentMethod)}
+              className="w-full rounded-md border border-border px-3 py-2 text-sm"
+              data-testid="channel-rate-method"
+            >
+              {methodOptions.map((option) => (
+                <option key={option} value={option}>
+                  {channelLabel(option, currency, formatMessage)}
                 </option>
               ))}
             </select>
