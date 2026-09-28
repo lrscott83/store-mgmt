@@ -99,6 +99,9 @@ El `ProductVersion` debe coincidir con el que registro `dotnet ef database updat
 | 18 | `18-20260918-Add-MultiPayments-Module.sql` | `20260918131144_Add-MultiPayments-Module-And-Payment-Mirror` | Módulo 16 MultiPayments (precio 10, 50% desc, solo VIP) + feature 44 + tablas espejo OrderPayment/ChannelExchangeRate + backfill tiendas VIP activas |
 | 19 | `19-20260918-Add-Elaboration-Module.sql` | `20260918153139_Add-Elaboration-Module` | Módulo 17 Elaboración (precio 3, 100% desc) + features 120/121 + asignación a Superior/VIP y backfill a tiendas activas existentes |
 | 20 | `20-20260920-Backfill-WholesaleSales-MultiStores-RoleFeatures.sql` | `20260920120000_Backfill-WholesaleSales-MultiStores-RoleFeatures` | Backfill StoreRoleFeature 39 (Ventas Mayoristas, OwnerAdmin+StoreUser) y 38 (Mis tiendas, OwnerAdmin) para tiendas activas con módulo 12/14 |
+| 24 | `24-20260927-Add-WebCatalog-Module.sql` | `20260927175335_Add-WebCatalog-Module` | Módulo 18 Catálogo web (precio 5, 100% desc, solo Superior) + feature 122 + backfill a tiendas Superior activas |
+| 25 | `25-20260927-Catalog-Product-Fields-And-Images.sql` | `20260927185726_Catalog-Product-Fields-And-Images` | Campos del catálogo web en Product (description, %/monto rebajado, IsNew, Image), slug público en ProductCategory/Store + tabla ProductImage (galería) |
+| 26 | `26-20260927-Catalog-Published-Tables.sql` | `20260927193020_Catalog-Published-Tables` | Tablas del catálogo publicado: CatalogCategory, CatalogProduct y CatalogProductImage (relación 1:1 por SourceId) |
 
 ### 4. Commit
 

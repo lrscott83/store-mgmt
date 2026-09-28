@@ -55,5 +55,8 @@ namespace Domain.Common.Enums
 
         [Description("Elaboración")]
         Elaboration = 17,
+
+        [Description("Catálogo web")]
+        WebCatalog = 18,
     }
 }

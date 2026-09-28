@@ -13,12 +13,22 @@ interface RouteEntry {
   children?: RouteEntry[];
 }
 
-// Design §3 step 3, exactly: the seven route module files reachable
-// WITHOUT going through `app-layout`'s `authLoader`.
+// Design §3 step 3: the route module files reachable WITHOUT going through
+// `app-layout`'s `authLoader`.
+//
+// §3 RE-VERIFIED 2026-09-27 (WebCatalog module, plan
+// `docs/plans/2026-09-27-web-catalog-module-plan.md`): `catalog/routes/public-catalog.tsx`
+// is the storefront at `/catalog/<slug>` and MUST stay anonymous — it is a shopper's
+// page, so it cannot sit behind `app-layout`. The file only issues HTTP calls
+// (`catalogHttpService`) and reads plain response DTOs: it touches NO
+// `encryptEntity`/`decryptEntity` seam and has no clientLoader of its own, so §3's
+// conclusion (nothing outside `app-layout` reaches the encrypted entity store) still
+// holds for it.
 const FROZEN_OUTSIDE_APP_LAYOUT = [
   'auth/routes/login.tsx',
   'auth/routes/provision.tsx',
   'auth/routes/register.tsx',
+  'catalog/routes/public-catalog.tsx',
   'help/routes/tutorial.tsx',
   'home/routes/landing-deep.tsx',
   'shared/routes/$.tsx',
@@ -42,7 +52,7 @@ function collectLeafFilesOutsideAppLayout(
 }
 
 describe('routes.ts — the set of route files outside app-layout is frozen (device-wrapped-dek design §3)', () => {
-  it('equals the exact 7-item list §3 verified nothing bypasses the authLoader/DEK-bootstrap gate', () => {
+  it('equals the exact 8-item list §3 verified nothing bypasses the authLoader/DEK-bootstrap gate', () => {
     const outside = collectLeafFilesOutsideAppLayout(routes as RouteEntry[], false).sort();
     expect(outside).toEqual(FROZEN_OUTSIDE_APP_LAYOUT);
   });

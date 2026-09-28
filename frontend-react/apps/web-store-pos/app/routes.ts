@@ -30,10 +30,17 @@ export default [
     route('auth/provision', 'auth/routes/provision.tsx'),
   ]),
 
+  // Catálogo público (módulo 18, plan 2026-09-27): la tienda que publicó su
+  // catálogo en /catalog/<slug>. SIN layout autenticado y SIN guard — lo abre el
+  // cliente final, y el backend lo sirve de forma anónima (PublicCatalogController).
+  route('catalog/:storeSlug', 'catalog/routes/public-catalog.tsx'),
+
   // Authenticated routes (require auth via authLoader)
   layout('shared/components/app-layout.tsx', { id: 'app-layout' }, [
     // Sales â€” Products
     route('sales/products', 'sales/routes/products.tsx'),
+    // Catálogo Web (módulo 18, plan 2026-09-27): publica la tienda en /catalog/<slug>.
+    route('sales/web-catalog', 'sales/routes/web-catalog.tsx'),
     // Sales â€” POS & Orders
     route('sales/new', 'sales/routes/sale.tsx'),
     // Sales â€” Wholesale (mismo guard de Ventas)

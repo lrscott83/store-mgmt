@@ -53,7 +53,9 @@ namespace Application.Features.SaleManagement.Products.Commands.ImportCsvProduct
 
         public async Task<ResponseResult<bool>> Handle(ImportCsvProductsCommand request, CancellationToken cancellationToken)
         {
-            if (!string.IsNullOrEmpty(_httpContextService.StoreId))
+            // Guarda invertida (ver CreateProductCategoryCommand): con la sesión normal la
+            // importación por CSV devolvía 400 "Tienda no encontrada" y nunca importaba nada.
+            if (string.IsNullOrEmpty(_httpContextService.StoreId))
                 throw new ApiException(_localizer["StoreNotFound"], HttpStatusCode.BadRequest);
 
             Store store = await _storeRepository.GetByIdAsync(_httpContextService.StoreId.ToGuid());

@@ -1,5 +1,7 @@
-﻿using Application.UnitOfWorks;
+﻿using Application.Abstractions.Storage;
+using Application.UnitOfWorks;
 using Domain.Interfaces.Repositories;
+using Infrastructure.Storage;
 using Infrastructure.Persistence;
 using Infrastructure.Persistence.Contexts;
 using Infrastructure.Persistence.Interceptors;
@@ -21,6 +23,10 @@ namespace Infrastructure
             
             //var connectionString = configuration.GetConnectionString("DefaultConnection");
             //Ensure.NotNullOrEmpty(connectionString, message: "Connection string 'DefaultConnection' not found.");
+
+            // Imágenes del catálogo web (módulo 18, plan 2026-09-27): raíz en disco del VPS.
+            services.Configure<CatalogImageStorageOptions>(configuration.GetSection("Storage"));
+            services.AddSingleton<ICatalogImageStorage, CatalogImageStorage>();
 
             services.AddSingleton<OutboxMessagesInterceptor>();
 
@@ -82,6 +88,10 @@ namespace Infrastructure
             services.AddScoped<IOrderItemRepository, OrderItemRepository>();
             services.AddScoped<IProductCategoryRepository, ProductCategoryRepository>();
             services.AddScoped<IProductRepository, ProductRepository>();
+            services.AddScoped<IProductImageRepository, ProductImageRepository>();
+            services.AddScoped<ICatalogCategoryRepository, CatalogCategoryRepository>();
+            services.AddScoped<ICatalogProductRepository, CatalogProductRepository>();
+            services.AddScoped<ICatalogProductImageRepository, CatalogProductImageRepository>();
             services.AddScoped<IInventoryEntryRepository, InventoryEntryRepository>();
             services.AddScoped<IInventoryEntryCostRepository, InventoryEntryCostRepository>();
             services.AddScoped<IStoreUsageRepository, StoreUsageRepository>();

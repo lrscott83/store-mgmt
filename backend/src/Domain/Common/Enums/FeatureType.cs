@@ -144,5 +144,9 @@ namespace Domain.Common.Enums
 
         [Description("Elaboraciones")]
         Elaborations = 121,
+
+        // Catálogo web
+        [Description("Catálogo web")]
+        WebCatalog = 122,
     }
 }

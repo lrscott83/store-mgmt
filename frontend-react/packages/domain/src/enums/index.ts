@@ -56,6 +56,8 @@ export enum EFeatures {
   Recipes = 120,
   /** Feature Elaboraciones — espejo de FeatureType.Elaborations=121 (backend). */
   Elaborations = 121,
+  /** Feature Catálogo web — espejo de FeatureType.WebCatalog=122 (backend, módulo 18). */
+  WebCatalog = 122,
 }
 
 export enum EModules {
@@ -82,6 +84,8 @@ export enum EModules {
   MultiPayments = 16,
   /** Módulo Elaboración — espejo de ModuleType.Elaboration=17 (backend). */
   Elaboration = 17,
+  /** Módulo Catálogo web — espejo de ModuleType.WebCatalog=18 (backend). */
+  WebCatalog = 18,
 }
 
 export enum PaymentType {

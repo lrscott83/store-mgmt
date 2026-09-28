@@ -115,6 +115,20 @@ namespace Infrastructure.Persistence.Repositories
             return await query.ToListAsync();
         }
 
+        public async Task<Store?> GetStoreByCatalogSlugAsync(string catalogSlug)
+            // IgnoreQueryFilters es intencional: el catálogo público se resuelve sin sesión
+            // (no hay tenant en el contexto) y lo que acota el resultado es el slug único global.
+            => await _stores
+                .IgnoreQueryFilters()
+                .FirstOrDefaultAsync(s => s.IsActive && s.CatalogSlug == catalogSlug);
+
+        public async Task<IReadOnlyCollection<string>> GetCatalogSlugsAsync()
+            => await _stores
+                .IgnoreQueryFilters()
+                .Where(s => s.CatalogSlug != null)
+                .Select(s => s.CatalogSlug!)
+                .ToListAsync();
+
         public async Task<Store?> GetStoreByIdIgnoreQueryFiltersAsync(Guid id)
         {
             return await _stores.Where(s => s.Id == id).IgnoreQueryFilters().FirstOrDefaultAsync();

@@ -41,7 +41,9 @@ namespace Application.Features.SaleManagement.Products.Queries.GetToEntryProduct
 
         public async Task<ResponseResult<IEnumerable<ProductToEntryDto>>> Handle(GetToEntryProductsQuery query, CancellationToken cancellationToken)
         {
-            if (!string.IsNullOrEmpty(_httpContextService.StoreId))
+            // Guarda invertida (ver CreateProductCategoryCommand): con la sesión normal este
+            // endpoint devolvía 400 "Tienda no encontrada" en vez de la lista de productos.
+            if (string.IsNullOrEmpty(_httpContextService.StoreId))
                 throw new ApiException(_localizer["StoreNotFound"], HttpStatusCode.BadRequest);
 
             Store store = await _storeRepository.GetByIdAsync(_httpContextService.StoreId.ToGuid());

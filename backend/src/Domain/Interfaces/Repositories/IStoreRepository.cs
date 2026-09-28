@@ -33,6 +33,19 @@ namespace Domain.Interfaces.Repositories
         Task<bool> IsStoreOwnedByReSellerUserAsync(Guid storeId, Guid reSellerUserId);
         Task<IEnumerable<Store>> GetActiveStoresByReSellerUserIdAsync(Guid reSellerUserId, Guid? excludeStoreId = null);
 
+        /// <summary>
+        /// Tienda por su slug público de catálogo web (Store.CatalogSlug). ATENCIÓN: ignora el
+        /// filtro de tenant a propósito — es la única forma de resolver /catalog/&lt;slug&gt; sin
+        /// sesión; el slug es único global y es lo que acota el resultado.
+        /// </summary>
+        Task<Store?> GetStoreByCatalogSlugAsync(string catalogSlug);
+
+        /// <summary>
+        /// TODOS los slugs públicos de catálogo ya tomados (cualquier tenant) para generar uno único.
+        /// Ignora el filtro de tenant a propósito: el índice único de Store.CatalogSlug es global.
+        /// </summary>
+        Task<IReadOnlyCollection<string>> GetCatalogSlugsAsync();
+
         new Task<bool> ExistsAsync(Guid id);
         Task<IEnumerable<Store>> GetPaidStoresAsync();
         Task<IEnumerable<Store>> GetPaidStoresByReSellerUserAsync(Guid reSellerUserId);

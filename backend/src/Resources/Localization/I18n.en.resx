@@ -537,4 +537,43 @@
   <data name="PasswordRequiresUppercase" xml:space="preserve">
     <value>{0} must contain at least one uppercase letter</value>
   </data>
+  <data name="CatalogDescriptionTooLong" xml:space="preserve">
+    <value>{0} cannot exceed {1} characters</value>
+  </data>
+  <data name="CatalogPercentDiscountRange" xml:space="preserve">
+    <value>{0} must be between 0 and 100</value>
+  </data>
+  <data name="CatalogDiscountPriceRange" xml:space="preserve">
+    <value>{0} cannot be negative</value>
+  </data>
+  <data name="CatalogImagePathTooLong" xml:space="preserve">
+    <value>{0} cannot exceed {1} characters</value>
+  </data>
+  <data name="CatalogImageTypeNotAllowed" xml:space="preserve">
+    <value>Only {0} images are allowed</value>
+  </data>
+  <data name="CatalogImageTooLarge" xml:space="preserve">
+    <value>The image cannot exceed {0} MB</value>
+  </data>
+  <data name="CatalogImagesLimitReached" xml:space="preserve">
+    <value>The product already has the maximum of {0} images</value>
+  </data>
+  <data name="CatalogImageNotFound" xml:space="preserve">
+    <value>Image not found</value>
+  </data>
+  <data name="CatalogStoreNotFound" xml:space="preserve">
+    <value>There is no published catalog at that address</value>
+  </data>
+  <data name="CatalogSnapshotTooLarge" xml:space="preserve">
+    <value>The catalog sent exceeds the allowed maximum of {0}</value>
+  </data>
+  <data name="CatalogSnapshotIdConflict" xml:space="preserve">
+    <value>The {0} with id {1} already belongs to another catalog</value>
+  </data>
+  <data name="CatalogSnapshotProductWithoutCategory" xml:space="preserve">
+    <value>Product {0} points to a category that is not part of the catalog sent</value>
+  </data>
+  <data name="CatalogSnapshotProductRequired" xml:space="preserve">
+    <value>To publish a product that is not on the server yet, its name and category are required</value>
+  </data>
 </root>

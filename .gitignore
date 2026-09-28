@@ -172,3 +172,6 @@ appsettings.Production.json
 
 # temporary diagnostic Playwright specs (never commit)
 frontend-react/e2e/diag-tmp/
+
+# runtime uploads: the API writes catalog images here at run time (never commit, back it up on the VPS)
+backend/src/SMCA.WebApi/storage/

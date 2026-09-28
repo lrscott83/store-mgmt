@@ -121,6 +121,23 @@ export const MENU_GROUPS: MenuGroup[] = [
         helpContent:
           'Catálogo de productos. Aquí puedes crear, editar y organizar tus productos por categoría. Puedes agregar nombre, precio, código de barras e imagen a cada producto.',
       },
+      // Catálogo Web (módulo 18, plan 2026-09-27): publica la tienda en
+      // /catalog/<slug>. El `moduleIds` replica el guard de la RUTA
+      // (ownerModuleLoader): sin el módulo contratado en la tienda seleccionada el
+      // enlace no se ofrece, porque el backend devuelve 403 en todos sus endpoints.
+      // El `rolesOnly` pina que solo el Owner lo vea, igual que el backend
+      // ([HasPermission(StoreRoleFeatures.WebCatalogAdmin)]).
+      {
+        label: 'MENU.WEB_CATALOG',
+        path: '/sales/web-catalog',
+        featureIds: [EFeatures.WebCatalog],
+        moduleId: EModules.WebCatalog,
+        moduleIds: [EModules.WebCatalog],
+        rolesOnly: (user) => user.isOwnerAdmin,
+        isNew: true,
+        helpContent:
+          'Catálogo Web. Publica tus productos en una página web propia (/catalog/tu-tienda): completa la descripción, el % de descuento, el precio rebajado, la marca Nuevo y las imágenes, y pulsa Sincronizar Catálogo para actualizar lo que ven tus clientes.',
+      },
       {
         label: 'MENU.SALE',
         path: '/sales/new',

@@ -568,6 +568,16 @@ namespace Infrastructure.Migrations
                             ModuleId = 17,
                             Name = "Elaboraciones",
                             Order = 241
+                        },
+                        new
+                        {
+                            Id = 122,
+                            AvailableToStore = true,
+                            Description = "Funcionalidad para publicar y sincronizar el catálogo web de la tienda",
+                            IsActive = true,
+                            ModuleId = 18,
+                            Name = "Catálogo web",
+                            Order = 250
                         });
                 });
 
@@ -917,6 +927,18 @@ namespace Infrastructure.Migrations
                             Order = 130,
                             PercentDiscountPrice = 100f,
                             Price = 3f,
+                            PriceIncluded = false
+                        },
+                        new
+                        {
+                            Id = 18,
+                            AvailableToStore = true,
+                            DiscountPrice = 0f,
+                            IsActive = true,
+                            Name = "Catálogo web",
+                            Order = 140,
+                            PercentDiscountPrice = 100f,
+                            Price = 5f,
                             PriceIncluded = false
                         });
                 });
@@ -1366,6 +1388,11 @@ namespace Infrastructure.Migrations
                         },
                         new
                         {
+                            PlanId = 3,
+                            ModuleId = 18
+                        },
+                        new
+                        {
                             PlanId = 4,
                             ModuleId = 2
                         },
@@ -1468,6 +1495,10 @@ namespace Infrastructure.Migrations
                     b.Property<int>("Order")
                         .HasColumnType("integer");
 
+                    b.Property<string>("Slug")
+                        .HasMaxLength(63)
+                        .HasColumnType("character varying(63)");
+
                     b.Property<Guid>("StoreId")
                         .HasColumnType("uuid");
 
@@ -1485,6 +1516,10 @@ namespace Infrastructure.Migrations
                     b.HasIndex("StoreId");
 
                     b.HasIndex("TenantId");
+
+                    b.HasIndex("StoreId", "Slug")
+                        .IsUnique()
+                        .HasFilter("\"Slug\" IS NOT NULL");
 
                     b.ToTable("ProductCategory");
                 });
@@ -1514,11 +1549,32 @@ namespace Infrastructure.Migrations
                     b.Property<int>("Currency")
                         .HasColumnType("integer");
 
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)")
+                        .HasDefaultValue("");
+
                     b.Property<bool>("DiscountFromInventory")
                         .HasColumnType("boolean");
 
+                    b.Property<int>("DiscountPrice")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
+                    b.Property<string>("Image")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
+
+                    b.Property<bool>("IsNew")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -1526,6 +1582,11 @@ namespace Infrastructure.Migrations
 
                     b.Property<int>("Order")
                         .HasColumnType("integer");
+
+                    b.Property<int>("PercentDiscountPrice")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
 
                     b.Property<decimal>("Price")
                         .HasColumnType("decimal(18,6)");
@@ -1546,6 +1607,52 @@ namespace Infrastructure.Migrations
                     b.HasIndex("TenantId");
 
                     b.ToTable("Product");
+                });
+
+            modelBuilder.Entity("Domain.Entities.Products.ProductImage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("Order")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
+                    b.Property<string>("Path")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("UpdatedDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductId");
+
+                    b.HasIndex("TenantId");
+
+                    b.ToTable("ProductImage");
                 });
 
             modelBuilder.Entity("Domain.Entities.ReSellerOwners.ReSellerOwner", b =>
@@ -2018,6 +2125,13 @@ namespace Infrastructure.Migrations
                     b.Property<bool>("Approved")
                         .HasColumnType("boolean");
 
+                    b.Property<string>("CatalogSlug")
+                        .HasMaxLength(63)
+                        .HasColumnType("character varying(63)");
+
+                    b.Property<DateTime?>("CatalogSyncedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<Guid>("CreatedBy")
                         .HasColumnType("uuid");
 
@@ -2058,6 +2172,10 @@ namespace Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("CatalogSlug")
+                        .IsUnique()
+                        .HasFilter("\"CatalogSlug\" IS NOT NULL");
 
                     b.HasIndex("OwnerId");
 
@@ -2295,6 +2413,203 @@ namespace Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Domain.Entities.WebCatalog.CatalogCategory", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("Order")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Slug")
+                        .IsRequired()
+                        .HasMaxLength(63)
+                        .HasColumnType("character varying(63)");
+
+                    b.Property<Guid>("SourceCategoryId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("StoreId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("SyncedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("UpdatedDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StoreId");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("StoreId", "Slug")
+                        .IsUnique();
+
+                    b.HasIndex("StoreId", "SourceCategoryId")
+                        .IsUnique();
+
+                    b.ToTable("CatalogCategory");
+                });
+
+            modelBuilder.Entity("Domain.Entities.WebCatalog.CatalogProduct", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CatalogCategoryId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Currency")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)")
+                        .HasDefaultValue("");
+
+                    b.Property<int>("DiscountPrice")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
+                    b.Property<string>("Image")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsNew")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("Order")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("PercentDiscountPrice")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
+                    b.Property<decimal>("Price")
+                        .HasColumnType("decimal(18,6)");
+
+                    b.Property<Guid>("SourceProductId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("StoreId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("SyncedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("NOW()");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("UpdatedDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CatalogCategoryId");
+
+                    b.HasIndex("StoreId");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("StoreId", "SourceProductId")
+                        .IsUnique();
+
+                    b.ToTable("CatalogProduct");
+                });
+
+            modelBuilder.Entity("Domain.Entities.WebCatalog.CatalogProductImage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CatalogProductId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("Order")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
+                    b.Property<string>("Path")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("UpdatedDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CatalogProductId");
+
+                    b.HasIndex("TenantId");
+
+                    b.ToTable("CatalogProductImage");
+                });
+
             modelBuilder.Entity("Infrastructure.Persistence.Outbox.OutboxMessage", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2476,6 +2791,17 @@ namespace Infrastructure.Migrations
                     b.Navigation("Category");
                 });
 
+            modelBuilder.Entity("Domain.Entities.Products.ProductImage", b =>
+                {
+                    b.HasOne("Domain.Entities.Products.Product", "Product")
+                        .WithMany("Images")
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Product");
+                });
+
             modelBuilder.Entity("Domain.Entities.ReSellerOwners.ReSellerOwner", b =>
                 {
                     b.HasOne("Domain.Entities.Owners.Owner", "Owner")
@@ -2652,6 +2978,28 @@ namespace Infrastructure.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("Domain.Entities.WebCatalog.CatalogProduct", b =>
+                {
+                    b.HasOne("Domain.Entities.WebCatalog.CatalogCategory", "CatalogCategory")
+                        .WithMany("Products")
+                        .HasForeignKey("CatalogCategoryId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("CatalogCategory");
+                });
+
+            modelBuilder.Entity("Domain.Entities.WebCatalog.CatalogProductImage", b =>
+                {
+                    b.HasOne("Domain.Entities.WebCatalog.CatalogProduct", "CatalogProduct")
+                        .WithMany("Images")
+                        .HasForeignKey("CatalogProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("CatalogProduct");
+                });
+
             modelBuilder.Entity("Domain.Entities.Features.Feature", b =>
                 {
                     b.Navigation("StoreRoleFeatures");
@@ -2703,6 +3051,8 @@ namespace Infrastructure.Migrations
 
             modelBuilder.Entity("Domain.Entities.Products.Product", b =>
                 {
+                    b.Navigation("Images");
+
                     b.Navigation("InventoryEntries");
 
                     b.Navigation("OrderItems");
@@ -2755,6 +3105,16 @@ namespace Infrastructure.Migrations
                     b.Navigation("StoreUser");
 
                     b.Navigation("UserRoles");
+                });
+
+            modelBuilder.Entity("Domain.Entities.WebCatalog.CatalogCategory", b =>
+                {
+                    b.Navigation("Products");
+                });
+
+            modelBuilder.Entity("Domain.Entities.WebCatalog.CatalogProduct", b =>
+                {
+                    b.Navigation("Images");
                 });
 #pragma warning restore 612, 618
         }

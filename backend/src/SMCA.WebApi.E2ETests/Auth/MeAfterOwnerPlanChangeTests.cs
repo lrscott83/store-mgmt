@@ -81,7 +81,9 @@ public sealed class MeAfterOwnerPlanChangeTests
         [SalesModuleId, InventoryModuleId, SynchronizationModuleId, ReportsModuleId, StatisticsModuleId,
          FreeManagementModuleId, (int)ModuleType.Expenses, BillingModuleId, HistoriesModuleId,
          (int)ModuleType.Credits, (int)ModuleType.WholesaleSales, WarehousesModuleId, (int)ModuleType.MultiStores,
-         (int)ModuleType.MultiMonedas, (int)ModuleType.Elaboration];
+         (int)ModuleType.MultiMonedas, (int)ModuleType.Elaboration,
+         // Catálogo web (2026-09-27): módulo 18 incluido en Superior.
+         (int)ModuleType.WebCatalog];
 
     public MeAfterOwnerPlanChangeTests(WebAppFixture fixture)
     {
