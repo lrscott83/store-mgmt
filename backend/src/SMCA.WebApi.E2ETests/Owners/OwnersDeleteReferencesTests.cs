@@ -24,9 +24,10 @@ namespace SMCA.WebApi.E2ETests.Owners;
 
 /// <summary>
 /// E2E tests for DELETE /api/v1/Owners/{id} — documents which references the handler
-/// cleans up and which it leaves behind (StorePayments, RefreshTokens, InventoryEntries,
-/// Orders). Happy-path tests assert full cleanup; edge tests assert documented current
-/// behavior (FK Restrict failures, orphan rows).
+/// cleans up and which it leaves behind (RefreshTokens, InventoryEntries, Orders).
+/// Happy-path tests assert full cleanup; edge tests assert documented current
+/// behavior (FK Restrict failures, orphan rows). StorePayments is the one reference
+/// REFUSED up front with a 409 before any delete is queued.
 /// Plan 2026-09-08-e2e-plan-gated-modules-auth-roster (Lote 4, E6).
 /// </summary>
 [Collection("e2e")]
@@ -173,6 +174,12 @@ public sealed class OwnersDeleteReferencesTests
         }
     }
 
+    // Payments are the one reference the delete REFUSES up front. The handler checks for a
+    // StorePayment before queuing the first HardDeleteAsync and answers 409 with a readable
+    // reason, so nothing is deleted at all — not the Owner, not the User, not the Store.
+    // The broader acceptance coverage (readable message, every surviving row) lives in
+    // OwnersDeletePaymentsGuardTests; this case keeps the edge-case matrix next to its
+    // still-500 siblings.
     [Fact]
     public async Task Delete_owner_with_store_payments_does_not_cascade()
     {
@@ -183,12 +190,21 @@ public sealed class OwnersDeleteReferencesTests
         {
             var r = await DbTestHelpers.AuthedClient(_f, saId, saLogin)
                 .DeleteAsync($"/api/v1/Owners/{store.OwnerId}");
-            r.StatusCode.Should().Be(HttpStatusCode.InternalServerError);
+            r.StatusCode.Should().Be(HttpStatusCode.Conflict);
 
             using var scope = _f.Services.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
             (await db.Set<StorePayment>().IgnoreQueryFilters()
                 .Where(sp => sp.StoreId == store.StoreId).CountAsync()).Should().BeGreaterThan(0);
+            (await db.Set<Store>().IgnoreQueryFilters()
+                .Where(s => s.Id == store.StoreId).CountAsync())
+                .Should().Be(1, "the refused delete must leave the Store in place");
+            (await db.Set<Owner>().IgnoreQueryFilters()
+                .Where(o => o.Id == store.OwnerId).CountAsync())
+                .Should().Be(1, "the refused delete must leave the Owner in place");
+            (await db.Set<User>().IgnoreQueryFilters()
+                .Where(u => u.Id == store.OwnerUserId).CountAsync())
+                .Should().Be(1, "the refused delete must leave the User in place");
         }
         finally
         {

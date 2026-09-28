@@ -32,6 +32,7 @@ vi.mock('~/shared/lib/i18n/es', () => ({
     'OWNER.LIST_TITLE': 'Propietarios',
     'GENERAL.ADD': 'Adicionar',
     'OWNER.ERROR': 'Error de propietarios',
+    'OWNER.HAS_PAYMENTS': 'Este propietario tiene pagos registrados y no se puede eliminar.',
     'GENERAL.RESELLER': 'Gestor',
     'OWNER.EDIT_OWNER': 'Editar Propietario',
     'GENERAL.DELETE': 'Eliminar',
@@ -428,6 +429,91 @@ describe('OwnerListPage — delete button', () => {
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
       expect(ownerHttpService.deleteOwner).not.toHaveBeenCalled();
     });
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// S-ADMIN-OWNERS-LIST-9 — delete refused with 409 (owner has payments)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('OwnerListPage — delete refused with 409', () => {
+  async function renderAndConfirmDelete() {
+    const { ownerHttpService } = await import('~/admin/owners/lib/services/owner-http-service');
+    vi.mocked(ownerHttpService.listOwners).mockResolvedValue({
+      succeeded: true,
+      data: [makeOwner({ id: 'o99', fullName: 'Paid Owner' })],
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
+    vi.mocked(ownerHttpService.deleteOwner).mockRejectedValue({
+      response: { status: 409 },
+    });
+
+    const { OwnerListPage } = await import('../owner-list');
+    render(
+      <Wrapper>
+        <OwnerListPage />
+      </Wrapper>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Paid Owner')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /acciones/i }));
+    fireEvent.click(screen.getByRole('menuitem', { name: esMessages['GENERAL.DELETE'] }));
+    await waitFor(() => {
+      expect(screen.getByTestId('confirm-dialog-confirm')).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByTestId('confirm-dialog-confirm'));
+
+    return ownerHttpService;
+  }
+
+  it('shows OWNER.HAS_PAYMENTS, not the generic OWNER.ERROR, when the API answers 409', async () => {
+    const ownerHttpService = await renderAndConfirmDelete();
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent(esMessages['OWNER.HAS_PAYMENTS']);
+    });
+    expect(screen.getByRole('alert')).not.toHaveTextContent(esMessages['OWNER.ERROR']);
+    expect(ownerHttpService.deleteOwner).toHaveBeenCalledWith('o99');
+  });
+
+  it('still shows OWNER.ERROR for an unmapped status — the 409 map must not swallow other failures', async () => {
+    const { ownerHttpService } = await import('~/admin/owners/lib/services/owner-http-service');
+    vi.mocked(ownerHttpService.listOwners).mockResolvedValue({
+      succeeded: true,
+      data: [makeOwner({ id: 'o99', fullName: 'Paid Owner' })],
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
+    vi.mocked(ownerHttpService.deleteOwner).mockRejectedValue({ response: { status: 500 } });
+
+    const { OwnerListPage } = await import('../owner-list');
+    render(
+      <Wrapper>
+        <OwnerListPage />
+      </Wrapper>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Paid Owner')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /acciones/i }));
+    fireEvent.click(screen.getByRole('menuitem', { name: esMessages['GENERAL.DELETE'] }));
+    await waitFor(() => {
+      expect(screen.getByTestId('confirm-dialog-confirm')).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByTestId('confirm-dialog-confirm'));
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent(esMessages['OWNER.ERROR']);
+    });
+    expect(screen.getByRole('alert')).not.toHaveTextContent(esMessages['OWNER.HAS_PAYMENTS']);
   });
 });
 

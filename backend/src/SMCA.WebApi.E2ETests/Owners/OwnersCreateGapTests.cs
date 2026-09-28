@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using Application.Dtos.Administration.Owners;
 using Domain.Common.Constants;
 using Domain.Common.Enums;
+using Domain.Entities.ReSellerOwners;
 using FluentAssertions;
 using Infrastructure.Persistence.Contexts;
 using Microsoft.EntityFrameworkCore;
@@ -24,15 +25,55 @@ public sealed class OwnersCreateGapTests
         Cellphone = "0000000000", ReSellerId = reSellerId, Email = (string?)null, Description = "e2e"
     };
 
+    private async Task<Guid> SeedReSellerAsync(Guid userId, string description)
+    {
+        using var scope = _f.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var reSeller = Domain.Entities.ReSellers.ReSeller.Create(
+            userId, true, 0, 25, DataUtils.DefaultTenant.Id, description);
+        db.Set<Domain.Entities.ReSellers.ReSeller>().Add(reSeller);
+        await db.SaveChangesAsync();
+        return reSeller.Id;
+    }
+
+    // ReSellerOwner is NOT in CleanupTenantCascadeAsync's table list and every FK in the model
+    // is DeleteBehavior.Restrict, so the link rows have to go before the owner/ReSeller rows.
+    private async Task DeleteReSellerRowsAsync(Guid reSellerId, Guid tenantId)
+    {
+        using var scope = _f.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var links = await db.Set<ReSellerOwner>().IgnoreQueryFilters()
+            .Where(r => r.ReSellerId == reSellerId || (tenantId != Guid.Empty && r.TenantId == tenantId))
+            .ToListAsync();
+        db.Set<ReSellerOwner>().RemoveRange(links);
+
+        if (reSellerId != Guid.Empty)
+        {
+            var reSellers = await db.Set<Domain.Entities.ReSellers.ReSeller>().IgnoreQueryFilters()
+                .Where(r => r.Id == reSellerId).ToListAsync();
+            db.Set<Domain.Entities.ReSellers.ReSeller>().RemoveRange(reSellers);
+        }
+
+        await db.SaveChangesAsync();
+    }
+
     // The create handler gate is SuperAdmin || ReSeller — a ReSeller actor can create an owner (R7.1).
+    // The actor is a COMPLETE Gestor (User + UserRole(ReSeller) + a ReSeller row for that same user),
+    // the only shape CreateReSellerCommand produces — SeedUserWithRoleAsync(ReSeller) alone is a
+    // half-Gestor a fixture can build but production cannot, and it makes the handler skip the
+    // actor-Gestor link entirely.
     [Fact]
     public async Task Create_owner_as_reseller_returns_201()
     {
         var actor = await DbTestHelpers.SeedUserWithRoleAsync(_f, (int)RoleType.ReSeller);
         var newLogin = $"owner-{Guid.NewGuid():N}@test.com";
         Guid newTenantId = Guid.Empty;
+        Guid actorReSellerId = Guid.Empty;
         try
         {
+            actorReSellerId = await SeedReSellerAsync(actor.UserId, "E2E Gestor Actor");
+
             var r = await DbTestHelpers.AuthedClient(_f, actor.UserId, actor.Login).PostAsJsonAsync("/api/v1/Owners", Valid(newLogin));
             r.StatusCode.Should().Be(HttpStatusCode.Created);
             var b = await r.Content.ReadFromJsonAsync<ApiResponse<OwnerDto>>(ApiResponse.Json);
@@ -44,6 +85,7 @@ public sealed class OwnersCreateGapTests
         }
         finally
         {
+            await DeleteReSellerRowsAsync(actorReSellerId, newTenantId);
             if (newTenantId != Guid.Empty) await DbTestHelpers.CleanupTenantCascadeAsync(_f, newTenantId);
             await DbTestHelpers.CleanupUserAsync(_f, actor.UserId);
         }

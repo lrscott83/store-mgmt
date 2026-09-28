@@ -1,0 +1,59 @@
+#!/bin/sh
+#
+# commit-msg — rejects any commit message carrying AI attribution.
+#
+# Why this hook and not pre-commit: pre-commit runs before the editor and sees
+# no message at all. commit-msg is the hook designed for this job — it runs
+# after the message is written and receives its path as $1, so it can veto the
+# commit before it is ever created.
+#
+# Project rule (AGENTS.md): "Never add 'Co-Authored-By' or AI attribution to
+# commits." This hook is that rule made mechanical.
+#
+# Escape hatch: `git commit --no-verify` still works, deliberately. A guard you
+# cannot get out of eventually gets deleted, and a deleted guard protects
+# nobody.
+#
+# NOTE ON SCOPE: this only ever sees NEW messages. The 232 commits already in
+# history are left exactly as they are, by decision.
+#
+# To allow legitimate HUMAN co-authors: drop the 'co-authored-by:' alternative
+# from `pattern` below. Everything else stays.
+
+message_file="$1"
+
+# A commit with no message file (e.g. some plumbing invocation) is not our
+# business. Let git deal with it.
+[ -f "$message_file" ] || exit 0
+
+# Patterns are matched case-insensitively against the whole message body.
+#
+#   co-authored-by:                    blanket, per the rule as written
+#   generated with <known tool>        the "🤖 Generated with X" trailer form
+#   generated with ai|llm|chatbot      the generic form
+#   noreply@                           bot identity, catches tools we have not
+#                                      enumerated yet
+#
+# Kept as POSIX ERE so this runs under Git-for-Windows' bundled sh.
+pattern='co-authored-by:|generated with[[:space:]]+(claude|anthropic|codex|openai|codebuff|copilot|codeium|chatgpt|openai|gemini|cursor|windsurf|devin|aider|qodo|tabnine|sourcegraph|cody|antigravity|opencode|shepherd)|generated with[[:space:]]+(an?[[:space:]]+)?(ai|llm)|noreply@'
+
+if grep -qiE "$pattern" "$message_file"; then
+	{
+		echo ""
+		echo "COMMIT BLOCKED — AI attribution is not allowed in this repository."
+		echo ""
+		echo "The rule (AGENTS.md): never add 'Co-Authored-By' or AI attribution"
+		echo "to commits. The offending line is:"
+		echo ""
+		grep -inE "$pattern" "$message_file" | sed 's/^/    /'
+		echo ""
+		echo "Write the commit message yourself, in your own words, describing"
+		echo "what changed and why."
+		echo ""
+		echo "If this is genuinely wrong, override with:  git commit --no-verify"
+		echo ""
+	} >&2
+	exit 1
+fi
+
+exit 0

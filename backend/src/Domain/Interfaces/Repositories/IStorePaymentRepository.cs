@@ -8,6 +8,7 @@ namespace Domain.Interfaces.Repositories
         Task<StorePayment?> GetLastByStoreIdAsync(Guid storeId);
         Task<IEnumerable<StorePayment>> GetByStoreIdAsync(Guid storeId);
         Task<int> GetPaidMonthsCountAsync(Guid storeId);
+        Task<bool> AnyByStoreIdsAsync(IEnumerable<Guid> storeIds, CancellationToken cancellationToken = default);
         Task<IEnumerable<StorePayment>> GetAllPaidWithReSellerAsync();
         Task<IEnumerable<StorePayment>> GetPaidWithReSellerByReSellerUserAsync(Guid reSellerUserId);
     }

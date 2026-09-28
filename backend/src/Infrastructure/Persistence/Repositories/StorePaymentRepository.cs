@@ -30,6 +30,15 @@ namespace Infrastructure.Persistence.Repositories
                 .CountAsync(sp => sp.StoreId == storeId
                     && sp.StorePaymentStatusId == (int)Domain.Common.Enums.StorePaymentStatusType.Paid);
 
+        public async Task<bool> AnyByStoreIdsAsync(IEnumerable<Guid> storeIds, CancellationToken cancellationToken = default)
+        {
+            var ids = storeIds as IList<Guid> ?? storeIds.ToList();
+            if (ids.Count == 0) return false;
+            return await _storePayments
+                .Where(sp => ids.Contains(sp.StoreId))
+                .AnyAsync(cancellationToken);
+        }
+
         public async Task<IEnumerable<StorePayment>> GetAllPaidWithReSellerAsync()
             => await _storePayments
                 .Where(p => p.StorePaymentStatusId == (int)Domain.Common.Enums.StorePaymentStatusType.Paid

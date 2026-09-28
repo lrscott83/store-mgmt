@@ -101,7 +101,12 @@ export function OwnerCreatePage() {
         return;
       }
 
-      navigate('/management/stores/create');
+      // Stay on the owners LIST for every role. The previous target
+      // (/management/stores/create) is gated by ownerStoresGate() → adminLoader()
+      // (SuperAdmin||OwnerAdmin only), so a Gestor was logged out and bounced to
+      // /login right after a successful create. Store creation is a separate
+      // action; the guard on that route is correct and stays untouched.
+      navigate('/admin/owners');
     } catch (error) {
       setServerError(
         intl.formatMessage({

@@ -10,6 +10,7 @@ using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
 using Resources;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
@@ -26,6 +27,7 @@ namespace Application.Features.Administration.Owners.Commands.DeleteOwner
         private readonly IStoreUsageRepository _storeUsageRepository;
         private readonly IStoreModuleRepository _storeModuleRepository;
         private readonly IStoreRoleFeatureRepository _storeRoleFeatureRepository;
+        private readonly IStorePaymentRepository _storePaymentRepository;
         private readonly IUserRepository _userRepository;
         private readonly IUserRoleRepository _userRoleRepository;
         private readonly IReSellerOwnerRepository _reSellerOwnerRepository;
@@ -49,6 +51,7 @@ namespace Application.Features.Administration.Owners.Commands.DeleteOwner
             IStoreUsageRepository storeUsageRepository,
             IStoreModuleRepository storeModuleRepository,
             IStoreRoleFeatureRepository storeRoleFeatureRepository,
+            IStorePaymentRepository storePaymentRepository,
             ILogger<DeleteOwnerCommandHandler> logger)
         {
             _ownerRepository = ownerRepository;
@@ -64,6 +67,7 @@ namespace Application.Features.Administration.Owners.Commands.DeleteOwner
             _storeUsageRepository = storeUsageRepository;
             _storeModuleRepository = storeModuleRepository;
             _storeRoleFeatureRepository = storeRoleFeatureRepository;
+            _storePaymentRepository = storePaymentRepository;
             _logger = logger;
         }
 
@@ -77,6 +81,18 @@ namespace Application.Features.Administration.Owners.Commands.DeleteOwner
                 throw new ApiException(_localizer["OwnerNotFound"], HttpStatusCode.NotFound);
 
             _logger.LogInformation("DeleteOwner: {OwnerId}", owner.Id);
+
+            // 0. Precondition — an owner whose store carries payments cannot be physically
+            // deleted, only deactivated. Checked BEFORE the first HardDeleteAsync is queued so
+            // nothing at all is deleted: without this the StorePayment Restrict FK throws
+            // mid-cascade and the request surfaces as a 500, and only survives by accident
+            // through EF's transaction rollback.
+            var storeIds = owner.Stores?.Select(s => s.Id).ToList() ?? new List<Guid>();
+            if (await _storePaymentRepository.AnyByStoreIdsAsync(storeIds, cancellationToken))
+            {
+                _logger.LogInformation("DeleteOwner: refused, owner {OwnerId} has store payments", owner.Id);
+                throw new ApiException(_localizer["OwnerHasPayments"], HttpStatusCode.Conflict);
+            }
 
             // 1. ReSellerOwner
             if (owner.ReSellerOwner != null)
