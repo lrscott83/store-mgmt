@@ -18,6 +18,7 @@ using Application.Features.StoreManagement.Stores.Commands.UpdateStore;
 using Application.Features.StoreManagement.Stores.Commands.UpdateStoreModulePricing;
 using Application.Features.StoreManagement.Stores.Queries.GetMyStores;
 using Application.Features.StoreManagement.Stores.Queries.GetStoreById;
+using Application.Features.StoreManagement.Stores.Queries.GetStoreModulePricing;
 using Application.Features.StoreManagement.Stores.Queries.GetStorePlan;
 using Application.Features.StoreManagement.Stores.Queries.GetStores;
 using Application.Features.StoreManagement.Stores.Queries.GetStoresByCurrentUser;
@@ -293,6 +294,24 @@ namespace SMCA.WebApi.Controllers.v1
         public async Task<IActionResult> UpdateStoreModulePricingAsync(
             Guid storeId, [FromBody] UpdateStoreModulePricingCommand command)
             => Ok(await Sender.Send(command with { StoreId = storeId }));
+
+        /// <summary>
+        /// Seeds the per-store module pricing editor (GET /v1/stores/{storeId}/module-pricing).
+        /// One row per module that is active and available to stores — the SAME universe and the
+        /// SAME repository call as GET /v1/modules/ToStore, so the row list is exactly the
+        /// payload the save expects. A row is the store's own isActive plus its stored prices
+        /// when a StoreModule exists (inactive rows included), and isActive:false seeded with
+        /// the live catalog prices when it does not. Also returns the total over the active
+        /// rows, computed with the same CurrentPriceServiceUtils the browser mirrors.
+        /// </summary>
+        [HttpGet("{storeId}/module-pricing")]
+        [HasPermission(StoreRoleFeatures.SuperAdmin)]
+        [ProducesResponseType(typeof(ResponseResult<StoreModulePricingReadResultDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        public async Task<IActionResult> GetStoreModulePricingAsync(Guid storeId)
+            => Ok(await Sender.Send(new GetStoreModulePricingQuery(storeId)));
 
         [HttpGet("to-collect")]
         [HasPermission(StoreRoleFeatures.SuperAdmin, StoreRoleFeatures.StorePaymentAdmin)]

@@ -12,6 +12,7 @@ import type {
   SwitchMyStoreResult,
   StoreModulePricingPayload,
   StoreModulePricingResult,
+  StoreModulePricingReadResult,
 } from '@store-mgmt/domain';
 import { apiClient } from '~/shared/lib/http/api-client';
 
@@ -169,6 +170,25 @@ export const storeHttpService = {
     const response = await apiClient.put<BaseResponseModel<StoreModulePricingResult>>(
       `/v1/stores/${id}/module-pricing`,
       { modules },
+    );
+    return response.data;
+  },
+
+  /**
+   * Seed for the per-store module pricing editor (GET /v1/stores/{storeId}/module-pricing).
+   * One row per module that is active and available to stores — the same universe, from the
+   * same backend call, as `getModulesToStore()`, and the exact list `updateStoreModulePricing`
+   * expects as its payload. A row carries the store's own `isActive` and stored prices when a
+   * StoreModule exists (inactive rows included), and `isActive: false` seeded with the live
+   * catalog prices when it does not.
+   *
+   * Prefer this over `store.modules[]` for anything editable: the backend's
+   * `StoreModule -> ModuleDto` map drops DiscountPrice/PercentDiscountPrice, so nested modules
+   * report 0 for both. SuperAdmin-only, like the save.
+   */
+  async getStoreModulePricing(id: string): Promise<BaseResponseModel<StoreModulePricingReadResult>> {
+    const response = await apiClient.get<BaseResponseModel<StoreModulePricingReadResult>>(
+      `/v1/stores/${id}/module-pricing`,
     );
     return response.data;
   },

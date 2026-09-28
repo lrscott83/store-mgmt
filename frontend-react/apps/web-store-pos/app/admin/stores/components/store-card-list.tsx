@@ -12,6 +12,10 @@ interface StoreCardListProps {
   /** Optional: only consumers wiring the plan-change popup (e.g. /admin/stores) pass
    * it; owner-edit's store tab omits it and never renders "Cambiar plan". */
   onChangePlan?: (id: string) => void;
+  /** Optional, same gating as onChangePlan: opens the per-store module pricing editor.
+   * A module activated on an inactive store never reaches the store's session, so the item
+   * hides with the plan item rather than offering a save that appears to do nothing. */
+  onEditModulePricing?: (id: string) => void;
 }
 
 /**
@@ -119,6 +123,7 @@ export function StoreCardList({
   onApprove,
   onDisapprove,
   onChangePlan,
+  onEditModulePricing,
 }: StoreCardListProps) {
   const intl = useIntl();
 
@@ -152,6 +157,15 @@ export function StoreCardList({
               {store.isActive && onChangePlan && (
                 <ActionMenuItem intent="pay" onClick={() => onChangePlan(store.id)}>
                   {intl.formatMessage({ id: 'STORES.CHANGE_PLAN' })}
+                </ActionMenuItem>
+              )}
+              {store.isActive && onEditModulePricing && (
+                <ActionMenuItem
+                  intent="pay"
+                  onClick={() => onEditModulePricing(store.id)}
+                  data-testid={`store-module-pricing-action-${store.id}`}
+                >
+                  {intl.formatMessage({ id: 'STORES.MODULE_PRICING.MENU_LABEL' })}
                 </ActionMenuItem>
               )}
             </ActionMenu>

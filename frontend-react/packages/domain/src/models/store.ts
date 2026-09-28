@@ -199,6 +199,37 @@ export interface StoreModulePricingResult {
   totalCurrentPrice: number;
 }
 
+/**
+ * One row of the per-store module pricing READ (GET /v1/stores/{storeId}/module-pricing):
+ * the seed the editor opens with. A distinct type from `StoreModulePricingRow` because it
+ * carries the module `name` — the read has to render on its own, while the save echo is keyed
+ * purely by moduleId since the client already holds the names.
+ */
+export interface StoreModulePricingReadRow {
+  moduleId: number;
+  name: string;
+  isActive: boolean;
+  price: number;
+  discountPrice: number;
+  percentDiscountPrice: number;
+  currentPrice: number;
+}
+
+/**
+ * The pricing read: one row per module that is active and available to stores — the exact
+ * universe the save payload must carry — plus the total over the ACTIVE rows.
+ *
+ * This is the only trustworthy source of a store's own discount values: modules nested in a
+ * `Store`/`StorePlan`/`OwnerStoreWithPlan` report 0 for both (the backend's
+ * `StoreModule -> ModuleDto` AutoMapper map has no rule for them), so never seed an editor
+ * from `store.modules[]`.
+ */
+export interface StoreModulePricingReadResult {
+  storeId: string;
+  modules: StoreModulePricingReadRow[];
+  totalCurrentPrice: number;
+}
+
 export interface ReSellerCommission {
   year: number;
   month: number;

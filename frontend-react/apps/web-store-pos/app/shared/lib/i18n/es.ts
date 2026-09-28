@@ -1086,6 +1086,26 @@ const messages: Record<string, string> = {
   'STORES.PLAN.NEXT_BILLING_DATE': 'Próximo cobro',
   'STORES.PLAN.ACTIVATE_PLAN': 'Activar Plan',
 
+  // Super-admin per-store module pricing (gear item + table). The grouping reuses the
+  // STORES.PLAN.*_TAB names; the last bucket holds modules no loaded plan carries (VIP-only,
+  // because GET /v1/plans excludes VIP) so every module in the table is still reachable.
+  'STORES.MODULE_PRICING.MENU_LABEL': 'Precios de módulos',
+  'STORES.MODULE_PRICING.TITLE': 'Precios de módulos',
+  'STORES.MODULE_PRICING.HINT':
+    'Marca un módulo para activarlo en esta tienda y desmarcalo para desactivarlo. El total solo cuenta los módulos marcados y se recalcula mientras escribes.',
+  'STORES.MODULE_PRICING.LOADING': 'Cargando módulos...',
+  'STORES.MODULE_PRICING.NO_MODULES': 'No hay módulos disponibles para esta tienda.',
+  'STORES.MODULE_PRICING.NO_PLAN_GROUP': 'Otros planes',
+  'STORES.MODULE_PRICING.COLUMN_ACTIVE': 'Activo',
+  'STORES.MODULE_PRICING.COLUMN_MODULE': 'Módulo',
+  'STORES.MODULE_PRICING.COLUMN_PRICE': 'Precio',
+  'STORES.MODULE_PRICING.COLUMN_DISCOUNT': 'Descuento',
+  'STORES.MODULE_PRICING.COLUMN_PERCENT_DISCOUNT': '% Descuento',
+  'STORES.MODULE_PRICING.COLUMN_CURRENT': 'Precio actual',
+  'STORES.MODULE_PRICING.TOTAL': 'Total',
+  'STORES.MODULE_PRICING.SERVER_TOTAL_NOTE':
+    'Total guardado por el servidor. Se recalcula al editar cualquier valor.',
+
   // Super-admin store cards (2026-09-10): owner contact + description labels.
   // The plan line reuses the STORES.PLAN.*_TAB names; the phone renders as a tel: link.
   'STORES.OWNER_LABEL': 'Owner',
