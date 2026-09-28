@@ -11,6 +11,7 @@ import { StoreCardList } from '~/admin/stores/components/store-card-list';
 import { httpErrorKey } from '~/shared/lib/http/http-error';
 import { confirmDialog } from '~/shared/lib/blocking-alert';
 import { softRefreshSession } from '~/shared/lib/stores/soft-refresh-session';
+import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { showToastSuccess } from '~/shared/lib/toast';
 import { Button } from '~/shared/components/ui/button';
 import { PlusIcon } from '~/shared/components/ui/icons';
@@ -40,6 +41,10 @@ function toPriceNumber(value: string): number {
 export function AdminStoreListPage() {
   const navigate = useNavigate();
   const { formatMessage } = useIntl();
+  // The pricing editor is SuperAdmin-only, but /admin/stores admits ReSellers too
+  // (resellerLoader) — hide the gear item for them; the backend enforces the same
+  // boundary with 403 on both verbs.
+  const isSuperAdmin = useAuthStore((s) => s.user?.isSuperAdmin) === true;
   const [stores, setStores] = useState<Store[]>([]);
   const [error, setError] = useState<string | undefined>(undefined);
   // Plan popup state — same shape as MyStoresPage (owner plan change parity).
@@ -302,7 +307,7 @@ export function AdminStoreListPage() {
         onApprove={handleApprove}
         onDisapprove={handleDisapprove}
         onChangePlan={openPlanModal}
-        onEditModulePricing={openPricingModal}
+        onEditModulePricing={isSuperAdmin ? openPricingModal : undefined}
       />
 
       <EditPlanModal
