@@ -106,15 +106,17 @@ under that plan.
 The new modal must use that same partition over the full available-module
 catalog, so a module appears once, under the lowest plan that includes it.
 
-**Correction (2026-09-28, T3).** `GET /v1/plans` returns only Gratis, Pago and
-Superior — VIP is excluded server-side — so a VIP-only module belongs to no plan
-in the catalog and the delta rule alone would drop it. The groups must therefore
-be **total** over the universe: a trailing "other plans" bucket catches whatever
-no plan claims. Without it the union is a strict subset of the catalog, and since
-the save payload is the flat list of visible modules, an omitted row would be
-read by the backend as "leave this module untouched" — a silent skip the operator
-cannot see. Implemented in `packages/domain/src/commons/plan-module-groups.ts`
-(`groupModulesByPlanDelta`), which guarantees union == input, once each.
+**Correction (2026-09-28, T3/T6).** `GET /v1/plans` returns all four plans —
+Gratis, Pago, Superior and VIP (an earlier claim that VIP is excluded was
+disproved by the T6 fixture against the real API). The grouping must still be
+**total** over the universe: a trailing "other plans" bucket catches whatever no
+plan claims, so the union always equals the catalog with each module exactly
+once. This matters because the save payload is the flat list of visible modules:
+an omitted row would be read by the backend as "leave this module untouched" — a
+silent skip the operator cannot see. Implemented in
+`packages/domain/src/commons/plan-module-groups.ts` (`groupModulesByPlanDelta`),
+which guarantees union == input, once each. With the current seeded catalog the
+bucket is empty and dropped.
 
 ## Constraints
 
@@ -145,14 +147,21 @@ cannot see. Implemented in `packages/domain/src/commons/plan-module-groups.ts`
       DiscountPrice/PercentDiscountPrice as 0, so the editor had no trustworthy
       source for a store's own discounts and for a module the store does not yet
       hold. Same route, same SuperAdmin guard, additive only.
-- [ ] T5 — Backend E2E: new file covering activate, deactivate, insert, exact
+- [x] T5 — Backend E2E: new file covering activate, deactivate, insert, exact
       price persistence, the formula including the clamp at zero, the total over
       ticked modules only, 403 for a non-SuperAdmin, soft-deactivation not
       deletion, and the pre-existing guards still firing unchanged.
-- [ ] T6 — Frontend E2E: new file covering opening from the gear, the grouped
+- [x] T6 — Frontend E2E: new file covering opening from the gear, the grouped
       table, inputs disabled while unticked, the live total, the browser total
       matching the server total, values surviving a reload, and the control being
       SuperAdmin-only.
+- [x] T6b — UI role gate: `/admin/stores` admits ReSellers via `resellerLoader`,
+      so the gear item was visible to them and answered 403. The route now passes
+      the pricing callback only when the session user is a SuperAdmin
+      (`store-list.tsx`, commit `f38a7362`).
+- [ ] T6c — (optional) E2E pin that a ReSeller sees no gear item. No ReSeller
+      session fixture exists yet; needs a new fixture user. Offered to the
+      maintainer, not yet approved.
 
 ## Acceptance criteria
 
@@ -180,3 +189,34 @@ would delete the live rows Playwright is using.
 T1–T6 all touch more than one non-trivial file and need reading that precedes
 the write, so each is delegated to a bounded writer rather than done inline.
 T5 and T6 depend on T1–T4 and run as their own workers with the suites.
+
+## Verified 2026-09-28
+
+Commits on `qa` (none pushed): `4b3a0838` (T1+T2), `46f34e67` (T4b+T3+T4),
+`de4b305f` (doc), `54742121` (T5), `60c1d86b` (T6), `f38a7362` (T6b).
+
+- Independent verification (fresh context) over T1–T4: PASS with zero blockers.
+  CONCERN: a ticked-and-already-active module gets no `StoreRoleFeature` sync —
+  exact parity with `UpdateStoreCommand.UpdateStoreModules` (inserted +
+  reactivated only), so not a regression; `/me` coherence holds across
+  transitions, not as an invariant. Pinned by T5 test 9 for transitions.
+- Backend E2E: 637 total, 633 passed — the 10 new tests all pass. The same 4
+  pre-existing failures reproduce without our file (stale VIP matrix
+  expectations vs the 17-module catalog after migration
+  `20260927175335_Add-WebCatalog-Module`; `StorePlanCatalogTests` +
+  `PlanChangeMatrixTests`). Untouched, per the E2E rule.
+- Frontend E2E: 8/8 new tests pass; full suite 340 passed, 7 flaky (green on
+  retry), 0 failed.
+- Backend unit tests: Domain 76, Application 532, all passed. Frontend: unit
+  5,009 passed, typecheck 5/5, lint 4/4.
+- Acceptances met: additive-only diff (the sole deletion across the feature is
+  one import-widening line), no existing test touched, both suites green modulo
+  the four pre-existing backend failures above.
+- Formula drift is bounded: C# evaluates float32, browser float64; T6 pins the
+  totals within 0.001 and the modal shows the server total after save.
+- Pre-existing startup defect, not ours: `dotnet run` for SMCA.WebApi dies with
+  `CultureNotFoundException "es"` because `SMCA.WebApi.csproj` sets
+  `<InvariantGlobalization>true</InvariantGlobalization>` while
+  `ServiceExtensions.cs:126` requests the `es` culture. E2E writers worked
+  around it with `-p:InvariantGlobalization=false`; no source change. Needs the
+  maintainer's decision (backend source/config is outside this feature's scope).
