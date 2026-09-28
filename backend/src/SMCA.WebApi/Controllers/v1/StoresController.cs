@@ -15,6 +15,7 @@ using Application.Features.StoreManagement.Stores.Commands.SetMyStore;
 using Application.Features.StoreManagement.Stores.Commands.SwitchMyStore;
 using Application.Features.StoreManagement.Stores.Commands.SetStoreActivation;
 using Application.Features.StoreManagement.Stores.Commands.UpdateStore;
+using Application.Features.StoreManagement.Stores.Commands.UpdateStoreModulePricing;
 using Application.Features.StoreManagement.Stores.Queries.GetMyStores;
 using Application.Features.StoreManagement.Stores.Queries.GetStoreById;
 using Application.Features.StoreManagement.Stores.Queries.GetStorePlan;
@@ -269,6 +270,28 @@ namespace SMCA.WebApi.Controllers.v1
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
         public async Task<IActionResult> ChangeStorePlanAsync(Guid storeId, [FromBody] ChangeStorePlanCommand command)
+            => Ok(await Sender.Send(command with { StoreId = storeId }));
+
+        /// <summary>
+        /// SuperAdmin authors ONE store's own module pricing (PUT
+        /// /v1/stores/{storeId}/module-pricing). Body carries the COMPLETE set of modules
+        /// the operator was shown — active AND AvailableToStore — each with a tick and the
+        /// three price fields. Ticked → activated (inserted or reactivated) and priced;
+        /// unticked → deactivated (a soft flag; rows are never deleted). A module ABSENT
+        /// from the payload is left untouched, never implicitly deactivated. The catalog
+        /// is consulted only for module existence and the PriceIncluded activation
+        /// snapshot, so a store's own price is never overwritten by catalog pricing.
+        /// Returns the saved state of every submitted row plus the total over the ticked
+        /// rows, computed with the same CurrentPriceServiceUtils the client mirrors.
+        /// </summary>
+        [HttpPut("{storeId}/module-pricing")]
+        [HasPermission(StoreRoleFeatures.SuperAdmin)]
+        [ProducesResponseType(typeof(ResponseResult<StoreModulePricingResultDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        public async Task<IActionResult> UpdateStoreModulePricingAsync(
+            Guid storeId, [FromBody] UpdateStoreModulePricingCommand command)
             => Ok(await Sender.Send(command with { StoreId = storeId }));
 
         [HttpGet("to-collect")]

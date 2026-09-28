@@ -21,6 +21,7 @@ export * from './commons/payment-pricing';
 export * from './commons/payment-channel';
 export * from './commons/channel-conversion';
 export * from './commons/payment-tally';
+export * from './commons/module-pricing';
 export * from './errors/product-errors';
 export * from './errors/product-category-errors';
 export * from './errors/inventory-errors';

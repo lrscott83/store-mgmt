@@ -10,6 +10,8 @@ import type {
   StoreToCollect,
   ReSellerCommission,
   SwitchMyStoreResult,
+  StoreModulePricingPayload,
+  StoreModulePricingResult,
 } from '@store-mgmt/domain';
 import { apiClient } from '~/shared/lib/http/api-client';
 
@@ -145,6 +147,28 @@ export const storeHttpService = {
     const response = await apiClient.post<BaseResponseModel<boolean>>(
       `/v1/stores/${id}/change-plan`,
       { storePlanId },
+    );
+    return response.data;
+  },
+
+  /**
+   * SuperAdmin authors ONE store's own module pricing (PUT
+   * /v1/stores/{storeId}/module-pricing). `modules` must be the COMPLETE set the
+   * operator was shown — every active, AvailableToStore module — because that
+   * completeness is what makes "unticked" actionable: a ticked row is activated
+   * (inserted or reactivated) and priced, an unticked row is deactivated (a soft
+   * flag, never a delete), and a module OMITTED from the payload is left untouched.
+   * The backend is SuperAdmin-only (403 for everyone else, owners included) and never
+   * reads catalog prices as the store's price. Returns the saved state of every
+   * submitted row plus the total over the ticked rows.
+   */
+  async updateStoreModulePricing(
+    id: string,
+    modules: StoreModulePricingPayload[],
+  ): Promise<BaseResponseModel<StoreModulePricingResult>> {
+    const response = await apiClient.put<BaseResponseModel<StoreModulePricingResult>>(
+      `/v1/stores/${id}/module-pricing`,
+      { modules },
     );
     return response.data;
   },

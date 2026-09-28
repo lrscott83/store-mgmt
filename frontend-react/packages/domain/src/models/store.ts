@@ -8,6 +8,20 @@ export interface Module {
   priceIncluded: boolean;
   discountText: string;
   selected: boolean;
+  // Flat and percent discount, already on the wire: the backend `ModuleDto`
+  // serializes both and this type used to drop them. Declared OPTIONAL because every
+  // construction site predates these fields — promote to required only together with
+  // the fixtures that build `Module` literals. Read them with `?? 0`.
+  //
+  // They carry real values on CATALOG modules (GET /v1/modules/ToStore), which is
+  // where a per-store pricing editor must seed its inputs from.
+  // CAVEAT: the backend's `StoreModule -> ModuleDto` AutoMapper map
+  // (Application/Mappings/Administration/ModuleProfile.cs:20-31) has no rule for these
+  // two, so modules nested in a Store/StorePlan/OwnerStoreWithPlan response report 0
+  // for both while `currentPrice` IS computed from the real values. Do not seed
+  // editable values from those.
+  discountPrice?: number;
+  percentDiscountPrice?: number;
 }
 
 export interface Feature {
@@ -146,6 +160,43 @@ export interface StoreToCollect {
   amount: number;
   nextDueDate: string | null;
   status: 'PorVencer' | 'EnGracia';
+}
+
+/**
+ * One row of the per-store module pricing save (PUT
+ * /v1/stores/{storeId}/module-pricing). The payload is the COMPLETE set the operator
+ * was shown — every active, AvailableToStore module — each with a tick and the three
+ * price fields. A module left out of the payload is NOT deactivated: absence means
+ * "not part of this edit", never "remove".
+ */
+export interface StoreModulePricingPayload {
+  moduleId: number;
+  isSelected: boolean;
+  price: number;
+  discountPrice: number;
+  percentDiscountPrice: number;
+}
+
+/** Saved state of one row, echoed back by the save. */
+export interface StoreModulePricingRow {
+  moduleId: number;
+  isActive: boolean;
+  price: number;
+  discountPrice: number;
+  percentDiscountPrice: number;
+  currentPrice: number;
+}
+
+/**
+ * Result of the save: the echoed state of every submitted row plus the total over the
+ * TICKED rows. `totalCurrentPrice` is the same arithmetic `totalCurrentModulePrice`
+ * computes in the browser, so the two can be compared directly — see the epsilon note
+ * in `module-pricing.ts` before asserting exact equality.
+ */
+export interface StoreModulePricingResult {
+  storeId: string;
+  modules: StoreModulePricingRow[];
+  totalCurrentPrice: number;
 }
 
 export interface ReSellerCommission {
