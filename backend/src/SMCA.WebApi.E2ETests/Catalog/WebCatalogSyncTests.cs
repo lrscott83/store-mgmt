@@ -1,6 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
-using Domain.Entities.WebCatalog;
+using Domain.Entities.Products;
 using FluentAssertions;
 using Infrastructure.Persistence.Contexts;
 using Microsoft.EntityFrameworkCore;
@@ -11,9 +11,11 @@ using Xunit;
 namespace SMCA.WebApi.E2ETests.Catalog;
 
 /// <summary>
-/// Sincronización del catálogo web (módulo 18, plan 2026-09-27): el botón "Sincronizar Catálogo"
-/// crea lo que falta, ACTUALIZA lo existente por el id de origen (relación 1:1, nunca duplica) y
-/// despublica — jamás borra — lo que dejó de estar en venta (decisión D6).
+/// Sincronización del catálogo web (módulo 18, plan 2026-09-27; publicación DIRECTA, decisión del
+/// Owner 2026-09-28): el botón "Sincronizar Catálogo" trae los hechos del catálogo LOCAL del POS a
+/// las tablas normales (`Product`/`ProductCategory`), ACTUALIZA por el id del dispositivo (nunca
+/// duplica) y DESACTIVA — jamás borra — lo que dejó de estar en el dispositivo (decisión D6).
+/// No existe una copia publicada: el catálogo público lee estas mismas tablas.
 /// </summary>
 [Collection("e2e")]
 public sealed class WebCatalogSyncTests
@@ -41,7 +43,7 @@ public sealed class WebCatalogSyncTests
     }
 
     [Fact]
-    public async Task Sync_creates_the_published_catalog_and_generates_the_store_slug()
+    public async Task Sync_without_a_snapshot_stamps_the_slug_and_the_sync_date()
     {
         var fixture = await WebCatalogSeed.SeedOwnerAsync(_f);
         try
@@ -55,28 +57,23 @@ public sealed class WebCatalogSyncTests
 
             summary.StoreSlug.Should().Be(fixture.Slug);
             summary.CatalogUrl.Should().Be($"/catalog/{fixture.Slug}");
-            summary.CategoriesCreated.Should().Be(1);
-            summary.ProductsCreated.Should().Be(1);
-            summary.ProductsDeactivated.Should().Be(0);
-
-            var published = await QueryAsync(db => db.Set<CatalogProduct>().IgnoreQueryFilters()
-                .Include(p => p.Images)
-                .FirstAsync(p => p.StoreId == fixture.StoreId));
-
-            published.IsActive.Should().BeTrue();
-            published.Name.Should().Be("Camisa azul");
-            published.Description.Should().Be("Camisa de algodón");
-            published.PercentDiscountPrice.Should().Be(1250);
-            published.DiscountPrice.Should().Be(500);
-            published.IsNew.Should().BeTrue();
-            published.Image.Should().Be("k/main.jpg");
-            published.SourceProductId.Should().NotBe(Guid.Empty);
-            published.Images.Select(i => i.Path).Should().BeEquivalentTo(new[] { "k/1.jpg", "k/2.jpg" });
 
             var store = await QueryAsync(db => db.Set<Domain.Entities.Stores.Store>().IgnoreQueryFilters()
                 .FirstAsync(s => s.Id == fixture.StoreId));
             store.CatalogSlug.Should().Be(fixture.Slug);
             store.CatalogSyncedAt.Should().NotBeNull();
+
+            // La fila del producto NO se tocó: el catálogo ya vive en la tabla normal.
+            var product = await QueryAsync(db => db.Set<Product>().IgnoreQueryFilters()
+                .Include(p => p.Images)
+                .FirstAsync(p => p.Category.StoreId == fixture.StoreId));
+            product.Name.Should().Be("Camisa azul");
+            product.Description.Should().Be("Camisa de algodón");
+            product.PercentDiscountPrice.Should().Be(1250);
+            product.DiscountPrice.Should().Be(500);
+            product.IsNew.Should().BeTrue();
+            product.Image.Should().Be("k/main.jpg");
+            product.Images.Select(i => i.Path).Should().BeEquivalentTo(new[] { "k/1.jpg", "k/2.jpg" });
         }
         finally
         {
@@ -85,41 +82,44 @@ public sealed class WebCatalogSyncTests
     }
 
     [Fact]
-    public async Task Second_sync_updates_the_existing_rows_and_never_duplicates()
+    public async Task The_snapshot_updates_the_source_rows_and_never_duplicates()
     {
         var fixture = await WebCatalogSeed.SeedOwnerAsync(_f);
         try
         {
-            var category = await WebCatalogSeed.AddCategoryAsync(_f, fixture, "Ropa", 1);
-            var product = await WebCatalogSeed.AddProductAsync(_f, fixture, category.Id, "Camisa", 100m);
+            var categoryId = Guid.NewGuid();
+            var productId = Guid.NewGuid();
+            var categories = new[] { new SnapshotCategory(categoryId, "Ropa", 1) };
+            var client = ClientFor(fixture);
 
-            await ReadSummaryAsync(await ClientFor(fixture).PostAsJsonAsync("/api/v1/catalog/sync", new { }));
-
-            // Cambia el origen: nombre, precio y descuentos.
-            await QueryAsync(async db =>
+            await ReadSummaryAsync(await SyncAsync(client, new
             {
-                product.Name = "Camisa premium";
-                product.Price = 200m;
-                product.Description = "Ahora con descripción";
-                product.PercentDiscountPrice = 1000;
-                db.Set<Domain.Entities.Products.Product>().Update(product);
-                return await db.SaveChangesAsync();
-            });
+                categories,
+                products = new[] { new PosProduct(productId, categoryId, "Camisa", 100m) },
+            }));
 
-            var second = await ReadSummaryAsync(await ClientFor(fixture).PostAsJsonAsync("/api/v1/catalog/sync", new { }));
+            // El dueño renombra y le cambia el precio en el dispositivo: el snapshot lo trae.
+            var second = await ReadSummaryAsync(await SyncAsync(client, new
+            {
+                categories,
+                products = new[] { new PosProduct(productId, categoryId, "Camisa premium", 150m) },
+            }));
 
             second.CategoriesCreated.Should().Be(0);
-            second.ProductsCreated.Should().Be(0);
             second.CategoriesUpdated.Should().Be(1);
+            second.ProductsCreated.Should().Be(0);
             second.ProductsUpdated.Should().Be(1);
+            second.ProductsDeactivated.Should().Be(0);
 
-            var rows = await QueryAsync(db => db.Set<CatalogProduct>().IgnoreQueryFilters()
-                .Where(p => p.StoreId == fixture.StoreId).ToListAsync());
-            rows.Should().HaveCount(1, "la relación 1:1 por id de origen hace el sync idempotente");
-            rows[0].Name.Should().Be("Camisa premium");
-            rows[0].Price.Should().Be(200m);
-            rows[0].Description.Should().Be("Ahora con descripción");
-            rows[0].PercentDiscountPrice.Should().Be(1000);
+            (await QueryAsync(db => db.Set<Product>().IgnoreQueryFilters()
+                .CountAsync(p => p.Id == productId))).Should().Be(1,
+                "el espejo es 1:1 por id del dispositivo: re-sincronizar nunca duplica");
+            var row = await QueryAsync(db => db.Set<Product>().IgnoreQueryFilters()
+                .FirstAsync(p => p.Id == productId));
+            row.Name.Should().Be("Camisa premium");
+            row.Price.Should().Be(150m);
+            row.Currency.Should().Be(Domain.Common.Enums.Currency.CUP, "el snapshot sin moneda cae a CUP");
+            row.CategoryId.Should().Be(categoryId);
         }
         finally
         {
@@ -128,33 +128,38 @@ public sealed class WebCatalogSyncTests
     }
 
     [Fact]
-    public async Task Product_out_of_sale_is_published_inactive_and_never_deleted()
+    public async Task A_product_that_disappeared_from_the_device_is_deactivated_and_never_deleted()
     {
         var fixture = await WebCatalogSeed.SeedOwnerAsync(_f);
         try
         {
-            var category = await WebCatalogSeed.AddCategoryAsync(_f, fixture, "Ropa");
-            var product = await WebCatalogSeed.AddProductAsync(_f, fixture, category.Id, "Camisa", 100m);
+            var categoryId = Guid.NewGuid();
+            var keptId = Guid.NewGuid();
+            var removedId = Guid.NewGuid();
+            var categories = new[] { new SnapshotCategory(categoryId, "Ropa", 1) };
+            var kept = new PosProduct(keptId, categoryId, "Camisa", 100m);
+            var client = ClientFor(fixture);
 
-            await ReadSummaryAsync(await ClientFor(fixture).PostAsJsonAsync("/api/v1/catalog/sync", new { }));
-
-            await QueryAsync(async db =>
+            await ReadSummaryAsync(await SyncAsync(client, new
             {
-                product.AvailableToSale = false;
-                db.Set<Domain.Entities.Products.Product>().Update(product);
-                return await db.SaveChangesAsync();
-            });
+                categories,
+                products = new[] { kept, new PosProduct(removedId, categoryId, "Gorra", 50m, Order: 2) },
+            }));
 
-            var summary = await ReadSummaryAsync(await ClientFor(fixture).PostAsJsonAsync("/api/v1/catalog/sync", new { }));
+            // El dispositivo borró «Gorra»: el siguiente snapshot solo trae «Camisa».
+            var summary = await ReadSummaryAsync(await SyncAsync(client, new
+            {
+                categories,
+                products = new[] { kept },
+            }));
 
             summary.ProductsDeactivated.Should().Be(1);
-            var published = await QueryAsync(db => db.Set<CatalogProduct>().IgnoreQueryFilters()
-                .FirstAsync(p => p.StoreId == fixture.StoreId));
-            published.IsActive.Should().BeFalse("un producto fuera de venta se despublica, no se borra");
-
-            // Despublicar no borra la fila y una nueva sincronización no crea otra.
-            (await QueryAsync(db => db.Set<CatalogProduct>().IgnoreQueryFilters()
-                .CountAsync(p => p.StoreId == fixture.StoreId))).Should().Be(1);
+            var removed = await QueryAsync(db => db.Set<Product>().IgnoreQueryFilters()
+                .FirstAsync(p => p.Id == removedId));
+            removed.IsActive.Should().BeFalse("lo que ya no está en el dispositivo se desactiva (D6)");
+            removed.AvailableToSale.Should().BeFalse("y tampoco queda en venta");
+            (await QueryAsync(db => db.Set<Product>().IgnoreQueryFilters()
+                .CountAsync(p => p.Id == removedId))).Should().Be(1, "nunca se borra");
         }
         finally
         {
@@ -163,28 +168,41 @@ public sealed class WebCatalogSyncTests
     }
 
     [Fact]
-    public async Task Product_deleted_in_the_source_keeps_its_published_row_deactivated()
+    public async Task Null_gallery_leaves_the_photos_alone_and_an_empty_list_clears_them()
     {
         var fixture = await WebCatalogSeed.SeedOwnerAsync(_f);
         try
         {
+            // Las fotos se subieron desde la vista Catálogo Web: viven en el servidor, no en el POS.
             var category = await WebCatalogSeed.AddCategoryAsync(_f, fixture, "Ropa");
-            var product = await WebCatalogSeed.AddProductAsync(_f, fixture, category.Id, "Camisa", 100m);
+            var product = await WebCatalogSeed.AddProductAsync(_f, fixture, category.Id, "Camisa", 100m,
+                image: "k/main.jpg", gallery: new[] { "k/main.jpg", "k/2.jpg" });
+            var client = ClientFor(fixture);
+            var categories = new[] { new SnapshotCategory(category.Id, "Ropa", 1) };
 
-            await ReadSummaryAsync(await ClientFor(fixture).PostAsJsonAsync("/api/v1/catalog/sync", new { }));
-
-            await QueryAsync(async db =>
+            // `null` = "el snapshot no habla de la galería": no se toca.
+            await ReadSummaryAsync(await SyncAsync(client, new
             {
-                await db.Set<Domain.Entities.Products.Product>().IgnoreQueryFilters()
-                    .Where(p => p.Id == product.Id).ExecuteDeleteAsync();
-                return 1;
-            });
+                categories,
+                products = new[] { new SnapshotProduct(product.Id, category.Id, "Camisa", 100m, Images: null) },
+            }));
 
-            var summary = await ReadSummaryAsync(await ClientFor(fixture).PostAsJsonAsync("/api/v1/catalog/sync", new { }));
+            (await QueryAsync(db => db.Set<ProductImage>().IgnoreQueryFilters()
+                .CountAsync(image => image.ProductId == product.Id))).Should().Be(2,
+                "las fotos subidas desde la vista siguen ahí");
 
-            summary.ProductsDeactivated.Should().Be(1);
-            (await QueryAsync(db => db.Set<CatalogProduct>().IgnoreQueryFilters()
-                .CountAsync(p => p.StoreId == fixture.StoreId && !p.IsActive))).Should().Be(1);
+            // Lista vacía = el dispositivo dice que no hay fotos: la galería se limpia.
+            await ReadSummaryAsync(await SyncAsync(client, new
+            {
+                categories,
+                products = new[]
+                {
+                    new SnapshotProduct(product.Id, category.Id, "Camisa", 100m, Images: new List<string>()),
+                },
+            }));
+
+            (await QueryAsync(db => db.Set<ProductImage>().IgnoreQueryFilters()
+                .CountAsync(image => image.ProductId == product.Id))).Should().Be(0);
         }
         finally
         {
@@ -193,22 +211,80 @@ public sealed class WebCatalogSyncTests
     }
 
     [Fact]
-    public async Task Category_of_a_product_in_another_store_stays_out_of_the_catalog()
+    public async Task A_snapshot_with_a_dangling_category_is_rejected()
+    {
+        var fixture = await WebCatalogSeed.SeedOwnerAsync(_f);
+        try
+        {
+            var response = await SyncAsync(ClientFor(fixture), new
+            {
+                categories = Array.Empty<SnapshotCategory>(),
+                products = new[] { new PosProduct(Guid.NewGuid(), Guid.NewGuid(), "Camisa", 100m) },
+            });
+
+            response.StatusCode.Should().Be(HttpStatusCode.BadRequest,
+                "un producto no puede apuntar a una categoría que no viene en el mismo snapshot");
+        }
+        finally
+        {
+            await WebCatalogSeed.CleanupAsync(_f, fixture);
+        }
+    }
+
+    [Fact]
+    public async Task A_snapshot_over_the_configured_limits_is_rejected()
+    {
+        var fixture = await WebCatalogSeed.SeedOwnerAsync(_f);
+        try
+        {
+            var client = ClientFor(fixture);
+            var categoryId = Guid.NewGuid();
+
+            var tooManyCategories = Enumerable.Range(0, 501)
+                .Select(index => new SnapshotCategory(Guid.NewGuid(), $"Categoría {index}", index)).ToArray();
+            (await SyncAsync(client, new { categories = tooManyCategories, products = Array.Empty<PosProduct>() }))
+                .StatusCode.Should().Be(HttpStatusCode.BadRequest, "el tope del snapshot son 500 categorías");
+
+            var tooManyProducts = Enumerable.Range(0, 5001)
+                .Select(index => new PosProduct(Guid.NewGuid(), categoryId, $"Producto {index}", 10m, Order: index))
+                .ToArray();
+            (await SyncAsync(client, new
+            {
+                categories = new[] { new SnapshotCategory(categoryId, "Ropa", 1) },
+                products = tooManyProducts,
+            })).StatusCode.Should().Be(HttpStatusCode.BadRequest, "el tope del snapshot son 5000 productos");
+
+            // Nada de eso se escribió: el snapshot inválido se rechaza antes de tocar la base.
+            (await QueryAsync(db => db.Set<Product>().IgnoreQueryFilters()
+                .CountAsync(p => p.Category.StoreId == fixture.StoreId))).Should().Be(0);
+        }
+        finally
+        {
+            await WebCatalogSeed.CleanupAsync(_f, fixture);
+        }
+    }
+
+    [Fact]
+    public async Task An_id_that_belongs_to_another_store_is_rejected()
     {
         var fixture = await WebCatalogSeed.SeedOwnerAsync(_f);
         var other = await WebCatalogSeed.SeedOwnerAsync(_f);
         try
         {
-            var mine = await WebCatalogSeed.AddCategoryAsync(_f, fixture, "Mía");
-            await WebCatalogSeed.AddProductAsync(_f, fixture, mine.Id, "Camisa", 100m);
-            var theirs = await WebCatalogSeed.AddCategoryAsync(_f, other, "Ajena");
-            await WebCatalogSeed.AddProductAsync(_f, other, theirs.Id, "Pantalón", 50m);
+            var theirCategory = await WebCatalogSeed.AddCategoryAsync(_f, other, "Ajena");
 
-            var summary = await ReadSummaryAsync(await ClientFor(fixture).PostAsJsonAsync("/api/v1/catalog/sync", new { }));
+            var response = await SyncAsync(ClientFor(fixture), new
+            {
+                // La clave primaria es global: recrear el id de otra tienda reventaría la base.
+                categories = new[] { new SnapshotCategory(theirCategory.Id, "Robada", 1) },
+                products = Array.Empty<PosProduct>(),
+            });
 
-            summary.ProductsCreated.Should().Be(1, "el catálogo solo publica los productos de la tienda seleccionada");
-            (await QueryAsync(db => db.Set<CatalogProduct>().IgnoreQueryFilters()
-                .CountAsync(p => p.StoreId == fixture.StoreId))).Should().Be(1);
+            response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+            (await QueryAsync(db => db.Set<Domain.Entities.ProductCategories.ProductCategory>().IgnoreQueryFilters()
+                .FirstAsync(c => c.Id == theirCategory.Id))).StoreId.Should().Be(other.StoreId,
+                "la categoría ajena no se toca");
         }
         finally
         {
@@ -225,7 +301,7 @@ public sealed class WebCatalogSyncTests
         {
             var withImage = await WebCatalogSeed.AddCategoryAsync(_f, fixture, "Ropa");
             await WebCatalogSeed.AddProductAsync(_f, fixture, withImage.Id, "Camisa", 100m, image: "k/main.jpg");
-            await WebCatalogSeed.AddProductAsync(_f, fixture, withImage.Id, "Sin foto", 50m, order: 2);
+            var outOfSale = await WebCatalogSeed.AddProductAsync(_f, fixture, withImage.Id, "Retirado", 50m, order: 2);
 
             var client = ClientFor(fixture);
 
@@ -233,7 +309,18 @@ public sealed class WebCatalogSyncTests
             beforeSync!.Data!.SourceCategoriesCount.Should().Be(1);
             beforeSync.Data.SourceProductsCount.Should().Be(2);
             beforeSync.Data.ProductsWithoutMainImageCount.Should().Be(1);
-            beforeSync.Data.PublishedProductsCount.Should().Be(0);
+            beforeSync.Data.PublishedProductsCount.Should().Be(2, "ambos nacen activos y en venta");
+
+            // Fuera de venta => deja de contar como publicado (es lo que el público ve).
+            await QueryAsync(async db =>
+            {
+                outOfSale.AvailableToSale = false;
+                db.Set<Product>().Update(outOfSale);
+                return await db.SaveChangesAsync();
+            });
+
+            var after = await client.GetFromJsonAsync<ApiResponse<CatalogStatusDto>>("/api/v1/catalog/status", ApiResponse.Json);
+            after!.Data!.PublishedProductsCount.Should().Be(1);
 
             await ReadSummaryAsync(await client.PostAsJsonAsync("/api/v1/catalog/sync", new { }));
 
@@ -241,11 +328,26 @@ public sealed class WebCatalogSyncTests
             afterSync!.Data!.StoreSlug.Should().Be(fixture.Slug);
             afterSync.Data.CatalogUrl.Should().Be($"/catalog/{fixture.Slug}");
             afterSync.Data.CatalogSyncedAt.Should().NotBeNull();
-            afterSync.Data.PublishedProductsCount.Should().Be(2);
         }
         finally
         {
             await WebCatalogSeed.CleanupAsync(_f, fixture);
         }
     }
+
+    private static Task<HttpResponseMessage> SyncAsync(HttpClient client, object snapshot)
+        => client.PostAsJsonAsync("/api/v1/catalog/sync", new { snapshot });
+
+    // --- Formas del snapshot (compartidas por los tests de este archivo). ---
+
+    private sealed record SnapshotCategory(Guid Id, string Name, int Order, bool IsActive = true);
+
+    private sealed record SnapshotProduct(Guid Id, Guid CategoryId, string Name, decimal Price,
+        int? Currency = null, int Order = 0, bool AvailableToSale = true, bool IsActive = true,
+        string? BusinessId = null, bool DiscountFromInventory = true, List<string>? Images = null);
+
+    /// <summary>Producto tal como lo envía el POS: la galería no existe en el dispositivo.</summary>
+    private sealed record PosProduct(Guid Id, Guid CategoryId, string Name, decimal Price,
+        int? Currency = null, int Order = 0, bool AvailableToSale = true, bool IsActive = true,
+        string? BusinessId = null, bool DiscountFromInventory = true);
 }

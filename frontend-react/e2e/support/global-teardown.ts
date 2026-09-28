@@ -59,27 +59,9 @@ const CLEANUP_STATEMENTS: ReadonlyArray<readonly [table: string, sql: string]> =
          AND o."UserId" = u."Id" AND u."Login" LIKE 'e2e-%'`,
   ],
   // --- Catálogo web (módulo 18, D11): "Sincronizar Catálogo" sube el catálogo local del POS al
-  // servidor, así que una tienda e2e deja filas de origen (ProductCategory/Product/ProductImage)
-  // y su copia publicada (CatalogCategory/CatalogProduct/CatalogProductImage). Sin estos borrados
-  // el DELETE de Store choca contra FK_ProductCategory_Store_StoreId.
-  [
-    'CatalogProductImage',
-    `DELETE FROM "CatalogProductImage" USING "CatalogProduct" cp, "Store" s, "Owner" o, "User" u
-       WHERE "CatalogProductImage"."CatalogProductId" = cp."Id" AND cp."StoreId" = s."Id"
-         AND s."OwnerId" = o."Id" AND o."UserId" = u."Id" AND u."Login" LIKE 'e2e-%'`,
-  ],
-  [
-    'CatalogProduct',
-    `DELETE FROM "CatalogProduct" USING "Store" s, "Owner" o, "User" u
-       WHERE "CatalogProduct"."StoreId" = s."Id" AND s."OwnerId" = o."Id"
-         AND o."UserId" = u."Id" AND u."Login" LIKE 'e2e-%'`,
-  ],
-  [
-    'CatalogCategory',
-    `DELETE FROM "CatalogCategory" USING "Store" s, "Owner" o, "User" u
-       WHERE "CatalogCategory"."StoreId" = s."Id" AND s."OwnerId" = o."Id"
-         AND o."UserId" = u."Id" AND u."Login" LIKE 'e2e-%'`,
-  ],
+  // servidor y lo escribe DIRECTO en las tablas normales (ProductCategory/Product/ProductImage),
+  // así que una tienda e2e deja filas de origen. Sin estos borrados el DELETE de Store choca
+  // contra FK_ProductCategory_Store_StoreId.
   [
     'ProductImage',
     `DELETE FROM "ProductImage" USING "Product" p, "ProductCategory" c, "Store" s, "Owner" o, "User" u

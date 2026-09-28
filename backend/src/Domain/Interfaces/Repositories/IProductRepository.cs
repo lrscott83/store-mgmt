@@ -20,5 +20,15 @@ namespace Domain.Interfaces.Repositories
         /// los que dejaron de estar en venta se publican desactivados, nunca se borran (decisión D6).
         /// </summary>
         Task<IList<Product>> GetProductsForCatalogSyncAsync(Guid storeId);
+
+        /// <summary>
+        /// Lectura del catálogo PÚBLICO sobre esta tabla (publicación directa, decisión del Owner
+        /// 2026-09-28): solo productos activos y en venta de categorías activas con slug público.
+        /// No existe una copia publicada.
+        /// </summary>
+        Task<IList<Product>> GetPublishedByStoreIdAsync(Guid storeId, Guid? categoryId, string? search);
+
+        /// <summary>Detalle público por id dentro de la tienda; null si no está publicado.</summary>
+        Task<Product?> GetPublishedByIdAsync(Guid storeId, Guid productId);
     }
 }

@@ -15,7 +15,8 @@ namespace SMCA.WebApi.E2ETests.Catalog;
 /// Campos del catálogo web editables desde la vista "Catálogo Web" (plan 2026-09-27, decisión D8:
 /// se editan SOLO ahí): descripción en texto plano (D9), % de descuento, precio rebajado, "Nuevo" e
 /// imagen principal. Editar el catálogo no toca el resto del producto (nombre, precio, código de
-/// barras, orden) y el sync publica exactamente lo editado.
+/// barras, orden) y, con la publicación DIRECTA (decisión del Owner, 2026-09-28), lo guardado es
+/// visible en el público al instante.
 /// </summary>
 [Collection("e2e")]
 public sealed class WebCatalogProductFieldsTests
@@ -236,7 +237,7 @@ public sealed class WebCatalogProductFieldsTests
     }
 
     [Fact]
-    public async Task The_sync_publishes_exactly_what_the_view_saved()
+    public async Task The_public_catalog_shows_exactly_what_the_view_saved()
     {
         var fixture = await WebCatalogSeed.SeedOwnerAsync(_f);
         try
@@ -259,13 +260,8 @@ public sealed class WebCatalogProductFieldsTests
 
             (await client.PostAsJsonAsync("/api/v1/catalog/sync", new { })).EnsureSuccessStatusCode();
 
-            Guid publishedId = await QueryAsync(db => db.Set<Domain.Entities.WebCatalog.CatalogProduct>()
-                .IgnoreQueryFilters()
-                .Where(p => p.StoreId == fixture.StoreId && p.SourceProductId == product.Id)
-                .Select(p => p.Id).FirstAsync());
-
             var body = await _f.CreateClient().GetFromJsonAsync<ApiResponse<PublicProductDto>>(
-                $"/api/v1/public/catalog/{fixture.Slug}/products/{publishedId}", ApiResponse.Json);
+                $"/api/v1/public/catalog/{fixture.Slug}/products/{product.Id}", ApiResponse.Json);
 
             var published = body!.Data!;
             published.Description.Should().Be("Primera línea\nSegunda línea con <b>etiquetas</b>",

@@ -273,10 +273,10 @@ namespace Domain.Common.Enums
 
         #region Catálogo web features
 
-        // WebCatalog (feature 122, module 18) is Superior-only and Owner-only (D5/D8,
-        // 2026-09-27): module 18 is assigned only to the Superior plan
-        // (StorePlanModuleEntityTypeConfiguration) and the "Catálogo Web" view is gated by
-        // rolesOnly: isOwnerAdmin in menu-config. Mirror MultiStoresAdmin — no StoreUser role.
+        // WebCatalog (feature 122, module 18) is Owner-only (D8, 2026-09-27). Module 18 is
+        // assigned to Superior AND VIP (plans are self-contained, owner decision 2026-09-28,
+        // amends D5) — see StorePlanModuleEntityTypeConfiguration. The "Catálogo Web" view is
+        // gated by rolesOnly: isOwnerAdmin in menu-config. Mirror MultiStoresAdmin — no StoreUser role.
         [HasRoles(RoleType.OwnerAdmin)]
         [HasFeature(FeatureType.WebCatalog)]
         [HasModule(ModuleType.WebCatalog)]

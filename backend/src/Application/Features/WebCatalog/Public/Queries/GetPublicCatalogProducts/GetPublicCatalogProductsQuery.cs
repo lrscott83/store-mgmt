@@ -1,9 +1,9 @@
 using Application.Abstractions.Messaging;
 using Application.Dtos.WebCatalog;
 using Application.Exceptions;
+using Application.Features.WebCatalog.Public;
 using Application.ResponseModels;
 using Domain.Entities.Stores;
-using Domain.Entities.WebCatalog;
 using Domain.Interfaces.Repositories;
 using Microsoft.Extensions.Localization;
 using Resources;
@@ -13,7 +13,10 @@ namespace Application.Features.WebCatalog.Public.Queries.GetPublicCatalogProduct
 {
     /// <summary>
     /// Listado público paginado del catálogo (anónimo), con filtro por categoría y búsqueda por
-    /// nombre. Solo muestra filas publicadas y activas.
+    /// nombre. Publicación DIRECTA sobre las tablas normales (decisión del Owner, 2026-09-28):
+    /// solo muestra productos ACTIVOS y EN VENTA de categorías activas con slug. El filtro por
+    /// slug de categoría se aplica sobre los productos leídos (que traen su categoría): una
+    /// lectura de `ProductCategory` con el filtro global por tenant responde VACÍA para anónimos.
     /// </summary>
     public sealed record GetPublicCatalogProductsQuery(
         string StoreSlug,
@@ -27,19 +30,16 @@ namespace Application.Features.WebCatalog.Public.Queries.GetPublicCatalogProduct
         private const int MaxPageSize = 60;
 
         private readonly IStoreRepository _storeRepository;
-        private readonly ICatalogCategoryRepository _catalogCategoryRepository;
-        private readonly ICatalogProductRepository _catalogProductRepository;
+        private readonly IProductRepository _productRepository;
         private readonly IStringLocalizer<I18n> _localizer;
 
         public GetPublicCatalogProductsQueryHandler(
             IStoreRepository storeRepository,
-            ICatalogCategoryRepository catalogCategoryRepository,
-            ICatalogProductRepository catalogProductRepository,
+            IProductRepository productRepository,
             IStringLocalizer<I18n> localizer)
         {
             _storeRepository = storeRepository;
-            _catalogCategoryRepository = catalogCategoryRepository;
-            _catalogProductRepository = catalogProductRepository;
+            _productRepository = productRepository;
             _localizer = localizer;
         }
 
@@ -49,32 +49,28 @@ namespace Application.Features.WebCatalog.Public.Queries.GetPublicCatalogProduct
                 ? null
                 : await _storeRepository.GetStoreByCatalogSlugAsync(query.StoreSlug.Trim().ToLowerInvariant());
 
-            if (store == null)
+            if (store == null || store.CatalogSlug == null)
                 throw new ApiException(_localizer["CatalogStoreNotFound"], HttpStatusCode.NotFound);
 
-            string storeSlug = store.CatalogSlug!;
-            Guid? categoryId = null;
+            string storeSlug = store.CatalogSlug;
+            IList<Domain.Entities.Products.Product> products = await _productRepository
+                .GetPublishedByStoreIdAsync(store.Id, null, null);
+
             if (!string.IsNullOrWhiteSpace(query.CategorySlug))
             {
-                var categories = await _catalogCategoryRepository.GetPublishedByStoreIdAsync(store.Id);
-                CatalogCategory? category = categories
-                    .FirstOrDefault(c => string.Equals(c.Slug, query.CategorySlug.Trim(), StringComparison.OrdinalIgnoreCase));
-
-                // Categoría desconocida => página vacía (no 404: la URL sigue siendo válida).
-                if (category == null)
-                    return ResponseResult.Success(new PublicCatalogPageDto
-                    {
-                        Items = new List<PublicCatalogProductDto>(),
-                        Total = 0,
-                        Page = 1,
-                        PageSize = NormalizePageSize(query.PageSize),
-                    });
-
-                categoryId = category.Id;
+                string categorySlug = query.CategorySlug.Trim();
+                products = products
+                    .Where(product => string.Equals(product.Category?.Slug, categorySlug, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
             }
 
-            IList<CatalogProduct> products = await _catalogProductRepository
-                .GetPublishedByStoreIdAsync(store.Id, categoryId, query.Search);
+            if (!string.IsNullOrWhiteSpace(query.Search))
+            {
+                string term = query.Search.Trim();
+                products = products
+                    .Where(product => product.Name.Contains(term, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+            }
 
             int page = query.Page < 1 ? 1 : query.Page;
             int pageSize = NormalizePageSize(query.PageSize);

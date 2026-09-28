@@ -11,7 +11,6 @@ using Domain.Common.Extensions;
 using Domain.Entities.ProductCategories;
 using Domain.Entities.Products;
 using Domain.Entities.Stores;
-using Domain.Entities.WebCatalog;
 using Domain.Interfaces.Repositories;
 using Microsoft.Extensions.Localization;
 using Resources;
@@ -22,18 +21,23 @@ namespace Application.Features.WebCatalog.Sync.Commands.SyncCatalog
     /// <summary>
     /// Sincroniza el catálogo web de la tienda seleccionada (el botón "Sincronizar Catálogo").
     ///
-    /// Reglas (plan 2026-09-27):
-    /// - Categorías primero, productos después; la relación con el origen es 1:1 por SourceId, así
-    ///   que re-sincronizar ACTUALIZA, nunca duplica.
-    /// - Un producto/categoría del origen que ya no está en venta se DESPUBLICA (decisión D6):
-    ///   la fila publicada nunca se borra.
-    /// - La galería publicada sigue a la del origen y se reemplaza solo cuando cambia.
+    /// Publicación DIRECTA sobre las tablas normales (decisión del Owner, 2026-09-28): el catálogo
+    /// público LEE `Product`/`ProductCategory`/`ProductImage` y NO existe una copia publicada.
+    /// Sincronizar = traer los hechos del catálogo LOCAL del POS a esas tablas.
+    ///
+    /// Reglas:
+    /// - Categorías primero, productos después; los ids son los del dispositivo, así que
+    ///   re-sincronizar ACTUALIZA, nunca duplica.
+    /// - Un producto/categoría que ya no está en el dispositivo se DESACTIVA (decisión D6):
+    ///   la fila nunca se borra.
+    /// - La galería se reemplaza solo cuando cambió; `images: null` = no tocarla.
+    /// - Los campos que se editan en la vista Catálogo Web (descripción, descuentos, "Nuevo",
+    ///   imagen principal) NO viajan en el snapshot y NO se tocan aquí (decisión D8).
     ///
     /// <paramref name="Snapshot"/> es el catálogo LOCAL del POS (plan §10.1): el POS es
     /// offline-first y el servidor no conoce sus productos, así que "Sincronizar" los envía.
-    /// Llega como espejo (hechos) antes de publicar, y respeta los campos de catálogo editados en
-    /// la vista. Sin snapshot (null) se publica el origen que ya tenga el servidor, que es el
-    /// comportamiento del módulo para las tiendas con datos propios en el backend.
+    /// Sin snapshot (null) solo se asegura el slug/fecha: el catálogo ya vive en las tablas
+    /// normales y lo que haya ahí es lo que se muestra.
     /// </summary>
     public sealed record SyncCatalogCommand(CatalogSnapshotDto? Snapshot = null) : ICommand<CatalogSyncSummaryDto>;
 
@@ -46,9 +50,6 @@ namespace Application.Features.WebCatalog.Sync.Commands.SyncCatalog
         private readonly IProductCategoryRepository _productCategoryRepository;
         private readonly IProductRepository _productRepository;
         private readonly IProductImageRepository _productImageRepository;
-        private readonly ICatalogCategoryRepository _catalogCategoryRepository;
-        private readonly ICatalogProductRepository _catalogProductRepository;
-        private readonly ICatalogProductImageRepository _catalogProductImageRepository;
         private readonly IStringLocalizer<I18n> _localizer;
 
         public SyncCatalogCommandHandler(
@@ -59,9 +60,6 @@ namespace Application.Features.WebCatalog.Sync.Commands.SyncCatalog
             IProductCategoryRepository productCategoryRepository,
             IProductRepository productRepository,
             IProductImageRepository productImageRepository,
-            ICatalogCategoryRepository catalogCategoryRepository,
-            ICatalogProductRepository catalogProductRepository,
-            ICatalogProductImageRepository catalogProductImageRepository,
             IStringLocalizer<I18n> localizer)
         {
             _applicationUnitOfWork = applicationUnitOfWork;
@@ -71,9 +69,6 @@ namespace Application.Features.WebCatalog.Sync.Commands.SyncCatalog
             _productCategoryRepository = productCategoryRepository;
             _productRepository = productRepository;
             _productImageRepository = productImageRepository;
-            _catalogCategoryRepository = catalogCategoryRepository;
-            _catalogProductRepository = catalogProductRepository;
-            _catalogProductImageRepository = catalogProductImageRepository;
             _localizer = localizer;
         }
 
@@ -101,127 +96,74 @@ namespace Application.Features.WebCatalog.Sync.Commands.SyncCatalog
             store.CatalogSyncedAt = syncedAt;
             string storeSlug = store.CatalogSlug!;
 
-            // Espejo del catálogo local ANTES de leer el origen: si el snapshot viene, es él quien
-            // pone los hechos del producto en el servidor (y desactiva lo que ya no existe en el
-            // dispositivo). Dos guardados porque la galería referencia filas de producto que tienen
-            // que existir primero.
-            //
-            // Las categorías son las que DEVUELVE el espejo y no una lectura nueva: las que crea el
-            // snapshot quedan tracked en el contexto (que trabaja sin tracking por defecto), así que
-            // releerlas daría una segunda instancia con la misma clave y el `UpdateAsync` del slug
-            // reventaría. Reusando la misma instancia no hay colisión.
-            IList<ProductCategory> sourceCategories;
-            if (request.Snapshot is { } snapshot)
-            {
-                sourceCategories = await CatalogMirrorWriter.MirrorCatalogAsync(snapshot, storeId, tenantId,
-                    _productCategoryRepository, _productRepository, _localizer);
-                await _applicationUnitOfWork.SaveChangesAsync(cancellationToken);
-
-                await CatalogMirrorWriter.MirrorGalleriesAsync(snapshot, storeId,
-                    _productRepository, _productImageRepository);
-                await _applicationUnitOfWork.SaveChangesAsync(cancellationToken);
-            }
-            else
-            {
-                sourceCategories = await _productCategoryRepository.GetByStoreIdAsync(storeId);
-            }
-            IList<Product> sourceProducts = await _productRepository.GetProductsForCatalogSyncAsync(storeId);
-            IList<CatalogCategory> catalogCategories = await _catalogCategoryRepository.GetByStoreIdAsync(storeId);
-            IList<CatalogProduct> catalogProducts = await _catalogProductRepository.GetByStoreIdAsync(storeId);
-
             int categoriesCreated = 0, categoriesUpdated = 0;
             int productsCreated = 0, productsUpdated = 0, productsDeactivated = 0;
 
-            var takenCategorySlugs = new HashSet<string>(
-                catalogCategories.Select(category => category.Slug)
-                    .Concat(sourceCategories.Where(category => !string.IsNullOrWhiteSpace(category.Slug))
-                        .Select(category => category.Slug!)),
-                StringComparer.OrdinalIgnoreCase);
-
-            var publishedCategoryIdBySource = new Dictionary<Guid, Guid>();
-
-            foreach (ProductCategory source in sourceCategories)
+            // Los slugs públicos de categoría se generan en la PRIMERA sincronización y no vuelven a
+            // cambiar (las URLs se mantienen estables). Se rellenan SIEMPRE (con o sin snapshot) y
+            // DENTRO de esta misma lectura — una segunda lectura chocaría con las entidades que el
+            // espejo deja tracked (contexto sin tracking por defecto).
+            //
+            // La generación usa SOLO los slugs ya tomados (leídos una vez): nueva lectura por
+            // categoría repetiría el mismo conflicto de tracking.
+            IList<ProductCategory> allCategories;
+            if (request.Snapshot is { } snapshot)
             {
-                string slug = await EnsureCategorySlugAsync(source, takenCategorySlugs, cancellationToken);
-                takenCategorySlugs.Add(slug);
+                // El espejo trae los hechos del dispositivo a las tablas normales y devuelve los
+                // conteos del resumen.
+                CatalogMirrorCounts counts = await CatalogMirrorWriter.MirrorCatalogAsync(
+                    snapshot, storeId, tenantId, _productCategoryRepository, _productRepository, _localizer);
 
-                CatalogCategory? published = catalogCategories.FirstOrDefault(category => category.SourceCategoryId == source.Id);
-                if (published == null)
+                allCategories = CatalogMirrorWriter.CategoryResult;
+                var takenSlugs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (ProductCategory category in allCategories)
                 {
-                    published = CatalogCategory.Create(storeId, source.Id, source.Name, slug, source.Order, tenantId);
-                    published.IsActive = source.IsActive;
-                    published.SyncedAt = syncedAt;
-                    await _catalogCategoryRepository.AddAsync(published);
-                    categoriesCreated++;
-                }
-                else
-                {
-                    published.Name = source.Name;
-                    published.Slug = slug;
-                    published.Order = source.Order;
-                    published.IsActive = source.IsActive;
-                    published.SyncedAt = syncedAt;
-                    await _catalogCategoryRepository.UpdateAsync(published);
-                    categoriesUpdated++;
+                    if (string.IsNullOrWhiteSpace(category.Slug))
+                    {
+                        // SIN UpdateAsync: para una categoría recién creada (todavía Added en el
+                        // contexto) forzar Modified la convertiría en UPDATE antes del INSERT — y
+                        // la fila aún no existe. Basta con asignar la propiedad: se va en el
+                        // INSERT que este SaveChanges ya emite.
+                        category.Slug = SlugNormalizer.MakeUnique(
+                            SlugNormalizer.Normalize(category.Name),
+                            candidate => takenSlugs.Contains(candidate));
+                    }
+                    takenSlugs.Add(category.Slug!);
                 }
 
-                publishedCategoryIdBySource[source.Id] = published.Id;
+                await _applicationUnitOfWork.SaveChangesAsync(cancellationToken);
+
+                // La galería referencia filas de producto que tienen que existir primero: segundo
+                // guardado.
+                await CatalogMirrorWriter.MirrorGalleriesAsync(snapshot, storeId,
+                    _productRepository, _productImageRepository);
+                await _applicationUnitOfWork.SaveChangesAsync(cancellationToken);
+
+                categoriesCreated = counts.CategoriesCreated;
+                categoriesUpdated = counts.CategoriesUpdated;
+                productsCreated = counts.ProductsCreated;
+                productsUpdated = counts.ProductsUpdated;
+                productsDeactivated = counts.ProductsDeactivated;
             }
-
-            // Categorías cuyo origen ya no existe: se despublican (nunca se borran).
-            var sourceCategoryIds = sourceCategories.Select(category => category.Id).ToHashSet();
-            foreach (CatalogCategory orphan in catalogCategories
-                .Where(category => !sourceCategoryIds.Contains(category.SourceCategoryId) && category.IsActive))
+            else
             {
-                orphan.IsActive = false;
-                orphan.SyncedAt = syncedAt;
-                await _catalogCategoryRepository.UpdateAsync(orphan);
-                categoriesUpdated++;
-            }
-
-            var activeSourceCategoryIds = sourceCategories.Where(category => category.IsActive)
-                .Select(category => category.Id).ToHashSet();
-            var sourceProductIds = sourceProducts.Select(product => product.Id).ToHashSet();
-
-            foreach (Product source in sourceProducts)
-            {
-                if (!publishedCategoryIdBySource.TryGetValue(source.CategoryId, out Guid catalogCategoryId))
-                    continue;
-
-                // D6: si el producto o su categoría dejaron de estar en venta, la copia se desactiva.
-                bool shouldBePublished = source.IsActive && source.AvailableToSale
-                    && activeSourceCategoryIds.Contains(source.CategoryId);
-
-                CatalogProduct? published = catalogProducts.FirstOrDefault(product => product.SourceProductId == source.Id);
-                if (published == null)
+                // Sin snapshot: las categorías que ya existían en el servidor (sin tracking) se
+                // leen una vez y se genera el slug de las que no tengan.
+                allCategories = await _productCategoryRepository.GetByStoreIdAsync(storeId);
+                var takenSlugs = new HashSet<string>(
+                    allCategories.Where(c => c.Slug != null).Select(c => c.Slug!),
+                    StringComparer.OrdinalIgnoreCase);
+                foreach (ProductCategory category in allCategories)
                 {
-                    published = CatalogProduct.Create(storeId, source.Id, catalogCategoryId, source.Name, tenantId);
-                    ApplySource(published, source, catalogCategoryId, shouldBePublished, syncedAt);
-                    await _catalogProductRepository.AddAsync(published);
-                    productsCreated++;
-                    await SyncGalleryAsync(published.Id, source, tenantId, null, cancellationToken);
+                    if (string.IsNullOrWhiteSpace(category.Slug))
+                    {
+                        category.Slug = SlugNormalizer.MakeUnique(
+                            SlugNormalizer.Normalize(category.Name),
+                            candidate => takenSlugs.Contains(candidate));
+                        await _productCategoryRepository.UpdateAsync(category);
+                    }
+                    takenSlugs.Add(category.Slug!);
                 }
-                else
-                {
-                    bool wasPublished = published.IsActive;
-                    ApplySource(published, source, catalogCategoryId, shouldBePublished, syncedAt);
-                    await _catalogProductRepository.UpdateAsync(published);
-                    productsUpdated++;
-                    if (wasPublished && !published.IsActive)
-                        productsDeactivated++;
-
-                    await SyncGalleryAsync(published.Id, source, tenantId, published.Images, cancellationToken);
-                }
-            }
-
-            // Productos borrados en el origen: la copia publicada se desactiva (decisión D6).
-            foreach (CatalogProduct orphan in catalogProducts
-                .Where(product => !sourceProductIds.Contains(product.SourceProductId) && product.IsActive))
-            {
-                orphan.IsActive = false;
-                orphan.SyncedAt = syncedAt;
-                await _catalogProductRepository.UpdateAsync(orphan);
-                productsDeactivated++;
             }
 
             await _storeRepository.UpdateAsync(store);
@@ -240,72 +182,6 @@ namespace Application.Features.WebCatalog.Sync.Commands.SyncCatalog
             });
         }
 
-        /// <summary>
-        /// El slug publicado sale del slug del origen; si aún no tiene (categorías anteriores al
-        /// módulo) se genera y se guarda en el origen para que las URLs se mantengan estables.
-        /// </summary>
-        private async Task<string> EnsureCategorySlugAsync(ProductCategory source, HashSet<string> takenSlugs,
-            CancellationToken cancellationToken)
-        {
-            if (!string.IsNullOrWhiteSpace(source.Slug))
-                return source.Slug!;
 
-            string slug = SlugNormalizer.MakeUnique(
-                SlugNormalizer.Normalize(source.Name),
-                candidate => takenSlugs.Contains(candidate));
-
-            source.Slug = slug;
-            await _productCategoryRepository.UpdateAsync(source);
-            return slug;
-        }
-
-        private static void ApplySource(CatalogProduct published, Product source, Guid catalogCategoryId,
-            bool shouldBePublished, DateTime syncedAt)
-        {
-            published.CatalogCategoryId = catalogCategoryId;
-            published.Name = source.Name;
-            published.Description = source.Description ?? string.Empty;
-            published.Price = source.Price;
-            published.Currency = source.Currency;
-            published.PercentDiscountPrice = source.PercentDiscountPrice;
-            published.DiscountPrice = source.DiscountPrice;
-            published.IsNew = source.IsNew;
-            published.Image = source.Image;
-            published.Order = source.Order;
-            published.IsActive = shouldBePublished;
-            published.SyncedAt = syncedAt;
-        }
-
-        /// <summary>
-        /// Reemplaza la galería publicada solo cuando el origen cambió: no se copian binarios, ambas
-        /// apuntan a la misma clave del almacenamiento.
-        /// </summary>
-        private async Task SyncGalleryAsync(Guid catalogProductId, Product source, Guid tenantId,
-            ICollection<CatalogProductImage>? currentImages, CancellationToken cancellationToken)
-        {
-            List<string> sourcePaths = source.Images
-                .Where(image => image.IsActive)
-                .OrderBy(image => image.Order).ThenBy(image => image.CreatedDate)
-                .Select(image => image.Path)
-                .ToList();
-
-            List<string> publishedPaths = (currentImages ?? new List<CatalogProductImage>())
-                .OrderBy(image => image.Order)
-                .Select(image => image.Path)
-                .ToList();
-
-            if (sourcePaths.SequenceEqual(publishedPaths))
-                return;
-
-            await _catalogProductImageRepository.HardDeleteWhereAsync(image => image.CatalogProductId == catalogProductId);
-
-            if (sourcePaths.Count == 0)
-                return;
-
-            IEnumerable<CatalogProductImage> rows = sourcePaths
-                .Select((path, index) => CatalogProductImage.Create(catalogProductId, path, index, tenantId));
-
-            await _catalogProductImageRepository.AddRangeAsync(rows);
-        }
     }
 }

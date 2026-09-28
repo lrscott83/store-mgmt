@@ -1,18 +1,20 @@
 using Application.Dtos.WebCatalog;
 using Domain.Common.Catalog;
-using Domain.Entities.WebCatalog;
+using Domain.Entities.Products;
 
 namespace Application.Features.WebCatalog.Public
 {
     /// <summary>
-    /// Traduce una fila publicada a lo que ve el cliente final: precios legibles (final combinado y
-    /// porcentaje desescalado) y URLs públicas listas para el catálogo.
+    /// Traduce un producto (tabla normal `Product`) a lo que ve el cliente final: precios legibles
+    /// (final combinado y porcentaje desescalado) y URLs públicas listas para el catálogo.
+    /// Publicación directa: no hay copia intermedia (decisión del Owner, 2026-09-28).
     /// </summary>
     internal static class PublicCatalogProductMapper
     {
-        public static PublicCatalogProductDto ToDto(CatalogProduct product, string storeSlug)
+        public static PublicCatalogProductDto ToDto(Product product, string storeSlug)
         {
             List<string> imageUrls = product.Images
+                .Where(image => image.IsActive)
                 .OrderBy(image => image.Order).ThenBy(image => image.CreatedDate)
                 .Select(image => CatalogPublicUrls.Media(storeSlug, image.Path))
                 .ToList();
@@ -31,9 +33,9 @@ namespace Application.Features.WebCatalog.Public
                 DiscountAmount = CatalogScales.ToDiscountAmount(product.DiscountPrice),
                 IsNew = product.IsNew,
                 Currency = product.Currency.ToString(),
-                CategoryId = product.CatalogCategoryId,
-                CategoryName = product.CatalogCategory?.Name ?? string.Empty,
-                CategorySlug = product.CatalogCategory?.Slug ?? string.Empty,
+                CategoryId = product.CategoryId,
+                CategoryName = product.Category?.Name ?? string.Empty,
+                CategorySlug = product.Category?.Slug ?? string.Empty,
                 ImageUrl = string.IsNullOrWhiteSpace(product.Image) ? null : CatalogPublicUrls.Media(storeSlug, product.Image!),
                 ImageUrls = imageUrls,
             };

@@ -14,6 +14,10 @@ namespace Domain.Interfaces.Repositories
         /// Es la lectura de la sincronización del catálogo web, no el listado de venta.
         /// </summary>
         Task<IList<ProductCategory>> GetByStoreIdAsync(Guid storeId);
+
+        /// <summary>Slugs públicos de categoría ya tomados (todas las tiendas): para generar únicos.</summary>
+        Task<IReadOnlyCollection<string>> GetCatalogSlugsAsync();
+
         Task<bool> HasAnyAvailableCategoryByStoreId(Guid id);
         Task<bool> IsUniqueLoginAsync(string name);
     }
