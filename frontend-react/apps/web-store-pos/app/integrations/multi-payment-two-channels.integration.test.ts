@@ -47,7 +47,8 @@ function registerCupRate(): void {
   const written = new ChannelRateOfflineService(STORE_ID).registerRate({
     method: SalePaymentMethod.Efectivo,
     currency: Currency.CUP,
-    value: CUP_PER_USD,
+    buyValue: CUP_PER_USD,
+    sellValue: CUP_PER_USD,
     effectiveFrom: RATE_EFFECTIVE_FROM,
   });
   expect(written.succeeded).toBe(true);

@@ -59,7 +59,8 @@ function makeRate(id: string, value: number, effectiveFrom = '2026-09-01T00:00:0
     id,
     method: SalePaymentMethod.Efectivo,
     currency: Currency.CUP,
-    value,
+    buyValue: value,
+    sellValue: value,
     effectiveFrom: new Date(effectiveFrom),
   };
 }

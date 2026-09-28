@@ -14,14 +14,16 @@ function register(
   overrides: Partial<{
     method: SalePaymentMethod;
     currency: Currency;
-    value: number;
+    buyValue: number;
+    sellValue: number;
     effectiveFrom: Date;
   }> = {},
 ) {
   return service.registerRate({
     method: SalePaymentMethod.Efectivo,
     currency: Currency.CUP,
-    value: 700,
+    buyValue: 700,
+    sellValue: 700,
     effectiveFrom: at('2026-09-01T00:00:00.000Z'),
     ...overrides,
   });
@@ -37,13 +39,14 @@ describe('ChannelRateOfflineService', () => {
 
   describe('registerRate (alta)', () => {
     it('appends a rate with a generated id, audit date and the requested channel', () => {
-      const result = register(service, { value: 700, effectiveFrom: at('2026-09-01T00:00:00.000Z') });
+      const result = register(service, { buyValue: 700, sellValue: 700, effectiveFrom: at('2026-09-01T00:00:00.000Z') });
 
       expect(result.succeeded).toBe(true);
       expect(result.data?.id).toBeTruthy();
       expect(result.data?.method).toBe(SalePaymentMethod.Efectivo);
       expect(result.data?.currency).toBe(Currency.CUP);
-      expect(result.data?.value).toBe(700);
+      expect(result.data?.buyValue).toBe(700);
+      expect(result.data?.sellValue).toBe(700);
       expect(result.data?.effectiveFrom).toBeInstanceOf(Date);
       expect(result.data?.createdDate).toBeInstanceOf(Date);
       expect(service.getStorageChannelRates()).toHaveLength(1);
@@ -54,21 +57,22 @@ describe('ChannelRateOfflineService', () => {
 
       const fresh = new ChannelRateOfflineService(storeId);
       expect(fresh.getStorageChannelRates()).toHaveLength(1);
-      expect(fresh.getStorageChannelRates()[0].value).toBe(700);
+      expect(fresh.getStorageChannelRates()[0].buyValue).toBe(700);
+      expect(fresh.getStorageChannelRates()[0].sellValue).toBe(700);
     });
 
     it('rejects a non-positive or non-finite value without writing', () => {
-      const zero = register(service, { value: 0 });
+      const zero = register(service, { buyValue: 0 });
       expect(zero.succeeded).toBe(false);
       expect(zero.errors).toEqual([ChannelRateOfflineErrors.InvalidValue]);
 
-      const negative = register(service, { value: -3 });
+      const negative = register(service, { buyValue: -3 });
       expect(negative.succeeded).toBe(false);
 
-      const infinite = register(service, { value: Number.POSITIVE_INFINITY });
+      const infinite = register(service, { buyValue: Number.POSITIVE_INFINITY });
       expect(infinite.succeeded).toBe(false);
 
-      const nan = register(service, { value: Number.NaN });
+      const nan = register(service, { buyValue: Number.NaN });
       expect(nan.succeeded).toBe(false);
 
       expect(service.getStorageChannelRates()).toEqual([]);
@@ -77,9 +81,10 @@ describe('ChannelRateOfflineService', () => {
 
   describe('setChannelRateActive (T19b — activate/deactivate)', () => {
     it('deactivates a row so the cascade skips it and reactivating restores it', () => {
-      register(service, { value: 700, effectiveFrom: at('2026-09-01T00:00:00.000Z') });
+      register(service, { buyValue: 700, sellValue: 700, effectiveFrom: at('2026-09-01T00:00:00.000Z') });
       const newest = register(service, {
-        value: 900,
+        buyValue: 900,
+        sellValue: 900,
         effectiveFrom: at('2026-09-10T00:00:00.000Z'),
       });
 
@@ -93,7 +98,7 @@ describe('ChannelRateOfflineService', () => {
         at('2026-09-20T00:00:00.000Z'),
       );
       expect(afterDeactivate.succeeded).toBe(true);
-      expect(afterDeactivate.data?.value).toBe(700 * 1_000_000);
+      expect(afterDeactivate.data?.buyValue).toBe(700 * 1_000_000);
       expect(service.getStorageChannelRates().find((r) => r.id === newest.data!.id)?.isActive).toBe(
         false,
       );
@@ -102,12 +107,12 @@ describe('ChannelRateOfflineService', () => {
       expect(reactivated.succeeded).toBe(true);
       expect(
         service.getRateAt(SalePaymentMethod.Efectivo, Currency.CUP, at('2026-09-20T00:00:00.000Z'))
-          .data?.value,
+          .data?.buyValue,
       ).toBe(900 * 1_000_000);
     });
 
     it('deactivating the only row makes the channel unresolvable, and reactivating restores it', () => {
-      const only = register(service, { value: 700 });
+      const only = register(service, { buyValue: 700, sellValue: 700 });
 
       expect(service.setChannelRateActive(only.data!.id!, false).succeeded).toBe(true);
       expect(service.getRateAt(SalePaymentMethod.Efectivo, Currency.CUP, at('2026-09-05T00:00:00.000Z')).succeeded).toBe(
@@ -115,7 +120,7 @@ describe('ChannelRateOfflineService', () => {
       );
 
       expect(service.setChannelRateActive(only.data!.id!, true).succeeded).toBe(true);
-      expect(service.getRateAt(SalePaymentMethod.Efectivo, Currency.CUP, at('2026-09-05T00:00:00.000Z')).data?.value).toBe(
+      expect(service.getRateAt(SalePaymentMethod.Efectivo, Currency.CUP, at('2026-09-05T00:00:00.000Z')).data?.buyValue).toBe(
         700 * 1_000_000,
       );
     });
@@ -132,13 +137,14 @@ describe('ChannelRateOfflineService', () => {
     });
 
     it('keeps the rest of a deactivated row untouched (id, value, moment)', () => {
-      const row = register(service, { value: 720, effectiveFrom: at('2026-09-01T00:00:00.000Z') });
+      const row = register(service, { buyValue: 720, sellValue: 720, effectiveFrom: at('2026-09-01T00:00:00.000Z') });
 
       service.setChannelRateActive(row.data!.id!, false);
 
       const stored = service.getStorageChannelRates()[0];
       expect(stored.id).toBe(row.data!.id);
-      expect(stored.value).toBe(720);
+      expect(stored.buyValue).toBe(720);
+      expect(stored.sellValue).toBe(720);
       expect(stored.effectiveFrom.toISOString()).toBe('2026-09-01T00:00:00.000Z');
       expect(stored.isActive).toBe(false);
     });
@@ -146,8 +152,8 @@ describe('ChannelRateOfflineService', () => {
 
   describe('getRateAt (tasa vigente por momento)', () => {
     it('picks the row in force at `at`, not the newest overall', () => {
-      register(service, { value: 700, effectiveFrom: at('2026-09-01T00:00:00.000Z') });
-      register(service, { value: 750, effectiveFrom: at('2026-09-10T00:00:00.000Z') });
+      register(service, { buyValue: 700, sellValue: 700, effectiveFrom: at('2026-09-01T00:00:00.000Z') });
+      register(service, { buyValue: 750, sellValue: 750, effectiveFrom: at('2026-09-10T00:00:00.000Z') });
 
       const early = service.getRateAt(
         SalePaymentMethod.Efectivo,
@@ -155,14 +161,14 @@ describe('ChannelRateOfflineService', () => {
         at('2026-09-05T00:00:00.000Z'),
       );
       expect(early.succeeded).toBe(true);
-      expect(early.data?.value).toBe(700 * 1_000_000);
+      expect(early.data?.buyValue).toBe(700 * 1_000_000);
 
       const late = service.getRateAt(
         SalePaymentMethod.Efectivo,
         Currency.CUP,
         at('2026-09-10T00:00:00.000Z'),
       );
-      expect(late.data?.value).toBe(750 * 1_000_000);
+      expect(late.data?.buyValue).toBe(750 * 1_000_000);
     });
 
     it('returns the typed RateNotFound error when no row is in force yet', () => {
@@ -181,7 +187,8 @@ describe('ChannelRateOfflineService', () => {
       register(service, {
         method: SalePaymentMethod.Zelle,
         currency: Currency.CUP,
-        value: 720,
+        buyValue: 720,
+        sellValue: 720,
         effectiveFrom: at('2026-09-01T00:00:00.000Z'),
       });
 
@@ -191,20 +198,21 @@ describe('ChannelRateOfflineService', () => {
         at('2026-09-05T00:00:00.000Z'),
       );
       expect(result.succeeded).toBe(true);
-      expect(result.data?.value).toBe(720 * 1_000_000);
+      expect(result.data?.buyValue).toBe(720 * 1_000_000);
       expect(result.data?.method).toBe(SalePaymentMethod.Zelle);
     });
   });
 
   describe('append-only', () => {
     it('keeps the first row untouched when a second rate for the same channel is registered', () => {
-      const first = register(service, { value: 700, effectiveFrom: at('2026-09-01T00:00:00.000Z') });
-      register(service, { value: 750, effectiveFrom: at('2026-09-10T00:00:00.000Z') });
+      const first = register(service, { buyValue: 700, sellValue: 700, effectiveFrom: at('2026-09-01T00:00:00.000Z') });
+      register(service, { buyValue: 750, sellValue: 750, effectiveFrom: at('2026-09-10T00:00:00.000Z') });
 
       const rows = service.getStorageChannelRates();
       expect(rows).toHaveLength(2);
       const storedFirst = rows.find((r) => r.id === first.data!.id)!;
-      expect(storedFirst.value).toBe(700);
+      expect(storedFirst.buyValue).toBe(700);
+      expect(storedFirst.sellValue).toBe(700);
       expect(storedFirst.effectiveFrom.toISOString()).toBe('2026-09-01T00:00:00.000Z');
     });
 
@@ -220,7 +228,7 @@ describe('ChannelRateOfflineService', () => {
       register(service);
       const rawBefore = localStorage.getItem(storageKey);
 
-      register(service, { value: 0 });
+      register(service, { buyValue: 0 });
 
       expect(localStorage.getItem(storageKey)).toBe(rawBefore);
     });
@@ -232,7 +240,8 @@ describe('ChannelRateOfflineService', () => {
         id: 'imported-1',
         method: SalePaymentMethod.Zelle,
         currency: Currency.USD,
-        value: 1,
+        buyValue: 1,
+        sellValue: 1,
         effectiveFrom: '2026-09-01T00:00:00.000Z' as unknown as Date,
         createdDate: '2026-09-01T00:00:00.000Z' as unknown as Date,
       });
@@ -250,7 +259,8 @@ describe('ChannelRateOfflineService', () => {
         id: 'imported-inactive',
         method: SalePaymentMethod.Transferencia,
         currency: Currency.MLC,
-        value: 350,
+        buyValue: 350,
+        sellValue: 350,
         effectiveFrom: at('2026-09-01T00:00:00.000Z'),
         isActive: false,
       });
@@ -269,20 +279,21 @@ describe('ChannelRateOfflineService', () => {
     });
 
     it('skips an id that is already present — no duplicate, no overwrite', () => {
-      const first = register(service, { value: 700 });
+      const first = register(service, { buyValue: 700, sellValue: 700 });
       const rawBefore = localStorage.getItem(storageKey);
 
       const result = service.addImportedChannelRate({
         id: first.data!.id,
         method: SalePaymentMethod.Efectivo,
         currency: Currency.CUP,
-        value: 999,
+        buyValue: 999,
+        sellValue: 999,
         effectiveFrom: at('2026-09-01T00:00:00.000Z'),
       });
 
       expect(result.succeeded).toBe(true);
       expect(service.getStorageChannelRates()).toHaveLength(1);
-      expect(service.getStorageChannelRates()[0].value).toBe(700);
+      expect(service.getStorageChannelRates()[0].buyValue).toBe(700);
       expect(localStorage.getItem(storageKey)).toBe(rawBefore);
     });
 
@@ -293,7 +304,8 @@ describe('ChannelRateOfflineService', () => {
         const result = service.addImportedChannelRate({
           method: SalePaymentMethod.Efectivo,
           currency: Currency.CUP,
-          value,
+          buyValue: value,
+          sellValue: value,
           effectiveFrom: at('2026-09-01T00:00:00.000Z'),
         });
 
@@ -308,7 +320,8 @@ describe('ChannelRateOfflineService', () => {
       const row = {
         method: SalePaymentMethod.Transferencia,
         currency: Currency.MLC,
-        value: 350,
+        buyValue: 350,
+        sellValue: 350,
         effectiveFrom: at('2026-09-01T00:00:00.000Z'),
       };
 
@@ -317,7 +330,7 @@ describe('ChannelRateOfflineService', () => {
 
       const rows = service.getStorageChannelRates();
       expect(rows).toHaveLength(1);
-      expect(rows[0].id).toBe('2-4-350-2026-09-01T00:00:00.000Z');
+      expect(rows[0].id).toBe('2-4-350-350-2026-09-01T00:00:00.000Z');
     });
 
     it('keeps two id-less rows with the same channel + moment but different values', () => {
@@ -327,12 +340,12 @@ describe('ChannelRateOfflineService', () => {
         effectiveFrom: at('2026-09-01T00:00:00.000Z'),
       };
 
-      service.addImportedChannelRate({ ...base, value: 350 });
-      service.addImportedChannelRate({ ...base, value: 400 });
+      service.addImportedChannelRate({ ...base, buyValue: 350, sellValue: 350 });
+      service.addImportedChannelRate({ ...base, buyValue: 400, sellValue: 400 });
 
       const rows = service.getStorageChannelRates();
       expect(rows).toHaveLength(2);
-      expect(rows.map((r) => r.value).sort((a, b) => a - b)).toEqual([350, 400]);
+      expect(rows.map((r) => r.buyValue).sort((a, b) => a - b)).toEqual([350, 400]);
     });
   });
 
@@ -348,10 +361,10 @@ describe('ChannelRateOfflineService', () => {
     });
 
     it('a fresh instance keeps registering on top of the stored rows', () => {
-      register(service, { value: 700, effectiveFrom: at('2026-09-01T00:00:00.000Z') });
+      register(service, { buyValue: 700, sellValue: 700, effectiveFrom: at('2026-09-01T00:00:00.000Z') });
 
       const fresh = new ChannelRateOfflineService(storeId);
-      register(fresh, { value: 750, effectiveFrom: at('2026-09-10T00:00:00.000Z') });
+      register(fresh, { buyValue: 750, sellValue: 750, effectiveFrom: at('2026-09-10T00:00:00.000Z') });
 
       // The writing instance sees its own append; a third instance loads both
       // rows from storage. (A non-empty in-memory cache is NOT invalidated by
@@ -372,6 +385,25 @@ describe('ChannelRateOfflineService', () => {
 
       const otherStore = new ChannelRateOfflineService('s2');
       expect(otherStore.getStorageChannelRates()).toEqual([]);
+    });
+
+    it('migrates legacy rows with only value to buyValue = sellValue = value', () => {
+      // Simulate a legacy row written before buy/sell existed
+      const legacyRow = {
+        id: 'legacy-1',
+        method: SalePaymentMethod.Efectivo,
+        currency: Currency.CUP,
+        value: 740,
+        effectiveFrom: at('2026-09-01T00:00:00.000Z'),
+        createdDate: at('2026-09-01T00:00:00.000Z'),
+      };
+      localStorage.setItem(storageKey, JSON.stringify([legacyRow]));
+
+      const fresh = new ChannelRateOfflineService(storeId);
+      const rows = fresh.getStorageChannelRates();
+      expect(rows).toHaveLength(1);
+      expect(rows[0].buyValue).toBe(740);
+      expect(rows[0].sellValue).toBe(740);
     });
   });
 });

@@ -90,7 +90,8 @@ function seedRate(overrides: Partial<RegisterChannelRateInput> = {}) {
   return svc.registerRate({
     method: SalePaymentMethod.Efectivo,
     currency: Currency.CUP,
-    value: 700,
+    buyValue: 700,
+    sellValue: 700,
     effectiveFrom: new Date(2026, 8, 1),
     ...overrides,
   });
