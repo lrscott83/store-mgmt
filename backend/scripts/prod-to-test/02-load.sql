@@ -10,8 +10,10 @@
 -- Tooling : psql >= 10, and a server >= 9.5. The floor is the meta-command
 --           family this script is built on: \if/\else/\endif arrived in 10,
 --           \gset in 9.6, to_regclass in 9.4. The server floor is ON CONFLICT,
---           which arrived in 9.5. The single feature it probes for, COPY ...
---           HEADER MATCH, needs 15, and is used only when the server has it.
+--           which arrived in 9.5. Beyond those two floors this script asks
+--           NOTHING of the server version, on purpose: the column check below
+--           is plain SQL over pg_attribute and behaves identically on every
+--           release, so there is no version to detect and none to report.
 --
 -- HOW TO RUN (from the backend/scripts directory, data/ already populated):
 --
@@ -233,16 +235,6 @@ SELECT
     :'allow_resume'               AS flag_allow_resume
 \gset
 
--- header_match reports whether this server understands COPY ... HEADER
--- MATCH, which arrived in PostgreSQL 15. Where it exists it is used, because
--- it is the only setting that checks the CSV header line: the number and
--- names of the columns in that line must match the ACTUAL COLUMN NAMES OF
--- THE TABLE, IN ORDER. That is the official wording, and it is what the
--- option really does - it compares the header to the table, not to a list
--- typed into this script, so a column list that drifted from the model here
--- would not be caught by it. Where the server is older the load falls back
--- to HEADER true, which reads and discards the header unchecked, and says so
--- out loud below. The server requirement is therefore never raised silently.
 SELECT
     COALESCE(NULLIF(lower(:'flag_product_category'), ''), '0')
         NOT IN ('0', 'false', 'off', 'no')                      AS act_product_category,
@@ -251,18 +243,8 @@ SELECT
     COALESCE(NULLIF(lower(:'flag_channel_exchange_rate'), ''), '0')
         NOT IN ('0', 'false', 'off', 'no')                      AS act_channel_exchange_rate,
     COALESCE(NULLIF(lower(:'flag_allow_resume'), ''), '0')
-        NOT IN ('0', 'false', 'off', 'no')                      AS act_allow_resume,
-    (current_setting('server_version_num')::integer >= 150000)::text AS header_match
+        NOT IN ('0', 'false', 'off', 'no')                      AS act_allow_resume
 \gset
-
-\if :header_match
-\else
-  \echo 'NOTE: this server is older than PostgreSQL 15, so COPY HEADER MATCH is unavailable.'
-  \echo '      The CSV header lines are read and discarded WITHOUT being checked against the'
-  \echo '      actual column names of the table. The column lists in this script were verified'
-  \echo '      against the EF model when these files were written; if you changed one, re-check'
-  \echo '      it by hand.'
-\endif
 
 -- --- Guard: the target schema and catalog must already be migrated -----
 -- This is the migration step from README section 3, and the maintainer does
@@ -312,6 +294,187 @@ BEGIN
 END
 $guard$;
 
+-- ---------------------------------------------------------------------
+-- Guard: the column lists in this script still describe the tables
+-- ---------------------------------------------------------------------
+-- The drift this catches is not hypothetical. The origin/test merge that
+-- brought in the WebCatalog fields added eight columns to three of the
+-- twelve tables - two to Store, one to ProductCategory, five to Product -
+-- and the column lists in 01-extract.sql and in this file were out of date
+-- the moment it landed.
+--
+-- WHAT IS COMPARED
+-- This script already knows, for each of the twelve tables, the exact set
+-- of column names it is going to ask for. Before a single \copy runs, that
+-- list is compared against what the table on the target actually has,
+-- read from pg_attribute: attnum > 0 leaves out the system columns, NOT
+-- attisdropped leaves out the ones a rename left behind, and relname is
+-- the table. A column that was renamed or dropped therefore shows up as a
+-- hole here instead of silently shifting every position after it.
+--
+-- WHY IT REPLACES COPY ... HEADER MATCH
+-- HEADER MATCH needed PostgreSQL 15, so on anything older this script fell
+-- back to HEADER true, which reads the header line and discards it
+-- unchecked - a different level of checking depending on the server, which
+-- is the one thing a procedure that moves real credentials cannot afford.
+-- This check has no version gate at all: it is a DO block over
+-- pg_attribute, and it behaves identically on every release.
+--
+-- It is also a larger guarantee, and this is the part worth being precise
+-- about. HEADER MATCH asked "do the column names in the CSV header line
+-- match the columns of the table?". This asks "do the column names written
+-- into THIS script still match the columns of the table?" - and that is
+-- where the eight columns of the merge actually entered, because both
+-- files carried the stale list and the CSV was written from it. It also
+-- fails before a row is read, not part-way through a COPY with the
+-- transaction already open.
+--
+-- WHY THE COMPARISON IS ON NAMES AND NOT ON THE PHYSICAL ORDER
+-- Both sides are put in name order and then compared position by position.
+-- A comparison against attnum was rejected on purpose:
+--
+--   * the lists here follow the EF model order - key columns first, then
+--     the rest alphabetically - and that is NOT attnum order. "User" was
+--     created as Id, Login, Password, FullName, CellPhone, Email,
+--     SelectedStoreId, TenantId, IsActive, CreatedDate, CreatedBy,
+--     UpdatedDate, UpdatedBy, and OfflinePasswordPreHash was appended by a
+--     later migration, so a strict ordinal comparison would reject all
+--     twelve tables on a perfectly healthy database;
+--   * attnum order is not a portable contract in this repository. There
+--     are numbered hand-written DDL scripts under backend/scripts/ that are
+--     applied alongside the EF migrations. If the same set of ADD COLUMNs
+--     ran in a different order on production than on test, the physical
+--     order differs while the schema is identical, and a check that fires
+--     on that would stop a correct migration.
+--
+-- A column moved on disk is harmless here regardless: every \copy below
+-- names its columns, so nothing in this load depends on their order.
+--
+-- WHAT IT DOES NOT SEE
+-- The order of the list itself is compared against nothing, and that order
+-- is what maps CSV field N to column N. Both copies of the list - the one
+-- below and the one in each \copy - are hand-written, and this check can
+-- see neither the CSV header nor the \copy line. A \copy that names a
+-- column the table does not have, or the wrong number of them, is caught
+-- by \copy itself. A \copy that reorders the columns without reordering
+-- 01-extract.sql to match is not caught here: the data lands in the wrong
+-- columns and the count checks in 03-verify.sql cannot see it. Keep the
+-- two files' lists in the same order.
+DO $columns$
+DECLARE
+    r       record;
+    _rel    regclass;
+    _script text[];
+    _actual text[];
+    _only   text[];
+    _max    integer;
+    _i      integer;
+    _report text := '';
+BEGIN
+    -- The lists are written here in the same order the \copy below uses
+    -- them, so this block is readable next to the statement it protects.
+    FOR r IN
+        SELECT * FROM (VALUES
+            ('User',                ARRAY['Id', 'CellPhone', 'CreatedBy', 'CreatedDate', 'Email', 'FullName', 'IsActive', 'Login', 'OfflinePasswordPreHash', 'Password', 'SelectedStoreId', 'TenantId', 'UpdatedBy', 'UpdatedDate']),
+            ('Owner',               ARRAY['Id', 'CreatedBy', 'CreatedDate', 'Description', 'Guest', 'IsActive', 'TenantId', 'UpdatedBy', 'UpdatedDate', 'UserId']),
+            ('ReSeller',            ARRAY['Id', 'Approved', 'CreatedBy', 'CreatedDate', 'Description', 'DiscountPrice', 'IsActive', 'PercentDiscountPrice', 'TenantId', 'UpdatedBy', 'UpdatedDate', 'UserId']),
+            ('ReSellerOwner',       ARRAY['ReSellerId', 'OwnerId', 'CreatedBy', 'CreatedDate', 'DiscountPrice', 'IsActive', 'PercentDiscountPrice', 'TenantId', 'UpdatedBy', 'UpdatedDate']),
+            ('Store',               ARRAY['Id', 'Address', 'Approved', 'CatalogSlug', 'CatalogSyncedAt', 'CreatedBy', 'CreatedDate', 'Description', 'IsActive', 'Name', 'NextDueDateOverride', 'OwnerId', 'PaymentStartDate', 'StorePlanId', 'TenantId', 'UpdatedBy', 'UpdatedDate']),
+            ('StoreModule',         ARRAY['StoreId', 'ModuleId', 'CreatedBy', 'CreatedDate', 'IsActive', 'ModuleDiscountPrice', 'ModulePercentDiscountPrice', 'ModulePrice', 'ModulePriceIncluded', 'Price', 'TenantId', 'UpdatedBy', 'UpdatedDate']),
+            ('StoreRoleFeature',    ARRAY['StoreId', 'RoleId', 'FeatureId', 'CreatedBy', 'CreatedDate', 'IsActive', 'TenantId', 'UpdatedBy', 'UpdatedDate']),
+            ('StoreUser',           ARRAY['UserId', 'StoreId', 'CreatedBy', 'CreatedDate', 'IsActive', 'TenantId', 'UpdatedBy', 'UpdatedDate']),
+            ('UserRole',            ARRAY['UserId', 'RoleId', 'CreatedBy', 'CreatedDate', 'IsActive', 'TenantId', 'UpdatedBy', 'UpdatedDate']),
+            ('ProductCategory',     ARRAY['Id', 'CreatedBy', 'CreatedDate', 'IsActive', 'Name', 'Order', 'Slug', 'StoreId', 'TenantId', 'UpdatedBy', 'UpdatedDate']),
+            ('Product',             ARRAY['Id', 'AvailableToSale', 'BusinessId', 'CategoryId', 'CreatedBy', 'CreatedDate', 'Currency', 'Description', 'DiscountFromInventory', 'DiscountPrice', 'Image', 'IsActive', 'IsNew', 'Name', 'Order', 'PercentDiscountPrice', 'Price', 'TenantId', 'UpdatedBy', 'UpdatedDate']),
+            ('ChannelExchangeRate', ARRAY['Id', 'CreatedBy', 'CreatedDate', 'Currency', 'EffectiveFrom', 'IsActive', 'Method', 'StoreId', 'TenantId', 'UpdatedBy', 'UpdatedDate', 'Value'])
+        ) AS v(tbl, cols)
+    LOOP
+        -- to_regclass, not a plain lookup: the body of a DO block is parsed
+        -- when it executes, so naming a missing table directly would raise
+        -- 'relation does not exist' and say nothing about the fix.
+        _rel := to_regclass(format('%I', r.tbl));
+
+        IF _rel IS NULL THEN
+            _report := _report
+                     || format(E'\n  %-22s the table does not exist on the target', r.tbl);
+            CONTINUE;
+        END IF;
+
+        -- attisdropped matters as much as the names do: a column a rename
+        -- left behind keeps its attnum and is excluded here, so the rename
+        -- is reported as a missing column instead of shifting every
+        -- position after it.
+        SELECT coalesce(array_agg(a.attname ORDER BY a.attname), '{}')
+          INTO _actual
+          FROM pg_attribute a
+         WHERE a.attrelid = _rel
+           AND a.attnum > 0
+           AND NOT a.attisdropped;
+
+        _script := array(SELECT x.c FROM unnest(r.cols) AS x(c) ORDER BY x.c);
+
+        CONTINUE WHEN _actual IS NOT DISTINCT FROM _script;
+
+        _report := _report
+                 || format(E'\n  %-22s this script lists %s column(s); the table has %s',
+                           r.tbl,
+                           coalesce(array_length(_script, 1), 0),
+                           coalesce(array_length(_actual, 1), 0));
+
+        _only := ARRAY(SELECT unnest(_actual) EXCEPT SELECT unnest(_script));
+        IF coalesce(array_length(_only, 1), 0) > 0 THEN
+            _report := _report
+                     || format(E'\n%25s in the table, not in this script: %s',
+                               '', array_to_string(_only, ', '));
+        END IF;
+
+        _only := ARRAY(SELECT unnest(_script) EXCEPT SELECT unnest(_actual));
+        IF coalesce(array_length(_only, 1), 0) > 0 THEN
+            _report := _report
+                     || format(E'\n%25s in this script, not in the table: %s',
+                               '', array_to_string(_only, ', '));
+        END IF;
+
+        -- The first position at which the two ordered lists stop agreeing,
+        -- so the message points at a line of the list instead of only
+        -- listing symmetric differences. An index past the end of one of
+        -- the two arrays reads as NULL, which is what makes a column added
+        -- or removed at the end land here too.
+        --
+        -- That position is a position in the DATABASE's name order, which
+        -- depends on the collation of the server and is not necessarily
+        -- the order the list above is written in. The two lines above it
+        -- are not affected by the collation and always name the columns,
+        -- so read those first.
+        _max := greatest(coalesce(array_length(_script, 1), 0),
+                         coalesce(array_length(_actual, 1), 0));
+        _i := 1;
+        WHILE _i <= _max LOOP
+            EXIT WHEN _actual[_i] IS DISTINCT FROM _script[_i];
+            _i := _i + 1;
+        END LOOP;
+
+        IF _i <= _max THEN
+            _report := _report
+                     || format(E'\n%25s first divergent position %s: this script has %s, the table has %s',
+                               '', _i,
+                               coalesce(_script[_i], '<no column at this position>'),
+                               coalesce(_actual[_i], '<no column at this position>'));
+        END IF;
+    END LOOP;
+
+    -- Every table is reported, not just the first one to fail: the drift
+    -- this catches comes from a model change, and a model change touches
+    -- more than one table. The other guards in this file stop at the first
+    -- problem because each of them describes one condition; this one
+    -- describes a list, and the whole list is the diagnosis.
+    IF _report <> '' THEN
+        RAISE EXCEPTION
+            'The column lists in 02-load.sql do not match the tables on the target, so the load was stopped before reading a single row:%\nThe usual cause is a column added to the model that this file was not updated for. Apply the migrations to the test database first (README section 3) so both sides describe the same schema, then add the column to the \copy, the INSERT and this check - or remove it from all three if it does not belong in this set.', _report;
+    END IF;
+END
+$columns$;
+
 -- --- Guard: an optional block that cannot stand on its own -------------
 \if :act_product
   \if :act_product_category
@@ -355,11 +518,7 @@ BEGIN;
 -- 1 / User
 -- =====================================================
 CREATE TEMP TABLE stg_user (LIKE "User" INCLUDING DEFAULTS) ON COMMIT DROP;
-\if :header_match
-  \copy stg_user ("Id", "CellPhone", "CreatedBy", "CreatedDate", "Email", "FullName", "IsActive", "Login", "OfflinePasswordPreHash", "Password", "SelectedStoreId", "TenantId", "UpdatedBy", "UpdatedDate") FROM 'prod-to-test/data/01-user.csv' WITH (FORMAT csv, HEADER MATCH)
-\else
-  \copy stg_user ("Id", "CellPhone", "CreatedBy", "CreatedDate", "Email", "FullName", "IsActive", "Login", "OfflinePasswordPreHash", "Password", "SelectedStoreId", "TenantId", "UpdatedBy", "UpdatedDate") FROM 'prod-to-test/data/01-user.csv' WITH (FORMAT csv, HEADER true)
-\endif
+\copy stg_user ("Id", "CellPhone", "CreatedBy", "CreatedDate", "Email", "FullName", "IsActive", "Login", "OfflinePasswordPreHash", "Password", "SelectedStoreId", "TenantId", "UpdatedBy", "UpdatedDate") FROM 'prod-to-test/data/01-user.csv' WITH (FORMAT csv, HEADER true)
 CREATE TEMP TABLE pre_user (LIKE stg_user) ON COMMIT DROP;
 INSERT INTO pre_user SELECT s.* FROM stg_user s
  WHERE EXISTS (SELECT 1 FROM "User" x WHERE x."Id" = s."Id");
@@ -371,11 +530,7 @@ FROM stg_user ON CONFLICT DO NOTHING;
 -- 2 / Owner   (-> User)
 -- =====================================================
 CREATE TEMP TABLE stg_owner (LIKE "Owner" INCLUDING DEFAULTS) ON COMMIT DROP;
-\if :header_match
-  \copy stg_owner ("Id", "CreatedBy", "CreatedDate", "Description", "Guest", "IsActive", "TenantId", "UpdatedBy", "UpdatedDate", "UserId") FROM 'prod-to-test/data/02-owner.csv' WITH (FORMAT csv, HEADER MATCH)
-\else
-  \copy stg_owner ("Id", "CreatedBy", "CreatedDate", "Description", "Guest", "IsActive", "TenantId", "UpdatedBy", "UpdatedDate", "UserId") FROM 'prod-to-test/data/02-owner.csv' WITH (FORMAT csv, HEADER true)
-\endif
+\copy stg_owner ("Id", "CreatedBy", "CreatedDate", "Description", "Guest", "IsActive", "TenantId", "UpdatedBy", "UpdatedDate", "UserId") FROM 'prod-to-test/data/02-owner.csv' WITH (FORMAT csv, HEADER true)
 CREATE TEMP TABLE pre_owner (LIKE stg_owner) ON COMMIT DROP;
 INSERT INTO pre_owner SELECT s.* FROM stg_owner s
  WHERE EXISTS (SELECT 1 FROM "Owner" x WHERE x."Id" = s."Id");
@@ -387,11 +542,7 @@ FROM stg_owner ON CONFLICT DO NOTHING;
 -- 3 / ReSeller   (-> User)
 -- =====================================================
 CREATE TEMP TABLE stg_reseller (LIKE "ReSeller" INCLUDING DEFAULTS) ON COMMIT DROP;
-\if :header_match
-  \copy stg_reseller ("Id", "Approved", "CreatedBy", "CreatedDate", "Description", "DiscountPrice", "IsActive", "PercentDiscountPrice", "TenantId", "UpdatedBy", "UpdatedDate", "UserId") FROM 'prod-to-test/data/03-reseller.csv' WITH (FORMAT csv, HEADER MATCH)
-\else
-  \copy stg_reseller ("Id", "Approved", "CreatedBy", "CreatedDate", "Description", "DiscountPrice", "IsActive", "PercentDiscountPrice", "TenantId", "UpdatedBy", "UpdatedDate", "UserId") FROM 'prod-to-test/data/03-reseller.csv' WITH (FORMAT csv, HEADER true)
-\endif
+\copy stg_reseller ("Id", "Approved", "CreatedBy", "CreatedDate", "Description", "DiscountPrice", "IsActive", "PercentDiscountPrice", "TenantId", "UpdatedBy", "UpdatedDate", "UserId") FROM 'prod-to-test/data/03-reseller.csv' WITH (FORMAT csv, HEADER true)
 CREATE TEMP TABLE pre_reseller (LIKE stg_reseller) ON COMMIT DROP;
 INSERT INTO pre_reseller SELECT s.* FROM stg_reseller s
  WHERE EXISTS (SELECT 1 FROM "ReSeller" x WHERE x."Id" = s."Id");
@@ -404,11 +555,7 @@ FROM stg_reseller ON CONFLICT DO NOTHING;
 -- Without this table a migrated Gestor sees an empty owner list.
 -- =====================================================
 CREATE TEMP TABLE stg_reseller_owner (LIKE "ReSellerOwner" INCLUDING DEFAULTS) ON COMMIT DROP;
-\if :header_match
-  \copy stg_reseller_owner ("ReSellerId", "OwnerId", "CreatedBy", "CreatedDate", "DiscountPrice", "IsActive", "PercentDiscountPrice", "TenantId", "UpdatedBy", "UpdatedDate") FROM 'prod-to-test/data/04-reseller-owner.csv' WITH (FORMAT csv, HEADER MATCH)
-\else
-  \copy stg_reseller_owner ("ReSellerId", "OwnerId", "CreatedBy", "CreatedDate", "DiscountPrice", "IsActive", "PercentDiscountPrice", "TenantId", "UpdatedBy", "UpdatedDate") FROM 'prod-to-test/data/04-reseller-owner.csv' WITH (FORMAT csv, HEADER true)
-\endif
+\copy stg_reseller_owner ("ReSellerId", "OwnerId", "CreatedBy", "CreatedDate", "DiscountPrice", "IsActive", "PercentDiscountPrice", "TenantId", "UpdatedBy", "UpdatedDate") FROM 'prod-to-test/data/04-reseller-owner.csv' WITH (FORMAT csv, HEADER true)
 CREATE TEMP TABLE pre_reseller_owner (LIKE stg_reseller_owner) ON COMMIT DROP;
 INSERT INTO pre_reseller_owner SELECT s.* FROM stg_reseller_owner s
  WHERE EXISTS (SELECT 1 FROM "ReSellerOwner" x
@@ -423,16 +570,12 @@ FROM stg_reseller_owner ON CONFLICT DO NOTHING;
 -- 3 Superior, 4 VIP). The guard above proves the catalog is populated.
 -- =====================================================
 CREATE TEMP TABLE stg_store (LIKE "Store" INCLUDING DEFAULTS) ON COMMIT DROP;
-\if :header_match
-  \copy stg_store ("Id", "Address", "Approved", "CreatedBy", "CreatedDate", "Description", "IsActive", "Name", "NextDueDateOverride", "OwnerId", "PaymentStartDate", "StorePlanId", "TenantId", "UpdatedBy", "UpdatedDate") FROM 'prod-to-test/data/05-store.csv' WITH (FORMAT csv, HEADER MATCH)
-\else
-  \copy stg_store ("Id", "Address", "Approved", "CreatedBy", "CreatedDate", "Description", "IsActive", "Name", "NextDueDateOverride", "OwnerId", "PaymentStartDate", "StorePlanId", "TenantId", "UpdatedBy", "UpdatedDate") FROM 'prod-to-test/data/05-store.csv' WITH (FORMAT csv, HEADER true)
-\endif
+\copy stg_store ("Id", "Address", "Approved", "CatalogSlug", "CatalogSyncedAt", "CreatedBy", "CreatedDate", "Description", "IsActive", "Name", "NextDueDateOverride", "OwnerId", "PaymentStartDate", "StorePlanId", "TenantId", "UpdatedBy", "UpdatedDate") FROM 'prod-to-test/data/05-store.csv' WITH (FORMAT csv, HEADER true)
 CREATE TEMP TABLE pre_store (LIKE stg_store) ON COMMIT DROP;
 INSERT INTO pre_store SELECT s.* FROM stg_store s
  WHERE EXISTS (SELECT 1 FROM "Store" x WHERE x."Id" = s."Id");
-INSERT INTO "Store" ("Id", "Address", "Approved", "CreatedBy", "CreatedDate", "Description", "IsActive", "Name", "NextDueDateOverride", "OwnerId", "PaymentStartDate", "StorePlanId", "TenantId", "UpdatedBy", "UpdatedDate")
-SELECT "Id", "Address", "Approved", "CreatedBy", "CreatedDate", "Description", "IsActive", "Name", "NextDueDateOverride", "OwnerId", "PaymentStartDate", "StorePlanId", "TenantId", "UpdatedBy", "UpdatedDate"
+INSERT INTO "Store" ("Id", "Address", "Approved", "CatalogSlug", "CatalogSyncedAt", "CreatedBy", "CreatedDate", "Description", "IsActive", "Name", "NextDueDateOverride", "OwnerId", "PaymentStartDate", "StorePlanId", "TenantId", "UpdatedBy", "UpdatedDate")
+SELECT "Id", "Address", "Approved", "CatalogSlug", "CatalogSyncedAt", "CreatedBy", "CreatedDate", "Description", "IsActive", "Name", "NextDueDateOverride", "OwnerId", "PaymentStartDate", "StorePlanId", "TenantId", "UpdatedBy", "UpdatedDate"
 FROM stg_store ON CONFLICT DO NOTHING;
 
 -- =====================================================
@@ -441,11 +584,7 @@ FROM stg_store ON CONFLICT DO NOTHING;
 -- reconstruction from the catalog can reproduce.
 -- =====================================================
 CREATE TEMP TABLE stg_store_module (LIKE "StoreModule" INCLUDING DEFAULTS) ON COMMIT DROP;
-\if :header_match
-  \copy stg_store_module ("StoreId", "ModuleId", "CreatedBy", "CreatedDate", "IsActive", "ModuleDiscountPrice", "ModulePercentDiscountPrice", "ModulePrice", "ModulePriceIncluded", "Price", "TenantId", "UpdatedBy", "UpdatedDate") FROM 'prod-to-test/data/06-store-module.csv' WITH (FORMAT csv, HEADER MATCH)
-\else
-  \copy stg_store_module ("StoreId", "ModuleId", "CreatedBy", "CreatedDate", "IsActive", "ModuleDiscountPrice", "ModulePercentDiscountPrice", "ModulePrice", "ModulePriceIncluded", "Price", "TenantId", "UpdatedBy", "UpdatedDate") FROM 'prod-to-test/data/06-store-module.csv' WITH (FORMAT csv, HEADER true)
-\endif
+\copy stg_store_module ("StoreId", "ModuleId", "CreatedBy", "CreatedDate", "IsActive", "ModuleDiscountPrice", "ModulePercentDiscountPrice", "ModulePrice", "ModulePriceIncluded", "Price", "TenantId", "UpdatedBy", "UpdatedDate") FROM 'prod-to-test/data/06-store-module.csv' WITH (FORMAT csv, HEADER true)
 CREATE TEMP TABLE pre_store_module (LIKE stg_store_module) ON COMMIT DROP;
 INSERT INTO pre_store_module SELECT s.* FROM stg_store_module s
  WHERE EXISTS (SELECT 1 FROM "StoreModule" x
@@ -462,11 +601,7 @@ FROM stg_store_module ON CONFLICT DO NOTHING;
 -- the produced rows is the only way to get the real grants back.
 -- =====================================================
 CREATE TEMP TABLE stg_store_role_feature (LIKE "StoreRoleFeature" INCLUDING DEFAULTS) ON COMMIT DROP;
-\if :header_match
-  \copy stg_store_role_feature ("StoreId", "RoleId", "FeatureId", "CreatedBy", "CreatedDate", "IsActive", "TenantId", "UpdatedBy", "UpdatedDate") FROM 'prod-to-test/data/07-store-role-feature.csv' WITH (FORMAT csv, HEADER MATCH)
-\else
-  \copy stg_store_role_feature ("StoreId", "RoleId", "FeatureId", "CreatedBy", "CreatedDate", "IsActive", "TenantId", "UpdatedBy", "UpdatedDate") FROM 'prod-to-test/data/07-store-role-feature.csv' WITH (FORMAT csv, HEADER true)
-\endif
+\copy stg_store_role_feature ("StoreId", "RoleId", "FeatureId", "CreatedBy", "CreatedDate", "IsActive", "TenantId", "UpdatedBy", "UpdatedDate") FROM 'prod-to-test/data/07-store-role-feature.csv' WITH (FORMAT csv, HEADER true)
 CREATE TEMP TABLE pre_store_role_feature (LIKE stg_store_role_feature) ON COMMIT DROP;
 INSERT INTO pre_store_role_feature SELECT s.* FROM stg_store_role_feature s
  WHERE EXISTS (SELECT 1 FROM "StoreRoleFeature" x
@@ -483,11 +618,7 @@ FROM stg_store_role_feature ON CONFLICT DO NOTHING;
 -- unique index, which is why the insert above uses the bare ON CONFLICT.
 -- =====================================================
 CREATE TEMP TABLE stg_store_user (LIKE "StoreUser" INCLUDING DEFAULTS) ON COMMIT DROP;
-\if :header_match
-  \copy stg_store_user ("UserId", "StoreId", "CreatedBy", "CreatedDate", "IsActive", "TenantId", "UpdatedBy", "UpdatedDate") FROM 'prod-to-test/data/08-store-user.csv' WITH (FORMAT csv, HEADER MATCH)
-\else
-  \copy stg_store_user ("UserId", "StoreId", "CreatedBy", "CreatedDate", "IsActive", "TenantId", "UpdatedBy", "UpdatedDate") FROM 'prod-to-test/data/08-store-user.csv' WITH (FORMAT csv, HEADER true)
-\endif
+\copy stg_store_user ("UserId", "StoreId", "CreatedBy", "CreatedDate", "IsActive", "TenantId", "UpdatedBy", "UpdatedDate") FROM 'prod-to-test/data/08-store-user.csv' WITH (FORMAT csv, HEADER true)
 CREATE TEMP TABLE pre_store_user (LIKE stg_store_user) ON COMMIT DROP;
 INSERT INTO pre_store_user SELECT s.* FROM stg_store_user s
  WHERE EXISTS (SELECT 1 FROM "StoreUser" x
@@ -500,11 +631,7 @@ FROM stg_store_user ON CONFLICT DO NOTHING;
 -- 9 / UserRole   (-> User, Role[catalog])
 -- =====================================================
 CREATE TEMP TABLE stg_user_role (LIKE "UserRole" INCLUDING DEFAULTS) ON COMMIT DROP;
-\if :header_match
-  \copy stg_user_role ("UserId", "RoleId", "CreatedBy", "CreatedDate", "IsActive", "TenantId", "UpdatedBy", "UpdatedDate") FROM 'prod-to-test/data/09-user-role.csv' WITH (FORMAT csv, HEADER MATCH)
-\else
-  \copy stg_user_role ("UserId", "RoleId", "CreatedBy", "CreatedDate", "IsActive", "TenantId", "UpdatedBy", "UpdatedDate") FROM 'prod-to-test/data/09-user-role.csv' WITH (FORMAT csv, HEADER true)
-\endif
+\copy stg_user_role ("UserId", "RoleId", "CreatedBy", "CreatedDate", "IsActive", "TenantId", "UpdatedBy", "UpdatedDate") FROM 'prod-to-test/data/09-user-role.csv' WITH (FORMAT csv, HEADER true)
 CREATE TEMP TABLE pre_user_role (LIKE stg_user_role) ON COMMIT DROP;
 INSERT INTO pre_user_role SELECT s.* FROM stg_user_role s
  WHERE EXISTS (SELECT 1 FROM "UserRole" x
@@ -518,16 +645,12 @@ FROM stg_user_role ON CONFLICT DO NOTHING;
 -- =====================================================
 \if :act_product_category
 CREATE TEMP TABLE stg_product_category (LIKE "ProductCategory" INCLUDING DEFAULTS) ON COMMIT DROP;
-\if :header_match
-  \copy stg_product_category ("Id", "CreatedBy", "CreatedDate", "IsActive", "Name", "Order", "StoreId", "TenantId", "UpdatedBy", "UpdatedDate") FROM 'prod-to-test/data/10-product-category.csv' WITH (FORMAT csv, HEADER MATCH)
-\else
-  \copy stg_product_category ("Id", "CreatedBy", "CreatedDate", "IsActive", "Name", "Order", "StoreId", "TenantId", "UpdatedBy", "UpdatedDate") FROM 'prod-to-test/data/10-product-category.csv' WITH (FORMAT csv, HEADER true)
-\endif
+\copy stg_product_category ("Id", "CreatedBy", "CreatedDate", "IsActive", "Name", "Order", "Slug", "StoreId", "TenantId", "UpdatedBy", "UpdatedDate") FROM 'prod-to-test/data/10-product-category.csv' WITH (FORMAT csv, HEADER true)
 CREATE TEMP TABLE pre_product_category (LIKE stg_product_category) ON COMMIT DROP;
 INSERT INTO pre_product_category SELECT s.* FROM stg_product_category s
  WHERE EXISTS (SELECT 1 FROM "ProductCategory" x WHERE x."Id" = s."Id");
-INSERT INTO "ProductCategory" ("Id", "CreatedBy", "CreatedDate", "IsActive", "Name", "Order", "StoreId", "TenantId", "UpdatedBy", "UpdatedDate")
-SELECT "Id", "CreatedBy", "CreatedDate", "IsActive", "Name", "Order", "StoreId", "TenantId", "UpdatedBy", "UpdatedDate"
+INSERT INTO "ProductCategory" ("Id", "CreatedBy", "CreatedDate", "IsActive", "Name", "Order", "Slug", "StoreId", "TenantId", "UpdatedBy", "UpdatedDate")
+SELECT "Id", "CreatedBy", "CreatedDate", "IsActive", "Name", "Order", "Slug", "StoreId", "TenantId", "UpdatedBy", "UpdatedDate"
 FROM stg_product_category ON CONFLICT DO NOTHING;
 \endif
 
@@ -537,16 +660,12 @@ FROM stg_product_category ON CONFLICT DO NOTHING;
 -- =====================================================
 \if :act_product
 CREATE TEMP TABLE stg_product (LIKE "Product" INCLUDING DEFAULTS) ON COMMIT DROP;
-\if :header_match
-  \copy stg_product ("Id", "AvailableToSale", "BusinessId", "CategoryId", "CreatedBy", "CreatedDate", "Currency", "DiscountFromInventory", "IsActive", "Name", "Order", "Price", "TenantId", "UpdatedBy", "UpdatedDate") FROM 'prod-to-test/data/11-product.csv' WITH (FORMAT csv, HEADER MATCH)
-\else
-  \copy stg_product ("Id", "AvailableToSale", "BusinessId", "CategoryId", "CreatedBy", "CreatedDate", "Currency", "DiscountFromInventory", "IsActive", "Name", "Order", "Price", "TenantId", "UpdatedBy", "UpdatedDate") FROM 'prod-to-test/data/11-product.csv' WITH (FORMAT csv, HEADER true)
-\endif
+\copy stg_product ("Id", "AvailableToSale", "BusinessId", "CategoryId", "CreatedBy", "CreatedDate", "Currency", "Description", "DiscountFromInventory", "DiscountPrice", "Image", "IsActive", "IsNew", "Name", "Order", "PercentDiscountPrice", "Price", "TenantId", "UpdatedBy", "UpdatedDate") FROM 'prod-to-test/data/11-product.csv' WITH (FORMAT csv, HEADER true)
 CREATE TEMP TABLE pre_product (LIKE stg_product) ON COMMIT DROP;
 INSERT INTO pre_product SELECT s.* FROM stg_product s
  WHERE EXISTS (SELECT 1 FROM "Product" x WHERE x."Id" = s."Id");
-INSERT INTO "Product" ("Id", "AvailableToSale", "BusinessId", "CategoryId", "CreatedBy", "CreatedDate", "Currency", "DiscountFromInventory", "IsActive", "Name", "Order", "Price", "TenantId", "UpdatedBy", "UpdatedDate")
-SELECT "Id", "AvailableToSale", "BusinessId", "CategoryId", "CreatedBy", "CreatedDate", "Currency", "DiscountFromInventory", "IsActive", "Name", "Order", "Price", "TenantId", "UpdatedBy", "UpdatedDate"
+INSERT INTO "Product" ("Id", "AvailableToSale", "BusinessId", "CategoryId", "CreatedBy", "CreatedDate", "Currency", "Description", "DiscountFromInventory", "DiscountPrice", "Image", "IsActive", "IsNew", "Name", "Order", "PercentDiscountPrice", "Price", "TenantId", "UpdatedBy", "UpdatedDate")
+SELECT "Id", "AvailableToSale", "BusinessId", "CategoryId", "CreatedBy", "CreatedDate", "Currency", "Description", "DiscountFromInventory", "DiscountPrice", "Image", "IsActive", "IsNew", "Name", "Order", "PercentDiscountPrice", "Price", "TenantId", "UpdatedBy", "UpdatedDate"
 FROM stg_product ON CONFLICT DO NOTHING;
 \endif
 
@@ -555,11 +674,7 @@ FROM stg_product ON CONFLICT DO NOTHING;
 -- =====================================================
 \if :act_channel_exchange_rate
 CREATE TEMP TABLE stg_channel_exchange_rate (LIKE "ChannelExchangeRate" INCLUDING DEFAULTS) ON COMMIT DROP;
-\if :header_match
-  \copy stg_channel_exchange_rate ("Id", "CreatedBy", "CreatedDate", "Currency", "EffectiveFrom", "IsActive", "Method", "StoreId", "TenantId", "UpdatedBy", "UpdatedDate", "Value") FROM 'prod-to-test/data/12-channel-exchange-rate.csv' WITH (FORMAT csv, HEADER MATCH)
-\else
-  \copy stg_channel_exchange_rate ("Id", "CreatedBy", "CreatedDate", "Currency", "EffectiveFrom", "IsActive", "Method", "StoreId", "TenantId", "UpdatedBy", "UpdatedDate", "Value") FROM 'prod-to-test/data/12-channel-exchange-rate.csv' WITH (FORMAT csv, HEADER true)
-\endif
+\copy stg_channel_exchange_rate ("Id", "CreatedBy", "CreatedDate", "Currency", "EffectiveFrom", "IsActive", "Method", "StoreId", "TenantId", "UpdatedBy", "UpdatedDate", "Value") FROM 'prod-to-test/data/12-channel-exchange-rate.csv' WITH (FORMAT csv, HEADER true)
 CREATE TEMP TABLE pre_channel_exchange_rate (LIKE stg_channel_exchange_rate) ON COMMIT DROP;
 INSERT INTO pre_channel_exchange_rate SELECT s.* FROM stg_channel_exchange_rate s
  WHERE EXISTS (SELECT 1 FROM "ChannelExchangeRate" x WHERE x."Id" = s."Id");

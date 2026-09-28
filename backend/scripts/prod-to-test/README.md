@@ -7,6 +7,12 @@ pueda **iniciar sesión en test y ver exactamente los mismos permisos que tenía
 Es una migración, no una transformación. Los datos llegan byte a byte idénticos. No se
 re-hashea nada, no se re-codifica nada, no se anonimiza nada y no se "actualiza" nada.
 
+**Todo esto ocurre en un solo sitio: el VPS.** Producción y test son **dos bases de datos del
+mismo servidor**, no dos máquinas. No hay un servidor de test, no hay una segunda máquina, y
+nada se copia de un equipo a otro: la extracción escribe los CSV en `prod-to-test/data/` en el
+VPS, y la carga los lee de ahí, en ese mismo VPS, unos minutos después. Las dos cadenas de
+conexión se diferencian en `Database=` (y en las credenciales), no en `Host=`.
+
 ---
 
 ## 1. Antes de empezar: dos advertencias
@@ -42,10 +48,12 @@ trabajo actual, así que **todos los comandos `psql` de esta guía se ejecutan d
 
 **Este paso lo hace usted, antes de todo lo demás, y no lo hace ninguno de estos scripts.**
 
-La base de datos de test debe tener el esquema completo y el catálogo sembrado. La forma
-habitual en este proyecto es dejar que la aplicación aplique las migraciones de EF Core al
-arrancar: `MigrationExtensions.ApplyMigrations()` llama a `Database.Migrate()` contra `smca_test`,
-y `Program.cs` la invoca como `app.ApplyMigrations()`.
+La base de datos de test debe tener el esquema completo y el catálogo sembrado. Esto se hace
+**en el mismo VPS**, contra `smca_test`: "test" aquí es una base de datos de ese servidor, no
+otra máquina, así que este paso no requiere acceso a ningún otro equipo. La forma habitual en
+este proyecto es dejar que la aplicación aplique las migraciones de EF Core al arrancar:
+`MigrationExtensions.ApplyMigrations()` llama a `Database.Migrate()` contra `smca_test`, y
+`Program.cs` la invoca como `app.ApplyMigrations()`.
 
 **Esa llamada está dentro de `if (app.Environment.IsDevelopment())`.** Si el VPS o el contenedor
 arranca la API con `ASPNETCORE_ENVIRONMENT=Production`, `Staging` o sin esa variable, **no se
@@ -60,7 +68,7 @@ tiempo de diseño de por medio, y la misma configuración que usa la aplicación
 
 ```bash
 # 1. La conexión de test, apuntando a smca_test
-export ConnectionStrings__DefaultConnection="Host=<host-test>;Port=5432;Database=smca_test;Username=<usuario-test>;Password=<clave-test>"
+export ConnectionStrings__DefaultConnection="Host=<host>;Port=5432;Database=smca_test;Username=<usuario-test>;Password=<clave-test>"
 
 # 2. Un arranque controlado con el entorno en Development
 ASPNETCORE_ENVIRONMENT=Development dotnet run --project src/SMCA.WebApi/SMCA.WebApi.csproj
@@ -92,7 +100,7 @@ cd backend
 dotnet ef database update \
   --project            src/Infrastructure/Infrastructure.csproj \
   --startup-project    src/SMCA.WebApi/SMCA.WebApi.csproj \
-  --connection         "Host=<host-test>;Port=5432;Database=smca_test;Username=<usuario-test>;Password=<clave-test>"
+  --connection         "Host=<host>;Port=5432;Database=smca_test;Username=<usuario-test>;Password=<clave-test>"
 ```
 
 **No omita `--connection`.** Este repositorio tiene
@@ -109,7 +117,7 @@ herramientas, y esa no es la suya. Pase siempre `--connection` y compruébelo:
 dotnet ef dbcontext info \
   --project         src/Infrastructure/Infrastructure.csproj \
   --startup-project src/SMCA.WebApi/SMCA.WebApi.csproj \
-  --connection      "Host=<host-test>;Port=5432;Database=smca_test;Username=<usuario-test>;Password=<clave-test>"
+  --connection      "Host=<host>;Port=5432;Database=smca_test;Username=<usuario-test>;Password=<clave-test>"
 # La fila debe decir  DatabaseName = smca_test
 ```
 
@@ -356,14 +364,16 @@ su categoría). Pedir uno sin el otro detiene la carga con un mensaje claro.
   `COPY` (que no admite `ON CONFLICT`) con una inserción idempotente. No son tablas del
   esquema, no sobreviven a la sesión y no las ve nadie más.
 
-### Las cuatro guardas de la carga
+### Las cinco guardas de la carga
 
-Todo esto corre **antes** del `COMMIT`, con la transacción todavía abierta, que es la única
-ventana en la que se puede deshacer.
+Todo esto corre **antes** del `COMMIT`, que es la única ventana en la que se puede deshacer. Las
+dos primeras corren además **antes** del `BEGIN`, cuando todavía no hay transacción abierta que
+deshacer y ninguna fila se ha escrito.
 
 | Guarda | Qué detiene |
 | --- | --- |
 | Esquema y catálogo | Tablas inexistentes, catálogo vacío, o falta del superadmin o del `Tenant` por defecto. |
+| Columnas | Cualquiera de las doce tablas cuyas columnas no coincidan con la lista de este script. Ver "La comprobación de columnas". |
 | Inquilino | Cualquier fila cargada cuyo `TenantId` no sea el `Tenant` por defecto. |
 | Tablas de paso no vacías | Cualquiera de las nueve tablas obligatorias con cero filas. |
 | Filas que no llegaron | Cualquier fila cargada, de **las doce tablas**, que no esté en test. Se acepta solo con `-v allow_resume=1`. |
@@ -460,22 +470,65 @@ estaba, y saltarla fue lo correcto. **Es la respuesta equivocada la primera vez*
 misma diferencia es pérdida de datos silenciosa, y después del `COMMIT` nada de este
 procedimiento vuelve a detectarla.
 
-### `COPY` y el encabezado de los CSV
+### La comprobación de columnas
 
-Cada `\copy` usa `HEADER MATCH` cuando el servidor es **PostgreSQL 15 o posterior**, que es la
-versión en que la opción apareció. Lo que hace es comparar la línea de encabezado del CSV con
-**"the actual column names of the table, in order"** — la redacción oficial de la documentación
-de PostgreSQL — y fallar si no coinciden. Compare bien lo que dice esa frase: la lista se
-compara contra **la tabla**, no contra una lista escrita en este script. Eso detecta un CSV cuyo
-encabezado no corresponde a la tabla, y no detecta una lista de columnas de este script que se
-haya quedado atrás respecto al modelo EF. Las listas de columnas de aquí se verificaron a mano
-contra `ApplicationDbContextModelSnapshot.cs`, y esa verificación hay que repetirla cuando
-alguien agregue una columna a una de las doce tablas.
+`02-load.sql` comprueba, **antes de leer una sola fila**, que las listas de columnas que este
+archo usa siguen describiendo las tablas del servidor. Para cada una de las doce tablas
+compara la lista que el propio script va a pedir con las columnas que la tabla tiene de
+verdad, leídas de `pg_attribute`: `attnum > 0` deja fuera las columnas del sistema, `NOT
+attisdropped` deja fuera las que un renombrado dejó atrás, y `relname` es la tabla. Si
+cualquiera de las dos listas tiene una columna que la otra no tiene, la carga se detiene con
+un mensaje que nombra la tabla, la columna, y la posición en la que las dos listas dejan de
+coincidir.
 
-En un servidor anterior a la 15 el script avisa por pantalla y usa `HEADER true`, es decir
-**lee y descarta el encabezado sin comprobarlo**. El requisito de versión del servidor no se
-sube en silencio: si su servidor es anterior, usted lo ve en la pantalla antes de que se
-inserte una sola fila.
+Es comprobación pura en SQL, así que **da lo mismo en cualquier versión del servidor**. No hay
+que detectar nada, no hay mensaje de requisito y no hay dos niveles de comprobación según la
+versión.
+
+#### Por qué reemplaza a `COPY ... HEADER MATCH`
+
+`HEADER MATCH` tenía dos comportamientos según el servidor: en PostgreSQL 15 o posterior
+comparaba la línea de encabezado del CSV con la tabla, y en cualquier versión anterior la
+carga caía a `HEADER true`, es decir **leía el encabezado y lo descartaba sin comprobarlo**.
+Un procedimiento que mueve credenciales reales no puede depender de en qué versión esté el
+servidor para saber si está o no protegido.
+
+La comprobación nueva cubre además un caso. `HEADER MATCH` preguntaba si los nombres del
+encabezado del CSV correspondían a la tabla; esta pregunta si los nombres escritos **en este
+script** siguen correspondiendo a la tabla. Y ese es justamente el punto por donde entraron
+las ocho columnas de la fusión de `origin/test`: los dos archivos llevaban la lista vieja, y
+el CSV se había escrito a partir de ella. Además falla antes de leer una fila, no a mitad de
+un `COPY` con la transacción ya abierta.
+
+#### La comparación es por nombre, no por orden físico
+
+Las dos listas se ordenan por nombre y luego se comparan posición por posición. Comparar
+contra el orden físico (`attnum`) se descartó a propósito, por dos razones:
+
+- Las listas de aquí siguen el orden del modelo EF —las columnas clave primero y el resto en
+  orden alfabético—, y ese **no** es el orden de `attnum`. `User` se creó como `Id`, `Login`,
+  `Password`, `FullName`, `CellPhone`, … y `OfflinePasswordPreHash` la añadió una migración
+  posterior. Una comparación estricta por ordinal rechazaría las doce tablas en una base de
+  datos perfectamente sana.
+- El orden de `attnum` no es un contrato portátil en este repositorio. Hay scripts de DDL
+  numerados escritos a mano en `backend/scripts/` que se aplican junto a las migraciones de
+  EF. Si el mismo conjunto de `ADD COLUMN` se aplicó en un orden distinto en producción que
+  en test, el orden físico es distinto y el esquema es idéntico; una comprobación que
+  disparara ahí detendría una migración correcta.
+
+Además, una columna movida de sitio en disco es inofensiva aquí: todos los `\copy` nombran sus
+columnas, así que nada depende de su orden.
+
+#### Lo que esta comprobación no ve
+
+El orden de la lista no se compara con nada, y ese orden es el que empareja el campo *n* del
+CSV con la columna *n*. Las dos copias de la lista —la del bloque de comprobación y la de
+cada `\copy`— están escritas a mano, y esta comprobación no puede ver ni el encabezado del CSV
+ni la línea del `\copy`. Un `\copy` que nombre una columna inexistente, o un número incorrecto
+de ellas, lo detecta el propio `\copy`. Un `\copy` que reordene las columnas sin reordenar
+`01-extract.sql` igual no lo detecta nada: los datos aterrizan en las columnas equivocadas y
+las comparaciones de conteo de `03-verify.sql` no lo ven. **Mantenga las dos listas en el
+mismo orden.**
 
 ### Por qué `ON CONFLICT DO NOTHING` no lleva destino de conflicto
 

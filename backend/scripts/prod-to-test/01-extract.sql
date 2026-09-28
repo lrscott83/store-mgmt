@@ -239,9 +239,10 @@ COPY (SELECT "ReSellerId", "OwnerId", "CreatedBy", "CreatedDate", "DiscountPrice
 \o
 
 \o prod-to-test/data/05-store.csv
-COPY (SELECT "Id", "Address", "Approved", "CreatedBy", "CreatedDate", "Description",
-             "IsActive", "Name", "NextDueDateOverride", "OwnerId", "PaymentStartDate",
-             "StorePlanId", "TenantId", "UpdatedBy", "UpdatedDate"
+COPY (SELECT "Id", "Address", "Approved", "CatalogSlug", "CatalogSyncedAt",
+             "CreatedBy", "CreatedDate", "Description", "IsActive", "Name",
+             "NextDueDateOverride", "OwnerId", "PaymentStartDate", "StorePlanId",
+             "TenantId", "UpdatedBy", "UpdatedDate"
       FROM "Store" ORDER BY "Id") TO STDOUT WITH (FORMAT csv, HEADER true);
 \o
 
@@ -272,14 +273,15 @@ COPY (SELECT "UserId", "RoleId", "CreatedBy", "CreatedDate", "IsActive",
 
 \o prod-to-test/data/10-product-category.csv
 COPY (SELECT "Id", "CreatedBy", "CreatedDate", "IsActive", "Name", "Order",
-             "StoreId", "TenantId", "UpdatedBy", "UpdatedDate"
+             "Slug", "StoreId", "TenantId", "UpdatedBy", "UpdatedDate"
       FROM "ProductCategory" ORDER BY "Id") TO STDOUT WITH (FORMAT csv, HEADER true);
 \o
 
 \o prod-to-test/data/11-product.csv
 COPY (SELECT "Id", "AvailableToSale", "BusinessId", "CategoryId", "CreatedBy",
-             "CreatedDate", "Currency", "DiscountFromInventory", "IsActive", "Name",
-             "Order", "Price", "TenantId", "UpdatedBy", "UpdatedDate"
+             "CreatedDate", "Currency", "Description", "DiscountFromInventory",
+             "DiscountPrice", "Image", "IsActive", "IsNew", "Name", "Order",
+             "PercentDiscountPrice", "Price", "TenantId", "UpdatedBy", "UpdatedDate"
       FROM "Product" ORDER BY "Id") TO STDOUT WITH (FORMAT csv, HEADER true);
 \o
 
