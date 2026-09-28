@@ -98,22 +98,33 @@ for "auto-login". That framing is INCORRECT for this change — see S3, Decision
 
 ---
 
-### S3: Response Envelope Handling at Call-Site (Corrected 2026-07-31)
+### S3: Response Envelope Handling at Call-Site (auto-login 2026-09-28)
 
 **Requirement**: `register.tsx` MUST branch on whether `register()` resolves or rejects, NOT on a
 resolved `succeeded: false` envelope. `AuthController.RegisterAsync` (backend) returns
 `201 Created` on success and `BadRequest(result)` on EVERY failure
 (`AuthController.cs:90-102`) — a `succeeded: false` envelope therefore NEVER resolves; axios
 raises it as a rejection because the HTTP status is non-2xx. On a resolved response (always
-`succeeded: true`) the call MUST navigate to `/login` — this behavior is **REAFFIRMED unchanged**
-(Angular parity, Decision 1: no auto-authentication). The resolved `data.authToken` MUST be
-received and typed but MUST NOT be persisted, stored, or used to hydrate a session on this path —
-it is deliberately discarded.
+`succeeded: true`) the registration MUST leave the owner **authenticated**: the call-site opens the
+session through the auth store's own `login` action with the credentials just typed, arms the
+usage tracker, warms the heavy route chunks and navigates to the home view
+`resolveUserHomePath(user)` returns — `/login` is NEVER a success destination.
+
+**The register response's own `data.authToken` is still deliberately NOT used to hydrate a
+session.** `AuthDto` leaves `WrappedDek`/`WrapSalt`/`WrapIv` empty on the register path
+("Only the login path populates them"; `Dtos/Authentication/AuthDto.cs`) and a brand-new device
+has neither a device-key wrap nor a roster, so the register token cannot open the store's DEK: a
+session persisted from it cannot decrypt its own store and the decryption-failure policy logs the
+owner straight back out. The wrap — and therefore a usable session — only ever arrives with the
+login response, which is why the auto-login goes through the login path.
 
 **Flow**:
 ```
 register() settles:
-├─ resolves (always succeeded: true) → navigate('/login') — authToken received, deliberately unused
+├─ resolves (always succeeded: true) → login(login, password) [auth store]
+│   ├─ resolves → armTracking() + preloadHeavyChunks() → navigate(resolveUserHomePath(user))
+│   └─ rejects (DekUnwrapError, /me verdict, network) → showBlockingError(REGISTRATION.AUTO_LOGIN_FAILED)
+│         + navigate('/login')   [the account EXISTS — never report a failed registration]
 └─ rejects (HTTP 4xx/5xx, including every succeeded:false case) → caught in the outer catch:
    ├─ status === 400 → setErrors({ form: response.data.errors[0]?.description ?? REGISTRATION.VALIDATION_ERROR })
    ├─ status === 429 → setErrors({ form: REGISTRATION.TOO_MANY_ATTEMPTS })
@@ -121,9 +132,14 @@ register() settles:
 ```
 
 **Constraints**:
-- Navigate to `/login` unconditionally when `register()` resolves.
-- No branch of the register success path MUST read `data.authToken` to hydrate a session, call an
-  auth-store login/session action, or otherwise authenticate the user.
+- On `register()` resolve, open the session via the auth store's `login` with the typed
+  credentials and navigate to the resolved home view. `/login` MUST NOT be a success destination.
+- `data.authToken` from the register response MUST NOT be persisted by this path — the session's
+  token comes from the login response (see above).
+- A failed auto-login MUST NOT be presented as a failed registration: it surfaces
+  `REGISTRATION.AUTO_LOGIN_FAILED` and lands on `/login`, where the key-recovery routes live.
+- The auto-login failure MUST be caught separately from the registration rejection branches, so an
+  HTTP 400/429/500 mapping is never applied to a registration that already returned `201`.
 - Failure text MUST be read from the rejection body's `errors[0].description`, guarding the array
   access (it MUST NOT index blindly) — `ResponseResult.Message` is always `null`
   (`ResponseResult.cs:14-17`; `ErrorHandlerMiddleware` only ever sets `.Errors`), so
@@ -136,6 +152,11 @@ register() settles:
 branch. REJECTED by Decision 1 — Angular's `register.component.ts:75` navigates to `/login`
 without authenticating; the forced re-login round trip is preserved on purpose.)
 
+(Reversed 2026-09-28, owner request: a newly registered owner must not be sent to the login form.
+The auto-login is NOT the rejected shape — it never persists the register response's JWT, and it
+uses the login path precisely because that is the only response carrying the DEK wrap. Decision 1's
+Angular-parity argument is superseded on this point; everything else in this section is unchanged.)
+
 (Also previously: this section documented a resolved `succeeded === false` branch reading
 `errors[0].description` directly off the resolved value, and a `response.data.message`-based
 `REGISTRATION.EMAIL_TAKEN` mapping on HTTP 400. Both were INCORRECT — the backend never resolves a
@@ -143,11 +164,26 @@ failure (see Requirement above) and never populates `.Message`, so neither path 
 That dead code has been removed from `register.tsx`, and the unreferenced `REGISTRATION.EMAIL_TAKEN`
 i18n key has been removed from `es.ts`.)
 
-#### Scenario: Successful registration navigates to /login without consuming the token
+#### Scenario: Successful registration leaves the owner authenticated
 - GIVEN `register()` resolves with `succeeded: true` and `data.authToken` present
 - WHEN the register flow completes
-- THEN the app navigates to `/login`
-- AND no code path reads `data.authToken` to hydrate a session or invoke a login/auth-store action
+- THEN the auth store's `login` was called with the credentials the user typed
+- AND the app navigates to the home view `resolveUserHomePath` returns
+- AND the register response's own `data.authToken` was never persisted by this path
+
+#### Scenario: A failed auto-login does not look like a failed registration
+- GIVEN `register()` resolves with `succeeded: true`
+- AND the subsequent sign-in rejects (e.g. `DekUnwrapError`)
+- WHEN the register flow completes
+- THEN `REGISTRATION.AUTO_LOGIN_FAILED` is shown (the account exists)
+- AND the app navigates to `/login`
+- AND `REGISTRATION.UNEXPECTED_ERROR` / `REGISTRATION.VALIDATION_ERROR` are NOT shown
+
+#### Scenario: A rejected registration never attempts a sign-in
+- GIVEN `register()` rejects with an HTTP 400
+- WHEN the register flow completes
+- THEN no auth-store `login` call is made
+- AND no navigation occurs
 
 #### Scenario: Registration failure surfaces the backend's literal description
 - GIVEN `register()` rejects with an HTTP 400 response whose body is
@@ -261,10 +297,10 @@ layer.
 
 - [x] All 5 spec requirements are implemented and test-covered.
 - [x] S2 updated: `register()` returns `Promise<BaseResponseModel<RegisterAuthModel>>` — service tests verify `RegisterAuthModel` shape including `login`, `authToken`, string `expiresIn`, and no `refreshToken`.
-- [x] S3 updated: call-site receives `data.authToken` but deliberately discards it — navigates to `/login` unconditionally on success, no auto-login (Decision 1, Angular parity).
+- [x] S3 updated (2026-09-28): on success the call-site opens the session through the auth store's `login` (auto-login), still without persisting the register response's `authToken`; a failed auto-login surfaces `REGISTRATION.AUTO_LOGIN_FAILED` and lands on `/login`. Supersedes the 2026-07-31 `navigate('/login')` behavior.
 - [x] S6: `getMe()` billing fields passthrough — `UserModel` carries `paymentDueDate`/`isInTrial`/`paymentStatus` unchanged; no mapping added.
 - [x] Service tests verify: body includes login/storeName, excludes passwordConfirmation, includes code only when non-empty (trim), returns `BaseResponseModel<RegisterAuthModel>`.
-- [x] Component tests verify: form renders login/storeName, code flows from query param without visible input, passwordConfirmation blocks submit locally and is never sent, envelope branch succeeds on true/false without auto-login (authToken received but unused), navigate only on success.
+- [x] Component tests verify: form renders login/storeName, code flows from query param without visible input, passwordConfirmation blocks submit locally and is never sent, the success branch signs in with the typed credentials and navigates to the home view (never `/login`), a failing sign-in surfaces `REGISTRATION.AUTO_LOGIN_FAILED` and goes to `/login`, and a rejected registration never attempts a sign-in.
 - [x] Rate-limit feedback (auth-rate-limit-feedback capability): login/register surface distinct copy on HTTP 429, existing non-429 branches unchanged.
 - [x] Backend: 52 unit tests + 11 E2E tests passing; `POST /api/v1/auth/register` returns `201 Created` with `AuthDto`.
 - [x] Rate limiting: `RegisterPolicy` (10 req / 10 min per IP) configured, returns 429 on excess.

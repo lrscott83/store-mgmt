@@ -82,11 +82,12 @@ async function readUserId(page: Page): Promise<string> {
 
 /**
  * Mints a SuperAdmin persona. Steps:
- * 1. Register a new user (costs 1 registration + 1 login)
+ * 1. Register a new user (1 registration, which now ALSO opens the session —
+ *    auto-login, 2026-09-28)
  * 2. Promote to SuperAdmin via DB (costs 0 — just a SQL insert)
  * 3. Login again to get a JWT with SuperAdmin claims (costs 1 login)
  *
- * Total login cost: 2 (register + re-login with SuperAdmin claims).
+ * Total login cost: 1 explicit login (the re-login with SuperAdmin claims).
  * The JWT contains the super_admin claim set by ClaimsTransformerService,
  * which reads the UserRole we just inserted.
  */
@@ -101,12 +102,9 @@ export async function mintSuperAdmin(browser: Browser): Promise<SuperAdminSnapsh
   await registerPage.fillValidForm(identity);
   await registerPage.acceptTerms.check();
   await registerPage.submit();
-  await page.waitForURL(/\/login$/);
-
-  // Step 2: Login as the new user (to get userId from localStorage)
-  const loginPage = new LoginPage(page);
-  await loginPage.fill(identity);
-  await loginPage.submit();
+  // Step 2 (2026-09-28): the registration now signs the new owner in itself, so
+  // the explicit login that used to sit here is gone. The session — and with it
+  // localStorage.currentUser, read in step 3 — exists without it.
   await page.waitForURL(/\/sales\/products$/);
 
   // Step 3: Read userId and promote to SuperAdmin

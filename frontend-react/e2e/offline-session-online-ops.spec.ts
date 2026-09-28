@@ -105,11 +105,12 @@ function installMeObserver(page: Page): {
   };
 }
 
-/** Registro real + primer login ONLINE real (1 registro + 1 login del
- * presupuesto). Aterriza en `/sales/products`: la tienda recién registrada no
+/** Registro real, que ya abre la sesión ONLINE él mismo (auto-login
+ * 2026-09-28): una sola petición, la de registro. Aterriza en
+ * `/sales/products`: la tienda recién registrada no
  * tiene productos vendibles, así que `resolveUserHomePath` resuelve ahí
  * (user-home.ts:24-25). */
-async function registerAndLoginOnline(page: Page): Promise<TestIdentity> {
+async function registerOnline(page: Page): Promise<TestIdentity> {
   const identity = newTestIdentity();
 
   const registerPage = new RegisterPage(page);
@@ -117,11 +118,8 @@ async function registerAndLoginOnline(page: Page): Promise<TestIdentity> {
   await registerPage.fillValidForm(identity);
   await registerPage.acceptTerms.check();
   await registerPage.submit();
-  await page.waitForURL(/\/login$/);
-
-  const loginPage = new LoginPage(page);
-  await loginPage.fill(identity);
-  await loginPage.submit();
+  // Auto-login (2026-09-28): the registration opens the session itself — no
+  // login leg to run, same destination as before.
   await page.waitForURL(/\/sales\/products$/);
 
   return identity;
@@ -170,7 +168,7 @@ test.describe('sesión nacida del roster + internet: las llamadas online usan el
     const loginPosts = installLoginPostCounter(page);
 
     // Tramo online: 1 registro + 1 login real. Deja el device-dek table.
-    const identity = await registerAndLoginOnline(page);
+    const identity = await registerOnline(page);
     const storeId = await readSelectedStoreId(page);
     const userId = await readCurrentUserId(page);
     const onlineJwt = await readBearerToken(page);
@@ -234,7 +232,7 @@ test.describe('sesión nacida del roster + internet: las llamadas online usan el
     const loginPosts = installLoginPostCounter(page);
 
     // Mismo tramo online que E2E 1.
-    const identity = await registerAndLoginOnline(page);
+    const identity = await registerOnline(page);
     const storeId = await readSelectedStoreId(page);
     const userId = await readCurrentUserId(page);
     await expectDeviceKeyMaterialPresent(page, 'tras el login online');

@@ -36,8 +36,9 @@ export class LoginPage {
   }
 
   async fill(identity: Pick<TestIdentity, 'login' | 'password'>): Promise<void> {
-    // The mint and registerAndLoginOnline reach /login via a CLIENT-side
-    // navigation (register.tsx:120 `navigate('/login')`), and
+    // Callers reach /login via a CLIENT-side navigation (the login/register
+    // forms link to each other; until 2026-09-28 the register success path also
+    // navigated there — the auto-login removed that hop, not the hazard), and
     // `waitForURL(/login)` resolves at pushState — BEFORE the route commits.
     // The register form SHARES the `#login`/`#password` ids
     // (register.tsx:188,257) and stays in the DOM until the /login route's

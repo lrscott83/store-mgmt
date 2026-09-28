@@ -269,7 +269,7 @@ function installLoginPostCounter(page: Page): () => number {
  * y todavía no tiene ningún producto vendible que haga que
  * `resolveUserHomePath` elija la pantalla de venta (user-home.ts:24-25).
  */
-async function registerAndLoginOnline(page: Page): Promise<TestIdentity> {
+async function registerOnline(page: Page): Promise<TestIdentity> {
   const identity = newTestIdentity();
 
   const registerPage = new RegisterPage(page);
@@ -277,11 +277,10 @@ async function registerAndLoginOnline(page: Page): Promise<TestIdentity> {
   await registerPage.fillValidForm(identity);
   await registerPage.acceptTerms.check();
   await registerPage.submit();
-  await page.waitForURL(/\/login$/);
-
-  const loginPage = new LoginPage(page);
-  await loginPage.fill(identity);
-  await loginPage.submit();
+  // Auto-login (2026-09-28): the registration opens the session itself, so the
+  // login leg that used to sit here is gone. The device-wrap table the
+  // preconditions below assert is written by the same resolution path either
+  // way (resolveDekForLogin inside the store's login action).
   await page.waitForURL(/\/sales\/products$/);
 
   return identity;
@@ -709,7 +708,7 @@ test.describe('el cifrado no depende del modo de autenticación (backend real) @
   }) => {
     const loginPosts = installLoginPostCounter(page);
 
-    const identity = await registerAndLoginOnline(page);
+    const identity = await registerOnline(page);
     const storeId = await readSelectedStoreId(page);
     await expectDeviceKeyMaterialPresent(page, 'después del primer login online');
 
@@ -827,7 +826,7 @@ test.describe('el cifrado no depende del modo de autenticación (backend real) @
     const loginPosts = installLoginPostCounter(page);
 
     // --- Tramo 1: ONLINE, se crea el producto #1 ---------------------------
-    const identity = await registerAndLoginOnline(page);
+    const identity = await registerOnline(page);
     const storeId = await readSelectedStoreId(page);
     await expectDeviceKeyMaterialPresent(page, 'después del primer login online');
 

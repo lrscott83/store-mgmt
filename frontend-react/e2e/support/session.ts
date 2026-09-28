@@ -238,8 +238,9 @@ async function mintOwnerAdmin(
     return primed;
   }
 
-  // Fallback: real registration + real login (its own login cost) — keeps
-  // this engine self-sufficient for a future consumer that never primes it.
+  // Fallback: one real registration, which now OPENS the session by itself
+  // (auto-login, 2026-09-28) — keeps this engine self-sufficient for a future
+  // consumer that never primes it.
   const context = await browser.newContext();
   const page = await context.newPage();
 
@@ -249,11 +250,8 @@ async function mintOwnerAdmin(
   await registerPage.fillValidForm(ownerIdentity);
   await registerPage.acceptTerms.check();
   await registerPage.submit();
-  await page.waitForURL(/\/login$/);
-
-  const loginPage = new LoginPage(page);
-  await loginPage.fill(ownerIdentity);
-  await loginPage.submit();
+  // No login leg: the registration lands the new owner on /sales/products with
+  // the session already open.
   await page.waitForURL(/\/sales\/products$/);
 
   const ownerStoreId = await readSelectedStoreId(page);

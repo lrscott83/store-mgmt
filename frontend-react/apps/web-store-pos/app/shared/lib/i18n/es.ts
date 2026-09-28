@@ -195,6 +195,11 @@ const messages: Record<string, string> = {
   // equivalent branching), spec-fixed Spanish text per the blanket text-parity rule
   // (view-text-parity DoD).
   'REGISTRATION.VALIDATION_ERROR': 'Error de validación. Por favor, revise sus datos.',
+  // NEW (2026-09-28) — auto-login after registration: the account WAS created
+  // (the 201 already happened) and only the session could not be opened, so the
+  // copy must never imply the registration failed. Names /login as the way in.
+  'REGISTRATION.AUTO_LOGIN_FAILED':
+    'Tu cuenta se creó correctamente, pero no pudimos iniciar sesión automáticamente. Entra con tu usuario y contraseña.',
   'REGISTRATION.TOO_MANY_ATTEMPTS':
     'Demasiados intentos de registro. Por favor, espere unos minutos antes de volver a intentar.',
   // Terms-acceptance toggle (Angular register.component.html:191-210, vocabs/es.ts:135-137)
