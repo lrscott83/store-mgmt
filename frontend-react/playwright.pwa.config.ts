@@ -30,7 +30,7 @@ export default defineConfig({
   // offline-shell.spec.ts + offline-version-check.spec.ts: ambos necesitan el
   // service worker REAL del build (precache + detección de nueva versión);
   // contra el dev server probarían un SW vacío que no existe en producción.
-  testMatch: '**/offline-{shell,version-check}.spec.ts',
+  testMatch: '**/{offline-{shell,version-check},precache-split}.spec.ts',
 
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
