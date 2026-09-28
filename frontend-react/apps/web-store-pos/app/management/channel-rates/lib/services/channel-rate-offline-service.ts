@@ -32,8 +32,10 @@ export const ChannelRateOfflineErrors = {
 export interface RegisterChannelRateInput {
   method: SalePaymentMethod;
   currency: Currency;
-  /** Units of `currency` per 1 USD (moneda-por-USD). */
-  value: number;
+  /** Buy value: units of `currency` per 1 USD (bank buys currency). */
+  buyValue: number;
+  /** Sell value: units of `currency` per 1 USD (bank sells currency). */
+  sellValue: number;
   effectiveFrom: Date;
 }
 
@@ -80,7 +82,12 @@ export class ChannelRateOfflineService {
    * write-once.
    */
   registerRate(input: RegisterChannelRateInput): DataResult<ChannelRate> {
-    if (!Number.isFinite(input.value) || input.value <= 0) {
+    if (!Number.isFinite(input.buyValue) || input.buyValue <= 0) {
+      return new DataResult<ChannelRate>(undefined, false, [
+        ChannelRateOfflineErrors.InvalidValue,
+      ]);
+    }
+    if (!Number.isFinite(input.sellValue) || input.sellValue <= 0) {
       return new DataResult<ChannelRate>(undefined, false, [
         ChannelRateOfflineErrors.InvalidValue,
       ]);
@@ -90,7 +97,8 @@ export class ChannelRateOfflineService {
       id: crypto.randomUUID(),
       method: input.method,
       currency: input.currency,
-      value: input.value,
+      buyValue: input.buyValue,
+      sellValue: input.sellValue,
       effectiveFrom: new Date(input.effectiveFrom),
       createdDate: new Date(),
     };
@@ -143,11 +151,24 @@ export class ChannelRateOfflineService {
    * skipped, never overwritten. Incoming date fields are revived.
    */
   addImportedChannelRate(rate: ChannelRate): Result {
-    if (!Number.isFinite(rate.value) || rate.value <= 0) {
+    const revived = this.reviveRateDates(rate);
+    // Migration: rows written before buy/sell existed carry only `value`.
+    // Set buyValue = sellValue = value so old data converts correctly.
+    if (revived.buyValue === undefined && revived.sellValue === undefined) {
+      const legacyValue = (revived as unknown as { value?: number }).value;
+      if (!Number.isFinite(legacyValue) || legacyValue === undefined || legacyValue <= 0) {
+        return Result.Failure([ChannelRateOfflineErrors.InvalidValue]);
+      }
+      revived.buyValue = legacyValue;
+      revived.sellValue = legacyValue;
+    }
+    if (!Number.isFinite(revived.buyValue) || revived.buyValue <= 0) {
+      return Result.Failure([ChannelRateOfflineErrors.InvalidValue]);
+    }
+    if (!Number.isFinite(revived.sellValue) || revived.sellValue <= 0) {
       return Result.Failure([ChannelRateOfflineErrors.InvalidValue]);
     }
 
-    const revived = this.reviveRateDates(rate);
     const id = revived.id ?? this.deriveRateId(revived);
     const rates = this.getStorageChannelRates();
     if (rates.some((r) => r.id === id)) return Result.Success();
@@ -166,7 +187,7 @@ export class ChannelRateOfflineService {
    * means.
    */
   private deriveRateId(rate: ChannelRate): string {
-    return `${rate.method}-${rate.currency}-${rate.value}-${rate.effectiveFrom.toISOString()}`;
+    return `${rate.method}-${rate.currency}-${rate.buyValue}-${rate.sellValue}-${rate.effectiveFrom.toISOString()}`;
   }
 
   private setRatesLocalStorage(rates: ChannelRate[]): void {
@@ -197,6 +218,14 @@ export class ChannelRateOfflineService {
     for (const field of ['effectiveFrom', 'createdDate']) {
       const value = revived[field];
       if (typeof value === 'string') revived[field] = new Date(value);
+    }
+    // Migration: rows written before buy/sell existed carry only `value`.
+    if (revived.buyValue === undefined && revived.sellValue === undefined) {
+      const legacyValue = revived.value;
+      if (typeof legacyValue === 'number') {
+        revived.buyValue = legacyValue;
+        revived.sellValue = legacyValue;
+      }
     }
     return revived as unknown as ChannelRate;
   }
