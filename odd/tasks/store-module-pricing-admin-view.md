@@ -155,13 +155,16 @@ bucket is empty and dropped.
       table, inputs disabled while unticked, the live total, the browser total
       matching the server total, values surviving a reload, and the control being
       SuperAdmin-only.
-- [x] T6b — UI role gate: `/admin/stores` admits ReSellers via `resellerLoader`,
-      so the gear item was visible to them and answered 403. The route now passes
-      the pricing callback only when the session user is a SuperAdmin
-      (`store-list.tsx`, commit `f38a7362`).
-- [ ] T6c — (optional) E2E pin that a ReSeller sees no gear item. No ReSeller
-      session fixture exists yet; needs a new fixture user. Offered to the
-      maintainer, not yet approved.
+- [x] T6b — UI role gate: the route now passes the pricing callback only when the
+      session user is a SuperAdmin (`store-list.tsx`, commit `f38a7362`). Later
+      investigation showed the scenario it defends is currently unreachable: a
+      ReSeller's store list (`GET /v1/stores/by-current-user`) is denied by the
+      backend (class-level `HasPermission(SuperAdmin, StoresAdmin)`; ReSeller is
+      neither), so `/admin/stores` shows an error and zero cards — no gear, no
+      item. The fix stays as a defensive gate in case the list privilege widens.
+- [x] T6c — (declined by maintainer, 2026-09-28) E2E pin that a ReSeller sees no
+      gear item. After the finding above, such a test could only pass vacuously
+      (no cards rendered). Not added, per the maintainer's explicit choice.
 
 ## Acceptance criteria
 
@@ -220,3 +223,9 @@ Commits on `qa` (none pushed): `4b3a0838` (T1+T2), `46f34e67` (T4b+T3+T4),
   `ServiceExtensions.cs:126` requests the `es` culture. E2E writers worked
   around it with `-p:InvariantGlobalization=false`; no source change. Needs the
   maintainer's decision (backend source/config is outside this feature's scope).
+- ReSeller scope finding, 2026-09-28: a ReSeller cannot list stores on
+  `/admin/stores` at all — `GET /v1/stores/by-current-user` carries the
+  controller's `HasPermission(SuperAdmin, StoresAdmin)` and ReSeller matches
+  neither role, so the page renders the error state with zero cards. The T6b
+  defensive gate therefore protects a currently-unreachable surface; T6c (E2E
+  pin) was declined by the maintainer as it could only pass vacuously.
