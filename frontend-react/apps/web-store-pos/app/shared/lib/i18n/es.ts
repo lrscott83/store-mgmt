@@ -1332,6 +1332,8 @@ const messages: Record<string, string> = {
   'OWNER.DUPLICATE_LOGIN': 'Ese login ya está en uso. Elige otro.',
   'OWNER.FORBIDDEN': 'No tienes permiso para esta acción.',
   'OWNER.NOT_FOUND': 'El propietario no existe o fue eliminado.',
+  'OWNER.HAS_PAYMENTS':
+    'Este propietario tiene pagos registrados y no se puede eliminar. Desactívalo en su lugar.',
   'OWNER.PASSWORD_POLICY':
     'La contraseña debe tener entre 8 y 30 caracteres, e incluir al menos una mayúscula, una minúscula y un número.',
   'OWNER.PASSWORDS_MUST_MATCH': 'Las contraseñas no coinciden.',

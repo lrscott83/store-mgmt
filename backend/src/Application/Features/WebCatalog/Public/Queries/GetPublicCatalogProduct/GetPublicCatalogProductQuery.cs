@@ -1,9 +1,9 @@
 using Application.Abstractions.Messaging;
 using Application.Dtos.WebCatalog;
 using Application.Exceptions;
+using Application.Features.WebCatalog.Public;
 using Application.ResponseModels;
 using Domain.Entities.Stores;
-using Domain.Entities.WebCatalog;
 using Domain.Interfaces.Repositories;
 using Microsoft.Extensions.Localization;
 using Resources;
@@ -13,23 +13,25 @@ namespace Application.Features.WebCatalog.Public.Queries.GetPublicCatalogProduct
 {
     /// <summary>
     /// Detalle público de un producto del catálogo: es lo que se abre al tocar la tarjeta, con la
-    /// descripción y la galería de imágenes (plan 2026-09-27).
+    /// descripción y la galería de imágenes (plan 2026-09-27). Publicación DIRECTA sobre las
+    /// tablas normales (decisión del Owner, 2026-09-28): lee `Product` — no existe una copia
+    /// publicada; el id del producto ES el id público.
     /// </summary>
     public sealed record GetPublicCatalogProductQuery(string StoreSlug, Guid ProductId) : IQuery<PublicCatalogProductDto>;
 
     public class GetPublicCatalogProductQueryHandler : IQueryHandler<GetPublicCatalogProductQuery, PublicCatalogProductDto>
     {
         private readonly IStoreRepository _storeRepository;
-        private readonly ICatalogProductRepository _catalogProductRepository;
+        private readonly IProductRepository _productRepository;
         private readonly IStringLocalizer<I18n> _localizer;
 
         public GetPublicCatalogProductQueryHandler(
             IStoreRepository storeRepository,
-            ICatalogProductRepository catalogProductRepository,
+            IProductRepository productRepository,
             IStringLocalizer<I18n> localizer)
         {
             _storeRepository = storeRepository;
-            _catalogProductRepository = catalogProductRepository;
+            _productRepository = productRepository;
             _localizer = localizer;
         }
 
@@ -39,14 +41,14 @@ namespace Application.Features.WebCatalog.Public.Queries.GetPublicCatalogProduct
                 ? null
                 : await _storeRepository.GetStoreByCatalogSlugAsync(query.StoreSlug.Trim().ToLowerInvariant());
 
-            if (store == null)
+            if (store == null || store.CatalogSlug == null)
                 throw new ApiException(_localizer["CatalogStoreNotFound"], HttpStatusCode.NotFound);
 
-            CatalogProduct? product = await _catalogProductRepository.GetPublishedByIdAsync(store.Id, query.ProductId);
-            if (product == null || product.CatalogCategory == null || !product.CatalogCategory.IsActive)
+            Domain.Entities.Products.Product? product = await _productRepository.GetPublishedByIdAsync(store.Id, query.ProductId);
+            if (product == null || product.Category == null || !product.Category.IsActive)
                 throw new ApiException(_localizer["ProductNotFound", nameof(query.ProductId)], HttpStatusCode.NotFound);
 
-            return ResponseResult.Success(PublicCatalogProductMapper.ToDto(product, store.CatalogSlug!));
+            return ResponseResult.Success(PublicCatalogProductMapper.ToDto(product, store.CatalogSlug));
         }
     }
 }

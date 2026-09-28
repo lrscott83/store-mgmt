@@ -102,12 +102,30 @@ namespace SMCA.WebApi.Extensions
             });
         }
 
+        /// <summary>
+        /// Pins every request to Spanish ("siempre español"). <c>Program.cs</c> MUST call this:
+        /// without it the <c>RequestLocalizationMiddleware</c> never enters the pipeline and
+        /// <see cref="IStringLocalizer"/> resolves against whatever <c>CurrentUICulture</c> the
+        /// process happens to inherit from the host's regional settings, so the API's language
+        /// would differ per machine.
+        /// </summary>
+        /// <remarks>
+        /// Restricting the supported lists to "es" ALONE — rather than merely making "es" the
+        /// default — is what turns the product decision into a guarantee. With "en" also listed, an
+        /// <c>Accept-Language: en</c> request header resolves through <c>I18n.en.resx</c> and the
+        /// response language follows the caller instead of staying Spanish.
+        /// <para>
+        /// There is deliberately no <c>I18n.es.resx</c>. With the culture pinned to "es" the
+        /// <c>ResourceManager</c> falls back to the neutral <c>I18n.resx</c>, whose values are
+        /// Spanish — that is the expected and tested resolution path, not an accident.
+        /// <c>I18n.en.resx</c> is left in place; it is simply never selected now.
+        /// </para>
+        /// </remarks>
         public static void UseLocalizationExtension(this IApplicationBuilder app)
         {
             var cultures = new List<CultureInfo>
             {
-                new CultureInfo("es"),
-                new CultureInfo("en")
+                new CultureInfo("es")
             };
 
             app.UseRequestLocalization(options =>

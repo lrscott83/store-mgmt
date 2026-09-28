@@ -81,5 +81,49 @@ namespace Infrastructure.Persistence.Repositories
                 && product.Category.IsActive);
 
         }
+
+        // --- Lecturas del catálogo público (publicación directa sobre esta tabla, decisión del
+        // Owner 2026-09-28): activos y en venta, de categorías activas con slug público. ---
+
+        public async Task<IList<Product>> GetPublishedByStoreIdAsync(Guid storeId, Guid? categoryId, string? search)
+        {
+            IQueryable<Product> query = _products
+                .IgnoreQueryFilters()
+                .Where(product => product.Category.StoreId == storeId
+                    && product.IsActive && product.AvailableToSale
+                    && product.Category.IsActive
+                    && product.Category.Slug != null)
+                .Include(product => product.Images)
+                .Include(product => product.Category);
+
+            if (categoryId.HasValue)
+                query = query.Where(product => product.CategoryId == categoryId.Value);
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                string term = search.Trim().ToLowerInvariant();
+                query = query.Where(product => product.Name.ToLower().Contains(term));
+            }
+
+            return await query
+                .OrderBy(product => product.Category.Order)
+                .ThenBy(product => product.Order)
+                .ThenBy(product => product.Name)
+                .ToListAsync();
+        }
+
+        public async Task<Product?> GetPublishedByIdAsync(Guid storeId, Guid productId)
+        {
+            return await _products
+                .IgnoreQueryFilters()
+                .Where(product => product.Category.StoreId == storeId
+                    && product.Id == productId
+                    && product.IsActive && product.AvailableToSale
+                    && product.Category.IsActive
+                    && product.Category.Slug != null)
+                .Include(product => product.Images)
+                .Include(product => product.Category)
+                .FirstOrDefaultAsync();
+        }
     }
 }

@@ -94,7 +94,7 @@ public sealed class PlanChangeMatrixTests
         (int)ModuleType.WholesaleSales, (int)ModuleType.Expenses, (int)ModuleType.Billing,
         (int)ModuleType.Histories, (int)ModuleType.Credits, (int)ModuleType.Warehouses,
         (int)ModuleType.MultiStores, (int)ModuleType.MultiMonedas, (int)ModuleType.MultiPayments,
-        (int)ModuleType.Elaboration,
+        (int)ModuleType.Elaboration, (int)ModuleType.WebCatalog,
     ];
 
     // ── Module → features the LIVE Feature table exposes as AvailableToStore ──

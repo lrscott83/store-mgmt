@@ -86,7 +86,10 @@ namespace Infrastructure.Persistence.EntityConfigurations
                 // MultiPayments (2026-09-18): module 16 belongs to VIP only.
                 StorePlanModule.Create((int)StorePlanType.VIP, (int)ModuleType.MultiPayments),
                 // Elaboration (2026-09-18): module 17 belongs to Superior and VIP.
-                StorePlanModule.Create((int)StorePlanType.VIP, (int)ModuleType.Elaboration));
+                StorePlanModule.Create((int)StorePlanType.VIP, (int)ModuleType.Elaboration),
+                // WebCatalog (2026-09-28): plans are self-contained — VIP includes every
+                // Superior module, so module 18 goes to VIP too (amends D5, 2026-09-27).
+                StorePlanModule.Create((int)StorePlanType.VIP, (int)ModuleType.WebCatalog));
         }
     }
 }

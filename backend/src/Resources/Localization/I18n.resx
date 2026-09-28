@@ -189,6 +189,9 @@
   <data name="OperationLimitExceded" xml:space="preserve">
     <value>Límite excedido para esta operación</value>
   </data>
+  <data name="OwnerHasPayments" xml:space="preserve">
+    <value>El propietario tiene pagos registrados y no se puede eliminar. Desactívelo en su lugar.</value>
+  </data>
   <data name="OwnerNotFound" xml:space="preserve">
     <value>Propietario no encontrado</value>
   </data>

@@ -370,7 +370,12 @@ public sealed class ToggleStorePlanTests
                 .PostAsync($"/api/v1/stores/{fx.StoreId}/toggle-plan", null);
             r.StatusCode.Should().Be(HttpStatusCode.BadRequest);
             var b = await r.Content.ReadFromJsonAsync<ApiResponse<object>>(ApiResponse.Json);
-            b!.Errors.Should().Contain(e => e.Code == "App.Unexpected" && e.Description!.Contains("inactive"));
+            // The API is pinned to Spanish (SMCA.WebApi/Extensions/ServiceExtensions.cs), so the
+            // refusal resolves through the neutral I18n.resx: "La tienda está inactiva". Asserting
+            // the accent-free stem keeps the literal safe from source-encoding while still
+            // distinguishing this reason from the inactive-owner one below, which ends in
+            // "inactivo" — a substring "inactiv" would wrongly accept both.
+            b!.Errors.Should().Contain(e => e.Code == "App.Unexpected" && e.Description!.Contains("inactiva"));
         }
         finally
         {
@@ -392,7 +397,10 @@ public sealed class ToggleStorePlanTests
                 .PostAsync($"/api/v1/stores/{fx.StoreId}/toggle-plan", null);
             r.StatusCode.Should().Be(HttpStatusCode.BadRequest);
             var b = await r.Content.ReadFromJsonAsync<ApiResponse<object>>(ApiResponse.Json);
-            b!.Errors.Should().Contain(e => e.Code == "App.Unexpected" && e.Description!.Contains("inactive"));
+            // Spanish-pinned API: "El usuario propietario está inactivo". The trailing "o" is
+            // what separates this from the inactive-store reason ("inactiva"), so the two
+            // tests cannot both pass on a single wrong message.
+            b!.Errors.Should().Contain(e => e.Code == "App.Unexpected" && e.Description!.Contains("inactivo"));
         }
         finally
         {

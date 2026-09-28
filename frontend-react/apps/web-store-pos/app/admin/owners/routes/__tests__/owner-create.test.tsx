@@ -362,11 +362,17 @@ describe('OwnerCreatePage — password mismatch validation', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// S-ADMIN-OWNERS-CREATE-7 — valid submit → createOwner + navigate /management/stores/create
+// S-ADMIN-OWNERS-CREATE-7 — valid submit → createOwner + navigate /admin/owners
+//
+// The target is the owners LIST for every role. It used to be
+// /management/stores/create, whose clientLoader is ownerStoresGate() →
+// adminLoader() — SuperAdmin||OwnerAdmin only. A Gestor (ReSeller) that landed
+// there was denied, logged out and bounced to /login right after a successful
+// create, with no feedback. The guard is correct; only the target was wrong.
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('OwnerCreatePage — successful submit', () => {
-  it('calls createOwner and navigates to /management/stores/create on success', async () => {
+  it('calls createOwner and navigates to /admin/owners on success (Gestor / ReSeller actor)', async () => {
     const { ownerHttpService } = await import('~/admin/owners/lib/services/owner-http-service');
     vi.mocked(ownerHttpService.createOwner).mockResolvedValue({
       succeeded: true,
@@ -393,8 +399,61 @@ describe('OwnerCreatePage — successful submit', () => {
           email: 'jane@example.com',
         }),
       );
-      expect(mockNavigate).toHaveBeenCalledWith('/management/stores/create');
+      expect(mockNavigate).toHaveBeenCalledWith('/admin/owners');
     });
+
+    // Exactly one hop, and it is the owners list — no /management/stores/create
+    // (which logs a Gestor out) and no /login.
+    expect(mockNavigate).toHaveBeenCalledTimes(1);
+  });
+
+  it('navigates to /admin/owners on success for a SuperAdmin actor too', async () => {
+    const { ownerHttpService } = await import('~/admin/owners/lib/services/owner-http-service');
+    vi.mocked(ownerHttpService.createOwner).mockResolvedValue({
+      succeeded: true,
+      data: makeOwner(),
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
+
+    await renderPage(true);
+    fillValidForm();
+
+    fireEvent.submit(
+      screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')!,
+    );
+
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith('/admin/owners');
+    });
+    expect(mockNavigate).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not log the actor out on a successful create', async () => {
+    const { ownerHttpService } = await import('~/admin/owners/lib/services/owner-http-service');
+    vi.mocked(ownerHttpService.createOwner).mockResolvedValue({
+      succeeded: true,
+      data: makeOwner(),
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
+    const { useAuthStore } = await import('~/shared/lib/stores/auth-store');
+
+    await renderPage(false);
+    fillValidForm();
+
+    fireEvent.submit(
+      screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')!,
+    );
+
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith('/admin/owners');
+    });
+
+    const authStore = vi.mocked(useAuthStore).mock.results[0]?.value;
+    expect(authStore?.logout).not.toHaveBeenCalled();
   });
 });
 

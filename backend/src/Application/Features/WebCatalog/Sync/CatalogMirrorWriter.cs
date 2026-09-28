@@ -11,6 +11,9 @@ using System.Net;
 
 namespace Application.Features.WebCatalog.Sync
 {
+    /// <summary>Conteos del espejo, para el resumen que muestra el botón de sincronización.</summary>
+    public sealed record CatalogMirrorCounts(int CategoriesCreated, int CategoriesUpdated, int ProductsCreated,
+        int ProductsUpdated, int ProductsDeactivated);
     /// <summary>
     /// Escribe el catálogo LOCAL del POS en las tablas de origen del servidor (espejo).
     ///
@@ -44,7 +47,7 @@ namespace Application.Features.WebCatalog.Sync
         /// clave y fallaría al attacharla ("another instance with the same key value is already
         /// being tracked"). Devolviéndolas se reusa la MISMA instancia y no hay colisión.
         /// </summary>
-        public static async Task<IList<ProductCategory>> MirrorCatalogAsync(
+        public static async Task<CatalogMirrorCounts> MirrorCatalogAsync(
             CatalogSnapshotDto snapshot,
             Guid storeId,
             Guid tenantId,
@@ -56,6 +59,7 @@ namespace Application.Features.WebCatalog.Sync
             var storedCategoriesById = storedCategories.ToDictionary(category => category.Id);
             var snapshotCategoryIds = snapshot.Categories.Select(category => category.Id).ToHashSet();
             var createdCategories = new List<ProductCategory>();
+            int categoriesCreated = 0, categoriesUpdated = 0;
 
             foreach (CatalogSnapshotCategoryDto incoming in snapshot.Categories)
             {
@@ -67,6 +71,7 @@ namespace Application.Features.WebCatalog.Sync
                     category.Order = incoming.Order;
                     category.IsActive = incoming.IsActive;
                     await categoryRepository.UpdateAsync(category);
+                    categoriesUpdated++;
                 }
                 else
                 {
@@ -75,6 +80,7 @@ namespace Application.Features.WebCatalog.Sync
                     var created = ProductCategory.Create(incoming.Id, storeId, incoming.Name, incoming.Order, tenantId);
                     await categoryRepository.AddAsync(created);
                     createdCategories.Add(created);
+                    categoriesCreated++;
                 }
             }
 
@@ -89,6 +95,7 @@ namespace Application.Features.WebCatalog.Sync
             IList<Product> storedProducts = await productRepository.GetProductsForCatalogSyncAsync(storeId);
             var storedProductsById = storedProducts.ToDictionary(product => product.Id);
             var snapshotProductIds = snapshot.Products.Select(product => product.Id).ToHashSet();
+            int productsCreated = 0, productsUpdated = 0, productsDeactivated = 0;
 
             foreach (CatalogSnapshotProductDto incoming in snapshot.Products)
             {
@@ -106,6 +113,7 @@ namespace Application.Features.WebCatalog.Sync
                         product.BusinessId = incoming.BusinessId!;
                     // Description / PercentDiscountPrice / DiscountPrice / IsNew / Image: NO se tocan.
                     await productRepository.UpdateAsync(product);
+                    productsUpdated++;
                 }
                 else
                 {
@@ -116,6 +124,7 @@ namespace Application.Features.WebCatalog.Sync
                         incoming.BusinessId ?? string.Empty, tenantId);
                     created.Currency = ToCurrency(incoming.Currency);
                     await productRepository.AddAsync(created);
+                    productsCreated++;
                 }
             }
 
@@ -126,13 +135,21 @@ namespace Application.Features.WebCatalog.Sync
                 orphan.IsActive = false;
                 orphan.AvailableToSale = false;
                 await productRepository.UpdateAsync(orphan);
+                productsDeactivated++;
             }
 
             // Mismo orden que `GetByStoreIdAsync` (orden, luego nombre) para que publicar sea estable.
-            return storedCategories.Concat(createdCategories)
+            IList<ProductCategory> allCategories = storedCategories.Concat(createdCategories)
                 .OrderBy(category => category.Order).ThenBy(category => category.Name)
                 .ToList();
+            CategoryResult = allCategories;
+
+            return new CatalogMirrorCounts(categoriesCreated, categoriesUpdated, productsCreated,
+                productsUpdated, productsDeactivated);
         }
+
+        /// <summary>Categorías tal como quedaron tras el último espejo (no-tracking-safe).</summary>
+        public static IList<ProductCategory> CategoryResult { get; private set; } = [];
 
         /// <summary>
         /// Segunda fase: galerías. Va aparte porque las filas de producto tienen que existir antes
