@@ -30,7 +30,7 @@ tarea, y eso es exactamente lo que hace peligroso hacerlo sin la comprobación p
 | `01-extract.sql` | En **producción** | Solo lectura. Extrae las filas seleccionadas, un CSV por tabla, en `data/` |
 | `02-load.sql` | En **test** | Una sola transacción. Carga en orden derivado. `ON CONFLICT DO NOTHING` |
 | `03-verify.sql` | En **test** | Conteos, verificación de huérfanos y verificación de permisos |
-| `data/` | — | Destino de los CSV. Git-ignored a propósito |
+| `data/` | — | Destino de los CSV de extracción y del registro de claves insertadas. Git-ignored a propósito |
 
 Todos los scripts se ejecutan con `psql`. Las rutas de los CSV son relativas al directorio de
 trabajo actual, así que **todos los comandos `psql` de esta guía se ejecutan desde
@@ -50,9 +50,74 @@ y `Program.cs` la invoca como `app.ApplyMigrations()`.
 **Esa llamada está dentro de `if (app.Environment.IsDevelopment())`.** Si el VPS o el contenedor
 arranca la API con `ASPNETCORE_ENVIRONMENT=Production`, `Staging` o sin esa variable, **no se
 aplica ninguna migración al arrancar**. Para un entorno que no sea `Development`, aplique las
-migraciones de forma explícita antes de continuar (por ejemplo con `dotnet ef database update`, o
-con la misma llamada en un arranque controlado) y compruebe que `__EFMigrationsHistory` en
+migraciones de forma explícita antes de continuar y compruebe que `__EFMigrationsHistory` en
 `smca_test` contiene la última migración.
+
+#### La vía que sí depende de usted: arrancar la API una vez en `Development`
+
+Es la más fiable y es el propio camino del repositorio: nada de la CLI de EF, ninguna fábrica de
+tiempo de diseño de por medio, y la misma configuración que usa la aplicación.
+
+```bash
+# 1. La conexión de test, apuntando a smca_test
+export ConnectionStrings__DefaultConnection="Host=<host-test>;Port=5432;Database=smca_test;Username=<usuario-test>;Password=<clave-test>"
+
+# 2. Un arranque controlado con el entorno en Development
+ASPNETCORE_ENVIRONMENT=Development dotnet run --project src/SMCA.WebApi/SMCA.WebApi.csproj
+
+# 3. Verificar, con la API ya detenida
+psql "$TARGET_DSN" -c 'SELECT count(*) FROM "__EFMigrationsHistory";'
+```
+
+Si el número no cambió, no se aplicó nada y hay que Investigarlo antes de seguir.
+
+#### La vía con la CLI de EF, y por qué necesita el `--connection`
+
+Si prefiere la CLI, instálela primero. **Este repositorio no la trae**: no hay un
+`dotnet-tools.json`, así que `dotnet ef` no existe en una máquina recién clonada. Además la
+herramienta debe ser de la **misma versión mayor** que EF Core, aquí 8.0:
+
+```bash
+dotnet tool install --global dotnet-ef --version 8.*
+dotnet ef --version        # debe decir 8.x; si dice otra mayor, actualícela
+```
+
+El comando tiene que nombrar **los dos** proyectos: `Infrastructure` es el proyecto de EF Core
+porque ahí vive `ApplicationDbContext` y su carpeta de migraciones, y `SMCA.WebApi` es el
+proyecto de arranque que la herramienta necesita para construir el host.
+
+```bash
+cd backend
+
+dotnet ef database update \
+  --project            src/Infrastructure/Infrastructure.csproj \
+  --startup-project    src/SMCA.WebApi/SMCA.WebApi.csproj \
+  --connection         "Host=<host-test>;Port=5432;Database=smca_test;Username=<usuario-test>;Password=<clave-test>"
+```
+
+**No omita `--connection`.** Este repositorio tiene
+`Infrastructure/Persistence/ApplicationDbContextDesignFactory.cs`, que implementa
+`IDesignTimeDbContextFactory<ApplicationDbContext>` y fija la cadena
+`Host=localhost;Database=design_time;Username=postgres;Password=postgres` con código, no con
+configuración. La documentación de Microsoft es explícita sobre el orden: una fábrica de tiempo de
+diseño tiene **precedencia sobre toda otra forma** de crear el `DbContext`, incluido el proveedor
+de servicios de la aplicación. Es decir, la fábrica decide qué base de datos ven las
+herramientas, y esa no es la suya. Pase siempre `--connection` y compruébelo:
+
+```bash
+# No abre conexión: solo informa qué base de datos usaría la herramienta.
+dotnet ef dbcontext info \
+  --project         src/Infrastructure/Infrastructure.csproj \
+  --startup-project src/SMCA.WebApi/SMCA.WebApi.csproj \
+  --connection      "Host=<host-test>;Port=5432;Database=smca_test;Username=<usuario-test>;Password=<clave-test>"
+# La fila debe decir  DatabaseName = smca_test
+```
+
+Si ahí apareciera `design_time`, la herramienta migraría una base de datos paralela equivocada
+dentro de `localhost`, y usted se quedaría sin cambios en `smca_test` sin darse cuenta. En ese
+caso no insista con la CLI: use el arranque en `Development` de arriba, que no depende de nada de
+esto. Y en cualquier caso, la comprobación que decide es siempre la misma y la última:
+`__EFMigrationsHistory` en `smca_test`.
 
 Ese paso es el que crea las tablas **y** las filas de catálogo (`Role`, `Feature`, `Module`,
 `StorePlan`, `Tenant`, y el usuario superadmin). Los scripts de este directorio no crean,
@@ -60,9 +125,9 @@ alteran ni borran ningún objeto de la base de datos: solo mueven filas.
 
 > **Las filas de `HasData` las escribe una migración, no el arranque.** Una vez registrada la
 > migración como aplicada, volver a arrancar la aplicación **no** vuelve a crear una fila de
-> semilla que se haya borrado. Si borra el superadmin, el Owner inicial o el Tenant por defecto,
-> la única forma de recuperarlos es restaurar el respaldo o insertarlos a mano. Por eso el
-> paso 12 no se ejecuta hasta que termina la ventana de reversa.
+> semilla que se haya borrado. Si borra el superadmin, su fila en `UserRole` o el `Tenant` por
+> defecto, la única forma de recuperarlos es restaurar el respaldo o insertarlos a mano. Por eso
+> el paso 12 no se ejecuta hasta que termina la ventana de reversa.
 
 Si se salta este paso, `02-load.sql` se detiene solo. El mensaje nombra las tablas que faltan, o
 dice que el catálogo está vacío, o que falta el superadmin o el Tenant por defecto. No lo dice
@@ -190,7 +255,11 @@ Esas dos líneas no son opcionales:
   extracción, solo al final de todo el procedimiento; sin esta línea, un archivo de una
   ejecución anterior sobrevive a una extracción que nunca lo reescribió, y la carga lee una
   mezcla de dos ejecuciones. Borrándolos primero, "el archivo que está en disco" y "el archivo
-  que escribió esta ejecución" son lo mismo.
+  que escribió esta ejecución" son lo mismo. El patrón `*.csv` también borra los
+  `NN-<tabla>-inserted.csv` que dejó la carga de una ronda anterior, y esa es la intención
+  (§6): el registro de filas insertadas de una ronda vieja no debe sobrevivir a una ronda
+  nueva. Note el orden: esta línea corre **al comienzo** de una ronda, nunca en la limpieza
+  final; por eso el registro de la carga sobrevive durante toda la ventana de reversa.
 
 `**SOURCE_DSN**` es la cadena de conexión de **producción**, con su cadena de `psql` completa,
 por ejemplo `postgresql://usuario:clave@host:5432/smca`.
@@ -201,7 +270,9 @@ Qué produce:
    sección A2, el resumen de permisos por rol, y el número de filas que informa cada `COPY`.
    **Guarde esa salida** en `extract-baseline.txt`. Es el lado "antes" de la comparación, y su
    última parte es la única fuente fiable del número de filas por tabla.
-2. En `prod-to-test/data/`: 12 archivos CSV, uno por tabla, con encabezado.
+2. En `prod-to-test/data/`: 12 archivos CSV, uno por tabla, con encabezado. La carga escribirá
+   en ese mismo directorio otros 12, los `NN-<tabla>-inserted.csv` del registro de filas
+   insertadas (§6); la extracción no los produce y no los necesita.
 
 Los bloques se ejecutan dentro de una única instantánea `REPEATABLE READ`, de modo que los
 conteos y las filas describen el mismo instante aunque producción se esté escribiendo mientras
@@ -218,7 +289,7 @@ suya y debe tomarla a conciencia.
 ### Verificación de la extracción
 
 ```bash
-ls -l prod-to-test/data/            # 12 CSV, todos -rw------- (por el umask 077)
+ls -l prod-to-test/data/            # 12 CSV de extracción, todos -rw------- (por el umask 077)
 head -2 prod-to-test/data/05-store.csv
 grep -c '^COPY ' prod-to-test/extract-baseline.txt   # 12: uno por tabla
 ```
@@ -236,9 +307,19 @@ surtió efecto y los archivos están legibles para cualquiera.
 ```bash
 cd backend/scripts
 
+umask 077
+
 # solo identidad y permisos (el comportamiento por defecto)
 psql "$TARGET_DSN" -f prod-to-test/02-load.sql
 ```
+
+El `umask 077` también aquí, y por la misma razón que en la sección 5: la carga escribe
+archivos en `prod-to-test/data/`, y los escribe su propio proceso `psql`, que hereda el
+`umask` de la shell. Esos archivos son el registro de filas insertadas (§6, "El registro de
+filas insertadas") del que depende la reversa de la sección 11. Contiene identificadores de
+usuario, de tienda y de datos de negocio de producción, así que merece el mismo tratamiento
+que los CSV de extracción. Si ve `-rw-r--r--` en cualquiera de los veinticuatro archivos,
+el `umask` no surtió efecto.
 
 Los bloques de datos de negocio son opcionales y están **apagados por defecto**. Cada uno se
 activa con su propia bandera, sin tocar el SQL:
@@ -285,7 +366,7 @@ ventana en la que se puede deshacer.
 | Esquema y catálogo | Tablas inexistentes, catálogo vacío, o falta del superadmin o del `Tenant` por defecto. |
 | Inquilino | Cualquier fila cargada cuyo `TenantId` no sea el `Tenant` por defecto. |
 | Tablas de paso no vacías | Cualquiera de las nueve tablas obligatorias con cero filas. |
-| Filas que no llegaron | Cualquier fila cargada que no esté en test. Se acepta solo con `-v allow_resume=1`. |
+| Filas que no llegaron | Cualquier fila cargada, de **las doce tablas**, que no esté en test. Se acepta solo con `-v allow_resume=1`. |
 
 Sobre la guarda de inquilino, que es la menos evidente: **`TenantId` no es una clave foránea en
 este modelo.** Ningún `HasForeignKey` del snapshot nombra a `Tenant` como tabla principal, así que
@@ -300,6 +381,68 @@ Sobre la guarda de tablas de paso vacías: una tabla de paso vacía es indisting
 correcta de cero filas, y la comparación de conteos informaría `0 = 0` y lo daría por bueno. Las
 nueve tablas obligatorias no pueden estar vacías legítimamente. Las tres opcionales sí, y por eso
 quedan fuera de la guarda: una tienda sin productos produce de verdad un `11-product.csv` vacío.
+
+### Vacío legítimo y fila perdida no se ven igual
+
+Esta distinción es la que hace que la guarda de "filas que no llegaron" no tenga que adivinar.
+Si una tabla de negocio opcional llegó vacía desde producción, su CSV tiene solo el
+encabezado; la carga crea la tabla de paso, `COPY` no inserta nada, y la comparación de conteos
+da `0 filas cargadas` contra `0 filas en destino`. Eso es un resultado correcto y la carga
+confirma.
+
+Si en cambio una fila se perdió por el camino, la comparación da `1 cargada` contra `0 en
+destino`, o `3` contra `2`, y la carga se detiene. El paso intermedio de esta carga usa
+`ON CONFLICT DO NOTHING`, así que una fila que ya existía en test por su clave **no** cuenta
+como cargada: es exactamente el caso que la reejecución con `allow_resume=1` acepta a
+propósito, y el caso que la primera ejecución nunca debería dejar pasar.
+
+### El registro de filas insertadas
+
+Al final de la carga, ya con todas las guardas superadas pero **antes** del `COMMIT`, el script
+escribe un archivo por tabla en `prod-to-test/data/`, llamado
+`NN-<tabla>-inserted.csv`. No es un resultado intermedio ni un aviso: es el inventario de **qué
+filas insertó esta ejecución**, y es lo que hace posible la reversa de la sección 11 sin borrar
+nunca algo que ya estuviera en test.
+
+Cada archivo lleva **solo las columnas de clave**, nunca la fila completa. La idea es que la
+reversa pueda borrar filas sin volver a exponer hashes Argon2id, correos y teléfonos a disco por
+segunda vez.
+
+Cómo se calcula, y por qué no puede ser de otra manera: antes de cada `INSERT`, el script copia
+las claves de la tabla de paso a una tabla temporal de preimagen llamada `pre_<tabla>`. Después
+del `INSERT`, la fórmula es
+
+```
+insertadas  =  (claves de stg_ presentes ahora en el destino)  menos  (pre_<tabla>)
+```
+
+Es decir, el conjunto de filas que esta ejecución insertó es **la diferencia** entre lo que
+acaba de quedar en la tabla destino y lo que ya estaba en ella un instante antes del `INSERT`.
+
+Un matiz importante, porque es donde se comete un error fácil: **`load_not_landed` no es ese
+conjunto.** `load_not_landed` reúne las filas que la carga no llegó a insertar, porque ya
+estaban en destino. Es el conjunto contrario. Confundir los dos —tomar `load_not_landed` por lo
+insertado— invierte por completo el sentido de la reversa y borra justo lo que había que
+conservar. Por eso el registro se calcula con las preimágenes y no a partir de la tabla de filas
+que no llegaron.
+
+Para las tres tablas opcionales que no llegaron a cargarse, el archivo se escribe igualmente
+con solo el encabezado y cero filas de datos. Así siempre hay **doce** archivos, la reversa no
+necesita banderas para saber cuáles existieron, y un archivo vacío significa "esta ejecución no
+insertó nada aquí" y nunca "este archivo no se escribió".
+
+Justo antes del `COMMIT`, la carga imprime además un resumen de las nueve tablas obligatorias
+con tres columnas: `table_name`, `already_in_target` (cuántas claves ya estaban en destino antes
+del `INSERT` de esta ejecución) e `inserted_by_this_run` (cuántas escribió esta ejecución).
+Una reejecución sobre una carga ya completada muestra `0` en `inserted_by_this_run` en las
+nueve, que es la respuesta honesta: no se insertó nada nuevo. Lea esa segunda columna antes de
+anotar el resultado de la carga; es el número que la reversa de la sección 11 va a borrar.
+
+Una segunda carga sobrescribe los doce archivos. Si vuelve a ejecutar la carga dentro de la
+ventana de reversa, el registro describe la segunda ejecución, no la primera, y la reversa
+trabajará sobre el conjunto más reciente. Es una limitación deliberada y documentada del
+enfoque: para una vuelta completa al punto de partida, el `pg_dump` de la sección 10 es la
+referencia, no este registro.
 
 ### Reejecución: `allow_resume`
 
@@ -319,11 +462,20 @@ procedimiento vuelve a detectarla.
 
 ### `COPY` y el encabezado de los CSV
 
-Cada `\copy` usa `HEADER MATCH` en PostgreSQL 17 o posterior, que compara la línea de encabezado
-del CSV con la lista de columnas del destino y falla si no coinciden. En un servidor anterior el
-script avisa por pantalla y usa `HEADER true`, es decir **lee y descarta el encabezado sin
-comprobarlo**. El requisito de versión del servidor no se sube en silencio: si está en un
-servidor anterior, usted lo ve.
+Cada `\copy` usa `HEADER MATCH` cuando el servidor es **PostgreSQL 15 o posterior**, que es la
+versión en que la opción apareció. Lo que hace es comparar la línea de encabezado del CSV con
+**"the actual column names of the table, in order"** — la redacción oficial de la documentación
+de PostgreSQL — y fallar si no coinciden. Compare bien lo que dice esa frase: la lista se
+compara contra **la tabla**, no contra una lista escrita en este script. Eso detecta un CSV cuyo
+encabezado no corresponde a la tabla, y no detecta una lista de columnas de este script que se
+haya quedado atrás respecto al modelo EF. Las listas de columnas de aquí se verificaron a mano
+contra `ApplicationDbContextModelSnapshot.cs`, y esa verificación hay que repetirla cuando
+alguien agregue una columna a una de las doce tablas.
+
+En un servidor anterior a la 15 el script avisa por pantalla y usa `HEADER true`, es decir
+**lee y descarta el encabezado sin comprobarlo**. El requisito de versión del servidor no se
+sube en silencio: si su servidor es anterior, usted lo ve en la pantalla antes de que se
+inserte una sola fila.
 
 ### Por qué `ON CONFLICT DO NOTHING` no lleva destino de conflicto
 
@@ -491,11 +643,32 @@ Solo lectura. Qué mirar, en orden:
 | 7 | Instantánea de precio de módulos | Confirma que los importes cobrados se movieron tal cual. |
 | 8 y 8b | Integridad de inquilino | `TOTAL ROWS WITH AN UNKNOWN TENANT` **debe ser 0**. La 8b es informativa: si tras la carga hay más de un inquilino con filas, el origen no era de un solo inquilino. |
 | 9a y 9b | Enlaces Gestor → Owner | La 9a **no debe devolver ninguna fila**: un Gestor sin ningún Owner es exactamente el fallo que un `ReSellerOwner` perdido produce, y la consulta 4 no lo puede ver. En la 9b, `owners = 0` es un fallo. |
-| 9c | Owners sin Gestor | Informativa. Un Owner sin Gestor no es incorrecto por sí mismo —el Owner de la tienda por defecto lo está por construcción—, pero una tienda cuyo Owner está en esa lista no tiene quién la administre. |
+| 9c | Owners sin Gestor | Informativa. Un Owner sin ningún Gestor no es incorrecto por sí mismo, pero una tienda cuyo Owner está en esa lista no tiene quién la administre. |
 
 La comparación de la consulta 1 es manual y es así a propósito: el lado "antes" vive en el
 servidor de producción y el lado "después" en test. El script no puede hacer la comparación por
 usted.
+
+### El registro de filas insertadas, antes de que lo necesite
+
+Compruebe ahora que el registro de la sección 6 existe y es completo. Es el insumo de la
+reversa, y si falta un archivo no lo va a notar hasta el día que quiera revertir:
+
+```bash
+ls prod-to-test/data/*-inserted.csv | wc -l     # debe dar 12
+head -1 prod-to-test/data/01-user-inserted.csv  # debe ser:  Id
+head -1 prod-to-test/data/07-store-role-feature-inserted.csv
+# debe ser:  StoreId,RoleId,FeatureId
+```
+
+`wc -l` **sí** sirve aquí, a diferencia de los CSV de extracción: estos archivos solo tienen
+claves y ningún campo puede contener un salto de línea. Un archivo con cero filas de datos
+tiene exactamente una línea, la del encabezado, y eso es correcto: significa que esta ejecución
+no insertó nada en esa tabla.
+
+Si el conteo da menos de 12, la carga se interrumpió antes de escribir el registro. Investigue
+antes de seguir: un `COMMIT` confirmado sin registro es un estado desde el cual la reversa
+acotada no se puede reconstruir.
 
 ### Comprobación funcional final
 
@@ -513,24 +686,45 @@ borrado va en el orden inverso.
 
 ### El `DELETE` total está prohibido
 
-Un `DELETE FROM "User"` sin condición no distingue lo migrado de lo que test ya tenía, y en esta
-base **destruye filas sembradas que no se pueden recuperar** (§3):
+Un `DELETE FROM "User"` sin condición no distingue lo migrado de lo que test ya tenía. Estas son
+las **únicas tres filas** que las migraciones de este repositorio siembran por código
+(`HasData`) y que tocan este procedimiento:
 
-| Fila sembrada | Identificador |
-| --- | --- |
-| `User` superadmin y su `UserRole` | `38b96d85-bf75-41ca-bfd7-796e7fe0ebc8` |
-| `Owner` "Admin Owner" | `b58bf718-c4ed-4ee9-a958-bb5a5db4f7e8` (su `Id` **es** el del `Tenant` por defecto) |
-| `Store` "Default Store" | `0ed24a91-6748-4f04-8902-7981a0ca79e0` |
+| Fila sembrada | Identificador | ¿La toca esta reversa? |
+| --- | --- | --- |
+| `Tenant` "Default Tenant" | `b58bf718-c4ed-4ee9-a958-bb5a5db4f7e8` | No: `Tenant` no es una de las doce tablas migradas |
+| `User` superadmin (`Login = admin`) | `38b96d85-bf75-41ca-bfd7-796e7fe0ebc8` | No, y por diseño, como se explica abajo |
+| `UserRole` del superadmin al rol `1` | `38b96d85-…-796e7fe0ebc8` + `RoleId = 1` | No, y por diseño, como se explica abajo |
 
-Borrarlas no es un incidente recuperable: las filas de `HasData` las escribe una migración, y
-volver a arrancar la aplicación no las vuelve a crear.
+Una revisión anterior de este README listaba también un `Owner` "Admin Owner" con el mismo `Id`
+que el `Tenant` por defecto, y una `Store` "Default Store"
+(`0ed24a91-6748-4f04-8902-7981a0ca79e0`). **Esas dos filas ya no existen**, y no por decisión de
+este documento: la migración `20240910194934_Create-Store-Module-Price.cs` las borra con
+`DeleteData` (líneas 30-33 para `Store`, y 35-38 para `Owner`), y por eso el snapshot actual
+`ApplicationDbContextModelSnapshot.cs` no tiene ningún bloque `HasData` en `Owner` ni en
+`Store`. Una fila que la migración ya eliminó no la puede destruir un `DELETE`.
 
-### Reversa acotada a los identificadores migrados
+Las tres que quedan no son recuperables por un simple reinicio de la aplicación: las escribe una
+migración, y volver a arrancar el backend no las vuelve a crear. Por eso la reversa está acotada
+y por eso el paso 12 no borra nada hasta que la ventana de reversa termina.
 
-Los CSV son el único registro de **exactamente** qué filas introdujo esta ejecución. Por eso
-esta reversa los necesita, y por eso el paso 12 no borra los CSV hasta que la ventana de reversa
-termina. Guárdelo como `prod-to-test/04-rollback.sql` **fuera** de este directorio, para que nadie
-lo ejecute por accidente junto con la migración.
+### Reversa acotada a las filas que esta ejecución insertó
+
+La reversa no puede usar los CSV de extracción como fuente de "qué borrar", y esa es la razón de
+que exista el registro de la sección 6. Un CSV de extracción es la foto de **producción**, y
+mezcla dos clases de filas que este procedimiento nunca debe tratar igual:
+
+- las que en test **no** existían y esta carga creó;
+- las que en test **ya** existían, con la misma clave, y la carga dejó intactas a propósito
+  (`ON CONFLICT DO NOTHING`).
+
+Borrar por el CSV borraría las dos clases, es decir, borraría filas que test ya tenía antes de
+que usted empezara. El registro `NN-<tabla>-inserted.csv` contiene **solo la primera clase**,
+porque la carga lo calculó con las preimágenes `pre_<tabla>` de cada tabla. Eso es lo que hace
+que esta reversa no pueda tocar una fila preexistente por construcción, y no por cortesía.
+
+Guárdelo como `prod-to-test/04-rollback.sql` **fuera** de este directorio, para que nadie lo
+ejecute por accidente junto con la migración.
 
 ```sql
 \set ON_ERROR_STOP on
@@ -539,34 +733,37 @@ lo ejecute por accidente junto con la migración.
 -- Mismo directorio de trabajo que la carga: backend/scripts
 BEGIN;
 
-CREATE TEMP TABLE rb_user (LIKE "User" INCLUDING DEFAULTS) ON COMMIT DROP;
-\copy rb_user ("Id", "CellPhone", "CreatedBy", "CreatedDate", "Email", "FullName", "IsActive", "Login", "OfflinePasswordPreHash", "Password", "SelectedStoreId", "TenantId", "UpdatedBy", "UpdatedDate") FROM 'prod-to-test/data/01-user.csv' WITH (FORMAT csv, HEADER true)
-CREATE TEMP TABLE rb_owner (LIKE "Owner" INCLUDING DEFAULTS) ON COMMIT DROP;
-\copy rb_owner ("Id", "CreatedBy", "CreatedDate", "Description", "Guest", "IsActive", "TenantId", "UpdatedBy", "UpdatedDate", "UserId") FROM 'prod-to-test/data/02-owner.csv' WITH (FORMAT csv, HEADER true)
-CREATE TEMP TABLE rb_reseller (LIKE "ReSeller" INCLUDING DEFAULTS) ON COMMIT DROP;
-\copy rb_reseller ("Id", "Approved", "CreatedBy", "CreatedDate", "Description", "DiscountPrice", "IsActive", "PercentDiscountPrice", "TenantId", "UpdatedBy", "UpdatedDate", "UserId") FROM 'prod-to-test/data/03-reseller.csv' WITH (FORMAT csv, HEADER true)
-CREATE TEMP TABLE rb_reseller_owner (LIKE "ReSellerOwner" INCLUDING DEFAULTS) ON COMMIT DROP;
-\copy rb_reseller_owner ("ReSellerId", "OwnerId", "CreatedBy", "CreatedDate", "DiscountPrice", "IsActive", "PercentDiscountPrice", "TenantId", "UpdatedBy", "UpdatedDate") FROM 'prod-to-test/data/04-reseller-owner.csv' WITH (FORMAT csv, HEADER true)
-CREATE TEMP TABLE rb_store (LIKE "Store" INCLUDING DEFAULTS) ON COMMIT DROP;
-\copy rb_store ("Id", "Address", "Approved", "CreatedBy", "CreatedDate", "Description", "IsActive", "Name", "NextDueDateOverride", "OwnerId", "PaymentStartDate", "StorePlanId", "TenantId", "UpdatedBy", "UpdatedDate") FROM 'prod-to-test/data/05-store.csv' WITH (FORMAT csv, HEADER true)
-CREATE TEMP TABLE rb_store_module (LIKE "StoreModule" INCLUDING DEFAULTS) ON COMMIT DROP;
-\copy rb_store_module ("StoreId", "ModuleId", "CreatedBy", "CreatedDate", "IsActive", "ModuleDiscountPrice", "ModulePercentDiscountPrice", "ModulePrice", "ModulePriceIncluded", "Price", "TenantId", "UpdatedBy", "UpdatedDate") FROM 'prod-to-test/data/06-store-module.csv' WITH (FORMAT csv, HEADER true)
-CREATE TEMP TABLE rb_store_role_feature (LIKE "StoreRoleFeature" INCLUDING DEFAULTS) ON COMMIT DROP;
-\copy rb_store_role_feature ("StoreId", "RoleId", "FeatureId", "CreatedBy", "CreatedDate", "IsActive", "TenantId", "UpdatedBy", "UpdatedDate") FROM 'prod-to-test/data/07-store-role-feature.csv' WITH (FORMAT csv, HEADER true)
-CREATE TEMP TABLE rb_store_user (LIKE "StoreUser" INCLUDING DEFAULTS) ON COMMIT DROP;
-\copy rb_store_user ("UserId", "StoreId", "CreatedBy", "CreatedDate", "IsActive", "TenantId", "UpdatedBy", "UpdatedDate") FROM 'prod-to-test/data/08-store-user.csv' WITH (FORMAT csv, HEADER true)
-CREATE TEMP TABLE rb_user_role (LIKE "UserRole" INCLUDING DEFAULTS) ON COMMIT DROP;
-\copy rb_user_role ("UserId", "RoleId", "CreatedBy", "CreatedDate", "IsActive", "TenantId", "UpdatedBy", "UpdatedDate") FROM 'prod-to-test/data/09-user-role.csv' WITH (FORMAT csv, HEADER true)
-CREATE TEMP TABLE rb_product_category (LIKE "ProductCategory" INCLUDING DEFAULTS) ON COMMIT DROP;
-\copy rb_product_category ("Id", "CreatedBy", "CreatedDate", "IsActive", "Name", "Order", "StoreId", "TenantId", "UpdatedBy", "UpdatedDate") FROM 'prod-to-test/data/10-product-category.csv' WITH (FORMAT csv, HEADER true)
-CREATE TEMP TABLE rb_product (LIKE "Product" INCLUDING DEFAULTS) ON COMMIT DROP;
-\copy rb_product ("Id", "AvailableToSale", "BusinessId", "CategoryId", "CreatedBy", "CreatedDate", "Currency", "DiscountFromInventory", "IsActive", "Name", "Order", "Price", "TenantId", "UpdatedBy", "UpdatedDate") FROM 'prod-to-test/data/11-product.csv' WITH (FORMAT csv, HEADER true)
-CREATE TEMP TABLE rb_channel_exchange_rate (LIKE "ChannelExchangeRate" INCLUDING DEFAULTS) ON COMMIT DROP;
-\copy rb_channel_exchange_rate ("Id", "CreatedBy", "CreatedDate", "Currency", "EffectiveFrom", "IsActive", "Method", "StoreId", "TenantId", "UpdatedBy", "UpdatedDate", "Value") FROM 'prod-to-test/data/12-channel-exchange-rate.csv' WITH (FORMAT csv, HEADER true)
+-- Tablas de paso con SOLO las claves que esta ejecución insertó. Nada más:
+-- ni contraseñas, ni correos, ni teléfonos. Las columnas y sus tipos son las
+-- claves primarias del modelo (ApplicationDbContextModelSnapshot.cs).
+CREATE TEMP TABLE rb_user ("Id" uuid PRIMARY KEY) ON COMMIT DROP;
+\copy rb_user ("Id") FROM 'prod-to-test/data/01-user-inserted.csv' WITH (FORMAT csv, HEADER true)
+CREATE TEMP TABLE rb_owner ("Id" uuid PRIMARY KEY) ON COMMIT DROP;
+\copy rb_owner ("Id") FROM 'prod-to-test/data/02-owner-inserted.csv' WITH (FORMAT csv, HEADER true)
+CREATE TEMP TABLE rb_reseller ("Id" uuid PRIMARY KEY) ON COMMIT DROP;
+\copy rb_reseller ("Id") FROM 'prod-to-test/data/03-reseller-inserted.csv' WITH (FORMAT csv, HEADER true)
+CREATE TEMP TABLE rb_reseller_owner ("ReSellerId" uuid, "OwnerId" uuid, PRIMARY KEY ("ReSellerId", "OwnerId")) ON COMMIT DROP;
+\copy rb_reseller_owner ("ReSellerId", "OwnerId") FROM 'prod-to-test/data/04-reseller-owner-inserted.csv' WITH (FORMAT csv, HEADER true)
+CREATE TEMP TABLE rb_store ("Id" uuid PRIMARY KEY) ON COMMIT DROP;
+\copy rb_store ("Id") FROM 'prod-to-test/data/05-store-inserted.csv' WITH (FORMAT csv, HEADER true)
+CREATE TEMP TABLE rb_store_module ("StoreId" uuid, "ModuleId" integer, PRIMARY KEY ("StoreId", "ModuleId")) ON COMMIT DROP;
+\copy rb_store_module ("StoreId", "ModuleId") FROM 'prod-to-test/data/06-store-module-inserted.csv' WITH (FORMAT csv, HEADER true)
+CREATE TEMP TABLE rb_store_role_feature ("StoreId" uuid, "RoleId" integer, "FeatureId" integer, PRIMARY KEY ("StoreId", "RoleId", "FeatureId")) ON COMMIT DROP;
+\copy rb_store_role_feature ("StoreId", "RoleId", "FeatureId") FROM 'prod-to-test/data/07-store-role-feature-inserted.csv' WITH (FORMAT csv, HEADER true)
+CREATE TEMP TABLE rb_store_user ("UserId" uuid, "StoreId" uuid, PRIMARY KEY ("UserId", "StoreId")) ON COMMIT DROP;
+\copy rb_store_user ("UserId", "StoreId") FROM 'prod-to-test/data/08-store-user-inserted.csv' WITH (FORMAT csv, HEADER true)
+CREATE TEMP TABLE rb_user_role ("UserId" uuid, "RoleId" integer, PRIMARY KEY ("UserId", "RoleId")) ON COMMIT DROP;
+\copy rb_user_role ("UserId", "RoleId") FROM 'prod-to-test/data/09-user-role-inserted.csv' WITH (FORMAT csv, HEADER true)
+CREATE TEMP TABLE rb_product_category ("Id" uuid PRIMARY KEY) ON COMMIT DROP;
+\copy rb_product_category ("Id") FROM 'prod-to-test/data/10-product-category-inserted.csv' WITH (FORMAT csv, HEADER true)
+CREATE TEMP TABLE rb_product ("Id" uuid PRIMARY KEY) ON COMMIT DROP;
+\copy rb_product ("Id") FROM 'prod-to-test/data/11-product-inserted.csv' WITH (FORMAT csv, HEADER true)
+CREATE TEMP TABLE rb_channel_exchange_rate ("Id" uuid PRIMARY KEY) ON COMMIT DROP;
+\copy rb_channel_exchange_rate ("Id") FROM 'prod-to-test/data/12-channel-exchange-rate-inserted.csv' WITH (FORMAT csv, HEADER true)
 
 -- Orden inverso al de carga: hojas primero, por las 34 claves Restrict.
--- Los tres bloques opcionales solo se borran si se cargaron; si no, el
--- DELETE no encuentra filas y no hace nada.
+-- Los tres bloques opcionales se borran igual aunque el archivo esté vacío:
+-- un registro sin filas hace que el DELETE no encuentre nada y no hace nada.
 DELETE FROM "ChannelExchangeRate"  WHERE "Id" IN (SELECT "Id" FROM rb_channel_exchange_rate);
 DELETE FROM "Product"             WHERE "Id" IN (SELECT "Id" FROM rb_product);
 DELETE FROM "ProductCategory"     WHERE "Id" IN (SELECT "Id" FROM rb_product_category);
@@ -580,26 +777,56 @@ DELETE FROM "ReSeller"            WHERE "Id" IN (SELECT "Id" FROM rb_reseller);
 DELETE FROM "Owner"               WHERE "Id" IN (SELECT "Id" FROM rb_owner);
 DELETE FROM "User"                WHERE "Id" IN (SELECT "Id" FROM rb_user);
 
--- Debe dar 0 en las tres filas sembradas.
-SELECT 'Tenant: Default Tenant' AS seeded_row, count(*) AS should_be_1
-  FROM "Tenant" WHERE "Id" = 'b58bf718-c4ed-4ee9-a958-bb5a5db4f7e8'
-UNION ALL SELECT 'User: superadmin', count(*)
-  FROM "User" WHERE "Id" = '38b96d85-bf75-41ca-bfd7-796e7fe0ebc8'
-UNION ALL SELECT 'Store: Default Store', count(*)
-  FROM "Store" WHERE "Id" = '0ed24a91-6748-4f04-8902-7981a0ca79e0';
+-- Las tres filas sembradas tienen que seguir ahí. Si falta alguna, la
+-- transacción se revierte sola: es preferible no deshacer la carga que
+-- deshacerla dejando el superadmin sin fila.
+DO $assert$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM "Tenant"  WHERE "Id" = 'b58bf718-c4ed-4ee9-a958-bb5a5db4f7e8') THEN
+        RAISE EXCEPTION 'ABORT: the Default Tenant seed row is missing. The rollback is not committed.';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM "User"    WHERE "Id" = '38b96d85-bf75-41ca-bfd7-796e7fe0ebc8') THEN
+        RAISE EXCEPTION 'ABORT: the superadmin User seed row is missing. The rollback is not committed.';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM "UserRole" WHERE "UserId" = '38b96d85-bf75-41ca-bfd7-796e7fe0ebc8' AND "RoleId" = 1) THEN
+        RAISE EXCEPTION 'ABORT: the superadmin UserRole seed row is missing. The rollback is not committed.';
+    END IF;
+END
+$assert$;
 
 COMMIT;
 ```
 
-Dos advertencias sobre esta reversa:
+El `DO` al final es lo que convierte el `COMMIT` en una decisión y no en un reflejo. Antes esta
+reversa terminaba con un `SELECT` de conteo y un `COMMIT` incondicional: el `SELECT` imprimía un
+número, nadie lo leía, y la transacción se confirmaba igual. Ahora, si falta cualquiera de las
+tres filas sembradas, la excepción aborta la transacción y **no se borra nada**, y usted lee el
+motivo en pantalla.
 
-- **El `Owner` sembrado comparte `Id` con el `Tenant` por defecto.** Si producción tuviera un
-  `Owner` con ese identificador, esta reversa lo borraría. Es improbable, pero es exactamente el
-  motivo por el que el respaldo sigue siendo la reversa real.
-- **Esto deshace la carga, no deshace lo que la aplicación haya hecho después.** Si alguien usó
-  test y creó ventas o productos sobre las filas migradas, el borrado puede dejar filas nuevas
-  huérfanas de datos que ya no existen. Preferible a perder las filas sembradas, pero no es
-  limpio.
+Sobre las advertencias de la tabla de arriba, y por qué el registro las resuelve: la fila
+sembrada de `User` tiene `Id = 38b96d85-…`. Si producción tiene un usuario con ese `Id`, la
+carga lo encuentra en destino, lo salta por `ON CONFLICT DO NOTHING`, y como estaba en destino
+*antes* del `INSERT` queda en `pre_user` y por tanto **fuera** del registro. Si producción no
+tiene ese `Id`, la fila nunca entra en `stg_user` y tampoco llega al registro. Los dos caminos
+terminan en lo mismo: el `DELETE FROM "User" WHERE "Id" IN (SELECT "Id" FROM rb_user)` no lo
+toca. Lo mismo vale para la fila de `UserRole` del superadmin al rol `1`, cuya clave compuesta
+está en el mismo caso. Ese es el punto entero del registro, y la razón por la que `load_not_landed`
+—el conjunto de filas que ya estaban en destino— no sirve aquí: es exactamente el conjunto que
+esta reversa debe **conservar**.
+
+Tres advertencias honestas sobre esta reversa:
+
+- **Deshace la carga, no deshace lo que la aplicación haya hecho después.** Si alguien usó test y
+  creó ventas, productos o movimientos sobre las filas migradas, el borrado puede dejar filas
+  nuevas huérfanas de datos que ya no existen. Preferible a perder las filas sembradas, pero no
+  es limpio.
+- **El registro se sobrescribe.** Si reejecutó la carga dentro de la ventana de reversa, los
+  doce archivos describen la última ejecución, no la primera, y esta reversa borrará el conjunto
+  de esa última. Vuelva a leer el resumen de la sección 6 y anote el `inserted_by_this_run` de
+  cada tabla antes de decidir.
+- **No distingue "insertada por mí" de "borrada y reinsertada por alguien más".** Si alguien
+  borró una fila migrada y volvió a crearla, el registro no lo sabe y la borrará igual. Es un
+  caso raro y usted lo sabría.
 
 En cualquier caso: **antes de la carga, guarde un respaldo de `smca_test`** (`pg_dump`). Ese
 respaldo es su reversa real.
@@ -613,14 +840,24 @@ cd backend/scripts
 shred -u prod-to-test/data/*.csv 2>/dev/null || rm -f prod-to-test/data/*.csv
 ```
 
-**No haga esto todavía.** Los CSV son la única fuente de las dos cosas que el script no puede
-rehacer: los identificadores que este procedimiento movió (necesarios para la reversa acotada de
-la sección 11) y el momento en que se movieron (necesario para explicar una diferencia que
-aparezca más adelante). Espere a que termine la ventana de reversa: hasta que usted decida que la
-carga es definitiva y que no va a repetirla.
+Ese `*.csv` se lleva los doce CSV de extracción **y** los doce `NN-<tabla>-inserted.csv` del
+registro de la sección 6, y está bien que se los lleve juntos, pero solo al final.
+
+**No haga esto todavía.** Los dos conjuntos son cosas distintas y los dos duran lo mismo:
+
+- Los **`NN-<tabla>-inserted.csv`** son la fuente de la reversa acotada de la sección 11. Sin
+  ellos, esa reversa no se puede hacer, y la alternativa es el `pg_dump` de la sección 10.
+  Son **claves solamente**: no contienen contraseñas, correos ni teléfonos, solo identificadores.
+- Los **doce CSV de extracción** son el registro de lo que producción tenía en el momento de la
+  foto. La reversa no los usa. Se conservan porque son la única forma de explicar una diferencia
+  que aparezca más adelante, y porque un reintento de la carga los necesita.
+
+Espere a que termine la ventana de reversa: hasta que usted decida que la carga es definitiva y
+que no va a repetirla. Si borra el registro y después cambia de opinión, ya no tiene reversa
+acotada.
 
 Haga la limpieza **después** de haber verificado. Si la verificación falla y necesita reintentar,
-conserve los CSV.
+conserve los dos conjuntos.
 
 Los archivos `extract-baseline.txt` y `verify-after.txt` se pueden conservar: no contienen
 secretos, solo conteos. Aun así, revise `verify-after.txt` antes de compartirlo: la consulta 7

@@ -208,18 +208,77 @@ would have been rejected.
 ### 8. The blanket `DELETE FROM "User"` rollback destroyed seeded rows
 
 The rollback in the earlier README deleted every row of every table. That destroys the seeded
-superadmin (`38b96d85-…`), the seeded "Admin Owner" `Owner` (whose `Id` **is** the Default Tenant
-id `b58bf718-…`), and the seeded "Default Store" (`0ed24a91-…`). `HasData` rows are written by a
-**migration**: once that migration is recorded as applied, restarting the application will not
-restore a deleted seed. Fixed by scoping the rollback to the migrated ids, re-read from the same
-CSVs into temp tables — which is also why section 12 must not shred the CSVs until the rollback
-window closes.
+superadmin (`38b96d85-…`) and its `UserRole` row. `HasData` rows are written by a **migration**:
+once that migration is recorded as applied, restarting the application will not restore a deleted
+seed.
+
+Two corrections to the original write-up of this defect, both verified against the snapshot:
+
+- The earlier version also listed the seeded "Admin Owner" `Owner` (whose `Id` **is** the Default
+  Tenant id `b58bf718-…`) and the seeded "Default Store" (`0ed24a91-…`) as at risk. **They are
+  not seeded rows any more.** `20240910194934_Create-Store-Module-Price.cs` issues `DeleteData`
+  for `Store` (lines 30-33) and for `Owner` (lines 35-38), and
+  `ApplicationDbContextModelSnapshot.cs` consequently carries no `HasData` block for either
+  table. The only `HasData` rows that touch this procedure are `Tenant` `b58bf718-…`, `User`
+  `38b96d85-…` and `UserRole` (`38b96d85-…`, role `1`).
+- Scoping the rollback to "the migrated ids", re-read from the extraction CSVs, is **not** a fix
+  — it is the same defect wearing a different hat. An extraction CSV is a snapshot of *production*
+  and mixes two classes of row: those that did not exist in test and that the load created, and
+  those that already existed in test under the same key and that the load correctly left alone
+  (`ON CONFLICT DO NOTHING`). Deleting by that CSV destroys the second class — rows test had
+  before the procedure started. `load_not_landed` is the same trap from the other side: it is the
+  set of staged rows **absent** from the target, which is precisely the set the rollback must
+  *keep*.
+
+The fix is a record of what **this run inserted**. Before each `INSERT`, the load snapshots the
+staging keys into a `pre_<table>` temp table; after the `INSERT`,
+
+```
+inserted = (staged keys present in the target now) − pre_<table>
+```
+
+and that difference is written to `data/NN-<table>-inserted.csv`, **key columns only**, after
+every guard has passed and immediately before the `COMMIT`. The three optional tables get a
+header-only file, so the set is always twelve files and the rollback needs no flags. A pre-existing
+row is structurally out of reach: if production carries a key that test already had, the row is
+in `pre_<table>` and therefore not in the record; if production does not carry it, the key never
+reaches the staging table. Either path, the seeded superadmin and its `UserRole` survive.
+
+The rollback now re-reads only those key-only files, and gates its own `COMMIT`: a `DO` block
+`RAISE EXCEPTION`s if any of the three seeded rows is missing, so a rollback that would leave the
+superadmin without a row aborts instead of confirming. Known limitation, documented in README
+section 6: a second load overwrites the twelve files, so a re-run inside the rollback window
+describes the later run.
 
 ### 9. The verification script could not see a missing link
 
 `03-verify.sql`'s orphan check asks whether a link's parents exist; it can never report a link
 that does not exist. Added Query 9 (Gestors with zero owner links) and Query 8 (tenant
 integrity, which no FK can check).
+
+### 10. Second correction round: the tooling and the docs
+
+- **`HEADER MATCH` was gated at the wrong version.** The gate was `server_version_num >= 170000`;
+  the option arrived in PostgreSQL **15**. The gate is now `>= 150000`, and the README quotes the
+  official wording — the header is compared to *the actual column names of the table, in order* —
+  which is also the honest caveat: it catches a mismatched CSV header, not a column list in the
+  script that has drifted from the EF model.
+- **`--connection` was presented as sufficient against
+  `ApplicationDbContextDesignFactory`.** `IDesignTimeDbContextFactory` does take precedence over
+  the application's service provider (confirmed in `DbContextOperations.FindContextTypes`), so
+  the factory does decide the database the tools see. Whether `--connection` overrides the
+  factory was **not** verified, so the README no longer claims it does: it installs a matching
+  EF 8 tool, passes `--connection` on both commands, and checks `dotnet ef dbcontext info`
+  (`DatabaseName = smca_test`) as the pre-flight, with the `ASPNETCORE_ENVIRONMENT=Development`
+  application start as the route that does not depend on the question.
+- **Derived flags were named `do_*` while the operator-facing ones are `-v do_*`** in older
+  revisions of the docs. Renamed to `act_*`, with the operator input copied to `flag_*` in a
+  separate `\gset`, and `\echo` NOTICE blocks for anyone still passing the legacy `-v do_*`.
+- The `02-load.sql` header now states the `psql >= 10` / server `>= 9.5` requirement and why;
+  `01-extract.sql` and `03-verify.sql` carry the same `psql` header.
+- README section 5 now notes that `rm -f prod-to-test/data/*.csv` also clears the previous
+  round's `*-inserted.csv` record, and that the load itself must run under `umask 077` because
+  it writes the record.
 
 ## Deliverables
 
@@ -271,7 +330,20 @@ idempotent, `ON CONFLICT DO NOTHING`, and a trailing verification `SELECT`.
     off.
 15. `00-preflight-secrets.sh` exits `2` rather than guessing when no working JSON reader exists,
     and never falls back to a leaf-key text match.
-16. Every `\copy` uses `HEADER MATCH` where the server supports it (PostgreSQL 17+) and says so
-    out loud where it does not.
-17. The documented rollback deletes only the migrated ids, and the README names the seeded rows a
-    blanket `DELETE` would destroy.
+16. Every `\copy` uses `HEADER MATCH` where the server supports it (PostgreSQL **15**+, gated on
+    `server_version_num >= 150000`) and says so out loud where it does not. The README quotes
+    what the option actually compares, and warns that it does not catch a column list in the
+    script that has drifted from the EF model.
+17. The documented rollback deletes **only the rows this run inserted**, re-read from the
+    key-only `data/NN-<table>-inserted.csv` record — never from the extraction CSVs, which also
+    contain rows that already existed in test. The README names the three `HasData` rows a
+    blanket `DELETE` would destroy (`Tenant` `b58bf718-…`, `User` `38b96d85-…`, `UserRole`
+    (`38b96d85-…`, `1`)), states that the seeded `Owner` and `Store` were removed by
+    `20240910194934_Create-Store-Module-Price.cs` and are therefore not at risk, and gates the
+    rollback's own `COMMIT` on those three rows still being present.
+18. The load writes the twelve `*-inserted.csv` record files after every guard and immediately
+    before the `COMMIT`; the three optional tables get header-only files, so the set is always
+    twelve and the rollback needs no flags. README section 10 tells the maintainer to verify all
+    twelve exist while the rollback window is still open.
+19. Both the extraction and the load run under `umask 077` in the maintainer's own shell, and the
+    README says why: `psql` is a separate process and inherits the `umask` of the shell.

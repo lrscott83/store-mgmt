@@ -7,7 +7,11 @@
 -- Safety  : it ADDS rows. It never removes a row, never truncates a table,
 --           and never overwrites an existing row, so the seeded superadmin
 --           User, its UserRole row and the Default Tenant are untouched.
--- Tooling : psql >= 10 (it uses the \copy and \if meta-commands).
+-- Tooling : psql >= 10, and a server >= 9.5. The floor is the meta-command
+--           family this script is built on: \if/\else/\endif arrived in 10,
+--           \gset in 9.6, to_regclass in 9.4. The server floor is ON CONFLICT,
+--           which arrived in 9.5. The single feature it probes for, COPY ...
+--           HEADER MATCH, needs 15, and is used only when the server has it.
 --
 -- HOW TO RUN (from the backend/scripts directory, data/ already populated):
 --
@@ -138,6 +142,17 @@
 --     empty one is indistinguishable from a successful load of zero rows;
 --   * the optional blocks are gated on the VALUE of their flag, not on its
 --     presence, so -v load_product=0 turns the block off.
+--
+-- The dropped-row report covers all TWELVE tables, not only the nine
+-- mandatory ones. "An empty optional table is legitimate" and "a row that
+-- was supposed to land did not" are two different questions, and only the
+-- first one has an exception.
+--
+-- And one thing is WRITTEN, not checked. Just before the COMMIT, the keys
+-- this run actually INSERTED are recorded per table in
+-- prod-to-test/data/NN-<table>-inserted.csv. That record - not the extract
+-- CSVs - is what the rollback reads, and the reason is in the last section
+-- of this file.
 -- =====================================================
 
 \set ON_ERROR_STOP on
@@ -183,30 +198,70 @@ SET TIME ZONE 'UTC';
 -- unambiguously. NULLIF makes an empty value behave like an absent one, and
 -- lower() makes "False" and "FALSE" behave like "false".
 --
--- header_match reports whether this server understands COPY ... HEADER
--- MATCH, which arrived in PostgreSQL 17. Where it exists it is used, because
--- it is the only setting that checks the CSV's header line against the
--- target column list; where it does not, the load falls back to HEADER true
--- and says so out loud below. The server requirement is therefore not
--- raised silently.
+-- The flags are read in TWO steps on purpose. Step one only COPIES the four
+-- operator inputs into flag_* and resolves nothing, so nothing here can
+-- overwrite what -v set. Step two derives the booleans from those copies.
+-- A single \gset that both read and derive cannot tell a value it was
+-- handed from a value it wrote, so the derived names used to be silently
+-- driven by the query even when the operator passed them on the -v line.
+-- That is why the derived names below are act_* and why nothing in this
+-- script reads do_*.
+--
+-- A -v do_product=... (or do_product_category, do_channel_exchange_rate,
+-- do_allow_resume) from an older copy of this script is now meaningless and
+-- is called out, because a flag that is accepted on the command line and
+-- then does the opposite is worse than no flag at all.
+\if :{?do_product}
+  \echo 'NOTICE: -v do_product=... is IGNORED. These are not the inputs.'
+  \echo '        The inputs are load_product, load_product_category,'
+  \echo '        load_channel_exchange_rate and allow_resume; see the header.'
+\endif
+\if :{?do_product_category}
+  \echo 'NOTICE: -v do_product_category=... is IGNORED. Use -v load_product_category=...'
+\endif
+\if :{?do_channel_exchange_rate}
+  \echo 'NOTICE: -v do_channel_exchange_rate=... is IGNORED. Use -v load_channel_exchange_rate=...'
+\endif
+\if :{?do_allow_resume}
+  \echo 'NOTICE: -v do_allow_resume=... is IGNORED. Use -v allow_resume=...'
+\endif
+
 SELECT
-    COALESCE(NULLIF(lower(:'load_product_category'), ''), '0')
-        NOT IN ('0', 'false', 'off', 'no')                      AS do_product_category,
-    COALESCE(NULLIF(lower(:'load_product'), ''), '0')
-        NOT IN ('0', 'false', 'off', 'no')                      AS do_product,
-    COALESCE(NULLIF(lower(:'load_channel_exchange_rate'), ''), '0')
-        NOT IN ('0', 'false', 'off', 'no')                      AS do_channel_exchange_rate,
-    COALESCE(NULLIF(lower(:'allow_resume'), ''), '0')
-        NOT IN ('0', 'false', 'off', 'no')                      AS do_allow_resume,
-    (current_setting('server_version_num')::integer >= 170000)::text AS header_match
+    :'load_product_category'      AS flag_product_category,
+    :'load_product'               AS flag_product,
+    :'load_channel_exchange_rate' AS flag_channel_exchange_rate,
+    :'allow_resume'               AS flag_allow_resume
+\gset
+
+-- header_match reports whether this server understands COPY ... HEADER
+-- MATCH, which arrived in PostgreSQL 15. Where it exists it is used, because
+-- it is the only setting that checks the CSV header line: the number and
+-- names of the columns in that line must match the ACTUAL COLUMN NAMES OF
+-- THE TABLE, IN ORDER. That is the official wording, and it is what the
+-- option really does - it compares the header to the table, not to a list
+-- typed into this script, so a column list that drifted from the model here
+-- would not be caught by it. Where the server is older the load falls back
+-- to HEADER true, which reads and discards the header unchecked, and says so
+-- out loud below. The server requirement is therefore never raised silently.
+SELECT
+    COALESCE(NULLIF(lower(:'flag_product_category'), ''), '0')
+        NOT IN ('0', 'false', 'off', 'no')                      AS act_product_category,
+    COALESCE(NULLIF(lower(:'flag_product'), ''), '0')
+        NOT IN ('0', 'false', 'off', 'no')                      AS act_product,
+    COALESCE(NULLIF(lower(:'flag_channel_exchange_rate'), ''), '0')
+        NOT IN ('0', 'false', 'off', 'no')                      AS act_channel_exchange_rate,
+    COALESCE(NULLIF(lower(:'flag_allow_resume'), ''), '0')
+        NOT IN ('0', 'false', 'off', 'no')                      AS act_allow_resume,
+    (current_setting('server_version_num')::integer >= 150000)::text AS header_match
 \gset
 
 \if :header_match
 \else
-  \echo 'NOTE: this server is older than PostgreSQL 17, so COPY HEADER MATCH is unavailable.'
+  \echo 'NOTE: this server is older than PostgreSQL 15, so COPY HEADER MATCH is unavailable.'
   \echo '      The CSV header lines are read and discarded WITHOUT being checked against the'
-  \echo '      column lists in this script. The column lists were verified against the EF model'
-  \echo '      when these files were written; if you changed one, re-check it by hand.'
+  \echo '      actual column names of the table. The column lists in this script were verified'
+  \echo '      against the EF model when these files were written; if you changed one, re-check'
+  \echo '      it by hand.'
 \endif
 
 -- --- Guard: the target schema and catalog must already be migrated -----
@@ -258,8 +313,8 @@ END
 $guard$;
 
 -- --- Guard: an optional block that cannot stand on its own -------------
-\if :do_product
-  \if :do_product_category
+\if :act_product
+  \if :act_product_category
   \else
     \echo 'STOP: -v load_product=1 requires -v load_product_category=1 (Product has a required FK to ProductCategory).'
     \quit 1
@@ -268,6 +323,34 @@ $guard$;
 
 BEGIN;
 
+-- ---------------------------------------------------------------------
+-- The pre-existing set: what the TARGET already held, per table
+-- ---------------------------------------------------------------------
+-- ON CONFLICT DO NOTHING makes the load additive but it makes the result
+-- ambiguous. Once a table has been written, a staged key being present in
+-- the target no longer says whether this run put it there or found it
+-- there first. Everything downstream needs that distinction, and the only
+-- place it exists is BEFORE the insert, so each table's pre-existing keys
+-- are captured here, immediately before that table is written.
+--
+-- pre_<table> is exactly: the staged keys that the target already held.
+-- Nothing else. It is not a snapshot of the table - only the keys the load
+-- is about to consider.
+--
+-- Why it has to exist: 01-extract.sql copies EVERY row of these twelve
+-- tables, with no filter of any kind, so the staged data includes the rows
+-- the migrations seeded in production - which test also has, built by the
+-- same migrations with the same fixed identifiers. The seeded superadmin
+-- User 38b96d85-bf75-41ca-bfd7-796e7fe0ebc8 is one of them, and so is its
+-- UserRole row. On a real run those two inserts are skipped, nothing looks
+-- wrong, and a rollback driven from the extract CSVs would delete them. The
+-- migration that wrote them is already recorded as applied, so it will not
+-- write them again.
+--
+-- These tables are what the rollback reads. The extract CSVs are not.
+--
+-- Each pre_<table> is created right after its stg_<table> is filled and
+-- right before that table's INSERT, so the two can never drift apart.
 -- =====================================================
 -- 1 / User
 -- =====================================================
@@ -277,6 +360,9 @@ CREATE TEMP TABLE stg_user (LIKE "User" INCLUDING DEFAULTS) ON COMMIT DROP;
 \else
   \copy stg_user ("Id", "CellPhone", "CreatedBy", "CreatedDate", "Email", "FullName", "IsActive", "Login", "OfflinePasswordPreHash", "Password", "SelectedStoreId", "TenantId", "UpdatedBy", "UpdatedDate") FROM 'prod-to-test/data/01-user.csv' WITH (FORMAT csv, HEADER true)
 \endif
+CREATE TEMP TABLE pre_user (LIKE stg_user) ON COMMIT DROP;
+INSERT INTO pre_user SELECT s.* FROM stg_user s
+ WHERE EXISTS (SELECT 1 FROM "User" x WHERE x."Id" = s."Id");
 INSERT INTO "User" ("Id", "CellPhone", "CreatedBy", "CreatedDate", "Email", "FullName", "IsActive", "Login", "OfflinePasswordPreHash", "Password", "SelectedStoreId", "TenantId", "UpdatedBy", "UpdatedDate")
 SELECT "Id", "CellPhone", "CreatedBy", "CreatedDate", "Email", "FullName", "IsActive", "Login", "OfflinePasswordPreHash", "Password", "SelectedStoreId", "TenantId", "UpdatedBy", "UpdatedDate"
 FROM stg_user ON CONFLICT DO NOTHING;
@@ -290,6 +376,9 @@ CREATE TEMP TABLE stg_owner (LIKE "Owner" INCLUDING DEFAULTS) ON COMMIT DROP;
 \else
   \copy stg_owner ("Id", "CreatedBy", "CreatedDate", "Description", "Guest", "IsActive", "TenantId", "UpdatedBy", "UpdatedDate", "UserId") FROM 'prod-to-test/data/02-owner.csv' WITH (FORMAT csv, HEADER true)
 \endif
+CREATE TEMP TABLE pre_owner (LIKE stg_owner) ON COMMIT DROP;
+INSERT INTO pre_owner SELECT s.* FROM stg_owner s
+ WHERE EXISTS (SELECT 1 FROM "Owner" x WHERE x."Id" = s."Id");
 INSERT INTO "Owner" ("Id", "CreatedBy", "CreatedDate", "Description", "Guest", "IsActive", "TenantId", "UpdatedBy", "UpdatedDate", "UserId")
 SELECT "Id", "CreatedBy", "CreatedDate", "Description", "Guest", "IsActive", "TenantId", "UpdatedBy", "UpdatedDate", "UserId"
 FROM stg_owner ON CONFLICT DO NOTHING;
@@ -303,6 +392,9 @@ CREATE TEMP TABLE stg_reseller (LIKE "ReSeller" INCLUDING DEFAULTS) ON COMMIT DR
 \else
   \copy stg_reseller ("Id", "Approved", "CreatedBy", "CreatedDate", "Description", "DiscountPrice", "IsActive", "PercentDiscountPrice", "TenantId", "UpdatedBy", "UpdatedDate", "UserId") FROM 'prod-to-test/data/03-reseller.csv' WITH (FORMAT csv, HEADER true)
 \endif
+CREATE TEMP TABLE pre_reseller (LIKE stg_reseller) ON COMMIT DROP;
+INSERT INTO pre_reseller SELECT s.* FROM stg_reseller s
+ WHERE EXISTS (SELECT 1 FROM "ReSeller" x WHERE x."Id" = s."Id");
 INSERT INTO "ReSeller" ("Id", "Approved", "CreatedBy", "CreatedDate", "Description", "DiscountPrice", "IsActive", "PercentDiscountPrice", "TenantId", "UpdatedBy", "UpdatedDate", "UserId")
 SELECT "Id", "Approved", "CreatedBy", "CreatedDate", "Description", "DiscountPrice", "IsActive", "PercentDiscountPrice", "TenantId", "UpdatedBy", "UpdatedDate", "UserId"
 FROM stg_reseller ON CONFLICT DO NOTHING;
@@ -317,6 +409,10 @@ CREATE TEMP TABLE stg_reseller_owner (LIKE "ReSellerOwner" INCLUDING DEFAULTS) O
 \else
   \copy stg_reseller_owner ("ReSellerId", "OwnerId", "CreatedBy", "CreatedDate", "DiscountPrice", "IsActive", "PercentDiscountPrice", "TenantId", "UpdatedBy", "UpdatedDate") FROM 'prod-to-test/data/04-reseller-owner.csv' WITH (FORMAT csv, HEADER true)
 \endif
+CREATE TEMP TABLE pre_reseller_owner (LIKE stg_reseller_owner) ON COMMIT DROP;
+INSERT INTO pre_reseller_owner SELECT s.* FROM stg_reseller_owner s
+ WHERE EXISTS (SELECT 1 FROM "ReSellerOwner" x
+                WHERE x."ReSellerId" = s."ReSellerId" AND x."OwnerId" = s."OwnerId");
 INSERT INTO "ReSellerOwner" ("ReSellerId", "OwnerId", "CreatedBy", "CreatedDate", "DiscountPrice", "IsActive", "PercentDiscountPrice", "TenantId", "UpdatedBy", "UpdatedDate")
 SELECT "ReSellerId", "OwnerId", "CreatedBy", "CreatedDate", "DiscountPrice", "IsActive", "PercentDiscountPrice", "TenantId", "UpdatedBy", "UpdatedDate"
 FROM stg_reseller_owner ON CONFLICT DO NOTHING;
@@ -332,6 +428,9 @@ CREATE TEMP TABLE stg_store (LIKE "Store" INCLUDING DEFAULTS) ON COMMIT DROP;
 \else
   \copy stg_store ("Id", "Address", "Approved", "CreatedBy", "CreatedDate", "Description", "IsActive", "Name", "NextDueDateOverride", "OwnerId", "PaymentStartDate", "StorePlanId", "TenantId", "UpdatedBy", "UpdatedDate") FROM 'prod-to-test/data/05-store.csv' WITH (FORMAT csv, HEADER true)
 \endif
+CREATE TEMP TABLE pre_store (LIKE stg_store) ON COMMIT DROP;
+INSERT INTO pre_store SELECT s.* FROM stg_store s
+ WHERE EXISTS (SELECT 1 FROM "Store" x WHERE x."Id" = s."Id");
 INSERT INTO "Store" ("Id", "Address", "Approved", "CreatedBy", "CreatedDate", "Description", "IsActive", "Name", "NextDueDateOverride", "OwnerId", "PaymentStartDate", "StorePlanId", "TenantId", "UpdatedBy", "UpdatedDate")
 SELECT "Id", "Address", "Approved", "CreatedBy", "CreatedDate", "Description", "IsActive", "Name", "NextDueDateOverride", "OwnerId", "PaymentStartDate", "StorePlanId", "TenantId", "UpdatedBy", "UpdatedDate"
 FROM stg_store ON CONFLICT DO NOTHING;
@@ -347,6 +446,10 @@ CREATE TEMP TABLE stg_store_module (LIKE "StoreModule" INCLUDING DEFAULTS) ON CO
 \else
   \copy stg_store_module ("StoreId", "ModuleId", "CreatedBy", "CreatedDate", "IsActive", "ModuleDiscountPrice", "ModulePercentDiscountPrice", "ModulePrice", "ModulePriceIncluded", "Price", "TenantId", "UpdatedBy", "UpdatedDate") FROM 'prod-to-test/data/06-store-module.csv' WITH (FORMAT csv, HEADER true)
 \endif
+CREATE TEMP TABLE pre_store_module (LIKE stg_store_module) ON COMMIT DROP;
+INSERT INTO pre_store_module SELECT s.* FROM stg_store_module s
+ WHERE EXISTS (SELECT 1 FROM "StoreModule" x
+                WHERE x."StoreId" = s."StoreId" AND x."ModuleId" = s."ModuleId");
 INSERT INTO "StoreModule" ("StoreId", "ModuleId", "CreatedBy", "CreatedDate", "IsActive", "ModuleDiscountPrice", "ModulePercentDiscountPrice", "ModulePrice", "ModulePriceIncluded", "Price", "TenantId", "UpdatedBy", "UpdatedDate")
 SELECT "StoreId", "ModuleId", "CreatedBy", "CreatedDate", "IsActive", "ModuleDiscountPrice", "ModulePercentDiscountPrice", "ModulePrice", "ModulePriceIncluded", "Price", "TenantId", "UpdatedBy", "UpdatedDate"
 FROM stg_store_module ON CONFLICT DO NOTHING;
@@ -364,6 +467,12 @@ CREATE TEMP TABLE stg_store_role_feature (LIKE "StoreRoleFeature" INCLUDING DEFA
 \else
   \copy stg_store_role_feature ("StoreId", "RoleId", "FeatureId", "CreatedBy", "CreatedDate", "IsActive", "TenantId", "UpdatedBy", "UpdatedDate") FROM 'prod-to-test/data/07-store-role-feature.csv' WITH (FORMAT csv, HEADER true)
 \endif
+CREATE TEMP TABLE pre_store_role_feature (LIKE stg_store_role_feature) ON COMMIT DROP;
+INSERT INTO pre_store_role_feature SELECT s.* FROM stg_store_role_feature s
+ WHERE EXISTS (SELECT 1 FROM "StoreRoleFeature" x
+                WHERE x."StoreId" = s."StoreId"
+                  AND x."RoleId" = s."RoleId"
+                  AND x."FeatureId" = s."FeatureId");
 INSERT INTO "StoreRoleFeature" ("StoreId", "RoleId", "FeatureId", "CreatedBy", "CreatedDate", "IsActive", "TenantId", "UpdatedBy", "UpdatedDate")
 SELECT "StoreId", "RoleId", "FeatureId", "CreatedBy", "CreatedDate", "IsActive", "TenantId", "UpdatedBy", "UpdatedDate"
 FROM stg_store_role_feature ON CONFLICT DO NOTHING;
@@ -379,6 +488,10 @@ CREATE TEMP TABLE stg_store_user (LIKE "StoreUser" INCLUDING DEFAULTS) ON COMMIT
 \else
   \copy stg_store_user ("UserId", "StoreId", "CreatedBy", "CreatedDate", "IsActive", "TenantId", "UpdatedBy", "UpdatedDate") FROM 'prod-to-test/data/08-store-user.csv' WITH (FORMAT csv, HEADER true)
 \endif
+CREATE TEMP TABLE pre_store_user (LIKE stg_store_user) ON COMMIT DROP;
+INSERT INTO pre_store_user SELECT s.* FROM stg_store_user s
+ WHERE EXISTS (SELECT 1 FROM "StoreUser" x
+                WHERE x."UserId" = s."UserId" AND x."StoreId" = s."StoreId");
 INSERT INTO "StoreUser" ("UserId", "StoreId", "CreatedBy", "CreatedDate", "IsActive", "TenantId", "UpdatedBy", "UpdatedDate")
 SELECT "UserId", "StoreId", "CreatedBy", "CreatedDate", "IsActive", "TenantId", "UpdatedBy", "UpdatedDate"
 FROM stg_store_user ON CONFLICT DO NOTHING;
@@ -392,6 +505,10 @@ CREATE TEMP TABLE stg_user_role (LIKE "UserRole" INCLUDING DEFAULTS) ON COMMIT D
 \else
   \copy stg_user_role ("UserId", "RoleId", "CreatedBy", "CreatedDate", "IsActive", "TenantId", "UpdatedBy", "UpdatedDate") FROM 'prod-to-test/data/09-user-role.csv' WITH (FORMAT csv, HEADER true)
 \endif
+CREATE TEMP TABLE pre_user_role (LIKE stg_user_role) ON COMMIT DROP;
+INSERT INTO pre_user_role SELECT s.* FROM stg_user_role s
+ WHERE EXISTS (SELECT 1 FROM "UserRole" x
+                WHERE x."UserId" = s."UserId" AND x."RoleId" = s."RoleId");
 INSERT INTO "UserRole" ("UserId", "RoleId", "CreatedBy", "CreatedDate", "IsActive", "TenantId", "UpdatedBy", "UpdatedDate")
 SELECT "UserId", "RoleId", "CreatedBy", "CreatedDate", "IsActive", "TenantId", "UpdatedBy", "UpdatedDate"
 FROM stg_user_role ON CONFLICT DO NOTHING;
@@ -399,13 +516,16 @@ FROM stg_user_role ON CONFLICT DO NOTHING;
 -- =====================================================
 -- 10 / ProductCategory   (-> Store)          [optional, off by default]
 -- =====================================================
-\if :do_product_category
+\if :act_product_category
 CREATE TEMP TABLE stg_product_category (LIKE "ProductCategory" INCLUDING DEFAULTS) ON COMMIT DROP;
 \if :header_match
   \copy stg_product_category ("Id", "CreatedBy", "CreatedDate", "IsActive", "Name", "Order", "StoreId", "TenantId", "UpdatedBy", "UpdatedDate") FROM 'prod-to-test/data/10-product-category.csv' WITH (FORMAT csv, HEADER MATCH)
 \else
   \copy stg_product_category ("Id", "CreatedBy", "CreatedDate", "IsActive", "Name", "Order", "StoreId", "TenantId", "UpdatedBy", "UpdatedDate") FROM 'prod-to-test/data/10-product-category.csv' WITH (FORMAT csv, HEADER true)
 \endif
+CREATE TEMP TABLE pre_product_category (LIKE stg_product_category) ON COMMIT DROP;
+INSERT INTO pre_product_category SELECT s.* FROM stg_product_category s
+ WHERE EXISTS (SELECT 1 FROM "ProductCategory" x WHERE x."Id" = s."Id");
 INSERT INTO "ProductCategory" ("Id", "CreatedBy", "CreatedDate", "IsActive", "Name", "Order", "StoreId", "TenantId", "UpdatedBy", "UpdatedDate")
 SELECT "Id", "CreatedBy", "CreatedDate", "IsActive", "Name", "Order", "StoreId", "TenantId", "UpdatedBy", "UpdatedDate"
 FROM stg_product_category ON CONFLICT DO NOTHING;
@@ -415,13 +535,16 @@ FROM stg_product_category ON CONFLICT DO NOTHING;
 -- 11 / Product   (-> ProductCategory)       [optional, off by default]
 -- Requires step 10. The guard above refuses to run without it.
 -- =====================================================
-\if :do_product
+\if :act_product
 CREATE TEMP TABLE stg_product (LIKE "Product" INCLUDING DEFAULTS) ON COMMIT DROP;
 \if :header_match
   \copy stg_product ("Id", "AvailableToSale", "BusinessId", "CategoryId", "CreatedBy", "CreatedDate", "Currency", "DiscountFromInventory", "IsActive", "Name", "Order", "Price", "TenantId", "UpdatedBy", "UpdatedDate") FROM 'prod-to-test/data/11-product.csv' WITH (FORMAT csv, HEADER MATCH)
 \else
   \copy stg_product ("Id", "AvailableToSale", "BusinessId", "CategoryId", "CreatedBy", "CreatedDate", "Currency", "DiscountFromInventory", "IsActive", "Name", "Order", "Price", "TenantId", "UpdatedBy", "UpdatedDate") FROM 'prod-to-test/data/11-product.csv' WITH (FORMAT csv, HEADER true)
 \endif
+CREATE TEMP TABLE pre_product (LIKE stg_product) ON COMMIT DROP;
+INSERT INTO pre_product SELECT s.* FROM stg_product s
+ WHERE EXISTS (SELECT 1 FROM "Product" x WHERE x."Id" = s."Id");
 INSERT INTO "Product" ("Id", "AvailableToSale", "BusinessId", "CategoryId", "CreatedBy", "CreatedDate", "Currency", "DiscountFromInventory", "IsActive", "Name", "Order", "Price", "TenantId", "UpdatedBy", "UpdatedDate")
 SELECT "Id", "AvailableToSale", "BusinessId", "CategoryId", "CreatedBy", "CreatedDate", "Currency", "DiscountFromInventory", "IsActive", "Name", "Order", "Price", "TenantId", "UpdatedBy", "UpdatedDate"
 FROM stg_product ON CONFLICT DO NOTHING;
@@ -430,13 +553,16 @@ FROM stg_product ON CONFLICT DO NOTHING;
 -- =====================================================
 -- 12 / ChannelExchangeRate   (-> Store)     [optional, off by default]
 -- =====================================================
-\if :do_channel_exchange_rate
+\if :act_channel_exchange_rate
 CREATE TEMP TABLE stg_channel_exchange_rate (LIKE "ChannelExchangeRate" INCLUDING DEFAULTS) ON COMMIT DROP;
 \if :header_match
   \copy stg_channel_exchange_rate ("Id", "CreatedBy", "CreatedDate", "Currency", "EffectiveFrom", "IsActive", "Method", "StoreId", "TenantId", "UpdatedBy", "UpdatedDate", "Value") FROM 'prod-to-test/data/12-channel-exchange-rate.csv' WITH (FORMAT csv, HEADER MATCH)
 \else
   \copy stg_channel_exchange_rate ("Id", "CreatedBy", "CreatedDate", "Currency", "EffectiveFrom", "IsActive", "Method", "StoreId", "TenantId", "UpdatedBy", "UpdatedDate", "Value") FROM 'prod-to-test/data/12-channel-exchange-rate.csv' WITH (FORMAT csv, HEADER true)
 \endif
+CREATE TEMP TABLE pre_channel_exchange_rate (LIKE stg_channel_exchange_rate) ON COMMIT DROP;
+INSERT INTO pre_channel_exchange_rate SELECT s.* FROM stg_channel_exchange_rate s
+ WHERE EXISTS (SELECT 1 FROM "ChannelExchangeRate" x WHERE x."Id" = s."Id");
 INSERT INTO "ChannelExchangeRate" ("Id", "CreatedBy", "CreatedDate", "Currency", "EffectiveFrom", "IsActive", "Method", "StoreId", "TenantId", "UpdatedBy", "UpdatedDate", "Value")
 SELECT "Id", "CreatedBy", "CreatedDate", "Currency", "EffectiveFrom", "IsActive", "Method", "StoreId", "TenantId", "UpdatedBy", "UpdatedDate", "Value"
 FROM stg_channel_exchange_rate ON CONFLICT DO NOTHING;
@@ -597,6 +723,19 @@ ORDER BY 1;
 -- nothing fires, the transaction commits, and the account is simply absent
 -- from test.
 --
+-- This report covers ALL TWELVE tables, the three optional ones included.
+-- Leaving them out would have been easy to argue for - a store with no
+-- products legitimately produces an empty 11-product.csv - but that is a
+-- different question from this one. "Zero rows was expected" is answered by
+-- the empty-staging-table guard above, which keeps its nine mandatory tables.
+-- "A row that was staged did not land" has no excuse in any table: a
+-- truncated CSV, a primary key collision or a unique index elsewhere all
+-- drop a product or a category exactly as silently as they drop a user, and
+-- the verdict block would still have printed OK. The three optional arms are
+-- appended as separate INSERTs because their staging tables do not exist
+-- unless their block ran, and a query that names a missing table is a parse
+-- error, not an empty result.
+--
 -- An empty result here is the good case.
 CREATE TEMP TABLE load_not_landed ON COMMIT DROP AS
 SELECT 'User' AS table_name,
@@ -702,6 +841,48 @@ SELECT 'UserRole',
  WHERE NOT EXISTS (SELECT 1 FROM "UserRole" x
                     WHERE x."UserId" = ur."UserId" AND x."RoleId" = ur."RoleId");
 
+-- The three optional tables. Same shape as their arms above, same key
+-- columns, same contract: a row staged here and absent from the target is a
+-- dropped row, and the verdict block treats it as one.
+\if :act_product_category
+INSERT INTO load_not_landed
+SELECT 'ProductCategory',
+       'Id=' || pc."Id"::text,
+       'Store=' || coalesce(pcs."Name", '<Store ' || pc."StoreId"::text || ' is not in the target>')
+           || '  Name=' || coalesce(pc."Name", '<null>')
+           || '  IsActive=' || pc."IsActive"::text,
+       'ProductCategory."Id" only. This table carries no unique index besides its primary key, so any difference here is a re-run over an existing row, or a CSV that was truncated or malformed.'
+  FROM stg_product_category pc
+  LEFT JOIN "Store" pcs ON pcs."Id" = pc."StoreId"
+ WHERE NOT EXISTS (SELECT 1 FROM "ProductCategory" x WHERE x."Id" = pc."Id");
+\endif
+
+\if :act_product
+INSERT INTO load_not_landed
+SELECT 'Product',
+       'Id=' || p."Id"::text,
+       'CategoryId=' || p."CategoryId"::text
+           || '  Name=' || coalesce(p."Name", '<null>')
+           || '  Price=' || p."Price"::text
+           || '  IsActive=' || p."IsActive"::text,
+       'Product."Id" only. This table carries no unique index besides its primary key, so any difference here is a re-run over an existing row, or a CSV that was truncated or malformed.'
+  FROM stg_product p
+ WHERE NOT EXISTS (SELECT 1 FROM "Product" x WHERE x."Id" = p."Id");
+\endif
+
+\if :act_channel_exchange_rate
+INSERT INTO load_not_landed
+SELECT 'ChannelExchangeRate',
+       'Id=' || cer."Id"::text,
+       'Store=' || coalesce(cers."Name", '<Store ' || cer."StoreId"::text || ' is not in the target>')
+           || '  Currency=' || coalesce(cer."Currency", '<null>')
+           || '  Value=' || cer."Value"::text,
+       'ChannelExchangeRate."Id" only. This table carries no unique index besides its primary key, so any difference here is a re-run over an existing row, or a CSV that was truncated or malformed.'
+  FROM stg_channel_exchange_rate cer
+  LEFT JOIN "Store" cers ON cers."Id" = cer."StoreId"
+ WHERE NOT EXISTS (SELECT 1 FROM "ChannelExchangeRate" x WHERE x."Id" = cer."Id");
+\endif
+
 \echo '--- staged rows that did not land (no rows listed means every staged row is present) ---'
 SELECT * FROM load_not_landed ORDER BY table_name, row_identity;
 
@@ -728,7 +909,7 @@ SELECT EXISTS (SELECT 1 FROM load_not_landed)::text AS any_row_did_not_land
 \gset
 
 \if :any_row_did_not_land
-  \if :do_allow_resume
+  \if :act_allow_resume
     \echo 'NOTICE: -v allow_resume=1 is set, so the rows listed above will NOT stop the COMMIT.'
     \echo '         Confirm you read that list, and that every entry is a row the target already had.'
   \else
@@ -741,8 +922,153 @@ SELECT EXISTS (SELECT 1 FROM load_not_landed)::text AS any_row_did_not_land
     $assert$;
   \endif
 \else
-  \echo 'OK: every staged row is present in the target.'
+  \echo 'OK: every staged row of all twelve tables is present in the target.'
 \endif
+
+-- =====================================================================
+-- The record the rollback reads: the keys THIS RUN actually inserted
+-- =====================================================================
+-- WHY THIS BLOCK EXISTS, and why the extract CSVs cannot do this job
+--
+-- 01-extract.sql copies EVERY row of all twelve tables. It has no WHERE, no
+-- seed exclusion and no tenant filter, on purpose, because the inventory it
+-- prints has to show what production really holds. So the staged data is not
+-- "the rows to migrate"; it is "every row production has". Some of those
+-- rows test ALREADY HAD before this load ran, and the ones that always do
+-- are the ones the migrations seeded in BOTH databases with the same fixed
+-- identifiers - the superadmin User 38b96d85-bf75-41ca-bfd7-796e7fe0ebc8
+-- and its UserRole row. Any of them, named or not.
+--
+-- A rollback driven from those CSVs therefore deletes rows this migration
+-- never created, and the seeded superadmin does not come back: the migration
+-- that wrote it is already recorded as applied. So the CSVs are not the
+-- record of what this run did, and the README says so in as many words.
+--
+-- WHAT IS WRITTEN
+--
+--   inserted(t) = staged keys that are in the target now, minus pre_<t>
+--
+-- pre_<t> is the set the target already held, captured above immediately
+-- before the insert, so the subtraction is exact and needs no list of known
+-- seed identifiers. A staged key that was already there is excluded; a
+-- staged key that is there now and was not is one this run wrote. The two
+-- cases are indistinguishable from the target table alone, which is the
+-- whole point: this is captured where the distinction still exists.
+--
+-- The record is the KEY COLUMNS ONLY - the same ones the rollback's DELETE
+-- predicates use. No payload, no password hash, no encrypted envelope, and
+-- the header names the columns. The file name repeats the extract's table
+-- number, so "which table" is never in doubt.
+--
+-- WHEN IT IS WRITTEN
+--
+-- Here, after every guard, immediately before the COMMIT. A run that stops
+-- at a guard never reaches this block, and a run that never reaches the
+-- COMMIT wrote nothing - so a record on disk means "this run committed".
+-- \copy writes on the client, from the same transaction, so the file and the
+-- committed rows agree. If the COMMIT itself were ever to fail, the record
+-- would name rows that are not there; a rollback then deletes nothing, which
+-- is harmless. The reverse cannot happen: a row this run inserted is always
+-- in the record.
+--
+-- The three optional tables get a header-only file when their block was off,
+-- so the record is always twelve files and the rollback needs no flags.
+\echo '--- writing the inserted-key record (prod-to-test/data/NN-<table>-inserted.csv) ---'
+
+\copy (SELECT s."Id" FROM stg_user s WHERE EXISTS (SELECT 1 FROM "User" x WHERE x."Id" = s."Id") AND NOT EXISTS (SELECT 1 FROM pre_user p WHERE p."Id" = s."Id") ORDER BY s."Id") TO 'prod-to-test/data/01-user-inserted.csv' WITH (FORMAT csv, HEADER true)
+\copy (SELECT s."Id" FROM stg_owner s WHERE EXISTS (SELECT 1 FROM "Owner" x WHERE x."Id" = s."Id") AND NOT EXISTS (SELECT 1 FROM pre_owner p WHERE p."Id" = s."Id") ORDER BY s."Id") TO 'prod-to-test/data/02-owner-inserted.csv' WITH (FORMAT csv, HEADER true)
+\copy (SELECT s."Id" FROM stg_reseller s WHERE EXISTS (SELECT 1 FROM "ReSeller" x WHERE x."Id" = s."Id") AND NOT EXISTS (SELECT 1 FROM pre_reseller p WHERE p."Id" = s."Id") ORDER BY s."Id") TO 'prod-to-test/data/03-reseller-inserted.csv' WITH (FORMAT csv, HEADER true)
+\copy (SELECT s."ReSellerId", s."OwnerId" FROM stg_reseller_owner s WHERE EXISTS (SELECT 1 FROM "ReSellerOwner" x WHERE x."ReSellerId" = s."ReSellerId" AND x."OwnerId" = s."OwnerId") AND NOT EXISTS (SELECT 1 FROM pre_reseller_owner p WHERE p."ReSellerId" = s."ReSellerId" AND p."OwnerId" = s."OwnerId") ORDER BY s."ReSellerId", s."OwnerId") TO 'prod-to-test/data/04-reseller-owner-inserted.csv' WITH (FORMAT csv, HEADER true)
+\copy (SELECT s."Id" FROM stg_store s WHERE EXISTS (SELECT 1 FROM "Store" x WHERE x."Id" = s."Id") AND NOT EXISTS (SELECT 1 FROM pre_store p WHERE p."Id" = s."Id") ORDER BY s."Id") TO 'prod-to-test/data/05-store-inserted.csv' WITH (FORMAT csv, HEADER true)
+\copy (SELECT s."StoreId", s."ModuleId" FROM stg_store_module s WHERE EXISTS (SELECT 1 FROM "StoreModule" x WHERE x."StoreId" = s."StoreId" AND x."ModuleId" = s."ModuleId") AND NOT EXISTS (SELECT 1 FROM pre_store_module p WHERE p."StoreId" = s."StoreId" AND p."ModuleId" = s."ModuleId") ORDER BY s."StoreId", s."ModuleId") TO 'prod-to-test/data/06-store-module-inserted.csv' WITH (FORMAT csv, HEADER true)
+\copy (SELECT s."StoreId", s."RoleId", s."FeatureId" FROM stg_store_role_feature s WHERE EXISTS (SELECT 1 FROM "StoreRoleFeature" x WHERE x."StoreId" = s."StoreId" AND x."RoleId" = s."RoleId" AND x."FeatureId" = s."FeatureId") AND NOT EXISTS (SELECT 1 FROM pre_store_role_feature p WHERE p."StoreId" = s."StoreId" AND p."RoleId" = s."RoleId" AND p."FeatureId" = s."FeatureId") ORDER BY s."StoreId", s."RoleId", s."FeatureId") TO 'prod-to-test/data/07-store-role-feature-inserted.csv' WITH (FORMAT csv, HEADER true)
+\copy (SELECT s."UserId", s."StoreId" FROM stg_store_user s WHERE EXISTS (SELECT 1 FROM "StoreUser" x WHERE x."UserId" = s."UserId" AND x."StoreId" = s."StoreId") AND NOT EXISTS (SELECT 1 FROM pre_store_user p WHERE p."UserId" = s."UserId" AND p."StoreId" = s."StoreId") ORDER BY s."UserId", s."StoreId") TO 'prod-to-test/data/08-store-user-inserted.csv' WITH (FORMAT csv, HEADER true)
+\copy (SELECT s."UserId", s."RoleId" FROM stg_user_role s WHERE EXISTS (SELECT 1 FROM "UserRole" x WHERE x."UserId" = s."UserId" AND x."RoleId" = s."RoleId") AND NOT EXISTS (SELECT 1 FROM pre_user_role p WHERE p."UserId" = s."UserId" AND p."RoleId" = s."RoleId") ORDER BY s."UserId", s."RoleId") TO 'prod-to-test/data/09-user-role-inserted.csv' WITH (FORMAT csv, HEADER true)
+
+-- Optional tables. The WHERE false form writes the header and zero rows, so
+-- an optional block that was off leaves a well-formed empty record and the
+-- rollback's DELETE finds nothing instead of failing on a missing file.
+\if :act_product_category
+\copy (SELECT s."Id" FROM stg_product_category s WHERE EXISTS (SELECT 1 FROM "ProductCategory" x WHERE x."Id" = s."Id") AND NOT EXISTS (SELECT 1 FROM pre_product_category p WHERE p."Id" = s."Id") ORDER BY s."Id") TO 'prod-to-test/data/10-product-category-inserted.csv' WITH (FORMAT csv, HEADER true)
+\else
+\copy (SELECT NULL::uuid AS "Id" WHERE false) TO 'prod-to-test/data/10-product-category-inserted.csv' WITH (FORMAT csv, HEADER true)
+\endif
+
+\if :act_product
+\copy (SELECT s."Id" FROM stg_product s WHERE EXISTS (SELECT 1 FROM "Product" x WHERE x."Id" = s."Id") AND NOT EXISTS (SELECT 1 FROM pre_product p WHERE p."Id" = s."Id") ORDER BY s."Id") TO 'prod-to-test/data/11-product-inserted.csv' WITH (FORMAT csv, HEADER true)
+\else
+\copy (SELECT NULL::uuid AS "Id" WHERE false) TO 'prod-to-test/data/11-product-inserted.csv' WITH (FORMAT csv, HEADER true)
+\endif
+
+\if :act_channel_exchange_rate
+\copy (SELECT s."Id" FROM stg_channel_exchange_rate s WHERE EXISTS (SELECT 1 FROM "ChannelExchangeRate" x WHERE x."Id" = s."Id") AND NOT EXISTS (SELECT 1 FROM pre_channel_exchange_rate p WHERE p."Id" = s."Id") ORDER BY s."Id") TO 'prod-to-test/data/12-channel-exchange-rate-inserted.csv' WITH (FORMAT csv, HEADER true)
+\else
+\copy (SELECT NULL::uuid AS "Id" WHERE false) TO 'prod-to-test/data/12-channel-exchange-rate-inserted.csv' WITH (FORMAT csv, HEADER true)
+\endif
+
+-- What the record holds, per table. staged minus pre is what the target
+-- already had and this run correctly left alone; landed minus that is what
+-- this run wrote. A re-run over a completed load shows every file at 0,
+-- which is the honest answer: nothing new was inserted.
+--
+-- NINE rows here, twelve files on disk, and the difference is not an
+-- oversight. This summary names stg_product_category, stg_product and
+-- stg_channel_exchange_rate unconditionally, and those staging tables do
+-- not exist unless their block ran - the same reason the three load_not_
+-- landed arms above have to be \if-guarded. Naming a missing table is a
+-- parse error, so this SELECT cannot cover all twelve without becoming
+-- three guarded statements and losing its one-screen shape. Nothing is
+-- lost for those three: each of their \copy TO lines above printed its own
+-- COPY n row count, and each wrote a (possibly header-only) file. Read the
+-- record as TWELVE files, not as nine.
+\echo '--- the inserted-key record: what the rollback will delete ---'
+SELECT * FROM (
+    SELECT 1 AS ord, 'User' AS table_name,
+           (SELECT count(*) FROM pre_user)                                             AS already_in_target,
+           (SELECT count(*) FROM stg_user s
+             WHERE EXISTS (SELECT 1 FROM "User" x WHERE x."Id" = s."Id")
+               AND NOT EXISTS (SELECT 1 FROM pre_user p WHERE p."Id" = s."Id"))       AS inserted_by_this_run
+    UNION ALL SELECT 2, 'Owner',
+           (SELECT count(*) FROM pre_owner),
+           (SELECT count(*) FROM stg_owner s
+             WHERE EXISTS (SELECT 1 FROM "Owner" x WHERE x."Id" = s."Id")
+               AND NOT EXISTS (SELECT 1 FROM pre_owner p WHERE p."Id" = s."Id"))
+    UNION ALL SELECT 3, 'ReSeller',
+           (SELECT count(*) FROM pre_reseller),
+           (SELECT count(*) FROM stg_reseller s
+             WHERE EXISTS (SELECT 1 FROM "ReSeller" x WHERE x."Id" = s."Id")
+               AND NOT EXISTS (SELECT 1 FROM pre_reseller p WHERE p."Id" = s."Id"))
+    UNION ALL SELECT 4, 'ReSellerOwner',
+           (SELECT count(*) FROM pre_reseller_owner),
+           (SELECT count(*) FROM stg_reseller_owner s
+             WHERE EXISTS (SELECT 1 FROM "ReSellerOwner" x WHERE x."ReSellerId" = s."ReSellerId" AND x."OwnerId" = s."OwnerId")
+               AND NOT EXISTS (SELECT 1 FROM pre_reseller_owner p WHERE p."ReSellerId" = s."ReSellerId" AND p."OwnerId" = s."OwnerId"))
+    UNION ALL SELECT 5, 'Store',
+           (SELECT count(*) FROM pre_store),
+           (SELECT count(*) FROM stg_store s
+             WHERE EXISTS (SELECT 1 FROM "Store" x WHERE x."Id" = s."Id")
+               AND NOT EXISTS (SELECT 1 FROM pre_store p WHERE p."Id" = s."Id"))
+    UNION ALL SELECT 6, 'StoreModule',
+           (SELECT count(*) FROM pre_store_module),
+           (SELECT count(*) FROM stg_store_module s
+             WHERE EXISTS (SELECT 1 FROM "StoreModule" x WHERE x."StoreId" = s."StoreId" AND x."ModuleId" = s."ModuleId")
+               AND NOT EXISTS (SELECT 1 FROM pre_store_module p WHERE p."StoreId" = s."StoreId" AND p."ModuleId" = s."ModuleId"))
+    UNION ALL SELECT 7, 'StoreRoleFeature',
+           (SELECT count(*) FROM pre_store_role_feature),
+           (SELECT count(*) FROM stg_store_role_feature s
+             WHERE EXISTS (SELECT 1 FROM "StoreRoleFeature" x WHERE x."StoreId" = s."StoreId" AND x."RoleId" = s."RoleId" AND x."FeatureId" = s."FeatureId")
+               AND NOT EXISTS (SELECT 1 FROM pre_store_role_feature p WHERE p."StoreId" = s."StoreId" AND p."RoleId" = s."RoleId" AND p."FeatureId" = s."FeatureId"))
+    UNION ALL SELECT 8, 'StoreUser',
+           (SELECT count(*) FROM pre_store_user),
+           (SELECT count(*) FROM stg_store_user s
+             WHERE EXISTS (SELECT 1 FROM "StoreUser" x WHERE x."UserId" = s."UserId" AND x."StoreId" = s."StoreId")
+               AND NOT EXISTS (SELECT 1 FROM pre_store_user p WHERE p."UserId" = s."UserId" AND p."StoreId" = s."StoreId"))
+    UNION ALL SELECT 9, 'UserRole',
+           (SELECT count(*) FROM pre_user_role),
+           (SELECT count(*) FROM stg_user_role s
+             WHERE EXISTS (SELECT 1 FROM "UserRole" x WHERE x."UserId" = s."UserId" AND x."RoleId" = s."RoleId")
+               AND NOT EXISTS (SELECT 1 FROM pre_user_role p WHERE p."UserId" = s."UserId" AND p."RoleId" = s."RoleId"))
+) AS record ORDER BY ord;
 
 -- One COMMIT for the whole load. If any statement above failed, psql has
 -- already stopped (ON_ERROR_STOP) and the transaction is rolled back, so
