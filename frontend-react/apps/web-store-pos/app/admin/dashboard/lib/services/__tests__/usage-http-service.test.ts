@@ -38,7 +38,7 @@ function instantWhereLocalAndUtcDaysDiffer(): Date {
 /** The `today` query param of the most recent apiClient.get call. */
 async function lastTodayParam(): Promise<string | null> {
   const { apiClient } = await import('~/shared/lib/http/api-client');
-  const url = apiClient.get.mock.calls.at(-1)?.[0] as string;
+  const url = (apiClient.get as ReturnType<typeof vi.fn>).mock.calls.at(-1)?.[0] as string;
   return new URL(url, 'http://localhost').searchParams.get('today');
 }
 
