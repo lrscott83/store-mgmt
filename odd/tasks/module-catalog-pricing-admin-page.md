@@ -31,30 +31,50 @@ The catalog (`Module`) currently has no write surface; only seed migrations chan
 
 ## Tasks
 
-- [ ] T1 — Backend write: `UpdateModulePricingCommand` + handler + validator + DTO,
-      `PUT /v1/modules/pricing` action on `ModulesController` with
-      `[HasPermission(StoreRoleFeatures.SuperAdmin)]` (action-level override of
-      the class-level `StoresAdmin`). Response returns the saved rows with
-      recalculated `CurrentPrice`.
-- [ ] T2 — Backend E2E (new `ModuleCatalogPricingTests.cs`): PUT persists price /
-      percent / flat; GET ToStore reflects them; `CurrentPrice` recalculated;
-      only pricing fields change (IsActive/AvailableToStore/PriceIncluded intact);
-      non-SuperAdmin gets 403; validation rejects negatives / percent > 100.
-- [ ] T3 — Frontend contract: http-service method `updateModulePricing` pointing
-      at `PUT /v1/modules/pricing`; reuse existing domain `Module` type + formula
-      (`module-pricing.ts`) + grouping (`plan-module-groups.ts`).
-- [ ] T4 — Page `/admin/modules`: `clientLoader = superAdminLoader`, route entry,
-      menu item "Módulos" in ADMIN group with `rolesOnly: (user) => user.isSuperAdmin`,
-      i18n keys (en + es). Table grouped by plan, inline inputs, strikethrough
-      when on offer, live group totals, single Save (with error/success handling,
-      refetch after save).
-- [ ] T5 — Page unit tests: render, grouping by plan, offer strikethrough, live
-      total math, save calls service and refreshes, save error path.
-- [ ] T6 — Frontend E2E (new spec + fixture/support only if needed): SuperAdmin
-      opens the page, sees modules grouped by plan, edits price/percent/flat,
-      sees strikethrough on an offered module, saves, reloads and values persist.
-      No non-SuperAdmin E2E (maintainer declined vacuous role pins; the menu
-      `rolesOnly` + `superAdminLoader` gate the route by construction).
+- [x] T1 — Backend write: `UpdateModuleCatalogPricingCommand` + handler +
+      validator + DTO, `PUT /v1/modules/pricing` action on `ModulesController`
+      with `[HasPermission(StoreRoleFeatures.SuperAdmin)]` (action-level override
+      of the class-level `StoresAdmin`). Response returns the saved rows with
+      recalculated `CurrentPrice`. Commit `d2d7e448`. All-or-nothing save
+      (unknown module aborts the whole table; empty/duplicate tables rejected).
+- [x] T2 — Backend E2E (new `ModuleCatalogPricingTests.cs`): 7 tests, all green
+      (spot-checked 7/7 on 2026-09-28). Covers: save persists and GET ToStore
+      reflects it; CurrentPrice recalculated incl. floor-at-zero; only pricing
+      fields change (visible/active/free-included intact, hidden module stays
+      hidden); OwnerAdmin gets 403; negatives / percent>100 rejected with no
+      write; unknown module aborts everything; empty/duplicate tables refused.
+- [x] T3 — Frontend contract: `updateModulePricing` added to `store-http-service.ts`
+      (PUT `/v1/modules/pricing`); domain types added to `store.ts`
+      (`ModuleCatalogPricingPayload/Row/Result`); formula + grouping reused from
+      `/packages/domain` (no duplication).
+- [x] T4 — Page `/admin/modules`: `module-catalog.tsx` (clientLoader
+      `superAdminLoader`) + `module-catalog-table.tsx`; route in `routes.ts`;
+      menu item "Módulos" in ADMIN group, plain text, `rolesOnly` isSuperAdmin;
+      i18n keys in `es.ts` (`MENU.MODULES`, `MODULE_CATALOG.*`). Table grouped by
+      plan (`groupModulesByPlanDelta`), inline inputs for the 3 prices, offer →
+      base strikethrough + effective normal (row and group total), one Guardar
+      button, refetch after save, edits kept on error.
+- [x] T5 — Unit tests `module-catalog.test.tsx`: 23/23 pass (grouping, offer
+      strikethrough, live math, save success/refetch, save error keeps edits).
+      Commit `70dce636`.
+
+## Notes from T3–T5 writer (2026-09-28)
+
+- No client-side IsActive filter added: `GetAvailableModulesToStore` already
+  returns exactly `IsActive && AvailableToStore`; a client filter would be dead
+  code.
+- PRE-EXISTING wire mismatch, not introduced here: domain `Module` declares
+  `selected` as required but `ModuleDto` has no such field; `ModuleDto` carries
+  `order`/`availableToStore`/`featureDescriptions` which `Module` does not
+  declare. Suggested as a separate follow-up; NOT fixed in this feature.
+- No `StoreRoleFeatures` entry advertises catalog pricing (the menu+loader gate
+  is UI-only; the backend endpoint 403s independently). Intentional.
+- [x] T6 — Frontend E2E (new `module-catalog-pricing.spec.ts`, 4 tests MCP1–MCP4):
+      page loads grouped by plan; offer strikethrough + effective price; edit +
+      save persists across reload; live group totals. Catalog snapshot/restore
+      before/after with post-run re-read verification (no leaked mutations).
+      4/4 green + store-module-pricing 8/8 green + smoke/regression specs green.
+      Commit `cf296167`. No non-SuperAdmin E2E (maintainer preference).
 
 ## Delivery
 
@@ -77,3 +97,19 @@ The catalog (`Module`) currently has no write surface; only seed migrations chan
 ## Progress
 
 - 2026-09-28 — Feature doc created. T1+T2 delegated to backend writer.
+- 2026-09-28 — T1+T2 DONE. Backend writer (fresh context) reported success,
+      spot-checked 7/7 E2E green. Commits on `qa`: `d2d7e448` (endpoint + E2E,
+      5 files, 820 insertions, 0 deletions), `e3feb127` (this doc). Endpoint PUT
+      /v1/modules/pricing — SuperAdmin-only, all-or-nothing, only 3 pricing
+      fields change, CurrentPrice via shared `CurrentPriceServiceUtils`.
+- 2026-09-28 — T3+T4+T5 DONE. Frontend writer (fresh context) reported success;
+      spot-checked tree clean, `features.tsx` pristine. Commit `70dce636`
+      (8 files, +1085). 23/23 new unit tests, full app suite 4820 tests no
+      regressions, typecheck 5/5, lint 4/4.
+- 2026-09-28 — T6 DONE. Frontend E2E writer (fresh context) reported success.
+      Commit `cf296167` (1 file, +961). MCP1–MCP4 4/4 green; combined with
+      store-module-pricing 12/12; regression specs green; catalog restored after
+      runs (verified). Playwright config lives at `frontend-react/playwright.config.ts` —
+      run `pnpm exec playwright test <filtro> --project=chromium` from
+      `frontend-react/` (the `--filter` app form is invalid for Playwright).
+      Next: independent verification over the feature diff; then final report.
