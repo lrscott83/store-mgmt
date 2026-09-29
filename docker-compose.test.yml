@@ -55,6 +55,13 @@ services:
       timeout: 10s
       retries: 6
       start_period: 120s
+    volumes:
+      # Imágenes del catálogo (Storage:CatalogImageRoot → /app/storage): volumen propio del
+      # entorno test (no comparte nada con producción). El Dockerfile crea el directorio con
+      # dueño `app`; el primer mount del named volume copia ese dueño y la API no-root puede
+      # escribir — sin esto, subir una imagen al catálogo revienta con
+      # UnauthorizedAccessException en /app/storage.
+      - storage_test_data:/app/storage
     depends_on:
       - postgres
     restart: always
@@ -111,6 +118,7 @@ services:
 volumes:
   postgres_test_data:
   pgadmin-test-data:
+  storage_test_data:
 
 networks:
   smca_test_network:
