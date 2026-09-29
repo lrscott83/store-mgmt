@@ -1,10 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
-using Domain.Entities.WebCatalog;
 using FluentAssertions;
-using Infrastructure.Persistence.Contexts;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 using SMCA.WebApi.E2ETests.Infrastructure;
 using Xunit;
 
@@ -13,7 +9,9 @@ namespace SMCA.WebApi.E2ETests.Catalog;
 /// <summary>
 /// Catálogo web público (anónimo) en /catalog/&lt;slug&gt;: cabecera con categorías, listado con
 /// filtro/búsqueda/paginación, detalle con descripción y galería, y 404 uniforme cuando el slug no
-/// tiene catálogo publicado (plan 2026-09-27).
+/// tiene catálogo (plan 2026-09-27). Publicación DIRECTA (decisión del Owner, 2026-09-28): lo que
+/// se publica es la fila NORMAL del producto — activo, en venta y de una categoría activa con
+/// slug. El id público ES el id del producto.
 /// </summary>
 [Collection("e2e")]
 public sealed class WebCatalogPublicApiTests
@@ -41,17 +39,6 @@ public sealed class WebCatalogPublicApiTests
 
         body!.Succeeded.Should().BeTrue();
         return body.Data!;
-    }
-
-    /// <summary>Id de la fila PUBLICADA (no el del producto del origen) de un producto sincronizado.</summary>
-    private async Task<Guid> PublishedProductIdAsync(WebCatalogSeed.StoreFixture fixture, Guid sourceProductId)
-    {
-        using var scope = _f.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        return await db.Set<CatalogProduct>().IgnoreQueryFilters()
-            .Where(product => product.StoreId == fixture.StoreId && product.SourceProductId == sourceProductId)
-            .Select(product => product.Id)
-            .FirstAsync();
     }
 
     [Fact]
@@ -202,15 +189,13 @@ public sealed class WebCatalogPublicApiTests
                     null, null, null, null, null));
             update.StatusCode.Should().Be(HttpStatusCode.OK);
 
-            var client = ClientFor(fixture);
-            await client.PostAsJsonAsync("/api/v1/catalog/sync", new { });
-
+            // Publicación directa: no hace falta re-sincronizar. La fila normal cambió y el
+            // catálogo público la refleja de inmediato.
             var page = await AnonClient().GetFromJsonAsync<ApiResponse<PublicPageDto>>(
                 $"/api/v1/public/catalog/{fixture.Slug}/products", ApiResponse.Json);
             page!.Data!.Total.Should().Be(0, "un producto fuera de venta no se muestra (decisión D6)");
 
-            Guid publishedId = await PublishedProductIdAsync(fixture, product.Id);
-            var detail = await AnonClient().GetAsync($"/api/v1/public/catalog/{fixture.Slug}/products/{publishedId}");
+            var detail = await AnonClient().GetAsync($"/api/v1/public/catalog/{fixture.Slug}/products/{product.Id}");
             detail.StatusCode.Should().Be(HttpStatusCode.NotFound);
         }
         finally
@@ -229,9 +214,8 @@ public sealed class WebCatalogPublicApiTests
             var product = await WebCatalogSeed.AddProductAsync(_f, fixture, category.Id, "Camisa", 100m);
 
             var client = ClientFor(fixture);
-            var update = await client.PutAsJsonAsync($"/api/v1/products/{product.Id}",
-                new UpdateProductBody(category.Id, "Camisa", 100m, true, true, $"B-{Guid.NewGuid():N}", 1, true,
-                    "Primera línea\nSegunda línea con <b>etiquetas</b>", 1250, 500, true, null));
+            var update = await client.PutAsJsonAsync($"/api/v1/catalog/products/{product.Id}",
+                new { description = "Primera línea\nSegunda línea con <b>etiquetas</b>", percentDiscountPrice = 1250, discountPrice = 500, isNew = true });
             update.StatusCode.Should().Be(HttpStatusCode.OK);
 
             using var upload = WebCatalogSeed.BuildImageUpload(new byte[] { 0xFF, 0xD8, 0xFF, 0xD9 }, "g.jpg", "image/jpeg");
@@ -239,12 +223,13 @@ public sealed class WebCatalogPublicApiTests
                 .Should().Be(HttpStatusCode.OK);
 
             await PublishAndReadCatalogAsync(fixture);
-            Guid publishedId = await PublishedProductIdAsync(fixture, product.Id);
 
+            // Publicación directa: el detalle usa el ID DEL PRODUCTO, no un id de copia.
             var body = await AnonClient().GetFromJsonAsync<ApiResponse<PublicProductDto>>(
-                $"/api/v1/public/catalog/{fixture.Slug}/products/{publishedId}", ApiResponse.Json);
+                $"/api/v1/public/catalog/{fixture.Slug}/products/{product.Id}", ApiResponse.Json);
 
             var published = body!.Data!;
+            published.Id.Should().Be(product.Id);
             published.Name.Should().Be("Camisa");
             published.Description.Should().Be("Primera línea\nSegunda línea con <b>etiquetas</b>",
                 "la descripción es texto plano: los saltos se conservan y nada se interpreta como HTML");
@@ -256,6 +241,36 @@ public sealed class WebCatalogPublicApiTests
             // El detalle de un producto de OTRA tienda tampoco existe en este slug.
             var other = await AnonClient().GetAsync($"/api/v1/public/catalog/{fixture.Slug}/products/{Guid.NewGuid()}");
             other.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        }
+        finally
+        {
+            await WebCatalogSeed.CleanupAsync(_f, fixture);
+        }
+    }
+
+    [Fact]
+    public async Task Edits_are_visible_immediately_without_re_syncing()
+    {
+        // La propiedad clave de la publicación directa: guardar un campo en la vista basta para
+        // que el catálogo público lo muestre — "Sincronizar" ya no es el acto de publicar.
+        var fixture = await WebCatalogSeed.SeedOwnerAsync(_f);
+        try
+        {
+            var category = await WebCatalogSeed.AddCategoryAsync(_f, fixture, "Ropa");
+            var product = await WebCatalogSeed.AddProductAsync(_f, fixture, category.Id, "Camisa", 100m);
+            var client = ClientFor(fixture);
+
+            (await client.PostAsJsonAsync("/api/v1/catalog/sync", new { })).EnsureSuccessStatusCode();
+
+            (await client.PutAsJsonAsync($"/api/v1/catalog/products/{product.Id}",
+                    new { description = "Descripción nueva", isNew = true }))
+                .StatusCode.Should().Be(HttpStatusCode.OK);
+
+            var page = await AnonClient().GetFromJsonAsync<ApiResponse<PublicPageDto>>(
+                $"/api/v1/public/catalog/{fixture.Slug}/products", ApiResponse.Json);
+            var item = page!.Data!.Items.Single();
+            item.Description.Should().Be("Descripción nueva");
+            item.IsNew.Should().BeTrue();
         }
         finally
         {

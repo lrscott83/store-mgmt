@@ -6,10 +6,10 @@ namespace Application.Tests.Catalog
 {
     /// <summary>
     /// WebCatalog module (18) catalog parity tests. The seed data lives in the EF entity
-    /// configurations and flows to Superior stores through RegisterCommand, the plan catalog
-    /// and the backfill; these tests freeze the id contract: module 18, feature 122
-    /// (Catálogo web), and plan assignment ONLY to Superior (3) — never Gratis (1),
-    /// Pago (2) or VIP (4). Owner decision D5 (2026-09-27).
+    /// configurations and flows to Superior and VIP stores through RegisterCommand, the plan
+    /// catalog and the backfill; these tests freeze the id contract: module 18, feature 122
+    /// (Catálogo web), and plan assignment to Superior (3) and VIP (4) — plans are
+    /// self-contained (owner decision 2026-09-28, amends D5). Never Gratis (1) or Pago (2).
     /// </summary>
     public class WebCatalogCatalogTests
     {
@@ -41,12 +41,12 @@ namespace Application.Tests.Catalog
         }
 
         /// <summary>
-        /// The plan->module assignment is pinned to Superior (3) ONLY. The seed
-        /// (StorePlanModuleEntityTypeConfiguration) and the backfill constants must agree:
-        /// a future VIP inclusion has to change BOTH and this test on purpose.
+        /// The plan->module assignment is pinned to Superior (3) AND VIP (4). Plans are
+        /// SELF-CONTAINED (owner decision 2026-09-28): every Superior module is in VIP too,
+        /// so the seed and the backfill must include both (amends D5, 2026-09-27).
         /// </summary>
         [Fact]
-        public void WebCatalog_PlanAssignment_TargetsSuperiorOnly()
+        public void WebCatalog_PlanAssignment_TargetsSuperiorAndVip()
         {
             const int superior = (int)StorePlanType.Superior;
             const int vip = (int)StorePlanType.VIP;
@@ -57,19 +57,15 @@ namespace Application.Tests.Catalog
         }
 
         /// <summary>
-        /// Backfill (migration + VPS script, one shared source of truth) targets the
-        /// Superior plan only: the WHERE clause is `s."StorePlanId" = 3` and never includes
-        /// plan 4 (VIP) — the D5 exclusion is asserted against the real SQL text.
+        /// Backfill (migration + VPS script, one shared source of truth) targets Superior (3)
+        /// and VIP (4): the WHERE clause is `s."StorePlanId" IN (3, 4)` — asserted against the
+        /// real SQL text.
         /// </summary>
         [Fact]
-        public void WebCatalogBackfill_TargetsSuperiorPlanOnly()
+        public void WebCatalogBackfill_TargetsSuperiorAndVipPlans()
         {
-            Assert.Contains("s.\"StorePlanId\" = 3", WebCatalogModuleBackfill.StoreModuleSql);
-            Assert.Contains("s.\"StorePlanId\" = 3", WebCatalogModuleBackfill.StoreRoleFeatureSql);
-            Assert.DoesNotContain("= 4", WebCatalogModuleBackfill.StoreModuleSql);
-            Assert.DoesNotContain("= 4", WebCatalogModuleBackfill.StoreRoleFeatureSql);
-            Assert.DoesNotContain("IN (3, 4)", WebCatalogModuleBackfill.StoreModuleSql);
-            Assert.DoesNotContain("IN (3, 4)", WebCatalogModuleBackfill.StoreRoleFeatureSql);
+            Assert.Contains("s.\"StorePlanId\" IN (3, 4)", WebCatalogModuleBackfill.StoreModuleSql);
+            Assert.Contains("s.\"StorePlanId\" IN (3, 4)", WebCatalogModuleBackfill.StoreRoleFeatureSql);
         }
 
         /// <summary>

@@ -77,13 +77,15 @@ public sealed class StorePlanCatalogTests
             (int)ModuleType.MultiMonedas,
             // Elaboración (2026-09-18): módulo 17 incluido en Superior y VIP.
             (int)ModuleType.Elaboration,
-            // Catálogo web (2026-09-27): módulo 18 incluido SOLO en Superior (VIP no lo lleva).
+            // Catálogo web (2026-09-27): módulo 18 en Superior; también en VIP desde el
+            // 2026-09-28 (planes autocontenidos).
             (int)ModuleType.WebCatalog
         };
         superior.Should().BeEquivalentTo(superiorCatalog);
 
         // VIP(4): full AvailableToStore catalog {2..15} + MultiPayments (2026-09-18, module 16)
-        // + Elaboration (module 17).
+        // + Elaboration (module 17) + WebCatalog (2026-09-28, plans are self-contained:
+        // every Superior module is in VIP too).
         var vipCatalog = new[]
         {
             (int)ModuleType.Sales, (int)ModuleType.Inventory,
@@ -95,7 +97,8 @@ public sealed class StorePlanCatalogTests
             (int)ModuleType.MultiStores,
             (int)ModuleType.MultiMonedas,
             (int)ModuleType.MultiPayments,
-            (int)ModuleType.Elaboration
+            (int)ModuleType.Elaboration,
+            (int)ModuleType.WebCatalog
         };
         vip.Should().BeEquivalentTo(vipCatalog);
 

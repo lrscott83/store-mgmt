@@ -10,7 +10,6 @@ using Domain.Entities.StoreRoleFeatures;
 using Domain.Entities.Stores;
 using Domain.Entities.UserRoles;
 using Domain.Entities.Users;
-using Domain.Entities.WebCatalog;
 using Infrastructure.Persistence.Contexts;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -117,21 +116,11 @@ internal static class WebCatalogSeed
         return new MultipartFormDataContent { { file, "file", fileName } };
     }
 
-    /// <summary>Borrar las filas del catálogo y del origen de ESTA tienda, y luego el grafo de la tienda.</summary>
+    /// <summary>Borrar las filas de producto de ESTA tienda y luego el grafo de la tienda.</summary>
     public static async Task CleanupAsync(AppTestFactory factory, StoreFixture fixture)
     {
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-
-        var catalogProductIds = await db.Set<CatalogProduct>().IgnoreQueryFilters()
-            .Where(product => product.StoreId == fixture.StoreId)
-            .Select(product => product.Id).ToListAsync();
-        await db.Set<CatalogProductImage>().IgnoreQueryFilters()
-            .Where(image => catalogProductIds.Contains(image.CatalogProductId)).ExecuteDeleteAsync();
-        await db.Set<CatalogProduct>().IgnoreQueryFilters()
-            .Where(product => product.StoreId == fixture.StoreId).ExecuteDeleteAsync();
-        await db.Set<CatalogCategory>().IgnoreQueryFilters()
-            .Where(category => category.StoreId == fixture.StoreId).ExecuteDeleteAsync();
 
         var sourceProductIds = await db.Set<Product>().IgnoreQueryFilters()
             .Where(product => product.Category.StoreId == fixture.StoreId)

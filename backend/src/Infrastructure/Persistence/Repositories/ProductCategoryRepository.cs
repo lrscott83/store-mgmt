@@ -40,6 +40,19 @@ namespace Infrastructure.Persistence.Repositories
                 .ToListAsync();
         }
 
+        /// <summary>Slugs públicos ya tomados: el índice único parcial es (StoreId, Slug) pero el
+        /// slug de la URL pública conviene único global para no confundir dos tiendas.</summary>
+        public async Task<IReadOnlyCollection<string>> GetCatalogSlugsAsync()
+        {
+            return (await _productCategories
+                .IgnoreQueryFilters()
+                .Where(category => category.Slug != null)
+                .Select(category => category.Slug!)
+                .ToListAsync())
+                .ToList()
+                .AsReadOnly();
+        }
+
         public async Task<bool> HasAnyAvailableCategoryByStoreId(Guid id)
         {
             return await _productCategories.AnyAsync(c => c.StoreId == id && c.IsActive);

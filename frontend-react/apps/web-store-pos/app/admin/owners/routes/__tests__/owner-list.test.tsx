@@ -14,16 +14,21 @@ vi.mock('react-router', () => ({
 // ─── react-intl mock ──────────────────────────────────────────────────────────
 
 const mockFormatMessage = vi.fn(({ id }: { id: string }) => esMessages[id] || id);
+// STABLE: one object for every useIntl() call. Returning a fresh object per render
+// changed the intl identity on each render, OwnerListPage's loadOwners useCallback
+// (it depends on `intl`) was re-created and the list effect re-ran — clearing the
+// inline error mid-assertion and making the 409/unmapped tests fail intermittently.
+const mockIntl = {
+  formatMessage: mockFormatMessage,
+  messages: esMessages,
+  locale: 'es',
+  defaultLocale: 'es',
+};
 vi.mock('react-intl', async (importOriginal) => {
   const actual = await importOriginal<typeof import('react-intl')>();
   return {
     ...actual,
-    useIntl: () => ({
-      formatMessage: mockFormatMessage,
-      messages: esMessages,
-      locale: 'es',
-      defaultLocale: 'es',
-    }),
+    useIntl: () => mockIntl,
   };
 });
 

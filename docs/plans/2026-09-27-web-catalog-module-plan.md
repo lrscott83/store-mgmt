@@ -1,6 +1,6 @@
 # Plan — Módulo WebCatalog (18): catálogo web público + sincronización desde Productos
 
-**Fecha:** 2026-09-27 · **Rama:** test · **Estado:** ✅ COMPLETADO (F1–F5 en código y **verificado**) — E2E backend **617/617**, Playwright **338 passed / 2 flaky ajenos / 0 failed**, vitest **328 archivos / 4790 tests**, `pnpm typecheck` + `pnpm lint` OK. Los 5 bugs que destapó la verificación están en §10.3.
+**Fecha:** 2026-09-27 · **Rama:** test · **Estado:** ✅ COMPLETADO (F1–F5 en código y verificado) — **REVISIÓN 2026-09-28: publicación DIRECTA sobre las tablas normales (decisión del Owner); las tablas `Catalog*` se ELIMINARON** (ver §11). E2E backend **620/620**, vitest **328 archivos / 4790 tests**, `pnpm typecheck` + `pnpm lint` OK.
 
 ## 1. Resumen y decisiones cerradas
 
@@ -19,7 +19,7 @@ La sincronización es **backend contra backend**: la vista llama a un endpoint n
 | D2 | Repo del catálogo (externo) | **No se modifica** (fuera de alcance) |
 | D3 | Imágenes | **Subida en nuestro backend** (multipart) + almacenamiento en disco del VPS |
 | D4 | Colisión de slug de tienda | **Sufijo automático** (`-2`, `-3`, …) generado en el backend |
-| D5 | Plan VIP | **No** incluye WebCatalog (solo Superior) |
+| D5 | Plan VIP | Incluye WebCatalog *(enmendada 2026-09-28: planes autocontenidos; originalmente solo Superior)* |
 | D6 | Producto/categoría que ya no está en venta | La copia se **desactiva** (`IsActive = false`), nunca se borra |
 | D7 | `% descuento` y `precio rebajado` a la vez | **Se combinan**: primero el %, luego se resta el monto |
 | D8 | Dónde se editan los campos nuevos | **Solo en la vista Catálogo Web** (el formulario de producto actual no cambia) |
@@ -52,15 +52,13 @@ La sincronización es **backend contra backend**: la vista llama a un endpoint n
 
 *Slug de tienda (D4):* `normalize(name)` = minúsculas, sin tildes/diacríticos, `ñ→n`, espacios y símbolos → `-`, colapsar guiones, recortar a 63 chars (`^[a-z0-9][a-z0-9-]*$`, mismo alfabeto que el template). Ante colisión se añade `-2`, `-3`, …; índice único global.
 
-### 2.2 Catálogo publicado (copia que se muestra en la web)
+### 2.2 Catálogo publicado (decisión del Owner, 2026-09-28: SIN tablas de copia)
 
-| Tabla | Campos clave |
-|---|---|
-| `CatalogCategory` | `Id`, `TenantId`, `StoreId`, **`SourceCategoryId`** (1:1), `Name`, `Slug`, `Order`, `IsActive`, `SyncedAt` |
-| `CatalogProduct` | `Id`, `TenantId`, `StoreId`, **`SourceProductId`** (1:1), `CatalogCategoryId`, `Name`, `Description`, `Price`, `Currency`, `PercentDiscountPrice`, `DiscountPrice`, `IsNew`, `Image`, `Order`, `IsActive`, `SyncedAt` |
-| `CatalogProductImage` | `CatalogProductId`, `Path`, `Order` |
-
-`UNIQUE (StoreId, SourceCategoryId)` y `UNIQUE (StoreId, SourceProductId)` son la garantía de **relación 1:1** y de **idempotencia** del sync (re-sincronizar actualiza, nunca duplica).
+No existen tablas de catálogo publicado. La publicación es **directa**: la sincronización escribe
+`Product` / `ProductCategory` / `ProductImage` y la API pública lee esas mismas tablas. Las tablas
+`CatalogCategory` / `CatalogProduct` / `CatalogProductImage` del diseño original
+(migración `20260927193020_Catalog-Published-Tables`) quedaron huérfanas y se **eliminaron** de
+código y de las BD (locales y VPS).
 
 ## 3. Módulo WebCatalog y plan Superior
 
@@ -116,7 +114,7 @@ Siguiendo el patrón exacto de Elaboración (17) / MultiPayments (16):
 
 | Endpoint | Descripción |
 |---|---|
-| `POST /api/v1/catalog/sync` | Auth + módulo **18** activo en la tienda + **Owner**. Body opcional `{snapshot: {categories, products}}` con el **catálogo local del POS** (D11): con snapshot, el backend lo espeja primero (categorías/productos del dispositivo + desactivar lo que ya no existe) y después publica. Sin body publica el origen que ya tenga el servidor. Responde `{storeSlug, catalogUrl, syncedAt, categoriesCreated, categoriesUpdated, productsCreated, productsUpdated, productsDeactivated}` |
+| `POST /api/v1/catalog/sync` | Auth + módulo **18** activo en la tienda + **Owner**. Body opcional `{snapshot: {categories, products}}` con el **catálogo local del POS** (D11): con snapshot, el backend lo espeja a las tablas normales (categorías/productos del dispositivo + desactivar lo que ya no existe). Sin body solo asegura el slug y la fecha. La publicación es DIRECTA (§11): lo que hay en `Product`/`ProductCategory` ES el catálogo. Responde `{storeSlug, catalogUrl, syncedAt, categoriesCreated, categoriesUpdated, productsCreated, productsUpdated, productsDeactivated}` |
 | `PUT /api/v1/catalog/products/{id}` | Auth + módulo **18** + **Owner**. Guarda SOLO los campos del catálogo (descripción, % descuento, precio rebajado, "Nuevo", imagen principal). Acepta también los hechos del producto para crear el espejo si aún no existe (el POS es su dueño). `null` = no tocar; 404 uniforme para productos de otra tienda |
 | `GET /api/v1/catalog/status` | Slug público, `CatalogSyncedAt` y contadores del origen (categorías, productos, publicados y sin imagen) para pintar la vista |
 | `GET /api/v1/catalog/preview` | (Opcional) resumen de lo que cambiaría, sin escribir — **descartado** (O3: sin dry-run en fase 1) |
@@ -129,7 +127,7 @@ Reglas: se crean las faltantes (por `SourceId`), se **actualizan valores** de la
 |---|---|
 | `GET /api/v1/public/catalog/{storeSlug}` | Tienda (nombre, slug) + categorías activas con su conteo de productos |
 | `GET /api/v1/public/catalog/{storeSlug}/products?categorySlug=&search=&page=&pageSize=` | Listado paginado de publicados activos (pageSize máx. 60; `sort` implícito: categoría → orden → nombre) |
-| `GET /api/v1/public/catalog/{storeSlug}/products/{productId}` | Detalle (descripción + galería). El `productId` es el **id publicado** (CatalogProduct), no el del origen |
+| `GET /api/v1/public/catalog/{storeSlug}/products/{productId}` | Detalle (descripción + galería). El `productId` ES el **id del producto** (publicación directa, §11) |
 
 Sin auth; `404` uniforme para slug inexistente o sin catálogo publicado (no distingue el motivo); política de rate-limit propia; respuesta con ETag/caché corta.
 
@@ -193,7 +191,7 @@ Al correr la suite completa rompieron **menos** de los previstos: las entradas B
 | 2 | `Plans/PlanChangeMatrixTests.cs:83,124` | Universo de módulos por plan y mapa módulo→features | Faltaban el módulo 18 y su feature 122 | Añadido 18 a Superior y `18 => [122]` al mapa |
 | 3 | `Auth/MeAfterOwnerPlanChangeTests.cs:81` | `/me` tras cambiar de plan expone los módulos del plan | Faltaba 18 en la lista esperada | Añadido `ModuleType.WebCatalog` |
 | 4 | `Catalog/WebCatalogProductFieldsTests.cs` | (archivo **nuevo** del módulo) | — | **Solo se AÑADIÓ un `[Fact]`** (producto que solo existe en el dispositivo se crea desde los hechos que manda la vista). No se cambió ninguna aserción existente |
-| 5 | `frontend-react/e2e/support/global-teardown.ts` | (no es aserción: barrido de datos `e2e-*`) | Con D11 las tiendas e2e **sí** dejan filas de producto en el servidor, así que `DELETE FROM "Store"` chocaba con `FK_ProductCategory_Store_StoreId` y el teardown fallaba | 6 `DELETE` nuevos, hijos primero: `CatalogProductImage`, `CatalogProduct`, `CatalogCategory`, `ProductImage`, `Product`, `ProductCategory` |
+| 5 | `frontend-react/e2e/support/global-teardown.ts` | (no es aserción: barrido de datos `e2e-*`) | Con D11 las tiendas e2e **sí** dejan filas de producto en el servidor, así que `DELETE FROM "Store"` chocaba con `FK_ProductCategory_Store_StoreId` y el teardown fallaba | 3 `DELETE` nuevos, hijos primero: `ProductImage`, `Product`, `ProductCategory` |
 
 > Ningún test se tocó sin permiso explícito, y ningún cambio alteró lo que el test verifica: solo se ampliaron listas de expectativa (módulo/feature que el plan gana) y, en el archivo nuevo, se añadió un caso más.
 
@@ -204,14 +202,14 @@ Al correr la suite completa rompieron **menos** de los previstos: las entradas B
 
 ## 7. Operación (VPS)
 
-1. Script `24-20260927-Add-WebCatalog-Module.sql` (módulo + feature + plan Superior + backfill de tiendas + registro en `__EFMigrationsHistory`), siguiendo el patrón de los scripts 17/18/19.
+1. Scripts `24` y `25` (módulo + feature + plan Superior + campos), luego el **26 combinado** `26-20260928-Currency-SalePaymentMethod-And-WebCatalog-Vip.sql` — cierra los huecos del 16/09 (Currency) y 17/09 (método de pago) y añade el módulo 18 al plan VIP con backfill de tiendas VIP activas.
 2. Volumen persistente para las imágenes del catálogo (`Storage:CatalogImageRoot`) + inclusión en el backup.
 3. nginx/loadbalancer: sin cambios de rutas (todo cae bajo `/api` y el SPA ya sirve deep links); **subir `client_max_body_size`** a ~5 MB para las subidas.
 4. Verificación post-deploy: `GET /api/v1/catalog/status` con una tienda Superior y `GET /api/v1/public/catalog/<slug>` anónimo.
 
 ## 8. Decisiones abiertas (defaults propuestos — objeta cualquiera y se ajusta el plan)
 
-**Cerradas con el Owner (2026-09-27):** D5 VIP = solo Superior · D6 desactivar la copia · D7 descuentos se combinan · D8 edición solo en la vista Catálogo Web.
+**Cerradas con el Owner (2026-09-27):** D5 VIP = solo Superior *(enmendada 2026-09-28: también VIP)* · D6 desactivar la copia · D7 descuentos se combinan · D8 edición solo en la vista Catálogo Web.
 
 - **O1** — SEO del catálogo público: fase 1 sin SSR (la app es `ssr: false`), sin meta tags por producto. *Default: aceptado.*
 - **O2 — CERRADA (D9)**: descripción en **texto plano**; sin editor HTML y sin sanitizador (no se añade ninguna dependencia).
@@ -223,7 +221,7 @@ Al correr la suite completa rompieron **menos** de los previstos: las entradas B
 |---|---|---|
 | F1 ✅ | Enums 18/122, seeds, `StorePlanModule`, migración + backfill, script VPS | `dotnet build` OK · Domain 76/76 · Application 532/532 · **E2E backend 576/576** |
 | F2 ✅ | Campos nuevos en `Product`/`ProductCategory`/`Store` (+ `ProductImage`), validators de rangos, subida/servido de imágenes (`ICatalogImageStorage`), migración `Catalog-Product-Fields-And-Images` + script 25 | Domain 76/76 (nuevos: escalas, precio final, slug) · Application 532/532 (14 nuevos de validadores + handler) |
-| F3 ✅ | Tablas publicadas (CatalogCategory/CatalogProduct/CatalogProductImage) + `SyncCatalogCommand`, `/catalog/sync`, `/catalog/status` y API pública `/public/catalog/*`, migración `Catalog-Published-Tables` + script 26 | **E2E del módulo al 100 %** (`--filter "FullyQualifiedName~Catalog"` → 60/60) + suite E2E backend completa |
+| F3 ✅ | Tablas publicadas (CatalogCategory/CatalogProduct/CatalogProductImage) + `SyncCatalogCommand`, `/catalog/sync`, `/catalog/status` y API pública `/public/catalog/*`, migración `Catalog-Published-Tables` — *(sustituido por la publicación directa de §11 el 2026-09-28; las tablas se eliminaron de código y BD)* | **E2E del módulo al 100 %** (`--filter "FullyQualifiedName~Catalog"` → 60/60) + suite E2E backend completa |
 | F4 ✅ | Frontend: enums, menú (`moduleIds` + `rolesOnly`), vista Catálogo Web (`app/sales/routes/web-catalog.tsx`), editor por producto, servicio HTTP, i18n, tests | `pnpm typecheck` ✅ · `pnpm lint` ✅ · `pnpm test` ✅ (web-store-pos **328 archivos / 4790 tests**) |
 | F5 ✅ | Catálogo público `/catalog/:storeSlug` (`app/catalog/routes/public-catalog.tsx`, ruta pública fuera del layout autenticado) + i18n `CATALOG_PUBLIC.*` + spec Playwright nuevo + D11 (snapshot del catálogo local) de punta a punta | Vitest de la vista pública ✅ · **Playwright `pnpm test:e2e --workers=4` → 338 passed / 2 flaky (ajenos) / 0 failed** |
 
@@ -270,3 +268,69 @@ El spec `e2e/web-catalog.spec.ts` se ejecutó con el entorno E2E limpio: (1) par
 5. **`415 Unsupported Media Type` al subir una imagen** — `api-client.ts` fija `Content-Type: application/json` global y **axios 1.16.1 convierte el `FormData` a JSON** al ver ese tipo. Fix en `uploadImage`: `{ headers: { 'Content-Type': 'multipart/form-data' } }` (axios borra la cabecera en el adaptador XHR y el navegador pone el boundary).
 
 También por D11: como las tiendas e2e ahora dejan filas de producto en el servidor, el barrido `e2e-*` de `global-teardown.ts` fallaba con `FK_ProductCategory_Store_StoreId`; se añadieron los 6 `DELETE` de §6.3 (hijos primero). En corridas intermedias aparecieron flaky ya conocidos y ajenos al módulo (`StoreDeactivationSessionTests`, `OwnerStoreSwitcherFlowTests` en .NET; `create-store-user.spec.ts:28`, `credits-history.spec.ts:89` en Playwright); la corrida final .NET salió limpia (617/617).
+
+## 11. Revisión 2026-09-28 — publicación DIRECTA sobre las tablas normales (decisión del Owner)
+
+**El Owner revirtió la arquitectura de "copia publicada"**: no se aprobó nunca una capa de tablas
+`Catalog*` espejo. La regla es la que se pidió desde el principio: **la sincronización escribe
+sobre las tablas que ya había** (`Product`, `ProductCategory`, `ProductImage`, con los campos del
+script 25) y el catálogo público **lee directamente de ellas** (lectura pura y anónima; el CRUD
+sigue con sus permisos).
+
+### Qué cambió
+
+| Antes (copia publicada) | Ahora (publicación directa) |
+|---|---|
+| El sync espejaba el snapshot y LUEGO publicaba a `Catalog*` | El sync escribe el snapshot en las tablas normales y ya está: eso ES el catálogo |
+| El público leía `CatalogProduct` (id de copia) | El público lee `Product` — el **id público es el id del producto** |
+| Editar un campo exigía re-sincronizar para verse público | **Publicación al instante**: guardar en la vista basta (no hay segundo paso) |
+| "Fuera de venta" se despublicaba en la copia | Fuera de venta / inactivo => no aparece en el público (mismo filtro: activo + en venta + categoría activa con slug) |
+| Slugs de categoría generados al publicar la copia | Slugs generados una sola vez y guardados en `ProductCategory.Slug` (URLs estables) |
+
+**Hallazgo técnico:** las consultas públicas (anónimas, sin tenant en el contexto) NO pueden leer
+`ProductCategory` con el filtro global por tenant — responde vacío. Por eso la cabecera y el filtro
+de categoría del listado se construyen **desde los productos publicados** (cada producto trae su
+categoría), todas las lecturas públicas con `IgnoreQueryFilters`. Mismo motivo por el que el
+rellenado de slugs vive dentro del espejo (una sola lectura; releer categorías chocha con las
+instancias tracked del contexto NoTracking).
+
+### Tablas `Catalog*`: eliminadas (2026-09-28)
+
+`CatalogCategory` / `CatalogProduct` / `CatalogProductImage` (migración
+`20260927193020_Catalog-Published-Tables`) **se eliminaron** por decisión del Owner: la publicación
+directa las dejó sin uso. Se quitó la migración EF, entidades/repositorios/configuraciones, los
+DbSets y sus bloques del snapshot. Las BD locales (`smca`, `smca_test`) están limpias, y el VPS
+debe limpiarse con el ROLLBACK del script 26 original (las tablas allí se crearon con la corrida
+del 27-09): `DROP TABLE IF EXISTS "CatalogProductImage", "CatalogProduct", "CatalogCategory"` +
+borrar la fila de `__EFMigrationsHistory`. No hay script de drop numerado: los scripts numerados
+son solo para crear/transformar, nunca para destruir (decisión del Owner).
+
+### WebCatalog también en VIP (2026-09-28)
+
+Los planes son **autocontenidos** (decisión del Owner): todo lo que aparece en Superior aparece en
+VIP. Migración EF `20260928191227_Add-WebCatalog-Module-Vip` (fila `(4, 18)` en `StorePlanModule`),
+backfill compartido `WebCatalogModuleBackfill` ahora con `StorePlanId IN (3, 4)`, y script 26
+combinado para el VPS (`26-20260928-Currency-SalePaymentMethod-And-WebCatalog-Vip.sql`) que además
+cierra los huecos del 16/09 (Currency) y 17/09 (precios por método de pago). Seed, backfill, tests
+de planes y gating ya alineados.
+
+### Verificación tras la revisión
+
+| Suite | Resultado |
+|---|---|
+| E2E backend `--filter "FullyQualifiedName~Catalog"` | **63/63 passed** |
+| E2E backend completa | **620/620 passed** (5 m 52 s) |
+| Application.Tests catálogo | 45/45 passed |
+| Vitest (frontend) | 328 archivos / 4790 tests, typecheck y lint OK |
+
+El contrato HTTP del frontend no cambió (mismos endpoints, mismos DTOs) — no hizo falta tocar código
+de frontend.
+
+### Hueco pendiente en los scripts del VPS (aparcado por el Owner)
+
+Las migraciones `20260916213905_AddCurrencyToStoreEntities` y `20260917194809_Add-SalePaymentMethod-Pricing`
+**nunca tuvieron script SQL** → en el VPS y en la BD local `smca` faltan las columnas `Currency`
+(Product/Order/OrderItem/InventoryEntry/InventoryEntryCost) y `Order.Percent/Tax/SalePaymentMethod`;
+el error `column p.Currency does not exist` al abrir Catálogo Web es exactamente eso. Verificado:
+`smca_test` las tiene; `smca` (local) y el VPS no. Generar scripts 27/28 quedó **aparcado** por el
+Owner — sin ellos el catálogo no arrancará en esas bases.

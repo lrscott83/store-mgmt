@@ -19,6 +19,19 @@ export const PRECACHE_GLOB_IGNORES = [
   // build (pwa-precache-build spec, "The service worker never precaches
   // itself").
   'service-worker.js',
+  // SuperAdmin-only routes: loaded on-demand online, NOT precached.
+  // Owner/StoreUser devices never navigate to these routes; precaching them
+  // wastes cache space on every device.
+  'assets/store-list-*.js', // admin/stores
+  'assets/owner-list-*.js', // admin/owners
+  'assets/owner-create-*.js', // admin/owners/create
+  'assets/owner-edit-*.js', // admin/owners/edit
+  'assets/reseller-list-*.js', // admin/resellers
+  'assets/reseller-create-*.js', // admin/resellers/create
+  'assets/reseller-edit-*.js', // admin/resellers/edit
+  'assets/features-*.js', // admin/features
+  'assets/collections-*.js', // management/stores/collections (SuperAdmin + ReSeller)
+  'assets/reseller-commissions-*.js', // management/stores/commissions (SuperAdmin + ReSeller)
 ];
 
 // Parity with today's vite.config.ts maximumFileSizeToCacheInBytes.

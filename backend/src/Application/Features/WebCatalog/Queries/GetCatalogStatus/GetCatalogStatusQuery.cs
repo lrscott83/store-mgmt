@@ -15,7 +15,9 @@ namespace Application.Features.WebCatalog.Queries.GetCatalogStatus
 {
     /// <summary>
     /// Estado del catálogo web de la tienda seleccionada: slug público, última sincronización y
-    /// contadores del origen (cabecera de la vista Catálogo Web, plan 2026-09-27).
+    /// contadores (cabecera de la vista Catálogo Web, plan 2026-09-27). Publicación DIRECTA
+    /// (decisión del Owner, 2026-09-28): el catálogo vive en `Product`/`ProductCategory`, así que
+    /// "publicados" son los productos activos y en venta de la tienda.
     /// </summary>
     public sealed record GetCatalogStatusQuery : IQuery<CatalogStatusDto>;
 
@@ -25,7 +27,6 @@ namespace Application.Features.WebCatalog.Queries.GetCatalogStatus
         private readonly IStoreRepository _storeRepository;
         private readonly IProductCategoryRepository _productCategoryRepository;
         private readonly IProductRepository _productRepository;
-        private readonly ICatalogProductRepository _catalogProductRepository;
         private readonly IStringLocalizer<I18n> _localizer;
 
         public GetCatalogStatusQueryHandler(
@@ -33,14 +34,12 @@ namespace Application.Features.WebCatalog.Queries.GetCatalogStatus
             IStoreRepository storeRepository,
             IProductCategoryRepository productCategoryRepository,
             IProductRepository productRepository,
-            ICatalogProductRepository catalogProductRepository,
             IStringLocalizer<I18n> localizer)
         {
             _httpContextService = httpContextService;
             _storeRepository = storeRepository;
             _productCategoryRepository = productCategoryRepository;
             _productRepository = productRepository;
-            _catalogProductRepository = catalogProductRepository;
             _localizer = localizer;
         }
 
@@ -55,7 +54,6 @@ namespace Application.Features.WebCatalog.Queries.GetCatalogStatus
 
             var sourceCategories = await _productCategoryRepository.GetByStoreIdAsync(storeId);
             var sourceProducts = await _productRepository.GetProductsForCatalogSyncAsync(storeId);
-            var publishedProducts = await _catalogProductRepository.GetByStoreIdAsync(storeId);
 
             return ResponseResult.Success(new CatalogStatusDto
             {
@@ -66,7 +64,7 @@ namespace Application.Features.WebCatalog.Queries.GetCatalogStatus
                 CatalogSyncedAt = store.CatalogSyncedAt,
                 SourceCategoriesCount = sourceCategories.Count,
                 SourceProductsCount = sourceProducts.Count,
-                PublishedProductsCount = publishedProducts.Count(product => product.IsActive),
+                PublishedProductsCount = sourceProducts.Count(product => product.IsActive && product.AvailableToSale),
                 ProductsWithoutMainImageCount = sourceProducts.Count(product => string.IsNullOrWhiteSpace(product.Image)),
             });
         }

@@ -17,6 +17,7 @@ import {
 } from '~/shared/lib/payment-methods/store-payment-methods-config-service';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { switchToStore } from '~/shared/lib/stores/switch-store';
+import { hasMultiPaymentsModuleAvailable } from '~/shared/lib/auth/authorization-service';
 
 export const clientLoader = adminFeatureLoader([EFeatures.Configurations]);
 
@@ -249,8 +250,11 @@ export function ConfigurationsPage() {
 
       {/* Formas de pago (store-payment-methods-config): per-store toggles for
           the CURRENT store — independent of MultiStores, like the rest of the
-          page's per-store settings. */}
-      <PaymentMethodsConfigSection storeId={user?.selectedStoreId ?? ''} />
+          page's per-store settings. Hidden when MultiPayments (module 16) is
+          active: the channel-rates register replaces this per-channel toggle UI. */}
+      {!hasMultiPaymentsModuleAvailable(user) && (
+        <PaymentMethodsConfigSection storeId={user?.selectedStoreId ?? ''} />
+      )}
     </div>
   );
 }
