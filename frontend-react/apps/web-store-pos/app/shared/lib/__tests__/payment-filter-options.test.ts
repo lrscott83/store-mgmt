@@ -138,4 +138,11 @@ describe('paymentMethodKeyToLabel', () => {
     expect(paymentMethodKeyToLabel('transferencia-0')).toBe('Transferencia (CUP)');
     expect(paymentMethodKeyToLabel('transferencia-1')).toBe('Transferencia (USD)');
   });
+
+  it('withCurrency=false devuelve el método sin el sufijo de moneda', () => {
+    expect(paymentMethodKeyToLabel('transferencia-0', false)).toBe('Transferencia');
+    expect(paymentMethodKeyToLabel('transferencia-1', false)).toBe('Transferencia');
+    expect(paymentMethodKeyToLabel('efectivo', false)).toBe('Efectivo');
+    expect(paymentMethodKeyToLabel('zelle', false)).toBe('Zelle');
+  });
 });

@@ -79,17 +79,13 @@ export function TodayOrdersPage() {
     return true;
   }
 
-  const paymentOptions = collectOrderPaymentMethodKeys(orders);
-  const paymentActive = paymentKey !== null && paymentOptions.includes(paymentKey) ? paymentKey : null;
-  const paymentFilteredOrders = orders.filter(
-    (o) => !paymentActive || matchesOrderPaymentFilter(o, paymentActive),
-  );
-
   // Filtro de moneda: las opciones se derivan del conjunto SIN filtrar por moneda
-  // (solo por método de pago), para que el filtro no desaparezca al elegir una
-  // moneda y no haya forma de volver a las demás.
+  // NI por método de pago, para que el filtro no desaparezca al elegir una moneda
+  // y no haya forma de volver a las demás. La base es `orders` y no las órdenes ya
+  // filtradas por pago porque los canales dependen de la moneda (abajo): derivarlos
+  // de las filtradas por pago invertiría la dependencia y la volvería circular.
   const currencyOptions = presentCurrencies(
-    paymentFilteredOrders.map((o) => ({ amount: o.total, currency: o.currency })),
+    orders.map((o) => ({ amount: o.total, currency: o.currency })),
   );
   const { visible: currencyFilterVisible, currency, setCurrency } =
     useCurrencyFilter(currencyOptions);
@@ -101,6 +97,19 @@ export function TodayOrdersPage() {
       : multiMonedas
         ? (currencyOptions[0] ?? DEFAULT_CURRENCY)
         : DEFAULT_CURRENCY;
+
+  // Canales de pago acotados a la moneda seleccionada: al cambiarla la lista se
+  // recalcula, y el canal elegido se autorrepara a "Todas" si desaparece de la
+  // nueva moneda. Sin filtro visible el conjunto es el completo (comportamiento previo).
+  const paymentOptions = collectOrderPaymentMethodKeys(
+    currencyFilterVisible && currency !== null
+      ? orders.filter((o) => resolveCurrency(o.currency) === currency)
+      : orders,
+  );
+  const paymentActive = paymentKey !== null && paymentOptions.includes(paymentKey) ? paymentKey : null;
+  const paymentFilteredOrders = orders.filter(
+    (o) => !paymentActive || matchesOrderPaymentFilter(o, paymentActive),
+  );
 
   const visibleOrders =
     currencyFilterVisible && currency !== null
@@ -148,7 +157,7 @@ export function TodayOrdersPage() {
               onChange={() => setPaymentKey(key)}
               className="accent-primary"
             />
-            {paymentMethodKeyToLabel(key)}
+            {paymentMethodKeyToLabel(key, !multiMonedas)}
           </label>
         ))}
       </fieldset>

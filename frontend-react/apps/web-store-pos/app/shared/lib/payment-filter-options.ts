@@ -99,10 +99,22 @@ export function matchesExpensePaymentFilter(expense: Expense, key: string): bool
   );
 }
 
-/** Etiqueta visible de una clave: "Efectivo", "Zelle", "Transferencia (CUP)"… */
-export function paymentMethodKeyToLabel(key: string): string {
+/**
+ * Etiqueta visible de una clave: "Efectivo", "Zelle", "Transferencia (CUP)"…
+ *
+ * `withCurrency: false` devuelve el método SIN el sufijo de moneda
+ * ("Transferencia"). Lo usan las vistas cuyo filtro de canales ya está acotado
+ * a la moneda seleccionada: con un solo canal por moneda visible, el sufijo solo
+ * repite lo que el selector de moneda ya dice, y sin él dos claves de
+ * transferencia distintas (CUP y USD) se renderían como DOS radios
+ * "Transferencia" indistinguibles.
+ *
+ * Solo Transferencia lleva sufijo; Efectivo y Zelle no cambian con el flag.
+ */
+export function paymentMethodKeyToLabel(key: string, withCurrency = true): string {
   const [method, currency] = parseKey(key);
-  return salePaymentMethodLabel(method, currency);
+  const label = salePaymentMethodLabel(method, currency);
+  return withCurrency ? label : label.split(' (')[0];
 }
 
 /**

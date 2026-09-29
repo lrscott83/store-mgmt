@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { act, render, screen, fireEvent } from '@testing-library/react';
+import { act, render, screen, fireEvent, within } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import { Currency, EModules, ExpenseType, PaymentType } from '@store-mgmt/domain';
 import type { Expense } from '@store-mgmt/domain';
@@ -232,5 +232,112 @@ describe('ExpensesHistoryPage — filtro de moneda en modo multi-store', () => {
     expect(screen.getAllByText('5 EUR').length).toBeGreaterThan(0);
     expect(screen.queryByText('30 USD')).toBeNull();
     expect(screen.getByTestId('currency-filter-select')).toBeInTheDocument();
+  });
+});
+
+// ─── Filtro de canales de pago acotado a la moneda (2026-09-29) ───────────────
+// Con MultiMonedas la etiqueta pierde el sufijo de moneda ("Transferencia" y no
+// "Transferencia (CUP)") y la lista de canales se recalcula con la moneda
+// seleccionada, para que nunca haya dos canales indistinguibles a la vez. Sin el
+// módulo se conserva el comportamiento previo, sufijo incluido.
+
+/** El fieldset de canales es el radiogroup que contiene el radio "Todas". */
+function channelFilter() {
+  return within(screen.getByText('Todas').closest('[role="radiogroup"]') as HTMLElement);
+}
+
+describe('ExpensesHistoryPage — filtro de canales por moneda (MultiMonedas)', () => {
+  beforeEach(() => {
+    authStoreState.user = { selectedStoreId: 's1' };
+    multiStore.enabled = false;
+    multiStore.stores = [];
+    singleStoreExpenses.length = 0;
+  });
+
+  it('gate ON: sin sufijo de moneda, y la lista se recalcula al cambiar de moneda', async () => {
+    authStoreState.user = { selectedStoreId: 's1', storeModuleIds: [EModules.MultiMonedas] };
+    singleStoreExpenses.push(
+      makeExpense({
+        id: 'usd-xfer',
+        total: 30,
+        currency: Currency.USD,
+        paymentType: PaymentType.Tarjeta,
+      }),
+      makeExpense({
+        id: 'eur-zelle',
+        total: 5,
+        currency: Currency.EUR,
+        paymentType: PaymentType.Zelle,
+      }),
+    );
+    await act(async () => {
+      renderPage();
+    });
+
+    fireEvent.change(screen.getByTestId('currency-filter-select'), {
+      target: { value: String(Currency.USD) },
+    });
+    // USD solo tiene una transferencia → "Transferencia", sin el sufijo "(USD)".
+    expect(channelFilter().getByRole('radio', { name: 'Transferencia' })).toBeInTheDocument();
+    expect(
+      channelFilter().queryByRole('radio', { name: 'Transferencia (USD)' }),
+    ).not.toBeInTheDocument();
+    // Zelle es de EUR: no se ofrece mientras la moneda sea USD.
+    expect(channelFilter().queryByRole('radio', { name: 'Zelle' })).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByTestId('currency-filter-select'), {
+      target: { value: String(Currency.EUR) },
+    });
+    // EUR solo tiene Zelle → la transferencia sale del filtro.
+    expect(channelFilter().getByRole('radio', { name: 'Zelle' })).toBeInTheDocument();
+    expect(channelFilter().queryByRole('radio', { name: 'Transferencia' })).not.toBeInTheDocument();
+  });
+
+  it('gate ON: el canal elegido vuelve a "Todas" si no existe en la moneda nueva', async () => {
+    authStoreState.user = { selectedStoreId: 's1', storeModuleIds: [EModules.MultiMonedas] };
+    singleStoreExpenses.push(
+      makeExpense({
+        id: 'usd-xfer',
+        total: 30,
+        currency: Currency.USD,
+        paymentType: PaymentType.Tarjeta,
+      }),
+      makeExpense({
+        id: 'eur-efectivo',
+        total: 5,
+        currency: Currency.EUR,
+        paymentType: PaymentType.Efectivo,
+      }),
+    );
+    await act(async () => {
+      renderPage();
+    });
+    fireEvent.change(screen.getByTestId('currency-filter-select'), {
+      target: { value: String(Currency.USD) },
+    });
+    fireEvent.click(channelFilter().getByRole('radio', { name: 'Transferencia' }));
+    expect(channelFilter().getByRole('radio', { name: 'Transferencia' })).toBeChecked();
+
+    // EUR no tiene transferencias: la selección deja de existir y se autorrepara.
+    fireEvent.change(screen.getByTestId('currency-filter-select'), {
+      target: { value: String(Currency.EUR) },
+    });
+    expect(channelFilter().getByRole('radio', { name: 'Todas' })).toBeChecked();
+  });
+
+  it('gate OFF: conserva el sufijo de moneda en las etiquetas del filtro', async () => {
+    singleStoreExpenses.push(
+      makeExpense({
+        id: 'usd-xfer',
+        total: 30,
+        currency: Currency.USD,
+        paymentType: PaymentType.Tarjeta,
+      }),
+    );
+    await act(async () => {
+      renderPage();
+    });
+    expect(channelFilter().getByRole('radio', { name: 'Transferencia (USD)' })).toBeInTheDocument();
+    expect(channelFilter().queryByRole('radio', { name: 'Transferencia' })).not.toBeInTheDocument();
   });
 });

@@ -199,11 +199,14 @@ export function ExpensesHistoryPage() {
         : [selectedMultiStoreId];
 
     // Opciones dinámicas: métodos presentes en el conjunto visible por el
-    // filtro de tienda Y de fechas (con "Todas las tiendas" agrega todas).
+    // filtro de tienda Y de fechas (con "Todas las tiendas" agrega todas), y
+    // acotados a la moneda seleccionada — al cambiarla la lista se recalcula.
     const baseExpenses = visibleStoreIds.flatMap((id) =>
       multiActiveExpenses(storeExpenses.get(id) ?? []).filter(inDateRange),
     );
-    const paymentOptions = collectExpensePaymentMethodKeys(baseExpenses);
+    const paymentOptions = collectExpensePaymentMethodKeys(
+      filterExpensesByCurrency(baseExpenses),
+    );
     const paymentActive =
       paymentKey !== null && paymentOptions.includes(paymentKey) ? paymentKey : null;
     const visibleExpenses = (expenses: Expense[]): Expense[] =>
@@ -282,7 +285,7 @@ export function ExpensesHistoryPage() {
                       onChange={() => setPaymentKey(key)}
                       className="text-primary focus:ring-primary"
                     />
-                    {paymentMethodKeyToLabel(key)}
+                    {paymentMethodKeyToLabel(key, !multiMonedas)}
                   </label>
                 ))}
               </div>
@@ -369,7 +372,7 @@ export function ExpensesHistoryPage() {
   }
 
   const allExpenses = dayGroups.flatMap((g) => g.items);
-  const paymentOptions = collectExpensePaymentMethodKeys(allExpenses);
+  const paymentOptions = collectExpensePaymentMethodKeys(filterExpensesByCurrency(allExpenses));
   const paymentActive =
     paymentKey !== null && paymentOptions.includes(paymentKey) ? paymentKey : null;
   const paymentFilteredDayGroups: LocalDayGroup<Expense>[] = paymentActive
@@ -441,7 +444,7 @@ export function ExpensesHistoryPage() {
                 onChange={() => setPaymentKey(key)}
                 className="text-primary focus:ring-primary"
               />
-              {paymentMethodKeyToLabel(key)}
+              {paymentMethodKeyToLabel(key, !multiMonedas)}
             </label>
           ))}
         </div>
