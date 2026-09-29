@@ -76,6 +76,7 @@ redact() {
   sed -E \
     -e 's/(Password=)[^;]+/\1***/g' \
     -e 's/(POSTGRES_PASSWORD=)[^ ]+/\1***/g' \
+    -e 's/(PGADMIN_DEFAULT_PASSWORD=)[^ ]+/\1***/g' \
     -e 's/(Jwt__SecretKey=)[^ ]+/\1***/g' \
     -e 's/(Jwt__Issuer=)[^ ]+/\1***/g' \
     -e 's/(Jwt__Audience=)[^ ]+/\1***/g' \
