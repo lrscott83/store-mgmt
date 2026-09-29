@@ -1,29 +1,25 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useIntl } from 'react-intl';
 import { Button } from '~/shared/components/ui/button';
 import { FileInput } from '~/shared/components/ui/file-input';
-import { Switch } from '~/shared/components/ui/switch';
 import { SaveIcon, TrashIcon } from '~/shared/components/ui/icons';
 import { confirmDialog } from '~/shared/lib/blocking-alert';
-import { formatCurrency } from '~/shared/lib/format-currency';
+import { currencyFromCode, formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency';
 import { apiFileUrl } from '~/shared/lib/http/media-url';
 import type { CatalogProductFields, CatalogProductView } from '../lib/services/catalog-http-service';
-import {
-  MAX_CATALOG_IMAGES,
-  MAX_CATALOG_IMAGE_BYTES,
-  MAX_DESCRIPTION_LENGTH,
-  computeFinalPrice,
-  toDiscountAmount,
-  toPercent,
-  toScaledDiscountAmount,
-  toScaledPercent,
-} from '../lib/catalog/web-catalog-format';
+import { MAX_CATALOG_IMAGES, MAX_CATALOG_IMAGE_BYTES } from '../lib/catalog/web-catalog-format';
+
+/**
+ * NOTA DE RESTAURACIÓN (campos de actualización comentados): al volver a habilitarlos,
+ * descomenta también — los estados `description/percent/discount/isNew`, `parseNumber`,
+ * `finalPrice` y `handleSave` (con sus validaciones), el grid de campos del JSX, el badge de -%
+ * de la cabecera, la constante INPUT_CLASSES y los imports `Switch`, `MAX_DESCRIPTION_LENGTH`,
+ * `computeFinalPrice`, `toPercent`, `toScaledPercent`, `toDiscountAmount`,
+ * `toScaledDiscountAmount`.
+ */
 
 /** Formatos aceptados por el backend (decisión D10) — se validan aquí para no subir en balde. */
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
-
-const INPUT_CLASSES =
-  'w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-primary';
 
 interface CatalogProductEditorProps {
   product: CatalogProductView;
@@ -31,8 +27,8 @@ interface CatalogProductEditorProps {
   storeSlug: string;
   /** true mientras hay una operación de ESTE producto en vuelo (guardar o imágenes). */
   busy: boolean;
-  onSave: (fields: CatalogProductFields) => void;
-  onUploadImage: (file: File) => void;
+  /** Guarda los campos enviados y sube la imagen retenida (null = sin imagen nueva). */
+  onSave: (fields: CatalogProductFields, image: File | null) => void;
   onRemoveImage: (path: string) => void;
   onSetMainImage: (key: string) => void;
   onReorderImages: (paths: string[]) => void;
@@ -41,71 +37,96 @@ interface CatalogProductEditorProps {
 /**
  * Fila editable de un producto en la vista Catálogo Web (módulo 18, plan 2026-09-27).
  *
- * Solo edita los campos del catálogo (decisión D8): descripción en TEXTO PLANO (D9 — un
- * `textarea`, nunca un editor HTML), `% de descuento`, `precio rebajado`, `Nuevo` y las imágenes
- * (principal + galería propietaria, decisión D10). El nombre, el precio de venta y el orden son
- * del catálogo de productos: aquí se muestran, no se tocan.
+ * POR AHORA solo permite modificar la imagen del producto (decisión del owner, 2026-09-29): los
+ * campos de actualización (descripción, % de descuento, precio rebajado y "Nuevo") quedan
+ * COMENTADOS — no borrados — para restaurarlos más adelante. Seleccionar una imagen NO dispara
+ * ninguna llamada: se retiene y SOLO se sube al pulsar Guardar. El nombre, el precio de venta y
+ * el orden son del catálogo de productos: aquí se muestran, no se tocan.
  */
 export function CatalogProductEditor({
   product,
   storeSlug,
   busy,
   onSave,
-  onUploadImage,
   onRemoveImage,
   onSetMainImage,
   onReorderImages,
 }: CatalogProductEditorProps) {
   const intl = useIntl();
 
+  // ── CAMPOS DE ACTUALIZACIÓN COMENTADOS (se restauran descomentando) ─────────────
   // Estado local del formulario: el producto de la lista es la referencia, lo editado vive aquí
   // hasta que se guarda.
-  const [description, setDescription] = useState(product.description);
-  const [percent, setPercent] = useState(toPercent(product.percentDiscountPrice).toString());
-  const [discount, setDiscount] = useState(toDiscountAmount(product.discountPrice).toString());
-  const [isNew, setIsNew] = useState(product.isNew);
+  // const [description, setDescription] = useState(product.description);
+  // const [percent, setPercent] = useState(toPercent(product.percentDiscountPrice).toString());
+  // const [discount, setDiscount] = useState(toDiscountAmount(product.discountPrice).toString());
+  // const [isNew, setIsNew] = useState(product.isNew);
+  // ────────────────────────────────────────────────────────────────────────────────
+
   const [error, setError] = useState<string | null>(null);
+  /** Imagen retenida: se valida al seleccionar pero NO se sube hasta pulsar Guardar. */
+  const [pendingImage, setPendingImage] = useState<File | null>(null);
 
-  function parseNumber(raw: string): number {
-    const parsed = Number(raw.trim().replace(',', '.'));
-    return Number.isFinite(parsed) ? parsed : 0;
-  }
+  // Una operación completada (Guardar, quitar, reorder) consume la selección retenida.
+  const wasBusyRef = useRef(busy);
+  useEffect(() => {
+    if (wasBusyRef.current && !busy) setPendingImage(null);
+    wasBusyRef.current = busy;
+  }, [busy]);
 
-  const percentNumber = parseNumber(percent);
-  const discountNumber = parseNumber(discount);
-  // El precio final es el mismo cálculo del backend (D7): % primero, monto rebajado después y
-  // nunca por debajo de 0. Solo es una previsualización; el dueño del dato es el backend.
-  const finalPrice = computeFinalPrice(
-    product.price,
-    toScaledPercent(percentNumber),
-    toScaledDiscountAmount(discountNumber),
-  );
+  // ── CAMPOS DE ACTUALIZACIÓN COMENTADOS (se restauran descomentando) ─────────────
+  // function parseNumber(raw: string): number {
+  //   const parsed = Number(raw.trim().replace(',', '.'));
+  //   return Number.isFinite(parsed) ? parsed : 0;
+  // }
+  //
+  // const percentNumber = parseNumber(percent);
+  // const discountNumber = parseNumber(discount);
+  // // El precio final es el mismo cálculo del backend (D7): % primero, monto rebajado después y
+  // // nunca por debajo de 0. Solo es una previsualización; el dueño del dato es el backend.
+  // const finalPrice = computeFinalPrice(
+  //   product.price,
+  //   toScaledPercent(percentNumber),
+  //   toScaledDiscountAmount(discountNumber),
+  // );
+  // ────────────────────────────────────────────────────────────────────────────────
+
+  /** Moneda del producto como valor del enum (el DTO la trae como código: "CUP", "USD", …). */
+  const currency = currencyFromCode(product.currency);
+
+  // ── CAMPOS DE ACTUALIZACIÓN COMENTADOS (se restauran descomentando) ─────────────
+  // function handleSave() {
+  //   if (percentNumber < 0 || percentNumber > 100) {
+  //     setError(intl.formatMessage({ id: 'WEB_CATALOG.PERCENT_RANGE' }));
+  //     return;
+  //   }
+  //   if (discountNumber < 0) {
+  //     setError(intl.formatMessage({ id: 'WEB_CATALOG.DISCOUNT_RANGE' }));
+  //     return;
+  //   }
+  //   if (description.length > MAX_DESCRIPTION_LENGTH) {
+  //     setError(
+  //       intl.formatMessage(
+  //         { id: 'WEB_CATALOG.DESCRIPTION_TOO_LONG' },
+  //         { max: MAX_DESCRIPTION_LENGTH },
+  //       ),
+  //     );
+  //     return;
+  //   }
+  //   setError(null);
+  //   onSave({
+  //     description,
+  //     percentDiscountPrice: toScaledPercent(percentNumber),
+  //     discountPrice: toScaledDiscountAmount(discountNumber),
+  //     isNew,
+  //   }, pendingImage);
+  // }
+  // ────────────────────────────────────────────────────────────────────────────────
 
   function handleSave() {
-    if (percentNumber < 0 || percentNumber > 100) {
-      setError(intl.formatMessage({ id: 'WEB_CATALOG.PERCENT_RANGE' }));
-      return;
-    }
-    if (discountNumber < 0) {
-      setError(intl.formatMessage({ id: 'WEB_CATALOG.DISCOUNT_RANGE' }));
-      return;
-    }
-    if (description.length > MAX_DESCRIPTION_LENGTH) {
-      setError(
-        intl.formatMessage(
-          { id: 'WEB_CATALOG.DESCRIPTION_TOO_LONG' },
-          { max: MAX_DESCRIPTION_LENGTH },
-        ),
-      );
-      return;
-    }
+    // Campos comentados: Guardar solo envía la imagen retenida ({} = el backend no toca campos).
     setError(null);
-    onSave({
-      description,
-      percentDiscountPrice: toScaledPercent(percentNumber),
-      discountPrice: toScaledDiscountAmount(discountNumber),
-      isNew,
-    });
+    onSave({}, pendingImage);
   }
 
   function handleFile(file: File | null) {
@@ -120,7 +141,8 @@ export function CatalogProductEditor({
       return;
     }
     setError(null);
-    onUploadImage(file);
+    // SOLO se retiene: nada de red al seleccionar; la subida ocurre al pulsar Guardar.
+    setPendingImage(file);
   }
 
   async function handleRemoveImage(path: string) {
@@ -152,27 +174,27 @@ export function CatalogProductEditor({
     >
       <header className="flex flex-wrap items-center gap-2">
         <h4 className="flex-1 text-base font-medium text-text">{product.name}</h4>
-        <span className="text-xs text-text-muted">{product.categoryName}</span>
-        <span className="text-sm font-medium text-text">{formatCurrency(product.price)}</span>
+        {/* Sin categoría junto al precio: la categoría ya nombra el panel colapsable que
+            contiene este producto. Precio con su moneda (código, no símbolo). */}
+        <span className="text-sm font-medium text-text">
+          {formatMoneyWithCurrency(product.price, currency)}
+        </span>
         {!product.availableToSale && (
           <span className="rounded-full bg-border px-2 py-0.5 text-xs font-medium text-text-muted">
             {intl.formatMessage({ id: 'WEB_CATALOG.UNPUBLISHED' })}
           </span>
         )}
-        {isNew && (
+        {product.isNew && (
           <span className="rounded-full bg-primary-light px-2 py-0.5 text-xs font-medium text-primary">
             {intl.formatMessage({ id: 'WEB_CATALOG.IS_NEW' })}
           </span>
         )}
-        {percentNumber > 0 && (
-          <span className="rounded-full bg-danger/10 px-2 py-0.5 text-xs font-medium text-danger">
-            -{percentNumber}%
-          </span>
-        )}
+        {/* El badge de -% del header vuelve junto a los campos de actualización (comentados). */}
       </header>
 
+      {/* ── CAMPOS DE ACTUALIZACIÓN COMENTADOS (se restauran descomentando) ──────────
+
       <div className="mt-3 grid gap-4 md:grid-cols-2">
-        {/* Descripción: texto plano, sin editor ni HTML (decisión D9). */}
         <div>
           <label
             className="mb-1 block text-xs font-medium text-text-muted"
@@ -245,22 +267,25 @@ export function CatalogProductEditor({
           <p className="text-sm" data-testid={`catalog-final-price-${product.id}`}>
             <span className="font-medium text-text">
               {intl.formatMessage({ id: 'WEB_CATALOG.FINAL_PRICE' })}:{' '}
-              {formatCurrency(finalPrice)}
+              {formatMoneyWithCurrency(finalPrice, currency)}
             </span>
             {finalPrice < product.price && (
               <span className="ml-2 text-xs text-text-muted line-through">
-                {formatCurrency(product.price)}
+                {formatMoneyWithCurrency(product.price, currency)}
               </span>
             )}
           </p>
         </div>
       </div>
+      ─────────────────────────────────────────────────────────────────────────────────── */}
 
-      {/* Imágenes: principal + galería (máx. 6 por producto, 2 MB cada una — decisión D10). */}
+      {/* Imágenes: principal + galería (máx. 6 por producto, 2 MB cada una — decisión D10).
+          En esta vista el bloque se llama solo "Imagen" (sin "principal") por decisión del
+          owner; el texto con "principal" vuelve más adelante. */}
       <div className="mt-4 border-t border-border pt-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <span className="text-xs font-medium text-text-muted">
-            {intl.formatMessage({ id: 'WEB_CATALOG.MAIN_IMAGE' })}
+            {intl.formatMessage({ id: 'WEB_CATALOG.IMAGE' })}
           </span>
           <span className="text-xs text-text-muted">
             {intl.formatMessage(
@@ -281,7 +306,7 @@ export function CatalogProductEditor({
               />
               <button
                 type="button"
-                onClick={() => onSave({ removeImage: true })}
+                onClick={() => onSave({ removeImage: true }, null)}
                 disabled={busy}
                 className="inline-flex items-center gap-1 text-xs text-danger hover:underline disabled:opacity-50"
                 data-testid={`catalog-clear-main-${product.id}`}
@@ -301,6 +326,17 @@ export function CatalogProductEditor({
               disabled={busy || galleryFull}
               data-testid={`catalog-upload-${product.id}`}
             />
+            {/* Selección retenida: se anuncia y SOLO se sube al pulsar Guardar. */}
+            {pendingImage && (
+              <p
+                className="mt-1 text-xs text-primary"
+                data-testid={`catalog-pending-image-${product.id}`}
+              >
+                {pendingImage.name}
+                {!product.image &&
+                  ` · ${intl.formatMessage({ id: 'WEB_CATALOG.WILL_BE_MAIN' })}`}
+              </p>
+            )}
           </div>
         </div>
 
