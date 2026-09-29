@@ -684,6 +684,10 @@ const messages: Record<string, string> = {
   // Stage 2.3). NEW_ENTRY kept as-is (used only for the Today Entries add-entry button, whose
   // Angular counterpart is GENERAL.ENTRY, added separately above).
   'INVENTORY.AVAILABLE.TITLE': 'Inventario',
+  // 2026-09-29 (petición del owner): el textbox de búsqueda de Inventario Disponible
+  // pasa de "Buscar" a "Buscar producto" (deja claro qué se filtra) y lleva lupa
+  // al inicio. Sustituye a GENERAL.SEARCH solo en esta vista.
+  'INVENTORY.SEARCH_PRODUCT': 'Buscar producto',
   'INVENTORY.TODAY_ENTRIES.TITLE': 'Entradas del día',
   'INVENTORY.TODAY_ENTRIES.NEW_ENTRY': 'Nueva entrada',
   // 2026-09-18 (permiso del usuario): el header ahora es «Entradas (n)» — el

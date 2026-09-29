@@ -9,7 +9,7 @@ import { CurrencyFilter } from '~/shared/components/multimonedas/currency-filter
 import { useCurrencyFilter } from '~/shared/components/multimonedas/use-currency-filter';
 import { presentCurrencies, resolveCurrency } from '~/shared/lib/currency-totals';
 import { Card } from '~/shared/components/ui/card';
-import { ChevronDownIcon } from '~/shared/components/ui/icons';
+import { ChevronDownIcon, SearchIcon } from '~/shared/components/ui/icons';
 import { InventoryOfflineService } from '../lib/services/inventory-offline-service';
 import type { InventoryCategoryView } from '../lib/services/inventory-offline-service';
 import { ProductRepository } from '~/sales/lib/repositories/product-repository';
@@ -183,15 +183,22 @@ export function InventoryAvailablePage() {
           onSelectedStoreIdChange={setSelectedMultiStoreId}
           filters={
             <>
-              <input
-                role="searchbox"
-                data-testid="multistore-inventory-search"
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder={intl.formatMessage({ id: 'GENERAL.SEARCH' })}
-                className="w-full max-w-xs rounded border border-border px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-              />
+              {/* Búsqueda global — misma fila que el select de tiendas (2026-09-29),
+                  con lupa al inicio. Ancho explícito (no `w-full`): un `w-full` como
+                  ítem flex reserva la línea entera y empuja la moneda a otra fila.
+                  La moneda conserva su `w-full` de abajo, que sí debe bajar. */}
+              <div className="relative w-64 sm:w-72">
+                <SearchIcon className="pointer-events-none absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
+                <input
+                  role="searchbox"
+                  data-testid="multistore-inventory-search"
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder={intl.formatMessage({ id: 'INVENTORY.SEARCH_PRODUCT' })}
+                  className="w-full rounded border border-border py-1 pl-8 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+              </div>
               {/* Fila propia de moneda debajo de la búsqueda (se auto-oculta). */}
               <div className="flex w-full justify-center">
                 <CurrencyFilter

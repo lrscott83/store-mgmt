@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { useIntl } from 'react-intl';
 import type { Currency } from '@store-mgmt/domain';
-import { ChevronDownIcon } from '~/shared/components/ui/icons';
+import { ChevronDownIcon, SearchIcon } from '~/shared/components/ui/icons';
 import type { InventoryCategoryView } from '../lib/services/inventory-offline-service';
 import { formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency';
 import { CurrencyTotalAmount } from '~/shared/components/multimonedas/currency-total-amount';
@@ -87,15 +87,16 @@ export function InventoryProductList({
 
   return (
     <div className="space-y-4">
-      {/* Search */}
-      <div>
+      {/* Search — lupa al inicio del campo (2026-09-29). */}
+      <div className="relative">
+        <SearchIcon className="pointer-events-none absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
         <input
           role="searchbox"
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder={intl.formatMessage({ id: 'GENERAL.SEARCH' })}
-          className="w-full rounded border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+          placeholder={intl.formatMessage({ id: 'INVENTORY.SEARCH_PRODUCT' })}
+          className="w-full rounded border border-border py-2 pl-8 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
         />
       </div>
 
