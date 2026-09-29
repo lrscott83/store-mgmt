@@ -579,7 +579,7 @@ describe('SaleCreditsPage (history) — header TODOS + gear/amarillito (petició
 
     const header = () => document.querySelector('[data-slot="card-header"]') as HTMLElement;
     // Los paneles de día nacen colapsados — esperar el HEADER, no las filas.
-    await screen.findByText('(2)');
+    await screen.findByText('(1)');
     // Count = 2 (todos); total = SOLO impagos: 40 (c2 pagado no suma).
     expect(within(header()).getByText('40 CUP')).toBeInTheDocument();
   });
@@ -596,11 +596,14 @@ describe('SaleCreditsPage (history) — header TODOS + gear/amarillito (petició
     );
 
     const header = () => document.querySelector('[data-slot="card-header"]') as HTMLElement;
-    await screen.findByText('(2)');
+    await screen.findByText('(1)');
     // Header total 40\u00A0CUP (solo impagos) en ámbar (40 > 0).
     expect(within(header()).getByText('40 CUP')).toHaveClass('text-warning');
+    // 2026-09-29: el default es "Por Pagar", que oculta el crédito pagado — pasar a
+    // "Todos" para que la fila pagada exista y poder contrastar ámbar vs verde.
+    fireEvent.click(screen.getByRole('radio', { name: 'Todos' }));
     // Expandir el panel para que existan las filas.
-    fireEvent.click(screen.getByTestId('credit-date-panel-toggle-2024-03-15'));
+    fireEvent.click(await screen.findByTestId('credit-date-panel-toggle-2024-03-15'));
     // Precio de fila: NO pagado en ámbar, PAGADO en verde.
     const tbody = document.querySelector('tbody') as HTMLElement;
     expect(await within(tbody).findByText('40 CUP')).toHaveClass('text-warning');
@@ -663,10 +666,12 @@ describe('SaleCreditsPage (history) — header TODOS + gear/amarillito (petició
     await waitFor(() => expect(filter).toHaveBeenCalledTimes(2));
   });
 
-  // Los paneles multi-store del historial permanecen SOLO LECTURA por arquitectura:
-  // no existe camino de escritura para tiendas que no son la seleccionada
-  // (decryptEntityWithDek es READ-ONLY by contract — no hay encryptEntityWithDek).
-  it('TC-H-MS-READONLY: en multi-store los paneles por tienda NO muestran gear (solo lectura por diseño)', async () => {
+  // Los paneles multi-store del historial habilitan el gear SOLO en la tienda
+  // SELECCIONADA. Para el resto no existe camino de escritura: sus datos llegan
+  // descifrados con DEK y decryptEntityWithDek es READ-ONLY by contract — no hay
+  // encryptEntityWithDek. En la seleccionada el write path es el MISMO que ya usa
+  // la vista de tienda única (service del storeId seleccionado).
+  it('TC-H-MS-GEAR: el gear aparece en el panel de la tienda SELECCIONADA y no en el de las demás', async () => {
     authStoreState.user = {
       selectedStoreId: 's1',
       isOwnerAdmin: true,
@@ -677,7 +682,9 @@ describe('SaleCreditsPage (history) — header TODOS + gear/amarillito (petició
       ],
     };
     vi.mocked(readStoreSaleCredits).mockImplementation((storeId) =>
-      storeId === 's1' ? [makeCredit({ id: 'c1', total: 10 })] : [],
+      storeId === 's1'
+        ? [makeCredit({ id: 'c1', client: 'Cliente S1', total: 10 })]
+        : [makeCredit({ id: 'c2', client: 'Cliente S2', total: 20 })],
     );
     vi.mocked(SaleCreditOfflineService).mockImplementation(
       () =>
@@ -694,9 +701,18 @@ describe('SaleCreditsPage (history) — header TODOS + gear/amarillito (petició
     );
 
     await screen.findByTestId('multistore-select');
+
+    // s1 = tienda SELECCIONADA → gear de editar/pagar disponible.
     fireEvent.click(screen.getByTestId('multistore-panel-toggle-s1'));
     fireEvent.click(await screen.findByTestId('multistore-credit-date-toggle-s1-2024-03-15'));
-    expect(screen.queryByTestId(/^sale-credit-actions-toggle-/)).toBeNull();
+    expect(await screen.findByText('Cliente S1')).toBeInTheDocument();
+    expect(screen.getByTestId('sale-credit-actions-toggle-c1')).toBeInTheDocument();
+
+    // s2 = tienda NO seleccionada → la fila se renderiza pero SIN gear.
+    fireEvent.click(screen.getByTestId('multistore-panel-toggle-s2'));
+    fireEvent.click(await screen.findByTestId('multistore-credit-date-toggle-s2-2024-03-15'));
+    expect(await screen.findByText('Cliente S2')).toBeInTheDocument();
+    expect(screen.queryByTestId('sale-credit-actions-toggle-c2')).toBeNull();
   });
 });
 
@@ -941,7 +957,7 @@ describe('SaleCreditsPage — filtro por estado de pago (credits-paid-green-filt
     ];
   }
 
-  it('T4-TODOS: radios Todos/Por Pagar/Pagados con Todos marcado por defecto; count=todos, total=impagos', async () => {
+  it('T4-DEFAULT-POR-PAGAR: el radio Por Pagar viene marcado por defecto (2026-09-29)', async () => {
     seedHistory(mixedCredits());
     render(
       <Wrapper>
@@ -950,19 +966,37 @@ describe('SaleCreditsPage — filtro por estado de pago (credits-paid-green-filt
     );
 
     const header = () => document.querySelector('[data-slot="card-header"]') as HTMLElement;
-    await screen.findByText('(2)');
+    await screen.findByText('(1)');
 
     // La fila de radios está debajo del filtro de fechas.
     expect(screen.getByRole('radiogroup')).toBeInTheDocument();
     const todos = screen.getByRole('radio', { name: 'Todos' }) as HTMLInputElement;
     const porPagar = screen.getByRole('radio', { name: 'Por Pagar' }) as HTMLInputElement;
     const pagados = screen.getByRole('radio', { name: 'Pagados' }) as HTMLInputElement;
-    expect(todos.checked).toBe(true);
-    expect(porPagar.checked).toBe(false);
+    expect(porPagar.checked).toBe(true);
+    expect(todos.checked).toBe(false);
     expect(pagados.checked).toBe(false);
 
     // Todos (default): count = 2 créditos, total = solo el impago (40\u00A0CUP).
-    expect(within(header()).getByText('(2)')).toBeInTheDocument();
+    expect(within(header()).getByText('(1)')).toBeInTheDocument();
+    expect(within(header()).getByText('40 CUP')).toBeInTheDocument();
+  });
+
+  it('T4-TODOS: elegir Todos restaura count y total completos (count=todos, total=impagos)', async () => {
+    seedHistory(mixedCredits());
+    render(
+      <Wrapper>
+        <SaleCreditsPage />
+      </Wrapper>,
+    );
+
+    const header = () => document.querySelector('[data-slot="card-header"]') as HTMLElement;
+    await screen.findByText('(1)');
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Todos' }));
+
+    // Todos: count = 2 créditos, total = solo el impago (40 CUP).
+    await waitFor(() => expect(within(header()).getByText('(2)')).toBeInTheDocument());
     expect(within(header()).getByText('40 CUP')).toBeInTheDocument();
   });
 
@@ -975,11 +1009,8 @@ describe('SaleCreditsPage — filtro por estado de pago (credits-paid-green-filt
     );
 
     const header = () => document.querySelector('[data-slot="card-header"]') as HTMLElement;
-    await screen.findByText('(2)');
-
-    fireEvent.click(screen.getByRole('radio', { name: 'Por Pagar' }));
-
-    await waitFor(() => expect(within(header()).getByText('(1)')).toBeInTheDocument());
+    // Por Pagar ya es el default desde 2026-09-29: no hace falta hacer clic para llegar aquí.
+    await screen.findByText('(1)');    await waitFor(() => expect(within(header()).getByText('(1)')).toBeInTheDocument());
     expect(within(header()).getByText('40 CUP')).toBeInTheDocument();
     // El panel del día (conteo (1)) solo muestra el crédito impago (c1): el pagado no existe.
     const dayToggle = screen.getByTestId('credit-date-panel-toggle-2024-03-15');
@@ -998,7 +1029,7 @@ describe('SaleCreditsPage — filtro por estado de pago (credits-paid-green-filt
     );
 
     const header = () => document.querySelector('[data-slot="card-header"]') as HTMLElement;
-    await screen.findByText('(2)');
+    await screen.findByText('(1)');
 
     fireEvent.click(screen.getByRole('radio', { name: 'Pagados' }));
 
@@ -1028,7 +1059,7 @@ describe('SaleCreditsPage — filtro por estado de pago (credits-paid-green-filt
     );
 
     const header = () => document.querySelector('[data-slot="card-header"]') as HTMLElement;
-    await screen.findByText('(2)');
+    await screen.findByText('(1)');
 
     fireEvent.click(screen.getByRole('radio', { name: 'Pagados' }));
     await waitFor(() => expect(within(header()).getByText('(1)')).toBeInTheDocument());
@@ -1075,7 +1106,11 @@ describe('SaleCreditsPage — filtro por estado de pago (credits-paid-green-filt
     const header = () => document.querySelector('[data-slot="card-header"]') as HTMLElement;
     fireEvent.click(screen.getByTestId('multistore-panel-toggle-s1'));
 
-    // Todos (default): count 2, total = solo impagos (10\u00A0CUP).
+    // Por Pagar (default desde 2026-09-29): count 1, total = solo impagos (10 CUP).
+    await waitFor(() => expect(within(header()).getByText('(1)')).toBeInTheDocument());
+
+    // Todos: ambos creditos, el total sigue sumando solo los impagos.
+    fireEvent.click(screen.getByRole('radio', { name: 'Todos' }));
     await waitFor(() => expect(within(header()).getByText('(2)')).toBeInTheDocument());
     expect(within(header()).getByText('10 CUP')).toBeInTheDocument();
 
