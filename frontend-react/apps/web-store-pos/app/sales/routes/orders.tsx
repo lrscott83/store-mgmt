@@ -321,9 +321,12 @@ export function OrdersPage() {
         : [selectedMultiStoreId];
 
     // Opciones dinámicas: métodos presentes en el conjunto visible por el
-    // filtro de tienda (con "Todas las tiendas" agrega todas).
+    // filtro de tienda (con "Todas las tiendas" agrega todas) Y acotados a la
+    // moneda seleccionada — al cambiarla la lista se recalcula.
     const baseOrders = visibleStoreIds.flatMap((id) => multiBaseFilteredOrders(storeOrders.get(id) ?? []));
-    const paymentOptions = collectOrderPaymentMethodKeys(baseOrders.filter(rangeFilter));
+    const paymentOptions = collectOrderPaymentMethodKeys(
+      filterOrdersByCurrency(baseOrders.filter(rangeFilter)),
+    );
     const paymentActive =
       paymentKey !== null && paymentOptions.includes(paymentKey) ? paymentKey : null;
     const visibleOrders = (orders: Order[]): Order[] =>
@@ -367,7 +370,7 @@ export function OrdersPage() {
               onChange={() => setPaymentKey(key)}
               className="accent-primary"
             />
-            {paymentMethodKeyToLabel(key)}
+            {paymentMethodKeyToLabel(key, !multiMonedas)}
           </label>
         ))}
       </fieldset>
@@ -556,11 +559,11 @@ export function OrdersPage() {
   }
 
   // ─── single-store mode ───────────────────────────────────────────────────
-  // Opciones dinámicas de las órdenes cargadas (activo + crédito); el filtro
-  // de pago se aplica en render para que opciones y filas salgan del mismo
-  // conjunto de datos.
+  // Opciones dinámicas de las órdenes cargadas (activo + crédito) acotadas a la
+  // moneda seleccionada; el filtro de pago se aplica en render para que opciones
+  // y filas salgan del mismo conjunto de datos.
   const allOrders = groups.flatMap((g) => g.items);
-  const paymentOptions = collectOrderPaymentMethodKeys(allOrders);
+  const paymentOptions = collectOrderPaymentMethodKeys(filterOrdersByCurrency(allOrders));
   const paymentActive =
     paymentKey !== null && paymentOptions.includes(paymentKey) ? paymentKey : null;
   const paymentFilteredGroups: LocalDayGroup<Order>[] = paymentActive
@@ -626,7 +629,7 @@ export function OrdersPage() {
               onChange={() => setPaymentKey(key)}
               className="accent-primary"
             />
-            {paymentMethodKeyToLabel(key)}
+            {paymentMethodKeyToLabel(key, !multiMonedas)}
           </label>
         ))}
       </fieldset>

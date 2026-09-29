@@ -15,8 +15,10 @@ using Application.Features.StoreManagement.Stores.Commands.SetMyStore;
 using Application.Features.StoreManagement.Stores.Commands.SwitchMyStore;
 using Application.Features.StoreManagement.Stores.Commands.SetStoreActivation;
 using Application.Features.StoreManagement.Stores.Commands.UpdateStore;
+using Application.Features.StoreManagement.Stores.Commands.UpdateStoreModulePricing;
 using Application.Features.StoreManagement.Stores.Queries.GetMyStores;
 using Application.Features.StoreManagement.Stores.Queries.GetStoreById;
+using Application.Features.StoreManagement.Stores.Queries.GetStoreModulePricing;
 using Application.Features.StoreManagement.Stores.Queries.GetStorePlan;
 using Application.Features.StoreManagement.Stores.Queries.GetStores;
 using Application.Features.StoreManagement.Stores.Queries.GetStoresByCurrentUser;
@@ -270,6 +272,46 @@ namespace SMCA.WebApi.Controllers.v1
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
         public async Task<IActionResult> ChangeStorePlanAsync(Guid storeId, [FromBody] ChangeStorePlanCommand command)
             => Ok(await Sender.Send(command with { StoreId = storeId }));
+
+        /// <summary>
+        /// SuperAdmin authors ONE store's own module pricing (PUT
+        /// /v1/stores/{storeId}/module-pricing). Body carries the COMPLETE set of modules
+        /// the operator was shown — active AND AvailableToStore — each with a tick and the
+        /// three price fields. Ticked → activated (inserted or reactivated) and priced;
+        /// unticked → deactivated (a soft flag; rows are never deleted). A module ABSENT
+        /// from the payload is left untouched, never implicitly deactivated. The catalog
+        /// is consulted only for module existence and the PriceIncluded activation
+        /// snapshot, so a store's own price is never overwritten by catalog pricing.
+        /// Returns the saved state of every submitted row plus the total over the ticked
+        /// rows, computed with the same CurrentPriceServiceUtils the client mirrors.
+        /// </summary>
+        [HttpPut("{storeId}/module-pricing")]
+        [HasPermission(StoreRoleFeatures.SuperAdmin)]
+        [ProducesResponseType(typeof(ResponseResult<StoreModulePricingResultDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        public async Task<IActionResult> UpdateStoreModulePricingAsync(
+            Guid storeId, [FromBody] UpdateStoreModulePricingCommand command)
+            => Ok(await Sender.Send(command with { StoreId = storeId }));
+
+        /// <summary>
+        /// Seeds the per-store module pricing editor (GET /v1/stores/{storeId}/module-pricing).
+        /// One row per module that is active and available to stores — the SAME universe and the
+        /// SAME repository call as GET /v1/modules/ToStore, so the row list is exactly the
+        /// payload the save expects. A row is the store's own isActive plus its stored prices
+        /// when a StoreModule exists (inactive rows included), and isActive:false seeded with
+        /// the live catalog prices when it does not. Also returns the total over the active
+        /// rows, computed with the same CurrentPriceServiceUtils the browser mirrors.
+        /// </summary>
+        [HttpGet("{storeId}/module-pricing")]
+        [HasPermission(StoreRoleFeatures.SuperAdmin)]
+        [ProducesResponseType(typeof(ResponseResult<StoreModulePricingReadResultDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        public async Task<IActionResult> GetStoreModulePricingAsync(Guid storeId)
+            => Ok(await Sender.Send(new GetStoreModulePricingQuery(storeId)));
 
         [HttpGet("to-collect")]
         [HasPermission(StoreRoleFeatures.SuperAdmin, StoreRoleFeatures.StorePaymentAdmin)]

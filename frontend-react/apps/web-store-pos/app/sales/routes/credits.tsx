@@ -78,7 +78,12 @@ export function SaleCreditsPage() {
     start: null,
     end: null,
   });
-  const [creditFilter, setCreditFilter] = useState<CreditPaidFilterValue>('all');
+  // 2026-09-29 (petición del owner): el radio arranca en "Por Pagar" (antes "Todos").
+  // Es el estado con el que el usuario entra — lo que se DEBE cobrar — y el header
+  // (n + total de impagos) ya totaliza solo `!isPaid`, así que "Por Pagar" deja
+  // count y total consistentes desde el primer render. Aplica a los dos modos
+  // (single-store y MultiStores) porque ambos leen este mismo estado.
+  const [creditFilter, setCreditFilter] = useState<CreditPaidFilterValue>('pending');
 
   // Goes through the service filter — `filterSaleCredits(null, null, null, null)` —
   // instead of bypassing it with getAll().filter(isActive).
@@ -387,7 +392,16 @@ export function SaleCreditsPage() {
                       </button>
                       {isExpanded && (
                         <div className="border-t border-border px-2 py-2">
-                          <SaleCreditList saleCredits={group.items} />
+                          {/* Gear (editar/pagar) SOLO en el panel de la tienda SELECCIONADA.
+                              handleSave/handlePay escriben en el SaleCreditOfflineService del
+                              storeId seleccionado, así que habilitarlos en el panel de otra
+                              tienda escribiría en la tienda equivocada. El resto queda readOnly. */}
+                          <SaleCreditList
+                            saleCredits={group.items}
+                            readOnly={store.id !== storeId}
+                            onSave={handleSave}
+                            onPay={handlePay}
+                          />
                         </div>
                       )}
                     </div>

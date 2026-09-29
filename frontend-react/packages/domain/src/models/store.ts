@@ -8,6 +8,20 @@ export interface Module {
   priceIncluded: boolean;
   discountText: string;
   selected: boolean;
+  // Flat and percent discount, already on the wire: the backend `ModuleDto`
+  // serializes both and this type used to drop them. Declared OPTIONAL because every
+  // construction site predates these fields — promote to required only together with
+  // the fixtures that build `Module` literals. Read them with `?? 0`.
+  //
+  // They carry real values on CATALOG modules (GET /v1/modules/ToStore), which is
+  // where a per-store pricing editor must seed its inputs from.
+  // CAVEAT: the backend's `StoreModule -> ModuleDto` AutoMapper map
+  // (Application/Mappings/Administration/ModuleProfile.cs:20-31) has no rule for these
+  // two, so modules nested in a Store/StorePlan/OwnerStoreWithPlan response report 0
+  // for both while `currentPrice` IS computed from the real values. Do not seed
+  // editable values from those.
+  discountPrice?: number;
+  percentDiscountPrice?: number;
 }
 
 export interface Feature {
@@ -148,6 +162,113 @@ export interface StoreToCollect {
   status: 'PorVencer' | 'EnGracia';
 }
 
+/**
+ * One row of the per-store module pricing save (PUT
+ * /v1/stores/{storeId}/module-pricing). The payload is the COMPLETE set the operator
+ * was shown — every active, AvailableToStore module — each with a tick and the three
+ * price fields. A module left out of the payload is NOT deactivated: absence means
+ * "not part of this edit", never "remove".
+ */
+export interface StoreModulePricingPayload {
+  moduleId: number;
+  isSelected: boolean;
+  price: number;
+  discountPrice: number;
+  percentDiscountPrice: number;
+}
+
+/** Saved state of one row, echoed back by the save. */
+export interface StoreModulePricingRow {
+  moduleId: number;
+  isActive: boolean;
+  price: number;
+  discountPrice: number;
+  percentDiscountPrice: number;
+  currentPrice: number;
+}
+
+/**
+ * Result of the save: the echoed state of every submitted row plus the total over the
+ * TICKED rows. `totalCurrentPrice` is the same arithmetic `totalCurrentModulePrice`
+ * computes in the browser, so the two can be compared directly — see the epsilon note
+ * in `module-pricing.ts` before asserting exact equality.
+ */
+export interface StoreModulePricingResult {
+  storeId: string;
+  modules: StoreModulePricingRow[];
+  totalCurrentPrice: number;
+}
+
+/**
+ * One row of the per-store module pricing READ (GET /v1/stores/{storeId}/module-pricing):
+ * the seed the editor opens with. A distinct type from `StoreModulePricingRow` because it
+ * carries the module `name` — the read has to render on its own, while the save echo is keyed
+ * purely by moduleId since the client already holds the names.
+ */
+export interface StoreModulePricingReadRow {
+  moduleId: number;
+  name: string;
+  isActive: boolean;
+  price: number;
+  discountPrice: number;
+  percentDiscountPrice: number;
+  currentPrice: number;
+}
+
+/**
+ * The pricing read: one row per module that is active and available to stores — the exact
+ * universe the save payload must carry — plus the total over the ACTIVE rows.
+ *
+ * This is the only trustworthy source of a store's own discount values: modules nested in a
+ * `Store`/`StorePlan`/`OwnerStoreWithPlan` report 0 for both (the backend's
+ * `StoreModule -> ModuleDto` AutoMapper map has no rule for them), so never seed an editor
+ * from `store.modules[]`.
+ */
+export interface StoreModulePricingReadResult {
+  storeId: string;
+  modules: StoreModulePricingReadRow[];
+  totalCurrentPrice: number;
+}
+
+/**
+ * One row of the GLOBAL module catalog pricing save (PUT /v1/modules/pricing). Only the
+ * three editable catalog price fields travel: the endpoint writes `Price`,
+ * `DiscountPrice` and `PercentDiscountPrice` and nothing else, so a structural flag can
+ * never be smuggled in through the payload.
+ *
+ * There is no `isSelected` here, unlike the per-store payload: the catalog save carries
+ * no tick — every submitted row is priced, and a module omitted from the table is simply
+ * not part of this edit (the catalog table the page shows is already the complete
+ * saveable universe, `GET /v1/modules/ToStore`).
+ */
+export interface ModuleCatalogPricingPayload {
+  moduleId: number;
+  price: number;
+  discountPrice: number;
+  percentDiscountPrice: number;
+}
+
+/**
+ * Saved state of one catalog row, echoed back by the save. Distinct from
+ * `ModuleCatalogPricingPayload` because it adds the module `name` (so the echo can
+ * identify the row) and the server-computed `currentPrice`.
+ */
+export interface ModuleCatalogPricingRow extends ModuleCatalogPricingPayload {
+  name: string;
+  currentPrice: number;
+}
+
+/**
+ * Result of the catalog pricing save: the echoed state of every submitted row plus the
+ * ungrouped total over the whole table. `totalCurrentPrice` is the backend's own float32
+ * `CurrentPriceServiceUtils` arithmetic, so compare it with an epsilon against the
+ * browser total — see the drift note in `module-pricing.ts`.
+ */
+export interface ModuleCatalogPricingResult {
+  modules: ModuleCatalogPricingRow[];
+  totalCurrentPrice: number;
+}
+
 export interface ReSellerCommission {
   year: number;
   month: number;
@@ -167,6 +288,7 @@ export interface OwnerStoreModule {
 export interface Owner extends AuditableBaseModel {
   id: string;
   userId: string;
+  login: string;
   fullName: string;
   cellPhone: string;
   email: string;

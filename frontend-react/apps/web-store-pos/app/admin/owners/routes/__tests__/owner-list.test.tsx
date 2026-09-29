@@ -39,6 +39,7 @@ vi.mock('~/shared/lib/i18n/es', () => ({
     'OWNER.ERROR': 'Error de propietarios',
     'OWNER.HAS_PAYMENTS': 'Este propietario tiene pagos registrados y no se puede eliminar.',
     'GENERAL.RESELLER': 'Gestor',
+    'OWNER.LOGIN_LABEL': 'Login',
     'OWNER.EDIT_OWNER': 'Editar Propietario',
     'GENERAL.DELETE': 'Eliminar',
     'OWNER.DELETE_CONFIRM_TITLE': 'Eliminar propietario',
@@ -78,6 +79,7 @@ function makeOwner(overrides: Partial<Owner> = {}): Owner {
   return {
     id: 'o1',
     userId: 'u1',
+    login: 'john',
     fullName: 'John Owner',
     cellPhone: '+53 5 123-4567',
     email: 'john@example.com',
@@ -617,6 +619,45 @@ describe('OwnerListPage — GENERAL.RESELLER label', () => {
         screen.getByText(new RegExp(`${esMessages['GENERAL.RESELLER']}.*Label Reseller`)),
       ).toBeInTheDocument();
     });
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// OWNERS-LIST-LOGIN — owner account login rendered after the Gestor line
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('OwnerListPage — owner login line', () => {
+  it('renders "Login: <login>" after the Gestor line', async () => {
+    const { ownerHttpService } = await import('~/admin/owners/lib/services/owner-http-service');
+    vi.mocked(ownerHttpService.listOwners).mockResolvedValue({
+      succeeded: true,
+      data: [makeOwner({ login: 'tom', reSellerName: 'Label Reseller' })],
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
+
+    const { OwnerListPage } = await import('../owner-list');
+    render(
+      <Wrapper>
+        <OwnerListPage />
+      </Wrapper>,
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(new RegExp(`${esMessages['OWNER.LOGIN_LABEL']}.*tom`)),
+      ).toBeInTheDocument();
+    });
+
+    const gestorLine = screen.getByText(
+      new RegExp(`${esMessages['GENERAL.RESELLER']}.*Label Reseller`),
+    );
+    const loginLine = screen.getByText(new RegExp(`${esMessages['OWNER.LOGIN_LABEL']}.*tom`));
+
+    expect(
+      gestorLine.compareDocumentPosition(loginLine) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 });
 
