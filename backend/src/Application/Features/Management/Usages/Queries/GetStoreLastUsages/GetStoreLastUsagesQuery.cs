@@ -1,6 +1,5 @@
 ﻿using Application.Abstractions.HttpContext;
 using Application.Abstractions.Messaging;
-using Application.Abstractions.Time;
 using Application.Dtos.Management.Usages;
 using Application.Exceptions;
 using Application.ResponseModels;
@@ -13,7 +12,14 @@ using System.Net;
 
 namespace Application.Features.Management.Usages.Queries.GetStoreLastWeekUsages
 {
-    public sealed record GetStoreLastUsagesQuery(int LastDays) : IQuery<StoreUsagesDto> {}
+    /// <summary>
+    /// Dashboard usage window. <paramref name="Today"/> is the viewer's own calendar day
+    /// ("yyyy-MM-dd", required) — NOT the server's UTC date. See the handler for why.
+    /// It stays a string so a missing/malformed value produces a 400 through the same
+    /// FluentValidation pipeline (and therefore the same ApiResponse envelope) as every
+    /// other validation failure, instead of ASP.NET's shape for a failed type bind.
+    /// </summary>
+    public sealed record GetStoreLastUsagesQuery(int LastDays, string? Today) : IQuery<StoreUsagesDto> {}
 
     public class GetStoreLastWeekUsagesQueryHandler : IQueryHandler<GetStoreLastUsagesQuery, StoreUsagesDto>
     {
@@ -22,17 +28,15 @@ namespace Application.Features.Management.Usages.Queries.GetStoreLastWeekUsages
         private readonly IStoreRepository _storeRepository;
         private readonly IMapper _mapper;
         private readonly IStringLocalizer<I18n> _localizer;
-        private readonly IDateTimeProvider _dateTimeProvider;
 
         public GetStoreLastWeekUsagesQueryHandler(IHttpContextService httpContextService, IStoreUsageRepository storeUsageRepository,
-            IMapper mapper, IStringLocalizer<I18n> localizer, IStoreRepository storeRepository, IDateTimeProvider dateTimeProvider)
+            IMapper mapper, IStringLocalizer<I18n> localizer, IStoreRepository storeRepository)
         {
             _httpContextService = httpContextService;
             _storeUsageRepository = storeUsageRepository;
             _storeRepository = storeRepository;
             _mapper = mapper;
             _localizer = localizer;
-            _dateTimeProvider = dateTimeProvider;
         }
 
         public async Task<ResponseResult<StoreUsagesDto>> Handle(GetStoreLastUsagesQuery query, CancellationToken cancellationToken)
@@ -41,11 +45,25 @@ namespace Application.Features.Management.Usages.Queries.GetStoreLastWeekUsages
                 throw new ApiException(_localizer["UserNotFound"], HttpStatusCode.BadRequest);
 
             // Dense-bucket contract (usage-dashboard-alignment): EXACTLY LastDays buckets,
-            // one per calendar day from (today - (LastDays-1)) to today inclusive. Days
-            // without usage (including today when nobody has connected yet) get an explicit
+            // one per calendar day from (Today - (LastDays-1)) to Today inclusive. Days
+            // without usage (including Today when nobody has connected yet) get an explicit
             // 0 and an empty owners list, so the frontend maps buckets 1:1 onto day labels
             // with no index shift. The window is LastDays days wide (not LastDays+1).
-            DateTime todayUtc = _dateTimeProvider.UtcNow.UtcDateTime.Date;
+            //
+            // Today is the CLIENT's calendar day, never UtcNow (client-local-day): a stored
+            // StoreUsage.Day is a pure calendar day in each store's own local calendar (always
+            // 00:00:00 UTC — the tracker sends "yyyy-MM-dd" built from local parts), so the
+            // axis must be the viewer's calendar too. Anchoring on UtcNow made every viewer
+            // behind UTC see a not-yet-happened day as "today" for the last hours of their
+            // evening (from 19:00 local at UTC-5), shifting the whole chart one position left.
+            // GetStoreLastUsagesQueryValidator guarantees the format before this line runs.
+            //
+            // Kind=Utc is mandatory, not cosmetic: the Day column is `timestamp with time
+            // zone` and Npgsql refuses a Kind=Unspecified parameter outright. The stored
+            // values are exactly midnight UTC, so the calendar day is carried by the tick
+            // count and the Kind only has to be explicit.
+            DateTime todayUtc = DateTime.SpecifyKind(
+                ClientDay.Parse(query.Today).ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);
             DateTime lastWeekDay = todayUtc.AddDays(-1 * (query.LastDays - 1));
 
             IEnumerable<StoreUsage> storeUsages = await _storeUsageRepository.GetStoresUsagesAfterDateWithOwnerAsync(lastWeekDay);
