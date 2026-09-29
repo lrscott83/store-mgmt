@@ -23,6 +23,11 @@ function renderLayout() {
   );
 }
 
+// The auth layout renders `<Footer variant="guest" />`, and the guest variant is
+// exactly the unauthenticated context. The WhatsApp contact link is gated to
+// authenticated sessions, so the gold-pill / legible-text-color assertions this
+// block used to make about the Contact trigger are unreachable here and are NOT
+// covered by these tests — they are replaced by the absence assertions below.
 describe('AuthLayout — guest footer (Req: parity with guest-footer.component.html)', () => {
   it('renders the legal links, each opening in a new tab (target="_blank")', () => {
     renderLayout();
@@ -36,24 +41,20 @@ describe('AuthLayout — guest footer (Req: parity with guest-footer.component.h
     expect(terms).toHaveAttribute('target', '_blank');
   });
 
-  it('renders a Contact Us trigger (FOOTER.CONTACT_US)', () => {
+  it('does NOT render the Contact Us item (FOOTER.CONTACT_US) — the auth layout is the unauthenticated context', () => {
     renderLayout();
-    expect(screen.getByText(esMessages['FOOTER.CONTACT_US'])).toBeInTheDocument();
+    expect(screen.queryByText(esMessages['FOOTER.CONTACT_US'])).not.toBeInTheDocument();
   });
 
-  it('renders the Contact Us trigger with the guest gold-pill styling (guest-footer.component.scss .contact-link)', () => {
-    renderLayout();
-    const contact = screen.getByText(esMessages['FOOTER.CONTACT_US']).closest('button');
-    expect(contact).toHaveClass('rounded-full');
-    expect(contact?.querySelector('svg')).toHaveClass('text-[#f5b026]');
+  it('renders no WhatsApp link (wa.me) in the guest footer', () => {
+    const { container } = renderLayout();
+    expect(container.querySelector('a[href^="https://wa.me"]')).toBeNull();
   });
 
-  it("renders the Contact Us text in a legible color on the light auth background (not Angular's dark-theme cream literal)", () => {
+  it('still renders both legal links, so the absent Contact item did not empty the row', () => {
     renderLayout();
-    const contact = screen.getByText(esMessages['FOOTER.CONTACT_US']).closest('button');
-    expect(contact).toHaveClass('text-gray-700');
-    expect(contact).not.toHaveClass('text-[rgba(232,228,220,0.7)]');
-    expect(contact).toHaveClass('hover:text-text');
+    expect(screen.getByText(esMessages['FOOTER.PRIVACY_POLICE'])).toBeInTheDocument();
+    expect(screen.getByText(esMessages['FOOTER.TERMS_CONDITIONS'])).toBeInTheDocument();
   });
 
   it('renders 2 copyright lines, the first interpolating the current year', () => {

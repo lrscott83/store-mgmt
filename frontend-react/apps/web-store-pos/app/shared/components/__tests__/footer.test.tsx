@@ -55,48 +55,54 @@ describe('Footer — parity with Angular client-footer.component.html', () => {
     );
   });
 
-  it('renders the email icon before "Contáctanos", matching Angular <mat-icon>email</mat-icon>', () => {
+  it('renders "Contáctanos" as a real WhatsApp link (wa.me) opening in a new tab', () => {
     renderFooter();
-    const contact = screen.getByText('Contáctanos').closest('button');
+    const label = screen.getByText('Contáctanos');
+    expect(label).toBeInTheDocument();
+
+    const contact = label.closest('a');
     expect(contact).not.toBeNull();
-    expect(contact?.querySelector('svg')).not.toBeNull();
+    expect(contact).toHaveAttribute('href', 'https://wa.me/5352432968');
+    expect(contact).toHaveAttribute('target', '_blank');
+    expect(contact).toHaveAttribute('rel', 'noopener noreferrer');
+
+    // The WhatsApp mark is a filled glyph — fills currentColor, carries no stroke.
+    const icon = contact?.querySelector('svg');
+    expect(icon).not.toBeNull();
+    expect(icon).toHaveAttribute('fill', 'currentColor');
+    expect(icon).not.toHaveAttribute('stroke');
   });
 
   it('default (client) variant does NOT render the guest pill styling on Contact', () => {
     renderFooter();
-    const contact = screen.getByText('Contáctanos').closest('button');
+    const contact = screen.getByText('Contáctanos').closest('a');
     expect(contact).not.toHaveClass('rounded-full');
     expect(contact?.querySelector('svg')).not.toHaveClass('text-[#f5b026]');
   });
 });
 
-describe('Footer — guest variant parity with Angular guest-footer.component.scss .contact-link', () => {
-  it('renders the gold pill (border, rounded, tinted background) on the Contact trigger', () => {
+// The guest variant is the auth/login footer, rendered only by `auth-layout`, so
+// it IS the unauthenticated context. The WhatsApp contact link is gated to
+// authenticated sessions, so the guest gold-pill styling this block used to
+// assert (rounded/border/tinted background, amber icon, hover emphasis) is no
+// longer reachable from this variant and is NOT covered by these tests. That
+// styling branch is deliberately left in place in `footer.tsx`; it never renders.
+describe('Footer — guest variant (unauthenticated): Contact is not rendered', () => {
+  it('does not render the Contact item at all', () => {
     renderFooter('guest');
-    const contact = screen.getByText('Contáctanos').closest('button');
-    expect(contact).toHaveClass('rounded-full');
-    expect(contact).toHaveClass('border-[rgba(245,176,38,0.25)]');
-    expect(contact).toHaveClass('bg-[rgba(245,176,38,0.08)]');
+    expect(screen.queryByText('Contáctanos')).not.toBeInTheDocument();
   });
 
-  it('renders the email icon in the Angular amber (#f5b026)', () => {
-    renderFooter('guest');
-    const contact = screen.getByText('Contáctanos').closest('button');
-    expect(contact?.querySelector('svg')).toHaveClass('text-[#f5b026]');
+  it('renders no WhatsApp link in the guest footer', () => {
+    const { container } = renderFooter('guest');
+    expect(screen.queryByRole('link', { name: /Contáctenos/i })).not.toBeInTheDocument();
+    expect(container.querySelector('a[href^="https://wa.me"]')).toBeNull();
   });
 
-  it("uses a legible text color on the light auth background, not Angular's dark-theme cream literal", () => {
+  it('still renders the legal links and the copyright block', () => {
     renderFooter('guest');
-    const contact = screen.getByText('Contáctanos').closest('button');
-    // Angular's `rgba(232,228,220,0.7)` cream only reads on a dark login background;
-    // React's AuthLayout is light, so the default text must be a legible dark/neutral tone.
-    expect(contact).toHaveClass('text-gray-700');
-    expect(contact).not.toHaveClass('text-[rgba(232,228,220,0.7)]');
-  });
-
-  it("deepens the Contact text on hover as a deliberate emphasis, matching the app's muted-to-emphasis convention", () => {
-    renderFooter('guest');
-    const contact = screen.getByText('Contáctanos').closest('button');
-    expect(contact).toHaveClass('hover:text-text');
+    expect(screen.getByText('Políticas de Privacidad')).toBeInTheDocument();
+    expect(screen.getByText('Términos y Condiciones')).toBeInTheDocument();
+    expect(screen.getByText('Todos los derechos reservados')).toBeInTheDocument();
   });
 });
