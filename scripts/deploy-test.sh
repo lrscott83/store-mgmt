@@ -59,6 +59,7 @@ REACT_PORT="${REACT_PORT:-8095}"
 PUSH_TAG="${PUSH_TAG:-0}"
 
 FROM_PROD=0
+NO_ROLLBACK=0
 LOG_FILE=""
 COMPOSE_FILE=""
 BACKUP_FILE=""
@@ -70,12 +71,26 @@ die() { log "[FATAL] $*"; exit 1; }
 require_cmd() { command -v "$1" >/dev/null 2>&1 || die "required command not found: $1"; }
 trap 'log "[FATAL] line $LINENO failed"' ERR
 
+# Redact sensitive values from any output before it reaches the log
+redact() {
+  sed -E \
+    -e 's/(Password=)[^;]+/\1***/g' \
+    -e 's/(POSTGRES_PASSWORD=)[^ ]+/\1***/g' \
+    -e 's/(Jwt__SecretKey=)[^ ]+/\1***/g' \
+    -e 's/(Jwt__Issuer=)[^ ]+/\1***/g' \
+    -e 's/(Jwt__Audience=)[^ ]+/\1***/g' \
+    -e 's/(Authentication__Pepper=)[^ ]+/\1***/g' \
+    -e 's/(StoreEncryption__MasterSecret=)[^ ]+/\1***/g' \
+    -e 's/(ConnectionStrings__Application=)[^ ]+/\1***/g'
+}
+
 usage() {
   cat <<'EOF'
-Usage: ./deploy-test.sh [--from-prod] [--keep-db] [--help]
-  --from-prod  seed smca_test from a fresh production dump (read-only on production)
-  --keep-db    deprecated no-op; keeping the existing test database is now the default
-  --help       show this help
+Usage: ./deploy-test.sh [--from-prod] [--no-rollback] [--keep-db] [--help]
+  --from-prod    seed smca_test from a fresh production dump (read-only on production)
+  --no-rollback  skip automatic rollback on smoke failure (for diagnosis)
+  --keep-db      deprecated no-op; keeping the existing test database is now the default
+  --help         show this help
 EOF
 }
 
@@ -83,6 +98,7 @@ EOF
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --from-prod) FROM_PROD=1 ;;
+    --no-rollback) NO_ROLLBACK=1 ;;
     --keep-db) log "[WARN] --keep-db is deprecated and now a no-op: keeping the existing test database is the default" ;;
     --help|-h) usage; exit 0 ;;
     *) usage; die "unknown argument: $1" ;;
@@ -134,9 +150,11 @@ fi
 [ -f "$CLONE_DIR/.env" ] || die "missing .env at $CLONE_DIR/.env — rename your .env-test to .env and upload it (secrets replicated from the production .env)"
 
 # Load the test environment. CRLFs are stripped so a Windows-created .env works.
+set +x
 set -a
 source <(tr -d '\r' < "$CLONE_DIR/.env")
 set +a
+set -x
 
 TEST_DB_USER="${POSTGRES_USER:-postgres}"
 SHORT_SHA="$(git -C "$CLONE_DIR" rev-parse --short HEAD)"
@@ -167,7 +185,7 @@ restore_test_db() {
     -c "DROP DATABASE IF EXISTS $TEST_DB_NAME WITH (FORCE);"
   podman exec "$TEST_PG_CONTAINER" psql -U "$TEST_DB_USER" -d postgres -v ON_ERROR_STOP=1 \
     -c "CREATE DATABASE $TEST_DB_NAME;"
-  gunzip -c "$BACKUP_FILE" | podman exec -i "$TEST_PG_CONTAINER" psql -U "$TEST_DB_USER" -d "$TEST_DB_NAME" -v ON_ERROR_STOP=1 2>&1 | tee -a "$LOG_FILE"
+  gunzip -c "$BACKUP_FILE" | podman exec -i "$TEST_PG_CONTAINER" psql -U "$TEST_DB_USER" -d "$TEST_DB_NAME" -v ON_ERROR_STOP=1 2>&1 | redact | tee -a "$LOG_FILE"
   log "ROLLBACK(DB) — done"
 }
 
@@ -258,7 +276,7 @@ for script in "$CLONE_DIR"/backend/scripts/*.sql; do
   if [ "$missing" -eq 1 ]; then
     log "applying: $(basename "$script")"
     if ! podman exec -i "$TEST_PG_CONTAINER" psql -U "$TEST_DB_USER" -d "$TEST_DB_NAME" \
-      -v ON_ERROR_STOP=1 < "$script" 2>&1 | tee -a "$LOG_FILE"; then
+      -v ON_ERROR_STOP=1 < "$script" 2>&1 | redact | tee -a "$LOG_FILE"; then
       log "[FATAL] script failed: $(basename "$script") — restoring the test database"
       restore_test_db
       die "script failed; the test database was restored from $BACKUP_FILE"
@@ -276,7 +294,7 @@ if podman image exists "$BACKEND_IMAGE"; then
   podman tag "$BACKEND_IMAGE" "${BACKEND_IMAGE%:*}:previous"
   log "rollback image updated: ${BACKEND_IMAGE%:*}:previous"
 fi
-if ! podman build -t "$BACKEND_IMAGE" "$CLONE_DIR/backend/src" 2>&1 | tee -a "$LOG_FILE"; then
+if ! podman build -t "$BACKEND_IMAGE" "$CLONE_DIR/backend/src" 2>&1 | redact | tee -a "$LOG_FILE"; then
   log "[FATAL] backend image build failed — restoring the test database"
   restore_test_db
   die "image build failed; the test database was restored from $BACKUP_FILE"
@@ -287,7 +305,7 @@ log "image ready: $BACKEND_IMAGE and ${BACKEND_IMAGE%:*}:$SHORT_SHA"
 # --- STEP 6: deploy the isolated test stack (rollback on failure) -------------
 log "STEP 6 — deploying test stack (project $TEST_PROJECT)"
 compose down || log "[WARN] compose down returned non-zero (nothing running?)"
-if ! compose up -d --build 2>&1 | tee -a "$LOG_FILE"; then
+if ! compose up -d --build 2>&1 | redact | tee -a "$LOG_FILE"; then
   log "[FATAL] compose up failed — rolling back (test DB + :previous image)"
   restore_test_db
   rollback_image
@@ -306,7 +324,25 @@ until smoke_ok; do
   sleep 10
 done
 if ! smoke_ok; then
-  log "[FATAL] smoke test failed — rolling back (test DB + :previous image)"
+  log "[FATAL] smoke test failed"
+  log "=== DIAGNOSTIC START ==="
+  log "--- container status ---"
+  podman ps -a --filter "label=io.podman.compose.project=$TEST_PROJECT" --format '{{.Names}} {{.Status}}' 2>&1 | redact | tee -a "$LOG_FILE" || true
+  log "--- backend health ---"
+  podman inspect --format='{{.State.Health.Status}}' smca_test_backend 2>&1 | tee -a "$LOG_FILE" || true
+  log "--- backend logs (last 30 lines) ---"
+  podman logs --tail 30 smca_test_backend 2>&1 | redact | tee -a "$LOG_FILE" || true
+  log "--- web-store-pos logs (last 20 lines) ---"
+  podman logs --tail 20 smca_test_web_pos 2>&1 | redact | tee -a "$LOG_FILE" || true
+  log "--- smoke test manual check ---"
+  curl -v "http://localhost:$REACT_PORT/api/v1/ping" 2>&1 | redact | tee -a "$LOG_FILE" || true
+  curl -v "http://localhost:$REACT_PORT/" 2>&1 | redact | tee -a "$LOG_FILE" || true
+  log "=== DIAGNOSTIC END ==="
+  if [ "$NO_ROLLBACK" -eq 1 ]; then
+    log "[WARN] --no-rollback set — skipping rollback, leaving stack as-is for diagnosis"
+    die "deploy failed (no-rollback mode); check the diagnostic output above"
+  fi
+  log "rolling back (test DB + :previous image)"
   restore_test_db
   rollback_image
   compose down || log "[WARN] compose down returned non-zero"

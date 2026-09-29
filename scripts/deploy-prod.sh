@@ -68,6 +68,19 @@ die() { log "[FATAL] $*"; exit 1; }
 require_cmd() { command -v "$1" >/dev/null 2>&1 || die "required command not found: $1"; }
 trap 'log "[FATAL] line $LINENO failed"' ERR
 
+# Redact sensitive values from any output before it reaches the log
+redact() {
+  sed -E \
+    -e 's/(Password=)[^;]+/\1***/g' \
+    -e 's/(POSTGRES_PASSWORD=)[^ ]+/\1***/g' \
+    -e 's/(Jwt__SecretKey=)[^ ]+/\1***/g' \
+    -e 's/(Jwt__Issuer=)[^ ]+/\1***/g' \
+    -e 's/(Jwt__Audience=)[^ ]+/\1***/g' \
+    -e 's/(Authentication__Pepper=)[^ ]+/\1***/g' \
+    -e 's/(StoreEncryption__MasterSecret=)[^ ]+/\1***/g' \
+    -e 's/(ConnectionStrings__Application=)[^ ]+/\1***/g'
+}
+
 usage() {
   cat <<'EOF'
 Usage: ./deploy-prod.sh [--yes] [--dry-run] [--rollback] [--help]
@@ -136,7 +149,7 @@ restore_db() {
     -c "DROP DATABASE IF EXISTS $PROD_DB_NAME WITH (FORCE);"
   podman exec "$PROD_DB_CONTAINER" psql -U "$PROD_DB_USER" -d postgres -v ON_ERROR_STOP=1 \
     -c "CREATE DATABASE $PROD_DB_NAME;"
-  gunzip -c "$BACKUP_FILE" | podman exec -i "$PROD_DB_CONTAINER" psql -U "$PROD_DB_USER" -d "$PROD_DB_NAME" -v ON_ERROR_STOP=1 2>&1 | tee -a "$LOG_FILE"
+  gunzip -c "$BACKUP_FILE" | podman exec -i "$PROD_DB_CONTAINER" psql -U "$PROD_DB_USER" -d "$PROD_DB_NAME" -v ON_ERROR_STOP=1 2>&1 | redact | tee -a "$LOG_FILE"
   log "ROLLBACK(DB) — done"
 }
 
@@ -187,9 +200,11 @@ fi
 [ -f "$CLONE_DIR/.env" ] || die "missing .env at $CLONE_DIR/.env — upload the PRODUCTION .env next to this script (or place it at the clone root)"
 
 # Load the production environment. CRLFs are stripped so a Windows-created .env works.
+set +x
 set -a
 source <(tr -d '\r' < "$CLONE_DIR/.env")
 set +a
+set -x
 
 PROD_DB_USER="${POSTGRES_USER:-postgres}"
 SHORT_SHA="$(git -C "$CLONE_DIR" rev-parse --short HEAD)"
@@ -217,7 +232,7 @@ if podman image exists "$BACKEND_IMAGE"; then
   podman tag "$BACKEND_IMAGE" "${BACKEND_IMAGE%:*}:previous"
   log "rollback image updated: ${BACKEND_IMAGE%:*}:previous"
 fi
-podman build -t "$BACKEND_IMAGE" "$CLONE_DIR/backend/src" 2>&1 | tee -a "$LOG_FILE"
+podman build -t "$BACKEND_IMAGE" "$CLONE_DIR/backend/src" 2>&1 | redact | tee -a "$LOG_FILE"
 podman tag "$BACKEND_IMAGE" "${BACKEND_IMAGE%:*}:$SHORT_SHA"
 log "image ready: $BACKEND_IMAGE and ${BACKEND_IMAGE%:*}:$SHORT_SHA"
 
@@ -257,7 +272,7 @@ for script in "$CLONE_DIR"/backend/scripts/*.sql; do
   if [ "$missing" -eq 1 ]; then
     log "applying: $(basename "$script")"
     if ! podman exec -i "$PROD_DB_CONTAINER" psql -U "$PROD_DB_USER" -d "$PROD_DB_NAME" \
-      -v ON_ERROR_STOP=1 < "$script" 2>&1 | tee -a "$LOG_FILE"; then
+      -v ON_ERROR_STOP=1 < "$script" 2>&1 | redact | tee -a "$LOG_FILE"; then
       log "[FATAL] migration failed: $(basename "$script") — restoring the database from the backup"
       restore_db
       die "migration failed; the database was restored from $BACKUP_FILE"
@@ -271,7 +286,7 @@ log "pending scripts applied: $APPLIED_COUNT"
 
 # --- STEP 6: deploy the production stack ---------------------------------------
 log "STEP 6 — deploying production stack (project $PROD_PROJECT)"
-compose up -d --build 2>&1 | tee -a "$LOG_FILE"
+compose up -d --build 2>&1 | redact | tee -a "$LOG_FILE"
 log "production stack deployed"
 
 # --- STEP 7: smoke test (+ automatic rollback) ---------------------------------
