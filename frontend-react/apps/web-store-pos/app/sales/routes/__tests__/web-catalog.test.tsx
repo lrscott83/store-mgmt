@@ -280,8 +280,11 @@ describe('WebCatalogPage (vista Catálogo Web)', () => {
     expect(showToastSuccessMock).toHaveBeenCalledWith('Producto guardado en el catálogo');
   });
 
-  it('guardar con imagen retenida cuando YA hay principal solo la sube a la galería', async () => {
+  it('guardar con imagen retenida cuando YA hay principal la reemplaza y borra la anterior', async () => {
     catalogMock.getProducts.mockResolvedValue(envelope([PRODUCT_WITH_IMAGE]));
+    // Clave DISTINTA a la principal existente: si el backend devolviera la misma ruta, no habría
+    // nada que superseder y el borrado no corresponde.
+    catalogMock.uploadImage.mockResolvedValue(envelope('t/s/p/nueva.jpg'));
     renderPage();
 
     fireEvent.click(await screen.findByTestId(`catalog-category-toggle-${PRODUCT_WITH_IMAGE.categoryId}`));
@@ -294,8 +297,15 @@ describe('WebCatalogPage (vista Catálogo Web)', () => {
     await waitFor(() =>
       expect(catalogMock.uploadImage).toHaveBeenCalledWith('p2', file),
     );
-    // Con principal existente NO se pisa: la nueva imagen solo engrosa la galería.
-    await waitFor(() => expect(catalogMock.saveProductFields).not.toHaveBeenCalled());
+    // Una sola imagen por producto: la nueva es la principal, aunque ya hubiera una.
+    await waitFor(() =>
+      expect(catalogMock.saveProductFields).toHaveBeenCalledWith('p2', { image: 't/s/p/nueva.jpg' }),
+    );
+    // Y la principal anterior se borra DESPUÉS del guardado (si se borrara antes, el backend
+    // anularía el puntero y el producto quedaría sin imagen).
+    await waitFor(() =>
+      expect(catalogMock.removeImage).toHaveBeenCalledWith('p2', 't/s/p/foto.jpg'),
+    );
     expect(showToastSuccessMock).toHaveBeenCalledWith('Producto guardado en el catálogo');
   });
 
@@ -321,9 +331,10 @@ describe('WebCatalogPage (vista Catálogo Web)', () => {
     Object.defineProperty(input, 'files', { value: [file], configurable: true });
     fireEvent.change(input);
 
-    // El límite se anuncia en la cabecera del bloque y en el error del archivo inválido.
+    // Con la galería oculta el aviso es el de la imagen única: formatos y tamaño, sin contar
+    // cuántas imágenes caben. El texto "Hasta N imágenes…" solo vive ya en la galería.
     expect(
-      await screen.findAllByText('Hasta 6 imágenes de 2 MB (jpg, png o webp).'),
+      await screen.findAllByText(/Solo imágenes jpg, png o webp de hasta 2 MB\./),
     ).not.toHaveLength(0);
     expect(catalogMock.uploadImage).not.toHaveBeenCalled();
     expect(screen.queryByTestId(`catalog-pending-image-${PRODUCT.id}`)).not.toBeInTheDocument();
