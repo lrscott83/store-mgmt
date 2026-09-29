@@ -1360,6 +1360,9 @@ const messages: Record<string, string> = {
   'OWNER.EDIT_OWNER': 'Editar Propietario',
   'OWNER.STORE_PRICE_LABEL': '{count, plural, one {# tienda} other {# tiendas}}',
   'OWNER.DAYS_LEFT': '{count, plural, one {# día} other {# días}}',
+  // Card label for the owner's own account login. Deliberately the literal
+  // "Login", not USERS.LOGIN ("Usuario"), which labels a different field.
+  'OWNER.LOGIN_LABEL': 'Login',
   'OWNER.FILTER_LABEL': 'Mostrar:',
   'OWNER.FILTER_ALL': 'Todos',
   'OWNER.FILTER_NOT_FREE': 'No Gratis',

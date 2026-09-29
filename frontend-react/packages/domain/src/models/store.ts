@@ -288,6 +288,7 @@ export interface OwnerStoreModule {
 export interface Owner extends AuditableBaseModel {
   id: string;
   userId: string;
+  login: string;
   fullName: string;
   cellPhone: string;
   email: string;

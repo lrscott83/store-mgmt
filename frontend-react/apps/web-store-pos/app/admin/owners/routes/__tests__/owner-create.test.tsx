@@ -55,6 +55,7 @@ function makeOwner(overrides: Partial<Owner> = {}): Owner {
   return {
     id: 'o1',
     userId: 'u1',
+    login: 'jane',
     fullName: 'Jane Owner',
     cellPhone: '+53 5 123-4567',
     email: 'jane@example.com',
