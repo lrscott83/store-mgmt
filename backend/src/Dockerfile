@@ -3,6 +3,7 @@ RUN apt update && apt install -y curl && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 EXPOSE 8000
 ENV ASPNETCORE_URLS=http://+:8000
+ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=0
 RUN groupadd -g 2000 dotnet \
     && useradd -m -u 2000 -g 2000 dotnet
 USER dotnet
