@@ -169,7 +169,7 @@ export function resolveChannelRate(
 
   if (Number(currency) === Number(Currency.USD)) {
     // Synthetic pivot: no id/effectiveFrom — never fabricate persisted values.
-    return success({ value: USD_PIVOT_MICRO, method, currency: Currency.USD });
+    return success({ buyValue: USD_PIVOT_MICRO, sellValue: USD_PIVOT_MICRO, method, currency: Currency.USD });
   }
 
   return rateNotFound<ResolvedChannelRate>();
@@ -188,7 +188,7 @@ export function resolveCurrencyRate(
   if (anyMethod) return success(toResolved(anyMethod));
 
   if (Number(currency) === Number(Currency.USD)) {
-    return success({ value: USD_PIVOT_MICRO, currency: Currency.USD });
+    return success({ buyValue: USD_PIVOT_MICRO, sellValue: USD_PIVOT_MICRO, currency: Currency.USD });
   }
 
   return rateNotFound<ResolvedChannelRate>();
