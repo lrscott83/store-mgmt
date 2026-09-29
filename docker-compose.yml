@@ -48,6 +48,11 @@ services:
       timeout: 10s
       retries: 6
       start_period: 120s
+    volumes:
+      # Imágenes del catálogo (Storage:CatalogImageRoot → /app/storage): volumen persistente.
+      # El Dockerfile crea el directorio con dueño `app`; con un named volume el primer mount
+      # copia ese dueño, así la API no-root puede escribir y las imágenes sobreviven a redeploys.
+      - storage_data:/app/storage
     depends_on:
       - postgres
     restart: always
@@ -101,6 +106,7 @@ services:
 volumes:
   postgres_data:
   pgadmin-data:
+  storage_data:
 
 networks:
   postgres_network:

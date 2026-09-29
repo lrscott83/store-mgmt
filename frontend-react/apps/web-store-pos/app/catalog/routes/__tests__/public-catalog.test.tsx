@@ -109,8 +109,9 @@ describe('PublicCatalogPage', () => {
 
     const card = await screen.findByTestId('catalog-card-cp1');
     expect(within(card).getByText('Camisa azul')).toBeInTheDocument();
-    expect(within(card).getByText('$82.50')).toBeInTheDocument();
-    expect(within(card).getByText('$100')).toBeInTheDocument();
+    // Moneda como CÓDIGO (CUP), nunca el símbolo $ (el NBSP del formato se matchea con \s).
+    expect(within(card).getByText(/82\.50\s*CUP/)).toBeInTheDocument();
+    expect(within(card).getByText(/100\s*CUP/)).toBeInTheDocument();
     expect(screen.getByTestId('catalog-badge-new-cp1')).toHaveTextContent('Nuevo');
     expect(screen.getByTestId('catalog-badge-discount-cp1')).toHaveTextContent('-12.5%');
   });

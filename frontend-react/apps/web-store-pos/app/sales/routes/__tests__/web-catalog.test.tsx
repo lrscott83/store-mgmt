@@ -102,6 +102,14 @@ const PRODUCT: CatalogProductView = {
   hasDiscount: false,
 };
 
+/** Variante con imagen principal publicada (la galería la repite). */
+const PRODUCT_WITH_IMAGE: CatalogProductView = {
+  ...PRODUCT,
+  id: 'p2',
+  image: 't/s/p/foto.jpg',
+  images: ['t/s/p/foto.jpg'],
+};
+
 function makeUser(overrides: Partial<UserModel> = {}): UserModel {
   return {
     id: 'u1',
@@ -142,6 +150,7 @@ describe('WebCatalogPage (vista Catálogo Web)', () => {
     session.user = makeUser();
     catalogMock.getStatus.mockResolvedValue(envelope(STATUS));
     catalogMock.getProducts.mockResolvedValue(envelope([PRODUCT]));
+    catalogMock.uploadImage.mockResolvedValue(envelope('t/s/p/foto.jpg'));
     catalogMock.saveProductFields.mockResolvedValue(envelope(true));
     catalogMock.sync.mockResolvedValue(
       envelope({
@@ -224,51 +233,89 @@ describe('WebCatalogPage (vista Catálogo Web)', () => {
     expect(buildCatalogSnapshotMock).not.toHaveBeenCalled();
   });
 
-  it('guardar envía los campos del catálogo escalados y con el precio final calculado', async () => {
+  it('agrupa los productos en paneles colapsables por categoría, cerrados por defecto', async () => {
+    catalogMock.getProducts.mockResolvedValue(envelope([PRODUCT]));
     renderPage();
 
-    const description = await screen.findByTestId(`catalog-description-${PRODUCT.id}`);
-    fireEvent.change(description, { target: { value: 'Camisa de algodón\nSegunda línea' } });
-    fireEvent.change(screen.getByTestId(`catalog-percent-${PRODUCT.id}`), {
-      target: { value: '12.5' },
-    });
-    fireEvent.change(screen.getByTestId(`catalog-discount-${PRODUCT.id}`), {
-      target: { value: '5' },
-    });
+    // El panel existe y nace colapsado: el editor NO está montado aún.
+    const toggle = await screen.findByTestId(`catalog-category-toggle-${PRODUCT.categoryId}`);
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(toggle).toHaveTextContent(`Ropa (1)`);
+    expect(screen.queryByTestId(`catalog-product-${PRODUCT.id}`)).not.toBeInTheDocument();
 
-    // Precio final (D7) en vivo: 100 - 12.5 % = 87.50; 87.50 - 5.00 = 82.50.
-    expect(screen.getByTestId(`catalog-final-price-${PRODUCT.id}`)).toHaveTextContent('$82.50');
+    fireEvent.click(toggle);
 
+    // Al expandir se montan los productos de ESA categoría, con precio con moneda y SIN la
+    // categoría repetida junto al precio.
+    expect(screen.getByTestId(`catalog-product-${PRODUCT.id}`)).toBeInTheDocument();
+    // Precio con moneda (el NBSP de los separadores se matchea con \s) y SIN la categoría
+    // repetida junto al precio.
+    expect(screen.getByTestId(`catalog-product-${PRODUCT.id}`)).toHaveTextContent(/100\s*CUP/);
+    expect(screen.getByTestId(`catalog-product-${PRODUCT.id}`)).not.toHaveTextContent(/Ropa\s*CUP/);
+
+    fireEvent.click(toggle);
+    expect(screen.queryByTestId(`catalog-product-${PRODUCT.id}`)).not.toBeInTheDocument();
+  });
+
+  it('guardar sube SOLO la imagen seleccionada: al elegirla no se hace ninguna llamada', async () => {
+    renderPage();
+
+    fireEvent.click(await screen.findByTestId(`catalog-category-toggle-${PRODUCT.categoryId}`));
+    const input = await screen.findByTestId(`catalog-upload-${PRODUCT.id}`);
+    const file = new File(['x'], 'foto.jpg', { type: 'image/jpeg' });
+    Object.defineProperty(input, 'files', { value: [file], configurable: true });
+    fireEvent.change(input);
+
+    // Al SELECCIONAR no se toca la red (ni subida ni guardado): solo se retiene el archivo.
+    expect(catalogMock.uploadImage).not.toHaveBeenCalled();
+    expect(catalogMock.saveProductFields).not.toHaveBeenCalled();
+    expect(screen.getByTestId(`catalog-pending-image-${PRODUCT.id}`)).toHaveTextContent(/foto\.jpg/);
+
+    // TODO ocurre al pulsar Guardar: sube la imagen y, al no haber principal, la deja como tal.
     fireEvent.click(screen.getByTestId(`catalog-save-${PRODUCT.id}`));
-
+    await waitFor(() => expect(catalogMock.uploadImage).toHaveBeenCalledWith('p1', file));
     await waitFor(() =>
-      expect(catalogMock.saveProductFields).toHaveBeenCalledWith('p1', {
-        description: 'Camisa de algodón\nSegunda línea',
-        percentDiscountPrice: 1250,
-        discountPrice: 500,
-        isNew: false,
-      }),
+      expect(catalogMock.saveProductFields).toHaveBeenCalledWith('p1', { image: 't/s/p/foto.jpg' }),
     );
     expect(showToastSuccessMock).toHaveBeenCalledWith('Producto guardado en el catálogo');
   });
 
-  it('un % fuera de rango no se envía y se avisa en pantalla', async () => {
+  it('guardar con imagen retenida cuando YA hay principal solo la sube a la galería', async () => {
+    catalogMock.getProducts.mockResolvedValue(envelope([PRODUCT_WITH_IMAGE]));
     renderPage();
 
-    fireEvent.change(await screen.findByTestId(`catalog-percent-${PRODUCT.id}`), {
-      target: { value: '120' },
-    });
-    fireEvent.click(screen.getByTestId(`catalog-save-${PRODUCT.id}`));
+    fireEvent.click(await screen.findByTestId(`catalog-category-toggle-${PRODUCT_WITH_IMAGE.categoryId}`));
+    const input = await screen.findByTestId(`catalog-upload-${PRODUCT_WITH_IMAGE.id}`);
+    const file = new File(['x'], 'extra.jpg', { type: 'image/jpeg' });
+    Object.defineProperty(input, 'files', { value: [file], configurable: true });
+    fireEvent.change(input);
+    fireEvent.click(screen.getByTestId(`catalog-save-${PRODUCT_WITH_IMAGE.id}`));
 
-    expect(
-      await screen.findByText('El % de descuento debe estar entre 0 y 100.'),
-    ).toBeInTheDocument();
+    await waitFor(() =>
+      expect(catalogMock.uploadImage).toHaveBeenCalledWith('p2', file),
+    );
+    // Con principal existente NO se pisa: la nueva imagen solo engrosa la galería.
+    await waitFor(() => expect(catalogMock.saveProductFields).not.toHaveBeenCalled());
+    expect(showToastSuccessMock).toHaveBeenCalledWith('Producto guardado en el catálogo');
+  });
+
+  it('guardar sin cambios solo avisa, sin PUT vacío ni subida', async () => {
+    renderPage();
+
+    fireEvent.click(await screen.findByTestId(`catalog-category-toggle-${PRODUCT.categoryId}`));
+    fireEvent.click(await screen.findByTestId(`catalog-save-${PRODUCT.id}`));
+
+    await waitFor(() =>
+      expect(showToastSuccessMock).toHaveBeenCalledWith('Producto guardado en el catálogo'),
+    );
+    expect(catalogMock.uploadImage).not.toHaveBeenCalled();
     expect(catalogMock.saveProductFields).not.toHaveBeenCalled();
   });
 
-  it('un archivo que no es imagen no se sube', async () => {
+  it('un archivo que no es imagen no se retiene ni se sube', async () => {
     renderPage();
 
+    fireEvent.click(await screen.findByTestId(`catalog-category-toggle-${PRODUCT.categoryId}`));
     const input = await screen.findByTestId(`catalog-upload-${PRODUCT.id}`);
     const file = new File(['hola'], 'notas.txt', { type: 'text/plain' });
     Object.defineProperty(input, 'files', { value: [file], configurable: true });
@@ -279,22 +326,55 @@ describe('WebCatalogPage (vista Catálogo Web)', () => {
       await screen.findAllByText('Hasta 6 imágenes de 2 MB (jpg, png o webp).'),
     ).not.toHaveLength(0);
     expect(catalogMock.uploadImage).not.toHaveBeenCalled();
+    expect(screen.queryByTestId(`catalog-pending-image-${PRODUCT.id}`)).not.toBeInTheDocument();
   });
 
-  it('subir la primera imagen de un producto sin principal la deja como principal', async () => {
-    catalogMock.uploadImage.mockResolvedValue(envelope('t/s/p/foto.jpg'));
-    renderPage();
-
-    const input = await screen.findByTestId(`catalog-upload-${PRODUCT.id}`);
-    const file = new File(['x'], 'foto.jpg', { type: 'image/jpeg' });
-    Object.defineProperty(input, 'files', { value: [file], configurable: true });
-    fireEvent.change(input);
-
-    await waitFor(() => expect(catalogMock.uploadImage).toHaveBeenCalledWith('p1', file));
-    await waitFor(() =>
-      expect(catalogMock.saveProductFields).toHaveBeenCalledWith('p1', { image: 't/s/p/foto.jpg' }),
-    );
-  });
+  // ── TESTS COMENTADOS (no borrados) ─────────────────────────────────────────────
+  // Pertenecen a los campos de actualización (descripción, %, monto, Nuevo), comentados en la
+  // vista por decisión del owner (2026-09-29). Al restaurar los campos, descomentar este bloque.
+  //
+  // it('guardar envía los campos del catálogo escalados y con el precio final calculado', async () => {
+  //   renderPage();
+  //
+  //   const description = await screen.findByTestId(`catalog-description-${PRODUCT.id}`);
+  //   fireEvent.change(description, { target: { value: 'Camisa de algodón\nSegunda línea' } });
+  //   fireEvent.change(screen.getByTestId(`catalog-percent-${PRODUCT.id}`), {
+  //     target: { value: '12.5' },
+  //   });
+  //   fireEvent.change(screen.getByTestId(`catalog-discount-${PRODUCT.id}`), {
+  //     target: { value: '5' },
+  //   });
+  //
+  //   // Precio final (D7) en vivo: 100 - 12.5 % = 87.50; 87.50 - 5.00 = 82.50.
+  //   expect(screen.getByTestId(`catalog-final-price-${PRODUCT.id}`)).toHaveTextContent('82.50\u00A0CUP');
+  //
+  //   fireEvent.click(screen.getByTestId(`catalog-save-${PRODUCT.id}`));
+  //
+  //   await waitFor(() =>
+  //     expect(catalogMock.saveProductFields).toHaveBeenCalledWith('p1', {
+  //       description: 'Camisa de algodón\nSegunda línea',
+  //       percentDiscountPrice: 1250,
+  //       discountPrice: 500,
+  //       isNew: false,
+  //     }),
+  //   );
+  //   expect(showToastSuccessMock).toHaveBeenCalledWith('Producto guardado en el catálogo');
+  // });
+  //
+  // it('un % fuera de rango no se envía y se avisa en pantalla', async () => {
+  //   renderPage();
+  //
+  //   fireEvent.change(await screen.findByTestId(`catalog-percent-${PRODUCT.id}`), {
+  //     target: { value: '120' },
+  //   });
+  //   fireEvent.click(screen.getByTestId(`catalog-save-${PRODUCT.id}`));
+  //
+  //   expect(
+  //     await screen.findByText('El % de descuento debe estar entre 0 y 100.'),
+  //   ).toBeInTheDocument();
+  //   expect(catalogMock.saveProductFields).not.toHaveBeenCalled();
+  // });
+  // ────────────────────────────────────────────────────────────────────────────────
 });
 
 describe('clientLoader del catálogo (módulo 18 + Owner)', () => {

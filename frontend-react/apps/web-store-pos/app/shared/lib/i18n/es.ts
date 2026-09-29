@@ -276,6 +276,10 @@ const messages: Record<string, string> = {
   'WEB_CATALOG.IS_NEW': 'Nuevo',
   'WEB_CATALOG.FINAL_PRICE': 'Precio final',
   'WEB_CATALOG.MAIN_IMAGE': 'Imagen principal',
+  // Vista WebCatalog: el bloque se llama solo "Imagen" por decisión del owner (2026-09-29);
+  // el texto "Imagen principal" (MAIN_IMAGE) vuelve más adelante.
+  'WEB_CATALOG.IMAGE': 'Imagen',
+  'WEB_CATALOG.WILL_BE_MAIN': 'quedará como imagen principal al guardar',
   'WEB_CATALOG.GALLERY': 'Otras imágenes',
   'WEB_CATALOG.GALLERY_LIMIT': 'Hasta {max} imágenes de {size} MB (jpg, png o webp).',
   'WEB_CATALOG.UPLOAD_IMAGE': 'Subir imagen',
