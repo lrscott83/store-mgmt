@@ -102,6 +102,118 @@ Related: `/me` `Roles` excludes a store user whose `StoreUser.IsActive` is false
 `GetStoreRoleFeaturesByUserIdAsync` gates the StoreUser role on an active `StoreUser` row for
 `(store, userId)` (OwnerAdmin has no `StoreUser` row and is unaffected).
 
+## Database migrations — the migration is the source, the script is generated (user-mandated 2026-09-30)
+
+**The EF migration is the single source of truth. The `.sql` script is GENERATED from it with
+`dotnet ef migrations script`. Never hand-write the script.** Writing the script first and the
+migration second inverts the guarantee: the two texts drift, and the one that never ran is the
+one nobody tested. That exact mistake shipped here — a hand-written script was verified against
+PostgreSQL while the C# migration it was supposed to mirror contained invalid SQL and had never
+been executed.
+
+### The steps, in order
+
+```bash
+cd backend
+
+# 1. Create the migration.
+dotnet ef migrations add <Nombre> --project src/Infrastructure --startup-project src/SMCA.WebApi
+
+# 2. For pure-data migrations the Up() is generated empty. Put the real SQL there. Prefer a
+#    shared static class of SQL constants (see PlanModuleConvergenceSql, ElaborationModuleBackfill,
+#    WarehousesPlanCleanup) so the migration, the script, and the tests all read the same text.
+
+# 3. Apply it for real against the test database.
+dotnet ef database update --project src/Infrastructure --startup-project src/SMCA.WebApi \
+  --connection "Host=localhost;Database=smca_test;Username=postgres;Password=postgres"
+
+# 4. Generate the script FROM the migration. See the -From rule below.
+dotnet ef migrations script <PreviousMigration> <LastMigration> \
+  --project src/Infrastructure --startup-project src/SMCA.WebApi -o scripts/<NN>-<name>.sql
+```
+
+### The `-From` rule (user-stated 2026-09-30)
+
+- **Several migrations in one script:** `-From <PreviousMigration> -To <LastMigration>`.
+- **A single migration:** `-From` the **PREVIOUS** migration — not the new one — and **omit `-To`**.
+  Omitting `-To` makes EF run through the latest migration, which is the new one.
+
+```bash
+# Single new migration 20260930090000_PlanModuleConvergence:
+dotnet ef migrations script 20260928191227_Add-WebCatalog-Module-Vip ... -o scripts/27-....sql
+```
+
+### Three things EF's generated script does NOT do for you
+
+1. **`ON CONFLICT` on the `__EFMigrationsHistory` insert.** EF emits a bare `INSERT`, so running
+   the script twice fails on the primary key. Every script since #08 adds
+   `ON CONFLICT ("MigrationId") DO NOTHING;`. Patch that one line after generating.
+2. **Header + verification queries.** Add the header block (name, EF migration, date, parity note,
+   prerequisites) and the post-`COMMIT` verification `SELECT`s by hand. Keep the commented
+   `ROLLBACK` block too.
+3. **Naming.** EF writes to whatever path `-o` gets. Rename it to the repo convention
+   `NN-nombre-descriptivo.sql` with the next sequential number.
+
+Do NOT reorder or rewrite the generated SQL body. If it looks wrong (a `)DELETE` on one line), read
+it before "fixing" it — the statement before it may end with a CTE, and `)` closes it.
+
+### Verifying a data migration really runs
+
+Running the script against an already-migrated database proves nothing: the six statements return
+`DELETE 0 / INSERT 0 0 / UPDATE 0` and the history row already exists. To prove the C# executes:
+
+```sql
+DELETE FROM "__EFMigrationsHistory" WHERE "MigrationId" = '<id>';
+```
+
+then `dotnet ef database update`. EF now sees it as pending and runs the real `Up`. Verify with
+`SELECT "MigrationId" FROM "__EFMigrationsHistory" WHERE "MigrationId" LIKE '<prefix>%';`.
+Run the script twice afterwards to prove idempotency.
+
+### C# raw string literals do NOT emit the trailing newline — gotcha
+
+This produced invalid SQL that compiled cleanly and ran nowhere:
+
+```csharp
+// BROKEN: yields WITHspec(...)  — a PostgreSQL syntax error.
+public const string X = """
+    WITH
+    """ + Cte + """
+    DELETE FROM ...
+```
+
+A raw string literal omits the newline before its closing delimiter. Put the join in a named
+constant instead:
+
+```csharp
+private const string HeadSql = "WITH\n" + Cte;   // correct
+```
+
+See `PlanModuleConvergenceSql.HeadSql`.
+
+### Adding a module to a plan — the established order
+
+Verified against `scripts/19-20260918-Add-Elaboration-Module.sql` (module 17 → Superior/VIP):
+
+1. `INSERT INTO "Module"` — full column list: `Id, AvailableToStore, DiscountPrice, IsActive, Name,
+   Order, PercentDiscountPrice, Price, PriceIncluded`.
+2. `INSERT INTO "Feature"` — `Id, AvailableToStore, Description, IsActive, ModuleId, Name, Order`.
+   `ModuleId` is the join key that makes role features computable in SQL.
+3. **`setval` fix-ups.** Explicit-PK inserts do NOT advance the serials, so the next generated id
+   collides. Always reset `"Feature"` and `"Module"`.
+4. `INSERT INTO "StorePlanModule"` — **only the destination plans**, e.g. `VALUES (3,17),(4,17)`.
+   Not cumulative: adding a module to Superior/VIP does not add it to Gratis/Pago.
+5. `INSERT INTO "StoreModule"` — predicate `s."IsActive" = TRUE AND s."StorePlanId" IN (...)`,
+   `CreatedBy` = `'38b96d85-bf75-41ca-bfd7-796e7fe0ebc8'::uuid` (NOT NULL audit column).
+6. `INSERT INTO "StoreRoleFeature"` — hardcode the role ids (OwnerAdmin 2, StoreUser 3, ReSeller 4)
+   and join the feature ids via `JOIN (VALUES (120),(121)) AS f("Id") ON TRUE`.
+
+Every insert carries `ON CONFLICT ... DO NOTHING`. FK order matters: catalog → plan → per-store.
+
+Convergence migrations (like `PlanModuleConvergence`) are the opposite shape: they do **not** insert
+new catalog rows, they derive the universe in a CTE and use `DO UPDATE` to reactivate soft-deleted
+rows without touching negotiated price columns.
+
 ## Running the tests
 
 Requires PostgreSQL on `localhost:5432`, database `smca_test`. `WebAppFixture` applies the migrations itself.
