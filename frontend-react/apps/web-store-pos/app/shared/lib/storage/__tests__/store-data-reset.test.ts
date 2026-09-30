@@ -17,11 +17,13 @@ describe('clearStoreData', () => {
     vi.restoreAllMocks();
   });
 
-  it('covers exactly the fourteen business entities', () => {
+  it('covers exactly the fifteen business entities', () => {
     // elaboration-module: recipes + elaborations joined the registry.
     // store-payment-methods-config: storePaymentMethods joined on 2026-09-23 —
     // it was missing from the registry, so the damaged-data recovery could not
     // wipe it and one damaged entry kept a store locked out.
+    // owner-messaging (T8): messagesQueue joined — a store reset must clear any
+    // offline-queued messages along with the rest of the store's data.
     expect([...BUSINESS_ENTITY_NAMES]).toEqual([
       'products',
       'product-categories',
@@ -37,6 +39,7 @@ describe('clearStoreData', () => {
       'recipes',
       'elaborations',
       'storePaymentMethods',
+      'messagesQueue',
     ]);
   });
 
