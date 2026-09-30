@@ -133,13 +133,20 @@ namespace Infrastructure.Migrations
             """;
 
         /// <summary>
+        /// Every statement starts with this exact prologue. It exists as a named constant
+        /// because a C# raw string literal does NOT emit the newline that precedes its closing
+        /// delimiter, so writing <c>""" + "WITH\n" + """</c> inline would concatenate as
+        /// <c>WITHspec(...)</c> — a syntax error PostgreSQL rejects. Keep the newline here and
+        /// never split it back across a raw-string boundary.
+        /// </summary>
+        private const string HeadSql = "WITH\n" + SpecCte;
+
+        /// <summary>
         /// 1a. Drop plan/module pairs outside the specification. A row survives only if some
         /// plan includes it, so this also removes any plan row pointing at a module that is
         /// no longer store-available.
         /// </summary>
-        public const string PlanCatalogCleanupSql = """
-            WITH
-            """ + SpecCte + """
+        public const string PlanCatalogCleanupSql = HeadSql + """
             DELETE FROM "StorePlanModule" spm
             WHERE NOT EXISTS (
                 SELECT 1
@@ -158,9 +165,7 @@ namespace Infrastructure.Migrations
             """;
 
         /// <summary>1b. Add the plan/module pairs the specification requires.</summary>
-        public const string PlanCatalogInsertSql = """
-            WITH
-            """ + SpecCte + """
+        public const string PlanCatalogInsertSql = HeadSql + """
             INSERT INTO "StorePlanModule" ("PlanId", "ModuleId")
             SELECT p."Id", spec."OwnModuleId"
             FROM "StorePlan" p
@@ -178,9 +183,7 @@ namespace Infrastructure.Migrations
         /// 2a. Soft-delete active modules a store's plan does not include. Mirrors the
         /// soft-delete half of ApplyPlanModules.
         /// </summary>
-        public const string StoreModuleCleanupSql = """
-            WITH
-            """ + SpecCte + """
+        public const string StoreModuleCleanupSql = HeadSql + """
             ,
             """ + UniverseCte + """
             UPDATE "StoreModule" sm
@@ -196,9 +199,7 @@ namespace Infrastructure.Migrations
         /// 2b. Grant the missing modules and reactivate soft-deleted ones. The conflict
         /// action touches only IsActive/UpdatedDate so negotiated per-store pricing survives.
         /// </summary>
-        public const string StoreModuleGrantSql = """
-            WITH
-            """ + SpecCte + """
+        public const string StoreModuleGrantSql = HeadSql + """
             ,
             """ + UniverseCte + """
             INSERT INTO "StoreModule" ("StoreId", "ModuleId", "ModulePriceIncluded", "Price",
@@ -226,9 +227,7 @@ namespace Infrastructure.Migrations
         /// <summary>
         /// 3a. Soft-delete active role features whose module the store no longer holds.
         /// </summary>
-        public const string StoreRoleFeatureCleanupSql = """
-            WITH
-            """ + SpecCte + """
+        public const string StoreRoleFeatureCleanupSql = HeadSql + """
             ,
             """ + UniverseCte + """
             ,
@@ -254,9 +253,7 @@ namespace Infrastructure.Migrations
         /// 3b. Grant the role features the store's active modules imply and reactivate
         /// soft-deleted ones, mirroring the regeneration ApplyPlanModules performs.
         /// </summary>
-        public const string StoreRoleFeatureGrantSql = """
-            WITH
-            """ + SpecCte + """
+        public const string StoreRoleFeatureGrantSql = HeadSql + """
             ,
             """ + UniverseCte + """
             ,
