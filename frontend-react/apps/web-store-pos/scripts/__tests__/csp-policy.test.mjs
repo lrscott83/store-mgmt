@@ -44,7 +44,7 @@ describe('csp-policy', () => {
         "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; " +
           "form-action 'self'; script-src 'self' 'report-sample'; " +
           "style-src 'self' 'unsafe-inline'; img-src 'self' data:; " +
-          "font-src 'self'; connect-src 'self'; worker-src 'self'; manifest-src 'self'"
+          "font-src 'self'; connect-src 'self' ws: wss:; worker-src 'self'; manifest-src 'self'"
       );
     });
   });
@@ -104,12 +104,12 @@ describe('csp-policy', () => {
         apiUrl: 'http://localhost:5019/api',
         devServerOrigin: 'http://localhost:3333',
       });
-      expect(dev.get('connect-src')).toEqual(["'self'", 'http://localhost:5019', 'ws://localhost:3333']);
+      expect(dev.get('connect-src')).toEqual(["'self'", 'ws:', 'wss:', 'http://localhost:5019', 'ws://localhost:3333']);
     });
 
     it('dev connect-src with no apiUrl still includes the ws HMR origin, never crashes', () => {
       const dev = buildCspDirectives('dev', { devServerOrigin: 'http://localhost:3333' });
-      expect(dev.get('connect-src')).toEqual(["'self'", 'ws://localhost:3333']);
+      expect(dev.get('connect-src')).toEqual(["'self'", 'ws:', 'wss:', 'ws://localhost:3333']);
     });
   });
 

@@ -104,7 +104,7 @@ describe('csp-nginx', () => {
       const reordered =
         "style-src 'self' 'unsafe-inline'; default-src 'self'; script-src 'report-sample' 'self'; " +
         "base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data:; " +
-        "font-src 'self'; connect-src 'self'; worker-src 'self'; manifest-src 'self'";
+        "font-src 'self'; connect-src 'self' ws: wss:; worker-src 'self'; manifest-src 'self'";
       const conf = fixtureConf(`    add_header ${CSP_HEADER_NAME} "${reordered}" always;`);
       expect(checkNginxConf(conf)).toEqual([]);
     });
