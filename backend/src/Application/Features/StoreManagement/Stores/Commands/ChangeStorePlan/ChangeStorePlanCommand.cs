@@ -235,16 +235,28 @@ internal sealed class ChangeStorePlanCommandHandler : ICommandHandler<ChangeStor
                 .GetAllByStoreIdAndModuleIdAndFeatureIdsAsync(store.Id, moduleId, featureIds);
             foreach (var featureId in featureIds)
             {
-                StoreRoleFeature? srf = existingFeatures.FirstOrDefault(f => f.FeatureId == featureId);
-                if (srf is null)
-                {
-                    await _storeRoleFeatureRepository.AddAsync(
-                        StoreRoleFeature.Create(store.Id, (int)RoleType.StoreUser, featureId, store.TenantId));
-                }
-                else
+                // The repo lookup is NOT filtered by IsActive, so soft-deleted rows come back
+                // here and keep their own RoleId — reactivate every row the store already has.
+                var existingForFeature = existingFeatures.Where(f => f.FeatureId == featureId).ToArray();
+                foreach (var srf in existingForFeature.Where(s => !s.IsActive))
                 {
                     srf.IsActive = true;
                     await _storeRoleFeatureRepository.UpdateAsync(srf);
+                }
+
+                // Roles the enum declares for this feature that have NO row yet. These come
+                // from StoreRoleFeatureGenerator, the same source the insert path above uses,
+                // so restoring a module grants exactly the roles inserting it would — the
+                // previous hardcoded RoleType.StoreUser inverted every OwnerAdmin-only
+                // permission (60, 80, 101, 102), stripping it from the owner and handing it
+                // to employees. Guarded on RoleId so a role that already has a row is not
+                // duplicated.
+                var existingRoleIds = existingForFeature.Select(s => s.RoleId).ToHashSet();
+                var generated = await _storeRoleFeaturesGenerator
+                    .GenerateStoreRoleFeaturesAsync(store.Id, store.TenantId, [featureId]);
+                foreach (var missingRole in generated.Where(g => !existingRoleIds.Contains(g.RoleId)))
+                {
+                    await _storeRoleFeatureRepository.AddAsync(missingRole);
                 }
             }
         }
