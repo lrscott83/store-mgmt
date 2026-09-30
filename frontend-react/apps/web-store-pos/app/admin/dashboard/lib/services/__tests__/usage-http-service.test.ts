@@ -38,6 +38,9 @@ function instantWhereLocalAndUtcDaysDiffer(): Date {
 /** The `today` query param of the most recent apiClient.get call. */
 async function lastTodayParam(): Promise<string | null> {
   const { apiClient } = await import('~/shared/lib/http/api-client');
+  // The cast is what the other mock touches in this file already do: `vi.mock` replaces the
+  // module at runtime, but the real `apiClient.get` type is the generic Axios request
+  // signature, which has no `.mock`. Without the cast the test file does not typecheck.
   const url = (apiClient.get as ReturnType<typeof vi.fn>).mock.calls.at(-1)?.[0] as string;
   return new URL(url, 'http://localhost').searchParams.get('today');
 }

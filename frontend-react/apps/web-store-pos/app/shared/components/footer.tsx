@@ -1,6 +1,6 @@
 import { useIntl } from 'react-intl';
 import { Link } from 'react-router';
-import { EmailIcon } from './ui/icons';
+import { WhatsappIcon } from './ui/icons';
 
 interface FooterProps {
   /**
@@ -17,6 +17,12 @@ interface FooterProps {
    * pill's text/hover colors are adapted here (kept legible on white) while
    * preserving the gold accent and Angular's intent of a muted label that
    * emphasizes on hover.
+   *
+   * `guest` is also the unauthenticated context: the Footer renders inside
+   * `auth-layout` (login) only with `variant="guest"`, and inside `app-layout`
+   * (authenticated routes) only with the `client` default. The Contact item is
+   * therefore gated to authenticated sessions, which makes its guest pill
+   * branch unreachable — kept for continuity, not because it still renders.
    */
   variant?: 'client' | 'guest';
 }
@@ -30,8 +36,10 @@ interface FooterProps {
  * at the Angular paths as a placeholder; see apply-progress for the
  * deferred-routes note. The 2 legal links open in a new tab
  * (`target="_blank"`), matching Angular's `[routerLink]` + `target="_blank"`
- * on every one of these anchors. Contact Us is a no-op trigger — Angular's own
- * `showEmailDialog()` handler is empty.
+ * on every one of these anchors. Contact Us is a real external link to the
+ * store's WhatsApp number (`wa.me`, no prefilled message) rather than the
+ * empty in-page trigger it used to be, and renders only for authenticated
+ * sessions — the guest/auth footer omits it.
  */
 export function Footer({ variant = 'client' }: FooterProps = {}) {
   const intl = useIntl();
@@ -59,20 +67,23 @@ export function Footer({ variant = 'client' }: FooterProps = {}) {
             {intl.formatMessage({ id: 'FOOTER.TERMS_CONDITIONS' })}
           </Link>
         </li>
-        <li>
-          <button
-            type="button"
-            onClick={() => {}}
-            className={
-              isGuest
-                ? 'inline-flex items-center gap-1.5 rounded-full border border-[rgba(245,176,38,0.25)] bg-[rgba(245,176,38,0.08)] px-3.5 py-1.5 text-gray-700 transition-colors hover:border-[rgba(245,176,38,0.4)] hover:bg-[rgba(245,176,38,0.15)] hover:text-text'
-                : 'inline-flex items-center gap-1 text-gray-500'
-            }
-          >
-            <EmailIcon className={isGuest ? 'h-4 w-4 text-[#f5b026]' : 'h-4 w-4'} />
-            {intl.formatMessage({ id: 'FOOTER.CONTACT_US' })}
-          </button>
-        </li>
+        {!isGuest && (
+          <li>
+            <a
+              href="https://wa.me/5352432968"
+              target="_blank"
+              rel="noopener noreferrer"
+              className={
+                isGuest
+                  ? 'inline-flex items-center gap-1.5 rounded-full border border-[rgba(245,176,38,0.25)] bg-[rgba(245,176,38,0.08)] px-3.5 py-1.5 text-gray-700 transition-colors hover:border-[rgba(245,176,38,0.4)] hover:bg-[rgba(245,176,38,0.15)] hover:text-text'
+                  : 'inline-flex items-center gap-1 text-gray-500'
+              }
+            >
+              <WhatsappIcon className={isGuest ? 'h-4 w-4 text-[#f5b026]' : 'h-4 w-4'} />
+              {intl.formatMessage({ id: 'FOOTER.CONTACT_US' })}
+            </a>
+          </li>
+        )}
       </ul>
       <p className="text-xs text-gray-400 text-center mt-2 mb-0">
         {intl.formatMessage({ id: 'FOOTER.COPYRIGHT1' }, { year })}

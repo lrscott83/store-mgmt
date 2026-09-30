@@ -283,6 +283,9 @@ const messages: Record<string, string> = {
   'WEB_CATALOG.WILL_BE_MAIN': 'quedará como imagen principal al guardar',
   'WEB_CATALOG.GALLERY': 'Otras imágenes',
   'WEB_CATALOG.GALLERY_LIMIT': 'Hasta {max} imágenes de {size} MB (jpg, png o webp).',
+  // Con la galería oculta solo hay una imagen: el aviso del archivo inválido no puede hablar de
+  // un número de imágenes (decisión del owner, 2026-09-29). GALLERY_LIMIT vuelve con la galería.
+  'WEB_CATALOG.IMAGE_RULES': 'Solo imágenes jpg, png o webp de hasta {size} MB.',
   'WEB_CATALOG.UPLOAD_IMAGE': 'Subir imagen',
   'WEB_CATALOG.REMOVE_IMAGE': 'Quitar imagen',
   'WEB_CATALOG.SET_MAIN_IMAGE': 'Usar como principal',

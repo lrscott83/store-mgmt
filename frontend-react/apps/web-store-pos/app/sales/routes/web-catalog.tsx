@@ -215,11 +215,16 @@ export function WebCatalogPage() {
   /**
    * Guardar de un producto: sube PRIMERO la imagen retenida (si hay) y después guarda los
    * campos enviados. Seleccionar la imagen no toca la red — todo ocurre aquí, al pulsar
-   * Guardar. La primera imagen de un producto sin principal pasa a serlo: es lo que el Owner
-   * espera al subirla desde el bloque "Imagen".
+   * Guardar. Solo hay UNA imagen por producto (decisión del owner, 2026-09-29): la imagen
+   * nueva SIEMPRE pasa a ser la principal y la anterior se borra al terminar, con su fila y
+   * su archivo. El borrado va DESPUÉS del guardado a propósito: `RemoveProductImageCommand`
+   * anula `product.Image` cuando la ruta borrada es la principal, así que borrar primero
+   * dejaría el producto sin imagen.
    */
   function handleSaveProduct(product: CatalogProductView, fields: CatalogProductFields, image: File | null) {
     void runProductAction(product.id, async () => {
+      // Principal vigente ANTES de subir nada: es la que hay que superseder.
+      const previousMain = product.image;
       let imageKey: string | null = null;
       if (image) {
         const uploaded = await catalogHttpService.uploadImage(product.id, image);
@@ -234,7 +239,7 @@ export function WebCatalogPage() {
       }
 
       const fieldsToSend: CatalogProductFields = { ...fields };
-      if (imageKey && !product.image) fieldsToSend.image = imageKey;
+      if (imageKey) fieldsToSend.image = imageKey;
 
       // Con los campos de actualización comentados, Guardar sin imagen nueva no tiene nada que
       // enviar: se evita el PUT vacío.
@@ -248,6 +253,12 @@ export function WebCatalogPage() {
           return;
         }
       }
+
+      // La principal ya fue sustituida con éxito: ahora se borra la anterior (fila + archivo).
+      if (imageKey && previousMain && previousMain !== imageKey) {
+        await catalogHttpService.removeImage(product.id, previousMain);
+      }
+
       showToastSuccess(intl.formatMessage({ id: 'WEB_CATALOG.SAVED' }));
       await loadData();
     });

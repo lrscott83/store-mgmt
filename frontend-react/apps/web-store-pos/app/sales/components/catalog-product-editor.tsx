@@ -3,13 +3,22 @@ import { useIntl } from 'react-intl';
 import { Button } from '~/shared/components/ui/button';
 import { FileInput } from '~/shared/components/ui/file-input';
 import { SaveIcon, TrashIcon } from '~/shared/components/ui/icons';
-import { confirmDialog } from '~/shared/lib/blocking-alert';
+// import { confirmDialog } from '~/shared/lib/blocking-alert'; ← solo lo usaba la galería (ver abajo).
 import { currencyFromCode, formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency';
 import { apiFileUrl } from '~/shared/lib/http/media-url';
 import type { CatalogProductFields, CatalogProductView } from '../lib/services/catalog-http-service';
-import { MAX_CATALOG_IMAGES, MAX_CATALOG_IMAGE_BYTES } from '../lib/catalog/web-catalog-format';
+// MAX_CATALOG_IMAGES solo lo usaba la galería (y su aviso de "Hasta {max} imágenes…"), ahora
+// comentada: vuelve con ella, junto a `galleryFull` y el `<span>` de la cabecera.
+import { MAX_CATALOG_IMAGE_BYTES } from '../lib/catalog/web-catalog-format';
 
 /**
+ * NOTA DE RESTAURACIÓN (galería comentada): al volver a habilitarla descomenta — el import
+ * `confirmDialog`, los props `onRemoveImage` / `onSetMainImage` / `onReorderImages` (su
+ * desestructuración en la firma), las funciones `handleRemoveImage` y `handleMove`, la constante
+ * `galleryFull` con su uso en `disabled={busy || galleryFull}`, el `<span>` del límite de la
+ * cabecera, el `<ul>` de miniaturas bajo el bloque de imagen y el `MAX_CATALOG_IMAGES` del
+ * import (el aviso nuevo `WEB_CATALOG.IMAGE_RULES` no lleva `{max}`).
+ *
  * NOTA DE RESTAURACIÓN (campos de actualización comentados): al volver a habilitarlos,
  * descomenta también — los estados `description/percent/discount/isNew`, `parseNumber`,
  * `finalPrice` y `handleSave` (con sus validaciones), el grid de campos del JSX, el badge de -%
@@ -29,6 +38,8 @@ interface CatalogProductEditorProps {
   busy: boolean;
   /** Guarda los campos enviados y sube la imagen retenida (null = sin imagen nueva). */
   onSave: (fields: CatalogProductFields, image: File | null) => void;
+  // Los tres props siguientes SOLO los usaba la galería multi-imagen, que ahora está comentada.
+  // Siguen declarados porque el padre los sigue pasando y el tipo debe seguir compilando.
   onRemoveImage: (path: string) => void;
   onSetMainImage: (key: string) => void;
   onReorderImages: (paths: string[]) => void;
@@ -39,18 +50,20 @@ interface CatalogProductEditorProps {
  *
  * POR AHORA solo permite modificar la imagen del producto (decisión del owner, 2026-09-29): los
  * campos de actualización (descripción, % de descuento, precio rebajado y "Nuevo") quedan
- * COMENTADOS — no borrados — para restaurarlos más adelante. Seleccionar una imagen NO dispara
- * ninguna llamada: se retiene y SOLO se sube al pulsar Guardar. El nombre, el precio de venta y
- * el orden son del catálogo de productos: aquí se muestran, no se tocan.
+ * COMENTADOS — no borrados — para restaurarlos más adelante. Y la imagen es una sola: la galería
+ * multi-imagen (miniaturas, "Usar como principal", mover y borrar) queda COMENTADA — no borrada —
+ * para restaurarla más adelante. Subir una imagen REEMPLAZA la principal: el guardado borra la
+ * anterior (ver `handleSaveProduct` en la vista). Seleccionar una imagen NO dispara ninguna
+ * llamada: se retiene y SOLO se sube al pulsar Guardar. El nombre, el precio de venta y el orden
+ * son del catálogo de productos: aquí se muestran, no se tocan.
  */
 export function CatalogProductEditor({
   product,
   storeSlug,
   busy,
   onSave,
-  onRemoveImage,
-  onSetMainImage,
-  onReorderImages,
+  // onRemoveImage, onSetMainImage y onReorderImages quedan sin desestructurar: solo los usaba la
+  // galería multi-imagen, que está comentada (se restauran descomentando aquí y arriba).
 }: CatalogProductEditorProps) {
   const intl = useIntl();
 
@@ -132,10 +145,11 @@ export function CatalogProductEditor({
   function handleFile(file: File | null) {
     if (!file) return;
     if (!ALLOWED_IMAGE_TYPES.includes(file.type) || file.size > MAX_CATALOG_IMAGE_BYTES) {
+      // Sin galería no hay "cuántas imágenes": el aviso solo habla de formatos y tamaño.
       setError(
         intl.formatMessage(
-          { id: 'WEB_CATALOG.GALLERY_LIMIT' },
-          { max: MAX_CATALOG_IMAGES, size: MAX_CATALOG_IMAGE_BYTES / (1024 * 1024) },
+          { id: 'WEB_CATALOG.IMAGE_RULES' },
+          { size: MAX_CATALOG_IMAGE_BYTES / (1024 * 1024) },
         ),
       );
       return;
@@ -145,25 +159,30 @@ export function CatalogProductEditor({
     setPendingImage(file);
   }
 
-  async function handleRemoveImage(path: string) {
-    const confirmed = await confirmDialog({
-      title: intl.formatMessage({ id: 'WEB_CATALOG.REMOVE_IMAGE' }),
-      message: intl.formatMessage({ id: 'WEB_CATALOG.REMOVE_IMAGE_CONFIRM' }),
-      confirmButtonText: intl.formatMessage({ id: 'GENERAL.YES' }),
-      cancelButtonText: intl.formatMessage({ id: 'GENERAL.NO' }),
-    });
-    if (confirmed) onRemoveImage(path);
-  }
-
-  function handleMove(index: number, direction: -1 | 1) {
-    const next = [...product.images];
-    const target = index + direction;
-    if (target < 0 || target >= next.length) return;
-    [next[index], next[target]] = [next[target], next[index]];
-    onReorderImages(next);
-  }
-
-  const galleryFull = product.images.length >= MAX_CATALOG_IMAGES;
+  // ── GALERÍA COMENTADA (se restaura descomentando) ──────────────────────────────
+  // Necesita el import `confirmDialog` y el prop `onRemoveImage` (ver NOTA DE RESTAURACIÓN).
+  // async function handleRemoveImage(path: string) {
+  //   const confirmed = await confirmDialog({
+  //     title: intl.formatMessage({ id: 'WEB_CATALOG.REMOVE_IMAGE' }),
+  //     message: intl.formatMessage({ id: 'WEB_CATALOG.REMOVE_IMAGE_CONFIRM' }),
+  //     confirmButtonText: intl.formatMessage({ id: 'GENERAL.YES' }),
+  //     cancelButtonText: intl.formatMessage({ id: 'GENERAL.NO' }),
+  //   });
+  //   if (confirmed) onRemoveImage(path);
+  // }
+  //
+  // function handleMove(index: number, direction: -1 | 1) {
+  //   const next = [...product.images];
+  //   const target = index + direction;
+  //   if (target < 0 || target >= next.length) return;
+  //   [next[index], next[target]] = [next[target], next[index]];
+  //   onReorderImages(next);
+  // }
+  //
+  // Con la galería oculta, subir una imagen reemplaza la principal: un producto que ya tenga 6
+  // imágenes vuelve a poder subirlas todas, así que el tope ya no bloquea el FileInput.
+  // const galleryFull = product.images.length >= MAX_CATALOG_IMAGES;
+  // ────────────────────────────────────────────────────────────────────────────────
 
   return (
     <article
@@ -279,20 +298,22 @@ export function CatalogProductEditor({
       </div>
       ─────────────────────────────────────────────────────────────────────────────────── */}
 
-      {/* Imágenes: principal + galería (máx. 6 por producto, 2 MB cada una — decisión D10).
-          En esta vista el bloque se llama solo "Imagen" (sin "principal") por decisión del
-          owner; el texto con "principal" vuelve más adelante. */}
+      {/* Imagen: UNA sola por producto. La galería multi-imagen y su texto de límite ("Hasta {max}
+          imágenes…") quedan comentados — no borrados — y vuelven con esa funcionalidad. */}
       <div className="mt-4 border-t border-border pt-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <span className="text-xs font-medium text-text-muted">
             {intl.formatMessage({ id: 'WEB_CATALOG.IMAGE' })}
           </span>
+          {/* GALERÍA COMENTADA (se restaura descomentando): con una sola imagen el aviso de "hasta
+              N imágenes" ya no describe nada real. Necesita MAX_CATALOG_IMAGES.
           <span className="text-xs text-text-muted">
             {intl.formatMessage(
               { id: 'WEB_CATALOG.GALLERY_LIMIT' },
               { max: MAX_CATALOG_IMAGES, size: MAX_CATALOG_IMAGE_BYTES / (1024 * 1024) },
             )}
           </span>
+          */}
         </div>
 
         <div className="mt-2 flex flex-wrap items-start gap-3">
@@ -323,7 +344,7 @@ export function CatalogProductEditor({
             <FileInput
               onFileChange={handleFile}
               accept=".jpg,.jpeg,.png,.webp"
-              disabled={busy || galleryFull}
+              disabled={busy}
               data-testid={`catalog-upload-${product.id}`}
             />
             {/* Selección retenida: se anuncia y SOLO se sube al pulsar Guardar. */}
@@ -333,13 +354,15 @@ export function CatalogProductEditor({
                 data-testid={`catalog-pending-image-${product.id}`}
               >
                 {pendingImage.name}
-                {!product.image &&
-                  ` · ${intl.formatMessage({ id: 'WEB_CATALOG.WILL_BE_MAIN' })}`}
+                {` · ${intl.formatMessage({ id: 'WEB_CATALOG.WILL_BE_MAIN' })}`}
               </p>
             )}
           </div>
         </div>
 
+        {/* GALERÍA COMENTADA (se restaura descomentando): miniaturas con "Usar como principal",
+            mover antes/después y borrar. Al volver hacen falta `onSetMainImage`, `onReorderImages`,
+            `handleRemoveImage`, `handleMove`, `galleryFull` y el import `confirmDialog`.
         {product.images.length > 0 && (
           <ul className="mt-3 flex flex-wrap gap-3">
             {product.images.map((key, index) => (
@@ -397,6 +420,7 @@ export function CatalogProductEditor({
             ))}
           </ul>
         )}
+        */}
       </div>
 
       {error && <p className="mt-2 text-xs text-danger">{error}</p>}
