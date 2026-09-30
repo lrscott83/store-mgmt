@@ -13,6 +13,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@microsoft/signalr": "^8.0.29",
     "@noble/ciphers": "2.2.0",
     "@react-router/node": "^7.7.1",
     "@react-router/serve": "^7.7.1",

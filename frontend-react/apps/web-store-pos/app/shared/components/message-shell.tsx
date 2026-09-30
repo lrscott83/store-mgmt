@@ -8,6 +8,12 @@ import { showToastError } from '~/shared/lib/toast';
 import { ChatIcon } from '~/shared/components/ui/icons';
 import { messagesHttpService } from '~/shared/lib/messages/messages-http-service';
 import { MessagesOfflineService } from '~/shared/lib/messages/messages-offline-service';
+import {
+  MESSAGE_READ_EVENT,
+  RECEIVE_MESSAGE_EVENT,
+  createMessagesRealtimeConnection,
+  resolveMessagesHubUrl,
+} from '~/shared/lib/messages/messages-realtime-service';
 import type { QueuedMessage } from '~/shared/lib/messages/messages-offline-service';
 import type {
   ConversationDto,
@@ -175,6 +181,28 @@ export function MessageShell() {
     }, REFRESH_INTERVAL_MS);
     return () => window.clearInterval(intervalId);
   }, [user, refresh]);
+
+  // T9.3 — real-time push (SignalR). The hub delivers a new message or a read
+  // receipt as it happens, so the panel and the unread badge update without
+  // waiting for the poll above. That interval stays as the FALLBACK: if the
+  // connection never opens (no WebSocket, a blocked upgrade, a dead hub) or
+  // later drops, everything still refreshes on its own. A failed `start()` is
+  // therefore swallowed on purpose — it is not an error the user must see.
+  useEffect(() => {
+    if (!user || !isOwnerAdmin(user) || !isOnline) return;
+    const connection = createMessagesRealtimeConnection(
+      resolveMessagesHubUrl(import.meta.env['API_URL'] as string | undefined, window.location.origin),
+    );
+    const pull = () => void refresh(isOpenRef.current);
+    connection.on(RECEIVE_MESSAGE_EVENT, pull);
+    connection.on(MESSAGE_READ_EVENT, pull);
+    void connection.start().catch(() => undefined);
+    return () => {
+      connection.off(RECEIVE_MESSAGE_EVENT, pull);
+      connection.off(MESSAGE_READ_EVENT, pull);
+      void connection.stop().catch(() => undefined);
+    };
+  }, [user, isOnline, refresh]);
 
   function handleToggle() {
     const next = !isOpen;

@@ -10,6 +10,22 @@ const sendMessageMock = vi.hoisted(() => vi.fn());
 const markAsReadMock = vi.hoisted(() => vi.fn());
 const markAllAsReadMock = vi.hoisted(() => vi.fn());
 
+// T9.3 — the realtime hub is additive: these tests exercise the REST +
+// interval-fallback path, so the connection is stubbed. Without this the shell
+// would attempt a real SignalR negotiate POST, which the suite's
+// block-real-http guard (vitest.setup.ts) correctly flags as an unmocked request.
+vi.mock('~/shared/lib/messages/messages-realtime-service', () => ({
+  RECEIVE_MESSAGE_EVENT: 'ReceiveMessage',
+  MESSAGE_READ_EVENT: 'MessageRead',
+  resolveMessagesHubUrl: () => '/hubs/messages',
+  createMessagesRealtimeConnection: () => ({
+    on: vi.fn(),
+    off: vi.fn(),
+    start: vi.fn().mockResolvedValue(undefined),
+    stop: vi.fn().mockResolvedValue(undefined),
+  }),
+}));
+
 vi.mock('~/shared/lib/messages/messages-http-service', () => ({
   messagesHttpService: {
     getConversations: getConversationsMock,
