@@ -22,6 +22,7 @@ using Domain.Entities.Orders;
 using Domain.Entities.OrderItems;
 using Domain.Entities.OrderPayments;
 using Domain.Entities.ChannelExchangeRates;
+using Domain.Entities.Messages;
 using Domain.Entities.ProductCategories;
 using Domain.Entities.Products;
 using Domain.Entities.InventoryEntryCosts;
@@ -143,19 +144,21 @@ namespace Infrastructure.Persistence.Contexts
             builder.ApplyConfiguration(new StorePlanEntityTypeConfiguration(this));
             builder.ApplyConfiguration(new StorePlanModuleEntityTypeConfiguration(this));
             builder.ApplyConfiguration(new ChannelExchangeRateEntityTypeConfiguration(this));
+            builder.ApplyConfiguration(new MessageEntityTypeConfiguration());
+            builder.ApplyConfiguration(new ConversationEntityTypeConfiguration());
 
         }
         internal DbSet<Tenant> Tenant { get; set; }
-        internal DbSet<User> User { get; set; }
+        public DbSet<User> User { get; set; }
         internal DbSet<OutboxMessage> OutboxMessage { get; set; }
         internal DbSet<Feature> Feature { get; set; }
         internal DbSet<Module> Module { get; set; }
         internal DbSet<Role> Role { get; set; }
-        internal DbSet<Store> Store { get; set; }
+        public DbSet<Store> Store { get; set; }
         internal DbSet<StoreRoleFeature> StoreRoleFeature { get; set; }
         internal DbSet<StoreModule> StoreModule { get; set; }
         internal DbSet<UserRole> UserRole { get; set; }
-        internal DbSet<Owner> Owner { get; set; }
+        public DbSet<Owner> Owner { get; set; }
         internal DbSet<StoreUser> StoreUser { get; set; }
         internal DbSet<StorePayment> StorePayment { get; set; }
         internal DbSet<StorePaymentStatus> StorePaymentStatus { get; set; }
@@ -173,5 +176,7 @@ namespace Infrastructure.Persistence.Contexts
         internal DbSet<StorePlan> StorePlan { get; set; }
         internal DbSet<StorePlanModule> StorePlanModule { get; set; }
         internal DbSet<ChannelExchangeRate> ChannelExchangeRate { get; set; }
+        public DbSet<Message> Messages { get; set; }
+        public DbSet<Conversation> Conversations { get; set; }
     }
 }
