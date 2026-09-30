@@ -10,8 +10,9 @@ import { DataResult } from './result';
  *
  * Integer math only: amounts are integer CENTS (2dp) and rates are integer
  * MILLIONTHS (6dp, value * 1e6). `divideHalfUp` is the ONLY rounding and runs
- * once at the end of each conversion, so no intermediate float artifact leaks
- * into a result.
+ * exactly ONCE per conversion, over the whole USD pivot — never once per hop —
+ * so no intermediate float or intermediate rounding artifact leaks into a
+ * result.
  *
  * Cascade (ratified decision 4): exact channel → same currency (any method) →
  * synthetic USD pivot (value 1e6, never replicated as a persisted row) → typed
@@ -220,18 +221,19 @@ export function convertPaymentAmount(
   if (!source.succeeded) return rateNotFound<number>();
   if (!target.succeeded) return rateNotFound<number>();
 
-  // Cross-currency conversion via USD pivot:
-  // - Converting FROM a non-USD currency: divide by buyValue (bank buys the source currency)
-  // - Converting TO a non-USD currency: multiply by sellValue (bank sells the target currency)
-  const amountInUsd = Number(currency) === Number(Currency.USD)
-    ? amountCents
-    : divideHalfUp(amountCents * RATE_MICRO, source.data!.buyValue);
+  // Cross-currency conversion via USD pivot, collapsed into ONE division so
+  // `divideHalfUp` runs exactly once (RF-08). A non-USD source divides by
+  // buyValue (the bank buys the source currency); a non-USD target multiplies
+  // by sellValue (the bank sells the target currency). Rounding at the USD hop
+  // and again at the target hop would round twice and drift from the exact
+  // value — e.g. 1 cent EUR at EUR=2 / CUP=3 must be 2, not 3.
+  const sourceIsUsd = Number(currency) === Number(Currency.USD);
+  const targetIsUsd = Number(toCurrency) === Number(Currency.USD);
 
-  const result = Number(toCurrency) === Number(Currency.USD)
-    ? amountInUsd
-    : divideHalfUp(amountInUsd * target.data!.sellValue, RATE_MICRO);
+  const numerator = targetIsUsd ? amountCents * RATE_MICRO : amountCents * target.data!.sellValue;
+  const denominator = sourceIsUsd ? RATE_MICRO : source.data!.buyValue;
 
-  return success(result);
+  return success(divideHalfUp(numerator, denominator));
 }
 
 /**
@@ -256,16 +258,13 @@ export function convertLineAmount(
   if (!source.succeeded) return rateNotFound<number>();
   if (!target.succeeded) return rateNotFound<number>();
 
-  // Cross-currency conversion via USD pivot:
-  // - Converting FROM a non-USD currency: divide by buyValue (bank buys the source currency)
-  // - Converting TO a non-USD currency: multiply by sellValue (bank sells the target currency)
-  const amountInUsd = Number(fromCurrency) === Number(Currency.USD)
-    ? amountCents
-    : divideHalfUp(amountCents * RATE_MICRO, source.data!.buyValue);
+  // Same single-rounding collapse as `convertPaymentAmount` (RF-08/RF-09):
+  // one `divideHalfUp` over the whole USD pivot, never one per hop.
+  const sourceIsUsd = Number(fromCurrency) === Number(Currency.USD);
+  const targetIsUsd = Number(toCurrency) === Number(Currency.USD);
 
-  const result = Number(toCurrency) === Number(Currency.USD)
-    ? amountInUsd
-    : divideHalfUp(amountInUsd * target.data!.sellValue, RATE_MICRO);
+  const numerator = targetIsUsd ? amountCents * RATE_MICRO : amountCents * target.data!.sellValue;
+  const denominator = sourceIsUsd ? RATE_MICRO : source.data!.buyValue;
 
-  return success(result);
+  return success(divideHalfUp(numerator, denominator));
 }
