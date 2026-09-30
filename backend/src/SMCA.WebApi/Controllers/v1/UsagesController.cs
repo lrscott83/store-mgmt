@@ -21,20 +21,24 @@ namespace SMCA.WebApi.Controllers.v1
             return Ok(await Sender.Send(command));
         }
 
+        // "today" is the viewer's own local calendar day, required. The window is anchored
+        // there instead of on UtcNow so a dashboard behind UTC is not shifted a day forward
+        // during the evening hours. Validated by GetStoreLastUsagesQueryValidator (400 + code
+        // "Today" when missing or malformed).
         [HttpGet("stores-last-week")]
         [ProducesResponseType(typeof(ResponseResult<StoreUsagesDto>), StatusCodes.Status200OK)]
         [HasPermission(StoreRoleFeatures.SuperAdmin)]
-        public async Task<IActionResult> GetStoreLastWeekUsagesQueryAsync()
+        public async Task<IActionResult> GetStoreLastWeekUsagesQueryAsync([FromQuery] string? today)
         {
-            return Ok(await Sender.Send(new GetStoreLastUsagesQuery(7)));
+            return Ok(await Sender.Send(new GetStoreLastUsagesQuery(7, today)));
         }
 
         [HttpGet("stores-last-month")]
         [ProducesResponseType(typeof(ResponseResult<StoreUsagesDto>), StatusCodes.Status200OK)]
         [HasPermission(StoreRoleFeatures.SuperAdmin)]
-        public async Task<IActionResult> GetStoreLastMonthUsagesQueryAsync()
+        public async Task<IActionResult> GetStoreLastMonthUsagesQueryAsync([FromQuery] string? today)
         {
-            return Ok(await Sender.Send(new GetStoreLastUsagesQuery(30)));
+            return Ok(await Sender.Send(new GetStoreLastUsagesQuery(30, today)));
         }
     }
 }

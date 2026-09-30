@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useIntl } from 'react-intl';
 import { EModules } from '@store-mgmt/domain';
 import { ownerModuleLoader } from '~/auth/routes/loaders';
 import { Button } from '~/shared/components/ui/button';
 import { Card } from '~/shared/components/ui/card';
+import { ChevronDownIcon } from '~/shared/components/ui/icons';
 import { InfoBox } from '~/shared/components/ui/info-box';
 import { Spinner } from '~/shared/components/ui/spinner';
 import { showBlockingError } from '~/shared/lib/blocking-alert';
@@ -31,6 +32,45 @@ export const clientLoader = ownerModuleLoader(EModules.WebCatalog);
 function formatSyncedAt(value: string): string {
   const hasZone = /[zZ]$|[+-]\d{2}:\d{2}$/.test(value);
   return new Date(hasZone ? value : `${value}Z`).toLocaleString('es-ES');
+}
+
+/**
+ * Panel colapsable de una categoría: mismos semántica y patrón que el listado de Productos
+ * (`products.tsx`) — colapsado por defecto, cuerpo montado solo cuando está expandido y chevron
+ * que rota con el estado.
+ */
+function CategoryPanelCard({
+  id,
+  name,
+  count,
+  children,
+}: {
+  id: string;
+  name: string;
+  count: number;
+  children: ReactNode;
+}) {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  return (
+    <Card
+      padding="tight"
+      title={
+        <button
+          type="button"
+          onClick={() => setIsExpanded((value) => !value)}
+          className="flex w-full items-center justify-between gap-2 text-left"
+          aria-expanded={isExpanded}
+          data-testid={`catalog-category-toggle-${id}`}
+        >
+          <span>{`${name} (${count})`}</span>
+          <ChevronDownIcon isExpanded={isExpanded} className="text-text-muted" />
+        </button>
+      }
+    >
+      {isExpanded && <div className="space-y-3">{children}</div>}
+    </Card>
+  );
 }
 
 /**
@@ -82,13 +122,16 @@ export function WebCatalogPage() {
 
   /** Productos agrupados por categoría, conservando el orden que ya trae el backend. */
   const groups = useMemo(() => {
-    const grouped = new Map<string, { name: string; products: CatalogProductView[] }>();
+    const grouped = new Map<
+      string,
+      { name: string; products: CatalogProductView[] }
+    >();
     for (const product of products) {
       const group = grouped.get(product.categoryId) ?? { name: product.categoryName, products: [] };
       group.products.push(product);
       grouped.set(product.categoryId, group);
     }
-    return [...grouped.values()];
+    return [...grouped.entries()].map(([key, group]) => ({ key, ...group }));
   }, [products]);
 
   async function handleSync() {
@@ -169,36 +212,43 @@ export function WebCatalogPage() {
     }
   }
 
-  function handleSaveFields(productId: string, fields: CatalogProductFields) {
-    void runProductAction(productId, async () => {
-      const result = await catalogHttpService.saveProductFields(productId, fields);
-      if (!result.succeeded) {
-        showBlockingError(
-          intl.formatMessage({ id: 'GENERAL.ERROR' }),
-          intl.formatMessage({ id: 'WEB_CATALOG.SAVE_ERROR' }),
-        );
-        return;
+  /**
+   * Guardar de un producto: sube PRIMERO la imagen retenida (si hay) y después guarda los
+   * campos enviados. Seleccionar la imagen no toca la red — todo ocurre aquí, al pulsar
+   * Guardar. La primera imagen de un producto sin principal pasa a serlo: es lo que el Owner
+   * espera al subirla desde el bloque "Imagen".
+   */
+  function handleSaveProduct(product: CatalogProductView, fields: CatalogProductFields, image: File | null) {
+    void runProductAction(product.id, async () => {
+      let imageKey: string | null = null;
+      if (image) {
+        const uploaded = await catalogHttpService.uploadImage(product.id, image);
+        if (!uploaded.succeeded) {
+          showBlockingError(
+            intl.formatMessage({ id: 'GENERAL.ERROR' }),
+            intl.formatMessage({ id: 'WEB_CATALOG.UPLOAD_ERROR' }),
+          );
+          return;
+        }
+        imageKey = uploaded.data;
+      }
+
+      const fieldsToSend: CatalogProductFields = { ...fields };
+      if (imageKey && !product.image) fieldsToSend.image = imageKey;
+
+      // Con los campos de actualización comentados, Guardar sin imagen nueva no tiene nada que
+      // enviar: se evita el PUT vacío.
+      if (Object.keys(fieldsToSend).length > 0) {
+        const result = await catalogHttpService.saveProductFields(product.id, fieldsToSend);
+        if (!result.succeeded) {
+          showBlockingError(
+            intl.formatMessage({ id: 'GENERAL.ERROR' }),
+            intl.formatMessage({ id: 'WEB_CATALOG.SAVE_ERROR' }),
+          );
+          return;
+        }
       }
       showToastSuccess(intl.formatMessage({ id: 'WEB_CATALOG.SAVED' }));
-      await loadData();
-    });
-  }
-
-  function handleUploadImage(product: CatalogProductView, file: File) {
-    void runProductAction(product.id, async () => {
-      const uploaded = await catalogHttpService.uploadImage(product.id, file);
-      if (!uploaded.succeeded) {
-        showBlockingError(
-          intl.formatMessage({ id: 'GENERAL.ERROR' }),
-          intl.formatMessage({ id: 'WEB_CATALOG.UPLOAD_ERROR' }),
-        );
-        return;
-      }
-      // La primera imagen de un producto sin principal pasa a serlo: es lo que el Owner espera al
-      // subirla desde el bloque "Imagen principal".
-      if (!product.image) {
-        await catalogHttpService.saveProductFields(product.id, { image: uploaded.data });
-      }
       await loadData();
     });
   }
@@ -316,23 +366,20 @@ export function WebCatalogPage() {
 
       {!isLoading &&
         groups.map((group) => (
-          <Card key={group.name} padding="tight" title={`${group.name} (${group.products.length})`}>
-            <div className="space-y-3">
-              {group.products.map((product) => (
-                <CatalogProductEditor
-                  key={product.id}
-                  product={product}
-                  storeSlug={status?.storeSlug ?? ''}
-                  busy={busyProductId === product.id}
-                  onSave={(fields) => handleSaveFields(product.id, fields)}
-                  onUploadImage={(file) => handleUploadImage(product, file)}
-                  onRemoveImage={(path) => handleRemoveImage(product.id, path)}
-                  onSetMainImage={(key) => handleSaveFields(product.id, { image: key })}
-                  onReorderImages={(paths) => handleReorderImages(product.id, paths)}
-                />
-              ))}
-            </div>
-          </Card>
+          <CategoryPanelCard key={group.key} id={group.key} name={group.name} count={group.products.length}>
+            {group.products.map((product) => (
+              <CatalogProductEditor
+                key={product.id}
+                product={product}
+                storeSlug={status?.storeSlug ?? ''}
+                busy={busyProductId === product.id}
+                onSave={(fields, image) => handleSaveProduct(product, fields, image)}
+                onRemoveImage={(path) => handleRemoveImage(product.id, path)}
+                onSetMainImage={(key) => handleSaveProduct(product, { image: key }, null)}
+                onReorderImages={(paths) => handleReorderImages(product.id, paths)}
+              />
+            ))}
+          </CategoryPanelCard>
         ))}
     </div>
   );

@@ -10,6 +10,11 @@ import type {
   StoreToCollect,
   ReSellerCommission,
   SwitchMyStoreResult,
+  StoreModulePricingPayload,
+  StoreModulePricingResult,
+  StoreModulePricingReadResult,
+  ModuleCatalogPricingPayload,
+  ModuleCatalogPricingResult,
 } from '@store-mgmt/domain';
 import { apiClient } from '~/shared/lib/http/api-client';
 
@@ -149,6 +154,47 @@ export const storeHttpService = {
     return response.data;
   },
 
+  /**
+   * SuperAdmin authors ONE store's own module pricing (PUT
+   * /v1/stores/{storeId}/module-pricing). `modules` must be the COMPLETE set the
+   * operator was shown — every active, AvailableToStore module — because that
+   * completeness is what makes "unticked" actionable: a ticked row is activated
+   * (inserted or reactivated) and priced, an unticked row is deactivated (a soft
+   * flag, never a delete), and a module OMITTED from the payload is left untouched.
+   * The backend is SuperAdmin-only (403 for everyone else, owners included) and never
+   * reads catalog prices as the store's price. Returns the saved state of every
+   * submitted row plus the total over the ticked rows.
+   */
+  async updateStoreModulePricing(
+    id: string,
+    modules: StoreModulePricingPayload[],
+  ): Promise<BaseResponseModel<StoreModulePricingResult>> {
+    const response = await apiClient.put<BaseResponseModel<StoreModulePricingResult>>(
+      `/v1/stores/${id}/module-pricing`,
+      { modules },
+    );
+    return response.data;
+  },
+
+  /**
+   * Seed for the per-store module pricing editor (GET /v1/stores/{storeId}/module-pricing).
+   * One row per module that is active and available to stores — the same universe, from the
+   * same backend call, as `getModulesToStore()`, and the exact list `updateStoreModulePricing`
+   * expects as its payload. A row carries the store's own `isActive` and stored prices when a
+   * StoreModule exists (inactive rows included), and `isActive: false` seeded with the live
+   * catalog prices when it does not.
+   *
+   * Prefer this over `store.modules[]` for anything editable: the backend's
+   * `StoreModule -> ModuleDto` map drops DiscountPrice/PercentDiscountPrice, so nested modules
+   * report 0 for both. SuperAdmin-only, like the save.
+   */
+  async getStoreModulePricing(id: string): Promise<BaseResponseModel<StoreModulePricingReadResult>> {
+    const response = await apiClient.get<BaseResponseModel<StoreModulePricingReadResult>>(
+      `/v1/stores/${id}/module-pricing`,
+    );
+    return response.data;
+  },
+
   async approveStore(id: string): Promise<BaseResponseModel<boolean>> {
     const response = await apiClient.post<BaseResponseModel<boolean>>('/v1/stores/approve', { id });
     return response.data;
@@ -163,6 +209,30 @@ export const storeHttpService = {
 
   async getModulesToStore(): Promise<BaseResponseModel<Module[]>> {
     const response = await apiClient.get<BaseResponseModel<Module[]>>('/v1/modules/ToStore');
+    return response.data;
+  },
+
+  /**
+   * SuperAdmin authors the GLOBAL module catalog prices (PUT /v1/modules/pricing): the
+   * base price, the flat discount and the percent discount of every module in one save.
+   *
+   * Distinct from `updateStoreModulePricing`: that one writes frozen per-store copies on
+   * `StoreModule` rows and never reads the catalog as a store's price, so editing the
+   * catalog can never silently reprice a store. The payload is the COMPLETE table the
+   * editor showed — `GET /v1/modules/ToStore` already returns exactly the active,
+   * AvailableToStore universe, and a module id the backend does not know aborts the WHOLE
+   * save rather than applying it partially. SuperAdmin-only (403 for everyone else).
+   *
+   * Returns the saved state of every submitted row plus the total over the whole table,
+   * with `currentPrice` recomputed by the backend's shared formula.
+   */
+  async updateModulePricing(
+    modules: ModuleCatalogPricingPayload[],
+  ): Promise<BaseResponseModel<ModuleCatalogPricingResult>> {
+    const response = await apiClient.put<BaseResponseModel<ModuleCatalogPricingResult>>(
+      '/v1/modules/pricing',
+      { modules },
+    );
     return response.data;
   },
 

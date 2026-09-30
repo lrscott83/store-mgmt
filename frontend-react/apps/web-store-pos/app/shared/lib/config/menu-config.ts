@@ -94,6 +94,18 @@ export const MENU_GROUPS: MenuGroup[] = [
         helpContent:
           'Bandeja de mensajes. Conversa con los propietarios de las tiendas, responde sus consultas y envía difusiones a todos los propietarios.',
       },
+      // Global module catalog pricing (PUT /v1/modules/pricing). SuperAdmin-only by
+      // construction: no StoreRoleFeatures entry backs a catalog-pricing capability, so
+      // the item carries no featureIds and gates on `rolesOnly`, mirroring the route's
+      // superAdminLoader. Nobody else can reach the page or the endpoint.
+      {
+        label: 'MENU.MODULES',
+        path: '/admin/modules',
+        moduleId: EModules.Administration,
+        rolesOnly: (user) => user.isSuperAdmin,
+        helpContent:
+          'Precios de los módulos. Edita el precio, el descuento y el descuento porcentual de cada módulo del catálogo, agrupados por plan. Los cambios se aplican a todo el sistema: los módulos con descuento muestran el precio base tachado y el precio final.',
+      },
       // Billing (Cobros pendientes + Comisiones): routes gated by
       // resellerFeatureLoader([EFeatures.StorePayment]) — SuperAdmin or
       // ReSeller only. rolesOnly mirrors that role set so the menu never

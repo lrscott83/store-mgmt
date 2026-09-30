@@ -18,6 +18,30 @@ export function formatMoneyWithCurrency(amount: number, currency?: number): stri
   return `${sign}${grouped}${decimals}\u00A0${currencyCode}`;
 }
 
+/**
+ * Puente `código de moneda -> valor del enum Currency`. El backend serializa el enum con
+ * `ToString()` ("CUP", "USD", …) en los DTOs del catálogo web; los formatters de aquí piden el
+ * valor del enum. Código desconocido/ausente vuelve a CUP (DEFAULT_CURRENCY).
+ */
+export function currencyFromCode(code?: string): Currency {
+  switch (code) {
+    case 'USD':
+      return Currency.USD;
+    case 'EUR':
+      return Currency.EUR;
+    case 'CLA':
+      return Currency.CLA;
+    case 'MLC':
+      return Currency.MLC;
+    case 'CAD':
+      return Currency.CAD;
+    case 'MXN':
+      return Currency.MXN;
+    default:
+      return Currency.CUP;
+  }
+}
+
 /** Currency code labels. CLA keeps its code as-is (product requirement). */
 export function currencyLabel(currency?: number): string {
   switch (currency) {

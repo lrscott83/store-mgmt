@@ -230,6 +230,7 @@ const messages: Record<string, string> = {
   'MENU.RESELLERS': 'Gestores',
   'MENU.FEATURES': 'Funcionalidades',
   'MENU.ADMIN_MESSAGES': 'Mensajes',
+  'MENU.MODULES': 'Módulos',
 
   // Menu items — Sales (Angular MENU.SALE_MGMT.*)
   'MENU.PRODUCTS': 'Catálogo Productos',
@@ -276,6 +277,10 @@ const messages: Record<string, string> = {
   'WEB_CATALOG.IS_NEW': 'Nuevo',
   'WEB_CATALOG.FINAL_PRICE': 'Precio final',
   'WEB_CATALOG.MAIN_IMAGE': 'Imagen principal',
+  // Vista WebCatalog: el bloque se llama solo "Imagen" por decisión del owner (2026-09-29);
+  // el texto "Imagen principal" (MAIN_IMAGE) vuelve más adelante.
+  'WEB_CATALOG.IMAGE': 'Imagen',
+  'WEB_CATALOG.WILL_BE_MAIN': 'quedará como imagen principal al guardar',
   'WEB_CATALOG.GALLERY': 'Otras imágenes',
   'WEB_CATALOG.GALLERY_LIMIT': 'Hasta {max} imágenes de {size} MB (jpg, png o webp).',
   'WEB_CATALOG.UPLOAD_IMAGE': 'Subir imagen',
@@ -684,6 +689,10 @@ const messages: Record<string, string> = {
   // Stage 2.3). NEW_ENTRY kept as-is (used only for the Today Entries add-entry button, whose
   // Angular counterpart is GENERAL.ENTRY, added separately above).
   'INVENTORY.AVAILABLE.TITLE': 'Inventario',
+  // 2026-09-29 (petición del owner): el textbox de búsqueda de Inventario Disponible
+  // pasa de "Buscar" a "Buscar producto" (deja claro qué se filtra) y lleva lupa
+  // al inicio. Sustituye a GENERAL.SEARCH solo en esta vista.
+  'INVENTORY.SEARCH_PRODUCT': 'Buscar producto',
   'INVENTORY.TODAY_ENTRIES.TITLE': 'Entradas del día',
   'INVENTORY.TODAY_ENTRIES.NEW_ENTRY': 'Nueva entrada',
   // 2026-09-18 (permiso del usuario): el header ahora es «Entradas (n)» — el
@@ -1087,6 +1096,46 @@ const messages: Record<string, string> = {
   'STORES.PLAN.NEXT_BILLING_DATE': 'Próximo cobro',
   'STORES.PLAN.ACTIVATE_PLAN': 'Activar Plan',
 
+  // Super-admin per-store module pricing (gear item + table). The grouping reuses the
+  // STORES.PLAN.*_TAB names; the last bucket holds modules no loaded plan carries (VIP-only,
+  // because GET /v1/plans excludes VIP) so every module in the table is still reachable.
+  'STORES.MODULE_PRICING.MENU_LABEL': 'Precios de módulos',
+  'STORES.MODULE_PRICING.TITLE': 'Precios de módulos',
+  'STORES.MODULE_PRICING.HINT':
+    'Marca un módulo para activarlo en esta tienda y desmarcalo para desactivarlo. El total solo cuenta los módulos marcados y se recalcula mientras escribes.',
+  'STORES.MODULE_PRICING.LOADING': 'Cargando módulos...',
+  'STORES.MODULE_PRICING.NO_MODULES': 'No hay módulos disponibles para esta tienda.',
+  'STORES.MODULE_PRICING.NO_PLAN_GROUP': 'Otros planes',
+  'STORES.MODULE_PRICING.COLUMN_ACTIVE': 'Activo',
+  'STORES.MODULE_PRICING.COLUMN_MODULE': 'Módulo',
+  'STORES.MODULE_PRICING.COLUMN_PRICE': 'Precio',
+  'STORES.MODULE_PRICING.COLUMN_DISCOUNT': 'Descuento',
+  'STORES.MODULE_PRICING.COLUMN_PERCENT_DISCOUNT': '% Descuento',
+  'STORES.MODULE_PRICING.COLUMN_CURRENT': 'Precio actual',
+  'STORES.MODULE_PRICING.TOTAL': 'Total',
+  'STORES.MODULE_PRICING.SERVER_TOTAL_NOTE':
+    'Total guardado por el servidor. Se recalcula al editar cualquier valor.',
+
+  // SuperAdmin GLOBAL module catalog pricing (/admin/modules). Distinct from
+  // STORES.MODULE_PRICING.* above, which prices one STORE's frozen copies. Grouping reuses
+  // the STORES.PLAN.*_TAB names; the last bucket holds modules no loaded plan claims.
+  'MODULE_CATALOG.TITLE': 'Precios de los módulos',
+  'MODULE_CATALOG.HINT':
+    'Edita el precio, el descuento y el descuento porcentual de cada módulo del catálogo. Si un módulo tiene descuento, su precio base aparece tachado y el precio final se recalcula mientras escribes. El total del plan suma los precios finales de sus módulos.',
+  'MODULE_CATALOG.LOADING': 'Cargando módulos...',
+  'MODULE_CATALOG.EMPTY': 'No hay módulos disponibles en el catálogo.',
+  'MODULE_CATALOG.NO_PLAN_GROUP': 'Otros planes',
+  'MODULE_CATALOG.COLUMN_MODULE': 'Módulo',
+  'MODULE_CATALOG.COLUMN_PRICE': 'Precio',
+  'MODULE_CATALOG.COLUMN_PERCENT_DISCOUNT': '% Descuento',
+  'MODULE_CATALOG.COLUMN_DISCOUNT': 'Descuento',
+  'MODULE_CATALOG.COLUMN_CURRENT': 'Precio final',
+  'MODULE_CATALOG.GROUP_TOTAL': 'Total del plan',
+  'MODULE_CATALOG.SAVE': 'Guardar',
+  'MODULE_CATALOG.SAVING': 'Guardando...',
+  'MODULE_CATALOG.SAVE_SUCCESS': 'Precios de los módulos actualizados correctamente.',
+  'MODULE_CATALOG.ERROR': 'No se pudieron guardar los precios de los módulos. Intente de nuevo.',
+
   // Super-admin store cards (2026-09-10): owner contact + description labels.
   // The plan line reuses the STORES.PLAN.*_TAB names; the phone renders as a tel: link.
   'STORES.OWNER_LABEL': 'Owner',
@@ -1320,6 +1369,9 @@ const messages: Record<string, string> = {
   'OWNER.EDIT_OWNER': 'Editar Propietario',
   'OWNER.STORE_PRICE_LABEL': '{count, plural, one {# tienda} other {# tiendas}}',
   'OWNER.DAYS_LEFT': '{count, plural, one {# día} other {# días}}',
+  // Card label for the owner's own account login. Deliberately the literal
+  // "Login", not USERS.LOGIN ("Usuario"), which labels a different field.
+  'OWNER.LOGIN_LABEL': 'Login',
   'OWNER.FILTER_LABEL': 'Mostrar:',
   'OWNER.FILTER_ALL': 'Todos',
   'OWNER.FILTER_NOT_FREE': 'No Gratis',

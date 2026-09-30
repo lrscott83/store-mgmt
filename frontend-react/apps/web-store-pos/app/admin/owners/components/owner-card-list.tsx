@@ -116,6 +116,11 @@ export function OwnerCardList({ owners, onEdit, onDelete }: OwnerCardListProps) 
                   {': '}
                   {owner.reSellerName || 'ADMIN'}
                 </p>
+                <p className="text-sm text-text-muted">
+                  {intl.formatMessage({ id: 'OWNER.LOGIN_LABEL' })}
+                  {': '}
+                  {owner.login}
+                </p>
                 <p className="text-sm text-text-muted">{owner.cellPhone}</p>
                 {owner.description && (
                   <p className="text-sm text-text-muted">{owner.description}</p>

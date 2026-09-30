@@ -55,6 +55,7 @@ function makeOwner(overrides: Partial<Owner> = {}): Owner {
   return {
     id: 'o1',
     userId: 'u1',
+    login: 'jane',
     fullName: 'Jane Owner',
     cellPhone: '+53 5 123-4567',
     email: 'jane@example.com',
@@ -821,5 +822,76 @@ describe('OwnerCreatePage — FE-OC7: array-scan finds phone code past errors[0]
       expect(screen.getByRole('alert')).toHaveTextContent(esMessages['OWNER.PHONE_REQUIRED']);
     });
     expect(mockNavigate).not.toHaveBeenCalled();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Email is OPTIONAL (owner request 2026-09-29) — a ReSeller adding an owner often
+// has no email to give.
+//
+// The server never required it: CreateOwnerCommand.Email is `string?`, and
+// CreateOwnerCommandValidator only runs EmailAddress() inside
+// `When(x => !string.IsNullOrEmpty(x.Email))`. The ONLY thing that blocked an
+// owner with no email was the `required` attribute on the input — so THAT is
+// what these tests pin. The backend side is already covered end-to-end by
+// OwnersCreateGestorAutoAssignTests, whose body helper already sends email: null.
+//
+// NOTE on the payload test: jsdom does not enforce HTML5 constraint validation
+// on a dispatched submit, so `required` would NOT have blocked the submit there
+// even before the fix. That is exactly why the attribute assertions are the
+// real regression guard.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('OwnerCreatePage — email is optional', () => {
+  it('does not mark the email input required (ReSeller / Gestor actor)', async () => {
+    await renderPage(false);
+
+    expect(screen.getByLabelText(esMessages['GENERAL.EMAIL'])).not.toBeRequired();
+  });
+
+  it('does not mark the email input required for a SuperAdmin actor either', async () => {
+    await renderPage(true);
+
+    expect(screen.getByLabelText(esMessages['GENERAL.EMAIL'])).not.toBeRequired();
+  });
+
+  it('creates the owner with an empty email when the field is left blank', async () => {
+    const { ownerHttpService } = await import('~/admin/owners/lib/services/owner-http-service');
+    vi.mocked(ownerHttpService.createOwner).mockResolvedValue({
+      succeeded: true,
+      data: makeOwner(),
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
+
+    await renderPage(false);
+    fillValidForm();
+    // Clear the email fillValidForm() sets: an owner with no email at all.
+    fireEvent.change(screen.getByLabelText(esMessages['GENERAL.EMAIL']), { target: { value: '' } });
+
+    fireEvent.submit(
+      screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')!,
+    );
+
+    await waitFor(() => {
+      expect(ownerHttpService.createOwner).toHaveBeenCalledWith(
+        expect.objectContaining({
+          fullName: 'Jane Owner',
+          login: 'janeowner',
+          email: '',
+        }),
+      );
+      expect(mockNavigate).toHaveBeenCalledWith('/admin/owners');
+    });
+  });
+
+  it('keeps type="email", so a malformed email is still caught client-side', async () => {
+    await renderPage(false);
+
+    // Optional does NOT mean unvalidated: the format guard stays on the input
+    // and on the server (CreateOwnerCommandValidator -> EmailFormatInvalid,
+    // covered by OwnersCreateValidationTests).
+    expect(screen.getByLabelText(esMessages['GENERAL.EMAIL'])).toHaveAttribute('type', 'email');
   });
 });

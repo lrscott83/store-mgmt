@@ -136,6 +136,11 @@ export default [
     // Admin â€” Stores
     route('admin/stores', 'admin/stores/routes/store-list.tsx'),
 
+    // Admin â€” Global module catalog pricing (SuperAdmin only, superAdminLoader in the
+    // route module; the menu item gates the same role). Distinct from the per-STORE module
+    // pricing editor on /admin/stores: this one writes the Module catalog itself.
+    route('admin/modules', 'admin/modules/routes/module-catalog.tsx'),
+
     // Admin â€” Dashboard
     route('admin/dashboard', 'admin/dashboard/routes/dashboard.tsx'),
 

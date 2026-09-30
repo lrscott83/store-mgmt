@@ -255,12 +255,15 @@ export function OwnerCreatePage() {
           <label htmlFor="email" className="block text-sm font-medium text-gray-700">
             {intl.formatMessage({ id: 'GENERAL.EMAIL' })}
           </label>
+          {/* Email is OPTIONAL (2026-09-29, owner request): the ReSeller that adds an
+              owner often has no email to give. The server never required it either —
+              CreateOwnerCommandValidator only checks the FORMAT when a value arrives —
+              so this `required` was the only thing blocking an owner with no email. */}
           <input
             id="email"
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            required
             className="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>

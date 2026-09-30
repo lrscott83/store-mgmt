@@ -6,7 +6,7 @@ import { InfoBox } from '~/shared/components/ui/info-box';
 import { Modal } from '~/shared/components/ui/modal';
 import { Spinner } from '~/shared/components/ui/spinner';
 import { SearchIcon } from '~/shared/components/ui/icons';
-import { formatCurrency } from '~/shared/lib/format-currency';
+import { currencyFromCode, formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency';
 import { isNetworkError } from '~/shared/lib/http/http-error';
 import { apiFileUrl } from '~/shared/lib/http/media-url';
 import {
@@ -293,12 +293,14 @@ export function PublicCatalogPage() {
                     {product.description}
                   </p>
                   <div className="mt-2 flex items-center gap-2">
+                    {/* Moneda como CÓDIGO (CUP/USD/…), nunca el símbolo $: cada producto lleva
+                        la suya. */}
                     <span className="text-lg font-bold text-primary">
-                      {formatCurrency(product.finalPrice)}
+                      {formatMoneyWithCurrency(product.finalPrice, currencyFromCode(product.currency))}
                     </span>
                     {product.hasDiscount && (
                       <span className="text-sm text-text-muted line-through">
-                        {formatCurrency(product.price)}
+                        {formatMoneyWithCurrency(product.price, currencyFromCode(product.currency))}
                       </span>
                     )}
                   </div>
@@ -409,16 +411,15 @@ export function PublicCatalogPage() {
                   -{detail.percentDiscount}%
                 </span>
               )}
-              <span className="text-xs text-text-muted">{detail.categoryName}</span>
             </div>
 
             <div className="flex items-center gap-3">
               <span className="text-2xl font-bold text-primary">
-                {formatCurrency(detail.finalPrice)}
+                {formatMoneyWithCurrency(detail.finalPrice, currencyFromCode(detail.currency))}
               </span>
               {detail.hasDiscount && (
                 <span className="text-lg text-text-muted line-through">
-                  {formatCurrency(detail.price)}
+                  {formatMoneyWithCurrency(detail.price, currencyFromCode(detail.currency))}
                 </span>
               )}
             </div>

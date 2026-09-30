@@ -6,6 +6,7 @@ import {
   Outlet,
   Scripts,
   ScrollRestoration,
+  useLocation,
   useNavigate,
 } from 'react-router';
 import type { Route } from './+types/root';
@@ -99,6 +100,11 @@ export default function App() {
   const navigate = useNavigate();
   const isLoading = useLoadingStore((state) => state.isLoading);
 
+  // El botón global "Instalar App" no se ofrece en el catálogo PÚBLICO (`/catalog/<slug>`): ahí
+  // el visitante es un cliente anónimo de la tienda, no un usuario del POS.
+  const { pathname } = useLocation();
+  const showInstallButton = !pathname.startsWith('/catalog/');
+
   // Mirrors Angular's `app.component.ts:57` — `setTimeout(() => updateService.init(), 5000)`:
   // the service-worker update flow (new-version prompt + 15-min poll) starts 5s after boot,
   // not immediately, so it doesn't compete with initial app startup.
@@ -136,8 +142,10 @@ export default function App() {
           hosted by AppComponent, which renders <router-outlet> for the WHOLE
           app (landing, login, register, and every authenticated route). This
           root is RR7's true equivalent of AppComponent, so it must mount here
-          — not in app-layout.tsx, which only wraps authenticated routes. */}
-      <InstallAppButton />
+          — not in app-layout.tsx, which only wraps authenticated routes.
+          EXCEPCIÓN: oculto en /catalog/* — el catálogo público es para clientes
+          finales de la tienda, no se les ofrece instalar la app del POS. */}
+      {showInstallButton && <InstallAppButton />}
       {/* DEMO-SEED: 90-day data generator (orders + expenses). Available in all
           builds; visibility is gated inside the component to the lrscott login
           (and to a selected store). */}
