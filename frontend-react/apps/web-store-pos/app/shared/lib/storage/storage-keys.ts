@@ -49,4 +49,6 @@ export const BUSINESS_ENTITY_NAMES = [
   // makes `entity-migration` encrypt it, `store-data-reset` wipe it and
   // `damaged-data-recovery` report it.
   'storePaymentMethods',
+  // owner-messaging (T8): offline-queued text messages, flushed on reconnect.
+  'messagesQueue',
 ] as const;

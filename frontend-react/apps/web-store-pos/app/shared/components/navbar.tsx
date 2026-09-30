@@ -4,6 +4,7 @@ import { Link, useLocation, useNavigate } from 'react-router';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { useClickOutside } from '~/shared/lib/hooks/use-click-outside';
 import { CartShell } from './cart-shell';
+import { MessageShell } from './message-shell';
 import { StoreSwitcher } from './store-switcher';
 
 interface NavbarProps {
@@ -101,6 +102,8 @@ export function Navbar({ isSidebarOpen, onSidebarToggle }: NavbarProps) {
         </Link>
 
         <CartShell />
+
+        <MessageShell />
 
         {/* User dropdown — trigger is a plain person icon, matches Angular's header-user-profile */}
         <div className="relative" ref={userMenuRef}>

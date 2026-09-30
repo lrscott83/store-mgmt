@@ -229,6 +229,7 @@ const messages: Record<string, string> = {
   'MENU.OWNERS': 'Propietarios',
   'MENU.RESELLERS': 'Gestores',
   'MENU.FEATURES': 'Funcionalidades',
+  'MENU.ADMIN_MESSAGES': 'Mensajes',
 
   // Menu items — Sales (Angular MENU.SALE_MGMT.*)
   'MENU.PRODUCTS': 'Catálogo Productos',
@@ -1428,6 +1429,24 @@ const messages: Record<string, string> = {
   'MULTISTORE.NO_CREDITS_IN_RANGE': 'Sin créditos en el rango seleccionado',
   'MULTISTORE.NO_ENTRIES_IN_RANGE': 'Sin entradas en el rango seleccionado',
   'MULTISTORE.STORE_SELECT_ARIA': 'Seleccionar tienda',
+
+  // Owner messaging (owner↔SuperAdmin chat): header icon, collapsible panel and
+  // error toasts. No raw HTTP error text is ever shown.
+  'MESSAGES.TITLE': 'Mensajes',
+  'MESSAGES.EMPTY': 'No hay mensajes con el administrador.',
+  'MESSAGES.INPUT_PLACEHOLDER': 'Escriba un mensaje',
+  'MESSAGES.SEND': 'Enviar',
+  'MESSAGES.PENDING': 'Pendiente',
+  'MESSAGES.LOAD_ERROR': 'No se pudieron cargar los mensajes. Intente de nuevo.',
+  'MESSAGES.SEND_ERROR': 'No se pudo enviar el mensaje. Intente de nuevo.',
+  'MESSAGES.LIST_EMPTY': 'No hay conversaciones.',
+  'MESSAGES.SELECT_CONVERSATION': 'Seleccione una conversación para ver los mensajes.',
+  'MESSAGES.BROADCAST': 'Difusión',
+  'MESSAGES.BROADCAST_TITLE': 'Enviar difusión',
+  'MESSAGES.BROADCAST_PLACEHOLDER': 'Escriba el mensaje para todos los propietarios',
+  'MESSAGES.BROADCAST_SEND': 'Enviar difusión',
+  'MESSAGES.BROADCAST_SUCCESS': 'Difusión enviada.',
+  'MESSAGES.BROADCAST_ERROR': 'No se pudo enviar la difusión. Intente de nuevo.',
 };
 
 export default messages;

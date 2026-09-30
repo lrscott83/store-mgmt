@@ -139,6 +139,9 @@ export default [
     // Admin â€” Dashboard
     route('admin/dashboard', 'admin/dashboard/routes/dashboard.tsx'),
 
+    // Admin â€” Messages (SuperAdmin-only ownerâ†”admin inbox)
+    route('admin/messages', 'admin/messages/routes/messages.tsx'),
+
     // Admin â€” Resellers
     route('admin/resellers', 'admin/resellers/routes/reseller-list.tsx'),
     route('admin/resellers/create', 'admin/resellers/routes/reseller-create.tsx'),

@@ -664,3 +664,23 @@ export function SearchIcon({ className = '' }: IconProps) {
     </svg>
   );
 }
+
+/** Heroicons `chat-bubble-left-right` — owner↔SuperAdmin messaging entry point in the header. */
+export function ChatIcon({ className = '' }: IconProps) {
+  return (
+    <svg
+      className={`${BASE} ${className}`.trim()}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      aria-hidden="true"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M20.25 8.511c.884.284 1.5 1.128 1.5 2.097v4.286c0 1.136-.847 2.1-1.98 2.193-.34.027-.68.052-1.02.072v3.091l-3-3c-1.354 0-2.694-.055-4.02-.163a2.115 2.115 0 01-.825-.242m9.345-8.334a2.126 2.126 0 00-.476-.095 48.64 48.64 0 00-8.048 0c-1.131.094-1.976 1.057-1.976 2.192v4.286c0 .837.46 1.58 1.155 1.951m9.345-8.334V6.637c0-1.621-1.152-3.026-2.76-3.235A48.455 48.455 0 0012 3.25c-2.115 0-4.191.135-6.215.396C4.177 3.856 3.025 5.261 3.025 6.882v4.286c0 1.136.845 2.099 1.976 2.192.415.034.83.066 1.246.094m0 0c.393.026.786.05 1.18.07v3.091l3-3c1.354 0 2.693-.055 4.02-.163"
+      />
+    </svg>
+  );
+}

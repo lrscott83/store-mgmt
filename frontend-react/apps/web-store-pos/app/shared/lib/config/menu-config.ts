@@ -84,6 +84,16 @@ export const MENU_GROUPS: MenuGroup[] = [
         helpContent:
           'Administra las funcionalidades disponibles del sistema. Desde aquí puedes activar o desactivar módulos y funciones para las tiendas.',
       },
+      // Mensajes (buzón propietario↔SuperAdmin): la ruta usa superAdminLoader,
+      // así que el rolesOnly la ofrece solo al SuperAdmin.
+      {
+        label: 'MENU.ADMIN_MESSAGES',
+        path: '/admin/messages',
+        moduleId: EModules.Administration,
+        rolesOnly: (user) => user.isSuperAdmin,
+        helpContent:
+          'Bandeja de mensajes. Conversa con los propietarios de las tiendas, responde sus consultas y envía difusiones a todos los propietarios.',
+      },
       // Billing (Cobros pendientes + Comisiones): routes gated by
       // resellerFeatureLoader([EFeatures.StorePayment]) — SuperAdmin or
       // ReSeller only. rolesOnly mirrors that role set so the menu never
