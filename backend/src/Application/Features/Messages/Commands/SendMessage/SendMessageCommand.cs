@@ -1,5 +1,7 @@
+using System.Net;
 using Application.Abstractions.HttpContext;
 using Application.Abstractions.Messaging;
+using Application.Exceptions;
 using Application.Features.Messages.Queries.GetMessages;
 using Application.ResponseModels;
 using Domain.Common.Enums;
@@ -29,14 +31,14 @@ public class SendMessageCommandHandler : ICommandHandler<SendMessageCommand, Mes
         var isSuperAdmin = _httpContextService.IsSuperAdmin;
 
         if (string.IsNullOrWhiteSpace(command.Content))
-            throw new ArgumentException("Content is required");
+            throw new ValidationException("Content is required");
 
         var conversation = await _messageRepository.GetConversationAsync(command.ConversationId, cancellationToken);
 
         if (conversation == null)
         {
             if (command.StoreId == Guid.Empty)
-                throw new ArgumentException("StoreId is required to start a new conversation");
+                throw new ValidationException("StoreId is required to start a new conversation");
 
             var owner = await _messageRepository.GetSuperAdminIdAsync(cancellationToken);
 
@@ -47,7 +49,7 @@ public class SendMessageCommandHandler : ICommandHandler<SendMessageCommand, Mes
         }
 
         if (!isSuperAdmin && conversation.OwnerId != currentUserId)
-            throw new UnauthorizedAccessException();
+            throw new ApiException("Forbidden", HttpStatusCode.Forbidden);
 
         var recipientId = isSuperAdmin ? conversation.OwnerId : await _messageRepository.GetSuperAdminIdAsync(cancellationToken);
         var senderType = isSuperAdmin ? MessageSenderType.SuperAdmin : MessageSenderType.Owner;

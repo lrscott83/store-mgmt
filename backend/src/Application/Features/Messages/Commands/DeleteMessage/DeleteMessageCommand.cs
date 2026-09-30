@@ -33,7 +33,7 @@ public class DeleteMessageCommandHandler : ICommandHandler<DeleteMessageCommand>
             throw new UnauthorizedAccessException();
 
         message.SoftDelete(currentUserId);
-        await _messageRepository.AddMessageAsync(message, cancellationToken);
+        await _messageRepository.UpdateMessageAsync(message, cancellationToken);
 
         return ResponseResult.Success(true);
     }
