@@ -1173,6 +1173,12 @@ const messages: Record<string, string> = {
   'CHANNEL_RATES.METHOD_LABEL': 'Método de pago',
   'CHANNEL_RATES.CURRENCY_LABEL': 'Moneda',
   'CHANNEL_RATES.VALUE_LABEL': 'Valor (unidades por 1 USD)',
+  'CHANNEL_RATES.BUY_VALUE_LABEL': 'Valor de compra (unidades por 1 USD)',
+  'CHANNEL_RATES.SELL_VALUE_LABEL': 'Valor de venta (unidades por 1 USD)',
+  'CHANNEL_RATES.BUY_VALUE_HELP':
+    'Unidades de la moneda del canal por 1 USD cuando se compra la moneda.',
+  'CHANNEL_RATES.SELL_VALUE_HELP':
+    'Unidades de la moneda del canal por 1 USD cuando se vende la moneda.',
   'CHANNEL_RATES.EFFECTIVE_FROM_LABEL': 'Vigente desde',
   'CHANNEL_RATES.REGISTER': 'Registrar tasa',
   'CHANNEL_RATES.SAVED': 'Tasa registrada correctamente.',
@@ -1185,6 +1191,8 @@ const messages: Record<string, string> = {
   'CHANNEL_RATES.CHANNEL_COLUMN': 'Canal',
   'CHANNEL_RATES.CURRENCY_COLUMN': 'Moneda',
   'CHANNEL_RATES.VALUE_COLUMN': 'Valor',
+  'CHANNEL_RATES.BUY_VALUE_COLUMN': 'Compra',
+  'CHANNEL_RATES.SELL_VALUE_COLUMN': 'Venta',
   'CHANNEL_RATES.EFFECTIVE_FROM_COLUMN': 'Vigente desde',
   'CHANNEL_RATES.CREATED_DATE_COLUMN': 'Registrado',
   'CHANNEL_RATES.NO_RECORDS': 'No hay tasas registradas todavía.',

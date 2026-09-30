@@ -485,7 +485,8 @@ describe('ChannelRatesPage (multipayments) — deactivate (T19b)', () => {
     expect(await screen.findByTestId('channel-rate-current-empty')).toBeInTheDocument();
     // …while the append-only history still lists the row.
     expect(screen.getAllByTestId(/^channel-rate-row-/)).toHaveLength(1);
-    expect(screen.getByText('700')).toBeInTheDocument();
+    // Buy and sell are separate columns, so both values (700) are present.
+    expect(screen.getAllByText('700')).toHaveLength(2);
   });
 
   it('treats a stored row without isActive as active (backwards compatible)', async () => {
