@@ -16,11 +16,14 @@ public class SendMessageCommandHandler : ICommandHandler<SendMessageCommand, Mes
 {
     private readonly IHttpContextService _httpContextService;
     private readonly IMessageRepository _messageRepository;
+    private readonly IMessagePushService _messagePushService;
 
-    public SendMessageCommandHandler(IHttpContextService httpContextService, IMessageRepository messageRepository)
+    public SendMessageCommandHandler(IHttpContextService httpContextService, IMessageRepository messageRepository,
+        IMessagePushService messagePushService)
     {
         _httpContextService = httpContextService;
         _messageRepository = messageRepository;
+        _messagePushService = messagePushService;
     }
 
     public async Task<ResponseResult<MessageDto>> Handle(SendMessageCommand command, CancellationToken cancellationToken)
@@ -64,7 +67,7 @@ public class SendMessageCommandHandler : ICommandHandler<SendMessageCommand, Mes
         conversation.UpdateLastMessage(message.Content);
         await _messageRepository.UpdateConversationAsync(conversation, cancellationToken);
 
-        return ResponseResult.Success(new MessageDto
+        var messageDto = new MessageDto
         {
             Id = message.Id,
             ConversationId = message.ConversationId,
@@ -75,6 +78,11 @@ public class SendMessageCommandHandler : ICommandHandler<SendMessageCommand, Mes
             Content = message.Content,
             SentAt = message.SentAt,
             ReadAt = message.ReadAt
-        });
+        };
+
+        // Push only after the message is persisted.
+        await _messagePushService.NewMessageAsync(recipientId, messageDto, cancellationToken);
+
+        return ResponseResult.Success(messageDto);
     }
 }

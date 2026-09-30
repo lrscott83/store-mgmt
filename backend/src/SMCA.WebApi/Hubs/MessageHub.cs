@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 
@@ -8,31 +9,32 @@ public class MessageHub : Hub
 {
     public override async Task OnConnectedAsync()
     {
-        var userId = Context.User?.FindFirst("sub")?.Value;
-        if (!string.IsNullOrEmpty(userId))
+        var groupKey = ResolveGroupKey();
+        if (groupKey is not null)
         {
-            await Groups.AddToGroupAsync(Context.ConnectionId, userId);
+            await Groups.AddToGroupAsync(Context.ConnectionId, groupKey);
         }
         await base.OnConnectedAsync();
     }
 
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
-        var userId = Context.User?.FindFirst("sub")?.Value;
-        if (!string.IsNullOrEmpty(userId))
+        var groupKey = ResolveGroupKey();
+        if (groupKey is not null)
         {
-            await Groups.RemoveFromGroupAsync(Context.ConnectionId, userId);
+            await Groups.RemoveFromGroupAsync(Context.ConnectionId, groupKey);
         }
         await base.OnDisconnectedAsync(exception);
     }
 
-    public async Task SendMessageToUser(string userId, object message)
+    /// <summary>
+    /// Resolves the group key for the current connection from the authenticated
+    /// principal. See <see cref="MessageGroupKey"/> for why this is the
+    /// <see cref="ClaimTypes.NameIdentifier"/> claim rather than <c>sub</c>.
+    /// </summary>
+    private string? ResolveGroupKey()
     {
-        await Clients.Group(userId).SendAsync("ReceiveMessage", message);
-    }
-
-    public async Task MarkAsReadToUser(string userId, Guid messageId)
-    {
-        await Clients.Group(userId).SendAsync("MessageRead", messageId);
+        var externalId = Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        return Guid.TryParse(externalId, out var userId) ? MessageGroupKey.ForUserId(userId) : null;
     }
 }

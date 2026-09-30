@@ -1,4 +1,5 @@
 using Application.Abstractions.HttpContext;
+using Application.Abstractions.Messaging;
 using Application.Services.Tenants;
 using Application.Abstractions.Time;
 using Microsoft.AspNetCore.Authentication;
@@ -133,6 +134,7 @@ builder.Services.Configure<FormOptions>(o =>
 builder.Services.AddRouting(options => options.LowercaseUrls = true);
 
 builder.Services.AddSignalR();
+builder.Services.AddScoped<IMessagePushService, SignalRMessagePushService>();
 builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();

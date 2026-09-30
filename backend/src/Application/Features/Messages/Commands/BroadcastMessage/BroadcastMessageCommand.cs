@@ -1,5 +1,6 @@
 using Application.Abstractions.HttpContext;
 using Application.Abstractions.Messaging;
+using Application.Features.Messages.Queries.GetMessages;
 using Application.ResponseModels;
 using Domain.Common.Enums;
 using Domain.Common.Extensions;
@@ -15,11 +16,14 @@ public class BroadcastMessageCommandHandler : ICommandHandler<BroadcastMessageCo
 {
     private readonly IHttpContextService _httpContextService;
     private readonly IMessageRepository _messageRepository;
+    private readonly IMessagePushService _messagePushService;
 
-    public BroadcastMessageCommandHandler(IHttpContextService httpContextService, IMessageRepository messageRepository)
+    public BroadcastMessageCommandHandler(IHttpContextService httpContextService, IMessageRepository messageRepository,
+        IMessagePushService messagePushService)
     {
         _httpContextService = httpContextService;
         _messageRepository = messageRepository;
+        _messagePushService = messagePushService;
     }
 
     public async Task<ResponseResult> Handle(BroadcastMessageCommand command, CancellationToken cancellationToken)
@@ -60,6 +64,20 @@ public class BroadcastMessageCommandHandler : ICommandHandler<BroadcastMessageCo
                 await _messageRepository.AddMessageAsync(message, cancellationToken);
                 conversation.UpdateLastMessage(message.Content);
                 await _messageRepository.UpdateConversationAsync(conversation, cancellationToken);
+
+                // Push only after this message is persisted.
+                await _messagePushService.NewMessageAsync(ownerId, new MessageDto
+                {
+                    Id = message.Id,
+                    ConversationId = message.ConversationId,
+                    SenderId = message.SenderId,
+                    SenderType = message.SenderType,
+                    RecipientId = message.RecipientId,
+                    StoreId = message.StoreId,
+                    Content = message.Content,
+                    SentAt = message.SentAt,
+                    ReadAt = message.ReadAt
+                }, cancellationToken);
             }
         }
 

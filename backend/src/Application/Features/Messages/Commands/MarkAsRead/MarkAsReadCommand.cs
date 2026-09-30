@@ -13,11 +13,14 @@ public class MarkAsReadCommandHandler : ICommandHandler<MarkAsReadCommand>
 {
     private readonly IHttpContextService _httpContextService;
     private readonly IMessageRepository _messageRepository;
+    private readonly IMessagePushService _messagePushService;
 
-    public MarkAsReadCommandHandler(IHttpContextService httpContextService, IMessageRepository messageRepository)
+    public MarkAsReadCommandHandler(IHttpContextService httpContextService, IMessageRepository messageRepository,
+        IMessagePushService messagePushService)
     {
         _httpContextService = httpContextService;
         _messageRepository = messageRepository;
+        _messagePushService = messagePushService;
     }
 
     public async Task<ResponseResult> Handle(MarkAsReadCommand command, CancellationToken cancellationToken)
@@ -34,6 +37,10 @@ public class MarkAsReadCommandHandler : ICommandHandler<MarkAsReadCommand>
 
         message.MarkAsRead();
         await _messageRepository.AddMessageAsync(message, cancellationToken);
+
+        // Notify the original sender that the recipient read the message.
+        await _messagePushService.MessageReadAsync(
+            message.SenderId, message.ConversationId, message.Id, cancellationToken);
 
         return ResponseResult.Success(true);
     }
