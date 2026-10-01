@@ -1523,8 +1523,11 @@ const messages: Record<string, string> = {
   // The message was queued, not lost: the offline queue flushes it on reconnect.
   'MESSAGES.OFFLINE_QUEUED':
     'Sin conexión. El mensaje se enviará automáticamente cuando vuelva la conexión.',
-  'MESSAGES.LIST_EMPTY': 'No hay conversaciones.',
-  'MESSAGES.SELECT_CONVERSATION': 'Seleccione una conversación para ver los mensajes.',
+  'MESSAGES.LIST_EMPTY': 'No hay propietarios activos.',
+  'MESSAGES.SELECT_CONVERSATION':
+    'Seleccione un propietario para ver los mensajes.',
+  'MESSAGES.NO_CONVERSATION': 'Sin conversación',
+  'MESSAGES.NO_STORE': 'Sin tienda',
   'MESSAGES.BROADCAST': 'Difusión',
   'MESSAGES.BROADCAST_TITLE': 'Enviar difusión',
   'MESSAGES.BROADCAST_PLACEHOLDER': 'Escriba el mensaje para todos los propietarios',
