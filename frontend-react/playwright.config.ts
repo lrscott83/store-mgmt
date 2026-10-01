@@ -65,13 +65,23 @@ export default defineConfig({
   // con `globPatterns: []` (vite.config.ts, design D10) y no precachea nada —
   // el test fallaría por un motivo que no existe en producción (ver el
   // encabezado de cada spec).
+  //  //   `csp-enforcing-*.spec.ts` corren SOLO con `playwright.csp.config.ts`
+  //   (`vite preview` del build + header ENFORCING via E2E_CSP_ENFORCE=1).
+  //   Contra este dev server fallarían dos veces: no existe el header
+  //   enforcing, y el payload de hidratación del dev NO es el del build (ver el
+  //   encabezado del spec).
   //
-  // `csp-enforcing-*.spec.ts` corren SOLO con `playwright.csp.config.ts`
-  // (`vite preview` del build + header ENFORCING via E2E_CSP_ENFORCE=1).
-  // Contra este dev server fallarían dos veces: no existe el header
-  // enforcing, y el payload de hidratación del dev NO es el del build (ver el
-  // encabezado del spec).
-  testIgnore: ['**/offline-{shell,version-check}.spec.ts', '**/csp-enforcing-*.spec.ts'],
+  //   `precache-split.spec.ts` corre SOLO con `playwright.pwa.config.ts` por el
+  //   mismo motivo que offline-shell: inspecciona el manifest de precache del
+  //   service worker REAL del build, y aquí el SW está bloqueado
+  //   (`serviceWorkers: 'block'`) y el de dev no precachea nada
+  //   (`globPatterns: []`) — cada test moría en el poll de 30 s de
+  //   `waitForControlledServiceWorker` y sus retries bloqueaban workers.
+  testIgnore: [
+    '**/offline-{shell,version-check}.spec.ts',
+    '**/csp-enforcing-*.spec.ts',
+    '**/precache-split.spec.ts',
+  ],
 
   // Corre cada test en un worker propio para aprovechar el paralelismo local.
   fullyParallel: true,

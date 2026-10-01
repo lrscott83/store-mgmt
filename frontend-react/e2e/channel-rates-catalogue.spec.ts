@@ -108,7 +108,8 @@ test.describe.serial('channel-rates catalogue (módulo 16) — solo canales real
     // so the form is only reachable after opening it.
     await page.getByTestId('channel-rate-add').click();
     await expect(page.getByTestId('channel-rate-add-dialog')).toBeVisible();
-    await expect(page.getByTestId('channel-rate-value')).toBeVisible();
+    await expect(page.getByTestId('channel-rate-buy-value')).toBeVisible();
+    await expect(page.getByTestId('channel-rate-sell-value')).toBeVisible();
 
     // CUP offers only Efectivo + Transferencia (no Zelle).
     expect(await optionTexts(page, 'channel-rate-method')).toEqual([
@@ -128,10 +129,12 @@ test.describe.serial('channel-rates catalogue (módulo 16) — solo canales real
     await page.getByTestId('channel-rate-currency').selectOption('4'); // MLC
     expect(await optionTexts(page, 'channel-rate-method')).toEqual(['Transferencia (MLC)']);
 
-    // Register a rate for a NAMED channel: Transferencia (CUP).
+    // Register a rate for a NAMED channel: Transferencia (CUP). The buy/sell
+    // migration (ddd41489) split the single value into two inputs.
     await page.getByTestId('channel-rate-currency').selectOption('0'); // CUP
     await page.getByTestId('channel-rate-method').selectOption('2'); // Transferencia
-    await page.getByTestId('channel-rate-value').fill('50');
+    await page.getByTestId('channel-rate-buy-value').fill('50');
+    await page.getByTestId('channel-rate-sell-value').fill('50');
     await page.getByTestId('channel-rate-submit').click();
     await expect(page.getByTestId('channel-rate-saved')).toBeVisible();
 

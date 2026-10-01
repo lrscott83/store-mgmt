@@ -328,10 +328,14 @@ test.describe.serial('multipayments (módulo 16) — selector, tasas, multi-pago
     // T22: registration lives in the `+ Tasa` popup (the inline card is gone).
     await page.getByTestId('channel-rate-add').click();
     await expect(page.getByTestId('channel-rate-add-dialog')).toBeVisible();
-    await expect(page.getByTestId('channel-rate-value')).toBeVisible();
+    await expect(page.getByTestId('channel-rate-buy-value')).toBeVisible();
+    await expect(page.getByTestId('channel-rate-sell-value')).toBeVisible();
     await page.getByTestId('channel-rate-currency').selectOption(String(0)); // Currency.CUP
     await page.getByTestId('channel-rate-method').selectOption(String(0)); // Efectivo
-    await page.getByTestId('channel-rate-value').fill('100');
+    // The buy/sell migration (ddd41489) split the single value into two: the
+    // buy value is the one the conversion cascade consumes (currency → CUP).
+    await page.getByTestId('channel-rate-buy-value').fill('100');
+    await page.getByTestId('channel-rate-sell-value').fill('100');
     await page.getByTestId('channel-rate-submit').click();
     await expect(page.getByTestId('channel-rate-saved')).toBeVisible();
 
@@ -396,10 +400,14 @@ test.describe.serial('multipayments (módulo 16) — selector, tasas, multi-pago
     // T22: registration lives in the `+ Tasa` popup (the inline card is gone).
     await page.getByTestId('channel-rate-add').click();
     await expect(page.getByTestId('channel-rate-add-dialog')).toBeVisible();
-    await expect(page.getByTestId('channel-rate-value')).toBeVisible();
+    await expect(page.getByTestId('channel-rate-buy-value')).toBeVisible();
+    await expect(page.getByTestId('channel-rate-sell-value')).toBeVisible();
     await page.getByTestId('channel-rate-currency').selectOption(String(0)); // Currency.CUP
     await page.getByTestId('channel-rate-method').selectOption(String(0)); // Efectivo
-    await page.getByTestId('channel-rate-value').fill('100');
+    // Buy/sell migration (ddd41489): both values registered, the buy value
+    // drives the CUP→USD conversion asserted below.
+    await page.getByTestId('channel-rate-buy-value').fill('100');
+    await page.getByTestId('channel-rate-sell-value').fill('100');
     await page.getByTestId('channel-rate-submit').click();
     await expect(page.getByTestId('channel-rate-saved')).toBeVisible();
 
