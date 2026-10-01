@@ -293,6 +293,19 @@ const messages: Record<string, string> = {
   'WEB_CATALOG.SAVE': 'Guardar',
   'WEB_CATALOG.SAVED': 'Producto guardado en el catálogo',
   'WEB_CATALOG.SAVE_ERROR': 'No se pudo guardar el producto',
+  // Guardado por lotes (decisión del owner, 2026-10-01): un ÚNICO botón al final de la página
+  // aplica todos los cambios pendientes y envía solo los campos que de verdad cambiaron.
+  'WEB_CATALOG.SAVE_CHANGES': 'Guardar cambios',
+  'WEB_CATALOG.SAVING': 'Guardando...',
+  'WEB_CATALOG.PENDING_COUNT': '{count} productos con cambios sin guardar',
+  'WEB_CATALOG.PENDING_COUNT_ONE': '1 producto con cambios sin guardar',
+  'WEB_CATALOG.NO_PENDING': 'No hay cambios sin guardar',
+  'WEB_CATALOG.SAVED_CHANGES': 'Se guardaron {count} productos en el catálogo',
+  'WEB_CATALOG.SAVED_CHANGES_ONE': 'Se guardó 1 producto en el catálogo',
+  'WEB_CATALOG.SAVE_PARTIAL':
+    'Se guardaron {saved} de {total}. No se pudieron guardar: {failed}',
+  'WEB_CATALOG.UNSAVED_BADGE': 'Sin guardar',
+  'WEB_CATALOG.PENDING_IMAGE_REMOVE': 'La imagen principal se quitará al guardar',
   'WEB_CATALOG.OFFLINE':
     'El catálogo web se publica en el servidor: necesitas conexión para sincronizar y guardar.',
   'WEB_CATALOG.UNPUBLISHED': 'Sin publicar',

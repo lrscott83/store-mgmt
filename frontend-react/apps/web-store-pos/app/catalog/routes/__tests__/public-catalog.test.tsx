@@ -116,6 +116,22 @@ describe('PublicCatalogPage', () => {
     expect(screen.getByTestId('catalog-badge-discount-cp1')).toHaveTextContent('-12.5%');
   });
 
+  it('la tarjeta recorta la descripción a 3 líneas y la omite si está vacía', async () => {
+    const long = 'Línea uno\nLínea dos\nLínea tres\nLínea cuatro\nLínea cinco';
+    const withDescription = makeProduct({ description: long });
+    const withoutDescription = makeProduct({ id: 'cp2', description: '' });
+    catalogMock.getPublicProducts.mockResolvedValue(envelope(page([withDescription, withoutDescription])));
+    renderPage();
+
+    // La descripción va DEBAJO, recortada a 3 líneas (con puntos suspensivos al desbordar) para
+    // que el precio no quede fuera de la vista rápida.
+    const clamped = await screen.findByTestId('catalog-card-description-cp1');
+    expect(clamped).toHaveClass('line-clamp-3');
+    expect(clamped).toHaveTextContent('Línea uno');
+    // Un producto sin descripción no deja un párrafo vacío ocupando espacio.
+    expect(screen.queryByTestId('catalog-card-description-cp2')).not.toBeInTheDocument();
+  });
+
   it('abre el detalle con la descripción en texto plano y la galería', async () => {
     const product = makeProduct({
       description: 'Camisa con <b>etiquetas</b>\nSegunda línea',

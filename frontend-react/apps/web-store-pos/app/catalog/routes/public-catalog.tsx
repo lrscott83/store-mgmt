@@ -287,23 +287,40 @@ export function PublicCatalogPage() {
                   )}
                 </div>
 
+                {/* Nombre y precio en la MISMA fila (decisión del owner, 2026-10-01): lo que
+                    identifica y lo que cuesta, de un vistazo, sin bajar la vista. */}
                 <div className="p-4">
-                  <h3 className="text-lg font-semibold text-text">{product.name}</h3>
-                  <p className="mt-1 whitespace-pre-line text-sm text-text-muted">
-                    {product.description}
-                  </p>
-                  <div className="mt-2 flex items-center gap-2">
+                  <div className="flex items-start justify-between gap-3">
+                    <h3 className="min-w-0 flex-1 text-base font-semibold text-text">
+                      {product.name}
+                    </h3>
                     {/* Moneda como CÓDIGO (CUP/USD/…), nunca el símbolo $: cada producto lleva
-                        la suya. */}
-                    <span className="text-lg font-bold text-primary">
-                      {formatMoneyWithCurrency(product.finalPrice, currencyFromCode(product.currency))}
-                    </span>
-                    {product.hasDiscount && (
-                      <span className="text-sm text-text-muted line-through">
-                        {formatMoneyWithCurrency(product.price, currencyFromCode(product.currency))}
+                        la suya. El precio original tachado va DEBAJO del final, no al lado. */}
+                    <div className="shrink-0 text-right">
+                      <span className="block text-base font-bold text-primary">
+                        {formatMoneyWithCurrency(
+                          product.finalPrice,
+                          currencyFromCode(product.currency),
+                        )}
                       </span>
-                    )}
+                      {product.hasDiscount && (
+                        <span className="block text-xs text-text-muted line-through">
+                          {formatMoneyWithCurrency(product.price, currencyFromCode(product.currency))}
+                        </span>
+                      )}
+                    </div>
                   </div>
+                  {/* Descripción como TEXTO PLANO (D9) recortada a 3 líneas: la larga ya no
+                      empuja el precio fuera de la vista rápida. El modal sigue con el texto
+                      completo. */}
+                  {product.description && (
+                    <p
+                      className="mt-1.5 line-clamp-3 whitespace-pre-line text-xs text-text-muted"
+                      data-testid={`catalog-card-description-${product.id}`}
+                    >
+                      {product.description}
+                    </p>
+                  )}
                 </div>
               </button>
             </li>

@@ -1,15 +1,17 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { useIntl } from 'react-intl';
-import { Button } from '~/shared/components/ui/button';
 import { FileInput } from '~/shared/components/ui/file-input';
-import { SaveIcon, TrashIcon } from '~/shared/components/ui/icons';
+import { TrashIcon } from '~/shared/components/ui/icons';
 // import { confirmDialog } from '~/shared/lib/blocking-alert'; ← solo lo usaba la galería (ver abajo).
 import { currencyFromCode, formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency';
 import { apiFileUrl } from '~/shared/lib/http/media-url';
-import type { CatalogProductFields, CatalogProductView } from '../lib/services/catalog-http-service';
+import type { CatalogProductView } from '../lib/services/catalog-http-service';
 // MAX_CATALOG_IMAGES solo lo usaba la galería (y su aviso de "Hasta {max} imágenes…"), ahora
 // comentada: vuelve con ella, junto a `galleryFull` y el `<span>` de la cabecera.
-import { MAX_CATALOG_IMAGE_BYTES } from '../lib/catalog/web-catalog-format';
+import {
+  MAX_CATALOG_IMAGE_BYTES,
+  MAX_DESCRIPTION_LENGTH,
+} from '../lib/catalog/web-catalog-format';
 
 /**
  * NOTA DE RESTAURACIÓN (galería comentada): al volver a habilitarla descomenta — el import
@@ -19,25 +21,40 @@ import { MAX_CATALOG_IMAGE_BYTES } from '../lib/catalog/web-catalog-format';
  * cabecera, el `<ul>` de miniaturas bajo el bloque de imagen y el `MAX_CATALOG_IMAGES` del
  * import (el aviso nuevo `WEB_CATALOG.IMAGE_RULES` no lleva `{max}`).
  *
- * NOTA DE RESTAURACIÓN (campos de actualización comentados): al volver a habilitarlos,
- * descomenta también — los estados `description/percent/discount/isNew`, `parseNumber`,
- * `finalPrice` y `handleSave` (con sus validaciones), el grid de campos del JSX, el badge de -%
- * de la cabecera, la constante INPUT_CLASSES y los imports `Switch`, `MAX_DESCRIPTION_LENGTH`,
- * `computeFinalPrice`, `toPercent`, `toScaledPercent`, `toDiscountAmount`,
- * `toScaledDiscountAmount`.
+ * NOTA DE RESTAURACIÓN (descuentos y "Nuevo" comentados): la descripción YA es editable
+ * (decisión del owner, 2026-10-01); lo que sigue COMENTADO es el resto del grid de actualización.
+ * Al volver a habilitarlo, descomenta también — los estados `percent/discount/isNew`, su botonera
+ * de Guardar en el padre, `parseNumber`, `finalPrice` y `handleSave` (con sus
+ * validaciones), el grid de campos del JSX, el badge de -% de la cabecera y los imports `Switch`,
+ * `computeFinalPrice`, `toPercent`, `toScaledPercent`, `toDiscountAmount`, `toScaledDiscountAmount`.
+ * `INPUT_CLASSES` y `MAX_DESCRIPTION_LENGTH` ya existen (los usa el textarea).
  */
 
 /** Formatos aceptados por el backend (decisión D10) — se validan aquí para no subir en balde. */
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
+/** Mismas clases que los inputs del catálogo público (`public-catalog.tsx`): el diseño es uno. */
+const INPUT_CLASSES =
+  'rounded-md border border-border bg-surface px-3 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-primary';
+
 interface CatalogProductEditorProps {
   product: CatalogProductView;
   /** Slug público de la tienda: solo con él se pueden previsualizar las imágenes publicadas. */
   storeSlug: string;
-  /** true mientras hay una operación de ESTE producto en vuelo (guardar o imágenes). */
+  /** true mientras hay una operación de ESTE producto en vuelo (subir o aplicar cambios). */
   busy: boolean;
-  /** Guarda los campos enviados y sube la imagen retenida (null = sin imagen nueva). */
-  onSave: (fields: CatalogProductFields, image: File | null) => void;
+  /** Borrador de la descripción: lo edita el padre, esta fila solo lo pinta y lo reporta. */
+  description: string;
+  onDescriptionChange: (value: string) => void;
+  /** Archivo retenido (ya validado, todavía sin subir): también lo posee el padre. */
+  pendingImage: File | null;
+  /** Se llama SOLO cuando el archivo seleccionado pasa la validación local. */
+  onSelectImage: (file: File | null) => void;
+  /** true cuando el dueño marcó la principal para borrar: se aplica al guardar. */
+  pendingImageRemoval: boolean;
+  onToggleImageRemoval: () => void;
+  /** true cuando este producto tiene cambios pendientes de guardar. */
+  dirty: boolean;
   // Los tres props siguientes SOLO los usaba la galería multi-imagen, que ahora está comentada.
   // Siguen declarados porque el padre los sigue pasando y el tipo debe seguir compilando.
   onRemoveImage: (path: string) => void;
@@ -48,44 +65,46 @@ interface CatalogProductEditorProps {
 /**
  * Fila editable de un producto en la vista Catálogo Web (módulo 18, plan 2026-09-27).
  *
- * POR AHORA solo permite modificar la imagen del producto (decisión del owner, 2026-09-29): los
- * campos de actualización (descripción, % de descuento, precio rebajado y "Nuevo") quedan
- * COMENTADOS — no borrados — para restaurarlos más adelante. Y la imagen es una sola: la galería
- * multi-imagen (miniaturas, "Usar como principal", mover y borrar) queda COMENTADA — no borrada —
- * para restaurarla más adelante. Subir una imagen REEMPLAZA la principal: el guardado borra la
- * anterior (ver `handleSaveProduct` en la vista). Seleccionar una imagen NO dispara ninguna
- * llamada: se retiene y SOLO se sube al pulsar Guardar. El nombre, el precio de venta y el orden
- * son del catálogo de productos: aquí se muestran, no se tocan.
+ * Es un editor CONTROLADO y SIN botón propio: la descripción y la imagen retenida viven en el
+ * padre (`web-catalog.tsx`), que reúne los cambios de todos los productos y los aplica con UN
+ * único botón al final de la página. Aquí solo se pinta el borrador, se avisa del estado
+ * pendiente y se validan los archivos antes de retenerlos — seleccionar no dispara NADA de red.
+ *
+ * Solo la descripción es editable (decisión del owner, 2026-10-01): el % de descuento, el precio
+ * rebajado y el switch "Nuevo" siguen COMENTADOS — no borrados — para restaurarlos más adelante.
+ * Y la imagen es una sola: la galería multi-imagen (miniaturas, "Usar como principal", mover y
+ * borrar) queda COMENTADA — no borrada — para restaurarla más adelante. Subir una imagen
+ * REEMPLAZA la principal: el guardado borra la anterior (ver `applyProductChanges` en la vista).
+ * El nombre, el precio de venta y el orden son del catálogo de productos: aquí se muestran, no se
+ * tocan.
  */
 export function CatalogProductEditor({
   product,
   storeSlug,
   busy,
-  onSave,
+  description,
+  onDescriptionChange,
+  pendingImage,
+  onSelectImage,
+  pendingImageRemoval,
+  onToggleImageRemoval,
+  dirty,
   // onRemoveImage, onSetMainImage y onReorderImages quedan sin desestructurar: solo los usaba la
   // galería multi-imagen, que está comentada (se restauran descomentando aquí y arriba).
 }: CatalogProductEditorProps) {
   const intl = useIntl();
 
+  const [error, setError] = useState<string | null>(null);
+
   // ── CAMPOS DE ACTUALIZACIÓN COMENTADOS (se restauran descomentando) ─────────────
-  // Estado local del formulario: el producto de la lista es la referencia, lo editado vive aquí
-  // hasta que se guarda.
-  // const [description, setDescription] = useState(product.description);
+  // Estado local del formulario para el resto del grid (la descripción ya vive en el padre).
   // const [percent, setPercent] = useState(toPercent(product.percentDiscountPrice).toString());
   // const [discount, setDiscount] = useState(toDiscountAmount(product.discountPrice).toString());
   // const [isNew, setIsNew] = useState(product.isNew);
   // ────────────────────────────────────────────────────────────────────────────────
 
-  const [error, setError] = useState<string | null>(null);
-  /** Imagen retenida: se valida al seleccionar pero NO se sube hasta pulsar Guardar. */
-  const [pendingImage, setPendingImage] = useState<File | null>(null);
-
-  // Una operación completada (Guardar, quitar, reorder) consume la selección retenida.
-  const wasBusyRef = useRef(busy);
-  useEffect(() => {
-    if (wasBusyRef.current && !busy) setPendingImage(null);
-    wasBusyRef.current = busy;
-  }, [busy]);
+  /** true mientras el borrador supere el límite del backend (espejo de ProductEntityLimits). */
+  const descriptionTooLong = description.length > MAX_DESCRIPTION_LENGTH;
 
   // ── CAMPOS DE ACTUALIZACIÓN COMENTADOS (se restauran descomentando) ─────────────
   // function parseNumber(raw: string): number {
@@ -107,41 +126,6 @@ export function CatalogProductEditor({
   /** Moneda del producto como valor del enum (el DTO la trae como código: "CUP", "USD", …). */
   const currency = currencyFromCode(product.currency);
 
-  // ── CAMPOS DE ACTUALIZACIÓN COMENTADOS (se restauran descomentando) ─────────────
-  // function handleSave() {
-  //   if (percentNumber < 0 || percentNumber > 100) {
-  //     setError(intl.formatMessage({ id: 'WEB_CATALOG.PERCENT_RANGE' }));
-  //     return;
-  //   }
-  //   if (discountNumber < 0) {
-  //     setError(intl.formatMessage({ id: 'WEB_CATALOG.DISCOUNT_RANGE' }));
-  //     return;
-  //   }
-  //   if (description.length > MAX_DESCRIPTION_LENGTH) {
-  //     setError(
-  //       intl.formatMessage(
-  //         { id: 'WEB_CATALOG.DESCRIPTION_TOO_LONG' },
-  //         { max: MAX_DESCRIPTION_LENGTH },
-  //       ),
-  //     );
-  //     return;
-  //   }
-  //   setError(null);
-  //   onSave({
-  //     description,
-  //     percentDiscountPrice: toScaledPercent(percentNumber),
-  //     discountPrice: toScaledDiscountAmount(discountNumber),
-  //     isNew,
-  //   }, pendingImage);
-  // }
-  // ────────────────────────────────────────────────────────────────────────────────
-
-  function handleSave() {
-    // Campos comentados: Guardar solo envía la imagen retenida ({} = el backend no toca campos).
-    setError(null);
-    onSave({}, pendingImage);
-  }
-
   function handleFile(file: File | null) {
     if (!file) return;
     if (!ALLOWED_IMAGE_TYPES.includes(file.type) || file.size > MAX_CATALOG_IMAGE_BYTES) {
@@ -155,8 +139,9 @@ export function CatalogProductEditor({
       return;
     }
     setError(null);
-    // SOLO se retiene: nada de red al seleccionar; la subida ocurre al pulsar Guardar.
-    setPendingImage(file);
+    // SOLO se retiene (el padre lo guarda): nada de red al seleccionar; la subida ocurre al
+    // pulsar el botón único de Guardar cambios.
+    onSelectImage(file);
   }
 
   // ── GALERÍA COMENTADA (se restaura descomentando) ──────────────────────────────
@@ -208,12 +193,26 @@ export function CatalogProductEditor({
             {intl.formatMessage({ id: 'WEB_CATALOG.IS_NEW' })}
           </span>
         )}
+        {/* Cambios de ESTE producto esperando al botón único del final de la página. */}
+        {dirty && (
+          <span
+            className="rounded-full bg-warning/10 px-2 py-0.5 text-xs font-medium text-warning"
+            data-testid={`catalog-unsaved-${product.id}`}
+          >
+            {intl.formatMessage({ id: 'WEB_CATALOG.UNSAVED_BADGE' })}
+          </span>
+        )}
         {/* El badge de -% del header vuelve junto a los campos de actualización (comentados). */}
       </header>
 
-      {/* ── CAMPOS DE ACTUALIZACIÓN COMENTADOS (se restauran descomentando) ──────────
+      {/* Descripción: TEXTO PLANO (decisión D9), nunca HTML. Es un borrador controlado por el
+          padre: esta fila no guarda nada por su cuenta.
 
-      <div className="mt-3 grid gap-4 md:grid-cols-2">
+          SIN `md:grid-cols-2`: el grid de dos columnas solo tenía sentido cuando la fila de
+          descuentos ocupaba la segunda. Con la descripción sola, media columna en escritorio
+          dejaba el textarea estrecho sin nada al lado. Al restaurar los descuentos, el grid
+          vuelve con el commented block de abajo. */}
+      <div className="mt-3">
         <div>
           <label
             className="mb-1 block text-xs font-medium text-text-muted"
@@ -226,7 +225,7 @@ export function CatalogProductEditor({
             rows={5}
             value={description}
             placeholder={intl.formatMessage({ id: 'WEB_CATALOG.DESCRIPTION_PLACEHOLDER' })}
-            onChange={(event) => setDescription(event.target.value)}
+            onChange={(event) => onDescriptionChange(event.target.value)}
             className={INPUT_CLASSES}
             data-testid={`catalog-description-${product.id}`}
           />
@@ -236,7 +235,17 @@ export function CatalogProductEditor({
               { count: description.length, max: MAX_DESCRIPTION_LENGTH },
             )}
           </p>
+          {descriptionTooLong && (
+            <p className="mt-1 text-xs text-danger">
+              {intl.formatMessage(
+                { id: 'WEB_CATALOG.DESCRIPTION_TOO_LONG' },
+                { max: MAX_DESCRIPTION_LENGTH },
+              )}
+            </p>
+          )}
         </div>
+
+        {/* ── CAMPOS DE ACTUALIZACIÓN COMENTADOS (se restauran descomentando) ─────────
 
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
@@ -295,8 +304,8 @@ export function CatalogProductEditor({
             )}
           </p>
         </div>
+        ─────────────────────────────────────────────────────────────────────────────── */}
       </div>
-      ─────────────────────────────────────────────────────────────────────────────────── */}
 
       {/* Imagen: UNA sola por producto. La galería multi-imagen y su texto de límite ("Hasta {max}
           imágenes…") quedan comentados — no borrados — y vuelven con esa funcionalidad. */}
@@ -325,9 +334,10 @@ export function CatalogProductEditor({
                 className="h-20 w-20 rounded-md border border-border object-cover"
                 data-testid={`catalog-main-image-${product.id}`}
               />
+              {/* Quitar imagen NO borra nada aquí: marca la eliminación y la aplica el guardado. */}
               <button
                 type="button"
-                onClick={() => onSave({ removeImage: true }, null)}
+                onClick={onToggleImageRemoval}
                 disabled={busy}
                 className="inline-flex items-center gap-1 text-xs text-danger hover:underline disabled:opacity-50"
                 data-testid={`catalog-clear-main-${product.id}`}
@@ -347,7 +357,7 @@ export function CatalogProductEditor({
               disabled={busy}
               data-testid={`catalog-upload-${product.id}`}
             />
-            {/* Selección retenida: se anuncia y SOLO se sube al pulsar Guardar. */}
+            {/* Selección retenida: se anuncia y SOLO se sube al pulsar Guardar cambios. */}
             {pendingImage && (
               <p
                 className="mt-1 text-xs text-primary"
@@ -355,6 +365,15 @@ export function CatalogProductEditor({
               >
                 {pendingImage.name}
                 {` · ${intl.formatMessage({ id: 'WEB_CATALOG.WILL_BE_MAIN' })}`}
+              </p>
+            )}
+            {/* El padre garantiza que imagen retenida y borrado marcado son excluyentes. */}
+            {pendingImageRemoval && (
+              <p
+                className="mt-1 text-xs text-danger"
+                data-testid={`catalog-pending-image-removal-${product.id}`}
+              >
+                {intl.formatMessage({ id: 'WEB_CATALOG.PENDING_IMAGE_REMOVE' })}
               </p>
             )}
           </div>
@@ -424,13 +443,6 @@ export function CatalogProductEditor({
       </div>
 
       {error && <p className="mt-2 text-xs text-danger">{error}</p>}
-
-      <div className="mt-3 flex justify-end">
-        <Button variant="fab" onClick={handleSave} disabled={busy} data-testid={`catalog-save-${product.id}`}>
-          <SaveIcon />
-          {intl.formatMessage({ id: 'WEB_CATALOG.SAVE' })}
-        </Button>
-      </div>
     </article>
   );
 }
