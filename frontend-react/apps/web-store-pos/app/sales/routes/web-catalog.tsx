@@ -4,7 +4,7 @@ import { EModules } from '@store-mgmt/domain';
 import { ownerModuleLoader } from '~/auth/routes/loaders';
 import { Button } from '~/shared/components/ui/button';
 import { Card } from '~/shared/components/ui/card';
-import { ChevronDownIcon } from '~/shared/components/ui/icons';
+import { ChevronDownIcon, SaveIcon } from '~/shared/components/ui/icons';
 import { InfoBox } from '~/shared/components/ui/info-box';
 import { Spinner } from '~/shared/components/ui/spinner';
 import { showBlockingError } from '~/shared/lib/blocking-alert';
@@ -13,6 +13,7 @@ import { showToastSuccess } from '~/shared/lib/toast';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { CatalogProductEditor } from '../components/catalog-product-editor';
 import { buildCatalogSnapshot } from '../lib/catalog/catalog-snapshot';
+import { MAX_DESCRIPTION_LENGTH } from '../lib/catalog/web-catalog-format';
 import {
   catalogHttpService,
   type CatalogProductFields,
@@ -32,6 +33,46 @@ export const clientLoader = ownerModuleLoader(EModules.WebCatalog);
 function formatSyncedAt(value: string): string {
   const hasZone = /[zZ]$|[+-]\d{2}:\d{2}$/.test(value);
   return new Date(hasZone ? value : `${value}Z`).toLocaleString('es-ES');
+}
+
+/**
+ * Copia de un registro de pendientes sin las claves indicadas: limpia lo YA aplicado y deja
+ * intacto lo que falló, para que el dueño pueda reintentar solo eso.
+ */
+function omitKeys<T>(record: Record<string, T>, keys: string[]): Record<string, T> {
+  if (keys.length === 0) return record;
+  const next = { ...record };
+  for (const key of keys) delete next[key];
+  return next;
+}
+
+/** Un cambio pendiente de un producto: solo lo que difiere del producto original. */
+interface PendingCatalogChange {
+  product: CatalogProductView;
+  fields: CatalogProductFields;
+  image: File | null;
+}
+
+/** Estado pendiente de un producto: el diff se deriva de estos tres registros en cada render. */
+function buildPendingChanges(
+  products: CatalogProductView[],
+  drafts: Record<string, string>,
+  pendingImages: Record<string, File>,
+  pendingImageRemovals: Record<string, boolean>,
+): PendingCatalogChange[] {
+  const changes: PendingCatalogChange[] = [];
+  for (const product of products) {
+    const fields: CatalogProductFields = {};
+    const draft = drafts[product.id];
+    // Una clave ausente = producto no editado; una clave igual a la original = sin cambio real.
+    if (draft !== undefined && draft !== product.description) fields.description = draft;
+    if (pendingImageRemovals[product.id] === true) fields.removeImage = true;
+    const image = pendingImages[product.id] ?? null;
+    // Un producto intacto no genera entrada: no hay PUT para él.
+    if (image === null && Object.keys(fields).length === 0) continue;
+    changes.push({ product, fields, image });
+  }
+  return changes;
 }
 
 /**
@@ -95,6 +136,13 @@ export function WebCatalogPage() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [busyProductId, setBusyProductId] = useState<string | null>(null);
   const [error, setError] = useState('');
+  /** Descripciones editadas por id de producto. Una clave AUSENTE = producto no editado. */
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  /** Archivos de imagen seleccionados (validados, NO subidos todavía), por producto. */
+  const [pendingImages, setPendingImages] = useState<Record<string, File>>({});
+  /** Imagen principal marcada para borrar, por producto. Excluyente con `pendingImages`. */
+  const [pendingImageRemovals, setPendingImageRemovals] = useState<Record<string, boolean>>({});
+  const [isSaving, setIsSaving] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
@@ -133,6 +181,25 @@ export function WebCatalogPage() {
     }
     return [...grouped.entries()].map(([key, group]) => ({ key, ...group }));
   }, [products]);
+
+  /**
+   * El diff contra el producto ORIGINAL: solo lo que el dueño editó de verdad entra. Un producto
+   * intacto no genera entrada, así que el guardado por lotes envía exactamente los campos
+   * modificados — un campo ausente no se toca en el backend (decisión D8).
+   */
+  const changes = useMemo(
+    () => buildPendingChanges(products, drafts, pendingImages, pendingImageRemovals),
+    [products, drafts, pendingImages, pendingImageRemovals],
+  );
+
+  const hasChanges = changes.length > 0;
+  // Una descripción que supera el límite NO se envía (el backend la rechazaría): con UNA sola
+  // larga entre varias, el botón entero queda deshabilitado hasta corregirla.
+  const hasInvalidDescription = changes.some(
+    (change) =>
+      change.fields.description !== undefined &&
+      change.fields.description.length > MAX_DESCRIPTION_LENGTH,
+  );
 
   async function handleSync() {
     // Sin tienda seleccionada no hay catálogo local que enviar (y el backend respondería
@@ -213,55 +280,136 @@ export function WebCatalogPage() {
   }
 
   /**
-   * Guardar de un producto: sube PRIMERO la imagen retenida (si hay) y después guarda los
-   * campos enviados. Seleccionar la imagen no toca la red — todo ocurre aquí, al pulsar
-   * Guardar. Solo hay UNA imagen por producto (decisión del owner, 2026-09-29): la imagen
-   * nueva SIEMPRE pasa a ser la principal y la anterior se borra al terminar, con su fila y
-   * su archivo. El borrado va DESPUÉS del guardado a propósito: `RemoveProductImageCommand`
-   * anula `product.Image` cuando la ruta borrada es la principal, así que borrar primero
-   * dejaría el producto sin imagen.
+   * PASO de un producto dentro del guardado por lotes: sube PRIMERO la imagen pendiente (si
+   * hay) y después aplica los campos del diff. Devuelve si se aplicó; NO abre ningún modal —
+   * el lote reporta el resultado una sola vez al final.
+   *
+   * Solo hay UNA imagen por producto (decisión del owner, 2026-09-29): la nueva SIEMPRE pasa a
+   * ser la principal y la anterior se borra al terminar, con su fila y su archivo. El borrado
+   * va DESPUÉS del guardado a propósito: `RemoveProductImageCommand` anula `product.Image`
+   * cuando la ruta borrada es la principal, así que borrar primero dejaría el producto sin
+   * imagen.
    */
-  function handleSaveProduct(product: CatalogProductView, fields: CatalogProductFields, image: File | null) {
-    void runProductAction(product.id, async () => {
-      // Principal vigente ANTES de subir nada: es la que hay que superseder.
-      const previousMain = product.image;
+  async function applyProductChange(change: PendingCatalogChange): Promise<boolean> {
+    const { product, fields, image } = change;
+    // Principal vigente ANTES de subir nada: es la que hay que superseder.
+    const previousMain = product.image;
+    try {
       let imageKey: string | null = null;
       if (image) {
         const uploaded = await catalogHttpService.uploadImage(product.id, image);
-        if (!uploaded.succeeded) {
-          showBlockingError(
-            intl.formatMessage({ id: 'GENERAL.ERROR' }),
-            intl.formatMessage({ id: 'WEB_CATALOG.UPLOAD_ERROR' }),
-          );
-          return;
-        }
+        if (!uploaded.succeeded) return false;
         imageKey = uploaded.data;
       }
 
       const fieldsToSend: CatalogProductFields = { ...fields };
       if (imageKey) fieldsToSend.image = imageKey;
 
-      // Con los campos de actualización comentados, Guardar sin imagen nueva no tiene nada que
-      // enviar: se evita el PUT vacío.
+      // Con solo el borrado marcado como pendiente, `removeImage` ya viaja en el PUT: el paso
+      // del borrado de la principal anterior es otro (ver más abajo). Nunca un PUT vacío.
       if (Object.keys(fieldsToSend).length > 0) {
         const result = await catalogHttpService.saveProductFields(product.id, fieldsToSend);
-        if (!result.succeeded) {
-          showBlockingError(
-            intl.formatMessage({ id: 'GENERAL.ERROR' }),
-            intl.formatMessage({ id: 'WEB_CATALOG.SAVE_ERROR' }),
-          );
-          return;
-        }
+        if (!result.succeeded) return false;
       }
 
       // La principal ya fue sustituida con éxito: ahora se borra la anterior (fila + archivo).
       if (imageKey && previousMain && previousMain !== imageKey) {
         await catalogHttpService.removeImage(product.id, previousMain);
       }
+      return true;
+    } catch {
+      // La red también falla de verdad aquí (el catálogo vive en el servidor). Este paso NO abre
+      // ningún modal a propósito: el producto se queda pendiente y el lote lo nombra UNA vez en
+      // su reporte final.
+      return false;
+    }
+  }
 
+  /**
+   * Guardado por lotes: aplica SECUENCIALMENTE el diff de todos los productos. Lo que se
+   * aplicó se limpia; lo que falló sigue pendiente para poder reintentarlo. El reporte es UNO,
+   * al final: éxito completo o lista de lo que no se pudo guardar.
+   */
+  async function handleSaveChanges() {
+    // El diff se recalcula al pulsar (puede haber cambiado desde el último render).
+    if (changes.length === 0) return;
+
+    setIsSaving(true);
+    const saved: string[] = [];
+    const failed: string[] = [];
+    try {
+      // Secuencial a propósito: son pocas escrituras y así el reporte nombra el orden real.
+      for (const change of changes) {
+        if (await applyProductChange(change)) {
+          saved.push(change.product.id);
+        } else {
+          failed.push(change.product.name);
+        }
+      }
+
+      // Solo se limpian los guardados: lo fallado permanece para que el dueño lo reintente.
+      setDrafts((current) => omitKeys(current, saved));
+      setPendingImages((current) => omitKeys(current, saved));
+      setPendingImageRemovals((current) => omitKeys(current, saved));
+
+      // El servidor manda: tras aplicar (o no) se recarga para que la lista diga la verdad.
+      await loadData();
+
+      if (failed.length > 0) {
+        showBlockingError(
+          intl.formatMessage({ id: 'GENERAL.ERROR' }),
+          intl.formatMessage(
+            { id: 'WEB_CATALOG.SAVE_PARTIAL' },
+            { saved: saved.length, total: changes.length, failed: failed.join(', ') },
+          ),
+        );
+        return;
+      }
+      showToastSuccess(
+        intl.formatMessage(
+          saved.length === 1 ? { id: 'WEB_CATALOG.SAVED_CHANGES_ONE' } : { id: 'WEB_CATALOG.SAVED_CHANGES' },
+          { count: saved.length },
+        ),
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  function handleSaveProduct(product: CatalogProductView, fields: CatalogProductFields, image: File | null) {
+    void runProductAction(product.id, async () => {
+      const applied = await applyProductChange({ product, fields, image });
+      if (!applied) {
+        showBlockingError(
+          intl.formatMessage({ id: 'GENERAL.ERROR' }),
+          intl.formatMessage({ id: 'WEB_CATALOG.SAVE_ERROR' }),
+        );
+        return;
+      }
       showToastSuccess(intl.formatMessage({ id: 'WEB_CATALOG.SAVED' }));
       await loadData();
     });
+  }
+
+  function handleDescriptionChange(productId: string, value: string) {
+    setDrafts((current) => ({ ...current, [productId]: value }));
+  }
+
+  /** Seleccionar un archivo RETIENE la imagen y descarta el borrado marcado: son excluyentes. */
+  function handleSelectImage(productId: string, file: File | null) {
+    setPendingImageRemovals((current) => omitKeys(current, [productId]));
+    setPendingImages((current) => (file ? { ...current, [productId]: file } : omitKeys(current, [productId])));
+  }
+
+  /** Marcar/desmarcar el borrado de la principal descarta la imagen retenida: son excluyentes. */
+  function handleToggleImageRemoval(productId: string) {
+    setPendingImages((current) => omitKeys(current, [productId]));
+    setPendingImageRemovals((current) => ({ ...current, [productId]: !current[productId] }));
+  }
+
+  /** true cuando ESTE producto tiene algo pendiente: es lo que enciende su badge "Sin guardar". */
+  function isProductDirty(productId: string): boolean {
+    return changes.some((change) => change.product.id === productId);
   }
 
   function handleRemoveImage(productId: string, path: string) {
@@ -383,8 +531,14 @@ export function WebCatalogPage() {
                 key={product.id}
                 product={product}
                 storeSlug={status?.storeSlug ?? ''}
-                busy={busyProductId === product.id}
-                onSave={(fields, image) => handleSaveProduct(product, fields, image)}
+                busy={busyProductId === product.id || isSaving}
+                description={drafts[product.id] ?? product.description}
+                onDescriptionChange={(value) => handleDescriptionChange(product.id, value)}
+                pendingImage={pendingImages[product.id] ?? null}
+                onSelectImage={(file) => handleSelectImage(product.id, file)}
+                pendingImageRemoval={pendingImageRemovals[product.id] === true}
+                onToggleImageRemoval={() => handleToggleImageRemoval(product.id)}
+                dirty={isProductDirty(product.id)}
                 onRemoveImage={(path) => handleRemoveImage(product.id, path)}
                 onSetMainImage={(key) => handleSaveProduct(product, { image: key }, null)}
                 onReorderImages={(paths) => handleReorderImages(product.id, paths)}
@@ -392,6 +546,41 @@ export function WebCatalogPage() {
             ))}
           </CategoryPanelCard>
         ))}
+
+      {/* El botón ÚNICO de guardado. Vive FUERA de los paneles de categoría a propósito: los
+          paneles nacen plegados y, si el botón viviera dentro de uno, no se alcanzaría sin
+          expandir primero. */}
+      {!isLoading && !error && (
+        <div className="flex flex-wrap items-center justify-end gap-3">
+          {hasInvalidDescription && (
+            <InfoBox variant="danger" className="text-center">
+              {intl.formatMessage(
+                { id: 'WEB_CATALOG.DESCRIPTION_TOO_LONG' },
+                { max: MAX_DESCRIPTION_LENGTH },
+              )}
+            </InfoBox>
+          )}
+          <span className="text-xs text-text-muted" data-testid="catalog-pending-summary">
+            {hasChanges
+              ? intl.formatMessage(
+                  changes.length === 1
+                    ? { id: 'WEB_CATALOG.PENDING_COUNT_ONE' }
+                    : { id: 'WEB_CATALOG.PENDING_COUNT' },
+                  { count: changes.length },
+                )
+              : intl.formatMessage({ id: 'WEB_CATALOG.NO_PENDING' })}
+          </span>
+          <Button
+            variant="fab"
+            onClick={() => void handleSaveChanges()}
+            disabled={!hasChanges || hasInvalidDescription || isSaving}
+            data-testid="catalog-save-all-button"
+          >
+            <SaveIcon />
+            {intl.formatMessage({ id: isSaving ? 'WEB_CATALOG.SAVING' : 'WEB_CATALOG.SAVE_CHANGES' })}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

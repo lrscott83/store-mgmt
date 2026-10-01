@@ -271,13 +271,15 @@ describe('WebCatalogPage (vista Catálogo Web)', () => {
     expect(catalogMock.saveProductFields).not.toHaveBeenCalled();
     expect(screen.getByTestId(`catalog-pending-image-${PRODUCT.id}`)).toHaveTextContent(/foto\.jpg/);
 
-    // TODO ocurre al pulsar Guardar: sube la imagen y, al no haber principal, la deja como tal.
-    fireEvent.click(screen.getByTestId(`catalog-save-${PRODUCT.id}`));
+    // TODO ocurre al pulsar el botón ÚNICO: sube la imagen y, al no haber principal, la deja como tal.
+    fireEvent.click(screen.getByTestId('catalog-save-all-button'));
     await waitFor(() => expect(catalogMock.uploadImage).toHaveBeenCalledWith('p1', file));
     await waitFor(() =>
       expect(catalogMock.saveProductFields).toHaveBeenCalledWith('p1', { image: 't/s/p/foto.jpg' }),
     );
-    expect(showToastSuccessMock).toHaveBeenCalledWith('Producto guardado en el catálogo');
+    await waitFor(() =>
+      expect(showToastSuccessMock).toHaveBeenCalledWith('Se guardó 1 producto en el catálogo'),
+    );
   });
 
   it('guardar con imagen retenida cuando YA hay principal la reemplaza y borra la anterior', async () => {
@@ -292,7 +294,7 @@ describe('WebCatalogPage (vista Catálogo Web)', () => {
     const file = new File(['x'], 'extra.jpg', { type: 'image/jpeg' });
     Object.defineProperty(input, 'files', { value: [file], configurable: true });
     fireEvent.change(input);
-    fireEvent.click(screen.getByTestId(`catalog-save-${PRODUCT_WITH_IMAGE.id}`));
+    fireEvent.click(screen.getByTestId('catalog-save-all-button'));
 
     await waitFor(() =>
       expect(catalogMock.uploadImage).toHaveBeenCalledWith('p2', file),
@@ -306,20 +308,215 @@ describe('WebCatalogPage (vista Catálogo Web)', () => {
     await waitFor(() =>
       expect(catalogMock.removeImage).toHaveBeenCalledWith('p2', 't/s/p/foto.jpg'),
     );
-    expect(showToastSuccessMock).toHaveBeenCalledWith('Producto guardado en el catálogo');
+    await waitFor(() =>
+      expect(showToastSuccessMock).toHaveBeenCalledWith('Se guardó 1 producto en el catálogo'),
+    );
   });
 
-  it('guardar sin cambios solo avisa, sin PUT vacío ni subida', async () => {
+  it('sin cambios pendientes el botón está deshabilitado y no toca la red', async () => {
     renderPage();
 
     fireEvent.click(await screen.findByTestId(`catalog-category-toggle-${PRODUCT.categoryId}`));
-    fireEvent.click(await screen.findByTestId(`catalog-save-${PRODUCT.id}`));
+    const saveAll = await screen.findByTestId('catalog-save-all-button');
 
-    await waitFor(() =>
-      expect(showToastSuccessMock).toHaveBeenCalledWith('Producto guardado en el catálogo'),
+    // Sin diff no hay nada que guardar: el botón ni siquiera se puede pulsar, así que no cabe
+    // ni un PUT vacío ni una subida sin motivo.
+    expect(saveAll).toBeDisabled();
+    expect(screen.getByTestId('catalog-pending-summary')).toHaveTextContent(
+      'No hay cambios sin guardar',
     );
+    fireEvent.click(saveAll);
+
     expect(catalogMock.uploadImage).not.toHaveBeenCalled();
     expect(catalogMock.saveProductFields).not.toHaveBeenCalled();
+  });
+
+  it('editar una descripción envía SOLO ese campo del producto tocado', async () => {
+    const untouched: CatalogProductView = {
+      ...PRODUCT,
+      id: 'p9',
+      categoryId: 'c2',
+      categoryName: 'Calzado',
+      name: 'Zapato',
+    };
+    catalogMock.getProducts.mockResolvedValue(envelope([PRODUCT, untouched]));
+    renderPage();
+
+    fireEvent.click(await screen.findByTestId(`catalog-category-toggle-${PRODUCT.categoryId}`));
+    fireEvent.click(await screen.findByTestId(`catalog-category-toggle-${untouched.categoryId}`));
+    fireEvent.change(await screen.findByTestId(`catalog-description-${PRODUCT.id}`), {
+      target: { value: 'Camisa de algodón' },
+    });
+
+    fireEvent.click(screen.getByTestId('catalog-save-all-button'));
+
+    // El diff manda: solo los campos que de verdad cambiaron, y solo del producto editado.
+    // Ni `percentDiscountPrice`, ni `discountPrice`, ni `isNew` (siguen comentados en la vista).
+    await waitFor(() => expect(catalogMock.saveProductFields).toHaveBeenCalledTimes(1));
+    expect(catalogMock.saveProductFields).toHaveBeenCalledWith('p1', {
+      description: 'Camisa de algodón',
+    });
+    // El producto intacto no genera entrada alguna.
+    expect(catalogMock.saveProductFields).not.toHaveBeenCalledWith('p9', expect.anything());
+    expect(catalogMock.uploadImage).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect(showToastSuccessMock).toHaveBeenCalledWith('Se guardó 1 producto en el catálogo'),
+    );
+  });
+
+  it('el guardado por lotes envía un PUT por producto modificado con solo SU payload', async () => {
+    const second: CatalogProductView = {
+      ...PRODUCT,
+      id: 'p8',
+      categoryId: 'c2',
+      categoryName: 'Calzado',
+      name: 'Zapato',
+    };
+    const untouched: CatalogProductView = { ...PRODUCT, id: 'p9', name: 'Gorra' };
+    catalogMock.getProducts.mockResolvedValue(envelope([PRODUCT, second, untouched]));
+    renderPage();
+
+    fireEvent.click(await screen.findByTestId(`catalog-category-toggle-${PRODUCT.categoryId}`));
+    fireEvent.click(await screen.findByTestId(`catalog-category-toggle-${second.categoryId}`));
+
+    // Producto 1: descripción. Producto 2: imagen. Producto 3 (Gorra): nada.
+    fireEvent.change(await screen.findByTestId(`catalog-description-${PRODUCT.id}`), {
+      target: { value: 'Nueva descripción' },
+    });
+    const imageInput = await screen.findByTestId(`catalog-upload-${second.id}`);
+    const file = new File(['x'], 'zapato.jpg', { type: 'image/jpeg' });
+    Object.defineProperty(imageInput, 'files', { value: [file], configurable: true });
+    fireEvent.change(imageInput);
+
+    // Dos productos con cambios distintos: el resumen los cuenta a los dos.
+    expect(screen.getByTestId('catalog-pending-summary')).toHaveTextContent(
+      '2 productos con cambios sin guardar',
+    );
+    fireEvent.click(screen.getByTestId('catalog-save-all-button'));
+
+    await waitFor(() => expect(catalogMock.saveProductFields).toHaveBeenCalledTimes(2));
+    // Cada producto recibe SOLO lo suyo: el que cambió la descripción no sube nada y el que
+    // subió la imagen no manda descripción.
+    expect(catalogMock.saveProductFields).toHaveBeenCalledWith('p1', {
+      description: 'Nueva descripción',
+    });
+    expect(catalogMock.saveProductFields).toHaveBeenCalledWith('p8', {
+      image: 't/s/p/foto.jpg',
+    });
+    expect(catalogMock.saveProductFields).not.toHaveBeenCalledWith('p9', expect.anything());
+    expect(catalogMock.uploadImage).toHaveBeenCalledWith('p8', file);
+    expect(catalogMock.uploadImage).not.toHaveBeenCalledWith('p1', expect.anything());
+    await waitFor(() =>
+      expect(showToastSuccessMock).toHaveBeenCalledWith('Se guardaron 2 productos en el catálogo'),
+    );
+  });
+
+  it('no existe ningún botón Guardar por producto: el guardado es uno al final', async () => {
+    renderPage();
+
+    fireEvent.click(await screen.findByTestId(`catalog-category-toggle-${PRODUCT.categoryId}`));
+
+    // Con el panel expandido, el editor montado no trae botón propio.
+    expect(screen.getByTestId(`catalog-product-${PRODUCT.id}`)).toBeInTheDocument();
+    expect(screen.queryByTestId(`catalog-save-${PRODUCT.id}`)).not.toBeInTheDocument();
+    // Y el único que hay es el de la página.
+    expect(screen.getAllByTestId('catalog-save-all-button')).toHaveLength(1);
+  });
+
+  it('el textarea arranca con la descripción que ya tiene el producto', async () => {
+    const described: CatalogProductView = { ...PRODUCT, description: 'Camisa de algodón' };
+    catalogMock.getProducts.mockResolvedValue(envelope([described]));
+    renderPage();
+
+    fireEvent.click(await screen.findByTestId(`catalog-category-toggle-${described.categoryId}`));
+
+    expect(await screen.findByTestId(`catalog-description-${described.id}`)).toHaveValue(
+      'Camisa de algodón',
+    );
+  });
+
+  it('quitar la imagen principal la MARCA y la aplica el guardado por lotes', async () => {
+    catalogMock.getProducts.mockResolvedValue(envelope([PRODUCT_WITH_IMAGE]));
+    renderPage();
+
+    fireEvent.click(
+      await screen.findByTestId(`catalog-category-toggle-${PRODUCT_WITH_IMAGE.categoryId}`),
+    );
+    fireEvent.click(await screen.findByTestId(`catalog-clear-main-${PRODUCT_WITH_IMAGE.id}`));
+
+    // Marcar NO borra nada todavía: solo deja el producto pendiente y lo dice en pantalla.
+    expect(catalogMock.saveProductFields).not.toHaveBeenCalled();
+    expect(catalogMock.removeImage).not.toHaveBeenCalled();
+    expect(
+      await screen.findByTestId(`catalog-pending-image-removal-${PRODUCT_WITH_IMAGE.id}`),
+    ).toHaveTextContent('La imagen principal se quitará al guardar');
+    expect(screen.getByTestId(`catalog-unsaved-${PRODUCT_WITH_IMAGE.id}`)).toHaveTextContent(
+      'Sin guardar',
+    );
+
+    fireEvent.click(screen.getByTestId('catalog-save-all-button'));
+
+    // `removeImage` viaja en el PUT como cualquier otro campo del diff; no hay subida de imagen.
+    await waitFor(() =>
+      expect(catalogMock.saveProductFields).toHaveBeenCalledWith('p2', { removeImage: true }),
+    );
+    expect(catalogMock.uploadImage).not.toHaveBeenCalled();
+  });
+
+  it('imagen retenida y borrado marcado son excluyentes: elegir una imagen cancela el borrado', async () => {
+    catalogMock.getProducts.mockResolvedValue(envelope([PRODUCT_WITH_IMAGE]));
+    renderPage();
+
+    fireEvent.click(
+      await screen.findByTestId(`catalog-category-toggle-${PRODUCT_WITH_IMAGE.categoryId}`),
+    );
+    fireEvent.click(await screen.findByTestId(`catalog-clear-main-${PRODUCT_WITH_IMAGE.id}`));
+    const input = await screen.findByTestId(`catalog-upload-${PRODUCT_WITH_IMAGE.id}`);
+    const file = new File(['x'], 'nueva.jpg', { type: 'image/jpeg' });
+    Object.defineProperty(input, 'files', { value: [file], configurable: true });
+    fireEvent.change(input);
+
+    // Sustituir la principal y quitarla son intenciones opuestas: gana la última.
+    expect(
+      screen.queryByTestId(`catalog-pending-image-removal-${PRODUCT_WITH_IMAGE.id}`),
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId(`catalog-pending-image-${PRODUCT_WITH_IMAGE.id}`)).toHaveTextContent(
+      /nueva\.jpg/,
+    );
+
+    fireEvent.click(screen.getByTestId('catalog-save-all-button'));
+
+    await waitFor(() =>
+      expect(catalogMock.saveProductFields).toHaveBeenCalledWith('p2', { image: 't/s/p/foto.jpg' }),
+    );
+    expect(
+      catalogMock.saveProductFields,
+    ).not.toHaveBeenCalledWith('p2', expect.objectContaining({ removeImage: true }));
+  });
+
+  it('una descripción demasiado larga bloquea el guardado y avisa en pantalla', async () => {
+    catalogMock.getProducts.mockResolvedValue(envelope([PRODUCT]));
+    renderPage();
+
+    fireEvent.click(await screen.findByTestId(`catalog-category-toggle-${PRODUCT.categoryId}`));
+    const description = await screen.findByTestId(`catalog-description-${PRODUCT.id}`);
+    fireEvent.change(description, { target: { value: 'x'.repeat(4001) } });
+
+    // El backend la rechazaría: el botón queda deshabilitado hasta corregirla y se nombra el motivo.
+    // El aviso aparece DOS veces a propósito: junto al campo que hay que corregir y en la barra
+    // del botón, para que se vea aunque la categoría esté plegada.
+    const saveAll = await screen.findByTestId('catalog-save-all-button');
+    expect(saveAll).toBeDisabled();
+    expect(
+      await screen.findAllByText('La descripción no puede pasar de 4000 caracteres.'),
+    ).toHaveLength(2);
+
+    fireEvent.change(description, { target: { value: 'Una descripción corta' } });
+
+    await waitFor(() => expect(screen.getByTestId('catalog-save-all-button')).not.toBeDisabled());
+    expect(
+      screen.queryByText('La descripción no puede pasar de 4000 caracteres.'),
+    ).not.toBeInTheDocument();
   });
 
   it('un archivo que no es imagen no se retiene ni se sube', async () => {
@@ -341,14 +538,14 @@ describe('WebCatalogPage (vista Catálogo Web)', () => {
   });
 
   // ── TESTS COMENTADOS (no borrados) ─────────────────────────────────────────────
-  // Pertenecen a los campos de actualización (descripción, %, monto, Nuevo), comentados en la
-  // vista por decisión del owner (2026-09-29). Al restaurar los campos, descomentar este bloque.
+  // Pertenecen a los campos de actualización que SIGUEN comentados en la vista (%, monto y
+  // "Nuevo") por decisión del owner (2026-09-29); la descripción ya es editable (2026-10-01).
+  // Al restaurar esos campos, descomentar este bloque y cambiar `catalog-save-${id}` por
+  // `catalog-save-all-button` (el guardado por lotes ya no tiene botón por producto).
   //
   // it('guardar envía los campos del catálogo escalados y con el precio final calculado', async () => {
   //   renderPage();
   //
-  //   const description = await screen.findByTestId(`catalog-description-${PRODUCT.id}`);
-  //   fireEvent.change(description, { target: { value: 'Camisa de algodón\nSegunda línea' } });
   //   fireEvent.change(screen.getByTestId(`catalog-percent-${PRODUCT.id}`), {
   //     target: { value: '12.5' },
   //   });
@@ -359,7 +556,7 @@ describe('WebCatalogPage (vista Catálogo Web)', () => {
   //   // Precio final (D7) en vivo: 100 - 12.5 % = 87.50; 87.50 - 5.00 = 82.50.
   //   expect(screen.getByTestId(`catalog-final-price-${PRODUCT.id}`)).toHaveTextContent('82.50\u00A0CUP');
   //
-  //   fireEvent.click(screen.getByTestId(`catalog-save-${PRODUCT.id}`));
+  //   fireEvent.click(screen.getByTestId('catalog-save-all-button'));
   //
   //   await waitFor(() =>
   //     expect(catalogMock.saveProductFields).toHaveBeenCalledWith('p1', {
@@ -369,7 +566,9 @@ describe('WebCatalogPage (vista Catálogo Web)', () => {
   //       isNew: false,
   //     }),
   //   );
-  //   expect(showToastSuccessMock).toHaveBeenCalledWith('Producto guardado en el catálogo');
+  //   await waitFor(() =>
+  //     expect(showToastSuccessMock).toHaveBeenCalledWith('Se guardó 1 producto en el catálogo'),
+  //   );
   // });
   //
   // it('un % fuera de rango no se envía y se avisa en pantalla', async () => {
@@ -378,7 +577,7 @@ describe('WebCatalogPage (vista Catálogo Web)', () => {
   //   fireEvent.change(await screen.findByTestId(`catalog-percent-${PRODUCT.id}`), {
   //     target: { value: '120' },
   //   });
-  //   fireEvent.click(screen.getByTestId(`catalog-save-${PRODUCT.id}`));
+  //   fireEvent.click(screen.getByTestId('catalog-save-all-button'));
   //
   //   expect(
   //     await screen.findByText('El % de descuento debe estar entre 0 y 100.'),
