@@ -22,7 +22,27 @@ import type {
 } from '~/shared/lib/messages/messages-types';
 
 const NEW_CONVERSATION_ID = '00000000-0000-0000-0000-000000000000';
-const REFRESH_INTERVAL_MS = 15000;
+
+/**
+ * T10 — incremental background polling. An idle conversation widens its poll
+ * interval up to five minutes, and the ladder snaps back to its fastest step the
+ * moment a message actually moves (incoming or outgoing). The realtime push
+ * (T9.3) is the fast path; this is the fallback that also covers a hub that
+ * never connects.
+ */
+const POLL_LADDER_MS = [10_000, 20_000, 50_000, 100_000, 180_000, 300_000] as const;
+
+/**
+ * The ladder's activity signal: `lastMessageAt` moves exactly when a message is
+ * added, incoming or outgoing. Deliberately NOT `unreadCount`, which also moves
+ * when the open panel marks messages read — that is not new activity and must
+ * not reset the backoff.
+ */
+function conversationsActivitySignature(conversations: readonly ConversationDto[]): string {
+  return conversations
+    .map((conversation) => `${conversation.id}:${conversation.lastMessageAt}`)
+    .join('|');
+}
 
 function isNetworkFailure(error: unknown): boolean {
   return (error as { isNetworkError?: boolean } | null)?.isNetworkError === true;
@@ -53,6 +73,10 @@ export function MessageShell() {
   const [pending, setPending] = useState<QueuedMessage[]>([]);
   const isFlushingRef = useRef(false);
   const initialFlushRef = useRef<string | null>(null);
+  /** Last seen conversation activity signature, for the poll ladder (T10). */
+  const activitySignatureRef = useRef('');
+  /** Re-arms the poll ladder at its fastest step. Assigned by the poll effect. */
+  const resetPollRef = useRef<(immediate: boolean) => void>(() => {});
   const activeConversation = conversations.find((c) => c.storeId === storeId) ?? null;
   const totalUnread = conversations.reduce((sum, c) => sum + (c.unreadCount ?? 0), 0);
 
@@ -63,24 +87,46 @@ export function MessageShell() {
 
   useClickOutside(shellRef, () => setPanelOpen(false));
 
+  /**
+   * Fetches the conversation list (and the open thread) and reports whether
+   * anything actually moved — that boolean drives the poll ladder.
+   *
+   * A BACKGROUND call drives no loading overlay and reports no error toast: it
+   * runs on a timer, so a spinner or a toast every cycle is exactly the bug T10
+   * fixes. A user-initiated call keeps both.
+   */
   const refresh = useCallback(
-    async (withMessages: boolean) => {
-      if (!user || !isOwnerAdmin(user)) return;
+    async (withMessages: boolean, options?: { background?: boolean }): Promise<boolean> => {
+      if (!user || !isOwnerAdmin(user)) return false;
+      const background = options?.background === true;
       try {
-        const conversationsResponse = await messagesHttpService.getConversations();
-        if (!conversationsResponse.succeeded) return;
+        // Only the background branch adds the option: a foreground call must keep
+        // passing exactly the arguments it always has — the shell tests pin the
+        // call arguments, and a meaningless `{ background: false }` is noise.
+        const conversationsResponse = background
+          ? await messagesHttpService.getConversations({ background: true })
+          : await messagesHttpService.getConversations();
+        if (!conversationsResponse.succeeded) return false;
         const nextConversations = conversationsResponse.data;
         setConversations(nextConversations);
 
-        if (!withMessages) return;
+        const signature = conversationsActivitySignature(nextConversations);
+        // The first fetch only establishes the baseline; it is not activity.
+        const changed =
+          activitySignatureRef.current !== '' && signature !== activitySignatureRef.current;
+        activitySignatureRef.current = signature;
+
+        if (!withMessages) return changed;
         const active = nextConversations.find((c) => c.storeId === user.selectedStoreId);
         if (!active) {
           setMessages([]);
-          return;
+          return changed;
         }
 
-        const messagesResponse = await messagesHttpService.getMessages(active.id);
-        if (!messagesResponse.succeeded) return;
+        const messagesResponse = background
+          ? await messagesHttpService.getMessages(active.id, { background: true })
+          : await messagesHttpService.getMessages(active.id);
+        if (!messagesResponse.succeeded) return changed;
         const nextMessages = messagesResponse.data;
         setMessages(nextMessages);
 
@@ -89,13 +135,21 @@ export function MessageShell() {
         );
         if (unreadIncoming.length > 0) {
           await Promise.all(
-            unreadIncoming.map((message) => messagesHttpService.markAsRead(message.id)),
+            unreadIncoming.map((message) =>
+              background
+                ? messagesHttpService.markAsRead(message.id, { background: true })
+                : messagesHttpService.markAsRead(message.id),
+            ),
           );
-          const updatedResponse = await messagesHttpService.getConversations();
+          const updatedResponse = background
+            ? await messagesHttpService.getConversations({ background: true })
+            : await messagesHttpService.getConversations();
           if (updatedResponse.succeeded) setConversations(updatedResponse.data);
         }
+        return changed;
       } catch {
-        showToastError(intl.formatMessage({ id: 'MESSAGES.LOAD_ERROR' }));
+        if (!background) showToastError(intl.formatMessage({ id: 'MESSAGES.LOAD_ERROR' }));
+        return false;
       }
     },
     [user, intl],
@@ -165,21 +219,60 @@ export function MessageShell() {
 
   useEffect(() => {
     if (!user || !isOwnerAdmin(user)) return;
+    // Returning to the window is foreground too, even when the tab never hid.
+    // Re-arming the ladder covers "the timer was lost while we were away".
     function handleFocus() {
-      void refresh(isOpenRef.current);
+      resetPollRef.current(true);
     }
     window.addEventListener('focus', handleFocus);
     return () => window.removeEventListener('focus', handleFocus);
-  }, [user, refresh]);
+  }, [user]);
 
+  // T10 — incremental polling. setTimeout, not setInterval: the next delay is a
+  // function of what the last poll found. `resetPollRef` is how the rest of the
+  // component (a send, a realtime push, the tab coming back) snaps the ladder
+  // back to its fastest step.
   useEffect(() => {
     if (!user || !isOwnerAdmin(user)) return;
-    const intervalId = window.setInterval(() => {
-      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
-        void refresh(isOpenRef.current);
+    let cancelled = false;
+    let step = 0;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    const loop = async () => {
+      if (cancelled) return;
+      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
+        // Hidden: don't poll, and don't widen — leaving the tab is not idleness.
+        // visibilitychange re-arms at the fastest step and polls immediately.
+        timer = setTimeout(loop, POLL_LADDER_MS[POLL_LADDER_MS.length - 1]);
+        return;
       }
-    }, REFRESH_INTERVAL_MS);
-    return () => window.clearInterval(intervalId);
+      const changed = await refresh(isOpenRef.current, { background: true });
+      if (cancelled) return;
+      step = changed ? 0 : Math.min(step + 1, POLL_LADDER_MS.length - 1);
+      timer = setTimeout(loop, POLL_LADDER_MS[step]);
+    };
+
+    resetPollRef.current = (immediate) => {
+      if (cancelled) return;
+      step = 0;
+      if (timer !== undefined) clearTimeout(timer);
+      if (immediate) void loop();
+      else timer = setTimeout(loop, POLL_LADDER_MS[0]);
+    };
+
+    // Foreground: never assume the timer survived a backgrounded tab.
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') resetPollRef.current(true);
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    timer = setTimeout(loop, POLL_LADDER_MS[0]);
+
+    return () => {
+      cancelled = true;
+      if (timer !== undefined) clearTimeout(timer);
+      document.removeEventListener('visibilitychange', handleVisibility);
+      resetPollRef.current = () => {};
+    };
   }, [user, refresh]);
 
   // T9.3 — real-time push (SignalR). The hub delivers a new message or a read
@@ -194,11 +287,17 @@ export function MessageShell() {
       resolveMessagesHubUrl(import.meta.env['API_URL'] as string | undefined, window.location.origin),
     );
     const pull = () => void refresh(isOpenRef.current);
-    connection.on(RECEIVE_MESSAGE_EVENT, pull);
+    // A pushed message is activity too, so the fallback poll re-arms fast. A
+    // read receipt is not a new message and leaves the ladder alone.
+    const pullNewMessage = () => {
+      void refresh(isOpenRef.current);
+      resetPollRef.current(false);
+    };
+    connection.on(RECEIVE_MESSAGE_EVENT, pullNewMessage);
     connection.on(MESSAGE_READ_EVENT, pull);
     void connection.start().catch(() => undefined);
     return () => {
-      connection.off(RECEIVE_MESSAGE_EVENT, pull);
+      connection.off(RECEIVE_MESSAGE_EVENT, pullNewMessage);
       connection.off(MESSAGE_READ_EVENT, pull);
       void connection.stop().catch(() => undefined);
     };
@@ -232,6 +331,8 @@ export function MessageShell() {
       }
       setInputValue('');
       await refresh(true);
+      // An outgoing message is activity: the fallback poll goes back to 10s.
+      resetPollRef.current(false);
     } catch (error) {
       if (isNetworkFailure(error)) {
         enqueueMessage(payload);
