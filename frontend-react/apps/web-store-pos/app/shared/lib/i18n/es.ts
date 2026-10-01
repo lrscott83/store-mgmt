@@ -448,6 +448,11 @@ const messages: Record<string, string> = {
   'PRODUCTS.FORM.BARCODE': 'Código de barras',
   'PRODUCTS.FORM.AVAILABLE_TO_SALE': 'Disponible para Vender',
   'PRODUCTS.FORM.DISCOUNT_FROM_INVENTORY': 'Descuenta del Inventario',
+  // El popup de alta muestra DOS selectores de moneda contiguos (costo antes que precio). Con
+  // la etiqueta única "Moneda" los dos quedaban idénticos en pantalla; cada uno nombra su campo.
+  'PRODUCTS.FORM.COST_CURRENCY': 'Moneda del costo',
+  'PRODUCTS.FORM.PRICE_CURRENCY': 'Moneda del precio',
+  'PRODUCTS.ENTRY_CREATED': 'Producto creado y entrada de inventario registrada.',
   'PRODUCTS.EMPTY_STATE': 'No hay productos registrados',
   'PRODUCTS.CSV.TITLE': 'Importar productos desde CSV',
   'PRODUCTS.CSV.PREVIEW': 'Vista previa',

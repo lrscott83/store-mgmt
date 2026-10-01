@@ -148,6 +148,9 @@ export function ProductsPage() {
     availableToSale: boolean;
     discountFromInvantory: boolean;
     wholesale?: WholesaleConfig;
+    cost?: number;
+    quantity?: number;
+    costCurrency?: number;
   }) {
     const result = await productService.createProduct(
       data.categoryId,
@@ -168,6 +171,44 @@ export function ProductsPage() {
         result.errors[0]?.description ?? '',
       );
       return;
+    }
+
+    // Entrada del día (owner, costo + cantidad > 0): el modal solo envía cost/quantity cuando
+    // ambos califican, así que aquí basta con comprobar que la cantidad viene.
+    //
+    // `createProduct` devuelve `boolean`, no el id, pero `createInventoryEntry` lo necesita o
+    // devuelve null. Se resuelve con `findProductByCategoryAndName`, el MISMO método que usa el
+    // importador CSV para resolver el id de sus productos: ahí la identidad producto =
+    // categoría + nombre, case-insensitive. Así el producto recién creado recibe su entrada sin
+    // cambiar la firma de ProductService (la implementan los servicios online y offline).
+    //
+    // El producto YA está creado a este punto: si la entrada falla, el producto sobrevive y solo
+    // se pierde la entrada. Es lo correcto — la entrada es aditiva, nunca una condición del alta.
+    if (data.quantity !== undefined && data.cost !== undefined) {
+      const productRepository = new ProductRepository(
+        storeId,
+        new ProductCategoryRepository(storeId),
+      );
+      const created = productRepository.findProductByCategoryAndName(data.categoryId, data.name);
+      if (created) {
+        const entry = new InventoryOfflineService(
+          storeId,
+          productRepository,
+        ).createInventoryEntry(
+          created.id,
+          data.quantity,
+          data.cost,
+          multiMonedas ? data.costCurrency : undefined,
+        );
+        // Aviso de que la compra quedó contabilizada: el popup no muestra la lista de entradas
+        // y el costo NO se guarda en el producto, así que sin este toast el usuario se queda
+        // sin ninguna confirmación visible de que la entrada del día se creó. La primitive
+        // devuelve `null` (producto no encontrado) o un DataResult que puede no haber tenido
+        // éxito — el optional chain absorbe ambos, igual que hace el importador CSV.
+        if (entry?.succeeded) {
+          showToastSuccess(intl.formatMessage({ id: 'PRODUCTS.ENTRY_CREATED' }));
+        }
+      }
     }
 
     setModal(null);

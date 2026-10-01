@@ -2336,4 +2336,194 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     await waitFor(() => expect(screen.queryByText('Bebidas')).not.toBeInTheDocument());
     expect(showToastSuccessMock).toHaveBeenCalledWith('Todos los datos fueron eliminados.');
   });
+
+  // Entrada del día al crear un producto (costo + cantidad, owner only).
+  //
+  // handleCreateProduct resuelve el id del producto recién creado con
+  // findProductByCategoryAndName porque `createProduct` devuelve `boolean`, no el id, y
+  // `createInventoryEntry` lo necesita o devuelve null. El ProductRepository sigue REAL en
+  // esta suite, así que el producto debe existir en localStorage para que la resolución
+  // del id funcione — por eso se siembra con la misma clave que usa el repositorio.
+  describe('crear producto con costo y cantidad -> entrada del día', () => {
+    function seedProductsForIdLookup(products: Product[]) {
+      const entries = products.map((p) => [p.id, p] as [string, Product]);
+      localStorage.setItem(`lizoft.store-products-s1`, JSON.stringify(entries));
+    }
+
+    async function openCreateModalAndSubmit(fill?: () => void) {
+      mockCategories = [makeCategory()];
+      render(
+        <Wrapper>
+          <ProductsPage />
+        </Wrapper>,
+      );
+      fireEvent.click(await screen.findByTestId('category-actions-toggle-cat-1'));
+      fireEvent.click(screen.getByTestId('add-product-button'));
+      fireEvent.change(await screen.findByTestId('product-name-input'), {
+        target: { value: 'Ron' },
+      });
+      fireEvent.change(screen.getByTestId('product-price-input'), { target: { value: '500' } });
+      fill?.();
+      fireEvent.click(screen.getByTestId('create-product-submit'));
+    }
+
+    beforeEach(() => {
+      localStorage.clear();
+      // El producto que handleCreateProduct debe encontrar tras el alta.
+      seedProductsForIdLookup([makeProduct({ id: 'p-nuevo', name: 'Ron' })]);
+      // El popup solo muestra costo/cantidad al owner CON el módulo de Inventario (3).
+      mockUser.storeModuleIds = [EModules.Inventory];
+    });
+
+    afterEach(() => {
+      localStorage.clear();
+      mockUser.storeModuleIds = [];
+    });
+
+    it('crea UNA entrada con (id resuelto, cantidad, costo, moneda del costo)', async () => {
+      await openCreateModalAndSubmit(() => {
+        fireEvent.change(screen.getByTestId('product-cost-input'), { target: { value: '300' } });
+        fireEvent.change(screen.getByTestId('product-quantity-input'), { target: { value: '5' } });
+      });
+
+      await waitFor(() =>
+        expect(inventoryServiceSpies.createInventoryEntry).toHaveBeenCalledTimes(1),
+      );
+      // El id NO viene de createProduct (devuelve boolean): se resuelve por categoría+nombre,
+      // igual que hace el importador CSV.
+      expect(inventoryServiceSpies.createInventoryEntry).toHaveBeenCalledWith(
+        'p-nuevo',
+        5,
+        300,
+        undefined,
+      );
+    });
+
+    it('pasa la moneda del costo cuando el owner tiene MultiMonedas', async () => {
+      mockUser.storeModuleIds = [EModules.Inventory, EModules.MultiMonedas];
+      await openCreateModalAndSubmit(() => {
+        fireEvent.change(screen.getByTestId('product-cost-input'), { target: { value: '300' } });
+        fireEvent.change(screen.getByTestId('product-quantity-input'), { target: { value: '5' } });
+        fireEvent.change(screen.getByTestId('product-cost-currency-select'), {
+          target: { value: String(Currency.USD) },
+        });
+      });
+
+      await waitFor(() =>
+        expect(inventoryServiceSpies.createInventoryEntry).toHaveBeenCalledTimes(1),
+      );
+      expect(inventoryServiceSpies.createInventoryEntry).toHaveBeenCalledWith(
+        'p-nuevo',
+        5,
+        300,
+        Currency.USD,
+      );
+    });
+
+    it('NO crea entrada si falta el costo (sin fallback al precio, a diferencia del import)', async () => {
+      await openCreateModalAndSubmit(() => {
+        fireEvent.change(screen.getByTestId('product-quantity-input'), { target: { value: '5' } });
+      });
+
+      await waitFor(() => expect(productServiceSpies.createProduct).toHaveBeenCalledTimes(1));
+      expect(inventoryServiceSpies.createInventoryEntry).not.toHaveBeenCalled();
+    });
+
+    it('NO crea entrada si falta la cantidad', async () => {
+      await openCreateModalAndSubmit(() => {
+        fireEvent.change(screen.getByTestId('product-cost-input'), { target: { value: '300' } });
+      });
+
+      await waitFor(() => expect(productServiceSpies.createProduct).toHaveBeenCalledTimes(1));
+      expect(inventoryServiceSpies.createInventoryEntry).not.toHaveBeenCalled();
+    });
+
+    it('el costo explícito de 0 SÍ crea entrada (0 es un costo válido)', async () => {
+      await openCreateModalAndSubmit(() => {
+        fireEvent.change(screen.getByTestId('product-cost-input'), { target: { value: '0' } });
+        fireEvent.change(screen.getByTestId('product-quantity-input'), { target: { value: '3' } });
+      });
+
+      await waitFor(() =>
+        expect(inventoryServiceSpies.createInventoryEntry).toHaveBeenCalledTimes(1),
+      );
+      expect(inventoryServiceSpies.createInventoryEntry).toHaveBeenCalledWith(
+        'p-nuevo',
+        3,
+        0,
+        undefined,
+      );
+    });
+
+    it('el producto se crea AUNQUE la entrada no pueda crearse (producto ausente en storage)', async () => {
+      // Sin el producto sembrado, la resolución del id devuelve undefined y la entrada se
+      // salta. El alta ya ocurrió antes de ese punto: la entrada es aditiva, nunca una
+      // condición del alta.
+      localStorage.clear();
+      await openCreateModalAndSubmit(() => {
+        fireEvent.change(screen.getByTestId('product-cost-input'), { target: { value: '300' } });
+        fireEvent.change(screen.getByTestId('product-quantity-input'), { target: { value: '5' } });
+      });
+
+      await waitFor(() => expect(productServiceSpies.createProduct).toHaveBeenCalledTimes(1));
+      expect(inventoryServiceSpies.createInventoryEntry).not.toHaveBeenCalled();
+    });
+
+    it('crea la entrada con la cantidad DECIMAL tal cual se escribió', async () => {
+      // Kilos y litros: un `parseInt` mandaría 2.5 al inventario como 2 — una cantidad
+      // equivocada y silenciosa en una entrada contable.
+      await openCreateModalAndSubmit(() => {
+        fireEvent.change(screen.getByTestId('product-cost-input'), { target: { value: '300' } });
+        fireEvent.change(screen.getByTestId('product-quantity-input'), { target: { value: '2.5' } });
+      });
+
+      await waitFor(() =>
+        expect(inventoryServiceSpies.createInventoryEntry).toHaveBeenCalledTimes(1),
+      );
+      expect(inventoryServiceSpies.createInventoryEntry).toHaveBeenCalledWith(
+        'p-nuevo',
+        2.5,
+        300,
+        undefined,
+      );
+    });
+
+    it('confirma con un toast que la entrada del día se registró', async () => {
+      // El popup no lista las entradas y el costo no se guarda en el producto: sin este aviso
+      // el owner se queda sin ninguna confirmación visible de que su compra quedó contabilizada.
+      await openCreateModalAndSubmit(() => {
+        fireEvent.change(screen.getByTestId('product-cost-input'), { target: { value: '300' } });
+        fireEvent.change(screen.getByTestId('product-quantity-input'), { target: { value: '5' } });
+      });
+
+      await waitFor(() =>
+        expect(showToastSuccessMock).toHaveBeenCalledWith(
+          'Producto creado y entrada de inventario registrada.',
+        ),
+      );
+    });
+
+    it('NO dispara el toast de entrada cuando el producto se crea sin entrada', async () => {
+      await openCreateModalAndSubmit();
+
+      await waitFor(() => expect(productServiceSpies.createProduct).toHaveBeenCalledTimes(1));
+      expect(inventoryServiceSpies.createInventoryEntry).not.toHaveBeenCalled();
+      expect(showToastSuccessMock).not.toHaveBeenCalled();
+    });
+
+    it('NO dispara el toast de entrada cuando la entrada no se pudo crear', async () => {
+      // `createInventoryEntry` devuelve `null` cuando el producto no aparece en storage: el
+      // toast anunciaría una entrada que no existe. El producto se crea igual — la entrada es
+      // aditiva, nunca una condición del alta.
+      localStorage.clear();
+      await openCreateModalAndSubmit(() => {
+        fireEvent.change(screen.getByTestId('product-cost-input'), { target: { value: '300' } });
+        fireEvent.change(screen.getByTestId('product-quantity-input'), { target: { value: '5' } });
+      });
+
+      await waitFor(() => expect(productServiceSpies.createProduct).toHaveBeenCalledTimes(1));
+      expect(inventoryServiceSpies.createInventoryEntry).not.toHaveBeenCalled();
+      expect(showToastSuccessMock).not.toHaveBeenCalled();
+    });
+  });
 });
