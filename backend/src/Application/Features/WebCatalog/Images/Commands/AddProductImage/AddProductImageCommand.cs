@@ -73,6 +73,18 @@ namespace Application.Features.WebCatalog.Images.Commands.AddProductImage
             int order = existingImages.Count == 0 ? 0 : existingImages.Max(image => image.Order) + 1;
             ProductImage productImage = ProductImage.Create(request.ProductId, key, order, tenantId);
             await _productImageRepository.AddAsync(productImage);
+
+            // La PRIMERA imagen del producto alimenta además la fuente única, `Product.Image`
+            // (decisión del Owner, 2026-10-01): es la columna que lee el catálogo público, así que
+            // sin esto la imagen solo aparecería en la galería. Las siguientes NO la pisan (la
+            // principal es la que manda) y la fila de galería se sigue creando igual, que es lo que
+            // lee la galería comentada cuando se restaure.
+            if (existingImages.Count == 0)
+            {
+                product.Image = key;
+                await _productRepository.UpdateAsync(product);
+            }
+
             await _applicationUnitOfWork.SaveChangesAsync(cancellationToken);
 
             return ResponseResult.Success(key);

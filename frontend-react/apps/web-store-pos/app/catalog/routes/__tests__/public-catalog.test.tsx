@@ -159,6 +159,31 @@ describe('PublicCatalogPage', () => {
     );
   });
 
+  it('el popup no cae a la galería cuando el producto no tiene imagen principal', async () => {
+    // La imagen tiene UNA sola fuente (imageUrl). Con null, el popup NO puede tomar imageUrls[0]:
+    // así salía la foto fantasma de la imagen que la vista ya había borrado.
+    const product = makeProduct({
+      imageUrl: null,
+      imageUrls: [
+        '/api/v1/public/catalog/mi-tienda/media/t/s/p/a.jpg',
+        '/api/v1/public/catalog/mi-tienda/media/t/s/p/b.jpg',
+      ],
+    });
+    catalogMock.getPublicProducts.mockResolvedValue(envelope(page([product])));
+    catalogMock.getPublicProduct.mockResolvedValue(envelope(product));
+    renderPage();
+
+    fireEvent.click(await screen.findByTestId('catalog-card-cp1'));
+
+    const modal = await screen.findByTestId('catalog-detail-modal');
+    // El detalle del servidor ya llegó (el mock resuelve al vuelo).
+    await waitFor(() =>
+      expect(within(modal).getByTestId('catalog-detail-description')).toBeInTheDocument(),
+    );
+    expect(within(modal).queryByTestId('catalog-detail-image')).not.toBeInTheDocument();
+    expect(within(modal).getByText('Este producto no tiene imágenes.')).toBeInTheDocument();
+  });
+
   it('filtra por categoría y vuelve a la primera página', async () => {
     renderPage();
     await screen.findByTestId('catalog-card-cp1');
