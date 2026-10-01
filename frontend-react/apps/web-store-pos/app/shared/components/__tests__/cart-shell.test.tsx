@@ -1472,7 +1472,7 @@ describe('CartShell — mixed-currency cart conversion (módulo 16, T8)', () => 
       {
         method: SalePaymentMethod.Efectivo,
         currency: Currency.CUP,
-        value: 350,
+        buyValue: 350, sellValue: 350,
         effectiveFrom: new Date('2026-09-01T00:00:00.000Z'),
       },
     ];
@@ -1792,7 +1792,7 @@ describe('CartShell — T4: bloqueo del cambio de moneda', () => {
     return {
       method: SalePaymentMethod.Efectivo,
       currency: Currency.CUP,
-      value: 350,
+      buyValue: 350, sellValue: 350,
       effectiveFrom: new Date('2026-09-01T00:00:00.000Z'),
     };
   }
@@ -1952,7 +1952,7 @@ describe('CartShell — T17: Limpiar reinicia la moneda a CUP', () => {
       {
         method: SalePaymentMethod.Efectivo,
         currency: Currency.CUP,
-        value: 350,
+        buyValue: 350, sellValue: 350,
         effectiveFrom: new Date('2026-09-01T00:00:00.000Z'),
       },
     ];

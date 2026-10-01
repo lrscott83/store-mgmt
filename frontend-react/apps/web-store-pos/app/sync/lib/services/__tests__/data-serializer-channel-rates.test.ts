@@ -60,13 +60,15 @@ describe('DataSerializerService — channelRates entry (multipayments T4)', () =
     channelRateSvc.registerRate({
       method: SalePaymentMethod.Efectivo,
       currency: Currency.CUP,
-      value: 700,
+      buyValue: 700,
+      sellValue: 700,
       effectiveFrom: new Date('2026-09-01T00:00:00.000Z'),
     });
     channelRateSvc.registerRate({
       method: SalePaymentMethod.Zelle,
       currency: Currency.USD,
-      value: 1,
+      buyValue: 1,
+      sellValue: 1,
       effectiveFrom: new Date('2026-09-10T00:00:00.000Z'),
     });
 
@@ -76,8 +78,8 @@ describe('DataSerializerService — channelRates entry (multipayments T4)', () =
     expect(parsed.channelRates).toHaveLength(2);
     expect(parsed.channelRates[0].method).toBe(SalePaymentMethod.Efectivo);
     expect(parsed.channelRates[0].currency).toBe(Currency.CUP);
-    expect(parsed.channelRates[0].value).toBe(700);
-    expect(parsed.channelRates[1].value).toBe(1);
+    expect(parsed.channelRates[0].buyValue).toBe(700);
+    expect(parsed.channelRates[1].buyValue).toBe(1);
   });
 
   it('preserves the isActive flag across export → import (T19b)', async () => {
@@ -85,7 +87,8 @@ describe('DataSerializerService — channelRates entry (multipayments T4)', () =
     const registered = channelRateSvc.registerRate({
       method: SalePaymentMethod.Efectivo,
       currency: Currency.CUP,
-      value: 700,
+      buyValue: 700,
+      sellValue: 700,
       effectiveFrom: new Date('2026-09-01T00:00:00.000Z'),
     });
     channelRateSvc.setChannelRateActive(registered.data!.id!, false);

@@ -229,6 +229,7 @@ const messages: Record<string, string> = {
   'MENU.OWNERS': 'Propietarios',
   'MENU.RESELLERS': 'Gestores',
   'MENU.FEATURES': 'Funcionalidades',
+  'MENU.ADMIN_MESSAGES': 'Mensajes',
   'MENU.MODULES': 'Módulos',
 
   // Menu items — Sales (Angular MENU.SALE_MGMT.*)
@@ -1177,6 +1178,12 @@ const messages: Record<string, string> = {
   'CHANNEL_RATES.METHOD_LABEL': 'Método de pago',
   'CHANNEL_RATES.CURRENCY_LABEL': 'Moneda',
   'CHANNEL_RATES.VALUE_LABEL': 'Valor (unidades por 1 USD)',
+  'CHANNEL_RATES.BUY_VALUE_LABEL': 'Valor de compra (unidades por 1 USD)',
+  'CHANNEL_RATES.SELL_VALUE_LABEL': 'Valor de venta (unidades por 1 USD)',
+  'CHANNEL_RATES.BUY_VALUE_HELP':
+    'Unidades de la moneda del canal por 1 USD cuando se compra la moneda.',
+  'CHANNEL_RATES.SELL_VALUE_HELP':
+    'Unidades de la moneda del canal por 1 USD cuando se vende la moneda.',
   'CHANNEL_RATES.EFFECTIVE_FROM_LABEL': 'Vigente desde',
   'CHANNEL_RATES.REGISTER': 'Registrar tasa',
   'CHANNEL_RATES.SAVED': 'Tasa registrada correctamente.',
@@ -1189,6 +1196,8 @@ const messages: Record<string, string> = {
   'CHANNEL_RATES.CHANNEL_COLUMN': 'Canal',
   'CHANNEL_RATES.CURRENCY_COLUMN': 'Moneda',
   'CHANNEL_RATES.VALUE_COLUMN': 'Valor',
+  'CHANNEL_RATES.BUY_VALUE_COLUMN': 'Compra',
+  'CHANNEL_RATES.SELL_VALUE_COLUMN': 'Venta',
   'CHANNEL_RATES.EFFECTIVE_FROM_COLUMN': 'Vigente desde',
   'CHANNEL_RATES.CREATED_DATE_COLUMN': 'Registrado',
   'CHANNEL_RATES.NO_RECORDS': 'No hay tasas registradas todavía.',
@@ -1488,6 +1497,24 @@ const messages: Record<string, string> = {
   'MULTISTORE.NO_CREDITS_IN_RANGE': 'Sin créditos en el rango seleccionado',
   'MULTISTORE.NO_ENTRIES_IN_RANGE': 'Sin entradas en el rango seleccionado',
   'MULTISTORE.STORE_SELECT_ARIA': 'Seleccionar tienda',
+
+  // Owner messaging (owner↔SuperAdmin chat): header icon, collapsible panel and
+  // error toasts. No raw HTTP error text is ever shown.
+  'MESSAGES.TITLE': 'Mensajes',
+  'MESSAGES.EMPTY': 'No hay mensajes con el administrador.',
+  'MESSAGES.INPUT_PLACEHOLDER': 'Escriba un mensaje',
+  'MESSAGES.SEND': 'Enviar',
+  'MESSAGES.PENDING': 'Pendiente',
+  'MESSAGES.LOAD_ERROR': 'No se pudieron cargar los mensajes. Intente de nuevo.',
+  'MESSAGES.SEND_ERROR': 'No se pudo enviar el mensaje. Intente de nuevo.',
+  'MESSAGES.LIST_EMPTY': 'No hay conversaciones.',
+  'MESSAGES.SELECT_CONVERSATION': 'Seleccione una conversación para ver los mensajes.',
+  'MESSAGES.BROADCAST': 'Difusión',
+  'MESSAGES.BROADCAST_TITLE': 'Enviar difusión',
+  'MESSAGES.BROADCAST_PLACEHOLDER': 'Escriba el mensaje para todos los propietarios',
+  'MESSAGES.BROADCAST_SEND': 'Enviar difusión',
+  'MESSAGES.BROADCAST_SUCCESS': 'Difusión enviada.',
+  'MESSAGES.BROADCAST_ERROR': 'No se pudo enviar la difusión. Intente de nuevo.',
 };
 
 export default messages;

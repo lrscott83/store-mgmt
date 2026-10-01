@@ -10,8 +10,9 @@ import { DataResult } from './result';
  *
  * Integer math only: amounts are integer CENTS (2dp) and rates are integer
  * MILLIONTHS (6dp, value * 1e6). `divideHalfUp` is the ONLY rounding and runs
- * once at the end of each conversion, so no intermediate float artifact leaks
- * into a result.
+ * exactly ONCE per conversion, over the whole USD pivot — never once per hop —
+ * so no intermediate float or intermediate rounding artifact leaks into a
+ * result.
  *
  * Cascade (ratified decision 4): exact channel → same currency (any method) →
  * synthetic USD pivot (value 1e6, never replicated as a persisted row) → typed
@@ -24,10 +25,12 @@ export const RATE_MICRO = 1_000_000;
 /** Synthetic pivot value for USD when no persisted row resolves. */
 const USD_PIVOT_MICRO = 1_000_000;
 
-/** A rate ready for integer math: `value` is always integer millionths. */
+/** A rate ready for integer math: `buyValue` and `sellValue` are always integer millionths. */
 export interface ResolvedChannelRate {
-  /** Moneda-por-USD in integer millionths (value * 1e6). */
-  value: number;
+  /** Buy value in integer millionths (buyValue * 1e6). */
+  buyValue: number;
+  /** Sell value in integer millionths (sellValue * 1e6). */
+  sellValue: number;
   /** Channel method that resolved the rate; absent on a currency-only USD pivot. */
   method?: SalePaymentMethod;
   currency: Currency;
@@ -72,7 +75,13 @@ function rateNotFound<T>(): DataResult<T> {
  * `ChannelRateErrors.RateNotFound`.
  */
 function isUsableRate(row: ChannelRate): boolean {
-  return row.isActive !== false && Number.isFinite(row.value) && row.value > 0;
+  return (
+    row.isActive !== false &&
+    Number.isFinite(row.buyValue) &&
+    row.buyValue > 0 &&
+    Number.isFinite(row.sellValue) &&
+    row.sellValue > 0
+  );
 }
 
 function toResolved(rate: ChannelRate): ResolvedChannelRate {
@@ -80,7 +89,8 @@ function toResolved(rate: ChannelRate): ResolvedChannelRate {
     id: rate.id,
     method: rate.method,
     currency: rate.currency,
-    value: Math.round(rate.value * RATE_MICRO),
+    buyValue: Math.round(rate.buyValue * RATE_MICRO),
+    sellValue: Math.round(rate.sellValue * RATE_MICRO),
     effectiveFrom: rate.effectiveFrom,
   };
 }
@@ -160,7 +170,7 @@ export function resolveChannelRate(
 
   if (Number(currency) === Number(Currency.USD)) {
     // Synthetic pivot: no id/effectiveFrom — never fabricate persisted values.
-    return success({ value: USD_PIVOT_MICRO, method, currency: Currency.USD });
+    return success({ buyValue: USD_PIVOT_MICRO, sellValue: USD_PIVOT_MICRO, method, currency: Currency.USD });
   }
 
   return rateNotFound<ResolvedChannelRate>();
@@ -179,7 +189,7 @@ export function resolveCurrencyRate(
   if (anyMethod) return success(toResolved(anyMethod));
 
   if (Number(currency) === Number(Currency.USD)) {
-    return success({ value: USD_PIVOT_MICRO, currency: Currency.USD });
+    return success({ buyValue: USD_PIVOT_MICRO, sellValue: USD_PIVOT_MICRO, currency: Currency.USD });
   }
 
   return rateNotFound<ResolvedChannelRate>();
@@ -201,20 +211,29 @@ export function convertPaymentAmount(
   rates: readonly ChannelRate[],
   at: Date,
 ): DataResult<number> {
-  const source = resolveChannelRate(rates, method, currency, at);
-
   if (Number(currency) === Number(toCurrency)) {
-    if (source.succeeded) {
-      return success(divideHalfUp(amountCents * source.data!.value, source.data!.value));
-    }
     return success(amountCents);
   }
 
+  const source = resolveChannelRate(rates, method, currency, at);
   const target = resolveCurrencyRate(rates, toCurrency, at);
 
   if (!source.succeeded) return rateNotFound<number>();
   if (!target.succeeded) return rateNotFound<number>();
-  return success(divideHalfUp(amountCents * target.data!.value, source.data!.value));
+
+  // Cross-currency conversion via USD pivot, collapsed into ONE division so
+  // `divideHalfUp` runs exactly once (RF-08). A non-USD source divides by
+  // buyValue (the bank buys the source currency); a non-USD target multiplies
+  // by sellValue (the bank sells the target currency). Rounding at the USD hop
+  // and again at the target hop would round twice and drift from the exact
+  // value — e.g. 1 cent EUR at EUR=2 / CUP=3 must be 2, not 3.
+  const sourceIsUsd = Number(currency) === Number(Currency.USD);
+  const targetIsUsd = Number(toCurrency) === Number(Currency.USD);
+
+  const numerator = targetIsUsd ? amountCents * RATE_MICRO : amountCents * target.data!.sellValue;
+  const denominator = sourceIsUsd ? RATE_MICRO : source.data!.buyValue;
+
+  return success(divideHalfUp(numerator, denominator));
 }
 
 /**
@@ -229,17 +248,23 @@ export function convertLineAmount(
   rates: readonly ChannelRate[],
   at: Date,
 ): DataResult<number> {
-  const source = resolveCurrencyRate(rates, fromCurrency, at);
-  const target = resolveCurrencyRate(rates, toCurrency, at);
-
   if (Number(fromCurrency) === Number(toCurrency)) {
-    if (source.succeeded && target.succeeded) {
-      return success(divideHalfUp(amountCents * target.data!.value, source.data!.value));
-    }
     return success(amountCents);
   }
 
+  const source = resolveCurrencyRate(rates, fromCurrency, at);
+  const target = resolveCurrencyRate(rates, toCurrency, at);
+
   if (!source.succeeded) return rateNotFound<number>();
   if (!target.succeeded) return rateNotFound<number>();
-  return success(divideHalfUp(amountCents * target.data!.value, source.data!.value));
+
+  // Same single-rounding collapse as `convertPaymentAmount` (RF-08/RF-09):
+  // one `divideHalfUp` over the whole USD pivot, never one per hop.
+  const sourceIsUsd = Number(fromCurrency) === Number(Currency.USD);
+  const targetIsUsd = Number(toCurrency) === Number(Currency.USD);
+
+  const numerator = targetIsUsd ? amountCents * RATE_MICRO : amountCents * target.data!.sellValue;
+  const denominator = sourceIsUsd ? RATE_MICRO : source.data!.buyValue;
+
+  return success(divideHalfUp(numerator, denominator));
 }

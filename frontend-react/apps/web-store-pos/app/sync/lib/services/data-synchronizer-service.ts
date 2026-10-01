@@ -318,7 +318,7 @@ interface MergeOutcome {
 function channelRateIdOf(rate: ChannelRate): string {
   return (
     rate.id ??
-    `${rate.method}-${rate.currency}-${rate.value}-${new Date(rate.effectiveFrom).toISOString()}`
+    `${rate.method}-${rate.currency}-${rate.buyValue}-${rate.sellValue}-${new Date(rate.effectiveFrom).toISOString()}`
   );
 }
 

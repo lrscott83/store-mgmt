@@ -79,7 +79,7 @@ export function settleMultiPayments(
       currency: row.currency,
       // Outbound boundary: persist UNITS, the same unit as Order.total.
       amount: row.amount,
-      rateApplied: rate ? rate.value / RATE_MICRO : 1,
+      rateApplied: rate ? rate.buyValue / RATE_MICRO : 1,
       rateMethod: rate?.method ?? null,
       rateCurrency: rate?.currency ?? null,
       rateEffectiveFrom: rate?.effectiveFrom ?? null,

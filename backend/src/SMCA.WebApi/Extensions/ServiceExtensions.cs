@@ -48,6 +48,22 @@ namespace SMCA.WebApi.Extensions
                     };
                     options.Events = new JwtBearerEvents
                     {
+                        OnMessageReceived = context =>
+                        {
+                            // Browsers cannot set an Authorization header on a
+                            // WebSocket/SSE handshake, so the SignalR JS client
+                            // passes the access token as ?access_token=... for the
+                            // /hubs paths. Accept it ONLY there; REST keeps using
+                            // the Authorization header untouched.
+                            var accessToken = context.Request.Query["access_token"];
+                            if (!string.IsNullOrEmpty(accessToken) &&
+                                context.HttpContext.Request.Path.StartsWithSegments("/hubs"))
+                            {
+                                context.Token = accessToken;
+                            }
+
+                            return Task.CompletedTask;
+                        },
                         OnAuthenticationFailed = async (context) =>
                         {
                             Console.WriteLine("Printing in the delegate OnAuthFailed");

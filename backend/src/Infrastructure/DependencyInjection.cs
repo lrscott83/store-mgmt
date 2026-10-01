@@ -93,6 +93,7 @@ namespace Infrastructure
             services.AddScoped<IInventoryEntryCostRepository, InventoryEntryCostRepository>();
             services.AddScoped<IStoreUsageRepository, StoreUsageRepository>();
             services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
+            services.AddScoped<IMessageRepository, MessageRepository>();
         }
     }
 }

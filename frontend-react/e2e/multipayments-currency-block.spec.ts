@@ -227,10 +227,14 @@ test.describe.serial('multipayments currency block (módulo 16) — cambio bloqu
     // T22: registration lives in the `+ Tasa` popup (the inline card is gone).
     await page.getByTestId('channel-rate-add').click();
     await expect(page.getByTestId('channel-rate-add-dialog')).toBeVisible();
-    await expect(page.getByTestId('channel-rate-value')).toBeVisible();
+    await expect(page.getByTestId('channel-rate-buy-value')).toBeVisible();
+    await expect(page.getByTestId('channel-rate-sell-value')).toBeVisible();
     await page.getByTestId('channel-rate-currency').selectOption('0'); // CUP
     await page.getByTestId('channel-rate-method').selectOption('0'); // Efectivo
-    await page.getByTestId('channel-rate-value').fill('100');
+    // Buy/sell migration (ddd41489): both values registered, the buy value
+    // enables the USD conversion asserted below.
+    await page.getByTestId('channel-rate-buy-value').fill('100');
+    await page.getByTestId('channel-rate-sell-value').fill('100');
     await page.getByTestId('channel-rate-submit').click();
     await expect(page.getByTestId('channel-rate-saved')).toBeVisible();
 

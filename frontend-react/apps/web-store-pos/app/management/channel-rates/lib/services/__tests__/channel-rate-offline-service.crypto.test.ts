@@ -50,7 +50,8 @@ describe('channel-rate-offline-service — at-rest encryption seam (entity-at-re
     service.registerRate({
       method: SalePaymentMethod.Efectivo,
       currency: Currency.CUP,
-      value: 700,
+      buyValue: 700,
+      sellValue: 700,
       effectiveFrom: new Date('2026-09-01T00:00:00.000Z'),
     });
 
@@ -69,7 +70,8 @@ describe('channel-rate-offline-service — at-rest encryption seam (entity-at-re
     service.registerRate({
       method: SalePaymentMethod.Efectivo,
       currency: Currency.CUP,
-      value: 700,
+      buyValue: 700,
+      sellValue: 700,
       effectiveFrom: new Date('2026-09-01T00:00:00.000Z'),
     });
 
@@ -78,7 +80,7 @@ describe('channel-rate-offline-service — at-rest encryption seam (entity-at-re
     expect(raw!.startsWith('enc:v1:')).toBe(true);
 
     expect(service.getStorageChannelRates()).toHaveLength(1);
-    expect(service.getStorageChannelRates()[0].value).toBe(700);
+    expect(service.getStorageChannelRates()[0].buyValue).toBe(700);
   });
 
   it('a provisioned-but-locked read never destroys existing ciphertext', () => {
@@ -88,7 +90,8 @@ describe('channel-rate-offline-service — at-rest encryption seam (entity-at-re
     service.registerRate({
       method: SalePaymentMethod.Efectivo,
       currency: Currency.CUP,
-      value: 700,
+      buyValue: 700,
+      sellValue: 700,
       effectiveFrom: new Date('2026-09-01T00:00:00.000Z'),
     });
 
@@ -110,7 +113,8 @@ describe('channel-rate-offline-service — at-rest encryption seam (entity-at-re
     service.registerRate({
       method: SalePaymentMethod.Efectivo,
       currency: Currency.CUP,
-      value: 700,
+      buyValue: 700,
+      sellValue: 700,
       effectiveFrom: new Date('2026-09-01T00:00:00.000Z'),
     });
 
@@ -122,7 +126,8 @@ describe('channel-rate-offline-service — at-rest encryption seam (entity-at-re
       service.registerRate({
         method: SalePaymentMethod.Efectivo,
         currency: Currency.CUP,
-        value: 800,
+        buyValue: 800,
+        sellValue: 800,
         effectiveFrom: new Date('2026-09-02T00:00:00.000Z'),
       }),
     ).toThrow(MissingDataKeyError);

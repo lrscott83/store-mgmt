@@ -90,7 +90,8 @@ function seedRate(overrides: Partial<RegisterChannelRateInput> = {}) {
   return svc.registerRate({
     method: SalePaymentMethod.Efectivo,
     currency: Currency.CUP,
-    value: 700,
+    buyValue: 700,
+    sellValue: 700,
     effectiveFrom: new Date(2026, 8, 1),
     ...overrides,
   });
@@ -161,7 +162,7 @@ describe('ChannelRatesPage (multipayments) — header and registration popup (T2
   it('keeps the registration form out of the view: only the `+ Tasa` popup registers', () => {
     renderPage();
 
-    expect(screen.queryByTestId('channel-rate-value')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('channel-rate-buy-value')).not.toBeInTheDocument();
     // The old "Registrar" card title is gone from the view (the popup carries it).
     expect(screen.queryByText('Registrar tasa')).not.toBeInTheDocument();
   });
@@ -173,7 +174,8 @@ describe('ChannelRatesPage (multipayments) — header and registration popup (T2
     openRegisterDialog();
     expect(screen.getByTestId('channel-rate-add-dialog')).toBeInTheDocument();
 
-    fireEvent.change(screen.getByTestId('channel-rate-value'), { target: { value: '350' } });
+    fireEvent.change(screen.getByTestId('channel-rate-buy-value'), { target: { value: '350' } });
+    fireEvent.change(screen.getByTestId('channel-rate-sell-value'), { target: { value: '350' } });
     fireEvent.click(screen.getByTestId('channel-rate-submit'));
 
     await waitFor(() => {
@@ -181,7 +183,7 @@ describe('ChannelRatesPage (multipayments) — header and registration popup (T2
     });
     expect(screen.queryByTestId('channel-rate-add-dialog')).not.toBeInTheDocument();
     expect(await screen.findByTestId('channel-rate-saved')).toBeInTheDocument();
-    expect(new ChannelRateOfflineService(storeId).getStorageChannelRates()[0].value).toBe(350);
+    expect(new ChannelRateOfflineService(storeId).getStorageChannelRates()[0].buyValue).toBe(350);
   });
 
   it('the header `?` opens a popup explaining that each value is 1 USD in the channel currency', () => {
@@ -232,7 +234,8 @@ describe('ChannelRatesPage (multipayments) — real channels only', () => {
     fireEvent.change(await screen.findByTestId('channel-rate-currency'), {
       target: { value: String(Currency.MLC) },
     });
-    fireEvent.change(screen.getByTestId('channel-rate-value'), { target: { value: '350' } });
+    fireEvent.change(screen.getByTestId('channel-rate-buy-value'), { target: { value: '350' } });
+    fireEvent.change(screen.getByTestId('channel-rate-sell-value'), { target: { value: '350' } });
     fireEvent.click(screen.getByTestId('channel-rate-submit'));
 
     await waitFor(() => {
@@ -247,7 +250,7 @@ describe('ChannelRatesPage (multipayments) — real channels only', () => {
 
   it('keeps rendering legacy rows whose channel is no longer in the catalogue', async () => {
     // Zelle+CUP does not exist in the catalogue but may already be stored.
-    seedRate({ method: SalePaymentMethod.Zelle, currency: Currency.CUP, value: 1 });
+    seedRate({ method: SalePaymentMethod.Zelle, currency: Currency.CUP, buyValue: 1, sellValue: 1 });
 
     renderPage();
 
@@ -259,7 +262,7 @@ describe('ChannelRatesPage (multipayments) — real channels only', () => {
   });
 
   it('always shows the currency in the channel name, in the selector and the history (T19a)', async () => {
-    seedRate({ method: SalePaymentMethod.Efectivo, currency: Currency.USD, value: 720 });
+    seedRate({ method: SalePaymentMethod.Efectivo, currency: Currency.USD, buyValue: 720, sellValue: 720 });
 
     renderPage();
     openRegisterDialog();
@@ -281,8 +284,8 @@ describe('ChannelRatesPage (multipayments) — real channels only', () => {
 
 describe('ChannelRatesPage (multipayments) — register and history', () => {
   it('renders existing rows from the append-only register', async () => {
-    seedRate({ value: 700 });
-    seedRate({ value: 720, effectiveFrom: new Date(2026, 8, 10) });
+    seedRate({ buyValue: 700, sellValue: 700 });
+    seedRate({ buyValue: 720, sellValue: 720, effectiveFrom: new Date(2026, 8, 10) });
 
     renderPage();
 
@@ -297,7 +300,8 @@ describe('ChannelRatesPage (multipayments) — register and history', () => {
     expect(await screen.findByTestId('channel-rate-empty')).toBeInTheDocument();
 
     openRegisterDialog();
-    fireEvent.change(screen.getByTestId('channel-rate-value'), { target: { value: '350' } });
+    fireEvent.change(screen.getByTestId('channel-rate-buy-value'), { target: { value: '350' } });
+    fireEvent.change(screen.getByTestId('channel-rate-sell-value'), { target: { value: '350' } });
     fireEvent.click(screen.getByTestId('channel-rate-submit'));
 
     await waitFor(() => {
@@ -307,7 +311,7 @@ describe('ChannelRatesPage (multipayments) — register and history', () => {
 
     const stored = new ChannelRateOfflineService(storeId).getStorageChannelRates();
     expect(stored).toHaveLength(1);
-    expect(stored[0].value).toBe(350);
+    expect(stored[0].buyValue).toBe(350);
   });
 
   it('rejects an invalid value (0) with the typed error and writes nothing', async () => {
@@ -316,7 +320,7 @@ describe('ChannelRatesPage (multipayments) — register and history', () => {
     expect(await screen.findByTestId('channel-rate-empty')).toBeInTheDocument();
 
     openRegisterDialog();
-    fireEvent.change(screen.getByTestId('channel-rate-value'), { target: { value: '0' } });
+    fireEvent.change(screen.getByTestId('channel-rate-buy-value'), { target: { value: '0' } });
     fireEvent.click(screen.getByTestId('channel-rate-submit'));
 
     expect(await screen.findByTestId('channel-rate-error')).toHaveTextContent(
@@ -333,7 +337,8 @@ describe('ChannelRatesPage (multipayments) — register and history', () => {
 
     expect(await screen.findByTestId('channel-rate-empty')).toBeInTheDocument();
     openRegisterDialog();
-    fireEvent.change(screen.getByTestId('channel-rate-value'), { target: { value: '350' } });
+    fireEvent.change(screen.getByTestId('channel-rate-buy-value'), { target: { value: '350' } });
+    fireEvent.change(screen.getByTestId('channel-rate-sell-value'), { target: { value: '350' } });
     fireEvent.click(screen.getByTestId('channel-rate-submit'));
     await screen.findByTestId('channel-rate-saved');
 
@@ -374,13 +379,13 @@ describe('ChannelRatesPage (multipayments) — T22 view shape', () => {
     svc.registerRate({
       method: SalePaymentMethod.Efectivo,
       currency: Currency.CUP,
-      value: 700,
+      buyValue: 700, sellValue: 700,
       effectiveFrom: new Date(2026, 8, 1),
     });
     svc.registerRate({
       method: SalePaymentMethod.Transferencia,
       currency: Currency.MLC,
-      value: 350,
+      buyValue: 350, sellValue: 350,
       effectiveFrom: new Date(2026, 8, 2),
     });
 
@@ -403,7 +408,7 @@ describe('ChannelRatesPage (multipayments) — T22 view shape', () => {
   });
 
   it('the `?` column of the history opens a popup with the row details and dates', async () => {
-    seedRate({ value: 700, effectiveFrom: new Date(2026, 8, 1) });
+    seedRate({ buyValue: 700, sellValue: 700, effectiveFrom: new Date(2026, 8, 1) });
 
     renderPage();
 
@@ -423,7 +428,7 @@ describe('ChannelRatesPage (multipayments) — T22 view shape', () => {
   });
 
   it('the value column of the history is a bare number too', async () => {
-    seedRate({ value: 720 });
+    seedRate({ buyValue: 720, sellValue: 720 });
 
     renderPage();
 
@@ -439,8 +444,8 @@ describe('ChannelRatesPage (multipayments) — T22 view shape', () => {
 describe('ChannelRatesPage (multipayments) — deactivate (T19b)', () => {
   it('deactivates the current row via the trash icon + confirmation popup, and the channel shows its latest active rate', async () => {
     // Two rows for the same channel: the newest (720) is in force.
-    seedRate({ value: 700, effectiveFrom: new Date(2026, 8, 1) });
-    seedRate({ value: 720, effectiveFrom: new Date(2026, 8, 10) });
+    seedRate({ buyValue: 700, sellValue: 700, effectiveFrom: new Date(2026, 8, 1) });
+    seedRate({ buyValue: 720, sellValue: 720, effectiveFrom: new Date(2026, 8, 10) });
 
     renderPage();
 
@@ -466,12 +471,12 @@ describe('ChannelRatesPage (multipayments) — deactivate (T19b)', () => {
     // History keeps both rows; the deactivated one is inactive in storage.
     expect(screen.getAllByTestId(/^channel-rate-row-/)).toHaveLength(2);
     const stored = new ChannelRateOfflineService(storeId).getStorageChannelRates();
-    expect(stored.find((row) => row.value === 720)?.isActive).toBe(false);
-    expect(stored.find((row) => row.value === 700)?.isActive).toBeUndefined();
+    expect(stored.find((row) => row.buyValue === 720)?.isActive).toBe(false);
+    expect(stored.find((row) => row.buyValue === 700)?.isActive).toBeUndefined();
   });
 
   it('a row deactivated before render leaves "Tasas Vigentes" but stays in history', async () => {
-    const row = seedRate({ value: 700 });
+    const row = seedRate({ buyValue: 700, sellValue: 700 });
     new ChannelRateOfflineService(storeId).setChannelRateActive(row.data!.id!, false);
 
     renderPage();
@@ -480,11 +485,12 @@ describe('ChannelRatesPage (multipayments) — deactivate (T19b)', () => {
     expect(await screen.findByTestId('channel-rate-current-empty')).toBeInTheDocument();
     // …while the append-only history still lists the row.
     expect(screen.getAllByTestId(/^channel-rate-row-/)).toHaveLength(1);
-    expect(screen.getByText('700')).toBeInTheDocument();
+    // Buy and sell are separate columns, so both values (700) are present.
+    expect(screen.getAllByText('700')).toHaveLength(2);
   });
 
   it('treats a stored row without isActive as active (backwards compatible)', async () => {
-    seedRate({ value: 700 });
+    seedRate({ buyValue: 700, sellValue: 700 });
 
     renderPage();
 

@@ -687,6 +687,115 @@ namespace Infrastructure.Migrations
                     b.ToTable("InventoryEntryCost");
                 });
 
+            modelBuilder.Entity("Domain.Entities.Messages.Conversation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime>("LastMessageAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("LastMessageContent")
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("StoreId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("UpdatedDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OwnerId");
+
+                    b.HasIndex("StoreId");
+
+                    b.HasIndex("OwnerId", "StoreId")
+                        .IsUnique();
+
+                    b.ToTable("Conversations", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.Entities.Messages.Message", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<Guid>("ConversationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsDeletedByRecipient")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsDeletedBySender")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("ReadAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("RecipientId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("SenderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("SenderType")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("SentAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("StoreId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("UpdatedDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ConversationId");
+
+                    b.HasIndex("RecipientId");
+
+                    b.HasIndex("SenderId");
+
+                    b.ToTable("Messages", (string)null);
+                });
+
             modelBuilder.Entity("Domain.Entities.Modules.Module", b =>
                 {
                     b.Property<int>("Id")

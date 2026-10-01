@@ -49,7 +49,8 @@ function cupRate(value: number): ChannelRate {
     id: `rate-cup-${value}`,
     method: SalePaymentMethod.Efectivo,
     currency: Currency.CUP,
-    value,
+    buyValue: value,
+    sellValue: value,
     effectiveFrom: new Date('2020-01-01T00:00:00.000Z'),
     createdDate: new Date('2020-01-01T00:00:00.000Z'),
   };

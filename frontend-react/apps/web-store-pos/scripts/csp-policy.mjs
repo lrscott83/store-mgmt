@@ -49,7 +49,14 @@ const BASE_DIRECTIVES = [
   // 'data:' is required because html2canvas rasterizes data:image/* sources for PDF export (jspdf).
   ['img-src', ["'self'", "data:"]],
   ['font-src', ["'self'"]],
-  ['connect-src', ["'self'"]],
+  // 'ws:' / 'wss:' are REQUIRED for the SignalR hub WebSocket: 'self' does NOT
+  // resolve to websocket schemes in all browsers (MDN connect-src; see
+  // w3c/webappsec-csp#7), so a same-origin wss://<host>/hubs/messages would be
+  // blocked silently in some of them. A scheme source keeps the policy static —
+  // the host varies per environment and the SAME image serves test and prod, so
+  // a host source cannot be baked here. Cost, accepted deliberately by the
+  // owner on 2026-09-30: ws(s) to any host becomes reachable from the page.
+  ['connect-src', ["'self'", "ws:", "wss:"]],
   // worker-src stays 'self': zip.js Web Workers are disabled app-wide
   // (configure({ useWebWorkers: false })), so no blob: worker is ever spawned.
   ['worker-src', ["'self'"]],
@@ -97,7 +104,10 @@ export function buildCspDirectives(env, options = {}) {
 
   if (env === 'dev') {
     const { apiUrl, devServerOrigin = DEFAULT_DEV_SERVER_ORIGIN } = options;
-    const connectSrc = ["'self'"];
+    // Start from the base tokens ('self' ws: wss:) so the hub WebSocket is
+    // covered in dev as well — there the app is on :3333 and the hub on the
+    // API origin, then add the env-derived origins on top.
+    const connectSrc = [...directives.get('connect-src')];
     const apiOrigin = deriveApiOrigin(apiUrl);
     if (apiOrigin) connectSrc.push(apiOrigin);
     const wsOrigin = deriveWsOrigin(devServerOrigin);

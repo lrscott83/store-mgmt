@@ -47,7 +47,8 @@ function registerCupRate(): void {
   const written = new ChannelRateOfflineService(STORE_ID).registerRate({
     method: SalePaymentMethod.Efectivo,
     currency: Currency.CUP,
-    value: CUP_PER_USD,
+    buyValue: CUP_PER_USD,
+    sellValue: CUP_PER_USD,
     effectiveFrom: RATE_EFFECTIVE_FROM,
   });
   expect(written.succeeded).toBe(true);
@@ -95,7 +96,8 @@ describe('T10.2 — pagar una venta en dos canales distintos (servicios + reposi
     expect(rates[0]).toMatchObject({
       method: SalePaymentMethod.Efectivo,
       currency: Currency.CUP,
-      value: CUP_PER_USD,
+      buyValue: CUP_PER_USD,
+      sellValue: CUP_PER_USD,
     });
     // Las fechas se reviven en la lectura: la liquidación compara instantes, no strings.
     expect(rates[0]!.effectiveFrom).toBeInstanceOf(Date);

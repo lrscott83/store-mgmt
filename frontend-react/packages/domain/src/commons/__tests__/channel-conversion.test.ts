@@ -19,7 +19,7 @@ function makeRate(
   effectiveFrom: string,
   method: SalePaymentMethod = SalePaymentMethod.Efectivo,
 ): ChannelRate {
-  return { method, currency, value, effectiveFrom: new Date(effectiveFrom) };
+  return { method, currency, buyValue: value, sellValue: value, effectiveFrom: new Date(effectiveFrom) };
 }
 
 describe('divideHalfUp — the single rounding point', () => {
@@ -50,7 +50,8 @@ describe('resolveChannelRate — cascade exact channel → same currency → USD
     ];
     const result = resolveChannelRate(rates, SalePaymentMethod.Transferencia, Currency.CUP, AT);
     expect(result.succeeded).toBe(true);
-    expect(result.data?.value).toBe(350 * RATE_MICRO);
+    expect(result.data?.buyValue).toBe(350 * RATE_MICRO);
+    expect(result.data?.sellValue).toBe(350 * RATE_MICRO);
     expect(result.data?.id).toBeUndefined();
   });
 
@@ -66,25 +67,25 @@ describe('resolveChannelRate — cascade exact channel → same currency → USD
     };
     const forward = resolveChannelRate([olderCreated, newerCreated], method, Currency.CUP, AT);
     const reverse = resolveChannelRate([newerCreated, olderCreated], method, Currency.CUP, AT);
-    expect(forward.data?.value).toBe(400 * RATE_MICRO);
-    expect(reverse.data?.value).toBe(forward.data?.value);
+    expect(forward.data?.buyValue).toBe(400 * RATE_MICRO);
+    expect(reverse.data?.buyValue).toBe(forward.data?.buyValue);
 
     const idA = { ...makeRate(Currency.CUP, 300, '2026-09-15', method), id: 'a' };
     const idB = { ...makeRate(Currency.CUP, 400, '2026-09-15', method), id: 'b' };
     const byIdForward = resolveChannelRate([idA, idB], method, Currency.CUP, AT);
     const byIdReverse = resolveChannelRate([idB, idA], method, Currency.CUP, AT);
-    expect(byIdForward.data?.value).toBe(400 * RATE_MICRO);
-    expect(byIdReverse.data?.value).toBe(byIdForward.data?.value);
+    expect(byIdForward.data?.buyValue).toBe(400 * RATE_MICRO);
+    expect(byIdReverse.data?.buyValue).toBe(byIdForward.data?.buyValue);
 
     const noCreated = makeRate(Currency.CUP, 300, '2026-09-15', method);
     const withCreated = {
       ...makeRate(Currency.CUP, 400, '2026-09-15', method),
       createdDate: new Date('2026-09-11'),
     };
-    expect(resolveChannelRate([noCreated, withCreated], method, Currency.CUP, AT).data?.value).toBe(
+    expect(resolveChannelRate([noCreated, withCreated], method, Currency.CUP, AT).data?.buyValue).toBe(
       400 * RATE_MICRO,
     );
-    expect(resolveChannelRate([withCreated, noCreated], method, Currency.CUP, AT).data?.value).toBe(
+    expect(resolveChannelRate([withCreated, noCreated], method, Currency.CUP, AT).data?.buyValue).toBe(
       400 * RATE_MICRO,
     );
   });
@@ -93,14 +94,15 @@ describe('resolveChannelRate — cascade exact channel → same currency → USD
     const rates = [makeRate(Currency.CUP, 340, '2026-09-01', SalePaymentMethod.Efectivo)];
     const result = resolveChannelRate(rates, SalePaymentMethod.Zelle, Currency.CUP, AT);
     expect(result.succeeded).toBe(true);
-    expect(result.data?.value).toBe(340 * RATE_MICRO);
+    expect(result.data?.buyValue).toBe(340 * RATE_MICRO);
     expect(result.data?.method).toBe(SalePaymentMethod.Efectivo);
   });
 
   it('(c) returns the synthetic USD pivot (value 1e6, no id/effectiveFrom)', () => {
     const result = resolveChannelRate([], SalePaymentMethod.Efectivo, Currency.USD, AT);
     expect(result.succeeded).toBe(true);
-    expect(result.data?.value).toBe(1_000_000);
+    expect(result.data?.buyValue).toBe(1_000_000);
+    expect(result.data?.sellValue).toBe(1_000_000);
     expect(result.data?.id).toBeUndefined();
     expect(result.data?.effectiveFrom).toBeUndefined();
     expect(result.data?.currency).toBe(Currency.USD);
@@ -121,9 +123,9 @@ describe('resolveChannelRate — cascade exact channel → same currency → USD
       Currency.EUR,
       AT,
     );
-    expect(resolved.data?.value).toBeGreaterThan(0);
+    expect(resolved.data?.buyValue).toBeGreaterThan(0);
     const pivot = resolveChannelRate([], SalePaymentMethod.Zelle, Currency.USD, AT);
-    expect(pivot.data?.value).toBeGreaterThan(0);
+    expect(pivot.data?.buyValue).toBeGreaterThan(0);
   });
 
   it('ignores stored rows whose value is not finite and positive, falling through to the typed error', () => {
@@ -153,8 +155,8 @@ describe('resolveChannelRate — cascade exact channel → same currency → USD
 
   it('resolveCurrencyRate resolves any method of the currency, else USD pivot, else error', () => {
     const rates = [makeRate(Currency.CUP, 700, '2026-09-01', SalePaymentMethod.Transferencia)];
-    expect(resolveCurrencyRate(rates, Currency.CUP, AT).data?.value).toBe(700 * RATE_MICRO);
-    expect(resolveCurrencyRate([], Currency.USD, AT).data?.value).toBe(1_000_000);
+    expect(resolveCurrencyRate(rates, Currency.CUP, AT).data?.buyValue).toBe(700 * RATE_MICRO);
+    expect(resolveCurrencyRate([], Currency.USD, AT).data?.buyValue).toBe(1_000_000);
     expect(resolveCurrencyRate([], Currency.EUR, AT).succeeded).toBe(false);
   });
 });
@@ -264,19 +266,19 @@ describe('isActive (T19b) — inactive rows never resolve, absent means active',
 
     const result = resolveChannelRate(rates, SalePaymentMethod.Efectivo, Currency.CUP, AT);
     expect(result.succeeded).toBe(true);
-    expect(result.data?.value).toBe(700 * RATE_MICRO);
+    expect(result.data?.buyValue).toBe(700 * RATE_MICRO);
     expect(result.data?.id).toBe('old');
   });
 
   it('treats a row WITHOUT isActive as active (backwards compatible)', () => {
     const legacy = [{ ...makeRate(Currency.CUP, 700, '2026-09-01'), id: 'legacy' }];
     expect(
-      resolveChannelRate(legacy, SalePaymentMethod.Efectivo, Currency.CUP, AT).data?.value,
+      resolveChannelRate(legacy, SalePaymentMethod.Efectivo, Currency.CUP, AT).data?.buyValue,
     ).toBe(700 * RATE_MICRO);
 
     const explicitTrue = legacy.map((row) => ({ ...row, isActive: true }));
     expect(
-      resolveChannelRate(explicitTrue, SalePaymentMethod.Efectivo, Currency.CUP, AT).data?.value,
+      resolveChannelRate(explicitTrue, SalePaymentMethod.Efectivo, Currency.CUP, AT).data?.buyValue,
     ).toBe(700 * RATE_MICRO);
   });
 
@@ -311,7 +313,50 @@ describe('isActive (T19b) — inactive rows never resolve, absent means active',
 
     const result = resolveChannelRate(rates, SalePaymentMethod.Transferencia, Currency.CUP, AT);
     expect(result.succeeded).toBe(true);
-    expect(result.data?.value).toBe(700 * RATE_MICRO);
+    expect(result.data?.buyValue).toBe(700 * RATE_MICRO);
     expect(result.data?.method).toBe(SalePaymentMethod.Efectivo);
+  });
+});
+
+describe('buy/sell directional conversion', () => {
+  it('CUP→USD divides by buyValue (bank buys CUP)', () => {
+    const rates = [{
+      method: SalePaymentMethod.Efectivo,
+      currency: Currency.CUP,
+      buyValue: 730,
+      sellValue: 750,
+      effectiveFrom: new Date('2026-09-01'),
+    }];
+    // 100 CUP / 730 = 0.137 USD (rounded to cents)
+    const result = convertLineAmount(100_00, Currency.CUP, Currency.USD, rates, AT);
+    expect(result.succeeded).toBe(true);
+    expect(result.data).toBe(14); // 0.14 USD rounded
+  });
+
+  it('USD→CUP multiplies by sellValue (bank sells CUP)', () => {
+    const rates = [{
+      method: SalePaymentMethod.Efectivo,
+      currency: Currency.CUP,
+      buyValue: 730,
+      sellValue: 750,
+      effectiveFrom: new Date('2026-09-01'),
+    }];
+    // 1 USD * 750 = 750 CUP
+    const result = convertLineAmount(100, Currency.USD, Currency.CUP, rates, AT);
+    expect(result.succeeded).toBe(true);
+    expect(result.data).toBe(750_00);
+  });
+
+  it('same currency is identity regardless of buy/sell values', () => {
+    const rates = [{
+      method: SalePaymentMethod.Efectivo,
+      currency: Currency.CUP,
+      buyValue: 730,
+      sellValue: 750,
+      effectiveFrom: new Date('2026-09-01'),
+    }];
+    const result = convertLineAmount(500_00, Currency.CUP, Currency.CUP, rates, AT);
+    expect(result.succeeded).toBe(true);
+    expect(result.data).toBe(500_00);
   });
 });

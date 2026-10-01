@@ -79,11 +79,13 @@ describe('StorageKeys.entityKey — per-entity, per-store scoping', () => {
 });
 
 describe('BUSINESS_ENTITY_NAMES — the encrypt/wipe/report registry', () => {
-  it('is exactly these fourteen entities, in this order', () => {
+  it('is exactly these fifteen entities, in this order', () => {
     // elaboration-module added recipes + elaborations;
     // store-payment-methods-config (2026-09-22) added storePaymentMethods on
     // 2026-09-23 — its absence let one damaged entry keep a store locked out,
     // because the recovery dialog could not remove it.
+    // owner-messaging (T8) added messagesQueue — the offline-queued messages
+    // must be wiped with the rest so a store reset leaves no pending sends.
     expect([...BUSINESS_ENTITY_NAMES]).toEqual([
       'products',
       'product-categories',
@@ -99,6 +101,7 @@ describe('BUSINESS_ENTITY_NAMES — the encrypt/wipe/report registry', () => {
       'recipes',
       'elaborations',
       'storePaymentMethods',
+      'messagesQueue',
     ]);
   });
 

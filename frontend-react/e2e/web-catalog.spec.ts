@@ -18,12 +18,15 @@ import { mintWebCatalogOwner } from './support/web-catalog-fixture';
  *   2. Catálogo Productos (offline): crear una categoría y un producto.
  *   3. `/sales/web-catalog`: al principio NO hay nada publicado ni listado (el servidor aún no
  *      conoce el catálogo). Sincronizar lo sube y lo publica.
- *   4. Ya con el producto listado se completan los campos que solo existen en el catálogo:
- *      descripción en TEXTO PLANO (D9), % de descuento, precio rebajado, "Nuevo" y dos imágenes.
- *   5. Sincronizar de nuevo publica esos campos (editar no republica por sí solo).
- *   6. La URL se abre en un contexto NUEVO y ANÓNIMO (sin sesión): el catálogo es público y muestra
- *      el precio final combinado (% y luego monto, D7), los badges y, al abrir el detalle, la
- *      descripción con sus saltos de línea y la galería.
+ *   4. El listado vive en paneles colapsables por categoría (cerrados por defecto): expandir el
+ *      panel monta el editor. Con los campos de actualización COMENTADOS (decisión del owner,
+ *      2026-09-29) el editor solo permite tocar la imagen — UNA sola por producto: la galería
+ *      multi-imagen quedó comentada y subir una REEMPLAZA la principal. La imagen se retiene al
+ *      elegirla y SOLO se sube al pulsar Guardar.
+ *   5. Sincronizar de nuevo publica el resultado (editar no republica por sí solo).
+ *   6. La URL se abre en un contexto NUEVO y ANÓNIMO (sin sesión): el catálogo es público, el
+ *      precio se muestra con el CÓDIGO de moneda (`100 CUP`, nunca `$`), sin badge "Nuevo" ni
+ *      descuento, y al abrir el detalle hay una sola imagen servida desde la API pública.
  */
 
 // i18n literal strings from es.ts — hardcoded, never imported (design.md §5)
@@ -71,14 +74,13 @@ test.describe.serial('Catálogo Web (módulo 18) — publicar el catálogo local
     0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0xff, 0xd9,
   ]);
 
-  test('crear el producto en el POS, sincronizar, editarlo y verlo publicado en /catalog/<slug>', async ({
+  test('crear el producto en el POS, sincronizar, ponerle imagen y verlo publicado en /catalog/<slug>', async ({
     page,
     browser,
   }) => {
     const suffix = `${Date.now().toString(36)}${Math.floor(Math.random() * 1e6).toString(36)}`;
     const categoryName = `Ropa ${suffix}`;
     const productName = `Camisa ${suffix}`;
-    const description = `Camisa de algodón ${suffix}\nSegunda línea con <b>etiquetas</b>`;
 
     // 1. Owner privado en Superior (módulo 18) + 2. su catálogo local, por la UI del POS.
     await mintWebCatalogOwner(page, browser);
@@ -97,7 +99,7 @@ test.describe.serial('Catálogo Web (módulo 18) — publicar el catálogo local
       ),
     ).toBeVisible();
 
-    // Sincronizar sube el catálogo local y lo publica: aparecen la URL pública y el producto.
+    // Sincronizar sube el catálogo local y lo publica: aparecen la URL pública y el panel.
     await page.getByTestId('catalog-sync-button').click();
     await expect(
       page.getByText(/^Catálogo sincronizado: 1 categorías nuevas, 0 actualizadas, 1 productos nuevos/),
@@ -108,41 +110,41 @@ test.describe.serial('Catálogo Web (módulo 18) — publicar el catálogo local
     const publicUrl = await publicLink.getAttribute('href');
     expect(publicUrl).toMatch(/\/catalog\/[a-z0-9-]+$/);
     await expect(page.getByTestId('catalog-last-sync')).not.toHaveText(/Nunca/);
+
+    // 4. El producto vive en un panel colapsable por categoría (cerrado por defecto): solo al
+    //    expandirlo se monta el editor. La tienda es nueva: hay exactamente un panel.
+    const categoryToggle = page.locator('[data-testid^="catalog-category-toggle-"]').first();
+    await expect(categoryToggle).toContainText(categoryName);
+    await categoryToggle.click();
     await expect(page.getByText(productName, { exact: true })).toBeVisible();
+    // Precio con el CÓDIGO de moneda (MultiMonedas): `100 CUP`, nunca `$100`.
+    await expect(page.getByText(/100\s*CUP/)).toBeVisible();
+    await expect(page.getByText(/\$\s*\d/)).toHaveCount(0);
 
-    // 4. Campos que solo existen en el catálogo: descripción en texto plano, descuentos y Nuevo.
-    await page.locator('textarea').first().fill(description);
-    const numberInputs = page.locator('input[inputmode="decimal"]');
-    await numberInputs.nth(0).fill('12.5');
-    await numberInputs.nth(1).fill('5');
-    await page.getByRole('switch', { name: 'Nuevo' }).click();
-
-    // Precio final en vivo: 100 − 12.5 % = 87.50; 87.50 − 5.00 = 82.50 (decisión D7).
-    await expect(page.getByText('Precio final: $82.50')).toBeVisible();
-
-    // Dos imágenes: la primera queda como principal, la segunda completa la galería.
+    // Sin los campos de actualización (comentados), el editor solo permite tocar la imagen:
+    // UNA sola por producto. Se retiene al elegirla (anuncio "quedará como imagen principal")
+    // y SOLO se sube al pulsar Guardar.
     await page.locator('input[type="file"]').setInputFiles({
       name: 'principal.jpg',
       mimeType: 'image/jpeg',
       buffer: TINY_JPEG,
     });
-    // Principal + su miniatura de galería.
-    await expect(page.locator('img[alt="' + productName + '"]')).toHaveCount(2);
-    await page.locator('input[type="file"]').setInputFiles({
-      name: 'galeria.jpg',
-      mimeType: 'image/jpeg',
-      buffer: TINY_JPEG,
-    });
-    // La segunda solo engrosa la galería (la principal ya existía).
-    await expect(page.locator('img[alt="' + productName + '"]')).toHaveCount(3);
+    await expect(page.locator('[data-testid^="catalog-pending-image-"]')).toBeVisible();
+    // Retenida, no subida: todavía no hay ninguna <img> del producto.
+    await expect(page.locator(`img[alt="${productName}"]`)).toHaveCount(0);
 
     await page.getByRole('button', { name: 'Guardar' }).click();
     await expect(page.getByText('Producto guardado en el catálogo')).toBeVisible();
+    // Tras el guardado la imagen es la principal y la ÚNICA (la galería está comentada).
+    const editorImage = page.locator(`img[alt="${productName}"]`);
+    await expect(editorImage).toHaveCount(1);
+    await expect(editorImage).toHaveAttribute('src', /\/api\/v1\/public\/catalog\//);
 
-    // 5. Publicar los campos editados: editar no republica por sí solo (solo hay un producto).
+    // 5. Publicar el resultado: editar no republica por sí solo (el catálogo local no cambió:
+    //    0 categorías y 0 productos nuevas; el número de actualizadas lo decide el backend).
     await page.getByTestId('catalog-sync-button').click();
     await expect(
-      page.getByText(/^Catálogo sincronizado: 0 categorías nuevas, 1 actualizadas, 0 productos nuevos/),
+      page.getByText(/^Catálogo sincronizado: 0 categorías nuevas, \d+ actualizadas, 0 productos nuevos/),
     ).toBeVisible();
 
     // 6. El catálogo público, en un contexto SIN sesión.
@@ -153,24 +155,19 @@ test.describe.serial('Catálogo Web (módulo 18) — publicar el catálogo local
 
       await expect(anonymous.getByTestId('catalog-store-name')).toBeVisible();
       await expect(anonymous.getByText(productName, { exact: true })).toBeVisible();
-      await expect(anonymous.getByText('Nuevo')).toBeVisible();
-      await expect(anonymous.getByText('-12.5%')).toBeVisible();
-      await expect(anonymous.getByText('$82.50')).toBeVisible();
-      await expect(anonymous.getByText('$100')).toBeVisible();
+      // Sin campos de actualización no hay "Nuevo" ni badge de descuento, y el precio lleva
+      // el código de moneda: `100 CUP`, nunca el símbolo `$`.
+      await expect(anonymous.getByText('Nuevo')).toHaveCount(0);
+      await expect(anonymous.getByText(/-\d+(\.\d+)?%/)).toHaveCount(0);
+      await expect(anonymous.getByText(/100\s*CUP/)).toBeVisible();
+      await expect(anonymous.getByText('$100')).toHaveCount(0);
       await expect(anonymous.getByTestId('catalog-results-count')).toHaveText('1 producto');
 
-      // Detalle: descripción en texto plano (los saltos se respetan, el HTML no se interpreta).
+      // Detalle: con UNA sola imagen la galería de miniaturas no se renderiza.
       await anonymous.getByText(productName, { exact: true }).click();
       const dialog = anonymous.getByRole('dialog');
       await expect(dialog).toBeVisible();
-      const detailDescription = dialog.getByTestId('catalog-detail-description');
-      await expect(detailDescription).toContainText(`Camisa de algodón ${suffix}`);
-      await expect(detailDescription).toContainText('Segunda línea con <b>etiquetas</b>');
-      await expect(detailDescription).not.toContainText('Camisa de algodón  <b>');
-
-      // Galería: dos miniaturas, y la imagen se sirve desde la API pública.
-      await expect(dialog.getByTestId('catalog-detail-thumb-0')).toBeVisible();
-      await expect(dialog.getByTestId('catalog-detail-thumb-1')).toBeVisible();
+      await expect(dialog.getByTestId('catalog-detail-thumb-0')).toHaveCount(0);
       const detailImage = dialog.getByTestId('catalog-detail-image');
       await expect(detailImage).toBeVisible();
       const mediaUrl = await detailImage.getAttribute('src');

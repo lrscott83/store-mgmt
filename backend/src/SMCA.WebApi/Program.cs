@@ -1,4 +1,5 @@
 using Application.Abstractions.HttpContext;
+using Application.Abstractions.Messaging;
 using Application.Services.Tenants;
 using Application.Abstractions.Time;
 using Microsoft.AspNetCore.Authentication;
@@ -14,6 +15,7 @@ using Infrastructure.Persistence.Contexts;
 using SMCA.WebApi.Authentication;
 using Microsoft.AspNetCore.Http.Features;
 using SMCA.WebApi.Extensions;
+using SMCA.WebApi.Hubs;
 using SMCA.WebApi.Middlewares;
 using Serilog;
 using System.Configuration;
@@ -131,6 +133,8 @@ builder.Services.Configure<FormOptions>(o =>
 
 builder.Services.AddRouting(options => options.LowercaseUrls = true);
 
+builder.Services.AddSignalR();
+builder.Services.AddScoped<IMessagePushService, SignalRMessagePushService>();
 builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
@@ -196,6 +200,7 @@ app.UseHealthChecks("/health");
 app.UseEndpoints(endpoints =>
 {
     endpoints.MapControllers();
+    endpoints.MapHub<MessageHub>("/hubs/messages");
     //.RequireAuthorization()
     //.RequireCors("AllowSpecificOrigin");
 });

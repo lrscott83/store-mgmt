@@ -95,8 +95,16 @@ public static class DbTestHelpers
         var owners = await db.Set<Owner>().IgnoreQueryFilters().Where(x => x.UserId == userId).ToListAsync();
         if (owners.Count > 0)
         {
-            // Also clean up ReSellerOwner if present
             var ownerIds = owners.Select(o => o.Id).ToList();
+
+            // Stores first: every FK is DeleteBehavior.Restrict, so the Owner delete would die
+            // with 23503 (FK_Store_Owner_OwnerId) whenever the owner had a store — MessagingTests
+            // seeds User + Owner + Store. Test-owned stores only: Production/managed stores
+            // (StoreManagement chain) are left untouched, as they were before.
+            var stores = await db.Set<Store>().IgnoreQueryFilters().Where(s => ownerIds.Contains(s.OwnerId)).ToListAsync();
+            db.Set<Store>().RemoveRange(stores);
+
+            // Also clean up ReSellerOwner if present
             var reSellerOwners = await db.Set<Domain.Entities.ReSellerOwners.ReSellerOwner>()
                 .IgnoreQueryFilters().Where(rso => ownerIds.Contains(rso.OwnerId)).ToListAsync();
             db.Set<Domain.Entities.ReSellerOwners.ReSellerOwner>().RemoveRange(reSellerOwners);
