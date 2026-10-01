@@ -123,6 +123,20 @@ describe('ExchangeRatesPage (daily-exchange-rate) — month-grouped collapsed pa
 
     renderPage();
 
+    // `today - 2` lands in the PREVIOUS month on the 1st and 2nd of every month,
+    // and only the current month's panel starts expanded — so expand the
+    // anchor's panel when the range crosses the boundary. Same handling as the
+    // sibling test above; without it this assertion only holds from the 3rd on.
+    const currentMonthKey = monthKeyOf(new Date());
+    await waitFor(() => {
+      expect(screen.getByTestId(`rate-month-panel-toggle-${currentMonthKey}`)).toBeDefined();
+    });
+
+    const anchorMonthKey = monthKeyOf(anchor);
+    if (anchorMonthKey !== currentMonthKey) {
+      fireEvent.click(screen.getByTestId(`rate-month-panel-toggle-${anchorMonthKey}`));
+    }
+
     await waitFor(() => {
       expect(screen.getAllByTestId(/^rate-row-/)).toHaveLength(3);
     });

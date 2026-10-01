@@ -69,4 +69,45 @@ describe('messagesHttpService', () => {
 
     expect(apiClient.post).toHaveBeenCalledWith('/v1/messages/mark-all-read');
   });
+
+  // ODD T10 — a scheduled poll must not drive the global loading overlay.
+  describe('background requests', () => {
+    it('getConversations passes skipLoading when asked for a background fetch', async () => {
+      vi.mocked(apiClient.get).mockResolvedValue({ data: { data: [], succeeded: true } });
+
+      await messagesHttpService.getConversations({ background: true });
+
+      expect(apiClient.get).toHaveBeenCalledWith('/v1/messages/conversations', {
+        skipLoading: true,
+      });
+    });
+
+    it('getMessages passes skipLoading when asked for a background fetch', async () => {
+      vi.mocked(apiClient.get).mockResolvedValue({ data: { data: [], succeeded: true } });
+
+      await messagesHttpService.getMessages('c1', { background: true });
+
+      expect(apiClient.get).toHaveBeenCalledWith('/v1/messages/conversations/c1/messages', {
+        skipLoading: true,
+      });
+    });
+
+    it('markAsRead passes skipLoading as axios config, never as a body', async () => {
+      vi.mocked(apiClient.post).mockResolvedValue({ data: { data: true, succeeded: true } });
+
+      await messagesHttpService.markAsRead('m1', { background: true });
+
+      expect(apiClient.post).toHaveBeenCalledWith('/v1/messages/m1/read', undefined, {
+        skipLoading: true,
+      });
+    });
+
+    it('keeps a foreground call at its original shape — no config object', async () => {
+      vi.mocked(apiClient.get).mockResolvedValue({ data: { data: [], succeeded: true } });
+
+      await messagesHttpService.getConversations();
+
+      expect(apiClient.get).toHaveBeenCalledWith('/v1/messages/conversations');
+    });
+  });
 });
