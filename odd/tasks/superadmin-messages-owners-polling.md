@@ -100,7 +100,7 @@ One row per active owner:
 
 ## Commits
 
-- `4195ea4d` feat(messages): list all active owners and poll incrementally in superadmin messages (local, not pushed)
+- `e7db99c0` feat(messages): list all active owners and poll incrementally in superadmin messages (local, not pushed)
 
 ## Estado
 
