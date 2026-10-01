@@ -3,6 +3,7 @@ import { useIntl } from 'react-intl';
 import { Link, useLocation, useNavigate } from 'react-router';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { useClickOutside } from '~/shared/lib/hooks/use-click-outside';
+import { GlobalConfig } from '~/shared/lib/config/global-config';
 import { CartShell } from './cart-shell';
 import { MessageShell } from './message-shell';
 import { StoreSwitcher } from './store-switcher';
@@ -103,7 +104,12 @@ export function Navbar({ isSidebarOpen, onSidebarToggle }: NavbarProps) {
 
         <CartShell />
 
-        <MessageShell />
+        {/* Chat SuperAdmin↔Owner: SOLO con USE_ONLINE_SERVICE — el POS es offline-first
+            (GlobalConfig, misma puerta que los services de products/categories) y el panel
+            hace polling HTTP en mount/intervalo/foco que violaría el invariant de cero
+            peticiones que los E2E offline (login-offline.spec.ts) documentan. Se activa solo
+            el día que el flag cambie a true. */}
+        {GlobalConfig.USE_ONLINE_SERVICE && <MessageShell />}
 
         {/* User dropdown — trigger is a plain person icon, matches Angular's header-user-profile */}
         <div className="relative" ref={userMenuRef}>
