@@ -1507,6 +1507,9 @@ const messages: Record<string, string> = {
   'MESSAGES.PENDING': 'Pendiente',
   'MESSAGES.LOAD_ERROR': 'No se pudieron cargar los mensajes. Intente de nuevo.',
   'MESSAGES.SEND_ERROR': 'No se pudo enviar el mensaje. Intente de nuevo.',
+  // The message was queued, not lost: the offline queue flushes it on reconnect.
+  'MESSAGES.OFFLINE_QUEUED':
+    'Sin conexión. El mensaje se enviará automáticamente cuando vuelva la conexión.',
   'MESSAGES.LIST_EMPTY': 'No hay conversaciones.',
   'MESSAGES.SELECT_CONVERSATION': 'Seleccione una conversación para ver los mensajes.',
   'MESSAGES.BROADCAST': 'Difusión',

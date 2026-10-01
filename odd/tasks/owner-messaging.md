@@ -81,6 +81,14 @@ Sistema de mensajería 1:1 entre SuperAdmin y Owners, con una conversación por 
   - **Envío.** Un envío exitoso reinicia la escalera a 10s.
   - **Cerrada 2026-10-01**: `messages-http-service` acepta `{ background: true }` → `skipLoading` (solo el camino background agrega el argumento, para no cambiar la forma de las llamadas que los tests pinchan); el shell pasó de `setInterval` fijo a `setTimeout` con la escalera; `visibilitychange` → visible y `window focus` re-arman en el paso 0 (el primero con poll inmediato); el envío y un `ReceiveMessage` reinician a 10s. La señal de actividad es `lastMessageAt`, nunca `unreadCount` (ese también cambia al marcar leído, y no es actividad). Evidencia: `web-store-pos` 336/336; typecheck limpio. **Cambio de comportamiento a tener presente:** un poll en background ya **no muestra toast de error** — un fallo de red en un tick programado es silencioso a propósito; antes habría sido un toast cada ciclo.
 
+### Chat siempre visible + aviso offline + verde WhatsApp (T11)
+
+- [x] **T11 — El icono del chat siempre visible (OwnerAdmin), aviso al encolar sin conexión, y el color de WhatsApp.** **Cerrada 2026-10-01**: se quitó el gate `GlobalConfig.USE_ONLINE_SERVICE` del navbar (`3bd432ab` lo había puesto porque el chat hacía HTTP en mount/intervalo/foco y rompía el invariante de cero peticiones de `login-offline.spec.ts` — 4/12 tests rojos). El gate se movió **dentro** del componente: el icono se monta siempre y el trabajo de red (refresh de montaje, escalera de polling, refresh al abrir el panel, SignalR) queda detrás de `isOnline`. El shell ya se auto-gateaba por rol, así que sigue siendo solo OwnerAdmin.
+  - **Aviso offline**: al encolar un mensaje (sin conexión, o envío que falla por red) se muestra `MESSAGES.OFFLINE_QUEUED` — «Sin conexión. El mensaje se enviará automáticamente cuando vuelva la conexión.» Antes se encolaba en silencio.
+  - **Color**: los dos iconos pasan a `#25D366` (verde WhatsApp) — el del chat en el header (`stroke="currentColor"`) y el de «Contáctanos» del footer (`fill="currentColor"`, icono + texto). `footer.test.tsx` no se rompe: pinea los atributos del SVG, no las clases, y solo prohíbe la clase dorada.
+  - **Tests actualizados**: `message-shell.offline.test.tsx` pineaba el comportamiento viejo — que el chat llamara a `getConversations` **estando offline** (justo lo que el E2E prohíbe) y que **no** hubiera toast. Ahora asserte lo contrario, que es el requisito nuevo.
+  - **Evidencia**: `web-store-pos` 337/337; typecheck limpio. **No ejecutado**: la E2E de Playwright (requiere backend + PostgreSQL). El mecanismo se verificó por lectura: `login-offline.spec.ts` usa `page.context().setOffline(true)` → `navigator.onLine === false` → `useOnlineStatus` false → cero HTTP del chat.
+
 ## Commits
 
 _(pendiente)_

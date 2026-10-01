@@ -191,11 +191,18 @@ export function MessageShell() {
     }
     setPending((current) => [...current, queued]);
     setInputValue('');
+    // The message is NOT lost: it is queued and flushed on reconnect. Say so,
+    // or the user assumes the send silently failed.
+    showToastError(intl.formatMessage({ id: 'MESSAGES.OFFLINE_QUEUED' }));
   }
 
+  // Offline-first: the icon is always mounted, but the chat never touches the
+  // network without a connection. That is what keeps the offline E2E's
+  // zero-request invariant intact while the header still shows the chat.
   useEffect(() => {
+    if (!isOnline) return;
     void refresh(false);
-  }, [refresh]);
+  }, [isOnline, refresh]);
 
   useEffect(() => {
     if (!user || !isOwnerAdmin(user)) return;
@@ -240,6 +247,11 @@ export function MessageShell() {
 
     const loop = async () => {
       if (cancelled) return;
+      if (!isOnline) {
+        // No connection: never poll. The online transition re-arms the ladder.
+        timer = setTimeout(loop, POLL_LADDER_MS[POLL_LADDER_MS.length - 1]);
+        return;
+      }
       if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
         // Hidden: don't poll, and don't widen — leaving the tab is not idleness.
         // visibilitychange re-arms at the fastest step and polls immediately.
@@ -273,7 +285,7 @@ export function MessageShell() {
       document.removeEventListener('visibilitychange', handleVisibility);
       resetPollRef.current = () => {};
     };
-  }, [user, refresh]);
+  }, [user, isOnline, refresh]);
 
   // T9.3 — real-time push (SignalR). The hub delivers a new message or a read
   // receipt as it happens, so the panel and the unread badge update without
@@ -306,7 +318,8 @@ export function MessageShell() {
   function handleToggle() {
     const next = !isOpen;
     setPanelOpen(next);
-    if (next) void refresh(true);
+    // Offline there is nothing to fetch; the queued messages are already local.
+    if (next && isOnline) void refresh(true);
   }
 
   async function handleSend() {
@@ -372,7 +385,7 @@ export function MessageShell() {
       <button
         type="button"
         onClick={handleToggle}
-        className="relative rounded-lg p-2 text-text-muted hover:bg-primary-light transition-colors"
+        className="relative rounded-lg p-2 text-[#25D366] hover:bg-primary-light transition-colors"
         aria-label={intl.formatMessage({ id: 'MESSAGES.TITLE' })}
       >
         <ChatIcon />

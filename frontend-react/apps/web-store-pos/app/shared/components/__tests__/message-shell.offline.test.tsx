@@ -122,7 +122,11 @@ describe('MessageShell — offline queue', () => {
     onlineState.value = false;
 
     renderShell();
-    await waitFor(() => expect(getConversationsMock).toHaveBeenCalled());
+    // Offline the chat must not touch the network at all — that is what keeps the
+    // offline E2E's zero-request invariant intact — while the header still shows
+    // the chat button (it is always mounted now).
+    expect(await screen.findByRole('button', { name: 'Mensajes' })).toBeInTheDocument();
+    expect(getConversationsMock).not.toHaveBeenCalled();
     openPanel();
 
     const input = await screen.findByLabelText('Escriba un mensaje');
@@ -131,7 +135,10 @@ describe('MessageShell — offline queue', () => {
 
     await waitFor(() => expect(input).toHaveValue(''));
     expect(sendMessageMock).not.toHaveBeenCalled();
-    expect(showToastErrorMock).not.toHaveBeenCalled();
+    // The queued message is announced, never dropped in silence.
+    await waitFor(() =>
+      expect(showToastErrorMock).toHaveBeenCalledWith(esMessages['MESSAGES.OFFLINE_QUEUED']),
+    );
 
     const pendingItem = screen.getByText('Hola sin conexión').closest('li');
     expect(pendingItem).toHaveAttribute('data-pending', 'true');
@@ -158,7 +165,8 @@ describe('MessageShell — offline queue', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Enviar' }));
 
     await waitFor(() => expect(screen.getByText('Se cayó la red')).toBeInTheDocument());
-    expect(showToastErrorMock).not.toHaveBeenCalled();
+    // A send that could not reach the server is announced as queued, not dropped.
+    expect(showToastErrorMock).toHaveBeenCalledWith(esMessages['MESSAGES.OFFLINE_QUEUED']);
     const pendingItem = screen.getByText('Se cayó la red').closest('li');
     expect(pendingItem).toHaveAttribute('data-pending', 'true');
   });
