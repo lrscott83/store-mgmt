@@ -1,5 +1,7 @@
+using System.Net;
 using Application.Abstractions.HttpContext;
 using Application.Abstractions.Messaging;
+using Application.Exceptions;
 using Application.Features.Messages.Queries.GetMessages;
 using Application.ResponseModels;
 using Domain.Common.Enums;
@@ -32,7 +34,7 @@ public class BroadcastMessageCommandHandler : ICommandHandler<BroadcastMessageCo
         var isSuperAdmin = _httpContextService.IsSuperAdmin;
 
         if (!isSuperAdmin)
-            throw new UnauthorizedAccessException();
+            throw new ApiException("Forbidden", HttpStatusCode.Forbidden);
 
         if (string.IsNullOrWhiteSpace(command.Content))
             throw new ArgumentException("Content is required");

@@ -29,7 +29,7 @@ public class DeleteAllMessagesCommandHandler : ICommandHandler<DeleteAllMessages
         foreach (var message in messages)
         {
             message.SoftDelete(currentUserId);
-            await _messageRepository.AddMessageAsync(message, cancellationToken);
+            await _messageRepository.UpdateMessageAsync(message, cancellationToken);
         }
 
         return ResponseResult.Success(true);

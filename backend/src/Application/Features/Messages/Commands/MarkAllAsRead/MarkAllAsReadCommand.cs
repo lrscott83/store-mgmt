@@ -32,7 +32,7 @@ public class MarkAllAsReadCommandHandler : ICommandHandler<MarkAllAsReadCommand>
         foreach (var message in unreadMessages)
         {
             message.MarkAsRead();
-            await _messageRepository.AddMessageAsync(message, cancellationToken);
+            await _messageRepository.UpdateMessageAsync(message, cancellationToken);
         }
 
         // Dedupe per (sender, conversation): one read receipt per sender per

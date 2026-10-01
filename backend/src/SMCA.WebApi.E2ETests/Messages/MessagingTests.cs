@@ -26,7 +26,7 @@ public sealed class MessagingTests
         try
         {
             var client = DbTestHelpers.AuthedClient(_f, admin, $"sa-{admin:N}@test.com");
-            var request = new { ConversationId = Guid.Empty, OwnerId = owner.OwnerId, StoreId = owner.StoreId, Content = "Hello from SuperAdmin" };
+            var request = new { ConversationId = Guid.Empty, OwnerId = owner.UserId, StoreId = owner.StoreId, Content = "Hello from SuperAdmin" };
 
             var r = await client.PostAsJsonAsync("/api/v1/Messages", request);
 
@@ -49,7 +49,7 @@ public sealed class MessagingTests
         try
         {
             var client = DbTestHelpers.AuthedClient(_f, owner.UserId, owner.Login);
-            var request = new { ConversationId = Guid.Empty, OwnerId = owner.OwnerId, StoreId = owner.StoreId, Content = "Hello from Owner" };
+            var request = new { ConversationId = Guid.Empty, OwnerId = owner.UserId, StoreId = owner.StoreId, Content = "Hello from Owner" };
 
             var r = await client.PostAsJsonAsync("/api/v1/Messages", request);
 
@@ -70,7 +70,7 @@ public sealed class MessagingTests
         try
         {
             var adminClient = DbTestHelpers.AuthedClient(_f, admin, $"sa-{admin:N}@test.com");
-            var request = new { ConversationId = Guid.Empty, OwnerId = owner.OwnerId, StoreId = owner.StoreId, Content = "Test" };
+            var request = new { ConversationId = Guid.Empty, OwnerId = owner.UserId, StoreId = owner.StoreId, Content = "Test" };
             await adminClient.PostAsJsonAsync("/api/v1/Messages", request);
 
             var r = await adminClient.GetAsync("/api/v1/Messages/conversations");
@@ -94,7 +94,7 @@ public sealed class MessagingTests
         try
         {
             var adminClient = DbTestHelpers.AuthedClient(_f, admin, $"sa-{admin:N}@test.com");
-            var sendRequest = new { ConversationId = Guid.Empty, OwnerId = owner.OwnerId, StoreId = owner.StoreId, Content = "Test message" };
+            var sendRequest = new { ConversationId = Guid.Empty, OwnerId = owner.UserId, StoreId = owner.StoreId, Content = "Test message" };
             var sendResponse = await adminClient.PostAsJsonAsync("/api/v1/Messages", sendRequest);
             var conversationId = await ExtractConversationId(sendResponse);
 
@@ -119,7 +119,7 @@ public sealed class MessagingTests
         try
         {
             var adminClient = DbTestHelpers.AuthedClient(_f, admin, $"sa-{admin:N}@test.com");
-            var sendRequest = new { ConversationId = Guid.Empty, OwnerId = owner.OwnerId, StoreId = owner.StoreId, Content = "Read me" };
+            var sendRequest = new { ConversationId = Guid.Empty, OwnerId = owner.UserId, StoreId = owner.StoreId, Content = "Read me" };
             var sendResponse = await adminClient.PostAsJsonAsync("/api/v1/Messages", sendRequest);
             var conversationId = await ExtractConversationId(sendResponse);
 
@@ -147,7 +147,7 @@ public sealed class MessagingTests
         try
         {
             var adminClient = DbTestHelpers.AuthedClient(_f, admin, $"sa-{admin:N}@test.com");
-            var sendRequest = new { ConversationId = Guid.Empty, OwnerId = owner.OwnerId, StoreId = owner.StoreId, Content = "Delete me" };
+            var sendRequest = new { ConversationId = Guid.Empty, OwnerId = owner.UserId, StoreId = owner.StoreId, Content = "Delete me" };
             var sendResponse = await adminClient.PostAsJsonAsync("/api/v1/Messages", sendRequest);
             var conversationId = await ExtractConversationId(sendResponse);
 
@@ -201,7 +201,7 @@ public sealed class MessagingTests
         try
         {
             var adminClient = DbTestHelpers.AuthedClient(_f, admin, $"sa-{admin:N}@test.com");
-            var request = new { ConversationId = Guid.Empty, OwnerId = owner.OwnerId, StoreId = owner.StoreId, Content = "Unread" };
+            var request = new { ConversationId = Guid.Empty, OwnerId = owner.UserId, StoreId = owner.StoreId, Content = "Unread" };
             await adminClient.PostAsJsonAsync("/api/v1/Messages", request);
 
             var ownerClient = DbTestHelpers.AuthedClient(_f, owner.UserId, owner.Login);
@@ -224,7 +224,7 @@ public sealed class MessagingTests
         try
         {
             var adminClient = DbTestHelpers.AuthedClient(_f, admin, $"sa-{admin:N}@test.com");
-            var request = new { ConversationId = Guid.Empty, OwnerId = owner.OwnerId, StoreId = owner.StoreId, Content = "Delete all" };
+            var request = new { ConversationId = Guid.Empty, OwnerId = owner.UserId, StoreId = owner.StoreId, Content = "Delete all" };
             await adminClient.PostAsJsonAsync("/api/v1/Messages", request);
 
             var r = await adminClient.DeleteAsync("/api/v1/Messages");
@@ -246,7 +246,7 @@ public sealed class MessagingTests
         try
         {
             var client = DbTestHelpers.AuthedClient(_f, admin, $"sa-{admin:N}@test.com");
-            var request = new { ConversationId = Guid.Empty, OwnerId = owner.OwnerId, StoreId = owner.StoreId, Content = "" };
+            var request = new { ConversationId = Guid.Empty, OwnerId = owner.UserId, StoreId = owner.StoreId, Content = "" };
 
             var r = await client.PostAsJsonAsync("/api/v1/Messages", request);
 

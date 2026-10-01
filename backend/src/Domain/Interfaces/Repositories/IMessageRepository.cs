@@ -10,6 +10,7 @@ public interface IMessageRepository
     Task<IEnumerable<Message>> GetMessagesAsync(Guid conversationId, Guid currentUserId, CancellationToken cancellationToken);
     Task<Message?> GetMessageAsync(Guid messageId, CancellationToken cancellationToken);
     Task AddMessageAsync(Message message, CancellationToken cancellationToken);
+    Task UpdateMessageAsync(Message message, CancellationToken cancellationToken);
     Task AddConversationAsync(Conversation conversation, CancellationToken cancellationToken);
     Task UpdateConversationAsync(Conversation conversation, CancellationToken cancellationToken);
     Task<IEnumerable<Message>> GetUnreadMessagesAsync(Guid userId, CancellationToken cancellationToken);

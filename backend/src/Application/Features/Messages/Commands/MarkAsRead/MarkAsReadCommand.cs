@@ -36,7 +36,7 @@ public class MarkAsReadCommandHandler : ICommandHandler<MarkAsReadCommand>
             throw new UnauthorizedAccessException();
 
         message.MarkAsRead();
-        await _messageRepository.AddMessageAsync(message, cancellationToken);
+        await _messageRepository.UpdateMessageAsync(message, cancellationToken);
 
         // Notify the original sender that the recipient read the message.
         await _messagePushService.MessageReadAsync(

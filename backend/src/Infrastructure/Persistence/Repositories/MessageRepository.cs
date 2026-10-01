@@ -53,6 +53,12 @@ public class MessageRepository : IMessageRepository
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task UpdateMessageAsync(Message message, CancellationToken cancellationToken)
+    {
+        _dbContext.Messages.Update(message);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
     public async Task AddConversationAsync(Conversation conversation, CancellationToken cancellationToken)
     {
         _dbContext.Conversations.Add(conversation);
