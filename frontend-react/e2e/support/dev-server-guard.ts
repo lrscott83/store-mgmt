@@ -51,8 +51,10 @@ const CSP_HEADER_NAME = 'content-security-policy-report-only';
 /**
  * Pulls the API origin out of a dev CSP header's `connect-src`.
  *
- * `csp-policy.mjs:87-92` builds that list as `['self', apiOrigin?, wsOrigin?]`,
- * so the API origin is the one token that is neither a quoted keyword nor the
+ * `csp-policy.mjs` builds that list as `['self', 'ws:', 'wss:', apiOrigin?,
+ * wsOrigin?]` — the bare wildcards (added for the SignalR hub) allow any
+ * WebSocket, so the API origin is the one token that is neither a quoted
+ * keyword, a scheme wildcard (`ws:`/`wss:`, with or without the `//`), nor the
  * HMR WebSocket origin. Returns `null` when the header carries no `connect-src`
  * or when that directive holds no such token — the latter is what a same-origin
  * or relative `API_URL` produces (`deriveApiOrigin` returns `null` for those,
@@ -67,7 +69,13 @@ export function apiOriginFromCsp(cspHeader: string | null | undefined): string |
       .slice(1)
       .find(
         (token) =>
-          !token.startsWith("'") && !token.startsWith('ws://') && !token.startsWith('wss://'),
+          !token.startsWith("'") &&
+          !token.startsWith('ws://') &&
+          !token.startsWith('wss://') &&
+          // Bare scheme wildcards (`ws:`, `wss:`) are also not origins — only
+          // their `//`-ful forms match the prefix filters above.
+          token !== 'ws:' &&
+          token !== 'wss:',
       );
     return origin ?? null;
   }
