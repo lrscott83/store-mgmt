@@ -11,7 +11,10 @@ function makePlanModule(overrides: Partial<PlanModule> = {}): PlanModule {
     moduleId: 1,
     name: 'Ventas',
     order: 1,
+    // Gratis-ish by default: active but INCLUDED, so it never reaches a plan total. The
+    // rule (`isActive && !priceIncluded`) is what the header totals now go through.
     priceIncluded: true,
+    isActive: true,
     price: 0,
     currentPrice: 0,
     discountPrice: 0,
@@ -65,6 +68,9 @@ function makeCatalog(): Plan[] {
           priceIncluded: false,
           price: 2000,
           currentPrice: 1500,
+          // The 25% is CARRIED, not just declared in currentPrice: the header now recomputes
+          // the effective price with the shared formula instead of reading the server's.
+          percentDiscountPrice: 25,
           discountText: '- 25%',
         }),
       ],
@@ -84,6 +90,9 @@ function makeCatalog(): Plan[] {
           priceIncluded: false,
           price: 2000,
           currentPrice: 1500,
+          // The 25% is CARRIED, not just declared in currentPrice: the header now recomputes
+          // the effective price with the shared formula instead of reading the server's.
+          percentDiscountPrice: 25,
           discountText: '- 25%',
         }),
         makePlanModule({

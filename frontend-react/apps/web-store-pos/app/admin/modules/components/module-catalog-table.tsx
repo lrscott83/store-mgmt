@@ -1,9 +1,10 @@
 import { useIntl } from 'react-intl';
-import type { Plan } from '@store-mgmt/domain';
+import type { ModulePricingRow, Plan, PlanModule } from '@store-mgmt/domain';
 import {
   currentModulePrice,
   groupModulesByPlanDelta,
   NO_PLAN_GROUP,
+  totalModulePricing,
 } from '@store-mgmt/domain';
 import { formatPlanAmount, formatPlanPrice } from '~/shared/lib/price-utils';
 
@@ -17,6 +18,9 @@ import { formatPlanAmount, formatPlanPrice } from '~/shared/lib/price-utils';
 export interface ModuleCatalogRow {
   moduleId: number;
   name: string;
+  /** The two flags `isBillableModule` reads — from `ModuleDto`, never from the operator. */
+  isActive: boolean;
+  priceIncluded: boolean;
   price: string;
   discountPrice: string;
   percentDiscountPrice: string;
@@ -45,6 +49,18 @@ function effectivePrice(row: ModuleCatalogRow): number {
     toNumber(row.percentDiscountPrice),
     toNumber(row.discountPrice),
   );
+}
+
+/** The draft row → the domain mirror's row. Flags come from the server, never the operator. */
+function toPricingRow(row: ModuleCatalogRow): ModulePricingRow {
+  return {
+    moduleId: row.moduleId,
+    isActive: row.isActive,
+    priceIncluded: row.priceIncluded,
+    price: toNumber(row.price),
+    percentDiscountPrice: toNumber(row.percentDiscountPrice),
+    discountPrice: toNumber(row.discountPrice),
+  };
 }
 
 const PLAN_NAME_KEYS: Record<string, string> = {
@@ -85,11 +101,21 @@ const INPUT_CLASS =
  * claims — `GET /v1/plans` excludes VIP — so nothing becomes unreachable), which is what
  * makes the flattened rows the save payload.
  *
+ * The group's TOTAL, unlike its rows, prices the plan's CUMULATIVE membership — every module
+ * `plans[].modules` carries, not just the delta this section renders. A plan inherits its
+ * predecessor's modules, so the number under a plan's heading has to be that PLAN's price;
+ * summing the delta made Superior's total read as the price of its two extra modules alone.
+ * The membership is resolved against the editable draft by `moduleId`, so the total still
+ * recomputes on every keystroke. The catch-all has no plan to inherit from, so it keeps
+ * summing its own rows.
+ *
  * The effective price of a row AND the total of its group are recomputed live with the shared
  * domain formula on every keystroke, so the number under the cursor is always the number the
- * backend would persist. When any row in a group is on offer, the group's BASE total is shown
- * struck through next to the effective one — the same offer treatment the per-row column
- * gets.
+ * backend would persist. Both total columns go through `totalModulePricing`, the client
+ * mirror of `ModulePriceCalculator`: inactive and price-included modules contribute nothing,
+ * and the base column counts exactly the rows the effective column does. When any row in the
+ * priced set is on offer, the group's BASE total is shown struck through next to the
+ * effective one — the same offer treatment the per-row column gets.
  *
  * Presentational on purpose: the host route owns the fetch, the draft and the save, so the
  * error and busy states are the parent's exactly as on the other admin pages.
@@ -107,6 +133,22 @@ export function ModuleCatalogTable({ rows, plans, disabled, onChangeField }: Mod
   }
 
   const groups = groupModulesByPlanDelta(rows, plans, (row) => row.moduleId);
+
+  /**
+   * The rows a group footer prices: the plan's CUMULATIVE membership resolved against the
+   * live draft, or the group's own rows for the catch-all (no plan claims them, so there is
+   * no membership to inherit). Filtering the draft — rather than walking `plan.modules` —
+   * dedupes by construction and drops membership the catalog table does not carry
+   * (`GET /v1/modules/ToStore` is already the editable universe).
+   */
+  const footerRows = (groupPlanType: string, ownRows: ModuleCatalogRow[]): ModuleCatalogRow[] => {
+    if (groupPlanType === NO_PLAN_GROUP) return ownRows;
+    const plan = plans.find((p) => p.planType === groupPlanType);
+    if (!plan) return ownRows;
+    const memberIds = new Set<number>(plan.modules.map((m: PlanModule) => m.moduleId));
+    const memberRows = rows.filter((row) => memberIds.has(row.moduleId));
+    return memberRows.length > 0 ? memberRows : ownRows;
+  };
 
   const groupLabel = (planType: string) =>
     planType === NO_PLAN_GROUP
@@ -154,9 +196,12 @@ export function ModuleCatalogTable({ rows, plans, disabled, onChangeField }: Mod
 
         {groups.map((group) => {
           const key = group.planType || 'no-plan';
-          const effectiveTotal = group.items.reduce((sum, row) => sum + effectivePrice(row), 0);
-          const baseTotal = group.items.reduce((sum, row) => sum + toNumber(row.price), 0);
-          const groupOnOffer = group.items.some(isOnOffer);
+          // One pass, one rule: the base and the effective column count the SAME billable rows.
+          const pricedRows = footerRows(group.planType, group.items);
+          const { price: baseTotal, currentPrice: effectiveTotal } = totalModulePricing(
+            pricedRows.map(toPricingRow),
+          );
+          const groupOnOffer = pricedRows.some(isOnOffer);
 
           return (
             <tbody key={key}>

@@ -22,6 +22,10 @@ export interface Module {
   // editable values from those.
   discountPrice?: number;
   percentDiscountPrice?: number;
+  // The other input to THE price rule (`isActive && !priceIncluded`), additive on
+  // `ModuleDto`. Required: every catalog read sends it, and the rule cannot be applied
+  // to a row that does not say whether the module is live.
+  isActive: boolean;
 }
 
 export interface Feature {
@@ -101,6 +105,10 @@ export interface PlanModule {
   name: string;
   order: number;
   priceIncluded: boolean;
+  // The catalog module's live flag, additive on `PlanModuleDto`. Together with
+  // `priceIncluded` it is what `isBillableModule` reads, so a client can tell a plan
+  // module that reaches the plan total from one excluded by the rule.
+  isActive: boolean;
   price: number;
   currentPrice: number;
   discountPrice: number;
@@ -168,6 +176,13 @@ export interface StoreToCollect {
  * was shown — every active, AvailableToStore module — each with a tick and the three
  * price fields. A module left out of the payload is NOT deactivated: absence means
  * "not part of this edit", never "remove".
+ *
+ * DELIBERATELY no `isActive`/`priceIncluded` here, unlike every other pricing shape:
+ * the request row is `StoreModulePricingRequest(ModuleId, IsSelected, Price,
+ * DiscountPrice, PercentDiscountPrice)` (UpdateStoreModulePricingCommand.cs:25-30) and the
+ * server resolves BOTH rule flags itself — from the `StoreModule` snapshot the save just
+ * wrote (insert/reactivate freeze them from the catalog), never from the request
+ * (StoreModulePricingDto.cs:32-39). `isSelected` IS the tick that becomes `IsActive`.
  */
 export interface StoreModulePricingPayload {
   moduleId: number;
@@ -181,6 +196,10 @@ export interface StoreModulePricingPayload {
 export interface StoreModulePricingRow {
   moduleId: number;
   isActive: boolean;
+  // The store's frozen `ModulePriceIncluded`, echoed server-side. The second input to
+  // `isBillableModule`, and the reason this row can report a non-zero `currentPrice`
+  // that never reaches the total.
+  priceIncluded: boolean;
   price: number;
   discountPrice: number;
   percentDiscountPrice: number;
@@ -189,9 +208,10 @@ export interface StoreModulePricingRow {
 
 /**
  * Result of the save: the echoed state of every submitted row plus the total over the
- * TICKED rows. `totalCurrentPrice` is the same arithmetic `totalCurrentModulePrice`
- * computes in the browser, so the two can be compared directly — see the epsilon note
- * in `module-pricing.ts` before asserting exact equality.
+ * BILLABLE ones. `totalCurrentPrice` is the same arithmetic `totalModulePricing` computes
+ * in the browser (the same `ModulePriceCalculator` rule, double accumulation on the server),
+ * so the two can be compared directly — see the epsilon note in `module-pricing.ts` before
+ * asserting exact equality.
  */
 export interface StoreModulePricingResult {
   storeId: string;
@@ -209,6 +229,10 @@ export interface StoreModulePricingReadRow {
   moduleId: number;
   name: string;
   isActive: boolean;
+  // The store's frozen `ModulePriceIncluded` when a row exists, else the catalog's — what
+  // ticking the row WOULD freeze. The second input to `isBillableModule`, so the editor
+  // can show the billable amount before the save.
+  priceIncluded: boolean;
   price: number;
   discountPrice: number;
   percentDiscountPrice: number;
@@ -217,7 +241,8 @@ export interface StoreModulePricingReadRow {
 
 /**
  * The pricing read: one row per module that is active and available to stores — the exact
- * universe the save payload must carry — plus the total over the ACTIVE rows.
+ * universe the save payload must carry — plus the total over the BILLABLE rows
+ * (`isBillableModule`: active and not price-included).
  *
  * This is the only trustworthy source of a store's own discount values: modules nested in a
  * `Store`/`StorePlan`/`OwnerStoreWithPlan` report 0 for both (the backend's
@@ -260,9 +285,10 @@ export interface ModuleCatalogPricingRow extends ModuleCatalogPricingPayload {
 
 /**
  * Result of the catalog pricing save: the echoed state of every submitted row plus the
- * ungrouped total over the whole table. `totalCurrentPrice` is the backend's own float32
- * `CurrentPriceServiceUtils` arithmetic, so compare it with an epsilon against the
- * browser total — see the drift note in `module-pricing.ts`.
+ * ungrouped total over the BILLABLE ones (`ModulePriceCalculator.CalculateTotal` on the
+ * server, `totalModulePricing` in the browser). `totalCurrentPrice` is the backend's own
+ * float32 arithmetic, so compare it with an epsilon against the browser total — see the
+ * drift note in `module-pricing.ts`.
  */
 export interface ModuleCatalogPricingResult {
   modules: ModuleCatalogPricingRow[];

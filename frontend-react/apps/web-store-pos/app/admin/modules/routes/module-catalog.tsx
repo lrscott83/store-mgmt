@@ -31,6 +31,10 @@ function toRows(modules: Module[]): ModuleCatalogRow[] {
   return modules.map((module) => ({
     moduleId: module.id,
     name: module.name,
+    // The two inputs to the price rule. Server-owned: the operator edits prices, never the
+    // flags that decide whether a row reaches the total.
+    isActive: module.isActive,
+    priceIncluded: module.priceIncluded,
     // String() keeps the operator looking at the exact digits the server sent: the backend
     // prices are float32, so 10.1 must not become 10.100000000000001 in the input.
     price: String(module.price),

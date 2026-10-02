@@ -183,6 +183,7 @@ export function AdminStoreListPage() {
           moduleId: row.moduleId,
           name: row.name,
           isSelected: row.isActive,
+          priceIncluded: row.priceIncluded,
           // String() keeps the operator looking at the exact digits the server sent: the
           // backend prices are float32, so 10.1 must not become 10.100000000000001 here.
           price: String(row.price),
@@ -241,6 +242,8 @@ export function AdminStoreListPage() {
           moduleId: row.moduleId,
           name: namesByModuleId.get(row.moduleId) ?? '',
           isSelected: row.isActive,
+          // Echoed by the save: the flag the rule needs, resolved server-side — never sent.
+          priceIncluded: row.priceIncluded,
           price: String(row.price),
           discountPrice: String(row.discountPrice),
           percentDiscountPrice: String(row.percentDiscountPrice),
