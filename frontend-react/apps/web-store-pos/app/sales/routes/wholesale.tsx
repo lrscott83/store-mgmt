@@ -15,7 +15,7 @@ import { formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency
 import { Switch } from '~/shared/components/ui/switch';
 import {
   hasInventoryModuleAvailable,
-  hasMultiPaymentsModuleAvailable,
+  hasMultiMonedasModuleAvailable,
   isModuleAvailable,
 } from '~/shared/lib/auth/authorization-service';
 import { resolveUserHomePath } from '~/shared/lib/auth/user-home';
@@ -227,7 +227,7 @@ export function WholesalePage() {
     const currencyGuard = guardCurrency({
       items: cartItems,
       requestedProduct: product,
-      allowMixedCurrencies: hasMultiPaymentsModuleAvailable(user),
+      allowMixedCurrencies: hasMultiMonedasModuleAvailable(user),
     });
     if (!currencyGuard.succeeded) return currencyGuard;
 

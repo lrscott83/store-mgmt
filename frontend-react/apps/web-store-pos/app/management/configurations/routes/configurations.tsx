@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useIntl } from 'react-intl';
 import {
+  Currency,
   EFeatures,
   EModules,
   PAYMENT_CHANNELS,
@@ -15,9 +16,16 @@ import {
   DEFAULT_ENABLED_CHANNEL_KEYS,
   StorePaymentMethodsConfigService,
 } from '~/shared/lib/payment-methods/store-payment-methods-config-service';
+import {
+  DEFAULT_STORE_CURRENCY_CONFIG,
+  StoreCurrencyConfigService,
+} from '~/shared/lib/store-currency-config-service';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { switchToStore } from '~/shared/lib/stores/switch-store';
-import { hasMultiPaymentsModuleAvailable } from '~/shared/lib/auth/authorization-service';
+import {
+  hasMultiMonedasModuleAvailable,
+  hasMultiPaymentsModuleAvailable,
+} from '~/shared/lib/auth/authorization-service';
 
 export const clientLoader = adminFeatureLoader([EFeatures.Configurations]);
 
@@ -152,6 +160,112 @@ export function PaymentMethodsConfigSection({ storeId }: { storeId: string }) {
   );
 }
 
+/**
+ * store-currency-config (MultiMonedas, module 15): "Moneda de Compra" and
+ * "Moneda de Venta" — per-store buy/sell currency, persisted immediately via
+ * `StoreCurrencyConfigService`. Both default to CUP when the store has no
+ * stored config. Independent of MultiStores, like the rest of the page.
+ */
+const CONFIGURABLE_CURRENCIES: Currency[] = [
+  Currency.CUP,
+  Currency.USD,
+  Currency.EUR,
+  Currency.CLA,
+  Currency.MLC,
+  Currency.CAD,
+  Currency.MXN,
+];
+
+export function CurrencyConfigSection({ storeId }: { storeId: string }) {
+  const intl = useIntl();
+  // SSR: no window on the server → render the defaults; hydration reads the
+  // store's config from localStorage afterwards (same seam as payment methods).
+  const configService = useMemo(() => {
+    if (typeof window === 'undefined' || !storeId) return null;
+    return new StoreCurrencyConfigService(storeId);
+  }, [storeId]);
+
+  const [buyCurrency, setBuyCurrency] = useState<number>(
+    DEFAULT_STORE_CURRENCY_CONFIG.buyCurrency,
+  );
+  const [sellCurrency, setSellCurrency] = useState<number>(
+    DEFAULT_STORE_CURRENCY_CONFIG.sellCurrency,
+  );
+
+  useEffect(() => {
+    if (!configService) {
+      setBuyCurrency(DEFAULT_STORE_CURRENCY_CONFIG.buyCurrency);
+      setSellCurrency(DEFAULT_STORE_CURRENCY_CONFIG.sellCurrency);
+      return;
+    }
+    const config = configService.getConfig();
+    setBuyCurrency(config.buyCurrency);
+    setSellCurrency(config.sellCurrency);
+  }, [configService, storeId]);
+
+  function handleBuyChange(event: React.ChangeEvent<HTMLSelectElement>) {
+    const currency = Number(event.target.value);
+    setBuyCurrency(currency);
+    configService?.setBuyCurrency(currency);
+  }
+
+  function handleSellChange(event: React.ChangeEvent<HTMLSelectElement>) {
+    const currency = Number(event.target.value);
+    setSellCurrency(currency);
+    configService?.setSellCurrency(currency);
+  }
+
+  return (
+    <div data-testid="currency-config" className="mt-8">
+      <h2 className="mb-3 text-base font-semibold text-gray-800">
+        {intl.formatMessage({ id: 'CONFIGURATIONS.CURRENCY_CONFIG.TITLE' })}
+      </h2>
+      <div className="flex flex-row flex-wrap gap-4">
+        <div className="min-w-[8rem] flex-1">
+          <label
+            htmlFor="buy-currency-select"
+            className="mb-1 block text-sm font-medium text-gray-700"
+          >
+            {intl.formatMessage({ id: 'CONFIGURATIONS.CURRENCY_CONFIG.BUY_CURRENCY' })}
+          </label>
+          <select
+            id="buy-currency-select"
+            value={buyCurrency}
+            onChange={handleBuyChange}
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-800"
+          >
+            {CONFIGURABLE_CURRENCIES.map((currency) => (
+              <option key={currency} value={currency}>
+                {currencyLabel(currency)}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="min-w-[8rem] flex-1">
+          <label
+            htmlFor="sell-currency-select"
+            className="mb-1 block text-sm font-medium text-gray-700"
+          >
+            {intl.formatMessage({ id: 'CONFIGURATIONS.CURRENCY_CONFIG.SELL_CURRENCY' })}
+          </label>
+          <select
+            id="sell-currency-select"
+            value={sellCurrency}
+            onChange={handleSellChange}
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-800"
+          >
+            {CONFIGURABLE_CURRENCIES.map((currency) => (
+              <option key={currency} value={currency}>
+                {currencyLabel(currency)}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function ConfigurationsPage() {
   const intl = useIntl();
   const { user } = useAuthStore();
@@ -254,6 +368,12 @@ export function ConfigurationsPage() {
           active: the channel-rates register replaces this per-channel toggle UI. */}
       {!hasMultiPaymentsModuleAvailable(user) && (
         <PaymentMethodsConfigSection storeId={user?.selectedStoreId ?? ''} />
+      )}
+
+      {/* Monedas de compra/venta (store-currency-config): only for stores with
+          MultiMonedas (module 15). Without it nothing renders. */}
+      {hasMultiMonedasModuleAvailable(user) && (
+        <CurrencyConfigSection storeId={user?.selectedStoreId ?? ''} />
       )}
     </div>
   );

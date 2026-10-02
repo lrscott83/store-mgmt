@@ -2,14 +2,16 @@
  * multipayments-currency-block — NEW E2E (payment-channels-and-multipayment, 2026-09-23).
  *
  * Pins the cart currency-change BLOCK and the load-time fallback with module 16:
- *   - a persisted currency preference that cannot convert every line makes the
- *     cart fall back to the cart's NATIVE currency (no error, no "0 USD") instead
- *     of painting a zero total;
+ *   - the cart seeds its sale currency from the STORE's configured "Moneda de
+ *     Venta" (StoreCurrencyConfigService, localStorage per store, default CUP) on
+ *     app load; the per-user preference is no longer read. When the store default
+ *     cannot convert every line (USD without a rate) the cart falls back to its
+ *     NATIVE currency (no error, no "0 USD") instead of painting a zero total;
  *   - choosing that currency stays blocked: the select keeps its value, a clear
  *     `cart-currency-change-error` appears, and the total never becomes "0 USD";
  *   - once the channel rate that makes the conversion possible is registered,
- *     the persisted preference is honored: the cart opens in USD and the total
- *     converts (10 CUP → 0.10 USD).
+ *     the STORE default is honored: the cart opens in USD and the total converts
+ *     (10 CUP → 0.10 USD).
  *
  * Module 16 is VIP-only, so this spec mints a PRIVATE identity (real register +
  * login), enables the module through the direct-DB precondition fixture,
@@ -190,19 +192,23 @@ test.describe.serial('multipayments currency block (módulo 16) — cambio bloqu
 
     const headerTotal = page.locator('span.text-primary.whitespace-nowrap');
 
-    // A persisted preference that cannot convert every line (USD without a rate)
-    // makes the cart fall back to its NATIVE currency (CUP) — never an error and
-    // never a zeroed total.
-    const userId = await page.evaluate(() => {
-      const raw = localStorage.getItem('currentUser');
-      if (!raw) throw new Error('no currentUser to key the cart preference');
-      return (JSON.parse(raw) as { id: string }).id;
-    });
-    await page.evaluate((uid) => {
-      localStorage.setItem(`lizoft.cart-currency-${uid}`, '1'); // Currency.USD
-    }, userId);
-    await page.reload();
+    // The cart seeds its sale currency from the STORE's configured "Moneda de
+    // Venta" (sellCurrency) on app load; the per-user preference is no longer
+    // read. Configure the store's sale currency as USD through the real
+    // Configurations UI (module 15 renders the currency section), then do a FULL
+    // navigation so CartShell remounts and re-seeds from the store config.
+    await page.goto('/management/configurations');
     await page.waitForLoadState('networkidle');
+    const sellCurrencySelect = page.locator('#sell-currency-select');
+    await expect(sellCurrencySelect).toBeVisible();
+    await sellCurrencySelect.selectOption('1'); // Currency.USD
+    await expect(sellCurrencySelect).toHaveValue('1');
+
+    // Full navigation: CartShell remounts and seeds preferredCartCurrency from
+    // the store's sellCurrency (USD). The cart item survives the reload.
+    await page.goto('/sales/new');
+    await page.waitForLoadState('networkidle');
+    await expect(page.getByText(SALE_HEADER)).toBeVisible();
     await openCartPanel(page);
 
     await expect(page.getByTestId(CURRENCY_SELECT)).toHaveValue('0'); // fell back to CUP
@@ -220,7 +226,7 @@ test.describe.serial('multipayments currency block (módulo 16) — cambio bloqu
     await expect(headerTotal).toHaveText(/10\s*CUP/);
     await expect(headerTotal).not.toHaveText(/0\s*USD/);
 
-    // Register the CUP channel rate, then the persisted preference is honored:
+    // Register the CUP channel rate, then the STORE sale currency is honored:
     // the cart opens in USD and the line converts to 0.10 USD.
     await page.goto('/management/channel-rates');
     await page.waitForLoadState('networkidle');
@@ -243,7 +249,7 @@ test.describe.serial('multipayments currency block (módulo 16) — cambio bloqu
     await expect(page.getByText(SALE_HEADER)).toBeVisible();
     await openCartPanel(page);
 
-    await expect(page.getByTestId(CURRENCY_SELECT)).toHaveValue('1'); // USD honored
+    await expect(page.getByTestId(CURRENCY_SELECT)).toHaveValue('1'); // store default USD honored
     await expect(page.getByTestId('cart-currency-change-error')).toHaveCount(0);
     await expect(page.getByTestId('cart-line-conversion-error')).toHaveCount(0);
     await expect(page.locator('span.text-primary.whitespace-nowrap')).toHaveText(/0\.10\s*USD/);

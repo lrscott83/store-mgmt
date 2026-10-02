@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
-import { Currency, SalePaymentMethod } from '@store-mgmt/domain';
+import { Currency, EModules, SalePaymentMethod } from '@store-mgmt/domain';
 import esMessages from '~/shared/lib/i18n/es';
 import { StorePaymentMethodsConfigService } from '~/shared/lib/payment-methods/store-payment-methods-config-service';
+import { StoreCurrencyConfigService } from '~/shared/lib/store-currency-config-service';
 
 // ─── adminFeatureLoader mock ──────────────────────────────────────────────────
 
@@ -536,5 +537,104 @@ describe('ConfigurationsPage — payment methods config section', () => {
     expect(
       new StorePaymentMethodsConfigService('s2').getEnabledMethods('s2'),
     ).toContain(SalePaymentMethod.Zelle);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CURRENCY CONFIG — "Monedas de compra y venta" (MultiMonedas module 15)
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('ConfigurationsPage — currency config section (MultiMonedas module 15)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    restoreDefaultUser();
+  });
+
+  it('renders nothing without MultiMonedas (module 15)', async () => {
+    mockAuthState(buildUser({ storeModuleIds: [7] }));
+    const { ConfigurationsPage } = await import('../configurations');
+    render(
+      <Wrapper>
+        <ConfigurationsPage />
+      </Wrapper>,
+    );
+
+    expect(screen.queryByTestId('currency-config')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Moneda de Compra')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Moneda de Venta')).not.toBeInTheDocument();
+  });
+
+  it('shows the section with MultiMonedas and defaults both selects to CUP', async () => {
+    mockAuthState(buildUser({ storeModuleIds: [14, EModules.MultiMonedas] }));
+    const { ConfigurationsPage } = await import('../configurations');
+    render(
+      <Wrapper>
+        <ConfigurationsPage />
+      </Wrapper>,
+    );
+
+    const buy = (await screen.findByLabelText('Moneda de Compra')) as HTMLSelectElement;
+    const sell = screen.getByLabelText('Moneda de Venta') as HTMLSelectElement;
+    expect(buy.value).toBe(String(Currency.CUP));
+    expect(sell.value).toBe(String(Currency.CUP));
+    // Both selects sit on the same flex row.
+    expect(buy.closest('.flex')).not.toBeNull();
+    expect(sell.closest('.flex')).toBe(buy.closest('.flex'));
+  });
+
+  it('persists a BUY currency change immediately via the service', async () => {
+    mockAuthState(buildUser({ storeModuleIds: [EModules.MultiMonedas] }));
+    const { ConfigurationsPage } = await import('../configurations');
+    render(
+      <Wrapper>
+        <ConfigurationsPage />
+      </Wrapper>,
+    );
+
+    const buy = (await screen.findByLabelText('Moneda de Compra')) as HTMLSelectElement;
+    fireEvent.change(buy, { target: { value: String(Currency.USD) } });
+
+    expect(new StoreCurrencyConfigService('s1').getConfig()).toEqual({
+      buyCurrency: Currency.USD,
+      sellCurrency: Currency.CUP,
+    });
+  });
+
+  it('persists a SELL currency change immediately via the service', async () => {
+    mockAuthState(buildUser({ storeModuleIds: [EModules.MultiMonedas] }));
+    const { ConfigurationsPage } = await import('../configurations');
+    render(
+      <Wrapper>
+        <ConfigurationsPage />
+      </Wrapper>,
+    );
+
+    const sell = (await screen.findByLabelText('Moneda de Venta')) as HTMLSelectElement;
+    fireEvent.change(sell, { target: { value: String(Currency.MLC) } });
+
+    expect(new StoreCurrencyConfigService('s1').getConfig()).toEqual({
+      buyCurrency: Currency.CUP,
+      sellCurrency: Currency.MLC,
+    });
+  });
+
+  it('loads a previously stored config', async () => {
+    new StoreCurrencyConfigService('s1').setConfig({
+      buyCurrency: Currency.EUR,
+      sellCurrency: Currency.USD,
+    });
+    mockAuthState(buildUser({ storeModuleIds: [EModules.MultiMonedas] }));
+    const { ConfigurationsPage } = await import('../configurations');
+    render(
+      <Wrapper>
+        <ConfigurationsPage />
+      </Wrapper>,
+    );
+
+    const buy = (await screen.findByLabelText('Moneda de Compra')) as HTMLSelectElement;
+    const sell = screen.getByLabelText('Moneda de Venta') as HTMLSelectElement;
+    expect(buy.value).toBe(String(Currency.EUR));
+    expect(sell.value).toBe(String(Currency.USD));
   });
 });

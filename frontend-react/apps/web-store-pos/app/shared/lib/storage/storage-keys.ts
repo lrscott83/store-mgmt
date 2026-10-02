@@ -51,4 +51,7 @@ export const BUSINESS_ENTITY_NAMES = [
   'storePaymentMethods',
   // owner-messaging (T8): offline-queued text messages, flushed on reconnect.
   'messagesQueue',
+  // store-currency-config: per-store buy/sell currency config, persisted with
+  // the same `entityKey` convention as the rest.
+  'storeCurrencyConfig',
 ] as const;

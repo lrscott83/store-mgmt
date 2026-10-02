@@ -76,3 +76,14 @@ export function hasMultiPaymentsModuleAvailable(user: UserModel | null): boolean
     !!user && Array.isArray(user.storeModuleIds) && isModuleAvailable(user, EModules.MultiPayments)
   );
 }
+
+/**
+ * MultiMonedas (module 15) availability — gates the per-store buy/sell currency
+ * configuration. Same defensive shape as `hasMultiPaymentsModuleAvailable`:
+ * cached profiles from previous sessions can load without `storeModuleIds`.
+ */
+export function hasMultiMonedasModuleAvailable(user: UserModel | null): boolean {
+  return (
+    !!user && Array.isArray(user.storeModuleIds) && isModuleAvailable(user, EModules.MultiMonedas)
+  );
+}

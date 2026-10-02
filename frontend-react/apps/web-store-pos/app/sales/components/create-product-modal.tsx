@@ -10,6 +10,16 @@ import { WholesaleConfigSection } from './wholesale-config-section';
 import { CurrencySelect } from '~/shared/components/multimonedas/currency-select';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { isOwnerAdmin } from '~/shared/lib/auth/authorization-service';
+import { StoreCurrencyConfigService } from '~/shared/lib/store-currency-config-service';
+
+/**
+ * Store buy currency ("Moneda de Compra") as the cost-currency default. SSR-safe:
+ * without window or a store id it falls back to CUP, matching an unconfigured store.
+ */
+function storeBuyCurrency(storeId: string): number {
+  if (typeof window === 'undefined' || !storeId) return DEFAULT_CURRENCY;
+  return new StoreCurrencyConfigService(storeId).getConfig().buyCurrency;
+}
 
 interface CreateProductForm {
   name: string;
@@ -60,6 +70,7 @@ export function CreateProductModal({
   onClose,
 }: CreateProductModalProps) {
   const intl = useIntl();
+  const storeId = useAuthStore((s) => s.user?.selectedStoreId ?? '');
   const [form, setForm] = useState<CreateProductForm>({
     name: '',
     price: '',
@@ -74,7 +85,8 @@ export function CreateProductModal({
   const [wholesale, setWholesale] = useState<WholesaleConfig | undefined>(undefined);
   // MultiMonedas: CUP salvo que el usuario elija otra (selector visible solo con el módulo).
   const [currency, setCurrency] = useState<number>(DEFAULT_CURRENCY);
-  const [costCurrency, setCostCurrency] = useState<number>(DEFAULT_CURRENCY);
+  // T9: la moneda del costo ("Moneda de Compra") arranca con la config de la tienda.
+  const [costCurrency, setCostCurrency] = useState<number>(() => storeBuyCurrency(storeId));
   // Costo + cantidad solo para el owner Y solo con el módulo de Inventario (3) activo.
   // La entrada del día es un movimiento de inventario: la controla el dueño de la tienda
   // (mismo gate que products.tsx:52), y sin el módulo Inventario no existe la pantalla donde

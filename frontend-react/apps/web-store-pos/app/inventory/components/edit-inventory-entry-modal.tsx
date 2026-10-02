@@ -1,13 +1,23 @@
 import { useState, useEffect } from 'react';
 import { useIntl } from 'react-intl';
 import type { InventoryEntry, ProductSelectView } from '@store-mgmt/domain';
-import { DEFAULT_CURRENCY } from '@store-mgmt/domain';
+import { Currency } from '@store-mgmt/domain';
 import { Card } from '~/shared/components/ui/card';
 import { Button } from '~/shared/components/ui/button';
 import { InfoBox } from '~/shared/components/ui/info-box';
 import { CloseIcon, SaveIcon } from '~/shared/components/ui/icons';
 import { createProductService } from '~/sales/lib/services/product-service.factory';
 import { CurrencySelect } from '~/shared/components/multimonedas/currency-select';
+import { StoreCurrencyConfigService } from '~/shared/lib/store-currency-config-service';
+
+/**
+ * Store buy currency ("Moneda de Compra") as the create-mode default. SSR-safe:
+ * without window or a store id it falls back to CUP, matching an unconfigured store.
+ */
+function storeBuyCurrency(storeId: string): number {
+  if (typeof window === 'undefined' || !storeId) return Currency.CUP;
+  return new StoreCurrencyConfigService(storeId).getConfig().buyCurrency;
+}
 
 export interface EditInventoryEntryInput {
   productId: string;
@@ -49,8 +59,8 @@ export function EditInventoryEntryModal({
   const [productId, setProductId] = useState(entry?.productId ?? '');
   const [quantity, setQuantity] = useState(entry?.quantity.toString() ?? '');
   const [costPrice, setCostPrice] = useState(entry?.costPrice.toString() ?? '');
-  // MultiMonedas: moneda del costo de la entrada (edit: la almacenada; create: CUP).
-  const [currency, setCurrency] = useState<number>(entry?.currency ?? DEFAULT_CURRENCY);
+  // MultiMonedas: moneda del costo de la entrada (edit: la almacenada; create: Moneda de Compra).
+  const [currency, setCurrency] = useState<number>(entry?.currency ?? storeBuyCurrency(storeId));
   const [validationError, setValidationError] = useState('');
   // Searchable combobox (UX improvement over Angular's plain mat-select): the input holds the
   // typed query, the list filters products while the user types, and selection keeps the id.

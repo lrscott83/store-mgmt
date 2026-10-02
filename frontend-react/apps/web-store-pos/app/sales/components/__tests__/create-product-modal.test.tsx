@@ -1,9 +1,10 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 import type { ProductCategory } from '@store-mgmt/domain';
-import { EModules } from '@store-mgmt/domain';
+import { Currency, EModules } from '@store-mgmt/domain';
+import { StoreCurrencyConfigService } from '~/shared/lib/store-currency-config-service';
 import { CreateProductModal } from '../create-product-modal';
 
 // Scanner camera lib — mocked so opening the modal never loads the real @zxing/browser
@@ -582,5 +583,105 @@ describe('CreateProductModal — footer icons/labels parity', () => {
     );
     expect(screen.getByRole('button', { name: 'Cerrar' }).className).toContain('rounded-full');
     expect(screen.getByTestId('create-product-submit').className).toContain('rounded-full');
+  });
+});
+
+// ─── CreateProductModal — T9: cost currency defaults to store buy currency ──
+//
+// The cost ("Moneda de Compra") initial state must reflect the store's configured
+// buyCurrency. The sale price currency (`currency`) is deliberately left untouched.
+
+describe('CreateProductModal — T9 cost currency = store buy currency', () => {
+  function ownerWithModules(storeId: string) {
+    return {
+      id: 'u1',
+      selectedStoreId: storeId,
+      isOwnerAdmin: true,
+      storeModuleIds: [EModules.Inventory, EModules.MultiMonedas],
+    };
+  }
+
+  beforeEach(() => {
+    localStorage.clear();
+    mockUser = null;
+  });
+
+  afterEach(() => {
+    localStorage.clear();
+  });
+
+  it('seeds costCurrency from the store buy currency when configured (non-CUP)', () => {
+    mockUser = ownerWithModules('s1');
+    new StoreCurrencyConfigService('s1').setBuyCurrency(Currency.USD);
+    render(
+      <Wrapper>
+        <CreateProductModal
+          category={makeCategory()}
+          defaultOrder={1}
+          onSave={vi.fn()}
+          onClose={vi.fn()}
+        />
+      </Wrapper>,
+    );
+    const select = screen.getByTestId('product-cost-currency-select') as HTMLSelectElement;
+    expect(select.value).toBe(String(Currency.USD));
+  });
+
+  it('leaves the sale price currency unchanged (CUP) when only the buy currency is configured', () => {
+    mockUser = ownerWithModules('s1');
+    new StoreCurrencyConfigService('s1').setBuyCurrency(Currency.USD);
+    render(
+      <Wrapper>
+        <CreateProductModal
+          category={makeCategory()}
+          defaultOrder={1}
+          onSave={vi.fn()}
+          onClose={vi.fn()}
+        />
+      </Wrapper>,
+    );
+    const select = screen.getByTestId('product-currency-select') as HTMLSelectElement;
+    expect(select.value).toBe(String(Currency.CUP));
+  });
+
+  it('threads the store buy currency as costCurrency into onSave (day entry)', () => {
+    mockUser = ownerWithModules('s1');
+    new StoreCurrencyConfigService('s1').setBuyCurrency(Currency.MLC);
+    const onSave = vi.fn();
+    render(
+      <Wrapper>
+        <CreateProductModal
+          category={makeCategory()}
+          defaultOrder={1}
+          onSave={onSave}
+          onClose={vi.fn()}
+        />
+      </Wrapper>,
+    );
+    fireEvent.change(screen.getByTestId('product-name-input'), { target: { value: 'Sprite' } });
+    fireEvent.change(screen.getByTestId('product-price-input'), { target: { value: '2.5' } });
+    fireEvent.change(screen.getByTestId('product-cost-input'), { target: { value: '4' } });
+    fireEvent.change(screen.getByTestId('product-quantity-input'), { target: { value: '2' } });
+    fireEvent.click(screen.getByTestId('create-product-submit'));
+
+    expect(onSave).toHaveBeenCalledWith(
+      expect.objectContaining({ cost: 4, quantity: 2, costCurrency: Currency.MLC }),
+    );
+  });
+
+  it('defaults costCurrency to CUP when the store has no config', () => {
+    mockUser = ownerWithModules('s1');
+    render(
+      <Wrapper>
+        <CreateProductModal
+          category={makeCategory()}
+          defaultOrder={1}
+          onSave={vi.fn()}
+          onClose={vi.fn()}
+        />
+      </Wrapper>,
+    );
+    const select = screen.getByTestId('product-cost-currency-select') as HTMLSelectElement;
+    expect(select.value).toBe(String(Currency.CUP));
   });
 });
