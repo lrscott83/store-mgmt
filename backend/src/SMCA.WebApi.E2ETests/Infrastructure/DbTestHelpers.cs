@@ -4,6 +4,7 @@ using Application.Services.Authentication;
 using Domain.Common.Constants;
 using Domain.Common.Enums;
 using Domain.Entities.Authentication;
+using Domain.Entities.Messages;
 using Domain.Entities.Owners;
 using Domain.Entities.Stores;
 using Domain.Entities.StoreModules;
@@ -123,6 +124,34 @@ public static class DbTestHelpers
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
+        // Messaging subtree FIRST, while the tenant's Owner rows still exist to resolve it from:
+        // Conversation/Message extend AuditableEntity (not ITenantBaseEntity) and carry no TenantId
+        // column, so there is no tenant-scoped delete to write — the tenant's conversations are
+        // reached through its owners' USER ids (Conversation.OwnerId is a user id, not the Owner
+        // entity id). Must run before RemoveByTenantAsync<Owner> below.
+        // Messages before Conversations for readability; there is no FK between them.
+        var ownerUserIds = await db.Set<Owner>().IgnoreQueryFilters()
+            .Where(o => o.TenantId == tenantId)
+            .Select(o => o.UserId)
+            .ToListAsync();
+
+        if (ownerUserIds.Count > 0)
+        {
+            var conversationIds = await db.Set<Conversation>().IgnoreQueryFilters()
+                .Where(c => ownerUserIds.Contains(c.OwnerId))
+                .Select(c => c.Id)
+                .ToListAsync();
+
+            if (conversationIds.Count > 0)
+                await db.Set<Message>().IgnoreQueryFilters()
+                    .Where(m => conversationIds.Contains(m.ConversationId))
+                    .ExecuteDeleteAsync();
+
+            await db.Set<Conversation>().IgnoreQueryFilters()
+                .Where(c => ownerUserIds.Contains(c.OwnerId))
+                .ExecuteDeleteAsync();
+        }
+
         await RemoveByTenantAsync<StoreRoleFeature>(db, tenantId);
         await RemoveByTenantAsync<StoreModule>(db, tenantId);
         await RemoveByTenantAsync<Store>(db, tenantId);
@@ -162,6 +191,12 @@ public static class DbTestHelpers
         await db.Set<RefreshToken>().IgnoreQueryFilters().ExecuteDeleteAsync();
         await db.Set<OutboxMessage>().IgnoreQueryFilters().ExecuteDeleteAsync();
         await db.Set<StoreUsage>().IgnoreQueryFilters().ExecuteDeleteAsync();
+
+        // Messaging: no FK between the two and none to the rest of the graph, but the welcome
+        // greeting written at registration time would otherwise survive the reset and leak an
+        // extra conversation into the next test. Messages before Conversations for readability.
+        await db.Set<Message>().IgnoreQueryFilters().ExecuteDeleteAsync();
+        await db.Set<Conversation>().IgnoreQueryFilters().ExecuteDeleteAsync();
 
         // Store children (before Store).
         await db.Set<StorePayment>().IgnoreQueryFilters().ExecuteDeleteAsync();

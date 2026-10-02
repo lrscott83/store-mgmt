@@ -3,6 +3,7 @@ using Application.Abstractions.Messaging;
 using Application.Dtos.Authentication;
 using Application.Exceptions;
 using Application.ResponseModels;
+using Application.Services.Messages;
 using Application.UnitOfWorks;
 using Domain.Common.Results;
 using Domain.Entities.Owners;
@@ -36,17 +37,20 @@ namespace Application.Features.Authentication.Commands.Register
         private readonly IRegisterService _registerService;
         private readonly IJwtProvider _jwtProvider;
         private readonly IAuthTokenConfig _authTokenConfig;
+        private readonly IOwnerWelcomeMessageService _ownerWelcomeMessageService;
 
         public RegisterCommandHandler(
             IApplicationUnitOfWork applicationUnitOfWork,
             IRegisterService registerService,
             IJwtProvider jwtProvider,
-            IAuthTokenConfig authTokenConfig)
+            IAuthTokenConfig authTokenConfig,
+            IOwnerWelcomeMessageService ownerWelcomeMessageService)
         {
             _applicationUnitOfWork = applicationUnitOfWork;
             _registerService = registerService;
             _jwtProvider = jwtProvider;
             _authTokenConfig = authTokenConfig;
+            _ownerWelcomeMessageService = ownerWelcomeMessageService;
         }
 
         public async Task<ResponseResult<AuthDto>> Handle(RegisterCommand request, CancellationToken cancellationToken)
@@ -81,10 +85,32 @@ namespace Application.Features.Authentication.Commands.Register
                     new Error("Register.FailedToSave", "Registration failed: changes could not be saved to database."),
                     (int)HttpStatusCode.InternalServerError);
 
+            // Only now, AFTER the single commit above. MessageRepository commits internally, so
+            // greeting before this save would flush its own call first, leave nothing staged here,
+            // and make this SaveChangesAsync return 0 — failing EVERY registration with
+            // Register.FailedToSave. The service never throws, so the response below is unaffected.
+            await SendWelcomeMessageAsync(owner, cancellationToken);
+
             string token = _jwtProvider.GenerateToken(owner.User.Id, request.Login);
             var expiresAt = DateTime.UtcNow.AddDays(_authTokenConfig.TokenLifetimeDays);
 
             return ResponseResult.Success(new AuthDto(request.Login, token, expiresAt));
+        }
+
+        /// <summary>
+        /// Posts the welcome greeting, or skips it. Nothing here can change the response: the gate
+        /// and the "anything missing" case both return without calling the service, and the service
+        /// itself swallows and logs its own failures.
+        /// </summary>
+        private async Task SendWelcomeMessageAsync(Owner owner, CancellationToken cancellationToken)
+        {
+            OwnerWelcomeMessage.OwnerWelcomeTarget? target = OwnerWelcomeMessage.Resolve(owner);
+
+            if (target is null)
+                return;
+
+            await _ownerWelcomeMessageService.SendAsync(
+                target.OwnerUserId, target.OwnerFullName, target.StoreId, cancellationToken);
         }
     }
 }

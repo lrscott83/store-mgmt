@@ -1,8 +1,10 @@
 ﻿using Application.Abstractions.Authentication;
 using Application.Abstractions.Features;
+using Application.Abstractions.Messaging;
 using Application.Abstractions.Roles;
 using Application.Behaviours;
 using Application.Services.Authentication;
+using Application.Services.Messages;
 using Application.Services.Billing;
 using Application.Services.Features;
 using Application.Services.Owners;
@@ -60,6 +62,11 @@ namespace Application
             services.AddScoped<ICreateOwnerService, CreateOwnerService>();
 
             services.AddScoped<IBillingService, BillingService>();
+
+            // owner-welcome-message: greets a brand new owner in their own chat conversation. Scoped,
+            // because it borrows the request's ApplicationDbContext through IMessageRepository.
+            // Callers MUST invoke it AFTER their single SaveChanges — see IOwnerWelcomeMessageService.
+            services.AddScoped<IOwnerWelcomeMessageService, OwnerWelcomeMessageService>();
 
             // Authentication: bind settings from config
             services.Configure<AuthenticationSettings>(
