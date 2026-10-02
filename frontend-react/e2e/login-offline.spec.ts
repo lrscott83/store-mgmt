@@ -8,9 +8,12 @@ import { readAuthModel } from './support/auth-storage';
 
 /**
  * [S1-03] Login offline en dispositivo aprovisionado
- * (docs/testing/e2e-stage-1/S1-03.md). Zero HTTP on the success path — the
- * roster FILE decides the mode, never connectivity (login.tsx:109-110,123,
- * before the `ConnectivityService.isOnline()` check at :128).
+ * (docs/testing/e2e-stage-1/S1-03.md). Zero AUTH and zero product/category
+ * HTTP on the success path — the roster FILE decides the mode, never
+ * connectivity (login.tsx:109-110,123, before the `ConnectivityService.isOnline()`
+ * check at :128). The always-visible Owner chat (business rule: the icon is
+ * mounted for every authenticated Owner — navbar.tsx) adds KNOWN messaging
+ * traffic on top; `expectOnlyKnownTelemetry` below whitelists it explicitly.
  *
  * `installAnyRequestObserver` is installed HERE, inside each test, once at
  * the start, without cutting the network — never wired into
@@ -70,8 +73,26 @@ function uniqueLogin(prefix: string): string {
  */
 const USAGE_TRACKER_PATH = '/v1/usages/store-daily-usage';
 
+/**
+ * Known BACKGROUND traffic an authenticated Owner page generates besides the
+ * telemetry POST above (user decision 2026-10-01): the chat Owner↔SuperAdmin
+ * is ALWAYS visible for an authenticated store Owner (navbar.tsx mounts
+ * `MessageShell` unconditionally — `77cf94af`), and with network available it
+ * negotiates the SignalR hub and refreshes conversations in the background.
+ * That traffic is correct product behavior, never a broken offline invariant:
+ * what the offline invariant still forbids is AUTH and product/category HTTP,
+ * which stay asserted as zero through these same filters.
+ */
+const KNOWN_BACKGROUND_PATHS = [
+  USAGE_TRACKER_PATH,
+  '/hubs/messages', // SignalR: /negotiate + the hub WebSocket itself
+  '/api/v1/messages', // REST: conversations / messages / mark-as-read
+];
+
 function expectOnlyKnownTelemetry(anyRequest: AnyRequestObserver, context: string): void {
-  const unexpected = anyRequest.requests().filter((r) => !r.url.includes(USAGE_TRACKER_PATH));
+  const unexpected = anyRequest
+    .requests()
+    .filter((r) => !KNOWN_BACKGROUND_PATHS.some((p) => r.url.includes(p)));
   if (unexpected.length > 0) {
     throw new Error(
       `Expected zero HTTP requests other than the known store-usage telemetry POST (${context}), ` +
@@ -246,9 +267,11 @@ test.describe('login offline — dispositivo aprovisionado (S1-03)', () => {
     await loginPage.submit();
     await page.waitForURL(/\/sales\/products$/);
 
-    // Zero API requests: GlobalConfig.USE_ONLINE_SERVICE = false routes this
-    // through the offline (localStorage) product/category services
-    // (store-seed.ts's own doc comment).
+    // Zero PRODUCT/CATEGORY API requests: GlobalConfig.USE_ONLINE_SERVICE =
+    // false routes this through the offline (localStorage) product/category
+    // services (store-seed.ts's own doc comment). Messaging traffic from the
+    // always-visible Owner chat is expected and whitelisted — see
+    // KNOWN_BACKGROUND_PATHS above.
     await seedCategoryAndProduct(page, `E2E Offline Product ${login}`);
 
     // logout() (auth-store.ts:352-370) removes only AUTH_MODEL — the roster

@@ -34,10 +34,34 @@ export function UserCreateForm({ isOnline, isLoading, onSubmit, error }: UserCre
   // create-store-user.component.html:43-48,63-68: a SINGLE showPassword
   // boolean drives BOTH password + confirmPassword fields.
   const [showPassword, setShowPassword] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  // The form carries `noValidate`, so the browser never raises its own "Please fill
+  // out this field" bubble — those strings are localized by the BROWSER, not by
+  // react-intl, so a Spanish app in an English browser showed English errors. Same
+  // required set the `required` attributes used to carry; email stays optional.
+  function validateRequiredFields(): Record<string, string> {
+    const errs: Record<string, string> = {};
+    const required = (labelId: string) =>
+      intl.formatMessage(
+        { id: 'GENERAL.VALIDATION.REQUIRED' },
+        { name: intl.formatMessage({ id: labelId }) },
+      );
+    if (!fullName.trim()) errs.fullName = required('USERS.FULL_NAME');
+    if (!login.trim()) errs.login = required('USERS.LOGIN');
+    if (!password) errs.password = required('USERS.PASSWORD');
+    if (!confirmPassword) errs.confirmPassword = required('USERS.CONFIRM_PASSWORD');
+    if (!cellPhone.trim()) errs.cellPhone = required('USERS.CELL_PHONE');
+    return errs;
+  }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setValidationError('');
+
+    const errs = validateRequiredFields();
+    setFieldErrors(errs);
+    if (Object.keys(errs).length > 0) return;
 
     if (!PASSWORD_REGEX.test(password)) {
       setValidationError(intl.formatMessage({ id: 'USERS.PASSWORD_POLICY' }));
@@ -53,7 +77,7 @@ export function UserCreateForm({ isOnline, isLoading, onSubmit, error }: UserCre
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} noValidate className="space-y-4">
       {!isOnline && (
         <p className="text-sm text-yellow-700 bg-yellow-50 border border-yellow-200 rounded px-3 py-2">
           {intl.formatMessage({ id: 'USERS.OFFLINE_NOTICE' })}
@@ -77,9 +101,13 @@ export function UserCreateForm({ isOnline, isLoading, onSubmit, error }: UserCre
           type="text"
           value={fullName}
           onChange={(e) => setFullName(e.target.value)}
-          required
           className="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
+        {fieldErrors.fullName && (
+          <p role="alert" className="mt-1 text-sm text-red-600">
+            {fieldErrors.fullName}
+          </p>
+        )}
       </div>
 
       <div>
@@ -91,9 +119,13 @@ export function UserCreateForm({ isOnline, isLoading, onSubmit, error }: UserCre
           type="text"
           value={login}
           onChange={(e) => setLogin(e.target.value)}
-          required
           className="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
+        {fieldErrors.login && (
+          <p role="alert" className="mt-1 text-sm text-red-600">
+            {fieldErrors.login}
+          </p>
+        )}
       </div>
 
       <div>
@@ -106,9 +138,13 @@ export function UserCreateForm({ isOnline, isLoading, onSubmit, error }: UserCre
             type={showPassword ? 'text' : 'password'}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            required
             className="block w-full rounded border border-gray-300 px-3 py-2 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
+          {fieldErrors.password && (
+            <p role="alert" className="mt-1 text-sm text-red-600">
+              {fieldErrors.password}
+            </p>
+          )}
           <button
             type="button"
             onClick={() => setShowPassword((visible) => !visible)}
@@ -132,9 +168,13 @@ export function UserCreateForm({ isOnline, isLoading, onSubmit, error }: UserCre
             type={showPassword ? 'text' : 'password'}
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
-            required
             className="block w-full rounded border border-gray-300 px-3 py-2 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
+          {fieldErrors.confirmPassword && (
+            <p role="alert" className="mt-1 text-sm text-red-600">
+              {fieldErrors.confirmPassword}
+            </p>
+          )}
           <button
             type="button"
             onClick={() => setShowPassword((visible) => !visible)}
@@ -157,9 +197,13 @@ export function UserCreateForm({ isOnline, isLoading, onSubmit, error }: UserCre
           type="text"
           value={cellPhone}
           onChange={(e) => setCellPhone(e.target.value)}
-          required
           className="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
+        {fieldErrors.cellPhone && (
+          <p role="alert" className="mt-1 text-sm text-red-600">
+            {fieldErrors.cellPhone}
+          </p>
+        )}
       </div>
 
       <div>

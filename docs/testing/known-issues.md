@@ -136,3 +136,71 @@ _Sin decisiones pendientes._ Todas las entradas de la corrida del 2026-09-24 que
 Historial: en la segunda tanda se cerró la decisión del test 12 (el spec pinea el diseño del gate con autorización del usuario), los tests 10/11 (ídem) y el T10.2 (spec reescrito verificado + núcleo pineado en integración) — detalle en las entradas 1, 2 y 3. En la tercera tanda se cerró el Grupo B (los 2 specs comparan la fecha ancla serializada), en la cuarta el Grupo C (el spec usa la persona privada Superior del fixture de dev y pasa 2/2) y en la quinta el Grupo D (aserción por valor/selección). El Grupo E (plan-catalog-superadmin y auth-me-\*, solo carga de la suite) quedó verificado en verde en solitario (16/16) y sin retries en la última corrida completa; su ficha se retiró. El Grupo F se retiró al confirmarse sus dos fixes en la corrida final.
 
 _Actualizado por última vez: 2026-09-24 (quinta actualización: corrida del 2026-09-24 cerrada por completo)._
+
+---
+
+## Corrida del 2026-09-29 — fallos traídos por el merge de qa
+
+**Contexto.** Suite completa E2E del frontend contra backend real (`:5019`, BD `smca_test`), 4 workers, tras hacer merge de `origin/qa` en `test`. La última corrida conocida (2026-09-25) tuvo **0 fallos**. Estos 8 fallos son **nuevos** — los trajo el merge.
+
+**Resultado:** 8 fallos (7 únicos + 1 retry). Fichas individuales en [`known-issues/qa-merge-2026-09-29/`](known-issues/qa-merge-2026-09-29/README.md).
+
+| #   | Spec                          | Qué prueba                                                                                                        | Qué fallaba                                                                                                    | Estado |
+| --- | ----------------------------- | ----------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | ------ |
+| 1   | `store-module-pricing`        | El menú de engranaje abre el modal con el nombre de la tienda y su universo de módulos                           | El botón de acciones de la tienda no aparece — la pantalla de tiendas no carga datos                         | ✅ **Resuelto 2026-09-30** (8/8) |
+| 2   | `plan-catalog-superadmin`     | El popup muestra los cuatro paneles de planes incluyendo VIP                                                      | Ídem — el botón de acciones de la tienda no aparece                                                            | ✅ **Resuelto 2026-09-30** (2/2) |
+| 3   | `web-catalog`                 | Crear producto en POS, sincronizar, editarlo y verlo publicado en `/catalog/<slug>`                               | El producto no aparece en el catálogo público después de sincronizar                                            | 🔍 a confirmar          |
+| 4   | `mayorista-sale`              | Venta mayorista con Transferencia (CUP) filtrable por método de pago                                             | La opción de pago Transferencia (CUP) nunca se renderiza (timeout 120s)                                          | 🔍 a confirmar          |
+| 5   | `precache-split` (2 tests)    | Los chunks de rutas Owner/StoreUser y las librerías pesadas (PDF, scanner, gráficos) están precacheados           | El service worker nunca llega a estado activado (timeout 30s)                                                    | 🔍 a confirmar          |
+| 6   | `store-switcher-refresh`      | Una tienda creada en la sesión aparece en el switcher del header sin re-login                                    | El botón de crear tienda nunca aparece (timeout 120s)                                                            | 🔍 a confirmar          |
+| —   | **Defecto sistémico**         | El dev server sirve la versión vigente de los paquetes del workspace                                            | No es un test: `vite.config.ts` deja un caché de Vite que puede servir un `dist/` viejo                        | 🔴 **ABIERTO — decisión pendiente** |
+
+**Tests E2E del backend (mismo día):** 660 passed, 0 failed. Sin relación con estos fallos.
+
+---
+
+## Defecto sistémico confirmado el 2026-09-30 — caché de dependencias de Vite
+
+**Resuelve los fallos 1 y 2.** No era la app, ni el backend, ni los tests.
+
+**Qué pasaba.** `frontend-react/apps/web-store-pos/vite.config.ts:222-224` declara
+`optimizeDeps: { include: ['@store-mgmt/domain'] }`. Eso obliga a Vite a pre-empaquetar el
+paquete del workspace en `apps/web-store-pos/node_modules/.vite/deps/`. Vite decide cuándo
+re-empaquetar mirando el `package.json` y el lockfile, **no el contenido de `dist/`** — así
+que un `packages/domain/dist/` recién compilado por turbo igual se servía desde el caché viejo.
+
+**Cómo se manifiesta.** Toda ruta que importe un export nuevo de `@store-mgmt/domain`
+falla al cargar con `SyntaxError: does not provide an export named 'NO_PLAN_GROUP'`.
+React Router convierte ese `SyntaxError` en `No result returned from dataStrategy for route
+...` y lo muestra en el error boundary. **La causa real nunca llega a la pantalla**, y
+`resellerLoader` nunca llega a ejecutarse.
+
+**Evidencia medida.** `src` modificado 2026-09-29 15:27 → `dist` recompilado 15:56 → caché de
+Vite generado 2026-09-28 10:20 (un día antes) sin el export. Borrar
+`apps/web-store-pos/node_modules/.vite` y reiniciar el dev server deja ambos specs en verde
+**sin tocar la app ni los tests**.
+
+**Efecto colateral documentado.** Mientras el defecto estuvo vivo, `e2e/admin-routes.spec.ts`
+daba verde: solo afirma que el pathname no es `/login` y que el body tenga texto, y una
+página de error cumple las dos. No usarlo como prueba de que la lista de tiendas carga.
+
+### Decisión pendiente
+
+| Opción | Qué hace | Estado |
+| ------ | -------- | ------ |
+| **A (recomendada)** | Quitar `optimizeDeps.include` de `vite.config.ts`. Vite pasa a servir el paquete directo, y `turbo run dev` ya garantiza que `dist/` está al día. El fallo deja de ser posible por construcción. | 🔴 Requiere autorización (toca código de la app) + re-correr la suite completa |
+| **B** | `optimizeDeps.force: true` — re-empaqueta en cada arranque. Parche: deja el modo de fallo intacto para el resto de paquetes. | 🔴 Sin aplicar |
+| **C** | Borrar `.vite` en `e2e/support/global-setup.ts`. Protege a los tests, no al dev manual. Defensa en profundidad. | 🔴 Sin aplicar |
+| **D** | No hacer nada; esta sección queda como manual de diagnóstico. | — |
+
+**También pendiente de decidir:**
+
+1. **¿Se refuerza `admin-routes.spec.ts`?** Endurecer sus aserciones es **modificar un test E2E
+   existente** — requiere autorización explícita del usuario.
+2. **¿Se re-verifican los fallos 3 a 6?** Se documentaron en la misma corrida y no se
+   reprodujeron. Solo se confirmó que 1 y 2 eran este defecto; no se comprobó si 3 a 6 lo son.
+
+Detalle completo en [`known-issues/qa-merge-2026-09-29/07-vite-dep-cache-stale.md`](known-issues/qa-merge-2026-09-29/07-vite-dep-cache-stale.md).
+
+_Actualizado por última vez: 2026-09-30 (corrida del 2026-09-29: fallos 1 y 2 resueltos y
+reclasificados como defecto sistémico; queda abierta la decisión sobre la Opción A)._

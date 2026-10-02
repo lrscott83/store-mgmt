@@ -72,15 +72,15 @@ import RegisterPage from '../register';
 import type { BaseResponseModel, RegisterAuthModel } from '@store-mgmt/domain';
 
 function fillRequiredFields() {
-  fireEvent.change(screen.getByLabelText('Nombre Completo'), { target: { value: 'Jane Doe' } });
-  fireEvent.change(screen.getByLabelText('Usuario'), { target: { value: 'janedoe' } });
-  fireEvent.change(screen.getByLabelText('Nombre de la tienda'), {
+  fireEvent.change(screen.getByLabelText('Nombre Completo (requerido)'), { target: { value: 'Jane Doe' } });
+  fireEvent.change(screen.getByLabelText('Usuario (requerido)'), { target: { value: 'janedoe' } });
+  fireEvent.change(screen.getByLabelText('Nombre de la tienda (requerido)'), {
     target: { value: 'Jane Store' },
   });
-  fireEvent.change(screen.getByLabelText('Correo'), { target: { value: 'jane@test.com' } });
-  fireEvent.change(screen.getByLabelText('Teléfono'), { target: { value: '+5491100000' } });
-  fireEvent.change(screen.getByLabelText('Contraseña'), { target: { value: 'Passw0rd!' } });
-  fireEvent.change(screen.getByLabelText('Confirmar Contraseña'), {
+  fireEvent.change(screen.getByLabelText('Correo (opcional)'), { target: { value: 'jane@test.com' } });
+  fireEvent.change(screen.getByLabelText('Teléfono (requerido)'), { target: { value: '+5491100000' } });
+  fireEvent.change(screen.getByLabelText('Contraseña (requerido)'), { target: { value: 'Passw0rd!' } });
+  fireEvent.change(screen.getByLabelText('Confirmar Contraseña (requerido)'), {
     target: { value: 'Passw0rd!' },
   });
   acceptTerms();
@@ -133,8 +133,8 @@ describe('RegisterPage — auth-http-register-parity call-site', () => {
 
   it('renders login and storeName inputs', () => {
     renderRegister();
-    expect(screen.getByLabelText('Usuario')).toBeInTheDocument();
-    expect(screen.getByLabelText('Nombre de la tienda')).toBeInTheDocument();
+    expect(screen.getByLabelText('Usuario (requerido)')).toBeInTheDocument();
+    expect(screen.getByLabelText('Nombre de la tienda (requerido)')).toBeInTheDocument();
   });
 
   it('does not render a visible input for code', () => {
@@ -215,7 +215,7 @@ describe('RegisterPage — auth-http-register-parity call-site', () => {
   it('blocks submit on password/passwordConfirmation mismatch — register() never called', async () => {
     renderRegister();
     fillRequiredFields();
-    fireEvent.change(screen.getByLabelText('Confirmar Contraseña'), {
+    fireEvent.change(screen.getByLabelText('Confirmar Contraseña (requerido)'), {
       target: { value: 'Different1!' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Registrar' }));
@@ -300,37 +300,37 @@ describe('RegisterPage — view-text-parity: field labels', () => {
 
   it('renders "Nombre Completo" label (GENERAL.FULL_NAME)', () => {
     renderRegister();
-    expect(screen.getByLabelText('Nombre Completo')).toBeInTheDocument();
+    expect(screen.getByLabelText('Nombre Completo (requerido)')).toBeInTheDocument();
   });
 
   it('renders "Usuario" label (GENERAL.LOGIN)', () => {
     renderRegister();
-    expect(screen.getByLabelText('Usuario')).toBeInTheDocument();
+    expect(screen.getByLabelText('Usuario (requerido)')).toBeInTheDocument();
   });
 
   it('renders "Contraseña" label (GENERAL.PASSWORD)', () => {
     renderRegister();
-    expect(screen.getByLabelText('Contraseña')).toBeInTheDocument();
+    expect(screen.getByLabelText('Contraseña (requerido)')).toBeInTheDocument();
   });
 
   it('renders "Confirmar Contraseña" label (GENERAL.CONFIRM_PASSWORD)', () => {
     renderRegister();
-    expect(screen.getByLabelText('Confirmar Contraseña')).toBeInTheDocument();
+    expect(screen.getByLabelText('Confirmar Contraseña (requerido)')).toBeInTheDocument();
   });
 
   it('renders "Teléfono" label (GENERAL.CELL_PHONE)', () => {
     renderRegister();
-    expect(screen.getByLabelText('Teléfono')).toBeInTheDocument();
+    expect(screen.getByLabelText('Teléfono (requerido)')).toBeInTheDocument();
   });
 
   it('renders "Correo" label (GENERAL.EMAIL)', () => {
     renderRegister();
-    expect(screen.getByLabelText('Correo')).toBeInTheDocument();
+    expect(screen.getByLabelText('Correo (opcional)')).toBeInTheDocument();
   });
 
   it('renders "Nombre de la tienda" label (STORE.STORE_NAME)', () => {
     renderRegister();
-    expect(screen.getByLabelText('Nombre de la tienda')).toBeInTheDocument();
+    expect(screen.getByLabelText('Nombre de la tienda (requerido)')).toBeInTheDocument();
   });
 });
 
@@ -357,14 +357,14 @@ describe('RegisterPage — view-text-parity: validate() error strings', () => {
 
   it('shows password-policy error text (GENERAL.VALIDATION.PASSWORD_POLICY)', async () => {
     renderRegister();
-    fireEvent.change(screen.getByLabelText('Nombre Completo'), { target: { value: 'Jane Doe' } });
-    fireEvent.change(screen.getByLabelText('Usuario'), { target: { value: 'janedoe' } });
-    fireEvent.change(screen.getByLabelText('Nombre de la tienda'), {
+    fireEvent.change(screen.getByLabelText('Nombre Completo (requerido)'), { target: { value: 'Jane Doe' } });
+    fireEvent.change(screen.getByLabelText('Usuario (requerido)'), { target: { value: 'janedoe' } });
+    fireEvent.change(screen.getByLabelText('Nombre de la tienda (requerido)'), {
       target: { value: 'Jane Store' },
     });
-    fireEvent.change(screen.getByLabelText('Teléfono'), { target: { value: '+5491100000' } });
-    fireEvent.change(screen.getByLabelText('Contraseña'), { target: { value: 'weak' } });
-    fireEvent.change(screen.getByLabelText('Confirmar Contraseña'), {
+    fireEvent.change(screen.getByLabelText('Teléfono (requerido)'), { target: { value: '+5491100000' } });
+    fireEvent.change(screen.getByLabelText('Contraseña (requerido)'), { target: { value: 'weak' } });
+    fireEvent.change(screen.getByLabelText('Confirmar Contraseña (requerido)'), {
       target: { value: 'weak' },
     });
     acceptTerms();
@@ -382,7 +382,7 @@ describe('RegisterPage — view-text-parity: validate() error strings', () => {
   it('shows password-mismatch error text (GENERAL.VALIDATION.INVALID_PASSWORD)', async () => {
     renderRegister();
     fillRequiredFields();
-    fireEvent.change(screen.getByLabelText('Confirmar Contraseña'), {
+    fireEvent.change(screen.getByLabelText('Confirmar Contraseña (requerido)'), {
       target: { value: 'Different1!' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Registrar' }));
@@ -611,8 +611,8 @@ describe('RegisterPage — password visibility toggle (register.component.html:1
   // one shared state) — clicking either toggle flips both fields together.
   it('password and confirm-password share one toggle state (both flip together)', () => {
     renderRegister();
-    const password = screen.getByLabelText('Contraseña');
-    const confirm = screen.getByLabelText('Confirmar Contraseña');
+    const password = screen.getByLabelText('Contraseña (requerido)');
+    const confirm = screen.getByLabelText('Confirmar Contraseña (requerido)');
     expect(password).toHaveAttribute('type', 'password');
     expect(confirm).toHaveAttribute('type', 'password');
 
@@ -656,5 +656,66 @@ describe('RegisterPage — submit control renders as fab (register.component.htm
     const submit = screen.getByRole('button', { name: 'Registrar' });
     const path = submit.querySelector('svg path')?.getAttribute('d');
     expect(path).toContain('13.5 10.5V6.75');
+  });
+});
+
+describe('RegisterPage — labels announce requiredness inline', () => {
+  it('marks every required field with "(requerido)" and the only optional one with "(opcional)"', () => {
+    renderRegister();
+
+    for (const label of [
+      'Nombre Completo (requerido)',
+      'Usuario (requerido)',
+      'Nombre de la tienda (requerido)',
+      'Contraseña (requerido)',
+      'Confirmar Contraseña (requerido)',
+      'Teléfono (requerido)',
+    ]) {
+      expect(screen.getByLabelText(label)).toBeInTheDocument();
+    }
+    // email is the only field validate() lets through empty — saying so up front is
+    // the point: a required marker on it would be a lie, and its absence here is what
+    // tells the user the account can be created without one.
+    expect(screen.getByLabelText('Correo (opcional)')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Correo (requerido)')).not.toBeInTheDocument();
+  });
+
+  it('keeps the terms checkbox marked as required, matching the disabled submit until it is ticked', () => {
+    renderRegister();
+    expect(screen.getByRole('checkbox').closest('label')).toHaveTextContent(
+      messages['GENERAL.VALIDATION.REQUIRED_SUFFIX'],
+    );
+    expect(screen.getByRole('button', { name: 'Registrar' })).toBeDisabled();
+  });
+});
+
+describe('RegisterPage — field order puts the contact pair below the credentials', () => {
+  it('renders password, its confirmation, then phone, then email — in that DOM order', () => {
+    renderRegister();
+
+    const indexOf = (id: string) =>
+      Array.prototype.indexOf.call(
+        document.querySelectorAll('input'),
+        document.getElementById(id)!,
+      );
+
+    expect(indexOf('password')).toBeLessThan(indexOf('passwordConfirmation'));
+    expect(indexOf('passwordConfirmation')).toBeLessThan(indexOf('cellPhone'));
+    expect(indexOf('cellPhone')).toBeLessThan(indexOf('email'));
+  });
+
+  it('keeps the identity fields above the credentials', () => {
+    renderRegister();
+
+    const indexOf = (id: string) =>
+      Array.prototype.indexOf.call(
+        document.querySelectorAll('input'),
+        document.getElementById(id)!,
+      );
+
+    expect(indexOf('fullName')).toBeLessThan(indexOf('login'));
+    expect(indexOf('login')).toBeLessThan(indexOf('storeName'));
+    expect(indexOf('storeName')).toBeLessThan(indexOf('password'));
+    expect(indexOf('email')).toBeLessThan(indexOf('acceptTerms'));
   });
 });

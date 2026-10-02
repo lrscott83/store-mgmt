@@ -60,9 +60,17 @@ const IMPORT_SUCCESS_TEXT = 'Los datos se importaron correctamente.';
 // by the import are re-encrypted with the importing device's DEK.
 const ENTITY_ENVELOPE_PREFIX = 'enc:v1:';
 
-// The ONLY backend traffic the suite tolerates, from login-offline.spec.ts:
-// the usage tracker POST that fires on route changes after login.
+// Known telemetry traffic, from login-offline.spec.ts: the usage tracker POST
+// that fires on route changes after login. KNOWN_BACKGROUND_PATHS below adds
+// the always-visible Owner chat's messaging traffic (business rule, user
+// decision 2026-10-01 — see login-offline.spec.ts's header comment).
 const USAGE_TRACKER_PATH = '/v1/usages/store-daily-usage';
+
+const KNOWN_BACKGROUND_PATHS = [
+  USAGE_TRACKER_PATH,
+  '/hubs/messages', // SignalR: /negotiate + the hub WebSocket itself
+  '/api/v1/messages', // REST: conversations / messages / mark-as-read
+];
 
 let loginSequence = 0;
 function uniqueLogin(prefix: string): string {
@@ -72,11 +80,13 @@ function uniqueLogin(prefix: string): string {
 
 /**
  * REQ-1 tolerated-traffic helper (login-offline.spec.ts convention): every
- * observed request must be the usage tracker POST, or the assertion fails
- * with the full request list for diagnosis.
+ * observed request must be one of KNOWN_BACKGROUND_PATHS, or the assertion
+ * fails with the full request list for diagnosis.
  */
 function expectOnlyKnownTelemetry(anyRequest: AnyRequestObserver, context: string): void {
-  const unexpected = anyRequest.requests().filter((r) => !r.url.includes(USAGE_TRACKER_PATH));
+  const unexpected = anyRequest
+    .requests()
+    .filter((r) => !KNOWN_BACKGROUND_PATHS.some((p) => r.url.includes(p)));
   expect(unexpected, `${context} — zero HTTP beyond the tolerated usage tracker`).toEqual([]);
 }
 

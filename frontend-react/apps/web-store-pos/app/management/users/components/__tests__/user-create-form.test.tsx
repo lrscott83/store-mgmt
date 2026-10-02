@@ -296,3 +296,57 @@ describe('UserCreateForm — PRES-5: no login/password clash with details shape'
     expect(screen.queryByLabelText(/activo/i)).not.toBeInTheDocument();
   });
 });
+
+/** Mirrors what the component does with GENERAL.VALIDATION.REQUIRED. */
+const requiredMsg = (nameKey: string) =>
+  esMessages['GENERAL.VALIDATION.REQUIRED'].replace('{name}', esMessages[nameKey] as string);
+
+describe('UserCreateForm — required fields are validated in-app, not by the browser', () => {
+  it('carries noValidate so the browser never raises its own English validation bubble', async () => {
+    const { UserCreateForm } = await import('../UserCreateForm');
+    render(
+      <Wrapper>
+        <UserCreateForm {...baseProps} />
+      </Wrapper>,
+    );
+    // A native `required` + no noValidate is what produced "Please fill out this field"
+    // in the BROWSER's language, bypassing react-intl entirely.
+    expect(screen.getByRole('button', { name: /adicionar/i }).closest('form')).toHaveAttribute(
+      'noValidate',
+    );
+  });
+
+  it('shows the Spanish required message for every blank required field and does not submit', async () => {
+    const { UserCreateForm } = await import('../UserCreateForm');
+    const onSubmit = vi.fn();
+    render(
+      <Wrapper>
+        <UserCreateForm {...baseProps} onSubmit={onSubmit} />
+      </Wrapper>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /adicionar/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(requiredMsg('USERS.FULL_NAME'))).toBeInTheDocument();
+    });
+    expect(screen.getByText(requiredMsg('USERS.LOGIN'))).toBeInTheDocument();
+    expect(screen.getByText(requiredMsg('USERS.PASSWORD'))).toBeInTheDocument();
+    expect(screen.getByText(requiredMsg('USERS.CONFIRM_PASSWORD'))).toBeInTheDocument();
+    expect(screen.getByText(requiredMsg('USERS.CELL_PHONE'))).toBeInTheDocument();
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('leaves no required attribute behind on the inputs themselves', async () => {
+    const { UserCreateForm } = await import('../UserCreateForm');
+    render(
+      <Wrapper>
+        <UserCreateForm {...baseProps} />
+      </Wrapper>,
+    );
+    // email is optional here; none of the five required ones keeps the attribute, which is
+    // what would re-arm the browser bubble if a future edit dropped noValidate.
+    for (const input of Array.from(document.querySelectorAll('input'))) {
+      expect(input).not.toHaveAttribute('required');
+    }
+  });
+});

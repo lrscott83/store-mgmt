@@ -78,6 +78,7 @@ export function OwnerEditPage() {
   const [validationError, setValidationError] = useState('');
   const [serverError, setServerError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   // ADR-9: local tab state
   const [activeTab, setActiveTab] = useState<TabKey>('details');
@@ -194,10 +195,31 @@ export function OwnerEditPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- loadStores reads no reactive value
   }, [isSuperAdmin, activeTab]);
 
+  // See owner-create.tsx: the form carries `noValidate` so the browser never raises
+  // its own "Please fill out this field" bubble, which is localized by the BROWSER
+  // and therefore ignores react-intl. Same required set the `required` attributes
+  // used to carry — email included, unlike owner-create (this is the EDIT form).
+  function validateRequiredFields(): Record<string, string> {
+    const errs: Record<string, string> = {};
+    const required = (labelId: string) =>
+      intl.formatMessage(
+        { id: 'GENERAL.VALIDATION.REQUIRED' },
+        { name: intl.formatMessage({ id: labelId }) },
+      );
+    if (!fullName.trim()) errs.fullName = required('GENERAL.FULL_NAME');
+    if (!cellPhone.trim()) errs.cellPhone = required('GENERAL.CELL_PHONE');
+    if (!email.trim()) errs.email = required('GENERAL.EMAIL');
+    return errs;
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setValidationError('');
     setServerError('');
+
+    const errs = validateRequiredFields();
+    setFieldErrors(errs);
+    if (Object.keys(errs).length > 0) return;
 
     if (!id) return;
 
@@ -274,7 +296,7 @@ export function OwnerEditPage() {
 
   // Render Details form (shared between SuperAdmin and Reseller)
   const detailsForm = (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} noValidate className="space-y-4">
       {(validationError || serverError) && (
         <p role="alert" className="text-sm text-red-600">
           {validationError || serverError}
@@ -304,9 +326,13 @@ export function OwnerEditPage() {
           type="text"
           value={fullName}
           onChange={(e) => setFullName(e.target.value)}
-          required
           className="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
+        {fieldErrors.fullName && (
+          <p role="alert" className="mt-1 text-sm text-red-600">
+            {fieldErrors.fullName}
+          </p>
+        )}
       </div>
 
       {isSuperAdmin && (
@@ -354,9 +380,13 @@ export function OwnerEditPage() {
           type="text"
           value={cellPhone}
           onChange={(e) => setCellPhone(e.target.value)}
-          required
           className="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
+        {fieldErrors.cellPhone && (
+          <p role="alert" className="mt-1 text-sm text-red-600">
+            {fieldErrors.cellPhone}
+          </p>
+        )}
       </div>
 
       <div>
@@ -368,9 +398,13 @@ export function OwnerEditPage() {
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          required
           className="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
+        {fieldErrors.email && (
+          <p role="alert" className="mt-1 text-sm text-red-600">
+            {fieldErrors.email}
+          </p>
+        )}
       </div>
 
       <div>

@@ -161,6 +161,28 @@ export function toLocalDayKey(date: Date): string {
   return `${d.getFullYear()}-${month}-${day}`;
 }
 
+/**
+ * Whole local calendar days from `today` (default: now) to the date-only day
+ * key `YYYY-MM-DD`: positive when the day is ahead, 0 when it is today,
+ * negative once it has passed. Returns `null` when the value is missing or
+ * malformed — the caller decides how to surface an unknown date.
+ *
+ * Both endpoints are local midnights (`fromLocalDayKey`/`startOfDay`), so the
+ * division is a pure calendar-day count: a DST shift inside the window moves
+ * the raw span by ±1h, which `Math.round` absorbs. Never parse the day key
+ * with `new Date(dayKey)` — see `formatDateOnly` for why (a bare `YYYY-MM-DD`
+ * parses as UTC midnight and shifts the calendar day west of Greenwich).
+ */
+export function daysUntilDayKey(
+  dayKey: string | null | undefined,
+  today: Date = new Date(),
+): number | null {
+  if (!dayKey || !DATE_ONLY_PATTERN.test(dayKey)) return null;
+  const due = fromLocalDayKey(dayKey).getTime();
+  const now = startOfDay(today).getTime();
+  return Math.round((due - now) / 86_400_000);
+}
+
 /** Inverse of `toLocalDayKey`: the LOCAL midnight that opens the given day key. */
 export function fromLocalDayKey(dayKey: string): Date {
   const [year, month, day] = dayKey.split('-').map(Number);

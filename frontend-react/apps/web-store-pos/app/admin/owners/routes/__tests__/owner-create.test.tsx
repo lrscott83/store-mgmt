@@ -927,3 +927,71 @@ describe('OwnerCreatePage — email is optional', () => {
     expect(screen.getByLabelText(esMessages['GENERAL.EMAIL'])).toHaveAttribute('type', 'email');
   });
 });
+
+const requiredMsg = (nameKey: string) =>
+  esMessages['GENERAL.VALIDATION.REQUIRED'].replace('{name}', esMessages[nameKey] as string);
+
+describe('OwnerCreatePage — required fields are validated in-app, not by the browser', () => {
+  it('carries noValidate so the browser never raises its own English validation bubble', async () => {
+    await renderPage();
+    // This is the whole point of the change: a native `required` was showing
+    // "Please fill out this field" in the BROWSER's language, bypassing react-intl.
+    expect(screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')).toHaveAttribute(
+      'noValidate',
+    );
+  });
+
+  it('shows the Spanish required message for every blank required field and does not create', async () => {
+    const { ownerHttpService } = await import('~/admin/owners/lib/services/owner-http-service');
+    await renderPage();
+
+    fireEvent.change(screen.getByLabelText(esMessages['GENERAL.FULL_NAME']), {
+      target: { value: '  ' },
+    });
+    fireEvent.change(screen.getByLabelText(esMessages['GENERAL.PASSWORD']), {
+      target: { value: 'Password1' },
+    });
+    fireEvent.change(screen.getByLabelText(esMessages['USERS.CONFIRM_PASSWORD']), {
+      target: { value: 'Password1' },
+    });
+    fireEvent.change(screen.getByLabelText(esMessages['GENERAL.CELL_PHONE']), {
+      target: { value: '+53 5 123-4567' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }));
+
+    await waitFor(() => {
+      expect(screen.getByText(requiredMsg('GENERAL.FULL_NAME'))).toBeInTheDocument();
+    });
+    expect(screen.getByText(requiredMsg('USERS.LOGIN'))).toBeInTheDocument();
+    expect(ownerHttpService.createOwner).not.toHaveBeenCalled();
+  });
+
+  it('flags email nowhere: it is optional, so no required message appears for it', async () => {
+    const { ownerHttpService } = await import('~/admin/owners/lib/services/owner-http-service');
+    await renderPage();
+
+    fireEvent.change(screen.getByLabelText(esMessages['GENERAL.FULL_NAME']), {
+      target: { value: 'Jane' },
+    });
+    fireEvent.change(screen.getByLabelText(esMessages['USERS.LOGIN']), {
+      target: { value: 'jane' },
+    });
+    fireEvent.change(screen.getByLabelText(esMessages['GENERAL.PASSWORD']), {
+      target: { value: 'Password1' },
+    });
+    fireEvent.change(screen.getByLabelText(esMessages['USERS.CONFIRM_PASSWORD']), {
+      target: { value: 'Password1' },
+    });
+    fireEvent.change(screen.getByLabelText(esMessages['GENERAL.CELL_PHONE']), {
+      target: { value: '+53 5 123-4567' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }));
+
+    await waitFor(() => {
+      expect(ownerHttpService.createOwner).toHaveBeenCalledWith(
+        expect.objectContaining({ email: '' }),
+      );
+    });
+    expect(screen.queryByText(requiredMsg('GENERAL.EMAIL'))).not.toBeInTheDocument();
+  });
+});

@@ -31,6 +31,7 @@ export function ResellerCreatePage() {
   // create-reseller.component.html:42-47,64-69: a SINGLE showPassword boolean
   // drives BOTH password + confirmPassword fields.
   const [showPassword, setShowPassword] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const isDirty = Boolean(
     fullName || login || password || confirmPassword || cellPhone || email || description,
@@ -39,10 +40,34 @@ export function ResellerCreatePage() {
   // ADR-5: only the hook — no UnsavedChangesDialog wiring
   useUnsavedChangesPrompt(isDirty);
 
+  // The form carries `noValidate`, so the browser never raises its own "Please fill
+  // out this field" bubble. Those strings are localized by the BROWSER, not by
+  // react-intl, so a Spanish app in an English browser showed English errors. Same
+  // required set the `required` attributes used to carry — email included here.
+  function validateRequiredFields(): Record<string, string> {
+    const errs: Record<string, string> = {};
+    const required = (labelId: string) =>
+      formatMessage(
+        { id: 'GENERAL.VALIDATION.REQUIRED' },
+        { name: formatMessage({ id: labelId }) },
+      );
+    if (!fullName.trim()) errs.fullName = required('GENERAL.FULL_NAME');
+    if (!login.trim()) errs.login = required('USERS.LOGIN');
+    if (!password) errs.password = required('GENERAL.PASSWORD');
+    if (!confirmPassword) errs.confirmPassword = required('USERS.CONFIRM_PASSWORD');
+    if (!cellPhone.trim()) errs.cellPhone = required('GENERAL.CELL_PHONE');
+    if (!email.trim()) errs.email = required('GENERAL.EMAIL');
+    return errs;
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setValidationError('');
     setServerError('');
+
+    const errs = validateRequiredFields();
+    setFieldErrors(errs);
+    if (Object.keys(errs).length > 0) return;
 
     // ADR-3: two-step validate — regex then match (mirrors UserCreateForm.tsx:42-50)
     if (!PASSWORD_REGEX.test(password)) {
@@ -90,7 +115,7 @@ export function ResellerCreatePage() {
     <div className="space-y-4 p-4">
       <h1 className="text-xl font-semibold">{formatMessage({ id: 'RESELLERS.CREATE_TITLE' })}</h1>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} noValidate className="space-y-4">
         {(validationError || serverError) && (
           <p role="alert" className="text-sm text-red-600">
             {validationError || serverError}
@@ -106,9 +131,13 @@ export function ResellerCreatePage() {
             type="text"
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
-            required
             className="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
+          {fieldErrors.fullName && (
+            <p role="alert" className="mt-1 text-sm text-red-600">
+              {fieldErrors.fullName}
+            </p>
+          )}
         </div>
 
         <div>
@@ -120,9 +149,13 @@ export function ResellerCreatePage() {
             type="text"
             value={login}
             onChange={(e) => setLogin(e.target.value)}
-            required
             className="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
+          {fieldErrors.login && (
+            <p role="alert" className="mt-1 text-sm text-red-600">
+              {fieldErrors.login}
+            </p>
+          )}
         </div>
 
         <div>
@@ -135,9 +168,13 @@ export function ResellerCreatePage() {
               type={showPassword ? 'text' : 'password'}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              required
               className="block w-full rounded border border-gray-300 px-3 py-2 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
+            {fieldErrors.password && (
+              <p role="alert" className="mt-1 text-sm text-red-600">
+                {fieldErrors.password}
+              </p>
+            )}
             <button
               type="button"
               onClick={() => setShowPassword((visible) => !visible)}
@@ -161,9 +198,13 @@ export function ResellerCreatePage() {
               type={showPassword ? 'text' : 'password'}
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              required
               className="block w-full rounded border border-gray-300 px-3 py-2 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
+            {fieldErrors.confirmPassword && (
+              <p role="alert" className="mt-1 text-sm text-red-600">
+                {fieldErrors.confirmPassword}
+              </p>
+            )}
             <button
               type="button"
               onClick={() => setShowPassword((visible) => !visible)}
@@ -186,9 +227,13 @@ export function ResellerCreatePage() {
             type="text"
             value={cellPhone}
             onChange={(e) => setCellPhone(e.target.value)}
-            required
             className="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
+          {fieldErrors.cellPhone && (
+            <p role="alert" className="mt-1 text-sm text-red-600">
+              {fieldErrors.cellPhone}
+            </p>
+          )}
         </div>
 
         <div>
@@ -200,9 +245,13 @@ export function ResellerCreatePage() {
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            required
             className="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
+          {fieldErrors.email && (
+            <p role="alert" className="mt-1 text-sm text-red-600">
+              {fieldErrors.email}
+            </p>
+          )}
         </div>
 
         <div>

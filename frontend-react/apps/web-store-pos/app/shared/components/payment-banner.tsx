@@ -1,11 +1,24 @@
 import { useState } from 'react';
 import { useIntl } from 'react-intl';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
-import { formatDateOnly } from '~/shared/lib/date-utils';
+import { daysUntilDayKey, formatDateOnly } from '~/shared/lib/date-utils';
 import { StorageKeys } from '~/shared/lib/storage/storage-keys';
 import { CloseIcon } from '~/shared/components/ui/icons';
 
 type BannerTone = 'blue' | 'amber' | 'red';
+
+/**
+ * Frontend-only reminder window (user request 2026-10-02): the two notices
+ * that print `paymentDueDate` — TRIAL (blue) and DUE (amber) — render only
+ * when the payment is this many local days away or less. A due date already
+ * in the past yields a negative count and keeps rendering (EnGracia still
+ * warns). The OVERDUE notice carries no date and ignores the window.
+ *
+ * Deliberately independent of the backend `DueSoonDays` config, which only
+ * drives the `PorVencer` status flip: this gate only narrows what the UI
+ * shows — the client adds no billing math beyond the display threshold.
+ */
+const PAYMENT_NOTICE_WINDOW_DAYS = 8;
 
 const TONE_CLASSES: Record<BannerTone, string> = {
   blue: 'border-blue-200 bg-blue-50 text-blue-800',
@@ -24,6 +37,10 @@ const TONE_CLASSES: Record<BannerTone, string> = {
  * only resets on a fresh authentication — logout() clears the flag
  * (auth-store.ts), so the notice reappears after the next login. The due and
  * overdue notices are never closable.
+ *
+ * VISIBILITY WINDOW (2026-10-02): the date-bearing notices (trial + due)
+ * render only when the payment is <= PAYMENT_NOTICE_WINDOW_DAYS days away;
+ * the overdue notice has no date and ignores the window.
  */
 export function PaymentBanner() {
   const intl = useIntl();
@@ -47,6 +64,17 @@ export function PaymentBanner() {
   // no indication of the free month or of when the first charge lands.
   if (paymentStatus === 'AlDia' && !user?.isInTrial) {
     return null;
+  }
+
+  // <=8-day window for the date-bearing notices (see PAYMENT_NOTICE_WINDOW_DAYS).
+  // `Vencido` is exempt: it shows no date and must always warn. An unknown or
+  // malformed due date cannot be counted, so the notice falls back to the
+  // previous behaviour (render) rather than silently disappearing.
+  if (paymentStatus !== 'Vencido') {
+    const daysRemaining = daysUntilDayKey(user?.paymentDueDate);
+    if (daysRemaining !== null && daysRemaining > PAYMENT_NOTICE_WINDOW_DAYS) {
+      return null;
+    }
   }
 
   let tone: BannerTone;

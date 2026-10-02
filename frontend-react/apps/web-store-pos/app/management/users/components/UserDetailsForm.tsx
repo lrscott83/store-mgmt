@@ -36,14 +36,28 @@ export function UserDetailsForm({
   const [cellPhone, setCellPhone] = useState(initialValues?.cellPhone ?? '');
   const [email, setEmail] = useState(initialValues?.email ?? '');
   const [isActive, setIsActive] = useState(initialValues?.isActive ?? true);
+  const [fullNameError, setFullNameError] = useState('');
 
+  // `noValidate` keeps the browser from raising its own "Please fill out this field"
+  // bubble, which is localized by the BROWSER and not by react-intl. fullName was the
+  // only required field here; cellPhone and email were and remain optional.
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!fullName.trim()) {
+      setFullNameError(
+        intl.formatMessage(
+          { id: 'GENERAL.VALIDATION.REQUIRED' },
+          { name: intl.formatMessage({ id: 'USERS.FULL_NAME' }) },
+        ),
+      );
+      return;
+    }
+    setFullNameError('');
     onSubmit({ fullName, cellPhone, email, isActive });
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} noValidate className="space-y-4">
       {!isOnline && (
         <p className="text-sm text-yellow-700 bg-yellow-50 border border-yellow-200 rounded px-3 py-2">
           {intl.formatMessage({ id: 'USERS.OFFLINE_NOTICE' })}
@@ -81,9 +95,13 @@ export function UserDetailsForm({
           type="text"
           value={fullName}
           onChange={(e) => setFullName(e.target.value)}
-          required
           className="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
+        {fullNameError && (
+          <p role="alert" className="mt-1 text-sm text-red-600">
+            {fullNameError}
+          </p>
+        )}
       </div>
 
       <div>

@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   startOfDay,
   addDays,
+  daysUntilDayKey,
   formatDateOnly,
   formatLocalDate,
   isoToDashedDate,
@@ -158,6 +159,40 @@ describe('formatLocalDate', () => {
       expect(localEvening.getUTCDate()).toBe(11); // sanity: crosses the UTC day boundary
       expect(formatLocalDate(localEvening)).toBe('10/03/2026');
     });
+  });
+});
+
+describe('daysUntilDayKey (ventana de aviso de pago, 2026-10-02)', () => {
+  const TODAY = new Date(2026, 9, 2, 12, 0, 0); // 2 oct 2026, mediodía local
+
+  it('S-DATE-22: positive count for a future day key', () => {
+    expect(daysUntilDayKey('2026-10-10', TODAY)).toBe(8);
+    expect(daysUntilDayKey('2026-11-01', TODAY)).toBe(30);
+  });
+
+  it('S-DATE-23: 0 for today, negative once the day key has passed', () => {
+    expect(daysUntilDayKey('2026-10-02', TODAY)).toBe(0);
+    expect(daysUntilDayKey('2026-09-29', TODAY)).toBe(-3);
+  });
+
+  it('S-DATE-24: the time of day on `today` never shifts the count', () => {
+    // 23:59 must still count as "today": both endpoints are local midnights.
+    expect(daysUntilDayKey('2026-10-10', new Date(2026, 9, 2, 23, 59, 59))).toBe(8);
+    expect(daysUntilDayKey('2026-10-03', new Date(2026, 9, 2, 0, 0, 0))).toBe(1);
+  });
+
+  it('S-DATE-25: missing or malformed input returns null, never NaN', () => {
+    expect(daysUntilDayKey(null, TODAY)).toBeNull();
+    expect(daysUntilDayKey(undefined, TODAY)).toBeNull();
+    expect(daysUntilDayKey('', TODAY)).toBeNull();
+    expect(daysUntilDayKey('not-a-date', TODAY)).toBeNull();
+    expect(daysUntilDayKey('2026-9-2', TODAY)).toBeNull();
+  });
+
+  it('S-DATE-26: defaults to the real clock when no `today` is given', () => {
+    const dayKey = `${new Date().getFullYear()}-12-31`; // future by construction
+    expect(daysUntilDayKey(dayKey)).not.toBeNull();
+    expect(daysUntilDayKey(dayKey)!).toBeGreaterThanOrEqual(0);
   });
 });
 

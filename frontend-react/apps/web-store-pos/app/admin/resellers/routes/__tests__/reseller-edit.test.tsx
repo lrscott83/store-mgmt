@@ -803,3 +803,181 @@ describe('ResellerEditPage — unsaved changes guard', () => {
     });
   });
 });
+
+const requiredMsg = (nameKey: string) =>
+  esMessages['GENERAL.VALIDATION.REQUIRED'].replace('{name}', esMessages[nameKey] as string);
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Discount fields: required AND clearable. A `type="number"` bound to a NUMBER
+// state snapped the 0 straight back, so the box could never be emptied and no
+// other number could be typed. Held as text now; emptiness is caught on submit.
+// ══════════════════════════════════════════════════════════════════════════════
+
+describe('ResellerEditPage — discount fields stay required but the 0 can be cleared', () => {
+  async function renderWithZeroDiscounts() {
+    const { resellerHttpService } =
+      await import('~/admin/resellers/lib/services/reseller-http-service');
+    vi.mocked(resellerHttpService.getReseller).mockResolvedValue({
+      succeeded: true,
+      data: makeReseller({ percentDiscountPrice: 0, discountPrice: 0 }),
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
+    vi.mocked(resellerHttpService.updateReseller).mockResolvedValue({
+      succeeded: true,
+      data: true,
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
+    await renderPage();
+  }
+
+  it('lets the user erase the 0 instead of snapping it back', async () => {
+    await renderWithZeroDiscounts();
+    const input = screen.getByLabelText(esMessages['RESELLERS.PERCENT_DISCOUNT']);
+
+    expect(input).toHaveValue(0);
+    fireEvent.change(input, { target: { value: '' } });
+
+    // THE regression: with a number state this re-rendered as "0" immediately.
+    expect(input).toHaveValue(null);
+    fireEvent.change(input, { target: { value: '25' } });
+    expect(input).toHaveValue(25);
+  });
+
+  it('alerts with the Spanish required message when the field is left empty', async () => {
+    const { resellerHttpService } =
+      await import('~/admin/resellers/lib/services/reseller-http-service');
+    await renderWithZeroDiscounts();
+
+    fireEvent.change(screen.getByLabelText(esMessages['RESELLERS.PERCENT_DISCOUNT']), {
+      target: { value: '' },
+    });
+    fireEvent.change(screen.getByLabelText(esMessages['RESELLERS.DISCOUNT_PRICE']), {
+      target: { value: '' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: esMessages['GENERAL.UPDATE'] }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(requiredMsg('RESELLERS.PERCENT_DISCOUNT')),
+      ).toBeInTheDocument();
+    });
+    expect(screen.getByText(requiredMsg('RESELLERS.DISCOUNT_PRICE'))).toBeInTheDocument();
+    expect(resellerHttpService.updateReseller).not.toHaveBeenCalled();
+  });
+
+  it('still accepts a 0 — only a CLEARED field is an error', async () => {
+    const { resellerHttpService } =
+      await import('~/admin/resellers/lib/services/reseller-http-service');
+    // Load NON-zero, then type 0: the submit button is disabled until the form is
+    // dirty, and "0" must survive a check written as `!value.trim()` — not `!value`,
+    // which would treat a legitimate 0 discount as missing.
+    vi.mocked(resellerHttpService.getReseller).mockResolvedValue({
+      succeeded: true,
+      data: makeReseller({ percentDiscountPrice: 10, discountPrice: 5 }),
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
+    vi.mocked(resellerHttpService.updateReseller).mockResolvedValue({
+      succeeded: true,
+      data: true,
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
+    await renderPage();
+
+    fireEvent.change(screen.getByLabelText(esMessages['RESELLERS.PERCENT_DISCOUNT']), {
+      target: { value: '0' },
+    });
+    fireEvent.change(screen.getByLabelText(esMessages['RESELLERS.DISCOUNT_PRICE']), {
+      target: { value: '0' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: esMessages['GENERAL.UPDATE'] }));
+
+    await waitFor(() => {
+      expect(resellerHttpService.updateReseller).toHaveBeenCalledWith(
+        'r42',
+        expect.objectContaining({ percentDiscountPrice: 0, discountPrice: 0 }),
+      );
+    });
+  });
+
+  it('sends numbers, not text strings, on the payload', async () => {
+    const { resellerHttpService } =
+      await import('~/admin/resellers/lib/services/reseller-http-service');
+    await renderWithZeroDiscounts();
+
+    fireEvent.change(screen.getByLabelText(esMessages['RESELLERS.PERCENT_DISCOUNT']), {
+      target: { value: '12.5' },
+    });
+    fireEvent.change(screen.getByLabelText(esMessages['RESELLERS.DISCOUNT_PRICE']), {
+      target: { value: '7' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: esMessages['GENERAL.UPDATE'] }));
+
+    await waitFor(() => {
+      expect(resellerHttpService.updateReseller).toHaveBeenCalledWith(
+        'r42',
+        expect.objectContaining({ percentDiscountPrice: 12.5, discountPrice: 7 }),
+      );
+    });
+  });
+});
+
+describe('ResellerEditPage — required fields are validated in-app, not by the browser', () => {
+  it('carries noValidate so the browser never raises its own English validation bubble', async () => {
+    await renderWithZeroDiscountsFallback();
+    expect(screen.getByRole('button', { name: esMessages['GENERAL.UPDATE'] }).closest('form')).toHaveAttribute(
+      'noValidate',
+    );
+  });
+
+  async function renderWithZeroDiscountsFallback() {
+    const { resellerHttpService } =
+      await import('~/admin/resellers/lib/services/reseller-http-service');
+    vi.mocked(resellerHttpService.getReseller).mockResolvedValue({
+      succeeded: true,
+      data: makeReseller(),
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
+    await renderPage();
+  }
+
+  it('shows the Spanish required message for blank fullName / cellPhone / email', async () => {
+    const { resellerHttpService } =
+      await import('~/admin/resellers/lib/services/reseller-http-service');
+    vi.mocked(resellerHttpService.updateReseller).mockResolvedValue({
+      succeeded: true,
+      data: true,
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
+    await renderWithZeroDiscountsFallback();
+
+    fireEvent.change(screen.getByLabelText(esMessages['GENERAL.FULL_NAME']), {
+      target: { value: '  ' },
+    });
+    fireEvent.change(screen.getByLabelText(esMessages['GENERAL.CELL_PHONE']), {
+      target: { value: '' },
+    });
+    fireEvent.change(screen.getByLabelText(esMessages['GENERAL.EMAIL']), {
+      target: { value: '' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: esMessages['GENERAL.UPDATE'] }));
+
+    await waitFor(() => {
+      expect(screen.getByText(requiredMsg('GENERAL.FULL_NAME'))).toBeInTheDocument();
+    });
+    expect(screen.getByText(requiredMsg('GENERAL.CELL_PHONE'))).toBeInTheDocument();
+    expect(screen.getByText(requiredMsg('GENERAL.EMAIL'))).toBeInTheDocument();
+    expect(resellerHttpService.updateReseller).not.toHaveBeenCalled();
+  });
+});

@@ -389,14 +389,38 @@ export function MessageShell() {
         aria-label={intl.formatMessage({ id: 'MESSAGES.TITLE' })}
       >
         <ChatIcon />
+        {/*
+          Attention dot (user request 2026-10-02): with the count always
+          rendered, "3" and "0" are easy to read past, so a >0 total gets a
+          red dot that grows and fades out over `animate-ping` — the pulse is
+          what actually pulls the eye, not the number. Anchored top-LEFT so it
+          never collides with the count badge, which owns the top-right
+          corner. `aria-hidden` because the number beside it already carries
+          the same fact for assistive tech, and `motion-reduce` stops the loop
+          for users who asked the OS to calm animations down.
+        */}
         {totalUnread > 0 && (
           <span
-            data-testid="message-badge"
-            className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-xs font-bold text-white"
-          >
-            {totalUnread > 99 ? '99+' : totalUnread}
-          </span>
+            data-testid="message-unread-dot"
+            aria-hidden="true"
+            className="absolute left-0 top-0 h-2.5 w-2.5 rounded-full bg-danger animate-ping motion-reduce:animate-none"
+          />
         )}
+        {/*
+          The count is ALWAYS shown, zero included: a badge that appears and
+          disappears with the total makes the icon itself look "inactive"
+          between bursts, and a slot that reflows as the number grows shifts
+          the icon under the cursor. At 0 it is muted so the red dot stays the
+          only thing competing for attention.
+        */}
+        <span
+          data-testid="message-badge"
+          className={`absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-xs font-bold text-white ${
+            totalUnread > 0 ? 'bg-primary' : 'bg-text-muted'
+          }`}
+        >
+          {totalUnread > 99 ? '99+' : totalUnread}
+        </span>
       </button>
 
       {isOpen && (

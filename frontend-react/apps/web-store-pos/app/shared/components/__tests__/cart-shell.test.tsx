@@ -387,8 +387,10 @@ describe('CartShell — line-item layout (2026-09-06)', () => {
     mockUser = { selectedStoreId: 's1', storeModuleIds: [11] };
   });
 
-  // User request: the quantity belongs NEXT TO THE PRICE in parens ("Precio: $1 234 (10)"),
+  // User request: the quantity belongs NEXT TO THE PRICE in parens ("$1 234 (10)"),
   // and the +/- controls sit flush against the right edge with minimal margin.
+  // El rótulo "Precio: " ya no se muestra (2026-10-02): la línea es solo el
+  // precio formateado + " (quantity)".
   it('shows the quantity next to the price in parens, NOT appended to the name', () => {
     const product = makeProduct({ name: 'Coca Cola', price: 5 });
     mockCartState({ items: [{ product, quantity: 10 }], total: vi.fn().mockReturnValue(50) });
@@ -398,8 +400,10 @@ describe('CartShell — line-item layout (2026-09-06)', () => {
     const name = screen.getByText('Coca Cola');
     expect(name).toBeInTheDocument();
     expect(name).not.toHaveTextContent('(10)');
-    // Price line: "Precio: " label (es.ts:259) + formatted unit price + " (quantity)".
-    expect(screen.getByText(/Precio:\s+5\s+CUP \(10\)/)).toBeInTheDocument();
+    // Price line: formatted unit price + " (quantity)", sin rótulo.
+    expect(screen.getByText(/5\s+CUP \(10\)/)).toBeInTheDocument();
+    // Y el rótulo "Precio:" ya no aparece en la línea.
+    expect(screen.queryByText(/Precio:/)).not.toBeInTheDocument();
     // Line subtotal is still present (price × quantity) inside the product row.
     const row = name.closest('li');
     expect(row).not.toBeNull();
@@ -1058,7 +1062,7 @@ describe('CartShell — venta mayorista mostrada en paquetes', () => {
     });
     renderCartShell();
     openCart();
-    expect(screen.getByText(/Cajas: 2 · Precio:\s+15\s+840\s+CUP/)).toBeInTheDocument();
+    expect(screen.getByText(/Cajas: 2 · 15\s+840\s+CUP/)).toBeInTheDocument();
     // Ya no se muestra la cantidad en unidades entre paréntesis.
     expect(screen.queryByText(/\(48\)/)).not.toBeInTheDocument();
   });
@@ -1109,7 +1113,7 @@ describe('CartShell — venta mayorista mostrada en paquetes', () => {
     });
     renderCartShell();
     openCart();
-    expect(screen.getByText(/Precio:\s+5\s+CUP \(10\)/)).toBeInTheDocument();
+    expect(screen.getByText(/5\s+CUP \(10\)/)).toBeInTheDocument();
   });
 
   it('el badge de un carrito normal sigue contando unidades', () => {
@@ -1162,14 +1166,14 @@ describe('CartShell — venta NORMAL con producto mayorista', () => {
     expect(screen.getByText('Registrar').closest('button')).not.toBeDisabled();
   });
 
-  it('la línea muestra el formato retail "Precio: $10 (1)", no "Cajas: 0"', () => {
+  it('la línea muestra el formato retail "$10 (1)", no "Cajas: 0"', () => {
     mockCartState({
       items: [{ product: wholesaleBeer, quantity: 1 }],
       total: vi.fn().mockReturnValue(10),
     });
     renderCartShell();
     openCart();
-    expect(screen.getByText(/Precio:\s+10\s+CUP \(1\)/)).toBeInTheDocument();
+    expect(screen.getByText(/10\s+CUP \(1\)/)).toBeInTheDocument();
     expect(screen.queryByText(/Cajas:/)).not.toBeInTheDocument();
   });
 

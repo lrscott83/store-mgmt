@@ -84,10 +84,14 @@ function getWholesaleConfigSafe(product: Product) {
 /**
  * Línea de precio del carrito — el modo lo define el orderType del carrito
  * (cart-wholesale-by-order-type 2026-09-23):
- * - Venta mayorista: "Cajas: 2 · Precio: $15 840" — cantidad en PAQUETES y el precio
+ * - Venta mayorista: "Cajas: 2 · $15 840" — cantidad en PAQUETES y el precio
  *   DEL PAQUETE (unitPrice × packSize).
- * - Venta normal: "Precio: $5 (10)" — precio unitario + unidades, como siempre,
+ * - Venta normal: "$5 (10)" — precio unitario + unidades, como siempre,
  *   incluso para productos con config mayorista.
+ *
+ * Sin el rótulo "Precio: " (user request 2026-10-02): la línea ya está dentro
+ * de una fila de producto y el número se lee solo; la palabra repetida en cada
+ * línea solo ocupaba espacio.
  */
 function formatWholesaleLine(
   item: { product: Product; quantity: number; price?: number },
@@ -96,19 +100,13 @@ function formatWholesaleLine(
 ): string {
   const config = orderType === OrderType.Mayorista ? getWholesaleConfigSafe(item.product) : undefined;
   if (!config) {
-    return `${intlPriceLabel()}${formatMoneyWithCurrency(item.price ?? item.product.price, currency)} (${item.quantity})`;
+    return `${formatMoneyWithCurrency(item.price ?? item.product.price, currency)} (${item.quantity})`;
   }
   const packs = wholesaleCartDisplay.packsFromUnits(item.quantity, item.product);
   const packPrice = wholesaleCartDisplay.packPrice(item.product, item.price);
   const unitPlural = wholesaleUnitPlural(item.product.wholesaleUnitLabel?.trim() || 'paquete');
   const capitalized = unitPlural.charAt(0).toUpperCase() + unitPlural.slice(1);
-  return `${capitalized}: ${packs} · ${intlPriceLabel()}${formatMoneyWithCurrency(packPrice, currency)}`;
-}
-
-/** SHOPPING_CART.PRICE_LABEL necesita intl; helper con lazy access al DOM no funciona —
- *  usamos el valor literal del mensaje (es.ts: 'Precio: ') como en Angular. */
-function intlPriceLabel(): string {
-  return 'Precio: ';
+  return `${capitalized}: ${packs} · ${formatMoneyWithCurrency(packPrice, currency)}`;
 }
 
 export function CartShell() {
