@@ -141,6 +141,12 @@ namespace Application.Features.StoreManagement.Stores.Commands.UpdateStoreModule
             var reactivatedModuleIds = new List<int>();
             var deactivatedModuleIds = new List<int>();
 
+            // The price-included flag AS PERSISTED for each payload row, captured while the
+            // rows are being written: insert and reactivate freeze it from the catalog, and an
+            // already-active row keeps its own frozen value. The payload carries no such flag,
+            // so the echo's total cannot be computed without this.
+            var persistedPriceIncluded = new Dictionary<int, bool>();
+
             foreach (var row in rows)
             {
                 StoreModule? storeModule = existing.FirstOrDefault(sm => sm.ModuleId == row.ModuleId);
@@ -157,6 +163,7 @@ namespace Application.Features.StoreManagement.Stores.Commands.UpdateStoreModule
                             row.PercentDiscountPrice, store.TenantId);
                         await _storeModuleRepository.AddAsync(storeModule);
                         insertedModuleIds.Add(row.ModuleId);
+                        persistedPriceIncluded[row.ModuleId] = storeModule.ModulePriceIncluded;
                     }
                     else
                     {
@@ -165,7 +172,7 @@ namespace Application.Features.StoreManagement.Stores.Commands.UpdateStoreModule
                             // REACTIVATE. ModulePriceIncluded is re-frozen from the
                             // catalog on every activation (UpdateStoreCommand.cs:202) —
                             // keeping that invariant here is what preserves the
-                            // BillingService.cs:81 exclusion of included modules.
+                            // BillingService exclusion of included modules.
                             storeModule.IsActive = true;
                             storeModule.ModulePriceIncluded = catalog[row.ModuleId].PriceIncluded;
                             reactivatedModuleIds.Add(row.ModuleId);
@@ -184,6 +191,8 @@ namespace Application.Features.StoreManagement.Stores.Commands.UpdateStoreModule
                         // NoTracking-safe: UpdateAsync sets Entry.State = Modified,
                         // which re-attaches this untracked entity so the write lands.
                         await _storeModuleRepository.UpdateAsync(storeModule);
+
+                        persistedPriceIncluded[row.ModuleId] = storeModule.ModulePriceIncluded;
                     }
                 }
                 else if (storeModule is not null && storeModule.IsActive)
@@ -192,6 +201,7 @@ namespace Application.Features.StoreManagement.Stores.Commands.UpdateStoreModule
                     storeModule.IsActive = false;
                     await _storeModuleRepository.UpdateAsync(storeModule);
                     deactivatedModuleIds.Add(row.ModuleId);
+                    persistedPriceIncluded[row.ModuleId] = storeModule.ModulePriceIncluded;
                 }
 
                 // Unticked with no row, or unticked and already inactive: no write. A
@@ -258,12 +268,20 @@ namespace Application.Features.StoreManagement.Stores.Commands.UpdateStoreModule
             double totalCurrentPrice = 0d;
             foreach (var row in rows)
             {
+                // The store's own frozen flag for this row; a row the save created no snapshot
+                // for falls back to the catalog, which is what activating it would freeze.
+                bool priceIncluded = persistedPriceIncluded.TryGetValue(row.ModuleId, out bool persisted)
+                    ? persisted
+                    : catalog[row.ModuleId].PriceIncluded;
+
                 // The one formula. Reused, never reimplemented: percent before flat
                 // discount, no rounding, clamped at zero.
                 float currentPrice = CurrentPriceServiceUtils.GetCurrentPrice(
                     row.Price, row.PercentDiscountPrice, row.DiscountPrice);
 
-                if (row.IsSelected)
+                // THE price rule (ModulePriceCalculator.IsBillable = ticked AND not
+                // price-included) — the same rows RegisterStorePaymentCommand charges.
+                if (ModulePriceCalculator.IsBillable(row.IsSelected, priceIncluded))
                     totalCurrentPrice += currentPrice;
 
                 saved.Add(new StoreModulePricingDto
@@ -273,6 +291,7 @@ namespace Application.Features.StoreManagement.Stores.Commands.UpdateStoreModule
                     Price = row.Price,
                     DiscountPrice = row.DiscountPrice,
                     PercentDiscountPrice = row.PercentDiscountPrice,
+                    PriceIncluded = priceIncluded,
                     CurrentPrice = currentPrice
                 });
             }

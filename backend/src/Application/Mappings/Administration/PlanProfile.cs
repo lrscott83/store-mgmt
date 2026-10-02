@@ -14,9 +14,11 @@ namespace Application.Mappings.Administration
             CreateMap<StorePlan, PlanDto>()
                 .IgnoreAllSourcePropertiesWithAnInaccessibleSetter()
                 .ForMember(dest => dest.PlanType, opt => opt.MapFrom(src => ((StorePlanType)src.Id).GetDescription()))
+                // THE price rule (ModulePriceCalculator): only ACTIVE and NOT price-included
+                // catalog modules contribute, each at its effective price. Previously this summed
+                // every member module regardless of IsActive/PriceIncluded.
                 .ForMember(dest => dest.Price, opt => opt.MapFrom(src =>
-                    src.StorePlanModules.Sum(spm => CurrentPriceServiceUtils.GetCurrentPrice(
-                        spm.Module.Price, spm.Module.PercentDiscountPrice, spm.Module.DiscountPrice))))
+                    ModulePriceCalculator.CalculateTotal(src.StorePlanModules.Select(spm => spm.Module))))
                 .ForMember(dest => dest.Modules, opt => opt.MapFrom(src =>
                     src.StorePlanModules.OrderBy(spm => spm.Module.Order)));
 
@@ -26,6 +28,8 @@ namespace Application.Mappings.Administration
                 .ForMember(dest => dest.Name, opt => opt.MapFrom(src => src.Module.Name))
                 .ForMember(dest => dest.Order, opt => opt.MapFrom(src => src.Module.Order))
                 .ForMember(dest => dest.PriceIncluded, opt => opt.MapFrom(src => src.Module.PriceIncluded))
+                // Additive: the catalog flag the price rule needs (IsBillable = IsActive && !PriceIncluded).
+                .ForMember(dest => dest.IsActive, opt => opt.MapFrom(src => src.Module.IsActive))
                 .ForMember(dest => dest.Price, opt => opt.MapFrom(src => src.Module.Price))
                 .ForMember(dest => dest.CurrentPrice, opt => opt.MapFrom(src =>
                     CurrentPriceServiceUtils.GetCurrentPrice(src.Module.Price, src.Module.PercentDiscountPrice, src.Module.DiscountPrice)))

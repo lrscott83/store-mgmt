@@ -116,14 +116,19 @@ namespace Application.Features.Administration.Modules.Commands.UpdateModuleCatal
             await _applicationUnitOfWork.SaveChangesAsync(cancellationToken);
 
             var saved = new List<ModuleCatalogPricingDto>(rows.Count);
-            double totalCurrentPrice = 0d;
+            // THE price rule (ModulePriceCalculator) over the catalog rows this save just
+            // wrote — the entities in `catalog` already carry the new prices, and
+            // CalculateTotal drops the ones that are inactive or price-included. Previously
+            // every payload row was summed, included and gratis ones alike.
+            float totalCurrentPrice = ModulePriceCalculator.CalculateTotal(
+                rows.Select(row => catalog[row.ModuleId]));
             foreach (var row in rows)
             {
                 // The one formula. Reused, never reimplemented: percent before flat
-                // discount, no rounding, clamped at zero.
+                // discount, no rounding, clamped at zero. Reported for EVERY row, billable
+                // or not.
                 float currentPrice = CurrentPriceServiceUtils.GetCurrentPrice(
                     row.Price, row.PercentDiscountPrice, row.DiscountPrice);
-                totalCurrentPrice += currentPrice;
 
                 saved.Add(new ModuleCatalogPricingDto
                 {
@@ -132,6 +137,8 @@ namespace Application.Features.Administration.Modules.Commands.UpdateModuleCatal
                     Price = row.Price,
                     DiscountPrice = row.DiscountPrice,
                     PercentDiscountPrice = row.PercentDiscountPrice,
+                    PriceIncluded = catalog[row.ModuleId].PriceIncluded,
+                    IsActive = catalog[row.ModuleId].IsActive,
                     CurrentPrice = currentPrice
                 });
             }

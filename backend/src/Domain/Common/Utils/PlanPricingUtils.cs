@@ -1,4 +1,7 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
+using Domain.Entities.Modules;
 using Domain.Entities.Plans;
 
 namespace Domain.Common.Utils
@@ -15,20 +18,27 @@ namespace Domain.Common.Utils
         /// <summary>
         /// Sums the plan's member modules (original price and discounted current price).
         /// A null plan (no catalog plan for the store) sums to zero — callers gate on it.
+        /// <para>
+        /// Both columns count EXACTLY the same rows: the billable ones, i.e. those satisfying
+        /// <see cref="ModulePriceCalculator.IsBillable"/> (active and not price-included). The
+        /// effective column is not re-derived here — it comes from
+        /// <see cref="ModulePriceCalculator.CalculateTotal(IEnumerable{Module})"/>, the single
+        /// rule — while the base-price column reuses the same predicate so the two can never
+        /// disagree about which modules are included.
+        /// </para>
         /// </summary>
         public static (float Price, float CurrentPrice) Sum(StorePlan? plan)
         {
             if (plan is null) return (0f, 0f);
 
-            float price = 0f, currentPrice = 0f;
-            foreach (var storePlanModule in plan.StorePlanModules)
-            {
-                var module = storePlanModule.Module;
-                if (module is null) continue;
-                price += module.Price;
-                currentPrice += CurrentPriceServiceUtils.GetCurrentPrice(
-                    module.Price, module.PercentDiscountPrice, module.DiscountPrice);
-            }
+            List<Module> billableModules = plan.StorePlanModules
+                .Select(spm => spm.Module)
+                .Where(module => module is not null
+                    && ModulePriceCalculator.IsBillable(module.IsActive, module.PriceIncluded))
+                .ToList();
+
+            float price = billableModules.Sum(m => m.Price);
+            float currentPrice = ModulePriceCalculator.CalculateTotal(billableModules);
             return (price, currentPrice);
         }
     }

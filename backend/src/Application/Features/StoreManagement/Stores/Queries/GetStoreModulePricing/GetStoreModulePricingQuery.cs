@@ -97,13 +97,18 @@ namespace Application.Features.StoreManagement.Stores.Queries.GetStoreModulePric
                 float price = storeModule?.Price ?? module.Price;
                 float discountPrice = storeModule?.ModuleDiscountPrice ?? module.DiscountPrice;
                 float percentDiscountPrice = storeModule?.ModulePercentDiscountPrice ?? module.PercentDiscountPrice;
+                // The store's FROZEN price-included flag when a row exists (that is what the
+                // charge excludes — see BillingService); the catalog's when it does not, which is
+                // exactly what activating the row would freeze.
+                bool priceIncluded = storeModule?.ModulePriceIncluded ?? module.PriceIncluded;
 
                 // The one formula — reused, never reimplemented. Computed for EVERY row so an
-                // unticked row still reports what it would cost; summed for active rows only.
+                // unticked row still reports what it would cost; summed for billable rows only,
+                // through the single price rule (IsBillable = active AND not price-included).
                 float currentPrice = CurrentPriceServiceUtils.GetCurrentPrice(
                     price, percentDiscountPrice, discountPrice);
 
-                if (isActive)
+                if (ModulePriceCalculator.IsBillable(isActive, priceIncluded))
                     totalCurrentPrice += currentPrice;
 
                 rows.Add(new StoreModulePricingReadDto
@@ -114,6 +119,7 @@ namespace Application.Features.StoreManagement.Stores.Queries.GetStoreModulePric
                     Price = price,
                     DiscountPrice = discountPrice,
                     PercentDiscountPrice = percentDiscountPrice,
+                    PriceIncluded = priceIncluded,
                     CurrentPrice = currentPrice
                 });
             }

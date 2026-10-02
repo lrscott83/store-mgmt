@@ -74,10 +74,9 @@ internal sealed class RegisterStorePaymentCommandHandler : ICommandHandler<Regis
         if (store.PaymentStartDate is null)
             throw new ApiException(_localizer["StoreNotFound"], HttpStatusCode.BadRequest);
 
-        // Compute amount = sum of GetCurrentPrice for all active, non-free StoreModules
-        float amount = store.StoreModules
-            .Where(sm => sm.IsActive && !sm.ModulePriceIncluded)
-            .Sum(sm => CurrentPriceServiceUtils.GetCurrentPrice(sm.Price, sm.ModulePercentDiscountPrice, sm.ModuleDiscountPrice));
+        // THE charge rule, in one place (ModulePriceCalculator): only ACTIVE and NOT
+        // price-included StoreModules contribute, each at its effective price.
+        float amount = ModulePriceCalculator.CalculateTotal(store.StoreModules);
 
         // Snapshot ReSellerOwner data for commission
         var reSellerOwner = store.Owner?.ReSellerOwner;

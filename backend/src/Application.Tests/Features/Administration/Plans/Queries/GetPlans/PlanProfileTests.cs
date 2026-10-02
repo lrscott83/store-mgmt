@@ -37,12 +37,40 @@ public class PlanProfileTests
     }
 
     [Fact]
-    public void Map_Plan_ComputesPriceAsSumOfModuleCurrentPrices()
+    public void Map_Plan_ComputesPriceAsSumOfBillableModuleCurrentPrices()
     {
         var dto = MapPlan(CreatePlanWithModules());
 
-        // Ventas: 1000 - 10% = 900; Bodegas: 2000 - 500 = 1500; total = 2400.
-        dto.Price.Should().Be(2400f);
+        // THE price rule (ModulePriceCalculator): only ACTIVE and NOT price-included modules
+        // contribute, each at its effective price.
+        //   Ventas  — price-included (gratis) → excluded, its 900 never counts.
+        //   Bodegas — billable: 2000 - 500 = 1500.
+        // Total = 1500. Previously 2400, because this summed every member module.
+        dto.Price.Should().Be(1500f);
+    }
+
+    [Fact]
+    public void Map_Plan_ExcludesInactiveModuleFromPriceButStillListsIt()
+    {
+        var plan = StorePlan.Create((int)StorePlanType.Superior, "Superior", 3, true);
+
+        var active = Module.Create(10, "Ventas", 1, false, 1000, 0, 0, true, true);
+        var inactive = Module.Create(11, "Bodegas", 2, false, 2000, 0, 0, true, isActive: false);
+
+        var activeInPlan = StorePlanModule.Create(plan.Id, active.Id);
+        activeInPlan.Module = active;
+        var inactiveInPlan = StorePlanModule.Create(plan.Id, inactive.Id);
+        inactiveInPlan.Module = inactive;
+        plan.StorePlanModules.Add(activeInPlan);
+        plan.StorePlanModules.Add(inactiveInPlan);
+
+        var dto = MapPlan(plan);
+
+        // Only the active module contributes (1000); the inactive one is listed but free.
+        dto.Price.Should().Be(1000f);
+        dto.Modules.Should().HaveCount(2);
+        dto.Modules.Single(m => m.Name == "Bodegas").IsActive.Should().BeFalse();
+        dto.Modules.Single(m => m.Name == "Ventas").IsActive.Should().BeTrue();
     }
 
     [Fact]
@@ -64,12 +92,15 @@ public class PlanProfileTests
         var sales = dto.Modules.Single(m => m.Name == "Ventas");
         sales.ModuleId.Should().Be(10);
         sales.PriceIncluded.Should().BeTrue();
+        // Additive field: the catalog flag the price rule reads.
+        sales.IsActive.Should().BeTrue();
         sales.CurrentPrice.Should().Be(900f);
         sales.DiscountText.Should().Be("- 10%");
         sales.FeatureDescriptions.Should().Contain("Emite ventas en segundos.");
 
         var warehouses = dto.Modules.Single(m => m.Name == "Bodegas");
         warehouses.PriceIncluded.Should().BeFalse();
+        warehouses.IsActive.Should().BeTrue();
         warehouses.CurrentPrice.Should().Be(1500f);
         warehouses.DiscountText.Should().Be("- $500");
     }
