@@ -53,14 +53,14 @@ function optionLabels(): string[] {
   return screen.getAllByRole('option').map((option) => option.textContent ?? '');
 }
 
-describe('CartCurrencySelect (module 16 gate)', () => {
+describe('CartCurrencySelect (module 15 gate)', () => {
   beforeEach(() => {
     localStorage.clear();
     mockUser = userWith([2, 3]);
     mockItems = [];
   });
 
-  it('renders nothing without the MultiPayments module', () => {
+  it('renders nothing without the MultiMonedas module', () => {
     renderSelect(Currency.CUP);
     expect(screen.queryByTestId('cart-currency-select')).not.toBeInTheDocument();
   });
@@ -75,8 +75,8 @@ describe('CartCurrencySelect (module 16 gate)', () => {
     expect(screen.queryByTestId('cart-currency-select')).not.toBeInTheDocument();
   });
 
-  it('renders the selector with CUP and USD for a store with module 16', () => {
-    mockUser = userWith([EModules.MultiPayments]);
+  it('renders the selector with CUP and USD for a store with module 15', () => {
+    mockUser = userWith([EModules.MultiMonedas]);
     renderSelect(Currency.CUP);
 
     const select = screen.getByTestId('cart-currency-select');
@@ -85,7 +85,7 @@ describe('CartCurrencySelect (module 16 gate)', () => {
   });
 
   it('appends the currencies present in the cart, deduplicated', () => {
-    mockUser = userWith([EModules.MultiPayments]);
+    mockUser = userWith([EModules.MultiMonedas, EModules.MultiPayments]);
     mockItems = [
       itemWith(Currency.CUP),
       itemWith(Currency.USD),
@@ -99,7 +99,7 @@ describe('CartCurrencySelect (module 16 gate)', () => {
   });
 
   it('falls back to CUP and notifies the parent when the value is not among the options', async () => {
-    mockUser = userWith([EModules.MultiPayments]);
+    mockUser = userWith([EModules.MultiMonedas]);
     mockItems = [itemWith(Currency.CUP)];
     // Persisted EUR with a CUP-only cart: EUR is not an option.
     const onChange = renderSelect(Currency.EUR);
@@ -113,7 +113,7 @@ describe('CartCurrencySelect (module 16 gate)', () => {
   });
 
   it('persists the selected currency for the user', () => {
-    mockUser = userWith([EModules.MultiPayments]);
+    mockUser = userWith([EModules.MultiMonedas]);
     const onChange = renderSelect(Currency.CUP);
 
     fireEvent.change(screen.getByTestId('cart-currency-select'), { target: { value: '1' } });
@@ -126,7 +126,7 @@ describe('CartCurrencySelect (module 16 gate)', () => {
 describe('CartCurrencySelect — T4: guard de cambio', () => {
   beforeEach(() => {
     localStorage.clear();
-    mockUser = userWith([EModules.MultiPayments]);
+    mockUser = userWith([EModules.MultiMonedas]);
     mockItems = [];
   });
 
