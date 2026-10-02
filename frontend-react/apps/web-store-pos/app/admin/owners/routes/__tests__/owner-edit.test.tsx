@@ -1311,3 +1311,40 @@ describe('OwnerEditPage — listResellers succeeded:false (Req: Owner Edit Resel
     expect(screen.queryAllByRole('alert')).toHaveLength(0);
   });
 });
+
+const requiredMsg = (nameKey: string) =>
+  esMessages['GENERAL.VALIDATION.REQUIRED'].replace('{name}', esMessages[nameKey] as string);
+
+describe('OwnerEditPage — required fields are validated in-app, not by the browser', () => {
+  it('carries noValidate so the browser never raises its own English validation bubble', async () => {
+    await renderPage();
+    expect(
+      screen.getByRole('button', { name: esMessages['GENERAL.UPDATE'] }).closest('form'),
+    ).toHaveAttribute('noValidate');
+  });
+
+  it('shows the Spanish required message for blank fullName / cellPhone and does not save', async () => {
+    const { ownerHttpService } = await import('~/admin/owners/lib/services/owner-http-service');
+    await renderPage();
+
+    // Unlike owner-create, email IS required on the edit form — the `required`
+    // attributes it replaces covered all three.
+    fireEvent.change(screen.getByLabelText(esMessages['GENERAL.FULL_NAME']), {
+      target: { value: '  ' },
+    });
+    fireEvent.change(screen.getByLabelText(esMessages['GENERAL.CELL_PHONE']), {
+      target: { value: '' },
+    });
+    fireEvent.change(screen.getByLabelText(esMessages['GENERAL.EMAIL']), {
+      target: { value: '' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: esMessages['GENERAL.UPDATE'] }));
+
+    await waitFor(() => {
+      expect(screen.getByText(requiredMsg('GENERAL.FULL_NAME'))).toBeInTheDocument();
+    });
+    expect(screen.getByText(requiredMsg('GENERAL.CELL_PHONE'))).toBeInTheDocument();
+    expect(screen.getByText(requiredMsg('GENERAL.EMAIL'))).toBeInTheDocument();
+    expect(ownerHttpService.updateOwner).not.toHaveBeenCalled();
+  });
+});
