@@ -24,11 +24,11 @@ import { ChannelRateOfflineService } from '../lib/services/channel-rate-offline-
 
 // multipayments — same guard as the Configurations feature and the daily
 // exchange-rate register (OwnerAdmin / SuperAdmin plus the feature gate), AND
-// the MultiPayments module gate (D11): without module 16 the page does not
+// the MultiMonedas module gate (D11): without module 15 the page does not
 // exist, so the route is not reachable even by direct URL.
 export const clientLoader = adminFeatureModuleLoader(
   [EFeatures.Configurations],
-  [EModules.MultiPayments],
+  [EModules.MultiMonedas],
 );
 
 const METHOD_OPTIONS: SalePaymentMethod[] = [
@@ -37,9 +37,12 @@ const METHOD_OPTIONS: SalePaymentMethod[] = [
   SalePaymentMethod.Transferencia,
 ];
 
+// The currency is the one being QUOTED against 1 USD ("units per 1 USD").
+// USD is deliberately absent: a USD-keyed row is the synthetic pivot
+// (1 USD = 1 USD) and can never resolve another currency, so registering a
+// channel with `currency = USD` would never convert anything.
 const CURRENCY_OPTIONS: Currency[] = [
   Currency.CUP,
-  Currency.USD,
   Currency.EUR,
   Currency.MLC,
   Currency.CLA,

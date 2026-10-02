@@ -1182,14 +1182,14 @@ const messages: Record<string, string> = {
   // rate in force per channel) plus the full history (T22, 2026-09-24).
   'CHANNEL_RATES.TITLE': 'Tasas de Cambio',
   'CHANNEL_RATES.INFO':
-    'Registra cuántas unidades de una moneda equivalen a 1 USD para cada método de pago, con la fecha desde la que rige la tasa. El registro es de solo lectura: cada cambio crea una fila nueva y el historial no se edita ni se elimina.',
+    'Registra cuántas unidades de la moneda elegida equivalen a 1 USD para cada método de pago, con la fecha desde la que rige la tasa. La moneda es la que se cotiza contra 1 USD (por eso USD no aparece: es el pivote 1 USD = 1 USD). El registro es de solo lectura: cada cambio crea una fila nueva y el historial no se edita ni se elimina.',
   'CHANNEL_RATES.ADD_RATE': 'Tasa',
   'CHANNEL_RATES.HELP_LABEL': '¿Qué significa el valor de la tasa?',
   'CHANNEL_RATES.HELP':
     'Cada valor indica cuántas unidades de la moneda del canal equivalen a 1 USD. Por ejemplo, un valor de 700 en Efectivo (CUP) significa que 1 USD = 700 CUP.',
   'CHANNEL_RATES.FORM_TITLE': 'Registrar tasa',
   'CHANNEL_RATES.METHOD_LABEL': 'Método de pago',
-  'CHANNEL_RATES.CURRENCY_LABEL': 'Moneda',
+  'CHANNEL_RATES.CURRENCY_LABEL': 'Moneda (a la que equivale 1 USD)',
   'CHANNEL_RATES.VALUE_LABEL': 'Valor (unidades por 1 USD)',
   'CHANNEL_RATES.BUY_VALUE_LABEL': 'Valor de compra (unidades por 1 USD)',
   'CHANNEL_RATES.SELL_VALUE_LABEL': 'Valor de venta (unidades por 1 USD)',

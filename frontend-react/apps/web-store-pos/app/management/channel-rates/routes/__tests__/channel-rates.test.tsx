@@ -117,13 +117,13 @@ describe('ChannelRatesPage (multipayments) — gating', () => {
     ).toBeInTheDocument();
   });
 
-  it('the real adminFeatureModuleLoader admits owner/admin WITH module 16 and denies without it', async () => {
+  it('the real adminFeatureModuleLoader admits owner/admin WITH module 15 and denies without it', async () => {
     const real = await vi.importActual<typeof import('~/auth/routes/loaders')>(
       '~/auth/routes/loaders',
     );
     const loader = real.adminFeatureModuleLoader(
       [EFeatures.Configurations],
-      [EModules.MultiPayments],
+      [EModules.MultiMonedas],
     );
 
     // Non-admin is denied by the role gate even with the module present.
@@ -131,20 +131,20 @@ describe('ChannelRatesPage (multipayments) — gating', () => {
       isSuperAdmin: false,
       isOwnerAdmin: false,
       isReSeller: false,
-      storeModuleIds: [EModules.MultiPayments],
+      storeModuleIds: [EModules.MultiMonedas],
     });
     const deniedRole = await loader({ params: {} } as never);
     expect(deniedRole).toBeInstanceOf(Response);
     expect((deniedRole as Response).headers.get('Location')).toBe('/login');
 
-    // Owner/admin WITHOUT module 16 is denied (D11).
+    // Owner/admin WITHOUT module 15 is denied (D11).
     mockUser = makeUser({ storeModuleIds: [] });
     const deniedModule = await loader({ params: {} } as never);
     expect(deniedModule).toBeInstanceOf(Response);
     expect((deniedModule as Response).headers.get('Location')).toBe('/login');
 
-    // Owner/admin WITH module 16 is admitted.
-    mockUser = makeUser({ storeModuleIds: [EModules.MultiPayments] });
+    // Owner/admin WITH module 15 is admitted.
+    mockUser = makeUser({ storeModuleIds: [EModules.MultiMonedas] });
     const allowed = await loader({ params: {} } as never);
     expect(allowed).toBeNull();
   });
@@ -212,6 +212,47 @@ describe('ChannelRatesPage (multipayments) — real channels only', () => {
       String(SalePaymentMethod.Transferencia),
     ]);
     expect(optionValues('channel-rate-method')).not.toContain(String(SalePaymentMethod.Zelle));
+  });
+
+  it('does not offer USD in the currency selector: USD is the pivot, not a quotable currency', async () => {
+    renderPage();
+    openRegisterDialog();
+
+    const currencySelect = await screen.findByTestId('channel-rate-currency');
+    const values = Array.from(currencySelect.querySelectorAll('option')).map(
+      (option) => option.getAttribute('value') ?? '',
+    );
+    expect(values).toEqual([
+      String(Currency.CUP),
+      String(Currency.EUR),
+      String(Currency.MLC),
+      String(Currency.CLA),
+      String(Currency.CAD),
+      String(Currency.MXN),
+    ]);
+    expect(values).not.toContain(String(Currency.USD));
+  });
+
+  it('registers a CUP rate (USD→CUP 700/750) and persists the row keyed by CUP', async () => {
+    renderPage();
+    openRegisterDialog();
+
+    // Default currency is CUP; registering "USD→CUP 700/750" must store
+    // currency=CUP so the cart can resolve USD→CUP (a USD-keyed row never can).
+    fireEvent.change(screen.getByTestId('channel-rate-buy-value'), { target: { value: '700' } });
+    fireEvent.change(screen.getByTestId('channel-rate-sell-value'), { target: { value: '750' } });
+    fireEvent.click(screen.getByTestId('channel-rate-submit'));
+
+    await waitFor(() => {
+      expect(screen.getAllByTestId(/^channel-rate-row-/)).toHaveLength(1);
+    });
+
+    const stored = new ChannelRateOfflineService(storeId).getStorageChannelRates();
+    expect(stored).toHaveLength(1);
+    expect(stored[0].currency).toBe(Currency.CUP);
+    expect(stored[0].method).toBe(SalePaymentMethod.Efectivo);
+    expect(stored[0].buyValue).toBe(700);
+    expect(stored[0].sellValue).toBe(750);
   });
 
   it('re-pins the method when the new currency does not support it (MLC → Transferencia)', async () => {
