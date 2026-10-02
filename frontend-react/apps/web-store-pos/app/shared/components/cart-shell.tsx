@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect, useMemo } from 'react';
+import { useRef, useState, useEffect, useMemo, useCallback } from 'react';
 import { useIntl } from 'react-intl';
 import type { Product } from '@store-mgmt/domain';
 import type { ChannelRate } from '@store-mgmt/domain';
@@ -42,7 +42,8 @@ import { showBlockingError, showAcknowledgeError } from '~/shared/lib/blocking-a
 import { showToastSuccess, showToastError } from '~/shared/lib/toast';
 import { round2 } from '~/shared/lib/money';
 import { currencyLabel, formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency';
-import { readCartCurrencyPreference, writeCartCurrencyPreference } from '~/shared/lib/cart-currency-preference';
+import { writeCartCurrencyPreference } from '~/shared/lib/cart-currency-preference';
+import { StoreCurrencyConfigService } from '~/shared/lib/store-currency-config-service';
 import {
   DEFAULT_ENABLED_CHANNEL_KEYS,
   StorePaymentMethodsConfigService,
@@ -151,15 +152,33 @@ export function CartShell() {
   const user = useAuthStore((s) => s.user);
   const creditsModuleAvailable = user ? hasCreditsModuleAvailable(user) : false;
   const storeId = user?.selectedStoreId ?? '';
-  // MultiMonedas (módulo 15): moneda de la venta elegida por el usuario,
-  // persistida por usuario y reutilizada en la próxima venta. Sin el módulo el
-  // estado queda sin uso y el carrito conserva el comportamiento previo.
+  // MultiMonedas (módulo 15): moneda de la venta. T4: el default lo fija la
+  // config de la tienda (sellCurrency); un cambio manual dura solo la sesión.
+  // Sin el módulo el estado queda sin uso y el carrito conserva el
+  // comportamiento previo.
   const multiMonedasAvailable = user ? hasMultiMonedasModuleAvailable(user) : false;
   // MultiPayments (módulo 16): solo gobierna la lista/cobro multi-pago.
   const multiPaymentsAvailable = user ? hasMultiPaymentsModuleAvailable(user) : false;
+  // T4: la moneda de venta por defecto la fija la config de la tienda ("Moneda
+  // de Venta" = sellCurrency). El cambio manual del cajero dura solo la sesión
+  // actual; al montar el carrito (o cambiar de tienda) vuelve a ganar el default
+  // de la tienda. SSR-safe: sin window o sin tienda cae a CUP.
+  const storeSellCurrency = useCallback((): Currency => {
+    if (typeof window === 'undefined' || !storeId) return Currency.CUP;
+    return new StoreCurrencyConfigService(storeId).getConfig().sellCurrency;
+  }, [storeId]);
   const [preferredCartCurrency, setPreferredCartCurrency] = useState<Currency>(() =>
-    readCartCurrencyPreference(user?.id),
+    storeSellCurrency(),
   );
+
+  // T4: siembra el default de la tienda al montar y cuando cambia la tienda (o el
+  // módulo). No depende de isOpen ni de cada render, así un cambio manual dentro
+  // de la sesión sobrevive.
+  useEffect(() => {
+    if (!multiMonedasAvailable) return;
+    setPreferredCartCurrency(storeSellCurrency());
+  }, [multiMonedasAvailable, storeSellCurrency]);
+
   // T4: último cambio de moneda rechazado (línea/moneda culpable) para el aviso.
   const [currencyChangeError, setCurrencyChangeError] = useState<{
     productName: string;
@@ -184,7 +203,11 @@ export function CartShell() {
     )
       return [];
     return new ChannelRateOfflineService(storeId).getStorageChannelRates();
-  }, [multiMonedasAvailable, multiPaymentsAvailable, storeId]);
+    // T4: `isOpen` es una dependencia INTENCIONAL — abrir el carrito debe releer
+    // el registro de tasas (localStorage) para ver una tasa registrada en la
+    // página de Tasas sin recargar. El cuerpo no la usa, por eso el disable.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [multiMonedasAvailable, multiPaymentsAvailable, storeId, isOpen]);
 
   // MultiMonedas: la moneda NATIVA del carrito la fija el primer ítem (CUP si está
   // vacío), igual que `cartCurrency()`. Es el fallback seguro: la primera línea es
@@ -374,13 +397,15 @@ export function CartShell() {
   function handleClear() {
     clear();
     resetTransientFields();
-    // T17: "Limpiar" returns the sale currency to CUP and dismisses any pending
-    // currency-change notice, so the next sale starts clean. Without MultiMonedas
-    // the selector is not rendered, so only the module path is touched.
+    // T4: "Limpiar" devuelve la moneda de la venta al default de la TIENDA
+    // (sellCurrency, no un CUP hardcodeado) y descarta cualquier aviso de cambio
+    // pendiente, para que la próxima venta arranque limpia. Sin MultiMonedas el
+    // selector no se renderiza, así que solo se toca el camino del módulo.
     if (multiMonedasAvailable) {
-      setPreferredCartCurrency(Currency.CUP);
+      const sellCurrency = storeSellCurrency();
+      setPreferredCartCurrency(sellCurrency);
       setCurrencyChangeError(null);
-      writeCartCurrencyPreference(user?.id, Currency.CUP);
+      writeCartCurrencyPreference(user?.id, sellCurrency);
     }
   }
 
