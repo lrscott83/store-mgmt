@@ -126,7 +126,9 @@ export function SaleProductRow({
           <span className="text-sm text-primary">
             {formatMoneyWithCurrency(product.price, product.currency)}
             {product.discountFromInvantory && availableQuantity !== undefined && (
-              <span className="ml-1 text-xs text-muted">({availableQuantity})</span>
+              <span className="ml-1 text-xs text-muted" data-testid="available-stock">
+                ({availableQuantity})
+              </span>
             )}
           </span>
         ) : (

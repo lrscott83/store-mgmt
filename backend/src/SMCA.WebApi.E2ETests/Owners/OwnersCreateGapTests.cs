@@ -22,7 +22,10 @@ public sealed class OwnersCreateGapTests
     private static object Valid(string? login = null, string password = "Password123", Guid? reSellerId = null) => new
     {
         Login = login ?? $"o-{Guid.NewGuid():N}@test.com", Password = password, FullName = "E2E Owner",
-        Cellphone = "0000000000", ReSellerId = reSellerId, Email = (string?)null, Description = "e2e"
+        Cellphone = "0000000000", ReSellerId = reSellerId, Email = (string?)null, Description = "e2e",
+        // Owner-create now creates a STORE through the shared register flow, so StoreName is
+        // required — without it these tests would get a 400 for the wrong reason.
+        StoreName = "E2E Store"
     };
 
     private async Task<Guid> SeedReSellerAsync(Guid userId, string description)

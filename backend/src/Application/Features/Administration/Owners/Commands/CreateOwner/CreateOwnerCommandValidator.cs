@@ -36,6 +36,12 @@ namespace Application.Features.Administration.Owners.Commands.CreateOwner
               .NotNull().WithMessage(_localizer["IsRequired", "{PropertyName}"])
               .NotEmpty().WithMessage(_localizer["IsRequired", "{PropertyName}"]);
 
+            // Required because this flow now goes through IRegisterService, which creates a STORE
+            // (same requirement RegisterCommandValidator already enforces for self-registration).
+            RuleFor(x => x.StoreName)
+              .NotNull().WithMessage(_localizer["IsRequired", "{PropertyName}"])
+              .NotEmpty().WithMessage(_localizer["IsRequired", "{PropertyName}"]);
+
             When(x => x.ReSellerId.HasValue, () =>
             {
                 RuleFor(x => x.ReSellerId)

@@ -28,7 +28,9 @@ public sealed class OwnersCreateTests
             var r = await DbTestHelpers.AuthedClient(_f, admin, login).PostAsJsonAsync("/api/v1/Owners", new
             {
                 Login = newLogin, Password = "Password123", FullName = "E2E Owner",
-                Cellphone = "0000000000", ReSellerId = (Guid?)null, Email = (string?)null, Description = "e2e"
+                Cellphone = "0000000000", ReSellerId = (Guid?)null, Email = (string?)null, Description = "e2e",
+                // Owner-create now creates a STORE through the shared register flow.
+                StoreName = "E2E Store"
             });
             r.StatusCode.Should().Be(HttpStatusCode.Created);
             var b = await r.Content.ReadFromJsonAsync<ApiResponse<OwnerDto>>(ApiResponse.Json);

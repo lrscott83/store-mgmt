@@ -605,6 +605,11 @@ const messages: Record<string, string> = {
 
   // GENERAL.VALIDATION.* (Angular GENERAL.VALIDATION — used by sale-product-row quantity/price form)
   'GENERAL.VALIDATION.REQUIRED': '{name} es requerido',
+  // Suffixes appended to a field's own label so requiredness is visible BEFORE the first
+  // submit instead of only after a failed one. Parenthetical and lowercase: they read as an
+  // aside, not as a second label the input has to match.
+  'GENERAL.VALIDATION.REQUIRED_SUFFIX': '(requerido)',
+  'GENERAL.VALIDATION.OPTIONAL_SUFFIX': '(opcional)',
   'GENERAL.VALIDATION.NUMBER_GREADER_THAN_ZERO': '{name} mínimo valor es 0',
   // GENERAL.VALIDATION.PASSWORD_POLICY / INVALID_PASSWORD (Angular vocabs/es.ts:242,241) —
   // register.tsx password field validation (view-text-parity).

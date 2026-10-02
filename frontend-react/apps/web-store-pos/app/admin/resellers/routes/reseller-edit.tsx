@@ -22,6 +22,18 @@ interface Snapshot {
   description: string;
 }
 
+/** Raw TEXT for the two discount fields, converted to a number only at the payload edge.
+ * A controlled `<input type="number">` bound to a NUMBER state cannot have its 0 cleared:
+ * the keystroke that empties the field runs `Number("") === 0`, the re-render puts the 0 back,
+ * and the box is stuck at 0 so no other number can be typed. Holding the text lets the 0 be
+ * deleted; emptiness is then caught by `validateRequiredFields()` with the same Spanish
+ * message every other field gets. Same approach as `store-module-pricing-modal.tsx`
+ * (PricingDraft) and `create-product-modal.tsx`. */
+function toNumber(value: string): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
 function makeSnapshot(r: ReSeller): Snapshot {
   return {
     fullName: r.fullName,
@@ -46,8 +58,8 @@ export function ResellerEditPage() {
   const [login, setLogin] = useState('');
   const [fullName, setFullName] = useState('');
   const [isActive, setIsActive] = useState(true);
-  const [percentDiscountPrice, setPercentDiscountPrice] = useState(0);
-  const [discountPrice, setDiscountPrice] = useState(0);
+  const [percentDiscountPrice, setPercentDiscountPrice] = useState('0');
+  const [discountPrice, setDiscountPrice] = useState('0');
   const [cellPhone, setCellPhone] = useState('');
   const [email, setEmail] = useState('');
   const [description, setDescription] = useState('');
@@ -55,14 +67,15 @@ export function ResellerEditPage() {
   const [validationError, setValidationError] = useState('');
   const [serverError, setServerError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   // Dirty = any tracked field differs from snapshot
   const isDirty = snapshot
     ? fullName !== snapshot.fullName ||
       cellPhone !== snapshot.cellPhone ||
       email !== snapshot.email ||
-      percentDiscountPrice !== snapshot.percentDiscountPrice ||
-      discountPrice !== snapshot.discountPrice ||
+      String(snapshot.percentDiscountPrice) !== percentDiscountPrice ||
+      String(snapshot.discountPrice) !== discountPrice ||
       isActive !== snapshot.isActive ||
       description !== snapshot.description
     : false;
@@ -84,8 +97,8 @@ export function ResellerEditPage() {
         setLogin(r.login ?? '');
         setFullName(r.fullName);
         setIsActive(r.isActive);
-        setPercentDiscountPrice(r.percentDiscountPrice);
-        setDiscountPrice(r.discountPrice);
+        setPercentDiscountPrice(String(r.percentDiscountPrice ?? 0));
+        setDiscountPrice(String(r.discountPrice ?? 0));
         setCellPhone(r.cellPhone);
         setEmail(r.email);
         setDescription(r.description);
@@ -97,10 +110,33 @@ export function ResellerEditPage() {
       });
   }, [id, formatMessage]);
 
+  // The form carries `noValidate`, so the browser never raises its own "Please fill
+  // out this field" bubble, which is localized by the BROWSER and not by react-intl.
+  // The discount fields are checked on `!value.trim()`, NOT on falsiness: "0" is a valid
+  // discount and must pass, only a cleared field is an error.
+  function validateRequiredFields(): Record<string, string> {
+    const errs: Record<string, string> = {};
+    const required = (labelId: string) =>
+      formatMessage(
+        { id: 'GENERAL.VALIDATION.REQUIRED' },
+        { name: formatMessage({ id: labelId }) },
+      );
+    if (!fullName.trim()) errs.fullName = required('GENERAL.FULL_NAME');
+    if (!cellPhone.trim()) errs.cellPhone = required('GENERAL.CELL_PHONE');
+    if (!email.trim()) errs.email = required('GENERAL.EMAIL');
+    if (!percentDiscountPrice.trim()) errs.percentDiscountPrice = required('RESELLERS.PERCENT_DISCOUNT');
+    if (!discountPrice.trim()) errs.discountPrice = required('RESELLERS.DISCOUNT_PRICE');
+    return errs;
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setValidationError('');
     setServerError('');
+
+    const errs = validateRequiredFields();
+    setFieldErrors(errs);
+    if (Object.keys(errs).length > 0) return;
 
     if (!id) return;
 
@@ -110,8 +146,8 @@ export function ResellerEditPage() {
         fullName,
         cellPhone,
         email,
-        percentDiscountPrice,
-        discountPrice,
+        percentDiscountPrice: toNumber(percentDiscountPrice),
+        discountPrice: toNumber(discountPrice),
         isActive,
         description,
       });
@@ -126,8 +162,8 @@ export function ResellerEditPage() {
         fullName,
         cellPhone,
         email,
-        percentDiscountPrice,
-        discountPrice,
+        percentDiscountPrice: toNumber(percentDiscountPrice),
+        discountPrice: toNumber(discountPrice),
         isActive,
         description,
       });
@@ -181,7 +217,7 @@ export function ResellerEditPage() {
         </Button>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} noValidate className="space-y-4">
         {(validationError || serverError) && (
           <p role="alert" className="text-sm text-red-600">
             {validationError || serverError}
@@ -211,9 +247,13 @@ export function ResellerEditPage() {
             type="text"
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
-            required
             className="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
+          {fieldErrors.fullName && (
+            <p role="alert" className="mt-1 text-sm text-red-600">
+              {fieldErrors.fullName}
+            </p>
+          )}
         </div>
 
         <div className="flex items-center gap-2">
@@ -238,10 +278,15 @@ export function ResellerEditPage() {
             type="number"
             min={0}
             value={percentDiscountPrice}
-            onChange={(e) => setPercentDiscountPrice(Number(e.target.value))}
+            onChange={(e) => setPercentDiscountPrice(e.target.value)}
             required
             className="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
+          {fieldErrors.percentDiscountPrice && (
+            <p role="alert" className="mt-1 text-sm text-red-600">
+              {fieldErrors.percentDiscountPrice}
+            </p>
+          )}
         </div>
 
         <div>
@@ -253,10 +298,15 @@ export function ResellerEditPage() {
             type="number"
             min={0}
             value={discountPrice}
-            onChange={(e) => setDiscountPrice(Number(e.target.value))}
+            onChange={(e) => setDiscountPrice(e.target.value)}
             required
             className="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
+          {fieldErrors.discountPrice && (
+            <p role="alert" className="mt-1 text-sm text-red-600">
+              {fieldErrors.discountPrice}
+            </p>
+          )}
         </div>
 
         <div>
@@ -268,9 +318,13 @@ export function ResellerEditPage() {
             type="text"
             value={cellPhone}
             onChange={(e) => setCellPhone(e.target.value)}
-            required
             className="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
+          {fieldErrors.cellPhone && (
+            <p role="alert" className="mt-1 text-sm text-red-600">
+              {fieldErrors.cellPhone}
+            </p>
+          )}
         </div>
 
         <div>
@@ -282,9 +336,13 @@ export function ResellerEditPage() {
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            required
             className="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
+          {fieldErrors.email && (
+            <p role="alert" className="mt-1 text-sm text-red-600">
+              {fieldErrors.email}
+            </p>
+          )}
         </div>
 
         <div>

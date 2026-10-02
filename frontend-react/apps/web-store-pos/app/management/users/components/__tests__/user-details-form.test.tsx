@@ -241,3 +241,57 @@ describe('UserDetailsForm — submit renders as fab (edit-user-details.component
     expect(path).toContain('16.862 4.487');
   });
 });
+
+const requiredMsg = (nameKey: string) =>
+  esMessages['GENERAL.VALIDATION.REQUIRED'].replace('{name}', esMessages[nameKey] as string);
+
+describe('UserDetailsForm — required fields are validated in-app, not by the browser', () => {
+  it('carries noValidate so the browser never raises its own English validation bubble', async () => {
+    const { UserDetailsForm } = await import('../UserDetailsForm');
+    render(
+      <Wrapper>
+        <UserDetailsForm {...baseProps} />
+      </Wrapper>,
+    );
+    expect(screen.getByRole('button', { name: /actualizar/i }).closest('form')).toHaveAttribute(
+      'noValidate',
+    );
+  });
+
+  it('shows the Spanish required message for a blank fullName and does not submit', async () => {
+    const { UserDetailsForm } = await import('../UserDetailsForm');
+    const onSubmit = vi.fn();
+    render(
+      <Wrapper>
+        <UserDetailsForm {...baseProps} onSubmit={onSubmit} />
+      </Wrapper>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /actualizar/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(requiredMsg('USERS.FULL_NAME'))).toBeInTheDocument();
+    });
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('keeps cellPhone and email optional: a whitespace-only fullName still blocks, but they never do', async () => {
+    const { UserDetailsForm } = await import('../UserDetailsForm');
+    const onSubmit = vi.fn();
+    render(
+      <Wrapper>
+        <UserDetailsForm {...baseProps} onSubmit={onSubmit} />
+      </Wrapper>,
+    );
+    fireEvent.change(screen.getByLabelText(/nombre completo/i), { target: { value: '   ' } });
+    fireEvent.change(screen.getByLabelText(/teléfono/i), { target: { value: '' } });
+    fireEvent.change(screen.getByLabelText(/correo|email/i), { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: /actualizar/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(requiredMsg('USERS.FULL_NAME'))).toBeInTheDocument();
+    });
+    // Only fullName is flagged — the other two produce no error of their own.
+    expect(screen.getAllByRole('alert')).toHaveLength(1);
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+});

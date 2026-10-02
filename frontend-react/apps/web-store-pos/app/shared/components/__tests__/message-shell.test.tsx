@@ -123,13 +123,17 @@ describe('MessageShell — header badge', () => {
     await waitFor(() => expect(screen.getByTestId('message-badge')).toHaveTextContent('5'));
   });
 
-  it('hides the badge when the total unread is 0', async () => {
+  // Invertido por el pedido del 2026-10-02: el contador se muestra SIEMPRE,
+  // cero incluido, para que el icono no parezca inactivo entre ráfagas. Lo que
+  // se esconde con 0 es el punto rojo de atención, no el número.
+  it('shows 0 in the badge and no attention dot when the total unread is 0', async () => {
     getConversationsMock.mockResolvedValue(success([conversation({ unreadCount: 0 })]));
 
     renderShell();
 
     await waitFor(() => expect(getConversationsMock).toHaveBeenCalled());
-    expect(screen.queryByTestId('message-badge')).not.toBeInTheDocument();
+    expect(screen.getByTestId('message-badge')).toHaveTextContent('0');
+    expect(screen.queryByTestId('message-unread-dot')).not.toBeInTheDocument();
   });
 
   it('renders nothing for a SuperAdmin user and issues no request', async () => {

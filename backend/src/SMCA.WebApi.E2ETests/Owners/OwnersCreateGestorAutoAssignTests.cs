@@ -50,7 +50,11 @@ public sealed class OwnersCreateGestorAutoAssignTests
         ["fullName"] = "E2E Owner",
         ["cellphone"] = "0000000000",
         ["email"] = null,
-        ["description"] = "e2e"
+        ["description"] = "e2e",
+        // Required since owner-create goes through the same flow as self-registration, which
+        // creates a STORE. The Gestor LINK is what this file guards; the store it builds is
+        // asserted separately in OwnersListReSellerNameTests.
+        ["storeName"] = "E2E Store"
     };
 
     private async Task<Guid> TenantOfCreatedOwnerAsync(string login)

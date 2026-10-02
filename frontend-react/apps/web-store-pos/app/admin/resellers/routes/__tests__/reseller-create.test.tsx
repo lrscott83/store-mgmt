@@ -146,6 +146,12 @@ describe('ResellerCreatePage — password regex validation', () => {
     fireEvent.change(screen.getByLabelText(esMessages['GENERAL.CELL_PHONE']), {
       target: { value: '+53 5 123-4567' },
     });
+    // Email is required on this form. The form is now `noValidate` + JS validation, so a
+    // submit that leaves it blank stops on the required check instead of ever reaching
+    // the password policy below — it has to be filled for this test to test the password.
+    fireEvent.change(screen.getByLabelText(esMessages['GENERAL.EMAIL']), {
+      target: { value: 'jane@example.com' },
+    });
 
     fireEvent.submit(
       screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')!,
@@ -183,6 +189,10 @@ describe('ResellerCreatePage — password mismatch validation', () => {
     });
     fireEvent.change(screen.getByLabelText(esMessages['GENERAL.CELL_PHONE']), {
       target: { value: '+53 5 123-4567' },
+    });
+    // Email is required on this form — see the note in the regex test above.
+    fireEvent.change(screen.getByLabelText(esMessages['GENERAL.EMAIL']), {
+      target: { value: 'jane@example.com' },
     });
 
     fireEvent.submit(
@@ -456,5 +466,46 @@ describe('ResellerCreatePage — submit renders as fab (create-reseller.componen
     const submit = screen.getByRole('button', { name: esMessages['GENERAL.ADD'] });
     const path = submit.querySelector('svg path')?.getAttribute('d');
     expect(path).toBe('M12 4.5v15m7.5-7.5h-15');
+  });
+});
+
+const requiredMsg = (nameKey: string) =>
+  esMessages['GENERAL.VALIDATION.REQUIRED'].replace('{name}', esMessages[nameKey] as string);
+
+describe('ResellerCreatePage — required fields are validated in-app, not by the browser', () => {
+  it('carries noValidate so the browser never raises its own English validation bubble', async () => {
+    await renderPage();
+    // The regression this guards: a native `required` showed "Please fill out this
+    // field" in the BROWSER's language, never reaching react-intl.
+    expect(screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')).toHaveAttribute(
+      'noValidate',
+    );
+  });
+
+  it('shows the Spanish required message for every blank required field and does not create', async () => {
+    const { resellerHttpService } =
+      await import('~/admin/resellers/lib/services/reseller-http-service');
+    await renderPage();
+
+    fireEvent.change(screen.getByLabelText(esMessages['GENERAL.FULL_NAME']), {
+      target: { value: '  ' },
+    });
+    fireEvent.change(screen.getByLabelText(esMessages['GENERAL.PASSWORD']), {
+      target: { value: 'Password1' },
+    });
+    fireEvent.change(screen.getByLabelText(esMessages['USERS.CONFIRM_PASSWORD']), {
+      target: { value: 'Password1' },
+    });
+    fireEvent.change(screen.getByLabelText(esMessages['GENERAL.CELL_PHONE']), {
+      target: { value: '+53 5 123-4567' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }));
+
+    await waitFor(() => {
+      expect(screen.getByText(requiredMsg('GENERAL.FULL_NAME'))).toBeInTheDocument();
+    });
+    expect(screen.getByText(requiredMsg('USERS.LOGIN'))).toBeInTheDocument();
+    expect(screen.getByText(requiredMsg('GENERAL.EMAIL'))).toBeInTheDocument();
+    expect(resellerHttpService.createReseller).not.toHaveBeenCalled();
   });
 });
