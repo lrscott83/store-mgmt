@@ -519,7 +519,7 @@ describe('Sidebar — billing menu entries (superadmin/reseller only, StorePayme
   });
 });
 
-describe('Sidebar — channel-rates entry requires the MultiPayments module (D11)', () => {
+describe('Sidebar — channel-rates entry requires the MultiMonedas module (D11)', () => {
   const makeOwnerWithConfigurations = (storeModuleIds: number[]): UserModel => ({
     ...makeSuperAdmin(),
     login: 'owner@test.com',
@@ -534,17 +534,17 @@ describe('Sidebar — channel-rates entry requires the MultiPayments module (D11
     vi.clearAllMocks();
   });
 
-  it('offers "Tasas de Cambio" when module 16 is available', () => {
-    renderSidebar(makeOwnerWithConfigurations([EModules.MultiPayments]));
+  it('offers "Tasas de Cambio" when module 15 is available', () => {
+    renderSidebar(makeOwnerWithConfigurations([EModules.MultiMonedas]));
     expect(screen.getByText('Tasas de Cambio')).toBeInTheDocument();
   });
 
-  it('hides "Tasas de Cambio" when module 16 is missing', () => {
+  it('hides "Tasas de Cambio" when module 15 is missing', () => {
     renderSidebar(makeOwnerWithConfigurations([]));
     expect(screen.queryByText('Tasas de Cambio')).not.toBeInTheDocument();
   });
 
-  it('leaves the other Management entries unaffected without module 16', () => {
+  it('leaves the other Management entries unaffected without module 15', () => {
     renderSidebar(makeOwnerWithConfigurations([]));
     // Both also require only Configurations (74) and carry no module gate.
     expect(screen.getByText('Cambio USD a MN')).toBeInTheDocument();

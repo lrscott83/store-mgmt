@@ -9,6 +9,9 @@ interface CreateOwnerPayload {
   email: string;
   description: string;
   reSellerId: string;
+  // Required: owner-create now runs the same flow as self-registration, which creates the
+  // customer's STORE. Without it the request is rejected 400 (StoreName).
+  storeName: string;
 }
 
 interface UpdateOwnerPayload {

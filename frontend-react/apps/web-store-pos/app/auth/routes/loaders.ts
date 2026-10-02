@@ -171,8 +171,8 @@ export function ownerStoresGate() {
 /**
  * Feature gate PLUS an all-modules gate: same admin + feature checks as
  * `adminFeatureLoader`, and the route is reachable only when the user's store
- * has EVERY required module. Used by "Canales de pago" (D11 — MultiPayments,
- * module 16, on top of Configurations).
+ * has EVERY required module. Used by "Canales de pago" (D11 — MultiMonedas,
+ * module 15, on top of Configurations).
  */
 export function adminFeatureModuleLoader(featureIds: number[], moduleIds: EModules[]) {
   return async ({ params }: LoaderFunctionArgs): Promise<Response | null> => {

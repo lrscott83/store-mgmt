@@ -186,8 +186,17 @@ export function InventoryAvailablePage() {
               {/* Búsqueda global — misma fila que el select de tiendas (2026-09-29),
                   con lupa al inicio. Ancho explícito (no `w-full`): un `w-full` como
                   ítem flex reserva la línea entera y empuja la moneda a otra fila.
-                  La moneda conserva su `w-full` de abajo, que sí debe bajar. */}
-              <div className="relative w-64 sm:w-72">
+                  La moneda conserva su `w-full` de abajo, que sí debe bajar.
+
+                  Móvil: el ancho FIJO de escritorio (`w-64`) no cabía al lado del
+                  select en un viewport de teléfono, así que los dos controles
+                  caían a filas distintas. `flex-1` + `min-w-0` deja que el campo
+                  tome el espacio que sobra y ceda el suyo antes de provocar un
+                  salto — la fila nunca se parte. Desde `sm` vuelve a su ancho
+                  fijo de escritorio, que es lo que se pidió colocar en la misma
+                  línea. `min-w-0` es lo que permite encogerse por debajo del
+                  contenido en vez de desbordar la tarjeta. */}
+              <div className="relative min-w-0 flex-1 sm:w-72 sm:flex-none">
                 <SearchIcon className="pointer-events-none absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
                 <input
                   role="searchbox"

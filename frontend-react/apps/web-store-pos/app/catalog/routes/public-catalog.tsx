@@ -111,7 +111,7 @@ export function PublicCatalogPage() {
       const result = await catalogHttpService.getPublicProduct(storeSlug, product.id);
       if (result.succeeded) {
         setDetail(result.data);
-        setActiveImage(result.data.imageUrl ?? result.data.imageUrls[0] ?? null);
+        setActiveImage(result.data.imageUrl);
       }
     } catch {
       // El detalle de la tarjeta ya alcanza para mostrar el producto.

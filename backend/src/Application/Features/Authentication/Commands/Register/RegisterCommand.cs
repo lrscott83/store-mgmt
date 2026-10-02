@@ -1,20 +1,12 @@
 using Application.Abstractions.Authentication;
 using Application.Abstractions.Messaging;
 using Application.Dtos.Authentication;
+using Application.Exceptions;
 using Application.ResponseModels;
 using Application.UnitOfWorks;
-using Domain.Common.Enums;
 using Domain.Common.Results;
 using Domain.Entities.Owners;
-using Domain.Entities.Plans;
-using Domain.Entities.ReSellerOwners;
-using Domain.Entities.ReSellers;
-using Domain.Interfaces.Repositories;
-using Domain.Interfaces.Services.Owners;
-using Domain.Interfaces.Services.Stores;
-using Microsoft.Extensions.Localization;
-using Microsoft.Extensions.Logging;
-using Resources;
+using Domain.Interfaces.Services.Authentication;
 using System.Net;
 
 namespace Application.Features.Authentication.Commands.Register
@@ -24,122 +16,69 @@ namespace Application.Features.Authentication.Commands.Register
         : ICommand<AuthDto>
     { }
 
+    /// <summary>
+    /// Now a thin adapter: it owns only what is genuinely the transport's business — the single
+    /// SaveChanges and the JWT. Every step that builds an artifact lives in
+    /// <see cref="IRegisterService"/>, shared with the Gestor owner-create flow.
+    /// </summary>
+    /// <remarks>
+    /// <para>The catch around the service is LOAD-BEARING, not defensive boilerplate. The service
+    /// reports failure as <see cref="ApiException"/> carrying the SAME AcctionCode this handler
+    /// used to return. It has to be caught and rebuilt into a returned ResponseResult, because
+    /// AuthController maps a returned failure through a switch whose default arm is also
+    /// BadRequest (HTTP 400) — whereas an escaping ApiException is handled by the middleware,
+    /// which sets the HTTP status from the exception (HTTP 500). Letting it escape would silently
+    /// turn every register failure from 400 into 500.</para>
+    /// </remarks>
     public class RegisterCommandHandler : ICommandHandler<RegisterCommand, AuthDto>
     {
         private readonly IApplicationUnitOfWork _applicationUnitOfWork;
-        private readonly ICreateOwnerService _createOwnerService;
-        private readonly ICreateStoreService _createStoreService;
-        private readonly IPlanRepository _planRepository;
-        private readonly IReSellerRepository _reSellerRepository;
-        private readonly IReSellerOwnerRepository _reSellerOwnerRepository;
+        private readonly IRegisterService _registerService;
         private readonly IJwtProvider _jwtProvider;
         private readonly IAuthTokenConfig _authTokenConfig;
-        private readonly IStringLocalizer<I18n> _localizer;
-        private readonly ILogger<RegisterCommandHandler> _logger;
 
         public RegisterCommandHandler(
             IApplicationUnitOfWork applicationUnitOfWork,
-            IStringLocalizer<I18n> localizer,
-            ICreateOwnerService createOwnerService,
-            ICreateStoreService createStoreService,
-            IPlanRepository planRepository,
+            IRegisterService registerService,
             IJwtProvider jwtProvider,
-            IAuthTokenConfig authTokenConfig,
-            IReSellerRepository reSellerRepository,
-            IReSellerOwnerRepository reSellerOwnerRepository,
-            ILogger<RegisterCommandHandler> logger)
+            IAuthTokenConfig authTokenConfig)
         {
             _applicationUnitOfWork = applicationUnitOfWork;
-            _localizer = localizer;
-            _createOwnerService = createOwnerService;
-            _createStoreService = createStoreService;
-            _planRepository = planRepository;
+            _registerService = registerService;
             _jwtProvider = jwtProvider;
             _authTokenConfig = authTokenConfig;
-            _reSellerRepository = reSellerRepository;
-            _reSellerOwnerRepository = reSellerOwnerRepository;
-            _logger = logger;
         }
 
         public async Task<ResponseResult<AuthDto>> Handle(RegisterCommand request, CancellationToken cancellationToken)
         {
-            // Create Owner
-            Owner owner = await _createOwnerService.CreateOwnerAsync(request.Login, request.Password, request.FullName,
-                request.CellPhone, request.Email, "Nombre de la tienda: " + request.StoreName);
-
-            // Create Store
-            // Self-registered stores start on the default birth plan (Pago, hardcoded in
-            // CreateStoreService): grant exactly that plan's modules, NOT every catalog module
-            // AvailableToStore. Keeps plan/module coherence (store pays for what it gets) and
-            // keeps Superior/VIP-only modules (Warehouses 13, MultiStores 14, MultiMonedas 15,
-            // Elaboración 17, MultiPayments 16) out of a Pago store.
-            StorePlan? defaultPlan;
+            Owner owner;
             try
             {
-                defaultPlan = await _planRepository.GetActivePlanWithModulesByIdAsync((int)StorePlanType.Pago);
+                // Unchanged from the pre-refactor behavior: the owner description is SYNTHESIZED
+                // from the store name, ignoring any caller-supplied description.
+                owner = await _registerService.RegisterAsync(
+                    request.Login,
+                    request.Password,
+                    request.FullName,
+                    request.CellPhone,
+                    request.Email,
+                    request.StoreName,
+                    "Nombre de la tienda: " + request.StoreName,
+                    request.Code,
+                    cancellationToken);
             }
-            catch (Exception ex)
+            catch (ApiException ex)
             {
                 return ResponseResult.Failure<AuthDto>(
-                    new Error("Register.PlanLoadFailed", "Failed to load the default plan: " + ex.Message),
-                    (int)HttpStatusCode.InternalServerError);
-            }
-
-            if (defaultPlan is null)
-            {
-                return ResponseResult.Failure<AuthDto>(
-                    new Error("Register.PlanLoadFailed", "The default plan (Pago) is not active or does not exist."),
-                    (int)HttpStatusCode.InternalServerError);
-            }
-
-            List<int> planModuleIds = defaultPlan.StorePlanModules.Select(spm => spm.ModuleId).ToList();
-            // Self-registered stores are approved immediately so they are usable without an admin
-            // act (product decision 2026-09-10): all creation paths force approved=true.
-            var store = await _createStoreService.CreateStoreAsync(owner.Id, owner.TenantId, request.StoreName, null,
-                "Tienda de prueba", true, planModuleIds);
-
-            // FIX: Add null check to prevent NullReferenceException
-            if (owner.User == null)
-                return ResponseResult.Failure<AuthDto>(
-                    new Error("Register.OwnerUserNotCreated", "Registration failed: user was not created properly."), 
-                    (int)HttpStatusCode.InternalServerError);
-
-            owner.User.SelectedStoreId = store.Id;
-
-            if (!string.IsNullOrEmpty(request.Code))
-            {
-                ReSeller? reSeller = null;
-                try
-                {
-                    reSeller = await _reSellerRepository.GetByUserNameAsync(request.Code);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "ReSeller lookup failed for code {Code}, continuing registration without ReSeller association", request.Code);
-                    reSeller = null;
-                }
-
-                if (reSeller != null)
-                {
-                    try
-                    {
-                        ReSellerOwner reSellerOwner = ReSellerOwner.Create(reSeller.Id, owner.Id, reSeller.DiscountPrice, reSeller.PercentDiscountPrice, owner.TenantId);
-                        await _reSellerOwnerRepository.AddAsync(reSellerOwner);
-                    }
-                    catch (Exception)
-                    {
-                        return ResponseResult.Failure<AuthDto>(
-                            new Error("Register.ReSellerAssociationFailed", "Failed to associate with reseller."),
-                            (int)HttpStatusCode.InternalServerError);
-                    }
-                }
+                    new Error(ex.AcctionCode, ex.Message),
+                    (int)ex.StatusCode);
             }
 
             int changesSaved = await _applicationUnitOfWork.SaveChangesAsync(cancellationToken);
 
             if (changesSaved <= 0)
                 return ResponseResult.Failure<AuthDto>(
-                    new Error("Register.FailedToSave", "Registration failed: changes could not be saved to database."), 
+                    new Error("Register.FailedToSave", "Registration failed: changes could not be saved to database."),
                     (int)HttpStatusCode.InternalServerError);
 
             string token = _jwtProvider.GenerateToken(owner.User.Id, request.Login);

@@ -432,8 +432,8 @@ export const MENU_GROUPS: MenuGroup[] = [
         featureIds: [EFeatures.Configurations],
         moduleId: EModules.Management,
         // D11: channels (method + currency) and their equivalence exist only
-        // with the MultiPayments module; without it the page is not offered.
-        moduleIds: [EModules.MultiPayments],
+        // with the MultiMonedas module; without it the page is not offered.
+        moduleIds: [EModules.MultiMonedas],
         helpContent:
           'Tasas de Cambio. Registra cuántas unidades de cada moneda equivalen a 1 USD para cada método de pago (efectivo, Zelle, transferencia), con la fecha desde la que rige. El historial es de solo lectura: cada cambio crea un registro nuevo y no se puede editar ni eliminar.',
       },

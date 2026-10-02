@@ -10,6 +10,7 @@ using Application.Services.Roles;
 using Application.Services.Stores;
 using Domain.Entities.Stores;
 using Domain.Entities.Tenants;
+using Domain.Interfaces.Services.Authentication;
 using Domain.Interfaces.Services.Billing;
 using Domain.Interfaces.Services.Owners;
 using Domain.Interfaces.Services.Stores;
@@ -51,6 +52,9 @@ namespace Application
             services.AddScoped<IGetStoreByIdService, GetStoreByIdService>();
             services.AddScoped<IStoreSessionRevocationService, StoreSessionRevocationService>();
             services.AddScoped<ICreateStoreService, CreateStoreService>();
+            // register-service: ONE owner+store creation flow shared by the public registration and
+            // the Gestor owner-create. It never commits — each handler owns its single save.
+            services.AddScoped<IRegisterService, RegisterService>();
             services.AddScoped<IAllowedFeaturesService, AllowedFeaturesService>();
 
             services.AddScoped<ICreateOwnerService, CreateOwnerService>();

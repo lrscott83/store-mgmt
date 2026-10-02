@@ -11,7 +11,7 @@ import { Card } from '~/shared/components/ui/card';
 import { InfoBox } from '~/shared/components/ui/info-box';
 import {
   hasInventoryModuleAvailable,
-  hasMultiPaymentsModuleAvailable,
+  hasMultiMonedasModuleAvailable,
 } from '~/shared/lib/auth/authorization-service';
 import { InventoryOfflineService } from '~/inventory/lib/services/inventory-offline-service';
 import { ProductRepository } from '~/sales/lib/repositories/product-repository';
@@ -89,7 +89,7 @@ export function EgressPage() {
     const currencyGuard = guardCurrency({
       items: cartItems,
       requestedProduct: product,
-      allowMixedCurrencies: hasMultiPaymentsModuleAvailable(user),
+      allowMixedCurrencies: hasMultiMonedasModuleAvailable(user),
     });
     if (!currencyGuard.succeeded) {
       showBlockingError(

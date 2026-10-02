@@ -1,7 +1,8 @@
 import { useIntl } from 'react-intl';
-import { Currency, EModules } from '@store-mgmt/domain';
+import { Currency } from '@store-mgmt/domain';
 import type { UserModel } from '@store-mgmt/domain';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
+import { hasMultiMonedasModuleAvailable } from '~/shared/lib/auth/authorization-service';
 
 /** Options in the required order: CUP default first, then the foreign codes. */
 const CURRENCY_OPTIONS: { value: number; label: string }[] = [
@@ -15,8 +16,9 @@ const CURRENCY_OPTIONS: { value: number; label: string }[] = [
 ];
 
 export function hasMultiMonedasAvailable(user: UserModel | null): boolean {
-  // Defensivo: perfiles cacheados de sesiones previas pueden no traer storeModuleIds.
-  return !!user && Array.isArray(user.storeModuleIds) && user.storeModuleIds.includes(EModules.MultiMonedas);
+  // Kept as a re-export for backward compatibility; the authoritative gate lives
+  // in `authorization-service` alongside the other module helpers.
+  return hasMultiMonedasModuleAvailable(user);
 }
 
 interface CurrencySelectProps {

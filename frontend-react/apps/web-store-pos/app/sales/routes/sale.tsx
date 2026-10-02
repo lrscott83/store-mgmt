@@ -5,6 +5,7 @@ import { EFeatures, OrderType, ProductErrors } from '@store-mgmt/domain';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { useCartStore } from '~/shared/lib/stores/cart-store';
+import { useDataRevisionStore } from '~/shared/lib/stores/data-revision-store';
 import { Card } from '~/shared/components/ui/card';
 import { InfoBox } from '~/shared/components/ui/info-box';
 import { Switch } from '~/shared/components/ui/switch';
@@ -13,7 +14,7 @@ import { showBlockingError } from '~/shared/lib/blocking-alert';
 import { showToastError, showToastSuccess } from '~/shared/lib/toast';
 import {
   hasInventoryModuleAvailable,
-  hasMultiPaymentsModuleAvailable,
+  hasMultiMonedasModuleAvailable,
 } from '~/shared/lib/auth/authorization-service';
 import { InventoryOfflineService } from '~/inventory/lib/services/inventory-offline-service';
 import { ProductRepository } from '~/sales/lib/repositories/product-repository';
@@ -176,6 +177,13 @@ export function SalePage() {
 
   const hasInventoryModule = user ? hasInventoryModuleAvailable(user) : false;
 
+  // A sale registered from the global cart decrements `entry.available` and persists it
+  // (OrderOfflineService.createOrder -> InventoryOfflineService.getAvailableInventoryCosts).
+  // Without this revision in the dependency list the badges below keep showing pre-sale
+  // quantities until the route remounts, so the merchant sees a stock level that never
+  // moves after selling from this very screen.
+  const dataRevision = useDataRevisionStore((s) => s.revision);
+
   /** Mapa productId → cantidad disponible (solo para productos que descuentan inventario
    * y que tienen entradas registradas; sin entradas no se muestra nada). */
   const availableByProductId = useMemo(() => {
@@ -187,7 +195,11 @@ export function SalePage() {
       if (quantity.hasEntries) map[product.id] = quantity.available;
     }
     return map;
-  }, [displayedProducts, hasInventoryModule, inventoryService]);
+    // `dataRevision` is a deliberate cache-busting dependency: it is not read in the body,
+    // it re-runs this derivation when a sale changed the persisted stock. Same idiom as
+    // the seeded-payment effects in cart-shell.tsx.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [displayedProducts, hasInventoryModule, inventoryService, dataRevision]);
 
   /** Shared inventory gate — 1:1 port of Angular's addProductToCart check
    * (sale-product-row.component.ts:58-104 -> hasAvailableProductToSale),
@@ -217,7 +229,7 @@ export function SalePage() {
     const currencyGuard = guardCurrency({
       items: cartItems,
       requestedProduct: requested ?? {},
-      allowMixedCurrencies: hasMultiPaymentsModuleAvailable(user),
+      allowMixedCurrencies: hasMultiMonedasModuleAvailable(user),
     });
     if (!currencyGuard.succeeded) return currencyGuard;
     return availabilityGate(requested, productId, quantity);
@@ -244,7 +256,7 @@ export function SalePage() {
     const currencyGuard = guardCurrency({
       items: cartItems,
       requestedProduct: product,
-      allowMixedCurrencies: hasMultiPaymentsModuleAvailable(user),
+      allowMixedCurrencies: hasMultiMonedasModuleAvailable(user),
     });
     if (!currencyGuard.succeeded) {
       return currencyGuard;

@@ -52,7 +52,10 @@ public sealed class OwnersCreateReSellerIdBindingTests
         ["fullName"] = "E2E Owner",
         ["cellphone"] = "0000000000",
         ["email"] = null,
-        ["description"] = "e2e"
+        ["description"] = "e2e",
+        // Owner-create now creates a STORE through the shared register flow, so the store name is
+        // required, exactly as it is for self-registration.
+        ["storeName"] = "E2E Store"
     };
 
     private async Task<Guid> TenantOfCreatedOwnerAsync(string login)

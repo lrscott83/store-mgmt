@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { redirect } from 'react-router';
 import { useIntl } from 'react-intl';
 import type { Product } from '@store-mgmt/domain';
 import { EModules, OrderType, ProductErrors, Result } from '@store-mgmt/domain';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { useCartStore } from '~/shared/lib/stores/cart-store';
+import { useDataRevisionStore } from '~/shared/lib/stores/data-revision-store';
 import { Card } from '~/shared/components/ui/card';
 import { InfoBox } from '~/shared/components/ui/info-box';
 import { HelpIcon, ScanBarcodeIcon } from '~/shared/components/ui/icons';
@@ -14,7 +15,7 @@ import { formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency
 import { Switch } from '~/shared/components/ui/switch';
 import {
   hasInventoryModuleAvailable,
-  hasMultiPaymentsModuleAvailable,
+  hasMultiMonedasModuleAvailable,
   isModuleAvailable,
 } from '~/shared/lib/auth/authorization-service';
 import { resolveUserHomePath } from '~/shared/lib/auth/user-home';
@@ -114,9 +115,16 @@ export function WholesalePage() {
     });
   }, [storeId]);
 
-  const inventoryService = new InventoryOfflineService(
-    storeId,
-    new ProductRepository(storeId, new ProductCategoryRepository(storeId)),
+  // Memoized on the store id, like sale.tsx: constructing it inline rebuilt two
+  // repositories plus the service on every single render and gave the availability map
+  // below an unstable dependency it could never memo on.
+  const inventoryService = useMemo(
+    () =>
+      new InventoryOfflineService(
+        storeId,
+        new ProductRepository(storeId, new ProductCategoryRepository(storeId)),
+      ),
+    [storeId],
   );
   const hasInventoryModule = user ? hasInventoryModuleAvailable(user) : false;
 
@@ -126,6 +134,27 @@ export function WholesalePage() {
     const quantity = inventoryService.getAvailableQuantity(product.id);
     return quantity.hasEntries ? quantity.available : undefined;
   }
+
+  // A sale registered from the global cart decrements `entry.available` and persists it
+  // (OrderOfflineService.createOrder -> InventoryOfflineService.getAvailableInventoryCosts).
+  // The per-product read below is live on every render, so what was missing here was a
+  // reason to RENDER again: nothing bumped, so the wholesale rows kept showing pre-sale
+  // availability until the route remounted. Keying this map on the revision is what closes
+  // that gap — and it keeps the row read a single map lookup instead of one service call
+  // per visible product.
+  const dataRevision = useDataRevisionStore((s) => s.revision);
+
+  const availableByProductId = useMemo(() => {
+    const map: Record<string, number | undefined> = {};
+    for (const product of products) {
+      map[product.id] = availableUnits(product);
+    }
+    return map;
+    // `dataRevision` is a deliberate cache-busting dependency: it is not read in the body,
+    // it re-runs this derivation when a sale changed the persisted stock. Same idiom as
+    // the availableByProductId memo in sale.tsx.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [products, hasInventoryModule, inventoryService, dataRevision]);
 
   /** Unidad de medida del producto ("caja", "paquete"…) con fallback "paquete". */
   function unitName(product: Product): string {
@@ -198,7 +227,7 @@ export function WholesalePage() {
     const currencyGuard = guardCurrency({
       items: cartItems,
       requestedProduct: product,
-      allowMixedCurrencies: hasMultiPaymentsModuleAvailable(user),
+      allowMixedCurrencies: hasMultiMonedasModuleAvailable(user),
     });
     if (!currencyGuard.succeeded) return currencyGuard;
 
@@ -450,7 +479,7 @@ export function WholesalePage() {
                 const packSize = product.wholesalePackSize ?? 0;
                 const packs = parseInt(packsByProduct[product.id] ?? '', 10) || 0;
                 const { unitPrice, total } = resolveWholesalePrice(product, packs);
-                const available = availableUnits(product);
+                const available = availableByProductId[product.id];
                 return (
                   <div key={product.id} className="flex items-center gap-3 py-2">
                     <div className="min-w-0 flex-1">
@@ -458,7 +487,9 @@ export function WholesalePage() {
                           nombre, como el precio en /sales/new (sale-product-row.tsx). */}
                       <p className="truncate text-sm text-text">{product.name}</p>
                       <p className="flex items-center gap-1 text-xs text-muted">
-                        {available !== undefined && <span>({available})</span>}
+                        {available !== undefined && (
+                          <span data-testid="available-stock">({available})</span>
+                        )}
                         <button
                           type="button"
                           onClick={() => showTiers(product)}

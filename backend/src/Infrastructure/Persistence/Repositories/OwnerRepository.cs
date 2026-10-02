@@ -80,6 +80,12 @@ namespace Infrastructure.Persistence.Repositories
                 .Include(o => o.User)
                 .Include(o => o.Stores.Where(s => includeInactive || s.IsActive)).ThenInclude(s => s.StoreModules.Where(sm => sm.IsActive))
                 .Include(o => o.Stores.Where(s => includeInactive || s.IsActive)).ThenInclude(s => s.StorePayments)
+                // OwnerProfile maps ReSellerName from this navigation chain. Without it the
+                // .Where above still filters correctly (it runs in SQL) but ReSellerOwner is
+                // null in memory, so the DTO returns ReSellerName=null and the UI falls back
+                // to a literal "ADMIN". Keep this chain in sync with
+                // GetAllOwnersIncludingStoreModulesAsync — that asymmetry is the whole defect.
+                .Include(o => o.ReSellerOwner).ThenInclude(ro => ro.ReSeller).ThenInclude(r => r.User)
                 .IgnoreQueryFilters()
                 .OrderBy(o => o.Id)
                 .Take(1000)

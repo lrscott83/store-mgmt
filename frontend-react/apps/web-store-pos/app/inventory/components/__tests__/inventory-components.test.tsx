@@ -1,7 +1,9 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act, render, screen, fireEvent } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
+import { Currency } from '@store-mgmt/domain';
 import esMessages from '~/shared/lib/i18n/es';
+import { StoreCurrencyConfigService } from '~/shared/lib/store-currency-config-service';
 
 function Wrapper({ children }: { children: React.ReactNode }) {
   return (
@@ -986,6 +988,82 @@ describe('EditInventoryEntryModal — warehouse-origin cost lock (A8)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Actualizar' }));
     expect(onSave).toHaveBeenCalledWith(
       { productId: 'p1', quantity: 5, costPrice: 2, currency: 0 },
+      'e1',
+    );
+  });
+});
+
+// ─── EditInventoryEntryModal — T9: create-mode currency = store buy currency ──
+//
+// CREATE mode seeds `currency` from the store's "Moneda de Compra" (buyCurrency);
+// EDIT mode must preserve the stored `entry.currency` untouched.
+
+describe('EditInventoryEntryModal — T9 buy-currency default', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  afterEach(() => {
+    localStorage.clear();
+  });
+
+  async function renderCreateWithProduct(onSave: ReturnType<typeof vi.fn>): Promise<void> {
+    vi.mocked(ProductOfflineService).mockImplementationOnce(
+      () => THREE_PRODUCTS as unknown as InstanceType<typeof ProductOfflineService>,
+    );
+    await act(async () => {
+      render(
+        <Wrapper>
+          <EditInventoryEntryModal isOpen onClose={vi.fn()} onSave={onSave} storeId="s1" />
+        </Wrapper>,
+      );
+    });
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'Ron' } });
+    fireEvent.click(await screen.findByRole('option', { name: 'Bebidas - Ron' }));
+    fireEvent.change(screen.getByLabelText('Cantidad'), { target: { value: '2' } });
+    fireEvent.change(screen.getByLabelText('Precio de costo'), { target: { value: '4' } });
+  }
+
+  it('create mode seeds the store buy currency (Moneda de Compra) into onSave', async () => {
+    new StoreCurrencyConfigService('s1').setBuyCurrency(Currency.USD);
+    const onSave = vi.fn();
+    await renderCreateWithProduct(onSave);
+    fireEvent.click(screen.getByRole('button', { name: 'Adicionar' }));
+    expect(onSave).toHaveBeenCalledWith(
+      { productId: 'p1', quantity: 2, costPrice: 4, currency: Currency.USD },
+      undefined,
+    );
+  });
+
+  it('create mode falls back to CUP when the store has no config', async () => {
+    const onSave = vi.fn();
+    await renderCreateWithProduct(onSave);
+    fireEvent.click(screen.getByRole('button', { name: 'Adicionar' }));
+    expect(onSave).toHaveBeenCalledWith(
+      { productId: 'p1', quantity: 2, costPrice: 4, currency: Currency.CUP },
+      undefined,
+    );
+  });
+
+  it('edit mode preserves entry.currency even when the store buy currency differs', async () => {
+    new StoreCurrencyConfigService('s1').setBuyCurrency(Currency.USD);
+    const onSave = vi.fn();
+    await act(async () => {
+      render(
+        <Wrapper>
+          <EditInventoryEntryModal
+            isOpen
+            onClose={vi.fn()}
+            onSave={onSave}
+            storeId="s1"
+            entry={makeEntry({ currency: Currency.EUR })}
+          />
+        </Wrapper>,
+      );
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Actualizar' }));
+    expect(onSave).toHaveBeenCalledWith(
+      { productId: 'p1', quantity: 5, costPrice: 2, currency: Currency.EUR },
       'e1',
     );
   });
