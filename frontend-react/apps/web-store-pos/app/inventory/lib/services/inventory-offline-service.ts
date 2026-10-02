@@ -645,12 +645,25 @@ export class InventoryOfflineService {
 
   /**
    * Updates an existing inventory entry (same-product edit).
-   * Guarded by {@link isNotSoldEntry} (entry-not-found / partially-sold).
    *
    * WU2 (category D): returns DataResult<InventoryEntryView> (was plain InventoryEntry,
    * throwing) — NEVER throws, matching Angular's own updateInventoryEntry contract.
    *
    * Spec §6.3 update contract; S-I4.
+   *
+   * PARTIALLY-SOLD ENTRIES ARE EDITABLE (2026-10-02, owner rule). This used to be blocked
+   * outright by isNotSoldEntry, which made the cost propagation dead code: the caller could
+   * never reach its updateProductCostsByInventoryIds call because it returns on that failure.
+   * The rule now is: the new quantity must still COVER what already went out.
+   *
+   *     sold       = entry.quantity - entry.available
+   *     valid when newQuantity >= sold
+   *     available  = newQuantity - sold
+   *
+   * available is DERIVED, never copied from quantity — copying it resurrects the sold units
+   * (an entry 10/8 edited to 12 would go back to 12 available instead of 10). "Sold" is derived
+   * from quantity minus available because deactivating a sale returns its units to available,
+   * so there is no separate counter to keep in sync.
    */
   update(
     entryId: string,
@@ -660,29 +673,41 @@ export class InventoryOfflineService {
     /** MultiMonedas: undefined deja la moneda almacenada intacta. */
     currency?: number,
   ): DataResult<InventoryEntryView> {
-    const guard = this.isNotSoldEntry(productId, entryId);
-    if (!guard.succeeded) {
-      return new DataResult<InventoryEntryView>(undefined, false, guard.errors);
+    // Existence checks, 1:1 with isNotSoldEntry's first two branches. Inlined here because the
+    // sold-status branch is exactly what this method now relaxes.
+    if (!this.productRepository.getProductById(productId)) {
+      return new DataResult<InventoryEntryView>(undefined, false, [ProductErrors.NotExists]);
     }
 
     // Product-scoped lookup (rule 12): Angular never scans across products for an entry —
-    // every caller already knows `productId`, so the entry is looked up within that exact
-    // bucket (isNotSoldEntry above already guarantees it exists there).
+    // every caller already knows productId, so the entry is looked up within that exact bucket.
     const allForProduct = this.getProductInventoriesByProductId(productId);
-    const entry = allForProduct.find((e) => e.id === entryId)!;
+    const entry = allForProduct.find((e) => e.id === entryId);
+    if (!entry) {
+      return new DataResult<InventoryEntryView>(undefined, false, [InventoryErrors.EntryNotExists]);
+    }
 
     // A8 (plan 2026-09-16): las entradas originadas por una salida de almacén
-    // no se editan en la tienda — la salida sí se edita en el almacén.
+    // no se editan en la tienda — la salida sí se edita en el almacén. Evaluated BEFORE the
+    // quantity rule so a warehouse entry stays sealed whatever the user types.
     if (entry.warehouseSaleOutMovementId !== undefined) {
       return new DataResult<InventoryEntryView>(undefined, false, [
         InventoryErrors.WarehouseEntryNotEditable,
       ]);
     }
 
+    const sold = entry.quantity - entry.available;
+    if (!approxEqual(quantity, sold) && quantity < sold) {
+      // The new total no longer covers the units that already left.
+      return new DataResult<InventoryEntryView>(undefined, false, [
+        InventoryErrors.SaleExistsWithThisEntry,
+      ]);
+    }
+
     const updated: InventoryEntry = {
       ...entry,
       quantity,
-      available: quantity,
+      available: quantity - sold,
       costPrice,
       ...(currency !== undefined ? { currency } : {}),
       updatedDate: new Date(),
