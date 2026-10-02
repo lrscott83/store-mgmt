@@ -48,7 +48,8 @@ public sealed class OwnersListReSellerNameTests
         ["fullName"] = "E2E Owner",
         ["cellphone"] = "0000000000",
         ["email"] = null,
-        ["description"] = "e2e"
+        ["description"] = "e2e",
+        ["storeName"] = "E2E Store"
     };
 
     private async Task<Guid> SeedReSellerAsync(Guid userId, string description)

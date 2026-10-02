@@ -30,7 +30,11 @@ public sealed class OwnersCreateValidationTests
         string cellphone = "0000000000", Guid? reSellerId = null, string? email = null) => new
     {
         Login = login ?? $"o-{Guid.NewGuid():N}@test.com", Password = password, FullName = fullName,
-        Cellphone = cellphone, ReSellerId = reSellerId, Email = email, Description = "e2e"
+        Cellphone = cellphone, ReSellerId = reSellerId, Email = email, Description = "e2e",
+        // Always valid: owner-create creates a STORE through the shared register flow, so a
+        // missing StoreName would make EVERY test below pass on the wrong error code instead of
+        // the one each one is actually asserting.
+        StoreName = "E2E Store"
     };
 
     [Fact] public Task Create_empty_login_400_Login() => Assert400(Valid(login: ""), "Login");
@@ -57,7 +61,11 @@ public sealed class OwnersCreateValidationTests
         {
             var r = await DbTestHelpers.AuthedClient(_f, admin, login).PostAsJsonAsync("/api/v1/Owners",
                 new { Login = existing.Login, Password = "Password123", FullName = "Dup", Cellphone = "0",
-                      ReSellerId = (Guid?)null, Email = (string?)null, Description = "e2e" });
+                      ReSellerId = (Guid?)null, Email = (string?)null, Description = "e2e",
+                      // Valid, so the ONLY reason this request can fail is the duplicate login:
+                      // a missing StoreName would be a 400 from the validator and never reach the
+                      // 409 the DB unique index is supposed to produce.
+                      StoreName = "E2E Store" });
             r.StatusCode.Should().Be(HttpStatusCode.Conflict);
             var b = await r.Content.ReadFromJsonAsync<ApiResponse<object>>(ApiResponse.Json);
             b!.Errors.Should().Contain(e => e.Code == "Owner.DuplicateLogin");

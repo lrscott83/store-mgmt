@@ -142,6 +142,7 @@ describe('ownerHttpService.createOwner — HTTP-4: POST /v1/owners/', () => {
       email: 'jane@example.com',
       description: '',
       reSellerId: '',
+      storeName: 'Jane Store',
     };
     await ownerHttpService.createOwner(payload);
     expect(apiClient.post).toHaveBeenCalledWith('/v1/owners/', payload);
@@ -159,6 +160,7 @@ describe('ownerHttpService.createOwner — HTTP-4: POST /v1/owners/', () => {
       email: 'jane@example.com',
       description: '',
       reSellerId: '',
+      storeName: 'Jane Store',
     });
     expect(result.succeeded).toBe(true);
     if (!result.succeeded) throw new Error('expected succeeded response');
@@ -302,6 +304,7 @@ describe('ownerHttpService — propagates error on HTTP failure', () => {
         email: 'x',
         description: '',
         reSellerId: '',
+        storeName: 'x',
       }),
     ).rejects.toThrow('Network error');
   });

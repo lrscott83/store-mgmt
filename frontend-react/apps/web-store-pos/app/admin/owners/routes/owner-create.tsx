@@ -32,6 +32,9 @@ export function OwnerCreatePage() {
   const [email, setEmail] = useState('');
   const [description, setDescription] = useState('');
   const [reSellerId, setReSellerId] = useState('');
+  // Store name: owner-create now runs the same flow as self-registration (RegisterService), which
+  // creates the customer's STORE along with the owner. The backend requires it (400 StoreName).
+  const [storeName, setStoreName] = useState('');
 
   const [resellers, setResellers] = useState<ReSeller[]>([]);
   const [validationError, setValidationError] = useState('');
@@ -49,7 +52,8 @@ export function OwnerCreatePage() {
     cellPhone ||
     email ||
     description ||
-    reSellerId,
+    reSellerId ||
+    storeName,
   );
 
   // ADR-5: only the hook — no UnsavedChangesDialog
@@ -94,6 +98,7 @@ export function OwnerCreatePage() {
         email,
         description,
         reSellerId,
+        storeName,
       });
 
       if (!res.succeeded) {
@@ -264,6 +269,23 @@ export function OwnerCreatePage() {
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            className="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+
+        <div>
+          <label htmlFor="storeName" className="block text-sm font-medium text-gray-700">
+            {intl.formatMessage({ id: 'STORE.STORE_NAME' })}
+          </label>
+          {/* The owner's STORE, created together with the owner by the shared register flow —
+              same as self-registration. Without it the merchant has an owner with nothing to
+              sell in. */}
+          <input
+            id="storeName"
+            type="text"
+            value={storeName}
+            onChange={(e) => setStoreName(e.target.value)}
+            required
             className="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>

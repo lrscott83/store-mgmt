@@ -175,6 +175,12 @@ function fillValidForm() {
   fireEvent.change(screen.getByLabelText(esMessages['GENERAL.EMAIL']), {
     target: { value: 'jane@example.com' },
   });
+  // Owner-create now creates the customer's STORE through the shared register flow, so the store
+  // name is part of a valid submission. The backend rejects the request with 400 (StoreName)
+  // without it.
+  fireEvent.change(screen.getByLabelText(esMessages['STORE.STORE_NAME']), {
+    target: { value: 'Jane Store' },
+  });
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -373,6 +379,32 @@ describe('OwnerCreatePage — password mismatch validation', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('OwnerCreatePage — successful submit', () => {
+  it('sends the store name so the backend can create the customer store', async () => {
+    const { ownerHttpService } = await import('~/admin/owners/lib/services/owner-http-service');
+    vi.mocked(ownerHttpService.createOwner).mockResolvedValue({
+      succeeded: true,
+      data: makeOwner(),
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
+
+    await renderPage(false);
+    fillValidForm();
+
+    fireEvent.submit(
+      screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')!,
+    );
+
+    await waitFor(() => {
+      // The store name is what turns this from "an owner with nothing to sell in" into a real
+      // customer. The backend requires it (400 StoreName) — so it must be in the payload.
+      expect(ownerHttpService.createOwner).toHaveBeenCalledWith(
+        expect.objectContaining({ storeName: 'Jane Store' }),
+      );
+    });
+  });
+
   it('calls createOwner and navigates to /admin/owners on success (Gestor / ReSeller actor)', async () => {
     const { ownerHttpService } = await import('~/admin/owners/lib/services/owner-http-service');
     vi.mocked(ownerHttpService.createOwner).mockResolvedValue({

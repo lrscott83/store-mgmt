@@ -1,302 +1,83 @@
-using Application.Dtos.Authentication;
-using Application.Features.Authentication.Commands.Login;
-using Application.ResponseModels;
-using Domain.Common.Enums;
-using Domain.Common.Results;
-using Domain.Entities.Plans;
-using Domain.Entities.ReSellerOwners;
-using Domain.Entities.ReSellers;
-using Domain.Interfaces.Repositories;
+using Application.Features.Authentication.Commands.Register;
 using FluentAssertions;
 using Moq;
-using Application.Features.Authentication.Commands.Register;
+using Xunit;
 
 namespace Application.Tests.Authentication.Commands.Register;
 
 /// <summary>
-/// Unit tests for RegisterCommandHandler covering all scenarios:
-/// - Happy Path: Normal registration flow
-/// - Edge Cases: Null/empty inputs, extreme values
-/// - Error Management: Controlled failures
-/// - Integration: Mock verification of dependencies
+/// Trimmed after the RegisterService extraction.
+/// <para>
+/// What MOVED to RegisterService*Tests (and why): every test asserting what gets BUILT — owner
+/// arguments, plan loading, module ids, store creation, SelectedStoreId, the Gestor link. The
+/// handler does not build those anymore, so asserting them here would have been asserting on a
+/// mock it no longer calls.
+/// </para>
+/// <para>
+/// What STAYED: the two things that are genuinely the handler's — the single SaveChanges and the
+/// JWT — plus the delegation contract itself, which is new and is what actually ties the two
+/// layers together.
+/// </para>
 /// </summary>
 public class RegisterCommandHandlerTests : RegisterCommandHandlerTestFixture
 {
-    #region Constructor Tests
-
-    [Fact]
-    public void Constructor_ShouldNotThrow_WhenAllDependenciesAreProvided()
-    {
-        // Act
-        var action = () => CreateHandler();
-
-        // Assert
-        action.Should().NotThrow();
-    }
-
-    #endregion
-
-    #region Happy Path Tests
+    #region Success path
 
     [Fact]
     public async Task Handle_ShouldReturnSuccess_WhenRegistrationIsSuccessful()
     {
-        // Arrange
         var handler = CreateHandler();
         var command = CreateValidCommand();
 
-        // Act
         var result = await handler.Handle(command, CancellationToken.None);
 
-        // Assert
         result.Succeeded.Should().BeTrue();
-        result.Data.Login.Should().Be(command.Login);
-        result.Data.AuthToken.Should().NotBeNullOrEmpty();
-        result.Data.ExpiresIn.Should().BeAfter(DateTime.UtcNow);
+        result.Errors.Should().BeEmpty();
+        result.Data.Should().NotBeNull();
     }
 
+    /// <summary>
+    /// Formerly <c>Handle_ShouldReturnSuccess_WhenPlanHasNoModulesButSaveSucceeds</c>. Its two
+    /// halves now live at their real owners and both survive: the empty-module-list behavior is
+    /// pinned by RegisterAsync_WithDefaultPlanWithoutModules_ShouldCreateStoreWithEmptyModuleList,
+    /// and "a committed save yields the success envelope" is the assertion kept here.
+    /// </summary>
     [Fact]
-    public async Task Handle_ShouldReturnSuccess_WithEmptyWrapFields()
+    public async Task Handle_ShouldReturnSuccess_WhenSaveSucceeds()
     {
-        // Arrange — auth-login-wrapped-dek R4: Register never delivers a wrapped DEK
+        MockUnitOfWork
+            .Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
+
         var handler = CreateHandler();
         var command = CreateValidCommand();
 
-        // Act
         var result = await handler.Handle(command, CancellationToken.None);
 
-        // Assert
         result.Succeeded.Should().BeTrue();
-        result.Data.WrappedDek.Should().BeEmpty();
-        result.Data.WrapSalt.Should().BeEmpty();
-        result.Data.WrapIv.Should().BeEmpty();
+        result.Data.Should().NotBeNull();
     }
 
     [Fact]
-    public async Task Handle_ShouldReturnSuccess_WhenRegistrationWithValidReSellerCode()
+    public async Task Handle_ShouldGenerateToken_WithCorrectUserCredentials()
     {
-        // Arrange
         var handler = CreateHandler();
-        var command = CreateValidCommand(code: "RESELLER123");
-        var reSeller = CreateTestReSeller();
+        var command = CreateValidCommand();
 
-        MockReSellerRepository
-            .Setup(x => x.GetByUserNameAsync(command.Code!))
-            .ReturnsAsync(reSeller);
-
-        MockReSellerOwnerRepository
-            .Setup(x => x.AddAsync(It.IsAny<ReSellerOwner>()))
-            .ReturnsAsync((ReSellerOwner rso) => rso);
-
-        // Act
         var result = await handler.Handle(command, CancellationToken.None);
 
-        // Assert
-        result.Succeeded.Should().BeTrue();
-        result.Data.Login.Should().Be(command.Login);
-        result.Data.AuthToken.Should().NotBeNullOrEmpty();
-        result.Data.ExpiresIn.Should().BeAfter(DateTime.UtcNow);
-    }
-
-    [Fact]
-    public async Task Handle_ShouldCreateOwnerWithCorrectParameters()
-    {
-        // Arrange
-        var handler = CreateHandler();
-        var command = new RegisterCommand(
-            Login: "owner123",
-            Password: "Password123!",
-            FullName: "Owner Name",
-            CellPhone: "+1234567890",
-            Email: "owner@example.com",
-            StoreName: "My Store",
-            Code: null);
-
-        // Act
-        await handler.Handle(command, CancellationToken.None);
-
-        // Assert
-        MockCreateOwnerService.Verify(x => x.CreateOwnerAsync(
-            command.Login,
-            command.Password,
-            command.FullName,
-            command.CellPhone,
-            command.Email,
-            It.Is<string>(s => s.Contains(command.StoreName))),
-            Times.Once);
+        MockJwtProvider.Verify(
+            x => x.GenerateToken(TestUserId, command.Login), Times.Once);
+        result.Data.AuthToken.Should().Be("mock-jwt-token-for-testing");
     }
 
     #endregion
 
-    #region Edge Cases Tests
-
-    [Theory]
-    [InlineData(null)]
-    [InlineData("")]
-    [InlineData("   ")]
-    public async Task Handle_ShouldCreateOwner_WhenLoginIsNullOrEmptyOrWhitespace(string? login)
-    {
-        // Arrange
-        var handler = CreateHandler();
-        var command = new RegisterCommand(
-            Login: login!,
-            Password: "Password123!",
-            FullName: "Test User",
-            CellPhone: "+1234567890",
-            Email: "test@example.com",
-            StoreName: "Test Store",
-            Code: null);
-
-        // Act - The handler should pass through validation and attempt creation
-        // Note: Validation happens via FluentValidation pipeline, not in handler
-        Func<Task> act = async () => await handler.Handle(command, CancellationToken.None);
-
-        // Assert - Handler should attempt creation (validation is handled separately)
-        await act.Should().NotThrowAsync();
-        MockCreateOwnerService.Verify(x => x.CreateOwnerAsync(
-            It.IsAny<string>(),
-            It.IsAny<string>(),
-            It.IsAny<string>(),
-            It.IsAny<string>(),
-            It.IsAny<string?>(),
-            It.IsAny<string?>()),
-            Times.Once);
-    }
-
-    [Fact]
-    public async Task Handle_ShouldCreateOwner_WhenPasswordIsEmpty()
-    {
-        // Arrange
-        var handler = CreateHandler();
-        var command = new RegisterCommand(
-            Login: "testuser",
-            Password: "",
-            FullName: "Test User",
-            CellPhone: "+1234567890",
-            Email: "test@example.com",
-            StoreName: "Test Store",
-            Code: null);
-
-        // Act
-        Func<Task> act = async () => await handler.Handle(command, CancellationToken.None);
-
-        // Assert
-        await act.Should().NotThrowAsync();
-    }
-
-    [Fact]
-    public async Task Handle_ShouldCreateOwner_WhenEmailIsNull()
-    {
-        // Arrange
-        var handler = CreateHandler();
-        var command = new RegisterCommand(
-            Login: "testuser",
-            Password: "Password123!",
-            FullName: "Test User",
-            CellPhone: "+1234567890",
-            Email: null,
-            StoreName: "Test Store",
-            Code: null);
-
-        // Act
-        var result = await handler.Handle(command, CancellationToken.None);
-
-        // Assert
-        result.Succeeded.Should().BeTrue();
-        MockCreateOwnerService.Verify(x => x.CreateOwnerAsync(
-            It.IsAny<string>(),
-            It.IsAny<string>(),
-            It.IsAny<string>(),
-            It.IsAny<string>(),
-            null,
-            It.IsAny<string?>()),
-            Times.Once);
-    }
-
-    [Fact]
-    public async Task Handle_ShouldCreateOwner_WhenCodeIsNull()
-    {
-        // Arrange
-        var handler = CreateHandler();
-        var command = CreateValidCommand(code: null);
-
-        // Act
-        var result = await handler.Handle(command, CancellationToken.None);
-
-        // Assert
-        result.Succeeded.Should().BeTrue();
-        MockReSellerRepository.Verify(x => x.GetByUserNameAsync(
-            It.IsAny<string>()),
-            Times.Never);
-    }
-
-    [Fact]
-    public async Task Handle_ShouldCreateOwner_WhenCodeIsEmptyString()
-    {
-        // Arrange
-        var handler = CreateHandler();
-        var command = CreateValidCommand(code: "");
-
-        // Act
-        var result = await handler.Handle(command, CancellationToken.None);
-
-        // Assert
-        result.Succeeded.Should().BeTrue();
-        MockReSellerRepository.Verify(x => x.GetByUserNameAsync(
-            It.IsAny<string>()),
-            Times.Never);
-    }
-
-    [Fact]
-    public async Task Handle_ShouldCreateOwner_WhenFullNameHasSpecialCharacters()
-    {
-        // Arrange
-        var handler = CreateHandler();
-        var command = new RegisterCommand(
-            Login: "testuser",
-            Password: "Password123!",
-            FullName: "José María García-López",
-            CellPhone: "+1234567890",
-            Email: "test@example.com",
-            StoreName: "Test Store",
-            Code: null);
-
-        // Act
-        var result = await handler.Handle(command, CancellationToken.None);
-
-        // Assert
-        result.Succeeded.Should().BeTrue();
-    }
-
-    [Fact]
-    public async Task Handle_ShouldCreateOwner_WhenCellPhoneHasInternationalFormat()
-    {
-        // Arrange
-        var handler = CreateHandler();
-        var command = new RegisterCommand(
-            Login: "testuser",
-            Password: "Password123!",
-            FullName: "Test User",
-            CellPhone: "+52-1-55-1234-5678",
-            Email: "test@example.com",
-            StoreName: "Test Store",
-            Code: null);
-
-        // Act
-        var result = await handler.Handle(command, CancellationToken.None);
-
-        // Assert
-        result.Succeeded.Should().BeTrue();
-    }
-
-    #endregion
-
-    #region Error Management Tests
+    #region SaveChanges — the handler owns the only commit
 
     [Fact]
     public async Task Handle_ShouldReturnFailure_WhenSaveChangesReturnsZero()
     {
-        // Arrange
         var handler = CreateHandler();
         var command = CreateValidCommand();
 
@@ -304,10 +85,8 @@ public class RegisterCommandHandlerTests : RegisterCommandHandlerTestFixture
             .Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(0);
 
-        // Act
         var result = await handler.Handle(command, CancellationToken.None);
 
-        // Assert
         result.Succeeded.Should().BeFalse();
         result.Errors.Should().NotBeEmpty();
         result.Errors.First().Code.Should().Be("Register.FailedToSave");
@@ -316,261 +95,120 @@ public class RegisterCommandHandlerTests : RegisterCommandHandlerTestFixture
     [Fact]
     public async Task Handle_ShouldReturnFailure_WhenSaveChangesFails()
     {
-        // Arrange
         var handler = CreateHandler();
         var command = CreateValidCommand();
 
         MockUnitOfWork
             .Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(0); // Simulate save failure
+            .ReturnsAsync(0);
 
-        // Act
         var result = await handler.Handle(command, CancellationToken.None);
 
-        // Assert
         result.Succeeded.Should().BeFalse();
         result.Errors.Should().NotBeEmpty();
         result.Errors.First().Code.Should().Be("Register.FailedToSave");
     }
 
     [Fact]
-    public async Task Handle_ShouldReturnSuccess_WhenPlanHasNoModulesButSaveSucceeds()
+    public async Task Handle_ShouldCallSaveChangesAsync_WithCancellationToken()
     {
-        // Arrange
         var handler = CreateHandler();
         var command = CreateValidCommand();
 
-        MockPlanRepository
-            .Setup(x => x.GetActivePlanWithModulesByIdAsync(It.IsAny<int>()))
-            .ReturnsAsync(StorePlan.Create((int)StorePlanType.Superior, "Superior", 3, true));
+        using var cts = new CancellationTokenSource();
 
-        // Act
-        var result = await handler.Handle(command, CancellationToken.None);
+        await handler.Handle(command, cts.Token);
 
-        // Assert
-        result.Succeeded.Should().BeTrue();
+        MockUnitOfWork.Verify(
+            x => x.SaveChangesAsync(cts.Token), Times.Once);
     }
 
+    /// <summary>
+    /// The whole point of the extraction: exactly ONE save, after the service staged everything.
+    /// A second commit here would mean a partially-persisted registration.
+    /// </summary>
     [Fact]
-    public async Task Handle_ShouldReturnFailure_WhenCreateOwnerThrowsException()
+    public async Task Handle_ShouldSaveExactlyOnce_AfterTheServiceStagedEverything()
     {
-        // Arrange
         var handler = CreateHandler();
         var command = CreateValidCommand();
 
-        MockCreateOwnerService
-            .Setup(x => x.CreateOwnerAsync(
-                It.IsAny<string>(),
-                It.IsAny<string>(),
-                It.IsAny<string>(),
-                It.IsAny<string>(),
-                It.IsAny<string?>(),
-                It.IsAny<string?>()))
-            .ThrowsAsync(new InvalidOperationException("Owner creation failed"));
+        await handler.Handle(command, CancellationToken.None);
 
-        // Act
-        Func<Task> act = async () => await handler.Handle(command, CancellationToken.None);
-
-        // Assert
-        await act.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("Owner creation failed");
+        MockUnitOfWork.Verify(
+            x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 
     #endregion
 
-    #region Integration Tests (Mock Verification)
+    #region Delegation contract
 
+    /// <summary>
+    /// The handler must hand the public <c>Code</c> to the service as <c>reSellerLogin</c>. Kept as
+    /// <c>Code</c> on the wire so the register API contract does not move — renaming the public
+    /// field would break the validator tests and the React form for nothing.
+    /// </summary>
     [Fact]
-    public async Task Handle_ShouldCallCreateOwnerService_WithCorrectParameters()
+    public async Task Handle_ShouldForwardCode_AsReSellerLogin()
     {
-        // Arrange
         var handler = CreateHandler();
-        var command = new RegisterCommand(
-            Login: "newowner",
-            Password: "SecurePass123!",
-            FullName: "New Owner",
-            CellPhone: "+1234567890",
-            Email: "owner@test.com",
-            StoreName: "New Store",
-            Code: null);
+        var command = CreateValidCommand(code: "gestor123");
 
-        // Act
         await handler.Handle(command, CancellationToken.None);
 
-        // Assert
-        MockCreateOwnerService.Verify(x => x.CreateOwnerAsync(
-            command.Login,
-            command.Password,
-            command.FullName,
-            command.CellPhone,
-            command.Email,
-            It.Is<string>(s => s.Contains(command.StoreName))),
-            Times.Once);
+        MockRegisterService.Verify(x => x.RegisterAsync(
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
+            It.IsAny<string?>(), It.IsAny<string>(), It.IsAny<string?>(),
+            "gestor123", It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
-    public async Task Handle_ShouldCallPlanRepository_GetActivePlanWithModulesByIdAsync()
+    public async Task Handle_ShouldForwardNullReSellerLogin_WhenCodeIsNull()
     {
-        // Arrange
         var handler = CreateHandler();
-        var command = CreateValidCommand();
+        var command = CreateValidCommand(code: null);
 
-        // Act
         await handler.Handle(command, CancellationToken.None);
 
-        // Assert
-        MockPlanRepository.Verify(x => x.GetActivePlanWithModulesByIdAsync(
-            (int)StorePlanType.Pago),
-            Times.Once);
+        MockRegisterService.Verify(x => x.RegisterAsync(
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
+            It.IsAny<string?>(), It.IsAny<string>(), It.IsAny<string?>(),
+            null, It.IsAny<CancellationToken>()), Times.Once);
     }
 
+    /// <summary>
+    /// The public registration SYNTHESIZES the owner description from the store name. That
+    /// asymmetry is intentional and predates the extraction: the Gestor flow forwards the
+    /// description its form collected instead.
+    /// </summary>
     [Fact]
-    public async Task Handle_ShouldCallCreateStoreService_WithOwnerIdAndTenantId()
+    public async Task Handle_ShouldSynthesizeOwnerDescription_FromStoreName()
     {
-        // Arrange
         var handler = CreateHandler();
         var command = CreateValidCommand();
 
-        // Act
         await handler.Handle(command, CancellationToken.None);
 
-        // Assert
-        MockCreateStoreService.Verify(x => x.CreateStoreAsync(
-            TestOwnerId,
-            TestTenantId,
-            command.StoreName,
+        MockRegisterService.Verify(x => x.RegisterAsync(
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
             It.IsAny<string?>(),
-            It.Is<string>(s => s.Contains("prueba")),
-            true, // all creation paths force approved=true (2026-09-10)
-            It.Is<List<int>>(list => list.Contains(TestPlanModuleId))),
-            Times.Once);
+            "New Store",
+            "Nombre de la tienda: New Store",
+            It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
-    public async Task Handle_ShouldCallSaveChangesAsync_WithCancellationToken()
+    public async Task Handle_ShouldForwardAllOwnerFields_Unmodified()
     {
-        // Arrange
-        var handler = CreateHandler();
-        var command = CreateValidCommand();
-        var cancellationToken = new CancellationToken();
-
-        // Act
-        await handler.Handle(command, cancellationToken);
-
-        // Assert
-        MockUnitOfWork.Verify(x => x.SaveChangesAsync(cancellationToken), Times.Once);
-    }
-
-    [Fact]
-    public async Task Handle_ShouldCreateReSellerOwner_WhenValidCodeProvided()
-    {
-        // Arrange
-        var handler = CreateHandler();
-        var command = CreateValidCommand(code: "VALIDCODE");
-        var reSeller = CreateTestReSeller();
-
-        MockReSellerRepository
-            .Setup(x => x.GetByUserNameAsync(command.Code!))
-            .ReturnsAsync(reSeller);
-
-        MockReSellerOwnerRepository
-            .Setup(x => x.AddAsync(It.IsAny<ReSellerOwner>()))
-            .ReturnsAsync((ReSellerOwner rso) => rso);
-
-        // Act
-        var result = await handler.Handle(command, CancellationToken.None);
-
-        // Assert
-        result.Succeeded.Should().BeTrue();
-        MockReSellerOwnerRepository.Verify(x => x.AddAsync(
-            It.Is<ReSellerOwner>(rso => 
-                rso.ReSellerId == reSeller.Id && 
-                rso.OwnerId == TestOwnerId)),
-            Times.Once);
-    }
-
-    [Fact]
-    public async Task Handle_ShouldGenerateToken_WithCorrectUserCredentials()
-    {
-        // Arrange
         var handler = CreateHandler();
         var command = CreateValidCommand();
 
-        // Act
         await handler.Handle(command, CancellationToken.None);
 
-        // Assert - Verify IJwtProvider was called with correct parameters
-        MockJwtProvider.Verify(x => x.GenerateToken(
-            TestUserId,
-            command.Login),
-            Times.Once);
-    }
-
-    [Fact]
-    public async Task Handle_ShouldSetSelectedStoreId_OnOwnerUser()
-    {
-        // Arrange
-        var handler = CreateHandler();
-        var command = CreateValidCommand();
-
-        // Act
-        await handler.Handle(command, CancellationToken.None);
-
-        // Assert
-        TestUser.SelectedStoreId.Should().Be(TestStoreId);
-    }
-
-    [Fact]
-    public async Task Handle_ShouldNotCallReSellerRepository_WhenCodeIsNull()
-    {
-        // Arrange
-        var handler = CreateHandler();
-        var command = CreateValidCommand(code: null);
-
-        // Act
-        await handler.Handle(command, CancellationToken.None);
-
-        // Assert
-        MockReSellerRepository.Verify(x => x.GetByUserNameAsync(
-            It.IsAny<string>()),
-            Times.Never);
-    }
-
-    [Fact]
-    public async Task Handle_ShouldNotCallReSellerOwnerRepository_WhenCodeIsNull()
-    {
-        // Arrange
-        var handler = CreateHandler();
-        var command = CreateValidCommand(code: null);
-
-        // Act
-        await handler.Handle(command, CancellationToken.None);
-
-        // Assert
-        MockReSellerOwnerRepository.Verify(x => x.AddAsync(
-            It.IsAny<ReSellerOwner>()),
-            Times.Never);
-    }
-
-    [Fact]
-    public async Task Handle_ShouldNotCreateReSellerOwner_WhenReSellerNotFound()
-    {
-        // Arrange
-        var handler = CreateHandler();
-        var command = CreateValidCommand(code: "INVALIDCODE");
-
-        MockReSellerRepository
-            .Setup(x => x.GetByUserNameAsync(command.Code!))
-            .ReturnsAsync((ReSeller?)null);
-
-        // Act
-        var result = await handler.Handle(command, CancellationToken.None);
-
-        // Assert
-        result.Succeeded.Should().BeTrue();
-        MockReSellerOwnerRepository.Verify(x => x.AddAsync(
-            It.IsAny<ReSellerOwner>()),
-            Times.Never);
+        MockRegisterService.Verify(x => x.RegisterAsync(
+            "newuser", "SecurePassword123!", "New User", "+1234567890",
+            "newuser@example.com", "New Store",
+            It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     #endregion

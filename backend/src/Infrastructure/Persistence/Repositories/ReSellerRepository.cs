@@ -27,6 +27,10 @@ namespace Infrastructure.Persistence.Repositories
         public async Task<ReSeller> GetByUserIdIgnoreQueryFiltersAsync(Guid userId)
         {
             return await _reSellers.Where(r => r.UserId == userId)
+                // User is included because the caller resolves the Gestor LOGIN from it to hand
+                // to IRegisterService, which takes a login. Without this the navigation is null and
+                // the owner would be registered with no Gestor link.
+                .Include(r => r.User)
                 .IgnoreQueryFilters()
                 .FirstOrDefaultAsync();
         }

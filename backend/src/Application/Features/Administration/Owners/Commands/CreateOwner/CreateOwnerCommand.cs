@@ -7,10 +7,9 @@ using Application.UnitOfWorks;
 using AutoMapper;
 using Domain.Common.Extensions;
 using Domain.Entities.Owners;
-using Domain.Entities.ReSellerOwners;
 using Domain.Entities.ReSellers;
 using Domain.Interfaces.Repositories;
-using Domain.Interfaces.Services.Owners;
+using Domain.Interfaces.Services.Authentication;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Localization;
 using Resources;
@@ -23,33 +22,45 @@ namespace Application.Features.Administration.Owners.Commands.CreateOwner
     // null ("no Gestor") instead of failing the WHOLE body. Kept at property level on purpose:
     // a global JsonSerializerOptions change would loosen every Guid? in the API.
     public sealed record CreateOwnerCommand(string Login, string Password, string FullName, string Cellphone,
-        [property: JsonConverter(typeof(NullableGuidJsonConverter))] Guid? ReSellerId, string? Email, string? Description) : ICommand<OwnerDto> { }
+        [property: JsonConverter(typeof(NullableGuidJsonConverter))] Guid? ReSellerId, string? Email,
+        string? Description, string StoreName) : ICommand<OwnerDto> { }
 
+    /// <summary>
+    /// Now a thin adapter over <see cref="IRegisterService"/> — the SAME flow the public
+    /// registration uses. Previously this handler created only the owner, so a customer added by
+    /// a Gestor ended up with no store at all: no Billing, no modules, nothing to sell in. The
+    /// Gestor could not even fix it by hand, because /management/stores/create is gated to
+    /// SuperAdmin/OwnerAdmin.
+    /// </summary>
+    /// <remarks>
+    /// Unlike the register handler, this one does NOT catch the service's ApiException. That is
+    /// deliberate and is the opposite choice on purpose: OwnersController renders a returned
+    /// failure as <c>Ok(result)</c> (HTTP 200 with succeeded:false), whereas an escaping
+    /// ApiException reaches the middleware and produces its real status. Catching here would turn
+    /// every failure into a 200.
+    /// </remarks>
     public class CreateOwnerCommandHandler : ICommandHandler<CreateOwnerCommand, OwnerDto>
     {
         private readonly IApplicationUnitOfWork _applicationUnitOfWork;
         private readonly IReSellerRepository _reSellerRepository;
-        private readonly IReSellerOwnerRepository _reSellerOwnerRepository;
+        private readonly IRegisterService _registerService;
         private readonly IHttpContextService _httpContextService;
-        private readonly ICreateOwnerService _createOwnerService;
         private readonly IStringLocalizer<I18n> _localizer;
         private readonly IMapper _mapper;
 
         public CreateOwnerCommandHandler(
             IApplicationUnitOfWork applicationUnitOfWork,
             IReSellerRepository reSellerRepository,
-            IReSellerOwnerRepository reSellerOwnerRepository,
+            IRegisterService registerService,
             IHttpContextService httpContextService,
             IStringLocalizer<I18n> localizer,
-            ICreateOwnerService createOwnerService,
             IMapper mapper)
         {
             _applicationUnitOfWork = applicationUnitOfWork;
             _httpContextService = httpContextService;
             _reSellerRepository = reSellerRepository;
-            _reSellerOwnerRepository = reSellerOwnerRepository;
+            _registerService = registerService;
             _localizer = localizer;
-            _createOwnerService = createOwnerService;
             _mapper = mapper;
         }
 
@@ -58,26 +69,25 @@ namespace Application.Features.Administration.Owners.Commands.CreateOwner
             if (!(_httpContextService.IsSuperAdmin || _httpContextService.IsReSeller))
                 throw new ApiException(_localizer["Unauthorized"], HttpStatusCode.Forbidden);
 
-            Owner owner = await _createOwnerService.CreateOwnerAsync(request.Login, request.Password, request.FullName,
-                request.Cellphone, request.Email, request.Description);
+            // The service takes a Gestor LOGIN; which Gestor that is depends on the role, so it is
+            // resolved here — never read straight off the body for the Gestor flow.
+            string? reSellerLogin = await ResolveReSellerLoginAsync(request);
 
-            // A Gestor that creates an owner IS that owner's Gestor, so the link is derived from
-            // the authenticated actor and any body reSellerId is IGNORED (not rejected) — otherwise
-            // a Gestor could push the new owner onto someone else's list, and could also leave it
-            // unlinked (the React form renders the selector for SuperAdmin only, so a Gestor never
-            // sends one). The link is not cosmetic: OwnerRepository's ReSeller-scoped list filters
-            // on ReSellerOwner.ReSeller.UserId, so an unlinked owner is invisible in the Gestor's
-            // own list. A SuperAdmin has no ReSeller entity, so for that role the body selector
-            // stays the only way to assign a Gestor — unchanged.
-            if (_httpContextService.IsReSeller && !_httpContextService.IsSuperAdmin)
-            {
-                await CreateReSellerOwnerForActor(owner);
-            }
-            else if (request.ReSellerId.HasValue)
-            {
-                await CreateReSellerOwner(request.ReSellerId.Value, owner.Id, owner.TenantId);
-            }
+            Owner owner = await _registerService.RegisterAsync(
+                request.Login,
+                request.Password,
+                request.FullName,
+                request.Cellphone,
+                request.Email,
+                request.StoreName,
+                // Unlike the public registration (which synthesizes "Nombre de la tienda: {name}"),
+                // this flow forwards the description the form actually collected.
+                request.Description,
+                reSellerLogin,
+                cancellationToken);
 
+            // The single save for this handler — the service staged everything but committed
+            // nothing, so owner + store + modules + Gestor link land atomically or not at all.
             try
             {
                 await _applicationUnitOfWork.SaveChangesAsync(cancellationToken);
@@ -94,30 +104,35 @@ namespace Application.Features.Administration.Owners.Commands.CreateOwner
             return ResponseResult.Success(_mapper.Map<OwnerDto>(owner));
         }
 
-        // Mirrors RegisterCommand's ReSellerOwner.Create(...) — same discount snapshot, same tenant.
-        private async Task CreateReSellerOwnerForActor(Owner owner)
+        /// <summary>
+        /// A Gestor that creates an owner IS that owner's Gestor, so its login is derived from the
+        /// AUTHENTICATED ACTOR and any body reSellerId is IGNORED (not rejected) — otherwise a
+        /// Gestor could push the new owner onto someone else's list. The link is not cosmetic:
+        /// OwnerRepository's ReSeller-scoped list filters on ReSellerOwner.ReSeller.UserId, so an
+        /// unlinked owner is invisible in the Gestor's own list. A SuperAdmin has no ReSeller
+        /// entity, so for that role the body selector stays the only way to assign one.
+        /// </summary>
+        private async Task<string?> ResolveReSellerLoginAsync(CreateOwnerCommand request)
         {
-            ReSeller? reSeller = await _reSellerRepository.GetByUserIdIgnoreQueryFiltersAsync(
-                _httpContextService.UserExternalId.ToGuid());
+            if (_httpContextService.IsReSeller && !_httpContextService.IsSuperAdmin)
+            {
+                // The ReSeller role can exist without a ReSeller row (E2E seeds do exactly that).
+                // There is no Gestor to link then, and that has always been a tolerated state that
+                // still answers 201 — so a null login means "register with no Gestor", not an error.
+                ReSeller? actor = await _reSellerRepository.GetByUserIdIgnoreQueryFiltersAsync(
+                    _httpContextService.UserExternalId.ToGuid());
+                return actor?.User?.Login;
+            }
 
-            // The ReSeller role can exist without a ReSeller row (E2E seeds do exactly that). There
-            // is no Gestor to link then, and throwing would turn a state that has always answered
-            // 201 into a 400 — so the owner is created unlinked, as it is today.
-            if (reSeller is null)
-                return;
+            if (request.ReSellerId.HasValue)
+            {
+                ReSeller? picked = await _reSellerRepository.GetReSellerIncludingUserByIdAsync(request.ReSellerId.Value);
+                if (picked is null)
+                    throw new ApiException(_localizer["ReSellerNotFound"], HttpStatusCode.BadRequest);
+                return picked.User?.Login;
+            }
 
-            ReSellerOwner reSellerOwner = ReSellerOwner.Create(reSeller.Id, owner.Id, reSeller.DiscountPrice,
-                reSeller.PercentDiscountPrice, owner.TenantId);
-            await _reSellerOwnerRepository.AddAsync(reSellerOwner);
-        }
-
-        private async Task CreateReSellerOwner(Guid reSellerId, Guid ownerId, Guid tenantId)
-        {
-            ReSeller reSeller = await _reSellerRepository.GetByIdAsync(reSellerId);
-            if (reSeller is null)
-                throw new ApiException(_localizer["ReSellerNotFound"], HttpStatusCode.BadRequest);
-            ReSellerOwner reSellerOwner = ReSellerOwner.Create(reSellerId, ownerId, reSeller.DiscountPrice, reSeller.PercentDiscountPrice, tenantId);
-            await _reSellerOwnerRepository.AddAsync(reSellerOwner);
+            return null;
         }
 
         private static bool IsUniqueViolation(DbUpdateException e)

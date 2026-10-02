@@ -42,7 +42,9 @@ public sealed class OwnersDeleteAndReCreateTests
                 Cellphone = "0000000000",
                 ReSellerId = (Guid?)null,
                 Email = (string?)null,
-                Description = "e2e lifecycle"
+                Description = "e2e lifecycle",
+                // Owner-create now creates a STORE through the shared register flow.
+                StoreName = "E2E Store"
             });
             createRes.StatusCode.Should().Be(HttpStatusCode.Created);
 
@@ -76,7 +78,9 @@ public sealed class OwnersDeleteAndReCreateTests
                 Cellphone = "0000000000",
                 ReSellerId = (Guid?)null,
                 Email = (string?)null,
-                Description = "e2e lifecycle"
+                Description = "e2e lifecycle",
+                // Owner-create now creates a STORE through the shared register flow.
+                StoreName = "E2E Store"
             });
             recreateRes.StatusCode.Should().Be(HttpStatusCode.Created);
 
