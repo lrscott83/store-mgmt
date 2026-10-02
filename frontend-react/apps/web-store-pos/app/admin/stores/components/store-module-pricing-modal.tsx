@@ -4,7 +4,7 @@ import {
   currentModulePrice,
   groupModulesByPlanDelta,
   NO_PLAN_GROUP,
-  totalCurrentModulePrice,
+  totalModulePricing,
 } from '@store-mgmt/domain';
 import { Button } from '~/shared/components/ui/button';
 import { CloseIcon } from '~/shared/components/ui/icons';
@@ -22,6 +22,12 @@ export interface PricingDraft {
   moduleId: number;
   name: string;
   isSelected: boolean;
+  /**
+   * The store's frozen `ModulePriceIncluded` (the catalog's when no snapshot exists).
+   * Server-owned — it is NOT in the save payload (the backend resolves it), so the draft
+   * only carries it to price the row correctly while it is on screen.
+   */
+  priceIncluded: boolean;
   price: string;
   discountPrice: string;
   percentDiscountPrice: string;
@@ -85,6 +91,10 @@ const INPUT_CLASS =
  * never a delete). The three price inputs are editable only while the row is ticked — an
  * unticked row keeps its stored values on display so untick-then-retick does not lose them.
  *
+ * The total is what the store will ACTUALLY be charged: it goes through `totalModulePricing`,
+ * the mirror of the backend's `ModulePriceCalculator`, so a price-included (gratis) row is
+ * excluded exactly as `RegisterStorePaymentCommand` and `BillingService` exclude it.
+ *
  * Presentational on purpose: the host route owns the fetch, the draft state and the save, so
  * the error and busy states are the parent's exactly as they are for the plan popup.
  */
@@ -112,15 +122,20 @@ export function StoreModulePricingModal({
   // groupModulesByPlanDelta), so the flattened groups ARE the save payload.
   const groups = groupModulesByPlanDelta(rows, plans, (row) => row.moduleId);
 
-  const liveTotal = totalCurrentModulePrice(
+  // The billable amount this store WILL be charged: the mirror of the backend's
+  // `ModulePriceCalculator`, fed the TICKED rows. The tick is the row's `isActive` input,
+  // so unticking a row drops it from the total and a price-included (gratis) row never
+  // enters it — the same rule the server applies when it persists and when it bills.
+  const liveTotal = totalModulePricing(
     rows.map((row) => ({
       moduleId: row.moduleId,
-      isSelected: row.isSelected,
+      isActive: row.isSelected,
+      priceIncluded: row.priceIncluded,
       price: toNumber(row.price),
       percentDiscountPrice: toNumber(row.percentDiscountPrice),
       discountPrice: toNumber(row.discountPrice),
     })),
-  );
+  ).currentPrice;
   const displayedTotal = serverTotal ?? liveTotal;
   // Editing invalidates the persisted total: the screen must stop claiming to show the server.
   const controlsDisabled = loading || saving;

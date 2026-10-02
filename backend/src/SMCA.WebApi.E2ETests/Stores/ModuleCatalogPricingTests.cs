@@ -23,8 +23,9 @@ namespace SMCA.WebApi.E2ETests.Stores;
 /// <para>
 ///  1. a save PERSISTS the three prices and the catalog read reports them back;
 ///  2. CurrentPrice is RECALCULATED by the shared formula, clamped at zero;
-///  3. ONLY the three pricing fields move — the catalog's structural flags survive, and a
-///     pricing save can never publish or hide a module;
+///  3. ONLY the three pricing fields move — the catalog's structural flags survive, a
+///     pricing save can never publish or hide a module, and the returned total sums the
+///     BILLABLE rows only (a price-included module contributes 0);
 ///  4. the action-level SuperAdmin gate TIGHTENS the controller's class-level scope: an
 ///     OwnerAdmin who may read the catalog is refused 403 on the write;
 ///  5. validation rejects a negative price and a percent discount above 100, writing nothing;
@@ -315,11 +316,23 @@ public sealed class ModuleCatalogPricingTests
             var nameBefore = (await GetModuleRowAsync(StatisticsModuleId)).Name;
 
             // A non-bundled module and a BUNDLED one, priced in the same save.
-            await PutPricingAsync(client, new[]
+            var first = await PutPricingAsync(client, new[]
             {
                 new PricingRow(StatisticsModuleId, 88f, 1f, 2f),
                 new PricingRow(ManagementModuleId, 77f, 3f, 4f)
             });
+
+            // The total is the BILLABLE sum — ModulePriceCalculator.IsBillable = active AND
+            // not price-included — so the bundled row, though saved and echoed, charges
+            // nothing: only Statistics counts, at GetCurrentPrice(88, 2, 1)
+            // = 88 - 1.76 - 1 = 85.24. (Before the rule, this was 85.24 + 70.92 = 156.16.)
+            first.Data!.TotalCurrentPrice.Should().BeApproximately(85.24f, Tolerance,
+                "a price-included module contributes 0 to the total");
+            // The bundled row still REPORTS what it would cost: 77 - 3.08 - 3 = 70.92.
+            first.Data!.Modules.Should().ContainSingle(m => m.ModuleId == ManagementModuleId)
+                .Which.CurrentPrice.Should().BeApproximately(70.92f, Tolerance,
+                    "a non-billable row still reports its effective price");
+
 
             var unbundled = await GetModuleRowAsync(StatisticsModuleId);
             var bundled = await GetModuleRowAsync(ManagementModuleId);

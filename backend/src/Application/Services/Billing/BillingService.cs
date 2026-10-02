@@ -72,15 +72,13 @@ public class BillingService : IBillingService
         var planType = !store.Approved || store.StorePlanId == (int)StorePlanType.Gratis ? "Free" : "Paid";
 
         // Monto efectivo del plan con los DESCUENTOS del snapshot de la tienda
-        // (StoreModule): mismo cálculo que RegisterStorePaymentCommand usa para el
-        // cobro. Un plan cuyo valor efectivo es 0 (p.ej. todos los módulos de pago
-        // con 100% de descuento) no debe entrar en trial: no hay nada pendiente de
-        // cobro, así que el cartel "Probando el plan de pago. Primer cobro..." no
-        // aplica (2026-09-06).
-        float effectiveAmount = store.StoreModules
-            .Where(sm => sm.IsActive && !sm.ModulePriceIncluded)
-            .Sum(sm => CurrentPriceServiceUtils.GetCurrentPrice(
-                sm.Price, sm.ModulePercentDiscountPrice, sm.ModuleDiscountPrice));
+        // (StoreModule): la MISMA regla y el MISMO overload que
+        // RegisterStorePaymentCommand usa para el cobro, así que el cartel y el
+        // cobro nunca pueden discrepar. Un plan cuyo valor efectivo es 0 (p.ej. todos
+        // los módulos de pago con 100% de descuento) no debe entrar en trial: no hay
+        // nada pendiente de cobro, así que el cartel "Probando el plan de pago.
+        // Primer cobro..." no aplica (2026-09-06).
+        float effectiveAmount = ModulePriceCalculator.CalculateTotal(store.StoreModules);
         var hasBillableAmount = effectiveAmount > 0;
 
         var lastPayment = await _paymentRepository.GetLastByStoreIdAsync(storeId);
@@ -114,7 +112,10 @@ public class BillingService : IBillingService
         float currentAmount = 0;
         if (hasPaidModule)
         {
-            currentAmount = lastPayment?.Price ?? modules.Where(m => !m.PriceIncluded).Sum(m => m.Price);
+            // The store's OWN snapshot, through the same rule/overload the charge uses —
+            // never raw catalog prices, which ignored discounts, ignored IsActive and
+            // could not agree with the amount RegisterStorePaymentCommand actually bills.
+            currentAmount = lastPayment?.Price ?? effectiveAmount;
         }
 
         float commission = 0;

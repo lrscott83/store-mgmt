@@ -27,9 +27,21 @@ namespace Application.Dtos.StoreManagement
         public float PercentDiscountPrice { get; set; }
 
         /// <summary>
+        /// The store's <c>ModulePriceIncluded</c> for this row — the flag that decides whether the
+        /// row contributes to the total (<see cref="StoreModulePricingResultDto.TotalCurrentPrice"/>).
+        /// <para>
+        /// Resolved SERVER-SIDE, never from the payload: the request row carries no such flag, so
+        /// the handler takes it from the <c>StoreModule</c> snapshot the save just wrote
+        /// (insert / reactivate freeze it from the catalog; an already-active row keeps its
+        /// frozen value), falling back to the catalog module when the save created no row.
+        /// </para>
+        /// </summary>
+        public bool PriceIncluded { get; set; }
+
+        /// <summary>
         /// <c>CurrentPriceServiceUtils.GetCurrentPrice(price, percentDiscountPrice,
         /// discountPrice)</c> over the three fields above — the same value the rest of the
-        /// system reports as a module's current price.
+        /// system reports as a module's current price. Reported for EVERY row, billable or not.
         /// </summary>
         public float CurrentPrice { get; set; }
     }
@@ -45,15 +57,12 @@ namespace Application.Dtos.StoreManagement
         public List<StoreModulePricingDto> Modules { get; set; }
 
         /// <summary>
-        /// Σ <see cref="StoreModulePricingDto.CurrentPrice"/> over the TICKED rows only.
-        /// <para>
-        /// This is the modal's total — the number the browser recomputes live from the
-        /// same three fields — and is deliberately NOT the billable amount.
-        /// <c>BillingService</c> excludes <c>ModulePriceIncluded</c> modules from what it
-        /// bills (<c>BillingService.cs:81</c>), so for a store holding included (gratis)
-        /// modules the two numbers legitimately differ. Keeping the server total as the
-        /// plain ticked-row sum is what pins the client formula to the server formula.
-        /// </para>
+        /// Σ <see cref="StoreModulePricingDto.CurrentPrice"/> over the BILLABLE rows only —
+        /// those satisfying <c>ModulePriceCalculator.IsBillable</c>
+        /// (<see cref="StoreModulePricingDto.IsActive"/> &amp;&amp;
+        /// !<see cref="StoreModulePricingDto.PriceIncluded"/>). This is THE price rule, so
+        /// the number here equals the amount <c>RegisterStorePaymentCommand</c> charges and
+        /// the amount <c>BillingService</c> reports.
         /// <para>
         /// Accumulated in <see cref="double"/> from the <see cref="float"/> row values so
         /// the running sum does not inherit float32 rounding as it grows.
@@ -100,9 +109,18 @@ namespace Application.Dtos.StoreManagement
         public float PercentDiscountPrice { get; set; }
 
         /// <summary>
+        /// The store's frozen <c>ModulePriceIncluded</c> when a row exists, else the catalog's.
+        /// Additive: the flag THE price rule needs to decide whether this row contributes to
+        /// <see cref="StoreModulePricingReadResultDto.TotalCurrentPrice"/>. A row with no
+        /// snapshot reports the catalog value, which is exactly what activating it would freeze.
+        /// </summary>
+        public bool PriceIncluded { get; set; }
+
+        /// <summary>
         /// <c>CurrentPriceServiceUtils.GetCurrentPrice</c> over the three values above, for
-        /// EVERY row — an unticked row reports what it WOULD cost. Only active rows are
-        /// summed into <see cref="StoreModulePricingReadResultDto.TotalCurrentPrice"/>.
+        /// EVERY row — an unticked row reports what it WOULD cost. Only BILLABLE rows
+        /// (<c>IsActive &amp;&amp; !PriceIncluded</c>) are summed into
+        /// <see cref="StoreModulePricingReadResultDto.TotalCurrentPrice"/>.
         /// </summary>
         public float CurrentPrice { get; set; }
     }
@@ -122,11 +140,12 @@ namespace Application.Dtos.StoreManagement
         public List<StoreModulePricingReadDto> Modules { get; set; }
 
         /// <summary>
-        /// Σ <see cref="StoreModulePricingReadDto.CurrentPrice"/> over the rows whose
-        /// <see cref="StoreModulePricingReadDto.IsActive"/> is true, in <see cref="double"/> so
-        /// the running sum does not inherit float32 rounding. Same arithmetic the browser
-        /// recomputes live, and — like the save's total — NOT the billable amount
-        /// (<c>BillingService</c> excludes <c>ModulePriceIncluded</c> modules).
+        /// Σ <see cref="StoreModulePricingReadDto.CurrentPrice"/> over the BILLABLE rows only —
+        /// <see cref="StoreModulePricingReadDto.IsActive"/> &amp;&amp;
+        /// !<see cref="StoreModulePricingReadDto.PriceIncluded"/> (the single
+        /// <c>ModulePriceCalculator</c> rule), in <see cref="double"/> so the running sum does
+        /// not inherit float32 rounding. Same rule, hence same number, as the save echo's total
+        /// and as the amount <c>BillingService</c> reports.
         /// </summary>
         public double TotalCurrentPrice { get; set; }
     }

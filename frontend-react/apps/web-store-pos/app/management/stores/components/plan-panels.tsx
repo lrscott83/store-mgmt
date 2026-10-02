@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useIntl } from 'react-intl';
 import type { Feature, Plan, PlanModule } from '@store-mgmt/domain';
+import { totalModulePricing } from '@store-mgmt/domain';
 
 /**
  * Format a plan amount as a bare number — decimals shown only when present
@@ -89,6 +90,25 @@ export function PlanPanels({
     }
   }, [storePlanType, prevPlanType]);
 
+  /**
+   * Header price, the client mirror of the backend's `PlanPricingUtils.Sum`: Σ over the
+   * plan's CUMULATIVE members, both columns counting exactly the BILLABLE rows
+   * (`isActive && !priceIncluded`). Summing the server's own `currentPrice`/`price` instead
+   * would charge the operator for modules the price rule excludes — an inactive catalog
+   * module or a gratis one — and would disagree with what GET /v1/plans reports.
+   */
+  const planTotals = (plan: Plan) =>
+    totalModulePricing(
+      plan.modules.map((m) => ({
+        moduleId: m.moduleId,
+        isActive: m.isActive,
+        priceIncluded: m.priceIncluded,
+        price: m.price,
+        percentDiscountPrice: m.percentDiscountPrice,
+        discountPrice: m.discountPrice,
+      })),
+    );
+
   if (plans.length === 0) return null;
 
   return (
@@ -102,8 +122,7 @@ export function PlanPanels({
       {plans.map((plan) => {
         const isActive = plan.planType === storePlanType;
         const isExpanded = expanded === plan.planType;
-        const total = plan.modules.reduce((sum, m) => sum + m.currentPrice, 0);
-        const listTotal = plan.modules.reduce((sum, m) => sum + m.price, 0);
+        const { currentPrice: total, price: listTotal } = planTotals(plan);
         const headerHasDiscount = listTotal > total;
 
         return (

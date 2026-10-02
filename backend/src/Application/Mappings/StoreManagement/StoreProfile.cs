@@ -51,9 +51,14 @@ namespace Application.Mappings.StoreManagement
 
         }
 
+        /// <summary>
+        /// THE price rule (ModulePriceCalculator): only ACTIVE and NOT price-included store
+        /// modules contribute, each at its effective price. Previously gratis (price-included)
+        /// modules were summed here, so this total disagreed with the billed amount.
+        /// </summary>
         private static float GetStoreModuleTotalCurrentPrice(ICollection<StoreModule> storeModules)
         {
-            return storeModules.Sum(sm => CurrentPriceServiceUtils.GetCurrentPrice(sm.Price, sm.ModulePercentDiscountPrice, sm.ModuleDiscountPrice));
+            return ModulePriceCalculator.CalculateTotal(storeModules);
         }
 
         private static string ResolvePlanType(Store src)

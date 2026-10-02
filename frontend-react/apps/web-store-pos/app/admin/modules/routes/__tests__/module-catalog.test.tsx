@@ -58,6 +58,7 @@ function moduleDto(
     name,
     order: id,
     priceIncluded: false,
+    isActive: true,
     price,
     currentPrice: currentModulePrice(price, percentDiscountPrice, discountPrice),
     discountPrice,
@@ -80,6 +81,7 @@ function plan(order: number, planType: string, moduleIds: number[]) {
       name: `module-${moduleId}`,
       order: 0,
       priceIncluded: false,
+      isActive: true,
       price: 0,
       currentPrice: 0,
       discountPrice: 0,
@@ -268,14 +270,24 @@ describe('ModuleCatalogPage — offer display', () => {
 
   it('shows the group base total struck through when any module in the group is on offer', async () => {
     await renderPage();
-    // Superior holds only Mayorista: base 30, effective 30 - 30*10/100 = 27.
-    expect(screen.getByTestId('module-catalog-group-base-Superior')).toHaveTextContent('30 USD');
-    expect(screen.getByTestId('module-catalog-group-total-Superior')).toHaveTextContent('27 USD');
+    // The footer prices Superior's CUMULATIVE membership — Ventas (10) + Inventario (20) +
+    // Mayorista (30 - 10% = 27) = 57 of a 60 base — even though only Mayorista is RENDERED
+    // in that section (the delta partition gives Ventas to Gratis and Inventario to Pago).
+    expect(screen.getByTestId('module-catalog-group-base-Superior')).toHaveTextContent('60 USD');
+    expect(screen.getByTestId('module-catalog-group-total-Superior')).toHaveTextContent('57 USD');
+  });
+
+  it('prices a middle plan by its cumulative membership too, not by its delta', async () => {
+    await renderPage();
+    // Pago carries Ventas + Inventario (10 + 20) although it RENDERS only Inventario:
+    // 30 USD, and no strikethrough because neither row is discounted.
+    expect(screen.queryByTestId('module-catalog-group-base-Pago')).toBeNull();
+    expect(screen.getByTestId('module-catalog-group-total-Pago')).toHaveTextContent('30 USD');
   });
 
   it('shows no group base total for a group with no discounts at all', async () => {
     await renderPage();
-    // Gratis holds only Ventas (10, no discount) → no offer, so no strikethrough.
+    // Gratis's cumulative membership is just Ventas (10, no discount) → no offer, no strike.
     expect(screen.queryByTestId('module-catalog-group-base-Gratis')).toBeNull();
     expect(screen.getByTestId('module-catalog-group-total-Gratis')).toHaveTextContent('10 USD');
   });
@@ -318,6 +330,18 @@ describe('ModuleCatalogPage — live math', () => {
     expect(screen.getByTestId('module-catalog-group-total-Gratis')).toHaveTextContent('10 USD');
   });
 
+  it('recomputes a plan footer from a member module rendered in ANOTHER group', async () => {
+    await renderPage();
+    expect(screen.getByTestId('module-catalog-group-total-Pago')).toHaveTextContent('30 USD');
+    expect(screen.getByTestId('module-catalog-group-total-Superior')).toHaveTextContent('57 USD');
+    // Ventas renders under Gratis (the delta partition), yet it is a member of Pago AND
+    // Superior: editing it must move all three footers, or the totals are stale snapshots.
+    fireEvent.change(screen.getByTestId('module-catalog-price-1'), { target: { value: '16' } });
+    expect(screen.getByTestId('module-catalog-group-total-Pago')).toHaveTextContent('36 USD');
+    expect(screen.getByTestId('module-catalog-group-total-Superior')).toHaveTextContent('63 USD');
+    expect(screen.getByTestId('module-catalog-group-base-Superior')).toHaveTextContent('66 USD');
+  });
+
   it('keeps the percent-before-flat order of the shared formula when both are set', async () => {
     await renderPage();
     // Ventas 100, 10% then 5 flat: (100 - 10) - 5 = 85. Swapping the order gives the same
@@ -338,6 +362,31 @@ describe('ModuleCatalogPage — live math', () => {
     });
     fireEvent.change(screen.getByTestId('module-catalog-discount-1'), { target: { value: '50' } });
     expect(screen.getByTestId('module-catalog-current-1')).toHaveTextContent('0');
+  });
+
+  it('excludes an INACTIVE and a PRICE-INCLUDED member from the plan footer', async () => {
+    // Same plan, but two of its members are excluded by the price rule the backend applies:
+    // Ventas is inactive in the catalog and Inventario is a gratis (price-included) module.
+    const catalog = [
+      { ...moduleDto(1, 'Ventas', 10), isActive: false },
+      { ...moduleDto(2, 'Inventario', 20), priceIncluded: true },
+      moduleDto(3, 'Mayorista', 30, 0, 10),
+    ];
+    await seedRead(catalog, [plan(3, 'Superior', [1, 2, 3])]);
+    const { ModuleCatalogPage } = await import('../module-catalog');
+    render(
+      <Wrapper>
+        <ModuleCatalogPage />
+      </Wrapper>,
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId('module-catalog-table')).toBeInTheDocument();
+    });
+
+    // Only Mayorista is billable: 30 - 30*10/100 = 27, and BOTH columns count that one row
+    // — a base built from all three rows would strike 60 through a 27 that excludes two of them.
+    expect(screen.getByTestId('module-catalog-group-base-Superior')).toHaveTextContent('30 USD');
+    expect(screen.getByTestId('module-catalog-group-total-Superior')).toHaveTextContent('27 USD');
   });
 
   it('seeds the inputs with the catalog values and accepts every row as editable', async () => {

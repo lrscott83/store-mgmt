@@ -12,6 +12,7 @@ namespace Application.Mappings.Administration
         {
             CreateMap<Module, ModuleDto>()
                 .IgnoreAllSourcePropertiesWithAnInaccessibleSetter()
+                .ForMember(dest => dest.IsActive, opt => opt.MapFrom(src => src.IsActive))
                 .ForMember(dest => dest.CurrentPrice, opt => opt.MapFrom(src =>
                     CurrentPriceServiceUtils.GetCurrentPrice(src.Price, src.PercentDiscountPrice, src.DiscountPrice)))
                 .ForMember(dest => dest.DiscountText, opt => opt.MapFrom(src => 
@@ -23,6 +24,7 @@ namespace Application.Mappings.Administration
                 .ForMember(dest => dest.Name, opt => opt.MapFrom(src => src.Module.Name))
                 .ForMember(dest => dest.Order, opt => opt.MapFrom(src => src.Module.Order))
                 .ForMember(dest => dest.PriceIncluded, opt => opt.MapFrom(src => src.ModulePriceIncluded))
+                .ForMember(dest => dest.IsActive, opt => opt.MapFrom(src => src.IsActive))
                 .ForMember(dest => dest.AvailableToStore, opt => opt.MapFrom(src => src.Module.AvailableToStore))
                 .ForMember(dest => dest.CurrentPrice, opt => opt.MapFrom(src =>
                     CurrentPriceServiceUtils.GetCurrentPrice(src.Price, src.ModulePercentDiscountPrice, src.ModuleDiscountPrice)))

@@ -86,8 +86,8 @@ describe('BUSINESS_ENTITY_NAMES — the encrypt/wipe/report registry', () => {
     // because the recovery dialog could not remove it.
     // owner-messaging (T8) added messagesQueue — the offline-queued messages
     // must be wiped with the rest so a store reset leaves no pending sends.
-    // store-currency-config added storeCurrencyConfig — per-store buy/sell
-    // currency, which needs the same encrypt/wipe/report treatment.
+// store-currency-config added storeCurrencyConfig — the per-store buy/sell
+    // currency config, which must be encrypted, wiped and reported like the rest.
     expect([...BUSINESS_ENTITY_NAMES]).toEqual([
       'products',
       'product-categories',

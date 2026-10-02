@@ -89,11 +89,10 @@ internal sealed class GetStoresToCollectQueryHandler : IQueryHandler<GetStoresTo
             if (status != StoreBillingStatusType.PorVencer && status != StoreBillingStatusType.EnGracia)
                 continue;
 
-            // Compute amount = sum of GetCurrentPrice for all active, non-free StoreModules
-            float amount = store.StoreModules
-                .Where(sm => sm.IsActive && !sm.ModulePriceIncluded)
-                .Sum(sm => CurrentPriceServiceUtils.GetCurrentPrice(
-                    sm.Price, sm.ModulePercentDiscountPrice, sm.ModuleDiscountPrice));
+            // THE price rule (ModulePriceCalculator): only ACTIVE and NOT price-included
+            // StoreModules contribute, each at its effective price — the same number
+            // RegisterStorePaymentCommand charges.
+            float amount = ModulePriceCalculator.CalculateTotal(store.StoreModules);
 
             result.Add(new StoreToCollectDto
             {

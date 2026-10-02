@@ -33,7 +33,7 @@ namespace SMCA.WebApi.E2ETests.Stores;
 ///  2. an unticked module is DEACTIVATED, never deleted, and its role features follow;
 ///  3. an inactive module is REACTIVATED with the PAYLOAD's prices, not catalog ones;
 ///  4. the reported current price and total follow CurrentPriceServiceUtils, clamped at 0;
-///  5. the total sums TICKED rows only;
+///  5. the total sums BILLABLE rows only — ticked AND not price-included;
 ///  6. a module ABSENT from the payload is left completely untouched;
 ///  7. GET returns exactly the available-to-store catalog, seeded from the catalog for
 ///     modules the store lacks and from the store for modules it holds;
@@ -62,8 +62,13 @@ public sealed class StoreModulePricingTests
     private sealed record PricingRow(int ModuleId, bool IsSelected, float Price,
         float DiscountPrice, float PercentDiscountPrice);
 
+    /// <summary>
+    /// <c>PriceIncluded</c> is carried because it is one of the TWO flags the price rule
+    /// (ModulePriceCalculator.IsBillable = active &amp;&amp; !priceIncluded) reads: a row the
+    /// catalog reports as bundled is excluded from the total even when it is ticked.
+    /// </summary>
     private sealed record CatalogModule(int Id, string Name, float Price,
-        float DiscountPrice, float PercentDiscountPrice);
+        float DiscountPrice, float PercentDiscountPrice, bool PriceIncluded);
 
     private sealed record OwnerFixture(Guid UserId, string Login, Guid StoreId);
 
@@ -132,7 +137,8 @@ public sealed class StoreModulePricingTests
             .OrderByDescending(m => m.PriceIncluded).ThenBy(m => m.Order)
             .ToListAsync();
         return modules
-            .Select(m => new CatalogModule(m.Id, m.Name, m.Price, m.DiscountPrice, m.PercentDiscountPrice))
+            .Select(m => new CatalogModule(m.Id, m.Name, m.Price, m.DiscountPrice,
+                m.PercentDiscountPrice, m.PriceIncluded))
             .ToList();
     }
 
@@ -142,6 +148,36 @@ public sealed class StoreModulePricingTests
         using var scope = _f.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         return await db.Set<Module>().IgnoreQueryFilters().Select(m => m.Id).ToListAsync();
+    }
+
+    /// <summary>
+    /// The first catalog module the price rule can actually CHARGE: catalog
+    /// <c>PriceIncluded == false</c> (so ticking it produces a billable snapshot) and not
+    /// already held by the store, whose frozen flag would otherwise decide the total.
+    /// Derived from the database instead of hardcoded so the tests survive catalog
+    /// evolution — a hardcoded id could silently become a bundled module and turn a total
+    /// assertion into a vacuous 0.
+    /// </summary>
+    private async Task<CatalogModule> BillableCatalogModuleAsync(Guid storeId, params int[] excludedModuleIds)
+    {
+        var held = await GetStoreModuleIdsAsync(storeId);
+        var candidate = (await AvailableCatalogAsync()).FirstOrDefault(m => !m.PriceIncluded
+            && !held.Contains(m.Id) && !excludedModuleIds.Contains(m.Id));
+        candidate.Should().NotBeNull(
+            "precondition: the catalog must offer a module that is neither bundled nor already held");
+        return candidate!;
+    }
+
+    /// <summary>
+    /// The first catalog module that is BUNDLED (PriceIncluded == true): ticking it freezes
+    /// ModulePriceIncluded = true on the store snapshot, which is what makes it non-billable.
+    /// </summary>
+    private async Task<CatalogModule> BundledCatalogModuleAsync(params int[] excludedModuleIds)
+    {
+        var candidate = (await AvailableCatalogAsync()).FirstOrDefault(m => m.PriceIncluded
+            && !excludedModuleIds.Contains(m.Id));
+        candidate.Should().NotBeNull("precondition: the catalog must offer a price-included module");
+        return candidate!;
     }
 
     private async Task<List<int>> AvailableFeatureIdsAsync(List<int> moduleIds)
@@ -418,10 +454,16 @@ public sealed class StoreModulePricingTests
             moduleIds: new[] { ManagementModuleId });
         try
         {
-            var target = (await AvailableCatalogAsync()).First(m => m.Id != ManagementModuleId);
+            // A BILLABLE target on purpose: the catalog's first non-Management entry is a
+            // bundled module (PriceIncluded = true), and ticking a bundled row excludes it
+            // from the total (ModulePriceCalculator.IsBillable), which would make both total
+            // assertions below 0 for a reason unrelated to the formula they are pinning.
+            var target = await BillableCatalogModuleAsync(fx.StoreId, ManagementModuleId);
             var client = DbTestHelpers.AuthedClient(_f, saId, saLogin);
 
-            // CurrentPriceServiceUtils.GetCurrentPrice(100, 10, 5) = 100 - 10 - 5 = 85.
+            // The inserted snapshot freezes ModulePriceIncluded = false from the catalog, so
+            // the row IS billable: GetCurrentPrice(100, 10, 5) = 100 - 10 - 5 = 85, and the
+            // total is that same 85 (single billable row).
             var first = await PutPricingAsync(client, fx.StoreId,
                 new[] { new PricingRow(target.Id, true, 100f, 5f, 10f) });
             first.Data!.Modules.Should().ContainSingle()
@@ -432,7 +474,9 @@ public sealed class StoreModulePricingTests
             row.ModuleDiscountPrice.Should().BeApproximately(5f, Tolerance);
             row.ModulePercentDiscountPrice.Should().BeApproximately(10f, Tolerance);
 
-            // GetCurrentPrice(10, 50, 20) = -15, clamped at 0 — never a negative total.
+            // Same billable row, now over-discounted: GetCurrentPrice(10, 50, 20) = -15,
+            // clamped at 0 — never a negative total, and here the clamp alone (not an
+            // exclusion) is what drives the total to 0.
             var second = await PutPricingAsync(client, fx.StoreId,
                 new[] { new PricingRow(target.Id, true, 10f, 20f, 50f) });
             second.Data!.Modules.Should().ContainSingle()
@@ -448,11 +492,11 @@ public sealed class StoreModulePricingTests
     }
 
     // ══════════════════════════════════════════════════════════════════════
-    // 5. The total covers ticked rows only
+    // 5. The total covers BILLABLE rows only (ticked AND not price-included)
     // ══════════════════════════════════════════════════════════════════════
 
     [Fact]
-    public async Task Put_total_sums_the_ticked_modules_only()
+    public async Task Put_total_sums_the_ticked_modules_that_are_not_price_included()
     {
         var saLogin = $"smp-sa-{Guid.NewGuid():N}@test.com";
         var saId = await DbTestHelpers.SeedSuperAdminAsync(_f, saLogin, "Password123");
@@ -460,25 +504,46 @@ public sealed class StoreModulePricingTests
             moduleIds: new[] { ManagementModuleId, StatisticsModuleId });
         try
         {
-            var unticked = (await AvailableCatalogAsync())
-                .First(m => m.Id != ManagementModuleId && m.Id != StatisticsModuleId);
+            // Three rows, one per branch of ModulePriceCalculator.IsBillable, each chosen from
+            // the catalog so the expected total below is derived, never hardcoded.
+            var billable = await BillableCatalogModuleAsync(fx.StoreId,
+                ManagementModuleId, StatisticsModuleId);
+            var bundled = await BundledCatalogModuleAsync(
+                ManagementModuleId, StatisticsModuleId, billable.Id);
+            var unticked = (await AvailableCatalogAsync()).First(m =>
+                m.Id != ManagementModuleId && m.Id != StatisticsModuleId
+                && m.Id != billable.Id && m.Id != bundled.Id);
 
-            // Statistics is ticked at 100; the other row is submitted at 50 but UNticked.
             var body = await PutPricingAsync(DbTestHelpers.AuthedClient(_f, saId, saLogin), fx.StoreId,
                 new[] {
-                    new PricingRow(StatisticsModuleId, true, 100f, 0f, 0f),
-                    new PricingRow(unticked.Id, false, 50f, 0f, 0f)
+                    new PricingRow(billable.Id, true, 40f, 0f, 0f),      // ticked + not bundled -> charged
+                    new PricingRow(bundled.Id, true, 70f, 0f, 0f),       // ticked + bundled      -> free
+                    new PricingRow(unticked.Id, false, 50f, 0f, 0f)      // unticked              -> free
                 });
 
-            // The unticked row is still reported (every submitted row is echoed, and each
-            // row reports what it would cost) — it just must not reach the total.
             var echoed = body.Data!.Modules.ToDictionary(m => m.ModuleId);
-            echoed.Should().ContainKeys(StatisticsModuleId, unticked.Id);
+            echoed.Should().ContainKeys(billable.Id, bundled.Id, unticked.Id);
+
+            // The billable row is the only one the total sees.
+            echoed[billable.Id].IsActive.Should().BeTrue();
+            echoed[billable.Id].PriceIncluded.Should().BeFalse(
+                "the insert froze ModulePriceIncluded from the catalog, which must be false");
+            echoed[billable.Id].CurrentPrice.Should().BeApproximately(40f, Tolerance);
+
+            // A TICKED but bundled row is still reported in full — and still charges nothing.
+            echoed[bundled.Id].IsActive.Should().BeTrue();
+            echoed[bundled.Id].PriceIncluded.Should().BeTrue(
+                "ticking a bundled module freezes ModulePriceIncluded = true");
+            echoed[bundled.Id].CurrentPrice.Should().BeApproximately(70f, Tolerance,
+                "every row reports what it would cost, billable or not");
+
+            // The unticked row likewise: reported, never charged.
             echoed[unticked.Id].IsActive.Should().BeFalse();
             echoed[unticked.Id].CurrentPrice.Should().BeApproximately(50f, Tolerance);
 
-            body.Data!.TotalCurrentPrice.Should().BeApproximately(100d, 0.0001d,
-                "the total is the ticked-row sum: 100 ticked + 50 unticked is 100, not 150");
+            // 40 (billable) + 0 (bundled, ticked) + 0 (unticked) = 40.
+            body.Data!.TotalCurrentPrice.Should().BeApproximately(40d, 0.0001d,
+                "the total is the BILLABLE sum: 40 + 70 + 50 is 40, not 165");
         }
         finally
         {
@@ -568,9 +633,13 @@ public sealed class StoreModulePricingTests
             own.PercentDiscountPrice.Should().BeApproximately(3.5f, Tolerance);
             own.Price.Should().NotBe(held.Price, "the read must not fall back to the catalog price");
 
-            // The read's total covers the ACTIVE rows only.
+            // The read's total covers the BILLABLE rows only — active AND not price-included
+            // (ModulePriceCalculator.IsBillable). Here that is Statistics alone: Management is
+            // active but its seeded snapshot is bundled (StoreSeed.cs:48 freezes
+            // ModulePriceIncluded = true), so it contributes 0 even though it is a live row.
+            // Derived from the response, so no catalog id or price is hardcoded here.
             body.Data.TotalCurrentPrice.Should().BeApproximately(
-                rows.Where(m => m.IsActive).Sum(m => (double)m.CurrentPrice), 0.0001d);
+                rows.Where(m => m.IsActive && !m.PriceIncluded).Sum(m => (double)m.CurrentPrice), 0.0001d);
         }
         finally
         {

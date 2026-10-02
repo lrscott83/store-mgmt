@@ -12,6 +12,14 @@ namespace Application.Dtos.Administration.Modules
         public string Name { get; set; }
         public int Order { get; set; }
         public bool PriceIncluded { get; set; }
+
+        /// <summary>
+        /// Additive: the catalog/live flag the price rule needs — a module contributes to a
+        /// total only when it is active and not price-included (<c>ModulePriceCalculator.IsBillable</c>).
+        /// For the <c>StoreModule -&gt; ModuleDto</c> map this is the STORE's own
+        /// <c>StoreModule.IsActive</c>.
+        /// </summary>
+        public bool IsActive { get; set; }
         public float Price { get; set; }
         public float CurrentPrice { get; set; }
         public float DiscountPrice { get; set; }

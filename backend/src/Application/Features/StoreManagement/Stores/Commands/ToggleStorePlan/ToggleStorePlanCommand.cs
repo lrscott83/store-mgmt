@@ -196,7 +196,11 @@ internal sealed class ToggleStorePlanCommandHandler : ICommandHandler<ToggleStor
         store.StorePlanId = (int)StorePlanType.Gratis;
         store.NextDueDateOverride = null;
 
-        var paidModules = store.StoreModules.Where(sm => sm.IsActive && !sm.ModulePriceIncluded).ToList();
+        // THE price rule's predicate (ModulePriceCalculator.IsBillable = active AND not
+        // price-included): exactly the modules that contribute to a charge.
+        var paidModules = store.StoreModules
+            .Where(sm => ModulePriceCalculator.IsBillable(sm.IsActive, sm.ModulePriceIncluded))
+            .ToList();
         if (paidModules.Count == 0)
             return;
 

@@ -27,10 +27,30 @@ namespace Application.Dtos.Administration.Modules
         public float PercentDiscountPrice { get; set; }
 
         /// <summary>
+        /// Additive: the module's catalog <c>PriceIncluded</c>. Read-only — the save never owns it.
+        /// It is one of the two inputs THE price rule reads
+        /// (<c>ModulePriceCalculator.IsBillable = IsActive &amp;&amp; !PriceIncluded</c>), so a
+        /// client can tell a billable row from one dropped from
+        /// <see cref="ModuleCatalogPricingResultDto.TotalCurrentPrice"/>.
+        /// </summary>
+        public bool PriceIncluded { get; set; }
+
+        /// <summary>
+        /// Additive: the module's catalog <c>IsActive</c>. Read-only, and the other input to the
+        /// price rule — an inactive module never reaches the total.
+        /// </summary>
+        public bool IsActive { get; set; }
+
+        /// <summary>
         /// <c>CurrentPriceServiceUtils.GetCurrentPrice(price, percentDiscountPrice,
         /// discountPrice)</c> over the three fields above — the same formula
         /// <c>ModuleProfile</c> applies when mapping the catalog read, so the value the
         /// editor shows after a save is the value the read will report.
+        /// <para>
+        /// Reported for EVERY row, billable or not. Only the billable rows
+        /// (<see cref="IsActive"/> &amp;&amp; !<see cref="PriceIncluded"/>) reach
+        /// <see cref="ModuleCatalogPricingResultDto.TotalCurrentPrice"/>.
+        /// </para>
         /// </summary>
         public float CurrentPrice { get; set; }
     }
@@ -43,21 +63,23 @@ namespace Application.Dtos.Administration.Modules
     {
         /// <summary>
         /// The saved rows, in payload order. Every submitted row is echoed; the payload is
-        /// the complete table the editor showed, and every row in it carries a price, so
-        /// there is no ticked/unticked distinction here and no rows are filtered out of the total.
+        /// the complete table the editor showed. Every row in it carries a price, so there
+        /// is no ticked/unticked distinction here and no row is filtered OUT of the echo —
+        /// but only the BILLABLE ones reach <see cref="TotalCurrentPrice"/>.
         /// </summary>
         public List<ModuleCatalogPricingDto> Modules { get; set; }
 
         /// <summary>
-        /// Σ <see cref="ModuleCatalogPricingDto.CurrentPrice"/> over every submitted row.
+        /// Σ <see cref="ModuleCatalogPricingDto.CurrentPrice"/> over the BILLABLE rows only —
+        /// <see cref="ModuleCatalogPricingDto.IsActive"/> &amp;&amp;
+        /// !<see cref="ModuleCatalogPricingDto.PriceIncluded"/>, i.e. THE single price rule
+        /// (<c>ModulePriceCalculator</c>). Previously this summed EVERY submitted row, so an
+        /// inactive or gratis module inflated the editor total.
         /// <para>
-        /// The per-module GROUP totals the editor renders are computed by the browser from
-        /// the same three fields; this is the ungrouped sum of the whole table, kept
-        /// server-side so the client arithmetic stays pinned to the server formula.
-        /// </para>
-        /// <para>
-        /// Accumulated in <see cref="double"/> from the <see cref="float"/> row values so the
-        /// running sum does not inherit float32 rounding as it grows.
+        /// Computed by <c>ModulePriceCalculator.CalculateTotal</c>, which accumulates the
+        /// <see cref="float"/> row values through LINQ <c>Sum</c> (double accumulation, cast
+        /// back to <see cref="float"/>) so the result is bit-identical to the rest of the
+        /// system. The widening to <see cref="double"/> here is exact, never rounded.
         /// </para>
         /// </summary>
         public double TotalCurrentPrice { get; set; }

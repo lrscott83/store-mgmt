@@ -8,6 +8,7 @@ import {
   expectedCurrentPrice,
   expectedPlanGroups,
   findModuleWithoutStoreRow,
+  isBillableRow,
   mintPlainOwner,
   openModulePricingModal,
   parsePlanPrice,
@@ -16,6 +17,7 @@ import {
   primeOnlyActiveModule,
   readPlanCatalog,
   readStoreModulePricing,
+  type PricingReadRow,
 } from './support/store-module-pricing-fixture';
 
 /**
@@ -41,6 +43,18 @@ import {
  *   SMP7 — a saved price edit survives a reload.
  *   SMP8 — the browser's total and the server's total agree, percent before
  *          flat discount, including the clamp at zero.
+ *
+ * ── WHAT "THE TOTAL" MEANS ─────────────────────────────────────────────────
+ * A row reaches a total only when it is BILLABLE: ticked (active) AND not
+ * price-included — the rule the backend states in `ModulePriceCalculator` and
+ * the client mirrors in `totalModulePricing`. An unticked row and a bundled
+ * (gratis) row both contribute 0, whatever their price says. So every test
+ * that measures a TOTAL picks a row the rule can actually charge: a bundled
+ * row priced at 10 would otherwise leave the total at 0 and turn every figure
+ * below into a coincidence. The per-row "Precio actual" column is unaffected —
+ * it reports what a row WOULD cost, billable or not — which is why the row
+ * figures (85, 36, 25, 8.5) are unchanged and only the totals are reasoned
+ * about here.
  *
  * ORDER MATTERS, and deliberately so. The suite is `serial` for two reasons:
  * a single SuperAdmin mint and a single owner mint are replayed per test
@@ -88,6 +102,38 @@ function countPricingPuts(page: Page, targetStoreId: string): () => number {
 async function openModalForStoreUnderTest(page: Page) {
   await applySuperAdminSnapshot(page, superAdmin);
   return openModulePricingModal(page, storeId());
+}
+
+/**
+ * The row a total measurement must be built on: BILLABLE (`isBillableRow`), so
+ * the number under test is decided by the prices typed into it.
+ *
+ * Without this the tests would silently measure a bundled row: the price rule
+ * excludes it, the total stays at 0, and an assertion of "0 USD" would hold no
+ * matter what the arithmetic did. The store's OWN rows carry their frozen
+ * `priceIncluded`, and the read reports it, so this is a decision about live
+ * data — never a hardcoded module id.
+ */
+function requireBillableRow(
+  rows: readonly PricingReadRow[],
+  what: string,
+  predicate: (row: PricingReadRow) => boolean = (row) => row.isActive,
+): PricingReadRow {
+  const row = rows.find((entry) => predicate(entry) && isBillableRow(entry));
+  if (!row) {
+    throw new Error(
+      `store-module-pricing: no BILLABLE (active and not price-included) row qualifies as ${what}, ` +
+        `so the total measured on it would be 0 whatever it is priced at and every assertion built ` +
+        `on it would be vacuous. Rows: ${JSON.stringify(
+          rows.map((entry) => ({
+            moduleId: entry.moduleId,
+            isActive: entry.isActive,
+            priceIncluded: entry.priceIncluded,
+          })),
+        )}`,
+    );
+  }
+  return row;
 }
 
 test.describe.serial('SuperAdmin per-store module pricing', () => {
@@ -267,13 +313,10 @@ test.describe.serial('SuperAdmin per-store module pricing', () => {
     await applySuperAdminSnapshot(page, superAdmin);
     const read = await readStoreModulePricing(page, storeId());
     const totalBefore = read.totalCurrentPrice;
-    const target = read.modules.find((row) => row.isActive);
-    if (!target) {
-      throw new Error(
-        'store-module-pricing: the store has no active module, so the live total has no ' +
-          'contributor to change and this test would pass vacuously.',
-      );
-    }
+    // A row the price rule can charge: an ACTIVE row the store is NOT already
+    // paying for through its plan. A bundled row would be excluded from the live
+    // total whatever is typed into it, so the 85/90 below would measure nothing.
+    const target = requireBillableRow(read.modules, 'the single contributor of the live total');
 
     const puts = countPricingPuts(page, storeId());
     const modal = await openModulePricingModal(page, storeId());
@@ -302,8 +345,12 @@ test.describe.serial('SuperAdmin per-store module pricing', () => {
     await expect(modal.getByTestId('module-pricing-total')).toHaveText('90 USD');
 
     // An un-ticked row contributes nothing: re-ticking one of the rows dropped
-    // above adds its stored current price back.
-    const dropped = read.modules.find((row) => row.isActive && row.moduleId !== target.moduleId);
+    // above adds its stored current price back. It must be a BILLABLE row —
+    // re-ticking a bundled one would add 0, and `90 + 0` would prove nothing
+    // about exclusion.
+    const dropped = read.modules.find(
+      (row) => row.isActive && row.moduleId !== target.moduleId && isBillableRow(row),
+    );
     if (dropped) {
       const droppedCurrent = dropped.currentPrice;
       if (droppedCurrent > 0) {
@@ -373,7 +420,14 @@ test.describe.serial('SuperAdmin per-store module pricing', () => {
     // Pick a module with NO StoreModule row, so the tick is an INSERT and not a
     // reactivation — the read universe lists both identically, so only the
     // table can tell them apart.
-    const inactive = read.modules.filter((row) => !row.isActive).map((row) => row.moduleId);
+    //
+    // Candidates are restricted to BILLABLE ones (`priceIncluded === false` on
+    // the catalog value the insert will freeze). A bundled newcomer would be
+    // excluded from the total by the price rule, so the "it is now part of the
+    // stored total" assertion below would hold for the wrong reason.
+    const inactive = read.modules
+      .filter((row) => !row.isActive && !row.priceIncluded)
+      .map((row) => row.moduleId);
     const newcomer = await findModuleWithoutStoreRow(storeId(), inactive);
     const keptActive = read.modules.find((row) => row.isActive);
     if (!keptActive) {
@@ -411,8 +465,9 @@ test.describe.serial('SuperAdmin per-store module pricing', () => {
     const keptCurrent = after.modules.find((row) => row.moduleId === keptActive.moduleId);
     expect(keptCurrent?.isActive).toBe(true);
 
-    // The stored total is the sum over EVERY active row, so the honest
-    // expectation is the server's own pre-save total plus the row just added.
+    // The stored total is the sum over every BILLABLE row, so the honest
+    // expectation is the server's own pre-save total plus the row just added —
+    // the newcomer is billable, so its 36 does reach the total.
     // (Anchoring on a single module would be wrong: the store starts with more
     // than one active module.)
     expectPricesClose(
@@ -436,7 +491,10 @@ test.describe.serial('SuperAdmin per-store module pricing', () => {
   test('SMP7 — a saved price edit survives a reload', async ({ page }) => {
     await applySuperAdminSnapshot(page, superAdmin);
     const read = await readStoreModulePricing(page, storeId());
-    const target = read.modules.find((row) => row.isActive) ?? read.modules[0];
+    // BILLABLE, because this test's whole claim is "the total is 25": a bundled
+    // row is excluded from the total by the price rule, so the baseline would
+    // contribute 0 and every assertion below would hold for the wrong reason.
+    const target = requireBillableRow(read.modules, "SMP7's single priced module", () => true);
 
     // Deterministic baseline: exactly one active module, so the total below has
     // a single contributor and cannot drift on an unrelated row.
@@ -490,16 +548,15 @@ test.describe.serial('SuperAdmin per-store module pricing', () => {
   }) => {
     await applySuperAdminSnapshot(page, superAdmin);
     const read = await readStoreModulePricing(page, storeId());
-    const primary = read.modules.find((row) => row.isActive) ?? read.modules[0];
-    const second =
-      read.modules.find((row) => row.moduleId !== primary.moduleId && !row.isActive) ??
-      read.modules.find((row) => row.moduleId !== primary.moduleId);
-    if (!second) {
-      throw new Error(
-        'store-module-pricing: the store has a single module, so the clamp has nothing to ' +
-          'clamp against and this test would pass vacuously.',
-      );
-    }
+    // Both rows must be BILLABLE: the price rule excludes a bundled row from the
+    // total, so a bundled `primary` would make the whole comparison read 0 vs 0
+    // and the two implementations would never actually be compared on a charge.
+    const primary = requireBillableRow(read.modules, "SMP8's order-sensitive row");
+    const second = requireBillableRow(
+      read.modules,
+      "SMP8's over-discounted row (the clamp needs a second, billable row)",
+      (row) => row.moduleId !== primary.moduleId,
+    );
 
     await primeOnlyActiveModule(page, storeId(), primary.moduleId, {
       price: 10,

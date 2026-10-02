@@ -3,6 +3,7 @@ using Application.Abstractions.Messaging;
 using Application.Dtos.Administration.Owners;
 using Application.Exceptions;
 using Application.ResponseModels;
+using Application.Services.Messages;
 using Application.UnitOfWorks;
 using AutoMapper;
 using Domain.Common.Extensions;
@@ -47,6 +48,7 @@ namespace Application.Features.Administration.Owners.Commands.CreateOwner
         private readonly IHttpContextService _httpContextService;
         private readonly IStringLocalizer<I18n> _localizer;
         private readonly IMapper _mapper;
+        private readonly IOwnerWelcomeMessageService _ownerWelcomeMessageService;
 
         public CreateOwnerCommandHandler(
             IApplicationUnitOfWork applicationUnitOfWork,
@@ -54,7 +56,8 @@ namespace Application.Features.Administration.Owners.Commands.CreateOwner
             IRegisterService registerService,
             IHttpContextService httpContextService,
             IStringLocalizer<I18n> localizer,
-            IMapper mapper)
+            IMapper mapper,
+            IOwnerWelcomeMessageService ownerWelcomeMessageService)
         {
             _applicationUnitOfWork = applicationUnitOfWork;
             _httpContextService = httpContextService;
@@ -62,6 +65,7 @@ namespace Application.Features.Administration.Owners.Commands.CreateOwner
             _registerService = registerService;
             _localizer = localizer;
             _mapper = mapper;
+            _ownerWelcomeMessageService = ownerWelcomeMessageService;
         }
 
         public async Task<ResponseResult<OwnerDto>> Handle(CreateOwnerCommand request, CancellationToken cancellationToken)
@@ -101,7 +105,29 @@ namespace Application.Features.Administration.Owners.Commands.CreateOwner
                 };
             }
 
+            // Only now, AFTER the single commit above. MessageRepository commits internally, so
+            // greeting before this save would flush its own call first, leave nothing staged here,
+            // and make this SaveChangesAsync a no-op — owner + store would never land. The service
+            // never throws, so the OwnerDto below is unaffected by a greeting failure.
+            await SendWelcomeMessageAsync(owner, cancellationToken);
+
             return ResponseResult.Success(_mapper.Map<OwnerDto>(owner));
+        }
+
+        /// <summary>
+        /// Posts the welcome greeting to the customer the Gestor just created, or skips it. Nothing
+        /// here can change the response: the gate and the "anything missing" case both return
+        /// without calling the service, and the service itself swallows and logs its own failures.
+        /// </summary>
+        private async Task SendWelcomeMessageAsync(Owner owner, CancellationToken cancellationToken)
+        {
+            OwnerWelcomeMessage.OwnerWelcomeTarget? target = OwnerWelcomeMessage.Resolve(owner);
+
+            if (target is null)
+                return;
+
+            await _ownerWelcomeMessageService.SendAsync(
+                target.OwnerUserId, target.OwnerFullName, target.StoreId, cancellationToken);
         }
 
         /// <summary>

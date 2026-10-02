@@ -34,6 +34,25 @@ import {
  *          browser, with no request at all until "Guardar", and the total the
  *          page then shows is the one the server computed.
  *
+ * ── WHAT A GROUP TOTAL COUNTS ───────────────────────────────────────────────
+ * Two rules, both mirrored below rather than imported, both read out of
+ * `module-catalog-table.tsx`:
+ *
+ *   1. CUMULATIVE membership. A plan group's footer prices every module
+ *      `GET /v1/plans` says that plan carries — its predecessor's modules plus
+ *      its own — not only the delta this section renders. A plan inherits its
+ *      predecessor's modules, so the number under a heading has to be that
+ *      PLAN's price. The VISUAL partition is unchanged: which rows are RENDERED
+ *      under a heading is still the delta rule (`expectedPlanGroups`), and this
+ *      spec keeps pinning that separately.
+ *   2. BILLABLE rows only. A row reaches the total when it is active AND not
+ *      price-included (`ModulePriceCalculator.IsBillable`), and the base column
+ *      counts exactly the rows the effective column does.
+ *
+ * Because of (2), the module these tests edit MUST be billable: editing a
+ * bundled module would leave its group total at 0 before and after, and MCP4's
+ * "the total moved" proof would be unmeetable by any implementation.
+ *
  * NO non-SuperAdmin test, deliberately: the maintainer declined vacuous role
  * pins for this feature. The route is behind `superAdminLoader` and the menu
  * item behind `rolesOnly`, so the gate is structural — a role test here could
@@ -70,6 +89,13 @@ import {
 interface CatalogRow {
   id: number;
   name: string;
+  /**
+   * The two flags the price rule reads (`ModulePriceCalculator.IsBillable`):
+   * a row reaches a group total only when it is active AND not price-included.
+   * `ModuleDto` reports both, so nothing here has to guess a module's status.
+   */
+  isActive: boolean;
+  priceIncluded: boolean;
   price: number;
   discountPrice: number;
   percentDiscountPrice: number;
@@ -426,61 +452,142 @@ function requireRow(catalog: readonly CatalogRow[], moduleId: number, context: s
   return row;
 }
 
-/** Σ effective price over a group's module ids, with optional per-row overrides. */
+/**
+ * The rows a group FOOTER prices — an INDEPENDENT mirror of the page's
+ * `footerRows`, and the reason a group's total is not the sum of the rows above
+ * it:
+ *
+ *   - a PLAN group's footer prices that plan's CUMULATIVE membership (every
+ *     module `GET /v1/plans` says the plan carries, which is the predecessor's
+ *     modules plus its own), resolved against the catalog read. A plan inherits
+ *     its predecessor's modules, so the number under a plan's heading has to be
+ *     that PLAN's price; summing the delta made a middle plan read as the price
+ *     of the few modules it adds.
+ *   - the catch-all group has no plan to inherit from, so it keeps summing its
+ *     own rows. Same fallback when the membership does not intersect the
+ *     catalog at all.
+ *
+ * The VISUAL partition is untouched by any of this: `groupModulesByPlanDelta`
+ * still decides which rows are RENDERED under a heading, and
+ * `expectedPlanGroups` (the mirror used for that) is unchanged.
+ */
+function footerModuleIds(
+  planType: string,
+  ownModuleIds: readonly number[],
+  catalog: readonly CatalogRow[],
+): number[] {
+  if (!planType) return [...ownModuleIds];
+  const plan = plans.find((entry) => entry.planType === planType);
+  if (!plan) return [...ownModuleIds];
+  const memberIds = new Set(plan.modules.map((entry) => entry.moduleId));
+  const members = catalog.filter((row) => memberIds.has(row.id)).map((row) => row.id);
+  return members.length > 0 ? members : [...ownModuleIds];
+}
+
+/**
+ * A row the price rule charges: active AND not price-included — the other half
+ * of the rule, kept out of `effectiveOf` so a mistake in either half cannot hide
+ * behind the other.
+ */
+function isBillableCatalogRow(row: CatalogRow): boolean {
+  return row.isActive && !row.priceIncluded;
+}
+
+/**
+ * Σ effective price over a group FOOTER's billable rows, with optional per-row
+ * overrides — the figure under the plan heading.
+ *
+ * Billable only: an inactive or price-included (gratis) module contributes
+ * nothing, exactly as the backend's `ModulePriceCalculator` and the page's
+ * `totalModulePricing` both decide. Before that rule, every row of the priced
+ * set was summed.
+ */
 function groupEffectiveTotal(
+  planType: string,
   groupModuleIds: readonly number[],
   catalog: readonly CatalogRow[],
   overrides: ReadonlyMap<number, Edit> = new Map(),
 ): number {
-  return groupModuleIds.reduce((sum, moduleId) => {
-    const row = requireRow(catalog, moduleId, 'in a rendered plan group');
+  return footerModuleIds(planType, groupModuleIds, catalog).reduce((sum, moduleId) => {
+    const row = requireRow(catalog, moduleId, 'in a priced plan group');
+    if (!isBillableCatalogRow(row)) return sum;
     const override = overrides.get(moduleId);
     return sum + (override ? expectedCurrentPrice(override.price, override.percentDiscountPrice, override.discountPrice) : effectiveOf(row));
   }, 0);
 }
 
-/** Σ base price over a group's module ids — the struck-through figure. */
+/** Σ base price over the SAME billable rows as {@link groupEffectiveTotal}. */
 function groupBaseTotal(
+  planType: string,
   groupModuleIds: readonly number[],
   catalog: readonly CatalogRow[],
   overrides: ReadonlyMap<number, Edit> = new Map(),
 ): number {
-  return groupModuleIds.reduce((sum, moduleId) => {
-    const row = requireRow(catalog, moduleId, 'in a rendered plan group');
+  return footerModuleIds(planType, groupModuleIds, catalog).reduce((sum, moduleId) => {
+    const row = requireRow(catalog, moduleId, 'in a priced plan group');
+    if (!isBillableCatalogRow(row)) return sum;
     return sum + (overrides.get(moduleId)?.price ?? row.price);
   }, 0);
 }
 
 /**
- * The module the mutating tests edit: the first one, scanning the groups in the
- * order the page renders them, that carries NO discount.
+ * Whether a group footer shows its base total struck through: the page decides
+ * it from the PRICED set (any row on an offer), which after the cumulative
+ * change can be a module rendered under a DIFFERENT group. Mirrors that, so the
+ * assertion is about the same set the total is computed from.
+ */
+function footerIsOnOffer(
+  planType: string,
+  groupModuleIds: readonly number[],
+  catalog: readonly CatalogRow[],
+): boolean {
+  return footerModuleIds(planType, groupModuleIds, catalog).some((moduleId) =>
+    isOnOffer(requireRow(catalog, moduleId, 'in a priced plan group')),
+  );
+}
+
+/**
+ * The module the mutating tests edit, scanning the groups in the order the page
+ * renders them.
  *
- * Preferred because it makes MCP3's offer proof the strongest kind — a module
- * that was NOT on offer becomes one, from the keystrokes alone. If some earlier
- * run left every module on offer, the first module of the first group is taken
- * instead so the mutation coverage is never silently dropped: "not on offer" is
- * a nicety here, not what the test is about.
+ * BILLABLE is a hard requirement, not a preference: a price-included (gratis)
+ * module is excluded from every group total, so editing one would leave the
+ * total at 0 before and after and MCP4's "the total moved" precondition could
+ * not be met by any implementation. No billable module means the page's totals
+ * cannot be exercised at all, so this fails loudly instead of degrading into a
+ * test that passes on a zero.
+ *
+ * Among the billable ones, a module carrying NO discount is preferred, because
+ * that makes MCP3's offer proof the strongest kind — a module that was NOT on
+ * offer becomes one, from the keystrokes alone. If some earlier run left every
+ * module on offer, the first billable module of the first group is taken so the
+ * mutation coverage is never silently dropped: "not on offer" is a nicety
+ * here, not what the test is about.
  */
 function chooseTarget(
   groups: ReadonlyArray<{ planType: string; moduleIds: number[] }>,
   catalog: readonly CatalogRow[],
 ): { moduleId: number; planType: string; name: string } {
+  const candidates: Array<{ moduleId: number; planType: string; name: string }> = [];
   for (const group of groups) {
     for (const moduleId of group.moduleIds) {
       const row = catalog.find((entry) => entry.id === moduleId);
-      if (row && !isOnOffer(row)) {
-        return { moduleId, planType: group.planType, name: row.name };
+      if (row && isBillableCatalogRow(row)) {
+        candidates.push({ moduleId, planType: group.planType, name: row.name });
       }
     }
   }
-  for (const group of groups) {
-    const first = group.moduleIds[0];
-    const row = first === undefined ? undefined : catalog.find((entry) => entry.id === first);
-    if (row) return { moduleId: first, planType: group.planType, name: row.name };
-  }
+  const plain = candidates.find((candidate) => {
+    const row = catalog.find((entry) => entry.id === candidate.moduleId);
+    return row !== undefined && !isOnOffer(row);
+  });
+  if (plain) return plain;
+  const first = candidates[0];
+  if (first) return first;
   throw new Error(
-    'module-catalog-pricing: the live catalog produced no plan group at all, so there is nothing ' +
-      'for this spec to edit and every assertion would be vacuous.',
+    'module-catalog-pricing: no BILLABLE (active and not price-included) module exists in the live ' +
+      'catalog, so every group total is 0 and no price edit could ever move one. Choosing a bundled ' +
+      'module instead would make MCP3 and MCP4 pass without measuring anything.',
   );
 }
 
@@ -720,7 +827,9 @@ test.describe.serial('SuperAdmin module catalog pricing', () => {
     // No discount, no strikethrough: the crossed-out base appears for an offer only.
     await expect(page.getByTestId(baseTestId(plain.id))).toHaveCount(0);
 
-    // The same treatment on the group total.
+    // The same treatment on the group total — which prices the plan's CUMULATIVE
+    // membership, not the delta this group renders, and counts only the billable
+    // rows of it.
     const groups = expectedPlanGroups(
       plans,
       catalog.map((row) => row.id),
@@ -733,20 +842,23 @@ test.describe.serial('SuperAdmin module catalog pricing', () => {
       );
     }
     await expect(page.getByTestId(groupBaseTotalTestId(offeredGroup.planType))).toHaveText(
-      `${formatAmount(groupBaseTotal(offeredGroup.moduleIds, catalog))} USD`,
+      `${formatAmount(groupBaseTotal(offeredGroup.planType, offeredGroup.moduleIds, catalog))} USD`,
     );
     await expectGroupTotal(
       page,
       offeredGroup.planType,
-      groupEffectiveTotal(offeredGroup.moduleIds, catalog),
+      groupEffectiveTotal(offeredGroup.planType, offeredGroup.moduleIds, catalog),
       'the group total of a group that contains an offer',
     );
 
-    // And a group with NO offer at all shows no crossed-out total. Conditional
-    // because the seeded catalog has a discount in every group, and skipping the
-    // branch is honest where the precondition does not exist.
+    // And a group with NO offer at all shows no crossed-out total. The offer is
+    // looked for in the group FOOTER's priced set (the cumulative membership),
+    // which is the same set the page decides it by — a member rendered under an
+    // earlier group still counts here. Conditional because the seeded catalog
+    // does have an offer in most groups, and skipping the branch is honest where
+    // the precondition does not exist.
     const plainGroup = groups.find(
-      (group) => !group.moduleIds.some((moduleId) => isOnOffer(requireRow(catalog, moduleId, 'in a plan group'))),
+      (group) => !footerIsOnOffer(group.planType, group.moduleIds, catalog),
     );
     if (plainGroup) {
       await expect(page.getByTestId(groupBaseTotalTestId(plainGroup.planType))).toHaveCount(0);
@@ -792,7 +904,12 @@ test.describe.serial('SuperAdmin module catalog pricing', () => {
     await expectGroupTotal(
       page,
       group.planType,
-      groupEffectiveTotal(group.moduleIds, before, new Map([[target.moduleId, edit]])),
+      groupEffectiveTotal(
+        group.planType,
+        group.moduleIds,
+        before,
+        new Map([[target.moduleId, edit]]),
+      ),
       'the group total after typing the new prices',
     );
 
@@ -886,10 +1003,17 @@ test.describe.serial('SuperAdmin module catalog pricing', () => {
       edit.percentDiscountPrice,
       edit.discountPrice,
     );
-    const totalBefore = groupEffectiveTotal(group.moduleIds, catalog);
-    const totalAfter = groupEffectiveTotal(group.moduleIds, catalog, new Map([[target.moduleId, edit]]));
+    const totalBefore = groupEffectiveTotal(group.planType, group.moduleIds, catalog);
+    const totalAfter = groupEffectiveTotal(
+      group.planType,
+      group.moduleIds,
+      catalog,
+      new Map([[target.moduleId, edit]]),
+    );
     // The precondition the "it moved" proof rests on: a different base price
-    // really does change this group's sum.
+    // really does change this group's sum. It holds because the target is
+    // BILLABLE (`chooseTarget`), so the edit reaches the total instead of being
+    // excluded by the price rule.
     expect(Math.abs(totalAfter - totalBefore)).toBeGreaterThan(0.001);
 
     const puts = countCatalogPricingPuts(page);
@@ -914,20 +1038,25 @@ test.describe.serial('SuperAdmin module catalog pricing', () => {
     // operator saves. A save-on-keystroke would show up here as a PUT.
     expect(puts()).toBe(0);
 
-    // An offered group also shows the summed base struck through.
-    if (group.moduleIds.some((moduleId) => isOnOffer(requireRow(catalog, moduleId, 'in a plan group')))) {
+    // An offered group also shows the summed base struck through. The offer is
+    // decided on the group FOOTER's priced set (the cumulative membership), the
+    // same set the total itself is computed from.
+    if (footerIsOnOffer(group.planType, group.moduleIds, catalog)) {
       await expect(page.getByTestId(groupBaseTotalTestId(group.planType))).toHaveText(
-        `${formatAmount(groupBaseTotal(group.moduleIds, catalog, new Map([[target.moduleId, edit]])))} USD`,
+        `${formatAmount(groupBaseTotal(group.planType, group.moduleIds, catalog, new Map([[target.moduleId, edit]])))} USD`,
       );
     }
 
     // Save: exactly one PUT, and the server's total over the whole table agrees
-    // with the browser's group arithmetic over the same submitted values.
+    // with the browser's group arithmetic over the same submitted values. The
+    // server sums the WHOLE submitted universe, not one group, so the plan type
+    // is the catch-all ('') and the footer set is the whole catalog.
     const echo = await saveAndReadEcho(page);
     expect(puts()).toBe(1);
     expectPricesClose(
       echo.totalCurrentPrice,
       groupEffectiveTotal(
+        '',
         catalog.map((row) => row.id),
         catalog,
         new Map([[target.moduleId, edit]]),
@@ -954,7 +1083,7 @@ test.describe.serial('SuperAdmin module catalog pricing', () => {
     await expectGroupTotal(
       page,
       target.planType,
-      groupEffectiveTotal(afterGroup?.moduleIds ?? group.moduleIds, after),
+      groupEffectiveTotal(target.planType, afterGroup?.moduleIds ?? group.moduleIds, after),
       'the group total shown after the reload',
     );
   });

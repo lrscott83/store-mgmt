@@ -184,7 +184,7 @@ describe('StoreCardList — card body (plan line, owner, phone, description)', (
               planPrice: null,
               planCurrentPrice: null,
               modules: [
-                { id: 2, name: 'Mgmt', price: 20, currentPrice: 20, priceIncluded: false, discountText: '', selected: true },
+                { id: 2, name: 'Mgmt', price: 20, currentPrice: 20, priceIncluded: false, isActive: true, discountText: '', selected: true },
               ],
             }),
           ]}

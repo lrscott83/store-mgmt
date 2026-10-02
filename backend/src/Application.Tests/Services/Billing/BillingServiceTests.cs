@@ -159,6 +159,22 @@ public class BillingServiceTests : IDisposable
         result.PlanType.Should().Be("Free");
     }
 
+    /// <summary>
+    /// Overrides the CATALOG module rows the store's module ids resolve to. <see cref="ArrangeStore"/>
+    /// builds the catalog by MIRRORING the snapshot, which makes a total computed from the catalog
+    /// and one computed from the store's own snapshot numerically identical — a mock that cannot
+    /// tell the two apart pins nothing. This lets a test make them disagree on purpose.
+    /// </summary>
+    private void ArrangeCatalogModules(params Module[] modules)
+        => _moduleRepository
+            .Setup(x => x.GetModulesByIdsAsync(It.IsAny<IEnumerable<int>>()))
+            .ReturnsAsync(modules);
+
+    private static Module CatalogModule(int moduleId, bool priceIncluded, float price,
+        float discountPrice = 0f, float percentDiscountPrice = 0f, bool isActive = true)
+        => Module.Create(moduleId, $"Module-{moduleId}", order: 1, priceIncluded, price,
+            discountPrice, percentDiscountPrice, availableToStore: true, isActive);
+
     // ── Test 4: Paid store, no payments → amount = sum of module prices ───────────
     [Fact]
     public async Task GetStoreBillingSummary_paidStoreWithoutPayments_amountIsSumOfPaidModules()
@@ -181,6 +197,105 @@ public class BillingServiceTests : IDisposable
         var result = await sut.GetStoreBillingSummaryAsync(storeId);
 
         result.CurrentMonthAmount.Should().Be(300f);
+    }
+
+    // ── Test 4b: CurrentMonthAmount comes from the STORE SNAPSHOT, not the catalog ──
+    [Fact]
+    public async Task GetStoreBillingSummary_amountUsesStoreSnapshot_notRawCatalogPrice()
+    {
+        var storeId = Guid.NewGuid();
+        var paidModule = StoreModule.Create(
+            storeId, moduleId: 1,
+            price: 100f, modulePriceIncluded: false,
+            modulePrice: 100f, moduleDiscountPrice: 0f, modulePercentDiscountPrice: 0f,
+            _tenantId);
+
+        ArrangeStore(storeId, DateOnly.FromDateTime(DateTime.UtcNow), paidModule);
+
+        // The catalog disagrees with the store's frozen snapshot: raw 1000, snapshot 100.
+        ArrangeCatalogModules(CatalogModule(1, priceIncluded: false, price: 1000f));
+
+        var sut = CreateSut();
+        var result = await sut.GetStoreBillingSummaryAsync(storeId);
+
+        // The snapshot's effective price (100), NOT the raw catalog price (1000) this used to
+        // report — the same rule and overload RegisterStorePaymentCommand charges with.
+        result.CurrentMonthAmount.Should().Be(100f);
+    }
+
+    [Fact]
+    public async Task GetStoreBillingSummary_amountAppliesSnapshotDiscounts()
+    {
+        var storeId = Guid.NewGuid();
+        // 200 with a 10% discount frozen on the store = 180. The mirrored catalog has no
+        // discount, so the old raw-catalog sum reported 200.
+        var paidModule = StoreModule.Create(
+            storeId, moduleId: 1,
+            price: 200f, modulePriceIncluded: false,
+            modulePrice: 200f, moduleDiscountPrice: 0f, modulePercentDiscountPrice: 10f,
+            _tenantId);
+
+        ArrangeStore(storeId, DateOnly.FromDateTime(DateTime.UtcNow), paidModule);
+
+        var sut = CreateSut();
+        var result = await sut.GetStoreBillingSummaryAsync(storeId);
+
+        result.CurrentMonthAmount.Should().Be(180f);
+    }
+
+    [Fact]
+    public async Task GetStoreBillingSummary_gratisModuleExcluded_evenWhenCatalogSaysBillable()
+    {
+        var storeId = Guid.NewGuid();
+        var paidModule = StoreModule.Create(
+            storeId, moduleId: 1,
+            price: 100f, modulePriceIncluded: false,
+            modulePrice: 100f, moduleDiscountPrice: 0f, modulePercentDiscountPrice: 0f,
+            _tenantId);
+        var gratisModule = StoreModule.Create(
+            storeId, moduleId: 2,
+            price: 500f, modulePriceIncluded: true,
+            modulePrice: 500f, moduleDiscountPrice: 0f, modulePercentDiscountPrice: 0f,
+            _tenantId);
+
+        ArrangeStore(storeId, DateOnly.FromDateTime(DateTime.UtcNow), paidModule, gratisModule);
+
+        // The catalog still reports module 2 as NOT price-included — the real-world drift that
+        // made the old catalog-based sum report 600 (100 + 500) instead of the charge of 100.
+        ArrangeCatalogModules(
+            CatalogModule(1, priceIncluded: false, price: 100f),
+            CatalogModule(2, priceIncluded: false, price: 500f));
+
+        var sut = CreateSut();
+        var result = await sut.GetStoreBillingSummaryAsync(storeId);
+
+        result.CurrentMonthAmount.Should().Be(100f);
+    }
+
+    [Fact]
+    public async Task GetStoreBillingSummary_inactiveStoreModule_notCharged()
+    {
+        var storeId = Guid.NewGuid();
+        var activeModule = StoreModule.Create(
+            storeId, moduleId: 1,
+            price: 100f, modulePriceIncluded: false,
+            modulePrice: 100f, moduleDiscountPrice: 0f, modulePercentDiscountPrice: 0f,
+            _tenantId);
+        var inactiveModule = StoreModule.Create(
+            storeId, moduleId: 2,
+            price: 500f, modulePriceIncluded: false,
+            modulePrice: 500f, moduleDiscountPrice: 0f, modulePercentDiscountPrice: 0f,
+            _tenantId);
+        // Deactivated on the store's own snapshot (the flag the rule reads).
+        inactiveModule.IsActive = false;
+
+        ArrangeStore(storeId, DateOnly.FromDateTime(DateTime.UtcNow), activeModule, inactiveModule);
+
+        var sut = CreateSut();
+        var result = await sut.GetStoreBillingSummaryAsync(storeId);
+
+        // An INACTIVE store module contributes nothing (100, not 600).
+        result.CurrentMonthAmount.Should().Be(100f);
     }
 
     // ── Test 5: Last payment exists → uses its Price as CurrentMonthAmount ────────

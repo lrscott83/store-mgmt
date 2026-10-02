@@ -95,6 +95,7 @@ function makePlanModule(overrides: Partial<PlanModule> = {}): PlanModule {
     name: 'Management',
     order: 1,
     priceIncluded: true,
+    isActive: true,
     price: 0,
     currentPrice: 0,
     discountPrice: 0,

@@ -53,7 +53,7 @@ function optionLabels(): string[] {
   return screen.getAllByRole('option').map((option) => option.textContent ?? '');
 }
 
-describe('CartCurrencySelect (MultiMonedas / module 15 gate)', () => {
+describe('CartCurrencySelect (module 15 gate)', () => {
   beforeEach(() => {
     localStorage.clear();
     mockUser = userWith([2, 3]);
@@ -69,8 +69,8 @@ describe('CartCurrencySelect (MultiMonedas / module 15 gate)', () => {
   it('renders nothing for MultiPayments alone — the gate is MultiMonedas, not MultiPayments', () => {
     // 09c65e27 moved the multi-currency gate from MultiPayments (16) to
     // MultiMonedas (15). A store that still holds MultiPayments must NOT get the
-    // selector: without this, the old gate could creep back in and every test
-    // above would keep passing because they all grant the module explicitly.
+    // selector: without this, the old gate could creep back in and every other
+    // test here would keep passing, because they all grant the module explicitly.
     mockUser = userWith([EModules.MultiPayments]);
     renderSelect(Currency.CUP);
     expect(screen.queryByTestId('cart-currency-select')).not.toBeInTheDocument();
@@ -86,7 +86,7 @@ describe('CartCurrencySelect (MultiMonedas / module 15 gate)', () => {
     expect(screen.queryByTestId('cart-currency-select')).not.toBeInTheDocument();
   });
 
-  it('renders the selector with CUP and USD for a store with the MultiMonedas module', () => {
+it('renders the selector with CUP and USD for a store with module 15', () => {
     mockUser = userWith([EModules.MultiMonedas]);
     renderSelect(Currency.CUP);
 
@@ -96,7 +96,7 @@ describe('CartCurrencySelect (MultiMonedas / module 15 gate)', () => {
   });
 
   it('appends the currencies present in the cart, deduplicated', () => {
-    mockUser = userWith([EModules.MultiMonedas]);
+mockUser = userWith([EModules.MultiMonedas]);
     mockItems = [
       itemWith(Currency.CUP),
       itemWith(Currency.USD),

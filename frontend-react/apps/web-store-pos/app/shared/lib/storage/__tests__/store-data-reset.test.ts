@@ -24,8 +24,8 @@ describe('clearStoreData', () => {
     // wipe it and one damaged entry kept a store locked out.
     // owner-messaging (T8): messagesQueue joined — a store reset must clear any
     // offline-queued messages along with the rest of the store's data.
-    // store-currency-config: storeCurrencyConfig joined — a store reset must clear
-    // its per-store buy/sell currency along with the rest of the store's data.
+// store-currency-config: storeCurrencyConfig joined — a store reset must
+    // clear the per-store buy/sell currency config along with the rest.
     expect([...BUSINESS_ENTITY_NAMES]).toEqual([
       'products',
       'product-categories',

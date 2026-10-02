@@ -171,6 +171,7 @@ function makePlanModule(overrides: Partial<PlanModule> = {}): PlanModule {
     name: 'Module A',
     order: 1,
     priceIncluded: false,
+    isActive: true,
     price: 10,
     currentPrice: 8,
     discountPrice: 0,
