@@ -574,15 +574,59 @@ describe('InventoryOfflineService', () => {
   // WU2 (category D): update() now returns DataResult<InventoryEntryView>, guarded by
   // isNotSoldEntry — NEVER throws (Angular's own updateInventoryEntry never throws either).
   describe('INV-04: update — S-I4 (DataResult<InventoryEntryView>, never throws)', () => {
-    it('fails with InventoryErrors.SaleExistsWithThisEntry when entry has been partially sold', () => {
+    it('rejects when the new quantity no longer covers the units already sold', () => {
       const map = new Map<string, InventoryEntry[]>();
       map.set('p1', [makeEntry('e1', 'p1', { quantity: 10, available: 4 })]); // 6 sold
       seedInventory(storeId, map);
 
-      const result = service.update('e1', 'p1', 15, 2.0);
+      const result = service.update('e1', 'p1', 5, 2.0); // 5 < 6 sold
       expect(result.succeeded).toBe(false);
       expect(result.errors).toEqual([InventoryErrors.SaleExistsWithThisEntry]);
       expect(result.data).toBeUndefined();
+    });
+
+    // 2026-10-02: a partially-sold entry is EDITABLE. sold = quantity - available; the new
+    // quantity must still cover it. `available` is DERIVED, never copied from the new
+    // quantity — copying it resurrects the sold units into stock. The blanket rejection this
+    // test used to assert is what made the cost propagation dead code.
+    it('allows a partially-sold entry and derives available from what was sold', () => {
+      const map = new Map<string, InventoryEntry[]>();
+      map.set('p1', [makeEntry('e1', 'p1', { quantity: 10, available: 4 })]); // 6 sold
+      seedInventory(storeId, map);
+
+      const result = service.update('e1', 'p1', 15, 2.0); // 15 >= 6 sold
+      expect(result.succeeded).toBe(true);
+      expect(result.errors).toEqual([]);
+
+      // available must be 15 - 6 = 9, NOT 15.
+      const stored = service.getProductInventoriesByProductId('p1')[0];
+      expect(stored.quantity).toBe(15);
+      expect(stored.available).toBe(9);
+      expect(stored.costPrice).toBe(2.0);
+    });
+
+    it('accepts the boundary: new quantity exactly equal to the sold amount', () => {
+      const map = new Map<string, InventoryEntry[]>();
+      map.set('p1', [makeEntry('e1', 'p1', { quantity: 10, available: 4 })]); // 6 sold
+      seedInventory(storeId, map);
+
+      const result = service.update('e1', 'p1', 6, 2.0); // 6 == 6 sold
+      expect(result.succeeded).toBe(true);
+      expect(service.getProductInventoriesByProductId('p1')[0].available).toBe(0);
+    });
+
+    it('still rejects a warehouse-origin entry even when the quantity is valid', () => {
+      const map = new Map<string, InventoryEntry[]>();
+      map.set('p1', [
+        makeEntry('e1', 'p1', { quantity: 10, available: 4, warehouseSaleOutMovementId: 'mv-1' }),
+      ]);
+      seedInventory(storeId, map);
+
+      const result = service.update('e1', 'p1', 15, 2.0); // valid quantity...
+      expect(result.succeeded).toBe(false);
+      expect(result.errors).toEqual([InventoryErrors.WarehouseEntryNotEditable]);
+      // ...but a sealed entry stays sealed: the warehouse check runs BEFORE the quantity rule.
+      expect(service.getProductInventoriesByProductId('p1')[0].available).toBe(4);
     });
 
     it('succeeds when no units sold (quantity === available)', () => {

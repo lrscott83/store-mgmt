@@ -10,9 +10,17 @@ import type { Page } from '@playwright/test';
  *   E-CP-1  Editar el costo de una entrada NORMAL (sin ventas) se guarda DIRECTO,
  *           sin diálogo de propagación, y el costo nuevo es lo que la fila de
  *           "Entradas del día" muestra después.
- *   E-CP-2  Una entrada que YA TIENE ventas (available < quantity) no se puede
- *           editar: la tienda la rechaza con su mensaje observable y el costo
- *           almacenado no cambia.
+ *   E-CP-2  Una entrada que YA TIENE ventas se puede editar: la nueva cantidad debe
+ *           seguir cubriendo lo vendido y `available` se DERIVA (nueva - vendidas),
+ *           de modo que las unidades ya vendidas no reaparecen como stock.
+ *   E-CP-3  La misma entrada RECHAZA una cantidad menor que lo ya vendido, con el
+ *           mensaje que ya existía y sin tocar costo ni cantidad.
+ *
+ * CAMBIO DE COMPORTAMIENTO (2026-10-02, autorizado por el owner). Antes E-CP-2 afirmaba
+ * lo contrario: una entrada con ventas era rechazada y su costo no cambiaba. Ese bloqueo
+ * (isNotSoldEntry dentro de update()) dejaba la propagacion muerta: la ruta hacia
+ * updateProductCostsByInventoryIds nunca se alcanzaba. El guard compartido NO se cambio —
+ * deleteInventoryEntry sigue rechazando entradas vendidas, igual que antes.
  *
  * Nota sobre el estado "vendido" de E-CP-2: la entrada se crea por el flujo real
  * del modal "+ Entrada" y luego su `available` se reduce a nivel de storage para
@@ -204,7 +212,7 @@ test.describe.serial('Fase 3 — Costo de una entrada de tienda sin almacén', (
     expect((await readEntry(page, selectedStoreId, entryId!))?.['costPrice']).toBe(70);
   });
 
-  test('E-CP-2: una entrada con ventas es rechazada y su costo no cambia', async ({
+  test('E-CP-2: una entrada con ventas ahora SI se puede editar, conservando lo vendido', async ({
     signedInPage,
   }) => {
     const { page, selectedStoreId } = signedInPage;
@@ -224,12 +232,50 @@ test.describe.serial('Fase 3 — Costo de una entrada de tienda sin almacén', (
 
     await openEditForEntry(page, entryId!);
     await page.locator('#entry-cost-price').fill('70');
+    // La cantidad se queda en 10: 10 >= 2 vendidas, asi que es valido.
     await page.getByRole('button', { name: UPDATE_BUTTON }).click();
 
-    // La tienda rechaza la edición con su mensaje observable y el modal sigue abierto.
+    // El modal cierra: ya no se rechaza la edicion.
+    await expect(page.getByText(EDIT_ENTRY_TITLE)).toHaveCount(0);
+
+    const stored = await readEntry(page, selectedStoreId, entryId!);
+    expect(stored?.['costPrice']).toBe(70);
+    // Lo importante: available sigue en 8, no vuelve a 10. Copiar la cantidad haria
+    // reaparecer las 2 unidades vendidas como stock fantasma.
+    expect(stored?.['quantity']).toBe(10);
+    expect(stored?.['available']).toBe(8);
+  });
+
+  test('E-CP-3: una entrada con ventas rechaza una cantidad menor que lo ya vendido', async ({
+    signedInPage,
+  }) => {
+    const { page, selectedStoreId } = signedInPage;
+    const product = await firstProduct(page, selectedStoreId);
+
+    await navigateToEntries(page);
+    const before = await activeEntryIdsForProduct(page, selectedStoreId, product.id);
+    await createNormalEntry(page, product.name, '10', '50');
+    const after = await activeEntryIdsForProduct(page, selectedStoreId, product.id);
+    const entryId = after.find((id) => !before.includes(id));
+    expect(entryId).toBeTruthy();
+
+    await markEntryAsPartiallySold(page, selectedStoreId, product.id, entryId!, 8);
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+
+    await openEditForEntry(page, entryId!);
+    await page.locator('#entry-quantity').fill('1'); // 1 < 2 vendidas
+    await page.locator('#entry-cost-price').fill('70');
+    await page.getByRole('button', { name: UPDATE_BUTTON }).click();
+
+    // Se rechaza con el mensaje existente y el modal sigue abierto.
     await expect(page.getByText(SOLD_ENTRY_ERROR)).toBeVisible();
     await expect(page.getByText(EDIT_ENTRY_TITLE)).toBeVisible();
-    // El costo almacenado no cambió.
-    expect((await readEntry(page, selectedStoreId, entryId!))?.['costPrice']).toBe(50);
+
+    // Ni el costo ni la cantidad se tocan.
+    const stored = await readEntry(page, selectedStoreId, entryId!);
+    expect(stored?.['costPrice']).toBe(50);
+    expect(stored?.['quantity']).toBe(10);
+    expect(stored?.['available']).toBe(8);
   });
 });
