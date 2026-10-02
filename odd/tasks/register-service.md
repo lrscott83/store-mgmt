@@ -129,8 +129,18 @@ ni se debilitó. Atención especial a dos que habrían pasado **por el motivo eq
 - `Create_duplicate_login_409_Conflict`: sin `storeName` el validador devolvería 400 y nunca se
   llegaría al 409 del índice único que ese test existe para verificar.
 
-### Nota (no tocada)
+### `OwnerDto.StoreModules` — CORREGIDO, no era un problema
 
-`OwnerDto.StoreModules` puede quedar vacío en la respuesta del create: el link owner→stores no se
-puebla en memoria cuando la tienda se agrega por repositorio. Es la misma clase de defecto que el
-`ReSellerName` corregido en `85268ebe`, pero no afecta el síntoma reportado.
+Anoté antes que "puede quedar vacío porque el link owner→stores no se puebla en memoria". **Eso
+era falso**, y estaba escrito de memoria sin verificar. Medido con un E2E:
+
+- **Antes:** el endpoint no creaba tienda → `StoreModules = []` y `Approved = false`.
+- **Ahora:** `StoreModules` trae la tienda y `Approved = true`.
+
+Funciona porque el `SaveChanges` del handler corre **antes** del `_mapper.Map`, y el relationship
+fixup de EF puebla `owner.Stores` en ese save. `RegisterService` nunca asigna la colección
+(`CreateStoreService` solo recibe `ownerId` y agrega la `Store` por repositorio).
+
+Impacto en la UI: ninguno, porque el frontend nunca lee esa respuesta — `owner-create.tsx` solo
+mira `res.succeeded` y navega a `/admin/owners`, que vuelve a pedir la lista, y ahí sí se cargan
+las tiendas por `Include`. Hay dos aserciones que lo fijan.

@@ -102,6 +102,16 @@ public sealed class OwnersCreateGestorCreatesStoreTests
             Guid ownerId = b.Data!.Id;
             ownerId.Should().NotBeEmpty();
 
+            // The create RESPONSE reflects the new store. OwnerProfile maps StoreModules from
+            // owner.Stores and Approved from owner.Stores.Any(s => s.Approved && s.IsActive);
+            // RegisterService never assigns owner.Stores directly (CreateStoreService only receives
+            // ownerId and adds the Store via the repository), so this works purely because EF
+            // relationship fixup populates the collection during the SaveChanges that runs BEFORE
+            // the mapping in the handler. Measured, not assumed: before the shared flow this
+            // endpoint returned StoreModules=[] and Approved=false because no store existed at all.
+            b.Data!.StoreModules.Should().HaveCount(1);
+            b.Data.Approved.Should().BeTrue();
+
             var createdUser = await DbTestHelpers.GetUserByLoginAsync(_f, login);
             createdUser.Should().NotBeNull();
             tenantId = createdUser!.TenantId;
