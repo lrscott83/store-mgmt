@@ -73,6 +73,18 @@ export default function RegisterPage() {
     return intl.formatMessage({ id: 'GENERAL.VALIDATION.REQUIRED' }, { name: fieldName });
   }
 
+  /** Field label plus its requiredness, so the user can tell before typing which fields
+   * the form will actually accept. Mirrors what validate() enforces: every field here is
+   * required EXCEPT email, which the server treats as optional on registration too. */
+  function fieldLabel(id: string, isRequired: boolean): string {
+    const suffix = intl.formatMessage({
+      id: isRequired
+        ? 'GENERAL.VALIDATION.REQUIRED_SUFFIX'
+        : 'GENERAL.VALIDATION.OPTIONAL_SUFFIX',
+    });
+    return `${intl.formatMessage({ id })} ${suffix}`;
+  }
+
   function validate(): FormErrors {
     const errs: FormErrors = {};
     if (!form.fullName.trim()) {
@@ -217,7 +229,7 @@ export default function RegisterPage() {
       <form onSubmit={handleSubmit} noValidate>
         <div className="mb-4">
           <label htmlFor="fullName" className="block text-sm font-medium text-gray-700 mb-1">
-            {intl.formatMessage({ id: 'GENERAL.FULL_NAME' })}
+            {fieldLabel('GENERAL.FULL_NAME', true)}
           </label>
           <input
             id="fullName"
@@ -232,7 +244,7 @@ export default function RegisterPage() {
 
         <div className="mb-4">
           <label htmlFor="login" className="block text-sm font-medium text-gray-700 mb-1">
-            {intl.formatMessage({ id: 'GENERAL.LOGIN' })}
+            {fieldLabel('GENERAL.LOGIN', true)}
           </label>
           <input
             id="login"
@@ -246,38 +258,8 @@ export default function RegisterPage() {
         </div>
 
         <div className="mb-4">
-          <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-            {intl.formatMessage({ id: 'GENERAL.EMAIL' })}
-          </label>
-          <input
-            id="email"
-            type="email"
-            autoComplete="email"
-            value={form.email}
-            onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-          />
-          {errors.email && <p className="mt-1 text-xs text-red-600">{errors.email}</p>}
-        </div>
-
-        <div className="mb-4">
-          <label htmlFor="cellPhone" className="block text-sm font-medium text-gray-700 mb-1">
-            {intl.formatMessage({ id: 'GENERAL.CELL_PHONE' })}
-          </label>
-          <input
-            id="cellPhone"
-            type="tel"
-            autoComplete="tel"
-            value={form.cellPhone}
-            onChange={(e) => setForm((f) => ({ ...f, cellPhone: e.target.value }))}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-          />
-          {errors.cellPhone && <p className="mt-1 text-xs text-red-600">{errors.cellPhone}</p>}
-        </div>
-
-        <div className="mb-4">
           <label htmlFor="storeName" className="block text-sm font-medium text-gray-700 mb-1">
-            {intl.formatMessage({ id: 'STORE.STORE_NAME' })}
+            {fieldLabel('STORE.STORE_NAME', true)}
           </label>
           <input
             id="storeName"
@@ -292,7 +274,7 @@ export default function RegisterPage() {
 
         <div className="mb-4">
           <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-            {intl.formatMessage({ id: 'GENERAL.PASSWORD' })}
+            {fieldLabel('GENERAL.PASSWORD', true)}
           </label>
           <div className="relative">
             <input
@@ -322,7 +304,7 @@ export default function RegisterPage() {
             htmlFor="passwordConfirmation"
             className="block text-sm font-medium text-gray-700 mb-1"
           >
-            {intl.formatMessage({ id: 'GENERAL.CONFIRM_PASSWORD' })}
+            {fieldLabel('GENERAL.CONFIRM_PASSWORD', true)}
           </label>
           <div className="relative">
             <input
@@ -349,6 +331,39 @@ export default function RegisterPage() {
           )}
         </div>
 
+        {/* Phone and email sit BELOW the credentials block: the credentials are what the
+            user came here to set, and the contact pair reads as one group once the two
+            password fields are done. */}
+        <div className="mb-4">
+          <label htmlFor="cellPhone" className="block text-sm font-medium text-gray-700 mb-1">
+            {fieldLabel('GENERAL.CELL_PHONE', true)}
+          </label>
+          <input
+            id="cellPhone"
+            type="tel"
+            autoComplete="tel"
+            value={form.cellPhone}
+            onChange={(e) => setForm((f) => ({ ...f, cellPhone: e.target.value }))}
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+          />
+          {errors.cellPhone && <p className="mt-1 text-xs text-red-600">{errors.cellPhone}</p>}
+        </div>
+
+        <div className="mb-4">
+          <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+            {fieldLabel('GENERAL.EMAIL', false)}
+          </label>
+          <input
+            id="email"
+            type="email"
+            autoComplete="email"
+            value={form.email}
+            onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+          />
+          {errors.email && <p className="mt-1 text-xs text-red-600">{errors.email}</p>}
+        </div>
+
         <div className="mb-4">
           <label htmlFor="acceptTerms" className="flex items-start gap-2 text-sm text-gray-700">
             <input
@@ -360,6 +375,8 @@ export default function RegisterPage() {
             />
             <span>
               {intl.formatMessage({ id: 'REGISTRATION.ACCEPT_CONDITIONS' })}
+              {' '}
+              {intl.formatMessage({ id: 'GENERAL.VALIDATION.REQUIRED_SUFFIX' })}
               <Link
                 to="/terms-conditions"
                 target="_blank"
