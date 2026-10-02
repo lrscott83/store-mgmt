@@ -219,8 +219,5 @@ export default defineConfig(({ mode }) => {
       // (reading 'useContext')" during client render.
       dedupe: ['react', 'react-dom', 'react-router'],
     },
-    optimizeDeps: {
-      include: ['@store-mgmt/domain'],
-    },
   };
 });
