@@ -1284,6 +1284,11 @@ const messages: Record<string, string> = {
   'CONFIGURATIONS.PAYMENT_METHODS.ALWAYS_ON': 'Siempre habilitado',
   'CONFIGURATIONS.PAYMENT_METHODS.SAVED': 'Guardado',
 
+  // Per-store currency config (MultiMonedas module 15): buy/sell currency.
+  'CONFIGURATIONS.CURRENCY_CONFIG.TITLE': 'Monedas de compra y venta',
+  'CONFIGURATIONS.CURRENCY_CONFIG.BUY_CURRENCY': 'Moneda de Compra',
+  'CONFIGURATIONS.CURRENCY_CONFIG.SELL_CURRENCY': 'Moneda de Venta',
+
   // Billing — payment status banner (neutral Latin American Spanish, no voseo)
   'BILLING.TRIAL_NOTICE':
     'Probando el plan de pago. Primer cobro será el {date}, PERO si no pagas pasas al plan gratis.',

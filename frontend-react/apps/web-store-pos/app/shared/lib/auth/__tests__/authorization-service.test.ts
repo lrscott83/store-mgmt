@@ -10,6 +10,7 @@ import {
   hasInventoryModuleAvailable,
   hasOwnersAvailableFeature,
   hasMultiPaymentsModuleAvailable,
+  hasMultiMonedasModuleAvailable,
 } from '../authorization-service';
 import { EModules, EFeatures } from '@store-mgmt/domain';
 import type { UserModel } from '@store-mgmt/domain';
@@ -263,6 +264,27 @@ describe('AuthorizationService', () => {
     it('returns false when storeModuleIds is not an array', () => {
       const user = makeUser({ storeModuleIds: undefined as unknown as number[] });
       expect(hasMultiPaymentsModuleAvailable(user)).toBe(false);
+    });
+  });
+
+  describe('hasMultiMonedasModuleAvailable (module 15 gate)', () => {
+    it('returns true when storeModuleIds includes module 15', () => {
+      const user = makeUser({ storeModuleIds: [EModules.Sales, EModules.MultiMonedas] });
+      expect(hasMultiMonedasModuleAvailable(user)).toBe(true);
+    });
+
+    it('returns false when storeModuleIds lacks module 15', () => {
+      const user = makeUser({ storeModuleIds: [EModules.Sales, EModules.MultiPayments] });
+      expect(hasMultiMonedasModuleAvailable(user)).toBe(false);
+    });
+
+    it('returns false for a null user', () => {
+      expect(hasMultiMonedasModuleAvailable(null)).toBe(false);
+    });
+
+    it('returns false when storeModuleIds is not an array', () => {
+      const user = makeUser({ storeModuleIds: undefined as unknown as number[] });
+      expect(hasMultiMonedasModuleAvailable(user)).toBe(false);
     });
   });
 });
