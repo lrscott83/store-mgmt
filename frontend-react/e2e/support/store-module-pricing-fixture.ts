@@ -21,7 +21,15 @@ import { readSelectedStoreId } from './session';
  *   - `GET /v1/plans`, so the expected plan grouping is computed from the live
  *     plan matrix and never from a hardcoded module id,
  *   - `expectedPlanGroups`, an INDEPENDENT mirror of
- *     `groupModulesByPlanDelta` (`packages/domain/src/commons/plan-module-groups.ts`),
+ *     `groupModulesByPlanDelta` (`packages/domain/src/commons/plan-module-groups.ts`).
+ *     The VISUAL partition is the thing it mirrors, and the visual partition did
+ *     NOT change with the price rule;
+ *   - `isBillableRow` / `expectedBillableTotal`, INDEPENDENT mirrors of
+ *     `ModulePriceCalculator.IsBillable` / `totalModulePricing` — the rule that
+ *     decides WHICH rows a total counts: a row must be active (ticked) AND not
+ *     price-included. This is a separate concern from the formula, and the
+ *     formula mirror (`expectedCurrentPrice`) below deliberately does NOT encode
+ *     it, so the two halves of the rule are proved independently;
  *   - `openModulePricingModal`, the gear-menu → modal navigation.
  */
 
@@ -33,6 +41,12 @@ export interface PricingReadRow {
   price: number;
   discountPrice: number;
   percentDiscountPrice: number;
+  /**
+   * The store's frozen `ModulePriceIncluded` (the catalog's when no snapshot
+   * exists). Server-owned and part of the price rule, so the specs can tell a
+   * chargeable row from a bundled one instead of guessing from the prices.
+   */
+  priceIncluded: boolean;
   currentPrice: number;
 }
 
@@ -49,6 +63,8 @@ export interface PricingSaveRow {
   price: number;
   discountPrice: number;
   percentDiscountPrice: number;
+  /** Server-resolved: the store's frozen `ModulePriceIncluded` for this row. */
+  priceIncluded: boolean;
   currentPrice: number;
 }
 
@@ -159,6 +175,12 @@ export async function saveStoreModulePricing(
  * exactly one contributor and a browser-side assertion cannot drift on an
  * unrelated row.
  *
+ * "Exactly one contributor" only holds when `moduleId` is BILLABLE: the price
+ * rule excludes a price-included (bundled) row, so a bundled baseline would
+ * leave the total at 0 and every assertion built on it vacuous. The helper
+ * refuses that case instead of letting it pass silently — pick a non-bundled
+ * row (see {@link isBillableRow}).
+ *
  * Direct API, not UI, on purpose — this is SETUP, the same split
  * `store-fixture.ts` draws (the backend reads a module's absence from the
  * payload as "leave untouched", so the payload must be the full universe; the
@@ -171,11 +193,19 @@ export async function primeOnlyActiveModule(
   values: { price: number; discountPrice: number; percentDiscountPrice: number },
 ): Promise<PricingSaveResult> {
   const read = await readStoreModulePricing(page, storeId);
-  if (!read.modules.some((row) => row.moduleId === moduleId)) {
+  const target = read.modules.find((row) => row.moduleId === moduleId);
+  if (!target) {
     throw new Error(
       `store-module-pricing-fixture: primeOnlyActiveModule — module ${moduleId} is not in the ` +
         `store's pricing universe [${read.modules.map((r) => r.moduleId).join(',')}]. The ` +
         'deterministic baseline this test needs cannot be created.',
+    );
+  }
+  if (!isBillableRow(target)) {
+    throw new Error(
+      `store-module-pricing-fixture: primeOnlyActiveModule — module ${moduleId} is price-included, ` +
+        'so the price rule excludes it from every total and this baseline would contribute nothing. ' +
+        'Pick a module with priceIncluded === false.',
     );
   }
   return saveStoreModulePricing(
@@ -429,8 +459,8 @@ export function expectPricesClose(actual: number, expected: number, what: string
 }
 
 /**
- * The independent browser-side copy of `GetCurrentPrice` / the ticked-row
- * total, used to state the expectation the modal must show. Written out here
+ * The independent browser-side copy of `GetCurrentPrice` — the FORMULA only,
+ * deliberately without the "which rows count" half of the rule. Written out here
  * rather than imported for the same reason as `expectedPlanGroups`: a test that
  * computes its expectation with the code under test proves nothing.
  */
@@ -441,4 +471,47 @@ export function expectedCurrentPrice(
 ): number {
   const current = price - (price * percentDiscountPrice) / 100 - discountPrice;
   return current < 0 ? 0 : current;
+}
+
+/**
+ * The independent copy of the OTHER half of the price rule —
+ * `ModulePriceCalculator.IsBillable` (backend) / `isBillableModule` (domain) —
+ * which decides WHETHER a row reaches a total at all:
+ *
+ *   billable  ⇔  isActive && !priceIncluded
+ *
+ * A row that is unticked contributes nothing (it is not part of the store), and
+ * a row whose price is already included in what the store pays contributes
+ * nothing either, however large its price is.
+ *
+ * Kept apart from {@link expectedCurrentPrice} on purpose: the formula is one
+ * clause of the rule and the filter is another, and a single helper that did
+ * both would let a bug in either hide behind the other.
+ */
+export function isBillableRow(row: { isActive: boolean; priceIncluded: boolean }): boolean {
+  return row.isActive && !row.priceIncluded;
+}
+
+/** The two rule flags a priced row must carry for {@link isBillableRow} to judge it. */
+export interface PricedRow {
+  isActive: boolean;
+  priceIncluded: boolean;
+  price: number;
+  discountPrice: number;
+  percentDiscountPrice: number;
+}
+
+/**
+ * Σ {@link expectedCurrentPrice} over the BILLABLE rows only — the expectation a
+ * total on screen must equal, re-derived instead of read off the code under
+ * test. Mirrors `totalModulePricing(...).currentPrice`.
+ */
+export function expectedBillableTotal(rows: readonly PricedRow[]): number {
+  return rows
+    .filter(isBillableRow)
+    .reduce(
+      (sum, row) =>
+        sum + expectedCurrentPrice(row.price, row.percentDiscountPrice, row.discountPrice),
+      0,
+    );
 }
