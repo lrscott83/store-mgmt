@@ -60,7 +60,18 @@ describe('CartCurrencySelect (MultiMonedas / module 15 gate)', () => {
     mockItems = [];
   });
 
-  it('renders nothing without the MultiPayments module', () => {
+  it('renders nothing without the MultiMonedas module', () => {
+    mockUser = userWith([2, 3]); // neither MultiMonedas nor MultiPayments
+    renderSelect(Currency.CUP);
+    expect(screen.queryByTestId('cart-currency-select')).not.toBeInTheDocument();
+  });
+
+  it('renders nothing for MultiPayments alone — the gate is MultiMonedas, not MultiPayments', () => {
+    // 09c65e27 moved the multi-currency gate from MultiPayments (16) to
+    // MultiMonedas (15). A store that still holds MultiPayments must NOT get the
+    // selector: without this, the old gate could creep back in and every test
+    // above would keep passing because they all grant the module explicitly.
+    mockUser = userWith([EModules.MultiPayments]);
     renderSelect(Currency.CUP);
     expect(screen.queryByTestId('cart-currency-select')).not.toBeInTheDocument();
   });
