@@ -26,6 +26,7 @@ import { ProductCategoryRepository } from '~/sales/lib/repositories/product-cate
 import {
   hasCreditsModuleAvailable,
   hasInventoryModuleAvailable,
+  hasMultiMonedasModuleAvailable,
   hasMultiPaymentsModuleAvailable,
 } from '~/shared/lib/auth/authorization-service';
 import { getOrderTypeText } from '~/sales/lib/order-type-utils';
@@ -42,7 +43,6 @@ import { showToastSuccess, showToastError } from '~/shared/lib/toast';
 import { round2 } from '~/shared/lib/money';
 import { currencyLabel, formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency';
 import { readCartCurrencyPreference, writeCartCurrencyPreference } from '~/shared/lib/cart-currency-preference';
-import { hasMultiMonedasAvailable } from '~/shared/components/multimonedas/currency-select';
 import {
   DEFAULT_ENABLED_CHANNEL_KEYS,
   StorePaymentMethodsConfigService,
@@ -151,9 +151,11 @@ export function CartShell() {
   const user = useAuthStore((s) => s.user);
   const creditsModuleAvailable = user ? hasCreditsModuleAvailable(user) : false;
   const storeId = user?.selectedStoreId ?? '';
-  // MultiPayments (módulo 16): moneda de la venta elegida por el usuario,
+  // MultiMonedas (módulo 15): moneda de la venta elegida por el usuario,
   // persistida por usuario y reutilizada en la próxima venta. Sin el módulo el
   // estado queda sin uso y el carrito conserva el comportamiento previo.
+  const multiMonedasAvailable = user ? hasMultiMonedasModuleAvailable(user) : false;
+  // MultiPayments (módulo 16): solo gobierna la lista/cobro multi-pago.
   const multiPaymentsAvailable = user ? hasMultiPaymentsModuleAvailable(user) : false;
   const [preferredCartCurrency, setPreferredCartCurrency] = useState<Currency>(() =>
     readCartCurrencyPreference(user?.id),
@@ -169,13 +171,20 @@ export function CartShell() {
   // sigue contando unidades (cartBadgeCount cae a la suma por producto sin config).
   const itemCount = wholesaleCartDisplay.cartBadgeCount(items, orderType);
 
-  // MultiPayments (módulo 16): las filas se convierten a la moneda de la venta con
-  // el MISMO registro de tasas que usa la lista, para que el bloqueo de "Registrar"
-  // coincida exactamente con el bloqueo de cobro de la propia lista.
+  // MultiMonedas (módulo 15) + MultiPayments (módulo 16): las líneas se convierten
+  // a la moneda de la venta con el MISMO registro de tasas que usa la lista de
+  // multi-pago, para que el bloqueo de "Registrar" coincida exactamente con el
+  // bloqueo de cobro de la propia lista. Las tasas se cargan si cualquiera de los
+  // dos caminos (multi-moneda o multi-pago) está activo.
   const multiPaymentRates = useMemo<ChannelRate[]>(() => {
-    if (!multiPaymentsAvailable || typeof window === 'undefined' || !storeId) return [];
+    if (
+      (!multiMonedasAvailable && !multiPaymentsAvailable) ||
+      typeof window === 'undefined' ||
+      !storeId
+    )
+      return [];
     return new ChannelRateOfflineService(storeId).getStorageChannelRates();
-  }, [multiPaymentsAvailable, storeId]);
+  }, [multiMonedasAvailable, multiPaymentsAvailable, storeId]);
 
   // MultiMonedas: la moneda NATIVA del carrito la fija el primer ítem (CUP si está
   // vacío), igual que `cartCurrency()`. Es el fallback seguro: la primera línea es
@@ -190,15 +199,15 @@ export function CartShell() {
     [items, preferredCartCurrency, multiPaymentRates],
   );
   const preferredCurrencyUnconvertible =
-    multiPaymentsAvailable &&
+    multiMonedasAvailable &&
     items.length > 0 &&
     preferredCartCurrency !== nativeCurrency &&
     preferredConversion.firstError !== null;
 
-  // MultiPayments (módulo 16): la moneda de la venta la define la preferencia
+  // MultiMonedas (módulo 15): la moneda de la venta la define la preferencia
   // persistida del usuario, salvo el fallback de T4; sin el módulo se conserva
   // EXACTAMENTE cartCurrency().
-  const saleCurrency: Currency = !multiPaymentsAvailable
+  const saleCurrency: Currency = !multiMonedasAvailable
     ? nativeCurrency
     : preferredCurrencyUnconvertible
       ? nativeCurrency
@@ -243,14 +252,14 @@ export function CartShell() {
 
   const methodOptions = useMemo(() => {
     const base = paymentMethodOptionsForCurrency(saleCurrency);
-    const planGate = hasMultiMonedasAvailable(user)
+    const planGate = multiMonedasAvailable
       ? base
       : base.filter((m) => m !== SalePaymentMethod.Zelle);
     return applyStorePaymentMethodsConfig(
       planGate,
       enabledMethodsForCurrency(paymentConfigEnabledChannels, saleCurrency),
     );
-  }, [saleCurrency, user, paymentConfigEnabledChannels]);
+  }, [saleCurrency, multiMonedasAvailable, paymentConfigEnabledChannels]);
 
   useEffect(() => {
     if (!methodOptions.includes(salePaymentMethod)) {
@@ -266,11 +275,15 @@ export function CartShell() {
   // Ratified decision 8 (multipayments plan 2026-09-18): while the multi-payment UI is
   // active (module 16 + items) the sale total is the UNPRICED line sum, so the display,
   // the coverage guard, the list total and the persisted order all agree. Without module
-  // 16 the priced total stays byte-identical to the legacy behavior.
+  // 16 the priced total is applied over the converted line sum (raw when MultiMonedas is
+  // off); with neither module it stays byte-identical to the legacy behavior.
   const pricing = paymentPricingFor(saleCurrency, salePaymentMethod);
   const multiPaymentsActive = multiPaymentsAvailable && items.length > 0;
+  // MultiMonedas (módulo 15) + items: el carrito multi-moneda está activo. La
+  // conversión de líneas y el submit dependen de este flag, no del multi-pago.
+  const multiCurrencyActive = multiMonedasAvailable && items.length > 0;
 
-  // MultiPayments (módulo 16, T8): cada línea del carrito se convierte a la moneda
+  // MultiMonedas (módulo 15, T8): cada línea del carrito se convierte a la moneda
   // de la venta elegida (una tasa por moneda, no por canal). Sin el módulo el
   // resultado queda sin uso y el total conserva EXACTAMENTE el camino legado.
   const lineConversion = useMemo(
@@ -279,11 +292,14 @@ export function CartShell() {
   );
 
   // Decision 8 + T8: con el multi-pago activo el total de la venta es la suma de
-  // las líneas CONVERTIDAS a la moneda de la venta; sin el módulo se conserva el
-  // total con pricing previo, byte-idéntico al comportamiento legado.
+  // las líneas CONVERTIDAS a la moneda de la venta. Sin multi-pago, pero con
+  // MultiMonedas, se usa la suma convertida (base) y se le aplica el pricing del
+  // método; sin ningún módulo se conserva el total con pricing previo,
+  // byte-idéntico al comportamiento legado.
+  const convertedLineTotal = multiMonedasAvailable ? lineConversion.total : total();
   const totalAmount = multiPaymentsActive
     ? lineConversion.total
-    : applyPaymentPricing(total(), pricing);
+    : applyPaymentPricing(convertedLineTotal, pricing);
   const paymentReturn = getPaymentReturn(payment, totalAmount);
   const paymentReturnKind = getPaymentReturnKind(paymentReturn);
   const cashSale = isCashMethod(salePaymentMethod);
@@ -342,7 +358,7 @@ export function CartShell() {
   // subpagadas).
   // Un error de conversión de línea es un bloqueo duro (también en ventas a crédito:
   // sin convertir la línea no hay precio persistible en la moneda de la venta).
-  const lineConversionBlocked = multiPaymentsActive && lineConversion.firstError !== null;
+  const lineConversionBlocked = multiCurrencyActive && lineConversion.firstError !== null;
   const multiPaymentBlocked =
     multiPaymentsAvailable &&
     items.length > 0 &&
@@ -359,9 +375,9 @@ export function CartShell() {
     clear();
     resetTransientFields();
     // T17: "Limpiar" returns the sale currency to CUP and dismisses any pending
-    // currency-change notice, so the next sale starts clean. Without module 16
+    // currency-change notice, so the next sale starts clean. Without MultiMonedas
     // the selector is not rendered, so only the module path is touched.
-    if (multiPaymentsAvailable) {
+    if (multiMonedasAvailable) {
       setPreferredCartCurrency(Currency.CUP);
       setCurrencyChangeError(null);
       writeCartCurrencyPreference(user?.id, Currency.CUP);
@@ -514,12 +530,13 @@ export function CartShell() {
       return;
     }
 
-    // T8: con el multi-pago activo las líneas se persisten YA convertidas a la
-    // moneda de la venta — `price` convertido y `product.currency = saleCurrency`,
-    // de modo que el `OrderItem.currency`, la `orderCurrency` derivada y el total
-    // del `createOrder` quedan en `saleCurrency` sin tocar el carrito del store.
+    // T8: con el carrito multi-moneda activo (módulo 15) las líneas se persisten
+    // YA convertidas a la moneda de la venta — `price` convertido y
+    // `product.currency = saleCurrency`, de modo que el `OrderItem.currency`, la
+    // `orderCurrency` derivada y el total del `createOrder` quedan en
+    // `saleCurrency` sin tocar el carrito del store.
     // Sin el módulo se pasan los ítems sin cambios (byte-idéntico).
-    const orderCartItems = multiPaymentsActive
+    const orderCartItems = multiCurrencyActive
       ? items.map((item, index) => {
           const line = lineConversion.lines[index];
           if (!line || line.convertedUnitPrice === null) return item;
@@ -642,7 +659,7 @@ export function CartShell() {
                 </span>
               </div>
               <div className="flex shrink-0 items-center gap-1.5">
-                {/* MultiPayments: selector de moneda del carrito (módulo 16), en la
+                {/* MultiMonedas: selector de moneda del carrito (módulo 15), en la
                   misma fila del encabezado y ANTES de "Limpiar". El propio
                   componente se oculta sin el módulo, así que ningún flujo existente cambia. */}
                 <CartCurrencySelect
@@ -671,7 +688,7 @@ export function CartShell() {
             </div>
 
             {/* T4: aviso cuando el cambio de moneda se rechazó porque una línea no
-              puede convertirse. Sin el módulo 16 el aviso nunca aparece. */}
+              puede convertirse. Sin el módulo 15 el aviso nunca aparece. */}
             {currencyChangeError && (
               <div className="border-b border-border px-2 py-2">
                 <p
@@ -777,8 +794,8 @@ export function CartShell() {
 
             {/* T8: si alguna línea no se puede convertir a la moneda de la venta, se
               muestra el error tipado y "Registrar" queda bloqueado (multiPaymentBlocked).
-              Sin el módulo 16 este aviso nunca aparece. */}
-            {multiPaymentsActive && lineConversion.firstError && (
+              Sin MultiMonedas (módulo 15) este aviso nunca aparece. */}
+            {multiCurrencyActive && lineConversion.firstError && (
               <div className="border-b border-border px-2 py-2">
                 <p
                   role="alert"
@@ -835,9 +852,10 @@ export function CartShell() {
               ) : (
                 <ul className="divide-y divide-border">
                   {items.map((item, index) => {
-                    // T8: con el multi-pago activo la línea se muestra convertida a la
-                    // moneda de la venta; sin el módulo se conserva el cálculo legado.
-                    const convertedUnitPrice = multiPaymentsActive
+                    // T8: con el carrito multi-moneda activo la línea se muestra
+                    // convertida a la moneda de la venta; sin el módulo se conserva
+                    // el cálculo legado.
+                    const convertedUnitPrice = multiCurrencyActive
                       ? (lineConversion.lines[index]?.convertedUnitPrice ?? null)
                       : null;
                     const displayItem =

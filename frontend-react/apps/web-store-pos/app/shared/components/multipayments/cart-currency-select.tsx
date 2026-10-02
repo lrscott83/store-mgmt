@@ -5,7 +5,7 @@ import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { useCartStore } from '~/shared/lib/stores/cart-store';
 import { currencyLabel } from '~/shared/lib/format-money-with-currency';
 import { writeCartCurrencyPreference } from '~/shared/lib/cart-currency-preference';
-import { hasMultiPaymentsModuleAvailable } from '~/shared/lib/auth/authorization-service';
+import { hasMultiMonedasModuleAvailable } from '~/shared/lib/auth/authorization-service';
 
 /** Fixed prefix of the options: CUP (default) then USD. Cart currencies append after. */
 const BASE_OPTIONS: { value: Currency; label: string }[] = [
@@ -55,9 +55,9 @@ interface CartCurrencySelectProps {
 }
 
 /**
- * Cart currency selector — rendered ONLY when the store has the MultiPayments
- * module (module 16). Without the module nothing renders and the cart keeps its
- * pre-MultiPayments behavior (the first item's currency). The selected value is
+ * Cart currency selector — rendered ONLY when the store has the MultiMonedas
+ * module (module 15). Without the module nothing renders and the cart keeps its
+ * pre-MultiMonedas behavior (the first item's currency). The selected value is
  * persisted per user so it survives reloads and is reused on the next sale.
  *
  * Layout: compact inline control so the cart can place it in the header
@@ -75,7 +75,7 @@ export function CartCurrencySelect({
   const intl = useIntl();
   const user = useAuthStore((s) => s.user);
   const items = useCartStore((s) => s.items);
-  const available = hasMultiPaymentsModuleAvailable(user);
+  const available = hasMultiMonedasModuleAvailable(user);
 
   // Built unconditionally (pure computation) because hooks must run on every
   // render; when the module is absent the early return below discards them.

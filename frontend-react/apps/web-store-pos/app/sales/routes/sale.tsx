@@ -13,7 +13,7 @@ import { showBlockingError } from '~/shared/lib/blocking-alert';
 import { showToastError, showToastSuccess } from '~/shared/lib/toast';
 import {
   hasInventoryModuleAvailable,
-  hasMultiPaymentsModuleAvailable,
+  hasMultiMonedasModuleAvailable,
 } from '~/shared/lib/auth/authorization-service';
 import { InventoryOfflineService } from '~/inventory/lib/services/inventory-offline-service';
 import { ProductRepository } from '~/sales/lib/repositories/product-repository';
@@ -217,7 +217,7 @@ export function SalePage() {
     const currencyGuard = guardCurrency({
       items: cartItems,
       requestedProduct: requested ?? {},
-      allowMixedCurrencies: hasMultiPaymentsModuleAvailable(user),
+      allowMixedCurrencies: hasMultiMonedasModuleAvailable(user),
     });
     if (!currencyGuard.succeeded) return currencyGuard;
     return availabilityGate(requested, productId, quantity);
@@ -244,7 +244,7 @@ export function SalePage() {
     const currencyGuard = guardCurrency({
       items: cartItems,
       requestedProduct: product,
-      allowMixedCurrencies: hasMultiPaymentsModuleAvailable(user),
+      allowMixedCurrencies: hasMultiMonedasModuleAvailable(user),
     });
     if (!currencyGuard.succeeded) {
       return currencyGuard;
