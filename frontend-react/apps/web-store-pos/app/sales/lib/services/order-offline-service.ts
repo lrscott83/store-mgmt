@@ -26,6 +26,7 @@ import type { CategoryCartItemsView } from '../category-cart-items-view';
 import { buildCategoryCartItemsView } from '../category-cart-items-view';
 import { getCurrentUserLogin } from '~/shared/lib/auth/current-user';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
+import { bumpDataRevision } from '~/shared/lib/stores/data-revision-store';
 import { hasInventoryModuleAvailable } from '~/shared/lib/auth/authorization-service';
 import { calculateOrderProfit } from '~/inventory/lib/profit-calculator';
 import { round2 } from '~/shared/lib/money';
@@ -493,6 +494,13 @@ export class OrderOfflineService {
     // cached array, then persist the whole array.
     this.getStorageOrders().push(order);
     this.setOrdersLocalStorage(this.orders!);
+
+    // This method already mutated more than the order list: `getAvailableInventoryCosts`
+    // above decremented `entry.available` in place and persisted it, so any mounted view
+    // deriving available stock from this store is stale from here on. The bump belongs
+    // here — at the mutation boundary — so it fires once per real data change and every
+    // sale-registration path is covered, rather than in whichever UI triggered it.
+    bumpDataRevision();
 
     if (isCredit) {
       // The returned DataResult is ignored (fire-and-forget). `note` is always ''. The credit
