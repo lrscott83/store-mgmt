@@ -94,7 +94,14 @@ Rama: `dev` (árbol limpio al iniciar). Alcance autorizado: **solo `frontend-rea
 - Checks: tests de loader/menu actualizados.
 - Criterio: un store con 15 y sin 16 ve y abre la vista; sin 15 no la ve.
 
-### T7 — Verificación final
+### T9 — Consumir Moneda de Compra en entrada del día y alta de producto
+- `inventory/components/edit-inventory-entry-modal.tsx`: en modo creación, el default de `currency` debe ser `StoreCurrencyConfigService(storeId).getConfig().buyCurrency` (SSR-safe → CUP). En modo edición se conserva `entry?.currency`.
+- `sales/components/create-product-modal.tsx`: el default de `costCurrency` (lado compra) debe ser la Moneda de Compra de la tienda; `currency` (precio de venta) sin cambios.
+- Sin config (default CUP) el comportamiento es idéntico al actual.
+- Checks: tests unitarios (creación usa Compra; edición preserva la moneda guardada; sin config → CUP).
+
+### T7 — Verificación final (re-ejecutar tras T9)
+
 - `pnpm typecheck`, `pnpm lint`, `pnpm test` (excluyendo E2E) en `frontend-react/`.
 - Reportar resultados reales; nada de "verde" sin correr.
 
@@ -137,7 +144,8 @@ Rama: `dev` (árbol limpio al iniciar). Alcance autorizado: **solo `frontend-rea
 - [x] T5 Guardarraíl registro de tasas (excluir USD) — commit `fe2cd29c`
 - [x] T6 Gating channel-rates + menu — commit `fe2cd29c` (52 + 54 tests, typecheck 0)
 - [x] T8 Actualizar E2E multipayments-currency-block.spec.ts a la nueva precedencia (AUTORIZADO) — commit `ad5a1f1e`
-- [x] T7 Verificación final (typecheck/lint/test no-E2E)
+- [x] T9 Consumir Moneda de Compra en entrada del día y alta de producto — commit `3e2f65cc` (535 + 285 tests, typecheck 0)
+- [x] T7 Verificación final (typecheck/lint/test no-E2E) — re-ejecutada tras T9 (typecheck 0)
 
 ## Evidencia de verificación (2026-10-02)
 
@@ -155,10 +163,12 @@ Rama: `dev` (árbol limpio al iniciar). Alcance autorizado: **solo `frontend-rea
 - `0bfdcf7c` feat(cart): default cart currency to store sale currency and refresh rates on open
 - `fe2cd29c` fix(channel-rates): gate by MultiMonedas and stop registering USD pivot rows
 - `ad5a1f1e` test(e2e): pin store sale-currency precedence in cart currency block spec
+- `3e2f65cc` feat(inventory,sales): default day entry and product cost to store buy currency
 
 ## Estado final
 
-- Todas las tareas T1–T8 cerradas. Feature completa en `dev` (sin push, sin PR).
+- Todas las tareas T1–T9 cerradas. Feature completa en `dev` (sin push, sin PR).
+- Moneda de Compra consumida en entrada del día (modo creación) y en el costo del alta de producto; Moneda de Venta por defecto en el carrito.
 - Pendiente de decisión del usuario: push/PR (política de repo). No hay gate de review ejecutado (RDD no se invocó en esta sesión).
 
 
