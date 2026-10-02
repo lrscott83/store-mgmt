@@ -226,7 +226,10 @@ export function CatalogProductEditor({
             value={description}
             placeholder={intl.formatMessage({ id: 'WEB_CATALOG.DESCRIPTION_PLACEHOLDER' })}
             onChange={(event) => onDescriptionChange(event.target.value)}
-            className={INPUT_CLASSES}
+            // `w-full` va AQUÍ y no en `INPUT_CLASSES`: el `textarea` es inline-block, así que sin
+            // esto se queda con su ancho por defecto (~20 columnas) en vez de llenar la tarjeta.
+            // Mismo criterio que el input del catálogo público, que también lo suma por fuera.
+            className={`w-full ${INPUT_CLASSES}`}
             data-testid={`catalog-description-${product.id}`}
           />
           <p className="mt-1 text-right text-xs text-text-muted">

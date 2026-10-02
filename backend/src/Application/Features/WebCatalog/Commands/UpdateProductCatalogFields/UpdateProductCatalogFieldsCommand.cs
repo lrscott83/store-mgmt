@@ -112,6 +112,12 @@ namespace Application.Features.WebCatalog.Commands.UpdateProductCatalogFields
                 product.DiscountPrice = request.DiscountPrice.Value;
             if (request.IsNew.HasValue)
                 product.IsNew = request.IsNew.Value;
+
+            // Quitar la imagen principal limpia SOLO `Product.Image`. La galería es un dato aparte y
+            // NO se borra aquí: el E2E `Remove_image_clears_the_main_image_only` fija exactamente esa
+            // separación. Y aunque sus filas se quedaran, el catálogo público ya no las lee —la
+            // fuente única es `Product.Image` (PublicCatalogProductMapper)—, así que no pueden
+            // publicar una foto fantasma.
             if (request.RemoveImage)
                 product.Image = null;
             else if (request.Image != null)

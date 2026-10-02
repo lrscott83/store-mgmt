@@ -78,6 +78,9 @@ reduce las escritura al mínimo.
 - [x] **T5** — `public-catalog.tsx`: tarjeta con nombre izquierda + precio derecha en la misma fila
   con fuente menor, y debajo la descripción en `text-xs` con `line-clamp-3` (puntos suspensivos).
 - [x] **T6** — Verificación: `typecheck`, `lint` y los dos archivos de test afectados.
+- [x] **T7** — El `textarea` de la descripción ocupa todo el ancho disponible. Decisión del owner
+  (2026-10-01): el control se estira a lo ancho de la tarjeta. **Sin borrar el código comentado**
+  (galería, descuentos, grid de actualización) — sigue intacto y comentado.
 
 ## Criterios de aceptación
 
@@ -119,6 +122,14 @@ estructural y una comprobación de un comando reportado.
   comentado (se eliminó la grid), y el escritor dejó el archivo sin salto de línea final.
 - 2026-10-01 — Tres ramas que el escritor dejó sin cubrir, cerradas por el padre: marcado de
   borrado de imagen, exclusividad imagen↔borrado, y bloqueo por descripción demasiado larga.
+- 2026-10-01 — T7 cerrada (inline, 1 archivo ya entendido). El `textarea` usaba solo
+  `INPUT_CLASSES`, que no trae ninguna clase de ancho, y siendo `inline-block` se quedaba en su
+  ancho por defecto (~20 columnas) aunque la caja padre es `block`. Se añadió `w-full` **en el
+  `textarea`** y no en `INPUT_CLASSES`: esa constante guarda a propósito solo la parte visual
+  compartida, y el input del catálogo público hace lo mismo (`w-full` por fuera de las clases
+  comunes). Código comentado intacto.
+- 2026-10-01 — Causa raíz del bug de imagen fantasma en el popup público diagnosticada y
+  documentada en `odd/tasks/catalog-image-single-source.md` (aún sin arreglar en esta feature).
 
 ## Evidencia de verificación
 
@@ -132,6 +143,17 @@ Los 69 errores de `typecheck` son preexistentes y viven en `app/sync/**` (`Chann
 `sellValue` ausentes en el tipo de dominio) y `messages-realtime-service.ts`
 (`Cannot find module '@microsoft/signalr'`). Ninguno de esos archivos aparece en el diff.
 `pnpm typecheck` NO estaba verde antes de este cambio; queda como deuda ajena a esta feature.
+
+### T7 (2026-10-01)
+
+| Comando | Resultado |
+| --- | --- |
+| `pnpm exec turbo run typecheck --force --filter=@store-mgmt/web-store-pos` | 5 successful, 0 cached, 43.7s |
+| `pnpm exec turbo run lint --force --filter=@store-mgmt/web-store-pos` | 4 successful, 0 cached, 1m14.654s |
+| `pnpm --filter @store-mgmt/web-store-pos exec vitest run app/sales/routes/__tests__/web-catalog.test.tsx` | 21 passed (21), 0 fallos |
+
+Con `--force` a propósito: sin él turbo devuelve `FULL TURBO` (replay de caché, cero ejecución real)
+y el exit 0 no probaría nada.
 
 ## Decisiones que quedaron dentro de la feature
 
