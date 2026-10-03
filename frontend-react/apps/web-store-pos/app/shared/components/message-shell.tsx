@@ -382,10 +382,24 @@ export function MessageShell() {
 
   return (
     <div className="static sm:relative" ref={shellRef}>
+      {/*
+        Trigger mirrors CartShell's trigger EXACTLY — `rounded-lg p-2`, a
+        colored glyph, a pale tint of that same color on hover — with the
+        brand purple swapped for the chat identity's WhatsApp green (user
+        request 2026-10-02). The two gadgets sit side by side in the header,
+        so before this the chat trigger borrowed the cart's `bg-primary-light`
+        hover and the two looked like the same control in two states. The
+        unread badge gets the same treatment for the same reason — it was
+        `bg-primary`, i.e. literally the cart badge's purple.
+
+        `text-whatsapp` / `hover:bg-whatsapp-light` are theme tokens
+        (web-common/styles.css); the literal `#25D366` used to be repeated in
+        three files, which is how a brand color ends up drifting.
+      */}
       <button
         type="button"
         onClick={handleToggle}
-        className="relative rounded-lg p-2 text-[#25D366] hover:bg-primary-light transition-colors"
+        className="relative rounded-lg p-2 text-whatsapp hover:bg-whatsapp-light transition-colors"
         aria-label={intl.formatMessage({ id: 'MESSAGES.TITLE' })}
       >
         <ChatIcon />
@@ -416,7 +430,7 @@ export function MessageShell() {
         <span
           data-testid="message-badge"
           className={`absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-xs font-bold text-white ${
-            totalUnread > 0 ? 'bg-primary' : 'bg-text-muted'
+            totalUnread > 0 ? 'bg-whatsapp' : 'bg-text-muted'
           }`}
         >
           {totalUnread > 99 ? '99+' : totalUnread}

@@ -1,11 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Currency, Result } from '@store-mgmt/domain';
-import type {
-  ExchangeRate,
-  Warehouse,
-  WarehouseStockLevel,
-  WarehouseStockMovement,
-} from '@store-mgmt/domain';
+import type { Warehouse, WarehouseStockLevel, WarehouseStockMovement } from '@store-mgmt/domain';
 import { ProductCategoryRepository } from '~/sales/lib/repositories/product-category-repository';
 import { ProductRepository } from '~/sales/lib/repositories/product-repository';
 import { InventoryOfflineService } from '~/inventory/lib/services/inventory-offline-service';
@@ -14,7 +9,6 @@ import { DataSerializerService } from '../data-serializer-service';
 import { DataSynchronizerService, SynchronizerErrors } from '../data-synchronizer-service';
 import type {
   CategoryImportRepo,
-  ExchangeRateImportService,
   ExpenseImportService,
   InventoryImportService,
   OrderImportService,
@@ -55,12 +49,6 @@ const makeExpenseService = (): ExpenseImportService => ({
   getStorageExpenses: () => [],
   addImportedExpense: () => Result.Success(),
   updateImportedExpense: () => Result.Success(),
-});
-
-const makeExchangeService = (): ExchangeRateImportService => ({
-  getStorageExchangeRates: () => [] as ExchangeRate[],
-  addImportedExchangeRate: () => Result.Success(),
-  updateImportedExchangeRate: () => Result.Success(),
 });
 
 const makeSaleCreditService = (): SaleCreditImportService => ({
@@ -114,7 +102,6 @@ function makeData(
     orders: [],
     expenses: [],
     saleCredits: [],
-    exchangeRates: [],
     warehouses,
     warehouseStockLevels: stockLevels,
     warehouseStockMovements: movements,
@@ -149,7 +136,6 @@ describe('DataSynchronizerService — warehouses merge (warehouses-plan)', () =>
       makeOrderService(),
       makeExpenseService(),
       makeSaleCreditService(),
-      undefined,
       warehouseSvc,
     );
 
@@ -202,7 +188,6 @@ describe('DataSynchronizerService — warehouses merge (warehouses-plan)', () =>
       makeOrderService(),
       makeExpenseService(),
       makeSaleCreditService(),
-      undefined,
       warehouseSvc,
     );
 
@@ -248,7 +233,6 @@ describe('DataSynchronizerService — warehouses merge (warehouses-plan)', () =>
       makeOrderService(),
       makeExpenseService(),
       makeSaleCreditService(),
-      undefined,
       broken,
     );
 
@@ -267,7 +251,6 @@ describe('DataSynchronizerService — warehouses merge (warehouses-plan)', () =>
       makeOrderService(),
       makeExpenseService(),
       makeSaleCreditService(),
-      makeExchangeService(),
     );
 
     const result = await svc.sync(makeData([makeWarehouse('wh-1', 'Central')], [], []));
@@ -279,7 +262,6 @@ describe('DataSynchronizerService — warehouses merge (warehouses-plan)', () =>
       'orders',
       'expenses',
       'saleCredits',
-      'exchangeRates',
     ]);
   });
 });
@@ -334,7 +316,6 @@ describe('DataSerializerService — warehouses roundtrip (warehouses-plan)', () 
       { getStorageOrders: () => [] },
       { getStorageExpenses: () => [] },
       { getStorageSaleCredits: () => [] },
-      { getStorageExchangeRates: () => [] },
       warehouseSvc,
     );
 
@@ -403,7 +384,6 @@ describe('DataSerializerService — warehouses roundtrip (warehouses-plan)', () 
       { getStorageOrders: () => [] },
       { getStorageExpenses: () => [] },
       { getStorageSaleCredits: () => [] },
-      { getStorageExchangeRates: () => [] },
       warehouseSvc,
     );
 
@@ -446,7 +426,6 @@ describe('DataSerializerService — warehouses roundtrip (warehouses-plan)', () 
       makeOrderService(),
       makeExpenseService(),
       makeSaleCreditService(),
-      undefined,
       warehouseSvc,
     );
 
@@ -490,7 +469,6 @@ describe('DataSerializerService — warehouses roundtrip (warehouses-plan)', () 
       makeOrderService(),
       makeExpenseService(),
       makeSaleCreditService(),
-      undefined,
       warehouseSvc,
     );
 

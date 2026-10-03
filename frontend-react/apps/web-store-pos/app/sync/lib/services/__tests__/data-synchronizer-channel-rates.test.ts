@@ -86,7 +86,6 @@ function makeData(channelRates: ChannelRate[]): ParsedData {
     orders: [],
     expenses: [],
     saleCredits: [],
-    exchangeRates: [],
     warehouses: [],
     warehouseStockLevels: [],
     warehouseStockMovements: [],
@@ -109,7 +108,6 @@ describe('DataSynchronizerService — channelRates merge (multipayments T4)', ()
       makeOrderService(),
       makeExpenseService(),
       makeSaleCreditService(),
-      undefined,
       undefined,
       channel.svc,
     );
@@ -138,7 +136,6 @@ describe('DataSynchronizerService — channelRates merge (multipayments T4)', ()
       makeOrderService(),
       makeExpenseService(),
       makeSaleCreditService(),
-      undefined,
       undefined,
       channel.svc,
     );
@@ -169,7 +166,6 @@ describe('DataSynchronizerService — channelRates merge (multipayments T4)', ()
       makeOrderService(),
       makeExpenseService(),
       makeSaleCreditService(),
-      undefined,
       undefined,
       channel.svc,
     );
@@ -202,7 +198,6 @@ describe('DataSynchronizerService — channelRates merge (multipayments T4)', ()
       makeExpenseService(),
       makeSaleCreditService(),
       undefined,
-      undefined,
       channel.svc,
     );
 
@@ -226,7 +221,6 @@ describe('DataSynchronizerService — channelRates merge (multipayments T4)', ()
       makeOrderService(),
       makeExpenseService(),
       makeSaleCreditService(),
-      undefined,
       undefined,
       channel.svc,
     );
@@ -259,7 +253,6 @@ describe('DataSynchronizerService — channelRates merge (multipayments T4)', ()
       makeExpenseService(),
       makeSaleCreditService(),
       undefined,
-      undefined,
       channel.svc,
     );
 
@@ -283,7 +276,6 @@ describe('DataSynchronizerService — channelRates merge (multipayments T4)', ()
       makeExpenseService(),
       makeSaleCreditService(),
       undefined,
-      undefined,
       channelService,
     );
 
@@ -305,7 +297,6 @@ describe('DataSynchronizerService — channelRates merge (multipayments T4)', ()
       makeOrderService(),
       makeExpenseService(),
       makeSaleCreditService(),
-      undefined,
       undefined,
       channelService,
     );

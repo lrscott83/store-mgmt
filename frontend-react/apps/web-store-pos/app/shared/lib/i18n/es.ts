@@ -370,7 +370,6 @@ const messages: Record<string, string> = {
   // edit view is reached only from store cards, not from the menu.
   // Owner's "my stores" cards listing (owner-stores-cards plan, 2026-09-08)
   'MENU.MY_STORES': 'Mis tiendas',
-  'MENU.EXCHANGE_RATES': 'Cambio USD a MN',
   'MENU.CHANNEL_RATES': 'Tasas de Cambio',
   'MENU.USERS': 'Empleados',
   'MENU.BILLING_COLLECTIONS': 'Cobros pendientes',
@@ -1167,19 +1166,6 @@ const messages: Record<string, string> = {
   'STORES.OWNER_LABEL': 'Owner',
   'STORES.STORE_PHONE_LABEL': 'Teléfono',
   'STORES.STORE_DESCRIPTION_LABEL': 'Descripción',
-
-  // Exchange rates — daily USD→MN register (daily-exchange-rate)
-  'EXCHANGE_RATES.TITLE': 'Registro del cambio de USD a MN',
-  'EXCHANGE_RATES.INFO':
-    'Cada día se añade automáticamente un registro con el valor del día anterior (el primer día usa el valor por defecto 1). El valor indica cuántos pesos (MN) equivale 1 USD en esa fecha. Solo se puede editar el valor de cada día.',
-  'EXCHANGE_RATES.DATE_COLUMN': 'Fecha',
-  'EXCHANGE_RATES.VALUE_COLUMN': '1 USD = (MN)',
-  'EXCHANGE_RATES.SAVE': 'Guardar',
-  'EXCHANGE_RATES.SAVED': 'Valor actualizado correctamente.',
-  'EXCHANGE_RATES.EDIT': 'Editar',
-  'EXCHANGE_RATES.EDIT_TITLE': 'Editar valor del día',
-  'EXCHANGE_RATES.INVALID_VALUE': 'El valor debe ser un número mayor que 0.',
-  'EXCHANGE_RATES.NO_RECORDS': 'No hay registros todavía.',
 
   // Channel rates — append-only register per channel (method + currency),
   // multipayments. A new effective moment is a new row; registration happens

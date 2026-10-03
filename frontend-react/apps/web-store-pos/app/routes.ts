@@ -108,12 +108,6 @@ export default [
     route('management/stores/collections', 'management/stores/routes/collections.tsx'),
     route('management/stores/commissions', 'management/stores/routes/reseller-commissions.tsx'),
 
-    // Management â€” Exchange rates (daily USDâ†’MN register; same guard as
-    // Configurations â€” daily-exchange-rate)
-    route('management/exchange-rates', 'management/exchange-rates/routes/exchange-rates.tsx', {
-      id: 'management-exchange-rates',
-    }),
-
     // Management - Channel rates (multipayments): append-only register of the
     // rate per channel (method + currency); same guard as Configurations.
     route('management/channel-rates', 'management/channel-rates/routes/channel-rates.tsx', {

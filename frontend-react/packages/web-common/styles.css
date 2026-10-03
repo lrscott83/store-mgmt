@@ -11,6 +11,17 @@
   --color-primary: rgb(103 58 183);
   --color-primary-hover: rgb(94 53 177);
   --color-primary-light: rgb(237 231 246);
+  /* WhatsApp green — the chat/messages identity (MessageShell trigger, its
+     unread badge, the footer's "Contáctanos" link). Named after the vendor on
+     purpose: it is deliberately NOT `--color-success` (rgb(82 196 26)), which
+     is a different, yellower green, and collapsing the two would quietly
+     repaint every success state. `--color-whatsapp-light` is the pale tint
+     that plays the same role as `primary-light` for a hover background, so
+     the header's chat and cart gadgets can share a shape without sharing a
+     hue. Lives here because it had leaked into three files as a literal
+     `text-[#25D366]` / `bg-[#25D366]`. */
+  --color-whatsapp: rgb(37 211 102);
+  --color-whatsapp-light: rgb(232 246 238);
   --color-secondary: rgb(22 119 255);
   --color-accent: rgb(250 173 20);
   --color-success: rgb(82 196 26);

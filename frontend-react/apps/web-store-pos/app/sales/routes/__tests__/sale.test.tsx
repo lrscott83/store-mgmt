@@ -283,6 +283,20 @@ describe('SalePage — Angular parity (sale.component.html)', () => {
       makeCategory({ id: 'c1', name: 'Bebidas' }),
       makeCategory({ id: 'c2', name: 'Snacks' }),
     ];
+    // A sellable product per category is LOAD-BEARING here, not decoration.
+    // sale.tsx computes `sellableCategoryIds` from a Promise.all over EVERY
+    // category, then `displayableCategories` drops any category without
+    // sellable products. With mockProducts empty that Set comes back empty
+    // and BOTH buttons unmount — so `findByRole('Bebidas')` could still pass
+    // (the buttons render immediately, before the product promises settle)
+    // while the very next `getByRole('Snacks')` lost the race and threw. That
+    // is the ~50% flake this data removes: with a product per category the
+    // Set keeps c1 and c2 both before and after the products resolve, so the
+    // assertion no longer depends on which promise wins.
+    mockProducts = [
+      makeProduct({ id: 'p1', name: 'Coca Cola', categoryId: 'c1' }),
+      makeProduct({ id: 'p2', name: 'Papas', categoryId: 'c2' }),
+    ];
     render(
       <Wrapper>
         <SalePage />
@@ -290,6 +304,69 @@ describe('SalePage — Angular parity (sale.component.html)', () => {
     );
     expect(await screen.findByRole('button', { name: 'Bebidas' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Snacks' })).toBeInTheDocument();
+  });
+
+  // Covers the tab-level half of the filter that 'only filters products by
+  // categoryId, isActive and availableToSale' does NOT reach: that test
+  // asserts which PRODUCT rows render inside one already-visible category,
+  // while this one asserts which CATEGORY TABS exist at all. sale.tsx builds
+  // `sellableCategoryIds` from a Promise.all over every category and drops
+  // the unsellable ones from `displayableCategories`, so a category whose
+  // products are all inactive or not-for-sale must not get a tab at all.
+  //
+  // TIMING, and it is the whole reason this test needs waitFor and not a
+  // bare query: `sellableLoadedRef` is a REF, not state, so setting it
+  // re-renders nothing. Until the Promise.all settles, `displayableCategories`
+  // returns the raw category list and EVERY tab is briefly on screen. Assert
+  // `not.toBeInTheDocument()` straight after render would therefore be
+  // asserting a race, not a rule — it would pass or fail depending on which
+  // promise wins.
+  it('a category with no sellable products never gets a tab', async () => {
+    mockCategories = [
+      makeCategory({ id: 'c1', name: 'Bebidas' }),
+      makeCategory({ id: 'c2', name: 'Snacks' }),
+      makeCategory({ id: 'c3', name: 'Licores' }),
+    ];
+    mockProducts = [
+      makeProduct({ id: 'p1', name: 'Coca Cola', categoryId: 'c1' }),
+      // c3 has products, but none of them can be sold.
+      makeProduct({
+        id: 'p3',
+        name: 'Ron',
+        categoryId: 'c3',
+        isActive: true,
+        availableToSale: false,
+      }),
+      makeProduct({
+        id: 'p4',
+        name: 'Vino archivado',
+        categoryId: 'c3',
+        isActive: false,
+        availableToSale: true,
+      }),
+    ];
+    render(
+      <Wrapper>
+        <SalePage />
+      </Wrapper>,
+    );
+
+    // Positive control: c1 is sellable, so its tab and its product both land.
+    // Waiting on the product proves the per-category fetch resolved, so the
+    // absences below are the filter acting and not an unfinished render.
+    expect(await screen.findByText('Coca Cola')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Bebidas' })).toBeInTheDocument();
+
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Snacks' })).not.toBeInTheDocument(),
+    );
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Licores' })).not.toBeInTheDocument(),
+    );
+
+    // Neither unsellable product leaked in either.
+    expect(screen.queryByText('Ron')).not.toBeInTheDocument();
+    expect(screen.queryByText('Vino archivado')).not.toBeInTheDocument();
   });
 
   it('auto-selects the first category and shows its products, without the no-selection alert', async () => {

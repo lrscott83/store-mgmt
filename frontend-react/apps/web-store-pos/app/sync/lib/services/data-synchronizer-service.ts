@@ -1,7 +1,6 @@
 import { Result } from '@store-mgmt/domain';
 import type {
   ChannelRate,
-  ExchangeRate,
   Expense,
   InventoryEntry,
   Order,
@@ -77,10 +76,6 @@ export const SynchronizerErrors = {
   SaleCreditsUnexpectedError: {
     code: 'Synchronizer.SaleCreditsUnexpectedError',
     message: 'Ocurrió un error inesperado al sincronizar los créditos.',
-  },
-  ExchangeRatesUnexpectedError: {
-    code: 'Synchronizer.ExchangeRatesUnexpectedError',
-    message: 'Ocurrió un error inesperado al sincronizar el registro de cambio.',
   },
   WarehousesUnexpectedError: {
     code: 'Synchronizer.WarehousesUnexpectedError',
@@ -214,22 +209,10 @@ export interface OrderImportService {
 }
 
 /**
- * Exchange-rate import routes through the offline SERVICE (Angular-parity
- * shape: the service owns the domain-command layer). Upsert by id — the id IS
- * the local day key, so the merge is "one record per day, last import wins"
- * (daily-exchange-rate).
- */
-export interface ExchangeRateImportService {
-  getStorageExchangeRates(): ExchangeRate[];
-  addImportedExchangeRate(rate: ExchangeRate): Result;
-  updateImportedExchangeRate(rate: ExchangeRate): Result;
-}
-
-/**
- * Warehouse import routes through the offline SERVICE (warehouses-plan),
- * mirroring the ExchangeRates seam: the service owns the domain-command
- * layer. Upsert by id for warehouses, by (warehouseId, productId) for stock
- * levels; movements are append-only (id-presence decides add-vs-skip).
+ * Warehouse import routes through the offline SERVICE (warehouses-plan):
+ * the service owns the domain-command layer. Upsert by id for warehouses, by
+ * (warehouseId, productId) for stock levels; movements are append-only
+ * (id-presence decides add-vs-skip).
  */
 export interface WarehouseImportService {
   getStorageWarehouses(): Warehouse[];
@@ -357,9 +340,6 @@ export class DataSynchronizerService {
     private readonly orderService: OrderImportService,
     private readonly expenseService: ExpenseImportService,
     private readonly saleCreditService: SaleCreditImportService,
-    // Optional (daily-exchange-rate): legacy call sites/tests that predate the
-    // register omit it — the merge then degrades to a zero-count no-op.
-    private readonly exchangeRateService?: ExchangeRateImportService,
     // Optional (warehouses-plan): legacy call sites/tests that predate the
     // module omit it — the merges then degrade to zero-count no-ops.
     private readonly warehouseService?: WarehouseImportService,
@@ -410,15 +390,7 @@ export class DataSynchronizerService {
     // SaleCreditsUnexpectedError (Angular's copy-paste bug is fixed here).
     push(this.mergeSaleCreditsViaService(data.saleCredits));
 
-    // 7. ExchangeRates — routed through the offline SERVICE (daily-exchange-rate),
-    // upsert-by-day-key, break-only (no revert). Only when the service was
-    // injected: legacy constructor call sites (and their tests) predate the
-    // register and must keep a 6-entity merge contract.
-    if (this.exchangeRateService) {
-      push(this.mergeExchangeRatesViaService(data.exchangeRates));
-    }
-
-    // 8. Recipes — routed through the offline SERVICE (elaboration-module),
+    // 7. Recipes — routed through the offline SERVICE (elaboration-module),
     // upsert by id, break-only (no revert). Runs AFTER products so the
     // finished-product check sees the MERGED product set. Only when injected:
     // legacy constructor call sites keep their entity contract.
@@ -426,17 +398,17 @@ export class DataSynchronizerService {
       push(this.mergeRecipesViaService(data.recipes ?? []));
     }
 
-    // 9-11. Warehouses — routed through the offline SERVICE (warehouses-plan),
+    // 8-10. Warehouses — routed through the offline SERVICE (warehouses-plan),
     // upsert by id / (warehouseId, productId), movements append-only; each
     // break-only (no revert). Only when the service was injected: legacy
-    // constructor call sites keep the 7-entity merge contract.
+    // constructor call sites keep their merge contract.
     if (this.warehouseService) {
       push(this.mergeWarehousesViaService(data.warehouses));
       push(this.mergeWarehouseStockLevelsViaService(data.warehouseStockLevels));
       push(this.mergeWarehouseMovementsViaService(data.warehouseStockMovements));
     }
 
-    // 11. ChannelRates — routed through the offline SERVICE (multipayments T4),
+    // 11. ChannelRates — routed through the offline SERVICE (multipayments),
     // append-only (id-presence decides add-vs-skip), break-only (no revert).
     // Only when the service was injected: legacy constructor call sites keep
     // their merge contract.
@@ -744,66 +716,6 @@ export class DataSynchronizerService {
   // ---------------------------------------------------------------------------
   // InventoryEntries — grouped by productId, break-only, no revert
   // ---------------------------------------------------------------------------
-
-  // ---------------------------------------------------------------------------
-  // ExchangeRates — routed through the offline SERVICE (daily-exchange-rate)
-  // ---------------------------------------------------------------------------
-
-  /**
-   * Upsert-by-day-key merge of the imported daily USD→MN register. The id IS
-   * the local day key (`YYYY-MM-DD`), so add-vs-update is decided per day and
-   * the register can never hold two records for the same day after an import.
-   * Break-only (no revert); an unexpected throw yields
-   * `ExchangeRatesUnexpectedError`. When the service was not injected (legacy
-   * constructor call sites) the merge is a zero-count no-op.
-   */
-  private mergeExchangeRatesViaService(incoming: ExchangeRate[]): MergeOutcome {
-    if (!this.exchangeRateService || incoming.length === 0) {
-      return { merge: { entity: 'exchangeRates', inserted: 0, updated: 0 } };
-    }
-
-    let inserted = 0;
-    let updated = 0;
-
-    try {
-      const existing = new Map(
-        this.exchangeRateService.getStorageExchangeRates().map((r) => [r.id, r]),
-      );
-      for (const rate of incoming) {
-        const isNew = !existing.has(rate.id);
-        if (isNew) {
-          existing.set(rate.id, rate);
-          inserted++;
-        } else {
-          updated++;
-        }
-        const result = isNew
-          ? this.exchangeRateService.addImportedExchangeRate(rate)
-          : this.exchangeRateService.updateImportedExchangeRate(rate);
-        if (!result.succeeded) {
-          return {
-            merge: { entity: 'exchangeRates', inserted, updated },
-            error: {
-              entity: 'exchangeRates',
-              code: SynchronizerErrors.ExchangeRatesUnexpectedError.code,
-              message: SynchronizerErrors.ExchangeRatesUnexpectedError.message,
-            },
-          };
-        }
-      }
-      return { merge: { entity: 'exchangeRates', inserted, updated } };
-    } catch {
-      // Break-only: no revert — writes already applied before the failure persist.
-      return {
-        merge: { entity: 'exchangeRates', inserted, updated },
-        error: {
-          entity: 'exchangeRates',
-          code: SynchronizerErrors.ExchangeRatesUnexpectedError.code,
-          message: SynchronizerErrors.ExchangeRatesUnexpectedError.message,
-        },
-      };
-    }
-  }
 
   // ---------------------------------------------------------------------------
   // Recipes — routed through the offline SERVICE (elaboration-module)
