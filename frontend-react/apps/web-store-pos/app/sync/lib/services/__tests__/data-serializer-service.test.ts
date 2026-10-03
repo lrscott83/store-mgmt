@@ -26,7 +26,6 @@ import type {
   OrderReader,
   ExpenseReader,
   SaleCreditReader,
-  ExchangeRateReader,
 } from '../data-serializer-service';
 import { ProductCategoryRepository } from '~/sales/lib/repositories/product-category-repository';
 import { ProductRepository } from '~/sales/lib/repositories/product-repository';
@@ -39,7 +38,6 @@ import type {
   Order,
   Expense,
   SaleCredit,
-  ExchangeRate,
 } from '@store-mgmt/domain';
 import { SalePaymentMethod } from '@store-mgmt/domain';
 
@@ -61,12 +59,13 @@ const ANGULAR_ENTRY_NAMES = [
   'sale-credits.json',
 ];
 
-// daily-exchange-rate: the seventh data entry added on top of Angular's six.
+// retire-exchange-rates-register: the daily USD→MN register is GONE from the
+// entry set, so `exchange-rates.json` is no longer written. An archive from
+// before the retirement still carries it and the import ignores it.
 // warehouses-plan: three more entries (warehouses, stock levels, movements).
-// multipayments T4: the append-only channel-rate register (channel-rates.json).
+// multipayments: the append-only channel-rate register (channel-rates.json).
 const ALL_ENTRY_NAMES = [
   ...ANGULAR_ENTRY_NAMES,
-  'exchange-rates.json',
   'warehouses.json',
   'warehouse-stock-levels.json',
   'warehouse-stock-movements.json',
@@ -210,7 +209,6 @@ function makeService(
     orders?: Order[];
     expenses?: Expense[];
     saleCredits?: SaleCredit[];
-    exchangeRates?: ExchangeRate[];
     // store-payment-methods-backup: undefined = no reader at all (legacy
     // call-site shape); null = reader present, key absent (no entry); config =
     // reader present with a stored config (entry written).
@@ -224,7 +222,6 @@ function makeService(
   const ords = overrides?.orders ?? [mockOrder];
   const exps = overrides?.expenses ?? [mockExpense];
   const creds = overrides?.saleCredits ?? [mockSaleCredit];
-  const rates = overrides?.exchangeRates ?? [];
 
   seedCategories(storeId, cats);
   seedProducts(storeId, prods);
@@ -236,7 +233,6 @@ function makeService(
   const orderReader: OrderReader = { getStorageOrders: () => ords };
   const expenseReader: ExpenseReader = { getStorageExpenses: () => exps };
   const saleCreditReader: SaleCreditReader = { getStorageSaleCredits: () => creds };
-  const exchangeRateReader: ExchangeRateReader = { getStorageExchangeRates: () => rates };
   const storePaymentMethodsReader =
     overrides?.storePaymentMethods !== undefined
       ? new StorePaymentMethodsConfigService(storeId)
@@ -253,7 +249,6 @@ function makeService(
     orderReader,
     expenseReader,
     saleCreditReader,
-    exchangeRateReader,
     undefined,
     undefined,
     undefined,
@@ -410,6 +405,13 @@ async function buildV2ZipWithIterations(
   return new Uint8Array(await blob.arrayBuffer());
 }
 
+/**
+ * Retired with the daily register (retire-exchange-rates-register): no longer a
+ * member of `EDataFileName`, but archives exported before the retirement still
+ * carry the entry under this exact name.
+ */
+const RETIRED_EXCHANGE_RATES_ENTRY = 'exchange-rates.json';
+
 /** The 6 Angular-named payloads for a legacy v1 archive (matches makeService defaults). */
 function makeV1Payloads(): Record<string, string> {
   return {
@@ -501,7 +503,7 @@ describe('DataSerializerService', () => {
 
     // parity-audit-remediation Slice 2: naming-only alignment with Angular's
     // EDataFileName enum (data.file.model.ts:6-13) — PascalCase members, same string values.
-    it("EDataFileName mirrors Angular's PascalCase member names with unchanged string values, plus the daily-exchange-rate seventh entry, the three warehouses entries, the multipayments channel-rates entry, the two elaboration entries and the store-payment-methods entry", () => {
+    it("EDataFileName mirrors Angular's PascalCase member names with unchanged string values, plus the three warehouses entries, the multipayments channel-rates entry, the two elaboration entries and the store-payment-methods entry (no exchange-rates entry: retire-exchange-rates-register)", () => {
       expect(EDataFileName).toEqual({
         Categories: 'categories.json',
         Products: 'products.json',
@@ -509,7 +511,6 @@ describe('DataSerializerService', () => {
         Orders: 'orders.json',
         Expenses: 'expenses.json',
         SaleCredits: 'sale-credits.json',
-        ExchangeRates: 'exchange-rates.json',
         Warehouses: 'warehouses.json',
         WarehouseStockLevels: 'warehouse-stock-levels.json',
         WarehouseStockMovements: 'warehouse-stock-movements.json',
@@ -932,49 +933,33 @@ describe('DataSerializerService', () => {
   });
 
   // -------------------------------------------------------------------------
-  // T8 — daily-exchange-rate: exchange-rates.json seventh data entry
+  // retire-exchange-rates-register: the retired daily register's entry
   // -------------------------------------------------------------------------
 
-  describe('T8 — daily USD→MN register entry (daily-exchange-rate)', () => {
-    const mockRate = (id: string, value: number): ExchangeRate => ({
-      id,
-      date: new Date(`2026-08-0${id.slice(-1)}T00:00:00.000Z`),
-      value,
-    });
-
-    it('export writes exchange-rates.json and import parses it back', async () => {
-      const rates = [
-        mockRate('2026-08-01', 120),
-        mockRate('2026-08-02', 120),
-        mockRate('2026-08-03', 125),
-      ];
-      const svc = makeService({ categories: [], products: [], exchangeRates: rates });
+  describe('retired daily USD→MN register entry (retire-exchange-rates-register)', () => {
+    it('export no longer writes exchange-rates.json', async () => {
+      const svc = makeService({ categories: [], products: [] });
       const payload = await svc.export(PASSWORD);
-      const parsed = await svc.import(payload, PASSWORD);
+      const { entries } = await readRawEntriesV2(payload, PASSWORD);
 
-      expect(parsed.exchangeRates).toHaveLength(3);
-      expect(parsed.exchangeRates.map((r) => r.id)).toEqual([
-        '2026-08-01',
-        '2026-08-02',
-        '2026-08-03',
-      ]);
-      expect(parsed.exchangeRates[2].value).toBe(125);
+      expect(entries.map((e) => e.filename)).not.toContain(RETIRED_EXCHANGE_RATES_ENTRY);
     });
 
-    it('an export with no register records still carries an empty exchange-rates.json entry', async () => {
-      const svc = makeService({ categories: [], products: [], exchangeRates: [] });
-      const payload = await svc.export(PASSWORD);
-      const parsed = await svc.import(payload, PASSWORD);
-      expect(parsed.exchangeRates).toEqual([]);
-    });
+    it('an archive from BEFORE the retirement still carrying exchange-rates.json imports WITHOUT failing, and the entry is ignored', async () => {
+      const oldPayload = await buildLegacyV1Zip(
+        {
+          ...makeV1Payloads(),
+          [RETIRED_EXCHANGE_RATES_ENTRY]: JSON.stringify([
+            { id: '2026-08-01', date: '2026-08-01T00:00:00.000Z', value: 120 },
+            { id: '2026-08-02', date: '2026-08-02T00:00:00.000Z', value: 125 },
+          ]),
+        },
+        PASSWORD + STORE_ID,
+      );
 
-    it('a legacy archive WITHOUT exchange-rates.json imports with an empty register (backwards compatible)', async () => {
-      // makeV1Payloads()/buildLegacyV1Zip build an archive from the six
-      // Angular entry names only — the seventh entry simply does not exist in
-      // archives exported before this feature.
-      const v1Payload = await buildLegacyV1Zip(makeV1Payloads(), PASSWORD + STORE_ID);
-      const parsed = await makeService().import(v1Payload, PASSWORD);
-      expect(parsed.exchangeRates).toEqual([]);
+      const parsed = await makeService().import(oldPayload, PASSWORD);
+
+      expect(parsed.exchangeRates).toBeUndefined();
       expect(parsed.categories).toHaveLength(1);
     });
   });

@@ -101,7 +101,6 @@ test.describe('precache split — Owner/StoreUser precacheado, SuperAdmin exclui
     expect(urls.some((u) => /\/assets\/user-create-[^/]+\.js$/.test(u))).toBe(true);
     expect(urls.some((u) => /\/assets\/user-edit-[^/]+\.js$/.test(u))).toBe(true);
     expect(urls.some((u) => /\/assets\/configurations-[^/]+\.js$/.test(u))).toBe(true);
-    expect(urls.some((u) => /\/assets\/exchange-rates-[^/]+\.js$/.test(u))).toBe(true);
 
     // Catálogo Web
     expect(urls.some((u) => /\/assets\/public-catalog-[^/]+\.js$/.test(u))).toBe(true);

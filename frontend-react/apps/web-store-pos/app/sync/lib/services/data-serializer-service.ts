@@ -15,7 +15,6 @@ import type {
   Order,
   Expense,
   SaleCredit,
-  ExchangeRate,
   ChannelRate,
   Warehouse,
   WarehouseStockLevel,
@@ -77,9 +76,10 @@ export const EDataFileName = {
   Orders: 'orders.json',
   Expenses: 'expenses.json',
   SaleCredits: 'sale-credits.json',
-  // daily-exchange-rate: the seventh data entry, absent from legacy v1/
-  // Angular archives (parsed as [] on import) and always written by exports.
-  ExchangeRates: 'exchange-rates.json',
+  // retire-exchange-rates-register: the retired daily USD→MN register is no
+  // longer written. Archives produced before the retirement still carry
+  // `exchange-rates.json`, and an import IGNORES it — the entry is simply never
+  // looked up, so an old backup imports exactly as a pre-feature one does.
   // warehouses (warehouses-plan): three more data entries, absent from
   // legacy archives (parsed as [] on import) and always written by exports.
   Warehouses: 'warehouses.json',
@@ -186,7 +186,15 @@ export interface ParsedData {
   orders: Order[];
   expenses: Expense[];
   saleCredits: SaleCredit[];
-  exchangeRates: ExchangeRate[];
+  /**
+   * RETIRED (retire-exchange-rates-register). Typed as a permissive
+   * `readonly unknown[]` and never populated or read: an archive carrying
+   * `exchange-rates.json` is ignored. The field survives ONLY so
+   * pre-existing `ParsedData` fixtures — some of which live in sync test files
+   * outside this feature's edit surface — keep compiling; nothing in the app
+   * sets it.
+   */
+  exchangeRates?: readonly unknown[];
   warehouses: Warehouse[];
   warehouseStockLevels: WarehouseStockLevel[];
   warehouseStockMovements: WarehouseStockMovement[];
@@ -228,10 +236,6 @@ export interface ExpenseReader {
 
 export interface SaleCreditReader {
   getStorageSaleCredits(): SaleCredit[];
-}
-
-export interface ExchangeRateReader {
-  getStorageExchangeRates(): ExchangeRate[];
 }
 
 /**
@@ -336,10 +340,6 @@ export class DataSerializerService {
     private readonly orderReader: OrderReader,
     private readonly expenseReader: ExpenseReader,
     private readonly saleCreditReader: SaleCreditReader,
-    // Optional (daily-exchange-rate): legacy call sites/tests that predate the
-    // register omit it; exports then write an empty entry and imports parse []
-    // for archives that carry none.
-    private readonly exchangeRateReader?: ExchangeRateReader,
     // Optional (warehouses-plan): legacy call sites/tests that predate the
     // module omit it; exports then write empty entries and imports parse []
     // for archives that carry none.
@@ -377,7 +377,6 @@ export class DataSerializerService {
     const orders = this.orderReader.getStorageOrders();
     const expenses = this.expenseReader.getStorageExpenses();
     const saleCredits = this.saleCreditReader.getStorageSaleCredits();
-    const exchangeRates = this.exchangeRateReader?.getStorageExchangeRates() ?? [];
     const warehouses = this.warehouseReader?.getStorageWarehouses() ?? [];
     const warehouseStockLevels = this.warehouseReader?.getStorageStockLevels() ?? [];
     const warehouseStockMovements = this.warehouseReader?.getStorageMovements() ?? [];
@@ -406,7 +405,6 @@ export class DataSerializerService {
     const ordersJson = JSON.stringify(orders);
     const expensesJson = JSON.stringify(expenses);
     const saleCreditsJson = JSON.stringify(saleCredits);
-    const exchangeRatesJson = JSON.stringify(exchangeRates);
     const warehousesJson = JSON.stringify(warehouses);
     const warehouseStockLevelsJson = JSON.stringify(warehouseStockLevels);
     const warehouseStockMovementsJson = JSON.stringify(warehouseStockMovements);
@@ -456,9 +454,6 @@ export class DataSerializerService {
       rawPassword: key,
     });
     await zipWriter.add(EDataFileName.SaleCredits, new TextReader(saleCreditsJson), {
-      rawPassword: key,
-    });
-    await zipWriter.add(EDataFileName.ExchangeRates, new TextReader(exchangeRatesJson), {
       rawPassword: key,
     });
     await zipWriter.add(EDataFileName.Warehouses, new TextReader(warehousesJson), {
@@ -626,7 +621,6 @@ export class DataSerializerService {
     const orders = this.orderReader.getStorageOrders();
     const expenses = this.expenseReader.getStorageExpenses();
     const saleCredits = this.saleCreditReader.getStorageSaleCredits();
-    const exchangeRates = this.exchangeRateReader?.getStorageExchangeRates() ?? [];
     const warehouses = this.warehouseReader?.getStorageWarehouses() ?? [];
     const warehouseStockLevels = this.warehouseReader?.getStorageStockLevels() ?? [];
     const warehouseStockMovements = this.warehouseReader?.getStorageMovements() ?? [];
@@ -666,7 +660,6 @@ export class DataSerializerService {
       orders,
       expenses,
       saleCredits,
-      exchangeRates,
       warehouses,
       warehouseStockLevels,
       warehouseStockMovements,
@@ -707,8 +700,9 @@ export class DataSerializerService {
       orders: parseJson<Order[]>(contents, EDataFileName.Orders, []),
       expenses: parseJson<Expense[]>(contents, EDataFileName.Expenses, []),
       saleCredits: parseJson<SaleCredit[]>(contents, EDataFileName.SaleCredits, []),
-      // Legacy archives (v1/Angular) carry no exchange-rates entry → [].
-      exchangeRates: parseJson<ExchangeRate[]>(contents, EDataFileName.ExchangeRates, []),
+      // `exchange-rates.json` is DELIBERATELY absent: the retired register is
+      // never read, so an archive written before the retirement imports
+      // unchanged instead of failing (retire-exchange-rates-register).
       // Legacy archives carry no warehouses entries → [].
       warehouses: parseJson<Warehouse[]>(contents, EDataFileName.Warehouses, []),
       warehouseStockLevels: parseJson<WarehouseStockLevel[]>(

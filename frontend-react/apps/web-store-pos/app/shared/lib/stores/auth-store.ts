@@ -12,16 +12,31 @@ import { clearDek, getDekStoreId } from '../storage/data-key-store';
 // service dynamically inside a try, so such a throw is swallowed as if it were
 // a network failure — silently degrading the user instead of failing loudly.
 import { SessionRejectedError } from '../http/session-rejected-error';
+// Pure role/module predicate over the hydrated profile — `@store-mgmt/domain`
+// enums only, no storage seam — so it is safe as a STATIC import here.
+import { hasMultiMonedasModuleAvailable } from '../auth/authorization-service';
 
-// daily-exchange-rate: fire-and-forget auth-time backfill of the daily USD→MN
-// register. Dynamic import (D6) — auth-store.ts is evaluated on every cold
-// boot, and the register's service drags storage/encryption seams that belong
-// only to authenticated owner sessions.
-async function ensureExchangeRates(user: UserModel | null): Promise<void> {
+const EMPTY_GUID = '00000000-0000-0000-0000-000000000000';
+
+// retire-exchange-rates-register: fire-and-forget auth-time resolution of the
+// RETIRED daily USD→MN register. "Tasas de Cambio" is gated by MultiMonedas
+// (sidebar.tsx hides the item without it), so a store WITHOUT the module has no
+// click to hang the migration on — authentication is that branch's only seam,
+// exactly where the old daily backfill ran. A store WITH the module keeps its
+// register until someone opens "Tasas de Cambio" (the migration is the click).
+//
+// Dynamic import (D6) — auth-store.ts is evaluated on every cold boot, and the
+// channel-rate service drags storage/encryption seams that belong only to
+// authenticated sessions.
+async function resolveRetiredExchangeRates(user: UserModel | null): Promise<void> {
   try {
-    const { ensureExchangeRateDailyRecords } =
-      await import('../exchange-rates/exchange-rate-daily');
-    await ensureExchangeRateDailyRecords(user);
+    const storeId = user?.selectedStoreId;
+    if (!storeId || storeId === EMPTY_GUID) return;
+    if (hasMultiMonedasModuleAvailable(user)) return;
+    const { migrateExchangeRatesToChannelRates } = await import(
+      '~/management/channel-rates/lib/migrate-exchange-rates-to-channel-rates'
+    );
+    migrateExchangeRatesToChannelRates(storeId, false);
   } catch {
     // Fire-and-forget: a register failure must never block authentication.
   }
@@ -170,9 +185,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       // shared HTTP error interceptor (api-client.ts / Angular error-interceptor
       // .service.ts:62), which breaks offline use — so the revalidation is removed.
       set({ user: userWithExpiry, isAuthenticated: true, error: null });
-      // daily-exchange-rate (cold boot): session already valid on this device —
-      // backfill the register through today without blocking hydration.
-      void ensureExchangeRates(userWithExpiry);
+      // retire-exchange-rates-register (cold boot): session already valid on
+      // this device — resolve the retired register without blocking hydration.
+      void resolveRetiredExchangeRates(userWithExpiry);
       return userWithExpiry;
     }
 
@@ -368,7 +383,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       // is the empty GUID) has no wrap, no roster entry, and no device table —
       // attempting resolution would always hit the F5 dead end and throw
       // DekUnwrapError, blocking login for a user who doesn't need data encryption.
-      const EMPTY_GUID = '00000000-0000-0000-0000-000000000000';
       if (user.selectedStoreId && user.selectedStoreId !== EMPTY_GUID) {
         const { resolveDekForLogin, provisionStoreDekWraps } = await import('../offline/dek-provisioning');
         await resolveDekForLogin({
@@ -403,8 +417,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const { resetDecryptionFailureLatch } = await import('../storage/decryption-failure-policy');
       resetDecryptionFailureLatch();
 
-      // daily-exchange-rate (online login): stamp first-login anchor + backfill.
-      void ensureExchangeRates(user);
+      // retire-exchange-rates-register (online login): resolve the retired register.
+      void resolveRetiredExchangeRates(user);
 
       set({ isLoading: false });
       return user;
@@ -465,8 +479,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const { getRoster } = await import('../offline/roster-store');
       const sessionBundle = getRoster();
       get().setUser(user, user.authToken, sessionBundle?.expiresAt);
-      // daily-exchange-rate (offline login): stamp first-login anchor + backfill.
-      void ensureExchangeRates(get().user);
+      // retire-exchange-rates-register (offline login): resolve the retired register.
+      void resolveRetiredExchangeRates(get().user);
       set({ isLoading: false });
       // Return the hydrated `get().user`, not the raw `user` — setUser()
       // stamps a fresh `expiresIn` and blanks `password`, so the returned
