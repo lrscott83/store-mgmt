@@ -128,7 +128,63 @@ Son dos conceptos distintos. Se crea uno nuevo.
 
 _(se completa por tarea, con evidencia observada)_
 
+- **T1** ✅ commit `160123b3` — entidad, configuración EF, `DbSet`, repositorio, query de
+  listado + unread count, `MarkAsRead`/`MarkAllAsRead`, controller con
+  `[HasPermission(StoreRoleFeatures.SuperAdmin)]`. Migración `20261003221534_AddNotifications`
+  aplicada a `smca_test`; script `28-20261003-Add-Notifications.sql` generado desde la
+  migración y registrado en el índice de `backend/scripts/README.md`.
+- **T2** ✅ commit `160123b3` — `OwnerRegistrationNotificationService` (traga y loguea sus
+  propios errores), emitido desde `RegisterCommandHandler` **y** `CreateOwnerCommandHandler`,
+  ambos después del `SaveChangesAsync` del handler. Destinatario
+  `DataUtils.SuperAdminUser.Id`; teléfono desde el comando.
+- **T3** ✅ commit (frontend) — escalera de polling adaptativa, sin hub nuevo.
+- **T4** ✅ commit (frontend) — `notifications-http-service`, `notification-permission`,
+  `NotificationShell` (auto-gateado por SuperAdmin, badge en 0, cap `99+`), montado en
+  `navbar.tsx`, 7 claves `NOTIFICATIONS.*` en `es.ts`.
+- **T5** ✅ — E2E backend nuevos (2) en `SMCA.WebApi.E2ETests/Notifications/`; unitarios
+  frontend nuevos (11) en `app/shared/components/__tests__/notification-shell.test.tsx`.
+
+### Evidencia observada
+
+| Verificación | Resultado |
+| --- | --- |
+| `dotnet build src/SMCA.sln` | 0 errores (8 warnings, NuGet preexistentes) |
+| `Application.Tests` | 586/586 |
+| `SMCA.WebApi.E2ETests` (PostgreSQL real) | 685/685 |
+| `pnpm typecheck` | 5/5 |
+| `pnpm lint` (`--max-warnings=0`) | 4/4, cero warnings |
+| Suite frontend completa | 345 archivos / 5048 tests, 0 fallos |
+
+### Desviaciones y hallazgos registrados
+
+- **Script 28 no era idempotente**: EF emite `CREATE TABLE` sin `IF NOT EXISTS`, así que
+  re-correrlo fallaba. Parcheado a `CREATE TABLE/CREATE INDEX IF NOT EXISTS` y declarado en el
+  header del script como única desviación del texto generado.
+- **Índice de scripts del README desactualizado**: faltaban los dos `27`
+  (`Add-Messaging` y `PlanModuleConvergence`). Agregados; el primero crea `Messages` y
+  `Conversations`, así que quien desplegara guiándose solo por esa tabla se saltaba el buzón.
+- **`app-layout.test.tsx` (11 tests) roto por el montaje**: renderiza con usuario SuperAdmin y
+  solo mockea el auth-store, así que la campana dispara HTTP y el guardián `block-real-http`
+  aborta el archivo. Resuelto con un `vi.mock` aditivo del servicio; sin tocar aserciones.
+  Queda un warning de `act(...)` no corregido a propósito: arreglarlo exigiría reescribir 11
+  tests existentes.
+- **Sin `en.ts`**: `i18n-provider.tsx` fija `SUPPORTED_LOCALES = ['es']`; la app es solo
+  español. Crear un `en.ts` huérfano habría sido código muerto.
+- **Bug corregido en el propio borrador del frontend**: la primera versión disparaba el popup
+  del SO comparando contra una firma no vacía, así que la primera notificación con la campana
+  vacía nunca habría hecho popup. Resuelto con un booleano de línea base.
+
+### Pendiente de decisión del usuario
+
+- `DbTestHelpers.CleanupUserAsync` borra `Store` sin borrar `StoreRoleFeature`/`StoreModule`/
+  `StoreUser` primero → FK 23503. Las semillas escritas a mano nunca lo disparan; un registro
+  real sí. No se tocó el helper compartido.
+- `Notification` no tiene FK ni `TenantId`, así que purge/reset nunca alcanza sus filas.
+  Documentado con un WHY-comment en la configuración EF.
+
 ## Riesgo / presupuesto de entrega
 
 El pronóstico supera las ~400 líneas authored. La estrategia de entrega (un PR o cadena de PRs)
-la decide el usuario antes de abrir cualquier PR — **no está decidida todavía**.
+la decide el usuario antes de abrir cualquier PR — **no está decidida todavía**. El trabajo se
+partió en dos work units commiteados para que ninguno de los dos diffs sea inabordable:
+backend (`160123b3`) y frontend.

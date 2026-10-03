@@ -5,6 +5,7 @@ import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { useClickOutside } from '~/shared/lib/hooks/use-click-outside';
 import { CartShell } from './cart-shell';
 import { MessageShell } from './message-shell';
+import { NotificationShell } from './notification-shell';
 import { StoreSwitcher } from './store-switcher';
 
 interface NavbarProps {
@@ -108,6 +109,11 @@ export function Navbar({ isSidebarOpen, onSidebarToggle }: NavbarProps) {
             ladder, SignalR) is gated on connectivity INSIDE the component, so the icon is
             always visible while the offline E2E's zero-request invariant stays intact. */}
         <MessageShell />
+
+        {/* Owner-registration bell: mounted for every authenticated session — NotificationShell
+            itself self-gates on the SuperAdmin role, and all of its HTTP work is gated inside
+            the component on that same role plus connectivity. Same contract as MessageShell. */}
+        <NotificationShell />
 
         {/* User dropdown — trigger is a plain person icon, matches Angular's header-user-profile */}
         <div className="relative" ref={userMenuRef}>
