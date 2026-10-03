@@ -76,7 +76,7 @@ export function Footer({ variant = 'client' }: FooterProps = {}) {
               className={
                 isGuest
                   ? 'inline-flex items-center gap-1.5 rounded-full border border-[rgba(245,176,38,0.25)] bg-[rgba(245,176,38,0.08)] px-3.5 py-1.5 text-gray-700 transition-colors hover:border-[rgba(245,176,38,0.4)] hover:bg-[rgba(245,176,38,0.15)] hover:text-text'
-                  : 'inline-flex items-center gap-1 text-[#25D366]'
+                  : 'inline-flex items-center gap-1 text-whatsapp'
               }
             >
               <WhatsappIcon className={isGuest ? 'h-4 w-4 text-[#f5b026]' : 'h-4 w-4'} />
