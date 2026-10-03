@@ -3,6 +3,7 @@ using Application.Abstractions.Messaging;
 using Application.Dtos.Authentication;
 using Application.Exceptions;
 using Application.ResponseModels;
+using Application.Services.Notifications;
 using Application.UnitOfWorks;
 using Domain.Common.Enums;
 using Domain.Common.Results;
@@ -38,6 +39,7 @@ public abstract class RegisterCommandHandlerTestFixture
     protected readonly Mock<IJwtProvider> MockJwtProvider;
     protected readonly Mock<IAuthTokenConfig> MockAuthTokenConfig;
     protected readonly Mock<IOwnerWelcomeMessageService> MockOwnerWelcomeMessageService;
+    protected readonly Mock<IOwnerRegistrationNotificationService> MockOwnerRegistrationNotificationService;
 
     // Test data
     protected readonly Guid TestOwnerId = Guid.NewGuid();
@@ -56,6 +58,7 @@ public abstract class RegisterCommandHandlerTestFixture
         MockJwtProvider = new Mock<IJwtProvider>();
         MockAuthTokenConfig = new Mock<IAuthTokenConfig>();
         MockOwnerWelcomeMessageService = new Mock<IOwnerWelcomeMessageService>();
+        MockOwnerRegistrationNotificationService = new Mock<IOwnerRegistrationNotificationService>();
 
         MockJwtProvider
             .Setup(x => x.GenerateToken(It.IsAny<Guid>(), It.IsAny<string>()))
@@ -82,7 +85,8 @@ public abstract class RegisterCommandHandlerTestFixture
             MockRegisterService.Object,
             MockJwtProvider.Object,
             MockAuthTokenConfig.Object,
-            MockOwnerWelcomeMessageService.Object);
+            MockOwnerWelcomeMessageService.Object,
+            MockOwnerRegistrationNotificationService.Object);
     }
 
     /// <summary>

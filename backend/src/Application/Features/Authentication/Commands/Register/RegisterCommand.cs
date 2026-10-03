@@ -4,6 +4,7 @@ using Application.Dtos.Authentication;
 using Application.Exceptions;
 using Application.ResponseModels;
 using Application.Services.Messages;
+using Application.Services.Notifications;
 using Application.UnitOfWorks;
 using Domain.Common.Results;
 using Domain.Entities.Owners;
@@ -38,19 +39,22 @@ namespace Application.Features.Authentication.Commands.Register
         private readonly IJwtProvider _jwtProvider;
         private readonly IAuthTokenConfig _authTokenConfig;
         private readonly IOwnerWelcomeMessageService _ownerWelcomeMessageService;
+        private readonly IOwnerRegistrationNotificationService _ownerRegistrationNotificationService;
 
         public RegisterCommandHandler(
             IApplicationUnitOfWork applicationUnitOfWork,
             IRegisterService registerService,
             IJwtProvider jwtProvider,
             IAuthTokenConfig authTokenConfig,
-            IOwnerWelcomeMessageService ownerWelcomeMessageService)
+            IOwnerWelcomeMessageService ownerWelcomeMessageService,
+            IOwnerRegistrationNotificationService ownerRegistrationNotificationService)
         {
             _applicationUnitOfWork = applicationUnitOfWork;
             _registerService = registerService;
             _jwtProvider = jwtProvider;
             _authTokenConfig = authTokenConfig;
             _ownerWelcomeMessageService = ownerWelcomeMessageService;
+            _ownerRegistrationNotificationService = ownerRegistrationNotificationService;
         }
 
         public async Task<ResponseResult<AuthDto>> Handle(RegisterCommand request, CancellationToken cancellationToken)
@@ -91,6 +95,13 @@ namespace Application.Features.Authentication.Commands.Register
             // Register.FailedToSave. The service never throws, so the response below is unaffected.
             await SendWelcomeMessageAsync(owner, cancellationToken);
 
+            // Same ordering rule as the greeting above, for the same reason:
+            // NotificationRepository commits internally, so notifying before this handler's save
+            // would flush first, leave nothing staged here, and make the save above return 0 —
+            // failing EVERY registration with Register.FailedToSave. The service never throws, so
+            // the response below is unaffected.
+            await NotifyOwnerRegistrationAsync(owner, request.CellPhone, request.StoreName, cancellationToken);
+
             string token = _jwtProvider.GenerateToken(owner.User.Id, request.Login);
             var expiresAt = DateTime.UtcNow.AddDays(_authTokenConfig.TokenLifetimeDays);
 
@@ -111,6 +122,23 @@ namespace Application.Features.Authentication.Commands.Register
 
             await _ownerWelcomeMessageService.SendAsync(
                 target.OwnerUserId, target.OwnerFullName, target.StoreId, cancellationToken);
+        }
+
+        /// <summary>
+        /// Tells the SuperAdmin a new owner just registered, or skips it. Nothing here can change the
+        /// response: the gate and the "anything missing" case both return without calling the
+        /// service, and the service itself swallows and logs its own failures.
+        /// </summary>
+        private async Task NotifyOwnerRegistrationAsync(
+            Owner owner, string cellPhone, string storeName, CancellationToken cancellationToken)
+        {
+            OwnerRegistrationNotification.OwnerRegistrationTarget? target =
+                OwnerRegistrationNotification.Resolve(owner, cellPhone, storeName);
+
+            if (target is null)
+                return;
+
+            await _ownerRegistrationNotificationService.NotifyAsync(target, cancellationToken);
         }
     }
 }

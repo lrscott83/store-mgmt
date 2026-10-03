@@ -102,6 +102,9 @@ El `ProductVersion` debe coincidir con el que registro `dotnet ef database updat
 | 24 | `24-20260927-Add-WebCatalog-Module.sql` | `20260927175335_Add-WebCatalog-Module` | Módulo 18 Catálogo web (precio 5, 100% desc, Superior) + feature 122 + backfill a tiendas Superior activas |
 | 25 | `25-20260927-Catalog-Product-Fields-And-Images.sql` | `20260927185726_Catalog-Product-Fields-And-Images` | Campos del catálogo web en Product (description, %/monto rebajado, IsNew, Image), slug público en ProductCategory/Store + tabla ProductImage (galería) |
 | 26 | `26-20260928-Currency-SalePaymentMethod-And-WebCatalog-Vip.sql` | `20260916213905_AddCurrencyToStoreEntities` + `20260917194809_Add-SalePaymentMethod-Pricing` + `20260928191227_Add-WebCatalog-Module-Vip` | Tres fases: (a) columnas Currency en Product/Order/OrderItem/InventoryEntry/InventoryEntryCost (cierra el hueco del 16/09 que rompía el catálogo con `column p.Currency does not exist`); (b) Order.Percent/Tax/SalePaymentMethod (hueco del 17/09); (c) módulo 18 también para VIP (4) + backfill a tiendas VIP activas (planes autocontenidos; corrige D5) |
+| 27 | `27-20260930-Add-Messaging.sql` | `20260929172332_AddMessaging` | Tablas `Conversations` y `Messages` (buzón SuperAdmin ↔ Owner, 1:1 por tienda) |
+| 27 | `27-20260930-Plan-Module-Convergence.sql` | `20260930090000_PlanModuleConvergence` | Convergencia de planes: reactiva filas soft-deleted del catálogo sin tocar precios negociados |
+| 28 | `28-20261003-Add-Notifications.sql` | `20261003221534_AddNotifications` | Tabla `Notifications` + índices por `CreatedAt` y `ReadAt`. Avisa al SuperAdmin (canónico) cuando se registra un propietario: copia nombre del owner, su teléfono y nombre de la tienda, sin FK ni TenantId (destinatario global, no store-scoped) |
 
 ### 4. Commit
 

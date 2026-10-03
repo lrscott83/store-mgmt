@@ -23,6 +23,7 @@ using Domain.Entities.OrderItems;
 using Domain.Entities.OrderPayments;
 using Domain.Entities.ChannelExchangeRates;
 using Domain.Entities.Messages;
+using Domain.Entities.Notifications;
 using Domain.Entities.ProductCategories;
 using Domain.Entities.Products;
 using Domain.Entities.InventoryEntryCosts;
@@ -146,6 +147,7 @@ namespace Infrastructure.Persistence.Contexts
             builder.ApplyConfiguration(new ChannelExchangeRateEntityTypeConfiguration(this));
             builder.ApplyConfiguration(new MessageEntityTypeConfiguration());
             builder.ApplyConfiguration(new ConversationEntityTypeConfiguration());
+            builder.ApplyConfiguration(new NotificationEntityTypeConfiguration());
 
         }
         internal DbSet<Tenant> Tenant { get; set; }
@@ -178,5 +180,6 @@ namespace Infrastructure.Persistence.Contexts
         internal DbSet<ChannelExchangeRate> ChannelExchangeRate { get; set; }
         public DbSet<Message> Messages { get; set; }
         public DbSet<Conversation> Conversations { get; set; }
+        public DbSet<Notification> Notifications { get; set; }
     }
 }
