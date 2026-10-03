@@ -4,18 +4,28 @@
  *
  * The MultiPayments UI (cart currency selector + multi-payment list) renders
  * ONLY when the client session has module 16 (`hasMultiPaymentsModuleAvailable`).
- * Module 16 is VIP-only, so a freshly self-registered store (Superior, modules
- * 2..15) does NOT have it — the spec mints a PRIVATE identity (real register +
- * login), enables module 16 for that store's `StoreModule` rows through the
- * direct-DB precondition fixture, refreshes the client session from
+ * A freshly self-registered store is born on the **Pago** plan, which carries
+ * NEITHER module 16 nor module 15 (`RegisterService.cs`) — so this spec mints a
+ * PRIVATE identity (real register + login), seeds the modules each test needs
+ * through the direct-DB precondition fixture, refreshes the client session from
  * `/v1/auth/me`, and then exercises the real cart.
+ *
+ * ── Two different gates, not one (2026-10-03) ─────────────────────────────
+ * This file used to seed module 16 and call that the whole precondition, which
+ * was half right: T10.1 drives ONLY MultiMonedas surfaces (the cart currency
+ * selector and the "Tasas de Cambio" page, both gated by module 15 — see
+ * cart-currency-select.tsx:57-62 and menu-config.ts:430-433), so seeding 16
+ * left the selector unrendered and the test never got past its first assertion.
+ * T10.2 drives the multi-payment block too and genuinely needs 16. Each test now
+ * seeds exactly the modules it exercises: T10.1 → 15, T10.2 → 15 + 16.
  *
  * Coverage (payment-channels-and-multipayment, T11 — behavior updated 2026-09-23):
  *   T10.1  gate precondition + currency selector (CUP/USD). Choosing a currency
  *          that cannot convert is now BLOCKED: the select stays on CUP, a clear
  *          `cart-currency-change-error` alert appears, and the header total
  *          never becomes "0 USD". Registering the channel rate makes the change
- *          proceed (0.10 USD) and the allowed choice survives a reload.
+ *          proceed (0.10 USD); on reload the cart returns to the store's
+ *          "Moneda de Venta" (T4), because the manual choice lasts one session.
  *   T10.2  the multipayment block now starts from the DEFAULT single Efectivo
  *          row (amount = sale total), "Agregar pago" opens the channel POPUP,
  *          rows are located per-row (the testids match more than one element)
@@ -37,7 +47,14 @@ import { RegisterPage } from './support/register-page';
 import { newTestIdentity, type TestIdentity } from './support/identity';
 import { readSelectedStoreId } from './support/session';
 import { seedCategoryAndProduct } from './support/store-seed';
-import { enableMultiPaymentsModule, MULTIPAYMENTS_MODULE_ID } from './support/multipayments-fixture';
+import {
+  CHANNEL_RATES_MODULES,
+  MULTI_PAYMENT_MODULES,
+  MULTIMONEDAS_MODULE_ID,
+  MULTIPAYMENTS_MODULE_ID,
+  assertModulesInSession,
+  enableStoreModules,
+} from './support/multipayments-fixture';
 
 // i18n literals from es.ts — hardcoded, never imported.
 const SALE_HEADER = 'Productos para vender';
@@ -254,7 +271,7 @@ async function seedProduct(page: Page, prefix: string): Promise<void> {
 let identity: TestIdentity;
 let storeId = '';
 
-test.describe.serial('multipayments (módulo 16) — selector, tasas, multi-pago y vuelto', () => {
+test.describe.serial('multipayments — selector y tasas (módulo 15), multi-pago y vuelto (módulo 16)', () => {
   test.describe.configure({ timeout: 180_000 });
 
   test('T10.1 — el selector bloquea un cambio de moneda sin tasa y lo permite tras registrarla', async ({
@@ -273,10 +290,15 @@ test.describe.serial('multipayments (módulo 16) — selector, tasas, multi-pago
     await page.waitForURL(/\/sales\/products$/);
     storeId = await readSelectedStoreId(page);
 
-    // Precondition (pinned BEFORE enabling): the fresh store lacks module 16.
+    // Precondition (pinned BEFORE enabling): a Pago store is born with NEITHER
+    // 15 nor 16. T10.1 drives only MultiMonedas surfaces (the cart currency
+    // selector and the "Tasas de Cambio" page), so 15 is the whole precondition —
+    // seeding 16 here used to satisfy the check while leaving the selector
+    // unrendered, because CartCurrencySelect is gated by module 15 alone.
     expect(await storeModuleIds(page)).not.toContain(MULTIPAYMENTS_MODULE_ID);
+    expect(await storeModuleIds(page)).not.toContain(MULTIMONEDAS_MODULE_ID);
 
-    await enableMultiPaymentsModule(page, storeId);
+    await enableStoreModules(page, storeId, CHANNEL_RATES_MODULES);
 
     // The client session still holds the old module set, and a plain reload is
     // offline-first (auth-store.ts caches a valid profile without re-calling
@@ -290,14 +312,7 @@ test.describe.serial('multipayments (módulo 16) — selector, tasas, multi-pago
     // read them — the diagnosed root cause of T10.1's stuck cart badge.
     await dropDekAndCiphertext(page);
 
-    const moduleIds = await storeModuleIds(page);
-    if (!moduleIds.includes(MULTIPAYMENTS_MODULE_ID)) {
-      throw new Error(
-        `multipayments.spec: the refreshed session still lacks module ${MULTIPAYMENTS_MODULE_ID} ` +
-          `(storeModuleIds=[${moduleIds.join(',')}]). The MultiPayments UI cannot render, so every ` +
-          'assertion below would fail for the wrong reason.',
-      );
-    }
+    await assertModulesInSession(page, CHANNEL_RATES_MODULES);
 
     // Seed a CUP (default currency) product.
     await seedProduct(page, 'MPT1');
@@ -351,14 +366,22 @@ test.describe.serial('multipayments (módulo 16) — selector, tasas, multi-pago
     await expect(selectWithRate).toHaveValue(String(1));
     await expect(page.locator('span.text-primary.whitespace-nowrap')).toHaveText(/0\.10\s*USD/);
 
-    // 5) The allowed choice persists across a reload (per-user preference). The
-    // cart itself is persisted too (zustand/persist `lizoft-cart`), so after the
-    // reload it still holds the line added above — reopen it rather than adding
-    // a second one; the point here is the persisted currency preference.
+    // 5) On reload the cart falls back to the STORE's "Moneda de Venta"
+    // (T4, cart-shell.tsx:161-167 and :395-406): the cashier's manual choice
+    // lasts for the session only, and remounting re-seeds from
+    // StoreCurrencyConfigService.sellCurrency — this store never changed it, so
+    // it is CUP. This step used to assert the opposite (that the manual choice
+    // persisted as a per-user preference); that expectation died with the
+    // module gate before anyone saw it fail, and the behaviour it described was
+    // deliberately replaced by T4.
+    //
+    // The cart itself IS persisted (zustand/persist `lizoft-cart`), so the line
+    // added above survives the reload — reopen the panel rather than adding a
+    // second one.
     await page.reload();
     await page.waitForLoadState('networkidle');
     await openCartPanel(page);
-    await expect(page.getByTestId(CART_CURRENCY_SELECT)).toHaveValue(String(1));
+    await expect(page.getByTestId(CART_CURRENCY_SELECT)).toHaveValue(String(0));
   });
 
   test('T10.2 — fila por defecto, segundo canal por el popup, recálculo y bloqueo por subpago', async ({
@@ -376,21 +399,17 @@ test.describe.serial('multipayments (módulo 16) — selector, tasas, multi-pago
     // module is already present) and its round-trip also lets the fresh login's
     // session settle before the DEK reset reloads the app — without it the
     // reload's clientLoader can run against a half-hydrated session and bounce
-    // to /login.
-    await enableMultiPaymentsModule(page, storeId);
+    // to /login. T10.2 drives the multi-payment block (module 16) AND still
+    // registers a channel rate and picks the cart currency (module 15), so it
+    // needs both — 16 alone leaves the rate form unreachable.
+    await enableStoreModules(page, storeId, MULTI_PAYMENT_MODULES);
 
     // This fresh context's real login left the store DEK in memory (and wrote
     // ciphertext entities). Reset to plaintext BEFORE seeding anything — the
     // channel rate and product this test creates must not be `enc:v1:`.
     await dropDekAndCiphertext(page);
 
-    const moduleIds = await storeModuleIds(page);
-    if (!moduleIds.includes(MULTIPAYMENTS_MODULE_ID)) {
-      throw new Error(
-        `multipayments.spec: T10.2 session lacks module ${MULTIPAYMENTS_MODULE_ID} ` +
-          `(storeModuleIds=[${moduleIds.join(',')}]). T10.1 must enable it first.`,
-      );
-    }
+    await assertModulesInSession(page, MULTI_PAYMENT_MODULES);
 
     // Register a CUP channel rate (100 CUP per 1 USD) through the real UI,
     // choosing the channel explicitly (Efectivo + CUP) instead of trusting the

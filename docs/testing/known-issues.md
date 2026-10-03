@@ -204,3 +204,91 @@ Detalle completo en [`known-issues/qa-merge-2026-09-29/07-vite-dep-cache-stale.m
 
 _Actualizado por última vez: 2026-09-30 (corrida del 2026-09-29: fallos 1 y 2 resueltos y
 reclasificados como defecto sistémico; queda abierta la decisión sobre la Opción A)._
+
+---
+
+## Corrida del 2026-10-03 — 9 fallos E2E, 7 de ellos nuevos al registro
+
+**Contexto.** Verificación completa siguiendo el README del proyecto, sobre la rama test, que ya
+tenía integrado todo lo que había en dev. Compilación, tests unitarios y tests E2E del backend y
+del frontend, todo en verde; los E2E del frontend no. Detalle y fichas en
+[`known-issues/2026-10-03-e2e-verification/`](known-issues/2026-10-03-e2e-verification/README.md).
+
+| Suite | Resultado |
+| --- | --- |
+| Backend: compilación, dominio, aplicación | 0 errores · **105/105** · **586/586** |
+| Backend E2E | **683/683** (2 min 6 s) |
+| Frontend: tipos, estilo, tests unitarios | 5/5 · 4/4 · **5037/5037** |
+| **Frontend E2E** (4 navegadores, 19 min 54 s) | **328 aprobados · 9 fallidos · 8 inestables · 9 sin ejecutar** |
+
+**Estado actual de los 9 fallos.** Tres ya no son fallos: se corrigieron el 2026-10-03.
+
+| #   | Test                          | Qué falla                                                                          | Estado |
+| --- | ----------------------------- | --------------------------------------------------------------------------------- | ------ |
+| 1   | `mayorista-sale` 218          | El filtro se llama Transferencia **sin** el sufijo de moneda cuando hay MultiMonedas | 🔴 Causa raíz **confirmada** (ficha 4 del 10-01) — solución propuesta, sin autorizar |
+| 2   | `web-catalog` 77              | El aviso de guardado del catálogo cambió de texto                                  | 🔴 Causa raíz **confirmada** (ficha 6 del 10-01) — solución propuesta, sin autorizar |
+| 3   | `multipayments-cart-v2` 171   | El clic se queda esperando y agota los 3 minutos del test                            | 🔴 Causa raíz **no confirmada** (ficha 4 del 10-03) |
+| 4   | `warehouses` 545              | El menú de la tarjeta no ofrece Desactivar; el clic agota los 2 minutos (línea 573)  | 🔴 Causa raíz **no confirmada** (ficha 5 del 10-03) |
+| 5   | `wholesale-cart-floor` 179    | La cantidad se recalcula bien, el precio no se muestra (línea 191)                   | 🔴 Causa raíz **no confirmada** (ficha 6 del 10-03) |
+| 6   | `store-module-pricing` 546    | El propio test se detiene: falta una segunda fila activa para probar el límite en cero | 🔴 **Defecto del test**, no de la aplicación (ficha 7 del 10-03) |
+| 7   | `multipayments` 378 (T10.2)   | Al pagar de más con varios canales, la pantalla se cae a la página de Error            | 🔴 **Defecto de la APLICACIÓN**, causa raíz **confirmada** (ficha 8 del 10-03) |
+
+**Los nueve eran fallos reales, ninguno por falta de recursos.** Los siete sin ficha previa se
+corrieron uno por archivo y con un solo navegador: los siete siguen fallando, agotando el intento
+inicial y los dos reintentos. Es el mismo método con el que la ficha 5 del 1 de octubre descartó
+la saturación de la máquina como explicación.
+
+### Tres fallos resueltos: el módulo 15 no es el módulo 16
+
+Los tres fallos originales —el de la vista de Tasas de Cambio, el del selector de moneda del carrito y
+el de la sección de monedas de la configuración— compartían causa: el archivo de apoyo que prepara esas
+pruebas sembraba el módulo **MultiPayments** (16), pero las tres pantallas de las que dependen están
+condicionadas al módulo **MultiMonedas** (15).
+
+Son dos módulos distintos. MultiMonedas da sentido a todo lo que tiene monedas —la vista de Tasas de
+Cambio, el selector de moneda del carrito y la sección de monedas de la configuración—; MultiPayments
+reparte una venta entre varios canales de pago. **Tener el 16 y no el 15 no abre nada de lo anterior.**
+
+La razón de fondo está en el backend: una tienda que se registra sola nace en el plan **Pago**, que
+deja fuera a propósito los módulos de los planes superiores, entre ellos el 15 y el 16. El origen del
+error fue una premisa desactualizada escrita en el propio archivo de apoyo: decía que la tienda
+nace en el plan Superior con los módulos 2 a 15 y por eso le falta el 16. Cuatro pruebas se escribieron
+sobre esa suposición. **La aplicación no tenía ningún defecto**: su test unitario de esa pantalla pasa
+en verde y comprueba precisamente que el 15 es el que abre la página.
+
+**Corregido el 2026-10-03**, con autorización explícita y sin tocar ningún archivo de la aplicación:
+el archivo de apoyo gana el módulo 15 y funciones genéricas, y las tres pruebas siembran lo que
+ejercitan. Las tres quedaron verdes, verificadas por mutación (quitar el módulo 15 hace caer cada
+prueba en su aserción de visibilidad). Sus fichas se retiraron; el detalle está en el README de la
+carpeta del 10-03.
+
+### Lo que apareció al destaparlas
+
+Cada arreglo destapó el siguiente fallo, que llevaba meses escondido:
+
+1. La vista de Tasas de Cambio llegó a su catálogo y falló porque la prueba elegía la moneda **USD**,
+   que la aplicación no ofrece a propósito (sería el pivote sintético 1 USD = 1 USD).
+2. El selector del carrito llegó a su último paso y falló porque afirmaba que la moneda elegida a mano
+   sobrevive a una recarga. Ya no es así por diseño: el cambio manual dura una sesión.
+3. La venta en varios canales llegó al cálculo del vuelto y **la pantalla se cayó entera**. Este sí es
+   un defecto de la aplicación: lanza una excepción cuando un pago llega a cero y nadie la captura
+   (ficha 8).
+
+### Frente a la corrida del 1 de octubre
+
+Pasó más verde (de 321 a 328 aprobados) y falló más (de 3 a 9). La reversión de movimientos entre
+almacenes, que el 1 de octubre no lograba reproducir aislada (ficha 5), **hoy pasó**. Los tests
+sin ejecutar bajaron de 16 a 9 y los inestables de 12 a 8, pero los que dejaron de ser inestables
+se convirtieron en fallos normales.
+
+### Nada de la aplicación se tocó
+
+Las soluciones de las fichas 4 y 6 del 1 de octubre y la del defecto de la ficha 8 requieren
+autorización explícita uno a uno. El commit anterior está verificado en verde y **no** se ve implicado:
+la única prueba E2E que toca el área que cambió es la de inicio de sesión sin conexión, que verifica
+el chat siempre montado, y pasó.
+
+_Actualizado por última vez: 2026-10-03 (corrida completa: 9 fallos E2E, 7 nuevos; **3 resueltos** —
+el módulo MultiMonedas (15) no el MultiPayments (16) era lo que faltaba, y no era un defecto de la
+aplicación; aparece además un defecto de la aplicación al calcular el vuelto con varios canales,
+ficha 8)._

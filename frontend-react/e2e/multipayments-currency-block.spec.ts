@@ -1,7 +1,8 @@
 /**
  * multipayments-currency-block — NEW E2E (payment-channels-and-multipayment, 2026-09-23).
+ * Module gate corrected 2026-10-03.
  *
- * Pins the cart currency-change BLOCK and the load-time fallback with module 16:
+ * Pins the cart currency-change BLOCK and the load-time fallback:
  *   - the cart seeds its sale currency from the STORE's configured "Moneda de
  *     Venta" (StoreCurrencyConfigService, localStorage per store, default CUP) on
  *     app load; the per-user preference is no longer read. When the store default
@@ -13,10 +14,20 @@
  *     the STORE default is honored: the cart opens in USD and the total converts
  *     (10 CUP → 0.10 USD).
  *
- * Module 16 is VIP-only, so this spec mints a PRIVATE identity (real register +
- * login), enables the module through the direct-DB precondition fixture,
- * refreshes the client session from `/v1/auth/me`, and exercises the real cart.
- * No existing spec or support file is modified.
+ * ── The gate is module 15 (MultiMonedas), NOT module 16 (2026-10-03) ───────
+ * Every element this spec drives belongs to the MultiMonedas half, not to the
+ * multi-payment block: the cart currency selector (`cart-currency-select`),
+ * the "Moneda de Venta" section of Configurations (rendered only under
+ * `hasMultiMonedasModuleAvailable`, configurations.tsx:373-375), and the
+ * "Tasas de Cambio" page used to register the rate (gated by
+ * `moduleIds: [EModules.MultiMonedas]`, menu-config.ts:430-433). This spec never
+ * touches a `multi-payment-*` element.
+ *
+ * It used to seed module 16 and wait for the store's sale-currency section,
+ * which never renders — its own comment at the call site already said "module 15
+ * renders the currency section", fifteen lines above the failure. A freshly
+ * registered store is born on the Pago plan, which carries NEITHER 15 NOR 16
+ * (`RegisterService.cs`), so seeding 16 alone left the screen missing.
  */
 
 import { test, expect } from './support/test';
@@ -25,7 +36,11 @@ import { RegisterPage } from './support/register-page';
 import { newTestIdentity } from './support/identity';
 import { readSelectedStoreId } from './support/session';
 import { seedCategoryAndProduct } from './support/store-seed';
-import { enableMultiPaymentsModule, MULTIPAYMENTS_MODULE_ID } from './support/multipayments-fixture';
+import {
+  CHANNEL_RATES_MODULES,
+  assertModulesInSession,
+  enableStoreModules,
+} from './support/multipayments-fixture';
 
 // i18n literals from es.ts — hardcoded, never imported.
 const SALE_HEADER = 'Productos para vender';
@@ -35,13 +50,6 @@ const CURRENCY_SELECT = 'cart-currency-select';
 
 function productName(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
-}
-
-async function storeModuleIds(page: Page): Promise<number[]> {
-  const raw = await page.evaluate(() => window.localStorage.getItem('currentUser'));
-  if (!raw) throw new Error('multipayments-currency-block: localStorage.currentUser is empty.');
-  const parsed = JSON.parse(raw) as { storeModuleIds?: number[] };
-  return parsed.storeModuleIds ?? [];
 }
 
 async function dropDekAndCiphertext(page: Page): Promise<void> {
@@ -160,7 +168,7 @@ async function seedProduct(page: Page, prefix: string): Promise<void> {
   await seedCategoryAndProduct(page, productName(prefix));
 }
 
-test.describe.serial('multipayments currency block (módulo 16) — cambio bloqueado y fallback', () => {
+test.describe.serial('currency block (gate: módulo 15 MultiMonedas) — cambio bloqueado y fallback', () => {
   test.describe.configure({ timeout: 180_000 });
 
   test('sin tasa el cambio se bloquea y el carrito cae a la moneda nativa; con la tasa se convierte', async ({
@@ -177,15 +185,9 @@ test.describe.serial('multipayments currency block (módulo 16) — cambio bloqu
     await page.waitForURL(/\/sales\/products$/);
     const storeId = await readSelectedStoreId(page);
 
-    await enableMultiPaymentsModule(page, storeId);
+    await enableStoreModules(page, storeId, CHANNEL_RATES_MODULES);
     await dropDekAndCiphertext(page);
-    const moduleIds = await storeModuleIds(page);
-    if (!moduleIds.includes(MULTIPAYMENTS_MODULE_ID)) {
-      throw new Error(
-        `multipayments-currency-block: session lacks module ${MULTIPAYMENTS_MODULE_ID} ` +
-          `(storeModuleIds=[${moduleIds.join(',')}]). The UI cannot render.`,
-      );
-    }
+    await assertModulesInSession(page, CHANNEL_RATES_MODULES);
 
     await seedProduct(page, 'MPCB');
     await addFirstProductAndOpenCart(page, storeId);
@@ -195,8 +197,9 @@ test.describe.serial('multipayments currency block (módulo 16) — cambio bloqu
     // The cart seeds its sale currency from the STORE's configured "Moneda de
     // Venta" (sellCurrency) on app load; the per-user preference is no longer
     // read. Configure the store's sale currency as USD through the real
-    // Configurations UI (module 15 renders the currency section), then do a FULL
-    // navigation so CartShell remounts and re-seeds from the store config.
+    // Configurations UI (module 15 is what renders the currency section), then
+    // do a FULL navigation so CartShell remounts and re-seeds from the store
+    // config.
     await page.goto('/management/configurations');
     await page.waitForLoadState('networkidle');
     const sellCurrencySelect = page.locator('#sell-currency-select');
