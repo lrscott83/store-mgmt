@@ -2027,6 +2027,123 @@ describe('CartShell — T17: Limpiar vuelve al sellCurrency de la tienda', () =>
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
+// 2026-10-03 — la moneda de la venta vuelve al sellCurrency de la tienda al
+// REGISTRAR la venta, no solo al pulsar "Limpiar". Requisito: "la moneda
+// seleccionada siempre por defecto en cada venta debe ser la moneda
+// configurada como la de venta". El mismo CartShell gobierna venta normal y
+// mayorista (cambia `orderType`), asi que un solo reset cubre ambas.
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('CartShell — registrar la venta restaura el sellCurrency de la tienda', () => {
+  const STORE_MODULES = [11, EModules.MultiMonedas, EModules.MultiPayments];
+
+  function cashRow(amount: number): MultiPaymentRow {
+    return {
+      id: 'row-1',
+      method: SalePaymentMethod.Efectivo,
+      currency: Currency.CUP,
+      amount,
+    };
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    mockUser = { id: 'u1', selectedStoreId: 's1', storeModuleIds: STORE_MODULES };
+    // 350 CUP por 1 USD: convierte en ambos sentidos.
+    mockChannelRates = [
+      {
+        method: SalePaymentMethod.Efectivo,
+        currency: Currency.CUP,
+        buyValue: 350, sellValue: 350,
+        effectiveFrom: new Date('2026-09-01T00:00:00.000Z'),
+      },
+    ];
+    mockProductLookup = {};
+  });
+
+  it('tras registrar, el selector vuelve al sellCurrency (USD) aunque el cajero habia cambiado a CUP', async () => {
+    new StoreCurrencyConfigService('s1').setSellCurrency(Currency.USD);
+    const cupProduct = makeProduct({ id: 'cup-1', name: 'Pan', price: 350, currency: Currency.CUP });
+    mockCartState({
+      items: [{ product: cupProduct, quantity: 1 }],
+      total: vi.fn().mockReturnValue(350),
+      cartCurrency: () => Currency.CUP,
+      payments: [cashRow(350)],
+      setPayments: vi.fn(),
+    });
+    renderCartShell();
+    openCart();
+
+    const select = screen.getByTestId('cart-currency-select') as HTMLSelectElement;
+    expect(select.value).toBe(String(Currency.USD));
+
+    // El cajero cambia a CUP para esta venta (toda línea convierte → permitido).
+    fireEvent.change(select, { target: { value: String(Currency.CUP) } });
+    expect(select.value).toBe(String(Currency.CUP));
+
+    fireEvent.click(screen.getByText('Registrar'));
+    await waitFor(() => expect(createOrderMock).toHaveBeenCalledTimes(1));
+
+    // Registrar cierra el panel; el cajero lo reabre para la venta siguiente.
+    openCart();
+    expect(
+      (screen.getByTestId('cart-currency-select') as HTMLSelectElement).value,
+    ).toBe(String(Currency.USD));
+  });
+
+  it('tras registrar en venta MAYORISTA también vuelve al sellCurrency', async () => {
+    new StoreCurrencyConfigService('s1').setSellCurrency(Currency.USD);
+    const cupProduct = makeProduct({ id: 'cup-1', name: 'Caja', price: 350, currency: Currency.CUP });
+    mockCartState({
+      items: [{ product: cupProduct, quantity: 24 }],
+      orderType: OrderType.Mayorista,
+      total: vi.fn().mockReturnValue(8400),
+      cartCurrency: () => Currency.CUP,
+      payments: [cashRow(8400)],
+      setPayments: vi.fn(),
+    });
+    renderCartShell();
+    openCart();
+
+    fireEvent.change(screen.getByTestId('cart-currency-select'), {
+      target: { value: String(Currency.CUP) },
+    });
+    expect((screen.getByTestId('cart-currency-select') as HTMLSelectElement).value).toBe(
+      String(Currency.CUP),
+    );
+
+    fireEvent.click(screen.getByText('Registrar'));
+    await waitFor(() => expect(createOrderMock).toHaveBeenCalledTimes(1));
+
+    openCart();
+    expect(
+      (screen.getByTestId('cart-currency-select') as HTMLSelectElement).value,
+    ).toBe(String(Currency.USD));
+  });
+
+  it('sin MultiMonedas el carrito no toca la moneda (sin selector, sin fallo)', async () => {
+    mockUser = { id: 'u1', selectedStoreId: 's1', storeModuleIds: [11] };
+    const product = makeProduct({ id: 'p1', name: 'Pan', price: 350, currency: Currency.CUP });
+    mockCartState({
+      items: [{ product, quantity: 1 }],
+      total: vi.fn().mockReturnValue(350),
+      cartCurrency: () => Currency.CUP,
+      payments: [],
+      setPayments: vi.fn(),
+    });
+    renderCartShell();
+    openCart();
+
+    expect(screen.queryByTestId('cart-currency-select')).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Pago'), { target: { value: '350' } });
+    fireEvent.click(screen.getByText('Registrar'));
+    await waitFor(() => expect(createOrderMock).toHaveBeenCalledTimes(1));
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
 // MultiMonedas (módulo 15) — el carrito multi-moneda ya NO depende de
 // MultiPayments (módulo 16): el selector, la conversión y el submit se activan
 // solo con el módulo 15.
