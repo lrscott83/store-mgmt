@@ -117,6 +117,16 @@ import {
 import type { ChannelRate, Product } from '@store-mgmt/domain';
 import type { MultiPaymentRow } from '~/shared/components/multipayments/multi-payment-list';
 
+/**
+ * Any leftover per-user cart-currency key. The preference module was deleted on
+ * 2026-10-03 — nothing writes it any more, so this must always come back empty.
+ * Deliberately scoped to the key PREFIX instead of `localStorage.length`: other
+ * entities (store currency config, channel rates) legitimately write keys.
+ */
+function cartCurrencyKeysInStorage(): string[] {
+  return Object.keys(localStorage).filter((key) => key.startsWith('lizoft.cart-currency-'));
+}
+
 function makeProduct(overrides: Partial<Product> = {}): Product {
   return {
     id: 'p1',
@@ -1844,9 +1854,9 @@ describe('CartShell — T4: bloqueo del cambio de moneda', () => {
 
     fireEvent.change(select, { target: { value: String(Currency.USD) } });
 
-    // Rejected: the selector stays on CUP and nothing is persisted.
+    // Rejected: the selector stays on CUP and nothing is written.
     expect(select.value).toBe(String(Currency.CUP));
-    expect(localStorage.getItem('lizoft.cart-currency-u1')).toBeNull();
+    expect(cartCurrencyKeysInStorage()).toHaveLength(0);
     // Clear message naming the culprit line and currencies.
     const alert = screen.getByTestId('cart-currency-change-error');
     expect(alert).toHaveTextContent('USD');
@@ -1879,7 +1889,6 @@ describe('CartShell — T4: bloqueo del cambio de moneda', () => {
     fireEvent.change(select, { target: { value: String(Currency.USD) } });
 
     expect(select.value).toBe(String(Currency.USD));
-    expect(localStorage.getItem('lizoft.cart-currency-u1')).toBe(String(Currency.USD));
     // 350 CUP / 350 = 1 USD, shown in the total and the line.
     expect(screen.getAllByText(/^1\s+USD$/).length).toBeGreaterThan(0);
     expect(screen.queryByTestId('cart-currency-change-error')).not.toBeInTheDocument();
@@ -1998,7 +2007,6 @@ describe('CartShell — T17: Limpiar vuelve al sellCurrency de la tienda', () =>
 
     // Vuelve al sellCurrency de la tienda, no a un CUP hardcodeado.
     expect(select.value).toBe(String(Currency.USD));
-    expect(localStorage.getItem('lizoft.cart-currency-u1')).toBe(String(Currency.USD));
     expect(screen.queryByTestId('cart-currency-change-error')).not.toBeInTheDocument();
   });
 
@@ -2269,10 +2277,10 @@ describe('CartShell — T4: sellCurrency de la tienda y relectura de tasas al ab
     mockProductLookup = {};
   });
 
-  it('T4-STORE-01: abre el carrito con el sellCurrency de la tienda (USD) e ignora la preferencia vieja', () => {
+  it('T4-STORE-01: abre el carrito con el sellCurrency de la tienda (USD)', () => {
     new StoreCurrencyConfigService('s1').setSellCurrency(Currency.USD);
-    // Una preferencia vieja del usuario NO debe ganar: manda la tienda.
-    localStorage.setItem('lizoft.cart-currency-u1', String(Currency.EUR));
+    // Sin residuo de una venta anterior: la moneda la fija la tienda y solo la
+    // tienda (la preferencia por usuario se eliminó el 2026-10-03).
     mockCartState({
       items: [],
       total: vi.fn().mockReturnValue(0),

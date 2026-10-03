@@ -42,7 +42,6 @@ import { showBlockingError, showAcknowledgeError } from '~/shared/lib/blocking-a
 import { showToastSuccess, showToastError } from '~/shared/lib/toast';
 import { round2 } from '~/shared/lib/money';
 import { currencyLabel, formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency';
-import { writeCartCurrencyPreference } from '~/shared/lib/cart-currency-preference';
 import { StoreCurrencyConfigService } from '~/shared/lib/store-currency-config-service';
 import {
   DEFAULT_ENABLED_CHANNEL_KEYS,
@@ -398,13 +397,12 @@ export function CartShell() {
   // registrada, porque el requisito es que CADA venta arranque en la moneda de
   // venta de la tienda: sin esto, la moneda elegida a mano se filtraba de una
   // venta a la siguiente. Sin MultiMonedas el selector no se renderiza, así que
-  // solo se toca el camino del módulo.
+  // solo se toca el camino del módulo. No persiste nada: la preferencia por
+  // usuario de la moneda del carrito se eliminó por ser código muerto.
   function resetCurrencyToStoreDefault() {
     if (!multiMonedasAvailable) return;
-    const sellCurrency = storeSellCurrency();
-    setPreferredCartCurrency(sellCurrency);
+    setPreferredCartCurrency(storeSellCurrency());
     setCurrencyChangeError(null);
-    writeCartCurrencyPreference(user?.id, sellCurrency);
   }
 
   function handleClear() {
