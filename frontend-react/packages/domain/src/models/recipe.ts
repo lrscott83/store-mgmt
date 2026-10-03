@@ -6,8 +6,8 @@ import type { AuditableBaseModel } from './base';
  * finished product, plus the fixed labor cost and overhead applied per batch.
  *
  * Offline-first, per-store entity (localStorage), same persistence shape as
- * expenses/exchange-rates/warehouses. Validation lives in the service layer,
- * not in the domain types — this module only describes the shape.
+ * expenses/warehouses. Validation lives in the service layer, not in the
+ * domain types — this module only describes the shape.
  */
 export interface RecipeComponent {
   /** Ingredient product id (must exist). */

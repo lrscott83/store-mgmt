@@ -51,6 +51,8 @@ ChannelRate {
 - [x] **T5** — Tests que se rompen: `sidebar.test.tsx`, serializer de sync, tests del servicio y de la vista. Actualizar o borrar.
 - [x] **T6** — E2E: borrar `precache-split.spec.ts:104`.
 - [x] **T7** — Verificación: `pnpm typecheck`, `pnpm test`, `pnpm lint`.
+- [x] **T8** — Borrar `ExchangeRate` y `ExchangeRateErrors` de `packages/domain`, incluido el barrel `src/index.ts`.
+- [x] **T9** — Corregir el razonamiento obsoleto de `REGENERABLE_ENTITY_KEY_PREFIX` en `unlock-gate.ts`.
 
 ## Idempotencia
 
@@ -77,6 +79,22 @@ La condición "el registro está vacío" **es** el marcador.
 - Backend, migraciones EF, cambios de API.
 - Tocar `frontend/` (Angular legacy, congelado).
 - Tocar cualquier E2E distinto de la línea 104 autorizada.
+
+## Pendientes cerrados (T8–T9)
+
+**T8 — modelo muerto fuera de `packages/domain`.** `ExchangeRate` (`models/exchange-rate.ts`) y `ExchangeRateErrors` (`errors/exchange-rate-errors.ts`) borrados, más su test `errors/__tests__/exchange-rate-errors.test.ts`. Las dos líneas del barrel (`src/index.ts:10,31`) eliminadas. Prueba de RED: cero `import { ExchangeRate }` / `import { ExchangeRateErrors }` en todo `frontend-react/`; los únicos matches restantes eran los propios archivos, el barrel y prosa. Referencia desactualizada corregida en `models/recipe.ts:9`.
+
+`ParsedData.exchangeRates?: readonly unknown[]` **se queda** (`sync/lib/services/data-serializer-service.ts:197`). No es opcional por gusto: dos test files fuera de la superficie autorizada (`sync/routes/__tests__/import-partial-paths.test.ts`, `import-no-write.test.ts`) siguen poniendo `exchangeRates: []` en literales que se pasan a `synchronizer.sync(data)`, y el excess-property check de TypeScript lo vuelve error de compilación. Es además la costura que demuestra que un backup previo a la retiro se ignora en vez de rechazarse.
+
+**T9 — razonamiento arreglado, comportamiento intacto.** El diff de `unlock-gate.ts` es **solo comentarios**: el prefijo (`línea 97`) y el `continue` (`línea 128`) quedan idénticos. **No se borró la constante, a propósito.** La exclusión sigue siendo load-bearing: un dispositivo que viene de un build anterior al retiro y nunca abrió "Tasas de Cambio" conserva el ciphertext `lizoft.store-exchangeRates-<storeId>` en `localStorage`, y tratar eso como evidencia reproduciría el lockout del 2026-09-06. El comentario nuevo dice exactamente eso y advierte explícitamente que no se borre el prefijo.
+
+La cobertura **no existía** — no había ningún test de `hasUnreadableCiphertext`. Se agregaron 7 tests en `offline/__tests__/unlock-gate.test.ts`, incluido el guard de regresión (leftover `exchange-rates-s1` → `false`) y una fila de control (ciphertext de usuario normal → `true`). Mutation-checked: borrar la línea 128 rompe 2 de 19; el archivo fue restaurado byte a byte.
+
+Verificación: `pnpm typecheck` PASS, `pnpm test` PASS (**5013** tests, +7 exactamente), `pnpm lint` PASS. Spot check del orquestador: `unlock-gate.test.ts` 19/19 PASS.
+
+### Deuda cosmética restante (no tocada, fuera de superficie)
+
+Siete archivos mencionan en comentarios los símbolos borrados, sin romper nada y con lint limpio: `packages/domain/src/errors/{recipe-errors,elaboration-errors,channel-rate-errors}.ts` citan `ExchangeRateErrors` como ejemplo de convención, y `inventory/lib/services/{warehouse-offline-service,recipe-offline-service}.ts`, `channel-rates/lib/services/channel-rate-offline-service.ts` y `sync/lib/services/data-synchronizer-service.ts:243` citan el `ExchangeRateOfflineService` borrado. Solo prosa.
 
 ## Progreso
 
