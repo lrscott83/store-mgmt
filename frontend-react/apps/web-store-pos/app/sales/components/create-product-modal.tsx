@@ -83,8 +83,11 @@ export function CreateProductModal({
     quantity: '',
   });
   const [wholesale, setWholesale] = useState<WholesaleConfig | undefined>(undefined);
-  // MultiMonedas: CUP salvo que el usuario elija otra (selector visible solo con el módulo).
-  const [currency, setCurrency] = useState<number>(DEFAULT_CURRENCY);
+  // MultiMonedas (2026-10-03): el precio de VENTA arranca con la MISMA moneda de
+  // compra configurada en la tienda. Antes pinnaba a CUP fijo, lo que obligaba a
+  // reelegir la moneda en cada producto de una tienda que opera en otra moneda.
+  // El selector sigue permitiendo cambiarla (visible solo con el módulo).
+  const [currency, setCurrency] = useState<number>(() => storeBuyCurrency(storeId));
   // T9: la moneda del costo ("Moneda de Compra") arranca con la config de la tienda.
   const [costCurrency, setCostCurrency] = useState<number>(() => storeBuyCurrency(storeId));
   // Costo + cantidad solo para el owner Y solo con el módulo de Inventario (3) activo.

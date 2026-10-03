@@ -5,6 +5,7 @@ import { IntlProvider } from 'react-intl';
 import type { UserModel } from '@store-mgmt/domain';
 import { EFeatures, EModules } from '@store-mgmt/domain';
 import esMessages from '~/shared/lib/i18n/es';
+import { MENU_GROUPS } from '~/shared/lib/config/menu-config';
 
 // Mock useAuthStore
 vi.mock('~/shared/lib/stores/auth-store', () => ({
@@ -586,6 +587,33 @@ describe('Sidebar — NEW badge on recently added menu items', () => {
 
     const badge = screen.getByTestId('menu-new-badge-/inventory/warehouses');
     expect(badge.className).toMatch(/bg-danger|bg-red/);
+  });
+
+  it('renders a NEW badge on BOTH Elaboracion items (Recetas y Elaboraciones)', () => {
+    renderSidebar(makeSuperAdmin());
+
+    expect(screen.getByTestId('menu-new-badge-/inventory/recipes')).toHaveTextContent('NEW');
+    expect(screen.getByTestId('menu-new-badge-/inventory/elaborations')).toHaveTextContent('NEW');
+  });
+
+  // El aviso de "fase de prueba" viaja con el badge: este test es la red que
+  // atrapa al próximo ítem que se marque NEW sin actualizar su popup de ayuda.
+  it('every NEW item warns in its help popup that it is in testing phase', () => {
+    const newItems = MENU_GROUPS.flatMap((g) => g.items).filter((i) => i.isNew);
+
+    expect(newItems.length).toBeGreaterThan(0);
+    for (const item of newItems) {
+      expect(item.helpContent ?? '').toContain('fase de prueba');
+      expect(item.helpContent ?? '').toMatch(/algún problema de funcionamiento/i);
+    }
+  });
+
+  it('shows the testing-phase warning inside the Recetas help popup', () => {
+    renderSidebar(makeSuperAdmin());
+
+    const row = screen.getByText('Recetas').closest('li');
+    fireEvent.click(row!.querySelector('button[aria-label="Ayuda"]')!);
+    expect(screen.getByRole('dialog')).toHaveTextContent('fase de prueba');
   });
 });
 

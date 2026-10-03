@@ -145,6 +145,26 @@ function Wrapper({ children }: { children: React.ReactNode }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// Carga de los módulos de ruta — UNA vez, fuera del presupuesto de cada test.
+//
+// Los `await import('../user-list')` que usaba cada test devolvían el módulo
+// del CACHÉ de ESM (el archivo no llama `vi.resetModules()` en ningún punto), así
+// que el trabajo caro — transformar el módulo y todas sus dependencias — lo
+// pagaba de su propio bolsillo el PRIMER test del archivo, con cargo a su
+// presupuesto de 5s. Con la suite completa (344 archivos en paralelo) ese import
+// se estiraba y S-LIST-1 expiraba por timeout sin que hubiera cambio real
+// alguno: aislado el archivo daba 28/28.
+//
+// `beforeAll` tiene su propio presupuesto (10s) y se paga una sola vez. Ningún
+// test depende de una recarga: los mocks (`vi.mock`) se registran al evaluar el
+// archivo, muy antes de que corra este hook.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const userListModule = await import('../user-list');
+const userCreateModule = await import('../user-create');
+const userEditModule = await import('../user-edit');
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // UserListPage — spec TEST-2 (5 cases)
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -160,7 +180,7 @@ describe('UserListPage — S-LIST-1: online fetch and render', () => {
   });
 
   it('fetches users on mount and renders them', async () => {
-    const { UserListPage } = await import('../user-list');
+    const { UserListPage } = userListModule;
     render(
       <Wrapper>
         <UserListPage />
@@ -173,7 +193,7 @@ describe('UserListPage — S-LIST-1: online fetch and render', () => {
   });
 
   it('renders the "Empleados" page title, not "Usuarios" (Req: Copy Matches Angular Terminology Exactly)', async () => {
-    const { UserListPage } = await import('../user-list');
+    const { UserListPage } = userListModule;
     render(
       <Wrapper>
         <UserListPage />
@@ -193,7 +213,7 @@ describe('UserListPage — S-LIST-2: empty state', () => {
   });
 
   it('shows empty state when no users exist', async () => {
-    const { UserListPage } = await import('../user-list');
+    const { UserListPage } = userListModule;
     render(
       <Wrapper>
         <UserListPage />
@@ -219,7 +239,7 @@ describe('UserListPage — S-LIST-3: HTTP-only fetch regardless of connectivity 
   });
 
   it('calls the users HTTP service on mount even when isOnline=false (no local cache read)', async () => {
-    const { UserListPage } = await import('../user-list');
+    const { UserListPage } = userListModule;
     render(
       <Wrapper>
         <UserListPage />
@@ -241,7 +261,7 @@ describe('UserListPage — S-LIST-4: no degraded/offline banner ever renders (Re
   });
 
   it('shows empty state and no degraded/cache notice when offline', async () => {
-    const { UserListPage } = await import('../user-list');
+    const { UserListPage } = userListModule;
     render(
       <Wrapper>
         <UserListPage />
@@ -270,7 +290,7 @@ describe('UserListPage — S-LIST-5: lifecycle action wired through the gear men
   });
 
   it('calls activateUser when Activar is chosen from the gear menu', async () => {
-    const { UserListPage } = await import('../user-list');
+    const { UserListPage } = userListModule;
     render(
       <Wrapper>
         <UserListPage />
@@ -307,7 +327,7 @@ describe('UserListPage — succeeded:false response (Req: Users List Surfaces su
   });
 
   it('shows USERS.ERROR when getUsers resolves with succeeded:false, does not set users from data', async () => {
-    const { UserListPage } = await import('../user-list');
+    const { UserListPage } = userListModule;
     render(
       <Wrapper>
         <UserListPage />
@@ -337,7 +357,7 @@ describe('UserListPage — succeeded:true still populates users (regression)', (
   });
 
   it('renders users and clears the error state on succeeded:true', async () => {
-    const { UserListPage } = await import('../user-list');
+    const { UserListPage } = userListModule;
     render(
       <Wrapper>
         <UserListPage />
@@ -363,7 +383,7 @@ describe('UserCreatePage — S-CREATE-1: missing selectedStoreId → redirect to
   });
 
   it('navigates to /management/stores/create when no storeId available', async () => {
-    const { UserCreatePage } = await import('../user-create');
+    const { UserCreatePage } = userCreateModule;
     render(
       <Wrapper>
         <UserCreatePage />
@@ -384,7 +404,7 @@ describe('UserCreatePage — S-CREATE-TITLE: renders "Adicionar Empleado", not "
   });
 
   it('shows the "Adicionar Empleado" page title', async () => {
-    const { UserCreatePage } = await import('../user-create');
+    const { UserCreatePage } = userCreateModule;
     render(
       <Wrapper>
         <UserCreatePage />
@@ -405,7 +425,7 @@ describe('UserCreatePage — S-CREATE-2: success navigates to /management/users'
   });
 
   it('navigates to /management/users after successful create', async () => {
-    const { UserCreatePage } = await import('../user-create');
+    const { UserCreatePage } = userCreateModule;
     render(
       <Wrapper>
         <UserCreatePage />
@@ -435,7 +455,7 @@ describe('UserCreatePage — S-CREATE-3: offline blocked', () => {
   });
 
   it('disables submit and shows offline notice when offline', async () => {
-    const { UserCreatePage } = await import('../user-create');
+    const { UserCreatePage } = userCreateModule;
     render(
       <Wrapper>
         <UserCreatePage />
@@ -457,7 +477,7 @@ describe('UserCreatePage — S-CREATE-4: HTTP error shown inline', () => {
   });
 
   it('shows inline error when createUser throws', async () => {
-    const { UserCreatePage } = await import('../user-create');
+    const { UserCreatePage } = userCreateModule;
     render(
       <Wrapper>
         <UserCreatePage />
@@ -489,7 +509,7 @@ describe('UserCreatePage — S-CREATE-5: password validation blocks submit', () 
   });
 
   it('blocks submit when password is too weak', async () => {
-    const { UserCreatePage } = await import('../user-create');
+    const { UserCreatePage } = userCreateModule;
     render(
       <Wrapper>
         <UserCreatePage />
@@ -530,7 +550,7 @@ describe('UserEditPage — S-EDIT-1: pre-fills UserDetailsForm after getById', (
   });
 
   it('pre-fills the fullName input from the fetched user', async () => {
-    const { UserEditPage } = await import('../user-edit');
+    const { UserEditPage } = userEditModule;
     render(
       <Wrapper>
         <UserEditPage />
@@ -556,7 +576,7 @@ describe('UserEditPage — S-EDIT-2: details submit calls editUser', () => {
   });
 
   it('calls editUser when details form submitted', async () => {
-    const { UserEditPage } = await import('../user-edit');
+    const { UserEditPage } = userEditModule;
     render(
       <Wrapper>
         <UserEditPage />
@@ -586,7 +606,7 @@ describe('UserEditPage — S-EDIT-NAV: successful save navigates to the users li
   });
 
   it('navigates to /management/users after a successful details save, with no inline success message', async () => {
-    const { UserEditPage } = await import('../user-edit');
+    const { UserEditPage } = userEditModule;
     render(
       <Wrapper>
         <UserEditPage />
@@ -611,7 +631,7 @@ describe('UserEditPage — S-EDIT-4: details form offline blocked', () => {
   });
 
   it('details submit is disabled when offline', async () => {
-    const { UserEditPage } = await import('../user-edit');
+    const { UserEditPage } = userEditModule;
     render(
       <Wrapper>
         <UserEditPage />
@@ -632,7 +652,7 @@ describe('UserEditPage — S-EDIT-6: isActive hidden for non-admin', () => {
   });
 
   it('does not show isActive toggle for regular (non-admin) user', async () => {
-    const { UserEditPage } = await import('../user-edit');
+    const { UserEditPage } = userEditModule;
     render(
       <Wrapper>
         <UserEditPage />
@@ -653,7 +673,7 @@ describe('UserEditPage — S-ERR-1: getById rejection renders error, no form mou
   });
 
   it('shows error alert and does not mount the details form', async () => {
-    const { UserEditPage } = await import('../user-edit');
+    const { UserEditPage } = userEditModule;
     render(
       <Wrapper>
         <UserEditPage />
@@ -686,7 +706,7 @@ describe('UserEditPage — getUserById succeeded:false', () => {
   });
 
   it('shows USERS.ERROR and does not mount the details form when getUserById resolves with succeeded:false', async () => {
-    const { UserEditPage } = await import('../user-edit');
+    const { UserEditPage } = userEditModule;
     render(
       <Wrapper>
         <UserEditPage />
@@ -710,7 +730,7 @@ describe('UserEditPage — S-NOCRED: no credentials/password UI is rendered (Req
   });
 
   it('does not render any password/credentials fields or change-password action', async () => {
-    const { UserEditPage } = await import('../user-edit');
+    const { UserEditPage } = userEditModule;
     render(
       <Wrapper>
         <UserEditPage />
@@ -728,19 +748,16 @@ describe('UserEditPage — S-NOCRED: no credentials/password UI is rendered (Req
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('adminFeatureLoader — ACCESS-4: all 3 user routes export named loader', () => {
-  it('UserListPage exports a named loader', async () => {
-    const mod = await import('../user-list');
-    expect(typeof mod.clientLoader).toBe('function');
+  it('UserListPage exports a named loader', () => {
+    expect(typeof userListModule.clientLoader).toBe('function');
   });
 
-  it('UserCreatePage exports a named loader', async () => {
-    const mod = await import('../user-create');
-    expect(typeof mod.clientLoader).toBe('function');
+  it('UserCreatePage exports a named loader', () => {
+    expect(typeof userCreateModule.clientLoader).toBe('function');
   });
 
-  it('UserEditPage exports a named loader', async () => {
-    const mod = await import('../user-edit');
-    expect(typeof mod.clientLoader).toBe('function');
+  it('UserEditPage exports a named loader', () => {
+    expect(typeof userEditModule.clientLoader).toBe('function');
   });
 
   it('ROUTE-EDIT-SHAPE: edit route uses /edit/:id (matching Angular + React convention)', () => {
@@ -762,7 +779,7 @@ describe('UserCreatePage — ROUTE-STOREID: resolves storeId from :storeId param
     mockUser = makeUser({ selectedStoreId: 'fallback-store' });
     mockParams = { storeId: 'param-store' };
     mockCreateUser = vi.fn().mockResolvedValue({ data: true });
-    const { UserCreatePage } = await import('../user-create');
+    const { UserCreatePage } = userCreateModule;
     render(
       <Wrapper>
         <UserCreatePage />
@@ -788,7 +805,7 @@ describe('UserCreatePage — ROUTE-STOREID: resolves storeId from :storeId param
     mockUser = makeUser({ selectedStoreId: 'fallback-store' });
     mockParams = {};
     mockCreateUser = vi.fn().mockResolvedValue({ data: true });
-    const { UserCreatePage } = await import('../user-create');
+    const { UserCreatePage } = userCreateModule;
     render(
       <Wrapper>
         <UserCreatePage />
