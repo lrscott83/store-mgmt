@@ -124,13 +124,18 @@ describe('MessageShell — el contador se muestra siempre', () => {
     expect(screen.getByTestId('message-badge').className).toContain('bg-text-muted');
   });
 
-  it('el contador con unread > 0 usa el color de marca', async () => {
+  it('el contador con unread > 0 usa el verde del icono, no el del carrito', async () => {
     getConversationsMock.mockResolvedValue(success([conversation({ unreadCount: 4 })]));
 
     renderShell();
 
     await waitFor(() => expect(screen.getByTestId('message-badge')).toHaveTextContent('4'));
-    expect(screen.getByTestId('message-badge').className).toContain('bg-primary');
+    // `bg-whatsapp` (theme token), NO `bg-primary`: el gadget de mensajes y
+    // el del carrito conviven en el header y antes ambos pintaban el morado
+    // de marca, lo que los hacía legibles como el mismo control.
+    const className = screen.getByTestId('message-badge').className;
+    expect(className).toContain('bg-whatsapp');
+    expect(className).not.toContain('bg-primary');
   });
 
   it('el badge se acota a "99+" y sigue ocupando el ancho del texto', async () => {

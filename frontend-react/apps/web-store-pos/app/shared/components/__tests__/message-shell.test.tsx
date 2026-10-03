@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
 import esMessages from '~/shared/lib/i18n/es';
 import type { ConversationDto, MessageDto } from '~/shared/lib/messages/messages-types';
 
@@ -90,6 +92,23 @@ function message(overrides: Partial<MessageDto> = {}): MessageDto {
     readAt: null,
     ...overrides,
   };
+}
+
+// Locates packages/web-common/styles.css by walking UP from the cwd instead
+// of counting `../` (breaks when this file moves) or building a file: URL
+// from import.meta.url (not a file: URL under Vitest) or importing the CSS
+// with `?raw` (the package's "exports" map resolves the query away and hands
+// back an empty string). Works whether Vitest is invoked from the app, the
+// package, or the workspace root.
+function readWebCommonStyles(): string {
+  let dir = process.cwd();
+  for (;;) {
+    const candidate = resolve(dir, 'packages/web-common/styles.css');
+    if (existsSync(candidate)) return readFileSync(candidate, 'utf8');
+    const parent = dirname(dir);
+    if (parent === dir) throw new Error('packages/web-common/styles.css not found above cwd');
+    dir = parent;
+  }
 }
 
 function renderShell() {
@@ -267,5 +286,41 @@ describe('MessageShell — errors', () => {
       ),
     );
     expect(screen.queryByText(/raw boom/)).not.toBeInTheDocument();
+  });
+});
+
+describe('MessageShell — trigger color identity', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUser = { id: 'u1', selectedStoreId: 's1', isSuperAdmin: false, isOwnerAdmin: true };
+    getConversationsMock.mockResolvedValue(success([]));
+  });
+
+  // The cart gadget (CartShell) is `text-text-muted hover:bg-primary-light`,
+  // so before this the chat trigger was the SAME control wearing the cart's
+  // lavender hover — the user reported it as "the shopping cart's color" and
+  // asked for the icon's own green instead (2026-10-02). This test exists to
+  // make that regression loud: it pins the hover, which is the part a
+  // redesign is most likely to silently revert to the shared brand token.
+  it('hovers in the chat green, never in the cart lavender', () => {
+    renderShell();
+
+    const trigger = screen.getByRole('button', { name: 'Mensajes' });
+    expect(trigger).toHaveClass('text-whatsapp');
+    expect(trigger).toHaveClass('hover:bg-whatsapp-light');
+    expect(trigger.className).not.toContain('primary');
+  });
+
+  // Guards the token itself, not just its use: if `--color-whatsapp` ever
+  // disappears from web-common/styles.css, `bg-whatsapp`/`text-whatsapp`
+  // stop resolving in the real build while these class-name assertions keep
+  // passing (jsdom never loads Tailwind's output). So the value is pinned
+  // here against the stylesheet rather than trusted.
+  it('keeps the theme token pinned to WhatsApp green, distinct from success', () => {
+    const css = readWebCommonStyles();
+    expect(css).toContain('--color-whatsapp: rgb(37 211 102)');
+    expect(css).toContain('--color-whatsapp-light:');
+    // Not collapsed into --color-success, which is a different green.
+    expect(css).not.toMatch(/--color-whatsapp:\s*rgb\(82 196 26\)/);
   });
 });
