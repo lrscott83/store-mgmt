@@ -362,18 +362,19 @@ export function ConfigurationsPage() {
         </div>
       )}
 
+      {/* Monedas de compra/venta (store-currency-config): only for stores with
+          MultiMonedas (module 15). Without it nothing renders. Primera sección
+          de la página: es la configuración que gobierna el resto de la tienda. */}
+      {hasMultiMonedasModuleAvailable(user) && (
+        <CurrencyConfigSection storeId={user?.selectedStoreId ?? ''} />
+      )}
+
       {/* Formas de pago (store-payment-methods-config): per-store toggles for
           the CURRENT store — independent of MultiStores, like the rest of the
           page's per-store settings. Hidden when MultiPayments (module 16) is
           active: the channel-rates register replaces this per-channel toggle UI. */}
       {!hasMultiPaymentsModuleAvailable(user) && (
         <PaymentMethodsConfigSection storeId={user?.selectedStoreId ?? ''} />
-      )}
-
-      {/* Monedas de compra/venta (store-currency-config): only for stores with
-          MultiMonedas (module 15). Without it nothing renders. */}
-      {hasMultiMonedasModuleAvailable(user) && (
-        <CurrencyConfigSection storeId={user?.selectedStoreId ?? ''} />
       )}
     </div>
   );
