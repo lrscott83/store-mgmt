@@ -39,6 +39,19 @@ export interface MenuGroup {
   items: MenuItem[];
 }
 
+/**
+ * Aviso que se concatena al `helpContent` de TODOS los ítems con `isNew: true`
+ * (badge "NEW" en el menú): la funcionalidad está en fase de prueba y puede
+ * presentar algún problema de funcionamiento. Existe como constante única —
+ * y no repetido dentro de cada `helpContent` — para que el aviso sea idéntico
+ * en todos los popups de ayuda y para que quitarlo cuando cada módulo salga de
+ * beta sea una edición de un solo lugar por ítem.
+ *
+ * Se elimina al quitarle `isNew` a un ítem: el badge y el aviso van juntos.
+ */
+const BETA_NOTICE =
+  ' ⚠️ Funcionalidad en fase de prueba: puede presentar algún problema de funcionamiento.';
+
 export const MENU_GROUPS: MenuGroup[] = [
   {
     groupLabel: 'MENU.ADMIN',
@@ -158,7 +171,8 @@ export const MENU_GROUPS: MenuGroup[] = [
         rolesOnly: (user) => user.isOwnerAdmin,
         isNew: true,
         helpContent:
-          'Catálogo Web. Publica tus productos en una página web propia (/catalog/tu-tienda): completa la descripción, el % de descuento, el precio rebajado, la marca Nuevo y las imágenes, y pulsa Sincronizar Catálogo para actualizar lo que ven tus clientes.',
+          'Catálogo Web. Publica tus productos en una página web propia (/catalog/tu-tienda): completa la descripción, el % de descuento, el precio rebajado, la marca Nuevo y las imágenes, y pulsa Sincronizar Catálogo para actualizar lo que ven tus clientes.' +
+          BETA_NOTICE,
       },
       {
         label: 'MENU.SALE',
@@ -175,7 +189,8 @@ export const MENU_GROUPS: MenuGroup[] = [
         moduleId: EModules.WholesaleSales,
         isNew: true,
         helpContent:
-          'Venta por mayor. Elige la cantidad en paquetes (cajas), el precio por unidad baja según los rangos configurados en el producto y la venta se descuenta del inventario en unidades. Ej: 12 cajas × 24 unidades × 660.',
+          'Venta por mayor. Elige la cantidad en paquetes (cajas), el precio por unidad baja según los rangos configurados en el producto y la venta se descuenta del inventario en unidades. Ej: 12 cajas × 24 unidades × 660.' +
+          BETA_NOTICE,
       },
       {
         label: 'MENU.TODAY_ORDERS',
@@ -308,7 +323,8 @@ export const MENU_GROUPS: MenuGroup[] = [
         moduleId: EModules.Warehouses,
         isNew: true,
         helpContent:
-          'Gestiona tus almacenes. Crea almacenes, registra entradas por compra, transfiere stock entre almacenes y haz salidas a la tienda: cada salida crea una entrada de inventario en la tienda con el costo promedio del almacén.',
+          'Gestiona tus almacenes. Crea almacenes, registra entradas por compra, transfiere stock entre almacenes y haz salidas a la tienda: cada salida crea una entrada de inventario en la tienda con el costo promedio del almacén.' +
+          BETA_NOTICE,
       },
       {
         label: 'MENU.WAREHOUSE_MOVEMENTS',
@@ -317,7 +333,8 @@ export const MENU_GROUPS: MenuGroup[] = [
         moduleId: EModules.Warehouses,
         isNew: true,
         helpContent:
-          'Historial de movimientos de almacenes. Consulta todas las entradas, salidas y transferencias entre almacenes, agrupadas por día, con el origen y destino de cada una.',
+          'Historial de movimientos de almacenes. Consulta todas las entradas, salidas y transferencias entre almacenes, agrupadas por día, con el origen y destino de cada una.' +
+          BETA_NOTICE,
       },
     ],
   },
@@ -332,16 +349,20 @@ export const MENU_GROUPS: MenuGroup[] = [
         path: '/inventory/recipes',
         featureIds: [EFeatures.Recipes],
         moduleId: EModules.Elaboration,
+        isNew: true,
         helpContent:
-          'Recetas de elaboración. Define el producto terminado, cuántas unidades produce un lote, los insumos que consume (con su merma) y los costos de mano de obra y gastos indirectos.',
+          'Recetas de elaboración. Define el producto terminado, cuántas unidades produce un lote, los insumos que consume (con su merma) y los costos de mano de obra y gastos indirectos.' +
+          BETA_NOTICE,
       },
       {
         label: 'MENU.ELABORATIONS',
         path: '/inventory/elaborations',
         featureIds: [EFeatures.Elaborations],
         moduleId: EModules.Elaboration,
+        isNew: true,
         helpContent:
-          'Registra una elaboración: elige la receta, los lotes y el almacén que aporta los insumos, revisa el consumo teórico y ajústalo con el real. El sistema descuenta los insumos, ingresa el producto terminado y calcula su costo unitario real.',
+          'Registra una elaboración: elige la receta, los lotes y el almacén que aporta los insumos, revisa el consumo teórico y ajústalo con el real. El sistema descuenta los insumos, ingresa el producto terminado y calcula su costo unitario real.' +
+          BETA_NOTICE,
       },
     ],
   },
@@ -418,14 +439,6 @@ export const MENU_GROUPS: MenuGroup[] = [
       // Convention: NO menu item carries an icon — plain text labels only
       // (the wholesale 📦, exchange-rate 💱 and warehouses 🏬 icons were
       // removed; the icon property is gone from MenuItem entirely).
-      {
-        label: 'MENU.EXCHANGE_RATES',
-        path: '/management/exchange-rates',
-        featureIds: [EFeatures.Configurations],
-        moduleId: EModules.Management,
-        helpContent:
-          'Registro diario del cambio de USD a MN. Cada día se añade un registro con el valor del día anterior (por defecto 1). Puedes editar el valor de cualquier día: escribe cuántos pesos (MN) equivale 1 USD en esa fecha y pulsa Guardar.',
-      },
       {
         label: 'MENU.CHANNEL_RATES',
         path: '/management/channel-rates',

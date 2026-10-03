@@ -9,9 +9,12 @@ export const StorageKeys = {
   // Lifecycle: set when the user closes the banner; cleared by logout() so the
   // notice reappears after the next authentication.
   TRIAL_NOTICE_DISMISSED: 'trialNoticeDismissed',
-  // First local calendar day (YYYY-MM-DD) the STORE OWNER (OwnerAdmin)
-  // authenticated on this device. The daily USD→MN register's list runs from
-  // today down to this day; stamped once, never updated (daily-exchange-rate).
+  // RETIRED with the daily USD→MN register (retire-exchange-rates-register),
+  // KEPT because the migration that resolves it is the only thing that can
+  // still wipe it: `migrate-exchange-rates-to-channel-rates` removes this
+  // anchor together with the register once its days are migrated (or once the
+  // store turns out to have no MultiMonedas to hold them). Deleting the key
+  // constant would leave that wipe with no single source of truth.
   EXCHANGE_RATES_FIRST_LOGIN: 'exchangeRatesFirstLogin',
   entityKey: (entity: string, storeId: string) => `lizoft.store-${entity}-${storeId}`,
 } as const;
@@ -31,6 +34,12 @@ export const BUSINESS_ENTITY_NAMES = [
   'orders',
   'expenses',
   'saleCredits',
+  // Retired with the daily USD→MN register (retire-exchange-rates-register),
+  // KEPT on this list on purpose: it is the single source of truth that makes
+  // `entity-migration` encrypt a legacy plaintext entry, `store-data-reset`
+  // wipe it and `damaged-data-recovery` offer to remove it. A device upgraded
+  // from the old app can still carry one, and dropping the name would leave
+  // that data invisible to all three.
   'exchangeRates',
   'warehouses',
   'warehouse-stock-levels',

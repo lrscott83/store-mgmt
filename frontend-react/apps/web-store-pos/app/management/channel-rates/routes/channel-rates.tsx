@@ -20,7 +20,9 @@ import { HelpIcon, PlusIcon, TrashIcon } from '~/shared/components/ui/icons';
 import { currencyLabel } from '~/shared/lib/format-money-with-currency';
 import { fromLocalDayKey, toLocalDayKey } from '~/shared/lib/date-utils';
 import { channelLabel } from '~/shared/lib/payment-methods/channel-label';
+import { hasMultiMonedasModuleAvailable } from '~/shared/lib/auth/authorization-service';
 import { ChannelRateOfflineService } from '../lib/services/channel-rate-offline-service';
+import { migrateExchangeRatesToChannelRates } from '../lib/migrate-exchange-rates-to-channel-rates';
 
 // multipayments — same guard as the Configurations feature and the daily
 // exchange-rate register (OwnerAdmin / SuperAdmin plus the feature gate), AND
@@ -93,6 +95,7 @@ export function ChannelRatesPage() {
   const intl = useIntl();
   const formatMessage = useCallback((id: string) => intl.formatMessage({ id }), [intl]);
   const storeId = useAuthStore((s) => s.user?.selectedStoreId ?? '');
+  const user = useAuthStore((s) => s.user);
 
   const [records, setRecords] = useState<ChannelRate[]>([]);
   const [formOpen, setFormOpen] = useState(false);
@@ -125,9 +128,35 @@ export function ChannelRatesPage() {
     setRecords(sortByRecency(svc.getStorageChannelRates()));
   }, [storeId]);
 
+  /**
+   * Opening this page is the click that resolves the RETIRED "Cambio USD a MN"
+   * daily register (retire-exchange-rates-register): with MultiMonedas its days
+   * move here as Efectivo/CUP rows; without it the register is wiped. Client
+   * side ONLY — this app also builds on the server, where `localStorage` does
+   * not exist, so this never runs in a loader.
+   *
+   * Safe on every render: the migration short-circuits on an EMPTY register,
+   * and every branch that does work ends by emptying it. A second call (a
+   * re-mount, a StrictMode double-invoke, a later visit) therefore finds `[]`
+   * and returns without touching anything.
+   */
+  const retireDailyExchangeRates = useCallback(() => {
+    if (!storeId) return;
+    try {
+      migrateExchangeRatesToChannelRates(storeId, hasMultiMonedasModuleAvailable(user));
+    } catch (err) {
+      // A damaged register must not break the rates page: the migration leaves
+      // the bytes in place (nothing is destroyed), so this only costs the move.
+      console.warn('[channel-rates] could not resolve the retired daily exchange register', err);
+    }
+  }, [storeId, user]);
+
   useEffect(() => {
+    // BEFORE `load()`: the migrated rows must be in the first render the user
+    // sees, not one reload later.
+    retireDailyExchangeRates();
     load();
-  }, [load]);
+  }, [retireDailyExchangeRates, load]);
 
   // Card 1: the latest ACTIVE rate per channel (deactivated rows never show
   // here; the previous active row of the channel takes over after a

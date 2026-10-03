@@ -10,7 +10,7 @@ import { readEntityOrThrow } from '~/shared/lib/storage/read-entity-or-throw';
  * wire format, auto-init on an absent key.
  */
 
-/** The currencies a store may configure, mirroring cart-currency-preference.ts. */
+/** The currencies a store may configure, mirroring the Currency enum catalogue. */
 const VALID_CURRENCIES: ReadonlySet<number> = new Set<number>([
   Currency.CUP,
   Currency.USD,

@@ -76,14 +76,24 @@ const ENTITY_ENVELOPE_PREFIX = 'enc:v1:';
 // `lizoft.store-{entity}-{storeId}` — store-scoped, no APP_VERSION prefix.
 const ENTITY_KEY_PREFIX = 'lizoft.store-';
 
-// The daily exchange-rate register is the ONE business entity that is
-// SYSTEM-GENERATED rather than user-authored: every OwnerAdmin
-// authentication backfills it (exchange-rate-daily.ts), values default to
-// 1 / the previous day's, and a lost register is re-ingestable by hand. It
-// must never justify hijacking a valid session — that was the second half
-// of the 2026-09-06 report: EVERY owner session writes this ciphertext at
-// login, so keying the gate on "any ciphertext" re-locked every store on
-// earth the moment its device key vanished.
+// The daily USD→MN exchange-rate register is RETIRED
+// (retire-exchange-rates-register): the entity, its service and its
+// backfill (`exchange-rate-daily.ts`) are all gone, so nothing regenerates
+// anything under this prefix any more and the name no longer describes what
+// it skips. The exclusion stays because the key is still on disk — a
+// device that upgraded from a build older than the retirement and has not
+// since run the migration or the auth-time wipe still holds
+// `lizoft.store-exchangeRates-<storeId>` ciphertext, and nothing deletes
+// it for a store with MultiMonedas that never opens "Tasas de Cambio".
+//
+// Treating that leftover as evidence would re-create the second half of the
+// 2026-09-06 report exactly: back then EVERY owner session wrote this
+// ciphertext at login, so keying the gate on "any ciphertext" re-locked
+// every store on earth the moment its device key vanished. Dead ciphertext
+// protecting a register nobody reads is not a reason to hijack a valid
+// session. Do NOT drop this prefix on the grounds that the register is
+// gone — it is load-bearing for every un-migrated device, and dropping it
+// is a repeat of the reported incident, not a cleanup.
 const REGENERABLE_ENTITY_KEY_PREFIX = 'lizoft.store-exchangeRates-';
 
 /**
@@ -108,8 +118,8 @@ function isEmptyCollectionCiphertext(value: string): boolean {
  * registration, with ZERO user ciphertext on disk. Hijacking navigation
  * there expelled a valid session to /login on every reload and parked it
  * on /login//register. The hijack is only justified to protect unreadable
- * USER data; system-regenerable registers and legacy empty collections do
- * not count.
+ * USER data; the retired register's legacy keys (see
+ * `REGENERABLE_ENTITY_KEY_PREFIX`) and legacy empty collections do not count.
  */
 export function hasUnreadableCiphertext(): boolean {
   for (let i = 0; i < localStorage.length; i++) {

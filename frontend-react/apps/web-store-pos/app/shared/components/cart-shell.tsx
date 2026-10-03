@@ -42,7 +42,6 @@ import { showBlockingError, showAcknowledgeError } from '~/shared/lib/blocking-a
 import { showToastSuccess, showToastError } from '~/shared/lib/toast';
 import { round2 } from '~/shared/lib/money';
 import { currencyLabel, formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency';
-import { writeCartCurrencyPreference } from '~/shared/lib/cart-currency-preference';
 import { StoreCurrencyConfigService } from '~/shared/lib/store-currency-config-service';
 import {
   DEFAULT_ENABLED_CHANNEL_KEYS,
@@ -392,19 +391,24 @@ export function CartShell() {
     setMustGenerateFacture(false);
   }
 
+  // T4/2026-10-03: devuelve la moneda de la venta al default de la TIENDA
+  // (sellCurrency, no un CUP hardcodeado) y descarta cualquier aviso de cambio
+  // pendiente. Lo invocan TANTO "Limpiar" como el cierre de una venta
+  // registrada, porque el requisito es que CADA venta arranque en la moneda de
+  // venta de la tienda: sin esto, la moneda elegida a mano se filtraba de una
+  // venta a la siguiente. Sin MultiMonedas el selector no se renderiza, así que
+  // solo se toca el camino del módulo. No persiste nada: la preferencia por
+  // usuario de la moneda del carrito se eliminó por ser código muerto.
+  function resetCurrencyToStoreDefault() {
+    if (!multiMonedasAvailable) return;
+    setPreferredCartCurrency(storeSellCurrency());
+    setCurrencyChangeError(null);
+  }
+
   function handleClear() {
     clear();
     resetTransientFields();
-    // T4: "Limpiar" devuelve la moneda de la venta al default de la TIENDA
-    // (sellCurrency, no un CUP hardcodeado) y descarta cualquier aviso de cambio
-    // pendiente, para que la próxima venta arranque limpia. Sin MultiMonedas el
-    // selector no se renderiza, así que solo se toca el camino del módulo.
-    if (multiMonedasAvailable) {
-      const sellCurrency = storeSellCurrency();
-      setPreferredCartCurrency(sellCurrency);
-      setCurrencyChangeError(null);
-      writeCartCurrencyPreference(user?.id, sellCurrency);
-    }
+    resetCurrencyToStoreDefault();
   }
 
   // 1:1 port of Angular's NavRightComponent.increaseProduct/decreaseProduct ->
@@ -494,6 +498,9 @@ export function CartShell() {
     // reset).
     clear();
     resetTransientFields();
+    // La venta siguiente arranca en la moneda de venta de la tienda, no en la
+    // que el cajero eligió para esta (2026-10-03).
+    resetCurrencyToStoreDefault();
   }
 
   async function handleCreateOrder() {

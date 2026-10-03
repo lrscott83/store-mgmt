@@ -9,11 +9,12 @@ import { InventoryOfflineService } from '~/inventory/lib/services/inventory-offl
 import { OrderOfflineService } from '~/sales/lib/services/order-offline-service';
 import { ExpenseOfflineService } from '~/expenses/lib/services/expense-offline-service';
 import { SaleCreditOfflineService } from '~/sales/lib/services/sale-credit-offline-service';
-import { ExchangeRateOfflineService } from '~/management/exchange-rates/lib/services/exchange-rate-offline-service';
 import { WarehouseOfflineService } from '~/inventory/lib/services/warehouse-offline-service';
 
 const STORE_ID = 'store-channel-rates';
 const PASSWORD = 'hunter2-correct-horse';
+/** Retired with the daily register (retire-exchange-rates-register): no longer in `EDataFileName`. */
+const RETIRED_EXCHANGE_RATES_ENTRY = 'exchange-rates.json';
 
 /** Builds a v1 archive (no meta.json) with the given entries, writer-level password. */
 async function buildLegacyV1Zip(
@@ -43,7 +44,6 @@ function makeSerializerWithRealServices() {
     new OrderOfflineService(STORE_ID),
     new ExpenseOfflineService(STORE_ID),
     new SaleCreditOfflineService(STORE_ID),
-    new ExchangeRateOfflineService(STORE_ID),
     new WarehouseOfflineService(STORE_ID, productRepo, inventorySvc),
     channelRateSvc,
   );
@@ -120,7 +120,7 @@ describe('DataSerializerService — channelRates entry (multipayments T4)', () =
         [EDataFileName.Orders]: JSON.stringify([]),
         [EDataFileName.Expenses]: JSON.stringify([]),
         [EDataFileName.SaleCredits]: JSON.stringify([]),
-        [EDataFileName.ExchangeRates]: JSON.stringify([]),
+        [RETIRED_EXCHANGE_RATES_ENTRY]: JSON.stringify([]),
         [EDataFileName.Warehouses]: JSON.stringify([]),
         [EDataFileName.WarehouseStockLevels]: JSON.stringify([]),
         [EDataFileName.WarehouseStockMovements]: JSON.stringify([]),
@@ -132,5 +132,34 @@ describe('DataSerializerService — channelRates entry (multipayments T4)', () =
     const parsed = await serializer.import(legacyPayload, PASSWORD);
 
     expect(parsed.channelRates).toEqual([]);
+  });
+
+  it('an archive from BEFORE the retirement still carrying exchange-rates.json imports and IGNORES it (retire-exchange-rates-register)', async () => {
+    // The daily register is retired, but backups taken before the retirement
+    // are still out there with a populated entry. An unknown-but-present entry
+    // must not be an error: the serializer simply never looks it up.
+    const oldPayload = await buildLegacyV1Zip(
+      {
+        [EDataFileName.Categories]: JSON.stringify([]),
+        [EDataFileName.Products]: JSON.stringify([]),
+        [EDataFileName.InventoryEntries]: JSON.stringify([]),
+        [EDataFileName.Orders]: JSON.stringify([]),
+        [EDataFileName.Expenses]: JSON.stringify([]),
+        [EDataFileName.SaleCredits]: JSON.stringify([]),
+        [RETIRED_EXCHANGE_RATES_ENTRY]: JSON.stringify([
+          { id: '2026-09-01', date: '2026-09-01T00:00:00.000Z', value: 400 },
+        ]),
+        [EDataFileName.ChannelRates]: JSON.stringify([]),
+      },
+      PASSWORD + STORE_ID,
+    );
+
+    const { serializer } = makeSerializerWithRealServices();
+
+    await expect(serializer.import(oldPayload, PASSWORD)).resolves.toMatchObject({
+      channelRates: [],
+    });
+    const parsed = await serializer.import(oldPayload, PASSWORD);
+    expect(parsed.exchangeRates).toBeUndefined();
   });
 });

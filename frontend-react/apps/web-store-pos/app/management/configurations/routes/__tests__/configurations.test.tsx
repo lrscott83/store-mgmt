@@ -637,4 +637,23 @@ describe('ConfigurationsPage — currency config section (MultiMonedas module 15
     expect(buy.value).toBe(String(Currency.EUR));
     expect(sell.value).toBe(String(Currency.USD));
   });
+
+  // El orden es parte del contrato de la página: con MultiMonedas la sección
+  // de monedas va PRIMERO, antes que formas de pago.
+  it('renders the currency section BEFORE the payment methods section', async () => {
+    mockAuthState(
+      buildUser({ storeModuleIds: [14, EModules.MultiMonedas] }),
+    );
+    const { ConfigurationsPage } = await import('../configurations');
+    render(
+      <Wrapper>
+        <ConfigurationsPage />
+      </Wrapper>,
+    );
+
+    const currency = await screen.findByTestId('currency-config');
+    const payments = await screen.findByTestId('payment-methods-config');
+    // true → currency-config aparece antes en el DOM.
+    expect(currency.compareDocumentPosition(payments) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
 });

@@ -4,7 +4,6 @@ import { Currency } from '@store-mgmt/domain';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { useCartStore } from '~/shared/lib/stores/cart-store';
 import { currencyLabel } from '~/shared/lib/format-money-with-currency';
-import { writeCartCurrencyPreference } from '~/shared/lib/cart-currency-preference';
 import { hasMultiMonedasModuleAvailable } from '~/shared/lib/auth/authorization-service';
 
 /** Fixed prefix of the options: CUP (default) then USD. Cart currencies append after. */
@@ -57,8 +56,9 @@ interface CartCurrencySelectProps {
 /**
  * Cart currency selector — rendered ONLY when the store has the MultiMonedas
  * module (module 15). Without the module nothing renders and the cart keeps its
- * pre-MultiMonedas behavior (the first item's currency). The selected value is
- * persisted per user so it survives reloads and is reused on the next sale.
+ * pre-MultiMonedas behavior (the first item's currency). The selection is NOT
+ * persisted (2026-10-03): cada venta arranca en la moneda de venta configurada
+ * en la tienda, sin importar qué se eligió en la venta anterior.
  *
  * Layout: compact inline control so the cart can place it in the header
  * toolbar next to "Limpiar"/"Registrar" without a full-width row of its own.
@@ -106,13 +106,13 @@ export function CartCurrencySelect({
 
   function handleChange(currency: number) {
     const next = currency as Currency;
-    // T4: reject the change BEFORE persisting or notifying the parent, so the
-    // selector stays on the current currency and the preference is untouched.
+    // T4: reject the change BEFORE notifying the parent, so the selector stays
+    // on the current currency. Sin persistencia: la moneda de la venta la fija
+    // la tienda (sellCurrency) y el carrito vuelve a ella al registrar o limpiar.
     if (canChange && !canChange(next)) {
       onRejected?.(next);
       return;
     }
-    writeCartCurrencyPreference(user?.id, next);
     onChange(next);
   }
 

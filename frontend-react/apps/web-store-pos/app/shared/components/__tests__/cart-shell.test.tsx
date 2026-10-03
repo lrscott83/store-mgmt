@@ -117,6 +117,16 @@ import {
 import type { ChannelRate, Product } from '@store-mgmt/domain';
 import type { MultiPaymentRow } from '~/shared/components/multipayments/multi-payment-list';
 
+/**
+ * Any leftover per-user cart-currency key. The preference module was deleted on
+ * 2026-10-03 — nothing writes it any more, so this must always come back empty.
+ * Deliberately scoped to the key PREFIX instead of `localStorage.length`: other
+ * entities (store currency config, channel rates) legitimately write keys.
+ */
+function cartCurrencyKeysInStorage(): string[] {
+  return Object.keys(localStorage).filter((key) => key.startsWith('lizoft.cart-currency-'));
+}
+
 function makeProduct(overrides: Partial<Product> = {}): Product {
   return {
     id: 'p1',
@@ -1844,9 +1854,9 @@ describe('CartShell — T4: bloqueo del cambio de moneda', () => {
 
     fireEvent.change(select, { target: { value: String(Currency.USD) } });
 
-    // Rejected: the selector stays on CUP and nothing is persisted.
+    // Rejected: the selector stays on CUP and nothing is written.
     expect(select.value).toBe(String(Currency.CUP));
-    expect(localStorage.getItem('lizoft.cart-currency-u1')).toBeNull();
+    expect(cartCurrencyKeysInStorage()).toHaveLength(0);
     // Clear message naming the culprit line and currencies.
     const alert = screen.getByTestId('cart-currency-change-error');
     expect(alert).toHaveTextContent('USD');
@@ -1879,7 +1889,6 @@ describe('CartShell — T4: bloqueo del cambio de moneda', () => {
     fireEvent.change(select, { target: { value: String(Currency.USD) } });
 
     expect(select.value).toBe(String(Currency.USD));
-    expect(localStorage.getItem('lizoft.cart-currency-u1')).toBe(String(Currency.USD));
     // 350 CUP / 350 = 1 USD, shown in the total and the line.
     expect(screen.getAllByText(/^1\s+USD$/).length).toBeGreaterThan(0);
     expect(screen.queryByTestId('cart-currency-change-error')).not.toBeInTheDocument();
@@ -1998,7 +2007,6 @@ describe('CartShell — T17: Limpiar vuelve al sellCurrency de la tienda', () =>
 
     // Vuelve al sellCurrency de la tienda, no a un CUP hardcodeado.
     expect(select.value).toBe(String(Currency.USD));
-    expect(localStorage.getItem('lizoft.cart-currency-u1')).toBe(String(Currency.USD));
     expect(screen.queryByTestId('cart-currency-change-error')).not.toBeInTheDocument();
   });
 
@@ -2023,6 +2031,123 @@ describe('CartShell — T17: Limpiar vuelve al sellCurrency de la tienda', () =>
     fireEvent.click(screen.getByText('Limpiar'));
 
     expect(screen.queryByTestId('cart-currency-change-error')).not.toBeInTheDocument();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 2026-10-03 — la moneda de la venta vuelve al sellCurrency de la tienda al
+// REGISTRAR la venta, no solo al pulsar "Limpiar". Requisito: "la moneda
+// seleccionada siempre por defecto en cada venta debe ser la moneda
+// configurada como la de venta". El mismo CartShell gobierna venta normal y
+// mayorista (cambia `orderType`), asi que un solo reset cubre ambas.
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('CartShell — registrar la venta restaura el sellCurrency de la tienda', () => {
+  const STORE_MODULES = [11, EModules.MultiMonedas, EModules.MultiPayments];
+
+  function cashRow(amount: number): MultiPaymentRow {
+    return {
+      id: 'row-1',
+      method: SalePaymentMethod.Efectivo,
+      currency: Currency.CUP,
+      amount,
+    };
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    mockUser = { id: 'u1', selectedStoreId: 's1', storeModuleIds: STORE_MODULES };
+    // 350 CUP por 1 USD: convierte en ambos sentidos.
+    mockChannelRates = [
+      {
+        method: SalePaymentMethod.Efectivo,
+        currency: Currency.CUP,
+        buyValue: 350, sellValue: 350,
+        effectiveFrom: new Date('2026-09-01T00:00:00.000Z'),
+      },
+    ];
+    mockProductLookup = {};
+  });
+
+  it('tras registrar, el selector vuelve al sellCurrency (USD) aunque el cajero habia cambiado a CUP', async () => {
+    new StoreCurrencyConfigService('s1').setSellCurrency(Currency.USD);
+    const cupProduct = makeProduct({ id: 'cup-1', name: 'Pan', price: 350, currency: Currency.CUP });
+    mockCartState({
+      items: [{ product: cupProduct, quantity: 1 }],
+      total: vi.fn().mockReturnValue(350),
+      cartCurrency: () => Currency.CUP,
+      payments: [cashRow(350)],
+      setPayments: vi.fn(),
+    });
+    renderCartShell();
+    openCart();
+
+    const select = screen.getByTestId('cart-currency-select') as HTMLSelectElement;
+    expect(select.value).toBe(String(Currency.USD));
+
+    // El cajero cambia a CUP para esta venta (toda línea convierte → permitido).
+    fireEvent.change(select, { target: { value: String(Currency.CUP) } });
+    expect(select.value).toBe(String(Currency.CUP));
+
+    fireEvent.click(screen.getByText('Registrar'));
+    await waitFor(() => expect(createOrderMock).toHaveBeenCalledTimes(1));
+
+    // Registrar cierra el panel; el cajero lo reabre para la venta siguiente.
+    openCart();
+    expect(
+      (screen.getByTestId('cart-currency-select') as HTMLSelectElement).value,
+    ).toBe(String(Currency.USD));
+  });
+
+  it('tras registrar en venta MAYORISTA también vuelve al sellCurrency', async () => {
+    new StoreCurrencyConfigService('s1').setSellCurrency(Currency.USD);
+    const cupProduct = makeProduct({ id: 'cup-1', name: 'Caja', price: 350, currency: Currency.CUP });
+    mockCartState({
+      items: [{ product: cupProduct, quantity: 24 }],
+      orderType: OrderType.Mayorista,
+      total: vi.fn().mockReturnValue(8400),
+      cartCurrency: () => Currency.CUP,
+      payments: [cashRow(8400)],
+      setPayments: vi.fn(),
+    });
+    renderCartShell();
+    openCart();
+
+    fireEvent.change(screen.getByTestId('cart-currency-select'), {
+      target: { value: String(Currency.CUP) },
+    });
+    expect((screen.getByTestId('cart-currency-select') as HTMLSelectElement).value).toBe(
+      String(Currency.CUP),
+    );
+
+    fireEvent.click(screen.getByText('Registrar'));
+    await waitFor(() => expect(createOrderMock).toHaveBeenCalledTimes(1));
+
+    openCart();
+    expect(
+      (screen.getByTestId('cart-currency-select') as HTMLSelectElement).value,
+    ).toBe(String(Currency.USD));
+  });
+
+  it('sin MultiMonedas el carrito no toca la moneda (sin selector, sin fallo)', async () => {
+    mockUser = { id: 'u1', selectedStoreId: 's1', storeModuleIds: [11] };
+    const product = makeProduct({ id: 'p1', name: 'Pan', price: 350, currency: Currency.CUP });
+    mockCartState({
+      items: [{ product, quantity: 1 }],
+      total: vi.fn().mockReturnValue(350),
+      cartCurrency: () => Currency.CUP,
+      payments: [],
+      setPayments: vi.fn(),
+    });
+    renderCartShell();
+    openCart();
+
+    expect(screen.queryByTestId('cart-currency-select')).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Pago'), { target: { value: '350' } });
+    fireEvent.click(screen.getByText('Registrar'));
+    await waitFor(() => expect(createOrderMock).toHaveBeenCalledTimes(1));
   });
 });
 
@@ -2152,10 +2277,10 @@ describe('CartShell — T4: sellCurrency de la tienda y relectura de tasas al ab
     mockProductLookup = {};
   });
 
-  it('T4-STORE-01: abre el carrito con el sellCurrency de la tienda (USD) e ignora la preferencia vieja', () => {
+  it('T4-STORE-01: abre el carrito con el sellCurrency de la tienda (USD)', () => {
     new StoreCurrencyConfigService('s1').setSellCurrency(Currency.USD);
-    // Una preferencia vieja del usuario NO debe ganar: manda la tienda.
-    localStorage.setItem('lizoft.cart-currency-u1', String(Currency.EUR));
+    // Sin residuo de una venta anterior: la moneda la fija la tienda y solo la
+    // tienda (la preferencia por usuario se eliminó el 2026-10-03).
     mockCartState({
       items: [],
       total: vi.fn().mockReturnValue(0),

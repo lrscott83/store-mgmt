@@ -586,12 +586,15 @@ describe('CreateProductModal — footer icons/labels parity', () => {
   });
 });
 
-// ─── CreateProductModal — T9: cost currency defaults to store buy currency ──
+// ─── CreateProductModal — cost AND sale price currency = store buy currency ──
 //
 // The cost ("Moneda de Compra") initial state must reflect the store's configured
-// buyCurrency. The sale price currency (`currency`) is deliberately left untouched.
+// buyCurrency (T9). As of 2026-10-03 the SALE PRICE currency (`currency`) follows the
+// SAME buyCurrency: a store that buys in USD catalogs its products in USD unless the
+// user changes the selector. The previous behavior (sale price pinned to CUP) is
+// deliberately reversed here.
 
-describe('CreateProductModal — T9 cost currency = store buy currency', () => {
+describe('CreateProductModal — cost + sale price currency = store buy currency', () => {
   function ownerWithModules(storeId: string) {
     return {
       id: 'u1',
@@ -627,7 +630,7 @@ describe('CreateProductModal — T9 cost currency = store buy currency', () => {
     expect(select.value).toBe(String(Currency.USD));
   });
 
-  it('leaves the sale price currency unchanged (CUP) when only the buy currency is configured', () => {
+  it('seeds the SALE PRICE currency from the store buy currency too', () => {
     mockUser = ownerWithModules('s1');
     new StoreCurrencyConfigService('s1').setBuyCurrency(Currency.USD);
     render(
@@ -641,7 +644,55 @@ describe('CreateProductModal — T9 cost currency = store buy currency', () => {
       </Wrapper>,
     );
     const select = screen.getByTestId('product-currency-select') as HTMLSelectElement;
-    expect(select.value).toBe(String(Currency.CUP));
+    expect(select.value).toBe(String(Currency.USD));
+  });
+
+  // La moneda configurada es la de COMPRA, no la de venta: una tienda que compra en
+  // USD y vende en CUP cataloga en USD. Este test existe para que nadie "arregle"
+  // el default a sellCurrency por intuición.
+  it('uses the BUY currency, not the sell currency, for the sale price', () => {
+    mockUser = ownerWithModules('s1');
+    new StoreCurrencyConfigService('s1').setConfig({
+      buyCurrency: Currency.USD,
+      sellCurrency: Currency.CUP,
+    });
+    render(
+      <Wrapper>
+        <CreateProductModal
+          category={makeCategory()}
+          defaultOrder={1}
+          onSave={vi.fn()}
+          onClose={vi.fn()}
+        />
+      </Wrapper>,
+    );
+    expect((screen.getByTestId('product-currency-select') as HTMLSelectElement).value).toBe(
+      String(Currency.USD),
+    );
+    expect((screen.getByTestId('product-cost-currency-select') as HTMLSelectElement).value).toBe(
+      String(Currency.USD),
+    );
+  });
+
+  it('threads the store buy currency as the saved sale price currency', () => {
+    mockUser = ownerWithModules('s1');
+    new StoreCurrencyConfigService('s1').setBuyCurrency(Currency.MLC);
+    const onSave = vi.fn();
+    render(
+      <Wrapper>
+        <CreateProductModal
+          category={makeCategory()}
+          defaultOrder={1}
+          onSave={onSave}
+          onClose={vi.fn()}
+        />
+      </Wrapper>,
+    );
+    fireEvent.change(screen.getByTestId('product-name-input'), { target: { value: 'Sprite' } });
+    fireEvent.change(screen.getByTestId('product-price-input'), { target: { value: '2.5' } });
+    fireEvent.click(screen.getByTestId('create-product-submit'));
+
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ currency: Currency.MLC }));
   });
 
   it('threads the store buy currency as costCurrency into onSave (day entry)', () => {

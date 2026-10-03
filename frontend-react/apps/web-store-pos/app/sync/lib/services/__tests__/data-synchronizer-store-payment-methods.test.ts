@@ -72,7 +72,6 @@ function makeData(
     orders: [],
     expenses: [],
     saleCredits: [],
-    exchangeRates: [],
     warehouses: [],
     warehouseStockLevels: [],
     warehouseStockMovements: [],
@@ -107,7 +106,6 @@ describe('DataSynchronizerService — storePaymentMethods merge (store-payment-m
       undefined,
       undefined,
       undefined,
-      undefined,
       paymentMethodsSvc,
     );
 
@@ -131,7 +129,6 @@ describe('DataSynchronizerService — storePaymentMethods merge (store-payment-m
       makeOrderService(),
       makeExpenseService(),
       makeSaleCreditService(),
-      undefined,
       undefined,
       undefined,
       undefined,
@@ -160,7 +157,6 @@ describe('DataSynchronizerService — storePaymentMethods merge (store-payment-m
       undefined,
       undefined,
       undefined,
-      undefined,
       paymentMethodsSvc,
     );
 
@@ -184,7 +180,6 @@ describe('DataSynchronizerService — storePaymentMethods merge (store-payment-m
       makeOrderService(),
       makeExpenseService(),
       makeSaleCreditService(),
-      undefined,
       undefined,
       undefined,
       undefined,

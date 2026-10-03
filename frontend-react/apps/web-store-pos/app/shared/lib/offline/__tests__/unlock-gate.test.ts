@@ -3,7 +3,7 @@
 // stranding-bug regression — gating on `getDek() !== null` instead of
 // `needsUnlock` would strand every online-auth-only user forever.
 import { describe, it, expect, beforeEach } from 'vitest';
-import { needsUnlock } from '../unlock-gate';
+import { needsUnlock, hasUnreadableCiphertext } from '../unlock-gate';
 import { importRoster } from '../roster-store';
 import { setDek, clearDek } from '../../storage/data-key-store';
 import { writeDeviceDekTable } from '../../storage/device-dek-table';
@@ -156,5 +156,74 @@ describe('needsUnlock — per-user, all four combinations (design §5)', () => {
         selectedStoreId: '00000000-0000-0000-0000-000000000000',
       }),
     ).toBe(false);
+  });
+});
+
+// `hasUnreadableCiphertext` is the second half of the gate
+// (`needsUnlock() && hasUnreadableCiphertext()` in auth/routes/loaders.ts):
+// it is what decides whether a locked-but-valid session may be hijacked to
+// /login?unlock=1. Entity keys are literals mirrored from storage-keys.ts and
+// entity-crypto.ts, same discipline loaders.test.ts:214-218 applies.
+describe('hasUnreadableCiphertext — what counts as evidence (user report 2026-09-06)', () => {
+  // Real (non-empty) ciphertext: a payload LONGER than the 40-base64-char
+  // empty-collection sentinel, so the length heuristic cannot be what
+  // dismisses it. Only the key prefix may.
+  const REAL_CIPHERTEXT = `enc:v1:${'A'.repeat(60)}`;
+
+  beforeEach(() => {
+    localStorage.clear();
+    clearDek();
+  });
+
+  it('is false with nothing encrypted on disk', () => {
+    expect(hasUnreadableCiphertext()).toBe(false);
+  });
+
+  it('is false for a plaintext entity value — the enc:v1 marker is what counts, not the key', () => {
+    localStorage.setItem('lizoft.store-products-s1', '[{"id":"p1"}]');
+    expect(hasUnreadableCiphertext()).toBe(false);
+  });
+
+  it('is true for ordinary USER data ciphertext (the control row)', () => {
+    localStorage.setItem('lizoft.store-products-s1', REAL_CIPHERTEXT);
+    expect(hasUnreadableCiphertext()).toBe(true);
+  });
+
+  // Regression guard, retire-exchange-rates-register T9: the daily USD→MN
+  // register is RETIRED and nothing regenerates it, but a device upgraded
+  // from a build older than the retirement that has not since run the
+  // migration or the auth-time wipe still carries
+  // `lizoft.store-exchangeRates-<storeId>` in localStorage — for a store
+  // with MultiMonedas that never opened "Tasas de Cambio", nothing ever
+  // removes it. If the gate stopped excluding that prefix, such a device
+  // would re-trigger exactly the 2026-09-06 lockout the guard was written
+  // to prevent: dead ciphertext for a register nobody reads hijacking a
+  // valid session. The KEY is what is excluded, not the code that wrote it.
+  it('is false for a leftover retired exchange-rate register key — legacy ciphertext never justifies the hijack', () => {
+    localStorage.setItem('lizoft.store-exchangeRates-s1', REAL_CIPHERTEXT);
+    expect(hasUnreadableCiphertext()).toBe(false);
+  });
+
+  it('the exclusion is per-store: leftover register keys beside real user data still find the user data', () => {
+    localStorage.setItem('lizoft.store-exchangeRates-s1', REAL_CIPHERTEXT);
+    localStorage.setItem('lizoft.store-exchangeRates-s2', REAL_CIPHERTEXT);
+    localStorage.setItem('lizoft.store-orders-s1', REAL_CIPHERTEXT);
+    expect(hasUnreadableCiphertext()).toBe(true);
+  });
+
+  it('a key that merely starts with the entity name but not the retired prefix is still evidence', () => {
+    // Guards an over-broad prefix match: `exchangeRatesArchive` must NOT
+    // inherit the exclusion.
+    localStorage.setItem('lizoft.store-exchangeRatesArchive-s1', REAL_CIPHERTEXT);
+    expect(hasUnreadableCiphertext()).toBe(true);
+  });
+
+  it('the retired key is excluded independently of the legacy empty-collection rule', () => {
+    // The prefix skip happens BEFORE the value is read, so the two
+    // exclusions cannot mask one another: 40 chars is exactly the
+    // empty-collection sentinel length and is dismissed for its own reason.
+    localStorage.setItem('lizoft.store-exchangeRates-s1', REAL_CIPHERTEXT);
+    localStorage.setItem('lizoft.store-warehouses-s1', `enc:v1:${'A'.repeat(40)}`);
+    expect(hasUnreadableCiphertext()).toBe(false);
   });
 });

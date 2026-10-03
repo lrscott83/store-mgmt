@@ -84,7 +84,6 @@ function makeSynchronizer(warehouseService: WarehouseOfflineService): DataSynchr
     s.orderService,
     s.expenseService,
     s.saleCreditService,
-    undefined, // exchangeRateService
     warehouseService,
   );
 }
@@ -97,7 +96,6 @@ function emptyData(): ParsedData {
     orders: [],
     expenses: [],
     saleCredits: [],
-    exchangeRates: [],
     warehouses: [],
     warehouseStockLevels: [],
     warehouseStockMovements: [],
