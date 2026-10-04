@@ -134,7 +134,8 @@ public class RegisterCommandHandlerWelcomeMessageTests : RegisterCommandHandlerT
             MockRegisterService.Object,
             MockJwtProvider.Object,
             MockAuthTokenConfig.Object,
-            realService);
+            realService,
+            MockOwnerRegistrationNotificationService.Object);
 
         var result = await handler.Handle(CreateValidCommand(), CancellationToken.None);
 

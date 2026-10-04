@@ -94,6 +94,7 @@ namespace Infrastructure
             services.AddScoped<IStoreUsageRepository, StoreUsageRepository>();
             services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
             services.AddScoped<IMessageRepository, MessageRepository>();
+            services.AddScoped<INotificationRepository, NotificationRepository>();
         }
     }
 }

@@ -41,6 +41,22 @@ vi.mock('~/shared/lib/stores/auth-store', () => {
   return { useAuthStore };
 });
 
+// La campana de notificaciones (NotificationShell) se auto-gatea por SuperAdmin y este
+// layout se renderiza con un usuario SuperAdmin, así que al montar pide
+// GET /v1/notifications — igual que MessageShell lo haría con un OwnerAdmin. Sin este
+// mock el guardián `block-real-http` aborta cada test de este archivo. Estos tests
+// miden layout (sidebar, padding, billing notice, idle timer), no notificaciones:
+// el comportamiento de la campana vive en notification-shell.test.tsx.
+vi.mock('~/shared/lib/notifications/notifications-http-service', () => ({
+  notificationsHttpService: {
+    getNotifications: vi
+      .fn()
+      .mockResolvedValue({ succeeded: true, data: { items: [], unreadCount: 0 } }),
+    markAsRead: vi.fn().mockResolvedValue({ succeeded: true, data: true }),
+    markAllAsRead: vi.fn().mockResolvedValue({ succeeded: true, data: 0 }),
+  },
+}));
+
 import { AppLayout } from '../app-layout';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 

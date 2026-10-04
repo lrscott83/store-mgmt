@@ -1530,6 +1530,17 @@ const messages: Record<string, string> = {
   'MESSAGES.BROADCAST_SEND': 'Enviar difusión',
   'MESSAGES.BROADCAST_SUCCESS': 'Difusión enviada.',
   'MESSAGES.BROADCAST_ERROR': 'No se pudo enviar la difusión. Intente de nuevo.',
+
+  // Campana de avisos del SuperAdmin (registro de propietarios): encabezado,
+  // panel, acciones y el popup del sistema operativo. Sin permiso del navegador,
+  // o con el permiso denegado, solo queda el aviso dentro de la aplicación.
+  'NOTIFICATIONS.TITLE': 'Notificaciones',
+  'NOTIFICATIONS.EMPTY': 'No hay avisos de registro de propietarios.',
+  'NOTIFICATIONS.MARK_ALL': 'Marcar todas como leídas',
+  'NOTIFICATIONS.LOAD_ERROR': 'No se pudieron cargar las notificaciones. Intente de nuevo.',
+  'NOTIFICATIONS.MARK_ERROR': 'No se pudo actualizar la notificación. Intente de nuevo.',
+  'NOTIFICATIONS.SYSTEM_TITLE': 'Nuevo propietario registrado',
+  'NOTIFICATIONS.SYSTEM_BODY': '{ownerName} · {cellPhone} · {storeName}',
 };
 
 export default messages;

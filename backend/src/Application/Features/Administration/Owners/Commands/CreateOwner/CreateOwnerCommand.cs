@@ -4,6 +4,7 @@ using Application.Dtos.Administration.Owners;
 using Application.Exceptions;
 using Application.ResponseModels;
 using Application.Services.Messages;
+using Application.Services.Notifications;
 using Application.UnitOfWorks;
 using AutoMapper;
 using Domain.Common.Extensions;
@@ -49,6 +50,7 @@ namespace Application.Features.Administration.Owners.Commands.CreateOwner
         private readonly IStringLocalizer<I18n> _localizer;
         private readonly IMapper _mapper;
         private readonly IOwnerWelcomeMessageService _ownerWelcomeMessageService;
+        private readonly IOwnerRegistrationNotificationService _ownerRegistrationNotificationService;
 
         public CreateOwnerCommandHandler(
             IApplicationUnitOfWork applicationUnitOfWork,
@@ -57,7 +59,8 @@ namespace Application.Features.Administration.Owners.Commands.CreateOwner
             IHttpContextService httpContextService,
             IStringLocalizer<I18n> localizer,
             IMapper mapper,
-            IOwnerWelcomeMessageService ownerWelcomeMessageService)
+            IOwnerWelcomeMessageService ownerWelcomeMessageService,
+            IOwnerRegistrationNotificationService ownerRegistrationNotificationService)
         {
             _applicationUnitOfWork = applicationUnitOfWork;
             _httpContextService = httpContextService;
@@ -66,6 +69,7 @@ namespace Application.Features.Administration.Owners.Commands.CreateOwner
             _localizer = localizer;
             _mapper = mapper;
             _ownerWelcomeMessageService = ownerWelcomeMessageService;
+            _ownerRegistrationNotificationService = ownerRegistrationNotificationService;
         }
 
         public async Task<ResponseResult<OwnerDto>> Handle(CreateOwnerCommand request, CancellationToken cancellationToken)
@@ -111,6 +115,14 @@ namespace Application.Features.Administration.Owners.Commands.CreateOwner
             // never throws, so the OwnerDto below is unaffected by a greeting failure.
             await SendWelcomeMessageAsync(owner, cancellationToken);
 
+            // Same ordering rule as the greeting above, for the same reason:
+            // NotificationRepository commits internally, so notifying before this handler's save
+            // would flush first and owner + store would never land. The service never throws, so the
+            // OwnerDto below is unaffected. Without this second call site every Gestor-created
+            // owner would register silently — that is the whole reason the notification is emitted
+            // from BOTH registration entry points.
+            await NotifyOwnerRegistrationAsync(owner, request.Cellphone, request.StoreName, cancellationToken);
+
             return ResponseResult.Success(_mapper.Map<OwnerDto>(owner));
         }
 
@@ -128,6 +140,23 @@ namespace Application.Features.Administration.Owners.Commands.CreateOwner
 
             await _ownerWelcomeMessageService.SendAsync(
                 target.OwnerUserId, target.OwnerFullName, target.StoreId, cancellationToken);
+        }
+
+        /// <summary>
+        /// Tells the SuperAdmin an owner was just created on their behalf, or skips it. Nothing here
+        /// can change the response: the gate and the "anything missing" case both return without
+        /// calling the service, and the service itself swallows and logs its own failures.
+        /// </summary>
+        private async Task NotifyOwnerRegistrationAsync(
+            Owner owner, string cellphone, string storeName, CancellationToken cancellationToken)
+        {
+            OwnerRegistrationNotification.OwnerRegistrationTarget? target =
+                OwnerRegistrationNotification.Resolve(owner, cellphone, storeName);
+
+            if (target is null)
+                return;
+
+            await _ownerRegistrationNotificationService.NotifyAsync(target, cancellationToken);
         }
 
         /// <summary>

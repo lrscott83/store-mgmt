@@ -5,6 +5,7 @@ using Application.Abstractions.Roles;
 using Application.Behaviours;
 using Application.Services.Authentication;
 using Application.Services.Messages;
+using Application.Services.Notifications;
 using Application.Services.Billing;
 using Application.Services.Features;
 using Application.Services.Owners;
@@ -67,6 +68,12 @@ namespace Application
             // because it borrows the request's ApplicationDbContext through IMessageRepository.
             // Callers MUST invoke it AFTER their single SaveChanges — see IOwnerWelcomeMessageService.
             services.AddScoped<IOwnerWelcomeMessageService, OwnerWelcomeMessageService>();
+
+            // owner-registration-notification: tells the SuperAdmin an owner just registered. Scoped,
+            // for the same reason as the greeting above — it borrows the request's
+            // ApplicationDbContext through INotificationRepository. Callers MUST invoke it AFTER
+            // their single SaveChanges — see IOwnerRegistrationNotificationService.
+            services.AddScoped<IOwnerRegistrationNotificationService, OwnerRegistrationNotificationService>();
 
             // Authentication: bind settings from config
             services.Configure<AuthenticationSettings>(
