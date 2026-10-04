@@ -21,6 +21,9 @@
 // (design §3 seam 1). An unbounded open here is a permanent white screen,
 // the same trap class the E2E suite already recorded for Vite dev-server
 // chunk fetches (engram `gotcha-e2e-offline-vite-dev-modulos`).
+import { logClientError } from '../diagnostics/client-log';
+import { readDeviceDekTable } from './device-dek-table';
+
 export const DEVICE_KEY_DB = 'lizoft-device-key'; // version 1, FOREVER — see design §2
 export const DEVICE_KEY_STORE = 'keys';
 export const DEVICE_KEY_ID = 'device-dek-key';
@@ -71,30 +74,118 @@ function openDb(): Promise<IDBDatabase | null> {
   });
 }
 
-function readKeyRecord(db: IDBDatabase): Promise<CryptoKey | null> {
+// Outcome of a read: `found` / `absent` / `error` are DISTINCT on purpose —
+// "could not read" must NEVER be treated as "does not exist" (the bug that
+// replaced a valid key and orphaned every wrap made with it).
+type DeviceKeyRead =
+  | { status: 'found'; key: CryptoKey }
+  | { status: 'absent' }
+  | { status: 'error'; error: unknown };
+
+function readKeyRecord(db: IDBDatabase): Promise<DeviceKeyRead> {
   return new Promise((resolve) => {
     try {
       const tx = db.transaction(DEVICE_KEY_STORE, 'readonly');
       const store = tx.objectStore(DEVICE_KEY_STORE);
       const request = store.get(DEVICE_KEY_ID);
-      request.onsuccess = () => resolve((request.result as CryptoKey | undefined) ?? null);
-      request.onerror = () => resolve(null);
-    } catch {
-      resolve(null);
+      request.onsuccess = () => {
+        const value = request.result as CryptoKey | undefined;
+        resolve(value ? { status: 'found', key: value } : { status: 'absent' });
+      };
+      request.onerror = () => resolve({ status: 'error', error: request.error });
+    } catch (error) {
+      resolve({ status: 'error', error });
     }
   });
 }
 
-function writeKeyRecord(db: IDBDatabase, key: CryptoKey): Promise<boolean> {
+function describeError(error: unknown): { name: string; message: string; stack: string } {
+  const e = error as { name?: string; message?: string; stack?: string } | null;
+  return {
+    name: e?.name ?? 'UnknownError',
+    message: e?.message ?? String(error),
+    stack: e?.stack ?? '',
+  };
+}
+
+/**
+ * Diagnostic trace for the events this module must never let become silent data
+ * loss. Writes to the console AND the persisted client-error ring buffer, with
+ * the previous wrap-table SHAPE (no key material — metadata only) so a field
+ * device can be diagnosed after the fact. Never throws.
+ */
+function logDeviceKeyEvent(
+  level: 'error' | 'warn',
+  what: string,
+  error?: unknown,
+  extra?: Record<string, string | number | boolean | null>,
+): void {
+  const described = error === undefined ? null : describeError(error);
+  let tableContext: Record<string, string | number | boolean | null>;
+  try {
+    const table = readDeviceDekTable();
+    tableContext = table
+      ? {
+          formatVersion: table.formatVersion,
+          dekSource: table.dekSource,
+          storeId: table.storeId,
+          hasDeviceWrap: table.device !== null,
+          userWrapCount: Object.keys(table.users).length,
+          storeWrapCount: Object.keys(table.stores ?? {}).length,
+        }
+      : { table: 'absent-or-invalid' };
+  } catch {
+    tableContext = { table: 'unreadable' };
+  }
+
+  const context = {
+    db: DEVICE_KEY_DB,
+    ...(described
+      ? { errorName: described.name, errorMessage: described.message }
+      : {}),
+    ...tableContext,
+    ...(extra ?? {}),
+  };
+
+  if (level === 'error') {
+    console.error(`[device-key-store] ${what}`, { ...context, stack: described?.stack ?? '' });
+  } else {
+    console.warn(`[device-key-store] ${what}`, context);
+  }
+
+  try {
+    logClientError({
+      level,
+      message: `[device-key-store] ${what}${
+        described ? ` (${described.name}: ${described.message})` : ''
+      }`,
+      location: described?.stack,
+      context,
+    });
+  } catch {
+    // logging must never break key handling
+  }
+}
+
+/**
+ * `add` (never `put`): writing over an existing record must FAIL with
+ * `ConstraintError` instead of silently destroying the stored key. A
+ * concurrent mint is expected to lose this way and adopt the winner instead
+ * (see `getOrCreateDeviceKey`).
+ */
+type DeviceKeyWrite = 'added' | 'exists' | 'error';
+
+function addKeyRecord(db: IDBDatabase, key: CryptoKey): Promise<DeviceKeyWrite> {
   return new Promise((resolve) => {
     try {
       const tx = db.transaction(DEVICE_KEY_STORE, 'readwrite');
       const store = tx.objectStore(DEVICE_KEY_STORE);
-      const request = store.put(key, DEVICE_KEY_ID);
-      request.onsuccess = () => resolve(true);
-      request.onerror = () => resolve(false);
+      const request = store.add(key, DEVICE_KEY_ID);
+      request.onsuccess = () => resolve('added');
+      request.onerror = () =>
+        resolve(request.error?.name === 'ConstraintError' ? 'exists' : 'error');
     } catch {
-      resolve(false);
+      resolve('error');
     }
   });
 }
@@ -121,40 +212,75 @@ export async function getDeviceKey(): Promise<CryptoKey | null> {
   try {
     const db = await openDb();
     if (!db) return null;
-    const key = await readKeyRecord(db);
+    const result = await readKeyRecord(db);
     db.close();
-    return key;
+    return result.status === 'found' ? result.key : null;
   } catch {
     return null;
   }
 }
 
-/**
- * Reads the persisted device key, minting one on first use.
- * `generateKey({name:'AES-GCM', length:256}, false, [...])` — the `false`
- * is the whole point (`extractable: false`, key model #2113).
- */
-export async function getOrCreateDeviceKey(): Promise<CryptoKey | null> {
+/** Single-flight memo (mirrors `dek-bootstrap`'s `inFlight`): concurrent callers
+ * share one resolution, so two callers on an empty DB can never double-mint. */
+let inFlight: Promise<CryptoKey | null> | null = null;
+
+async function doGetOrCreateDeviceKey(): Promise<CryptoKey | null> {
   try {
     const db = await openDb();
     if (!db) return null;
 
     const existing = await readKeyRecord(db);
-    if (existing) {
+    if (existing.status === 'found') {
       db.close();
-      return existing;
+      return existing.key;
+    }
+    if (existing.status === 'error') {
+      // THE GUARD: a failed read is NOT "no key". Before this fix the code
+      // minted a new key here and wrote it with `put`, overwriting the stored
+      // one and orphaning every wrap made with it. Refuse; leave it untouched.
+      logDeviceKeyEvent('error', 'read failed — refusing to mint a new key', existing.error);
+      db.close();
+      return null;
     }
 
+    // Genuinely absent: safe to mint.
     const key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, [
       'encrypt',
       'decrypt',
     ]);
-    const wrote = await writeKeyRecord(db, key);
+    const outcome = await addKeyRecord(db, key);
+    if (outcome === 'added') {
+      logDeviceKeyEvent('warn', 'minted a new device key', undefined, { outcome: 'added' });
+      db.close();
+      return key;
+    }
+    if (outcome === 'exists') {
+      // A concurrent caller won the race — adopt ITS key, never overwrite it.
+      const again = await readKeyRecord(db);
+      db.close();
+      return again.status === 'found' ? again.key : null;
+    }
+    logDeviceKeyEvent('warn', 'write failed for a new device key', undefined, { outcome });
     db.close();
-    return wrote ? key : null;
-  } catch {
+    return null;
+  } catch (error) {
+    logDeviceKeyEvent('error', 'unexpected failure resolving the device key', error);
     return null;
   }
+}
+
+/**
+ * Reads the persisted device key, minting one only when the record is
+ * GENUINELY absent. `generateKey({...}, false, [...])` — the `false` is the
+ * whole point (`extractable: false`, key model #2113).
+ */
+export async function getOrCreateDeviceKey(): Promise<CryptoKey | null> {
+  if (!inFlight) {
+    inFlight = doGetOrCreateDeviceKey().finally(() => {
+      inFlight = null;
+    });
+  }
+  return inFlight;
 }
 
 /** Used by tests and E2E's F4 scenario (device key destroyed, wrap intact). */
