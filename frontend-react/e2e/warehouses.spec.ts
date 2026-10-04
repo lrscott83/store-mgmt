@@ -546,6 +546,22 @@ test.describe.serial('Almacenes — flujo completo', () => {
     signedInPage,
   }) => {
     const { page, selectedStoreId } = signedInPage;
+    // El botón flotante "Instalar App" va fixed bottom-6 right-6 z-[9999] en TODAS las
+    // pantallas y se monta en la raíz de la app (root.tsx), así que tapa la esquina
+    // inferior derecha del menú de la tarjeta y se queda con el clic de "Desactivar"
+    // de la SEGUNDA tarjeta (la de Vacío). La primera sí logra el clic: solo la de
+    // abajo cae bajo el botón flotante (ficha 5 del 10-03).
+    //
+    // Este test no prueba ese botón, así que se marca la PWA como ya instalada ANTES
+    // de que arranque la app: con la bandera puesta, usePwaInstall calcula
+    // canInstall=false y el botón no se monta. addInitScript corre antes de cualquier
+    // script de la app en cada navegación completa, y openWarehouses() usa page.goto.
+    //
+    // La bandera NO debe escribirse con evaluate() después de cargar: usePwaInstall la
+    // lee una sola vez al montar, así que un cambio posterior no saca el botón.
+    await page.addInitScript(() => {
+      window.localStorage.setItem('pwa-installed', 'true');
+    });
     await enableWarehouseFeatures(page);
     await openWarehouses(page);
 

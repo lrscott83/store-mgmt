@@ -227,9 +227,9 @@ del frontend, todo en verde; los E2E del frontend no. Detalle y fichas en
 | --- | ----------------------------- | --------------------------------------------------------------------------------- | ------ |
 | 1   | `mayorista-sale` 218          | El filtro se llama Transferencia **sin** el sufijo de moneda cuando hay MultiMonedas | 🔴 Causa raíz **confirmada** (ficha 4 del 10-01) — solución propuesta, sin autorizar |
 | 2   | `web-catalog` 77              | El aviso de guardado del catálogo cambió de texto                                  | 🔴 Causa raíz **confirmada** (ficha 6 del 10-01) — solución propuesta, sin autorizar |
-| 3   | `multipayments-cart-v2` 171   | El clic se queda esperando y agota los 3 minutos del test                            | 🔴 Causa raíz **no confirmada** (ficha 4 del 10-03) |
-| 4   | `warehouses` 545              | El menú de la tarjeta no ofrece Desactivar; el clic agota los 2 minutos (línea 573)  | 🔴 Causa raíz **no confirmada** (ficha 5 del 10-03) |
-| 5   | `wholesale-cart-floor` 179    | La cantidad se recalcula bien, el precio no se muestra (línea 191)                   | 🔴 Causa raíz **no confirmada** (ficha 6 del 10-03) |
+| 3   | `multipayments-cart-v2` 171   | Siembra el módulo 16 pero abre una vista que exige el 15; la ruta no existe y cae al inicio de sesión | 🔴 Causa raíz **confirmada** (ficha 4 del 10-03) — **defecto del test**, solución propuesta, sin autorizar |
+| 4   | `warehouses` 545              | El botón flotante "Instalar App" tapa Desactivar e intercepta el clic               | 🟡 Arreglado en el test el 2026-10-04 (ficha 5 del 10-03) — **el defecto de la APLICACIÓN sigue vivo** y ese test ya no lo vigila |
+| 5   | `wholesale-cart-floor` 179    | El precio sí se recalcula y se muestra; falta el rótulo "Precio:" que se quitó el 2026-10-02 | 🔴 Causa raíz **confirmada** (ficha 6 del 10-03) — **defecto del test**, solución propuesta, sin autorizar |
 | 6   | `store-module-pricing` 546    | El propio test se detiene: falta una segunda fila activa para probar el límite en cero | 🔴 **Defecto del test**, no de la aplicación (ficha 7 del 10-03) |
 | 7   | `multipayments` 378 (T10.2)   | Al pagar de más con varios canales, la pantalla se cae a la página de Error            | 🔴 **Defecto de la APLICACIÓN**, causa raíz **confirmada** (ficha 8 del 10-03) |
 
@@ -237,6 +237,13 @@ del frontend, todo en verde; los E2E del frontend no. Detalle y fichas en
 corrieron uno por archivo y con un solo navegador: los siete siguen fallando, agotando el intento
 inicial y los dos reintentos. Es el mismo método con el que la ficha 5 del 1 de octubre descartó
 la saturación de la máquina como explicación.
+
+**Las tres causas raíz sin confirmar quedaron confirmadas el 2026-10-04.** La corrida completa de
+ese día (21 min 36 s: 336 aprobados, 7 fallidos, 3 inestables, 8 sin ejecutar) no produjo ningún
+fallo nuevo: los siete son los siete de esta tabla. La evidencia que faltaba estaba en los
+archivos de contexto del último reintento, que guardan la imagen de la página en el momento del
+fallo. Las tres fichas quedaron reescritas con la causa confirmada y su tipo. Ninguna propuesta
+se aplicó: sigue faltando autorización para tocar los tests y para tocar la aplicación.
 
 ### Tres fallos resueltos: el módulo 15 no es el módulo 16
 

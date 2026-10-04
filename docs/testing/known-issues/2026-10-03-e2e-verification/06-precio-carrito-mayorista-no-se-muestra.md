@@ -14,33 +14,49 @@ lo encuentra. La línea que falla es la 191 del archivo.
 
 Falla en los tres intentos, incluidos los dos reintentos.
 
-**Por qué este detalle es el más útil de los siete.** Es el único de los siete en el que la mitad
-"fácil" del caso funciona. El recorrido llega al umbral, cruza el rango, y la línea **sí** se
-actualiza — pero el precio que debería acompañarla no se pinta. Eso acota el problema a la
-representación del precio en pantalla, no a la lógica que recalcula el precio por rango. **No se
-investigó más.**
+**Causa raíz: CONFIRMADA. Es un defecto del test, no de la aplicación.**
 
-**Causa raíz: NO CONFIRMADA.**
+El precio sí se recalcula y sí se muestra. Lo que falta es la palabra que el test busca delante.
+El registro de la página que Playwright guardó al fallar muestra las dos líneas de texto que la
+aplicación escribe junto al producto:
 
-Sin confirmar. No se comprobó si el precio sí se recalculó pero se muestra con otro formato del
-que el test espera —por ejemplo un separador de miles o el símbolo de otra moneda activa— o si
-simplemente no se recalculó. El texto que el test busca es estricto en cuanto a los espacios
-entre el número y la moneda, lo que deja abierta la posibilidad de un fallo por formato, pero
-**no se verificó contra la página real**.
+- "Paquetes: 12 · 120 CUP"
+- "1 440 CUP"
 
-**Evidencia (2026-10-03).**
+El precio del paquete, 120 CUP, está escrito en la primera línea. El total de la línea, que es el
+resultado de multiplicar 12 paquetes por 120 CUP, está en la segunda: 1 440 CUP. Las dos cuentas
+salen bien, así que el recálculo por rango funciona.
 
-Corrida completa de la suite E2E del frontend, con 4 navegadores en paralelo, 19 minutos 54
-segundos: 328 aprobados, 9 fallidos, 8 inestables y 9 sin ejecutar. Este test aparece entre los 9
-fallidos. En esa misma corrida, su hermano de la línea 152 fue **inestable** (pasó al reintentar).
+El problema es que el test busca el texto "Precio: 120 CUP", con la palabra Precio delante y dos
+puntos. Esa palabra ya no se escribe en ninguna parte de la línea del carrito. Se quitó a
+propósito el 2 de octubre de 2026, cuando se pidió que la línea se leyera sola porque la palabra
+repetida en cada fila solo ocupaba espacio. Queda escrito en un comentario junto al código que
+arma ese texto, con la fecha del pedido. La aplicación hoy arma la línea en el formato "Paquetes:
+12 · 120 CUP" y esa es la forma esperada desde entonces.
 
-Corrida aislada de este único archivo, con un solo navegador: **1 fallido y 1 aprobado**, en 1
-minuto 48 segundos. El test de la línea 152 pasó en los 2 intentos, el de la línea 179 falló en los
-3. **No es falta de recursos.**
+Queda además una sobra: en el archivo de textos de la interfaz sigue existiendo la traducción de
+la palabra Precio, pero ningún componente la usa. Es la huella de lo que se quitó.
 
-**Estado de la causa raíz:** no confirmada.
+**Evidencia (2026-10-04).**
+Corrida completa de la suite E2E del frontend con 4 navegadores en paralelo, 21 minutos 36
+segundos: 336 aprobados, 7 fallidos, 3 inestables y 8 sin ejecutar. Este test aparece entre los 7
+fallidos y falla en los 3 intentos.
 
-**Propuesta de diagnóstico (pendiente de autorización — no se aplicó nada).**
-Ninguna. El registro de contexto del último reintento guarda la imagen de la línea del carrito tal
-como se vio y permite responder de una vez a la pregunta de si el precio está con otro formato o
-si no está. **No se tocó nada.**
+La evidencia que faltaba quedó fijada en el archivo de contexto del último reintento, que guarda
+la imagen de la página en el momento del fallo. Ahí se leen las dos líneas citadas, que contestan
+de una vez a la pregunta que el registro anterior dejaba abierta: el precio no está con otro
+formato ni con otro símbolo de moneda, está bien calculado y bien escrito, solo que sin la palabra
+que el test exige.
+
+Se descartó además la sospecha de un fallo de formato por espacios o por el símbolo de la moneda:
+el separador de miles y el símbolo CUP están tal cual el test los espera. Lo único que cambió es
+la palabra del encabezado.
+
+**Estado de la causa raíz:** confirmada. Defecto del andamiaje de pruebas, con la aplicación
+funcionando como se pidió.
+
+**Propuesta de arreglo (pendiente de autorización — no se aplicó nada).**
+Que el test busque el precio en la forma en que la aplicación lo escribe hoy, que es la de la
+línea de paquetes, en lugar de la forma antigua con la palabra Precio delante. También conviene
+retirar del archivo de textos de la interfaz la traducción que quedó sin uso. No hace falta tocar
+la aplicación. **No se tocó nada.**
