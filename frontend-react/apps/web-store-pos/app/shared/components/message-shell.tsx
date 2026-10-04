@@ -77,6 +77,16 @@ export function MessageShell() {
   const activitySignatureRef = useRef('');
   /** Re-arms the poll ladder at its fastest step. Assigned by the poll effect. */
   const resetPollRef = useRef<(immediate: boolean) => void>(() => {});
+  /** The thread's scroll box: the visible box every read receipt is measured against. */
+  const listRef = useRef<HTMLDivElement>(null);
+  /** Rendered `<li>` per message id, so visibility can be measured per message. */
+  const itemRefs = useRef(new Map<string, HTMLLIElement>());
+  /**
+   * Ids already sent a receipt. The local `messages` state keeps its original
+   * `readAt === null` forever, so without this every scroll would re-POST the
+   * same messages the server already marked read.
+   */
+  const receiptedRef = useRef<Set<string>>(new Set());
   const activeConversation = conversations.find((c) => c.storeId === storeId) ?? null;
   const totalUnread = conversations.reduce((sum, c) => sum + (c.unreadCount ?? 0), 0);
 
@@ -127,25 +137,12 @@ export function MessageShell() {
           ? await messagesHttpService.getMessages(active.id, { background: true })
           : await messagesHttpService.getMessages(active.id);
         if (!messagesResponse.succeeded) return changed;
-        const nextMessages = messagesResponse.data;
-        setMessages(nextMessages);
-
-        const unreadIncoming = nextMessages.filter(
-          (message) => message.readAt === null && message.senderId !== user.id,
-        );
-        if (unreadIncoming.length > 0) {
-          await Promise.all(
-            unreadIncoming.map((message) =>
-              background
-                ? messagesHttpService.markAsRead(message.id, { background: true })
-                : messagesHttpService.markAsRead(message.id),
-            ),
-          );
-          const updatedResponse = background
-            ? await messagesHttpService.getConversations({ background: true })
-            : await messagesHttpService.getConversations();
-          if (updatedResponse.succeeded) setConversations(updatedResponse.data);
-        }
+        // Read receipts are NOT issued here — see `markVisibleIncomingAsRead`.
+        // Listing a thread is not reading it: this thread mounts every message
+        // inside a `max-h-64` scroll box, so most of what this returns was never
+        // on screen, and stamping them all dropped the badge to 0 for messages
+        // the user had not seen.
+        setMessages(messagesResponse.data);
         return changed;
       } catch {
         if (!background) showToastError(intl.formatMessage({ id: 'MESSAGES.LOAD_ERROR' }));
@@ -154,6 +151,73 @@ export function MessageShell() {
     },
     [user, intl],
   );
+
+  /**
+   * A read receipt asserts the user SAW the message, so it follows the eye, not
+   * the fetcher: only incoming messages whose rendered rect sits inside the
+   * visible box are receipted. Everything else stays unread and keeps counting
+   * in the badge, which is the number this gadget exists to report.
+   *
+   * In jsdom every rect is 0x0, so "inside the box" is true for all of them and
+   * the shell tests keep exercising this path end to end.
+   */
+  const markVisibleIncomingAsRead = useCallback(() => {
+    if (!user || !isOwnerAdmin(user) || !isOpenRef.current) return;
+    const container = listRef.current;
+    if (!container) return;
+    const box = container.getBoundingClientRect();
+    const visible = messages
+      .filter((message) => message.readAt === null && message.senderId !== user.id)
+      .filter((message) => {
+        const element = itemRefs.current.get(message.id);
+        if (!element) return false;
+        const rect = element.getBoundingClientRect();
+        return rect.top >= box.top && rect.bottom <= box.bottom;
+      })
+      .map((message) => message.id)
+      .filter((id) => !receiptedRef.current.has(id));
+    if (visible.length === 0) return;
+
+    // Claim them before awaiting: a scroll mid-flight must not double-POST.
+    visible.forEach((id) => receiptedRef.current.add(id));
+    void Promise.all(visible.map((id) => messagesHttpService.markAsRead(id)))
+      .then((results) => {
+        // A refused receipt has to stay retryable, or the message is stranded
+        // unread with nothing left that could re-trigger it.
+        results.forEach((result, index) => {
+          if (!result.succeeded) receiptedRef.current.delete(visible[index]);
+        });
+        return messagesHttpService.getConversations();
+      })
+      .then((updated) => {
+        if (updated.succeeded) setConversations(updated.data);
+      })
+      .catch(() => {
+        visible.forEach((id) => receiptedRef.current.delete(id));
+      });
+  }, [messages, user]);
+
+  // After paint, and again on every scroll inside the thread box. rAF-throttled:
+  // scroll fires per frame and each pass measures every incoming row.
+  useEffect(() => {
+    if (!isOpen) return;
+    const frame = requestAnimationFrame(markVisibleIncomingAsRead);
+    const container = listRef.current;
+    let scrollFrame = 0;
+    const handleScroll = () => {
+      if (scrollFrame !== 0) return;
+      scrollFrame = requestAnimationFrame(() => {
+        scrollFrame = 0;
+        markVisibleIncomingAsRead();
+      });
+    };
+    container?.addEventListener('scroll', handleScroll, { passive: true });
+    return () => {
+      cancelAnimationFrame(frame);
+      if (scrollFrame !== 0) cancelAnimationFrame(scrollFrame);
+      container?.removeEventListener('scroll', handleScroll);
+    };
+  }, [isOpen, messages, markVisibleIncomingAsRead]);
 
   const readPending = useCallback((): QueuedMessage[] => {
     try {
@@ -453,7 +517,7 @@ export function MessageShell() {
             </h3>
           </div>
 
-          <div className="max-h-64 overflow-y-auto px-2 py-2">
+          <div className="max-h-64 overflow-y-auto px-2 py-2" ref={listRef}>
             {displayMessages.length === 0 ? (
               <p className="px-1 py-3 text-xs text-text-muted">
                 {intl.formatMessage({ id: 'MESSAGES.EMPTY' })}
@@ -463,6 +527,10 @@ export function MessageShell() {
                 {displayMessages.map((message) => (
                   <li
                     key={message.key}
+                    ref={(element) => {
+                      if (element) itemRefs.current.set(message.key, element);
+                      else itemRefs.current.delete(message.key);
+                    }}
                     data-testid={message.testId}
                     data-mine={message.isMine ? 'true' : 'false'}
                     data-pending={message.pending ? 'true' : 'false'}
