@@ -424,14 +424,22 @@ export function MessageShell() {
           The count is ALWAYS shown, zero included: a badge that appears and
           disappears with the total makes the icon itself look "inactive"
           between bursts, and a slot that reflows as the number grows shifts
-          the icon under the cursor. At 0 it is muted so the red dot stays the
-          only thing competing for attention.
+          the icon under the cursor.
+
+          The BACKGROUND is the chat's WhatsApp green in EVERY case, zero
+          included (user request 2026-10-04). The `totalUnread > 0 ? green :
+          bg-text-muted` branch painted rgb(140 140 140) at zero, which read as
+          a disabled control instead of a quiet one — and because
+          `totalUnread` sits at zero for most of the session (see the mark-as-
+          read blast in `refresh`), the badge looked gray almost always. The
+          gadget's identity IS the icon's color, so the two never diverge.
+
+          No opacity variant: the cart badge paints a solid `bg-primary` with
+          no dimmed state (cart-shell.tsx:663), so there is nothing to mirror.
         */}
         <span
           data-testid="message-badge"
-          className={`absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-xs font-bold text-white ${
-            totalUnread > 0 ? 'bg-whatsapp' : 'bg-text-muted'
-          }`}
+          className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-whatsapp px-1 text-xs font-bold text-white"
         >
           {totalUnread > 99 ? '99+' : totalUnread}
         </span>
