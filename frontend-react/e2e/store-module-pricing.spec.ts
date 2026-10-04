@@ -136,6 +136,37 @@ function requireBillableRow(
   return row;
 }
 
+/**
+ * Same guard as {@link requireBillableRow} but WITHOUT the active requirement:
+ * the row only has to be non-bundled (`!priceIncluded`).
+ *
+ * `isBillableRow` is `isActive && !priceIncluded`, so `requireBillableRow`
+ * cannot be used for a row the test is about to TICK in the modal: ticking is
+ * what activates it, so requiring it to already be active asks for something
+ * the test has not done yet. SMP8 needs a second, non-bundled row and got none,
+ * aborting itself (ficha 7 del 10-03). Authorized 2026-10-04.
+ */
+function requireNonBundledRow(
+  rows: readonly PricingReadRow[],
+  what: string,
+  predicate: (row: PricingReadRow) => boolean,
+): PricingReadRow {
+  const row = rows.find((entry) => predicate(entry) && !entry.priceIncluded);
+  if (!row) {
+    throw new Error(
+      `store-module-pricing: no non-bundled (not price-included) row qualifies as ${what}. ` +
+        `Rows: ${JSON.stringify(
+          rows.map((entry) => ({
+            moduleId: entry.moduleId,
+            isActive: entry.isActive,
+            priceIncluded: entry.priceIncluded,
+          })),
+        )}`,
+    );
+  }
+  return row;
+}
+
 test.describe.serial('SuperAdmin per-store module pricing', () => {
   test.beforeAll(async ({ browser }) => {
     superAdmin = await mintSuperAdmin(browser);
@@ -552,9 +583,12 @@ test.describe.serial('SuperAdmin per-store module pricing', () => {
     // total, so a bundled `primary` would make the whole comparison read 0 vs 0
     // and the two implementations would never actually be compared on a charge.
     const primary = requireBillableRow(read.modules, "SMP8's order-sensitive row");
-    const second = requireBillableRow(
+    // Non-bundled, NOT active: `primeOnlyActiveModule` below leaves exactly one
+    // active module by design, and this row is ticked in the modal further down,
+    // which is what activates it.
+    const second = requireNonBundledRow(
       read.modules,
-      "SMP8's over-discounted row (the clamp needs a second, billable row)",
+      "SMP8's over-discounted row (the clamp needs a second, non-bundled row)",
       (row) => row.moduleId !== primary.moduleId,
     );
 

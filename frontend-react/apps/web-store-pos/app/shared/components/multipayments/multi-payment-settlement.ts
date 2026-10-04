@@ -85,7 +85,16 @@ export function settleMultiPayments(
       rateEffectiveFrom: rate?.effectiveFrom ?? null,
       amountInOrderCurrency: round2(conversion.data / 100),
     });
-    convertedCents.push(conversion.data);
+    // Same guard as multi-payment-list.tsx (its `tallyInput` filter): a row whose
+    // converted amount rounds to 0 cents is not a payment. summarizePayments
+    // rejects non-positive amounts with a typed error BY DESIGN (never silently
+    // ignored), and this file fed it unfiltered, so one tiny row took the whole
+    // screen down to the error page (ficha 8 del 10-03). The row is still persisted
+    // in `orderPayments`; only the tally input drops it, which leaves the sale
+    // `underpaid` and blocked — the same outcome the list already produced.
+    if (conversion.data > 0) {
+      convertedCents.push(conversion.data);
+    }
   }
 
   const summary = summarizePayments(

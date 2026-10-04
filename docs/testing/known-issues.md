@@ -230,8 +230,8 @@ del frontend, todo en verde; los E2E del frontend no. Detalle y fichas en
 | 3   | `multipayments-cart-v2` 171   | Siembra el módulo 16 pero abre una vista que exige el 15; la ruta no existe y cae al inicio de sesión | ✅ **Resuelto 2026-10-04** (ficha 4 del 10-03) — siembra el 15 y verifica que Zelle sí se ofrece |
 | 4   | `warehouses` 545              | El botón flotante "Instalar App" tapa Desactivar e intercepta el clic               | 🟡 Arreglado en el test el 2026-10-04 (ficha 5 del 10-03) — **el defecto de la APLICACIÓN sigue vivo** y ese test ya no lo vigila |
 | 5   | `wholesale-cart-floor` 179    | El precio sí se recalcula y se muestra; falta el rótulo "Precio:" que se quitó el 2026-10-02 | ✅ **Resuelto 2026-10-04** (ficha 6 del 10-03) — los 3 asserts leen la línea como la app la escribe |
-| 6   | `store-module-pricing` 546    | El propio test se detiene: falta una segunda fila activa para probar el límite en cero | 🔴 **Defecto del test**, no de la aplicación (ficha 7 del 10-03) |
-| 7   | `multipayments` 378 (T10.2)   | Al pagar de más con varios canales, la pantalla se cae a la página de Error            | 🔴 **Defecto de la APLICACIÓN**, causa raíz **confirmada** (ficha 8 del 10-03) |
+| 6   | `store-module-pricing` 546    | La segunda fila debía estar activa, pero el armado deja una sola activa | ✅ **Resuelto 2026-10-04** (ficha 7 del 10-03) — auxiliar gemelo que no exige «activa» |
+| 7   | `multipayments` 387 (T10.2)   | Al pagar de más con varios canales, la pantalla se cae a la página de Error            | ✅ **Resuelto 2026-10-04** (ficha 8 del 10-03) — la app filtra el importe a 0, como ya hacía el otro llamador |
 
 **Los nueve eran fallos reales, ninguno por falta de recursos.** Los siete sin ficha previa se
 corrieron uno por archivo y con un solo navegador: los siete siguen fallando, agotando el intento

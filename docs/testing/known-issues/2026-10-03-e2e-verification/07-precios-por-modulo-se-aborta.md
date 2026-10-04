@@ -22,17 +22,31 @@ El mismo mensaje incluye la lista de filas, que revisada da: de las 17 filas de 
 tienda, **16 están inactivas** y la única activa es la del módulo **Statistics**. El límite en
 cero necesita al menos dos activas, y solo hay una.
 
-**Causa raíz: NO CONFIRMADA.**
+**Causa raíz: CONFIRMADA. Es una precondición que el propio test hace insatisfacible.**
 
-Lo que **sí** está confirmado es dónde está el problema: los datos que prepara el test no
-cumplen la precondición que el propio test documenta. Lo que **no** se investigó es por qué queda
-una sola fila activa — si la instantánea que restaura el test quedó desactualizada, si la
-aplicación devuelve todos los módulos inactivos salvo uno, o si es el criterio de "no incluido en
-el precio" el que deja fuera al resto. Sin eso no hay una solución que proponer.
+No es la aplicación ni una instantánea desactualizada: es una contradicción entre las dos piezas
+del test.
 
-**Estado de la causa raíz:** el fallo es **del test, no de la aplicación**. Eso está confirmado por
-la comprobación interna del propio test, que existe justamente para no reportar un fallo falso.
-La causa de por qué los datos quedan así, no está confirmada.
+La prueba necesita dos filas y, para la segunda, exige que sea distinta de la primera y que no
+esté incluida en el precio. El detalle que la vuelve imposible está en el auxiliar que las
+busca: al elegir una fila descarta las que ya están incluidas en el precio, y entre las condiciones
+de ese descarte está **que la fila esté activa**. O sea que la segunda fila tenía que estar activa.
+
+Pero el auxiliar que arma los datos del archivo existe, por propósito, para dejar **una sola fila
+activa**: desactiva todos los módulos menos uno. Con una sola activa, la segunda fila —que además
+tiene que ser otra distinta— no puede aparecer nunca, y la prueba se detiene a sí misma.
+
+El orden agrava el caso. Las dos búsquedas ocurren **antes** de que se armen los datos, y el armado
+ocurre después. O sea que el test le pide dos filas activas y acto seguido se asegura de que quede
+una.
+
+La exigencia era además innecesaria. Más abajo la propia prueba **marca esa fila desde la ventana
+de precios**, y marcarla es justamente lo que la activa: exigírsela antes pedía algo que el test
+todavía no había hecho.
+
+**Por qué se confundió con un problema de datos.** El mensaje de error lista las filas y muestra
+que solo hay una activa, lo que parece un defecto de la base restaurada. La lista es la prueba del
+síntoma, no de la causa: una sola fila activa es precisamente lo que ese archivo de preparacion se propone dejar.
 
 **Evidencia (2026-10-03).**
 
@@ -44,11 +58,14 @@ recursos.**
 La lista de filas que imprime el propio mensaje es lo que permite ver que solo Statistics queda
 activa.
 
-**Estado de la causa raíz:** no confirmada en cuanto al origen de los datos. Confirmado que no es
-un defecto de la aplicación.
+**Estado de la causa raíz:** confirmada y **resuelta** el 2026-10-04. Es un defecto del test, no de
+la aplicación.
 
-**Propuesta de diagnóstico (pendiente de autorización — no se aplicó nada).**
-Ninguna aplicada. Cuando se investigue, el primer paso es comprobar si esa lista de filas es
-estable o depende del estado de la base de datos. Una posible mejora sería que la comprobación
-interna dijera cómo habilitar la segunda fila, pero eso **modifica un test existente** y requiere
-autorización explícita uno a uno. **No se tocó nada.**
+**Arreglo aplicado (autorizado).**
+Se agregó al archivo un auxiliar gemelo del que ya usaba, igual en todo salvo en un punto: el
+anterior descarta las filas que ya vienen incluidas en el precio, y el nuevo descarta solo eso, sin
+exigir además que estén activas. La prueba usa el gemelo para la segunda fila y el original sigue
+sirviendo para la primera, que sí tiene que estar activa porque es la que sobrevive al armado.
+
+**Verificación.** La prueba pasa en 30 segundos con un solo navegador. Antes se detenía a sí misma en
+los tres intentos. No se tocó la aplicación.

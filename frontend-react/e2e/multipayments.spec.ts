@@ -477,6 +477,12 @@ test.describe.serial('multipayments — selector y tasas (módulo 15), multi-pag
     await page.getByTestId(CART_CURRENCY_SELECT).selectOption(String(1)); // USD
     const changeRows = page.getByTestId('multi-payment-row');
     await expect(changeRows).toHaveCount(1);
+    // The row must be in USD, the sale currency: the amounts asserted below
+    // (0.15 paid against a 0.10 total -> 0.05 of change) are USD arithmetic.
+    // The default row is Efectivo + CUP ('0|0'), and 0.15 CUP is 0.0015 USD ->
+    // 0 cents once converted, which the tally now drops instead of crashing
+    // (ficha 8 del 10-03). Authorized 2026-10-04.
+    await changeRows.nth(0).getByTestId('multi-payment-channel').selectOption('1|0'); // Efectivo (USD)
     await changeRows.nth(0).getByTestId('multi-payment-amount').fill('0.15');
 
     await expect(page.getByTestId('multi-payment-change')).toHaveText(/0\.05\s*USD/);

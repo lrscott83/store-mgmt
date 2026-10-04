@@ -54,17 +54,26 @@ en sus tres intentos, siempre en la misma línea, la que comprueba el vuelto de 
 de la página en el momento del fallo muestra la pantalla de error con la referencia interna al cálculo
 del resumen.
 
-**Estado de la causa raíz:** confirmada en el código. **La aplicación no captura la excepción que ella
-misma lanza**, y ese es el defecto.
+**Estado de la causa raíz:** confirmada. El defecto de la aplicación quedó corregido el 2026-10-04.
 
-**Propuesta de corrección (pendiente de autorización — no se aplicó nada).**
+**Arreglo aplicado en la aplicación (autorizado).**
+Había dos llamadores del resumen de pagos y solo uno estaba protegido. El componente que dibuja las
+filas filtra los importes que no son positivos antes de llamar al resumen, y su comentario lo dice
+expresamente. El archivo que liquida los pagos no lo hacia: empujaba toda conversión correcta sin
+mirar su importe. Ahí se colaba el cero.
 
-Ninguna aplicada. La decisión es del usuario y tiene dos caminos que no son equivalentes:
+Se replicó el filtro que ya tenia el otro archivo. La fila se sigue guardando entre los pagos de la
+venta; lo que se descarta es su aporte al calculo, y la venta queda sin saldar y bloqueada, que es
+justo lo que el otro archivo ya producia. Una fila diminuta ya no tumba la pantalla.
 
-- Que el cálculo del resumen tolere un pago que llega a cero, igual que ya descarta las filas con
-  importe no positivo, en vez de propagar el error. Convierte un cierre de pantalla en una marca de
-  error en la fila.
-- O que el liquidation devuelva ese caso como un error controlado, que el carrito muestre y que no
-  reviente nada.
+**Arreglo aplicado en el test (autorizado).**
+Al arreglar lo anterior aparecio un segundo problema, que era del test: escribia un monto corto en
+una fila expresada en la moneda local, cuando las cuentas que despues comprueba son en dolares. Al
+convertir, ese monto daba cero centavos y la venta quedaba sin saldar en lugar de dar el vuelto
+esperado. La fila se pone ahora en dolares, que es la moneda de la venta, y con eso las cuentas del
+test cuadran.
 
-Cualquiera de las dos toca la aplicación y necesita su propia autorización. **No se tocó nada.**
+**Verificación.** El archivo entero pasa en 30 segundos con un solo navegador, las dos pruebas. Antes
+la segunda tumbaba la pantalla en los tres intentos. Tambien se comprobaron los tipos y el estilo,
+que si cubren esta parte del codigo.
+
