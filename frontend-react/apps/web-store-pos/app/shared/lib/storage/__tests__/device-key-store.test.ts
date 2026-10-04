@@ -150,3 +150,71 @@ describe('device-key-store — getDeviceKey never creates (task 1.9)', () => {
     await expect(getDeviceKey()).resolves.toBeNull();
   });
 });
+
+// Regression for the observed data-loss event (2026-10-04): a FAILED read used
+// to be collapsed into "no key", so getOrCreateDeviceKey minted a new key and
+// overwrote the stored one with `put`, orphaning every wrap made with it.
+describe('device-key-store — read failure must never overwrite (regression)', () => {
+  beforeEach(() => {
+    globalThis.indexedDB = new IDBFactory();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('keeps the existing key and returns null when the read fails', async () => {
+    const original = await getOrCreateDeviceKey();
+    expect(original).not.toBeNull();
+
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    // Force the read path to fail: `transaction()` throwing is caught inside
+    // `readKeyRecord` and classified as 'error' (NOT 'absent').
+    const txSpy = vi.spyOn(IDBDatabase.prototype, 'transaction').mockImplementation(() => {
+      throw new Error('indexeddb read boom');
+    });
+
+    await expect(getOrCreateDeviceKey()).resolves.toBeNull();
+    expect(consoleError).toHaveBeenCalled();
+
+    txSpy.mockRestore();
+
+    // The original key survives: it still decrypts what it encrypted.
+    const stillThere = await getDeviceKey();
+    expect(stillThere).not.toBeNull();
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const ciphertext = await crypto.subtle.encrypt(
+      { name: 'AES-GCM', iv },
+      original!,
+      new TextEncoder().encode('probe'),
+    );
+    const plaintext = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, stillThere!, ciphertext);
+    expect(new TextDecoder().decode(plaintext)).toBe('probe');
+  });
+});
+
+describe('device-key-store — concurrent mint yields a single key', () => {
+  beforeEach(() => {
+    globalThis.indexedDB = new IDBFactory();
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('two concurrent getOrCreateDeviceKey() calls share one key', async () => {
+    const [k1, k2] = await Promise.all([getOrCreateDeviceKey(), getOrCreateDeviceKey()]);
+    expect(k1).not.toBeNull();
+    expect(k2).not.toBeNull();
+
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const ciphertext = await crypto.subtle.encrypt(
+      { name: 'AES-GCM', iv },
+      k1!,
+      new TextEncoder().encode('probe'),
+    );
+    const plaintext = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, k2!, ciphertext);
+    expect(new TextDecoder().decode(plaintext)).toBe('probe');
+  });
+});
