@@ -115,13 +115,18 @@ describe('MessageShell — el contador se muestra siempre', () => {
     await waitFor(() => expect(screen.getByTestId('message-badge')).toHaveTextContent('5'));
   });
 
-  it('el contador en 0 es discreto para no competir con el punto rojo', async () => {
+  it('el contador en 0 conserva el verde del icono (user request 2026-10-04)', async () => {
     getConversationsMock.mockResolvedValue(success([conversation({ unreadCount: 0 })]));
 
     renderShell();
 
     await waitFor(() => expect(screen.getByTestId('message-badge')).toBeInTheDocument());
-    expect(screen.getByTestId('message-badge').className).toContain('bg-text-muted');
+    // El badge ya no tiene rama de cero: `bg-whatsapp` para todos los casos.
+    // Antes en 0 salía `bg-text-muted` (rgb 140 140 140) y se leía como un
+    // control deshabilitado, no como uno en reposo.
+    const className = screen.getByTestId('message-badge').className;
+    expect(className).toContain('bg-whatsapp');
+    expect(className).not.toContain('bg-text-muted');
   });
 
   it('el contador con unread > 0 usa el verde del icono, no el del carrito', async () => {
