@@ -561,6 +561,19 @@ test.describe.serial('Almacenes — flujo completo', () => {
     // lee una sola vez al montar, así que un cambio posterior no saca el botón.
     await page.addInitScript(() => {
       window.localStorage.setItem('pwa-installed', 'true');
+      // Blindaje: usePwaInstall BORRA esa bandera en cuanto captura un prompt de
+      // instalacion (use-pwa-install.ts, el efecto que sincroniza el flag con
+      // deferredPrompt), y el prompt llega por dos vías: el listener normal y un
+      // script inline del <head> que lo aparca en window.__pwaInstallPrompt
+      // (pwa-install-prompt.ts, initPwaInstallCapture). Si Chromium llega a
+      // dispararlo —depende de que el service worker se active, y aqui su
+      // activacion es intermitente— la bandera desaparece y el boton vuelve a
+      // tapar el menu. Se anula el borrado de ESA clave y solo de esa.
+      const removeItem = Storage.prototype.removeItem;
+      Storage.prototype.removeItem = function (key: string) {
+        if (key === 'pwa-installed') return;
+        return removeItem.call(this, key);
+      };
     });
     await enableWarehouseFeatures(page);
     await openWarehouses(page);

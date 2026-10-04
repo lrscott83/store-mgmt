@@ -24,7 +24,12 @@ import { RegisterPage } from './support/register-page';
 import { newTestIdentity } from './support/identity';
 import { readSelectedStoreId } from './support/session';
 import { seedCategoryAndProduct } from './support/store-seed';
-import { enableMultiPaymentsModule, MULTIPAYMENTS_MODULE_ID } from './support/multipayments-fixture';
+import {
+  enableMultiPaymentsModule,
+  enableStoreModules,
+  MULTI_PAYMENT_MODULES,
+  MULTIPAYMENTS_MODULE_ID,
+} from './support/multipayments-fixture';
 
 // i18n literals from es.ts — hardcoded, never imported.
 const SALE_HEADER = 'Productos para vender';
@@ -184,6 +189,13 @@ test.describe.serial('multipayments cart v2 (módulo 16) — fila por defecto, p
 
     // Module 16 gate precondition (idempotent) + settle window before the DEK reset.
     await enableMultiPaymentsModule(page, storeId);
+  // Este recorrido abre /management/channel-rates (linea ~197) para registrar la tasa
+  // que luego convierte la fila, y esa vista esta condicionada al modulo 15
+  // (MultiMonedas), no al 16. Sin el 15 la ruta no existe ni escribiendola a mano:
+  // la app manda a /login y el boton de alta de tasa nunca aparece, que es lo que
+  // hacia colgarse el clic (ficha 4 del 10-03). Es la misma siembra que ya usan los
+  // otros tres specs de moneda corregidos el 2026-10-03.
+  await enableStoreModules(page, storeId, MULTI_PAYMENT_MODULES);
     await dropDekAndCiphertext(page);
     const moduleIds = await storeModuleIds(page);
     if (!moduleIds.includes(MULTIPAYMENTS_MODULE_ID)) {
@@ -241,7 +253,13 @@ test.describe.serial('multipayments cart v2 (módulo 16) — fila por defecto, p
       .allInnerTexts();
     expect(channelOptions).toContain('Efectivo');
     expect(channelOptions).toContain('Transferencia (CUP)');
-    expect(channelOptions.some((label) => label.includes('Zelle'))).toBe(false);
+    // Con MultiMonedas activo Zelle SI se ofrece: multi-payment-list.tsx lo filtra
+    // con `hasMultiMonedasAvailable(user) || channel.method !== Zelle`, o sea
+    // "sin MultiMonedas no hay Zelle" (linea ~151). Este recorrido siembra el 15
+    // porque abre /management/channel-rates, asi que la asercion invertiria su
+    // sentido. Antes afirmaba lo contrario y solo podia cumplirse en el estado
+    // roto, donde esa vista ni siquiera existe. Autorizado 2026-10-04.
+    expect(channelOptions.some((label) => label.includes('Zelle'))).toBe(true);
 
     await page.getByTestId('multi-payment-add-channel').selectOption('0|2'); // Transferencia (CUP)
     await page.getByTestId('multi-payment-add-confirm').click();

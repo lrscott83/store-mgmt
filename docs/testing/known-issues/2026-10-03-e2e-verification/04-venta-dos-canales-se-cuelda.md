@@ -53,7 +53,19 @@ anterior y la ventana ni siquiera llega a abrirse.
 
 **Estado de la causa raíz:** confirmada. Defecto del andamiaje de pruebas.
 
-**Propuesta de arreglo (pendiente de autorización — no se aplicó nada).**
-Que el archivo siembre también el módulo 15, que es el que abre la pantalla de tasas, con el mismo
-auxiliar que ya usan los otros tres archivos corregidos. No hace falta tocar la aplicación ni el
-texto del test. **No se tocó nada.**
+**Arreglo aplicado (2026-10-04, autorizado).**
+El archivo siembra ahora también el módulo 15, con el mismo auxiliar que ya usan los otros tres
+specs de moneda corregidos el 3 de octubre. No hizo falta tocar la aplicación.
+
+Al sembrarlo el cuelgue desapareció y el recorrido llegó mucho más lejos, hasta una segunda
+comprobación que también estaba escrita contra el estado roto: el popup de canales afirmaba que
+Zelle no debía aparecer. Con el módulo 15 activo esa afirmación es justo al revés, porque el
+propio componente filtra ese método con la condición de que sin multi-monedas no hay Zelle, y el
+comentario lo dice al pie. Antes solo podía cumplirse en el estado en que la vista de tasas ni
+siquiera existe. Con autorización se invirtió la comprobación: ahora el test verifica que Zelle se
+ofrece cuando el módulo está activo, que es lo que la aplicación implementa.
+
+**Verificación.** El archivo entero pasa en 21 segundos con un solo navegador, cuando antes
+agotaba los tres intentos de tres minutos cada uno. La cadena causal se observó en dos pasos: con
+solo la siembra nueva el test alcanzó la línea de Zelle y falló ahí, y al invertir esa comprobación
+pasó de punta a punta. **No se aplicó nada más.**

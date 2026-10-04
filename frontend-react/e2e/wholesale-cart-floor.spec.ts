@@ -186,20 +186,25 @@ test.describe.serial('wholesale cart — floor del menor rango y re-precificaci�
 
     // 12 paquetes → rango 12 ($5/ud). La línea muestra el PRECIO DEL PAQUETE:
     // $5 × 24 = $120.
+    // El rotulo "Precio: " se elimino de la linea del carrito el 2026-10-02 por
+    // peticion del usuario (cart-shell.tsx, formatWholesaleLine). El precio del
+    // paquete vive ahora dentro de la misma linea de paquetes: "Paquetes: 12 - 120
+    // CUP". El recalculo por rango nunca estuvo roto (12 x 120 = 1 440 CUP se
+    // muestra bien); solo se buscaba el texto viejo (ficha 6 del 10-03).
     await addPacksAndOpenCart(page, product.id, '12');
     await expect(page.getByText(/Paquetes: 12/)).toBeVisible();
-    await expect(page.getByText(/Precio:\s*120\s*CUP/)).toBeVisible();
+    await expect(page.getByText(/Paquetes: 12\s*·\s*120\s*CUP/)).toBeVisible();
 
     // − → 11 paquetes cae al rango 5 ($6/ud): precio de paquete $6 × 24 = $144.
     const decrease = page.getByRole('button', { name: /disminuir cantidad de/i });
     await decrease.click();
     await expect(page.getByText(/Paquetes: 11/)).toBeVisible();
-    await expect(page.getByText(/Precio:\s*144\s*CUP/)).toBeVisible();
+    await expect(page.getByText(/Paquetes: 11\s*·\s*144\s*CUP/)).toBeVisible();
 
     // + → 12 paquetes vuelve al rango 12 ($5/ud): precio de paquete $120.
     const increase = page.getByRole('button', { name: /aumentar cantidad de/i });
     await increase.click();
     await expect(page.getByText(/Paquetes: 12/)).toBeVisible();
-    await expect(page.getByText(/Precio:\s*120\s*CUP/)).toBeVisible();
+    await expect(page.getByText(/Paquetes: 12\s*·\s*120\s*CUP/)).toBeVisible();
   });
 });

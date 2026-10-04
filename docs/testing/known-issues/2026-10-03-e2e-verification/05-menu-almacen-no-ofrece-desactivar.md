@@ -59,9 +59,19 @@ página, el botón ya estaría en pantalla y no volvería a dibujarse. Por eso s
 corre antes de cualquier código de la aplicación en cada carga completa, que es lo que hace la
 navegación del test.
 
-Verificación: el test pasa en 35 segundos, con un solo navegador. Se comprobó además que el arreglo
-es el que causes el cambio, desactivando solo la bandera: el test vuelve a fallar con el mismo
-mensaje de que el botón de instalar app intercepta el clic.
+La bandera se blindó además contra un borrado que hace la propia aplicación. El gancho que
+decide si el botón se muestra borra esa bandera en cuanto captura una solicitud de instalación, y
+esa solicitud puede llegar por dos vías: el listener normal y un script de la página que la aparca
+antes de que arranque el programa. Si el navegador llegara a dispararla, la bandera desaparecería y
+el botón volvería a tapar el menú. Depende de que se active el service worker, y aquí esa
+activación es intermitente. Por eso el test anula el borrado de esa clave y solo de esa.
+
+Verificación: el test pasa en 31 segundos con un solo navegador, y se comprobó dos veces seguidas
+para descartar que fuera casualidad. Se comprobó además que el arreglo es el que causa el cambio,
+desactivando solo la bandera: el test vuelve a fallar con el mismo mensaje de que el botón de
+instalar app intercepta el clic. El blindaje contra el borrado no se pudo provocar a proposito,
+porque exige que el navegador dispare la solicitud de instalación, que es justamente lo que hoy no
+ocurre: el botón salía desactivado, señal de que esa solicitud nunca se capturó.
 
 **Lo que este arreglo NO resuelve.**
 El defecto de la aplicación sigue vivo. El botón flotante sigue tapando la esquina inferior

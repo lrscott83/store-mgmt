@@ -55,8 +55,18 @@ la palabra del encabezado.
 **Estado de la causa raíz:** confirmada. Defecto del andamiaje de pruebas, con la aplicación
 funcionando como se pidió.
 
-**Propuesta de arreglo (pendiente de autorización — no se aplicó nada).**
-Que el test busque el precio en la forma en que la aplicación lo escribe hoy, que es la de la
-línea de paquetes, en lugar de la forma antigua con la palabra Precio delante. También conviene
-retirar del archivo de textos de la interfaz la traducción que quedó sin uso. No hace falta tocar
-la aplicación. **No se tocó nada.**
+**Arreglo aplicado (2026-10-04, autorizado).**
+Las tres comprobaciones de precio del test buscan ahora la forma en que la aplicación escribe la
+línea, que es el número de paquetes seguido del precio del paquete, en lugar de la palabra que se
+quitó. No hizo falta tocar la aplicación.
+
+La comprobación del precio quedó junto a la del número de paquetes porque las dos cosas viven en
+el mismo texto. El total de la línea ya se comprobaba por separado.
+
+**Verificación.** El archivo entero pasa en 34 segundos con un solo navegador, con sus dos
+recorridos: el del extremo inferior y el de cruzar el rango. Antes el segundo fallaba en los tres
+intentos.
+
+**Pendiente de una segunda decisión.** En el archivo de textos de la interfaz sigue existiendo la
+traducción de la palabra que se quitó, ya sin ningún uso. Retirarla es una limpieza aparte y no se
+hizo.
