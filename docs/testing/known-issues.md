@@ -149,13 +149,49 @@ _Actualizado por última vez: 2026-09-24 (quinta actualización: corrida del 202
 | --- | ----------------------------- | ----------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | ------ |
 | 1   | `store-module-pricing`        | El menú de engranaje abre el modal con el nombre de la tienda y su universo de módulos                           | El botón de acciones de la tienda no aparece — la pantalla de tiendas no carga datos                         | ✅ **Resuelto 2026-09-30** (8/8) |
 | 2   | `plan-catalog-superadmin`     | El popup muestra los cuatro paneles de planes incluyendo VIP                                                      | Ídem — el botón de acciones de la tienda no aparece                                                            | ✅ **Resuelto 2026-09-30** (2/2) |
-| 3   | `web-catalog`                 | Crear producto en POS, sincronizar, editarlo y verlo publicado en `/catalog/<slug>`                               | El producto no aparece en el catálogo público después de sincronizar                                            | 🔍 a confirmar          |
-| 4   | `mayorista-sale`              | Venta mayorista con Transferencia (CUP) filtrable por método de pago                                             | La opción de pago Transferencia (CUP) nunca se renderiza (timeout 120s)                                          | 🔍 a confirmar          |
-| 5   | `precache-split` (2 tests)    | Los chunks de rutas Owner/StoreUser y las librerías pesadas (PDF, scanner, gráficos) están precacheados           | El service worker nunca llega a estado activado (timeout 30s)                                                    | 🔍 a confirmar          |
-| 6   | `store-switcher-refresh`      | Una tienda creada en la sesión aparece en el switcher del header sin re-login                                    | El botón de crear tienda nunca aparece (timeout 120s)                                                            | 🔍 a confirmar          |
+| 3   | `web-catalog`                 | Crear producto en POS, sincronizar, editarlo y verlo publicado en `/catalog/<slug>`                               | Defecto del test: esperaba el aviso de éxito del guardado por producto, que ya no existe (decisión del 2026-10-01) | ✅ **Resuelto 2026-10-04** (1/1) |
+| 4   | `mayorista-sale`              | Venta mayorista con Transferencia (CUP) filtrable por método de pago                                             | Defecto del test: buscaba el radio "Transferencia (CUP)"; con el módulo 15 activo el sufijo de moneda se omite a propósito | ✅ **Resuelto 2026-10-04** (6/6) |
+| 5   | `precache-split` (2 tests)    | Los chunks de rutas Owner/StoreUser y las librerías pesadas (PDF, scanner, gráficos) están precacheados           | El service worker nunca llega a estado activado (timeout 30s)                                                    | ⚠️ **Sin verificar** — el spec está en `testIgnore` del config principal; solo corre con `playwright.pwa.config.ts` |
+| 6   | `store-switcher-refresh`      | Una tienda creada en la sesión aparece en el switcher del header sin re-login                                    | El botón de crear tienda nunca aparece (timeout 120s)                                                            | ⚪ **No se reproduce** — 2/2 verdes el 2026-10-04; sin causa raíz investigada |
 | —   | **Defecto sistémico**         | El dev server sirve la versión vigente de los paquetes del workspace                                            | No es un test: `vite.config.ts` deja un caché de Vite que puede servir un `dist/` viejo                        | 🔴 **ABIERTO — decisión pendiente** |
 
 **Tests E2E del backend (mismo día):** 660 passed, 0 failed. Sin relación con estos fallos.
+
+### Fallos 3 y 4 resueltos el 2026-10-04 — los dos eran del test, no de la aplicación
+
+Corrida completa del frontend el 2026-10-04 contra backend real (`:5019`, `smca_test`), 4 workers,
+354 tests, 13.6 min: **346 passed, 2 failed, 2 flaky, 4 did not run**. Los dos fallos fueron
+exactamente estos dos. Se reprodujeron luego archivo por archivo y con un solo navegador (7.7 min,
+`2 failed / 4 did not run / 1 passed`), lo que descarta saturación de la máquina.
+
+**Fallo 3 — `web-catalog`.** Fallaba en la línea 141 esperando el texto "Producto guardado en el
+catálogo". El archivo de contexto de Playwright muestra el estado real de la página: el botón es
+"Guardar cambios" y ya no hay ningún "Guardar" por producto. El guardado paso a lotes el 2026-10-01
+(una sola acción al final de la página), asi que el aviso de exito ahora es el del lote, "Se guardó 1
+producto en el catálogo", y la cadena `WEB_CATALOG.SAVED` que el test buscaba ya no la emite ninguna
+rama del codigo. El guardado funcionaba: la instantanea muestra la imagen subida, el nombre del
+archivo y "No hay cambios sin guardar". El fallo era la expectativa, no la operacion.
+
+**Fallo 4 — `mayorista-sale`.** Fallaba en la linea 248 esperando el radio "Transferencia (CUP)". La
+instantanea muestra el radio real: "Transferencia", sin sufijo. No es un defecto de la aplicacion:
+`today-orders.tsx` pinta el filtro con `paymentMethodKeyToLabel(key, !multiMonedas)`, asi que cuando la
+tienda tiene MultiMonedas el sufijo de moneda se omite a proposito (la moneda ya la acota el selector
+de la misma pantalla) y solo aparece en tiendas sin el modulo 15. Esta persona es del plan Superior,
+que incluye el 15, asi que la etiqueta correcta es la sin sufijo. Es el mismo par 15/16 que explico la
+ficha 4 de la carpeta `2026-10-03-e2e-verification`, planteado al reves.
+
+**Verificacion.** Con los dos arreglos, los 7 tests de los dos archivos pasan en 52.2 s. Se hizo la
+mutacion de cada arreglo por separado: al volver cada uno a su texto viejo, el test cae exactamente
+en la asercion tocada, en los 3 intentos, y la corrida reproduce la firma previa
+(`2 failed / 4 did not run / 1 passed`, exit 1). No se toco ningun archivo de la aplicacion.
+
+**Nota sobre los "4 did not run".** No son un cuarto defecto: son los cuatro tests posteriores dentro
+del `describe.serial` de `mayorista-sale`. Cuando un test de un bloque serial falla, el resto del
+bloque no corre, y un solo fallo real puede aparentar cuatro.
+
+**Fallo 5 sigue sin verificar.** `precache-split` esta en `testIgnore` del config principal, asi que
+la suite por defecto no lo ejecuta: solo corre con `playwright.pwa.config.ts`. No se puede cerrar con
+esta corrida.
 
 ---
 
