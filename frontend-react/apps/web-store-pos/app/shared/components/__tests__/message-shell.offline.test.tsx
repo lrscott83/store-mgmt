@@ -190,12 +190,15 @@ describe('MessageShell — offline queue', () => {
     renderShell();
 
     await waitFor(() =>
-      expect(sendMessageMock).toHaveBeenCalledWith({
-        conversationId: 'c1',
-        ownerId: 'u1',
-        storeId: 's1',
-        content: 'Mensaje atrasado',
-      }),
+      expect(sendMessageMock).toHaveBeenCalledWith(
+        {
+          conversationId: 'c1',
+          ownerId: 'u1',
+          storeId: 's1',
+          content: 'Mensaje atrasado',
+        },
+        { background: true },
+      ),
     );
     await waitFor(() => {
       const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '[]') as unknown[];

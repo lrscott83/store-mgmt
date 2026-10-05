@@ -45,8 +45,16 @@ export const messagesHttpService = {
     return response.data;
   },
 
-  async sendMessage(payload: SendMessagePayload): Promise<BaseResponseModel<MessageDto>> {
-    const response = await apiClient.post<BaseResponseModel<MessageDto>>('/v1/messages', payload);
+  async sendMessage(
+    payload: SendMessagePayload,
+    options?: MessagesRequestOptions,
+  ): Promise<BaseResponseModel<MessageDto>> {
+    const url = '/v1/messages';
+    // The non-background branch keeps passing exactly the arguments it always
+    // has: the existing assertion pins `post(url, payload)` with no config.
+    const response = options?.background
+      ? await apiClient.post<BaseResponseModel<MessageDto>>(url, payload, SKIP_LOADING)
+      : await apiClient.post<BaseResponseModel<MessageDto>>(url, payload);
     return response.data;
   },
 

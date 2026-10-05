@@ -225,12 +225,15 @@ describe('AdminMessagesPage — sending', () => {
     fireEvent.click(screen.getByTestId('message-send'));
 
     await waitFor(() => {
-      expect(messagesHttpService.sendMessage).toHaveBeenCalledWith({
-        conversationId: 'conv-a',
-        ownerId: 'user-a',
-        storeId: 'store-a',
-        content: 'Hola admin',
-      });
+      expect(messagesHttpService.sendMessage).toHaveBeenCalledWith(
+        {
+          conversationId: 'conv-a',
+          ownerId: 'user-a',
+          storeId: 'store-a',
+          content: 'Hola admin',
+        },
+        { background: true },
+      );
     });
   });
 
@@ -244,12 +247,15 @@ describe('AdminMessagesPage — sending', () => {
     fireEvent.click(screen.getByTestId('message-send'));
 
     await waitFor(() => {
-      expect(messagesHttpService.sendMessage).toHaveBeenCalledWith({
-        conversationId: '00000000-0000-0000-0000-000000000000',
-        ownerId: 'user-c',
-        storeId: 'store-c',
-        content: 'Bienvenida',
-      });
+      expect(messagesHttpService.sendMessage).toHaveBeenCalledWith(
+        {
+          conversationId: '00000000-0000-0000-0000-000000000000',
+          ownerId: 'user-c',
+          storeId: 'store-c',
+          content: 'Bienvenida',
+        },
+        { background: true },
+      );
     });
   });
 });

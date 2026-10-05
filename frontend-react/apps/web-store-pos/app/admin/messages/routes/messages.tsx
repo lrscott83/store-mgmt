@@ -58,7 +58,6 @@ export function AdminMessagesPage() {
   const [selectedOwnerId, setSelectedOwnerId] = useState<string | null>(null);
   const [messages, setMessages] = useState<MessageDto[]>([]);
   const [inputValue, setInputValue] = useState('');
-  const [isSending, setIsSending] = useState(false);
   const [broadcastOpen, setBroadcastOpen] = useState(false);
   const [broadcastContent, setBroadcastContent] = useState('');
   const [isBroadcasting, setIsBroadcasting] = useState(false);
@@ -136,13 +135,17 @@ export function AdminMessagesPage() {
     }
   }, [intl]);
 
+  /**
+   * Message requests are always background: the admin chat must not drive the
+   * global overlay nor toast on a timer. The owners/stores directory
+   * (`loadDirectory`) stays foreground — it is a user-facing page load.
+   */
   const loadMessages = useCallback(
-    async (conversationId: string, options?: { background?: boolean }) => {
-      const background = options?.background === true;
+    async (conversationId: string) => {
       try {
-        const response = background
-          ? await messagesHttpService.getMessages(conversationId, { background: true })
-          : await messagesHttpService.getMessages(conversationId);
+        const response = await messagesHttpService.getMessages(conversationId, {
+          background: true,
+        });
         if (!response.succeeded) return;
         setMessages(response.data);
         const unreadIncoming = response.data.filter(
@@ -151,66 +154,57 @@ export function AdminMessagesPage() {
         if (unreadIncoming.length > 0) {
           await Promise.all(
             unreadIncoming.map((message) =>
-              background
-                ? messagesHttpService.markAsRead(message.id, { background: true })
-                : messagesHttpService.markAsRead(message.id),
+              messagesHttpService.markAsRead(message.id, { background: true }),
             ),
           );
-          const updated = background
-            ? await messagesHttpService.getConversations({ background: true })
-            : await messagesHttpService.getConversations();
+          const updated = await messagesHttpService.getConversations({ background: true });
           if (updated.succeeded) setConversations(updated.data);
         }
       } catch {
-        if (!background) showToastError(intl.formatMessage({ id: 'MESSAGES.LOAD_ERROR' }));
+        // Background: a failed load is silent. The next poll retries.
       }
     },
-    [userId, intl],
+    [userId],
   );
 
   /**
    * Fetches the conversation list and reports whether anything actually moved —
    * that boolean drives the poll ladder. Also refreshes the open thread when the
-   * selected owner has one. A background call is silent: no loading overlay and
-   * no error toast on a timer.
+   * selected owner has one. Always background: no loading overlay and no error
+   * toast, whether on a timer or user-initiated.
    */
-  const refreshThreads = useCallback(
-    async (background: boolean): Promise<boolean> => {
-      try {
-        const response = background
-          ? await messagesHttpService.getConversations({ background: true })
-          : await messagesHttpService.getConversations();
-        if (!response.succeeded) return false;
-        const nextConversations = response.data;
-        setConversations(nextConversations);
+  const refreshThreads = useCallback(async (): Promise<boolean> => {
+    try {
+      const response = await messagesHttpService.getConversations({ background: true });
+      if (!response.succeeded) return false;
+      const nextConversations = response.data;
+      setConversations(nextConversations);
 
-        const signature = conversationsActivitySignature(nextConversations);
-        const changed =
-          activitySignatureRef.current !== '' && signature !== activitySignatureRef.current;
-        activitySignatureRef.current = signature;
+      const signature = conversationsActivitySignature(nextConversations);
+      const changed =
+        activitySignatureRef.current !== '' && signature !== activitySignatureRef.current;
+      activitySignatureRef.current = signature;
 
-        const owner = selectedOwnerRef.current;
-        if (owner) {
-          const conversation = nextConversations.find((c) => c.ownerId === owner.userId);
-          if (conversation) {
-            await loadMessages(conversation.id, background ? { background: true } : undefined);
-          }
+      const owner = selectedOwnerRef.current;
+      if (owner) {
+        const conversation = nextConversations.find((c) => c.ownerId === owner.userId);
+        if (conversation) {
+          await loadMessages(conversation.id);
         }
-        return changed;
-      } catch {
-        if (!background) showToastError(intl.formatMessage({ id: 'MESSAGES.LOAD_ERROR' }));
-        return false;
       }
-    },
-    [loadMessages, intl],
-  );
+      return changed;
+    } catch {
+      // Background: silent, retried on the next poll.
+      return false;
+    }
+  }, [loadMessages]);
 
   useEffect(() => {
     void loadDirectory();
   }, [loadDirectory]);
 
   useEffect(() => {
-    void refreshThreads(false);
+    void refreshThreads();
   }, [refreshThreads]);
 
   const selectedConversationId = selectedConversation?.id ?? null;
@@ -259,7 +253,7 @@ export function AdminMessagesPage() {
         timer = setTimeout(loop, POLL_LADDER_MS[POLL_LADDER_MS.length - 1]);
         return;
       }
-      const changed = await refreshThreads(true);
+      const changed = await refreshThreads();
       if (cancelled) return;
       step = changed ? 0 : Math.min(step + 1, POLL_LADDER_MS.length - 1);
       timer = setTimeout(loop, POLL_LADDER_MS[step]);
@@ -289,33 +283,33 @@ export function AdminMessagesPage() {
 
   async function handleSend() {
     const content = inputValue.trim();
-    if (!content || !selectedOwner || isSending) return;
+    if (!content || !selectedOwner) return;
     const storeId =
       selectedConversation?.storeId ?? preferredStoreId(selectedOwner);
     if (!storeId) {
       showToastError(intl.formatMessage({ id: 'MESSAGES.NO_STORE' }));
       return;
     }
-    setIsSending(true);
     try {
-      const response = await messagesHttpService.sendMessage({
-        conversationId: selectedConversation?.id ?? NEW_CONVERSATION_ID,
-        ownerId: selectedOwner.userId,
-        storeId,
-        content,
-      });
+      const response = await messagesHttpService.sendMessage(
+        {
+          conversationId: selectedConversation?.id ?? NEW_CONVERSATION_ID,
+          ownerId: selectedOwner.userId,
+          storeId,
+          content,
+        },
+        { background: true },
+      );
       if (!response.succeeded) {
         showToastError(intl.formatMessage({ id: 'MESSAGES.SEND_ERROR' }));
         return;
       }
       setInputValue('');
-      await refreshThreads(false);
+      await refreshThreads();
       // An outgoing message is activity: the fallback poll goes back to 10s.
       resetPollRef.current(false);
     } catch {
       showToastError(intl.formatMessage({ id: 'MESSAGES.SEND_ERROR' }));
-    } finally {
-      setIsSending(false);
     }
   }
 
@@ -332,7 +326,7 @@ export function AdminMessagesPage() {
       showToastSuccess(intl.formatMessage({ id: 'MESSAGES.BROADCAST_SUCCESS' }));
       setBroadcastContent('');
       setBroadcastOpen(false);
-      await refreshThreads(false);
+      await refreshThreads();
       resetPollRef.current(false);
     } catch {
       showToastError(intl.formatMessage({ id: 'MESSAGES.BROADCAST_ERROR' }));
@@ -482,7 +476,7 @@ export function AdminMessagesPage() {
                   type="button"
                   data-testid="message-send"
                   onClick={handleSend}
-                  disabled={isSending || inputValue.trim().length === 0 || !selectedStoreId}
+                  disabled={inputValue.trim().length === 0 || !selectedStoreId}
                   className="rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-white hover:bg-primary-hover transition-colors disabled:opacity-50"
                 >
                   {intl.formatMessage({ id: 'MESSAGES.SEND' })}
