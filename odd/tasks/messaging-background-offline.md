@@ -158,12 +158,19 @@ coordinates verification and commits.
 - [x] T2 — shell `refresh`/`markVisibleIncomingAsRead`/`flushQueue`/`handleSend` all background, no load toast, `isSending` removed. `message-shell*.test.tsx` 24/24 pass (vitest, 2026-10-05).
 - [x] T3 — composer is `<textarea rows={2}>` with auto-grow effect + Enter/Shift+Enter. TEXTAREA/rows test passes (vitest, 2026-10-05).
 - [x] T4 — admin `loadMessages`/`refreshThreads`/`handleSend` background, no load toast, `isSending` removed; `loadDirectory` unchanged. `messages.test.tsx` 7/7 pass (vitest, 2026-10-05).
-- [ ] T5
-- [ ] T6
-- [ ] T7
-- [ ] T8
-- [ ] T9
+- [x] T5 — `MessagesOfflineService.getStorageMessagesQueueJson()` + `addImportedQueuedMessage` (append, duplicate skip, empty-content `Result.Failure`, date revival). `messages-offline-service*.test.ts` 24/24 pass (vitest, 2026-10-05).
+- [x] T6 — `EDataFileName.MessagesQueue='messages-queue.json'`, optional `MessagesQueueReader`, `ParsedData.messagesQueue`, always-written entry, `parseContents` legacy → `[]`, `exportPlainData`. `data-serializer-service.test.ts` 52/52 pass (serializer tests now assert 14 data entries + round-trip/legacy/plain).
+- [x] T7 — optional `MessagesQueueImportService`, append-only `mergeMessagesQueueViaService` (oldest→newest, skip-on-duplicate, break-only `MessagesQueueUnexpectedError`). `data-synchronizer-service.test.ts` 39/39 pass.
+- [x] T8 — `MessagesOfflineService(storeId)` wired into `export.tsx` (both export paths) and `import.tsx` (serializer + synchronizer, one instance). `sync/routes/__tests__` 18/18 pass.
+- [x] T9 — WU2 verification: 8 suites, 138/138 pass, `pnpm typecheck` exit 0 (2026-10-05).
+
+## Review note (RDD)
+
+- WU1 (`26bcfaef`) was assessed by native RDD: `review_due=true` (`slice_budget_reached`, medium), consent granted by the user, review frozen (lineage `review-8751bae352763961`, one lens `review-reliability`).
+- The OpenCode reviewer transport is **unavailable** in this install: the managed plugin sends a relay frame the installed transport rejects (`the V2 relay start must name the host agent dispatched for the Task`); `gentle-ai doctor` reports installed assets match 4.0.0. No sanctioned path exists to produce the reviewer artifact, so no PASS was fabricated.
+- **User decision (2026-10-05): continue without the review.** WU1's review transaction remains unacknowledged; no review authority is produced. Delivery is a separate human decision under ordinary repository policy.
+- WU2 is not re-entered into RDD per the same user decision.
 
 ## Next step
 
-Create feature branch (done) and start WU1 (T1–T4).
+Feature complete pending commit of WU2. Push/PR remain the user's decision.

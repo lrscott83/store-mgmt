@@ -23,6 +23,7 @@ import type {
   Elaboration,
 } from '@store-mgmt/domain';
 import type { StorePaymentMethodsConfig } from '~/shared/lib/payment-methods/store-payment-methods-config-service';
+import type { QueuedMessage } from '~/shared/lib/messages/messages-offline-service';
 import type { ProductCategoryRepository } from '~/sales/lib/repositories/product-category-repository';
 import type { ProductRepository } from '~/sales/lib/repositories/product-repository';
 
@@ -96,6 +97,10 @@ export const EDataFileName = {
   // from legacy archives. Unlike the list entries it is written ONLY when the
   // store actually has a config (absent = store never configured = default).
   StorePaymentMethods: 'store-payment-methods.json',
+  // messaging-background-offline: the per-store offline outgoing message queue,
+  // always written (empty array when the store has none) and parsed as [] for
+  // legacy archives.
+  MessagesQueue: 'messages-queue.json',
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -210,6 +215,10 @@ export interface ParsedData {
   // touches the local config (absent → no-op, unlike the list entries whose
   // absent → [] is a legitimate empty merge).
   storePaymentMethods?: StorePaymentMethodsConfig;
+  // messaging-background-offline: OPTIONAL so the literals built by pre-existing
+  // sync tests/call sites keep compiling. `parseContents` always populates it
+  // (legacy archives → []), so real imports never see `undefined`.
+  messagesQueue?: QueuedMessage[];
 }
 
 // ---------------------------------------------------------------------------
@@ -275,6 +284,15 @@ export interface ElaborationReader {
  */
 export interface StorePaymentMethodsReader {
   getStorageStorePaymentMethods(): StorePaymentMethodsConfig | null;
+}
+
+/**
+ * Offline message-queue read seam (messaging-background-offline): the offline
+ * service owns the per-store queue; the serializer only reads its raw stored
+ * JSON for export. Mirrors {@link RecipeReader}.
+ */
+export interface MessagesQueueReader {
+  getStorageMessagesQueueJson(): string;
 }
 
 // ---------------------------------------------------------------------------
@@ -357,6 +375,10 @@ export class DataSerializerService {
     // the field `undefined` for archives that carry none (absent = do not touch
     // the local config on import).
     private readonly storePaymentMethodsReader?: StorePaymentMethodsReader,
+    // Optional (messaging-background-offline): legacy call sites/tests that
+    // predate the offline message queue omit it; exports then write an empty
+    // entry and imports parse [] for archives that carry none.
+    private readonly messagesQueueReader?: MessagesQueueReader,
   ) {}
 
   private derivePassword(password: string): string {
@@ -418,6 +440,9 @@ export class DataSerializerService {
     // object in the zip.
     const storePaymentMethods =
       this.storePaymentMethodsReader?.getStorageStorePaymentMethods() ?? null;
+    // messaging-background-offline: raw passthrough from the offline service's
+    // JSON seam; always written (empty array when the store has no queue).
+    const messagesQueueJson = this.messagesQueueReader?.getStorageMessagesQueueJson() ?? '[]';
 
     // v2 envelope: a fresh salt per export (V2-02), password-only key (V2-03).
     const salt = crypto.getRandomValues(new Uint8Array(V2_SALT_BYTES));
@@ -489,6 +514,9 @@ export class DataSerializerService {
         { rawPassword: key },
       );
     }
+    await zipWriter.add(EDataFileName.MessagesQueue, new TextReader(messagesQueueJson), {
+      rawPassword: key,
+    });
 
     const blob = await zipWriter.close();
     return new Uint8Array(await blob.arrayBuffer());
@@ -637,6 +665,11 @@ export class DataSerializerService {
     // as the ZIP entry).
     const storePaymentMethods =
       this.storePaymentMethodsReader?.getStorageStorePaymentMethods() ?? undefined;
+    // messaging-background-offline: parse the service's raw-JSON seam (reader
+    // optional → empty queue).
+    const messagesQueue = this.messagesQueueReader
+      ? (JSON.parse(this.messagesQueueReader.getStorageMessagesQueueJson()) as QueuedMessage[])
+      : [];
 
     // Categories and products: read raw JSON and parse
     const categoriesJson = this.categoryRepository.getCategoriesJson() ?? '[]';
@@ -667,6 +700,7 @@ export class DataSerializerService {
       recipes,
       elaborations,
       storePaymentMethods,
+      messagesQueue,
     };
   }
 
@@ -723,6 +757,9 @@ export class DataSerializerService {
       // store-payment-methods-backup: absent entry → `undefined` (legacy
       // archive: import must NOT touch the local config); present → config.
       storePaymentMethods: parseOptionalStorePaymentMethods(contents),
+      // messaging-background-offline: legacy archives carry no messages-queue
+      // entry → [].
+      messagesQueue: parseJson<QueuedMessage[]>(contents, EDataFileName.MessagesQueue, []),
     };
   }
 }
