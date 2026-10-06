@@ -102,7 +102,7 @@ que prueba el camino feliz y no el camino que de verdad puede romperse.
 - [x] F1 (R3-002) — Test negativo de auto-init frío sin aviso en los cinco servicios restantes: expenses, sale-credit, channel-rate, warehouse (las tres cachés) y payment-methods.
 - [x] F2 (R3-003) — Aislar el test de integración de la venta: drenar la cola de avisos y resetear la revisión en su `beforeEach`, sin debilitar ninguna aserción existente.
 - [x] F3 (R3-001) — Fijar que el bump de revisión de una venta no depende del asentamiento de las promesas de sus colaboradores (dobles que nunca resuelven) y que N ventas producen N revisiones.
-- [ ] F4 — Verificación: suites enfocadas en verde, `pnpm typecheck`.
+- [x] F4 — Verificación: suites enfocadas en verde, `pnpm typecheck`.
 
 ## Alcance de los follow-ups
 
@@ -145,3 +145,11 @@ que prueba el camino feliz y no el camino que de verdad puede romperse.
   UNA revisión aunque `createSaleCredit` devuelva una promesa que nunca asienta; el doble cableado
   se verifica por su resultado) y OR-7 (5 ventas → 5 revisiones). OR-4 intacto. Observado 7/7.
 - 2026-10-06: `pnpm typecheck` en verde tras F1–F3.
+- 2026-10-06: F4 y T6 cerrados por el padre. Spot check independiente de la suite de la venta:
+  1 archivo / 7 tests en verde. Comprobación de mutación ejecutada por el padre (no por el
+  escritor): quitando `if (initializing) return;` en `expense-offline-service.ts:327` la suite de
+  expenses pasa a 1 failed / 5 passed y el único rojo es EX-6
+  (`expected [ 1 ] to deeply equal []`); el archivo de producción se restauró byte-idéntico
+  (`git status` solo muestra los 8 archivos previstos, sin diffs de producción). Corrida combinada
+  de 11 archivos (los 7 tocados + inventory, product, product-category y warehouse crypto):
+  71 tests en verde. `pnpm typecheck`: exit 0.
