@@ -187,6 +187,18 @@ function orderItemFor(
   };
 }
 
+// sale snapshot (2026-10-06): the read path heals legacy items with the snapshot
+// defaults (original = converted, rate 1, original currency defaulted), so a raw seed
+// is compared against that healed shape.
+function healedItems(items: OrderItem[]): OrderItem[] {
+  return items.map((item) => ({
+    ...item,
+    originalPrice: item.price,
+    originalCurrency: item.currency ?? Currency.CUP,
+    conversionRate: 1,
+  }));
+}
+
 // WU3 (eliminate-base-repository): plain-array wire format (Angular parity,
 // order-offline.service.ts:420-423 `JSON.stringify(orders)`), NOT Map-entries.
 function seedOrders(storeId: string, orders: Order[]): void {
@@ -1640,7 +1652,9 @@ describe('OrderOfflineService', () => {
       expect(stored?.updatedByName).toBe('jdoe');
       // Protected fields UNCHANGED from the original seed.
       expect(stored?.total).toBe(500);
-      expect(stored?.orderItems).toEqual(seeded.orderItems);
+      // Contract changed 2026-10-06 (user-mandated snapshot completeness): reading an
+      // order now heals each legacy item with the snapshot defaults.
+      expect(stored?.orderItems).toEqual(healedItems(seeded.orderItems));
       expect(stored?.isCredit).toBe(true);
       expect(stored?.paymentType).toBe(PaymentType.Efectivo);
       expect(stored?.description).toBe('original description');
@@ -1751,7 +1765,9 @@ describe('OrderOfflineService', () => {
       service.updateImportedOrder(imported);
 
       const stored = findOrder('o1');
-      expect(stored?.orderItems).toEqual(seeded.orderItems);
+      // Contract changed 2026-10-06 (user-mandated snapshot completeness): reading an
+      // order now heals each legacy item with the snapshot defaults.
+      expect(stored?.orderItems).toEqual(healedItems(seeded.orderItems));
       expect(stored?.orderItems[0].productCosts[0].costPrice).toBe(1);
       expect(stored?.orderItems[1].productCosts[0].costPrice).toBe(2);
       expect(stored?.isActive).toBe(false); // the 4-field merge still ran

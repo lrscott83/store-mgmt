@@ -820,24 +820,39 @@ export class OrderOfflineService {
    * `isCredit=false`/`paymentType=Efectivo` for legacy orders missing those fields
    * (falsy-check semantics, mirroring Angular's `!order.isCredit`/`!order.paymentType`, not
    * an is-undefined check).
+   *
+   * sale snapshot (2026-10-06): also revives the new date fields and backfills the snapshot
+   * defaults (`originalPrice=price`, `originalCurrency=currency`, `conversionRate=1`,
+   * `saleCurrencyRateApplied=1`, no provenance). The healed orders are written back
+   * ("se salvan así mismo") so a legacy order is repaired once, on disk.
    */
   private getOrdersFromLocalStorage(): Order[] {
     // design D4: an unreadable store propagates and is never written over. The
     // auto-init below survives only for its honest case — no stored value at
     // all, i.e. a genuinely new store.
+    let changed = false;
     const stored = readEntityOrThrow(this.getStorageKey(), (json) =>
       json
-        ? (JSON.parse(json) as Order[]).map((order) => this.reviveAndBackfillOrder(order))
+        ? (JSON.parse(json) as Order[]).map((order) => {
+            const revived = this.reviveAndBackfillOrder(order);
+            if (revived.changed) changed = true;
+            return revived.order;
+          })
         : null,
     );
-    if (stored) return stored;
+    if (stored) {
+      // sale snapshot (2026-10-06): persist the backfilled defaults once.
+      if (changed) this.setOrdersLocalStorage(stored);
+      return stored;
+    }
 
     this.setOrdersLocalStorage([]);
     return [];
   }
 
-  private reviveAndBackfillOrder(order: Order): Order {
+  private reviveAndBackfillOrder(order: Order): { order: Order; changed: boolean } {
     const revived = { ...order } as Record<string, unknown>;
+    let changed = false;
     if (typeof revived.date === 'string') revived.date = new Date(revived.date);
     if (!revived.isCredit) revived.isCredit = false;
     if (!revived.paymentType) revived.paymentType = PaymentType.Efectivo;
@@ -853,18 +868,58 @@ export class OrderOfflineService {
     }
     if (revived.percent === undefined || revived.percent === null) revived.percent = 0;
     if (revived.tax === undefined || revived.tax === null) revived.tax = 0;
+
+    // sale snapshot (2026-10-06): revive the sale-currency rate moment and backfill the
+    // 1x1 identity default when the order predates the snapshot.
+    if (typeof revived.saleCurrencyRateEffectiveFrom === 'string') {
+      revived.saleCurrencyRateEffectiveFrom = new Date(revived.saleCurrencyRateEffectiveFrom);
+    }
+    if (revived.saleCurrencyRateApplied === undefined || revived.saleCurrencyRateApplied === null) {
+      revived.saleCurrencyRateApplied = 1;
+      changed = true;
+    }
+
+    // sale snapshot (2026-10-06): per item, revive the conversion-rate moment and
+    // backfill original = converted / rate 1 (no ids or dates, per spec §4.4).
+    if (Array.isArray(revived.orderItems)) {
+      revived.orderItems = (revived.orderItems as OrderItem[]).map((item) => {
+        const revivedItem = { ...item } as Record<string, unknown>;
+        if (typeof revivedItem.conversionRateEffectiveFrom === 'string') {
+          revivedItem.conversionRateEffectiveFrom = new Date(
+            revivedItem.conversionRateEffectiveFrom,
+          );
+        }
+        if (revivedItem.originalPrice === undefined || revivedItem.originalPrice === null) {
+          revivedItem.originalPrice = revivedItem.price;
+          changed = true;
+        }
+        if (revivedItem.originalCurrency === undefined || revivedItem.originalCurrency === null) {
+          revivedItem.originalCurrency = revivedItem.currency ?? DEFAULT_CURRENCY;
+          changed = true;
+        }
+        if (revivedItem.conversionRate === undefined || revivedItem.conversionRate === null) {
+          revivedItem.conversionRate = 1;
+          changed = true;
+        }
+        return revivedItem;
+      });
+    }
+
     // MultiPayments (plan 2026-09-18): legacy orders have no `payments` — leave it
-    // absent (no required backfill). When present, revive the frozen rate moment so a
-    // JSON round-trip keeps `rateEffectiveFrom` a Date instead of a raw string.
+    // absent (no required backfill). When present, revive the frozen rate moments (source
+    // and target, sale snapshot 2026-10-06) so a JSON round-trip keeps them Dates.
     if (Array.isArray(revived.payments)) {
       revived.payments = (revived.payments as OrderPayment[]).map((payment) => {
         const revivedPayment = { ...payment } as Record<string, unknown>;
         if (typeof revivedPayment.rateEffectiveFrom === 'string') {
           revivedPayment.rateEffectiveFrom = new Date(revivedPayment.rateEffectiveFrom);
         }
+        if (typeof revivedPayment.targetRateEffectiveFrom === 'string') {
+          revivedPayment.targetRateEffectiveFrom = new Date(revivedPayment.targetRateEffectiveFrom);
+        }
         return revivedPayment;
       });
     }
-    return revived as unknown as Order;
+    return { order: revived as unknown as Order, changed };
   }
 }
