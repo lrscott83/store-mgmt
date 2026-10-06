@@ -244,7 +244,17 @@ export function PublicCatalogPage() {
           </InfoBox>
         )}
 
-        <ul className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {/* Dos columnas DESDE móvil (decisión del owner, 2026-10-06): la rejilla anterior
+            solo tenía 2 columnas desde `sm`, así que en móvil cada tarjeta ocupaba el ancho
+            completo y la vista desaprovechaba el espacio. Al partirla en dos, la tarjeta se
+            estrecha a la mitad, y por eso el nombre y el precio tienen que ir APILADOS (más
+            abajo): repartidos en horizontal el nombre se sale de su caja y pinta sobre el
+            precio. `gap` también baja en móvil porque a media columna un `gap-4` se come la
+            tarjeta. */}
+        <ul
+          className="mt-4 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3"
+          data-testid="catalog-grid"
+        >
           {items.map((product) => (
             <li key={product.id}>
               <button
@@ -258,10 +268,10 @@ export function PublicCatalogPage() {
                     <img
                       src={toImageUrl(product.imageUrl) ?? undefined}
                       alt={product.name}
-                      className="h-64 w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                      className="h-40 w-full object-cover transition-transform duration-300 group-hover:scale-105"
                     />
                   ) : (
-                    <div className="flex h-64 w-full items-center justify-center bg-surface-hover text-sm text-text-muted">
+                    <div className="flex h-40 w-full items-center justify-center bg-surface-hover text-sm text-text-muted sm:h-64">
                       {intl.formatMessage({ id: 'CATALOG_PUBLIC.NO_IMAGE' })}
                     </div>
                   )}
@@ -287,16 +297,25 @@ export function PublicCatalogPage() {
                   )}
                 </div>
 
-                {/* Nombre y precio en la MISMA fila (decisión del owner, 2026-10-01): lo que
-                    identifica y lo que cuesta, de un vistazo, sin bajar la vista. */}
-                <div className="p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <h3 className="min-w-0 flex-1 text-base font-semibold text-text">
+                {/* Nombre y precio APILADOS y a la IZQUIERDA (decisión del owner, 2026-10-06; sustituye
+                    el reparto en la misma fila del 2026-10-01). Con dos columnas en móvil la
+                    tarjeta se estrecha, y en horizontal el nombre —que puede encogerse por
+                    debajo de su contenido— se salía de su caja y pintaba encima del precio,
+                    que al ser `shrink-0` nunca cedía espacio. En columna no compiten. */}
+                <div className="p-3 sm:p-4">
+                  <div
+                    className="flex flex-col gap-1"
+                    data-testid={`catalog-card-pricing-${product.id}`}
+                  >
+                    <h3 className="min-w-0 break-words text-base font-semibold text-text">
                       {product.name}
                     </h3>
                     {/* Moneda como CÓDIGO (CUP/USD/…), nunca el símbolo $: cada producto lleva
-                        la suya. El precio original tachado va DEBAJO del final, no al lado. */}
-                    <div className="shrink-0 text-right">
+                        la suya. El precio original tachado va DEBAJO del final. */}
+                    <div
+                      className="shrink-0 text-left"
+                      data-testid={`catalog-card-price-${product.id}`}
+                    >
                       <span className="block text-base font-bold text-primary">
                         {formatMoneyWithCurrency(
                           product.finalPrice,

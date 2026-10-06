@@ -132,6 +132,38 @@ describe('PublicCatalogPage', () => {
     expect(screen.queryByTestId('catalog-card-description-cp2')).not.toBeInTheDocument();
   });
 
+  it('dos columnas ya en móvil y nombre y precio apilados a la izquierda, sin solaparse', async () => {
+    renderPage();
+
+    // Dos columnas DESDE MÓVIL (no desde sm): con una sola columna la tarjeta era ancha y
+    // el problema no se veía; al partir en dos, la tarjeta se estrecha a la mitad.
+    // `grid-cols-2` sin prefijo es lo que las da en móvil; `lg:grid-cols-3` las sube a tres
+    // en escritorio. No debe haber ninguna clase que las baje a 1 en móvil.
+    const grid = await screen.findByTestId('catalog-grid');
+    expect(grid).toHaveClass('grid-cols-2');
+    expect(grid).toHaveClass('lg:grid-cols-3');
+    expect(grid.className).not.toMatch(/(^|\s)grid-cols-1(\s|$)/);
+
+    // Todo se espera con findBy, nunca con getBy: bajo carga de la suite completa el render
+    // puede tardar mas que un getBy sincronico, y el fallo era un falso rojo de timing.
+    const card = await screen.findByTestId('catalog-card-cp1');
+    const stacked = await within(card).findByTestId('catalog-card-pricing-cp1');
+
+    // Apilados (columna) y no repartidos: en una tarjeta estrecha el reparto horizontal
+    // hace que el nombre, que puede encogerse por debajo de su contenido, se salga de su
+    // caja y PINTE ENCIMA del precio, que es shrink-0 y nunca cede espacio.
+    expect(stacked).toHaveClass('flex-col');
+    expect(stacked).not.toHaveClass('justify-between');
+
+    // Y el precio se alinea a la izquierda, no a la derecha.
+    const price = await within(stacked).findByTestId('catalog-card-price-cp1');
+    expect(price).toHaveClass('text-left');
+
+    // El nombre tiene que poder partirse: sin esto, un nombre largo sin espacios vuelve a
+    // desbordar su caja aunque el precio ya no compita por el espacio.
+    expect(within(card).getByRole('heading', { level: 3 })).toHaveClass('break-words');
+  });
+
   it('abre el detalle con la descripción en texto plano y la galería', async () => {
     const product = makeProduct({
       description: 'Camisa con <b>etiquetas</b>\nSegunda línea',
