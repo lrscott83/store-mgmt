@@ -95,3 +95,79 @@ describe('convertCartLines — convierte cada línea a la moneda de la venta', (
     expect(result.lines[0].convertedUnitPrice).toBe(0.95);
   });
 });
+
+/** Rate row with an explicit id, to pin the persisted provenance fields. */
+function identifiedRate(currency: Currency, value: number, id: string): ChannelRate {
+  return {
+    method: SalePaymentMethod.Efectivo,
+    currency,
+    id,
+    buyValue: value,
+    sellValue: value,
+    effectiveFrom: new Date('2026-09-01T00:00:00.000Z'),
+  };
+}
+
+describe('convertCartLines — sale snapshot (original price, used rate, sale-currency rate)', () => {
+  it('same-currency line: original price/currency exposed, conversionRate 1 with no provenance', () => {
+    const result = convertCartLines([item('eur-1', Currency.EUR, 7.77, 3)], Currency.EUR, [], AT);
+    const line = result.lines[0];
+
+    expect(line.originalUnitPrice).toBe(7.77);
+    expect(line.originalCurrency).toBe(Currency.EUR);
+    expect(line.conversionRate).toBe(1);
+    expect(line.conversionRateId).toBeNull();
+    expect(line.conversionRateEffectiveFrom).toBeNull();
+  });
+
+  it('cross-currency line: keeps the original price/currency and the ORIGINAL currency rate used', () => {
+    const rates = [identifiedRate(Currency.CUP, 350, 'rate-cup')];
+    const result = convertCartLines([item('cup-1', Currency.CUP, 350, 2)], Currency.USD, rates, AT);
+    const line = result.lines[0];
+
+    // 350 CUP → 1 USD, but the line keeps that it WAS 350 CUP and the rate was 350 CUP/USD.
+    expect(line.convertedUnitPrice).toBe(1);
+    expect(line.originalUnitPrice).toBe(350);
+    expect(line.originalCurrency).toBe(Currency.CUP);
+    expect(line.conversionRate).toBe(350);
+    expect(line.conversionRateId).toBe('rate-cup');
+    expect(line.conversionRateEffectiveFrom).toEqual(new Date('2026-09-01T00:00:00.000Z'));
+  });
+
+  it('exposes the sale-currency rate (value + provenance) shared by every line', () => {
+    const rates = [identifiedRate(Currency.CUP, 350, 'rate-cup')];
+    const result = convertCartLines([item('usd-1', Currency.USD, 10, 1)], Currency.CUP, rates, AT);
+
+    expect(result.saleCurrencyRate).toEqual({
+      value: 350,
+      id: 'rate-cup',
+      effectiveFrom: new Date('2026-09-01T00:00:00.000Z'),
+    });
+  });
+
+  it('a sale currency with a resolvable persisted row reports it; unresolvable non-USD is null', () => {
+    const rates = [identifiedRate(Currency.CUP, 350, 'rate-cup')];
+    // EUR has no row and is not the synthetic USD pivot → no sale-currency rate.
+    const result = convertCartLines([item('cup-1', Currency.CUP, 350, 1)], Currency.EUR, rates, AT);
+    expect(result.saleCurrencyRate).toBeNull();
+  });
+
+  it('the USD sale currency resolves through the synthetic pivot (value 1, no provenance)', () => {
+    const result = convertCartLines([item('usd-1', Currency.USD, 10, 1)], Currency.USD, [], AT);
+    expect(result.saleCurrencyRate).toEqual({
+      value: 1,
+      id: null,
+      effectiveFrom: null,
+    });
+  });
+
+  it('an unconvertible line keeps its original price/currency but reports no applied rate', () => {
+    const result = convertCartLines([item('cup-1', Currency.CUP, 350, 1)], Currency.USD, [], AT);
+    const line = result.lines[0];
+    expect(line.originalUnitPrice).toBe(350);
+    expect(line.originalCurrency).toBe(Currency.CUP);
+    expect(line.conversionRate).toBeNull();
+    expect(line.conversionRateId).toBeNull();
+    expect(line.conversionRateEffectiveFrom).toBeNull();
+  });
+});
