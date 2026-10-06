@@ -134,6 +134,25 @@ tras los fallos — se completarían en la corrida que resuelva los 3 failed.
 
 Ninguno se tocó: los fixes propuestos están en las fichas, pendientes de autorización.
 
+## Cierre del 2026-10-05 — las 6 fichas quedaron retiradas
+
+La corrida completa del 2026-10-05 (351 aprobados, 0 fallidos, 3 inestables, exit 0; detalle en
+[`../2026-10-05-e2e-verification/README.md`](../2026-10-05-e2e-verification/README.md)) ejecutó los
+tests de todas estas fichas y ninguno falló. Con eso, las 6 fichas de esta carpeta se retiraron y su
+contenido queda resumido acá:
+
+| Ficha | Test | Cierre |
+|---|---|---|
+| 1 | Guard preflight `assertDevServerBackend` → `api-health.spec.ts` | ✅ **Resuelto 2026-10-01.** El guard ya no confunde el comodín `ws:`/`wss:` del CSP de SignalR con el origen de la API. La suite arranca; el preflight no volvió a abortar ninguna corrida. Fix commit `9fa2eada` |
+| 2 | `login-offline.spec.ts` (4 tests) | ✅ **Resuelto 2026-10-01.** Whitelist de tráfico de fondo ampliado con autorización 1 a 1 (telemetría + `/hubs/messages` + `/api/v1/messages`), invariante de cero AUTH/productos intacto. Verificado 12/12 ×2 el mismo día. Commit `4c4f37a0` |
+| 3 | `sync-export-import-v2.spec.ts` (2 tests) | ✅ **Resuelto 2026-10-01.** Mismo fix aplicado a la copia del whitelist. Verificado 2/2. Commit `4c4f37a0` |
+| 4 | `mayorista-sale.spec.ts:218` | ✅ **Resuelto 2026-10-04.** Defecto del test confirmado (buscaba `Transferencia (CUP)`; con el módulo 15 activo el sufijo se omite a propósito). Corregido con autorización en el commit `ede7e030`; verde el 2026-10-04 (6/6) y en la corrida completa del 2026-10-05 |
+| 5 | `movement-reversal.spec.ts:557` (E-R7) | ⚪ **Sin defecto demostrado.** No reproducía ni aislado ni con 1 o 4 workers el 2026-10-01; pasó en la corrida del 2026-10-03 y en la completa del 2026-10-05 (el spec entero en 5.9 min). Sin acción |
+| 6 | `web-catalog.spec.ts:77` | ✅ **Resuelto 2026-10-04.** Defecto del test confirmado (esperaba el aviso de guardado por producto, reemplazado por el guardado por lotes). Corregido con autorización en `ede7e030`; verde el 2026-10-04 y el 2026-10-05 |
+
+Los tres fixes de código de esta carpeta (guard + los dos whitelists) están commiteados
+(`9fa2eada`, `4c4f37a0`), así que la ficha 1, 2 y 3 también quedaron cerradas del lado del árbol.
+
 ## Estado del workspace durante la verificación
 
 - Backend levantado con `--launch-profile http-e2e`, guard confirmado (`smca_test`), puerto 5019.

@@ -1,6 +1,39 @@
 # Problemas conocidos — E2E frontend (Playwright)
 
 > Documento vivo de hallazgos de corridas E2E. Cada entrada declara: **qué prueba el test**, **qué falla** (en lenguaje simple), **causa raíz** (con su estado: confirmada / a confirmar) y **propuesta de solución**. Los tests E2E existentes no se tocan sin autorización explícita del usuario (regla innegociable del proyecto).
+>
+> **Antes de correr los E2E, mira acá.** Cada corrida nueva agrega su sección al final y toda ficha de test fallido sigue el contrato de la sección [Contrato de una ficha de test fallido](#contrato-de-una-ficha-de-test-fallido). El punto de entrada de la carpeta de fichas es [`known-issues/README.md`](known-issues/README.md).
+
+## Contrato de una ficha de test fallido
+
+> **Regla de la carpeta (`docs/testing/known-issues/`).** Toda corrida E2E empieza leyendo este documento y las fichas vivas: acá está lo ya diagnosticado. Cuando un test falla —o queda **inestable**, es decir, falla en su primer intento y pasa en el reintento— se le crea o actualiza su ficha en la carpeta de esa corrida (`known-issues/AAAA-MM-DD-e2e-verification/`). Cuando un test que tenía ficha **ya no falla**, la ficha **se retira** y el registro de cierre (fecha, commit, verificación) queda en el README de esa corrida. El punto de entrada de la carpeta es [`known-issues/README.md`](known-issues/README.md).
+
+**Elementos obligatorios de cada ficha.** Una ficha sin estos elementos no permite decidir si el arreglo va del lado de la aplicación o del lado del test, que es para lo que existe:
+
+| # | Elemento | Qué debe contener |
+| --- | --- | --- |
+| 1 | Nombre del archivo | `NN-spec-slug-corto.md` (`NN` = orden dentro de la corrida) |
+| 2 | Título | `# NN. spec.ts:línea — resumen en una frase del fallo` |
+| 3 | Qué prueba el test | Spec y línea exactos, **nombre literal** del test y qué verifica en términos de negocio |
+| 4 | Qué falla (en simple) | El texto **literal** del error o timeout de Playwright y **la línea del spec que revienta** |
+| 5 | Evidencia | El estado real de la página en el momento del fallo: snapshot del árbol de accesibilidad (`error-context.md`), trace, y el archivo del artifact |
+| 6 | Causa raíz | Hipótesis descartadas y causa confirmada, con `archivo:línea` y el cambio que la introdujo. **Si no está confirmada se escribe "NO CONFIRMADA"** y solo se listan los hechos que la evidencia sostiene |
+| 7 | Clasificación | Defecto del test / defecto de la aplicación / inestable de entorno o carga. Es lo que decide quién arregla qué |
+| 8 | Propuesta de solución | Marcada como **no aplicada** mientras no haya autorización |
+| 9 | Aplicación y verificación | Si se aplicó: qué se tocó, el comando y su **exit code**, la fecha, y para un fix de un test la **prueba de mutación** |
+| 10 | Estado final | ✅ resuelto / 🟡 inestable documentado sin diagnóstico cerrado / 🔴 abierto / ⚪ sin verificar, con fecha |
+
+**Reglas de evidencia (lo que separa un diagnóstico de una corazonada):**
+
+- **Snapshot primero.** Sin el estado de la página en el momento del fallo no se clasifica nada: el mismo timeout puede ser una aserción vieja o una caída de la aplicación.
+- **Prueba de mutación.** Al arreglar un test, se vuelve el arreglo a su forma vieja y se comprueba que el test **sí** cae, en la aserción tocada. Sin eso no se distingue un fix real de un falso verde (el test podría pasar por otra razón).
+- **Exit code preservado.** Al filtrar la salida de un comando con `grep`/`tail`, se conserva el código de salida del comando real (o se revisa el log completo): un `grep` vacío no es un verde.
+- **Nunca en paralelo.** La suite E2E del backend y la de Playwright no se corren a la vez: el reset de datos del backend borra filas vivas y los fallos que aparecen así son falsos.
+- **Workers.** En esta máquina la suite del frontend se corre con `--workers=4` (con 8 el flakiness se multiplica por contención, no por defectos).
+- **Una corrida en verde no cierra una ficha que no ejecutó.** Si un spec está en `testIgnore`, sigue ⚠️ sin verificar: eso se dice, no se asume.
+- **Autorización 1 a 1.** Editar un test E2E existente o código de la aplicación requiere autorización explícita del usuario, ficha por ficha.
+
+---
 
 ## Corrida del 2026-09-24
 
@@ -152,7 +185,7 @@ _Actualizado por última vez: 2026-09-24 (quinta actualización: corrida del 202
 | 3   | `web-catalog`                 | Crear producto en POS, sincronizar, editarlo y verlo publicado en `/catalog/<slug>`                               | Defecto del test: esperaba el aviso de éxito del guardado por producto, que ya no existe (decisión del 2026-10-01) | ✅ **Resuelto 2026-10-04** (1/1) |
 | 4   | `mayorista-sale`              | Venta mayorista con Transferencia (CUP) filtrable por método de pago                                             | Defecto del test: buscaba el radio "Transferencia (CUP)"; con el módulo 15 activo el sufijo de moneda se omite a propósito | ✅ **Resuelto 2026-10-04** (6/6) |
 | 5   | `precache-split` (2 tests)    | Los chunks de rutas Owner/StoreUser y las librerías pesadas (PDF, scanner, gráficos) están precacheados           | El service worker nunca llega a estado activado (timeout 30s)                                                    | ⚠️ **Sin verificar** — el spec está en `testIgnore` del config principal; solo corre con `playwright.pwa.config.ts` |
-| 6   | `store-switcher-refresh`      | Una tienda creada en la sesión aparece en el switcher del header sin re-login                                    | El botón de crear tienda nunca aparece (timeout 120s)                                                            | ⚪ **No se reproduce** — 2/2 verdes el 2026-10-04; sin causa raíz investigada |
+| 6   | `store-switcher-refresh`      | Una tienda creada en la sesión aparece en el switcher del header sin re-login                                    | El botón de crear tienda nunca aparece (timeout 120s)                                                            | 🟡 **Reapareció el 2026-10-05** — inestable (falló el intento 1, pasó al reintento); ficha viva en [`known-issues/2026-10-05-e2e-verification/03-store-switcher-refresh-boton-crear-no-aparece.md`](known-issues/2026-10-05-e2e-verification/03-store-switcher-refresh-boton-crear-no-aparece.md) |
 | —   | **Defecto sistémico**         | El dev server sirve la versión vigente de los paquetes del workspace                                            | No es un test: `vite.config.ts` deja un caché de Vite que puede servir un `dist/` viejo                        | 🔴 **ABIERTO — decisión pendiente** |
 
 **Tests E2E del backend (mismo día):** 660 passed, 0 failed. Sin relación con estos fallos.
@@ -341,3 +374,41 @@ _Actualizado por última vez: 2026-10-03 (corrida completa: 9 fallos E2E, 7 nuev
 el módulo MultiMonedas (15) no el MultiPayments (16) era lo que faltaba, y no era un defecto de la
 aplicación; aparece además un defecto de la aplicación al calcular el vuelto con varios canales,
 ficha 8)._
+
+---
+
+## Corrida del 2026-10-05 — la suite completa quedó en verde
+
+**Contexto.** Rama `test`, backend real `:5019` (perfil `http-e2e`, guard confirmado `Database=smca_test`), dev server `:3333`, `pnpm test:e2e --workers=4` desde `frontend-react/`. 12.2 minutos. Log: `/tmp/e2e-full.log`.
+
+| Resultado | Cantidad |
+| --- | --- |
+| passed | **351** |
+| failed | **0** |
+| flaky (pasaron en el reintento) | 3 |
+| did not run | 0 |
+
+Es la continuación directa de la corrida del 2026-10-04 (346 aprobados, 2 fallidos): esos dos fallos ya estaban corregidos el mismo 2026-10-04 (commit `ede7e030`) y esta corrida confirma que quedaron cerrados. Teardown OK: 2988 filas `e2e-*` borradas de `smca_test`.
+
+**Ningún test quedó fallando**, así que no se creó ninguna ficha por un fallo determinista. Sí quedaron **3 inestables** (fallaron el intento 1 y pasaron en el reintento), y cada uno tiene su ficha en [`known-issues/2026-10-05-e2e-verification/`](known-issues/2026-10-05-e2e-verification/README.md):
+
+| # | Test | Qué se vio en el fallo | Estado |
+| --- | --- | --- | --- |
+| 1 | `change-password.spec.ts:126:5` — "offline: el botón de envío está deshabilitado" | La aserción de 5 s no encuentra el botón: la página estaba vacía (solo la región de notificaciones) | 🟡 inestable, sin diagnóstico cerrado |
+| 2 | `store-create-security.spec.ts:88:7` — "StoreUser en /management/stores/create es deslogueado y redirigido a /login" | `Test timeout of 120000ms exceeded while setting up "signedInPage"`: la portada pública seguía en "Cargando..." | 🟡 inestable, sin diagnóstico cerrado — reaparición del modo ya visto en la tanda del 2026-09-25 |
+| 3 | `store-switcher-refresh.spec.ts:173:5` — "SWR-1 — a store created this session appears in the header switcher without re-login" | `/management/my-stores` pintó sus tarjetas pero sin el botón de crear (el permiso `hasMultiStores` en falso) | 🟡 inestable, sin diagnóstico cerrado — tercera aparición del mismo síntoma (2026-09-25 y 2026-09-29) |
+
+**Fichas retiradas en esta corrida** (sus tests pasaron; el registro de cierre quedó en el README de cada carpeta):
+
+- `known-issues/2026-10-01-e2e-verification/` — las 6 fichas (guard del preflight, chat siempre montado, whitelist de sync-export-import-v2, `mayorista-sale`, `movement-reversal` E-R7, `web-catalog`).
+- `known-issues/qa-merge-2026-09-29/` — las fichas 1 a 4 y 6.
+
+**Fichas vivas al cierre de esta corrida:**
+
+| Ficha | Estado |
+| --- | --- |
+| `known-issues/qa-merge-2026-09-29/05-precache-split.md` | ⚠️ Sin verificar — el spec está en `testIgnore` del config principal; la suite por defecto no lo ejecuta |
+| `known-issues/qa-merge-2026-09-29/07-vite-dep-cache-stale.md` | 🔴 Abierto — defecto sistémico del caché de dependencias de Vite (`optimizeDeps.include`), sin decisión tomada |
+| `known-issues/2026-10-05-e2e-verification/` (fichas 1 a 3) | 🟡 Los 3 inestables de esta corrida, documentados sin diagnóstico cerrado |
+
+_Actualizado por última vez: 2026-10-05 (corrida completa: 351 aprobados, 0 fallidos, 3 inestables; las fichas de las corridas del 2026-10-01 y del merge de qa quedaron retiradas salvo `precache-split` y el defecto del caché de Vite)._

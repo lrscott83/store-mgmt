@@ -64,6 +64,6 @@ Planes transversales (no numerados por etapa):
 |---|---|---|---|---|
 | **Cobertura del frontend** | Auditoría completa (Vitest + Playwright) y cierre de gaps: 16 rutas sin E2E (las 9 de admin incluidas) + 4 huecos de integración | 21 US | Pendiente de implementar | [frontend-coverage/](frontend-coverage/README.md) |
 | **Tests de integración** | Repositorios y servicios offline al 100% (Vitest) | — | Implementado | [integration-tests/](integration-tests/README.md) |
-| **Problemas conocidos** | Hallazgos de corridas E2E: qué prueba cada test fallido, causa raíz y propuesta — sin tocar tests sin autorización | — | Vivo | [known-issues.md](known-issues.md) |
+| **Problemas conocidos** | Hallazgos de corridas E2E: qué prueba cada test fallido, causa raíz y propuesta — sin tocar tests sin autorización. **Primer lugar donde se mira cuando una corrida E2E no queda en verde** | — | Vivo | [known-issues/README.md](known-issues/README.md) (contrato de ficha) · [known-issues.md](known-issues.md) (índice maestro) |
 
 Las siguientes etapas se agregan como filas de la tabla, con su propia carpeta hermana.
