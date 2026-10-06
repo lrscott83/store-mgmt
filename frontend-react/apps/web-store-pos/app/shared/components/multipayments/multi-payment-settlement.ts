@@ -2,6 +2,7 @@ import {
   RATE_MICRO,
   convertPaymentAmount,
   resolveChannelRate,
+  resolveCurrencyRate,
   summarizePayments,
 } from '@store-mgmt/domain';
 import type { BaseError, ChannelRate, Currency, OrderPayment } from '@store-mgmt/domain';
@@ -74,15 +75,26 @@ export function settleMultiPayments(
       : resolveChannelRate(rates, row.method, row.currency, at);
     const rate = resolved?.succeeded ? resolved.data : undefined;
 
+    // Target (order-currency) rate: identity for a same-currency row, the resolved
+    // order-currency row otherwise. `convertPaymentAmount` already proved a target
+    // resolves whenever the row reached this point, so a pushed cross-currency row
+    // always carries one.
+    const resolvedTarget = sameCurrency ? undefined : resolveCurrencyRate(rates, orderCurrency, at);
+    const targetRate = resolvedTarget?.succeeded ? resolvedTarget.data : undefined;
+
     orderPayments.push({
       method: row.method,
       currency: row.currency,
       // Outbound boundary: persist UNITS, the same unit as Order.total.
       amount: row.amount,
       rateApplied: rate ? rate.buyValue / RATE_MICRO : 1,
+      rateId: rate?.id ?? null,
       rateMethod: rate?.method ?? null,
       rateCurrency: rate?.currency ?? null,
       rateEffectiveFrom: rate?.effectiveFrom ?? null,
+      targetRateApplied: targetRate ? targetRate.buyValue / RATE_MICRO : 1,
+      targetRateId: targetRate?.id ?? null,
+      targetRateEffectiveFrom: targetRate?.effectiveFrom ?? null,
       amountInOrderCurrency: round2(conversion.data / 100),
     });
     // Same guard as multi-payment-list.tsx (its `tallyInput` filter): a row whose
