@@ -19,6 +19,10 @@ import { StorageKeys } from '~/shared/lib/storage/storage-keys';
 import { encryptEntity } from '~/shared/lib/storage/entity-crypto';
 import { readEntityOrThrow } from '~/shared/lib/storage/read-entity-or-throw';
 import { getCurrentUserLogin } from '~/shared/lib/auth/current-user';
+import {
+  notifyDataChanged,
+  useDataRevisionStore,
+} from '~/shared/lib/stores/data-revision-store';
 import { round2 } from '~/shared/lib/money';
 import { ProductRepository } from '~/sales/lib/repositories/product-repository';
 import { InventoryOfflineService } from './inventory-offline-service';
@@ -159,6 +163,22 @@ export class WarehouseOfflineService {
   private lastStockLevelsKey: string | undefined;
   private movements: WarehouseStockMovement[] | null = null;
   private lastMovementsKey: string | undefined;
+  /**
+   * Global data revision at the moment each of the three caches above was loaded from
+   * storage. A HIGHER current revision means another instance mutated store-local data
+   * and that snapshot is stale, so it must be re-read — hence the `>` comparison and not
+   * `!==`: the instance that just wrote stamps the affected cache with the revision its
+   * own pending notice will produce, so it must never look stale relative to its own
+   * write. `?? -1` makes "never stamped" always stale, forcing the first read.
+   *
+   * Tracked per cache (not once for the class) because the three are independent: a
+   * movement writes levels AND movements but never warehouses, and one shared field would
+   * force all three to reload on any single write. Read imperatively from the zustand
+   * store — a service must not subscribe to it.
+   */
+  private warehousesRevision: number | undefined;
+  private stockLevelsRevision: number | undefined;
+  private movementsRevision: number | undefined;
 
   constructor(
     private readonly storeId: string,
@@ -170,15 +190,18 @@ export class WarehouseOfflineService {
   // ─── warehouses ──────────────────────────────────────────────────────────
 
   getStorageWarehouses(): Warehouse[] {
+    const revision = useDataRevisionStore.getState().revision;
     if (
       !this.warehouses ||
       this.warehouses.length === 0 ||
-      this.getCurrentStorageKey('warehouses') !== this.lastWarehousesKey
+      this.getCurrentStorageKey('warehouses') !== this.lastWarehousesKey ||
+      revision > (this.warehousesRevision ?? -1)
     ) {
       this.warehouses = this.getFromLocalStorage<Warehouse>('warehouses', [
         'createdDate',
         'updatedDate',
       ]);
+      this.warehousesRevision = revision;
     }
     return this.warehouses;
   }
@@ -241,15 +264,18 @@ export class WarehouseOfflineService {
   // ─── stock levels ────────────────────────────────────────────────────────
 
   getStorageStockLevels(): WarehouseStockLevel[] {
+    const revision = useDataRevisionStore.getState().revision;
     if (
       !this.stockLevels ||
       this.stockLevels.length === 0 ||
-      this.getCurrentStorageKey('warehouse-stock-levels') !== this.lastStockLevelsKey
+      this.getCurrentStorageKey('warehouse-stock-levels') !== this.lastStockLevelsKey ||
+      revision > (this.stockLevelsRevision ?? -1)
     ) {
       this.stockLevels = this.getFromLocalStorage<WarehouseStockLevel>('warehouse-stock-levels', [
         'createdDate',
         'updatedDate',
       ]);
+      this.stockLevelsRevision = revision;
     }
     return this.stockLevels;
   }
@@ -269,15 +295,18 @@ export class WarehouseOfflineService {
   // ─── movements ───────────────────────────────────────────────────────────
 
   getStorageMovements(): WarehouseStockMovement[] {
+    const revision = useDataRevisionStore.getState().revision;
     if (
       !this.movements ||
       this.movements.length === 0 ||
-      this.getCurrentStorageKey('warehouse-stock-movements') !== this.lastMovementsKey
+      this.getCurrentStorageKey('warehouse-stock-movements') !== this.lastMovementsKey ||
+      revision > (this.movementsRevision ?? -1)
     ) {
       this.movements = this.getFromLocalStorage<WarehouseStockMovement>(
         'warehouse-stock-movements',
         ['createdDate'],
       );
+      this.movementsRevision = revision;
     }
     return this.movements;
   }
@@ -1494,11 +1523,37 @@ export class WarehouseOfflineService {
     });
     if (stored) return stored;
     const empty: T[] = [];
-    this.setLocalStorage(entity, empty);
+    this.setLocalStorage(entity, empty, true);
     return empty;
   }
 
-  private setLocalStorage(entity: string, value: unknown): void {
+  /**
+   * The ONLY `localStorage.setItem` in this class: all 21 explicit call sites plus the
+   * auto-init in `getFromLocalStorage` funnel through it, so it is also the single door
+   * every write of ALL THREE caches (warehouses, stock levels, movements) goes through.
+   * Notifying here is what makes "a write cannot happen without a notice" structural
+   * instead of a rule each of the 21 call sites has to remember. Coalesced:
+   * `recordMovement` writes levels AND movements, and a multi-lot movement writes levels
+   * once per operation, without ever producing a notice storm.
+   *
+   * Only the cache actually written is stamped. That is what keeps THIS instance from
+   * re-reading its own write — pointless I/O, and lossy besides, since the reviving does
+   * not revive every date field. It is not a claim that the untouched caches survive:
+   * another instance's write moves the global revision and legitimately reloads them all,
+   * because the revision says THAT something changed, never WHAT.
+   *
+   * `initializing` is the ONE case that does not notify: seeding a genuinely empty store
+   * is not a change to data that anyone could be holding a stale photo of — there was
+   * nothing there. Notifying would bump the revision, invalidate the very cache the
+   * auto-init just filled, and make the next read decrypt the whole entity again, on
+   * every cold instance of every service.
+   */
+  private setLocalStorage(entity: string, value: unknown, initializing = false): void {
     localStorage.setItem(this.getStorageKey(entity), encryptEntity(JSON.stringify(value)));
+    if (initializing) return;
+    const revision = notifyDataChanged();
+    if (entity === 'warehouses') this.warehousesRevision = revision;
+    else if (entity === 'warehouse-stock-levels') this.stockLevelsRevision = revision;
+    else this.movementsRevision = revision;
   }
 }
