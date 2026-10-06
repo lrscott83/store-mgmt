@@ -26,7 +26,11 @@ import type { CategoryCartItemsView } from '../category-cart-items-view';
 import { buildCategoryCartItemsView } from '../category-cart-items-view';
 import { getCurrentUserLogin } from '~/shared/lib/auth/current-user';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
-import { bumpDataRevision } from '~/shared/lib/stores/data-revision-store';
+import {
+  bumpDataRevision,
+  notifyDataChanged,
+  useDataRevisionStore,
+} from '~/shared/lib/stores/data-revision-store';
 import { hasInventoryModuleAvailable } from '~/shared/lib/auth/authorization-service';
 import { calculateOrderProfit } from '~/inventory/lib/profit-calculator';
 import { round2 } from '~/shared/lib/money';
@@ -70,6 +74,17 @@ export class OrderOfflineService {
 
   private orders: Order[] | null = null;
   private lastOrdersKey: string | undefined;
+  /**
+   * Global data revision at the moment `orders` was loaded from storage. A HIGHER current
+   * revision means another instance mutated store-local data (e.g. a sale registered from
+   * the global cart) and this snapshot is stale, so it must be re-read — hence the `>`
+   * comparison and not `!==`: the instance that just wrote stamps this with the revision
+   * its own pending notice will produce, so it must never look stale relative to its own
+   * write (which for an `Order` would be lossy, since only `date` is revived on read).
+   * `?? -1` makes "never stamped" always stale, forcing the first read. Read imperatively
+   * from the zustand store — a service must not subscribe to it.
+   */
+  private ordersRevision: number | undefined;
 
   constructor(private readonly storeId: string) {
     this.creditService = new SaleCreditOfflineService(storeId);
@@ -81,12 +96,15 @@ export class OrderOfflineService {
 
   /** 1:1 port of Angular `getStorageOrders` (order-offline.service.ts:400-405). */
   getStorageOrders(): Order[] {
+    const revision = useDataRevisionStore.getState().revision;
     if (
       !this.orders ||
       this.orders.length === 0 ||
-      this.getCurrentStorageKey() !== this.lastOrdersKey
+      this.getCurrentStorageKey() !== this.lastOrdersKey ||
+      revision > (this.ordersRevision ?? -1)
     ) {
       this.orders = this.getOrdersFromLocalStorage();
+      this.ordersRevision = revision;
     }
     return this.orders;
   }
@@ -686,8 +704,31 @@ export class OrderOfflineService {
    * plain-array write. At-rest encryption seam: encrypted immediately after
    * `JSON.stringify`, before `setItem`.
    */
-  private setOrdersLocalStorage(orders: Order[]): void {
+  /**
+   * Private port of Angular `setOrdersLocalStorage` (order-offline.service.ts:420-423) —
+   * plain-array write. At-rest encryption seam: encrypted immediately after
+   * `JSON.stringify`, before `setItem`.
+   *
+   * This is the ONLY `localStorage.setItem` in this class, so every write — create,
+   * update, activate/deactivate, cost propagation, snapshot restore and import — passes
+   * through here. Notifying at this door is what makes "a write cannot happen without a
+   * notice" structural instead of a rule each mutation has to remember. `createOrder`'s
+   * own immediate `bumpDataRevision()` is untouched and still covers its extra inventory
+   * mutation; the coalescer stands down when an immediate bump supersedes this notice, so
+   * a sale costs exactly one revision. Stamping with the returned revision keeps THIS
+   * instance from re-reading its own write — which for an `Order` would be lossy, since
+   * only `date` is revived on read.
+   *
+   * `initializing` is the ONE case that does not notify: seeding a genuinely empty store
+   * is not a change to data that anyone could be holding a stale photo of — there was
+   * nothing there. Notifying would bump the revision, invalidate the very cache the
+   * auto-init just filled, and make the next read decrypt the whole entity again, on
+   * every cold instance of every service.
+   */
+  private setOrdersLocalStorage(orders: Order[], initializing = false): void {
     localStorage.setItem(this.getStorageKey(), encryptEntity(JSON.stringify(orders)));
+    if (initializing) return;
+    this.ordersRevision = notifyDataChanged();
   }
 
   /** Private port of Angular `getStorageKey` (order-offline.service.ts:407-410) — records the last-used key. */
@@ -723,7 +764,7 @@ export class OrderOfflineService {
     );
     if (stored) return stored;
 
-    this.setOrdersLocalStorage([]);
+    this.setOrdersLocalStorage([], true);
     return [];
   }
 

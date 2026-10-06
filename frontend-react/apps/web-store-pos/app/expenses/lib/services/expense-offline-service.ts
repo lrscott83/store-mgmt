@@ -14,6 +14,10 @@ import { encryptEntity } from '~/shared/lib/storage/entity-crypto';
 import { readEntityOrThrow } from '~/shared/lib/storage/read-entity-or-throw';
 import { startOfDay, addDays, localDayRange } from '~/shared/lib/date-utils';
 import { getCurrentUserLogin } from '~/shared/lib/auth/current-user';
+import {
+  notifyDataChanged,
+  useDataRevisionStore,
+} from '~/shared/lib/stores/data-revision-store';
 
 function generateId(): string {
   return crypto.randomUUID();
@@ -43,17 +47,30 @@ interface CreateExpenseInput {
 export class ExpenseOfflineService {
   private expenses: Expense[] | null = null;
   private lastExpensesKey: string | undefined;
+  /**
+   * Global data revision at the moment `expenses` was loaded from storage. A HIGHER
+   * current revision means another instance mutated store-local data and this snapshot is
+   * stale, so it must be re-read — hence the `>` comparison and not `!==`: the instance
+   * that just wrote stamps this with the revision its own pending notice will produce, so
+   * it must never look stale relative to its own write. `?? -1` makes "never stamped"
+   * always stale, forcing the first read. Read imperatively from the zustand store — a
+   * service must not subscribe to it.
+   */
+  private expensesRevision: number | undefined;
 
   constructor(private readonly storeId: string) {}
 
   /** 1:1 port of Angular `getStorageExpenses` (expense-offline.service.ts:28-33). */
   getStorageExpenses(): Expense[] {
+    const revision = useDataRevisionStore.getState().revision;
     if (
       !this.expenses ||
       this.expenses.length === 0 ||
-      this.getCurrentStorageKey() !== this.lastExpensesKey
+      this.getCurrentStorageKey() !== this.lastExpensesKey ||
+      revision > (this.expensesRevision ?? -1)
     ) {
       this.expenses = this.getExpensesFromLocalStorage();
+      this.expensesRevision = revision;
     }
     return this.expenses;
   }
@@ -286,8 +303,29 @@ export class ExpenseOfflineService {
    * plain-array write. At-rest encryption seam: encrypted immediately after
    * `JSON.stringify`, before `setItem`.
    */
-  private setExpensesLocalStorage(expenses: Expense[]): void {
+  /**
+   * Private port of Angular `setExpensesLocalStorage` (expense-offline.service.ts:200-203) —
+   * plain-array write. At-rest encryption seam: encrypted immediately after
+   * `JSON.stringify`, before `setItem`.
+   *
+   * This is the ONLY `localStorage.setItem` in this class, so every write — create,
+   * update, soft-delete and import — passes through here. Notifying at this door is what
+   * makes "a write cannot happen without a notice" structural instead of a rule each
+   * mutation has to remember. Coalesced: a report that registers N expenses in one
+   * handler costs one notice, not N. Stamping with the returned revision keeps THIS
+   * instance from re-reading the array it just persisted, while every other instance
+   * still carries the previous stamp and reloads.
+   *
+   * `initializing` is the ONE case that does not notify: seeding a genuinely empty store
+   * is not a change to data that anyone could be holding a stale photo of — there was
+   * nothing there. Notifying would bump the revision, invalidate the very cache the
+   * auto-init just filled, and make the next read decrypt the whole entity again, on
+   * every cold instance of every service.
+   */
+  private setExpensesLocalStorage(expenses: Expense[], initializing = false): void {
     localStorage.setItem(this.getStorageKey(), encryptEntity(JSON.stringify(expenses)));
+    if (initializing) return;
+    this.expensesRevision = notifyDataChanged();
   }
 
   /** Private port of Angular `getStorageKey` (expense-offline.service.ts:163-166) — records the last-used key. */
@@ -320,7 +358,7 @@ export class ExpenseOfflineService {
     );
     if (stored) return stored;
 
-    this.setExpensesLocalStorage([]);
+    this.setExpensesLocalStorage([], true);
     return [];
   }
 

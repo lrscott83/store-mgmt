@@ -3,6 +3,10 @@ import { ProductCategoryErrors, Result } from '@store-mgmt/domain';
 import { StorageKeys } from '~/shared/lib/storage/storage-keys';
 import { encryptEntity, decryptEntity } from '~/shared/lib/storage/entity-crypto';
 import { readEntityOrThrow } from '~/shared/lib/storage/read-entity-or-throw';
+import {
+  notifyDataChanged,
+  useDataRevisionStore,
+} from '~/shared/lib/stores/data-revision-store';
 
 function generateId(): string {
   return crypto.randomUUID();
@@ -31,17 +35,30 @@ function generateId(): string {
 export class ProductCategoryRepository {
   private categories: Map<string, ProductCategory> | null = null;
   private lastCategoriesKey: string | undefined;
+  /**
+   * Global data revision at the moment `categories` was loaded from storage. A HIGHER
+   * current revision means another instance mutated store-local data and this snapshot is
+   * stale, so it must be re-read — hence the `>` comparison and not `!==`: the instance
+   * that just wrote stamps this with the revision its own pending notice will produce, so
+   * it must never look stale relative to its own write. `?? -1` makes "never stamped"
+   * always stale, which is what forces the first read. Read imperatively from the zustand
+   * store — a repository must not subscribe to it.
+   */
+  private categoriesRevision: number | undefined;
 
   constructor(private readonly storeId: string) {}
 
   /** 1:1 port of Angular `getStorageCategoriesMap` (product-category.repository.ts:40-45). */
   getStorageCategoriesMap(): Map<string, ProductCategory> {
+    const revision = useDataRevisionStore.getState().revision;
     if (
       !this.categories ||
       this.categories.size === 0 ||
-      this.getCurrentStorageKey() !== this.lastCategoriesKey
+      this.getCurrentStorageKey() !== this.lastCategoriesKey ||
+      revision > (this.categoriesRevision ?? -1)
     ) {
       this.categories = this.getProductCategoriesFromLocalStorage();
+      this.categoriesRevision = revision;
     }
     return this.categories;
   }
@@ -253,9 +270,34 @@ export class ProductCategoryRepository {
    * Map-entries write. At-rest encryption seam: encrypted immediately after
    * `JSON.stringify`, before `setItem`.
    */
-  private setProductCategoriesLocalStorage(categories: Map<string, ProductCategory>): void {
+  /**
+   * Private port of Angular `setProductCategoriesLocalStorage`
+   * (product-category.repository.ts:167-170) — Map-entries write. At-rest encryption
+   * seam: encrypted immediately after `JSON.stringify`, before `setItem`.
+   *
+   * This is the ONLY `localStorage.setItem` in this class, so every write — add,
+   * update, activate/deactivate, whole-map replace and the auto-init on read — passes
+   * through here. Notifying at this door is what makes "a write cannot happen without a
+   * notice" structural instead of a rule each mutation has to remember. Coalesced: a CSV
+   * import of N category-bearing rows costs one notice, not N. Stamping with the returned
+   * revision keeps THIS instance from re-reading the map it just persisted — it is
+   * already the truth in memory, while every other instance still carries the previous
+   * stamp and reloads.
+   *
+   * `initializing` is the ONE case that does not notify: seeding a genuinely empty store
+   * is not a change to data that anyone could be holding a stale photo of — there was
+   * nothing there. Notifying would bump the revision, invalidate the very cache the
+   * auto-init just filled, and make the next read decrypt the whole entity again, on
+   * every cold instance of every service.
+   */
+  private setProductCategoriesLocalStorage(
+    categories: Map<string, ProductCategory>,
+    initializing = false,
+  ): void {
     const categoryMapJson = JSON.stringify(Array.from(categories.entries()));
     localStorage.setItem(this.getStorageKey(), encryptEntity(categoryMapJson));
+    if (initializing) return;
+    this.categoriesRevision = notifyDataChanged();
   }
 
   /**
@@ -275,7 +317,7 @@ export class ProductCategoryRepository {
     if (stored) return stored;
 
     const categories = new Map<string, ProductCategory>();
-    this.setProductCategoriesLocalStorage(categories);
+    this.setProductCategoriesLocalStorage(categories, true);
     return categories;
   }
 }
