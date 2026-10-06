@@ -9,10 +9,12 @@ la causa raíz, la evidencia y lo que ya se intentó.
 | Elemento | Qué es |
 |---|---|
 | [`../known-issues.md`](../known-issues.md) | **Índice maestro.** Cada corrida con su veredicto, el contrato detallado de una ficha y las decisiones pendientes |
+| `2026-10-06-e2e-verification/` | Verificación **dirigida** del 2026-10-06 (nunca la suite completa): cerró las dos fichas del merge de qa, confirmó las causas documentadas y abrió una ficha nueva (SWR-2) |
 | `2026-10-05-e2e-verification/` | Corrida completa del 2026-10-05: 351 aprobados, **0 fallidos**, 3 inestables documentados |
 | `2026-10-03-e2e-verification/` | Corrida completa del 2026-10-03 (9 fallos); sus fichas se retiraron al cerrarse, queda el registro en su README |
 | `2026-10-01-e2e-verification/` | Corrida del 2026-10-01 (backend + frontend); sus 6 fichas se retiraron al quedar verdes, queda el registro en su README |
-| `qa-merge-2026-09-29/` | Fallos traídos por el merge de qa. **Quedan 2 fichas vivas**: 5 (`precache-split`, sin verificar) y 7 (caché de dependencias de Vite, 🔴 abierto) |
+| `qa-merge-2026-09-29/` | Fallos traídos por el merge de qa. **Sin fichas vivas**: las dos últimas (5 y 7) se cerraron y retiraron el 2026-10-06 |
+| `funcionan-en-solitario/` | **Inventario** de los specs que la suite marca inestables y que pasan cuando se corren solos, con la medición y el comando exacto |
 | `group-g/` | Flaky recurrentes de la serie de estabilidad del 2026-09-25 (cerrado) |
 
 ## Regla de la carpeta (obligatoria en cada corrida)

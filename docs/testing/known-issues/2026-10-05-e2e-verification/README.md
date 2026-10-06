@@ -46,17 +46,26 @@ no se habian vuelto a correr desde su diagnostico). Se retiraron sus archivos y 
 cierre quedo en el README de cada carpeta:
 
 - `../2026-10-01-e2e-verification/` — sus 6 fichas (1 a 6), retiradas.
-- `../qa-merge-2026-09-29/` — fichas 1 a 4 y 6, retiradas; quedan la 5 (`precache-split`, sin
-  verificar) y la 7 (defecto sistemico del cache de Vite, abierto).
+- `../qa-merge-2026-09-29/` — fichas 1 a 4 y 6, retiradas. Las dos que quedaban vivas (5 y 7)
+  **se cerraron y retiraron el 2026-10-06**: ver
+  [`../2026-10-06-e2e-verification/README.md`](../2026-10-06-e2e-verification/README.md).
 
-## Lo que sigue sin verificar
+## Cierre del 2026-10-06 — no queda nada sin verificar de esta corrida
 
-- `precache-split` (2 tests): el spec esta en `testIgnore` del config principal, asi que la
-  suite por defecto no lo ejecuta. Solo corre con `playwright.pwa.config.ts`. Esta corrida
-  no puede cerrarlo. Ficha: `../qa-merge-2026-09-29/05-precache-split.md`.
-- El defecto sistemico del cache de dependencias de Vite (`optimizeDeps.include` en
-  `apps/web-store-pos/vite.config.ts`) sigue abierto y sin decision tomada: ficha
-  `../qa-merge-2026-09-29/07-vite-dep-cache-stale.md`.
+- **`precache-split` (2 tests) — cerrado.** Corría con el config equivocado, no con el que le
+  corresponde: el config principal bloquea los service workers. Con `playwright.pwa.config.ts`
+  pasa **3/3** (21.1 s, exit 0) y el fallo se reprodujo a voluntad devolviéndolo al config
+  equivocado. Cierre en `../qa-merge-2026-09-29/README.md`.
+- **El defecto sistemico del cache de dependencias de Vite — cerrado.** La Opcion A
+  (`optimizeDeps.include` fuera de `vite.config.ts`) ya estaba aplicada desde el 2026-10-02
+  (commit `d6f47d53`); esta corrida del 2026-10-05, posterior al fix, es su verificacion.
+- **Los tres inestables de esta corrida — re-verificados en solitario el 2026-10-06.** Las fichas
+  1 y 2 pasan solas (50.0 s y 42.6 s); SWR-1 (ficha 3) tambien. El archivo del switcher esconde un
+  **cuarto** hallazgo: SWR-2 cae en solitario (1 de 2 corridas) por un locator ambiguo — defecto del
+  test, con ficha nueva en
+  [`../2026-10-06-e2e-verification/01-store-switcher-refresh-swr2-locator-actual.md`](../2026-10-06-e2e-verification/01-store-switcher-refresh-swr2-locator-actual.md).
+- Evidencia en solitario de los tres:
+  [`../funcionan-en-solitario/README.md`](../funcionan-en-solitario/README.md).
 
 ## Regla de la carpeta
 

@@ -93,3 +93,37 @@ Medir antes de parchear:
 
 **Estado final (2026-10-05):** 🟡 inestable documentado — sin diagnostico cerrado, con dos
 antecedentes (2026-09-25 y 2026-09-29) del mismo sintoma.
+
+---
+
+## Re-verificacion en solitario (2026-10-06) — SWR-1 pasa; aparecio **otro** fallo, el de SWR-2
+
+Se corrio **solo este spec**, con un worker y sin reintentos:
+
+```
+cd frontend-react
+npx playwright test e2e/store-switcher-refresh.spec.ts --workers=1 --retries=0 --reporter=line
+# 1 failed (SWR-2) · 1 passed (SWR-1) · 48.7s
+# EXITCODE=1
+```
+
+Log: `/tmp/iso-store-switcher-refresh.log`.
+
+- **SWR-1 (esta ficha) — pasa en solitario.** Su modo de fallo (el boton de crear tienda no aparece
+  en 120 s) no se reproduce con la maquina libre, lo que **sostiene la clasificacion de carga** de esta
+  ficha. La respuesta al punto 1 de la propuesta ("medir en solitario") queda dada: la preparacion de
+  la sesion —sembrar el 14 por SQL y refrescar con un /me real— **si trae el modulo 14** cuando no hay
+  contencion, porque el spec llega a crear la tienda por la interfaz y a abrir el switcher.
+- **SWR-2 — cae en solitario en una de dos corridas, con un modo que ninguna ficha tenia
+  documentado.** (Corrida 1: falla; corrida 2, 25.8 s: 2 passed.) El fallo no es el de esta ficha: es
+  la asercion de la marca "Actual" del popup, que choca con el aviso de exito del guardado («Tienda
+  **actual**izada correctamente.») por un locator de substring. Es un defecto propio del test, y
+  **no** de carga: por eso SWR-2 no entra a la lista de "pasa en solitario".
+  **Ficha nueva:** [`../2026-10-06-e2e-verification/01-store-switcher-refresh-swr2-locator-actual.md`](../2026-10-06-e2e-verification/01-store-switcher-refresh-swr2-locator-actual.md).
+
+Evidencia de la corrida aislada en
+[`../funcionan-en-solitario/README.md`](../funcionan-en-solitario/README.md).
+
+**Estado final actualizado (2026-10-06):** 🟡 inestable documentado — SWR-1 pasa en solitario en las
+dos corridas (clasificacion de carga sostenida); el unico fallo del archivo es de SWR-2, intermitente y
+propio del test, con ficha nueva en la carpeta del 2026-10-06.

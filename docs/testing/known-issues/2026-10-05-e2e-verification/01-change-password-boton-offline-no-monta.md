@@ -71,3 +71,30 @@ estado real. Alternativa, si se repite: subir el timeout de esa unica asercion.
 (paso al reintento) y no hay evidencia de un fallo determinista.
 
 **Estado final (2026-10-05):** 🟡 inestable documentado — sin diagnostico cerrado.
+
+---
+
+## Re-verificacion en solitario (2026-10-06) — pasa, y eso sostiene la clasificacion
+
+Se corrio **solo este spec**, con un worker y sin reintentos:
+
+```
+cd frontend-react
+npx playwright test e2e/change-password.spec.ts --workers=1 --retries=0 --reporter=line
+# 2 passed (50.0s)
+# EXITCODE=0
+```
+
+Log: `/tmp/iso-change-password.log`. Teardown: 57 filas `e2e-*` borradas de `smca_test`.
+**Respuesta al punto 1 de la propuesta** ("medir antes de parchear"): el archivo entero —los dos
+tests, con el montaje de la ruta que aqui fallo— completa en 50.0 s cuando la maquina esta libre, muy
+por debajo de cualquier umbral. Con la suite entera (4 workers + backend + dev server + PostgreSQL) el
+paso 1 de este mismo test no llego a montar en 5 s. **La clasificacion "inestable de entorno/carga"
+queda sostenida por evidencia** (antes era tentativa); el mecanismo fino —si el retraso fue del
+bootstrap de sesion o del montaje de la ruta— sigue sin medirse, y por eso el estado no cambia.
+
+Evidencia de la corrida aislada en
+[`../funcionan-en-solitario/README.md`](../funcionan-en-solitario/README.md).
+
+**Estado final actualizado (2026-10-06):** 🟡 inestable documentado — clasificacion de carga
+confirmada por corrida aislada, mecanismo sin cerrar.

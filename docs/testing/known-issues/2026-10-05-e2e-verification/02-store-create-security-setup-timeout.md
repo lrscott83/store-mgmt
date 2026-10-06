@@ -62,3 +62,32 @@ Primero medir, no parchear:
 
 **Estado final (2026-10-05):** 🟡 inestable documentado — sin diagnostico cerrado, con
 antecedente de dos apariciones en la tanda del 2026-09-25.
+
+---
+
+## Re-verificacion en solitario (2026-10-06) — el fixture no es lento cuando la maquina esta libre
+
+Se corrio **solo este spec**, con un worker y sin reintentos:
+
+```
+cd frontend-react
+npx playwright test e2e/store-create-security.spec.ts --workers=1 --retries=0 --reporter=line
+# 2 passed (42.6s)
+# EXITCODE=0
+```
+
+Log: `/tmp/iso-store-create-security.log`.
+
+**Respuesta al punto 1 de la propuesta** ("primero medir, no parchear"): los **dos** tests del archivo
+—cada uno con su `signedInPage` completo, identidad + login + perfil— terminan en 42.6 s en total. El
+setup que en la corrida completa agoto los 120 s no llega ni a la mitad de ese presupuesto cuando la
+maquina esta libre. **La clasificacion "inestable de entorno/carga en el setup" queda sostenida por
+evidencia**; el mecanismo exacto (que parte del armado de sesion se degrada bajo contencion) sigue sin
+medirse, asi que el paso 2 (endurecer el fixture con una marca de sesion real) sigue **sin aplicar y
+sin autorizacion**.
+
+Evidencia de la corrida aislada en
+[`../funcionan-en-solitario/README.md`](../funcionan-en-solitario/README.md).
+
+**Estado final actualizado (2026-10-06):** 🟡 inestable documentado — clasificacion de carga
+confirmada por corrida aislada, mecanismo sin cerrar.
