@@ -30,6 +30,10 @@ import { StorageKeys } from '~/shared/lib/storage/storage-keys';
 import { writeDeviceDekTable } from '~/shared/lib/storage/device-dek-table';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { useCartStore } from '~/shared/lib/stores/cart-store';
+import {
+  flushDataChangeNotifications,
+  useDataRevisionStore,
+} from '~/shared/lib/stores/data-revision-store';
 // La hidratación real del auth-store deja una cola fire-and-forget (/me en background) —
 // mismas razones que available-multistore-integration.
 import { allowUnmockedHttpReporting } from '~/shared/lib/testing/block-real-http';
@@ -142,7 +146,12 @@ async function registerSaleFromCart() {
 }
 
 describe('La venta registrada en el carrito refresca el inventario de la vista actual', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    // La revisión y la cola de coalescencia son estado module-scoped: un aviso pendiente
+    // del caso anterior no debe aterrizar en éste. Se drena ANTES de resetear, porque el
+    // flag de coalescencia (`pendingSinceRevision`) vive fuera del store.
+    await flushDataChangeNotifications();
+    useDataRevisionStore.setState({ revision: 0 });
     localStorage.clear();
     clearDek();
     setDek(crypto.getRandomValues(new Uint8Array(32)), STORE_ID);

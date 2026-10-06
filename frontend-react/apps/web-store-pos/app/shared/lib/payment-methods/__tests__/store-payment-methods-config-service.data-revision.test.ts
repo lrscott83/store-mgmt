@@ -126,4 +126,28 @@ describe('StorePaymentMethodsConfigService — invalidación por revisión y avi
 
     unsubscribe();
   });
+
+  it('PM-6: la escritura de auto-inicialización NO dispara notificación', async () => {
+    // Arranque en frío de una tienda genuinamente sin configurar: `getConfig()` siembra
+    // el catálogo por defecto en el almacenamiento. Eso NO es un cambio de datos — no
+    // había nada que alguien pudiera tener viejo, y el default es justo lo que todo
+    // lector ya resuelve — así que no puede subir la revisión: hacerlo invalidaría la
+    // foto que el propio auto-init acaba de llenar en cada instancia en frío.
+    localStorage.clear();
+    expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
+
+    const seen: number[] = [];
+    const unsubscribe = useDataRevisionStore.subscribe((state) => seen.push(state.revision));
+
+    const cold = svc();
+    expect(cold.getEnabledChannels().length).toBeGreaterThan(0);
+    await flushDataChangeNotifications();
+
+    expect(seen).toEqual([]);
+    expect(useDataRevisionStore.getState().revision).toBe(0);
+    // Y el auto-init sí sembró: la tienda deja de estar "sin configurar" para las demás.
+    expect(localStorage.getItem(STORAGE_KEY)).not.toBeNull();
+
+    unsubscribe();
+  });
 });

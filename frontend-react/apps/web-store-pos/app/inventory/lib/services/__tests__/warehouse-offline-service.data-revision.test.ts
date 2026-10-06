@@ -253,4 +253,38 @@ describe('WarehouseOfflineService — invalidación por revisión en sus TRES ca
 
     unsubscribe();
   });
+
+  it('WH-8: la escritura de auto-inicialización de las TRES cachés NO dispara notificación', async () => {
+    // Arranque en frío de una tienda genuinamente vacía: cada uno de los tres getters
+    // de auto-init siembra su caché vacía en el almacenamiento. Ninguna de esas tres
+    // escrituras es un cambio de datos — no había nada que alguien pudiera tener viejo —
+    // así que ninguna puede subir la revisión: hacerlo invalidaría las fotos que el
+    // propio auto-init acaba de llenar y duplicaría el descifrado en cada instancia en
+    // frío de cada servicio.
+    const WAREHOUSES_KEY = `lizoft.store-warehouses-${storeId}`;
+    const LEVELS_KEY = `lizoft.store-warehouse-stock-levels-${storeId}`;
+    const MOVEMENTS_KEY = `lizoft.store-warehouse-stock-movements-${storeId}`;
+    localStorage.clear();
+    expect(localStorage.getItem(WAREHOUSES_KEY)).toBeNull();
+    expect(localStorage.getItem(LEVELS_KEY)).toBeNull();
+    expect(localStorage.getItem(MOVEMENTS_KEY)).toBeNull();
+
+    const seen: number[] = [];
+    const unsubscribe = useDataRevisionStore.subscribe((state) => seen.push(state.revision));
+
+    const cold = svc();
+    expect(cold.getStorageWarehouses()).toHaveLength(0);
+    expect(cold.getStorageStockLevels()).toHaveLength(0);
+    expect(cold.getStorageMovements()).toHaveLength(0);
+    await flushDataChangeNotifications();
+
+    expect(seen).toEqual([]);
+    expect(useDataRevisionStore.getState().revision).toBe(0);
+    // Y los tres auto-init sí sembraron: ninguna caché queda "ausente" para las demás.
+    expect(localStorage.getItem(WAREHOUSES_KEY)).not.toBeNull();
+    expect(localStorage.getItem(LEVELS_KEY)).not.toBeNull();
+    expect(localStorage.getItem(MOVEMENTS_KEY)).not.toBeNull();
+
+    unsubscribe();
+  });
 });

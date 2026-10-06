@@ -42,6 +42,7 @@ vi.mock('~/sales/lib/repositories/product-category-repository', () => ({
 }));
 
 import { OrderOfflineService } from '../order-offline-service';
+import { SaleCreditOfflineService } from '~/sales/lib/services/sale-credit-offline-service';
 import {
   flushDataChangeNotifications,
   useDataRevisionStore,
@@ -202,6 +203,76 @@ describe('OrderOfflineService — invalidación por revisión y aviso en la escr
     expect(seen).toEqual([1]);
     expect(useDataRevisionStore.getState().revision).toBe(1);
     expect(b.getStorageOrders()).toHaveLength(11);
+
+    unsubscribe();
+  });
+
+  it('OR-6: una venta cuesta UNA revisión aunque el crédito nunca asiente', async () => {
+    // El colaborador de créditos devuelve una promesa que NUNCA asienta. El bump de la
+    // venta pertenece al límite de la mutación, no al asentamiento de las promesas de sus
+    // colaboradores: si una refactorización futura moviera el bump detrás de ese `await`,
+    // esta venta no subiría la revisión (o el test colgaría).
+    const creditCtor = vi.mocked(SaleCreditOfflineService);
+    const neverSettles = new Promise<never>(() => {});
+    creditCtor.mockImplementationOnce(
+      () =>
+        ({
+          createSaleCredit: vi.fn().mockReturnValue(neverSettles),
+          deactivateSaleCreditByOrderId: vi.fn().mockReturnValue({ succeeded: true }),
+        }) as unknown as SaleCreditOfflineService,
+    );
+
+    const seen: number[] = [];
+    const unsubscribe = useDataRevisionStore.subscribe((state) => seen.push(state.revision));
+
+    await svc().createOrder(
+      makeCartItems(),
+      OrderType.Normal,
+      true,
+      PaymentType.Efectivo,
+      undefined,
+      'Cliente',
+      SalePaymentMethod.Efectivo,
+    );
+    await flushDataChangeNotifications();
+
+    // La promesa pendiente Sí quedó cableada y Sí se invocó: el pin no puede pasar con un
+    // doble por defecto que resolviera al instante.
+    const createdCredit = creditCtor.mock.results.at(-1)!.value as {
+      createSaleCredit: ReturnType<typeof vi.fn>;
+    };
+    expect(createdCredit.createSaleCredit).toHaveBeenCalledTimes(1);
+    expect(createdCredit.createSaleCredit.mock.results[0].value).toBe(neverSettles);
+
+    // Una sola venta: la escritura de órdenes (aviso agrupado) y el bump inmediato del
+    // descuento de existencias se funden en UNA notificación observable.
+    expect(seen).toEqual([1]);
+    expect(useDataRevisionStore.getState().revision).toBe(1);
+
+    unsubscribe();
+  });
+
+  it('OR-7: N ventas consecutivas producen exactamente N revisiones', async () => {
+    const seen: number[] = [];
+    const unsubscribe = useDataRevisionStore.subscribe((state) => seen.push(state.revision));
+
+    for (let i = 0; i < 5; i += 1) {
+      await svc().createOrder(
+        makeCartItems(),
+        OrderType.Normal,
+        false,
+        PaymentType.Efectivo,
+        undefined,
+        '',
+        SalePaymentMethod.Efectivo,
+      );
+    }
+    await flushDataChangeNotifications();
+
+    // Cada venta avisa de forma inmediata e independiente: ni se pierde ninguna (menos de
+    // N) ni se duplica (más de N).
+    expect(seen).toEqual([1, 2, 3, 4, 5]);
+    expect(useDataRevisionStore.getState().revision).toBe(5);
 
     unsubscribe();
   });

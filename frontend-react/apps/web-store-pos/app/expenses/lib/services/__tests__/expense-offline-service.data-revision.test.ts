@@ -127,4 +127,29 @@ describe('ExpenseOfflineService — invalidación por revisión y aviso en la es
 
     unsubscribe();
   });
+
+  it('EX-6: la escritura de auto-inicialización NO dispara notificación', async () => {
+    // Lectura en frío de una tienda genuinamente vacía: el servicio siembra un array
+    // vacío en el almacenamiento. Eso NO es un cambio de datos — no había nada que
+    // alguien pudiera tener viejo — así que no puede subir la revisión: hacerlo
+    // invalidaría la foto que el propio auto-init acaba de llenar y duplicaría el
+    // descifrado en cada instancia en frío de cada servicio.
+    localStorage.clear();
+    localStorage.setItem(`lizoft.store-products-${storeId}`, '[]');
+    expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
+
+    const seen: number[] = [];
+    const unsubscribe = useDataRevisionStore.subscribe((state) => seen.push(state.revision));
+
+    const cold = svc();
+    expect(cold.getStorageExpenses()).toHaveLength(0);
+    await flushDataChangeNotifications();
+
+    expect(seen).toEqual([]);
+    expect(useDataRevisionStore.getState().revision).toBe(0);
+    // Y el auto-init sí sembró: la tienda deja de estar "ausente" para las demás.
+    expect(localStorage.getItem(STORAGE_KEY)).not.toBeNull();
+
+    unsubscribe();
+  });
 });
