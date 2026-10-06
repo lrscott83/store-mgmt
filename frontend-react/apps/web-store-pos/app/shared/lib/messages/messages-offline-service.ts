@@ -1,9 +1,23 @@
+import { Result } from '@store-mgmt/domain';
+import type { BaseError } from '@store-mgmt/domain';
 import { StorageKeys } from '~/shared/lib/storage/storage-keys';
 import { encryptEntity } from '~/shared/lib/storage/entity-crypto';
 import { readEntityOrThrow } from '~/shared/lib/storage/read-entity-or-throw';
 import type { SendMessagePayload } from './messages-types';
 
 const MESSAGES_QUEUE_ENTITY = 'messagesQueue';
+
+/**
+ * Errors of the offline message queue. Lives at the persistence boundary (not
+ * in the domain error catalogue) because it is a write guard, mirroring the
+ * `ChannelRateOfflineErrors` app-layer constant pattern.
+ */
+export const MessagesOfflineErrors = {
+  InvalidContent: {
+    code: 'Messages.InvalidContent',
+    description: 'El contenido del mensaje no puede estar vacío.',
+  },
+} as const satisfies Record<string, BaseError>;
 
 export interface QueuedMessage {
   id: string;
@@ -48,6 +62,32 @@ export class MessagesOfflineService {
 
   getQueue(): QueuedMessage[] {
     return this.read();
+  }
+
+  /** Raw stored-JSON read for the sync export (mirrors the channel-rate reader seam). */
+  getStorageMessagesQueueJson(): string {
+    return JSON.stringify(this.getQueue());
+  }
+
+  /**
+   * Import seam (sync import) — appends a queued message, reviving `queuedAt`
+   * from a string. Empty content is rejected with a failed `Result` and nothing
+   * is written; a message whose id is already queued is skipped (never
+   * overwritten). A missing id is assigned a generated one.
+   */
+  addImportedQueuedMessage(message: QueuedMessage): Result {
+    const revived = this.revive(message);
+    if (!revived.content) {
+      return Result.Failure([MessagesOfflineErrors.InvalidContent]);
+    }
+
+    const id = revived.id || generateId();
+    const queue = this.read();
+    if (queue.some((queued) => queued.id === id)) return Result.Success();
+
+    queue.push({ ...revived, id });
+    this.write(queue);
+    return Result.Success();
   }
 
   remove(id: string): void {

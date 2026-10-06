@@ -12,6 +12,7 @@ import { WarehouseOfflineService } from '~/inventory/lib/services/warehouse-offl
 import { RecipeOfflineService } from '~/inventory/lib/services/recipe-offline-service';
 import { ElaborationOfflineService } from '~/inventory/lib/services/elaboration-offline-service';
 import { StorePaymentMethodsConfigService } from '~/shared/lib/payment-methods/store-payment-methods-config-service';
+import { MessagesOfflineService } from '~/shared/lib/messages/messages-offline-service';
 import { DataSerializerService } from '~/sync/lib/services/data-serializer-service';
 import { DataSynchronizerService } from '~/sync/lib/services/data-synchronizer-service';
 import { ImportForm } from '~/sync/components/import-form';
@@ -67,6 +68,10 @@ export function ImportPage() {
     // (getStoredConfig, exported only when the store has a config) and the
     // synchronizer's write seam (setConfigFromBackup, wholesale overwrite).
     const storePaymentMethodsSvc = new StorePaymentMethodsConfigService(storeId);
+    // messaging-background-offline: serves BOTH the serializer's read seam
+    // (getStorageMessagesQueueJson, always exported) and the synchronizer's
+    // write seam (addImportedQueuedMessage, append/skip-on-duplicate).
+    const messagesQueueSvc = new MessagesOfflineService(storeId);
 
     const serializer = new DataSerializerService(
       storeId,
@@ -81,6 +86,7 @@ export function ImportPage() {
       recipeSvc,
       elaborationSvc,
       storePaymentMethodsSvc,
+      messagesQueueSvc,
     );
 
     // Read file bytes
@@ -121,6 +127,7 @@ export function ImportPage() {
       recipeSvc,
       elaborationSvc,
       storePaymentMethodsSvc,
+      messagesQueueSvc,
     );
 
     return synchronizer.sync(parsedData);

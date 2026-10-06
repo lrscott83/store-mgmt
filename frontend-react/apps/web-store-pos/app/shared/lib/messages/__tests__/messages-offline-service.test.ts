@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { MessagesOfflineService } from '../messages-offline-service';
+import type { QueuedMessage } from '../messages-offline-service';
 import type { SendMessagePayload } from '../messages-types';
 
 const storeId = 's1';
@@ -170,6 +171,91 @@ describe('MessagesOfflineService', () => {
         storeId,
         content: 'X',
       });
+    });
+  });
+
+  describe('getStorageMessagesQueueJson', () => {
+    it('returns the queue as plain JSON with ISO-string dates', () => {
+      const queued = service.enqueue(payload({ content: 'Exportame' }));
+
+      const raw = service.getStorageMessagesQueueJson();
+      const parsed = JSON.parse(raw) as QueuedMessage[];
+
+      expect(parsed).toHaveLength(1);
+      expect(parsed[0].id).toBe(queued.id);
+      expect(parsed[0].content).toBe('Exportame');
+      expect(typeof parsed[0].queuedAt).toBe('string');
+      expect(parsed[0].queuedAt).toBe(queued.queuedAt.toISOString());
+    });
+
+    it('returns [] for an empty queue', () => {
+      expect(JSON.parse(service.getStorageMessagesQueueJson())).toEqual([]);
+    });
+  });
+
+  describe('addImportedQueuedMessage', () => {
+    function imported(overrides: Partial<QueuedMessage> = {}): QueuedMessage {
+      return {
+        id: 'imported-1',
+        conversationId: 'c1',
+        ownerId: 'u1',
+        storeId,
+        content: 'Restaurado',
+        queuedAt: '2026-10-01T10:00:00.000Z' as unknown as Date,
+        ...overrides,
+      };
+    }
+
+    it('appends an imported message and revives its queuedAt string to a Date', () => {
+      const result = service.addImportedQueuedMessage(imported());
+
+      expect(result.succeeded).toBe(true);
+      const queue = service.getQueue();
+      expect(queue).toHaveLength(1);
+      expect(queue[0].id).toBe('imported-1');
+      expect(queue[0].content).toBe('Restaurado');
+      expect(queue[0].queuedAt).toBeInstanceOf(Date);
+      expect(queue[0].queuedAt.getTime()).toBe(
+        new Date('2026-10-01T10:00:00.000Z').getTime(),
+      );
+    });
+
+    it('skips a message whose id is already queued (append-only)', () => {
+      service.addImportedQueuedMessage(imported({ content: 'first' }));
+      const result = service.addImportedQueuedMessage(imported({ content: 'second' }));
+
+      expect(result.succeeded).toBe(true);
+      const queue = service.getQueue();
+      expect(queue).toHaveLength(1);
+      expect(queue[0].content).toBe('first');
+    });
+
+    it('rejects an empty content with a failed Result and writes nothing', () => {
+      const result = service.addImportedQueuedMessage(imported({ content: '' }));
+
+      expect(result.succeeded).toBe(false);
+      expect(result.errors.length).toBeGreaterThan(0);
+      expect(service.getQueue()).toEqual([]);
+      expect(localStorage.getItem(storageKey)).toBeNull();
+    });
+
+    it('assigns a generated id when the imported message has none', () => {
+      const result = service.addImportedQueuedMessage(
+        imported({ id: '' as unknown as string }),
+      );
+
+      expect(result.succeeded).toBe(true);
+      const queue = service.getQueue();
+      expect(queue).toHaveLength(1);
+      expect(queue[0].id).toBeTruthy();
+    });
+
+    it('persists so a fresh instance reads the imported message back', () => {
+      service.addImportedQueuedMessage(imported());
+
+      const fresh = new MessagesOfflineService(storeId);
+      expect(fresh.getQueue()).toHaveLength(1);
+      expect(fresh.getQueue()[0].content).toBe('Restaurado');
     });
   });
 });

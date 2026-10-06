@@ -62,8 +62,8 @@ export function MessageShell() {
   const [conversations, setConversations] = useState<ConversationDto[]>([]);
   const [messages, setMessages] = useState<MessageDto[]>([]);
   const [inputValue, setInputValue] = useState('');
-  const [isSending, setIsSending] = useState(false);
   const shellRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const isOpenRef = useRef(false);
   const wasOnlineRef = useRef(isOnline);
 
@@ -101,21 +101,18 @@ export function MessageShell() {
    * Fetches the conversation list (and the open thread) and reports whether
    * anything actually moved — that boolean drives the poll ladder.
    *
-   * A BACKGROUND call drives no loading overlay and reports no error toast: it
-   * runs on a timer, so a spinner or a toast every cycle is exactly the bug T10
-   * fixes. A user-initiated call keeps both.
+   * EVERY call is background: a chat widget mounted in the global header must
+   * never drive the loading overlay or surface an error toast, whether it runs
+   * on a timer or because the user tapped the icon. Offline is an expected
+   * state, not an error.
    */
   const refresh = useCallback(
-    async (withMessages: boolean, options?: { background?: boolean }): Promise<boolean> => {
+    async (withMessages: boolean): Promise<boolean> => {
       if (!user || !isOwnerAdmin(user)) return false;
-      const background = options?.background === true;
       try {
-        // Only the background branch adds the option: a foreground call must keep
-        // passing exactly the arguments it always has — the shell tests pin the
-        // call arguments, and a meaningless `{ background: false }` is noise.
-        const conversationsResponse = background
-          ? await messagesHttpService.getConversations({ background: true })
-          : await messagesHttpService.getConversations();
+        const conversationsResponse = await messagesHttpService.getConversations({
+          background: true,
+        });
         if (!conversationsResponse.succeeded) return false;
         const nextConversations = conversationsResponse.data;
         setConversations(nextConversations);
@@ -133,9 +130,9 @@ export function MessageShell() {
           return changed;
         }
 
-        const messagesResponse = background
-          ? await messagesHttpService.getMessages(active.id, { background: true })
-          : await messagesHttpService.getMessages(active.id);
+        const messagesResponse = await messagesHttpService.getMessages(active.id, {
+          background: true,
+        });
         if (!messagesResponse.succeeded) return changed;
         // Read receipts are NOT issued here — see `markVisibleIncomingAsRead`.
         // Listing a thread is not reading it: this thread mounts every message
@@ -145,11 +142,11 @@ export function MessageShell() {
         setMessages(messagesResponse.data);
         return changed;
       } catch {
-        if (!background) showToastError(intl.formatMessage({ id: 'MESSAGES.LOAD_ERROR' }));
+        // Background: a failed poll is silent. The next cycle retries.
         return false;
       }
     },
-    [user, intl],
+    [user],
   );
 
   /**
@@ -180,14 +177,14 @@ export function MessageShell() {
 
     // Claim them before awaiting: a scroll mid-flight must not double-POST.
     visible.forEach((id) => receiptedRef.current.add(id));
-    void Promise.all(visible.map((id) => messagesHttpService.markAsRead(id)))
+    void Promise.all(visible.map((id) => messagesHttpService.markAsRead(id, { background: true })))
       .then((results) => {
         // A refused receipt has to stay retryable, or the message is stranded
         // unread with nothing left that could re-trigger it.
         results.forEach((result, index) => {
           if (!result.succeeded) receiptedRef.current.delete(visible[index]);
         });
-        return messagesHttpService.getConversations();
+        return messagesHttpService.getConversations({ background: true });
       })
       .then((updated) => {
         if (updated.succeeded) setConversations(updated.data);
@@ -233,7 +230,7 @@ export function MessageShell() {
     isFlushingRef.current = true;
     try {
       const result = await offlineService.flush(async (payload) => {
-        const response = await messagesHttpService.sendMessage(payload);
+        const response = await messagesHttpService.sendMessage(payload, { background: true });
         return response.succeeded;
       });
       setPending(readPending());
@@ -322,7 +319,7 @@ export function MessageShell() {
         timer = setTimeout(loop, POLL_LADDER_MS[POLL_LADDER_MS.length - 1]);
         return;
       }
-      const changed = await refresh(isOpenRef.current, { background: true });
+      const changed = await refresh(isOpenRef.current);
       if (cancelled) return;
       step = changed ? 0 : Math.min(step + 1, POLL_LADDER_MS.length - 1);
       timer = setTimeout(loop, POLL_LADDER_MS[step]);
@@ -388,25 +385,29 @@ export function MessageShell() {
 
   async function handleSend() {
     const content = inputValue.trim();
-    if (!content || isSending || !user || !isOwnerAdmin(user)) return;
+    if (!content || !user || !isOwnerAdmin(user)) return;
     const payload: SendMessagePayload = {
       conversationId: activeConversation?.id ?? NEW_CONVERSATION_ID,
       ownerId: user.id,
       storeId: user.selectedStoreId,
       content,
     };
+    // Clear immediately: the composer never blocks on the network, and there is
+    // no global loading state for a send.
+    setInputValue('');
     if (!isOnline) {
       enqueueMessage(payload);
       return;
     }
-    setIsSending(true);
     try {
-      const response = await messagesHttpService.sendMessage(payload);
+      const response = await messagesHttpService.sendMessage(payload, { background: true });
       if (!response.succeeded) {
+        // A server rejection is not a network failure: keep the text so the user
+        // can retry instead of losing it.
+        setInputValue(content);
         showToastError(intl.formatMessage({ id: 'MESSAGES.SEND_ERROR' }));
         return;
       }
-      setInputValue('');
       await refresh(true);
       // An outgoing message is activity: the fallback poll goes back to 10s.
       resetPollRef.current(false);
@@ -415,11 +416,21 @@ export function MessageShell() {
         enqueueMessage(payload);
         return;
       }
+      setInputValue(content);
       showToastError(intl.formatMessage({ id: 'MESSAGES.SEND_ERROR' }));
-    } finally {
-      setIsSending(false);
     }
   }
+
+  // T3 — the composer grows with its content. Reset to `auto` first so the box
+  // can shrink when text is deleted; then adopt the content height. Runs on
+  // every value change and when the panel opens (the ref is unmounted while
+  // closed, so a late panel needs a fresh measurement).
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  }, [inputValue, isOpen]);
 
   const displayMessages = [
     ...messages.map((message) => ({
@@ -558,22 +569,26 @@ export function MessageShell() {
             )}
           </div>
 
-          <div className="flex items-center gap-2 border-t border-border px-2 py-2">
-            <input
-              type="text"
+          <div className="flex items-end gap-2 border-t border-border px-2 py-2">
+            <textarea
+              ref={inputRef}
+              rows={2}
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') void handleSend();
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  void handleSend();
+                }
               }}
               aria-label={intl.formatMessage({ id: 'MESSAGES.INPUT_PLACEHOLDER' })}
               placeholder={intl.formatMessage({ id: 'MESSAGES.INPUT_PLACEHOLDER' })}
-              className="flex-1 rounded-md border border-border px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+              className="max-h-32 flex-1 resize-none overflow-y-auto rounded-md border border-border px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
             />
             <button
               type="button"
               onClick={handleSend}
-              disabled={isSending || inputValue.trim().length === 0}
+              disabled={inputValue.trim().length === 0}
               className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary-hover transition-colors disabled:opacity-50"
             >
               {intl.formatMessage({ id: 'MESSAGES.SEND' })}

@@ -12,7 +12,7 @@ import {
   paymentPricingFor,
   salePaymentMethodToLegacyPaymentType,
 } from '@store-mgmt/domain';
-import type { SalePaymentMethod } from '@store-mgmt/domain';
+import type { SalePaymentMethod, Currency } from '@store-mgmt/domain';
 import type { CartItem } from '~/shared/lib/stores/cart-store';
 import { StorageKeys } from '~/shared/lib/storage/storage-keys';
 import { encryptEntity, decryptEntity } from '~/shared/lib/storage/entity-crypto';
@@ -34,6 +34,7 @@ import {
 import { hasInventoryModuleAvailable } from '~/shared/lib/auth/authorization-service';
 import { calculateOrderProfit } from '~/inventory/lib/profit-calculator';
 import { round2 } from '~/shared/lib/money';
+import { getWholesaleConfig } from '../wholesale';
 
 /**
  * TopProduct — view model for getTopProductsProfitInLastMonth/getTopProductsSaleQuantityInLastMonth.
@@ -54,6 +55,44 @@ export interface TopProduct {
 export interface ChartData {
   label: Date;
   value: number;
+}
+
+/**
+ * Per-line sale snapshot handed to `createOrder` (aligned by index with `cartItems`).
+ * `originalUnitPrice`/`originalCurrency` are the price before conversion; the
+ * `conversionRate*` fields carry the currency-per-USD rate used and its ChannelRate
+ * row provenance. Absent snapshot → original = converted, rate 1, no provenance.
+ */
+export interface OrderLineSnapshot {
+  originalUnitPrice: number;
+  originalCurrency: Currency;
+  conversionRate: number | null;
+  conversionRateId: string | null;
+  conversionRateEffectiveFrom: Date | null;
+}
+
+/** Sale-currency rate snapshot (`value` is currency-per-USD), shared by all lines. */
+export interface SaleCurrencyRateSnapshot {
+  value: number;
+  id: string | null;
+  effectiveFrom: Date | null;
+}
+
+/**
+ * Optional full-sale snapshot for `createOrder`. When omitted the order is still
+ * complete: each line defaults to original = converted / 1x1, the sale-currency rate
+ * defaults to 1, and the single synthesized payment carries identity rates.
+ */
+export interface OrderSnapshot {
+  /** Per-line snapshots, index-aligned with the `cartItems` argument. */
+  lineSnapshots?: readonly OrderLineSnapshot[];
+  saleCurrencyRate?: SaleCurrencyRateSnapshot | null;
+  /** Cash handed over by the client. */
+  tenderedAmount?: number;
+  /** Change handed back. */
+  change?: number;
+  /** Store the sale belongs to; defaults to the service's own store. */
+  storeId?: string;
 }
 
 function generateId(): string {
@@ -404,6 +443,7 @@ export class OrderOfflineService {
     client: string = '',
     salePaymentMethod?: SalePaymentMethod,
     payments?: OrderPayment[],
+    snapshot?: OrderSnapshot,
   ): Promise<BaseResponseModel<Order>> {
     const now = new Date();
     const orderId = generateId();
@@ -412,7 +452,7 @@ export class OrderOfflineService {
     const hasInventoryModule = user ? hasInventoryModuleAvailable(user) : false;
 
     // Build orderItems with FIFO inventory deduction if needed
-    const orderItems: OrderItem[] = cartItems.map((cartItem) => {
+    const orderItems: OrderItem[] = cartItems.map((cartItem, index) => {
       const { product, quantity } = cartItem;
       let productCosts: import('@store-mgmt/domain').InventoryEntryCost[] = [];
 
@@ -429,6 +469,35 @@ export class OrderOfflineService {
         });
       }
 
+      const convertedPrice = cartItem.price ?? product.price;
+      const convertedCurrency = product.currency ?? DEFAULT_CURRENCY;
+      const lineSnapshot = snapshot?.lineSnapshots?.[index];
+
+      // Wholesale tier snapshot, only for a Mayorista sale of a tier-configured product.
+      const wholesaleConfig =
+        type === OrderType.Mayorista ? getWholesaleConfig(product) : undefined;
+      let wholesaleFields: Partial<
+        Pick<
+          OrderItem,
+          | 'wholesalePackSize'
+          | 'wholesalePacks'
+          | 'wholesaleTierMinPacks'
+          | 'wholesaleTierUnitPrice'
+        >
+      > = {};
+      if (wholesaleConfig) {
+        const packs = quantity / wholesaleConfig.packSize;
+        const applicableTier = [...wholesaleConfig.tiers]
+          .filter((tier) => tier.minPacks <= packs)
+          .sort((a, b) => b.minPacks - a.minPacks)[0];
+        wholesaleFields = {
+          wholesalePackSize: wholesaleConfig.packSize,
+          wholesalePacks: packs,
+          wholesaleTierMinPacks: applicableTier?.minPacks ?? null,
+          wholesaleTierUnitPrice: applicableTier?.pricePerUnit ?? null,
+        };
+      }
+
       return {
         productId: product.id,
         productName: product.name,
@@ -436,7 +505,7 @@ export class OrderOfflineService {
         categoryName: product.categoryName,
         name: product.name,
         quantity,
-        price: cartItem.price ?? product.price,
+        price: convertedPrice,
         productBusinessId: product.businessId ?? '',
         productCosts,
         // Angular parity (order-offline.service.ts:377): stamps OrderItem.order from the
@@ -445,7 +514,16 @@ export class OrderOfflineService {
         // currency-in-costs-and-prices (plan 2026-09-16) + MultiMonedas: the sale price's
         // currency is the PRODUCT's own currency (the one-currency guard keeps every
         // cart line homogeneous, so item currency == cart currency).
-        currency: product.currency ?? DEFAULT_CURRENCY,
+        currency: convertedCurrency,
+        // sale snapshot (2026-10-06): original price/currency before conversion, the rate
+        // used and its ChannelRate provenance. Absent snapshot → original = converted,
+        // rate 1, no provenance.
+        originalPrice: lineSnapshot?.originalUnitPrice ?? convertedPrice,
+        originalCurrency: lineSnapshot?.originalCurrency ?? convertedCurrency,
+        conversionRate: lineSnapshot?.conversionRate ?? 1,
+        conversionRateId: lineSnapshot?.conversionRateId ?? null,
+        conversionRateEffectiveFrom: lineSnapshot?.conversionRateEffectiveFrom ?? null,
+        ...wholesaleFields,
       };
     });
 
@@ -478,6 +556,28 @@ export class OrderOfflineService {
     // the credit is what gets collected later, so it must carry the sale's final price.
     const orderTotal = hasMultiPayments ? total : applyPaymentPricing(total, pricing);
 
+    // sale snapshot (2026-10-06): every order carries a payment trail. With no
+    // non-empty list, the legacy single-payment path synthesizes ONE identity row
+    // (rate 1 on both sides, no provenance) for the full order total.
+    const resolvedPayments: OrderPayment[] = hasMultiPayments
+      ? payments!
+      : [
+          {
+            method: resolvedMethod.method,
+            currency: orderCurrency,
+            amount: orderTotal,
+            rateApplied: 1,
+            rateId: null,
+            rateMethod: null,
+            rateCurrency: null,
+            rateEffectiveFrom: null,
+            targetRateApplied: 1,
+            targetRateId: null,
+            targetRateEffectiveFrom: null,
+            amountInOrderCurrency: orderTotal,
+          },
+        ];
+
     const order: Order = {
       id: orderId,
       orderItems,
@@ -499,9 +599,18 @@ export class OrderOfflineService {
       // pricing audit fields match the unpriced total. Legacy path keeps them.
       percent: hasMultiPayments ? 0 : pricing.percent,
       tax: hasMultiPayments ? 0 : pricing.tax,
-      // MultiPayments (plan 2026-09-18): only persist a non-empty payment list, so
-      // legacy / single-payment sales keep a payment-less order shape.
-      ...(payments && payments.length > 0 ? { payments } : {}),
+      // sale snapshot (2026-10-06): identity/audit fields of the whole sale.
+      client: client || undefined,
+      storeId: snapshot?.storeId ?? this.storeId,
+      createdById: user?.id,
+      tenderedAmount: snapshot?.tenderedAmount,
+      change: snapshot?.change,
+      saleCurrencyRateApplied: snapshot?.saleCurrencyRate?.value ?? 1,
+      saleCurrencyRateId: snapshot?.saleCurrencyRate?.id ?? null,
+      saleCurrencyRateEffectiveFrom: snapshot?.saleCurrencyRate?.effectiveFrom ?? null,
+      // Every order persists a payment trail: the supplied non-empty list, or the
+      // single identity row synthesized above.
+      payments: resolvedPayments,
       createdDate: now,
       createdByName: getCurrentUserLogin(),
       updatedDate: undefined,
@@ -752,24 +861,39 @@ export class OrderOfflineService {
    * `isCredit=false`/`paymentType=Efectivo` for legacy orders missing those fields
    * (falsy-check semantics, mirroring Angular's `!order.isCredit`/`!order.paymentType`, not
    * an is-undefined check).
+   *
+   * sale snapshot (2026-10-06): also revives the new date fields and backfills the snapshot
+   * defaults (`originalPrice=price`, `originalCurrency=currency`, `conversionRate=1`,
+   * `saleCurrencyRateApplied=1`, no provenance). The healed orders are written back
+   * ("se salvan así mismo") so a legacy order is repaired once, on disk.
    */
   private getOrdersFromLocalStorage(): Order[] {
     // design D4: an unreadable store propagates and is never written over. The
     // auto-init below survives only for its honest case — no stored value at
     // all, i.e. a genuinely new store.
+    let changed = false;
     const stored = readEntityOrThrow(this.getStorageKey(), (json) =>
       json
-        ? (JSON.parse(json) as Order[]).map((order) => this.reviveAndBackfillOrder(order))
+        ? (JSON.parse(json) as Order[]).map((order) => {
+            const revived = this.reviveAndBackfillOrder(order);
+            if (revived.changed) changed = true;
+            return revived.order;
+          })
         : null,
     );
-    if (stored) return stored;
+    if (stored) {
+      // sale snapshot (2026-10-06): persist the backfilled defaults once.
+      if (changed) this.setOrdersLocalStorage(stored);
+      return stored;
+    }
 
     this.setOrdersLocalStorage([], true);
     return [];
   }
 
-  private reviveAndBackfillOrder(order: Order): Order {
+  private reviveAndBackfillOrder(order: Order): { order: Order; changed: boolean } {
     const revived = { ...order } as Record<string, unknown>;
+    let changed = false;
     if (typeof revived.date === 'string') revived.date = new Date(revived.date);
     if (!revived.isCredit) revived.isCredit = false;
     if (!revived.paymentType) revived.paymentType = PaymentType.Efectivo;
@@ -785,18 +909,58 @@ export class OrderOfflineService {
     }
     if (revived.percent === undefined || revived.percent === null) revived.percent = 0;
     if (revived.tax === undefined || revived.tax === null) revived.tax = 0;
+
+    // sale snapshot (2026-10-06): revive the sale-currency rate moment and backfill the
+    // 1x1 identity default when the order predates the snapshot.
+    if (typeof revived.saleCurrencyRateEffectiveFrom === 'string') {
+      revived.saleCurrencyRateEffectiveFrom = new Date(revived.saleCurrencyRateEffectiveFrom);
+    }
+    if (revived.saleCurrencyRateApplied === undefined || revived.saleCurrencyRateApplied === null) {
+      revived.saleCurrencyRateApplied = 1;
+      changed = true;
+    }
+
+    // sale snapshot (2026-10-06): per item, revive the conversion-rate moment and
+    // backfill original = converted / rate 1 (no ids or dates, per spec §4.4).
+    if (Array.isArray(revived.orderItems)) {
+      revived.orderItems = (revived.orderItems as OrderItem[]).map((item) => {
+        const revivedItem = { ...item } as Record<string, unknown>;
+        if (typeof revivedItem.conversionRateEffectiveFrom === 'string') {
+          revivedItem.conversionRateEffectiveFrom = new Date(
+            revivedItem.conversionRateEffectiveFrom,
+          );
+        }
+        if (revivedItem.originalPrice === undefined || revivedItem.originalPrice === null) {
+          revivedItem.originalPrice = revivedItem.price;
+          changed = true;
+        }
+        if (revivedItem.originalCurrency === undefined || revivedItem.originalCurrency === null) {
+          revivedItem.originalCurrency = revivedItem.currency ?? DEFAULT_CURRENCY;
+          changed = true;
+        }
+        if (revivedItem.conversionRate === undefined || revivedItem.conversionRate === null) {
+          revivedItem.conversionRate = 1;
+          changed = true;
+        }
+        return revivedItem;
+      });
+    }
+
     // MultiPayments (plan 2026-09-18): legacy orders have no `payments` — leave it
-    // absent (no required backfill). When present, revive the frozen rate moment so a
-    // JSON round-trip keeps `rateEffectiveFrom` a Date instead of a raw string.
+    // absent (no required backfill). When present, revive the frozen rate moments (source
+    // and target, sale snapshot 2026-10-06) so a JSON round-trip keeps them Dates.
     if (Array.isArray(revived.payments)) {
       revived.payments = (revived.payments as OrderPayment[]).map((payment) => {
         const revivedPayment = { ...payment } as Record<string, unknown>;
         if (typeof revivedPayment.rateEffectiveFrom === 'string') {
           revivedPayment.rateEffectiveFrom = new Date(revivedPayment.rateEffectiveFrom);
         }
+        if (typeof revivedPayment.targetRateEffectiveFrom === 'string') {
+          revivedPayment.targetRateEffectiveFrom = new Date(revivedPayment.targetRateEffectiveFrom);
+        }
         return revivedPayment;
       });
     }
-    return revived as unknown as Order;
+    return { order: revived as unknown as Order, changed };
   }
 }

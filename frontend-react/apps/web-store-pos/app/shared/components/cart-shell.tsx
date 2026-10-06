@@ -593,6 +593,15 @@ export function CartShell() {
         clientName.trim(),
         effectiveSalePaymentMethod,
         hasMultiPayments ? multiPaymentSettlement.orderPayments : undefined,
+        // sale snapshot (2026-10-06): the converted lines carry the original price/rate,
+        // the sale-currency rate is shared, and the cash/change/store close the trail.
+        {
+          lineSnapshots: lineConversion.lines,
+          saleCurrencyRate: lineConversion.saleCurrencyRate,
+          tenderedAmount: payment,
+          change: paymentReturn,
+          storeId,
+        },
       );
       if (!result.succeeded) {
         // Angular createOrder `else` branch (nav-right.component.ts:222-225):

@@ -18,5 +18,13 @@ export interface OrderPayment {
   rateMethod?: SalePaymentMethod | null;
   rateCurrency?: Currency | null;
   rateEffectiveFrom?: Date | null;
+  // Id of the source rate row (complements the frozen source-rate provenance above).
+  rateId?: string | null;
+  // Target (order-currency) rate; `1` when no conversion happened.
+  targetRateApplied?: number | null;
+  // Id of the target rate row.
+  targetRateId?: string | null;
+  // Moment from which the target rate was in force.
+  targetRateEffectiveFrom?: Date | null;
   amountInOrderCurrency: number; // frozen conversion into the order currency
 }

@@ -189,7 +189,7 @@ describe('MessageShell — panel conversation', () => {
     await waitFor(() => expect(screen.getByText('Mío')).toBeInTheDocument());
     expect(screen.getByTestId('message-m1')).toHaveAttribute('data-mine', 'true');
     expect(screen.getByTestId('message-m2')).toHaveAttribute('data-mine', 'false');
-    expect(getMessagesMock).toHaveBeenCalledWith('c1');
+    expect(getMessagesMock).toHaveBeenCalledWith('c1', { background: true });
   });
 
   it('marks unread incoming messages as read (never the user own unread ones)', async () => {
@@ -208,8 +208,8 @@ describe('MessageShell — panel conversation', () => {
     await waitFor(() => expect(getConversationsMock).toHaveBeenCalled());
     openPanel();
 
-    await waitFor(() => expect(markAsReadMock).toHaveBeenCalledWith('theirs'));
-    expect(markAsReadMock).not.toHaveBeenCalledWith('mine');
+    await waitFor(() => expect(markAsReadMock).toHaveBeenCalledWith('theirs', { background: true }));
+    expect(markAsReadMock).not.toHaveBeenCalledWith('mine', { background: true });
   });
 });
 
@@ -235,12 +235,15 @@ describe('MessageShell — send', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Enviar' }));
 
     await waitFor(() =>
-      expect(sendMessageMock).toHaveBeenCalledWith({
-        conversationId: 'c1',
-        ownerId: 'u1',
-        storeId: 's1',
-        content: 'Hola SA',
-      }),
+      expect(sendMessageMock).toHaveBeenCalledWith(
+        {
+          conversationId: 'c1',
+          ownerId: 'u1',
+          storeId: 's1',
+          content: 'Hola SA',
+        },
+        { background: true },
+      ),
     );
     await waitFor(() => expect(input).toHaveValue(''));
   });
@@ -259,12 +262,15 @@ describe('MessageShell — send', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Enviar' }));
 
     await waitFor(() =>
-      expect(sendMessageMock).toHaveBeenCalledWith({
-        conversationId: NEW_CONVERSATION_ID,
-        ownerId: 'u1',
-        storeId: 's1',
-        content: 'Primer mensaje',
-      }),
+      expect(sendMessageMock).toHaveBeenCalledWith(
+        {
+          conversationId: NEW_CONVERSATION_ID,
+          ownerId: 'u1',
+          storeId: 's1',
+          content: 'Primer mensaje',
+        },
+        { background: true },
+      ),
     );
   });
 });
@@ -275,17 +281,37 @@ describe('MessageShell — errors', () => {
     mockUser = { id: 'u1', selectedStoreId: 's1', isSuperAdmin: false, isOwnerAdmin: true };
   });
 
-  it('shows an i18n error toast and never the raw error message', async () => {
+  it('does not toast on a load error and never renders the raw error message', async () => {
     getConversationsMock.mockRejectedValue(new Error('raw boom, do not leak me'));
 
     renderShell();
 
-    await waitFor(() =>
-      expect(showToastErrorMock).toHaveBeenCalledWith(
-        'No se pudieron cargar los mensajes. Intente de nuevo.',
-      ),
-    );
+    await waitFor(() => expect(getConversationsMock).toHaveBeenCalled());
+    // Let the rejected promise settle before asserting the silent failure.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(showToastErrorMock).not.toHaveBeenCalled();
     expect(screen.queryByText(/raw boom/)).not.toBeInTheDocument();
+  });
+});
+
+describe('MessageShell — composer', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUser = { id: 'u1', selectedStoreId: 's1', isSuperAdmin: false, isOwnerAdmin: true };
+    getConversationsMock.mockResolvedValue(success([]));
+    getMessagesMock.mockResolvedValue(success([]));
+  });
+
+  // T3 — the composer is an auto-growing textarea, two rows minimum, so a long
+  // message is always readable instead of scrolling a single line.
+  it('renders the composer as a TEXTAREA with two rows', async () => {
+    renderShell();
+    await waitFor(() => expect(getConversationsMock).toHaveBeenCalled());
+    openPanel();
+
+    const composer = await screen.findByLabelText('Escriba un mensaje');
+    expect(composer.tagName).toBe('TEXTAREA');
+    expect(composer).toHaveAttribute('rows', '2');
   });
 });
 
