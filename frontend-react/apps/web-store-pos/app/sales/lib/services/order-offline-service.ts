@@ -12,7 +12,7 @@ import {
   paymentPricingFor,
   salePaymentMethodToLegacyPaymentType,
 } from '@store-mgmt/domain';
-import type { SalePaymentMethod } from '@store-mgmt/domain';
+import type { SalePaymentMethod, Currency } from '@store-mgmt/domain';
 import type { CartItem } from '~/shared/lib/stores/cart-store';
 import { StorageKeys } from '~/shared/lib/storage/storage-keys';
 import { encryptEntity, decryptEntity } from '~/shared/lib/storage/entity-crypto';
@@ -30,6 +30,7 @@ import { bumpDataRevision } from '~/shared/lib/stores/data-revision-store';
 import { hasInventoryModuleAvailable } from '~/shared/lib/auth/authorization-service';
 import { calculateOrderProfit } from '~/inventory/lib/profit-calculator';
 import { round2 } from '~/shared/lib/money';
+import { getWholesaleConfig } from '../wholesale';
 
 /**
  * TopProduct — view model for getTopProductsProfitInLastMonth/getTopProductsSaleQuantityInLastMonth.
@@ -50,6 +51,44 @@ export interface TopProduct {
 export interface ChartData {
   label: Date;
   value: number;
+}
+
+/**
+ * Per-line sale snapshot handed to `createOrder` (aligned by index with `cartItems`).
+ * `originalUnitPrice`/`originalCurrency` are the price before conversion; the
+ * `conversionRate*` fields carry the currency-per-USD rate used and its ChannelRate
+ * row provenance. Absent snapshot → original = converted, rate 1, no provenance.
+ */
+export interface OrderLineSnapshot {
+  originalUnitPrice: number;
+  originalCurrency: Currency;
+  conversionRate: number | null;
+  conversionRateId: string | null;
+  conversionRateEffectiveFrom: Date | null;
+}
+
+/** Sale-currency rate snapshot (`value` is currency-per-USD), shared by all lines. */
+export interface SaleCurrencyRateSnapshot {
+  value: number;
+  id: string | null;
+  effectiveFrom: Date | null;
+}
+
+/**
+ * Optional full-sale snapshot for `createOrder`. When omitted the order is still
+ * complete: each line defaults to original = converted / 1x1, the sale-currency rate
+ * defaults to 1, and the single synthesized payment carries identity rates.
+ */
+export interface OrderSnapshot {
+  /** Per-line snapshots, index-aligned with the `cartItems` argument. */
+  lineSnapshots?: readonly OrderLineSnapshot[];
+  saleCurrencyRate?: SaleCurrencyRateSnapshot | null;
+  /** Cash handed over by the client. */
+  tenderedAmount?: number;
+  /** Change handed back. */
+  change?: number;
+  /** Store the sale belongs to; defaults to the service's own store. */
+  storeId?: string;
 }
 
 function generateId(): string {
@@ -386,6 +425,7 @@ export class OrderOfflineService {
     client: string = '',
     salePaymentMethod?: SalePaymentMethod,
     payments?: OrderPayment[],
+    snapshot?: OrderSnapshot,
   ): Promise<BaseResponseModel<Order>> {
     const now = new Date();
     const orderId = generateId();
@@ -394,7 +434,7 @@ export class OrderOfflineService {
     const hasInventoryModule = user ? hasInventoryModuleAvailable(user) : false;
 
     // Build orderItems with FIFO inventory deduction if needed
-    const orderItems: OrderItem[] = cartItems.map((cartItem) => {
+    const orderItems: OrderItem[] = cartItems.map((cartItem, index) => {
       const { product, quantity } = cartItem;
       let productCosts: import('@store-mgmt/domain').InventoryEntryCost[] = [];
 
@@ -411,6 +451,35 @@ export class OrderOfflineService {
         });
       }
 
+      const convertedPrice = cartItem.price ?? product.price;
+      const convertedCurrency = product.currency ?? DEFAULT_CURRENCY;
+      const lineSnapshot = snapshot?.lineSnapshots?.[index];
+
+      // Wholesale tier snapshot, only for a Mayorista sale of a tier-configured product.
+      const wholesaleConfig =
+        type === OrderType.Mayorista ? getWholesaleConfig(product) : undefined;
+      let wholesaleFields: Partial<
+        Pick<
+          OrderItem,
+          | 'wholesalePackSize'
+          | 'wholesalePacks'
+          | 'wholesaleTierMinPacks'
+          | 'wholesaleTierUnitPrice'
+        >
+      > = {};
+      if (wholesaleConfig) {
+        const packs = quantity / wholesaleConfig.packSize;
+        const applicableTier = [...wholesaleConfig.tiers]
+          .filter((tier) => tier.minPacks <= packs)
+          .sort((a, b) => b.minPacks - a.minPacks)[0];
+        wholesaleFields = {
+          wholesalePackSize: wholesaleConfig.packSize,
+          wholesalePacks: packs,
+          wholesaleTierMinPacks: applicableTier?.minPacks ?? null,
+          wholesaleTierUnitPrice: applicableTier?.pricePerUnit ?? null,
+        };
+      }
+
       return {
         productId: product.id,
         productName: product.name,
@@ -418,7 +487,7 @@ export class OrderOfflineService {
         categoryName: product.categoryName,
         name: product.name,
         quantity,
-        price: cartItem.price ?? product.price,
+        price: convertedPrice,
         productBusinessId: product.businessId ?? '',
         productCosts,
         // Angular parity (order-offline.service.ts:377): stamps OrderItem.order from the
@@ -427,7 +496,16 @@ export class OrderOfflineService {
         // currency-in-costs-and-prices (plan 2026-09-16) + MultiMonedas: the sale price's
         // currency is the PRODUCT's own currency (the one-currency guard keeps every
         // cart line homogeneous, so item currency == cart currency).
-        currency: product.currency ?? DEFAULT_CURRENCY,
+        currency: convertedCurrency,
+        // sale snapshot (2026-10-06): original price/currency before conversion, the rate
+        // used and its ChannelRate provenance. Absent snapshot → original = converted,
+        // rate 1, no provenance.
+        originalPrice: lineSnapshot?.originalUnitPrice ?? convertedPrice,
+        originalCurrency: lineSnapshot?.originalCurrency ?? convertedCurrency,
+        conversionRate: lineSnapshot?.conversionRate ?? 1,
+        conversionRateId: lineSnapshot?.conversionRateId ?? null,
+        conversionRateEffectiveFrom: lineSnapshot?.conversionRateEffectiveFrom ?? null,
+        ...wholesaleFields,
       };
     });
 
@@ -460,6 +538,28 @@ export class OrderOfflineService {
     // the credit is what gets collected later, so it must carry the sale's final price.
     const orderTotal = hasMultiPayments ? total : applyPaymentPricing(total, pricing);
 
+    // sale snapshot (2026-10-06): every order carries a payment trail. With no
+    // non-empty list, the legacy single-payment path synthesizes ONE identity row
+    // (rate 1 on both sides, no provenance) for the full order total.
+    const resolvedPayments: OrderPayment[] = hasMultiPayments
+      ? payments!
+      : [
+          {
+            method: resolvedMethod.method,
+            currency: orderCurrency,
+            amount: orderTotal,
+            rateApplied: 1,
+            rateId: null,
+            rateMethod: null,
+            rateCurrency: null,
+            rateEffectiveFrom: null,
+            targetRateApplied: 1,
+            targetRateId: null,
+            targetRateEffectiveFrom: null,
+            amountInOrderCurrency: orderTotal,
+          },
+        ];
+
     const order: Order = {
       id: orderId,
       orderItems,
@@ -481,9 +581,18 @@ export class OrderOfflineService {
       // pricing audit fields match the unpriced total. Legacy path keeps them.
       percent: hasMultiPayments ? 0 : pricing.percent,
       tax: hasMultiPayments ? 0 : pricing.tax,
-      // MultiPayments (plan 2026-09-18): only persist a non-empty payment list, so
-      // legacy / single-payment sales keep a payment-less order shape.
-      ...(payments && payments.length > 0 ? { payments } : {}),
+      // sale snapshot (2026-10-06): identity/audit fields of the whole sale.
+      client: client || undefined,
+      storeId: snapshot?.storeId ?? this.storeId,
+      createdById: user?.id,
+      tenderedAmount: snapshot?.tenderedAmount,
+      change: snapshot?.change,
+      saleCurrencyRateApplied: snapshot?.saleCurrencyRate?.value ?? 1,
+      saleCurrencyRateId: snapshot?.saleCurrencyRate?.id ?? null,
+      saleCurrencyRateEffectiveFrom: snapshot?.saleCurrencyRate?.effectiveFrom ?? null,
+      // Every order persists a payment trail: the supplied non-empty list, or the
+      // single identity row synthesized above.
+      payments: resolvedPayments,
       createdDate: now,
       createdByName: getCurrentUserLogin(),
       updatedDate: undefined,

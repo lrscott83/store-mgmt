@@ -1918,7 +1918,25 @@ describe('OrderOfflineService', () => {
       );
 
       expect(withPayments.payments).toEqual(payments);
-      expect(withoutPayments.payments).toBeUndefined();
+      // Contract changed 2026-10-06 (user-mandated): a sale with NO payments list is
+      // no longer payment-less — it persists exactly ONE synthesized identity row for
+      // the full order total (rate 1 on both sides, no provenance).
+      expect(withoutPayments.payments).toEqual([
+        {
+          method: SalePaymentMethod.Efectivo,
+          currency: Currency.CUP,
+          amount: 10,
+          rateApplied: 1,
+          rateId: null,
+          rateMethod: null,
+          rateCurrency: null,
+          rateEffectiveFrom: null,
+          targetRateApplied: 1,
+          targetRateId: null,
+          targetRateEffectiveFrom: null,
+          amountInOrderCurrency: 10,
+        },
+      ]);
 
       // Decision A: the persisted amounts are in the order currency's UNITS, so the
       // payments' `amountInOrderCurrency` sum matches `Order.total` in that same unit.
@@ -1950,7 +1968,10 @@ describe('OrderOfflineService', () => {
       expect(stored.find((o) => o.id === withPayments.id)?.payments).toEqual(payments);
       const storedWithout = stored.find((o) => o.id === withoutPayments.id);
       expect(storedWithout).toBeDefined();
-      expect(storedWithout).not.toHaveProperty('payments');
+      // Contract changed 2026-10-06 (user-mandated): the synthesized payout row is
+      // persisted on disk too — the stored order has a `payments` array of length 1.
+      expect(storedWithout?.payments).toEqual(withoutPayments.payments);
+      expect(storedWithout?.payments).toHaveLength(1);
     });
 
     it('reads a legacy order without payments without error (no required backfill)', () => {
