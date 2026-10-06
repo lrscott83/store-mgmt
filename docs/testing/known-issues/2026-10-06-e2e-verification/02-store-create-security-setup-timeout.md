@@ -87,7 +87,7 @@ medirse, asi que el paso 2 (endurecer el fixture con una marca de sesion real) s
 sin autorizacion**.
 
 Evidencia de la corrida aislada en
-[`../funcionan-en-solitario/README.md`](../funcionan-en-solitario/README.md).
+[`funcionan-en-solitario.md`](funcionan-en-solitario.md).
 
 **Estado final actualizado (2026-10-06):** 🟡 inestable documentado — clasificacion de carga
 confirmada por corrida aislada, mecanismo sin cerrar.

@@ -94,7 +94,7 @@ queda sostenida por evidencia** (antes era tentativa); el mecanismo fino —si e
 bootstrap de sesion o del montaje de la ruta— sigue sin medirse, y por eso el estado no cambia.
 
 Evidencia de la corrida aislada en
-[`../funcionan-en-solitario/README.md`](../funcionan-en-solitario/README.md).
+[`funcionan-en-solitario.md`](funcionan-en-solitario.md).
 
 **Estado final actualizado (2026-10-06):** 🟡 inestable documentado — clasificacion de carga
 confirmada por corrida aislada, mecanismo sin cerrar.

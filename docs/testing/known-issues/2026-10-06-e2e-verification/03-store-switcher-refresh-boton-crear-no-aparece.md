@@ -67,7 +67,8 @@ Lo que la evidencia permite afirmar:
 **Tercera aparicion de un modo conocido — nunca antes diagnosticado.**
 
 - `2026-09-29` — el mismo sintoma exacto ("el boton de crear tienda nunca aparece, timeout 120 s")
-  quedo como fallo 6 de la carpeta [`../qa-merge-2026-09-29/`](../qa-merge-2026-09-29/README.md) y
+  quedo como fallo 6 de la corrida del merge de qa (registro en
+  [`README.md`](README.md#registro-de-fichas-retiradas)) y
   se cerro como **"no se reproduce"** (2/2 verdes el 2026-10-04, sin causa raiz investigada).
 - `2026-09-25` — en la serie de estabilidad de 7 corridas, SWR-1 fue el **unico flaky** de la
   corrida 7 (etiquetado entonces como "esporadico, segunda aparicion, absorbido por el reintento").
@@ -119,10 +120,10 @@ Log: `/tmp/iso-store-switcher-refresh.log`.
   la asercion de la marca "Actual" del popup, que choca con el aviso de exito del guardado («Tienda
   **actual**izada correctamente.») por un locator de substring. Es un defecto propio del test, y
   **no** de carga: por eso SWR-2 no entra a la lista de "pasa en solitario".
-  **Ficha nueva:** [`../2026-10-06-e2e-verification/01-store-switcher-refresh-swr2-locator-actual.md`](../2026-10-06-e2e-verification/01-store-switcher-refresh-swr2-locator-actual.md).
+  **Ficha nueva:** [`04-store-switcher-refresh-swr2-locator-actual.md`](04-store-switcher-refresh-swr2-locator-actual.md).
 
 Evidencia de la corrida aislada en
-[`../funcionan-en-solitario/README.md`](../funcionan-en-solitario/README.md).
+[`funcionan-en-solitario.md`](funcionan-en-solitario.md).
 
 **Estado final actualizado (2026-10-06):** 🟡 inestable documentado — SWR-1 pasa en solitario en las
 dos corridas (clasificacion de carga sostenida); el unico fallo del archivo es de SWR-2, intermitente y

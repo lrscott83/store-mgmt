@@ -1,4 +1,4 @@
-# 1. store-switcher-refresh.spec.ts:196 — SWR-2 cae de forma intermitente por un locator que también casa con su propio aviso de éxito
+# 4. store-switcher-refresh.spec.ts:196 — SWR-2 cae de forma intermitente por un locator que también casa con su propio aviso de éxito
 
 **Qué prueba el test.**
 `store-switcher-refresh.spec.ts:196:5` — "SWR-2 — a store deactivated this session disappears from

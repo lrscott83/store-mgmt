@@ -9,13 +9,13 @@ la causa raíz, la evidencia y lo que ya se intentó.
 | Elemento | Qué es |
 |---|---|
 | [`../known-issues.md`](../known-issues.md) | **Índice maestro.** Cada corrida con su veredicto, el contrato detallado de una ficha y las decisiones pendientes |
-| `2026-10-06-e2e-verification/` | Verificación **dirigida** del 2026-10-06 (nunca la suite completa): cerró las dos fichas del merge de qa, confirmó las causas documentadas y abrió una ficha nueva (SWR-2) |
-| `2026-10-05-e2e-verification/` | Corrida completa del 2026-10-05: 351 aprobados, **0 fallidos**, 3 inestables documentados |
-| `2026-10-03-e2e-verification/` | Corrida completa del 2026-10-03 (9 fallos); sus fichas se retiraron al cerrarse, queda el registro en su README |
-| `2026-10-01-e2e-verification/` | Corrida del 2026-10-01 (backend + frontend); sus 6 fichas se retiraron al quedar verdes, queda el registro en su README |
-| `qa-merge-2026-09-29/` | Fallos traídos por el merge de qa. **Sin fichas vivas**: las dos últimas (5 y 7) se cerraron y retiraron el 2026-10-06 |
-| `funcionan-en-solitario/` | **Inventario** de los specs que la suite marca inestables y que pasan cuando se corren solos, con la medición y el comando exacto |
-| `group-g/` | Flaky recurrentes de la serie de estabilidad del 2026-09-25 (cerrado) |
+| [`2026-10-06-e2e-verification/`](2026-10-06-e2e-verification/README.md) | **La única carpeta de fichas.** Las 4 fichas vivas y el inventario de tests que pasan en solitario. Su README es además el **Registro de fichas retiradas** |
+
+Desde el 2026-10-06 **no hay una carpeta por corrida**: las que quedaron sin ninguna ficha de test
+(`2026-10-01-e2e-verification/`, `2026-10-03-e2e-verification/`, `group-g/`, `qa-merge-2026-09-29/`,
+`2026-10-05-e2e-verification/` y `funcionan-en-solitario/`) se retiraron. Su texto completo sigue en
+el historial de git y el resumen de lo que cerraron está en el
+[Registro de fichas retiradas](2026-10-06-e2e-verification/README.md#registro-de-fichas-retiradas).
 
 ## Regla de la carpeta (obligatoria en cada corrida)
 
@@ -23,9 +23,11 @@ la causa raíz, la evidencia y lo que ya se intentó.
    fichas, para no re-diagnosticar lo ya sabido.
 2. **Después de correr**:
    - Si un test falla o queda inestable (falla en su primer intento), **crear o actualizar su ficha**
-     en la carpeta de esa corrida (`AAAA-MM-DD-e2e-verification/`), con el contrato de abajo.
-   - Si un test que tenía ficha **ya no falla**, **retirar la ficha** y dejar el registro de cierre
-     (fecha, commit, verificación) en el README de esa corrida.
+     en la carpeta única de fichas, con el contrato de abajo.
+   - Si un test que tenía ficha **ya no falla**, **retirar la ficha** y pasar su resumen (qué era,
+     causa raíz, commit y verificación) al *Registro de fichas retiradas* del README de esa carpeta.
+   - Si la verificación abre una fecha nueva, la carpeta se renombra a esa fecha: sigue habiendo
+     **una sola** carpeta de fichas.
    - Actualizar el índice maestro: veredicto de la corrida, estado de cada fallo y qué fichas quedan
      vivas.
    - Una corrida **en verde no cierra las fichas por sí sola**: cierra lo que efectivamente ejecutó

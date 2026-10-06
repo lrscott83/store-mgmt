@@ -1,6 +1,6 @@
 # Tests E2E que pasan en solitario
 
-**Qué es esta carpeta.** El inventario de los specs que la suite completa marca como inestables —o
+**Qué es este documento.** El inventario de los specs que la suite completa marca como inestables —o
 que una ficha previa dio por "solo carga de la suite"— y que **pasan cuando se corren solos**. Existe
 para que la próxima vez que uno de ellos caiga en una corrida completa no se confunda carga con
 defecto: acá está la medición que dice "este test funciona; lo que no funciona es correrlo junto con
@@ -45,12 +45,12 @@ pasada del archivo del switcher, 2 aprobados más. Los logs de cada corrida qued
 - **`precache-split`** pasa, pero sólo porque corre con **su propio config** (`playwright.pwa.config.ts`,
   `vite preview` del build real). No era un test lento: corría en un config que bloquea los service
   workers. Su ficha se retiró el 2026-10-06; el cierre está en
-  [`../qa-merge-2026-09-29/README.md`](../qa-merge-2026-09-29/README.md).
+  [`README.md`](README.md).
 - **`store-switcher-refresh` SWR-2** cayó **en solitario** en la primera corrida del 2026-10-06 y pasó
   en la segunda: es un defecto propio del test (un locator que también casa con su propio aviso de
   éxito), intermitente, que no tiene nada que ver con la carga. Que un spec esté en esta lista no
   significa que **todos** sus tests sean de carga. Ficha:
-  [`../2026-10-06-e2e-verification/01-store-switcher-refresh-swr2-locator-actual.md`](../2026-10-06-e2e-verification/01-store-switcher-refresh-swr2-locator-actual.md).
+  [`04-store-switcher-refresh-swr2-locator-actual.md`](04-store-switcher-refresh-swr2-locator-actual.md).
 
 ## Cómo se mantiene esta lista
 
