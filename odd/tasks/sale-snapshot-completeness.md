@@ -228,5 +228,28 @@ no encontró ninguna aserción sobre la forma cambiada: `originalPrice`, `conver
 
 ## 9. Siguiente paso
 
-Implementación completa y verificada. Pendiente: revisión nativa RDD del candidato
-(`54007a17..HEAD`). Sin push y sin PR — decisión del usuario.
+Implementación completa y verificada. Revisión nativa RDD **aprobada** (§10). Sin push y sin PR —
+decisión del usuario.
+
+## 10. Revisión nativa (RDD)
+
+- **Candidato**: `54007a17..HEAD`, base-diff sobre `f7551cc7d5c5fe7b7f2d3d8d3f7248085abe1f17`.
+- **Riesgo**: `medium` (`executable_change`). Lente seleccionado: `review-reliability`.
+- **Lineage**: `review-0ad703bb5a59aea3`.
+- **Resultado**: **aprobado**. `review/acknowledge-approved` → `action: acknowledged`,
+  `authority: burned`, `consumed_revision: sha256:c06545e34263c464125f00c667789e7e011198d4b8ac49647a18cb9db4e44f3f`.
+- **Incidente**: el relay del transporte rechazó dos veces con `opencode_review_transport_relay_refused`
+  y luego funcionó sin cambios en el candidato. El árbol no cambió entre reintentos.
+
+### Hallazgos de la revisión (todos NO bloqueantes — trabajo posterior, no corrigen este cambio)
+
+| ID | Severidad | Ubicación | Qué dice |
+|---|---|---|---|
+| `R3-WHOLESALE-PACKS` | WARNING | `order-offline-service.ts:471` | `packs = quantity / packSize` sin guarda: una cantidad no divisible deja `wholesalePacks` fraccionario, y `packSize` 0 produce `Infinity`/`NaN` que serializan a `null`. El único test usa un múltiplo exacto. |
+| `R3-READ-WRITE-BACK` | WARNING | `order-offline-service.ts:845` | La lectura ahora escribe (persiste el backfill); si esa escritura falla (cuota, clave), una lectura que antes funcionaba ahora falla sin fallback. No hay test de ese camino. |
+| `R3-BACKFILL-IDEMPOTENCE` | SUGGESTION | `order-offline-service.backfill.test.ts:148` | Falta un test que pruebe que una segunda lectura de un store ya sanado no vuelve a escribir. |
+| `R3-E2E-NOT-RUN` | SUGGESTION | `odd/tasks/sale-snapshot-completeness.md:200` | El contrato persistido cambió y no se ejecutó ningún E2E; la conclusión "ningún E2E afectado" se apoya en grep manual. |
+| `R3-HEALED-MIRROR` | SUGGESTION | `order-offline-service.test.ts:197` | Los tests actualizados comparan contra una forma sanada reimplementada localmente, que espeja la regla de producción. |
+
+> La propia revisión declara que estos hallazgos son informativos: ninguno abrió una corrección, ninguno
+> reabre la revisión, y **no** hay que re-ejecutar la revisión sobre este candidato por ellos.
