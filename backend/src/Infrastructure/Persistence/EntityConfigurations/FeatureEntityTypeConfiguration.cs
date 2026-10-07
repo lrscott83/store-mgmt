@@ -440,6 +440,19 @@ namespace Infrastructure.Persistence.EntityConfigurations
                      250,
                      true,
                      true
+                 ),
+
+                // Pedidos online (pedidos-whatsapp-persistencia, F2). Segunda feature del módulo 18:
+                // WebCatalog publica el catálogo, esta gestiona los pedidos que llegan desde él.
+                // AvailableToStore=true (la consumen tiendas), Order 251 = siguiente hueco tras 250.
+                Feature.Create(
+                     (int)FeatureType.OnlineOrders,
+                     FeatureType.OnlineOrders.GetDescription(),
+                     "Funcionalidad para gestionar los pedidos online de la tienda",
+                     (int)ModuleType.WebCatalog,
+                     251,
+                     true,
+                     true
                  )
             );
         }
