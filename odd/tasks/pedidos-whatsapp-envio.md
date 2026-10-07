@@ -121,14 +121,13 @@ Estado del pedido: <link consulta si aplica>
 
 ## Tareas
 
-- [ ] **T1** — Helper `buildWhatsAppOrderLink` (normalización de número + texto resumen).
-- [ ] **T2** — Decidir y fijar de dónde sale el número (config público vs. respuesta de pedido) —
-  **pendiente de confirmar**; por defecto no en el config público.
-- [ ] **T3** — Integrar apertura del enlace tras el `POST` exitoso.
-- [ ] **T4** — Estado "bloqueado" cuando no hay número.
-- [ ] **T5** — Claves i18n del resumen y del bloqueo.
-- [ ] **T6** — Tests unitarios del enlace (número con `+`, espacios, sin número) y del texto.
-- [ ] **T7** — Verificación (`typecheck`/`lint`/`vitest`).
+- [x] **T1** — Helper `buildWhatsAppOrderLink` (normalización de número + texto resumen).
+- [x] **T2** — Origen del número **decidido**: viaja en la **respuesta de creación del pedido** (`OnlineOrderCreatedDto.WhatsappNumber?`), **no** en el config público (privacidad).
+- [x] **T3** — Integrar apertura del enlace tras el `POST` exitoso (`window.open` + enlace visible de respaldo).
+- [x] **T4** — Estado "bloqueado" cuando no hay número.
+- [x] **T5** — Claves i18n del resumen y del bloqueo.
+- [x] **T6** — Tests unitarios del enlace (número con `+`, espacios, sin número) y del texto.
+- [x] **T7** — Verificación (`typecheck`/`lint`/`vitest`).
 
 ## Criterios de aceptación
 
@@ -154,13 +153,52 @@ pnpm vitest run app/catalog/
 - **Pedido sin WhatsApp**: el pedido existe igualmente; la tienda lo ve en el panel (F5).
 - **Exposición del número**: decidir si se publica en el config público (ver F1); por defecto no.
 
+## Decisiones resueltas durante la implementación (2026-10-07)
+
+| # | Punto | Decisión | Motivo |
+| --- | --- | --- | --- |
+| I1 | Origen del número (T2) | En la **respuesta de creación del pedido** (`OnlineOrderCreatedDto.WhatsappNumber?`), no en el config público | Privacidad: el número no queda scrapeable; solo lo ve quien creó un pedido. |
+| I2 | Normalización | Solo dígitos (`\D` fuera) | `wa.me` exige dígitos con código de país; un `+`/espacio abre un chat inexistente. |
+| I3 | Sin número | `null` → estado **bloqueado** (no se abre) | El pedido ya está persistido; no se promete un canal inexistente. |
+| I4 | NBSP | El texto reemplaza el NBSP del formatter por espacio normal | El NBSP invisible rompe la búsqueda/copia del mensaje. |
+
+## Evidencia de verificación (2026-10-07)
+
+| Comando | Resultado |
+| --- | --- |
+| `dotnet build` | 0 errores |
+| `dotnet test Application.Tests` | **832 passed** |
+| `turbo typecheck` / `lint` | 0 errores |
+| `vitest app/catalog/` | **69 passed** |
+| E2E | No se corrió |
+
+Nota: un full-suite de frontend mostró 2 fallos **flaky por carga** (`public-app-layout.test.ts`,
+`feature-loader-timing.test.ts`), verdes aislados y ajenos a F4.
+
+## Incidencia nativa (resuelta)
+
+La primera transacción de revisión de F4 quedó **atascada** con `operation_timeout` (presupuesto de
+tiempo agregado, `retry_safe: false`), sin autoridad. Se **liberó con `review abandon`**
+(`operator_disposition`) y se abrió una transacción nueva, que aprobó.
+
+## Hallazgos de la revisión nativa (RDD) — TODOs rastreados (2026-10-07)
+
+- [ ] **F4-R1** (WARNING) — El reset del aviso al reabrir el checkout no tiene test.
+- [ ] **F4-R2** (WARNING) — `buildWhatsAppOrderLink`/`window.open` dentro del try/catch del POST: si lanzan, el pedido ya guardado se reporta como fallo y el cliente reintenta (duplicado).
+- [ ] **F4-R3** (WARNING) — El resumen imprime el total del servidor junto a líneas/subtotal del cliente; si difieren, no cuadra.
+- [ ] **F4-R4/R5/R6** (SUGGESTION) — Test estructural por reflexión (`WhatsappNumber`); test que no modela el cierre del checkout; aserciones atadas al formato de `Intl`.
+
 ## Siguiente paso
 
-Confirmar el origen del número; implementar F4 tras F3.
+F5 (dashboard de pedidos y pago), luego F6 (ventas), F7 (repartidores).
 
 ## Progreso
 
 - 2026-10-06 — Feature creado (documento de diseño). Sin implementación.
 - 2026-10-06 — Sincronizado con el maestro: moneda del catálogo (A3 eliminada); sin "En camino"
-  (D18); nombres de vistas confirmados (A6); "Decisiones abiertas" → "Decisiones resueltas y notas".
-  Sin implementación.
+  (D18); nombres de vistas confirmados (A6). Sin implementación.
+- 2026-10-07 — **Implementado** (rama `feat/pedidos-whatsapp-f4-envio`, sobre `dev`), commit
+  `feat(catalog): add wa.me order link and blocked state after checkout` (backend + frontend en un
+  slice). Owner resolvió T2 (número en la respuesta de creación). Revisión nativa **aprobada y
+  acknowledgeada** tras liberar una transacción atascada por `operation_timeout`. Push = decisión del
+  owner.

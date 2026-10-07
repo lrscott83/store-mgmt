@@ -646,6 +646,12 @@
   <data name="OnlineOrderNotesTooLong" xml:space="preserve">
     <value>{0} cannot be longer than {1} characters</value>
   </data>
+  <data name="OnlineOrderStoreSlugTooLong" xml:space="preserve">
+    <value>{0} cannot be longer than {1} characters</value>
+  </data>
+  <data name="OnlineOrderStatusNotFound" xml:space="preserve">
+    <value>There is no order with that code and that phone number</value>
+  </data>
   <data name="LessThanOrEqualTo" xml:space="preserve">
     <value>{0} must be less than or equal to {1}</value>
   </data>

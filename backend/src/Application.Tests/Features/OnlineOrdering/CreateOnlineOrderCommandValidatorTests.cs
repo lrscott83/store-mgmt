@@ -33,6 +33,7 @@ public class CreateOnlineOrderCommandValidatorTests
 
     private static CreateOnlineOrderCommand ValidCommand() => new()
     {
+        StoreSlug = "tienda-ana",
         DeliveryType = (int)Domain.Common.Enums.OrderDeliveryType.Pickup,
         CustomerName = "Ana",
         CustomerPhone = "+5350000000",
@@ -59,6 +60,22 @@ public class CreateOnlineOrderCommandValidatorTests
     #endregion
 
     #region Edge Cases
+
+    /// <summary>
+    /// El slug viene de la RUTA (`/public/ordering/{storeSlug}/orders`): sin él el handler no
+    /// puede ni resolver la tienda ni su configuración, así que el payload vacío se rechaza en la
+    /// puerta más barata, antes de tocar la base.
+    /// </summary>
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void Validate_WithABlankStoreSlug_ShouldFail(string slug)
+    {
+        CreateOnlineOrderCommand command = ValidCommand();
+        command.StoreSlug = slug;
+
+        Validator().Validate(command).IsValid.Should().BeFalse();
+    }
 
     [Theory]
     [InlineData("")]

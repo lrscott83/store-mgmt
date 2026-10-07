@@ -42,5 +42,24 @@ namespace Infrastructure.Persistence.Repositories
                 .Include(o => o.OrderItems)
                 .Include(o => o.Driver)
                 .FirstOrDefaultAsync();
+
+        /// <summary>
+        /// Lectura PÚBLICA del pedido por código: salta el filtro global por tenant porque una
+        /// petición ANÓNIMA no tiene tenant en el contexto (ver la nota del handler). El filtro no
+        /// es lo único que acota el resultado: sigue filtrando por `StoreId` y por código.
+        ///
+        /// `IgnoreQueryFilters` alcanza también a las LÍNEAS, y `OrderItem` tiene su propio filtro
+        /// por tenant: sin el bypass del conjunto, el pedido volvería sin items y el DTO público
+        /// publicaría un carrito vacío.
+        ///
+        /// No incluye `Driver`: el repartidor es interno de la tienda (F7) y el DTO público no lo
+        /// publica.
+        /// </summary>
+        public async Task<Order?> GetPublicByCodeAsync(Guid storeId, string code)
+            => await _orders
+                .IgnoreQueryFilters()
+                .Where(o => o.StoreId == storeId && o.Code == code)
+                .Include(o => o.OrderItems)
+                .FirstOrDefaultAsync();
     }
 }
