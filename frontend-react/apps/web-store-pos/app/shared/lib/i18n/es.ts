@@ -236,6 +236,7 @@ const messages: Record<string, string> = {
   'MENU.PRODUCTS': 'Catálogo Productos',
   'MENU.WEB_CATALOG': 'Catálogo Web',
   'MENU.ONLINE_ORDERS_SETTINGS': 'Pedidos WhatsApp',
+  'MENU.ONLINE_ORDERS_DRIVERS': 'Repartidores',
   'MENU.SALE': 'Vender',
   'MENU.WHOLESALE': 'Vender Mayorista',
   'MENU.TODAY_ORDERS': 'Ventas del día',
@@ -363,6 +364,35 @@ const messages: Record<string, string> = {
   'ORDERING_SETTINGS.LOAD_FAILED': 'No se pudo cargar la configuración de pedidos',
   'ORDERING_SETTINGS.LAST_SYNC': 'Última sincronización',
   'ORDERING_SETTINGS.NEVER_SYNCED': 'Nunca',
+
+  // Repartidores (F7): catálogo de personas. NO cuenta pedidos ni asigna ninguno — de eso se
+  // ocupa la operación del pedido (F5), que es otra vista (D8).
+  'ORDERING_DRIVERS.TITLE': 'Repartidores',
+  'ORDERING_DRIVERS.SUBTITLE':
+    'Personas que reparten los pedidos de esta tienda. Aquí se da de alta y se activa o desactiva cada repartidor; asignarlo a un pedido se hace al atender ese pedido.',
+  'ORDERING_DRIVERS.NEW': 'Nuevo repartidor',
+  'ORDERING_DRIVERS.SAVE': 'Guardar',
+  'ORDERING_DRIVERS.SAVING': 'Guardando...',
+  'ORDERING_DRIVERS.CANCEL': 'Cancelar',
+  'ORDERING_DRIVERS.NAME': 'Nombre',
+  'ORDERING_DRIVERS.NAME_PLACEHOLDER': 'Nombre del repartidor',
+  'ORDERING_DRIVERS.PHONE': 'Teléfono',
+  'ORDERING_DRIVERS.PHONE_PLACEHOLDER': 'Con prefijo internacional, por ejemplo 5351234567',
+  'ORDERING_DRIVERS.ACTIVE': 'Activo',
+  'ORDERING_DRIVERS.EDIT': 'Editar',
+  'ORDERING_DRIVERS.EDIT_TITLE': 'Editar repartidor',
+  'ORDERING_DRIVERS.CREATE_DONE': 'Repartidor creado',
+  'ORDERING_DRIVERS.UPDATE_DONE': 'Repartidor actualizado',
+  'ORDERING_DRIVERS.SAVE_FAILED': 'No se pudo guardar el repartidor',
+  'ORDERING_DRIVERS.LOAD_FAILED': 'No se pudieron cargar los repartidores',
+  'ORDERING_DRIVERS.EMPTY': 'Esta tienda todavía no tiene repartidores dados de alta.',
+  'ORDERING_DRIVERS.INACTIVE_BADGE': 'Inactivo',
+  'ORDERING_DRIVERS.INACTIVE_HINT':
+    'Un repartidor inactivo no aparece en el selector de reparto, pero los pedidos que ya entregó conservan su referencia.',
+  'ORDERING_DRIVERS.TABLE_NAME': 'Nombre',
+  'ORDERING_DRIVERS.TABLE_PHONE': 'Teléfono',
+  'ORDERING_DRIVERS.TABLE_STATUS': 'Estado',
+  'ORDERING_DRIVERS.TABLE_ACTIONS': 'Acciones',
 
   // Catálogo público (/catalog/<slug>): lo que ve el cliente final, sin sesión.
   'CATALOG_PUBLIC.SEARCH_PLACEHOLDER': 'Buscar productos…',

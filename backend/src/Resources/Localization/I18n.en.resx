@@ -652,4 +652,13 @@
   <data name="StoreNotSelected" xml:space="preserve">
     <value>User {0} has no store selected</value>
   </data>
+  <data name="DeliveryDriverNameTooLong" xml:space="preserve">
+    <value>{0} cannot be longer than {1} characters</value>
+  </data>
+  <data name="DeliveryDriverPhoneTooLong" xml:space="preserve">
+    <value>{0} cannot be longer than {1} characters</value>
+  </data>
+  <data name="DeliveryDriverNotFound" xml:space="preserve">
+    <value>The driver does not exist or does not belong to this store.</value>
+  </data>
 </root>

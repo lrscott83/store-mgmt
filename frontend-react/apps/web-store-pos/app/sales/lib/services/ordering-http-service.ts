@@ -48,9 +48,38 @@ export interface OrderingSettingsPayload {
 }
 
 /**
- * Endpoints de gestión de la configuración de pedidos (módulo 18, F1). El gate real vive en el
- * backend (`[HasPermission(StoreRoleFeatures.WebCatalogAdmin)]`: módulo 18 + feature 122 +
- * OwnerAdmin) — aquí solo se hablan las dos rutas.
+ * Un repartidor de la tienda, tal como lo ve su panel (F7, vista "Repartidores"). Espejo de
+ * `DeliveryDriverDto`.
+ *
+ * El `isActive` es una baja LÓGICA, no un borrado: apagar esta bandera NO elimina la fila ni los
+ * pedidos que ya llevó, solo la esconde de las listas por defecto.
+ */
+export interface DeliveryDriver {
+  readonly id: string;
+  readonly storeId: string;
+  readonly name: string;
+  readonly phone: string;
+  readonly isActive: boolean;
+}
+
+/**
+ * Cuerpo de alta y de edición. SIN `storeId` (la tienda es la del contexto) y SIN `tenantId`.
+ * La edición añade `isActive`, porque el interruptor de baja va en el mismo PATCH que el texto:
+ * es la acción que el dueño hace ("se fue", "vuelve"), no un endpoint aparte.
+ */
+export interface DeliveryDriverPayload {
+  name: string;
+  phone: string;
+}
+
+/**
+ * Endpoints de gestión de la configuración de pedidos (módulo 18, F1) y del catálogo de
+ * repartidores (módulo 18, F7).
+ *
+ * El gate real vive en el backend, y NO es el mismo en los dos: la configuración es
+ * `[HasPermission(StoreRoleFeatures.WebCatalogAdmin)]` (módulo 18 + feature 122 + solo
+ * OwnerAdmin) mientras que los repartidores son `OnlineOrdersAdmin` (módulo 18 + feature 123 +
+ * OwnerAdmin Y StoreUser, D15). Aquí solo se hablan las rutas.
  */
 export const orderingHttpService = {
   /**
@@ -70,6 +99,63 @@ export const orderingHttpService = {
   ): Promise<BaseResponseModel<OrderingSettings>> {
     const response = await apiClient.put<BaseResponseModel<OrderingSettings>>(
       '/v1/online-ordering/settings',
+      payload,
+    );
+    return response.data;
+  },
+
+  /**
+   * Repartidores de la tienda actual (F7). Espejo de
+   * `Application/Dtos/OnlineOrdering/DeliveryDriverDtos.cs`.
+   *
+   * SIN `tenantId`: el aislamiento por tienda ya está resuelto en el servidor y la vista no
+   * necesita el tenant de cada fila. SÍ lleva `storeId`, a diferencia del DTO de configuración
+   * de más arriba: la respuesta dice de qué tienda es cada repartidor en lugar de dejarlo
+   * implícito, y no hay nada que el cliente pueda cambiar con él.
+   *
+   * NO lleva el número de pedidos asignados. Contarlo es leer `Order.DriverId` — dato de F5, que
+   * es la vista de la operación del pedido. Aquí solo se gestiona el catálogo de personas (D8).
+   */
+  async getDeliveryDrivers(): Promise<BaseResponseModel<DeliveryDriver[]>> {
+    // `activeOnly=true`: la vista de gestión necesita ver los dados de baja para poder
+    // reactivarlos. El valor por defecto del backend (solo activos) es el que necesita el
+    // selector de reparto de F5, no este.
+    const response = await apiClient.get<BaseResponseModel<DeliveryDriver[]>>(
+      '/v1/delivery-drivers',
+      { params: { activeOnly: true } },
+    );
+    return response.data;
+  },
+
+  /**
+   * Da de alta un repartidor. Nace activo: no hay `isActive` en el cuerpo, y volverlo a apagar
+   * es una EDICIÓN, no un alta.
+   *
+   * NO lleva `storeId`: la tienda es la del contexto de la petición, y mandarlo dejaría que un
+   * dueño creara repartidores en la tienda de otro.
+   */
+  async createDeliveryDriver(
+    payload: DeliveryDriverPayload,
+  ): Promise<BaseResponseModel<DeliveryDriver>> {
+    const response = await apiClient.post<BaseResponseModel<DeliveryDriver>>(
+      '/v1/delivery-drivers',
+      payload,
+    );
+    return response.data;
+  },
+
+  /**
+   * Edita nombre, teléfono y el interruptor de activo. Un repartidor de otra tienda responde 404
+   * — indistinguible de uno inexistente, que es lo que el aislamiento por tienda quiere.
+   *
+   * Apagar `isActive` es una BAJA LÓGICA: no borra la fila ni los pedidos que ya llevó.
+   */
+  async updateDeliveryDriver(
+    id: string,
+    payload: DeliveryDriverPayload & { isActive: boolean },
+  ): Promise<BaseResponseModel<DeliveryDriver>> {
+    const response = await apiClient.patch<BaseResponseModel<DeliveryDriver>>(
+      `/v1/delivery-drivers/${id}`,
       payload,
     );
     return response.data;

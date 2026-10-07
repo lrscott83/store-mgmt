@@ -44,6 +44,10 @@ export default [
     // Pedidos WhatsApp (módulo 18, F1): configuración del pedido online. Mismo gate que el
     // catálogo (ownerModuleLoader + WebCatalogAdmin) — configurar la tienda es cosa del dueño.
     route('sales/online-orders/settings', 'sales/routes/ordering-settings.tsx'),
+    // Repartidores (módulo 18 + feature 123, F7): catálogo de personas. Gate DISTINTO al de
+    // arriba a propósito: `featureLoader([EFeatures.OnlineOrders])`, no `ownerModuleLoader`,
+    // porque el backend lo exige con `OnlineOrdersAdmin` (OwnerAdmin Y StoreUser, D15).
+    route('sales/online-orders/drivers', 'sales/routes/ordering-drivers.tsx'),
     // Sales â€” POS & Orders
     route('sales/new', 'sales/routes/sale.tsx'),
     // Sales â€” Wholesale (mismo guard de Ventas)
