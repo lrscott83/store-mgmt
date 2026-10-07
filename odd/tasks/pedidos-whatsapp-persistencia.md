@@ -332,6 +332,32 @@ con el texto verbatim del script dentro de una transacción revertida: roles 2/3
 - **Mínimo sobre el total con envío dentro**: hay test que lo fija
   (`Handle_WhenTheDeliveryFeePushesTheTotalOverTheMinimum_ShouldAccept`).
 
+## Hallazgos de la revisión nativa (RDD) — TODOs rastreados (2026-10-07)
+
+Tareas nuevas derivadas de la revisión nativa (todas **advisory, no bloqueantes**). Ninguna reabre F2;
+son trabajo posterior. Destino indicado por tarea.
+
+- [ ] **F2-R1** (WARNING · slice 1) — Ramas del handler sin test: carrito multi-moneda
+  (`EnsureSingleCurrency`, `CreateOnlineOrderCommand.cs:260-265`) y `DeliveryType` fuera del enum
+  (`:214-215`). Acción: casos en `CreateOnlineOrderCommandHandlerTests`. **Destino: F2 (tests).**
+- [ ] **F2-R2** (WARNING · slice 1) — La persistencia nueva se prueba **solo con Moq**:
+  `StoreCatalogSettingsRepository.UpsertAsync` (NoTracking, UPDATE vs INSERT, `IgnoreQueryFilters`),
+  `OrderRepository.CodeExistsAsync`/`GetByCodeAsync` y `ProductRepository.GetPublishedByIdsAsync`.
+  Acción: cobertura de integración real (E2E intocable ⇒ archivo nuevo o test de infraestructura).
+  **Destino: F2 (tests de integración).**
+- [ ] **F2-R3** (WARNING · slice 2) — El grant de la feature 123 por tienda (backfill) no tiene test que
+  confirme que `OnlineOrdersAdmin` queda resuelto (`/me` `FeatureIds` / roster offline) para una tienda
+  con módulo 18. **Destino: F2/F5 (test del generador).**
+- [ ] **F2-R4** (SUGGESTION · slice 1) — Tests estructurales por reflexión
+  (`CreateOnlineOrderCommand_ShouldCarryNoPriceFieldAtAll` / `...NoCodeField`): frágiles; sustituir por
+  aserción de comportamiento. **Destino: F2 (tests).**
+- [ ] **F2-R5** (SUGGESTION · slice 2) — Índice único `StoreCatalogSettings.StoreId` **no parcial**: con
+  soft-delete, la fila retenida bloquearía recrear settings; las tablas nuevas del catálogo usan filtro
+  parcial. Requiere **nueva migración**. **Destino: F1/F8 (config/marca).**
+- [ ] **F2-R6** (SUGGESTION · slice 2) — El `Down()` del backfill borra **toda** fila `FeatureId=123`, no
+  solo las creadas por la migración, y el comentario afirma "ONLY". Acción: acotar el `DELETE` o corregir
+  el contrato declarado. Toca una migración ya aplicada. **Destino: F2 (migración) / decisión owner.**
+
 ## Siguiente paso
 
 F1 (config, `StoreCatalogSettings` + sincronización), luego F8 (marca), F3 (carrito/checkout, que fija
