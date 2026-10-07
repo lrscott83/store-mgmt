@@ -282,6 +282,16 @@ namespace Domain.Common.Enums
         [HasModule(ModuleType.WebCatalog)]
         WebCatalogAdmin,
 
+        // OnlineOrders (feature 123, módulo 18) es la GESTIÓN de los pedidos del catálogo: los
+        // pedidos mismos, las ventas que salen de ellos y los repartidores (F5/F6/F7). Se separa de
+        // WebCatalogAdmin a propósito: la CONFIGURACIÓN y la MARCA son del dueño (OwnerAdmin),
+        // pero atender un pedido es trabajo del día a día que también hace el StoreUser (D15).
+        // Por eso lleva StoreUser, el que no lleva WebCatalogAdmin.
+        [HasRoles(RoleType.OwnerAdmin, RoleType.StoreUser)]
+        [HasFeature(FeatureType.OnlineOrders)]
+        [HasModule(ModuleType.WebCatalog)]
+        OnlineOrdersAdmin,
+
         #endregion
     }
 }

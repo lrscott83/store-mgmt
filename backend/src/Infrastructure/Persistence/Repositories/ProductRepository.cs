@@ -125,5 +125,31 @@ namespace Infrastructure.Persistence.Repositories
                 .Include(product => product.Category)
                 .FirstOrDefaultAsync();
         }
+
+        /// <summary>
+        /// Los mismos productos publicados que devuelve <see cref="GetPublishedByStoreIdAsync"/>,
+        /// filtrados por un conjunto de ids y en UNA consulta. Existe para el carrito del pedido
+        /// online (F2): recorrer `GetPublishedByIdAsync` por línea del carrito es un N+1 —N viajes
+        /// a la base para N filas— y además cada viaje pagaría el `Include` de imágenes y categoría.
+        ///
+        /// MISMAS puertas de publicación, sin excepción: si un producto no está publicado, esta
+        /// consulta simplemente no lo devuelve, así que el handler del pedido ve el faltante y
+        /// rechaza el pedido en vez de aceptarlo con un precio que ya no existe.
+        /// </summary>
+        public async Task<IList<Product>> GetPublishedByIdsAsync(Guid storeId, IReadOnlyCollection<Guid> ids)
+        {
+            if (ids.Count == 0)
+                return [];
+
+            return await _products
+                .IgnoreQueryFilters()
+                .Where(product => ids.Contains(product.Id)
+                    && product.Category.StoreId == storeId
+                    && product.IsActive && product.AvailableToSale
+                    && product.Category.IsActive
+                    && product.Category.Slug != null)
+                .Include(product => product.Category)
+                .ToListAsync();
+        }
     }
 }
