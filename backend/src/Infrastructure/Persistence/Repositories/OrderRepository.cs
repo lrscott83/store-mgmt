@@ -42,5 +42,77 @@ namespace Infrastructure.Persistence.Repositories
                 .Include(o => o.OrderItems)
                 .Include(o => o.Driver)
                 .FirstOrDefaultAsync();
+
+        /// <summary>
+        /// Filtra POR LA BASE y no en memoria (F5, T1). Traer la tabla entera y descartar en C# lo
+        /// que no cumple el filtro convertiría "abrir la vista de pedidos con un filtro puesto" en
+        /// una lectura completa del histórico, y el histórico de pedidos es la tabla que más crece
+        /// sin que nada la acote. Cada <c>Where</c> es condicional para que un filtro sin usar NO
+        /// escriba un predicado espurio en el SQL.
+        ///
+        /// El <c>storeId</c> se aplica primero y sin condiciones: es el aislamiento entre tiendas
+        /// (criterio 7), y que no dependa de ningún otro filtro significa que ni un `skip`/`take`
+        /// descuidado ni un filtro mal formado pueden dejar ver un pedido de otra tienda.
+        /// </summary>
+        public async Task<PagedOrders> GetPagedByStoreIdAsync(Guid storeId, OrderListFilter filter, int skip, int take)
+        {
+            IQueryable<Order> query = _orders.Where(o => o.StoreId == storeId);
+
+            if (filter.Status is { } status)
+                query = query.Where(o => o.Status == status);
+
+            if (filter.PaymentStatus is { } paymentStatus)
+                query = query.Where(o => o.PaymentStatus == paymentStatus);
+
+            if (filter.DeliveryType is { } deliveryType)
+                query = query.Where(o => o.DeliveryType == deliveryType);
+
+            if (filter.DriverId is { } driverId)
+                query = query.Where(o => o.DriverId == driverId);
+
+            // Ambos extremos son INCLUSIVOS. `To` con la hora 00:00 del día siguiente excluiría los
+            // pedidos hechos ese mismo día, y el filtro por rango es el que la vista usa para
+            // "hoy" y "esta semana".
+            if (filter.From is { } from)
+                query = query.Where(o => o.Date >= from);
+
+            if (filter.To is { } to)
+                query = query.Where(o => o.Date <= to);
+
+            if (!string.IsNullOrWhiteSpace(filter.Search))
+            {
+                string term = filter.Search.Trim();
+                query = query.Where(o =>
+                    (o.Code != null && o.Code.Contains(term)) ||
+                    (o.CustomerPhone != null && o.CustomerPhone.Contains(term)));
+            }
+
+            // `Total` se cuenta ANTES del `Skip`/`Take` sobre la misma consulta ya filtrada: es el
+            // número de pedidos que cumplen los filtros en toda la tienda, que es lo que la vista
+            // necesita para pintar "página 3 de 12".
+            int total = await query.CountAsync();
+
+            List<Order> items = await query
+                .OrderByDescending(o => o.Date)
+                .ThenByDescending(o => o.Id)
+                .Skip(skip)
+                .Take(take)
+                .ToListAsync();
+
+            return new PagedOrders(items, total);
+        }
+
+        /// <summary>
+        /// Detalle de un pedido de ESTA tienda (F5, T2). El `storeId` va en el MISMO predicado que el
+        /// id a propósito: pedir el pedido primero y comprobar la tienda después en memoria dejaría
+        /// una ventana en la que el pedido ajeno ya está cargado, y "lo borro si no es mío" es
+        /// exactamente el patrón que produce una fuga entre tiendas.
+        /// </summary>
+        public async Task<Order?> GetByIdWithItemsAsync(Guid storeId, Guid orderId)
+            => await _orders
+                .Where(o => o.StoreId == storeId && o.Id == orderId)
+                .Include(o => o.OrderItems)
+                .Include(o => o.Driver)
+                .FirstOrDefaultAsync();
     }
 }
