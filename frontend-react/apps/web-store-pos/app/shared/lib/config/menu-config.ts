@@ -174,6 +174,23 @@ export const MENU_GROUPS: MenuGroup[] = [
           'Catálogo Web. Publica tus productos en una página web propia (/catalog/tu-tienda): completa la descripción, el % de descuento, el precio rebajado, la marca Nuevo y las imágenes, y pulsa Sincronizar Catálogo para actualizar lo que ven tus clientes.' +
           BETA_NOTICE,
       },
+      // Pedidos WhatsApp (módulo 18, F1): la configuración del pedido online (interruptor,
+      // número de WhatsApp, modalidades, envío, mínimo, horarios y zonas). Comparte módulo,
+      // feature y rol con Catálogo Web porque comparte endpoints y gate en el backend
+      // ([HasPermission(StoreRoleFeatures.WebCatalogAdmin)]) —gestionar pedidos es otra
+      // feature, la de F2—. Los precios y la moneda NO se configuran aquí: salen del catálogo.
+      {
+        label: 'MENU.ONLINE_ORDERS_SETTINGS',
+        path: '/sales/online-orders/settings',
+        featureIds: [EFeatures.WebCatalog],
+        moduleId: EModules.WebCatalog,
+        moduleIds: [EModules.WebCatalog],
+        rolesOnly: (user) => user.isOwnerAdmin,
+        isNew: true,
+        helpContent:
+          'Pedidos WhatsApp. Activa el pedido online y configura el número de WhatsApp al que llegan los pedidos, si recoges en la tienda o envías a domicilio, el costo del envío, el importe mínimo, el horario y las zonas de reparto. El precio y la moneda salen del catálogo.' +
+          BETA_NOTICE,
+      },
       {
         label: 'MENU.SALE',
         path: '/sales/new',

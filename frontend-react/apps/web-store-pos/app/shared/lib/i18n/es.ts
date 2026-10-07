@@ -235,6 +235,7 @@ const messages: Record<string, string> = {
   // Menu items — Sales (Angular MENU.SALE_MGMT.*)
   'MENU.PRODUCTS': 'Catálogo Productos',
   'MENU.WEB_CATALOG': 'Catálogo Web',
+  'MENU.ONLINE_ORDERS_SETTINGS': 'Pedidos WhatsApp',
   'MENU.SALE': 'Vender',
   'MENU.WHOLESALE': 'Vender Mayorista',
   'MENU.TODAY_ORDERS': 'Ventas del día',
@@ -316,6 +317,34 @@ const messages: Record<string, string> = {
   'WEB_CATALOG.DESCRIPTION_TOO_LONG': 'La descripción no puede pasar de {max} caracteres.',
   'WEB_CATALOG.MOVE_LEFT': 'Mover antes',
   'WEB_CATALOG.MOVE_RIGHT': 'Mover después',
+
+  // Pedidos WhatsApp (módulo 18, F1): configuración del pedido online. Sin moneda — el precio
+  // y la moneda los pone el catálogo (A3 eliminada).
+  'ORDERING_SETTINGS.TITLE': 'Pedidos WhatsApp',
+  'ORDERING_SETTINGS.SUBTITLE':
+    'Activa los pedidos online y configura a dónde y cómo los recibe tu tienda. Los pedidos se envían por WhatsApp.',
+  'ORDERING_SETTINGS.ENABLED': 'Pedidos online',
+  'ORDERING_SETTINGS.ENABLED_HINT':
+    'Con el interruptor apagado el catálogo se publica igual, pero tus clientes no pueden hacer pedidos.',
+  'ORDERING_SETTINGS.WHATSAPP_NUMBER': 'Número de WhatsApp',
+  'ORDERING_SETTINGS.WHATSAPP_NUMBER_PLACEHOLDER': 'Con prefijo internacional, por ejemplo 5351234567',
+  'ORDERING_SETTINGS.PICKUP_ENABLED': 'Recogida en la tienda',
+  'ORDERING_SETTINGS.DELIVERY_ENABLED': 'Envío a domicilio',
+  'ORDERING_SETTINGS.DELIVERY_FEE': 'Costo del envío',
+  'ORDERING_SETTINGS.MINIMUM_ORDER_AMOUNT': 'Importe mínimo del pedido',
+  'ORDERING_SETTINGS.BUSINESS_HOURS': 'Horario de atención',
+  'ORDERING_SETTINGS.BUSINESS_HOURS_PLACEHOLDER': 'Texto libre, por ejemplo Lunes a sábado de 8:00 a 18:00',
+  'ORDERING_SETTINGS.DELIVERY_ZONES': 'Zonas de reparto',
+  'ORDERING_SETTINGS.DELIVERY_ZONES_PLACEHOLDER': 'Texto libre, por ejemplo Vedado y Centro Habana',
+  'ORDERING_SETTINGS.CURRENCY_NOTE':
+    'El precio y la moneda salen del catálogo, no se configuran aquí.',
+  'ORDERING_SETTINGS.SYNC': 'Sincronizar',
+  'ORDERING_SETTINGS.SYNCING': 'Sincronizando...',
+  'ORDERING_SETTINGS.SYNC_DONE': 'Configuración de pedidos guardada',
+  'ORDERING_SETTINGS.SYNC_FAILED': 'No se pudo guardar la configuración de pedidos',
+  'ORDERING_SETTINGS.LOAD_FAILED': 'No se pudo cargar la configuración de pedidos',
+  'ORDERING_SETTINGS.LAST_SYNC': 'Última sincronización',
+  'ORDERING_SETTINGS.NEVER_SYNCED': 'Nunca',
 
   // Catálogo público (/catalog/<slug>): lo que ve el cliente final, sin sesión.
   'CATALOG_PUBLIC.SEARCH_PLACEHOLDER': 'Buscar productos…',
