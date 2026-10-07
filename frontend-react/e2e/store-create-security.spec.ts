@@ -33,6 +33,14 @@ import { test, expect } from './support/test';
  * (RateLimitPolicies.cs:15-24).
  */
 
+// Presupuesto ORIGINAL de 120_000. El 2026-10-06 se había subido a 240_000 para
+// absorber el 2× medido bajo contención (setup de 32.3 s en solitario vs 63.6 s con
+// 8 workers: 12 s de POST /api/v1/auth/register + 26.7 s del `waitForURL` tras
+// registrar + frío de Vite), y el usuario pidió bajarlo de nuevo para DIAGNOSTICAR
+// en vez de tapar el problema. Ahora lo que acota las esperas colgadas es
+// `actionTimeout: 30_000` (playwright.config.ts): una espera sin límite falla
+// NOMBRANDO el paso, que era lo que faltó para cerrar la ficha 02. Medición:
+// docs/testing/known-issues/2026-10-06-e2e-verification/02-store-create-security-setup-timeout.md
 test.describe.configure({ timeout: 120_000 });
 
 // ── Test 1: OwnerAdmin sin MultiStores ───────────────────────────────

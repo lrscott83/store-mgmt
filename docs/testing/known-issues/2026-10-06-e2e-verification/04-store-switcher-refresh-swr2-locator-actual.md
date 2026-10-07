@@ -1,4 +1,4 @@
-# 4. store-switcher-refresh.spec.ts:196 — SWR-2 cae de forma intermitente por un locator que también casa con su propio aviso de éxito
+# 4. store-switcher-refresh.spec.ts (SWR-2) — caía de forma intermitente por un locator que también casa con su propio aviso de éxito — FIX APLICADO 2026-10-06
 
 **Qué prueba el test.**
 `store-switcher-refresh.spec.ts:196:5` — "SWR-2 — a store deactivated this session disappears from
@@ -101,22 +101,42 @@ aviso de edicion si la contiene.
 **Clasificación:** defecto del test. La aplicación y el entorno quedan descartados: la pantalla, la
 desactivación por la interfaz y el switcher hicieron exactamente lo que el test esperaba.
 
-**Propuesta de solución (NO aplicada — tocar un test E2E existente requiere autorización 1 a 1).**
-Acotar el locator de la marca de "tienda actual" a lo que de verdad la representa. Dos formas, en
-orden de preferencia:
+**Propuesta de solución — APLICADA el 2026-10-06 con autorización 1 a 1 (opción 2).**
+Acotar el locator de la marca de "tienda actual" a lo que de verdad la representa. Las dos formas
+que se plantearon, en orden de preferencia:
 
 1. Por rol y nombre accesible del **botón de esa tienda** (que es el contenedor real de la marca), o
-   por un `getByTestId` del marcador dentro de ese botón.
-2. Mínima y quirúrgica: `getByText('Actual', { exact: true })` — cierra la colisión con el aviso sin
-   cambiar la semántica de la aserción. Se aplica igual en la línea 170 (ayudante) y en la 245.
+   por un `getByTestId` del marcador dentro de ese botón. — **no usada**.
+2. **APLICADA:** `getByText('Actual', { exact: true })` — cierra la colisión con el aviso sin cambiar
+   la semántica de la aserción. Aplicada en los dos sitios: el ayudante `openSwitcherPopup` y la
+   aserción final de SWR-2, cada una con su comentario del porqué.
 
-**Prueba de mutación propuesta** (cuando haya autorización): con el arreglo puesto, provocar de nuevo
-el aviso «Tienda actualizada correctamente.» justo antes de abrir el popup y comprobar que el test
-sigue verde — hoy esa es la forma mas barata de reintroducir el fallo; sin el arreglo, vuelve a caer en
-la línea 170 con el mismo `strict mode violation` de dos elementos.
+**Prueba de mutación — HECHA el 2026-10-06 con una sonda desechable (borrada tras medir).**
+Se provocó el aviso «Tienda actualizada correctamente.» por el flujo real de guardado y se midieron
+los DOS estados por separado: la ventana del aviso es de 1 s (`root.tsx:82 autoClose={1000}`), así
+que intentar medirlos a la vez era una carrera (medido: al contar, el aviso ya había desaparecido).
 
-**Verificación.** Ninguna sobre el codigo: no se toco el test ni la aplicación. Lo hecho es correr el
-spec en solitario dos veces y leer los reportes de Playwright.
+```
+[sonda] ESTADO aviso  -> locator viejo=1  locator exacto=0
+[sonda] ESTADO marca  -> locator viejo=1  locator exacto=1  aviso=0
+1 passed (17.9s) · EXITCODE=0
+```
 
-**Estado final (2026-10-06):** 🔴 abierto — defecto del test confirmado, intermitente, sin autorización
-para corregirlo.
+Es decir: el locator viejo casa con **dos nodos distintos** (aviso y marca), así que con ambos en
+el DOM resuelve a 2 y `toBeVisible()` revienta con `strict mode violation` — el fallo observado. El
+locator nuevo (`exact: true`) nunca ve más de uno.
+
+**Verificación del fix (foreground, sin suite completa).** `--list` OK (4 tests en 2 ficheros) y el
+spec en solitario **dos veces seguidas**, sin reintentos:
+
+```
+npx playwright test e2e/store-switcher-refresh.spec.ts --workers=1 --retries=0 --reporter=list
+# corrida 1: 2 passed (22.4s) · EXITCODE=0
+# corrida 2: 2 passed (21.7s) · EXITCODE=0
+```
+
+**Estado final (2026-10-06):** ✅ **fix aplicado y verificado** — locator acotado a
+`getByText('Actual', { exact: true })` en los dos sitios con autorización 1 a 1; la sonda midió que
+el locator viejo casa con 2 nodos y el nuevo con 1; spec verde dos corridas seguidas en solitario
+(`2 passed`, 22.4 s y 21.7 s, exit 0). La sonda se borró tras medir; el test existente solo se tocó
+en esas dos líneas de locator y sus comentarios.

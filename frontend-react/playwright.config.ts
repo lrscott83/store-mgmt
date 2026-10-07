@@ -115,8 +115,12 @@ export default defineConfig({
   // puede flakear por la primera compilación del dev server.
   retries: 2,
 
-  // En CI un solo worker (dev servers no dan para más); localmente todos los CPUs disponibles.
-  workers: process.env.CI ? 1 : undefined,
+  // En CI un solo worker (dev servers no dan para más). Localmente 4, no el default
+  // de Playwright (50% de los 16 CPUs de esta máquina = 8): con más workers el
+  // flake por contención se dispara (known-issues.md: 23 → 4 → 2 fallos al bajar
+  // de 8 a 3 workers) y el fallo de la ficha 02 nace justo ahí. Opción 4 de la
+  // ficha 02, aplicada 2026-10-06.
+  workers: process.env.CI ? 1 : 4,
 
   // Reporte HTML para revisar a mano tras correr; `open: 'never'` para no abrir el navegador solo.
   reporter: [['html', { open: 'never' }]],
@@ -126,6 +130,21 @@ export default defineConfig({
     baseURL: 'http://localhost:3333',
     // Guarda un trace (film de la sesión) solo al reintentar un test que falló.
     trace: 'on-first-retry',
+    // Opción 2 de la ficha 02 (autorizada el 2026-10-06): sin esto el default es 0 =
+    // SIN LÍMITE, así que `click()`/`fill()`/`check()` se cuelgan hasta el timeout
+    // global del test y el fallo no dice en qué paso esperó — exactamente lo que
+    // impidió diagnosticar el agotamiento de los 120 s de store-create-security. Con
+    // 30 s la espera colgada falla nombrando la acción y su selector.
+    actionTimeout: 30_000,
+    // Opción 2 extendida a la familia de NAVEGACIÓN (ficha 02, 2026-10-06): en
+    // Playwright 1.62 `waitForURL`/`goto`/`waitForLoadState` NO resuelven por
+    // `actionTimeout` sino por `navigationTimeout`, y el runner lo fija en 0 =
+    // SIN LÍMITE (`navigationTimeout: [0, { option: true }]` →
+    // `_defaultContextNavigationTimeout = navigationTimeout || 0`). Por eso el
+    // `waitForURL` de mintOwnerAdmin colgó ~101 s sin fallar y el test murió en
+    // el timeout global sin decir dónde esperaba. 60 s y no 30 s porque la
+    // navegación legítima post-registro midió 26.7 s con 8 workers.
+    navigationTimeout: 60_000,
     // vite-plugin-pwa (devOptions.enabled) registra un service worker que cachea respuestas en dev.
     // Lo bloqueamos para no obtener respuestas cacheadas falsas durante los tests.
     contextOptions: { serviceWorkers: 'block' },

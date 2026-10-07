@@ -11,10 +11,10 @@ su texto completo sigue en el historial de git y su resumen está en el
 
 | Archivo | Estado | Qué documenta |
 | --- | --- | --- |
-| [`01-change-password-boton-offline-no-monta.md`](01-change-password-boton-offline-no-monta.md) | 🟡 inestable | Corrida del 2026-10-05: el botón offline no montó dentro de los 5 s de la aserción bajo carga. **Pasa en solitario (2/2, 50.0 s)**; el mecanismo fino sigue sin cerrar |
-| [`02-store-create-security-setup-timeout.md`](02-store-create-security-setup-timeout.md) | 🟡 inestable | Corrida del 2026-10-05: el fixture `signedInPage` agotó los 120 s bajo carga. **Pasa en solitario (2/2, 42.6 s)**; reaparición de la tanda del 2026-09-25 |
-| [`03-store-switcher-refresh-boton-crear-no-aparece.md`](03-store-switcher-refresh-boton-crear-no-aparece.md) | 🟡 inestable | Corrida del 2026-10-05 (SWR-1): el botón de crear tienda no apareció en 120 s. **Pasa en solitario en las dos corridas del 2026-10-06**; tercera aparición del síntoma |
-| [`04-store-switcher-refresh-swr2-locator-actual.md`](04-store-switcher-refresh-swr2-locator-actual.md) | 🔴 **abierta** | **Defecto del test confirmado** (intermitente, 1 de 2 corridas en solitario): `getByText('Actual')` también casa con el aviso «Tienda actualizada correctamente.» que el propio test provoca. Espera autorización 1 a 1 para corregirlo |
+| [`01-change-password-boton-offline-no-monta.md`](01-change-password-boton-offline-no-monta.md) | ✅ **causa raíz confirmada** | Corrida del 2026-10-05: el botón offline no montó dentro de los 5 s de la aserción bajo carga. **La aserción corre dentro de la ventana de pre-hidratación del shell SPA** (medida: 337→819 ms en ruta fría); **fix aplicado y verificado el 2026-10-06** (espera del montaje antes de la aserción, `2 passed (24.8s)`) |
+| [`02-store-create-security-setup-timeout.md`](02-store-create-security-setup-timeout.md) | ✅ **causa raíz medida** | Corrida del 2026-10-05: el fixture `signedInPage` agotó los 120 s. **Medido el 2026-10-06 con `--trace on` bajo contención (8 workers): el setup sube de 32.3 s a 63.6 s y el presupuesto se agota por suma de esperas acotadas** (12 s de `POST /auth/register`, 26.7 s de `waitForURL` tras registrar, frío de Vite); **causa raíz definitiva y fix aplicado el 2026-10-06 (opciones 2+3+4)** — el `POST /auth/register` del mint aborta bajo contención (`net::ERR_ABORTED`) y el `waitForURL` de `session.ts:255` esperaba SIN LÍMITE (`navigationTimeout` default 0, verificado en el fuente de Playwright 1.62.1); fix: `navigationTimeout: 60_000` + mint con detección por diálogo propio, 1 retry y error nombrado + `workers` local default 4; timeout del spec restaurado a 120_000 (el 240_000 se revirtió). Verificado: solitario 2 passed (18.6 s), 4 workers 27 passed (42.2 s); a 16 workers los 4 specs que caían pasan |
+| [`03-store-switcher-refresh-boton-crear-no-aparece.md`](03-store-switcher-refresh-boton-crear-no-aparece.md) | ✅ **causa raíz confirmada** | Corrida del 2026-10-05 (SWR-1): el botón de crear tienda no apareció en 120 s. **La selección persistida en la base apunta a una tienda creada por la interfaz (plan Pago, sin el módulo 14)**: el `/me` no trae el 14 y el botón no existe. Reproducido de forma determinista y **fix aplicado y verificado el 2026-10-06** (realineado de la selección, autorización 1 a 1) |
+| [`04-store-switcher-refresh-swr2-locator-actual.md`](04-store-switcher-refresh-swr2-locator-actual.md) | ✅ **fix aplicado y verificado** | Locator acotado a `getByText('Actual', { exact: true })` el 2026-10-06 (autorización 1 a 1): la sonda midió que el locator viejo casa con **2 nodos distintos** (aviso + marca) y el nuevo con 1. Spec verde dos corridas seguidas en solitario (22.4 s / 21.7 s) |
 | [`funcionan-en-solitario.md`](funcionan-en-solitario.md) | inventario | No es una ficha: es la medición de qué specs pasan cuando se corren solos, con el comando exacto y las reglas para mantenerla |
 
 ## Cómo se corrieron estas fichas
@@ -40,6 +40,34 @@ su texto completo sigue en el historial de git y su resumen está en el
 | `movement-reversal` E-R7: "no se reproduce" (2026-10-01) | ✅ **Re-confirmada** — 20/20 en solitario, 4.2 m |
 | `store-switcher-refresh` SWR-2: nunca falló / sin modo documentado | ❌ **Refutada** — cae en solitario (1 de 2 corridas) por un locator ambiguo: **ficha 04** |
 | Grupos B, C y D del 2026-09-24; fallos 1 a 4 y 6 del merge; corridas del 2026-10-01 y del 2026-10-03 | ⏸️ **No re-corridos el 2026-10-06** — sus arreglos están aplicados y verificados en sus propias corridas. Este barrido no los re-ejecutó: eso se dice, no se asume |
+
+### Cierre: las tres causas "no confirmadas" quedaron confirmadas
+
+Las fichas 01, 02 y 03 estaban en 🟡 *mecanismo sin cerrar*. El 2026-10-06 se cerraron con
+instrumentación desechable (specs y sondas temporales, **eliminados** después de medir; ningún test
+existente ni código de la app fue tocado):
+
+| Ficha | Qué se midió | Resultado |
+| --- | --- | --- |
+| 01 | El HTML que el dev server sirve para `/profile/change-password`, y el DOM cada ~20 ms entre `page.goto()` y `#oldPassword` visible | El `<body>` servido **es** el snapshot del fallo (`<section class="Toastify" … aria-label="Notifications Alt+T">` y nada más). La ventana de shell pelado es de ~480 ms (ruta fría) y ~250 ms (caliente); la aserción solo tiene los 5 s por defecto de `expect` |
+| 02 | El coste real del setup del fixture `signedInPage` para `store-user`, llamando a la misma función que el fixture | **32 324 ms** el primer *resolve* (mint + replay) y 3 340 ms el memoizado. Además se corrigió la lectura del snapshot: es el **layout de invitado** (`GENERAL.APP_NAME` + `GENERAL.APP_SUBTITLE` de `auth-layout.tsx`), no la portada pública, con la app a mitad de un login. El 2026-10-06 se midió además con `--trace on` bajo contención: **63.6 s de setup con 8 workers** (2× los 32.3 s en solitario), por suma de esperas acotadas |
+| 03 | El estado que deja el spec vecino en la base, y una demostración determinista del mecanismo | `sel=e2e-ssr-second-… (plan 2, module14=0)`; con la selección persistida en esa tienda, `/me` devuelve `storeModuleIds=[2..11]` (**sin el 14**) y `my-stores-create-button` **nunca** se hace visible |
+
+De los tres fixes propuestos, el de **03** (realinear la selección persistida) quedó **aplicado y
+verificado el 2026-10-06** con autorización 1 a 1 del usuario: ver la [ficha
+03](03-store-switcher-refresh-boton-crear-no-aparece.md) y el doc de tarea
+[`odd/tasks/e2e-switcher-session-realign.md`](../../../../odd/tasks/e2e-switcher-session-realign.md)
+(`2 passed (45.1s)` en solitario; `2 passed (2.3m)` con el drift de SSR-1 presente). Los de **01**
+(esperar el formulario) y de **04** (locator `getByText('Actual', { exact: true })`) quedaron
+aplicados y verificados el 2026-10-06 con autorización 1 a 1: `change-password` verde
+(`2 passed (24.8s)`) y `store-switcher-refresh` verde dos corridas seguidas (22.4 s / 21.7 s). En
+**02** la opción 1 (`240_000`) se aplicó y luego se **revirtió por pedido del usuario** (timeout
+de vuelta a `120_000`); con su autorización "arregla 2, del modo que sea… haz las otras partes"
+quedaron aplicadas y verificadas las opciones 2 a 4: `actionTimeout: 30_000` +
+`navigationTimeout: 60_000` en la config, mint acotado con detección por diálogo propio, 1 retry
+y error nombrado en `session.ts`, y `workers` local default 4. Causa raíz definitiva medida con
+trace: el registro aborta (`net::ERR_ABORTED`) y el `waitForURL` del mint era espera infinita
+(`navigationTimeout` default 0). Ningún test E2E se tocó.
 
 ## Registro de fichas retiradas
 

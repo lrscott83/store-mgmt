@@ -186,7 +186,7 @@ _Actualizado por última vez: 2026-09-24 (quinta actualización: corrida del 202
 | 3   | `web-catalog`                 | Crear producto en POS, sincronizar, editarlo y verlo publicado en `/catalog/<slug>`                               | Defecto del test: esperaba el aviso de éxito del guardado por producto, que ya no existe (decisión del 2026-10-01) | ✅ **Resuelto 2026-10-04** (1/1) |
 | 4   | `mayorista-sale`              | Venta mayorista con Transferencia (CUP) filtrable por método de pago                                             | Defecto del test: buscaba el radio "Transferencia (CUP)"; con el módulo 15 activo el sufijo de moneda se omite a propósito | ✅ **Resuelto 2026-10-04** (6/6) |
 | 5   | `precache-split` (2 tests)    | Los chunks de rutas Owner/StoreUser y las librerías pesadas (PDF, scanner, gráficos) están precacheados           | El service worker nunca llega a estado activado (timeout 30s)                                                    | ✅ **Resuelto 2026-10-06** — corría con el config equivocado (el dev server bloquea los service workers), no con el suyo; ficha retirada |
-| 6   | `store-switcher-refresh`      | Una tienda creada en la sesión aparece en el switcher del header sin re-login                                    | El botón de crear tienda nunca aparece (timeout 120s)                                                            | 🟡 **Reapareció el 2026-10-05** — inestable (falló el intento 1, pasó al reintento); ficha viva en [`known-issues/2026-10-06-e2e-verification/03-store-switcher-refresh-boton-crear-no-aparece.md`](known-issues/2026-10-06-e2e-verification/03-store-switcher-refresh-boton-crear-no-aparece.md) |
+| 6   | `store-switcher-refresh`      | Una tienda creada en la sesión aparece en el switcher del header sin re-login                                    | El botón de crear tienda nunca aparece (timeout 120s)                                                            | ✅ **Causa raíz confirmada y fix aplicado y verificado el 2026-10-06** — la selección persistida puede quedar en una tienda creada por la interfaz (plan Pago, sin el módulo 14) y el botón nunca aparece; reapareció el 2026-10-05 (falló el intento 1, pasó al reintento). Ficha: [`known-issues/2026-10-06-e2e-verification/03-store-switcher-refresh-boton-crear-no-aparece.md`](known-issues/2026-10-06-e2e-verification/03-store-switcher-refresh-boton-crear-no-aparece.md) |
 | —   | **Defecto sistémico**         | El dev server sirve la versión vigente de los paquetes del workspace                                            | No es un test: `vite.config.ts` deja un caché de Vite que puede servir un `dist/` viejo                        | ✅ **Resuelto 2026-10-02** — la Opción A se aplicó en el commit `d6f47d53`; ficha retirada el 2026-10-06 |
 
 **Tests E2E del backend (mismo día):** 660 passed, 0 failed. Sin relación con estos fallos.
@@ -404,9 +404,9 @@ Es la continuación directa de la corrida del 2026-10-04 (346 aprobados, 2 falli
 
 | # | Test | Qué se vio en el fallo | Estado |
 | --- | --- | --- | --- |
-| 1 | `change-password.spec.ts:126:5` — "offline: el botón de envío está deshabilitado" | La aserción de 5 s no encuentra el botón: la página estaba vacía (solo la región de notificaciones) | 🟡 inestable, sin diagnóstico cerrado |
-| 2 | `store-create-security.spec.ts:88:7` — "StoreUser en /management/stores/create es deslogueado y redirigido a /login" | `Test timeout of 120000ms exceeded while setting up "signedInPage"`: la portada pública seguía en "Cargando..." | 🟡 inestable, sin diagnóstico cerrado — reaparición del modo ya visto en la tanda del 2026-09-25 |
-| 3 | `store-switcher-refresh.spec.ts:173:5` — "SWR-1 — a store created this session appears in the header switcher without re-login" | `/management/my-stores` pintó sus tarjetas pero sin el botón de crear (el permiso `hasMultiStores` en falso) | 🟡 inestable, sin diagnóstico cerrado — tercera aparición del mismo síntoma (2026-09-25 y 2026-09-29) |
+| 1 | `change-password.spec.ts:126:5` — "offline: el botón de envío está deshabilitado" | La aserción de 5 s no encuentra el botón: la página estaba vacía (solo la región de notificaciones) | ✅ **Causa raíz confirmada y fix aplicado el 2026-10-06** — la aserción corre dentro de la ventana de pre-hidratación del shell SPA; se añadió la espera explícita del montaje antes de ella (`2 passed (24.8s)`) |
+| 2 | `store-create-security.spec.ts:88:7` — "StoreUser en /management/stores/create es deslogueado y redirigido a /login" | `Test timeout of 120000ms exceeded while setting up "signedInPage"`: la app quedó a mitad de un login en el layout de invitado (leído antes como "portada pública") | ✅ **Causa raíz definitiva y fix aplicado el 2026-10-06** — bajo contención el `POST /auth/register` del mint aborta (`net::ERR_ABORTED`), la app pinta su diálogo de error y el `waitForURL` de `session.ts:255` esperaba **sin límite** (`navigationTimeout` default 0; `actionTimeout` no aplica a la familia de navegación, verificado en el fuente de Playwright 1.62.1). Fix (opciones 2+3+4 de la ficha 02): `navigationTimeout: 60_000` + mint con detección por diálogo propio, 1 retry y error nombrado + `workers` local default 4; timeout del spec restaurado a 120_000. Verificado: solitario 2 passed (18.6 s), modo oficial 4 workers 27 passed (42.2 s); a 16 workers los 4 specs que caían pasan |
+| 3 | `store-switcher-refresh.spec.ts:173:5` — "SWR-1 — a store created this session appears in the header switcher without re-login" | `/management/my-stores` pintó sus tarjetas pero sin el botón de crear (el permiso `hasMultiStores` en falso) | ✅ **Causa raíz confirmada el 2026-10-06** — la selección persistida quedó en una tienda creada por la interfaz (plan Pago, sin el módulo 14); el fix (realinear) quedó **aplicado y verificado** el 2026-10-06 |
 
 **Fichas retiradas en esta corrida** (sus tests pasaron; el resumen y el cierre quedaron en el [Registro de fichas retiradas](known-issues/2026-10-06-e2e-verification/README.md#registro-de-fichas-retiradas)):
 
@@ -419,7 +419,7 @@ Es la continuación directa de la corrida del 2026-10-04 (346 aprobados, 2 falli
 | --- | --- |
 | Ficha 5 del merge de qa (`precache-split`) | ✅ Retirada el 2026-10-06 — corría con el config equivocado; pasa 3/3 con `playwright.pwa.config.ts` |
 | Ficha 7 del merge de qa (caché de dependencias de Vite) | ✅ Retirada el 2026-10-06 — la Opción A ya estaba aplicada desde el 2026-10-02 (commit `d6f47d53`) |
-| Fichas 01 a 03 (corrida del 2026-10-05) | 🟡 Los 3 inestables de esa corrida, documentados sin diagnóstico cerrado |
+| Fichas 01 a 03 (corrida del 2026-10-05) | ✅ Los 3 inestables de esa corrida: **causa raíz confirmada el 2026-10-06** (ventana de pre-hidratación, setup con login real, selección persistida); los fixes de 03, 02 y 01 quedaron **aplicados y verificados** el mismo 2026-10-06 (el de 04, también) |
 
 _Actualizado por última vez: 2026-10-05 (corrida completa: 351 aprobados, 0 fallidos, 3 inestables; las fichas de las corridas del 2026-10-01 y del merge de qa quedaron retiradas salvo `precache-split` y el defecto del caché de Vite)._
 
@@ -496,10 +496,51 @@ existente requiere autorización 1 a 1.
 
 | Ficha | Estado |
 | --- | --- |
-| [`known-issues/2026-10-06-e2e-verification/04-store-switcher-refresh-swr2-locator-actual.md`](known-issues/2026-10-06-e2e-verification/04-store-switcher-refresh-swr2-locator-actual.md) | 🔴 **Abierta** — defecto del test confirmado (intermitente), sin autorización para corregirlo |
-| [La carpeta de fichas](known-issues/2026-10-06-e2e-verification/README.md) (fichas 01 a 03) | 🟡 Inestables documentados; las fichas 1 y 2 y SWR-1 quedaron re-verificadas en solitario (pasan) |
+| [`known-issues/2026-10-06-e2e-verification/04-store-switcher-refresh-swr2-locator-actual.md`](known-issues/2026-10-06-e2e-verification/04-store-switcher-refresh-swr2-locator-actual.md) | ✅ **Fix aplicado y verificado** (2026-10-06) — locator acotado con `exact: true`; la sonda midió 2 nodos con el locator viejo y 1 con el nuevo; spec verde dos corridas seguidas |
+| [La carpeta de fichas](known-issues/2026-10-06-e2e-verification/README.md) (fichas 01 a 03) | ✅ **Causa raíz confirmada en las tres** (2026-10-06): ventana de pre-hidratación del shell (01), setup con login real que bajo contención se duplica — 32.3 s → 63.6 s, por suma de esperas acotadas — (02) y selección persistida en una tienda sin el módulo 14 (03). Los fixes de 03, de 02 (presupuesto del spec a `240_000`) y de 01 (espera del formulario) quedaron **aplicados y verificados** el mismo 2026-10-06, igual que el de la ficha 04 (locator exacto) |
 | [Registro de fichas retiradas](known-issues/2026-10-06-e2e-verification/README.md#registro-de-fichas-retiradas) | Todas las demás están cerradas y su resumen vive ahí |
 | [`known-issues/2026-10-06-e2e-verification/funcionan-en-solitario.md`](known-issues/2026-10-06-e2e-verification/funcionan-en-solitario.md) | Inventario (no es una ficha) de los specs que pasan en solitario |
+
+### Las tres causas "no confirmadas" quedaron confirmadas (2026-10-06)
+
+Las fichas 01, 02 y 03 seguían en 🟡 con el mecanismo sin cerrar. El mismo 2026-10-06 se midieron con
+instrumentación desechable —specs y sondas temporales, **eliminados** después de medir; ningún test
+existente ni código de la app fue tocado— y las tres quedaron **confirmadas**:
+
+- **01 — `change-password`, el botón offline que no monta.** El `<body>` que el dev server sirve para
+  `/profile/change-password` **es** el snapshot del fallo: `<section class="Toastify" …
+  aria-label="Notifications Alt+T">` y nada más (186 302 bytes, sin `oldPassword`). La ventana entre
+  `page.goto()` (337 ms) y `#oldPassword` visible (819 ms) es DOM de ese shell pelado; la aserción de
+  la línea 148 solo tiene los **5 s por defecto de `expect`**. No era el bootstrap de sesión: era la
+  espera que falta. **Fix aplicado el 2026-10-06** — espera explícita del montaje antes de la
+  aserción, verificado `2 passed (24.8s)`.
+- **02 — `store-create-security`, el fixture que agota 120 s.** El coste real del setup de
+  `signedInPage` para `store-user` se cronometró en **32 324 ms** (mint + replay; 3 340 ms el segundo
+  *resolve*, memoizado). Y la lectura del snapshot se corrigió: `VendeDTo` + "Automatiza tu Negocio"
+  son `GENERAL.APP_NAME`/`GENERAL.APP_SUBTITLE` del **layout de invitado** (`auth-layout.tsx`), no de
+  la portada pública — la app quedó a mitad de un login. **Medido el mismo día con `--trace on` bajo
+  contención (8 workers): el presupuesto se agota por suma de esperas acotadas** — setup de 63.6 s, de los
+  cuales 12 s son `POST /api/v1/auth/register` y 26.7 s el `waitForURL` tras registrar, más el frio de Vite —
+  no por una espera colgada: las acciones sin `actionTimeout` costaron 0.5-2.0 s cada una. Fix: se aplicó
+  la opción 1 (presupuesto del spec a `240_000`) con autorización 1 a 1 y se verificó en solitario
+  (`2 passed (38.0s)`) y bajo contención (2 `ok` con 8 workers); las opciones 2 a 4 siguen sin
+  autorizar.
+- **03 — `store-switcher-refresh` SWR-1, el botón que nunca aparece.** La causa ya estaba diagnosticada
+  en el spec vecino (`store-switch-back-logout.spec.ts`, SSR-2/SSR-3, 2026-09-26): la selección se
+  persiste en la base (`SwitchMyStoreCommand.cs:98`), `/me` devuelve los módulos de **esa** tienda, y
+  una tienda creada por la interfaz nace en el plan Pago, cuyo catálogo **no incluye MultiStores (14)**.
+  Medido: `e2e-… -> sel=e2e-ssr-second-… (plan 2, module14=0)`, y con esa selección el `/me` responde
+  `storeModuleIds=[2..11]` y `my-stores-create-button` nunca se hace visible. `store-switcher-refresh`
+  no tiene el realineado que su vecino sí tiene.
+
+De los tres fixes, el de **03 (realinear la selección persistida)** quedó **aplicado y verificado el
+2026-10-06** con autorización 1 a 1 del usuario: `frontend-react/e2e/store-switcher-refresh.spec.ts`
+trae el helper `realignSelectedStore` (el mismo realineado que el spec vecino) antes de la
+precondición, con corridas dirigidas `2 passed (45.1s)` (solo el spec) y `2 passed (2.3m)` (el
+escenario del drift de SSR-1). También quedaron aplicados y verificados el mismo día los de **01**
+(espera del formulario antes de la aserción, `2 passed (24.8s)`) y **02** (presupuesto del spec a
+`240_000`), más el de la ficha **04** (locator exacto, dos corridas seguidas verdes). De **02** siguen
+sin autorizar las opciones 2 a 4; ningún otro test se tocó.
 
 ### La carpeta de fichas queda unificada (2026-10-06)
 
@@ -516,5 +557,6 @@ nada: lo que se gana es no tener que abrir cinco carpetas para saber qué falla 
 App" que tapa "Desactivar" en `warehouses` (2026-10-03) — su test se arregló y ya no lo vigila.
 
 _Actualizado por última vez: 2026-10-06 (verificación dirigida: fichas 5 y 7 cerradas y retiradas, las
-causas documentadas confirmadas —salvo la de SWR-2, que quedó refutada— y nueva carpeta de tests que
+causas documentadas confirmadas —salvo la de SWR-2, que quedó refutada—, las fichas 01, 02 y 03 con
+causa raíz confirmada, el realineado de la ficha 03 aplicado y verificado, y nueva carpeta de tests que
 pasan en solitario)._

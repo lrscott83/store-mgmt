@@ -47,24 +47,62 @@ Archivo:
 `frontend-react/test-results/store-switcher-refresh-SWR-7aa52-r-switcher-without-re-login-chromium/error-context.md`
 (el trace conservado es el del reintento, `...-retry1/trace.zip`).
 
-**Causa raiz: NO CONFIRMADA.**
-Lo que la evidencia permite afirmar:
+**Causa raiz: CONFIRMADA (2026-10-06) — el boton depende de la tienda de la seleccion PERSISTIDA,
+no de la tienda que el spec siembra.**
+El snapshot ya decia lo esencial: la ruta pinto con sus tarjetas y sin el boton, o sea
+`user.storeModuleIds` sin el 14 (`my-stores.tsx:37`). Lo que faltaba era **por que** ese perfil no
+traia el 14, y la respuesta esta en el repo: `GetMeQuery.cs:103` calcula `StoreModuleIds` con los
+modulos de la tienda **`user.SelectedStoreId`** —la seleccion del usuario en la BASE, no la que el
+spec cree tener—, y esa seleccion la **persiste la app**: `SwitchMyStoreCommand.cs:98`
+(`user.SelectedStoreId = request.StoreId`). El spec, mientras tanto, siembra el 14 en la tienda de
+su **snapshot** (`selectedStoreId`) y confia en el /me.
 
-- No es un arranque colgado: la pantalla renderizo su titulo y las tarjetas de tiendas.
-- El boton de crear esta detras de un permiso de sesion, no del dibujo de la ruta:
-  `my-stores.tsx:37` calcula `hasMultiStores = (user?.storeModuleIds ?? []).includes(14)` y la
-  linea **217** solo pinta `my-stores-create-button` si ese valor es verdadero. El snapshot sin el
-  boton significa que el perfil en memoria **no traia el modulo 14**.
-- El test hace exactamente lo que su comentario de cabecera dice que hace falta para que lo traiga
-  (sembrar el 14 por SQL y refrescar el perfil con un /me real). Ninguna de esas dos cosas fallo de
-  forma ruidosa: el INSERT es idempotente y `refreshSessionFromMe` lanza excepcion si el /me no
-  responde. Quedo por medir **que devolvio ese /me** y si el 14 estaba en el perfil recargado.
-- No puede ser una carrera de milisegundos: el clic reintenta hasta 120 s y el boton no aparecio en
-  ninguno. O el perfil nunca llevo el 14, o la hidratacion posterior a la recarga lo reemplazo por
-  uno sin el 14 (por ejemplo, un /me posterior filtrado por facturacion). Con un solo snapshot no
-  se puede distinguir.
+La pieza que hace que la condicion sea silenciosa: **una tienda creada por la interfaz nace en el
+plan Pago, y ese catalogo NO incluye MultiStores (14)**. `CreateStoreCommand` la clampa
+explicitamente (*"12..17 — WholesaleSales, Warehouses, MultiStores, ... inherited from a
+Superior/VIP selected store are never copied"*). O sea: apenas la seleccion persistida apunta a
+una tienda creada por la UI, el /me responde sin el 14 y el boton de crear **no existe** para el
+`getByTestId('my-stores-create-button').click()`, que reintenta hasta los 120 s del test.
 
-**Tercera aparicion de un modo conocido — nunca antes diagnosticado.**
+**Este mismo modo ya estaba diagnosticado en este repo, en el spec vecino.**
+`store-switch-back-logout.spec.ts` (SSR-2, 2026-09-26) lo dice con esas palabras: *"SSR-1 (the
+serial test right before this one) ends with store B persisted server-side, so /me would answer
+with B's modules and the '+ Tienda' button would never render"*, y por eso agrega
+`realignBackendSelectedStore(page, selectedStoreId)` (un `PUT /v1/stores {storeId}`) **antes** de
+sembrar. SSR-3 lo repite: *"its module set lacks MultiStores 14 and '+ Tienda' never renders"*.
+`store-switcher-refresh.spec.ts` **no tiene ese realineado**: confia en que la seleccion persistida
+sigue siendo la de su snapshot. En una corrida aislada lo es (por eso SWR-1 pasa en solitario
+2/2); en una corrida completa no, porque el worker reutiliza su `personaCache` entre archivos y
+cualquier archivo que cambio la seleccion antes que el —o el propio archivo del switcher, que es
+`serial` y **salta sus realineados (SSR-2/SSR-3) cuando SSR-1 falla**— deja la seleccion apuntando a
+una tienda sin el 14. El snapshot del 2026-10-05 incluso muestra la huella de esa convivencia: la
+segunda tarjeta es `E2E-EDIT-1791239440732`, una tienda que creo **otro** spec en el mismo worker.
+
+**Evidencia medida hoy (instrumentacion desechable, borrada despues):**
+
+1. **Estado real que deja el spec vecino.** Un run dirigido de `SSR-1` (dos archivos en un worker)
+   dejo en `smca_test` exactamente esto, leido por polling de la base:
+   `e2e-20261006T110140-8r405v -> sel=e2e-ssr-second-1791298918420 (plan 2, module14=0, stores=2)`.
+   La seleccion persistida en una tienda creada por la interfaz: plan Pago y **0 filas** de
+   `StoreModule` para el modulo 14.
+2. **La demostracion deterministica del mecanismo** (spec temporal que pasa porque el boton NO
+   aparece):
+
+   ```
+   [tmp-drift] A=6baaae58-... (module14=1) · B=56a1220e-... (module14=0)
+   [tmp-drift] perfil tras /me: selectedStoreId=56a1220e-... storeModuleIds=[2,3,4,5,6,7,8,9,10,11]
+   [tmp-drift] boton de crear visible = false
+   1 passed (2.8m)
+   ```
+
+   A es la tienda del snapshot (con el 14 sembrado por el SQL del propio spec), B es una tienda
+   creada por el modal real, y la seleccion se movio con `PUT /v1/stores` —el mismo primitivo que
+   usa `realignBackendSelectedStore`, en la direccion contraria—. Con esa seleccion, el /me devuelve
+   un perfil sin el 14 (`storeModuleIds` = [2..11]) y `my-stores-create-button` **nunca se hace
+   visible**; el clic del spec habria esperado los 120 s y muerto igual que el 2026-10-05.
+
+**Tercera aparicion de un modo conocido — ya diagnosticado en el spec vecino, nunca conectado con
+esta ficha.**
 
 - `2026-09-29` — el mismo sintoma exacto ("el boton de crear tienda nunca aparece, timeout 120 s")
   quedo como fallo 6 de la corrida del merge de qa (registro en
@@ -75,25 +113,65 @@ Lo que la evidencia permite afirmar:
 - `2026-10-05` — vuelve a fallar en el intento 1 de la corrida completa. Esta es la primera vez que
   se conserva el snapshot del momento del fallo, y es el que muestra que la ruta pinto sin el boton.
 
-**Clasificacion:** inestable de entorno/carga en la preparacion de la sesion (tentativo). No hay
-evidencia de defecto de la aplicacion ni de expectativa equivocada del test.
+**Clasificacion:** defecto de **precondicion del test** (no de la aplicacion) — **confirmado**: el
+boton esta detras de un permiso de la SESION, y la sesion depende de una seleccion que otra parte
+del suite puede haber movido y que la app persiste en la base. No hay defecto de la app.
 
-**Propuesta de solucion (no aplicada — tocar un test E2E requiere autorizacion 1 a 1).**
-Medir antes de parchear:
+**Propuesta de solucion — APLICADA el 2026-10-06 (autorizacion 1 a 1 del usuario, solo a este spec).**
+La misma que ya usa el spec vecino, en el mismo punto: **realinear la seleccion persistida antes de
+la precondicion** — un `PUT /v1/stores { storeId: selectedStoreId }` (el equivalente a
+`realignBackendSelectedStore`, que es no-op cuando ya coincide) al principio de SWR-1 y de SWR-2, y
+recien despues sembrar el 14 y refrescar con el /me. Alternativa si se prefiere no tocar el spec:
+que la restauracion de la sesion realinee la seleccion en la base, para que la del snapshot y la de
+la base no puedan divergir. Como red de seguridad del diagnostico: esperar el boton como
+precondicion visible (`await expect(button).toBeVisible()`) para que un fallo futuro apunte a
+"perfil sin permiso" en vez de a un clic que espera 120 s.
 
-1. Correr el spec en solitario (`pnpm exec playwright test e2e/store-switcher-refresh.spec.ts`) y
-   registrar el `storeModuleIds` del perfil despues de `refreshSessionFromMe`. Si el 14 esta, el
-   problema es la recarga bajo carga; si no esta, el problema es el sembrado o el filtro de
-   facturacion del /me.
-2. Si el modulo llega pero la recarga lo pierde, dejar de depender de la recarga: esperar el boton
-   como precondicion visible antes de usarlo (`await expect(button).toBeVisible()` con el mismo
-   timeout) para que el fallo apunte a la causa (perfil sin permiso) en vez de al clic.
+**Los dos puntos de la propuesta original — respondidos por la medicion de hoy:** (1) en solitario
+el 14 SI llega al perfil (SWR-1 pasa; el sembrado y el /me funcionan), y (2) el perfil no lo pierde
+por la recarga: lo pierde porque el /me describe la tienda de la **seleccion persistida**, que no
+es la del snapshot.
 
-**Verificacion.** Ninguna: no se toco nada. La corrida completa marco el test como inestable
-(paso al reintento).
+**Verificacion (2026-10-05).** Ninguna: no se toco nada en esa fecha. La corrida completa marco el
+test como inestable (paso al reintento).
 
-**Estado final (2026-10-05):** 🟡 inestable documentado — sin diagnostico cerrado, con dos
-antecedentes (2026-09-25 y 2026-09-29) del mismo sintoma.
+**Aplicada y verificada (2026-10-06, sobre `store-switcher-refresh.spec.ts`).** Se agrego el helper
+`realignSelectedStore(page, storeId)` —un `PUT /v1/stores { storeId }`, el mismo realineado del spec
+vecino— y se lo llama antes de `seedMultiStoresModule` + `refreshSessionFromMe` en SWR-1 y en SWR-2,
+con la causa raiz documentada en la cabecera del archivo. La red de seguridad del diagnostico
+(esperar el boton como precondicion visible) NO se agrego: queda para una autorizacion aparte. La
+instrumentacion de medicion (sonda de base y runner) fue temporal y se elimino.
+
+Verificacion, comandos y resultados observados:
+
+```
+cd frontend-react
+npx playwright test e2e/store-switcher-refresh.spec.ts --workers=1 --retries=0 --reporter=line
+# 2 passed (45.1s)
+
+# escenario del drift, un worker, dos archivos (SSR-1 deja la seleccion en B, sin el 14; SWR-1 corre despues):
+npx playwright test e2e/store-switch-back-logout.spec.ts e2e/store-switcher-refresh.spec.ts \
+  --grep "SSR-1|SWR-1" --workers=1 --retries=0 --reporter=line
+# 2 passed (2.3m) · EXITCODE=0
+```
+
+Sonda de base (solo cambios) durante la segunda corrida:
+
+```
+15:33:15  e2e-…-7fjx25 -> sel=e2e-ssr-second-1791300784013 (module14=0, stores=2)     <- el drift que deja SSR-1
+15:33:20  e2e-…-7fjx25 -> sel=E2E Store 20261006T113239-7fjx25 (module14=1, stores=2)  <- realineado de SWR-1
+15:33:23  e2e-…-7fjx25 -> sel=E2E Store 20261006T113239-7fjx25 (module14=1, stores=3)  <- SWR-1 creo su tienda
+```
+
+La misma condicion que reproducia el timeout de 120 s —seleccion persistida en una tienda creada por
+la interfaz, sin el modulo 14— ahora termina en verde, y la sonda muestra el realineado en el momento
+exacto en que SWR-1 arranca.
+
+**Estado final (2026-10-06):** ✅ **causa raiz confirmada y fix aplicado y verificado** — precondicion
+de sesion: la seleccion persistida puede apuntar a una tienda creada por la interfaz (plan Pago, sin
+el modulo 14), y el boton de crear no existe para ese perfil. El realineado quedo aplicado en
+`store-switcher-refresh.spec.ts` con autorizacion 1 a 1 del usuario (2026-10-06) y verificado en el
+escenario del drift (`2 passed`, exit 0).
 
 ---
 
@@ -111,10 +189,12 @@ npx playwright test e2e/store-switcher-refresh.spec.ts --workers=1 --retries=0 -
 Log: `/tmp/iso-store-switcher-refresh.log`.
 
 - **SWR-1 (esta ficha) — pasa en solitario.** Su modo de fallo (el boton de crear tienda no aparece
-  en 120 s) no se reproduce con la maquina libre, lo que **sostiene la clasificacion de carga** de esta
-  ficha. La respuesta al punto 1 de la propuesta ("medir en solitario") queda dada: la preparacion de
-  la sesion —sembrar el 14 por SQL y refrescar con un /me real— **si trae el modulo 14** cuando no hay
-  contencion, porque el spec llega a crear la tienda por la interfaz y a abrir el switcher.
+  en 120 s) no se reproduce con la maquina libre. La respuesta al punto 1 de la propuesta ("medir en
+  solitario") queda dada: la preparacion de la sesion —sembrar el 14 por SQL y refrescar con un /me
+  real— **si trae el modulo 14** cuando no hay contencion, porque el spec llega a crear la tienda por
+  la interfaz y a abrir el switcher. Lo que hoy se sabe —y esta corrida aislada ya lo anticipaba— es
+  que eso vale **siempre que nadie haya movido antes la seleccion persistida**: aislado no puede
+  pasar; en la corrida completa, si.
 - **SWR-2 — cae en solitario en una de dos corridas, con un modo que ninguna ficha tenia
   documentado.** (Corrida 1: falla; corrida 2, 25.8 s: 2 passed.) El fallo no es el de esta ficha: es
   la asercion de la marca "Actual" del popup, que choca con el aviso de exito del guardado («Tienda
@@ -125,6 +205,8 @@ Log: `/tmp/iso-store-switcher-refresh.log`.
 Evidencia de la corrida aislada en
 [`funcionan-en-solitario.md`](funcionan-en-solitario.md).
 
-**Estado final actualizado (2026-10-06):** 🟡 inestable documentado — SWR-1 pasa en solitario en las
-dos corridas (clasificacion de carga sostenida); el unico fallo del archivo es de SWR-2, intermitente y
-propio del test, con ficha nueva en la carpeta del 2026-10-06.
+**Estado final actualizado (2026-10-06):** ✅ causa raiz **confirmada y cerrada** — SWR-1 pasa en
+solitario (2/2) porque aislado la seleccion persistida no puede estar movida; el mecanismo
+(precondicion de sesion sobre la tienda de la seleccion PERSISTIDA, sin realineado) quedo confirmado
+con la medicion de arriba, y el unico fallo del archivo en solitario es el de SWR-2, que tiene ficha
+propia: [`04-store-switcher-refresh-swr2-locator-actual.md`](04-store-switcher-refresh-swr2-locator-actual.md).

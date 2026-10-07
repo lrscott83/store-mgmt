@@ -45,32 +45,65 @@ tiene contenido de la ruta. Archivo:
 `frontend-react/test-results/change-password-offline-el-boton-de-envio-esta-deshabilitado-chromium/error-context.md`
 (el trace conservado es el del reintento, `...-retry1/trace.zip`).
 
-**Causa raiz: NO CONFIRMADA.**
-Lo que la evidencia permite afirmar:
+**Causa raiz: CONFIRMADA (2026-10-06) — la asercion corre dentro de la ventana de pre-hidratacion.**
+El arbol vacio del `error-context.md` no es una app colgada: es **el shell SPA tal como lo sirve el
+dev server, antes de que React monte la ruta**. Su arbol de accesibilidad es `region "Notifications
+Alt+T"` y nada mas — exactamente el snapshot del fallo. Dos mediciones hechas hoy lo cierran (banco
+de diagnostico temporal, borrado despues de medir; no se toco ningun test existente):
 
-- No es un defecto de la asercion: el boton existe y se deshabilita cuando la pagina esta
-  montada (el reintento y las corridas anteriores pasan). La asercion esta bien escrita.
-- El modo de fallo es de **tiempo de montaje**: la asercion tiene solo 5 s (default de
-  Playwright para `expect`) y espera el boton sin esperar antes a que el formulario este en
-  pantalla. Bajo la carga de la suite completa (4 workers + backend + dev server + PostgreSQL)
-  el arranque de esa ruta no completo dentro de esa ventana.
-- No hay snapshot intermedio (que pantalla se veia en lugar del formulario) porque la pagina
-  no renderizo ningun nodo: no se puede distinguir entre "app arrancando" y "ruta colgada en
-  el bootstrap de sesion".
+1. **El HTML servido para esa URL es, literalmente, el del snapshot.**
+   `GET http://localhost:3333/profile/change-password` responde `200`, 186 302 bytes, y el `<body>`
+   empieza asi:
 
-**Clasificacion:** inestable de entorno/carga (tentativo). Ni defecto del test (la asercion
-es correcta) ni defecto de la aplicacion demostrado.
+   ```html
+   <body><section class="Toastify" aria-live="polite" aria-atomic="false" aria-relevant="additions text" aria-label="Notifications Alt+T"></section><script>window.__reactRouterContext = {...}
+   ```
 
-**Propuesta de solucion (no aplicada — tocar un test E2E requiere autorizacion 1 a 1).**
+   El documento **no contiene navbar, ni heading, ni formulario**, y la subcadena `oldPassword` no
+   aparece en el HTML. El unico nodo del arbol de accesibilidad de ese documento es la region del
+   `ToastContainer` (`root.tsx:82`): el snapshot del fallo es una foto de ese documento.
+2. **La ventana entre `page.goto()` y el commit de la ruta es real, y se midio.** Un spec temporal
+   muestreo el DOM cada ~20 ms desde que `page.goto()` resuelve (maquina libre, sin contencion):
+
+   | Visita | `goto` resuelve | `#oldPassword` visible | Ventana con el DOM del shell |
+   |---|---|---|---|
+   | ruta fria (primer request: Vite compila el modulo) | 337 ms | 819 ms | ~480 ms |
+   | ruta caliente (segunda visita) | 326 ms | 575 ms | ~250 ms |
+
+   En las dos muestras, durante cientos de milisegundos, el DOM es exactamente el del snapshot:
+   `form=false`, `h1=null`, `bodyLen=95991` (el largo del shell servido). `HydrateFallback` devuelve
+   `null` a proposito (`root.tsx:165-167`, SPA mode), asi que en esa ventana **no hay ningun
+   fallback visible**: la pantalla es el shell pelado.
+
+**Mecanismo (por que falla).** `change-password.spec.ts:148` afirma
+`await expect(submitButton).toBeDisabled()` **sin esperar antes a que el formulario exista**. La
+unica espera de esa afirmacion es el default de Playwright para `expect`: **5 s**. Cualquier cosa
+que alargue el arranque del cliente por encima de esos 5 s —la compilacion bajo demanda del dev
+server y, sobre todo, la contencion de la corrida completa (la config reparte los tests entre todos
+los CPUs: 8+ workers contra un unico dev server + backend + PostgreSQL)— hace que la asercion corra
+y muera dentro de la ventana de pre-hidratacion. No es un defecto de la app ni de la asercion: es la
+espera que falta.
+
+**Clasificacion:** inestable de entorno/carga — **confirmada** (deja de ser tentativa): la ventana
+de pre-hidratacion existe siempre (medida: ~250-480 ms en una maquina libre) y su duracion es lo
+unico que depende de la carga.
+
+**Propuesta de solucion — PUESTA EN PRACTICA el 2026-10-06 con autorizacion 1 a 1**
+(ver "Fix aplicado y verificado" mas abajo).
+Con la causa confirmada, esta es la espera exacta que falta:
 Antes de la asercion de deshabilitado, esperar a que el formulario exista
 (`await expect(page.locator('#oldPassword')).toBeVisible()`), que es lo que ya hace el test 1
 del mismo archivo. Es la espera que falta: convierte los 5 s de la asercion en una espera del
 estado real. Alternativa, si se repite: subir el timeout de esa unica asercion.
 
-**Verificacion.** Ninguna: no se toco nada. La corrida completa marco el test como inestable
-(paso al reintento) y no hay evidencia de un fallo determinista.
+**Verificacion.** Hasta el 2026-10-06 ninguna: no se toco nada. La corrida completa marco el
+test como inestable (paso al reintento) y no hay evidencia de un fallo determinista. El fix
+se aplico despues — ver "Fix aplicado y verificado" mas abajo.
 
-**Estado final (2026-10-05):** 🟡 inestable documentado — sin diagnostico cerrado.
+**Estado final (2026-10-06):** ✅ **causa raiz confirmada** — la asercion corre dentro de la ventana
+de pre-hidratacion del shell SPA (medida: ~250-480 ms en maquina libre; el shell servido es
+exactamente el snapshot del fallo). El fix (esperar el formulario antes de afirmar) sigue **sin
+aplicar**: tocar el test requiere autorizacion 1 a 1.
 
 ---
 
@@ -90,11 +123,39 @@ Log: `/tmp/iso-change-password.log`. Teardown: 57 filas `e2e-*` borradas de `smc
 tests, con el montaje de la ruta que aqui fallo— completa en 50.0 s cuando la maquina esta libre, muy
 por debajo de cualquier umbral. Con la suite entera (4 workers + backend + dev server + PostgreSQL) el
 paso 1 de este mismo test no llego a montar en 5 s. **La clasificacion "inestable de entorno/carga"
-queda sostenida por evidencia** (antes era tentativa); el mecanismo fino —si el retraso fue del
-bootstrap de sesion o del montaje de la ruta— sigue sin medirse, y por eso el estado no cambia.
+queda sostenida por evidencia** (antes era tentativa). El mecanismo fino quedo medido despues, el
+mismo 2026-10-06: **no** era el bootstrap de sesion, era la ventana de pre-hidratacion del shell SPA
+(seccion "Causa raiz: CONFIRMADA" arriba).
 
 Evidencia de la corrida aislada en
 [`funcionan-en-solitario.md`](funcionan-en-solitario.md).
 
-**Estado final actualizado (2026-10-06):** 🟡 inestable documentado — clasificacion de carga
-confirmada por corrida aislada, mecanismo sin cerrar.
+---
+
+## Fix aplicado y verificado (2026-10-06) — autorizacion 1 a 1
+
+Se aplico el paso 1 de la propuesta tal cual: una espera explicita del montaje del formulario
+**antes** de la asercion de deshabilitado. Unico cambio en `change-password.spec.ts`
+(+6 lineas, de las cuales 4 son comentario; CRLF preservado):
+
+```
+const submitButton = page.getByRole('button', { name: SUBMIT_TEXT });
+// ... comentario de la fija 01 ...
+await expect(submitButton).toBeVisible({ timeout: 15_000 });  // la espera que faltaba
+await expect(submitButton).toBeDisabled();                     // asercion INTACTA
+```
+
+La asercion **no se debilito**: sigue siendo `toBeDisabled()` con su default de 5 s; lo
+anadido es la espera del estado real que la propia propuesta pedia.
+
+Verificacion (foreground, sin suite completa):
+
+```
+npx playwright test --list e2e/change-password.spec.ts           # 2 tests, OK
+npx playwright test e2e/change-password.spec.ts --workers=1 --retries=0 --reporter=list
+# 2 passed (24.8s) · EXITCODE=0 · teardown: 57 filas e2e-* borradas de smca_test
+```
+
+**Estado final actualizado (2026-10-06):** ✅ causa raiz confirmada **y FIX APLICADO** —
+ventana de pre-hidratacion medida, espera explicita anadida antes de la asercion y spec verde
+en solitario (`2 passed (24.8s)`, exit 0).
