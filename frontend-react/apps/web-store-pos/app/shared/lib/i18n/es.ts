@@ -432,6 +432,15 @@ const messages: Record<string, string> = {
   'CHECKOUT.FAILED': 'No se pudo crear el pedido. Inténtalo de nuevo.',
   'CHECKOUT.DELIVERY_FEE': 'Costo del envío',
   'CHECKOUT.MINIMUM_ORDER': 'Importe mínimo del pedido',
+  // Envío del pedido por WhatsApp (F4). El texto del RESUMEN que viaja en el enlace va en
+  // `catalog/lib/whatsapp-order-link.ts`: lo lee la tienda en su chat, no es interfaz de la app.
+  // Aquí solo está el estado que ve el cliente en el navegador.
+  'CHECKOUT.WHATSAPP_TITLE': 'Envío por WhatsApp',
+  'CHECKOUT.WHATSAPP_PENDING':
+    'Pedido {code} guardado. Abrimos WhatsApp con el resumen: queda pendiente de confirmar por WhatsApp.',
+  'CHECKOUT.WHATSAPP_BLOCKED':
+    'Pedido {code} guardado. Esta tienda no tiene un número de WhatsApp, así que el envío quedó bloqueado: guarda el código y escríbele por otro medio.',
+  'CHECKOUT.WHATSAPP_LINK': 'Abrir el chat de WhatsApp',
   'ORDER.CREATED_TITLE': 'Pedido creado',
   'ORDER.CREATED_LEAD':
     'Guarda este código: con él y tu teléfono puedes consultar el estado de tu pedido cuando quieras.',

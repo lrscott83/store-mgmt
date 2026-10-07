@@ -278,6 +278,15 @@ export interface PublicOrderCreated {
   total: number;
   /** Moneda del catálogo por valor de `Currency`. */
   currency: number;
+  /**
+   * Número de WhatsApp de la tienda (F4, decisión T2). Viaja AQUÍ y no en el config público:
+   * quien recibe esta respuesta es quien acaba de dejar sus datos de contacto para este pedido,
+   * mientras que el config lo lee cualquiera que abra el catálogo.
+   *
+   * `null`/`undefined` cuando la tienda no lo tiene configurado: el enlace `wa.me` queda
+   * BLOQUEADO y el pedido sigue guardado.
+   */
+  whatsappNumber?: string | null;
 }
 
 /**

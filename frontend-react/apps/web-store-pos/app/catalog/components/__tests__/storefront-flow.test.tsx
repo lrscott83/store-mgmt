@@ -298,6 +298,90 @@ describe('storefront cart / checkout / order status (F3)', () => {
 
       expect(await screen.findByTestId('checkout-error')).toBeInTheDocument();
     });
+
+    // ── F4: envío del pedido por WhatsApp ──────────────────────────────────────────────────
+    // El pedido YA está guardado cuando esto ocurre: el enlace es el AVISO, no el pedido. Por eso
+    // estos tests fijan las dos caras a la vez — el `wa.me` que se abre y el `onCreated` que
+    // avisa al padre— y comprueban que el alta se reporta igual incluso sin número.
+    describe('envío por WhatsApp', () => {
+      const CREATED_WITH_NUMBER: PublicOrderCreated = {
+        ...CREATED,
+        whatsappNumber: '+53 5-987 6543',
+      };
+
+      function submitValidOrder() {
+        fireEvent.change(screen.getByTestId('checkout-name'), { target: { value: 'Ana' } });
+        fireEvent.change(screen.getByTestId('checkout-phone'), { target: { value: '5351234567' } });
+        fireEvent.click(screen.getByTestId('checkout-submit'));
+      }
+
+      it('abre el chat de wa.me con el código y el resumen, y avisa de que queda pendiente', async () => {
+        // `window.open` no existe de verdad en jsdom: se espía para poder leer la URL.
+        const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+        serviceMock.createPublicOrder.mockResolvedValue(envelope(CREATED_WITH_NUMBER));
+        const onCreated = vi.fn();
+        renderCheckout({ onCreated });
+
+        submitValidOrder();
+
+        await waitFor(() => expect(openSpy).toHaveBeenCalledTimes(1));
+        const [url, target, features] = openSpy.mock.calls[0] as [string, string, string];
+        // El número normalizado a dígitos: `wa.me` no entiende "+53 5-987 6543".
+        expect(url).toContain('https://wa.me/5359876543?text=');
+        expect(target).toBe('_blank');
+        // `noopener`: la pestaña de WhatsApp es de OTRO origen y no debe poder tocar la del
+        // catálogo a través de `window.opener`.
+        expect(features).toBe('noopener');
+
+        const summary = new URL(url).searchParams.get('text') ?? '';
+        expect(summary).toContain('K7M2QX');
+        expect(summary).toContain('2 × Camisa azul');
+
+        expect(screen.getByTestId('checkout-whatsapp-pending')).toHaveTextContent(
+          'pendiente de confirmar por WhatsApp',
+        );
+        // El alta se reporta igual: el resumen es un aviso, no el pedido.
+        expect(onCreated).toHaveBeenCalledWith(CREATED_WITH_NUMBER);
+        openSpy.mockRestore();
+      });
+
+      // `window.open` devolvió null: el navegador bloqueó la ventana (o, con `noopener`, no hay
+      // handle). El enlace queda a la vista para que el pedido se pueda enviar a mano.
+      it('deja el enlace a la vista cuando el navegador bloquea la ventana', async () => {
+        const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+        serviceMock.createPublicOrder.mockResolvedValue(envelope(CREATED_WITH_NUMBER));
+        renderCheckout();
+
+        submitValidOrder();
+
+        await waitFor(() => expect(openSpy).toHaveBeenCalledTimes(1));
+        const link = await screen.findByTestId('checkout-whatsapp-link');
+        expect(link).toHaveAttribute('href', openSpy.mock.calls[0][0] as string);
+        expect(link).toHaveTextContent('Abrir el chat de WhatsApp');
+        openSpy.mockRestore();
+      });
+
+      // Sin número NO se abre un chat contra un destinatario vacío: el envío queda BLOQUEADO con
+      // aviso y el pedido sigue guardado, que es justo lo que ve la tienda en su panel.
+      it('sin número NO abre nada: el envío queda bloqueado y el pedido sigue guardado', async () => {
+        const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+        const createdWithoutNumber: PublicOrderCreated = { ...CREATED, whatsappNumber: null };
+        serviceMock.createPublicOrder.mockResolvedValue(envelope(createdWithoutNumber));
+        const onCreated = vi.fn();
+        renderCheckout({ onCreated });
+
+        submitValidOrder();
+
+        expect(await screen.findByTestId('checkout-whatsapp-blocked')).toHaveTextContent('K7M2QX');
+        expect(screen.getByTestId('checkout-whatsapp-blocked')).toHaveTextContent(
+          'quedó bloqueado',
+        );
+        expect(openSpy).not.toHaveBeenCalled();
+        expect(screen.queryByTestId('checkout-whatsapp-link')).not.toBeInTheDocument();
+        expect(onCreated).toHaveBeenCalledWith(createdWithoutNumber);
+        openSpy.mockRestore();
+      });
+    });
   });
 
   describe('estado del pedido', () => {

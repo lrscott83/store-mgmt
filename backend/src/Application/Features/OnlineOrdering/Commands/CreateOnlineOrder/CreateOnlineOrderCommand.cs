@@ -80,8 +80,17 @@ namespace Application.Features.OnlineOrdering.Commands.CreateOnlineOrder
         public int Quantity { get; set; }
     }
 
-    /// <summary>Lo que devuelve el alta: el código con el que la persona consulta y escribe por WhatsApp.</summary>
-    public sealed record OnlineOrderCreatedDto(Guid Id, string Code, decimal Total, Currency Currency);
+    /// <summary>
+    /// Lo que devuelve el alta: el código con el que la persona consulta y escribe por WhatsApp.
+    ///
+    /// `WhatsappNumber` viaja AQUÍ y no en el config público (decisión T2): el config lo lee
+    /// cualquiera que abra el catálogo, así que publicarlo ahí haría el número rastreable con una
+    /// simple petición; esta respuesta solo la recibe quien acaba de dejar sus datos de contacto
+    /// para ese pedido. Viene TAL CUAL lo guardó la tienda —normalizarlo a solo dígitos es tarea
+    /// del cliente que arma el enlace `wa.me`— y es `null` cuando la tienda no lo tiene
+    /// configurado, que es lo que permite BLOQUEAR el envío en vez de abrir un chat vacío.
+    /// </summary>
+    public sealed record OnlineOrderCreatedDto(Guid Id, string Code, decimal Total, Currency Currency, string? WhatsappNumber);
 
     public class CreateOnlineOrderCommandHandler
         : ICommandHandler<CreateOnlineOrderCommand, OnlineOrderCreatedDto>
@@ -217,7 +226,15 @@ namespace Application.Features.OnlineOrdering.Commands.CreateOnlineOrder
 
             await _applicationUnitOfWork.SaveChangesAsync(cancellationToken);
 
-            return ResponseResult.Success(new OnlineOrderCreatedDto(order.Id, order.Code!, order.Total, order.Currency));
+            return ResponseResult.Success(new OnlineOrderCreatedDto(
+                order.Id,
+                order.Code!,
+                order.Total,
+                order.Currency,
+                // El número sale de la MISMA lectura de configuración que ya fijó el envío y el
+                // mínimo: una consulta menos y ninguna posibilidad de que el enlace se arme con
+                // un número de una versión distinta de la que el resto del pedido usó.
+                settings.WhatsappNumber));
         }
 
         /// <summary>

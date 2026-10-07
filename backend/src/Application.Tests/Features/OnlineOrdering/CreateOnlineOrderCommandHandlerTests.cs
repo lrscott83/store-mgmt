@@ -728,4 +728,64 @@ public class CreateOnlineOrderCommandHandlerTests
     }
 
     #endregion
+
+    #region F4: el número de WhatsApp viaja SOLO en la respuesta del alta
+
+    /// <summary>
+    /// T2: el número de WhatsApp viaja en la RESPUESTA DEL ALTA, no en el config público. El
+    /// config lo lee cualquiera que abra el catálogo —publicarlo ahí haría el número rastreable
+    /// con una simple petición—; la respuesta solo la recibe quien acaba de dejar sus datos de
+    /// contacto para ese pedido, y es justo la que necesita el resumen `wa.me`.
+    ///
+    /// Sale TAL CUAL lo guardó la tienda, con sus espacios y sus signos: normalizarlo ("solo
+    /// dígitos") es tarea del cliente que arma la URL, no de una respuesta que además sirve para
+    /// pintar el pedido recién creado.
+    /// </summary>
+    [Fact]
+    public async Task Handle_ShouldReturnTheWhatsappNumberOfTheStore()
+    {
+        PublishedStore();
+        StoreCatalogSettings settings = EnabledSettings();
+        settings.WhatsappNumber = "+53 5-000 0000";
+        Guid productId = Publish("Arroz", 100m);
+
+        var result = await Handler().Handle(Command(productId: productId), CancellationToken.None);
+
+        result.Data!.WhatsappNumber.Should().Be("+53 5-000 0000");
+    }
+
+    /// <summary>
+    /// Tienda SIN número NO es un fallo del alta: el pedido se guarda igual (la tienda lo ve en
+    /// su panel aunque el mensaje no llegue) y la respuesta lo dice con un `null`. Ese `null` es
+    /// lo que el cliente usa para BLOQUEAR el envío, en vez de abrir un chat contra un número
+    /// vacío.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenTheStoreHasNoWhatsappNumber_ShouldReturnNullAndKeepTheOrder()
+    {
+        PublishedStore();
+        EnabledSettings();
+        Guid productId = Publish("Arroz", 100m);
+
+        var result = await Handler().Handle(Command(productId: productId), CancellationToken.None);
+
+        result.Succeeded.Should().BeTrue();
+        result.Data!.WhatsappNumber.Should().BeNull();
+        _orderRepository.Verify(x => x.AddAsync(It.IsAny<Order>()), Times.Once);
+    }
+
+    /// <summary>
+    /// El número es de la TIENDA, nunca del cliente: si el comando admitiera un campo
+    /// `WhatsappNumber`, un anónimo podría apuntar el resumen al número que quisiera. Fija esa
+    /// ausencia por comportamiento, igual que `Code`.
+    /// </summary>
+    [Fact]
+    public void CreateOnlineOrderCommand_ShouldCarryNoWhatsappNumberField()
+    {
+        typeof(CreateOnlineOrderCommand).GetProperties()
+            .Select(p => p.Name)
+            .Should().NotContain("WhatsappNumber");
+    }
+
+    #endregion
 }
