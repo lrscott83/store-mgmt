@@ -4,17 +4,21 @@
 #
 # What it does:
 #   1. Backs up the PRODUCTION database (pg_dump) into ./backups. MANDATORY.
+#      It also backs up the CATALOG IMAGES from the storage volume, stamped with
+#      the same timestamp: the photos live in a podman volume, not in the dump.
 #   2. Fetches the production sources (branch $BRANCH, default main) into ./prod-store-mgmt.
 #   3. Builds the production backend image (tags :previous and :<sha>).
 #   4. Applies the SQL scripts from backend/scripts that are not yet in the prod DB.
 #   5. Deploys the production stack.
-#   6. Smoke-tests it; on failure it ROLLS BACK: restores the DB from the backup,
-#      re-tags :previous as :latest and redeploys.
+#   6. Smoke-tests it; on failure it ROLLS BACK: restores the DB and the catalog
+#      images from their backups, re-tags :previous as :latest and redeploys.
 #   7. Tags the deployed git revision and writes deploy-state.txt.
 #
 # SAFETY:
 #   - A valid DB backup is taken BEFORE any write. No backup, no deploy.
-#   - Rollback restores BOTH the database and the backend image.
+#   - Rollback restores the database, the backend image AND the catalog images.
+#     The images are rewound as well because restore_db() rewinds the rows that
+#     reference them; leaving the files on disk would desync the catalog.
 #   - The test stack (smca-test) is never touched.
 #   - The podman-compose project name is read from the running prod container's
 #     labels; it is never invented. Inventing it would make `compose up` create NEW
@@ -23,11 +27,14 @@
 # Usage:   ./deploy-prod.sh [--yes] [--dry-run] [--rollback] [--help]
 #   --yes        skip the interactive confirmation
 #   --dry-run    backup + fetch + build + validate only; no DB writes, no deploy
-#   --rollback   restore the DB from the latest backup + :previous image + redeploy
+#   --rollback   restore the DB + catalog images from the latest backup +
+#                :previous image + redeploy
 #   --help       show this help
 #
 # Prerequisites:
 #   - bash, podman, podman-compose, git, curl, gzip (flock recommended).
+#     The catalog image backup needs `tar` INSIDE the backend container (the
+#     aspnet:8.0 image has it); gzip runs on the host.
 #   - Upload this script to its own folder on the VPS (e.g. /home/malayo/prod-deploy/)
 #     together with the PRODUCTION .env. It creates ./backups, ./logs and ./prod-store-mgmt.
 #   - The .env must live at the ROOT OF THE SOURCES CLONE (./prod-store-mgmt/.env).
@@ -45,12 +52,23 @@ LOG_DIR="$SCRIPT_DIR/logs"
 REPO_URL="${REPO_URL:-https://github.com/lrscott83/store-mgmt.git}"
 BRANCH="${BRANCH:-main}"
 PROD_DB_CONTAINER="${PROD_DB_CONTAINER:-smca_postgres_db}"
+PROD_BACKEND_CONTAINER="${PROD_BACKEND_CONTAINER:-smca_backend}"
 PROD_DB_NAME="${PROD_DB_NAME:-smca}"
 BACKEND_IMAGE="${BACKEND_IMAGE:-localhost/store-mgmt_backend:latest}"
 KEEP_BACKUPS="${KEEP_BACKUPS:-7}"
 SMOKE_TIMEOUT_SECONDS="${SMOKE_TIMEOUT_SECONDS:-300}"
 REACT_PORT="${REACT_PORT:-8085}"
 PUSH_TAG="${PUSH_TAG:-0}"
+
+# Catalog images (web catalog photos). They live on the podman volume mounted at
+# /app/storage in the backend container, NOT in the database.
+STORAGE_MOUNT_DEST="${STORAGE_MOUNT_DEST:-/app/storage}"
+# CatalogImageStorageOptions.CatalogImageRoot is "storage/catalog" and a relative
+# root is resolved against the container's WORKDIR (/app), so the real directory is
+# /app/storage/storage/catalog — NOT the whole mount. Backing up /app/storage would
+# also sweep whatever else lands in that volume.
+CATALOG_IMAGE_SUBDIR="${CATALOG_IMAGE_SUBDIR:-storage/catalog}"
+CATALOG_IMAGE_PATH="$STORAGE_MOUNT_DEST/$CATALOG_IMAGE_SUBDIR"
 
 ASSUME_YES=0
 DRY_RUN=0
@@ -59,6 +77,9 @@ LOG_FILE=""
 COMPOSE_FILE=""
 SHORT_SHA=""
 BACKUP_FILE=""
+BACKUP_STAMP=""
+IMAGES_BACKUP_FILE=""
+STORAGE_VOLUME=""
 PROD_PROJECT=""
 PROD_DB_USER="postgres"
 
@@ -87,7 +108,8 @@ usage() {
 Usage: ./deploy-prod.sh [--yes] [--dry-run] [--rollback] [--help]
   --yes        skip the interactive confirmation
   --dry-run    backup + fetch + build + validate only; no DB writes, no deploy
-  --rollback   restore the DB from the latest backup + :previous image + redeploy
+  --rollback   restore the DB + catalog images from the latest backup +
+               :previous image + redeploy
   --help       show this help
 EOF
 }
@@ -163,17 +185,126 @@ rollback_image() {
   fi
 }
 
+# --- Catalog images: backup + rollback -----------------------------------------
+# Resolve the REAL source of the catalog volume. The volume is NOT "storage_data":
+# podman-compose prefixes every named volume with the compose project name, so on
+# disk it is "<project>_storage_data". Hardcoding the short name would point at
+# nothing, so the mount is READ from the container at runtime — the same trick
+# already used above for io.podman.compose.project.
+resolve_storage_volume() {
+  # One "destination name" pair per line ({{"\n"}}) so the filter below stays correct
+  # when the container has more than one mount.
+  STORAGE_VOLUME="$(podman inspect -f '{{range .Mounts}}{{.Destination}} {{.Name}}{{"\n"}}{{end}}' \
+    "$PROD_BACKEND_CONTAINER" 2>/dev/null \
+    | awk -v dest="$STORAGE_MOUNT_DEST" '$1 == dest { print $2 }' || true)"
+  [ -n "$STORAGE_VOLUME" ] || return 1
+  log "catalog images volume: $STORAGE_VOLUME (mounted at $STORAGE_MOUNT_DEST in $PROD_BACKEND_CONTAINER)"
+}
+
+# Rotate the image family on its own. The DB dumps (smca_backup_*.sql.gz) are
+# rotated by the loop in STEP 1 and are never touched here — each family keeps
+# its own $KEEP_BACKUPS newest files.
+rotate_image_backups() {
+  log "rotating image backups (keep last $KEEP_BACKUPS)"
+  ls -1t "$BACKUP_DIR"/smca_images_backup_*.tar.gz 2>/dev/null | tail -n +$((KEEP_BACKUPS + 1)) | while IFS= read -r old; do
+    rm -f "$old"
+    log "removed old image backup: $old"
+  done || true
+}
+
+# Back up the catalog images BEFORE any write. $1 is the stamp already used for the
+# DB dump, so smca_backup_<ts>.sql.gz and smca_images_backup_<ts>.tar.gz always
+# describe the same state of the system and an operator can pair them.
+backup_images() {
+  local stamp="$1"
+  IMAGES_BACKUP_FILE="$BACKUP_DIR/smca_images_backup_${stamp}.tar.gz"
+
+  [ "$(podman inspect -f '{{.State.Running}}' "$PROD_BACKEND_CONTAINER" 2>/dev/null || true)" = "true" ] \
+    || die "production backend container $PROD_BACKEND_CONTAINER is not running — cannot back up the catalog images"
+
+  # The directory may not exist yet (no photo uploaded since the volume was created).
+  # Creating it keeps tar's path stable instead of failing the deploy over an empty
+  # catalog; it is the very directory the API creates on its first image save.
+  podman exec "$PROD_BACKEND_CONTAINER" mkdir -p "$CATALOG_IMAGE_PATH" \
+    || die "could not create $CATALOG_IMAGE_PATH inside $PROD_BACKEND_CONTAINER"
+
+  log "STEP 1b — backing up catalog images ($CATALOG_IMAGE_PATH) from $PROD_BACKEND_CONTAINER"
+  # tar runs inside the container because that is where the volume is mounted, and
+  # gzip runs on the host where the script already requires it. Only `tar` is needed
+  # in the image, which the aspnet:8.0 base image ships.
+  podman exec "$PROD_BACKEND_CONTAINER" tar -cf - -C "$STORAGE_MOUNT_DEST" "$CATALOG_IMAGE_SUBDIR" \
+    | gzip > "$IMAGES_BACKUP_FILE" \
+    || die "catalog image backup failed — refusing to deploy with no rollback point for the images"
+
+  # Same rule as the DB dump: an archive that was never validated is not a backup.
+  gzip -t "$IMAGES_BACKUP_FILE" || die "catalog image backup is not a valid gzip: $IMAGES_BACKUP_FILE"
+  log "images backup ok: $IMAGES_BACKUP_FILE ($(du -h "$IMAGES_BACKUP_FILE" | cut -f1))"
+
+  rotate_image_backups
+}
+
+# Rollback companion of restore_db. It NEVER dies on purpose: this runs in the
+# middle of a rollback, and aborting here would skip the image retag and the
+# redeploy, leaving production worse off than a missing catalog restore. Every
+# failure is logged loudly and the rollback continues.
+restore_images() {
+  if [ -z "$IMAGES_BACKUP_FILE" ] || [ ! -f "$IMAGES_BACKUP_FILE" ]; then
+    log "[WARN] no catalog image backup for this rollback ($BACKUP_FILE has no paired .tar.gz) — images NOT restored"
+    return 0
+  fi
+  if ! gzip -t "$IMAGES_BACKUP_FILE"; then
+    log "[WARN] catalog image archive is corrupt: $IMAGES_BACKUP_FILE — images NOT restored"
+    return 0
+  fi
+  if ! resolve_storage_volume; then
+    log "[WARN] could not resolve the $STORAGE_MOUNT_DEST volume of $PROD_BACKEND_CONTAINER — images NOT restored"
+    return 0
+  fi
+  if [ "$(podman inspect -f '{{.State.Running}}' "$PROD_BACKEND_CONTAINER" 2>/dev/null || true)" != "true" ]; then
+    log "[WARN] $PROD_BACKEND_CONTAINER is not running — cannot restore the catalog images"
+    return 0
+  fi
+
+  log "ROLLBACK(IMAGES) — restoring $CATALOG_IMAGE_PATH from $IMAGES_BACKUP_FILE"
+  # Clean the destination FIRST, then extract. Extracting over the live directory
+  # would leave every file the archive does not contain, which is precisely the
+  # inconsistency this restore exists to remove.
+  if podman exec "$PROD_BACKEND_CONTAINER" sh -c "rm -rf '$CATALOG_IMAGE_PATH' && mkdir -p '$CATALOG_IMAGE_PATH'"; then
+    if gunzip -c "$IMAGES_BACKUP_FILE" \
+      | podman exec -i "$PROD_BACKEND_CONTAINER" tar -xf - -C "$STORAGE_MOUNT_DEST"; then
+      log "ROLLBACK(IMAGES) — done"
+      return 0
+    fi
+  fi
+  log "[WARN] catalog image restore FAILED — $CATALOG_IMAGE_PATH may be inconsistent with $PROD_DB_NAME"
+}
+
 # --- STEP 1: backup the production database -----------------------------------
 if [ "$DO_ROLLBACK" -eq 1 ]; then
   BACKUP_FILE="$(ls -1t "$BACKUP_DIR"/smca_backup_*.sql.gz 2>/dev/null | head -n1 || true)"
   [ -n "$BACKUP_FILE" ] || die "no backup found in $BACKUP_DIR — nothing to roll back to"
-  log "ROLLBACK mode — latest backup: $BACKUP_FILE"
+  # Pair the image archive with THIS dump by timestamp instead of picking the newest
+  # one: both files are written with the same stamp, so this is the image set that
+  # matches the database state being restored. Backups taken before this feature
+  # existed have no pair — restore_images warns and the rollback continues.
+  BACKUP_STAMP="$(basename "$BACKUP_FILE" .sql.gz)"
+  BACKUP_STAMP="${BACKUP_STAMP#smca_backup_}"
+  IMAGES_BACKUP_FILE="$BACKUP_DIR/smca_images_backup_${BACKUP_STAMP}.tar.gz"
+  log "ROLLBACK mode — latest backup: $BACKUP_FILE (paired images: $IMAGES_BACKUP_FILE)"
 else
   log "STEP 1 — backing up production database $PROD_DB_NAME"
-  BACKUP_FILE="$BACKUP_DIR/smca_backup_$(date +%Y%m%d_%H%M%S).sql.gz"
+  BACKUP_STAMP="$(date +%Y%m%d_%H%M%S)"
+  BACKUP_FILE="$BACKUP_DIR/smca_backup_$BACKUP_STAMP.sql.gz"
   podman exec "$PROD_DB_CONTAINER" pg_dump -U "$PROD_DB_USER" "$PROD_DB_NAME" | gzip > "$BACKUP_FILE"
   gzip -t "$BACKUP_FILE" || die "backup file is not a valid gzip: $BACKUP_FILE"
   log "backup ok: $BACKUP_FILE ($(du -h "$BACKUP_FILE" | cut -f1))"
+
+  # The photos are not in the dump, and a rollback that rewinds the database also
+  # rewinds the rows pointing at them. Back them up now, before any write, with the
+  # same stamp. No volume, no deploy — same rule as the database dump.
+  resolve_storage_volume \
+    || die "could not resolve the $STORAGE_MOUNT_DEST volume of $PROD_BACKEND_CONTAINER — refusing to deploy with no rollback point for the catalog images"
+  backup_images "$BACKUP_STAMP"
 
   log "rotating backups (keep last $KEEP_BACKUPS)"
   ls -1t "$BACKUP_DIR"/smca_backup_*.sql.gz 2>/dev/null | tail -n +$((KEEP_BACKUPS + 1)) | while IFS= read -r old; do
@@ -219,6 +350,9 @@ compose() { ( cd "$CLONE_DIR" && podman-compose -p "$PROD_PROJECT" -f "$COMPOSE_
 if [ "$DO_ROLLBACK" -eq 1 ]; then
   confirm "ROLLBACK: restore PRODUCTION database '$PROD_DB_NAME' from $BACKUP_FILE and redeploy the :previous image."
   restore_db
+  # The DB rows are going back to $BACKUP_FILE, so the files they point at have to
+  # go back with them — otherwise the catalog shows photos that "vanished".
+  restore_images
   rollback_image
   log "redeploying the production stack with the rolled-back image"
   compose down || log "[WARN] compose down returned non-zero"
@@ -249,8 +383,9 @@ confirm "About to DEPLOY PRODUCTION:
   commit       : $SHORT_SHA
   compose proj : $PROD_PROJECT
   database     : $PROD_DB_NAME (backup: $BACKUP_FILE)
+  images       : $CATALOG_IMAGE_PATH (backup: $IMAGES_BACKUP_FILE)
   migrations   : will be applied to the PRODUCTION database
-  rollback     : automatic on smoke failure (DB + :previous image)"
+  rollback     : automatic on smoke failure (DB + catalog images + :previous image)"
 
 # --- STEP 5: apply pending SQL scripts (POINT OF NO RETURN) ---------------------
 log "STEP 5 — checking pending SQL scripts in backend/scripts"
@@ -276,6 +411,7 @@ for script in "$CLONE_DIR"/backend/scripts/*.sql; do
       -v ON_ERROR_STOP=1 < "$script" 2>&1 | redact | tee -a "$LOG_FILE"; then
       log "[FATAL] migration failed: $(basename "$script") — restoring the database from the backup"
       restore_db
+      restore_images
       die "migration failed; the database was restored from $BACKUP_FILE"
     fi
     APPLIED_COUNT=$((APPLIED_COUNT + 1))
@@ -303,8 +439,9 @@ until smoke_ok; do
 done
 
 if ! smoke_ok; then
-  log "[FATAL] smoke test failed — automatic ROLLBACK (DB + :previous image)"
+  log "[FATAL] smoke test failed — automatic ROLLBACK (DB + catalog images + :previous image)"
   restore_db
+  restore_images
   rollback_image
   compose down || log "[WARN] compose down returned non-zero"
   compose up -d || log "[WARN] compose up returned non-zero"
@@ -326,6 +463,7 @@ COMMIT=$SHORT_SHA
 BRANCH=$BRANCH
 DATE=$(date '+%Y-%m-%d %H:%M:%S')
 BACKUP=$BACKUP_FILE
+IMAGES_BACKUP=$IMAGES_BACKUP_FILE
 IMAGE=${BACKEND_IMAGE%:*}:$SHORT_SHA
 REACT_URL=http://localhost:$REACT_PORT
 EOF
