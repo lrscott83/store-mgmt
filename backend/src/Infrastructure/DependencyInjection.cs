@@ -95,6 +95,9 @@ namespace Infrastructure
             services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
             services.AddScoped<IMessageRepository, MessageRepository>();
             services.AddScoped<INotificationRepository, NotificationRepository>();
+            // Pedidos online (pedidos-whatsapp-persistencia, F2). El POS NO pasa por aquí (D14).
+            services.AddScoped<IStoreCatalogSettingsRepository, StoreCatalogSettingsRepository>();
+            services.AddScoped<IDeliveryDriverRepository, DeliveryDriverRepository>();
         }
     }
 }

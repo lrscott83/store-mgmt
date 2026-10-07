@@ -30,5 +30,13 @@ namespace Domain.Interfaces.Repositories
 
         /// <summary>Detalle público por id dentro de la tienda; null si no está publicado.</summary>
         Task<Product?> GetPublishedByIdAsync(Guid storeId, Guid productId);
+
+        /// <summary>
+        /// Varios productos publicados por id, de una sola consulta (carrito de un pedido online,
+        /// F2). Mismas puertas que <see cref="GetPublishedByStoreIdAsync"/> —activo, en venta, de
+        /// categoría activa con slug público— y por eso NO es un `GetByIdAsync` por producto: N
+        /// id contra la base para leer N filas es el N+1 clásico.
+        /// </summary>
+        Task<IList<Product>> GetPublishedByIdsAsync(Guid storeId, IReadOnlyCollection<Guid> ids);
     }
 }

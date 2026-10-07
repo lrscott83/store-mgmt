@@ -15,10 +15,14 @@ namespace Infrastructure.Storage
 
     /// <summary>
     /// Guarda las imágenes del catálogo en disco con la estructura
-    /// <c>{tenantId}/{storeId}/{productId}/{guid}{ext}</c> (decisión D3, plan 2026-09-27).
+    /// <c>{tenantId}/{storeId}/{productId}/{guid}{ext}</c> (decisión D3, plan 2026-09-27), y las de
+    /// MARCA con <c>{tenantId}/{storeId}/branding/{kind}/{guid}{ext}</c> (F8).
     /// </summary>
     public sealed class CatalogImageStorage : ICatalogImageStorage
     {
+        /// <summary>Carpeta que separa las imágenes de MARCA de las de producto (F8).</summary>
+        private const string BrandingFolder = "branding";
+
         private static readonly Dictionary<string, string> ContentTypesByExtension = new(StringComparer.OrdinalIgnoreCase)
         {
             [".jpg"] = "image/jpeg",
@@ -34,19 +38,44 @@ namespace Infrastructure.Storage
             _options = options.Value;
         }
 
-        public async Task<string> SaveAsync(CatalogImageUpload upload, Guid tenantId, Guid storeId, Guid productId,
+        public Task<string> SaveAsync(CatalogImageUpload upload, Guid tenantId, Guid storeId, Guid productId,
             CancellationToken cancellationToken = default)
         {
-            string extension = Path.GetExtension(upload.FileName ?? string.Empty).ToLowerInvariant();
-            if (!ContentTypesByExtension.ContainsKey(extension))
-                extension = ExtensionFromContentType(upload.ContentType);
-
             string key = string.Join('/',
                 tenantId.ToString("N"),
                 storeId.ToString("N"),
                 productId.ToString("N"),
-                Guid.NewGuid().ToString("N") + extension);
+                Guid.NewGuid().ToString("N") + ResolveExtension(upload));
 
+            return WriteAsync(key, upload, cancellationToken);
+        }
+
+        /// <summary>
+        /// Guarda el logo o el banner de la tienda. El `kind` va en la ruta, así que se sanea: lo
+        /// pone el backend ("logo"/"banner") y nunca el cliente, pero una clave con separadores
+        /// escondería un nivel de carpeta y <see cref="ResolveFullPath"/> solo protege contra
+        /// traversal, no contra eso.
+        /// </summary>
+        public Task<string> SaveBrandingAsync(CatalogImageUpload upload, Guid tenantId, Guid storeId, string kind,
+            CancellationToken cancellationToken = default)
+        {
+            string key = string.Join('/',
+                tenantId.ToString("N"),
+                storeId.ToString("N"),
+                BrandingFolder,
+                SanitizeKind(kind),
+                Guid.NewGuid().ToString("N") + ResolveExtension(upload));
+
+            return WriteAsync(key, upload, cancellationToken);
+        }
+
+        /// <summary>
+        /// Escribe el archivo de una clave ya compuesta. Lo comparten las dos formas de clave: la
+        /// parte que decide DÓNDE va el archivo es la que compone la clave, no la que escribe.
+        /// </summary>
+        private async Task<string> WriteAsync(string key, CatalogImageUpload upload,
+            CancellationToken cancellationToken)
+        {
             string fullPath = ResolveFullPath(key);
             Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
 
@@ -56,6 +85,48 @@ namespace Infrastructure.Storage
             }
 
             return key;
+        }
+
+        /// <summary>
+        /// Extensión del archivo por la del nombre y, si no se reconoce, por el content type. Sin
+        /// ninguna de las dos se guarda SIN extensión en vez de inventar una que no corresponde.
+        /// </summary>
+        private string ResolveExtension(CatalogImageUpload upload)
+        {
+            string extension = Path.GetExtension(upload.FileName ?? string.Empty).ToLowerInvariant();
+            if (!ContentTypesByExtension.ContainsKey(extension))
+                extension = ExtensionFromContentType(upload.ContentType);
+
+            return extension;
+        }
+
+        /// <summary>
+        /// Reduce el `kind` a un único segmento de carpeta: minúsculas, y cualquier carácter que no
+        /// sea alfanumérico (ni el propio separador) se convierte en <c>-</c>. Con eso
+        /// <c>../../etc</c> no abre nada y la clave sigue teniendo siempre los mismos segmentos.
+        /// Un `kind` que no deja nada utilizable se rechaza: una clave ambigua sería imposible de
+        /// explicar y de depurar.
+        /// </summary>
+        private static string SanitizeKind(string kind)
+        {
+            var sanitized = new System.Text.StringBuilder(kind.Length);
+            foreach (char character in kind ?? string.Empty)
+            {
+                // Solo alfanumérico pasa; el resto colapsa en un único guion, incluidos los
+                // separadores, los puntos y los espacios.
+                char mapped = char.IsAsciiLetterOrDigit(character) ? char.ToLowerInvariant(character) : '-';
+                if (mapped == '-' && sanitized.Length > 0 && sanitized[^1] == '-')
+                    continue;
+
+                sanitized.Append(mapped);
+            }
+
+            string result = sanitized.ToString().Trim('-');
+            if (result.Length == 0)
+                throw new ArgumentException(
+                    $"El tipo de imagen de marca '{kind}' no deja un segmento de carpeta válido.", nameof(kind));
+
+            return result;
         }
 
         public Task DeleteAsync(string key, CancellationToken cancellationToken = default)

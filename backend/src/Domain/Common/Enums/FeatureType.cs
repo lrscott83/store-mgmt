@@ -148,5 +148,9 @@ namespace Domain.Common.Enums
         // Catálogo web
         [Description("Catálogo web")]
         WebCatalog = 122,
+
+        // Pedidos online (pedidos-whatsapp-persistencia, F2)
+        [Description("Pedidos online")]
+        OnlineOrders = 123,
     }
 }

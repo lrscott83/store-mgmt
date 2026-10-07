@@ -235,6 +235,7 @@ const messages: Record<string, string> = {
   // Menu items — Sales (Angular MENU.SALE_MGMT.*)
   'MENU.PRODUCTS': 'Catálogo Productos',
   'MENU.WEB_CATALOG': 'Catálogo Web',
+  'MENU.ONLINE_ORDERS_SETTINGS': 'Pedidos WhatsApp',
   'MENU.SALE': 'Vender',
   'MENU.WHOLESALE': 'Vender Mayorista',
   'MENU.TODAY_ORDERS': 'Ventas del día',
@@ -317,6 +318,52 @@ const messages: Record<string, string> = {
   'WEB_CATALOG.MOVE_LEFT': 'Mover antes',
   'WEB_CATALOG.MOVE_RIGHT': 'Mover después',
 
+  // Marca del catálogo público (F8): SOLO logo y banner. Sin paletas — se cancelaron por
+  // decisión del owner (2026-10-07) y el catálogo sigue con la paleta que ya tenía.
+  'WEB_CATALOG.BRAND_TITLE': 'Marca',
+  'WEB_CATALOG.BRAND_SUBTITLE':
+    'El logo y el banner que tus clientes ven en la cabecera de tu catálogo público.',
+  'WEB_CATALOG.BRAND_LOGO': 'Logo',
+  'WEB_CATALOG.BRAND_BANNER': 'Banner',
+  'WEB_CATALOG.BRAND_REMOVE_LOGO': 'Quitar logo',
+  'WEB_CATALOG.BRAND_REMOVE_BANNER': 'Quitar banner',
+  'WEB_CATALOG.BRAND_PENDING_REMOVE_LOGO': 'El logo se quitará al guardar la marca',
+  'WEB_CATALOG.BRAND_PENDING_REMOVE_BANNER': 'El banner se quitará al guardar la marca',
+  'WEB_CATALOG.BRAND_PENDING_UPLOAD': 'se subirá al guardar la marca',
+  'WEB_CATALOG.BRAND_SAVE': 'Guardar marca',
+  'WEB_CATALOG.BRAND_SAVING': 'Guardando...',
+  'WEB_CATALOG.BRAND_SAVED': 'Marca guardada',
+  'WEB_CATALOG.BRAND_SAVE_ERROR': 'No se pudo guardar la marca',
+  'WEB_CATALOG.BRAND_LOAD_ERROR': 'No se pudo cargar la marca',
+
+  // Pedidos WhatsApp (módulo 18, F1): configuración del pedido online. Sin moneda — el precio
+  // y la moneda los pone el catálogo (A3 eliminada).
+  'ORDERING_SETTINGS.TITLE': 'Pedidos WhatsApp',
+  'ORDERING_SETTINGS.SUBTITLE':
+    'Activa los pedidos online y configura a dónde y cómo los recibe tu tienda. Los pedidos se envían por WhatsApp.',
+  'ORDERING_SETTINGS.ENABLED': 'Pedidos online',
+  'ORDERING_SETTINGS.ENABLED_HINT':
+    'Con el interruptor apagado el catálogo se publica igual, pero tus clientes no pueden hacer pedidos.',
+  'ORDERING_SETTINGS.WHATSAPP_NUMBER': 'Número de WhatsApp',
+  'ORDERING_SETTINGS.WHATSAPP_NUMBER_PLACEHOLDER': 'Con prefijo internacional, por ejemplo 5351234567',
+  'ORDERING_SETTINGS.PICKUP_ENABLED': 'Recogida en la tienda',
+  'ORDERING_SETTINGS.DELIVERY_ENABLED': 'Envío a domicilio',
+  'ORDERING_SETTINGS.DELIVERY_FEE': 'Costo del envío',
+  'ORDERING_SETTINGS.MINIMUM_ORDER_AMOUNT': 'Importe mínimo del pedido',
+  'ORDERING_SETTINGS.BUSINESS_HOURS': 'Horario de atención',
+  'ORDERING_SETTINGS.BUSINESS_HOURS_PLACEHOLDER': 'Texto libre, por ejemplo Lunes a sábado de 8:00 a 18:00',
+  'ORDERING_SETTINGS.DELIVERY_ZONES': 'Zonas de reparto',
+  'ORDERING_SETTINGS.DELIVERY_ZONES_PLACEHOLDER': 'Texto libre, por ejemplo Vedado y Centro Habana',
+  'ORDERING_SETTINGS.CURRENCY_NOTE':
+    'El precio y la moneda salen del catálogo, no se configuran aquí.',
+  'ORDERING_SETTINGS.SYNC': 'Sincronizar',
+  'ORDERING_SETTINGS.SYNCING': 'Sincronizando...',
+  'ORDERING_SETTINGS.SYNC_DONE': 'Configuración de pedidos guardada',
+  'ORDERING_SETTINGS.SYNC_FAILED': 'No se pudo guardar la configuración de pedidos',
+  'ORDERING_SETTINGS.LOAD_FAILED': 'No se pudo cargar la configuración de pedidos',
+  'ORDERING_SETTINGS.LAST_SYNC': 'Última sincronización',
+  'ORDERING_SETTINGS.NEVER_SYNCED': 'Nunca',
+
   // Catálogo público (/catalog/<slug>): lo que ve el cliente final, sin sesión.
   'CATALOG_PUBLIC.SEARCH_PLACEHOLDER': 'Buscar productos…',
   'CATALOG_PUBLIC.SEARCH': 'Buscar',
@@ -338,6 +385,11 @@ const messages: Record<string, string> = {
   'CATALOG_PUBLIC.ZOOM_IN': 'Ampliar imagen',
   'CATALOG_PUBLIC.ZOOM_OUT': 'Reducir imagen',
   'CATALOG_PUBLIC.FOOTER': 'Catálogo publicado con VendeDTo',
+  // Marca (F8): logo y banner de la cabecera. El texto alternativo nombra a la tienda, que es
+  // de whom es la imagen; la ausencia de logo o banner NO es un error (una tienda puede no
+  // tenerlos), así que no hay ningún aviso para ese caso.
+  'CATALOG_PUBLIC.LOGO_ALT': 'Logo de {store}',
+  'CATALOG_PUBLIC.BANNER_ALT': 'Banner de {store}',
   'MENU.WAREHOUSES_MODULE': 'ALMACENES',
   'MENU.WAREHOUSE_MOVEMENTS': 'Movimientos',
   // Módulo Elaboración (17): recetas (BoM) y órdenes de elaboración.

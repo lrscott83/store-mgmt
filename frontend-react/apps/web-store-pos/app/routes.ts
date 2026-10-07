@@ -41,6 +41,9 @@ export default [
     route('sales/products', 'sales/routes/products.tsx'),
     // Catálogo Web (módulo 18, plan 2026-09-27): publica la tienda en /catalog/<slug>.
     route('sales/web-catalog', 'sales/routes/web-catalog.tsx'),
+    // Pedidos WhatsApp (módulo 18, F1): configuración del pedido online. Mismo gate que el
+    // catálogo (ownerModuleLoader + WebCatalogAdmin) — configurar la tienda es cosa del dueño.
+    route('sales/online-orders/settings', 'sales/routes/ordering-settings.tsx'),
     // Sales â€” POS & Orders
     route('sales/new', 'sales/routes/sale.tsx'),
     // Sales â€” Wholesale (mismo guard de Ventas)

@@ -4,18 +4,22 @@ import { EModules } from '@store-mgmt/domain';
 import { ownerModuleLoader } from '~/auth/routes/loaders';
 import { Button } from '~/shared/components/ui/button';
 import { Card } from '~/shared/components/ui/card';
-import { ChevronDownIcon, SaveIcon } from '~/shared/components/ui/icons';
+import { FileInput } from '~/shared/components/ui/file-input';
+import { ChevronDownIcon, SaveIcon, TrashIcon } from '~/shared/components/ui/icons';
 import { InfoBox } from '~/shared/components/ui/info-box';
 import { Spinner } from '~/shared/components/ui/spinner';
 import { showBlockingError } from '~/shared/lib/blocking-alert';
 import { httpErrorKey } from '~/shared/lib/http/http-error';
+import { apiFileUrl } from '~/shared/lib/http/media-url';
 import { showToastSuccess } from '~/shared/lib/toast';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { CatalogProductEditor } from '../components/catalog-product-editor';
 import { buildCatalogSnapshot } from '../lib/catalog/catalog-snapshot';
-import { MAX_DESCRIPTION_LENGTH } from '../lib/catalog/web-catalog-format';
+import { MAX_CATALOG_IMAGE_BYTES, MAX_DESCRIPTION_LENGTH } from '../lib/catalog/web-catalog-format';
 import {
   catalogHttpService,
+  type CatalogBranding,
+  type CatalogBrandingUpdate,
   type CatalogProductFields,
   type CatalogProductView,
   type CatalogStatus,
@@ -24,6 +28,9 @@ import {
 // El módulo 18 + OwnerAdmin es el gate real (el backend lo vuelve a exigir en cada endpoint):
 // un Owner sin el catálogo contratado no entra, igual que en el resto de vistas gateadas.
 export const clientLoader = ownerModuleLoader(EModules.WebCatalog);
+
+/** Formatos de imagen que acepta el backend para la marca (los mismos que las del producto). */
+const ALLOWED_BRAND_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 /**
  * Formatea la marca de la última sincronización. El backend guarda UTC, y según la columna el
@@ -115,6 +122,107 @@ function CategoryPanelCard({
 }
 
 /**
+ * Un lado de la marca (logo o banner): previsualiza lo guardado, deja elegir un archivo nuevo
+ * y marca el borrado. No guarda NADA por su cuenta — el botón de la tarjeta "Marca" aplica el
+ * conjunto, igual que hace el guardado por lotes con los productos.
+ *
+ * El archivo nuevo NO se previsualiza: el preview es el de la clave guardada, porque el
+ * endpoint público solo sirve claves ya persistidas y no hay URL que pintar antes de guardar.
+ */
+function BrandSlot({
+  labelId,
+  removeLabelId,
+  pendingRemoveLabelId,
+  slotTestId,
+  testId,
+  uploadTestId,
+  removeTestId,
+  pendingTestId,
+  pendingRemoveTestId,
+  storeSlug,
+  mediaKey,
+  pendingFile,
+  markedForRemoval,
+  busy,
+  previewClass,
+  onSelectFile,
+  onToggleRemove,
+}: {
+  labelId: string;
+  removeLabelId: string;
+  pendingRemoveLabelId: string;
+  slotTestId: string;
+  testId: string;
+  uploadTestId: string;
+  removeTestId: string;
+  pendingTestId: string;
+  pendingRemoveTestId: string;
+  storeSlug: string;
+  /** Clave persistida de este lado (null = la tienda no lo tiene). */
+  mediaKey: string | null;
+  /** Archivo retenido (ya validado, todavía sin subir). */
+  pendingFile: File | null;
+  /** true cuando el dueño marcó este lado para borrar: se aplica al guardar. */
+  markedForRemoval: boolean;
+  busy: boolean;
+  previewClass: string;
+  onSelectFile: (file: File | null) => void;
+  onToggleRemove: () => void;
+}) {
+  const intl = useIntl();
+
+  return (
+    <div data-testid={slotTestId}>
+      <span className="text-xs font-medium text-text-muted">
+        {intl.formatMessage({ id: labelId })}
+      </span>
+      <div className="mt-2 flex flex-wrap items-start gap-3">
+        {mediaKey && (
+          <figure className="flex flex-col items-center gap-1">
+            <img
+              src={apiFileUrl(`/api/v1/public/catalog/${storeSlug}/media/${mediaKey}`)}
+              alt={intl.formatMessage({ id: labelId })}
+              className={`w-16 rounded-md border border-border ${previewClass}`}
+              data-testid={testId}
+            />
+            {/* Quitar NO borra nada aquí: marca la eliminación y la aplica el botón de marca. */}
+            <button
+              type="button"
+              onClick={onToggleRemove}
+              disabled={busy}
+              className="inline-flex items-center gap-1 text-xs text-danger hover:underline disabled:opacity-50"
+              data-testid={removeTestId}
+            >
+              <TrashIcon className="h-3 w-3" />
+              {intl.formatMessage({ id: removeLabelId })}
+            </button>
+          </figure>
+        )}
+        <div className="min-w-56 flex-1">
+          <FileInput
+            onFileChange={onSelectFile}
+            accept=".jpg,.jpeg,.png,.webp"
+            disabled={busy}
+            data-testid={uploadTestId}
+          />
+          {pendingFile && (
+            <p className="mt-1 text-xs text-primary" data-testid={pendingTestId}>
+              {pendingFile.name}
+              {` · ${intl.formatMessage({ id: 'WEB_CATALOG.BRAND_PENDING_UPLOAD' })}`}
+            </p>
+          )}
+          {mediaKey && markedForRemoval && (
+            <p className="mt-1 text-xs text-danger" data-testid={pendingRemoveTestId}>
+              {intl.formatMessage({ id: pendingRemoveLabelId })}
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
  * Vista "Catálogo Web" (`/sales/web-catalog`, módulo 18, plan 2026-09-27).
  *
  * Publicar es un acto explícito: aquí se completan los campos que solo existen en el catálogo
@@ -144,6 +252,20 @@ export function WebCatalogPage() {
   const [pendingImageRemovals, setPendingImageRemovals] = useState<Record<string, boolean>>({});
   const [isSaving, setIsSaving] = useState(false);
 
+  /**
+   * Marca (F8): la del catálogo público, guardada con SU PROPIO botón y en SU PROPIA petición.
+   * Vive aparte del diff de productos a propósito — el PUT de marca es un parche y el de
+   * productos es un lote, así que mezclarlos haría que cada botón tocara columnas que no son suyas.
+   */
+  const [branding, setBranding] = useState<CatalogBranding | null>(null);
+  const [brandError, setBrandError] = useState('');
+  const [pendingLogo, setPendingLogo] = useState<File | null>(null);
+  const [pendingBanner, setPendingBanner] = useState<File | null>(null);
+  /** Logo/banner marcados para borrar, NO borrados todavía: los aplica el botón de marca. */
+  const [removeLogo, setRemoveLogo] = useState(false);
+  const [removeBanner, setRemoveBanner] = useState(false);
+  const [isSavingBrand, setIsSavingBrand] = useState(false);
+
   const loadData = useCallback(async () => {
     try {
       const [statusResult, productsResult] = await Promise.all([
@@ -167,6 +289,29 @@ export function WebCatalogPage() {
   useEffect(() => {
     void loadData();
   }, [loadData]);
+
+  /**
+   * La marca se carga APARTE del catálogo: si este endpoint falla (una tienda con la fila de
+   * pedidos pero sin la de marca, un 403 puntual) el catálogo y sus productos siguen siendo
+   * utilizables. Solo la sección de marca se queda sin configurar.
+   */
+  const loadBranding = useCallback(async () => {
+    try {
+      const result = await catalogHttpService.getBranding();
+      if (!result.succeeded) {
+        setBrandError(intl.formatMessage({ id: 'WEB_CATALOG.BRAND_LOAD_ERROR' }));
+        return;
+      }
+      setBranding(result.data);
+      setBrandError('');
+    } catch (err) {
+      setBrandError(intl.formatMessage({ id: httpErrorKey(err, 'WEB_CATALOG.BRAND_LOAD_ERROR') }));
+    }
+  }, [intl]);
+
+  useEffect(() => {
+    void loadBranding();
+  }, [loadBranding]);
 
   /** Productos agrupados por categoría, conservando el orden que ya trae el backend. */
   const groups = useMemo(() => {
@@ -426,6 +571,95 @@ export function WebCatalogPage() {
     });
   }
 
+  // ── Marca (F8): subir / quitar logo y banner, y guardarla con SU botón ────────────────
+  // La validación local es la MISMA que la de la imagen de producto (formatos + tamaño): el
+  // backend usa las mismas reglas (`CatalogImageUploadRules`) y así no se sube en balde.
+  function handleBrandFile(
+    file: File | null,
+    onValid: (file: File) => void,
+    onInvalid: (error: string) => void,
+  ) {
+    if (!file) return;
+    if (
+      !ALLOWED_BRAND_IMAGE_TYPES.includes(file.type) ||
+      file.size > MAX_CATALOG_IMAGE_BYTES
+    ) {
+      onInvalid(
+        intl.formatMessage(
+          { id: 'WEB_CATALOG.IMAGE_RULES' },
+          { size: MAX_CATALOG_IMAGE_BYTES / (1024 * 1024) },
+        ),
+      );
+      return;
+    }
+    onValid(file);
+  }
+
+  function handleSelectLogo(file: File | null) {
+    setBrandError('');
+    handleBrandFile(
+      file,
+      (valid) => {
+        // Elegir una imagen y quitar la vigente son intenciones opuestas: gana la última.
+        setRemoveLogo(false);
+        setPendingLogo(valid);
+      },
+      setBrandError,
+    );
+  }
+
+  function handleSelectBanner(file: File | null) {
+    setBrandError('');
+    handleBrandFile(
+      file,
+      (valid) => {
+        setRemoveBanner(false);
+        setPendingBanner(valid);
+      },
+      setBrandError,
+    );
+  }
+
+  const hasBrandChanges = pendingLogo !== null || pendingBanner !== null || removeLogo || removeBanner;
+
+  async function handleSaveBrand() {
+    if (!hasBrandChanges) return;
+
+    const payload: CatalogBrandingUpdate = {};
+    if (pendingLogo) payload.logo = pendingLogo;
+    if (removeLogo) payload.removeLogo = true;
+    if (pendingBanner) payload.banner = pendingBanner;
+    if (removeBanner) payload.removeBanner = true;
+
+    setIsSavingBrand(true);
+    try {
+      const result = await catalogHttpService.updateBranding(payload);
+      if (!result.succeeded) {
+        showBlockingError(
+          intl.formatMessage({ id: 'GENERAL.ERROR' }),
+          intl.formatMessage({ id: 'WEB_CATALOG.BRAND_SAVE_ERROR' }),
+        );
+        return;
+      }
+      setPendingLogo(null);
+      setPendingBanner(null);
+      setRemoveLogo(false);
+      setRemoveBanner(false);
+      setBrandError('');
+      showToastSuccess(intl.formatMessage({ id: 'WEB_CATALOG.BRAND_SAVED' }));
+      // El servidor manda: se recarga para que la previsualización sea la que quedó guardada
+      // (la clave nueva lleva guid, así que el navegador no sirve la imagen vieja desde caché).
+      await loadBranding();
+    } catch (err) {
+      showBlockingError(
+        intl.formatMessage({ id: 'GENERAL.ERROR' }),
+        intl.formatMessage({ id: httpErrorKey(err, 'WEB_CATALOG.BRAND_SAVE_ERROR') }),
+      );
+    } finally {
+      setIsSavingBrand(false);
+    }
+  }
+
   const publicUrl = status?.catalogUrl
     ? new URL(status.catalogUrl, window.location.origin).toString()
     : '';
@@ -506,6 +740,83 @@ export function WebCatalogPage() {
               </div>
             ))}
           </dl>
+        </div>
+      </Card>
+
+      {/* Marca (F8). Su propio botón y su propio PUT: el guardado por lotes de productos, más
+          abajo, no la toca, para que guardar descripciones nunca escriba (ni borre) el logo. */}
+      <Card
+        padding="tight"
+        title={
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span>{intl.formatMessage({ id: 'WEB_CATALOG.BRAND_TITLE' })}</span>
+            <Button
+              variant="fab"
+              onClick={() => void handleSaveBrand()}
+              disabled={!hasBrandChanges || isSavingBrand}
+              data-testid="brand-save"
+            >
+              <SaveIcon />
+              {intl.formatMessage({
+                id: isSavingBrand ? 'WEB_CATALOG.BRAND_SAVING' : 'WEB_CATALOG.BRAND_SAVE',
+              })}
+            </Button>
+          </div>
+        }
+      >
+        <p className="text-sm text-text-muted">{intl.formatMessage({ id: 'WEB_CATALOG.BRAND_SUBTITLE' })}</p>
+
+        {brandError && (
+          <InfoBox variant="danger" className="mt-2">
+            <span data-testid="brand-error">{brandError}</span>
+          </InfoBox>
+        )}
+
+        <div className="mt-3 grid gap-4 sm:grid-cols-2">
+          <BrandSlot
+            labelId="WEB_CATALOG.BRAND_LOGO"
+            removeLabelId="WEB_CATALOG.BRAND_REMOVE_LOGO"
+            pendingRemoveLabelId="WEB_CATALOG.BRAND_PENDING_REMOVE_LOGO"
+            testId="brand-logo"
+            uploadTestId="brand-logo-upload"
+            removeTestId="brand-logo-remove"
+            pendingTestId="brand-pending-logo"
+            pendingRemoveTestId="brand-pending-logo-remove"
+            slotTestId="brand-slot-logo"
+            storeSlug={status?.storeSlug ?? ''}
+            mediaKey={branding?.logoKey ?? null}
+            pendingFile={pendingLogo}
+            markedForRemoval={removeLogo}
+            busy={isSavingBrand}
+            previewClass="h-16 w-16 object-contain"
+            onSelectFile={handleSelectLogo}
+            onToggleRemove={() => {
+              setPendingLogo(null);
+              setRemoveLogo((current) => !current);
+            }}
+          />
+          <BrandSlot
+            labelId="WEB_CATALOG.BRAND_BANNER"
+            removeLabelId="WEB_CATALOG.BRAND_REMOVE_BANNER"
+            pendingRemoveLabelId="WEB_CATALOG.BRAND_PENDING_REMOVE_BANNER"
+            testId="brand-banner"
+            uploadTestId="brand-banner-upload"
+            removeTestId="brand-banner-remove"
+            pendingTestId="brand-pending-banner"
+            pendingRemoveTestId="brand-pending-banner-remove"
+            slotTestId="brand-slot-banner"
+            storeSlug={status?.storeSlug ?? ''}
+            mediaKey={branding?.bannerKey ?? null}
+            pendingFile={pendingBanner}
+            markedForRemoval={removeBanner}
+            busy={isSavingBrand}
+            previewClass="h-16 w-full object-cover"
+            onSelectFile={handleSelectBanner}
+            onToggleRemove={() => {
+              setPendingBanner(null);
+              setRemoveBanner((current) => !current);
+            }}
+          />
         </div>
       </Card>
 

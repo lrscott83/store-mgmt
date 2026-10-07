@@ -579,4 +579,77 @@
   <data name="CatalogSnapshotProductRequired" xml:space="preserve">
     <value>To publish a product that is not on the server yet, its name and category are required</value>
   </data>
+  <data name="OrderingNoDeliveryTypeEnabled" xml:space="preserve">
+    <value>With orders enabled at least one delivery method must be open: store pickup or home delivery</value>
+  </data>
+  <data name="OrderingWhatsappNumberRequired" xml:space="preserve">
+    <value>The WhatsApp number is required to receive orders: every order is sent through it</value>
+  </data>
+  <data name="OrderingWhatsappNumberTooLong" xml:space="preserve">
+    <value>{0} cannot be longer than {1} characters</value>
+  </data>
+  <data name="OrderingBusinessHoursTooLong" xml:space="preserve">
+    <value>{0} cannot be longer than {1} characters</value>
+  </data>
+  <data name="OrderingDeliveryZonesTooLong" xml:space="preserve">
+    <value>{0} cannot be longer than {1} characters</value>
+  </data>
+  <data name="BrandingNothingToUpdate" xml:space="preserve">
+    <value>At least the logo or the banner must be uploaded or removed: the request carries no change</value>
+  </data>
+  <data name="BrandingUploadAndRemoveConflict" xml:space="preserve">
+    <value>{0} cannot be uploaded and removed in the same request</value>
+  </data>
+
+<data name="OnlineOrdersNotEnabled" xml:space="preserve">
+    <value>Store {0} does not have online orders enabled</value>
+  </data>
+  <data name="OnlineOrderProductNotAvailable" xml:space="preserve">
+    <value>Product {0} is no longer available in the catalog</value>
+  </data>
+  <data name="OnlineOrderDeliveryTypeInvalid" xml:space="preserve">
+    <value>Delivery method {0} is not valid</value>
+  </data>
+  <data name="OnlineOrderDeliveryNotAllowed" xml:space="preserve">
+    <value>This store does not allow home delivery ({0} is disabled)</value>
+  </data>
+  <data name="OnlineOrderPickupNotAllowed" xml:space="preserve">
+    <value>This store does not allow store pickup ({0} is disabled)</value>
+  </data>
+  <data name="OnlineOrderDeliveryAddressRequired" xml:space="preserve">
+    <value>Home delivery requires a delivery address ({0})</value>
+  </data>
+  <data name="OnlineOrderEmptyCart" xml:space="preserve">
+    <value>The cart cannot be empty ({0})</value>
+  </data>
+  <data name="OnlineOrderQuantityInvalid" xml:space="preserve">
+    <value>Quantity {0} is not valid</value>
+  </data>
+  <data name="OnlineOrderMixedCurrencies" xml:space="preserve">
+    <value>The order mixes currencies ({0}); an order can only carry one</value>
+  </data>
+  <data name="OnlineOrderBelowMinimumAmount" xml:space="preserve">
+    <value>The total {0} does not reach the minimum of {1}</value>
+  </data>
+  <data name="OnlineOrderCodeGenerationFailed" xml:space="preserve">
+    <value>Could not generate an order code for store {0}</value>
+  </data>
+  <data name="OnlineOrderCustomerNameTooLong" xml:space="preserve">
+    <value>{0} cannot be longer than {1} characters</value>
+  </data>
+  <data name="OnlineOrderCustomerPhoneTooLong" xml:space="preserve">
+    <value>{0} cannot be longer than {1} characters</value>
+  </data>
+  <data name="OnlineOrderDeliveryAddressTooLong" xml:space="preserve">
+    <value>{0} cannot be longer than {1} characters</value>
+  </data>
+  <data name="OnlineOrderNotesTooLong" xml:space="preserve">
+    <value>{0} cannot be longer than {1} characters</value>
+  </data>
+  <data name="LessThanOrEqualTo" xml:space="preserve">
+    <value>{0} must be less than or equal to {1}</value>
+  </data>
+  <data name="StoreNotSelected" xml:space="preserve">
+    <value>User {0} has no store selected</value>
+  </data>
 </root>

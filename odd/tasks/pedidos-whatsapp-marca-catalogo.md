@@ -141,24 +141,16 @@ Quedan como **propuesta (pendiente de confirmar)**:
 
 ## Tareas
 
-- [ ] **T1** — Confirmar la forma de lectura/escritura de marca (query/command propio vs. extensión de
-  `StoreCatalogSettings`).
-- [ ] **T2** — `PaletteId`: definir la lista de paletas predefinidas y el id de la paleta actual por
-  defecto.
-- [ ] **T3** — Backend: lectura/escritura de `LogoKey`/`BannerKey`/`PaletteId` (sin pisar las columnas
-  de pedidos).
-- [ ] **T4** — Backend: almacenamiento y servido de logo/banner reutilizando el patrón de media
-  (propuesta) y validación de pertenencia por tienda.
-- [ ] **T5** — Exponer `LogoUrl?`, `BannerUrl?`, `PaletteId` en el config público (F1).
-- [ ] **T6** — UI: sección "Marca" en la vista Catálogo Web (subida de logo/banner + selector de
-  paleta).
-- [ ] **T7** — UI: aplicar logo, banner y paleta en la página pública, con la paleta actual por
-  defecto.
-- [ ] **T8** — Claves i18n.
-- [ ] **T9** — Tests unitarios nuevos (query/command con Moq; componentes de la sección y de la
-  página pública).
-- [ ] **T10** — Verificación (build/tests backend, `typecheck`/`lint`/`vitest`). Sin migración propia:
-  la cubre F2.
+- [x] **T1** — Forma de lectura/escritura de marca: **query/command propios** (`GetStoreCatalogBrandingQuery` / `UpdateStoreCatalogBrandingCommand`), no extender el de pedidos.
+- [x] **T2** — `PaletteId`: **paletas CANCELADAS por el owner (2026-10-07)** — se usa solo la actual; `PaletteId` se lee/devuelve pero **no se escribe**. Sin lista de paletas.
+- [x] **T3** — Backend: lectura/escritura de `LogoKey`/`BannerKey` (sin pisar las columnas de pedidos ni `PaletteId`).
+- [x] **T4** — Backend: `SaveBrandingAsync` en `ICatalogImageStorage` (clave `{tenant}/{store}/branding/{kind}/{guid}{ext}`) servido por el **mismo** endpoint público de media (valida pertenencia por tienda).
+- [x] **T5** — `LogoUrl?`/`BannerUrl?` (+ `PaletteId`) en el config público (F1).
+- [x] **T6** — UI: sección "Marca" en la vista Catálogo Web (subida de logo/banner, **sin** selector de paleta).
+- [x] **T7** — UI: aplicar logo y banner en la página pública (sin paleta; tema actual).
+- [x] **T8** — Claves i18n.
+- [x] **T9** — Tests unitarios nuevos (storage/query/command con Moq; sección de marca y página pública).
+- [x] **T10** — Verificación (build/tests backend, `typecheck`/`lint`/`vitest`). Sin migración propia: la cubre F2.
 
 ## Criterios de aceptación
 
@@ -198,13 +190,44 @@ pnpm vitest run app/catalog/ app/sales/routes/__tests__/
   banner, la clave nueva (con guid) evita servir la imagen vieja.
 - **Migración**: las columnas las crea la migración de F2; **no** escribir `.sql` a mano.
 
+## Decisiones resueltas durante la implementación (2026-10-07)
+
+| # | Punto | Decisión | Motivo |
+| --- | --- | --- | --- |
+| I1 | Paletas de color | **Canceladas** (solo la actual) | Owner 2026-10-07. Sin selector, sin mapa, `PaletteId` nunca se escribe. |
+| I2 | Almacenamiento de marca | Extender `ICatalogImageStorage.SaveBrandingAsync` (clave `{tenant}/{store}/branding/{kind}/{guid}{ext}`) | Comparte prefijo `{tenant}/{store}/`, así `BelongsToStore` la acepta y se sirve por el endpoint público de media actual; sin almacén paralelo. El `guid` es obligatorio: el endpoint cachea `immutable` 1 año. |
+| I3 | Lectura/escritura de marca | Query/command **separados** de pedidos | `UpsertStoreCatalogSettingsCommand` no debe tocar columnas de marca (test por reflexión). |
+| I4 | PUT de marca | **Parcial** (logo/banner/remove por lado) | "No menciono este lado" = no lo toco. |
+| I5 | Guardado en la vista | Botón propio de la sección (`brand-save`) | Independiente del batch de productos (menor riesgo). |
+
+## Evidencia de verificación (2026-10-07)
+
+| Comando | Resultado |
+| --- | --- |
+| `dotnet build` | 0 errores |
+| `dotnet test Application.Tests` | **782 passed** (+36) |
+| `dotnet test Domain.UnitTests` | 154 passed |
+| `turbo typecheck` / `lint` | 0 errores |
+| `vitest web-catalog + public-catalog` | **46 passed** |
+| E2E | No se corrió |
+
+## Hallazgos de la revisión nativa (RDD) — TODOs rastreados (2026-10-07)
+
+- [ ] **F8-R1** (WARNING · backend) — Logo válido + banner inválido deja un **archivo huérfano** en disco (el logo se escribe antes de validar el banner). Destino: F8.
+- [ ] **F8-R2** (WARNING · backend) — Al reemplazar, se **borra el archivo anterior antes** de persistir; si `SaveChanges` falla, la BD apunta a un archivo ya borrado (404). Destino: F8.
+- [ ] **F8-R3** (WARNING · frontend) — El mapeo `CatalogBrandingUpdate → FormData` de `updateBranding` **no se ejecuta en ningún test** (todo mockea el servicio). Destino: F8.
+- [ ] **F8-R4** (WARNING · frontend) — Falta el caso de archivo **demasiado grande** en la validación de marca. Destino: F8.
+- [ ] **F8-R5/R6** (SUGGESTION) — `MediaUrl` con slug null/blank; alt de imágenes solo por testid. Destino: F8.
+
 ## Siguiente paso
 
-Confirmar las propuestas (paletas predefinidas y almacenamiento de logo/banner); implementar F8 tras
-F2 y F1.
+F3 (carrito/checkout del cliente), que fija el contrato de `CreateOnlineOrderCommand` con un endpoint
+público por slug y trae T10 (tipos espejo TS en `@store-mgmt/domain`).
 
 ## Progreso
 
-- 2026-10-06 — Feature creado (documento de diseño). Sin implementación. Marca en la vista actual
-  Catálogo Web (OwnerAdmin), en `StoreCatalogSettings` (`LogoKey`, `BannerKey`, `PaletteId`), paleta
-  actual por defecto, migración incluida en F2. Sin implementación.
+- 2026-10-06 — Feature creado (documento de diseño). Sin implementación.
+- 2026-10-07 — **Implementado en 2 slices** (rama `feat/pedidos-whatsapp-f8-marca-catalogo`, sobre
+  `dev`): `6000daca` (backend) y `c98d0b90` (frontend). Ambos **revisados y aprobados/acknowledgeados**
+  por la revisión nativa. Owner **canceló las paletas** (solo la actual). Sin migración (columnas ya
+  existían en F2). Push/PR = decisión del owner.
