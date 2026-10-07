@@ -223,26 +223,27 @@ Sin UI en F2. Los contratos de tipos TypeScript (`OrderStatus`, `OrderPaymentSta
 
 ## Tareas
 
-- [ ] **T1** — Enums `OrderStatus`, `OrderPaymentStatus`, `OrderDeliveryType`; `WhatsApp = 101` en
+- [x] **T1** — Enums `OrderStatus`, `OrderPaymentStatus`, `OrderDeliveryType`; `WhatsApp = 101` en
   `OrderType` (D17).
-- [ ] **T2** — Entidades `StoreCatalogSettings` (config + marca) y `DeliveryDriver`.
-- [ ] **T3** — Feature `OnlineOrdersAdmin` (OwnerAdmin + StoreUser) en `StoreRoleFeatures`, colgada
+- [x] **T2** — Entidades `StoreCatalogSettings` (config + marca) y `DeliveryDriver`.
+- [x] **T3** — Feature `OnlineOrdersAdmin` (OwnerAdmin + StoreUser) en `StoreRoleFeatures`, colgada
   del módulo Catálogo Web.
-- [ ] **T4** — Extender `Order` con los campos nullable + factory `CreateOnline` (requiere aprobación
-  del owner por tocar producción).
-- [ ] **T5** — Configuración EF (Order, OrderItem, StoreCatalogSettings, DeliveryDriver), índices
+- [x] **T4** — Extender `Order` con los campos nullable + factory `CreateOnline` (aprobado por el
+  owner para tocar producción).
+- [x] **T5** — Configuración EF (Order, OrderItem, StoreCatalogSettings, DeliveryDriver), índices
   únicos (`Order.StoreId`+`Code`, `StoreCatalogSettings.StoreId`) y FK `DriverId`.
-- [ ] **T6** — Repositorios `IOrderRepository`, `IStoreCatalogSettingsRepository`,
+- [x] **T6** — Repositorios `IOrderRepository`, `IStoreCatalogSettingsRepository`,
   `IDeliveryDriverRepository` (+ registros DI).
-- [ ] **T7** — `CreateOnlineOrderCommand` con recalculo de total, snapshot, moneda del catálogo y
+- [x] **T7** — `CreateOnlineOrderCommand` con recalculo de total, snapshot, moneda del catálogo y
   `Code`.
-- [ ] **T8** — Reglas de transición `OrderStatus` (método de dominio + test unitario de la tabla).
-- [ ] **T9** — **Migración EF** `Add-StoreCatalogSettings-Drivers-OrderFields` y **script 29
+- [x] **T8** — Reglas de transición `OrderStatus` (método de dominio + test unitario de la tabla).
+- [x] **T9** — **Migración EF** `Add-StoreCatalogSettings-Drivers-OrderFields` y **script 29
   generado** (con el patch de idempotencia) + fila en `backend/scripts/README.md`.
-- [ ] **T10** — Tipos espejo en `@store-mgmt/domain`.
-- [ ] **T11** — Tests unitarios de dominio (defaults, transiciones válidas/inválidas) y de aplicación
+- [ ] **T10** — Tipos espejo en `@store-mgmt/domain`. **Diferida a F3** (motivo en «Decisiones
+  resueltas durante la implementación»: sin consumidor y `frontend-react/AGENTS.md` manda YAGNI).
+- [x] **T11** — Tests unitarios de dominio (defaults, transiciones válidas/inválidas) y de aplicación
   (command con Moq). Nuevos E2E solo en ficheros nuevos si se autoriza.
-- [ ] **T12** — Verificación (build, tests, `database update` + `migrations script`).
+- [x] **T12** — Verificación (build, tests, `database update` + `migrations script`).
 
 ## Criterios de aceptación
 
@@ -286,10 +287,56 @@ dotnet ef migrations script <PreviousMigration> --project src/Infrastructure --s
 - **Migración mal generada**: nunca escribir el `.sql` a mano; verificar el `Up` ejecutándolo de
   verdad.
 
+## Decisiones resueltas durante la implementación (2026-10-06)
+
+| # | Punto | Decisión | Motivo |
+| --- | --- | --- | --- |
+| I1 | `FeatureType` de `OnlineOrdersAdmin` | Nuevo `FeatureType.OnlineOrders = 123` | Reusar `WebCatalog=122` duplicaría el par `(122, OwnerAdmin)` y rompería `StoreRoleFeatures_ShouldHaveNoDuplicateFeatureAndRoleCombinations`. |
+| I2 | Datos de catálogo del feature nuevo | **En la migración 29** (owner eligió opción 1) | Un despliegue atómico al VPS. |
+| I3 | Mecanismo de la fila `Feature` 123 | **`HasData`** en `FeatureEntityTypeConfiguration` (no SQL crudo en `Up()`) | Las 43 features del repo se siembran por `HasData`; el SQL crudo dejaba seed ↔ BD divergentes y un `InsertData` futuro colisionaría en PK 123. El SQL crudo se reserva al backfill de `StoreRoleFeature` (por tienda), como `WholesaleSalesMultiStoresRoleFeatureBackfill`. |
+| I4 | `Name`/`Description` de la feature 123 | `Name='Pedidos online'`, `Description='Funcionalidad para gestionar los pedidos online de la tienda'` | Convención del catálogo: el `[Description]` del enum es la etiqueta (`Name`); las 43 filas usan la frase `Funcionalidad para …` en `Description`. |
+| I5 | Orden de la feature | `"Order" = 251` | Siguiente slot tras 122 (250) dentro del módulo 18. |
+| I6 | Excepción de transición | `InvalidOrderStatusTransitionException` de **dominio** | `Domain` no referencia `Application`; el handler de F5 la traducirá a `ApiException(400)`. |
+| I7 | Tipos espejo TS (T10) | **Diferidos a F3** | Sin consumidor todavía; `frontend-react/AGENTS.md` (YAGNI) y meter `WhatsApp=101` en el `OrderType` TS cambiaría el selector de tipos del POS (`getOrderTypes`). |
+
+## Evidencia de verificación (2026-10-06, la corrió el padre)
+
+| Comando | Resultado |
+| --- | --- |
+| `dotnet build src/SMCA.sln` | `Build succeeded`, 0 errores |
+| `dotnet test src/Domain.UnitTests/…` | **154 passed (154)**, 0 fallos (spot check del padre: 154/154) |
+| `dotnet test src/Application.Tests/…` | **626 passed (626)**, 0 fallos |
+| `dotnet ef migrations has-pending-model-changes …` | `No changes have been made to the model since the last migration.` |
+| `dotnet ef database update … smca_test` | `Applying '20261007021020_Add-StoreCatalogSettings-Drivers-OrderFields'. Done.` |
+| `psql -f scripts/29-….sql` (×2) | exit 0 ambas; 2ª corrida sin errores (idempotente) |
+| `psql` SELECT Feature 123 | 1 fila, valores = seed; `Feature_Id_seq.last_value > 123` |
+| E2E | **No se corrió** (excluido por el owner) |
+
+`StoreRoleFeature` backfill da 0 filas en `smca_test` porque las 10 tiendas están en `StorePlanId=2` y
+el módulo 18 vive en planes 3/4 — universo vacío, no un fallo. Se probó la sentencia a nivel de fila
+con el texto verbatim del script dentro de una transacción revertida: roles 2/3 → 2 filas, 2ª corrida
+→ 0 (ON CONFLICT), ROLLBACK → 0.
+
+## Follow-ups (no bloqueantes)
+
+- **Contrato F2 ↔ F3**: `CreateOnlineOrderCommand` resuelve la tienda por
+  `IHttpContextService.StoreId`, pero el endpoint público de F3 (`POST /public/ordering/{slug}/orders`)
+  es **anónimo por slug**. F3 debe resolver la tienda por slug y pasarla al comando (o envolverlo).
+  El propio plan deja "definir el contrato con F3" abierto.
+- **`setval` duplicado en el script**: Npgsql ya emite su propio `setval` tras el `InsertData` de la
+  feature, y el `SequenceFixupsSql` hace lo mismo. Es idempotente y duplicado inofensivo; se deja y se
+  documenta (no se borra en silencio).
+- **`OrderRepository.CodeExistsAsync` usa `IgnoreQueryFilters`**: el filtro global de
+  `ApplicationDbContext` es por *tenant*, no por *tienda*; sin él dos tiendas con el mismo código
+  romperían el índice único.
+- **Mínimo sobre el total con envío dentro**: hay test que lo fija
+  (`Handle_WhenTheDeliveryFeePushesTheTotalOverTheMinimum_ShouldAccept`).
+
 ## Siguiente paso
 
-Definir el contrato `CreateOnlineOrderCommand` con F3 y el de `StoreCatalogSettings` con F1/F8;
-ejecutar F2 (incluye la migración y el script 29) antes que el resto.
+F1 (config, `StoreCatalogSettings` + sincronización), luego F8 (marca), F3 (carrito/checkout, que fija
+el contrato de `CreateOnlineOrderCommand` y trae T10), F4–F7. Entrega (commit/push/PR) es decisión del
+owner.
 
 ## Progreso
 
@@ -299,3 +346,9 @@ ejecutar F2 (incluye la migración y el script 29) antes que el resto.
   "En camino" (D18); feature `OnlineOrdersAdmin` (OwnerAdmin + StoreUser, D15); horarios/zonas texto
   (D16); migración + **script 29 generado** documentados; "Decisiones abiertas" → "Decisiones
   resueltas y notas". Sin implementación.
+- 2026-10-06 — **T1–T9, T11, T12 implementadas** por tres escritores secuenciales (ruta ODD:
+  directa delegada; disparadores de mapeo, escritura y preparación) + un inline diferido (T10 → F3).
+  Owner aprobó explícitamente modificar producción y la opción 1 (datos de catálogo en la migración
+  29). Migración final `20261007021020_Add-StoreCatalogSettings-Drivers-OrderFields` con la fila
+  `Feature` 123 vía `HasData` y el backfill de `StoreRoleFeature` por SQL crudo idempotente. Script 29
+  generado; `has-pending-model-changes` limpio. Ver evidencia arriba. Sin commit (entrega = owner).
