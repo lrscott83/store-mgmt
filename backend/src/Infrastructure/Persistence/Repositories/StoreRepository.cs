@@ -118,9 +118,21 @@ namespace Infrastructure.Persistence.Repositories
         public async Task<Store?> GetStoreByCatalogSlugAsync(string catalogSlug)
             // IgnoreQueryFilters es intencional: el catálogo público se resuelve sin sesión
             // (no hay tenant en el contexto) y lo que acota el resultado es el slug único global.
+            //
+            // IsActive del Owner Y de su User también acotan (odd/tasks/webcatalog-active-filters.md):
+            // el catálogo web es anónimo, así que sin estos filtros desactivar al dueño —o a su
+            // usuario— no apagaba NADA y sus tiendas seguían servidas completas para cualquiera con
+            // el slug. Ambos campos existen por herencia de AuditableEntity< Guid >; no son columnas
+            // nuevas. Las navegaciones son no-nullables, así que EF las resuelve con INNER JOIN.
+            // Un catálogo con dueño inactivo no se vacía: desaparece (404), igual que una tienda
+            // inactiva y que un slug desconocido — los tres endpoints públicos comparten esta
+            // resolución, así que responden el mismo 404.
             => await _stores
                 .IgnoreQueryFilters()
-                .FirstOrDefaultAsync(s => s.IsActive && s.CatalogSlug == catalogSlug);
+                .FirstOrDefaultAsync(s => s.IsActive
+                    && s.Owner.IsActive
+                    && s.Owner.User.IsActive
+                    && s.CatalogSlug == catalogSlug);
 
         public async Task<IReadOnlyCollection<string>> GetCatalogSlugsAsync()
             => await _stores
