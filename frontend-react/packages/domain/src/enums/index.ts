@@ -58,6 +58,13 @@ export enum EFeatures {
   Elaborations = 121,
   /** Feature Catálogo web — espejo de FeatureType.WebCatalog=122 (backend, módulo 18). */
   WebCatalog = 122,
+  /**
+   * Feature Gestión de pedidos online — espejo de FeatureType.OnlineOrders=123 (backend, módulo
+   * 18). Distinta de `WebCatalog` a propósito: la configuración y la marca son del dueño
+   * (`WebCatalogAdmin`), pero atender un pedido es trabajo del día a día que también hace el
+   * `StoreUser` (`OnlineOrdersAdmin`).
+   */
+  OnlineOrders = 123,
 }
 
 export enum EModules {

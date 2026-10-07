@@ -336,6 +336,10 @@ const messages: Record<string, string> = {
   'WEB_CATALOG.BRAND_SAVE_ERROR': 'No se pudo guardar la marca',
   'WEB_CATALOG.BRAND_LOAD_ERROR': 'No se pudo cargar la marca',
 
+  // Menú — Gestión de pedidos (F5). Distinto de MENU.ONLINE_ORDERS_SETTINGS (F1): esa es la
+  // CONFIGURACIÓN del dueño; esta es la operación del día a día, que también hace el StoreUser.
+  'MENU.ONLINE_ORDERS': 'Pedidos',
+
   // Pedidos WhatsApp (módulo 18, F1): configuración del pedido online. Sin moneda — el precio
   // y la moneda los pone el catálogo (A3 eliminada).
   'ORDERING_SETTINGS.TITLE': 'Pedidos WhatsApp',
@@ -363,6 +367,63 @@ const messages: Record<string, string> = {
   'ORDERING_SETTINGS.LOAD_FAILED': 'No se pudo cargar la configuración de pedidos',
   'ORDERING_SETTINGS.LAST_SYNC': 'Última sincronización',
   'ORDERING_SETTINGS.NEVER_SYNCED': 'Nunca',
+
+  // Gestión de pedidos (feature 123, F5): la tabla de pedidos de la tienda. Los estados son los
+  // seis de la D11 y NO existe "En camino" (D18): el reparto se gestiona con el repartidor
+  // asignado, no con un estado nuevo.
+  'ORDERING_ORDERS.TITLE': 'Pedidos',
+  'ORDERING_ORDERS.SUBTITLE':
+    'Los pedidos que llegan por WhatsApp. Cambia su estado, marca el pago y asigna el repartidor.',
+  'ORDERING_ORDERS.REFRESH': 'Actualizar',
+  'ORDERING_ORDERS.COUNT': '{count} pedidos',
+  'ORDERING_ORDERS.EMPTY': 'No hay pedidos que coincidan con los filtros.',
+  'ORDERING_ORDERS.LOAD_FAILED': 'No se pudieron cargar los pedidos',
+  'ORDERING_ORDERS.PAGE': 'Página {page} de {last}',
+  'ORDERING_ORDERS.PREV_PAGE': 'Anterior',
+  'ORDERING_ORDERS.NEXT_PAGE': 'Siguiente',
+  'ORDERING_ORDERS.SEARCH_LABEL': 'Buscar por código o teléfono',
+  'ORDERING_ORDERS.SEARCH_PLACEHOLDER': 'Código del pedido o teléfono del cliente',
+  'ORDERING_ORDERS.FILTER_STATUS': 'Estado',
+  'ORDERING_ORDERS.FILTER_PAYMENT': 'Pago',
+  'ORDERING_ORDERS.FILTER_DELIVERY_TYPE': 'Entrega',
+  'ORDERING_ORDERS.FILTER_DRIVER': 'Repartidor',
+  'ORDERING_ORDERS.FILTER_FROM': 'Desde',
+  'ORDERING_ORDERS.FILTER_TO': 'Hasta',
+  'ORDERING_ORDERS.COL_CODE': 'Código',
+  'ORDERING_ORDERS.COL_CUSTOMER': 'Cliente',
+  'ORDERING_ORDERS.COL_DELIVERY_TYPE': 'Entrega',
+  'ORDERING_ORDERS.COL_TOTAL': 'Total',
+  'ORDERING_ORDERS.COL_STATUS': 'Estado',
+  'ORDERING_ORDERS.COL_PAYMENT': 'Pago',
+  'ORDERING_ORDERS.COL_DRIVER': 'Repartidor',
+  'ORDERING_ORDERS.COL_DATE': 'Fecha',
+  'ORDERING_ORDERS.STATUS_NEW': 'Nuevo',
+  'ORDERING_ORDERS.STATUS_ACCEPTED': 'Aceptado',
+  'ORDERING_ORDERS.STATUS_PREPARING': 'En preparación',
+  'ORDERING_ORDERS.STATUS_READY': 'Listo',
+  'ORDERING_ORDERS.STATUS_DELIVERED': 'Entregado',
+  'ORDERING_ORDERS.STATUS_CANCELLED': 'Cancelado',
+  'ORDERING_ORDERS.PAYMENT_PENDING': 'Pendiente',
+  'ORDERING_ORDERS.PAYMENT_PAID': 'Pagado',
+  'ORDERING_ORDERS.DELIVERY_PICKUP': 'Recogida en la tienda',
+  'ORDERING_ORDERS.DELIVERY_HOME': 'Envío a domicilio',
+  'ORDERING_ORDERS.CHANGE_STATUS': 'Cambiar estado',
+  'ORDERING_ORDERS.MARK_PAID': 'Marcar pagado',
+  'ORDERING_ORDERS.MARK_UNPAID': 'Marcar pendiente',
+  'ORDERING_ORDERS.ASSIGN_DRIVER': 'Asignar repartidor',
+  'ORDERING_ORDERS.NO_DRIVER': 'Sin asignar',
+  'ORDERING_ORDERS.NO_CODE': 'Sin código',
+  'ORDERING_ORDERS.NO_CUSTOMER': 'Sin cliente',
+  // El catálogo de repartidores (F7) puede no estar desplegado: el selector queda en "Sin
+  // asignar" y el resto de la vista sigue funcionando.
+  'ORDERING_ORDERS.DRIVERS_UNAVAILABLE':
+    'No se pudo cargar el catálogo de repartidores: no puedes asignarlos a un pedido.',
+  'ORDERING_ORDERS.STATUS_CHANGED': 'Estado del pedido actualizado',
+  'ORDERING_ORDERS.STATUS_FAILED': 'No se pudo cambiar el estado del pedido',
+  'ORDERING_ORDERS.PAYMENT_CHANGED': 'Pago del pedido actualizado',
+  'ORDERING_ORDERS.PAYMENT_FAILED': 'No se pudo actualizar el pago del pedido',
+  'ORDERING_ORDERS.DRIVER_CHANGED': 'Repartidor del pedido actualizado',
+  'ORDERING_ORDERS.DRIVER_FAILED': 'No se pudo asignar el repartidor',
 
   // Catálogo público (/catalog/<slug>): lo que ve el cliente final, sin sesión.
   'CATALOG_PUBLIC.SEARCH_PLACEHOLDER': 'Buscar productos…',
