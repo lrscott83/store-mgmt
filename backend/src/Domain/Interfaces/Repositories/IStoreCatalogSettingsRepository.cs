@@ -14,6 +14,28 @@ namespace Domain.Interfaces.Repositories
         Task<StoreCatalogSettings?> GetByStoreIdAsync(Guid storeId);
 
         /// <summary>
+        /// Configuración de la tienda para una LECTURA PÚBLICA (anónimo, sin sesión): salta el
+        /// filtro global por tenant del <c>ApplicationDbContext</c>.
+        ///
+        /// Existe separada de <see cref="GetByStoreIdAsync"/> y no la sustituye, por dos razones
+        /// que importan:
+        ///
+        ///   * El filtro por tenant es lo que confina las lecturas AUTENTICADAS a la tienda del
+        ///     contexto. Quitarle el bypass a <see cref="GetByStoreIdAsync"/> abriría esa puerta
+        ///     (pedidos, F2), así que el bypass vive en un método aparte y explícito.
+        ///   * Una petición anónima NO tiene tenant en el contexto, así que el filtro no puede
+        ///     coincidir con ninguna fila: la misma consulta que en sesión devuelve la fila
+        ///     devolvería VACÍA sin error ni aviso. Ya lo hacen a propósito
+        ///     <c>StoreRepository.GetStoreByCatalogSlugAsync</c> y
+        ///     <c>ProductRepository.GetPublishedBy*</c>.
+        ///
+        /// Seguro por construcción: no devuelve "cualquier configuración" sino la de UN
+        /// <c>storeId</c>, y quien lo llama lo resolvió antes por un slug ÚNICO GLOBAL
+        /// (<c>GetStoreByCatalogSlugAsync</c>), que es lo que acota el resultado sin sesión.
+        /// </summary>
+        Task<StoreCatalogSettings?> GetPublicByStoreIdAsync(Guid storeId);
+
+        /// <summary>
         /// Guarda la configuración de la tienda: si ya existe su fila la ACTUALIZA y si no, la
         /// inserta. Es un upsert explícito porque el editor de F1 manda la fila completa y la
         /// tienda puede no tener ninguna todavía.

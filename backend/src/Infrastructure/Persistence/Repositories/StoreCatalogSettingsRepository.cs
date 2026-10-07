@@ -13,8 +13,34 @@ namespace Infrastructure.Persistence.Repositories
             _settings = dbContext.Set<StoreCatalogSettings>();
         }
 
+        /// <summary>
+        /// Lectura EN SESIÓN (pedidos, F2): el filtro global por tenant se queda, que es lo que
+        /// confina la lectura a la tienda del contexto.
+        /// </summary>
         public async Task<StoreCatalogSettings?> GetByStoreIdAsync(Guid storeId)
             => await _settings.FirstOrDefaultAsync(s => s.StoreId == storeId);
+
+        /// <summary>
+        /// Lectura PÚBLICA (catálogo de una tienda sin sesión): `IgnoreQueryFilters` es
+        /// OBLIGATORIO, no una comodidad.
+        ///
+        /// `StoreCatalogSettings` tiene filtro global `IsSuperAdmin || TenantId == TenantId`
+        /// (ver <c>StoreCatalogSettingsEntityTypeConfiguration</c>) y una petición anónima no tiene
+        /// tenant en el contexto: `IsSuperAdmin` es false y `TenantId` es null sobre una columna no
+        /// nulable, así que el filtro NO puede coincidir con ninguna fila. Sin este bypass la
+        /// consulta devolvería VACÍA — sin error y sin aviso — y el storefront vería
+        /// `Enabled = false` para siempre aunque el dueño hubiera abierto los pedidos. Es el mismo
+        /// motivo por el que <c>StoreRepository.GetStoreByCatalogSlugAsync</c> y
+        /// <c>ProductRepository.GetPublishedBy*</c> saltan el filtro.
+        ///
+        /// Lo que mantiene acotada la lectura no es el filtro (no hay sesión que acotar) sino el
+        /// `StoreId`: lo resuelve el llamador con un slug único global, y el índice único de
+        /// `StoreId` garantiza una sola fila por tienda.
+        /// </summary>
+        public async Task<StoreCatalogSettings?> GetPublicByStoreIdAsync(Guid storeId)
+            => await _settings
+                .IgnoreQueryFilters()
+                .FirstOrDefaultAsync(s => s.StoreId == storeId);
 
         /// <summary>
         /// Upsert por IDENTIDAD de la fila: si ese id ya existe la marca como modificada, y si no

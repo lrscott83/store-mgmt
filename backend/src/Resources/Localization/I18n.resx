@@ -315,4 +315,65 @@
   <data name="CatalogSnapshotProductRequired" xml:space="preserve">
     <value>Para publicar un producto que aún no está en el servidor se necesitan el nombre y la categoría</value>
   </data>
+  <data name="OrderingNoDeliveryTypeEnabled" xml:space="preserve">
+    <value>Al habilitar los pedidos hay que abrir al menos una modalidad: recogida en tienda o envío a domicilio</value>
+  </data>
+  <data name="OrderingWhatsappNumberRequired" xml:space="preserve">
+    <value>El número de WhatsApp es obligatorio para recibir pedidos: todos los pedidos se envían por ál</value>
+  </data>
+  <data name="OrderingWhatsappNumberTooLong" xml:space="preserve">
+    <value>{0} no puede superar los {1} caracteres</value>
+  </data>
+  <data name="OrderingBusinessHoursTooLong" xml:space="preserve">
+    <value>{0} no puede superar los {1} caracteres</value>
+  </data>
+  <data name="OrderingDeliveryZonesTooLong" xml:space="preserve">
+    <value>{0} no puede superar los {1} caracteres</value>
+  </data>
+
+<data name="OnlineOrdersNotEnabled" xml:space="preserve">
+    <value>La tienda {0} no tiene los pedidos online habilitados</value>
+  </data>
+  <data name="OnlineOrderProductNotAvailable" xml:space="preserve">
+    <value>El producto {0} ya no está disponible en el catálogo</value>
+  </data>
+  <data name="OnlineOrderDeliveryTypeInvalid" xml:space="preserve">
+    <value>La modalidad de entrega {0} no es válida</value>
+  </data>
+  <data name="OnlineOrderDeliveryNotAllowed" xml:space="preserve">
+    <value>Esta tienda no permite envío a domicilio ({0} está desactivado)</value>
+  </data>
+  <data name="OnlineOrderPickupNotAllowed" xml:space="preserve">
+    <value>Esta tienda no permite recogida en la tienda ({0} está desactivado)</value>
+  </data>
+  <data name="OnlineOrderDeliveryAddressRequired" xml:space="preserve">
+    <value>El envío a domicilio necesita la dirección de entrega ({0})</value>
+  </data>
+  <data name="OnlineOrderEmptyCart" xml:space="preserve">
+    <value>El carrito no puede estar vacío ({0})</value>
+  </data>
+  <data name="OnlineOrderQuantityInvalid" xml:space="preserve">
+    <value>La cantidad {0} no es válida</value>
+  </data>
+  <data name="OnlineOrderMixedCurrencies" xml:space="preserve">
+    <value>El pedido mezcla monedas ({0}); un pedido solo puede llevar una</value>
+  </data>
+  <data name="OnlineOrderBelowMinimumAmount" xml:space="preserve">
+    <value>El total {0} no alcanza el mínimo de {1}</value>
+  </data>
+  <data name="OnlineOrderCodeGenerationFailed" xml:space="preserve">
+    <value>No se pudo generar un código de pedido para la tienda {0}</value>
+  </data>
+  <data name="OnlineOrderCustomerNameTooLong" xml:space="preserve">
+    <value>{0} no puede superar los {1} caracteres</value>
+  </data>
+  <data name="OnlineOrderCustomerPhoneTooLong" xml:space="preserve">
+    <value>{0} no puede superar los {1} caracteres</value>
+  </data>
+  <data name="OnlineOrderDeliveryAddressTooLong" xml:space="preserve">
+    <value>{0} no puede superar los {1} caracteres</value>
+  </data>
+  <data name="OnlineOrderNotesTooLong" xml:space="preserve">
+    <value>{0} no puede superar los {1} caracteres</value>
+  </data>
 </root>
