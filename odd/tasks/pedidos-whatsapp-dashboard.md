@@ -50,6 +50,14 @@ local no sirve: el pedido online vive **solo** en el servidor (D10/D14).
 - F7: tabla `DeliveryDriver` para poblar el selector de reparto.
 - Patrón de controlador de gestión: `CatalogController` (`[HasPermission(WebCatalogAdmin)]`).
 
+**Frontera con F7 (resuelta 2026-10-07).** F5 es la **dueña única** de la asignación de repartidor:
+
+- **T5** (`AssignOrderDriverCommand`) valida que el `DriverId` existe, es de la tienda y está activo.
+- El filtro `driverId` de `GetOnlineOrdersQuery` es lo que permite leer los pedidos de un repartidor.
+
+F7 soltó ambas por redundantes y ya no las implementa. Si ves esas validaciones descritas en el
+documento de F7, ese documento está desactualizado — la fuente es esta.
+
 ## Decisiones del owner aplicables
 
 | # | Decisión | Cómo aplica a F5 |
@@ -158,3 +166,6 @@ Implementar F5 tras F2 y F7 (para el selector de repartidores).
 - 2026-10-06 — Sincronizado con el maestro: gestión por OwnerAdmin + StoreUser (`OnlineOrdersAdmin`,
   D15); sin "En camino" (D18); vista "Pedidos" confirmada (A6); "Decisiones abiertas" → "Decisiones
   resueltas y notas". Sin implementación.
+- 2026-10-07 — **Frontera con F7 resuelta.** Se documenta que F5 es la dueña única de la asignación de
+  repartidor (T5 + filtro `driverId`), y que F7 soltó esas tareas por redundantes. No cambia ninguna
+  tarea de este documento: T5 y el filtro ya existían aquí. Sin implementación.
