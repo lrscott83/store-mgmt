@@ -166,20 +166,20 @@ o este config; **pendiente de confirmar**; ver F4).
 
 ## Tareas
 
-- [ ] **T1** — Definir el contrato de `StoreCatalogSettings` (columnas de pedidos) y su mapeo a
+- [x] **T1** — Definir el contrato de `StoreCatalogSettings` (columnas de pedidos) y su mapeo a
   `StoreCatalogSettingsDto`.
-- [ ] **T2** — `GetStoreCatalogSettingsQuery` (auth, por tienda actual; defaults si no existe).
-- [ ] **T3** — `UpsertStoreCatalogSettingsCommand` + validator (upsert, `SyncedAt`, sin pisar marca)
+- [x] **T2** — `GetStoreCatalogSettingsQuery` (auth, por tienda actual; defaults si no existe).
+- [x] **T3** — `UpsertStoreCatalogSettingsCommand` + validator (upsert, `SyncedAt`, sin pisar marca)
   — destino del botón Sincronizar.
-- [ ] **T4** — `GetPublicOrderingConfigQuery` (anónima, por slug, 404 uniforme).
-- [ ] **T5** — Controlador de gestión `StoreCatalogSettingsController`
-  (`[HasPermission(WebCatalogAdmin)]`) y `PublicOrderingController` (`[AllowAnonymous]`, ruta
-  `~/api/v1/public/ordering/...`).
-- [ ] **T6** — Vista `ordering-settings.tsx` (interruptor + panel condicional + botón Sincronizar).
-- [ ] **T7** — Registrar ruta y entrada de menú (`routes.ts`, `menu-config.ts`).
-- [ ] **T8** — Claves i18n nuevas en `es.ts`.
-- [ ] **T9** — Tests unitarios nuevos (query/command con Moq; componente con Testing Library).
-- [ ] **T10** — Verificación (build backend, tests, `typecheck`/`lint`/`vitest`).
+- [x] **T4** — `GetPublicOrderingConfigQuery` (anónima, por slug, 404 uniforme).
+- [x] **T5** — Controlador de gestión `OnlineOrderingController`
+  (`[HasPermission(WebCatalogAdmin)]`, rutas `~/api/v1/online-ordering/settings`) y
+  `PublicOrderingController` (`[AllowAnonymous]`, `~/api/v1/public/ordering/{storeSlug}/config`).
+- [x] **T6** — Vista `ordering-settings.tsx` (interruptor + panel condicional + botón Sincronizar).
+- [x] **T7** — Registrar ruta y entrada de menú (`routes.ts`, `menu-config.ts`).
+- [x] **T8** — Claves i18n nuevas en `es.ts`.
+- [x] **T9** — Tests unitarios nuevos (query/command con Moq; componente con Testing Library).
+- [x] **T10** — Verificación (build backend, tests, `typecheck`/`lint`/`vitest`).
 
 ## Criterios de aceptación
 
@@ -219,15 +219,56 @@ pnpm vitest run app/sales/routes/__tests__/
 - **Tabla compartida con la marca**: los commands de pedidos y de marca deben escribir solo sus
   columnas para no pisarse entre vistas.
 
+## Decisiones resueltas durante la implementación (2026-10-07)
+
+| # | Punto | Decisión | Motivo |
+| --- | --- | --- | --- |
+| I1 | `WhatsappNumber` requerido | **Cuando `Enabled`, siempre** (recogida o envío) | Todo pedido sale por `wa.me`; el plan lo ataba solo a `DeliveryEnabled`. Decidido por el owner. |
+| I2 | Lectura pública de `StoreCatalogSettings` | Método nuevo `GetPublicByStoreIdAsync` con `IgnoreQueryFilters()` | El filtro global por tenant anula silenciosamente las lecturas anónimas (`Enabled=false`). `GetByStoreIdAsync` intacto (F2 lo usa con tenant). |
+| I3 | Ruta del controlador de gestión | Rutas absolutas `~/api/v1/online-ordering/settings` | `BaseApiController` fija `api/v1/[controller]`; un `[Route]` de clase se combina y expondría `api/v1/OnlineOrdering/...` de más. |
+| I4 | `LogoUrl`/`BannerUrl` en el config público | **No** se exponen todavía | No hay writer ni servido de marca (F8); `BelongsToStore` exige `productId`. Se expone `PaletteId` (default). F8 los añadirá. |
+| I5 | `WhatsappNumber` en config público | **No** se expone | Plan (riesgo); F4 decide si viaja en la creación del pedido. |
+
+## Evidencia de verificación (2026-10-07)
+
+| Comando | Resultado |
+| --- | --- |
+| `dotnet build src/SMCA.sln` | Build succeeded, 0 errores |
+| `dotnet test src/Application.Tests/…` | **701 passed**, 0 fallos (115 de OnlineOrdering) |
+| `dotnet test src/Domain.UnitTests/…` | 154 passed |
+| `turbo run typecheck --force --filter=@store-mgmt/web-store-pos` | 5 successful, 0 errores |
+| `turbo run lint --force --filter=@store-mgmt/web-store-pos` | 4 successful |
+| `vitest run …/ordering-settings.test.tsx` | 13 passed (regresión: 1721 passed) |
+| E2E | No se corrió (excluido por el owner) |
+
+## Hallazgos de la revisión nativa (RDD) — TODOs rastreados (2026-10-07)
+
+Advisory, no bloqueantes:
+
+- [ ] **F1-R1** (WARNING) — Endpoints sin test de ruta/permiso (`[AllowAnonymous]` y `[HasPermission]`). Destino: F1 (tests).
+- [ ] **F1-R2** (WARNING · backend) — `PaletteId` almacenado vacío/whitespace no cubierto (fallback distinto del null). Destino: F1.
+- [ ] **F1-R3** (WARNING · backend) — `MaximumLength` sobre el valor crudo pero se persiste `Trim()`; padding podría rechazarse aunque quepa. Destino: F1.
+- [ ] **F1-R4** (WARNING · backend) — `StoreId`/`TenantId` no-Guid (claim corrupto) sin resultado asertado. Destino: F1.
+- [ ] **F1-R5** (WARNING · frontend) — Coerción monetaria sin test (vacío/no numérico → 0; negativos pasan). Destino: F1.
+- [ ] **F1-R6** (WARNING · frontend) — Tras guardar OK, fallar el reload muestra toast de éxito + error fatal contradictorio y oculta los valores. Destino: F1.
+- [ ] **F1-R7** (WARNING · frontend) — Rama de error lanzado en la carga inicial sin test. Destino: F1.
+- [ ] **F1-R8/R9** (SUGGESTION · frontend) — `formatSyncedAt` sin test; selectores por testid en vez de role/label. Destino: F1.
+
 ## Siguiente paso
 
-Cerrar el contrato de `StoreCatalogSettings` con F2 (y las columnas de marca con F8); implementar F1
-tras F2.
+F8 (marca: logo/banner/paleta en la vista Catálogo Web; añadirá `LogoUrl`/`BannerUrl` al config
+público), luego F3 (carrito/checkout, que fija el contrato de `CreateOnlineOrderCommand` y trae T10).
 
 ## Progreso
 
 - 2026-10-06 — Feature creado (documento de diseño). Sin implementación.
 - 2026-10-06 — Sincronizado con el maestro: `OnlineOrderingSettings` → `StoreCatalogSettings`;
-  eliminada la moneda configurable (A3); permisos D15 (config OwnerAdmin, gestión StoreUser);
-  horarios/zonas texto (D16); "Decisiones abiertas" → "Decisiones resueltas y notas"; sin decisiones
+  eliminada la moneda configurable (A3); permisos D15; horarios/zonas texto (D16); sin decisiones
   abiertas bloqueantes. Sin implementación.
+- 2026-10-07 — **Implementado en 2 slices** (rama `feat/pedidos-whatsapp-f1-config`): `1019d119`
+  (backend: query/command/public + controllers + tests) y `e5844dd4` (frontend: vista/ruta/menú/i18n/
+  cliente + tests). Ambos **revisados por la revisión nativa (lens reliability), aprobados y
+  acknowledgeados**. Owner resolvió I1. La revisión del backend falló 4× por **DNS del proveedor
+  `opencode-go` → `opencode.ai`** (`getaddrinfo ENOTFOUND` en el log de OpenCode), no por el código;
+  al reintentar con la conectividad de vuelta, aprobó. Ver evidencia y TODOs arriba. Push/PR =
+  decisión del owner.
