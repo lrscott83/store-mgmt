@@ -147,16 +147,16 @@ Debe coincidir **código + teléfono** (ambos) para devolver estado y pago. Resp
 
 ## Tareas
 
-- [ ] **T1** — Store `storefront-cart-store.ts` con clave propia y aislamiento por slug.
-- [ ] **T2** — Componente carrito + integración mínima en `public-catalog.tsx`.
-- [ ] **T3** — Componente checkout (campos, validaciones, tipo de entrega condicional).
-- [ ] **T4** — Cliente API `ordering-api.ts` (config, crear pedido, consultar estado).
-- [ ] **T5** — Backend: exponer `CreateOnlineOrderCommand` en `PublicOrderingController`.
-- [ ] **T6** — Backend: `GetPublicOrderStatusQuery` (código + teléfono).
-- [ ] **T7** — Validaciones/anti-abuso (formato, mínimos, tasa) + tests.
-- [ ] **T8** — Claves i18n.
-- [ ] **T9** — Tests unitarios nuevos (store, componentes, query/command).
-- [ ] **T10** — Verificación (`typecheck`/`lint`/`vitest`, build/tests backend).
+- [x] **T1** — Store `storefront-cart-store.ts` con clave propia (`lizoft-catalog-cart`) y aislamiento por slug (`itemsByStore`).
+- [x] **T2** — Componente carrito + integración en `public-catalog.tsx` (botón con badge).
+- [x] **T3** — Componente checkout (campos, validaciones, tipo de entrega condicional).
+- [x] **T4** — Cliente API: `createPublicOrder`/`getPublicOrderStatus` en `catalog-http-service.ts` (junto a `getPublicOrderingConfig`, sin servicio nuevo).
+- [x] **T5** — Backend: `CreateOnlineOrderCommand` **rehecho público por slug** (resuelve tienda+tenant por slug, lectura anónima) y expuesto en `PublicOrderingController`.
+- [x] **T6** — Backend: `GetPublicOrderStatusQuery` (código + teléfono, 404 uniforme).
+- [x] **T7** — Validaciones/anti-abuso: formato, mínimos, **rate limit `OnlineOrderPolicy`** (20/10 min por IP+slug).
+- [x] **T8** — Claves i18n.
+- [x] **T9** — Tests unitarios nuevos (store, componentes, query/command).
+- [x] **T10** — Verificación (`typecheck`/`lint`/`vitest`, build/tests backend).
 
 ## Criterios de aceptación
 
@@ -192,13 +192,47 @@ dotnet test src/Application.Tests/Application.Tests.csproj
   slug.
 - **Enum privado de la respuesta**: no filtrar datos internos de la tienda en la consulta pública.
 
+## Decisiones resueltas durante la implementación (2026-10-07)
+
+| # | Punto | Decisión | Motivo |
+| --- | --- | --- | --- |
+| I1 | Contrato F2↔F3 (tienda) | `CreateOnlineOrderCommand` **rehecho público por slug** | El endpoint es anónimo; la versión de F2 leía `IHttpContextService` (JWT) → vacío. Ahora resuelve por `GetStoreByCatalogSlugAsync` y `tenantId = store.TenantId`. |
+| I2 | Config en el alta | `GetPublicByStoreIdAsync` | El filtro de tenant anula la lectura de sesión en anónimo. |
+| I3 | Estado del pedido | Nuevo `GetPublicByCodeAsync` con `IgnoreQueryFilters` | `Order` tiene filtro de tenant; `GetByCodeAsync` se deja intacto. |
+| I4 | Pickup | **Ignora** la dirección (null) | No rechazar al cliente por un campo que no aplica. |
+| I5 | Rate limit | Policy `OnlineOrderPolicy`: 20/10 min, partición IP+slug | Ya había infra (`AddRateLimiter`); se añade la tercera policy. |
+| I6 | Carrito | Un store con `itemsByStore: Record<slug, …>`, clave `lizoft-catalog-cart` | Aísla por tienda sin varias claves; no toca `lizoft-cart`. |
+| I7 | Enums en el contrato público | Numéricos | El proyecto no usa `JsonStringEnumConverter`; el frontend mapea por valor. |
+| I8 | Código del pedido | El checkout muestra el código; el enlace `wa.me` es F4 | Fuera de alcance de F3. |
+
+## Evidencia de verificación (2026-10-07)
+
+| Comando | Resultado |
+| --- | --- |
+| `dotnet build src/SMCA.sln` | 0 errores |
+| `dotnet test Application.Tests` | **829 passed** (+47) |
+| `dotnet test Domain.UnitTests` | 154 passed |
+| `turbo typecheck` / `lint` | 0 errores |
+| `vitest app/catalog/` | **46 passed** |
+| E2E | No se corrió (excluido) |
+
+## Hallazgos de la revisión nativa (RDD) — TODOs rastreados (2026-10-07)
+
+- [ ] **F3-R1** (WARNING · backend) — El bypass del filtro de tenant en `Order` solo se prueba con EF InMemory, no con PostgreSQL real. Destino: F3/E2E (requiere autorización).
+- [ ] **F3-R2** (WARNING · backend) — La partición del rate limit lee el slug de `RouteValues`; no se prueba que el middleware corra después del routing (podría colapsar a IP-only). Destino: F3.
+- [ ] **F3-R3** (WARNING · frontend) — `storefront-order-status` muestra "no encontrado" para **cualquier** error (red/5xx), no solo 404; `ORDER.STATUS_FAILED` queda sin usar. Destino: F3.
+- [ ] **F3-R4** (WARNING · frontend) — Vaciar el input de cantidad **borra la línea** (`Number('') || 0` → 0 → remove). Destino: F3.
+- [ ] **F3-R5/R6** (SUGGESTION · frontend) — Doble-submit del checkout sin test; aviso "añadido" con auto-dismiss sin test. Destino: F3.
+
 ## Siguiente paso
 
-Cerrar el contrato de `CreateOnlineOrderCommand` con F2; implementar F3 tras F1/F2/F8.
+F4 (envío del pedido por WhatsApp: enlace `wa.me` con el código y el resumen), luego F5 (dashboard), F6 (ventas), F7 (repartidores).
 
 ## Progreso
 
 - 2026-10-06 — Feature creado (documento de diseño). Sin implementación.
-- 2026-10-06 — Sincronizado con el maestro: eliminadas las referencias a A1/A3; sin moneda propia
-  (viene del catálogo); `OrderType = WhatsApp` (D17); horarios/zonas texto (D16);
-  "Decisiones abiertas" → "Decisiones resueltas y notas". Sin implementación.
+- 2026-10-06 — Sincronizado con el maestro: eliminadas referencias a A1/A3; sin moneda propia; `OrderType = WhatsApp` (D17); horarios/zonas texto (D16). Sin implementación.
+- 2026-10-07 — **Implementado en 2 slices** (rama `feat/pedidos-whatsapp-f3-carrito-cliente`, sobre F8):
+  `3dd15c16` (backend: alta pública por slug + estado + rate limit) y `dbdddafe` (frontend: carrito +
+  checkout + estado). Ambos **revisados y aprobados/acknowledgeados**. Owner resolvió el contrato
+  F2↔F3. **Push: no** (F3 sigue local). Ver evidencia y TODOs arriba.
