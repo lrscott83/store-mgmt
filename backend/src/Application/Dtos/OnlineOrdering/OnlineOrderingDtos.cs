@@ -49,8 +49,10 @@ namespace Application.Dtos.OnlineOrdering
     ///
     ///   * NO lleva `WhatsappNumber`: el enlace `wa.me` se arma en el endpoint del pedido (F4), no
     ///     en un config que lee cualquiera que abra el catálogo.
-    ///   * NO lleva `LogoUrl`/`BannerUrl`: son claves internas de imagen y su URL pública es
-    ///     trabajo de F8. Inventar una URL aquí sería publicar una ruta de almacenamiento falsa.
+    ///   * SÍ lleva `LogoUrl`/`BannerUrl` (F8) y NUNCA `LogoKey`/`BannerKey`: el storefront necesita
+    ///     la URL para pintar el <c>&lt;img&gt;</c>, y publicar la clave cruda filtraría una ruta de
+    ///     almacenamiento interno a cualquiera que abra el catálogo. Las URL son del endpoint público
+    ///     de media, que es el único que puede resolverlas con el slug.
     ///   * SÍ lleva `PaletteId`: la paleta la pinta el storefront, y sin fila de configuración la
     ///     que se devuelve es <see cref="StoreCatalogSettings.DefaultPaletteId"/> — la que el
     ///     catálogo ya usa, para que una tienda recién sincronizada no se vea rota.
@@ -77,6 +79,18 @@ namespace Application.Dtos.OnlineOrdering
 
         /// <summary>Zonas de reparto (texto libre, D16). null = todas.</summary>
         public string? DeliveryZones { get; set; }
+
+        /// <summary>
+        /// URL PÚBLICA del logo (F8), construida con el slug de la tienda y servida por el endpoint
+        /// de media del catálogo. null = la tienda no tiene logo.
+        ///
+        /// Nunca es una ruta del servidor: sale de <c>CatalogPublicUrls.Media</c> como la de
+        /// cualquier imagen del catálogo.
+        /// </summary>
+        public string? LogoUrl { get; set; }
+
+        /// <summary>URL PÚBLICA del banner (F8). null = la tienda no tiene banner.</summary>
+        public string? BannerUrl { get; set; }
 
         /// <summary>
         /// Paleta del catálogo de la tienda. Cuando la tienda no tiene fila de configuración se

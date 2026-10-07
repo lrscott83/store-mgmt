@@ -594,6 +594,12 @@
   <data name="OrderingDeliveryZonesTooLong" xml:space="preserve">
     <value>{0} cannot be longer than {1} characters</value>
   </data>
+  <data name="BrandingNothingToUpdate" xml:space="preserve">
+    <value>At least the logo or the banner must be uploaded or removed: the request carries no change</value>
+  </data>
+  <data name="BrandingUploadAndRemoveConflict" xml:space="preserve">
+    <value>{0} cannot be uploaded and removed in the same request</value>
+  </data>
 
 <data name="OnlineOrdersNotEnabled" xml:space="preserve">
     <value>Store {0} does not have online orders enabled</value>

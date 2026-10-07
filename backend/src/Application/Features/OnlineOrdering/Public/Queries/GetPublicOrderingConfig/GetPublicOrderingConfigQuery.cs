@@ -1,6 +1,7 @@
 using Application.Abstractions.Messaging;
 using Application.Dtos.OnlineOrdering;
 using Application.Exceptions;
+using Application.Features.WebCatalog.Public;
 using Application.ResponseModels;
 using Domain.Entities.StoreCatalogSettings;
 using Domain.Entities.Stores;
@@ -74,6 +75,12 @@ namespace Application.Features.OnlineOrdering.Public.Queries.GetPublicOrderingCo
                 MinimumOrderAmount = settings?.MinimumOrderAmount ?? 0m,
                 BusinessHours = settings?.BusinessHours,
                 DeliveryZones = settings?.DeliveryZones,
+                // La MARCA (F8) viaja como URL pública del endpoint de media, nunca como clave
+                // cruda: la clave es una ruta interna de almacenamiento y este config lo lee
+                // cualquiera que abra el catálogo. Sin clave (o sin fila) la URL es null, y el
+                // storefront simplemente no pinta logo ni banner.
+                LogoUrl = MediaUrl(store.CatalogSlug, settings?.LogoKey),
+                BannerUrl = MediaUrl(store.CatalogSlug, settings?.BannerKey),
                 // El storefront siempre tiene que pintar algo: sin fila (o con una paleta en
                 // blanco) se cae a la paleta que el catálogo ya usa hoy.
                 PaletteId = string.IsNullOrWhiteSpace(settings?.PaletteId)
@@ -81,5 +88,16 @@ namespace Application.Features.OnlineOrdering.Public.Queries.GetPublicOrderingCo
                     : settings.PaletteId,
             });
         }
+
+        /// <summary>
+        /// URL pública de una imagen de MARCA, o null si no hay clave (o no hay slug).
+        ///
+        /// Se construye con <c>CatalogPublicUrls.Media</c>, el MISMO builder que usan las imágenes
+        /// de producto: por eso el logo y el banner se sirven con el endpoint de media que ya
+        /// existe, sin un caso nuevo. La clave de marca pasa su <c>BelongsToStore</c> porque
+        /// comparte el prefijo <c>{tenant}/{store}/</c>.
+        /// </summary>
+        private static string? MediaUrl(string? storeSlug, string? key)
+            => string.IsNullOrWhiteSpace(key) ? null : CatalogPublicUrls.Media(storeSlug!, key);
     }
 }

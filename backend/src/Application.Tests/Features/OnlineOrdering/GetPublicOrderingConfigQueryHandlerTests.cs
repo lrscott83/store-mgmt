@@ -13,7 +13,7 @@ using Resources;
 namespace Application.Tests.Features.OnlineOrdering;
 
 /// <summary>
-/// El config público es lo único que el storefront lee antes de ofrecer el carrito, y son tres
+/// El config público es lo único que el storefront lee antes de ofrecer el carrito, y son cuatro
 /// propiedades las que importan:
 ///
 ///   1. ANÓNIMO y acotado al slug: sin sesión, y el slug (único global) es lo que resuelve la
@@ -24,8 +24,8 @@ namespace Application.Tests.Features.OnlineOrdering;
 ///   3. NO expone el número de WhatsApp. El enlace `wa.me` se arma en el endpoint del pedido (F4),
 ///      no en un config que cualquier visitante puede leer.
 ///
-/// La paleta viene porque el storefront la pinta; el logo y el banner NO se inventan: son claves
-/// internas y publicarlos es trabajo de F8.
+/// La paleta viene porque el storefront la pinta; el logo y el banner también, como URLs públicas
+/// del endpoint de media construidas con el slug de la tienda.
 /// </summary>
 public class GetPublicOrderingConfigQueryHandlerTests
 {
@@ -131,6 +131,121 @@ public class GetPublicOrderingConfigQueryHandlerTests
         result.Data.PaletteId.Should().Be("sunset");
     }
 
+    #region Branding (F8)
+
+    /// <summary>
+    /// La marca viaja como URL del endpoint PÚBLICO de media, construida con el slug de la tienda:
+    /// es lo que el storefront pone en el `src` y lo que lo sirve sin sesión. Reutilizar el mismo
+    /// builder que las imágenes de producto es lo que evita un endpoint de marca paralelo.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WithALogoAndABanner_ShouldPublishTheirPublicMediaUrls()
+    {
+        PublishedStore("tienda-ana");
+        StoreCatalogSettings settings = StoreCatalogSettings.Create(_storeId, _tenantId);
+        settings.LogoKey = $"{_tenantId:N}/{_storeId:N}/branding/logo/logo.png";
+        settings.BannerKey = $"{_tenantId:N}/{_storeId:N}/branding/banner/banner.png";
+        _settingsRepository.Setup(x => x.GetPublicByStoreIdAsync(_storeId)).ReturnsAsync(settings);
+
+        var result = await Handler().Handle(new GetPublicOrderingConfigQuery("tienda-ana"), CancellationToken.None);
+
+        result.Data!.LogoUrl.Should().Be($"/api/v1/public/catalog/tienda-ana/media/{settings.LogoKey}");
+        result.Data.BannerUrl.Should().Be($"/api/v1/public/catalog/tienda-ana/media/{settings.BannerKey}");
+    }
+
+    /// <summary>
+    /// Sin clave la URL es null, no una cadena vacía ni una ruta rota: el storefront no pinta nada.
+    /// Sin fila también (una tienda recién sincronizada no tiene marca todavía).
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenTheStoreHasNoSettings_ShouldPublishNoMediaUrls()
+    {
+        PublishedStore();
+        _settingsRepository.Setup(x => x.GetPublicByStoreIdAsync(_storeId)).ReturnsAsync((StoreCatalogSettings?)null);
+
+        var result = await Handler().Handle(new GetPublicOrderingConfigQuery("tienda-ana"), CancellationToken.None);
+
+        result.Data!.LogoUrl.Should().BeNull();
+        result.Data.BannerUrl.Should().BeNull();
+    }
+
+    /// <summary>Logo y banner son independientes: puede tener uno solo.</summary>
+    [Fact]
+    public async Task Handle_WithOnlyALogo_ShouldPublishTheBannerUrlAsNull()
+    {
+        PublishedStore();
+        StoreCatalogSettings settings = StoreCatalogSettings.Create(_storeId, _tenantId);
+        settings.LogoKey = $"{_tenantId:N}/{_storeId:N}/branding/logo/logo.png";
+        _settingsRepository.Setup(x => x.GetPublicByStoreIdAsync(_storeId)).ReturnsAsync(settings);
+
+        var result = await Handler().Handle(new GetPublicOrderingConfigQuery("tienda-ana"), CancellationToken.None);
+
+        result.Data!.LogoUrl.Should().NotBeNull();
+        result.Data.BannerUrl.Should().BeNull();
+    }
+
+    /// <summary>
+    /// Una key en blanco es una key que no existe: hay que filtrarla ANTES de construir la URL, o el
+    /// storefront recibiría `/media/` y pediría el índice de un directorio.
+    /// </summary>
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task Handle_WithABlankMediaKey_ShouldPublishNoUrl(string blank)
+    {
+        PublishedStore();
+        StoreCatalogSettings settings = StoreCatalogSettings.Create(_storeId, _tenantId);
+        settings.LogoKey = blank;
+        settings.BannerKey = blank;
+        _settingsRepository.Setup(x => x.GetPublicByStoreIdAsync(_storeId)).ReturnsAsync(settings);
+
+        var result = await Handler().Handle(new GetPublicOrderingConfigQuery("tienda-ana"), CancellationToken.None);
+
+        result.Data!.LogoUrl.Should().BeNull();
+        result.Data.BannerUrl.Should().BeNull();
+    }
+
+    /// <summary>
+    /// La URL es del endpoint PÚBLICO y lleva el slug de la tienda RESUELTA, no el que vino en la
+    /// petición: si se publicara el slug crudo, dos consultas con distinta capitalización darían dos
+    /// URLs distintas para la misma imagen y la caché inmutable del navegador serviría la vieja.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WithABrandingKey_ShouldBuildTheUrlFromTheResolvedSlug()
+    {
+        PublishedStore("tienda-ana");
+        StoreCatalogSettings settings = StoreCatalogSettings.Create(_storeId, _tenantId);
+        settings.LogoKey = "tenant/store/branding/logo/logo.png";
+        _settingsRepository.Setup(x => x.GetPublicByStoreIdAsync(_storeId)).ReturnsAsync(settings);
+
+        var result = await Handler().Handle(new GetPublicOrderingConfigQuery("  TIENDA-ANA  "), CancellationToken.None);
+
+        result.Data!.LogoUrl.Should().Be("/api/v1/public/catalog/tienda-ana/media/tenant/store/branding/logo/logo.png");
+        result.Data.LogoUrl.Should().NotContain("TIENDA-ANA");
+    }
+
+    /// <summary>
+    /// Nunca una ruta del servidor. La URL es relativa al endpoint público, sin host ni ruta del
+    /// almacenamiento: el config lo lee un anónimo y no puede usarse para localizar archivos en
+    /// disco.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WithABrandingKey_ShouldPublishNoServerPath()
+    {
+        PublishedStore();
+        StoreCatalogSettings settings = StoreCatalogSettings.Create(_storeId, _tenantId);
+        settings.LogoKey = $"{_tenantId:N}/{_storeId:N}/branding/logo/logo.png";
+        _settingsRepository.Setup(x => x.GetPublicByStoreIdAsync(_storeId)).ReturnsAsync(settings);
+
+        var result = await Handler().Handle(new GetPublicOrderingConfigQuery("tienda-ana"), CancellationToken.None);
+
+        result.Data!.LogoUrl.Should().StartWith("/api/v1/public/catalog/");
+        result.Data.LogoUrl.Should().NotContain(@":\");
+        result.Data.LogoUrl.Should().NotContain("storage");
+    }
+
+    #endregion
+
     /// <summary>
     /// Solo recogida: el storefront ofrece pasar a recoger y NO ofrece domicilio con envío, aunque
     /// la columna de envío tenga un costo guardado de cuando lo cerró.
@@ -185,16 +300,18 @@ public class GetPublicOrderingConfigQueryHandlerTests
     }
 
     /// <summary>
-    /// El config público tampoco inventa logo/banner: son claves internas (`LogoKey`/`BannerKey`) y
-    /// su URL pública es trabajo de F8. Publicar una clave sin resolver sería filtrar una ruta de
-    /// almacenamiento a cualquiera que abra el catálogo.
+    /// F8: el storefront necesita la URL del logo y del banner para pintarlos, así que el DTO las
+    /// lleva. Lo que NO puede llevar son las CLAVES: `LogoKey`/`BannerKey` son rutas internas de
+    /// almacenamiento y este config lo lee cualquiera que abra el catálogo. Publicarlas sería
+    /// filtrar la estructura del disco.
     /// </summary>
     [Fact]
-    public void PublicOrderingConfigDto_ShouldCarryNoMediaKeysOrUrls()
+    public void PublicOrderingConfigDto_ShouldCarryTheMediaUrlsButNeverTheKeys()
     {
-        typeof(PublicOrderingConfigDto).GetProperties()
-            .Select(p => p.Name)
-            .Should().NotContain(new[] { "LogoKey", "BannerKey", "LogoUrl", "BannerUrl" });
+        string[] properties = typeof(PublicOrderingConfigDto).GetProperties().Select(p => p.Name).ToArray();
+
+        properties.Should().Contain(["LogoUrl", "BannerUrl"]);
+        properties.Should().NotContain(new[] { "LogoKey", "BannerKey" });
     }
 
     /// <summary>A3: no hay moneda configurable. El precio y la moneda los pone el catálogo.</summary>
