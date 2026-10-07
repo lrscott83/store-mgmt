@@ -62,11 +62,14 @@ public sealed class ExportOfflineRosterOwnerTests
     public async Task OwnerAdmin_store_with_store_users_includes_owner_and_users_in_roster()
     {
         var owner = await AuthzSeed.SeedOwnerAdminAsync(_f, withManagementModule: true);
+        // Declared out here, not inside the try: the finally block needs it and a
+        // try-scoped local is not visible there.
+        Guid employeeId = Guid.Empty;
 
         try
         {
             // Seed a store user (employee) using the helper from ExportOfflineRosterTests
-            await SeedStoreUserAsync(owner.StoreId, owner.TenantId, "emp1", "Employee One");
+            employeeId = await SeedStoreUserAsync(owner.StoreId, owner.TenantId, "emp1", "Employee One");
 
             var client = DbTestHelpers.AuthedClient(_f, owner.UserId, owner.Login);
             var r = await client.GetAsync($"/api/v1/StoreUsers/{owner.StoreId}/offline-roster");
@@ -86,12 +89,29 @@ public sealed class ExportOfflineRosterOwnerTests
         }
         finally
         {
+            // FK-safe order, and no leak: CleanupStoreGraphAsync deletes the StoreUser rows, the
+            // Store and the Owner FIRST, and only then the UserRole/User pair for each id it was
+            // given. Both ids are required — the employee's User was previously left behind, and a
+            // stale User row is what later trips FK_Owner_User_UserId in an unrelated test.
             await CleanupStoreUsersAsync(owner.StoreId);
-            await AuthzSeed.CleanupStoreGraphAsync(_f, owner.StoreId, owner.UserId);
+            // Empty only when the seed itself threw; then there is no employee row to clean.
+            Guid[] usersToClean = employeeId == Guid.Empty
+                ? new[] { owner.UserId }
+                : new[] { owner.UserId, employeeId };
+            await AuthzSeed.CleanupStoreGraphAsync(_f, owner.StoreId, usersToClean);
         }
     }
 
-    private async Task SeedStoreUserAsync(Guid storeId, Guid tenantId, string prefix, string fullName)
+    /// <summary>
+    /// Returns the seeded employee's <c>User.Id</c>.
+    ///
+    /// The id MUST be handed back to <see cref="AuthzSeed.CleanupStoreGraphAsync"/>, which is the
+    /// only thing that deletes the <c>UserRole</c>/<c>User</c> pair for the ids it receives. When
+    /// this method returned void the employee row leaked into smca_test on every run, and the
+    /// next run that deleted a User hit `FK_Owner_User_UserId` — a failure that only appeared in
+    /// the full suite and never in isolation, which is what made it look like cross-test noise.
+    /// </summary>
+    private async Task<Guid> SeedStoreUserAsync(Guid storeId, Guid tenantId, string prefix, string fullName)
     {
         using var scope = _f.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -104,6 +124,7 @@ public sealed class ExportOfflineRosterOwnerTests
         db.Set<Domain.Entities.StoreUsers.StoreUser>().Add(Domain.Entities.StoreUsers.StoreUser.Create(user.Id, storeId, tenantId));
         db.Set<Domain.Entities.UserRoles.UserRole>().Add(Domain.Entities.UserRoles.UserRole.Create(user.Id, (int)Domain.Common.Enums.RoleType.StoreUser, tenantId));
         await db.SaveChangesAsync();
+        return user.Id;
     }
 
     private async Task CleanupStoreUsersAsync(Guid storeId)
