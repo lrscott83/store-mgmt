@@ -1369,15 +1369,23 @@ describe('CartShell — multi-payment list (módulo 16)', () => {
     expect(args[6]).toBe(SalePaymentMethod.Transferencia);
     // 8th positional (index 7): the persisted payments (amounts in order-currency
     // UNITS, decision A — the same unit as Order.total, NOT integer cents).
+    // Contract changed 2026-10-06 (user-mandated snapshot completeness): every payment
+    // now also freezes the source rate id and the order-currency (target) rate with
+    // its id/effectiveFrom. Same-currency here → both rates are the identity (1) with
+    // null ids/dates.
     expect(args[7]).toEqual([
       {
         method: SalePaymentMethod.Transferencia,
         currency: Currency.CUP,
         amount: 5,
         rateApplied: 1,
+        rateId: null,
         rateMethod: null,
         rateCurrency: null,
         rateEffectiveFrom: null,
+        targetRateApplied: 1,
+        targetRateId: null,
+        targetRateEffectiveFrom: null,
         amountInOrderCurrency: 5,
       },
     ]);

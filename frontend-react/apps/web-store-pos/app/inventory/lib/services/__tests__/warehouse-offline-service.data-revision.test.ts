@@ -39,7 +39,7 @@ function makeProduct(id: string): Product {
   } as unknown as Product;
 }
 
-function makeWarehouse(id: string, name: string): Warehouse {
+function _makeWarehouse(id: string, name: string): Warehouse {
   return {
     id,
     name,

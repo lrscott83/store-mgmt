@@ -54,6 +54,21 @@ describe('messagesHttpService', () => {
     expect(apiClient.post).toHaveBeenCalledWith('/v1/messages', payload);
   });
 
+  it('sendMessage omits the config on a default (foreground) send', async () => {
+    const payload: SendMessagePayload = {
+      conversationId: 'c1',
+      ownerId: 'u1',
+      storeId: 's1',
+      content: 'Hola',
+    };
+    vi.mocked(apiClient.post).mockResolvedValue({ data: { data: { id: 'm1' }, succeeded: true } });
+
+    await messagesHttpService.sendMessage(payload);
+
+    // Exactly one config-less argument pair: never a stray `undefined` config.
+    expect(apiClient.post).toHaveBeenCalledWith('/v1/messages', payload);
+  });
+
   it('markAsRead calls POST /v1/messages/{id}/read', async () => {
     vi.mocked(apiClient.post).mockResolvedValue({ data: { data: true, succeeded: true } });
 
@@ -98,6 +113,24 @@ describe('messagesHttpService', () => {
       await messagesHttpService.markAsRead('m1', { background: true });
 
       expect(apiClient.post).toHaveBeenCalledWith('/v1/messages/m1/read', undefined, {
+        skipLoading: true,
+      });
+    });
+
+    it('sendMessage passes skipLoading when asked for a background send', async () => {
+      const payload: SendMessagePayload = {
+        conversationId: 'c1',
+        ownerId: 'u1',
+        storeId: 's1',
+        content: 'Hola',
+      };
+      vi.mocked(apiClient.post).mockResolvedValue({
+        data: { data: { id: 'm1' }, succeeded: true },
+      });
+
+      await messagesHttpService.sendMessage(payload, { background: true });
+
+      expect(apiClient.post).toHaveBeenCalledWith('/v1/messages', payload, {
         skipLoading: true,
       });
     });

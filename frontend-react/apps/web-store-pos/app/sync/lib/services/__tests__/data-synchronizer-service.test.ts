@@ -1,5 +1,5 @@
-import { beforeEach, describe, it, expect } from 'vitest';
-import { DataSynchronizerService } from '../data-synchronizer-service';
+import { beforeEach, describe, it, expect, vi } from 'vitest';
+import { DataSynchronizerService, SynchronizerErrors } from '../data-synchronizer-service';
 import type {
   CategoryImportRepo,
   ProductImportRepo,
@@ -7,6 +7,7 @@ import type {
   InventoryImportService,
   ExpenseImportService,
   SaleCreditImportService,
+  MessagesQueueImportService,
 } from '../data-synchronizer-service';
 import type { ParsedData } from '../data-serializer-service';
 import { Result } from '@store-mgmt/domain';
@@ -18,6 +19,7 @@ import type {
   Expense,
   SaleCredit,
 } from '@store-mgmt/domain';
+import type { QueuedMessage } from '~/shared/lib/messages/messages-offline-service';
 import { ProductRepository } from '~/sales/lib/repositories/product-repository';
 import { ProductCategoryRepository } from '~/sales/lib/repositories/product-category-repository';
 
@@ -1505,5 +1507,208 @@ describe('DataSynchronizerService', () => {
       const err = result.errors.find((e) => e.entity === 'orders');
       expect(err?.code).toBe('Synchronizer.OrdersUnexpectedError');
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// messaging-background-offline — messages-queue merge
+// ---------------------------------------------------------------------------
+
+function makeQueuedMessage(
+  id: string,
+  queuedAt: string,
+  content = `queued ${id}`,
+): QueuedMessage {
+  return {
+    id,
+    conversationId: 'c1',
+    ownerId: 'u1',
+    storeId: STORE_ID,
+    content,
+    queuedAt: new Date(queuedAt),
+  };
+}
+
+function makeMessagesQueueService(existing: QueuedMessage[] = []) {
+  const stored = [...existing];
+  const addImportedQueuedMessage = vi.fn((message: QueuedMessage) => {
+    if (!message.content) {
+      return Result.Failure([
+        { code: 'Messages.InvalidContent', description: 'El contenido está vacío.' },
+      ]);
+    }
+    if (stored.some((m) => m.id === message.id)) return Result.Success();
+    stored.push(message);
+    return Result.Success();
+  });
+  const svc: MessagesQueueImportService = {
+    getQueue: () => stored,
+    addImportedQueuedMessage,
+  };
+  return { svc, stored, addImportedQueuedMessage };
+}
+
+describe('DataSynchronizerService — messagesQueue merge (messaging-background-offline)', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it('inserts new queued messages (append-only) and reports the messagesQueue merge', async () => {
+    const queue = makeMessagesQueueService();
+    const svc = new DataSynchronizerService(
+      STORE_ID,
+      makeCategoryImportRepoMock(),
+      makeProductImportRepoMock(),
+      makeInventoryImportServiceMock(),
+      makeOrderImportServiceMock(),
+      makeExpenseImportServiceMock(),
+      makeSaleCreditImportServiceMock(),
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      queue.svc,
+    );
+
+    const result = await svc.sync({
+      ...emptyData(),
+      messagesQueue: [
+        makeQueuedMessage('q1', '2026-10-01T10:00:00.000Z'),
+        makeQueuedMessage('q2', '2026-10-01T11:00:00.000Z'),
+      ],
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(queue.stored).toHaveLength(2);
+    const merge = result.merges.find((m) => m.entity === 'messagesQueue');
+    expect(merge).toEqual({ entity: 'messagesQueue', inserted: 2, updated: 0 });
+  });
+
+  it('skips a queued message whose id already exists locally — neither inserted nor updated', async () => {
+    const queue = makeMessagesQueueService([
+      makeQueuedMessage('q1', '2026-10-01T10:00:00.000Z'),
+    ]);
+    const svc = new DataSynchronizerService(
+      STORE_ID,
+      makeCategoryImportRepoMock(),
+      makeProductImportRepoMock(),
+      makeInventoryImportServiceMock(),
+      makeOrderImportServiceMock(),
+      makeExpenseImportServiceMock(),
+      makeSaleCreditImportServiceMock(),
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      queue.svc,
+    );
+
+    const result = await svc.sync({
+      ...emptyData(),
+      messagesQueue: [
+        makeQueuedMessage('q1', '2026-10-01T10:00:00.000Z'),
+        makeQueuedMessage('q2', '2026-10-01T11:00:00.000Z'),
+      ],
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(queue.stored).toHaveLength(2);
+    const merge = result.merges.find((m) => m.entity === 'messagesQueue');
+    expect(merge).toEqual({ entity: 'messagesQueue', inserted: 1, updated: 0 });
+  });
+
+  it('drains incoming messages oldest→newest by queuedAt', async () => {
+    const queue = makeMessagesQueueService();
+    const svc = new DataSynchronizerService(
+      STORE_ID,
+      makeCategoryImportRepoMock(),
+      makeProductImportRepoMock(),
+      makeInventoryImportServiceMock(),
+      makeOrderImportServiceMock(),
+      makeExpenseImportServiceMock(),
+      makeSaleCreditImportServiceMock(),
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      queue.svc,
+    );
+
+    await svc.sync({
+      ...emptyData(),
+      messagesQueue: [
+        makeQueuedMessage('late', '2026-10-01T12:00:00.000Z'),
+        makeQueuedMessage('early', '2026-10-01T09:00:00.000Z'),
+      ],
+    });
+
+    expect(
+      queue.addImportedQueuedMessage.mock.calls.map(
+        (call) => (call[0] as QueuedMessage).id,
+      ),
+    ).toEqual(['early', 'late']);
+  });
+
+  it('reports MessagesQueueUnexpectedError and stops on the first failed Result (break-only)', async () => {
+    const queue = makeMessagesQueueService();
+    const svc = new DataSynchronizerService(
+      STORE_ID,
+      makeCategoryImportRepoMock(),
+      makeProductImportRepoMock(),
+      makeInventoryImportServiceMock(),
+      makeOrderImportServiceMock(),
+      makeExpenseImportServiceMock(),
+      makeSaleCreditImportServiceMock(),
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      queue.svc,
+    );
+
+    const result = await svc.sync({
+      ...emptyData(),
+      messagesQueue: [
+        makeQueuedMessage('ok', '2026-10-01T09:00:00.000Z'),
+        makeQueuedMessage('bad', '2026-10-01T10:00:00.000Z', ''),
+        makeQueuedMessage('never', '2026-10-01T11:00:00.000Z'),
+      ],
+    });
+
+    expect(result.succeeded).toBe(false);
+    const err = result.errors.find((e) => e.entity === 'messagesQueue');
+    expect(err?.code).toBe(SynchronizerErrors.MessagesQueueUnexpectedError.code);
+    expect(queue.addImportedQueuedMessage).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps the legacy merge contract when the service is omitted (legacy call sites)', async () => {
+    const svc = new DataSynchronizerService(
+      STORE_ID,
+      makeCategoryImportRepoMock(),
+      makeProductImportRepoMock(),
+      makeInventoryImportServiceMock(),
+      makeOrderImportServiceMock(),
+      makeExpenseImportServiceMock(),
+      makeSaleCreditImportServiceMock(),
+    );
+
+    const result = await svc.sync({
+      ...emptyData(),
+      messagesQueue: [makeQueuedMessage('q1', '2026-10-01T10:00:00.000Z')],
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.merges.map((m) => m.entity)).toEqual([
+      'categories',
+      'products',
+      'inventoryEntries',
+      'orders',
+      'expenses',
+      'saleCredits',
+    ]);
   });
 });

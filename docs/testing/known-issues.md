@@ -1,6 +1,39 @@
 # Problemas conocidos — E2E frontend (Playwright)
 
 > Documento vivo de hallazgos de corridas E2E. Cada entrada declara: **qué prueba el test**, **qué falla** (en lenguaje simple), **causa raíz** (con su estado: confirmada / a confirmar) y **propuesta de solución**. Los tests E2E existentes no se tocan sin autorización explícita del usuario (regla innegociable del proyecto).
+>
+> **Antes de correr los E2E, mira acá.** Cada corrida nueva agrega su sección al final y toda ficha de test fallido sigue el contrato de la sección [Contrato de una ficha de test fallido](#contrato-de-una-ficha-de-test-fallido). El punto de entrada de la carpeta de fichas es [`known-issues/README.md`](known-issues/README.md).
+
+## Contrato de una ficha de test fallido
+
+> **Regla de la carpeta (`docs/testing/known-issues/`).** Toda corrida E2E empieza leyendo este documento y las fichas vivas: acá está lo ya diagnosticado. Cuando un test falla —o queda **inestable**, es decir, falla en su primer intento y pasa en el reintento— se le crea o actualiza su ficha en la carpeta de esa corrida (`known-issues/AAAA-MM-DD-e2e-verification/`). Cuando un test que tenía ficha **ya no falla**, la ficha **se retira** y el registro de cierre (fecha, commit, verificación) queda en el README de esa corrida. El punto de entrada de la carpeta es [`known-issues/README.md`](known-issues/README.md).
+
+**Elementos obligatorios de cada ficha.** Una ficha sin estos elementos no permite decidir si el arreglo va del lado de la aplicación o del lado del test, que es para lo que existe:
+
+| # | Elemento | Qué debe contener |
+| --- | --- | --- |
+| 1 | Nombre del archivo | `NN-spec-slug-corto.md` (`NN` = orden dentro de la corrida) |
+| 2 | Título | `# NN. spec.ts:línea — resumen en una frase del fallo` |
+| 3 | Qué prueba el test | Spec y línea exactos, **nombre literal** del test y qué verifica en términos de negocio |
+| 4 | Qué falla (en simple) | El texto **literal** del error o timeout de Playwright y **la línea del spec que revienta** |
+| 5 | Evidencia | El estado real de la página en el momento del fallo: snapshot del árbol de accesibilidad (`error-context.md`), trace, y el archivo del artifact |
+| 6 | Causa raíz | Hipótesis descartadas y causa confirmada, con `archivo:línea` y el cambio que la introdujo. **Si no está confirmada se escribe "NO CONFIRMADA"** y solo se listan los hechos que la evidencia sostiene |
+| 7 | Clasificación | Defecto del test / defecto de la aplicación / inestable de entorno o carga. Es lo que decide quién arregla qué |
+| 8 | Propuesta de solución | Marcada como **no aplicada** mientras no haya autorización |
+| 9 | Aplicación y verificación | Si se aplicó: qué se tocó, el comando y su **exit code**, la fecha, y para un fix de un test la **prueba de mutación** |
+| 10 | Estado final | ✅ resuelto / 🟡 inestable documentado sin diagnóstico cerrado / 🔴 abierto / ⚪ sin verificar, con fecha |
+
+**Reglas de evidencia (lo que separa un diagnóstico de una corazonada):**
+
+- **Snapshot primero.** Sin el estado de la página en el momento del fallo no se clasifica nada: el mismo timeout puede ser una aserción vieja o una caída de la aplicación.
+- **Prueba de mutación.** Al arreglar un test, se vuelve el arreglo a su forma vieja y se comprueba que el test **sí** cae, en la aserción tocada. Sin eso no se distingue un fix real de un falso verde (el test podría pasar por otra razón).
+- **Exit code preservado.** Al filtrar la salida de un comando con `grep`/`tail`, se conserva el código de salida del comando real (o se revisa el log completo): un `grep` vacío no es un verde.
+- **Nunca en paralelo.** La suite E2E del backend y la de Playwright no se corren a la vez: el reset de datos del backend borra filas vivas y los fallos que aparecen así son falsos.
+- **Workers.** En esta máquina la suite del frontend se corre con `--workers=4` (con 8 el flakiness se multiplica por contención, no por defectos).
+- **Una corrida en verde no cierra una ficha que no ejecutó.** Si un spec está en `testIgnore`, sigue ⚠️ sin verificar: eso se dice, no se asume.
+- **Autorización 1 a 1.** Editar un test E2E existente o código de la aplicación requiere autorización explícita del usuario, ficha por ficha.
+
+---
 
 ## Corrida del 2026-09-24
 
@@ -118,7 +151,7 @@ Contexto: backend real `:5019` (BD `smca_test`, confirmada por el teardown en am
 
 ## Flaky recurrentes — Grupo G (cerrado 2026-09-25)
 
-De los 38 flaky de las seis corridas (23 + 4 + 2 + 3 + 2 + 2), 33 fueron tests distintos al azar — contención pura: pasan al reintento y en solitario. Los dos specs con recurrencia quedaron resueltos con autorización del usuario y sus fichas se retiraron (nota de cierre en [`group-g/README.md`](group-g/README.md)):
+De los 38 flaky de las seis corridas (23 + 4 + 2 + 3 + 2 + 2), 33 fueron tests distintos al azar — contención pura: pasan al reintento y en solitario. Los dos specs con recurrencia quedaron resueltos con autorización del usuario y sus fichas se retiraron (nota de cierre en el [Registro de fichas retiradas](known-issues/2026-10-06-e2e-verification/README.md#registro-de-fichas-retiradas)):
 
 - **`warehouses` — StoreUser sin Almacenes** (flaky en 4 de 6 corridas: el boot del StoreUser no terminaba bajo contención y la espera del enlace "Catálogo Productos" vencía): el test estaba **duplicado** por `create-store-user.spec.ts` — mismo flujo línea por línea — y fue retirado; el gating del menú de Almacenes sigue pineado por el test anterior del mismo spec.
 - **`store-switch-back-logout` SSR-1** (flaky en 2 de 6 corridas): el setup podía avanzar con el nombre de la tienda **vacío** → `storeRow('')` generaba una regex vacía que casaba con TODOS los botones (strict mode violation). Endurecido con reintentos acotados del refresh de sesión y fallo ruidoso si el nombre no llega; el timeout x2 temporal se retiró — la causa nunca fue el tiempo.
@@ -143,19 +176,56 @@ _Actualizado por última vez: 2026-09-24 (quinta actualización: corrida del 202
 
 **Contexto.** Suite completa E2E del frontend contra backend real (`:5019`, BD `smca_test`), 4 workers, tras hacer merge de `origin/qa` en `test`. La última corrida conocida (2026-09-25) tuvo **0 fallos**. Estos 8 fallos son **nuevos** — los trajo el merge.
 
-**Resultado:** 8 fallos (7 únicos + 1 retry). Fichas individuales en [`known-issues/qa-merge-2026-09-29/`](known-issues/qa-merge-2026-09-29/README.md).
+**Resultado:** 8 fallos (7 únicos + 1 retry). Las fichas individuales ya estan retiradas; su resumen y su cierre, en el
+[Registro de fichas retiradas](known-issues/2026-10-06-e2e-verification/README.md#registro-de-fichas-retiradas).
 
 | #   | Spec                          | Qué prueba                                                                                                        | Qué fallaba                                                                                                    | Estado |
 | --- | ----------------------------- | ----------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | ------ |
 | 1   | `store-module-pricing`        | El menú de engranaje abre el modal con el nombre de la tienda y su universo de módulos                           | El botón de acciones de la tienda no aparece — la pantalla de tiendas no carga datos                         | ✅ **Resuelto 2026-09-30** (8/8) |
 | 2   | `plan-catalog-superadmin`     | El popup muestra los cuatro paneles de planes incluyendo VIP                                                      | Ídem — el botón de acciones de la tienda no aparece                                                            | ✅ **Resuelto 2026-09-30** (2/2) |
-| 3   | `web-catalog`                 | Crear producto en POS, sincronizar, editarlo y verlo publicado en `/catalog/<slug>`                               | El producto no aparece en el catálogo público después de sincronizar                                            | 🔍 a confirmar          |
-| 4   | `mayorista-sale`              | Venta mayorista con Transferencia (CUP) filtrable por método de pago                                             | La opción de pago Transferencia (CUP) nunca se renderiza (timeout 120s)                                          | 🔍 a confirmar          |
-| 5   | `precache-split` (2 tests)    | Los chunks de rutas Owner/StoreUser y las librerías pesadas (PDF, scanner, gráficos) están precacheados           | El service worker nunca llega a estado activado (timeout 30s)                                                    | 🔍 a confirmar          |
-| 6   | `store-switcher-refresh`      | Una tienda creada en la sesión aparece en el switcher del header sin re-login                                    | El botón de crear tienda nunca aparece (timeout 120s)                                                            | 🔍 a confirmar          |
-| —   | **Defecto sistémico**         | El dev server sirve la versión vigente de los paquetes del workspace                                            | No es un test: `vite.config.ts` deja un caché de Vite que puede servir un `dist/` viejo                        | 🔴 **ABIERTO — decisión pendiente** |
+| 3   | `web-catalog`                 | Crear producto en POS, sincronizar, editarlo y verlo publicado en `/catalog/<slug>`                               | Defecto del test: esperaba el aviso de éxito del guardado por producto, que ya no existe (decisión del 2026-10-01) | ✅ **Resuelto 2026-10-04** (1/1) |
+| 4   | `mayorista-sale`              | Venta mayorista con Transferencia (CUP) filtrable por método de pago                                             | Defecto del test: buscaba el radio "Transferencia (CUP)"; con el módulo 15 activo el sufijo de moneda se omite a propósito | ✅ **Resuelto 2026-10-04** (6/6) |
+| 5   | `precache-split` (2 tests)    | Los chunks de rutas Owner/StoreUser y las librerías pesadas (PDF, scanner, gráficos) están precacheados           | El service worker nunca llega a estado activado (timeout 30s)                                                    | ✅ **Resuelto 2026-10-06** — corría con el config equivocado (el dev server bloquea los service workers), no con el suyo; ficha retirada |
+| 6   | `store-switcher-refresh`      | Una tienda creada en la sesión aparece en el switcher del header sin re-login                                    | El botón de crear tienda nunca aparece (timeout 120s)                                                            | ✅ **Causa raíz confirmada y fix aplicado y verificado el 2026-10-06** — la selección persistida puede quedar en una tienda creada por la interfaz (plan Pago, sin el módulo 14) y el botón nunca aparece; reapareció el 2026-10-05 (falló el intento 1, pasó al reintento). Ficha: [`known-issues/2026-10-06-e2e-verification/03-store-switcher-refresh-boton-crear-no-aparece.md`](known-issues/2026-10-06-e2e-verification/03-store-switcher-refresh-boton-crear-no-aparece.md) |
+| —   | **Defecto sistémico**         | El dev server sirve la versión vigente de los paquetes del workspace                                            | No es un test: `vite.config.ts` deja un caché de Vite que puede servir un `dist/` viejo                        | ✅ **Resuelto 2026-10-02** — la Opción A se aplicó en el commit `d6f47d53`; ficha retirada el 2026-10-06 |
 
 **Tests E2E del backend (mismo día):** 660 passed, 0 failed. Sin relación con estos fallos.
+
+### Fallos 3 y 4 resueltos el 2026-10-04 — los dos eran del test, no de la aplicación
+
+Corrida completa del frontend el 2026-10-04 contra backend real (`:5019`, `smca_test`), 4 workers,
+354 tests, 13.6 min: **346 passed, 2 failed, 2 flaky, 4 did not run**. Los dos fallos fueron
+exactamente estos dos. Se reprodujeron luego archivo por archivo y con un solo navegador (7.7 min,
+`2 failed / 4 did not run / 1 passed`), lo que descarta saturación de la máquina.
+
+**Fallo 3 — `web-catalog`.** Fallaba en la línea 141 esperando el texto "Producto guardado en el
+catálogo". El archivo de contexto de Playwright muestra el estado real de la página: el botón es
+"Guardar cambios" y ya no hay ningún "Guardar" por producto. El guardado paso a lotes el 2026-10-01
+(una sola acción al final de la página), asi que el aviso de exito ahora es el del lote, "Se guardó 1
+producto en el catálogo", y la cadena `WEB_CATALOG.SAVED` que el test buscaba ya no la emite ninguna
+rama del codigo. El guardado funcionaba: la instantanea muestra la imagen subida, el nombre del
+archivo y "No hay cambios sin guardar". El fallo era la expectativa, no la operacion.
+
+**Fallo 4 — `mayorista-sale`.** Fallaba en la linea 248 esperando el radio "Transferencia (CUP)". La
+instantanea muestra el radio real: "Transferencia", sin sufijo. No es un defecto de la aplicacion:
+`today-orders.tsx` pinta el filtro con `paymentMethodKeyToLabel(key, !multiMonedas)`, asi que cuando la
+tienda tiene MultiMonedas el sufijo de moneda se omite a proposito (la moneda ya la acota el selector
+de la misma pantalla) y solo aparece en tiendas sin el modulo 15. Esta persona es del plan Superior,
+que incluye el 15, asi que la etiqueta correcta es la sin sufijo. Es el mismo par 15/16 que explico la
+ficha 4 de la corrida del 2026-10-03 (retirada), planteado al reves.
+
+**Verificacion.** Con los dos arreglos, los 7 tests de los dos archivos pasan en 52.2 s. Se hizo la
+mutacion de cada arreglo por separado: al volver cada uno a su texto viejo, el test cae exactamente
+en la asercion tocada, en los 3 intentos, y la corrida reproduce la firma previa
+(`2 failed / 4 did not run / 1 passed`, exit 1). No se toco ningun archivo de la aplicacion.
+
+**Nota sobre los "4 did not run".** No son un cuarto defecto: son los cuatro tests posteriores dentro
+del `describe.serial` de `mayorista-sale`. Cuando un test de un bloque serial falla, el resto del
+bloque no corre, y un solo fallo real puede aparentar cuatro.
+
+**Fallo 5 sigue sin verificar.** `precache-split` esta en `testIgnore` del config principal, asi que
+la suite por defecto no lo ejecuta: solo corre con `playwright.pwa.config.ts`. No se puede cerrar con
+esta corrida.
 
 ---
 
@@ -184,26 +254,35 @@ Vite generado 2026-09-28 10:20 (un día antes) sin el export. Borrar
 daba verde: solo afirma que el pathname no es `/login` y que el body tenga texto, y una
 página de error cumple las dos. No usarlo como prueba de que la lista de tiendas carga.
 
-### Decisión pendiente
+### Estado (cerrado el 2026-10-06)
 
-| Opción | Qué hace | Estado |
-| ------ | -------- | ------ |
-| **A (recomendada)** | Quitar `optimizeDeps.include` de `vite.config.ts`. Vite pasa a servir el paquete directo, y `turbo run dev` ya garantiza que `dist/` está al día. El fallo deja de ser posible por construcción. | 🔴 Requiere autorización (toca código de la app) + re-correr la suite completa |
-| **B** | `optimizeDeps.force: true` — re-empaqueta en cada arranque. Parche: deja el modo de fallo intacto para el resto de paquetes. | 🔴 Sin aplicar |
-| **C** | Borrar `.vite` en `e2e/support/global-setup.ts`. Protege a los tests, no al dev manual. Defensa en profundidad. | 🔴 Sin aplicar |
-| **D** | No hacer nada; esta sección queda como manual de diagnóstico. | — |
+| Opción | Qué hacía | Estado |
+| ------ | --------- | ------ |
+| **A** | Quitar `optimizeDeps.include` de `vite.config.ts`. Vite sirve el paquete directo, y `turbo run dev` ya garantiza que `dist/` está al día. El fallo deja de ser posible por construcción. | ✅ **Aplicada el 2026-10-02** (commit `d6f47d53`) |
+| **B** | `optimizeDeps.force: true` — re-empaqueta en cada arranque. Parche: deja el modo de fallo intacto para el resto de paquetes. | ⚪ No aplicada, innecesaria |
+| **C** | Borrar `.vite` en `e2e/support/global-setup.ts`. Protege a los tests, no al dev manual. Defensa en profundidad. | ⚪ No aplicada |
+| **D** | No hacer nada; esta sección queda como manual de diagnóstico. | — (esta sección se conserva igual) |
 
-**También pendiente de decidir:**
+**Verificación de la Opción A (2026-10-06).** `git grep optimizeDeps HEAD -- apps/web-store-pos/vite.config.ts`
+no devuelve nada, y en `node_modules/.vite/deps/` no queda ningún artefacto de `@store-mgmt/*`. La corrida
+completa del 2026-10-05 (351 aprobados, 0 fallidos, exit 0) es **posterior** al fix: es la re-corrida de la
+suite que la decisión pedía. La ficha 7 se retiró.
+
+**Decisiones que sobreviven** (ninguna es del defecto, y ninguna está autorizada):
 
 1. **¿Se refuerza `admin-routes.spec.ts`?** Endurecer sus aserciones es **modificar un test E2E
-   existente** — requiere autorización explícita del usuario.
-2. **¿Se re-verifican los fallos 3 a 6?** Se documentaron en la misma corrida y no se
-   reprodujeron. Solo se confirmó que 1 y 2 eran este defecto; no se comprobó si 3 a 6 lo son.
+   existente** — requiere autorización explícita del usuario. Sigue pasando en verde aunque la app esté
+   rota: solo afirma que el pathname no es `/login` y que el body tiene texto.
+2. **¿Se re-verifican los fallos 3 a 6?** ✅ **Respondida el 2026-10-06.** Los fallos 3 y 4 eran
+   defectos de sus propios tests (corregidos el 2026-10-04, commit `ede7e030`); el 5 era el config
+   equivocado de `precache-split` (cerrado el 2026-10-06) y el 6 es la inestabilidad de
+   `store-switcher-refresh`, viva en su ficha del 2026-10-05.
 
-Detalle completo en [`known-issues/qa-merge-2026-09-29/07-vite-dep-cache-stale.md`](known-issues/qa-merge-2026-09-29/07-vite-dep-cache-stale.md).
+Cierre completo de las fichas 5 y 7 en el
+[Registro de fichas retiradas](known-issues/2026-10-06-e2e-verification/README.md#registro-de-fichas-retiradas).
 
-_Actualizado por última vez: 2026-09-30 (corrida del 2026-09-29: fallos 1 y 2 resueltos y
-reclasificados como defecto sistémico; queda abierta la decisión sobre la Opción A)._
+_Actualizado por última vez: 2026-10-06 (Opción A confirmada como ya aplicada el 2026-10-02 y las
+fichas 5 y 7 retiradas; queda pendiente solo la autorización para endurecer `admin-routes.spec.ts`)._
 
 ---
 
@@ -211,8 +290,8 @@ reclasificados como defecto sistémico; queda abierta la decisión sobre la Opci
 
 **Contexto.** Verificación completa siguiendo el README del proyecto, sobre la rama test, que ya
 tenía integrado todo lo que había en dev. Compilación, tests unitarios y tests E2E del backend y
-del frontend, todo en verde; los E2E del frontend no. Detalle y fichas en
-[`known-issues/2026-10-03-e2e-verification/`](known-issues/2026-10-03-e2e-verification/README.md).
+del frontend, todo en verde; los E2E del frontend no. Detalle y fichas (ya retiradas) en el
+[Registro de fichas retiradas](known-issues/2026-10-06-e2e-verification/README.md#registro-de-fichas-retiradas).
 
 | Suite | Resultado |
 | --- | --- |
@@ -305,3 +384,179 @@ _Actualizado por última vez: 2026-10-03 (corrida completa: 9 fallos E2E, 7 nuev
 el módulo MultiMonedas (15) no el MultiPayments (16) era lo que faltaba, y no era un defecto de la
 aplicación; aparece además un defecto de la aplicación al calcular el vuelto con varios canales,
 ficha 8)._
+
+---
+
+## Corrida del 2026-10-05 — la suite completa quedó en verde
+
+**Contexto.** Rama `test`, backend real `:5019` (perfil `http-e2e`, guard confirmado `Database=smca_test`), dev server `:3333`, `pnpm test:e2e --workers=4` desde `frontend-react/`. 12.2 minutos. Log: `/tmp/e2e-full.log`.
+
+| Resultado | Cantidad |
+| --- | --- |
+| passed | **351** |
+| failed | **0** |
+| flaky (pasaron en el reintento) | 3 |
+| did not run | 0 |
+
+Es la continuación directa de la corrida del 2026-10-04 (346 aprobados, 2 fallidos): esos dos fallos ya estaban corregidos el mismo 2026-10-04 (commit `ede7e030`) y esta corrida confirma que quedaron cerrados. Teardown OK: 2988 filas `e2e-*` borradas de `smca_test`.
+
+**Ningún test quedó fallando**, así que no se creó ninguna ficha por un fallo determinista. Sí quedaron **3 inestables** (fallaron el intento 1 y pasaron en el reintento), y cada uno tiene su ficha en [`known-issues/2026-10-06-e2e-verification/`](known-issues/2026-10-06-e2e-verification/README.md):
+
+| # | Test | Qué se vio en el fallo | Estado |
+| --- | --- | --- | --- |
+| 1 | `change-password.spec.ts:126:5` — "offline: el botón de envío está deshabilitado" | La aserción de 5 s no encuentra el botón: la página estaba vacía (solo la región de notificaciones) | ✅ **Causa raíz confirmada y fix aplicado el 2026-10-06** — la aserción corre dentro de la ventana de pre-hidratación del shell SPA; se añadió la espera explícita del montaje antes de ella (`2 passed (24.8s)`) |
+| 2 | `store-create-security.spec.ts:88:7` — "StoreUser en /management/stores/create es deslogueado y redirigido a /login" | `Test timeout of 120000ms exceeded while setting up "signedInPage"`: la app quedó a mitad de un login en el layout de invitado (leído antes como "portada pública") | ✅ **Causa raíz definitiva y fix aplicado el 2026-10-06** — bajo contención el `POST /auth/register` del mint aborta (`net::ERR_ABORTED`), la app pinta su diálogo de error y el `waitForURL` de `session.ts:255` esperaba **sin límite** (`navigationTimeout` default 0; `actionTimeout` no aplica a la familia de navegación, verificado en el fuente de Playwright 1.62.1). Fix (opciones 2+3+4 de la ficha 02): `navigationTimeout: 60_000` + mint con detección por diálogo propio, 1 retry y error nombrado + `workers` local default 4; timeout del spec restaurado a 120_000. Verificado: solitario 2 passed (18.6 s), modo oficial 4 workers 27 passed (42.2 s); a 16 workers los 4 specs que caían pasan |
+| 3 | `store-switcher-refresh.spec.ts:173:5` — "SWR-1 — a store created this session appears in the header switcher without re-login" | `/management/my-stores` pintó sus tarjetas pero sin el botón de crear (el permiso `hasMultiStores` en falso) | ✅ **Causa raíz confirmada el 2026-10-06** — la selección persistida quedó en una tienda creada por la interfaz (plan Pago, sin el módulo 14); el fix (realinear) quedó **aplicado y verificado** el 2026-10-06 |
+
+**Fichas retiradas en esta corrida** (sus tests pasaron; el resumen y el cierre quedaron en el [Registro de fichas retiradas](known-issues/2026-10-06-e2e-verification/README.md#registro-de-fichas-retiradas)):
+
+- La corrida del 2026-10-01 — las 6 fichas (guard del preflight, chat siempre montado, whitelist de sync-export-import-v2, `mayorista-sale`, `movement-reversal` E-R7, `web-catalog`).
+- El merge de qa (2026-09-29) — las fichas 1 a 4 y 6.
+
+**Fichas vivas al cierre de esta corrida:**
+
+| Ficha | Estado |
+| --- | --- |
+| Ficha 5 del merge de qa (`precache-split`) | ✅ Retirada el 2026-10-06 — corría con el config equivocado; pasa 3/3 con `playwright.pwa.config.ts` |
+| Ficha 7 del merge de qa (caché de dependencias de Vite) | ✅ Retirada el 2026-10-06 — la Opción A ya estaba aplicada desde el 2026-10-02 (commit `d6f47d53`) |
+| Fichas 01 a 03 (corrida del 2026-10-05) | ✅ Los 3 inestables de esa corrida: **causa raíz confirmada el 2026-10-06** (ventana de pre-hidratación, setup con login real, selección persistida); los fixes de 03, 02 y 01 quedaron **aplicados y verificados** el mismo 2026-10-06 (el de 04, también) |
+
+_Actualizado por última vez: 2026-10-05 (corrida completa: 351 aprobados, 0 fallidos, 3 inestables; las fichas de las corridas del 2026-10-01 y del merge de qa quedaron retiradas salvo `precache-split` y el defecto del caché de Vite)._
+
+---
+
+## Verificación del 2026-10-06 — corridas dirigidas, nunca la suite completa
+
+**Contexto.** No es una corrida completa: son corridas **dirigidas, spec por spec**, hechas para cerrar
+las dos fichas que seguían vivas del merge de qa y para confirmar (o refutar) las causas que los
+documentos daban por tentativas. La suite completa **no** se corrió — pedido explícito. Backend real
+`:5019` (perfil `http-e2e`, `smca_test` confirmada por el teardown de cada corrida), dev server `:3333`.
+Detalle y fichas en
+[`known-issues/2026-10-06-e2e-verification/`](known-issues/2026-10-06-e2e-verification/README.md).
+
+### Las dos fichas vivas del merge de qa quedaron cerradas
+
+- **Ficha 5 (`precache-split`) — ✅ resuelta.** El fallo documentado ("el service worker nunca llega a
+  estado activado") era un **síntoma**: el spec corría con `playwright.config.ts`, que bloquea los
+  service workers (`serviceWorkers: 'block'`) y cuyo SW de dev no precachea nada. **Reproducción a
+  voluntad:** una copia temporal de ese config con `testIgnore: []` hace caer las tres pruebas con
+  `Test timeout of 30000ms exceeded` en `precache-split.spec.ts:31` (EXITCODE=1) — el texto exacto de
+  la ficha original. **Verificación con su config:** 3 passed, 21.1 s, EXITCODE=0 contra un build
+  recién hecho (y 12.9 s contra el build que ya existía). El arreglo ya estaba aplicado desde el
+  2026-10-01 (commit `78f3d804`: el spec entró en `testIgnore` y corre con `playwright.pwa.config.ts`).
+- **Ficha 7 (`vite-dep-cache-stale`) — ✅ resuelta, y la ficha era la desactualizada.** La Opción A
+  recomendada ya estaba aplicada desde el 2026-10-02 (commit `d6f47d53`): `optimizeDeps.include` no
+  está en `vite.config.ts` y no queda ningún artefacto pre-empaquetado de `@store-mgmt/*` en
+  `.vite/deps/`. La corrida completa del 2026-10-05 es **posterior** al fix y es su verificación.
+
+### Barrido de confirmación de causas — qué se sostiene y qué no
+
+| Causa documentada | Veredicto del 2026-10-06 |
+| --- | --- |
+| Ficha 5: "el service worker nunca se activa" | ⚠️ Era el **síntoma**; la causa real es el config. Corregida y ficha retirada |
+| Ficha 7: caché de dependencias de Vite | ✅ Cierto, y el arreglo ya estaba aplicado (2026-10-02) |
+| 2026-10-05 #1 `change-password`: inestable de carga | ✅ **Sostenida** — el archivo entero pasa en solitario en 50.0 s |
+| 2026-10-05 #2 `store-create-security`: inestable de carga en el setup | ✅ **Sostenida** — los dos tests con su fixture completo pasan en solitario en 42.6 s |
+| 2026-10-05 #3 `store-switcher-refresh` SWR-1: inestable de carga | ✅ **Sostenida** — SWR-1 pasa en solitario en las dos corridas aisladas |
+| Grupo E (`plan-catalog-superadmin`, `auth-me-*`): "solo carga" | ✅ **Re-confirmada** — 2/2, 11/11 y 3/3 en solitario |
+| `movement-reversal` E-R7: "no se reproduce" (2026-10-01) | ✅ **Re-confirmada** — 20/20 en solitario, 4.2 m |
+| `store-switcher-refresh` SWR-2: nunca falló / sin modo documentado | ❌ **Refutada** — cae en solitario (1 de 2 corridas) por un locator ambiguo (ficha 1 del 2026-10-06) |
+| Grupos B, C y D; fallos 1 a 4 y 6 del merge; corridas del 2026-10-01 y del 2026-10-03 | ⏸️ **No re-corridos hoy** — sus arreglos están aplicados y verificados en sus propias corridas. Este barrido no los re-ejecutó: eso se dice, no se asume |
+
+### Los inestables del 2026-10-05, medidos en solitario
+
+Cada spec **solo**, con `--workers=1 --retries=0` (sin `--retries=0`, un verde puede ser el reintento,
+que es justo lo que la suite completa esconde). Inventario completo y reglas de mantenimiento en
+[`known-issues/2026-10-06-e2e-verification/funcionan-en-solitario.md`](known-issues/2026-10-06-e2e-verification/funcionan-en-solitario.md).
+
+| Spec | Resultado en solitario | Duración | Exit |
+| --- | --- | --- | --- |
+| `change-password.spec.ts` | 2 passed | 50.0 s | 0 |
+| `store-create-security.spec.ts` | 2 passed | 42.6 s | 0 |
+| `store-switcher-refresh.spec.ts` (corrida 1) | **1 failed (SWR-2)** + 1 passed | 48.7 s | **1** |
+| `store-switcher-refresh.spec.ts` (corrida 2) | 2 passed | 25.8 s | 0 |
+| `plan-catalog-superadmin.spec.ts` | 2 passed | 52.8 s | 0 |
+| `auth-me-session-rejection.spec.ts` | 11 passed | 1.3 m | 0 |
+| `auth-me-deleted-user.spec.ts` | 3 passed | 33.8 s | 0 |
+| `movement-reversal.spec.ts` | 20 passed | 4.2 m | 0 |
+| `precache-split.spec.ts` (config PWA) | 3 passed | 21.1 s | 0 |
+
+### Hallazgo nuevo: `store-switcher-refresh` SWR-2
+
+La corrida en solitario del archivo del switcher destapó un fallo que **ninguna ficha tenía
+documentado** y que no es de carga: SWR-2 cae (intermitente: 1 de 2 corridas) en la aserción de la
+marca "Actual" del popup, porque `getByText('Actual')` — búsqueda por substring y sin distinguir
+mayúsculas — también casa con el aviso de éxito que el propio test provoca, «Tienda **actual**izada
+correctamente.» (`es.ts:1095`, `my-stores.tsx:202`). El reporte de Playwright muestra los dos
+elementos en el mismo momento. **Clasificación: defecto del test**, confirmado; la solución propuesta
+(`getByRole` del botón, o `getByText('Actual', { exact: true })`) **no se aplicó**: tocar un test E2E
+existente requiere autorización 1 a 1.
+
+### Fichas vivas al cierre de esta verificación
+
+| Ficha | Estado |
+| --- | --- |
+| [`known-issues/2026-10-06-e2e-verification/04-store-switcher-refresh-swr2-locator-actual.md`](known-issues/2026-10-06-e2e-verification/04-store-switcher-refresh-swr2-locator-actual.md) | ✅ **Fix aplicado y verificado** (2026-10-06) — locator acotado con `exact: true`; la sonda midió 2 nodos con el locator viejo y 1 con el nuevo; spec verde dos corridas seguidas |
+| [La carpeta de fichas](known-issues/2026-10-06-e2e-verification/README.md) (fichas 01 a 03) | ✅ **Causa raíz confirmada en las tres** (2026-10-06): ventana de pre-hidratación del shell (01), setup con login real que bajo contención se duplica — 32.3 s → 63.6 s, por suma de esperas acotadas — (02) y selección persistida en una tienda sin el módulo 14 (03). Los fixes de 03, de 02 (presupuesto del spec a `240_000`) y de 01 (espera del formulario) quedaron **aplicados y verificados** el mismo 2026-10-06, igual que el de la ficha 04 (locator exacto) |
+| [Registro de fichas retiradas](known-issues/2026-10-06-e2e-verification/README.md#registro-de-fichas-retiradas) | Todas las demás están cerradas y su resumen vive ahí |
+| [`known-issues/2026-10-06-e2e-verification/funcionan-en-solitario.md`](known-issues/2026-10-06-e2e-verification/funcionan-en-solitario.md) | Inventario (no es una ficha) de los specs que pasan en solitario |
+
+### Las tres causas "no confirmadas" quedaron confirmadas (2026-10-06)
+
+Las fichas 01, 02 y 03 seguían en 🟡 con el mecanismo sin cerrar. El mismo 2026-10-06 se midieron con
+instrumentación desechable —specs y sondas temporales, **eliminados** después de medir; ningún test
+existente ni código de la app fue tocado— y las tres quedaron **confirmadas**:
+
+- **01 — `change-password`, el botón offline que no monta.** El `<body>` que el dev server sirve para
+  `/profile/change-password` **es** el snapshot del fallo: `<section class="Toastify" …
+  aria-label="Notifications Alt+T">` y nada más (186 302 bytes, sin `oldPassword`). La ventana entre
+  `page.goto()` (337 ms) y `#oldPassword` visible (819 ms) es DOM de ese shell pelado; la aserción de
+  la línea 148 solo tiene los **5 s por defecto de `expect`**. No era el bootstrap de sesión: era la
+  espera que falta. **Fix aplicado el 2026-10-06** — espera explícita del montaje antes de la
+  aserción, verificado `2 passed (24.8s)`.
+- **02 — `store-create-security`, el fixture que agota 120 s.** El coste real del setup de
+  `signedInPage` para `store-user` se cronometró en **32 324 ms** (mint + replay; 3 340 ms el segundo
+  *resolve*, memoizado). Y la lectura del snapshot se corrigió: `VendeDTo` + "Automatiza tu Negocio"
+  son `GENERAL.APP_NAME`/`GENERAL.APP_SUBTITLE` del **layout de invitado** (`auth-layout.tsx`), no de
+  la portada pública — la app quedó a mitad de un login. **Medido el mismo día con `--trace on` bajo
+  contención (8 workers): el presupuesto se agota por suma de esperas acotadas** — setup de 63.6 s, de los
+  cuales 12 s son `POST /api/v1/auth/register` y 26.7 s el `waitForURL` tras registrar, más el frio de Vite —
+  no por una espera colgada: las acciones sin `actionTimeout` costaron 0.5-2.0 s cada una. Fix: se aplicó
+  la opción 1 (presupuesto del spec a `240_000`) con autorización 1 a 1 y se verificó en solitario
+  (`2 passed (38.0s)`) y bajo contención (2 `ok` con 8 workers); las opciones 2 a 4 siguen sin
+  autorizar.
+- **03 — `store-switcher-refresh` SWR-1, el botón que nunca aparece.** La causa ya estaba diagnosticada
+  en el spec vecino (`store-switch-back-logout.spec.ts`, SSR-2/SSR-3, 2026-09-26): la selección se
+  persiste en la base (`SwitchMyStoreCommand.cs:98`), `/me` devuelve los módulos de **esa** tienda, y
+  una tienda creada por la interfaz nace en el plan Pago, cuyo catálogo **no incluye MultiStores (14)**.
+  Medido: `e2e-… -> sel=e2e-ssr-second-… (plan 2, module14=0)`, y con esa selección el `/me` responde
+  `storeModuleIds=[2..11]` y `my-stores-create-button` nunca se hace visible. `store-switcher-refresh`
+  no tiene el realineado que su vecino sí tiene.
+
+De los tres fixes, el de **03 (realinear la selección persistida)** quedó **aplicado y verificado el
+2026-10-06** con autorización 1 a 1 del usuario: `frontend-react/e2e/store-switcher-refresh.spec.ts`
+trae el helper `realignSelectedStore` (el mismo realineado que el spec vecino) antes de la
+precondición, con corridas dirigidas `2 passed (45.1s)` (solo el spec) y `2 passed (2.3m)` (el
+escenario del drift de SSR-1). También quedaron aplicados y verificados el mismo día los de **01**
+(espera del formulario antes de la aserción, `2 passed (24.8s)`) y **02** (presupuesto del spec a
+`240_000`), más el de la ficha **04** (locator exacto, dos corridas seguidas verdes). De **02** siguen
+sin autorizar las opciones 2 a 4; ningún otro test se tocó.
+
+### La carpeta de fichas queda unificada (2026-10-06)
+
+Las carpetas por corrida que ya no tenían **ninguna ficha de test** se retiraron:
+`2026-10-01-e2e-verification/`, `2026-10-03-e2e-verification/`, `group-g/`, `qa-merge-2026-09-29/` y
+`2026-10-05-e2e-verification/` (esta última solo tenía el README de su corrida). Las 4 fichas vivas y
+el inventario de tests que pasan en solitario quedan en **una sola** carpeta,
+[`known-issues/2026-10-06-e2e-verification/`](known-issues/2026-10-06-e2e-verification/README.md), y su README lleva además el
+**Registro de fichas retiradas**: qué era cada una, su causa raíz y con qué commit o verificación se
+cerró. El texto completo de las carpetas retiradas sigue en el historial de git, así que no se pierde
+nada: lo que se gana es no tener que abrir cinco carpetas para saber qué falla hoy.
+
+**Queda abierto, ajeno a esta verificación:** el defecto de la aplicación del botón flotante "Instalar
+App" que tapa "Desactivar" en `warehouses` (2026-10-03) — su test se arregló y ya no lo vigila.
+
+_Actualizado por última vez: 2026-10-06 (verificación dirigida: fichas 5 y 7 cerradas y retiradas, las
+causas documentadas confirmadas —salvo la de SWR-2, que quedó refutada—, las fichas 01, 02 y 03 con
+causa raíz confirmada, el realineado de la ficha 03 aplicado y verificado, y nueva carpeta de tests que
+pasan en solitario)._

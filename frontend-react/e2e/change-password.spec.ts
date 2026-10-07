@@ -145,5 +145,11 @@ test('offline: el botón de envío está deshabilitado', async ({ page }) => {
 
   // The form disables the submit button when offline (change-password.tsx:39).
   const submitButton = page.getByRole('button', { name: SUBMIT_TEXT });
+  // Fija 01 — la espera que faltaba (fix 2026-10-06, autorización 1 a 1): `page.goto`
+  // resuelve con el shell SPA crudo, todavía sin el contenido de la ruta — medido
+  // 337 → 819 ms en frío, y > 5 s bajo carga, que es exactamente donde fallaba esta
+  // aserción. Se espera el montaje del botón con un tope explícito; la aserción de
+  // abajo sigue intacta (`toBeDisabled()` con su default de 5 s).
+  await expect(submitButton).toBeVisible({ timeout: 15_000 });
   await expect(submitButton).toBeDisabled();
 });

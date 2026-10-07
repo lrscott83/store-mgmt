@@ -17,6 +17,24 @@ export interface OrderItem {
   order: number;
   /** Moneda de `price` (plan 2026-09-16). Ausente = CUP (DEFAULT_CURRENCY). */
   currency?: Currency;
+  /** Price in the product's original currency, before conversion. Absent = `price`. */
+  originalPrice?: number;
+  /** Currency of `originalPrice`. Absent = `currency`. */
+  originalCurrency?: Currency;
+  /** Currency-per-USD rate used to convert. `1` when no conversion happened. */
+  conversionRate?: number | null;
+  /** Id of the resolved `ChannelRate` row used for the conversion. */
+  conversionRateId?: string | null;
+  /** Moment from which the conversion rate was in force. */
+  conversionRateEffectiveFrom?: Date | null;
+  /** Units per pack of the applied wholesale tier. */
+  wholesalePackSize?: number | null;
+  /** Packs sold (`quantity / packSize`). */
+  wholesalePacks?: number | null;
+  /** `minPacks` of the applied wholesale tier. */
+  wholesaleTierMinPacks?: number | null;
+  /** `pricePerUnit` of the applied wholesale tier. */
+  wholesaleTierUnitPrice?: number | null;
 }
 
 export interface Order extends AuditableBaseModel {
@@ -47,4 +65,20 @@ export interface Order extends AuditableBaseModel {
    * means "single legacy payment" described by `paymentType`/`salePaymentMethod`.
    */
   payments?: OrderPayment[];
+  /** Store the sale was registered against (today implicit in the storage key). */
+  storeId?: string;
+  /** `userId` of the user who registered the sale. */
+  createdById?: string;
+  /** Client name (today only inside `description`, and only for credit sales). */
+  client?: string;
+  /** Amount the client handed over (cash). */
+  tenderedAmount?: number;
+  /** Change handed back. */
+  change?: number;
+  /** Sale-currency currency-per-USD rate at sale time. `1` without MultiMonedas. */
+  saleCurrencyRateApplied?: number | null;
+  /** Id of the sale-currency rate row. */
+  saleCurrencyRateId?: string | null;
+  /** Moment from which the sale-currency rate was in force. */
+  saleCurrencyRateEffectiveFrom?: Date | null;
 }

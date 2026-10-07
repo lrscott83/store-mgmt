@@ -126,7 +126,7 @@ async function seedCatalogAndInventory(quantity: number) {
 }
 
 /** Lo que una instancia NUEVA del servicio lee del almacenamiento: la verdad persistida. */
-function persistedAvailable(productId: string, units: number): number {
+function persistedAvailable(productId: string, _units: number): number {
   const productSvc = new ProductOfflineService(STORE_ID);
   const reader = new InventoryOfflineService(STORE_ID, productSvc['productRepository']);
   return reader.getAvailableQuantity(productId).available;

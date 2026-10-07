@@ -12,6 +12,7 @@ import { WarehouseOfflineService } from '~/inventory/lib/services/warehouse-offl
 import { RecipeOfflineService } from '~/inventory/lib/services/recipe-offline-service';
 import { ElaborationOfflineService } from '~/inventory/lib/services/elaboration-offline-service';
 import { StorePaymentMethodsConfigService } from '~/shared/lib/payment-methods/store-payment-methods-config-service';
+import { MessagesOfflineService } from '~/shared/lib/messages/messages-offline-service';
 import { DataSerializerService } from '~/sync/lib/services/data-serializer-service';
 import { ExportForm } from '~/sync/components/export-form';
 
@@ -46,6 +47,7 @@ export function ExportPage() {
       inventorySvc,
     );
     const storePaymentMethodsSvc = new StorePaymentMethodsConfigService(storeId);
+    const messagesQueueSvc = new MessagesOfflineService(storeId);
 
     const serializer = new DataSerializerService(
       storeId,
@@ -60,6 +62,7 @@ export function ExportPage() {
       recipeSvc,
       elaborationSvc,
       storePaymentMethodsSvc,
+      messagesQueueSvc,
     );
 
     const payload = await serializer.export(password);
@@ -116,6 +119,7 @@ export function ExportPage() {
       inventorySvc,
     );
     const storePaymentMethodsSvc = new StorePaymentMethodsConfigService(storeId);
+    const messagesQueueSvc = new MessagesOfflineService(storeId);
 
     const serializer = new DataSerializerService(
       storeId,
@@ -130,6 +134,7 @@ export function ExportPage() {
       recipeSvc,
       elaborationSvc,
       storePaymentMethodsSvc,
+      messagesQueueSvc,
     );
 
     const data = await serializer.exportPlainData();
