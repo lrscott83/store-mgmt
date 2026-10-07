@@ -87,6 +87,32 @@ Prior art with the same trap already documented in production code: `Application
 
 When an E2E test returns an empty collection or a "not applicable" state, assert the **precondition** first — is the data you seeded actually there? — before blaming the behavior under test. A test that asserts a filtered effect without pinning the state that triggers the filter cannot distinguish "filtered correctly" from "found nothing".
 
+### A stray `testhost` makes the build fail SILENTLY (learned 2026-10-07)
+
+An orphaned `testhost` process keeps `backend/src/SMCA.WebApi.E2ETests/bin/Debug/net8.0/Infrastructure.dll`
+locked. The build then fails with `error MSB3027` / `MSB3021` — *"The file is locked by: testhost (PID)"* — and
+**`dotnet test` runs the tests against the PREVIOUS binaries anyway**. You get results that mean nothing.
+
+The trap: **`error MSB3027` is not an `error CS`.** Grepping build output for `error CS` alone reports a failed
+build as clean. This cost a real debugging detour — a perfectly good E2E class looked flaky (3/3 green, then
+3/3 red in 39 ms, then `< 1 ms` durations) when the actual cause was a stale DLL.
+
+Rules when iterating on backend E2E on Windows:
+
+1. **Always grep for `Build succeeded|Build FAILED` and `error MSB`**, never `error CS` alone.
+2. **Before rebuilding, kill leftovers:** `Get-Process -Name "testhost*" -ErrorAction SilentlyContinue | Stop-Process -Force`.
+3. **`< 1 ms` duration in a backend E2E is the tell.** These tests apply EF migrations, seed PostgreSQL and make
+   real HTTP calls. Tens-of-milliseconds failures mean the binary is stale or the collection fixture never
+   initialized — not that the behaviour under test is broken.
+4. **`dotnet test --list-tests --filter X` lies.** It reports *"No test matches the given testcase filter"* for
+   classes that DO exist in the assembly (verified against 688 tests). To confirm a test exists, run
+   `--list-tests` WITHOUT `--filter` and grep.
+5. **A wrong `--filter` suffix fails silently** — empty output, no error. `Inactive_store_keeps_hiding_...` does
+   not match a filter for `Inactive_store_hides_...`. Copy the exact name from `--list-tests`.
+
+Never diagnose a test as flaky before ruling out a stale binary. Confirm with: revert the change, kill
+`testhost`, rebuild, re-run. If the failure survives that, it is real.
+
 ### Every store module must have a `StoreRoleFeatures` mapping
 
 Every store module that carries store-level features MUST have a `StoreRoleFeatures` enum entry
