@@ -5,6 +5,7 @@ import esMessages from '~/shared/lib/i18n/es';
 import type {
   PublicCatalog,
   PublicCatalogProduct,
+  PublicOrderingConfig,
 } from '~/sales/lib/services/catalog-http-service';
 
 vi.mock('react-router', () => ({
@@ -15,6 +16,7 @@ const catalogMock = vi.hoisted(() => ({
   getPublicCatalog: vi.fn(),
   getPublicProducts: vi.fn(),
   getPublicProduct: vi.fn(),
+  getPublicOrderingConfig: vi.fn(),
 }));
 
 vi.mock('~/sales/lib/services/catalog-http-service', () => ({
@@ -68,6 +70,20 @@ const page = (items: PublicCatalogProduct[], total = items.length) => ({
   pageSize: 12,
 });
 
+/** Config anónimo de pedidos: sin marca por defecto (una tienda puede no tener logo/banner). */
+const CONFIG_WITHOUT_BRAND: PublicOrderingConfig = {
+  enabled: true,
+  pickupEnabled: true,
+  deliveryEnabled: true,
+  deliveryFee: 0,
+  minimumOrderAmount: 0,
+  businessHours: null,
+  deliveryZones: null,
+  paletteId: 'default',
+  logoUrl: null,
+  bannerUrl: null,
+};
+
 function renderPage() {
   return render(
     <IntlProvider locale="es" messages={esMessages}>
@@ -82,6 +98,7 @@ describe('PublicCatalogPage', () => {
     catalogMock.getPublicCatalog.mockResolvedValue(envelope(CATALOG));
     catalogMock.getPublicProducts.mockResolvedValue(envelope(page([makeProduct()])));
     catalogMock.getPublicProduct.mockResolvedValue(envelope(makeProduct()));
+    catalogMock.getPublicOrderingConfig.mockResolvedValue(envelope(CONFIG_WITHOUT_BRAND));
   });
 
   it('muestra la tienda, los filtros y el conteo de resultados', async () => {
@@ -299,5 +316,68 @@ describe('PublicCatalogPage', () => {
     expect(await screen.findByTestId('catalog-public-unavailable')).toHaveTextContent(
       'Sin conexión. Se requiere conexión a internet.',
     );
+  });
+
+  // ── MARCA (F8): logo y banner de la carta pública ─────────────────────────────────
+  describe('marca del catálogo público', () => {
+    it('pinta el logo junto al nombre y el banner sobre la cabecera', async () => {
+      catalogMock.getPublicOrderingConfig.mockResolvedValue(
+        envelope({
+          ...CONFIG_WITHOUT_BRAND,
+          logoUrl: '/api/v1/public/catalog/mi-tienda/media/t/s/branding/logo.png',
+          bannerUrl: '/api/v1/public/catalog/mi-tienda/media/t/s/branding/banner.png',
+        }),
+      );
+      renderPage();
+
+      // Las rutas del backend se resuelven contra el origen de la API (mismo origen aquí).
+      expect(await screen.findByTestId('catalog-logo')).toHaveAttribute(
+        'src',
+        `${window.location.origin}/api/v1/public/catalog/mi-tienda/media/t/s/branding/logo.png`,
+      );
+      expect(screen.getByTestId('catalog-banner')).toHaveAttribute(
+        'src',
+        `${window.location.origin}/api/v1/public/catalog/mi-tienda/media/t/s/branding/banner.png`,
+      );
+      expect(catalogMock.getPublicOrderingConfig).toHaveBeenCalledWith('mi-tienda');
+      // El logo acompaña al nombre: sigue siendo el título de la carta.
+      expect(screen.getByTestId('catalog-store-name')).toHaveTextContent('Moda Cubana');
+    });
+
+    it('sin marca no pinta ni logo ni banner, y la carta es la de siempre', async () => {
+      renderPage();
+
+      expect(await screen.findByTestId('catalog-store-name')).toBeInTheDocument();
+      expect(screen.queryByTestId('catalog-logo')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('catalog-banner')).not.toBeInTheDocument();
+      // Y el catálogo sigue entero: la marca es un plus, no su condición.
+      expect(screen.getByTestId('catalog-grid')).toBeInTheDocument();
+    });
+
+    it('solo logo o solo banner: cada lado es independiente', async () => {
+      catalogMock.getPublicOrderingConfig.mockResolvedValue(
+        envelope({
+          ...CONFIG_WITHOUT_BRAND,
+          logoUrl: '/api/v1/public/catalog/mi-tienda/media/t/s/branding/logo.png',
+        }),
+      );
+      renderPage();
+
+      expect(await screen.findByTestId('catalog-logo')).toBeInTheDocument();
+      expect(screen.queryByTestId('catalog-banner')).not.toBeInTheDocument();
+    });
+
+    it('si el config anónimo falla la carta se publica igual, sin marca', async () => {
+      // La marca es opcional: este endpoint puede no existir todavía para una tienda, y eso NO
+      // significa que el catálogo no exista. La página no puede caer por esto.
+      catalogMock.getPublicOrderingConfig.mockRejectedValue({ response: { status: 500 } });
+      renderPage();
+
+      expect(await screen.findByTestId('catalog-store-name')).toHaveTextContent('Moda Cubana');
+      expect(await screen.findByTestId('catalog-card-cp1')).toBeInTheDocument();
+      expect(screen.queryByTestId('catalog-logo')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('catalog-banner')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('catalog-public-unavailable')).not.toBeInTheDocument();
+    });
   });
 });

@@ -14,6 +14,7 @@ import {
   type PublicCatalog,
   type PublicCatalogPage,
   type PublicCatalogProduct,
+  type PublicOrderingConfig,
 } from '~/sales/lib/services/catalog-http-service';
 
 const PAGE_SIZE = 12;
@@ -48,6 +49,13 @@ export function PublicCatalogPage() {
   const [detailOpen, setDetailOpen] = useState(false);
   const [activeImage, setActiveImage] = useState<string | null>(null);
   const [zoomed, setZoomed] = useState(false);
+
+  /**
+   * Marca de la carta pública (F8): logo y banner. Es un PLUS sobre el catálogo, no su
+   * condición — una tienda puede no tenerlos, así que `null` (o un fallo entero de este
+   * endpoint) se pinta como un catálogo sin marca, nunca como un catálogo roto.
+   */
+  const [orderingConfig, setOrderingConfig] = useState<PublicOrderingConfig | null>(null);
 
   const loadCatalog = useCallback(async () => {
     try {
@@ -84,9 +92,26 @@ export function PublicCatalogPage() {
     }
   }, [storeSlug, categorySlug, search, currentPage]);
 
+  const loadOrderingConfig = useCallback(async () => {
+    try {
+      const result = await catalogHttpService.getPublicOrderingConfig(storeSlug);
+      if (result.succeeded) {
+        setOrderingConfig(result.data);
+      }
+    } catch {
+      // La marca es opcional: si el config anónimo no está (o falla la red), la carta se publica
+      // igual, solo que sin logo ni banner. No se avisa al cliente ni se cambia el estado de la
+      // página, porque aquí un fallo NO significa que el catálogo no exista.
+    }
+  }, [storeSlug]);
+
   useEffect(() => {
     void loadCatalog();
   }, [loadCatalog]);
+
+  useEffect(() => {
+    void loadOrderingConfig();
+  }, [loadOrderingConfig]);
 
   useEffect(() => {
     if (state !== 'ready') return;
@@ -122,6 +147,11 @@ export function PublicCatalogPage() {
   // de la API (en producción es el mismo origen; en dev y E2E no lo es).
   const toImageUrl = (path: string | null | undefined) => (path ? apiFileUrl(path) : null);
 
+  // Logo y banner llegan como rutas relativas del endpoint público de media (nunca rutas del
+  // servidor): `null` = la tienda no configuró ese lado, y entonces no se pinta nada.
+  const logoUrl = toImageUrl(orderingConfig?.logoUrl);
+  const bannerUrl = toImageUrl(orderingConfig?.bannerUrl);
+
   const total = page?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
@@ -154,14 +184,46 @@ export function PublicCatalogPage() {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Marca (F8): el banner va sobre la cabecera (ancho completo, recortado para no comerse
+          la carta) y el logo junto al nombre. Ninguno de los dos es obligatorio: sin marca, la
+          cabecera es exactamente la que había. */}
+      {bannerUrl && (
+        <div className="bg-surface">
+          <img
+            src={bannerUrl}
+            alt={intl.formatMessage(
+              { id: 'CATALOG_PUBLIC.BANNER_ALT' },
+              { store: catalog?.storeName ?? '' },
+            )}
+            className="mx-auto block max-h-56 w-full max-w-5xl object-cover"
+            data-testid="catalog-banner"
+          />
+        </div>
+      )}
+
       <header className="border-b border-border bg-surface px-4 py-6">
         <div className="mx-auto max-w-5xl">
-          <h1 className="text-2xl font-bold text-text" data-testid="catalog-store-name">
-            {catalog?.storeName}
-          </h1>
-          <p className="text-xs text-text-muted">
-            {intl.formatMessage({ id: 'CATALOG_PUBLIC.FOOTER' })}
-          </p>
+          <div className="flex items-center gap-3">
+            {logoUrl && (
+              <img
+                src={logoUrl}
+                alt={intl.formatMessage(
+                  { id: 'CATALOG_PUBLIC.LOGO_ALT' },
+                  { store: catalog?.storeName ?? '' },
+                )}
+                className="h-12 w-12 shrink-0 rounded-md border border-border object-contain"
+                data-testid="catalog-logo"
+              />
+            )}
+            <div className="min-w-0">
+              <h1 className="text-2xl font-bold text-text" data-testid="catalog-store-name">
+                {catalog?.storeName}
+              </h1>
+              <p className="text-xs text-text-muted">
+                {intl.formatMessage({ id: 'CATALOG_PUBLIC.FOOTER' })}
+              </p>
+            </div>
+          </div>
         </div>
       </header>
 

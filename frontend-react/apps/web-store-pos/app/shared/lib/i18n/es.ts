@@ -318,6 +318,24 @@ const messages: Record<string, string> = {
   'WEB_CATALOG.MOVE_LEFT': 'Mover antes',
   'WEB_CATALOG.MOVE_RIGHT': 'Mover después',
 
+  // Marca del catálogo público (F8): SOLO logo y banner. Sin paletas — se cancelaron por
+  // decisión del owner (2026-10-07) y el catálogo sigue con la paleta que ya tenía.
+  'WEB_CATALOG.BRAND_TITLE': 'Marca',
+  'WEB_CATALOG.BRAND_SUBTITLE':
+    'El logo y el banner que tus clientes ven en la cabecera de tu catálogo público.',
+  'WEB_CATALOG.BRAND_LOGO': 'Logo',
+  'WEB_CATALOG.BRAND_BANNER': 'Banner',
+  'WEB_CATALOG.BRAND_REMOVE_LOGO': 'Quitar logo',
+  'WEB_CATALOG.BRAND_REMOVE_BANNER': 'Quitar banner',
+  'WEB_CATALOG.BRAND_PENDING_REMOVE_LOGO': 'El logo se quitará al guardar la marca',
+  'WEB_CATALOG.BRAND_PENDING_REMOVE_BANNER': 'El banner se quitará al guardar la marca',
+  'WEB_CATALOG.BRAND_PENDING_UPLOAD': 'se subirá al guardar la marca',
+  'WEB_CATALOG.BRAND_SAVE': 'Guardar marca',
+  'WEB_CATALOG.BRAND_SAVING': 'Guardando...',
+  'WEB_CATALOG.BRAND_SAVED': 'Marca guardada',
+  'WEB_CATALOG.BRAND_SAVE_ERROR': 'No se pudo guardar la marca',
+  'WEB_CATALOG.BRAND_LOAD_ERROR': 'No se pudo cargar la marca',
+
   // Pedidos WhatsApp (módulo 18, F1): configuración del pedido online. Sin moneda — el precio
   // y la moneda los pone el catálogo (A3 eliminada).
   'ORDERING_SETTINGS.TITLE': 'Pedidos WhatsApp',
@@ -367,6 +385,11 @@ const messages: Record<string, string> = {
   'CATALOG_PUBLIC.ZOOM_IN': 'Ampliar imagen',
   'CATALOG_PUBLIC.ZOOM_OUT': 'Reducir imagen',
   'CATALOG_PUBLIC.FOOTER': 'Catálogo publicado con VendeDTo',
+  // Marca (F8): logo y banner de la cabecera. El texto alternativo nombra a la tienda, que es
+  // de whom es la imagen; la ausencia de logo o banner NO es un error (una tienda puede no
+  // tenerlos), así que no hay ningún aviso para ese caso.
+  'CATALOG_PUBLIC.LOGO_ALT': 'Logo de {store}',
+  'CATALOG_PUBLIC.BANNER_ALT': 'Banner de {store}',
   'MENU.WAREHOUSES_MODULE': 'ALMACENES',
   'MENU.WAREHOUSE_MOVEMENTS': 'Movimientos',
   // Módulo Elaboración (17): recetas (BoM) y órdenes de elaboración.

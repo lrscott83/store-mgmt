@@ -4,7 +4,11 @@ import { IntlProvider } from 'react-intl';
 import { EModules } from '@store-mgmt/domain';
 import type { UserModel } from '@store-mgmt/domain';
 import esMessages from '~/shared/lib/i18n/es';
-import type { CatalogProductView, CatalogStatus } from '~/sales/lib/services/catalog-http-service';
+import type {
+  CatalogBranding,
+  CatalogProductView,
+  CatalogStatus,
+} from '~/sales/lib/services/catalog-http-service';
 
 /** Sesión mutable: el loader y los tests de gate la reescriben por prueba. */
 const session = vi.hoisted(() => ({
@@ -48,6 +52,8 @@ const catalogMock = vi.hoisted(() => ({
   removeImage: vi.fn(),
   reorderImages: vi.fn(),
   mediaUrl: vi.fn((slug: string, key: string) => `/media/${slug}/${key}`),
+  getBranding: vi.fn(),
+  updateBranding: vi.fn(),
 }));
 
 vi.mock('~/sales/lib/services/catalog-http-service', () => ({
@@ -110,6 +116,26 @@ const PRODUCT_WITH_IMAGE: CatalogProductView = {
   images: ['t/s/p/foto.jpg'],
 };
 
+const BRAND_WITHOUT_MEDIA: CatalogBranding = { logoKey: null, bannerKey: null, paletteId: 'default' };
+
+const BRAND_WITH_MEDIA: CatalogBranding = {
+  logoKey: 't/s/branding/logo.png',
+  bannerKey: 't/s/branding/banner.png',
+  paletteId: 'default',
+};
+
+/** Lo que el servidor devuelve tras un PUT PARCIAL que solo quitó el logo. */
+const BRAND_WITH_BANNER_ONLY: CatalogBranding = {
+  ...BRAND_WITH_MEDIA,
+  logoKey: null,
+};
+
+/** Adjunta un archivo a un `<input type="file">` y dispara el cambio, como haría el diálogo. */
+function selectFile(input: HTMLElement, file: File) {
+  Object.defineProperty(input, 'files', { value: [file], configurable: true });
+  fireEvent.change(input);
+}
+
 function makeUser(overrides: Partial<UserModel> = {}): UserModel {
   return {
     id: 'u1',
@@ -152,6 +178,8 @@ describe('WebCatalogPage (vista Catálogo Web)', () => {
     catalogMock.getProducts.mockResolvedValue(envelope([PRODUCT]));
     catalogMock.uploadImage.mockResolvedValue(envelope('t/s/p/foto.jpg'));
     catalogMock.saveProductFields.mockResolvedValue(envelope(true));
+    catalogMock.getBranding.mockResolvedValue(envelope(BRAND_WITHOUT_MEDIA));
+    catalogMock.updateBranding.mockResolvedValue(envelope(BRAND_WITHOUT_MEDIA));
     catalogMock.sync.mockResolvedValue(
       envelope({
         storeSlug: 'mi-tienda',
@@ -535,6 +563,171 @@ describe('WebCatalogPage (vista Catálogo Web)', () => {
     ).not.toHaveLength(0);
     expect(catalogMock.uploadImage).not.toHaveBeenCalled();
     expect(screen.queryByTestId(`catalog-pending-image-${PRODUCT.id}`)).not.toBeInTheDocument();
+  });
+
+  // ── MARCA (F8) ────────────────────────────────────────────────────────────────────
+  // El PUT de marca es un PARCHE y el de productos es un LOTE: los dos botones son
+  // independientes y ninguna prueba de esta sección toca el guardado por lotes.
+  describe('marca del catálogo (logo y banner)', () => {
+    it('carga la marca al montar y no pinta previsualización si la tienda no tiene', async () => {
+      renderPage();
+
+      expect(await screen.findByTestId('brand-slot-logo')).toBeInTheDocument();
+      expect(catalogMock.getBranding).toHaveBeenCalledTimes(1);
+      // Sin clave guardada no hay <img>: no se reserva espacio ni se adivina una URL.
+      expect(screen.queryByTestId('brand-logo')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('brand-banner')).not.toBeInTheDocument();
+      // Y sin cambios pendientes su botón no se puede pulsar.
+      expect(screen.getByTestId('brand-save')).toBeDisabled();
+    });
+
+    it('previsualiza el logo y el banner ya guardados por el endpoint público de media', async () => {
+      catalogMock.getBranding.mockResolvedValue(envelope(BRAND_WITH_MEDIA));
+      renderPage();
+
+      const logo = await screen.findByTestId('brand-logo');
+      expect(logo).toHaveAttribute(
+        'src',
+        `${window.location.origin}/api/v1/public/catalog/mi-tienda/media/t/s/branding/logo.png`,
+      );
+      expect(screen.getByTestId('brand-banner')).toHaveAttribute(
+        'src',
+        `${window.location.origin}/api/v1/public/catalog/mi-tienda/media/t/s/branding/banner.png`,
+      );
+    });
+
+    it('elegir logo y banner los retiene sin tocar la red hasta pulsar Guardar marca', async () => {
+      renderPage();
+
+      const logo = new File(['x'], 'logo.png', { type: 'image/png' });
+      const banner = new File(['x'], 'banner.jpg', { type: 'image/jpeg' });
+      selectFile(await screen.findByTestId('brand-logo-upload'), logo);
+      selectFile(await screen.findByTestId('brand-banner-upload'), banner);
+
+      expect(screen.getByTestId('brand-pending-logo')).toHaveTextContent(/logo\.png/);
+      expect(screen.getByTestId('brand-pending-banner')).toHaveTextContent(/banner\.jpg/);
+      expect(catalogMock.updateBranding).not.toHaveBeenCalled();
+
+      fireEvent.click(screen.getByTestId('brand-save'));
+
+      // Un solo PUT con los dos lados: el backend los aplica en la misma petición.
+      await waitFor(() => expect(catalogMock.updateBranding).toHaveBeenCalledTimes(1));
+      expect(catalogMock.updateBranding).toHaveBeenCalledWith({ logo, banner });
+      await waitFor(() =>
+        expect(showToastSuccessMock).toHaveBeenCalledWith('Marca guardada'),
+      );
+    });
+
+    it('el guardado de la marca NO toca el lote de productos ni al revés', async () => {
+      renderPage();
+
+      // Editar un producto y cambiar la marca a la vez: cada botón llama a SU endpoint.
+      fireEvent.click(await screen.findByTestId(`catalog-category-toggle-${PRODUCT.categoryId}`));
+      fireEvent.change(await screen.findByTestId(`catalog-description-${PRODUCT.id}`), {
+        target: { value: 'Camisa de algodón' },
+      });
+      selectFile(await screen.findByTestId('brand-logo-upload'), new File(['x'], 'l.png', { type: 'image/png' }));
+
+      fireEvent.click(screen.getByTestId('brand-save'));
+      await waitFor(() => expect(catalogMock.updateBranding).toHaveBeenCalledTimes(1));
+      // Guardar la marca no aplicó el diff de productos…
+      expect(catalogMock.saveProductFields).not.toHaveBeenCalled();
+      expect(catalogMock.uploadImage).not.toHaveBeenCalled();
+
+      fireEvent.click(screen.getByTestId('catalog-save-all-button'));
+      await waitFor(() => expect(catalogMock.saveProductFields).toHaveBeenCalledTimes(1));
+      // …y guardar el producto no volvió a escribir la marca.
+      expect(catalogMock.updateBranding).toHaveBeenCalledTimes(1);
+    });
+
+    it('marcar quitar NO borra nada todavía: lo aplica el botón de marca', async () => {
+      // La carga del montage trae logo y banner; la recarga posterior al guardado ya no trae el
+      // logo: es el servidor quien dice qué quedó guardado, no la vista.
+      catalogMock.getBranding
+        .mockResolvedValueOnce(envelope(BRAND_WITH_MEDIA))
+        .mockResolvedValue(envelope(BRAND_WITH_BANNER_ONLY));
+      catalogMock.updateBranding.mockResolvedValue(envelope(BRAND_WITH_BANNER_ONLY));
+      renderPage();
+
+      fireEvent.click(await screen.findByTestId('brand-logo-remove'));
+
+      expect(catalogMock.updateBranding).not.toHaveBeenCalled();
+      expect(screen.getByTestId('brand-pending-logo-remove')).toHaveTextContent(
+        'El logo se quitará al guardar la marca',
+      );
+
+      fireEvent.click(screen.getByTestId('brand-save'));
+
+      // El PUT parcial solo lleva `removeLogo`: el banner, no mencionado, no se toca.
+      await waitFor(() =>
+        expect(catalogMock.updateBranding).toHaveBeenCalledWith({ removeLogo: true }),
+      );
+      await waitFor(() => expect(screen.queryByTestId('brand-logo')).not.toBeInTheDocument());
+      // El banner sobrevivió al PUT parcial: quitó el logo, no la marca entera.
+      expect(screen.getByTestId('brand-banner')).toBeInTheDocument();
+    });
+
+    it('elegir una imagen cancela el borrado marcado del mismo lado: son excluyentes', async () => {
+      catalogMock.getBranding.mockResolvedValue(envelope(BRAND_WITH_MEDIA));
+      renderPage();
+
+      fireEvent.click(await screen.findByTestId('brand-banner-remove'));
+      expect(screen.getByTestId('brand-pending-banner-remove')).toBeInTheDocument();
+
+      const file = new File(['x'], 'nuevo.png', { type: 'image/png' });
+      selectFile(await screen.findByTestId('brand-banner-upload'), file);
+
+      expect(screen.queryByTestId('brand-pending-banner-remove')).not.toBeInTheDocument();
+      fireEvent.click(screen.getByTestId('brand-save'));
+
+      await waitFor(() =>
+        expect(catalogMock.updateBranding).toHaveBeenCalledWith({ banner: file }),
+      );
+    });
+
+    it('un archivo que no es imagen no se retiene: avisa y no guarda', async () => {
+      renderPage();
+
+      selectFile(
+        await screen.findByTestId('brand-logo-upload'),
+        new File(['hola'], 'notas.txt', { type: 'text/plain' }),
+      );
+
+      // Misma validación local que la imagen de producto (formatos + tamaño).
+      expect(await screen.findByTestId('brand-error')).toHaveTextContent(
+        /Solo imágenes jpg, png o webp de hasta 2 MB\./,
+      );
+      expect(screen.queryByTestId('brand-pending-logo')).not.toBeInTheDocument();
+      expect(screen.getByTestId('brand-save')).toBeDisabled();
+    });
+
+    it('si el PUT de marca falla se avisa y los cambios siguen pendientes', async () => {
+      catalogMock.updateBranding.mockRejectedValue({ response: { status: 500 } });
+      renderPage();
+
+      selectFile(
+        await screen.findByTestId('brand-logo-upload'),
+        new File(['x'], 'logo.png', { type: 'image/png' }),
+      );
+      fireEvent.click(screen.getByTestId('brand-save'));
+
+      await waitFor(() => expect(showBlockingErrorMock).toHaveBeenCalled());
+      // No se limpia lo que no se guardó: el dueño puede reintentarlo sin volver a elegir.
+      expect(screen.getByTestId('brand-pending-logo')).toHaveTextContent(/logo\.png/);
+      expect(screen.getByTestId('brand-save')).not.toBeDisabled();
+    });
+
+    it('si la marca no carga, el catálogo y sus productos siguen utilizables', async () => {
+      catalogMock.getBranding.mockRejectedValue({ response: { status: 403 } });
+      renderPage();
+
+      expect(await screen.findByTestId('brand-error')).toHaveTextContent(
+        'No se pudo cargar la marca',
+      );
+      // La vista no se cae: productos, panels y guardado por lotes siguen ahí.
+      fireEvent.click(await screen.findByTestId(`catalog-category-toggle-${PRODUCT.categoryId}`));
+      expect(screen.getByTestId(`catalog-product-${PRODUCT.id}`)).toBeInTheDocument();
+    });
   });
 
   // ── TESTS COMENTADOS (no borrados) ─────────────────────────────────────────────

@@ -170,6 +170,52 @@ export interface PublicCatalogFilters {
   pageSize?: number;
 }
 
+/**
+ * MARCA de la tienda: el logo y el banner que el dueño sube desde la vista Catálogo Web.
+ * Espejo de `Application/Dtos/WebCatalog/StoreCatalogBrandingDto.cs`.
+ *
+ * Son CLAVES, no URLs: la clave es lo que se persiste, y la URL pública la compone el config
+ * anónimo con el slug de la tienda. `paletteId` viaja para conocerla, pero NO se escribe: las
+ * paletas se cancelaron (decisión del owner, 2026-10-07) y el catálogo sigue con la que ya usa.
+ */
+export interface CatalogBranding {
+  logoKey: string | null;
+  bannerKey: string | null;
+  paletteId: string;
+}
+
+/**
+ * Cuerpo de `PUT /v1/catalog/branding`: un PARCHE. Lo que no viaja no se toca, así que cambiar
+ * el logo no borra el banner (y al revés). Los cuatro campos son independientes.
+ */
+export interface CatalogBrandingUpdate {
+  logo?: File;
+  banner?: File;
+  removeLogo?: boolean;
+  removeBanner?: boolean;
+}
+
+/**
+ * Configuración de pedidos que el catálogo público lee sin sesión
+ * (`GET /v1/public/ordering/{storeSlug}/config`). Espejo de `PublicOrderingConfigDto`.
+ *
+ * `logoUrl`/`bannerUrl` son rutas RELATIVAS del endpoint público de media (nunca rutas del
+ * servidor): se resuelven con `apiFileUrl`. No lleva `whatsappNumber` — el enlace `wa.me` lo
+ * arma el endpoint del pedido, no un config que lee cualquiera que abra el catálogo.
+ */
+export interface PublicOrderingConfig {
+  enabled: boolean;
+  pickupEnabled: boolean;
+  deliveryEnabled: boolean;
+  deliveryFee: number;
+  minimumOrderAmount: number;
+  businessHours: string | null;
+  deliveryZones: string | null;
+  paletteId: string;
+  logoUrl?: string | null;
+  bannerUrl?: string | null;
+}
+
 export const catalogHttpService = {
   async getStatus(): Promise<BaseResponseModel<CatalogStatus>> {
     const response = await apiClient.get<BaseResponseModel<CatalogStatus>>('/v1/catalog/status');
@@ -243,6 +289,40 @@ export const catalogHttpService = {
     return response.data;
   },
 
+  /**
+   * Marca de la tienda actual. Una tienda sin fila NO es un 404: el backend devuelve los valores
+   * por defecto (sin logo, sin banner, paleta actual).
+   */
+  async getBranding(): Promise<BaseResponseModel<CatalogBranding>> {
+    const response = await apiClient.get<BaseResponseModel<CatalogBranding>>('/v1/catalog/branding');
+    return response.data;
+  },
+
+  /**
+   * Sube, cambia o quita el logo y/o el banner (F8). Es un PUT PARCIAL: lo que no se manda no
+   * se toca, así que cambiar el logo no borra el banner.
+   *
+   * Multipart porque los archivos viajan como `IFormFile`. El `Content-Type` EXPLÍCITO es el
+   * mismo requisito documentado en `uploadImage`: `api-client` fija `application/json` y axios
+   * convertiría el FormData a JSON — declarando multipart, axios deja el FormData intacto y el
+   * adaptador borra la cabecera para que el navegador ponga el boundary real.
+   */
+  async updateBranding(
+    payload: CatalogBrandingUpdate,
+  ): Promise<BaseResponseModel<CatalogBranding>> {
+    const formData = new FormData();
+    if (payload.logo) formData.append('logo', payload.logo);
+    if (payload.banner) formData.append('banner', payload.banner);
+    if (payload.removeLogo) formData.append('removeLogo', 'true');
+    if (payload.removeBanner) formData.append('removeBanner', 'true');
+    const response = await apiClient.put<BaseResponseModel<CatalogBranding>>(
+      '/v1/catalog/branding',
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    );
+    return response.data;
+  },
+
   /** URL pública (anónima) de una imagen del catálogo publicado. */
   mediaUrl(storeSlug: string, key: string): string {
     return `/api/v1/public/catalog/${storeSlug}/media/${key}`;
@@ -277,6 +357,18 @@ export const catalogHttpService = {
   ): Promise<BaseResponseModel<PublicCatalogProduct>> {
     const response = await apiClient.get<BaseResponseModel<PublicCatalogProduct>>(
       `/v1/public/catalog/${encodeURIComponent(storeSlug)}/products/${productId}`,
+    );
+    return response.data;
+  },
+
+  /**
+   * Configuración de pedidos + marca que la carta pública lee sin sesión. A diferencia del
+   * catálogo, un fallo aquí NO es un 404 de tienda inexistente: la marca es opcional, así que
+   * quien la consume trata el error como "sin marca" y sigue pintando la página.
+   */
+  async getPublicOrderingConfig(storeSlug: string): Promise<BaseResponseModel<PublicOrderingConfig>> {
+    const response = await apiClient.get<BaseResponseModel<PublicOrderingConfig>>(
+      `/v1/public/ordering/${encodeURIComponent(storeSlug)}/config`,
     );
     return response.data;
   },
