@@ -382,4 +382,10 @@
   <data name="OnlineOrderNotesTooLong" xml:space="preserve">
     <value>{0} no puede superar los {1} caracteres</value>
   </data>
+  <data name="OnlineOrderStoreSlugTooLong" xml:space="preserve">
+    <value>{0} no puede superar los {1} caracteres</value>
+  </data>
+  <data name="OnlineOrderStatusNotFound" xml:space="preserve">
+    <value>No hay ningún pedido con ese código y ese teléfono</value>
+  </data>
 </root>

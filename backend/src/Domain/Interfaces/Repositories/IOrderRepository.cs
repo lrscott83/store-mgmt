@@ -21,9 +21,26 @@ namespace Domain.Interfaces.Repositories
         Task<IReadOnlyCollection<Order>> GetByStoreIdAsync(Guid storeId);
 
         /// <summary>
-        /// Pedido por su código público DENTRO de la tienda (la consulta que hace la persona por
-        /// WhatsApp). null si ese código no existe en esa tienda.
+        /// Pedido por su código público DENTRO de la tienda, CON la sesión. null si ese código no
+        /// existe en esa tienda.
         /// </summary>
         Task<Order?> GetByCodeAsync(Guid storeId, string code);
+
+        /// <summary>
+        /// Pedido por su código público para una LECTURA PÚBLICA (anónimo, sin sesión): salta el
+        /// filtro global por tenant del <c>ApplicationDbContext</c>. null si ese código no existe en
+        /// esa tienda.
+        ///
+        /// Existe separada de <see cref="GetByCodeAsync"/> y no la sustituye, por la misma razón
+        /// que <c>StoreCatalogSettingsRepository.GetPublicByStoreIdAsync</c>: el filtro por tenant
+        /// es lo que confina las lecturas AUTENTICADAS, y quitarle el bypass abriría esa puerta. Y
+        /// una petición anónima NO tiene tenant en el contexto, así que la lectura de sesión
+        /// devolvería VACÍA sin error ni aviso — el cliente perdería su pedido siempre.
+        ///
+        /// Seguro por construcción: no devuelve "cualquier pedido" sino el de UN <c>storeId</c>
+        /// con UN código, y quien lo llama resolvió antes la tienda por un slug ÚNICO GLOBAL. El
+        /// código además es corto y aleatorio, y el endpoint público exige además el teléfono.
+        /// </summary>
+        Task<Order?> GetPublicByCodeAsync(Guid storeId, string code);
     }
 }

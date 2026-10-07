@@ -148,6 +148,11 @@ builder.Services.AddRateLimiter(options =>
 
     options.AddPolicy("LoginPolicy", RateLimitPolicies.Login);
     options.AddPolicy("RegisterPolicy", RateLimitPolicies.Register);
+
+    // F3: el alta de pedidos online es anónima y ESCRIBE, así que lleva su propio presupuesto
+    // (20 pedidos / 10 min por IP + slug). `UseRateLimiter()` ya está en el pipeline, después de
+    // `UseAuthorization()`.
+    options.AddPolicy("OnlineOrderPolicy", RateLimitPolicies.OnlineOrder);
 });
 
 var app = builder.Build();
