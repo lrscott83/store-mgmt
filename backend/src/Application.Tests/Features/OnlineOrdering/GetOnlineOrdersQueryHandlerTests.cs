@@ -2,11 +2,16 @@ using Application.Abstractions.HttpContext;
 using Application.Dtos.OnlineOrdering;
 using Application.Exceptions;
 using Application.Features.OnlineOrdering.Queries.GetOnlineOrders;
+using Application.Services.Tenants;
 using Domain.Common.Enums;
 using Domain.Entities.DeliveryDrivers;
 using Domain.Entities.Orders;
 using Domain.Interfaces.Repositories;
 using FluentAssertions;
+using Infrastructure.Persistence.Contexts;
+using Infrastructure.Persistence.Repositories;
+using Microsoft.AspNetCore.Http;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Localization;
 using Moq;
 using Resources;
@@ -65,6 +70,38 @@ public class GetOnlineOrdersQueryHandlerTests
         order.Code = code;
         return order;
     }
+
+    /// <summary>
+    /// Ejecuta el handler y devuelve el filtro que salió REALMENTE hacia el repositorio.
+    ///
+    /// Los filtros de fecha se comprueban sobre el filtro capturado y no sobre la respuesta del
+    /// handler porque el DTO no los devuelve: lo que se arregla (D2) es exactamente el predicado
+    /// que se ejecuta en la base, y un `Verify` con `It.Is` sobre un filtro normalizado ya no
+    /// documentaría el valor concreto al que se llega.
+    /// </summary>
+    private async Task<OrderListFilter> CaptureFilter(GetOnlineOrdersQuery query)
+    {
+        OrderListFilter? captured = null;
+        _orderRepository
+            .Setup(x => x.GetPagedByStoreIdAsync(It.IsAny<Guid>(), It.IsAny<OrderListFilter>(), It.IsAny<int>(), It.IsAny<int>()))
+            .Callback<Guid, OrderListFilter, int, int>((storeId, filter, skip, take) => captured = filter)
+            .ReturnsAsync(new PagedOrders(new List<Order>(), 0));
+
+        await Handler().Handle(query, CancellationToken.None);
+
+        captured.Should().NotBeNull("el handler tiene que llamar al repositorio");
+        return captured!;
+    }
+
+    /// <summary>
+    /// El último instante representable de un día: <c>23:59:59.9999999</c>.
+    ///
+    /// Se escribe como "el último tick del segundo 59" y NO como <c>day.Date.AddDays(1).AddTicks(-1)</c>
+    /// a propósito: repetir aquí la fórmula del handler haría que el test pasara aunque la fórmula
+    /// cambiara, que es justo lo que un test de normalización no puede permitirse.
+    /// </summary>
+    private static DateTime EndOfDay(int year, int month, int day)
+        => new DateTime(year, month, day, 23, 59, 59, DateTimeKind.Utc).AddTicks(TimeSpan.TicksPerSecond - 1);
 
     #region Happy Path
 
@@ -256,18 +293,21 @@ public class GetOnlineOrdersQueryHandlerTests
             Times.Once);
     }
 
+    /// <summary>
+    /// Un rango con los dos extremos puestos se reenvía NORMALIZADO a los días que representan (D2).
+    /// Antes se comparaba contra el `to` literal; ese `23:59:59` era un accidente del dato de test,
+    /// no un contrato: el navegador manda `"2026-10-07"` y esa hora nunca llega.
+    /// </summary>
     [Fact]
-    public async Task Handle_WithADateRange_ShouldForwardBothEnds()
+    public async Task Handle_WithADateRange_ShouldForwardBothEndsAsWholeDays()
     {
         DateTime from = new(2026, 10, 1, 0, 0, 0, DateTimeKind.Utc);
         DateTime to = new(2026, 10, 7, 23, 59, 59, DateTimeKind.Utc);
 
-        await Handler().Handle(new GetOnlineOrdersQuery(From: from, To: to), CancellationToken.None);
+        OrderListFilter filter = await CaptureFilter(new GetOnlineOrdersQuery(From: from, To: to));
 
-        _orderRepository.Verify(
-            x => x.GetPagedByStoreIdAsync(
-                _storeId, It.Is<OrderListFilter>(f => f.From == from && f.To == to), It.IsAny<int>(), It.IsAny<int>()),
-            Times.Once);
+        filter.From.Should().Be(from);
+        filter.To.Should().Be(EndOfDay(2026, 10, 7));
     }
 
     /// <summary>
@@ -334,10 +374,242 @@ public class GetOnlineOrdersQueryHandlerTests
                     && f.DeliveryType == OrderDeliveryType.Delivery
                     && f.DriverId == driverId
                     && f.From == new DateTime(2026, 10, 1, 0, 0, 0, DateTimeKind.Utc)
-                    && f.To == new DateTime(2026, 10, 7, 23, 59, 59, DateTimeKind.Utc)
+                    && f.To == EndOfDay(2026, 10, 7)
                     && f.Search == "+34611"),
                 It.IsAny<int>(), It.IsAny<int>()),
             Times.Once);
+    }
+
+    /// <summary>
+    /// El caso que fallaba: `from = to` sobre el MISMO día. Es lo que produce la vista cuando se
+    /// eligen "hoy" en los dos campos, y sin normalizar el rango valía `[00:00:00, 00:00:00]` — una
+    /// ventana de cero ticks que no contiene ni un pedido hecho después de medianoche.
+    ///
+    /// Se afirma el extremo exacto Y que un pedido de las 22:30 de ese día cabe, porque el
+    /// predicado del repositorio es un `<=` sobre ese valor: es la única forma de que el test
+    /// falle si el extremo superior vuelve a ser la medianoche.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WithFromAndToOnTheSameDay_ShouldCoverThatWholeDay()
+    {
+        DateTime day = new(2026, 10, 7, 0, 0, 0, DateTimeKind.Utc);
+
+        OrderListFilter filter = await CaptureFilter(new GetOnlineOrdersQuery(From: day, To: day));
+
+        filter.From.Should().Be(day);
+        filter.To.Should().Be(EndOfDay(2026, 10, 7));
+
+        DateTime orderPlacedLateInTheDay = new(2026, 10, 7, 22, 30, 0, DateTimeKind.Utc);
+        (orderPlacedLateInTheDay <= filter.To).Should().BeTrue(
+            "un pedido de las 22:30 del día pedido tiene que entrar en el rango de ese día");
+    }
+
+    /// <summary>
+    /// Un rango de días DISTINTOS no se estrecha: el último día entra entero y el día siguiente
+    /// sigue fuera. Es el control que distingue "normalizar" de "cambiar el filtro": si el extremo
+    /// superior se normalizara al día siguiente entero, aparecería un día de pedidos que nadie
+    /// pidió.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WithARangeAcrossDifferentDays_ShouldStopAtTheEndOfTheLastOne()
+    {
+        OrderListFilter filter = await CaptureFilter(new GetOnlineOrdersQuery(
+            From: new DateTime(2026, 10, 1, 0, 0, 0, DateTimeKind.Utc),
+            To: new DateTime(2026, 10, 7, 0, 0, 0, DateTimeKind.Utc)));
+
+        filter.From.Should().Be(new DateTime(2026, 10, 1, 0, 0, 0, DateTimeKind.Utc));
+        filter.To.Should().Be(EndOfDay(2026, 10, 7));
+
+        // Los cuatro lados del rango, con los dos predicados del repositorio (`>=` y `<=`).
+        (new DateTime(2026, 10, 1, 9, 0, 0, DateTimeKind.Utc) >= filter.From).Should().BeTrue();
+        (new DateTime(2026, 10, 4, 12, 0, 0, DateTimeKind.Utc) >= filter.From).Should().BeTrue();
+        (new DateTime(2026, 10, 7, 23, 30, 0, DateTimeKind.Utc) <= filter.To).Should().BeTrue();
+        (new DateTime(2026, 10, 8, 0, 0, 0, DateTimeKind.Utc) <= filter.To).Should().BeFalse();
+        (new DateTime(2026, 9, 30, 23, 59, 59, DateTimeKind.Utc) >= filter.From).Should().BeFalse();
+    }
+
+    /// <summary>
+    /// El extremo INFERIOR se clava a las 00:00 de su día aunque venga con hora: "desde el 1" es el
+    /// día 1 entero, no el día 1 a partir de la hora que marcara el reloj del navegador. Con la
+    /// hora a medias, el primer día del rango perdía los pedidos de la mañana sin que nada lo
+    /// pidiera.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WithAClockTimeOnTheFromBound_ShouldClampItToTheStartOfThatDay()
+    {
+        OrderListFilter filter = await CaptureFilter(new GetOnlineOrdersQuery(
+            From: new DateTime(2026, 10, 1, 14, 30, 0, DateTimeKind.Utc)));
+
+        filter.From.Should().Be(new DateTime(2026, 10, 1, 0, 0, 0, DateTimeKind.Utc));
+        (new DateTime(2026, 10, 1, 9, 0, 0, DateTimeKind.Utc) >= filter.From).Should().BeTrue(
+            "el primer día del rango entra desde su medianoche");
+    }
+
+    /// <summary>
+    /// El extremo SUPERIOR también se ensancha: "hasta el 7" incluye el 7 entero. Normalizar solo el
+    /// inferior dejaría la mitad del bug —el día elegido saldría a medias— y una aserción que solo
+    /// mirara `From` no lo vería.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WithAClockTimeOnTheToBound_ShouldWidenItToTheEndOfThatDay()
+    {
+        OrderListFilter filter = await CaptureFilter(new GetOnlineOrdersQuery(
+            To: new DateTime(2026, 10, 7, 9, 15, 0, DateTimeKind.Utc)));
+
+        filter.To.Should().Be(EndOfDay(2026, 10, 7));
+        (new DateTime(2026, 10, 7, 20, 0, 0, DateTimeKind.Utc) <= filter.To).Should().BeTrue();
+    }
+
+    /// <summary>
+    /// Normalizar NO es rellenar: un filtro sin usar sigue sin usarse. Si el handler fabricara un
+    /// extremo para el lado que no se pidió, "pedidos de este mes" se volvería "pedidos hasta el
+    /// principio de la eternidad" — o, peor, "pedidos desde el año 1", que para PostgreSQL es un
+    /// rango que ni se puede indexar.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WithOnlyAFromBound_ShouldNotInventAnUpperBound()
+    {
+        OrderListFilter filter = await CaptureFilter(new GetOnlineOrdersQuery(
+            From: new DateTime(2026, 10, 1, 0, 0, 0, DateTimeKind.Utc)));
+
+        filter.To.Should().BeNull();
+    }
+
+    /// El otro lado: normalizar el extremo superior no autoriza a fabricar el inferior. Un
+    /// `?to=` sin `?from=` significa "hasta el 7", no "desde el 1 de enero del año 1".
+    /// </summary>
+    [Fact]
+    public async Task Handle_WithOnlyAToBound_ShouldNotInventALowerBound()
+    {
+        OrderListFilter filter = await CaptureFilter(new GetOnlineOrdersQuery(
+            To: new DateTime(2026, 10, 7, 0, 0, 0, DateTimeKind.Utc)));
+
+        filter.From.Should().BeNull();
+    }
+
+    /// <summary>
+    /// El último día representable no se puede "pasar al día siguiente": <c>9999-12-31</c>.Date
+    /// <c>AddDays(1)</c> lanza <see cref="ArgumentOutOfRangeException"/>, así que un
+    /// <c>?to=9999-12-31</c> —una URL perfectamente válida— devolvería un 500 por la aritmética de
+    /// un día. Se queda en el último tick del rango en vez de reventar.
+    ///
+    /// Contexto propio (no usa <see cref="CaptureFilter"/>) porque además del filtro filtrado hace
+    /// falta comprobar que el handler no lanzó: el fallo sería una excepción, no un valor.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WithTheLastRepresentableDayAsTo_ShouldNotOverflowPastDateTimeMaxValue()
+    {
+        OrderListFilter? captured = null;
+        _orderRepository
+            .Setup(x => x.GetPagedByStoreIdAsync(It.IsAny<Guid>(), It.IsAny<OrderListFilter>(), It.IsAny<int>(), It.IsAny<int>()))
+            .Callback<Guid, OrderListFilter, int, int>((storeId, filter, skip, take) => captured = filter)
+            .ReturnsAsync(new PagedOrders(new List<Order>(), 0));
+
+        var result = await Handler().Handle(
+            new GetOnlineOrdersQuery(To: DateTime.MaxValue), CancellationToken.None);
+
+        result.Succeeded.Should().BeTrue();
+        captured.Should().NotBeNull();
+        captured!.To.Should().Be(DateTime.MaxValue);
+    }
+
+    #endregion
+
+    #region The List Query Has To Load The Driver (D1)
+
+    /// <summary>
+    /// <c>OrderRepository</c> REAL sobre <c>InMemory</c> con la sesión de la tienda, sembrado con
+    /// los pedidos dados. Es lo que separa "el mapeo funciona" de "el dato llega cargado".
+    ///
+    /// El resto de esta clase mete un `Mock<IOrderRepository>` que devuelve pedidos con `Driver` ya
+    /// puesto: eso ENSEÑA un mundo que la base nunca produce. <see cref="ApplicationDbContext"/> es
+    /// `NoTracking` global y el modelo no tiene ningún `AutoInclude`, así que la navegación llega
+    /// null salvo que la consulta la pida — y `DriverName` sale null para TODOS los pedidos aunque el
+    /// selector de la vista tenga repartidor elegido. Ningún test con mocks puede ver eso.
+    ///
+    /// Nota de alcance: `InMemory` prueba que el `Include` está en la consulta, no el `LEFT JOIN`
+    /// que genera Npgsql. Lo que demuestra el SQL real es la suite E2E, fuera del alcance de esta
+    /// feature.
+    /// </summary>
+    private static (ApplicationDbContext Db, OrderRepository Repository) RepositoryOver(
+        Guid tenantId, params Order[] orders)
+    {
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+
+        var session = new Mock<IHttpContextService>();
+        session.Setup(x => x.TenantId).Returns(tenantId.ToString());
+        session.Setup(x => x.UserExternalId).Returns(Guid.NewGuid().ToString());
+
+        var db = new ApplicationDbContext(
+            options, new TenantIdProvider(new HttpContextAccessor()), session.Object);
+
+        db.Set<DeliveryDriver>().AddRange(orders.Select(o => o.Driver).OfType<DeliveryDriver>());
+        db.Set<Order>().AddRange(orders);
+        db.SaveChanges();
+
+        return (db, new OrderRepository(db));
+    }
+
+    /// <summary>Un pedido de esta tienda y de este tenant: los dos los pone el filtro global.</summary>
+    private Order OrderOfThisStore(Guid tenantId)
+    {
+        Order order = Order();
+        order.StoreId = _storeId;
+        order.TenantId = tenantId;
+        return order;
+    }
+
+    private GetOnlineOrdersQueryHandler HandlerOver(OrderRepository repository)
+        => new(_httpContextService.Object, repository, _localizer.Object);
+
+    /// <summary>
+    /// El defecto D1 de punta a punta: la fila SÍ tiene repartidor en la base, el repositorio la
+    /// devuelve, y el nombre tiene que llegar al DTO. Si la lista no carga la navegación, esto falla
+    /// con <c>DriverName</c> null mientras <c>DriverId</c> sí trae el id — el desajuste exacto que ve
+    /// la vista.
+    /// </summary>
+    [Fact]
+    public async Task Handle_OverTheRealRepository_ShouldCarryTheDriverNameLoadedByTheQuery()
+    {
+        Guid tenantId = Guid.NewGuid();
+        DeliveryDriver driver = DeliveryDriver.Create(_storeId, "Ana", "+34600000000", tenantId);
+        Order order = OrderOfThisStore(tenantId);
+        order.DriverId = driver.Id;
+        order.Driver = driver;
+
+        var (db, repository) = RepositoryOver(tenantId, order);
+
+        var result = await HandlerOver(repository).Handle(new GetOnlineOrdersQuery(), CancellationToken.None);
+
+        OnlineOrderListItemDto item = result.Data!.Items.Should().ContainSingle().Which;
+        item.DriverId.Should().Be(driver.Id);
+        item.DriverName.Should().Be("Ana");
+
+        db.Dispose();
+    }
+
+    /// <summary>
+    /// El otro lado de la navegación opcional: un pedido SIN repartidor tiene que salir con el
+    /// nombre null y sin que la consulta se caiga. Si el `Include` se escribiera como si la
+    /// relación fuera obligatoria, este test lo delata.
+    /// </summary>
+    [Fact]
+    public async Task Handle_OverTheRealRepository_WithNoDriverAssigned_ShouldLeaveTheDriverNameNull()
+    {
+        Guid tenantId = Guid.NewGuid();
+        Order order = OrderOfThisStore(tenantId);
+
+        var (db, repository) = RepositoryOver(tenantId, order);
+
+        var result = await HandlerOver(repository).Handle(new GetOnlineOrdersQuery(), CancellationToken.None);
+
+        OnlineOrderListItemDto item = result.Data!.Items.Should().ContainSingle().Which;
+        item.DriverId.Should().BeNull();
+        item.DriverName.Should().BeNull();
+
+        db.Dispose();
     }
 
     #endregion

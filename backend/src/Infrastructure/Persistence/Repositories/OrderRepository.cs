@@ -70,9 +70,11 @@ namespace Infrastructure.Persistence.Repositories
             if (filter.DriverId is { } driverId)
                 query = query.Where(o => o.DriverId == driverId);
 
-            // Ambos extremos son INCLUSIVOS. `To` con la hora 00:00 del día siguiente excluiría los
-            // pedidos hechos ese mismo día, y el filtro por rango es el que la vista usa para
-            // "hoy" y "esta semana".
+            // Ambos extremos son INCLUSIVOS y llegan YA NORMALIZADOS a día completo por el handler
+            // (`NormalizeFrom`/`NormalizeTo`): `To` es el último tick del día que se eligió, así que
+            // "hoy" y "esta semana" —los dos rangos que usa la vista— incluyen ese día entero. Este
+            // repositorio NO vuelve a normalizar: si lo hiciera, el filtro registrado y el filtro
+            // ejecutado dejarían de ser el mismo, que es justo lo que el test del handler comprueba.
             if (filter.From is { } from)
                 query = query.Where(o => o.Date >= from);
 
@@ -90,9 +92,19 @@ namespace Infrastructure.Persistence.Repositories
             // `Total` se cuenta ANTES del `Skip`/`Take` sobre la misma consulta ya filtrada: es el
             // número de pedidos que cumplen los filtros en toda la tienda, que es lo que la vista
             // necesita para pintar "página 3 de 12".
+            //
+            // El `Include` del repartidor va AQUÍ y no en la consulta de arriba a propósito: cargarlo
+            // también en el `Count` añadiría su `LEFT JOIN` a la consulta que más filas cuenta sin
+            // usar ninguna columna suya.
             int total = await query.CountAsync();
 
+            // El repartidor se carga para el LISTADO porque el DTO lleva su nombre, y porque el
+            // contexto es `NoTracking` por omisión (`ApplicationDbContext`) sin ningún `AutoInclude`
+            // en el modelo: sin este `Include`, `order.Driver` llega null y TODOS los pedidos salen
+            // "sin repartidor" aunque su `DriverId` venga puesto. El nombre no se puede rellenar
+            // después —`DriverId` es solo la llave— y el mapeo (`order.Driver?.Name`) no lo inventa.
             List<Order> items = await query
+                .Include(o => o.Driver)
                 .OrderByDescending(o => o.Date)
                 .ThenByDescending(o => o.Id)
                 .Skip(skip)

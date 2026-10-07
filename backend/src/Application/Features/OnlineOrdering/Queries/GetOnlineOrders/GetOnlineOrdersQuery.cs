@@ -90,8 +90,8 @@ namespace Application.Features.OnlineOrdering.Queries.GetOnlineOrders
                     query.PaymentStatus,
                     query.DeliveryType,
                     query.DriverId,
-                    query.From,
-                    query.To,
+                    NormalizeFrom(query.From),
+                    NormalizeTo(query.To),
                     NormalizeSearch(query.Search)),
                 (page - 1) * pageSize,
                 pageSize);
@@ -115,6 +115,43 @@ namespace Application.Features.OnlineOrdering.Queries.GetOnlineOrders
             => pageSize < 1 ? OnlineOrderPaging.DefaultPageSize
                 : pageSize > OnlineOrderPaging.MaxPageSize ? OnlineOrderPaging.MaxPageSize
                 : pageSize;
+
+        /// <summary>
+        /// Los dos extremos del rango son DÍAS, no instantes, y el filtro por rango es el que la
+        /// vista usa para "hoy" y "esta semana". `<input type="date">` manda `"2026-10-07"`, el
+        /// binder lo aterriza en <c>2026-10-07 00:00:00</c>, y reenviarlo tal cual deja el extremo
+        /// SUPERIOR en la medianoche que ARRANCA el día elegido: `from = to` produce una ventana
+        /// de cero ticks y "los pedidos del 7" sale vacío salvo el pedido exacto de medianoche.
+        ///
+        /// Por eso se normaliza AQUÍ y no en el repositorio: el filtro que el handler construye es
+        /// el que se ejecuta, y una aritmética de fechas repartida en dos capas es imposible de
+        /// comprobar desde un test de una de ellas. El repositorio conserva sus `<=`/`>=`: lo que
+        /// llega ya es el intervalo que la persona pidió, cerrado y con los dos días dentro.
+        ///
+        /// `null` se devuelve intacto en los dos lados: normalizar NO es rellenar, y un `?from=` sin
+        /// `?to=` tiene que seguir siendo "sin límite superior", no "hasta el final del tiempo".
+        /// </summary>
+        private static DateTime? NormalizeFrom(DateTime? from)
+            => from?.Date;
+
+        /// <inheritdoc cref="NormalizeFrom"/>
+        /// <remarks>
+        /// El último tick del día y no las 23:59:59 porque <c>Order.Date</c> es un
+        /// <c>timestamp</c> de PostgreSQL, que guarda microsegundos: con segundos enteros,
+        /// <c>23:59:59.500</c> quedaría fuera de un rango que la persona eligió completo.
+        ///
+        /// <c>9999-12-31</c> no tiene "día siguiente" y <see cref="DateTime.AddDays(int)"/> lanza
+        /// <see cref="ArgumentOutOfRangeException"/>; un <c>?to=9999-12-31</c> es una URL válida,
+        /// así que ahí el extremo se queda donde ya estaba en vez de devolver un 500.
+        /// </remarks>
+        private static DateTime? NormalizeTo(DateTime? to)
+        {
+            if (to is not { } value)
+                return null;
+
+            DateTime day = value.Date;
+            return day == DateTime.MaxValue.Date ? DateTime.MaxValue : day.AddDays(1).AddTicks(-1);
+        }
 
         /// <summary>
         /// Limpia el texto de búsqueda y convierte un campo en blanco en "no filtrar". Sin esto, un
