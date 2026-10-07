@@ -133,8 +133,12 @@ test.describe.serial('Catálogo Web (módulo 18) — publicar el catálogo local
     // Retenida, no subida: todavía no hay ninguna <img> del producto.
     await expect(page.locator(`img[alt="${productName}"]`)).toHaveCount(0);
 
+    // El guardado es por lotes (decisión del owner, 2026-10-01): no hay un "Guardar" por
+    // producto, hay UN "Guardar cambios" al final de la página, y su aviso de éxito es el
+    // del lote ("Se guardó 1 producto en el catálogo"), no el antiguo aviso por producto
+    // ("Producto guardado en el catálogo"), que ya no emite ninguna rama del código.
     await page.getByRole('button', { name: 'Guardar' }).click();
-    await expect(page.getByText('Producto guardado en el catálogo')).toBeVisible();
+    await expect(page.getByText('Se guardó 1 producto en el catálogo')).toBeVisible();
     // Tras el guardado la imagen es la principal y la ÚNICA (la galería está comentada).
     const editorImage = page.locator(`img[alt="${productName}"]`);
     await expect(editorImage).toHaveCount(1);

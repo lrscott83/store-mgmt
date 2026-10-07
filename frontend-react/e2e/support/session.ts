@@ -219,6 +219,27 @@ export async function createStoreUserViaUi(ownerPage: Page, identity: TestIdenti
 }
 
 /**
+ * Copy of the register-failure dialog (`es.ts:193`) — the app's own, unambiguous
+ * signal that `POST /v1/auth/register` failed. Reproduced under contention as
+ * `net::ERR_ABORTED` with this exact dialog visible on `/register`. Matching the
+ * app's text (not the network) keeps the check independent of how the request
+ * dies: abort, 5xx or timeout, the app funnels all of them into this dialog.
+ */
+const REGISTER_ERROR_DIALOG_TEXT = 'Ocurrió un error inesperado en la creación de la cuenta';
+
+/**
+ * Cap for both racers inside the mint (ficha 02, 2026-10-06). 30 s mirrors
+ * `actionTimeout` and keeps two attempts inside the 120 s test budget; the
+ * slowest legitimate post-register navigation measured 26.7 s under 8-worker
+ * contention. Without a cap this wait is INFINITE: `waitForURL` reads
+ * `navigationTimeout`, whose runner default is 0.
+ */
+const MINT_NAVIGATION_TIMEOUT = 30_000;
+
+/** Registration attempts before the mint gives up with a named error. */
+const MAX_MINT_ATTEMPTS = 2;
+
+/**
  * Mints (or reuses a primed) `owner-admin` snapshot. Called at most once per
  * worker — the caller (`createPersonaCache`) memoizes the returned promise.
  *
@@ -241,29 +262,66 @@ async function mintOwnerAdmin(
   // Fallback: one real registration, which now OPENS the session by itself
   // (auto-login, 2026-09-28) — keeps this engine self-sufficient for a future
   // consumer that never primes it.
-  const context = await browser.newContext();
-  const page = await context.newPage();
+  //
+  // Bounded + self-healing (ficha 02, 2026-10-06): under suite contention the
+  // register POST can die in the network (reproduced: `POST /v1/auth/register`
+  // → net::ERR_ABORTED) — the app then shows its "Ocurrió un error inesperado
+  // en la creación de la cuenta" dialog (es.ts:193) and stays on `/register`,
+  // so a bare `waitForURL(/\/sales\/products$/)` waits forever for a navigation
+  // that never comes (navigationTimeout defaults to 0 = infinite) and the whole
+  // 120 s test budget burns inside "while setting up signedInPage". Now:
+  //   (a) the navigation and the app's OWN error dialog race with explicit 30 s
+  //       caps, so a dead register is detected in seconds, not 120;
+  //   (b) a failed attempt discards its context and retries ONCE with a fresh
+  //       identity (a register POST, not one of the 4-budget real logins);
+  //   (c) exhausting both attempts throws a NAMED error stating the last
+  //       outcome, instead of dying silently in the global test timeout.
+  let lastOutcome = 'no attempt ran';
+  for (let attempt = 1; attempt <= MAX_MINT_ATTEMPTS; attempt++) {
+    const ownerIdentity = newTestIdentity();
+    const context = await browser.newContext();
+    try {
+      const page = await context.newPage();
+      const registerPage = new RegisterPage(page);
+      await registerPage.goto();
+      await registerPage.fillValidForm(ownerIdentity);
+      await registerPage.acceptTerms.check();
 
-  const ownerIdentity = newTestIdentity();
-  const registerPage = new RegisterPage(page);
-  await registerPage.goto();
-  await registerPage.fillValidForm(ownerIdentity);
-  await registerPage.acceptTerms.check();
-  await registerPage.submit();
-  // No login leg: the registration lands the new owner on /sales/products with
-  // the session already open.
-  await page.waitForURL(/\/sales\/products$/);
+      // Both waiters are created BEFORE the click so neither can miss a fast
+      // failure, and both swallow their own timeout into a value, so the losing
+      // side of the race can never surface as an unhandled rejection.
+      const navigated = page
+        .waitForURL(/\/sales\/products$/, { timeout: MINT_NAVIGATION_TIMEOUT })
+        .then(() => 'ok', () => 'navigation-timeout');
+      const registerRejected = page
+        .getByText(REGISTER_ERROR_DIALOG_TEXT)
+        .waitFor({ state: 'visible', timeout: MINT_NAVIGATION_TIMEOUT })
+        .then(() => 'error-dialog', () => 'no-error-dialog');
 
-  const ownerStoreId = await readSelectedStoreId(page);
-  const snapshot = await captureSnapshot(
-    context,
-    page,
-    ownerIdentity,
-    ownerStoreId,
-    '/sales/products',
+      await registerPage.submit();
+      // No login leg: a successful registration lands the new owner on
+      // /sales/products with the session already open — see the race above for
+      // what happens when it fails instead.
+      const outcome = await Promise.race([navigated, registerRejected]);
+      lastOutcome = outcome;
+      if (outcome !== 'ok') {
+        continue;
+      }
+
+      const ownerStoreId = await readSelectedStoreId(page);
+      return await captureSnapshot(context, page, ownerIdentity, ownerStoreId, '/sales/products');
+    } catch (error) {
+      lastOutcome = error instanceof Error ? error.message : String(error);
+    } finally {
+      await context.close().catch(() => {});
+    }
+  }
+  throw new Error(
+    `[mint:owner-admin] the owner-admin registration never reached /sales/products after ` +
+      `${MAX_MINT_ATTEMPTS} attempts (last outcome: ${lastOutcome}). Under suite contention ` +
+      `this is the ficha-02 failure: POST /v1/auth/register aborted or the navigation never ` +
+      `arrived. Check backend :5019 and dev-server load before blaming the spec.`,
   );
-  await context.close();
-  return snapshot;
 }
 
 /**

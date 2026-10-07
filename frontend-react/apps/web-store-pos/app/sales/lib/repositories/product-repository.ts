@@ -4,6 +4,10 @@ import { StorageKeys } from '~/shared/lib/storage/storage-keys';
 import { getCurrentUserLogin } from '~/shared/lib/auth/current-user';
 import { encryptEntity, decryptEntity } from '~/shared/lib/storage/entity-crypto';
 import { readEntityOrThrow } from '~/shared/lib/storage/read-entity-or-throw';
+import {
+  notifyDataChanged,
+  useDataRevisionStore,
+} from '~/shared/lib/stores/data-revision-store';
 import { ProductCategoryRepository } from './product-category-repository';
 
 function generateId(): string {
@@ -32,6 +36,17 @@ export class ProductRepository {
 
   private products: Map<string, Product> | null = null;
   private lastProductsKey: string | undefined;
+  /**
+   * Global data revision at the moment `products` was loaded from storage. A HIGHER current
+   * revision means another instance mutated store-local data (a CSV import, another screen's
+   * edit) and this snapshot is stale, so it must be re-read — hence the `>` comparison and
+   * not `!==`: the instance that just wrote stamps this with the revision its own pending
+   * notice will produce, which is already AHEAD of the current revision, so `!==` would call
+   * the writer's own in-memory map stale and re-decrypt what it just persisted. `?? -1`
+   * makes "never stamped" always stale, forcing the first read. Read imperatively from the
+   * zustand store — a repository must not subscribe to it.
+   */
+  private productsRevision: number | undefined;
 
   constructor(
     private readonly storeId: string,
@@ -55,12 +70,15 @@ export class ProductRepository {
 
   /** 1:1 port of Angular `getStorageProductsMap` (product.repository.ts:36-40). */
   getStorageProductsMap(): Map<string, Product> {
+    const revision = useDataRevisionStore.getState().revision;
     if (
       !this.products ||
       this.products.size === 0 ||
-      this.getCurrentStorageKey() !== this.lastProductsKey
+      this.getCurrentStorageKey() !== this.lastProductsKey ||
+      revision > (this.productsRevision ?? -1)
     ) {
       this.products = this.getProductsFromLocalStorage();
+      this.productsRevision = revision;
     }
     return this.products;
   }
@@ -474,10 +492,30 @@ export class ProductRepository {
    * Private port of Angular `setProductsLocalStorage` (product.repository.ts:287-290) —
    * Map-entries write. At-rest encryption seam: encrypted immediately after
    * `JSON.stringify`, before `setItem`.
+   *
+   * This is the ONLY `localStorage.setItem` in this class, so every write passes through
+   * here: create, update, soft-delete, the whole-map replace (`updateProducts`), the
+   * `setInitProducts` seed and both CSV-import paths — plus the auto-init on a cold read.
+   * Notifying at this door is what makes "a write cannot happen without a notice"
+   * structural instead of a rule each mutation has to remember. Coalesced: a CSV import of
+   * N products costs ONE notice, not N.
+   *
+   * Stamping with the returned revision keeps THIS instance from re-reading the map it just
+   * persisted — it is already the truth in memory, and a storage round-trip would revive no
+   * dates at all (`createdDate` comes back as the string it was stored as) — while every
+   * other instance still carries the previous stamp and reloads.
+   *
+   * `initializing` is the ONE case that does not notify: seeding a genuinely empty store is
+   * not a change to data that anyone could be holding a stale photo of — there was nothing
+   * there. Notifying would bump the revision, invalidate the very map the auto-init just
+   * filled, and make the next read decrypt the whole entity again, on every cold instance
+   * of every service.
    */
-  private setProductsLocalStorage(products: Map<string, Product>): void {
+  private setProductsLocalStorage(products: Map<string, Product>, initializing = false): void {
     const productMapJson = JSON.stringify(Array.from(products.entries()));
     localStorage.setItem(this.getStorageKey(), encryptEntity(productMapJson));
+    if (initializing) return;
+    this.productsRevision = notifyDataChanged();
   }
 
   /** Private port of Angular `getStorageKey` (product.repository.ts:292-295) — records the last-used key. */
@@ -509,7 +547,7 @@ export class ProductRepository {
     if (stored) return stored;
 
     const products = new Map<string, Product>();
-    this.setProductsLocalStorage(products);
+    this.setProductsLocalStorage(products, true);
     return products;
   }
 }

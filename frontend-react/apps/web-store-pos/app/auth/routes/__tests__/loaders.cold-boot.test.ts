@@ -39,7 +39,15 @@ function makeUser(overrides: Partial<UserModel> = {}): UserModel {
   };
 }
 
-describe('Cold-boot session restoration (real auth-store + authLoader)', () => {
+// `vi.resetModules()` (beforeEach) plus the cold dynamic `await import('../loaders')`
+// re-evaluates this loader's whole module graph INSIDE the test body, and vitest only
+// times test BODIES. Under full parallel load that overruns the default 5s testTimeout
+// and fails with a bare "Test timed out in 5000ms" — a clock kill, not a failed
+// assertion, so the red result says nothing about the redirect behaviour. The dynamic
+// import is mandatory here (it is what reproduces a true cold page load), so unlike
+// sync-routes.test.tsx this cannot move into the untimed collect phase; the budget is
+// raised instead. Same remedy and same 10s figure as that file.
+describe('Cold-boot session restoration (real auth-store + authLoader)', { timeout: 10_000 }, () => {
   beforeEach(() => {
     localStorage.clear();
     vi.resetModules();

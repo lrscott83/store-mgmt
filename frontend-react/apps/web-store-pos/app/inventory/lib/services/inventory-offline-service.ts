@@ -26,6 +26,10 @@ import {
 } from '~/sales/lib/product-availability';
 import { getCurrentUserLogin } from '~/shared/lib/auth/current-user';
 import { approxEqual, round2 } from '~/shared/lib/money';
+import {
+  notifyDataChanged,
+  useDataRevisionStore,
+} from '~/shared/lib/stores/data-revision-store';
 
 /**
  * Optional eligibility context for {@link InventoryOfflineService.getAvailableInventoryCosts}.
@@ -129,6 +133,18 @@ function generateId(): string {
 export class InventoryOfflineService {
   private inventories: Map<string, InventoryEntry[]> | null = null;
   private lastInventoriesKey: string | undefined;
+  /**
+   * Global data revision at the moment `inventories` was loaded from storage. A HIGHER
+   * current revision means another instance mutated store-local data (e.g.
+   * `OrderOfflineService` deducted stock) and this snapshot is stale, so it must be
+   * re-read — hence the `>` comparison and not `!==`: the instance that just wrote stamps
+   * this with the revision its own pending notice will produce, which is already AHEAD of
+   * the current revision, so `!==` would call the writer's own in-memory map stale and
+   * re-decrypt what it just persisted. `?? -1` makes "never stamped" always stale, forcing
+   * the first read. Read imperatively from the zustand store — a service must not
+   * subscribe to it.
+   */
+  private inventoriesRevision: number | undefined;
 
   /**
    * Mirrors Angular's `InventoryOfflineService` constructor DI
@@ -184,12 +200,15 @@ export class InventoryOfflineService {
    */
   getStorageInventoriesMap(): Map<string, InventoryEntry[]> {
     const storageKey = this.getCurrentStorageKey();
+    const revision = useDataRevisionStore.getState().revision;
     if (
       !this.inventories ||
       this.inventories.size === 0 ||
-      storageKey !== this.lastInventoriesKey
+      storageKey !== this.lastInventoriesKey ||
+      revision > (this.inventoriesRevision ?? -1)
     ) {
       this.inventories = this.getInventoriesFromLocalStorage();
+      this.inventoriesRevision = revision;
     }
     return this.inventories;
   }
@@ -1065,15 +1084,39 @@ export class InventoryOfflineService {
   // ─── Inline persistence (rule 12 — no InventoryRepository correlate in Angular) ──────────
 
   /**
-   * 1:1 port of Angular's `setInventoriesLocalStorage` (inventory-offline.service.ts:526-529).
+   * Private port of Angular `setInventoriesLocalStorage` (inventory-offline.service.ts:526-529).
    * At-rest encryption seam: encrypted immediately after `JSON.stringify`, before
    * `setItem`.
+   *
+   * This is the ONLY `localStorage.setItem` in this class, so every write passes through
+   * here: the FIFO deduction (`getAvailableInventoryCosts`, `updateAvailableInventories`),
+   * the restock by order items, entry create/update/soft-delete/move, the warehouse-origin
+   * marks and both CSV-import paths — plus the auto-init on a cold read. Notifying at this
+   * door is what makes "a write cannot happen without a notice" structural instead of a
+   * rule each mutation has to remember. Coalesced: a 500-row import, or one sale touching
+   * several entries, costs ONE notice, not N.
+   *
+   * Stamping with the returned revision keeps THIS instance from re-reading (and
+   * re-decrypting) the map it just persisted — the mutated map in memory IS the truth,
+   * and a storage round-trip would normalise `createdDate` back to the string it was stored
+   * as — while every OTHER instance still carries the previous stamp and reloads.
+   *
+   * `initializing` is the ONE case that does not notify: seeding a genuinely empty store is
+   * not a change to data that anyone could be holding a stale photo of — there was nothing
+   * there. Notifying would bump the revision, invalidate the very map the auto-init just
+   * filled, and make the next read decrypt the whole entity again, on every cold instance
+   * of every service (measured: it took the suite from 183s to 352s).
    */
-  private setInventoriesLocalStorage(inventories: Map<string, InventoryEntry[]>): void {
+  private setInventoriesLocalStorage(
+    inventories: Map<string, InventoryEntry[]>,
+    initializing = false,
+  ): void {
     localStorage.setItem(
       this.getStorageKey(),
       encryptEntity(JSON.stringify(Array.from(inventories.entries()))),
     );
+    if (initializing) return;
+    this.inventoriesRevision = notifyDataChanged();
   }
 
   /**
@@ -1137,7 +1180,7 @@ export class InventoryOfflineService {
     }
 
     const inventories = new Map<string, InventoryEntry[]>();
-    this.setInventoriesLocalStorage(inventories);
+    this.setInventoriesLocalStorage(inventories, true);
     return inventories;
   }
 }

@@ -35,6 +35,20 @@ import { E2E_API_URL } from './support/backend-url';
  * store). Billing reads `FilterForBilling` only trims on Vencido; the seeded
  * store stays AlDia, so 14 survives /me's billing filter.
  *
+ * SETUP — REALIGN (ficha 03, root cause confirmed 2026-10-06): `SelectedStoreId`
+ * is PERSISTED server-side (`SwitchMyStoreCommand.cs:98`) and `/me` answers with
+ * the modules of THAT store (`GetMeQuery.cs:103`) — not with the ones of the
+ * snapshot this spec seeds. A store created through the UI is born on the Pago
+ * plan, whose catalog excludes MultiStores (14) (`CreateStoreCommand` clamps the
+ * inherited set), so a worker whose persona was left selected on such a store
+ * would seed module 14 into a store nobody is looking at: `storeModuleIds` stays
+ * without 14, `my-stores.tsx:37` never renders the create button and the click
+ * burns the whole test timeout (the 2026-10-05 flake). Each test re-aims the
+ * server-side selection at the persona store first — the same realign the
+ * neighbouring spec has applied since 2026-09-26
+ * (`store-switch-back-logout.spec.ts`'s `realignBackendSelectedStore`); it is a
+ * no-op when the selection already matches.
+ *
  * NEVER touches existing specs (CLAUDE.md E2E rule) — brand-new file. Direct-DB
  * reads/writes follow owner-store-create.spec.ts / store-fixture.ts patterns.
  */
@@ -76,6 +90,28 @@ async function seedMultiStoresModule(storeId: string): Promise<void> {
       [storeId, MODULE_MULTISTORES],
     );
   });
+}
+
+/**
+ * Re-aims the SERVER-SIDE selection at the persona's snapshot store, so the
+ * `/me` this setup trusts describes the store this spec seeds (see the SETUP —
+ * REALIGN note in the header). `PUT /v1/stores` is SetMyStoreCommand: it
+ * persists `User.SelectedStoreId` and is a no-op when the selection already
+ * matches. Fails loudly, because a realign that silently did not happen would
+ * resurface as a 120 s click timeout three steps later.
+ */
+async function realignSelectedStore(page: Page, storeId: string): Promise<void> {
+  const token = await readBearerToken(page);
+  const response = await page.request.put(`${E2E_API_URL}/v1/stores`, {
+    headers: { Authorization: `Bearer ${token}` },
+    data: { storeId },
+  });
+  if (!response.ok()) {
+    throw new Error(
+      `realignSelectedStore: PUT /v1/stores failed (${response.status()}) — the persisted ` +
+        "selection could not be re-aimed at the persona's store.",
+    );
+  }
 }
 
 /**
@@ -167,7 +203,12 @@ async function createStoreViaUi(page: Page, name: string): Promise<{ id: string;
 /** Opens the header switcher popup and waits for the CURRENT marker. */
 async function openSwitcherPopup(page: Page): Promise<void> {
   await page.getByRole('button', { name: 'Cambiar tienda' }).click();
-  await expect(page.getByText('Actual')).toBeVisible();
+  // Fija 04 — locator EXACTO (fix 2026-10-06, autorización 1 a 1): sin `exact`
+  // `getByText` hace substring e ignora mayúsculas, así que la marca «Actual»
+  // también casaba con el aviso que el propio test dispara («Tienda actualizada
+  // correctamente.»). Con ambos en el DOM Playwright falla por modo estricto —
+  // intermitente: 1 de 2 corridas en solitario (store-switcher.tsx:169-171).
+  await expect(page.getByText('Actual', { exact: true })).toBeVisible();
 }
 
 test('SWR-1 — a store created this session appears in the header switcher without re-login', async ({
@@ -176,7 +217,9 @@ test('SWR-1 — a store created this session appears in the header switcher with
   const { page, selectedStoreId } = signedInPage;
   await assertStoresFeature(page);
 
-  // SETUP: MultiStores (14) into the persona's selected store + fresh profile.
+  // SETUP: realign the server-side selection at the persona store (no-op when it
+  // already matches), then MultiStores (14) into it + a fresh profile.
+  await realignSelectedStore(page, selectedStoreId);
   await seedMultiStoresModule(selectedStoreId);
   await refreshSessionFromMe(page);
 
@@ -199,7 +242,9 @@ test('SWR-2 — a store deactivated this session disappears from the switcher (c
   const { page, selectedStoreId } = signedInPage;
   await assertStoresFeature(page);
 
-  // SETUP (same as SWR-1 — serial mode, fresh per test).
+  // SETUP (same as SWR-1 — serial mode, fresh per test): realign the persisted
+  // selection, then MultiStores (14) into the persona store + a fresh profile.
+  await realignSelectedStore(page, selectedStoreId);
   await seedMultiStoresModule(selectedStoreId);
   await refreshSessionFromMe(page);
 
@@ -242,7 +287,8 @@ test('SWR-2 — a store deactivated this session disappears from the switcher (c
   ).not.toBeVisible();
 
   // …while the CURRENT store is always offered (never stranded).
-  await expect(page.getByText('Actual')).toBeVisible();
+  // (mismo locator exacto de la fija 04 — ver openSwitcherPopup)
+  await expect(page.getByText('Actual', { exact: true })).toBeVisible();
 });
 
 /** Escapes a name for a RegExp literal (names contain no regex metachars). */

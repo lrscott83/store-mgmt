@@ -233,15 +233,23 @@ test.describe.serial('Ventas Mayoristas — flujo completo', () => {
     await registerButton.click();
     await expect(page.getByText(ORDER_CREATED_TEXT)).toBeVisible();
 
-    // En Ventas del día, el filtro dinámico (2026-09-19) ofrece Transferencia (CUP)
+    // En Ventas del día, el filtro dinámico (2026-09-19) ofrece este método
     // — la única venta del día es esta, así que es la única opción de método.
+    //
+    // El radio se llama "Transferencia" SIN el sufijo de moneda, y es lo correcto:
+    // `today-orders.tsx` pinta `paymentMethodKeyToLabel(key, !multiMonedas)`, así que
+    // cuando la tienda SÍ tiene MultiMonedas (esta persona es del plan Superior, que
+    // incluye el módulo 15) el sufijo "(CUP)" se omite a propósito — la moneda ya la
+    // acota el selector de moneda de la misma pantalla y repetirla sería redundante.
+    // El sufijo solo aparece en tiendas SIN el módulo 15, donde el filtro por método
+    // es la única forma de distinguir monedas.
     await page.goto('/sales/today-orders');
     await expect(page.getByText(TODAY_ORDERS_HEADER)).toBeVisible();
-    await page.getByRole('radio', { name: 'Transferencia (CUP)' }).click();
+    await page.getByRole('radio', { name: 'Transferencia', exact: true }).click();
     const transferSummary = page.getByRole('button', { name: /216/ });
     await expect(transferSummary).toBeVisible();
 
-    // El método quedó persistido: la venta sigue filtrable bajo Transferencia (CUP).
+    // El método quedó persistido: la venta sigue filtrable bajo Transferencia.
     await expect(page.getByText(NO_ORDER_FOUND)).toHaveCount(0);
   });
 
