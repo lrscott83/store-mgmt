@@ -351,4 +351,13 @@ owner.
   Owner aprobó explícitamente modificar producción y la opción 1 (datos de catálogo en la migración
   29). Migración final `20261007021020_Add-StoreCatalogSettings-Drivers-OrderFields` con la fila
   `Feature` 123 vía `HasData` y el backfill de `StoreRoleFeature` por SQL crudo idempotente. Script 29
-  generado; `has-pending-model-changes` limpio. Ver evidencia arriba. Sin commit (entrega = owner).
+  generado; `has-pending-model-changes` limpio. Ver evidencia arriba.
+- 2026-10-07 — **Entrega y revisión nativa (RDD, on global)**: el rango F2 completo excedía el
+  presupuesto de un lens (`lens_context_budget_exceeded`; sin autoridad creada), así que se reparticionó
+  en 3 commits por unidad de trabajo con los tests junto a su código:
+  `039f3969` (modelo + persistencia + `CreateOnlineOrderCommand` + tests), `a7f916e9` (migración +
+  seed + script 29) y `ae418b49` (docs). Los dos primeros pasaron la revisión nativa (lens
+  `review-reliability`) **aprobada y acknowledgeada** (autoridad quemada); el de docs es pasivo. La
+  revisión dejó hallazgos **advisory no bloqueantes** (p. ej. ramas del handler sin test: multi-moneda
+  y `DeliveryType` fuera de enum; `UpsertAsync`/repos solo probados con mocks; `Down()` del backfill
+  borra toda fila `FeatureId=123`). Push/PR = decisión del owner.
