@@ -59,7 +59,7 @@ namespace SMCA.WebApi.Controllers.v1
         [HttpPost("~/api/v1/catalog/showcase")]
         [Consumes("multipart/form-data")]
         [ProducesResponseType(typeof(ResponseResult<StoreCatalogImageDto>), StatusCodes.Status200OK)]
-        public async Task<IActionResult> AddImageAsync(StoreCatalogImageKind kind, IFormFile file, string? caption)
+        public async Task<IActionResult> AddImageAsync([FromForm] StoreCatalogImageKind kind, IFormFile file, [FromForm] string? caption)
         {
             // Si el multipart no trae archivo, el binding deja el `IFormFile` en null: el validador lo
             // rechaza y, si llegara al handler, `CatalogImageUploadRules` devolvería el 400 localizado.
