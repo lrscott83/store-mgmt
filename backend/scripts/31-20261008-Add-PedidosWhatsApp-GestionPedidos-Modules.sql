@@ -168,20 +168,30 @@ FROM "Module" WHERE "Id" IN (18, 19, 20) ORDER BY "Id";
 SELECT "Id", "Name", "ModuleId", "Order", "AvailableToStore", "IsActive"
 FROM "Feature" WHERE "Id" IN (122, 123, 124) ORDER BY "Id";
 
--- 4) Paridad seed <-> base: las 3 filas con esos MISMOS valores (debe listar 3). Si sale menos, el
---    seed de HasData no coincide con lo que hay en la base — y con menos filas del script, divergencia
---    silenciosa, que es justo lo que el camino HasData evita.
+-- 4) Paridad seed <-> base: las 4 filas del bloque de catálogo con esos MISMOS valores (debe
+--    listar 4: los módulos 19 y 20, la feature 123 ya movida a 20 y la feature 124). Se comprueba
+--    cada fila por separado (UNION ALL): un JOIN entre "Module" y "Feature" contaría el producto
+--    cartesiano de las dos tablas y no probaría nada. Si sale menos de 4, el seed de HasData no
+--    coincide con lo que hay en la base — divergencia silenciosa, que es justo lo que el camino
+--    HasData evita.
 SELECT COUNT(*) AS catalog_rows_matching_seed
-FROM "Module" m
-JOIN "Feature" f ON TRUE
-WHERE (m."Id" = 19 AND m."Name" = 'Pedidos WhatsApp' AND m."Order" = 150
-       AND m."Price" = 10 AND m."PercentDiscountPrice" = 50 AND m."PriceIncluded" = FALSE
-       AND m."AvailableToStore" = TRUE AND m."IsActive" = TRUE)
-   OR (m."Id" = 20 AND m."Name" = 'Gestión de pedidos' AND m."Order" = 151
-       AND m."Price" = 10 AND m."PercentDiscountPrice" = 50 AND m."PriceIncluded" = FALSE
-       AND m."AvailableToStore" = TRUE AND m."IsActive" = TRUE)
-   OR (f."Id" = 123 AND f."Name" = 'Pedidos online' AND f."ModuleId" = 20 AND f."Order" = 251)
-   OR (f."Id" = 124 AND f."Name" = 'Pedidos WhatsApp' AND f."ModuleId" = 19 AND f."Order" = 252);
+FROM (
+    SELECT 1 FROM "Module"
+    WHERE "Id" = 19 AND "Name" = 'Pedidos WhatsApp' AND "Order" = 150
+      AND "Price" = 10 AND "PercentDiscountPrice" = 50 AND "PriceIncluded" = FALSE
+      AND "AvailableToStore" = TRUE AND "IsActive" = TRUE
+    UNION ALL
+    SELECT 1 FROM "Module"
+    WHERE "Id" = 20 AND "Name" = 'Gestión de pedidos' AND "Order" = 151
+      AND "Price" = 10 AND "PercentDiscountPrice" = 50 AND "PriceIncluded" = FALSE
+      AND "AvailableToStore" = TRUE AND "IsActive" = TRUE
+    UNION ALL
+    SELECT 1 FROM "Feature"
+    WHERE "Id" = 123 AND "Name" = 'Pedidos online' AND "ModuleId" = 20 AND "Order" = 251
+    UNION ALL
+    SELECT 1 FROM "Feature"
+    WHERE "Id" = 124 AND "Name" = 'Pedidos WhatsApp' AND "ModuleId" = 19 AND "Order" = 252
+) AS seed_matches;
 
 -- 5) Los dos módulos a Superior (3) y VIP (4) y SOLO a esos (debe listar 4 filas):
 SELECT "PlanId", "ModuleId" FROM "StorePlanModule"

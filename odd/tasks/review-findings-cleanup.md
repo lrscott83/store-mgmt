@@ -18,9 +18,14 @@ nativa*). Este documento es el **seguimiento** y el mapa de cierre.
 ## Hallazgos por feature
 
 ### Módulos (`modulos-pedidos-whatsapp-gestion.md`)
-- [ ] **M-R3-001** (defecto) — La query de verificación #4 del **script 31** tiene `JOIN "Feature" ON TRUE` (cartesiano): no puede devolver el "3" que documenta. Corregir la query.
-- [ ] **M-R3-002** (test) — La topología (módulos 19/20, feature 124/123→20, `StorePlanModule` 3/4, backfill) no tiene test automatizado (solo SELECTs manuales). Añadir test contra `HasData`/modelo.
-- [ ] **M-R3-003** (defecto) — El `Down` borra **todas** las filas `StoreModule` de 19/20, no solo las creadas por la migración. Acotar el `Down`.
+- [x] **M-R3-001** (defecto) — La query de verificación #4 del **script 31** tiene `JOIN "Feature" ON TRUE` (cartesiano): no puede devolver el "3" que documenta. Corregir la query.
+- [x] **M-R3-002** (test) — La topología (módulos 19/20, feature 124/123→20, `StorePlanModule` 3/4, backfill) no tiene test automatizado (solo SELECTs manuales). Añadir test contra `HasData`/modelo.
+- [x] **M-R3-003** (defecto) — El `Down` borra **todas** las filas `StoreModule` de 19/20, no solo las creadas por la migración. Acotar el `Down`.
+  - **Reclasificado como falso positivo.** El `DELETE` amplio lo exige la FK **Restrict**: el `Down` también borra
+    `Module 19/20` y `Feature 124`, así que cualquier fila de `StoreModule`/`StoreRoleFeature` que sobreviviera
+    haría fallar el rollback con violación de FK. Los módulos son nuevos, luego no hay filas preexistentes que
+    preservar; acotar el `DELETE` rompería el rollback. Se documenta y se cubre con test de contrato
+    (`Catalog.PedidosModulesBackfillTests.DownSql_RemovesTheRowsTheRestrictForeignKeysWouldOtherwiseBlock`).
 
 ### Showcase (`catalogo-publico-carrusel-dia.md`)
 - [ ] **SC-R1** (defecto) — Archivo huérfano si falla `SaveChanges` tras subir; borrado no idempotente (fila antes que archivo).
@@ -67,3 +72,12 @@ nativa*). Este documento es el **seguimiento** y el mapa de cierre.
 ## Progreso
 
 - 2026-10-08 — Documento creado. Owner: "absolutamente todo". Sin cierre todavía.
+- 2026-10-08 — **Slice "Módulos" cerrado (M-R3-001, M-R3-002, M-R3-003).** Query de verificación #4 del script 31
+  reescrita con `UNION ALL` por fila (fin del producto cartesiano `JOIN "Feature" ON TRUE`); `StorePlanCatalogTests`
+  actualizado con los módulos 19/20 en Superior y VIP (el seed ya los añadía y el test no los listaba: estaba rojo);
+  nuevos tests de topología del seed contra `HasData` (`PedidosModulesSeedTests`) y de contrato del SQL compartido del
+  backfill (`Catalog.PedidosModulesBackfillTests`). M-R3-003 reclasificado como falso positivo (FK Restrict).
+  Commit (work-unit): `fix(modules): correct script 31 parity query and close module-slice review findings`. Verificación observada: `dotnet build src/SMCA.sln` → Build succeeded (0 errors);
+  `Application.Tests --filter PedidosModulesBackfillTests` → 4/4; E2E `StorePlanCatalogTests|PedidosModulesSeedTests` → 4/4
+  (re-ejecutado por el orquestador como spot-check: 4/4, 785 ms). RDD `assess` con base `817ec633`: risk=medium, 273 líneas,
+  `review_due=false` (`under_budget`) → el slice queda en cola en la acumulación hasta el umbral; sin revisión nativa todavía.

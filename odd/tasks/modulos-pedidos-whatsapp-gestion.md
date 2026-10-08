@@ -116,3 +116,15 @@ y se guarda como **`scripts/31-<nombre>.sql`** (el último es el 30). La migraci
   - El grant de 123 se deriva del **módulo 18**, no del 20: tienda con solo el 19 no debe adquirir
     permisos de gestión de pedidos (M2/M3). Hay un `SELECT` de verificación que lo fija.
   - El `Down()` está probado: revertido y reaplicado contra `smca_test`, no solo aplicado.
+- 2026-10-08 — **Cierre de hallazgos de revisión (M-R3-001/002/003).**
+  - El E2E `StorePlanCatalogTests` se actualizó para listar los módulos 19/20 en Superior y VIP (M6). Estaba
+    **rojo**: el seed de `StorePlanModule` ya los añade desde el 2026-10-08 y el test mantenía la lista vieja,
+    así que `BeEquivalentTo` fallaba — hallazgo del cierre de review, no un defecto del seed.
+  - La query de verificación #4 del script 31 (cartesiano `JOIN "Feature" ON TRUE`) reescrita con `UNION ALL`
+    por fila; ahora sí puede devolver el conteo que documenta.
+  - Topología congelada en tests: `PedidosModulesSeedTests` (módulos 19/20, feature 123→20, 124→19,
+    `StorePlanModule` solo 3/4) y `Catalog.PedidosModulesBackfillTests` (contrato del SQL compartido).
+  - **M-R3-003 reclasificado como falso positivo**: el `DELETE` amplio del `Down` lo exige la FK **Restrict** —
+    el `Down` también borra `Module 19/20` y `Feature 124`, así que cualquier fila superviviente en
+    `StoreModule`/`StoreRoleFeature` violaría la FK y el rollback reventaría. Módulos nuevos ⇒ no hay filas
+    preexistentes que acotar. Cubierto por test de contrato.

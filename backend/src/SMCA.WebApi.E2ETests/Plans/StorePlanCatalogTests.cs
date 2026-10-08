@@ -79,7 +79,11 @@ public sealed class StorePlanCatalogTests
             (int)ModuleType.Elaboration,
             // Catálogo web (2026-09-27): módulo 18 en Superior; también en VIP desde el
             // 2026-09-28 (planes autocontenidos).
-            (int)ModuleType.WebCatalog
+            (int)ModuleType.WebCatalog,
+            // Pedidos WhatsApp (2026-10-08, M6 modulos-pedidos-whatsapp-gestion): los dos módulos
+            // nuevos van a Superior y VIP, igual que Catálogo web.
+            (int)ModuleType.PedidosWhatsApp,
+            (int)ModuleType.GestionPedidos
         };
         superior.Should().BeEquivalentTo(superiorCatalog);
 
@@ -98,7 +102,10 @@ public sealed class StorePlanCatalogTests
             (int)ModuleType.MultiMonedas,
             (int)ModuleType.MultiPayments,
             (int)ModuleType.Elaboration,
-            (int)ModuleType.WebCatalog
+            (int)ModuleType.WebCatalog,
+            // ...y los dos módulos nuevos también a VIP (planes autocontenidos).
+            (int)ModuleType.PedidosWhatsApp,
+            (int)ModuleType.GestionPedidos
         };
         vip.Should().BeEquivalentTo(vipCatalog);
 
