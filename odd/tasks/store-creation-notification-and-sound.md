@@ -186,6 +186,92 @@ Se reutiliza tal cual, con su política y su mensaje.
 | Frontend suite de notificaciones tras el cambio de copy | **40/40** (los 4 archivos: 2 nuevos + `notification-shell.test.tsx` + `app-layout.test.tsx` preexistentes), `Type Errors: no errors` |
 | E2E backend / Playwright | **no ejecutados** (no autorizados en esta iteración) |
 
+### Revisión RDD del rango (base `b1231e7a` → `704612c0`)
+
+Riesgo `medium`, un lente (`review-reliability`). **APROBADA**, `authority: burned`.
+Cero BLOCKER/CRITICAL. Cuatro findings, todos informativos.
+
+- **R3-001 (WARNING) — FALSO POSITIVO, descartado.** Alegaba que ningún test probaba que el
+  flujo de registro **no** emita un segundo aviso. Es falso: ya existía
+  `SMCA.WebApi.E2ETests/Notifications/OwnerRegistrationNotificationTests.cs`, cuyo test
+  `Self_registration_leaves_exactly_one_notification_with_the_three_facts` (líneas 97-102) afirma
+  `Items.Where(i => i.StoreName == storeName).Should().HaveCount(1, "one registration produces
+  exactly one notification")`. El registro **sí** pasa por `ICreateStoreService` y crea una
+  tienda, así que ese es exactamente el criterio 2. El reviewer no podía verlo porque solo
+  inspecciona los paths del diff, y ese E2E no está en el rango.
+  **Verificado ejecutándolo** (no escribiendo un test redundante):
+  `dotnet test --filter "FullyQualifiedName~Notifications.OwnerRegistrationNotificationTests"`
+  → **2 passed / 0 failed, Duration 2 s**, con log real de PostgreSQL y **una sola** línea
+  `Owner registration notification created`. Si el store creation duplicara el aviso, habría dos.
+  - ⚠️ La **primera** corrida de ese mismo filtro dio `Passed` con `Duration: 1 ms`. Verde vacío:
+    la `WebAppFixture` no inicializó. Es la trampa documentada en el `AGENTS.md` raíz. **Nunca
+    aceptar un resultado E2E sin mirar `Duration` y el log de la fixture.**
+- **R3-002 (SUGGESTION)** — `notification-shell-sound.test.tsx:201`: el
+  `await waitFor(() => expect(mock).not.toHaveBeenCalled())` resuelve en el primer tick porque el
+  callback nunca lanza; solo prueba que no hubo fetch **síncrono**.
+- **R3-003 (SUGGESTION)** — aserciones atadas a `data-testid` en vez de queries por rol/texto.
+- **R3-004 (SUGGESTION)** — el estado de permiso espejado no tiene test del caso "el navegador
+  desbloquea mientras el panel está cerrado"; solo el del clic en reintentar.
+
+### Cobertura E2E del emit nuevo — AÑADIDA
+
+`backend/src/SMCA.WebApi.E2ETests/Notifications/StoreCreationNotificationTests.cs` *(archivo
+nuevo, un test)*: `Owner_store_creation_leaves_exactly_one_notification_and_never_disturbs_the_first`.
+
+- Registra un owner real por `POST /api/v1/auth/register` (que produce owner + primera tienda +
+  su notificación), autentica **como ese owner** y hace `POST /api/v1/stores` para una segunda
+  tienda.
+- Afirma `HaveCount(1)` para la **segunda** tienda y que la **primera** sigue teniendo
+  exactamente una, sin duplicarse ni perturbarse. Esa es la parte que carga el test.
+- Teardown propio en `finally` con `ExecuteDeleteAsync` e `IgnoreQueryFilters`, por
+  `StoreName`. No usa `DbTestHelpers.CleanupUserAsync` (mismo gap 23503 que el archivo hermano).
+
+**Obstáculo de producto descubierto al escribirlo (no eraayanada):** un owner auto-registrado
+**no puede** crear una segunda tienda tal cual. `RegisterService` le otorga solo el catálogo Pago,
+**MultiStores (14) es exclusivo de Superior/VIP**, y `CreateStoreCommand.cs:98-102` exige que la
+tienda seleccionada tenga el módulo activo → **403** antes de llegar al emit. El test lo resuelve
+con código de producción real: un cliente **SuperAdmin** llama
+`POST /api/v1/stores/{id}/change-plan` con `{ storePlanId: 3 }`, que materializa el universo
+Superior (módulos y `StoreRoleFeature`s), y luego afirma esa precondición para que un 403
+posterior se lea como fallo de fixture y no de producto.
+
+**RED no observable:** el cambio de producción ya está commiteado en `qa`, no hay estado previo
+contra el cual fallar. En su lugar se hizo un **mutation probe** en el archivo propio: voltear
+`HaveCount(1)` → `HaveCount(9999)` falló con `but found 1`, y se revirtió.
+
+Verificado por el padre (no por el reporte del ejecutor): 1 passed / 0 failed, con
+`[E2E Guard] ... Database=smca_test`, dos líneas `Owner registration notification created`
+(una por tienda) y GUIDs frescos.
+
+### Fuga de `Notifications` en la base de test — CORREGIDA
+
+`DbTestHelpers.ResetDataAsync` **nunca borró** la tabla `Notifications`: la entidad no tiene FK ni
+`TenantId`, así que queda fuera de toda cascada `Restrict` y de todo filtro de tenant, y ningún
+`DELETE` la alcanzaba. Acumulaba **892 filas** en `smca_test` (`E2E Store` ×169,
+`E2E Tienda del Gestor` ×13, más singletons), todas visibles para el SuperAdmin a través de
+`GET /v1/notifications`, o sea que una notificación filtrada de un test se leía en el siguiente.
+
+**Autorizado explícitamente por el usuario** (es infraestructura E2E compartida, normalmente
+intocable). Añadida una línea `ExecuteDeleteAsync` con `using Domain.Entities.Notifications;`.
+Orden libre: es una hoja verdadera, sin FK.
+
+Verificado: **892 → 0**. Suite `E2ETests.Notifications` 3/3, y muestra amplia de flujos que crean
+tiendas y owners (`E2ETests.Stores` + `E2ETests.Owners`) **253/253**, 253 s de wall clock.
+
+### Corrección de una regla falsa del AGENTS.md
+
+El gotcha #3 ("`< 1 ms` de duración = binario obsoleto / fixture sin inicializar") de la sección
+`testhost` del `AGENTS.md` raíz **es falsa** para esta suite. Medido: VSTest reportó
+`Duration: < 1 ms` con **58 s** de wall clock real, dos inserts de `Notification` en el log y
+GUIDs frescos. Peor aún, en la corrida de 253 tests sí reportó `3 min 28 s`: **el medidor es
+errático, no siempre roto**. Regla sustituida por señales fiables (`Build succeeded|error MSB`,
+la línea `[E2E Guard]`, GUIDs frescos, timestamps del log de la app, wall clock) y por el mutation
+probe como prueba de que una aserción muerde.
+
+**Consecuencia sobre un juicio previo:** en este mismo turno se declaró "verde
+vacío" una corrida de 1 ms basándose en esa regla. Esa inferencia estaba infundada y queda
+retirada.
+
 ### Defectos detectados
 
 1. ~~**`NOTIFICATIONS.SYSTEM_TITLE` miente.**~~ ✅ **CORREGIDO** (decisión del usuario
