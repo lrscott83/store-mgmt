@@ -425,6 +425,43 @@ const messages: Record<string, string> = {
   'ORDERING_ORDERS.DRIVER_CHANGED': 'Repartidor del pedido actualizado',
   'ORDERING_ORDERS.DRIVER_FAILED': 'No se pudo asignar el repartidor',
 
+  // Menú — Ventas/historial (F6). Distinto de MENU.ONLINE_ORDERS (F5, la cola de trabajo) y de
+  // MENU.ONLINE_ORDERS_SETTINGS (F1, la configuración del dueño): aquí se LEE cuánto se vendió.
+  'MENU.ONLINE_ORDERS_SALES': 'Ventas',
+
+  // Ventas (F6): el agregado del rango y el histórico paginado. Los rótulos de estado, pago y
+  // entrega se REUSAN de ORDERING_ORDERS a propósito: son los mismos seis estados y las mismas dos
+  // modalidades, y duplicarlos daría dos verdades que un día dejarían de coincidir.
+  'ORDERING_SALES.TITLE': 'Ventas',
+  'ORDERING_SALES.SUBTITLE':
+    'Cuánto vendieron tus pedidos de WhatsApp en el rango elegido, con el histórico de los pedidos que lo componen.',
+  'ORDERING_SALES.REFRESH': 'Actualizar',
+  'ORDERING_SALES.FILTER_STATUS': 'Estado',
+  'ORDERING_SALES.FILTER_PAYMENT': 'Pago',
+  'ORDERING_SALES.FILTER_DELIVERY_TYPE': 'Entrega',
+  'ORDERING_SALES.FILTER_FROM': 'Desde',
+  'ORDERING_SALES.FILTER_TO': 'Hasta',
+  'ORDERING_SALES.METRIC_ORDERS': 'Pedidos',
+  // El denominador del ticket medio se enseña aparte: es lo que hace verificable que la venta
+  // total y el ticket medio excluyen los cancelados.
+  'ORDERING_SALES.METRIC_NON_CANCELLED': 'No cancelados',
+  'ORDERING_SALES.METRIC_TOTAL': 'Ventas totales',
+  'ORDERING_SALES.METRIC_AVERAGE': 'Ticket medio',
+  'ORDERING_SALES.METRIC_PAID': 'Pagado',
+  'ORDERING_SALES.METRIC_PENDING': 'Pendiente de cobro',
+  'ORDERING_SALES.BREAKDOWN_STATUS': 'Por estado',
+  'ORDERING_SALES.BREAKDOWN_DELIVERY': 'Por entrega',
+  // Las métricas son un RESUMEN del rango: si el agregado falla se degrada la cabecera, nunca la
+  // página, porque el histórico es lo que hace falta para trabajar.
+  'ORDERING_SALES.STATS_LOAD_FAILED':
+    'No se pudieron cargar las métricas del rango. El histórico de pedidos sigue disponible.',
+  'ORDERING_SALES.LOAD_FAILED': 'No se pudo cargar el historial de ventas',
+  'ORDERING_SALES.COUNT': '{count} pedidos',
+  'ORDERING_SALES.EMPTY': 'No hay pedidos en el rango seleccionado.',
+  'ORDERING_SALES.PAGE': 'Página {page} de {last}',
+  'ORDERING_SALES.PREV_PAGE': 'Anterior',
+  'ORDERING_SALES.NEXT_PAGE': 'Siguiente',
+
   // Catálogo público (/catalog/<slug>): lo que ve el cliente final, sin sesión.
   'CATALOG_PUBLIC.SEARCH_PLACEHOLDER': 'Buscar productos…',
   'CATALOG_PUBLIC.SEARCH': 'Buscar',

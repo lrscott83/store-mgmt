@@ -136,6 +136,70 @@ export interface DeliveryDriverOption {
   isActive?: boolean;
 }
 
+// --- Métricas de ventas (F6): el agregado del rango y su desglose ------------------------------
+//
+// El agregado se calcula ENTERO en el servidor (`IOrderRepository.GetStatsByStoreIdAsync`, un solo
+// `Count`/`Sum`/`GroupBy` en la base). Por eso NO hay `page`/`pageSize` en estos filtros: paginar un
+// agregado no tiene sentido, y un `page` colado aquí se ignoraría en silencio.
+
+/**
+ * Filtros del agregado. Son un SUB-CONJUNTO de los del listado (`OnlineOrderFilters`) y a propósito
+ * NO llevan `page`, `pageSize`, `search` ni `driverId`: el endpoint los declara uno a uno y solo
+ * acepta estos cinco, así que inventar los otros aquí sería mandar parámetros que nadie lee.
+ */
+export interface OnlineOrderStatsFilters {
+  status?: OnlineOrderStatus;
+  paymentStatus?: OnlineOrderPaymentStatus;
+  deliveryType?: OnlineOrderDeliveryType;
+  from?: string;
+  to?: string;
+}
+
+/** Conteo por estado. Espejo de `OnlineOrderStatusCountDto`: el enum por VALOR, como el resto. */
+export interface OnlineOrderStatusCount {
+  status: OnlineOrderStatus;
+  count: number;
+}
+
+/** Conteo por modalidad. Espejo de `OnlineOrderDeliveryTypeCountDto`. */
+export interface OnlineOrderDeliveryTypeCount {
+  deliveryType: OnlineOrderDeliveryType;
+  count: number;
+}
+
+/**
+ * Métricas de los pedidos de la tienda en un rango (F6). Espejo de `OnlineOrderStatsDto`.
+ *
+ * `totalSales`, `averageTicket` y los cuatro campos de pago excluyen los CANCELADOS a propósito: un
+ * cancelado no es venta ni es deuda. `ordersCount` y los dos desgloses sí los cuentan —los desgloses
+ * son el ÚNICO sitio donde se ven— y por eso ambos suman `ordersCount`.
+ *
+ * `nonCancelledCount` viaja solo para poder verificar la regla desde el cliente: si
+ * `averageTicket != totalSales / ordersCount`, hay cancelados, y sin este campo eso no se podría
+ * distinguir de un agregado mal calculado.
+ */
+export interface OnlineOrderStats {
+  ordersCount: number;
+  nonCancelledCount: number;
+  totalSales: number;
+  averageTicket: number;
+  paidCount: number;
+  paidAmount: number;
+  pendingCount: number;
+  pendingAmount: number;
+  /** Los seis estados en el orden del enum, con un 0 por cada estado sin pedidos del rango. */
+  byStatus: OnlineOrderStatusCount[];
+  /** Pickup y Delivery en el orden del enum, con un 0 por cada modalidad sin pedidos. */
+  byDeliveryType: OnlineOrderDeliveryTypeCount[];
+  /**
+   * Moneda de TODOS los importes de esta respuesta, y es del conjunto: sale de los pedidos NO
+   * cancelados del rango (A3 eliminada: no hay moneda configurable). Viaja como NÚMERO, no como
+   * `"CUP"`, porque la API no registra `JsonStringEnumConverter` — el formateador de importes
+   * (`formatMoneyWithCurrency`) ya pide el valor del enum.
+   */
+  currency: number;
+}
+
 /**
  * Transiciones alcanzables desde un estado — MISMA tabla que `Order.AllowedTransitionsFrom` (F2).
  *
@@ -248,6 +312,25 @@ export const orderingHttpService = {
     } catch {
       return [];
     }
+  },
+
+  /**
+   * Métricas de los pedidos de la tienda en un rango (F6, vista "Ventas"). Comparte la MISMA tabla
+   * y el mismo rango de fechas que el listado, pero agregado: sin `page`, y sin `search` ni
+   * `driverId` porque el endpoint no los declara.
+   *
+   * A diferencia de `listActiveDrivers`, aquí NO se traga el fallo: quien llama es la vista, que
+   * degrada la cabecera y conserva el historial, y esa decisión necesita ver el error.
+   */
+  async getSalesStats(
+    filters: OnlineOrderStatsFilters = {},
+  ): Promise<BaseResponseModel<OnlineOrderStats>> {
+    const params = withoutEmptyFilters(filters);
+    const response = await apiClient.get<BaseResponseModel<OnlineOrderStats>>(
+      '/v1/online-orders/stats',
+      { params },
+    );
+    return response.data;
   },
 };
 

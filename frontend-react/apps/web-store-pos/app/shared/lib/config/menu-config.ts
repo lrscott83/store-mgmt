@@ -206,6 +206,20 @@ export const MENU_GROUPS: MenuGroup[] = [
           'Pedidos. Los pedidos que llegan por WhatsApp, filtrables por estado, pago, entrega, repartidor, fechas y búsqueda por código o teléfono. Desde aquí confirmas el pedido, lo dejas en preparación o listo, lo entregas, lo cancelas, marcas el pago y asignas el repartidor.' +
           BETA_NOTICE,
       },
+      // Ventas de los pedidos (feature 123, F6): el mismo módulo, la misma feature y el mismo gate
+      // que el item de ARRIBA, y sin `rolesOnly` de dueño por la misma razón. Comparte tabla y
+      // roles porque comparte la pregunta: cuánto se vendió de lo que llegó por WhatsApp.
+      {
+        label: 'MENU.ONLINE_ORDERS_SALES',
+        path: '/sales/online-orders/sales',
+        featureIds: [EFeatures.OnlineOrders],
+        moduleId: EModules.WebCatalog,
+        moduleIds: [EModules.WebCatalog],
+        isNew: true,
+        helpContent:
+          'Ventas de tus pedidos de WhatsApp. Elige el rango de fechas y mira cuántos pedidos hubo, cuánto se vendió, el ticket medio y cuánto quedó pendiente de cobro, con el desglose por estado y por entrega y el histórico de los pedidos del rango.' +
+          BETA_NOTICE,
+      },
       {
         label: 'MENU.SALE',
         path: '/sales/new',
