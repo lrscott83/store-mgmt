@@ -36,8 +36,9 @@ namespace Application.Dtos.Administration.Modules
         public bool PriceIncluded { get; set; }
 
         /// <summary>
-        /// Additive: the module's catalog <c>IsActive</c>. Read-only, and the other input to the
-        /// price rule — an inactive module never reaches the total.
+        /// The module's catalog <c>IsActive</c>, as just persisted by the save (the fourth
+        /// field it owns) — and the other input to the price rule, so an inactive module
+        /// never reaches the total.
         /// </summary>
         public bool IsActive { get; set; }
 

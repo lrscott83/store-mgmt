@@ -1457,6 +1457,7 @@ const messages: Record<string, string> = {
   'MODULE_CATALOG.LOADING': 'Cargando módulos...',
   'MODULE_CATALOG.EMPTY': 'No hay módulos disponibles en el catálogo.',
   'MODULE_CATALOG.NO_PLAN_GROUP': 'Otros planes',
+  'MODULE_CATALOG.COLUMN_ACTIVE': 'Activo',
   'MODULE_CATALOG.COLUMN_MODULE': 'Módulo',
   'MODULE_CATALOG.COLUMN_PRICE': 'Precio',
   'MODULE_CATALOG.COLUMN_PERCENT_DISCOUNT': '% Descuento',

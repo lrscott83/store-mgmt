@@ -256,21 +256,23 @@ export interface StoreModulePricingReadResult {
 }
 
 /**
- * One row of the GLOBAL module catalog pricing save (PUT /v1/modules/pricing). Only the
- * three editable catalog price fields travel: the endpoint writes `Price`,
- * `DiscountPrice` and `PercentDiscountPrice` and nothing else, so a structural flag can
- * never be smuggled in through the payload.
+ * One row of the GLOBAL module catalog pricing save (PUT /v1/modules/pricing). Four fields
+ * travel and the endpoint writes exactly them: `Price`, `DiscountPrice`,
+ * `PercentDiscountPrice` and `IsActive`. Every other structural flag (AvailableToStore,
+ * PriceIncluded, Name, Order) stays out of the payload's reach.
  *
- * There is no `isSelected` here, unlike the per-store payload: the catalog save carries
- * no tick — every submitted row is priced, and a module omitted from the table is simply
- * not part of this edit (the catalog table the page shows is already the complete
- * saveable universe, `GET /v1/modules/ToStore`).
+ * There is no `isSelected` here, unlike the per-store payload: the catalog save carries no
+ * tick for PRICING — every submitted row is priced — but `isActive` IS the module's own
+ * activation switch, so a row is priced and (de)activated in the same save. A module omitted
+ * from the table is simply not part of this edit (the catalog table the page shows is already
+ * the complete saveable universe, `GET /v1/modules/catalog`).
  */
 export interface ModuleCatalogPricingPayload {
   moduleId: number;
   price: number;
   discountPrice: number;
   percentDiscountPrice: number;
+  isActive: boolean;
 }
 
 /**

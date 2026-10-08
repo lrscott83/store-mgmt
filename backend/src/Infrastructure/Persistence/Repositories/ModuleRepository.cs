@@ -23,6 +23,21 @@ namespace Infrastructure.Persistence.Repositories
                 .ToListAsync();
         }
 
+        /// <summary>
+        /// Every module available to stores, ACTIVE OR NOT — the SuperAdmin catalog editor's
+        /// universe. Unlike <see cref="GetAvailableModulesToStore"/> it does NOT filter
+        /// <c>IsActive</c>, so a module switched off is still listed and can be switched back
+        /// on. Same ordering, so the editor shows the same rows in the same order.
+        /// </summary>
+        public async Task<IEnumerable<Module>> GetAllModulesAvailableToStore()
+        {
+            return await _modules
+                .Where(m => m.AvailableToStore
+                    && m.Features.Any(f => f.IsActive && f.AvailableToStore))
+                .OrderByDescending(f => f.PriceIncluded).ThenBy(f => f.Order)
+                .ToListAsync();
+        }
+
         public async Task<IEnumerable<Module>> GetModulesByIdsAsync(IEnumerable<int> ids)
             => await _modules.Where(m => ids.Contains(m.Id)).ToListAsync();
     }
