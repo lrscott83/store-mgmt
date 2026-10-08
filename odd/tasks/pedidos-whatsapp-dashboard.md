@@ -114,17 +114,17 @@ documento de F7, ese documento está desactualizado — la fuente es esta.
 
 ## Tareas
 
-- [ ] **T1** — `GetOnlineOrdersQuery` (filtros + paginación + aislamiento por tienda).
-- [ ] **T2** — `GetOnlineOrderByIdQuery` (detalle con líneas).
-- [ ] **T3** — `UpdateOrderStatusCommand` (transiciones válidas).
-- [ ] **T4** — `UpdateOrderPaymentStatusCommand`.
-- [ ] **T5** — `AssignOrderDriverCommand` (validar que el `DriverId` sea de la tienda y activo).
-- [ ] **T6** — `OnlineOrdersController` con `[HasPermission(OnlineOrdersAdmin)]` y rutas.
-- [ ] **T7** — Vista `ordering-orders.tsx` (lista, filtros, acciones).
-- [ ] **T8** — Registrar ruta + menú.
-- [ ] **T9** — Claves i18n.
-- [ ] **T10** — Tests unitarios nuevos (queries/commands con Moq; componente).
-- [ ] **T11** — Verificación (build/tests backend, `typecheck`/`lint`/`vitest`).
+- [x] **T1** — `GetOnlineOrdersQuery` (filtros + paginación + aislamiento por tienda). Commit `f2dfd14c`.
+- [x] **T2** — `GetOnlineOrderByIdQuery` (detalle con líneas). Commit `f2dfd14c`.
+- [x] **T3** — `UpdateOrderStatusCommand` (transiciones válidas). Commit `8458fb91`.
+- [x] **T4** — `UpdateOrderPaymentStatusCommand`. Commit `8458fb91`.
+- [x] **T5** — `AssignOrderDriverCommand` (validar que el `DriverId` sea de la tienda y activo). Commit `8458fb91`.
+- [x] **T6** — `OnlineOrdersController` con `[HasPermission(OnlineOrdersAdmin)]` y rutas. Commit `8458fb91`.
+- [x] **T7** — Vista `ordering-orders.tsx` (lista, filtros, acciones). Commit `b674a881`.
+- [x] **T8** — Registrar ruta + menú. Commit `b674a881`.
+- [x] **T9** — Claves i18n. Commit `b674a881`.
+- [x] **T10** — Tests unitarios nuevos (queries/commands con Moq; componente). Commits `f2dfd14c`, `8458fb91`, `b674a881`, `be568bab`.
+- [x] **T11** — Verificación (build/tests backend, `typecheck`/`lint`/`vitest`). Ver evidencia abajo.
 
 ## Criterios de aceptación
 
@@ -156,12 +156,69 @@ pnpm vitest run app/sales/routes/__tests__/
 - **Transiciones inconsistentes**: centralizar la regla en dominio (F2), no duplicarla.
 - **Polling y carga**: paginar y no traer todo el histórico (eso es F6).
 
+## Ruta de implementación (ODD) y disparadores
+
+F2 (dependencia dura) está **implementado y verificado**. F7 lo está haciendo otro agente en paralelo; F5
+integra contra su contrato `GET /api/v1/delivery-drivers?activeOnly=`. F3/F4 no bloquean la construcción
+(solo la disponibilidad de datos reales en runtime).
+
+| Unidad de trabajo | Tareas | Ruta | Disparador / evidencia |
+| --- | --- | --- | --- |
+| Backend — consultas + repo | T1, T2 | Delegada (escritor) | Escritura ≥2 ficheros no triviales; `IOrderRepository.GetByStoreIdAsync` no pagina (`IOrderRepository.cs:21`) → requiere método nuevo |
+| Backend — commands + controller | T3, T4, T5, T6 | Delegada (escritor) | Escritura ≥2 ficheros; `NoTracking` global obliga a `Update` explícito antes de `SaveChangesAsync` |
+| Backend — tests | T10 (backend) | Delegada (escritor) | Preparación + escritura |
+| Frontend — vista + ruta + menú + i18n + cliente + tests | T7, T8, T9, T10 (front) | Delegada (escritor) | Escritura ≥2 ficheros; no existe `EFeatures.OnlineOrders` (`enums/index.ts:60`) |
+| Verificación | T11 | Delegada (verificador) | Comandos de verificación de la sección homónima |
+
+Commits por unidad de trabajo en la rama actual (`test`), stageando **solo** los ficheros de F5 (hay otro
+agente trabajando F7 en paralelo sobre el mismo checkout). Estrategia de entrega: `ask-on-risk`.
+
+## Evidencia de verificación (2026-10-07)
+
+| Comando | Resultado |
+| --- | --- |
+| `dotnet build src/SMCA.sln` | `Build succeeded. 192 Warning(s), 0 Error(s)` (sin `error MSB`) |
+| `dotnet test src/Application.Tests/…` | **886 passed (886)**, 0 fallos (spot check del padre: 886/886) |
+| `dotnet test src/Domain.UnitTests/…` | **154 passed (154)**, 0 fallos |
+| `pnpm typecheck` | exit 0 |
+| `pnpm lint` (`--max-warnings=0`) | exit 0 |
+| `pnpm vitest run app/sales/routes/__tests__/` | **332 passed (332)**, 20 ficheros, sin errores de tipo |
+| E2E | **No se tocaron** (`git show --name-only` de los 4 commits: 0 rutas en `SMCA.WebApi.E2ETests/` y `frontend-react/e2e/`) |
+
+Criterios de aceptación 1–7: **pass** (verificación read-only con evidencia `path:line`). Hallazgos de la
+verificación independiente: **D1** (nombre de repartidor en la lista siempre nulo — faltaba `.Include(o =>
+o.Driver)`) y **D2** (el filtro `to` excluía el día final por el binding a medianoche) — **ambos corregidos**
+en `be568bab`, con RED real y tests (886 verdes).
+
+### Follow-ups (no bloqueantes)
+
+- **F5-F1** — Sin cobertura E2E del seam HTTP (403 real, aislamiento por tienda en PostgreSQL). El fix de
+  D1 se probó con `InMemory`; el `LEFT JOIN` de Npgsql no queda probado. Requiere E2E nuevo (autorización).
+- **F5-F2** — Mensajes de error de los handlers son literales en inglés, no claves `IStringLocalizer`
+  (`Resources/` quedó fuera del alcance de las unidades).
+- **F5-F3** — El estado de filtros/página es solo estado React; recargar resetea a página 1 sin filtros.
+- **F5-F4** — `GetPagedByStoreIdAsync`/`GetByIdWithItemsAsync` sin test contra PostgreSQL (mismo seam que
+  F2-R2).
+
 ## Siguiente paso
 
-Implementar F5 tras F2 y F7 (para el selector de repartidores).
+F5 implementado y verificado en `test`. Pendiente: revisión nativa (RDD, sobre de consentimiento emitido) y
+decisión de entrega por el owner (presupuesto de ~400 líneas superado → estrategia por aplicar).
 
 ## Progreso
 
+- 2026-10-07 — **F5 implementado (T1–T11).** Cuatro commits de unidad de trabajo: `f2dfd14c` (queries +
+  extensión aditiva de `IOrderRepository`/`OrderRepository` + DTOs), `8458fb91` (commands estado/pago/
+  repartidor + `OnlineOrdersController`), `b674a881` (vista `ordering-orders.tsx`, ruta, menú, i18n,
+  cliente API, `EFeatures.OnlineOrders=123`), `be568bab` (fix D1 `.Include(Driver)` + D2 rango de fechas
+  inclusivo). Verificación T11: 886+154 tests backend, 332 vitest, typecheck/lint limpios; 2 defectos
+  medios hallados y corregidos con RED. E2E intactos. Revisión nativa: `assess` → risk `medium`,
+  `review_due` (`slice_budget_reached`, 4375 líneas); preflight STATUS + START emitieron el sobre de
+  consentimiento `consent/v3` (pendiente de decisión del owner). Sin push.
+- 2026-10-07 — Arranque autorizado por el owner ("F5, ya F7 lo está haciendo otro agente"). Exploración
+  read-only completada (patrones de controller/query/command, API de F2, patrones React). Puntos abiertos
+  detectados: falta `EFeatures.OnlineOrders = 123` en `@store-mgmt/domain`; no hay tipos espejo de pedido
+  online; `IOrderRepository` no tiene filtrado/paginación; sin tipo de página compartido. Sin escrituras aún.
 - 2026-10-06 — Feature creado (documento de diseño). Sin implementación.
 - 2026-10-06 — Sincronizado con el maestro: gestión por OwnerAdmin + StoreUser (`OnlineOrdersAdmin`,
   D15); sin "En camino" (D18); vista "Pedidos" confirmada (A6); "Decisiones abiertas" → "Decisiones
