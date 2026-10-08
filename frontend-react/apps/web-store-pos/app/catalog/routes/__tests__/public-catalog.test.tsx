@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 import { useStorefrontCartStore } from '~/catalog/lib/storefront-cart-store';
@@ -609,12 +609,37 @@ describe('PublicCatalogPage', () => {
     });
 
     it('el halo de atención del botón se apaga con movimiento reducido', async () => {
-      renderPage();
+      // Se comprueba el EFECTO (la animación apagada de verdad), no la clase: un test que solo
+      // mira el className no distingue "el componente decidió apagarlo" de "el navegador lo
+      // apagaría", y en jsdom la media query no se aplica. `afterEach` restaura `matchMedia`.
+      const mockReducedMotion = (matches: boolean) => {
+        window.matchMedia = vi.fn().mockReturnValue({
+          matches,
+          addEventListener: vi.fn(),
+          removeEventListener: vi.fn(),
+        }) as unknown as typeof window.matchMedia;
+      };
+      const halo = async (): Promise<Element> => {
+        const button = await screen.findByTestId('catalog-see-products');
+        const span = button.querySelector('span[aria-hidden="true"]');
+        if (!span) throw new Error('el botón "Ver productos" no tiene halo');
+        return span;
+      };
 
-      const button = await screen.findByTestId('catalog-see-products');
-      const halo = button.querySelector('span[aria-hidden="true"]');
-      expect(halo?.className).toContain('animate-ping');
-      expect(halo?.className).toContain('motion-reduce:animate-none');
+      mockReducedMotion(true);
+      renderPage();
+      expect((await halo()).className).not.toContain('animate-ping');
+      // Y el botón dice que lo tiene apagado, para que el estado no viva solo en el CSS.
+      expect(await halo()).toHaveAttribute('data-reduced-motion', 'true');
+
+      // Montaje propio para la segunda mitad: la preferencia se lee al montar, así que cambiar el
+      // mock después no cambiaría el botón ya pintado.
+      cleanup();
+      mockReducedMotion(false);
+      renderPage();
+      // Sin la preferencia del sistema el halo late: el botón sí pide atención.
+      expect((await halo()).className).toContain('animate-ping');
+      expect(await halo()).not.toHaveAttribute('data-reduced-motion');
     });
 
     it('el carrusel avanza solo, y con movimiento reducido se queda quieto', async () => {
@@ -662,6 +687,86 @@ describe('PublicCatalogPage', () => {
       expect(screen.getByTestId('catalog-carousel-dot-1')).toHaveAttribute('aria-current', 'true');
       fireEvent.click(screen.getByTestId('catalog-carousel-previous'));
       expect(screen.getByTestId('catalog-carousel-dot-0')).toHaveAttribute('aria-current', 'true');
+    });
+
+    it('el carrusel se para mientras el puntero está encima y sigue al salir', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      catalogMock.getPublicOrderingConfig.mockResolvedValue(
+        envelope(showcaseConfig({ carouselImages: CAROUSEL })),
+      );
+      renderPage();
+
+      const carousel = await screen.findByTestId('catalog-carousel');
+      // Avanza solo: cinco segundos cambian de imagen.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5000);
+      });
+      expect(screen.getByTestId('catalog-carousel-dot-1')).toHaveAttribute('aria-current', 'true');
+
+      // Con el puntero encima, cinco segundos más NO lo mueven: un carrusel que se mueve
+      // mientras se está leyendo (o intentando pinchar una flecha) es peor que uno quieto.
+      fireEvent.mouseEnter(carousel);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10000);
+      });
+      expect(screen.getByTestId('catalog-carousel-dot-1')).toHaveAttribute('aria-current', 'true');
+
+      // Al salir, vuelve a su ritmo: la pausa era del puntero, no del carrusel.
+      fireEvent.mouseLeave(carousel);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5000);
+      });
+      expect(screen.getByTestId('catalog-carousel-dot-0')).toHaveAttribute('aria-current', 'true');
+    });
+
+    it('el carrusel se para con el teclado dentro y sigue al salir', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      catalogMock.getPublicOrderingConfig.mockResolvedValue(
+        envelope(showcaseConfig({ carouselImages: CAROUSEL })),
+      );
+      renderPage();
+
+      await screen.findByTestId('catalog-carousel');
+      // El foco viaja por CAPTURA (onFocusCapture), no por el elemento que lo recibe: así
+      // cualquier control del carrusel —flechas, puntos— lo para, también los que se añadan.
+      fireEvent.focus(screen.getByTestId('catalog-carousel-next'));
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(15000);
+      });
+      expect(screen.getByTestId('catalog-carousel-dot-0')).toHaveAttribute('aria-current', 'true');
+
+      // Al perder el foco el auto-avance vuelve, para que el resto del catálogo no quede congelado
+      // solo porque el cliente tocó una flecha hace un rato.
+      fireEvent.blur(screen.getByTestId('catalog-carousel-next'));
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5000);
+      });
+      expect(screen.getByTestId('catalog-carousel-dot-1')).toHaveAttribute('aria-current', 'true');
+    });
+
+    it('con una sola imagen no hay flechas ni puntos, y no se auto-avanza', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      catalogMock.getPublicOrderingConfig.mockResolvedValue(
+        envelope(showcaseConfig({ carouselImages: [CAROUSEL[0]] })),
+      );
+      renderPage();
+
+      const carousel = await screen.findByTestId('catalog-carousel');
+      expect(within(carousel).getByTestId('catalog-carousel-image-0')).toBeInTheDocument();
+      // Controles para pasar de una imagen a la misma imagen: ruido, no ayuda.
+      expect(screen.queryByTestId('catalog-carousel-previous')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('catalog-carousel-next')).not.toBeInTheDocument();
+      expect(within(carousel).queryByTestId('catalog-carousel-dot-0')).not.toBeInTheDocument();
+
+      // Y tampoco auto-avanza: veinte segundos (cuatro intervalos) no la mueven ni a la otra ni
+      // fuera del catálogo.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(20000);
+      });
+      expect(within(carousel).getByTestId('catalog-carousel-image-0')).toHaveAttribute(
+        'src',
+        `${window.location.origin}${MEDIA}/a.jpg`,
+      );
     });
   });
 

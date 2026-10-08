@@ -337,6 +337,10 @@ function ShowcaseCard({
     const fileList = event.target.files;
     if (!fileList) return;
     const selected = Array.from(fileList);
+    // Se vacía el input DESPUÉS de leer los archivos: un `<input type="file">` sin limpiar NO
+    // dispara `change` cuando se elige el MISMO archivo otra vez (el navegador ve el mismo
+    // valor), así que sin esto reintentar una selección rechazada no hacía nada.
+    event.target.value = '';
     if (selected.length === 0) return;
     if (!selected.every(isValidCatalogImage)) {
       setFileError(

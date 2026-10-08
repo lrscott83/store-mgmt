@@ -1,9 +1,20 @@
+import { useState } from 'react';
 import type { RefObject } from 'react';
 import { useIntl } from 'react-intl';
 
 interface CatalogSeeProductsProps {
   /** El elemento al que se baja: la rejilla de productos de esta carta. */
   readonly targetRef: RefObject<HTMLElement | null>;
+}
+
+/**
+ * `prefers-reduced-motion` del SISTEMA, leído UNA vez y sin suscripción (mismo criterio que el
+ * carrusel): es una preferencia del dispositivo, no algo que cambie mientras se mira la carta, y
+ * `window` no existe en el render de servidor.
+ */
+function readReducedMotion(): boolean {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false;
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
 /**
@@ -16,6 +27,10 @@ interface CatalogSeeProductsProps {
  */
 export function CatalogSeeProducts({ targetRef }: CatalogSeeProductsProps) {
   const intl = useIntl();
+  // La animación se decide en JS y NO solo con `motion-reduce:`, para que sea comprobable en un
+  // test de comportamiento (jsdom no aplica media queries). La clase `motion-reduce:animate-none`
+  // se conserva como red de seguridad para el HTML sin JS y para el primer render del servidor.
+  const [reducedMotion] = useState(readReducedMotion);
 
   function scrollToProducts() {
     targetRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -35,7 +50,10 @@ export function CatalogSeeProducts({ targetRef }: CatalogSeeProductsProps) {
       >
         <span
           aria-hidden="true"
-          className="absolute inset-0 -z-10 animate-ping rounded-full bg-primary/50 motion-reduce:animate-none"
+          data-reduced-motion={reducedMotion ? 'true' : undefined}
+          className={`absolute inset-0 -z-10 rounded-full bg-primary/50 motion-reduce:animate-none ${
+            reducedMotion ? '' : 'animate-ping'
+          }`}
         />
         {intl.formatMessage({ id: 'CATALOG_PUBLIC.SEE_PRODUCTS' })}
       </button>

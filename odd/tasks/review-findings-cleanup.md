@@ -34,8 +34,10 @@ nativa*). Este documento es el **seguimiento** y el mapa de cierre.
   - **Cerrado (2026-10-08).** Sustituida por `RuleFor(x => x.Length).GreaterThan(0)`, que sí rechaza el multipart sin archivo.
 - [x] **SC-R3** (defecto) — El config público no filtra por `IsActive`.
   - **Cerrado (2026-10-08).** `&& image.IsActive` en `Showcase(...)`. El repositorio ya filtraba: es endurecimiento explícito del contrato público, sin cambio de comportamiento.
-- [ ] **SC-R4** (test+defecto) — UI: el input file no se resetea (re-seleccionar el mismo archivo no dispara cambio); ramas de fallo parcial/red sin test; el test del halo comprueba clases CSS, no comportamiento.
-- [ ] **SC-R5** (test) — Carrusel: pausa por hover/focus y caso de **una sola imagen** sin cubrir.
+- [x] **SC-R4** (test+defecto) — UI: el input file no se resetea (re-seleccionar el mismo archivo no dispara cambio); ramas de fallo parcial/red sin test; el test del halo comprueba clases CSS, no comportamiento.
+  - **Cerrado (2026-10-08).** Reset del input de archivos, halo con la animación decidida en JS y test conductual, y cobertura de las ramas de fallo parcial y de red del upload.
+- [x] **SC-R5** (test) — Carrusel: pausa por hover/focus y caso de **una sola imagen** sin cubrir.
+  - **Cerrado (2026-10-08).** Tests de pausa por hover y por foco/teclado (con reanudación al salir) y de una sola imagen sin flechas, sin puntos y sin auto-avance.
 
 ### F8 marca (`pedidos-whatsapp-marca-catalogo.md`)
 - [ ] **F8-R1** (defecto) — Logo válido + banner inválido deja archivo huérfano.
@@ -85,3 +87,4 @@ nativa*). Este documento es el **seguimiento** y el mapa de cierre.
   (re-ejecutado por el orquestador como spot-check: 4/4, 785 ms). RDD `assess` con base `817ec633`: risk=medium, 273 líneas,
   `review_due=false` (`under_budget`) → el slice queda en cola en la acumulación hasta el umbral; sin revisión nativa todavía.
 - 2026-10-08 — **Bloque Showcase cerrado en su parte backend (SC-R1, SC-R2, SC-R3).** Compensación de archivo huérfano en el alta; borrado tolerante a fallo de disco con log; regla de archivo presente alcanzable (`Length > 0`); `IsActive` explícito en el config público. Verificación observada: build de la solución OK (0 errors, sin `error MSB`); `Showcase` 113/113; `GetPublicOrderingConfig` 43/43; sonda de mutación confirma que cada test cae al revertir su fix. SC-R4/SC-R5 (UI) siguen abiertos.
+- 2026-10-08 — **Cerrados SC-R4 y SC-R5 (frontend del showcase).** Reset del `<input type="file">` tras leer los archivos, para que re-seleccionar el mismo archivo vuelva a disparar `change`; el halo del botón "Ver productos" decide la animación en JS a partir de `prefers-reduced-motion` (conservando `motion-reduce:animate-none` como red SSR) y su test comprueba el efecto en vez de las clases; tests nuevos de las ramas de fallo parcial y de red del upload (aviso, retención de lo que falló, sin toast de éxito) y del carrusel (pausa por hover y por foco/teclado con reanudación, y una sola imagen sin flechas, sin puntos y sin auto-avance). Verificación observada: `pnpm vitest run app/catalog/ app/sales/routes/__tests__/` → 28 archivos / 494 tests verdes; `pnpm exec eslint` sobre los 4 archivos tocados → limpio; `pnpm typecheck` → único error preexistente y ajeno (`storefront-checkout-staff.test.tsx(24,7)`, `PublicOrderingConfig` sin `carouselImages`/`dailyImages`). Sin commit (writer acotado).

@@ -1031,6 +1031,83 @@ describe('WebCatalogPage (vista Catálogo Web)', () => {
       expect(screen.getByTestId('showcase-carousel-save')).toBeDisabled();
     });
 
+    it('al elegir archivos el input queda limpio, para poder repetir la MISMA selección', async () => {
+      renderPage();
+
+      const input = (await screen.findByTestId(
+        'showcase-carousel-upload',
+      )) as HTMLInputElement;
+      const file = new File(['x'], 'uno.jpg', { type: 'image/jpeg' });
+      // El value se define a mano porque jsdom SOLO permite escribir '' en un input de archivo:
+      // reproduzco a mano el estado del navegador DESPUÉS de elegir el archivo, que es
+      // precisamente el que dispara (o no) el siguiente `change`.
+      Object.defineProperty(input, 'files', { value: [file], configurable: true });
+      Object.defineProperty(input, 'value', { value: 'uno.jpg', writable: true, configurable: true });
+      fireEvent.change(input);
+
+      // Un `<input type="file">` cuyo value no se limpia NO vuelve a disparar `change` al elegir
+      // el mismo archivo: el dueño que corregía una selección inválida tenía que cambiar de
+      // foto a foto para que el formulario reaccionara. Con el value limpio, repetir la
+      // selección dispara el cambio otra vez.
+      expect(input.value).toBe('');
+      expect(screen.getByTestId('showcase-carousel-pending')).toHaveTextContent(
+        '1 imágenes por subir',
+      );
+    });
+
+    it('si una imagen falla a mitad, avisa de cuántas entraron y retiene las que faltan', async () => {
+      renderPage();
+
+      // La segunda se rechaza: la primera YA está en el servidor y no se puede volver a subir
+      // (sería un duplicado), así que el aviso tiene que decir cuántas entraron de cuántas.
+      catalogMock.uploadShowcaseImage
+        .mockResolvedValueOnce(envelope(SHOWCASE.carousel[0]))
+        .mockResolvedValueOnce({ succeeded: false, message: '', actionCode: 500, errors: [] });
+
+      selectFiles(await screen.findByTestId('showcase-carousel-upload'), [
+        new File(['x'], 'uno.jpg', { type: 'image/jpeg' }),
+        new File(['x'], 'dos.jpg', { type: 'image/jpeg' }),
+      ]);
+      fireEvent.click(screen.getByTestId('showcase-carousel-save'));
+
+      await waitFor(() => expect(catalogMock.uploadShowcaseImage).toHaveBeenCalledTimes(2));
+      await waitFor(() =>
+        expect(showBlockingErrorMock).toHaveBeenCalledWith(
+          'Error',
+          'Se subieron 1 de 2. No se pudieron subir las demás: inténtalo de nuevo.',
+        ),
+      );
+      // El éxito NO se canta cuando el conjunto quedó a medias: el dueño tiene que saber que
+      // falta una, y la lista se recarga para que lo guardado sea lo que se ve.
+      expect(showToastSuccessMock).not.toHaveBeenCalled();
+      expect(catalogMock.getShowcaseImages).toHaveBeenCalledTimes(2);
+      // Solo la que se colgó sigue retenida: se reintenta sin volver a elegir los archivos.
+      expect(screen.getByTestId('showcase-carousel-pending')).toHaveTextContent(
+        '1 imágenes por subir',
+      );
+    });
+
+    it('si la subida se cae por red, avisa y deja el archivo retenido', async () => {
+      renderPage();
+
+      catalogMock.uploadShowcaseImage.mockRejectedValue({ isNetworkError: true });
+      selectFiles(await screen.findByTestId('showcase-carousel-upload'), [
+        new File(['x'], 'uno.jpg', { type: 'image/jpeg' }),
+      ]);
+      fireEvent.click(screen.getByTestId('showcase-carousel-save'));
+
+      // Sin conexión el error es real y hay que decirlo: un botón que no hace nada al pulsarlo
+      // es indistinguible de que no se haya leído.
+      await waitFor(() => expect(showBlockingErrorMock).toHaveBeenCalled());
+      // Y el archivo sigue ahí para reintentar: elegirlo otra vez sería volver a escribirlo todo.
+      expect(screen.getByTestId('showcase-carousel-pending')).toHaveTextContent(
+        '1 imágenes por subir',
+      );
+      expect(showToastSuccessMock).not.toHaveBeenCalled();
+      // La lista NO se recarga: nada se guardó, y recargarla solo haría parpadear la vista.
+      expect(catalogMock.getShowcaseImages).toHaveBeenCalledTimes(1);
+    });
+
     it('si el showcase no carga, el catálogo y sus productos siguen utilizables', async () => {
       catalogMock.getShowcaseImages.mockRejectedValue({ response: { status: 403 } });
       renderPage();
