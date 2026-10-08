@@ -15,13 +15,17 @@ namespace Infrastructure.Storage
 
     /// <summary>
     /// Guarda las imágenes del catálogo en disco con la estructura
-    /// <c>{tenantId}/{storeId}/{productId}/{guid}{ext}</c> (decisión D3, plan 2026-09-27), y las de
-    /// MARCA con <c>{tenantId}/{storeId}/branding/{kind}/{guid}{ext}</c> (F8).
+    /// <c>{tenantId}/{storeId}/{productId}/{guid}{ext}</c> (decisión D3, plan 2026-09-27), las de
+    /// MARCA con <c>{tenantId}/{storeId}/branding/{kind}/{guid}{ext}</c> (F8) y las de SHOWCASE con
+    /// <c>{tenantId}/{storeId}/catalog/{kind}/{guid}{ext}</c> (carrusel e imágenes del día).
     /// </summary>
     public sealed class CatalogImageStorage : ICatalogImageStorage
     {
         /// <summary>Carpeta que separa las imágenes de MARCA de las de producto (F8).</summary>
         private const string BrandingFolder = "branding";
+
+        /// <summary>Carpeta que separa las imágenes de SHOWCASE de las de producto y de marca.</summary>
+        private const string CatalogFolder = "catalog";
 
         private static readonly Dictionary<string, string> ContentTypesByExtension = new(StringComparer.OrdinalIgnoreCase)
         {
@@ -70,7 +74,29 @@ namespace Infrastructure.Storage
         }
 
         /// <summary>
-        /// Escribe el archivo de una clave ya compuesta. Lo comparten las dos formas de clave: la
+        /// Guarda una imagen de SHOWCASE (carrusel o imágenes del día). Igual que la marca, no hay
+        /// producto: el archivo es de la TIENDA, y la carpeta `catalog` con el `kind` ("carousel",
+        /// "daily") es lo que lo separa de las imágenes de producto y de las de marca.
+        ///
+        /// El `kind` se sanea por la misma razón que en `SaveBrandingAsync`: lo pone el backend, pero
+        /// la clave acaba siendo una ruta y `ResolveFullPath` solo protege contra traversal, no contra
+        /// un nivel de carpeta escondido.
+        /// </summary>
+        public Task<string> SaveCatalogImageAsync(CatalogImageUpload upload, Guid tenantId, Guid storeId, string kind,
+            CancellationToken cancellationToken = default)
+        {
+            string key = string.Join('/',
+                tenantId.ToString("N"),
+                storeId.ToString("N"),
+                CatalogFolder,
+                SanitizeKind(kind),
+                Guid.NewGuid().ToString("N") + ResolveExtension(upload));
+
+            return WriteAsync(key, upload, cancellationToken);
+        }
+
+        /// <summary>
+        /// Escribe el archivo de una clave ya compuesta. Lo comparten las TRES formas de clave: la
         /// parte que decide DÓNDE va el archivo es la que compone la clave, no la que escribe.
         /// </summary>
         private async Task<string> WriteAsync(string key, CatalogImageUpload upload,
@@ -124,7 +150,7 @@ namespace Infrastructure.Storage
             string result = sanitized.ToString().Trim('-');
             if (result.Length == 0)
                 throw new ArgumentException(
-                    $"El tipo de imagen de marca '{kind}' no deja un segmento de carpeta válido.", nameof(kind));
+                    $"El tipo de imagen '{kind}' no deja un segmento de carpeta válido.", nameof(kind));
 
             return result;
         }

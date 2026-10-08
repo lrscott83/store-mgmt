@@ -60,6 +60,21 @@ namespace Application.Dtos.OnlineOrdering
     /// </summary>
     public sealed class PublicOrderingConfigDto
     {
+        /// <summary>
+        /// Imágenes del carrusel de la cabecera, en el orden que eligió el dueño. VACÍA si la tienda no
+        /// tiene carrusel: el storefront solo lo pinta si hay alguna, así que con ninguna la página
+        /// funciona exactamente igual que hoy.
+        ///
+        /// URLs PÚBLICAS del endpoint de media, nunca claves: este config lo lee cualquiera que abra el
+        /// catálogo y una clave cruda filtraría la estructura del almacenamiento en disco.
+        /// </summary>
+        public IReadOnlyList<PublicShowcaseImageDto> CarouselImages { get; set; } = [];
+
+        /// <summary>
+        /// Imágenes del día (destacadas que el dueño cambia a mano), en el orden que eligió. VACÍA si
+        /// no hay ninguna. Independientes del carrusel: puede haber los dos, uno o ninguno.
+        /// </summary>
+        public IReadOnlyList<PublicShowcaseImageDto> DailyImages { get; set; } = [];
         /// <summary>Si la tienda acepta pedidos online. `false` = el storefront no ofrece carrito.</summary>
         public bool Enabled { get; set; }
 
@@ -99,6 +114,24 @@ namespace Application.Dtos.OnlineOrdering
         /// el storefront siempre tiene algo que pintar.
         /// </summary>
         public string PaletteId { get; set; } = StoreCatalogSettings.DefaultPaletteId;
+    }
+
+    /// <summary>
+    /// Una imagen del SHOWCASE tal como la ve el cliente del catálogo público: URL y pie de foto. Dos
+    /// campos y ni uno más.
+    ///
+    /// Deliberadamente NO lleva la clave: es una ruta interna de almacenamiento y este DTO lo lee
+    /// cualquiera que abra el catálogo. La URL la compone el config anónimo con el slug de la tienda
+    /// (`CatalogPublicUrls.Media`), que es el único que sabe resolverlo, y la sirve el MISMO endpoint
+    /// público de media que las imágenes de producto y las de marca.
+    /// </summary>
+    public sealed class PublicShowcaseImageDto
+    {
+        /// <summary>URL pública de la imagen.</summary>
+        public string Url { get; set; } = string.Empty;
+
+        /// <summary>Pie de foto opcional. null = sin pie.</summary>
+        public string? Caption { get; set; }
     }
 
     /// <summary>

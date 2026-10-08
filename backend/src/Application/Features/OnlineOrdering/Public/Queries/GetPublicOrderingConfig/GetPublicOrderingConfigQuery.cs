@@ -3,6 +3,8 @@ using Application.Dtos.OnlineOrdering;
 using Application.Exceptions;
 using Application.Features.WebCatalog.Public;
 using Application.ResponseModels;
+using Domain.Common.Enums;
+using Domain.Entities.StoreCatalogImages;
 using Domain.Entities.StoreCatalogSettings;
 using Domain.Entities.Stores;
 using Domain.Interfaces.Repositories;
@@ -24,9 +26,9 @@ namespace Application.Features.OnlineOrdering.Public.Queries.GetPublicOrderingCo
     /// catálogo publicado responden EXACTAMENTE igual, para que el anónimo no pueda usar el
     /// endpoint para averiguar qué tiendas existen.
     ///
-    /// OJO — filtro global por tenant: la configuración se lee con `GetPublicByStoreIdAsync`, la
-    /// lectura PÚBLICA del repositorio, que salta ese filtro. Con la lectura de sesión el anónimo
-    /// no obtendría fila alguna. Ver la nota del handler y del repositorio.
+    /// OJO — filtro global por tenant: la configuración y las imágenes del showcase se leen con
+    /// `GetPublicByStoreIdAsync`, la lectura PÚBLICA del repositorio, que salta ese filtro. Con la
+    /// lectura de sesión el anónimo no obtendría fila alguna. Ver la nota del handler y del repositorio.
     /// </summary>
     public sealed record GetPublicOrderingConfigQuery(string StoreSlug) : IQuery<PublicOrderingConfigDto>;
 
@@ -35,15 +37,18 @@ namespace Application.Features.OnlineOrdering.Public.Queries.GetPublicOrderingCo
     {
         private readonly IStoreRepository _storeRepository;
         private readonly IStoreCatalogSettingsRepository _storeCatalogSettingsRepository;
+        private readonly IStoreCatalogImageRepository _storeCatalogImageRepository;
         private readonly IStringLocalizer<I18n> _localizer;
 
         public GetPublicOrderingConfigQueryHandler(
             IStoreRepository storeRepository,
             IStoreCatalogSettingsRepository storeCatalogSettingsRepository,
+            IStoreCatalogImageRepository storeCatalogImageRepository,
             IStringLocalizer<I18n> localizer)
         {
             _storeRepository = storeRepository;
             _storeCatalogSettingsRepository = storeCatalogSettingsRepository;
+            _storeCatalogImageRepository = storeCatalogImageRepository;
             _localizer = localizer;
         }
 
@@ -63,6 +68,7 @@ namespace Application.Features.OnlineOrdering.Public.Queries.GetPublicOrderingCo
             // devolvería VACÍA siempre y el storefront vería `Enabled = false` para siempre.
             // Lo que acota el resultado es el `StoreId`, que el slug ya resolvió y es único global.
             StoreCatalogSettings? settings = await _storeCatalogSettingsRepository.GetPublicByStoreIdAsync(store.Id);
+            IList<StoreCatalogImage> images = await ReadShowcaseAsync(store);
 
             return ResponseResult.Success(new PublicOrderingConfigDto
             {
@@ -86,8 +92,49 @@ namespace Application.Features.OnlineOrdering.Public.Queries.GetPublicOrderingCo
                 PaletteId = string.IsNullOrWhiteSpace(settings?.PaletteId)
                     ? StoreCatalogSettings.DefaultPaletteId
                     : settings.PaletteId,
+                // El SHOWCASE se lee UNA vez para los dos conjuntos (ver `ReadShowcaseAsync`), y viaja igual que
+                // la marca: URL pública del endpoint de media, nunca la
+                // clave cruda. Sin imágenes —una tienda recién sincronizada, o una que no quiere
+                // carrusel— las dos listas salen VACÍAS y el storefront no pinta ni carrusel ni
+                // bloque del día, que es exactamente como debe verse el catálogo de una tienda que no
+                // los configuró.
+                CarouselImages = Showcase(images, StoreCatalogImageKind.Carousel, store.CatalogSlug),
+                DailyImages = Showcase(images, StoreCatalogImageKind.Daily, store.CatalogSlug),
             });
         }
+
+        /// <summary>
+        /// Lectura PÚBLICA de las imágenes del showcase, por el mismo motivo que la configuración de
+        /// arriba: sin `IgnoreQueryFilters` una petición anónima no obtendría fila alguna — el filtro
+        /// global por tenant no puede coincidir sin tenant en el contexto — y el carrusel se vería
+        /// siempre vacío, sin error ni aviso. Lo que acota el resultado es el `StoreId`, que el slug ya
+        /// resolvió y es único global.
+        ///
+        /// UNA sola lectura para los dos conjuntos: son las mismas filas y leerlas dos veces haría dos
+        /// viajes a la base para pintar dos bloques. Además, de una lista sale que las dos secciones del
+        /// storefront reflejan la MISMA foto de la tienda.
+        /// </summary>
+        private async Task<IList<StoreCatalogImage>> ReadShowcaseAsync(Store store)
+            => await _storeCatalogImageRepository.GetPublicByStoreIdAsync(store.Id);
+
+        /// <summary>
+        /// Imágenes de UN conjunto del showcase, ya como URLs públicas.
+        ///
+        /// El repositorio ya devuelve la lista ordenada por <c>OrderIndex</c> y aquí no se reordena,
+        /// para que la primera imagen del carrusel sea la que el dueño puso primera. Una key en blanco
+        /// se filtra: construiría una URL `/media/` que el storefront pediría como si fuera un
+        /// directorio.
+        /// </summary>
+        private static IReadOnlyList<PublicShowcaseImageDto> Showcase(
+            IEnumerable<StoreCatalogImage> images, StoreCatalogImageKind kind, string storeSlug)
+            => images
+                .Where(image => image.Kind == kind && !string.IsNullOrWhiteSpace(image.Key))
+                .Select(image => new PublicShowcaseImageDto
+                {
+                    Url = CatalogPublicUrls.Media(storeSlug, image.Key),
+                    Caption = image.Caption,
+                })
+                .ToList();
 
         /// <summary>
         /// URL pública de una imagen de MARCA, o null si no hay clave (o no hay slug).
