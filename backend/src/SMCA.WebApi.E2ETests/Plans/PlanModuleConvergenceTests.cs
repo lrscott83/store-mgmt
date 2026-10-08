@@ -158,7 +158,10 @@ public sealed class PlanModuleConvergenceTests
         // Elaboración (17) / Catálogo web (18)
         ((int)FeatureType.Recipes, OwnerAdminRole),
         ((int)FeatureType.Elaborations, OwnerAdminRole),
-        ((int)FeatureType.WebCatalog, OwnerAdminRole)
+        ((int)FeatureType.WebCatalog, OwnerAdminRole),
+        // Pedidos online (123, módulo 18): OnlineOrdersAdmin declara OwnerAdmin + StoreUser
+        // — a diferencia de WebCatalogAdmin (122), que es OwnerAdmin solo (D15).
+        ((int)FeatureType.OnlineOrders, OwnerAdminRole), ((int)FeatureType.OnlineOrders, StoreUserRole)
     ];
 
     /// <summary>Distinctive negotiated per-store prices, seeded on the row that gets reactivated.</summary>
