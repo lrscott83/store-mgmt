@@ -5,13 +5,15 @@ import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { isSuperAdmin } from '~/shared/lib/auth/authorization-service';
 import { useClickOutside } from '~/shared/lib/hooks/use-click-outside';
 import { useOnlineStatus } from '~/shared/lib/hooks/use-online-status';
-import { showToastError } from '~/shared/lib/toast';
+import { showToastError, showToastSuccess } from '~/shared/lib/toast';
 import { notificationsHttpService } from '~/shared/lib/notifications/notifications-http-service';
 import {
   getNotificationPermission,
   requestNotificationPermission,
   showSystemNotification,
 } from '~/shared/lib/notifications/notification-permission';
+import type { NotificationPermissionState } from '~/shared/lib/notifications/notification-permission';
+import { playNotificationSound } from '~/shared/lib/notifications/notification-sound';
 import type { NotificationDto } from '~/shared/lib/notifications/notifications-types';
 
 /**
@@ -67,6 +69,13 @@ export function NotificationShell() {
   const [isOpen, setIsOpen] = useState(false);
   const [items, setItems] = useState<readonly NotificationDto[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  /**
+   * Mirrored so the popover can react to a permission the user just changed in
+   * the browser. It is re-read whenever the panel opens — a value captured once
+   * on mount would keep showing a stale 'denied' after the user unblocked the
+   * site, hiding the recovery control when it is no longer needed.
+   */
+  const [permission, setPermission] = useState<NotificationPermissionState>('unsupported');
   const shellRef = useRef<HTMLDivElement>(null);
   const isOpenRef = useRef(false);
   /** Baseline of unread ids, compared to detect arrivals. */
@@ -125,7 +134,14 @@ export function NotificationShell() {
 
         const previousIds = new Set(previous.length > 0 ? previous.split('|') : []);
         const fresh = nextItems.filter((item) => !item.isRead && !previousIds.has(item.id));
-        if (fresh.length > 0) fireSystemPopup(intl, fresh[0]);
+        if (fresh.length > 0) {
+          fireSystemPopup(intl, fresh[0]);
+          // One beep per ARRIVAL, next to the popup it announces: the OS sound is
+          // the browser's, so the in-app cue is what guarantees an audible signal
+          // even with no Notification permission at all. Inside the same branch,
+          // so the baseline population above can never beep.
+          void playNotificationSound();
+        }
         return signature !== previous;
       } catch {
         if (!background) showToastError(intl.formatMessage({ id: 'NOTIFICATIONS.LOAD_ERROR' }));
@@ -160,6 +176,47 @@ export function NotificationShell() {
       await refresh();
     } catch {
       showToastError(intl.formatMessage({ id: 'NOTIFICATIONS.MARK_ERROR' }));
+    }
+  }
+
+  /**
+   * Asks the browser for the OS popup again, after it answered 'denied' once.
+   *
+   * This bypasses `requestNotificationPermission` on purpose: that helper is
+   * deliberately once-per-session and returns early on anything but 'default',
+   * which is correct for the automatic prompt and exactly wrong here. A 'denied'
+   * answer is otherwise terminal — the helper never re-asks, so a SuperAdmin who
+   * clicked "Block" once had no way back and this control is the only exit.
+   *
+   * Re-prompting is not guaranteed: browsers that persist the block per origin
+   * just answer 'denied' again. That is reported, not swallowed, because a
+   * button that appears to do nothing is worse than one that says so.
+   */
+  async function handleRetryPermission() {
+    const ctor = typeof window !== 'undefined' && typeof window.Notification === 'function'
+      ? window.Notification
+      : null;
+
+    if (!ctor) {
+      setPermission('unsupported');
+      return;
+    }
+
+    let next: NotificationPermissionState = 'denied';
+    try {
+      next = (await ctor.requestPermission()) as NotificationPermissionState;
+    } catch {
+      // A browser that throws on the request is treated as still blocked.
+    }
+
+    setPermission(next);
+    if (next === 'granted') {
+      showToastSuccess(intl.formatMessage({ id: 'NOTIFICATIONS.PERMISSION_RESTORED' }));
+    } else if (next === 'default') {
+      // The browser asked again and the user has not answered yet: nothing to
+      // report, the permission will be re-read the next time the panel opens.
+    } else if (next === 'denied') {
+      showToastError(intl.formatMessage({ id: 'NOTIFICATIONS.PERMISSION_STILL_DENIED' }));
     }
   }
 
@@ -239,6 +296,7 @@ export function NotificationShell() {
     const next = !isOpen;
     setPanelOpen(next);
     if (next && isOnline) void refresh();
+    if (next) setPermission(getNotificationPermission());
   }
 
   // Self-gate: mounted unconditionally by the navbar, but the bell and ALL of
@@ -293,6 +351,25 @@ export function NotificationShell() {
               {intl.formatMessage({ id: 'NOTIFICATIONS.MARK_ALL' })}
             </button>
           </div>
+
+          {/* Shown ONLY on 'denied'. The automatic prompt cannot ask a second time, so this is the one place a SuperAdmin can act on a block they can no longer undo from the page. Nothing is rendered for 'default'/'granted'/'unsupported': there is either nothing to recover or no browser to ask. */}
+          {permission === 'denied' && (
+            <div
+              className="flex items-center justify-between gap-2 border-b border-border bg-surface-hover px-3 py-2"
+              data-testid="notification-permission-recovery"
+            >
+              <p className="text-[11px] text-text-muted">
+                {intl.formatMessage({ id: 'NOTIFICATIONS.PERMISSION_DENIED' })}
+              </p>
+              <button
+                type="button"
+                onClick={() => void handleRetryPermission()}
+                className="shrink-0 rounded-md px-2 py-1 text-xs font-semibold text-primary hover:bg-primary-light transition-colors"
+              >
+                {intl.formatMessage({ id: 'NOTIFICATIONS.PERMISSION_RETRY' })}
+              </button>
+            </div>
+          )}
 
           <div className="max-h-72 overflow-y-auto px-2 py-2">
             {items.length === 0 ? (
