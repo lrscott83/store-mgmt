@@ -32,6 +32,8 @@ const CONFIG: PublicOrderingConfig = {
   paletteId: 'default',
   logoUrl: null,
   bannerUrl: null,
+  carouselImages: [],
+  dailyImages: [],
 };
 
 const LINE: StorefrontCartLine = {
