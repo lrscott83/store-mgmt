@@ -4,6 +4,7 @@ import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 import { useStorefrontCartStore } from '~/catalog/lib/storefront-cart-store';
 import { useCartStore } from '~/shared/lib/stores/cart-store';
+import type { UserModel } from '@store-mgmt/domain';
 import type {
   PublicCatalog,
   PublicCatalogProduct,
@@ -17,6 +18,21 @@ const useParamsMock = vi.hoisted(() => vi.fn(() => ({ storeSlug: 'mi-tienda' }))
 vi.mock('react-router', () => ({
   useParams: () => useParamsMock(),
 }));
+
+// La página decide el modo staff leyendo la sesión, así que el store se sustituye por un estado
+// MUTABLE: por defecto anónimo —que es lo que ve el resto de esta suite, porque la ruta es
+// pública— y `setSession` introduce a un staff concreto para probar el cableado. El store real
+// ejecuta `initialize()` al importarse (y con él un `/me` de fondo), así que aquí no se deja
+// entrar: lo que se prueba aquí es la página, no la hidratación.
+const session = vi.hoisted(() => ({ current: null as UserModel | null }));
+
+vi.mock('~/shared/lib/stores/auth-store', () => {
+  const useAuthStore = vi.fn(
+    (selector: (state: { user: UserModel | null; isAuthenticated: boolean }) => unknown) =>
+      selector({ user: session.current, isAuthenticated: session.current !== null }),
+  );
+  return { useAuthStore };
+});
 
 const catalogMock = vi.hoisted(() => ({
   getPublicCatalog: vi.fn(),
@@ -103,9 +119,38 @@ function renderPage() {
   );
 }
 
+/** Sesión de `/me` reducida a lo que la regla de elegibilidad mira. */
+function makeUser(overrides: Partial<UserModel> = {}): UserModel {
+  return {
+    login: 'ana@tienda.cu',
+    authToken: 'tok',
+    refreshToken: 'ref',
+    expiresIn: Date.now() + 3_600_000,
+    id: 'u1',
+    fullName: 'Ana Pérez',
+    cellPhone: '5351234567',
+    email: 'ana@tienda.cu',
+    isActive: true,
+    password: '',
+    roles: [],
+    featureIds: [],
+    storeModuleIds: [],
+    isSuperAdmin: false,
+    isOwnerAdmin: false,
+    isReSeller: false,
+    selectedStoreId: '',
+    paymentDueDate: null,
+    isInTrial: false,
+    paymentStatus: 'AlDia',
+    ...overrides,
+  };
+}
+
 describe('PublicCatalogPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // La ruta es pública: sin sesión salvo que un test la ponga.
+    session.current = null;
     useParamsMock.mockReturnValue({ storeSlug: 'mi-tienda' });
     catalogMock.getPublicCatalog.mockResolvedValue(envelope(CATALOG));
     catalogMock.getPublicProducts.mockResolvedValue(envelope(page([makeProduct()])));
@@ -568,6 +613,122 @@ describe('PublicCatalogPage', () => {
       expect(screen.getByTestId('order-status-delivery-type')).toHaveTextContent(
         'Recogida en la tienda',
       );
+    });
+  });
+
+  // ── STAFF DE LA TIENDA REGISTRANDO SIN WHATSAPP (D2) ───────────────────────────────────
+  describe('staff de la tienda registrando sin WhatsApp', () => {
+    beforeEach(() => {
+      useStorefrontCartStore.setState({ itemsByStore: {} });
+      localStorage.clear();
+      // CON número de WhatsApp a propósito: si la tienda lo tiene, el flujo normal SÍ abre el
+      // chat, así que que el modo staff no lo abra es una decisión y no una degradación por
+      // falta de número.
+      catalogMock.createPublicOrder.mockResolvedValue(
+        envelope({
+          id: 'o1',
+          code: 'K7M2QX',
+          total: 82.5,
+          currency: 0,
+          whatsappNumber: '+53 5-987 6543',
+        }),
+      );
+    });
+
+    /** Monta la página CON esa sesión y lleva al checkout, que es donde se ve el modo staff. */
+    async function openCheckoutAs(user: UserModel | null) {
+      session.current = user;
+      renderPage();
+
+      await screen.findByTestId('catalog-add-cp1');
+      fireEvent.click(screen.getByTestId('catalog-add-cp1'));
+      fireEvent.click(screen.getByTestId('catalog-cart-button'));
+      fireEvent.click(await screen.findByTestId('catalog-cart-checkout'));
+      return screen.findByTestId('catalog-checkout-modal');
+    }
+
+    function fillAndSubmit(checkout: HTMLElement) {
+      fireEvent.change(within(checkout).getByTestId('checkout-name'), {
+        target: { value: 'Cliente en el local' },
+      });
+      fireEvent.change(within(checkout).getByTestId('checkout-phone'), {
+        target: { value: '5351234567' },
+      });
+      fireEvent.click(within(checkout).getByTestId('checkout-submit'));
+    }
+
+    it('el owner de la tienda registra el pedido: sin wa.me, sin aviso, con el código a la vista', async () => {
+      const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+      // `CATALOG.storeId` es 's1': es ese id real —no el slug— contra el que se decide el modo.
+      const checkout = await openCheckoutAs(makeUser({ isOwnerAdmin: true, selectedStoreId: 's1' }));
+
+      // La etiqueta anuncia lo que va a pasar, antes de que pase: no se "envía" nada.
+      expect(within(checkout).getByTestId('checkout-submit')).toHaveTextContent('Registrar pedido');
+
+      fillAndSubmit(checkout);
+
+      // El alta es la MISMA que la del cliente anónimo: mismos campos, mismos pasos (D3).
+      await waitFor(() => expect(catalogMock.createPublicOrder).toHaveBeenCalledTimes(1));
+      const [slug, payload] = catalogMock.createPublicOrder.mock.calls[0] as [
+        string,
+        Record<string, unknown>,
+      ];
+      expect(slug).toBe('mi-tienda');
+      expect(payload['items']).toEqual([{ productId: 'cp1', quantity: 1 }]);
+      expect(payload).not.toHaveProperty('total');
+
+      // Lo único que cambia: nada sale a WhatsApp. El padre abre el estado del pedido creado,
+      // que es la confirmación.
+      expect(openSpy).not.toHaveBeenCalled();
+      expect(screen.queryByTestId('checkout-whatsapp-notice')).not.toBeInTheDocument();
+      expect(await screen.findByTestId('order-code')).toHaveTextContent('K7M2QX');
+      openSpy.mockRestore();
+    });
+
+    it('un StoreUser de la tienda también registra el pedido, sin el aviso', async () => {
+      const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+      const checkout = await openCheckoutAs(
+        makeUser({
+          roles: [{ storeId: 's1', storeName: 'Moda Cubana', moduleId: 1, featureIds: [1] }],
+        }),
+      );
+
+      expect(within(checkout).getByTestId('checkout-submit')).toHaveTextContent('Registrar pedido');
+      fillAndSubmit(checkout);
+
+      await waitFor(() => expect(catalogMock.createPublicOrder).toHaveBeenCalledTimes(1));
+      expect(openSpy).not.toHaveBeenCalled();
+      expect(screen.queryByTestId('checkout-whatsapp-notice')).not.toBeInTheDocument();
+      expect(await screen.findByTestId('order-code')).toHaveTextContent('K7M2QX');
+      openSpy.mockRestore();
+    });
+
+    it.each([
+      ['anónimo', null],
+      [
+        'un owner de OTRA tienda',
+        makeUser({
+          isOwnerAdmin: true,
+          selectedStoreId: 's-otra',
+          storeList: [{ id: 's-otra', name: 'Otra' }],
+        }),
+      ],
+      ['un SuperAdmin', makeUser({ isSuperAdmin: true, isOwnerAdmin: true, selectedStoreId: 's1' })],
+      ['un ReSeller', makeUser({ isReSeller: true, selectedStoreId: 's1' })],
+    ] as const)('%s sigue con el flujo de envío por WhatsApp', async (_label, user) => {
+      const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+
+      const checkout = await openCheckoutAs(user);
+      // Etiqueta de cliente: la del flujo intacto.
+      expect(within(checkout).getByTestId('checkout-submit')).toHaveTextContent('Enviar pedido');
+
+      fillAndSubmit(checkout);
+
+      await waitFor(() => expect(catalogMock.createPublicOrder).toHaveBeenCalledTimes(1));
+      // Y con aviso de WhatsApp, que es lo que este visitante sigue necesitando.
+      expect(openSpy).toHaveBeenCalledTimes(1);
+      expect(await screen.findByTestId('checkout-whatsapp-pending')).toHaveTextContent('K7M2QX');
+      openSpy.mockRestore();
     });
   });
 });

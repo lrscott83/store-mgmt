@@ -556,6 +556,11 @@ const messages: Record<string, string> = {
   'CHECKOUT.ERROR_EMPTY': 'Añade al menos un producto antes de pedir.',
   'CHECKOUT.SUBMIT': 'Enviar pedido',
   'CHECKOUT.SUBMITTING': 'Enviando pedido…',
+  // Staff de la tienda (owner o StoreUser) haciendo el pedido en la misma vista pública: el
+  // cliente está presente, así que el pedido se REGISTRA y no se envía a WhatsApp. Mismo formulario,
+  // mismo pedido; lo único que cambia es que no hay nada que enviar.
+  'CHECKOUT.SUBMIT_STAFF': 'Registrar pedido',
+  'CHECKOUT.SUBMITTING_STAFF': 'Registrando pedido…',
   'CHECKOUT.FAILED': 'No se pudo crear el pedido. Inténtalo de nuevo.',
   'CHECKOUT.DELIVERY_FEE': 'Costo del envío',
   'CHECKOUT.MINIMUM_ORDER': 'Importe mínimo del pedido',

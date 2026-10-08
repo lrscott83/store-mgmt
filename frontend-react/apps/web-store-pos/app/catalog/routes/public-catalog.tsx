@@ -13,6 +13,8 @@ import { StorefrontCart } from '~/catalog/components/storefront-cart';
 import { StorefrontCheckout } from '~/catalog/components/storefront-checkout';
 import { StorefrontOrderStatus } from '~/catalog/components/storefront-order-status';
 import { useStorefrontCartStore } from '~/catalog/lib/storefront-cart-store';
+import { isCatalogStoreStaff } from '~/catalog/lib/catalog-staff';
+import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import {
   catalogHttpService,
   type PublicCatalog,
@@ -41,6 +43,13 @@ type CatalogState = 'loading' | 'ready' | 'not-found' | 'offline';
 export function PublicCatalogPage() {
   const intl = useIntl();
   const { storeSlug = '' } = useParams<{ storeSlug: string }>();
+
+  /**
+   * Quién está mirando esta carta. La ruta es PÚBLICA y no exige sesión: `isAuthenticated`
+   * discrimina al visitante anónimo (el caso normal, con envío por WhatsApp) del staff de ESTA
+   * tienda, que registra el pedido en vez de enviarlo.
+   */
+  const user = useAuthStore((s) => (s.isAuthenticated ? s.user : null));
 
   const [catalog, setCatalog] = useState<PublicCatalog | null>(null);
   const [page, setPage] = useState<PublicCatalogPage | null>(null);
@@ -87,6 +96,13 @@ export function PublicCatalogPage() {
 
   /** Publicar el catálogo y aceptar pedidos son DOS interruptores distintos (F1). */
   const orderingEnabled = orderingConfig?.enabled ?? false;
+
+  /**
+   * Staff de ESTA tienda viendo su propia carta: el pedido se registra y no se manda a WhatsApp
+   * (D2). Anónimo, SuperAdmin/ReSeller y staff de otra tienda siguen con el flujo de siempre.
+   * Se calcula sobre `catalog.storeId` —el id real detrás del slug— y no sobre el slug.
+   */
+  const staffMode = isCatalogStoreStaff(user, catalog?.storeId);
 
   function addProductToCart(product: PublicCatalogProduct) {
     addToCart(storeSlug, {
@@ -663,6 +679,7 @@ export function PublicCatalogPage() {
           storeSlug={storeSlug}
           config={orderingConfig}
           lines={cartLines}
+          staffMode={staffMode}
           onCreated={(order) => {
             clearCart(storeSlug);
             setCheckoutOpen(false);

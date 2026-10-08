@@ -41,6 +41,15 @@ interface StorefrontCheckoutProps {
   readonly lines: readonly StorefrontCartLine[];
   /** Se llama con la orden creada para que el padre la pinte y vacíe el carrito. */
   readonly onCreated: (order: PublicOrderCreated) => void;
+  /**
+   * Quien registra el pedido es STAFF de esta tienda: el cliente está presente, así que el
+   * pedido se da de alta y no se envía a WhatsApp (y no hay aviso que dar). Todo lo demás —mismos
+   * campos, misma llamada, misma validación— es idéntico (decisión D3).
+   *
+   * Por defecto `false`: el catálogo público lo es para cualquiera, y quien no es staff de la
+   * tienda sigue con el flujo de envío intacto.
+   */
+  readonly staffMode?: boolean;
 }
 
 /**
@@ -59,6 +68,7 @@ export function StorefrontCheckout({
   config,
   lines,
   onCreated,
+  staffMode = false,
 }: StorefrontCheckoutProps) {
   const intl = useIntl();
   const [customerName, setCustomerName] = useState('');
@@ -121,7 +131,17 @@ export function StorefrontCheckout({
         return;
       }
 
-      // El pedido YA está guardado: esto solo manda el aviso. `buildWhatsAppOrderLink` devuelve
+      // El pedido YA está guardado. En modo staff eso es TODO lo que hay que hacer: el cliente
+      // está delante y el pedido es suyo, así que no se arma el enlace, no se abre `wa.me` y no
+      // se pinta aviso. `onCreated` es lo que el padre ya usaba como confirmación (cierra el
+      // checkout y abre el estado del pedido recién creado), así que el mismo gesto confirma
+      // igual en los dos modos.
+      if (staffMode) {
+        onCreated(result.data);
+        return;
+      }
+
+      // Aquí lo único que queda es mandar el aviso. `buildWhatsAppOrderLink` devuelve
       // `null` cuando la tienda no tiene número utilizable, y en ese caso NO se abre nada — el
       // envío queda bloqueado y el pedido sigue existiendo (la tienda lo ve en su panel).
       const link = buildWhatsAppOrderLink({
@@ -347,7 +367,13 @@ export function StorefrontCheckout({
               data-testid="checkout-submit"
             >
               {intl.formatMessage({
-                id: submitting ? 'CHECKOUT.SUBMITTING' : 'CHECKOUT.SUBMIT',
+                id: staffMode
+                  ? submitting
+                    ? 'CHECKOUT.SUBMITTING_STAFF'
+                    : 'CHECKOUT.SUBMIT_STAFF'
+                  : submitting
+                    ? 'CHECKOUT.SUBMITTING'
+                    : 'CHECKOUT.SUBMIT',
               })}
             </Button>
           </div>
