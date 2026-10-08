@@ -713,9 +713,9 @@ describe('RegisterPage — field order puts the contact pair below the credentia
         document.getElementById(id)!,
       );
 
-    expect(indexOf('fullName')).toBeLessThan(indexOf('login'));
-    expect(indexOf('login')).toBeLessThan(indexOf('storeName'));
-    expect(indexOf('storeName')).toBeLessThan(indexOf('password'));
+    expect(indexOf('fullName')).toBeLessThan(indexOf('storeName'));
+    expect(indexOf('storeName')).toBeLessThan(indexOf('login'));
+    expect(indexOf('login')).toBeLessThan(indexOf('password'));
     expect(indexOf('email')).toBeLessThan(indexOf('acceptTerms'));
   });
 });
