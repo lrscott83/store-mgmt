@@ -1,4 +1,4 @@
-﻿import { type RouteConfig, index, layout, route } from '@react-router/dev/routes';
+import { type RouteConfig, index, layout, route } from '@react-router/dev/routes';
 
 export default [
   // Public landing page â€” no auth required, matches Angular's unguarded '' route.
@@ -48,6 +48,10 @@ export default [
     // arriba a propósito: `featureLoader([EFeatures.OnlineOrders])`, no `ownerModuleLoader`,
     // porque el backend lo exige con `OnlineOrdersAdmin` (OwnerAdmin Y StoreUser, D15).
     route('sales/online-orders/drivers', 'sales/routes/ordering-drivers.tsx'),
+    // Gestión de pedidos (feature 123, F5): la tabla de pedidos del día a día. Gate DISTINTO del
+    // de arriba: featureLoader(OnlineOrdersAdmin), que además del OwnerAdmin deja entrar al
+    // StoreUser (D15) — atender un pedido no es cosa del dueño.
+    route('sales/online-orders', 'sales/routes/ordering-orders.tsx'),
     // Sales â€” POS & Orders
     route('sales/new', 'sales/routes/sale.tsx'),
     // Sales â€” Wholesale (mismo guard de Ventas)

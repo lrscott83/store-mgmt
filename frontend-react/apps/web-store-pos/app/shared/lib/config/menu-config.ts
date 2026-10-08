@@ -209,6 +209,23 @@ export const MENU_GROUPS: MenuGroup[] = [
           'Repartidores. Da de alta las personas que reparten los pedidos de tu tienda, con su nombre y su teléfono, y actívalas o desactívalas cuando dejan de repartir. Al atender cada pedido eliges cuál lo lleva.' +
           BETA_NOTICE,
       },
+
+      // Gestión de pedidos (feature 123, F5): la tabla de pedidos del día a día. El item de ARRIBA
+      // es la CONFIGURACIÓN (feature 122, solo el dueño); este lo opera también el StoreUser, así
+      // que lleva SU feature y NO un `rolesOnly` de dueño. El `moduleIds` replica el módulo 18 del
+      // backend ([HasModule(ModuleType.WebCatalog)] en `OnlineOrdersAdmin`).
+      {
+        label: 'MENU.ONLINE_ORDERS',
+        path: '/sales/online-orders',
+        featureIds: [EFeatures.OnlineOrders],
+        moduleId: EModules.WebCatalog,
+        moduleIds: [EModules.WebCatalog],
+        isNew: true,
+        helpContent:
+          'Repartidores. Da de alta las personas que reparten los pedidos de tu tienda, con su nombre y su teléfono, y actívalas o desactívalas cuando dejan de repartir. Al atender cada pedido eliges cuál lo lleva.' +
+          'Pedidos. Los pedidos que llegan por WhatsApp, filtrables por estado, pago, entrega, repartidor, fechas y búsqueda por código o teléfono. Desde aquí confirmas el pedido, lo dejas en preparación o listo, lo entregas, lo cancelas, marcas el pago y asignas el repartidor.' +
+          BETA_NOTICE,
+      },
       {
         label: 'MENU.SALE',
         path: '/sales/new',

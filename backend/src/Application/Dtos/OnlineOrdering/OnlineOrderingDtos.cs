@@ -152,4 +152,150 @@ namespace Application.Dtos.OnlineOrdering
         /// <summary>Precio unitario del snapshot, no el del catálogo de hoy.</summary>
         public decimal Price { get; set; }
     }
+
+    // --- Lecturas de gestión de pedidos (F5, vista "Pedidos") ---------------------------------
+
+    /// <summary>
+    /// Una fila de la tabla de pedidos de la tienda del contexto (F5). Es lo mínimo que la tabla
+    /// pinta y lo máximo que se puede leer SIN cargar las líneas: el listado trae pedidos completos
+    /// en una sola consulta, y las líneas solo se piden al abrir uno (T1 frente a T2).
+    ///
+    /// NO lleva `StoreId`: la lista es siempre de la tienda de la sesión, así que publicarlo sería
+    /// redundante y abriría la puerta a que el frontend lo relajara como filtro.
+    /// </summary>
+    public sealed class OnlineOrderListItemDto
+    {
+        /// <summary>Identificador del pedido. Es lo que llevan las acciones de estado/pago/repartidor.</summary>
+        public Guid Id { get; set; }
+
+        /// <summary>Código público dictado por WhatsApp. null en ventas del POS.</summary>
+        public string? Code { get; set; }
+
+        /// <summary>Nombre de quien pide. null en ventas del POS.</summary>
+        public string? CustomerName { get; set; }
+
+        /// <summary>Teléfono de quien pide. Es lo que la búsqueda (`search`) contrasta junto al código.</summary>
+        public string? CustomerPhone { get; set; }
+
+        /// <summary>Recogida o envío a domicilio.</summary>
+        public OrderDeliveryType DeliveryType { get; set; }
+
+        /// <summary>Importe del pedido (líneas + costo de envío), en <see cref="Currency"/>.</summary>
+        public decimal Total { get; set; }
+
+        /// <summary>Moneda de <see cref="Total"/> y de los precios de las líneas. La pone el catálogo.</summary>
+        public Currency Currency { get; set; }
+
+        /// <summary>Estado del pedido (D11).</summary>
+        public OrderStatus Status { get; set; }
+
+        /// <summary>Pago manual (D3/D12). Independiente de <see cref="Status"/>.</summary>
+        public OrderPaymentStatus PaymentStatus { get; set; }
+
+        /// <summary>Repartidor asignado. null mientras nadie lo asigne (F7).</summary>
+        public Guid? DriverId { get; set; }
+
+        /// <summary>
+        /// Nombre del repartidor YA resuelto. Viene desnormalizado a propósito: la tabla lo pinta
+        /// y así la vista no necesita una segunda consulta de repartidores por cada fila.
+        /// null si no hay repartidor asignado.
+        /// </summary>
+        public string? DriverName { get; set; }
+
+        /// <summary>Momento del pedido. Es la columna de orden del listado (del más nuevo al más viejo).</summary>
+        public DateTime Date { get; set; }
+    }
+
+    /// <summary>
+    /// Una línea del detalle de un pedido (F5, T2). Es el SNAPSHOT que el servidor resolvió al
+    /// crear el pedido, no una lectura del catálogo: cambiar el precio de un producto después NO
+    /// reescribe el pedido ya hecho.
+    /// </summary>
+    public sealed class OnlineOrderLineDto
+    {
+        /// <summary>Producto comprado. Se mantiene aunque el producto después se dé de baja.</summary>
+        public Guid ProductId { get; set; }
+
+        /// <summary>Nombre del producto en el momento del pedido.</summary>
+        public string Name { get; set; } = string.Empty;
+
+        public int Quantity { get; set; }
+
+        /// <summary>Precio UNITARIO en el momento del pedido.</summary>
+        public decimal Price { get; set; }
+
+        /// <summary>Moneda de <see cref="Price"/>.</summary>
+        public Currency Currency { get; set; }
+
+        /// <summary>
+        /// Importe de la línea (`Quantity * Price`). Viaja calculado para que la vista no tenga que
+        /// repetir la multiplicación con una moneda distinta a la que espera.
+        /// </summary>
+        public decimal LineTotal { get; set; }
+    }
+
+    /// <summary>
+    /// Detalle de UN pedido (F5, T2). Lleva TODO lo de <see cref="OnlineOrderListItemDto"/> y además
+    /// las líneas, el domicilio y las notas: es el pedido entero, que es lo que se abre para
+    /// confirmar, imprimir o auditar.
+    /// </summary>
+    public sealed class OnlineOrderDetailDto
+    {
+        public Guid Id { get; set; }
+
+        public string? Code { get; set; }
+
+        public string? CustomerName { get; set; }
+
+        public string? CustomerPhone { get; set; }
+
+        public OrderDeliveryType DeliveryType { get; set; }
+
+        /// <summary>Importe del pedido (líneas + costo de envío), en <see cref="Currency"/>.</summary>
+        public decimal Total { get; set; }
+
+        public Currency Currency { get; set; }
+
+        public OrderStatus Status { get; set; }
+
+        public OrderPaymentStatus PaymentStatus { get; set; }
+
+        public Guid? DriverId { get; set; }
+
+        public string? DriverName { get; set; }
+
+        public DateTime Date { get; set; }
+
+        /// <summary>Domicilio. Obligatorio solo con <see cref="OrderDeliveryType.Delivery"/>.</summary>
+        public string? DeliveryAddress { get; set; }
+
+        /// <summary>Notas que dejó quien pidió.</summary>
+        public string? Notes { get; set; }
+
+        /// <summary>
+        /// Líneas del pedido EN EL ORDEN EN QUE SE PIDIERON (`OrderItem.OrderIndex`), no en el
+        /// orden arbitrario que devuelva la base: el orden de la lista es parte de lo que el cliente
+        /// escribió y de lo que se confirma leyendo.
+        /// </summary>
+        public List<OnlineOrderLineDto> Lines { get; set; } = new();
+    }
+
+    /// <summary>
+    /// Página de pedidos de la tienda del contexto (F5, T1). Mismo contrato que la página del
+    /// catálogo público: `Items` ya viene paginada y `Total` es el TOTAL FILTRADO, no el de la
+    /// tienda — es lo que la vista necesita para saber cuántas páginas hay.
+    /// </summary>
+    public sealed class OnlineOrderPageDto
+    {
+        public List<OnlineOrderListItemDto> Items { get; set; } = new();
+
+        /// <summary>Cuántos pedidos cumplen los filtros, en toda la tienda (no solo en esta página).</summary>
+        public int Total { get; set; }
+
+        /// <summary>Página devuelta, ya normalizada (siempre ≥ 1).</summary>
+        public int Page { get; set; }
+
+        /// <summary>Tamaño de página realmente aplicado, ya acotado por el máximo del handler.</summary>
+        public int PageSize { get; set; }
+    }
 }
