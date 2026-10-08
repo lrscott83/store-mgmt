@@ -2,6 +2,7 @@ using Application.Abstractions.HttpContext;
 using Application.Dtos.StoreManagement;
 using Application.Exceptions;
 using Application.Features.StoreManagement.Stores.Commands.CreateStore;
+using Application.Services.Notifications;
 using Application.UnitOfWorks;
 using AutoMapper;
 using Domain.Common.Enums;
@@ -9,15 +10,18 @@ using Domain.Common.Extensions;
 using Domain.Common.Utils;
 using Domain.Entities.Billing;
 using Domain.Entities.Modules;
+using Domain.Entities.Notifications;
 using Domain.Entities.Owners;
 using Domain.Entities.Plans;
 using Domain.Entities.StoreModules;
 using Domain.Entities.Stores;
+using Domain.Entities.Users;
 using Domain.Interfaces.Repositories;
 using Domain.Interfaces.Services.Billing;
 using Domain.Interfaces.Services.Stores;
 using FluentAssertions;
 using Microsoft.Extensions.Localization;
+using Microsoft.Extensions.Logging;
 using Moq;
 using Resources;
 using System.Net;
@@ -41,6 +45,7 @@ public class CreateStoreCommandHandlerTests
     private readonly Mock<IMapper> _mockMapper;
     private readonly Mock<IStringLocalizer<I18n>> _mockLocalizer;
     private readonly Mock<ICreateStoreService> _mockCreateStoreService;
+    private readonly Mock<IOwnerRegistrationNotificationService> _mockOwnerRegistrationNotificationService;
     private readonly CreateStoreCommandHandler _handler;
 
     private readonly Guid _callerUserId = Guid.NewGuid();
@@ -57,6 +62,7 @@ public class CreateStoreCommandHandlerTests
         _mockMapper = new Mock<IMapper>();
         _mockLocalizer = new Mock<IStringLocalizer<I18n>>();
         _mockCreateStoreService = new Mock<ICreateStoreService>();
+        _mockOwnerRegistrationNotificationService = new Mock<IOwnerRegistrationNotificationService>();
 
         _mockUnitOfWork.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(1);
@@ -72,7 +78,16 @@ public class CreateStoreCommandHandlerTests
             .Setup(x => x.GetActivePlanWithModulesByIdAsync((int)StorePlanType.Pago))
             .ReturnsAsync(pagoPlan);
 
-        _handler = new CreateStoreCommandHandler(
+        _handler = CreateHandler(_mockOwnerRegistrationNotificationService.Object);
+    }
+
+    /// <summary>
+    /// Factory, not a second inline construction: one test needs the REAL notification service over
+    /// a throwing repository, and duplicating a 10-argument call to allow that would let the two
+    /// constructions drift apart.
+    /// </summary>
+    private CreateStoreCommandHandler CreateHandler(IOwnerRegistrationNotificationService notificationService)
+        => new(
             _mockUnitOfWork.Object,
             _mockOwnerRepository.Object,
             _mockStoreModuleRepository.Object,
@@ -81,8 +96,8 @@ public class CreateStoreCommandHandlerTests
             _mockHttpContextService.Object,
             _mockMapper.Object,
             _mockLocalizer.Object,
-            _mockCreateStoreService.Object);
-    }
+            _mockCreateStoreService.Object,
+            notificationService);
 
     private CreateStoreCommand CreateOwnerCommand(Guid ownerId = default)
         => new(ownerId, "New Store", "Address 1", null, false, new List<int>());
@@ -146,6 +161,24 @@ public class CreateStoreCommandHandlerTests
         _mockMapper
             .Setup(x => x.Map<StoreDto>(It.IsAny<Store>()))
             .Returns(new StoreDto { Id = created.Id, Name = created.Name, OwnerId = created.OwnerId, Approved = created.Approved });
+    }
+
+    /// <summary>
+    /// SuperAdmin-branch owner WITH its <c>User</c> loaded, mirroring what
+    /// <c>GetOwnerIncludingUserByIdAsync</c> really returns (it <c>Include</c>s <c>o.User</c>). The
+    /// owner's full name and cell phone both live on that navigation — never on <c>Owner</c> — so a
+    /// fixture without it would exercise the "nothing to report" branch instead of the notice.
+    /// </summary>
+    private Owner ArrangeSuperAdminOwner(string fullName, string? cellPhone)
+    {
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var owner = Owner.Create(userId, false, tenantId, "Owner");
+        owner.User = User.Create(userId, "ana", "pwd", fullName, cellPhone, "ana@example.com", tenantId);
+        _mockOwnerRepository
+            .Setup(x => x.GetOwnerIncludingUserByIdAsync(owner.Id, CancellationToken.None))
+            .ReturnsAsync(owner);
+        return owner;
     }
 
     #region Gate 2
@@ -348,6 +381,98 @@ public class CreateStoreCommandHandlerTests
         var result = await _handler.Handle(request, CancellationToken.None);
 
         result.Succeeded.Should().BeFalse();
+    }
+
+    #endregion
+
+    #region SuperAdmin notice on store creation
+
+    [Fact]
+    public async Task Handle_notifies_super_admin_with_owner_name_cellphone_and_store()
+    {
+        ArrangeRoles(isSuperAdmin: true, isOwnerAdmin: false);
+        var owner = ArrangeSuperAdminOwner("Ana Gómez", "+5491122334455");
+        ArrangeStoreCreation(owner, out _);
+        var request = new CreateStoreCommand(owner.Id, "Admin Store", null, null, false, new List<int> { 1 });
+
+        var result = await _handler.Handle(request, CancellationToken.None);
+
+        result.Succeeded.Should().BeTrue();
+        // "New Store" is the name the CREATED store carries (what CreateStoreAsync returned), not
+        // the command's name: the notice reports the store that actually landed.
+        _mockOwnerRegistrationNotificationService.Verify(
+            x => x.NotifyAsync(
+                It.Is<OwnerRegistrationNotification.OwnerRegistrationTarget>(t =>
+                    t.OwnerName == "Ana Gómez" &&
+                    t.OwnerCellPhone == "+5491122334455" &&
+                    t.StoreName == "New Store"),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_emits_no_notification_when_the_save_fails()
+    {
+        ArrangeRoles(isSuperAdmin: true, isOwnerAdmin: false);
+        var owner = ArrangeSuperAdminOwner("Ana Gómez", "+5491122334455");
+        ArrangeStoreCreation(owner, out _);
+        _mockUnitOfWork.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(0);
+        var request = new CreateStoreCommand(owner.Id, "Admin Store", null, null, false, new List<int> { 1 });
+
+        var result = await _handler.Handle(request, CancellationToken.None);
+
+        result.Succeeded.Should().BeFalse();
+        // Nothing was committed, so there is nothing to report.
+        _mockOwnerRegistrationNotificationService.Verify(
+            x => x.NotifyAsync(
+                It.IsAny<OwnerRegistrationNotification.OwnerRegistrationTarget>(),
+                It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_emits_no_notification_when_the_owner_has_no_cell_phone()
+    {
+        ArrangeRoles(isSuperAdmin: true, isOwnerAdmin: false);
+        var owner = ArrangeSuperAdminOwner("Ana Gómez", cellPhone: null);
+        ArrangeStoreCreation(owner, out _);
+        var request = new CreateStoreCommand(owner.Id, "Admin Store", null, null, false, new List<int> { 1 });
+
+        var result = await _handler.Handle(request, CancellationToken.None);
+
+        result.Succeeded.Should().BeTrue();
+        // The shared policy drops a notice with an empty phone — reused as-is, not re-decided here.
+        _mockOwnerRegistrationNotificationService.Verify(
+            x => x.NotifyAsync(
+                It.IsAny<OwnerRegistrationNotification.OwnerRegistrationTarget>(),
+                It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_notification_write_failure_still_returns_success_and_never_throws()
+    {
+        ArrangeRoles(isSuperAdmin: true, isOwnerAdmin: false);
+        var owner = ArrangeSuperAdminOwner("Ana Gómez", "+5491122334455");
+        ArrangeStoreCreation(owner, out _);
+
+        // The REAL service, over a repository that throws. That is deliberate: "a notice can never
+        // turn a committed store into a 500" is guaranteed by the service's own try/catch
+        // (OwnerRegistrationNotificationService.NotifyAsync), NOT by the handler — a throwing MOCK of
+        // the interface would just propagate and prove nothing about production behaviour.
+        var throwingRepository = new Mock<INotificationRepository>();
+        throwingRepository
+            .Setup(x => x.AddAsync(It.IsAny<Notification>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("Notification table unavailable."));
+        var handler = CreateHandler(new OwnerRegistrationNotificationService(
+            throwingRepository.Object,
+            Mock.Of<ILogger<OwnerRegistrationNotificationService>>()));
+        var request = new CreateStoreCommand(owner.Id, "Admin Store", null, null, false, new List<int> { 1 });
+
+        var result = await handler.Handle(request, CancellationToken.None);
+
+        result.Succeeded.Should().BeTrue();
     }
 
     #endregion
