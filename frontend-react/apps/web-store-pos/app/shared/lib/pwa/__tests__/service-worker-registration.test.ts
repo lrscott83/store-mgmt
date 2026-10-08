@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import Swal from 'sweetalert2';
 import { UPDATE_POLL_INTERVAL_MS } from '../service-worker-registration';
 import type { RegisterSWOptions } from '../service-worker-registration';
 
@@ -69,6 +70,89 @@ describe('setupServiceWorker — PWA-SW-1: polls registration.update() on the co
     capturedOnRegisteredSW?.('sw.js', undefined);
 
     expect(setIntervalSpy).not.toHaveBeenCalled();
+  });
+});
+
+// El catálogo público (`/catalog/<slug>`) es la carta del cliente final: anónima y ajena al
+// POS. Un usuario que venía del POS entra ahí por navegación SPA, con el service worker YA
+// registrado, así que excluir el registro (root.tsx) no basta: si entonces llega una versión
+// nueva, el diálogo "¡Nueva versión disponible!" se le abriría encima de la carta.
+describe('setupServiceWorker — onNeedRefresh never interrupts the public catalog', () => {
+  function captureOptions() {
+    let captured: RegisterSWOptions | undefined;
+    // Lo que `registerSW` devuelve es el `updateSW(reloadPage?)` de vite-plugin-pwa.
+    const updateSW = vi.fn().mockResolvedValue(undefined);
+    const registerSW = vi.fn((options: RegisterSWOptions) => {
+      captured = options;
+      return updateSW;
+    });
+    return { registerSW, updateSW, get: () => captured };
+  }
+
+  /** jsdom: `history.pushState` actualiza `window.location.pathname` sin recargar. */
+  function visit(path: string) {
+    window.history.pushState({}, '', path);
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    visit('/');
+  });
+
+  afterEach(() => {
+    visit('/');
+  });
+
+  it('shows the update dialog when a new version is waiting on a POS route', async () => {
+    const { setupServiceWorker } = await import('../service-worker-registration');
+    const { registerSW, get } = captureOptions();
+    setupServiceWorker(registerSW);
+
+    visit('/sales/new');
+    get()?.onNeedRefresh?.();
+
+    expect(Swal.fire).toHaveBeenCalledWith(
+      expect.objectContaining({ title: '¡Nueva versión disponible!' }),
+    );
+  });
+
+  it('shows no dialog at all on a public catalog route', async () => {
+    const { setupServiceWorker } = await import('../service-worker-registration');
+    const { registerSW, get } = captureOptions();
+    setupServiceWorker(registerSW);
+
+    visit('/catalog/mi-tienda');
+    get()?.onNeedRefresh?.();
+
+    // Supresión TOTAL: ni el diálogo ni un sustituto. Un aviso de versión aquí no le
+    // significa nada a quien no usa el POS, y el diálogo es bloqueante.
+    expect(Swal.fire).not.toHaveBeenCalled();
+  });
+
+  it('does not confuse a POS route that merely contains "catalog" for the storefront', async () => {
+    const { setupServiceWorker } = await import('../service-worker-registration');
+    const { registerSW, get } = captureOptions();
+    setupServiceWorker(registerSW);
+
+    visit('/sales/web-catalog');
+    get()?.onNeedRefresh?.();
+
+    expect(Swal.fire).toHaveBeenCalledWith(
+      expect.objectContaining({ title: '¡Nueva versión disponible!' }),
+    );
+  });
+
+  it('never applies the update the user cannot confirm: the catalog leaves the SW alone', async () => {
+    const { setupServiceWorker } = await import('../service-worker-registration');
+    const { registerSW, updateSW, get } = captureOptions();
+    setupServiceWorker(registerSW);
+
+    visit('/catalog/mi-tienda');
+    get()?.onNeedRefresh?.();
+
+    // `updateSW`/`window.location.reload` sólo se alcanzan desde el `onConfirm` del diálogo;
+    // sin diálogo no hay SKIP_WAITING ni recarga hard encima de la carta de un cliente.
+    expect(updateSW).not.toHaveBeenCalled();
   });
 });
 

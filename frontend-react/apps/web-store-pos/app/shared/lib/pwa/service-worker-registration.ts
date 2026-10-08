@@ -1,4 +1,5 @@
 import { showUpdateAvailable } from '~/shared/lib/blocking-alert';
+import { isPublicCatalogPath } from '~/shared/lib/pwa/public-catalog-route';
 
 // PWA-01/Stage-6-Slice-D: 5-minute periodic `registration.update()` poll, in
 // addition to the existing update-available confirm/apply flow. Matches
@@ -28,6 +29,17 @@ export function setupServiceWorker(registerSW: RegisterSWFn): void {
   console.info('[PWA] setupServiceWorker: wiring registerSW callbacks');
   const updateSW = registerSW({
     onNeedRefresh: () => {
+      // El catálogo público (`/catalog/<slug>`) es la carta del cliente final, no el POS.
+      // (root.tsx ya NO registra el service worker ahí, pero un usuario que venía del POS
+      // puede entrar por navegación SPA con el SW ya registrado y su `onNeedRefresh` vivo.)
+      // "Hay una versión nueva" no le dice nada a quien no usa el POS, y el diálogo es
+      // bloqueante: se suprime TOTALMENTE, sin toast ni aviso que lo sustituya.
+      if (isPublicCatalogPath(window.location.pathname)) {
+        console.info(
+          '[PWA] onNeedRefresh: suppressed — the public catalog is not the POS, no update dialog',
+        );
+        return;
+      }
       console.info('[PWA] onNeedRefresh: a new version is WAITING → showing the update dialog');
       void showUpdateAvailable(() => {
         console.info('[PWA] user confirmed → updateSW(true): posts SKIP_WAITING, then hard reload');

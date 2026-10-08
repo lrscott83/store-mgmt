@@ -13,6 +13,7 @@ import type { Route } from './+types/root';
 import { I18nProvider } from '~/shared/lib/i18n/i18n-provider';
 import messages from '~/shared/lib/i18n/es';
 import { registerServiceWorker } from '~/shared/lib/pwa/service-worker-registration';
+import { isPublicCatalogPath } from '~/shared/lib/pwa/public-catalog-route';
 import { installClientLog } from '~/shared/lib/diagnostics/install-client-log';
 import { logClientError } from '~/shared/lib/diagnostics/client-log';
 import { useStoreUsageTracker } from '~/shared/lib/usage/use-store-usage-tracker';
@@ -100,17 +101,33 @@ export default function App() {
   const navigate = useNavigate();
   const isLoading = useLoadingStore((state) => state.isLoading);
 
-  // El botón global "Instalar App" no se ofrece en el catálogo PÚBLICO (`/catalog/<slug>`): ahí
-  // el visitante es un cliente anónimo de la tienda, no un usuario del POS.
+  // El catálogo PÚBLICO (`/catalog/<slug>`) es la carta del cliente final de la tienda: ahí
+  // el visitante es anónimo, no un usuario del POS. Ni se le ofrece instalar la app del POS
+  // (botón, más abajo) ni se registra su service worker (efecto siguiente). Los dos sitios
+  // deciden con el MISMO predicado: la regla se había quedado a medias, escrita sólo para el
+  // botón, y por eso el diálogo de nueva versión salía en la carta del cliente.
   const { pathname } = useLocation();
-  const showInstallButton = !pathname.startsWith('/catalog/');
+  const onPublicCatalog = isPublicCatalogPath(pathname);
+  const showInstallButton = !onPublicCatalog;
 
   // Mirrors Angular's `app.component.ts:57` — `setTimeout(() => updateService.init(), 5000)`:
   // the service-worker update flow (new-version prompt + 15-min poll) starts 5s after boot,
   // not immediately, so it doesn't compete with initial app startup.
+  //
+  // La excepción del catálogo se mira al ARRANQUE, como `ngOnInit` en Angular, y por eso las
+  // dependencias siguen siendo `[]` a propósito: `registerServiceWorker()` cablea `registerSW`
+  // —y con él `onNeedRefresh` y el poll de 5 min— UNA vez por llamada, así que reevaluarla en
+  // cada navegación dejaría que un usuario que va del POS al catálogo y vuelve lo cableara dos
+  // veces (doble diálogo, doble poll). Además, del POS al catálogo sólo se llega por URL
+  // absoluta con `target="_blank"` (sales/routes/web-catalog.tsx), o sea con una carga de
+  // página nueva, donde este efecto vuelve a arrancar de cero. El salto DENTRO de la SPA, que
+  // sí llega con el service worker ya registrado, lo cubre la guarda de `onNeedRefresh` en
+  // shared/lib/pwa/service-worker-registration.ts.
   useEffect(() => {
+    if (onPublicCatalog) return;
     const timer = setTimeout(() => registerServiceWorker(), 5000);
     return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only, like Angular's ngOnInit
   }, []);
 
   // Decision 2 (auth-service-parity, Slice 3): give the framework-agnostic
@@ -143,8 +160,9 @@ export default function App() {
           app (landing, login, register, and every authenticated route). This
           root is RR7's true equivalent of AppComponent, so it must mount here
           — not in app-layout.tsx, which only wraps authenticated routes.
-          EXCEPCIÓN: oculto en /catalog/* — el catálogo público es para clientes
-          finales de la tienda, no se les ofrece instalar la app del POS. */}
+          EXCEPCIÓN: oculto en el catálogo público (predicado `isPublicCatalogPath`, el
+          mismo que decide el registro del service worker más arriba) — el catálogo es para
+          clientes finales de la tienda, no se les ofrece instalar la app del POS. */}
       {showInstallButton && <InstallAppButton />}
       {/* DEMO-SEED: 90-day data generator (orders + expenses). Available in all
           builds; visibility is gated inside the component to the lrscott login
