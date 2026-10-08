@@ -15,7 +15,7 @@ vi.mock('~/auth/routes/loaders', () => ({
 
 vi.mock('~/management/stores/lib/services/store-http-service', () => ({
   storeHttpService: {
-    getModulesToStore: vi.fn(),
+    getModuleCatalog: vi.fn(),
     getPlans: vi.fn(),
     updateModulePricing: vi.fn(),
   },
@@ -114,7 +114,7 @@ const PLANS = [
 
 async function seedRead(catalog = CATALOG, plans = PLANS) {
   const { storeHttpService } = await import('~/management/stores/lib/services/store-http-service');
-  vi.mocked(storeHttpService.getModulesToStore).mockResolvedValue({
+  vi.mocked(storeHttpService.getModuleCatalog).mockResolvedValue({
     succeeded: true,
     data: catalog as unknown as Module[],
     message: '',
@@ -211,7 +211,7 @@ describe('ModuleCatalogPage — grouping by plan', () => {
 
   it('renders an empty state when the catalog has no modules', async () => {
     const { storeHttpService } = await import('~/management/stores/lib/services/store-http-service');
-    vi.mocked(storeHttpService.getModulesToStore).mockResolvedValue({
+    vi.mocked(storeHttpService.getModuleCatalog).mockResolvedValue({
       succeeded: true,
       data: [],
       message: '',
@@ -408,7 +408,7 @@ describe('ModuleCatalogPage — save', () => {
     const { storeHttpService } = await import('~/management/stores/lib/services/store-http-service');
     await renderPage();
     await waitFor(() => {
-      expect(storeHttpService.getModulesToStore).toHaveBeenCalledTimes(1);
+      expect(storeHttpService.getModuleCatalog).toHaveBeenCalledTimes(1);
     });
 
     fireEvent.change(screen.getByTestId('module-catalog-price-1'), { target: { value: '16' } });
@@ -421,6 +421,7 @@ describe('ModuleCatalogPage — save', () => {
           price: m.id === 1 ? 16 : m.price,
           discountPrice: m.discountPrice,
           percentDiscountPrice: m.percentDiscountPrice,
+          isActive: m.isActive,
           currentPrice: m.id === 1 ? 16 : m.currentPrice,
         })),
         totalCurrentPrice: 16 + 20 + 27 + 35 + 50,
@@ -435,19 +436,19 @@ describe('ModuleCatalogPage — save', () => {
     await waitFor(() => {
       expect(storeHttpService.updateModulePricing).toHaveBeenCalledTimes(1);
     });
-    // Every module in the table, ticked or not — the save is all-or-nothing, so an omitted
-    // row would silently mean "leave this module untouched".
+    // Every module in the table — the save is all-or-nothing, so an omitted row would
+    // silently mean "leave this module untouched". Each row carries its own activation flag.
     expect(storeHttpService.updateModulePricing).toHaveBeenCalledWith([
-      { moduleId: 1, price: 16, discountPrice: 0, percentDiscountPrice: 0 },
-      { moduleId: 2, price: 20, discountPrice: 0, percentDiscountPrice: 0 },
-      { moduleId: 3, price: 30, discountPrice: 0, percentDiscountPrice: 10 },
-      { moduleId: 4, price: 40, discountPrice: 5, percentDiscountPrice: 0 },
-      { moduleId: 5, price: 50, discountPrice: 0, percentDiscountPrice: 0 },
+      { moduleId: 1, price: 16, discountPrice: 0, percentDiscountPrice: 0, isActive: true },
+      { moduleId: 2, price: 20, discountPrice: 0, percentDiscountPrice: 0, isActive: true },
+      { moduleId: 3, price: 30, discountPrice: 0, percentDiscountPrice: 10, isActive: true },
+      { moduleId: 4, price: 40, discountPrice: 5, percentDiscountPrice: 0, isActive: true },
+      { moduleId: 5, price: 50, discountPrice: 0, percentDiscountPrice: 0, isActive: true },
     ]);
 
     // Refetched: the catalog read is the authority on what the table now shows.
     await waitFor(() => {
-      expect(storeHttpService.getModulesToStore).toHaveBeenCalledTimes(2);
+      expect(storeHttpService.getModuleCatalog).toHaveBeenCalledTimes(2);
     });
     expect(screen.queryByTestId('module-catalog-error')).toBeNull();
   });
@@ -534,7 +535,7 @@ describe('ModuleCatalogPage — save error', () => {
     expect(screen.getByTestId('module-catalog-price-1')).toHaveValue(16);
     expect(screen.getByTestId('module-catalog-current-1')).toHaveTextContent('16');
     // No refetch on failure — the screen keeps showing the unpersisted draft.
-    expect(storeHttpService.getModulesToStore).toHaveBeenCalledTimes(1);
+    expect(storeHttpService.getModuleCatalog).toHaveBeenCalledTimes(1);
   });
 
   it('shows the error when the response reports succeeded false, and keeps the edits', async () => {
@@ -588,7 +589,7 @@ describe('ModuleCatalogPage — save error', () => {
 
   it('shows the error and an empty table when the catalog read itself fails', async () => {
     const { storeHttpService } = await import('~/management/stores/lib/services/store-http-service');
-    vi.mocked(storeHttpService.getModulesToStore).mockRejectedValue(new Error('boom'));
+    vi.mocked(storeHttpService.getModuleCatalog).mockRejectedValue(new Error('boom'));
     vi.mocked(storeHttpService.getPlans).mockResolvedValue({
       succeeded: true,
       data: PLANS,
@@ -609,5 +610,57 @@ describe('ModuleCatalogPage — save error', () => {
     });
     expect(screen.getByTestId('module-catalog-empty')).toBeInTheDocument();
     expect(screen.getByTestId('module-catalog-save')).toBeDisabled();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// T5.6 — activation checkbox (admin-module-activation-toggle)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('ModuleCatalogPage — activation checkbox', () => {
+  it('renders a checkbox per module, checked from the catalog isActive flag', async () => {
+    const catalog = [
+      moduleDto(1, 'Ventas', 10),
+      { ...moduleDto(2, 'Inventario', 20), isActive: false },
+    ];
+    await seedRead(catalog, [plan(1, 'Gratis', [1, 2])]);
+    const { ModuleCatalogPage } = await import('../module-catalog');
+    render(
+      <Wrapper>
+        <ModuleCatalogPage />
+      </Wrapper>,
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId('module-catalog-table')).toBeInTheDocument();
+    });
+
+    expect(screen.getByTestId('module-catalog-active-1')).toBeChecked();
+    expect(screen.getByTestId('module-catalog-active-2')).not.toBeChecked();
+  });
+
+  it('drops an unticked module from the group total and sends isActive=false on save', async () => {
+    await renderPage();
+    const { storeHttpService } = await import('~/management/stores/lib/services/store-http-service');
+    vi.mocked(storeHttpService.updateModulePricing).mockResolvedValue({
+      succeeded: true,
+      data: { modules: [], totalCurrentPrice: 0 },
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
+
+    // Gratis holds only Ventas (10); deactivating it drops it from the price rule.
+    expect(screen.getByTestId('module-catalog-group-total-Gratis')).toHaveTextContent('10 USD');
+    fireEvent.click(screen.getByTestId('module-catalog-active-1'));
+    expect(screen.getByTestId('module-catalog-active-1')).not.toBeChecked();
+    expect(screen.getByTestId('module-catalog-group-total-Gratis')).toHaveTextContent('0 USD');
+
+    fireEvent.click(screen.getByTestId('module-catalog-save'));
+    await waitFor(() => {
+      expect(storeHttpService.updateModulePricing).toHaveBeenCalledTimes(1);
+    });
+    const payload = vi.mocked(storeHttpService.updateModulePricing).mock.calls[0][0];
+    expect(payload.find((row) => row.moduleId === 1)?.isActive).toBe(false);
+    expect(payload.find((row) => row.moduleId === 2)?.isActive).toBe(true);
   });
 });

@@ -152,4 +152,44 @@ public class GetPlansQueryHandlerTests
         result.Data!.Select(p => p.Name).Should().ContainInOrder("Gratis", "Pago", "Superior");
         result.Data!.Select(p => p.Name).Should().NotContain("VIP");
     }
+
+    // ─── admin-module-activation-toggle: inactive modules leave the plan panels ───────
+
+    [Fact]
+    public async Task Handle_StoreAdmin_DropsInactiveModulesFromEveryPlan()
+    {
+        _httpContextService.Setup(x => x.IsSuperAdminOrOwnerAdmin).Returns(true);
+        _httpContextService.Setup(x => x.IsSuperAdmin).Returns(true);
+        var plans = new List<StorePlan>
+        {
+            StorePlan.Create((int)StorePlanType.Gratis, "Gratis", 1, true),
+        };
+        _planRepository
+            .Setup(x => x.GetActivePlansIncludingModulesForCatalogAsync())
+            .ReturnsAsync(plans);
+        _mapper
+            .Setup(x => x.Map<IEnumerable<PlanDto>>(plans))
+            .Returns(new List<PlanDto>
+            {
+                new()
+                {
+                    Id = 1,
+                    Name = "Gratis",
+                    Order = 1,
+                    Modules = new List<PlanModuleDto>
+                    {
+                        new() { ModuleId = 6, Name = "Estadisticas", IsActive = true },
+                        new() { ModuleId = 7, Name = "Gestion", IsActive = false },
+                    }
+                }
+            });
+
+        var result = await _handler.Handle(new GetPlansQuery(), CancellationToken.None);
+
+        result.Succeeded.Should().BeTrue();
+        var modules = result.Data!.Single().Modules;
+        modules.Should().ContainSingle(m => m.ModuleId == 6);
+        modules.Should().NotContain(m => m.ModuleId == 7,
+            "a deactivated module must not appear in the store plan editing panels");
+    }
 }
