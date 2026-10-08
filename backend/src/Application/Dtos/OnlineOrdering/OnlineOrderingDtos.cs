@@ -185,4 +185,266 @@ namespace Application.Dtos.OnlineOrdering
         /// <summary>Precio unitario del snapshot, no el del catálogo de hoy.</summary>
         public decimal Price { get; set; }
     }
+
+    // --- Lecturas de gestión de pedidos (F5, vista "Pedidos") ---------------------------------
+
+    /// <summary>
+    /// Una fila de la tabla de pedidos de la tienda del contexto (F5). Es lo mínimo que la tabla
+    /// pinta y lo máximo que se puede leer SIN cargar las líneas: el listado trae pedidos completos
+    /// en una sola consulta, y las líneas solo se piden al abrir uno (T1 frente a T2).
+    ///
+    /// NO lleva `StoreId`: la lista es siempre de la tienda de la sesión, así que publicarlo sería
+    /// redundante y abriría la puerta a que el frontend lo relajara como filtro.
+    /// </summary>
+    public sealed class OnlineOrderListItemDto
+    {
+        /// <summary>Identificador del pedido. Es lo que llevan las acciones de estado/pago/repartidor.</summary>
+        public Guid Id { get; set; }
+
+        /// <summary>Código público dictado por WhatsApp. null en ventas del POS.</summary>
+        public string? Code { get; set; }
+
+        /// <summary>Nombre de quien pide. null en ventas del POS.</summary>
+        public string? CustomerName { get; set; }
+
+        /// <summary>Teléfono de quien pide. Es lo que la búsqueda (`search`) contrasta junto al código.</summary>
+        public string? CustomerPhone { get; set; }
+
+        /// <summary>Recogida o envío a domicilio.</summary>
+        public OrderDeliveryType DeliveryType { get; set; }
+
+        /// <summary>Importe del pedido (líneas + costo de envío), en <see cref="Currency"/>.</summary>
+        public decimal Total { get; set; }
+
+        /// <summary>Moneda de <see cref="Total"/> y de los precios de las líneas. La pone el catálogo.</summary>
+        public Currency Currency { get; set; }
+
+        /// <summary>Estado del pedido (D11).</summary>
+        public OrderStatus Status { get; set; }
+
+        /// <summary>Pago manual (D3/D12). Independiente de <see cref="Status"/>.</summary>
+        public OrderPaymentStatus PaymentStatus { get; set; }
+
+        /// <summary>Repartidor asignado. null mientras nadie lo asigne (F7).</summary>
+        public Guid? DriverId { get; set; }
+
+        /// <summary>
+        /// Nombre del repartidor YA resuelto. Viene desnormalizado a propósito: la tabla lo pinta
+        /// y así la vista no necesita una segunda consulta de repartidores por cada fila.
+        /// null si no hay repartidor asignado.
+        /// </summary>
+        public string? DriverName { get; set; }
+
+        /// <summary>Momento del pedido. Es la columna de orden del listado (del más nuevo al más viejo).</summary>
+        public DateTime Date { get; set; }
+    }
+
+    /// <summary>
+    /// Una línea del detalle de un pedido (F5, T2). Es el SNAPSHOT que el servidor resolvió al
+    /// crear el pedido, no una lectura del catálogo: cambiar el precio de un producto después NO
+    /// reescribe el pedido ya hecho.
+    /// </summary>
+    public sealed class OnlineOrderLineDto
+    {
+        /// <summary>Producto comprado. Se mantiene aunque el producto después se dé de baja.</summary>
+        public Guid ProductId { get; set; }
+
+        /// <summary>Nombre del producto en el momento del pedido.</summary>
+        public string Name { get; set; } = string.Empty;
+
+        public int Quantity { get; set; }
+
+        /// <summary>Precio UNITARIO en el momento del pedido.</summary>
+        public decimal Price { get; set; }
+
+        /// <summary>Moneda de <see cref="Price"/>.</summary>
+        public Currency Currency { get; set; }
+
+        /// <summary>
+        /// Importe de la línea (`Quantity * Price`). Viaja calculado para que la vista no tenga que
+        /// repetir la multiplicación con una moneda distinta a la que espera.
+        /// </summary>
+        public decimal LineTotal { get; set; }
+    }
+
+    /// <summary>
+    /// Detalle de UN pedido (F5, T2). Lleva TODO lo de <see cref="OnlineOrderListItemDto"/> y además
+    /// las líneas, el domicilio y las notas: es el pedido entero, que es lo que se abre para
+    /// confirmar, imprimir o auditar.
+    /// </summary>
+    public sealed class OnlineOrderDetailDto
+    {
+        public Guid Id { get; set; }
+
+        public string? Code { get; set; }
+
+        public string? CustomerName { get; set; }
+
+        public string? CustomerPhone { get; set; }
+
+        public OrderDeliveryType DeliveryType { get; set; }
+
+        /// <summary>Importe del pedido (líneas + costo de envío), en <see cref="Currency"/>.</summary>
+        public decimal Total { get; set; }
+
+        public Currency Currency { get; set; }
+
+        public OrderStatus Status { get; set; }
+
+        public OrderPaymentStatus PaymentStatus { get; set; }
+
+        public Guid? DriverId { get; set; }
+
+        public string? DriverName { get; set; }
+
+        public DateTime Date { get; set; }
+
+        /// <summary>Domicilio. Obligatorio solo con <see cref="OrderDeliveryType.Delivery"/>.</summary>
+        public string? DeliveryAddress { get; set; }
+
+        /// <summary>Notas que dejó quien pidió.</summary>
+        public string? Notes { get; set; }
+
+        /// <summary>
+        /// Líneas del pedido EN EL ORDEN EN QUE SE PIDIERON (`OrderItem.OrderIndex`), no en el
+        /// orden arbitrario que devuelva la base: el orden de la lista es parte de lo que el cliente
+        /// escribió y de lo que se confirma leyendo.
+        /// </summary>
+        public List<OnlineOrderLineDto> Lines { get; set; } = new();
+    }
+
+    /// <summary>
+    /// Página de pedidos de la tienda del contexto (F5, T1). Mismo contrato que la página del
+    /// catálogo público: `Items` ya viene paginada y `Total` es el TOTAL FILTRADO, no el de la
+    /// tienda — es lo que la vista necesita para saber cuántas páginas hay.
+    /// </summary>
+    public sealed class OnlineOrderPageDto
+    {
+        public List<OnlineOrderListItemDto> Items { get; set; } = new();
+
+        /// <summary>Cuántos pedidos cumplen los filtros, en toda la tienda (no solo en esta página).</summary>
+        public int Total { get; set; }
+
+        /// <summary>Página devuelta, ya normalizada (siempre ≥ 1).</summary>
+        public int Page { get; set; }
+
+        /// <summary>Tamaño de página realmente aplicado, ya acotado por el máximo del handler.</summary>
+        public int PageSize { get; set; }
+    }
+
+    // --- Métricas de la vista "Ventas" (F6) --------------------------------------------
+
+    /// <summary>
+    /// Una fila del desglose por estado (F6). Es un tipo y no un
+    /// <c>Dictionary&lt;OrderStatus, int&gt;</c> por dos razones concretas:
+    ///
+    ///   * El cliente necesita un EJE FIJO. Un diccionario solo trae los estados presentes, así que
+    ///     la tarjeta cambiaría de altura y saltaría de sitio en cuanto cambiara el filtro. Con la
+    ///     lista completa —incluidos los ceros— el gráfico es el mismo siempre.
+    ///   * El orden es el del enum (el handler lo impone), no el que devuelva la base.
+    ///
+    /// No son claves porque un `enum` serializado como clave de diccionario depende de que haya un
+    /// `JsonStringEnumConverter` registrado para CLAVES, y el proyecto no lo tiene: las claves
+    /// saldrían numéricas mientras el resto de los enums del contrato salen por su valor. Aquí el
+    /// enum es un VALOR de propiedad, igual que <see cref="OnlineOrderListItemDto.Status"/>, y
+    /// entonces se serializa exactamente igual que el resto de la feature.
+    /// </summary>
+    public sealed class OnlineOrderStatusCountDto
+    {
+        public OrderStatus Status { get; set; }
+
+        /// <summary>Pedidos del rango en ese estado. Incluye los cancelados.</summary>
+        public int Count { get; set; }
+    }
+
+    /// <inheritdoc cref="OnlineOrderStatusCountDto"/>
+    public sealed class OnlineOrderDeliveryTypeCountDto
+    {
+        public OrderDeliveryType DeliveryType { get; set; }
+
+        /// <summary>Pedidos del rango con esa modalidad.</summary>
+        public int Count { get; set; }
+    }
+
+    /// <summary>
+    /// Métricas agregadas de los pedidos online de la tienda del contexto en un rango (F6, vista
+    /// "Ventas"). Se calculan EN LA BASE: la vista pinta números, no necesita las filas.
+    ///
+    /// <para><b>LA REGLA</b>: <see cref="TotalSales"/> EXCLUYE los pedidos
+    /// <see cref="OrderStatus.Cancelled"/>, y <see cref="AverageTicket"/> divide por
+    /// <see cref="NonCancelledCount"/> —el mismo conjunto excluido. <see cref="OrdersCount"/> NO
+    /// los excluye, porque "cuántos pedidos entraron" y "cuánto se vendió" son preguntas distintas
+    /// y mezclarlas diría que se vendieron pedidos que el dueño canceló. El cancelado sigue
+    /// visible en <see cref="ByStatus"/>, así que no se pierde ningún dato.
+    ///
+    /// <see cref="PaidCount"/>/<see cref="PaidAmount"/> y
+    /// <see cref="PendingCount"/>/<see cref="PendingAmount"/> usan el MISMO conjunto excluido, y
+    /// los RECUENTOS y los IMPORTES también van de la mano: cada par describe exactamente el mismo
+    /// conjunto de pedidos, para que <c>PaidAmount / PaidCount</c> sea el ticket medio de lo
+    /// pagado. Un cancelado no es venta ni es deuda: si sumara, el panel pediría un cobro que no
+    /// existe.
+    ///
+    /// Los desgloses CUENTAN cancelados a propósito —es el único sitio donde se ven— y por eso
+    /// ambos suman <see cref="OrdersCount"/>.</para>
+    ///
+    /// <para><see cref="Currency"/> sale de los PEDIDOS del rango (A3 eliminada: no hay moneda
+    /// configurable). Es la del pedido no cancelado más reciente y, sin ninguno, el default del
+    /// dominio, <see cref="Domain.Common.Enums.Currency.CUP"/>. No es <c>Currency?</c> a
+    /// propósito: el cliente siempre formatea importes y un <c>null</c> lo obligaría a ramificar en
+    /// cada tarjeta.</para>
+    /// </summary>
+    public sealed class OnlineOrderStatsDto
+    {
+        /// <summary>
+        /// Pedidos del rango, TODOS. Suma lo de <see cref="ByStatus"/> y lo de
+        /// <see cref="ByDeliveryType"/>, e incluye los cancelados.
+        /// </summary>
+        public int OrdersCount { get; set; }
+
+        /// <summary>
+        /// Pedidos del rango EXCEPTO cancelados: el denominador de <see cref="AverageTicket"/> y el
+        /// conjunto del que salen <see cref="TotalSales"/> y los importes de pago. Viaja en el DTO
+        /// porque es lo que hace verificable la regla de exclusión sin tener que conocer la
+        /// regla: si <c>AverageTicket != TotalSales / OrdersCount</c>, hay cancelados.
+        /// </summary>
+        public int NonCancelledCount { get; set; }
+
+        /// <summary>Suma de <c>Order.Total</c> de los pedidos NO cancelados, en <see cref="Currency"/>.</summary>
+        public decimal TotalSales { get; set; }
+
+        /// <summary>
+        /// <c>TotalSales / NonCancelledCount</c>, redondeado a dos decimales, o 0 si no hay pedidos
+        /// no cancelados. Se divide por los NO cancelados a propósito: dividir por
+        /// <see cref="OrdersCount"/> bajaría el ticket medio en cuanto hubiera un cancelado, y es el
+        /// número más grande de la vista.
+        /// </summary>
+        public decimal AverageTicket { get; set; }
+
+        /// <summary>Pedidos NO cancelados con pago <see cref="OrderPaymentStatus.Paid"/>.</summary>
+        public int PaidCount { get; set; }
+
+        /// <summary>Suma de sus <c>Total</c>. El mismo conjunto que <see cref="PaidCount"/>.</summary>
+        public decimal PaidAmount { get; set; }
+
+        /// <summary>Pedidos NO cancelados con pago <see cref="OrderPaymentStatus.Pending"/>.</summary>
+        public int PendingCount { get; set; }
+
+        /// <summary>Suma de sus <c>Total</c>. El mismo conjunto que <see cref="PendingCount"/>.</summary>
+        public decimal PendingAmount { get; set; }
+
+        /// <summary>
+        /// Conteo por estado, en el ORDEN del enum y con un 0 por cada estado sin pedidos del
+        /// rango. Suma <see cref="OrdersCount"/>.
+        /// </summary>
+        public List<OnlineOrderStatusCountDto> ByStatus { get; set; } = new();
+
+        /// <summary>
+        /// Conteo por modalidad, en el ORDEN del enum y con un 0 por cada modalidad sin pedidos del
+        /// rango. Suma <see cref="OrdersCount"/>.
+        /// </summary>
+        public List<OnlineOrderDeliveryTypeCountDto> ByDeliveryType { get; set; } = new();
+
+        /// <summary>Moneda de todos los importes de esta respuesta.</summary>
+        public Currency Currency { get; set; }
+    }
 }

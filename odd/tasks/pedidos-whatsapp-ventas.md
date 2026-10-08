@@ -108,13 +108,15 @@ así:
 
 ## Tareas
 
-- [ ] **T1** — `GetOnlineOrderStatsQuery` + `OnlineOrderStatsDto`.
-- [ ] **T2** — Endpoint `GET /api/v1/online-orders/stats` en `OnlineOrdersController`.
-- [ ] **T3** — Vista `ordering-sales.tsx` (filtros + métricas + historial).
-- [ ] **T4** — Registrar ruta + menú.
-- [ ] **T5** — Claves i18n.
-- [ ] **T6** — Tests unitarios nuevos (query con datos sembrados; componente).
-- [ ] **T7** — Verificación (build/tests backend, `typecheck`/`lint`/`vitest`).
+- [x] **T1** — `GetOnlineOrderStatsQuery` + `OnlineOrderStatsDto`. Commit `14bd3ada`. Revisión nativa
+  `review-e3fa56dee5229ec4` (lens `review-reliability`) **approved + acknowledged**.
+- [x] **T2** — Endpoint `GET /api/v1/online-orders/stats` en `OnlineOrdersController`. Commit `14bd3ada`.
+- [x] **T3** — Vista `ordering-sales.tsx` (filtros + métricas + historial). Commit `e3a1c218`. Revisión
+  nativa `review-1efd9968b04e4d99` **approved + acknowledged**.
+- [x] **T4** — Registrar ruta + menú. Commit `e3a1c218`.
+- [x] **T5** — Claves i18n. Commit `e3a1c218`.
+- [x] **T6** — Tests unitarios nuevos (query con datos sembrados; componente). Commits `14bd3ada`, `e3a1c218`.
+- [x] **T7** — Verificación (build/tests backend, `typecheck`/`lint`/`vitest`). Ver evidencia abajo.
 
 ## Criterios de aceptación
 
@@ -145,12 +147,77 @@ pnpm vitest run app/sales/routes/__tests__/
 - **Rendimiento**: agregar en servidor, no traer todo el histórico.
 - **Aislamiento por tienda**: filtro obligatorio.
 
+## Ruta de implementación (ODD) y disparadores
+
+F2 y F5 están implementados y verificados; F6 reutiliza `OnlineOrdersController` y su permiso.
+
+| Unidad de trabajo | Tareas | Ruta | Disparador / evidencia |
+| --- | --- | --- | --- |
+| Backend — stats + endpoint | T1, T2 | Delegada (escritor) | ≥2 ficheros; `IOrderRepository` necesita agregación nueva (aditiva) y el controlador una acción |
+| Frontend — vista + ruta + menú + i18n + tests | T3, T4, T5, T6 | Delegada (escritor) | ≥2 ficheros; reutiliza `ordering-http-service` y `EFeatures.OnlineOrders=123` |
+| Verificación | T7 | Delegada (verificador) | Comandos de la sección homónima |
+
+**Revisión nativa (RDD, on):** se ejecuta **tras cada commit, en el checkout principal, con HEAD fijado en
+ese commit** y `--base-ref` = el commit anterior (candidato = una sola unidad). NO usar worktrees: el
+transporte del plugin (`opencode-review-transport.ts`) lanza el reviewer con `cwd =` el directorio de la
+sesión, por lo que un binding creado en un worktree no es releable.
+
 ## Siguiente paso
 
-Implementar F6 tras F2 y F5.
+F6 implementado, revisado (2/2 unidades `approved` + `acknowledged`) y verificado. La entrega
+(commit/push/PR) es decisión del owner.
+
+## Follow-ups (no bloqueantes)
+
+### Unidad 1 (backend)
+
+- **R3-001** (WARNING) — La agregación nueva de `OrderRepository.GetStatsByStoreIdAsync`
+  (Count/Sum condicionales dentro de `GroupBy(_ => 1)` + subconsulta de moneda) solo se prueba con el
+  provider **InMemory**; no hay test contra Npgsql, así que un fallo de traducción o de materialización
+  decimal/null daría un 500 en runtime con la suite verde. Destino: test de integración/E2E nuevo.
+- **R3-002** (SUGGESTION) — Un rango invertido (`From` > `To`) no se valida ni se cubre: devuelve el
+  mismo DTO a cero que un periodo genuinamente vacío. Destino: F6 (validación/UX).
+
+### Unidad 2 (frontend)
+
+- **R3-01** (WARNING) — `loadStats`/`loadOrders` sin cancelación ni guarda de orden: una respuesta
+  lenta anterior puede sobrescribir datos más nuevos (cambiar filtros en rápida sucesión). Sin test de
+  resolución fuera de orden.
+- **R3-02** (WARNING) — El filtro por `New` (enum `0`) no tiene test y su conversión depende de
+  `withoutEmptyFilters` (que no debe usar truthiness o descartaría el 0 en silencio).
+- **R3-03** (SUGGESTION) — `isLoadingStats`/`isLoadingOrders` solo pasan a `false`; no hay feedback de
+  carga tras la primera lectura.
+- **R3-04** (SUGGESTION) — `formatOrderDate` (sufijo `Z`/`Invalid Date`) sin test; la columna DATE no
+  se asserta.
+- **R3-05** (SUGGESTION) — Los asserts de desglose fijan ordinales de enum en crudo en vez de
+  referenciar los miembros.
+
+## Evidencia de verificación (T7, 2026-10-08)
+
+| Comando | Resultado |
+| --- | --- |
+| `dotnet build src/SMCA.sln` | `Build succeeded`, 0 errores (sin `error MSB`) |
+| `dotnet test src/Application.Tests/…` | **931 passed (931)**, 0 fallos (spot check del padre) |
+| `pnpm typecheck` | exit 0 |
+| `pnpm lint` (`--max-warnings=0`) | exit 0 |
+| `pnpm vitest run app/sales/routes/__tests__/` | **349 passed (349)**, 21 ficheros, sin errores de tipo |
+| E2E | No se tocaron |
 
 ## Progreso
 
+- 2026-10-08 — **F6 completo (T1–T7).** Commits `14bd3ada` (backend stats + endpoint) y `e3a1c218`
+  (vista Ventas + ruta + menú + i18n + cliente + tests). Revisión nativa por commit en el checkout
+  principal: unidad 1 `review-e3fa56dee5229ec4` y unidad 2 `review-1efd9968b04e4d99`, **ambas `approved`
+  + `acknowledged`** (autoridad quemada); 7 hallazgos advisory no bloqueantes (2 WARNING + 2 WARNING +
+  3 SUGGESTION) listados arriba. Verificación: 931 backend + 349 vitest, typecheck/lint limpios.
+- 2026-10-08 — **Unidad 1 (T1+T2) implementada y revisada.** Commit `14bd3ada`; 43 tests nuevos
+  (26 handler + 17 repositorio con InMemory real); `Application.Tests` 931/931. Revisión nativa por
+  commit en el checkout principal: `approved` + `acknowledged` (autoridad quemada), 2 hallazgos
+  advisory (R3-001 WARNING, R3-002 SUGGESTION). Nota de proceso: el review por commit con HEAD fijado
+  SÍ funciona (a diferencia de intentarlo por worktrees).
+- 2026-10-08 — Arranque autorizado por el owner ("commit y push, luego pasa para F6 y que sí se pueda
+  hacer RDD"). F5 ya pusheado a `origin/test`. Ruta y disparadores fijados; revisión nativa planificada
+  por commit en el checkout principal. Sin escrituras aún.
 - 2026-10-06 — Feature creado (documento de diseño). Sin implementación.
 - 2026-10-06 — Sincronizado con el maestro: acceso StoreUser (`OnlineOrdersAdmin`, D15); moneda del
   catálogo (A3 eliminada); sin "En camino" (D18); vista "Ventas" confirmada (A6);
