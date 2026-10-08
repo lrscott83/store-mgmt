@@ -32,6 +32,10 @@ namespace Application.Tests.Features.WebCatalog.Showcase.Commands;
 ///   6. El `Kind` tiene que ser un valor del enum: un conjunto inventado escribiría una fila que el
 ///      catálogo público nunca publica y que la vista no puede quitar.
 ///
+/// Y el par DE LA VEZ que dos de ellas: si la fila no llega a persistirse, el archivo ya escrito se
+/// borra. El orden "primero el archivo, después la fila" es inevitable — la clave la compone el
+/// almacenamiento — así que el fallo de guardado es el único caso en que hay que compensar.
+///
 /// Y lo que NO hace: decidir el otro conjunto. Subir un destacado no toca el carrusel.
 /// </summary>
 public class AddStoreCatalogImageCommandHandlerTests
@@ -52,6 +56,12 @@ public class AddStoreCatalogImageCommandHandlerTests
 
     public AddStoreCatalogImageCommandHandlerTests()
     {
+        // Índice de un solo nombre: `ShowcaseImageRequired` no tiene placeholders, así que el
+        // validador lo pide así. Moq no cubre un indexador con el setup del otro.
+        _localizer
+            .Setup(x => x[It.IsAny<string>()])
+            .Returns((string name) => new LocalizedString(name, name));
+
         _localizer
             .Setup(x => x[It.IsAny<string>(), It.IsAny<object[]>()])
             .Returns<string, object[]>((name, args) =>
@@ -424,6 +434,59 @@ public class AddStoreCatalogImageCommandHandlerTests
         _catalogImageStorage.Verify(
             x => x.SaveCatalogImageAsync(It.IsAny<CatalogImageUpload>(), It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
             Times.Never);
+    }
+
+    #endregion
+
+    #region Compensación archivo↔fila (SC-R1)
+
+    /// <summary>
+    /// Si la fila NO se persiste, el archivo que ya está en disco se borra. El orden importa: el
+    /// archivo se sube ANTES de tocar la base, así que un fallo de guardado dejaba en disco una clave
+    /// que ninguna fila referencia y que nadie volvería a pedir — un huérfano que no se limpia solo.
+    /// La compensación devuelve el almacén al estado en que estaba.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenThePersistenceFails_ShouldDeleteTheJustSavedFile()
+    {
+        _unitOfWork
+            .Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("No se pudo guardar la fila."));
+
+        Func<Task> act = () => Handler().Handle(Command(), CancellationToken.None);
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+        _catalogImageStorage.Verify(x => x.DeleteAsync(SavedKey, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>
+    /// Y el fallo se propaga tal cual: el error que hay que reportar es el de la persistencia, no el
+    /// de la limpieza. Un `catch` que se tragara la excepción devolvería un 200 sin fila, que es peor
+    /// que un 500 con el archivo ya limpiado.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenThePersistenceFails_ShouldRethrowTheOriginalError()
+    {
+        _unitOfWork
+            .Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("No se pudo guardar la fila."));
+
+        Func<Task> act = () => Handler().Handle(Command(), CancellationToken.None);
+
+        var exception = await act.Should().ThrowAsync<InvalidOperationException>();
+        exception.Which.Message.Should().Be("No se pudo guardar la fila.");
+    }
+
+    /// <summary>
+    /// La compensación NO toca el camino feliz: con la fila persistida el archivo se queda, porque es
+    /// la clave que esa fila publica.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenThePersistenceSucceeds_ShouldKeepTheFile()
+    {
+        await Handler().Handle(Command(), CancellationToken.None);
+
+        _catalogImageStorage.Verify(x => x.DeleteAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     #endregion

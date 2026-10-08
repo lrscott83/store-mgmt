@@ -8,6 +8,7 @@ using Domain.Entities.StoreCatalogImages;
 using Domain.Interfaces.Repositories;
 using FluentAssertions;
 using Microsoft.Extensions.Localization;
+using Microsoft.Extensions.Logging;
 using Moq;
 using Resources;
 
@@ -25,9 +26,12 @@ namespace Application.Tests.Features.WebCatalog.Showcase.Commands;
 ///   2. El archivo se borra SOLO cuando la fila quedó eliminada. Nunca al revés: borrar el archivo
 ///      antes de confirmar la fila dejaría el carrusel del storefront pidiendo una imagen que ya no
 ///      existe.
-///   3. Si la imagen no existe (o es de otra tienda) es un 404, no un 200 silencioso: la vista
+///   3. Y si el borrado del ARCHIVO falla, la operación sigue siendo correcta: la fila es la fuente
+///      de verdad y ya se confirmó. Relanzar convertiría un 200 en un fallo y el reintento recibiría
+///      un 404; lo que queda es un archivo huérfano que se registra y se limpia aparte.
+///   4. Si la imagen no existe (o es de otra tienda) es un 404, no un 200 silencioso: la vista
 ///      necesita saber que su lista quedó desfasada.
-///   4. El otro conjunto no se toca: quitar un destacado no puede vaciar el carrusel.
+///   5. El otro conjunto no se toca: quitar un destacado no puede vaciar el carrusel.
 ///
 /// Lo que NO hace: compactar el `OrderIndex` de las que quedan. Al volver a subir, la imagen entra
 /// al final del conjunto, y eso es exactamente lo que espera la vista.
@@ -39,6 +43,7 @@ public class RemoveStoreCatalogImageCommandHandlerTests
     private readonly Mock<IStoreCatalogImageRepository> _imageRepository = new();
     private readonly Mock<ICatalogImageStorage> _catalogImageStorage = new();
     private readonly Mock<IStringLocalizer<I18n>> _localizer = new();
+    private readonly Mock<ILogger<RemoveStoreCatalogImageCommandHandler>> _logger = new();
 
     private readonly Guid _storeId = Guid.NewGuid();
     private readonly Guid _tenantId = Guid.NewGuid();
@@ -63,7 +68,8 @@ public class RemoveStoreCatalogImageCommandHandlerTests
         _httpContextService.Object,
         _imageRepository.Object,
         _catalogImageStorage.Object,
-        _localizer.Object);
+        _localizer.Object,
+        _logger.Object);
 
     private StoreCatalogImage Image(StoreCatalogImageKind kind, int orderIndex)
         => StoreCatalogImage.Create(_storeId, _tenantId, kind, $"{_tenantId:N}/{_storeId:N}/catalog/{kind}/{Guid.NewGuid():N}.png", orderIndex, null);
@@ -187,6 +193,73 @@ public class RemoveStoreCatalogImageCommandHandlerTests
 
         result.Data.Should().BeFalse();
         _catalogImageStorage.Verify(x => x.DeleteAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    /// <summary>
+    /// Un fallo de DISCO al borrar el archivo NO convierte en error una operación ya confirmada. La
+    /// fila es la fuente de verdad: si se relanzara, el dueño vería un 500 y su reintento recibiría un
+    /// 404 de una imagen que ya no existe. Lo que queda es un archivo huérfano — deuda de disco, que
+    /// se limpia aparte y por eso se registra.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenTheFileCannotBeDeleted_ShouldStillSucceed()
+    {
+        StoreCatalogImage image = Image(StoreCatalogImageKind.Carousel, 0);
+        Given(image);
+        _catalogImageStorage
+            .Setup(x => x.DeleteAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new IOException("El archivo está en uso."));
+
+        var result = await Handler().Handle(new RemoveStoreCatalogImageCommand(image.Id), CancellationToken.None);
+
+        result.Succeeded.Should().BeTrue();
+        result.Data.Should().BeTrue();
+        _imageRepository.Verify(x => x.DeleteAsync(image), Times.Once);
+        _catalogImageStorage.Verify(x => x.DeleteAsync(image.Key, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>
+    /// La deuda de disco es rastreable: el fallo se registra como warning, con la clave del archivo,
+    /// para que quede alguien a quien preguntarle por él.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenTheFileCannotBeDeleted_ShouldLogAWarningWithTheKey()
+    {
+        StoreCatalogImage image = Image(StoreCatalogImageKind.Carousel, 0);
+        Given(image);
+        var failure = new IOException("El archivo está en uso.");
+        _catalogImageStorage
+            .Setup(x => x.DeleteAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(failure);
+
+        await Handler().Handle(new RemoveStoreCatalogImageCommand(image.Id), CancellationToken.None);
+
+        _logger.Verify(
+            x => x.Log(
+                It.Is<LogLevel>(level => level == LogLevel.Warning),
+                It.IsAny<EventId>(),
+                It.IsAny<It.IsAnyType>(),
+                failure,
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.Once);
+    }
+
+    /// <summary>
+    /// Y no se repite el trabajo: el archivo se intenta borrar UNA vez. Un reintento en bucle de un
+    /// almacenamiento caído sería una amplificación del problema.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenTheFileCannotBeDeleted_ShouldTryToDeleteItOnlyOnce()
+    {
+        StoreCatalogImage image = Image(StoreCatalogImageKind.Carousel, 0);
+        Given(image);
+        _catalogImageStorage
+            .Setup(x => x.DeleteAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new IOException("El archivo está en uso."));
+
+        await Handler().Handle(new RemoveStoreCatalogImageCommand(image.Id), CancellationToken.None);
+
+        _catalogImageStorage.Verify(x => x.DeleteAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     /// <summary>Sin tienda en el contexto no hay imágenes propias que borrar.</summary>

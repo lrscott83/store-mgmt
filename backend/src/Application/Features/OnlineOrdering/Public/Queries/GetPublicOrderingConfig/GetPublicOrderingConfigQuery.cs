@@ -124,11 +124,17 @@ namespace Application.Features.OnlineOrdering.Public.Queries.GetPublicOrderingCo
         /// para que la primera imagen del carrusel sea la que el dueño puso primera. Una key en blanco
         /// se filtra: construiría una URL `/media/` que el storefront pediría como si fuera un
         /// directorio.
+        ///
+        /// <c>IsActive</c> se exige explícitamente aunque la lectura pública del repositorio ya
+        /// filtre por él. Es ENDURECIMIENTO del contrato, no una segunda defensa: "el catálogo público
+        /// no publica imágenes desactivadas" es parte de lo que este método garantiza, y no debe
+        /// depender de un detalle interno del repositorio. Si mañana esa lectura cambia, este filtro
+        /// sigue sosteniendo el contrato.
         /// </summary>
         private static IReadOnlyList<PublicShowcaseImageDto> Showcase(
             IEnumerable<StoreCatalogImage> images, StoreCatalogImageKind kind, string storeSlug)
             => images
-                .Where(image => image.Kind == kind && !string.IsNullOrWhiteSpace(image.Key))
+                .Where(image => image.Kind == kind && image.IsActive && !string.IsNullOrWhiteSpace(image.Key))
                 .Select(image => new PublicShowcaseImageDto
                 {
                     Url = CatalogPublicUrls.Media(storeSlug, image.Key),

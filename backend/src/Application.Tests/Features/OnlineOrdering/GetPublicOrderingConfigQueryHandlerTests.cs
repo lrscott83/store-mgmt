@@ -399,6 +399,49 @@ public class GetPublicOrderingConfigQueryHandlerTests
     }
 
     /// <summary>
+    /// Una imagen DESACTIVADA no se publica. Desactivar es "dejar de mostrarla sin perder el
+    /// archivo", así que la fila existe y el archivo se queda — pero el catálogo público no la pinta.
+    ///
+    /// El repositorio ya devuelve solo las activas, así que esta fila no llegaría por HTTP; se monta
+    /// a propósito para fijar el CONTRATO del método: que no dependa de un detalle interno de la
+    /// lectura. Si esa lectura cambia y empieza a traer inactivas, este test cae.
+    /// </summary>
+    [Theory]
+    [InlineData(StoreCatalogImageKind.Carousel)]
+    [InlineData(StoreCatalogImageKind.Daily)]
+    public async Task Handle_WithAnInactiveShowcaseImage_ShouldNotPublishIt(StoreCatalogImageKind kind)
+    {
+        PublishedStore();
+        StoreCatalogImage inactive = ShowcaseImage(kind, 0, "apagada");
+        inactive.IsActive = false;
+        GivenShowcase(inactive);
+
+        var result = await Handler().Handle(new GetPublicOrderingConfigQuery("tienda-ana"), CancellationToken.None);
+
+        result.Data!.CarouselImages.Should().BeEmpty();
+        result.Data.DailyImages.Should().BeEmpty();
+    }
+
+    /// <summary>
+    /// Desactivar UNA imagen no esconde el resto: solo cae la fila desactivada. Un filtro demasiado
+    /// amplio dejaría el carrusel entero vacío y el dueño no sabría por qué.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WithAnInactiveCarouselImage_ShouldStillPublishTheActiveOne()
+    {
+        PublishedStore();
+        StoreCatalogImage active = ShowcaseImage(StoreCatalogImageKind.Carousel, 0, "visible");
+        StoreCatalogImage inactive = ShowcaseImage(StoreCatalogImageKind.Carousel, 1, "apagada");
+        inactive.IsActive = false;
+        GivenShowcase(active, inactive);
+
+        var result = await Handler().Handle(new GetPublicOrderingConfigQuery("tienda-ana"), CancellationToken.None);
+
+        result.Data!.CarouselImages.Should().ContainSingle().Which.Url
+            .Should().Be($"/api/v1/public/catalog/tienda-ana/media/{active.Key}");
+    }
+
+    /// <summary>
     /// Nunca una ruta del servidor. La URL es relativa al endpoint público, sin host ni ruta del
     /// almacenamiento: el config lo lee un anónimo y no puede usarse para localizar archivos en disco.
     /// </summary>

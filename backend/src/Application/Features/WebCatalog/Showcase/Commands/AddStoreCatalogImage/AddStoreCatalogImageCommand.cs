@@ -108,8 +108,22 @@ namespace Application.Features.WebCatalog.Showcase.Commands.AddStoreCatalogImage
             int orderIndex = existing.Count == 0 ? 0 : existing.Max(image => image.OrderIndex) + 1;
 
             StoreCatalogImage image = StoreCatalogImage.Create(storeId, tenantId, request.Kind, key, orderIndex, request.Caption);
-            await _imageRepository.AddAsync(image);
-            await _applicationUnitOfWork.SaveChangesAsync(cancellationToken);
+
+            // COMPENSACIÓN del archivo↔fila. A estas alturas el archivo YA está escrito en disco, y la
+            // fila es lo único que lo referencia: si la persistencia falla, nadie volvería a pedir esa
+            // clave y quedaría un huérfano que no se limpia solo. `DeleteAsync` es idempotente (no-op
+            // si el archivo no existe), así que compensar es seguro; el error original se relanza tal
+            // cual, porque lo que se quiere reportar es el fallo de guardado, no el de la limpieza.
+            try
+            {
+                await _imageRepository.AddAsync(image);
+                await _applicationUnitOfWork.SaveChangesAsync(cancellationToken);
+            }
+            catch
+            {
+                await _catalogImageStorage.DeleteAsync(key, cancellationToken);
+                throw;
+            }
 
             return ResponseResult.Success(new StoreCatalogImageDto
             {

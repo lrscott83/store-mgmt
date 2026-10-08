@@ -202,9 +202,12 @@ Los 4 slices pasaron por la revisión nativa. Incidencias:
 
 Hallazgos **advisory** (no bloqueantes):
 
-- [ ] **SC-R1** — La subida escribe el archivo **antes** de persistir la fila: si `SaveChanges` falla, queda archivo huérfano. Y el borrado quita la fila antes del archivo (fallo no idempotente). Destino: seguimiento.
-- [ ] **SC-R2** — La regla `Content NotNull` del validador es inalcanzable (el controller coacciona a `Stream.Null`). Destino: limpieza.
-- [ ] **SC-R3** — El config público no filtra por `IsActive` (latente; nada lo apaga hoy). Destino: endurecer.
+- [x] **SC-R1** — La subida escribe el archivo **antes** de persistir la fila: si `SaveChanges` falla, queda archivo huérfano. Y el borrado quita la fila antes del archivo (fallo no idempotente). Destino: seguimiento.
+  - **Cerrado (2026-10-08).** Subida: `AddAsync` + `SaveChangesAsync` van en un `try/catch` que, al fallar, borra el archivo recién escrito (`DeleteAsync` es idempotente) y **relanza** el error original — el que se reporta es el de persistencia, no el de la limpieza. Borrado: se conserva el orden fila→archivo y la guarda `if (saved)`, pero el `DeleteAsync` va en su propio `try/catch` que registra `LogWarning` y **no relanza**: la fila es la fuente de verdad y la operación ya está confirmada, así que un fallo de disco es deuda de disco, no un error (relanzar daba un 500 cuyo reintento recibía 404).
+- [x] **SC-R2** — La regla `Content NotNull` del validador es inalcanzable (el controller coacciona a `Stream.Null`). Destino: limpieza.
+  - **Cerrado (2026-10-08).** La regla ahora es `RuleFor(x => x.Length).GreaterThan(0)`: la longitud es la señal REAL de que el multipart trajo archivo, porque el controller nunca manda `Content` en null (pasa `Stream.Null` y `file?.Length ?? 0`). Cubierto por `Validate_WithZeroLength_ShouldFail_EvenThoughTheStreamIsNotNull` (falla) y `Validate_WithAFile_ShouldPass` (pasa).
+- [x] **SC-R3** — El config público no filtra por `IsActive` (latente; nada lo apaga hoy). Destino: endurecer.
+  - **Cerrado (2026-10-08).** `&& image.IsActive` añadido al filtro de `Showcase(...)`. Endurecimiento **explícito del contrato público**: el repositorio ya devolvía solo activas, así que el cambio no altera el comportamiento de hoy — evita que el contrato dependa de un detalle interno de la lectura. Cubierto por tests que montan una imagen inactiva (el mock del repositorio no aplica los filtros del repo, así que el test sí distingue el caso).
 - [ ] **SC-R4** — UI: el input file no se resetea (re-seleccionar el mismo archivo no dispara cambio); ramas de fallo parcial/red sin test; el test del halo con reduced-motion comprueba clases CSS, no comportamiento.
 - [ ] **SC-R5** — Tests del carrusel: pausa por hover/focus y el caso de **una sola imagen** sin cubrir.
 
@@ -212,3 +215,4 @@ Hallazgos **advisory** (no bloqueantes):
 
 - 2026-10-07 — Feature creado. Decisiones C1–C4 del owner. Sin implementación.
 - 2026-10-08 — **Implementado** en 4 slices, todos **revisados y aprobados/acknowledgeados**. Un CRITICAL real (binding multipart) corregido vía el circuito de corrección + validador. UI admin y pública completas. Push = decisión del owner.
+- 2026-10-08 — **Cerrados los 3 hallazgos backend (SC-R1, SC-R2, SC-R3).** Compensación del archivo huérfano en el alta (borrado del archivo recién escrito + rethrow del error de persistencia); borrado tolerante a fallo de disco (orden fila→archivo intacto, `LogWarning`, sin relanzar); regla de "archivo presente" alcanzable sobre `Length > 0` en vez de `Content NotNull`; e `IsActive` explícito en el config público. 7 tests nuevos/ampliados. Verificación observada: `dotnet build src/SMCA.sln` → Build succeeded, 0 errors, sin `error MSB`; `Application.Tests --filter FullyQualifiedName~Showcase` → 113/113; `--filter FullyQualifiedName~GetPublicOrderingConfig` → 43/43. Sonda de mutación: revirtiendo cada fix caen exactamente sus tests (4 y 4), así que los tests fijan el comportamiento y no pasan por casualidad. Sin commit (writer acotado).

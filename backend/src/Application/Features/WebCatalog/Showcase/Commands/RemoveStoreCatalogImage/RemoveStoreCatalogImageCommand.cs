@@ -8,6 +8,7 @@ using Domain.Common.Extensions;
 using Domain.Entities.StoreCatalogImages;
 using Domain.Interfaces.Repositories;
 using Microsoft.Extensions.Localization;
+using Microsoft.Extensions.Logging;
 using Resources;
 using System.Net;
 
@@ -38,19 +39,22 @@ namespace Application.Features.WebCatalog.Showcase.Commands.RemoveStoreCatalogIm
         private readonly IStoreCatalogImageRepository _imageRepository;
         private readonly ICatalogImageStorage _catalogImageStorage;
         private readonly IStringLocalizer<I18n> _localizer;
+        private readonly ILogger<RemoveStoreCatalogImageCommandHandler> _logger;
 
         public RemoveStoreCatalogImageCommandHandler(
             IApplicationUnitOfWork applicationUnitOfWork,
             IHttpContextService httpContextService,
             IStoreCatalogImageRepository imageRepository,
             ICatalogImageStorage catalogImageStorage,
-            IStringLocalizer<I18n> localizer)
+            IStringLocalizer<I18n> localizer,
+            ILogger<RemoveStoreCatalogImageCommandHandler> logger)
         {
             _applicationUnitOfWork = applicationUnitOfWork;
             _httpContextService = httpContextService;
             _imageRepository = imageRepository;
             _catalogImageStorage = catalogImageStorage;
             _localizer = localizer;
+            _logger = logger;
         }
 
         public async Task<ResponseResult<bool>> Handle(RemoveStoreCatalogImageCommand request, CancellationToken cancellationToken)
@@ -75,8 +79,27 @@ namespace Application.Features.WebCatalog.Showcase.Commands.RemoveStoreCatalogIm
             // El archivo se borra SOLO cuando la fila quedó eliminada: nunca al revés. Borrar el
             // archivo antes de confirmar la fila dejaría el carrusel del storefront pidiendo una imagen
             // que ya no existe.
+            //
+            // Y si el borrado del ARCHIVO falla, no se relanza: la fila es la fuente de verdad y la
+            // operación ya está confirmada, así que un fallo de disco aquí es DEUDA DE DISCO, no un
+            // error de la operación. Relanzar convertiría un 200 correcto en un fallo y el reintento
+            // del dueño recibiría un 404 de una imagen que ya no existe. Se registra para que la deuda
+            // sea rastreable y se limpia aparte.
             if (saved)
-                await _catalogImageStorage.DeleteAsync(image.Key, cancellationToken);
+            {
+                try
+                {
+                    await _catalogImageStorage.DeleteAsync(image.Key, cancellationToken);
+                }
+                catch (Exception exception)
+                {
+                    _logger.LogWarning(
+                        exception,
+                        "Fila de imagen de showcase {ShowcaseImageId} eliminada, pero su archivo no se pudo borrar: {ImageKey}. La fila es la fuente de verdad; el archivo queda como deuda de disco.",
+                        image.Id,
+                        image.Key);
+                }
+            }
 
             return ResponseResult.Success(saved);
         }

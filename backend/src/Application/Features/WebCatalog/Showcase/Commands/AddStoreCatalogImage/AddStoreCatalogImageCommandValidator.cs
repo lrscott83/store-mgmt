@@ -34,11 +34,15 @@ namespace Application.Features.WebCatalog.Showcase.Commands.AddStoreCatalogImage
                 .Must(kind => Enum.IsDefined(kind))
                 .WithMessage(localizer["ShowcaseImageKindInvalid", "{PropertyName}"]);
 
-            // Un `Stream` no nulable es la señal de que el multipart sí trajo archivo. El archivo vacío
-            // (longitud 0) lo rechaza después el handler, con las reglas de imagen.
-            RuleFor(x => x.Content)
-                .NotNull()
-                .WithMessage(localizer["ShowcaseImageRequired", "{PropertyName}"]);
+            // La señal REAL de que el multipart trajo archivo es la LONGITUD, no el `Stream`. El
+            // controller nunca manda `Content` en null: cuando el multipart no trae archivo pasa
+            // `Stream.Null` (nunca null) y `file?.Length ?? 0`, así que una regla `NotNull()` sobre el
+            // `Stream` sería INALCANZABLE por HTTP — siempre pasaría. Longitud > 0 es lo que el
+            // controller envía cuando hay archivo, y 0 cuando no, que es justo lo que esta regla
+            // rechaza.
+            RuleFor(x => x.Length)
+                .GreaterThan(0)
+                .WithMessage(localizer["ShowcaseImageRequired"]);
 
             RuleFor(x => x.Caption)
                 .MaximumLength(StoreCatalogImage.CaptionMaxLength)

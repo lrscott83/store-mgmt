@@ -28,9 +28,12 @@ nativa*). Este documento es el **seguimiento** y el mapa de cierre.
     (`Catalog.PedidosModulesBackfillTests.DownSql_RemovesTheRowsTheRestrictForeignKeysWouldOtherwiseBlock`).
 
 ### Showcase (`catalogo-publico-carrusel-dia.md`)
-- [ ] **SC-R1** (defecto) — Archivo huérfano si falla `SaveChanges` tras subir; borrado no idempotente (fila antes que archivo).
-- [ ] **SC-R2** (defecto) — La regla `Content NotNull` del validador es inalcanzable (el controller coacciona a `Stream.Null`).
-- [ ] **SC-R3** (defecto) — El config público no filtra por `IsActive`.
+- [x] **SC-R1** (defecto) — Archivo huérfano si falla `SaveChanges` tras subir; borrado no idempotente (fila antes que archivo).
+  - **Cerrado (2026-10-08).** Alta: `AddAsync`+`SaveChangesAsync` en `try/catch` → borra el archivo recién escrito y relanza. Baja: el `DeleteAsync` se traga el fallo con `LogWarning` (la fila ya está confirmada; el archivo es deuda de disco).
+- [x] **SC-R2** (defecto) — La regla `Content NotNull` del validador es inalcanzable (el controller coacciona a `Stream.Null`).
+  - **Cerrado (2026-10-08).** Sustituida por `RuleFor(x => x.Length).GreaterThan(0)`, que sí rechaza el multipart sin archivo.
+- [x] **SC-R3** (defecto) — El config público no filtra por `IsActive`.
+  - **Cerrado (2026-10-08).** `&& image.IsActive` en `Showcase(...)`. El repositorio ya filtraba: es endurecimiento explícito del contrato público, sin cambio de comportamiento.
 - [ ] **SC-R4** (test+defecto) — UI: el input file no se resetea (re-seleccionar el mismo archivo no dispara cambio); ramas de fallo parcial/red sin test; el test del halo comprueba clases CSS, no comportamiento.
 - [ ] **SC-R5** (test) — Carrusel: pausa por hover/focus y caso de **una sola imagen** sin cubrir.
 
@@ -81,3 +84,4 @@ nativa*). Este documento es el **seguimiento** y el mapa de cierre.
   `Application.Tests --filter PedidosModulesBackfillTests` → 4/4; E2E `StorePlanCatalogTests|PedidosModulesSeedTests` → 4/4
   (re-ejecutado por el orquestador como spot-check: 4/4, 785 ms). RDD `assess` con base `817ec633`: risk=medium, 273 líneas,
   `review_due=false` (`under_budget`) → el slice queda en cola en la acumulación hasta el umbral; sin revisión nativa todavía.
+- 2026-10-08 — **Bloque Showcase cerrado en su parte backend (SC-R1, SC-R2, SC-R3).** Compensación de archivo huérfano en el alta; borrado tolerante a fallo de disco con log; regla de archivo presente alcanzable (`Length > 0`); `IsActive` explícito en el config público. Verificación observada: build de la solución OK (0 errors, sin `error MSB`); `Showcase` 113/113; `GetPublicOrderingConfig` 43/43; sonda de mutación confirma que cada test cae al revertir su fix. SC-R4/SC-R5 (UI) siguen abiertos.
