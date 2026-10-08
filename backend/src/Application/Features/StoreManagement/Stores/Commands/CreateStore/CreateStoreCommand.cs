@@ -3,11 +3,13 @@ using Application.Abstractions.Messaging;
 using Application.Dtos.StoreManagement;
 using Application.Exceptions;
 using Application.ResponseModels;
+using Application.Services.Notifications;
 using Application.UnitOfWorks;
 using AutoMapper;
 using Domain.Common.Enums;
 using Domain.Common.Extensions;
 using Domain.Common.Utils;
+using Domain.Entities.Owners;
 using Domain.Entities.Stores;
 using Domain.Interfaces.Repositories;
 using Domain.Interfaces.Services.Billing;
@@ -32,6 +34,7 @@ namespace Application.Features.StoreManagement.Stores.Commands.CreateStore
         private readonly IMapper _mapper;
         private readonly IStringLocalizer<I18n> _localizer;
         private readonly ICreateStoreService _createStoreService;
+        private readonly IOwnerRegistrationNotificationService _ownerRegistrationNotificationService;
 
         public CreateStoreCommandHandler(
             IApplicationUnitOfWork applicationUnitOfWork,
@@ -42,7 +45,8 @@ namespace Application.Features.StoreManagement.Stores.Commands.CreateStore
             IHttpContextService httpContextService,
             IMapper mapper,
             IStringLocalizer<I18n> localizer,
-            ICreateStoreService createStoreService)
+            ICreateStoreService createStoreService,
+            IOwnerRegistrationNotificationService ownerRegistrationNotificationService)
         {
             _applicationUnitOfWork = applicationUnitOfWork;
             _storeModuleRepository = storeModuleRepository;
@@ -53,6 +57,7 @@ namespace Application.Features.StoreManagement.Stores.Commands.CreateStore
             _mapper = mapper;
             _localizer = localizer;
             _createStoreService = createStoreService;
+            _ownerRegistrationNotificationService = ownerRegistrationNotificationService;
         }
 
         public async Task<ResponseResult<StoreDto>> Handle(CreateStoreCommand request, CancellationToken cancellationToken)
@@ -121,9 +126,39 @@ namespace Application.Features.StoreManagement.Stores.Commands.CreateStore
             var store = await _createStoreService.CreateStoreAsync(ownerId, owner.TenantId, request.Name, request.Address, 
                 request.Description, approved, moduleIds);
 
-            return await _applicationUnitOfWork.SaveChangesAsync(cancellationToken) > 0
-                ? ResponseResult.Success(_mapper.Map<StoreDto>(store)) 
-                : ResponseResult.Failure<StoreDto>(StoreErrors.NotCreated, (int)HttpStatusCode.BadRequest);
+            // Split, not a ternary: the notice may only ever be emitted on the committed branch.
+            if (await _applicationUnitOfWork.SaveChangesAsync(cancellationToken) <= 0)
+                return ResponseResult.Failure<StoreDto>(StoreErrors.NotCreated, (int)HttpStatusCode.BadRequest);
+
+            // Same ordering rule as the registration handlers, for the same reason: NotificationRepository
+            // commits internally, so notifying BEFORE this save would flush first, leave nothing staged
+            // here and make this SaveChangesAsync a no-op — the store would never land.
+            await NotifyOwnerRegistrationAsync(owner, store, cancellationToken);
+
+            return ResponseResult.Success(_mapper.Map<StoreDto>(store));
+        }
+
+        /// <summary>
+        /// Tells the SuperAdmin a store was just created, or skips it. Nothing here can change the
+        /// response: the "anything missing" case returns without calling the service, and the service
+        /// itself swallows and logs its own failures.
+        /// </summary>
+        /// <remarks>
+        /// The cell phone comes from <c>owner.User</c>, NOT from the command: POST /v1/stores has no
+        /// phone field. That navigation is already loaded by <c>GetOwnerIncludingUserByIdAsync</c>
+        /// (<c>Include(o =&gt; o.User)</c>), so this adds no query — which is why the same
+        /// <see cref="OwnerRegistrationNotification"/> policy as the registration flows is reused here
+        /// instead of a second notification shape and a migration.
+        /// </remarks>
+        private async Task NotifyOwnerRegistrationAsync(Owner owner, Store store, CancellationToken cancellationToken)
+        {
+            OwnerRegistrationNotification.OwnerRegistrationTarget? target =
+                OwnerRegistrationNotification.Resolve(owner, owner.User?.CellPhone, store.Name);
+
+            if (target is null)
+                return;
+
+            await _ownerRegistrationNotificationService.NotifyAsync(target, cancellationToken);
         }
     }
 }
