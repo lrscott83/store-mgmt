@@ -1,4 +1,5 @@
-﻿using Domain.Entities.Orders;
+﻿using Domain.Common.Enums;
+using Domain.Entities.Orders;
 using Domain.Interfaces.Repositories;
 using Infrastructure.Persistence.Contexts;
 using Microsoft.EntityFrameworkCore;
@@ -126,5 +127,133 @@ namespace Infrastructure.Persistence.Repositories
                 .Include(o => o.OrderItems)
                 .Include(o => o.Driver)
                 .FirstOrDefaultAsync();
+
+        /// <summary>
+        /// Agregado de los pedidos de UNA tienda en un rango (F6, T1). TODO el agregado ocurre en la
+        /// BASE: cuatro consultas contadas y agrupadas, ninguna que devuelva filas de pedido.
+        ///
+        /// Traer la tabla y sumar en C# convertiría "abrir el panel de ventas" en una lectura
+        /// completa del histórico, y el histórico de pedidos es lo que más crece sin que nada lo
+        /// acote. Por eso el desglose se pide con <c>GroupBy</c> y no con un <c>.Count()</c> en
+        /// memoria sobre la lista.
+        ///
+        /// <para><b>LA REGLA DE F6</b>: los pedidos <see cref="OrderStatus.Cancelled"/> NO suman
+        /// <c>TotalSales</c>, y tampoco cuentan ni suman en los pares de pago. Un pedido cancelado
+        /// no es venta y no es deuda: si sumara, el panel publicaría una venta que el dueño deshizo
+        /// y le pediría cobrar un pedido que ya no existe.
+        ///
+        /// Los RECUENTOS se excluyen igual que los IMPORTES a propósito, porque cada par tiene que
+        /// describir el MISMO conjunto de pedidos: si <c>PaidCount</c> contara el cancelado y
+        /// <c>PaidAmount</c> no, el ticket medio de lo pagado (<c>PaidAmount / PaidCount</c>) saldría
+        /// mal.
+        ///
+        /// <c>OrdersCount</c>, en cambio, cuenta TODO, cancelados incluidos: "cuántos pedidos
+        /// entraron" y "cuánto se vendió" son preguntas distintas, y el cancelado sigue visible en
+        /// <c>ByStatus</c>, así que ningún dato se pierde por excluirlo de la venta.</para>
+        ///
+        /// Los extremos del rango llegan YA NORMALIZADOS a día completo por el handler
+        /// (<c>NormalizeFrom</c>/<c>NormalizeTo</c>), igual que en
+        /// <see cref="GetPagedByStoreIdAsync"/>: este repositorio no vuelve a normalizar, para que
+        /// el filtro registrado y el filtro ejecutado sean el mismo. El <c>storeId</c> se aplica
+        /// PRIMERO y sin condiciones —es el aislamiento entre tiendas (criterio 7)— para que ni un
+        /// filtro mal formado pueda dejar ver un pedido de otra tienda.
+        ///
+        /// La moneda no se configurable (A3 eliminada): se lee del pedido no cancelado MÁS
+        /// RECIENTE del rango, con desempate por id para que dos pedidos del mismo instante no
+        /// dejen la moneda al azar. Sin ninguno, sale el default del dominio, <see cref="Currency.CUP"/>.
+        /// </summary>
+        public async Task<OrderAggregateStats> GetStatsByStoreIdAsync(Guid storeId, OrderStatsFilter filter)
+        {
+            IQueryable<Order> query = _orders.Where(o => o.StoreId == storeId);
+
+            if (filter.Status is { } status)
+                query = query.Where(o => o.Status == status);
+
+            if (filter.PaymentStatus is { } paymentStatus)
+                query = query.Where(o => o.PaymentStatus == paymentStatus);
+
+            if (filter.DeliveryType is { } deliveryType)
+                query = query.Where(o => o.DeliveryType == deliveryType);
+
+            if (filter.From is { } from)
+                query = query.Where(o => o.Date >= from);
+
+            if (filter.To is { } to)
+                query = query.Where(o => o.Date <= to);
+
+            // Una sola fila con los siete sumatorios. Se proyecta un `0` en vez de filtrar por
+            // separado (`g.Where(...).Sum(...)`) porque el filtro dentro del grupo devuelve NULL en
+            // SQL cuando no casa con ninguna fila, y un `SUM` nulo sobre `decimal` es un
+            // `InvalidOperationException` al materializar — el mismo AggregateException que
+            // revienta con un rango donde todo está cancelado. La forma condicional no tiene
+            // grupo vacío posible y devuelve 0 sola.
+            //
+            // `GroupBy(_ => 1)` es la forma de pedir un agregado SIN columna de agrupación: sin
+            // ella no hay ninguna proyección donde colocar un `Count`/`Sum` de todo el conjunto.
+            var totals = await query
+                .GroupBy(_ => 1)
+                .Select(g => new
+                {
+                    OrdersCount = g.Count(),
+                    NonCancelledCount = g.Count(o => o.Status != OrderStatus.Cancelled),
+                    TotalSales = g.Sum(o => o.Status != OrderStatus.Cancelled ? o.Total : 0m),
+                    PaidCount = g.Count(o => o.Status != OrderStatus.Cancelled
+                        && o.PaymentStatus == OrderPaymentStatus.Paid),
+                    PaidAmount = g.Sum(o => o.Status != OrderStatus.Cancelled
+                        && o.PaymentStatus == OrderPaymentStatus.Paid ? o.Total : 0m),
+                    PendingCount = g.Count(o => o.Status != OrderStatus.Cancelled
+                        && o.PaymentStatus == OrderPaymentStatus.Pending),
+                    PendingAmount = g.Sum(o => o.Status != OrderStatus.Cancelled
+                        && o.PaymentStatus == OrderPaymentStatus.Pending ? o.Total : 0m),
+                })
+                .FirstOrDefaultAsync();
+
+            // Rango sin pedidos: no hay grupo, así que no hay fila. Se devuelve el agregado vacío
+            // con la moneda por defecto en vez de un `null` que el handler tendría que distinguir
+            // de "todo cancelado" — para el cliente los dos casos son el mismo cero.
+            if (totals is null)
+                return new OrderAggregateStats();
+
+            // La moneda se lee del ÚLTIMO pedido no cancelado, no del primero: si una tienda
+            // cambiara de moneda a mitad de periodo, la que se está usando es la del final. El
+            // `OrderBy` + `Take(1)` es una subconsulta escalar sobre el MISMO filtro, así que no
+            // puede salirse del rango. Va en su propia consulta y no dentro del grupo a propósito:
+            // aquí no hay `GROUP BY` implicado y la traducción es la simple, que es la que se
+            // puede leer y verificar.
+            Currency? currency = await query
+                .Where(o => o.Status != OrderStatus.Cancelled)
+                .OrderByDescending(o => o.Date)
+                .ThenByDescending(o => o.Id)
+                .Select(o => (Currency?)o.Currency)
+                .FirstOrDefaultAsync();
+
+            // Los dos desgloses CUENTAN cancelados: son el único sitio donde se ven, y es lo que
+            // explica por qué `OrdersCount` no cuadra con `NonCancelledCount`. Se traen solo los
+            // valores presentes; rellenar los que faltan con 0 es del handler, que es quien
+            // conoce la lista completa de la D11 y su orden.
+            var statusRows = await query
+                .GroupBy(o => o.Status)
+                .Select(g => new { Status = g.Key, Count = g.Count() })
+                .ToListAsync();
+
+            var deliveryRows = await query
+                .GroupBy(o => o.DeliveryType)
+                .Select(g => new { DeliveryType = g.Key, Count = g.Count() })
+                .ToListAsync();
+
+            return new OrderAggregateStats
+            {
+                OrdersCount = totals.OrdersCount,
+                NonCancelledCount = totals.NonCancelledCount,
+                TotalSales = totals.TotalSales,
+                PaidCount = totals.PaidCount,
+                PaidAmount = totals.PaidAmount,
+                PendingCount = totals.PendingCount,
+                PendingAmount = totals.PendingAmount,
+                Currency = currency ?? Currency.CUP,
+                ByStatus = statusRows.ToDictionary(row => row.Status, row => row.Count),
+                ByDeliveryType = deliveryRows.ToDictionary(row => row.DeliveryType, row => row.Count),
+            };
+        }
     }
 }

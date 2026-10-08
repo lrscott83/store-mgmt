@@ -3,6 +3,7 @@ using Application.Features.OnlineOrdering.Commands.AssignOrderDriver;
 using Application.Features.OnlineOrdering.Commands.UpdateOrderPaymentStatus;
 using Application.Features.OnlineOrdering.Commands.UpdateOrderStatus;
 using Application.Features.OnlineOrdering.Queries.GetOnlineOrderById;
+using Application.Features.OnlineOrdering.Queries.GetOnlineOrderStats;
 using Application.Features.OnlineOrdering.Queries.GetOnlineOrders;
 using Application.ResponseModels;
 using Asp.Versioning;
@@ -72,6 +73,37 @@ namespace SMCA.WebApi.Controllers.v1
         public async Task<IActionResult> GetOrderAsync(Guid id)
         {
             return Ok(await Sender.Send(new GetOnlineOrderByIdQuery(id)));
+        }
+
+        /// <summary>
+        /// Métricas de los pedidos online de la tienda en un rango (F6, T2, vista "Ventas"):
+        /// pedidos, ventas totales, ticket medio, pagado/pendiente y los desgloses por estado y
+        /// modalidad.
+        ///
+        /// Comparte la feature `OnlineOrdersAdmin` con el resto de la clase —el dueño y el
+        /// <c>StoreUser</c> gestionan pedidos y ventas igual— y por eso no hay una clase aparte:
+        /// es la MISMA tabla y las MISMAS filas que la vista de "Pedidos", leídas de otra forma.
+        ///
+        /// Los parámetros van explícitos (y no un `[FromQuery] GetOnlineOrderStatsQuery`) por la
+        /// misma razón que en <see cref="GetOrdersAsync"/>: que los nombres de la query sean los
+        /// nombres de la URL se lea aquí, en el contrato de la ruta.
+        ///
+        /// `stats` es un segmento LITERAL y `GetOrderAsync` tiene un `{id}` en el mismo sitio. No es
+        /// una colisión: cuando dos plantillas encajan en la misma URL gana la de segmento literal,
+        /// así que <c>GET /api/v1/online-orders/stats</c> llega aquí y nunca al detalle. El orden de
+        /// las acciones en la clase no influye; solo cuenta que `stats` no sea un `Guid`.
+        /// </summary>
+        [HttpGet("~/api/v1/online-orders/stats")]
+        [ProducesResponseType(typeof(ResponseResult<OnlineOrderStatsDto>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> GetStatsAsync(
+            [FromQuery] DateTime? from,
+            [FromQuery] DateTime? to,
+            [FromQuery] OrderStatus? status,
+            [FromQuery] OrderPaymentStatus? paymentStatus,
+            [FromQuery] OrderDeliveryType? deliveryType)
+        {
+            return Ok(await Sender.Send(new GetOnlineOrderStatsQuery(
+                from, to, status, paymentStatus, deliveryType)));
         }
 
         /// <summary>
