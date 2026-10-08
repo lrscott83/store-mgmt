@@ -191,6 +191,25 @@ export const MENU_GROUPS: MenuGroup[] = [
           'Pedidos WhatsApp. Activa el pedido online y configura el número de WhatsApp al que llegan los pedidos, si recoges en la tienda o envías a domicilio, el costo del envío, el importe mínimo, el horario y las zonas de reparto. El precio y la moneda salen del catálogo.' +
           BETA_NOTICE,
       },
+      // Repartidores (módulo 18, F7): catálogo de personas de la tienda. Comparte MÓDULO con los
+      // dos ítems anteriores pero cambia FEATURE (123, no 122) y ROL: el backend lo exige con
+      // `OnlineOrdersAdmin` ([HasPermission]), que lleva OwnerAdmin Y StoreUser (D15) — atender
+      // pedidos y repartir es trabajo del día a día, no solo del dueño. Por eso NO lleva
+      // `rolesOnly: isOwnerAdmin` como los otros dos: con él, el StoreUser que puede usar el
+      // endpoint no vería el enlace.
+      // El `moduleIds` replica el gate del backend: sin el módulo 18 contratado, 403.
+      {
+        label: 'MENU.ONLINE_ORDERS_DRIVERS',
+        path: '/sales/online-orders/drivers',
+        featureIds: [EFeatures.OnlineOrders],
+        moduleId: EModules.WebCatalog,
+        moduleIds: [EModules.WebCatalog],
+        isNew: true,
+        helpContent:
+          'Repartidores. Da de alta las personas que reparten los pedidos de tu tienda, con su nombre y su teléfono, y actívalas o desactívalas cuando dejan de repartir. Al atender cada pedido eliges cuál lo lleva.' +
+          BETA_NOTICE,
+      },
+
       // Gestión de pedidos (feature 123, F5): la tabla de pedidos del día a día. El item de ARRIBA
       // es la CONFIGURACIÓN (feature 122, solo el dueño); este lo opera también el StoreUser, así
       // que lleva SU feature y NO un `rolesOnly` de dueño. El `moduleIds` replica el módulo 18 del
@@ -203,6 +222,7 @@ export const MENU_GROUPS: MenuGroup[] = [
         moduleIds: [EModules.WebCatalog],
         isNew: true,
         helpContent:
+          'Repartidores. Da de alta las personas que reparten los pedidos de tu tienda, con su nombre y su teléfono, y actívalas o desactívalas cuando dejan de repartir. Al atender cada pedido eliges cuál lo lleva.' +
           'Pedidos. Los pedidos que llegan por WhatsApp, filtrables por estado, pago, entrega, repartidor, fechas y búsqueda por código o teléfono. Desde aquí confirmas el pedido, lo dejas en preparación o listo, lo entregas, lo cancelas, marcas el pago y asignas el repartidor.' +
           BETA_NOTICE,
       },

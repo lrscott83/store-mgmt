@@ -133,15 +133,15 @@ ya no sale gratis de esta feature: necesita consumir el endpoint de F5 o uno pro
 
 ## Tareas
 
-- [ ] **T1** — `GetDeliveryDriversQuery` (filtro `activeOnly`, por tienda).
-- [ ] **T2** — `CreateDeliveryDriverCommand` + validator.
-- [ ] **T3** — `UpdateDeliveryDriverCommand` (incluye `IsActive`).
-- [ ] **T4** — `DeliveryDriversController` con `[HasPermission(OnlineOrdersAdmin)]`.
-- [ ] **T5** — Vista `ordering-drivers.tsx` (lista + formulario + activo).
-- [ ] **T6** — Registrar ruta + menú.
-- [ ] **T7** — Claves i18n.
-- [ ] **T8** — Tests unitarios nuevos (commands/queries con Moq; componente).
-- [ ] **T9** — Verificación (build/tests backend, `typecheck`/`lint`/`vitest`).
+- [x] **T1** — `GetDeliveryDriversQuery` (filtro `activeOnly`, por tienda).
+- [x] **T2** — `CreateDeliveryDriverCommand` + validator.
+- [x] **T3** — `UpdateDeliveryDriverCommand` (incluye `IsActive`).
+- [x] **T4** — `DeliveryDriversController` con `[HasPermission(OnlineOrdersAdmin)]`.
+- [x] **T5** — Vista `ordering-drivers.tsx` (lista + formulario + activo).
+- [x] **T6** — Registrar ruta + menú.
+- [x] **T7** — Claves i18n.
+- [x] **T8** — Tests unitarios nuevos (commands/queries con Moq; componente).
+- [x] **T9** — Verificación (build/tests backend, `typecheck`/`lint`/`vitest`).
 
 ## Criterios de aceptación
 
@@ -185,6 +185,67 @@ paralelo a F5** (F5 necesita el selector de repartidores), y **F7 no necesita F3
 - 2026-10-06 — Sincronizado con el maestro: gestión por OwnerAdmin + StoreUser (`OnlineOrdersAdmin`,
   D15); sin "En camino" (D18); vista "Repartidores" confirmada (A6); "Decisiones abiertas" →
   "Decisiones resueltas y notas". Sin implementación.
+- 2026-10-07 — **Implementada** (T1–T9). Backend: `GetDeliveryDriversQuery` (`?activeOnly=`),
+  `CreateDeliveryDriverCommand` + validator, `UpdateDeliveryDriverCommand` (con `IsActive`) +
+  validator, `DeliveryDriversDto` y `DeliveryDriversController`
+  (`[HasPermission(StoreRoleFeatures.OnlineOrdersAdmin)]`, rutas absolutas `~/api/v1/delivery-drivers`).
+  Frontend: `ordering-drivers.tsx` + su test, servicio extendido, ruta, menú e i18n. Sin E2E y sin
+  tocar pedidos: no hay `AssignOrderDriverCommand` ni filtro `driverId` aquí.
+
+  **Evidencia de verificación** (2026-10-07, este agente):
+
+  ```
+  dotnet build backend/src/SMCA.sln
+  Build succeeded.  144 Warning(s)  0 Error(s)
+
+  dotnet test backend/src/Application.Tests/Application.Tests.csproj
+  Passed! - Failed: 0, Passed: 832, Skipped: 0, Total: 832, Duration: 5 s
+
+  pnpm typecheck   ->  Tasks: 5 successful, 5 total
+  pnpm lint        ->  Tasks: 4 successful, 4 total
+  pnpm test        ->  web-store-pos: Test Files 358 passed (358) | Tests 5195 passed (5195)
+                      domain: 23 files / 222 tests · web-common: 1 file / 11 tests
+                      Tasks: 5 successful, 5 total
+  ```
+
+  18 tests nuevos del componente (`ordering-drivers.test.tsx`) y 50 del backend
+  (`GetDeliveryDriversQueryHandlerTests`, `CreateDeliveryDriverCommandHandlerTests`,
+  `UpdateDeliveryDriverCommandHandlerTests`, `DeliveryDriverCommandValidatorTests`).
+
+  **TDD observado (RED → GREEN).** Los tests se escribieron antes que la implementación. RED del
+  aislamiento por tienda en `UpdateDeliveryDriverCommandHandler`, quitando `driver.StoreId != storeId`
+  del handler:
+
+  ```
+  Failed Application.Tests.Features.OnlineOrdering.UpdateDeliveryDriverCommandHandlerTests
+        .Handle_WhenTheDriverBelongsToAnotherStore_ShouldReject
+  Failed Application.Tests.Features.OnlineOrdering.UpdateDeliveryDriverCommandHandlerTests
+        .Handle_WhenTheDriverBelongsToAnotherStore_ShouldReportNotFound
+  Error Message:
+       Expected a <Application.Exceptions.ApiException> to be thrown, but no exception was thrown.
+  Failed! - Failed: 2, Passed: 9, Skipped: 0, Total: 11
+  ```
+
+  GREEN tras restaurar la condición: `Passed! - Failed: 0, Passed: 50, Total: 50`
+  (los 4 test classes de F7).
+
+  **Desviaciones y pendientes declarados:**
+
+  - `EFeatures.OnlineOrders = 123` **añadido** a `packages/domain/src/enums/index.ts`. Ese archivo
+    NO estaba en la superficie autorizada de F7: sin el miembro no había forma de gatear por
+    `OnlineOrders` en menú y loader, y usar `EFeatures.WebCatalog` (122) habría admitido a quien no
+    tiene la 123. Se reporta aquí en vez de dejarlo silencioso.
+  - El gate de la RUTA es `featureLoader([EFeatures.OnlineOrders])`, no `ownerModuleLoader` como en
+    F1: el backend admite OwnerAdmin **y** StoreUser (D15) y `ownerModuleLoader` expulsaría al
+    `StoreUser`. Consecuencia asumida y fijada en test: `featureLoader` tiene bypass legacy para
+    OwnerAdmin/SuperAdmin, así que un Owner sin la feature 123 llega a la vista y ve el error del
+    backend en lugar de ser expulsado. El enlace del menú sí queda gateado por 123 sin bypass.
+  - Los mensajes de longitud de los validadores PRESTAN las claves `OnlineOrderCustomerNameTooLong` /
+    `OnlineOrderCustomerPhoneTooLong` (sus valores son posicionales y el texto es correcto).
+    `Resources/Localization/*.resx` está fuera de la superficie autorizada: faltan
+    `DeliveryDriverNameTooLong` / `DeliveryDriverPhoneTooLong` y `DeliveryDriverNotFound`.
+  - `DeliveryDriverRepository` **sí** estaba registrado en `Infrastructure/DependencyInjection.cs`
+    (línea 100). No hubo que añadirlo.
 - 2026-10-07 — **Frontera con F5 resuelta.** Se eliminaron T5 y T6 (validación de la asignación y filtro
   `driverId`) por **redundantes**: F5 ya las cubre en su T5 y en los filtros de `GetOnlineOrdersQuery`.
   Se quitó el criterio de aceptación de asignación (vive en F5, criterio 5). F7 queda en 9 tareas

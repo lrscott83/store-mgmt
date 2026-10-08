@@ -1,13 +1,12 @@
-using Application.Abstractions.HttpContext;
 using Application.Abstractions.Messaging;
 using Application.Exceptions;
 using Application.ResponseModels;
 using Application.UnitOfWorks;
 using Domain.Common.Enums;
-using Domain.Common.Extensions;
 using Domain.Entities.Orders;
 using Domain.Entities.Products;
 using Domain.Entities.StoreCatalogSettings;
+using Domain.Entities.Stores;
 using Domain.Interfaces.Repositories;
 using Microsoft.Extensions.Localization;
 using Resources;
@@ -23,11 +22,19 @@ namespace Application.Features.OnlineOrdering.Commands.CreateOnlineOrder
     /// El comando es deliberadamente ESCUETO: lleva QUIÉN pide, CÓMO se entrega y QUÉ productos
     /// (id + cantidad). NO lleva total, ni moneda, ni precio. Todo eso se lee del catálogo aquí, en
     /// servidor, y por eso el cliente no puede comprar a 1 CUP ni en la moneda que quiera.
+    ///
+    /// F3 lo hace PÚBLICO: lo llama el storefront sin sesión, así que la tienda se resuelve por
+    /// <see cref="StoreSlug"/> (único global) y NO por el contexto. De ahí que este handler no
+    /// dependa de `IHttpContextService`: el anónimo no tiene tienda ni tenant en el contexto, así
+    /// que pedirlo ahí devolvería `Guid.Empty` y un pedido sin tenant.
     /// </summary>
     public sealed class CreateOnlineOrderCommand : ICommand<OnlineOrderCreatedDto>
     {
         // Límites de formato del pedido. Viven AQUÍ y no en `Domain/Common/Limits` porque son
         // longitudes de la ENTRADA de esta feature, no invariantes de una entidad de dominio.
+
+        /// <summary>Slug de catálogo de la tienda. Viene de la ruta, no del cuerpo.</summary>
+        public const int StoreSlugMaxLength = 63;
 
         /// <summary>Nombre de quien pide.</summary>
         public const int CustomerNameMaxLength = 200;
@@ -40,6 +47,14 @@ namespace Application.Features.OnlineOrdering.Commands.CreateOnlineOrder
 
         /// <summary>Notas del pedido (D16: texto simple).</summary>
         public const int NotesMaxLength = 512;
+
+        /// <summary>
+        /// Slug de catálogo de la tienda (`Store.CatalogSlug`), lo fija el CONTROLADOR desde la
+        /// ruta `/public/ordering/{storeSlug}/orders`. No está en el cuerpo del request porque el
+        /// cuerpo es lo que el cliente controla y la tienda decide el catálogo: aceptar el slug del
+        /// body dejaría que un pedido se guardara en otra tienda sin querer.
+        /// </summary>
+        public string StoreSlug { get; set; } = string.Empty;
 
         /// <summary>Modalidad por VALOR de `OrderDeliveryType` (Pickup / Delivery).</summary>
         public int DeliveryType { get; set; } = (int)OrderDeliveryType.Pickup;
@@ -65,8 +80,17 @@ namespace Application.Features.OnlineOrdering.Commands.CreateOnlineOrder
         public int Quantity { get; set; }
     }
 
-    /// <summary>Lo que devuelve el alta: el código con el que la persona consulta y escribe por WhatsApp.</summary>
-    public sealed record OnlineOrderCreatedDto(Guid Id, string Code, decimal Total, Currency Currency);
+    /// <summary>
+    /// Lo que devuelve el alta: el código con el que la persona consulta y escribe por WhatsApp.
+    ///
+    /// `WhatsappNumber` viaja AQUÍ y no en el config público (decisión T2): el config lo lee
+    /// cualquiera que abra el catálogo, así que publicarlo ahí haría el número rastreable con una
+    /// simple petición; esta respuesta solo la recibe quien acaba de dejar sus datos de contacto
+    /// para ese pedido. Viene TAL CUAL lo guardó la tienda —normalizarlo a solo dígitos es tarea
+    /// del cliente que arma el enlace `wa.me`— y es `null` cuando la tienda no lo tiene
+    /// configurado, que es lo que permite BLOQUEAR el envío en vez de abrir un chat vacío.
+    /// </summary>
+    public sealed record OnlineOrderCreatedDto(Guid Id, string Code, decimal Total, Currency Currency, string? WhatsappNumber);
 
     public class CreateOnlineOrderCommandHandler
         : ICommandHandler<CreateOnlineOrderCommand, OnlineOrderCreatedDto>
@@ -86,7 +110,7 @@ namespace Application.Features.OnlineOrdering.Commands.CreateOnlineOrder
         private const int MaxCodeAttempts = 8;
 
         private readonly IApplicationUnitOfWork _applicationUnitOfWork;
-        private readonly IHttpContextService _httpContextService;
+        private readonly IStoreRepository _storeRepository;
         private readonly IProductRepository _productRepository;
         private readonly IOrderRepository _orderRepository;
         private readonly IStoreCatalogSettingsRepository _storeCatalogSettingsRepository;
@@ -94,14 +118,14 @@ namespace Application.Features.OnlineOrdering.Commands.CreateOnlineOrder
 
         public CreateOnlineOrderCommandHandler(
             IApplicationUnitOfWork applicationUnitOfWork,
-            IHttpContextService httpContextService,
+            IStoreRepository storeRepository,
             IProductRepository productRepository,
             IOrderRepository orderRepository,
             IStoreCatalogSettingsRepository storeCatalogSettingsRepository,
             IStringLocalizer<I18n> localizer)
         {
             _applicationUnitOfWork = applicationUnitOfWork;
-            _httpContextService = httpContextService;
+            _storeRepository = storeRepository;
             _productRepository = productRepository;
             _orderRepository = orderRepository;
             _storeCatalogSettingsRepository = storeCatalogSettingsRepository;
@@ -111,11 +135,21 @@ namespace Application.Features.OnlineOrdering.Commands.CreateOnlineOrder
         public async Task<ResponseResult<OnlineOrderCreatedDto>> Handle(CreateOnlineOrderCommand request,
             CancellationToken cancellationToken)
         {
-            Guid storeId = _httpContextService.StoreId.ToGuid();
-            if (storeId == Guid.Empty)
-                throw new ApiException(_localizer["StoreNotSelected", _httpContextService.UserExternalId], HttpStatusCode.BadRequest);
+            // El anónimo no tiene tienda en el contexto: se resuelve por slug, que es ÚNICO GLOBAL
+            // y es lo único que acota la petición. Mismo 404 uniforme que el catálogo público: un
+            // slug que no existe y una tienda sin catálogo publicado responden igual, para que el
+            // anónimo no pueda usar el endpoint para averiguar qué tiendas existen.
+            Store? store = string.IsNullOrWhiteSpace(request.StoreSlug)
+                ? null
+                : await _storeRepository.GetStoreByCatalogSlugAsync(request.StoreSlug.Trim().ToLowerInvariant());
 
-            Guid tenantId = _httpContextService.TenantId.ToGuid();
+            if (store == null || store.CatalogSlug == null)
+                throw new ApiException(_localizer["CatalogStoreNotFound"], HttpStatusCode.NotFound);
+
+            // El tenant sale de la TIENDA RESUELTA, no de la sesión: sin él el pedido quedaría sin
+            // tenant y el filtro global no lo protegería de ninguna lectura posterior.
+            Guid storeId = store.Id;
+            Guid tenantId = store.TenantId;
 
             StoreCatalogSettings settings = await LoadEnabledSettingsAsync(storeId);
             OrderDeliveryType deliveryType = ResolveDeliveryType(request.DeliveryType, settings);
@@ -178,7 +212,11 @@ namespace Application.Features.OnlineOrdering.Commands.CreateOnlineOrder
                 // tiene su propio campo `Notes`, así que aquí `Description` queda vacío en vez de
                 // duplicar la nota en las dos columnas.
                 description: null,
-                deliveryAddress: request.DeliveryAddress,
+                // La dirección SOLO existe para domicilio: en recogida no se persiste ni la que
+                // venga en el payload. La persona va a la tienda, así que guardar su dirección sería
+                // guardar un dato que además puede ser de OTRA persona (el carrito es del cliente
+                // anónimo, no del POS).
+                deliveryAddress: deliveryType == OrderDeliveryType.Delivery ? request.DeliveryAddress : null,
                 notes: request.Notes);
 
             // Alta nueva: `.AddAsync` marca la entidad como Added. `ApplicationDbContext` es
@@ -188,17 +226,31 @@ namespace Application.Features.OnlineOrdering.Commands.CreateOnlineOrder
 
             await _applicationUnitOfWork.SaveChangesAsync(cancellationToken);
 
-            return ResponseResult.Success(new OnlineOrderCreatedDto(order.Id, order.Code!, order.Total, order.Currency));
+            return ResponseResult.Success(new OnlineOrderCreatedDto(
+                order.Id,
+                order.Code!,
+                order.Total,
+                order.Currency,
+                // El número sale de la MISMA lectura de configuración que ya fijó el envío y el
+                // mínimo: una consulta menos y ninguna posibilidad de que el enlace se arme con
+                // un número de una versión distinta de la que el resto del pedido usó.
+                settings.WhatsappNumber));
         }
 
         /// <summary>
         /// La tienda tiene que haber abierto los pedidos. `StoreCatalogSettings` nace DESACTIVADA
         /// (D7/F1) y publicar el catálogo NO publica los pedidos: son dos interruptores distintos
         /// y esta es la puerta del segundo.
+        ///
+        /// Lectura PÚBLICA (`GetPublicByStoreIdAsync`), no la de sesión: `StoreCatalogSettings` tiene
+        /// filtro global por tenant y una petición ANÓNIMA no tiene tenant en el contexto, así que
+        /// `GetByStoreIdAsync` devolvería VACÍA y todo pedido sería rechazado como "pedidos no
+        /// habilitados" — sin error y sin aviso. Lo que acota el resultado es el `storeId`, que el
+        /// slug ya resolvió y es único global.
         /// </summary>
         private async Task<StoreCatalogSettings> LoadEnabledSettingsAsync(Guid storeId)
         {
-            StoreCatalogSettings? settings = await _storeCatalogSettingsRepository.GetByStoreIdAsync(storeId);
+            StoreCatalogSettings? settings = await _storeCatalogSettingsRepository.GetPublicByStoreIdAsync(storeId);
             if (settings is null || !settings.Enabled)
                 throw new ApiException(_localizer["OnlineOrdersNotEnabled", storeId], HttpStatusCode.BadRequest);
 

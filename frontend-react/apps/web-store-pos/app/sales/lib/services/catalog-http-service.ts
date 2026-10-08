@@ -216,6 +216,105 @@ export interface PublicOrderingConfig {
   bannerUrl?: string | null;
 }
 
+/**
+ * Modalidad de entrega de un pedido online, por VALOR del enum `OrderDeliveryType`
+ * (`Domain/Common/Enums/OrderDeliveryType.cs`).
+ */
+export enum PublicOrderDeliveryType {
+  Pickup = 0,
+  Delivery = 1,
+}
+
+/**
+ * Estado de un pedido online, por VALOR de `OrderStatus` (`Domain/Common/Enums/OrderStatus.cs`).
+ * Los valores numéricos están persistidos, así que no se reordenan.
+ */
+export enum PublicOrderStatusKind {
+  New = 0,
+  Accepted = 1,
+  Preparing = 2,
+  Ready = 3,
+  Delivered = 4,
+  Cancelled = 5,
+}
+
+/**
+ * Pago de un pedido online, por VALOR de `OrderPaymentStatus`. Es manual y en efectivo (D3): lo
+ * marca una persona, no una pasarela, así que solo hay estos dos.
+ */
+export enum PublicOrderPaymentStatus {
+  Pending = 0,
+  Paid = 1,
+}
+
+/**
+ * Cuerpo de `POST /v1/public/ordering/{storeSlug}/orders`. Espejo de `CreateOnlineOrderCommand`.
+ *
+ * DELIBERADAMENTE sin `price` ni `total`: el cliente no los envía porque el servidor los calcula
+ * con los productos publicados. El `storeSlug` tampoco viaja —lo pone la ruta— para que el cuerpo
+ * no pueda decidir en qué tienda se crea el pedido.
+ */
+export interface CreatePublicOrderRequest {
+  customerName: string;
+  customerPhone: string;
+  deliveryType: PublicOrderDeliveryType;
+  /** Obligatorio solo con `Delivery`. */
+  deliveryAddress?: string;
+  notes?: string;
+  items: PublicOrderLineRequest[];
+}
+
+/** Una línea del pedido: QUÉ producto y CUÁNTO, nunca a qué precio. */
+export interface PublicOrderLineRequest {
+  productId: string;
+  quantity: number;
+}
+
+/** Lo que devuelve el alta (`OnlineOrderCreatedDto`): el código con el que se consulta el pedido. */
+export interface PublicOrderCreated {
+  id: string;
+  code: string;
+  /** Total YA calculado por el servidor. */
+  total: number;
+  /** Moneda del catálogo por valor de `Currency`. */
+  currency: number;
+  /**
+   * Número de WhatsApp de la tienda (F4, decisión T2). Viaja AQUÍ y no en el config público:
+   * quien recibe esta respuesta es quien acaba de dejar sus datos de contacto para este pedido,
+   * mientras que el config lo lee cualquiera que abra el catálogo.
+   *
+   * `null`/`undefined` cuando la tienda no lo tiene configurado: el enlace `wa.me` queda
+   * BLOQUEADO y el pedido sigue guardado.
+   */
+  whatsappNumber?: string | null;
+}
+
+/**
+ * Estado de un pedido tal como lo ve quien lo pidió (`PublicOrderStatusDto`). Va ACOTADO a
+ * propósito: sin nombre ni teléfono del cliente, sin dirección, sin notas ni ids internos.
+ *
+ * Los enums viajan como NÚMERO (serialización por defecto de `System.Text.Json`), no como
+ * cadena: `status`, `paymentStatus`, `deliveryType` y `currency`.
+ */
+export interface PublicOrderStatus {
+  code: string;
+  status: PublicOrderStatusKind;
+  paymentStatus: PublicOrderPaymentStatus;
+  deliveryType: PublicOrderDeliveryType;
+  total: number;
+  /** Moneda del catálogo por valor de `Currency`. */
+  currency: number;
+  /** Líneas con el SNAPSHOT del momento del pedido, no el precio del catálogo de hoy. */
+  items: PublicOrderStatusItem[];
+}
+
+/** Una línea de la consulta pública: nombre, cantidad y precio unitario del snapshot. */
+export interface PublicOrderStatusItem {
+  name: string;
+  quantity: number;
+  price: number;
+}
+
 export const catalogHttpService = {
   async getStatus(): Promise<BaseResponseModel<CatalogStatus>> {
     const response = await apiClient.get<BaseResponseModel<CatalogStatus>>('/v1/catalog/status');
@@ -369,6 +468,42 @@ export const catalogHttpService = {
   async getPublicOrderingConfig(storeSlug: string): Promise<BaseResponseModel<PublicOrderingConfig>> {
     const response = await apiClient.get<BaseResponseModel<PublicOrderingConfig>>(
       `/v1/public/ordering/${encodeURIComponent(storeSlug)}/config`,
+    );
+    return response.data;
+  },
+
+  /**
+   * Crea el pedido del cliente anónimo (F3, T5). Es la única escritura pública y lleva su propio
+   * límite de tasa en el servidor.
+   *
+   * El payload NO lleva precio ni total: el servidor los recalcula leyendo el catálogo, así que un
+   * total manipulado desde el navegador no cambia nada.
+   */
+  async createPublicOrder(
+    storeSlug: string,
+    payload: CreatePublicOrderRequest,
+  ): Promise<BaseResponseModel<PublicOrderCreated>> {
+    const response = await apiClient.post<BaseResponseModel<PublicOrderCreated>>(
+      `/v1/public/ordering/${encodeURIComponent(storeSlug)}/orders`,
+      payload,
+    );
+    return response.data;
+  },
+
+  /**
+   * Estado de un pedido por código + teléfono (F3, T6), la vía de autoservicio sin cuenta (D4).
+   *
+   * El `404` es uniforme a propósito —código inexistente, de otra tienda o teléfono que no
+   * coincide responden igual—, así que un fallo aquí NO significa "ese código no existe".
+   */
+  async getPublicOrderStatus(
+    storeSlug: string,
+    code: string,
+    phone: string,
+  ): Promise<BaseResponseModel<PublicOrderStatus>> {
+    const response = await apiClient.get<BaseResponseModel<PublicOrderStatus>>(
+      `/v1/public/ordering/${encodeURIComponent(storeSlug)}/orders/${encodeURIComponent(code)}`,
+      { params: { phone } },
     );
     return response.data;
   },

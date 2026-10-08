@@ -1,4 +1,4 @@
-﻿import { type RouteConfig, index, layout, route } from '@react-router/dev/routes';
+import { type RouteConfig, index, layout, route } from '@react-router/dev/routes';
 
 export default [
   // Public landing page â€” no auth required, matches Angular's unguarded '' route.
@@ -44,6 +44,10 @@ export default [
     // Pedidos WhatsApp (módulo 18, F1): configuración del pedido online. Mismo gate que el
     // catálogo (ownerModuleLoader + WebCatalogAdmin) — configurar la tienda es cosa del dueño.
     route('sales/online-orders/settings', 'sales/routes/ordering-settings.tsx'),
+    // Repartidores (módulo 18 + feature 123, F7): catálogo de personas. Gate DISTINTO al de
+    // arriba a propósito: `featureLoader([EFeatures.OnlineOrders])`, no `ownerModuleLoader`,
+    // porque el backend lo exige con `OnlineOrdersAdmin` (OwnerAdmin Y StoreUser, D15).
+    route('sales/online-orders/drivers', 'sales/routes/ordering-drivers.tsx'),
     // Gestión de pedidos (feature 123, F5): la tabla de pedidos del día a día. Gate DISTINTO del
     // de arriba: featureLoader(OnlineOrdersAdmin), que además del OwnerAdmin deja entrar al
     // StoreUser (D15) — atender un pedido no es cosa del dueño.

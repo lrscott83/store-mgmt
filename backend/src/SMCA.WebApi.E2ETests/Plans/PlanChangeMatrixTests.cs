@@ -83,7 +83,8 @@ public sealed class PlanChangeMatrixTests
         (int)ModuleType.WholesaleSales, (int)ModuleType.Expenses, (int)ModuleType.Billing,
         (int)ModuleType.Histories, (int)ModuleType.Credits, (int)ModuleType.Warehouses,
         (int)ModuleType.MultiStores, (int)ModuleType.MultiMonedas, (int)ModuleType.Elaboration,
-        // Catálogo web (2026-09-27): módulo 18, SOLO Superior (VipUniverse queda sin cambios).
+        // Catálogo web (2026-09-27; ampliado a VIP el 2026-09-28): módulo 18. VIP incluye
+        // TODO módulo de Superior — los planes son acumulativos — así que entra en ambos.
         (int)ModuleType.WebCatalog,
     ];
 
@@ -124,7 +125,7 @@ public sealed class PlanChangeMatrixTests
         [(int)ModuleType.MultiMonedas] = [(int)FeatureType.MultiMonedas],
         [(int)ModuleType.MultiPayments] = [(int)FeatureType.MultiPayments],
         [(int)ModuleType.Elaboration] = [(int)FeatureType.Recipes, (int)FeatureType.Elaborations],
-        [(int)ModuleType.WebCatalog] = [(int)FeatureType.WebCatalog],
+        [(int)ModuleType.WebCatalog] = [(int)FeatureType.WebCatalog, (int)FeatureType.OnlineOrders],
     };
 
     // ── The 9 real transitions lacking exact target-universe coverage ──────────

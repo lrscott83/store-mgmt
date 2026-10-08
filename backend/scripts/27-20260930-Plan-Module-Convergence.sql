@@ -204,8 +204,10 @@ spec("OwnModuleId", "OwnPlanId") AS (
            (39, 2), (39, 3), (36, 2), (37, 2), (38, 2),
            -- Múltiples monedas (15) / Múltiples pagos (16)
            (43, 2), (43, 3), (44, 2), (44, 3),
-           -- Elaboración (17) / Catálogo web (18)
-           (120, 2), (121, 2), (122, 2)
+           -- Elaboración (17) / Catálogo web (18) / Pedidos online (123, módulo 18).
+           -- El 123 lleva OwnerAdmin + StoreUser (D15), no solo OwnerAdmin como el 122:
+           -- OnlineOrdersAdmin declara ambos roles en StoreRoleFeatures.cs.
+           (120, 2), (121, 2), (122, 2), (123, 2), (123, 3)
 )UPDATE "StoreRoleFeature" srf
 SET "IsActive"   = FALSE,
     "UpdatedDate" = NOW()
@@ -275,8 +277,10 @@ spec("OwnModuleId", "OwnPlanId") AS (
            (39, 2), (39, 3), (36, 2), (37, 2), (38, 2),
            -- Múltiples monedas (15) / Múltiples pagos (16)
            (43, 2), (43, 3), (44, 2), (44, 3),
-           -- Elaboración (17) / Catálogo web (18)
-           (120, 2), (121, 2), (122, 2)
+           -- Elaboración (17) / Catálogo web (18) / Pedidos online (123, módulo 18).
+           -- El 123 lleva OwnerAdmin + StoreUser (D15), no solo OwnerAdmin como el 122:
+           -- OnlineOrdersAdmin declara ambos roles en StoreRoleFeatures.cs.
+           (120, 2), (121, 2), (122, 2), (123, 2), (123, 3)
 ), esperado AS (
     SELECT DISTINCT u."StoreId", fr."RoleId", fr."FeatureId", u."TenantId"
     FROM universo u

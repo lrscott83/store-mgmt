@@ -2,14 +2,20 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
+import { useStorefrontCartStore } from '~/catalog/lib/storefront-cart-store';
+import { useCartStore } from '~/shared/lib/stores/cart-store';
 import type {
   PublicCatalog,
   PublicCatalogProduct,
   PublicOrderingConfig,
 } from '~/sales/lib/services/catalog-http-service';
 
+// El slug cambia a mitad de la suite para probar el AISLAMIENTO por tienda del carrito del
+// storefront, así que el mock es mutable en vez de fijo.
+const useParamsMock = vi.hoisted(() => vi.fn(() => ({ storeSlug: 'mi-tienda' })));
+
 vi.mock('react-router', () => ({
-  useParams: () => ({ storeSlug: 'mi-tienda' }),
+  useParams: () => useParamsMock(),
 }));
 
 const catalogMock = vi.hoisted(() => ({
@@ -17,11 +23,16 @@ const catalogMock = vi.hoisted(() => ({
   getPublicProducts: vi.fn(),
   getPublicProduct: vi.fn(),
   getPublicOrderingConfig: vi.fn(),
+  createPublicOrder: vi.fn(),
+  getPublicOrderStatus: vi.fn(),
 }));
 
-vi.mock('~/sales/lib/services/catalog-http-service', () => ({
-  catalogHttpService: catalogMock,
-}));
+vi.mock('~/sales/lib/services/catalog-http-service', async () => {
+  const actual = await vi.importActual<
+    typeof import('~/sales/lib/services/catalog-http-service')
+  >('~/sales/lib/services/catalog-http-service');
+  return { ...actual, catalogHttpService: { ...actual.catalogHttpService, ...catalogMock } };
+});
 
 import { PublicCatalogPage } from '../public-catalog';
 
@@ -95,6 +106,7 @@ function renderPage() {
 describe('PublicCatalogPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    useParamsMock.mockReturnValue({ storeSlug: 'mi-tienda' });
     catalogMock.getPublicCatalog.mockResolvedValue(envelope(CATALOG));
     catalogMock.getPublicProducts.mockResolvedValue(envelope(page([makeProduct()])));
     catalogMock.getPublicProduct.mockResolvedValue(envelope(makeProduct()));
@@ -378,6 +390,184 @@ describe('PublicCatalogPage', () => {
       expect(screen.queryByTestId('catalog-logo')).not.toBeInTheDocument();
       expect(screen.queryByTestId('catalog-banner')).not.toBeInTheDocument();
       expect(screen.queryByTestId('catalog-public-unavailable')).not.toBeInTheDocument();
+    });
+
+    it('si el config falla tampoco hay carrito: la carta se publica sin pedidos', async () => {
+      // Sin config no se sabe si la tienda acepta pedidos, y ofrecer un carrito que el backend
+      // va a rechazar sería una trampa. El catálogo entero sigue ahí.
+      catalogMock.getPublicOrderingConfig.mockRejectedValue({ response: { status: 500 } });
+      renderPage();
+
+      expect(await screen.findByTestId('catalog-card-cp1')).toBeInTheDocument();
+      expect(screen.queryByTestId('catalog-cart-button')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('catalog-add-cp1')).not.toBeInTheDocument();
+    });
+  });
+
+  // ── CARRITO Y PEDIDO DEL CLIENTE ANÓNIMO (F3) ────────────────────────────────────────────
+  describe('pedido del cliente anónimo (F3)', () => {
+    beforeEach(() => {
+      useStorefrontCartStore.setState({ itemsByStore: {} });
+      localStorage.clear();
+    });
+
+    it('añade desde la tarjeta y muestra el badge con la cantidad', async () => {
+      renderPage();
+      await screen.findByTestId('catalog-add-cp1');
+
+      fireEvent.click(screen.getByTestId('catalog-add-cp1'));
+
+      // El carrito es del STOREFRONT, no el del POS: la línea vive en el store nuevo.
+      const lines = useStorefrontCartStore.getState().itemsByStore['mi-tienda'];
+      expect(lines).toHaveLength(1);
+      expect(lines[0]).toMatchObject({ productId: 'cp1', quantity: 1, unitPrice: 82.5 });
+      // Y el carrito del POS sigue vacío (claves distintas: `lizoft-catalog-cart` vs `lizoft-cart`).
+      expect(useCartStore.getState().items).toHaveLength(0);
+      expect(await screen.findByTestId('catalog-cart-count')).toHaveTextContent('1');
+      expect(await screen.findByTestId('catalog-add-notice')).toHaveTextContent('Camisa azul');
+    });
+
+    it('abre el carrito con la línea y el subtotal, sin romper la rejilla', async () => {
+      renderPage();
+      await screen.findByTestId('catalog-add-cp1');
+
+      fireEvent.click(screen.getByTestId('catalog-add-cp1'));
+      fireEvent.click(screen.getByTestId('catalog-cart-button'));
+
+      const modal = await screen.findByTestId('catalog-cart-modal');
+      expect(within(modal).getByTestId('catalog-cart-item-cp1')).toHaveTextContent('Camisa azul');
+      expect(within(modal).getByTestId('catalog-cart-subtotal')).toHaveTextContent(/82\.50\s*CUP/);
+    });
+
+    it('va del carrito al checkout y crea el pedido mostrando el código', async () => {
+      catalogMock.createPublicOrder.mockResolvedValue(
+        envelope({ id: 'o1', code: 'K7M2QX', total: 82.5, currency: 0 }),
+      );
+      // El código se pinta en el modal de estado, que la página abre tras crear; se comprueba
+      // desde aquí porque la página es quien se lo pasa.
+      renderPage();
+      await screen.findByTestId('catalog-add-cp1');
+
+      fireEvent.click(screen.getByTestId('catalog-add-cp1'));
+      fireEvent.click(screen.getByTestId('catalog-cart-button'));
+      fireEvent.click(await screen.findByTestId('catalog-cart-checkout'));
+
+      const checkout = await screen.findByTestId('catalog-checkout-modal');
+      fireEvent.change(within(checkout).getByTestId('checkout-name'), {
+        target: { value: 'Ana' },
+      });
+      fireEvent.change(within(checkout).getByTestId('checkout-phone'), {
+        target: { value: '5351234567' },
+      });
+      fireEvent.click(within(checkout).getByTestId('checkout-submit'));
+
+      await waitFor(() => expect(catalogMock.createPublicOrder).toHaveBeenCalledTimes(1));
+      const [slug, payload] = catalogMock.createPublicOrder.mock.calls[0] as [
+        string,
+        Record<string, unknown>,
+      ];
+      expect(slug).toBe('mi-tienda');
+      // Solo id y cantidad: ni precio, ni total.
+      expect(payload['items']).toEqual([{ productId: 'cp1', quantity: 1 }]);
+      expect(payload).not.toHaveProperty('total');
+
+      // El carrito se vacía y se muestra el código del pedido.
+      await waitFor(() =>
+        expect(useStorefrontCartStore.getState().itemsByStore['mi-tienda']).toEqual([]),
+      );
+      expect(await screen.findByTestId('order-code')).toHaveTextContent('K7M2QX');
+    });
+
+    it('añade desde el detalle del producto', async () => {
+      renderPage();
+      await screen.findByTestId('catalog-card-cp1');
+
+      fireEvent.click(screen.getByTestId('catalog-card-cp1'));
+      await screen.findByTestId('catalog-detail-modal');
+      fireEvent.click(screen.getByTestId('catalog-detail-add'));
+
+      const lines = useStorefrontCartStore.getState().itemsByStore['mi-tienda'];
+      expect(lines).toHaveLength(1);
+      expect(lines[0].productId).toBe('cp1');
+      // El detalle se cierra y el carrito se abre: el cliente ve qué acaba de añadir.
+      expect(screen.queryByTestId('catalog-detail-modal')).not.toBeInTheDocument();
+      expect(await screen.findByTestId('catalog-cart-modal')).toBeInTheDocument();
+    });
+
+    it('el carrito de una tienda no aparece en el de otra', async () => {
+      const { unmount } = render(
+        <IntlProvider locale="es" messages={esMessages}>
+          <PublicCatalogPage />
+        </IntlProvider>,
+      );
+      await screen.findByTestId('catalog-add-cp1');
+      fireEvent.click(screen.getByTestId('catalog-add-cp1'));
+      unmount();
+
+      // El slug cambió: el catálogo se pide para la otra tienda y el contador sigue en cero,
+      // porque el store aísla por slug en vez de mezclar carritos.
+      useParamsMock.mockReturnValue({ storeSlug: 'otra-tienda' });
+      render(
+        <IntlProvider locale="es" messages={esMessages}>
+          <PublicCatalogPage />
+        </IntlProvider>,
+      );
+
+      await screen.findByTestId('catalog-store-name');
+      await waitFor(() => expect(catalogMock.getPublicCatalog).toHaveBeenLastCalledWith('otra-tienda'));
+      expect(screen.queryByTestId('catalog-cart-count')).not.toBeInTheDocument();
+      expect(useStorefrontCartStore.getState().itemsByStore['mi-tienda']).toHaveLength(1);
+    });
+
+    it('con la tienda cerrada no hay carrito ni botón de añadir', async () => {
+      catalogMock.getPublicOrderingConfig.mockResolvedValue(
+        envelope({ ...CONFIG_WITHOUT_BRAND, enabled: false }),
+      );
+      renderPage();
+
+      // Publicar el catálogo y aceptar pedidos son dos interruptores distintos (F1).
+      expect(await screen.findByTestId('catalog-card-cp1')).toBeInTheDocument();
+      expect(screen.queryByTestId('catalog-cart-button')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('catalog-add-cp1')).not.toBeInTheDocument();
+      expect(screen.getByTestId('catalog-orders-disabled')).toHaveTextContent(
+        'Esta tienda no está aceptando pedidos por ahora.',
+      );
+      // Y el catálogo es el de siempre.
+      expect(screen.getByTestId('catalog-grid')).toBeInTheDocument();
+    });
+
+    it('consulta el estado de un pedido por código y teléfono', async () => {
+      catalogMock.getPublicOrderStatus.mockResolvedValue(
+        envelope({
+          code: 'K7M2QX',
+          status: 0,
+          paymentStatus: 0,
+          deliveryType: 0,
+          total: 82.5,
+          currency: 0,
+          items: [{ name: 'Camisa azul', quantity: 1, price: 82.5 }],
+        }),
+      );
+      renderPage();
+
+      fireEvent.click(await screen.findByTestId('order-status-button'));
+      fireEvent.change(screen.getByTestId('order-status-code'), { target: { value: 'K7M2QX' } });
+      fireEvent.change(screen.getByTestId('order-status-phone'), {
+        target: { value: '5351234567' },
+      });
+      fireEvent.click(screen.getByTestId('order-status-submit'));
+
+      await waitFor(() =>
+        expect(catalogMock.getPublicOrderStatus).toHaveBeenCalledWith(
+          'mi-tienda',
+          'K7M2QX',
+          '5351234567',
+        ),
+      );
+      expect(await screen.findByTestId('order-status-state')).toHaveTextContent('Recibido');
+      expect(screen.getByTestId('order-status-delivery-type')).toHaveTextContent(
+        'Recogida en la tienda',
+      );
     });
   });
 });

@@ -9,17 +9,24 @@ import { SearchIcon } from '~/shared/components/ui/icons';
 import { currencyFromCode, formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency';
 import { isNetworkError } from '~/shared/lib/http/http-error';
 import { apiFileUrl } from '~/shared/lib/http/media-url';
+import { StorefrontCart } from '~/catalog/components/storefront-cart';
+import { StorefrontCheckout } from '~/catalog/components/storefront-checkout';
+import { StorefrontOrderStatus } from '~/catalog/components/storefront-order-status';
+import { useStorefrontCartStore } from '~/catalog/lib/storefront-cart-store';
 import {
   catalogHttpService,
   type PublicCatalog,
   type PublicCatalogPage,
   type PublicCatalogProduct,
   type PublicOrderingConfig,
+  type PublicOrderCreated,
 } from '~/sales/lib/services/catalog-http-service';
 
 const PAGE_SIZE = 12;
 /** La búsqueda espera a que el cliente deje de teclear: una petición, no una por letra. */
 const SEARCH_DEBOUNCE_MS = 300;
+/** Cuánto vive el aviso de "añadido al pedido" antes de desaparecer solo. */
+const ADD_NOTICE_MS = 2500;
 
 type CatalogState = 'loading' | 'ready' | 'not-found' | 'offline';
 
@@ -56,6 +63,41 @@ export function PublicCatalogPage() {
    * endpoint) se pinta como un catálogo sin marca, nunca como un catálogo roto.
    */
   const [orderingConfig, setOrderingConfig] = useState<PublicOrderingConfig | null>(null);
+
+  /**
+   * Pedido del cliente anónimo (F3). El carrito es un store PROPIO y aislado por slug
+   * (`lizoft-catalog-cart`): el del POS (`lizoft-cart`) es la venta del vendedor y no se toca.
+   */
+  const cartItemsByStore = useStorefrontCartStore((state) => state.itemsByStore);
+  const addToCart = useStorefrontCartStore((state) => state.addItem);
+  const removeFromCart = useStorefrontCartStore((state) => state.removeItem);
+  const updateCartQuantity = useStorefrontCartStore((state) => state.updateQuantity);
+  const clearCart = useStorefrontCartStore((state) => state.clear);
+  const cartTotal = useStorefrontCartStore((state) => state.total);
+  const cartCount = useStorefrontCartStore((state) => state.count);
+
+  const cartLines = cartItemsByStore[storeSlug] ?? [];
+  const cartCountForStore = cartCount(storeSlug);
+
+  const [cartOpen, setCartOpen] = useState(false);
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [statusOpen, setStatusOpen] = useState(false);
+  const [createdOrder, setCreatedOrder] = useState<PublicOrderCreated | null>(null);
+  const [addNotice, setAddNotice] = useState<string | null>(null);
+
+  /** Publicar el catálogo y aceptar pedidos son DOS interruptores distintos (F1). */
+  const orderingEnabled = orderingConfig?.enabled ?? false;
+
+  function addProductToCart(product: PublicCatalogProduct) {
+    addToCart(storeSlug, {
+      id: product.id,
+      name: product.name,
+      currency: product.currency,
+      unitPrice: product.finalPrice,
+      imageUrl: product.imageUrl,
+    });
+    setAddNotice(product.name);
+  }
 
   const loadCatalog = useCallback(async () => {
     try {
@@ -125,6 +167,14 @@ export function PublicCatalogPage() {
     }, SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(timer);
   }, [searchInput]);
+
+  // El aviso de "añadido" es transitorio: sin esto el texto se queda pegado hasta el siguiente
+  // clic, que no es lo que comunica.
+  useEffect(() => {
+    if (!addNotice) return;
+    const timer = setTimeout(() => setAddNotice(null), ADD_NOTICE_MS);
+    return () => clearTimeout(timer);
+  }, [addNotice]);
 
   async function openDetail(product: PublicCatalogProduct) {
     // Se abre con lo que ya trae la tarjeta (instantáneo) y se completa con el detalle.
@@ -215,7 +265,7 @@ export function PublicCatalogPage() {
                 data-testid="catalog-logo"
               />
             )}
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <h1 className="text-2xl font-bold text-text" data-testid="catalog-store-name">
                 {catalog?.storeName}
               </h1>
@@ -223,7 +273,39 @@ export function PublicCatalogPage() {
                 {intl.formatMessage({ id: 'CATALOG_PUBLIC.FOOTER' })}
               </p>
             </div>
+            {/* Entrada al pedido (F3). Con la tienda cerrada (`enabled: false`) NO se ofrece:
+                publicar el catálogo no publica los pedidos, son dos interruptores distintos. */}
+            {orderingEnabled && (
+              <div className="flex shrink-0 items-center gap-2">
+                <Button variant="outline" onClick={() => setStatusOpen(true)} data-testid="order-status-button">
+                  {intl.formatMessage({ id: 'ORDER.STATUS_TITLE' })}
+                </Button>
+                <Button onClick={() => setCartOpen(true)} data-testid="catalog-cart-button">
+                  {intl.formatMessage({ id: 'CATALOG_PUBLIC.CART_BUTTON' })}
+                  {cartCountForStore > 0 && (
+                    <span
+                      className="ml-1 rounded-full bg-white/25 px-2 py-0.5 text-xs"
+                      data-testid="catalog-cart-count"
+                    >
+                      {cartCountForStore}
+                    </span>
+                  )}
+                </Button>
+              </div>
+            )}
           </div>
+
+          {!orderingEnabled && orderingConfig && (
+            <p className="mt-3 text-xs text-text-muted" data-testid="catalog-orders-disabled">
+              {intl.formatMessage({ id: 'CATALOG_PUBLIC.ORDERS_DISABLED' })}
+            </p>
+          )}
+
+          {addNotice && (
+            <p className="mt-3 text-xs text-primary" role="status" data-testid="catalog-add-notice">
+              {intl.formatMessage({ id: 'CATALOG_PUBLIC.CART_ADDED' }, { name: addNotice })}
+            </p>
+          )}
         </div>
       </header>
 
@@ -318,7 +400,11 @@ export function PublicCatalogPage() {
           data-testid="catalog-grid"
         >
           {items.map((product) => (
-            <li key={product.id}>
+            /* El botón "Añadir" va SOBRE la tarjeta, no dentro: la tarjeta es un `<button>` que
+               abre el detalle, y un `<button>` dentro de otro `<button>` es HTML inválido —el
+               navegador cierra el primero y el clic acaba en la tarjeta, sin añadir nada. Por
+               eso el `<li>` es el contenedor `relative` y el botón va posicionado encima. */
+            <li key={product.id} className="relative">
               <button
                 type="button"
                 onClick={() => void openDetail(product)}
@@ -404,6 +490,15 @@ export function PublicCatalogPage() {
                   )}
                 </div>
               </button>
+              {orderingEnabled && (
+                <Button
+                  className="absolute bottom-2 right-2 z-10 shadow-card"
+                  onClick={() => addProductToCart(product)}
+                  data-testid={`catalog-add-${product.id}`}
+                >
+                  {intl.formatMessage({ id: 'CATALOG_PUBLIC.ADD_TO_CART' })}
+                </Button>
+              )}
             </li>
           ))}
         </ul>
@@ -525,9 +620,67 @@ export function PublicCatalogPage() {
             <p className="whitespace-pre-line text-sm text-text" data-testid="catalog-detail-description">
               {detail.description}
             </p>
+
+            {orderingEnabled && (
+              <Button
+                className="w-full"
+                onClick={() => {
+                  addProductToCart(detail);
+                  setDetailOpen(false);
+                  setCartOpen(true);
+                }}
+                data-testid="catalog-detail-add"
+              >
+                {intl.formatMessage({ id: 'CATALOG_PUBLIC.ADD_TO_CART' })}
+              </Button>
+            )}
           </div>
         )}
       </Modal>
+
+      <StorefrontCart
+        open={cartOpen}
+        onClose={() => setCartOpen(false)}
+        lines={cartLines}
+        subtotal={cartTotal(storeSlug)}
+        currency={cartLines[0]?.currency ?? null}
+        onUpdateQuantity={(productId, quantity) => updateCartQuantity(storeSlug, productId, quantity)}
+        onRemove={(productId) => removeFromCart(storeSlug, productId)}
+        onClear={() => clearCart(storeSlug)}
+        onCheckout={() => {
+          setCartOpen(false);
+          setCheckoutOpen(true);
+        }}
+      />
+
+      {/* El checkout solo existe si la tienda acepta pedidos: con `enabled: false` no hay ni
+          botón ni modal, porque el backend lo rechazaría (y el cliente no puede permitirse
+          descubrir eso escribiendo a mano un pedido). */}
+      {orderingConfig && (
+        <StorefrontCheckout
+          open={checkoutOpen}
+          onClose={() => setCheckoutOpen(false)}
+          storeSlug={storeSlug}
+          config={orderingConfig}
+          lines={cartLines}
+          onCreated={(order) => {
+            clearCart(storeSlug);
+            setCheckoutOpen(false);
+            setCreatedOrder(order);
+            setStatusOpen(true);
+          }}
+        />
+      )}
+
+      <StorefrontOrderStatus
+        open={statusOpen}
+        onClose={() => {
+          setStatusOpen(false);
+          setCreatedOrder(null);
+        }}
+        storeSlug={storeSlug}
+        createdOrder={createdOrder}
+      />
     </div>
   );
 }

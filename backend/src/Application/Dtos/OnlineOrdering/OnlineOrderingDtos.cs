@@ -101,6 +101,58 @@ namespace Application.Dtos.OnlineOrdering
         public string PaletteId { get; set; } = StoreCatalogSettings.DefaultPaletteId;
     }
 
+    /// <summary>
+    /// Estado de UN pedido, tal como lo ve quien lo pidió (F3). Anónimo: lo lee el storefront con el
+    /// código y el teléfono, sin sesión y sin cuenta de cliente (D4).
+    ///
+    /// Está ACOTADO A PROPÓSITO. Sale lo que hace falta para responder "¿ya está? ¿lo pagado? ¿a
+    /// domicilio?": estado, pago, modalidad, total, moneda y las líneas. NO sale ni el nombre ni el
+    /// teléfono del cliente (ya los conoce quien pregunta y no aportan nada), ni la DIRECCIÓN ni las
+    /// NOTAS (datos personales que el lector anónimo no ha acreditado más allá del teléfono), ni el
+    /// repartidor, ni los ids internos. Cada campo nuevo aquí es un dato del pedido que un anónimo
+    /// puede leer probando códigos.
+    /// </summary>
+    public sealed class PublicOrderStatusDto
+    {
+        /// <summary>Código del pedido, tal como se guarda (mayúsculas).</summary>
+        public string Code { get; set; } = string.Empty;
+
+        /// <summary>Estado del pedido (D11). El POS nunca lo mueve.</summary>
+        public OrderStatus Status { get; set; }
+
+        /// <summary>Pago manual (D3/D12): pendiente hasta que la tienda lo marque pagado en efectivo.</summary>
+        public OrderPaymentStatus PaymentStatus { get; set; }
+
+        /// <summary>Recogida o domicilio.</summary>
+        public OrderDeliveryType DeliveryType { get; set; }
+
+        /// <summary>Total YA calculado por el servidor, con el envío dentro si lo hubo.</summary>
+        public decimal Total { get; set; }
+
+        /// <summary>Moneda del catálogo (A3 eliminó la moneda configurable de pedidos).</summary>
+        public Currency Currency { get; set; }
+
+        /// <summary>Líneas con el SNAPSHOT histórico: nombre, cantidad y precio del momento del pedido.</summary>
+        public List<PublicOrderItemDto> Items { get; set; } = [];
+    }
+
+    /// <summary>
+    /// Una línea del pedido en la consulta pública. Tres campos y ni uno más: sin `ProductId`
+    /// (identificador interno), sin moneda (la del pedido vale para todas) y sin datos del producto
+    /// que el catálogo público ya publica por su cuenta.
+    /// </summary>
+    public sealed class PublicOrderItemDto
+    {
+        /// <summary>Nombre del producto tal como se guardó al pedir.</summary>
+        public string Name { get; set; } = string.Empty;
+
+        /// <summary>Cantidad pedida.</summary>
+        public int Quantity { get; set; }
+
+        /// <summary>Precio unitario del snapshot, no el del catálogo de hoy.</summary>
+        public decimal Price { get; set; }
+    }
+
     // --- Lecturas de gestión de pedidos (F5, vista "Pedidos") ---------------------------------
 
     /// <summary>
