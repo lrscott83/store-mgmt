@@ -67,6 +67,10 @@ namespace Infrastructure.Persistence.EntityConfigurations
                 StorePlanModule.Create((int)StorePlanType.Superior, (int)ModuleType.MultiMonedas),
                 StorePlanModule.Create((int)StorePlanType.Superior, (int)ModuleType.Elaboration),
                 StorePlanModule.Create((int)StorePlanType.Superior, (int)ModuleType.WebCatalog),
+                // PedidosWhatsApp (19) y GestionPedidos (20) (2026-10-08, M6): a Superior y a VIP,
+                // igual que el Catálogo web — los pedidos sin catálogo público no tienen sentido.
+                StorePlanModule.Create((int)StorePlanType.Superior, (int)ModuleType.PedidosWhatsApp),
+                StorePlanModule.Create((int)StorePlanType.Superior, (int)ModuleType.GestionPedidos),
 
                 // VIP: todos los módulos AvailableToStore
                 StorePlanModule.Create((int)StorePlanType.VIP, (int)ModuleType.Sales),
@@ -89,7 +93,10 @@ namespace Infrastructure.Persistence.EntityConfigurations
                 StorePlanModule.Create((int)StorePlanType.VIP, (int)ModuleType.Elaboration),
                 // WebCatalog (2026-09-28): plans are self-contained — VIP includes every
                 // Superior module, so module 18 goes to VIP too (amends D5, 2026-09-27).
-                StorePlanModule.Create((int)StorePlanType.VIP, (int)ModuleType.WebCatalog));
+                StorePlanModule.Create((int)StorePlanType.VIP, (int)ModuleType.WebCatalog),
+                // ...y los dos módulos nuevos también a VIP: los planes son autocontenidos.
+                StorePlanModule.Create((int)StorePlanType.VIP, (int)ModuleType.PedidosWhatsApp),
+                StorePlanModule.Create((int)StorePlanType.VIP, (int)ModuleType.GestionPedidos));
         }
     }
 }

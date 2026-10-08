@@ -442,15 +442,28 @@ namespace Infrastructure.Persistence.EntityConfigurations
                      true
                  ),
 
-                // Pedidos online (pedidos-whatsapp-persistencia, F2). Segunda feature del módulo 18:
-                // WebCatalog publica el catálogo, esta gestiona los pedidos que llegan desde él.
-                // AvailableToStore=true (la consumen tiendas), Order 251 = siguiente hueco tras 250.
+                // Pedidos online (pedidos-whatsapp-persistencia, F2). 2026-10-08
+                // (modulos-pedidos-whatsapp-gestion, M3): esta feature MUEVE su ModuleId de 18 a 20 —
+                // la gestión de la orden pasa al módulo "Gestión de Pedidos", que es el que la
+                // persiste. Order 251 se queda (no se renumera nada).
                 Feature.Create(
                      (int)FeatureType.OnlineOrders,
                      FeatureType.OnlineOrders.GetDescription(),
                      "Funcionalidad para gestionar los pedidos online de la tienda",
-                     (int)ModuleType.WebCatalog,
+                     (int)ModuleType.GestionPedidos,
                      251,
+                     true,
+                     true
+                 ),
+
+                // Pedidos WhatsApp (modulos-pedidos-whatsapp-gestion, M1): carrito del catálogo público,
+                // envío por wa.me y su configuración, TODO bajo el módulo 19 — sin persistir la orden.
+                Feature.Create(
+                     (int)FeatureType.PedidosWhatsApp,
+                     FeatureType.PedidosWhatsApp.GetDescription(),
+                     "Funcionalidad para tomar pedidos por WhatsApp y configurar su envío",
+                     (int)ModuleType.PedidosWhatsApp,
+                     252,
                      true,
                      true
                  )

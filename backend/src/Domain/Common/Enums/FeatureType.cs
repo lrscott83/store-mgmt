@@ -152,5 +152,11 @@ namespace Domain.Common.Enums
         // Pedidos online (pedidos-whatsapp-persistencia, F2)
         [Description("Pedidos online")]
         OnlineOrders = 123,
+
+        // 2026-10-08 (modulos-pedidos-whatsapp-gestion, M1): la feature del módulo 19. Gatea la
+        // CONFIGURACIÓN de pedidos y el carrito del catálogo público. OnlineOrders (123) se mueve al
+        // módulo 20 — la que persiste la orden — así que las dos quedan en módulos distintos.
+        [Description("Pedidos WhatsApp")]
+        PedidosWhatsApp = 124,
     }
 }

@@ -287,10 +287,27 @@ namespace Domain.Common.Enums
         // WebCatalogAdmin a propósito: la CONFIGURACIÓN y la MARCA son del dueño (OwnerAdmin),
         // pero atender un pedido es trabajo del día a día que también hace el StoreUser (D15).
         // Por eso lleva StoreUser, el que no lleva WebCatalogAdmin.
+        // 2026-10-08 (modulos-pedidos-whatsapp-gestion, M3): la gestión de la orden pasa al módulo 20
+        // "Gestión de Pedidos" — es el que persiste la Order y gestiona las entregas. Los roles NO
+        // cambian: atender un pedido sigue siendo trabajo del día a día que también hace el StoreUser (D15).
         [HasRoles(RoleType.OwnerAdmin, RoleType.StoreUser)]
         [HasFeature(FeatureType.OnlineOrders)]
-        [HasModule(ModuleType.WebCatalog)]
+        [HasModule(ModuleType.GestionPedidos)]
         OnlineOrdersAdmin,
+
+        #endregion
+
+        #region Pedidos WhatsApp / Gestión de pedidos features
+
+        // PedidosWhatsApp (feature 124, módulo 19) es el carrito del catálogo público, el envío por
+        // wa.me y TODO su configuración (número, tipos de entrega, envío, mínimo, horarios, zonas) —
+        // que es del dueño (M4). Por eso es Owner-only: replica WebCatalogAdmin, no OnlineOrdersAdmin.
+        // Sin esta entrada el módulo 19 quedaría invisible para AllowedFeaturesService y para el
+        // StoreRoleFeatureGenerator (ver AGENTS.md, gotcha de 2026-09-20).
+        [HasRoles(RoleType.OwnerAdmin)]
+        [HasFeature(FeatureType.PedidosWhatsApp)]
+        [HasModule(ModuleType.PedidosWhatsApp)]
+        PedidosWhatsAppAdmin,
 
         #endregion
     }

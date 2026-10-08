@@ -223,6 +223,32 @@ namespace Infrastructure.Persistence.EntityConfigurations
                     percentDiscountPrice: 100,
                     availableToStore: true,
                     true
+                ),
+
+                // 2026-10-08 (modulos-pedidos-whatsapp-gestion, M1/M5): los dos módulos en los que se
+                // reparte lo que colgaba del Catálogo web (18). Precio 10 con 50% de descuento (M5:
+                // antes 5 con 100%, el de WebCatalog) — los dos valen lo mismo, no son escalones.
+                Module.Create(
+                    (int)ModuleType.PedidosWhatsApp,
+                    ModuleType.PedidosWhatsApp.GetDescription(),
+                    150,
+                    priceIncluded: false,
+                    10,
+                    discountPrice: 0,
+                    percentDiscountPrice: 50,
+                    availableToStore: true,
+                    true
+                ),
+                Module.Create(
+                    (int)ModuleType.GestionPedidos,
+                    ModuleType.GestionPedidos.GetDescription(),
+                    151,
+                    priceIncluded: false,
+                    10,
+                    discountPrice: 0,
+                    percentDiscountPrice: 50,
+                    availableToStore: true,
+                    true
                 ));
         }
     }

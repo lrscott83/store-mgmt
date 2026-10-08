@@ -58,5 +58,16 @@ namespace Domain.Common.Enums
 
         [Description("Catálogo web")]
         WebCatalog = 18,
+
+        // 2026-10-08 (modulos-pedidos-whatsapp-gestion, M1): lo que estaba colgando del Catálogo web
+        // (18) se reparte en dos módulos. PedidosWhatsApp = carrito + envío por wa.me + su CONFIGURACIÓN
+        // (M4); NO persiste la orden ni gestiona entregas (M3).
+        [Description("Pedidos WhatsApp")]
+        PedidosWhatsApp = 19,
+
+        // Gestión de Pedidos = la que SÍ guarda la orden en el backend y gestiona las entregas
+        // (Pedidos / Ventas / Repartidores), con la feature OnlineOrders (123) movida aquí.
+        [Description("Gestión de pedidos")]
+        GestionPedidos = 20,
     }
 }
