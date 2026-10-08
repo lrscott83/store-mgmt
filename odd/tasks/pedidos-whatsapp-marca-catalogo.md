@@ -213,11 +213,12 @@ pnpm vitest run app/catalog/ app/sales/routes/__tests__/
 
 ## Hallazgos de la revisión nativa (RDD) — TODOs rastreados (2026-10-07)
 
-- [ ] **F8-R1** (WARNING · backend) — Logo válido + banner inválido deja un **archivo huérfano** en disco (el logo se escribe antes de validar el banner). Destino: F8.
-- [ ] **F8-R2** (WARNING · backend) — Al reemplazar, se **borra el archivo anterior antes** de persistir; si `SaveChanges` falla, la BD apunta a un archivo ya borrado (404). Destino: F8.
+- [x] **F8-R1** (WARNING · backend) — Logo válido + banner inválido deja un **archivo huérfano** en disco (el logo se escribe antes de validar el banner). Destino: F8. **Cerrado (2026-10-08):** los dos archivos se validan up-front en `Handle`, antes de que ninguno toque el disco; `EnsureValid` sale de `ResolveAsync`.
+- [x] **F8-R2** (WARNING · backend) — Al reemplazar, se **borra el archivo anterior antes** de persistir; si `SaveChanges` falla, la BD apunta a un archivo ya borrado (404). Destino: F8. **Cerrado (2026-10-08):** `ResolveAsync` ya no borra, solo encola `obsoleteKeys`/`newKeys`; el borrado ocurre tras persistir, best-effort con `LogWarning`, y si el guardado falla se compensa borrando lo nuevo mientras lo anterior sobrevive.
 - [ ] **F8-R3** (WARNING · frontend) — El mapeo `CatalogBrandingUpdate → FormData` de `updateBranding` **no se ejecuta en ningún test** (todo mockea el servicio). Destino: F8.
 - [ ] **F8-R4** (WARNING · frontend) — Falta el caso de archivo **demasiado grande** en la validación de marca. Destino: F8.
-- [ ] **F8-R5/R6** (SUGGESTION) — `MediaUrl` con slug null/blank; alt de imágenes solo por testid. Destino: F8.
+- [x] **F8-R5** (SUGGESTION) — `MediaUrl` con slug null/blank. Destino: F8. **Cerrado (2026-10-08):** `MediaUrl` exige slug y clave no blank; un slug vacío devolvía `/api/v1/public/catalog//media/{key}`.
+- [ ] **F8-R6** (SUGGESTION) — Alt de imágenes solo por testid. Destino: F8.
 
 ## Siguiente paso
 
@@ -231,3 +232,16 @@ público por slug y trae T10 (tipos espejo TS en `@store-mgmt/domain`).
   `dev`): `6000daca` (backend) y `c98d0b90` (frontend). Ambos **revisados y aprobados/acknowledgeados**
   por la revisión nativa. Owner **canceló las paletas** (solo la actual). Sin migración (columnas ya
   existían en F2). Push/PR = decisión del owner.
+- 2026-10-08 — **Cerrados F8-R1, F8-R2 y F8-R5 (backend).** Validación up-front de logo Y banner en
+  `Handle`, antes de que ningún archivo toque el disco; `ResolveAsync` ya no borra, solo encola las
+  keys nuevas y obsoletas, y el borrado se hace **después** de persistir (best-effort con `LogWarning`,
+  nunca relanza una operación ya confirmada); si el guardado falla se compensa borrando el archivo
+  nuevo y el anterior sobrevive. `MediaUrl` exige slug no blank además de clave no blank. El handler
+  pasa a llevar `ILogger<T>`, igual que `RemoveStoreCatalogImageCommandHandler`.
+  Verificación observada: `dotnet build src/SMCA.sln` → Build succeeded, 0 errors, sin `error MSB`;
+  `--filter UpdateStoreCatalogBranding` → 46/46; `--filter GetPublicOrderingConfig` → 45/45;
+  `Application.Tests` completo → **1163/1163**. Sondas de mutación: revertir la guarda de slug rompe
+  solo los 2 casos nuevos; devolver el borrado al interior de `ResolveAsync` rompe los 2 tests de
+  F8-R2; devolver la validación al interior de `ResolveAsync` (la forma pre-fix) rompe **solo**
+  `Handle_WithAValidLogoAndAnInvalidBanner_ShouldNotSaveAnyFile`. F8-R3/R4/R6 (frontend) siguen
+  abiertos. Sin commit (writer acotado).

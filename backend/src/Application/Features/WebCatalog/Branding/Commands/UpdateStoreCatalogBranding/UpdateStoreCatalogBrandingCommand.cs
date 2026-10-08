@@ -11,6 +11,7 @@ using Domain.Common.Extensions;
 using Domain.Entities.StoreCatalogSettings;
 using Domain.Interfaces.Repositories;
 using Microsoft.Extensions.Localization;
+using Microsoft.Extensions.Logging;
 using Resources;
 using System.Net;
 
@@ -33,6 +34,17 @@ namespace Application.Features.WebCatalog.Branding.Commands.UpdateStoreCatalogBr
     ///
     /// NO lleva `PaletteId`: las paletas se cancelaron (decisión del Owner, 2026-10-07). Esta feature
     /// escribe únicamente `LogoKey` y `BannerKey`.
+    ///
+    /// Dos órdenes gobiernan el handler, y los dos nacieron desendos (F8-R1 y F8-R2, revisión nativa
+    /// 2026-10-07):
+    ///
+    ///   1. Se VALIDA antes de ESCRIBIR. Los dos archivos del PUT se validan arriba del todo, antes de
+    ///      que ninguno toque el disco. Validar cada lado justo antes de guardarlo dejaba el logo ya
+    ///      escrito cuando el banner resultaba inválido, y ese archivo se quedaba para siempre.
+    ///   2. Se PERSISTE antes de BORRAR. Los archivos que quedan obsoletos se encolan y se borran solo
+    ///      cuando la fila ya está guardada; si el guardado falla, se borra lo nuevo (compensación) y
+    ///      lo anterior sobrevive. Al revés, un fallo de `SaveChanges` dejaba la fila apuntando a un
+    ///      archivo ya borrado, y el catálogo público respondía 404 por la marca que acababa de subir.
     /// </summary>
     public sealed record UpdateStoreCatalogBrandingCommand(
         CatalogImageUpload? Logo,
@@ -48,19 +60,22 @@ namespace Application.Features.WebCatalog.Branding.Commands.UpdateStoreCatalogBr
         private readonly IStoreCatalogSettingsRepository _storeCatalogSettingsRepository;
         private readonly ICatalogImageStorage _catalogImageStorage;
         private readonly IStringLocalizer<I18n> _localizer;
+        private readonly ILogger<UpdateStoreCatalogBrandingCommandHandler> _logger;
 
         public UpdateStoreCatalogBrandingCommandHandler(
             IApplicationUnitOfWork applicationUnitOfWork,
             IHttpContextService httpContextService,
             IStoreCatalogSettingsRepository storeCatalogSettingsRepository,
             ICatalogImageStorage catalogImageStorage,
-            IStringLocalizer<I18n> localizer)
+            IStringLocalizer<I18n> localizer,
+            ILogger<UpdateStoreCatalogBrandingCommandHandler> logger)
         {
             _applicationUnitOfWork = applicationUnitOfWork;
             _httpContextService = httpContextService;
             _storeCatalogSettingsRepository = storeCatalogSettingsRepository;
             _catalogImageStorage = catalogImageStorage;
             _localizer = localizer;
+            _logger = logger;
         }
 
         public async Task<ResponseResult<StoreCatalogBrandingDto>> Handle(
@@ -79,13 +94,34 @@ namespace Application.Features.WebCatalog.Branding.Commands.UpdateStoreCatalogBr
             StoreCatalogSettings? settings = await _storeCatalogSettingsRepository.GetByStoreIdAsync(storeId);
             settings ??= StoreCatalogSettings.Create(storeId, tenantId);
 
-            // Se resuelven los DOS lados ANTES de escribir nada. Si el banner resultara inválido, el
-            // logo ya subido no se persiste: el dueño recibe un 400 y su logo sigue siendo el de
-            // antes, en vez de encontrarse con medio formulario aplicado.
+            // F8-R1: los DOS archivos se validan ANTES de que ninguno toque el disco. Validar cada
+            // lado justo antes de guardarlo dejaba el logo ya escrito cuando el banner era inválido, y
+            // ese logo se quedaba en el disco como archivo huérfano por cada intento fallido.
+            //
+            // Las MISMAS reglas que las imágenes de producto (jpg/jpeg/png/webp y 2 MB), con el mismo
+            // 400 localizado. La marca no es una puerta distinta al contenido del catálogo.
+            if (request.Logo != null)
+                CatalogImageUploadRules.EnsureValid(
+                    request.Logo.FileName, request.Logo.ContentType, request.Logo.Length, _localizer);
+
+            if (request.Banner != null)
+                CatalogImageUploadRules.EnsureValid(
+                    request.Banner.FileName, request.Banner.ContentType, request.Banner.Length, _localizer);
+
+            // F8-R2: los archivos que la fila va a dejar atrás se COLECCIONAN y se borran después de
+            // persistir, nunca antes. Borrarlos aquí dejaría la fila apuntando a un archivo que ya no
+            // existe si el guardado fallara — el catálogo público pediría un 404 por la marca que el
+            // dueño acababa de subir.
+            var obsoleteKeys = new List<string>();
+            var newKeys = new List<string>();
+
+            // Los dos lados se resuelven antes de tocar la fila. Nada de ellos puede fallar por
+            // validación (eso ya está hecho arriba), así que si se llega aquí la marca se aplica
+            // entera: el dueño nunca se encuentra con medio formulario guardado.
             string? logoKey = await ResolveAsync(
-                request.Logo, request.RemoveLogo, settings.LogoKey, BrandingImageKinds.Logo, tenantId, storeId, cancellationToken);
+                request.Logo, request.RemoveLogo, settings.LogoKey, BrandingImageKinds.Logo, tenantId, storeId, obsoleteKeys, newKeys, cancellationToken);
             string? bannerKey = await ResolveAsync(
-                request.Banner, request.RemoveBanner, settings.BannerKey, BrandingImageKinds.Banner, tenantId, storeId, cancellationToken);
+                request.Banner, request.RemoveBanner, settings.BannerKey, BrandingImageKinds.Banner, tenantId, storeId, obsoleteKeys, newKeys, cancellationToken);
 
             // SOLO columnas de marca (D19). Las de pedidos, `PaletteId`, `SyncedAt` e `Id` quedan
             // como estaban: si esta feature los tocara, subir un logo dejaría al dueño sin los
@@ -93,11 +129,60 @@ namespace Application.Features.WebCatalog.Branding.Commands.UpdateStoreCatalogBr
             settings.LogoKey = logoKey;
             settings.BannerKey = bannerKey;
 
-            // El upsert del repositorio marca la entidad explícitamente (Add o Modified).
-            // `ApplicationDbContext` es NoTracking, así que mutar la fila cargada y llamar a
-            // `SaveChanges` sin marcar no escribiría NADA — sin error y sin aviso.
-            await _storeCatalogSettingsRepository.UpsertAsync(settings);
-            await _applicationUnitOfWork.SaveChangesAsync(cancellationToken);
+            try
+            {
+                // El upsert del repositorio marca la entidad explícitamente (Add o Modified).
+                // `ApplicationDbContext` es NoTracking, así que mutar la fila cargada y llamar a
+                // `SaveChanges` sin marcar no escribiría NADA — sin error y sin aviso.
+                await _storeCatalogSettingsRepository.UpsertAsync(settings);
+                await _applicationUnitOfWork.SaveChangesAsync(cancellationToken);
+            }
+            catch
+            {
+                // Compensación: los archivos nuevos ya están en disco pero la fila no se persistió; sin
+                // esto quedarían huérfanos. La fila anterior (y sus archivos) siguen intactos, así que
+                // el catálogo sigue sirviendo la marca de antes.
+                //
+                // El borrado va protegido para que un fallo de disco NO enmascare la excepción que hay
+                // que relanzar: el dueño necesita ver el error real, no el del almacenamiento.
+                foreach (string key in newKeys)
+                {
+                    try
+                    {
+                        await _catalogImageStorage.DeleteAsync(key, cancellationToken);
+                    }
+                    catch (Exception exception)
+                    {
+                        _logger.LogWarning(
+                            exception,
+                            "Fallo al guardar la marca de la tienda {StoreId}: no se pudo borrar el archivo recién subido '{Key}', que queda como deuda de disco.",
+                            storeId,
+                            key);
+                    }
+                }
+
+                throw;
+            }
+
+            // La fila está guardada, así que los archivos obsoletos son DEUDA DE DISCO y no parte de la
+            // operación. Un fallo aquí no se relanza: devolver un error por un borrado que ya no
+            // cambia nada haría que el reintento del dueño viera un 404 por una imagen que ya no se
+            // usa. Se registra para que la deuda sea rastreable y se limpia aparte.
+            foreach (string key in obsoleteKeys)
+            {
+                try
+                {
+                    await _catalogImageStorage.DeleteAsync(key, cancellationToken);
+                }
+                catch (Exception exception)
+                {
+                    _logger.LogWarning(
+                        exception,
+                        "Marca de la tienda {StoreId} guardada, pero no se pudo borrar el archivo obsoleto '{Key}': la fila ya no lo apunta.",
+                        storeId,
+                        key);
+                }
+            }
 
             return ResponseResult.Success(new StoreCatalogBrandingDto
             {
@@ -110,15 +195,20 @@ namespace Application.Features.WebCatalog.Branding.Commands.UpdateStoreCatalogBr
         }
 
         /// <summary>
-        /// Resuelve UN lado de la marca y devuelve la key con la que queda.
+        /// Resuelve UN lado de la marca y devuelve la key con la que queda. NO borra nada.
         ///
         ///   * Sin archivo y sin quitar → se devuelve la anterior sin tocar nada (el PUT parcial).
-        ///   * Quitar → se borra el archivo y la key queda en null.
-        ///   * Subir → se valida, se guarda, se borra la anterior si cambió y se devuelve la nueva.
+        ///   * Quitar → se apunta la anterior como obsoleta y la key queda en null.
+        ///   * Subir → se guarda la nueva, se apunta como nueva y la anterior como obsoleta.
         ///
-        /// El orden importa: se guarda la NUEVA antes de borrar la anterior, y se persiste la key
-        /// nueva. Si el borrado fallara, el catálogo público sigue sirviendo la imagen vieja desde su
-        /// caché inmutable en vez de romperse con un 404.
+        /// El borrado NO ocurre aquí, y esa es la garantía: lo que deja de usarse se encola en
+        /// <paramref name="obsoleteKeys"/> y lo recién escrito en <paramref name="newKeys"/>, y el
+        /// handler decide el momento. El orden es guardar → persistir → y SOLO entonces borrar:
+        ///
+        ///   * Si el guardado falla, el handler borra lo nuevo y lo anterior sobrevive: la fila sigue
+        ///     apuntando a un archivo que existe y no queda ningún huérfano.
+        ///   * Si el borrado falla, la fila ya no apunta a ese archivo, así que el catálogo sigue
+        ///     sirviendo la nueva con normalidad y el archivo viejo es deuda de disco.
         /// </summary>
         private async Task<string?> ResolveAsync(
             CatalogImageUpload? upload,
@@ -127,6 +217,8 @@ namespace Application.Features.WebCatalog.Branding.Commands.UpdateStoreCatalogBr
             string kind,
             Guid tenantId,
             Guid storeId,
+            ICollection<string> obsoleteKeys,
+            ICollection<string> newKeys,
             CancellationToken cancellationToken)
         {
             if (upload == null && !remove)
@@ -134,34 +226,28 @@ namespace Application.Features.WebCatalog.Branding.Commands.UpdateStoreCatalogBr
 
             if (remove)
             {
-                await DeleteIfReplacedAsync(previousKey, null, cancellationToken);
+                // Quitar algo que no estaba no encola nada: no hay archivo, y no es un error.
+                if (!string.IsNullOrWhiteSpace(previousKey))
+                    obsoleteKeys.Add(previousKey);
+
                 return null;
             }
 
-            // Las MISMAS reglas que las imágenes de producto (jpg/jpeg/png/webp y 2 MB), con el mismo
-            // 400 localizado. La marca no es una puerta distinta al contenido del catálogo.
-            CatalogImageUploadRules.EnsureValid(upload!.FileName, upload.ContentType, upload.Length, _localizer);
+            // Sin `CatalogImageUploadRules.EnsureValid` aquí a propósito: la validación es up-front en
+            // `Handle`, para que un lado inválido rechace la petición ANTES de que el otro se escriba.
+            // Volver a validar aquí solo añadiría una comprobación que llega tarde.
+            string key = await _catalogImageStorage.SaveBrandingAsync(upload!, tenantId, storeId, kind, cancellationToken);
+            newKeys.Add(key);
 
-            string key = await _catalogImageStorage.SaveBrandingAsync(upload, tenantId, storeId, kind, cancellationToken);
-            await DeleteIfReplacedAsync(previousKey, key, cancellationToken);
-
-            return key;
-        }
-
-        /// <summary>
-        /// Borra el archivo de la key anterior, y SOLO si de verdad la reemplaza. Sin esta guarda,
-        /// subir un logo donde ya había uno dejaría en el disco un archivo que ya nadie va a pedir.
-        /// Quitar algo que no estaba no borra nada: no hay archivo, y no es un error.
-        /// </summary>
-        private Task DeleteIfReplacedAsync(string? previousKey, string? newKey, CancellationToken cancellationToken)
-        {
+            // Sin esta guarda, subir un logo donde ya había uno dejaría en el disco un archivo que ya
+            // nadie va a pedir.
             if (!string.IsNullOrWhiteSpace(previousKey)
-                && !string.Equals(previousKey, newKey, StringComparison.Ordinal))
+                && !string.Equals(previousKey, key, StringComparison.Ordinal))
             {
-                return _catalogImageStorage.DeleteAsync(previousKey, cancellationToken);
+                obsoleteKeys.Add(previousKey);
             }
 
-            return Task.CompletedTask;
+            return key;
         }
     }
 }

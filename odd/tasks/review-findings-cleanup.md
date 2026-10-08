@@ -40,11 +40,14 @@ nativa*). Este documento es el **seguimiento** y el mapa de cierre.
   - **Cerrado (2026-10-08).** Tests de pausa por hover y por foco/teclado (con reanudación al salir) y de una sola imagen sin flechas, sin puntos y sin auto-avance.
 
 ### F8 marca (`pedidos-whatsapp-marca-catalogo.md`)
-- [ ] **F8-R1** (defecto) — Logo válido + banner inválido deja archivo huérfano.
-- [ ] **F8-R2** (defecto) — Se borra el archivo anterior antes de persistir; si `SaveChanges` falla, la BD apunta a un archivo borrado (404).
+- [x] **F8-R1** (defecto) — Logo válido + banner inválido deja archivo huérfano.
+  - **Cerrado (2026-10-08).** Validación up-front de los dos archivos en `Handle`: un banner inválido rechaza la petición antes de que el logo toque el disco. `EnsureValid` sale de `ResolveAsync`; el test pasa a exigir `SaveBrandingAsync` `Times.Never`, no solo el upsert.
+- [x] **F8-R2** (defecto) — Se borra el archivo anterior antes de persistir; si `SaveChanges` falla, la BD apunta a un archivo borrado (404).
+  - **Cerrado (2026-10-08).** Orden nuevo guardar → persistir → borrar. `ResolveAsync` solo encola `newKeys`/`obsoleteKeys` (y `DeleteIfReplacedAsync` desaparece); el borrado de los obsoletos va tras persistir y es best-effort con `LogWarning` (mismo patrón que `RemoveStoreCatalogImageCommandHandler`); si el guardado falla, se compensa borrando lo nuevo y lo anterior sobrevive. El handler suma `ILogger<T>`.
 - [ ] **F8-R3** (test) — El mapeo `CatalogBrandingUpdate → FormData` de `updateBranding` no se ejecuta en ningún test.
 - [ ] **F8-R4** (test) — Falta el caso de archivo demasiado grande.
-- [ ] **F8-R5** (defecto) — `MediaUrl` con slug null/blank.
+- [x] **F8-R5** (defecto) — `MediaUrl` con slug null/blank.
+  - **Cerrado (2026-10-08).** `MediaUrl` devuelve null si la clave **o** el slug están en blanco; antes construía `/api/v1/public/catalog//media/{key}`. El handler solo rechaza `CatalogSlug == null` con 404, así que el slug en blanco llegaba vivo hasta aquí: lo correcto es null y no pintar logo ni banner.
 - [ ] **F8-R6** (test) — Alt de imágenes solo por testid.
 
 ### F4 envío (`pedidos-whatsapp-envio.md`)
@@ -88,3 +91,14 @@ nativa*). Este documento es el **seguimiento** y el mapa de cierre.
   `review_due=false` (`under_budget`) → el slice queda en cola en la acumulación hasta el umbral; sin revisión nativa todavía.
 - 2026-10-08 — **Bloque Showcase cerrado en su parte backend (SC-R1, SC-R2, SC-R3).** Compensación de archivo huérfano en el alta; borrado tolerante a fallo de disco con log; regla de archivo presente alcanzable (`Length > 0`); `IsActive` explícito en el config público. Verificación observada: build de la solución OK (0 errors, sin `error MSB`); `Showcase` 113/113; `GetPublicOrderingConfig` 43/43; sonda de mutación confirma que cada test cae al revertir su fix. SC-R4/SC-R5 (UI) siguen abiertos.
 - 2026-10-08 — **Cerrados SC-R4 y SC-R5 (frontend del showcase).** Reset del `<input type="file">` tras leer los archivos, para que re-seleccionar el mismo archivo vuelva a disparar `change`; el halo del botón "Ver productos" decide la animación en JS a partir de `prefers-reduced-motion` (conservando `motion-reduce:animate-none` como red SSR) y su test comprueba el efecto en vez de las clases; tests nuevos de las ramas de fallo parcial y de red del upload (aviso, retención de lo que falló, sin toast de éxito) y del carrusel (pausa por hover y por foco/teclado con reanudación, y una sola imagen sin flechas, sin puntos y sin auto-avance). Verificación observada: `pnpm vitest run app/catalog/ app/sales/routes/__tests__/` → 28 archivos / 494 tests verdes; `pnpm exec eslint` sobre los 4 archivos tocados → limpio; `pnpm typecheck` → único error preexistente y ajeno (`storefront-checkout-staff.test.tsx(24,7)`, `PublicOrderingConfig` sin `carouselImages`/`dailyImages`). Sin commit (writer acotado).
+- 2026-10-08 — **Slice F8 backend cerrado (F8-R1, F8-R2, F8-R5).** Validación up-front de logo+banner antes de
+  escribir nada; borrado de archivos obsoletos diferido hasta después de persistir, best-effort con `LogWarning`,
+  con compensación del archivo nuevo si el guardado falla (el anterior sobrevive); `MediaUrl` con guarda de slug
+  además de la de clave. Tests: `Handle_WithAValidLogoAndAnInvalidBanner_ShouldNotSaveAnyFile` (renombrado y
+  fortalecido con `SaveBrandingAsync` `Never`), `Handle_WhenThePersistenceFails_ShouldKeepThePreviousFileAndDeleteTheNewOne`,
+  `Handle_WhenThePreviousFileCannotBeDeleted_ShouldStillSucceed` y `Handle_WhenTheStoreHasABlankCatalogSlug_ShouldPublishNoMediaUrls`.
+  Verificación observada: `dotnet build src/SMCA.sln` → Build succeeded, 0 errors, sin `error MSB`;
+  `--filter UpdateStoreCatalogBranding` → 46/46; `--filter GetPublicOrderingConfig` → 45/45;
+  `Application.Tests` completo → **1163 passed, 0 failed**. Sondas de mutación: cada fix revertido rompe
+  exactamente los tests que lo fijan (y solo uno, `...ShouldNotSaveAnyFile`, para F8-R1). Sin commit (writer acotado).
+  F8-R3/R4/R6 (frontend) siguen abiertos.

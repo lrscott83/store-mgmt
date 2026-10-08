@@ -222,6 +222,37 @@ public class GetPublicOrderingConfigQueryHandlerTests
     }
 
     /// <summary>
+    /// F8-R5: un slug EN BLANCO tampoco puede producir una URL. El handler solo rechaza `CatalogSlug
+    /// == null` con 404, así que una fila con el slug vacío o en blanco llega viva hasta `MediaUrl`, que
+    /// es quien tiene que frenarla: sin esa guarda el storefront recibiría
+    /// `/api/v1/public/catalog//media/{key}` — una ruta con el slug vacío, que no corresponde a
+    /// ninguna tienda y se pediría como si fuera un archivo. Null es la respuesta correcta.
+    ///
+    /// El slug se monta en blanco a propósito aunque la búsqueda llegue por otro valor: así lo que se
+    /// fija es el contrato de `MediaUrl` (la guarda), no el `store == null` del resolutor.
+    /// </summary>
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task Handle_WhenTheStoreHasABlankCatalogSlug_ShouldPublishNoMediaUrls(string blankSlug)
+    {
+        Store store = Store.Create("Sin slug publicado", Guid.NewGuid(), true, _tenantId, null);
+        store.CatalogSlug = blankSlug;
+        _storeRepository.Setup(x => x.GetStoreByCatalogSlugAsync(It.IsAny<string>())).ReturnsAsync(store);
+        _storeId = store.Id;
+
+        StoreCatalogSettings settings = StoreCatalogSettings.Create(_storeId, _tenantId);
+        settings.LogoKey = $"{_tenantId:N}/{_storeId:N}/branding/logo/logo.png";
+        settings.BannerKey = $"{_tenantId:N}/{_storeId:N}/branding/banner/banner.png";
+        _settingsRepository.Setup(x => x.GetPublicByStoreIdAsync(_storeId)).ReturnsAsync(settings);
+
+        var result = await Handler().Handle(new GetPublicOrderingConfigQuery("tienda-ana"), CancellationToken.None);
+
+        result.Data!.LogoUrl.Should().BeNull();
+        result.Data.BannerUrl.Should().BeNull();
+    }
+
+    /// <summary>
     /// La URL es del endpoint PÚBLICO y lleva el slug de la tienda RESUELTA, no el que vino en la
     /// petición: si se publicara el slug crudo, dos consultas con distinta capitalización darían dos
     /// URLs distintas para la misma imagen y la caché inmutable del navegador serviría la vieja.

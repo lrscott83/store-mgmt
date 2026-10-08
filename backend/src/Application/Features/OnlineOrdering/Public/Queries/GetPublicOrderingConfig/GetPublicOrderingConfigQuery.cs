@@ -149,8 +149,16 @@ namespace Application.Features.OnlineOrdering.Public.Queries.GetPublicOrderingCo
         /// de producto: por eso el logo y el banner se sirven con el endpoint de media que ya
         /// existe, sin un caso nuevo. La clave de marca pasa su <c>BelongsToStore</c> porque
         /// comparte el prefijo <c>{tenant}/{store}/</c>.
+        ///
+        /// El slug se exige con la MISMA guarda que la clave, y no solo `null`: una tienda con el
+        /// slug en blanco no es un 404 (el handler solo rechaza `null`), y sin esta guarda el
+        /// storefront recibiría <c>/api/v1/public/catalog//media/{key}</c> — una ruta con el slug
+        /// vacío, que no corresponde a ninguna tienda y se pediría como si fuera un archivo. Null es
+        /// la respuesta correcta: el storefront simplemente no pinta logo ni banner.
         /// </summary>
         private static string? MediaUrl(string? storeSlug, string? key)
-            => string.IsNullOrWhiteSpace(key) ? null : CatalogPublicUrls.Media(storeSlug!, key);
+            => string.IsNullOrWhiteSpace(key) || string.IsNullOrWhiteSpace(storeSlug)
+                ? null
+                : CatalogPublicUrls.Media(storeSlug, key);
     }
 }
