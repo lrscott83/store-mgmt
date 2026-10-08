@@ -101,9 +101,20 @@ Rules when iterating on backend E2E on Windows:
 
 1. **Always grep for `Build succeeded|Build FAILED` and `error MSB`**, never `error CS` alone.
 2. **Before rebuilding, kill leftovers:** `Get-Process -Name "testhost*" -ErrorAction SilentlyContinue | Stop-Process -Force`.
-3. **`< 1 ms` duration in a backend E2E is the tell.** These tests apply EF migrations, seed PostgreSQL and make
-   real HTTP calls. Tens-of-milliseconds failures mean the binary is stale or the collection fixture never
-   initialized — not that the behaviour under test is broken.
+3. **Do NOT use `Duration` to judge a backend E2E run. It is not a reliable signal in this suite.**
+   VSTest reports `< 1 ms` for runs that genuinely took ~58 s of wall clock: real EF migrations, Argon2id
+   hashing, PostgreSQL writes and HTTP calls all happen, and the run still prints `< 1 ms`. Verified
+   2026-10-08 on `Notifications.StoreCreationNotificationTests`: VSTest said `< 1 ms`, wall clock was 58 s.
+   Treating that number as "the fixture never initialized" condemns healthy runs and costs a real
+   debugging detour — it already caused one. Use these signals instead, in this order:
+   - `Build succeeded|Build FAILED` and `error MSB` in the build output (see above — this one is reliable),
+   - the `[E2E Guard] ConnectionStrings:Application -> Database=smca_test` line, which proves the fixture
+     initialized against the real database,
+   - fresh GUIDs in the generated store/notification names, which a stale binary cannot mint,
+   - the app-under-test's own log timestamps spanning the expected seconds,
+   - wall-clock time of the whole `dotnet test` invocation.
+   A mutation probe settles it when you still doubt a pass: flip the expected count in YOUR OWN new test
+   file, confirm it fails with the real count, revert.
 4. **`dotnet test --list-tests --filter X` lies.** It reports *"No test matches the given testcase filter"* for
    classes that DO exist in the assembly (verified against 688 tests). To confirm a test exists, run
    `--list-tests` WITHOUT `--filter` and grep.
