@@ -2,6 +2,8 @@ using Application.Abstractions.HttpContext;
 using Application.Dtos.OnlineOrdering;
 using Application.Exceptions;
 using Application.Features.OnlineOrdering.Public.Queries.GetPublicOrderingConfig;
+using Domain.Common.Enums;
+using Domain.Entities.StoreCatalogImages;
 using Domain.Entities.StoreCatalogSettings;
 using Domain.Entities.Stores;
 using Domain.Interfaces.Repositories;
@@ -31,6 +33,7 @@ public class GetPublicOrderingConfigQueryHandlerTests
 {
     private readonly Mock<IStoreRepository> _storeRepository = new();
     private readonly Mock<IStoreCatalogSettingsRepository> _settingsRepository = new();
+    private readonly Mock<IStoreCatalogImageRepository> _imageRepository = new();
     private readonly Mock<IStringLocalizer<I18n>> _localizer = new();
 
     /// <summary>
@@ -47,12 +50,25 @@ public class GetPublicOrderingConfigQueryHandlerTests
             .Setup(x => x[It.IsAny<string>(), It.IsAny<object[]>()])
             .Returns<string, object[]>((name, args) =>
                 new LocalizedString(name, args is { Length: > 0 } ? $"{name}:{string.Join(',', args)}" : name));
+
+        // Por defecto la tienda no tiene imágenes de showcase: cada test monta las suyas si quiere
+        // mirarlas. Es el caso normal de una tienda recién sincronizada.
+        _imageRepository.Setup(x => x.GetPublicByStoreIdAsync(It.IsAny<Guid>())).ReturnsAsync([]);
     }
 
     private GetPublicOrderingConfigQueryHandler Handler() => new(
         _storeRepository.Object,
         _settingsRepository.Object,
+        _imageRepository.Object,
         _localizer.Object);
+
+    /// <summary>Imagen de showcase ya persistida: la fila solo aporta la clave y el pie de foto.</summary>
+    private StoreCatalogImage ShowcaseImage(StoreCatalogImageKind kind, int orderIndex, string? caption = null)
+        => StoreCatalogImage.Create(
+            _storeId, _tenantId, kind, $"{_tenantId:N}/{_storeId:N}/catalog/{kind.ToString().ToLowerInvariant()}/{Guid.NewGuid():N}.png", orderIndex, caption);
+
+    private void GivenShowcase(params StoreCatalogImage[] images)
+        => _imageRepository.Setup(x => x.GetPublicByStoreIdAsync(_storeId)).ReturnsAsync(images.ToList());
 
     /// <summary>Tienda con catálogo publicado: el caso normal del storefront.</summary>
     private Store PublishedStore(string slug = "tienda-ana")
@@ -242,6 +258,222 @@ public class GetPublicOrderingConfigQueryHandlerTests
         result.Data!.LogoUrl.Should().StartWith("/api/v1/public/catalog/");
         result.Data.LogoUrl.Should().NotContain(@":\");
         result.Data.LogoUrl.Should().NotContain("storage");
+    }
+
+    #endregion
+
+    #region Showcase (carrusel e imágenes del día)
+
+    /// <summary>
+    /// Sin imágenes, las dos listas vienen VACÍAS y no `null`. La página pública tiene que poder
+    /// preguntar "¿hay carrusel?" con `length > 0` sin comprobar antes que la lista existe: una
+    /// tienda recién sincronizada no tiene ninguna y su catálogo debe funcionar exactamente igual que
+    /// hoy.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenTheStoreHasNoShowcaseImages_ShouldPublishTwoEmptyLists()
+    {
+        PublishedStore();
+        _settingsRepository.Setup(x => x.GetPublicByStoreIdAsync(_storeId)).ReturnsAsync((StoreCatalogSettings?)null);
+        GivenShowcase();
+
+        var result = await Handler().Handle(new GetPublicOrderingConfigQuery("tienda-ana"), CancellationToken.None);
+
+        result.Data!.CarouselImages.Should().NotBeNull().And.BeEmpty();
+        result.Data.DailyImages.Should().NotBeNull().And.BeEmpty();
+    }
+
+    /// <summary>
+    /// Las imágenes viajan como URL PÚBLICA del endpoint de media, construida con el slug de la
+    /// tienda: es lo que el storefront pone en el `src` y lo que lo sirve sin sesión. La clave cruda
+    /// es una ruta interna de almacenamiento y este config lo lee cualquiera que abra el catálogo.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WithACarouselImage_ShouldPublishItsPublicMediaUrlAndCaption()
+    {
+        PublishedStore("tienda-ana");
+        StoreCatalogImage image = ShowcaseImage(StoreCatalogImageKind.Carousel, 0, "Portada");
+        GivenShowcase(image);
+
+        var result = await Handler().Handle(new GetPublicOrderingConfigQuery("tienda-ana"), CancellationToken.None);
+
+        result.Data!.CarouselImages.Should().ContainSingle().Which.Url
+            .Should().Be($"/api/v1/public/catalog/tienda-ana/media/{image.Key}");
+        result.Data.CarouselImages[0].Caption.Should().Be("Portada");
+    }
+
+    [Fact]
+    public async Task Handle_WithADailyImage_ShouldPublishItsPublicMediaUrl()
+    {
+        PublishedStore();
+        StoreCatalogImage image = ShowcaseImage(StoreCatalogImageKind.Daily, 0, "Plato del día");
+        GivenShowcase(image);
+
+        var result = await Handler().Handle(new GetPublicOrderingConfigQuery("tienda-ana"), CancellationToken.None);
+
+        result.Data!.DailyImages.Should().ContainSingle().Which.Url
+            .Should().Be($"/api/v1/public/catalog/tienda-ana/media/{image.Key}");
+        result.Data.DailyImages[0].Caption.Should().Be("Plato del día");
+    }
+
+    /// <summary>
+    /// Los dos conjuntos son independientes (decisión C1): puede tener los dos, solo uno, o ninguno.
+    /// Una lista nunca se rellena con lo del otro conjunto.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WithBothSets_ShouldKeepThemSeparated()
+    {
+        PublishedStore();
+        GivenShowcase(
+            ShowcaseImage(StoreCatalogImageKind.Carousel, 0),
+            ShowcaseImage(StoreCatalogImageKind.Daily, 0));
+
+        var result = await Handler().Handle(new GetPublicOrderingConfigQuery("tienda-ana"), CancellationToken.None);
+
+        result.Data!.CarouselImages.Should().ContainSingle();
+        result.Data.DailyImages.Should().ContainSingle();
+    }
+
+    /// <summary>Puede tener solo un conjunto: el otro sale vacío, no `null` ni con contenido ajeno.</summary>
+    [Fact]
+    public async Task Handle_WithOnlyCarousel_ShouldPublishTheDailyListAsEmpty()
+    {
+        PublishedStore();
+        GivenShowcase(ShowcaseImage(StoreCatalogImageKind.Carousel, 0));
+
+        var result = await Handler().Handle(new GetPublicOrderingConfigQuery("tienda-ana"), CancellationToken.None);
+
+        result.Data!.CarouselImages.Should().ContainSingle();
+        result.Data.DailyImages.Should().NotBeNull().And.BeEmpty();
+    }
+
+    /// <summary>
+    /// El orden que se publica es el que el dueño puso en la vista: el repositorio ya devuelve cada
+    /// conjunto ordenado por `OrderIndex` y el config no lo reordena ni lo invierte, así que la
+    /// primera imagen del carrusel es la que el dueño puso primera.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WithSeveralCarouselImages_ShouldPublishThemInTheStoredOrder()
+    {
+        PublishedStore();
+        StoreCatalogImage first = ShowcaseImage(StoreCatalogImageKind.Carousel, 0, "uno");
+        StoreCatalogImage second = ShowcaseImage(StoreCatalogImageKind.Carousel, 1, "dos");
+        GivenShowcase(first, second);
+
+        var result = await Handler().Handle(new GetPublicOrderingConfigQuery("tienda-ana"), CancellationToken.None);
+
+        result.Data!.CarouselImages.Select(i => i.Url).Should().Equal(
+            $"/api/v1/public/catalog/tienda-ana/media/{first.Key}",
+            $"/api/v1/public/catalog/tienda-ana/media/{second.Key}");
+    }
+
+    /// <summary>El pie de foto es opcional: sin él la imagen se publica igual, con caption null.</summary>
+    [Fact]
+    public async Task Handle_WithAnImageWithoutCaption_ShouldPublishTheUrlWithANullCaption()
+    {
+        PublishedStore();
+        GivenShowcase(ShowcaseImage(StoreCatalogImageKind.Carousel, 0));
+
+        var result = await Handler().Handle(new GetPublicOrderingConfigQuery("tienda-ana"), CancellationToken.None);
+
+        result.Data!.CarouselImages.Should().ContainSingle().Which.Caption.Should().BeNull();
+    }
+
+    /// <summary>
+    /// Una key en blanco es una key que no existe: se filtra ANTES de construir la URL, o el
+    /// storefront recibiría `/media/` y pediría el índice de un directorio.
+    /// </summary>
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task Handle_WithABlankShowcaseKey_ShouldNotPublishThatImage(string blank)
+    {
+        PublishedStore();
+        StoreCatalogImage image = ShowcaseImage(StoreCatalogImageKind.Carousel, 0);
+        typeof(StoreCatalogImage).GetProperty(nameof(StoreCatalogImage.Key))!.SetValue(image, blank);
+        GivenShowcase(image);
+
+        var result = await Handler().Handle(new GetPublicOrderingConfigQuery("tienda-ana"), CancellationToken.None);
+
+        result.Data!.CarouselImages.Should().BeEmpty();
+    }
+
+    /// <summary>
+    /// Nunca una ruta del servidor. La URL es relativa al endpoint público, sin host ni ruta del
+    /// almacenamiento: el config lo lee un anónimo y no puede usarse para localizar archivos en disco.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WithShowcaseImages_ShouldPublishNoServerPath()
+    {
+        PublishedStore();
+        GivenShowcase(ShowcaseImage(StoreCatalogImageKind.Carousel, 0), ShowcaseImage(StoreCatalogImageKind.Daily, 0));
+
+        var result = await Handler().Handle(new GetPublicOrderingConfigQuery("tienda-ana"), CancellationToken.None);
+
+        result.Data!.CarouselImages.Concat(result.Data.DailyImages).Should().OnlyContain(i =>
+            i.Url.StartsWith("/api/v1/public/catalog/")
+            && !i.Url.Contains(@":\")
+            && !i.Url.Contains("storage"));
+    }
+
+    /// <summary>
+    /// ESTE es el guardián del filtro por tenant, el mismo de la configuración. Las imágenes tienen
+    /// filtro global `IsSuperAdmin || TenantId == TenantId`; el anónimo no tiene tenant en el
+    /// contexto, así que la lectura DE SESIÓN devolvería VACÍA — sin error ni aviso — y el storefront
+    /// nunca vería un carrusel. Si alguien "simplifica" esto y vuelve a `GetByStoreIdAsync`, este test
+    /// cae.
+    /// </summary>
+    [Fact]
+    public async Task Handle_ShouldNeverUseTheSessionScopedReadForShowcaseImages()
+    {
+        PublishedStore();
+        GivenShowcase(ShowcaseImage(StoreCatalogImageKind.Carousel, 0));
+
+        await Handler().Handle(new GetPublicOrderingConfigQuery("tienda-ana"), CancellationToken.None);
+
+        _imageRepository.Verify(x => x.GetPublicByStoreIdAsync(_storeId), Times.Once);
+        _imageRepository.Verify(x => x.GetByStoreIdAsync(It.IsAny<Guid>()), Times.Never);
+    }
+
+    /// <summary>El showcase se lee de la tienda resuelta por el slug, y no se escribe nada.</summary>
+    [Fact]
+    public async Task Handle_ShouldReadTheShowcaseOfTheStoreResolvedFromTheSlugOnce()
+    {
+        PublishedStore();
+        GivenShowcase();
+
+        await Handler().Handle(new GetPublicOrderingConfigQuery("tienda-ana"), CancellationToken.None);
+
+        _imageRepository.Verify(x => x.GetPublicByStoreIdAsync(_storeId), Times.Once);
+        _imageRepository.Verify(x => x.GetPublicByStoreIdAsync(It.Is<Guid>(id => id != _storeId)), Times.Never);
+        _imageRepository.Verify(x => x.UpdateAsync(It.IsAny<StoreCatalogImage>()), Times.Never);
+        _imageRepository.Verify(x => x.AddAsync(It.IsAny<StoreCatalogImage>()), Times.Never);
+    }
+
+    /// <summary>
+    /// Un slug inexistente NO lee imágenes: se responde el 404 uniforme antes de tocar nada, para que
+    /// el anónimo no pueda usar el endpoint para averiguar qué tiendas tienen catálogo.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WithAnUnknownSlug_ShouldNotReadAnyShowcaseImage()
+    {
+        Func<Task> act = () => Handler().Handle(new GetPublicOrderingConfigQuery("no-existe"), CancellationToken.None);
+
+        await act.Should().ThrowAsync<ApiException>();
+        _imageRepository.Verify(x => x.GetPublicByStoreIdAsync(It.IsAny<Guid>()), Times.Never);
+    }
+
+    /// <summary>
+    /// El DTO público lleva URL y pie de foto, y NUNCA la clave cruda: `PublicShowcaseImageDto` es lo
+    /// que viaja al storefront y una `Key` ahí sería filtrar la estructura del disco.
+    /// </summary>
+    [Fact]
+    public void PublicShowcaseImageDto_ShouldCarryTheUrlAndNeverTheKey()
+    {
+        string[] properties = typeof(PublicShowcaseImageDto).GetProperties().Select(p => p.Name).ToArray();
+
+        properties.Should().Equal("Url", "Caption");
+        properties.Should().NotContain(["Key", "Path", "AbsolutePath"]);
     }
 
     #endregion

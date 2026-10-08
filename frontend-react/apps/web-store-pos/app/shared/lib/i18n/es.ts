@@ -337,6 +337,34 @@ const messages: Record<string, string> = {
   'WEB_CATALOG.BRAND_SAVE_ERROR': 'No se pudo guardar la marca',
   'WEB_CATALOG.BRAND_LOAD_ERROR': 'No se pudo cargar la marca',
 
+  // Showcase del catálogo (carrusel + imágenes del día): DOS CONJUNTOS INDEPENDIENTES (decisión
+  // C1 del owner, 2026-10-07). Cada uno se configura, se ordena y se limpia por su cuenta, y
+  // ninguno toca el guardado por lotes de productos.
+  'WEB_CATALOG.SHOWCASE_CAROUSEL_TITLE': 'Carrusel',
+  'WEB_CATALOG.SHOWCASE_CAROUSEL_SUBTITLE':
+    'Las imágenes que se van pasando en la cabecera de tu catálogo público.',
+  'WEB_CATALOG.SHOWCASE_DAILY_TITLE': 'Imágenes del día',
+  'WEB_CATALOG.SHOWCASE_DAILY_SUBTITLE':
+    'El bloque de destacadas que aparece en tu catálogo con las imágenes que subas aquí.',
+  'WEB_CATALOG.SHOWCASE_LIMIT': 'Hasta {max} imágenes por conjunto.',
+  'WEB_CATALOG.SHOWCASE_EMPTY': 'Sin imágenes en este conjunto',
+  'WEB_CATALOG.SHOWCASE_SELECT_FILES': 'Elegir imágenes',
+  'WEB_CATALOG.SHOWCASE_PENDING_COUNT': '{count} imágenes por subir',
+  'WEB_CATALOG.SHOWCASE_CAPTION': 'Pie de foto (opcional)',
+  'WEB_CATALOG.SHOWCASE_CAPTION_HINT':
+    'Se aplica a las imágenes que subas ahora. Para cambiarlo, quita la imagen y vuélvela a subir.',
+  'WEB_CATALOG.SHOWCASE_UPLOAD': 'Subir imágenes',
+  'WEB_CATALOG.SHOWCASE_UPLOADED': 'Se subieron {count} imágenes al catálogo',
+  'WEB_CATALOG.SHOWCASE_UPLOADED_ONE': 'Se subió 1 imagen al catálogo',
+  'WEB_CATALOG.SHOWCASE_UPLOAD_PARTIAL':
+    'Se subieron {uploaded} de {total}. No se pudieron subir las demás: inténtalo de nuevo.',
+  'WEB_CATALOG.SHOWCASE_REMOVED': 'Imagen quitada del catálogo',
+  'WEB_CATALOG.SHOWCASE_MOVE_UP': 'Subir en la lista',
+  'WEB_CATALOG.SHOWCASE_MOVE_DOWN': 'Bajar en la lista',
+  'WEB_CATALOG.SHOWCASE_REMOVE': 'Quitar imagen',
+  'WEB_CATALOG.SHOWCASE_LOAD_ERROR': 'No se pudieron cargar las imágenes del catálogo',
+  'WEB_CATALOG.SHOWCASE_SAVE_ERROR': 'No se pudo guardar el cambio en las imágenes del catálogo',
+
   // Menú — Gestión de pedidos (F5). Distinto de MENU.ONLINE_ORDERS_SETTINGS (F1): esa es la
   // CONFIGURACIÓN del dueño; esta es la operación del día a día, que también hace el StoreUser.
   'MENU.ONLINE_ORDERS': 'Pedidos',
@@ -517,6 +545,21 @@ const messages: Record<string, string> = {
   // tenerlos), así que no hay ningún aviso para ese caso.
   'CATALOG_PUBLIC.LOGO_ALT': 'Logo de {store}',
   'CATALOG_PUBLIC.BANNER_ALT': 'Banner de {store}',
+  // ── SHOWCASE de la carta pública: carrusel de portada, botón "Ver productos" y destacados ──
+  // Todo esto es opcional (C2): sin imágenes el catálogo es exactamente el de siempre, así que
+  // no hay ningún texto de aviso para ese caso. El texto alternativo de una imagen del showcase es
+  // su propio pie de foto, y el de las flechas del carrusel NO puede reutilizar
+  // `PREVIOUS`/`NEXT` (los de la paginación): para un lector de pantalla "Anterior" no dice si
+  // cambia de producto o de imagen.
+  'CATALOG_PUBLIC.CAROUSEL_LABEL': 'Galería de la tienda',
+  'CATALOG_PUBLIC.CAROUSEL_ROLE': 'carrusel',
+  'CATALOG_PUBLIC.CAROUSEL_SLIDE_ROLE': 'diapositiva',
+  'CATALOG_PUBLIC.CAROUSEL_SLIDE': 'Imagen {index} de {total}',
+  'CATALOG_PUBLIC.CAROUSEL_PREVIOUS': 'Imagen anterior',
+  'CATALOG_PUBLIC.CAROUSEL_NEXT': 'Imagen siguiente',
+  'CATALOG_PUBLIC.CAROUSEL_DOT': 'Ir a la imagen {index}',
+  'CATALOG_PUBLIC.SEE_PRODUCTS': 'Ver Productos',
+  'CATALOG_PUBLIC.DAILY_TITLE': 'Destacados de hoy',
   // ── Carrito y pedido del cliente anónimo (F3) ─────────────────────────────────────────────
   // El carrito del STOREFRONT (`lizoft-catalog-cart`), no el del POS (`lizoft-cart`): el cliente
   // anónimo no tiene sesión ni tienda, así que sus claves no mezclan con las del vendedor.
@@ -556,6 +599,11 @@ const messages: Record<string, string> = {
   'CHECKOUT.ERROR_EMPTY': 'Añade al menos un producto antes de pedir.',
   'CHECKOUT.SUBMIT': 'Enviar pedido',
   'CHECKOUT.SUBMITTING': 'Enviando pedido…',
+  // Staff de la tienda (owner o StoreUser) haciendo el pedido en la misma vista pública: el
+  // cliente está presente, así que el pedido se REGISTRA y no se envía a WhatsApp. Mismo formulario,
+  // mismo pedido; lo único que cambia es que no hay nada que enviar.
+  'CHECKOUT.SUBMIT_STAFF': 'Registrar pedido',
+  'CHECKOUT.SUBMITTING_STAFF': 'Registrando pedido…',
   'CHECKOUT.FAILED': 'No se pudo crear el pedido. Inténtalo de nuevo.',
   'CHECKOUT.DELIVERY_FEE': 'Costo del envío',
   'CHECKOUT.MINIMUM_ORDER': 'Importe mínimo del pedido',

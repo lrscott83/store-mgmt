@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useIntl } from 'react-intl';
 import { EModules } from '@store-mgmt/domain';
 import { ownerModuleLoader } from '~/auth/routes/loaders';
 import { Button } from '~/shared/components/ui/button';
 import { Card } from '~/shared/components/ui/card';
 import { FileInput } from '~/shared/components/ui/file-input';
-import { ChevronDownIcon, SaveIcon, TrashIcon } from '~/shared/components/ui/icons';
+import { ChevronDownIcon, PaperclipIcon, SaveIcon, TrashIcon } from '~/shared/components/ui/icons';
 import { InfoBox } from '~/shared/components/ui/info-box';
 import { Spinner } from '~/shared/components/ui/spinner';
 import { showBlockingError } from '~/shared/lib/blocking-alert';
@@ -18,10 +18,13 @@ import { buildCatalogSnapshot } from '../lib/catalog/catalog-snapshot';
 import { MAX_CATALOG_IMAGE_BYTES, MAX_DESCRIPTION_LENGTH } from '../lib/catalog/web-catalog-format';
 import {
   catalogHttpService,
+  CatalogShowcaseKind,
   type CatalogBranding,
   type CatalogBrandingUpdate,
   type CatalogProductFields,
   type CatalogProductView,
+  type CatalogShowcaseImage,
+  type CatalogShowcaseImages,
   type CatalogStatus,
 } from '../lib/services/catalog-http-service';
 
@@ -29,8 +32,23 @@ import {
 // un Owner sin el catálogo contratado no entra, igual que en el resto de vistas gateadas.
 export const clientLoader = ownerModuleLoader(EModules.WebCatalog);
 
-/** Formatos de imagen que acepta el backend para la marca (los mismos que las del producto). */
-const ALLOWED_BRAND_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+/** Formatos de imagen que acepta el backend para el catálogo (marca, showcase y producto). */
+const ALLOWED_CATALOG_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+
+/**
+ * Imágenes máximas POR CONJUNTO del showcase (espejo de
+ * `Domain/Entities/StoreCatalogImages/StoreCatalogImage.MaxImagesPerKind`). Los conjuntos no
+ * comparten cupo: son dos listas independientes (decisión C1).
+ */
+const MAX_SHOWCASE_IMAGES = 10;
+
+/**
+ * true si el archivo cumple las reglas locales de imagen del catálogo: los MISMOS formatos y el
+ * MISMO tamaño que valida el backend (`CatalogImageUploadRules`), para no subir en balde.
+ */
+function isValidCatalogImage(file: File): boolean {
+  return ALLOWED_CATALOG_IMAGE_TYPES.includes(file.type) && file.size <= MAX_CATALOG_IMAGE_BYTES;
+}
 
 /**
  * Formatea la marca de la última sincronización. El backend guarda UTC, y según la columna el
@@ -222,6 +240,280 @@ function BrandSlot({
   );
 }
 
+/** Textos y `data-testid` de UN conjunto del showcase: los dos bloques se pintan igual. */
+interface ShowcaseSetUi {
+  readonly titleId: string;
+  readonly subtitleId: string;
+  readonly uploadTestId: string;
+  readonly saveTestId: string;
+  readonly pendingTestId: string;
+  readonly errorTestId: string;
+  readonly captionTestId: string;
+  readonly listTestId: string;
+}
+
+const SHOWCASE_SET_UI: Record<CatalogShowcaseKind, ShowcaseSetUi> = {
+  [CatalogShowcaseKind.Carousel]: {
+    titleId: 'WEB_CATALOG.SHOWCASE_CAROUSEL_TITLE',
+    subtitleId: 'WEB_CATALOG.SHOWCASE_CAROUSEL_SUBTITLE',
+    uploadTestId: 'showcase-carousel-upload',
+    saveTestId: 'showcase-carousel-save',
+    pendingTestId: 'showcase-carousel-pending',
+    errorTestId: 'showcase-carousel-error',
+    captionTestId: 'showcase-carousel-caption',
+    listTestId: 'showcase-carousel-images',
+  },
+  [CatalogShowcaseKind.Daily]: {
+    titleId: 'WEB_CATALOG.SHOWCASE_DAILY_TITLE',
+    subtitleId: 'WEB_CATALOG.SHOWCASE_DAILY_SUBTITLE',
+    uploadTestId: 'showcase-daily-upload',
+    saveTestId: 'showcase-daily-save',
+    pendingTestId: 'showcase-daily-pending',
+    errorTestId: 'showcase-daily-error',
+    captionTestId: 'showcase-daily-caption',
+    listTestId: 'showcase-daily-images',
+  },
+};
+
+/** Mismas clases que el editor de producto usa para sus campos de texto. */
+const SHOWCASE_INPUT_CLASSES =
+  'rounded-md border border-border bg-surface px-3 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-primary';
+
+/**
+ * UN conjunto del showcase: el carrusel o las imágenes del día (decisión C1: son independientes y
+ * pueden estar los dos, solo uno o ninguno).
+ *
+ * Sube VARIAS imágenes de una vez, las previsualiza por el endpoint público de media, las mueve de
+ * orden y las quita. Cada acción es una petición propia del módulo de catálogo —subir es un POST
+ * por imagen, ordenar un PUT con el orden final completo, quitar un DELETE— así que la tarjeta
+ * guarda NADA por su cuenta: avisa del resultado y quien la pinta recarga la lista desde el
+ * servidor, que es el dueño del orden real.
+ *
+ * El input nativo va oculto detrás de su propio botón —como en `FileInput`— porque `multiple` no
+ * cabe en el componente compartido y ampliarlo llevaría el cambio a todos los que lo usan.
+ */
+function ShowcaseCard({
+  kind,
+  images,
+  storeSlug,
+  busy,
+  error,
+  onUpload,
+  onRemove,
+  onMove,
+}: {
+  kind: CatalogShowcaseKind;
+  /** Imágenes YA guardadas de este conjunto, en el orden que dice el servidor. */
+  images: CatalogShowcaseImage[];
+  /** Slug público de la tienda: solo con él se previsualizan las imágenes publicadas. */
+  storeSlug: string;
+  /** true mientras hay una operación de ESTE conjunto en vuelo (subir, mover o quitar). */
+  busy: boolean;
+  /** Error del servidor para ESTE conjunto (null = nada que reportar). */
+  error: string;
+  /** Sube las imágenes y devuelve CUÁNTAS aceptó el servidor. */
+  onUpload: (kind: CatalogShowcaseKind, files: File[], caption: string) => Promise<number>;
+  onRemove: (kind: CatalogShowcaseKind, imageId: string) => void;
+  /** Reordena ESTE conjunto: `orderedIds` es su orden final completo. */
+  onMove: (kind: CatalogShowcaseKind, orderedIds: string[]) => void;
+}) {
+  const intl = useIntl();
+  const ui = SHOWCASE_SET_UI[kind];
+  const inputRef = useRef<HTMLInputElement>(null);
+  /** Archivos elegidos y validados, todavía SIN subir. */
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [caption, setCaption] = useState('');
+  const [fileError, setFileError] = useState('');
+
+  /** Cupo que queda en ESTE conjunto: el tope es por conjunto, no compartido. */
+  const room = MAX_SHOWCASE_IMAGES - images.length;
+
+  /**
+   * Se retienen los archivos elegidos tras validar TODOS: si uno no cumple las reglas se rechaza
+   * la selección entera, porque subir "las que valen" dejaría al dueño sin saber cuál se quedó
+   * fuera. El pie de foto no se manda aquí —viaja en el POST— así que se conserva para la subida.
+   */
+  function handleSelectFiles(event: React.ChangeEvent<HTMLInputElement>) {
+    const fileList = event.target.files;
+    if (!fileList) return;
+    const selected = Array.from(fileList);
+    if (selected.length === 0) return;
+    if (!selected.every(isValidCatalogImage)) {
+      setFileError(
+        intl.formatMessage(
+          { id: 'WEB_CATALOG.IMAGE_RULES' },
+          { size: MAX_CATALOG_IMAGE_BYTES / (1024 * 1024) },
+        ),
+      );
+      return;
+    }
+    setFileError('');
+    setPendingFiles(selected.slice(0, Math.max(room, 0)));
+  }
+
+  async function handleUpload() {
+    if (pendingFiles.length === 0) return;
+    const uploaded = await onUpload(kind, pendingFiles, caption.trim());
+    // Solo se suelta lo que el servidor aceptó: lo que se quedó colgado se reintenta sin volver a
+    // elegir los archivos, y lo que ya está guardado no se vuelve a subir (sería un duplicado).
+    if (uploaded > 0) {
+      setPendingFiles((current) => current.slice(uploaded));
+      setCaption('');
+    }
+  }
+
+  /**
+   * Mover una imagen envía el orden FINAL COMPLETO de este conjunto, no un desplazamiento: el
+   * backend reescribe el índice de todas y rechaza (400) una lista incompleta o con repetidos.
+   */
+  function handleMove(index: number, direction: -1 | 1) {
+    const ordered = images.map((image) => image.id);
+    const target = index + direction;
+    if (target < 0 || target >= ordered.length) return;
+    [ordered[index], ordered[target]] = [ordered[target], ordered[index]];
+    onMove(kind, ordered);
+  }
+
+  return (
+    <Card
+      padding="tight"
+      title={
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <span>{intl.formatMessage({ id: ui.titleId })}</span>
+          <Button
+            variant="fab"
+            onClick={() => void handleUpload()}
+            disabled={pendingFiles.length === 0 || busy || room <= 0}
+            data-testid={ui.saveTestId}
+          >
+            {intl.formatMessage({ id: 'WEB_CATALOG.SHOWCASE_UPLOAD' })}
+          </Button>
+        </div>
+      }
+    >
+      <p className="text-sm text-text-muted">{intl.formatMessage({ id: ui.subtitleId })}</p>
+
+      {error && (
+        <InfoBox variant="danger" className="mt-2">
+          <span data-testid={ui.errorTestId}>{error}</span>
+        </InfoBox>
+      )}
+
+      <div className="mt-3 flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          onClick={() => inputRef.current?.click()}
+          disabled={busy || room <= 0}
+          className="inline-flex shrink-0 items-center gap-2 rounded-md border border-border px-3 py-1.5 text-sm font-medium text-text hover:bg-primary-light disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <PaperclipIcon />
+          {intl.formatMessage({ id: 'WEB_CATALOG.SHOWCASE_SELECT_FILES' })}
+        </button>
+        <input
+          ref={inputRef}
+          type="file"
+          multiple
+          accept=".jpg,.jpeg,.png,.webp"
+          disabled={busy || room <= 0}
+          onChange={handleSelectFiles}
+          className="hidden"
+          data-testid={ui.uploadTestId}
+        />
+        <span className="text-xs text-text-muted">
+          {intl.formatMessage({ id: 'WEB_CATALOG.SHOWCASE_LIMIT' }, { max: MAX_SHOWCASE_IMAGES })}
+        </span>
+      </div>
+
+      {/* Selección retenida: se anuncia y SOLO sube al pulsar "Subir imágenes". */}
+      {pendingFiles.length > 0 && (
+        <p className="mt-1 text-xs text-primary" data-testid={ui.pendingTestId}>
+          {intl.formatMessage(
+            { id: 'WEB_CATALOG.SHOWCASE_PENDING_COUNT' },
+            { count: pendingFiles.length },
+          )}
+        </p>
+      )}
+      {fileError && <p className="mt-1 text-xs text-danger">{fileError}</p>}
+
+      {/* El pie de foto se escribe AL SUBIR: el backend no tiene endpoint para cambiarlo después. */}
+      <div className="mt-3">
+        <label
+          className="mb-1 block text-xs font-medium text-text-muted"
+          htmlFor={`${ui.captionTestId}-field`}
+        >
+          {intl.formatMessage({ id: 'WEB_CATALOG.SHOWCASE_CAPTION' })}
+        </label>
+        <input
+          id={`${ui.captionTestId}-field`}
+          type="text"
+          value={caption}
+          disabled={busy}
+          onChange={(event) => setCaption(event.target.value)}
+          className={`w-full ${SHOWCASE_INPUT_CLASSES}`}
+          data-testid={ui.captionTestId}
+        />
+        <p className="mt-1 text-xs text-text-muted">
+          {intl.formatMessage({ id: 'WEB_CATALOG.SHOWCASE_CAPTION_HINT' })}
+        </p>
+      </div>
+
+      {images.length === 0 ? (
+        <p className="mt-3 text-xs text-text-muted">{intl.formatMessage({ id: 'WEB_CATALOG.SHOWCASE_EMPTY' })}</p>
+      ) : (
+        <ul className="mt-3 flex flex-wrap gap-3" data-testid={ui.listTestId}>
+          {images.map((image, index) => (
+            <li key={image.id} className="flex w-28 flex-col items-center gap-1">
+              <img
+                src={apiFileUrl(`/api/v1/public/catalog/${storeSlug}/media/${image.key}`)}
+                alt={image.caption ?? intl.formatMessage({ id: ui.titleId })}
+                className="h-20 w-28 rounded-md border border-border object-cover"
+                data-testid={`showcase-image-${image.id}`}
+              />
+              {image.caption && (
+                <span className="w-full truncate text-center text-xs text-text-muted">
+                  {image.caption}
+                </span>
+              )}
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => handleMove(index, -1)}
+                  disabled={busy || index === 0}
+                  aria-label={intl.formatMessage({ id: 'WEB_CATALOG.SHOWCASE_MOVE_UP' })}
+                  className="px-1 text-xs text-text-muted hover:text-text disabled:opacity-40"
+                  data-testid={`showcase-move-up-${image.id}`}
+                >
+                  ↑
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleMove(index, 1)}
+                  disabled={busy || index === images.length - 1}
+                  aria-label={intl.formatMessage({ id: 'WEB_CATALOG.SHOWCASE_MOVE_DOWN' })}
+                  className="px-1 text-xs text-text-muted hover:text-text disabled:opacity-40"
+                  data-testid={`showcase-move-down-${image.id}`}
+                >
+                  ↓
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onRemove(kind, image.id)}
+                  disabled={busy}
+                  aria-label={intl.formatMessage({ id: 'WEB_CATALOG.SHOWCASE_REMOVE' })}
+                  className="px-1 text-danger hover:opacity-80 disabled:opacity-40"
+                  data-testid={`showcase-remove-${image.id}`}
+                >
+                  <TrashIcon className="h-3 w-3" />
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Card>
+  );
+}
+
 /**
  * Vista "Catálogo Web" (`/sales/web-catalog`, módulo 18, plan 2026-09-27).
  *
@@ -265,6 +557,15 @@ export function WebCatalogPage() {
   const [removeLogo, setRemoveLogo] = useState(false);
   const [removeBanner, setRemoveBanner] = useState(false);
   const [isSavingBrand, setIsSavingBrand] = useState(false);
+
+  /**
+   * Showcase (carrusel + imágenes del día): los dos conjuntos son independientes (decisión C1) y
+   * cada uno va con SUS peticiones —nada de esto entra en el guardado por lotes de productos—.
+   */
+  const [showcase, setShowcase] = useState<CatalogShowcaseImages | null>(null);
+  const [showcaseError, setShowcaseError] = useState('');
+  /** Conjuntos con una operación en vuelo: uno ocupado deja al otro usable. */
+  const [busyShowcaseKinds, setBusyShowcaseKinds] = useState<readonly CatalogShowcaseKind[]>([]);
 
   const loadData = useCallback(async () => {
     try {
@@ -312,6 +613,29 @@ export function WebCatalogPage() {
   useEffect(() => {
     void loadBranding();
   }, [loadBranding]);
+
+  /**
+   * El showcase se carga APARTE del catálogo, igual que la marca: si este endpoint falla (una
+   * tienda recién sincronizada, un 403 puntual) el catálogo y sus productos siguen utilizables y
+   * solo los dos bloques de imágenes se quedan sin configurar.
+   */
+  const loadShowcase = useCallback(async () => {
+    try {
+      const result = await catalogHttpService.getShowcaseImages();
+      if (!result.succeeded) {
+        setShowcaseError(intl.formatMessage({ id: 'WEB_CATALOG.SHOWCASE_LOAD_ERROR' }));
+        return;
+      }
+      setShowcase(result.data);
+      setShowcaseError('');
+    } catch (err) {
+      setShowcaseError(intl.formatMessage({ id: httpErrorKey(err, 'WEB_CATALOG.SHOWCASE_LOAD_ERROR') }));
+    }
+  }, [intl]);
+
+  useEffect(() => {
+    void loadShowcase();
+  }, [loadShowcase]);
 
   /** Productos agrupados por categoría, conservando el orden que ya trae el backend. */
   const groups = useMemo(() => {
@@ -580,10 +904,7 @@ export function WebCatalogPage() {
     onInvalid: (error: string) => void,
   ) {
     if (!file) return;
-    if (
-      !ALLOWED_BRAND_IMAGE_TYPES.includes(file.type) ||
-      file.size > MAX_CATALOG_IMAGE_BYTES
-    ) {
+    if (!isValidCatalogImage(file)) {
       onInvalid(
         intl.formatMessage(
           { id: 'WEB_CATALOG.IMAGE_RULES' },
@@ -658,6 +979,110 @@ export function WebCatalogPage() {
     } finally {
       setIsSavingBrand(false);
     }
+  }
+
+  // ── Showcase: subir, mover y quitar imágenes del carrusel y de las del día ───────────
+  /**
+   * Envoltorio de las operaciones del showcase: marca SOLO ese conjunto como ocupado (el otro
+   * sigue usable) y unifica el reporte de errores, que vive en el servidor y por tanto falla de
+   * verdad cuando no hay conexión.
+   */
+  async function runShowcaseAction(kind: CatalogShowcaseKind, action: () => Promise<boolean>) {
+    setBusyShowcaseKinds((current) => [...current, kind]);
+    try {
+      return await action();
+    } catch (err) {
+      showBlockingError(
+        intl.formatMessage({ id: 'GENERAL.ERROR' }),
+        intl.formatMessage({ id: httpErrorKey(err, 'WEB_CATALOG.SHOWCASE_SAVE_ERROR') }),
+      );
+      return false;
+    } finally {
+      setBusyShowcaseKinds((current) => current.filter((busy) => busy !== kind));
+    }
+  }
+
+  /**
+   * Sube las imágenes de UN conjunto, de una en una (el backend acepta una por POST) y con el pie
+   * de foto que el dueño escribió, que es el mismo para todas. Devuelve CUÁNTAS aceptó el
+   * servidor: la tarjeta suelta solo esas y deja retenidas las que fallaron, para poder
+   * reintentarlas sin volver a elegir los archivos.
+   */
+  async function handleShowcaseUpload(
+    kind: CatalogShowcaseKind,
+    files: File[],
+    caption: string,
+  ): Promise<number> {
+    let uploaded = 0;
+    await runShowcaseAction(kind, async () => {
+      // Secuencial a propósito: son pocas imágenes y así el fallo se para en la que lo causó.
+      for (const file of files) {
+        const result = await catalogHttpService.uploadShowcaseImage({
+          kind,
+          file,
+          ...(caption ? { caption } : {}),
+        });
+        if (!result.succeeded) break;
+        uploaded += 1;
+      }
+
+      // El servidor manda: la lista se recarga para que las previsualizaciones y el orden sean
+      // los que quedaron guardados (la clave nueva lleva guid, así que no hay imagen cacheada).
+      await loadShowcase();
+
+      if (uploaded !== files.length) {
+        showBlockingError(
+          intl.formatMessage({ id: 'GENERAL.ERROR' }),
+          intl.formatMessage(
+            { id: 'WEB_CATALOG.SHOWCASE_UPLOAD_PARTIAL' },
+            { uploaded, total: files.length },
+          ),
+        );
+        return false;
+      }
+      showToastSuccess(
+        intl.formatMessage(
+          files.length === 1
+            ? { id: 'WEB_CATALOG.SHOWCASE_UPLOADED_ONE' }
+            : { id: 'WEB_CATALOG.SHOWCASE_UPLOADED' },
+          { count: files.length },
+        ),
+      );
+      return true;
+    });
+    return uploaded;
+  }
+
+  function handleShowcaseRemove(kind: CatalogShowcaseKind, imageId: string) {
+    void runShowcaseAction(kind, async () => {
+      const result = await catalogHttpService.removeShowcaseImage(imageId);
+      if (!result.succeeded) {
+        showBlockingError(
+          intl.formatMessage({ id: 'GENERAL.ERROR' }),
+          intl.formatMessage({ id: 'WEB_CATALOG.SHOWCASE_SAVE_ERROR' }),
+        );
+        return false;
+      }
+      await loadShowcase();
+      showToastSuccess(intl.formatMessage({ id: 'WEB_CATALOG.SHOWCASE_REMOVED' }));
+      return true;
+    });
+  }
+
+  /** Reordena UN conjunto. Sin aviso de éxito: el botón ya está en su sitio y el orden se ve. */
+  function handleShowcaseMove(kind: CatalogShowcaseKind, orderedIds: string[]) {
+    void runShowcaseAction(kind, async () => {
+      const result = await catalogHttpService.reorderShowcaseImages(kind, orderedIds);
+      if (!result.succeeded) {
+        showBlockingError(
+          intl.formatMessage({ id: 'GENERAL.ERROR' }),
+          intl.formatMessage({ id: 'WEB_CATALOG.SHOWCASE_SAVE_ERROR' }),
+        );
+        return false;
+      }
+      await loadShowcase();
+      return true;
+    });
   }
 
   const publicUrl = status?.catalogUrl
@@ -819,6 +1244,23 @@ export function WebCatalogPage() {
           />
         </div>
       </Card>
+
+      {/* Showcase: carrusel e imágenes del día (decisión C1). Dos bloques INDEPENDIENTES con
+          sus propias peticiones, y ninguno mezclado con el guardado por lotes de productos: la
+          configuración de lo que se ve en el catálogo no toca las filas de los productos. */}
+      {([CatalogShowcaseKind.Carousel, CatalogShowcaseKind.Daily] as const).map((kind) => (
+        <ShowcaseCard
+          key={kind}
+          kind={kind}
+          images={kind === CatalogShowcaseKind.Carousel ? (showcase?.carousel ?? []) : (showcase?.daily ?? [])}
+          storeSlug={status?.storeSlug ?? ''}
+          busy={busyShowcaseKinds.includes(kind)}
+          error={showcaseError}
+          onUpload={handleShowcaseUpload}
+          onRemove={handleShowcaseRemove}
+          onMove={handleShowcaseMove}
+        />
+      ))}
 
       {isLoading && <Spinner label={intl.formatMessage({ id: 'GENERAL.LOADING' })} />}
 

@@ -196,6 +196,72 @@ export interface CatalogBrandingUpdate {
 }
 
 /**
+ * Conjunto del SHOWCASE del catálogo: el carrusel de la cabecera o las imágenes del día.
+ * Espejo de `Domain/Common/Enums/StoreCatalogImageKind.cs` POR VALOR — los valores viajan como
+ * número tanto en el multipart del alta como en el cuerpo del reordenado, así que reordenar el
+ * enum en el C# rompería los dos endpoints en silencio.
+ */
+export enum CatalogShowcaseKind {
+  Carousel = 0,
+  Daily = 1,
+}
+
+/**
+ * Una imagen del showcase tal como la ve el dueño. Espejo de
+ * `Application/Dtos/WebCatalog/StoreCatalogImageDto.cs`.
+ *
+ * Son CLAVES, no URLs, por el mismo motivo que en `CatalogBranding`: lo que se persiste es la
+ * clave y la URL la compone el endpoint público de media con el slug de la tienda. `id` viaja
+ * porque quitar y reordenar son por id, que es lo único que identifica UNA imagen concreta.
+ */
+export interface CatalogShowcaseImage {
+  id: string;
+  kind: CatalogShowcaseKind;
+  key: string;
+  /** Posición dentro de SU conjunto, empezando en 0. */
+  orderIndex: number;
+  caption: string | null;
+  isActive: boolean;
+}
+
+/**
+ * Las imágenes de la tienda agrupadas por conjunto (decisión C1: dos conjuntos INDEPENDIENTES).
+ * Espejo de `Application/Dtos/WebCatalog/StoreCatalogImagesDto.cs`.
+ *
+ * Son DOS LISTAS y no un array plano por una razón práctica: la vista renderiza dos secciones y
+ * no debería conocer el enum para decidir a cuál pertenece una imagen. Ambas listas están siempre
+ * presentes aunque estén vacías — una tienda recién sincronizada no tiene ninguna imagen y eso NO
+ * es un 404.
+ */
+export interface CatalogShowcaseImages {
+  carousel: CatalogShowcaseImage[];
+  daily: CatalogShowcaseImage[];
+}
+
+/**
+ * Alta de UNA imagen del showcase. El pie de foto viaja en el MISMO POST porque el backend no
+ * tiene endpoint para cambiarlo: corregirlo obliga a quitar la imagen y volver a subirla.
+ */
+export interface CatalogShowcaseImageUpload {
+  kind: CatalogShowcaseKind;
+  file: File;
+  caption?: string;
+}
+
+/**
+ * Una imagen del SHOWCASE ya publicada para el cliente final: el carrusel de cabecera o las
+ * imágenes del día. A diferencia de `CatalogShowcaseImage` (la vista del dueño, que habla en
+ * CLAVES y lleva `id`/`kind`/`orderIndex`), aquí viaja lo único que el catálogo necesita pintar:
+ * la ruta y el pie de foto.
+ */
+export interface PublicShowcaseImage {
+  /** Ruta RELATIVA del endpoint público de media (nunca una ruta del servidor). */
+  readonly url: string;
+  /** Pie de foto opcional: el dueño lo escribe al subir, y puede no ponerlo. */
+  readonly caption?: string | null;
+}
+
+/**
  * Configuración de pedidos que el catálogo público lee sin sesión
  * (`GET /v1/public/ordering/{storeSlug}/config`). Espejo de `PublicOrderingConfigDto`.
  *
@@ -214,6 +280,14 @@ export interface PublicOrderingConfig {
   paletteId: string;
   logoUrl?: string | null;
   bannerUrl?: string | null;
+  /**
+   * Carrusel de cabecera e imágenes del día, cada uno en orden de presentación y SIEMPRE
+   * presente aunque esté VACÍO (decisión C1: dos conjuntos independientes; una tienda recién
+   * sincronizada no tiene ninguno y eso NO es un 404). Al ser una lista vacía y no un campo
+   * ausente, quien lo pinte decide con `length` si lo muestra, sin tratar los dos casos distinto.
+   */
+  carouselImages: PublicShowcaseImage[];
+  dailyImages: PublicShowcaseImage[];
 }
 
 /**
@@ -425,6 +499,68 @@ export const catalogHttpService = {
   /** URL pública (anónima) de una imagen del catálogo publicado. */
   mediaUrl(storeSlug: string, key: string): string {
     return `/api/v1/public/catalog/${storeSlug}/media/${key}`;
+  },
+
+  // --- SHOWCASE: carrusel de cabecera e imágenes del día, los dos conjuntos independientes. ---
+
+  /**
+   * Las imágenes de la tienda actual agrupadas por conjunto. Una tienda sin imágenes devuelve los
+   * dos conjuntos VACÍOS, no un 404: acaba de sincronizar y todavía no subió ninguna.
+   */
+  async getShowcaseImages(): Promise<BaseResponseModel<CatalogShowcaseImages>> {
+    const response = await apiClient.get<BaseResponseModel<CatalogShowcaseImages>>(
+      '/v1/catalog/showcase',
+    );
+    return response.data;
+  },
+
+  /**
+   * Sube UNA imagen a UN conjunto. Multipart porque el archivo viaja como `IFormFile`, y el
+   * `Content-Type` EXPLÍCITO es el mismo requisito documentado en `uploadImage`: `api-client` fija
+   * `application/json` como cabecera por defecto y axios convertiría el FormData a JSON — declarando
+   * multipart, axios lo deja intacto y el adaptador borra la cabecera para que el navegador ponga el
+   * boundary real.
+   *
+   * `kind` viaja como NÚMERO (el binder de `[FromForm]` acepta "0"/"1" para el enum), y el pie de
+   * foto solo se manda si el dueño lo escribió: vacío y ausente no son lo mismo para el comando.
+   */
+  async uploadShowcaseImage(
+    payload: CatalogShowcaseImageUpload,
+  ): Promise<BaseResponseModel<CatalogShowcaseImage>> {
+    const formData = new FormData();
+    formData.append('kind', String(payload.kind));
+    formData.append('file', payload.file);
+    if (payload.caption) formData.append('caption', payload.caption);
+    const response = await apiClient.post<BaseResponseModel<CatalogShowcaseImage>>(
+      '/v1/catalog/showcase',
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    );
+    return response.data;
+  },
+
+  /** Quita una imagen: borra la fila y el archivo (sin vuelta atrás). */
+  async removeShowcaseImage(imageId: string): Promise<BaseResponseModel<boolean>> {
+    const response = await apiClient.delete<BaseResponseModel<boolean>>(
+      `/v1/catalog/showcase/${imageId}`,
+    );
+    return response.data;
+  },
+
+  /**
+   * Reordena UN conjunto enviando su orden FINAL COMPLETO — no un movimiento: el backend reescribe
+   * el `OrderIndex` de todas las imágenes de ese conjunto y rechaza (400) una lista incompleta,
+   * con repetidos o con ids de otro conjunto.
+   */
+  async reorderShowcaseImages(
+    kind: CatalogShowcaseKind,
+    orderedIds: string[],
+  ): Promise<BaseResponseModel<boolean>> {
+    const response = await apiClient.put<BaseResponseModel<boolean>>('/v1/catalog/showcase/order', {
+      kind,
+      orderedIds,
+    });
+    return response.data;
   },
 
   // --- API pública: sin sesión, la consume el catálogo que ve el cliente final. ---

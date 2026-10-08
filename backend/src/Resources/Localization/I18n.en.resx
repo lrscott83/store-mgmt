@@ -600,6 +600,24 @@
   <data name="BrandingUploadAndRemoveConflict" xml:space="preserve">
     <value>{0} cannot be uploaded and removed in the same request</value>
   </data>
+  <data name="ShowcaseImageKindInvalid" xml:space="preserve">
+    <value>The image type {0} is not valid</value>
+  </data>
+  <data name="ShowcaseImageRequired" xml:space="preserve">
+    <value>The image file is required</value>
+  </data>
+  <data name="ShowcaseCaptionTooLong" xml:space="preserve">
+    <value>The caption cannot be longer than {0} characters</value>
+  </data>
+  <data name="ShowcaseImagesLimitReached" xml:space="preserve">
+    <value>The {0} image set already has the maximum of {1} images</value>
+  </data>
+  <data name="ShowcaseImageNotFound" xml:space="preserve">
+    <value>Image not found</value>
+  </data>
+  <data name="ShowcaseOrderMismatch" xml:space="preserve">
+    <value>The image list must contain exactly the images of the given set, without duplicates</value>
+  </data>
 
 <data name="OnlineOrdersNotEnabled" xml:space="preserve">
     <value>Store {0} does not have online orders enabled</value>

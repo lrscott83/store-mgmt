@@ -1,13 +1,15 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 import { useStorefrontCartStore } from '~/catalog/lib/storefront-cart-store';
 import { useCartStore } from '~/shared/lib/stores/cart-store';
+import type { UserModel } from '@store-mgmt/domain';
 import type {
   PublicCatalog,
   PublicCatalogProduct,
   PublicOrderingConfig,
+  PublicShowcaseImage,
 } from '~/sales/lib/services/catalog-http-service';
 
 // El slug cambia a mitad de la suite para probar el AISLAMIENTO por tienda del carrito del
@@ -17,6 +19,21 @@ const useParamsMock = vi.hoisted(() => vi.fn(() => ({ storeSlug: 'mi-tienda' }))
 vi.mock('react-router', () => ({
   useParams: () => useParamsMock(),
 }));
+
+// La página decide el modo staff leyendo la sesión, así que el store se sustituye por un estado
+// MUTABLE: por defecto anónimo —que es lo que ve el resto de esta suite, porque la ruta es
+// pública— y `setSession` introduce a un staff concreto para probar el cableado. El store real
+// ejecuta `initialize()` al importarse (y con él un `/me` de fondo), así que aquí no se deja
+// entrar: lo que se prueba aquí es la página, no la hidratación.
+const session = vi.hoisted(() => ({ current: null as UserModel | null }));
+
+vi.mock('~/shared/lib/stores/auth-store', () => {
+  const useAuthStore = vi.fn(
+    (selector: (state: { user: UserModel | null; isAuthenticated: boolean }) => unknown) =>
+      selector({ user: session.current, isAuthenticated: session.current !== null }),
+  );
+  return { useAuthStore };
+});
 
 const catalogMock = vi.hoisted(() => ({
   getPublicCatalog: vi.fn(),
@@ -93,6 +110,10 @@ const CONFIG_WITHOUT_BRAND: PublicOrderingConfig = {
   paletteId: 'default',
   logoUrl: null,
   bannerUrl: null,
+  // El showcase viaja SIEMPRE, y vacío es lo normal: una tienda recién sincronizada no ha
+  // subido ninguna imagen. Los dos conjuntos son independientes (decisión C1).
+  carouselImages: [],
+  dailyImages: [],
 };
 
 function renderPage() {
@@ -103,9 +124,38 @@ function renderPage() {
   );
 }
 
+/** Sesión de `/me` reducida a lo que la regla de elegibilidad mira. */
+function makeUser(overrides: Partial<UserModel> = {}): UserModel {
+  return {
+    login: 'ana@tienda.cu',
+    authToken: 'tok',
+    refreshToken: 'ref',
+    expiresIn: Date.now() + 3_600_000,
+    id: 'u1',
+    fullName: 'Ana Pérez',
+    cellPhone: '5351234567',
+    email: 'ana@tienda.cu',
+    isActive: true,
+    password: '',
+    roles: [],
+    featureIds: [],
+    storeModuleIds: [],
+    isSuperAdmin: false,
+    isOwnerAdmin: false,
+    isReSeller: false,
+    selectedStoreId: '',
+    paymentDueDate: null,
+    isInTrial: false,
+    paymentStatus: 'AlDia',
+    ...overrides,
+  };
+}
+
 describe('PublicCatalogPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // La ruta es pública: sin sesión salvo que un test la ponga.
+    session.current = null;
     useParamsMock.mockReturnValue({ storeSlug: 'mi-tienda' });
     catalogMock.getPublicCatalog.mockResolvedValue(envelope(CATALOG));
     catalogMock.getPublicProducts.mockResolvedValue(envelope(page([makeProduct()])));
@@ -404,6 +454,217 @@ describe('PublicCatalogPage', () => {
     });
   });
 
+  // ── SHOWCASE DE LA CARTA: carrusel de portada, botón "Ver productos" y destacados ────────
+  describe('showcase de la carta pública', () => {
+    const MEDIA = '/api/v1/public/catalog/mi-tienda/media/t/s/showcase';
+
+    const CAROUSEL: PublicShowcaseImage[] = [
+      { url: `${MEDIA}/a.jpg`, caption: 'Menú de la casa' },
+      // Sin pie de foto: la imagen se tiene que ver igual, y su texto alternativo cae al
+      // nombre de la tienda.
+      { url: `${MEDIA}/b.jpg`, caption: null },
+    ];
+
+    const DAILY: PublicShowcaseImage[] = [
+      { url: `${MEDIA}/d1.jpg`, caption: 'Plato del día' },
+      { url: `${MEDIA}/d2.jpg`, caption: null },
+    ];
+
+    const showcaseConfig = (config: {
+      carouselImages?: PublicShowcaseImage[];
+      dailyImages?: PublicShowcaseImage[];
+    }): PublicOrderingConfig => ({
+      ...CONFIG_WITHOUT_BRAND,
+      ...config,
+    });
+
+    let scrolledFrom: Element[] = [];
+    const originalScrollIntoView = Element.prototype.scrollIntoView;
+    const originalMatchMedia = window.matchMedia;
+
+    beforeEach(() => {
+      // jsdom NO implementa `scrollIntoView`: sin este sustituto el clic del botón flotante
+      // revienta con un TypeError y el test moriría por el motivo equivocado.
+      scrolledFrom = [];
+      Element.prototype.scrollIntoView = function recordScroll(this: Element) {
+        scrolledFrom.push(this);
+      };
+    });
+
+    afterEach(() => {
+      Element.prototype.scrollIntoView = originalScrollIntoView;
+      window.matchMedia = originalMatchMedia;
+      vi.useRealTimers();
+    });
+
+    it('con imágenes de carrusel pinta la portada con pie de foto y controles', async () => {
+      catalogMock.getPublicOrderingConfig.mockResolvedValue(
+        envelope(showcaseConfig({ carouselImages: CAROUSEL })),
+      );
+      renderPage();
+
+      const carousel = await screen.findByTestId('catalog-carousel');
+      // Las rutas del backend se resuelven contra el origen de la API (mismo origen aquí).
+      expect(within(carousel).getByTestId('catalog-carousel-image-0')).toHaveAttribute(
+        'src',
+        `${window.location.origin}${MEDIA}/a.jpg`,
+      );
+      expect(within(carousel).getByTestId('catalog-carousel-caption-0')).toHaveTextContent(
+        'Menú de la casa',
+      );
+      // Sin pie de foto no hay párrafo de caption, pero la imagen se sigue viendo.
+      expect(within(carousel).queryByTestId('catalog-carousel-caption-1')).not.toBeInTheDocument();
+      expect(within(carousel).getByTestId('catalog-carousel-image-1')).toBeInTheDocument();
+
+      // Un punto por imagen, y solo el primero marcado como actual.
+      expect(within(carousel).getByTestId('catalog-carousel-dot-0')).toHaveAttribute(
+        'aria-current',
+        'true',
+      );
+      expect(within(carousel).getByTestId('catalog-carousel-dot-1')).toHaveAttribute(
+        'aria-current',
+        'false',
+      );
+      // Las flechas se nombran por IMAGEN, no por página: para un lector de pantalla
+      // "Anterior" a secas no dice si cambia de producto o de foto.
+      expect(within(carousel).getByTestId('catalog-carousel-previous')).toHaveAttribute(
+        'aria-label',
+        'Imagen anterior',
+      );
+      expect(within(carousel).getByTestId('catalog-carousel-next')).toHaveAttribute(
+        'aria-label',
+        'Imagen siguiente',
+      );
+    });
+
+    it('el carrusel solo aparece con imágenes: con el conjunto vacío no hay ni un marco', async () => {
+      renderPage();
+
+      await screen.findByTestId('catalog-card-cp1');
+      expect(screen.queryByTestId('catalog-carousel')).not.toBeInTheDocument();
+    });
+
+    it('con imágenes del día pinta el bloque de destacados con sus pies de foto', async () => {
+      catalogMock.getPublicOrderingConfig.mockResolvedValue(
+        envelope(showcaseConfig({ dailyImages: DAILY })),
+      );
+      renderPage();
+
+      const daily = await screen.findByTestId('catalog-daily');
+      expect(within(daily).getByText('Destacados de hoy')).toBeInTheDocument();
+      expect(within(daily).getByTestId('catalog-daily-image-0')).toHaveAttribute(
+        'src',
+        `${window.location.origin}${MEDIA}/d1.jpg`,
+      );
+      expect(within(daily).getByTestId('catalog-daily-caption-0')).toHaveTextContent(
+        'Plato del día',
+      );
+      expect(within(daily).queryByTestId('catalog-daily-caption-1')).not.toBeInTheDocument();
+    });
+
+    it('el bloque de destacados solo aparece con imágenes', async () => {
+      renderPage();
+
+      await screen.findByTestId('catalog-card-cp1');
+      expect(screen.queryByTestId('catalog-daily')).not.toBeInTheDocument();
+    });
+
+    it('los dos conjuntos son independientes: el carrusel no implica los destacados', async () => {
+      catalogMock.getPublicOrderingConfig.mockResolvedValue(
+        envelope(showcaseConfig({ carouselImages: CAROUSEL })),
+      );
+      renderPage();
+
+      expect(await screen.findByTestId('catalog-carousel')).toBeInTheDocument();
+      expect(screen.queryByTestId('catalog-daily')).not.toBeInTheDocument();
+    });
+
+    it('sin ninguna imagen del showcase la carta es exactamente la de antes', async () => {
+      renderPage();
+
+      // Nada nuevo: ni portada ni vitrina, y el catálogo entero en su sitio.
+      expect(await screen.findByTestId('catalog-store-name')).toHaveTextContent('Moda Cubana');
+      await screen.findByTestId('catalog-card-cp1');
+      expect(screen.queryByTestId('catalog-carousel')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('catalog-daily')).not.toBeInTheDocument();
+      expect(screen.queryByText('Destacados de hoy')).not.toBeInTheDocument();
+      expect(screen.getByTestId('catalog-grid')).toBeInTheDocument();
+      expect(screen.getByTestId('catalog-category-select')).toBeInTheDocument();
+    });
+
+    it('el botón "Ver productos" baja a la rejilla con scroll suave', async () => {
+      renderPage();
+
+      const button = await screen.findByTestId('catalog-see-products');
+      expect(button).toHaveTextContent('Ver Productos');
+      // Por debajo de los modales (`z-50`): el carrito y el checkout se abren encima, así que
+      // este botón nunca queda encima de sus controles.
+      expect(button.parentElement?.className).toContain('z-30');
+
+      fireEvent.click(button);
+
+      // Y baja a la REJILLA, no al principio de la página: el `this` del espía lo dice.
+      expect(scrolledFrom).toHaveLength(1);
+      expect(scrolledFrom[0]).toBe(screen.getByTestId('catalog-grid'));
+    });
+
+    it('el halo de atención del botón se apaga con movimiento reducido', async () => {
+      renderPage();
+
+      const button = await screen.findByTestId('catalog-see-products');
+      const halo = button.querySelector('span[aria-hidden="true"]');
+      expect(halo?.className).toContain('animate-ping');
+      expect(halo?.className).toContain('motion-reduce:animate-none');
+    });
+
+    it('el carrusel avanza solo, y con movimiento reducido se queda quieto', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      catalogMock.getPublicOrderingConfig.mockResolvedValue(
+        envelope(showcaseConfig({ carouselImages: CAROUSEL })),
+      );
+      renderPage();
+
+      await screen.findByTestId('catalog-carousel');
+      expect(screen.getByTestId('catalog-carousel-dot-0')).toHaveAttribute('aria-current', 'true');
+
+      // Tres segundos no mueven nada; el intervalo del carrusel es de 5 s.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(3000);
+      });
+      expect(screen.getByTestId('catalog-carousel-dot-0')).toHaveAttribute('aria-current', 'true');
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2500);
+      });
+      expect(screen.getByTestId('catalog-carousel-dot-1')).toHaveAttribute('aria-current', 'true');
+    });
+
+    it('con prefers-reduced-motion no hay auto-avance, pero las flechas siguen', async () => {
+      window.matchMedia = vi.fn().mockReturnValue({
+        matches: true,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      }) as unknown as typeof window.matchMedia;
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      catalogMock.getPublicOrderingConfig.mockResolvedValue(
+        envelope(showcaseConfig({ carouselImages: CAROUSEL })),
+      );
+      renderPage();
+
+      await screen.findByTestId('catalog-carousel');
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(20000);
+      });
+      expect(screen.getByTestId('catalog-carousel-dot-0')).toHaveAttribute('aria-current', 'true');
+
+      // Reducido no significa inaccesible: la navegación manual sigue ahí.
+      fireEvent.click(screen.getByTestId('catalog-carousel-next'));
+      expect(screen.getByTestId('catalog-carousel-dot-1')).toHaveAttribute('aria-current', 'true');
+      fireEvent.click(screen.getByTestId('catalog-carousel-previous'));
+      expect(screen.getByTestId('catalog-carousel-dot-0')).toHaveAttribute('aria-current', 'true');
+    });
+  });
+
   // ── CARRITO Y PEDIDO DEL CLIENTE ANÓNIMO (F3) ────────────────────────────────────────────
   describe('pedido del cliente anónimo (F3)', () => {
     beforeEach(() => {
@@ -568,6 +829,122 @@ describe('PublicCatalogPage', () => {
       expect(screen.getByTestId('order-status-delivery-type')).toHaveTextContent(
         'Recogida en la tienda',
       );
+    });
+  });
+
+  // ── STAFF DE LA TIENDA REGISTRANDO SIN WHATSAPP (D2) ───────────────────────────────────
+  describe('staff de la tienda registrando sin WhatsApp', () => {
+    beforeEach(() => {
+      useStorefrontCartStore.setState({ itemsByStore: {} });
+      localStorage.clear();
+      // CON número de WhatsApp a propósito: si la tienda lo tiene, el flujo normal SÍ abre el
+      // chat, así que que el modo staff no lo abra es una decisión y no una degradación por
+      // falta de número.
+      catalogMock.createPublicOrder.mockResolvedValue(
+        envelope({
+          id: 'o1',
+          code: 'K7M2QX',
+          total: 82.5,
+          currency: 0,
+          whatsappNumber: '+53 5-987 6543',
+        }),
+      );
+    });
+
+    /** Monta la página CON esa sesión y lleva al checkout, que es donde se ve el modo staff. */
+    async function openCheckoutAs(user: UserModel | null) {
+      session.current = user;
+      renderPage();
+
+      await screen.findByTestId('catalog-add-cp1');
+      fireEvent.click(screen.getByTestId('catalog-add-cp1'));
+      fireEvent.click(screen.getByTestId('catalog-cart-button'));
+      fireEvent.click(await screen.findByTestId('catalog-cart-checkout'));
+      return screen.findByTestId('catalog-checkout-modal');
+    }
+
+    function fillAndSubmit(checkout: HTMLElement) {
+      fireEvent.change(within(checkout).getByTestId('checkout-name'), {
+        target: { value: 'Cliente en el local' },
+      });
+      fireEvent.change(within(checkout).getByTestId('checkout-phone'), {
+        target: { value: '5351234567' },
+      });
+      fireEvent.click(within(checkout).getByTestId('checkout-submit'));
+    }
+
+    it('el owner de la tienda registra el pedido: sin wa.me, sin aviso, con el código a la vista', async () => {
+      const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+      // `CATALOG.storeId` es 's1': es ese id real —no el slug— contra el que se decide el modo.
+      const checkout = await openCheckoutAs(makeUser({ isOwnerAdmin: true, selectedStoreId: 's1' }));
+
+      // La etiqueta anuncia lo que va a pasar, antes de que pase: no se "envía" nada.
+      expect(within(checkout).getByTestId('checkout-submit')).toHaveTextContent('Registrar pedido');
+
+      fillAndSubmit(checkout);
+
+      // El alta es la MISMA que la del cliente anónimo: mismos campos, mismos pasos (D3).
+      await waitFor(() => expect(catalogMock.createPublicOrder).toHaveBeenCalledTimes(1));
+      const [slug, payload] = catalogMock.createPublicOrder.mock.calls[0] as [
+        string,
+        Record<string, unknown>,
+      ];
+      expect(slug).toBe('mi-tienda');
+      expect(payload['items']).toEqual([{ productId: 'cp1', quantity: 1 }]);
+      expect(payload).not.toHaveProperty('total');
+
+      // Lo único que cambia: nada sale a WhatsApp. El padre abre el estado del pedido creado,
+      // que es la confirmación.
+      expect(openSpy).not.toHaveBeenCalled();
+      expect(screen.queryByTestId('checkout-whatsapp-notice')).not.toBeInTheDocument();
+      expect(await screen.findByTestId('order-code')).toHaveTextContent('K7M2QX');
+      openSpy.mockRestore();
+    });
+
+    it('un StoreUser de la tienda también registra el pedido, sin el aviso', async () => {
+      const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+      const checkout = await openCheckoutAs(
+        makeUser({
+          roles: [{ storeId: 's1', storeName: 'Moda Cubana', moduleId: 1, featureIds: [1] }],
+        }),
+      );
+
+      expect(within(checkout).getByTestId('checkout-submit')).toHaveTextContent('Registrar pedido');
+      fillAndSubmit(checkout);
+
+      await waitFor(() => expect(catalogMock.createPublicOrder).toHaveBeenCalledTimes(1));
+      expect(openSpy).not.toHaveBeenCalled();
+      expect(screen.queryByTestId('checkout-whatsapp-notice')).not.toBeInTheDocument();
+      expect(await screen.findByTestId('order-code')).toHaveTextContent('K7M2QX');
+      openSpy.mockRestore();
+    });
+
+    it.each([
+      ['anónimo', null],
+      [
+        'un owner de OTRA tienda',
+        makeUser({
+          isOwnerAdmin: true,
+          selectedStoreId: 's-otra',
+          storeList: [{ id: 's-otra', name: 'Otra' }],
+        }),
+      ],
+      ['un SuperAdmin', makeUser({ isSuperAdmin: true, isOwnerAdmin: true, selectedStoreId: 's1' })],
+      ['un ReSeller', makeUser({ isReSeller: true, selectedStoreId: 's1' })],
+    ] as const)('%s sigue con el flujo de envío por WhatsApp', async (_label, user) => {
+      const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+
+      const checkout = await openCheckoutAs(user);
+      // Etiqueta de cliente: la del flujo intacto.
+      expect(within(checkout).getByTestId('checkout-submit')).toHaveTextContent('Enviar pedido');
+
+      fillAndSubmit(checkout);
+
+      await waitFor(() => expect(catalogMock.createPublicOrder).toHaveBeenCalledTimes(1));
+      // Y con aviso de WhatsApp, que es lo que este visitante sigue necesitando.
+      expect(openSpy).toHaveBeenCalledTimes(1);
+      expect(await screen.findByTestId('checkout-whatsapp-pending')).toHaveTextContent('K7M2QX');
+      openSpy.mockRestore();
     });
   });
 });

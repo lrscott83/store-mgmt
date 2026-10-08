@@ -1,19 +1,21 @@
 namespace Application.Abstractions.Storage
 {
     /// <summary>
-    /// Almacenamiento de las imágenes del catálogo web (decisión D3, plan 2026-09-27) y de la MARCA
-    /// de la tienda (F8: logo y banner).
+    /// Almacenamiento de las imágenes del catálogo web (decisión D3, plan 2026-09-27), de la MARCA
+    /// de la tienda (F8: logo y banner) y del SHOWCASE (carrusel e imágenes del día).
     ///
     /// La clave (<c>key</c>) es relativa y estable, y es lo ÚNICO que se persiste en la base de
-    /// datos: las rutas absolutas del servidor nunca salen del almacenamiento. Hay dos formas:
+    /// datos: las rutas absolutas del servidor nunca salen del almacenamiento. Hay tres formas:
     ///
     ///   * Imagen de producto: <c>{tenantId}/{storeId}/{productId}/{guid}{ext}</c>.
     ///   * Imagen de MARCA: <c>{tenantId}/{storeId}/branding/{kind}/{guid}{ext}</c>.
+    ///   * Imagen de SHOWCASE: <c>{tenantId}/{storeId}/catalog/{kind}/{guid}{ext}</c>.
     ///
-    /// Las dos comparten el prefijo <c>{tenantId}/{storeId}/</c> a propósito: es lo que
+    /// Las tres comparten el prefijo <c>{tenantId}/{storeId}/</c> a propósito: es lo que
     /// <see cref="BelongsToStore"/> valida, así que el MISMO endpoint público
-    /// (<c>GET /api/v1/public/catalog/{storeSlug}/media/{**key}</c>) sirve el logo y el banner sin
-    /// un caso nuevo. La marca no introduce un almacén paralelo.
+    /// (<c>GET /api/v1/public/catalog/{storeSlug}/media/{**key}</c>) sirve el logo, el banner, el
+    /// carrusel y las imágenes del día sin un caso nuevo. Ni la marca ni el showcase introducen un
+    /// almacén paralelo.
     /// </summary>
     public interface ICatalogImageStorage
     {
@@ -31,6 +33,18 @@ namespace Application.Abstractions.Storage
         /// puede traer separadores ni abrir carpetas.
         /// </summary>
         Task<string> SaveBrandingAsync(CatalogImageUpload upload, Guid tenantId, Guid storeId, string kind,
+            CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Guarda una imagen de SHOWCASE (carrusel o imágenes del día) y devuelve su clave. Igual que
+        /// la marca, no hay producto: el archivo pertenece a la tienda. La carpeta
+        /// <c>catalog</c> con el <paramref name="kind"/> ("carousel", "daily") es lo que lo separa de
+        /// las de producto y de las de marca.
+        ///
+        /// <paramref name="kind"/> va dentro de la ruta, así que se sanea antes de escribir: no
+        /// puede traer separadores ni abrir carpetas.
+        /// </summary>
+        Task<string> SaveCatalogImageAsync(CatalogImageUpload upload, Guid tenantId, Guid storeId, string kind,
             CancellationToken cancellationToken = default);
 
         /// <summary>Borra el archivo de una clave. No falla si el archivo ya no existe.</summary>

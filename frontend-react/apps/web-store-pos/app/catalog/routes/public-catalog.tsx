@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useIntl } from 'react-intl';
 import { useParams } from 'react-router';
 import { Button } from '~/shared/components/ui/button';
@@ -9,10 +9,15 @@ import { SearchIcon } from '~/shared/components/ui/icons';
 import { currencyFromCode, formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency';
 import { isNetworkError } from '~/shared/lib/http/http-error';
 import { apiFileUrl } from '~/shared/lib/http/media-url';
+import { CatalogCarousel } from '~/catalog/components/catalog-carousel';
+import { CatalogDaily } from '~/catalog/components/catalog-daily';
+import { CatalogSeeProducts } from '~/catalog/components/catalog-see-products';
 import { StorefrontCart } from '~/catalog/components/storefront-cart';
 import { StorefrontCheckout } from '~/catalog/components/storefront-checkout';
 import { StorefrontOrderStatus } from '~/catalog/components/storefront-order-status';
 import { useStorefrontCartStore } from '~/catalog/lib/storefront-cart-store';
+import { isCatalogStoreStaff } from '~/catalog/lib/catalog-staff';
+import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import {
   catalogHttpService,
   type PublicCatalog,
@@ -42,6 +47,13 @@ export function PublicCatalogPage() {
   const intl = useIntl();
   const { storeSlug = '' } = useParams<{ storeSlug: string }>();
 
+  /**
+   * Quién está mirando esta carta. La ruta es PÚBLICA y no exige sesión: `isAuthenticated`
+   * discrimina al visitante anónimo (el caso normal, con envío por WhatsApp) del staff de ESTA
+   * tienda, que registra el pedido en vez de enviarlo.
+   */
+  const user = useAuthStore((s) => (s.isAuthenticated ? s.user : null));
+
   const [catalog, setCatalog] = useState<PublicCatalog | null>(null);
   const [page, setPage] = useState<PublicCatalogPage | null>(null);
   const [state, setState] = useState<CatalogState>('loading');
@@ -56,6 +68,13 @@ export function PublicCatalogPage() {
   const [detailOpen, setDetailOpen] = useState(false);
   const [activeImage, setActiveImage] = useState<string | null>(null);
   const [zoomed, setZoomed] = useState(false);
+
+  /**
+   * La rejilla de productos, para que el botón flotante "Ver Productos" sepa a dónde bajar. Es
+   * una referencia y no un `querySelector`: el objetivo es el elemento que esta misma vista
+   * pinta, y atarlo por `testid` lo convertiría en algo que un renombrado rompe en silencio.
+   */
+  const gridRef = useRef<HTMLUListElement>(null);
 
   /**
    * Marca de la carta pública (F8): logo y banner. Es un PLUS sobre el catálogo, no su
@@ -87,6 +106,13 @@ export function PublicCatalogPage() {
 
   /** Publicar el catálogo y aceptar pedidos son DOS interruptores distintos (F1). */
   const orderingEnabled = orderingConfig?.enabled ?? false;
+
+  /**
+   * Staff de ESTA tienda viendo su propia carta: el pedido se registra y no se manda a WhatsApp
+   * (D2). Anónimo, SuperAdmin/ReSeller y staff de otra tienda siguen con el flujo de siempre.
+   * Se calcula sobre `catalog.storeId` —el id real detrás del slug— y no sobre el slug.
+   */
+  const staffMode = isCatalogStoreStaff(user, catalog?.storeId);
 
   function addProductToCart(product: PublicCatalogProduct) {
     addToCart(storeSlug, {
@@ -202,6 +228,12 @@ export function PublicCatalogPage() {
   const logoUrl = toImageUrl(orderingConfig?.logoUrl);
   const bannerUrl = toImageUrl(orderingConfig?.bannerUrl);
 
+  // Showcase de la carta (carrusel + destacados). Los DOS conjuntos son independientes y
+  // opcionales (C1/C2): el backend los manda SIEMPRE, vacíos cuando la tienda no subió ninguna.
+  // El `?.` cubre además el config entero ausente (si el endpoint falla, esto queda `[]`).
+  const carouselImages = orderingConfig?.carouselImages ?? [];
+  const dailyImages = orderingConfig?.dailyImages ?? [];
+
   const total = page?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
@@ -234,6 +266,15 @@ export function PublicCatalogPage() {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Portada visual de la tienda: el carrusel va ENCIMA de la marca, porque es lo primero
+          que el cliente debería ver al abrir la carta. Con el array vacío no se pinta ni un
+          marco —la página es exactamente la de antes—. */}
+      {carouselImages.length > 0 && (
+        <div className="pt-4">
+          <CatalogCarousel images={carouselImages} storeName={catalog?.storeName ?? ''} />
+        </div>
+      )}
+
       {/* Marca (F8): el banner va sobre la cabecera (ancho completo, recortado para no comerse
           la carta) y el logo junto al nombre. Ninguno de los dos es obligatorio: sin marca, la
           cabecera es exactamente la que había. */}
@@ -310,6 +351,13 @@ export function PublicCatalogPage() {
       </header>
 
       <main className="mx-auto max-w-5xl px-4 py-6">
+        {/* Destacados: el bloque rotativo del dueño va PRIMERO en el cuerpo, antes de los
+            filtros, para que se lea como una vitrina y no como un filtro más. Con el array vacío
+            no hay ni caja ni título. */}
+        {dailyImages.length > 0 && (
+          <CatalogDaily images={dailyImages} storeName={catalog?.storeName ?? ''} />
+        )}
+
         {/* Buscador + filtro por categoría: el backend filtra y pagina. */}
         <div className="flex flex-wrap items-end gap-3">
           <form
@@ -396,6 +444,7 @@ export function PublicCatalogPage() {
             precio. `gap` también baja en móvil porque a media columna un `gap-4` se come la
             tarjeta. */}
         <ul
+          ref={gridRef}
           className="mt-4 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3"
           data-testid="catalog-grid"
         >
@@ -531,6 +580,11 @@ export function PublicCatalogPage() {
         )}
       </main>
 
+      {/* Atajo a los productos. Solo con la página lista y ALGO que ver: sin productos no hay
+          rejilla a la que bajar, y ofrecer un botón que no lleva a ninguna parte es peor que
+          no ofrecerlo. */}
+      {items.length > 0 && <CatalogSeeProducts targetRef={gridRef} />}
+
       {/* Detalle: descripción en texto plano (D9) + galería. */}
       <Modal
         open={detailOpen}
@@ -663,6 +717,7 @@ export function PublicCatalogPage() {
           storeSlug={storeSlug}
           config={orderingConfig}
           lines={cartLines}
+          staffMode={staffMode}
           onCreated={(order) => {
             clearCart(storeSlug);
             setCheckoutOpen(false);

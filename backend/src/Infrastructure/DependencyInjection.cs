@@ -97,6 +97,8 @@ namespace Infrastructure
             services.AddScoped<INotificationRepository, NotificationRepository>();
             // Pedidos online (pedidos-whatsapp-persistencia, F2). El POS NO pasa por aquí (D14).
             services.AddScoped<IStoreCatalogSettingsRepository, StoreCatalogSettingsRepository>();
+            // Showcase del catálogo público (carrusel e imágenes del día). También es catálogo, no POS.
+            services.AddScoped<IStoreCatalogImageRepository, StoreCatalogImageRepository>();
             services.AddScoped<IDeliveryDriverRepository, DeliveryDriverRepository>();
         }
     }
