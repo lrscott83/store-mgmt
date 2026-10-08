@@ -84,7 +84,13 @@ support files), ni el comportamiento del flujo normal del cliente anónimo.
 - [x] T3 — `public-catalog.tsx`: detectar staff de la tienda y pasar `staffMode`. **`useAuthStore` + `isCatalogStoreStaff(user, catalog?.storeId)`.**
 - [x] T4 — Claves i18n nuevas en `es.ts` (etiqueta y textos de registro). **`CHECKOUT.SUBMIT_STAFF` / `CHECKOUT.SUBMITTING_STAFF`.**
 - [x] T5 — Tests unitarios nuevos (helper; checkout en modo staff; cableado del catálogo). **Añadidos 6 casos a `public-catalog.test.tsx` (24→30); ninguna aserción existente borrada/debilitada.**
-- [ ] T6 — Checks (vitest focalizado + suite, typecheck, lint) + commit del work-unit. **Focalizado: 55/55 verde. Suite: 5316 passed / 0 failed. Lint 0. Typecheck: 68 errores PREEXISTENTES (idénticos en baseline con `git stash -u`; 67 en `.react-router/types/+routes.ts` generado + 1 en `decryption-failure-policy.ts:192`), ninguno en catálogo.**
+- [x] T6 — Checks (vitest focalizado + suite, typecheck, lint) + commit del work-unit. **Focalizado: 55/55 verde. Suite: 5316 passed / 0 failed. Lint 0. Typecheck: 68 errores PREEXISTENTES (idénticos en baseline con `git stash -u`; 67 en `.react-router/types/+routes.ts` generado + 1 en `decryption-failure-policy.ts:192`), ninguno en catálogo. Commit `c0ac78a1`.**
+
+## Decisión del owner (2026-10-08)
+
+- Tras 4 refusals del relay, el owner decidió **dejar la revisión nativa pendiente y seguir**.
+  La transacción `review-11c6fc814489e559` queda `reviewing` (intacta). El código está commiteado;
+  push/PR son decisión del owner bajo política ordinaria. **Nada más que hacer aquí.**
 
 ## Route plan (por tarea; presupuesto de líneas ~400 es advisory)
 
@@ -110,3 +116,18 @@ convencionales en `test` (rama actual). Push/PR = decisión del humano.
 ## Progress
 
 - 2026-10-08 — Doc creado. Decisiones D1–D3 cerradas con el owner. Implementación pendiente.
+- 2026-10-08 — **Implementación DONE y commiteada** en `c0ac78a1`
+  (`feat(catalog): registra pedidos del staff sin envio por WhatsApp`). 8 ficheros (3 nuevos +
+  4 modificados + este doc). Checks: focalizado 55/55 verde; suite 5316 passed/0 failed; lint 0;
+  typecheck con 68 errores **preexistentes** idénticos a baseline (ninguno en catálogo). Ningún
+  E2E/backend/Angular tocado.
+
+## Blocker de la revisión nativa (RDD) — 2026-10-08
+
+- Assessment: `risk=medium`, `review_due=true` (`slice_budget_reached`, 713 líneas). Consent
+  otorgado por el owner → transacción `review-11c6fc814489e559` (lente `review-reliability`).
+- El slot del reviewer devuelve **`opencode_review_transport_relay_refused (reason: output_refused)`**
+  en dos intentos exactos; el STATUS reofrece el mismo slot y **no** emite stop tipado. El contrato
+  de review prohíbe reintentar a ciegas / inventar comandos → **decisión humana pendiente**.
+- La transacción queda **intacta** (`state: reviewing`). El código ya está commiteado; la entrega
+  es decisión humana bajo política ordinaria.
