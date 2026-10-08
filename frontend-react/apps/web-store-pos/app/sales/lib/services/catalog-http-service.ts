@@ -249,6 +249,19 @@ export interface CatalogShowcaseImageUpload {
 }
 
 /**
+ * Una imagen del SHOWCASE ya publicada para el cliente final: el carrusel de cabecera o las
+ * imágenes del día. A diferencia de `CatalogShowcaseImage` (la vista del dueño, que habla en
+ * CLAVES y lleva `id`/`kind`/`orderIndex`), aquí viaja lo único que el catálogo necesita pintar:
+ * la ruta y el pie de foto.
+ */
+export interface PublicShowcaseImage {
+  /** Ruta RELATIVA del endpoint público de media (nunca una ruta del servidor). */
+  readonly url: string;
+  /** Pie de foto opcional: el dueño lo escribe al subir, y puede no ponerlo. */
+  readonly caption?: string | null;
+}
+
+/**
  * Configuración de pedidos que el catálogo público lee sin sesión
  * (`GET /v1/public/ordering/{storeSlug}/config`). Espejo de `PublicOrderingConfigDto`.
  *
@@ -267,6 +280,14 @@ export interface PublicOrderingConfig {
   paletteId: string;
   logoUrl?: string | null;
   bannerUrl?: string | null;
+  /**
+   * Carrusel de cabecera e imágenes del día, cada uno en orden de presentación y SIEMPRE
+   * presente aunque esté VACÍO (decisión C1: dos conjuntos independientes; una tienda recién
+   * sincronizada no tiene ninguno y eso NO es un 404). Al ser una lista vacía y no un campo
+   * ausente, quien lo pinte decide con `length` si lo muestra, sin tratar los dos casos distinto.
+   */
+  carouselImages: PublicShowcaseImage[];
+  dailyImages: PublicShowcaseImage[];
 }
 
 /**

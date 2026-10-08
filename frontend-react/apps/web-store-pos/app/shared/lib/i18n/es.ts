@@ -448,6 +448,21 @@ const messages: Record<string, string> = {
   // tenerlos), así que no hay ningún aviso para ese caso.
   'CATALOG_PUBLIC.LOGO_ALT': 'Logo de {store}',
   'CATALOG_PUBLIC.BANNER_ALT': 'Banner de {store}',
+  // ── SHOWCASE de la carta pública: carrusel de portada, botón "Ver productos" y destacados ──
+  // Todo esto es opcional (C2): sin imágenes el catálogo es exactamente el de siempre, así que
+  // no hay ningún texto de aviso para ese caso. El texto alternativo de una imagen del showcase es
+  // su propio pie de foto, y el de las flechas del carrusel NO puede reutilizar
+  // `PREVIOUS`/`NEXT` (los de la paginación): para un lector de pantalla "Anterior" no dice si
+  // cambia de producto o de imagen.
+  'CATALOG_PUBLIC.CAROUSEL_LABEL': 'Galería de la tienda',
+  'CATALOG_PUBLIC.CAROUSEL_ROLE': 'carrusel',
+  'CATALOG_PUBLIC.CAROUSEL_SLIDE_ROLE': 'diapositiva',
+  'CATALOG_PUBLIC.CAROUSEL_SLIDE': 'Imagen {index} de {total}',
+  'CATALOG_PUBLIC.CAROUSEL_PREVIOUS': 'Imagen anterior',
+  'CATALOG_PUBLIC.CAROUSEL_NEXT': 'Imagen siguiente',
+  'CATALOG_PUBLIC.CAROUSEL_DOT': 'Ir a la imagen {index}',
+  'CATALOG_PUBLIC.SEE_PRODUCTS': 'Ver Productos',
+  'CATALOG_PUBLIC.DAILY_TITLE': 'Destacados de hoy',
   // ── Carrito y pedido del cliente anónimo (F3) ─────────────────────────────────────────────
   // El carrito del STOREFRONT (`lizoft-catalog-cart`), no el del POS (`lizoft-cart`): el cliente
   // anónimo no tiene sesión ni tienda, así que sus claves no mezclan con las del vendedor.

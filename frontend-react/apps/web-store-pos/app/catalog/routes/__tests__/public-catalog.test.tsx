@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 import { useStorefrontCartStore } from '~/catalog/lib/storefront-cart-store';
@@ -8,6 +8,7 @@ import type {
   PublicCatalog,
   PublicCatalogProduct,
   PublicOrderingConfig,
+  PublicShowcaseImage,
 } from '~/sales/lib/services/catalog-http-service';
 
 // El slug cambia a mitad de la suite para probar el AISLAMIENTO por tienda del carrito del
@@ -93,6 +94,10 @@ const CONFIG_WITHOUT_BRAND: PublicOrderingConfig = {
   paletteId: 'default',
   logoUrl: null,
   bannerUrl: null,
+  // El showcase viaja SIEMPRE, y vacío es lo normal: una tienda recién sincronizada no ha
+  // subido ninguna imagen. Los dos conjuntos son independientes (decisión C1).
+  carouselImages: [],
+  dailyImages: [],
 };
 
 function renderPage() {
@@ -401,6 +406,217 @@ describe('PublicCatalogPage', () => {
       expect(await screen.findByTestId('catalog-card-cp1')).toBeInTheDocument();
       expect(screen.queryByTestId('catalog-cart-button')).not.toBeInTheDocument();
       expect(screen.queryByTestId('catalog-add-cp1')).not.toBeInTheDocument();
+    });
+  });
+
+  // ── SHOWCASE DE LA CARTA: carrusel de portada, botón "Ver productos" y destacados ────────
+  describe('showcase de la carta pública', () => {
+    const MEDIA = '/api/v1/public/catalog/mi-tienda/media/t/s/showcase';
+
+    const CAROUSEL: PublicShowcaseImage[] = [
+      { url: `${MEDIA}/a.jpg`, caption: 'Menú de la casa' },
+      // Sin pie de foto: la imagen se tiene que ver igual, y su texto alternativo cae al
+      // nombre de la tienda.
+      { url: `${MEDIA}/b.jpg`, caption: null },
+    ];
+
+    const DAILY: PublicShowcaseImage[] = [
+      { url: `${MEDIA}/d1.jpg`, caption: 'Plato del día' },
+      { url: `${MEDIA}/d2.jpg`, caption: null },
+    ];
+
+    const showcaseConfig = (config: {
+      carouselImages?: PublicShowcaseImage[];
+      dailyImages?: PublicShowcaseImage[];
+    }): PublicOrderingConfig => ({
+      ...CONFIG_WITHOUT_BRAND,
+      ...config,
+    });
+
+    let scrolledFrom: Element[] = [];
+    const originalScrollIntoView = Element.prototype.scrollIntoView;
+    const originalMatchMedia = window.matchMedia;
+
+    beforeEach(() => {
+      // jsdom NO implementa `scrollIntoView`: sin este sustituto el clic del botón flotante
+      // revienta con un TypeError y el test moriría por el motivo equivocado.
+      scrolledFrom = [];
+      Element.prototype.scrollIntoView = function recordScroll(this: Element) {
+        scrolledFrom.push(this);
+      };
+    });
+
+    afterEach(() => {
+      Element.prototype.scrollIntoView = originalScrollIntoView;
+      window.matchMedia = originalMatchMedia;
+      vi.useRealTimers();
+    });
+
+    it('con imágenes de carrusel pinta la portada con pie de foto y controles', async () => {
+      catalogMock.getPublicOrderingConfig.mockResolvedValue(
+        envelope(showcaseConfig({ carouselImages: CAROUSEL })),
+      );
+      renderPage();
+
+      const carousel = await screen.findByTestId('catalog-carousel');
+      // Las rutas del backend se resuelven contra el origen de la API (mismo origen aquí).
+      expect(within(carousel).getByTestId('catalog-carousel-image-0')).toHaveAttribute(
+        'src',
+        `${window.location.origin}${MEDIA}/a.jpg`,
+      );
+      expect(within(carousel).getByTestId('catalog-carousel-caption-0')).toHaveTextContent(
+        'Menú de la casa',
+      );
+      // Sin pie de foto no hay párrafo de caption, pero la imagen se sigue viendo.
+      expect(within(carousel).queryByTestId('catalog-carousel-caption-1')).not.toBeInTheDocument();
+      expect(within(carousel).getByTestId('catalog-carousel-image-1')).toBeInTheDocument();
+
+      // Un punto por imagen, y solo el primero marcado como actual.
+      expect(within(carousel).getByTestId('catalog-carousel-dot-0')).toHaveAttribute(
+        'aria-current',
+        'true',
+      );
+      expect(within(carousel).getByTestId('catalog-carousel-dot-1')).toHaveAttribute(
+        'aria-current',
+        'false',
+      );
+      // Las flechas se nombran por IMAGEN, no por página: para un lector de pantalla
+      // "Anterior" a secas no dice si cambia de producto o de foto.
+      expect(within(carousel).getByTestId('catalog-carousel-previous')).toHaveAttribute(
+        'aria-label',
+        'Imagen anterior',
+      );
+      expect(within(carousel).getByTestId('catalog-carousel-next')).toHaveAttribute(
+        'aria-label',
+        'Imagen siguiente',
+      );
+    });
+
+    it('el carrusel solo aparece con imágenes: con el conjunto vacío no hay ni un marco', async () => {
+      renderPage();
+
+      await screen.findByTestId('catalog-card-cp1');
+      expect(screen.queryByTestId('catalog-carousel')).not.toBeInTheDocument();
+    });
+
+    it('con imágenes del día pinta el bloque de destacados con sus pies de foto', async () => {
+      catalogMock.getPublicOrderingConfig.mockResolvedValue(
+        envelope(showcaseConfig({ dailyImages: DAILY })),
+      );
+      renderPage();
+
+      const daily = await screen.findByTestId('catalog-daily');
+      expect(within(daily).getByText('Destacados de hoy')).toBeInTheDocument();
+      expect(within(daily).getByTestId('catalog-daily-image-0')).toHaveAttribute(
+        'src',
+        `${window.location.origin}${MEDIA}/d1.jpg`,
+      );
+      expect(within(daily).getByTestId('catalog-daily-caption-0')).toHaveTextContent(
+        'Plato del día',
+      );
+      expect(within(daily).queryByTestId('catalog-daily-caption-1')).not.toBeInTheDocument();
+    });
+
+    it('el bloque de destacados solo aparece con imágenes', async () => {
+      renderPage();
+
+      await screen.findByTestId('catalog-card-cp1');
+      expect(screen.queryByTestId('catalog-daily')).not.toBeInTheDocument();
+    });
+
+    it('los dos conjuntos son independientes: el carrusel no implica los destacados', async () => {
+      catalogMock.getPublicOrderingConfig.mockResolvedValue(
+        envelope(showcaseConfig({ carouselImages: CAROUSEL })),
+      );
+      renderPage();
+
+      expect(await screen.findByTestId('catalog-carousel')).toBeInTheDocument();
+      expect(screen.queryByTestId('catalog-daily')).not.toBeInTheDocument();
+    });
+
+    it('sin ninguna imagen del showcase la carta es exactamente la de antes', async () => {
+      renderPage();
+
+      // Nada nuevo: ni portada ni vitrina, y el catálogo entero en su sitio.
+      expect(await screen.findByTestId('catalog-store-name')).toHaveTextContent('Moda Cubana');
+      await screen.findByTestId('catalog-card-cp1');
+      expect(screen.queryByTestId('catalog-carousel')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('catalog-daily')).not.toBeInTheDocument();
+      expect(screen.queryByText('Destacados de hoy')).not.toBeInTheDocument();
+      expect(screen.getByTestId('catalog-grid')).toBeInTheDocument();
+      expect(screen.getByTestId('catalog-category-select')).toBeInTheDocument();
+    });
+
+    it('el botón "Ver productos" baja a la rejilla con scroll suave', async () => {
+      renderPage();
+
+      const button = await screen.findByTestId('catalog-see-products');
+      expect(button).toHaveTextContent('Ver Productos');
+      // Por debajo de los modales (`z-50`): el carrito y el checkout se abren encima, así que
+      // este botón nunca queda encima de sus controles.
+      expect(button.parentElement?.className).toContain('z-30');
+
+      fireEvent.click(button);
+
+      // Y baja a la REJILLA, no al principio de la página: el `this` del espía lo dice.
+      expect(scrolledFrom).toHaveLength(1);
+      expect(scrolledFrom[0]).toBe(screen.getByTestId('catalog-grid'));
+    });
+
+    it('el halo de atención del botón se apaga con movimiento reducido', async () => {
+      renderPage();
+
+      const button = await screen.findByTestId('catalog-see-products');
+      const halo = button.querySelector('span[aria-hidden="true"]');
+      expect(halo?.className).toContain('animate-ping');
+      expect(halo?.className).toContain('motion-reduce:animate-none');
+    });
+
+    it('el carrusel avanza solo, y con movimiento reducido se queda quieto', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      catalogMock.getPublicOrderingConfig.mockResolvedValue(
+        envelope(showcaseConfig({ carouselImages: CAROUSEL })),
+      );
+      renderPage();
+
+      await screen.findByTestId('catalog-carousel');
+      expect(screen.getByTestId('catalog-carousel-dot-0')).toHaveAttribute('aria-current', 'true');
+
+      // Tres segundos no mueven nada; el intervalo del carrusel es de 5 s.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(3000);
+      });
+      expect(screen.getByTestId('catalog-carousel-dot-0')).toHaveAttribute('aria-current', 'true');
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2500);
+      });
+      expect(screen.getByTestId('catalog-carousel-dot-1')).toHaveAttribute('aria-current', 'true');
+    });
+
+    it('con prefers-reduced-motion no hay auto-avance, pero las flechas siguen', async () => {
+      window.matchMedia = vi.fn().mockReturnValue({
+        matches: true,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      }) as unknown as typeof window.matchMedia;
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      catalogMock.getPublicOrderingConfig.mockResolvedValue(
+        envelope(showcaseConfig({ carouselImages: CAROUSEL })),
+      );
+      renderPage();
+
+      await screen.findByTestId('catalog-carousel');
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(20000);
+      });
+      expect(screen.getByTestId('catalog-carousel-dot-0')).toHaveAttribute('aria-current', 'true');
+
+      // Reducido no significa inaccesible: la navegación manual sigue ahí.
+      fireEvent.click(screen.getByTestId('catalog-carousel-next'));
+      expect(screen.getByTestId('catalog-carousel-dot-1')).toHaveAttribute('aria-current', 'true');
+      fireEvent.click(screen.getByTestId('catalog-carousel-previous'));
+      expect(screen.getByTestId('catalog-carousel-dot-0')).toHaveAttribute('aria-current', 'true');
     });
   });
 

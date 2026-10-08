@@ -43,6 +43,9 @@ const CONFIG: PublicOrderingConfig = {
   paletteId: 'default',
   logoUrl: null,
   bannerUrl: null,
+  // El showcase viaja siempre; el checkout no lo usa, pero el config es uno solo.
+  carouselImages: [],
+  dailyImages: [],
 };
 
 const LINE: StorefrontCartLine = {
