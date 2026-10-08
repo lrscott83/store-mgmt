@@ -220,7 +220,10 @@ describe('NotificationShell — browser notification permission', () => {
 
     await waitFor(() => expect(shownNotifications).toHaveLength(1));
     const shown = shownNotifications[0] as { title: string; options?: NotificationOptions };
-    expect(shown.title).toBe('Nuevo propietario registrado');
+    // El título es neutro a propósito: la misma fila se emite en el registro de owner
+    // y en la creación de una tienda por un owner ya existente, así que no puede
+    // decir "Nuevo propietario registrado" (ver odd/tasks/store-creation-notification-and-sound.md).
+    expect(shown.title).toBe('Nueva tienda registrada');
     expect(shown.options?.body).toContain('Ana Gómez');
     expect(shown.options?.body).toContain('+5491122334455');
     expect(shown.options?.body).toContain('Ferretería del Sur');

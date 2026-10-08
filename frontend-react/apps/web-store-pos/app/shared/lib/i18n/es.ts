@@ -1846,8 +1846,22 @@ const messages: Record<string, string> = {
   'NOTIFICATIONS.MARK_ALL': 'Marcar todas como leídas',
   'NOTIFICATIONS.LOAD_ERROR': 'No se pudieron cargar las notificaciones. Intente de nuevo.',
   'NOTIFICATIONS.MARK_ERROR': 'No se pudo actualizar la notificación. Intente de nuevo.',
-  'NOTIFICATIONS.SYSTEM_TITLE': 'Nuevo propietario registrado',
+  // Deliberadamente neutro: la misma fila Notification ahora se emite en DOS eventos —
+  // el registro de un owner (flujo original) y la creación de una tienda por un owner
+  // ya existente (POST /v1/stores). Un título que dijera "Nuevo propietario registrado"
+  // mentía en el segundo caso. El body ya lleva nombre · teléfono · tienda, así que el
+  // título no necesita distinguir. Distinguir de verdad exigiría una columna Kind y una
+  // migración; no está justificado por el beneficio.
+  'NOTIFICATIONS.SYSTEM_TITLE': 'Nueva tienda registrada',
   'NOTIFICATIONS.SYSTEM_BODY': '{ownerName} · {cellPhone} · {storeName}',
+  // Recuperación de un permiso bloqueado: el navegador no vuelve a preguntar solo, así
+  // que la campana ofrece la única salida visible. Solo aparece con permiso 'denied'.
+  'NOTIFICATIONS.PERMISSION_DENIED':
+    'Las notificaciones del navegador están bloqueadas para este sitio.',
+  'NOTIFICATIONS.PERMISSION_RETRY': 'Volver a pedir permiso',
+  'NOTIFICATIONS.PERMISSION_RESTORED': 'Se activaron las notificaciones del navegador.',
+  'NOTIFICATIONS.PERMISSION_STILL_DENIED':
+    'El navegador sigue bloqueando las notificaciones. Habilítelas en los ajustes del sitio.',
 };
 
 export default messages;
