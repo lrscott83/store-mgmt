@@ -120,19 +120,19 @@ Ambas listas ordenadas y **vacías** si no hay imágenes. Las URLs se construyen
 
 ## Tareas
 
-- [ ] **T1** — Entidad `StoreCatalogImage` + enum `StoreCatalogImageKind` + config EF + `DbSet`.
-- [ ] **T2** — `ICatalogImageStorage.SaveCatalogImageAsync` + impl.
-- [ ] **T3** — `GetStoreCatalogImagesQuery`.
-- [ ] **T4** — `AddStoreCatalogImageCommand` (+validator) y `RemoveStoreCatalogImageCommand`.
-- [ ] **T5** — `ReorderStoreCatalogImagesCommand`.
-- [ ] **T6** — `CatalogShowcaseController` (`[HasPermission(WebCatalogAdmin)]`).
-- [ ] **T7** — Exponer `carouselImages`/`dailyImages` en el config público.
-- [ ] **T8** — Migración EF + script generado (tabla nueva).
-- [ ] **T9** — Config UI: dos secciones en Catálogo Web.
-- [ ] **T10** — Público: carrusel + botón flotante + bloque del día.
-- [ ] **T11** — i18n.
-- [ ] **T12** — Tests unitarios (backend + React).
-- [ ] **T13** — Verificación.
+- [x] **T1** — Entidad `StoreCatalogImage` + enum `StoreCatalogImageKind` + config EF + `DbSet`.
+- [x] **T2** — `ICatalogImageStorage.SaveCatalogImageAsync` + impl.
+- [x] **T3** — `GetStoreCatalogImagesQuery`.
+- [x] **T4** — `AddStoreCatalogImageCommand` (+validator) y `RemoveStoreCatalogImageCommand`.
+- [x] **T5** — `ReorderStoreCatalogImagesCommand`.
+- [x] **T6** — `CatalogShowcaseController` (`[HasPermission(WebCatalogAdmin)]`).
+- [x] **T7** — Exponer `carouselImages`/`dailyImages` en el config público.
+- [x] **T8** — Migración EF + script generado (tabla nueva).
+- [x] **T9** — Config UI: dos secciones en Catálogo Web.
+- [x] **T10** — Público: carrusel + botón flotante + bloque del día.
+- [x] **T11** — i18n.
+- [x] **T12** — Tests unitarios (backend + React).
+- [x] **T13** — Verificación.
 
 ## Criterios de aceptación
 
@@ -169,6 +169,46 @@ pnpm vitest run app/catalog/ app/sales/routes/__tests__/
 Implementar en slices: **backend** (entidad+comandos+controller+público), **migración+script**,
 **config UI**, **público UI**.
 
+## Resultado
+
+Implementado en **4 slices** (rama `feat/catalogo-publico-carrusel-dia`, sobre `dev`):
+
+| Commit | Contenido |
+| --- | --- |
+| `a3833e62` | Entidad `StoreCatalogImage` + enum + config EF + **migración EF + script 30** |
+| `decd847e` | Repositorio, `SaveCatalogImageAsync`, comandos/queries, `CatalogShowcaseController` y exposición pública (`carouselImages`/`dailyImages`) |
+| `4708e53e` | **Fix** del binding multipart del POST (`[FromForm]`) — CRITICAL detectado por la revisión y corregido |
+| `4036affb` | UI admin: secciones **Carrusel** e **Imágenes del día** en la vista Catálogo Web |
+| `d346ab92` | UI pública: **carrusel**, botón flotante **"Ver Productos"** y bloque de **imágenes del día** |
+
+## Evidencia de verificación
+
+| Comando | Resultado |
+| --- | --- |
+| `dotnet build` | 0 errores |
+| `dotnet test Application.Tests` | **991 passed** |
+| `dotnet test Domain.UnitTests` | 154 passed |
+| `turbo typecheck` / `lint` | 0 errores |
+| `vitest app/catalog/` | **79 passed** (34 public-catalog) |
+| `vitest web-catalog.test.tsx` | **41 passed** |
+| E2E | No se corrió (excluido) |
+
+## Revisión nativa (RDD)
+
+Los 4 slices pasaron por la revisión nativa. Incidencias:
+- El primer candidato del backend (combinado) excedía el **lens budget**; se reparticionó en entidad+migración / comandos+público.
+- El reviewer marcó **CRITICAL** que la entidad se añadía **sin migración** (artefacto de la repartición) → se incluyó la migración en el slice de la entidad.
+- El reviewer detectó un **CRITICAL real**: el POST multipart no bindeaba `kind`/`caption` del form (faltaba `[FromForm]`) → **corregido y validado** (`4708e53e`).
+
+Hallazgos **advisory** (no bloqueantes):
+
+- [ ] **SC-R1** — La subida escribe el archivo **antes** de persistir la fila: si `SaveChanges` falla, queda archivo huérfano. Y el borrado quita la fila antes del archivo (fallo no idempotente). Destino: seguimiento.
+- [ ] **SC-R2** — La regla `Content NotNull` del validador es inalcanzable (el controller coacciona a `Stream.Null`). Destino: limpieza.
+- [ ] **SC-R3** — El config público no filtra por `IsActive` (latente; nada lo apaga hoy). Destino: endurecer.
+- [ ] **SC-R4** — UI: el input file no se resetea (re-seleccionar el mismo archivo no dispara cambio); ramas de fallo parcial/red sin test; el test del halo con reduced-motion comprueba clases CSS, no comportamiento.
+- [ ] **SC-R5** — Tests del carrusel: pausa por hover/focus y el caso de **una sola imagen** sin cubrir.
+
 ## Progreso
 
 - 2026-10-07 — Feature creado. Decisiones C1–C4 del owner. Sin implementación.
+- 2026-10-08 — **Implementado** en 4 slices, todos **revisados y aprobados/acknowledgeados**. Un CRITICAL real (binding multipart) corregido vía el circuito de corrección + validador. UI admin y pública completas. Push = decisión del owner.
