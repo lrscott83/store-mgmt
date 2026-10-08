@@ -337,6 +337,34 @@ const messages: Record<string, string> = {
   'WEB_CATALOG.BRAND_SAVE_ERROR': 'No se pudo guardar la marca',
   'WEB_CATALOG.BRAND_LOAD_ERROR': 'No se pudo cargar la marca',
 
+  // Showcase del catálogo (carrusel + imágenes del día): DOS CONJUNTOS INDEPENDIENTES (decisión
+  // C1 del owner, 2026-10-07). Cada uno se configura, se ordena y se limpia por su cuenta, y
+  // ninguno toca el guardado por lotes de productos.
+  'WEB_CATALOG.SHOWCASE_CAROUSEL_TITLE': 'Carrusel',
+  'WEB_CATALOG.SHOWCASE_CAROUSEL_SUBTITLE':
+    'Las imágenes que se van pasando en la cabecera de tu catálogo público.',
+  'WEB_CATALOG.SHOWCASE_DAILY_TITLE': 'Imágenes del día',
+  'WEB_CATALOG.SHOWCASE_DAILY_SUBTITLE':
+    'El bloque de destacadas que aparece en tu catálogo con las imágenes que subas aquí.',
+  'WEB_CATALOG.SHOWCASE_LIMIT': 'Hasta {max} imágenes por conjunto.',
+  'WEB_CATALOG.SHOWCASE_EMPTY': 'Sin imágenes en este conjunto',
+  'WEB_CATALOG.SHOWCASE_SELECT_FILES': 'Elegir imágenes',
+  'WEB_CATALOG.SHOWCASE_PENDING_COUNT': '{count} imágenes por subir',
+  'WEB_CATALOG.SHOWCASE_CAPTION': 'Pie de foto (opcional)',
+  'WEB_CATALOG.SHOWCASE_CAPTION_HINT':
+    'Se aplica a las imágenes que subas ahora. Para cambiarlo, quita la imagen y vuélvela a subir.',
+  'WEB_CATALOG.SHOWCASE_UPLOAD': 'Subir imágenes',
+  'WEB_CATALOG.SHOWCASE_UPLOADED': 'Se subieron {count} imágenes al catálogo',
+  'WEB_CATALOG.SHOWCASE_UPLOADED_ONE': 'Se subió 1 imagen al catálogo',
+  'WEB_CATALOG.SHOWCASE_UPLOAD_PARTIAL':
+    'Se subieron {uploaded} de {total}. No se pudieron subir las demás: inténtalo de nuevo.',
+  'WEB_CATALOG.SHOWCASE_REMOVED': 'Imagen quitada del catálogo',
+  'WEB_CATALOG.SHOWCASE_MOVE_UP': 'Subir en la lista',
+  'WEB_CATALOG.SHOWCASE_MOVE_DOWN': 'Bajar en la lista',
+  'WEB_CATALOG.SHOWCASE_REMOVE': 'Quitar imagen',
+  'WEB_CATALOG.SHOWCASE_LOAD_ERROR': 'No se pudieron cargar las imágenes del catálogo',
+  'WEB_CATALOG.SHOWCASE_SAVE_ERROR': 'No se pudo guardar el cambio en las imágenes del catálogo',
+
   // Pedidos WhatsApp (módulo 18, F1): configuración del pedido online. Sin moneda — el precio
   // y la moneda los pone el catálogo (A3 eliminada).
   'ORDERING_SETTINGS.TITLE': 'Pedidos WhatsApp',
