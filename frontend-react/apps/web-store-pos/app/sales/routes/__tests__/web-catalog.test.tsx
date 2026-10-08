@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import { EModules } from '@store-mgmt/domain';
 import type { UserModel } from '@store-mgmt/domain';
@@ -7,6 +7,8 @@ import esMessages from '~/shared/lib/i18n/es';
 import type {
   CatalogBranding,
   CatalogProductView,
+  CatalogShowcaseImage,
+  CatalogShowcaseImages,
   CatalogStatus,
 } from '~/sales/lib/services/catalog-http-service';
 
@@ -54,11 +56,21 @@ const catalogMock = vi.hoisted(() => ({
   mediaUrl: vi.fn((slug: string, key: string) => `/media/${slug}/${key}`),
   getBranding: vi.fn(),
   updateBranding: vi.fn(),
+  getShowcaseImages: vi.fn(),
+  uploadShowcaseImage: vi.fn(),
+  removeShowcaseImage: vi.fn(),
+  reorderShowcaseImages: vi.fn(),
 }));
 
-vi.mock('~/sales/lib/services/catalog-http-service', () => ({
-  catalogHttpService: catalogMock,
-}));
+// El módulo se sustituye ENTERO, pero no sus exports que no son el servicio: la vista consume el
+// enum `CatalogShowcaseKind` por VALOR y lo necesita de aquí. Mismo patrón que el resto de pruebas
+// del catálogo (`public-catalog.test.tsx`, `storefront-flow.test.tsx`).
+vi.mock('~/sales/lib/services/catalog-http-service', async () => {
+  const actual = await vi.importActual<
+    typeof import('~/sales/lib/services/catalog-http-service')
+  >('~/sales/lib/services/catalog-http-service');
+  return { ...actual, catalogHttpService: { ...actual.catalogHttpService, ...catalogMock } };
+});
 
 const showBlockingErrorMock = vi.hoisted(() => vi.fn());
 vi.mock('~/shared/lib/blocking-alert', () => ({
@@ -130,10 +142,76 @@ const BRAND_WITH_BANNER_ONLY: CatalogBranding = {
   logoKey: null,
 };
 
+/** Los DOS conjuntos con una imagen cada uno: sirven para comprobar que NO se mezclan. */
+const SHOWCASE: CatalogShowcaseImages = {
+  carousel: [
+    {
+      id: 'car-1',
+      kind: 0,
+      key: 't/s/showcase/carousel/uno.png',
+      orderIndex: 0,
+      caption: 'Portada',
+      isActive: true,
+    },
+    {
+      id: 'car-2',
+      kind: 0,
+      key: 't/s/showcase/carousel/dos.png',
+      orderIndex: 1,
+      caption: null,
+      isActive: true,
+    },
+  ],
+  daily: [
+    {
+      id: 'day-1',
+      kind: 1,
+      key: 't/s/showcase/daily/plato.jpg',
+      orderIndex: 0,
+      caption: 'Plato del día',
+      isActive: true,
+    },
+  ],
+};
+
+/** Tienda recién sincronizada: los dos conjuntos vacíos, que NO es un 404. */
+const SHOWCASE_EMPTY: CatalogShowcaseImages = { carousel: [], daily: [] };
+
 /** Adjunta un archivo a un `<input type="file">` y dispara el cambio, como haría el diálogo. */
 function selectFile(input: HTMLElement, file: File) {
   Object.defineProperty(input, 'files', { value: [file], configurable: true });
   fireEvent.change(input);
+}
+
+/** Igual que `selectFile` pero para el input MULTI del showcase: una lista de archivos. */
+function selectFiles(input: HTMLElement, files: File[]) {
+  Object.defineProperty(input, 'files', { value: files, configurable: true });
+  fireEvent.change(input);
+}
+
+/**
+ * Aplica a un conjunto el orden final que envió el cliente, como hace el backend al reordenar
+ * (reescribe el índice de TODAS). Sirve para que el mock de la lista devuelva el estado real
+ * después de un PUT y no el de antes.
+ */
+function reorderShowcase(
+  images: CatalogShowcaseImage[],
+  orderedIds: string[],
+): CatalogShowcaseImage[] {
+  const byId = new Map(images.map((image) => [image.id, image]));
+  return orderedIds
+    .map((id, index) => {
+      const image = byId.get(id);
+      return image ? { ...image, orderIndex: index } : null;
+    })
+    .filter((image): image is CatalogShowcaseImage => image !== null);
+}
+
+/** Los ids de las imágenes del carrusel EN EL ORDEN EN QUE SE PINTAN. */
+function visibleCarouselIds(): (string | undefined)[] {
+  return within(screen.getByTestId('showcase-carousel-images'))
+    .getAllByTestId(/^showcase-image-/)
+    .map((image) => image.getAttribute('data-testid')?.replace('showcase-image-', ''));
 }
 
 function makeUser(overrides: Partial<UserModel> = {}): UserModel {
@@ -180,6 +258,10 @@ describe('WebCatalogPage (vista Catálogo Web)', () => {
     catalogMock.saveProductFields.mockResolvedValue(envelope(true));
     catalogMock.getBranding.mockResolvedValue(envelope(BRAND_WITHOUT_MEDIA));
     catalogMock.updateBranding.mockResolvedValue(envelope(BRAND_WITHOUT_MEDIA));
+    catalogMock.getShowcaseImages.mockResolvedValue(envelope(SHOWCASE_EMPTY));
+    catalogMock.uploadShowcaseImage.mockResolvedValue(envelope(SHOWCASE.carousel[0]));
+    catalogMock.removeShowcaseImage.mockResolvedValue(envelope(true));
+    catalogMock.reorderShowcaseImages.mockResolvedValue(envelope(true));
     catalogMock.sync.mockResolvedValue(
       envelope({
         storeSlug: 'mi-tienda',
@@ -725,6 +807,239 @@ describe('WebCatalogPage (vista Catálogo Web)', () => {
         'No se pudo cargar la marca',
       );
       // La vista no se cae: productos, panels y guardado por lotes siguen ahí.
+      fireEvent.click(await screen.findByTestId(`catalog-category-toggle-${PRODUCT.categoryId}`));
+      expect(screen.getByTestId(`catalog-product-${PRODUCT.id}`)).toBeInTheDocument();
+    });
+  });
+
+  // ── SHOWCASE: carrusel e imágenes del día ─────────────────────────────────────────
+  // Los dos conjuntos son INDEPENDIENTES (decisión C1): cada uno sube, ordena y quita por su
+  // cuenta, y ninguno pasa por el guardado por lotes de productos.
+  describe('showcase del catálogo (carrusel e imágenes del día)', () => {
+    it('carga los dos conjuntos al montar y previsualiza cada imagen por el endpoint de media', async () => {
+      catalogMock.getShowcaseImages.mockResolvedValue(envelope(SHOWCASE));
+      renderPage();
+
+      expect(catalogMock.getShowcaseImages).toHaveBeenCalledTimes(1);
+
+      // Cada conjunto muestra SOLO sus imágenes, por la ruta del endpoint público de media.
+      expect(await screen.findByTestId('showcase-image-car-1')).toHaveAttribute(
+        'src',
+        `${window.location.origin}/api/v1/public/catalog/mi-tienda/media/t/s/showcase/carousel/uno.png`,
+      );
+      expect(screen.getByTestId('showcase-image-car-2')).toHaveAttribute(
+        'src',
+        `${window.location.origin}/api/v1/public/catalog/mi-tienda/media/t/s/showcase/carousel/dos.png`,
+      );
+      expect(screen.getByTestId('showcase-image-day-1')).toHaveAttribute(
+        'src',
+        `${window.location.origin}/api/v1/public/catalog/mi-tienda/media/t/s/showcase/daily/plato.jpg`,
+      );
+      // La imagen del día no aparece en el bloque del carrusel, ni al revés.
+      expect(screen.getByTestId('showcase-carousel-upload')).toBeInTheDocument();
+      expect(screen.getByTestId('showcase-daily-upload')).toBeInTheDocument();
+      expect(screen.getAllByTestId(/^showcase-image-/)).toHaveLength(3);
+    });
+
+    it('una tienda sin imágenes muestra los dos bloques vacíos, no un error', async () => {
+      renderPage();
+
+      expect(await screen.findByTestId('showcase-carousel-upload')).toBeInTheDocument();
+      expect(screen.getByTestId('showcase-daily-upload')).toBeInTheDocument();
+      expect(screen.getAllByText('Sin imágenes en este conjunto')).toHaveLength(2);
+      // Sin selección no hay nada que subir: el botón ni siquiera se puede pulsar.
+      expect(screen.getByTestId('showcase-carousel-save')).toBeDisabled();
+      expect(catalogMock.uploadShowcaseImage).not.toHaveBeenCalled();
+    });
+
+    it('elegir archivos solo los retiene: la subida ocurre al pulsar Subir imágenes', async () => {
+      renderPage();
+
+      const first = new File(['x'], 'uno.jpg', { type: 'image/jpeg' });
+      const second = new File(['x'], 'dos.jpg', { type: 'image/jpeg' });
+      selectFiles(await screen.findByTestId('showcase-carousel-upload'), [first, second]);
+
+      // Elegir NO toca la red: el upload es un POST por imagen y va con su propio botón.
+      expect(catalogMock.uploadShowcaseImage).not.toHaveBeenCalled();
+      expect(screen.getByTestId('showcase-carousel-pending')).toHaveTextContent(
+        '2 imágenes por subir',
+      );
+      expect(screen.getByTestId('showcase-carousel-save')).not.toBeDisabled();
+
+      fireEvent.click(screen.getByTestId('showcase-carousel-save'));
+
+      // Un POST por archivo, y el conjunto viaja en CADA payload (0 = carrusel).
+      await waitFor(() => expect(catalogMock.uploadShowcaseImage).toHaveBeenCalledTimes(2));
+      expect(catalogMock.uploadShowcaseImage).toHaveBeenNthCalledWith(1, {
+        kind: 0,
+        file: first,
+      });
+      expect(catalogMock.uploadShowcaseImage).toHaveBeenNthCalledWith(2, {
+        kind: 0,
+        file: second,
+      });
+      await waitFor(() =>
+        expect(showToastSuccessMock).toHaveBeenCalledWith('Se subieron 2 imágenes al catálogo'),
+      );
+      // Subido todo, no queda nada retenido y la lista se recarga desde el servidor.
+      await waitFor(() =>
+        expect(screen.queryByTestId('showcase-carousel-pending')).not.toBeInTheDocument(),
+      );
+      expect(catalogMock.getShowcaseImages).toHaveBeenCalledTimes(2);
+    });
+
+    it('el pie de foto viaja con la imagen y solo si el dueño lo escribió', async () => {
+      renderPage();
+
+      const conPie = new File(['x'], 'con-pie.jpg', { type: 'image/jpeg' });
+      selectFiles(await screen.findByTestId('showcase-daily-upload'), [conPie]);
+      fireEvent.change(screen.getByTestId('showcase-daily-caption'), {
+        target: { value: 'Pasta del día' },
+      });
+      fireEvent.click(screen.getByTestId('showcase-daily-save'));
+
+      // El conjunto del día es OTRO (1) y el pie viaja en el mismo POST: no hay endpoint para
+      // cambiarlo después, así que se manda con el alta.
+      await waitFor(() =>
+        expect(catalogMock.uploadShowcaseImage).toHaveBeenCalledWith({
+          kind: 1,
+          file: conPie,
+          caption: 'Pasta del día',
+        }),
+      );
+
+      // Sin pie no se manda la clave: vacío y ausente no son lo mismo para el comando.
+      const sinPie = new File(['x'], 'sin-pie.jpg', { type: 'image/jpeg' });
+      selectFiles(screen.getByTestId('showcase-daily-upload'), [sinPie]);
+      fireEvent.click(screen.getByTestId('showcase-daily-save'));
+      await waitFor(() => expect(catalogMock.uploadShowcaseImage).toHaveBeenCalledTimes(2));
+      expect(catalogMock.uploadShowcaseImage).toHaveBeenLastCalledWith({
+        kind: 1,
+        file: sinPie,
+      });
+    });
+
+    it('subir al carrusel no toca el conjunto del día', async () => {
+      renderPage();
+
+      const file = new File(['x'], 'portada.jpg', { type: 'image/jpeg' });
+      selectFiles(await screen.findByTestId('showcase-carousel-upload'), [file]);
+      fireEvent.click(screen.getByTestId('showcase-carousel-save'));
+
+      await waitFor(() => expect(catalogMock.uploadShowcaseImage).toHaveBeenCalledTimes(1));
+      expect(catalogMock.uploadShowcaseImage).toHaveBeenCalledWith(expect.objectContaining({ kind: 0 }));
+      expect(catalogMock.uploadShowcaseImage).not.toHaveBeenCalledWith(
+        expect.objectContaining({ kind: 1 }),
+      );
+      // El pie de foto del día es suyo: el carrusel no lo tocó.
+      expect(screen.getByTestId('showcase-daily-caption')).toHaveValue('');
+    });
+
+    it('mover una imagen envía el orden final COMPLETO de su conjunto', async () => {
+      // El servidor es el dueño del orden: tras el PUT devuelve la lista ya reordenada, así que
+      // el segundo movimiento parte del resultado del primero y no del estado inicial.
+      let state = SHOWCASE;
+      catalogMock.getShowcaseImages.mockImplementation(async () => envelope(state));
+      catalogMock.reorderShowcaseImages.mockImplementation(async (kind: number, ids: string[]) => {
+        const set = kind === 0 ? state.carousel : state.daily;
+        state = { ...state, [kind === 0 ? 'carousel' : 'daily']: reorderShowcase(set, ids) };
+        return envelope(true);
+      });
+      renderPage();
+
+      // La segunda del carrusel sube: el backend reescribe el índice de TODAS, no solo el suyo.
+      fireEvent.click(await screen.findByTestId('showcase-move-up-car-2'));
+
+      await waitFor(() => expect(catalogMock.reorderShowcaseImages).toHaveBeenCalledTimes(1));
+      expect(catalogMock.reorderShowcaseImages).toHaveBeenCalledWith(0, ['car-2', 'car-1']);
+      // La imagen del día no se menciona: el reordenado es POR conjunto.
+      expect(catalogMock.reorderShowcaseImages).not.toHaveBeenCalledWith(1, expect.anything());
+      await waitFor(() => expect(visibleCarouselIds()).toEqual(['car-2', 'car-1']));
+
+      fireEvent.click(screen.getByTestId('showcase-move-down-car-2'));
+      await waitFor(() => expect(catalogMock.reorderShowcaseImages).toHaveBeenCalledTimes(2));
+      expect(catalogMock.reorderShowcaseImages).toHaveBeenLastCalledWith(0, ['car-1', 'car-2']);
+      await waitFor(() => expect(visibleCarouselIds()).toEqual(['car-1', 'car-2']));
+    });
+
+    it('las flechas de los extremos no envían nada', async () => {
+      catalogMock.getShowcaseImages.mockResolvedValue(envelope(SHOWCASE));
+      renderPage();
+
+      // La primera no puede subir y la única del día no puede bajar: no hay con qué cambiar.
+      expect(await screen.findByTestId('showcase-move-up-car-1')).toBeDisabled();
+      expect(screen.getByTestId('showcase-move-down-day-1')).toBeDisabled();
+
+      fireEvent.click(screen.getByTestId('showcase-move-up-car-1'));
+      fireEvent.click(screen.getByTestId('showcase-move-down-day-1'));
+      expect(catalogMock.reorderShowcaseImages).not.toHaveBeenCalled();
+    });
+
+    it('quitar una imagen la borra del servidor y recarga la lista', async () => {
+      catalogMock.getShowcaseImages.mockResolvedValue(envelope(SHOWCASE));
+      renderPage();
+
+      fireEvent.click(await screen.findByTestId('showcase-remove-car-2'));
+
+      await waitFor(() => expect(catalogMock.removeShowcaseImage).toHaveBeenCalledWith('car-2'));
+      await waitFor(() =>
+        expect(showToastSuccessMock).toHaveBeenCalledWith('Imagen quitada del catálogo'),
+      );
+      expect(catalogMock.getShowcaseImages).toHaveBeenCalledTimes(2);
+    });
+
+    it('el showcase NO toca el guardado por lotes de productos ni al revés', async () => {
+      catalogMock.getShowcaseImages.mockResolvedValue(envelope(SHOWCASE));
+      renderPage();
+
+      // Editar un producto y subir una imagen del carrusel a la vez: cada botón llama a SU
+      // endpoint y ninguno arrastra al otro.
+      fireEvent.click(await screen.findByTestId(`catalog-category-toggle-${PRODUCT.categoryId}`));
+      fireEvent.change(await screen.findByTestId(`catalog-description-${PRODUCT.id}`), {
+        target: { value: 'Camisa de algodón' },
+      });
+      selectFiles(await screen.findByTestId('showcase-carousel-upload'), [
+        new File(['x'], 'nueva.jpg', { type: 'image/jpeg' }),
+      ]);
+      fireEvent.click(screen.getByTestId('showcase-carousel-save'));
+
+      await waitFor(() => expect(catalogMock.uploadShowcaseImage).toHaveBeenCalledTimes(1));
+      expect(catalogMock.saveProductFields).not.toHaveBeenCalled();
+      expect(screen.getByTestId('catalog-pending-summary')).toHaveTextContent(
+        '1 producto con cambios sin guardar',
+      );
+
+      fireEvent.click(screen.getByTestId('catalog-save-all-button'));
+      await waitFor(() => expect(catalogMock.saveProductFields).toHaveBeenCalledTimes(1));
+      // Guardar el producto no volvió a escribir el showcase.
+      expect(catalogMock.uploadShowcaseImage).toHaveBeenCalledTimes(1);
+    });
+
+    it('un archivo que no es imagen no se retiene: avisa y no sube', async () => {
+      renderPage();
+
+      selectFiles(await screen.findByTestId('showcase-carousel-upload'), [
+        new File(['hola'], 'notas.txt', { type: 'text/plain' }),
+      ]);
+
+      // Misma validación local que la imagen de producto (formatos + tamaño).
+      expect(
+        await screen.findByText(/Solo imágenes jpg, png o webp de hasta 2 MB\./),
+      ).toBeInTheDocument();
+      expect(catalogMock.uploadShowcaseImage).not.toHaveBeenCalled();
+      expect(screen.queryByTestId('showcase-carousel-pending')).not.toBeInTheDocument();
+      expect(screen.getByTestId('showcase-carousel-save')).toBeDisabled();
+    });
+
+    it('si el showcase no carga, el catálogo y sus productos siguen utilizables', async () => {
+      catalogMock.getShowcaseImages.mockRejectedValue({ response: { status: 403 } });
+      renderPage();
+
+      // El error se nombra en los dos bloques y la vista no se cae.
+      expect(await screen.findAllByTestId(/^showcase-(carousel|daily)-error$/)).toHaveLength(2);
+      expect(screen.getByTestId('showcase-carousel-error')).toHaveTextContent(
+        'No se pudieron cargar las imágenes del catálogo',
+      );
       fireEvent.click(await screen.findByTestId(`catalog-category-toggle-${PRODUCT.categoryId}`));
       expect(screen.getByTestId(`catalog-product-${PRODUCT.id}`)).toBeInTheDocument();
     });

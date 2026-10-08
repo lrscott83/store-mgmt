@@ -336,6 +336,24 @@
   <data name="BrandingUploadAndRemoveConflict" xml:space="preserve">
     <value>No se puede subir y quitar {0} en la misma petición</value>
   </data>
+  <data name="ShowcaseImageKindInvalid" xml:space="preserve">
+    <value>El tipo de imagen {0} no es válido</value>
+  </data>
+  <data name="ShowcaseImageRequired" xml:space="preserve">
+    <value>Hay que enviar el archivo de la imagen</value>
+  </data>
+  <data name="ShowcaseCaptionTooLong" xml:space="preserve">
+    <value>El pie de foto no puede superar los {0} caracteres</value>
+  </data>
+  <data name="ShowcaseImagesLimitReached" xml:space="preserve">
+    <value>El conjunto de imágenes {0} ya tiene el máximo de {1} imágenes</value>
+  </data>
+  <data name="ShowcaseImageNotFound" xml:space="preserve">
+    <value>Imagen no encontrada</value>
+  </data>
+  <data name="ShowcaseOrderMismatch" xml:space="preserve">
+    <value>La lista de imágenes debe contener exactamente las imágenes del conjunto indicado, sin repetidas</value>
+  </data>
 
 <data name="OnlineOrdersNotEnabled" xml:space="preserve">
     <value>La tienda {0} no tiene los pedidos online habilitados</value>

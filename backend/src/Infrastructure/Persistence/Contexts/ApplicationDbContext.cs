@@ -22,6 +22,7 @@ using Domain.Entities.Orders;
 using Domain.Entities.OrderItems;
 using Domain.Entities.OrderPayments;
 using Domain.Entities.StoreCatalogSettings;
+using Domain.Entities.StoreCatalogImages;
 using Domain.Entities.DeliveryDrivers;
 using Domain.Entities.ChannelExchangeRates;
 using Domain.Entities.Messages;
@@ -151,6 +152,7 @@ namespace Infrastructure.Persistence.Contexts
             builder.ApplyConfiguration(new ConversationEntityTypeConfiguration());
             builder.ApplyConfiguration(new NotificationEntityTypeConfiguration());
             builder.ApplyConfiguration(new StoreCatalogSettingsEntityTypeConfiguration(this));
+            builder.ApplyConfiguration(new StoreCatalogImageEntityTypeConfiguration(this));
             builder.ApplyConfiguration(new DeliveryDriverEntityTypeConfiguration(this));
 
         }
@@ -173,6 +175,7 @@ namespace Infrastructure.Persistence.Contexts
         internal DbSet<OrderItem> OrderItem { get; set; }
         internal DbSet<OrderPayment> OrderPayment { get; set; }
         internal DbSet<StoreCatalogSettings> StoreCatalogSettings { get; set; }
+        internal DbSet<StoreCatalogImage> StoreCatalogImage { get; set; }
         internal DbSet<DeliveryDriver> DeliveryDriver { get; set; }
         internal DbSet<ProductCategory> ProductCategory { get; set; }
         internal DbSet<Product> Product { get; set; }
