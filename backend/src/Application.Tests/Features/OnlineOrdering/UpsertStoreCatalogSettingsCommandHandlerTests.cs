@@ -68,15 +68,13 @@ public class UpsertStoreCatalogSettingsCommandHandlerTests
         _settingsRepository.Object,
         _localizer.Object);
 
-    /// <summary>Config abierta de verdad: número, recogida, envío de pago y mínimo.</summary>
+    /// <summary>Config abierta de verdad: número, recogida y domicilio, con horarios y zonas.</summary>
     private static UpsertStoreCatalogSettingsCommand OpenCommand() => new()
     {
         Enabled = true,
         WhatsappNumber = "+5350000000",
         PickupEnabled = true,
         DeliveryEnabled = true,
-        DeliveryFee = 50m,
-        MinimumOrderAmount = 200m,
         BusinessHours = "Lun-Vie 8:00-18:00",
         DeliveryZones = "Centro, Vedado",
     };
@@ -127,7 +125,7 @@ public class UpsertStoreCatalogSettingsCommandHandlerTests
         result.Succeeded.Should().BeTrue();
         _persisted.Should().BeSameAs(existing);
         _persisted!.Enabled.Should().BeTrue();
-        _persisted.DeliveryFee.Should().Be(50m);
+        _persisted.WhatsappNumber.Should().Be("+5350000000");
     }
 
     /// <summary>
@@ -194,8 +192,6 @@ public class UpsertStoreCatalogSettingsCommandHandlerTests
         result.Data.WhatsappNumber.Should().Be("+5350000000");
         result.Data.PickupEnabled.Should().BeTrue();
         result.Data.DeliveryEnabled.Should().BeTrue();
-        result.Data.DeliveryFee.Should().Be(50m);
-        result.Data.MinimumOrderAmount.Should().Be(200m);
         result.Data.BusinessHours.Should().Be("Lun-Vie 8:00-18:00");
         result.Data.DeliveryZones.Should().Be("Centro, Vedado");
         result.Data.SyncedAt.Should().Be(_now);

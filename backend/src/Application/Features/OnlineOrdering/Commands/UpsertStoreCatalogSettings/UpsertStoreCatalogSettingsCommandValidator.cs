@@ -5,15 +5,17 @@ using Resources;
 namespace Application.Features.OnlineOrdering.Commands.UpsertStoreCatalogSettings
 {
     /// <summary>
-    /// ¿Se puede GUARDAR esta configuración? Tres reglas con una razón de negocio detrás:
+    /// ¿Se puede GUARDAR esta configuración? Dos reglas con una razón de negocio detrás:
     ///
     ///   1. `Enabled` SIN número de WhatsApp → rechazado. No importa la modalidad: TODOS los
     ///      pedidos salen por `wa.me`, así que sin número no hay a dónde enviar ni uno solo.
     ///      (Con el interruptor apagado el número puede faltar: la fila guarda el estado apagado.)
     ///   2. `Enabled` sin NINGUNA modalidad → rechazado. Un pedido abierto que no se puede recoger
     ///      ni enviar es un pedido que nadie puede hacer. Con al menos una abierta vale.
-    ///   3. Importes negativos → rechazados SIEMPRE, con el interruptor encendido o no: se
-    ///      guardan igual y aparecerían al volver a encenderlo.
+    ///
+    /// No hay reglas de importe: el pedido online no tiene costo de envío ni importe mínimo
+    /// (2026-10-08), así que el precio lo pone el catálogo y esta configuración ya no toca un solo
+    /// número de dinero.
     ///
     /// Los límites de longitud son los de las columnas: convertirlos aquí en un 400 con mensaje
     /// evita un 500 en el INSERT.
@@ -42,14 +44,6 @@ namespace Application.Features.OnlineOrdering.Commands.UpsertStoreCatalogSetting
                 .WithMessage(localizer["OrderingNoDeliveryTypeEnabled", "{PropertyName}"])
                 .OverridePropertyName($"{nameof(UpsertStoreCatalogSettingsCommand.PickupEnabled)}/{nameof(UpsertStoreCatalogSettingsCommand.DeliveryEnabled)}")
                 .When(x => x.Enabled);
-
-            RuleFor(x => x.DeliveryFee)
-                .GreaterThanOrEqualTo(0)
-                .WithMessage(localizer["LessThanOrEqualTo", "{PropertyName}", 0]);
-
-            RuleFor(x => x.MinimumOrderAmount)
-                .GreaterThanOrEqualTo(0)
-                .WithMessage(localizer["LessThanOrEqualTo", "{PropertyName}", 0]);
 
             RuleFor(x => x.BusinessHours)
                 .MaximumLength(UpsertStoreCatalogSettingsCommand.BusinessHoursMaxLength)

@@ -1,7 +1,9 @@
+using Application.Dtos.OnlineOrdering;
 using Application.Exceptions;
 using Application.Features.OnlineOrdering.Commands.CreateOnlineOrder;
 using Application.UnitOfWorks;
 using Domain.Common.Enums;
+using Domain.Entities.OrderItems;
 using Domain.Entities.Orders;
 using Domain.Entities.ProductCategories;
 using Domain.Entities.Products;
@@ -29,7 +31,10 @@ namespace Application.Tests.Features.OnlineOrdering.CreateOnlineOrder;
 ///   * el total y la moneda se LEEN del catálogo, nunca se aceptan del cliente;
 ///   * la modalidad la decide la configuración de ESA tienda;
 ///   * a domicilio hace falta dirección, y en recogida la dirección NO se persiste;
-///   * el importe mínimo se compara contra el total ya recalculado + costo de envío.
+///   * el total ES el subtotal: el pedido online no tiene costo de envío ni importe mínimo, así que
+///     las columnas históricas de la configuración no llegan al cálculo;
+///   * la respuesta lleva el SNAPSHOT persistido (subtotal + líneas), que es lo que el resumen de
+///     WhatsApp del frontend muestra.
 ///
 /// Y la mitad positiva: se persiste con `Code`, `OrderType = WhatsApp`, `New` y `Pending`, con el
 /// snapshot de los items leído en servidor.
@@ -87,19 +92,17 @@ public class CreateOnlineOrderCommandHandlerTests
         return store;
     }
 
-    /// <summary>Config por defecto: pedidos abiertos, recogida sí, domicilio no, sin mínimos.</summary>
-    private StoreCatalogSettings EnabledSettings(
-        bool pickup = true,
-        bool delivery = false,
-        decimal deliveryFee = 0m,
-        decimal minimumOrderAmount = 0m)
+    /// <summary>
+    /// Config por defecto: pedidos abiertos, recogida sí, domicilio no. Sin importes que
+    /// configurar: el pedido online no tiene costo de envío ni importe mínimo (2026-10-08), así que
+    /// la configuración ya no decide ningún número de dinero.
+    /// </summary>
+    private StoreCatalogSettings EnabledSettings(bool pickup = true, bool delivery = false)
     {
         StoreCatalogSettings settings = StoreCatalogSettings.Create(_storeId, _tenantId);
         settings.Enabled = true;
         settings.PickupEnabled = pickup;
         settings.DeliveryEnabled = delivery;
-        settings.DeliveryFee = deliveryFee;
-        settings.MinimumOrderAmount = minimumOrderAmount;
         _settingsRepository.Setup(x => x.GetPublicByStoreIdAsync(_storeId)).ReturnsAsync(settings);
         return settings;
     }
@@ -219,19 +222,84 @@ public class CreateOnlineOrderCommandHandlerTests
         result.Data!.Total.Should().Be(200m);
     }
 
-    /// <summary>A domicilio se suma el costo de envío de la configuración de la tienda.</summary>
+    /// <summary>
+    /// A domicilio el total sigue siendo la suma de las líneas: el envío es una MODALIDAD, no un
+    /// costo. Lo que se entrega a la tienda es el importe de los productos.
+    /// </summary>
     [Fact]
-    public async Task Handle_WithDelivery_ShouldAddTheConfiguredDeliveryFee()
+    public async Task Handle_WithDelivery_ShouldNotAddAnyFee_TotalEqualsSubtotal()
     {
         PublishedStore();
-        EnabledSettings(pickup: false, delivery: true, deliveryFee: 50m);
+        EnabledSettings(pickup: false, delivery: true);
         Guid productId = Publish("Arroz", 100m);
         CreateOnlineOrderCommand command = Command(
             deliveryType: OrderDeliveryType.Delivery, productId: productId, quantity: 2, deliveryAddress: "Calle 23 #45");
 
         var result = await Handler().Handle(command, CancellationToken.None);
 
-        result.Data!.Total.Should().Be(250m, "200 de productos + 50 de envío");
+        result.Succeeded.Should().BeTrue();
+        result.Data!.Subtotal.Should().Be(200m);
+        result.Data.Total.Should().Be(result.Data.Subtotal, "a domicilio no se suma ningún costo");
+    }
+
+    /// <summary>
+    /// F4-R3 (option B): la respuesta del alta lleva el SNAPSHOT PERSISTIDO —subtotal y líneas—,
+    /// no lo que el navegador tenía en el carrito. Es lo que el frontend usa para armar el resumen
+    /// de WhatsApp, así que si estas líneas no son las guardadas, el mensaje a la tienda describe un
+    /// pedido que no existe.
+    /// </summary>
+    [Fact]
+    public async Task Handle_ShouldReturnThePersistedLineSnapshot()
+    {
+        PublishedStore();
+        EnabledSettings();
+        Guid arroz = Publish("Arroz", 100m);
+        Guid azucar = Publish("Azúcar", 50m);
+        var command = new CreateOnlineOrderCommand
+        {
+            StoreSlug = _slug,
+            DeliveryType = (int)OrderDeliveryType.Pickup,
+            CustomerName = "Ana",
+            CustomerPhone = "+5350000000",
+            Items =
+            [
+                new CreateOnlineOrderLineRequest { ProductId = azucar, Quantity = 1 },
+                new CreateOnlineOrderLineRequest { ProductId = arroz, Quantity = 2 },
+            ],
+        };
+
+        Order? persisted = null;
+        _orderRepository
+            .Setup(x => x.AddAsync(It.IsAny<Order>()))
+            .Callback<Order>(o =>
+            {
+                // Simula el viaje de ida y vuelta. Lo que se devuelve tiene que leerse del pedido
+                // que se PERSISTIÓ, no de la lista en memoria que el handler resolvió del
+                // catálogo: si alguien construyera `Lines` desde esa lista, este test lo suelta.
+                foreach (OrderItem item in o.OrderItems)
+                    item.Name = $"{item.Name} persistido";
+                persisted = o;
+            })
+            .ReturnsAsync((Order o) => o);
+
+        var result = await Handler().Handle(command, CancellationToken.None);
+
+        // Lo que se devuelve tiene que ser, línea a línea, lo que quedó en `OrderItem`.
+        result.Data!.Lines.Select(line => (line.Name, line.Quantity, line.Price))
+            .Should().Equal(persisted!.OrderItems
+                .OrderBy(item => item.OrderIndex)
+                .Select(item => (item.Name, item.Quantity, item.Price)));
+        result.Data.Lines.Should().BeEquivalentTo(new[]
+        {
+            new OnlineOrderCreatedLineDto("Azúcar persistido", 1, 50m),
+            new OnlineOrderCreatedLineDto("Arroz persistido", 2, 100m),
+        });
+
+        // El subtotal es el de esas líneas, y el total ya no lleva nada encima.
+        decimal snapshotSum = result.Data.Lines.Sum(line => line.Quantity * line.Price);
+        snapshotSum.Should().Be(250m);
+        result.Data.Subtotal.Should().Be(snapshotSum);
+        result.Data.Total.Should().Be(result.Data.Subtotal);
     }
 
     /// <summary>
@@ -249,21 +317,6 @@ public class CreateOnlineOrderCommandHandlerTests
         var result = await Handler().Handle(command, CancellationToken.None);
 
         result.Data!.Currency.Should().Be(Currency.USD);
-    }
-
-    /// <summary>El mínimo se compara contra el total YA recalculado, no contra lo que dice el cliente.</summary>
-    [Fact]
-    public async Task Handle_WhenTheRecalculatedTotalReachesTheMinimum_ShouldCreateTheOrder()
-    {
-        PublishedStore();
-        EnabledSettings(minimumOrderAmount: 200m);
-        Guid productId = Publish("Arroz", 100m);
-        CreateOnlineOrderCommand command = Command(productId: productId, quantity: 2);
-
-        var result = await Handler().Handle(command, CancellationToken.None);
-
-        result.Succeeded.Should().BeTrue();
-        result.Data!.Total.Should().Be(200m);
     }
 
     [Fact]
@@ -558,43 +611,6 @@ public class CreateOnlineOrderCommandHandlerTests
 
         await act.Should().ThrowAsync<ApiException>();
         _orderRepository.Verify(x => x.AddAsync(It.IsAny<Order>()), Times.Never);
-    }
-
-    /// <summary>
-    /// El mínimo se evalúa contra el total del servidor + envío. Aquí 100 + 0 = 100 &lt; 150 → 400.
-    /// Si el mínimo se comprobara contra el total que "dice" el cliente, esto sería un agujero.
-    /// </summary>
-    [Fact]
-    public async Task Handle_WhenTheRecalculatedTotalIsBelowTheMinimum_ShouldReject()
-    {
-        PublishedStore();
-        EnabledSettings(minimumOrderAmount: 150m);
-        Guid productId = Publish("Arroz", 100m);
-
-        Func<Task> act = () => Handler().Handle(Command(productId: productId), CancellationToken.None);
-
-        await act.Should().ThrowAsync<ApiException>();
-        _orderRepository.Verify(x => x.AddAsync(It.IsAny<Order>()), Times.Never);
-    }
-
-    /// <summary>
-    /// El mínimo se mide SOBRE el total con envío: si se midiera solo sobre los productos,
-    /// 100 &lt; 150 con envío 100 → 200, un pedido que SÍ se debería aceptar y se rechazaría. Este
-    /// test fija que el envío cuenta para el mínimo.
-    /// </summary>
-    [Fact]
-    public async Task Handle_WhenTheDeliveryFeePushesTheTotalOverTheMinimum_ShouldAccept()
-    {
-        PublishedStore();
-        EnabledSettings(pickup: false, delivery: true, deliveryFee: 100m, minimumOrderAmount: 150m);
-        Guid productId = Publish("Arroz", 100m);
-        CreateOnlineOrderCommand command = Command(
-            deliveryType: OrderDeliveryType.Delivery, productId: productId, deliveryAddress: "Calle 23 #45");
-
-        var result = await Handler().Handle(command, CancellationToken.None);
-
-        result.Succeeded.Should().BeTrue();
-        result.Data!.Total.Should().Be(200m);
     }
 
     #endregion

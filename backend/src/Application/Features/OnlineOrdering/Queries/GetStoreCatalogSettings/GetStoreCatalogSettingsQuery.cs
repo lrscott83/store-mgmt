@@ -52,9 +52,8 @@ namespace Application.Features.OnlineOrdering.Queries.GetStoreCatalogSettings
             StoreCatalogSettings? settings = await _storeCatalogSettingsRepository.GetByStoreIdAsync(storeId);
 
             // Sin fila: los mismos valores con los que `StoreCatalogSettings` nace — pedidos
-            // cerrados, sin número, sin modalidades y sin importes. Es explícita en vez de
-            // "new DTO()" para que añadir un campo a la entidad no se olvide en el DTO de los
-            // valores por defecto.
+            // cerrados, sin número y sin modalidades. Es explícita en vez de "new DTO()" para que
+            // añadir un campo a la entidad no se olvide en el DTO de los valores por defecto.
             return ResponseResult.Success(settings is null ? Default() : Map(settings));
         }
 
@@ -64,8 +63,6 @@ namespace Application.Features.OnlineOrdering.Queries.GetStoreCatalogSettings
             WhatsappNumber = null,
             PickupEnabled = false,
             DeliveryEnabled = false,
-            DeliveryFee = 0m,
-            MinimumOrderAmount = 0m,
             BusinessHours = null,
             DeliveryZones = null,
             SyncedAt = null,
@@ -82,8 +79,6 @@ namespace Application.Features.OnlineOrdering.Queries.GetStoreCatalogSettings
             WhatsappNumber = settings.WhatsappNumber,
             PickupEnabled = settings.PickupEnabled,
             DeliveryEnabled = settings.DeliveryEnabled,
-            DeliveryFee = settings.DeliveryFee,
-            MinimumOrderAmount = settings.MinimumOrderAmount,
             BusinessHours = settings.BusinessHours,
             DeliveryZones = settings.DeliveryZones,
             SyncedAt = settings.SyncedAt,

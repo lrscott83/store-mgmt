@@ -25,14 +25,8 @@ namespace Application.Dtos.OnlineOrdering
         /// <summary>Admite recogida en la tienda.</summary>
         public bool PickupEnabled { get; set; }
 
-        /// <summary>Admite envío a domicilio (el pedido exige dirección y suma <see cref="DeliveryFee"/>).</summary>
+        /// <summary>Admite envío a domicilio (el pedido exige dirección; el domicilio no lleva costo).</summary>
         public bool DeliveryEnabled { get; set; }
-
-        /// <summary>Costo de envío, en la moneda del catálogo. 0 = envío gratis.</summary>
-        public decimal DeliveryFee { get; set; }
-
-        /// <summary>Importe mínimo del pedido. 0 = sin mínimo.</summary>
-        public decimal MinimumOrderAmount { get; set; }
 
         /// <summary>Horario de atención como texto simple (D16). null = no publicado.</summary>
         public string? BusinessHours { get; set; }
@@ -83,12 +77,6 @@ namespace Application.Dtos.OnlineOrdering
 
         /// <summary>Modalidad envío a domicilio disponible.</summary>
         public bool DeliveryEnabled { get; set; }
-
-        /// <summary>Costo de envío, en la moneda del catálogo. Solo aplica con <see cref="DeliveryEnabled"/>.</summary>
-        public decimal DeliveryFee { get; set; }
-
-        /// <summary>Importe mínimo del pedido. 0 = sin mínimo.</summary>
-        public decimal MinimumOrderAmount { get; set; }
 
         /// <summary>Horario de atención (texto libre, D16). null = no publicado.</summary>
         public string? BusinessHours { get; set; }
@@ -159,7 +147,7 @@ namespace Application.Dtos.OnlineOrdering
         /// <summary>Recogida o domicilio.</summary>
         public OrderDeliveryType DeliveryType { get; set; }
 
-        /// <summary>Total YA calculado por el servidor, con el envío dentro si lo hubo.</summary>
+        /// <summary>Total YA calculado por el servidor: la suma de las líneas, sin nada más encima.</summary>
         public decimal Total { get; set; }
 
         /// <summary>Moneda del catálogo (A3 eliminó la moneda configurable de pedidos).</summary>
@@ -185,6 +173,20 @@ namespace Application.Dtos.OnlineOrdering
         /// <summary>Precio unitario del snapshot, no el del catálogo de hoy.</summary>
         public decimal Price { get; set; }
     }
+
+    // --- Alta del pedido online (F4) -------------------------------------------------------
+
+    /// <summary>
+    /// Una línea del pedido RECIÉN CREADO, tal como quedó PERSISTIDA (`OrderItem`): nombre,
+    /// cantidad y precio unitario del snapshot. Sin `ProductId`, sin moneda (la del pedido vale
+    /// para todas las líneas) y sin importe de línea.
+    ///
+    /// Es una proyección del snapshot, no una lectura del catálogo: si el cliente arman el resumen
+    /// con ESTOS datos y no con los de su carrito, el mensaje que la tienda recibe en WhatsApp
+    /// dice exactamente lo que el servidor guardó (D6), aunque el carrito viniera manipulado o el
+    /// precio del producto cambiara entre la carga del catálogo y el alta.
+    /// </summary>
+    public sealed record OnlineOrderCreatedLineDto(string Name, int Quantity, decimal Price);
 
     // --- Lecturas de gestión de pedidos (F5, vista "Pedidos") ---------------------------------
 
@@ -213,7 +215,7 @@ namespace Application.Dtos.OnlineOrdering
         /// <summary>Recogida o envío a domicilio.</summary>
         public OrderDeliveryType DeliveryType { get; set; }
 
-        /// <summary>Importe del pedido (líneas + costo de envío), en <see cref="Currency"/>.</summary>
+        /// <summary>Importe del pedido (la suma de sus líneas), en <see cref="Currency"/>.</summary>
         public decimal Total { get; set; }
 
         /// <summary>Moneda de <see cref="Total"/> y de los precios de las líneas. La pone el catálogo.</summary>
@@ -284,7 +286,7 @@ namespace Application.Dtos.OnlineOrdering
 
         public OrderDeliveryType DeliveryType { get; set; }
 
-        /// <summary>Importe del pedido (líneas + costo de envío), en <see cref="Currency"/>.</summary>
+        /// <summary>Importe del pedido (la suma de sus líneas), en <see cref="Currency"/>.</summary>
         public decimal Total { get; set; }
 
         public Currency Currency { get; set; }

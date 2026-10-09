@@ -8,18 +8,17 @@ namespace Application.Tests.Features.OnlineOrdering;
 
 /// <summary>
 /// El validador de la CONFIGURACIÓN de pedidos (F1) decide si la tienda puede abrir el interruptor
-/// con lo que el dueño acaba de escribir. Tres reglas con una razón de negocio detrás, y todas
+/// con lo que el dueño acaba de escribir. Dos reglas con una razón de negocio detrás, y las dos
 /// importan:
 ///
 ///   * `Enabled` SIN número de WhatsApp → rechazado. No importa la modalidad: TODOS los pedidos
 ///     salen por `wa.me`, así que sin número no hay a dónde enviar ni uno solo.
 ///   * `Enabled` sin ninguna modalidad (ni recogida ni envío) → rechazado. Un pedido abierto que
 ///     no se puede recoger ni enviar es un pedido que nadie puede hacer.
-///   * Importes negativos → rechazados siempre, habilitado o no: un costo de envío negativo
-///     cobraría de más al cliente y ningún total cuadraría.
 ///
-/// Y lo que NO decide: el formato del número (no es un teléfono validable, es texto para `wa.me`),
-/// ni nada de la marca (F8), ni la existencia de la tienda.
+/// Y lo que NO decide: ningún importe —el pedido online no tiene costo de envío ni importe mínimo
+/// (2026-10-08)—, el formato del número (no es un teléfono validable, es texto para `wa.me`),
+/// nada de la marca (F8), ni la existencia de la tienda.
 /// </summary>
 public class UpsertStoreCatalogSettingsCommandValidatorTests
 {
@@ -44,8 +43,6 @@ public class UpsertStoreCatalogSettingsCommandValidatorTests
         WhatsappNumber = "+5350000000",
         PickupEnabled = true,
         DeliveryEnabled = false,
-        DeliveryFee = 0m,
-        MinimumOrderAmount = 0m,
     };
 
     #region Happy Path
@@ -62,7 +59,6 @@ public class UpsertStoreCatalogSettingsCommandValidatorTests
     {
         UpsertStoreCatalogSettingsCommand command = ValidCommand();
         command.DeliveryEnabled = true;
-        command.DeliveryFee = 50m;
 
         Validator().Validate(command).IsValid.Should().BeTrue();
     }
@@ -89,17 +85,6 @@ public class UpsertStoreCatalogSettingsCommandValidatorTests
     {
         UpsertStoreCatalogSettingsCommand command = ValidCommand();
         command.Enabled = false;
-
-        Validator().Validate(command).IsValid.Should().BeTrue();
-    }
-
-    /// <summary>Costos e importes en cero son válidos: 0 = sin envío de pago / sin mínimo.</summary>
-    [Fact]
-    public void Validate_WithZeroAmounts_ShouldPass()
-    {
-        UpsertStoreCatalogSettingsCommand command = ValidCommand();
-        command.DeliveryFee = 0m;
-        command.MinimumOrderAmount = 0m;
 
         Validator().Validate(command).IsValid.Should().BeTrue();
     }
@@ -134,32 +119,6 @@ public class UpsertStoreCatalogSettingsCommandValidatorTests
         UpsertStoreCatalogSettingsCommand command = ValidCommand();
         command.PickupEnabled = false;
         command.DeliveryEnabled = false;
-
-        Validator().Validate(command).IsValid.Should().BeFalse();
-    }
-
-    /// <summary>
-    /// Un importe negativo NO es un caso raro: es una tienda cobrando al revés. Se rechaza aunque
-    /// el interruptor esté apagado, porque el valor se guarda igual y aparecería al reencender.
-    /// </summary>
-    [Theory]
-    [InlineData(-0.01)]
-    [InlineData(-100)]
-    public void Validate_WithANegativeDeliveryFee_ShouldFail(decimal fee)
-    {
-        UpsertStoreCatalogSettingsCommand command = ValidCommand();
-        command.DeliveryFee = fee;
-
-        Validator().Validate(command).IsValid.Should().BeFalse();
-    }
-
-    [Theory]
-    [InlineData(-0.01)]
-    [InlineData(-100)]
-    public void Validate_WithANegativeMinimumOrderAmount_ShouldFail(decimal amount)
-    {
-        UpsertStoreCatalogSettingsCommand command = ValidCommand();
-        command.MinimumOrderAmount = amount;
 
         Validator().Validate(command).IsValid.Should().BeFalse();
     }

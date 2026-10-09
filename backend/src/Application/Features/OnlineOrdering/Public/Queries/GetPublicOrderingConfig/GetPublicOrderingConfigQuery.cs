@@ -77,8 +77,6 @@ namespace Application.Features.OnlineOrdering.Public.Queries.GetPublicOrderingCo
                 Enabled = settings?.Enabled ?? false,
                 PickupEnabled = settings?.PickupEnabled ?? false,
                 DeliveryEnabled = settings?.DeliveryEnabled ?? false,
-                DeliveryFee = settings?.DeliveryFee ?? 0m,
-                MinimumOrderAmount = settings?.MinimumOrderAmount ?? 0m,
                 BusinessHours = settings?.BusinessHours,
                 DeliveryZones = settings?.DeliveryZones,
                 // La MARCA (F8) viaja como URL pública del endpoint de media, nunca como clave

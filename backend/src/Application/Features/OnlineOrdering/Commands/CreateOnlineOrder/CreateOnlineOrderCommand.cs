@@ -1,4 +1,5 @@
 using Application.Abstractions.Messaging;
+using Application.Dtos.OnlineOrdering;
 using Application.Exceptions;
 using Application.ResponseModels;
 using Application.UnitOfWorks;
@@ -81,7 +82,15 @@ namespace Application.Features.OnlineOrdering.Commands.CreateOnlineOrder
     }
 
     /// <summary>
-    /// Lo que devuelve el alta: el código con el que la persona consulta y escribe por WhatsApp.
+    /// Lo que devuelve el alta: el código con el que la persona consulta y escribe por WhatsApp,
+    /// más el SNAPSHOT de lo guardado.
+    ///
+    /// <see cref="Subtotal"/> y <see cref="Lines"/> salen del pedido PERSISTIDO (los
+    /// <c>OrderItem</c> que el servidor acaba de resolver contra el catálogo), no de lo que
+    /// envió el cliente: el frontend arma el resumen `wa.me` con ellos (D6) para que el mensaje
+    /// diga exactamente lo guardado en vez de lo que el navegador tenía en el carrito.
+    /// <see cref="Total"/> es el importe del pedido y, sin costo de envío, coincide con el
+    /// subtotal: viaja de todas formas porque es el dato que la lista y el detalle muestran.
     ///
     /// `WhatsappNumber` viaja AQUÍ y no en el config público (decisión T2): el config lo lee
     /// cualquiera que abra el catálogo, así que publicarlo ahí haría el número rastreable con una
@@ -90,7 +99,14 @@ namespace Application.Features.OnlineOrdering.Commands.CreateOnlineOrder
     /// del cliente que arma el enlace `wa.me`— y es `null` cuando la tienda no lo tiene
     /// configurado, que es lo que permite BLOQUEAR el envío en vez de abrir un chat vacío.
     /// </summary>
-    public sealed record OnlineOrderCreatedDto(Guid Id, string Code, decimal Total, Currency Currency, string? WhatsappNumber);
+    public sealed record OnlineOrderCreatedDto(
+        Guid Id,
+        string Code,
+        decimal Subtotal,
+        decimal Total,
+        Currency Currency,
+        IReadOnlyList<OnlineOrderCreatedLineDto> Lines,
+        string? WhatsappNumber);
 
     public class CreateOnlineOrderCommandHandler
         : ICommandHandler<CreateOnlineOrderCommand, OnlineOrderCreatedDto>
@@ -185,16 +201,12 @@ namespace Application.Features.OnlineOrdering.Commands.CreateOnlineOrder
             Currency currency = resolvedLines[0].Currency;
 
             decimal subtotal = resolvedLines.Sum(line => line.Price * line.Quantity);
-            decimal deliveryFee = deliveryType == OrderDeliveryType.Delivery ? settings.DeliveryFee : 0m;
-            decimal total = subtotal + deliveryFee;
 
-            // El mínimo se mide sobre el total YA recalculado, con el envío dentro: si se midiera
-            // solo sobre los productos, un pedido de 100 con 100 de envío sería rechazado aunque
-            // llegue al mínimo de 150.
-            if (total < settings.MinimumOrderAmount)
-                throw new ApiException(
-                    _localizer["OnlineOrderBelowMinimumAmount", total, settings.MinimumOrderAmount],
-                    HttpStatusCode.BadRequest);
+            // El total ES el subtotal de las líneas: el pedido online no tiene costo de envío ni
+            // importe mínimo (2026-10-08). Se mantiene la variable —y no `total = subtotal` en
+            // línea— porque es lo que recibe `Order.CreateOnline`: el importe persistido lo decide
+            // el servidor, no el cliente.
+            decimal total = subtotal;
 
             string code = await GenerateUniqueCodeAsync(storeId);
 
@@ -229,11 +241,20 @@ namespace Application.Features.OnlineOrdering.Commands.CreateOnlineOrder
             return ResponseResult.Success(new OnlineOrderCreatedDto(
                 order.Id,
                 order.Code!,
+                subtotal,
                 order.Total,
                 order.Currency,
-                // El número sale de la MISMA lectura de configuración que ya fijó el envío y el
-                // mínimo: una consulta menos y ninguna posibilidad de que el enlace se arme con
-                // un número de una versión distinta de la que el resto del pedido usó.
+                // Las líneas salen del SNAPSHOT PERSISTIDO (`OrderItem`), en el orden en que se
+                // pidieron, y no de `resolvedLines`: es lo que quedó guardado, así que el resumen
+                // que arma el frontend (D6) no puede mezclar los precios que el cliente tenía en el
+                // carrito con los que el servidor resolvió. El cliente no manda precios, pero
+                // tampoco decide lo que se le muestra a la tienda.
+                [.. order.OrderItems
+                    .OrderBy(item => item.OrderIndex)
+                    .Select(item => new OnlineOrderCreatedLineDto(item.Name, item.Quantity, item.Price))],
+                // El número sale de la MISMA lectura de configuración que ya decidió que esta
+                // tienda acepta pedidos: una consulta menos y ninguna posibilidad de que el enlace
+                // se arme con un número de una versión distinta de la que el resto del pedido usó.
                 settings.WhatsappNumber));
         }
 

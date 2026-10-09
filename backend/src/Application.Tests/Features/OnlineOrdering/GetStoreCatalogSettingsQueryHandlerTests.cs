@@ -63,8 +63,6 @@ public class GetStoreCatalogSettingsQueryHandlerTests
         result.Data.WhatsappNumber.Should().BeNull();
         result.Data.PickupEnabled.Should().BeFalse();
         result.Data.DeliveryEnabled.Should().BeFalse();
-        result.Data.DeliveryFee.Should().Be(0m);
-        result.Data.MinimumOrderAmount.Should().Be(0m);
         result.Data.BusinessHours.Should().BeNull();
         result.Data.DeliveryZones.Should().BeNull();
         result.Data.SyncedAt.Should().BeNull();
@@ -78,8 +76,6 @@ public class GetStoreCatalogSettingsQueryHandlerTests
         settings.WhatsappNumber = "+5350000000";
         settings.PickupEnabled = true;
         settings.DeliveryEnabled = true;
-        settings.DeliveryFee = 50m;
-        settings.MinimumOrderAmount = 200m;
         settings.BusinessHours = "Lun-Vie 8:00-18:00";
         settings.DeliveryZones = "Centro, Vedado";
         settings.SyncedAt = new DateTimeOffset(2026, 10, 7, 12, 0, 0, TimeSpan.Zero);
@@ -91,8 +87,6 @@ public class GetStoreCatalogSettingsQueryHandlerTests
         result.Data.WhatsappNumber.Should().Be("+5350000000");
         result.Data.PickupEnabled.Should().BeTrue();
         result.Data.DeliveryEnabled.Should().BeTrue();
-        result.Data.DeliveryFee.Should().Be(50m);
-        result.Data.MinimumOrderAmount.Should().Be(200m);
         result.Data.BusinessHours.Should().Be("Lun-Vie 8:00-18:00");
         result.Data.DeliveryZones.Should().Be("Centro, Vedado");
         result.Data.SyncedAt.Should().Be(settings.SyncedAt);

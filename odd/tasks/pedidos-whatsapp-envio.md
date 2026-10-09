@@ -202,3 +202,9 @@ F5 (dashboard de pedidos y pago), luego F6 (ventas), F7 (repartidores).
   slice). Owner resolvió T2 (número en la respuesta de creación). Revisión nativa **aprobada y
   acknowledgeada** tras liberar una transacción atascada por `operation_timeout`. Push = decisión del
   owner.
+- 2026-10-08 — **Contrato del backend cambiado** (ver `remove-delivery-fee-and-minimum.md`, F4-R3
+  option B): `OnlineOrderCreatedDto` es ahora
+  `(Id, Code, Subtotal, Total, Currency, Lines, WhatsappNumber)` con
+  `OnlineOrderCreatedLineDto(Name, Quantity, Price)` leído del snapshot PERSISTIDO (`OrderItem`).
+  El total ya no lleva costo de envío, así que `Subtotal == Total`. El resumen `wa.me` debe usar
+  `lines`/`subtotal`/`total` de la respuesta y ya no imprime línea de envío.

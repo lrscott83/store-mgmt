@@ -646,9 +646,6 @@
   <data name="OnlineOrderMixedCurrencies" xml:space="preserve">
     <value>The order mixes currencies ({0}); an order can only carry one</value>
   </data>
-  <data name="OnlineOrderBelowMinimumAmount" xml:space="preserve">
-    <value>The total {0} does not reach the minimum of {1}</value>
-  </data>
   <data name="OnlineOrderCodeGenerationFailed" xml:space="preserve">
     <value>Could not generate an order code for store {0}</value>
   </data>

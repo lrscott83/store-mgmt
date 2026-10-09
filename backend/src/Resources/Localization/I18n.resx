@@ -382,9 +382,6 @@
   <data name="OnlineOrderMixedCurrencies" xml:space="preserve">
     <value>El pedido mezcla monedas ({0}); un pedido solo puede llevar una</value>
   </data>
-  <data name="OnlineOrderBelowMinimumAmount" xml:space="preserve">
-    <value>El total {0} no alcanza el mínimo de {1}</value>
-  </data>
   <data name="OnlineOrderCodeGenerationFailed" xml:space="preserve">
     <value>No se pudo generar un código de pedido para la tienda {0}</value>
   </data>

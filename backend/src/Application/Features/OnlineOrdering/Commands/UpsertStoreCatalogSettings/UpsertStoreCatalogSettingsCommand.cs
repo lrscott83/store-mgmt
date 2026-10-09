@@ -54,12 +54,6 @@ namespace Application.Features.OnlineOrdering.Commands.UpsertStoreCatalogSetting
         /// <summary>Admite envío a domicilio.</summary>
         public bool DeliveryEnabled { get; set; }
 
-        /// <summary>Costo de envío, en la moneda del catálogo. 0 = envío gratis.</summary>
-        public decimal DeliveryFee { get; set; }
-
-        /// <summary>Importe mínimo del pedido. 0 = sin mínimo.</summary>
-        public decimal MinimumOrderAmount { get; set; }
-
         /// <summary>Horario de atención (texto simple, D16).</summary>
         public string? BusinessHours { get; set; }
 
@@ -133,8 +127,6 @@ namespace Application.Features.OnlineOrdering.Commands.UpsertStoreCatalogSetting
             settings.WhatsappNumber = Trim(request.WhatsappNumber);
             settings.PickupEnabled = request.PickupEnabled;
             settings.DeliveryEnabled = request.DeliveryEnabled;
-            settings.DeliveryFee = request.DeliveryFee;
-            settings.MinimumOrderAmount = request.MinimumOrderAmount;
             settings.BusinessHours = Trim(request.BusinessHours);
             settings.DeliveryZones = Trim(request.DeliveryZones);
         }
@@ -149,8 +141,6 @@ namespace Application.Features.OnlineOrdering.Commands.UpsertStoreCatalogSetting
             WhatsappNumber = settings.WhatsappNumber,
             PickupEnabled = settings.PickupEnabled,
             DeliveryEnabled = settings.DeliveryEnabled,
-            DeliveryFee = settings.DeliveryFee,
-            MinimumOrderAmount = settings.MinimumOrderAmount,
             BusinessHours = settings.BusinessHours,
             DeliveryZones = settings.DeliveryZones,
             SyncedAt = settings.SyncedAt,

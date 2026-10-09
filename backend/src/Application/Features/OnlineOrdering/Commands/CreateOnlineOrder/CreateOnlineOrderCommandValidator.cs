@@ -6,8 +6,8 @@ namespace Application.Features.OnlineOrdering.Commands.CreateOnlineOrder
 {
     /// <summary>
     /// Reglas de FORMATO del pedido online. Lo que NO cabe aquí es nada que dependa de la tienda
-    /// (si admite la modalidad, el mínimo, el envío): eso lo comprueba el handler contra
-    /// `StoreCatalogSettings`, porque esta tienda y la siguiente no tienen las mismas reglas.
+    /// (si admite la modalidad): eso lo comprueba el handler contra `StoreCatalogSettings`, porque
+    /// esta tienda y la siguiente no tienen las mismas reglas.
     ///
     /// El `StoreSlug` sí se valida, aunque venga de la ruta: es parte del comando y sin él el
     /// handler no tiene ni tienda ni configuración contra las que trabajar. Que lo llene el

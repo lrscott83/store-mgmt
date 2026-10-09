@@ -98,7 +98,9 @@ public class UpdateStoreCatalogBrandingCommandHandlerTests
 
     /// <summary>
     /// Fila ya existente de la tienda: con la marca que el dueño configuró antes y las columnas de
-    /// pedidos con valores que NO se deben perder.
+    /// pedidos con valores que NO se deben perder. Son las que la vista Pedidos WhatsApp escribe:
+    /// interruptor, número, modalidades, horarios y zonas (el pedido online no tiene costo de envío
+    /// ni importe mínimo, así que la configuración ya no guarda importes).
     /// </summary>
     private StoreCatalogSettings ExistingRow(Guid? id = null, string? logoKey = "old-logo.png", string? bannerKey = "old-banner.png")
     {
@@ -107,8 +109,6 @@ public class UpdateStoreCatalogBrandingCommandHandlerTests
         settings.WhatsappNumber = "+5350000000";
         settings.PickupEnabled = true;
         settings.DeliveryEnabled = true;
-        settings.DeliveryFee = 50m;
-        settings.MinimumOrderAmount = 200m;
         settings.BusinessHours = "Lun-Vie 8:00-18:00";
         settings.DeliveryZones = "Centro, Vedado";
         settings.SyncedAt = new DateTimeOffset(2026, 10, 1, 8, 0, 0, TimeSpan.Zero);
@@ -243,6 +243,10 @@ public class UpdateStoreCatalogBrandingCommandHandlerTests
     /// ESTE es el test que protege la fila compartida. Marca y pedidos son dos vistas (F1 y F8) sobre
     /// la MISMA fila: si el guardado de la marca tocara una columna de pedidos, el dueño perdería
     /// los pedidos que tenía abiertos cada vez que subiera su logo.
+    ///
+    /// Las columnas que se comprueban son las que la vista Pedidos WhatsApp sigue escribiendo
+    /// (interruptor, número, modalidades, horarios y zonas). Ya no hay importes que proteger:
+    /// desde 2026-10-08 el pedido online no tiene costo de envío ni importe mínimo.
     /// </summary>
     [Fact]
     public async Task Handle_ShouldNotTouchTheOrderingColumnsOfAnExistingRow()
@@ -255,8 +259,6 @@ public class UpdateStoreCatalogBrandingCommandHandlerTests
         _persisted.WhatsappNumber.Should().Be("+5350000000");
         _persisted.PickupEnabled.Should().BeTrue();
         _persisted.DeliveryEnabled.Should().BeTrue();
-        _persisted.DeliveryFee.Should().Be(50m);
-        _persisted.MinimumOrderAmount.Should().Be(200m);
         _persisted.BusinessHours.Should().Be("Lun-Vie 8:00-18:00");
         _persisted.DeliveryZones.Should().Be("Centro, Vedado");
     }

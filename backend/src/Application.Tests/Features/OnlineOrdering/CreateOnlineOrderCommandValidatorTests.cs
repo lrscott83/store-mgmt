@@ -8,9 +8,9 @@ namespace Application.Tests.Features.OnlineOrdering;
 
 /// <summary>
 /// El validador del pedido online cubre SOLO el formato (longitudes, campos obligatorios del
-/// payload). Lo que depende de la tienda —si admite la modalidad, el importe mínimo, el envío— NO
-/// está aquí a propósito: son reglas de `StoreCatalogSettings` y las comprueba el handler, porque
-/// esta tienda y la siguiente no tienen las mismas.
+/// payload). Lo que depende de la tienda —si admite la modalidad— NO está aquí a propósito: son
+/// reglas de `StoreCatalogSettings` y las comprueba el handler, porque esta tienda y la siguiente
+/// no tienen las mismas.
 ///
 /// Y hay algo que este validador NO puede validar: el precio. No existe en el payload. Lo pone el
 /// catálogo, en servidor.

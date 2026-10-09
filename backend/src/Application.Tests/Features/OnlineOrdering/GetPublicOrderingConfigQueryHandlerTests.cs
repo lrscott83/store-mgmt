@@ -99,8 +99,6 @@ public class GetPublicOrderingConfigQueryHandlerTests
         result.Data!.Enabled.Should().BeFalse();
         result.Data.PickupEnabled.Should().BeFalse();
         result.Data.DeliveryEnabled.Should().BeFalse();
-        result.Data.DeliveryFee.Should().Be(0m);
-        result.Data.MinimumOrderAmount.Should().Be(0m);
         result.Data.BusinessHours.Should().BeNull();
         result.Data.DeliveryZones.Should().BeNull();
     }
@@ -128,8 +126,6 @@ public class GetPublicOrderingConfigQueryHandlerTests
         settings.Enabled = true;
         settings.PickupEnabled = true;
         settings.DeliveryEnabled = true;
-        settings.DeliveryFee = 50m;
-        settings.MinimumOrderAmount = 200m;
         settings.BusinessHours = "Lun-Vie 8:00-18:00";
         settings.DeliveryZones = "Centro, Vedado";
         settings.PaletteId = "sunset";
@@ -140,8 +136,6 @@ public class GetPublicOrderingConfigQueryHandlerTests
         result.Data!.Enabled.Should().BeTrue();
         result.Data.PickupEnabled.Should().BeTrue();
         result.Data.DeliveryEnabled.Should().BeTrue();
-        result.Data.DeliveryFee.Should().Be(50m);
-        result.Data.MinimumOrderAmount.Should().Be(200m);
         result.Data.BusinessHours.Should().Be("Lun-Vie 8:00-18:00");
         result.Data.DeliveryZones.Should().Be("Centro, Vedado");
         result.Data.PaletteId.Should().Be("sunset");
@@ -553,8 +547,8 @@ public class GetPublicOrderingConfigQueryHandlerTests
     #endregion
 
     /// <summary>
-    /// Solo recogida: el storefront ofrece pasar a recoger y NO ofrece domicilio con envío, aunque
-    /// la columna de envío tenga un costo guardado de cuando lo cerró.
+    /// Solo recogida: el storefront ofrece pasar a recoger y NO ofrece domicilio, aunque la fila
+    /// conserve de cuando lo cerró.
     /// </summary>
     [Fact]
     public async Task Handle_WithPickupOnly_ShouldPublishTheOpenDeliveryTypeOnly()
@@ -564,14 +558,12 @@ public class GetPublicOrderingConfigQueryHandlerTests
         settings.Enabled = true;
         settings.PickupEnabled = true;
         settings.DeliveryEnabled = false;
-        settings.DeliveryFee = 50m;
         _settingsRepository.Setup(x => x.GetPublicByStoreIdAsync(_storeId)).ReturnsAsync(settings);
 
         var result = await Handler().Handle(new GetPublicOrderingConfigQuery("tienda-ana"), CancellationToken.None);
 
         result.Data!.PickupEnabled.Should().BeTrue();
         result.Data.DeliveryEnabled.Should().BeFalse();
-        result.Data.DeliveryFee.Should().Be(50m);
     }
 
     /// <summary>El slug se normaliza como en el catálogo público: el que llega puede venir con espacios o mayúsculas.</summary>
