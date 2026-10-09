@@ -43,10 +43,59 @@ vi.mock('~/shared/lib/stores/auth-store', () => {
 
 // La campana de notificaciones (NotificationShell) se auto-gatea por SuperAdmin y este
 // layout se renderiza con un usuario SuperAdmin, así que al montar pide
-// GET /v1/notifications — igual que MessageShell lo haría con un OwnerAdmin. Sin este
-// mock el guardián `block-real-http` aborta cada test de este archivo. Estos tests
-// miden layout (sidebar, padding, billing notice, idle timer), no notificaciones:
-// el comportamiento de la campana vive en notification-shell.test.tsx.
+// GET /v1/notifications. Sin este mock el guardián `block-real-http` aborta cada test
+// de este archivo. Estos tests miden layout (sidebar, padding, billing notice, idle
+// timer), no notificaciones: el comportamiento de la campana vive en
+// notification-shell.test.tsx.
+//
+// MessageShell pide lo mismo por el mismo motivo desde 2026-10-08: el icono de
+// mensajes del header también se muestra al SuperAdmin con su contador de no leídos,
+// así que monta el refresh de conversaciones. Su comportamiento vive en
+// message-shell.test.tsx.
+vi.mock('~/shared/lib/messages/messages-http-service', () => ({
+  messagesHttpService: {
+    getConversations: vi
+      .fn()
+      .mockResolvedValue({ succeeded: true, data: [], message: '', actionCode: 200, errors: [] }),
+    getMessages: vi
+      .fn()
+      .mockResolvedValue({ succeeded: true, data: [], message: '', actionCode: 200, errors: [] }),
+    sendMessage: vi.fn(),
+    markAsRead: vi.fn(),
+    markAllAsRead: vi.fn(),
+    broadcastMessage: vi.fn(),
+  },
+}));
+const connectionStartMock = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
+const connectionStopMock = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
+
+const connectionHandlers = vi.hoisted(() => new Map<string, (...args: unknown[]) => void>());
+const connectionOnMock = vi.hoisted(() =>
+  vi.fn((event: string, handler: (...args: unknown[]) => void) => {
+    connectionHandlers.set(event, handler);
+  }),
+);
+const connectionOffMock = vi.hoisted(() =>
+  vi.fn((event: string) => {
+    connectionHandlers.delete(event);
+  }),
+);
+
+const createConnectionMock = vi.hoisted(() =>
+  vi.fn(() => ({
+    on: connectionOnMock,
+    off: connectionOffMock,
+    start: connectionStartMock,
+    stop: connectionStopMock,
+  })),
+);
+
+vi.mock('~/shared/lib/messages/messages-realtime-service', () => ({
+  RECEIVE_MESSAGE_EVENT: 'ReceiveMessage',
+  MESSAGE_READ_EVENT: 'MessageRead',
+  resolveMessagesHubUrl: () => '/hubs/messages',
+  createMessagesRealtimeConnection: createConnectionMock,
+}));
 vi.mock('~/shared/lib/notifications/notifications-http-service', () => ({
   notificationsHttpService: {
     getNotifications: vi

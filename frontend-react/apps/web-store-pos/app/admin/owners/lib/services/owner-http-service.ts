@@ -24,9 +24,28 @@ interface UpdateOwnerPayload {
   reSellerId: string;
 }
 
+/** Per-call knobs for the owner directory read. */
+export interface OwnerListRequestOptions {
+  /**
+   * A background load must not drive the global loading overlay — maps to
+   * api-client's `skipLoading`. The messages view loads the owner directory
+   * on mount and on focus/online, and flashing the overlay on every pass is
+   * exactly what that flag exists to prevent.
+   */
+  background?: boolean;
+}
+
+/** Axios config that turns the global loading overlay off. */
+const SKIP_LOADING = { skipLoading: true };
+
 export const ownerHttpService = {
-  async listOwners(): Promise<BaseResponseModel<Owner[]>> {
-    const response = await apiClient.get<BaseResponseModel<Owner[]>>('/v1/owners/all/true');
+  async listOwners(options?: OwnerListRequestOptions): Promise<BaseResponseModel<Owner[]>> {
+    const url = '/v1/owners/all/true';
+    // The non-background branch keeps its single-argument call: the existing
+    // HTTP-2 assertion pins `get(url)` with no config object.
+    const response = options?.background
+      ? await apiClient.get<BaseResponseModel<Owner[]>>(url, SKIP_LOADING)
+      : await apiClient.get<BaseResponseModel<Owner[]>>(url);
     return response.data;
   },
 

@@ -1,7 +1,9 @@
 import { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { useIntl } from 'react-intl';
+import { Link } from 'react-router';
+import type { UserModel } from '@store-mgmt/domain';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
-import { isOwnerAdmin } from '~/shared/lib/auth/authorization-service';
+import { isOwnerAdmin, isSuperAdmin } from '~/shared/lib/auth/authorization-service';
 import { useClickOutside } from '~/shared/lib/hooks/use-click-outside';
 import { useOnlineStatus } from '~/shared/lib/hooks/use-online-status';
 import { showToastError } from '~/shared/lib/toast';
@@ -52,6 +54,17 @@ function formatMessageTime(value: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '';
   return date.toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' });
+}
+
+/**
+ * Who sees the header gadget. Both chat-capable roles get the same icon and
+ * the same unread counter, with different bodies behind it: an OwnerAdmin
+ * opens its store thread in the panel, while the SuperAdmin has no single
+ * "active store" conversation to open — its inbox IS `/admin/messages`, so
+ * its trigger is a link to that page (see the render below).
+ */
+function seesHeaderMessages(user: UserModel): boolean {
+  return isOwnerAdmin(user) || isSuperAdmin(user);
 }
 
 export function MessageShell() {
@@ -108,7 +121,7 @@ export function MessageShell() {
    */
   const refresh = useCallback(
     async (withMessages: boolean): Promise<boolean> => {
-      if (!user || !isOwnerAdmin(user)) return false;
+      if (!user || !seesHeaderMessages(user)) return false;
       try {
         const conversationsResponse = await messagesHttpService.getConversations({
           background: true,
@@ -286,7 +299,7 @@ export function MessageShell() {
   }, [isOnline, user, flushQueue, refresh]);
 
   useEffect(() => {
-    if (!user || !isOwnerAdmin(user)) return;
+    if (!user || !seesHeaderMessages(user)) return;
     // Returning to the window is foreground too, even when the tab never hid.
     // Re-arming the ladder covers "the timer was lost while we were away".
     function handleFocus() {
@@ -301,7 +314,7 @@ export function MessageShell() {
   // component (a send, a realtime push, the tab coming back) snaps the ladder
   // back to its fastest step.
   useEffect(() => {
-    if (!user || !isOwnerAdmin(user)) return;
+    if (!user || !seesHeaderMessages(user)) return;
     let cancelled = false;
     let step = 0;
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -354,10 +367,18 @@ export function MessageShell() {
   // connection never opens (no WebSocket, a blocked upgrade, a dead hub) or
   // later drops, everything still refreshes on its own. A failed `start()` is
   // therefore swallowed on purpose — it is not an error the user must see.
+  // Both roles that see the gadget: the hub pushes to the RECIPIENT's per-user
+  // group and an owner→SuperAdmin message names the SuperAdmin as recipient, so
+  // the SuperAdmin's badge updates the instant a message lands instead of riding
+  // the poll ladder above. Its inbox page (/admin/messages) keeps its own cycle;
+  // this is only the badge and the open panel.
   useEffect(() => {
-    if (!user || !isOwnerAdmin(user) || !isOnline) return;
+    if (!user || !seesHeaderMessages(user) || !isOnline) return;
     const connection = createMessagesRealtimeConnection(
-      resolveMessagesHubUrl(import.meta.env['API_URL'] as string | undefined, window.location.origin),
+      resolveMessagesHubUrl(
+        import.meta.env['API_URL'] as string | undefined,
+        window.location.origin,
+      ),
     );
     const pull = () => void refresh(isOpenRef.current);
     // A pushed message is activity too, so the fallback poll re-arms fast. A
@@ -453,7 +474,64 @@ export function MessageShell() {
     })),
   ].sort((a, b) => a.timestamp - b.timestamp);
 
-  if (!user || !isOwnerAdmin(user)) return null;
+  if (!user || !seesHeaderMessages(user)) return null;
+
+  // The SuperAdmin never opens the panel: it has no active-store thread to
+  // show (a conversation keyed on its empty `selectedStoreId` does not exist),
+  // so an empty popup would be a dead end. Its trigger is a plain link to the
+  // inbox page instead, carrying the exact same glyph, dot and counter.
+  const isInboxLink = !isOwnerAdmin(user) && isSuperAdmin(user);
+
+  /**
+   * The glyph, the attention dot and the counter, shared byte for byte by
+   * both triggers so the icon cannot drift between the owner's panel button
+   * and the SuperAdmin's link to the inbox.
+   */
+  const triggerGlyph = (
+    <>
+      <ChatIcon />
+      {/*
+        Attention dot (user request 2026-10-02): with the count always
+        rendered, "3" and "0" are easy to read past, so a >0 total gets a
+        red dot that grows and fades out over `animate-ping` — the pulse is
+        what actually pulls the eye, not the number. Anchored top-LEFT so it
+        never collides with the count badge, which owns the top-right
+        corner. `aria-hidden` because the number beside it already carries
+        the same fact for assistive tech, and `motion-reduce` stops the loop
+        for users who asked the OS to calm animations down.
+      */}
+      {totalUnread > 0 && (
+        <span
+          data-testid="message-unread-dot"
+          aria-hidden="true"
+          className="absolute left-0 top-0 h-2.5 w-2.5 rounded-full bg-danger animate-ping motion-reduce:animate-none"
+        />
+      )}
+      {/*
+        The count is ALWAYS shown, zero included: a badge that appears and
+        disappears with the total makes the icon itself look "inactive"
+        between bursts, and a slot that reflows as the number grows shifts
+        the icon under the cursor.
+
+        The BACKGROUND is the chat's WhatsApp green in EVERY case, zero
+        included (user request 2026-10-04). The `totalUnread > 0 ? green :
+        bg-text-muted` branch painted rgb(140 140 140) at zero, which read as
+        a disabled control instead of a quiet one — and because
+        `totalUnread` sits at zero for most of the session (see the mark-as-
+        read blast in `refresh`), the badge looked gray almost always. The
+        gadget's identity IS the icon's color, so the two never diverge.
+
+        No opacity variant: the cart badge paints a solid `bg-primary` with
+        no dimmed state (cart-shell.tsx:663), so there is nothing to mirror.
+      */}
+      <span
+        data-testid="message-badge"
+        className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-whatsapp px-1 text-xs font-bold text-white"
+      >
+        {totalUnread > 99 ? '99+' : totalUnread}
+      </span>
+    </>
+  );
 
   return (
     <div className="static sm:relative" ref={shellRef}>
@@ -471,54 +549,24 @@ export function MessageShell() {
         (web-common/styles.css); the literal `#25D366` used to be repeated in
         three files, which is how a brand color ends up drifting.
       */}
-      <button
-        type="button"
-        onClick={handleToggle}
-        className="relative rounded-lg p-2 text-whatsapp hover:bg-whatsapp-light transition-colors"
-        aria-label={intl.formatMessage({ id: 'MESSAGES.TITLE' })}
-      >
-        <ChatIcon />
-        {/*
-          Attention dot (user request 2026-10-02): with the count always
-          rendered, "3" and "0" are easy to read past, so a >0 total gets a
-          red dot that grows and fades out over `animate-ping` — the pulse is
-          what actually pulls the eye, not the number. Anchored top-LEFT so it
-          never collides with the count badge, which owns the top-right
-          corner. `aria-hidden` because the number beside it already carries
-          the same fact for assistive tech, and `motion-reduce` stops the loop
-          for users who asked the OS to calm animations down.
-        */}
-        {totalUnread > 0 && (
-          <span
-            data-testid="message-unread-dot"
-            aria-hidden="true"
-            className="absolute left-0 top-0 h-2.5 w-2.5 rounded-full bg-danger animate-ping motion-reduce:animate-none"
-          />
-        )}
-        {/*
-          The count is ALWAYS shown, zero included: a badge that appears and
-          disappears with the total makes the icon itself look "inactive"
-          between bursts, and a slot that reflows as the number grows shifts
-          the icon under the cursor.
-
-          The BACKGROUND is the chat's WhatsApp green in EVERY case, zero
-          included (user request 2026-10-04). The `totalUnread > 0 ? green :
-          bg-text-muted` branch painted rgb(140 140 140) at zero, which read as
-          a disabled control instead of a quiet one — and because
-          `totalUnread` sits at zero for most of the session (see the mark-as-
-          read blast in `refresh`), the badge looked gray almost always. The
-          gadget's identity IS the icon's color, so the two never diverge.
-
-          No opacity variant: the cart badge paints a solid `bg-primary` with
-          no dimmed state (cart-shell.tsx:663), so there is nothing to mirror.
-        */}
-        <span
-          data-testid="message-badge"
-          className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-whatsapp px-1 text-xs font-bold text-white"
+      {isInboxLink ? (
+        <Link
+          to="/admin/messages"
+          className="relative rounded-lg p-2 text-whatsapp hover:bg-whatsapp-light transition-colors"
+          aria-label={intl.formatMessage({ id: 'MESSAGES.TITLE' })}
         >
-          {totalUnread > 99 ? '99+' : totalUnread}
-        </span>
-      </button>
+          {triggerGlyph}
+        </Link>
+      ) : (
+        <button
+          type="button"
+          onClick={handleToggle}
+          className="relative rounded-lg p-2 text-whatsapp hover:bg-whatsapp-light transition-colors"
+          aria-label={intl.formatMessage({ id: 'MESSAGES.TITLE' })}
+        >
+          {triggerGlyph}
+        </button>
+      )}
 
       {isOpen && (
         <div className="absolute left-0 right-0 top-full mt-2 w-auto rounded-xl border border-border bg-surface shadow-card z-50 sm:left-auto sm:right-0 sm:w-96">

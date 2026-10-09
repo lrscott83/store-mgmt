@@ -105,9 +105,11 @@ export function Navbar({ isSidebarOpen, onSidebarToggle }: NavbarProps) {
         <CartShell />
 
         {/* Chat SuperAdmin↔Owner: mounted for every authenticated session — MessageShell
-            itself self-gates on the OwnerAdmin role. Its HTTP work (mount refresh, poll
-            ladder, SignalR) is gated on connectivity INSIDE the component, so the icon is
-            always visible while the offline E2E's zero-request invariant stays intact. */}
+            self-gates on the two roles that chat (OwnerAdmin opens the panel, SuperAdmin
+            gets the inbox link + unread counter). Its HTTP work (mount refresh, poll
+            ladder, SignalR) is gated on role and connectivity INSIDE the component, so the
+            icon is always visible while the offline E2E's zero-request invariant stays
+            intact. */}
         <MessageShell />
 
         {/* Owner-registration bell: mounted for every authenticated session — NotificationShell

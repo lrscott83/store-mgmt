@@ -26,19 +26,27 @@ public class GetConversationsQueryHandler : IQueryHandler<GetConversationsQuery,
 
         var conversations = await _messageRepository.GetConversationsAsync(currentUserId, isSuperAdmin, cancellationToken);
 
-        var result = new List<ConversationDto>();
-        foreach (var conversation in conversations)
+        // Batched, not per conversation. Awaiting the unread count and the owner
+        // recency INSIDE the loop was an N+1: two extra round trips for every row the
+        // inbox lists, so the endpoint's cost grew with the number of registered
+        // owners and the SuperAdmin inbox is exactly where that is felt. Two queries
+        // for the whole list instead of 2N.
+        var conversationIds = conversations.Select(c => c.Id).ToList();
+        var unreadCounts = await _messageRepository.GetUnreadCountsAsync(conversationIds, currentUserId, cancellationToken);
+        var lastOwnerMessageAt = await _messageRepository.GetLastOwnerMessageAtAsync(conversationIds, cancellationToken);
+
+        // A missing entry means zero unread / never wrote, which is why the lookups
+        // default rather than the dictionary being pre-filled.
+        var result = conversations.Select(conversation => new ConversationDto
         {
-            result.Add(new ConversationDto
-            {
-                Id = conversation.Id,
-                OwnerId = conversation.OwnerId,
-                StoreId = conversation.StoreId,
-                LastMessageAt = conversation.LastMessageAt,
-                LastMessageContent = conversation.LastMessageContent,
-                UnreadCount = await _messageRepository.GetUnreadCountAsync(conversation.Id, currentUserId, cancellationToken),
-            });
-        }
+            Id = conversation.Id,
+            OwnerId = conversation.OwnerId,
+            StoreId = conversation.StoreId,
+            LastMessageAt = conversation.LastMessageAt,
+            LastMessageContent = conversation.LastMessageContent,
+            UnreadCount = unreadCounts.TryGetValue(conversation.Id, out var count) ? count : 0,
+            LastOwnerMessageAt = lastOwnerMessageAt.TryGetValue(conversation.Id, out var at) ? at : null,
+        }).ToList();
 
         return ResponseResult.Success<IEnumerable<ConversationDto>>(result);
     }
@@ -52,4 +60,9 @@ public sealed record ConversationDto
     public DateTime LastMessageAt { get; set; }
     public string? LastMessageContent { get; set; }
     public int UnreadCount { get; set; }
+    /// <summary>
+    /// When the owner last wrote, <c>null</c> when they never have. Unlike
+    /// <see cref="LastMessageAt"/> this does NOT move when the SuperAdmin replies.
+    /// </summary>
+    public DateTime? LastOwnerMessageAt { get; set; }
 }

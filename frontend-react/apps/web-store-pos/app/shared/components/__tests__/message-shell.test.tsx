@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
+import { MemoryRouter } from 'react-router';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import esMessages from '~/shared/lib/i18n/es';
@@ -12,6 +13,38 @@ const sendMessageMock = vi.hoisted(() => vi.fn());
 const markAsReadMock = vi.hoisted(() => vi.fn());
 const markAllAsReadMock = vi.hoisted(() => vi.fn());
 
+// T9.3 — the connection is created by the shell itself, so a hoisted factory lets
+// a test assert the SuperAdmin path OPENS it (the badge's realtime push) rather
+// than only that the REST + poll-fallback path works.
+const connectionStartMock = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
+const connectionStopMock = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
+
+// The handlers the shell subscribes with are KEPT, not swallowed. A bare
+// `on: vi.fn()` only proves the subscription happened; it cannot prove the
+// subscription WORKS. Recording them lets a test fire the hub's
+// ReceiveMessage and assert the badge actually moves — which is the whole
+// point of opening the connection (a stubbed handler proves nothing).
+const connectionHandlers = vi.hoisted(() => new Map<string, (...args: unknown[]) => void>());
+const connectionOnMock = vi.hoisted(() =>
+  vi.fn((event: string, handler: (...args: unknown[]) => void) => {
+    connectionHandlers.set(event, handler);
+  }),
+);
+const connectionOffMock = vi.hoisted(() =>
+  vi.fn((event: string) => {
+    connectionHandlers.delete(event);
+  }),
+);
+
+const createConnectionMock = vi.hoisted(() =>
+  vi.fn(() => ({
+    on: connectionOnMock,
+    off: connectionOffMock,
+    start: connectionStartMock,
+    stop: connectionStopMock,
+  })),
+);
+
 // T9.3 — the realtime hub is additive: these tests exercise the REST +
 // interval-fallback path, so the connection is stubbed. Without this the shell
 // would attempt a real SignalR negotiate POST, which the suite's
@@ -20,12 +53,7 @@ vi.mock('~/shared/lib/messages/messages-realtime-service', () => ({
   RECEIVE_MESSAGE_EVENT: 'ReceiveMessage',
   MESSAGE_READ_EVENT: 'MessageRead',
   resolveMessagesHubUrl: () => '/hubs/messages',
-  createMessagesRealtimeConnection: () => ({
-    on: vi.fn(),
-    off: vi.fn(),
-    start: vi.fn().mockResolvedValue(undefined),
-    stop: vi.fn().mockResolvedValue(undefined),
-  }),
+  createMessagesRealtimeConnection: createConnectionMock,
 }));
 
 vi.mock('~/shared/lib/messages/messages-http-service', () => ({
@@ -112,10 +140,14 @@ function readWebCommonStyles(): string {
 }
 
 function renderShell() {
+  // MemoryRouter because the SuperAdmin trigger is a <Link> to the inbox page;
+  // the owner path renders a plain button and is unaffected by the context.
   return render(
-    <IntlProvider messages={esMessages} locale="es" defaultLocale="es">
-      <MessageShell />
-    </IntlProvider>,
+    <MemoryRouter>
+      <IntlProvider messages={esMessages} locale="es" defaultLocale="es">
+        <MessageShell />
+      </IntlProvider>
+    </MemoryRouter>,
   );
 }
 
@@ -155,13 +187,109 @@ describe('MessageShell — header badge', () => {
     expect(screen.queryByTestId('message-unread-dot')).not.toBeInTheDocument();
   });
 
-  it('renders nothing for a SuperAdmin user and issues no request', async () => {
-    mockUser = { id: 'sa', selectedStoreId: 's1', isSuperAdmin: true };
+  it('shows the icon with the unread counter for a SuperAdmin user', async () => {
+    mockUser = { id: 'sa', selectedStoreId: '', isSuperAdmin: true, isOwnerAdmin: false };
+    getConversationsMock.mockResolvedValue(
+      success([
+        conversation({ id: 'c1', storeId: 's1', unreadCount: 4 }),
+        conversation({ id: 'c2', storeId: 's2', unreadCount: 1 }),
+      ]),
+    );
 
     renderShell();
 
-    await waitFor(() => expect(getConversationsMock).not.toHaveBeenCalled());
+    // The SuperAdmin sees the same gadget with the sum over ALL its
+    // conversations — the backend already returns the whole list for this role.
+    await waitFor(() => expect(screen.getByTestId('message-badge')).toHaveTextContent('5'));
+    expect(screen.queryByTestId('message-unread-dot')).toBeInTheDocument();
+  });
+
+  it('links the SuperAdmin trigger to the inbox page and opens no panel', async () => {
+    mockUser = { id: 'sa', selectedStoreId: '', isSuperAdmin: true, isOwnerAdmin: false };
+    getConversationsMock.mockResolvedValue(success([conversation({ unreadCount: 1 })]));
+
+    renderShell();
+
+    const link = await screen.findByRole('link', { name: 'Mensajes' });
+    expect(link).toHaveAttribute('href', '/admin/messages');
     expect(screen.queryByRole('button', { name: 'Mensajes' })).not.toBeInTheDocument();
+
+    fireEvent.click(link);
+    // No popup thread: the SuperAdmin's inbox is the page itself.
+    expect(screen.queryByTestId('message-list')).not.toBeInTheDocument();
+  });
+});
+
+describe('MessageShell — realtime connection', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    connectionHandlers.clear();
+    getConversationsMock.mockResolvedValue(success([]));
+  });
+
+  // The hub pushes to the RECIPIENT's per-user group and an owner→SuperAdmin
+  // message names the SuperAdmin as recipient, so gating the connection on
+  // OwnerAdmin alone meant the badge only moved when the poll ladder came
+  // around. Both roles that see the gadget must open it.
+  it('opens the realtime connection for a SuperAdmin so its badge updates on push', async () => {
+    mockUser = { id: 'sa', selectedStoreId: '', isSuperAdmin: true, isOwnerAdmin: false };
+
+    renderShell();
+
+    await waitFor(() => expect(getConversationsMock).toHaveBeenCalled());
+    await waitFor(() => expect(createConnectionMock).toHaveBeenCalled());
+    await waitFor(() => expect(connectionStartMock).toHaveBeenCalled());
+
+    // The owner path still opens it — the guard is a widening, not a swap.
+    mockUser = { id: 'u1', selectedStoreId: 's1', isSuperAdmin: false, isOwnerAdmin: true };
+    renderShell();
+
+    await waitFor(() => expect(connectionStartMock).toHaveBeenCalledTimes(2));
+  });
+
+  // The assertion above proves the connection OPENS. This one proves the
+  // subscription it opens actually works: the badge used to move only when the
+  // poll ladder came around, and a mock that swallows handlers cannot tell a
+  // wired subscription from a dead one. So the recorded ReceiveMessage handler is
+  // invoked here and the badge must follow without any timer advancing — the
+  // first read returns 0 unread, the push read returns 2.
+  it('moves the badge when the hub pushes a ReceiveMessage', async () => {
+    mockUser = { id: 'sa', selectedStoreId: '', isSuperAdmin: true, isOwnerAdmin: false };
+    getConversationsMock
+      .mockResolvedValueOnce(success([conversation({ id: 'c1', storeId: 's1', unreadCount: 0 })]))
+      .mockResolvedValue(success([conversation({ id: 'c1', storeId: 's1', unreadCount: 2 })]));
+
+    renderShell();
+
+    await waitFor(() => expect(screen.getByTestId('message-badge')).toHaveTextContent('0'));
+    const handler = connectionHandlers.get('ReceiveMessage');
+    expect(handler).toBeTypeOf('function');
+
+    // Sanity: the mock is actually listening, so the badge moving below is
+    // attributable to the shell's subscription and not to a stray timer.
+    expect(connectionOnMock).toHaveBeenCalledWith('ReceiveMessage', expect.any(Function));
+
+    // The hub delivers the pushed message as the handler's payload; firing the
+    // recorded handler WITH it proves the real subscription contract instead of an
+    // argument-less call that would keep passing even if the handler started
+    // reading the payload. The field names mirror MessageDto / the hub's payload.
+    const pushed: MessageDto = {
+      id: 'm-push',
+      conversationId: 'c1',
+      senderId: 'u1',
+      senderType: 1,
+      recipientId: 'sa',
+      storeId: 's1',
+      content: 'Mensaje empujado',
+      sentAt: '2026-01-01T12:00:00Z',
+      readAt: null,
+    };
+
+    await act(async () => {
+      handler!(pushed);
+    });
+
+    await waitFor(() => expect(screen.getByTestId('message-badge')).toHaveTextContent('2'));
   });
 });
 
@@ -208,7 +336,9 @@ describe('MessageShell — panel conversation', () => {
     await waitFor(() => expect(getConversationsMock).toHaveBeenCalled());
     openPanel();
 
-    await waitFor(() => expect(markAsReadMock).toHaveBeenCalledWith('theirs', { background: true }));
+    await waitFor(() =>
+      expect(markAsReadMock).toHaveBeenCalledWith('theirs', { background: true }),
+    );
     expect(markAsReadMock).not.toHaveBeenCalledWith('mine', { background: true });
   });
 });

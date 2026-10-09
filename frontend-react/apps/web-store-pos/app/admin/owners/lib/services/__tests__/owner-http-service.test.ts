@@ -50,6 +50,17 @@ describe('ownerHttpService.listOwners — HTTP-2: GET /v1/owners/all/true', () =
     expect(result.actionCode).toBe(0);
     expect(result.errors).toEqual([]);
   });
+
+  // The messages view loads this directory on mount and on focus/online: a
+  // background fetch must not drive the global loading overlay.
+  it('listOwners passes skipLoading when asked for a background fetch', async () => {
+    const { ownerHttpService } = await import('../owner-http-service');
+    const { apiClient } = await import('~/shared/lib/http/api-client');
+
+    await ownerHttpService.listOwners({ background: true });
+
+    expect(apiClient.get).toHaveBeenCalledWith('/v1/owners/all/true', { skipLoading: true });
+  });
 });
 
 describe('ownerHttpService.getOwner — HTTP-3: GET /v1/owners/:id', () => {

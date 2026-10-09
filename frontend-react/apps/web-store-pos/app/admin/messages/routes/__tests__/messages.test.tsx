@@ -117,6 +117,7 @@ const conversationA: ConversationDto = {
   lastMessageAt: '2026-01-01T10:00:00Z',
   lastMessageContent: 'Hola administrador',
   unreadCount: 3,
+  lastOwnerMessageAt: '2026-01-01T10:00:00Z',
 };
 
 function response<T>(data: T): BaseResponseModel<T> {
@@ -260,6 +261,81 @@ describe('AdminMessagesPage — sending', () => {
   });
 });
 
+describe('AdminMessagesPage — thread scroll', () => {
+  it('brings an owner reply into view by jumping the thread to the bottom', async () => {
+    const { messagesHttpService } = await import('~/shared/lib/messages/messages-http-service');
+    // The thread is read empty when it is opened, then the owner replies. Both
+    // land through `loadMessages`, which is the path the poll ladder and the
+    // realtime push share.
+    const incoming: MessageDto = {
+      id: 'm-owner-1',
+      conversationId: 'conv-a',
+      senderId: 'user-a',
+      senderType: 2,
+      recipientId: 'super-1',
+      storeId: 'store-a',
+      content: 'Hola, necesito ayuda',
+      sentAt: '2026-01-01T12:00:00Z',
+      readAt: null,
+    };
+    vi.mocked(messagesHttpService.getMessages)
+      .mockResolvedValueOnce(response<MessageDto[]>([]))
+      .mockResolvedValue(response<MessageDto[]>([incoming]));
+
+    await renderPage();
+    fireEvent.click(await screen.findByTestId('owner-owner-a'));
+    const thread = await screen.findByTestId('message-thread');
+
+    // jsdom has no layout: pin the scroll box so the jump is measurable at all.
+    Object.defineProperty(thread, 'scrollHeight', { value: 480, configurable: true });
+    Object.defineProperty(thread, 'scrollTop', { value: 0, writable: true, configurable: true });
+
+    // Returning to the window re-arms the ladder, so the next poll happens now.
+    fireEvent(window, new Event('focus'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('message-m-owner-1')).toBeInTheDocument();
+    });
+    expect(thread.scrollTop).toBe(480);
+  });
+
+  it('leaves the view alone when a poll re-reads the same rows', async () => {
+    const { messagesHttpService } = await import('~/shared/lib/messages/messages-http-service');
+    const incoming: MessageDto = {
+      id: 'm-owner-1',
+      conversationId: 'conv-a',
+      senderId: 'user-a',
+      senderType: 2,
+      recipientId: 'super-1',
+      storeId: 'store-a',
+      content: 'Hola, necesito ayuda',
+      sentAt: '2026-01-01T12:00:00Z',
+      readAt: null,
+    };
+    vi.mocked(messagesHttpService.getMessages).mockResolvedValue(
+      response<MessageDto[]>([incoming]),
+    );
+
+    await renderPage();
+    fireEvent.click(await screen.findByTestId('owner-owner-a'));
+    const thread = await screen.findByTestId('message-thread');
+    await waitFor(() => {
+      expect(screen.getByTestId('message-m-owner-1')).toBeInTheDocument();
+    });
+
+    // The operator scrolls up to read history, and a poll re-reads the same rows:
+    // the identical newest message must not yank the panel back down.
+    Object.defineProperty(thread, 'scrollHeight', { value: 480, configurable: true });
+    Object.defineProperty(thread, 'scrollTop', { value: 120, writable: true, configurable: true });
+    fireEvent(window, new Event('focus'));
+
+    await waitFor(() => {
+      expect(vi.mocked(messagesHttpService.getMessages).mock.calls.length).toBeGreaterThan(1);
+    });
+    expect(thread.scrollTop).toBe(120);
+  });
+});
+
 describe('AdminMessagesPage — broadcast', () => {
   it('sends the broadcast content and shows a success toast', async () => {
     const { messagesHttpService } = await import('~/shared/lib/messages/messages-http-service');
@@ -272,8 +348,250 @@ describe('AdminMessagesPage — broadcast', () => {
     fireEvent.click(screen.getByTestId('broadcast-send'));
 
     await waitFor(() => {
-      expect(messagesHttpService.broadcastMessage).toHaveBeenCalledWith('Promocion de octubre');
+      // Background: the whole messages view runs without the global overlay.
+      expect(messagesHttpService.broadcastMessage).toHaveBeenCalledWith('Promocion de octubre', {
+        background: true,
+      });
     });
     expect(mockShowToastSuccess).toHaveBeenCalled();
+  });
+});
+
+describe('AdminMessagesPage — owner ordering', () => {
+  function ownerOrder(): (string | null)[] {
+    return Array.from(document.querySelectorAll('[data-testid="owners-list"] button')).map(
+      (button) => button.getAttribute('data-testid'),
+    );
+  }
+
+  it('lists first the owner whose OWN message is the most recent', async () => {
+    const { messagesHttpService } = await import('~/shared/lib/messages/messages-http-service');
+    vi.mocked(messagesHttpService.getConversations).mockResolvedValue(
+      response<ConversationDto[]>([
+        conversationA, // user-a — owner wrote 10:00
+        {
+          id: 'conv-b',
+          ownerId: 'user-b',
+          storeId: 'store-b',
+          lastMessageAt: '2026-01-01T12:00:00Z',
+          lastMessageContent: 'Necesito ayuda',
+          unreadCount: 1,
+          lastOwnerMessageAt: '2026-01-01T12:00:00Z',
+        },
+      ]),
+    );
+
+    await renderPage();
+    await screen.findByTestId('owners-list');
+
+    // Newest OWNER message first; the owner who never wrote keeps the old
+    // rank ordering (non-free store) below the ones that have one.
+    expect(ownerOrder()).toEqual(['owner-owner-b', 'owner-owner-a', 'owner-owner-c']);
+  });
+
+  // The regression this ordering exists to prevent: `lastMessageAt` moves for
+  // EVERY message including the SuperAdmin's own reply, so ordering on it
+  // floated the owner being ANSWERED to the top of the inbox. Here Ana's thread
+  // is the newest one but her owner-recency is the OLDEST, and the list must not
+  // follow the thread.
+  it('does not reorder when the SuperAdmin answers, though lastMessageAt moves', async () => {
+    const { messagesHttpService } = await import('~/shared/lib/messages/messages-http-service');
+    const answeredByAdmin = (replyAt: string): ConversationDto => ({
+      ...conversationA,
+      lastMessageAt: replyAt,
+      lastMessageContent: 'Respuesta del administrador',
+      lastOwnerMessageAt: '2026-01-01T10:00:00Z',
+    });
+    const waiting: ConversationDto = {
+      id: 'conv-b',
+      ownerId: 'user-b',
+      storeId: 'store-b',
+      lastMessageAt: '2026-01-01T12:00:00Z',
+      lastMessageContent: 'Sigo esperando',
+      unreadCount: 1,
+      lastOwnerMessageAt: '2026-01-01T12:00:00Z',
+    };
+
+    // Bea wrote last (12:00) and nobody has answered her, so she leads. The
+    // SuperAdmin then answers Ana at 13:00 — the newest thread of the two.
+    vi.mocked(messagesHttpService.getConversations)
+      .mockResolvedValueOnce(
+        response<ConversationDto[]>([answeredByAdmin('2026-01-01T10:30:00Z'), waiting]),
+      )
+      .mockResolvedValue(
+        response<ConversationDto[]>([answeredByAdmin('2026-01-01T13:00:00Z'), waiting]),
+      );
+
+    await renderPage();
+    await screen.findByTestId('owners-list');
+    expect(ownerOrder()).toEqual(['owner-owner-b', 'owner-owner-a', 'owner-owner-c']);
+
+    // The refresh that runs when the window regains focus delivers the reply.
+    fireEvent(window, new Event('focus'));
+
+    await waitFor(() => {
+      expect(vi.mocked(messagesHttpService.getConversations).mock.calls.length).toBeGreaterThan(1);
+    });
+    // Ana's lastMessageAt is now 13:00, the newest of the two threads. Ordering
+    // on it would flip the list; ordering on the owner's own message must not.
+    // Bea is the one still WAITING, so she stays on top.
+    expect(ownerOrder()).toEqual(['owner-owner-b', 'owner-owner-a', 'owner-owner-c']);
+  });
+
+  // A conversation can EXIST with no owner message in it: registration opens the
+  // thread with the platform's welcome message, which the admin sent. That is the
+  // shape every owner starts in, and `lastOwnerMessageAt` is null there — not
+  // absent from the payload, null. Every other ordering test here left the
+  // never-wrote owner with NO conversation at all, so the null branch was only
+  // ever exercised by a payload shape the backend cannot produce.
+  //
+  // Two owners in that exact shape, ordered against a real one: both nulls sit
+  // BELOW Ana (owner activity outranks plan and name), and between themselves the
+  // pre-existing fallback still decides — Carla's paid store ahead of Bea's free
+  // one, and Bea ahead of Dora on name alone so the final tiebreak is proven too.
+  it('ranks owners whose conversation has a null lastOwnerMessageAt below those who wrote', async () => {
+    const { messagesHttpService } = await import('~/shared/lib/messages/messages-http-service');
+    const { ownerHttpService } = await import('~/admin/owners/lib/services/owner-http-service');
+    const { storeHttpService } =
+      await import('~/management/stores/lib/services/store-http-service');
+
+    const ownerDora = {
+      id: 'owner-f',
+      userId: 'user-f',
+      fullName: 'Dora Sin Escribir',
+      isActive: true,
+    } as Owner;
+    const storeDora = {
+      id: 'store-f',
+      name: 'Tienda F',
+      ownerId: 'owner-f',
+      ownerName: 'Dora Sin Escribir',
+      approved: true,
+      planType: 'Gratis',
+      isActive: true,
+    } as Store;
+
+    vi.mocked(ownerHttpService.listOwners).mockResolvedValue(
+      response<Owner[]>([ownerA, ownerB, ownerC, ownerDora]),
+    );
+    vi.mocked(storeHttpService.listStores).mockResolvedValue(
+      response<Store[]>([storeA, storeB, storeC, storeDora]),
+    );
+
+    // Ana wrote; Bea and Dora have a conversation but never wrote in it.
+    const welcomeOnly = (ownerId: string, storeId: string, content: string): ConversationDto => ({
+      id: `conv-${storeId}`,
+      ownerId,
+      storeId,
+      lastMessageAt: '2026-01-01T09:00:00Z',
+      lastMessageContent: content,
+      unreadCount: 0,
+      lastOwnerMessageAt: null,
+    });
+    vi.mocked(messagesHttpService.getConversations).mockResolvedValue(
+      response<ConversationDto[]>([
+        conversationA,
+        welcomeOnly('user-b', 'store-b', 'Bienvenida'),
+        welcomeOnly('user-f', 'store-f', 'Bienvenida'),
+      ]),
+    );
+
+    await renderPage();
+    await screen.findByTestId('owners-list');
+
+    // Ana wrote last → first. Carla never wrote but pays → next. Bea (free) before
+    // Dora (free) purely by name.
+    expect(ownerOrder()).toEqual([
+      'owner-owner-a',
+      'owner-owner-c',
+      'owner-owner-b',
+      'owner-owner-f',
+    ]);
+  });
+
+  it('moves an owner to the top when the poll brings a message from them', async () => {
+    const { messagesHttpService } = await import('~/shared/lib/messages/messages-http-service');
+    vi.mocked(messagesHttpService.getConversations)
+      .mockResolvedValueOnce(response<ConversationDto[]>([conversationA]))
+      .mockResolvedValue(
+        response<ConversationDto[]>([
+          conversationA,
+          {
+            id: 'conv-b',
+            ownerId: 'user-b',
+            storeId: 'store-b',
+            lastMessageAt: '2026-01-01T12:00:00Z',
+            lastMessageContent: 'Acabo de escribir',
+            unreadCount: 1,
+            lastOwnerMessageAt: '2026-01-01T12:00:00Z',
+          },
+        ]),
+      );
+
+    await renderPage();
+    await screen.findByTestId('owners-list');
+    expect(ownerOrder()).toEqual(['owner-owner-a', 'owner-owner-c', 'owner-owner-b']);
+
+    // The refresh that runs when the window regains focus brings Bea's message.
+    fireEvent(window, new Event('focus'));
+
+    await waitFor(() => {
+      expect(ownerOrder()).toEqual(['owner-owner-b', 'owner-owner-a', 'owner-owner-c']);
+    });
+  });
+});
+
+describe('AdminMessagesPage — background loading', () => {
+  it('requests the directory and the threads with background:true so no overlay shows', async () => {
+    const { ownerHttpService } = await import('~/admin/owners/lib/services/owner-http-service');
+    const { storeHttpService } =
+      await import('~/management/stores/lib/services/store-http-service');
+    const { messagesHttpService } = await import('~/shared/lib/messages/messages-http-service');
+
+    await renderPage();
+    await screen.findByTestId('owners-list');
+
+    await waitFor(() => {
+      expect(ownerHttpService.listOwners).toHaveBeenCalledWith({ background: true });
+      expect(storeHttpService.listStores).toHaveBeenCalledWith({ background: true });
+      expect(messagesHttpService.getConversations).toHaveBeenCalledWith({ background: true });
+    });
+  });
+});
+
+describe('AdminMessagesPage — sending scrolls the thread', () => {
+  it('jumps the thread to the bottom after the SuperAdmin sends a message', async () => {
+    const { messagesHttpService } = await import('~/shared/lib/messages/messages-http-service');
+    const sent: MessageDto = {
+      id: 'm-sent',
+      conversationId: 'conv-a',
+      senderId: 'super-1',
+      senderType: 2,
+      recipientId: 'user-a',
+      storeId: 'store-a',
+      content: 'Hola Ana',
+      sentAt: '2026-01-01T12:30:00Z',
+      readAt: null,
+    };
+    vi.mocked(messagesHttpService.getMessages)
+      .mockResolvedValueOnce(response<MessageDto[]>([]))
+      .mockResolvedValue(response<MessageDto[]>([sent]));
+
+    await renderPage();
+    fireEvent.click(await screen.findByTestId('owner-owner-a'));
+    const thread = await screen.findByTestId('message-thread');
+
+    // jsdom has no layout: pin the scroll box so the jump is measurable at all.
+    Object.defineProperty(thread, 'scrollHeight', { value: 480, configurable: true });
+    Object.defineProperty(thread, 'scrollTop', { value: 0, writable: true, configurable: true });
+
+    const input = await screen.findByTestId('message-input');
+    fireEvent.change(input, { target: { value: 'Hola Ana' } });
+    fireEvent.click(screen.getByTestId('message-send'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('message-m-sent')).toBeInTheDocument();
+    });
+    expect(thread.scrollTop).toBe(480);
   });
 });
