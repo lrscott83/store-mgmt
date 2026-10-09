@@ -66,6 +66,36 @@ vi.mock('~/shared/lib/messages/messages-http-service', () => ({
     broadcastMessage: vi.fn(),
   },
 }));
+const connectionStartMock = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
+const connectionStopMock = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
+
+const connectionHandlers = vi.hoisted(() => new Map<string, (...args: unknown[]) => void>());
+const connectionOnMock = vi.hoisted(() =>
+  vi.fn((event: string, handler: (...args: unknown[]) => void) => {
+    connectionHandlers.set(event, handler);
+  }),
+);
+const connectionOffMock = vi.hoisted(() =>
+  vi.fn((event: string) => {
+    connectionHandlers.delete(event);
+  }),
+);
+
+const createConnectionMock = vi.hoisted(() =>
+  vi.fn(() => ({
+    on: connectionOnMock,
+    off: connectionOffMock,
+    start: connectionStartMock,
+    stop: connectionStopMock,
+  })),
+);
+
+vi.mock('~/shared/lib/messages/messages-realtime-service', () => ({
+  RECEIVE_MESSAGE_EVENT: 'ReceiveMessage',
+  MESSAGE_READ_EVENT: 'MessageRead',
+  resolveMessagesHubUrl: () => '/hubs/messages',
+  createMessagesRealtimeConnection: createConnectionMock,
+}));
 vi.mock('~/shared/lib/notifications/notifications-http-service', () => ({
   notificationsHttpService: {
     getNotifications: vi
