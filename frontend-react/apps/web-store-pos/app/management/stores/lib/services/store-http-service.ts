@@ -52,9 +52,28 @@ interface UpdateStorePayload {
   isActive: boolean;
 }
 
+/** Per-call knobs for the store directory read. */
+export interface StoreListRequestOptions {
+  /**
+   * A background load must not drive the global loading overlay — maps to
+   * api-client's `skipLoading`. The messages view reloads the store directory
+   * on focus/online, and flashing the overlay on every pass is exactly what
+   * that flag exists to prevent.
+   */
+  background?: boolean;
+}
+
+/** Axios config that turns the global loading overlay off. */
+const SKIP_LOADING = { skipLoading: true };
+
 export const storeHttpService = {
-  async listStores(): Promise<BaseResponseModel<Store[]>> {
-    const response = await apiClient.get<BaseResponseModel<Store[]>>('/v1/stores/by-current-user');
+  async listStores(options?: StoreListRequestOptions): Promise<BaseResponseModel<Store[]>> {
+    const url = '/v1/stores/by-current-user';
+    // The non-background branch keeps its single-argument call: the existing
+    // HTTP-2 assertion pins `get(url)` with no config object.
+    const response = options?.background
+      ? await apiClient.get<BaseResponseModel<Store[]>>(url, SKIP_LOADING)
+      : await apiClient.get<BaseResponseModel<Store[]>>(url);
     return response.data;
   },
 

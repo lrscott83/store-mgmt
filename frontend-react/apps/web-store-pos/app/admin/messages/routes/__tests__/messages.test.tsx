@@ -117,6 +117,7 @@ const conversationA: ConversationDto = {
   lastMessageAt: '2026-01-01T10:00:00Z',
   lastMessageContent: 'Hola administrador',
   unreadCount: 3,
+  lastOwnerMessageAt: '2026-01-01T10:00:00Z',
 };
 
 function response<T>(data: T): BaseResponseModel<T> {
@@ -311,7 +312,9 @@ describe('AdminMessagesPage — thread scroll', () => {
       sentAt: '2026-01-01T12:00:00Z',
       readAt: null,
     };
-    vi.mocked(messagesHttpService.getMessages).mockResolvedValue(response<MessageDto[]>([incoming]));
+    vi.mocked(messagesHttpService.getMessages).mockResolvedValue(
+      response<MessageDto[]>([incoming]),
+    );
 
     await renderPage();
     fireEvent.click(await screen.findByTestId('owner-owner-a'));
@@ -345,8 +348,179 @@ describe('AdminMessagesPage — broadcast', () => {
     fireEvent.click(screen.getByTestId('broadcast-send'));
 
     await waitFor(() => {
-      expect(messagesHttpService.broadcastMessage).toHaveBeenCalledWith('Promocion de octubre');
+      // Background: the whole messages view runs without the global overlay.
+      expect(messagesHttpService.broadcastMessage).toHaveBeenCalledWith('Promocion de octubre', {
+        background: true,
+      });
     });
     expect(mockShowToastSuccess).toHaveBeenCalled();
+  });
+});
+
+describe('AdminMessagesPage — owner ordering', () => {
+  function ownerOrder(): (string | null)[] {
+    return Array.from(document.querySelectorAll('[data-testid="owners-list"] button')).map(
+      (button) => button.getAttribute('data-testid'),
+    );
+  }
+
+  it('lists first the owner whose OWN message is the most recent', async () => {
+    const { messagesHttpService } = await import('~/shared/lib/messages/messages-http-service');
+    vi.mocked(messagesHttpService.getConversations).mockResolvedValue(
+      response<ConversationDto[]>([
+        conversationA, // user-a — owner wrote 10:00
+        {
+          id: 'conv-b',
+          ownerId: 'user-b',
+          storeId: 'store-b',
+          lastMessageAt: '2026-01-01T12:00:00Z',
+          lastMessageContent: 'Necesito ayuda',
+          unreadCount: 1,
+          lastOwnerMessageAt: '2026-01-01T12:00:00Z',
+        },
+      ]),
+    );
+
+    await renderPage();
+    await screen.findByTestId('owners-list');
+
+    // Newest OWNER message first; the owner who never wrote keeps the old
+    // rank ordering (non-free store) below the ones that have one.
+    expect(ownerOrder()).toEqual(['owner-owner-b', 'owner-owner-a', 'owner-owner-c']);
+  });
+
+  // The regression this ordering exists to prevent: `lastMessageAt` moves for
+  // EVERY message including the SuperAdmin's own reply, so ordering on it
+  // floated the owner being ANSWERED to the top of the inbox. Here Ana's thread
+  // is the newest one but her owner-recency is the OLDEST, and the list must not
+  // follow the thread.
+  it('does not reorder when the SuperAdmin answers, though lastMessageAt moves', async () => {
+    const { messagesHttpService } = await import('~/shared/lib/messages/messages-http-service');
+    const answeredByAdmin = (replyAt: string): ConversationDto => ({
+      ...conversationA,
+      lastMessageAt: replyAt,
+      lastMessageContent: 'Respuesta del administrador',
+      lastOwnerMessageAt: '2026-01-01T10:00:00Z',
+    });
+    const waiting: ConversationDto = {
+      id: 'conv-b',
+      ownerId: 'user-b',
+      storeId: 'store-b',
+      lastMessageAt: '2026-01-01T12:00:00Z',
+      lastMessageContent: 'Sigo esperando',
+      unreadCount: 1,
+      lastOwnerMessageAt: '2026-01-01T12:00:00Z',
+    };
+
+    // Bea wrote last (12:00) and nobody has answered her, so she leads. The
+    // SuperAdmin then answers Ana at 13:00 — the newest thread of the two.
+    vi.mocked(messagesHttpService.getConversations)
+      .mockResolvedValueOnce(
+        response<ConversationDto[]>([answeredByAdmin('2026-01-01T10:30:00Z'), waiting]),
+      )
+      .mockResolvedValue(
+        response<ConversationDto[]>([answeredByAdmin('2026-01-01T13:00:00Z'), waiting]),
+      );
+
+    await renderPage();
+    await screen.findByTestId('owners-list');
+    expect(ownerOrder()).toEqual(['owner-owner-b', 'owner-owner-a', 'owner-owner-c']);
+
+    // The refresh that runs when the window regains focus delivers the reply.
+    fireEvent(window, new Event('focus'));
+
+    await waitFor(() => {
+      expect(vi.mocked(messagesHttpService.getConversations).mock.calls.length).toBeGreaterThan(1);
+    });
+    // Ana's lastMessageAt is now 13:00, the newest of the two threads. Ordering
+    // on it would flip the list; ordering on the owner's own message must not.
+    // Bea is the one still WAITING, so she stays on top.
+    expect(ownerOrder()).toEqual(['owner-owner-b', 'owner-owner-a', 'owner-owner-c']);
+  });
+
+  it('moves an owner to the top when the poll brings a message from them', async () => {
+    const { messagesHttpService } = await import('~/shared/lib/messages/messages-http-service');
+    vi.mocked(messagesHttpService.getConversations)
+      .mockResolvedValueOnce(response<ConversationDto[]>([conversationA]))
+      .mockResolvedValue(
+        response<ConversationDto[]>([
+          conversationA,
+          {
+            id: 'conv-b',
+            ownerId: 'user-b',
+            storeId: 'store-b',
+            lastMessageAt: '2026-01-01T12:00:00Z',
+            lastMessageContent: 'Acabo de escribir',
+            unreadCount: 1,
+            lastOwnerMessageAt: '2026-01-01T12:00:00Z',
+          },
+        ]),
+      );
+
+    await renderPage();
+    await screen.findByTestId('owners-list');
+    expect(ownerOrder()).toEqual(['owner-owner-a', 'owner-owner-c', 'owner-owner-b']);
+
+    // The refresh that runs when the window regains focus brings Bea's message.
+    fireEvent(window, new Event('focus'));
+
+    await waitFor(() => {
+      expect(ownerOrder()).toEqual(['owner-owner-b', 'owner-owner-a', 'owner-owner-c']);
+    });
+  });
+});
+
+describe('AdminMessagesPage — background loading', () => {
+  it('requests the directory and the threads with background:true so no overlay shows', async () => {
+    const { ownerHttpService } = await import('~/admin/owners/lib/services/owner-http-service');
+    const { storeHttpService } =
+      await import('~/management/stores/lib/services/store-http-service');
+    const { messagesHttpService } = await import('~/shared/lib/messages/messages-http-service');
+
+    await renderPage();
+    await screen.findByTestId('owners-list');
+
+    await waitFor(() => {
+      expect(ownerHttpService.listOwners).toHaveBeenCalledWith({ background: true });
+      expect(storeHttpService.listStores).toHaveBeenCalledWith({ background: true });
+      expect(messagesHttpService.getConversations).toHaveBeenCalledWith({ background: true });
+    });
+  });
+});
+
+describe('AdminMessagesPage — sending scrolls the thread', () => {
+  it('jumps the thread to the bottom after the SuperAdmin sends a message', async () => {
+    const { messagesHttpService } = await import('~/shared/lib/messages/messages-http-service');
+    const sent: MessageDto = {
+      id: 'm-sent',
+      conversationId: 'conv-a',
+      senderId: 'super-1',
+      senderType: 2,
+      recipientId: 'user-a',
+      storeId: 'store-a',
+      content: 'Hola Ana',
+      sentAt: '2026-01-01T12:30:00Z',
+      readAt: null,
+    };
+    vi.mocked(messagesHttpService.getMessages)
+      .mockResolvedValueOnce(response<MessageDto[]>([]))
+      .mockResolvedValue(response<MessageDto[]>([sent]));
+
+    await renderPage();
+    fireEvent.click(await screen.findByTestId('owner-owner-a'));
+    const thread = await screen.findByTestId('message-thread');
+
+    // jsdom has no layout: pin the scroll box so the jump is measurable at all.
+    Object.defineProperty(thread, 'scrollHeight', { value: 480, configurable: true });
+    Object.defineProperty(thread, 'scrollTop', { value: 0, writable: true, configurable: true });
+
+    const input = await screen.findByTestId('message-input');
+    fireEvent.change(input, { target: { value: 'Hola Ana' } });
+    fireEvent.click(screen.getByTestId('message-send'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('message-m-sent')).toBeInTheDocument();
+    });
+    expect(thread.scrollTop).toBe(480);
   });
 });

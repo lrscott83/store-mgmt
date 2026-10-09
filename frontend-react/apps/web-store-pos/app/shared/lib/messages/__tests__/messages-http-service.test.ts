@@ -142,5 +142,25 @@ describe('messagesHttpService', () => {
 
       expect(apiClient.get).toHaveBeenCalledWith('/v1/messages/conversations');
     });
+
+    it('broadcastMessage passes skipLoading when asked for a background broadcast', async () => {
+      vi.mocked(apiClient.post).mockResolvedValue({ data: { data: true, succeeded: true } });
+
+      await messagesHttpService.broadcastMessage('Promo', { background: true });
+
+      expect(apiClient.post).toHaveBeenCalledWith(
+        '/v1/messages/broadcast',
+        { content: 'Promo' },
+        { skipLoading: true },
+      );
+    });
+
+    it('broadcastMessage keeps the config-less shape on a foreground broadcast', async () => {
+      vi.mocked(apiClient.post).mockResolvedValue({ data: { data: true, succeeded: true } });
+
+      await messagesHttpService.broadcastMessage('Promo');
+
+      expect(apiClient.post).toHaveBeenCalledWith('/v1/messages/broadcast', { content: 'Promo' });
+    });
   });
 });

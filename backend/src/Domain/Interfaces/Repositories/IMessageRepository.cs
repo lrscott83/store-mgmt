@@ -25,4 +25,5 @@ public interface IMessageRepository
     /// </summary>
     Task<Guid> GetSuperAdminIdAsync(CancellationToken cancellationToken);
     Task<Conversation?> GetConversationByOwnerAndStoreAsync(Guid ownerId, Guid storeId, CancellationToken cancellationToken);
+    Task<DateTime?> GetLastOwnerMessageAtAsync(Guid conversationId, Guid ownerId, CancellationToken cancellationToken);
 }

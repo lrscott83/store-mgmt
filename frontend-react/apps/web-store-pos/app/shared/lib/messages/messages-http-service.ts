@@ -76,10 +76,17 @@ export const messagesHttpService = {
     return response.data;
   },
 
-  async broadcastMessage(content: string): Promise<BaseResponseModel<boolean>> {
-    const response = await apiClient.post<BaseResponseModel<boolean>>('/v1/messages/broadcast', {
-      content,
-    });
+  async broadcastMessage(
+    content: string,
+    options?: MessagesRequestOptions,
+  ): Promise<BaseResponseModel<boolean>> {
+    const url = '/v1/messages/broadcast';
+    const payload = { content };
+    // Non-background keeps `post(url, payload)` exactly, as pinned by the
+    // existing assertions.
+    const response = options?.background
+      ? await apiClient.post<BaseResponseModel<boolean>>(url, payload, SKIP_LOADING)
+      : await apiClient.post<BaseResponseModel<boolean>>(url, payload);
     return response.data;
   },
 };

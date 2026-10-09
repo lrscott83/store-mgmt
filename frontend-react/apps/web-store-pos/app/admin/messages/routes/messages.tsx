@@ -110,15 +110,38 @@ export function AdminMessagesPage() {
       : null;
 
   const sortedOwners = useMemo(() => {
+    // Most recent OWNER message first (user request 2026-10-08): the owner who
+    // wrote last jumps to the top, and the poll that brings a new message
+    // re-sorts the list live, because this memo also depends on `conversations`.
+    // Owners who never wrote keep the old ordering (non-free store first, then
+    // name) below them.
+    //
+    // Ordered by `lastOwnerMessageAt`, NOT by `lastMessageAt`: the backend stamps
+    // `lastMessageAt` for every message, including the SuperAdmin's own reply, so
+    // ordering on it floats an owner to the top for the admin ANSWERING them —
+    // the list would jump away from the owner who is actually waiting. The
+    // welcome message the admin sends on store creation leaves `lastOwnerMessageAt`
+    // null, which is right: nothing the admin said makes an owner more active.
+    const lastOwnerMessageAt = new Map<string, number>();
+    for (const conversation of conversations) {
+      if (conversation.lastOwnerMessageAt == null) continue;
+      const at = Date.parse(conversation.lastOwnerMessageAt);
+      if (Number.isNaN(at)) continue;
+      const previous = lastOwnerMessageAt.get(conversation.ownerId) ?? Number.NEGATIVE_INFINITY;
+      if (at > previous) lastOwnerMessageAt.set(conversation.ownerId, at);
+    }
     const hasNonFreeStore = (owner: Owner) =>
       stores.some((store) => store.ownerId === owner.id && !isFreeStore(store));
     return [...owners].sort((a, b) => {
+      const atA = lastOwnerMessageAt.get(a.userId) ?? Number.NEGATIVE_INFINITY;
+      const atB = lastOwnerMessageAt.get(b.userId) ?? Number.NEGATIVE_INFINITY;
+      if (atA !== atB) return atB - atA;
       const rankA = hasNonFreeStore(a) ? 0 : 1;
       const rankB = hasNonFreeStore(b) ? 0 : 1;
       if (rankA !== rankB) return rankA - rankB;
       return a.fullName.localeCompare(b.fullName);
     });
-  }, [owners, stores]);
+  }, [owners, stores, conversations]);
 
   useEffect(() => {
     selectedOwnerRef.current = selectedOwner;
@@ -127,12 +150,16 @@ export function AdminMessagesPage() {
   /**
    * Owners + stores are the slowly moving directory, so they load on mount and
    * on focus / online — never on every poll (listStores is heavy).
+   *
+   * Background, both of them: this screen must never show the global loading
+   * overlay (user request 2026-10-08). Everything the messages view requests —
+   * directory, threads, sends, read receipts — runs behind the scenes.
    */
   const loadDirectory = useCallback(async () => {
     try {
       const [ownersResponse, storesResponse] = await Promise.all([
-        ownerHttpService.listOwners(),
-        storeHttpService.listStores(),
+        ownerHttpService.listOwners({ background: true }),
+        storeHttpService.listStores({ background: true }),
       ]);
       if (ownersResponse.succeeded) {
         setOwners(ownersResponse.data.filter((owner) => owner.isActive));
@@ -145,8 +172,8 @@ export function AdminMessagesPage() {
 
   /**
    * Message requests are always background: the admin chat must not drive the
-   * global overlay nor toast on a timer. The owners/stores directory
-   * (`loadDirectory`) stays foreground — it is a user-facing page load.
+   * global overlay nor toast on a timer. That now includes the owners/stores
+   * directory (`loadDirectory`): the whole view is background by contract.
    */
   const loadMessages = useCallback(
     async (conversationId: string) => {
@@ -310,8 +337,7 @@ export function AdminMessagesPage() {
   async function handleSend() {
     const content = inputValue.trim();
     if (!content || !selectedOwner) return;
-    const storeId =
-      selectedConversation?.storeId ?? preferredStoreId(selectedOwner);
+    const storeId = selectedConversation?.storeId ?? preferredStoreId(selectedOwner);
     if (!storeId) {
       showToastError(intl.formatMessage({ id: 'MESSAGES.NO_STORE' }));
       return;
@@ -344,7 +370,7 @@ export function AdminMessagesPage() {
     if (!content || isBroadcasting) return;
     setIsBroadcasting(true);
     try {
-      const response = await messagesHttpService.broadcastMessage(content);
+      const response = await messagesHttpService.broadcastMessage(content, { background: true });
       if (!response.succeeded) {
         showToastError(intl.formatMessage({ id: 'MESSAGES.BROADCAST_ERROR' }));
         return;
@@ -438,7 +464,9 @@ export function AdminMessagesPage() {
           ) : (
             <>
               <div className="border-b border-border px-4 py-2">
-                <h2 className="truncate text-sm font-semibold text-text">{selectedOwner.fullName}</h2>
+                <h2 className="truncate text-sm font-semibold text-text">
+                  {selectedOwner.fullName}
+                </h2>
                 <span className="block truncate text-xs text-text-muted">
                   {selectedStoreId
                     ? (storeLabels.get(selectedStoreId) ??

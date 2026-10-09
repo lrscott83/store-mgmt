@@ -42,6 +42,17 @@ describe('storeHttpService.listStores — HTTP-2: GET /v1/stores/by-current-user
     expect(result.data).toHaveLength(1);
     expect(result.data[0].name).toBe('Store One');
   });
+
+  // The messages view reloads this directory on focus/online: a background
+  // fetch must not drive the global loading overlay.
+  it('listStores passes skipLoading when asked for a background fetch', async () => {
+    const { storeHttpService } = await import('../store-http-service');
+    const { apiClient } = await import('~/shared/lib/http/api-client');
+
+    await storeHttpService.listStores({ background: true });
+
+    expect(apiClient.get).toHaveBeenCalledWith('/v1/stores/by-current-user', { skipLoading: true });
+  });
 });
 
 describe('storeHttpService.getStore — HTTP-3: GET /v1/stores/:id', () => {

@@ -37,6 +37,7 @@ public class GetConversationsQueryHandler : IQueryHandler<GetConversationsQuery,
                 LastMessageAt = conversation.LastMessageAt,
                 LastMessageContent = conversation.LastMessageContent,
                 UnreadCount = await _messageRepository.GetUnreadCountAsync(conversation.Id, currentUserId, cancellationToken),
+                LastOwnerMessageAt = await _messageRepository.GetLastOwnerMessageAtAsync(conversation.Id, conversation.OwnerId, cancellationToken),
             });
         }
 
@@ -52,4 +53,9 @@ public sealed record ConversationDto
     public DateTime LastMessageAt { get; set; }
     public string? LastMessageContent { get; set; }
     public int UnreadCount { get; set; }
+    /// <summary>
+    /// When the owner last wrote, <c>null</c> when they never have. Unlike
+    /// <see cref="LastMessageAt"/> this does NOT move when the SuperAdmin replies.
+    /// </summary>
+    public DateTime? LastOwnerMessageAt { get; set; }
 }

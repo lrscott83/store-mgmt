@@ -158,6 +158,26 @@ public class MessageRepository : IMessageRepository
             .FirstOrDefaultAsync(c => c.OwnerId == ownerId && c.StoreId == storeId, cancellationToken);
     }
 
+    /// <summary>
+    /// When the OWNER last wrote in this conversation, or <c>null</c> when they never
+    /// have. This is the ordering signal the SuperAdmin inbox needs: <c>Conversation</c>
+    /// stores no sender, so its <c>LastMessageAt</c> moves when the admin replies too —
+    /// ordering on it floats an owner to the top for the admin answering them. The
+    /// SuperAdmin's own welcome message leaves this <c>null</c>, which is correct:
+    /// nothing the admin said makes an owner "more active".
+    /// </summary>
+    public async Task<DateTime?> GetLastOwnerMessageAtAsync(Guid conversationId, Guid ownerId, CancellationToken cancellationToken)
+    {
+        return await _dbContext.Messages
+            .AsNoTracking()
+            .Where(m => m.ConversationId == conversationId
+                     && m.SenderId == ownerId
+                     && !m.IsDeletedBySender)
+            .OrderByDescending(m => m.SentAt)
+            .Select(m => (DateTime?)m.SentAt)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
     public async Task<int> GetUnreadCountAsync(Guid conversationId, Guid currentUserId, CancellationToken cancellationToken)
     {
         return await _dbContext.Messages
