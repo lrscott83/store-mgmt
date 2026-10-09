@@ -34,7 +34,7 @@ tema ni layout por tienda en backend ni frontend.
 - **Backend** (módulo Catálogo Web, sin módulo ni feature nuevos):
   - Columna `TemplateId` (`string`, por defecto `"default"`, max 64, requerida) en
     `StoreCatalogSettings`.
-  - **Migración EF + script 30** (reglas de `AGENTS.md`: la migración es la fuente, el `.sql` se
+  - **Migración EF + script 31** (reglas de `AGENTS.md`: la migración es la fuente, el `.sql` se
     **genera** con `dotnet ef migrations script`).
   - Exponer `TemplateId` en `StoreCatalogBrandingDto` (lectura OwnerAdmin) y en
     `PublicOrderingConfigDto` (lectura anónima), con default `"default"` cuando la fila falta o está
@@ -116,7 +116,8 @@ cd backend
 dotnet ef migrations add Add-StoreCatalogSettings-TemplateId --project src/Infrastructure --startup-project src/SMCA.WebApi
 # Up() de una migración de columna con default: revisar que el default sea 'default' y NOT NULL.
 dotnet ef database update --project src/Infrastructure --startup-project src/SMCA.WebApi --connection "Host=localhost;Database=smca_test;Username=postgres;Password=postgres"
-dotnet ef migrations script <PREVIA> --project src/Infrastructure --startup-project src/SMCA.WebApi -o scripts/30-2026XXXX-Add-StoreCatalogSettings-TemplateId.sql
+# Single new migration → -From la PREVIA (20261008021950_Add-StoreCatalogImages) y sin -To.
+dotnet ef migrations script 20261008021950_Add-StoreCatalogImages --project src/Infrastructure --startup-project src/SMCA.WebApi -o scripts/31-20261009-Add-StoreCatalogSettings-TemplateId.sql
 # + ON CONFLICT ("MigrationId") DO NOTHING, header, SELECTs de verificación, fila en scripts/README.md
 ```
 
@@ -134,19 +135,19 @@ dotnet ef migrations script <PREVIA> --project src/Infrastructure --startup-proj
 
 ## Tareas
 
-- [ ] **T1** — Backend: propiedad `TemplateId` en `StoreCatalogSettings` + config EF (max 64, required, default `default`).
-- [ ] **T2** — Backend: migración EF + script 30 generado + fila en `scripts/README.md` + aplicar a `smca_test`.
-- [ ] **T3** — Backend: `TemplateId` en `StoreCatalogBrandingDto` y `PublicOrderingConfigDto`; mapear y default en `GetStoreCatalogBrandingQuery` y `GetPublicOrderingConfigQuery`.
-- [ ] **T4** — Backend: escribir `TemplateId` (parcial) en `UpdateStoreCatalogBrandingCommand` + `CatalogBrandingController` (campo de formulario) + validación de formato.
-- [ ] **T5** — Backend: tests (query/command/validator; revisar test por reflexión de columnas).
-- [ ] **T6** — Frontend: tipos y servicio (`templateId` en 3 interfaces + `FormData`).
-- [ ] **T7** — Frontend: refactor container/presentational de `public-catalog.tsx` con plantilla `default` movida sin cambios (mismo DOM/testids).
-- [ ] **T8** — Frontend: plantilla `boutique` nueva.
-- [ ] **T9** — Frontend: `registry.ts` + `resolveTemplate` con fallback.
-- [ ] **T10** — Frontend: selector de plantilla en la sección "Marca" de `web-catalog.tsx`.
-- [ ] **T11** — Frontend: claves i18n.
-- [ ] **T12** — Frontend: tests unitarios (plantillas, resolver, selector, servicio).
-- [ ] **T13** — Verificación (build/tests backend, `typecheck`/`lint`/`vitest`).
+- [x] **T1** — Backend: propiedad `TemplateId` en `StoreCatalogSettings` + config EF (max 64, required, default `default`).
+- [x] **T2** — Backend: migración EF + script 31 generado + fila en `scripts/README.md` + aplicar a `smca_test`.
+- [x] **T3** — Backend: `TemplateId` en `StoreCatalogBrandingDto` y `PublicOrderingConfigDto`; mapear y default en `GetStoreCatalogBrandingQuery` y `GetPublicOrderingConfigQuery`.
+- [x] **T4** — Backend: escribir `TemplateId` (parcial) en `UpdateStoreCatalogBrandingCommand` + `CatalogBrandingController` (campo de formulario) + validación de formato.
+- [x] **T5** — Backend: tests (query/command/validator; revisar test por reflexión de columnas).
+- [x] **T6** — Frontend: tipos y servicio (`templateId` en 3 interfaces + `FormData`).
+- [x] **T7** — Frontend: refactor container/presentational de `public-catalog.tsx` con plantilla `default` movida sin cambios (mismo DOM/testids).
+- [x] **T8** — Frontend: plantilla `boutique` nueva.
+- [x] **T9** — Frontend: `registry.ts` + `resolveTemplate` con fallback.
+- [x] **T10** — Frontend: selector de plantilla en la sección "Marca" de `web-catalog.tsx`.
+- [x] **T11** — Frontend: claves i18n.
+- [x] **T12** — Frontend: tests unitarios (plantillas, resolver, selector, servicio).
+- [x] **T13** — Verificación (build/tests backend, `typecheck`/`lint`/`vitest`).
 
 ## Criterios de aceptación
 
@@ -182,3 +183,25 @@ pnpm vitest run app/catalog/ app/sales/routes/__tests__/
 
 - 2026-10-09 — Feature creado tras exploración; decisión del owner: selector de plantilla + 1 diseño
   nuevo. Sin implementación.
+- 2026-10-09 — **Slice A (backend T1–T5) implementado y verificado**, commit `a0303551` (rama
+  `feat/catalogo-publico-plantillas-por-tienda`). Documento `802ca41d`.
+  - `dotnet build src/SMCA.sln`: 0 errores.
+  - `dotnet test Application.Tests`: **1175 passed** (+21).
+  - Migración `20261009182159_Add-StoreCatalogSettings-TemplateId` aplicada a `smca_test`;
+    `Up()` C# probado de verdad (borrar columna + historia → `database update` la re-crea).
+  - Script `31-20261009-...sql` generado desde la migración (`-From`
+    `20261008021950_Add-StoreCatalogImages`, sin `-To`); idempotente (ejecutado 2×).
+  - Nota: la numeración de scripts saltó a 31 porque el 30 ya existía
+    (`30-20261008-Add-StoreCatalogImages.sql`).
+- 2026-10-09 — **Slice B/C (frontend T6–T13) implementado y verificado.**
+  - `58ea65c9` — mecanismo de plantillas (contenedor + `default` movido sin cambios + `boutique`
+    + registro con fallback), tipos/servicio, i18n y tests.
+  - `0b99f265` — selector de plantilla en la sección "Marca" de `web-catalog.tsx` + tests.
+  - `pnpm typecheck`: 0 errores.
+  - `pnpm lint`: 0 errores.
+  - `pnpm vitest run app/sales/`: **1566 passed** (76 archivos); los nuevos (registro, boutique,
+    selección en el contenedor, FormData del servicio, selector en web-catalog) verdes.
+  - El DOM de la plantilla `default` es idéntico: los tests preexistentes del catálogo público
+    (`public-catalog.test.tsx`) siguen verdes sin cambios de comportamiento.
+  - **Pendiente**: revisión nativa (RDD) y, si el owner quiere, PRs encadenados. Push y PR son
+    decisión del owner.
