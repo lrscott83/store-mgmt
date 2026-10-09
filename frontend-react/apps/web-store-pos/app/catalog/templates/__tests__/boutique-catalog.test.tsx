@@ -169,4 +169,76 @@ describe('BoutiqueCatalogTemplate', () => {
 
     expect(props.onOpenCart).toHaveBeenCalledTimes(1);
   });
+
+  it('muestra el conteo de resultados en singular y plural', () => {
+    const { unmount } = renderTemplate(makeProps({ total: 1 }));
+    expect(screen.getByTestId('catalog-results-count')).toHaveTextContent('1 producto');
+    unmount();
+
+    renderTemplate(makeProps({ total: 5 }));
+    expect(screen.getByTestId('catalog-results-count')).toHaveTextContent('5 productos');
+  });
+
+  it('avisa de la lista fallida sin tumbar la vista', () => {
+    renderTemplate(makeProps({ listFailed: true }));
+
+    expect(screen.getByText(esMessages['GENERAL.OFFLINE'] as string)).toBeInTheDocument();
+  });
+
+  it('distingue catálogo vacío de búsqueda sin resultados', () => {
+    const { unmount } = renderTemplate(
+      makeProps({
+        catalog: { ...CATALOG, categories: [] },
+        page: { items: [], total: 0, page: 1, pageSize: 12 },
+        total: 0,
+      }),
+    );
+    // Sin categorías: la tienda todavía no publicó nada.
+    expect(screen.getByText(esMessages['CATALOG_PUBLIC.EMPTY_CATALOG'] as string)).toBeInTheDocument();
+    unmount();
+
+    renderTemplate(makeProps({ page: { items: [], total: 0, page: 1, pageSize: 12 }, total: 0 }));
+    // Con categorías pero sin coincidencias: es la búsqueda/filtro.
+    expect(screen.getByText(esMessages['CATALOG_PUBLIC.EMPTY'] as string)).toBeInTheDocument();
+  });
+
+  it('pagina: anterior deshabilitado en la primera página y siguiente avisa', () => {
+    const props = makeProps({
+      page: { items: [PRODUCT], total: 25, page: 1, pageSize: 12 },
+      total: 25,
+      totalPages: 3,
+      currentPage: 1,
+    });
+    renderTemplate(props);
+
+    expect(screen.getByTestId('catalog-previous-page')).toBeDisabled();
+    expect(screen.getByTestId('catalog-next-page')).not.toBeDisabled();
+
+    fireEvent.click(screen.getByTestId('catalog-next-page'));
+
+    expect(props.onPageChange).toHaveBeenCalledWith(2);
+  });
+
+  it('pagina: siguiente deshabilitado en la última página y anterior avisa', () => {
+    const props = makeProps({
+      page: { items: [PRODUCT], total: 25, page: 3, pageSize: 12 },
+      total: 25,
+      totalPages: 3,
+      currentPage: 3,
+    });
+    renderTemplate(props);
+
+    expect(screen.getByTestId('catalog-next-page')).toBeDisabled();
+
+    fireEvent.click(screen.getByTestId('catalog-previous-page'));
+
+    expect(props.onPageChange).toHaveBeenCalledWith(2);
+  });
+
+  it('no pinta paginación con una sola página', () => {
+    renderTemplate(makeProps({ total: 1, totalPages: 1 }));
+
+    expect(screen.queryByTestId('catalog-previous-page')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('catalog-next-page')).not.toBeInTheDocument();
+  });
 });
