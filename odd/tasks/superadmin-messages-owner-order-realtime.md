@@ -117,14 +117,30 @@ delegated verification gate and a parent spot check.
   (`gentle-ai.review-acknowledged/v1`, authority=burned). The relay's first
   attempt was refused (`opencode_review_transport_relay_refused / output_refused`)
   and admitted on the second — a known transient (load), not a capability issue.
-- Advisory findings (non-blocking, informational): R3-COV-1 (WARNING, the
-  nullable contract is half-pinned: a silent owner = null and the
-  `IsDeletedBySender` exclusion are untested), R3-PERF-1 (WARNING, the new
-  per-conversation query worsens the handler's N+1), R3-COV-2 (SUGGESTION, the
-  realtime gate is proven only up to "connection starts"), R3-EVID-1
-  (SUGGESTION, resolved by this correction).
+- Advisory findings (non-blocking) from the first review: R3-COV-1 (nullable
+  contract half-pinned), R3-PERF-1 (new per-conversation query worsened the
+  handler's N+1), R3-COV-2 (realtime gate proven only up to "connection
+  starts"), R3-EVID-1 (doc referenced already-reverted fixture edits).
+- 2026-10-09 (2): committed `7bdbde78` (feature), then fixed the four findings:
+  - R3-PERF-1: batched `GetUnreadCountsAsync` / `GetLastOwnerMessageAtAsync` — two
+    queries for the whole list instead of 2N; the owner is resolved through the
+    `m.SenderId == c.OwnerId` join instead of a parameter.
+  - R3-COV-1: NEW backend E2E `SuperAdminConversationLastOwnerMessageEdgeTests`
+    (silent owner = null; sender-deleted message excluded).
+  - R3-COV-2: the message-shell test now fires the recorded `ReceiveMessage`
+    handler and asserts the badge moves.
+  - R3-EVID-1: this document corrected.
+  Committed as `1fed7635`. Verified: new E2E 1/1 + Messages namespace 15/15;
+  Application.Tests 1149/1149; focused vitest 29/29; typecheck clean.
+- Second native review lineage **`review-540a021a37c6f49a`** (committed-only, base
+  `7bdbde78`, medium) completed **APPROVED**; authority burned. Two new
+  non-blocking advisories: R3-UNREAD-BATCH-UNASSERTED (WARNING — the batched
+  unread path has no candidate-supplied observable assertion) and
+  R3-PUSH-HANDLER-NO-PAYLOAD (SUGGESTION — the push test fires the handler with
+  no payload).
 
 ## Next step
 
-Nothing committed. Await the user's decision on commit/delivery under ordinary
-repository policy.
+Feature (`7bdbde78`) and fixes (`1fed7635`) committed on `test`. The two new
+advisories are separate later work. Await the user's decision on pushing/delivery
+under ordinary repository policy.
