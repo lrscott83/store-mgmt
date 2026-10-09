@@ -5,6 +5,7 @@ using Domain.Common.Constants;
 using Domain.Common.Enums;
 using Domain.Entities.Authentication;
 using Domain.Entities.Messages;
+using Domain.Entities.Notifications;
 using Domain.Entities.Owners;
 using Domain.Entities.Stores;
 using Domain.Entities.StoreModules;
@@ -197,6 +198,13 @@ public static class DbTestHelpers
         // extra conversation into the next test. Messages before Conversations for readability.
         await db.Set<Message>().IgnoreQueryFilters().ExecuteDeleteAsync();
         await db.Set<Conversation>().IgnoreQueryFilters().ExecuteDeleteAsync();
+
+        // Platform-level notices addressed to the SuperAdmin (2026-10-08). Notification carries NO
+        // foreign key and no TenantId, so it sits outside every Restrict cascade and every tenant
+        // filter in the graph — which is exactly why it accumulated 892 rows in smca_test: no other
+        // delete ever reached it, and the SuperAdmin's list endpoint returns them all, so a leaked
+        // notice from one test was visible to the next. Order is free here; it is a true leaf.
+        await db.Set<Notification>().IgnoreQueryFilters().ExecuteDeleteAsync();
 
         // Store children (before Store).
         await db.Set<StorePayment>().IgnoreQueryFilters().ExecuteDeleteAsync();

@@ -60,7 +60,7 @@ export function CatalogCarousel({ images, storeName }: CatalogCarouselProps) {
 
   return (
     <section
-      className="relative mx-auto max-w-5xl overflow-hidden rounded-lg bg-surface shadow-card"
+      className="relative mx-auto h-56 max-w-5xl overflow-hidden rounded-lg bg-surface shadow-card sm:h-72 lg:h-96"
       aria-label={intl.formatMessage({ id: 'CATALOG_PUBLIC.CAROUSEL_LABEL' })}
       aria-roledescription={intl.formatMessage({ id: 'CATALOG_PUBLIC.CAROUSEL_ROLE' })}
       onMouseEnter={() => setPaused(true)}
@@ -71,13 +71,20 @@ export function CatalogCarousel({ images, storeName }: CatalogCarouselProps) {
     >
       {/* Todas las imágenes viven montadas y se distinguen por opacidad: así el cambio es un
           fundido y no un parpadeo de `<img>` en blanco. Las que no están activas salen del árbol
-          de accesibilidad (`aria-hidden`) y dejan de recibir clics. */}
+          de accesibilidad (`aria-hidden`) y dejan de recibir clics.
+
+          Y se SUPERPONEN (`absolute inset-0`): en flujo normal cada diapositiva —opacidad 0 o no—
+          reservaba su propia altura, así que el marco medía N×alto, la imagen visible saltaba de
+          posición al cambiar y las flechas (`top-1/2`) y los puntos (`bottom-2`) quedaban
+          anclados al fondo de toda la pila. Con la altura fija del `<section>` y las
+          diapositivas superpuestas, el marco mide UNA imagen y los controles se centran en él.
+          El pie de foto sigue funcionando: su `relative` ahora es la propia diapositiva. */}
       {images.map((image, position) => {
         const isActive = position === active;
         return (
           <div
             key={image.url}
-            className={`transition-opacity duration-700 ease-out motion-reduce:transition-none ${
+            className={`absolute inset-0 transition-opacity duration-700 ease-out motion-reduce:transition-none ${
               isActive ? 'opacity-100' : 'pointer-events-none opacity-0'
             }`}
             role="group"
@@ -89,13 +96,13 @@ export function CatalogCarousel({ images, storeName }: CatalogCarouselProps) {
             aria-hidden={!isActive}
             data-testid={`catalog-carousel-slide-${position}`}
           >
-            <div className="relative">
+            <div className="relative h-full">
               <img
                 src={apiFileUrl(image.url)}
                 // El pie de foto describe la foto mejor que el nombre de la tienda; sin pie de
                 // foto, la tienda es lo único que se sabe de ella.
                 alt={image.caption || storeName}
-                className="h-56 w-full object-cover sm:h-72 lg:h-96"
+                className="h-full w-full object-cover"
                 data-testid={`catalog-carousel-image-${position}`}
               />
               {image.caption && (

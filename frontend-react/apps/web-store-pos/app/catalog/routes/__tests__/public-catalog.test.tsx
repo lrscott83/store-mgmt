@@ -51,6 +51,64 @@ vi.mock('~/sales/lib/services/catalog-http-service', async () => {
   return { ...actual, catalogHttpService: { ...actual.catalogHttpService, ...catalogMock } };
 });
 
+const showToastSuccessMock = vi.hoisted(() => vi.fn());
+vi.mock('~/shared/lib/toast', () => ({
+  showToastSuccess: (...args: unknown[]) => showToastSuccessMock(...args),
+}));
+
+/**
+ * jsdom NO implementa `IntersectionObserver`, y la página lo usa para decidir si el botón
+ * "Ver Productos" se retira (decisión del owner, 2026-10-08). Sin este doble, `new
+ * IntersectionObserver` revienta con ReferenceError y toda la suite muere por el motivo
+ * equivocado. Se deja CONTROLABLE a propósito —`emit(true|false)`— para poder comprobar que el
+ * botón se oculta al llegar a la rejilla, en vez de dejar el caso sin cubrir.
+ */
+class FakeIntersectionObserver implements IntersectionObserver {
+  readonly root = null;
+  readonly rootMargin = '';
+  readonly thresholds: readonly number[] = [];
+  readonly elements = new Set<Element>();
+
+  constructor(private readonly callback: IntersectionObserverCallback) {
+    observedBy.push(this);
+  }
+
+  observe(element: Element) {
+    this.elements.add(element);
+  }
+
+  unobserve(element: Element) {
+    this.elements.delete(element);
+  }
+
+  disconnect() {
+    this.elements.clear();
+  }
+
+  takeRecords(): IntersectionObserverEntry[] {
+    return [];
+  }
+
+  /** Lo que el navegador hace al hacer scroll: avisa si el elemento está o no en pantalla. */
+  emit(isIntersecting: boolean) {
+    this.callback(
+      Array.from(this.elements).map(
+        (target) => ({ target, isIntersecting }) as IntersectionObserverEntry,
+      ),
+      this,
+    );
+  }
+}
+
+const observedBy: FakeIntersectionObserver[] = [];
+
+/** Dispara la entrada/salida de TODO lo observado, como haría el scroll del navegador. */
+function emitIntersection(isIntersecting: boolean) {
+  act(() => {
+    observedBy.forEach((observer) => observer.emit(isIntersecting));
+  });
+}
+
 import { PublicCatalogPage } from '../public-catalog';
 
 const envelope = <T,>(data: T) => ({ data, succeeded: true, message: '', actionCode: 200, errors: [] });
@@ -154,6 +212,10 @@ function makeUser(overrides: Partial<UserModel> = {}): UserModel {
 describe('PublicCatalogPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    showToastSuccessMock.mockClear();
+    observedBy.length = 0;
+    globalThis.IntersectionObserver =
+      FakeIntersectionObserver as unknown as typeof IntersectionObserver;
     // La ruta es pública: sin sesión salvo que un test la ponga.
     session.current = null;
     useParamsMock.mockReturnValue({ storeSlug: 'mi-tienda' });
@@ -380,9 +442,9 @@ describe('PublicCatalogPage', () => {
     );
   });
 
-  // ── MARCA (F8): logo y banner de la carta pública ─────────────────────────────────
+  // ── MARCA (F8): SOLO el logo — el banner se retiró de la carta el 2026-10-08 (D3) ────
   describe('marca del catálogo público', () => {
-    it('pinta el logo junto al nombre y el banner sobre la cabecera', async () => {
+    it('pinta el logo junto al nombre y NUNCA un banner, aunque la tienda tenga los dos', async () => {
       catalogMock.getPublicOrderingConfig.mockResolvedValue(
         envelope({
           ...CONFIG_WITHOUT_BRAND,
@@ -397,13 +459,12 @@ describe('PublicCatalogPage', () => {
         'src',
         `${window.location.origin}/api/v1/public/catalog/mi-tienda/media/t/s/branding/logo.png`,
       );
-      expect(screen.getByTestId('catalog-banner')).toHaveAttribute(
-        'src',
-        `${window.location.origin}/api/v1/public/catalog/mi-tienda/media/t/s/branding/banner.png`,
-      );
       expect(catalogMock.getPublicOrderingConfig).toHaveBeenCalledWith('mi-tienda');
       // El logo acompaña al nombre: sigue siendo el título de la carta.
       expect(screen.getByTestId('catalog-store-name')).toHaveTextContent('Moda Cubana');
+      // El banner sigue LLEGANDO en el config —el backend no se toca (D10)— pero la vista ya no
+      // lo pinta: lo que se retiró es el dato en pantalla, no el endpoint.
+      expect(screen.queryByTestId('catalog-banner')).not.toBeInTheDocument();
     });
 
     it('sin marca no pinta ni logo ni banner, y la carta es la de siempre', async () => {
@@ -416,17 +477,20 @@ describe('PublicCatalogPage', () => {
       expect(screen.getByTestId('catalog-grid')).toBeInTheDocument();
     });
 
-    it('solo logo o solo banner: cada lado es independiente', async () => {
+    it('solo banner y sin logo: el logo falta y el banner tampoco se pinta', async () => {
       catalogMock.getPublicOrderingConfig.mockResolvedValue(
         envelope({
           ...CONFIG_WITHOUT_BRAND,
-          logoUrl: '/api/v1/public/catalog/mi-tienda/media/t/s/branding/logo.png',
+          bannerUrl: '/api/v1/public/catalog/mi-tienda/media/t/s/branding/banner.png',
         }),
       );
       renderPage();
 
-      expect(await screen.findByTestId('catalog-logo')).toBeInTheDocument();
+      await screen.findByTestId('catalog-store-name');
+      expect(screen.queryByTestId('catalog-logo')).not.toBeInTheDocument();
       expect(screen.queryByTestId('catalog-banner')).not.toBeInTheDocument();
+      // Y sin un solo hueco: la carta es exactamente la de siempre.
+      expect(screen.getByTestId('catalog-grid')).toBeInTheDocument();
     });
 
     it('si el config anónimo falla la carta se publica igual, sin marca', async () => {
@@ -451,6 +515,117 @@ describe('PublicCatalogPage', () => {
       expect(await screen.findByTestId('catalog-card-cp1')).toBeInTheDocument();
       expect(screen.queryByTestId('catalog-cart-button')).not.toBeInTheDocument();
       expect(screen.queryByTestId('catalog-add-cp1')).not.toBeInTheDocument();
+    });
+  });
+
+  // ── CABECERA FIJA Y NAVEGACIÓN POR SECCIONES (decisión del owner, 2026-10-08) ───────
+  describe('cabecera fija y navegación', () => {
+    it('el header se queda arriba con la marca a la izquierda', async () => {
+      renderPage();
+
+      const header = (await screen.findByTestId('catalog-store-name')).closest('header');
+      expect(header).not.toBeNull();
+      expect(header).toHaveClass('sticky');
+      expect(header).toHaveClass('top-0');
+      // Por encima del contenido (`z-30` del botón flotante y `z-50` de los modales) para que
+      // pegarse arriba no lo tape nadie.
+      expect(header).toHaveClass('z-40');
+      expect(header).toHaveClass('bg-surface');
+      expect(header).toHaveClass('border-b');
+      expect(header).toHaveClass('border-border');
+    });
+
+    it('el contenedor raíz hace el scroll suave, sin ninguna librería', async () => {
+      const { container } = renderPage();
+
+      await screen.findByTestId('catalog-store-name');
+      expect(container.firstElementChild).toHaveClass('scroll-smooth');
+    });
+
+    it('enlaza las TRES secciones, y "Categorías" no es una sección', async () => {
+      renderPage();
+      await screen.findByTestId('catalog-nav');
+
+      // D2: Inicio · Destacados · Productos. El filtro de categorías no es un sitio al que ir.
+      const anchors = within(screen.getByTestId('catalog-nav')).getAllByRole('link');
+      expect(anchors.map((link) => link.textContent)).toEqual([
+        'Inicio',
+        'Destacados',
+        'Productos',
+      ]);
+      expect(anchors.map((link) => link.getAttribute('href'))).toEqual([
+        '#inicio',
+        '#destacados',
+        '#productos',
+      ]);
+      expect(screen.queryByRole('link', { name: 'Categorías' })).not.toBeInTheDocument();
+    });
+
+    it('cada ancla existe y deja margen para que el header fijo no la tape', async () => {
+      const MEDIA = '/api/v1/public/catalog/mi-tienda/media/t/s/showcase';
+      catalogMock.getPublicOrderingConfig.mockResolvedValue(
+        envelope({
+          ...CONFIG_WITHOUT_BRAND,
+          carouselImages: [{ url: `${MEDIA}/a.jpg`, caption: null }],
+          dailyImages: [{ url: `${MEDIA}/d1.jpg`, caption: null }],
+        }),
+      );
+      renderPage();
+      await screen.findByTestId('catalog-grid');
+
+      // Los tres destinos del menú tienen su `id` en la página.
+      expect(document.getElementById('inicio')).not.toBeNull();
+      expect(document.getElementById('destacados')).not.toBeNull();
+      expect(document.getElementById('productos')).toBe(screen.getByTestId('catalog-grid'));
+
+      // Y `scroll-mt-24` en los tres: sin margen, el header fijo se comería el título.
+      for (const id of ['inicio', 'destacados', 'productos']) {
+        expect(document.getElementById(id)).toHaveClass('scroll-mt-24');
+      }
+    });
+
+    it('en móvil las secciones salen del desplegable, y se cierra al elegir', async () => {
+      renderPage();
+      const menu = await screen.findByTestId('catalog-menu-button');
+
+      expect(menu).toHaveAttribute('aria-label', 'Menú');
+      expect(menu).toHaveAttribute('aria-expanded', 'false');
+      // Plegado: el panel no existe hasta que se pide.
+      expect(screen.queryByTestId('catalog-menu-panel')).not.toBeInTheDocument();
+
+      fireEvent.click(menu);
+      expect(menu).toHaveAttribute('aria-expanded', 'true');
+
+      const panel = await screen.findByTestId('catalog-menu-panel');
+      const links = within(panel).getAllByRole('link');
+      expect(links.map((link) => link.textContent)).toEqual([
+        'Inicio',
+        'Destacados',
+        'Productos',
+      ]);
+      expect(links.map((link) => link.getAttribute('href'))).toEqual([
+        '#inicio',
+        '#destacados',
+        '#productos',
+      ]);
+
+      // Elegir destino cierra el panel: si no, taparía la sección a la que se bajó.
+      fireEvent.click(screen.getByTestId('catalog-menu-productos'));
+      expect(screen.queryByTestId('catalog-menu-panel')).not.toBeInTheDocument();
+      expect(menu).toHaveAttribute('aria-expanded', 'false');
+    });
+
+    it('la navegación existe con la tienda cerrada: lo gateado es el carrito', async () => {
+      catalogMock.getPublicOrderingConfig.mockResolvedValue(
+        envelope({ ...CONFIG_WITHOUT_BRAND, enabled: false }),
+      );
+      renderPage();
+
+      await screen.findByTestId('catalog-nav');
+      // Sin carrito (F1), pero la carta se sigue recorriendo como un catálogo.
+      expect(screen.queryByTestId('catalog-cart-button')).not.toBeInTheDocument();
+      expect(screen.getByTestId('catalog-menu-button')).toBeInTheDocument();
+      expect(within(screen.getByTestId('catalog-nav')).getAllByRole('link')).toHaveLength(3);
     });
   });
 
@@ -592,6 +767,49 @@ describe('PublicCatalogPage', () => {
       expect(screen.getByTestId('catalog-category-select')).toBeInTheDocument();
     });
 
+    it('las diapositivas se SUPERPONEN: el marco mide una sola imagen', async () => {
+      const MEDIA = '/api/v1/public/catalog/mi-tienda/media/t/s/showcase';
+      catalogMock.getPublicOrderingConfig.mockResolvedValue(
+        envelope({
+          ...CONFIG_WITHOUT_BRAND,
+          carouselImages: [
+            { url: `${MEDIA}/a.jpg`, caption: null },
+            { url: `${MEDIA}/b.jpg`, caption: null },
+          ],
+        }),
+      );
+      renderPage();
+
+      const carousel = await screen.findByTestId('catalog-carousel');
+      // El ARREGLO ESTRUCTURAL (el defecto que reportaba el owner): antes cada diapositiva iba
+      // en flujo normal, así que el marco medía N×alto y las flechas y los puntos quedaban
+      // anclados al fondo de toda la pila.
+      expect(carousel).toHaveClass('relative');
+      expect(carousel).toHaveClass('h-56');
+      expect(carousel).toHaveClass('sm:h-72');
+      expect(carousel).toHaveClass('lg:h-96');
+
+      for (const position of [0, 1]) {
+        const slide = within(carousel).getByTestId(`catalog-carousel-slide-${position}`);
+        expect(slide).toHaveClass('absolute');
+        expect(slide).toHaveClass('inset-0');
+        // Y no reservan altura propia: sin `h-*` de diapositiva, la altura es la del marco.
+        expect(slide.className).not.toMatch(/(^|\s)h-\d/);
+      }
+
+      // Solo la activa se ve; la otra sale del árbol de accesibilidad.
+      expect(within(carousel).getByTestId('catalog-carousel-slide-0')).toHaveClass('opacity-100');
+      expect(within(carousel).getByTestId('catalog-carousel-slide-0')).toHaveAttribute(
+        'aria-hidden',
+        'false',
+      );
+      expect(within(carousel).getByTestId('catalog-carousel-slide-1')).toHaveClass('opacity-0');
+      expect(within(carousel).getByTestId('catalog-carousel-slide-1')).toHaveAttribute(
+        'aria-hidden',
+        'true',
+      );
+    });
+
     it('el botón "Ver productos" baja a la rejilla con scroll suave', async () => {
       renderPage();
 
@@ -606,6 +824,23 @@ describe('PublicCatalogPage', () => {
       // Y baja a la REJILLA, no al principio de la página: el `this` del espía lo dice.
       expect(scrolledFrom).toHaveLength(1);
       expect(scrolledFrom[0]).toBe(screen.getByTestId('catalog-grid'));
+    });
+
+    it('el botón "Ver productos" se retira al llegar a la rejilla (D9)', async () => {
+      renderPage();
+
+      const button = await screen.findByTestId('catalog-see-products');
+      expect(button).toBeInTheDocument();
+
+      // El navegador avisa de que la rejilla entró en pantalla: entonces el atajo solo taparía
+      // los productos que el cliente ya está leyendo.
+      emitIntersection(true);
+      expect(screen.queryByTestId('catalog-see-products')).not.toBeInTheDocument();
+
+      // Y vuelve al salir: arriba el botón sigue haciendo falta. Se desmonta y se vuelve a
+      // montar, así que se comprueba que está, no que sea el mismo nodo.
+      emitIntersection(false);
+      expect(await screen.findByTestId('catalog-see-products')).toBeInTheDocument();
     });
 
     it('el halo de atención del botón se apaga con movimiento reducido', async () => {
@@ -672,10 +907,15 @@ describe('PublicCatalogPage', () => {
       localStorage.clear();
     });
 
-    it('añade desde la tarjeta y muestra el badge con la cantidad', async () => {
+    it('añade desde la tarjeta, sube el badge y avisa con un toast', async () => {
       renderPage();
       await screen.findByTestId('catalog-add-cp1');
 
+      // El botón de la tarjeta es un ícono, así que se busca por su nombre accesible: sin el
+      // `aria-label` con el producto sería un botón sin decir qué añade (D6).
+      expect(screen.getByRole('button', { name: 'Añadir Camisa azul al carrito' })).toBe(
+        screen.getByTestId('catalog-add-cp1'),
+      );
       fireEvent.click(screen.getByTestId('catalog-add-cp1'));
 
       // El carrito es del STOREFRONT, no el del POS: la línea vive en el store nuevo.
@@ -684,8 +924,50 @@ describe('PublicCatalogPage', () => {
       expect(lines[0]).toMatchObject({ productId: 'cp1', quantity: 1, unitPrice: 82.5 });
       // Y el carrito del POS sigue vacío (claves distintas: `lizoft-catalog-cart` vs `lizoft-cart`).
       expect(useCartStore.getState().items).toHaveLength(0);
-      expect(await screen.findByTestId('catalog-cart-count')).toHaveTextContent('1');
-      expect(await screen.findByTestId('catalog-add-notice')).toHaveTextContent('Camisa azul');
+      expect(await screen.findByTestId('catalog-cart-badge')).toHaveTextContent('1');
+      // La confirmación va al TOAST global (D8), no a un texto pegado en la cabecera.
+      expect(showToastSuccessMock).toHaveBeenCalledWith('Añadido al carrito de venta');
+      expect(screen.queryByTestId('catalog-add-notice')).not.toBeInTheDocument();
+    });
+
+    it('el badge del carrito se ve SIEMPRE, y vacío marca 0 (D7)', async () => {
+      renderPage();
+      await screen.findByTestId('catalog-cart-button');
+
+      // El badge del POS nunca se oculta: tapar y destapar el número con la compra es ruido.
+      const badge = screen.getByTestId('catalog-cart-badge');
+      expect(badge).toHaveTextContent('0');
+      expect(badge).toHaveClass('rounded-full');
+      expect(badge).toHaveClass('bg-primary');
+
+      // El botón es un ícono de carrito, no un botón de texto.
+      expect(screen.getByTestId('catalog-cart-button').querySelector('svg')).not.toBeNull();
+    });
+
+    it('el tope del badge es 99+, porque el badge es de 16 px', async () => {
+      renderPage();
+      await screen.findByTestId('catalog-add-cp1');
+
+      // `setState` sobre el store dispara un re-render: sin envolverlo en `act()` React avisa
+      // que el update quedó fuera de su ciclo (el warning ensuciaba la corrida sin romper el test).
+      act(() => {
+        useStorefrontCartStore.setState({
+          itemsByStore: {
+            'mi-tienda': Array.from({ length: 150 }, () => ({
+              productId: 'cp1',
+              name: 'Camisa azul',
+              quantity: 1,
+              unitPrice: 82.5,
+              currency: 'CUP',
+              imageUrl: null,
+            })),
+          },
+        });
+      });
+
+      await waitFor(() =>
+        expect(screen.getByTestId('catalog-cart-badge')).toHaveTextContent('99+'),
+      );
     });
 
     it('abre el carrito con la línea y el subtotal, sin romper la rejilla', async () => {
@@ -776,7 +1058,8 @@ describe('PublicCatalogPage', () => {
 
       await screen.findByTestId('catalog-store-name');
       await waitFor(() => expect(catalogMock.getPublicCatalog).toHaveBeenLastCalledWith('otra-tienda'));
-      expect(screen.queryByTestId('catalog-cart-count')).not.toBeInTheDocument();
+      // El badge NO desaparece: siempre visible, y en la otra tienda marca 0 (D7).
+      expect(screen.getByTestId('catalog-cart-badge')).toHaveTextContent('0');
       expect(useStorefrontCartStore.getState().itemsByStore['mi-tienda']).toHaveLength(1);
     });
 
@@ -797,38 +1080,14 @@ describe('PublicCatalogPage', () => {
       expect(screen.getByTestId('catalog-grid')).toBeInTheDocument();
     });
 
-    it('consulta el estado de un pedido por código y teléfono', async () => {
-      catalogMock.getPublicOrderStatus.mockResolvedValue(
-        envelope({
-          code: 'K7M2QX',
-          status: 0,
-          paymentStatus: 0,
-          deliveryType: 0,
-          total: 82.5,
-          currency: 0,
-          items: [{ name: 'Camisa azul', quantity: 1, price: 82.5 }],
-        }),
-      );
+    it('la cabecera NO ofrece "Consultar mi pedido": sale del header (D1)', async () => {
       renderPage();
+      await screen.findByTestId('catalog-card-cp1');
 
-      fireEvent.click(await screen.findByTestId('order-status-button'));
-      fireEvent.change(screen.getByTestId('order-status-code'), { target: { value: 'K7M2QX' } });
-      fireEvent.change(screen.getByTestId('order-status-phone'), {
-        target: { value: '5351234567' },
-      });
-      fireEvent.click(screen.getByTestId('order-status-submit'));
-
-      await waitFor(() =>
-        expect(catalogMock.getPublicOrderStatus).toHaveBeenCalledWith(
-          'mi-tienda',
-          'K7M2QX',
-          '5351234567',
-        ),
-      );
-      expect(await screen.findByTestId('order-status-state')).toHaveTextContent('Recibido');
-      expect(screen.getByTestId('order-status-delivery-type')).toHaveTextContent(
-        'Recogida en la tienda',
-      );
+      // El botón se fue del header: el estado del pedido recién creado lo abre el checkout, que
+      // es parte del flujo de compra (D5). Lo que ya no existe es la consulta suelta por código.
+      expect(screen.queryByTestId('order-status-button')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('order-status-code')).not.toBeInTheDocument();
     });
   });
 

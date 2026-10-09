@@ -5,10 +5,11 @@ import { Button } from '~/shared/components/ui/button';
 import { InfoBox } from '~/shared/components/ui/info-box';
 import { Modal } from '~/shared/components/ui/modal';
 import { Spinner } from '~/shared/components/ui/spinner';
-import { SearchIcon } from '~/shared/components/ui/icons';
+import { CartIcon, SearchIcon } from '~/shared/components/ui/icons';
 import { currencyFromCode, formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency';
 import { isNetworkError } from '~/shared/lib/http/http-error';
 import { apiFileUrl } from '~/shared/lib/http/media-url';
+import { showToastSuccess } from '~/shared/lib/toast';
 import { CatalogCarousel } from '~/catalog/components/catalog-carousel';
 import { CatalogDaily } from '~/catalog/components/catalog-daily';
 import { CatalogSeeProducts } from '~/catalog/components/catalog-see-products';
@@ -30,8 +31,20 @@ import {
 const PAGE_SIZE = 12;
 /** La búsqueda espera a que el cliente deje de teclear: una petición, no una por letra. */
 const SEARCH_DEBOUNCE_MS = 300;
-/** Cuánto vive el aviso de "añadido al pedido" antes de desaparecer solo. */
-const ADD_NOTICE_MS = 2500;
+
+/**
+ * Las TRES secciones de la carta (D2), y ni una más. El ancla es el `id` que monta cada bloque:
+ * el carrusel `inicio`, los destacados `destacados` y la rejilla `productos`. "Categorías" NO
+ * está porque es un FILTRO, no un sitio al que ir.
+ */
+const NAV_SECTIONS = [
+  { anchor: 'inicio', labelId: 'CATALOG_PUBLIC.NAV_HOME' },
+  { anchor: 'destacados', labelId: 'CATALOG_PUBLIC.NAV_FEATURED' },
+  { anchor: 'productos', labelId: 'CATALOG_PUBLIC.NAV_PRODUCTS' },
+] as const;
+
+const NAV_LINK_CLASSES =
+  'rounded-md px-2 py-1 text-sm text-text-muted transition-colors hover:bg-primary-light hover:text-text';
 
 type CatalogState = 'loading' | 'ready' | 'not-found' | 'offline';
 
@@ -77,9 +90,32 @@ export function PublicCatalogPage() {
   const gridRef = useRef<HTMLUListElement>(null);
 
   /**
-   * Marca de la carta pública (F8): logo y banner. Es un PLUS sobre el catálogo, no su
-   * condición — una tienda puede no tenerlos, así que `null` (o un fallo entero de este
-   * endpoint) se pinta como un catálogo sin marca, nunca como un catálogo roto.
+   * ¿Está la rejilla a la vista? Lo decide el navegador con un `IntersectionObserver`, sin
+   * costuras de scroll propias: el botón flotante se retira cuando el cliente YA está en los
+   * productos (decisión del owner, 2026-10-08) porque entonces solo tapa lo que está leyendo.
+   *
+   * Se engancha en cuanto la página tiene cuerpo (`state === 'ready'`): antes de eso el retorno
+   * temprano no monta la rejilla y no hay nada que observar. La lista se pide después, así que
+   * observar cuando aparece el `<ul>` y no cuando llegan los productos evita un observer por
+   * re-render.
+   */
+  const [gridVisible, setGridVisible] = useState(false);
+  useEffect(() => {
+    const grid = gridRef.current;
+    if (!grid) return;
+    const observer = new IntersectionObserver((entries) => {
+      setGridVisible(entries.some((entry) => entry.isIntersecting));
+    });
+    observer.observe(grid);
+    return () => observer.disconnect();
+  }, [state]);
+
+  /**
+   * Marca de la carta pública (F8): solo el LOGO. El banner se retiró de la carta por decisión del
+   * owner el 2026-10-08 —ni en la vista ni en la configuración del dueño— sin tocar el dato ni el
+   * backend. El logo es un PLUS sobre el catálogo, no su condición: una tienda puede no tenerlo, así
+   * que `null` (o un fallo entero de este endpoint) se pinta como un catálogo sin marca, nunca como
+   * un catálogo roto.
    */
   const [orderingConfig, setOrderingConfig] = useState<PublicOrderingConfig | null>(null);
 
@@ -102,7 +138,6 @@ export function PublicCatalogPage() {
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [statusOpen, setStatusOpen] = useState(false);
   const [createdOrder, setCreatedOrder] = useState<PublicOrderCreated | null>(null);
-  const [addNotice, setAddNotice] = useState<string | null>(null);
 
   /** Publicar el catálogo y aceptar pedidos son DOS interruptores distintos (F1). */
   const orderingEnabled = orderingConfig?.enabled ?? false;
@@ -122,7 +157,10 @@ export function PublicCatalogPage() {
       unitPrice: product.finalPrice,
       imageUrl: product.imageUrl,
     });
-    setAddNotice(product.name);
+    // El aviso va al TOAST global, no a un `<p>` en la cabecera (decisión del owner,
+    // 2026-10-08): el botón de la tarjeta ya es solo un ícono, así que el texto pegado a la
+    // cabecera era la única confirmación y competía con el propio botón del carrito.
+    showToastSuccess(intl.formatMessage({ id: 'CATALOG_PUBLIC.ADDED_TO_CART' }));
   }
 
   const loadCatalog = useCallback(async () => {
@@ -168,8 +206,8 @@ export function PublicCatalogPage() {
       }
     } catch {
       // La marca es opcional: si el config anónimo no está (o falla la red), la carta se publica
-      // igual, solo que sin logo ni banner. No se avisa al cliente ni se cambia el estado de la
-      // página, porque aquí un fallo NO significa que el catálogo no exista.
+      // igual, solo que sin logo. No se avisa al cliente ni se cambia el estado de la página,
+      // porque aquí un fallo NO significa que el catálogo no exista.
     }
   }, [storeSlug]);
 
@@ -194,14 +232,6 @@ export function PublicCatalogPage() {
     return () => clearTimeout(timer);
   }, [searchInput]);
 
-  // El aviso de "añadido" es transitorio: sin esto el texto se queda pegado hasta el siguiente
-  // clic, que no es lo que comunica.
-  useEffect(() => {
-    if (!addNotice) return;
-    const timer = setTimeout(() => setAddNotice(null), ADD_NOTICE_MS);
-    return () => clearTimeout(timer);
-  }, [addNotice]);
-
   async function openDetail(product: PublicCatalogProduct) {
     // Se abre con lo que ya trae la tarjeta (instantáneo) y se completa con el detalle.
     setDetail(product);
@@ -223,10 +253,9 @@ export function PublicCatalogPage() {
   // de la API (en producción es el mismo origen; en dev y E2E no lo es).
   const toImageUrl = (path: string | null | undefined) => (path ? apiFileUrl(path) : null);
 
-  // Logo y banner llegan como rutas relativas del endpoint público de media (nunca rutas del
-  // servidor): `null` = la tienda no configuró ese lado, y entonces no se pinta nada.
+  // El logo llega como ruta relativa del endpoint público de media (nunca una ruta del servidor):
+  // `null` = la tienda no configuró logo, y entonces no se pinta nada.
   const logoUrl = toImageUrl(orderingConfig?.logoUrl);
-  const bannerUrl = toImageUrl(orderingConfig?.bannerUrl);
 
   // Showcase de la carta (carrusel + destacados). Los DOS conjuntos son independientes y
   // opcionales (C1/C2): el backend los manda SIEMPRE, vacíos cuando la tienda no subió ninguna.
@@ -265,34 +294,14 @@ export function PublicCatalogPage() {
   const items = page?.items ?? [];
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Portada visual de la tienda: el carrusel va ENCIMA de la marca, porque es lo primero
-          que el cliente debería ver al abrir la carta. Con el array vacío no se pinta ni un
-          marco —la página es exactamente la de antes—. */}
-      {carouselImages.length > 0 && (
-        <div className="pt-4">
-          <CatalogCarousel images={carouselImages} storeName={catalog?.storeName ?? ''} />
-        </div>
-      )}
-
-      {/* Marca (F8): el banner va sobre la cabecera (ancho completo, recortado para no comerse
-          la carta) y el logo junto al nombre. Ninguno de los dos es obligatorio: sin marca, la
-          cabecera es exactamente la que había. */}
-      {bannerUrl && (
-        <div className="bg-surface">
-          <img
-            src={bannerUrl}
-            alt={intl.formatMessage(
-              { id: 'CATALOG_PUBLIC.BANNER_ALT' },
-              { store: catalog?.storeName ?? '' },
-            )}
-            className="mx-auto block max-h-56 w-full max-w-5xl object-cover"
-            data-testid="catalog-banner"
-          />
-        </div>
-      )}
-
-      <header className="border-b border-border bg-surface px-4 py-6">
+    /* `scroll-smooth` en el contenedor raíz: las anclas de la cabecera bajan con suavidad sin
+       ninguna librería de scroll. */
+    <div className="min-h-screen scroll-smooth bg-background">
+      {/* Cabecera FIJA con la marca y la navegación. Va PRIMERO y se queda pegada al scroll:
+          con el carrusel debajo, las tres secciones siguen a mano sin volver arriba. El botón
+          "Consultar mi pedido" ya NO está aquí (decisión del owner, 2026-10-08): el popup de
+          estado sigue existiendo y lo abre el checkout al crear el pedido. */}
+      <header className="sticky top-0 z-40 border-b border-border bg-surface px-4 py-4">
         <div className="mx-auto max-w-5xl">
           <div className="flex items-center gap-3">
             {logoUrl && (
@@ -314,25 +323,32 @@ export function PublicCatalogPage() {
                 {intl.formatMessage({ id: 'CATALOG_PUBLIC.FOOTER' })}
               </p>
             </div>
-            {/* Entrada al pedido (F3). Con la tienda cerrada (`enabled: false`) NO se ofrece:
-                publicar el catálogo no publica los pedidos, son dos interruptores distintos. */}
+            {/* Las TRES secciones, en línea en escritorio (D2). En móvil el mismo grupo de
+                enlaces sale del desplegable de al lado: no son dos navegaciones, es una. */}
+            <CatalogNavLinks className="hidden shrink-0 items-center gap-1 md:flex" />
+            <CatalogNavMenu className="md:hidden" />
+            {/* Carrito (F3) con la misma forma que el del POS: ícono + contador SIEMPRE visible.
+                Con la tienda cerrada (`enabled: false`) no se ofrece: publicar el catálogo no
+                publica los pedidos, son dos interruptores distintos. Lo gateado es el CARRITO,
+                no la navegación —una tienda cerrada sigue siendo un catálogo que se recorre—. */}
             {orderingEnabled && (
-              <div className="flex shrink-0 items-center gap-2">
-                <Button variant="outline" onClick={() => setStatusOpen(true)} data-testid="order-status-button">
-                  {intl.formatMessage({ id: 'ORDER.STATUS_TITLE' })}
-                </Button>
-                <Button onClick={() => setCartOpen(true)} data-testid="catalog-cart-button">
-                  {intl.formatMessage({ id: 'CATALOG_PUBLIC.CART_BUTTON' })}
-                  {cartCountForStore > 0 && (
-                    <span
-                      className="ml-1 rounded-full bg-white/25 px-2 py-0.5 text-xs"
-                      data-testid="catalog-cart-count"
-                    >
-                      {cartCountForStore}
-                    </span>
-                  )}
-                </Button>
-              </div>
+              <button
+                type="button"
+                onClick={() => setCartOpen(true)}
+                className="relative rounded-lg p-2 text-text-muted transition-colors hover:bg-primary-light"
+                aria-label={intl.formatMessage({ id: 'CATALOG_PUBLIC.CART_TITLE' })}
+                data-testid="catalog-cart-button"
+              >
+                <CartIcon />
+                {/* Contador SIEMPRE visible, como en el POS: tapar y destapar el número con la
+                    compra es ruido. Con tope en 99+ porque el badge es de 16 px. */}
+                <span
+                  className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-xs font-bold text-white"
+                  data-testid="catalog-cart-badge"
+                >
+                  {cartCountForStore > 99 ? '99+' : cartCountForStore}
+                </span>
+              </button>
             )}
           </div>
 
@@ -341,21 +357,26 @@ export function PublicCatalogPage() {
               {intl.formatMessage({ id: 'CATALOG_PUBLIC.ORDERS_DISABLED' })}
             </p>
           )}
-
-          {addNotice && (
-            <p className="mt-3 text-xs text-primary" role="status" data-testid="catalog-add-notice">
-              {intl.formatMessage({ id: 'CATALOG_PUBLIC.CART_ADDED' }, { name: addNotice })}
-            </p>
-          )}
         </div>
       </header>
+
+      {/* Portada visual de la tienda: el carrusel va DEBAJO de la cabecera (decisión del owner,
+          2026-10-08) y es `id="inicio"`, la primera de las tres secciones. Con el array vacío
+          no se pinta ni un marco —la página es exactamente la de antes—. */}
+      {carouselImages.length > 0 && (
+        <div className="scroll-mt-24 px-4 pt-4" id="inicio">
+          <CatalogCarousel images={carouselImages} storeName={catalog?.storeName ?? ''} />
+        </div>
+      )}
 
       <main className="mx-auto max-w-5xl px-4 py-6">
         {/* Destacados: el bloque rotativo del dueño va PRIMERO en el cuerpo, antes de los
             filtros, para que se lea como una vitrina y no como un filtro más. Con el array vacío
-            no hay ni caja ni título. */}
+            no hay ni caja ni título. Es la segunda sección, `id="destacados"`. */}
         {dailyImages.length > 0 && (
-          <CatalogDaily images={dailyImages} storeName={catalog?.storeName ?? ''} />
+          <div className="scroll-mt-24" id="destacados">
+            <CatalogDaily images={dailyImages} storeName={catalog?.storeName ?? ''} />
+          </div>
         )}
 
         {/* Buscador + filtro por categoría: el backend filtra y pagina. */}
@@ -445,7 +466,8 @@ export function PublicCatalogPage() {
             tarjeta. */}
         <ul
           ref={gridRef}
-          className="mt-4 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3"
+          id="productos"
+          className="mt-4 grid scroll-mt-24 grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3"
           data-testid="catalog-grid"
         >
           {items.map((product) => (
@@ -539,13 +561,20 @@ export function PublicCatalogPage() {
                   )}
                 </div>
               </button>
+              {/* "Añadir" es SOLO el ícono del carrito de venta (decisión del owner, 2026-10-08):
+                  el texto se comía media tarjeta en la rejilla de dos columnas. Un ícono sin
+                  nombre no dice qué hace, así que el `aria-label` lleva el producto. */}
               {orderingEnabled && (
                 <Button
-                  className="absolute bottom-2 right-2 z-10 shadow-card"
+                  className="absolute right-2 bottom-2 z-10 size-9 rounded-full p-0 shadow-card"
                   onClick={() => addProductToCart(product)}
+                  aria-label={intl.formatMessage(
+                    { id: 'CATALOG_PUBLIC.ADD_TO_CART_PRODUCT' },
+                    { name: product.name },
+                  )}
                   data-testid={`catalog-add-${product.id}`}
                 >
-                  {intl.formatMessage({ id: 'CATALOG_PUBLIC.ADD_TO_CART' })}
+                  <CartIcon />
                 </Button>
               )}
             </li>
@@ -582,8 +611,9 @@ export function PublicCatalogPage() {
 
       {/* Atajo a los productos. Solo con la página lista y ALGO que ver: sin productos no hay
           rejilla a la que bajar, y ofrecer un botón que no lleva a ninguna parte es peor que
-          no ofrecerlo. */}
-      {items.length > 0 && <CatalogSeeProducts targetRef={gridRef} />}
+          no ofrecerlo. Y se retira al llegar a la rejilla (decisión del owner, 2026-10-08),
+          porque entonces solo taparía los productos que el cliente ya está leyendo. */}
+      {items.length > 0 && <CatalogSeeProducts targetRef={gridRef} hidden={gridVisible} />}
 
       {/* Detalle: descripción en texto plano (D9) + galería. */}
       <Modal
@@ -741,3 +771,87 @@ export function PublicCatalogPage() {
 }
 
 export default PublicCatalogPage;
+
+/**
+ * Navegación de la cabecera en ESCRITORIO: las tres secciones en línea.
+ *
+ * Son anclas, no manejadores de scroll: el navegador baja solo al `id` y el `scroll-smooth` del
+ * contenedor raíz hace el resto. Así el enlace sigue siendo un enlace —se abre en otra pestaña,
+ * se copia, se navega con teclado— sin ninguna librería de scroll.
+ */
+function CatalogNavLinks({ className = '' }: { readonly className?: string }) {
+  const intl = useIntl();
+
+  return (
+    <nav
+      className={className}
+      aria-label={intl.formatMessage({ id: 'CATALOG_PUBLIC.NAV_LABEL' })}
+      data-testid="catalog-nav"
+    >
+      {NAV_SECTIONS.map((section) => (
+        <a
+          key={section.anchor}
+          href={`#${section.anchor}`}
+          className={NAV_LINK_CLASSES}
+          data-testid={`catalog-nav-${section.anchor}`}
+        >
+          {intl.formatMessage({ id: section.labelId })}
+        </a>
+      ))}
+    </nav>
+  );
+}
+
+/**
+ * La MISMA navegación en MÓVIL, plegada tras un botón `☰`.
+ *
+ * En una barra estrecha los tres enlaces no caben junto al logo sin partirla, así que el header
+ * se queda con marca + carrito y las secciones salen de un desplegable. Se cierra al elegir
+ * destino —si no, el panel seguiría abierto encima de la sección a la que se bajó— y el botón
+ * declara `aria-expanded` para que un lector de pantalla sepa si el panel está abierto.
+ *
+ * El panel se ancla al header (`sticky` es un contenedor de su `absolute`), así que se abre
+ * ENCIMA del contenido en vez de empujarlo.
+ */
+function CatalogNavMenu({ className = '' }: { readonly className?: string }) {
+  const intl = useIntl();
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className={`relative shrink-0 ${className}`.trim()}>
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        aria-expanded={open}
+        aria-controls="catalog-menu-panel"
+        aria-label={intl.formatMessage({ id: 'CATALOG_PUBLIC.MENU' })}
+        className="rounded-lg p-2 text-text-muted transition-colors hover:bg-primary-light"
+        data-testid="catalog-menu-button"
+      >
+        <span aria-hidden="true" className="text-lg leading-none">
+          ☰
+        </span>
+      </button>
+
+      {open && (
+        <div
+          id="catalog-menu-panel"
+          className="absolute right-0 top-full z-50 mt-1 w-44 overflow-hidden rounded-lg border border-border bg-surface py-1 shadow-card"
+          data-testid="catalog-menu-panel"
+        >
+          {NAV_SECTIONS.map((section) => (
+            <a
+              key={section.anchor}
+              href={`#${section.anchor}`}
+              onClick={() => setOpen(false)}
+              className="block px-3 py-2 text-sm text-text transition-colors hover:bg-primary-light"
+              data-testid={`catalog-menu-${section.anchor}`}
+            >
+              {intl.formatMessage({ id: section.labelId })}
+            </a>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
