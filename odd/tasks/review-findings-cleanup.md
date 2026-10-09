@@ -87,6 +87,13 @@ Review `review-45af9674edf7bfe9` **APROBADA** (2 advisory, ninguno bloqueante; a
 - [x] **F3-R6** (test) — Auto-dismiss del aviso "añadido" sin test.
   - **Cerrado (2026-10-09).** Test con temporizadores falsos: se va a los 2,5 s y el temporizador se reinicia al añadir otro producto. Sin cambio de producción.
 
+### Revisión nativa — F3 frontend (2026-10-09)
+
+Review `review-808d9dda34fad1da` **APROBADA** (3 advisory, ninguno bloqueante; autoridad quemada):
+- [ ] **R3-001** (WARNING · frontend) — La discriminación 404-vs-incidente clasifica como "no encontrado" solo si el rechazo trae `response.status === 404`; los tests nuevos solo cubren la rama de fallo con objetos fabricados, así que la rama del veredicto 404 (la que el fix protege) no está probada con la forma real del rechazo. Si esa forma no trae el status anidado, un 404 se muestra como "no se pudo consultar".
+- [ ] **R3-002** (SUGGESTION · test) — Los tests del estado fabrican el rechazo como formas literales (`{isNetworkError:true}`, `{response:{status}}`) en vez del tipo de error real del servicio: fija la expectativa del componente, no el contrato.
+- [ ] **R3-003** (SUGGESTION · test) — `spyOnWarn` se restaura con `mockRestore()` manual al final de cada test; si una aserción falla antes, el espía se filtra a tests posteriores y silencia la señal.
+
 ### F2 persistencia (`pedidos-whatsapp-persistencia.md`)
 - [ ] **F2-R1** (test) — Carreras del handler sin test: multi-moneda (`EnsureSingleCurrency`) y `DeliveryType` fuera del enum.
 - [ ] **F2-R2** (test) — Persistencia nueva solo con Moq (integración real).
