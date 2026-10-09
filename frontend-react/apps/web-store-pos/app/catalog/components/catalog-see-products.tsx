@@ -4,6 +4,14 @@ import { useIntl } from 'react-intl';
 interface CatalogSeeProductsProps {
   /** El elemento al que se baja: la rejilla de productos de esta carta. */
   readonly targetRef: RefObject<HTMLElement | null>;
+  /**
+   * Ya se está en la sección de productos: entonces el botón se retira.
+   *
+   * Antes esta decisión era OPPUESTA —"un botón que huye es peor que uno quieto" (2026-10-07)— y
+   * el owner la REVOCÓ el 2026-10-08: un atajo que sigue ahí cuando ya estás en su destino solo
+   * tapa productos. Lo único que se ocultó es esto; el halo y el resto siguen igual.
+   */
+  readonly hidden: boolean;
 }
 
 /**
@@ -11,15 +19,17 @@ interface CatalogSeeProductsProps {
  *
  * Va FIJO en el borde inferior y por debajo de los modales (`z-30` frente al `z-50` de `Modal`):
  * el carrito y el checkout se abren encima, así que nunca quedan tapados ni se mezclan con sus
- * controles. No aparece y desaparece al hacer scroll —un botón que huye es peor que uno
- * quieto—: quien ya llegó a la rejilla lo pasa por encima con el dedo o lo deja estar.
+ * controles. No se pinta cuando el cliente YA está en la rejilla (`hidden`): el atajo solo tiene
+ * sentido mientras el destino queda fuera de pantalla.
  */
-export function CatalogSeeProducts({ targetRef }: CatalogSeeProductsProps) {
+export function CatalogSeeProducts({ targetRef, hidden }: CatalogSeeProductsProps) {
   const intl = useIntl();
 
   function scrollToProducts() {
     targetRef.current?.scrollIntoView({ behavior: 'smooth' });
   }
+
+  if (hidden) return null;
 
   return (
     <div className="pointer-events-none fixed inset-x-0 bottom-4 z-30 flex justify-center px-4">

@@ -140,12 +140,16 @@ function CategoryPanelCard({
 }
 
 /**
- * Un lado de la marca (logo o banner): previsualiza lo guardado, deja elegir un archivo nuevo
- * y marca el borrado. No guarda NADA por su cuenta — el botón de la tarjeta "Marca" aplica el
- * conjunto, igual que hace el guardado por lotes con los productos.
+ * Un lado de la marca: previsualiza lo guardado, deja elegir un archivo nuevo y marca el borrado.
+ * No guarda NADA por su cuenta — el botón de la tarjeta "Marca" aplica el conjunto, igual que hace
+ * el guardado por lotes con los productos.
  *
  * El archivo nuevo NO se previsualiza: el preview es el de la clave guardada, porque el
  * endpoint público solo sirve claves ya persistidas y no hay URL que pintar antes de guardar.
+ *
+ * Queda UN solo lado, el logo: el del BANNER se retiró de la carta pública el 2026-10-08 por
+ * decisión del owner, así que el dueño ya no tiene dónde subirlo. El dato (`bannerKey`) y su
+ * endpoint siguen en el backend sin tocar —decisión D10—; lo que se retiró es el control.
  */
 function BrandSlot({
   labelId,
@@ -552,10 +556,8 @@ export function WebCatalogPage() {
   const [branding, setBranding] = useState<CatalogBranding | null>(null);
   const [brandError, setBrandError] = useState('');
   const [pendingLogo, setPendingLogo] = useState<File | null>(null);
-  const [pendingBanner, setPendingBanner] = useState<File | null>(null);
-  /** Logo/banner marcados para borrar, NO borrados todavía: los aplica el botón de marca. */
+  /** Logo marcado para borrar, NO borrado todavía: lo aplica el botón de marca. */
   const [removeLogo, setRemoveLogo] = useState(false);
-  const [removeBanner, setRemoveBanner] = useState(false);
   const [isSavingBrand, setIsSavingBrand] = useState(false);
 
   /**
@@ -895,7 +897,7 @@ export function WebCatalogPage() {
     });
   }
 
-  // ── Marca (F8): subir / quitar logo y banner, y guardarla con SU botón ────────────────
+  // ── Marca (F8): subir / quitar el logo y guardarlo con SU botón ───────────────────
   // La validación local es la MISMA que la de la imagen de producto (formatos + tamaño): el
   // backend usa las mismas reglas (`CatalogImageUploadRules`) y así no se sube en balde.
   function handleBrandFile(
@@ -929,19 +931,7 @@ export function WebCatalogPage() {
     );
   }
 
-  function handleSelectBanner(file: File | null) {
-    setBrandError('');
-    handleBrandFile(
-      file,
-      (valid) => {
-        setRemoveBanner(false);
-        setPendingBanner(valid);
-      },
-      setBrandError,
-    );
-  }
-
-  const hasBrandChanges = pendingLogo !== null || pendingBanner !== null || removeLogo || removeBanner;
+  const hasBrandChanges = pendingLogo !== null || removeLogo;
 
   async function handleSaveBrand() {
     if (!hasBrandChanges) return;
@@ -949,8 +939,6 @@ export function WebCatalogPage() {
     const payload: CatalogBrandingUpdate = {};
     if (pendingLogo) payload.logo = pendingLogo;
     if (removeLogo) payload.removeLogo = true;
-    if (pendingBanner) payload.banner = pendingBanner;
-    if (removeBanner) payload.removeBanner = true;
 
     setIsSavingBrand(true);
     try {
@@ -963,9 +951,7 @@ export function WebCatalogPage() {
         return;
       }
       setPendingLogo(null);
-      setPendingBanner(null);
       setRemoveLogo(false);
-      setRemoveBanner(false);
       setBrandError('');
       showToastSuccess(intl.formatMessage({ id: 'WEB_CATALOG.BRAND_SAVED' }));
       // El servidor manda: se recarga para que la previsualización sea la que quedó guardada
@@ -1168,8 +1154,10 @@ export function WebCatalogPage() {
         </div>
       </Card>
 
-      {/* Marca (F8). Su propio botón y su propio PUT: el guardado por lotes de productos, más
-          abajo, no la toca, para que guardar descripciones nunca escriba (ni borre) el logo. */}
+      {/* Marca (F8). Solo el LOGO: el control de banner se retiró el 2026-10-08 (decisión del
+          owner) sin tocar el dato ni el backend. Su propio botón y su propio PUT: el guardado
+          por lotes de productos, más abajo, no la toca, para que guardar descripciones nunca
+          escriba (ni borre) el logo. */}
       <Card
         padding="tight"
         title={
@@ -1218,28 +1206,6 @@ export function WebCatalogPage() {
             onToggleRemove={() => {
               setPendingLogo(null);
               setRemoveLogo((current) => !current);
-            }}
-          />
-          <BrandSlot
-            labelId="WEB_CATALOG.BRAND_BANNER"
-            removeLabelId="WEB_CATALOG.BRAND_REMOVE_BANNER"
-            pendingRemoveLabelId="WEB_CATALOG.BRAND_PENDING_REMOVE_BANNER"
-            testId="brand-banner"
-            uploadTestId="brand-banner-upload"
-            removeTestId="brand-banner-remove"
-            pendingTestId="brand-pending-banner"
-            pendingRemoveTestId="brand-pending-banner-remove"
-            slotTestId="brand-slot-banner"
-            storeSlug={status?.storeSlug ?? ''}
-            mediaKey={branding?.bannerKey ?? null}
-            pendingFile={pendingBanner}
-            markedForRemoval={removeBanner}
-            busy={isSavingBrand}
-            previewClass="h-16 w-full object-cover"
-            onSelectFile={handleSelectBanner}
-            onToggleRemove={() => {
-              setPendingBanner(null);
-              setRemoveBanner((current) => !current);
             }}
           />
         </div>
