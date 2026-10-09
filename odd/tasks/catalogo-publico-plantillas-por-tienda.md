@@ -205,3 +205,19 @@ pnpm vitest run app/catalog/ app/sales/routes/__tests__/
     (`public-catalog.test.tsx`) siguen verdes sin cambios de comportamiento.
   - **Pendiente**: revisión nativa (RDD) y, si el owner quiere, PRs encadenados. Push y PR son
     decisión del owner.
+- 2026-10-09 — **Revisión nativa (RDD) intentada y bloqueada por el harness** (owner decidió
+  dejarla atrás y continuar). Diagnóstico con evidencia dura:
+  - Candidato completo (38 archivos / 5910 líneas): `lens_context_budget_exceeded` — el
+    `Designer.cs` autogenerado por EF pesa 3332 líneas y revienta el presupuesto del revisor.
+  - Candidato frontend reducido (lineage `review-c1c4fa2555c8f6e6`, lente `review-reliability`):
+    el revisor **sí produjo** el JSON correcto (`inspection.status=completed`, `subject_hash`
+    coincide), pero la **admisión lo rechaza**:
+    `proof_path_out_of_scope / unknown_or_malformed_repository_path` sobre `R3-001`. El prompt del
+    agente revisor **exige** probar con prefijo `changed-hunk:`, y la admisión resuelve esos refs
+    como rutas → contradicción instrucciones↔admisión (fallo de Gentle AI, no del cambio).
+    El transporte OpenCode lo surface como `opencode_review_transport_relay_refused (output_refused)`.
+  - Sin aprobación creada. Rama y tests intactos.
+- 2026-10-09 — **Cierre del hallazgo del revisor** (aunque RDD no lo pueda admitir): commit
+  `b1c5f43b` añade 6 tests a `boutique-catalog.test.tsx` (lista fallida, catálogo vacío vs búsqueda
+  sin resultados, conteo singular/plural, paginación anterior/siguiente y una sola página).
+  `pnpm typecheck` 0, `pnpm lint` 0, boutique 14/14.
