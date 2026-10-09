@@ -269,8 +269,24 @@ describe('MessageShell — realtime connection', () => {
     // attributable to the shell's subscription and not to a stray timer.
     expect(connectionOnMock).toHaveBeenCalledWith('ReceiveMessage', expect.any(Function));
 
+    // The hub delivers the pushed message as the handler's payload; firing the
+    // recorded handler WITH it proves the real subscription contract instead of an
+    // argument-less call that would keep passing even if the handler started
+    // reading the payload. The field names mirror MessageDto / the hub's payload.
+    const pushed: MessageDto = {
+      id: 'm-push',
+      conversationId: 'c1',
+      senderId: 'u1',
+      senderType: 1,
+      recipientId: 'sa',
+      storeId: 's1',
+      content: 'Mensaje empujado',
+      sentAt: '2026-01-01T12:00:00Z',
+      readAt: null,
+    };
+
     await act(async () => {
-      handler!();
+      handler!(pushed);
     });
 
     await waitFor(() => expect(screen.getByTestId('message-badge')).toHaveTextContent('2'));
