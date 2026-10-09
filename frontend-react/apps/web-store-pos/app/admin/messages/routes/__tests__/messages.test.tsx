@@ -438,6 +438,77 @@ describe('AdminMessagesPage — owner ordering', () => {
     expect(ownerOrder()).toEqual(['owner-owner-b', 'owner-owner-a', 'owner-owner-c']);
   });
 
+  // A conversation can EXIST with no owner message in it: registration opens the
+  // thread with the platform's welcome message, which the admin sent. That is the
+  // shape every owner starts in, and `lastOwnerMessageAt` is null there — not
+  // absent from the payload, null. Every other ordering test here left the
+  // never-wrote owner with NO conversation at all, so the null branch was only
+  // ever exercised by a payload shape the backend cannot produce.
+  //
+  // Two owners in that exact shape, ordered against a real one: both nulls sit
+  // BELOW Ana (owner activity outranks plan and name), and between themselves the
+  // pre-existing fallback still decides — Carla's paid store ahead of Bea's free
+  // one, and Bea ahead of Dora on name alone so the final tiebreak is proven too.
+  it('ranks owners whose conversation has a null lastOwnerMessageAt below those who wrote', async () => {
+    const { messagesHttpService } = await import('~/shared/lib/messages/messages-http-service');
+    const { ownerHttpService } = await import('~/admin/owners/lib/services/owner-http-service');
+    const { storeHttpService } =
+      await import('~/management/stores/lib/services/store-http-service');
+
+    const ownerDora = {
+      id: 'owner-f',
+      userId: 'user-f',
+      fullName: 'Dora Sin Escribir',
+      isActive: true,
+    } as Owner;
+    const storeDora = {
+      id: 'store-f',
+      name: 'Tienda F',
+      ownerId: 'owner-f',
+      ownerName: 'Dora Sin Escribir',
+      approved: true,
+      planType: 'Gratis',
+      isActive: true,
+    } as Store;
+
+    vi.mocked(ownerHttpService.listOwners).mockResolvedValue(
+      response<Owner[]>([ownerA, ownerB, ownerC, ownerDora]),
+    );
+    vi.mocked(storeHttpService.listStores).mockResolvedValue(
+      response<Store[]>([storeA, storeB, storeC, storeDora]),
+    );
+
+    // Ana wrote; Bea and Dora have a conversation but never wrote in it.
+    const welcomeOnly = (ownerId: string, storeId: string, content: string): ConversationDto => ({
+      id: `conv-${storeId}`,
+      ownerId,
+      storeId,
+      lastMessageAt: '2026-01-01T09:00:00Z',
+      lastMessageContent: content,
+      unreadCount: 0,
+      lastOwnerMessageAt: null,
+    });
+    vi.mocked(messagesHttpService.getConversations).mockResolvedValue(
+      response<ConversationDto[]>([
+        conversationA,
+        welcomeOnly('user-b', 'store-b', 'Bienvenida'),
+        welcomeOnly('user-f', 'store-f', 'Bienvenida'),
+      ]),
+    );
+
+    await renderPage();
+    await screen.findByTestId('owners-list');
+
+    // Ana wrote last → first. Carla never wrote but pays → next. Bea (free) before
+    // Dora (free) purely by name.
+    expect(ownerOrder()).toEqual([
+      'owner-owner-a',
+      'owner-owner-c',
+      'owner-owner-b',
+      'owner-owner-f',
+    ]);
+  });
+
   it('moves an owner to the top when the poll brings a message from them', async () => {
     const { messagesHttpService } = await import('~/shared/lib/messages/messages-http-service');
     vi.mocked(messagesHttpService.getConversations)

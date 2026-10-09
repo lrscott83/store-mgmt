@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import { MemoryRouter } from 'react-router';
 import { existsSync, readFileSync } from 'node:fs';
@@ -18,10 +18,28 @@ const markAllAsReadMock = vi.hoisted(() => vi.fn());
 // than only that the REST + poll-fallback path works.
 const connectionStartMock = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 const connectionStopMock = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
+
+// The handlers the shell subscribes with are KEPT, not swallowed. A bare
+// `on: vi.fn()` only proves the subscription happened; it cannot prove the
+// subscription WORKS. Recording them lets a test fire the hub's
+// ReceiveMessage and assert the badge actually moves — which is the whole
+// point of opening the connection (a stubbed handler proves nothing).
+const connectionHandlers = vi.hoisted(() => new Map<string, (...args: unknown[]) => void>());
+const connectionOnMock = vi.hoisted(() =>
+  vi.fn((event: string, handler: (...args: unknown[]) => void) => {
+    connectionHandlers.set(event, handler);
+  }),
+);
+const connectionOffMock = vi.hoisted(() =>
+  vi.fn((event: string) => {
+    connectionHandlers.delete(event);
+  }),
+);
+
 const createConnectionMock = vi.hoisted(() =>
   vi.fn(() => ({
-    on: vi.fn(),
-    off: vi.fn(),
+    on: connectionOnMock,
+    off: connectionOffMock,
     start: connectionStartMock,
     stop: connectionStopMock,
   })),
@@ -205,6 +223,7 @@ describe('MessageShell — header badge', () => {
 describe('MessageShell — realtime connection', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    connectionHandlers.clear();
     getConversationsMock.mockResolvedValue(success([]));
   });
 
@@ -226,6 +245,35 @@ describe('MessageShell — realtime connection', () => {
     renderShell();
 
     await waitFor(() => expect(connectionStartMock).toHaveBeenCalledTimes(2));
+  });
+
+  // The assertion above proves the connection OPENS. This one proves the
+  // subscription it opens actually works: the badge used to move only when the
+  // poll ladder came around, and a mock that swallows handlers cannot tell a
+  // wired subscription from a dead one. So the recorded ReceiveMessage handler is
+  // invoked here and the badge must follow without any timer advancing — the
+  // first read returns 0 unread, the push read returns 2.
+  it('moves the badge when the hub pushes a ReceiveMessage', async () => {
+    mockUser = { id: 'sa', selectedStoreId: '', isSuperAdmin: true, isOwnerAdmin: false };
+    getConversationsMock
+      .mockResolvedValueOnce(success([conversation({ id: 'c1', storeId: 's1', unreadCount: 0 })]))
+      .mockResolvedValue(success([conversation({ id: 'c1', storeId: 's1', unreadCount: 2 })]));
+
+    renderShell();
+
+    await waitFor(() => expect(screen.getByTestId('message-badge')).toHaveTextContent('0'));
+    const handler = connectionHandlers.get('ReceiveMessage');
+    expect(handler).toBeTypeOf('function');
+
+    // Sanity: the mock is actually listening, so the badge moving below is
+    // attributable to the shell's subscription and not to a stray timer.
+    expect(connectionOnMock).toHaveBeenCalledWith('ReceiveMessage', expect.any(Function));
+
+    await act(async () => {
+      handler!();
+    });
+
+    await waitFor(() => expect(screen.getByTestId('message-badge')).toHaveTextContent('2'));
   });
 });
 

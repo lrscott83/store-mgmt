@@ -159,35 +159,66 @@ public class MessageRepository : IMessageRepository
     }
 
     /// <summary>
-    /// When the OWNER last wrote in this conversation, or <c>null</c> when they never
-    /// have. This is the ordering signal the SuperAdmin inbox needs: <c>Conversation</c>
-    /// stores no sender, so its <c>LastMessageAt</c> moves when the admin replies too —
-    /// ordering on it floats an owner to the top for the admin answering them. The
-    /// SuperAdmin's own welcome message leaves this <c>null</c>, which is correct:
-    /// nothing the admin said makes an owner "more active".
+    /// When each conversation's OWNER last wrote, in ONE query for the whole set.
+    /// <para>
+    /// Batched on purpose: the SuperAdmin inbox calls this for every conversation it
+    /// lists, and the singular form it replaces was one round trip each — an N+1 whose
+    /// cost grows with the number of registered owners. The owner is resolved through
+    /// the join (<c>m.SenderId == c.OwnerId</c>) instead of being passed in, because
+    /// the caller is listing conversations it did not pick one of.
+    /// </para>
+    /// <para>
+    /// A conversation whose owner has never written is ABSENT from the result, and a
+    /// message the owner deleted for themselves is EXCLUDED (<c>!IsDeletedBySender</c>),
+    /// exactly as the singular query did — both make the conversation fall back to "no
+    /// owner activity" rather than surfacing a message its author has withdrawn.
+    /// </para>
     /// </summary>
-    public async Task<DateTime?> GetLastOwnerMessageAtAsync(Guid conversationId, Guid ownerId, CancellationToken cancellationToken)
+    public async Task<IReadOnlyDictionary<Guid, DateTime>> GetLastOwnerMessageAtAsync(
+        IReadOnlyCollection<Guid> conversationIds,
+        CancellationToken cancellationToken)
     {
-        return await _dbContext.Messages
-            .AsNoTracking()
-            .Where(m => m.ConversationId == conversationId
-                     && m.SenderId == ownerId
-                     && !m.IsDeletedBySender)
-            .OrderByDescending(m => m.SentAt)
-            .Select(m => (DateTime?)m.SentAt)
-            .FirstOrDefaultAsync(cancellationToken);
+        if (conversationIds.Count == 0)
+            return new Dictionary<Guid, DateTime>();
+
+        var rows = await (
+            from c in _dbContext.Conversations.AsNoTracking()
+            where conversationIds.Contains(c.Id)
+            join m in _dbContext.Messages.AsNoTracking() on c.Id equals m.ConversationId
+            where m.SenderId == c.OwnerId && !m.IsDeletedBySender
+            group m by c.Id into g
+            select new { ConversationId = g.Key, Last = g.Max(x => x.SentAt) }
+        ).ToListAsync(cancellationToken);
+
+        return rows.ToDictionary(r => r.ConversationId, r => r.Last);
     }
 
-    public async Task<int> GetUnreadCountAsync(Guid conversationId, Guid currentUserId, CancellationToken cancellationToken)
+    /// <summary>
+    /// The unread count of <c>currentUserId</c> per conversation, in ONE query for the
+    /// whole set. Batched for the same reason as
+    /// <see cref="GetLastOwnerMessageAtAsync(IReadOnlyCollection{Guid}, CancellationToken)"/>:
+    /// the per-conversation call it replaces was the other half of that N+1. A
+    /// conversation with nothing unread is ABSENT from the result — missing means zero.
+    /// </summary>
+    public async Task<IReadOnlyDictionary<Guid, int>> GetUnreadCountsAsync(
+        IReadOnlyCollection<Guid> conversationIds,
+        Guid currentUserId,
+        CancellationToken cancellationToken)
     {
-        return await _dbContext.Messages
+        if (conversationIds.Count == 0)
+            return new Dictionary<Guid, int>();
+
+        var rows = await _dbContext.Messages
             .AsNoTracking()
-            .CountAsync(m =>
-                m.ConversationId == conversationId &&
-                m.RecipientId == currentUserId &&
-                m.ReadAt == null &&
-                !m.IsDeletedByRecipient,
-                cancellationToken);
+            .Where(m => conversationIds.Contains(m.ConversationId)
+                     && m.RecipientId == currentUserId
+                     && m.ReadAt == null
+                     && !m.IsDeletedByRecipient)
+            .GroupBy(m => m.ConversationId)
+            .Select(g => new { ConversationId = g.Key, Count = g.Count() })
+            .ToListAsync(cancellationToken);
+
+        return rows.ToDictionary(r => r.ConversationId, r => r.Count);
     }
 }
 
