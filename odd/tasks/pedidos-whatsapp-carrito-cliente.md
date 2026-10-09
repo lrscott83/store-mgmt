@@ -218,8 +218,10 @@ dotnet test src/Application.Tests/Application.Tests.csproj
 
 ## Hallazgos de la revisión nativa (RDD) — TODOs rastreados (2026-10-07)
 
-- [ ] **F3-R1** (WARNING · backend) — El bypass del filtro de tenant en `Order` solo se prueba con EF InMemory, no con PostgreSQL real. Destino: F3/E2E (requiere autorización).
-- [ ] **F3-R2** (WARNING · backend) — La partición del rate limit lee el slug de `RouteValues`; no se prueba que el middleware corra después del routing (podría colapsar a IP-only). Destino: F3.
+- [x] **F3-R1** (WARNING · backend) — El bypass del filtro de tenant en `Order` solo se prueba con EF InMemory, no con PostgreSQL real. Destino: F3/E2E (requiere autorización).
+  - **Cerrado (2026-10-09)** con E2E nuevo: `Orders/PublicOrderingReadE2ETests.cs` (4 casos) + seed local `Orders/PublicOrderingSeed.cs`. El alta usa la vía de producción `Order.CreateOnline` y la lectura entra por el cliente HTTP **anónimo** contra `smca_test`. R1-1 (200 con código/total/snapshot), R1-2 (**la sonda que hace que R1-1 signifique algo**: con un tenant ajeno la consulta filtrada devuelve 0 filas y la que ignora el filtro devuelve 1, y un contexto sin tenant tampoco la ve — sin esta prueba el 200 de R1-1 no distinguiría "el bypass funciona" de "el filtro no llega a SQL en este Provider"), R1-3 (código inexistente y teléfono que no coincide → 404, uniforme) y R1-4 (el mismo código desde el slug de otra tienda → 404).
+- [x] **F3-R2** (WARNING · backend) — La partición del rate limit lee el slug de `RouteValues`; no se prueba que el middleware corra después del routing (podría colapsar a IP-only). Destino: F3.
+  - **Cerrado (2026-10-09)** con E2E nuevo: `Orders/PublicOrderingRateLimitE2ETests.cs` (3 casos), reutilizando el mismo seed. Los unitarios de `OnlineOrderRateLimitPolicyTests` **pasarían igual con el middleware antes del routing** — inyectan `RouteValues` a mano sobre un `DefaultHttpContext`, o sea que suponen un routing que el pipeline no garantiza. Aquí la petición entra por HTTP: R2-1 agota el presupuesto de 20 y el siguiente POST es 429 **y sigue siéndolo** (no es un 429 puntual por reposición: el test no afirma "la 21ª es 429" porque el repositorio es de 2/min y cruzaría una frontera de segmento; afirma que los 20 primeros pasan y el cubo queda cerrado). R2-2 es la del hallazgo: agotado el slug A desde la misma IP, el slug B responde 200 y A sigue en 429 — si la partición colapsara a IP-only, B heredaría el límite. R2-3 fija la normalización (el slug en MAYÚSCULAS cae en el mismo cubo).
 - [x] **F3-R3** (WARNING · frontend) — `storefront-order-status` muestra "no encontrado" para **cualquier** error (red/5xx), no solo 404; `ORDER.STATUS_FAILED` queda sin usar. Destino: F3.
   - **Cerrado (2026-10-09).** `catch (err)` discrimina: solo el `404` se pinta como "no encontrado" (sigue siendo uniforme, así que no hace de oráculo); red caída, `5xx` y `429` muestran `ORDER.STATUS_FAILED`, que por fin se usa. Helper local `isNotFound` leyendo `response.status`, el mismo criterio con el que `auth-store.ts` separa veredicto de incidente: en `http-error.ts` no hay helper de status. Tres tests nuevos (sin conexión / 500 / 429) que además niegan el texto de "no encontrado".
 - [x] **F3-R4** (WARNING · frontend) — Vaciar el input de cantidad **borra la línea** (`Number('') || 0` → 0 → remove). Destino: F3.
@@ -252,3 +254,16 @@ F4 (envío del pedido por WhatsApp: enlace `wa.me` con el código y el resumen),
   rompe exactamente su test (F3-R4 → 1 rojo; F3-R3 → 3 rojos; F3-R5 → 1 rojo, y el mismo rojo con
   la guarda por estado en lugar de la ref; F3-R6 → 1 rojo; R3-1 → 2 rojos por cada mitad del fix;
   R3-2 → 1 rojo). Sin commit (writer acotado).
+- 2026-10-09 — **Slice backend cerrado (F3-R1, F3-R2).** E2E nuevos contra PostgreSQL real, sin tocar
+  producción ni ningún E2E existente: `Orders/PublicOrderingReadE2ETests.cs` (4),
+  `Orders/PublicOrderingRateLimitE2ETests.cs` (3) y el seed local `Orders/PublicOrderingSeed.cs`.
+  El seed es LOCAL a propósito: `WebCatalogSeed` y `AuthzSeed` son del harness compartido y aquí
+  hacen falta filas que ellos no crean (el `StoreCatalogSettings` con pedidos abiertos y un `Order`
+  con líneas); el `CatalogSlug` se fija EN EL alta del store porque `ApplicationDbContext` es
+  NoTracking y un `UPDATE` posterior no se escribiría. El slug lleva GUID → cada prueba tiene su
+  cubo de rate limit y el suite no se pisa a sí mismo.
+  Verificación observada: `dotnet build src/SMCA.sln` → **Build succeeded**, 0 errors, sin `error MSB`;
+  `--filter PublicOrderingReadE2ETests` → **4/4**; `--filter PublicOrderingRateLimitE2ETests` → **3/3**
+  (ambos con `[E2E Guard] … Database=smca_test`). Nombres verificados con `--list-tests` **sin**
+  `--filter` antes de correr, porque un sufijo mal escrito hace que el filtro no matchee nada y la
+  corrida salga vacía sin error. Sin commit (writer acotado).

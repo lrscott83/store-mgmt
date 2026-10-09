@@ -76,8 +76,19 @@ Review `review-45af9674edf7bfe9` **APROBADA** (2 advisory, ninguno bloqueante; a
   - **Cerrado (2026-10-09).** `console.warn` con el error en el `catch` de `window.open`. Sin cambio de flujo: el aviso sigue pintándose con su enlace manual, que es el respaldo del popup bloqueado. El test de F4-R2 (el de `window.open` lanzando) se amplía para exigir la señal **y** que el enlace manual siga ahí —las dos mitades, no una.
 
 ### F3 carrito (`pedidos-whatsapp-carrito-cliente.md`)
-- [ ] **F3-R1** (test · requiere E2E nuevo) — El bypass de filtro de tenant en `Order` solo con InMemory.
-- [ ] **F3-R2** (test) — La partición del rate limit desde `RouteValues` no se prueba end-to-end.
+- [x] **F3-R1** (test · requiere E2E nuevo) — El bypass de filtro de tenant en `Order` solo con InMemory.
+  - **Cerrado (2026-10-09)** con `Orders/PublicOrderingReadE2ETests.cs` (4 casos) + seed local
+    `Orders/PublicOrderingSeed.cs`, contra `smca_test` por HTTP anónimo. El caso R1-2 es el que
+    justifica el resto: prueba que el filtro global por tenant **sí** esconde la fila en PostgreSQL
+    (filtrada = 0 filas, con `IgnoreQueryFilters` = 1, y un contexto sin tenant tampoco la ve), así
+    que el 200 de R1-1 no puede explicarse por un filtro que no llega a SQL.
+- [x] **F3-R2** (test) — La partición del rate limit desde `RouteValues` no se prueba end-to-end.
+  - **Cerrado (2026-10-09)** con `Orders/PublicOrderingRateLimitE2ETests.cs` (3 casos). Los
+    unitarios de la política pasan igual con el middleware antes del routing (inyectan `RouteValues`
+    a mano); aquí la petición entra por HTTP, y R2-2 (agotar el slug A, el slug B responde 200 desde
+    la misma IP) es exactamente la prueba que se colapsa a IP-only. R2-1 evita afirmar "la 21ª es
+    429" porque la reposición es de 2/min y cruzaría una frontera de segmento; afirma los 20
+    primeros en 200 y el cubo cerrado. R2-3 fija la normalización del slug.
 - [x] **F3-R3** (defecto) — El estado muestra "no encontrado" para **cualquier** error (red/5xx), no solo 404.
   - **Cerrado (2026-10-09).** Solo el `404` se pinta como "no encontrado" (uniforme, no oráculo); el resto usa `ORDER.STATUS_FAILED`, hasta ahora sin usar. Detalle en `pedidos-whatsapp-carrito-cliente.md`.
 - [x] **F3-R4** (defecto) — Vaciar el input de cantidad **borra la línea**.
@@ -167,3 +178,30 @@ Review `review-808d9dda34fad1da` **APROBADA** (3 advisory, ninguno bloqueante; a
   exactamente los tests que lo fijan. Sin commit (writer acotado). Sigue pendiente, por estar fuera de
   la superficie autorizada: `http-error.ts` no tiene helper de status y el 404 del estado del pedido se
   lee con un helper local al componente (si algún día se añade `isNotFound`, se sustituye aquí).
+- 2026-10-09 — **Cerrados F3-R1 y F3-R2 (backend, E2E nuevo).** Los dos avisos pedían cobertura que
+  ningún test tenía, y los dos tienen la misma forma: una garantía que solo se rompe si el PIPELINE
+  real se comporta como el test supone.
+  F3-R1: `Orders/PublicOrderingReadE2ETests.cs` lee el pedido por HTTP anónimo contra `smca_test`.
+  El caso que hace que valga la pena es **R1-2**, no R1-1: con un tenant ajeno, la consulta filtrada
+  de `Order` devuelve 0 filas y la de `IgnoreQueryFilters` devuelve 1, y un contexto sin tenant (el
+  caso real del anónimo) tampoco ve la fila. Sin esa sonda, el 200 de R1-1 distinguiría "el bypass
+  funciona" de "el filtro global no llega a traducirse a SQL en este Provider" — que es
+  precisamente la duda que Ahumada dejó abierta al decir "solo con InMemory".
+  F3-R2: `Orders/PublicOrderingRateLimitE2ETests.cs`. Los unitarios de la política pasan IGUAL con el
+  middleware corrido antes del routing, porque inyectan `RouteValues` en un `DefaultHttpContext`: la
+  premise está presupuesta en el test, no comprobada. Aquí entra por HTTP, y R2-2 es la prueba
+  directa del hallazgo —agotado el slug A desde la misma IP, el slug B responde 200— que es
+  justamente lo que se pierde si el slug llega vacío al limiter. Detalle no obvio: R2-1 **no** afirma
+  "la petición 21 es 429", porque la reposición de `OnlineOrderPolicy` es de 2 por minuto y el bucle
+  puede cruzar una frontera de segmento; afirma los 20 primeros en 200 y que el cubo **sigue**
+  cerrado, que es lo que distingue un límite de un 429 puntual.
+  Superficie: solo E2E nuevos (`Orders/PublicOrderingReadE2ETests.cs`,
+  `Orders/PublicOrderingRateLimitE2ETests.cs`, `Orders/PublicOrderingSeed.cs`). Ni producción ni tests
+  E2E existentes. El seed es local y no toca `WebCatalogSeed`/`AuthzSeed`: hace falta el
+  `StoreCatalogSettings` con pedidos abiertos y un `Order` con líneas, y el `CatalogSlug` se fija en el
+  alta del store porque `ApplicationDbContext` es NoTracking. El slug lleva GUID → un cubo de rate
+  limit por prueba, así que el suite no se pisa a sí mismo.
+  Verificación observada: `dotnet build src/SMCA.sln` → **Build succeeded**, 0 errors, sin `error MSB`;
+  `--filter PublicOrderingReadE2ETests` → **4/4**; `--filter PublicOrderingRateLimitE2ETests` → **3/3**.
+  Los nombres se confirmaron con `--list-tests` **sin** `--filter` antes de correr. Sin commit (writer
+  acotado). Sin pendientes fuera de superficie en este slice.
