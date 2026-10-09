@@ -92,6 +92,11 @@ namespace Application.Features.OnlineOrdering.Public.Queries.GetPublicOrderingCo
                 PaletteId = string.IsNullOrWhiteSpace(settings?.PaletteId)
                     ? StoreCatalogSettings.DefaultPaletteId
                     : settings.PaletteId,
+                // La PLANTILLA (vista) viaja igual que la paleta: sin fila, o en blanco, el storefront
+                // usa la plantilla actual para no romperse. Es un id predefinido, no un color.
+                TemplateId = string.IsNullOrWhiteSpace(settings?.TemplateId)
+                    ? StoreCatalogSettings.DefaultTemplateId
+                    : settings.TemplateId,
                 // El SHOWCASE se lee UNA vez para los dos conjuntos (ver `ReadShowcaseAsync`), y viaja igual que
                 // la marca: URL pública del endpoint de media, nunca la
                 // clave cruda. Sin imágenes —una tienda recién sincronizada, o una que no quiere

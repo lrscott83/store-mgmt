@@ -19,9 +19,9 @@ namespace Application.Tests.Features.WebCatalog.Branding.Commands;
 ///
 ///   1. ALTA la primera vez y ACTUALIZACIÓN después, por `StoreId`, conservando SU `Id` (el índice
 ///      único de `StoreId` haría fallar un INSERT con id nuevo).
-///   2. Escribe SOLO `LogoKey` y `BannerKey`. Es la mitad de una fila compartida (D19): si tocara
-///      las columnas de pedidos o la paleta, guardar el logo dejaría al dueño sin pedidos abiertos
-///      ni paleta.
+///   2. Escribe SOLO las columnas de marca (`LogoKey`, `BannerKey` y `TemplateId`). Es la mitad de
+///      una fila compartida (D19): si tocara las columnas de pedidos o la paleta, guardar el logo
+///      dejaría al dueño sin pedidos abiertos ni paleta.
 ///   3. Sube el archivo nuevo y BORRA la key anterior, solo si cambió. Sin ese borrado el disco
 ///      acumula logos huérfanos que nadie vuelve a pedir.
 ///   4. Un PUT PARCIAL: cambiar el logo no puede borrar el banner, ni al revés. Por eso cada
@@ -296,6 +296,76 @@ public class UpdateStoreCatalogBrandingCommandHandlerTests
 
         _persisted!.PaletteId.Should().Be(StoreCatalogSettings.DefaultPaletteId);
         _persisted.BannerKey.Should().BeNull();
+    }
+
+    #endregion
+
+    #region Template (vista del catálogo)
+
+    /// <summary>
+    /// El dueño elige la plantilla en la misma vista que el logo; el command la escribe. Es un id
+    /// predefinido (no un color): la vista decide cómo se pinta, la funcionalidad es común.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WithATemplate_ShouldWriteIt()
+    {
+        ExistingRow();
+
+        var result = await Handler().Handle(
+            new UpdateStoreCatalogBrandingCommand(null, false, null, false, "boutique"), CancellationToken.None);
+
+        result.Data!.TemplateId.Should().Be("boutique");
+        _persisted!.TemplateId.Should().Be("boutique");
+    }
+
+    /// <summary>Cambiar la plantilla no borra el logo ni el banner: es un PUT parcial.</summary>
+    [Fact]
+    public async Task Handle_WithOnlyATemplate_ShouldKeepTheLogoAndBanner()
+    {
+        ExistingRow();
+
+        await Handler().Handle(
+            new UpdateStoreCatalogBrandingCommand(null, false, null, false, "boutique"), CancellationToken.None);
+
+        _persisted!.LogoKey.Should().Be("old-logo.png");
+        _persisted.BannerKey.Should().Be("old-banner.png");
+        _persisted.TemplateId.Should().Be("boutique");
+    }
+
+    /// <summary>Sin plantilla en la petición (null) la fila conserva la que tenía.</summary>
+    [Fact]
+    public async Task Handle_WithoutATemplate_ShouldKeepTheExistingTemplate()
+    {
+        ExistingRow().TemplateId = "boutique";
+
+        await Handler().Handle(new UpdateStoreCatalogBrandingCommand(Logo(), false, null, false), CancellationToken.None);
+
+        _persisted!.TemplateId.Should().Be("boutique");
+    }
+
+    /// <summary>En blanco también es "no la toco": la fila conserva su plantilla.</summary>
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task Handle_WithABlankTemplate_ShouldKeepTheExistingTemplate(string templateId)
+    {
+        ExistingRow().TemplateId = "boutique";
+
+        await Handler().Handle(
+            new UpdateStoreCatalogBrandingCommand(null, false, null, false, templateId), CancellationToken.None);
+
+        _persisted!.TemplateId.Should().Be("boutique");
+    }
+
+    /// <summary>Una fila nueva nace con la plantilla por defecto, que es la vista actual.</summary>
+    [Fact]
+    public async Task Handle_WhenTheRowIsNew_ShouldStartWithTheDefaultTemplate()
+    {
+        _settingsRepository.Setup(x => x.GetByStoreIdAsync(_storeId)).ReturnsAsync((StoreCatalogSettings?)null);
+
+        await Handler().Handle(new UpdateStoreCatalogBrandingCommand(Logo(), false, null, false), CancellationToken.None);
+
+        _persisted!.TemplateId.Should().Be(StoreCatalogSettings.DefaultTemplateId);
     }
 
     #endregion
