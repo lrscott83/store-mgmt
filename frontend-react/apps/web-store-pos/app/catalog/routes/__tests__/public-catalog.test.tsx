@@ -948,17 +948,21 @@ describe('PublicCatalogPage', () => {
       renderPage();
       await screen.findByTestId('catalog-add-cp1');
 
-      useStorefrontCartStore.setState({
-        itemsByStore: {
-          'mi-tienda': Array.from({ length: 150 }, () => ({
-            productId: 'cp1',
-            name: 'Camisa azul',
-            quantity: 1,
-            unitPrice: 82.5,
-            currency: 'CUP',
-            imageUrl: null,
-          })),
-        },
+      // `setState` sobre el store dispara un re-render: sin envolverlo en `act()` React avisa
+      // que el update quedó fuera de su ciclo (el warning ensuciaba la corrida sin romper el test).
+      act(() => {
+        useStorefrontCartStore.setState({
+          itemsByStore: {
+            'mi-tienda': Array.from({ length: 150 }, () => ({
+              productId: 'cp1',
+              name: 'Camisa azul',
+              quantity: 1,
+              unitPrice: 82.5,
+              currency: 'CUP',
+              imageUrl: null,
+            })),
+          },
+        });
       });
 
       await waitFor(() =>

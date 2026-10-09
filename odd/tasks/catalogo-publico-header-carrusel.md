@@ -118,18 +118,18 @@ en inactivas, `aria-roledescription`, flechas y puntos.
 
 ## Tareas
 
-- [ ] **T1** — `CartIcon` en `icons.tsx` (extraído del SVG del POS).
-- [ ] **T2** — Carrusel: diapositivas superpuestas (`absolute inset-0`) + altura fija del marco.
-- [ ] **T3** — `public-catalog.tsx`: orden header → carrusel; banner fuera del render.
-- [ ] **T4** — Header fijo con navegación (escritorio inline / móvil desplegable) y anclas.
-- [ ] **T5** — Carrito POS-style (ícono + badge siempre visible) y quitar el botón "Consultar mi pedido".
-- [ ] **T6** — Botón "Añadir" → botón de ícono (solo carrito, con `aria-label` del producto).
-- [ ] **T7** — Toast "Añadido al carrito de venta"; quitar el aviso estático.
-- [ ] **T8** — "Ver Productos" oculto cuando la sección de productos está en pantalla.
-- [ ] **T9** — `web-catalog.tsx`: quitar el control de banner (el logo se queda).
-- [ ] **T10** — i18n: claves nuevas y limpieza de las de banner.
-- [ ] **T11** — Actualizar los tests unitarios afectados.
-- [ ] **T12** — Verificación (`typecheck`, `lint`, `vitest`).
+- [x] **T1** — `CartIcon` en `icons.tsx` (extraído del SVG del POS).
+- [x] **T2** — Carrusel: diapositivas superpuestas (`absolute inset-0`) + altura fija del marco.
+- [x] **T3** — `public-catalog.tsx`: orden header → carrusel; banner fuera del render.
+- [x] **T4** — Header fijo con navegación (escritorio inline / móvil desplegable) y anclas.
+- [x] **T5** — Carrito POS-style (ícono + badge siempre visible) y quitar el botón "Consultar mi pedido".
+- [x] **T6** — Botón "Añadir" → botón de ícono (solo carrito, con `aria-label` del producto).
+- [x] **T7** — Toast "Añadido al carrito de venta"; quitar el aviso estático.
+- [x] **T8** — "Ver Productos" oculto cuando la sección de productos está en pantalla.
+- [x] **T9** — `web-catalog.tsx`: quitar el control de banner (el logo se queda).
+- [x] **T10** — i18n: claves nuevas y limpieza de las de banner.
+- [x] **T11** — Actualizar los tests unitarios afectados.
+- [x] **T12** — Verificación (`typecheck`, `lint`, `vitest`).
 
 ## Criterios de aceptación
 
@@ -164,6 +164,22 @@ pnpm exec vitest run app/catalog app/sales/routes/__tests__/web-catalog.test.tsx
 - **No inventar alcance**: quedan **fuera** el doble hover de la tarjeta y cualquier cambio de escala
   tipográfica — no fueron pedidos.
 
+## Evidencia de verificación
+
+| Comando | Resultado |
+| --- | --- |
+| `pnpm typecheck` | 0 errores |
+| `pnpm lint` | 0 errores (`--max-warnings=0`) |
+| `pnpm exec vitest run app/catalog app/sales/routes/__tests__/web-catalog.test.tsx` | **162 passed**, 7 archivos, 0 fallos |
+
+Commits: `c97a33fe` (implementación) + el commit del cierre del warning `act()`.
+
 ## Progreso
 
 - 2026-10-08 — Feature creado. Decisiones D1–D10 del owner aprobadas. Sin implementación.
+- 2026-10-09 — **Implementado y verificado** (T1–T12). El único cambio fuera de lo pedido fue
+  arreglar el warning `act(...)` que introdujo un test nuevo: `useStorefrontCartStore.setState`
+  dentro de `act()`. Sin cambios en backend, BD ni E2E.
+- **RDD nativa**: se intentó y quedó bloqueada por el transporte del plugin de OpenCode
+  (`opencode_review_transport_relay_refused: output_refused`); el owner decidió no perseguirla.
+  El candidato queda **sin revisar**; la entrega sigue siendo decisión de política ordinaria.
