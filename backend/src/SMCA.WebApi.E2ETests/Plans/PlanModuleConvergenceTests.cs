@@ -809,6 +809,12 @@ public sealed class PlanModuleConvergenceTests
             // Catálogo: en ambas direcciones. UpSql BORRA los pares fuera de su SpecCte histórico
             // (los módulos añadidos a los planes después de la convergencia) e INSERTA los que su
             // especificación exige. Se quitan los insertados y se re-insertan los borrados.
+            //
+            // En UNA transacción: borrado y reinserción son una sola unidad. Sin ella, una
+            // interrupción entre ambas (justo el modo de crash que este snapshot neutraliza)
+            // dejaría el catálogo compartido mutilado: los pares borrados no volverían.
+            await using var catalogTransaction = await db.Database.BeginTransactionAsync();
+
             var capturedPlanKeys = snapshot._planModules.Select(p => (p.PlanId, p.ModuleId)).ToHashSet();
             foreach (var extra in await db.Set<Domain.Entities.Plans.StorePlanModule>().IgnoreQueryFilters()
                          .Select(spm => new { spm.PlanId, spm.ModuleId }).ToListAsync())
@@ -833,6 +839,8 @@ public sealed class PlanModuleConvergenceTests
                         row.PlanId, row.ModuleId);
                 }
             }
+
+            await catalogTransaction.CommitAsync();
         }
     }
 }
