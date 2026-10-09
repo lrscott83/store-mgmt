@@ -223,3 +223,14 @@ Review `review-808d9dda34fad1da` **APROBADA** (3 advisory, ninguno bloqueante; a
   - [ ] **R3-003** (WARNING · test) — `PlanChangeMatrixTests` se editó en lockstep con una reparación manual de la DB: deja de ser corroboración independiente del wiring de producción.
   - [ ] **R3-004** (WARNING) — La suite E2E completa no termina (crash del testhost) y hubo un falso verde sospechado por binario stale: la reproducibilidad full-suite de los E2E nuevos no está evidenciada.
   - [ ] **R3-005** (WARNING) — La migración `20261008185523` marcada aplicada sin sus filas `StorePlanModule` 19/20 es un peligro en cualquier entorno donde corrió primero; los tests no cubren esa aplicación parcial.
+- 2026-10-09 — **Crash del testhost + corrupción del catálogo: CAUSA RAÍZ encontrada y arreglada
+  (autorizada).** El crash de la suite E2E y la desaparición recurrente de los `StorePlanModule`
+  19/20 tenían la MISMA causa: `PlanModuleConvergenceTests` re-ejecuta
+  `PlanModuleConvergenceSql.UpSql` contra `smca_test`, y su `PlanCatalogCleanupSql` BORRA los pares
+  plan↔módulo fuera de su `SpecCte` **histórico** (que no conoce 19/20); el `ConvergenceSnapshot`
+  solo restauraba estado **por tienda**, no el catálogo. Arreglo: `ConvergenceSnapshot` ahora captura
+  y restaura `StorePlanModule` en ambas direcciones. Además `MeAfterOwnerPlanChangeTests` (universo
+  de Superior) se actualizó a los módulos 19/20. Verificación observada:
+  `PlanModuleConvergenceTests` → **3/3** y `StorePlanModule` 19/20 siguen **4** tras la corrida;
+  suite E2E **COMPLETA** → **700/700, 0 fallos** (antes crasheaba a mitad); catálogo intacto (4) al
+  final. La causa histórica de la aplicación parcial (R3-005) queda como riesgo separado.

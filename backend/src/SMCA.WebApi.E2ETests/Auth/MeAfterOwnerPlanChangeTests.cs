@@ -83,7 +83,9 @@ public sealed class MeAfterOwnerPlanChangeTests
          (int)ModuleType.Credits, (int)ModuleType.WholesaleSales, WarehousesModuleId, (int)ModuleType.MultiStores,
          (int)ModuleType.MultiMonedas, (int)ModuleType.Elaboration,
          // Catálogo web (2026-09-27): módulo 18 incluido en Superior.
-         (int)ModuleType.WebCatalog];
+         (int)ModuleType.WebCatalog,
+         // Pedidos WhatsApp (2026-10-08, M6): módulos 19 y 20 en Superior (y VIP).
+         (int)ModuleType.PedidosWhatsApp, (int)ModuleType.GestionPedidos];
 
     public MeAfterOwnerPlanChangeTests(WebAppFixture fixture)
     {

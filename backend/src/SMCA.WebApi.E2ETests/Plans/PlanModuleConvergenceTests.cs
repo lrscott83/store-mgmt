@@ -713,11 +713,16 @@ public sealed class PlanModuleConvergenceTests
     {
         private readonly List<StoreModuleRow> _modules;
         private readonly List<StoreRoleFeatureRow> _roleFeatures;
+        private readonly List<StorePlanModuleRow> _planModules;
 
-        private ConvergenceSnapshot(List<StoreModuleRow> modules, List<StoreRoleFeatureRow> roleFeatures)
+        private sealed record StorePlanModuleRow(int PlanId, int ModuleId);
+
+        private ConvergenceSnapshot(List<StoreModuleRow> modules, List<StoreRoleFeatureRow> roleFeatures,
+            List<StorePlanModuleRow> planModules)
         {
             _modules = modules;
             _roleFeatures = roleFeatures;
+            _planModules = planModules;
         }
 
         public static async Task<ConvergenceSnapshot> CaptureAsync(AppTestFactory factory)
@@ -738,7 +743,15 @@ public sealed class PlanModuleConvergenceTests
                     srf.CreatedDate, srf.CreatedBy, srf.UpdatedDate, srf.UpdatedBy))
                 .ToListAsync();
 
-            return new ConvergenceSnapshot(modules, roleFeatures);
+            // El catálogo también: PlanCatalogCleanupSql borra los pares plan↔módulo fuera de la
+            // especificación de la convergencia (histórica), que no conoce los módulos añadidos
+            // después (p.ej. 19/20). Sin capturarlo, re-ejecutar UpSql mutila el catálogo de la DB
+            // compartida de forma permanente.
+            var planModules = await db.Set<Domain.Entities.Plans.StorePlanModule>().IgnoreQueryFilters()
+                .Select(spm => new StorePlanModuleRow(spm.PlanId, spm.ModuleId))
+                .ToListAsync();
+
+            return new ConvergenceSnapshot(modules, roleFeatures, planModules);
         }
 
         public static async Task RestoreAsync(AppTestFactory factory, ConvergenceSnapshot snapshot)
@@ -790,6 +803,34 @@ public sealed class PlanModuleConvergenceTests
                         .Where(srf => srf.StoreId == extra.StoreId && srf.RoleId == extra.RoleId
                             && srf.FeatureId == extra.FeatureId)
                         .ExecuteDeleteAsync();
+                }
+            }
+
+            // Catálogo: en ambas direcciones. UpSql BORRA los pares fuera de su SpecCte histórico
+            // (los módulos añadidos a los planes después de la convergencia) e INSERTA los que su
+            // especificación exige. Se quitan los insertados y se re-insertan los borrados.
+            var capturedPlanKeys = snapshot._planModules.Select(p => (p.PlanId, p.ModuleId)).ToHashSet();
+            foreach (var extra in await db.Set<Domain.Entities.Plans.StorePlanModule>().IgnoreQueryFilters()
+                         .Select(spm => new { spm.PlanId, spm.ModuleId }).ToListAsync())
+            {
+                if (!capturedPlanKeys.Contains((extra.PlanId, extra.ModuleId)))
+                {
+                    await db.Set<Domain.Entities.Plans.StorePlanModule>().IgnoreQueryFilters()
+                        .Where(spm => spm.PlanId == extra.PlanId && spm.ModuleId == extra.ModuleId)
+                        .ExecuteDeleteAsync();
+                }
+            }
+
+            var currentPlanKeys = (await db.Set<Domain.Entities.Plans.StorePlanModule>().IgnoreQueryFilters()
+                .Select(spm => new { spm.PlanId, spm.ModuleId }).ToListAsync())
+                .Select(p => (p.PlanId, p.ModuleId)).ToHashSet();
+            foreach (var row in snapshot._planModules)
+            {
+                if (!currentPlanKeys.Contains((row.PlanId, row.ModuleId)))
+                {
+                    await db.Database.ExecuteSqlRawAsync(
+                        "INSERT INTO \"StorePlanModule\" (\"PlanId\", \"ModuleId\") VALUES ({0}, {1}) ON CONFLICT (\"PlanId\", \"ModuleId\") DO NOTHING;",
+                        row.PlanId, row.ModuleId);
                 }
             }
         }
