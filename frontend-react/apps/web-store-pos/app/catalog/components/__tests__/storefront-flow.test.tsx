@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
@@ -16,17 +17,36 @@ import {
   PublicOrderPaymentStatus,
   PublicOrderStatusKind,
 } from '~/sales/lib/services/catalog-http-service';
+import { formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency';
 
 const serviceMock = vi.hoisted(() => ({
   createPublicOrder: vi.fn(),
   getPublicOrderStatus: vi.fn(),
 }));
 
+/** Interruptor para el caso "componer el resumen revienta" (F4-R2): el resto usa el real. */
+const linkSpy = vi.hoisted(() => ({ throwsOnBuild: false }));
+
 vi.mock('~/sales/lib/services/catalog-http-service', async () => {
   const actual = await vi.importActual<
     typeof import('~/sales/lib/services/catalog-http-service')
   >('~/sales/lib/services/catalog-http-service');
   return { ...actual, catalogHttpService: { ...serviceMock } };
+});
+
+// Delegado al real salvo que el test pida que reviente: componer el resumen es una operación pura
+// que en la vida real no falla, así que para cubrir su fallo hay que forzarlo.
+vi.mock('~/catalog/lib/whatsapp-order-link', async () => {
+  const actual = await vi.importActual<typeof import('~/catalog/lib/whatsapp-order-link')>(
+    '~/catalog/lib/whatsapp-order-link',
+  );
+  return {
+    ...actual,
+    buildWhatsAppOrderLink: (input: Parameters<typeof actual.buildWhatsAppOrderLink>[0]) => {
+      if (linkSpy.throwsOnBuild) throw new Error('no se pudo componer el resumen');
+      return actual.buildWhatsAppOrderLink(input);
+    },
+  };
 });
 
 const envelope = <T,>(data: T) => ({ data, succeeded: true, message: '', actionCode: 200, errors: [] });
@@ -36,8 +56,6 @@ const CONFIG: PublicOrderingConfig = {
   enabled: true,
   pickupEnabled: true,
   deliveryEnabled: true,
-  deliveryFee: 0,
-  minimumOrderAmount: 0,
   businessHours: null,
   deliveryZones: null,
   paletteId: 'default',
@@ -57,7 +75,27 @@ const LINE: StorefrontCartLine = {
   quantity: 2,
 };
 
-const CREATED: PublicOrderCreated = { id: 'o1', code: 'K7M2QX', total: 165, currency: 0 };
+/**
+ * Lo que devuelve el SERVIDOR al crear el pedido: el código, los importes y las líneas del
+ * SNAPSHOT PERSISTIDO (no las del carrito) y el número de la tienda (F4, T2).
+ */
+const CREATED: PublicOrderCreated = {
+  id: 'o1',
+  code: 'K7M2QX',
+  subtotal: 165,
+  total: 165,
+  currency: 0,
+  lines: [{ name: 'Camisa azul', quantity: 2, price: 82.5 }],
+  whatsappNumber: '+53 5-987 6543',
+};
+
+/**
+ * Importe tal como lo escribe la app: el formatter de la carta, con el NBSP de millares que el
+ * resumen de WhatsApp sustituye por un espacio normal (F4-R6: nada de separadores a mano).
+ */
+function money(amount: number, currency = 0): string {
+  return formatMoneyWithCurrency(amount, currency).replace(/\u00A0/g, ' ');
+}
 
 const STATUS: PublicOrderStatus = {
   code: 'K7M2QX',
@@ -76,6 +114,7 @@ function renderWithIntl(node: React.ReactNode) {
 describe('storefront cart / checkout / order status (F3)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    linkSpy.throwsOnBuild = false;
   });
 
   describe('carrito', () => {
@@ -109,8 +148,8 @@ describe('storefront cart / checkout / order status (F3)', () => {
 
     it('avisa de que el total lo calcula la tienda, no el carrito', () => {
       renderCart();
-      // El subtotal del cliente NUNCA es el total del pedido: el servidor recalcula con el envío
-      // y el mínimo. La vista lo dice en vez de dejar que se lea como cifra cerrada.
+      // El subtotal del cliente NUNCA es el total del pedido: el servidor lo recalcula con los
+      // precios publicados. La vista lo dice en vez de dejar que se lea como cifra cerrada.
       expect(screen.getByTestId('catalog-cart-modal')).toHaveTextContent(
         'El total final lo calcula la tienda al confirmar el pedido.',
       );
@@ -312,6 +351,33 @@ describe('storefront cart / checkout / order status (F3)', () => {
         whatsappNumber: '+53 5-987 6543',
       };
 
+      /**
+       * Padre mínimo que hace EXACTAMENTE lo que hace `public-catalog.tsx` al recibir el pedido:
+       * vacía el carrito, CIERRA el checkout y abre la consulta del pedido recién creado. Es el
+       * gesto que dispara el reset del aviso, así que probarlo aquí es probarlo de verdad (F4-R1).
+       */
+      function ParentHarness({ onCreatedSpy }: { onCreatedSpy: () => void }) {
+        const [open, setOpen] = useState(true);
+        return (
+          <IntlProvider locale="es" messages={esMessages}>
+            <button type="button" data-testid="parent-reopen" onClick={() => setOpen(true)}>
+              reabrir
+            </button>
+            <StorefrontCheckout
+              open={open}
+              onClose={() => setOpen(false)}
+              storeSlug="mi-tienda"
+              config={CONFIG}
+              lines={[LINE]}
+              onCreated={() => {
+                onCreatedSpy();
+                setOpen(false);
+              }}
+            />
+          </IntlProvider>
+        );
+      }
+
       function submitValidOrder() {
         fireEvent.change(screen.getByTestId('checkout-name'), { target: { value: 'Ana' } });
         fireEvent.change(screen.getByTestId('checkout-phone'), { target: { value: '5351234567' } });
@@ -382,6 +448,140 @@ describe('storefront cart / checkout / order status (F3)', () => {
         expect(openSpy).not.toHaveBeenCalled();
         expect(screen.queryByTestId('checkout-whatsapp-link')).not.toBeInTheDocument();
         expect(onCreated).toHaveBeenCalledWith(createdWithoutNumber);
+        openSpy.mockRestore();
+      });
+
+      // ── F4-R3 (option B) ─────────────────────────────────────────────────────────────────
+      // El resumen dice lo que el SERVIDOR persistió. Si dijera el carrito del cliente y los
+      // dos difieren, el mensaje que llega al chat no cuadra con el pedido que la tienda ve en su
+      // panel — y el panel es contra lo que se cruza el pedido.
+      it('el resumen usa el snapshot del SERVIDOR, no el carrito del cliente', async () => {
+        const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+        // El servidor persistió 90 por unidad, no los 82.50 que el carrito tiene en pantalla.
+        serviceMock.createPublicOrder.mockResolvedValue(
+          envelope({
+            ...CREATED_WITH_NUMBER,
+            lines: [{ name: 'Camisa azul', quantity: 2, price: 90 }],
+            subtotal: 180,
+            total: 180,
+          } satisfies PublicOrderCreated),
+        );
+        renderCheckout();
+
+        submitValidOrder();
+
+        await waitFor(() => expect(openSpy).toHaveBeenCalledTimes(1));
+        const summary = new URL(openSpy.mock.calls[0][0] as string).searchParams.get('text') ?? '';
+        expect(summary).toContain(`2 × Camisa azul — ${money(180)}`);
+        expect(summary).toContain(`Subtotal: ${money(180)}`);
+        expect(summary).toContain(`TOTAL: ${money(180)}`);
+        // El importe del carrito (2 × 82.50) NO aparece: el resumen no se arma con él.
+        expect(summary).not.toContain(money(165));
+        openSpy.mockRestore();
+      });
+
+      // ── F4-R1 ───────────────────────────────────────────────────────────────────────────
+      // Abrir el checkout es empezar un pedido nuevo: el aviso del pedido ANTERIOR no puede
+      // quedar flotando sobre el formulario del siguiente. Sin este reset, el cliente ve el
+      // "pedido K7M2QX enviado" del pedido que acaba de cerrar mientras rellena OTRO.
+      it('al reabrir el checkout el aviso del pedido anterior desaparece', async () => {
+        const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+        serviceMock.createPublicOrder.mockResolvedValue(envelope(CREATED_WITH_NUMBER));
+        const onCreated = vi.fn();
+        renderWithIntl(<ParentHarness onCreatedSpy={onCreated} />);
+
+        submitValidOrder();
+
+        // El padre cierra el checkout, pero el aviso sobrevive: es su confirmación.
+        await waitFor(() => expect(onCreated).toHaveBeenCalledTimes(1));
+        await screen.findByTestId('checkout-whatsapp-notice');
+        expect(screen.queryByTestId('catalog-checkout-modal')).not.toBeInTheDocument();
+
+        fireEvent.click(screen.getByTestId('parent-reopen'));
+
+        await screen.findByTestId('catalog-checkout-modal');
+        expect(screen.queryByTestId('checkout-whatsapp-notice')).not.toBeInTheDocument();
+        openSpy.mockRestore();
+      });
+
+      // ── F4-R2 ───────────────────────────────────────────────────────────────────────────
+      // El aviso NO es el pedido: el pedido ya está guardado cuando se abre WhatsApp. Si un fallo
+      // al abrirlo se reportara como fallo del alta, el cliente vería "no se pudo crear" sobre un
+      // pedido que SÍ existe y reintentaría — y el reintento crea un duplicado.
+      it('un fallo al abrir WhatsApp no reporta el pedido como fallido ni impide el cierre', async () => {
+        // `window.open` LANZANDO, no solo devolviendo null: es el peor caso de popup bloqueado.
+        const openSpy = vi.spyOn(window, 'open').mockImplementation(() => {
+          throw new Error('popup bloqueado');
+        });
+        serviceMock.createPublicOrder.mockResolvedValue(envelope(CREATED_WITH_NUMBER));
+        const onCreated = vi.fn();
+        renderCheckout({ onCreated });
+
+        submitValidOrder();
+
+        await waitFor(() => expect(onCreated).toHaveBeenCalledTimes(1));
+        expect(onCreated).toHaveBeenCalledWith(CREATED_WITH_NUMBER);
+        expect(screen.queryByTestId('checkout-error')).not.toBeInTheDocument();
+        // El aviso (respaldo manual del popup bloqueado) se pinta igual, con su código.
+        expect(screen.getByTestId('checkout-whatsapp-pending')).toHaveTextContent('K7M2QX');
+        expect(screen.getByTestId('checkout-whatsapp-link')).toHaveAttribute(
+          'href',
+          expect.stringContaining('https://wa.me/5359876543'),
+        );
+        openSpy.mockRestore();
+      });
+
+      // Y el otro extremo: si lo que falla es componer el propio resumen, no hay aviso — pero el
+      // pedido guardado se reporta igual, y solo una vez.
+      it('un fallo al componer el resumen tampoco convierte el alta en fallo', async () => {
+        linkSpy.throwsOnBuild = true;
+        serviceMock.createPublicOrder.mockResolvedValue(envelope(CREATED_WITH_NUMBER));
+        const onCreated = vi.fn();
+        renderCheckout({ onCreated });
+
+        submitValidOrder();
+
+        await waitFor(() => expect(onCreated).toHaveBeenCalledTimes(1));
+        expect(onCreated).toHaveBeenCalledWith(CREATED_WITH_NUMBER);
+        expect(screen.queryByTestId('checkout-error')).not.toBeInTheDocument();
+        expect(screen.queryByTestId('checkout-whatsapp-notice')).not.toBeInTheDocument();
+      });
+
+      // ── F4-R4 ───────────────────────────────────────────────────────────────────────────
+      // Dónde viaja el número de la tienda es una decisión de PRIVACIDAD (T2), no de gusto: el
+      // config público lo lee cualquiera que abra el catálogo. Se fija sobre las CLAVES de los
+      // dos contratos, que es exactamente lo que decide esa privacidad.
+      it('el número viaja en la respuesta de creación y NO en el config público', () => {
+        expect(Object.keys(CONFIG)).not.toContain('whatsappNumber');
+        expect(Object.keys(CREATED_WITH_NUMBER)).toContain('whatsappNumber');
+        // Los importes del SERVIDOR solo se conocen al crear el pedido: el config público no los
+        // lleva, así que el resumen no podría armarse sin la respuesta del alta.
+        expect(Object.keys(CONFIG)).not.toContain('lines');
+        expect(Object.keys(CONFIG)).not.toContain('subtotal');
+        expect(Object.keys(CREATED_WITH_NUMBER)).toEqual(
+          expect.arrayContaining(['lines', 'subtotal', 'total']),
+        );
+      });
+
+      // ── F4-R5 ───────────────────────────────────────────────────────────────────────────
+      // El padre CIERRA el checkout al recibir el pedido y abre su consulta. El aviso vive fuera
+      // del modal justo para sobrevivir a ese cierre: si estuviera dentro, nunca se vería — y es
+      // el único sitio donde el cliente puede reenviar el resumen.
+      it('el padre cierra el checkout al recibir el pedido, una sola vez y sin perder el aviso', async () => {
+        const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+        serviceMock.createPublicOrder.mockResolvedValue(envelope(CREATED_WITH_NUMBER));
+        const onCreated = vi.fn();
+        renderWithIntl(<ParentHarness onCreatedSpy={onCreated} />);
+
+        submitValidOrder();
+
+        await waitFor(() => expect(onCreated).toHaveBeenCalledTimes(1));
+        expect(serviceMock.createPublicOrder).toHaveBeenCalledTimes(1);
+
+        await screen.findByTestId('checkout-whatsapp-notice');
+        expect(screen.queryByTestId('catalog-checkout-modal')).not.toBeInTheDocument();
+        // Un `onCreated` de más haría que el padre abriera dos veces la consulta del pedido.
+        expect(onCreated).toHaveBeenCalledTimes(1);
         openSpy.mockRestore();
       });
     });

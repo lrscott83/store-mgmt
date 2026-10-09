@@ -25,13 +25,14 @@ const CONFIG: PublicOrderingConfig = {
   enabled: true,
   pickupEnabled: true,
   deliveryEnabled: true,
-  deliveryFee: 0,
-  minimumOrderAmount: 0,
   businessHours: null,
   deliveryZones: null,
   paletteId: 'default',
   logoUrl: null,
   bannerUrl: null,
+  // El showcase viaja siempre; el checkout no lo usa, pero el config es uno solo.
+  carouselImages: [],
+  dailyImages: [],
 };
 
 const LINE: StorefrontCartLine = {
@@ -44,7 +45,15 @@ const LINE: StorefrontCartLine = {
 };
 
 /** Con número, porque un staff de la tienda tampoco deja de tener número: no es lo que lo exime. */
-const CREATED: PublicOrderCreated = { id: 'o1', code: 'K7M2QX', total: 165, currency: 0 };
+const CREATED: PublicOrderCreated = {
+  id: 'o1',
+  code: 'K7M2QX',
+  subtotal: 165,
+  total: 165,
+  currency: 0,
+  lines: [{ name: 'Camisa azul', quantity: 2, price: 82.5 }],
+  whatsappNumber: '+53 5-123 4567',
+};
 
 function renderCheckout(overrides: Partial<React.ComponentProps<typeof StorefrontCheckout>> = {}) {
   return render(

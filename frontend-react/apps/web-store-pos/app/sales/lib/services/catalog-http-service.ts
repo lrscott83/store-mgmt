@@ -268,13 +268,14 @@ export interface PublicShowcaseImage {
  * `logoUrl`/`bannerUrl` son rutas RELATIVAS del endpoint público de media (nunca rutas del
  * servidor): se resuelven con `apiFileUrl`. No lleva `whatsappNumber` — el enlace `wa.me` lo
  * arma el endpoint del pedido, no un config que lee cualquiera que abra el catálogo.
+ *
+ * Sin costo de envío ni importe mínimo: el pedido vale lo que valen sus líneas y no hay
+ * mínimo que frappe. Ni el backend los publica ni esta UI los pinta.
  */
 export interface PublicOrderingConfig {
   enabled: boolean;
   pickupEnabled: boolean;
   deliveryEnabled: boolean;
-  deliveryFee: number;
-  minimumOrderAmount: number;
   businessHours: string | null;
   deliveryZones: string | null;
   paletteId: string;
@@ -344,14 +345,35 @@ export interface PublicOrderLineRequest {
   quantity: number;
 }
 
+/**
+ * Una línea del SNAPSHOT persistido del pedido (`OnlineOrderCreatedLineDto`): nombre, cantidad y
+ * precio UNITARIO tal como quedaron guardados en `OrderItem`.
+ *
+ * El precio es el del servidor por definición — es una copia de lo ya persistido—, así que el
+ * resumen de WhatsApp se arma con esto y no con el carrito del cliente.
+ */
+export interface PublicOrderCreatedLine {
+  name: string;
+  quantity: number;
+  price: number;
+}
+
 /** Lo que devuelve el alta (`OnlineOrderCreatedDto`): el código con el que se consulta el pedido. */
 export interface PublicOrderCreated {
   id: string;
   code: string;
-  /** Total YA calculado por el servidor. */
+  /** Subtotal de las líneas, ya calculado por el servidor desde el snapshot persistido. */
+  subtotal: number;
+  /** Total YA calculado por el servidor. Sin costo de envío, así que hoy coincide con el subtotal. */
   total: number;
   /** Moneda del catálogo por valor de `Currency`. */
   currency: number;
+  /**
+   * Líneas del snapshot PERSISTIDO, no las que envió el cliente: es lo que la tienda ve en su
+   * panel y lo que el resumen de WhatsApp tiene que decir (si no, el mensaje no cuadra con el
+   * pedido guardado).
+   */
+  lines: PublicOrderCreatedLine[];
   /**
    * Número de WhatsApp de la tienda (F4, decisión T2). Viaja AQUÍ y no en el config público:
    * quien recibe esta respuesta es quien acaba de dejar sus datos de contacto para este pedido,

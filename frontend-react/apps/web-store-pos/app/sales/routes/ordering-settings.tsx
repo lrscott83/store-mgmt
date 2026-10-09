@@ -34,14 +34,12 @@ function formatSyncedAt(value: string): string {
   return new Date(hasZone ? value : `${value}Z`).toLocaleString('es-ES');
 }
 
-/** Lo que el dueño ve y escribe. Los importes van como texto: se envía lo que hay en el campo. */
+/** Lo que el dueño ve y escribe. Los textos van como texto: se envía lo que hay en el campo. */
 interface OrderingForm {
   enabled: boolean;
   whatsappNumber: string;
   pickupEnabled: boolean;
   deliveryEnabled: boolean;
-  deliveryFee: string;
-  minimumOrderAmount: string;
   businessHours: string;
   deliveryZones: string;
 }
@@ -51,34 +49,24 @@ function text(value: string | null): string {
   return value ?? '';
 }
 
-/** Importes: 0 (envío gratis / sin mínimo) cuando el campo está vacío o no es un número. */
-function amount(value: string): number {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
 function toForm(settings: OrderingSettings): OrderingForm {
   return {
     enabled: settings.enabled,
     whatsappNumber: text(settings.whatsappNumber),
     pickupEnabled: settings.pickupEnabled,
     deliveryEnabled: settings.deliveryEnabled,
-    deliveryFee: String(settings.deliveryFee ?? 0),
-    minimumOrderAmount: String(settings.minimumOrderAmount ?? 0),
     businessHours: text(settings.businessHours),
     deliveryZones: text(settings.deliveryZones),
   };
 }
 
-/** Cuerpo del PUT: la fila completa de pedidos, con los importes ya en número. */
+/** Cuerpo del PUT: la fila completa de pedidos, sin importes (no hay envío ni mínimo). */
 function toPayload(form: OrderingForm): OrderingSettingsPayload {
   return {
     enabled: form.enabled,
     whatsappNumber: text(form.whatsappNumber) || null,
     pickupEnabled: form.pickupEnabled,
     deliveryEnabled: form.deliveryEnabled,
-    deliveryFee: amount(form.deliveryFee),
-    minimumOrderAmount: amount(form.minimumOrderAmount),
     businessHours: text(form.businessHours) || null,
     deliveryZones: text(form.deliveryZones) || null,
   };
@@ -139,8 +127,8 @@ export function OrderingSettingsPage() {
       const result = await orderingHttpService.updateSettings(toPayload(form));
       if (!result.succeeded) {
         // El servidor decide si eso se puede guardar (WhatsApp obligatorio con el interruptor
-        // encendido, al menos una modalidad abierta, importes no negativos): su mensaje ES la
-        // razón del rechazo, no un texto genérico de esta vista.
+        // encendido, al menos una modalidad abierta): su mensaje ES la razón del rechazo, no un
+        // texto genérico de esta vista.
         showBlockingError(
           intl.formatMessage({ id: 'GENERAL.ERROR' }),
           result.errors[0]?.description ??
@@ -264,42 +252,6 @@ export function OrderingSettingsPage() {
                       disabled={isSyncing}
                     />
                   </div>
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="ordering-delivery-fee"
-                    className="mb-1 block text-sm font-medium text-text"
-                  >
-                    {intl.formatMessage({ id: 'ORDERING_SETTINGS.DELIVERY_FEE' })}
-                  </label>
-                  <input
-                    id="ordering-delivery-fee"
-                    type="text"
-                    inputMode="decimal"
-                    value={form.deliveryFee}
-                    onChange={(event) => update('deliveryFee', event.target.value)}
-                    className={INPUT_CLASSES}
-                    data-testid="ordering-delivery-fee"
-                  />
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="ordering-minimum-amount"
-                    className="mb-1 block text-sm font-medium text-text"
-                  >
-                    {intl.formatMessage({ id: 'ORDERING_SETTINGS.MINIMUM_ORDER_AMOUNT' })}
-                  </label>
-                  <input
-                    id="ordering-minimum-amount"
-                    type="text"
-                    inputMode="decimal"
-                    value={form.minimumOrderAmount}
-                    onChange={(event) => update('minimumOrderAmount', event.target.value)}
-                    className={INPUT_CLASSES}
-                    data-testid="ordering-minimum-amount"
-                  />
                 </div>
 
                 <div className="sm:col-span-2">

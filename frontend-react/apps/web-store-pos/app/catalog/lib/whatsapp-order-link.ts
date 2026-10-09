@@ -11,6 +11,10 @@ import { formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency
  * El texto va en español y en TEXTO PLANO: WhatsApp no interpreta etiquetas y el mensaje lo lee
  * una persona, no una plantilla. Los importes usan la moneda del catálogo y el formatter de la
  * app, para que el número que ve la tienda sea el mismo que ve el cliente en la carta.
+ *
+ * `lines`, `subtotal` y `total` son los del SNAPSHOT que devolvió el servidor al crear el pedido,
+ * no los del carrito del cliente: el mensaje tiene que cuadrar con el pedido ya guardado. No hay
+ * línea de envío porque el pedido no tiene costo de envío.
  */
 
 /** Base del esquema de WhatsApp. El número va como dígitos, sin `+` ni separación. */
@@ -42,8 +46,6 @@ export interface WhatsAppOrderLinkInput {
   readonly lines: readonly WhatsAppOrderLine[];
   /** Subtotal de las líneas. */
   readonly subtotal: number;
-  /** Costo de envío de la configuración de la tienda (0 en recogida). */
-  readonly deliveryFee: number;
   /** TOTAL ya calculado por el servidor: aquí no se recalcula, se imprime. */
   readonly total: number;
   /** Moneda del catálogo por valor del enum `Currency`. */
@@ -110,11 +112,8 @@ function buildWhatsAppOrderSummary(input: WhatsAppOrderLinkInput): string {
     `Subtotal: ${formatMoneyWithCurrency(input.subtotal, currency)}`,
   ];
 
-  // Envío solo cuando hay importe: con costo 0 la línea "Envío: 0 CUP" es ruido, y la modalidad
-  // ya se dice en "Entrega:".
-  if (input.deliveryType === 'delivery' && input.deliveryFee > 0) {
-    body.push(`Envío: ${formatMoneyWithCurrency(input.deliveryFee, currency)}`);
-  }
+  // Envío: el pedido no tiene costo de envío, así que no hay línea que imprimir. La modalidad ya
+  // se dice en "Entrega:".
 
   body.push(`TOTAL: ${formatMoneyWithCurrency(input.total, currency)}`);
 

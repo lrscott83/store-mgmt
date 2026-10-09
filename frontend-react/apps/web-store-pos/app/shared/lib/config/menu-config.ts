@@ -175,7 +175,7 @@ export const MENU_GROUPS: MenuGroup[] = [
           BETA_NOTICE,
       },
       // Pedidos WhatsApp (módulo 18, F1): la configuración del pedido online (interruptor,
-      // número de WhatsApp, modalidades, envío, mínimo, horarios y zonas). Comparte módulo,
+      // número de WhatsApp, modalidades, horarios y zonas). Comparte módulo,
       // feature y rol con Catálogo Web porque comparte endpoints y gate en el backend
       // ([HasPermission(StoreRoleFeatures.WebCatalogAdmin)]) —gestionar pedidos es otra
       // feature, la de F2—. Los precios y la moneda NO se configuran aquí: salen del catálogo.
@@ -188,7 +188,7 @@ export const MENU_GROUPS: MenuGroup[] = [
         rolesOnly: (user) => user.isOwnerAdmin,
         isNew: true,
         helpContent:
-          'Pedidos WhatsApp. Activa el pedido online y configura el número de WhatsApp al que llegan los pedidos, si recoges en la tienda o envías a domicilio, el costo del envío, el importe mínimo, el horario y las zonas de reparto. El precio y la moneda salen del catálogo.' +
+          'Pedidos WhatsApp. Activa el pedido online y configura el número de WhatsApp al que llegan los pedidos, si recoges en la tienda o envías a domicilio, el horario y las zonas de reparto. El precio y la moneda salen del catálogo.' +
           BETA_NOTICE,
       },
       // Repartidores (módulo 18, F7): catálogo de personas de la tienda. Comparte MÓDULO con los

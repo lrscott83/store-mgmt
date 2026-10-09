@@ -110,3 +110,46 @@ pnpm lint
     ("el mínimo, el envío") y su test homónimo
     `Application.Tests/Features/OnlineOrdering/CreateOnlineOrderCommandValidatorTests.cs:11`.
     `Application/Dtos/OnlineOrdering/OnlineOrderingDtos.cs` sí quedó limpio porque sí estaba autorizado.
+- 2026-10-08 — **Frontend hecho** (este writer). Contrato del backend ya consumido; nada de E2E ni
+  de `frontend/` (Angular) tocado.
+  - `catalog-http-service.ts`: `PublicOrderingConfig` sin `deliveryFee`/`minimumOrderAmount`;
+    `PublicOrderCreated` gana `subtotal` y `lines` (`PublicOrderCreatedLine { name, quantity,
+    price }`) como espejo de `OnlineOrderCreatedDto`/`OnlineOrderCreatedLineDto`.
+  - `ordering-http-service.ts`: `OrderingSettings` y `OrderingSettingsPayload` sin los dos campos;
+    el doc-comment del payload deja de prometer "los importes viajan ya en número".
+  - `whatsapp-order-link.ts`: fuera `deliveryFee` de `WhatsAppOrderLinkInput` y fuera el bloque
+    `Envío`. `lines`/`subtotal`/`total` no se tocan en el helper: los imprime tal cual, y ahora
+    quien llama les pasa los del servidor.
+  - `storefront-checkout.tsx`: fuera los bloques `checkout-delivery-fee` y `checkout-minimum`
+    (**option B**): el resumen se arma con `result.data.lines.map(...)`, `result.data.subtotal` y
+    `result.data.total`. El `subtotal` local del carrito sigue usándose para el resumen del modal
+    (es de presentación; el aviso tampoco lo recalcula).
+    **F4-R2**: el POST queda aislado en su propio `try/catch`; el aviso
+    (`buildWhatsAppOrderLink` + `window.open` + `setWhatsapp`) va en un segundo, y `onCreated` se
+    llama SIEMPRE tras un alta exitosa, incluido `staffMode`.
+  - `ordering-settings.tsx`: fuera los dos campos de `OrderingForm`/`toForm`/`toPayload`, los dos
+    inputs y el helper `amount()`, que queda sin uso y desaparece.
+  - i18n: fuera exactamente las cuatro claves (`ORDERING_SETTINGS.DELIVERY_FEE`,
+    `ORDERING_SETTINGS.MINIMUM_ORDER_AMOUNT`, `CHECKOUT.DELIVERY_FEE`, `CHECKOUT.MINIMUM_ORDER`).
+  - Tests: los cuatro archivos autorizados actualizados (fixtures de `PublicOrderingConfig` y de
+    `OrderingSettings`, y los dos `createPublicOrder` de `public-catalog.test.tsx` que ahora
+    necesitan `subtotal`/`lines`). Nuevos: el resumen con el snapshot del servidor (option B) y
+    F4-R1/R2/R4/R5/R6. Los fixtures de `PublicOrderingConfig` de `storefront-checkout-staff.test.tsx`
+    y `storefront-flow.test.tsx` llevan ya `carouselImages: []`/`dailyImages: []`, lo que además
+    **resuelve** el único error de `pnpm typecheck` que venía de la tanda anterior.
+  - Verificación observada: `pnpm vitest run app/catalog/ app/sales/` → **82 archivos / 1685
+    tests verdes**, `Type Errors: no errors`; `pnpm exec eslint` sobre los 11 archivos tocados →
+    limpio (exit 0); `pnpm typecheck` → limpio (exit 0); los 11 archivos verificados estables frente
+    a `prettier` (byte a byte sobre una copia).
+  - Sondas de mutación (cada fix revertido rompe el test que lo fija): `created.lines`/
+    `created.subtotal` → carrito → cae el test del snapshot del servidor; el aviso dentro del
+    `try/catch` del POST → cae el de "un fallo al abrir WhatsApp no reporta el pedido como
+    fallido"; sin `setWhatsapp(null)` en el efecto de `open` → cae el de "al reabrir el checkout el
+    aviso desaparece".
+  - **Fuera de superficie, pendiente de aviso:** dos menciones que quedaron obsoletas y NO se
+    tocaron (no estaban autorizadas):
+    - `app/shared/lib/config/menu-config.ts:178` y `:191` — el texto de ayuda del ítem "Pedidos
+      WhatsApp" sigue **prometiendo al dueño** que puede configurar "el costo del envío, el importe
+      mínimo". Es ayuda de usuario que miente, no solo un comentario obsoleto.
+    - `app/catalog/lib/storefront-cart-store.ts:49` — doc-comment de `total()`: "el servidor
+      recalcula precios, envío y mínimo al crear la orden".

@@ -98,13 +98,14 @@ const page = (items: PublicCatalogProduct[], total = items.length) => ({
   pageSize: 12,
 });
 
-/** Config anónimo de pedidos: sin marca por defecto (una tienda puede no tener logo/banner). */
+/**
+ * Config anónimo de pedidos: sin marca por defecto (una tienda puede no tener logo/banner) y sin
+ * costo de envío ni importe mínimo —no existen— y sin `whatsappNumber` (privacidad, T2).
+ */
 const CONFIG_WITHOUT_BRAND: PublicOrderingConfig = {
   enabled: true,
   pickupEnabled: true,
   deliveryEnabled: true,
-  deliveryFee: 0,
-  minimumOrderAmount: 0,
   businessHours: null,
   deliveryZones: null,
   paletteId: 'default',
@@ -835,7 +836,14 @@ describe('PublicCatalogPage', () => {
 
     it('va del carrito al checkout y crea el pedido mostrando el código', async () => {
       catalogMock.createPublicOrder.mockResolvedValue(
-        envelope({ id: 'o1', code: 'K7M2QX', total: 82.5, currency: 0 }),
+        envelope({
+          id: 'o1',
+          code: 'K7M2QX',
+          subtotal: 82.5,
+          total: 82.5,
+          currency: 0,
+          lines: [{ name: 'Camisa azul', quantity: 1, price: 82.5 }],
+        }),
       );
       // El código se pinta en el modal de estado, que la página abre tras crear; se comprueba
       // desde aquí porque la página es quien se lo pasa.
@@ -977,8 +985,10 @@ describe('PublicCatalogPage', () => {
         envelope({
           id: 'o1',
           code: 'K7M2QX',
+          subtotal: 82.5,
           total: 82.5,
           currency: 0,
+          lines: [{ name: 'Camisa azul', quantity: 1, price: 82.5 }],
           whatsappNumber: '+53 5-987 6543',
         }),
       );

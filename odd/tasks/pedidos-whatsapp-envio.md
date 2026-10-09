@@ -183,10 +183,35 @@ tiempo agregado, `retry_safe: false`), sin autoridad. Se **liberó con `review a
 
 ## Hallazgos de la revisión nativa (RDD) — TODOs rastreados (2026-10-07)
 
-- [ ] **F4-R1** (WARNING) — El reset del aviso al reabrir el checkout no tiene test.
-- [ ] **F4-R2** (WARNING) — `buildWhatsAppOrderLink`/`window.open` dentro del try/catch del POST: si lanzan, el pedido ya guardado se reporta como fallo y el cliente reintenta (duplicado).
-- [ ] **F4-R3** (WARNING) — El resumen imprime el total del servidor junto a líneas/subtotal del cliente; si difieren, no cuadra.
-- [ ] **F4-R4/R5/R6** (SUGGESTION) — Test estructural por reflexión (`WhatsappNumber`); test que no modela el cierre del checkout; aserciones atadas al formato de `Intl`.
+- [x] **F4-R1** (WARNING) — El reset del aviso al reabrir el checkout no tiene test.
+  - **Cerrado (2026-10-08).** `al reabrir el checkout el aviso del pedido anterior desaparece`, con
+    un padre mínimo que hace lo que `public-catalog.tsx` (recibe el pedido, cierra el checkout):
+    primero comprueba que el aviso SOBREVIVE al cierre y luego que al reabrir desaparece.
+- [x] **F4-R2** (WARNING) — `buildWhatsAppOrderLink`/`window.open` dentro del try/catch del POST: si lanzan, el pedido ya guardado se reporta como fallo y el cliente reintenta (duplicado).
+  - **Cerrado (2026-10-08).** El POST quedó aislado; el aviso va en su propio `try/catch` y
+    `onCreated` se llama siempre tras un alta exitosa (también en `staffMode`). Dos tests: con
+    `window.open` **lanzando** y con `buildWhatsAppOrderLink` lanzando — en ninguno aparece
+    `CHECKOUT.FAILED`, y `onCreated` se cumple exactamente una vez.
+    **Matiz propio del fix:** `window.open` lleva además un `try/catch` PROPIO dentro del bloque de
+    aviso, para que un popup que revienta no se lleve por delante el `setWhatsapp`. Si no, se
+    perdía justo el respaldo (el enlace manual) que existe para el caso del popup bloqueado. El
+    test lo fija: con `window.open` lanzando, el aviso se pinta igual con su código y su enlace.
+- [x] **F4-R3** (WARNING) — El resumen imprime el total del servidor junto a líneas/subtotal del cliente; si difieren, no cuadra.
+  - **Cerrado por option B** (ver `remove-delivery-fee-and-minimum.md`): el resumen se arma con
+    `result.data.lines`/`subtotal`/`total` — el snapshot PERSISTIDO. El helper no cambia; quien
+    llama deja de pasarle el carrito. Cubierto por `el resumen usa el snapshot del SERVIDOR, no el
+    carrito del cliente` (el servidor devuelve 90/unidad y el carrito tiene 82.50; el mensaje lleva
+    los del servidor y no contiene el importe del carrito).
+- [x] **F4-R4/R5/R6** (SUGGESTION) — Test estructural (`WhatsappNumber`); test que no modela el cierre del checkout; aserciones atadas al formato de `Intl`.
+  - **R4 cerrado (2026-10-08).** `el número viaja en la respuesta de creación y NO en el config
+    público`: sobre las CLAVES de los dos contratos (`Object.keys`), que es exactamente lo que
+    decide la privacidad de T2.
+  - **R5 cerrado (2026-10-08).** `el padre cierra el checkout al recibir el pedido, una sola vez y
+    sin perder el aviso`: con el mismo padre mínimo del cierre real.
+  - **R6 cerrado (2026-10-08).** Las aserciones de importes se derivan con `formatMoneyWithCurrency`
+    (el MISMO formatter de la app) en vez de escribir separadores a mano, en
+    `whatsapp-order-link.test.ts` y en el nuevo test del snapshot. Se añadió un caso con millares
+    (`12345`) para que un fallo de agrupación se vea: el separador es un NBSP.
 
 ## Siguiente paso
 
@@ -208,3 +233,16 @@ F5 (dashboard de pedidos y pago), luego F6 (ventas), F7 (repartidores).
   `OnlineOrderCreatedLineDto(Name, Quantity, Price)` leído del snapshot PERSISTIDO (`OrderItem`).
   El total ya no lleva costo de envío, así que `Subtotal == Total`. El resumen `wa.me` debe usar
   `lines`/`subtotal`/`total` de la respuesta y ya no imprime línea de envío.
+- 2026-10-08 — **Frontend alineado con el contrato nuevo y F4-R1/R2/R4/R5/R6 cerrados** (writer
+  acotado; sin commit). El resumen se arma con el snapshot del servidor (option B) y el paso de
+  aviso salió del `try/catch` del POST. El helper `buildWhatsAppOrderLink` solo pierde
+  `deliveryFee` y la línea `Envío`; el resto de su texto es idéntico, salvo que ahora sus
+  `lines`/`subtotal`/`total` vienen del servidor. Verificación observada desde
+  `frontend-react/apps/web-store-pos`: `pnpm vitest run app/catalog/ app/sales/` → 82 archivos /
+  **1685 tests verdes** (los nuevos del snapshot, R1, R2×2, R4 y R5, más los ya existentes de
+  `whatsapp-order-link.test.ts` reescritos sin `deliveryFee`); `pnpm exec eslint` sobre los 11
+  archivos tocados → limpio; `pnpm typecheck` → limpio (0 errores).
+  Detalle completo en `remove-delivery-fee-and-minimum.md` (sección `## Progreso`).
+  **Fuera de superficie y pendiente de aviso:** `app/shared/lib/config/menu-config.ts:178`/`:191`
+  (ayuda de menú que aún ofrece configurar el costo de envío y el importe mínimo) y
+  `app/catalog/lib/storefront-cart-store.ts:49` (doc-comment con la misma idea).

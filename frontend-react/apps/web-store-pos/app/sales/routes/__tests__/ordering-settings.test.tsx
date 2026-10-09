@@ -66,8 +66,6 @@ const DISABLED_SETTINGS: OrderingSettings = {
   whatsappNumber: null,
   pickupEnabled: false,
   deliveryEnabled: false,
-  deliveryFee: 0,
-  minimumOrderAmount: 0,
   businessHours: null,
   deliveryZones: null,
   syncedAt: null,
@@ -138,10 +136,12 @@ describe('OrderingSettingsPage (vista Pedidos WhatsApp)', () => {
     expect(within(panel).getByTestId('ordering-whatsapp')).toBeInTheDocument();
     expect(screen.getByTestId('ordering-pickup')).toBeInTheDocument();
     expect(screen.getByTestId('ordering-delivery')).toBeInTheDocument();
-    expect(screen.getByTestId('ordering-delivery-fee')).toBeInTheDocument();
-    expect(screen.getByTestId('ordering-minimum-amount')).toBeInTheDocument();
     expect(screen.getByTestId('ordering-business-hours')).toBeInTheDocument();
     expect(screen.getByTestId('ordering-delivery-zones')).toBeInTheDocument();
+    // Sin costo de envío ni importe mínimo: no hay nada que configurar de eso (el precio y la
+    // moneda salen del catálogo, A3 eliminada).
+    expect(screen.queryByTestId('ordering-delivery-fee')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('ordering-minimum-amount')).not.toBeInTheDocument();
     // Sin selector de moneda: el precio y la moneda salen del catálogo (A3 eliminada).
     expect(screen.getByText('El precio y la moneda salen del catálogo, no se configuran aquí.'))
       .toBeInTheDocument();
@@ -169,8 +169,6 @@ describe('OrderingSettingsPage (vista Pedidos WhatsApp)', () => {
     fireEvent.change(screen.getByTestId('ordering-whatsapp'), { target: { value: '5351234567' } });
     fireEvent.click(screen.getByTestId('ordering-pickup').querySelector('button') as HTMLElement);
     fireEvent.click(screen.getByTestId('ordering-delivery').querySelector('button') as HTMLElement);
-    fireEvent.change(screen.getByTestId('ordering-delivery-fee'), { target: { value: '150' } });
-    fireEvent.change(screen.getByTestId('ordering-minimum-amount'), { target: { value: '500' } });
     fireEvent.change(screen.getByTestId('ordering-business-hours'), {
       target: { value: 'Lunes a sábado de 8:00 a 18:00' },
     });
@@ -186,8 +184,6 @@ describe('OrderingSettingsPage (vista Pedidos WhatsApp)', () => {
       whatsappNumber: '5351234567',
       pickupEnabled: true,
       deliveryEnabled: true,
-      deliveryFee: 150,
-      minimumOrderAmount: 500,
       businessHours: 'Lunes a sábado de 8:00 a 18:00',
       deliveryZones: 'Vedado y Centro Habana',
     });
@@ -260,8 +256,6 @@ describe('OrderingSettingsPage (vista Pedidos WhatsApp)', () => {
         enabled: true,
         whatsappNumber: '5351234567',
         pickupEnabled: true,
-        deliveryFee: 150,
-        minimumOrderAmount: 500,
         businessHours: 'Lunes a sábado',
         deliveryZones: 'Vedado',
         syncedAt: '2026-10-07T10:00:00Z',
@@ -271,8 +265,6 @@ describe('OrderingSettingsPage (vista Pedidos WhatsApp)', () => {
 
     expect(await enabledSwitch()).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByTestId('ordering-whatsapp')).toHaveValue('5351234567');
-    expect(screen.getByTestId('ordering-delivery-fee')).toHaveValue('150');
-    expect(screen.getByTestId('ordering-minimum-amount')).toHaveValue('500');
     expect(screen.getByTestId('ordering-business-hours')).toHaveValue('Lunes a sábado');
     expect(screen.getByTestId('ordering-delivery-zones')).toHaveValue('Vedado');
     // Ningún selector de moneda: el precio y la moneda son del catálogo.

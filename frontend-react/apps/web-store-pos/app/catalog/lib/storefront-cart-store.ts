@@ -46,7 +46,7 @@ export interface StorefrontCartState {
   clear: (storeSlug: string) => void;
   /**
    * Subtotal de presentación: lo que ve el cliente mientras arma el pedido. NO es el total del
-   * pedido — el servidor recalcula precios, envío y mínimo al crear la orden.
+   * pedido — el servidor recalcula los precios al crear la orden.
    */
   total: (storeSlug: string) => number;
   count: (storeSlug: string) => number;

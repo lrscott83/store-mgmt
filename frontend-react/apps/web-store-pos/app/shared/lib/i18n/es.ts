@@ -381,8 +381,6 @@ const messages: Record<string, string> = {
   'ORDERING_SETTINGS.WHATSAPP_NUMBER_PLACEHOLDER': 'Con prefijo internacional, por ejemplo 5351234567',
   'ORDERING_SETTINGS.PICKUP_ENABLED': 'Recogida en la tienda',
   'ORDERING_SETTINGS.DELIVERY_ENABLED': 'Envío a domicilio',
-  'ORDERING_SETTINGS.DELIVERY_FEE': 'Costo del envío',
-  'ORDERING_SETTINGS.MINIMUM_ORDER_AMOUNT': 'Importe mínimo del pedido',
   'ORDERING_SETTINGS.BUSINESS_HOURS': 'Horario de atención',
   'ORDERING_SETTINGS.BUSINESS_HOURS_PLACEHOLDER': 'Texto libre, por ejemplo Lunes a sábado de 8:00 a 18:00',
   'ORDERING_SETTINGS.DELIVERY_ZONES': 'Zonas de reparto',
@@ -605,8 +603,6 @@ const messages: Record<string, string> = {
   'CHECKOUT.SUBMIT_STAFF': 'Registrar pedido',
   'CHECKOUT.SUBMITTING_STAFF': 'Registrando pedido…',
   'CHECKOUT.FAILED': 'No se pudo crear el pedido. Inténtalo de nuevo.',
-  'CHECKOUT.DELIVERY_FEE': 'Costo del envío',
-  'CHECKOUT.MINIMUM_ORDER': 'Importe mínimo del pedido',
   // Envío del pedido por WhatsApp (F4). El texto del RESUMEN que viaja en el enlace va en
   // `catalog/lib/whatsapp-order-link.ts`: lo lee la tienda en su chat, no es interfaz de la app.
   // Aquí solo está el estado que ve el cliente en el navegador.

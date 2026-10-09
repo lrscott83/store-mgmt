@@ -54,12 +54,18 @@ nativa*). Este documento es el **seguimiento** y el mapa de cierre.
   - **Cerrado (2026-10-08).** El test de marca pública asserta el `alt` del logo y del banner (con el nombre de la tienda); los del carrusel y del bloque del día assertan que el `alt` usa el pie de foto o, sin él, el nombre de la tienda.
 
 ### F4 envío (`pedidos-whatsapp-envio.md`)
-- [ ] **F4-R1** (test) — El reset del aviso al reabrir el checkout no tiene test.
-- [ ] **F4-R2** (defecto) — `buildWhatsAppOrderLink`/`window.open` dentro del `try/catch` del POST: si lanzan, el pedido ya guardado se reporta como fallo (reintento → duplicado).
-- [ ] **F4-R3** (defecto) — El resumen imprime el total del servidor junto a líneas/subtotal del cliente; si difieren, no cuadra.
-- [ ] **F4-R4** (test) — Test estructural por reflexión (`WhatsappNumber`).
-- [ ] **F4-R5** (test) — Test que no modela el cierre del checkout.
-- [ ] **F4-R6** (test) — Aserciones atadas al formato de `Intl`.
+- [x] **F4-R1** (test) — El reset del aviso al reabrir el checkout no tiene test.
+  - **Cerrado (2026-10-08).** `al reabrir el checkout el aviso del pedido anterior desaparece`: con un padre mínimo que replica el cierre real de `public-catalog.tsx`, primero afirma que el aviso sobrevive al cierre y luego que al reabrir desaparece.
+- [x] **F4-R2** (defecto) — `buildWhatsAppOrderLink`/`window.open` dentro del `try/catch` del POST: si lanzan, el pedido ya guardado se reporta como fallo (reintento → duplicado).
+  - **Cerrado (2026-10-08).** POST y aviso en `try/catch` separados; `onCreated` siempre tras un alta exitosa, también en `staffMode`. `window.open` lleva su propio guarda para no perder el `setWhatsapp` (el aviso es el respaldo del popup bloqueado). Dos tests: `window.open` lanzando y `buildWhatsAppOrderLink` lanzando; ninguno muestra `CHECKOUT.FAILED` y `onCreated` se cumple una sola vez.
+- [x] **F4-R3** (defecto) — El resumen imprime el total del servidor junto a líneas/subtotal del cliente; si difieren, no cuadra.
+  - **Cerrado (2026-10-08), por option B** (decisión del owner en `remove-delivery-fee-and-minimum.md`): el resumen se arma con `result.data.lines`/`subtotal`/`total`, el snapshot PERSISTIDO. Test con precios distintos entre servidor (90) y carrito (82.50).
+- [x] **F4-R4** (test) — Test estructural por reflexión (`WhatsappNumber`).
+  - **Cerrado (2026-10-08).** Sin reflexión: sobre las claves reales de los dos contratos (`Object.keys`), que es lo que decide la privacidad de T2 — el config público no lleva el número, la respuesta de creación sí.
+- [x] **F4-R5** (test) — Test que no modela el cierre del checkout.
+  - **Cerrado (2026-10-08).** `el padre cierra el checkout al recibir el pedido, una sola vez y sin perder el aviso`: padre mínimo con `useState` que cierra el checkout en `onCreated`, como `public-catalog.tsx`.
+- [x] **F4-R6** (test) — Aserciones atadas al formato de `Intl`.
+  - **Cerrado (2026-10-08).** Los importes esperados se derivan con `formatMoneyWithCurrency` (el formatter de la app) en lugar de escribirse a mano; caso añadido con millares (`12345`), cuyo separador es un NBSP.
 
 ### F3 carrito (`pedidos-whatsapp-carrito-cliente.md`)
 - [ ] **F3-R1** (test · requiere E2E nuevo) — El bypass de filtro de tenant en `Order` solo con InMemory.
@@ -112,3 +118,18 @@ nativa*). Este documento es el **seguimiento** y el mapa de cierre.
   y en las imágenes del carrusel y del bloque del día (pie de foto o nombre de la tienda).
   Verificación observada: `pnpm vitest run public-catalog + web-catalog + catalog-http-service` →
   3 archivos / **102 tests verdes**, 0 errores de tipo.
+- 2026-10-08 — **Bloque F4 envío cerrado (F4-R1, F4-R2, F4-R3, F4-R4, F4-R5, F4-R6).** Frontend
+  alineado con el contrato nuevo del backend (`remove-delivery-fee-and-minimum.md`): el resumen
+  `wa.me` se arma con el snapshot del servidor (**option B**, cierra R3) y el aviso sale del
+  `try/catch` del POST (R2). R1, R4, R5 y R6 son tests nuevos: reset al reabrir, claves de los dos
+  contratos (el número no viaja en el config público), cierre del checkout modelado con el padre
+  real, e importes esperados derivados de `formatMoneyWithCurrency`.
+  Verificación observada: `pnpm vitest run app/catalog/ app/sales/` → 82 archivos / **1685 tests
+  verdes**, `Type Errors: no errors`; `pnpm exec eslint` sobre los 11 archivos tocados → limpio;
+  `pnpm typecheck` → **0 errores** (se resolvió de paso el preexistente de
+  `storefront-checkout-staff.test.tsx`, `PublicOrderingConfig` sin `carouselImages`/`dailyImages`).
+  Sondas de mutación: los tres fixes revertidos rompen exactamente sus tests. Sin commit (writer
+  acotado). Pendiente de aviso por estar **fuera de la superficie autorizada**:
+  `app/shared/lib/config/menu-config.ts:178`/`:191` (la ayuda del ítem "Pedidos WhatsApp" sigue
+  ofreciendo configurar el costo de envío y el importe mínimo, que ya no existen) y
+  `app/catalog/lib/storefront-cart-store.ts:49` (doc-comment con la misma idea obsoleta).

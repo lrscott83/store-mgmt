@@ -113,6 +113,10 @@ export function StorefrontCheckout({
 
     setError(null);
     setSubmitting(true);
+
+    // ── 1) EL PEDIDO ────────────────────────────────────────────────────────────────────────
+    // Aislado en su propio try/catch: un fallo aquí SÍ es un fallo del alta y se muestra como tal.
+    let created: PublicOrderCreated;
     try {
       // Solo `productId` + `quantity`: ni precio, ni total, ni moneda. El servidor los recalcula
       // con el catálogo publicado, y la dirección solo viaja con domicilio (con recogida el
@@ -131,57 +135,79 @@ export function StorefrontCheckout({
         return;
       }
 
+      created = result.data;
+    } catch {
+      setError(intl.formatMessage({ id: 'CHECKOUT.FAILED' }));
+      return;
+    } finally {
+      setSubmitting(false);
+    }
+
+    // ── 2) EL AVISO ─────────────────────────────────────────────────────────────────────────
+    // A PARTIR DE AQUÍ el pedido YA está guardado, así que NADA de lo que viene puede reportarse
+    // como un fallo del alta: `CHECKOUT.FAILED` aquí sería una mentira que además empuja al
+    // cliente a reintentar, y el reintento CREA un pedido duplicado (F4-R2). El aviso es un
+    // mensaje, no el pedido: si no se arma o no se abre, el pedido sigue existiendo y la tienda
+    // lo ve igual en su panel.
+    //
+    // Por eso el alta se reporta SIEMPRE —también en modo staff, donde no hay aviso que armar—
+    // y solo el paso de aviso va protegido.
+    try {
       // El pedido YA está guardado. En modo staff eso es TODO lo que hay que hacer: el cliente
       // está delante y el pedido es suyo, así que no se arma el enlace, no se abre `wa.me` y no
       // se pinta aviso. `onCreated` es lo que el padre ya usaba como confirmación (cierra el
       // checkout y abre el estado del pedido recién creado), así que el mismo gesto confirma
       // igual en los dos modos.
-      if (staffMode) {
-        onCreated(result.data);
-        return;
+      if (!staffMode) {
+        // Aquí lo único que queda es mandar el aviso. `buildWhatsAppOrderLink` devuelve
+        // `null` cuando la tienda no tiene número utilizable, y en ese caso NO se abre nada — el
+        // envío queda bloqueado y el pedido sigue existiendo (la tienda lo ve en su panel).
+        const link = buildWhatsAppOrderLink({
+          whatsappNumber: created.whatsappNumber,
+          storeName: storeName ?? storeSlug,
+          code: created.code,
+          // LÍNEAS, SUBTOTAL Y TOTAL DEL SERVIDOR (snapshot persistido, opción B): el carrito es
+          // de presentación. Si el resumen dijera otra cosa, el mensaje no cuadraría con el pedido
+          // que la tienda ve en su panel, que es lo único contra lo que se cruza el pedido.
+          lines: created.lines.map((line) => ({
+            name: line.name,
+            quantity: line.quantity,
+            unitPrice: line.price,
+          })),
+          subtotal: created.subtotal,
+          total: created.total,
+          currency: created.currency,
+          deliveryType: deliverySelected ? 'delivery' : 'pickup',
+          deliveryAddress: deliverySelected ? deliveryAddress.trim() : null,
+          customerName: customerName.trim(),
+          customerPhone: customerPhone.trim(),
+          notes: notes.trim(),
+        });
+
+        if (link) {
+          // `noopener` porque la pestaña es de OTRO origen y no debe poder llegar al catálogo por
+          // `window.opener`. Con `noopener` el navegador no devuelve handle aunque abra la
+          // pestaña, así que el enlace queda SIEMPRE a la vista: es a la vez el fallback del
+          // bloqueo de popups y el botón manual para enviar el resumen.
+          //
+          // Abrir la pestaña es lo ÚNICO de este bloque que es best-effort: si el navegador la
+          // bloquea y hasta lanza, el aviso tiene que pintarse igual. Perder el aviso entero
+          // (que lleva el código y el enlace manual) sería justo perder el respaldo que existe
+          // para el caso del popup bloqueado.
+          try {
+            window.open(link, '_blank', 'noopener');
+          } catch {
+            // El aviso de abajo es el respaldo: se pinta igual.
+          }
+        }
+        setWhatsapp({ code: created.code, link });
       }
-
-      // Aquí lo único que queda es mandar el aviso. `buildWhatsAppOrderLink` devuelve
-      // `null` cuando la tienda no tiene número utilizable, y en ese caso NO se abre nada — el
-      // envío queda bloqueado y el pedido sigue existiendo (la tienda lo ve en su panel).
-      const link = buildWhatsAppOrderLink({
-        whatsappNumber: result.data.whatsappNumber,
-        storeName: storeName ?? storeSlug,
-        code: result.data.code,
-        lines: lines.map((line) => ({
-          name: line.name,
-          quantity: line.quantity,
-          unitPrice: line.unitPrice,
-        })),
-        subtotal,
-        deliveryFee: deliverySelected ? config.deliveryFee : 0,
-        // Total y moneda son los del SERVIDOR: el carrito es de presentación y aquí no se
-        // recalcula nada, que es justo lo que impide que un cliente manipulado cambie lo que la
-        // tienda ve en su panel.
-        total: result.data.total,
-        currency: result.data.currency,
-        deliveryType: deliverySelected ? 'delivery' : 'pickup',
-        deliveryAddress: deliverySelected ? deliveryAddress.trim() : null,
-        customerName: customerName.trim(),
-        customerPhone: customerPhone.trim(),
-        notes: notes.trim(),
-      });
-
-      if (link) {
-        // `noopener` porque la pestaña es de OTRO origen y no debe poder llegar al catálogo por
-        // `window.opener`. Con `noopener` el navegador no devuelve handle aunque abra la
-        // pestaña, así que el enlace queda SIEMPRE a la vista: es a la vez el fallback del
-        // bloqueo de popups y el botón manual para enviar el resumen.
-        window.open(link, '_blank', 'noopener');
-      }
-      setWhatsapp({ code: result.data.code, link });
-
-      onCreated(result.data);
     } catch {
-      setError(intl.formatMessage({ id: 'CHECKOUT.FAILED' }));
-    } finally {
-      setSubmitting(false);
+      // El resumen ni siquiera se pudo componer: no hay aviso, pero el pedido, que ya está
+      // guardado, se reporta igual.
     }
+
+    onCreated(created);
   }
 
   const subtotal = lines.reduce((sum, line) => sum + line.unitPrice * line.quantity, 0);
@@ -217,18 +243,6 @@ export function StorefrontCheckout({
                 </li>
               ))}
             </ul>
-            {deliverySelected && config.deliveryFee > 0 && (
-              <p className="mt-2 text-xs text-text-muted" data-testid="checkout-delivery-fee">
-                {intl.formatMessage({ id: 'CHECKOUT.DELIVERY_FEE' })}:{' '}
-                {formatMoneyWithCurrency(config.deliveryFee, currencyFromCode(currency))}
-              </p>
-            )}
-            {config.minimumOrderAmount > 0 && (
-              <p className="mt-1 text-xs text-text-muted" data-testid="checkout-minimum">
-                {intl.formatMessage({ id: 'CHECKOUT.MINIMUM_ORDER' })}:{' '}
-                {formatMoneyWithCurrency(config.minimumOrderAmount, currencyFromCode(currency))}
-              </p>
-            )}
             <p className="mt-2 border-t border-border pt-2 text-sm">
               <span className="font-medium text-text">
                 {intl.formatMessage({ id: 'CATALOG_PUBLIC.CART_SUBTOTAL' })}

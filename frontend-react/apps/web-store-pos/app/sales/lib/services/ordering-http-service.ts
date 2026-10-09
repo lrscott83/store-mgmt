@@ -17,10 +17,6 @@ export interface OrderingSettings {
   whatsappNumber: string | null;
   pickupEnabled: boolean;
   deliveryEnabled: boolean;
-  /** Costo de envío en la moneda del catálogo. 0 = envío gratis. */
-  deliveryFee: number;
-  /** Importe mínimo del pedido. 0 = sin mínimo. */
-  minimumOrderAmount: number;
   /** Horario de atención como texto libre (D16). null = no publicado. */
   businessHours: string | null;
   /** Zonas de reparto como texto libre (D16). null = todas. */
@@ -34,15 +30,14 @@ export interface OrderingSettings {
  * pedidos, no un parche — el servidor resuelve alta o actualización por tienda.
  *
  * NO lleva `storeId`: la tienda es la del contexto de la petición, y `syncedAt` tampoco: lo fija
- * el servidor con su reloj. Los importes viajan ya en número (el formulario los convierte).
+ * el servidor con su reloj. No lleva ningún importe: no hay costo de envío ni mínimo que
+ * configurar — los precios y la moneda son los del catálogo.
  */
 export interface OrderingSettingsPayload {
   enabled: boolean;
   whatsappNumber: string | null;
   pickupEnabled: boolean;
   deliveryEnabled: boolean;
-  deliveryFee: number;
-  minimumOrderAmount: number;
   businessHours: string | null;
   deliveryZones: string | null;
 }
