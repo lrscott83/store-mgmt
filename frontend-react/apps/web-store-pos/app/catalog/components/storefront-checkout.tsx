@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useIntl } from 'react-intl';
 import { Button } from '~/shared/components/ui/button';
 import { InfoBox } from '~/shared/components/ui/info-box';
@@ -20,8 +20,9 @@ const INPUT_CLASSES =
 const PHONE_MIN_DIGITS = 7;
 
 /**
- * Estado del envío por WhatsApp (F4). `link === null` NO es "aún no está": es la tienda SIN
- * número, con el envío BLOQUEADO — el pedido ya está guardado y lo que falta es el aviso.
+ * Estado del envío por WhatsApp (F4). `link === null` NO es "aún no está": es que NO hay handoff
+ * automático —la tienda SIN número o un resumen que no se pudo componer (R3-1)—, con el envío
+ * BLOQUEADO. El pedido ya está guardado y lo que falta es el aviso.
  */
 interface WhatsAppSend {
   readonly code: string;
@@ -84,6 +85,18 @@ export function StorefrontCheckout({
   const [submitting, setSubmitting] = useState(false);
   const [whatsapp, setWhatsapp] = useState<WhatsAppSend | null>(null);
 
+  /**
+   * Espejo de `submitting` que se escribe EN EL MOMENTO (F3-R5), no en el render.
+   *
+   * Leer el estado no cerraba la ventana que hay que cerrar: dos pulsaciones seguidas leen el
+   * MISMO `submitting === false` —el estado solo cambia cuando React vuelve a renderizar, y hasta
+   * entonces el closure es el viejo—, así que el segundo `submit()` pasaba igual y creaba un
+   * SEGUNDO pedido. Y `disabled={submitting}` tampoco ayuda ahí: depende de ese mismo render
+   * pendiente. La ref se escribe antes del primer `await` y se borra en el `finally`, con lo que
+   * la segunda pulsación ve el pedido en vuelo aunque llegue en el mismo tick.
+   */
+  const submittingRef = useRef(false);
+
   const deliverySelected = deliveryType === PublicOrderDeliveryType.Delivery;
 
   // Un aviso del pedido ANTERIOR no puede quedar flotando mientras se hace el siguiente: abrir
@@ -105,6 +118,12 @@ export function StorefrontCheckout({
   }
 
   async function submit() {
+    // Guarda de doble envío (F3-R5): con una petición en vuelo, un segundo gesto no crea un
+    // segundo pedido. Va ANTES de `validate()` a propósito —una pulsación de más no tiene que
+    // reevaluar el formulario, solo dejar de enviar— y lee la ref, no el estado: ver la nota de
+    // `submittingRef`.
+    if (submittingRef.current) return;
+
     const validationError = validate();
     if (validationError) {
       setError(validationError);
@@ -112,6 +131,9 @@ export function StorefrontCheckout({
     }
 
     setError(null);
+    // El estado apaga el botón; la ref frena el envío. Hace falta la pareja: el botón es lo que ve
+    // el cliente y el ref es lo que decide.
+    submittingRef.current = true;
     setSubmitting(true);
 
     // ── 1) EL PEDIDO ────────────────────────────────────────────────────────────────────────
@@ -140,6 +162,7 @@ export function StorefrontCheckout({
       setError(intl.formatMessage({ id: 'CHECKOUT.FAILED' }));
       return;
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
 
@@ -196,15 +219,33 @@ export function StorefrontCheckout({
           // para el caso del popup bloqueado.
           try {
             window.open(link, '_blank', 'noopener');
-          } catch {
-            // El aviso de abajo es el respaldo: se pinta igual.
+          } catch (err) {
+            // El aviso de abajo es el respaldo: se pinta igual. Lo que cambia es que el fallo
+            // deja SEÑAL (R3-2): antes, un popup que lanzaba era indistinguible de uno abierto,
+            // y sin ningún rastro no había forma de saber desde fuera que el cliente tendrá que
+            // pulsar el enlace a mano.
+            console.warn(
+              '[storefront-checkout] window.open falló al enviar el aviso; queda el enlace manual.',
+              err,
+            );
           }
         }
         setWhatsapp({ code: created.code, link });
       }
-    } catch {
-      // El resumen ni siquiera se pudo componer: no hay aviso, pero el pedido, que ya está
-      // guardado, se reporta igual.
+    } catch (err) {
+      // El resumen no se pudo componer (`created.lines` que no es un array, por ejemplo). El
+      // pedido YA está guardado, así que callar aquí dejaba al cliente sin handoff de WhatsApp Y
+      // sin error visible (R3-1). Ahora el aviso se pinta igualmente con el código y sin enlace:
+      // `link: null` ya significa "envío bloqueado, el pedido existe", que es exactamente lo que
+      // el cliente puede hacer —decir el código por otro medio— y lo que la tienda ve en su
+      // panel. El `console.warn` deja constancia de por qué el resumen no se armó.
+      // El `!staffMode` es el mismo criterio del bloque de arriba: en modo staff no hay aviso que
+      // pintar, ni siquiera al fallar.
+      console.warn(
+        '[storefront-checkout] no se pudo componer el resumen de WhatsApp; el aviso sale con el código y sin enlace.',
+        err,
+      );
+      if (!staffMode) setWhatsapp({ code: created.code, link: null });
     }
 
     onCreated(created);

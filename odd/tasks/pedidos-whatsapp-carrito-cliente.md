@@ -220,9 +220,14 @@ dotnet test src/Application.Tests/Application.Tests.csproj
 
 - [ ] **F3-R1** (WARNING · backend) — El bypass del filtro de tenant en `Order` solo se prueba con EF InMemory, no con PostgreSQL real. Destino: F3/E2E (requiere autorización).
 - [ ] **F3-R2** (WARNING · backend) — La partición del rate limit lee el slug de `RouteValues`; no se prueba que el middleware corra después del routing (podría colapsar a IP-only). Destino: F3.
-- [ ] **F3-R3** (WARNING · frontend) — `storefront-order-status` muestra "no encontrado" para **cualquier** error (red/5xx), no solo 404; `ORDER.STATUS_FAILED` queda sin usar. Destino: F3.
-- [ ] **F3-R4** (WARNING · frontend) — Vaciar el input de cantidad **borra la línea** (`Number('') || 0` → 0 → remove). Destino: F3.
-- [ ] **F3-R5/R6** (SUGGESTION · frontend) — Doble-submit del checkout sin test; aviso "añadido" con auto-dismiss sin test. Destino: F3.
+- [x] **F3-R3** (WARNING · frontend) — `storefront-order-status` muestra "no encontrado" para **cualquier** error (red/5xx), no solo 404; `ORDER.STATUS_FAILED` queda sin usar. Destino: F3.
+  - **Cerrado (2026-10-09).** `catch (err)` discrimina: solo el `404` se pinta como "no encontrado" (sigue siendo uniforme, así que no hace de oráculo); red caída, `5xx` y `429` muestran `ORDER.STATUS_FAILED`, que por fin se usa. Helper local `isNotFound` leyendo `response.status`, el mismo criterio con el que `auth-store.ts` separa veredicto de incidente: en `http-error.ts` no hay helper de status. Tres tests nuevos (sin conexión / 500 / 429) que además niegan el texto de "no encontrado".
+- [x] **F3-R4** (WARNING · frontend) — Vaciar el input de cantidad **borra la línea** (`Number('') || 0` → 0 → remove). Destino: F3.
+  - **Cerrado (2026-10-09).** El input ignora lo vacío y lo que no sea entero ≥ 1; quitar sigue teniendo sus gestos propios (−, "Quitar", "Vaciar") y el `updateQuantity(<= 0) → remove` del store **no se toca** (lo fija un test y lo usa el botón −). Dos tests: vaciar/borrar el dígito no borra la línea, y el − sigue llegando a `0`.
+- [x] **F3-R5** (SUGGESTION · frontend) — Doble-submit del checkout sin test. Destino: F3.
+  - **Cerrado (2026-10-09)**, con desviación sobre lo propuesto: el guarda pedido (`if (submitting) return`) **no cerraba la ventana**. El test nuevo (dos clics en el mismo tick con el POST en vuelo) falló con 2 llamadas: dos pulsaciones leen el MISMO estado mientras React no ha re-renderizado, y `disabled` depende de ese mismo render. La guarda real es un espejo del estado en una `useRef` que se escribe antes del primer `await` y se borra en el `finally`; el estado sigue apagando el botón. El estado por sí solo se queda como evidencia del fallo.
+- [x] **F3-R6** (SUGGESTION · frontend) — Aviso "añadido" con auto-dismiss sin test. Destino: F3.
+  - **Cerrado (2026-10-09).** Test con `vi.useFakeTimers({ shouldAdvanceTime: true })`: el aviso aparece, a los 2,5 s se va solo, y añadir OTRO producto a mitad de ciclo reinicia el temporizador (a los 2,5 s del primero el texto sigue ahí). Sin cambio de producción: el comportamiento ya era correcto, lo que faltaba era el test que lo fijara.
 
 ## Siguiente paso
 
@@ -236,3 +241,14 @@ F4 (envío del pedido por WhatsApp: enlace `wa.me` con el código y el resumen),
   `3dd15c16` (backend: alta pública por slug + estado + rate limit) y `dbdddafe` (frontend: carrito +
   checkout + estado). Ambos **revisados y aprobados/acknowledgeados**. Owner resolvió el contrato
   F2↔F3. **Push: no** (F3 sigue local). Ver evidencia y TODOs arriba.
+- 2026-10-09 — **Slice frontend cerrado (F3-R3, F3-R4, F3-R5, F3-R6).** El estado del pedido
+  discrimina el veredicto (404) del incidente (red/5xx/429); el input de cantidad ya no borra la
+  línea al vaciarse; el checkout frena el doble envío; y el auto-dismiss del aviso "añadido" queda
+  fijado por test. R3-1 y R3-2 (aviso del checkout) se cerraron en el mismo slice y están anotados en
+  `review-findings-cleanup.md`.
+  Verificación observada: `pnpm vitest run app/catalog/ app/sales/` → 82 archivos / **1693 tests
+  verdes**, `Type Errors: no errors`; `pnpm exec eslint` sobre los 6 archivos tocados → limpio;
+  `pnpm typecheck` → **0 errores**. Sondas de mutación sobre los 6 hallazgos: cada fix revertido
+  rompe exactamente su test (F3-R4 → 1 rojo; F3-R3 → 3 rojos; F3-R5 → 1 rojo, y el mismo rojo con
+  la guarda por estado en lugar de la ref; F3-R6 → 1 rojo; R3-1 → 2 rojos por cada mitad del fix;
+  R3-2 → 1 rojo). Sin commit (writer acotado).

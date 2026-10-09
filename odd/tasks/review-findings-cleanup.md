@@ -70,16 +70,22 @@ nativa*). Este documento es el **seguimiento** y el mapa de cierre.
 ### Revisión nativa — eliminación de envío/mínimo (2026-10-08)
 
 Review `review-45af9674edf7bfe9` **APROBADA** (2 advisory, ninguno bloqueante; autoridad quemada):
-- [ ] **R3-1** (WARNING · frontend) — El paso de aviso traga cualquier error en un `catch` vacío: si `result.data.lines` no es un array (respuesta degradada) o `setWhatsapp` lanza, el cliente se queda sin handoff de WhatsApp y **sin error visible**, aunque el pedido esté guardado. No hay test del límite "lines vacío/ausente".
-- [ ] **R3-2** (SUGGESTION · frontend) — El guarda interno de `window.open` también traga todo, sin señal ni distinción de fallback: un popup que lanza es indistinguible de un open normal en cualquier punto de observabilidad.
+- [x] **R3-1** (WARNING · frontend) — El paso de aviso traga cualquier error en un `catch` vacío: si `result.data.lines` no es un array (respuesta degradada) o `setWhatsapp` lanza, el cliente se queda sin handoff de WhatsApp y **sin error visible**, aunque el pedido esté guardado. No hay test del límite "lines vacío/ausente".
+  - **Cerrado (2026-10-09).** Cambio de observabilidad, no de flujo: el pedido ya está guardado y el aviso se pinta IGUAL con el código y `link: null`, el estado BLOQUEADO que ya existía (el de "la tienda no tiene número"). Antes no se llamaba a `setWhatsapp` y el cliente se quedaba sin handoff ni error. `console.warn` con el error para que la respuesta degradada deje rastro. El `!staffMode` mantiene la regla D2 (en modo staff no hay aviso, ni al fallar). Dos tests: el fallo forzado de composición y el caso real —respuesta sin `lines`, que revienta en el `.map` antes de llegar al builder—; ambos fijan aviso con el código, estado bloqueado y `onCreated` una sola vez.
+- [x] **R3-2** (SUGGESTION · frontend) — El guarda interno de `window.open` también traga todo, sin señal ni distinción de fallback: un popup que lanza es indistinguible de un open normal en cualquier punto de observabilidad.
+  - **Cerrado (2026-10-09).** `console.warn` con el error en el `catch` de `window.open`. Sin cambio de flujo: el aviso sigue pintándose con su enlace manual, que es el respaldo del popup bloqueado. El test de F4-R2 (el de `window.open` lanzando) se amplía para exigir la señal **y** que el enlace manual siga ahí —las dos mitades, no una.
 
 ### F3 carrito (`pedidos-whatsapp-carrito-cliente.md`)
 - [ ] **F3-R1** (test · requiere E2E nuevo) — El bypass de filtro de tenant en `Order` solo con InMemory.
 - [ ] **F3-R2** (test) — La partición del rate limit desde `RouteValues` no se prueba end-to-end.
-- [ ] **F3-R3** (defecto) — El estado muestra "no encontrado" para **cualquier** error (red/5xx), no solo 404.
-- [ ] **F3-R4** (defecto) — Vaciar el input de cantidad **borra la línea**.
-- [ ] **F3-R5** (test) — Doble-submit del checkout sin test.
-- [ ] **F3-R6** (test) — Auto-dismiss del aviso "añadido" sin test.
+- [x] **F3-R3** (defecto) — El estado muestra "no encontrado" para **cualquier** error (red/5xx), no solo 404.
+  - **Cerrado (2026-10-09).** Solo el `404` se pinta como "no encontrado" (uniforme, no oráculo); el resto usa `ORDER.STATUS_FAILED`, hasta ahora sin usar. Detalle en `pedidos-whatsapp-carrito-cliente.md`.
+- [x] **F3-R4** (defecto) — Vaciar el input de cantidad **borra la línea**.
+  - **Cerrado (2026-10-09).** El input ignora lo vacío y lo no entero/positivo; el store (`updateQuantity(0) → remove`) intacto, porque lo usa el botón − y lo fija un test.
+- [x] **F3-R5** (test) — Doble-submit del checkout sin test.
+  - **Cerrado (2026-10-09)**, incluida una desviación: el test demostrado que el guarda por estado no cerraba la ventana (dos clics en el mismo tick → 2 pedidos); la guarda real es una `useRef` espejo del estado. Detalle en `pedidos-whatsapp-carrito-cliente.md`.
+- [x] **F3-R6** (test) — Auto-dismiss del aviso "añadido" sin test.
+  - **Cerrado (2026-10-09).** Test con temporizadores falsos: se va a los 2,5 s y el temporizador se reinicia al añadir otro producto. Sin cambio de producción.
 
 ### F2 persistencia (`pedidos-whatsapp-persistencia.md`)
 - [ ] **F2-R1** (test) — Carreras del handler sin test: multi-moneda (`EnsureSingleCurrency`) y `DeliveryType` fuera del enum.
@@ -139,3 +145,18 @@ Review `review-45af9674edf7bfe9` **APROBADA** (2 advisory, ninguno bloqueante; a
   `app/shared/lib/config/menu-config.ts:178`/`:191` (la ayuda del ítem "Pedidos WhatsApp" sigue
   ofreciendo configurar el costo de envío y el importe mínimo, que ya no existen) y
   `app/catalog/lib/storefront-cart-store.ts:49` (doc-comment con la misma idea obsoleta).
+- 2026-10-09 — **Cerrados F3-R3, F3-R4, F3-R5 y F3-R6 (frontend del carrito/checkout) y R3-1/R3-2
+  (aviso del checkout).** El estado del pedido separa el veredicto (404) del incidente (red caída,
+  5xx, 429) con la clave `ORDER.STATUS_FAILED`, que existía sin usar; el input de cantidad ya no
+  borra la línea al vaciarse (ni con `0`, `1.5` o negativos), y el `updateQuantity(<= 0) → remove`
+  del store se deja como estaba porque lo usa el botón −; el doble envío se frena con un espejo del
+  estado en una `useRef`; y el auto-dismiss del aviso "añadido" queda fijado con temporizadores falsos,
+  incluido el reinicio del temporizador al añadir otro producto. R3-1 y R3-2 son de observabilidad:
+  el aviso se pinta con el código y `link: null` (estado bloqueado) cuando el resumen no se puede
+  componer, y tanto ese fallo como el de `window.open` dejan `console.warn`.
+  Verificación observada: `pnpm vitest run app/catalog/ app/sales/` → 82 archivos / **1693 tests
+  verdes**, `Type Errors: no errors`; `pnpm exec eslint` sobre los 6 archivos tocados → limpio;
+  `pnpm typecheck` → **0 errores**. Sondas de mutación: cada uno de los 6 fixes revertidos rompe
+  exactamente los tests que lo fijan. Sin commit (writer acotado). Sigue pendiente, por estar fuera de
+  la superficie autorizada: `http-error.ts` no tiene helper de status y el 404 del estado del pedido se
+  lee con un helper local al componente (si algún día se añade `isNotFound`, se sustituye aquí).

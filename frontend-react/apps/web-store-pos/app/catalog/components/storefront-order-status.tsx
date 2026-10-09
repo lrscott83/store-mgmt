@@ -18,13 +18,29 @@ const INPUT_CLASSES =
 const PHONE_MIN_DIGITS = 7;
 
 /**
+ * ¿El fallo es el veredicto del servidor sobre ESE código? Solo el 404 lo es (y es uniforme a
+ * propósito, así que el mensaje no dice por qué). Cualquier otra cosa —red caída, `5xx`, `429`— es
+ * la consulta fallando, no el pedido sin existir.
+ *
+ * `http-error.ts` NO tiene un helper de status (`isNetworkError`/`httpErrorKey` distinguen offline
+ * del resto, que aquí sobra: sin red el catálogo tampoco está), así que se lee `response.status`
+ * igual que `auth-store.ts` lo hace para el mismo propósito de separar veredicto de incidente.
+ */
+function isNotFound(err: unknown): boolean {
+  return (err as { response?: { status?: number } } | null)?.response?.status === 404;
+}
+
+/**
  * Consulta pública del estado de un pedido (F3, T6): código + teléfono, sin cuenta y sin login
  * (D4). El teléfono es el segundo factor débil que exige el backend —código y teléfono tienen que
  * coincidir los dos—.
  *
- * Un fallo se muestra como "no encontramos ese pedido" sin distinguir el motivo, porque el
- * backend responde 404 UNIFORME (código inexistente, de otra tienda o teléfono que no cuadra) para
- * no servir de oráculo de qué códigos existen.
+ * El `404` se muestra como "no encontramos ese pedido" SIN distinguir el motivo, porque el backend
+ * responde UNIFORME (código inexistente, de otra tienda o teléfono que no cuadra) para no servir de
+ * oráculo de qué códigos existen (F3-R3). Todo lo demás —red caída, `5xx`, `429`— es un FALLO de la
+ * consulta, no un veredicto sobre el código, y se dice como tal: pintar "no encontrado" por un
+ * `500` le dice al cliente que su pedido no existe, que es mentira, y lo Invite a reescribir el
+ * código en vez de a reintentar la consulta.
  */
 export function StorefrontOrderStatus({
   open,
@@ -73,9 +89,17 @@ export function StorefrontOrderStatus({
         return;
       }
       setOrder(result.data);
-    } catch {
+    } catch (err) {
       setOrder(null);
-      setError(intl.formatMessage({ id: 'ORDER.STATUS_NOT_FOUND' }));
+      // Espejo del patrón de `public-catalog.tsx` (404 = veredicto del servidor, el resto es otra
+      // cosa): aquí el 404 se muestra como "no encontrado" y CUALQUIER otro fallo como fallo de la
+      // consulta. `ORDER.STATUS_FAILED` existía sin usarse; una red caída o un 500 tienen que decir
+      // "reintenta", no "ese pedido no existe".
+      setError(
+        intl.formatMessage({
+          id: isNotFound(err) ? 'ORDER.STATUS_NOT_FOUND' : 'ORDER.STATUS_FAILED',
+        }),
+      );
     } finally {
       setSearching(false);
     }

@@ -806,6 +806,12 @@ describe('PublicCatalogPage', () => {
       localStorage.clear();
     });
 
+    // Los temporizadores falsos de un test no pueden filtrarse al siguiente: el bloque de
+    // `showcase` los restaura en su `afterEach`, este necesita lo propio.
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
     it('añade desde la tarjeta y muestra el badge con la cantidad', async () => {
       renderPage();
       await screen.findByTestId('catalog-add-cp1');
@@ -820,6 +826,53 @@ describe('PublicCatalogPage', () => {
       expect(useCartStore.getState().items).toHaveLength(0);
       expect(await screen.findByTestId('catalog-cart-count')).toHaveTextContent('1');
       expect(await screen.findByTestId('catalog-add-notice')).toHaveTextContent('Camisa azul');
+    });
+
+    // ── F3-R6 ─────────────────────────────────────────────────────────────────────────────
+    // El aviso de "añadido" es TRANSITORIO: sin el auto-dismiss el texto se queda pegado hasta el
+    // siguiente clic, que no es lo que comunica. Y al añadir otro producto, el aviso cambia: el
+    // temporizador tiene que REINICIARSE con el nuevo, porque si no el segundo aviso se iría a
+    // mitad de camino con la misma cadencia del primero.
+    it('el aviso de "añadido" se va solo, y se reinicia al añadir otro producto', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      // Dos productos con NOMBRE distinto: el aviso se reinicia porque su texto cambia, no
+      // porque se vuelva a añadir el mismo (eso no tocaría el estado y no reiniciaría nada).
+      catalogMock.getPublicProducts.mockResolvedValue(
+        envelope(page([makeProduct(), makeProduct({ id: 'cp2', name: 'Zapatos negros' })])),
+      );
+      renderPage();
+      await screen.findByTestId('catalog-add-cp1');
+
+      fireEvent.click(screen.getByTestId('catalog-add-cp1'));
+      expect(await screen.findByTestId('catalog-add-notice')).toHaveTextContent('Camisa azul');
+
+      // Pasados los 2,5 s sin tocar nada, el aviso desaparece solo.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2500);
+      });
+      expect(screen.queryByTestId('catalog-add-notice')).not.toBeInTheDocument();
+
+      // Ahora a mitad del segundo ciclo: se añade OTRO producto y el aviso vuelve con su nombre.
+      fireEvent.click(screen.getByTestId('catalog-add-cp1'));
+      expect(await screen.findByTestId('catalog-add-notice')).toHaveTextContent('Camisa azul');
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1000);
+      });
+      fireEvent.click(screen.getByTestId('catalog-add-cp2'));
+      expect(await screen.findByTestId('catalog-add-notice')).toHaveTextContent('Zapatos negros');
+
+      // 1,5 s más: ya han pasado los 2,5 desde el primer aviso, pero el temporizador se reinició
+      // con el segundo, así que el texto sigue ahí. Si no se reiniciara, ya se habría ido.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1500);
+      });
+      expect(screen.getByTestId('catalog-add-notice')).toHaveTextContent('Zapatos negros');
+
+      // Y su propio ciclo completo sí lo retira.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2500);
+      });
+      expect(screen.queryByTestId('catalog-add-notice')).not.toBeInTheDocument();
     });
 
     it('abre el carrito con la línea y el subtotal, sin romper la rejilla', async () => {

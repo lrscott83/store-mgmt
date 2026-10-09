@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 import { StorefrontCart } from '~/catalog/components/storefront-cart';
@@ -111,6 +111,27 @@ function renderWithIntl(node: React.ReactNode) {
   return render(<IntlProvider locale="es" messages={esMessages}>{node}</IntlProvider>);
 }
 
+/**
+ * Promesa que el test suelta cuando quiere. Sirve para dejar el POST EN VUELO: es la única forma
+ * de mirar el botón mientras la petición sigue abierta, que es donde vive la ventana del doble
+ * envío.
+ */
+function deferred() {
+  let release: (value: unknown) => void = () => undefined;
+  const promise = new Promise((resolve) => {
+    release = resolve;
+  });
+  return { promise, release };
+}
+
+/**
+ * Espía de `console.warn` silenciada: los avisos de R3-1/R3-2 son SEÑALES intencionadas, y sin
+ * silenciarlos el test que las provoca ensucia la salida de la suite.
+ */
+function spyOnWarn() {
+  return vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+}
+
 describe('storefront cart / checkout / order status (F3)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -183,6 +204,52 @@ describe('storefront cart / checkout / order status (F3)', () => {
 
       fireEvent.click(screen.getByTestId('catalog-cart-clear'));
       expect(onClear).toHaveBeenCalled();
+    });
+
+    // ── F3-R4 ─────────────────────────────────────────────────────────────────────────────
+    // La CANTIDAD manda sobre la línea: en el store `updateQuantity(<= 0)` la borra, y eso está
+    // bien para el botón − (una unidad menos que una es quitarla). En el input, en cambio, un
+    // valor vacío o no positivo es el cliente RETOCANDO lo que escribió —el cursor está en medio y
+    // acaba de borrar el dígito—: convertir eso en `0` se comía el producto entero.
+    // Un número no entero (`1.5`) o un `0` tecleado también se ignoran: el input es de cantidad,
+    // no de texto libre, y no puede ir más allá de lo que los botones −/+ permiten.
+    it('vaciar el input de cantidad NO borra la línea, y tampoco un valor no positivo', () => {
+      const onUpdateQuantity = vi.fn();
+      renderCart({ onUpdateQuantity });
+
+      fireEvent.change(screen.getByTestId('catalog-cart-quantity-p1'), { target: { value: '7' } });
+      expect(onUpdateQuantity).toHaveBeenLastCalledWith('p1', 7);
+
+      // Vaciar del todo: el input queda en blanco, la línea sigue ahí.
+      fireEvent.change(screen.getByTestId('catalog-cart-quantity-p1'), { target: { value: '' } });
+      expect(onUpdateQuantity).toHaveBeenCalledTimes(1);
+
+      // Y el gesto real de retocar —borrar el dígito— tampoco lanza nada al store.
+      fireEvent.change(screen.getByTestId('catalog-cart-quantity-p1'), { target: { value: '1' } });
+      fireEvent.change(screen.getByTestId('catalog-cart-quantity-p1'), { target: { value: '' } });
+      expect(onUpdateQuantity).toHaveBeenLastCalledWith('p1', 1);
+      expect(onUpdateQuantity).toHaveBeenCalledTimes(2);
+
+      // Valores que el input puede producir y que NO son una cantidad: se ignoran igual.
+      fireEvent.change(screen.getByTestId('catalog-cart-quantity-p1'), { target: { value: '0' } });
+      fireEvent.change(screen.getByTestId('catalog-cart-quantity-p1'), {
+        target: { value: '1.5' },
+      });
+      fireEvent.change(screen.getByTestId('catalog-cart-quantity-p1'), {
+        target: { value: '-3' },
+      });
+      expect(onUpdateQuantity).toHaveBeenCalledTimes(2);
+    });
+
+    // El botón − SÍ puede llegar a 0, y a 0 la línea se va: quitar es un gesto con su propio
+    // botón. Lo que no puede es pasar por el input.
+    it('el botón de decrease sigue pudiendo llegar a quitar la línea', () => {
+      const onUpdateQuantity = vi.fn();
+      renderCart({ lines: [{ ...LINE, quantity: 1 }], onUpdateQuantity });
+
+      fireEvent.click(screen.getByTestId('catalog-cart-decrease-p1'));
+
+      expect(onUpdateQuantity).toHaveBeenCalledWith('p1', 0);
     });
   });
 
@@ -339,6 +406,36 @@ describe('storefront cart / checkout / order status (F3)', () => {
       fireEvent.click(screen.getByTestId('checkout-submit'));
 
       expect(await screen.findByTestId('checkout-error')).toBeInTheDocument();
+    });
+
+    // ── F3-R5 ─────────────────────────────────────────────────────────────────────────────
+    // `disabled={submitting}` depende del RENDER: entre el gesto y ese render el botón sigue
+    // vivo, así que un doble clic (o un Enter repetido) llega a `submit()` DOS veces. Sin el
+    // guarda, el mismo clic crea dos pedidos — y el segundo ya no lo frena `disabled`, porque el
+    // botón aún no sabe que está enviando.
+    it('dos clics seguidos con el POST en vuelo crean UN solo pedido', async () => {
+      const inFlight = deferred();
+      serviceMock.createPublicOrder.mockReturnValue(inFlight.promise);
+      const onCreated = vi.fn();
+      renderCheckout({ onCreated });
+
+      fireEvent.change(screen.getByTestId('checkout-name'), { target: { value: 'Ana' } });
+      fireEvent.change(screen.getByTestId('checkout-phone'), { target: { value: '5351234567' } });
+
+      // Los dos clics en el mismo tick: con el POST pendiente, que es la ventana donde `disabled`
+      // todavía no se ha aplicado.
+      const button = screen.getByTestId('checkout-submit');
+      await act(async () => {
+        button.click();
+        button.click();
+      });
+
+      expect(serviceMock.createPublicOrder).toHaveBeenCalledTimes(1);
+
+      // Cerrado el círculo: el pedido sale y se reporta una sola vez.
+      inFlight.release(envelope(CREATED));
+      await waitFor(() => expect(onCreated).toHaveBeenCalledTimes(1));
+      expect(serviceMock.createPublicOrder).toHaveBeenCalledTimes(1);
     });
 
     // ── F4: envío del pedido por WhatsApp ──────────────────────────────────────────────────
@@ -504,15 +601,17 @@ describe('storefront cart / checkout / order status (F3)', () => {
         openSpy.mockRestore();
       });
 
-      // ── F4-R2 ───────────────────────────────────────────────────────────────────────────
+      // ── F4-R2 / R3-2 ──────────────────────────────────────────────────────────────────────
       // El aviso NO es el pedido: el pedido ya está guardado cuando se abre WhatsApp. Si un fallo
       // al abrirlo se reportara como fallo del alta, el cliente vería "no se pudo crear" sobre un
-      // pedido que SÍ existe y reintentaría — y el reintento crea un duplicado.
-      it('un fallo al abrir WhatsApp no reporta el pedido como fallido ni impide el cierre', async () => {
+      // pedido que SÍ existe y reintentaría — y el reintento crea un duplicado. Y el fallo tiene
+      // que dejar SEÑAL (R3-2): antes era indistinguible de un `window.open` que sí abrió.
+      it('un fallo al abrir WhatsApp no reporta el pedido como fallido, deja señal y no impide el cierre', async () => {
         // `window.open` LANZANDO, no solo devolviendo null: es el peor caso de popup bloqueado.
         const openSpy = vi.spyOn(window, 'open').mockImplementation(() => {
           throw new Error('popup bloqueado');
         });
+        const warnSpy = spyOnWarn();
         serviceMock.createPublicOrder.mockResolvedValue(envelope(CREATED_WITH_NUMBER));
         const onCreated = vi.fn();
         renderCheckout({ onCreated });
@@ -522,19 +621,31 @@ describe('storefront cart / checkout / order status (F3)', () => {
         await waitFor(() => expect(onCreated).toHaveBeenCalledTimes(1));
         expect(onCreated).toHaveBeenCalledWith(CREATED_WITH_NUMBER);
         expect(screen.queryByTestId('checkout-error')).not.toBeInTheDocument();
-        // El aviso (respaldo manual del popup bloqueado) se pinta igual, con su código.
+        // La señal: el popup que lanzó queda registrado, con el error que lo provocó.
+        expect(warnSpy).toHaveBeenCalledWith(
+          expect.stringContaining('window.open'),
+          expect.any(Error),
+        );
+        // Y el aviso (respaldo manual del popup bloqueado) se pinta igual, con su código y su
+        // enlace: perderlo sería perder justo el respaldo que existe para este caso.
         expect(screen.getByTestId('checkout-whatsapp-pending')).toHaveTextContent('K7M2QX');
         expect(screen.getByTestId('checkout-whatsapp-link')).toHaveAttribute(
           'href',
           expect.stringContaining('https://wa.me/5359876543'),
         );
         openSpy.mockRestore();
+        warnSpy.mockRestore();
       });
 
-      // Y el otro extremo: si lo que falla es componer el propio resumen, no hay aviso — pero el
-      // pedido guardado se reporta igual, y solo una vez.
-      it('un fallo al componer el resumen tampoco convierte el alta en fallo', async () => {
+      // ── R3-1 ─────────────────────────────────────────────────────────────────────────────
+      // Y el otro extremo: si lo que falla es componer el propio resumen, el pedido guardado se
+      // reporta igual y solo una vez — pero el cliente NECESITA ver algo. Antes el `catch` vacío
+      // lo dejaba sin handoff de WhatsApp y sin error visible, con el pedido ya en la base de
+      // datos. Ahora el aviso sale con el código y en estado BLOQUEADO, que es un estado real
+      // (`link: null`, el mismo que se pinta cuando la tienda no tiene número).
+      it('si el resumen no se puede componer el aviso sale igual, con el código y bloqueado', async () => {
         linkSpy.throwsOnBuild = true;
+        const warnSpy = spyOnWarn();
         serviceMock.createPublicOrder.mockResolvedValue(envelope(CREATED_WITH_NUMBER));
         const onCreated = vi.fn();
         renderCheckout({ onCreated });
@@ -543,8 +654,43 @@ describe('storefront cart / checkout / order status (F3)', () => {
 
         await waitFor(() => expect(onCreated).toHaveBeenCalledTimes(1));
         expect(onCreated).toHaveBeenCalledWith(CREATED_WITH_NUMBER);
+        // El alta no se reporta como fallida: el pedido existe.
         expect(screen.queryByTestId('checkout-error')).not.toBeInTheDocument();
-        expect(screen.queryByTestId('checkout-whatsapp-notice')).not.toBeInTheDocument();
+        // Pero el aviso está: sin él el cliente no sabría ni el código ni que tiene que decirlo
+        // por otro medio.
+        const notice = await screen.findByTestId('checkout-whatsapp-notice');
+        expect(within(notice).getByTestId('checkout-whatsapp-blocked')).toHaveTextContent('K7M2QX');
+        expect(within(notice).queryByTestId('checkout-whatsapp-link')).not.toBeInTheDocument();
+        // Y el motivo del fallo queda registrado.
+        expect(warnSpy).toHaveBeenCalledWith(
+          expect.stringContaining('resumen de WhatsApp'),
+          expect.any(Error),
+        );
+        warnSpy.mockRestore();
+      });
+
+      // El caso REAL de ese fallo: una respuesta degradada sin líneas. `created.lines.map` revienta
+      // antes incluso de llegar a `buildWhatsAppOrderLink`, y para el cliente el resultado tiene que
+      // ser el mismo: el pedido guardado, su código a la vista y la tienda enterada.
+      it('una respuesta degradada sin líneas tampoco deja al cliente sin handoff', async () => {
+        const warnSpy = spyOnWarn();
+        serviceMock.createPublicOrder.mockResolvedValue(
+          envelope({
+            ...CREATED_WITH_NUMBER,
+            lines: undefined,
+          }) as unknown as ReturnType<typeof envelope<PublicOrderCreated>>,
+        );
+        const onCreated = vi.fn();
+        renderCheckout({ onCreated });
+
+        submitValidOrder();
+
+        await waitFor(() => expect(onCreated).toHaveBeenCalledTimes(1));
+        expect(onCreated).toHaveBeenCalledTimes(1);
+        const notice = await screen.findByTestId('checkout-whatsapp-notice');
+        expect(within(notice).getByTestId('checkout-whatsapp-blocked')).toHaveTextContent('K7M2QX');
+        expect(warnSpy).toHaveBeenCalled();
+        warnSpy.mockRestore();
       });
 
       // ── F4-R4 ───────────────────────────────────────────────────────────────────────────
@@ -645,6 +791,30 @@ describe('storefront cart / checkout / order status (F3)', () => {
       expect(await screen.findByTestId('order-status-error')).toHaveTextContent(
         'No encontramos ese pedido con ese teléfono.',
       );
+      expect(screen.queryByTestId('order-status-state')).not.toBeInTheDocument();
+    });
+
+    // ── F3-R3 ─────────────────────────────────────────────────────────────────────────────
+    // El 404 es el único veredicto del servidor sobre ESE código, y por eso solo él se pinta como
+    // 'no encontrado'. Antes, TODO fallo —red caída, `500`, `429`— caía en el mismo `catch` sin
+    // mirar el motivo, y le decía al cliente que su pedido no existe cuando lo que había pasado es
+    // que la consulta falló. `ORDER.STATUS_FAILED` existía sin usarse para este caso.
+    it.each([
+      ['sin conexión', { isNetworkError: true }],
+      ['con un 500 del servidor', { response: { status: 500 } }],
+      ['con un 429 por límite de tasa', { response: { status: 429 } }],
+    ])('un fallo %s NO se disfraza de pedido inexistente', async (_label, rejection) => {
+      serviceMock.getPublicOrderStatus.mockRejectedValue(rejection);
+      renderStatus();
+
+      fireEvent.change(screen.getByTestId('order-status-code'), { target: { value: 'K7M2QX' } });
+      fireEvent.change(screen.getByTestId('order-status-phone'), { target: { value: '5351234567' } });
+      fireEvent.click(screen.getByTestId('order-status-submit'));
+
+      const error = await screen.findByTestId('order-status-error');
+      expect(error).toHaveTextContent('No se pudo consultar el pedido. Inténtalo de nuevo.');
+      // Y no dice que no exista: eso lo haría reescribir el código en vez de reintentar.
+      expect(error).not.toHaveTextContent('No encontramos ese pedido');
       expect(screen.queryByTestId('order-status-state')).not.toBeInTheDocument();
     });
 

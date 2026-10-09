@@ -96,9 +96,17 @@ export function StorefrontCart({
                   min={1}
                   step={1}
                   value={line.quantity}
-                  onChange={(event) =>
-                    onUpdateQuantity(line.productId, Number(event.target.value) || 0)
-                  }
+                  // Un input VACIADO, o con algo que no sea un entero >= 1, NO toca el store: la
+                  // cantidad manda sobre la línea, y `updateQuantity(<= 0)` la BORRA (F3-R4). Con
+                  // `Number(v) || 0`, borrar el dígito para retocarlo se comía el producto entero
+                  // —un fallo de datos, no de UX—. Quitar tiene sus propios gestos: el −, el
+                  // "Quitar" y el "Vaciar".
+                  onChange={(event) => {
+                    const raw = event.target.value.trim();
+                    const quantity = Number(raw);
+                    if (raw === '' || !Number.isInteger(quantity) || quantity < 1) return;
+                    onUpdateQuantity(line.productId, quantity);
+                  }}
                   className={`${INPUT_CLASSES} w-16 text-center`}
                   aria-label={line.name}
                   data-testid={`catalog-cart-quantity-${line.productId}`}
