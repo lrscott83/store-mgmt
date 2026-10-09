@@ -234,3 +234,9 @@ Review `review-808d9dda34fad1da` **APROBADA** (3 advisory, ninguno bloqueante; a
   `PlanModuleConvergenceTests` → **3/3** y `StorePlanModule` 19/20 siguen **4** tras la corrida;
   suite E2E **COMPLETA** → **700/700, 0 fallos** (antes crasheaba a mitad); catálogo intacto (4) al
   final. La causa histórica de la aplicación parcial (R3-005) queda como riesgo separado.
+- 2026-10-09 — **Review 4R `review-eb5e26c51ba20365` APROBADA** (6 advisory, ninguno bloqueante;
+  autoridad quemada). Lentes: risk (0 hallazgos), resilience, readability, reliability.
+  - [ ] **R4-001** (WARNING · resilience, el más accionable) — El restore del catálogo borra y reinserta en sentencias **no transaccionales**: una interrupción entre ambas deja el catálogo mutilado (justo el modo de crash que el fix neutraliza). Arreglo recomendado: envolver el restore del catálogo en una **transacción**.
+  - [ ] **R3-CATALOG-SCOPE** (WARNING · reliability) — El restore borra **cualquier** par ausente del snapshot (global), no solo lo que movió `UpSql`; sensible al orden de tests.
+  - [ ] **R3-CATALOG-LOSSY** (WARNING · reliability) — El reinsert manda solo `PlanId`/`ModuleId`; si la tabla tuviera más estado persistido, el snapshot no sería fiel (hoy solo tiene esas 2 columnas → sin efecto).
+  - [ ] **R2-001/R2-002/R2-003** (readability) — Tres copias de la misma proyección EF; tipo anónimo/tuplas junto al `record`; SQL crudo con nombres de tabla/columna hardcodeados.
