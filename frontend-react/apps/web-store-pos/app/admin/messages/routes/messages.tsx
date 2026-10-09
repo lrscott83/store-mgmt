@@ -67,6 +67,14 @@ export function AdminMessagesPage() {
   const activitySignatureRef = useRef('');
   /** Re-arms the poll ladder at its fastest step. Assigned by the poll effect. */
   const resetPollRef = useRef<(immediate: boolean) => void>(() => {});
+  /** The thread's scroll box, so a new message can be brought into view. */
+  const threadRef = useRef<HTMLDivElement>(null);
+  /**
+   * Id of the newest row the thread already jumped to. Tracked separately from
+   * `messages` because the poll replaces the array on every cycle: only a
+   * genuinely NEW newest message (or opening another thread) may move the view.
+   */
+  const lastMessageIdRef = useRef<string | null>(null);
 
   const storeLabels = useMemo(
     () => new Map(stores.map((store) => [store.id, store.name])),
@@ -213,6 +221,24 @@ export function AdminMessagesPage() {
     if (selectedConversationId) void loadMessages(selectedConversationId);
     else setMessages([]);
   }, [selectedConversationId, loadMessages]);
+
+  /**
+   * An incoming message must be SEEN, not merely fetched. The thread jumps to the
+   * newest row when the operator opens (or switches to) a conversation, and every
+   * time a genuinely new message lands — including a reply from an owner.
+   *
+   * Gated on the newest id on purpose: the T10 poll re-reads the same thread every
+   * cycle and would otherwise yank the panel back to the bottom while the operator
+   * is scrolling through history.
+   */
+  useEffect(() => {
+    const container = threadRef.current;
+    if (!container) return;
+    const newest = messages.length > 0 ? messages[messages.length - 1].id : null;
+    if (newest === lastMessageIdRef.current) return;
+    lastMessageIdRef.current = newest;
+    container.scrollTop = container.scrollHeight;
+  }, [messages, selectedConversationId]);
 
   // Returning to the window or regaining a connection is foreground: reload the
   // directory and re-arm the ladder at its fastest step.
@@ -421,7 +447,11 @@ export function AdminMessagesPage() {
                 </span>
               </div>
 
-              <div className="max-h-[60vh] flex-1 overflow-y-auto px-4 py-3">
+              <div
+                ref={threadRef}
+                data-testid="message-thread"
+                className="max-h-[60vh] flex-1 overflow-y-auto px-4 py-3"
+              >
                 {messages.length === 0 ? (
                   <p className="text-sm text-text-muted">
                     {intl.formatMessage({

@@ -17,6 +17,12 @@ public interface IMessageRepository
     Task<IEnumerable<Message>> GetMessagesForUserAsync(Guid userId, CancellationToken cancellationToken);
     Task<IEnumerable<Guid>> GetAllOwnerIdsAsync(CancellationToken cancellationToken);
     Task<IEnumerable<Guid>> GetStoreIdsByOwnerAsync(Guid ownerId, CancellationToken cancellationToken);
+    /// <summary>
+    /// The platform SuperAdmin an owner's messages are addressed to. Matched by role ID and
+    /// across tenants — an owner lives in its own tenant, the platform admin in the default
+    /// one — so it resolves correctly from an owner's request. Returns <see cref="Guid.Empty"/>
+    /// only when no SuperAdmin exists at all.
+    /// </summary>
     Task<Guid> GetSuperAdminIdAsync(CancellationToken cancellationToken);
     Task<Conversation?> GetConversationByOwnerAndStoreAsync(Guid ownerId, Guid storeId, CancellationToken cancellationToken);
 }

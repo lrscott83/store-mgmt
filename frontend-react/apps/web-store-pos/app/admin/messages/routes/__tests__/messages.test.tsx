@@ -260,6 +260,79 @@ describe('AdminMessagesPage — sending', () => {
   });
 });
 
+describe('AdminMessagesPage — thread scroll', () => {
+  it('brings an owner reply into view by jumping the thread to the bottom', async () => {
+    const { messagesHttpService } = await import('~/shared/lib/messages/messages-http-service');
+    // The thread is read empty when it is opened, then the owner replies. Both
+    // land through `loadMessages`, which is the path the poll ladder and the
+    // realtime push share.
+    const incoming: MessageDto = {
+      id: 'm-owner-1',
+      conversationId: 'conv-a',
+      senderId: 'user-a',
+      senderType: 2,
+      recipientId: 'super-1',
+      storeId: 'store-a',
+      content: 'Hola, necesito ayuda',
+      sentAt: '2026-01-01T12:00:00Z',
+      readAt: null,
+    };
+    vi.mocked(messagesHttpService.getMessages)
+      .mockResolvedValueOnce(response<MessageDto[]>([]))
+      .mockResolvedValue(response<MessageDto[]>([incoming]));
+
+    await renderPage();
+    fireEvent.click(await screen.findByTestId('owner-owner-a'));
+    const thread = await screen.findByTestId('message-thread');
+
+    // jsdom has no layout: pin the scroll box so the jump is measurable at all.
+    Object.defineProperty(thread, 'scrollHeight', { value: 480, configurable: true });
+    Object.defineProperty(thread, 'scrollTop', { value: 0, writable: true, configurable: true });
+
+    // Returning to the window re-arms the ladder, so the next poll happens now.
+    fireEvent(window, new Event('focus'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('message-m-owner-1')).toBeInTheDocument();
+    });
+    expect(thread.scrollTop).toBe(480);
+  });
+
+  it('leaves the view alone when a poll re-reads the same rows', async () => {
+    const { messagesHttpService } = await import('~/shared/lib/messages/messages-http-service');
+    const incoming: MessageDto = {
+      id: 'm-owner-1',
+      conversationId: 'conv-a',
+      senderId: 'user-a',
+      senderType: 2,
+      recipientId: 'super-1',
+      storeId: 'store-a',
+      content: 'Hola, necesito ayuda',
+      sentAt: '2026-01-01T12:00:00Z',
+      readAt: null,
+    };
+    vi.mocked(messagesHttpService.getMessages).mockResolvedValue(response<MessageDto[]>([incoming]));
+
+    await renderPage();
+    fireEvent.click(await screen.findByTestId('owner-owner-a'));
+    const thread = await screen.findByTestId('message-thread');
+    await waitFor(() => {
+      expect(screen.getByTestId('message-m-owner-1')).toBeInTheDocument();
+    });
+
+    // The operator scrolls up to read history, and a poll re-reads the same rows:
+    // the identical newest message must not yank the panel back down.
+    Object.defineProperty(thread, 'scrollHeight', { value: 480, configurable: true });
+    Object.defineProperty(thread, 'scrollTop', { value: 120, writable: true, configurable: true });
+    fireEvent(window, new Event('focus'));
+
+    await waitFor(() => {
+      expect(vi.mocked(messagesHttpService.getMessages).mock.calls.length).toBeGreaterThan(1);
+    });
+    expect(thread.scrollTop).toBe(120);
+  });
+});
+
 describe('AdminMessagesPage — broadcast', () => {
   it('sends the broadcast content and shows a success toast', async () => {
     const { messagesHttpService } = await import('~/shared/lib/messages/messages-http-service');
