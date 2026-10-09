@@ -215,10 +215,10 @@ pnpm vitest run app/catalog/ app/sales/routes/__tests__/
 
 - [x] **F8-R1** (WARNING · backend) — Logo válido + banner inválido deja un **archivo huérfano** en disco (el logo se escribe antes de validar el banner). Destino: F8. **Cerrado (2026-10-08):** los dos archivos se validan up-front en `Handle`, antes de que ninguno toque el disco; `EnsureValid` sale de `ResolveAsync`.
 - [x] **F8-R2** (WARNING · backend) — Al reemplazar, se **borra el archivo anterior antes** de persistir; si `SaveChanges` falla, la BD apunta a un archivo ya borrado (404). Destino: F8. **Cerrado (2026-10-08):** `ResolveAsync` ya no borra, solo encola `obsoleteKeys`/`newKeys`; el borrado ocurre tras persistir, best-effort con `LogWarning`, y si el guardado falla se compensa borrando lo nuevo mientras lo anterior sobrevive.
-- [ ] **F8-R3** (WARNING · frontend) — El mapeo `CatalogBrandingUpdate → FormData` de `updateBranding` **no se ejecuta en ningún test** (todo mockea el servicio). Destino: F8.
-- [ ] **F8-R4** (WARNING · frontend) — Falta el caso de archivo **demasiado grande** en la validación de marca. Destino: F8.
+- [x] **F8-R3** (WARNING · frontend) — El mapeo `CatalogBrandingUpdate → FormData` de `updateBranding` **no se ejecuta en ningún test** (todo mockea el servicio). Destino: F8. **Cerrado (2026-10-08):** `HTTP-12` fija el multipart completo (logo/banner como `File`, booleanos `'true'`, header `multipart/form-data`) y `HTTP-13` el PATCH (lo no mencionado no viaja).
+- [x] **F8-R4** (WARNING · frontend) — Falta el caso de archivo **demasiado grande** en la validación de marca. Destino: F8. **Cerrado (2026-10-08):** test de un PNG válido de 2 MB + 1 byte: avisa, no retiene ni sube.
 - [x] **F8-R5** (SUGGESTION) — `MediaUrl` con slug null/blank. Destino: F8. **Cerrado (2026-10-08):** `MediaUrl` exige slug y clave no blank; un slug vacío devolvía `/api/v1/public/catalog//media/{key}`.
-- [ ] **F8-R6** (SUGGESTION) — Alt de imágenes solo por testid. Destino: F8.
+- [x] **F8-R6** (SUGGESTION) — Alt de imágenes solo por testid. Destino: F8. **Cerrado (2026-10-08):** el test asserta el `alt` del logo/banner (con nombre de tienda) y de las imágenes del carrusel y del día (pie de foto o nombre de la tienda).
 
 ## Siguiente paso
 
@@ -245,3 +245,10 @@ público por slug y trae T10 (tipos espejo TS en `@store-mgmt/domain`).
   F8-R2; devolver la validación al interior de `ResolveAsync` (la forma pre-fix) rompe **solo**
   `Handle_WithAValidLogoAndAnInvalidBanner_ShouldNotSaveAnyFile`. F8-R3/R4/R6 (frontend) siguen
   abiertos. Sin commit (writer acotado).
+- 2026-10-08 — **Cerrados F8-R3, F8-R4 y F8-R6 (frontend, solo tests).** `catalog-http-service.test.ts`:
+  `HTTP-12` fija el mapeo multipart de `updateBranding` y `HTTP-13` el PATCH. `web-catalog.test.tsx`:
+  caso de archivo demasiado grande (2 MB + 1 byte). `public-catalog.test.tsx`: aserciones de `alt`
+  en logo, banner, carrusel y bloque del día. Verificación observada:
+  `pnpm vitest run public-catalog + web-catalog + catalog-http-service` → 3 archivos / **102 tests
+  verdes**, 0 errores de tipo. (El writer se abortó por un reinicio del server antes de documentar;
+  el orquestador verificó y documentó aquí.)

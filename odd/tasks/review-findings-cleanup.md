@@ -44,11 +44,14 @@ nativa*). Este documento es el **seguimiento** y el mapa de cierre.
   - **Cerrado (2026-10-08).** Validación up-front de los dos archivos en `Handle`: un banner inválido rechaza la petición antes de que el logo toque el disco. `EnsureValid` sale de `ResolveAsync`; el test pasa a exigir `SaveBrandingAsync` `Times.Never`, no solo el upsert.
 - [x] **F8-R2** (defecto) — Se borra el archivo anterior antes de persistir; si `SaveChanges` falla, la BD apunta a un archivo borrado (404).
   - **Cerrado (2026-10-08).** Orden nuevo guardar → persistir → borrar. `ResolveAsync` solo encola `newKeys`/`obsoleteKeys` (y `DeleteIfReplacedAsync` desaparece); el borrado de los obsoletos va tras persistir y es best-effort con `LogWarning` (mismo patrón que `RemoveStoreCatalogImageCommandHandler`); si el guardado falla, se compensa borrando lo nuevo y lo anterior sobrevive. El handler suma `ILogger<T>`.
-- [ ] **F8-R3** (test) — El mapeo `CatalogBrandingUpdate → FormData` de `updateBranding` no se ejecuta en ningún test.
-- [ ] **F8-R4** (test) — Falta el caso de archivo demasiado grande.
+- [x] **F8-R3** (test) — El mapeo `CatalogBrandingUpdate → FormData` de `updateBranding` no se ejecuta en ningún test.
+  - **Cerrado (2026-10-08).** `HTTP-12` fija el multipart completo (logo/banner como `File`, booleanos como `'true'`, header `multipart/form-data`, URL `/v1/catalog/branding`) y `HTTP-13` fija el PATCH: lo no mencionado no viaja al `FormData`.
+- [x] **F8-R4** (test) — Falta el caso de archivo demasiado grande.
+  - **Cerrado (2026-10-08).** Test de un PNG válido de 2 MB + 1 byte en `brand-logo-upload`: avisa, no retiene ni sube, botón deshabilitado.
 - [x] **F8-R5** (defecto) — `MediaUrl` con slug null/blank.
   - **Cerrado (2026-10-08).** `MediaUrl` devuelve null si la clave **o** el slug están en blanco; antes construía `/api/v1/public/catalog//media/{key}`. El handler solo rechaza `CatalogSlug == null` con 404, así que el slug en blanco llegaba vivo hasta aquí: lo correcto es null y no pintar logo ni banner.
-- [ ] **F8-R6** (test) — Alt de imágenes solo por testid.
+- [x] **F8-R6** (test) — Alt de imágenes solo por testid.
+  - **Cerrado (2026-10-08).** El test de marca pública asserta el `alt` del logo y del banner (con el nombre de la tienda); los del carrusel y del bloque del día assertan que el `alt` usa el pie de foto o, sin él, el nombre de la tienda.
 
 ### F4 envío (`pedidos-whatsapp-envio.md`)
 - [ ] **F4-R1** (test) — El reset del aviso al reabrir el checkout no tiene test.
@@ -102,3 +105,10 @@ nativa*). Este documento es el **seguimiento** y el mapa de cierre.
   `Application.Tests` completo → **1163 passed, 0 failed**. Sondas de mutación: cada fix revertido rompe
   exactamente los tests que lo fijan (y solo uno, `...ShouldNotSaveAnyFile`, para F8-R1). Sin commit (writer acotado).
   F8-R3/R4/R6 (frontend) siguen abiertos.
+- 2026-10-08 — **Slice F8 frontend cerrado (F8-R3, F8-R4, F8-R6).** Tests, sin cambio de producción:
+  `HTTP-12` fija el mapeo multipart de `updateBranding` (logo/banner como `File`, booleanos `'true'`,
+  header `multipart/form-data`) y `HTTP-13` el PATCH (lo no mencionado no viaja); caso de archivo
+  demasiado grande (2 MB + 1 byte) en la marca; aserciones de `alt` en logo/banner (con nombre de tienda)
+  y en las imágenes del carrusel y del bloque del día (pie de foto o nombre de la tienda).
+  Verificación observada: `pnpm vitest run public-catalog + web-catalog + catalog-http-service` →
+  3 archivos / **102 tests verdes**, 0 errores de tipo.

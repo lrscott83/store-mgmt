@@ -401,6 +401,13 @@ describe('PublicCatalogPage', () => {
         'src',
         `${window.location.origin}/api/v1/public/catalog/mi-tienda/media/t/s/branding/banner.png`,
       );
+      // El texto alternativo NOMBRA la imagen y la tienda, no repite el rótulo del campo:
+      // un lector de pantalla tiene que oír de quién es el logo que no ve.
+      expect(screen.getByTestId('catalog-logo')).toHaveAttribute('alt', 'Logo de Moda Cubana');
+      expect(screen.getByTestId('catalog-banner')).toHaveAttribute(
+        'alt',
+        'Banner de Moda Cubana',
+      );
       expect(catalogMock.getPublicOrderingConfig).toHaveBeenCalledWith('mi-tienda');
       // El logo acompaña al nombre: sigue siendo el título de la carta.
       expect(screen.getByTestId('catalog-store-name')).toHaveTextContent('Moda Cubana');
@@ -515,6 +522,17 @@ describe('PublicCatalogPage', () => {
       // Sin pie de foto no hay párrafo de caption, pero la imagen se sigue viendo.
       expect(within(carousel).queryByTestId('catalog-carousel-caption-1')).not.toBeInTheDocument();
       expect(within(carousel).getByTestId('catalog-carousel-image-1')).toBeInTheDocument();
+      // El texto alternativo NO es un adorno: con pie de foto describe la foto; sin él cae al
+      // nombre de la tienda, que es lo único que se sabe de ella. Nunca vacío: una imagen sin
+      // `alt` es un nombre de archivo leído en voz alta.
+      expect(within(carousel).getByTestId('catalog-carousel-image-0')).toHaveAttribute(
+        'alt',
+        'Menú de la casa',
+      );
+      expect(within(carousel).getByTestId('catalog-carousel-image-1')).toHaveAttribute(
+        'alt',
+        'Moda Cubana',
+      );
 
       // Un punto por imagen, y solo el primero marcado como actual.
       expect(within(carousel).getByTestId('catalog-carousel-dot-0')).toHaveAttribute(
@@ -560,6 +578,16 @@ describe('PublicCatalogPage', () => {
         'Plato del día',
       );
       expect(within(daily).queryByTestId('catalog-daily-caption-1')).not.toBeInTheDocument();
+      // Misma regla de texto alternativo que el carrusel: el pie describe la foto y, si no hay,
+      // se nombra la tienda. Sin esto el bloque de destacados sería un-gallery muda.
+      expect(within(daily).getByTestId('catalog-daily-image-0')).toHaveAttribute(
+        'alt',
+        'Plato del día',
+      );
+      expect(within(daily).getByTestId('catalog-daily-image-1')).toHaveAttribute(
+        'alt',
+        'Moda Cubana',
+      );
     });
 
     it('el bloque de destacados solo aparece con imágenes', async () => {

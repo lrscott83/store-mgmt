@@ -783,6 +783,25 @@ describe('WebCatalogPage (vista Catálogo Web)', () => {
       expect(screen.getByTestId('brand-save')).toBeDisabled();
     });
 
+    it('un archivo demasiado grande no se retiene: avisa y no guarda', async () => {
+      renderPage();
+
+      // 2 MB + 1 byte: un PNG de formato válido que solo viola el TAMAÑO. Es la mitad del
+      // aviso que el formato inválido no distingue, así que el tamaño necesita su propia prueba.
+      selectFile(
+        await screen.findByTestId('brand-logo-upload'),
+        new File([new Uint8Array(2 * 1024 * 1024 + 1)], 'grande.png', { type: 'image/png' }),
+      );
+
+      expect(await screen.findByTestId('brand-error')).toHaveTextContent(
+        /Solo imágenes jpg, png o webp de hasta 2 MB\./,
+      );
+      // Lo que no pasó la validación no se retiene ni se sube: ni pendiente, ni botón, ni red.
+      expect(screen.queryByTestId('brand-pending-logo')).not.toBeInTheDocument();
+      expect(screen.getByTestId('brand-save')).toBeDisabled();
+      expect(catalogMock.updateBranding).not.toHaveBeenCalled();
+    });
+
     it('si el PUT de marca falla se avisa y los cambios siguen pendientes', async () => {
       catalogMock.updateBranding.mockRejectedValue({ response: { status: 500 } });
       renderPage();
