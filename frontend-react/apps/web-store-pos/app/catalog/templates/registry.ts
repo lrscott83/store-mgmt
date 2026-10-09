@@ -24,7 +24,11 @@ const TEMPLATES: Record<string, ComponentType<CatalogTemplateProps>> = {
 export function resolveTemplate(
   templateId: string | null | undefined,
 ): ComponentType<CatalogTemplateProps> {
-  if (templateId && TEMPLATES[templateId]) {
+  // `Object.hasOwn` y no `TEMPLATES[templateId]`: un object literal hereda las claves de
+  // `Object.prototype`, así que ids como `constructor` o `__proto__` serían truthy y se
+  // devolverían como si fueran una plantilla — y `<Template />` recibiría algo que no es un
+  // componente. Con `hasOwn` solo cuentan las claves propias.
+  if (templateId && Object.hasOwn(TEMPLATES, templateId)) {
     return TEMPLATES[templateId];
   }
   return TEMPLATES[DEFAULT_TEMPLATE_ID];

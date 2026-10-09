@@ -22,6 +22,18 @@ describe('resolveTemplate', () => {
     expect(resolveTemplate('plantilla-que-no-existe')).toBe(DefaultCatalogTemplate);
   });
 
+  /**
+   * Regresión R3-TEMPLATE-PROTO: un object literal hereda las claves de `Object.prototype`, así
+   * que sin la guarda `Object.hasOwn` un id como `constructor` o `__proto__` se colaba como
+   * "plantilla" (truthy) y `<Template />` recibía algo que no es un componente.
+   */
+  it.each(['constructor', '__proto__', 'toString', 'hasOwnProperty', 'valueOf'])(
+    'cae a la plantilla por defecto con una clave heredada de Object.prototype (%s)',
+    (id) => {
+      expect(resolveTemplate(id)).toBe(DefaultCatalogTemplate);
+    },
+  );
+
   it.each([null, undefined, ''])('cae a la plantilla por defecto con id ausente (%s)', (id) => {
     expect(resolveTemplate(id)).toBe(DefaultCatalogTemplate);
   });
