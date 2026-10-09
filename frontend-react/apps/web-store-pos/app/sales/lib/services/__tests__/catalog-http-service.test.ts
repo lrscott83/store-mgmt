@@ -191,4 +191,34 @@ describe('catalogHttpService — endpoints del módulo 18', () => {
 
     expect(apiClient.get).toHaveBeenCalledWith('/v1/public/catalog/mi-tienda/products/cp1');
   });
+
+  it('HTTP-12: updateBranding incluye templateId en el multipart', async () => {
+    const { apiClient } = await import('~/shared/lib/http/api-client');
+    vi.mocked(apiClient.put).mockResolvedValue(okEnvelope({ templateId: 'boutique' }) as never);
+
+    const { catalogHttpService } = await import('../catalog-http-service');
+    await catalogHttpService.updateBranding({ templateId: 'boutique' });
+
+    const [url, body, config] = vi.mocked(apiClient.put).mock.calls[0] as unknown as [
+      string,
+      FormData,
+      { headers: Record<string, string> },
+    ];
+    expect(url).toBe('/v1/catalog/branding');
+    expect(body).toBeInstanceOf(FormData);
+    expect((body as FormData).get('templateId')).toBe('boutique');
+    expect(config.headers['Content-Type']).toBe('multipart/form-data');
+  });
+
+  it('HTTP-12b: updateBranding omite templateId cuando no viaja (PUT parcial)', async () => {
+    const { apiClient } = await import('~/shared/lib/http/api-client');
+    vi.mocked(apiClient.put).mockResolvedValue(okEnvelope({}) as never);
+
+    const { catalogHttpService } = await import('../catalog-http-service');
+    await catalogHttpService.updateBranding({ removeLogo: true });
+
+    const [, body] = vi.mocked(apiClient.put).mock.calls[0] as unknown as [string, FormData];
+    expect((body as FormData).get('templateId')).toBeNull();
+    expect((body as FormData).get('removeLogo')).toBe('true');
+  });
 });

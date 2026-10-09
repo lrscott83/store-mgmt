@@ -182,17 +182,25 @@ export interface CatalogBranding {
   logoKey: string | null;
   bannerKey: string | null;
   paletteId: string;
+  /**
+   * Id de la PLANTILLA (vista) del catálogo público de la tienda. A diferencia de `paletteId`, SÍ lo
+   * escribe el command de marca: el dueño elige la plantilla junto con el logo. `default` = la
+   * vista actual.
+   */
+  templateId: string;
 }
 
 /**
  * Cuerpo de `PUT /v1/catalog/branding`: un PARCHE. Lo que no viaja no se toca, así que cambiar
- * el logo no borra el banner (y al revés). Los cuatro campos son independientes.
+ * el logo no borra el banner (y al revés). Los campos son independientes.
  */
 export interface CatalogBrandingUpdate {
   logo?: File;
   banner?: File;
   removeLogo?: boolean;
   removeBanner?: boolean;
+  /** Id de plantilla. Ausente = no se toca (PUT parcial). */
+  templateId?: string;
 }
 
 /**
@@ -278,6 +286,11 @@ export interface PublicOrderingConfig {
   businessHours: string | null;
   deliveryZones: string | null;
   paletteId: string;
+  /**
+   * Id de la PLANTILLA (vista) con la que el storefront pinta el catálogo. `default` = la vista
+   * actual. Una tienda sin fila, o con la plantilla en blanco, recibe `default`.
+   */
+  templateId: string;
   logoUrl?: string | null;
   bannerUrl?: string | null;
   /**
@@ -488,6 +501,7 @@ export const catalogHttpService = {
     if (payload.banner) formData.append('banner', payload.banner);
     if (payload.removeLogo) formData.append('removeLogo', 'true');
     if (payload.removeBanner) formData.append('removeBanner', 'true');
+    if (payload.templateId) formData.append('templateId', payload.templateId);
     const response = await apiClient.put<BaseResponseModel<CatalogBranding>>(
       '/v1/catalog/branding',
       formData,

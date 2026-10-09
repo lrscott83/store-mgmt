@@ -166,6 +166,7 @@ const CONFIG_WITHOUT_BRAND: PublicOrderingConfig = {
   businessHours: null,
   deliveryZones: null,
   paletteId: 'default',
+  templateId: 'default',
   logoUrl: null,
   bannerUrl: null,
   // El showcase viaja SIEMPRE, y vacío es lo normal: una tienda recién sincronizada no ha
