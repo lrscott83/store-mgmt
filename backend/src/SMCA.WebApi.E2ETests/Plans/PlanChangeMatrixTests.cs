@@ -86,6 +86,9 @@ public sealed class PlanChangeMatrixTests
         // Catálogo web (2026-09-27; ampliado a VIP el 2026-09-28): módulo 18. VIP incluye
         // TODO módulo de Superior — los planes son acumulativos — así que entra en ambos.
         (int)ModuleType.WebCatalog,
+        // Pedidos WhatsApp (2026-10-08, M6): módulos 19 y 20 en Superior y VIP, igual que
+        // Catálogo web (modulos-pedidos-whatsapp-gestion).
+        (int)ModuleType.PedidosWhatsApp, (int)ModuleType.GestionPedidos,
     ];
 
     private static readonly int[] VipUniverse =
@@ -96,6 +99,8 @@ public sealed class PlanChangeMatrixTests
         (int)ModuleType.Histories, (int)ModuleType.Credits, (int)ModuleType.Warehouses,
         (int)ModuleType.MultiStores, (int)ModuleType.MultiMonedas, (int)ModuleType.MultiPayments,
         (int)ModuleType.Elaboration, (int)ModuleType.WebCatalog,
+        // Pedidos WhatsApp (2026-10-08, M6): módulos 19 y 20 también en VIP (planes autocontenidos).
+        (int)ModuleType.PedidosWhatsApp, (int)ModuleType.GestionPedidos,
     ];
 
     // ── Module → features the LIVE Feature table exposes as AvailableToStore ──
@@ -125,7 +130,11 @@ public sealed class PlanChangeMatrixTests
         [(int)ModuleType.MultiMonedas] = [(int)FeatureType.MultiMonedas],
         [(int)ModuleType.MultiPayments] = [(int)FeatureType.MultiPayments],
         [(int)ModuleType.Elaboration] = [(int)FeatureType.Recipes, (int)FeatureType.Elaborations],
-        [(int)ModuleType.WebCatalog] = [(int)FeatureType.WebCatalog, (int)FeatureType.OnlineOrders],
+        // OnlineOrders (123) se MOVIÓ al módulo 20 el 2026-10-08 (M3); el módulo 18 se queda con
+        // el catálogo y la marca (122). Pedidos WhatsApp (124) es el carrito/config del módulo 19.
+        [(int)ModuleType.WebCatalog] = [(int)FeatureType.WebCatalog],
+        [(int)ModuleType.PedidosWhatsApp] = [(int)FeatureType.PedidosWhatsApp],
+        [(int)ModuleType.GestionPedidos] = [(int)FeatureType.OnlineOrders],
     };
 
     // ── The 9 real transitions lacking exact target-universe coverage ──────────

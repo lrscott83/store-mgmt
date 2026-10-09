@@ -205,3 +205,15 @@ Review `review-808d9dda34fad1da` **APROBADA** (3 advisory, ninguno bloqueante; a
   `--filter PublicOrderingReadE2ETests` → **4/4**; `--filter PublicOrderingRateLimitE2ETests` → **3/3**.
   Los nombres se confirmaron con `--list-tests` **sin** `--filter` antes de correr. Sin commit (writer
   acotado). Sin pendientes fuera de superficie en este slice.
+- 2026-10-09 — **E2E de matriz de planes: regresión del cambio Módulos 19/20 encontrada y corregida
+  (autorizada por el owner).** Al correr la suite E2E completa aparecieron 9 fallas, TODAS de la
+  matriz de planes: `PlanChangeMatrixTests` ×8 (esperaba los feature sets sin 123/124 y sin los
+  módulos 19/20 en Superior/VIP) y `StorePlanCatalogTests` ×1. El segundo reveló además que
+  `smca_test` tenía la migración `20261008185523` **marcada aplicada pero SIN las filas
+  `StorePlanModule` 19/20** (Superior = 16 en la DB); se reparó con el script idempotente 31 (su query
+  #4 pasó a devolver 4). `PlanChangeMatrixTests` se actualizó: módulos 19/20 en Superior/VIP, feature
+  123 → módulo 20 (sale del 18) y 124 → módulo 19. Verificación observada:
+  `--filter PlanChangeMatrixTests|StorePlanCatalogTests` → **10/10**. El "4/4 verde" reportado en el
+  slice de Módulos se sospecha **falso verde por binario stale** (AGENTS.md: mirar `error MSB`, no la
+  duración). Nota: la suite E2E **completa** no terminó en la última corrida — el testhost crashea a
+  mitad (0 fallas hasta el crash) —; los subconjuntos dirigidos pasan.
