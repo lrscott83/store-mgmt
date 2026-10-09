@@ -337,26 +337,147 @@ con el texto verbatim del script dentro de una transacción revertida: roles 2/3
 Tareas nuevas derivadas de la revisión nativa (todas **advisory, no bloqueantes**). Ninguna reabre F2;
 son trabajo posterior. Destino indicado por tarea.
 
-- [ ] **F2-R1** (WARNING · slice 1) — Ramas del handler sin test: carrito multi-moneda
+- [x] **F2-R1** (WARNING · slice 1) — Ramas del handler sin test: carrito multi-moneda
   (`EnsureSingleCurrency`, `CreateOnlineOrderCommand.cs:260-265`) y `DeliveryType` fuera del enum
   (`:214-215`). Acción: casos en `CreateOnlineOrderCommandHandlerTests`. **Destino: F2 (tests).**
-- [ ] **F2-R2** (WARNING · slice 1) — La persistencia nueva se prueba **solo con Moq**:
+  - **Cerrado (2026-10-09).** Cuatro casos nuevos en `CreateOnlineOrderCommandHandlerTests`, todos con
+    el status y el mensaje que fija cada rama:
+    - `Handle_WhenTheCartMixesTwoCurrencies_ShouldRejectTheWholeOrder`: 400 +
+      `OnlineOrderMixedCurrencies`, y `AddAsync`/`SaveChangesAsync` `Never` (el rechazo es anterior al
+      alta, no un pedido guardado a medias).
+    - `Handle_WithTwoProductsOfTheSameCurrency_ShouldNotTreatItAsMixedCurrency`: su control positivo.
+      Sin él, un `Distinct().Count() > 1` distraído pasaría los dos tests.
+    - `Handle_WithADeliveryTypeOutsideTheEnum_ShouldRejectBeforeReadingTheCart` (`[Theory]` -1/2/999):
+      400 + `OnlineOrderDeliveryTypeInvalid`, y `GetPublishedByIdsAsync` `Never` porque la modalidad se
+      resuelve ANTES que las líneas. El validador deja pasar esos valores a propósito
+      (`Validate_ShouldNotJudgeTheDeliveryType_ThatIsTheHandlersJob`): la puerta está en el handler.
+  - Sonda de mutación (hecha dentro de la superficie, sin tocar producción): los dos mensajes
+    esperados cambiados por una cadena inexistente → **4 fallos y solo esos 4** (36 verdes). Revertido.
+- [x] **F2-R2** (WARNING · slice 1) — La persistencia nueva se prueba **solo con Moq**:
   `StoreCatalogSettingsRepository.UpsertAsync` (NoTracking, UPDATE vs INSERT, `IgnoreQueryFilters`),
   `OrderRepository.CodeExistsAsync`/`GetByCodeAsync` y `ProductRepository.GetPublishedByIdsAsync`.
   Acción: cobertura de integración real (E2E intocable ⇒ archivo nuevo o test de infraestructura).
   **Destino: F2 (tests de integración).**
-- [ ] **F2-R3** (WARNING · slice 2) — El grant de la feature 123 por tienda (backfill) no tiene test que
+  - **Cerrado (2026-10-09)** con `Orders/OnlineOrderingPersistenceE2ETests.cs` — **archivo NUEVO**,
+    `[Collection("e2e")]` + `WebAppFixture`, 7 casos contra `smca_test` real. Reutiliza
+    `PublicOrderingSeed` **sin modificarlo** (ya crea tienda con slug, categoría con slug, producto
+    publicado y configuración con pedidos abiertos); lo que faltaba lo crea con helpers locales.
+  - Casos:
+    - `R2_1` — rama de **INSERT** de `UpsertAsync`: una fila, con el id que trajo el caller. Lo que
+      prueba que es esa rama es el índice único de `StoreId`: la rama del UPDATE sobre una clave
+      inexistente daría «UPDATE de 0 filas» y el test caería con un error de BD, no con una aserción.
+    - `R2_2` — rama de **UPDATE** sobre la fila real, con la sonda del `NoTracking` delante: mutar la
+      fila CARGADA y llamar a `SaveChanges` no escribe nada (`ChangeTracker.Entries` vacío, el valor
+      sigue en la BD sin error ni aviso) y el `UpsertAsync` sí la escribe sin duplicar. Las dos mitades
+      se distinguen EN LA BASE REAL: si tomara la del INSERT, el índice único lo rechazaría.
+    - `R2_3` — el índice único NO parcial no bloquea nada (ver F2-R5 abajo).
+    - `R2_4` — `CodeExistsAsync` encuentra la fila sin tenant en el contexto y **no** encuentra el
+      mismo código en otra tienda, con la **sonda** que hace que eso valga: en el mismo scope, la
+      consulta filtrada devuelve 0 filas y la de `IgnoreQueryFilters` devuelve 1. Sin ella, un `true`
+      no distingue «el bypass funciona» de «el filtro global no llega a traducirse a SQL», que es
+      justo lo que InMemory escondería.
+    - `R2_5` — `GetByCodeAsync` con el tenant de la tienda devuelve el pedido **con sus líneas**
+      (`OrderItem` tiene su propio filtro por tenant, así que el `Include` tiene que llegar a ellas);
+      sin tenant devuelve `null`; el código de otra tienda no existe.
+    - `R2_6` / `R2_6b` — `GetPublishedByIdsAsync`: las **cuatro** puertas de publicación rotas de una en
+      una (producto inactivo / no en venta / categoría sin slug / categoría inactiva) más el producto de
+      otra tienda, con una sola lista de ids para que el fallo diga PUERTA y no «algo del filtro»; el
+      control positivo por tienda; y el `ids.Count == 0`.
+  - **Por qué E2E y no InMemory**: InMemory no es SQL — ejecuta el filtro global como predicado en
+    memoria y acepta cualquier clave primaria, así que un UPDATE de una fila que no existe «funciona»
+    y un índice único inexistente no se nota. Las dos cosas que estos casos verifican solo existen en
+    PostgreSQL.
+  - **Catálogo intacto**: ni una línea inserta, borra o lee `Module`/`Feature`/`StorePlanModule`/
+    `StoreRoleFeature`. Siembra y limpieza SIEMPRE en `finally`, con `IgnoreQueryFilters`, en orden de
+    FK (líneas → pedido → configuración → productos → categorías → grafo de tienda). Auditoría tras la
+    corrida: `StorePlanModule` 19/20 = **4**, `Feature 123` → `ModuleId` **20**, **0** filas E2E
+    remanentes (productos, tiendas, categorías, pedidos, settings, usuarios).
+- [x] **F2-R3** (WARNING · slice 2) — El grant de la feature 123 por tienda (backfill) no tiene test que
   confirme que `OnlineOrdersAdmin` queda resuelto (`/me` `FeatureIds` / roster offline) para una tienda
   con módulo 18. **Destino: F2/F5 (test del generador).**
-- [ ] **F2-R4** (SUGGESTION · slice 1) — Tests estructurales por reflexión
+  - **Cerrado (2026-10-09)** en `Domain.UnitTests/Tenants/StoreRoleFeatureGeneratorTests.cs`. La
+    pregunta útil no es «¿el generador mapea 123?» —eso lo responde cualquier test que le pase el
+    id— sino «**una tienda con el módulo 20 activo** recibe ese grant», y esa pregunta no la puede
+    responder el generador solo: la lista de featureIds la produce `AllowedFeaturesService`, que se
+    queda con las entradas de `StoreRoleFeatures` cuyo `[HasModule]` está entre los módulos de la
+    tienda. Por eso el test modela esa media etapa con un helper `FeaturesGrantedBy(module)` que la
+    deriva del propio enum con el mismo criterio que `AllowedFeaturesService`.
+  - `..._ForAStoreWithTheGestionPedidosModule_ShouldResolveOnlineOrdersForOwnerAdminAndStoreUser`
+    afirma 123 para OwnerAdmin **y** StoreUser (D15), y de paso fija `(GestionPedidos, OnlineOrders)
+    == (20, 123)` para que una mudanza de módulo futura lo rompa en vez de dejarlo pasar en verde.
+  - `..._ForAStoreWithoutTheGestionPedidosModule_ShouldNotResolveOnlineOrders` es el caso que le da
+    sentido: el módulo 18 (Catálogo web) **no** arrastra la gestión de pedidos, y sí incluye un control
+    positivo (la feature 122 del módulo 18 sí sale). Nota: el hallazgo decía «módulo 18»; el
+    2026-10-08 (M3) la feature 123 se movió al **módulo 20** «Gestión de Pedidos» — el test fija la
+    topología actual.
+- [x] **F2-R4** (SUGGESTION · slice 1) — Tests estructurales por reflexión
   (`CreateOnlineOrderCommand_ShouldCarryNoPriceFieldAtAll` / `...NoCodeField`): frágiles; sustituir por
   aserción de comportamiento. **Destino: F2 (tests).**
-- [ ] **F2-R5** (SUGGESTION · slice 2) — Índice único `StoreCatalogSettings.StoreId` **no parcial**: con
+  - **Cerrado (2026-10-09), sin reflexión y más fuerte.** Lo que decide si el cliente puede mandar un
+    precio o un código es lo que hace el **binding real** de
+    `POST /api/v1/public/ordering/{slug}/orders` (`[FromBody] CreateOnlineOrderCommand`), así que los
+    tests deserializan CUERPOS con esos campos colados usando `JsonSerializerDefaults.Web` (las
+    opciones de ASP.NET Core; sin su `PropertyNameCaseInsensitive` un `"total"` minúsculo no llenaría un
+    `Total` del contrato y el test pasaría por un motivo falso) y exigen que el comando que salga sea
+    **idéntico** al del cuerpo limpio:
+    - `Handle_WithAForgedCodeInTheRawPayload_ShouldPersistItsOwnGeneratedCode` sustituye a
+      `..._ShouldCarryNoCodeField`: el `code`/`Code` forjado no aterriza, y el handler persiste y
+      devuelve su propio código.
+    - `Handle_ShouldRecalculateTheTotalServerSide_IgnoringAnyClientTotal` reescrito: su
+      `command.Items.Should().ContainSingle()` no probaba nada. Ahora `total`/`subtotal`/`amount`/
+      `currency`/`price`/`unitPrice` colados en el pedido **y** en la línea no sobreviven al binding, y
+      lo persistido es 2 × 100 en la moneda del catálogo.
+    - `Validate_WithAPayloadFullOfPrices_ShouldProduceTheSameCommandAsACleanOne` sustituye a
+      `..._ShouldCarryNoPriceFieldAtAll`: los dos cuerpos producen el mismo comando, y el validador no
+      se inventa ninguna regla de precio.
+    - Además `Handle_WithAForgedWhatsappNumberInTheRawPayload_ShouldReturnTheStoresOne`: el tercer test
+      por reflexión del archivo, cuyo comentario además decía «por comportamiento». Mismo patrón;
+      cierra la misma debilidad.
+  - Los tests por reflexión no miraban solo seis nombres: un `Importe` colado en el contrato pasaba
+    los tres. Ahora da igual cómo se llamara el campo — si existiera, el binding lo llenaría y los dos
+    comandos dejarían de coincidir.
+- [x] **F2-R5** (SUGGESTION · slice 2) — Índice único `StoreCatalogSettings.StoreId` **no parcial**: con
   soft-delete, la fila retenida bloquearía recrear settings; las tablas nuevas del catálogo usan filtro
   parcial. Requiere **nueva migración**. **Destino: F1/F8 (config/marca).**
-- [ ] **F2-R6** (SUGGESTION · slice 2) — El `Down()` del backfill borra **toda** fila `FeatureId=123`, no
+  - **FALSO POSITIVO (2026-10-09). Sin migración.** La premisa —«con soft-delete, la fila retenida
+    bloquearía recrear settings»— no se da: **`StoreCatalogSettings` NO es soft-deletable**. Evidencia:
+    1. `StoreCatalogSettingsEntityTypeConfiguration.cs:25` — el único `HasQueryFilter` es
+       `x => IsSuperAdmin || x.TenantId == TenantId`: **por tenant**, sin `x.IsActive`. Una fila «dada
+       de baja» con `IsActive = false` la sigue viendo la lectura de sesión.
+    2. `StoreCatalogSettings : AuditableEntity<Guid>, ITenantBaseEntity`, sin `IDeleteableEntity`, sin
+       `IsDeleted` y sin interceptor de borrado lógico: el borrado es de verdad (`DELETE`).
+    3. Por tanto el `AnyAsync(s => s.Id == settings.Id)` de `UpsertAsync` —con `IgnoreQueryFilters`—
+       **encuentra** la fila dada de baja y el guardado va por la **rama del UPDATE**, reutilizando su
+       `Id`. El índice único no llega a evaluarse nunca frente a un segundo INSERT: la unicidad la
+       garantiza el upsert y el índice es solo la red de seguridad.
+  - Fijado además contra PostgreSQL: `R2_3_an_inactive_row_stays_visible_and_the_upsert_reactivates_it_in_place`
+    deja `IsActive = false`, demuestra que la lectura de sesión sigue viendo la fila, que el upsert la
+    reactiva **en la misma fila** y que sigue habiendo **una** sola. Ese test CAERÁ el día que la tabla
+    se vuelva soft-deletable de verdad, que es justo cuando el índice parcial volvería a plantearse:
+    el test avisa de que el día llegó.
+- [x] **F2-R6** (SUGGESTION · slice 2) — El `Down()` del backfill borra **toda** fila `FeatureId=123`, no
   solo las creadas por la migración, y el comentario afirma "ONLY". Acción: acotar el `DELETE` o corregir
   el contrato declarado. Toca una migración ya aplicada. **Destino: F2 (migración) / decisión owner.**
+  - **FALSO POSITIVO (2026-10-09) para el `DELETE`.** El borrado amplio es **obligatorio**, y acotarlo
+    rompería el rollback:
+    1. El `Down()` de la migración **también borra la fila de catálogo**: `20261007021020_…` ejecuta
+       `OnlineOrdersRoleFeatureBackfill.DownStoreRoleFeatureSql` y acto seguido el `DeleteData`
+       generado `table: "Feature", keyValue: 123`. `StoreRoleFeature.FeatureId` es **Restrict**
+       (`FeatureEntityTypeConfiguration.cs:25`), así que cualquier fila `FeatureId = 123` que
+       sobreviviera haría fallar el rollback con violación de FK. El orden está escrito y comentado en
+       la propia migración (líneas 214-218) y es la razón de ser de la constante.
+    2. Las migraciones posteriores se revierten **antes** en la cadena. `20261008185523` (Módulos 19/20)
+       restaura el `ModuleId` de la feature 123 a 18 con su propio `UpdateData` y **no toca** las filas
+       `StoreRoleFeature` de 123 —los módulos 19/20 son nuevos, luego no hay filas preexistentes que
+       preservar—. Es el mismo razonamiento que ya dejó M-R3-003 como falso positivo.
+    3. Acotar el `DELETE` al universo histórico «tiendas con módulo 18» dejaría fuera cualquier fila de
+       123 que no venga de ese `INSERT`, y **cualquier fila de 123 que sobreviva bloquearía el
+       `DeleteData`**. En un despliegue que pasó por las dos migraciones, esas filas existen.
+  - **Pendiente de aviso por estar FUERA de la superficie autorizada**: el comentario de
+    `OnlineOrdersRoleFeatureBackfill.DownStoreRoleFeatureSql` dice literalmente «remove ONLY the
+    StoreRoleFeature rows this migration created», y no es del todo exacto (borra las 123, creadas por
+    esta migración o no). No se tocó: `backend/src/Infrastructure/Migrations/**` es producción. Es una
+    corrección de una línea de comentario, sin efecto de comportamiento, para cuando el owner lo autorice.
 
 ## Siguiente paso
 
@@ -387,3 +508,25 @@ owner.
   revisión dejó hallazgos **advisory no bloqueantes** (p. ej. ramas del handler sin test: multi-moneda
   y `DeliveryType` fuera de enum; `UpsertAsync`/repos solo probados con mocks; `Down()` del backfill
   borra toda fila `FeatureId=123`). Push/PR = decisión del owner.
+- 2026-10-09 — **F2-R1..R6 cerrados.** R1, R3 y R4 son tests (unitarios, sin reflexión); R2 es un E2E
+  **nuevo** (`Orders/OnlineOrderingPersistenceE2ETests.cs`, 7 casos contra `smca_test`) que cubre la
+  persistencia que hasta ahora solo se probaba con Moq; R5 y R6 quedan **documentados como falsos
+  positivos** con su evidencia (no hay migración ni cambio de código). Superficie tocada: solo los tres
+  archivos de test del backend y un E2E nuevo; `PublicOrderingSeed` se **reutiliza sin modificar**.
+  Sin commit (writer acotado).
+  Verificación observada:
+  - `dotnet build src/SMCA.sln` → **Build succeeded**, 0 errors, sin `error MSB`.
+  - `dotnet test src/Domain.UnitTests/… --filter StoreRoleFeatureGeneratorTests` → **14/14**; la
+    suite completa de `Domain.UnitTests` → **165/165**.
+  - `dotnet test src/Application.Tests/… --filter OnlineOrdering` → **388/388**; la suite completa →
+    **1166/1166**.
+  - `dotnet test src/SMCA.WebApi.E2ETests/… --filter OnlineOrderingPersistenceE2ETests` → **7/7**, con
+    la línea `[E2E Guard] ConnectionStrings:Application -> Database=smca_test` que prueba que el
+    fixture se inicializó contra la base real; `--filter E2ETests.Orders` (los 4 archivos de la
+    carpeta) → **17/17**.
+  - Auditoría de `smca_test` tras la corrida: `StorePlanModule` 19/20 = **4**, `Feature 123` →
+    `ModuleId` **20**, **0** filas E2E remanentes. El catálogo no se tocó.
+  - Sonda de mutación (dentro de la superficie): los mensajes esperados de los dos rechazos nuevos
+    cambiados por una cadena inexistente → **4 fallos y solo esos 4**; revertido.
+  Sin pendientes fuera de superficie salvo el comentario «ONLY» de
+  `OnlineOrdersRoleFeatureBackfill` (producción, ver F2-R6).

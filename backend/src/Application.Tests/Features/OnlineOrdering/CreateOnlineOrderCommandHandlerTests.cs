@@ -2,6 +2,7 @@ using Application.Dtos.OnlineOrdering;
 using Application.Exceptions;
 using Application.Features.OnlineOrdering.Commands.CreateOnlineOrder;
 using Application.UnitOfWorks;
+using System.Text.Json;
 using Domain.Common.Enums;
 using Domain.Entities.OrderItems;
 using Domain.Entities.Orders;
@@ -41,6 +42,15 @@ namespace Application.Tests.Features.OnlineOrdering.CreateOnlineOrder;
 /// </summary>
 public class CreateOnlineOrderCommandHandlerTests
 {
+    /// <summary>
+    /// Opciones del binding REAL de `POST /api/v1/public/ordering/{slug}/orders`, que recibe
+    /// `[FromBody] CreateOnlineOrderCommand`: `JsonSerializerDefaults.Web` es lo que usa
+    /// ASP.NET Core, y su `PropertyNameCaseInsensitive` es lo que decide si un `"code"` minúsculo en
+    /// el cuerpo llenaría un `Code` del contrato. Serializar/deserializar con las opciones de la
+    /// librería NO reproduciría ese enlace, así que los tests de contrato los usan a propósito.
+    /// </summary>
+    private static readonly JsonSerializerOptions WebJson = new(JsonSerializerDefaults.Web);
+
     private readonly Mock<IApplicationUnitOfWork> _unitOfWork = new();
     private readonly Mock<IStoreRepository> _storeRepository = new();
     private readonly Mock<IProductRepository> _productRepository = new();
@@ -205,21 +215,71 @@ public class CreateOnlineOrderCommandHandlerTests
         persisted.OrderItems.Single().Currency.Should().Be(Currency.CUP);
     }
 
-    /// <summary>El cliente NO manda total: se recalcula desde el catálogo (2 x 100 = 200).</summary>
+    /// <summary>
+    /// F2-R4 — el cliente NO manda total, ni precio de línea, ni moneda: se recalcula desde el
+    /// catálogo (2 x 100 = 200). Y no se afirma por reflexión ("la clase no tiene `Total`"), sino
+    /// con el cuerpo REAL que manda el cliente: seDeserializean dos cuerpos gemelos —uno con
+    /// `total`/`subtotal`/`amount`/`currency`/`price`/`unitPrice` colados en el pedido y en la
+    /// línea, otro sin ellos— y se exige que el binding produzca el MISMO comando. Después se
+    /// comprueba que lo persistido es el precio del catálogo. Un precio manipulado no cambia nada
+    /// porque no hay dónde escribirlo.
+    /// </summary>
     [Fact]
     public async Task Handle_ShouldRecalculateTheTotalServerSide_IgnoringAnyClientTotal()
     {
         PublishedStore();
         EnabledSettings();
-        Guid productId = Publish("Arroz", 100m);
-        CreateOnlineOrderCommand command = Command(productId: productId, quantity: 2);
-        // Aunque el payload trajera un total manipulado, el comando no lo acepta: no existe campo
-        // para él. Este test fija esa ausencia por comportamiento, no por reflexión.
-        command.Items.Should().ContainSingle();
+        Guid productId = Publish("Arroz", 100m, currency: Currency.USD);
 
-        var result = await Handler().Handle(command, CancellationToken.None);
+        // "1" es lo que un cliente intentaría pagar: una unidad y la moneda que le viene bien.
+        string tamperedBody = $$"""
+            {
+              "storeSlug": "{{_slug}}",
+              "deliveryType": 0,
+              "customerName": "Ana",
+              "customerPhone": "+5350000000",
+              "total": 1, "subtotal": 1, "amount": 1, "currency": "USD", "price": 1, "unitPrice": 1,
+              "items": [
+                { "productId": "{{productId}}", "quantity": 2,
+                  "price": 1, "unitPrice": 1, "total": 1, "currency": "USD" }
+              ]
+            }
+            """;
+        string cleanBody = $$"""
+            {
+              "storeSlug": "{{_slug}}",
+              "deliveryType": 0,
+              "customerName": "Ana",
+              "customerPhone": "+5350000000",
+              "items": [ { "productId": "{{productId}}", "quantity": 2 } ]
+            }
+            """;
 
+        CreateOnlineOrderCommand bound =
+            JsonSerializer.Deserialize<CreateOnlineOrderCommand>(tamperedBody, WebJson)!;
+        CreateOnlineOrderCommand clean =
+            JsonSerializer.Deserialize<CreateOnlineOrderCommand>(cleanBody, WebJson)!;
+
+        // (1) Ningún precio del cuerpo sobrevive al binding: el comando es el del cuerpo limpio.
+        JsonSerializer.Serialize(bound).Should().Be(JsonSerializer.Serialize(clean),
+            "el cuerpo no tiene dónde aterrizar un precio, un total ni una moneda");
+
+        Order? persisted = null;
+        _orderRepository
+            .Setup(x => x.AddAsync(It.IsAny<Order>()))
+            .Callback<Order>(o => persisted = o)
+            .ReturnsAsync((Order o) => o);
+
+        var result = await Handler().Handle(bound, CancellationToken.None);
+
+        // (2) Y lo que se persiste es lo que dice el CATÁLOGO: 2 x 100, en la moneda del producto.
+        result.Succeeded.Should().BeTrue();
         result.Data!.Total.Should().Be(200m);
+        result.Data.Subtotal.Should().Be(200m);
+        result.Data.Currency.Should().Be(Currency.USD);
+        persisted!.Total.Should().Be(200m);
+        persisted.Currency.Should().Be(Currency.USD);
+        persisted.OrderItems.Single().Price.Should().Be(100m);
     }
 
     /// <summary>
@@ -615,6 +675,116 @@ public class CreateOnlineOrderCommandHandlerTests
 
     #endregion
 
+    #region F2-R1: las dos ramas que la revisión dejó sin test
+
+    /// <summary>
+    /// F2-R1(a) — `EnsureSingleCurrency`: `Order.Currency` es UNA moneda para todo el pedido, y con
+    /// A3 eliminada la tienda no puede fijar otra. Un carrito con productos de dos monedas NO se
+    /// guarda: se rechaza entero, en vez de elegir una y perder el importe de la otra línea.
+    ///
+    /// El caso que hace que valga la pena es el negativo de al lado: dos productos de la MISMA moneda
+    /// sí entran. Sin él, un `Distinct().Count() > 1` distraído pasaría los dos tests.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenTheCartMixesTwoCurrencies_ShouldRejectTheWholeOrder()
+    {
+        PublishedStore();
+        EnabledSettings();
+        Guid arroz = Publish("Arroz", 100m);
+        Guid queso = Publish("Queso", 300m, currency: Currency.USD);
+
+        var command = new CreateOnlineOrderCommand
+        {
+            StoreSlug = _slug,
+            DeliveryType = (int)OrderDeliveryType.Pickup,
+            CustomerName = "Ana",
+            CustomerPhone = "+5350000000",
+            Items =
+            [
+                new CreateOnlineOrderLineRequest { ProductId = arroz, Quantity = 1 },
+                new CreateOnlineOrderLineRequest { ProductId = queso, Quantity = 1 },
+            ],
+        };
+
+        Func<Task> act = () => Handler().Handle(command, CancellationToken.None);
+
+        var exception = await act.Should().ThrowAsync<ApiException>();
+        exception.Which.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest);
+        exception.Which.Message.Should().Contain("OnlineOrderMixedCurrencies");
+
+        // Ni una sola escritura: el rechazo es ANTERIOR al alta, no un pedido guardado a medias.
+        _orderRepository.Verify(x => x.AddAsync(It.IsAny<Order>()), Times.Never);
+        _unitOfWork.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    /// <summary>
+    /// Control positivo del anterior: varias líneas de la MISMA moneda no es un carrito mixto. El
+    /// handler resuelve las líneas del catálogo y compara sus monedas entre sí.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WithTwoProductsOfTheSameCurrency_ShouldNotTreatItAsMixedCurrency()
+    {
+        PublishedStore();
+        EnabledSettings();
+        Guid arroz = Publish("Arroz", 100m);
+        Guid frijoles = Publish("Frijoles", 60m);
+        var command = new CreateOnlineOrderCommand
+        {
+            StoreSlug = _slug,
+            DeliveryType = (int)OrderDeliveryType.Pickup,
+            CustomerName = "Ana",
+            CustomerPhone = "+5350000000",
+            Items =
+            [
+                new CreateOnlineOrderLineRequest { ProductId = arroz, Quantity = 1 },
+                new CreateOnlineOrderLineRequest { ProductId = frijoles, Quantity = 2 },
+            ],
+        };
+
+        var result = await Handler().Handle(command, CancellationToken.None);
+
+        result.Succeeded.Should().BeTrue();
+        result.Data!.Currency.Should().Be(Currency.CUP);
+        result.Data.Lines.Should().HaveCount(2);
+    }
+
+    /// <summary>
+    /// F2-R1(b) — `ResolveDeliveryType`: el valor llega como `int` desde el JSON del cliente, así
+    /// que puede ser CUALQUIER entero. Un valor fuera de <c>OrderDeliveryType</c> se rechaza con
+    /// 400 ANTES de mirar el carrito y antes de tocar la base — un `2` no es "recogida ni envío, lo
+    /// veo luego": no es una modalidad.
+    ///
+    /// El validador deja pasar estos valores a propósito (`Validate_ShouldNotJudgeTheDeliveryType_ThatIsTheHandlersJob`:
+    /// su regla es "es un entero"); el cierre de la puerta está aquí, que es donde vive el resto de
+    /// las reglas de la tienda.
+    /// </summary>
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(2)]
+    [InlineData(999)]
+    public async Task Handle_WithADeliveryTypeOutsideTheEnum_ShouldRejectBeforeReadingTheCart(int deliveryType)
+    {
+        PublishedStore();
+        EnabledSettings(pickup: true, delivery: true);
+        Guid productId = Publish("Arroz", 100m);
+        var command = Command(deliveryType: OrderDeliveryType.Pickup, productId: productId);
+        command.DeliveryType = deliveryType;
+
+        Func<Task> act = () => Handler().Handle(command, CancellationToken.None);
+
+        var exception = await act.Should().ThrowAsync<ApiException>();
+        exception.Which.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest);
+        exception.Which.Message.Should().Contain("OnlineOrderDeliveryTypeInvalid");
+
+        // La modalidad se resuelve ANTES que las líneas: ni una consulta al catálogo, ni un alta.
+        _productRepository.Verify(
+            x => x.GetPublishedByIdsAsync(It.IsAny<Guid>(), It.IsAny<IReadOnlyCollection<Guid>>()),
+            Times.Never);
+        _orderRepository.Verify(x => x.AddAsync(It.IsAny<Order>()), Times.Never);
+    }
+
+    #endregion
+
     #region Integration / Dependencies
 
     /// <summary>
@@ -647,15 +817,55 @@ public class CreateOnlineOrderCommandHandlerTests
     }
 
     /// <summary>
-    /// El código es un identificador, no un dato: se genera aquí y NO viene en el payload. Si
-    /// alguien añadiera un campo `Code` al comando, el cliente podría fijar el código del pedido.
+    /// F2-R4 — el código es un identificador, no un dato: lo genera el servidor y NO viene en el
+    /// payload. Antes esto se afirmaba por reflexión ("la clase no tiene propiedad `Code`"), que es
+    /// una forma frágil: fija la FORMA del tipo, no lo que el cliente puede hacer con él, y solo
+    /// miraba ese nombre — un `OrderCode` colado en el contrato pasaba el test.
+    ///
+    /// Ahora se afirma por COMPORTAMIENTO sobre el contrato que de verdad llega al handler.
+    /// `POST /api/v1/public/ordering/{slug}/orders` recibe `[FromBody] CreateOnlineOrderCommand`, así
+    /// que lo que decide si un anónimo puede fijar el código es lo que el binding hace con un
+    /// `"code"` en el JSON: se serializa el comando, se le cuela un `code` forjado y se comprueba
+    /// que el objeto que sale del binding es IDÉNTICO al que saldría sin él (el campo no existe
+    /// donde aterrizar) y que el handler persiste y devuelve su propio código.
     /// </summary>
     [Fact]
-    public void CreateOnlineOrderCommand_ShouldCarryNoCodeField()
+    public async Task Handle_WithAForgedCodeInTheRawPayload_ShouldPersistItsOwnGeneratedCode()
     {
-        typeof(CreateOnlineOrderCommand).GetProperties()
-            .Select(p => p.Name)
-            .Should().NotContain("Code");
+        PublishedStore();
+        EnabledSettings();
+        Guid productId = Publish("Arroz", 100m);
+
+        CreateOnlineOrderCommand clean = Command(productId: productId);
+        string cleanJson = JsonSerializer.Serialize(clean);
+
+        // El mismo cuerpo + un `code` que el cliente querría imponerse. Se repite en minúsculas y en
+        // PascalCase porque el binding de ASP.NET Core es case-insensitive: si el contrato tuviera
+        // `Code`, cualquiera de las dos formas lo llenaría.
+        string tamperedJson = cleanJson[..^1]
+            + @",""code"":""FORJADO"",""Code"":""FORJADO""}";
+
+        CreateOnlineOrderCommand bound =
+            JsonSerializer.Deserialize<CreateOnlineOrderCommand>(tamperedJson, WebJson)!;
+
+        // (1) El binding descarta el `code`: el comando es el mismo de antes, campo por campo. Si
+        // alguien añadiera `Code` al contrato, aquí aparecería el valor forjado y esto cae.
+        JsonSerializer.Serialize(bound).Should().Be(cleanJson,
+            "un `code` en el cuerpo no tiene dónde aterrizar en el comando");
+
+        Order? persisted = null;
+        _orderRepository
+            .Setup(x => x.AddAsync(It.IsAny<Order>()))
+            .Callback<Order>(o => persisted = o)
+            .ReturnsAsync((Order o) => o);
+
+        var result = await Handler().Handle(bound, CancellationToken.None);
+
+        // (2) Y el código que sale es el que el servidor generó y guardó, no el del cuerpo.
+        result.Succeeded.Should().BeTrue();
+        result.Data!.Code.Should().NotBe("FORJADO");
+        result.Data.Code.Should().Be(persisted!.Code);
+        result.Data.Code.Should().HaveLength(6, "el alfabeto del código son 6 caracteres");
     }
 
     /// <summary>
@@ -791,16 +1001,33 @@ public class CreateOnlineOrderCommandHandlerTests
     }
 
     /// <summary>
-    /// El número es de la TIENDA, nunca del cliente: si el comando admitiera un campo
-    /// `WhatsappNumber`, un anónimo podría apuntar el resumen al número que quisiera. Fija esa
-    /// ausencia por comportamiento, igual que `Code`.
+    /// F2-R4 (mismo patrón que el `code`) — el número es de la TIENDA, nunca del cliente. Este test
+    /// también era por reflexión y su comentario decía otra cosa ("por comportamiento"), así que
+    /// también se pasa al cuerpo real: un `whatsappNumber` forjado en el JSON no llega al comando,
+    /// y la respuesta sale con el número que tiene la tienda.
     /// </summary>
     [Fact]
-    public void CreateOnlineOrderCommand_ShouldCarryNoWhatsappNumberField()
+    public async Task Handle_WithAForgedWhatsappNumberInTheRawPayload_ShouldReturnTheStoresOne()
     {
-        typeof(CreateOnlineOrderCommand).GetProperties()
-            .Select(p => p.Name)
-            .Should().NotContain("WhatsappNumber");
+        PublishedStore();
+        StoreCatalogSettings settings = EnabledSettings();
+        settings.WhatsappNumber = "+53 5-111 2222";
+        Guid productId = Publish("Arroz", 100m);
+
+        CreateOnlineOrderCommand clean = Command(productId: productId);
+        string tamperedJson = JsonSerializer.Serialize(clean)[..^1]
+            + @",""whatsappNumber"":""+1-555-0000"",""WhatsappNumber"":""+1-555-0000""}";
+
+        CreateOnlineOrderCommand bound =
+            JsonSerializer.Deserialize<CreateOnlineOrderCommand>(tamperedJson, WebJson)!;
+
+        JsonSerializer.Serialize(bound).Should().Be(JsonSerializer.Serialize(clean),
+            "un número de WhatsApp en el cuerpo no tiene dónde aterrizar en el comando");
+
+        var result = await Handler().Handle(bound, CancellationToken.None);
+
+        result.Data!.WhatsappNumber.Should().Be("+53 5-111 2222");
+        result.Data.WhatsappNumber.Should().NotBe("+1-555-0000");
     }
 
     #endregion

@@ -1,4 +1,5 @@
 using Application.Features.OnlineOrdering.Commands.CreateOnlineOrder;
+using System.Text.Json;
 using FluentAssertions;
 using Microsoft.Extensions.Localization;
 using Moq;
@@ -17,6 +18,14 @@ namespace Application.Tests.Features.OnlineOrdering;
 /// </summary>
 public class CreateOnlineOrderCommandValidatorTests
 {
+    /// <summary>
+    /// Opciones del binding REAL de `POST /api/v1/public/ordering/{slug}/orders`, que recibe
+    /// `[FromBody] CreateOnlineOrderCommand`. `JsonSerializerDefaults.Web` es lo que usa ASP.NET
+    /// Core: sin su `PropertyNameCaseInsensitive`, un `"total"` minúsculo en el cuerpo NO llenaría
+    /// un `Total` del contrato, y el test de "no hay campo de precio" pasaría por un motivo falso.
+    /// </summary>
+    private static readonly JsonSerializerOptions WebJson = new(JsonSerializerDefaults.Web);
+
     private readonly Mock<IStringLocalizer<I18n>> _localizer = new();
 
     public CreateOnlineOrderCommandValidatorTests()
@@ -188,19 +197,61 @@ public class CreateOnlineOrderCommandValidatorTests
     }
 
     /// <summary>
-    /// No hay campo de precio en el payload: la ausencia es la garantía de que el cliente no puede
-    /// fijar el total. Este test falla si alguien añade un `UnitPrice` al contrato.
+    /// F2-R4 — no hay campo de precio en el payload, y la ausencia es la garantía de que el cliente
+    /// no puede fijar el total. Antes se afirmaba por reflexión con una lista de nombres
+    /// (`Total`, `Price`, `UnitPrice`, `Currency`, `Subtotal`, `Amount`), que es frágil por partida
+    /// doble: fija la FORMA del tipo en vez de lo que el cliente puede hacer con él, y solo miraba
+    /// ESOS nombres — un `Importe` colado en el contrato pasaba el test.
+    ///
+    /// Ahora se afirma por COMPORTAMIENTO sobre el cuerpo real del endpoint
+    /// (`[FromBody] CreateOnlineOrderCommand`, binding de ASP.NET Core): dos cuerpos gemelos, uno
+    /// con `total`/`subtotal`/`amount`/`currency`/`price`/`unitPrice` colados en el pedido y en la
+    /// línea y otro sin ellos, tienen que producir EXACTAMENTE el mismo comando. Si alguien añadiera
+    /// un campo de importe al contrato, el binding lo llenaría y los dos comandos dejarían de ser
+    /// iguales — sin importar cómo se llamara ese campo.
+    ///
+    /// Y el validador, que es de lo que trata esta suite, no inventa ninguna regla de precio: un
+    /// cuerpo con precios colados se valida igual que uno limpio.
     /// </summary>
     [Fact]
-    public void CreateOnlineOrderCommand_ShouldCarryNoPriceFieldAtAll()
+    public void Validate_WithAPayloadFullOfPrices_ShouldProduceTheSameCommandAsACleanOne()
     {
-        typeof(CreateOnlineOrderCommand).GetProperties()
-            .Select(p => p.Name)
-            .Should().NotContain(new[] { "Total", "Price", "UnitPrice", "Currency", "Subtotal", "Amount" });
+        var productId = Guid.NewGuid();
 
-        typeof(CreateOnlineOrderLineRequest).GetProperties()
-            .Select(p => p.Name)
-            .Should().NotContain(new[] { "Price", "UnitPrice", "Total" });
+        string cleanBody = $$"""
+            {
+              "storeSlug": "tienda-ana",
+              "deliveryType": 0,
+              "customerName": "Ana",
+              "customerPhone": "+5350000000",
+              "items": [ { "productId": "{{productId}}", "quantity": 2 } ]
+            }
+            """;
+        string tamperedBody = $$"""
+            {
+              "storeSlug": "tienda-ana",
+              "deliveryType": 0,
+              "customerName": "Ana",
+              "customerPhone": "+5350000000",
+              "total": 1, "subtotal": 1, "amount": 1, "currency": "USD", "price": 1, "unitPrice": 1,
+              "items": [
+                { "productId": "{{productId}}", "quantity": 2,
+                  "price": 1, "unitPrice": 1, "total": 1, "currency": "USD" }
+              ]
+            }
+            """;
+
+        CreateOnlineOrderCommand tampered =
+            JsonSerializer.Deserialize<CreateOnlineOrderCommand>(tamperedBody, WebJson)!;
+        CreateOnlineOrderCommand clean =
+            JsonSerializer.Deserialize<CreateOnlineOrderCommand>(cleanBody, WebJson)!;
+
+        // El precio del cliente no llega ni al comando ni a la línea del carrito.
+        JsonSerializer.Serialize(tampered).Should().Be(JsonSerializer.Serialize(clean));
+        tampered.Items.Should().BeEquivalentTo(clean.Items);
+
+        // Y el validador no se inventa una regla que no le corresponde: sigue siendo válido.
+        Validator().Validate(tampered).IsValid.Should().BeTrue();
     }
 
     #endregion

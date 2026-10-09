@@ -106,12 +106,45 @@ Review `review-808d9dda34fad1da` **APROBADA** (3 advisory, ninguno bloqueante; a
 - [ ] **R3-003** (SUGGESTION · test) — `spyOnWarn` se restaura con `mockRestore()` manual al final de cada test; si una aserción falla antes, el espía se filtra a tests posteriores y silencia la señal.
 
 ### F2 persistencia (`pedidos-whatsapp-persistencia.md`)
-- [ ] **F2-R1** (test) — Carreras del handler sin test: multi-moneda (`EnsureSingleCurrency`) y `DeliveryType` fuera del enum.
-- [ ] **F2-R2** (test) — Persistencia nueva solo con Moq (integración real).
-- [ ] **F2-R3** (test) — Grant de feature 123 por tienda sin test.
-- [ ] **F2-R4** (test) — Tests estructurales por reflexión.
-- [ ] **F2-R5** (defecto · migración) — Índice único `StoreCatalogSettings.StoreId` no parcial vs soft-delete.
-- [ ] **F2-R6** (defecto · migración) — `Down()` del backfill borra toda fila `FeatureId=123`.
+- [x] **F2-R1** (test) — Carreras del handler sin test: multi-moneda (`EnsureSingleCurrency`) y `DeliveryType` fuera del enum.
+  - **Cerrado (2026-10-09).** 4 casos en `CreateOnlineOrderCommandHandlerTests`, cada uno con su status
+    y su mensaje: carrito multi-moneda → 400 `OnlineOrderMixedCurrencies` sin llegar a escribir; su
+    control positivo (dos productos de la MISMA moneda sí entran); y `[Theory]` -1/2/999 →
+    400 `OnlineOrderDeliveryTypeInvalid` antes de leer el carrito (`GetPublishedByIdsAsync` `Never`).
+- [x] **F2-R2** (test) — Persistencia nueva solo con Moq (integración real).
+  - **Cerrado (2026-10-09)** con `Orders/OnlineOrderingPersistenceE2ETests.cs` (**archivo nuevo**,
+    `WebAppFixture`, 7 casos contra `smca_test`): `UpsertAsync` INSERT **y** UPDATE con la sonda del
+    `NoTracking` delante, `CodeExistsAsync` con la sonda de que el filtro global sí es SQL,
+    `GetByCodeAsync` con sus líneas y su filtro por tenant, y las **cuatro** puertas de publicación de
+    `GetPublishedByIdsAsync`. Detalle y evidencia en `pedidos-whatsapp-persistencia.md`.
+- [x] **F2-R3** (test) — Grant de feature 123 por tienda sin test.
+  - **Cerrado (2026-10-09)** en `StoreRoleFeatureGeneratorTests`: el test modela la media etapa que el
+    generador no puede ver (módulo activo → featureIds, con el criterio de `AllowedFeaturesService`) y
+    afirma 123 para OwnerAdmin + StoreUser; el caso contrario (módulo 18) fija que el grant **no** se
+    arrastra. Nota: el hallazgo decía «módulo 18»; desde el 2026-10-08 (M3) la feature 123 está en el
+    módulo 20.
+- [x] **F2-R4** (test) — Tests estructurales por reflexión.
+  - **Cerrado (2026-10-09), sin reflexión y más fuerte.** Los tests deserializan ahora **cuerpos JSON
+    reales** con `code`/`total`/`price`/`currency` colados usando `JsonSerializerDefaults.Web` (las
+    opciones del binding de ASP.NET Core) y exigen que el comando resultante sea idéntico al del cuerpo
+    limpio. Tres de ellos eran por reflexión —los dos del hallazgo y un tercero (`WhatsappNumber`)
+    cuyo comentario además decía «por comportamiento»—, y los tres solo miraban una lista de nombres:
+    un `Importe` colado en el contrato pasaba el test.
+- [x] **F2-R5** (defecto · migración) — Índice único `StoreCatalogSettings.StoreId` no parcial vs soft-delete.
+  - **Reclasificado como falso positivo.** La premisa no se da: `StoreCatalogSettings` **no es
+    soft-deletable**. Su único `HasQueryFilter` es por **tenant** (sin `x.IsActive`), no hay
+    `IDeleteableEntity` ni borrado lógico, y el `AnyAsync` del upsert (con `IgnoreQueryFilters`)
+    encuentra la fila dada de baja: el guardado va por la rama del UPDATE y el índice único nunca llega
+    a evaluarse frente a un segundo INSERT. Sin migración. Fijado contra PostgreSQL con
+    `R2_3_an_inactive_row_stays_visible_and_the_upsert_reactivates_it_in_place`.
+- [x] **F2-R6** (defecto · migración) — `Down()` del backfill borra toda fila `FeatureId=123`.
+  - **Reclasificado como falso positivo.** El borrado amplio es obligatorio: el `Down()` de
+    `20261007021020_…` también ejecuta el `DeleteData` generado de la fila de catálogo 123 y
+    `StoreRoleFeature.FeatureId` es **Restrict**, así que cualquier fila 123 que sobreviviera rompe el
+    rollback con violación de FK; las migraciones posteriores (19/20) se revierten antes en la cadena y
+    no tocan esas filas. Mismo razonamiento que M-R3-003. **Pendiente de aviso:** el comentario «ONLY»
+    de `OnlineOrdersRoleFeatureBackfill.DownStoreRoleFeatureSql` no es del todo exacto, pero está en
+    `Infrastructure/Migrations/**` (producción) y queda **fuera de la superficie autorizada**.
 
 ### F1 config (`pedidos-whatsapp-config.md`)
 - [ ] **F1-R1..R9** (mix) — Ruta/permiso sin test; `PaletteId` vacío; `MaximumLength` vs `Trim`; `StoreId` no-Guid; coerción monetaria; reload tras guardar; error de carga inicial; `formatSyncedAt`; selectores por testid vs role/label.
@@ -240,3 +273,22 @@ Review `review-808d9dda34fad1da` **APROBADA** (3 advisory, ninguno bloqueante; a
   - [ ] **R3-CATALOG-SCOPE** (WARNING · reliability) — El restore borra **cualquier** par ausente del snapshot (global), no solo lo que movió `UpSql`; sensible al orden de tests.
   - [ ] **R3-CATALOG-LOSSY** (WARNING · reliability) — El reinsert manda solo `PlanId`/`ModuleId`; si la tabla tuviera más estado persistido, el snapshot no sería fiel (hoy solo tiene esas 2 columnas → sin efecto).
   - [ ] **R2-001/R2-002/R2-003** (readability) — Tres copias de la misma proyección EF; tipo anónimo/tuplas junto al `record`; SQL crudo con nombres de tabla/columna hardcodeados.
+- 2026-10-09 — **Slice F2 persistencia cerrado (F2-R1..F2-R6).** R1, R3 y R4 son tests nuevos;
+  R2 es un E2E **nuevo** (`Orders/OnlineOrderingPersistenceE2ETests.cs`, 7 casos contra `smca_test`)
+  porque la persistencia de F2 —`UpsertAsync`, `CodeExistsAsync`/`GetByCodeAsync` y
+  `GetPublishedByIdsAsync`— solo estaba probada con Moq; R5 y R6 quedan **documentados como falsos
+  positivos** con evidencia, sin migración ni cambio de producción. R4 además se apoyó en una idea que
+  salió de F4-R4: dejar de afirmar la FORMA del contrato y afirmar lo que hace el **binding** con el
+  cuerpo real (`JsonSerializerDefaults.Web`), que es donde un cliente anónimo intentaría colar el
+  precio o el código. El E2E reutiliza `PublicOrderingSeed` **sin tocarlo** y, por la lección del crash
+  del 2026-10-09, no toca el catálogo: siembra y limpia en `finally`, con `IgnoreQueryFilters`, en orden
+  de FK. Superficie: los tres archivos de test del backend y un E2E nuevo. Sin commit (writer acotado).
+  Verificación observada: `dotnet build src/SMCA.sln` → **Build succeeded**, 0 errors, sin `error MSB`;
+  `Domain.UnitTests --filter StoreRoleFeatureGeneratorTests` → **14/14** (suite completa **165/165**);
+  `Application.Tests --filter OnlineOrdering` → **388/388** (suite completa **1166/1166**);
+  `OnlineOrderingPersistenceE2ETests` → **7/7** con la línea `[E2E Guard] … Database=smca_test`, y
+  `--filter E2ETests.Orders` (los 4 archivos de la carpeta) → **17/17**. Auditoría de `smca_test` tras
+  la corrida: `StorePlanModule` 19/20 = **4**, `Feature 123` → `ModuleId` **20**, **0** filas E2E
+  remanentes. Sonda de mutación dentro de la superficie: los mensajes esperados de los dos rechazos
+  nuevos cambiados por una cadena inexistente → **4 fallos y solo esos 4**; revertido. Sin pendientes
+  fuera de superficie salvo el comentario «ONLY» de `OnlineOrdersRoleFeatureBackfill` (producción).

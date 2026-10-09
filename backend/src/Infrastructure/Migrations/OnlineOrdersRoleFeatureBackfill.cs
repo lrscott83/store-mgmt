@@ -78,7 +78,11 @@ namespace Infrastructure.Migrations
             """;
 
         /// <summary>
-        /// Down() half of the backfill: remove ONLY the StoreRoleFeature rows this migration created.
+        /// Down() half of the backfill: remove ALL the StoreRoleFeature rows of feature 123 — which
+        /// IS the set this migration owns. The generated Down also deletes the feature 123 catalog
+        /// row, and <c>StoreRoleFeature.FeatureId</c> is <c>Restrict</c>, so no grant may survive;
+        /// the migrations created after this one are reverted BEFORE it in the chain, so no later
+        /// grant can still be present here. Scoping the DELETE would break the rollback.
         /// The feature 123 catalog row is EF's business — the generated <c>DeleteData(table: "Feature",
         /// keyValue: 123)</c> removes it, so this constant must not delete it too.
         /// <para>
