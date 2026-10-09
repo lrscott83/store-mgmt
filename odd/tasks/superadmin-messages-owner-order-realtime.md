@@ -139,8 +139,15 @@ delegated verification gate and a parent spot check.
   R3-PUSH-HANDLER-NO-PAYLOAD (SUGGESTION — the push test fires the handler with
   no payload).
 
+- 2026-10-09 (3): the two follow-up advisories closed in `3cd81f38` (tests only):
+  a NEW backend E2E `SuperAdminConversationUnreadCountTests` asserts the batched
+  unread count (2 → 1 → 0) and the missing-means-zero default, and the
+  message-shell push test fires the `ReceiveMessage` handler with a realistic
+  payload. `review assess` on `1fed7635..3cd81f38` returned `under_budget`
+  (no review due).
+
 ## Next step
 
-Feature (`7bdbde78`) and fixes (`1fed7635`) committed on `test`. The two new
-advisories are separate later work. Await the user's decision on pushing/delivery
-under ordinary repository policy.
+All four original findings and the two follow-up advisories are closed. Commits
+`7bdbde78`, `1fed7635`, `297f1f3b`, `3cd81f38` on `test`. Await the user's
+decision on pushing/delivery under ordinary repository policy.
