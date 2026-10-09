@@ -538,11 +538,19 @@ const messages: Record<string, string> = {
   'CATALOG_PUBLIC.ZOOM_IN': 'Ampliar imagen',
   'CATALOG_PUBLIC.ZOOM_OUT': 'Reducir imagen',
   'CATALOG_PUBLIC.FOOTER': 'Catálogo publicado con VendeDTo',
-  // Marca (F8): logo y banner de la cabecera. El texto alternativo nombra a la tienda, que es
-  // de whom es la imagen; la ausencia de logo o banner NO es un error (una tienda puede no
-  // tenerlos), así que no hay ningún aviso para ese caso.
+  // Marca (F8): solo el logo de la cabecera —el BANNER se retiró de la carta el 2026-10-08 por
+  // decisión del owner, sin tocar el dato ni el backend—. El texto alternativo nombra a la
+  // tienda, de quien es la imagen; la ausencia de logo NO es un error (una tienda puede no
+  // tenerlo), así que no hay ningún aviso para ese caso.
   'CATALOG_PUBLIC.LOGO_ALT': 'Logo de {store}',
-  'CATALOG_PUBLIC.BANNER_ALT': 'Banner de {store}',
+  // ── NAVEGACIÓN por secciones de la carta pública (decisión del owner, 2026-10-08) ────────
+  // Tres secciones, ni una más: "Categorías" es un FILTRO, no una sección. La cabecera es fija,
+  // así que cada destino lleva `scroll-mt-24` para que no quede bajo el header.
+  'CATALOG_PUBLIC.NAV_HOME': 'Inicio',
+  'CATALOG_PUBLIC.NAV_FEATURED': 'Destacados',
+  'CATALOG_PUBLIC.NAV_PRODUCTS': 'Productos',
+  'CATALOG_PUBLIC.NAV_LABEL': 'Secciones de la tienda',
+  'CATALOG_PUBLIC.MENU': 'Menú',
   // ── SHOWCASE de la carta pública: carrusel de portada, botón "Ver productos" y destacados ──
   // Todo esto es opcional (C2): sin imágenes el catálogo es exactamente el de siempre, así que
   // no hay ningún texto de aviso para ese caso. El texto alternativo de una imagen del showcase es
@@ -561,7 +569,13 @@ const messages: Record<string, string> = {
   // ── Carrito y pedido del cliente anónimo (F3) ─────────────────────────────────────────────
   // El carrito del STOREFRONT (`lizoft-catalog-cart`), no el del POS (`lizoft-cart`): el cliente
   // anónimo no tiene sesión ni tienda, así que sus claves no mezclan con las del vendedor.
+  // `ADDED_TO_CART` sustituye al aviso estático del header (`CART_ADDED`, 2026-10-08): la
+  // confirmación va al toast global, que es el sistema de avisos de la app.
   'CATALOG_PUBLIC.ADD_TO_CART': 'Añadir',
+  // El botón de la tarjeta es ya SOLO un ícono (2026-10-08), así que su texto alternativo tiene
+  // que decir QUÉ añade: sin `{name}` un `aria-label` no llevaría el producto.
+  'CATALOG_PUBLIC.ADD_TO_CART_PRODUCT': 'Añadir {name} al carrito',
+  'CATALOG_PUBLIC.ADDED_TO_CART': 'Añadido al carrito de venta',
   'CATALOG_PUBLIC.CART_BUTTON': 'Ver mi pedido',
   'CATALOG_PUBLIC.CART_TITLE': 'Tu pedido',
   'CATALOG_PUBLIC.CART_EMPTY': 'Tu pedido está vacío.',
@@ -1453,6 +1467,7 @@ const messages: Record<string, string> = {
   'MODULE_CATALOG.LOADING': 'Cargando módulos...',
   'MODULE_CATALOG.EMPTY': 'No hay módulos disponibles en el catálogo.',
   'MODULE_CATALOG.NO_PLAN_GROUP': 'Otros planes',
+  'MODULE_CATALOG.COLUMN_ACTIVE': 'Activo',
   'MODULE_CATALOG.COLUMN_MODULE': 'Módulo',
   'MODULE_CATALOG.COLUMN_PRICE': 'Precio',
   'MODULE_CATALOG.COLUMN_PERCENT_DISCOUNT': '% Descuento',

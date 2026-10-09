@@ -13,18 +13,20 @@ using System.Net;
 namespace Application.Features.Administration.Modules.Commands.UpdateModuleCatalogPricing
 {
     /// <summary>
-    /// One row of the catalog pricing save: a module id and the three editable
-    /// GLOBAL catalog price fields.
+    /// One row of the catalog pricing save: a module id, the three editable
+    /// GLOBAL catalog price fields, and the module's activation flag.
     /// </summary>
     public sealed record ModuleCatalogPricingRequest(
         int ModuleId,
         float Price,
         float DiscountPrice,
-        float PercentDiscountPrice);
+        float PercentDiscountPrice,
+        bool IsActive);
 
     /// <summary>
-    /// SuperAdmin authors the GLOBAL module catalog prices: base price, flat discount and
-    /// percent discount, for every module in one save.
+    /// SuperAdmin authors the GLOBAL module catalog prices — base price, flat discount,
+    /// percent discount — and each module's activation flag (<c>IsActive</c>), for every
+    /// module in one save.
     /// <para>
     /// This edits the <c>Module</c> catalog itself — the prices seed migrations and the
     /// SuperAdmin catalog page are built on. It is NOT the per-store capability
@@ -33,11 +35,11 @@ namespace Application.Features.Administration.Modules.Commands.UpdateModuleCatal
     /// deliberately separate so editing the catalog can never silently reprice a store.
     /// </para>
     /// <para>
-    /// SCOPE — exactly three fields move: <c>Price</c>, <c>DiscountPrice</c> and
-    /// <c>PercentDiscountPrice</c>. The catalog's structural flags — <c>IsActive</c>,
+    /// SCOPE — four fields move: <c>Price</c>, <c>DiscountPrice</c>,
+    /// <c>PercentDiscountPrice</c> and <c>IsActive</c>. The remaining structural flags —
     /// <c>AvailableToStore</c>, <c>PriceIncluded</c>, <c>Name</c>, <c>Order</c> — are read
-    /// and written back unchanged, so a pricing save can never publish, hide, re-bundle or
-    /// rename a module. Those flags have their own endpoints.
+    /// and written back unchanged, so a pricing save can never publish to store, re-bundle
+    /// or rename a module. Those flags have their own endpoints.
     /// </para>
     /// <para>
     /// FAIL-CLOSED — existence is decided for the WHOLE payload before a single row is
@@ -97,10 +99,11 @@ namespace Application.Features.Administration.Modules.Commands.UpdateModuleCatal
             {
                 var module = catalog[row.ModuleId];
 
-                // The only three fields this endpoint owns.
+                // The four fields this endpoint owns.
                 module.Price = row.Price;
                 module.DiscountPrice = row.DiscountPrice;
                 module.PercentDiscountPrice = row.PercentDiscountPrice;
+                module.IsActive = row.IsActive;
 
                 // NoTracking-safe: ApplicationDbContext sets QueryTrackingBehavior.NoTracking
                 // globally, so the entity read above is detached and a bare SaveChangesAsync

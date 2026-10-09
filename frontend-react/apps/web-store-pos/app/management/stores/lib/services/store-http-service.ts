@@ -213,6 +213,18 @@ export const storeHttpService = {
   },
 
   /**
+   * The SuperAdmin catalog editor's read (GET /v1/modules/catalog): every module available
+   * to stores — ACTIVE OR NOT. Unlike `getModulesToStore()`, it does NOT filter `IsActive`,
+   * so a deactivated module stays listed and its checkbox can switch it back on. Backs
+   * `updateModulePricing` (PUT /v1/modules/pricing), whose payload now also carries
+   * `isActive`.
+   */
+  async getModuleCatalog(): Promise<BaseResponseModel<Module[]>> {
+    const response = await apiClient.get<BaseResponseModel<Module[]>>('/v1/modules/catalog');
+    return response.data;
+  },
+
+  /**
    * SuperAdmin authors the GLOBAL module catalog prices (PUT /v1/modules/pricing): the
    * base price, the flat discount and the percent discount of every module in one save.
    *

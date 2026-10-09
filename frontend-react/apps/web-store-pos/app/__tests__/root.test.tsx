@@ -31,11 +31,19 @@ afterEach(() => {
 const mockNavigate = vi.fn();
 const mockRegisterAuthRedirect = vi.fn();
 
+// Navegar dentro de la SPA cambia la ruta sin recargar, y `MemoryRouter` sólo lee
+// `initialEntries` al montar: para que un test pueda observar ese cambio se sustituye
+// `useLocation` aquí. Vale `null` en todos los tests que no lo tocan, de modo que siguen viendo
+// la ubicación real del router. Se lee dentro del closure (no al construir el mock), así que el
+// hoisting de `vi.mock` no lo pilla mientras siga en su zona muerta.
+let locationPathname: string | null = null;
+
 vi.mock('react-router', async (importOriginal) => {
   const actual = await importOriginal<typeof import('react-router')>();
   return {
     ...actual,
     useNavigate: () => mockNavigate,
+    useLocation: () => (locationPathname ? { pathname: locationPathname } : actual.useLocation()),
     // `Meta`/`Links` need the framework-mode router context that only the real dev/SSR
     // server provides (`<HydratedRouter>`); Vitest never runs that server. They render
     // nothing user-visible, so they're stubbed as no-ops here to let `Layout` render in
@@ -116,6 +124,7 @@ vi.mock('react-toastify', () => ({
 
 import App, { ErrorBoundary, Layout } from '../root';
 import { logClientError } from '~/shared/lib/diagnostics/client-log';
+import { registerServiceWorker } from '~/shared/lib/pwa/service-worker-registration';
 
 function mockRouteError(status: number, statusText = '') {
   return { status, statusText, internal: false, data: null };
@@ -214,6 +223,110 @@ describe('App (root) — global PWA install button (Angular app.component parity
     );
 
     expect(screen.getByRole('button', { name: /instalar app/i })).toBeInTheDocument();
+  });
+
+  // EXCEPCIÓN del catálogo público: el botón no se ofrece al cliente final anónimo de la
+  // tienda. root.tsx lo decide con `isPublicCatalogPath` — el MISMO predicado que decide el
+  // registro del service worker más abajo, que es donde la regla se había quedado a medias.
+  it('hides the "Instalar App" button on the public catalog', () => {
+    render(
+      <MemoryRouter initialEntries={['/catalog/mi-tienda']}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    expect(screen.queryByRole('button', { name: /instalar app/i })).not.toBeInTheDocument();
+  });
+
+  // "/sales/web-catalog" contiene "catalog" pero es la admin del módulo dentro del POS: el
+  // botón del POS debe seguir apareciendo ahí.
+  it('still renders the button on a POS route that merely contains "catalog"', () => {
+    render(
+      <MemoryRouter initialEntries={['/sales/web-catalog']}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole('button', { name: /instalar app/i })).toBeInTheDocument();
+  });
+});
+
+// La otra mitad de la MISMA regla (root.tsx: el botón la aplicaba, `registerServiceWorker()`
+// no — de ahí el diálogo "¡Nueva versión disponible!" ante el visitante anónimo del catálogo).
+// El efecto arma su temporizador de 5 s, así que estos casos avanzan el reloj para comprobar
+// que la exclusión se decide de verdad y no sólo "todavía no ha registrado".
+describe('App (root) — the public catalog never registers the POS service worker', () => {
+  function renderAt(path: string) {
+    return render(
+      <MemoryRouter initialEntries={[path]}>
+        <App />
+      </MemoryRouter>,
+    );
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useLoadingStore.setState({ count: 0, isLoading: false });
+    vi.useFakeTimers();
+    locationPathname = null;
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    locationPathname = null;
+  });
+
+  it('never calls registerServiceWorker on a public catalog path, not even after the 5s delay', () => {
+    renderAt('/catalog/mi-tienda');
+
+    vi.advanceTimersByTime(5000);
+
+    expect(registerServiceWorker).not.toHaveBeenCalled();
+  });
+
+  it('still registers once on the POS root, and only after the 5s delay', () => {
+    renderAt('/');
+
+    vi.advanceTimersByTime(4000);
+    expect(registerServiceWorker).not.toHaveBeenCalled();
+
+    vi.advanceTimersByTime(1000);
+    expect(registerServiceWorker).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not mistake a POS route that merely contains "catalog" for the public storefront', () => {
+    renderAt('/sales/web-catalog');
+
+    vi.advanceTimersByTime(5000);
+
+    expect(registerServiceWorker).toHaveBeenCalledTimes(1);
+  });
+
+  it('registers once even when the SPA navigates to the catalog and back', () => {
+    // `registerServiceWorker` cablea `registerSW` —y con él `onNeedRefresh` y el poll de 5
+    // min— UNA vez por llamada; llamarlo dos veces duplicaría ambos. El efecto es de
+    // arranque (`[]`, como `ngOnInit` en Angular), así que POS → catálogo → POS dentro de la
+    // SPA no vuelve a registrar. (La navegación dentro del catálogo la cubre la guarda de
+    // `onNeedRefresh`: el SW ya estaba registrado cuando se entra en la carta.)
+    locationPathname = '/';
+    // Un elemento NUEVO en cada render: reusar la misma referencia hace que React saltee el
+    // subárbol entero (`bailoutOnAlreadyFinishedWork`) y el test no observaría nada.
+    const tree = () => (
+      <MemoryRouter>
+        <App />
+      </MemoryRouter>
+    );
+    const { rerender } = render(tree());
+    vi.advanceTimersByTime(5000);
+    expect(registerServiceWorker).toHaveBeenCalledTimes(1);
+
+    for (const path of ['/sales/new', '/catalog/mi-tienda', '/sales/new']) {
+      locationPathname = path;
+      rerender(tree());
+      vi.advanceTimersByTime(5000);
+    }
+
+    expect(registerServiceWorker).toHaveBeenCalledTimes(1);
   });
 });
 

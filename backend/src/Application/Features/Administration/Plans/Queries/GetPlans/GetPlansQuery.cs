@@ -46,6 +46,15 @@ namespace Application.Features.Administration.Plans.Queries.GetPlans
                 plans = plans.Where(p => p.Id != (int)StorePlanType.VIP);
 
             IEnumerable<PlanDto> planDtos = _mapper.Map<IEnumerable<PlanDto>>(plans).ToList();
+
+            // Plan-module activation: a module switched off in the catalog must vanish from
+            // every plan's panel (the owner's store-plan view AND the SuperAdmin one), so the
+            // operator only ever sees ACTIVE modules. The plan's Price already excludes
+            // inactive modules (ModulePriceCalculator), so only the visible list is filtered
+            // here. Done on the mapped DTOs so the repository stays a plain read.
+            foreach (var plan in planDtos)
+                plan.Modules = plan.Modules.Where(module => module.IsActive).ToList();
+
             return ResponseResult.Success(planDtos);
         }
     }

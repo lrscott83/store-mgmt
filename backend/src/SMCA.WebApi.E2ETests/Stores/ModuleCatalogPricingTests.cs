@@ -65,12 +65,12 @@ public sealed class ModuleCatalogPricingTests
 
     // ── Payload / row shapes ──────────────────────────────────────────────
 
-    private sealed record PricingRow(int ModuleId, float Price, float DiscountPrice, float PercentDiscountPrice);
+    private sealed record PricingRow(int ModuleId, float Price, float DiscountPrice, float PercentDiscountPrice, bool IsActive = true);
 
     private sealed record ModuleRow(int Id, string Name, bool IsActive, bool AvailableToStore,
         bool PriceIncluded, float Price, float DiscountPrice, float PercentDiscountPrice);
 
-    private sealed record ModuleSnapshot(int Id, float Price, float DiscountPrice, float PercentDiscountPrice);
+    private sealed record ModuleSnapshot(int Id, float Price, float DiscountPrice, float PercentDiscountPrice, bool IsActive);
 
     private static object PricingBody(IEnumerable<PricingRow> rows) => new
     {
@@ -79,7 +79,8 @@ public sealed class ModuleCatalogPricingTests
             r.ModuleId,
             r.Price,
             r.DiscountPrice,
-            r.PercentDiscountPrice
+            r.PercentDiscountPrice,
+            r.IsActive
         }).ToList()
     };
 
@@ -151,7 +152,7 @@ public sealed class ModuleCatalogPricingTests
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         return await db.Set<Module>().IgnoreQueryFilters()
             .Where(m => moduleIds.Contains(m.Id))
-            .Select(m => new ModuleSnapshot(m.Id, m.Price, m.DiscountPrice, m.PercentDiscountPrice))
+            .Select(m => new ModuleSnapshot(m.Id, m.Price, m.DiscountPrice, m.PercentDiscountPrice, m.IsActive))
             .ToListAsync();
     }
 
@@ -172,7 +173,8 @@ public sealed class ModuleCatalogPricingTests
                 .ExecuteUpdateAsync(set => set
                     .SetProperty(m => m.Price, s.Price)
                     .SetProperty(m => m.DiscountPrice, s.DiscountPrice)
-                    .SetProperty(m => m.PercentDiscountPrice, s.PercentDiscountPrice));
+                    .SetProperty(m => m.PercentDiscountPrice, s.PercentDiscountPrice)
+                    .SetProperty(m => m.IsActive, s.IsActive));
         }
     }
 
@@ -300,11 +302,11 @@ public sealed class ModuleCatalogPricingTests
     }
 
     // ══════════════════════════════════════════════════════════════════════
-    // 3. Only the three pricing fields move
+    // 3. The prices move; the other catalog flags are untouched
     // ══════════════════════════════════════════════════════════════════════
 
     [Fact]
-    public async Task Put_changes_only_the_three_prices_and_leaves_the_catalog_flags_intact()
+    public async Task Put_changes_the_prices_and_leaves_the_non_pricing_catalog_flags_intact()
     {
         var saLogin = $"mcp-sa-{Guid.NewGuid():N}@test.com";
         var saId = await DbTestHelpers.SeedSuperAdminAsync(_f, saLogin, "Password123");
@@ -345,9 +347,11 @@ public sealed class ModuleCatalogPricingTests
             bundled.DiscountPrice.Should().BeApproximately(3f, Tolerance);
             bundled.PercentDiscountPrice.Should().BeApproximately(4f, Tolerance);
 
-            // Every structural flag survived — in BOTH directions, so neither "stayed true"
-            // nor "stayed false" can be an accident of the seed.
-            unbundled.IsActive.Should().BeTrue();
+            // Every flag the save does NOT own survived — in BOTH directions, so neither
+            // "stayed true" nor "stayed false" can be an accident of the seed. IsActive is
+            // NOT in the price rule's untouched set anymore: the save owns it now, and the
+            // payload above defaulted it to true, so the module must remain active.
+            unbundled.IsActive.Should().BeTrue("a payload that says active leaves it active");
             unbundled.AvailableToStore.Should().BeTrue();
             unbundled.PriceIncluded.Should().BeFalse();
             unbundled.Name.Should().Be(nameBefore, "a pricing save must never rename a module");
@@ -534,6 +538,54 @@ public sealed class ModuleCatalogPricingTests
             var after = await GetModuleRowAsync(StatisticsModuleId);
             after.Price.Should().BeApproximately(before.Price, Tolerance,
                 "a rejected payload must never reach the catalog");
+        }
+        finally
+        {
+            await RestorePricingAsync(snapshot);
+            await DbTestHelpers.CleanupUserAsync(_f, saId);
+        }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    // 8. The activation flag is OWNED by the save (admin-module-activation-toggle)
+    // ══════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// The pricing save now also writes <c>IsActive</c>, so the SuperAdmin catalog editor's
+    /// checkbox persists. Deactivating drops the module from the store-planning read
+    /// (GET /v1/modules/ToStore), which is the universe store plan editing uses; reactivating
+    /// brings it back. The snapshot/restore covers IsActive too, so the shared seed is left
+    /// exactly as it was found.
+    /// </summary>
+    [Fact]
+    public async Task Put_applies_the_activation_flag_and_the_catalog_read_drops_the_inactive_module()
+    {
+        var saLogin = $"mcp-sa-{Guid.NewGuid():N}@test.com";
+        var saId = await DbTestHelpers.SeedSuperAdminAsync(_f, saLogin, "Password123");
+        var snapshot = await SnapshotPricingAsync(StatisticsModuleId);
+        try
+        {
+            await AssertCatalogPreconditionsAsync();
+            var client = DbTestHelpers.AuthedClient(_f, saId, saLogin);
+
+            // Deactivate through the pricing save, the editor's own endpoint.
+            var off = await PutPricingAsync(client,
+                new[] { new PricingRow(StatisticsModuleId, 50f, 0f, 0f, IsActive: false) });
+
+            // The echo reports the persisted flag...
+            off.Data!.Modules.Should().ContainSingle().Which.IsActive.Should().BeFalse();
+            // ...the database agrees...
+            (await GetModuleRowAsync(StatisticsModuleId)).IsActive.Should().BeFalse();
+            // ...and the store-planning read no longer offers the module.
+            (await GetToStoreAsync(client)).Should().NotContain(m => m.Id == StatisticsModuleId,
+                "a deactivated module must leave the store-planning universe");
+
+            // Reactivating brings it back — the checkbox is bidirectional.
+            await PutPricingAsync(client,
+                new[] { new PricingRow(StatisticsModuleId, 50f, 0f, 0f, IsActive: true) });
+            (await GetModuleRowAsync(StatisticsModuleId)).IsActive.Should().BeTrue();
+            (await GetToStoreAsync(client)).Should().Contain(m => m.Id == StatisticsModuleId,
+                "reactivating the module restores it to the store-planning universe");
         }
         finally
         {

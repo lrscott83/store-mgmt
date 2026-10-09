@@ -18,8 +18,13 @@ import { formatPlanAmount, formatPlanPrice } from '~/shared/lib/price-utils';
 export interface ModuleCatalogRow {
   moduleId: number;
   name: string;
-  /** The two flags `isBillableModule` reads — from `ModuleDto`, never from the operator. */
+  /**
+   * The module's catalog activation switch. It is ONE of the two flags the price rule reads
+   * (`isBillableModule`), so an inactive row drops out of every total — and, unlike the
+   * other flag, the OPERATOR owns it through the checkbox at the start of the row.
+   */
   isActive: boolean;
+  /** Server-owned: the operator edits prices and activation, never the bundle flag. */
   priceIncluded: boolean;
   price: string;
   discountPrice: string;
@@ -87,6 +92,8 @@ interface ModuleCatalogTableProps {
   plans: Plan[];
   disabled: boolean;
   onChangeField: (moduleId: number, field: ModuleCatalogField, value: string) => void;
+  /** Flips a module's catalog activation — the checkbox at the start of each row. */
+  onToggleActive: (moduleId: number, isActive: boolean) => void;
 }
 
 const COLUMN_CLASS = 'py-1.5 px-2';
@@ -120,7 +127,13 @@ const INPUT_CLASS =
  * Presentational on purpose: the host route owns the fetch, the draft and the save, so the
  * error and busy states are the parent's exactly as on the other admin pages.
  */
-export function ModuleCatalogTable({ rows, plans, disabled, onChangeField }: ModuleCatalogTableProps) {
+export function ModuleCatalogTable({
+  rows,
+  plans,
+  disabled,
+  onChangeField,
+  onToggleActive,
+}: ModuleCatalogTableProps) {
   const intl = useIntl();
   const t = (id: string) => intl.formatMessage({ id });
 
@@ -176,6 +189,9 @@ export function ModuleCatalogTable({ rows, plans, disabled, onChangeField }: Mod
       <table className="w-full border-collapse text-left" data-testid="module-catalog-table">
         <thead>
           <tr className="border-b border-border text-xs uppercase text-text-muted">
+            <th scope="col" className={`${COLUMN_CLASS} w-12`}>
+              {t('MODULE_CATALOG.COLUMN_ACTIVE')}
+            </th>
             <th scope="col" className={COLUMN_CLASS}>
               {t('MODULE_CATALOG.COLUMN_MODULE')}
             </th>
@@ -208,7 +224,7 @@ export function ModuleCatalogTable({ rows, plans, disabled, onChangeField }: Mod
               <tr>
                 <th
                   scope="colgroup"
-                  colSpan={5}
+                  colSpan={6}
                   className="bg-surface-hover px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-text-muted"
                   data-testid={`module-catalog-group-${key}`}
                 >
@@ -220,6 +236,16 @@ export function ModuleCatalogTable({ rows, plans, disabled, onChangeField }: Mod
                 const offer = isOnOffer(row);
                 return (
                   <tr key={row.moduleId} className="border-b border-border/60">
+                    <td className={COLUMN_CLASS}>
+                      <input
+                        type="checkbox"
+                        checked={row.isActive}
+                        disabled={disabled}
+                        onChange={(e) => onToggleActive(row.moduleId, e.target.checked)}
+                        aria-label={`${t('MODULE_CATALOG.COLUMN_ACTIVE')}: ${row.name}`}
+                        data-testid={`module-catalog-active-${row.moduleId}`}
+                      />
+                    </td>
                     <td className={`${COLUMN_CLASS} text-sm font-medium text-text`}>{row.name}</td>
                     <td className={COLUMN_CLASS}>
                       {priceInput(row, 'price', t('MODULE_CATALOG.COLUMN_PRICE'))}
@@ -255,7 +281,7 @@ export function ModuleCatalogTable({ rows, plans, disabled, onChangeField }: Mod
               <tr className="border-t-2 border-border">
                 <th
                   scope="row"
-                  colSpan={4}
+                  colSpan={5}
                   className={`${COLUMN_CLASS} text-right text-sm font-semibold text-text`}
                 >
                   {t('MODULE_CATALOG.GROUP_TOTAL')}

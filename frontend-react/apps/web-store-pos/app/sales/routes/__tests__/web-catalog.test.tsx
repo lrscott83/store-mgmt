@@ -132,14 +132,11 @@ const BRAND_WITHOUT_MEDIA: CatalogBranding = { logoKey: null, bannerKey: null, p
 
 const BRAND_WITH_MEDIA: CatalogBranding = {
   logoKey: 't/s/branding/logo.png',
+  // El backend SIGUE devolviendo `bannerKey` y el tipo lo sigue exigiendo (D10: ni dato ni
+  // endpoint se tocan). Lo que se retiró el 2026-10-08 es el CONTROL, así que esta clave viaja
+  // hasta el cliente y la vista la ignora — el fixture la conserva a propósito.
   bannerKey: 't/s/branding/banner.png',
   paletteId: 'default',
-};
-
-/** Lo que el servidor devuelve tras un PUT PARCIAL que solo quitó el logo. */
-const BRAND_WITH_BANNER_ONLY: CatalogBranding = {
-  ...BRAND_WITH_MEDIA,
-  logoKey: null,
 };
 
 /** Los DOS conjuntos con una imagen cada uno: sirven para comprobar que NO se mezclan. */
@@ -650,7 +647,7 @@ describe('WebCatalogPage (vista Catálogo Web)', () => {
   // ── MARCA (F8) ────────────────────────────────────────────────────────────────────
   // El PUT de marca es un PARCHE y el de productos es un LOTE: los dos botones son
   // independientes y ninguna prueba de esta sección toca el guardado por lotes.
-  describe('marca del catálogo (logo y banner)', () => {
+  describe('marca del catálogo (solo el logo)', () => {
     it('carga la marca al montar y no pinta previsualización si la tienda no tiene', async () => {
       renderPage();
 
@@ -658,12 +655,11 @@ describe('WebCatalogPage (vista Catálogo Web)', () => {
       expect(catalogMock.getBranding).toHaveBeenCalledTimes(1);
       // Sin clave guardada no hay <img>: no se reserva espacio ni se adivina una URL.
       expect(screen.queryByTestId('brand-logo')).not.toBeInTheDocument();
-      expect(screen.queryByTestId('brand-banner')).not.toBeInTheDocument();
       // Y sin cambios pendientes su botón no se puede pulsar.
       expect(screen.getByTestId('brand-save')).toBeDisabled();
     });
 
-    it('previsualiza el logo y el banner ya guardados por el endpoint público de media', async () => {
+    it('previsualiza el logo ya guardado por el endpoint público de media', async () => {
       catalogMock.getBranding.mockResolvedValue(envelope(BRAND_WITH_MEDIA));
       renderPage();
 
@@ -672,32 +668,36 @@ describe('WebCatalogPage (vista Catálogo Web)', () => {
         'src',
         `${window.location.origin}/api/v1/public/catalog/mi-tienda/media/t/s/branding/logo.png`,
       );
-      expect(screen.getByTestId('brand-banner')).toHaveAttribute(
-        'src',
-        `${window.location.origin}/api/v1/public/catalog/mi-tienda/media/t/s/branding/banner.png`,
-      );
     });
 
-    it('elegir logo y banner los retiene sin tocar la red hasta pulsar Guardar marca', async () => {
+    it('ya NO existe ningún control de banner en la configuración (D3)', async () => {
+      catalogMock.getBranding.mockResolvedValue(envelope(BRAND_WITH_MEDIA));
+      renderPage();
+
+      await screen.findByTestId('brand-logo');
+      expect(screen.queryByTestId('brand-slot-banner')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('brand-banner-upload')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('brand-banner-remove')).not.toBeInTheDocument();
+      // El backend sigue devolviendo `bannerKey` y aceptándolo (D10): solo se retiró el control.
+      expect(screen.queryByTestId('brand-slot-logo')).toBeInTheDocument();
+      expect(document.querySelector('img[src*="banner"]')).toBeNull();
+    });
+
+    it('elegir el logo lo retiene sin tocar la red hasta pulsar Guardar marca', async () => {
       renderPage();
 
       const logo = new File(['x'], 'logo.png', { type: 'image/png' });
-      const banner = new File(['x'], 'banner.jpg', { type: 'image/jpeg' });
       selectFile(await screen.findByTestId('brand-logo-upload'), logo);
-      selectFile(await screen.findByTestId('brand-banner-upload'), banner);
 
       expect(screen.getByTestId('brand-pending-logo')).toHaveTextContent(/logo\.png/);
-      expect(screen.getByTestId('brand-pending-banner')).toHaveTextContent(/banner\.jpg/);
       expect(catalogMock.updateBranding).not.toHaveBeenCalled();
 
       fireEvent.click(screen.getByTestId('brand-save'));
 
-      // Un solo PUT con los dos lados: el backend los aplica en la misma petición.
+      // El PUT lleva SOLO el logo: el payload ya no tiene ningún lado de banner.
       await waitFor(() => expect(catalogMock.updateBranding).toHaveBeenCalledTimes(1));
-      expect(catalogMock.updateBranding).toHaveBeenCalledWith({ logo, banner });
-      await waitFor(() =>
-        expect(showToastSuccessMock).toHaveBeenCalledWith('Marca guardada'),
-      );
+      expect(catalogMock.updateBranding).toHaveBeenCalledWith({ logo });
+      await waitFor(() => expect(showToastSuccessMock).toHaveBeenCalledWith('Marca guardada'));
     });
 
     it('el guardado de la marca NO toca el lote de productos ni al revés', async () => {
@@ -723,12 +723,12 @@ describe('WebCatalogPage (vista Catálogo Web)', () => {
     });
 
     it('marcar quitar NO borra nada todavía: lo aplica el botón de marca', async () => {
-      // La carga del montage trae logo y banner; la recarga posterior al guardado ya no trae el
-      // logo: es el servidor quien dice qué quedó guardado, no la vista.
+      // La carga del montage trae el logo; la recarga posterior al guardado ya no lo trae: es el
+      // servidor quien dice qué quedó guardado, no la vista.
       catalogMock.getBranding
         .mockResolvedValueOnce(envelope(BRAND_WITH_MEDIA))
-        .mockResolvedValue(envelope(BRAND_WITH_BANNER_ONLY));
-      catalogMock.updateBranding.mockResolvedValue(envelope(BRAND_WITH_BANNER_ONLY));
+        .mockResolvedValue(envelope(BRAND_WITHOUT_MEDIA));
+      catalogMock.updateBranding.mockResolvedValue(envelope(BRAND_WITHOUT_MEDIA));
       renderPage();
 
       fireEvent.click(await screen.findByTestId('brand-logo-remove'));
@@ -740,31 +740,28 @@ describe('WebCatalogPage (vista Catálogo Web)', () => {
 
       fireEvent.click(screen.getByTestId('brand-save'));
 
-      // El PUT parcial solo lleva `removeLogo`: el banner, no mencionado, no se toca.
+      // El PUT parcial solo lleva `removeLogo`, y nada más.
       await waitFor(() =>
         expect(catalogMock.updateBranding).toHaveBeenCalledWith({ removeLogo: true }),
       );
       await waitFor(() => expect(screen.queryByTestId('brand-logo')).not.toBeInTheDocument());
-      // El banner sobrevivió al PUT parcial: quitó el logo, no la marca entera.
-      expect(screen.getByTestId('brand-banner')).toBeInTheDocument();
+      expect(screen.queryByTestId('brand-slot-logo')).toBeInTheDocument();
     });
 
     it('elegir una imagen cancela el borrado marcado del mismo lado: son excluyentes', async () => {
       catalogMock.getBranding.mockResolvedValue(envelope(BRAND_WITH_MEDIA));
       renderPage();
 
-      fireEvent.click(await screen.findByTestId('brand-banner-remove'));
-      expect(screen.getByTestId('brand-pending-banner-remove')).toBeInTheDocument();
+      fireEvent.click(await screen.findByTestId('brand-logo-remove'));
+      expect(screen.getByTestId('brand-pending-logo-remove')).toBeInTheDocument();
 
       const file = new File(['x'], 'nuevo.png', { type: 'image/png' });
-      selectFile(await screen.findByTestId('brand-banner-upload'), file);
+      selectFile(await screen.findByTestId('brand-logo-upload'), file);
 
-      expect(screen.queryByTestId('brand-pending-banner-remove')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('brand-pending-logo-remove')).not.toBeInTheDocument();
       fireEvent.click(screen.getByTestId('brand-save'));
 
-      await waitFor(() =>
-        expect(catalogMock.updateBranding).toHaveBeenCalledWith({ banner: file }),
-      );
+      await waitFor(() => expect(catalogMock.updateBranding).toHaveBeenCalledWith({ logo: file }));
     });
 
     it('un archivo que no es imagen no se retiene: avisa y no guarda', async () => {

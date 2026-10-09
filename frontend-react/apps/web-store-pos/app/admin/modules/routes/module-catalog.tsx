@@ -58,8 +58,9 @@ function toRows(modules: Module[]): ModuleCatalogRow[] {
  * The save payload is the WHOLE table the operator was shown, never the plan groups: the
  * backend save is all-or-nothing and reads a module's absence as "leave it untouched", so a
  * grouped, filtered or deduplicated payload would silently skip rows the operator expected to
- * be saved. `GET /v1/modules/ToStore` already returns exactly the editable universe
- * (`IsActive && AvailableToStore`), so no client-side universe filter is needed.
+ * be saved. `GET /v1/modules/catalog` returns exactly the editable universe
+ * (`AvailableToStore`, active OR NOT), so a deactivated module stays listed and its checkbox
+ * can reactivate it — no client-side universe filter is needed.
  */
 export function ModuleCatalogPage() {
   const { formatMessage } = useIntl();
@@ -75,7 +76,7 @@ export function ModuleCatalogPage() {
       // The plan catalog drives the VISUAL grouping only; it never gates, filters or reorders
       // what is saved. Both reads are needed before the first render, hence Promise.all.
       const [modulesRes, plansRes] = await Promise.all([
-        storeHttpService.getModulesToStore(),
+        storeHttpService.getModuleCatalog(),
         storeHttpService.getPlans(),
       ]);
       if (!modulesRes.succeeded || !plansRes.succeeded) {
@@ -106,6 +107,17 @@ export function ModuleCatalogPage() {
     );
   }
 
+  /**
+   * Flips a module's activation in the draft. Nothing is persisted here — like a price edit,
+   * it only reaches the server on save, which is why the checkbox travels in the SAME payload
+   * (`isActive`). The total recomputes live because the row's `isActive` feeds the price rule.
+   */
+  function handleToggleActive(moduleId: number, isActive: boolean): void {
+    setRows((current) =>
+      current.map((row) => (row.moduleId === moduleId ? { ...row, isActive } : row)),
+    );
+  }
+
   async function handleSave() {
     if (isSaving || isLoading || rows.length === 0) return;
     setError('');
@@ -116,6 +128,7 @@ export function ModuleCatalogPage() {
         price: toPriceNumber(row.price),
         discountPrice: toPriceNumber(row.discountPrice),
         percentDiscountPrice: toPriceNumber(row.percentDiscountPrice),
+        isActive: row.isActive,
       }));
       const saved = await storeHttpService.updateModulePricing(payload);
       if (!saved.succeeded) {
@@ -171,6 +184,7 @@ export function ModuleCatalogPage() {
             plans={plans}
             disabled={isSaving}
             onChangeField={handleChangeField}
+            onToggleActive={handleToggleActive}
           />
         )}
       </Card>
