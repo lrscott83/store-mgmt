@@ -67,6 +67,12 @@ nativa*). Este documento es el **seguimiento** y el mapa de cierre.
 - [x] **F4-R6** (test) — Aserciones atadas al formato de `Intl`.
   - **Cerrado (2026-10-08).** Los importes esperados se derivan con `formatMoneyWithCurrency` (el formatter de la app) en lugar de escribirse a mano; caso añadido con millares (`12345`), cuyo separador es un NBSP.
 
+### Revisión nativa — eliminación de envío/mínimo (2026-10-08)
+
+Review `review-45af9674edf7bfe9` **APROBADA** (2 advisory, ninguno bloqueante; autoridad quemada):
+- [ ] **R3-1** (WARNING · frontend) — El paso de aviso traga cualquier error en un `catch` vacío: si `result.data.lines` no es un array (respuesta degradada) o `setWhatsapp` lanza, el cliente se queda sin handoff de WhatsApp y **sin error visible**, aunque el pedido esté guardado. No hay test del límite "lines vacío/ausente".
+- [ ] **R3-2** (SUGGESTION · frontend) — El guarda interno de `window.open` también traga todo, sin señal ni distinción de fallback: un popup que lanza es indistinguible de un open normal en cualquier punto de observabilidad.
+
 ### F3 carrito (`pedidos-whatsapp-carrito-cliente.md`)
 - [ ] **F3-R1** (test · requiere E2E nuevo) — El bypass de filtro de tenant en `Order` solo con InMemory.
 - [ ] **F3-R2** (test) — La partición del rate limit desde `RouteValues` no se prueba end-to-end.
