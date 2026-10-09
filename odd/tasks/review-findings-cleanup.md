@@ -217,3 +217,9 @@ Review `review-808d9dda34fad1da` **APROBADA** (3 advisory, ninguno bloqueante; a
   slice de Módulos se sospecha **falso verde por binario stale** (AGENTS.md: mirar `error MSB`, no la
   duración). Nota: la suite E2E **completa** no terminó en la última corrida — el testhost crashea a
   mitad (0 fallas hasta el crash) —; los subconjuntos dirigidos pasan.
+- 2026-10-09 — **Review `review-6049fd7fe3bc3f5e` APROBADA** (5 advisory, ninguno bloqueante; autoridad quemada):
+  - [ ] **R3-001** (WARNING · test) — `PublicOrderingReadE2ETests` R1-3 afirma que el 404 es uniforme entre código inexistente y teléfono incorrecto, pero `ReadAsync` deja el body en null ante cualquier status no-éxito: las aserciones son tautológicas y no prueban el anti-oráculo.
+  - [ ] **R3-002** (SUGGESTION · test) — Los tests de rate limit no fijan el presupuesto exacto (20): cualquier límite entre 20 y 30 los deja verdes.
+  - [ ] **R3-003** (WARNING · test) — `PlanChangeMatrixTests` se editó en lockstep con una reparación manual de la DB: deja de ser corroboración independiente del wiring de producción.
+  - [ ] **R3-004** (WARNING) — La suite E2E completa no termina (crash del testhost) y hubo un falso verde sospechado por binario stale: la reproducibilidad full-suite de los E2E nuevos no está evidenciada.
+  - [ ] **R3-005** (WARNING) — La migración `20261008185523` marcada aplicada sin sus filas `StorePlanModule` 19/20 es un peligro en cualquier entorno donde corrió primero; los tests no cubren esa aplicación parcial.
