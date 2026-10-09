@@ -142,9 +142,9 @@ Review `review-808d9dda34fad1da` **APROBADA** (3 advisory, ninguno bloqueante; a
     `20261007021020_…` también ejecuta el `DeleteData` generado de la fila de catálogo 123 y
     `StoreRoleFeature.FeatureId` es **Restrict**, así que cualquier fila 123 que sobreviviera rompe el
     rollback con violación de FK; las migraciones posteriores (19/20) se revierten antes en la cadena y
-    no tocan esas filas. Mismo razonamiento que M-R3-003. **Pendiente de aviso:** el comentario «ONLY»
-    de `OnlineOrdersRoleFeatureBackfill.DownStoreRoleFeatureSql` no es del todo exacto, pero está en
-    `Infrastructure/Migrations/**` (producción) y queda **fuera de la superficie autorizada**.
+    no tocan esas filas. Mismo razonamiento que M-R3-003. El comentario «ONLY» de
+    `OnlineOrdersRoleFeatureBackfill.DownStoreRoleFeatureSql` se **corrigió** para declarar que el
+    `Down` es dueño de TODAS las filas 123 (FK Restrict) — solo comentario, sin cambio de comportamiento.
 
 ### F1 config (`pedidos-whatsapp-config.md`)
 - [ ] **F1-R1..R9** (mix) — Ruta/permiso sin test; `PaletteId` vacío; `MaximumLength` vs `Trim`; `StoreId` no-Guid; coerción monetaria; reload tras guardar; error de carga inicial; `formatSyncedAt`; selectores por testid vs role/label.
@@ -291,4 +291,4 @@ Review `review-808d9dda34fad1da` **APROBADA** (3 advisory, ninguno bloqueante; a
   la corrida: `StorePlanModule` 19/20 = **4**, `Feature 123` → `ModuleId` **20**, **0** filas E2E
   remanentes. Sonda de mutación dentro de la superficie: los mensajes esperados de los dos rechazos
   nuevos cambiados por una cadena inexistente → **4 fallos y solo esos 4**; revertido. Sin pendientes
-  fuera de superficie salvo el comentario «ONLY» de `OnlineOrdersRoleFeatureBackfill` (producción).
+  fuera de superficie: el comentario «ONLY» de `OnlineOrdersRoleFeatureBackfill` se corrigió (F2-R6).

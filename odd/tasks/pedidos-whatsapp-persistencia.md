@@ -473,11 +473,12 @@ son trabajo posterior. Destino indicado por tarea.
     3. Acotar el `DELETE` al universo histórico «tiendas con módulo 18» dejaría fuera cualquier fila de
        123 que no venga de ese `INSERT`, y **cualquier fila de 123 que sobreviva bloquearía el
        `DeleteData`**. En un despliegue que pasó por las dos migraciones, esas filas existen.
-  - **Pendiente de aviso por estar FUERA de la superficie autorizada**: el comentario de
-    `OnlineOrdersRoleFeatureBackfill.DownStoreRoleFeatureSql` dice literalmente «remove ONLY the
-    StoreRoleFeature rows this migration created», y no es del todo exacto (borra las 123, creadas por
-    esta migración o no). No se tocó: `backend/src/Infrastructure/Migrations/**` es producción. Es una
-    corrección de una línea de comentario, sin efecto de comportamiento, para cuando el owner lo autorice.
+  - **Corregido (2026-10-09):** el comentario de `OnlineOrdersRoleFeatureBackfill.DownStoreRoleFeatureSql`
+    decía «remove ONLY the StoreRoleFeature rows this migration created», que no era exacto (borra las
+    123, creadas por esta migración o no). Se reescribió para declarar que el `Down` es dueño de TODAS
+    las filas 123 —el `Down` generado también borra la feature 123 y `StoreRoleFeature.FeatureId` es
+    `Restrict`, así que ninguna grant puede sobrevivir— sin cambiar el comportamiento: es una
+    corrección de comentario en producción, ya aplicada.
 
 ## Siguiente paso
 
@@ -528,5 +529,5 @@ owner.
     `ModuleId` **20**, **0** filas E2E remanentes. El catálogo no se tocó.
   - Sonda de mutación (dentro de la superficie): los mensajes esperados de los dos rechazos nuevos
     cambiados por una cadena inexistente → **4 fallos y solo esos 4**; revertido.
-  Sin pendientes fuera de superficie salvo el comentario «ONLY» de
-  `OnlineOrdersRoleFeatureBackfill` (producción, ver F2-R6).
+  Sin pendientes fuera de superficie: el comentario «ONLY» de
+  `OnlineOrdersRoleFeatureBackfill` se corrigió (ver F2-R6).
