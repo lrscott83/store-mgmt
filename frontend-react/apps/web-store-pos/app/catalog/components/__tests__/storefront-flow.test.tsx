@@ -1,7 +1,9 @@
 import { useState } from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
+import axios from 'axios';
+import type { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import esMessages from '~/shared/lib/i18n/es';
 import { StorefrontCart } from '~/catalog/components/storefront-cart';
 import { StorefrontCheckout } from '~/catalog/components/storefront-checkout';
@@ -127,15 +129,89 @@ function deferred() {
 /**
  * Espía de `console.warn` silenciada: los avisos de R3-1/R3-2 son SEÑALES intencionadas, y sin
  * silenciarlos el test que las provoca ensucia la salida de la suite.
+ *
+ * NO se restaura a mano al final del test: si una aserción intermedia falla antes de llegar al
+ * `mockRestore()`, el espía sobrevive a este test y silencia la señal de los SIGUIENTES, que
+ * entonces pasan sin que nadie mire sus avisos. `afterEach(restoreAllMocks)` lo resuelve para
+ * todos los espías de golpe (R3-003).
  */
 function spyOnWarn() {
   return vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+}
+
+/**
+ * El rechazo REAL de `catalogHttpService` para un status HTTP: un `AxiosError` de axios con la
+ * respuesta del servidor colgando de `error.response`. Es literalmente lo que llega al `catch`
+ * del componente — `api-client.ts:109-155` rechaza el MISMO objeto en todas las ramas HTTP (401,
+ * 404, 429, 5xx), sin envolverlo ni reetiquetarlo— y es lo que construye `shared/lib/http/
+ * __tests__/api-client.test.ts` para fijarlas.
+ *
+ * Detalle que salió al medirlo (axios 1.16.1, `lib/core/AxiosError.js:122-125`): el constructor
+ * pone el status en LOS DOS canales, `error.response.status` Y `error.status`. Por eso una sonda
+ * que cambiaba `isNotFound` a leer el de arriba seguía en verde —no es un canal roto, hay dos—,
+ * y por eso `response.status` sigue siendo el que se lee: `package.json` pide `axios ^1.7.9` y
+ * el atajo `error.status` solo existe desde 1.8.0, así que el canal anidado es el que funciona
+ * en toda la rango declarada.
+ *
+ * Los tests anteriores fabricaban `{ response: { status } }` a mano: una forma que axios NUNCA
+ * produce. Con un doble así, el helper del componente podía leer el canal equivocado y el suite
+ * seguía verde — el test fijaba la expectativa del autor, no el contrato del servicio (R3-002).
+ */
+function httpRejection(status: number): AxiosError {
+  return new axios.AxiosError(
+    `Request failed with status code ${status}`,
+    String(status),
+    undefined,
+    undefined,
+    {
+      status,
+      data: {},
+      headers: {},
+      config: {} as InternalAxiosRequestConfig,
+      statusText: String(status),
+    },
+  );
+}
+
+/**
+ * El rechazo REAL de red: un `AxiosError` SIN `response` (offline, DNS, o el timeout de 30 s).
+ *
+ * Esta es la única forma que `api-client` MUTA antes de rechazarla — le pega `isNetworkError =
+ * true` (`api-client.ts:136-138`)—, así que aquí no basta con construir el error: se hace pasar
+ * por el interceptor REAL y se devuelve lo que él rechaza. Si el test sellara el `true` a mano,
+ * volvería a fijar una expectativa del autor en vez del contrato (R3-001/R3-002).
+ */
+async function networkRejection(): Promise<AxiosError> {
+  const { apiClient } = await import('~/shared/lib/http/api-client');
+  const { handlers } = apiClient.interceptors.response as unknown as {
+    handlers: Array<{ rejected?: unknown } | null>;
+  };
+  const rejected = handlers.find((h) => typeof h?.rejected === 'function')?.rejected;
+  if (typeof rejected !== 'function') throw new Error('Response interceptor not found');
+
+  const offline = new axios.AxiosError('Network Error', 'ERR_NETWORK', undefined, undefined, undefined);
+  try {
+    await (rejected as (error: AxiosError) => Promise<never>)(offline);
+  } catch (rejection) {
+    return rejection as AxiosError;
+  }
+  throw new Error('El interceptor de respuesta no rechazó: la forma de red está desfasada.');
 }
 
 describe('storefront cart / checkout / order status (F3)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     linkSpy.throwsOnBuild = false;
+  });
+
+  /**
+   * Todo espía se restaura SIEMPRE, haya pasado o no el test (R3-003). Con un `mockRestore()`
+   * manual al final de cada test, el primer fallo de aserción abandona la línea y deja el espía
+   * vivo: los tests siguientes heredan un `console.warn` mudo y sus señales dejan de verse, que
+   * es justo el test que pasa por no mirar.
+   */
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   describe('carrito', () => {
@@ -398,7 +474,7 @@ describe('storefront cart / checkout / order status (F3)', () => {
     });
 
     it('un rechazo del servidor (excepción) también se muestra', async () => {
-      serviceMock.createPublicOrder.mockRejectedValue({ response: { status: 429 } });
+      serviceMock.createPublicOrder.mockRejectedValue(httpRejection(429));
       renderCheckout();
 
       fireEvent.change(screen.getByTestId('checkout-name'), { target: { value: 'Ana' } });
@@ -508,7 +584,6 @@ describe('storefront cart / checkout / order status (F3)', () => {
         );
         // El alta se reporta igual: el resumen es un aviso, no el pedido.
         expect(onCreated).toHaveBeenCalledWith(CREATED_WITH_NUMBER);
-        openSpy.mockRestore();
       });
 
       // `window.open` devolvió null: el navegador bloqueó la ventana (o, con `noopener`, no hay
@@ -524,7 +599,6 @@ describe('storefront cart / checkout / order status (F3)', () => {
         const link = await screen.findByTestId('checkout-whatsapp-link');
         expect(link).toHaveAttribute('href', openSpy.mock.calls[0][0] as string);
         expect(link).toHaveTextContent('Abrir el chat de WhatsApp');
-        openSpy.mockRestore();
       });
 
       // Sin número NO se abre un chat contra un destinatario vacío: el envío queda BLOQUEADO con
@@ -545,7 +619,6 @@ describe('storefront cart / checkout / order status (F3)', () => {
         expect(openSpy).not.toHaveBeenCalled();
         expect(screen.queryByTestId('checkout-whatsapp-link')).not.toBeInTheDocument();
         expect(onCreated).toHaveBeenCalledWith(createdWithoutNumber);
-        openSpy.mockRestore();
       });
 
       // ── F4-R3 (option B) ─────────────────────────────────────────────────────────────────
@@ -574,7 +647,6 @@ describe('storefront cart / checkout / order status (F3)', () => {
         expect(summary).toContain(`TOTAL: ${money(180)}`);
         // El importe del carrito (2 × 82.50) NO aparece: el resumen no se arma con él.
         expect(summary).not.toContain(money(165));
-        openSpy.mockRestore();
       });
 
       // ── F4-R1 ───────────────────────────────────────────────────────────────────────────
@@ -582,7 +654,9 @@ describe('storefront cart / checkout / order status (F3)', () => {
       // quedar flotando sobre el formulario del siguiente. Sin este reset, el cliente ve el
       // "pedido K7M2QX enviado" del pedido que acaba de cerrar mientras rellena OTRO.
       it('al reabrir el checkout el aviso del pedido anterior desaparece', async () => {
-        const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+        // Espía SIN capturar: `afterEach(restoreAllMocks)` lo retira, y este test solo lo quiere
+        // INSTALADO —para que `window.open` no reviente en jsdom—, nunca lo consulta.
+        vi.spyOn(window, 'open').mockImplementation(() => null);
         serviceMock.createPublicOrder.mockResolvedValue(envelope(CREATED_WITH_NUMBER));
         const onCreated = vi.fn();
         renderWithIntl(<ParentHarness onCreatedSpy={onCreated} />);
@@ -598,7 +672,6 @@ describe('storefront cart / checkout / order status (F3)', () => {
 
         await screen.findByTestId('catalog-checkout-modal');
         expect(screen.queryByTestId('checkout-whatsapp-notice')).not.toBeInTheDocument();
-        openSpy.mockRestore();
       });
 
       // ── F4-R2 / R3-2 ──────────────────────────────────────────────────────────────────────
@@ -608,7 +681,8 @@ describe('storefront cart / checkout / order status (F3)', () => {
       // que dejar SEÑAL (R3-2): antes era indistinguible de un `window.open` que sí abrió.
       it('un fallo al abrir WhatsApp no reporta el pedido como fallido, deja señal y no impide el cierre', async () => {
         // `window.open` LANZANDO, no solo devolviendo null: es el peor caso de popup bloqueado.
-        const openSpy = vi.spyOn(window, 'open').mockImplementation(() => {
+        // Sin capturar: la señal que este test mira es la de `console.warn`, no la del espía.
+        vi.spyOn(window, 'open').mockImplementation(() => {
           throw new Error('popup bloqueado');
         });
         const warnSpy = spyOnWarn();
@@ -633,8 +707,6 @@ describe('storefront cart / checkout / order status (F3)', () => {
           'href',
           expect.stringContaining('https://wa.me/5359876543'),
         );
-        openSpy.mockRestore();
-        warnSpy.mockRestore();
       });
 
       // ── R3-1 ─────────────────────────────────────────────────────────────────────────────
@@ -666,7 +738,6 @@ describe('storefront cart / checkout / order status (F3)', () => {
           expect.stringContaining('resumen de WhatsApp'),
           expect.any(Error),
         );
-        warnSpy.mockRestore();
       });
 
       // El caso REAL de ese fallo: una respuesta degradada sin líneas. `created.lines.map` revienta
@@ -690,7 +761,6 @@ describe('storefront cart / checkout / order status (F3)', () => {
         const notice = await screen.findByTestId('checkout-whatsapp-notice');
         expect(within(notice).getByTestId('checkout-whatsapp-blocked')).toHaveTextContent('K7M2QX');
         expect(warnSpy).toHaveBeenCalled();
-        warnSpy.mockRestore();
       });
 
       // ── F4-R4 ───────────────────────────────────────────────────────────────────────────
@@ -714,7 +784,8 @@ describe('storefront cart / checkout / order status (F3)', () => {
       // del modal justo para sobrevivir a ese cierre: si estuviera dentro, nunca se vería — y es
       // el único sitio donde el cliente puede reenviar el resumen.
       it('el padre cierra el checkout al recibir el pedido, una sola vez y sin perder el aviso', async () => {
-        const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+        // Espía SIN capturar: este test fija el cierre y el aviso, no la llamada a `window.open`.
+        vi.spyOn(window, 'open').mockImplementation(() => null);
         serviceMock.createPublicOrder.mockResolvedValue(envelope(CREATED_WITH_NUMBER));
         const onCreated = vi.fn();
         renderWithIntl(<ParentHarness onCreatedSpy={onCreated} />);
@@ -728,7 +799,6 @@ describe('storefront cart / checkout / order status (F3)', () => {
         expect(screen.queryByTestId('catalog-checkout-modal')).not.toBeInTheDocument();
         // Un `onCreated` de más haría que el padre abriera dos veces la consulta del pedido.
         expect(onCreated).toHaveBeenCalledTimes(1);
-        openSpy.mockRestore();
       });
     });
   });
@@ -780,30 +850,56 @@ describe('storefront cart / checkout / order status (F3)', () => {
       expect(screen.getByTestId('order-status-code-value')).toHaveTextContent('K7M2QX');
     });
 
-    it('el 404 uniforme se muestra como "no encontrado" sin distinguir el motivo', async () => {
-      serviceMock.getPublicOrderStatus.mockRejectedValue({ response: { status: 404 } });
+    // ── F3-R3 + R3-001 / R3-002 ───────────────────────────────────────────────────────
+    // El 404 es el único VEREDICTO del servidor sobre ESE código, y por eso solo él se pinta como
+    // 'no encontrado'. Antes, TODO fallo —red caída, `500`, `429`— caía en el mismo `catch` sin
+    // mirar el motivo, y le decía al cliente que su pedido no existe cuando lo que había pasado es
+    // que la consulta falló. `ORDER.STATUS_FAILED` existía sin usarse para este caso.
+    //
+    // Y el rechazo es el REAL: un `AxiosError` con la respuesta colgando de `error.response`, tal
+    // como `api-client.ts` la rechaza sin retocar. Antes estas filas usaban un doble
+    // `{response:{status}}` que axios NUNCA produce, así que la rama que el fix protege —el
+    // veredicto— estaba probada contra una forma inventada: el helper podía leer cualquier otro
+    // canal y el suite seguiría verde (R3-001).
+    //
+    // Cada fila afirma SU frase Y LA CONTRARIA, y las tres usan la MISMA construcción: el único
+    // dato que cambia es el status anidado. Ese es el discriminado entero — si `isNotFound` leyera
+    // otro canal, las filas caerían JUNTAS y no por separado.
+    it.each([
+      [404, 'No encontramos ese pedido con ese teléfono.'],
+      [500, 'No se pudo consultar el pedido. Inténtalo de nuevo.'],
+      [429, 'No se pudo consultar el pedido. Inténtalo de nuevo.'],
+    ])('un %i real produce "%s" y no la frase contraria', async (status, expected) => {
+      serviceMock.getPublicOrderStatus.mockRejectedValue(httpRejection(status));
       renderStatus();
 
       fireEvent.change(screen.getByTestId('order-status-code'), { target: { value: 'K7M2QX' } });
       fireEvent.change(screen.getByTestId('order-status-phone'), { target: { value: '5351234567' } });
       fireEvent.click(screen.getByTestId('order-status-submit'));
 
-      expect(await screen.findByTestId('order-status-error')).toHaveTextContent(
-        'No encontramos ese pedido con ese teléfono.',
+      const error = await screen.findByTestId('order-status-error');
+      expect(error).toHaveTextContent(expected);
+      expect(error).not.toHaveTextContent(
+        expected.startsWith('No encontramos')
+          ? 'No se pudo consultar el pedido'
+          : 'No encontramos ese pedido',
       );
+      // El veredicto NO se adorna con el motivo (F3-R3): el backend responde igual —código
+      // inexistente, de otra tienda o teléfono que no cuadra— para no servir de oráculo de qué
+      // códigos existen.
+      expect(error).not.toHaveTextContent(/no existe|no coincide|otra tienda/i);
       expect(screen.queryByTestId('order-status-state')).not.toBeInTheDocument();
     });
 
-    // ── F3-R3 ─────────────────────────────────────────────────────────────────────────────
-    // El 404 es el único veredicto del servidor sobre ESE código, y por eso solo él se pinta como
-    // 'no encontrado'. Antes, TODO fallo —red caída, `500`, `429`— caía en el mismo `catch` sin
-    // mirar el motivo, y le decía al cliente que su pedido no existe cuando lo que había pasado es
-    // que la consulta falló. `ORDER.STATUS_FAILED` existía sin usarse para este caso.
-    it.each([
-      ['sin conexión', { isNetworkError: true }],
-      ['con un 500 del servidor', { response: { status: 500 } }],
-      ['con un 429 por límite de tasa', { response: { status: 429 } }],
-    ])('un fallo %s NO se disfraza de pedido inexistente', async (_label, rejection) => {
+    // El caso de RED es el único que `api-client` MUTA antes de rechazar (`isNetworkError =
+    // true`), así que su forma no se fabrica: el error pasa por el interceptor REAL y se usa lo
+    // que él rechaza. Sellar el `true` a mano volvería a fijar la expectativa del autor (R3-002).
+    it('sin conexión tampoco se disfraza de pedido inexistente', async () => {
+      const rejection = await networkRejection();
+      // La etiqueta la pone producción: si `api-client` dejara de marcarla, este helper devuelve
+      // un error sin `isNetworkError` y la aserción de abajo lo delata en vez de dejarlo pasar.
+      expect((rejection as { isNetworkError?: boolean }).isNetworkError).toBe(true);
+
       serviceMock.getPublicOrderStatus.mockRejectedValue(rejection);
       renderStatus();
 

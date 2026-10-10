@@ -101,9 +101,13 @@ Review `review-45af9674edf7bfe9` **APROBADA** (2 advisory, ninguno bloqueante; a
 ### Revisión nativa — F3 frontend (2026-10-09)
 
 Review `review-808d9dda34fad1da` **APROBADA** (3 advisory, ninguno bloqueante; autoridad quemada):
-- [ ] **R3-001** (WARNING · frontend) — La discriminación 404-vs-incidente clasifica como "no encontrado" solo si el rechazo trae `response.status === 404`; los tests nuevos solo cubren la rama de fallo con objetos fabricados, así que la rama del veredicto 404 (la que el fix protege) no está probada con la forma real del rechazo. Si esa forma no trae el status anidado, un 404 se muestra como "no se pudo consultar".
-- [ ] **R3-002** (SUGGESTION · test) — Los tests del estado fabrican el rechazo como formas literales (`{isNetworkError:true}`, `{response:{status}}`) en vez del tipo de error real del servicio: fija la expectativa del componente, no el contrato.
-- [ ] **R3-003** (SUGGESTION · test) — `spyOnWarn` se restaura con `mockRestore()` manual al final de cada test; si una aserción falla antes, el espía se filtra a tests posteriores y silencia la señal.
+- [x] **R3-001** (WARNING · frontend) — La discriminación 404-vs-incidente clasifica como "no encontrado" solo si el rechazo trae `response.status === 404`; los tests nuevos solo cubren la rama de fallo con objetos fabricados, así que la rama del veredicto 404 (la que el fix protege) no está probada con la forma real del rechazo. Si esa forma no trae el status anidado, un 404 se muestra como "no se pudo consultar".
+  - **Cerrado (2026-10-10) sin tocar producción: el helper YA reconocía la forma real, y ahora está probado con ella.** `catalogHttpService.getPublicOrderStatus` llama a `apiClient.get` y no envuelve nada, y el interceptor de `api-client.ts:109-155` rechaza **el mismo objeto** en todas las ramas HTTP — así que al `catch` del componente llega un `AxiosError` con `error.response.status`. Un `it.each` de tres filas (404/500/429) construye ese `AxiosError` real y afirma, por fila, su frase **y la contraria**, con lo único que cambia entre ellas siendo el status anidado. Ese par es el discriminado completo.
+  - **Hallazgo colateral medido, que el aviso daba por hecho y no se cumple:** una sonda que cambiaba `isNotFound` a leer `error.status` (atajo de nivel superior) **dejó la suite en verde**. No es un canal roto —hay dos—: axios 1.16.1 puebla los dos en el constructor (`lib/core/AxiosError.js:122-125`, `this.response = response` **y** `this.status = response.status`). Se conserva `response.status` porque es el que funciona en toda la rango declarada: `package.json` pide `axios ^1.7.9` y el atajo `error.status` solo existe desde 1.8.0. Queda escrito en el helper del test para que una "simplificación" futura no rompa en 1.7.x.
+- [x] **R3-002** (SUGGESTION · test) — Los tests del estado fabrican el rechazo como formas literales (`{isNetworkError:true}`, `{response:{status}}`) en vez del tipo de error real del servicio: fija la expectativa del componente, no el contrato.
+  - **Cerrado (2026-10-10).** Los dobles literales desaparecieron (0 coincidencias de `{isNetworkError:true}` / `{response:{status}}` en el archivo). Dos helpers los sustituyen: `httpRejection(status)` construye el `AxiosError` real con su respuesta, y `networkRejection()` **pasa el error por el interceptor REAL de `api-client` y devuelve lo que él rechaza** — porque esa es la única forma que producción MUTA (`isNetworkError = true`, `api-client.ts:136-138`), y sellar ese `true` a mano habría reproducido exactamente el defecto que el aviso denunciaba. El test de red afirma además que la etiqueta viene puesta. El rechazo del checkout (429) usa el mismo helper.
+- [x] **R3-003** (SUGGESTION · test) — `spyOnWarn` se restaura con `mockRestore()` manual al final de cada test; si una aserción falla antes, el espía se filtra a tests posteriores y silencia la señal.
+  - **Cerrado (2026-10-10).** Los 10 `mockRestore()` manuales (7 `openSpy` + 3 `warnSpy`) se borraron y se puso `afterEach(() => vi.restoreAllMocks())`, que los retira haya pasado o no el test. Efecto lateral que hubo que absorber: tres espías de `window.open` solo se leían para restaurarlos, así que quedaron como `vi.spyOn(...)` sin capturar —siguen **instalados**, que es lo que evita que `window.open` reviente en jsdom— y con comentario que explica por qué no se capturan.
 
 ### F2 persistencia (`pedidos-whatsapp-persistencia.md`)
 - [x] **F2-R1** (test) — Carreras del handler sin test: multi-moneda (`EnsureSingleCurrency`) y `DeliveryType` fuera del enum.
@@ -414,3 +418,42 @@ Review `review-808d9dda34fad1da` **APROBADA** (3 advisory, ninguno bloqueante; a
   `ProductCategory`, `User` (`pmc-*`) y `Owner`. Sin commit (writer acotado).
   Sin pendientes fuera de superficie: el `Trim` del handler y el del validador NO difieren, así que no
   hubo que unificarlos ni tocar producción.
+- 2026-10-10 — **Cerrados los 3 advisories frontend de F3 (`review-808d9dda34fad1da` R3-001/R3-002/
+  R3-003), writer acotado, sin commit.** Superficie tocada: **solo el archivo de test**
+  `storefront-flow.test.tsx` + este doc. `storefront-order-status.tsx` terminó **byte-idéntico a
+  HEAD** (`git status` lo confirma) porque la hipótesis del R3-001 —«si la forma real no trae el
+  status anidado, hay que arreglar el helper»— **no se cumplió al medirla**, y ya está escrito por
+  qué en el advisory.
+  **R3-001 (la rama del veredicto, que era el hueco real):** `getPublicOrderStatus` no envuelve nada
+  y `api-client.ts:109-155` rechaza **el mismo objeto** en toda rama HTTP, así que al `catch` llega
+  un `AxiosError` con `error.response.status`. La fila 404 pasó de un doble `{response:{status:404}}`
+  a un `AxiosError` real, y las tres filas (404/500/429) afirman su frase **y la contraria** con la
+  misma construcción: el único dato que cambia es el status anidado, luego es el discriminado entero.
+  El 404 además afirma ahora lo que su nombre prometía desde antes —que no se adorna con el motivo
+  (anti-oráculo F3-R3)— con un `not.toHaveTextContent(/no existe|no coincide|otra tienda/i)`.
+  **Sondas de mutación, dos, y revertidas:** `isNotFound` a `return false` → cae **exactamente 1**
+  test (la fila 404) y `return true` → caen **exactamente 3** (500, 429 y red). Ninguna más, que es
+  lo que prueba que el test ata el comportamiento y no pasa por estar vacío.
+  **Un hallazgo que la sonda no detectó, y que queda documentado igual:** cambiar `isNotFound`
+  a leer `error.status` (atajo de nivel superior) **deja la suite VERDE**. No es un canal roto:axios
+  1.16.1 puebla los dos canales en el constructor (`lib/core/AxiosError.js:122-125`). Se conserva
+  `response.status` porque es el que vale en toda la rango declarada —`package.json` pide
+  `axios ^1.7.9` y el atajo de nivel superior solo existe desde 1.8.0—, y queda escrito en el helper
+  para que nadie lo "simplifique" y rompa en 1.7.x.
+  **R3-002:** cero dobles literales (0 coincidencias de `{isNetworkError:true}` y de
+  `{response:{status}}`). `httpRejection(status)` construye el `AxiosError` real;
+  `networkRejection()` hace pasar el error **por el interceptor REAL de `api-client`** y devuelve lo
+  que él rechaza —porque red es la única forma que producción MUTA (`isNetworkError = true`,
+  `api-client.ts:136-138`), y sellar ese `true` a mano habría repetido el defecto—so, y el test
+  afirma que la etiqueta viene puesta. El 429 del checkout usa el mismo helper.
+  **R3-003:** los 10 `mockRestore()` manuales (7 `openSpy` + 3 `warnSpy`) fuera y
+  `afterEach(() => vi.restoreAllMocks())`. Efecto lateral absorbido: tres espías de `window.open` solo
+  se leían para restaurarlos, así que quedaron sin capturar —siguen instalados, que es lo que impide
+  que `window.open` reviente en jsdom— con comentario explicando por qué.
+  Verificación observada: `pnpm vitest run …storefront-flow.test.tsx` → **32/32** verde, `Type Errors:
+  no errors`, y las seis pruebas de `estado del pedido` visibles por nombre en `--reporter=verbose`
+  (las tres filas reales + la de red). `pnpm exec eslint` sobre los 2 archivos autorizados →
+  **exit 0**. `pnpm typecheck` → 2 errores, **preexistentes y ajenos**, los dos en
+  `app/admin/modules/routes/__tests__/module-catalog.test.tsx(663,664)`: reproducidos **con mi cambio
+  en stash** y son idénticos, luego esta superficie **no añade ninguno**. Nada de `frontend/` (Angular)
+  leído ni tocado, nada de `frontend-react/e2e/`.
