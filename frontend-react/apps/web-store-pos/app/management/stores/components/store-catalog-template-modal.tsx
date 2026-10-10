@@ -1,5 +1,5 @@
 import { useIntl } from 'react-intl';
-import { CATALOG_TEMPLATES } from '~/catalog/templates/template-ids';
+import { CATALOG_TEMPLATES, DEFAULT_TEMPLATE_ID } from '~/catalog/templates/template-ids';
 import { Button } from '~/shared/components/ui/button';
 import { CloseIcon } from '~/shared/components/ui/icons';
 import { InfoBox } from '~/shared/components/ui/info-box';
@@ -13,6 +13,8 @@ interface StoreCatalogTemplateModalProps {
   value: string;
   loading: boolean;
   saving: boolean;
+  /** La carga de la plantilla falló: guardar queda bloqueado para no escribir un valor que no se leyó. */
+  loadFailed: boolean;
   error?: string;
   onChange: (templateId: string) => void;
   onClose: () => void;
@@ -32,6 +34,7 @@ export function StoreCatalogTemplateModal({
   value,
   loading,
   saving,
+  loadFailed,
   error,
   onChange,
   onClose,
@@ -40,6 +43,17 @@ export function StoreCatalogTemplateModal({
   const intl = useIntl();
 
   if (!open || !storeId) return null;
+
+  // Version skew (R3-1): un id guardado que ESTE build no anuncia no tiene `<option>`, así que el
+  // `select` quedaría sin selección válida. El storefront cae a `default` para ids desconocidos, así
+  // que aquí se muestra ese mismo `default` — lo que se ve es lo que se pinta.
+  const shownValue = CATALOG_TEMPLATES.some((template) => template.id === value)
+    ? value
+    : DEFAULT_TEMPLATE_ID;
+
+  // R3-2: si la lectura falló, `value` es el default de relleno, NO lo que tiene la tienda; guardar
+  // lo escribiría encima de la plantilla real. Bloquear el guardado hasta una carga correcta.
+  const saveDisabled = loading || saving || loadFailed;
 
   return (
     <div
@@ -82,7 +96,7 @@ export function StoreCatalogTemplateModal({
         </label>
         <select
           id="store-catalog-template-select"
-          value={value}
+          value={shownValue}
           disabled={loading || saving}
           onChange={(event) => onChange(event.target.value)}
           className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-primary"
@@ -105,7 +119,7 @@ export function StoreCatalogTemplateModal({
           <Button
             variant="fab"
             onClick={onSave}
-            disabled={loading || saving}
+            disabled={saveDisabled}
             data-testid="store-catalog-template-save"
           >
             {intl.formatMessage({ id: saving ? 'STORES.SAVING' : 'GENERAL.SAVE' })}

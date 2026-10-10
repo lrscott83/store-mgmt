@@ -12,6 +12,7 @@ function renderModal(overrides: Partial<Parameters<typeof StoreCatalogTemplateMo
     value: 'default',
     loading: false,
     saving: false,
+    loadFailed: false,
     error: '',
     onChange: vi.fn(),
     onClose: vi.fn(),
@@ -71,6 +72,20 @@ describe('StoreCatalogTemplateModal', () => {
     unmount();
 
     renderModal({ saving: true });
+    expect(screen.getByTestId('store-catalog-template-save')).toBeDisabled();
+  });
+
+  it('muestra el default cuando la plantilla guardada no la lista este build (version skew, R3-1)', () => {
+    renderModal({ value: 'legacy-v1' });
+
+    const select = screen.getByTestId('store-catalog-template-select') as HTMLSelectElement;
+    // El storefront cae a `default` para ids desconocidos; el selector refleja eso mismo.
+    expect(select.value).toBe('default');
+  });
+
+  it('bloquea guardar si la carga falló (R3-2)', () => {
+    renderModal({ loadFailed: true, error: 'No se pudo cargar' });
+
     expect(screen.getByTestId('store-catalog-template-save')).toBeDisabled();
   });
 });

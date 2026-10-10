@@ -74,6 +74,7 @@ export function AdminStoreListPage() {
   const [templateLoading, setTemplateLoading] = useState(false);
   const [templateSaving, setTemplateSaving] = useState(false);
   const [templateError, setTemplateError] = useState('');
+  const [templateLoadFailed, setTemplateLoadFailed] = useState(false);
   // Filter by plan type: 'all' shows all stores, 'not-free' excludes Gratis plan,
   // and specific plan types (VIP, Superior, Pago, Gratis) filter by that plan.
   // Default is 'not-free' to show all paid plans except Gratis.
@@ -272,6 +273,7 @@ export function AdminStoreListPage() {
     const store = stores.find((s) => s.id === id);
     if (!store) return;
     setTemplateError('');
+    setTemplateLoadFailed(false);
     setTemplateValue(DEFAULT_TEMPLATE_ID);
     setTemplateStore(store);
     setTemplateLoading(true);
@@ -279,12 +281,14 @@ export function AdminStoreListPage() {
       const res = await storeHttpService.getStoreCatalogTemplate(store.id);
       if (!res.succeeded) {
         setTemplateError(formatMessage({ id: 'STORES.ERROR' }));
+        setTemplateLoadFailed(true);
         return;
       }
       // El backend ya cae a `default` para una fila sin plantilla; el `||` cubre un id vacío.
       setTemplateValue(res.data.templateId || DEFAULT_TEMPLATE_ID);
     } catch (error) {
       setTemplateError(formatMessage({ id: httpErrorKey(error, 'STORES.ERROR') }));
+      setTemplateLoadFailed(true);
     } finally {
       setTemplateLoading(false);
     }
@@ -405,11 +409,13 @@ export function AdminStoreListPage() {
         value={templateValue}
         loading={templateLoading}
         saving={templateSaving}
+        loadFailed={templateLoadFailed}
         error={templateError}
         onChange={setTemplateValue}
         onClose={() => {
           setTemplateStore(null);
           setTemplateError('');
+          setTemplateLoadFailed(false);
         }}
         onSave={handleTemplateSave}
       />

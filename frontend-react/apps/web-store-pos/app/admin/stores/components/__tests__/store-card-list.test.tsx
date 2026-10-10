@@ -478,6 +478,66 @@ describe('StoreCardList — Change Plan gear item (opens the plan-change popup)'
   });
 });
 
+describe('StoreCardList — Plantilla del catálogo gear item', () => {
+  it('renders the item for an active store and calls onEditCatalogTemplate with the id', async () => {
+    const onEditCatalogTemplate = vi.fn();
+    const { StoreCardList } = await import('../store-card-list');
+    render(
+      <Wrapper>
+        <StoreCardList
+          stores={[makeStore({ id: 'store-c', name: 'Store C', isActive: true })]}
+          onEdit={vi.fn()}
+          onApprove={vi.fn()}
+          onDisapprove={vi.fn()}
+          onEditCatalogTemplate={onEditCatalogTemplate}
+        />
+      </Wrapper>,
+    );
+    fireEvent.click(screen.getByTestId('store-actions-toggle-store-c'));
+    fireEvent.click(
+      screen.getByRole('menuitem', { name: esMessages['STORES.CATALOG_TEMPLATE.MENU_LABEL'] }),
+    );
+    expect(onEditCatalogTemplate).toHaveBeenCalledWith('store-c');
+  });
+
+  it('hides the item when the store is inactive', async () => {
+    const { StoreCardList } = await import('../store-card-list');
+    render(
+      <Wrapper>
+        <StoreCardList
+          stores={[makeStore({ id: 'store-ci', name: 'Store CI', isActive: false })]}
+          onEdit={vi.fn()}
+          onApprove={vi.fn()}
+          onDisapprove={vi.fn()}
+          onEditCatalogTemplate={vi.fn()}
+        />
+      </Wrapper>,
+    );
+    fireEvent.click(screen.getByTestId('store-actions-toggle-store-ci'));
+    expect(
+      screen.queryByRole('menuitem', { name: esMessages['STORES.CATALOG_TEMPLATE.MENU_LABEL'] }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('hides the item when no handler is wired', async () => {
+    const { StoreCardList } = await import('../store-card-list');
+    render(
+      <Wrapper>
+        <StoreCardList
+          stores={[makeStore({ id: 'store-n', name: 'Store N', isActive: true })]}
+          onEdit={vi.fn()}
+          onApprove={vi.fn()}
+          onDisapprove={vi.fn()}
+        />
+      </Wrapper>,
+    );
+    fireEvent.click(screen.getByTestId('store-actions-toggle-store-n'));
+    expect(
+      screen.queryByRole('menuitem', { name: esMessages['STORES.CATALOG_TEMPLATE.MENU_LABEL'] }),
+    ).not.toBeInTheDocument();
+  });
+});
+
 describe('StoreCardList — Activate/Deactivate removed (Req: Activate/Deactivate Controls Removed)', () => {
   it('does NOT render Activate or Deactivate buttons', async () => {
     const { StoreCardList } = await import('../store-card-list');
