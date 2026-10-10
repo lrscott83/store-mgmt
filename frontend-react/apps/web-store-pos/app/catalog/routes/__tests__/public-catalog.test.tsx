@@ -158,7 +158,9 @@ const page = (items: PublicCatalogProduct[], total = items.length) => ({
 
 /**
  * Config anónimo de pedidos: sin marca por defecto (una tienda puede no tener logo/banner) y sin
- * costo de envío ni importe mínimo —no existen— y sin `whatsappNumber` (privacidad, T2).
+ * costo de envío ni importe mínimo —no existen—. Los dos módulos vienen ON porque el caso normal de
+ * esta suite es una tienda que los compró (M6: los dos van a Superior/VIP); los tests que
+ * necesitan apagarlos los montan explícitamente.
  */
 const CONFIG_WITHOUT_BRAND: PublicOrderingConfig = {
   enabled: true,
@@ -169,6 +171,8 @@ const CONFIG_WITHOUT_BRAND: PublicOrderingConfig = {
   paletteId: 'default',
   logoUrl: null,
   bannerUrl: null,
+  pedidosWhatsAppEnabled: true,
+  gestionPedidosEnabled: true,
   // El showcase viaja SIEMPRE, y vacío es lo normal: una tienda recién sincronizada no ha
   // subido ninguna imagen. Los dos conjuntos son independientes (decisión C1).
   carouselImages: [],
@@ -1221,6 +1225,116 @@ describe('PublicCatalogPage', () => {
       );
       // Y el catálogo es el de siempre.
       expect(screen.getByTestId('catalog-grid')).toBeInTheDocument();
+    });
+
+    // ── GATING POR MÓDULOS (M2/M3) ──────────────────────────────────────────────────────────
+    // El carrito es del módulo "Pedidos WhatsApp" (19), no solo del interruptor de la fila: sin
+    // él no hay carrito ni pedidos nuevos, y la carta es exactamente el catálogo de siempre.
+    it('sin el módulo "Pedidos WhatsApp" no hay carrito ni botón de añadir', async () => {
+      catalogMock.getPublicOrderingConfig.mockResolvedValue(
+        envelope({ ...CONFIG_WITHOUT_BRAND, pedidosWhatsAppEnabled: false }),
+      );
+      renderPage();
+
+      expect(await screen.findByTestId('catalog-card-cp1')).toBeInTheDocument();
+      expect(screen.queryByTestId('catalog-cart-button')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('catalog-add-cp1')).not.toBeInTheDocument();
+      // El aviso es el de siempre: para el cliente la consecuencia es la misma —no se pide—.
+      expect(screen.getByTestId('catalog-orders-disabled')).toBeInTheDocument();
+      // La navegación NO se gatea: seguir siendo un catálogo que se recorre es lo de siempre.
+      expect(within(screen.getByTestId('catalog-nav')).getAllByRole('link')).toHaveLength(3);
+      // Y con el módulo pagado pero el interruptor apagado, tampoco hay carrito: se exigen los dos.
+      cleanup();
+      catalogMock.getPublicOrderingConfig.mockResolvedValue(
+        envelope({ ...CONFIG_WITHOUT_BRAND, enabled: false }),
+      );
+      renderPage();
+      await screen.findByTestId('catalog-card-cp1');
+      expect(screen.queryByTestId('catalog-cart-button')).not.toBeInTheDocument();
+    });
+
+    // Con los dos módulos el flujo es el de siempre: POST al backend y el código del pedido
+    // guardado. Se fija aquí porque es el CONTRAPUNTO del caso sin persistencia de abajo.
+    it('con el módulo "Gestión de Pedidos" el checkout hace POST y muestra el código', async () => {
+      catalogMock.createPublicOrder.mockResolvedValue(
+        envelope({
+          id: 'o1',
+          code: 'K7M2QX',
+          subtotal: 82.5,
+          total: 82.5,
+          currency: 0,
+          lines: [{ name: 'Camisa azul', quantity: 1, price: 82.5 }],
+        }),
+      );
+      renderPage();
+      await screen.findByTestId('catalog-add-cp1');
+
+      fireEvent.click(screen.getByTestId('catalog-add-cp1'));
+      fireEvent.click(screen.getByTestId('catalog-cart-button'));
+      fireEvent.click(await screen.findByTestId('catalog-cart-checkout'));
+      const checkout = await screen.findByTestId('catalog-checkout-modal');
+      fireEvent.change(within(checkout).getByTestId('checkout-name'), { target: { value: 'Ana' } });
+      fireEvent.change(within(checkout).getByTestId('checkout-phone'), {
+        target: { value: '5351234567' },
+      });
+      fireEvent.click(within(checkout).getByTestId('checkout-submit'));
+
+      await waitFor(() => expect(catalogMock.createPublicOrder).toHaveBeenCalledTimes(1));
+      expect(await screen.findByTestId('order-code')).toHaveTextContent('K7M2QX');
+      await waitFor(() =>
+        expect(useStorefrontCartStore.getState().itemsByStore['mi-tienda']).toEqual([]),
+      );
+    });
+
+    // Con solo "Pedidos WhatsApp" (19) el carrito existe pero el pedido NO se persiste (M3): sin
+    // `POST`, sin `Order`, sin código. Lo que sale es el resumen por `wa.me` con el número del
+    // CONFIG (T5), que es la única fuente disponible en este modo.
+    it('con solo "Pedidos WhatsApp" el pedido NO se persiste: sale el wa.me del cliente', async () => {
+      const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+      catalogMock.getPublicOrderingConfig.mockResolvedValue(
+        envelope({
+          ...CONFIG_WITHOUT_BRAND,
+          gestionPedidosEnabled: false,
+          whatsappNumber: '+53 5-987 6543',
+        }),
+      );
+      renderPage();
+      await screen.findByTestId('catalog-add-cp1');
+
+      fireEvent.click(screen.getByTestId('catalog-add-cp1'));
+      fireEvent.click(screen.getByTestId('catalog-cart-button'));
+      fireEvent.click(await screen.findByTestId('catalog-cart-checkout'));
+      const checkout = await screen.findByTestId('catalog-checkout-modal');
+      fireEvent.change(within(checkout).getByTestId('checkout-name'), { target: { value: 'Ana' } });
+      fireEvent.change(within(checkout).getByTestId('checkout-phone'), {
+        target: { value: '5351234567' },
+      });
+      fireEvent.click(within(checkout).getByTestId('checkout-submit'));
+
+      await waitFor(() => expect(openSpy).toHaveBeenCalledTimes(1));
+      // El backend NI SE LLAMA: sin el módulo 20 lo rechaza con un 400 y no hay nada que crear.
+      expect(catalogMock.createPublicOrder).not.toHaveBeenCalled();
+      const url = openSpy.mock.calls[0][0] as string;
+      expect(url).toContain('https://wa.me/5359876543?text=');
+      const summary = new URL(url).searchParams.get('text') ?? '';
+      // El carrito del cliente (1 × 82.50), no el snapshot del servidor: ese snapshot no existe.
+      expect(summary).toContain('1 × Camisa azul');
+      expect(summary).toContain('Cliente: Ana');
+
+      // El aviso no promete un pedido guardado y el carrito se conserva.
+      expect(await screen.findByTestId('checkout-whatsapp-pending')).toBeInTheDocument();
+      expect(screen.queryByTestId('order-code')).not.toBeInTheDocument();
+      expect(useStorefrontCartStore.getState().itemsByStore['mi-tienda']).toHaveLength(1);
+      // El checkout se cierra (lo hace el padre por `onSentWithoutOrder`) y el aviso sobrevive:
+      // es la única confirmación de que el pedido salió.
+      await waitFor(() =>
+        expect(screen.queryByTestId('catalog-checkout-modal')).not.toBeInTheDocument(),
+      );
+      expect(screen.getByTestId('checkout-whatsapp-link')).toHaveAttribute(
+        'href',
+        expect.stringContaining('https://wa.me/5359876543'),
+      );
+      openSpy.mockRestore();
     });
 
     it('la cabecera NO ofrece "Consultar mi pedido": sale del header (D1)', async () => {

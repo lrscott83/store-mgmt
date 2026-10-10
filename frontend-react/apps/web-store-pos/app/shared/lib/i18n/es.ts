@@ -617,6 +617,15 @@ const messages: Record<string, string> = {
   'CHECKOUT.SUBMIT_STAFF': 'Registrar pedido',
   'CHECKOUT.SUBMITTING_STAFF': 'Registrando pedido…',
   'CHECKOUT.FAILED': 'No se pudo crear el pedido. Inténtalo de nuevo.',
+  // Sin el módulo "Gestión de Pedidos" (20) el checkout NO hace POST: no hay `Order`, así que no
+  // hay código que dictar y el aviso no puede decir "pedido guardado" —sería mentira—. Son las
+  // mismas dos situaciones de siempre (handoff o bloqueo) con un texto que no inventa un pedido.
+  'CHECKOUT.SUBMIT_WHATSAPP': 'Enviar por WhatsApp',
+  'CHECKOUT.SUBMITTING_WHATSAPP': 'Enviando pedido…',
+  'CHECKOUT.WHATSAPP_SENT':
+    'Abrimos WhatsApp con el resumen de tu pedido. Esta tienda lo confirma contigo directamente por ahí.',
+  'CHECKOUT.WHATSAPP_BLOCKED_NO_ORDER':
+    'Esta tienda no tiene un número de WhatsApp, así que el envío quedó bloqueado y tu pedido no se ha guardado: guarda el resumen y escríbele por otro medio.',
   // Envío del pedido por WhatsApp (F4). El texto del RESUMEN que viaja en el enlace va en
   // `catalog/lib/whatsapp-order-link.ts`: lo lee la tienda en su chat, no es interfaz de la app.
   // Aquí solo está el estado que ve el cliente en el navegador.

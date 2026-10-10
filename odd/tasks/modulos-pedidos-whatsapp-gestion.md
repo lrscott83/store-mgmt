@@ -54,8 +54,8 @@ carrito + envío por `wa.me` + su configuración por un lado, y la **persistenci
 - **La orden se persiste** ⟺ la tienda tiene el **módulo 20** activo. Si no, el checkout **no hace
   `POST`**: arma el `wa.me` en cliente.
 - El **config público** (`GET /public/ordering/{slug}/config`) expone los **flags de los dos módulos**
-  (`PedidosWhatsAppEnabled` / `GestionPedidosEnabled`). El **número de WhatsApp NO viaja ahí**: sigue en la
-  respuesta de creación (`F4-T2`), que solo recibe quien deja sus datos de contacto.
+  (`PedidosWhatsAppEnabled` / `GestionPedidosEnabled`). El **número de WhatsApp TAMBIÉN viaja ahí** —
+  esto **revierte F4-T2** (decisión T5, 2026-10-10); ver "Supersesión de F4-T2" abajo.
 
 ### Migración + script (README/AGENTS.md)
 
@@ -75,13 +75,14 @@ y se guarda como **`scripts/31-<nombre>.sql`** (el último es el 30). La migraci
 - [x] **T2** — `HasData`: `Module` 19/20, `Feature` 124, `ModuleId` de 123 → 20, `StorePlanModule` 19/20 → planes 3/4.
 - [x] **T3** — Migración EF + **script 31** generado (con el patch de idempotencia) + fila en `scripts/README.md`.
 - [x] **T4** — Backfill SQL de `StoreModule` y `StoreRoleFeature` para tiendas existentes (+ `setval`).
-- [x] **T5** — Backend: el config público expone los flags de módulo (**no** el número: ya no viaja aquí, F4-T2).
+- [x] **T5** — Backend: el config público expone los flags de módulo y (desde 2026-10-10) el número de
+  WhatsApp —**revierte F4-T2**, ver "Supersesión de F4-T2" abajo.
 - [x] **T6** — Backend: `CreateOnlineOrderCommand` exige módulo 20 (y la config) para persistir.
-- [ ] **T7** — Frontend: carrito gated por módulo 19; checkout sin `POST` cuando no hay módulo 20.
-- [ ] **T8** — Frontend: gating de las vistas de gestión por el módulo 20.
-- [ ] **T9** — i18n.
-- [ ] **T10** — Tests.
-- [ ] **T11** — Verificación.
+- [x] **T7** — Frontend: carrito gated por módulo 19; checkout sin `POST` cuando no hay módulo 20.
+- [x] **T8** — Frontend: gating de las vistas de gestión por el módulo 20.
+- [x] **T9** — i18n.
+- [x] **T10** — Tests.
+- [x] **T11** — Verificación.
 
 ## Criterios de aceptación
 
@@ -160,3 +161,73 @@ y se guarda como **`scripts/31-<nombre>.sql`** (el último es el 30). La migraci
     El arreglo es de UNA línea en el seed (`db.Set<StoreModule>().Add(...)` para 19 y 20) — y `CleanupAsync`
     tendría que borrarlas antes de la tienda por la FK Restrict — pero `PublicOrderingSeed.cs` es un
     **support file de E2E existente** y la regla del repo lo prohíbe sin autorización explícita. **No se tocó.**
+- 2026-10-10 — **T7–T11 cerradas** (gating de módulos en el frontend + el número al config público).
+  Sin commits en esta pasada.
+  - **Supersesión de F4-T2 (decisión T5 aplicada)**: el config público **también** expone
+    `WhatsappNumber`. F4-T2 lo dejaba solo en la respuesta de creación, y esa justificación —"solo
+    recibe quien deja sus datos de contacto"— se rompe con M3: el modo "solo Pedidos WhatsApp" **no
+    hace `POST`**, así que **no hay respuesta de creación** de la que sacar el número. Un gate que
+    depende de una respuesta que en ese modo no se produce es un gate roto. Sigue sin exponer
+    dirección, notas ni nada del cliente. Reflejado en el DTO, en el query, en los tests de
+    `GetPublicOrderingConfigQueryHandlerTests` (el `ShouldCarryNoWhatsappNumber` se invirtió) y en el
+    test F4-R4 del frontend.
+  - **Carrito (M2)**: `orderingEnabled` pasa a ser `enabled && pedidosWhatsAppEnabled`. Los dos
+    interruptores se exigen, y son independientes (uno es lo que compró la tienda, el otro si abre
+    pedidos hoy). Sin el 19 no hay botón de carrito, ni "añadir" en la tarjeta, ni en el detalle, y
+    el checkout ni se monta. El aviso `CATALOG_PUBLIC.ORDERS_DISABLED` cubre los dos casos: para el
+    cliente la consecuencia es la misma —no se pide—.
+  - **Checkout (M3)**: `persistsOrders = config.gestionPedidosEnabled`. Sin el 20 **no se llama al
+    servicio** (ni para fallar: solo conseguiría el 400 con el que el backend rechaza el alta por
+    diseño). Con módulo 20, el flujo es el de siempre: POST + resumen con el snapshot del servidor +
+    `code` en el aviso. El aviso tiene dos copys según haya `Order` o no: con pedido,
+    `WHATSAPP_PENDING`/`WHATSAPP_BLOCKED` (los de siempre); sin pedido,
+    `WHATSAPP_SENT`/`WHATSAPP_BLOCKED_NO_ORDER`, que no promete un pedido guardado. `WhatsAppSend.code`
+    pasa a `string | null` —`null` **es** "no hay pedido guardado"—, no un dato que falte. La defensa
+    de doble envío (`submittingRef`) se suelta en las dos ramas: sin POST no hay nada en vuelo.
+  - **El carrito NO se vacía en el modo sin persistencia**: el pedido solo vive en el chat de WhatsApp,
+    y vaciarlo tiraría el trabajo del cliente si el handoff no llegó a completarse. El padre recibe
+    `onSentWithoutOrder` (cierra el checkout) en vez de `onCreated` (que además abriría la consulta de
+    un pedido inexistente).
+  - **Cruce con el modo staff**: el handoff por WhatsApp se suprime para el staff **solo cuando el
+    pedido se persistió** (`sendsByWhatsapp = !staffMode || !persistsOrders`). La alternativa —suprimirlo
+    siempre— dejaba un botón que no hace nada visible para el dueño que atiende en el local. Con
+    módulo 20 el modo staff queda intacto (registra, no manda, y su botón sigue diciendo "Registrar
+    pedido"); sin módulo 20 el botón dice "Enviar por WhatsApp" para todos, porque "Registrar
+    pedido" sería una etiqueta que miente.
+  - **Wart conocido**: `buildWhatsAppOrderLink` exige un `code` no vacío y su cabecera es
+    `Pedido <código> — <tienda>`. Ese módulo no entraba en las superficies autorizadas, así que el
+    resumen del modo sin persistencia pasa `code: 'nuevo'` → "Pedido nuevo — <tienda>". El arreglo
+    limpio es hacer `code` opcional ahí y omitir la cabecera cuando no hay pedido. **Pendiente.**
+  - **T8 — hallazgo, sin cambios en los cargadores**: `ordering-orders.tsx`, `ordering-sales.tsx` y
+    `ordering-drivers.tsx` **ya gatean** con `featureLoader([EFeatures.OnlineOrders])`, o sea por la
+    feature **123**, que desde T1/T2 es del módulo **20**. El gate de T8 se cumple sin tocar una
+    línea; lo que documenta cada vista (bypass de OwnerAdmin/SuperAdmin en `featureLoader`, módulo
+    replicado en el ítem de menú) sigue siendo cierto.
+  - **Pendiente de T8 (fuera de las superficies de esta pasada)**: `menu-config.ts` sigue apuntando
+    `moduleId`/`moduleIds` a `EModules.WebCatalog` (**18**) en los tres ítems de gestión, y
+    `packages/domain/src/enums/index.ts` no tiene `PedidosWhatsApp = 19` / `GestionPedidos = 20`. Con
+    la fila de `StoreRoleFeature` 123 derivada del módulo 18 (backfill de T4), una tienda con 18 y
+    **sin** 20 pasa el gate de la vista y recibe un 403 en el primer GET. Reapuntar el menú a `20` y
+    añadir los dos `EModules` es lo que cierra del todo el gating; requiere esos dos archivos.
+  - **Fuera de alcance tocado (1 archivo)**: `storefront-checkout-staff.test.tsx` tiene su propia
+    fixture `CONFIG: PublicOrderingConfig` y, sin los flags nuevos, sus 5 tests medirían el flujo de
+    un checkout que ya no hace `POST`. Se le añadieron `pedidosWhatsAppEnabled`/`gestionPedidosEnabled`
+    a la fixture y **nada más**: ninguna aserción de ese archivo se tocó.
+  - **Tests**: 10 nuevos (8 de componente en `storefront-flow.test.tsx`, 2 de página en
+    `public-catalog.test.tsx`): carrito oculto sin el 19 (y con el 19 pero `enabled: false`), con solo
+    el 19 **no hay `POST`** + el `wa.me` se arma con el carrito y el número del config + el aviso no
+    promete un pedido guardado + el botón no dice "Registrar pedido", sin número en el config el envío
+    queda bloqueado, y con los dos módulos el flujo es el de siempre (POST + código + carrito vacío).
+    Sonda de mutación: `persistsOrders = true` deja en rojo exactamente los **8** tests que dependen
+    del gate (y los revertidos).
+  - **Verificación (2026-10-10)**:
+    - `dotnet build src/SMCA.sln` → `Build succeeded`, 0 errores, sin `error MSB` (testhost limpiado antes).
+    - `dotnet test src/Application.Tests/Application.Tests.csproj --filter "FullyQualifiedName~GetPublicOrderingConfig"`
+      → `Passed! 59 / 59`.
+    - `pnpm vitest run app/catalog/ app/sales/` → **82 archivos / 1725 tests en verde**, `Type Errors: no errors`.
+    - `pnpm exec eslint` sobre los 10 archivos tocados → sin salida (limpio).
+    - `pnpm typecheck` → solo los **2 errores preexistentes y ajenos** de
+      `app/admin/modules/routes/__tests__/module-catalog.test.tsx` (663/664). Ninguno nuevo.
+  - **Sigue pendiente de la pasada anterior**: el bloqueo de los 3 E2E de
+    `PublicOrderingRateLimitE2ETests` por el seed que no siembra `StoreModule` 19/20. Nada de esto la
+    toca ni la desmiente; sigue necesitando autorización para tocar `PublicOrderingSeed.cs`.

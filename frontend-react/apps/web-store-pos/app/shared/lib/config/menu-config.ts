@@ -174,11 +174,14 @@ export const MENU_GROUPS: MenuGroup[] = [
           'Catálogo Web. Publica tus productos en una página web propia (/catalog/tu-tienda): completa la descripción, el % de descuento, el precio rebajado, la marca Nuevo y las imágenes, y pulsa Sincronizar Catálogo para actualizar lo que ven tus clientes.' +
           BETA_NOTICE,
       },
-      // Pedidos WhatsApp (módulo 18, F1): la configuración del pedido online (interruptor,
-      // número de WhatsApp, modalidades, horarios y zonas). Comparte módulo,
-      // feature y rol con Catálogo Web porque comparte endpoints y gate en el backend
-      // ([HasPermission(StoreRoleFeatures.WebCatalogAdmin)]) —gestionar pedidos es otra
-      // feature, la de F2—. Los precios y la moneda NO se configuran aquí: salen del catálogo.
+      // Pedidos WhatsApp — CONFIGURACIÓN (F1): el interruptor, el número de WhatsApp, las modalidades,
+      // los horarios y las zonas. Comparte módulo, feature y rol con Catálogo Web porque comparte
+      // endpoints y gate en el backend ([HasPermission(StoreRoleFeatures.WebCatalogAdmin)] en
+      // OnlineOrderingController) —gestionar pedidos es otra feature, la 123, que ya NO es esta—.
+      // OJO: se queda en el 18 a propósito aunque los tres ítems de abajo estén en el 20. Su ruta
+      // gatea con `ownerModuleLoader(EModules.WebCatalog)`, así que apuntarla al 20 escondería la
+      // configuración de quien tiene el catálogo. Los precios y la moneda NO se configuran aquí:
+      // salen del catálogo.
       {
         label: 'MENU.ONLINE_ORDERS_SETTINGS',
         path: '/sales/online-orders/settings',
@@ -191,19 +194,21 @@ export const MENU_GROUPS: MenuGroup[] = [
           'Pedidos WhatsApp. Activa el pedido online y configura el número de WhatsApp al que llegan los pedidos, si recoges en la tienda o envías a domicilio, el horario y las zonas de reparto. El precio y la moneda salen del catálogo.' +
           BETA_NOTICE,
       },
-      // Repartidores (módulo 18, F7): catálogo de personas de la tienda. Comparte MÓDULO con los
-      // dos ítems anteriores pero cambia FEATURE (123, no 122) y ROL: el backend lo exige con
-      // `OnlineOrdersAdmin` ([HasPermission]), que lleva OwnerAdmin Y StoreUser (D15) — atender
-      // pedidos y repartir es trabajo del día a día, no solo del dueño. Por eso NO lleva
-      // `rolesOnly: isOwnerAdmin` como los otros dos: con él, el StoreUser que puede usar el
-      // endpoint no vería el enlace.
-      // El `moduleIds` replica el gate del backend: sin el módulo 18 contratado, 403.
+      // Repartidores (módulo 20, F7): catálogo de personas de la tienda. Cambia de MÓDULO
+      // respecto a los dos ítems anteriores (que siguen en el 18, el de su CONFIGURACIÓN) porque
+      // comparte FEATURE (123, no 122) y ROL con la gestión: el backend lo exige con
+      // `OnlineOrdersAdmin` ([HasPermission(DeliveryDriversController)]), que lleva OwnerAdmin Y
+      // StoreUser (D15) — atender pedidos y repartir es trabajo del día a día, no solo del dueño.
+      // Por eso NO lleva `rolesOnly: isOwnerAdmin` como los otros dos: con él, el StoreUser que
+      // puede usar el endpoint no vería el enlace.
+      // El `moduleIds` replica el gate del backend ([HasModule(ModuleType.GestionPedidos)]): sin
+      // el módulo 20 contratado, 403.
       {
         label: 'MENU.ONLINE_ORDERS_DRIVERS',
         path: '/sales/online-orders/drivers',
         featureIds: [EFeatures.OnlineOrders],
-        moduleId: EModules.WebCatalog,
-        moduleIds: [EModules.WebCatalog],
+        moduleId: EModules.GestionPedidos,
+        moduleIds: [EModules.GestionPedidos],
         isNew: true,
         helpContent:
           'Repartidores. Da de alta las personas que reparten los pedidos de tu tienda, con su nombre y su teléfono, y actívalas o desactívalas cuando dejan de repartir. Al atender cada pedido eliges cuál lo lleva.' +
@@ -211,30 +216,32 @@ export const MENU_GROUPS: MenuGroup[] = [
       },
 
       // Gestión de pedidos (feature 123, F5): la tabla de pedidos del día a día. El item de ARRIBA
-      // es la CONFIGURACIÓN (feature 122, solo el dueño); este lo opera también el StoreUser, así
-      // que lleva SU feature y NO un `rolesOnly` de dueño. El `moduleIds` replica el módulo 18 del
-      // backend ([HasModule(ModuleType.WebCatalog)] en `OnlineOrdersAdmin`).
+      // es la CONFIGURACIÓN (feature 122, módulo 18, solo el dueño); este lo opera también el
+      // StoreUser, así que lleva SU feature y NO un `rolesOnly` de dueño. Su módulo es el 20 y
+      // no el 18 porque la feature 123 se movió a "Gestión de Pedidos": el `moduleIds` replica el
+      // backend ([HasModule(ModuleType.GestionPedidos)] en `OnlineOrdersAdmin`), así que apuntarlo
+      // al 18 ofrecería el enlace a una tienda sin el módulo y luego recibiría un 403 en el GET.
       {
         label: 'MENU.ONLINE_ORDERS',
         path: '/sales/online-orders',
         featureIds: [EFeatures.OnlineOrders],
-        moduleId: EModules.WebCatalog,
-        moduleIds: [EModules.WebCatalog],
+        moduleId: EModules.GestionPedidos,
+        moduleIds: [EModules.GestionPedidos],
         isNew: true,
         helpContent:
           'Repartidores. Da de alta las personas que reparten los pedidos de tu tienda, con su nombre y su teléfono, y actívalas o desactívalas cuando dejan de repartir. Al atender cada pedido eliges cuál lo lleva.' +
           'Pedidos. Los pedidos que llegan por WhatsApp, filtrables por estado, pago, entrega, repartidor, fechas y búsqueda por código o teléfono. Desde aquí confirmas el pedido, lo dejas en preparación o listo, lo entregas, lo cancelas, marcas el pago y asignas el repartidor.' +
           BETA_NOTICE,
       },
-      // Ventas de los pedidos (feature 123, F6): el mismo módulo, la misma feature y el mismo gate
-      // que el item de ARRIBA, y sin `rolesOnly` de dueño por la misma razón. Comparte tabla y
-      // roles porque comparte la pregunta: cuánto se vendió de lo que llegó por WhatsApp.
+      // Ventas de los pedidos (feature 123, F6): el mismo módulo (20), la misma feature y el mismo
+      // gate que el item de ARRIBA, y sin `rolesOnly` de dueño por la misma razón. Comparte tabla
+      // y roles porque comparte la pregunta: cuánto se vendió de lo que llegó por WhatsApp.
       {
         label: 'MENU.ONLINE_ORDERS_SALES',
         path: '/sales/online-orders/sales',
         featureIds: [EFeatures.OnlineOrders],
-        moduleId: EModules.WebCatalog,
-        moduleIds: [EModules.WebCatalog],
+        moduleId: EModules.GestionPedidos,
+        moduleIds: [EModules.GestionPedidos],
         isNew: true,
         helpContent:
           'Ventas de tus pedidos de WhatsApp. Elige el rango de fechas y mira cuántos pedidos hubo, cuánto se vendió, el ticket medio y cuánto quedó pendiente de cobro, con el desglose por estado y por entrega y el histórico de los pedidos del rango.' +

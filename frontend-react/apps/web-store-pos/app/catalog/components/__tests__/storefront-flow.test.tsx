@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import axios from 'axios';
 import type { AxiosError, InternalAxiosRequestConfig } from 'axios';
@@ -54,6 +54,11 @@ vi.mock('~/catalog/lib/whatsapp-order-link', async () => {
 const envelope = <T,>(data: T) => ({ data, succeeded: true, message: '', actionCode: 200, errors: [] });
 const failure = { data: null, succeeded: false, message: 'x', actionCode: 404, errors: [] };
 
+/**
+ * Config con los DOS módulos activos: carrito (19) y persistencia (20). Es el caso de Superior/VIP
+ * con M6 aplicado y el que hace que el checkout haga `POST`, que es el flujo que cubren el resto de
+ * esta suite. El modo SIN persistencia vive en su propio bloque, más abajo.
+ */
 const CONFIG: PublicOrderingConfig = {
   enabled: true,
   pickupEnabled: true,
@@ -63,6 +68,8 @@ const CONFIG: PublicOrderingConfig = {
   paletteId: 'default',
   logoUrl: null,
   bannerUrl: null,
+  pedidosWhatsAppEnabled: true,
+  gestionPedidosEnabled: true,
   // El showcase viaja siempre; el checkout no lo usa, pero el config es uno solo.
   carouselImages: [],
   dailyImages: [],
@@ -764,14 +771,19 @@ describe('storefront cart / checkout / order status (F3)', () => {
       });
 
       // ── F4-R4 ───────────────────────────────────────────────────────────────────────────
-      // Dónde viaja el número de la tienda es una decisión de PRIVACIDAD (T2), no de gusto: el
-      // config público lo lee cualquiera que abra el catálogo. Se fija sobre las CLAVES de los
-      // dos contratos, que es exactamente lo que decide esa privacidad.
-      it('el número viaja en la respuesta de creación y NO en el config público', () => {
+      // Dónde viaja el número de la tienda. F4-T2 lo dejó SOLO en la respuesta de creación;
+      // T5 (2026-10-10) lo revirtió y lo puso TAMBIÉN en el config público, porque el modo sin
+      // persistencia (M3) no hace `POST` y por tanto no hay respuesta de creación de la que
+      // sacarlo. Se fija sobre las CLAVES de los dos contratos, que es lo que decide eso.
+      it('el número viaja en el alta Y en el config (T5 revierte F4-T2)', () => {
         expect(Object.keys(CONFIG)).not.toContain('whatsappNumber');
+        expect(Object.keys({ ...CONFIG, whatsappNumber: '+53 5-987 6543' })).toContain(
+          'whatsappNumber',
+        );
         expect(Object.keys(CREATED_WITH_NUMBER)).toContain('whatsappNumber');
         // Los importes del SERVIDOR solo se conocen al crear el pedido: el config público no los
-        // lleva, así que el resumen no podría armarse sin la respuesta del alta.
+        // lleva, así que el resumen del flujo persistido no podría armarse con la respuesta del
+        // alta... y el del modo sin persistencia los toma del propio carrito.
         expect(Object.keys(CONFIG)).not.toContain('lines');
         expect(Object.keys(CONFIG)).not.toContain('subtotal');
         expect(Object.keys(CREATED_WITH_NUMBER)).toEqual(
@@ -800,6 +812,176 @@ describe('storefront cart / checkout / order status (F3)', () => {
         // Un `onCreated` de más haría que el padre abriera dos veces la consulta del pedido.
         expect(onCreated).toHaveBeenCalledTimes(1);
       });
+    });
+  });
+
+  // ── M3: GATING POR MÓDULOS EN EL CHECKOUT ───────────────────────────────────────────────
+  // "Pedidos WhatsApp" (19) abre el carrito; "Gestión de Pedidos" (20) es lo que hace que el
+  // pedido se PERSISTA. Con solo el 19 el checkout NO hace `POST`: arma el `wa.me` con el carrito
+  // del cliente y no guarda nada. El backend lo rechaza con 400 si se intentara
+  // (`OnlineOrdersModuleNotEnabled`), así que el cliente ni lo intenta.
+  describe('gating por módulos (M2/M3)', () => {
+    /** Config con carrito (19) y SIN persistencia (20): el modo que manda el pedido por `wa.me`. */
+    const CONFIG_WITHOUT_ORDER_MANAGEMENT: PublicOrderingConfig = {
+      ...CONFIG,
+      gestionPedidosEnabled: false,
+      whatsappNumber: '+53 5-987 6543',
+    };
+
+    function renderCheckout(overrides: Partial<React.ComponentProps<typeof StorefrontCheckout>> = {}) {
+      return renderWithIntl(
+        <StorefrontCheckout
+          open
+          onClose={() => undefined}
+          storeSlug="mi-tienda"
+          config={CONFIG_WITHOUT_ORDER_MANAGEMENT}
+          lines={[LINE]}
+          onCreated={vi.fn()}
+          {...overrides}
+        />,
+      );
+    }
+
+    function submitValidOrder() {
+      fireEvent.change(screen.getByTestId('checkout-name'), { target: { value: 'Ana' } });
+      fireEvent.change(screen.getByTestId('checkout-phone'), { target: { value: '5351234567' } });
+      fireEvent.click(screen.getByTestId('checkout-submit'));
+    }
+
+    it('sin "Gestión de Pedidos" NO hace POST: el pedido no se persiste', async () => {
+      const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+      serviceMock.createPublicOrder.mockResolvedValue(envelope(CREATED));
+      const onCreated = vi.fn();
+      renderCheckout({ onCreated });
+
+      submitValidOrder();
+
+      await waitFor(() => expect(openSpy).toHaveBeenCalledTimes(1));
+      expect(serviceMock.createPublicOrder).not.toHaveBeenCalled();
+      // Y no se reporta una orden que no existe: el padre no puede abrir la consulta de un
+      // pedido que nadie guardó.
+      expect(onCreated).not.toHaveBeenCalled();
+    });
+
+    it('sin "Gestión de Pedidos" el resumen se arma con el CARRITO y el número del CONFIG', async () => {
+      const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+      renderCheckout();
+
+      submitValidOrder();
+
+      await waitFor(() => expect(openSpy).toHaveBeenCalledTimes(1));
+      const [url, target, features] = openSpy.mock.calls[0] as [string, string, string];
+      // El número sale del CONFIG (T5), no de una respuesta de alta que en este modo no existe.
+      expect(url).toContain('https://wa.me/5359876543?text=');
+      expect(target).toBe('_blank');
+      expect(features).toBe('noopener');
+
+      const summary = new URL(url).searchParams.get('text') ?? '';
+      // El carrito del cliente: 2 × 82.50 = 165, que es lo único que hay en este modo.
+      expect(summary).toContain('2 × Camisa azul');
+      expect(summary).toContain(`2 × Camisa azul — ${money(165)}`);
+      expect(summary).toContain(`Subtotal: ${money(165)}`);
+      expect(summary).toContain(`TOTAL: ${money(165)}`);
+      expect(summary).toContain('Cliente: Ana');
+      // Sin pedido guardado no hay código que dictar, así que la cabecera no inventa uno.
+      expect(summary).not.toContain('K7M2QX');
+    });
+
+    // El aviso NO puede decir "pedido K7M2QX guardado": en este modo no hay pedido guardado, y esa
+    // frase dejaría al cliente esperando un código que la tienda nunca va a(dictar.
+    it('el aviso sin código no promete un pedido guardado', async () => {
+      vi.spyOn(window, 'open').mockImplementation(() => null);
+      renderCheckout();
+
+      submitValidOrder();
+
+      const notice = await screen.findByTestId('checkout-whatsapp-notice');
+      expect(within(notice).getByTestId('checkout-whatsapp-pending')).toHaveTextContent(
+        'resumen de tu pedido',
+      );
+      expect(notice).not.toHaveTextContent('K7M2QX');
+      expect(notice).not.toHaveTextContent('guardado');
+      expect(within(notice).getByTestId('checkout-whatsapp-link')).toHaveAttribute(
+        'href',
+        expect.stringContaining('https://wa.me/5359876543'),
+      );
+    });
+
+    it('el botón anuncia el envío por WhatsApp, no un registro que no va a pasar', () => {
+      renderCheckout();
+      expect(screen.getByTestId('checkout-submit')).toHaveTextContent('Enviar por WhatsApp');
+
+      // Ni el cliente anónimo ni el staff: sin módulo 20 no hay pedido que registrar.
+      cleanup();
+      renderCheckout({ staffMode: true });
+      expect(screen.getByTestId('checkout-submit')).toHaveTextContent('Enviar por WhatsApp');
+      expect(screen.getByTestId('checkout-submit')).not.toHaveTextContent('Registrar pedido');
+    });
+
+    it('avisa al padre por `onSentWithoutOrder` y NO vacía el carrito por su cuenta', async () => {
+      vi.spyOn(window, 'open').mockImplementation(() => null);
+      const onSentWithoutOrder = vi.fn();
+      renderCheckout({ onSentWithoutOrder });
+
+      submitValidOrder();
+
+      await waitFor(() => expect(onSentWithoutOrder).toHaveBeenCalledTimes(1));
+      // El carrito no se vacía desde aquí: el componente no lo tiene. Lo que NO puede pasar es
+      // vaciarlo como si el pedido estuviera confirmado, y eso lo decide el padre.
+    });
+
+    it('sin número en el CONFIG el envío queda bloqueado y sin abrir nada', async () => {
+      const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+      renderCheckout({ config: { ...CONFIG_WITHOUT_ORDER_MANAGEMENT, whatsappNumber: null } });
+
+      submitValidOrder();
+
+      expect(await screen.findByTestId('checkout-whatsapp-blocked')).toHaveTextContent(
+        'no se ha guardado',
+      );
+      expect(openSpy).not.toHaveBeenCalled();
+      expect(screen.queryByTestId('checkout-whatsapp-link')).not.toBeInTheDocument();
+    });
+
+    // El staff SIN el módulo 20 es el cruce de los dos modos: "registrar" solo tiene sentido si hay
+    // algo que registrar. Sin él el pedido no existe en ninguna parte, así que el handoff se hace
+    // igual —si no, el botón sería un no-op silencioso para quien sí puede mandar el resumen.
+    it('el staff sin "Gestión de Pedidos" también manda el resumen por WhatsApp', async () => {
+      const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+      renderCheckout({ staffMode: true });
+
+      submitValidOrder();
+
+      await waitFor(() => expect(openSpy).toHaveBeenCalledTimes(1));
+      expect(serviceMock.createPublicOrder).not.toHaveBeenCalled();
+      expect(await screen.findByTestId('checkout-whatsapp-pending')).toBeInTheDocument();
+    });
+
+    // El revés: con el módulo 20 el staff NO manda nada a WhatsApp. El gating no puede haber
+    // movido el modo staff por el camino.
+    it('con "Gestión de Pedidos" el staff sigue registrando y sin aviso', async () => {
+      const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+      // `CREATED` ya trae número: el modo staff no lo usa, y que lo haya tampoco lo cambia.
+      serviceMock.createPublicOrder.mockResolvedValue(envelope(CREATED));
+      const onCreated = vi.fn();
+      renderWithIntl(
+        <StorefrontCheckout
+          open
+          onClose={() => undefined}
+          storeSlug="mi-tienda"
+          config={CONFIG}
+          lines={[LINE]}
+          onCreated={onCreated}
+          staffMode
+        />,
+      );
+
+      submitValidOrder();
+
+      await waitFor(() => expect(onCreated).toHaveBeenCalledTimes(1));
+      expect(serviceMock.createPublicOrder).toHaveBeenCalledTimes(1);
+      expect(openSpy).not.toHaveBeenCalled();
+      expect(screen.queryByTestId('checkout-whatsapp-notice')).not.toBeInTheDocument();
     });
   });
 

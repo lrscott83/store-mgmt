@@ -97,6 +97,17 @@ export enum EModules {
   Elaboration = 17,
   /** Módulo Catálogo web — espejo de ModuleType.WebCatalog=18 (backend). */
   WebCatalog = 18,
+  /**
+   * Módulo Pedidos WhatsApp — espejo de ModuleType.PedidosWhatsApp=19 (backend). Lo que cuelga
+   * del catálogo público y NO se persiste: el carrito y el envío del resumen por `wa.me` (M3).
+   */
+  PedidosWhatsApp = 19,
+  /**
+   * Módulo Gestión de pedidos — espejo de ModuleType.GestionPedidos=20 (backend). Lo que SÍ
+   * guarda la orden y la gestiona: Pedidos / Ventas / Repartidores, o sea la feature
+   * `OnlineOrders` (123), que está en este módulo y no en `WebCatalog`.
+   */
+  GestionPedidos = 20,
 }
 
 export enum PaymentType {

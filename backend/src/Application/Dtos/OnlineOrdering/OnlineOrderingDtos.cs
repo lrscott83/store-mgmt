@@ -42,8 +42,13 @@ namespace Application.Dtos.OnlineOrdering
     /// Lo que el storefront lee de una tienda para ofrecer el pedido online (anónimo). Tres
     /// decisiones que son parte del contrato, no detalles:
     ///
-    ///   * NO lleva `WhatsappNumber`: el enlace `wa.me` se arma en el endpoint del pedido (F4), no
-    ///     en un config que lee cualquiera que abra el catálogo.
+    ///   * SÍ lleva `WhatsappNumber`, y esto REVIERTE la decisión F4-T2 (2026-10-10): antes solo
+    ///     viajaba en la respuesta de creación, que solo recibe quien deja sus datos de contacto.
+    ///     Con la separación de módulos (M3) ese modo —solo "Pedidos WhatsApp"— NO hace `POST`, así
+    ///     que no hay respuesta de creación de la que sacarlo, y sin número el frontend no puede
+    ///     armar el `wa.me`. El número de un negocio es su teléfono de contacto, no un dato
+    ///     sensible: el que puede ver el catálogo público ya puede escribirle a la tienda por
+    ///     cualquier otro medio.
     ///   * SÍ lleva `PedidosWhatsAppEnabled`/`GestionPedidosEnabled`: son la respuesta a "¿esta
     ///     tienda tiene carrito?" (M2) y "¿el pedido se persiste?" (M3). El storefront no puede
     ///     deducirlos del catálogo —un módulo se compra y se activa por tienda—, así que tienen que
@@ -103,6 +108,18 @@ namespace Application.Dtos.OnlineOrdering
         /// comprables por separado y cada uno significa algo distinto: este no habilita el carrito.
         /// </summary>
         public bool GestionPedidosEnabled { get; set; }
+
+        /// <summary>
+        /// Número de WhatsApp de la tienda con prefijo internacional, TAL CUAL lo guardó el
+        /// dueño (D17). Viaja aquí desde T5 (2026-10-10) y REVIERTE F4-T2: sin el módulo
+        /// "Gestión de Pedidos" el checkout NO hace `POST`, así que no hay respuesta de creación
+        /// de la que sacar el número, y el storefront no podría armar el `wa.me`.
+        ///
+        /// null = la tienda no lo tiene configurado, que NO es lo mismo que tener un número: es el
+        /// único caso en el que NO hay a quién escribir, y el frontend lo trata bloqueando el
+        /// envío en vez de abrir un chat contra un destinatario vacío.
+        /// </summary>
+        public string? WhatsappNumber { get; set; }
 
         /// <summary>Horario de atención (texto libre, D16). null = no publicado.</summary>
         public string? BusinessHours { get; set; }

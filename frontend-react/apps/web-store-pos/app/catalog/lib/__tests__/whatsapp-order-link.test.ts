@@ -81,6 +81,15 @@ describe('buildWhatsAppOrderLink (F4)', () => {
       expect(text).toContain('Notas: Tocar el timbre');
     });
 
+    // Modo SIN PERSISTENCIA (M3, solo módulo 19): no hay `Order`, así que no hay código que dictar.
+    // El encabezado NO lo inventa: sin código, la primera línea es solo el nombre de la tienda.
+    it('sin código el encabezado es solo la tienda, sin inventar un "Pedido"', () => {
+      const text = summaryText(buildWhatsAppOrderLink({ ...ORDER, code: null }));
+
+      expect(text.split('\n')[0]).toBe('Tienda Ana');
+      expect(text).not.toContain('Pedido');
+    });
+
     // El código es lo que la persona dicta por WhatsApp y lo que la tienda cruza con su panel:
     // tiene que leerse de un vistazo, así que va en la primera línea.
     it('pone el código en la primera línea, donde se lee y se dicta', () => {

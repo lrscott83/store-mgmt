@@ -41,8 +41,12 @@ export interface WhatsAppOrderLinkInput {
    */
   readonly whatsappNumber?: string | null;
   readonly storeName: string;
-  /** Código del pedido: se dicta por WhatsApp y es lo que la tienda cruza con su panel. */
-  readonly code: string;
+  /**
+   * Código del pedido: se dicta por WhatsApp y es lo que la tienda cruza con su panel. Es
+   * OPCIONAL: en el modo SIN PERSISTENCIA (M3, solo módulo 19) no hay `Order`, así que no hay
+   * código que dictar y el encabezado NO lo inventa.
+   */
+  readonly code?: string | null;
   readonly lines: readonly WhatsAppOrderLine[];
   /** Subtotal de las líneas. */
   readonly subtotal: number;
@@ -82,7 +86,10 @@ function collapse(value?: string | null): string {
 /** Resumen del pedido en texto plano, tal cual lo lee la tienda en WhatsApp. */
 function buildWhatsAppOrderSummary(input: WhatsAppOrderLinkInput): string {
   const currency = input.currency;
-  const header: string[] = [`Pedido ${collapse(input.code)} — ${collapse(input.storeName)}`];
+  const code = collapse(input.code ?? '');
+  const header: string[] = [
+    code ? `Pedido ${code} — ${collapse(input.storeName)}` : collapse(input.storeName),
+  ];
 
   const client = [
     collapse(input.customerName),

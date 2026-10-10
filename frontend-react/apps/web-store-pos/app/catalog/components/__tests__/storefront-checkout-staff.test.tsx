@@ -30,6 +30,10 @@ const CONFIG: PublicOrderingConfig = {
   paletteId: 'default',
   logoUrl: null,
   bannerUrl: null,
+  // Módulos 19 y 20 activos: sin "Gestión de Pedidos" el checkout no haría `POST` (M3) y todo lo
+  // que hay aquí —el alta, el código, `onCreated`— se mediría sobre un flujo que ya no existe.
+  pedidosWhatsAppEnabled: true,
+  gestionPedidosEnabled: true,
   // El showcase viaja siempre; el checkout no lo usa, pero el config es uno solo.
   carouselImages: [],
   dailyImages: [],

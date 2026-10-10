@@ -23,8 +23,9 @@ namespace Application.Tests.Features.OnlineOrdering;
 ///      "no existe" y "no hay catálogo".
 ///   2. `Enabled = false` cuando la tienda no tiene fila: publicar el catálogo NO publica los
 ///      pedidos (dos interruptores distintos), y por defecto el segundo está apagado.
-///   3. NO expone el número de WhatsApp. El enlace `wa.me` se arma en el endpoint del pedido (F4),
-///      no en un config que cualquier visitante puede leer.
+///   3. SÍ expone el número de WhatsApp. Reversión de F4-T2 (T5, 2026-10-10): el modo "solo
+///      Pedidos WhatsApp" no hace `POST`, así que no hay respuesta de creación de la que sacarlo y
+///      sin este campo el storefront no puede armar el `wa.me`.
 ///   4. Los DOS flags de módulo: `PedidosWhatsAppEnabled` (19) decide si hay carrito (M2) y
 ///      `GestionPedidosEnabled` (20) si el checkout persiste (M3). Son de TIENDA, no del plan, así
 ///      que el storefront no puede deducirlos y tienen que viajar aquí.
@@ -787,15 +788,79 @@ public class GetPublicOrderingConfigQueryHandlerTests
     #region Integration / Contract
 
     /// <summary>
-    /// El config público NO lleva el número de WhatsApp: el enlace `wa.me` se arma en el endpoint
-    /// del pedido (F4). Este test falla si alguien lo añade porque resulta más fácil.
+    /// EL NÚMERO DE WHATSAPP SÍ VIAJA en el config público: esto REVIERTE la decisión F4-T2
+    /// ("solo en la respuesta de creación"), que T5 dejó sin efecto.
+    ///
+    /// El motivo es el modo SIN PERSISTENCIA (M3): con solo el módulo 19 el checkout no hace
+    /// `POST`, así que no existe respuesta de creación de la que sacar el número, y sin este
+    /// campo el frontend no puede armar el `wa.me` que el pedido necesita. Un gate que depende de
+    /// una respuesta que en ese modo no se produce, es un gate roto.
+    ///
+    /// Sigue sin llevar el resto de los datos de contacto: el config público NO expone dirección,
+    /// notas ni nada del cliente — lo que expone es lo que la tienda configuró para su carta.
     /// </summary>
     [Fact]
-    public void PublicOrderingConfigDto_ShouldCarryNoWhatsappNumber()
+    public void PublicOrderingConfigDto_ShouldCarryTheWhatsappNumber()
     {
         typeof(PublicOrderingConfigDto).GetProperties()
             .Select(p => p.Name)
-            .Should().NotContain(new[] { "WhatsappNumber", "Phone", "Contact" });
+            .Should().Contain("WhatsappNumber");
+    }
+
+    /// <summary>
+    /// Viaja TAL CUAL lo guardó el dueño, con su formato (prefijos, guiones y espacios): el
+    /// frontend es quien lo normaliza a dígitos al armar el `wa.me`, y un backend que "limpiara"
+    /// el número introduciría una segunda normalización que puede discrepar de la del navegador.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WithAWhatsappNumber_ShouldPublishItVerbatim()
+    {
+        PublishedStore();
+        StoreCatalogSettings settings = StoreCatalogSettings.Create(_storeId, _tenantId);
+        settings.Enabled = true;
+        settings.WhatsappNumber = "+53 5-987 6543";
+        _settingsRepository.Setup(x => x.GetPublicByStoreIdAsync(_storeId)).ReturnsAsync(settings);
+
+        var result = await Handler().Handle(new GetPublicOrderingConfigQuery("tienda-ana"), CancellationToken.None);
+
+        result.Data!.WhatsappNumber.Should().Be("+53 5-987 6543");
+    }
+
+    /// <summary>
+    /// Sin fila de configuración NO hay número: sale null, no una cadena vacía. null es el estado
+    /// que el storefront entiende como "no hay a quién escribir" (envío bloqueado); una cadena
+    /// vacía sería un número que `wa.me` no entiende y abriría un chat contra la nada.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenTheStoreHasNoSettings_ShouldPublishNoWhatsappNumber()
+    {
+        PublishedStore();
+        _settingsRepository.Setup(x => x.GetPublicByStoreIdAsync(_storeId)).ReturnsAsync((StoreCatalogSettings?)null);
+
+        var result = await Handler().Handle(new GetPublicOrderingConfigQuery("tienda-ana"), CancellationToken.None);
+
+        result.Data!.WhatsappNumber.Should().BeNull();
+    }
+
+    /// <summary>
+    /// El número es INDEPENDIENTE de los módulos: una tienda puede tener "Pedidos WhatsApp" (19)
+    /// y no haber escrito el número todavía (envío bloqueado), o tener el módulo y el número en la
+    /// fila sin haber abierto pedidos (`enabled = false`). Que el número salga o no depende de lo
+    /// que el dueño escribió, no de lo que compró.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WithTheCartModuleAndNoNumber_ShouldReportTheFlagOnAndTheNumberNull()
+    {
+        PublishedStore();
+        StoreCatalogSettings settings = StoreCatalogSettings.Create(_storeId, _tenantId);
+        settings.Enabled = true;
+        _settingsRepository.Setup(x => x.GetPublicByStoreIdAsync(_storeId)).ReturnsAsync(settings);
+        GivenActiveModules(ModuleType.PedidosWhatsApp);
+
+        var result = await Handler().Handle(new GetPublicOrderingConfigQuery("tienda-ana"), CancellationToken.None);
+
+        result.Data!.PedidosWhatsAppEnabled.Should().BeTrue();
+        result.Data.WhatsappNumber.Should().BeNull();
     }
 
     /// <summary>

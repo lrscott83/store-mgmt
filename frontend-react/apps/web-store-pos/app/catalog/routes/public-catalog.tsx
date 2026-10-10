@@ -139,8 +139,19 @@ export function PublicCatalogPage() {
   const [statusOpen, setStatusOpen] = useState(false);
   const [createdOrder, setCreatedOrder] = useState<PublicOrderCreated | null>(null);
 
-  /** Publicar el catálogo y aceptar pedidos son DOS interruptores distintos (F1). */
-  const orderingEnabled = orderingConfig?.enabled ?? false;
+  /**
+   * EL CARRITO exige los DOS interruptores (M2), no uno: el módulo "Pedidos WhatsApp" (19) —sin él
+   * no hay carrito ni pedidos nuevos— y la fila de configuración (`enabled`), que es la decisión
+   * del dueño de abrir o cerrar pedidos.
+   *
+   * Son INDEPENDIENTES y por eso se exigen los dos: `enabled` es lo que la tienda acepta hacer y
+   * `pedidosWhatsAppEnabled` es lo que compró. Con el interruptor en false pero el módulo pagado,
+   * publicar el catálogo no publica los pedidos; con el módulo pagado pero el interruptor apagado,
+   * son dos cosas distintas y la tienda ganó; y con ninguno de los dos, este catálogo es
+   * exactamente el catálogo de siempre, sin carrito.
+   */
+  const orderingEnabled =
+    (orderingConfig?.enabled ?? false) && (orderingConfig?.pedidosWhatsAppEnabled ?? false);
 
   /**
    * Staff de ESTA tienda viendo su propia carta: el pedido se registra y no se manda a WhatsApp
@@ -328,9 +339,11 @@ export function PublicCatalogPage() {
             <CatalogNavLinks className="hidden shrink-0 items-center gap-1 md:flex" />
             <CatalogNavMenu className="md:hidden" />
             {/* Carrito (F3) con la misma forma que el del POS: ícono + contador SIEMPRE visible.
-                Con la tienda cerrada (`enabled: false`) no se ofrece: publicar el catálogo no
-                publica los pedidos, son dos interruptores distintos. Lo gateado es el CARRITO,
-                no la navegación —una tienda cerrada sigue siendo un catálogo que se recorre—. */}
+                Con la tienda cerrada (`enabled: false`) o SIN el módulo "Pedidos WhatsApp" (19)
+                no se ofrece: sin ese módulo no hay carrito ni pedidos nuevos (M2), y sin el
+                interruptor tampoco —son dos interruptores distintos y se exigen los dos—. Lo
+                gateado es el CARRITO, no la navegación —una tienda cerrada sigue siendo un
+                catálogo que se recorre—. */}
             {orderingEnabled && (
               <button
                 type="button"
@@ -737,10 +750,12 @@ export function PublicCatalogPage() {
         }}
       />
 
-      {/* El checkout solo existe si la tienda acepta pedidos: con `enabled: false` no hay ni
-          botón ni modal, porque el backend lo rechazaría (y el cliente no puede permitirse
-          descubrir eso escribiendo a mano un pedido). */}
-      {orderingConfig && (
+      {/* El checkout solo existe si la tienda ofrece el carrito: con `enabled: false` o sin el
+          módulo 19 no hay ni botón ni modal, porque el backend no lo aceptaría (y el cliente no
+          puede permitirse descubrir eso escribiendo a mano un pedido). Cuál de los dos flujos usa
+          por dentro —POST con "Gestión de Pedidos" (20) o `wa.me` sin él (M3)— lo decide el
+          propio checkout leyendo `config.gestionPedidosEnabled`. */}
+      {orderingConfig && orderingEnabled && (
         <StorefrontCheckout
           open={checkoutOpen}
           onClose={() => setCheckoutOpen(false)}
@@ -754,6 +769,7 @@ export function PublicCatalogPage() {
             setCreatedOrder(order);
             setStatusOpen(true);
           }}
+          onSentWithoutOrder={() => setCheckoutOpen(false)}
         />
       )}
 

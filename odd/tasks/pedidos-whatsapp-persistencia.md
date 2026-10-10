@@ -239,8 +239,7 @@ Sin UI en F2. Los contratos de tipos TypeScript (`OrderStatus`, `OrderPaymentSta
 - [x] **T8** — Reglas de transición `OrderStatus` (método de dominio + test unitario de la tabla).
 - [x] **T9** — **Migración EF** `Add-StoreCatalogSettings-Drivers-OrderFields` y **script 29
   generado** (con el patch de idempotencia) + fila en `backend/scripts/README.md`.
-- [ ] **T10** — Tipos espejo en `@store-mgmt/domain`. **Diferida a F3** (motivo en «Decisiones
-  resueltas durante la implementación»: sin consumidor y `frontend-react/AGENTS.md` manda YAGNI).
+- [x] **T10** — Tipos espejo en `@store-mgmt/domain`. **Resuelto como NO implementado (2026-10-10)**: los tipos del carrito/pedido viven en la propia app (`app/sales/lib/services/catalog-http-service.ts`), no en el paquete compartido, porque no hay otro consumidor que la app del POS; `frontend-react/AGENTS.md` manda YAGNI. Si otra app los necesita, se mueven entonces.
 - [x] **T11** — Tests unitarios de dominio (defaults, transiciones válidas/inválidas) y de aplicación
   (command con Moq). Nuevos E2E solo en ficheros nuevos si se autoriza.
 - [x] **T12** — Verificación (build, tests, `database update` + `migrations script`).

@@ -35,6 +35,13 @@ namespace Application.Features.OnlineOrdering.Public.Queries.GetPublicOrderingCo
     /// 19/20 son de TIENDA (`StoreModule.IsActive`), no del plan, así que "tiene catálogo" no dice
     /// nada sobre ellos. Sin los flags, el gating del carrito (M2) y del POST del checkout (M3)
     /// sería una suposición del cliente.
+    ///
+    /// El NÚMERO de WhatsApp también viaja aquí desde T5 (2026-10-10), y REVIERTE F4-T2. Antes
+    /// solo volvía en la respuesta de creación, que solo recibe quien deja sus datos de contacto;
+    /// pero el modo "solo Pedidos WhatsApp" (M3) NO crea `Order` y por tanto no tiene respuesta
+    /// de creación, así que sin este campo el frontend no podría armar el `wa.me` de ese modo.
+    /// No es un dato sensible —es el teléfono de contacto de un negocio, visible en su carta— y el
+    /// gating del módulo 19 es lo que decide si el cliente ve siquiera un carrito.
     /// </summary>
     public sealed record GetPublicOrderingConfigQuery(string StoreSlug) : IQuery<PublicOrderingConfigDto>;
 
@@ -99,6 +106,14 @@ namespace Application.Features.OnlineOrdering.Public.Queries.GetPublicOrderingCo
                 // tienda que no compró ninguno de los dos módulos.
                 PedidosWhatsAppEnabled = activeModuleIds.Contains((int)ModuleType.PedidosWhatsApp),
                 GestionPedidosEnabled = activeModuleIds.Contains((int)ModuleType.GestionPedidos),
+                // NÚMERO DE WHATSAPP (revierte F4-T2, 2026-10-10). Sale de la MISMA fila que el
+                // resto de la configuración, sin ninguna lectura extra, y con la justificación
+                // del modo SIN PERSISTENCIA: con solo el módulo 19 el checkout NO hace POST, así
+                // que no hay respuesta de creación de la que sacarlo y sin este campo el frontend
+                // no puede armar el `wa.me`. Sin fila (o con el número en blanco) sale null: no hay
+                // a quién escribir, y el storefront bloquea el envío en vez de abrir un chat
+                // contra un destinatario vacío.
+                WhatsappNumber = settings?.WhatsappNumber,
                 BusinessHours = settings?.BusinessHours,
                 DeliveryZones = settings?.DeliveryZones,
                 // La MARCA (F8) viaja como URL pública del endpoint de media, nunca como clave

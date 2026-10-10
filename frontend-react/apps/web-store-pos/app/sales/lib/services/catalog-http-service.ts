@@ -266,8 +266,7 @@ export interface PublicShowcaseImage {
  * (`GET /v1/public/ordering/{storeSlug}/config`). Espejo de `PublicOrderingConfigDto`.
  *
  * `logoUrl`/`bannerUrl` son rutas RELATIVAS del endpoint público de media (nunca rutas del
- * servidor): se resuelven con `apiFileUrl`. No lleva `whatsappNumber` — el enlace `wa.me` lo
- * arma el endpoint del pedido, no un config que lee cualquiera que abra el catálogo.
+ * servidor): se resuelven con `apiFileUrl`.
  *
  * Sin costo de envío ni importe mínimo: el pedido vale lo que valen sus líneas y no hay
  * mínimo que frappe. Ni el backend los publica ni esta UI los pinta.
@@ -281,6 +280,33 @@ export interface PublicOrderingConfig {
   paletteId: string;
   logoUrl?: string | null;
   bannerUrl?: string | null;
+  /**
+   * La tienda tiene ACTIVO el módulo "Pedidos WhatsApp" (19). Es el interruptor del CARRITO
+   * (M2): sin él no hay carrito ni pedidos nuevos, aunque `enabled` esté en true.
+   *
+   * INDEPENDIENTE de `enabled` a propósito: uno es lo que compró la tienda (el módulo es de
+   * `StoreModule`, no del plan) y el otro la decisión de abrir pedidos hoy.
+   */
+  pedidosWhatsAppEnabled: boolean;
+  /**
+   * La tienda tiene ACTIVO el módulo "Gestión de Pedidos" (20). Es el interruptor de la
+   * PERSISTENCIA (M3): solo con este módulo el checkout hace `POST` y hay `Order` que
+   * gestionar. Sin él NO se hace `POST`: el resumen se arma en cliente y viaja por `wa.me`,
+   * sin código porque no hay pedido guardado.
+   */
+  gestionPedidosEnabled: boolean;
+  /**
+   * Número de WhatsApp de la tienda, con prefijo internacional, TAL CUAL lo guardó el dueño.
+   *
+   * Viaja AQUÍ y no solo en la respuesta de creación desde T5 (2026-10-10), que revierte F4-T2:
+   * el modo sin persistencia (M3) no hace `POST` y por tanto no tiene respuesta de creación de
+   * la que sacarlo — sin este campo el frontend no podría armar el `wa.me` de ese modo.
+   *
+   * `null`/`undefined` = la tienda no lo tiene configurado: el enlace queda BLOQUEADO y el aviso
+   * lo dice. NUNCA se "limpia" aquí: el backend lo publica tal cual y `wa.me` lo normaliza a
+   * dígitos (`whatsapp-order-link.ts`).
+   */
+  whatsappNumber?: string | null;
   /**
    * Carrusel de cabecera e imágenes del día, cada uno en orden de presentación y SIEMPRE
    * presente aunque esté VACÍO (decisión C1: dos conjuntos independientes; una tienda recién
@@ -375,12 +401,14 @@ export interface PublicOrderCreated {
    */
   lines: PublicOrderCreatedLine[];
   /**
-   * Número de WhatsApp de la tienda (F4, decisión T2). Viaja AQUÍ y no en el config público:
-   * quien recibe esta respuesta es quien acaba de dejar sus datos de contacto para este pedido,
-   * mientras que el config lo lee cualquiera que abra el catálogo.
+   * Número de WhatsApp de la tienda (F4, decisión T2). REPETIDO en la respuesta de creación desde
+   * T5 (2026-10-10), que además lo publica en `PublicOrderingConfig`: aquí sigue llegando porque es
+   * el número con el que el servidor resolvió ESTE pedido, y el config lo lee cualquiera que abra
+   * el catálogo.
    *
    * `null`/`undefined` cuando la tienda no lo tiene configurado: el enlace `wa.me` queda
-   * BLOQUEADO y el pedido sigue guardado.
+   * BLOQUEADO. Con el módulo 20 activo es el caso raro (el aviso lo dirá); sin él —modo solo
+   * WhatsApp— el número del CONFIG es el que manda, porque esta respuesta no existe.
    */
   whatsappNumber?: string | null;
 }
