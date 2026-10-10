@@ -30,8 +30,9 @@ namespace SMCA.WebApi.E2ETests.Orders;
 ///         misma consulta filtrada devuelve cero filas y la que ignora el filtro devuelve una.
 ///         Sin esta sonda, el 200 de R1-1 no distingue "el bypass funciona" de "el filtro no
 ///         existe en PostgreSQL".
-///   R1-3  Un código inexistente → 404 uniforme (mismo cuerpo que un teléfono que no coincide:
-///         el endpoint no puede servir de oráculo de qué códigos existen).
+///   R1-3  Un código inexistente y un teléfono que no coincide devuelven el MISMO 404, y se
+///         compara el CUERPO CRUDO de los dos —no solo el status—: el endpoint no puede servir de
+///         oráculo de qué códigos existen en la tienda.
 ///   R1-4  El mismo código leído desde el slug de OTRA tienda → 404: el slug es lo que acota,
 ///         no el código.
 /// </summary>
@@ -63,6 +64,27 @@ public sealed class PublicOrderingReadE2ETests
         if (response.IsSuccessStatusCode)
             body = await response.Content.ReadFromJsonAsync<ApiResponse<PublicOrderStatusDto>>(ApiResponse.Json);
         return (response.StatusCode, body);
+    }
+
+    /// <summary>
+    /// La respuesta CRUDA, sin parsear — status y cuerpo tal cual los escribió el servidor.
+    /// <para>
+    /// Existe por una razón concreta: <see cref="ReadAsync"/> solo deserializa cuando la respuesta
+    /// es un éxito, así que ante CUALQUIER status no-éxito deja <c>Body</c> en <c>null</c>. Afirmar
+    /// <c>Body == null</c> sobre dos 404 no distingue "ambos son uniformes" de "ambos fallaron": es
+    /// tautológico, y pasaría igual con un endpoint que en un caso dijera <i>código inexistente</i> y
+    /// en el otro <i>ese código existe pero el teléfono no es tuyo</i> — exactamente el oráculo que
+    /// el endpoint no debe ser. Lo que hay que comparar es el CUERPO.
+    /// </para>
+    /// </summary>
+    private async Task<(HttpStatusCode Status, string Raw)> GetStatusRawAsync(
+        string slug, string code, string? phone)
+    {
+        string url = $"/api/v1/public/ordering/{slug}/orders/{code}"
+            + (phone is null ? string.Empty : $"?phone={Uri.EscapeDataString(phone)}");
+
+        var response = await Anon().GetAsync(url);
+        return (response.StatusCode, await response.Content.ReadAsStringAsync());
     }
 
     [Fact]
@@ -148,16 +170,37 @@ public sealed class PublicOrderingReadE2ETests
         {
             await PublicOrderingSeed.SeedOnlineOrderAsync(_f, fixture, code);
 
-            var (unknown, unknownBody) = await GetStatusAsync(fixture.Slug, "ZZZZZZ", fixture.Phone);
-            var (wrongPhone, wrongPhoneBody) = await GetStatusAsync(fixture.Slug, code, "+5300000000");
+            // Control positivo PRIMERO. Sin él, "los dos 404 son idénticos" también lo diría un
+            // endpoint que no devuelve nunca nada: la igualdad de dos respuestas inválidas no
+            // prueba nada por sí sola. Lo que la ata es que el par correcto SÍ sale con 200.
+            (await GetStatusAsync(fixture.Slug, code, fixture.Phone)).Status
+                .Should().Be(HttpStatusCode.OK,
+                    "el par (código, teléfono) correcto tiene que responder 200, o la igualdad de los dos 404 de abajo no probaría nada");
+
+            var (unknown, unknownRaw) = await GetStatusRawAsync(fixture.Slug, "ZZZZZZ", fixture.Phone);
+            var (wrongPhone, wrongPhoneRaw) = await GetStatusRawAsync(fixture.Slug, code, "+5300000000");
 
             unknown.Should().Be(HttpStatusCode.NotFound);
             wrongPhone.Should().Be(HttpStatusCode.NotFound);
 
-            // Uniforme a propósito: si los mensajes difieren, el endpoint es un oráculo de qué
-            // códigos existen en la tienda.
-            unknownBody.Should().BeNull();
-            wrongPhoneBody.Should().BeNull();
+            // ── EL ANTI-ORÁCULO, de verdad ──
+            // Se comparan los CUERPOS CRUDOS carácter a carácter, no "que no hubiera cuerpo".
+            // Uniforme significa indistinguible: quien recorre códigos no puede saber si el que
+            // escribió existe, y por eso la comparación es de igualdad y no de "ambos vacíos".
+            unknownRaw.Should().NotBeNullOrWhiteSpace(
+                "un 404 sin cuerpo también sería 'uniforme', pero por accidente — y el cliente no tiene nada que mostrar");
+
+            wrongPhoneRaw.Should().Be(unknownRaw,
+                "«ese código no existe» y «ese código existe pero el teléfono no coincide» deben ser "
+                + "INDISTINGUIBLES: si los cuerpos difieren, el endpoint es un oráculo de qué códigos "
+                + "existen en la tienda");
+
+            // Y el cuerpo no puede devolver el código buscado ni el teléfono: un eco de cualquiera
+            // de los dos bastaría para filtrar la información que el 404 uniforme esconde.
+            unknownRaw.Should().NotContain("ZZZZZZ").And.NotContain(fixture.Phone,
+                "el cuerpo del 404 no puede devolver el código probado ni el teléfono con el que se buscó");
+            wrongPhoneRaw.Should().NotContain(code).And.NotContain("+5300000000",
+                "el cuerpo del 404 no puede devolver el código real ni el teléfono que falló");
         }
         finally
         {

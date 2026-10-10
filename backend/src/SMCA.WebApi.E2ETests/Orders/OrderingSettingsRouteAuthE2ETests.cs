@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using Application.Dtos.OnlineOrdering;
+using Application.Features.OnlineOrdering.Commands.UpsertStoreCatalogSettings;
 using Domain.Common.Enums;
 using Domain.Entities.StoreCatalogSettings;
 using Domain.Entities.StoreModules;
@@ -85,6 +86,59 @@ public sealed class OrderingSettingsRouteAuthE2ETests
         deliveryEnabled = false,
         businessHours = "Lunes a sábado de 8:00 a 18:00",
         deliveryZones = "Vedado",
+    };
+
+    /// <summary>
+    /// Cuerpo válido con los TRES campos de texto rellenos de <b>padding</b>: lo que se manda es
+    /// más largo que la columna, pero lo que queda RECORTADO cabe exacto.
+    /// <para>
+    /// Es la forma de atar la decisión del VALIDADOR (<c>FitsAfterTrim</c>, que mide el valor
+    /// recortado) a lo que se PERSISTE de verdad. El riesgo del que este caso protege es
+    /// concreto: si el validador midiera el crudo y aceptara, o si midiera el recortado pero el
+    /// handler guardara otra cosa —sin recortar, o con un recorte distinto—, la columna (32/512)
+    /// se rompería con un 500 en el INSERT en vez de un 400 con mensaje. Aquí el 200 y la fila
+    /// real son la prueba de que las dos medidas coinciden con lo que acaba en la base.
+    /// </para>
+    /// <para>
+    /// Se usan las constantes de PRODUCCIÓN del comando, no números escritos a mano: son los topes
+    /// que el validador mide y los que el DTO escribe.
+    /// </para>
+    /// </summary>
+    private static object PaddedBodyToTheColumnLimit() => new
+    {
+        enabled = true,
+        whatsappNumber = new string(' ', 4)
+            + new string('9', UpsertStoreCatalogSettingsCommand.WhatsappNumberMaxLength)
+            + new string(' ', 4),
+        pickupEnabled = true,
+        deliveryEnabled = false,
+        businessHours = "\n  "
+            + new string('a', UpsertStoreCatalogSettingsCommand.BusinessHoursMaxLength)
+            + "  \t",
+        deliveryZones = new string(' ', 3)
+            + new string('b', UpsertStoreCatalogSettingsCommand.DeliveryZonesMaxLength)
+            + new string(' ', 3),
+    };
+
+    /// <summary>
+    /// El MISMO relleno pero con el contenido un carácter POR ENCIMA del tope: recortado sigue
+    /// sobrando, y tiene que rechazarse. Sin este control, "acepta lo que cabe recortado" podría
+    /// haberse implementado como "no mide nada".
+    /// </summary>
+    private static object PaddedBodyOverTheColumnLimit() => new
+    {
+        enabled = true,
+        whatsappNumber = new string(' ', 4)
+            + new string('9', UpsertStoreCatalogSettingsCommand.WhatsappNumberMaxLength + 1)
+            + new string(' ', 4),
+        pickupEnabled = true,
+        deliveryEnabled = false,
+        businessHours = "\n  "
+            + new string('a', UpsertStoreCatalogSettingsCommand.BusinessHoursMaxLength + 1)
+            + "  \t",
+        deliveryZones = new string(' ', 3)
+            + new string('b', UpsertStoreCatalogSettingsCommand.DeliveryZonesMaxLength + 1)
+            + new string(' ', 3),
     };
 
     /// <summary>
@@ -335,6 +389,107 @@ public sealed class OrderingSettingsRouteAuthE2ETests
 
             response.StatusCode.Should().Be(HttpStatusCode.NotFound,
                 "el slug es lo que acota la lectura pública; sin él, cualquiera vería cualquier tienda");
+        }
+        finally
+        {
+            await PublicOrderingSeed.CleanupAsync(_f, fixture);
+        }
+    }
+
+    /// <summary>
+    /// F1-R3-002 — la decisión del VALIDADOR atada al VALOR PERSISTIDO.
+    /// <para>
+    /// <c>FitsAfterTrim</c> mide <c>(value ?? "").Trim().Length</c> y el handler escribe
+    /// <c>IsNullOrWhiteSpace(value) ? null : value.Trim()</c>. Son dos <c>Trim()</c> distintos
+    /// escritos en dos capas, y el único modo de que diverjan sin que nadie se entere es un valor
+    /// que el validador mida corto y el handler escriba largo — que es justo lo que revienta la
+    /// columna con un 500 en el INSERT.
+    /// </para>
+    /// <para>
+    /// Por eso el caso no se queda en el validador (los unitarios de
+    /// <c>UpsertStoreCatalogSettingsCommandValidatorTests</c> ya lo cubren, y solo miran la decisión)
+    /// y sube por HTTP hasta la FILA: un número con 4 espacios a cada lado que ocupa 40
+    /// caracteres crudos y 32 recortados. Si el handler no recortara, el 200 no habría llegado: la
+    /// base lo habría tirado. Y si el validador midiera el crudo, el 400 habría llegado antes. El
+    /// 200 con los 32 dígitos EXACTOS en la fila es lo que dice que las dos medidas son la misma.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public async Task R1_7_a_padded_value_that_fits_once_trimmed_is_persisted_trimmed()
+    {
+        var fixture = await PublicOrderingSeed.SeedAsync(_f);
+        try
+        {
+            await GrantWebCatalogModuleAsync(fixture);
+            var client = DbTestHelpers.AuthedClient(_f, fixture.UserId, fixture.Login);
+
+            var put = await client.PutAsJsonAsync(SettingsUrl, PaddedBodyToTheColumnLimit());
+
+            put.StatusCode.Should().Be(HttpStatusCode.OK,
+                "lo que se manda excede la columna, pero lo que se PERSISTE (recortado) cabe exacto: "
+                + "si el validador midiera el crudo sería un 400, y si el handler no recortara sería un 500 en el INSERT");
+
+            var row = await ReadRowAsync(fixture.StoreId);
+            row.Should().NotBeNull();
+
+            // Lo guardado es lo RECORTADO, con la longitud exacta de la columna. Ni el padding ni
+            // un carácter de más: la fila leída es la prueba, no el 200.
+            row!.WhatsappNumber.Should().Be(
+                new string('9', UpsertStoreCatalogSettingsCommand.WhatsappNumberMaxLength),
+                "el handler persiste el valor recortado, que es exactamente lo que el validador midió");
+            row.WhatsappNumber!.Length.Should().Be(
+                UpsertStoreCatalogSettingsCommand.WhatsappNumberMaxLength,
+                "el número ocupa la columna entera, sin un carácter de sobra");
+
+            // Los otros dos: el `Trim` del handler también recorta los saltos de línea y las
+            // tabulaciones del borde, no solo los espacios.
+            row.BusinessHours.Should().Be(
+                new string('a', UpsertStoreCatalogSettingsCommand.BusinessHoursMaxLength));
+            row.DeliveryZones.Should().Be(
+                new string('b', UpsertStoreCatalogSettingsCommand.DeliveryZonesMaxLength));
+
+            // Y el GET devuelve lo mismo que la fila: el DTO no re-corta ni expande.
+            var body = await client.GetAsync(SettingsUrl);
+            body.StatusCode.Should().Be(HttpStatusCode.OK);
+            var read = await body.Content.ReadFromJsonAsync<ApiResponse<StoreCatalogSettingsDto>>(
+                ApiResponse.Json);
+            read!.Data!.WhatsappNumber.Should().Be(row.WhatsappNumber,
+                "lo que el dueño vuelve a leer es lo recortado, no lo que escribió");
+        }
+        finally
+        {
+            await PublicOrderingSeed.CleanupAsync(_f, fixture);
+        }
+    }
+
+    /// <summary>
+    /// El control negativo del caso anterior, y el que demuestra que el anterior no pasó por
+    /// gracia. Un carácter de más SOBRE EL TOPE ya recortado se rechaza con un 400 —no con un
+    /// 500 de columna— y la fila se queda como estaba: el recorte no es una licencia para meter un
+    /// texto infinito, solo cambia sobre qué se mide.
+    /// </summary>
+    [Fact]
+    public async Task R1_8_a_padded_value_over_the_limit_once_trimmed_is_rejected_and_the_row_is_untouched()
+    {
+        var fixture = await PublicOrderingSeed.SeedAsync(_f);
+        try
+        {
+            await GrantWebCatalogModuleAsync(fixture);
+            var client = DbTestHelpers.AuthedClient(_f, fixture.UserId, fixture.Login);
+
+            var before = await ReadRowAsync(fixture.StoreId);
+            before.Should().NotBeNull();
+
+            var put = await client.PutAsJsonAsync(SettingsUrl, PaddedBodyOverTheColumnLimit());
+
+            put.StatusCode.Should().Be(HttpStatusCode.BadRequest,
+                "recortado sigue estando sobre el tope de la columna: es un 400 con mensaje, no un 500 en el INSERT");
+
+            var after = await ReadRowAsync(fixture.StoreId);
+            after.Should().NotBeNull();
+            after!.WhatsappNumber.Should().Be(before!.WhatsappNumber,
+                "el rechazo tiene que venir ANTES del handler: la fila es la que había");
+            after.BusinessHours.Should().Be(before.BusinessHours);
         }
         finally
         {

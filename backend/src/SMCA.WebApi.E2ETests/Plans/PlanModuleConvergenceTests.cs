@@ -41,8 +41,10 @@ namespace SMCA.WebApi.E2ETests.Plans;
 /// </para>
 /// <para>
 /// <c>UpSql</c> is a DATABASE-WIDE convergence: it rewrites the rows of every store, not just the
-/// ones a test seeds. Each test therefore captures the whole <c>StoreModule</c> /
-/// <c>StoreRoleFeature</c> content up front and puts it back afterwards
+/// ones a test seeds, AND it rewrites the plan/module catalog itself
+/// (<c>PlanCatalogCleanupSql</c> deletes pairs outside its historical spec, which does not know the
+/// modules added later — 19/20). Each test therefore captures the whole <c>StoreModule</c> /
+/// <c>StoreRoleFeature</c> / <c>StorePlanModule</c> content up front and puts it back afterwards
 /// (<see cref="ConvergenceSnapshot"/>), so running this file leaves <c>smca_test</c> exactly as
 /// it found it.
 /// </para>
@@ -662,6 +664,21 @@ public sealed class PlanModuleConvergenceTests
             .OrderBy(r => r.RoleId).ThenBy(r => r.FeatureId).ToArray());
     }
 
+    /// <summary>
+    /// Los pares plan↔módulo del CATÁLOGO tal como están AHORA en la base.
+    ///
+    /// <b>Una sola proyección</b> para las TRES lecturas que el bloque del catálogo necesita
+    /// (captura, qué sobró tras la corrida, qué falta reponer). Estaba escrita tres veces —cada
+    /// copia con su propio tipo anónimo— y tres copias de la misma proyección son tres ocasiones
+    /// de divergir: la que olvida <c>IgnoreQueryFilters</c>, o una columna, restaura algo distinto
+    /// de lo que capturó, y el síntoma sería un catálogo que se mutila en silencio (el 2026-10-09).
+    /// Con el helper, capturar y restaurar leen EXACTAMENTE la misma forma.
+    /// </summary>
+    private static Task<List<StorePlanModuleRow>> ReadPlanModuleKeysAsync(ApplicationDbContext db) =>
+        db.Set<StorePlanModule>().IgnoreQueryFilters()
+            .Select(spm => new StorePlanModuleRow(spm.PlanId, spm.ModuleId))
+            .ToListAsync();
+
     // ── Records ────────────────────────────────────────────────────────────────
 
     private sealed record Catalog(
@@ -689,24 +706,64 @@ public sealed class PlanModuleConvergenceTests
         Guid StoreId, int RoleId, int FeatureId, Guid TenantId, bool IsActive,
         DateTimeOffset CreatedDate, Guid CreatedBy, DateTimeOffset? UpdatedDate, Guid? UpdatedBy);
 
+    /// <summary>
+    /// El catálogo de planes, que <c>UpSql</c> también reescribe. <b>La fila entera son sus dos
+    /// columnas</b>: <c>StorePlanModule</c> deriva de <c>Entity</c> (no de <c>AuditableEntity</c>),
+    /// no tiene <c>Id</c> propio —su PK ES la pareja <c>(PlanId, ModuleId)</c>— y la migración
+    /// <c>20260908194919_Add-StorePlanModules</c> solo crea esas dos. No hay estado adicional que
+    /// capturar ni que restaurar: por eso el snapshot del catálogo es completo y no una aproximación.
+    /// </summary>
+    private sealed record StorePlanModuleRow(int PlanId, int ModuleId);
+
     // ── Global-state capture/restore ───────────────────────────────────────────
 
     /// <summary>
     /// <c>UpSql</c> converges the WHOLE database, not just the store a test seeds — it
-    /// soft-deletes extras and grants missing modules for every store it can see. Running it
-    /// would therefore hand modules to stores another test deliberately seeded in a partial
-    /// state (<c>AuthzSeed.SeedOwnerAdminAsync(withManagementModule: false)</c>) and change
-    /// their outcome for reasons unrelated to that test. Each test captures both tables before
+    /// soft-deletes extras and grants missing modules for every store it can see, AND it rewrites
+    /// the plan/module catalog (<c>PlanCatalogCleanupSql</c> deletes every pair outside its
+    /// historical spec, which does not know the modules added later — 19/20). Running it would
+    /// therefore hand modules to stores another test deliberately seeded in a partial state
+    /// (<c>AuthzSeed.SeedOwnerAdminAsync(withManagementModule: false)</c>) and change their
+    /// outcome for reasons unrelated to that test. Each test captures all three tables before
     /// touching anything and puts them back here.
     /// <para>
-    /// The restore is exact because <c>UpSql</c> never hard-deletes: every captured row still
-    /// exists, so restoring is an UPDATE of the only columns <c>UpSql</c> can move on an
-    /// existing row (IsActive, UpdatedDate, UpdatedBy); the rows it INSERTed did not exist
-    /// before and are deleted. <c>ExecuteUpdateAsync</c>/<c>ExecuteDeleteAsync</c> are used
+    /// The store-side restore is exact because <c>UpSql</c> never hard-deletes: every captured row
+    /// still exists, so restoring is an UPDATE of the only columns <c>UpSql</c> can move on an
+    /// existing row (IsActive, UpdatedDate, UpdatedBy); the rows it INSERTed did not exist before
+    /// and are deleted. <c>ExecuteUpdateAsync</c>/<c>ExecuteDeleteAsync</c> are used
     /// deliberately — they bypass the NoTracking trap
     /// (<c>ApplicationDbContext</c> sets <c>QueryTrackingBehavior.NoTracking</c> globally, so a
     /// query-then-mutate-then-SaveChanges would write nothing, silently) and the audit
     /// interceptor, which would otherwise restamp CreatedDate/CreatedBy on the restore.
+    /// </para>
+    /// <para>
+    /// <b>ALCANCE GLOBAL, a propósito (R3-CATALOG-SCOPE).</b> El restore borra cualquier par
+    /// ausente del snapshot —no solo los que movió <c>UpSql</c>—, y eso no es descuido: <c>UpSql</c>
+    /// recorre <b>todos</b> los planes de <c>StorePlan</c> (su CTE los cruza enteros, sin filtrar
+    /// por plan) y todas las tiendas, así que un restore acotado a un subconjunto NO restauraría la
+    /// base: dejaría fuera justo los pares que la corrida tocó por fuera del recorte. Acotarlo por
+    /// tienda o por plan daría una restauración <i>menos</i> fiel, no más.
+    /// <para>
+    /// Y no hay escritor concurrente al quearle: la clase está en la colección
+    /// <c>[Collection("e2e")]</c>, que corre SERIALIZADA sobre un único <c>WebAppFixture</c>, así
+    /// que entre la captura y el restore no puede aparecer ni desaparecer una fila que otro test
+    /// sea dueño. El único que escribe el catálogo dentro de esa ventana es esta misma corrida, y
+    /// todo lo que ella inserta queda fuera del snapshot por definición —que es exactamente lo que
+    /// hay que deshacer.
+    /// </para>
+    /// <para>
+    /// <b>FIDELIDAD DEL CATÁLOGO (R3-CATALOG-LOSSY): sin pérdida, por construcción.</b> La
+    /// reinserción manda la fila COMPLETA de <c>StorePlanModule</c> porque la fila son sus dos
+    /// columnas: <c>StorePlanModule : Entity</c> (no <c>AuditableEntity</c>), sin <c>Id</c> propio
+    /// porque su PK ES <c>(PlanId, ModuleId)</c>, sin columnas de auditoría, y la migración
+    /// <c>20260908194919_Add-StorePlanModules</c> no crea ninguna más. No queda estado que capturar
+    /// ni que restaurar: el snapshot del catálogo es completo por tener que serlo. La reinserción
+    /// va por el <c>DbSet</c> mapeado (<c>StorePlanModule.Create</c> + <c>SaveChangesAsync</c>) y
+    /// no por SQL crudo con nombres de tabla y de columnas repetidos a mano: el mismo mapeo que
+    /// usa <c>HasData</c>, así que un cambio de esquema no puede dejar el restore escribiendo en una
+    /// tabla que ya no existe ni con una columna que se renombró. No hay <c>CreatedDate</c> que el
+    /// interceptor de auditoría pueda reestampar, y <c>StorePlanModuleCreatedDomainEvent</c> no
+    /// tiene handler: el <c>Add</c> no arrastra ningún efecto secundario.
     /// </para>
     /// </summary>
     private sealed class ConvergenceSnapshot
@@ -714,8 +771,6 @@ public sealed class PlanModuleConvergenceTests
         private readonly List<StoreModuleRow> _modules;
         private readonly List<StoreRoleFeatureRow> _roleFeatures;
         private readonly List<StorePlanModuleRow> _planModules;
-
-        private sealed record StorePlanModuleRow(int PlanId, int ModuleId);
 
         private ConvergenceSnapshot(List<StoreModuleRow> modules, List<StoreRoleFeatureRow> roleFeatures,
             List<StorePlanModuleRow> planModules)
@@ -746,10 +801,9 @@ public sealed class PlanModuleConvergenceTests
             // El catálogo también: PlanCatalogCleanupSql borra los pares plan↔módulo fuera de la
             // especificación de la convergencia (histórica), que no conoce los módulos añadidos
             // después (p.ej. 19/20). Sin capturarlo, re-ejecutar UpSql mutila el catálogo de la DB
-            // compartida de forma permanente.
-            var planModules = await db.Set<Domain.Entities.Plans.StorePlanModule>().IgnoreQueryFilters()
-                .Select(spm => new StorePlanModuleRow(spm.PlanId, spm.ModuleId))
-                .ToListAsync();
+            // compartida de forma permanente. Lee con la MISMA proyección que usa el restore
+            // (ReadPlanModuleKeysAsync): capturar y restaurar no pueden divergir.
+            var planModules = await ReadPlanModuleKeysAsync(db);
 
             return new ConvergenceSnapshot(modules, roleFeatures, planModules);
         }
@@ -816,30 +870,35 @@ public sealed class PlanModuleConvergenceTests
             await using var catalogTransaction = await db.Database.BeginTransactionAsync();
 
             var capturedPlanKeys = snapshot._planModules.Select(p => (p.PlanId, p.ModuleId)).ToHashSet();
-            foreach (var extra in await db.Set<Domain.Entities.Plans.StorePlanModule>().IgnoreQueryFilters()
-                         .Select(spm => new { spm.PlanId, spm.ModuleId }).ToListAsync())
+
+            foreach (var extra in (await ReadPlanModuleKeysAsync(db))
+                         .Where(p => !capturedPlanKeys.Contains((p.PlanId, p.ModuleId))))
             {
-                if (!capturedPlanKeys.Contains((extra.PlanId, extra.ModuleId)))
-                {
-                    await db.Set<Domain.Entities.Plans.StorePlanModule>().IgnoreQueryFilters()
-                        .Where(spm => spm.PlanId == extra.PlanId && spm.ModuleId == extra.ModuleId)
-                        .ExecuteDeleteAsync();
-                }
+                await db.Set<StorePlanModule>().IgnoreQueryFilters()
+                    .Where(spm => spm.PlanId == extra.PlanId && spm.ModuleId == extra.ModuleId)
+                    .ExecuteDeleteAsync();
             }
 
-            var currentPlanKeys = (await db.Set<Domain.Entities.Plans.StorePlanModule>().IgnoreQueryFilters()
-                .Select(spm => new { spm.PlanId, spm.ModuleId }).ToListAsync())
+            // Se relee DESPUÉS de borrar, dentro de la misma transacción: insertar un par que la
+            // fila anterior acaba de eliminar no es un error (la PK `(PlanId, ModuleId)` es
+            // compuesta y el `Add` es un INSERT limpio), pero releer evita mandar a la base un
+            // INSERT para algo que ya está.
+            var currentPlanKeys = (await ReadPlanModuleKeysAsync(db))
                 .Select(p => (p.PlanId, p.ModuleId)).ToHashSet();
-            foreach (var row in snapshot._planModules)
+
+            // Por el `DbSet` MAPEADO, no por SQL crudo: la fila de `StorePlanModule` son sus dos
+            // columnas, `StorePlanModule.Create` es la misma fábrica que usa `HasData`, y EF
+            // conoce el esquema. Un `INSERT INTO "StorePlanModule" (...)` escrito a mano repetía
+            // nombres de tabla y de columnas en un segundo lugar que el modelo no vigila: un
+            // rename de columna lo dejaba escribiendo contra una tabla que ya no existe, y solo
+            // cuando esa mitad del restore se ejecutaba.
+            foreach (var row in snapshot._planModules
+                         .Where(p => !currentPlanKeys.Contains((p.PlanId, p.ModuleId))))
             {
-                if (!currentPlanKeys.Contains((row.PlanId, row.ModuleId)))
-                {
-                    await db.Database.ExecuteSqlRawAsync(
-                        "INSERT INTO \"StorePlanModule\" (\"PlanId\", \"ModuleId\") VALUES ({0}, {1}) ON CONFLICT (\"PlanId\", \"ModuleId\") DO NOTHING;",
-                        row.PlanId, row.ModuleId);
-                }
+                db.Set<StorePlanModule>().Add(StorePlanModule.Create(row.PlanId, row.ModuleId));
             }
 
+            await db.SaveChangesAsync();
             await catalogTransaction.CommitAsync();
         }
     }

@@ -236,6 +236,56 @@ public class UpsertStoreCatalogSettingsCommandValidatorTests
     }
 
     /// <summary>
+    /// <summary>
+    /// F1-R3-002: el ÚNICO punto donde la medida del validador y la del handler <b>no</b> dan el
+    /// mismo resultado, y por qué no es un problema.
+    /// <para>
+    /// <c>FitsAfterTrim</c> mide <c>(value ?? "").Trim()</c> —para un texto solo-espacios eso es la
+    /// cadena vacía, longitud 0, así que PASA aunque el crudo sea larguísimo—. El handler escribe
+    /// <c>IsNullOrWhiteSpace(value) ? null : value.Trim()</c>, o sea que ese mismo valor se persiste
+    /// como <c>null</c>. Divergen en el rótulo, no en el riesgo: lo que entra en la columna es
+    /// <c>null</c>, que no tiene longitud que pueda reventar nada.
+    /// </para>
+    /// <para>
+    /// La otra mitad, y la que hace este caso necesario: con el interruptor <b>encendido</b> esa
+    /// divergencia es INALCANZABLE, porque la regla de negocio (<c>NotEmpty</c>, que FluentValidation
+    /// trata también como vacío un texto de puros espacios) rechaza antes de que la de longitud mire
+    /// nada. El hueco solo se abre con la fila apagada, que es donde un texto solo-espacios sí llega
+    /// a persistirse — como <c>null</c>.
+    /// </para>
+    /// <para>
+    /// Fijarlo evita el futuro arreglo a medias: si alguien "unifica" las dos medidas midiendo el
+    /// crudo en el validador, este caso rompe y con él el que está justo encima. Y el extremo REAL
+    /// persistido —que a 40 dígitos crudos se guarden 32 y no 40— lo afirma
+    /// <c>OrderingSettingsRouteAuthE2ETests.R1_7</c> por HTTP, contra la fila de verdad.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void Validate_WithAWhitespaceOnlyNumberFarOverTheLimit_ShouldOnlyReachTheLengthRuleWithTheSwitchOff()
+    {
+        // Interruptor ENCENDIDO: lo rechaza la regla de NEGOCIO, no la de longitud. Un dueño que
+        // enciende los pedidos sin escribir un número real recibe el mensaje que toca.
+        UpsertStoreCatalogSettingsCommand on = ValidCommand();
+        on.WhatsappNumber = new string(' ', UpsertStoreCatalogSettingsCommand.WhatsappNumberMaxLength * 4);
+
+        var resultOn = Validator().Validate(on);
+        resultOn.IsValid.Should().BeFalse();
+        resultOn.Errors.Should().ContainSingle(e => e.PropertyName == nameof(on.WhatsappNumber));
+
+        // Interruptor APAGADO: la regla de negocio no corre (es el estado en que nace la tienda),
+        // y la de longitud ve longitud 0. Pasa — y lo que el handler persista de esto es `null`.
+        UpsertStoreCatalogSettingsCommand off = ValidCommand();
+        off.Enabled = false;
+        off.WhatsappNumber = new string(' ', UpsertStoreCatalogSettingsCommand.WhatsappNumberMaxLength * 4);
+        off.BusinessHours = "\n" + new string('\t', UpsertStoreCatalogSettingsCommand.BusinessHoursMaxLength * 2);
+        off.DeliveryZones = new string('\r', UpsertStoreCatalogSettingsCommand.DeliveryZonesMaxLength * 2);
+
+        Validator().Validate(off).IsValid.Should().BeTrue(
+            "recortado queda vacío, y lo que el handler persiste de un texto solo-espacios es null: "
+            + "no hay longitud que pueda reventar la columna");
+    }
+
+    /// <summary>
     /// Los límites son los de la COLUMNA (`StoreCatalogSettingsEntityTypeConfiguration`): un valor
     /// más largo no lo recorta la base, lo revienta con un 500 en el INSERT. El validador lo
     /// convierte en un 400 con mensaje.
