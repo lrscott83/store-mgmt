@@ -31,19 +31,15 @@ namespace Application.Features.WebCatalog.Branding.Commands.UpdateStoreCatalogBr
     /// NO lleva `StoreId`: la tienda es la del contexto. Aceptarlo en el cuerpo dejaría que un
     /// dueño escribiera la marca de la tienda de otro.
     ///
-    /// NO lleva `PaletteId`: las paletas se cancelaron (decisión del Owner, 2026-10-07). Esta feature
-    /// escribe `LogoKey`, `BannerKey` y `TemplateId` (la plantilla/vista del catálogo).
-    ///
-    /// `TemplateId` es PARCIAL como los lados de imagen: `null` o en blanco = "no toco la plantilla";
-    /// un valor no vacío se valida y se escribe. Se estrena con valor por defecto para no obligar a
-    /// las llamadas de logo/banner a mencionarlo.
+    /// NO lleva `PaletteId` (las paletas se cancelaron, 2026-10-07) NI `TemplateId` (la plantilla
+    /// pasó a ser SuperAdmin-only en `/v1/stores/{storeId}/catalog-template`): esta feature escribe
+    /// únicamente `LogoKey` y `BannerKey`.
     /// </summary>
     public sealed record UpdateStoreCatalogBrandingCommand(
         CatalogImageUpload? Logo,
         bool RemoveLogo,
         CatalogImageUpload? Banner,
-        bool RemoveBanner,
-        string? TemplateId = null) : ICommand<StoreCatalogBrandingDto>;
+        bool RemoveBanner) : ICommand<StoreCatalogBrandingDto>;
 
     public class UpdateStoreCatalogBrandingCommandHandler
         : ICommandHandler<UpdateStoreCatalogBrandingCommand, StoreCatalogBrandingDto>
@@ -92,17 +88,12 @@ namespace Application.Features.WebCatalog.Branding.Commands.UpdateStoreCatalogBr
             string? bannerKey = await ResolveAsync(
                 request.Banner, request.RemoveBanner, settings.BannerKey, BrandingImageKinds.Banner, tenantId, storeId, cancellationToken);
 
-            // SOLO columnas de marca (D19): logo, banner y plantilla. Las de pedidos, `PaletteId`,
+            // SOLO columnas de marca (D19): logo y banner. Las de pedidos, `PaletteId`, `TemplateId`,
             // `SyncedAt` e `Id` quedan como estaban: si esta feature los tocara, subir un logo
             // dejaría al dueño sin los pedidos que tenía abiertos. Su ausencia aquí ES el
             // comportamiento, no un olvido.
             settings.LogoKey = logoKey;
             settings.BannerKey = bannerKey;
-
-            // La PLANTILLA (vista) es PARCIAL como los lados de imagen: `null` o en blanco significa
-            // "no la toco". El validador ya comprobó su formato cuando venía con valor.
-            if (!string.IsNullOrWhiteSpace(request.TemplateId))
-                settings.TemplateId = request.TemplateId.Trim();
 
             // El upsert del repositorio marca la entidad explícitamente (Add o Modified).
             // `ApplicationDbContext` es NoTracking, así que mutar la fila cargada y llamar a
@@ -117,9 +108,6 @@ namespace Application.Features.WebCatalog.Branding.Commands.UpdateStoreCatalogBr
                 PaletteId = string.IsNullOrWhiteSpace(settings.PaletteId)
                     ? StoreCatalogSettings.DefaultPaletteId
                     : settings.PaletteId,
-                TemplateId = string.IsNullOrWhiteSpace(settings.TemplateId)
-                    ? StoreCatalogSettings.DefaultTemplateId
-                    : settings.TemplateId,
             });
         }
 

@@ -20,30 +20,17 @@ namespace Application.Features.WebCatalog.Branding.Commands.UpdateStoreCatalogBr
     /// producto — un validador que leyera `Stream` para decidir el formato mezclaría dos capas y
     /// dejaría dos juegos de reglas que divergirían.
     ///
-    /// Tampoco decide la tienda (eso es el handler, contra el contexto) ni la paleta (cancelada).
-    ///
-    /// La PLANTILLA (`TemplateId`) suma una regla de FORMA: cuando viene con valor debe ser un id
-    /// kebab-case en minúsculas; en blanco significa "no la toco" y no se valida. También cuenta
-    /// como "algo que hacer": cambiar solo la plantilla es una petición con sentido.
+    /// Tampoco decide la tienda (eso es el handler, contra el contexto) ni la paleta (cancelada) ni
+    /// la plantilla (ahora SuperAdmin-only, fuera de esta feature).
     /// </summary>
     public class UpdateStoreCatalogBrandingCommandValidator : AbstractValidator<UpdateStoreCatalogBrandingCommand>
     {
-        /// <summary>Id de plantilla: minúsculas, empieza por letra, guiones, máx. 64.</summary>
-        private const string TemplateIdPattern = "^[a-z][a-z0-9-]{0,63}$";
-
         public UpdateStoreCatalogBrandingCommandValidator(IStringLocalizer<I18n> localizer)
         {
             RuleFor(x => x)
-                .Must(x => x.Logo != null || x.RemoveLogo || x.Banner != null || x.RemoveBanner || !string.IsNullOrWhiteSpace(x.TemplateId))
+                .Must(x => x.Logo != null || x.RemoveLogo || x.Banner != null || x.RemoveBanner)
                 .WithMessage(localizer["BrandingNothingToUpdate", "{PropertyName}"])
-                .OverridePropertyName("Logo/Banner/Template");
-
-            // La plantilla solo se valida cuando viene con valor: en blanco es "no la toco".
-            RuleFor(x => x.TemplateId)
-                .Matches(TemplateIdPattern)
-                .When(x => !string.IsNullOrWhiteSpace(x.TemplateId))
-                .WithMessage(localizer["BrandingInvalidTemplate", nameof(UpdateStoreCatalogBrandingCommand.TemplateId)])
-                .OverridePropertyName(nameof(UpdateStoreCatalogBrandingCommand.TemplateId));
+                .OverridePropertyName("Logo/Banner");
 
             // Las dos condiciones cuelgan del objeto entero porque combinan un archivo con una
             // bandera; `OverridePropertyName` hace que el mensaje hable del lado y no de una

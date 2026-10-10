@@ -15,9 +15,11 @@ using Application.Features.StoreManagement.Stores.Commands.SetMyStore;
 using Application.Features.StoreManagement.Stores.Commands.SwitchMyStore;
 using Application.Features.StoreManagement.Stores.Commands.SetStoreActivation;
 using Application.Features.StoreManagement.Stores.Commands.UpdateStore;
+using Application.Features.StoreManagement.Stores.Commands.UpdateStoreCatalogTemplate;
 using Application.Features.StoreManagement.Stores.Commands.UpdateStoreModulePricing;
 using Application.Features.StoreManagement.Stores.Queries.GetMyStores;
 using Application.Features.StoreManagement.Stores.Queries.GetStoreById;
+using Application.Features.StoreManagement.Stores.Queries.GetStoreCatalogTemplate;
 using Application.Features.StoreManagement.Stores.Queries.GetStoreModulePricing;
 using Application.Features.StoreManagement.Stores.Queries.GetStorePlan;
 using Application.Features.StoreManagement.Stores.Queries.GetStores;
@@ -312,6 +314,31 @@ namespace SMCA.WebApi.Controllers.v1
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
         public async Task<IActionResult> GetStoreModulePricingAsync(Guid storeId)
             => Ok(await Sender.Send(new GetStoreModulePricingQuery(storeId)));
+
+        /// <summary>
+        /// Fija la PLANTILLA (vista) del catálogo público de UNA tienda. SuperAdmin only: la vista
+        /// es una decisión de plataforma, no de la tienda (por eso NO vive en la marca del Owner,
+        /// `WebCatalogAdmin`). El handler escribe SOLO `TemplateId` de la fila por tienda.
+        /// </summary>
+        [HttpPut("{storeId}/catalog-template")]
+        [HasPermission(StoreRoleFeatures.SuperAdmin)]
+        [ProducesResponseType(typeof(ResponseResult<StoreCatalogTemplateDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        public async Task<IActionResult> UpdateStoreCatalogTemplateAsync(
+            Guid storeId, [FromBody] UpdateStoreCatalogTemplateCommand command)
+            => Ok(await Sender.Send(command with { StoreId = storeId }));
+
+        /// <summary>
+        /// Lee la plantilla del catálogo público de UNA tienda (SuperAdmin), semilla del selector.
+        /// Una tienda sin fila devuelve la plantilla por defecto, no un 404.
+        /// </summary>
+        [HttpGet("{storeId}/catalog-template")]
+        [HasPermission(StoreRoleFeatures.SuperAdmin)]
+        [ProducesResponseType(typeof(ResponseResult<StoreCatalogTemplateDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        public async Task<IActionResult> GetStoreCatalogTemplateAsync(Guid storeId)
+            => Ok(await Sender.Send(new GetStoreCatalogTemplateQuery(storeId)));
 
         [HttpGet("to-collect")]
         [HasPermission(StoreRoleFeatures.SuperAdmin, StoreRoleFeatures.StorePaymentAdmin)]
