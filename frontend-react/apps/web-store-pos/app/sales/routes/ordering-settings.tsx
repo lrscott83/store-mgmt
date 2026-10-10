@@ -28,8 +28,12 @@ const INPUT_CLASSES =
  * Formatea la marca de la última sincronización. Misma convención que `web-catalog.tsx`: el
  * backend guarda UTC y, según la columna, el valor puede llegar sin sufijo de zona — sin él el
  * navegador lo leería como hora local, así que se completa antes de convertir.
+ *
+ * Se exporta para poder fijarla en un test propio (F1-R8): la vista solo la alcanza a través de un
+ * `syncedAt` que el servicio controla, así que probarla por la pantalla no cubre ni el valor
+ * inválido ni el borde del regex de zona.
  */
-function formatSyncedAt(value: string): string {
+export function formatSyncedAt(value: string): string {
   const hasZone = /[zZ]$|[+-]\d{2}:\d{2}$/.test(value);
   return new Date(hasZone ? value : `${value}Z`).toLocaleString('es-ES');
 }
@@ -92,24 +96,46 @@ export function OrderingSettingsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
   const [error, setError] = useState('');
+  /**
+   * Aviso de "guardado, pero no se pudo recargar" (F1-R6). Vive APARTE de `error` a propósito:
+   * `error` es el estado FATAL de la vista (no hay nada que pintar) y reutilizarlo convertía un
+   * guardado correcto en una pantalla roja que además escondía lo que el dueño acababa de escribir.
+   */
+  const [staleWarning, setStaleWarning] = useState('');
 
-  const loadData = useCallback(async () => {
-    try {
-      const result = await orderingHttpService.getSettings();
-      if (!result.succeeded) {
-        // Sin fila NO es un 404: el backend devuelve los valores por defecto con `enabled=false`.
-        setError(intl.formatMessage({ id: 'ORDERING_SETTINGS.LOAD_FAILED' }));
-        return;
+  /**
+   * @param keepOnFailure cuando es `true` (la recarga posterior a un guardado OK), un fallo deja
+   * intacto lo ya cargado y se comunica como AVISO en vez de como error fatal.
+   */
+  const loadData = useCallback(
+    async ({ keepOnFailure = false }: { keepOnFailure?: boolean } = {}) => {
+      try {
+        const result = await orderingHttpService.getSettings();
+        if (!result.succeeded) {
+          // Sin fila NO es un 404: el backend devuelve los valores por defecto con `enabled=false`.
+          // OJO: esta rama tiene que avisar TAMBIÉN con `keepOnFailure` (un rechazo controlado del
+          // servicio es el mismo fallo que una excepción, y dejarlo mudo hacía que un guardado
+          // correcto + recarga rechazada no dejara ni rastro), pero por el canal que NO es fatal.
+          const message = intl.formatMessage({ id: 'ORDERING_SETTINGS.LOAD_FAILED' });
+          if (keepOnFailure) setStaleWarning(message);
+          else setError(message);
+          return;
+        }
+        setForm(toForm(result.data));
+        setSyncedAt(result.data.syncedAt);
+        setError('');
+      } catch (err) {
+        const message = intl.formatMessage({
+          id: httpErrorKey(err, 'ORDERING_SETTINGS.LOAD_FAILED'),
+        });
+        if (keepOnFailure) setStaleWarning(message);
+        else setError(message);
+      } finally {
+        setIsLoading(false);
       }
-      setForm(toForm(result.data));
-      setSyncedAt(result.data.syncedAt);
-      setError('');
-    } catch (err) {
-      setError(intl.formatMessage({ id: httpErrorKey(err, 'ORDERING_SETTINGS.LOAD_FAILED') }));
-    } finally {
-      setIsLoading(false);
-    }
-  }, [intl]);
+    },
+    [intl],
+  );
 
   useEffect(() => {
     void loadData();
@@ -137,8 +163,12 @@ export function OrderingSettingsPage() {
         return;
       }
       showToastSuccess(intl.formatMessage({ id: 'ORDERING_SETTINGS.SYNC_DONE' }));
-      // El servidor manda: tras guardar se recarga para que la pantalla diga la verdad.
-      await loadData();
+      // El servidor manda: tras guardar se recarga para que la pantalla diga la verdad. Pero si ESA
+      // recarga falla, el guardado YA está hecho: se avisa y se conserva lo que hay en pantalla
+      // (F1-R6). Con `keepOnFailure` el fallo no toca `error` —que es fatal y escondería el
+      // formulario— sino `staleWarning`, que solo añade una línea.
+      setStaleWarning('');
+      await loadData({ keepOnFailure: true });
     } catch (err) {
       showBlockingError(
         intl.formatMessage({ id: 'GENERAL.ERROR' }),
@@ -187,6 +217,18 @@ export function OrderingSettingsPage() {
         <InfoBox variant="danger" className="text-center">
           <span data-testid="ordering-error">{error}</span>
         </InfoBox>
+      )}
+
+      {/* F1-R6: guardado OK + recarga fallida. No es fatal y NO oculta el formulario: el dueño
+          escribió unos valores que el servidor ya tiene, y verlos desaparecer sería peor que no
+          recargar. El envoltorio existe porque `InfoBox` no acepta `data-testid` ni tiene variante
+          `warning`: se usa `info` y el testid va en el div de fuera. */}
+      {!isLoading && !error && staleWarning && (
+        <div data-testid="ordering-stale-warning">
+          <InfoBox variant="info" className="text-center">
+            {intl.formatMessage({ id: 'ORDERING_SETTINGS.SYNC_DONE' })} — {staleWarning}
+          </InfoBox>
+        </div>
       )}
 
       {!isLoading && !error && form !== null && (

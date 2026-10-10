@@ -158,6 +158,56 @@ public class GetStoreCatalogSettingsQueryHandlerTests
     }
 
     /// <summary>
+    /// F1-R2: el HALLAZGO se atribuyó a <c>GetStoreCatalogSettingsQuery</c>, pero la lectura de
+    /// GESTIÓN no tiene ninguna rama de paleta: <c>PaletteId</c> es de F8 y el DTO ni siquiera lo
+    /// expone (<see cref="StoreCatalogSettingsDto_ShouldCarryNoBrandField"/>). El fallback de
+    /// <c>DefaultPaletteId</c> vive en la lectura PÚBLICA
+    /// (<c>GetPublicOrderingConfigQuery</c>: <c>string.IsNullOrWhiteSpace</c> → default), y ahí
+    /// el vacío/whitespace es indistinguible del <c>null</c>: los dos caen a la paleta por defecto.
+    ///
+    /// Estos casos fijan la diferencia REAL que existe del lado de la gestión: con la fila
+    /// presente, la marca NO sale por esta lectura diga lo diga la paleta — vacía, en blanco o con
+    /// nombre. Si algún día <c>GetStoreCatalogSettings</c> llegara a exponer la paleta, el
+    /// <see cref="StoreCatalogSettingsDto_ShouldCarryNoBrandField"/> de abajo lo fijaría antes que
+    /// estos tests; aquí lo que se deja constancia es que la fila se devuelve intacta y que el
+    /// mapeo sale igual de limpio con la paleta puesta que sin ella.
+    ///
+    /// <b>HUECO QUE QUEDA ABIERTO.</b> La rama de verdad —<c>string.IsNullOrWhiteSpace</c> →
+    /// <c>DefaultPaletteId</c> en <c>GetPublicOrderingConfigQuery</c>— tiene el caso "sin fila" y
+    /// el caso "paleta con nombre", pero NO el de "fila presente con la paleta vacía/en blanco".
+    /// Ese caso sí está cubierto para la otra lectura que comparte la misma columna
+    /// (<c>GetStoreCatalogBrandingQueryHandlerTests.Handle_WithABlankPalette_ShouldReportTheDefaultPalette</c>),
+    /// porque paletas se cancelaron y quedó una sola rama viva. Cerrar el hueco aquí exigiría tocar
+    /// <c>GetPublicOrderingConfigQueryHandlerTests.cs</c>, fuera de la superficie autorizada de este
+    /// trabajo: se deja anotado en vez de meterse por donde no toca.
+    /// </summary>
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("sunset")]
+    public async Task Handle_WithAPaletteStoredOrBlank_ShouldReturnOnlyTheOrderingColumns(
+        string? paletteId)
+    {
+        StoreCatalogSettings settings = StoreCatalogSettings.Create(_storeId, Guid.NewGuid());
+        settings.PaletteId = paletteId;
+        _settingsRepository.Setup(x => x.GetByStoreIdAsync(_storeId)).ReturnsAsync(settings);
+
+        var result = await Handler().Handle(new GetStoreCatalogSettingsQuery(), CancellationToken.None);
+
+        // La marca no aparece en el DTO; lo que se afirma es que el resto del mapeo es idéntico
+        // con la paleta puesta que sin ella (nada de "no hay fila" por el camino).
+        result.Succeeded.Should().BeTrue();
+        result.Data.Should().NotBeNull();
+        result.Data!.Enabled.Should().BeFalse();
+        result.Data.WhatsappNumber.Should().BeNull();
+        result.Data.SyncedAt.Should().BeNull();
+
+        // Y la entidad queda como estaba: esta lectura no la muta (es una lectura pura).
+        settings.PaletteId.Should().Be(paletteId);
+    }
+
+    /// <summary>
     /// El DTO de gestión no lleva la MARCA (F8): ni las claves de imagen ni la paleta. Esta
     /// lectura es de la vista Pedidos WhatsApp y no debe solaparse con la de Catálogo Web.
     /// </summary>
@@ -193,6 +243,41 @@ public class GetStoreCatalogSettingsQueryHandlerTests
     #endregion
 
     #region Error Handling
+
+    /// <summary>
+    /// Un claim de tienda CORROMPIDO — ni vacío ni un Guid: una cadena arbitraria— es el mismo caso
+    /// que no hay tienda, y se resuelve igual. <c>GuidExtensions.ToGuid</c> devuelve
+    /// <c>Guid.Empty</c> para lo que no parsea, así que sin esta guarda el repositorio se
+    /// preguntaría por <c>00000000-0000-0000-0000-000000000000</c>: una tienda que no existe con
+    /// los valores por defecto de todas formas.
+    /// </summary>
+    [Theory]
+    [InlineData("not-a-guid")]
+    [InlineData("1234")]
+    [InlineData("11111111-1111-1111-1111-11111111111")]  // un dígito de menos: tampoco parsea
+    [InlineData("11111111-1111-1111-1111-111111111111x")] // un carácter de más
+    public async Task Handle_WithACorruptStoreClaim_ShouldRejectWithoutReadingAnything(string claim)
+    {
+        _httpContextService.Setup(x => x.StoreId).Returns(claim);
+
+        Func<Task> act = () => Handler().Handle(new GetStoreCatalogSettingsQuery(), CancellationToken.None);
+
+        await act.Should().ThrowAsync<ApiException>();
+        _settingsRepository.Verify(x => x.GetByStoreIdAsync(It.IsAny<Guid>()), Times.Never);
+    }
+
+    [Theory]
+    [InlineData("not-a-guid")]
+    [InlineData("1234")]
+    public async Task Handle_WithACorruptStoreClaim_ShouldReportBadRequest(string claim)
+    {
+        _httpContextService.Setup(x => x.StoreId).Returns(claim);
+
+        Func<Task> act = () => Handler().Handle(new GetStoreCatalogSettingsQuery(), CancellationToken.None);
+
+        var exception = await act.Should().ThrowAsync<ApiException>();
+        exception.Which.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest);
+    }
 
     /// <summary>
     /// Sin tienda en el contexto no hay configuración que leer: no se adivina. Se rechaza antes de

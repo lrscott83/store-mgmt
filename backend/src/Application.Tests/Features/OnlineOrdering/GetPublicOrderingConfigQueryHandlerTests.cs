@@ -141,6 +141,27 @@ public class GetPublicOrderingConfigQueryHandlerTests
         result.Data.PaletteId.Should().Be("sunset");
     }
 
+    /// <summary>
+    /// Una fila con la paleta en BLANCO (vacía o solo espacios) es una fila rota: el storefront
+    /// tiene que pintar algo, así que cae a la paleta por defecto igual que sin fila. El fallback
+    /// es por BLANCO, no solo por `null`: una cadena que no corresponde a ninguna paleta rompería el
+    /// estilo (F1-R2).
+    /// </summary>
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task Handle_WhenTheStoredPaletteIsBlank_ShouldFallBackToTheDefaultPalette(string blankPalette)
+    {
+        PublishedStore();
+        StoreCatalogSettings settings = StoreCatalogSettings.Create(_storeId, _tenantId);
+        settings.PaletteId = blankPalette;
+        _settingsRepository.Setup(x => x.GetPublicByStoreIdAsync(_storeId)).ReturnsAsync(settings);
+
+        var result = await Handler().Handle(new GetPublicOrderingConfigQuery("tienda-ana"), CancellationToken.None);
+
+        result.Data!.PaletteId.Should().Be(StoreCatalogSettings.DefaultPaletteId);
+    }
+
     #region Branding (F8)
 
     /// <summary>

@@ -331,6 +331,69 @@ public class UpsertStoreCatalogSettingsCommandHandlerTests
         _unitOfWork.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 
+    /// <summary>
+    /// Un claim de tienda CORROMPIDO —ni vacío ni un Guid: una cadena arbitraria— es el mismo caso
+    /// que no hay tienda, y se resuelve igual. <c>GuidExtensions.ToGuid</c> devuelve
+    /// <c>Guid.Empty</c> para lo que no parsea; sin esta guarda el handler crearía una fila para
+    /// <c>00000000-0000-0000-0000-000000000000</c>, que es una tienda que no existe.
+    ///
+    /// Lo que se afirma además es que no se ESCRIBE nada: ni upsert ni <c>SaveChangesAsync</c>. Un
+    /// 400 que deja basura en la tabla es peor que un 500, porque la fila fantasma no se ve.
+    /// </summary>
+    [Theory]
+    [InlineData("not-a-guid")]
+    [InlineData("1234")]
+    [InlineData("11111111-1111-1111-1111-11111111111")]
+    [InlineData("11111111-1111-1111-1111-111111111111x")]
+    public async Task Handle_WithACorruptStoreClaim_ShouldRejectWithoutWritingAnything(string claim)
+    {
+        _httpContextService.Setup(x => x.StoreId).Returns(claim);
+
+        Func<Task> act = () => Handler().Handle(OpenCommand(), CancellationToken.None);
+
+        await act.Should().ThrowAsync<ApiException>();
+        _settingsRepository.Verify(x => x.UpsertAsync(It.IsAny<StoreCatalogSettings>()), Times.Never);
+        _unitOfWork.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Theory]
+    [InlineData("not-a-guid")]
+    [InlineData("1234")]
+    public async Task Handle_WithACorruptStoreClaim_ShouldReportBadRequest(string claim)
+    {
+        _httpContextService.Setup(x => x.StoreId).Returns(claim);
+
+        Func<Task> act = () => Handler().Handle(OpenCommand(), CancellationToken.None);
+
+        var exception = await act.Should().ThrowAsync<ApiException>();
+        exception.Which.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest);
+    }
+
+    /// <summary>
+    /// El claim de TENANT corrupto es un caso distinto y NO se confunde con este: la tienda es la
+    /// que decide a qué fila se escribe, así que un <c>TenantId</c> ilegible no cambia el destino
+    /// —se sigue guardando la fila de la tienda del contexto, que es lo que el dueño espera—.
+    /// Lo que queda registrado aquí es que el tenant viaja como el handler lo recibió, sin que
+    /// ninguna guarda lo convierta en otra cosa.
+    ///
+    /// Se documenta en vez de "arreglarse" porque cualquier guarda de tenant sería una decisión de
+    /// producto fuera de esta superficie (¿400? ¿inferirlo de la tienda? ¿dejarlo?). Lo que sí es
+    /// un hecho probado es que la tienda del contexto manda: el <c>StoreId</c> persistido es el
+    /// del claim bueno aunque el de tenant no lo sea.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WithACorruptTenantClaim_ShouldStillSaveToTheStoreInContext()
+    {
+        _httpContextService.Setup(x => x.TenantId).Returns("not-a-guid");
+        _settingsRepository.Setup(x => x.GetByStoreIdAsync(_storeId)).ReturnsAsync((StoreCatalogSettings?)null);
+
+        var result = await Handler().Handle(OpenCommand(), CancellationToken.None);
+
+        result.Succeeded.Should().BeTrue();
+        _persisted.Should().NotBeNull();
+        _persisted!.StoreId.Should().Be(_storeId, "la tienda del contexto es el destino, no el tenant");
+    }
+
     /// <summary>El error es de tienda no seleccionada (400), no de validación del cuerpo.</summary>
     [Fact]
     public async Task Handle_WithoutAStoreInContext_ShouldReportBadRequest()

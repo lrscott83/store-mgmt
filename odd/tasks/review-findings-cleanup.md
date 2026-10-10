@@ -147,7 +147,34 @@ Review `review-808d9dda34fad1da` **APROBADA** (3 advisory, ninguno bloqueante; a
     `Down` es dueño de TODAS las filas 123 (FK Restrict) — solo comentario, sin cambio de comportamiento.
 
 ### F1 config (`pedidos-whatsapp-config.md`)
-- [ ] **F1-R1..R9** (mix) — Ruta/permiso sin test; `PaletteId` vacío; `MaximumLength` vs `Trim`; `StoreId` no-Guid; coerción monetaria; reload tras guardar; error de carga inicial; `formatSyncedAt`; selectores por testid vs role/label.
+- [x] **F1-R1** — E2E nuevo `SMCA.WebApi.E2ETests/Orders/OrderingSettingsRouteAuthE2ETests.cs`: 401 sin token
+  (GET y PUT), 403 con Owner **sin** el módulo 18 en la tienda (con la fila sin tocar), 200 con módulo y fila
+  real escrita, gating por tienda (el módulo en la A no abre la B del mismo Owner), público anónimo 200 y slug
+  desconocido 404. Verificado 8/8.
+- [x] **F1-R2** — **Reatribuido**: el fallback `DefaultPaletteId` no está en `GetStoreCatalogSettingsQuery`
+  (su DTO ni siquiera expone `PaletteId`), sino en `GetPublicOrderingConfigQuery`. Cubierto en
+  `GetStoreCatalogSettingsQueryHandlerTests` como test de caracterización (la marca no sale, la fila no se
+  muta) + **hueco real anotado** en el propio archivo (ver nota de alcance abajo).
+- [x] **F1-R3** — El validador mide el valor **recortado** (`FitsAfterTrim`), no el crudo. Tres casos que pasan
+  con padding + tres que fallan por exceder el tope ya recortado + `null` que no lo activa.
+- [x] **F1-R4** — Claim de tienda corrupto: 400 y **cero escrituras** (`UpsertAsync`/`SaveChanges` `Never`), en
+  query y command. El de tenant se documenta aparte: la tienda del contexto manda.
+- [x] **F1-R5** — **OBSOLETO**: `DeliveryFee`/`MinimumOrderAmount` se eliminaron del producto (backend + UI);
+  no queda coerción monetaria que probar. `toForm`/`toPayload` no tienen campos de importe.
+- [x] **F1-R6** — `staleWarning` aparte de `error`: guardado OK + recarga fallida avisa sin error fatal y
+  conserva los valores. Tres tests (excepción, `succeeded: false`, aviso que se limpia al reintentar).
+- [x] **F1-R7** — Rama de **excepción** en la carga inicial: error fatal, sin formulario, botón deshabilitado,
+  sin aviso de recarga y sin `showBlockingError`.
+- [x] **F1-R8** — `formatSyncedAt` exportada y con suite propia: UTC con `Z`, offset `+02:00`, sin zona,
+  `z` minúscula e inválido.
+- [x] **F1-R9** — Selectores migrados a rol/nombre accesible: los tres `Switch` por
+  `getByRole('switch', { name })`, los campos por `getByLabelText`, el botón por su nombre y el aviso de
+  recarga por `role="status"` **dentro de su región**. Documentado por qué el error fatal NO puede usar rol.
+
+> **Alcance que queda fuera y por qué.** El caso "fila presente con `PaletteId` vacío/en blanco → paleta por
+> defecto" de `GetPublicOrderingConfigQuery` sigue SIN cubrir: vive en `GetPublicOrderingConfigQueryHandlerTests.cs`,
+> fuera de la superficie autorizada para este trabajo. El hueco queda escrito en el doc del test de
+> caracterización de `GetStoreCatalogSettingsQueryHandlerTests` para que no se pierda.
 
 ## Progreso
 
@@ -292,3 +319,33 @@ Review `review-808d9dda34fad1da` **APROBADA** (3 advisory, ninguno bloqueante; a
   remanentes. Sonda de mutación dentro de la superficie: los mensajes esperados de los dos rechazos
   nuevos cambiados por una cadena inexistente → **4 fallos y solo esos 4**; revertido. Sin pendientes
   fuera de superficie: el comentario «ONLY» de `OnlineOrdersRoleFeatureBackfill` se corrigió (F2-R6).
+
+- 2026-10-10 — **F1 (Pedidos WhatsApp config) cerrado en sus nueve hallazgos.** Retomado sobre un árbol con
+  cambios sin commitear de un writer cancelado: primero se leyó cada `git diff` y se conservó lo que estaba bien
+  (el fix del validador, los casos de claim corrupto, la reescritura de `loadData`, los tests F1-R6/R7/R8 y el
+  E2E de ruta/permiso). **Reparado lo que quedó a medias**: (a) el writer dejó dos bloques `<summary>` seguidos
+  en `UpsertStoreCatalogSettingsCommandValidatorTests` —el doc de `Validate_WithAnOverlongWhatsappNumber_ShouldFail`
+  había quedado huérfano sobre el test nuevo y ahora está devuelto a su método—; (b) el validador de producción
+  acabó **sin salto de línea final** (`\ No newline at end of file`), añadido; (c) `formatSyncedAt` arrastraba
+  dos JSDoc apilados, fusionados en uno.
+  **F1-R2 se reatribuyó** tras verificar el código: el fallback `DefaultPaletteId` está en
+  `GetPublicOrderingConfigQuery`, no en la query de gestión cuyo DTO ni expone `PaletteId`; se dejó el test de
+  caracterización y **el hueco real anotado** (cerrarlo tocaría `GetPublicOrderingConfigQueryHandlerTests.cs`,
+  fuera de superficie). **F1-R5 se cerró como OBSOLETO**: `DeliveryFee`/`MinimumOrderAmount` ya no existen en
+  `ordering-settings.tsx` (`toForm`/`toPayload` sin importes), luego no hay coerción monetaria que probar.
+  **F1-R9** se ido más allá de "un selector": los tres `Switch` por `getByRole('switch', { name })`, los campos
+  por `getByLabelText`, el botón por su nombre y el aviso de recarga por `role="status"` dentro de su región —
+  con el motivo escrito de por qué el error fatal NO puede localizarse por rol (`Spinner` y `InfoBox` comparten
+  `role="status"` sin nombre accesible que los distinga; el `findByRole` resolvía contra el Spinner).
+  Verificación observada: `dotnet build src/SMCA.sln` → **Build succeeded**, 0 errors, sin `error MSB`;
+  `Application.Tests --filter FullyQualifiedName~StoreCatalogSettings` → **75/75**;
+  E2E `--filter OrderingSettingsRouteAuthE2ETests` → **8/8** con `[E2E Guard] ... Database=smca_test` y reloj de
+  pared 59 s frente a los `8 ms` que reporta VSTest (la trampa documentada en `AGENTS.md`: la duración de VSTest no
+  dice nada en esta suite); auditoría de `smca_test` tras la corrida → **0** `StoreCatalogSettings` huérfanas,
+  **0** `StoreModule` de módulo 18, **0** tiendas `e2e-pedidos-%`, y el catálogo **intacto** (`Module` 18 con su
+  `Feature`, 20 módulos, 52 `StorePlanModule`) — el E2E no toca tablas globales.
+  `vitest run …/ordering-settings.test.tsx` → **24/24** sin avisos de `act`; `pnpm eslint` sobre los dos archivos
+  tocados → limpio; `pnpm typecheck` → **2 errores preexistentes y ajenos** en
+  `app/admin/modules/routes/__tests__/module-catalog.test.tsx` (`isActive` no existe en `ModuleCatalogPricingPayload`),
+  archivo **no tocado por este trabajo** (`git diff --name-only HEAD` vacío para él) y con vitest en verde: se
+  reporta, no se arregla. Sin commit (writer acotado).

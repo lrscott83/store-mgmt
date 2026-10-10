@@ -143,6 +143,99 @@ public class UpsertStoreCatalogSettingsCommandValidatorTests
     #region Edge Cases
 
     /// <summary>
+    /// F1-R3: el límite se mide sobre el valor RECORTADO, que es el que se persiste (el handler
+    /// aplica su <c>Trim</c> antes de escribir). Un número que "sobra" solo por el padding de los
+    /// bordes entra: de lo contrario el cliente recibía un 400 por algo que en la columna cabía.
+    ///
+    /// El control negativo del caso está justo debajo: el mismo relleno pero con el contenido
+    /// SOBRE el límite sigue rechazándose, así que el test no pasa por haber quitado la regla.
+    /// </summary>
+    [Fact]
+    public void Validate_WithAPaddedNumberThatFitsOnceTrimmed_ShouldPass()
+    {
+        UpsertStoreCatalogSettingsCommand command = ValidCommand();
+        command.WhatsappNumber = new string(' ', 4)
+            + new string('9', UpsertStoreCatalogSettingsCommand.WhatsappNumberMaxLength)
+            + new string(' ', 4);
+
+        Validator().Validate(command).IsValid.Should().BeTrue(
+            "lo que se persiste son 32 dígitos, y la columna admite 32");
+    }
+
+    [Fact]
+    public void Validate_WithAPaddedBusinessHoursThatFitsOnceTrimmed_ShouldPass()
+    {
+        UpsertStoreCatalogSettingsCommand command = ValidCommand();
+        command.BusinessHours = "\n  "
+            + new string('a', UpsertStoreCatalogSettingsCommand.BusinessHoursMaxLength)
+            + "  \t";
+
+        Validator().Validate(command).IsValid.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Validate_WithAPaddedDeliveryZonesThatFitsOnceTrimmed_ShouldPass()
+    {
+        UpsertStoreCatalogSettingsCommand command = ValidCommand();
+        command.DeliveryZones = "   "
+            + new string('a', UpsertStoreCatalogSettingsCommand.DeliveryZonesMaxLength)
+            + "   ";
+
+        Validator().Validate(command).IsValid.Should().BeTrue();
+    }
+
+    /// <summary>
+    /// El recorte NO compra longitud infinita: un contenido que recortado sigue sobre el tope se
+    /// rechaza igual. Sin este caso, "medir el valor recortado" podría haberse implemented como
+    /// "no medir nada".
+    /// </summary>
+    [Fact]
+    public void Validate_WithAPaddedNumberOverTheLimitOnceTrimmed_ShouldFail()
+    {
+        UpsertStoreCatalogSettingsCommand command = ValidCommand();
+        command.WhatsappNumber = "  "
+            + new string('9', UpsertStoreCatalogSettingsCommand.WhatsappNumberMaxLength + 1)
+            + "  ";
+
+        Validator().Validate(command).IsValid.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Validate_WithAPaddedBusinessHoursOverTheLimitOnceTrimmed_ShouldFail()
+    {
+        UpsertStoreCatalogSettingsCommand command = ValidCommand();
+        command.BusinessHours = "  "
+            + new string('a', UpsertStoreCatalogSettingsCommand.BusinessHoursMaxLength + 1)
+            + "  ";
+
+        Validator().Validate(command).IsValid.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Validate_WithAPaddedDeliveryZonesOverTheLimitOnceTrimmed_ShouldFail()
+    {
+        UpsertStoreCatalogSettingsCommand command = ValidCommand();
+        command.DeliveryZones = "  "
+            + new string('a', UpsertStoreCatalogSettingsCommand.DeliveryZonesMaxLength + 1)
+            + "  ";
+
+        Validator().Validate(command).IsValid.Should().BeFalse();
+    }
+
+    /// <summary>
+    /// El `null` se mide como cadena vacía y PASA: un campo ausente no es un campo largo. El que
+    /// decide si falta el número es la regla de negocio (<c>NotEmpty</c> con el interruptor
+    /// encendido), no el tope de longitud.
+    /// </summary>
+    [Fact]
+    public void Validate_WithANullText_ShouldNotBeRejectedByTheLengthRule()
+    {
+        var command = new UpsertStoreCatalogSettingsCommand { Enabled = false };
+
+        Validator().Validate(command).IsValid.Should().BeTrue();
+    }
+
+    /// <summary>
     /// Los límites son los de la COLUMNA (`StoreCatalogSettingsEntityTypeConfiguration`): un valor
     /// más largo no lo recorta la base, lo revienta con un 500 en el INSERT. El validador lo
     /// convierte en un 400 con mensaje.

@@ -48,7 +48,7 @@ vi.mock('~/shared/lib/toast', () => ({
   showToastSuccess: (...args: unknown[]) => showToastSuccessMock(...args),
 }));
 
-import { OrderingSettingsPage, clientLoader } from '../ordering-settings';
+import { OrderingSettingsPage, clientLoader, formatSyncedAt } from '../ordering-settings';
 
 const envelope = <T,>(data: T) => ({ data, succeeded: true, message: '', actionCode: 200, errors: [] });
 
@@ -105,9 +105,62 @@ function renderPage() {
   );
 }
 
-/** El switch maestro: el `data-testid` envuelve al control `role="switch"`. */
-async function enabledSwitch() {
-  return within(await screen.findByTestId('ordering-enabled')).getByRole('switch');
+/**
+ * F1-R9 — localizadores por ACCESIBILIDAD, no por `data-testid`.
+ *
+ * Un `data-testid` solo ve que existe un atributo: si el `<label>` se desalinea de su `id`, o el
+ * `Switch` pierde su `aria-label`, los lectores de pantalla se quedan sin nombre y la vista sigue
+ * "verde" en los tests. Con rol + nombre accesible, el mismo defecto rompe el test.
+ *
+ *   * `Switch` expone `role="switch"` con `aria-label` = su texto visible (`ORDERING_SETTINGS.*`).
+ *   * Los campos de texto son `<label htmlFor>` + `<input id>` → `getByLabelText`.
+ *   * El botón Sincronizar es un `<button>` con el texto del mensaje como nombre accesible.
+ *   * `InfoBox` expone `role="status"`, así que el error fatal y el aviso de recarga se localizan
+ *     por rol en vez de por el testid que los envuelve.
+ *
+ * Los `data-testid` SIGUEN en producción: no se tocan (esta tarea no cambia la vista más de lo
+ * necesario). Los que quedan en los tests son los que no tienen nombre accesible propio —el panel,
+ * el sello de sincronización y los switches sin `aria-label` propio fuera del maestro— y están
+ * señalados donde aparecen.
+ */
+const ENABLED_SWITCH = { name: 'Pedidos online' };
+const PICKUP_SWITCH = { name: 'Recogida en la tienda' };
+const DELIVERY_SWITCH = { name: 'Envío a domicilio' };
+
+/** El interruptor maestro, por su rol y su nombre accesible. */
+function enabledSwitch() {
+  return screen.findByRole('switch', ENABLED_SWITCH);
+}
+
+/** El interruptor de recogida, por rol y nombre. */
+function pickupSwitch() {
+  return screen.findByRole('switch', PICKUP_SWITCH);
+}
+
+/** El interruptor de envío, por rol y nombre. */
+function deliverySwitch() {
+  return screen.findByRole('switch', DELIVERY_SWITCH);
+}
+
+/**
+ * El botón Sincronizar, por rol y nombre. Es `find` a propósito, no `get`: mientras guarda, el
+ * botón se renombra a "Sincronizando..." (mismo `<button>`, otro nombre accesible), así que un
+ * `getByRole` sin reintentos fallaría justo en el segundo guardado de una misma prueba.
+ */
+function syncButton() {
+  return screen.findByRole('button', { name: 'Sincronizar' });
+}
+
+/**
+ * El aviso de "guardado, pero no se pudo recargar".
+ *
+ * Se busca el `role="status"` DENTRO de su región y no a secas a propósito: la caja de error
+ * fatal es el MISMO `InfoBox` con el mismo rol, y con un fallo de red pinta exactamente el mismo
+ * texto. Un `getByRole('status')` a secas daría verde tanto con el aviso correcto como con el
+ * error fatal que el aviso sustituye — es decir, no probaría nada.
+ */
+function staleWarning() {
+  return within(screen.getByTestId('ordering-stale-warning')).getByRole('status');
 }
 
 describe('OrderingSettingsPage (vista Pedidos WhatsApp)', () => {
@@ -133,11 +186,14 @@ describe('OrderingSettingsPage (vista Pedidos WhatsApp)', () => {
     fireEvent.click(await enabledSwitch());
 
     const panel = await screen.findByTestId('ordering-panel');
-    expect(within(panel).getByTestId('ordering-whatsapp')).toBeInTheDocument();
-    expect(screen.getByTestId('ordering-pickup')).toBeInTheDocument();
-    expect(screen.getByTestId('ordering-delivery')).toBeInTheDocument();
-    expect(screen.getByTestId('ordering-business-hours')).toBeInTheDocument();
-    expect(screen.getByTestId('ordering-delivery-zones')).toBeInTheDocument();
+    // F1-R9: por ETIQUETA y por ROL, no por testid. El panel sigue por testid (no tiene nombre
+    // accesible propio), pero lo que hay dentro se localiza como lo localizeía un lector de
+    // pantalla.
+    expect(within(panel).getByLabelText('Número de WhatsApp')).toBeInTheDocument();
+    expect(within(panel).getByRole('switch', PICKUP_SWITCH)).toBeInTheDocument();
+    expect(within(panel).getByRole('switch', DELIVERY_SWITCH)).toBeInTheDocument();
+    expect(within(panel).getByLabelText('Horario de atención')).toBeInTheDocument();
+    expect(within(panel).getByLabelText('Zonas de reparto')).toBeInTheDocument();
     // Sin costo de envío ni importe mínimo: no hay nada que configurar de eso (el precio y la
     // moneda salen del catálogo, A3 eliminada).
     expect(screen.queryByTestId('ordering-delivery-fee')).not.toBeInTheDocument();
@@ -154,7 +210,9 @@ describe('OrderingSettingsPage (vista Pedidos WhatsApp)', () => {
     await screen.findByTestId('ordering-panel');
     orderingMock.updateSettings.mockClear();
 
-    fireEvent.click(screen.getByTestId('ordering-enabled').querySelector('button') as HTMLElement);
+    // F1-R9: se apaga por el MISMO interruptor, no por el `querySelector('button')` que colgaba
+    // del testid: así el test usa el control que el dueño usa.
+    fireEvent.click(await enabledSwitch());
 
     expect(screen.queryByTestId('ordering-panel')).not.toBeInTheDocument();
     expect(orderingMock.updateSettings).not.toHaveBeenCalled();
@@ -166,17 +224,17 @@ describe('OrderingSettingsPage (vista Pedidos WhatsApp)', () => {
     fireEvent.click(await enabledSwitch());
     await screen.findByTestId('ordering-panel');
 
-    fireEvent.change(screen.getByTestId('ordering-whatsapp'), { target: { value: '5351234567' } });
-    fireEvent.click(screen.getByTestId('ordering-pickup').querySelector('button') as HTMLElement);
-    fireEvent.click(screen.getByTestId('ordering-delivery').querySelector('button') as HTMLElement);
-    fireEvent.change(screen.getByTestId('ordering-business-hours'), {
+    fireEvent.change(screen.getByLabelText('Número de WhatsApp'), { target: { value: '5351234567' } });
+    fireEvent.click(await pickupSwitch());
+    fireEvent.click(await deliverySwitch());
+    fireEvent.change(screen.getByLabelText('Horario de atención'), {
       target: { value: 'Lunes a sábado de 8:00 a 18:00' },
     });
-    fireEvent.change(screen.getByTestId('ordering-delivery-zones'), {
+    fireEvent.change(screen.getByLabelText('Zonas de reparto'), {
       target: { value: 'Vedado y Centro Habana' },
     });
 
-    fireEvent.click(screen.getByTestId('ordering-sync'));
+    fireEvent.click(await syncButton());
 
     await waitFor(() => expect(orderingMock.updateSettings).toHaveBeenCalledTimes(1));
     expect(orderingMock.updateSettings).toHaveBeenCalledWith({
@@ -201,7 +259,7 @@ describe('OrderingSettingsPage (vista Pedidos WhatsApp)', () => {
     renderPage();
 
     fireEvent.click(await enabledSwitch());
-    fireEvent.click(screen.getByTestId('ordering-sync'));
+    fireEvent.click(await syncButton());
 
     await waitFor(() => expect(orderingMock.updateSettings).toHaveBeenCalledTimes(1));
     expect(orderingMock.updateSettings).toHaveBeenCalledWith(
@@ -217,7 +275,7 @@ describe('OrderingSettingsPage (vista Pedidos WhatsApp)', () => {
 
     fireEvent.click(await enabledSwitch());
     await screen.findByTestId('ordering-panel');
-    fireEvent.click(screen.getByTestId('ordering-sync'));
+    fireEvent.click(await syncButton());
 
     await waitFor(() => expect(showBlockingErrorMock).toHaveBeenCalled());
     expect(showBlockingErrorMock).toHaveBeenCalledWith('Error', 'El campo WhatsappNumber es obligatorio.');
@@ -232,7 +290,7 @@ describe('OrderingSettingsPage (vista Pedidos WhatsApp)', () => {
 
     fireEvent.click(await enabledSwitch());
     await screen.findByTestId('ordering-panel');
-    fireEvent.click(screen.getByTestId('ordering-sync'));
+    fireEvent.click(await syncButton());
 
     await waitFor(() => expect(showBlockingErrorMock).toHaveBeenCalled());
     expect(showBlockingErrorMock).toHaveBeenCalledWith('Error', 'Sin conexión. Se requiere conexión a internet.');
@@ -243,10 +301,15 @@ describe('OrderingSettingsPage (vista Pedidos WhatsApp)', () => {
     orderingMock.getSettings.mockResolvedValue(failure('Tienda no seleccionada.'));
     renderPage();
 
+    // F1-R9 (límite): aquí NO se puede usar `role="status"`. `Spinner` y `InfoBox` comparten ese
+    // rol y no hay ningún nombre accesible que los distinga, así que un `findByRole('status')`
+    // resuelve contra el Spinner —con texto vacío— mientras carga. La caja de error fatal solo
+    // tiene un asidero propio: su `data-testid`. Queda anotado como hueco de markup (el aviso de
+    // recarga sí se localiza por rol, porque va dentro de una región propia).
     expect(await screen.findByTestId('ordering-error')).toHaveTextContent(
       'No se pudo cargar la configuración de pedidos',
     );
-    expect(screen.queryByTestId('ordering-enabled')).not.toBeInTheDocument();
+    expect(screen.queryByRole('switch', ENABLED_SWITCH)).not.toBeInTheDocument();
   });
 
   it('una configuración ya guardada se pinta con sus valores y su sello de sincronización', async () => {
@@ -264,12 +327,189 @@ describe('OrderingSettingsPage (vista Pedidos WhatsApp)', () => {
     renderPage();
 
     expect(await enabledSwitch()).toHaveAttribute('aria-checked', 'true');
-    expect(screen.getByTestId('ordering-whatsapp')).toHaveValue('5351234567');
-    expect(screen.getByTestId('ordering-business-hours')).toHaveValue('Lunes a sábado');
-    expect(screen.getByTestId('ordering-delivery-zones')).toHaveValue('Vedado');
+    expect(screen.getByLabelText('Número de WhatsApp')).toHaveValue('5351234567');
+    expect(screen.getByLabelText('Horario de atención')).toHaveValue('Lunes a sábado');
+    expect(screen.getByLabelText('Zonas de reparto')).toHaveValue('Vedado');
     // Ningún selector de moneda: el precio y la moneda son del catálogo.
     expect(screen.queryByText('Moneda')).not.toBeInTheDocument();
     expect(screen.getByTestId('ordering-last-sync')).not.toHaveTextContent('Nunca');
+  });
+
+  // F1-R9 — el caso que un `getByTestId` NO puede fijar. Si el `<label>` de un campo se
+  // desalineara de su `id` (o se borrara), el `getByTestId('ordering-whatsapp')` seguiría
+  // verde, pero el lector de pantalla se quedaría sin nombre: el campo se anunciaría como "caja
+  // de texto" a secas. Estos localizadores por ETIQUETA son los que se rompen con ese defecto, y
+  // por eso valen más que el testid que convive con ellos.
+  it('los campos se localizan por su etiqueta, no por un testid', async () => {
+    orderingMock.getSettings.mockResolvedValue(
+      envelope({ ...DISABLED_SETTINGS, enabled: true, whatsappNumber: '5351234567' }),
+    );
+    renderPage();
+
+    // El interruptor ya viene encendido de la fila guardada: NO se pulsa (eso lo apagaría y
+    // escondería justo el panel que se quiere localizar).
+    expect(await enabledSwitch()).toHaveAttribute('aria-checked', 'true');
+    await screen.findByTestId('ordering-panel');
+
+    expect(screen.getByLabelText('Número de WhatsApp')).toHaveValue('5351234567');
+    expect(screen.getByLabelText('Horario de atención')).toBeInTheDocument();
+    expect(screen.getByLabelText('Zonas de reparto')).toBeInTheDocument();
+  });
+
+  // F1-R6 — el guardado OK con recarga fallida. Antes el `catch` de `loadData` caía en el mismo
+  // `error` FATAL que la carga inicial, así que la vista pintaba a la vez el toast de éxito y una
+  // caja roja, y además escondía el formulario (`!error`): el dueño veía desaparecer lo que
+  // acababa de escribir sin ninguna explicación útil.
+  it('si el guardado funciona pero la recarga falla, avisa sin error fatal y conserva los valores', async () => {
+    orderingMock.getSettings.mockResolvedValue(
+      envelope({ ...DISABLED_SETTINGS, enabled: true, pickupEnabled: true }),
+    );
+    renderPage();
+
+    // La fila guardada ya tiene el interruptor encendido: pulsarlo lo apagaría.
+    expect(await enabledSwitch()).toHaveAttribute('aria-checked', 'true');
+    await screen.findByTestId('ordering-panel');
+    fireEvent.change(screen.getByLabelText('Número de WhatsApp'), { target: { value: '5351234567' } });
+
+    // La recarga posterior al guardado falla por red: el PUT ya está hecho.
+    orderingMock.getSettings.mockRejectedValue(
+      Object.assign(new Error('offline'), { isNetworkError: true }),
+    );
+    fireEvent.click(await syncButton());
+
+    await waitFor(() => expect(orderingMock.updateSettings).toHaveBeenCalledTimes(1));
+    // El aviso NO es fatal: no hay caja roja y el formulario sigue en pantalla.
+    //
+    // OJO con el localizador: la caja de ERROR FATAL también es `role="status"` (mismo
+    // `InfoBox`) y pinta el MISMO texto cuando el fallo es de red. Un `getByRole('status')` a
+    // secas, en esta prueba, daría verde también con el comportamiento roto. Por eso el aviso se
+    // busca DENTRO de su propia región, y se afirma además que la región de error no existe.
+    await waitFor(() =>
+      expect(staleWarning()).toHaveTextContent('Sin conexión. Se requiere conexión a internet.'),
+    );
+    expect(screen.queryByTestId('ordering-error')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Número de WhatsApp')).toHaveValue('5351234567');
+    expect(screen.getByRole('switch', ENABLED_SWITCH)).toBeInTheDocument();
+    // El éxito del guardado sigue siendo un éxito: el PUT sí se hizo.
+    expect(showToastSuccessMock).toHaveBeenCalledWith('Configuración de pedidos guardada');
+    expect(showBlockingErrorMock).not.toHaveBeenCalled();
+  });
+
+  // El caso contiguo del anterior: una recarga que devuelve `succeeded: false` (no una excepción)
+  // es el MISMO fallo y no puede volver a caer en el error fatal.
+  it('si la recarga devuelve un fallo de negocio, tampoco tapa el formulario', async () => {
+    orderingMock.getSettings.mockResolvedValue(
+      envelope({ ...DISABLED_SETTINGS, enabled: true, pickupEnabled: true }),
+    );
+    renderPage();
+
+    // Sin pulsar el interruptor: la fila guardada ya lo tiene encendido.
+    await screen.findByTestId('ordering-panel');
+
+    orderingMock.getSettings.mockResolvedValue(failure('Tienda no seleccionada.'));
+    fireEvent.click(await syncButton());
+
+    await waitFor(() =>
+      expect(staleWarning()).toHaveTextContent('No se pudo cargar la configuración de pedidos'),
+    );
+    expect(screen.queryByTestId('ordering-error')).not.toBeInTheDocument();
+    expect(screen.getByRole('switch', ENABLED_SWITCH)).toBeInTheDocument();
+  });
+
+  // El aviso anterior se limpia al guardar de nuevo: si no, un aviso viejo sobrevive a un
+  // guardado que sí recargó bien.
+  it('un guardado que sí recarga limpia el aviso de la recarga anterior', async () => {
+    orderingMock.getSettings.mockResolvedValue(
+      envelope({ ...DISABLED_SETTINGS, enabled: true, pickupEnabled: true }),
+    );
+    renderPage();
+
+    await screen.findByTestId('ordering-panel');
+
+    orderingMock.getSettings.mockRejectedValueOnce(new Error('boom'));
+    fireEvent.click(await syncButton());
+    await waitFor(() => expect(staleWarning()).toBeInTheDocument());
+    // Se espera a que el guardado termine de verdad (el botón vuelve a habilitarse) antes del
+    // segundo clic: sin esta barrera, el `setIsSyncing(false)` del primer guardado se resuelve
+    // entre dos `act` y React avisa de una actualización fuera de `act`.
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Sincronizar' })).toBeEnabled(),
+    );
+
+    // La segunda recarga va bien: el aviso viejo no puede quedar ahí diciendo lo contrario.
+    orderingMock.getSettings.mockResolvedValue(
+      envelope({ ...DISABLED_SETTINGS, enabled: true, pickupEnabled: true }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Sincronizar' }));
+
+    await waitFor(() =>
+      expect(screen.queryByTestId('ordering-stale-warning')).not.toBeInTheDocument(),
+    );
+  });
+
+  // F1-R7 — la rama de EXCEPCIÓN de la carga inicial. Los tests fijaban el caso `succeeded: false`
+  // (que es un rechazo controlado del servicio), no el `throw`, que es lo que de verdad ocurre con
+  // una caída de red o un fallo de deserialización. Aquí el `catch` debe absorberlo y pintar el
+  // error sin reventar el render.
+  it('un fallo lanzado al cargar se muestra como error y no rompe la vista', async () => {
+    orderingMock.getSettings.mockRejectedValue(
+      Object.assign(new Error('offline'), { isNetworkError: true }),
+    );
+    renderPage();
+
+    expect(await screen.findByTestId('ordering-error')).toHaveTextContent(
+      'Sin conexión. Se requiere conexión a internet.',
+    );
+    expect(screen.queryByRole('switch', ENABLED_SWITCH)).not.toBeInTheDocument();
+    // El botón Sincronizar sigue disponible pero sin formulario que enviar: no es un crash.
+    expect(await syncButton()).toBeDisabled();
+    expect(screen.queryByTestId('ordering-last-sync')).toHaveTextContent('Nunca');
+  });
+
+  // F1-R7 (contiguo) — una excepción en la carga NO pinta aviso de "guardado pero no recargó":
+  // ese aviso solo tiene sentido después de un PUT que sí funcionó.
+  it('un fallo lanzado al cargar no muestra el aviso de recarga fallida', async () => {
+    orderingMock.getSettings.mockRejectedValue(new Error('boom'));
+    renderPage();
+
+    expect(await screen.findByTestId('ordering-error')).toBeInTheDocument();
+    expect(screen.queryByTestId('ordering-stale-warning')).not.toBeInTheDocument();
+    expect(showBlockingErrorMock).not.toHaveBeenCalled();
+  });
+});
+
+// F1-R8 — `formatSyncedAt` se exporta para fijarla aquí: por la pantalla solo se alcanza con un
+// `syncedAt` válido, y lo interesante es justo el borde (sin sufijo de zona, con offset, inválido).
+describe('formatSyncedAt (marca de la última sincronización)', () => {
+  /** La misma referencia que usa la vista, para no atar el test al `Intl` de otra máquina. */
+  const inEs = (iso: string) => new Date(iso).toLocaleString('es-ES');
+
+  it('un valor UTC con sufijo Z se formatea tal cual', () => {
+    expect(formatSyncedAt('2026-10-07T10:00:00Z')).toBe(inEs('2026-10-07T10:00:00Z'));
+  });
+
+  it('un valor con offset se respeta, sin añadirle otra zona', () => {
+    // `+02:00` ya dice la zona: el `Z` solo se añade cuando NO hay ninguna.
+    expect(formatSyncedAt('2026-10-07T12:00:00+02:00')).toBe(
+      inEs(new Date('2026-10-07T12:00:00+02:00').toISOString()),
+    );
+  });
+
+  it('sin sufijo de zona se interpreta como UTC, no como hora local', () => {
+    // Es la razón del `Z` condicional: sin él el navegador lo leería en la zona de la máquina y la
+    // marca cambiaría según quién mire la pantalla.
+    expect(formatSyncedAt('2026-10-07T10:00:00')).toBe(inEs('2026-10-07T10:00:00Z'));
+  });
+
+  it('un offset en minúsculas también cuenta como zona', () => {
+    expect(formatSyncedAt('2026-10-07T10:00:00z')).toBe(inEs('2026-10-07T10:00:00Z'));
+  });
+
+  it('un valor inválido no lanza: devuelve lo que el navegador da para una fecha inválida', () => {
+    // El backend sella con `IDateTimeProvider` (siempre válido), así que esto no se da en la
+    // práctica: lo que se fija aquí es que un valor raro NO rompe el render de la vista.
+    expect(() => formatSyncedAt('no-es-una-fecha')).not.toThrow();
+    expect(formatSyncedAt('no-es-una-fecha')).toBe('Invalid Date');
   });
 });
 

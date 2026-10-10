@@ -245,14 +245,44 @@ pnpm vitest run app/sales/routes/__tests__/
 
 Advisory, no bloqueantes:
 
-- [ ] **F1-R1** (WARNING) — Endpoints sin test de ruta/permiso (`[AllowAnonymous]` y `[HasPermission]`). Destino: F1 (tests).
-- [ ] **F1-R2** (WARNING · backend) — `PaletteId` almacenado vacío/whitespace no cubierto (fallback distinto del null). Destino: F1.
-- [ ] **F1-R3** (WARNING · backend) — `MaximumLength` sobre el valor crudo pero se persiste `Trim()`; padding podría rechazarse aunque quepa. Destino: F1.
-- [ ] **F1-R4** (WARNING · backend) — `StoreId`/`TenantId` no-Guid (claim corrupto) sin resultado asertado. Destino: F1.
-- [ ] **F1-R5** (WARNING · frontend) — Coerción monetaria sin test (vacío/no numérico → 0; negativos pasan). Destino: F1.
-- [ ] **F1-R6** (WARNING · frontend) — Tras guardar OK, fallar el reload muestra toast de éxito + error fatal contradictorio y oculta los valores. Destino: F1.
-- [ ] **F1-R7** (WARNING · frontend) — Rama de error lanzado en la carga inicial sin test. Destino: F1.
-- [ ] **F1-R8/R9** (SUGGESTION · frontend) — `formatSyncedAt` sin test; selectores por testid en vez de role/label. Destino: F1.
+- [x] **F1-R1** (WARNING) — Endpoints sin test de ruta/permiso (`[AllowAnonymous]` y `[HasPermission]`).
+  → E2E nuevo `OrderingSettingsRouteAuthE2ETests` (6 métodos / 8 casos) contra `smca_test`: 401 sin token (GET y
+  PUT), 403 con Owner sin el módulo 18 (afirmando que el PUT no tocó la fila), 200 con módulo + fila real
+  escrita, gating por tienda, público anónimo 200 y slug desconocido 404. Verificado 8/8.
+- [x] **F1-R2** (WARNING · backend) — `PaletteId` vacío/whitespace con fallback distinto del null.
+  → **Reatribuido**: el `DefaultPaletteId` no está en esta query (su DTO ni expone `PaletteId`, D19/F8), está en
+  `GetPublicOrderingConfigQuery`. Aquí se cubre el hecho real de la lectura de gestión (la marca no sale y la
+  fila no se muta). **El hueco de "fila presente con la paleta en blanco" se CERRÓ** con
+  `GetPublicOrderingConfigQueryHandlerTests.Handle_WhenTheStoredPaletteIsBlank_ShouldFallBackToTheDefaultPalette`
+  (`[Theory]` con `""` y `"   "`), añadido por el orquestador tras autorizar ese archivo.
+- [x] **F1-R3** (WARNING · backend) — `MaximumLength` sobre el valor crudo pero se persiste `Trim()`.
+  → El validador mide lo RECORTADO (`FitsAfterTrim`), que es lo que llega al INSERT. Fijado por los dos lados:
+  tres campos con padding que caben PASA, y los mismos tres con el contenido un carácter por encima del tope
+  FALLAN (sin ese control, "medir lo recortado" podría haberse implementado como "no medir nada").
+- [x] **F1-R4** (WARNING · backend) — `StoreId`/`TenantId` no-Guid (claim corrupto) sin resultado asertado.
+  → Claim de tienda corrupto → 400 y **cero escrituras** (`GetByStoreIdAsync`/`UpsertAsync`/`SaveChanges` `Never`),
+  en la query y en el command. El claim de TENANT se documenta aparte porque NO es el mismo caso: la fila se
+  sigue guardando en la tienda del contexto; lo probado es que la tienda manda y que el tenant viaja tal cual.
+- [x] **F1-R5** (WARNING · frontend) — Coerción monetaria sin test (vacío/no numérico → 0; negativos pasan).
+  → **OBSOLETO, resuelto por la eliminación del producto**: `DeliveryFee`/`MinimumOrderAmount` ya no están ni en
+  el backend ni en la vista. `toForm`/`toPayload` de `ordering-settings.tsx` no tienen ningún campo de importe, así
+  que no existe coerción monetaria que probar. No se inventan tests para código ya borrado.
+- [x] **F1-R6** (WARNING · frontend) — Tras guardar OK, fallar el reload mostraba toast de éxito + error fatal
+  contradictorio y ocultaba los valores.
+  → `staleWarning` vive APARTE de `error`: la recarga posterior al guardado avisa por un canal no fatal y deja el
+  formulario en pantalla. Tres tests: excepción de red, `succeeded: false` (el mismo fallo por otra vía) y el aviso
+  viejo que se limpia al guardar de nuevo.
+- [x] **F1-R7** (WARNING · frontend) — Rama de error lanzado en la carga inicial sin test.
+  → Cubierta: error fatal en pantalla, sin formulario, botón Sincronizar deshabilitado, sin toast y **sin** el
+  aviso de recarga (que solo tiene sentido después de un PUT que sí funcionó).
+- [x] **F1-R8** (SUGGESTION · frontend) — `formatSyncedAt` sin test.
+  → Exportada y con suite propia de 5 casos: UTC con `Z`, offset `+02:00` (no se le añade otra zona), sin sufijo
+  de zona (se interpreta como UTC, no como hora local de la máquina), `z` minúscula e inválido (no lanza).
+- [x] **F1-R9** (SUGGESTION · frontend) — Selectores por testid en vez de role/label.
+  → Los tres `Switch` por `getByRole('switch', { name })`, los campos por `getByLabelText`, el botón Sincronizar
+  por su nombre accesible y el aviso de recarga por `role="status"` **dentro de su región**. Se deja escrito por
+  qué el error fatal NO puede localizarse por rol: `Spinner` e `InfoBox` comparten `role="status"` sin nombre
+  accesible que los distinga, así que un `findByRole('status')` resuelve contra el Spinner.
 
 ## Siguiente paso
 
@@ -272,3 +302,24 @@ público), luego F3 (carrito/checkout, que fija el contrato de `CreateOnlineOrde
   `opencode-go` → `opencode.ai`** (`getaddrinfo ENOTFOUND` en el log de OpenCode), no por el código;
   al reintentar con la conectividad de vuelta, aprobó. Ver evidencia y TODOs arriba. Push/PR =
   decisión del owner.
+- 2026-10-10 — **Hallazgos F1-R1..R9 cerrados** (rama `feat/modulos-pedidos-gestion`), retomando un árbol con
+  cambios **sin commitear** de un writer cancelado. Se leyó cada `git diff` antes de tocar nada y se conservó lo
+  que estaba bien. **Lo que quedó a medias y se reparó**: dos bloques `<summary>` apilados en
+  `UpsertStoreCatalogSettingsCommandValidatorTests` (el doc de `Validate_WithAnOverlongWhatsappNumber_ShouldFail`
+  había quedado huérfano sobre el test nuevo — devuelto a su método), el validador de producción sin **salto de
+  línea final**, y dos JSDoc apilados sobre `formatSyncedAt`. **F1-R5 cerrado como OBSOLETO**: la coerción
+  monetaria desapareció con `DeliveryFee`/`MinimumOrderAmount`, así que no hay qué probar. **F1-R2 reatribuido**:
+  el fallback de paleta vive en `GetPublicOrderingConfigQuery`, no en esta lectura de gestión; el hueco residual
+  queda escrito en el test en vez de inventarse cobertura donde no aplica. **F1-R9** se fue más allá de un
+  selector: los tres `Switch` por rol y nombre accesible, los campos por etiqueta, el botón por su nombre y el
+  aviso de recarga por `role="status"` dentro de su región.
+  Verificación observada: `dotnet build src/SMCA.sln` → **Build succeeded**, 0 errors, sin `error MSB`;
+  `Application.Tests --filter FullyQualifiedName~StoreCatalogSettings` → **75/75**; E2E
+  `--filter OrderingSettingsRouteAuthE2ETests` → **8/8** con `[E2E Guard] ... Database=smca_test` (y 59 s de reloj
+  de pared frente a los `8 ms` de VSTest: la duración de VSTest no es señal en esta suite). Auditoría de
+  `smca_test` tras la corrida: 0 filas E2E remanentes y catálogo intacto. Frontend:
+  `vitest run …/ordering-settings.test.tsx` → **24/24**, `Type Errors: no errors`, sin avisos de `act`;
+  `pnpm eslint` sobre los 2 archivos tocados → limpio; `pnpm typecheck` → 2 errores **preexistentes y ajenos** en
+  `app/admin/modules/routes/__tests__/module-catalog.test.tsx` (no tocado por este trabajo) — reportado, no
+  arreglado. Sin pendientes fuera de superficie: el caso "paleta en blanco → `DefaultPaletteId`" de
+  `GetPublicOrderingConfigQueryHandlerTests.cs` se añadió (F1-R2 cerrado).
