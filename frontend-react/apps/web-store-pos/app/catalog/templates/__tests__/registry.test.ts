@@ -44,9 +44,25 @@ describe('CATALOG_TEMPLATES', () => {
     expect(CATALOG_TEMPLATES[0].id).toBe(DEFAULT_TEMPLATE_ID);
   });
 
-  it('cada id anunciado resuelve a un componente', () => {
-    for (const template of CATALOG_TEMPLATES) {
-      expect(resolveTemplate(template.id)).toBeDefined();
+  /**
+   * Antes esto solo hacía `expect(resolveTemplate(id)).toBeDefined()`, que SIEMPRE pasa (el
+   * fallback está definido), así que un id anunciado pero sin cablear en el registro colaba.
+   * Ahora se afirma IDENTIDAD: el id por defecto resuelve a `default`, y ningún otro id anunciado
+   * cae al fallback ni colisiona con otro.
+   */
+  it('cada id anunciado resuelve a su propio componente y no al fallback', () => {
+    expect(resolveTemplate(DEFAULT_TEMPLATE_ID)).toBe(DefaultCatalogTemplate);
+
+    const others = CATALOG_TEMPLATES.map((template) => template.id).filter(
+      (id) => id !== DEFAULT_TEMPLATE_ID,
+    );
+    const resolved = others.map((id) => resolveTemplate(id));
+
+    for (const component of resolved) {
+      expect(component).toBeDefined();
+      expect(component).not.toBe(DefaultCatalogTemplate);
     }
+    // Los ids anunciados no comparten componente: cada uno está cableado por separado.
+    expect(new Set(resolved).size).toBe(resolved.length);
   });
 });

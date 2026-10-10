@@ -939,6 +939,15 @@ export function WebCatalogPage() {
   }
 
   const effectiveTemplate = branding?.templateId ?? DEFAULT_TEMPLATE_ID;
+  /**
+   * Version skew: un `templateId` guardado que ESTE build no anuncia no tiene `<option>` en el
+   * selector, así que el `select` quedaría sin selección válida (React avisa y muestra algo que no
+   * es lo que el storefront pinta). El storefront cae a `default` para ids desconocidos, así que el
+   * selector muestra ese mismo `default` — lo que se ve es lo que se renderiza.
+   */
+  const shownTemplate = CATALOG_TEMPLATES.some((template) => template.id === effectiveTemplate)
+    ? effectiveTemplate
+    : DEFAULT_TEMPLATE_ID;
   const templateChanged = selectedTemplate !== null && selectedTemplate !== effectiveTemplate;
   const hasBrandChanges = pendingLogo !== null || removeLogo || templateChanged;
 
@@ -1207,7 +1216,7 @@ export function WebCatalogPage() {
           </label>
           <select
             id="brand-template"
-            value={selectedTemplate ?? effectiveTemplate}
+            value={selectedTemplate ?? shownTemplate}
             disabled={isSavingBrand}
             onChange={(event) => setSelectedTemplate(event.target.value)}
             className="w-full max-w-xs rounded-md border border-border bg-surface px-3 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-primary"

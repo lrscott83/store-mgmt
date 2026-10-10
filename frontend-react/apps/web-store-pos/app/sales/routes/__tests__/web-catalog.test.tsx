@@ -736,6 +736,33 @@ describe('WebCatalogPage (vista Catálogo Web)', () => {
       expect(screen.getByTestId('brand-save')).toBeDisabled();
     });
 
+    it('muestra el default cuando el templateId guardado no lo lista este build (version skew)', async () => {
+      catalogMock.getBranding.mockResolvedValue(
+        envelope({ ...BRAND_WITHOUT_MEDIA, templateId: 'legacy-v1' }),
+      );
+      renderPage();
+
+      const select = (await screen.findByTestId('brand-template')) as HTMLSelectElement;
+      // El storefront cae a `default` para ids desconocidos; el selector refleja eso mismo.
+      expect(select.value).toBe('default');
+      expect(screen.getByTestId('brand-save')).toBeDisabled();
+    });
+
+    it('desde un templateId desconocido, elegir otra plantilla la guarda', async () => {
+      catalogMock.getBranding.mockResolvedValue(
+        envelope({ ...BRAND_WITHOUT_MEDIA, templateId: 'legacy-v1' }),
+      );
+      renderPage();
+
+      fireEvent.change(await screen.findByTestId('brand-template'), {
+        target: { value: 'boutique' },
+      });
+      fireEvent.click(screen.getByTestId('brand-save'));
+
+      await waitFor(() => expect(catalogMock.updateBranding).toHaveBeenCalledTimes(1));
+      expect(catalogMock.updateBranding).toHaveBeenCalledWith({ templateId: 'boutique' });
+    });
+
     it('el guardado de la marca NO toca el lote de productos ni al revés', async () => {
       renderPage();
 
