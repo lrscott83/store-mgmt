@@ -349,3 +349,6 @@ Review `review-808d9dda34fad1da` **APROBADA** (3 advisory, ninguno bloqueante; a
   `app/admin/modules/routes/__tests__/module-catalog.test.tsx` (`isActive` no existe en `ModuleCatalogPricingPayload`),
   archivo **no tocado por este trabajo** (`git diff --name-only HEAD` vacío para él) y con vitest en verde: se
   reporta, no se arregla. Sin commit (writer acotado).
+- 2026-10-10 — **Review F1 `review-11b26b457f05e0c2` APROBADA** (2 advisory, ninguno bloqueante; autoridad quemada):
+  - [x] **R3-001** (WARNING · test) — El test caracterizador `Handle_WithAPaletteStoredOrBlank_ShouldReturnOnlyTheOrderingColumns` solo afirmaba valores POR DEFECTO (Enabled=false, WhatsappNumber/SyncedAt null), así que no distinguía "se usó la fila" de "se devolvieron los defaults". **Cerrado (2026-10-10):** la fila se siembra con valores NO por defecto (Enabled=true, WhatsappNumber, SyncedAt) y se afirman; doc actualizado (el caso "paleta en blanco" vive en `GetPublicOrderingConfigQueryHandlerTests`).
+  - [ ] **R3-002** (SUGGESTION · backend) — `FitsAfterTrim` mide `(value ?? "").Trim()`, que podría divergir del `Trim` del handler; un valor con padding que el validador acepte pero el handler escriba más largo reintroduciría el 500 del INSERT. Sugiere un caso de borde a nivel columna/persistencia.

@@ -172,14 +172,11 @@ public class GetStoreCatalogSettingsQueryHandlerTests
     /// estos tests; aquí lo que se deja constancia es que la fila se devuelve intacta y que el
     /// mapeo sale igual de limpio con la paleta puesta que sin ella.
     ///
-    /// <b>HUECO QUE QUEDA ABIERTO.</b> La rama de verdad —<c>string.IsNullOrWhiteSpace</c> →
-    /// <c>DefaultPaletteId</c> en <c>GetPublicOrderingConfigQuery</c>— tiene el caso "sin fila" y
-    /// el caso "paleta con nombre", pero NO el de "fila presente con la paleta vacía/en blanco".
-    /// Ese caso sí está cubierto para la otra lectura que comparte la misma columna
-    /// (<c>GetStoreCatalogBrandingQueryHandlerTests.Handle_WithABlankPalette_ShouldReportTheDefaultPalette</c>),
-    /// porque paletas se cancelaron y quedó una sola rama viva. Cerrar el hueco aquí exigiría tocar
-    /// <c>GetPublicOrderingConfigQueryHandlerTests.cs</c>, fuera de la superficie autorizada de este
-    /// trabajo: se deja anotado en vez de meterse por donde no toca.
+    /// La rama de verdad —<c>string.IsNullOrWhiteSpace</c> → <c>DefaultPaletteId</c> en
+    /// <c>GetPublicOrderingConfigQuery</c>— está cubierta en
+    /// <c>GetPublicOrderingConfigQueryHandlerTests.Handle_WhenTheStoredPaletteIsBlank_ShouldFallBackToTheDefaultPalette</c>.
+    /// Aquí se fija lo propio de la GESTIÓN: que devuelve la fila REAL (valores no por defecto) y
+    /// que no la muta, sea cual sea la paleta.
     /// </summary>
     [Theory]
     [InlineData(null)]
@@ -191,17 +188,22 @@ public class GetStoreCatalogSettingsQueryHandlerTests
     {
         StoreCatalogSettings settings = StoreCatalogSettings.Create(_storeId, Guid.NewGuid());
         settings.PaletteId = paletteId;
+        // Valores NO por defecto: sin ellos, todo lo que se afirma coincide con el "sin fila" y el
+        // test no distinguiría "se usó la fila" de "se devolvieron los defaults" (R3-001).
+        settings.Enabled = true;
+        settings.WhatsappNumber = "+5355555555";
+        settings.SyncedAt = new DateTimeOffset(2026, 10, 1, 8, 0, 0, TimeSpan.Zero);
         _settingsRepository.Setup(x => x.GetByStoreIdAsync(_storeId)).ReturnsAsync(settings);
 
         var result = await Handler().Handle(new GetStoreCatalogSettingsQuery(), CancellationToken.None);
 
-        // La marca no aparece en el DTO; lo que se afirma es que el resto del mapeo es idéntico
-        // con la paleta puesta que sin ella (nada de "no hay fila" por el camino).
+        // La marca no aparece en el DTO; sí viajan los valores de pedidos de la fila, que es lo que
+        // prueba que se usó la fila real y no los defaults.
         result.Succeeded.Should().BeTrue();
         result.Data.Should().NotBeNull();
-        result.Data!.Enabled.Should().BeFalse();
-        result.Data.WhatsappNumber.Should().BeNull();
-        result.Data.SyncedAt.Should().BeNull();
+        result.Data!.Enabled.Should().BeTrue();
+        result.Data.WhatsappNumber.Should().Be("+5355555555");
+        result.Data.SyncedAt.Should().Be(new DateTimeOffset(2026, 10, 1, 8, 0, 0, TimeSpan.Zero));
 
         // Y la entidad queda como estaba: esta lectura no la muta (es una lectura pura).
         settings.PaletteId.Should().Be(paletteId);
