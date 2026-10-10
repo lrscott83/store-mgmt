@@ -113,7 +113,9 @@ namespace Application.Features.OnlineOrdering.Public.Queries.GetPublicOrderingCo
                 // no puede armar el `wa.me`. Sin fila (o con el número en blanco) sale null: no hay
                 // a quién escribir, y el storefront bloquea el envío en vez de abrir un chat
                 // contra un destinatario vacío.
-                WhatsappNumber = settings?.WhatsappNumber,
+                WhatsappNumber = string.IsNullOrWhiteSpace(settings?.WhatsappNumber)
+                    ? null
+                    : settings.WhatsappNumber,
                 BusinessHours = settings?.BusinessHours,
                 DeliveryZones = settings?.DeliveryZones,
                 // La MARCA (F8) viaja como URL pública del endpoint de media, nunca como clave

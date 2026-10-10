@@ -194,10 +194,10 @@ y se guarda como **`scripts/31-<nombre>.sql`** (el último es el 30). La migraci
     módulo 20 el modo staff queda intacto (registra, no manda, y su botón sigue diciendo "Registrar
     pedido"); sin módulo 20 el botón dice "Enviar por WhatsApp" para todos, porque "Registrar
     pedido" sería una etiqueta que miente.
-  - **Wart conocido**: `buildWhatsAppOrderLink` exige un `code` no vacío y su cabecera es
-    `Pedido <código> — <tienda>`. Ese módulo no entraba en las superficies autorizadas, así que el
-    resumen del modo sin persistencia pasa `code: 'nuevo'` → "Pedido nuevo — <tienda>". El arreglo
-    limpio es hacer `code` opcional ahí y omitir la cabecera cuando no hay pedido. **Pendiente.**
+  - **Resuelto**: `buildWhatsAppOrderLink` ahora acepta `code` **opcional** (`string | null`) y su
+    cabecera omite el `Pedido <código>` cuando no hay pedido; el modo sin persistencia pasa
+    `code: null` y la primera línea es solo el nombre de la tienda. Fijado por test
+    (`sin código el encabezado es solo la tienda`).
   - **T8 — hallazgo, sin cambios en los cargadores**: `ordering-orders.tsx`, `ordering-sales.tsx` y
     `ordering-drivers.tsx` **ya gatean** con `featureLoader([EFeatures.OnlineOrders])`, o sea por la
     feature **123**, que desde T1/T2 es del módulo **20**. El gate de T8 se cumple sin tocar una

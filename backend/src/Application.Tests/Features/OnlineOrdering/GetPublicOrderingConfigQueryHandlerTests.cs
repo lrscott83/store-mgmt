@@ -827,6 +827,27 @@ public class GetPublicOrderingConfigQueryHandlerTests
     }
 
     /// <summary>
+    /// Un número guardado en BLANCO (vacío o solo espacios) es "sin número": sale null, no la cadena
+    /// en blanco. Mismo estado que sin fila — el storefront bloquea el envío en vez de abrir un chat
+    /// contra un destinatario vacío (R3-002).
+    /// </summary>
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task Handle_WhenTheWhatsappNumberIsBlank_ShouldPublishNoNumber(string blank)
+    {
+        PublishedStore();
+        StoreCatalogSettings settings = StoreCatalogSettings.Create(_storeId, _tenantId);
+        settings.Enabled = true;
+        settings.WhatsappNumber = blank;
+        _settingsRepository.Setup(x => x.GetPublicByStoreIdAsync(_storeId)).ReturnsAsync(settings);
+
+        var result = await Handler().Handle(new GetPublicOrderingConfigQuery("tienda-ana"), CancellationToken.None);
+
+        result.Data!.WhatsappNumber.Should().BeNull();
+    }
+
+    /// <summary>
     /// Sin fila de configuración NO hay número: sale null, no una cadena vacía. null es el estado
     /// que el storefront entiende como "no hay a quién escribir" (envío bloqueado); una cadena
     /// vacía sería un número que `wa.me` no entiende y abriría un chat contra la nada.

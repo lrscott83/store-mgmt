@@ -770,16 +770,15 @@ describe('storefront cart / checkout / order status (F3)', () => {
         expect(warnSpy).toHaveBeenCalled();
       });
 
-      // ── F4-R4 ───────────────────────────────────────────────────────────────────────────
+      // ── F4-R4 / T5 ──────────────────────────────────────────────────────────────────────
       // Dónde viaja el número de la tienda. F4-T2 lo dejó SOLO en la respuesta de creación;
-      // T5 (2026-10-10) lo revirtió y lo puso TAMBIÉN en el config público, porque el modo sin
-      // persistencia (M3) no hace `POST` y por tanto no hay respuesta de creación de la que
-      // sacarlo. Se fija sobre las CLAVES de los dos contratos, que es lo que decide eso.
-      it('el número viaja en el alta Y en el config (T5 revierte F4-T2)', () => {
-        expect(Object.keys(CONFIG)).not.toContain('whatsappNumber');
-        expect(Object.keys({ ...CONFIG, whatsappNumber: '+53 5-987 6543' })).toContain(
-          'whatsappNumber',
-        );
+      // T5 (2026-10-10) lo añadió TAMBIÉN al config público, porque el modo sin persistencia (M3)
+      // no hace `POST` y no tiene respuesta de creación de la que sacarlo. La PRUEBA de que el
+      // config público lo lleva está en el handler backend
+      // (`GetPublicOrderingConfigQueryHandlerTests`) y en los tests de página que arman el `wa.me`
+      // con `config.whatsappNumber`. Aquí se fija, con CLAVES REALES, lo que ve el CLIENTE: el alta
+      // lleva el número y los importes del servidor; el config no los lleva.
+      it('el alta lleva el número y los importes del servidor; el config no', () => {
         expect(Object.keys(CREATED_WITH_NUMBER)).toContain('whatsappNumber');
         // Los importes del SERVIDOR solo se conocen al crear el pedido: el config público no los
         // lleva, así que el resumen del flujo persistido no podría armarse con la respuesta del
