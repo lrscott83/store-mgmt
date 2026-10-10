@@ -53,9 +53,9 @@ carrito + envío por `wa.me` + su configuración por un lado, y la **persistenci
   `StoreCatalogSettings.Enabled`).
 - **La orden se persiste** ⟺ la tienda tiene el **módulo 20** activo. Si no, el checkout **no hace
   `POST`**: arma el `wa.me` en cliente.
-- El **config público** (`GET /public/ordering/{slug}/config`) expone: los flags de los dos módulos y
-  el **número de WhatsApp** (hoy solo viajaba en la respuesta de creación de orden, que en el modo
-  sin persistencia no existe).
+- El **config público** (`GET /public/ordering/{slug}/config`) expone los **flags de los dos módulos**
+  (`PedidosWhatsAppEnabled` / `GestionPedidosEnabled`). El **número de WhatsApp NO viaja ahí**: sigue en la
+  respuesta de creación (`F4-T2`), que solo recibe quien deja sus datos de contacto.
 
 ### Migración + script (README/AGENTS.md)
 
@@ -75,8 +75,8 @@ y se guarda como **`scripts/31-<nombre>.sql`** (el último es el 30). La migraci
 - [x] **T2** — `HasData`: `Module` 19/20, `Feature` 124, `ModuleId` de 123 → 20, `StorePlanModule` 19/20 → planes 3/4.
 - [x] **T3** — Migración EF + **script 31** generado (con el patch de idempotencia) + fila en `scripts/README.md`.
 - [x] **T4** — Backfill SQL de `StoreModule` y `StoreRoleFeature` para tiendas existentes (+ `setval`).
-- [ ] **T5** — Backend: el config público expone los flags de módulo y el número de WhatsApp.
-- [ ] **T6** — Backend: `CreateOnlineOrderCommand` exige módulo 20 (y la config) para persistir.
+- [x] **T5** — Backend: el config público expone los flags de módulo (**no** el número: ya no viaja aquí, F4-T2).
+- [x] **T6** — Backend: `CreateOnlineOrderCommand` exige módulo 20 (y la config) para persistir.
 - [ ] **T7** — Frontend: carrito gated por módulo 19; checkout sin `POST` cuando no hay módulo 20.
 - [ ] **T8** — Frontend: gating de las vistas de gestión por el módulo 20.
 - [ ] **T9** — i18n.
@@ -128,3 +128,35 @@ y se guarda como **`scripts/31-<nombre>.sql`** (el último es el 30). La migraci
     el `Down` también borra `Module 19/20` y `Feature 124`, así que cualquier fila superviviente en
     `StoreModule`/`StoreRoleFeature` violaría la FK y el rollback reventaría. Módulos nuevos ⇒ no hay filas
     preexistentes que acotar. Cubierto por test de contrato.
+- 2026-10-10 — **T5 y T6 cerradas** (gating de módulos en backend, parte de T10).
+  - **Lectura pública de módulos**: `IStoreModuleRepository.GetPublicActiveModuleIdsByStoreIdAsync(storeId)`
+    → `IReadOnlyCollection<int>`, con `IgnoreQueryFilters()` porque `StoreModule` tiene filtro global
+    `IsSuperAdmin || TenantId == TenantId` (`StoreModuleEntityTypeConfiguration:21`) y el anónimo no tiene
+    tenant: con la lectura de sesión el conjunto saldría VACÍO. Devuelve solo los `ModuleId` con
+    `StoreModule.IsActive`, **sin** filtrar por `Module.IsActive`/`AvailableToStore` — el gating responde
+    "¿la TIENDA tiene este módulo?", no "qué puede ofrecer el catálogo" (`GetAvailableModulesByStoreIdAsync`
+    seguiría siendo el camino equivocado para un booleano).
+  - **Flags**: `PublicOrderingConfigDto.PedidosWhatsAppEnabled` (19) y `.GestionPedidosEnabled` (20), con
+    `ModuleType` como fuente de los ids (no números sueltos). Son INDEPENDIENTES de `Enabled`: uno es la
+    decisión de la tienda, el otro lo que compró.
+  - **T6**: `CreateOnlineOrderCommandHandler` llama a `EnsureGestionPedidosAsync` **después** de
+    `LoadEnabledSettingsAsync` y antes de cualquier escritura. Sin el 20 → 400
+    `OnlineOrdersModuleNotEnabled` (es/en) y **nada** persistido. El 19 NO se exige aquí: el 19 habilita el
+    carrito (M2), no la persistencia. Firma del comando sin cambios.
+  - **Tests**: 430 `Application.Tests` en verde con `--filter FullyQualifiedName~OnlineOrdering`. 9 casos
+    nuevos de flags (19 solo / 20 solo / ambos / ninguno / solo WebCatalog) + 6 del gating del alta, con
+    `AddAsync`/`SaveChangesAsync`/`CodeExistsAsync` en `Never`. Sonda de mutación: quitar el
+    `await EnsureGestionPedidosAsync(...)` pone en rojo exactamente los 3 tests que lo cubren.
+  - **BLOQUEO (decisión del owner pendiente) — 3 E2E existentes quedan en rojo por T6**, verificado
+    contra `smca_test` (`[E2E Guard] ... Database=smca_test`, 3 Failed / 24 Passed en
+    `--filter FullyQualifiedName~E2ETests.Orders`):
+    `PublicOrderingRateLimitE2ETests.R2_1_the_exceeding_post_is_rejected_with_429_by_the_middleware`,
+    `R2_2_exhausting_one_slug_does_not_throttle_another_slug_from_the_same_ip` y
+    `R2_3_the_slug_partition_key_normalizes_case`. **No es un defecto del gating**: los tres hacen POST y
+    esperan 200, y ahora reciben 400.
+    La causa es el seed: `PublicOrderingSeed.SeedAsync` crea la tienda con
+    `db.Set<Store>().Add(store)` (saltándose el servicio que reparte `StoreModule` desde el plan) y **no**
+    siembra filas `StoreModule` 19/20, así que la tienda sembrada nunca compró el módulo 20.
+    El arreglo es de UNA línea en el seed (`db.Set<StoreModule>().Add(...)` para 19 y 20) — y `CleanupAsync`
+    tendría que borrarlas antes de la tienda por la FK Restrict — pero `PublicOrderingSeed.cs` es un
+    **support file de E2E existente** y la regla del repo lo prohíbe sin autorización explícita. **No se tocó.**

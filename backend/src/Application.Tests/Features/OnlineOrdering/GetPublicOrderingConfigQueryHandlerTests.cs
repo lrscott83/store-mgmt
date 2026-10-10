@@ -25,6 +25,9 @@ namespace Application.Tests.Features.OnlineOrdering;
 ///      pedidos (dos interruptores distintos), y por defecto el segundo está apagado.
 ///   3. NO expone el número de WhatsApp. El enlace `wa.me` se arma en el endpoint del pedido (F4),
 ///      no en un config que cualquier visitante puede leer.
+///   4. Los DOS flags de módulo: `PedidosWhatsAppEnabled` (19) decide si hay carrito (M2) y
+///      `GestionPedidosEnabled` (20) si el checkout persiste (M3). Son de TIENDA, no del plan, así
+///      que el storefront no puede deducirlos y tienen que viajar aquí.
 ///
 /// La paleta viene porque el storefront la pinta; el logo y el banner también, como URLs públicas
 /// del endpoint de media construidas con el slug de la tienda.
@@ -34,6 +37,7 @@ public class GetPublicOrderingConfigQueryHandlerTests
     private readonly Mock<IStoreRepository> _storeRepository = new();
     private readonly Mock<IStoreCatalogSettingsRepository> _settingsRepository = new();
     private readonly Mock<IStoreCatalogImageRepository> _imageRepository = new();
+    private readonly Mock<IStoreModuleRepository> _moduleRepository = new();
     private readonly Mock<IStringLocalizer<I18n>> _localizer = new();
 
     /// <summary>
@@ -54,13 +58,29 @@ public class GetPublicOrderingConfigQueryHandlerTests
         // Por defecto la tienda no tiene imágenes de showcase: cada test monta las suyas si quiere
         // mirarlas. Es el caso normal de una tienda recién sincronizada.
         _imageRepository.Setup(x => x.GetPublicByStoreIdAsync(It.IsAny<Guid>())).ReturnsAsync([]);
+
+        // Igual con los módulos: por defecto la tienda NO tiene ninguno de los dos. Los tests del
+        // gating montan los suyos con `GivenActiveModules`, y el resto no mira los flags.
+        _moduleRepository
+            .Setup(x => x.GetPublicActiveModuleIdsByStoreIdAsync(It.IsAny<Guid>()))
+            .ReturnsAsync([]);
     }
 
     private GetPublicOrderingConfigQueryHandler Handler() => new(
         _storeRepository.Object,
         _settingsRepository.Object,
         _imageRepository.Object,
+        _moduleRepository.Object,
         _localizer.Object);
+
+    /// <summary>
+    /// Módulos ACTIVOS de la tienda (filas `StoreModule`). Se monta con la vía ANÓNIMA porque es la
+    /// única que usa el handler: con la de sesión el anónimo vería siempre cero módulos.
+    /// </summary>
+    private void GivenActiveModules(params ModuleType[] modules)
+        => _moduleRepository
+            .Setup(x => x.GetPublicActiveModuleIdsByStoreIdAsync(_storeId))
+            .ReturnsAsync([.. modules.Select(module => (int)module)]);
 
     /// <summary>Imagen de showcase ya persistida: la fila solo aporta la clave y el pie de foto.</summary>
     private StoreCatalogImage ShowcaseImage(StoreCatalogImageKind kind, int orderIndex, string? caption = null)
@@ -563,6 +583,166 @@ public class GetPublicOrderingConfigQueryHandlerTests
 
         properties.Should().Equal("Url", "Caption");
         properties.Should().NotContain(["Key", "Path", "AbsolutePath"]);
+    }
+
+    #endregion
+
+    #region Gating de módulos (M2/M3): flags del config público
+
+    /// <summary>
+    /// Sin módulos, los dos flags en false: es el caso de una tienda que no compró ninguno, y el
+    /// storefront no ofrece carrito ni persiste pedidos. No es un 404 — el catálogo sigue siendo
+    /// público.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenTheStoreHasNoModules_ShouldReportBothModuleFlagsOff()
+    {
+        PublishedStore();
+        _settingsRepository.Setup(x => x.GetPublicByStoreIdAsync(_storeId)).ReturnsAsync((StoreCatalogSettings?)null);
+        GivenActiveModules();
+
+        var result = await Handler().Handle(new GetPublicOrderingConfigQuery("tienda-ana"), CancellationToken.None);
+
+        result.Succeeded.Should().BeTrue();
+        result.Data!.PedidosWhatsAppEnabled.Should().BeFalse();
+        result.Data.GestionPedidosEnabled.Should().BeFalse();
+    }
+
+    /// <summary>
+    /// SOLO "Pedidos WhatsApp" (19): hay carrito, pero el checkout NO persiste (M2/M3). El segundo
+    /// flag en false es lo que le dice al frontend que no haga `POST` y arme el `wa.me` en cliente.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WithOnlyTheWhatsAppModule_ShouldEnableTheCartButNotTheOrderPersistence()
+    {
+        PublishedStore();
+        StoreCatalogSettings settings = StoreCatalogSettings.Create(_storeId, _tenantId);
+        settings.Enabled = true;
+        settings.PickupEnabled = true;
+        _settingsRepository.Setup(x => x.GetPublicByStoreIdAsync(_storeId)).ReturnsAsync(settings);
+        GivenActiveModules(ModuleType.PedidosWhatsApp);
+
+        var result = await Handler().Handle(new GetPublicOrderingConfigQuery("tienda-ana"), CancellationToken.None);
+
+        result.Data!.PedidosWhatsAppEnabled.Should().BeTrue();
+        result.Data.GestionPedidosEnabled.Should().BeFalse();
+        // El módulo no REEMPLAZA al interruptor de la fila: los dos se leen y se exigen los dos.
+        result.Data.Enabled.Should().BeTrue();
+    }
+
+    /// <summary>
+    /// SOLO "Gestión de Pedidos" (20): el backend puede persistir, pero el carrito sigue apagado
+    /// (M2) — sin el 19 el cliente no tiene por dónde pedir. Son módulos comprables por separado y
+    /// el flag equivocado equivaldría a ofrecer un carrito que nadie puede usar.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WithOnlyTheOrderManagementModule_ShouldNotEnableTheCart()
+    {
+        PublishedStore();
+        StoreCatalogSettings settings = StoreCatalogSettings.Create(_storeId, _tenantId);
+        settings.Enabled = true;
+        settings.PickupEnabled = true;
+        _settingsRepository.Setup(x => x.GetPublicByStoreIdAsync(_storeId)).ReturnsAsync(settings);
+        GivenActiveModules(ModuleType.GestionPedidos);
+
+        var result = await Handler().Handle(new GetPublicOrderingConfigQuery("tienda-ana"), CancellationToken.None);
+
+        result.Data!.PedidosWhatsAppEnabled.Should().BeFalse();
+        result.Data.GestionPedidosEnabled.Should().BeTrue();
+    }
+
+    /// <summary>Los dos módulos: carrito y persistencia. El caso de Superior/VIP con M6 aplicado.</summary>
+    [Fact]
+    public async Task Handle_WithBothModules_ShouldReportBothModuleFlagsOn()
+    {
+        PublishedStore();
+        StoreCatalogSettings settings = StoreCatalogSettings.Create(_storeId, _tenantId);
+        settings.Enabled = true;
+        settings.PickupEnabled = true;
+        _settingsRepository.Setup(x => x.GetPublicByStoreIdAsync(_storeId)).ReturnsAsync(settings);
+        GivenActiveModules(ModuleType.PedidosWhatsApp, ModuleType.GestionPedidos);
+
+        var result = await Handler().Handle(new GetPublicOrderingConfigQuery("tienda-ana"), CancellationToken.None);
+
+        result.Data!.PedidosWhatsAppEnabled.Should().BeTrue();
+        result.Data.GestionPedidosEnabled.Should().BeTrue();
+    }
+
+    /// <summary>
+    /// Los flags vienen de los módulos de la TIENDA, así que un módulo que sí está en el catálogo
+    /// pero no activate esta tienda no enciende nada. Sin esta guarda, un filtro por "los módulos
+    /// 19/20 existen" en vez de por "los tiene esta tienda" publicaría carrito en todas.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WithOnlyTheWebCatalogModule_ShouldReportBothModuleFlagsOff()
+    {
+        PublishedStore();
+        GivenActiveModules(ModuleType.WebCatalog, ModuleType.Sales);
+
+        var result = await Handler().Handle(new GetPublicOrderingConfigQuery("tienda-ana"), CancellationToken.None);
+
+        result.Data!.PedidosWhatsAppEnabled.Should().BeFalse();
+        result.Data.GestionPedidosEnabled.Should().BeFalse();
+    }
+
+    /// <summary>
+    /// Los flags se leen por la vía ANÓNIMA. `StoreModule` tiene filtro global por tenant y el
+    /// anónimo no tiene tenant en el contexto: con la lectura de sesión el conjunto saldría VACÍO
+    /// y el carrito se cerraría de una tienda que lo compró — sin error y sin aviso. Si alguien
+    /// "simplifica" esto y usa `GetStoreModulesByIdAsync`/`GetAvailableModulesByStoreIdAsync`
+    /// (las de sesión), este test cae.
+    /// </summary>
+    [Fact]
+    public async Task Handle_ShouldNeverUseTheSessionScopedReadForModules()
+    {
+        PublishedStore();
+        GivenActiveModules(ModuleType.PedidosWhatsApp, ModuleType.GestionPedidos);
+
+        var result = await Handler().Handle(new GetPublicOrderingConfigQuery("tienda-ana"), CancellationToken.None);
+
+        result.Data!.PedidosWhatsAppEnabled.Should().BeTrue();
+        _moduleRepository.Verify(x => x.GetPublicActiveModuleIdsByStoreIdAsync(_storeId), Times.Once);
+        _moduleRepository.Verify(x => x.GetStoreModulesByIdAsync(It.IsAny<Guid>()), Times.Never);
+        _moduleRepository.Verify(x => x.GetAvailableModulesByStoreIdAsync(It.IsAny<Guid>()), Times.Never);
+    }
+
+    /// <summary>
+    /// Los módulos se leen de la tienda RESUELTA por el slug, una sola vez, y no se escribe nada.
+    /// Un slug inexistente NO los lee: el 404 uniforme va antes de tocar la base, para que el
+    /// anónimo no pueda usar el endpoint para averiguar qué tiendas tienen módulos.
+    /// </summary>
+    [Fact]
+    public async Task Handle_ShouldReadTheModulesOfTheStoreResolvedFromTheSlugOnce()
+    {
+        PublishedStore();
+        GivenActiveModules();
+
+        await Handler().Handle(new GetPublicOrderingConfigQuery("tienda-ana"), CancellationToken.None);
+
+        _moduleRepository.Verify(x => x.GetPublicActiveModuleIdsByStoreIdAsync(_storeId), Times.Once);
+        _moduleRepository.Verify(x => x.GetPublicActiveModuleIdsByStoreIdAsync(It.Is<Guid>(id => id != _storeId)), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_WithAnUnknownSlug_ShouldNotReadAnyModule()
+    {
+        Func<Task> act = () => Handler().Handle(new GetPublicOrderingConfigQuery("no-existe"), CancellationToken.None);
+
+        await act.Should().ThrowAsync<ApiException>();
+        _moduleRepository.Verify(x => x.GetPublicActiveModuleIdsByStoreIdAsync(It.IsAny<Guid>()), Times.Never);
+    }
+
+    /// <summary>
+    /// Los dos flags tienen que EXISTIR en el contrato: el storefront gatea con ellos, así que sin
+    /// las propiedades el gating del cliente sería una suposición. Y no puede ser que un flag
+    /// replaces al otro por error de nombre.
+    /// </summary>
+    [Fact]
+    public void PublicOrderingConfigDto_ShouldCarryBothModuleFlags()
+    {
+        typeof(PublicOrderingConfigDto).GetProperties()
+            .Select(p => p.Name)
+            .Should().Contain(["PedidosWhatsAppEnabled", "GestionPedidosEnabled"]);
     }
 
     #endregion

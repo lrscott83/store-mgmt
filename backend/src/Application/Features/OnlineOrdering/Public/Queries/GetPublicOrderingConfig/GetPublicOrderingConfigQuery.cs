@@ -26,9 +26,15 @@ namespace Application.Features.OnlineOrdering.Public.Queries.GetPublicOrderingCo
     /// catálogo publicado responden EXACTAMENTE igual, para que el anónimo no pueda usar el
     /// endpoint para averiguar qué tiendas existen.
     ///
-    /// OJO — filtro global por tenant: la configuración y las imágenes del showcase se leen con
-    /// `GetPublicByStoreIdAsync`, la lectura PÚBLICA del repositorio, que salta ese filtro. Con la
-    /// lectura de sesión el anónimo no obtendría fila alguna. Ver la nota del handler y del repositorio.
+    /// OJO — filtro global por tenant: la configuración, las imágenes del showcase y los módulos de la
+    /// tienda se leen con las lecturas PÚBLICAS del repositorio (`GetPublicByStoreIdAsync` /
+    /// `GetPublicActiveModuleIdsByStoreIdAsync`), que saltan ese filtro. Con la lectura de sesión el
+    /// anónimo no obtendría fila alguna. Ver la nota del handler y de los repositorios.
+    ///
+    /// Los DOS flags de módulo viajan aquí porque el storefront NO puede deducirlos: los módulos
+    /// 19/20 son de TIENDA (`StoreModule.IsActive`), no del plan, así que "tiene catálogo" no dice
+    /// nada sobre ellos. Sin los flags, el gating del carrito (M2) y del POST del checkout (M3)
+    /// sería una suposición del cliente.
     /// </summary>
     public sealed record GetPublicOrderingConfigQuery(string StoreSlug) : IQuery<PublicOrderingConfigDto>;
 
@@ -38,17 +44,20 @@ namespace Application.Features.OnlineOrdering.Public.Queries.GetPublicOrderingCo
         private readonly IStoreRepository _storeRepository;
         private readonly IStoreCatalogSettingsRepository _storeCatalogSettingsRepository;
         private readonly IStoreCatalogImageRepository _storeCatalogImageRepository;
+        private readonly IStoreModuleRepository _storeModuleRepository;
         private readonly IStringLocalizer<I18n> _localizer;
 
         public GetPublicOrderingConfigQueryHandler(
             IStoreRepository storeRepository,
             IStoreCatalogSettingsRepository storeCatalogSettingsRepository,
             IStoreCatalogImageRepository storeCatalogImageRepository,
+            IStoreModuleRepository storeModuleRepository,
             IStringLocalizer<I18n> localizer)
         {
             _storeRepository = storeRepository;
             _storeCatalogSettingsRepository = storeCatalogSettingsRepository;
             _storeCatalogImageRepository = storeCatalogImageRepository;
+            _storeModuleRepository = storeModuleRepository;
             _localizer = localizer;
         }
 
@@ -70,6 +79,13 @@ namespace Application.Features.OnlineOrdering.Public.Queries.GetPublicOrderingCo
             StoreCatalogSettings? settings = await _storeCatalogSettingsRepository.GetPublicByStoreIdAsync(store.Id);
             IList<StoreCatalogImage> images = await ReadShowcaseAsync(store);
 
+            // Lectura PÚBLICA por el mismo motivo que la configuración y las imágenes: con la de
+            // sesión el anónimo no obtendría fila alguna (no hay tenant en el contexto) y los flags
+            // saldrían SIEMPRE en false — el storefront cerraría el carrito de una tienda que lo
+            // compró, sin error y sin aviso. UNA sola lectura para los dos módulos.
+            IReadOnlyCollection<int> activeModuleIds =
+                await _storeModuleRepository.GetPublicActiveModuleIdsByStoreIdAsync(store.Id);
+
             return ResponseResult.Success(new PublicOrderingConfigDto
             {
                 // Sin fila = pedidos cerrados. El interruptor lo enciende el dueño; que el catálogo
@@ -77,6 +93,12 @@ namespace Application.Features.OnlineOrdering.Public.Queries.GetPublicOrderingCo
                 Enabled = settings?.Enabled ?? false,
                 PickupEnabled = settings?.PickupEnabled ?? false,
                 DeliveryEnabled = settings?.DeliveryEnabled ?? false,
+                // GATING DE MÓDULOS (M2/M3). Los flags se sacan de los módulos ACTIVOS de la fila
+                // `StoreModule` de esta tienda, que son de TIENDA y no del plan: sin fila el
+                // conjunto sale vacío y los dos flags quedan en false, que es lo correcto para una
+                // tienda que no compró ninguno de los dos módulos.
+                PedidosWhatsAppEnabled = activeModuleIds.Contains((int)ModuleType.PedidosWhatsApp),
+                GestionPedidosEnabled = activeModuleIds.Contains((int)ModuleType.GestionPedidos),
                 BusinessHours = settings?.BusinessHours,
                 DeliveryZones = settings?.DeliveryZones,
                 // La MARCA (F8) viaja como URL pública del endpoint de media, nunca como clave

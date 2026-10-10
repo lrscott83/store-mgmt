@@ -6,6 +6,7 @@ using Domain.Entities.Owners;
 using Domain.Entities.ProductCategories;
 using Domain.Entities.Products;
 using Domain.Entities.StoreCatalogSettings;
+using Domain.Entities.StoreModules;
 using Domain.Entities.Stores;
 using Domain.Entities.UserRoles;
 using Domain.Entities.Users;
@@ -32,6 +33,8 @@ namespace SMCA.WebApi.E2ETests.Orders;
 ///     al rate limit.
 ///   * Producto en una categoría CON slug: `GetPublishedByIdsAsync` exige producto activo y en
 ///     venta de categoría activa con slug público.
+///   * Filas `StoreModule` para 19 (PedidosWhatsApp) y 20 (GestionPedidos): sin la fila de
+///     `GestionPedidos` el POST responde 400 y la tienda sembrada no puede persistir un pedido.
 ///   * (opcional) Un `Order` creado con `Order.CreateOnline` + líneas, para la lectura pública por
 ///     código.
 ///
@@ -91,6 +94,19 @@ internal static class PublicOrderingSeed
             DateOnly.FromDateTime(DateTime.UtcNow), storePlanId: (int)StorePlanType.Superior);
         store.CatalogSlug = slug;
         db.Set<Store>().Add(store);
+
+        // Módulos de pedidos 19/20 (M6). Sin estas filas la tienda sembrada NO persistiría:
+        // `CreateOnlineOrderCommandHandler.EnsureGestionPedidosAsync` consulta
+        // `GetPublicActiveModuleIdsByStoreIdAsync` y responde 400 "OnlineOrdersModuleNotEnabled"
+        // cuando `GestionPedidos` no está en el resultado. La puerta es la FILA de `StoreModule`,
+        // no el catálogo del plan: `Store.Create` no crea filas `StoreModule` por sí solo, así que
+        // una tienda creada directo en la base nace sin módulos aunque el plan los incluya.
+        // `IsActive` no se fija: `AuditableEntity` lo inicializa en `true`, que es lo que
+        // `GetPublicActiveModuleIdsByStoreIdAsync` filtra. Precios a 0 — irrelevantes para el gating.
+        db.Set<StoreModule>().Add(
+            StoreModule.Create(store.Id, (int)ModuleType.PedidosWhatsApp, 0, true, 0, 0, 0, tenantId));
+        db.Set<StoreModule>().Add(
+            StoreModule.Create(store.Id, (int)ModuleType.GestionPedidos, 0, true, 0, 0, 0, tenantId));
 
         var category = ProductCategory.Create(store.Id, "E2E Pedidos", 1, tenantId,
             slug: $"e2e-categoria-{Guid.NewGuid():N}");
@@ -164,6 +180,10 @@ internal static class PublicOrderingSeed
     /// Borra lo sembrado en orden de FK (todas son Restrict): `OrderItem` antes que `Order` antes
     /// que la tienda. `IgnoreQueryFilters` en todas: las tres tablas tienen filtro global por
     /// tenant y el scope del test no tiene tenant en el contexto.
+    ///
+    /// Las `StoreModule` NO se borran aquí: `AuthzSeed.CleanupStoreGraphAsync` ya las elimina
+    /// (`RemoveWhere<StoreModule>`) justo antes de `Store`, que es el orden FK que exige el
+    /// Restrict. Duplicar el borrado aquí sería redundante y ese helper es compartido.
     /// </summary>
     public static async Task CleanupAsync(AppTestFactory factory, OrderingFixture fixture)
     {

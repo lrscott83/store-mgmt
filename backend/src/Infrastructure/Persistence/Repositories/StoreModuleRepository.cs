@@ -34,5 +34,40 @@ namespace Infrastructure.Persistence.Repositories
                 .Where(sm => sm.StoreId == storeId)
                 .ToListAsync();
         }
+
+        /// <summary>
+        /// Lectura PÚBLICA de los módulos ACTIVOS de la tienda: `IgnoreQueryFilters` es
+        /// OBLIGATORIO, no una comodidad.
+        ///
+        /// `StoreModule` tiene filtro global `IsSuperAdmin || TenantId == TenantId` (ver
+        /// <c>StoreModuleEntityTypeConfiguration</c>) y una petición ANÓNIMA no tiene tenant en el
+        /// contexto: `IsSuperAdmin` es false y el `TenantId` del contexto es null sobre una columna
+        /// no nulable, así que el filtro NO puede coincidir con ninguna fila. Sin este bypass la
+        /// consulta devolvería VACÍA — sin error y sin aviso — y el gating se leería como
+        /// "ningún módulo activo" siempre, aunque el dueño hubiera comprado el módulo. Es el mismo
+        /// motivo por el que <c>StoreCatalogSettingsRepository.GetPublicByStoreIdAsync</c>,
+        /// <c>StoreCatalogImageRepository.GetPublicByStoreIdAsync</c> y
+        /// <c>StoreRepository.GetStoreByCatalogSlugAsync</c> saltan el filtro.
+        ///
+        /// Lo que mantiene acotada la lectura no es el filtro (no hay sesión que acotar) sino el
+        /// `StoreId`: lo resuelve el llamador con un slug único global, y el índice único de
+        /// <c>(StoreId, ModuleId)</c> garantiza una sola fila por módulo de tienda.
+        ///
+        /// NO se filtra por <c>Module.IsActive</c> ni por <c>Module.AvailableToStore</c>: el gating
+        /// responde "¿la TIENDA tiene este módulo activo?", que es la fila de <c>StoreModule</c>, no
+        /// "qué puede ofrecer el catálogo". Exigir el catálogo entero
+        /// (<see cref="GetAvailableModulesByStoreIdAsync"/>) para esta pregunta convertiría un
+        /// booleano en un fallo silencioso el día que una tienda tenga un módulo activo que no
+        /// cumple alguna de esas condiciones.
+        /// </summary>
+        public async Task<IReadOnlyCollection<int>> GetPublicActiveModuleIdsByStoreIdAsync(Guid storeId)
+        {
+            return await _storeModules
+                .IgnoreQueryFilters()
+                .Where(sm => sm.StoreId == storeId && sm.IsActive)
+                .Select(sm => sm.ModuleId)
+                .Distinct()
+                .ToListAsync();
+        }
     }
 }

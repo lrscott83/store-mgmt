@@ -130,6 +130,7 @@ namespace Application.Features.OnlineOrdering.Commands.CreateOnlineOrder
         private readonly IProductRepository _productRepository;
         private readonly IOrderRepository _orderRepository;
         private readonly IStoreCatalogSettingsRepository _storeCatalogSettingsRepository;
+        private readonly IStoreModuleRepository _storeModuleRepository;
         private readonly IStringLocalizer<I18n> _localizer;
 
         public CreateOnlineOrderCommandHandler(
@@ -138,6 +139,7 @@ namespace Application.Features.OnlineOrdering.Commands.CreateOnlineOrder
             IProductRepository productRepository,
             IOrderRepository orderRepository,
             IStoreCatalogSettingsRepository storeCatalogSettingsRepository,
+            IStoreModuleRepository storeModuleRepository,
             IStringLocalizer<I18n> localizer)
         {
             _applicationUnitOfWork = applicationUnitOfWork;
@@ -145,6 +147,7 @@ namespace Application.Features.OnlineOrdering.Commands.CreateOnlineOrder
             _productRepository = productRepository;
             _orderRepository = orderRepository;
             _storeCatalogSettingsRepository = storeCatalogSettingsRepository;
+            _storeModuleRepository = storeModuleRepository;
             _localizer = localizer;
         }
 
@@ -168,6 +171,7 @@ namespace Application.Features.OnlineOrdering.Commands.CreateOnlineOrder
             Guid tenantId = store.TenantId;
 
             StoreCatalogSettings settings = await LoadEnabledSettingsAsync(storeId);
+            await EnsureGestionPedidosAsync(storeId);
             OrderDeliveryType deliveryType = ResolveDeliveryType(request.DeliveryType, settings);
             ValidateDeliveryAddress(deliveryType, request.DeliveryAddress);
 
@@ -276,6 +280,40 @@ namespace Application.Features.OnlineOrdering.Commands.CreateOnlineOrder
                 throw new ApiException(_localizer["OnlineOrdersNotEnabled", storeId], HttpStatusCode.BadRequest);
 
             return settings;
+        }
+
+        /// <summary>
+        /// Este comando ESCRIBE en <c>Order</c>, así que exige el módulo "Gestión de Pedidos"
+        /// (M3). Es la contraparte de servidor del gating que hace el frontend: con el carrito
+        /// abierto pero SIN este módulo el checkout no debería hacer <c>POST</c> —arma el
+        /// <c>wa.me</c> en cliente y no se guarda nada—, así que un <c>POST</c> aquí es un cliente
+        /// que se salta el gating (o uno viejo que no lo conoce). Sin <c>Order</c> no hay nada que
+        /// gestionar: ningún Pedido, ninguna venta, ningún reparto.
+        ///
+        /// OJO — esto NO es una autorización de seguridad, es la puerta de negocio de M3. Los
+        /// módulos son de TIENDA (fila <c>StoreModule.IsActive</c>), no del plan, y el comando es
+        /// público: sin esta comprobación, quitarle el módulo a una tienda no impediría seguir
+        /// guardándole pedidos.
+        ///
+        /// Lectura PÚBLICA (`GetPublicActiveModuleIdsByStoreIdAsync`), por el MISMO motivo que la
+        /// configuración de arriba: `StoreModule` tiene filtro global por tenant y esta petición es
+        /// ANÓNIMA. Con la lectura de sesión el conjunto saldría VACÍO y TODO pedido sería
+        /// rechazado — sin error ni aviso— aunque la tienda tuviera el módulo comprado.
+        ///
+        /// El módulo 19 ("Pedidos WhatsApp") NO se exige aquí, y es deliberado: el 19 habilita el
+        /// CARRITO (M2), no la persistencia. Quien solo tiene el 19 debe poder pedir por
+        /// WhatsApp, y ese camino no pasa por este comando.
+        ///
+        /// Se comprueba DESPUÉS de la configuración y ANTES de cualquier escritura: una tienda sin
+        /// el módulo recibe 400 sin que se llegue a crear el <c>Order</c>.
+        /// </summary>
+        private async Task EnsureGestionPedidosAsync(Guid storeId)
+        {
+            IReadOnlyCollection<int> activeModuleIds =
+                await _storeModuleRepository.GetPublicActiveModuleIdsByStoreIdAsync(storeId);
+
+            if (!activeModuleIds.Contains((int)ModuleType.GestionPedidos))
+                throw new ApiException(_localizer["OnlineOrdersModuleNotEnabled", storeId], HttpStatusCode.BadRequest);
         }
 
         /// <summary>

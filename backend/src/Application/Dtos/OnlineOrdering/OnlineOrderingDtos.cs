@@ -44,6 +44,10 @@ namespace Application.Dtos.OnlineOrdering
     ///
     ///   * NO lleva `WhatsappNumber`: el enlace `wa.me` se arma en el endpoint del pedido (F4), no
     ///     en un config que lee cualquiera que abra el catálogo.
+    ///   * SÍ lleva `PedidosWhatsAppEnabled`/`GestionPedidosEnabled`: son la respuesta a "¿esta
+    ///     tienda tiene carrito?" (M2) y "¿el pedido se persiste?" (M3). El storefront no puede
+    ///     deducirlos del catálogo —un módulo se compra y se activa por tienda—, así que tienen que
+    ///     viajar aquí o el gating sería una suposición del cliente.
     ///   * SÍ lleva `LogoUrl`/`BannerUrl` (F8) y NUNCA `LogoKey`/`BannerKey`: el storefront necesita
     ///     la URL para pintar el <c>&lt;img&gt;</c>, y publicar la clave cruda filtraría una ruta de
     ///     almacenamiento interno a cualquiera que abra el catálogo. Las URL son del endpoint público
@@ -77,6 +81,28 @@ namespace Application.Dtos.OnlineOrdering
 
         /// <summary>Modalidad envío a domicilio disponible.</summary>
         public bool DeliveryEnabled { get; set; }
+
+        /// <summary>
+        /// La tienda tiene ACTIVO el módulo "Pedidos WhatsApp" (M2). Es el interruptor del CARRITO:
+        /// sin él el storefront no ofrece carrito ni pedidos nuevos, aunque la fila de configuración
+        /// tenga <see cref="Enabled"/> en true.
+        ///
+        /// Es INDEPENDIENTE de <see cref="Enabled"/> a propósito: uno es la decisión de la tienda
+        /// (abrir/cerrar pedidos) y el otro lo que compró (M6). El storefront los lee los dos y
+        /// exige los dos.
+        /// </summary>
+        public bool PedidosWhatsAppEnabled { get; set; }
+
+        /// <summary>
+        /// La tienda tiene ACTIVO el módulo "Gestión de Pedidos" (M3). Es el interruptor de la
+        /// PERSISTENCIA: solo con este módulo el backend crea el <c>Order</c> y hay entregas que
+        /// gestionar. Con el carrito abierto pero SIN este módulo, el checkout no hace <c>POST</c>:
+        /// arma el enlace <c>wa.me</c> en cliente y no se guarda nada.
+        ///
+        /// Viaja aparte de <see cref="PedidosWhatsAppEnabled"/> porque los dos módulos son
+        /// comprables por separado y cada uno significa algo distinto: este no habilita el carrito.
+        /// </summary>
+        public bool GestionPedidosEnabled { get; set; }
 
         /// <summary>Horario de atención (texto libre, D16). null = no publicado.</summary>
         public string? BusinessHours { get; set; }

@@ -37,6 +37,10 @@ namespace Application.Tests.Features.OnlineOrdering.CreateOnlineOrder;
 ///   * la respuesta lleva el SNAPSHOT persistido (subtotal + líneas), que es lo que el resumen de
 ///     WhatsApp del frontend muestra.
 ///
+/// Y el gating de M3: este comando ESCRIBE en `Order`, así que exige el módulo "Gestión de Pedidos"
+/// activo en la tienda. Con solo "Pedidos WhatsApp" el pedido se arma y se manda por `wa.me` en
+/// cliente, sin pasar por aquí.
+///
 /// Y la mitad positiva: se persiste con `Code`, `OrderType = WhatsApp`, `New` y `Pending`, con el
 /// snapshot de los items leído en servidor.
 /// </summary>
@@ -56,6 +60,7 @@ public class CreateOnlineOrderCommandHandlerTests
     private readonly Mock<IProductRepository> _productRepository = new();
     private readonly Mock<IOrderRepository> _orderRepository = new();
     private readonly Mock<IStoreCatalogSettingsRepository> _settingsRepository = new();
+    private readonly Mock<IStoreModuleRepository> _moduleRepository = new();
     private readonly Mock<IStringLocalizer<I18n>> _localizer = new();
 
     private readonly string _slug = "tienda-ana";
@@ -78,6 +83,13 @@ public class CreateOnlineOrderCommandHandlerTests
             .Setup(x => x.CodeExistsAsync(It.IsAny<Guid>(), It.IsAny<string>()))
             .ReturnsAsync(false);
         _unitOfWork.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
+
+        // Gating de M3: por defecto la tienda TIENE "Gestión de Pedidos", que es lo que permite que
+        // este comando escriba. El caso contrario se monta con `WithoutGestionPedidosModule()`.
+        // Por vía ANÓNIMA, igual que en producción: con la de sesión el conjunto saldría vacío.
+        _moduleRepository
+            .Setup(x => x.GetPublicActiveModuleIdsByStoreIdAsync(It.IsAny<Guid>()))
+            .ReturnsAsync([(int)ModuleType.GestionPedidos]);
     }
 
     private CreateOnlineOrderCommandHandler Handler() => new(
@@ -86,7 +98,17 @@ public class CreateOnlineOrderCommandHandlerTests
         _productRepository.Object,
         _orderRepository.Object,
         _settingsRepository.Object,
+        _moduleRepository.Object,
         _localizer.Object);
+
+    /// <summary>
+    /// La tienda NO tiene activo "Gestión de Pedidos": este comando no debe persistir nada (M3).
+    /// Solo con el 19 el pedido se arma y se manda por `wa.me` en cliente, sin pasar por aquí.
+    /// </summary>
+    private void WithoutGestionPedidosModule()
+        => _moduleRepository
+            .Setup(x => x.GetPublicActiveModuleIdsByStoreIdAsync(It.IsAny<Guid>()))
+            .ReturnsAsync([(int)ModuleType.PedidosWhatsApp]);
 
     /// <summary>
     /// Tienda con catálogo publicado en `<paramref name="slug"/>`: el caso normal del storefront.
@@ -1028,6 +1050,129 @@ public class CreateOnlineOrderCommandHandlerTests
 
         result.Data!.WhatsappNumber.Should().Be("+53 5-111 2222");
         result.Data.WhatsappNumber.Should().NotBe("+1-555-0000");
+    }
+
+    #endregion
+
+    #region Gating de módulo (M3): la orden se persiste SOLO con "Gestión de Pedidos"
+
+    /// <summary>
+    /// Con el módulo ACTIVO el alta sigue funcionando exactamente igual: el gating no cambia el
+    /// camino de éxito, solo añade una puerta. Sin esto, el resto de la suite pasaría por un
+    /// handler que nunca aceptara un pedido.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WithTheOrderManagementModule_ShouldPersistTheOrder()
+    {
+        PublishedStore();
+        EnabledSettings();
+        Guid productId = Publish("Arroz", 100m);
+
+        var result = await Handler().Handle(Command(productId: productId), CancellationToken.None);
+
+        result.Succeeded.Should().BeTrue();
+        _orderRepository.Verify(x => x.AddAsync(It.IsAny<Order>()), Times.Once);
+        _unitOfWork.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>
+    /// SIN el módulo, 400 y NADA persistido (M3). Con solo "Pedidos WhatsApp" el pedido se arma y
+    /// se manda por `wa.me` en cliente; si llega un `POST` aquí, es un cliente saltándose el
+    /// gating, y aceptarlo guardaría un pedido que nadie va a gestionar.
+    ///
+    /// Se exige que no se escriba en NINGÚN punto: ni `AddAsync`, ni `SaveChangesAsync`, ni el
+    /// código. La puerta va ANTES de resolver el catálogo, así que ni se llega a mirar el producto.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WithoutTheOrderManagementModule_ShouldRejectAndPersistNothing()
+    {
+        PublishedStore();
+        EnabledSettings();
+        WithoutGestionPedidosModule();
+        Guid productId = Publish("Arroz", 100m);
+
+        Func<Task> act = () => Handler().Handle(Command(productId: productId), CancellationToken.None);
+
+        var exception = await act.Should().ThrowAsync<ApiException>();
+        exception.Which.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest);
+        _orderRepository.Verify(x => x.AddAsync(It.IsAny<Order>()), Times.Never);
+        _unitOfWork.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+        _orderRepository.Verify(x => x.CodeExistsAsync(It.IsAny<Guid>(), It.IsAny<string>()), Times.Never);
+    }
+
+    /// <summary>
+    /// El mensaje sale de la clave nueva, no del "pedidos no habilitados": son dos puertas
+    /// distintas —la fila apagada y el módulo sin comprar— y un mensaje único haría que el dueño
+    /// abriera el interruptor equivocado.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WithoutTheOrderManagementModule_ShouldReportTheModuleMessage()
+    {
+        PublishedStore();
+        EnabledSettings();
+        WithoutGestionPedidosModule();
+        Guid productId = Publish("Arroz", 100m);
+
+        Func<Task> act = () => Handler().Handle(Command(productId: productId), CancellationToken.None);
+
+        var exception = await act.Should().ThrowAsync<ApiException>();
+        exception.Which.Message.Should().StartWith("OnlineOrdersModuleNotEnabled");
+    }
+
+    /// <summary>
+    /// La puerta de configuración va PRIMERO: una tienda sin fila de configuración se rechaza con
+    /// su mensaje aunque tampoco tenga el módulo. Son dos filas distintas y la primera que falla
+    /// es la que se reporta — al revés, el dueño abriría un interruptor que no era.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WithNeitherSettingsNorModule_ShouldReportTheSettingsMessage()
+    {
+        PublishedStore();
+        _settingsRepository.Setup(x => x.GetPublicByStoreIdAsync(_storeId)).ReturnsAsync((StoreCatalogSettings?)null);
+        WithoutGestionPedidosModule();
+        Guid productId = Publish("Arroz", 100m);
+
+        Func<Task> act = () => Handler().Handle(Command(productId: productId), CancellationToken.None);
+
+        var exception = await act.Should().ThrowAsync<ApiException>();
+        exception.Which.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest);
+        exception.Which.Message.Should().StartWith("OnlineOrdersNotEnabled");
+        _moduleRepository.Verify(x => x.GetPublicActiveModuleIdsByStoreIdAsync(It.IsAny<Guid>()), Times.Never);
+        _orderRepository.Verify(x => x.AddAsync(It.IsAny<Order>()), Times.Never);
+    }
+
+    /// <summary>
+    /// Un slug desconocido NO lee módulos: el 404 uniforme va antes de tocar la base, para que el
+    /// anónimo no pueda usar el endpoint para averiguar qué tiendas tienen el módulo comprado.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WithAnUnknownSlug_ShouldNotReadAnyModule()
+    {
+        Func<Task> act = () => Handler().Handle(Command(slug: "no-existe"), CancellationToken.None);
+
+        await act.Should().ThrowAsync<ApiException>();
+        _moduleRepository.Verify(x => x.GetPublicActiveModuleIdsByStoreIdAsync(It.IsAny<Guid>()), Times.Never);
+    }
+
+    /// <summary>
+    /// Los módulos se leen de la tienda RESUELTA por el slug, una sola vez. `StoreModule` tiene
+    /// filtro global por tenant y esta petición es ANÓNIMA: con la lectura de sesión el conjunto
+    /// saldría VACÍO y se rechazaría TODO pedido — sin error ni aviso— aunque la tienda tuviera el
+    /// módulo comprado. Si alguien "simplifica" esto y usa `GetStoreModulesByIdAsync` o
+    /// `GetAvailableModulesByStoreIdAsync` (las de sesión), este test cae.
+    /// </summary>
+    [Fact]
+    public async Task Handle_ShouldReadTheModulesOfTheStoreResolvedFromTheSlugOnce()
+    {
+        PublishedStore();
+        EnabledSettings();
+        Guid productId = Publish("Arroz", 100m);
+
+        await Handler().Handle(Command(productId: productId), CancellationToken.None);
+
+        _moduleRepository.Verify(x => x.GetPublicActiveModuleIdsByStoreIdAsync(_storeId), Times.Once);
+        _moduleRepository.Verify(x => x.GetStoreModulesByIdAsync(It.IsAny<Guid>()), Times.Never);
+        _moduleRepository.Verify(x => x.GetAvailableModulesByStoreIdAsync(It.IsAny<Guid>()), Times.Never);
     }
 
     #endregion
