@@ -83,6 +83,10 @@ tienda (`StoresController`, como `{storeId}/module-pricing`) y quitar el control
       guardado se rehabilita → un admin podría **guardar `default` sobre la plantilla real**.
     - `R3-3`/`R3-4`/`R3-5` (SUGGESTION): tests más semánticos; falta test de la acción del
       card-list (gating por `isActive`); falta test a nivel de controller/routing/atributo.
+  - **Cerrados `R3-1`, `R3-2` y `R3-4`** en el commit `1e6cf322`: el modal cae a `default` con un
+    id desconocido (version skew), el guardado queda bloqueado si la carga falló, y hay tests del
+    modal (ambos casos) y del gating de la acción del card-list. Quedan `R3-3` (tests más
+    semánticos) y `R3-5` (test de controller) como trabajo posterior.
 
 ## Criterios de aceptación
 
