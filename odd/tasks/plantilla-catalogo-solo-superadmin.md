@@ -73,6 +73,16 @@ tienda (`StoresController`, como `{storeId}/module-pricing`) y quitar el control
     `app/admin/stores` + `app/catalog` verdes.
   - Se quitó `WEB_CATALOG.BRAND_TEMPLATE*` (del Owner); el selector del SuperAdmin reusa
     `WEB_CATALOG.TEMPLATE_DEFAULT`/`TEMPLATE_BOUTIQUE` vía `CATALOG_TEMPLATES`.
+- 2026-10-10 — **RDD cerrada y APROBADA (autoridad quemada)**. Lineage `review-590812242852cd0d`.
+  - `gentle-ai review acknowledge-approved` → `action: acknowledged`, `authority: burned`.
+  - **Advisories NO bloqueantes** (trabajo posterior, nunca motivo para re-revisar este candidato):
+    - `R3-1` (WARNING): el modal del SuperAdmin **no** repite el *fallback* de version skew que tenía
+      el selector del Owner (un `templateId` guardado que este build no lista → `select` sin opción
+      válida). Regresión de cobertura al mover el selector.
+    - `R3-2` (WARNING): si la carga de la plantilla falla, `templateValue` queda en `default` y el
+      guardado se rehabilita → un admin podría **guardar `default` sobre la plantilla real**.
+    - `R3-3`/`R3-4`/`R3-5` (SUGGESTION): tests más semánticos; falta test de la acción del
+      card-list (gating por `isActive`); falta test a nivel de controller/routing/atributo.
 
 ## Criterios de aceptación
 
