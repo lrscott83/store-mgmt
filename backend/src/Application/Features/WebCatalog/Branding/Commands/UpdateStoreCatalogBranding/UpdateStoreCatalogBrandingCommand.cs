@@ -32,13 +32,18 @@ namespace Application.Features.WebCatalog.Branding.Commands.UpdateStoreCatalogBr
     /// dueño escribiera la marca de la tienda de otro.
     ///
     /// NO lleva `PaletteId`: las paletas se cancelaron (decisión del Owner, 2026-10-07). Esta feature
-    /// escribe únicamente `LogoKey` y `BannerKey`.
+    /// escribe `LogoKey`, `BannerKey` y `TemplateId` (la plantilla/vista del catálogo).
+    ///
+    /// `TemplateId` es PARCIAL como los lados de imagen: `null` o en blanco = "no toco la plantilla";
+    /// un valor no vacío se valida y se escribe. Se estrena con valor por defecto para no obligar a
+    /// las llamadas de logo/banner a mencionarlo.
     /// </summary>
     public sealed record UpdateStoreCatalogBrandingCommand(
         CatalogImageUpload? Logo,
         bool RemoveLogo,
         CatalogImageUpload? Banner,
-        bool RemoveBanner) : ICommand<StoreCatalogBrandingDto>;
+        bool RemoveBanner,
+        string? TemplateId = null) : ICommand<StoreCatalogBrandingDto>;
 
     public class UpdateStoreCatalogBrandingCommandHandler
         : ICommandHandler<UpdateStoreCatalogBrandingCommand, StoreCatalogBrandingDto>
@@ -87,11 +92,17 @@ namespace Application.Features.WebCatalog.Branding.Commands.UpdateStoreCatalogBr
             string? bannerKey = await ResolveAsync(
                 request.Banner, request.RemoveBanner, settings.BannerKey, BrandingImageKinds.Banner, tenantId, storeId, cancellationToken);
 
-            // SOLO columnas de marca (D19). Las de pedidos, `PaletteId`, `SyncedAt` e `Id` quedan
-            // como estaban: si esta feature los tocara, subir un logo dejaría al dueño sin los
-            // pedidos que tenía abiertos. Su ausencia aquí ES el comportamiento, no un olvido.
+            // SOLO columnas de marca (D19): logo, banner y plantilla. Las de pedidos, `PaletteId`,
+            // `SyncedAt` e `Id` quedan como estaban: si esta feature los tocara, subir un logo
+            // dejaría al dueño sin los pedidos que tenía abiertos. Su ausencia aquí ES el
+            // comportamiento, no un olvido.
             settings.LogoKey = logoKey;
             settings.BannerKey = bannerKey;
+
+            // La PLANTILLA (vista) es PARCIAL como los lados de imagen: `null` o en blanco significa
+            // "no la toco". El validador ya comprobó su formato cuando venía con valor.
+            if (!string.IsNullOrWhiteSpace(request.TemplateId))
+                settings.TemplateId = request.TemplateId.Trim();
 
             // El upsert del repositorio marca la entidad explícitamente (Add o Modified).
             // `ApplicationDbContext` es NoTracking, así que mutar la fila cargada y llamar a
@@ -106,6 +117,9 @@ namespace Application.Features.WebCatalog.Branding.Commands.UpdateStoreCatalogBr
                 PaletteId = string.IsNullOrWhiteSpace(settings.PaletteId)
                     ? StoreCatalogSettings.DefaultPaletteId
                     : settings.PaletteId,
+                TemplateId = string.IsNullOrWhiteSpace(settings.TemplateId)
+                    ? StoreCatalogSettings.DefaultTemplateId
+                    : settings.TemplateId,
             });
         }
 

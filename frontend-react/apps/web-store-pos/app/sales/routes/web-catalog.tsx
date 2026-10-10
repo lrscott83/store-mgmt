@@ -13,6 +13,7 @@ import { httpErrorKey } from '~/shared/lib/http/http-error';
 import { apiFileUrl } from '~/shared/lib/http/media-url';
 import { showToastSuccess } from '~/shared/lib/toast';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
+import { CATALOG_TEMPLATES, DEFAULT_TEMPLATE_ID } from '~/catalog/templates/template-ids';
 import { CatalogProductEditor } from '../components/catalog-product-editor';
 import { buildCatalogSnapshot } from '../lib/catalog/catalog-snapshot';
 import { MAX_CATALOG_IMAGE_BYTES, MAX_DESCRIPTION_LENGTH } from '../lib/catalog/web-catalog-format';
@@ -559,6 +560,12 @@ export function WebCatalogPage() {
   /** Logo marcado para borrar, NO borrado todavía: lo aplica el botón de marca. */
   const [removeLogo, setRemoveLogo] = useState(false);
   const [isSavingBrand, setIsSavingBrand] = useState(false);
+  /**
+   * Plantilla (vista) elegida, PENDIENTE de guardar. `null` = el dueño todavía no la cambió y se
+   * usa la que devolvió el servidor (`branding.templateId`). Se confirma con el mismo botón de
+   * marca: el PUT de marca es parcial y también escribe la plantilla.
+   */
+  const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
 
   /**
    * Showcase (carrusel + imágenes del día): los dos conjuntos son independientes (decisión C1) y
@@ -931,7 +938,18 @@ export function WebCatalogPage() {
     );
   }
 
-  const hasBrandChanges = pendingLogo !== null || removeLogo;
+  const effectiveTemplate = branding?.templateId ?? DEFAULT_TEMPLATE_ID;
+  /**
+   * Version skew: un `templateId` guardado que ESTE build no anuncia no tiene `<option>` en el
+   * selector, así que el `select` quedaría sin selección válida (React avisa y muestra algo que no
+   * es lo que el storefront pinta). El storefront cae a `default` para ids desconocidos, así que el
+   * selector muestra ese mismo `default` — lo que se ve es lo que se renderiza.
+   */
+  const shownTemplate = CATALOG_TEMPLATES.some((template) => template.id === effectiveTemplate)
+    ? effectiveTemplate
+    : DEFAULT_TEMPLATE_ID;
+  const templateChanged = selectedTemplate !== null && selectedTemplate !== effectiveTemplate;
+  const hasBrandChanges = pendingLogo !== null || removeLogo || templateChanged;
 
   async function handleSaveBrand() {
     if (!hasBrandChanges) return;
@@ -939,6 +957,7 @@ export function WebCatalogPage() {
     const payload: CatalogBrandingUpdate = {};
     if (pendingLogo) payload.logo = pendingLogo;
     if (removeLogo) payload.removeLogo = true;
+    if (templateChanged) payload.templateId = selectedTemplate!;
 
     setIsSavingBrand(true);
     try {
@@ -952,6 +971,7 @@ export function WebCatalogPage() {
       }
       setPendingLogo(null);
       setRemoveLogo(false);
+      setSelectedTemplate(null);
       setBrandError('');
       showToastSuccess(intl.formatMessage({ id: 'WEB_CATALOG.BRAND_SAVED' }));
       // El servidor manda: se recarga para que la previsualización sea la que quedó guardada
@@ -1184,6 +1204,34 @@ export function WebCatalogPage() {
             <span data-testid="brand-error">{brandError}</span>
           </InfoBox>
         )}
+
+        {/* Plantilla (vista) del catálogo público: elige CÓMO SE VE la carta. La funcionalidad es
+            idéntica en todas; se guarda con el mismo botón de marca (el PUT de marca es parcial). */}
+        <div className="mt-3">
+          <label
+            className="mb-1 block text-sm font-medium text-text"
+            htmlFor="brand-template"
+          >
+            {intl.formatMessage({ id: 'WEB_CATALOG.BRAND_TEMPLATE' })}
+          </label>
+          <select
+            id="brand-template"
+            value={selectedTemplate ?? shownTemplate}
+            disabled={isSavingBrand}
+            onChange={(event) => setSelectedTemplate(event.target.value)}
+            className="w-full max-w-xs rounded-md border border-border bg-surface px-3 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-primary"
+            data-testid="brand-template"
+          >
+            {CATALOG_TEMPLATES.map((template) => (
+              <option key={template.id} value={template.id}>
+                {intl.formatMessage({ id: template.labelId })}
+              </option>
+            ))}
+          </select>
+          <p className="mt-1 text-xs text-text-muted">
+            {intl.formatMessage({ id: 'WEB_CATALOG.BRAND_TEMPLATE_HINT' })}
+          </p>
+        </div>
 
         <div className="mt-3 grid gap-4 sm:grid-cols-2">
           <BrandSlot

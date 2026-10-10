@@ -30,6 +30,7 @@ const CONFIG: PublicOrderingConfig = {
   businessHours: null,
   deliveryZones: null,
   paletteId: 'default',
+  templateId: 'default',
   logoUrl: null,
   bannerUrl: null,
   carouselImages: [],

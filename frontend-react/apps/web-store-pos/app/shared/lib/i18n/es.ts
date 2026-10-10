@@ -337,6 +337,14 @@ const messages: Record<string, string> = {
   'WEB_CATALOG.BRAND_SAVE_ERROR': 'No se pudo guardar la marca',
   'WEB_CATALOG.BRAND_LOAD_ERROR': 'No se pudo cargar la marca',
 
+  // Selector de PLANTILLA (vista) del catálogo público. El dueño elige CÓMO SE VE su carta; la
+  // funcionalidad (búsqueda, carrito, pedido, consulta de estado) es la misma en todas.
+  'WEB_CATALOG.BRAND_TEMPLATE': 'Plantilla',
+  'WEB_CATALOG.BRAND_TEMPLATE_HINT':
+    'Cómo se ve tu catálogo público. Todas las plantillas ofrecen las mismas funciones.',
+  'WEB_CATALOG.TEMPLATE_DEFAULT': 'Clásico',
+  'WEB_CATALOG.TEMPLATE_BOUTIQUE': 'Vitrina',
+
   // Showcase del catálogo (carrusel + imágenes del día): DOS CONJUNTOS INDEPENDIENTES (decisión
   // C1 del owner, 2026-10-07). Cada uno se configura, se ordena y se limpia por su cuenta, y
   // ninguno toca el guardado por lotes de productos.
@@ -545,6 +553,11 @@ const messages: Record<string, string> = {
   // tienda, de quien es la imagen; la ausencia de logo NO es un error (una tienda puede no
   // tenerlo), así que no hay ningún aviso para ese caso.
   'CATALOG_PUBLIC.LOGO_ALT': 'Logo de {store}',
+  // ── Plantilla `boutique`: la vitrina centrada en la marca ────────────────────────────────
+  // Las modalidades de entrega se muestran como una nota del hero; son informativas (el modo real
+  // lo decide el checkout).
+  'CATALOG_BOUTIQUE.PICKUP': 'Recogida en tienda',
+  'CATALOG_BOUTIQUE.DELIVERY': 'Envío a domicilio',
   // ── NAVEGACIÓN por secciones de la carta pública (decisión del owner, 2026-10-08) ────────
   // Tres secciones, ni una más: "Categorías" es un FILTRO, no una sección. La cabecera es fija,
   // así que cada destino lleva `scroll-mt-24` para que no quede bajo el header.

@@ -93,6 +93,32 @@ public class UpdateStoreCatalogBrandingCommandValidatorTests
             .IsValid.Should().BeTrue();
     }
 
+    /// <summary>Cambiar SOLO la plantilla es una petición con sentido: no requiere tocar logo/banner.</summary>
+    [Fact]
+    public void Validate_WithOnlyATemplate_ShouldPass()
+    {
+        Validator().Validate(new UpdateStoreCatalogBrandingCommand(null, false, null, false, "boutique"))
+            .IsValid.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Validate_WithAValidTemplateAndALogo_ShouldPass()
+    {
+        Validator().Validate(new UpdateStoreCatalogBrandingCommand(File(), false, null, false, "boutique"))
+            .IsValid.Should().BeTrue();
+    }
+
+    /// <summary>Un id con guiones y dígitos (kebab-case) es válido.</summary>
+    [Theory]
+    [InlineData("default")]
+    [InlineData("boutique")]
+    [InlineData("market-2")]
+    public void Validate_WithAKebabCaseTemplate_ShouldPass(string templateId)
+    {
+        Validator().Validate(new UpdateStoreCatalogBrandingCommand(null, false, null, false, templateId))
+            .IsValid.Should().BeTrue();
+    }
+
     #endregion
 
     #region Error Handling
@@ -143,6 +169,45 @@ public class UpdateStoreCatalogBrandingCommandValidatorTests
 
         result.IsValid.Should().BeFalse();
         result.Errors.Should().HaveCount(2);
+    }
+
+    /// <summary>
+    /// Un id de plantilla con formato inválido (mayúsculas, espacios, símbolos, demasiado largo) se
+    /// rechaza: el storefront solo entiende ids kebab-case.
+    /// </summary>
+    [Theory]
+    [InlineData("Boutique")]
+    [InlineData("boutique two")]
+    [InlineData("boutique!")]
+    [InlineData("2-boutique")]
+    [InlineData("-boutique")]
+    [InlineData("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")]
+    public void Validate_WithAnInvalidTemplate_ShouldFail(string templateId)
+    {
+        var result = Validator().Validate(new UpdateStoreCatalogBrandingCommand(null, false, null, false, templateId));
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain(e => e.ErrorMessage.StartsWith("BrandingInvalidTemplate", StringComparison.Ordinal));
+    }
+
+    /// <summary>Una plantilla en blanco es "no la toco": sin nada más, la petición no trae cambio.</summary>
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void Validate_WithABlankTemplateAndNothingElse_ShouldFail(string templateId)
+    {
+        var result = Validator().Validate(new UpdateStoreCatalogBrandingCommand(null, false, null, false, templateId));
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain(e => e.ErrorMessage.StartsWith("BrandingNothingToUpdate", StringComparison.Ordinal));
+    }
+
+    /// <summary>Una plantilla en blanco no estorba si la petición trae otra cosa (aquí, un logo).</summary>
+    [Fact]
+    public void Validate_WithABlankTemplateAndALogo_ShouldPass()
+    {
+        Validator().Validate(new UpdateStoreCatalogBrandingCommand(File(), false, null, false, "   "))
+            .IsValid.Should().BeTrue();
     }
 
     #endregion

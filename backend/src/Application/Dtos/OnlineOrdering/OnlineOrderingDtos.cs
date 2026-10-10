@@ -114,6 +114,13 @@ namespace Application.Dtos.OnlineOrdering
         /// el storefront siempre tiene algo que pintar.
         /// </summary>
         public string PaletteId { get; set; } = StoreCatalogSettings.DefaultPaletteId;
+
+        /// <summary>
+        /// Plantilla (vista) con la que el storefront pinta el catálogo. Cuando la tienda no tiene
+        /// fila de configuración, o la tiene en blanco, se devuelve
+        /// <see cref="StoreCatalogSettings.DefaultTemplateId"/>: el catálogo se ve como hoy.
+        /// </summary>
+        public string TemplateId { get; set; } = StoreCatalogSettings.DefaultTemplateId;
     }
 
     /// <summary>

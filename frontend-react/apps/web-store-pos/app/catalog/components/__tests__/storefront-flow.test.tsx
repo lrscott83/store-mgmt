@@ -41,6 +41,7 @@ const CONFIG: PublicOrderingConfig = {
   businessHours: null,
   deliveryZones: null,
   paletteId: 'default',
+  templateId: 'default',
   logoUrl: null,
   bannerUrl: null,
   // El showcase viaja siempre; el checkout no lo usa, pero el config es uno solo.

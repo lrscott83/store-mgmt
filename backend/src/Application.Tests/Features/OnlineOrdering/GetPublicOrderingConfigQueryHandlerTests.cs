@@ -27,7 +27,8 @@ namespace Application.Tests.Features.OnlineOrdering;
 ///      no en un config que cualquier visitante puede leer.
 ///
 /// La paleta viene porque el storefront la pinta; el logo y el banner también, como URLs públicas
-/// del endpoint de media construidas con el slug de la tienda.
+/// del endpoint de media construidas con el slug de la tienda. La plantilla (`TemplateId`) viaja
+/// igual que la paleta: sin fila, o en blanco, la vista actual.
 /// </summary>
 public class GetPublicOrderingConfigQueryHandlerTests
 {
@@ -258,6 +259,57 @@ public class GetPublicOrderingConfigQueryHandlerTests
         result.Data!.LogoUrl.Should().StartWith("/api/v1/public/catalog/");
         result.Data.LogoUrl.Should().NotContain(@":\");
         result.Data.LogoUrl.Should().NotContain("storage");
+    }
+
+    #endregion
+
+    #region Template (vista del catálogo)
+
+    /// <summary>
+    /// Sin fila la plantilla es la vista actual: el storefront siempre tiene algo que pintar, y una
+    /// tienda recién sincronizada se ve igual que hoy.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenTheStoreHasNoSettings_ShouldReportTheDefaultTemplate()
+    {
+        PublishedStore();
+        _settingsRepository.Setup(x => x.GetPublicByStoreIdAsync(_storeId)).ReturnsAsync((StoreCatalogSettings?)null);
+
+        var result = await Handler().Handle(new GetPublicOrderingConfigQuery("tienda-ana"), CancellationToken.None);
+
+        result.Data!.TemplateId.Should().Be(StoreCatalogSettings.DefaultTemplateId);
+    }
+
+    [Fact]
+    public async Task Handle_WithASettingsRow_ShouldPublishItsTemplate()
+    {
+        PublishedStore();
+        StoreCatalogSettings settings = StoreCatalogSettings.Create(_storeId, _tenantId);
+        settings.TemplateId = "boutique";
+        _settingsRepository.Setup(x => x.GetPublicByStoreIdAsync(_storeId)).ReturnsAsync(settings);
+
+        var result = await Handler().Handle(new GetPublicOrderingConfigQuery("tienda-ana"), CancellationToken.None);
+
+        result.Data!.TemplateId.Should().Be("boutique");
+    }
+
+    /// <summary>
+    /// Una fila con la plantilla en blanco es una fila rota: se cae a la vista actual en lugar de
+    /// publicar una cadena vacía que no resuelve ninguna plantilla.
+    /// </summary>
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task Handle_WithABlankTemplate_ShouldReportTheDefaultTemplate(string templateId)
+    {
+        PublishedStore();
+        StoreCatalogSettings settings = StoreCatalogSettings.Create(_storeId, _tenantId);
+        settings.TemplateId = templateId;
+        _settingsRepository.Setup(x => x.GetPublicByStoreIdAsync(_storeId)).ReturnsAsync(settings);
+
+        var result = await Handler().Handle(new GetPublicOrderingConfigQuery("tienda-ana"), CancellationToken.None);
+
+        result.Data!.TemplateId.Should().Be(StoreCatalogSettings.DefaultTemplateId);
     }
 
     #endregion

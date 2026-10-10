@@ -34,6 +34,10 @@ namespace Infrastructure.Persistence.EntityConfigurations
             builder.Property(x => x.WhatsappNumber).HasMaxLength(32);
             builder.Property(x => x.PaletteId).HasMaxLength(64).IsRequired();
 
+            // Id de la PLANTILLA (vista) del catálogo. Mismo límite que `PaletteId`; kebab-case
+            // validado en el command de marca, con `default` como valor de una fila recién creada.
+            builder.Property(x => x.TemplateId).HasMaxLength(64).IsRequired();
+
             // D16: horarios y zonas son texto libre para el dueño, sin estructura que validar.
             builder.Property(x => x.BusinessHours).HasMaxLength(512);
             builder.Property(x => x.DeliveryZones).HasMaxLength(512);
