@@ -52,16 +52,27 @@ tienda (`StoresController`, como `{storeId}/module-pricing`) y quitar el control
 
 ## Tareas
 
-- [ ] **T1** — Backend: DTO `StoreCatalogTemplateDto` + query `GetStoreCatalogTemplateQuery` (SuperAdmin).
-- [ ] **T2** — Backend: command `UpdateStoreCatalogTemplateCommand` + validator (kebab) + handler (upsert solo TemplateId).
-- [ ] **T3** — Backend: endpoints en `StoresController` (`{storeId}/catalog-template`).
-- [ ] **T4** — Backend: quitar `TemplateId` de la marca (DTO/command/controller/validador) + ajustar tests.
-- [ ] **T5** — Backend: tests del nuevo query/command/validator.
-- [ ] **T6** — Frontend: `store-http-service` (get/update template).
-- [ ] **T7** — Frontend: modal + acción en `/admin/stores` (store-list + store-card-list).
-- [ ] **T8** — Frontend: quitar selector de `web-catalog.tsx` + tipos/servicio + tests.
-- [ ] **T9** — Frontend: i18n + tests.
-- [ ] **T10** — Verificación (build/tests backend, typecheck/lint/vitest).
+- [x] **T1** — Backend: DTO `StoreCatalogTemplateDto` + query `GetStoreCatalogTemplateQuery` (SuperAdmin).
+- [x] **T2** — Backend: command `UpdateStoreCatalogTemplateCommand` + validator (kebab) + handler (upsert solo TemplateId).
+- [x] **T3** — Backend: endpoints en `StoresController` (`{storeId}/catalog-template`).
+- [x] **T4** — Backend: quitar `TemplateId` de la marca (DTO/command/controller/validador) + ajustar tests.
+- [x] **T5** — Backend: tests del nuevo query/command/validator.
+- [x] **T6** — Frontend: `store-http-service` (get/update template).
+- [x] **T7** — Frontend: modal + acción en `/admin/stores` (store-list + store-card-list).
+- [x] **T8** — Frontend: quitar selector de `web-catalog.tsx` + tipos/servicio + tests.
+- [x] **T9** — Frontend: i18n + tests.
+- [x] **T10** — Verificación (build/tests backend, typecheck/lint/vitest).
+
+## Progreso
+
+- 2026-10-10 — **Implementado y entregado** en la rama `qa`.
+  - Backend `4bd…` — commit `feat(stores): SuperAdmin-only per-store catalog template endpoint`.
+    `dotnet build src/SMCA.sln` 0 errores; `dotnet test Application.Tests` **1176 passed**.
+  - Frontend — commit `feat(stores): SuperAdmin selector for a store's catalog template`.
+    `pnpm typecheck` 0, `pnpm lint` 0; `app/sales` **1561 passed**; `app/management/stores` +
+    `app/admin/stores` + `app/catalog` verdes.
+  - Se quitó `WEB_CATALOG.BRAND_TEMPLATE*` (del Owner); el selector del SuperAdmin reusa
+    `WEB_CATALOG.TEMPLATE_DEFAULT`/`TEMPLATE_BOUTIQUE` vía `CATALOG_TEMPLATES`.
 
 ## Criterios de aceptación
 
