@@ -221,3 +221,18 @@ pnpm vitest run app/catalog/ app/sales/routes/__tests__/
   `b1c5f43b` añade 6 tests a `boutique-catalog.test.tsx` (lista fallida, catálogo vacío vs búsqueda
   sin resultados, conteo singular/plural, paginación anterior/siguiente y una sola página).
   `pnpm typecheck` 0, `pnpm lint` 0, boutique 14/14.
+- 2026-10-10 — **RDD cerrada y APROBADA (autoridad quemada)**. Lineage `review-c1c4fa2555c8f6e6`.
+  - El revisor admitió un artefacto (una corrida usó solo `candidate-created-path:`; el prefijo
+    `changed-hunk:` es el que la admisión rechaza, y varía por corrida) y **encontró un bug real**:
+    `R3-TEMPLATE-PROTO` (CRITICAL, determinístico): `resolveTemplate` devolvía claves heredadas de
+    `Object.prototype` (`constructor`, `__proto__`, …) en vez de la plantilla por defecto → crash.
+  - **Corregido**: `Object.hasOwn` + 5 tests de regresión (RED observado con el bug, luego verde).
+    Commit `da8272b0`, pusheado a `qa` (`3532d4f7..da8272b0`).
+  - El validador dirigido falló con `binding_mismatch` hasta reintentar con un binding **fresco tras
+    el commit**; entonces pasó y la revisión cerró en `approved`.
+  - `gentle-ai review acknowledge-approved` → `action: acknowledged`, `authority: burned`.
+  - **Advisories NO bloqueantes** (trabajo posterior, nunca motivo para re-revisar este candidato):
+    - `R3-REGISTRY-TAUTOLOGY` (WARNING): el test "cada id anunciado resuelve a un componente" usa
+      `toBeDefined()`, que es tautológico.
+    - `R3-SELECT-VERSION-SKEW` (SUGGESTION): el selector del dueño puede recibir un `templateId`
+      que este build no lista (version skew) y quedar sin opción válida.
