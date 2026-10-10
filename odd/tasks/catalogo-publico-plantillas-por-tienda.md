@@ -236,3 +236,7 @@ pnpm vitest run app/catalog/ app/sales/routes/__tests__/
       `toBeDefined()`, que es tautológico.
     - `R3-SELECT-VERSION-SKEW` (SUGGESTION): el selector del dueño puede recibir un `templateId`
       que este build no lista (version skew) y quedar sin opción válida.
+  - **Ambos advisories CERRADOS** en el commit `9867f5a1` (selector refleja el `default` que el
+    storefront ya usa para ids desconocidos; el test tautológico ahora afirma identidad). Verificado
+    (`typecheck` 0, `lint` 0, registry 13 + web-catalog 47). `review assess` sobre `da8272b0..HEAD`:
+    `risk=medium`, 75 líneas → **`review_due: false`** (`under_budget`); no requiere revisión propia.
