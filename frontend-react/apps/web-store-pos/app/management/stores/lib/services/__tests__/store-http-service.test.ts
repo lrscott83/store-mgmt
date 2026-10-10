@@ -547,3 +547,53 @@ describe('storeHttpService.changeStorePlan — HTTP-16: POST /v1/stores/{id}/cha
     await expect(storeHttpService.changeStorePlan('s1', 2)).rejects.toThrow('network down');
   });
 });
+
+describe('storeHttpService.getStoreCatalogTemplate — TEMPLATE-1: GET /v1/stores/{id}/catalog-template', () => {
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    const { apiClient } = await import('~/shared/lib/http/api-client');
+    (apiClient.get as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: { succeeded: true, data: { storeId: 's1', templateId: 'boutique' } },
+    });
+  });
+
+  it('calls GET /v1/stores/{id}/catalog-template', async () => {
+    const { storeHttpService } = await import('../store-http-service');
+    const { apiClient } = await import('~/shared/lib/http/api-client');
+    await storeHttpService.getStoreCatalogTemplate('s1');
+    expect(apiClient.get).toHaveBeenCalledWith('/v1/stores/s1/catalog-template');
+  });
+
+  it('returns the template data', async () => {
+    const { storeHttpService } = await import('../store-http-service');
+    const result = await storeHttpService.getStoreCatalogTemplate('s1');
+    if (!result.succeeded) throw new Error('expected succeeded response');
+    expect(result.data.templateId).toBe('boutique');
+  });
+});
+
+describe('storeHttpService.updateStoreCatalogTemplate — TEMPLATE-2: PUT /v1/stores/{id}/catalog-template', () => {
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    const { apiClient } = await import('~/shared/lib/http/api-client');
+    (apiClient.put as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: { succeeded: true, data: { storeId: 's1', templateId: 'boutique' } },
+    });
+  });
+
+  it('calls PUT /v1/stores/{id}/catalog-template with { templateId }', async () => {
+    const { storeHttpService } = await import('../store-http-service');
+    const { apiClient } = await import('~/shared/lib/http/api-client');
+    await storeHttpService.updateStoreCatalogTemplate('s1', 'boutique');
+    expect(apiClient.put).toHaveBeenCalledWith('/v1/stores/s1/catalog-template', {
+      templateId: 'boutique',
+    });
+  });
+
+  it('returns the saved template data', async () => {
+    const { storeHttpService } = await import('../store-http-service');
+    const result = await storeHttpService.updateStoreCatalogTemplate('s1', 'boutique');
+    if (!result.succeeded) throw new Error('expected succeeded response');
+    expect(result.data.templateId).toBe('boutique');
+  });
+});

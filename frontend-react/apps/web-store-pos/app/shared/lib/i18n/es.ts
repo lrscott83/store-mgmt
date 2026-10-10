@@ -337,11 +337,9 @@ const messages: Record<string, string> = {
   'WEB_CATALOG.BRAND_SAVE_ERROR': 'No se pudo guardar la marca',
   'WEB_CATALOG.BRAND_LOAD_ERROR': 'No se pudo cargar la marca',
 
-  // Selector de PLANTILLA (vista) del catálogo público. El dueño elige CÓMO SE VE su carta; la
-  // funcionalidad (búsqueda, carrito, pedido, consulta de estado) es la misma en todas.
-  'WEB_CATALOG.BRAND_TEMPLATE': 'Plantilla',
-  'WEB_CATALOG.BRAND_TEMPLATE_HINT':
-    'Cómo se ve tu catálogo público. Todas las plantillas ofrecen las mismas funciones.',
+  // Nombres de las plantillas del catálogo público. La plantilla la fija SOLO el SuperAdmin
+  // (/admin/stores); el dueño ya no la elige, así que estos textos los muestra el selector del
+  // SuperAdmin, no la config del catálogo web.
   'WEB_CATALOG.TEMPLATE_DEFAULT': 'Clásico',
   'WEB_CATALOG.TEMPLATE_BOUTIQUE': 'Vitrina',
 
@@ -1458,6 +1456,13 @@ const messages: Record<string, string> = {
   // Super-admin per-store module pricing (gear item + table). The grouping reuses the
   // STORES.PLAN.*_TAB names; the last bucket holds modules no loaded plan carries (VIP-only,
   // because GET /v1/plans excludes VIP) so every module in the table is still reachable.
+  // Plantilla (vista) del catálogo público de una tienda: la fija SOLO el SuperAdmin desde
+  // /admin/stores (por tienda), no el dueño. Todas las plantillas ofrecen las mismas funciones.
+  'STORES.CATALOG_TEMPLATE.MENU_LABEL': 'Plantilla del catálogo',
+  'STORES.CATALOG_TEMPLATE.TITLE': 'Plantilla del catálogo',
+  'STORES.CATALOG_TEMPLATE.LABEL': 'Plantilla',
+  'STORES.CATALOG_TEMPLATE.HINT':
+    'Cómo se ve el catálogo público de esta tienda. Todas las plantillas ofrecen las mismas funciones.',
   'STORES.MODULE_PRICING.MENU_LABEL': 'Precios de módulos',
   'STORES.MODULE_PRICING.TITLE': 'Precios de módulos',
   'STORES.MODULE_PRICING.HINT':

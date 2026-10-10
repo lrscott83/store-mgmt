@@ -18,6 +18,12 @@ import type {
 } from '@store-mgmt/domain';
 import { apiClient } from '~/shared/lib/http/api-client';
 
+/** Plantilla (vista) del catálogo público de una tienda (SuperAdmin). */
+export interface StoreCatalogTemplate {
+  storeId: string;
+  templateId: string;
+}
+
 interface CreateStorePayload {
   ownerId: string;
   name: string;
@@ -191,6 +197,32 @@ export const storeHttpService = {
   async getStoreModulePricing(id: string): Promise<BaseResponseModel<StoreModulePricingReadResult>> {
     const response = await apiClient.get<BaseResponseModel<StoreModulePricingReadResult>>(
       `/v1/stores/${id}/module-pricing`,
+    );
+    return response.data;
+  },
+
+  /**
+   * Plantilla (vista) del catálogo público de una tienda (SuperAdmin-only, igual que el save).
+   * Una tienda sin fila devuelve la plantilla por defecto, no un 404.
+   */
+  async getStoreCatalogTemplate(id: string): Promise<BaseResponseModel<StoreCatalogTemplate>> {
+    const response = await apiClient.get<BaseResponseModel<StoreCatalogTemplate>>(
+      `/v1/stores/${id}/catalog-template`,
+    );
+    return response.data;
+  },
+
+  /**
+   * Fija la plantilla (vista) del catálogo público de una tienda (SuperAdmin-only, mismo patrón
+   * por-tienda que el pricing). Escribe SOLO el id de plantilla: no toca la marca ni los pedidos.
+   */
+  async updateStoreCatalogTemplate(
+    id: string,
+    templateId: string,
+  ): Promise<BaseResponseModel<StoreCatalogTemplate>> {
+    const response = await apiClient.put<BaseResponseModel<StoreCatalogTemplate>>(
+      `/v1/stores/${id}/catalog-template`,
+      { templateId },
     );
     return response.data;
   },

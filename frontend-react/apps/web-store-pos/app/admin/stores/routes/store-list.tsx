@@ -6,6 +6,8 @@ import { storeHttpService } from '~/management/stores/lib/services/store-http-se
 import { EditPlanModal } from '~/management/stores/components/edit-plan-modal';
 import { StoreModulePricingModal } from '~/admin/stores/components/store-module-pricing-modal';
 import type { PricingDraft, PricingField } from '~/admin/stores/components/store-module-pricing-modal';
+import { StoreCatalogTemplateModal } from '~/management/stores/components/store-catalog-template-modal';
+import { DEFAULT_TEMPLATE_ID } from '~/catalog/templates/template-ids';
 import { groupFeaturesByModuleId } from '~/management/stores/lib/plan-utils';
 import { StoreCardList } from '~/admin/stores/components/store-card-list';
 import { httpErrorKey } from '~/shared/lib/http/http-error';
@@ -65,6 +67,13 @@ export function AdminStoreListPage() {
   const [pricingSaving, setPricingSaving] = useState(false);
   const [pricingError, setPricingError] = useState('');
   const [pricingServerTotal, setPricingServerTotal] = useState<number | null>(null);
+  // Catalog-template editor (SuperAdmin-only, same per-store pattern as the pricing editor). The
+  // selected value lives here so the modal stays presentational.
+  const [templateStore, setTemplateStore] = useState<Store | null>(null);
+  const [templateValue, setTemplateValue] = useState<string>(DEFAULT_TEMPLATE_ID);
+  const [templateLoading, setTemplateLoading] = useState(false);
+  const [templateSaving, setTemplateSaving] = useState(false);
+  const [templateError, setTemplateError] = useState('');
   // Filter by plan type: 'all' shows all stores, 'not-free' excludes Gratis plan,
   // and specific plan types (VIP, Superior, Pago, Gratis) filter by that plan.
   // Default is 'not-free' to show all paid plans except Gratis.
@@ -259,6 +268,48 @@ export function AdminStoreListPage() {
     }
   }
 
+  async function openTemplateModal(id: string) {
+    const store = stores.find((s) => s.id === id);
+    if (!store) return;
+    setTemplateError('');
+    setTemplateValue(DEFAULT_TEMPLATE_ID);
+    setTemplateStore(store);
+    setTemplateLoading(true);
+    try {
+      const res = await storeHttpService.getStoreCatalogTemplate(store.id);
+      if (!res.succeeded) {
+        setTemplateError(formatMessage({ id: 'STORES.ERROR' }));
+        return;
+      }
+      // El backend ya cae a `default` para una fila sin plantilla; el `||` cubre un id vacío.
+      setTemplateValue(res.data.templateId || DEFAULT_TEMPLATE_ID);
+    } catch (error) {
+      setTemplateError(formatMessage({ id: httpErrorKey(error, 'STORES.ERROR') }));
+    } finally {
+      setTemplateLoading(false);
+    }
+  }
+
+  async function handleTemplateSave() {
+    if (!templateStore || templateSaving) return;
+    setTemplateError('');
+    setTemplateSaving(true);
+    try {
+      const saved = await storeHttpService.updateStoreCatalogTemplate(templateStore.id, templateValue);
+      if (!saved.succeeded) {
+        setTemplateError(formatMessage({ id: 'STORES.ERROR' }));
+        return;
+      }
+      setTemplateValue(saved.data.templateId);
+      showToastSuccess(formatMessage({ id: 'STORES.UPDATE_SUCCESS' }));
+      setTemplateStore(null);
+    } catch (error) {
+      setTemplateError(formatMessage({ id: httpErrorKey(error, 'STORES.ERROR') }));
+    } finally {
+      setTemplateSaving(false);
+    }
+  }
+
   function getFilteredStores(): Store[] {
     if (filter === 'all') {
       return stores;
@@ -311,6 +362,7 @@ export function AdminStoreListPage() {
         onDisapprove={handleDisapprove}
         onChangePlan={openPlanModal}
         onEditModulePricing={isSuperAdmin ? openPricingModal : undefined}
+        onEditCatalogTemplate={isSuperAdmin ? openTemplateModal : undefined}
       />
 
       <EditPlanModal
@@ -344,6 +396,22 @@ export function AdminStoreListPage() {
           setPricingError('');
         }}
         onSave={handlePricingSave}
+      />
+
+      <StoreCatalogTemplateModal
+        open={templateStore !== null}
+        storeId={templateStore?.id ?? null}
+        storeName={templateStore?.name ?? ''}
+        value={templateValue}
+        loading={templateLoading}
+        saving={templateSaving}
+        error={templateError}
+        onChange={setTemplateValue}
+        onClose={() => {
+          setTemplateStore(null);
+          setTemplateError('');
+        }}
+        onSave={handleTemplateSave}
       />
     </div>
   );
