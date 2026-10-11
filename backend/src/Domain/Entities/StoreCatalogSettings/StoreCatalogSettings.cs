@@ -22,6 +22,12 @@ namespace Domain.Entities.StoreCatalogSettings
         /// <summary>Paleta por defecto: la que el catálogo ya usa hoy (plan 2026-09-27).</summary>
         public const string DefaultPaletteId = "default";
 
+        /// <summary>
+        /// Plantilla (vista) del catálogo por defecto: la que el catálogo ya usa hoy. Una tienda sin
+        /// fila, o con la plantilla en blanco, se pinta con esta para no romperse.
+        /// </summary>
+        public const string DefaultTemplateId = "default";
+
         public Guid StoreId { get; set; }
         public Store Store { get; set; } = null!;
 
@@ -59,6 +65,14 @@ namespace Domain.Entities.StoreCatalogSettings
         /// (<see cref="DefaultPaletteId"/>), para que una fila recién creada no rompa el estilo.
         /// </summary>
         public string PaletteId { get; set; } = DefaultPaletteId;
+
+        /// <summary>
+        /// Id de la PLANTILLA (vista) con la que se pinta el catálogo público. Por defecto la actual
+        /// (<see cref="DefaultTemplateId"/>): una tienda que no elige otra vista se ve igual que hoy.
+        /// La plantilla solo cambia la PRESENTACIÓN; la funcionalidad (datos, búsqueda, carrito,
+        /// checkout) es común a todas. NO es un color: eso es <see cref="PaletteId"/>.
+        /// </summary>
+        public string TemplateId { get; set; } = DefaultTemplateId;
 
         // --- Comunes ---
 

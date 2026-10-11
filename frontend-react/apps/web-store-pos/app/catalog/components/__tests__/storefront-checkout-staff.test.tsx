@@ -28,6 +28,7 @@ const CONFIG: PublicOrderingConfig = {
   businessHours: null,
   deliveryZones: null,
   paletteId: 'default',
+  templateId: 'default',
   logoUrl: null,
   bannerUrl: null,
   // Módulos 19 y 20 activos: sin "Gestión de Pedidos" el checkout no haría `POST` (M3) y todo lo

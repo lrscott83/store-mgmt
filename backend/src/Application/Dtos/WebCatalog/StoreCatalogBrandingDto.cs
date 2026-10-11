@@ -15,6 +15,9 @@ namespace Application.Dtos.WebCatalog
     /// `PaletteId` viaja porque la fila la tiene y porque la vista necesita conocerla. NO lo escribe
     /// el command de marca: las paletas se cancelaron por ahora (decisión del Owner, 2026-10-07) y
     /// queda la que el catálogo ya usa.
+    ///
+    /// `TemplateId` (vista del catálogo) sí lo escribe el command de marca: el dueño elige la
+    /// plantilla junto con el logo en la misma vista.
     /// </summary>
     public sealed class StoreCatalogBrandingDto
     {
@@ -30,5 +33,12 @@ namespace Application.Dtos.WebCatalog
         /// que una tienda recién sincronizada no se vea rota.
         /// </summary>
         public string PaletteId { get; set; } = StoreCatalogSettings.DefaultPaletteId;
+
+        /// <summary>
+        /// Plantilla (vista) del catálogo público de la tienda. Nunca vacía: sin fila, o con una en
+        /// blanco, se devuelve <see cref="StoreCatalogSettings.DefaultTemplateId"/>. Es un id
+        /// predefinido, no un color.
+        /// </summary>
+        public string TemplateId { get; set; } = StoreCatalogSettings.DefaultTemplateId;
     }
 }

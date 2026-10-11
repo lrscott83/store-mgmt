@@ -65,6 +65,7 @@ namespace Application.Features.WebCatalog.Branding.Queries.GetStoreCatalogBrandi
             LogoKey = null,
             BannerKey = null,
             PaletteId = StoreCatalogSettings.DefaultPaletteId,
+            TemplateId = StoreCatalogSettings.DefaultTemplateId,
         };
 
         private static StoreCatalogBrandingDto Map(StoreCatalogSettings settings) => new()
@@ -77,6 +78,10 @@ namespace Application.Features.WebCatalog.Branding.Queries.GetStoreCatalogBrandi
             PaletteId = string.IsNullOrWhiteSpace(settings.PaletteId)
                 ? StoreCatalogSettings.DefaultPaletteId
                 : settings.PaletteId,
+            // Mismo criterio para la plantilla: en blanco = la vista actual.
+            TemplateId = string.IsNullOrWhiteSpace(settings.TemplateId)
+                ? StoreCatalogSettings.DefaultTemplateId
+                : settings.TemplateId,
         };
     }
 }

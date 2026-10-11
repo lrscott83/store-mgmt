@@ -331,10 +331,13 @@
     <value>{0} no puede superar los {1} caracteres</value>
   </data>
   <data name="BrandingNothingToUpdate" xml:space="preserve">
-    <value>Hay que subir o quitar al menos el logo o el banner: la petición no trae ningún cambio</value>
+    <value>Hay que subir o quitar el logo o el banner, o elegir una plantilla: la petición no trae ningún cambio</value>
   </data>
   <data name="BrandingUploadAndRemoveConflict" xml:space="preserve">
     <value>No se puede subir y quitar {0} en la misma petición</value>
+  </data>
+  <data name="BrandingInvalidTemplate" xml:space="preserve">
+    <value>El id de la plantilla {0} no es válido</value>
   </data>
   <data name="ShowcaseImageKindInvalid" xml:space="preserve">
     <value>El tipo de imagen {0} no es válido</value>

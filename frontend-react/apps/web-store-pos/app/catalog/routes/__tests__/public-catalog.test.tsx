@@ -169,6 +169,7 @@ const CONFIG_WITHOUT_BRAND: PublicOrderingConfig = {
   businessHours: null,
   deliveryZones: null,
   paletteId: 'default',
+  templateId: 'default',
   logoUrl: null,
   bannerUrl: null,
   pedidosWhatsAppEnabled: true,

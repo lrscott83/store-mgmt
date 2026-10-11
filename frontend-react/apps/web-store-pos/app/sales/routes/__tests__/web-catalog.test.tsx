@@ -128,7 +128,7 @@ const PRODUCT_WITH_IMAGE: CatalogProductView = {
   images: ['t/s/p/foto.jpg'],
 };
 
-const BRAND_WITHOUT_MEDIA: CatalogBranding = { logoKey: null, bannerKey: null, paletteId: 'default' };
+const BRAND_WITHOUT_MEDIA: CatalogBranding = { logoKey: null, bannerKey: null, paletteId: 'default', templateId: 'default' };
 
 const BRAND_WITH_MEDIA: CatalogBranding = {
   logoKey: 't/s/branding/logo.png',
@@ -137,6 +137,7 @@ const BRAND_WITH_MEDIA: CatalogBranding = {
   // hasta el cliente y la vista la ignora — el fixture la conserva a propósito.
   bannerKey: 't/s/branding/banner.png',
   paletteId: 'default',
+  templateId: 'default',
 };
 
 /** Los DOS conjuntos con una imagen cada uno: sirven para comprobar que NO se mezclan. */
@@ -698,6 +699,68 @@ describe('WebCatalogPage (vista Catálogo Web)', () => {
       await waitFor(() => expect(catalogMock.updateBranding).toHaveBeenCalledTimes(1));
       expect(catalogMock.updateBranding).toHaveBeenCalledWith({ logo });
       await waitFor(() => expect(showToastSuccessMock).toHaveBeenCalledWith('Marca guardada'));
+    });
+
+    it('el selector de plantilla arranca con la guardada por el servidor', async () => {
+      catalogMock.getBranding.mockResolvedValue(envelope({ ...BRAND_WITHOUT_MEDIA, templateId: 'boutique' }));
+      renderPage();
+
+      const select = (await screen.findByTestId('brand-template')) as HTMLSelectElement;
+      expect(select.value).toBe('boutique');
+      // Sin cambios pendientes, el botón sigue deshabilitado.
+      expect(screen.getByTestId('brand-save')).toBeDisabled();
+    });
+
+    it('cambiar la plantilla la retiene y la envía con Guardar marca', async () => {
+      renderPage();
+
+      const select = await screen.findByTestId('brand-template');
+      fireEvent.change(select, { target: { value: 'boutique' } });
+
+      // El cambio habilita el botón de marca, aunque no haya logo pendiente.
+      expect(screen.getByTestId('brand-save')).not.toBeDisabled();
+      expect(catalogMock.updateBranding).not.toHaveBeenCalled();
+
+      fireEvent.click(screen.getByTestId('brand-save'));
+
+      await waitFor(() => expect(catalogMock.updateBranding).toHaveBeenCalledTimes(1));
+      expect(catalogMock.updateBranding).toHaveBeenCalledWith({ templateId: 'boutique' });
+    });
+
+    it('elegir la misma plantilla que ya estaba no habilita el guardado', async () => {
+      renderPage();
+
+      const select = await screen.findByTestId('brand-template');
+      fireEvent.change(select, { target: { value: 'default' } });
+
+      expect(screen.getByTestId('brand-save')).toBeDisabled();
+    });
+
+    it('muestra el default cuando el templateId guardado no lo lista este build (version skew)', async () => {
+      catalogMock.getBranding.mockResolvedValue(
+        envelope({ ...BRAND_WITHOUT_MEDIA, templateId: 'legacy-v1' }),
+      );
+      renderPage();
+
+      const select = (await screen.findByTestId('brand-template')) as HTMLSelectElement;
+      // El storefront cae a `default` para ids desconocidos; el selector refleja eso mismo.
+      expect(select.value).toBe('default');
+      expect(screen.getByTestId('brand-save')).toBeDisabled();
+    });
+
+    it('desde un templateId desconocido, elegir otra plantilla la guarda', async () => {
+      catalogMock.getBranding.mockResolvedValue(
+        envelope({ ...BRAND_WITHOUT_MEDIA, templateId: 'legacy-v1' }),
+      );
+      renderPage();
+
+      fireEvent.change(await screen.findByTestId('brand-template'), {
+        target: { value: 'boutique' },
+      });
+      fireEvent.click(screen.getByTestId('brand-save'));
+
+      await waitFor(() => expect(catalogMock.updateBranding).toHaveBeenCalledTimes(1));
+      expect(catalogMock.updateBranding).toHaveBeenCalledWith({ templateId: 'boutique' });
     });
 
     it('el guardado de la marca NO toca el lote de productos ni al revés', async () => {

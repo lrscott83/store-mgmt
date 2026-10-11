@@ -215,17 +215,44 @@ describe('catalogHttpService — endpoints del módulo 18', () => {
       { headers: Record<string, string> },
     ];
     expect(url).toBe('/v1/catalog/branding');
-    // Los archivos viajan como `IFormFile`, así que el cuerpo NO puede ser JSON: mismo requisito
-    // documentado en `uploadImage` (sin el header explícito, el backend responde 415).
     expect(body).toBeInstanceOf(FormData);
     expect(body.get('logo')).toBe(logo);
     expect(body.get('banner')).toBe(banner);
-    // Los booleanos viajan como el literal 'true', no como JSON: es lo que bindea `[FromForm]`.
     expect(body.get('removeLogo')).toBe('true');
     expect(body.get('removeBanner')).toBe('true');
     expect(config.headers['Content-Type']).toBe('multipart/form-data');
     if (!result.succeeded) throw new Error('expected succeeded response');
     expect(result.data.logoKey).toBe('t/s/b/logo.png');
+  });
+
+  it('HTTP-12b: updateBranding incluye templateId en el multipart', async () => {
+    const { apiClient } = await import('~/shared/lib/http/api-client');
+    vi.mocked(apiClient.put).mockResolvedValue(okEnvelope({ templateId: 'boutique' }) as never);
+
+    const { catalogHttpService } = await import('../catalog-http-service');
+    await catalogHttpService.updateBranding({ templateId: 'boutique' });
+
+    const [url, body, config] = vi.mocked(apiClient.put).mock.calls[0] as unknown as [
+      string,
+      FormData,
+      { headers: Record<string, string> },
+    ];
+    expect(url).toBe('/v1/catalog/branding');
+    expect(body).toBeInstanceOf(FormData);
+    expect(body.get('templateId')).toBe('boutique');
+    expect(config.headers['Content-Type']).toBe('multipart/form-data');
+  });
+
+  it('HTTP-12c: updateBranding omite templateId cuando no viaja (PUT parcial)', async () => {
+    const { apiClient } = await import('~/shared/lib/http/api-client');
+    vi.mocked(apiClient.put).mockResolvedValue(okEnvelope({}) as never);
+
+    const { catalogHttpService } = await import('../catalog-http-service');
+    await catalogHttpService.updateBranding({ removeLogo: true });
+
+    const [, body] = vi.mocked(apiClient.put).mock.calls[0] as unknown as [string, FormData];
+    expect(body.get('templateId')).toBeNull();
+    expect(body.get('removeLogo')).toBe('true');
   });
 
   it('HTTP-13: updateBranding es un PATCH: lo no mencionado no viaja y no se toca', async () => {
@@ -238,7 +265,6 @@ describe('catalogHttpService — endpoints del módulo 18', () => {
     await catalogHttpService.updateBranding({ removeLogo: true });
 
     const [, body] = vi.mocked(apiClient.put).mock.calls[0] as unknown as [string, FormData];
-    // Quitar el logo NO manda el banner: si viajara un vacío, el backend leería "sin banner".
     expect(body.get('removeLogo')).toBe('true');
     expect(body.has('logo')).toBe(false);
     expect(body.has('banner')).toBe(false);

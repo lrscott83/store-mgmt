@@ -41,8 +41,9 @@ namespace SMCA.WebApi.Controllers.v1
         }
 
         /// <summary>
-        /// Sube, cambia o quita el logo y/o el banner. Los cuatro campos son independientes: lo que
-        /// no se manda no se toca, así que cambiar el logo no borra el banner.
+        /// Sube, cambia o quita el logo y/o el banner, y elige la plantilla (vista) del catálogo. Los
+        /// campos son independientes: lo que no se manda no se toca, así que cambiar el logo no borra
+        /// el banner ni la plantilla. `templateId` en blanco (o ausente) = no se toca.
         ///
         /// Multipart porque los archivos viajan como `IFormFile`; la capa Application recibe
         /// streams (`CatalogImageUpload`), igual que las imágenes de producto.
@@ -51,7 +52,7 @@ namespace SMCA.WebApi.Controllers.v1
         [Consumes("multipart/form-data")]
         [ProducesResponseType(typeof(ResponseResult<StoreCatalogBrandingDto>), StatusCodes.Status200OK)]
         public async Task<IActionResult> UpdateBrandingAsync(
-            IFormFile? logo, IFormFile? banner, bool removeLogo, bool removeBanner)
+            IFormFile? logo, IFormFile? banner, bool removeLogo, bool removeBanner, string? templateId)
         {
             // Si el multipart no trae archivo, el binding deja el IFormFile en null y se traduce a
             // `null`: "no menciono este lado". Un archivo de longitud 0 (o de formato inválido) lo
@@ -60,7 +61,8 @@ namespace SMCA.WebApi.Controllers.v1
                 ToUpload(logo),
                 removeLogo,
                 ToUpload(banner),
-                removeBanner)));
+                removeBanner,
+                templateId)));
         }
 
         /// <summary>

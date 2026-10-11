@@ -2245,6 +2245,11 @@ namespace Infrastructure.Migrations
                     b.Property<DateTimeOffset?>("SyncedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("TemplateId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
 
