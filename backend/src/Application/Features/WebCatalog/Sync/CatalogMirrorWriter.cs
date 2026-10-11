@@ -14,6 +14,17 @@ namespace Application.Features.WebCatalog.Sync
     /// <summary>Conteos del espejo, para el resumen que muestra el botón de sincronización.</summary>
     public sealed record CatalogMirrorCounts(int CategoriesCreated, int CategoriesUpdated, int ProductsCreated,
         int ProductsUpdated, int ProductsDeactivated);
+
+    /// <summary>
+    /// Resultado de la fase 1 del espejo: los conteos del resumen MÁS las categorías tal como
+    /// quedaron.
+    ///
+    /// Las categorías viajan en el VALOR DE RETORNO, no en una propiedad `static`: una propiedad
+    /// `static` es ÚNICA para todo el proceso, así que dos sincronizaciones concurrentes se pisaban
+    /// entre sí (una tienda leía las categorías de la otra). El llamador reusa la MISMA instancia
+    /// para evitar la colisión de tracking del `ApplicationDbContext` (NoTracking).
+    /// </summary>
+    public sealed record CatalogMirrorResult(CatalogMirrorCounts Counts, IList<ProductCategory> Categories);
     /// <summary>
     /// Escribe el catálogo LOCAL del POS en las tablas de origen del servidor (espejo).
     ///
@@ -47,7 +58,7 @@ namespace Application.Features.WebCatalog.Sync
         /// clave y fallaría al attacharla ("another instance with the same key value is already
         /// being tracked"). Devolviéndolas se reusa la MISMA instancia y no hay colisión.
         /// </summary>
-        public static async Task<CatalogMirrorCounts> MirrorCatalogAsync(
+        public static async Task<CatalogMirrorResult> MirrorCatalogAsync(
             CatalogSnapshotDto snapshot,
             Guid storeId,
             Guid tenantId,
@@ -142,14 +153,12 @@ namespace Application.Features.WebCatalog.Sync
             IList<ProductCategory> allCategories = storedCategories.Concat(createdCategories)
                 .OrderBy(category => category.Order).ThenBy(category => category.Name)
                 .ToList();
-            CategoryResult = allCategories;
 
-            return new CatalogMirrorCounts(categoriesCreated, categoriesUpdated, productsCreated,
-                productsUpdated, productsDeactivated);
+            return new CatalogMirrorResult(
+                new CatalogMirrorCounts(categoriesCreated, categoriesUpdated, productsCreated,
+                    productsUpdated, productsDeactivated),
+                allCategories);
         }
-
-        /// <summary>Categorías tal como quedaron tras el último espejo (no-tracking-safe).</summary>
-        public static IList<ProductCategory> CategoryResult { get; private set; } = [];
 
         /// <summary>
         /// Segunda fase: galerías. Va aparte porque las filas de producto tienen que existir antes

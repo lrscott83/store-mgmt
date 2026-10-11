@@ -110,11 +110,12 @@ namespace Application.Features.WebCatalog.Sync.Commands.SyncCatalog
             if (request.Snapshot is { } snapshot)
             {
                 // El espejo trae los hechos del dispositivo a las tablas normales y devuelve los
-                // conteos del resumen.
-                CatalogMirrorCounts counts = await CatalogMirrorWriter.MirrorCatalogAsync(
+                // conteos del resumen + las categorías (en el VALOR de retorno, no en un estático).
+                CatalogMirrorResult mirror = await CatalogMirrorWriter.MirrorCatalogAsync(
                     snapshot, storeId, tenantId, _productCategoryRepository, _productRepository, _localizer);
 
-                allCategories = CatalogMirrorWriter.CategoryResult;
+                CatalogMirrorCounts counts = mirror.Counts;
+                allCategories = mirror.Categories;
                 var takenSlugs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 foreach (ProductCategory category in allCategories)
                 {
