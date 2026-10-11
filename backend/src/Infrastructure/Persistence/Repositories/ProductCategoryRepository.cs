@@ -40,6 +40,9 @@ namespace Infrastructure.Persistence.Repositories
                 .ToListAsync();
         }
 
+        public async Task<int> CountByStoreIdAsync(Guid storeId)
+            => await _productCategories.CountAsync(category => category.StoreId == storeId);
+
         /// <summary>Slugs públicos ya tomados: el índice único parcial es (StoreId, Slug) pero el
         /// slug de la URL pública conviene único global para no confundir dos tiendas.</summary>
         public async Task<IReadOnlyCollection<string>> GetCatalogSlugsAsync()

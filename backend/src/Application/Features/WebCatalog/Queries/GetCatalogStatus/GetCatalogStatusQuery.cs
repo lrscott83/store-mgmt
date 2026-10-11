@@ -52,8 +52,8 @@ namespace Application.Features.WebCatalog.Queries.GetCatalogStatus
             Store store = await _storeRepository.GetStoreByIdAsync(storeId)
                 ?? throw new ApiException(_localizer["StoreNotFound"], HttpStatusCode.NotFound);
 
-            var sourceCategories = await _productCategoryRepository.GetByStoreIdAsync(storeId);
-            var sourceProducts = await _productRepository.GetProductsForCatalogSyncAsync(storeId);
+            int sourceCategoriesCount = await _productCategoryRepository.CountByStoreIdAsync(storeId);
+            CatalogProductCounts sourceProducts = await _productRepository.CountForCatalogStatusAsync(storeId);
 
             return ResponseResult.Success(new CatalogStatusDto
             {
@@ -62,10 +62,10 @@ namespace Application.Features.WebCatalog.Queries.GetCatalogStatus
                 StoreSlug = store.CatalogSlug ?? string.Empty,
                 CatalogUrl = store.CatalogSlug == null ? string.Empty : CatalogPublicUrls.Catalog(store.CatalogSlug),
                 CatalogSyncedAt = store.CatalogSyncedAt,
-                SourceCategoriesCount = sourceCategories.Count,
-                SourceProductsCount = sourceProducts.Count,
-                PublishedProductsCount = sourceProducts.Count(product => product.IsActive && product.AvailableToSale),
-                ProductsWithoutMainImageCount = sourceProducts.Count(product => string.IsNullOrWhiteSpace(product.Image)),
+                SourceCategoriesCount = sourceCategoriesCount,
+                SourceProductsCount = sourceProducts.Total,
+                PublishedProductsCount = sourceProducts.Published,
+                ProductsWithoutMainImageCount = sourceProducts.WithoutMainImage,
             });
         }
     }
