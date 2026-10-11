@@ -3,6 +3,7 @@ using Application.Abstractions.Messaging;
 using Application.Abstractions.Time;
 using Application.Dtos.WebCatalog;
 using Application.Exceptions;
+using Application.Features.WebCatalog.Public;
 using Application.Features.WebCatalog.Sync;
 using Application.ResponseModels;
 using Application.UnitOfWorks;
@@ -173,7 +174,9 @@ namespace Application.Features.WebCatalog.Sync.Commands.SyncCatalog
             return ResponseResult.Success(new CatalogSyncSummaryDto
             {
                 StoreSlug = storeSlug,
-                CatalogUrl = $"/catalog/{storeSlug}",
+                // Una sola fuente para la URL del catálogo: el mismo builder que usa la vista de
+                // estado, para que el prefijo no pueda divergir.
+                CatalogUrl = CatalogPublicUrls.Catalog(storeSlug),
                 SyncedAt = syncedAt,
                 CategoriesCreated = categoriesCreated,
                 CategoriesUpdated = categoriesUpdated,
