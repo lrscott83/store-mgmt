@@ -16,6 +16,9 @@ interface StoreCardListProps {
    * A module activated on an inactive store never reaches the store's session, so the item
    * hides with the plan item rather than offering a save that appears to do nothing. */
   onEditModulePricing?: (id: string) => void;
+  /** Optional, same gating: opens the per-store catalog-template editor (SuperAdmin-only
+   * capability, same as module pricing). */
+  onEditCatalogTemplate?: (id: string) => void;
 }
 
 /**
@@ -124,6 +127,7 @@ export function StoreCardList({
   onDisapprove,
   onChangePlan,
   onEditModulePricing,
+  onEditCatalogTemplate,
 }: StoreCardListProps) {
   const intl = useIntl();
 
@@ -166,6 +170,15 @@ export function StoreCardList({
                   data-testid={`store-module-pricing-action-${store.id}`}
                 >
                   {intl.formatMessage({ id: 'STORES.MODULE_PRICING.MENU_LABEL' })}
+                </ActionMenuItem>
+              )}
+              {store.isActive && onEditCatalogTemplate && (
+                <ActionMenuItem
+                  intent="pay"
+                  onClick={() => onEditCatalogTemplate(store.id)}
+                  data-testid={`store-catalog-template-action-${store.id}`}
+                >
+                  {intl.formatMessage({ id: 'STORES.CATALOG_TEMPLATE.MENU_LABEL' })}
                 </ActionMenuItem>
               )}
             </ActionMenu>

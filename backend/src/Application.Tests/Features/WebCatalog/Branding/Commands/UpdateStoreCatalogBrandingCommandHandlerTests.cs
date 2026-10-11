@@ -20,7 +20,7 @@ namespace Application.Tests.Features.WebCatalog.Branding.Commands;
 ///
 ///   1. ALTA la primera vez y ACTUALIZACIÓN después, por `StoreId`, conservando SU `Id` (el índice
 ///      único de `StoreId` haría fallar un INSERT con id nuevo).
-///   2. Escribe SOLO las columnas de marca (`LogoKey`, `BannerKey` y `TemplateId`). Es la mitad de una fila compartida (D19): si tocara
+///   2. Escribe SOLO las columnas de marca (`LogoKey` y `BannerKey`). Es la mitad de una fila compartida (D19): si tocara
 ///      las columnas de pedidos o la paleta, guardar el logo dejaría al dueño sin pedidos abiertos
 ///      ni paleta.
 ///   3. Sube el archivo nuevo y BORRA la key anterior, solo si cambió — y en ese ORDEN: la fila se

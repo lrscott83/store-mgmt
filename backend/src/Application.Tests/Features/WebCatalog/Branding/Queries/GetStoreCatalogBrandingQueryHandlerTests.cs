@@ -66,7 +66,6 @@ public class GetStoreCatalogBrandingQueryHandlerTests
         result.Data!.LogoKey.Should().BeNull();
         result.Data.BannerKey.Should().BeNull();
         result.Data.PaletteId.Should().Be(StoreCatalogSettings.DefaultPaletteId);
-        result.Data.TemplateId.Should().Be(StoreCatalogSettings.DefaultTemplateId);
     }
 
     [Fact]
@@ -75,14 +74,12 @@ public class GetStoreCatalogBrandingQueryHandlerTests
         StoreCatalogSettings settings = StoreCatalogSettings.Create(_storeId, _tenantId);
         settings.LogoKey = $"{_tenantId:N}/{_storeId:N}/branding/logo/abc.png";
         settings.BannerKey = $"{_tenantId:N}/{_storeId:N}/branding/banner/def.png";
-        settings.TemplateId = "boutique";
         _settingsRepository.Setup(x => x.GetByStoreIdAsync(_storeId)).ReturnsAsync(settings);
 
         var result = await Handler().Handle(new GetStoreCatalogBrandingQuery(), CancellationToken.None);
 
         result.Data!.LogoKey.Should().Be(settings.LogoKey);
         result.Data.BannerKey.Should().Be(settings.BannerKey);
-        result.Data.TemplateId.Should().Be("boutique");
     }
 
     /// <summary>La vista puede tener solo una de las dos: son independientes.</summary>
@@ -115,24 +112,6 @@ public class GetStoreCatalogBrandingQueryHandlerTests
         var result = await Handler().Handle(new GetStoreCatalogBrandingQuery(), CancellationToken.None);
 
         result.Data!.PaletteId.Should().Be(StoreCatalogSettings.DefaultPaletteId);
-    }
-
-    /// <summary>
-    /// Una fila con la plantilla en blanco también es una fila rota: el storefront cae a la vista
-    /// actual en lugar de quedarse sin nada que pintar.
-    /// </summary>
-    [Theory]
-    [InlineData("")]
-    [InlineData("   ")]
-    public async Task Handle_WithABlankTemplate_ShouldReportTheDefaultTemplate(string templateId)
-    {
-        StoreCatalogSettings settings = StoreCatalogSettings.Create(_storeId, _tenantId);
-        settings.TemplateId = templateId;
-        _settingsRepository.Setup(x => x.GetByStoreIdAsync(_storeId)).ReturnsAsync(settings);
-
-        var result = await Handler().Handle(new GetStoreCatalogBrandingQuery(), CancellationToken.None);
-
-        result.Data!.TemplateId.Should().Be(StoreCatalogSettings.DefaultTemplateId);
     }
 
     #endregion
@@ -176,7 +155,7 @@ public class GetStoreCatalogBrandingQueryHandlerTests
     {
         string[] properties = typeof(StoreCatalogBrandingDto).GetProperties().Select(p => p.Name).ToArray();
 
-        properties.Should().Contain(["LogoKey", "BannerKey", "PaletteId", "TemplateId"]);
+        properties.Should().Contain(["LogoKey", "BannerKey", "PaletteId"]);
         properties.Should().NotContain(["LogoUrl", "BannerUrl", "AbsolutePath"]);
     }
 
