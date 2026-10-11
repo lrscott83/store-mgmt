@@ -195,6 +195,15 @@ namespace Application.Features.WebCatalog.Sync
 
                 await imageRepository.HardDeleteWhereAsync(image => image.ProductId == product.Id);
 
+                // Invariante de la imagen principal: `Product.Image` es lo que lee el catálogo
+                // público, así que no puede quedar apuntando a una fila que este sync acaba de
+                // borrar (quedaría un enlace roto y un archivo huérfano en disco).
+                if (product.Image != null && !desiredPaths.Contains(product.Image))
+                {
+                    product.Image = null;
+                    await productRepository.UpdateAsync(product);
+                }
+
                 if (desiredPaths.Count == 0)
                     continue;
 
