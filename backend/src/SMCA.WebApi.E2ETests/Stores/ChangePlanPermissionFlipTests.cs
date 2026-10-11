@@ -94,17 +94,17 @@ public sealed class ChangePlanPermissionFlipTests
             var createdId = body.Data!.Id;
             createdStores.Add(createdId);
 
-            // The created store inherits the selected store's module set CLAMPED to the active
-            // Pago catalog (strict birth invariant, 2026-09-25): MultiStores (14), Superior/VIP-only,
-            // never reaches the child — the gate passes on 14, the inheritance drops it.
+            // store-birth-superior (2026-10-11): the child no longer inherits (nor clamps to Pago) — it is
+            // born on the Superior catalog, which INCLUDES MultiStores (14). The gate above is
+            // what flipped the outcome; this asserts what the created store now carries.
             using (var scope = _f.Services.CreateScope())
             {
                 var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-                var inherited = await db.Set<StoreModule>().IgnoreQueryFilters()
+                var granted = await db.Set<StoreModule>().IgnoreQueryFilters()
                     .Where(sm => sm.StoreId == createdId && sm.IsActive)
                     .Select(sm => sm.ModuleId).ToListAsync();
-                inherited.Should().NotContain(MultiStoresModuleId);
-                inherited.Should().Contain(FreeManagementModuleId); // the Pago member still propagates
+                granted.Should().Contain(MultiStoresModuleId, "14 is a Superior member and is granted at birth");
+                granted.Should().Contain(FreeManagementModuleId);
             }
 
             // ── 3. SuperAdmin downgrades Superior → Pago closes the gate again, SAME owner token. ──
@@ -137,18 +137,18 @@ public sealed class ChangePlanPermissionFlipTests
 
     private sealed record SeededOwnerStore(Guid UserId, string Login, Guid OwnerId, Guid StoreId);
 
+    // store-birth-superior (2026-10-11): no ModuleIds in the body — the birth module set is the
+    // Superior plan catalog, derived server-side.
     private sealed record StoreCreateBody(
         Guid OwnerId,
         string Name,
         string? Address,
         string? Description,
-        bool Approved,
-        int[] ModuleIds);
+        bool Approved);
 
-    // OwnerAdmin branch: zero-Guid OwnerId means "derive mine"; body ModuleIds are ignored
-    // (the created store inherits the selected store's module set).
+    // OwnerAdmin branch: zero-Guid OwnerId means "derive mine"; the module set is the server's.
     private static StoreCreateBody OwnerBody(string name) =>
-        new(Guid.Empty, name, "", "", true, Array.Empty<int>());
+        new(Guid.Empty, name, "", "", true);
 
     /// <summary>
     /// LOCAL seed helper (does not touch the shared Infrastructure seeds — E2E-untouchable rule).

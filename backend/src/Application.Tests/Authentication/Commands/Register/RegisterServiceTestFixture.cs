@@ -1,7 +1,6 @@
 using Application.Services.Authentication;
 using Domain.Common.Enums;
 using Domain.Entities.Owners;
-using Domain.Entities.Plans;
 using Domain.Entities.ReSellers;
 using Domain.Entities.Stores;
 using Domain.Entities.Users;
@@ -9,7 +8,6 @@ using Domain.Interfaces.Repositories;
 using Domain.Interfaces.Services.Owners;
 using Domain.Interfaces.Services.Stores;
 using Moq;
-using Resources;
 using Microsoft.Extensions.Logging;
 
 namespace Application.Tests.Authentication.Commands.Register;
@@ -27,9 +25,10 @@ namespace Application.Tests.Authentication.Commands.Register;
 public abstract class RegisterServiceTestFixture
 {
     // Mock dependencies — exactly what the service injects.
+    // store-birth-superior (2026-10-11): IPlanRepository is GONE from the service — the birth plan
+    // and its module set are resolved inside CreateStoreService, not here.
     protected readonly Mock<ICreateOwnerService> MockCreateOwnerService;
     protected readonly Mock<ICreateStoreService> MockCreateStoreService;
-    protected readonly Mock<IPlanRepository> MockPlanRepository;
     protected readonly Mock<IReSellerRepository> MockReSellerRepository;
     protected readonly Mock<IReSellerOwnerRepository> MockReSellerOwnerRepository;
     protected readonly Mock<ILogger<RegisterService>> MockLogger;
@@ -43,16 +42,18 @@ public abstract class RegisterServiceTestFixture
     protected readonly User TestUser;
     protected readonly Owner TestOwner;
     protected readonly Store TestStore;
-    protected readonly StorePlan TestPlan;
 
-    /// <summary>Module id seeded into <see cref="TestPlan"/> (the default Superior plan).</summary>
-    protected const int TestPlanModuleId = 1;
+    /// <summary>
+    /// The birth plan constant the service no longer resolves itself — pinned here only to keep the
+    /// plan/module derivation assertion in <c>CreateStoreServiceTests</c> honest about WHICH plan a
+    /// new store is born on (store-birth-superior, 2026-10-11).
+    /// </summary>
+    protected const int BirthPlanId = (int)StorePlanType.Superior;
 
     protected RegisterServiceTestFixture()
     {
         MockCreateOwnerService = new Mock<ICreateOwnerService>();
         MockCreateStoreService = new Mock<ICreateStoreService>();
-        MockPlanRepository = new Mock<IPlanRepository>();
         MockReSellerRepository = new Mock<IReSellerRepository>();
         MockReSellerOwnerRepository = new Mock<IReSellerOwnerRepository>();
         MockLogger = new Mock<ILogger<RegisterService>>();
@@ -60,7 +61,6 @@ public abstract class RegisterServiceTestFixture
         TestUser = CreateTestUser();
         TestOwner = CreateTestOwner();
         TestStore = CreateTestStore();
-        TestPlan = CreateTestPlan();
 
         SetupDefaultSuccessfulScenarios();
     }
@@ -70,7 +70,6 @@ public abstract class RegisterServiceTestFixture
         return new RegisterService(
             MockCreateOwnerService.Object,
             MockCreateStoreService.Object,
-            MockPlanRepository.Object,
             MockReSellerRepository.Object,
             MockReSellerOwnerRepository.Object,
             MockLogger.Object);
@@ -110,10 +109,8 @@ public abstract class RegisterServiceTestFixture
                 It.IsAny<string?>()))
             .ReturnsAsync(TestOwner);
 
-        MockPlanRepository
-            .Setup(x => x.GetActivePlanWithModulesByIdAsync(It.IsAny<int>()))
-            .ReturnsAsync(TestPlan);
-
+        // store-birth-superior (2026-10-11): the service passes NO module set — the birth plan
+        // and its catalog are CreateStoreService's decision.
         MockCreateStoreService
             .Setup(x => x.CreateStoreAsync(
                 It.IsAny<Guid>(),
@@ -121,8 +118,7 @@ public abstract class RegisterServiceTestFixture
                 It.IsAny<string>(),
                 It.IsAny<string?>(),
                 It.IsAny<string?>(),
-                It.IsAny<bool>(),
-                It.IsAny<List<int>>()))
+                It.IsAny<bool>()))
             .ReturnsAsync(TestStore);
     }
 
@@ -196,6 +192,7 @@ public abstract class RegisterServiceTestFixture
 
     private Store CreateTestStore()
     {
+        // store-birth-superior (2026-10-11): Store.Create's default plan is Superior (3).
         var store = Store.Create(
             "Test Store",
             TestOwnerId,
@@ -208,12 +205,5 @@ public abstract class RegisterServiceTestFixture
             .SetValue(store, TestStoreId);
 
         return store;
-    }
-
-    private StorePlan CreateTestPlan()
-    {
-        var plan = StorePlan.Create((int)StorePlanType.Superior, "Superior", 3, true);
-        plan.StorePlanModules.Add(StorePlanModule.Create(plan.Id, TestPlanModuleId));
-        return plan;
     }
 }

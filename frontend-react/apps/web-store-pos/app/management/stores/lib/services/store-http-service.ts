@@ -24,13 +24,16 @@ export interface StoreCatalogTemplate {
   templateId: string;
 }
 
+/**
+ * Create has no `moduleIds` (store-birth-superior, 2026-10-11): the server
+ * owns the born plan (Superior) and its module set, so the request names none.
+ */
 interface CreateStorePayload {
   ownerId: string;
   name: string;
   address: string;
   description: string;
   approved: boolean;
-  moduleIds: number[];
 }
 
 interface UpdateStorePayload {

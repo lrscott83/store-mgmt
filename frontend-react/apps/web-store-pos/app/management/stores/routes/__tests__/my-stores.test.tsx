@@ -858,7 +858,6 @@ describe('MyStoresPage — create store flow', () => {
         address: '',
         description: '',
         approved: true,
-        moduleIds: [],
       });
     });
   });

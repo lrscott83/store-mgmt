@@ -12,7 +12,6 @@ using Domain.Entities.Billing;
 using Domain.Entities.Modules;
 using Domain.Entities.Notifications;
 using Domain.Entities.Owners;
-using Domain.Entities.Plans;
 using Domain.Entities.StoreModules;
 using Domain.Entities.Stores;
 using Domain.Entities.Users;
@@ -30,16 +29,20 @@ namespace Application.Tests.Features.StoreManagement.Stores.Commands.CreateStore
 
 /// <summary>
 /// Unit tests for CreateStoreCommandHandler covering Gate 2 (role re-verification), the
-/// OwnerAdmin branch (own-owner derivation, selected-store MultiStores gate, module
-/// inheritance, forced approval) and the SuperAdmin branch (approved forced true, 2026-09-10 —
-/// the body's Approved value is ignored).
+/// OwnerAdmin branch (own-owner derivation, selected-store MultiStores gate, forced approval) and
+/// the SuperAdmin branch (approved forced true, 2026-09-10 — the body's Approved value is ignored).
+/// <para>
+/// store-birth-superior (2026-10-11, replaces store-birth-pago-only): the handler neither receives
+/// nor derives a module set. <c>ICreateStoreService.CreateStoreAsync</c> has no module parameter,
+/// so what this handler decides is the owner identity, the gates, and the save — nothing about
+/// which modules the child gets.
+/// </para>
 /// </summary>
 public class CreateStoreCommandHandlerTests
 {
     private readonly Mock<IApplicationUnitOfWork> _mockUnitOfWork;
     private readonly Mock<IOwnerRepository> _mockOwnerRepository;
     private readonly Mock<IStoreModuleRepository> _mockStoreModuleRepository;
-    private readonly Mock<IPlanRepository> _mockPlanRepository;
     private readonly Mock<IBillingService> _mockBillingService;
     private readonly Mock<IHttpContextService> _mockHttpContextService;
     private readonly Mock<IMapper> _mockMapper;
@@ -56,7 +59,6 @@ public class CreateStoreCommandHandlerTests
         _mockUnitOfWork = new Mock<IApplicationUnitOfWork>();
         _mockOwnerRepository = new Mock<IOwnerRepository>();
         _mockStoreModuleRepository = new Mock<IStoreModuleRepository>();
-        _mockPlanRepository = new Mock<IPlanRepository>();
         _mockBillingService = new Mock<IBillingService>();
         _mockHttpContextService = new Mock<IHttpContextService>();
         _mockMapper = new Mock<IMapper>();
@@ -68,15 +70,6 @@ public class CreateStoreCommandHandlerTests
             .ReturnsAsync(1);
         _mockHttpContextService.Setup(x => x.UserExternalId).Returns(_callerUserId.ToString());
         _mockHttpContextService.Setup(x => x.StoreId).Returns(_callerStoreId.ToString());
-
-        // Active Pago plan catalog (strict birth invariant): the Pago loanable members this
-        // fixture pins are { 7, 8, 9, 10, 11 } — Superior/VIP-only members are NOT in it.
-        var pagoPlan = StorePlan.Create((int)StorePlanType.Pago, "Pago", 2, true);
-        foreach (var moduleId in new[] { 7, 8, 9, 10, 11 })
-            pagoPlan.StorePlanModules.Add(StorePlanModule.Create((int)StorePlanType.Pago, moduleId));
-        _mockPlanRepository
-            .Setup(x => x.GetActivePlanWithModulesByIdAsync((int)StorePlanType.Pago))
-            .ReturnsAsync(pagoPlan);
 
         _handler = CreateHandler(_mockOwnerRegistrationNotificationService.Object);
     }
@@ -91,7 +84,6 @@ public class CreateStoreCommandHandlerTests
             _mockUnitOfWork.Object,
             _mockOwnerRepository.Object,
             _mockStoreModuleRepository.Object,
-            _mockPlanRepository.Object,
             _mockBillingService.Object,
             _mockHttpContextService.Object,
             _mockMapper.Object,
@@ -100,7 +92,7 @@ public class CreateStoreCommandHandlerTests
             notificationService);
 
     private CreateStoreCommand CreateOwnerCommand(Guid ownerId = default)
-        => new(ownerId, "New Store", "Address 1", null, false, new List<int>());
+        => new(ownerId, "New Store", "Address 1", null, false);
 
     private Owner ArrangeCallerOwner()
     {
@@ -156,7 +148,7 @@ public class CreateStoreCommandHandlerTests
         _mockCreateStoreService
             .Setup(x => x.CreateStoreAsync(
                 It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string?>(),
-                It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<List<int>>()))
+                It.IsAny<string?>(), It.IsAny<bool>()))
             .ReturnsAsync(created);
         _mockMapper
             .Setup(x => x.Map<StoreDto>(It.IsAny<Store>()))
@@ -194,7 +186,7 @@ public class CreateStoreCommandHandlerTests
             .Which.StatusCode.Should().Be(HttpStatusCode.Forbidden);
         _mockCreateStoreService.Verify(
             x => x.CreateStoreAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string?>(),
-                It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<List<int>>()), Times.Never);
+                It.IsAny<string?>(), It.IsAny<bool>()), Times.Never);
     }
 
     #endregion
@@ -258,26 +250,12 @@ public class CreateStoreCommandHandlerTests
     }
 
     [Fact]
-    public async Task Handle_owner_admin_without_inherited_modules_throws_Forbidden()
+    public async Task Handle_owner_admin_creates_using_own_owner_regardless_of_the_selected_store_modules()
     {
-        ArrangeRoles(isSuperAdmin: false, isOwnerAdmin: true);
-        ArrangeCallerOwner();
-        ArrangeAvailableModulesAlDia();
-        // Selected store has no modules -> nothing to inherit.
-        _mockStoreModuleRepository
-            .Setup(x => x.GetStoreModulesByIdAsync(_callerStoreId))
-            .ReturnsAsync(new List<StoreModule>());
-
-        var act = () => _handler.Handle(CreateOwnerCommand(), CancellationToken.None);
-
-        (await act.Should().ThrowAsync<ApiException>())
-            .Which.StatusCode.Should().Be(HttpStatusCode.Forbidden);
-        _mockOwnerRepository.Verify(x => x.GetOwnerIncludingUserByIdAsync(It.IsAny<Guid>(), CancellationToken.None), Times.Never);
-    }
-
-    [Fact]
-    public async Task Handle_owner_admin_creates_using_own_owner_and_inherited_modules()
-    {
+        // store-birth-superior (2026-10-11): the handler reads NOTHING about the selected store's
+        // module set — not even to inherit it. Only the MultiStores gate above decides. This is the
+        // structural counterpart of removing ModuleIds from the command: the call the service
+        // receives has no module argument to assert on.
         ArrangeRoles(isSuperAdmin: false, isOwnerAdmin: true);
         var owner = ArrangeCallerOwner();
         ArrangeAvailableModulesAlDia();
@@ -288,27 +266,27 @@ public class CreateStoreCommandHandlerTests
 
         result.Succeeded.Should().BeTrue();
         _mockOwnerRepository.Verify(x => x.GetOwnerIncludingUserByIdAsync(owner.Id, CancellationToken.None), Times.Once);
-        // Strict birth invariant: MultiStores (14) is Superior/VIP-only, so the inherited
-        // module set is clamped to the active Pago catalog -> only 7 reaches the service.
         _mockCreateStoreService.Verify(x => x.CreateStoreAsync(
             owner.Id,
             owner.TenantId,
             "New Store",
             "Address 1",
             null,
-            true, // Owner decision 6: owner-created stores are approved immediately.
-            It.Is<List<int>>(m => m.SequenceEqual(new List<int> { 7 }))),
+            true), // Owner decision 6: owner-created stores are approved immediately.
             Times.Once);
-        _mockPlanRepository.Verify(x => x.GetActivePlanWithModulesByIdAsync((int)StorePlanType.Pago), Times.Once);
+        // The whole point: the selected store's rows are never read to build the child.
+        _mockStoreModuleRepository.Verify(x => x.GetStoreModulesByIdAsync(It.IsAny<Guid>()), Times.Never);
     }
 
     [Fact]
-    public async Task Handle_owner_admin_filters_superior_only_modules_from_inherited_set()
+    public async Task Handle_owner_admin_does_not_filter_the_selected_store_module_set()
     {
+        // store-birth-superior (2026-10-11): the old clamp-to-Pago filter is gone. A Superior/VIP
+        // selected store carrying every Superior/VIP-only member produces the SAME call as one
+        // carrying only Management — there is nothing left to filter.
         ArrangeRoles(isSuperAdmin: false, isOwnerAdmin: true);
         var owner = ArrangeCallerOwner();
         ArrangeAvailableModulesAlDia();
-        // Selected store is a Superior/VIP store carrying every Superior/VIP-only member.
         ArrangeSelectedStoreModules(7, (int)ModuleType.WholesaleSales, (int)ModuleType.Warehouses,
             (int)ModuleType.MultiStores, (int)ModuleType.MultiMonedas, (int)ModuleType.MultiPayments,
             (int)ModuleType.Elaboration);
@@ -318,9 +296,9 @@ public class CreateStoreCommandHandlerTests
 
         result.Succeeded.Should().BeTrue();
         _mockCreateStoreService.Verify(x => x.CreateStoreAsync(
-            owner.Id, owner.TenantId, "New Store", "Address 1", null, true,
-            It.Is<List<int>>(m => m.SequenceEqual(new List<int> { 7 }))),
+            owner.Id, owner.TenantId, "New Store", "Address 1", null, true),
             Times.Once);
+        _mockStoreModuleRepository.Verify(x => x.GetStoreModulesByIdAsync(It.IsAny<Guid>()), Times.Never);
     }
 
     [Fact]
@@ -337,8 +315,7 @@ public class CreateStoreCommandHandlerTests
 
         result.Succeeded.Should().BeTrue();
         _mockCreateStoreService.Verify(x => x.CreateStoreAsync(
-            owner.Id, owner.TenantId, "New Store", "Address 1", null, true,
-            It.IsAny<List<int>>()), Times.Once);
+            owner.Id, owner.TenantId, "New Store", "Address 1", null, true), Times.Once);
     }
 
     #endregion
@@ -346,7 +323,7 @@ public class CreateStoreCommandHandlerTests
     #region SuperAdmin branch
 
     [Fact]
-    public async Task Handle_super_admin_creates_with_modules_and_request_approved_ignored()
+    public async Task Handle_super_admin_creates_and_request_approved_ignored()
     {
         ArrangeRoles(isSuperAdmin: true, isOwnerAdmin: false);
         var owner = Owner.Create(Guid.NewGuid(), false, Guid.NewGuid(), "Owner");
@@ -355,14 +332,13 @@ public class CreateStoreCommandHandlerTests
             .ReturnsAsync(owner);
         ArrangeStoreCreation(owner, out _);
         // Body says Approved=false — it is ignored: every creation path forces approved=true (2026-09-10).
-        var request = new CreateStoreCommand(owner.Id, "Admin Store", null, null, false, new List<int> { 1, 2 });
+        var request = new CreateStoreCommand(owner.Id, "Admin Store", null, null, false);
 
         var result = await _handler.Handle(request, CancellationToken.None);
 
         result.Succeeded.Should().BeTrue();
         _mockCreateStoreService.Verify(x => x.CreateStoreAsync(
-            owner.Id, owner.TenantId, "Admin Store", null, null, true, It.Is<List<int>>(m => m.SequenceEqual(new List<int> { 1, 2 }))),
-            Times.Once);
+            owner.Id, owner.TenantId, "Admin Store", null, null, true), Times.Once);
     }
 
     [Fact]
@@ -376,7 +352,7 @@ public class CreateStoreCommandHandlerTests
         ArrangeStoreCreation(owner, out _);
         _mockUnitOfWork.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(0);
-        var request = new CreateStoreCommand(owner.Id, "Admin Store", null, null, false, new List<int> { 1 });
+        var request = new CreateStoreCommand(owner.Id, "Admin Store", null, null, false);
 
         var result = await _handler.Handle(request, CancellationToken.None);
 
@@ -393,7 +369,7 @@ public class CreateStoreCommandHandlerTests
         ArrangeRoles(isSuperAdmin: true, isOwnerAdmin: false);
         var owner = ArrangeSuperAdminOwner("Ana Gómez", "+5491122334455");
         ArrangeStoreCreation(owner, out _);
-        var request = new CreateStoreCommand(owner.Id, "Admin Store", null, null, false, new List<int> { 1 });
+        var request = new CreateStoreCommand(owner.Id, "Admin Store", null, null, false);
 
         var result = await _handler.Handle(request, CancellationToken.None);
 
@@ -418,7 +394,7 @@ public class CreateStoreCommandHandlerTests
         ArrangeStoreCreation(owner, out _);
         _mockUnitOfWork.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(0);
-        var request = new CreateStoreCommand(owner.Id, "Admin Store", null, null, false, new List<int> { 1 });
+        var request = new CreateStoreCommand(owner.Id, "Admin Store", null, null, false);
 
         var result = await _handler.Handle(request, CancellationToken.None);
 
@@ -437,7 +413,7 @@ public class CreateStoreCommandHandlerTests
         ArrangeRoles(isSuperAdmin: true, isOwnerAdmin: false);
         var owner = ArrangeSuperAdminOwner("Ana Gómez", cellPhone: null);
         ArrangeStoreCreation(owner, out _);
-        var request = new CreateStoreCommand(owner.Id, "Admin Store", null, null, false, new List<int> { 1 });
+        var request = new CreateStoreCommand(owner.Id, "Admin Store", null, null, false);
 
         var result = await _handler.Handle(request, CancellationToken.None);
 
@@ -468,7 +444,7 @@ public class CreateStoreCommandHandlerTests
         var handler = CreateHandler(new OwnerRegistrationNotificationService(
             throwingRepository.Object,
             Mock.Of<ILogger<OwnerRegistrationNotificationService>>()));
-        var request = new CreateStoreCommand(owner.Id, "Admin Store", null, null, false, new List<int> { 1 });
+        var request = new CreateStoreCommand(owner.Id, "Admin Store", null, null, false);
 
         var result = await handler.Handle(request, CancellationToken.None);
 

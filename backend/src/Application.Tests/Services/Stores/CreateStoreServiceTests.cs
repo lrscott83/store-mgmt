@@ -1,7 +1,8 @@
 using Application.Abstractions.Time;
 using Application.Services.Stores;
-using Domain.Entities.Features;
+using Domain.Common.Enums;
 using Domain.Entities.Modules;
+using Domain.Entities.Plans;
 using Domain.Entities.StoreModules;
 using Domain.Entities.StoreRoleFeatures;
 using Domain.Entities.Stores;
@@ -15,7 +16,9 @@ namespace Application.Tests.Services.Stores;
 /// <summary>
 /// Unit tests for CreateStoreService covering all scenarios:
 /// - Happy Path: Normal store creation flow
-/// - Edge Cases: Empty module lists, various inputs
+/// - Birth plan: store-birth-superior (2026-10-11) — the store lands on Superior and the module
+///   set is DERIVED from the Superior plan catalog filtered by IsActive &amp;&amp; AvailableToStore
+/// - Edge Cases: empty catalog, various inputs
 /// - Error Management: Repository failures
 /// - Integration: Mock verification of dependencies
 /// </summary>
@@ -23,7 +26,7 @@ public class CreateStoreServiceTests
 {
     // Mock dependencies
     private readonly Mock<IStoreRepository> _mockStoreRepository;
-    private readonly Mock<IModuleRepository> _mockModuleRepository;
+    private readonly Mock<IPlanRepository> _mockPlanRepository;
     private readonly Mock<IFeatureRepository> _mockFeatureRepository;
     private readonly Mock<IStoreModuleRepository> _mockStoreModuleRepository;
     private readonly Mock<IOwnerRepository> _mockOwnerRepository;
@@ -36,10 +39,19 @@ public class CreateStoreServiceTests
     private readonly Guid _testStoreId = Guid.NewGuid();
     private static readonly DateTimeOffset FixedNow = new(2026, 3, 10, 0, 0, 0, TimeSpan.Zero);
 
+    /// <summary>Module id seeded into the fake Superior catalog (IsActive + AvailableToStore).</summary>
+    private const int CatalogModuleId = 7;
+
+    /// <summary>Module id whose catalog row exists but which is NOT AvailableToStore.</summary>
+    private const int NotAvailableModuleId = 8;
+
+    /// <summary>Module id whose catalog row exists but which is NOT IsActive.</summary>
+    private const int InactiveModuleId = 9;
+
     public CreateStoreServiceTests()
     {
         _mockStoreRepository = new Mock<IStoreRepository>();
-        _mockModuleRepository = new Mock<IModuleRepository>();
+        _mockPlanRepository = new Mock<IPlanRepository>();
         _mockFeatureRepository = new Mock<IFeatureRepository>();
         _mockStoreModuleRepository = new Mock<IStoreModuleRepository>();
         _mockOwnerRepository = new Mock<IOwnerRepository>();
@@ -54,13 +66,40 @@ public class CreateStoreServiceTests
     {
         return new CreateStoreService(
             _mockStoreRepository.Object,
-            _mockModuleRepository.Object,
+            _mockPlanRepository.Object,
             _mockStoreModuleRepository.Object,
             _mockOwnerRepository.Object,
             _mockStoreFeatureRepository.Object,
             _mockStoreRoleFeatureGenerator.Object,
             _mockFeatureRepository.Object,
             _mockDateTimeProvider.Object);
+    }
+
+    /// <summary>
+    /// The active Superior plan, with the Module navigation loaded exactly the way
+    /// <c>PlanRepository.GetActivePlanWithModulesByIdAsync</c> loads it. Catalog flags live on the
+    /// Module, so the filter under test is exercised through real Module rows.
+    /// </summary>
+    private static StorePlan CreateSuperiorPlan(bool includeCatalogModule = true, bool includeNotAvailable = true, bool includeInactive = true)
+    {
+        var plan = StorePlan.Create((int)StorePlanType.Superior, "Superior", 3, true);
+        if (includeCatalogModule)
+            plan.StorePlanModules.Add(NewCatalogEntry(plan.Id, CatalogModuleId, isActive: true, availableToStore: true));
+        if (includeNotAvailable)
+            plan.StorePlanModules.Add(NewCatalogEntry(plan.Id, NotAvailableModuleId, isActive: true, availableToStore: false));
+        if (includeInactive)
+            plan.StorePlanModules.Add(NewCatalogEntry(plan.Id, InactiveModuleId, isActive: false, availableToStore: true));
+        return plan;
+    }
+
+    private static StorePlanModule NewCatalogEntry(int planId, int moduleId, bool isActive, bool availableToStore)
+    {
+        var module = Module.Create(moduleId, $"Test Module {moduleId}", 1, priceIncluded: false,
+            price: 100f, discountPrice: 0, percentDiscountPrice: 0, availableToStore: availableToStore,
+            isActive: isActive);
+        var entry = StorePlanModule.Create(planId, moduleId);
+        entry.Module = module;
+        return entry;
     }
 
     private void SetupDefaultSuccessfulScenarios()
@@ -77,17 +116,10 @@ public class CreateStoreServiceTests
             .Setup(x => x.UtcNow)
             .Returns(FixedNow);
 
-        // Module repository setup - returns valid modules by ids
-        _mockModuleRepository
-            .Setup(x => x.GetModulesByIdsAsync(It.IsAny<IEnumerable<int>>()))
-            .ReturnsAsync((IEnumerable<int> ids) => ids.Select(id => Module.Create(
-                id: id,
-                name: "Test Module",
-                order: 1,
-                priceIncluded: true,
-                price: 100f,
-                availableToStore: true,
-                isActive: true)));
+        // Plan repository setup — the birth plan is ALWAYS Superior (store-birth-superior).
+        _mockPlanRepository
+            .Setup(x => x.GetActivePlanWithModulesByIdAsync((int)StorePlanType.Superior))
+            .ReturnsAsync(CreateSuperiorPlan());
 
         // Feature repository setup
         _mockFeatureRepository
@@ -132,7 +164,6 @@ public class CreateStoreServiceTests
         var name = "Test Store";
         var address = "123 Main St";
         var description = "Test Description";
-        var moduleIds = new List<int> { 1, 2 };
 
         // Act
         var result = await service.CreateStoreAsync(
@@ -141,8 +172,7 @@ public class CreateStoreServiceTests
             name,
             address,
             description,
-            approved: false,
-            moduleIds);
+            approved: false);
 
         // Assert
         result.Should().NotBeNull();
@@ -164,8 +194,7 @@ public class CreateStoreServiceTests
             "Store",
             null,
             null,
-            false,
-            new List<int> { 1 });
+            false);
 
         // Assert
         result.PaymentStartDate.Should().Be(DateOnly.FromDateTime(FixedNow.UtcDateTime));
@@ -186,8 +215,7 @@ public class CreateStoreServiceTests
             "Store",
             null,
             null,
-            false,
-            new List<int> { 1 });
+            false);
 
         // Assert
         result.PaymentStartDate.Should().Be(DateOnly.FromDateTime(distinctInstant.UtcDateTime));
@@ -195,38 +223,10 @@ public class CreateStoreServiceTests
     }
 
     [Fact]
-    public async Task CreateStoreAsync_ShouldCreateStoreModules_ForEachModuleId()
-    {
-        // Arrange
-        var service = CreateService();
-        var moduleIds = new List<int> { 1, 2, 3 };
-        var callCount = 0;
-
-        _mockStoreModuleRepository
-            .Setup(x => x.AddRangeAsync(It.IsAny<IEnumerable<StoreModule>>()))
-            .Callback<IEnumerable<StoreModule>>(modules => callCount = modules.Count())
-            .Returns(Task.CompletedTask);
-
-        // Act
-        await service.CreateStoreAsync(
-            _testOwnerId,
-            _testTenantId,
-            "Store",
-            null,
-            null,
-            false,
-            moduleIds);
-
-        // Assert
-        callCount.Should().Be(moduleIds.Count);
-    }
-
-    [Fact]
     public async Task CreateStoreAsync_ShouldGenerateStoreRoleFeatures()
     {
         // Arrange
         var service = CreateService();
-        var featureIds = new List<int> { 1, 2, 3 };
 
         // Use reflection to create StoreRoleFeature instances since there's no public constructor
         var generatedFeatures = CreateTestStoreRoleFeatures();
@@ -236,14 +236,13 @@ public class CreateStoreServiceTests
             .ReturnsAsync(generatedFeatures);
 
         // Act
-        var result = await service.CreateStoreAsync(
+        await service.CreateStoreAsync(
             _testOwnerId,
             _testTenantId,
             "Store",
             null,
             null,
-            false,
-            new List<int> { 1 });
+            false);
 
         // Assert
         _mockStoreRoleFeatureGenerator.Verify(x => x.GenerateStoreRoleFeaturesAsync(
@@ -266,29 +265,127 @@ public class CreateStoreServiceTests
 
     #endregion
 
-    #region Edge Cases Tests
+    #region Birth plan — store-birth-superior (2026-10-11)
 
     [Fact]
-    public async Task CreateStoreAsync_ShouldHandleEmptyModuleIdsList()
+    public async Task CreateStoreAsync_ShouldCreateStore_OnSuperiorPlan()
     {
         // Arrange
         var service = CreateService();
-        var emptyModuleIds = new List<int>();
 
         // Act
         var result = await service.CreateStoreAsync(
-            _testOwnerId,
-            _testTenantId,
-            "Store",
-            null,
-            null,
-            false,
-            emptyModuleIds);
+            _testOwnerId, _testTenantId, "Store", null, null, false);
 
         // Assert
-        result.Should().NotBeNull();
-        _mockStoreModuleRepository.Verify(x => x.AddAsync(It.IsAny<StoreModule>()), Times.Never);
+        result.StorePlanId.Should().Be((int)StorePlanType.Superior);
+        _mockPlanRepository.Verify(
+            x => x.GetActivePlanWithModulesByIdAsync((int)StorePlanType.Superior), Times.Once);
+        _mockPlanRepository.Verify(
+            x => x.GetActivePlanWithModulesByIdAsync(It.IsAny<int>()), Times.Once,
+            "the birth plan is Superior and nothing else — no caller-chosen plan.");
     }
+
+    [Fact]
+    public async Task CreateStoreAsync_ShouldGrantExactlyTheActiveAvailableSuperiorCatalogMembers()
+    {
+        // Arrange: catalog = {7 ok, 8 NOT AvailableToStore, 9 NOT IsActive}.
+        var service = CreateService();
+        List<StoreModule> granted = new List<StoreModule>();
+        _mockStoreModuleRepository
+            .Setup(x => x.AddRangeAsync(It.IsAny<IEnumerable<StoreModule>>()))
+            .Callback<IEnumerable<StoreModule>>(m => granted = m.ToList())
+            .Returns(Task.CompletedTask);
+
+        // Act
+        await service.CreateStoreAsync(_testOwnerId, _testTenantId, "Store", null, null, false);
+
+        // Assert
+        granted.Select(sm => sm.ModuleId).Should().BeEquivalentTo(new[] { CatalogModuleId },
+            "only catalog members that are IsActive AND AvailableToStore are granted");
+    }
+
+    [Fact]
+    public async Task CreateStoreAsync_ShouldSnapshotCatalogPrice_OnEveryGrantedStoreModule()
+    {
+        // Arrange
+        var service = CreateService();
+        List<StoreModule> granted = new List<StoreModule>();
+        _mockStoreModuleRepository
+            .Setup(x => x.AddRangeAsync(It.IsAny<IEnumerable<StoreModule>>()))
+            .Callback<IEnumerable<StoreModule>>(m => granted = m.ToList())
+            .Returns(Task.CompletedTask);
+
+        // Act
+        var store = await service.CreateStoreAsync(_testOwnerId, _testTenantId, "Store", null, null, false);
+
+        // Assert
+        var module = granted.Single();
+        module.ModulePrice.Should().Be(100f);
+        module.ModulePriceIncluded.Should().BeFalse();
+        module.ModuleDiscountPrice.Should().Be(0f);
+        module.ModulePercentDiscountPrice.Should().Be(0f);
+        module.StoreId.Should().Be(store.Id);
+        module.TenantId.Should().Be(_testTenantId);
+    }
+
+    [Fact]
+    public async Task CreateStoreAsync_ShouldResolveFeaturesForTheGrantedModulesOnly()
+    {
+        // Arrange
+        var service = CreateService();
+
+        // Act
+        await service.CreateStoreAsync(_testOwnerId, _testTenantId, "Store", null, null, false);
+
+        // Assert
+        _mockFeatureRepository.Verify(
+            x => x.GetAvailableFeatureIdsByModuleIdsAsync(
+                It.Is<List<int>>(ids => ids.SequenceEqual(new List<int> { CatalogModuleId }))),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task CreateStoreAsync_ShouldGrantNothing_WhenSuperiorPlanHasNoEligibleMembers()
+    {
+        // Arrange: a plan whose only members are inactive or not available to stores.
+        _mockPlanRepository
+            .Setup(x => x.GetActivePlanWithModulesByIdAsync((int)StorePlanType.Superior))
+            .ReturnsAsync(CreateSuperiorPlan(
+                includeCatalogModule: false, includeNotAvailable: false, includeInactive: false));
+        var service = CreateService();
+
+        // Act
+        var store = await service.CreateStoreAsync(_testOwnerId, _testTenantId, "Store", null, null, false);
+
+        // Assert — the store still lands on Superior; it just carries no billable module.
+        store.StorePlanId.Should().Be((int)StorePlanType.Superior);
+        _mockStoreModuleRepository.Verify(x => x.AddRangeAsync(It.IsAny<IEnumerable<StoreModule>>()), Times.Never);
+        _mockFeatureRepository.Verify(
+            x => x.GetAvailableFeatureIdsByModuleIdsAsync(It.IsAny<List<int>>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task CreateStoreAsync_ShouldGrantNothing_WhenTheBirthPlanIsNotActive()
+    {
+        // Arrange: GetActivePlanWithModulesByIdAsync filters on IsActive, so an inactive Superior
+        // plan comes back null — the same production shape as a missing plan.
+        _mockPlanRepository
+            .Setup(x => x.GetActivePlanWithModulesByIdAsync((int)StorePlanType.Superior))
+            .ReturnsAsync((StorePlan?)null);
+        var service = CreateService();
+
+        // Act
+        var store = await service.CreateStoreAsync(_testOwnerId, _testTenantId, "Store", null, null, false);
+
+        // Assert — no silent crash, and no module outside the (absent) catalog.
+        store.StorePlanId.Should().Be((int)StorePlanType.Superior);
+        _mockStoreModuleRepository.Verify(x => x.AddRangeAsync(It.IsAny<IEnumerable<StoreModule>>()), Times.Never);
+    }
+
+    #endregion
+
+    #region Edge Cases Tests
 
     [Fact]
     public async Task CreateStoreAsync_ShouldHandleNullAddress()
@@ -303,8 +400,7 @@ public class CreateStoreServiceTests
             "Store",
             null,
             null,
-            false,
-            new List<int> { 1 });
+            false);
 
         // Assert
         result.Should().NotBeNull();
@@ -324,8 +420,7 @@ public class CreateStoreServiceTests
             "Store",
             "123 Main St",
             null,
-            false,
-            new List<int> { 1 });
+            false);
 
         // Assert
         result.Should().NotBeNull();
@@ -345,8 +440,7 @@ public class CreateStoreServiceTests
             "Store",
             null,
             null,
-            approved: true,
-            new List<int> { 1 });
+            approved: true);
 
         // Assert
         result.Should().NotBeNull();
@@ -366,8 +460,7 @@ public class CreateStoreServiceTests
             "Store",
             null,
             null,
-            approved: false,
-            new List<int> { 1 });
+            approved: false);
 
         // Assert
         result.Should().NotBeNull();
@@ -388,8 +481,7 @@ public class CreateStoreServiceTests
             storeName,
             null,
             null,
-            false,
-            new List<int> { 1 });
+            false);
 
         // Assert
         result.Should().NotBeNull();
@@ -417,8 +509,7 @@ public class CreateStoreServiceTests
             "Store",
             null,
             null,
-            false,
-            new List<int> { 1 });
+            false);
 
         // Assert
         await act.Should().ThrowAsync<InvalidOperationException>()
@@ -426,12 +517,12 @@ public class CreateStoreServiceTests
     }
 
     [Fact]
-    public async Task CreateStoreAsync_ShouldThrow_WhenModuleRepositoryFails()
+    public async Task CreateStoreAsync_ShouldThrow_WhenPlanRepositoryFails()
     {
         // Arrange
-        _mockModuleRepository
-            .Setup(x => x.GetModulesByIdsAsync(It.IsAny<IEnumerable<int>>()))
-            .ThrowsAsync(new InvalidOperationException("Module not found"));
+        _mockPlanRepository
+            .Setup(x => x.GetActivePlanWithModulesByIdAsync((int)StorePlanType.Superior))
+            .ThrowsAsync(new InvalidOperationException("Plan query failed"));
 
         var service = CreateService();
 
@@ -442,12 +533,11 @@ public class CreateStoreServiceTests
             "Store",
             null,
             null,
-            false,
-            new List<int> { 1, 2 });
+            false);
 
         // Assert
         await act.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("Module not found");
+            .WithMessage("Plan query failed");
     }
 
     [Fact]
@@ -467,8 +557,7 @@ public class CreateStoreServiceTests
             "Store",
             null,
             null,
-            false,
-            new List<int> { 1 });
+            false);
 
         // Assert
         await act.Should().ThrowAsync<InvalidOperationException>()
@@ -492,8 +581,7 @@ public class CreateStoreServiceTests
             "Store",
             null,
             null,
-            false,
-            new List<int> { 1 });
+            false);
 
         // Assert
         await act.Should().ThrowAsync<InvalidOperationException>()
@@ -517,8 +605,7 @@ public class CreateStoreServiceTests
             "Store",
             null,
             null,
-            false,
-            new List<int> { 1 });
+            false);
 
         // Assert
         await act.Should().ThrowAsync<InvalidOperationException>()
@@ -574,8 +661,7 @@ public class CreateStoreServiceTests
             "Store",
             null,
             null,
-            false,
-            new List<int> { 1 });
+            false);
 
         // Assert - With Task.WhenAll, all calls should complete
         addCallCount.Should().Be(3, "All StoreRoleFeatures should be added");
@@ -611,8 +697,7 @@ public class CreateStoreServiceTests
             "Store",
             null,
             null,
-            false,
-            new List<int> { 1 });
+            false);
 
         // Assert
         _mockStoreRoleFeatureRepository.Verify(
@@ -638,8 +723,7 @@ public class CreateStoreServiceTests
             storeName,
             null,
             null,
-            false,
-            new List<int> { 1 });
+            false);
 
         // Assert
         _mockStoreRepository.Verify(x => x.AddAsync(
@@ -647,51 +731,6 @@ public class CreateStoreServiceTests
                 s.Name == storeName && 
                 s.OwnerId == _testOwnerId &&
                 s.TenantId == _testTenantId)),
-            Times.Once);
-    }
-
-    [Fact]
-    public async Task CreateStoreAsync_ShouldCallModuleRepository_ForEachModuleId()
-    {
-        // Arrange
-        var service = CreateService();
-        var moduleIds = new List<int> { 1, 2, 3 };
-
-        // Act
-        await service.CreateStoreAsync(
-            _testOwnerId,
-            _testTenantId,
-            "Store",
-            null,
-            null,
-            false,
-            moduleIds);
-
-        // Assert
-        _mockModuleRepository.Verify(
-            x => x.GetModulesByIdsAsync(It.Is<IEnumerable<int>>(ids => ids.SequenceEqual(moduleIds))),
-            Times.Once);
-    }
-
-    [Fact]
-    public async Task CreateStoreAsync_ShouldCallFeatureRepository_WithModuleIds()
-    {
-        // Arrange
-        var service = CreateService();
-        var moduleIds = new List<int> { 1, 2, 3 };
-
-        // Act
-        await service.CreateStoreAsync(
-            _testOwnerId,
-            _testTenantId,
-            "Store",
-            null,
-            null,
-            false,
-            moduleIds);
-
-        // Assert
-        _mockFeatureRepository.Verify(x => x.GetAvailableFeatureIdsByModuleIdsAsync(moduleIds),
             Times.Once);
     }
 
@@ -714,8 +753,7 @@ public class CreateStoreServiceTests
             "Store",
             null,
             null,
-            false,
-            new List<int> { 1 });
+            false);
 
         // Assert
         capturedStoreModule.Should().NotBeNull();
@@ -741,8 +779,7 @@ public class CreateStoreServiceTests
             "Store",
             null,
             null,
-            false,
-            new List<int> { 1 });
+            false);
 
         // Assert
         capturedStoreModule.Should().NotBeNull();
@@ -768,8 +805,7 @@ public class CreateStoreServiceTests
             "Store",
             null,
             null,
-            false,
-            new List<int> { 1 });
+            false);
 
         // Assert
         capturedStoreId.Should().NotBeNull();
@@ -789,8 +825,7 @@ public class CreateStoreServiceTests
             "Store",
             null,
             null,
-            false,
-            new List<int> { 1 });
+            false);
 
         // Assert
         result.OwnerId.Should().Be(_testOwnerId);
@@ -809,8 +844,7 @@ public class CreateStoreServiceTests
             "Store",
             null,
             null,
-            false,
-            new List<int> { 1 });
+            false);
 
         // Assert
         result.TenantId.Should().Be(_testTenantId);
@@ -840,8 +874,7 @@ public class CreateStoreServiceTests
             "Store",
             null,
             null,
-            false,
-            new List<int> { 1 });
+            false);
 
         // Assert
         callOrder.IndexOf("Store").Should().BeLessThan(callOrder.IndexOf("StoreModule"),

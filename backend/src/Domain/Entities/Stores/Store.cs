@@ -53,8 +53,12 @@ namespace Domain.Entities.Stores
         /// <summary>Fecha de la última sincronización del catálogo (solo diagnóstico).</summary>
         public DateTime? CatalogSyncedAt { get; set; }
 
+        // store-birth-superior (2026-10-11, replaces store-birth-pago-only): a store born through
+        // ANY creation path lands on Superior (3). The module set is not a caller decision — it is
+        // derived from the Superior plan catalog by CreateStoreService, filtered by Module.IsActive
+        // and Module.AvailableToStore.
         private Store(Guid id, Guid ownerId, string name, bool approved, Guid tenantId, DateOnly? paymentStartDate = null,
-            string? address = null, string? description = null, int storePlanId = (int)StorePlanType.Pago) 
+            string? address = null, string? description = null, int storePlanId = (int)StorePlanType.Superior) 
             : base (id)
         {
             OwnerId = ownerId;
@@ -75,14 +79,14 @@ namespace Domain.Entities.Stores
         }
 
         private static Store Create(Guid id, Guid ownerId, string name, bool approved, Guid tenantId, DateOnly? paymentStartDate = null, 
-            string? address = null, string? description = null, int storePlanId = (int)StorePlanType.Pago)
+            string? address = null, string? description = null, int storePlanId = (int)StorePlanType.Superior)
         {
             var store = new Store(id, ownerId, name, approved, tenantId, paymentStartDate, address, description, storePlanId);
             store.Raise(new StoreCreatedDomainEvent(store.Id, ownerId));
             return store;
         }
         public static Store Create(string name, Guid ownerId, bool approved, Guid tenantId, DateOnly? paymentStartDate = null, 
-            string? address = null, string? description = null, int storePlanId = (int)StorePlanType.Pago)
+            string? address = null, string? description = null, int storePlanId = (int)StorePlanType.Superior)
         {
             return Create(Guid.NewGuid(), ownerId, name, approved, tenantId, paymentStartDate, address, description, storePlanId);
         }

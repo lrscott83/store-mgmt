@@ -104,7 +104,7 @@ public class RegisterServiceReSellerTests : RegisterServiceTestFixture
                 It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<string?>()), Times.Once);
         MockCreateStoreService.Verify(
             x => x.CreateStoreAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(),
-                It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<List<int>>()),
+                It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<bool>()),
             Times.Once);
     }
 
@@ -122,7 +122,7 @@ public class RegisterServiceReSellerTests : RegisterServiceTestFixture
         owner.Should().NotBeNull();
         MockCreateStoreService.Verify(
             x => x.CreateStoreAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(),
-                It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<List<int>>()),
+                It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<bool>()),
             Times.Once);
         MockReSellerOwnerRepository.Verify(
             x => x.AddAsync(It.IsAny<ReSellerOwner>()), Times.Never);
