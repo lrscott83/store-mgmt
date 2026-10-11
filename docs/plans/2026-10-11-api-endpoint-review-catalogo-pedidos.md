@@ -105,16 +105,17 @@ owners distintos (pendiente de confirmar; si aplica, recupera la severidad de se
       en SQL, sin materializar).
 - [x] **1.7 — `SyncCatalogCommand` arma la URL a mano.** — **HECHO 2026-10-11** (`e3c0c020`): usa
       `CatalogPublicUrls.Catalog(storeSlug)`, el mismo builder que la vista de estado.
-- [ ] **1.8 — `SyncCatalogCommandHandler.Handle` = 108 líneas y 8 dependencias.** Extraer helpers
-      (slugs, mapeo del resumen). (Clean code.)
+- [x] **1.8 — DECISIÓN (2026-10-11): no se hace ahora.** Refactor cosmético de `SyncCatalogCommand`
+      (extraer helpers) sin cambio de comportamiento; el riesgo no compensa por ahora.
 - [x] **1.9 — DECISIÓN (2026-10-11): se deja como está.** `Success(SaveChanges()>0)` → 200 con
       `data:false` es el patrón **vigente en todo el proyecto**; no se cambia aquí. (No se toca.)
 - [x] **1.10 — `MirrorGalleriesAsync` rompe el invariante de imagen principal.** — **HECHO 2026-10-11**
       (`0d28fa97`): limpia `Product.Image` cuando el sync borra su fila de galería.
-- [ ] **1.11 — R5–R7 sin `AbstractValidator`** (a diferencia de R1/R4). Fix: validadores declarativos
-      (paths count/longitud/duplicados).
+- [x] **1.11 — R5–R7 sin `AbstractValidator`.** — **HECHO 2026-10-11** (`f649a6f8`): validadores
+      declarativos de forma (ProductId, Path(s) presentes + longitud, lista de reordenado no vacía y
+      dentro del tope). El formato/tamaño del archivo y la biyección siguen en el handler.
 
-### LOW
+### LOW (diferidos 2026-10-11 — no críticos)
 - [ ] **1.12 — DTO `ReorderProductImagesRequest` vive en WebApi** (`CatalogController.cs:98-101`).
 - [ ] **1.13 — `UpdateProductCatalogFieldsCommand` es la única clase mutable** (por `request.Id =`).
 - [ ] **1.14 — `[ProducesResponseType]` incompletos** (solo 200). Ver X4.
@@ -370,3 +371,6 @@ owners distintos (pendiente de confirmar; si aplica, recupera la severidad de se
   principal · `09a4356e` contar en SQL · `e3c0c020` URL por helper · `0d28fa97` sync limpia imagen
   principal). `Application.Tests` **1242 verde**. Pendientes: 1.8 (extraer helpers de `Handle`),
   1.11 (validadores R5–R7) y LOW 1.12–1.15.
+- 2026-10-11 — **Controller 1 CERRADO** salvo LOWs. 1.11 hecho (`f649a6f8`); 1.8 = decisión de NO
+  hacerlo ahora (refactor cosmético); LOW 1.12–1.15 **diferidos** (no críticos). `dotnet build` 0
+  errores; `Application.Tests` **1242 verde** en cada paso. Siguiente: Controller 2.
