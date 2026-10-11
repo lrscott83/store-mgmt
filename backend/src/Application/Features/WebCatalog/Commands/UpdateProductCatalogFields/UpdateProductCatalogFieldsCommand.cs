@@ -1,5 +1,6 @@
 using Application.Abstractions.HttpContext;
 using Application.Abstractions.Messaging;
+using Application.Abstractions.Storage;
 using Application.Exceptions;
 using Application.Features.WebCatalog.Sync;
 using Application.ResponseModels;
@@ -66,6 +67,7 @@ namespace Application.Features.WebCatalog.Commands.UpdateProductCatalogFields
         private readonly IHttpContextService _httpContextService;
         private readonly IProductRepository _productRepository;
         private readonly IProductCategoryRepository _productCategoryRepository;
+        private readonly ICatalogImageStorage _catalogImageStorage;
         private readonly IStringLocalizer<I18n> _localizer;
 
         public UpdateProductCatalogFieldsCommandHandler(
@@ -73,12 +75,14 @@ namespace Application.Features.WebCatalog.Commands.UpdateProductCatalogFields
             IHttpContextService httpContextService,
             IProductRepository productRepository,
             IProductCategoryRepository productCategoryRepository,
+            ICatalogImageStorage catalogImageStorage,
             IStringLocalizer<I18n> localizer)
         {
             _applicationUnitOfWork = applicationUnitOfWork;
             _httpContextService = httpContextService;
             _productRepository = productRepository;
             _productCategoryRepository = productCategoryRepository;
+            _catalogImageStorage = catalogImageStorage;
             _localizer = localizer;
         }
 
@@ -120,9 +124,19 @@ namespace Application.Features.WebCatalog.Commands.UpdateProductCatalogFields
             // fuente única es `Product.Image` (PublicCatalogProductMapper)—, así que no pueden
             // publicar una foto fantasma.
             if (request.RemoveImage)
+            {
                 product.Image = null;
+            }
             else if (request.Image != null)
+            {
+                // La imagen principal la pinta el catálogo PUBLICO: la clave tiene que pertenecer a
+                // ESTA tienda, no ser un string bien formado. Mismo guard que el endpoint de media.
+                Guid tenantId = _httpContextService.TenantId.ToGuid();
+                if (!_catalogImageStorage.BelongsToStore(request.Image, tenantId, storeId))
+                    throw new ApiException(_localizer["CatalogImageNotFound"], HttpStatusCode.BadRequest);
+
                 product.Image = request.Image;
+            }
 
             return ResponseResult.Success(await _applicationUnitOfWork.SaveChangesAsync(cancellationToken) > 0);
         }

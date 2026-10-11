@@ -1,4 +1,6 @@
 using Application.Abstractions.HttpContext;
+using Application.Abstractions.Storage;
+using Application.Exceptions;
 using Application.Features.WebCatalog.Commands.UpdateProductCatalogFields;
 using Application.UnitOfWorks;
 using Domain.Entities.ProductCategories;
@@ -20,8 +22,8 @@ namespace Application.Tests.Features.WebCatalog.Commands.UpdateProductCatalogFie
 /// solo en `Product.Image` (PublicCatalogProductMapper), así que aunque las filas se quedaran no
 /// podrían publicarse.
 ///
-/// El handler ni siquiera depende de `ICatalogImageStorage`, así que "no borra archivos" está
-/// garantizado por el compilador y no necesita un mock que lo afirme.
+/// El handler depende de `ICatalogImageStorage` SOLO para VALIDAR que la clave de la imagen
+/// principal pertenece a la tienda (`BelongsToStore`, 400 si no); no borra ni escribe archivos.
 /// </summary>
 public class UpdateProductCatalogFieldsImageTests
 {
@@ -30,6 +32,7 @@ public class UpdateProductCatalogFieldsImageTests
     private readonly Mock<IProductRepository> _productRepository = new();
     private readonly Mock<IProductCategoryRepository> _categoryRepository = new();
     private readonly Mock<IProductImageRepository> _productImageRepository = new();
+    private readonly Mock<ICatalogImageStorage> _catalogImageStorage = new();
     private readonly Mock<IStringLocalizer<I18n>> _localizer = new();
 
     private readonly Guid _tenantId = Guid.NewGuid();
@@ -56,6 +59,10 @@ public class UpdateProductCatalogFieldsImageTests
         _productRepository.Setup(x => x.UpdateAsync(It.IsAny<Product>())).ReturnsAsync(true);
         _categoryRepository.Setup(x => x.GetByIdAsync(It.IsAny<Guid>())).ReturnsAsync(category);
         _unitOfWork.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(3);
+        // Por defecto, la clave de imagen propuesta pertenece a la tienda (caso feliz).
+        _catalogImageStorage
+            .Setup(x => x.BelongsToStore(It.IsAny<string>(), It.IsAny<Guid>(), It.IsAny<Guid>()))
+            .Returns(true);
     }
 
     private UpdateProductCatalogFieldsCommandHandler Handler() => new(
@@ -63,6 +70,7 @@ public class UpdateProductCatalogFieldsImageTests
         _httpContextService.Object,
         _productRepository.Object,
         _categoryRepository.Object,
+        _catalogImageStorage.Object,
         _localizer.Object);
 
     private UpdateProductCatalogFieldsCommand Command() => new() { Id = _product.Id };
@@ -106,5 +114,26 @@ public class UpdateProductCatalogFieldsImageTests
         result.Data.Should().BeTrue();
         _product.Image.Should().Be("tenant/store/product/new.jpg");
         _productImageRepository.Verify(x => x.DeleteAsync(It.IsAny<IEnumerable<ProductImage>>()), Times.Never);
+    }
+
+    /// <summary>
+    /// La imagen principal la pinta el catálogo PÚBLICO: una clave que NO pertenece a la tienda se
+    /// rechaza con 400 y `Product.Image` no cambia (no se pinta un archivo de otra tienda).
+    /// </summary>
+    [Fact]
+    public async Task Handle_WithAnImageKeyOfAnotherStore_ShouldRejectAndNotChangeTheImage()
+    {
+        _catalogImageStorage
+            .Setup(x => x.BelongsToStore(It.IsAny<string>(), It.IsAny<Guid>(), It.IsAny<Guid>()))
+            .Returns(false);
+
+        var command = Command();
+        command.Image = "otra-tienda/producto/x.jpg";
+
+        Func<Task> act = () => Handler().Handle(command, CancellationToken.None);
+
+        var exception = await act.Should().ThrowAsync<ApiException>();
+        exception.Which.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest);
+        _product.Image.Should().Be("tenant/store/product/main.jpg");
     }
 }
