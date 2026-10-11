@@ -99,7 +99,8 @@ namespace Application.Features.WebCatalog.Commands.UpdateProductCatalogFields
             {
                 // 404 uniforme: un producto inexistente y uno de OTRA tienda del mismo tenant
                 // responden igual, así el catálogo de una tienda nunca se edita desde otra.
-                await EnsureBelongsToStoreAsync(product, storeId, request.Id);
+                await ProductStoreAccess.EnsureBelongsToStoreAsync(
+                    product, storeId, _productCategoryRepository, _localizer, request.Id);
                 await ApplyFactsAsync(product, request, storeId);
                 await _productRepository.UpdateAsync(product);
             }
@@ -183,13 +184,6 @@ namespace Application.Features.WebCatalog.Commands.UpdateProductCatalogFields
                 product.BusinessId = request.BusinessId!;
             if (request.DiscountFromInventory.HasValue)
                 product.DiscountFromInventory = request.DiscountFromInventory.Value;
-        }
-
-        private async Task EnsureBelongsToStoreAsync(Product product, Guid storeId, Guid productId)
-        {
-            ProductCategory? category = await _productCategoryRepository.GetByIdAsync(product.CategoryId);
-            if (category == null || category.StoreId != storeId)
-                throw new ApiException(_localizer["ProductNotFound", nameof(productId)], HttpStatusCode.NotFound);
         }
     }
 }
