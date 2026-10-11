@@ -5,6 +5,7 @@ using Application.Features.WebCatalog.Branding.Queries.GetStoreCatalogBranding;
 using Application.ResponseModels;
 using Asp.Versioning;
 using Domain.Common.Enums;
+using Domain.Common.Limits;
 using Microsoft.AspNetCore.Mvc;
 using SMCA.WebApi.Filters;
 
@@ -49,6 +50,7 @@ namespace SMCA.WebApi.Controllers.v1
         /// </summary>
         [HttpPut("~/api/v1/catalog/branding")]
         [Consumes("multipart/form-data")]
+        [RequestSizeLimit(2L * ProductEntityLimits.MaxImageSizeInBytes + 131072)]
         [ProducesResponseType(typeof(ResponseResult<StoreCatalogBrandingDto>), StatusCodes.Status200OK)]
         public async Task<IActionResult> UpdateBrandingAsync(
             IFormFile? logo, IFormFile? banner, bool removeLogo, bool removeBanner)

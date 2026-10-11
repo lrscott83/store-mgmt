@@ -125,9 +125,16 @@ builder.Services.AddCors(options => options.AddDefaultPolicy(builder =>
 
 builder.Services.Configure<FormOptions>(o =>
 {
-    o.ValueLengthLimit = int.MaxValue;
-    o.MultipartBodyLengthLimit = int.MaxValue;
-    o.MemoryBufferThreshold = int.MaxValue;
+    // Los límites multipart estaban en `int.MaxValue` (sin tope) y con el buffer SIEMPRE en
+    // memoria: el tope de 2 MB de las imágenes (CatalogImageUploadRules) corría DESPUÉS de que el
+    // cuerpo entero estuviera en RAM, así que no protegía nada. Se acotan:
+    //   * MemoryBufferThreshold vuelve a su default (64 KB): lo que pase de ahí se vuelca a disco.
+    //   * El tope global del cuerpo multipart queda en 8 MB; los endpoints de subida lo aprietan
+    //     aún más con [RequestSizeLimit] (2 MB por archivo, 4 MB en marca que lleva 2).
+    //   * Los VALORES de formulario (campos de texto, no archivos) se acotan a 1 MB.
+    o.ValueLengthLimit = 1024 * 1024;
+    o.MultipartBodyLengthLimit = 8 * 1024 * 1024;
+    o.MemoryBufferThreshold = 64 * 1024;
 });
 
 
