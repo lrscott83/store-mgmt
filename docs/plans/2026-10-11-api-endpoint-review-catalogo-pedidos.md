@@ -97,23 +97,20 @@ owners distintos (pendiente de confirmar; si aplica, recupera la severidad de se
       `Program.cs:129-130`.
 
 ### MEDIUM
-- [ ] **1.5 — `Product.Image` se escribe desde un string del cliente sin verificar pertenencia.**
-      `UpdateProductCatalogFieldsCommand.cs:123-124`: no se llama a `ICatalogImageStorage.BelongsToStore`
-      (que existe, `CatalogImageStorage.cs:188`). Fix: validar la clave antes de asignar (400 si no
-      pertenece a la tienda).
-- [ ] **1.6 — `GET /catalog/status` materializa todo el grafo de productos para contar 3 enteros.**
-      `GetCatalogStatusQuery.cs:55-56` + `ProductRepository.cs:67-76` (Include Category+Images).
-      Fix: proyecciones `CountAsync` (sin materializar).
-- [ ] **1.7 — `SyncCatalogCommand` arma la URL a mano.**
-      `SyncCatalogCommand.cs:175` vs el helper `CatalogPublicUrls.Catalog` (`CatalogPublicUrls.cs:10`)
-      que usa `GetCatalogStatusQuery.cs:63`. Fix: usar el helper (una copia menos del contrato).
+- [x] **1.5 — `Product.Image` se escribe desde un string del cliente sin verificar pertenencia.** —
+      **HECHO 2026-10-11** (`9bcc1e7a`): valida con `ICatalogImageStorage.BelongsToStore` (400 si la
+      clave no es de la tienda) + test negativo.
+- [x] **1.6 — `GET /catalog/status` materializa todo el grafo de productos para contar 3 enteros.** —
+      **HECHO 2026-10-11** (`09a4356e`): `CountForCatalogStatusAsync` / `CountByStoreIdAsync` (COUNT
+      en SQL, sin materializar).
+- [x] **1.7 — `SyncCatalogCommand` arma la URL a mano.** — **HECHO 2026-10-11** (`e3c0c020`): usa
+      `CatalogPublicUrls.Catalog(storeSlug)`, el mismo builder que la vista de estado.
 - [ ] **1.8 — `SyncCatalogCommandHandler.Handle` = 108 líneas y 8 dependencias.** Extraer helpers
       (slugs, mapeo del resumen). (Clean code.)
 - [x] **1.9 — DECISIÓN (2026-10-11): se deja como está.** `Success(SaveChanges()>0)` → 200 con
       `data:false` es el patrón **vigente en todo el proyecto**; no se cambia aquí. (No se toca.)
-- [ ] **1.10 — `MirrorGalleriesAsync` rompe el invariante de imagen principal.**
-      `CatalogMirrorWriter.cs:187` borra las filas de galería pero no limpia `Product.Image` ni borra
-      los archivos → imagen principal apuntando a una fila inexistente + huérfanos.
+- [x] **1.10 — `MirrorGalleriesAsync` rompe el invariante de imagen principal.** — **HECHO 2026-10-11**
+      (`0d28fa97`): limpia `Product.Image` cuando el sync borra su fila de galería.
 - [ ] **1.11 — R5–R7 sin `AbstractValidator`** (a diferencia de R1/R4). Fix: validadores declarativos
       (paths count/longitud/duplicados).
 
@@ -369,3 +366,7 @@ owners distintos (pendiente de confirmar; si aplica, recupera la severidad de se
   `548eb20f` mirror por retorno · `8449cc2b` topes de subida). `dotnet build` 0 errores;
   `Application.Tests` **1241 verde**. Decisión A1 aplicada. Pendientes del Controller 1: MEDIUM
   1.5–1.9 (1.9 se deja como está), 1.10, 1.11 y LOW 1.12–1.15.
+- 2026-10-11 — **Controller 1: MEDIUM 1.5, 1.6, 1.7, 1.10 HECHOS** (`9bcc1e7a` validar imagen
+  principal · `09a4356e` contar en SQL · `e3c0c020` URL por helper · `0d28fa97` sync limpia imagen
+  principal). `Application.Tests` **1242 verde**. Pendientes: 1.8 (extraer helpers de `Handle`),
+  1.11 (validadores R5–R7) y LOW 1.12–1.15.
