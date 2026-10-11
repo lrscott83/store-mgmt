@@ -128,29 +128,27 @@ owners distintos (pendiente de confirmar; si aplica, recupera la severidad de se
 `GET|PUT /catalog/branding`
 
 ### HIGH
-- [ ] **2.1 — Tercera ventana de compensación F8-R1/R2.** El `try` abre en
-      `UpdateStoreCatalogBrandingCommand.cs:134`, pero los `ResolveAsync` están en `:122-125` (fuera).
-      Un fallo de E/S al escribir el **banner** deja el **logo** recién subido huérfano. Fix: mover
-      los dos `ResolveAsync` dentro del `try` (las listas `newKeys`/`obsoleteKeys` ya cubren).
-- [ ] **2.2 — La compensación usa el `CancellationToken` de la petición** (`:154`,`:177`) → en una
-      cancelación (causa típica del fallo parcial) el `DeleteAsync` lanza al instante y la limpieza
-      **nunca ocurre**. Fix: `CancellationToken.None` en los borrados de limpieza.
+- [x] **2.1 — Tercera ventana de compensación F8-R1/R2.** — **HECHO 2026-10-11** (`de48a72c`): los
+      dos `ResolveAsync` ahora van DENTRO del `try`, así la compensación cubre el fallo de E/S al
+      escribir el 2º archivo.
+- [x] **2.2 — La compensación usa el `CancellationToken` de la petición.** — **HECHO 2026-10-11**
+      (`de48a72c`): los borrados de limpieza usan `CancellationToken.None`.
 
 ### MEDIUM
-- [ ] **2.3 — Límite multipart (ver X1).**
-- [ ] **2.4 — Validación de archivo por extensión O content-type, ambos del cliente; sin magic bytes.**
-      `CatalogImageUploadRules.cs:19-26`. Fix: verificar firma (12 bytes) + `X-Content-Type-Options: nosniff`
-      en el endpoint público de media.
-- [ ] **2.5 — Sin concurrencia optimista** (`last-write-wins` + huérfanos garantizados). Fix: rowversion.
-- [ ] **2.6 — `PUT` con semántica de merge (no es idempotente).** Fix: `PATCH`, o `PUT`+`If-Match`.
-- [ ] **2.7 — `Handle` de 115 líneas / 6 responsabilidades**; extraer `ApplyAsync`.
-- [ ] **2.8 — Regla de fallback de `PaletteId` triplicada** (`:193-195`, `GetStoreCatalogBrandingQuery.cs:63-68,77-79`).
-- [ ] **2.9 — TOCTOU en `UpsertAsync` → 500 (ver X3).** `StoreCatalogSettingsRepository.cs:61-68`.
+- [x] **2.3 — Límite multipart.** — **HECHO** vía 1.4 (`8449cc2b`): `[RequestSizeLimit]` en
+      `UpdateBrandingAsync` + spill global a disco.
+- [x] **2.4 — Validación de archivo.** — **PARCIAL 2026-10-11** (`cd53081e`): `X-Content-Type-Options:
+      nosniff` en el endpoint público de media. La verificación por **magic bytes** queda DIFERIDA
+      (cambia la firma de `CatalogImageUploadRules` para recibir el contenido).
+- [ ] **2.5 — Sin concurrencia optimista** → **DIFERIDO**: añadir `rowversion` implica columna + migración.
+- [ ] **2.6 — `PUT` con semántica de merge** → **DIFERIDO**: cambiar el verbo a `PATCH` rompe al cliente.
+- [ ] **2.7 — `Handle` de 115 líneas** → **DIFERIDO** (refactor cosmético).
+- [ ] **2.8 — fallback de `PaletteId` triplicado** → **DIFERIDO** (refactor).
+- [ ] **2.9 — TOCTOU en `UpsertAsync`** → **DIFERIDO**: es el transversal **X3** (unidades 2/5/9);
+      requiere decidir entre mapear Postgres `23505`→409 o `ON CONFLICT` (decisión de diseño).
 
-### LOW
-- [ ] **2.10 — `[Authorize]` ausente** (el filtro es la única barrera) + skip total para SuperAdmin.
-- [ ] **2.11 — `ResolveAsync` con 8 parámetros** (agrupar contexto).
-- [ ] **2.12 — `[ProducesResponseType]` incompletos** / `[FromForm]` explícito.
+### LOW (diferidos 2026-10-11 — no críticos)
+- [ ] **2.10–2.12** — diferidos (`[Authorize]` global, `ResolveAsync` con 8 params, `[ProducesResponseType]`).
 
 ---
 
@@ -374,3 +372,7 @@ owners distintos (pendiente de confirmar; si aplica, recupera la severidad de se
 - 2026-10-11 — **Controller 1 CERRADO** salvo LOWs. 1.11 hecho (`f649a6f8`); 1.8 = decisión de NO
   hacerlo ahora (refactor cosmético); LOW 1.12–1.15 **diferidos** (no críticos). `dotnet build` 0
   errores; `Application.Tests` **1242 verde** en cada paso. Siguiente: Controller 2.
+- 2026-10-11 — **Controller 2 (`CatalogBrandingController`)**: HIGH 2.1/2.2 (`de48a72c`) + 2.3 (vía
+  1.4) + 2.4 parcial (`cd53081e`, `nosniff`) HECHOS. **Diferidos con motivo**: 2.5 (rowversion+migración),
+  2.6 (rompe cliente), 2.7/2.8 (refactor), 2.9 (= **X3** transversal 2/5/9) y LOW 2.10–2.12.
+  `Application.Tests` 1242 verde.
