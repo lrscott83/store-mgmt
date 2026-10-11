@@ -214,6 +214,7 @@ const messages: Record<string, string> = {
   // Menu groups (exact Angular MENU.*.TITLE strings from vocabs/es.ts)
   'MENU.ADMIN': 'ADMINISTRACIÓN',
   'MENU.SALES': 'VENTA',
+  'MENU.WEB_CATALOG_GROUP': 'CATÁLOGO WEB',
   'MENU.INVENTORY': 'INVENTARIO',
   'MENU.EXPENSES': 'GASTOS',
   'MENU.SYNCHRONIZATION': 'SINCRONIZACIÓN',
@@ -234,7 +235,7 @@ const messages: Record<string, string> = {
 
   // Menu items — Sales (Angular MENU.SALE_MGMT.*)
   'MENU.PRODUCTS': 'Catálogo Productos',
-  'MENU.WEB_CATALOG': 'Catálogo Web',
+  'MENU.WEB_CATALOG_SETTINGS': 'Configuración',
   'MENU.ONLINE_ORDERS_SETTINGS': 'Pedidos WhatsApp',
   'MENU.ONLINE_ORDERS_DRIVERS': 'Repartidores',
   'MENU.SALE': 'Vender',

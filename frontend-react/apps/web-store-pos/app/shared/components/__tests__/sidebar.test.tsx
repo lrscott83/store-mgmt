@@ -668,3 +668,83 @@ describe('Sidebar — SHELL-06: brand logo at the top of the sidebar', () => {
     expect(brand.className).toContain('font-bold');
   });
 });
+
+describe('Sidebar — Catálogo Web group (módulos 18/19/20)', () => {
+  const makeOwner = (featureIds: number[], storeModuleIds: number[]): UserModel => ({
+    ...makeSuperAdmin(),
+    login: 'owner@test.com',
+    fullName: 'Owner Admin',
+    isSuperAdmin: false,
+    isOwnerAdmin: true,
+    featureIds,
+    storeModuleIds,
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('OwnerAdmin con módulo 18 ve "Configuración" → /sales/web-catalog', () => {
+    renderSidebar(makeOwner([EFeatures.WebCatalog], [EModules.WebCatalog]));
+    const link = screen.getByText('Configuración').closest('a');
+    expect(link?.getAttribute('href')).toBe('/sales/web-catalog');
+  });
+
+  it('sin módulo 18 no ofrece la configuración del catálogo', () => {
+    renderSidebar(makeOwner([EFeatures.WebCatalog], []));
+    expect(screen.queryByText('Configuración')).not.toBeInTheDocument();
+    expect(screen.queryByText('Pedidos WhatsApp')).not.toBeInTheDocument();
+  });
+
+  it('muestra "Pedidos WhatsApp" solo con módulo 19', () => {
+    renderSidebar(
+      makeOwner([EFeatures.WebCatalog], [EModules.WebCatalog, EModules.PedidosWhatsApp]),
+    );
+    const link = screen.getByText('Pedidos WhatsApp').closest('a');
+    expect(link?.getAttribute('href')).toBe('/sales/online-orders/settings');
+  });
+
+  it('oculta "Pedidos WhatsApp" sin el módulo 19', () => {
+    renderSidebar(makeOwner([EFeatures.WebCatalog], [EModules.WebCatalog]));
+    expect(screen.queryByText('Pedidos WhatsApp')).not.toBeInTheDocument();
+  });
+
+  it('muestra los ítems de gestión de pedidos con módulo 20', () => {
+    renderSidebar(
+      makeOwner(
+        [EFeatures.WebCatalog, EFeatures.OnlineOrders],
+        [EModules.WebCatalog, EModules.GestionPedidos],
+      ),
+    );
+    const hrefs = screen.getAllByRole('link').map((l) => l.getAttribute('href'));
+    expect(hrefs).toContain('/sales/online-orders');
+    expect(hrefs).toContain('/sales/online-orders/drivers');
+    expect(hrefs).toContain('/sales/online-orders/sales');
+  });
+
+  it('oculta los ítems de gestión de pedidos sin el módulo 20', () => {
+    renderSidebar(
+      makeOwner([EFeatures.WebCatalog, EFeatures.OnlineOrders], [EModules.WebCatalog]),
+    );
+    const hrefs = screen.getAllByRole('link').map((l) => l.getAttribute('href'));
+    expect(hrefs).not.toContain('/sales/online-orders');
+    expect(hrefs).not.toContain('/sales/online-orders/drivers');
+    expect(hrefs).not.toContain('/sales/online-orders/sales');
+  });
+
+  it('coloca el grupo Catálogo Web después de VENTA', () => {
+    renderSidebar(
+      makeOwner(
+        [EFeatures.WebCatalog, EFeatures.Products, EFeatures.Sale],
+        [EModules.WebCatalog],
+      ),
+    );
+    const texts = screen
+      .getAllByRole('link')
+      .map((l) => (l.textContent ?? '').replace(/NEW$/, ''));
+    const productsIdx = texts.indexOf('Catálogo Productos');
+    const configIdx = texts.indexOf('Configuración');
+    expect(productsIdx).toBeGreaterThan(-1);
+    expect(configIdx).toBeGreaterThan(productsIdx);
+  });
+});
