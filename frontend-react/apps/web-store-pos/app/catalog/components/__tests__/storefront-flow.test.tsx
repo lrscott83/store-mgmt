@@ -1000,11 +1000,14 @@ describe('storefront cart / checkout / order status (F3)', () => {
     it('muestra el código del pedido recién creado', () => {
       renderStatus(CREATED);
 
-      expect(screen.getByTestId('order-created-title')).toHaveTextContent('Pedido creado');
+      // La tarjeta del pedido recién creado queda reducida a su CÓDIGO: el título, el texto guía
+      // y el total están comentados en `storefront-order-status.tsx` a petición.
       expect(screen.getByTestId('order-code')).toHaveTextContent('K7M2QX');
     });
 
-    it('busca por código y teléfono y pinta estado, pago, modalidad y líneas', async () => {
+    // SKIP (no E2E): la consulta de estado —la "segunda parte"— está comentada en la vista, así
+    // que sus tests quedan deshabilitados en espejo. Reactivar al restaurar la vista.
+    it.skip('busca por código y teléfono y pinta estado, pago, modalidad y líneas', async () => {
       serviceMock.getPublicOrderStatus.mockResolvedValue(envelope(STATUS));
       renderStatus();
 
@@ -1047,7 +1050,7 @@ describe('storefront cart / checkout / order status (F3)', () => {
     // Cada fila afirma SU frase Y LA CONTRARIA, y las tres usan la MISMA construcción: el único
     // dato que cambia es el status anidado. Ese es el discriminado entero — si `isNotFound` leyera
     // otro canal, las filas caerían JUNTAS y no por separado.
-    it.each([
+    it.skip.each([
       [404, 'No encontramos ese pedido con ese teléfono.'],
       [500, 'No se pudo consultar el pedido. Inténtalo de nuevo.'],
       [429, 'No se pudo consultar el pedido. Inténtalo de nuevo.'],
@@ -1076,7 +1079,7 @@ describe('storefront cart / checkout / order status (F3)', () => {
     // El caso de RED es el único que `api-client` MUTA antes de rechazar (`isNetworkError =
     // true`), así que su forma no se fabrica: el error pasa por el interceptor REAL y se usa lo
     // que él rechaza. Sellar el `true` a mano volvería a fijar la expectativa del autor (R3-002).
-    it('sin conexión tampoco se disfraza de pedido inexistente', async () => {
+    it.skip('sin conexión tampoco se disfraza de pedido inexistente', async () => {
       const rejection = await networkRejection();
       // La etiqueta la pone producción: si `api-client` dejara de marcarla, este helper devuelve
       // un error sin `isNetworkError` y la aserción de abajo lo delata en vez de dejarlo pasar.
@@ -1096,7 +1099,7 @@ describe('storefront cart / checkout / order status (F3)', () => {
       expect(screen.queryByTestId('order-status-state')).not.toBeInTheDocument();
     });
 
-    it('valida código y teléfono antes de preguntar al servidor', () => {
+    it.skip('valida código y teléfono antes de preguntar al servidor', () => {
       renderStatus();
 
       fireEvent.click(screen.getByTestId('order-status-submit'));
