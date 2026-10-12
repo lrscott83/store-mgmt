@@ -33,6 +33,9 @@ El backend registra:
 
 - Corrida completa: **709 passed / 6 failed**; estos 2 con el 500 de arriba.
 - Reproducible en el commit base `f1cae8e5`, sin cambios de la sesión.
+- **Confirmado abierto tras mergear `test` y `qa` (HEAD `dd9327fa`, 2026-10-12): **719 total → 716 passed /
+  3 failed** — estos 2 siguen entre los 3 rojos (el fix `f551b031` de la causa 01 no los toca, y `qa` no
+  cambió el sync de galerías).
 - La ruta del fallo es exactamente la rama que limpia la imagen principal cuando la galería deja de
   contenerla (`CatalogMirrorWriter.cs:201-205`): pasa cuando la lista llega **vacía** (o sin la
   principal), no cuando la galería es `null` (esa rama hace `continue`).

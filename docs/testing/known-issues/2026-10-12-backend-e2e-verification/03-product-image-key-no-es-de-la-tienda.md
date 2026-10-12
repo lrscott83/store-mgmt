@@ -23,6 +23,9 @@ occurred.`), es decir, un 400 de negocio, no una caída.
 
 - Corrida completa: **709 passed / 6 failed**; este con el 400 de arriba.
 - Reproducible en el commit base `f1cae8e5`, sin cambios de la sesión.
+- **Confirmado abierto tras mergear `test` y `qa` (HEAD `dd9327fa`, 2026-10-12): 719 total → 716 passed /
+  3 failed** — sigue rojo. `qa` endureció `BelongsToStore` (anti-traversal) pero la regla base (prefijo
+  `{tenant}/{store}/`) es la misma, así que `"k/main.jpg"` sigue siendo rechazada.
 - El cuerpo que envía el test (`WebCatalogProductFieldsTests.cs:72-74`):
   `new CatalogFieldsBody(Description: "Camisa de algodón\nSegunda línea", PercentDiscountPrice: 1250, DiscountPrice: 500, IsNew: true, Image: "k/main.jpg")`.
 
