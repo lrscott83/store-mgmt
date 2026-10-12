@@ -245,23 +245,34 @@ owners distintos (pendiente de confirmar; si aplica, recupera la severidad de se
       que el storefront nunca leerá). Fix: `[HasPermission(StoreRolesFeatures.PedidosWhatsAppAdmin)]`
       — **nota**: el E2E existente fija módulo 18; cambiarlo requiere autorización (añadir test
       nuevo, no tocar el existente).
-- [ ] **5.2 — `TenantId` sale del claim del llamador, no de la tienda.** `:98`:
-      `StoreCatalogSettings.Create(storeId, _httpContextService.TenantId.ToGuid())`. Un SuperAdmin
-      escribiendo una tienda de otro tenant crea una fila que el owner no ve y **no puede actualizar
-      nunca** (500 por índice único en cada PUT). Fix: resolver el tenant desde la fila `Store`
-      (`store.TenantId`). Mismo defecto en `UpdateStoreCatalogBrandingCommand.cs:96`.
-
-### MEDIUM
-- [ ] **5.3 — Pérdida de columnas de marca (ver X2).** `EntityState.Modified` reescribe la fila
-      entera → guardar settings pisa `LogoKey`/`BannerKey` (el logo "desaparece"). Fix: update por
-      columnas (`ExecuteUpdateAsync`).
-- [ ] **5.4 — `UpsertAsync` re-deriva existencia con `AnyAsync`** (round-trip de más) + TOCTOU (ver X3).
-- [ ] **5.5 — Tres copias de la proyección `StoreCatalogSettingsDto`** (ver X9).
-- [ ] **5.6 — Límites de columna declarados en 2 sitios** (command const vs EF config).
+- [ ] **5.1 — Gate en el módulo 18 en vez del 19.** — **BLOQUEADO 2026-10-12**: el cambio a
+      `PedidosWhatsAppAdmin` (módulo 19) es correcto, pero el plan **Superior/VIP YA incluye el módulo
+      19** (`PedidosModulesBackfill` → `StorePlanModule` 19→planes 3 y 4), así que el fixture del E2E
+      (tienda Superior) **no puede expresar** "tiene 19 sin 18": sin contratar nada, el gate del 19
+      responde 200, y el caso negativo exige una tienda en un plan SIN el 19 (Gratis/Pago). Cambiar el
+      gate rompió 8 asserts de `OrderingSettingsRouteAuthE2ETests` (R1_2/R1_3/R1_4/R1_7/R1_8/R1_9)
+      sin poder probar la semántica. **Revertido** el cambio (gate sigue en 18) para no dejar la suite
+      roja. Necesita: un seed en plan inferior + decisión de producto (¿el gate debe ser 19, que es
+      del plan, o 18?). *No es un cambio de una línea.*
+- [x] **5.2 — `TenantId` sale del claim del llamador.** — **HECHO 2026-10-12** (`00acfe44`): el handler
+      de settings resuelve el tenant desde `Store.TenantId` al crear; el de marca lo resuelve SIEMPRE
+      (es también el prefijo de la clave del archivo). Default de `UpsertAsync` conserva la firma
+      histórica para el E2E.
+- [x] **5.3 — Pérdida de columnas por UPDATE de fila completa (X2).** — **HECHO 2026-10-12**
+      (`00acfe44`): `UpsertAsync` marca SOLO las columnas que la operación tocó (`modifiedProperties`);
+      cada vista pasa las suyas. Probado contra Postgres (E2E nuevo: un cambio de marca concurrente
+      sobrevive a un guardado de pedidos).
+- [x] **5.4 — `AnyAsync` redundante + TOCTOU (X3).** — **PARCIAL 2026-10-12** (`00acfe44`): los
+      handlers pasan la existencia conocida y se evita el round-trip. El mapeo `23505 → 409` para
+      altas concurrentes queda **DIFERIDO** (decisión de diseño de X3, compartida con 2.9).
+- [x] **5.5 — Proyección `StoreCatalogSettingsDto` duplicada (X9).** — **HECHO 2026-10-12**
+      (`00acfe44`): `StoreCatalogSettingsDtoMapper` único para el GET y el upsert.
+- [x] **5.6 — Límites de columna en 2 sitios.** — **HECHO 2026-10-12** (`00acfe44`): consts en la
+      entidad; EF y el comando los referencian.
 
 ### LOW
 - [ ] **5.7 — `DbUpdateException` → 500 opaco** (ver X6); `[ProducesResponseType]` solo 200;
-      `PUT` sin token de concurrencia; create devuelve 200.
+      `PUT` sin token de concurrencia; create devuelve 200. — **DIFERIDO**.
 
 ---
 
@@ -456,3 +467,10 @@ documenta `AGENTS.md`).
   nombres válidos; ninguna clave del backend se ve afectada); (b) el test de `OpenAsync` no dispone un
   stream si alguna vez devolviera uno. `Application.Tests` **1274 verde**; E2E `Catalog` 49/52 (los 3
   pre-existentes). Push `1c3e5cdb..`.
+- 2026-10-12 — **Controller 5 (`OnlineOrderingController`)**: **5.2–5.6 HECHOS** (`00acfe44`): tenant
+  desde la tienda (fila y clave del archivo) · upsert PARCIAL por columnas (probado en Postgres: un
+  cambio de marca concurrente sobrevive) · existencia conocida (sin `AnyAsync`) · mapper DTO único ·
+  límites de columna en la entidad. Unit **1276 verde**; E2E `Orders` **28/28**. **5.1 BLOQUEADO** y
+  **revertido** (el plan Superior/VIP ya incluye el módulo 19 → el fixture no puede probar el caso
+  negativo; rompía 8 asserts). **Diferidos**: 5.4b (`23505→409`, X3) y 5.7 (LOW). Pendiente de decisión:
+  cómo testear 5.1 (seed en plan inferior) antes de RDD.
