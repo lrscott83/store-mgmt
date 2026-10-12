@@ -67,9 +67,18 @@ public sealed class WebCatalogProductFieldsTests
             var product = await WebCatalogSeed.AddProductAsync(_f, fixture, category.Id, "Camisa", 100m);
             var client = ClientFor(fixture);
 
+            // La clave de imagen principal se valida contra el almacén de la tienda
+            // (`BelongsToStore` exige el prefijo `{tenant}/{store}/`), así que el test sube una imagen
+            // REAL y usa la clave que devuelve el endpoint. La clave ficticia anterior ("k/main.jpg")
+            // no pertenecía a la tienda y el guardado la rechazaba con 400 `CatalogImageNotFound`.
+            using var upload = WebCatalogSeed.BuildImageUpload(TinyJpeg, "main.jpg", "image/jpeg");
+            var uploadResponse = await client.PostAsync($"/api/v1/catalog/products/{product.Id}/images", upload);
+            uploadResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+            string key = (await uploadResponse.Content.ReadFromJsonAsync<ApiResponse<string>>(ApiResponse.Json))!.Data!;
+
             var response = await SaveFieldsAsync(client, product.Id, new CatalogFieldsBody(
                 Description: "Camisa de algodón\nSegunda línea", PercentDiscountPrice: 1250,
-                DiscountPrice: 500, IsNew: true, Image: "k/main.jpg"));
+                DiscountPrice: 500, IsNew: true, Image: key));
 
             response.StatusCode.Should().Be(HttpStatusCode.OK);
             (await response.Content.ReadFromJsonAsync<ApiResponse<bool>>(ApiResponse.Json))!.Data.Should().BeTrue();
@@ -79,7 +88,7 @@ public sealed class WebCatalogProductFieldsTests
             view.PercentDiscountPrice.Should().Be(1250);
             view.DiscountPrice.Should().Be(500);
             view.IsNew.Should().BeTrue();
-            view.Image.Should().Be("k/main.jpg");
+            view.Image.Should().Be(key);
             view.FinalPrice.Should().Be(82.5m, "el % se aplica primero y el monto rebajado después (D7)");
             view.HasDiscount.Should().BeTrue();
             view.CategoryName.Should().Be("Ropa");
