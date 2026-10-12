@@ -157,6 +157,23 @@ export function StorefrontCheckout({
     if (open) setWhatsapp(null);
   }, [open]);
 
+  // [TEMP DIAG] Traza del flujo del cliente para localizar por qué no sale el WhatsApp. Quitar
+  // cuando el diagnóstico cierre.
+  useEffect(() => {
+    if (!open) return;
+    console.info('[checkout:diag] checkout abierto', {
+      staffMode,
+      persistsOrders,
+      sendsByWhatsapp,
+      config: {
+        enabled: config.enabled,
+        pedidosWhatsAppEnabled: config.pedidosWhatsAppEnabled,
+        gestionPedidosEnabled: config.gestionPedidosEnabled,
+        whatsappNumber: config.whatsappNumber,
+      },
+    });
+  }, [open, staffMode, persistsOrders, sendsByWhatsapp, config]);
+
   function validate(): string | null {
     if (lines.length === 0) return intl.formatMessage({ id: 'CHECKOUT.ERROR_EMPTY' });
     if (!customerName.trim()) return intl.formatMessage({ id: 'CHECKOUT.ERROR_NAME' });
@@ -170,14 +187,25 @@ export function StorefrontCheckout({
   }
 
   async function submit() {
+    console.info('[checkout:diag] submit() llamado', {
+      lines: lines.length,
+      sendsByWhatsapp,
+      persistsOrders,
+      staffMode,
+    });
+
     // Guarda de doble envío (F3-R5): con una petición en vuelo, un segundo gesto no crea un
     // segundo pedido. Va ANTES de `validate()` a propósito —una pulsación de más no tiene que
     // reevaluar el formulario, solo dejar de enviar— y lee la ref, no el estado: ver la nota de
     // `submittingRef`.
-    if (submittingRef.current) return;
+    if (submittingRef.current) {
+      console.warn('[checkout:diag] submit ignorado: ya hay un pedido en vuelo (submittingRef)');
+      return;
+    }
 
     const validationError = validate();
     if (validationError) {
+      console.warn('[checkout:diag] submit abortado por validación:', validationError);
       setError(validationError);
       return;
     }
@@ -196,6 +224,7 @@ export function StorefrontCheckout({
     // backend devuelve por diseño— y lo que sigue arma el resumen con el carrito del cliente.
     let created: PublicOrderCreated | null = null;
     if (persistsOrders) {
+      console.info('[checkout:diag] POST createPublicOrder…', { storeSlug });
       try {
         // Solo `productId` + `quantity`: ni precio, ni total, ni moneda. El servidor los recalcula
         // con el catálogo publicado, y la dirección solo viaja con domicilio (con recogida el
@@ -210,12 +239,15 @@ export function StorefrontCheckout({
         });
 
         if (!result.succeeded) {
+          console.warn('[checkout:diag] el alta falló (result.succeeded=false):', result);
           setError(intl.formatMessage({ id: 'CHECKOUT.FAILED' }));
           return;
         }
 
         created = result.data;
-      } catch {
+        console.info('[checkout:diag] pedido creado:', created);
+      } catch (err) {
+        console.warn('[checkout:diag] excepción en el POST createPublicOrder:', err);
         setError(intl.formatMessage({ id: 'CHECKOUT.FAILED' }));
         return;
       } finally {
@@ -242,6 +274,18 @@ export function StorefrontCheckout({
     //
     // Por eso el alta se reporta SIEMPRE —también en modo staff, donde no hay aviso que armar—
     // y solo el paso de aviso va protegido.
+    if (!sendsByWhatsapp) {
+      console.warn(
+        '[checkout:diag] NO se arma el aviso: sendsByWhatsapp=false (staffMode=%s, persistsOrders=%s)',
+        staffMode,
+        persistsOrders,
+      );
+    } else {
+      console.info('[checkout:diag] armando enlace wa.me…', {
+        whatsappNumber: created ? created.whatsappNumber : config.whatsappNumber,
+        code: created ? created.code : null,
+      });
+    }
     try {
       // Con el pedido YA guardado, en modo staff eso es TODO lo que hay que hacer: el cliente
       // está delante y el pedido es suyo, así que no se arma el enlace, no se abre `wa.me` y no
@@ -286,6 +330,7 @@ export function StorefrontCheckout({
           notes: notes.trim(),
         });
 
+        console.info('[checkout:diag] link wa.me construido:', link);
         if (link) {
           // `noopener` porque la pestaña es de OTRO origen y no debe poder llegar al catálogo por
           // `window.opener`. Con `noopener` el navegador no devuelve handle aunque abra la
@@ -297,7 +342,11 @@ export function StorefrontCheckout({
           // (que lleva el código y el enlace manual) sería justo perder el respaldo que existe
           // para el caso del popup bloqueado.
           try {
-            window.open(link, '_blank', 'noopener');
+            const opened = window.open(link, '_blank', 'noopener');
+            console.info(
+              '[checkout:diag] window.open devolvió:',
+              opened ? 'ventana abierta' : 'null/undefined (posible bloqueo de popup)',
+            );
           } catch (err) {
             // El aviso de abajo es el respaldo: se pinta igual. Lo que cambia es que el fallo
             // deja SEÑAL (R3-2): antes, un popup que lanzaba era indistinguible de uno abierto,
@@ -310,6 +359,10 @@ export function StorefrontCheckout({
           }
         }
         setWhatsapp({ code: created?.code ?? null, link });
+        console.info('[checkout:diag] aviso WhatsApp seteado:', {
+          code: created?.code ?? null,
+          link: Boolean(link),
+        });
       }
     } catch (err) {
       // El resumen no se pudo componer (`created.lines` que no es un array, por ejemplo). El
@@ -324,8 +377,14 @@ export function StorefrontCheckout({
         '[storefront-checkout] no se pudo componer el resumen de WhatsApp; el aviso sale con el código y sin enlace.',
         err,
       );
+      console.warn('[checkout:diag] excepción al componer el resumen:', err);
       if (sendsByWhatsapp) setWhatsapp({ code: created?.code ?? null, link: null });
     }
+
+    console.info('[checkout:diag] fin de submit:', {
+      created: created ? 'pedido persistido' : 'sin pedido (modo sin Gestión de Pedidos)',
+      sendsByWhatsapp,
+    });
 
     // El gesto se reporta según lo que PASÓ, no siempre igual: con pedido guardado se llama a
     // `onCreated` (el padre lo pinta, vacía el carrito y abre su consulta) y sin él —M3— no hay
