@@ -157,31 +157,39 @@ owners distintos (pendiente de confirmar; si aplica, recupera la severidad de se
 `GET|POST /catalog/showcase` · `DELETE /catalog/showcase/{id}` · `PUT /catalog/showcase/order`
 
 ### HIGH
-- [ ] **3.1 — Límite multipart sin tope real (ver X1).**
-- [ ] **3.2 — `TenantId` sin guard en el alta.**
-      `AddStoreCatalogImageCommand.cs:73`: token sin claim de tenant escribe `TenantId = Guid.Empty`
-      → fila invisible para siempre (el filtro resuelve tenant a NULL) + archivo huérfano. Fix: mismo
-      guard que `StoreId` (400).
+- [x] **3.1 — Límite multipart sin tope real (ver X1).** — **HECHO vía 1.4** (`8449cc2b`): el `POST`
+      ya lleva `[RequestSizeLimit]`, el buffer global vuelca a disco (64 KB) y el cuerpo está acotado a
+      8 MB. Cerrado por cobertura, sin cambio propio.
+- [x] **3.2 — `TenantId` sin guard en el alta.** — **HECHO 2026-10-12** (`d2d6c195`): el handler exige
+      tenant no vacío (400 con mensaje nuevo `ShowcaseStoreTenantNotResolved`) antes de subir el
+      archivo; test del caso añadido.
 
 ### MEDIUM
-- [ ] **3.3 — Contenido de archivo no validado (ver 2.4).**
-- [ ] **3.4 — `DELETE` carga TODO el set de imágenes para borrar una.**
-      `RemoveStoreCatalogImageCommand.cs:69-70`. Fix: `WHERE StoreId AND Id` indexado.
-- [ ] **3.5 — `Reorder` marca toda la fila `Modified`** → revierte `Caption`/`IsActive` concurrentes
-      + hasta 10 UPDATEs. Fix: marcar solo `OrderIndex` (`UpdatePropertiesAsync`).
-- [ ] **3.6 — TOCTOU en el tope de 10 imágenes** → 11 imágenes / orden empatado.
-- [ ] **3.7 — Compensación puede enmascarar el error original.** `AddStoreCatalogImageCommand.cs:112-126`:
-      el `DeleteAsync` de limpieza puede lanzar y reemplazar la excepción real. Fix: envolverlo en
-      try/catch + `LogWarning` y relanzar el original.
-- [ ] **3.8 — Ventana de crash en DELETE** deja archivo huérfano sin reconciliación.
-- [ ] **3.9 — Dos formas de 400**: `ValidationProblemDetails` (binding) vs `ResponseResult`
-      (FluentValidation). Fix: `InvalidModelStateResponseFactory` unificado.
+- [x] **3.3 — Contenido de archivo no validado (ver 2.4).** — *cubierto por 2.4*: queda la
+      verificación por magic bytes **DIFERIDA** junto a 2.4 (misma decisión).
+- [x] **3.4 — `DELETE` carga TODO el set para borrar una.** — **HECHO 2026-10-12** (`d2d6c195`):
+      nuevo `IStoreCatalogImageRepository.GetByIdAndStoreIdAsync(id, storeId, ct)`; el handler borra
+      por id acotado a la tienda.
+- [x] **3.5 — `Reorder` marca toda la fila `Modified`.** — **HECHO 2026-10-12** (`d2d6c195`):
+      nuevo `SetOrderIndexAsync` que marca SOLO `OrderIndex`; ya no revierte `Caption`/`IsActive`
+      concurrentes ni reescribe la fila entera.
+- [x] **3.6 — TOCTOU en el tope de 10 imágenes.** — **HECHO 2026-10-12** (`d2d6c195`): decisión del
+      owner = **check transaccional sin tocar el esquema**. `BeginTransactionAsync` en el UoW +
+      `AcquireSetLockAsync` (lock de transacción `pg_advisory_xact_lock` por (tienda, conjunto)); el
+      handler re-cuenta y calcula el `OrderIndex` dentro del lock. Serializa altas al mismo conjunto,
+      no bloquea tiendas/conjuntos distintos.
+- [x] **3.7 — La compensación puede enmascarar el error original.** — **HECHO 2026-10-12** (`d2d6c195`):
+      la limpieza va en `TryDeleteFileQuietlyAsync` (try/catch + `LogWarning`, `CancellationToken.None`)
+      y el error original se relanza; test del caso añadido.
+- [ ] **3.8 — Ventana de crash en DELETE** deja archivo huérfano sin reconciliación. — **DIFERIDO**:
+      hoy se registra como deuda de disco; la reconciliación es una tarea aparte.
+- [x] **3.9 — Dos formas de 400** (`ValidationProblemDetails` vs `ResponseResult`). — **HECHO
+      2026-10-12** (`d2d6c195`): `InvalidModelStateResponseFactory` unificado
+      (`AddUnifiedValidationResponseExtension`) proyecta el binding al mismo sobre de la API.
 
-### LOW
-- [ ] **3.10 — Folder name en dos ensamblados** (`ShowcaseImageKinds.Folder` muerto vs `CatalogImageStorage.cs:28`).
-- [ ] **3.11 — `IsActive` en el DTO es constante `true`** (siempre filtrado).
-- [ ] **3.12 — `POST` 200 en vez de 201**; `DELETE` 200 en vez de 204; `[ProducesResponseType]` incompletos.
-- [ ] **3.13 — Sin E2E de showcase (ver X8).**
+### LOW (diferidos 2026-10-12 — no críticos)
+- [ ] **3.10–3.13** — diferidos (`ShowcaseImageKinds.Folder` muerto, `IsActive` constante en el DTO,
+      `POST` 200 / `DELETE` 200, `[ProducesResponseType]` incompletos, sin E2E de showcase).
 
 ---
 
@@ -376,3 +384,9 @@ owners distintos (pendiente de confirmar; si aplica, recupera la severidad de se
   1.4) + 2.4 parcial (`cd53081e`, `nosniff`) HECHOS. **Diferidos con motivo**: 2.5 (rowversion+migración),
   2.6 (rompe cliente), 2.7/2.8 (refactor), 2.9 (= **X3** transversal 2/5/9) y LOW 2.10–2.12.
   `Application.Tests` 1242 verde.
+- 2026-10-12 — **Controller 3 (`CatalogShowcaseController`) HECHO** (`d2d6c195`): 3.2 (guard de tenant)
+  + 3.4 (borrado por id acotado a la tienda) + 3.5 (solo `OrderIndex`) + 3.6 (check transaccional con
+  lock por (tienda, conjunto) — decisión del owner: **sin tocar el esquema**) + 3.7 (compensación que
+  no enmascara) + 3.9 (un solo sobre de 400). 3.1 cerrado por cobertura (1.4). **Diferidos con motivo**:
+  3.3 (junto a 2.4, magic bytes), 3.8 (deuda de disco/reconciliación) y LOW 3.10–3.13.
+  `dotnet build` 0 errores; `Application.Tests` **1244 verde** (2 tests nuevos). Siguiente: Controller 4.
