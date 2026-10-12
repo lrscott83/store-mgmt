@@ -421,6 +421,28 @@ Es la continuación directa de la corrida del 2026-10-04 (346 aprobados, 2 falli
 | Ficha 7 del merge de qa (caché de dependencias de Vite) | ✅ Retirada el 2026-10-06 — la Opción A ya estaba aplicada desde el 2026-10-02 (commit `d6f47d53`) |
 | Fichas 01 a 03 (corrida del 2026-10-05) | ✅ Los 3 inestables de esa corrida: **causa raíz confirmada el 2026-10-06** (ventana de pre-hidratación, setup con login real, selección persistida); los fixes de 03, 02 y 01 quedaron **aplicados y verificados** el mismo 2026-10-06 (el de 04, también) |
 
+---
+
+## Corrida E2E BACKEND del 2026-10-12 (suite xUnit, NO Playwright)
+
+**Contexto.** `dotnet test backend/src/SMCA.WebApi.E2ETests/SMCA.WebApi.E2ETests.csproj` (README raíz,
+sección 3) contra PostgreSQL real `smca_test`: **715 total → 709 passed / 6 failed**. Los 6 son
+**deterministas** y **pre-existentes**: fallan igual en el commit base `f1cae8e5` (el `dev` tras el
+merge `dev ← test`), **sin** los cambios de la sesión del 2026-10-12 (feature de columnas móviles y
+arreglo del reset). Los introdujo el merge: los commits causantes (`f649a6f8`, `0d28fa97`, `9bcc1e7a`)
+**no** son ancestros de `eac38545`, el `dev` previo al merge.
+
+| # | Tests | Síntoma | Causa raíz (confirmada) | Estado |
+| --- | --- | --- | --- | --- |
+| 01 | `WebCatalogImagesTests.Reorder_…`, `WebCatalogImagesTests.Delete_…`, `WebCatalogProductFieldsTests.Removing_the_main_image_…` | 500 | La clave `CatalogImagePathTooLong` está **duplicada** en `I18n.resx`/`I18n.en.resx` con aridad distinta; los validadores NUEVOS de imágenes llaman a la variante de 2 placeholders con 1 argumento → `FormatException` al construir el validador | 🔴 abierto |
+| 02 | `WebCatalogSyncTests.Null_gallery_…`, `WebCatalogSnapshotTests.Null_gallery_…` | 500 | `CatalogMirrorWriter.MirrorGalleriesAsync` (`CatalogMirrorWriter.cs:204`) adjunta un `Product` ya trackeado en el mismo contexto (NoTracking + `UpdateAsync`) → conflicto de identidad en `SyncCatalog` | 🔴 abierto |
+| 03 | `WebCatalogProductFieldsTests.Saving_the_fields_…` | 400 | El fixture envía la clave ficticia `"k/main.jpg"`; la validación nueva (`UpdateProductCatalogFieldsCommand.cs:135`) exige que la clave pertenezca a la tienda → `CatalogImageNotFound`. La app es correcta; el test quedó desalineado | 🔴 abierto |
+
+**Fichas:** [`known-issues/2026-10-12-backend-e2e-verification/`](known-issues/2026-10-12-backend-e2e-verification/README.md)
+(01, 02 y 03). **Ninguna propuesta aplicada**: tocar tests E2E existentes o código de la app requiere
+autorización 1 a 1.
+
+
 _Actualizado por última vez: 2026-10-05 (corrida completa: 351 aprobados, 0 fallidos, 3 inestables; las fichas de las corridas del 2026-10-01 y del merge de qa quedaron retiradas salvo `precache-split` y el defecto del caché de Vite)._
 
 ---

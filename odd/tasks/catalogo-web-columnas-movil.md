@@ -135,5 +135,8 @@ L2 (verbatim, 2026-10-12):
   - `Catalog.WebCatalogSnapshotTests.Null_gallery_leaves_the_photos_alone_and_an_empty_list_clears_them`
   - `Catalog.WebCatalogSyncTests.Null_gallery_leaves_the_photos_alone_and_an_empty_list_clears_them`
   - No son de este cambio (fallan igual en la base) ni estaban en `docs/testing/known-issues/`.
-    **Pendiente de decisión del owner** (regla: un E2E rojo es información, no se toca sin autorización).
+    **Documentados como known-issue** (2026-10-12) en
+    `docs/testing/known-issues/2026-10-12-backend-e2e-verification/`: 3 causas raíz confirmadas
+    (aridad duplicada de `CatalogImagePathTooLong`; tracking EF en `CatalogMirrorWriter`;
+    fixture con clave de imagen ficticia). Propuestas **no aplicadas** (autorización 1 a 1).
 - Pendiente: push/PR = decisión del owner.
