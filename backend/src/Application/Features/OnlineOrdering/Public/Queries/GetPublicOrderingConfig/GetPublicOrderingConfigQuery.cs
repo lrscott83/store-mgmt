@@ -134,6 +134,13 @@ namespace Application.Features.OnlineOrdering.Public.Queries.GetPublicOrderingCo
                 TemplateId = string.IsNullOrWhiteSpace(settings?.TemplateId)
                     ? StoreCatalogSettings.DefaultTemplateId
                     : settings.TemplateId,
+                // Elementos por fila en MÓVIL de la rejilla (decisión del owner, 2026-10-12). Sin
+                // fila (o con un valor fuera de rango) sale el default 2 — como la paleta y la
+                // plantilla: el storefront siempre tiene que poder pintar. Solo la plantilla
+                // `default` lo usa; `boutique` lo ignora.
+                MobileColumns = settings is { MobileColumns: 1 or 2 }
+                    ? settings.MobileColumns
+                    : StoreCatalogSettings.DefaultMobileColumns,
                 // El SHOWCASE se lee UNA vez para los dos conjuntos (ver `ReadShowcaseAsync`), y viaja igual que
                 // la marca: URL pública del endpoint de media, nunca la
                 // clave cruda. Sin imágenes —una tienda recién sincronizada, o una que no quiere

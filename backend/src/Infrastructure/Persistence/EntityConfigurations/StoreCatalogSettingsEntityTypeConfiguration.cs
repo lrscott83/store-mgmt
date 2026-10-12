@@ -38,6 +38,13 @@ namespace Infrastructure.Persistence.EntityConfigurations
             // validado en el command de marca, con `default` como valor de una fila recién creada.
             builder.Property(x => x.TemplateId).HasMaxLength(64).IsRequired();
 
+            // Elementos por fila en MÓVIL de la rejilla pública (1 o 2; decisión del owner,
+            // 2026-10-12). El `HasDefaultValue` es lo que hace que la migración rellene las filas
+            // existentes con 2 (el comportamiento actual) en vez del 0 que EF pondría por defecto.
+            builder.Property(x => x.MobileColumns)
+                .IsRequired()
+                .HasDefaultValue(StoreCatalogSettings.DefaultMobileColumns);
+
             // D16: horarios y zonas son texto libre para el dueño, sin estructura que validar.
             builder.Property(x => x.BusinessHours).HasMaxLength(512);
             builder.Property(x => x.DeliveryZones).HasMaxLength(512);

@@ -66,6 +66,40 @@ public class GetStoreCatalogBrandingQueryHandlerTests
         result.Data!.LogoKey.Should().BeNull();
         result.Data.BannerKey.Should().BeNull();
         result.Data.PaletteId.Should().Be(StoreCatalogSettings.DefaultPaletteId);
+        result.Data.MobileColumns.Should().Be(StoreCatalogSettings.DefaultMobileColumns);
+    }
+
+    /// <summary>El ajuste de elementos por fila en móvil viaja tal cual lo guardó el dueño (1 o 2).</summary>
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    public async Task Handle_WithMobileColumns_ShouldReturnTheStoredValue(int columns)
+    {
+        StoreCatalogSettings settings = StoreCatalogSettings.Create(_storeId, _tenantId);
+        settings.MobileColumns = columns;
+        _settingsRepository.Setup(x => x.GetByStoreIdAsync(_storeId)).ReturnsAsync(settings);
+
+        var result = await Handler().Handle(new GetStoreCatalogBrandingQuery(), CancellationToken.None);
+
+        result.Data!.MobileColumns.Should().Be(columns);
+    }
+
+    /// <summary>
+    /// Una fila con un valor fuera de rango (una migración futura, un dato a mano) no puede dejar la
+    /// vista sin una opción válida: se normaliza al default (2), que es el comportamiento actual.
+    /// </summary>
+    [Theory]
+    [InlineData(0)]
+    [InlineData(3)]
+    public async Task Handle_WithAnOutOfRangeMobileColumns_ShouldFallBackToTheDefault(int stored)
+    {
+        StoreCatalogSettings settings = StoreCatalogSettings.Create(_storeId, _tenantId);
+        settings.MobileColumns = stored;
+        _settingsRepository.Setup(x => x.GetByStoreIdAsync(_storeId)).ReturnsAsync(settings);
+
+        var result = await Handler().Handle(new GetStoreCatalogBrandingQuery(), CancellationToken.None);
+
+        result.Data!.MobileColumns.Should().Be(StoreCatalogSettings.DefaultMobileColumns);
     }
 
     [Fact]

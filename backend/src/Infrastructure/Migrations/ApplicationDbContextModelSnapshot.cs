@@ -2231,6 +2231,11 @@ namespace Infrastructure.Migrations
                     b.Property<decimal>("MinimumOrderAmount")
                         .HasColumnType("decimal(18,2)");
 
+                    b.Property<int>("MobileColumns")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(2);
+
                     b.Property<string>("PaletteId")
                         .IsRequired()
                         .HasMaxLength(64)

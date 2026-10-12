@@ -65,6 +65,7 @@ namespace Application.Features.WebCatalog.Branding.Queries.GetStoreCatalogBrandi
             LogoKey = null,
             BannerKey = null,
             PaletteId = StoreCatalogSettings.DefaultPaletteId,
+            MobileColumns = StoreCatalogSettings.DefaultMobileColumns,
         };
 
         private static StoreCatalogBrandingDto Map(StoreCatalogSettings settings) => new()
@@ -77,6 +78,17 @@ namespace Application.Features.WebCatalog.Branding.Queries.GetStoreCatalogBrandi
             PaletteId = string.IsNullOrWhiteSpace(settings.PaletteId)
                 ? StoreCatalogSettings.DefaultPaletteId
                 : settings.PaletteId,
+            // Una fila con un valor fuera de rango (una migración futura, un dato a mano) no puede
+            // dejar la vista sin una opción válida seleccionada: se normaliza al default.
+            MobileColumns = NormalizeMobileColumns(settings.MobileColumns),
         };
+
+        /// <summary>
+        /// Solo 1 y 2 son valores válidos de "elementos por fila en móvil". Cualquier otro valor
+        /// de la fila se normaliza al default (2). El validador del command impide escribir fuera
+        /// de rango, así que esto es endurecimiento del contrato de lectura, no una segunda puerta.
+        /// </summary>
+        private static int NormalizeMobileColumns(int value)
+            => value is 1 or 2 ? value : StoreCatalogSettings.DefaultMobileColumns;
     }
 }
