@@ -448,3 +448,11 @@ documenta `AGENTS.md`).
   guard de separador de `ResolveFullPath` sin test; (d) R3-3 la normalización del filtro no se prueba;
   (e) **R4-1** el rate limit por IP colapsa todo un NAT/egress en un cubo → lecturas válidas podrían
   rechazarse; (f) R4-2 (pre-existente) el endpoint de media sigue sin límite.
+- 2026-10-12 — **Traversal residual endurecido** (`65efee36`): `IsTraversalSegment` rechaza todo
+  segmento que al recortar espacios/puntos finales quede vacío (cubre `.`/`..`/`.. `/`...`), aplicado
+  en `BelongsToStore` y en `ResolveFullPath`. **RDD APROBADA** (lineage `review-d708f28e5ae16c24`,
+  lentes risk+reliability, autoridad quemada); la lente de riesgo no encontró hallazgos.
+  Advisories no bloqueantes: (a) sobre-rechazo conservador de segmentos solo-espacios (en Linux serían
+  nombres válidos; ninguna clave del backend se ve afectada); (b) el test de `OpenAsync` no dispone un
+  stream si alguna vez devolviera uno. `Application.Tests` **1274 verde**; E2E `Catalog` 49/52 (los 3
+  pre-existentes). Push `1c3e5cdb..`.
