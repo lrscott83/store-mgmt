@@ -192,12 +192,11 @@ namespace Infrastructure.Storage
 
             string normalized = key.Replace('\\', '/');
 
-            // La clave se compone de segmentos y un segmento `.`/`..` cambia el destino al normalizar
-            // la ruta: `{tenantA}/{storeA}/../{tenantB}/…` EMPIEZA por el prefijo esperado pero
-            // `Path.GetFullPath` lo resolvería leyendo otra tienda. Se rechaza aquí, ANTES de comparar,
-            // para que la pertenencia se decida sobre la MISMA forma que se resuelve al leer.
-            if (normalized.Split('/', StringSplitOptions.RemoveEmptyEntries)
-                .Any(segment => segment is "." or ".."))
+            // La clave se compone de segmentos y un segmento que cambia el destino al normalizar la
+            // ruta (`..`, `.`, y también `.. ` o `...`, que Windows recorta a `..`) haría que
+            // `{tenantA}/{storeA}/.. /{tenantB}/…` EMPEZARA por el prefijo esperado y aun así leyera
+            // otra tienda. Se decide sobre la MISMA forma que se resuelve al abrir, ANTES de comparar.
+            if (normalized.Split('/', StringSplitOptions.RemoveEmptyEntries).Any(IsTraversalSegment))
                 return false;
 
             string expectedPrefix = tenantId.ToString("N") + "/" + storeId.ToString("N") + "/";
@@ -212,7 +211,11 @@ namespace Infrastructure.Storage
 
             string relative = key.Replace('/', Path.DirectorySeparatorChar).Replace('\\', Path.DirectorySeparatorChar);
 
-            // Defensa contra traversal: la clave se compone en el backend, pero nunca se confía.
+            // Defensa contra traversal, para CUALQUIER clave (no solo la que valida la pertenencia):
+            // un segmento que al recortar es `.`/`..`/vacío cambia de carpeta al resolver la ruta.
+            if (relative.Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries).Any(IsTraversalSegment))
+                throw new InvalidOperationException($"Clave de imagen con traversal: '{key}'.");
+
             string fullPath = Path.GetFullPath(Path.Combine(root, relative));
             string fullRoot = Path.GetFullPath(root);
 
@@ -227,6 +230,15 @@ namespace Infrastructure.Storage
 
             return fullPath;
         }
+
+        /// <summary>
+        /// ¿El segmento escapa del directorio al normalizarse? Windows recorta espacios y puntos
+        /// FINALES de cada componente de la ruta (`.. ` y `...` colapsan a `..`), así que un segmento
+        /// que se vuelve vacío/`.`/`..` al recortarlos también cambia de carpeta. Se rechaza aunque el
+        /// SO de producción (Linux) no recorte: el contrato es que una clave nunca salga de su tienda.
+        /// </summary>
+        private static bool IsTraversalSegment(string segment)
+            => segment.TrimEnd(' ', '.').Length == 0;
 
         private static string ExtensionFromContentType(string? contentType)
             => contentType?.ToLowerInvariant() switch

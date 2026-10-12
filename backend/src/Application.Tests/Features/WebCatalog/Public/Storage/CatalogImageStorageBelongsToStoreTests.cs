@@ -36,13 +36,16 @@ public class CatalogImageStorageBelongsToStoreTests
             .Should().BeFalse();
 
     /// <summary>
-    /// El prefijo ES el correcto, pero el segmento `.`/`..` cambia el destino al normalizar la ruta.
-    /// Aceptar esto equivaldría a leer la imagen de otra tienda: la clave NO pertenece aunque empiece
-    /// por el prefijo esperado.
+    /// El prefijo ES el correcto, pero el segmento cambia el destino al normalizar la ruta. Además de
+    /// `.`/`..` exactos, Windows recorta espacios/puntos finales (`.. ` y `...` colapsan a `..`), así
+    /// que esos también se rechazan: aceptarlos equivaldría a leer la imagen de otra tienda.
     /// </summary>
     [Theory]
     [InlineData("..")]
     [InlineData(".")]
+    [InlineData(".. ")]
+    [InlineData("...")]
+    [InlineData(". ")]
     public void BelongsToStore_WithATraversalSegment_ShouldBeFalse(string segment)
     {
         string key = $"{N(Tenant)}/{N(Store)}/{segment}/{N(Guid.NewGuid())}/{N(Guid.NewGuid())}/x.png";
@@ -56,4 +59,29 @@ public class CatalogImageStorageBelongsToStoreTests
     [InlineData("otra/ruta.png")]
     public void BelongsToStore_WithAKeyWithoutThePrefix_ShouldBeFalse(string key)
         => Storage().BelongsToStore(key, Tenant, Store).Should().BeFalse();
+
+    /// <summary>
+    /// La resolución de ruta rechaza el traversal por sí misma, para CUALQUIER clave (no solo la que
+    /// pasa por `BelongsToStore`): un `..` no puede escapar de la raíz del catálogo.
+    /// </summary>
+    [Theory]
+    [InlineData("../escape.png")]
+    [InlineData("..\\escape.png")]
+    public async Task OpenAsync_WithATraversalKey_ShouldThrow(string key)
+    {
+        string root = Path.Combine(Path.GetTempPath(), "cat-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var storage = new CatalogImageStorage(Options.Create(new CatalogImageStorageOptions { CatalogImageRoot = root }));
+
+        try
+        {
+            Func<Task> act = () => storage.OpenAsync(key);
+
+            await act.Should().ThrowAsync<InvalidOperationException>();
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
 }
