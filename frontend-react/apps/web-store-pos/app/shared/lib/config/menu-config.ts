@@ -255,6 +255,10 @@ export const MENU_GROUPS: MenuGroup[] = [
       {
         label: 'MENU.ONLINE_ORDERS',
         path: '/sales/online-orders',
+        // `exact` para que "Pedidos" no quede marcado cuando se está en una de sus subrutas
+        // (/settings, /drivers, /sales): sin `end`, NavLink lo da por activo por PREFIJO y el
+        // menú quedaba con dos ítems seleccionados a la vez.
+        exact: true,
         featureIds: [EFeatures.OnlineOrders],
         moduleId: EModules.GestionPedidos,
         moduleIds: [EModules.GestionPedidos],
