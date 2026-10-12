@@ -121,22 +121,6 @@ export function PublicCatalogPage() {
    */
   const staffMode = isCatalogStoreStaff(user, catalog?.storeId);
 
-  // [TEMP DIAG] Traza de por qué el visitante entra (o no) en modo staff: es el único camino que
-  // apaga el WhatsApp del cliente. Quitar cuando el diagnóstico cierre.
-  useEffect(() => {
-    console.info('[catalog:diag] staffMode', {
-      staffMode,
-      isAuthenticated: Boolean(user),
-      userId: user?.id ?? null,
-      catalogStoreId: catalog?.storeId ?? null,
-      selectedStoreId: user?.selectedStoreId ?? null,
-      isOwnerAdmin: user?.isOwnerAdmin ?? null,
-      isSuperAdmin: user?.isSuperAdmin ?? null,
-      isReSeller: user?.isReSeller ?? null,
-      roleStoreIds: user?.roles?.map((role) => role?.storeId) ?? [],
-    });
-  }, [staffMode, user, catalog?.storeId]);
-
   function addProductToCart(product: PublicCatalogProduct) {
     addToCart(storeSlug, {
       id: product.id,
@@ -190,11 +174,9 @@ export function PublicCatalogPage() {
     try {
       const result = await catalogHttpService.getPublicOrderingConfig(storeSlug);
       if (result.succeeded) {
-        console.info('[catalog:diag] orderingConfig cargado', result.data);
         setOrderingConfig(result.data);
       }
-    } catch (err) {
-      console.warn('[catalog:diag] getPublicOrderingConfig falló:', err);
+    } catch {
       // La marca es opcional: si el config anónimo no está (o falla la red), la carta se publica
       // igual, solo que sin logo. No se avisa al cliente ni se cambia el estado de la página,
       // porque aquí un fallo NO significa que el catálogo no exista.
@@ -450,6 +432,7 @@ export function PublicCatalogPage() {
           open={checkoutOpen}
           onClose={() => setCheckoutOpen(false)}
           storeSlug={storeSlug}
+          storeName={catalog?.storeName}
           config={orderingConfig}
           lines={cartLines}
           staffMode={staffMode}
