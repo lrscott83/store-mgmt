@@ -127,20 +127,34 @@ namespace SMCA.WebApi.Middlewares
         }
 
         /// <summary>
-        /// ¿El error es una violación de índice único de PostgreSQL (SQLSTATE 23505)? EF lo envuelve en
-        /// <see cref="DbUpdateException"/>, pero la excepción de PostgreSQL puede venir anidada a más de
-        /// un nivel (envoltorios de batch/retry), así que se recorre la cadena de <c>InnerException</c>
-        /// en vez de mirar solo el primer nivel. Es un conflicto de cliente, no un fallo del servidor.
+        /// ¿El error es un fallo de guardado por violación de índice único de PostgreSQL (SQLSTATE
+        /// 23505)? Dos cuidados:
+        ///
+        ///   * Se ancla en <see cref="DbUpdateException"/> —lo que EF lanza al guardar— para NO ampliar
+        ///     el mapeo a una violación que llegue por otro camino: esa sigue siendo un 500.
+        ///   * Recorre TODA la cadena de <c>InnerException</c> (incluidas las internas múltiples de un
+        ///     <see cref="AggregateException"/>), porque la excepción de PostgreSQL puede venir anidada
+        ///     a más de un nivel (envoltorios de batch/retry).
+        ///
+        /// Es un conflicto de cliente, no un fallo del servidor.
         /// </summary>
         private static bool IsUniqueViolation(Exception error)
         {
-            for (Exception? current = error; current is not null; current = current.InnerException)
-            {
-                if (current is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
-                    return true;
-            }
+            if (error is not DbUpdateException)
+                return false;
 
-            return false;
+            return ContainsUniqueViolation(error);
+        }
+
+        private static bool ContainsUniqueViolation(Exception error)
+        {
+            if (error is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
+                return true;
+
+            if (error is AggregateException aggregate)
+                return aggregate.InnerExceptions.Any(ContainsUniqueViolation);
+
+            return error.InnerException is not null && ContainsUniqueViolation(error.InnerException);
         }
 
         /// <summary>

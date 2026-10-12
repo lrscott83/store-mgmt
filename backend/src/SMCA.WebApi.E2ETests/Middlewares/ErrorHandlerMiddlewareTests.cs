@@ -213,6 +213,36 @@ public sealed class ErrorHandlerMiddlewareTests
     }
 
     /// <summary>
+    /// La ampliación NO va más allá de un fallo de guardado: una violación de unicidad que NO venga
+    /// envuelta en <see cref="DbUpdateException"/> sigue siendo un 500 (no se reclasifica a conflicto).
+    /// </summary>
+    [Fact]
+    public async Task Unique_violation_outside_a_save_stays_500()
+    {
+        var thrown = new PostgresException("duplicate key value", "ERROR", "ERROR", PostgresErrorCodes.UniqueViolation);
+
+        var (status, _, _) = await Run(thrown);
+
+        status.Should().Be(500);
+    }
+
+    /// <summary>
+    /// La excepción de PostgreSQL puede venir dentro de las internas MÚLTIPLES de un
+    /// <see cref="AggregateException"/>: el recorrido las inspecciona y la encuentra.
+    /// </summary>
+    [Fact]
+    public async Task Unique_violation_inside_a_nested_aggregate_still_maps_to_409()
+    {
+        var thrown = new DbUpdateException("save failed",
+            new AggregateException(
+                new PostgresException("duplicate key value", "ERROR", "ERROR", PostgresErrorCodes.UniqueViolation)));
+
+        var (status, _, _) = await Run(thrown);
+
+        status.Should().Be(409);
+    }
+
+    /// <summary>
     /// Runs the REAL <see cref="ErrorHandlerMiddleware"/> against an exception thrown by the
     /// next delegate, returning the resulting status, response body, and recorded log entries.
     /// </summary>
