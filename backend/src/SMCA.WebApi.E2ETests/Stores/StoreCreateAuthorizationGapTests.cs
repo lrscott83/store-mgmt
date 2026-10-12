@@ -33,8 +33,10 @@ public sealed class StoreCreateAuthorizationGapTests
     private readonly AppTestFactory _f;
     public StoreCreateAuthorizationGapTests(WebAppFixture fixture) => _f = fixture.Factory;
 
-    private static object Body(Guid ownerId, string name, IEnumerable<int> moduleIds) => new
-    { OwnerId = ownerId, Name = name, Address = (string?)null, Description = (string?)null, Approved = false, ModuleIds = moduleIds };
+    // store-birth-superior (2026-10-11): no ModuleIds in the body — the birth module set is the
+    // Superior plan catalog, derived server-side. The rejection side of this matrix is unchanged.
+    private static object Body(Guid ownerId, string name) => new
+    { OwnerId = ownerId, Name = name, Address = (string?)null, Description = (string?)null, Approved = false };
 
     [Fact]
     public async Task OwnerAdmin_with_stores_feature_gets_403_and_no_side_effects()
@@ -44,7 +46,7 @@ public sealed class StoreCreateAuthorizationGapTests
         try
         {
             var response = await DbTestHelpers.AuthedClient(_f, sa.UserId, sa.Login)
-                .PostAsJsonAsync("/api/v1/stores", Body(sa.OwnerId, name, new[] { StoreSeed.ManagementModuleId }));
+                .PostAsJsonAsync("/api/v1/stores", Body(sa.OwnerId, name));
             response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
 
             using var scope = _f.Services.CreateScope();
@@ -70,7 +72,7 @@ public sealed class StoreCreateAuthorizationGapTests
         try
         {
             var response = await DbTestHelpers.AuthedClient(_f, f.UserId, f.Login)
-                .PostAsJsonAsync("/api/v1/stores", Body(f.OwnerId, name, new[] { StoreSeed.ManagementModuleId }));
+                .PostAsJsonAsync("/api/v1/stores", Body(f.OwnerId, name));
             response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
 
             using var scope = _f.Services.CreateScope();
@@ -94,7 +96,7 @@ public sealed class StoreCreateAuthorizationGapTests
         try
         {
             var response = await DbTestHelpers.AuthedClient(_f, f.UserId, f.Login)
-                .PostAsJsonAsync("/api/v1/stores", Body(Guid.NewGuid(), name, new[] { StoreSeed.ManagementModuleId }));
+                .PostAsJsonAsync("/api/v1/stores", Body(Guid.NewGuid(), name));
             response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
 
             using var scope = _f.Services.CreateScope();

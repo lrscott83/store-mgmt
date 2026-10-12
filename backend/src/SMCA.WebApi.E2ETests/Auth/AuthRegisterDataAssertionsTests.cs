@@ -186,15 +186,16 @@ public sealed class AuthRegisterDataAssertionsTests
             using var scope = _factory.Services.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
-            // Registration grants the modules of the DEFAULT birth plan (Pago — coherent
-            // with the plan Pago hardcoded in CreateStoreService since 2026-09-18; aligned
-            // 2026-09-19 user decision, was incorrectly reading the Superior plan).
+            // Registration grants the modules of the DEFAULT birth plan (Superior — the plan
+            // CreateStoreService hardcodes since store-birth-superior, 2026-10-11), filtered by
+            // Module.IsActive && Module.AvailableToStore — the exact derivation CreateStoreService uses.
             var expectedModuleIds = await db.Set<StorePlanModule>().AsNoTracking()
-                .Where(spm => spm.PlanId == (int)StorePlanType.Pago)
+                .Where(spm => spm.PlanId == (int)StorePlanType.Superior
+                    && spm.Module.IsActive && spm.Module.AvailableToStore)
                 .Select(spm => spm.ModuleId)
                 .ToListAsync();
 
-            // Precondition guard (CLAUDE.md): the Superior plan must have modules and at least
+            // Precondition guard (CLAUDE.md): the birth plan must have modules and at least
             // one paid module, otherwise set equality would pass vacuously.
             expectedModuleIds.Should().NotBeEmpty();
             var paidExpectedIds = await db.Set<Module>().AsNoTracking()
@@ -209,10 +210,9 @@ public sealed class AuthRegisterDataAssertionsTests
                 .ToListAsync();
 
             actualModuleIds.Should().BeEquivalentTo(expectedModuleIds);
-            // Superior/VIP-only modules must NOT be granted to a fresh Pago store:
-            // Warehouses (13), MultiStores (14), MultiMonedas (15), MultiPayments (16, VIP
-            // only) and Elaboration (17).
-            actualModuleIds.Should().NotContain(new[] { 13, 14, 15, 16, 17 });
+            // A Superior-born store never carries the VIP-only MultiPayments (16), nor
+            // Administration (1), which is not AvailableToStore.
+            actualModuleIds.Should().NotContain(new[] { 1, 16 });
         }
         finally
         {

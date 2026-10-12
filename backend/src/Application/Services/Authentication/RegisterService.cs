@@ -1,7 +1,5 @@
 using Application.Exceptions;
-using Domain.Common.Enums;
 using Domain.Entities.Owners;
-using Domain.Entities.Plans;
 using Domain.Entities.ReSellerOwners;
 using Domain.Entities.ReSellers;
 using Domain.Interfaces.Repositories;
@@ -23,7 +21,6 @@ namespace Application.Services.Authentication
     {
         private readonly ICreateOwnerService _createOwnerService;
         private readonly ICreateStoreService _createStoreService;
-        private readonly IPlanRepository _planRepository;
         private readonly IReSellerRepository _reSellerRepository;
         private readonly IReSellerOwnerRepository _reSellerOwnerRepository;
         private readonly ILogger<RegisterService> _logger;
@@ -31,14 +28,12 @@ namespace Application.Services.Authentication
         public RegisterService(
             ICreateOwnerService createOwnerService,
             ICreateStoreService createStoreService,
-            IPlanRepository planRepository,
             IReSellerRepository reSellerRepository,
             IReSellerOwnerRepository reSellerOwnerRepository,
             ILogger<RegisterService> logger)
         {
             _createOwnerService = createOwnerService;
             _createStoreService = createStoreService;
-            _planRepository = planRepository;
             _reSellerRepository = reSellerRepository;
             _reSellerOwnerRepository = reSellerOwnerRepository;
             _logger = logger;
@@ -60,39 +55,15 @@ namespace Application.Services.Authentication
                 cellPhone, email, ownerDescription ?? string.Empty);
 
             // Create Store
-            // Self-registered stores start on the default birth plan (Pago, hardcoded in
-            // CreateStoreService): grant exactly that plan's modules, NOT every catalog module
-            // AvailableToStore. Keeps plan/module coherence (store pays for what it gets) and
-            // keeps Superior/VIP-only modules (Warehouses 13, MultiStores 14, MultiMonedas 15,
-            // Elaboración 17, MultiPayments 16) out of a Pago store.
-            StorePlan? defaultPlan;
-            try
-            {
-                defaultPlan = await _planRepository.GetActivePlanWithModulesByIdAsync((int)StorePlanType.Pago);
-            }
-            catch (Exception ex)
-            {
-                throw new ApiException("Failed to load the default plan: " + ex.Message,
-                    HttpStatusCode.InternalServerError)
-                {
-                    AcctionCode = "Register.PlanLoadFailed"
-                };
-            }
-
-            if (defaultPlan is null)
-            {
-                throw new ApiException("The default plan (Pago) is not active or does not exist.",
-                    HttpStatusCode.InternalServerError)
-                {
-                    AcctionCode = "Register.PlanLoadFailed"
-                };
-            }
-
-            List<int> planModuleIds = defaultPlan.StorePlanModules.Select(spm => spm.ModuleId).ToList();
+            // store-birth-superior (2026-10-11, replaces store-birth-pago-only): the birth plan
+            // AND its module set are CreateStoreService's decision, not this service's. Registration
+            // passes no modules — the service grants exactly the Superior (3) catalog filtered by
+            // Module.IsActive && Module.AvailableToStore, which keeps plan/module coherence (the
+            // store pays for what it gets) and keeps the VIP-only 16 (Múltiples pagos) out of it.
             // All creation paths force approved=true (product decision 2026-09-10) so the store
             // is usable without a separate admin act.
             var store = await _createStoreService.CreateStoreAsync(owner.Id, owner.TenantId, storeName, null,
-                "Tienda de prueba", true, planModuleIds);
+                "Tienda de prueba", true);
 
             // FIX: Add null check to prevent NullReferenceException
             if (owner.User == null)

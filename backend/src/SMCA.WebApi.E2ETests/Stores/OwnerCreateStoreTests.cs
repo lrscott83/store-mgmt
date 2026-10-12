@@ -20,14 +20,13 @@ namespace SMCA.WebApi.E2ETests.Stores;
 // Owner store-creation matrix (user-approved 2026-09-09, owner-multistores-store-creation):
 // POST /v1/stores admits a second caller class — an OwnerAdmin whose SELECTED store has the
 // MultiStores module (14) active after billing filtering. Contract:
-//   - OwnerAdmin + {7,14} + own/zero-Guid OwnerId → 201, modules inherited from the selected
-//     store CLAMPED to the active Pago catalog (7 only — strict birth invariant, 2026-09-25),
-//     Approved forced true, plan Pago (birth default since 2026-09-18), trial clock today,
-//     SelectedStoreId NOT repointed.
+//   - OwnerAdmin + {7,14} + own/zero-Guid OwnerId → 201, Approved forced true, plan Superior
+//     (store-birth-superior, 2026-10-11 — the birth module set is the Superior catalog, NOT an
+//     inheritance clamped to Pago), trial clock today, SelectedStoreId NOT repointed.
 //   - OwnerAdmin without 14 (missing OR billing-Vencido) → 403, nothing persisted.
 //   - OwnerAdmin with foreign OwnerId → 403, nothing persisted.
 //   - StoreUser (even holding feature 73) → 403 at handler gate 2, nothing persisted.
-//   - SuperAdmin branch: modules come from the body, Approved is forced true (2026-09-10 — body
+//   - SuperAdmin branch: no module ids at all; Approved is forced true (2026-09-10 — body
 //     Approved is ignored, complements untouchable StoreCreateTests).
 // Coupling: pin the handler two-gate rule (D1) and the end-to-end contract on the real API.
 [Collection("e2e")]
@@ -73,19 +72,21 @@ public sealed class OwnerCreateStoreTests
         return new OwnerMultiStoresFixture(user.Id, login, owner.Id, store.Id, tenantId);
     }
 
+    // store-birth-superior (2026-10-11): no ModuleIds — the birth module set is the Superior plan
+    // catalog, derived server-side by CreateStoreService. What differs between these two bodies is
+    // ONLY the OwnerId, which is the matrix dimension under test.
     private sealed record StoreCreateBody(
         Guid OwnerId,
         string Name,
         string? Address,
         string? Description,
-        bool Approved,
-        int[] ModuleIds);
+        bool Approved);
 
     private static StoreCreateBody OwnerBody(string name) => new(
-        Guid.Empty, name, "", "", true, Array.Empty<int>());
+        Guid.Empty, name, "", "", true);
 
     private static StoreCreateBody ForeignBody(Guid ownerId, string name) => new(
-        ownerId, name, null, null, true, new[] { ManagementModuleId });
+        ownerId, name, null, null, true);
 
     [Fact]
     public async Task OC01_without_token_returns_401()
@@ -166,12 +167,16 @@ public sealed class OwnerCreateStoreTests
             store.Approved.Should().BeTrue();            // decision 6: forced approved
             store.IsActive.Should().BeTrue();
             store.OwnerId.Should().Be(f.OwnerId);        // derived from the caller
-            store.StorePlanId.Should().Be((int)StorePlanType.Pago);
+            store.StorePlanId.Should().Be((int)StorePlanType.Superior);
             store.PaymentStartDate.Should().Be(DateOnly.FromDateTime(DateTime.UtcNow)); // trial clock today
 
+            // store-birth-superior (2026-10-11): the child is born on the Superior plan catalog,
+            // so MultiStores (14) — which the OLD invariant kept OUT by clamping to Pago — is now
+            // granted like any other Superior member.
             var moduleIds = await db.Set<StoreModule>().IgnoreQueryFilters()
-                .Where(m => m.StoreId == created).Select(m => m.ModuleId).OrderBy(m => m).ToListAsync();
-            moduleIds.Should().Equal(ManagementModuleId); // strict birth invariant: the child inherits only the Pago-catalog member (7); MultiStores (14) is Superior/VIP-only
+                .Where(m => m.StoreId == created && m.IsActive).Select(m => m.ModuleId).OrderBy(m => m).ToListAsync();
+            moduleIds.Should().Contain(ManagementModuleId);
+            moduleIds.Should().Contain(MultiStoresModuleId, "MultiStores (14) is a Superior member and is granted at birth");
 
             (await db.Set<StoreRoleFeature>().IgnoreQueryFilters().AnyAsync(srf => srf.StoreId == created)).Should().BeTrue();
 
@@ -220,7 +225,6 @@ public sealed class OwnerCreateStoreTests
                 .PostAsJsonAsync("/api/v1/stores", ForeignBody(owner.OwnerId, name) with
                 {
                     Approved = false,
-                    ModuleIds = new[] { ManagementModuleId }
                 });
             response.StatusCode.Should().Be(HttpStatusCode.Created);
             var body = await response.Content.ReadFromJsonAsync<ApiResponse<StoreData>>(ApiResponse.Json);
@@ -233,8 +237,8 @@ public sealed class OwnerCreateStoreTests
             store.Approved.Should().BeTrue(); // body Approved=false is ignored: ALL creation paths force approved (2026-09-10)
             store.OwnerId.Should().Be(owner.OwnerId);
             var moduleIds = await db.Set<StoreModule>().IgnoreQueryFilters()
-                .Where(m => m.StoreId == created).Select(m => m.ModuleId).ToListAsync();
-            moduleIds.Should().Equal(ManagementModuleId);
+                .Where(m => m.StoreId == created && m.IsActive).Select(m => m.ModuleId).ToListAsync();
+            moduleIds.Should().NotBeEmpty("store-birth-superior: the SuperAdmin branch also grants the Superior catalog");
         }
         finally
         {

@@ -89,8 +89,15 @@ public sealed class StoreCreationTrialTests
     /// Seeds a SuperAdmin + owner, then creates a store via the real admin endpoint
     /// (POST /api/v1/stores), asserting 201 Created. Pass strayPaymentStartDate to reproduce
     /// test 4's stray client-supplied field.
+    /// <para>
+    /// store-birth-superior (2026-10-11): the <c>moduleIds</c> parameter is GONE — the request
+    /// names no modules and the store is born with the Superior plan catalog. Callers that used
+    /// to build a specific module shape (paid-only, free-only) can no longer; what they were
+    /// really pinning — that the trial clock starts UNCONDITIONALLY — is asserted here on the
+    /// catalog the server now grants.
+    /// </para>
     /// </summary>
-    private async Task<CreatedStore> CreateStoreViaApiAsync(IEnumerable<int> moduleIds, string? strayPaymentStartDate = null)
+    private async Task<CreatedStore> CreateStoreViaApiAsync(string? strayPaymentStartDate = null)
     {
         var adminLogin = $"admin-{Guid.NewGuid():N}@test.com";
         var adminId = await DbTestHelpers.SeedSuperAdminAsync(_f, adminLogin, "Password123");
@@ -105,7 +112,6 @@ public sealed class StoreCreationTrialTests
                 Address = (string?)null,
                 Description = (string?)null,
                 Approved = true,
-                ModuleIds = moduleIds.ToList(),
             }
             : new
             {
@@ -114,7 +120,6 @@ public sealed class StoreCreationTrialTests
                 Address = (string?)null,
                 Description = (string?)null,
                 Approved = true,
-                ModuleIds = moduleIds.ToList(),
                 PaymentStartDate = strayPaymentStartDate,
             };
 
@@ -186,6 +191,22 @@ public sealed class StoreCreationTrialTests
         return store.PaymentStartDate;
     }
 
+    /// <summary>
+    /// The store's granted module set, read back from the rows the creation path wrote. Used by
+    /// the update tests so they PUT the SAME module list the store already carries — store-birth-superior
+    /// (2026-10-11) removed ModuleIds from the create request, so the set is no longer known upfront.
+    /// </summary>
+    private async Task<List<int>> ReadStoreModuleIdsAsync(Guid storeId)
+    {
+        using var scope = _f.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        return await db.Set<Domain.Entities.StoreModules.StoreModule>().IgnoreQueryFilters()
+            .Where(sm => sm.StoreId == storeId && sm.IsActive)
+            .Select(sm => sm.ModuleId)
+            .OrderBy(id => id)
+            .ToListAsync();
+    }
+
     private async Task SetSelectedStoreIdAsync(Guid userId, Guid storeId)
     {
         using var scope = _f.Services.CreateScope();
@@ -217,45 +238,10 @@ public sealed class StoreCreationTrialTests
     {
         using var clock = _fixture.Clock.Pin(AnchorInstant);
 
-        // Base case: a mixed module set (one free, one paid) — the ordinary shape of a new store.
-        // Tests 2 and 3 narrow this to paid-only and free-only respectively, so the three
-        // together cover every module shape the creation path can receive.
-        var created = await CreateStoreViaApiAsync(new[] { StoreSeed.ManagementModuleId, BillingSeed.StatisticsModuleId });
-        try
-        {
-            (await ReadPaymentStartDateAsync(created.StoreId)).Should().Be(Start);
-        }
-        finally
-        {
-            await CleanupCreatedStoreAsync(created);
-        }
-    }
-
-    [Fact]
-    public async Task Create_with_paid_module_sets_paymentStartDate_to_today()
-    {
-        using var clock = _fixture.Clock.Pin(AnchorInstant);
-
-        // Paid-only (PriceIncluded = false) module set.
-        var created = await CreateStoreViaApiAsync(new[] { BillingSeed.StatisticsModuleId });
-        try
-        {
-            (await ReadPaymentStartDateAsync(created.StoreId)).Should().Be(Start);
-        }
-        finally
-        {
-            await CleanupCreatedStoreAsync(created);
-        }
-    }
-
-    [Fact]
-    public async Task Create_with_free_only_modules_also_sets_paymentStartDate()
-    {
-        using var clock = _fixture.Clock.Pin(AnchorInstant);
-
-        // Free-only (PriceIncluded) modules — the discriminator vs. the UpdateStore-only conditional:
-        // creation must be unconditional, not gated on a paid module being present.
-        var created = await CreateStoreViaApiAsync(new[] { StoreSeed.ManagementModuleId });
+        // store-birth-superior (2026-10-11): there is no module-set parameter any more. The
+        // ordinary shape of a new store is the Superior catalog (free AND paid members), and the
+        // trial clock starts for it unconditionally.
+        var created = await CreateStoreViaApiAsync();
         try
         {
             (await ReadPaymentStartDateAsync(created.StoreId)).Should().Be(Start);
@@ -271,7 +257,7 @@ public sealed class StoreCreationTrialTests
     {
         using var clock = _fixture.Clock.Pin(AnchorInstant);
 
-        var created = await CreateStoreViaApiAsync(new[] { StoreSeed.ManagementModuleId }, strayPaymentStartDate: "2020-01-01");
+        var created = await CreateStoreViaApiAsync(strayPaymentStartDate: "2020-01-01");
         try
         {
             var persisted = await ReadPaymentStartDateAsync(created.StoreId);
@@ -289,16 +275,16 @@ public sealed class StoreCreationTrialTests
     {
         using var clock = _fixture.Clock.Pin(AnchorCloseInstant);
 
-        var moduleIds = new[] { StoreSeed.ManagementModuleId, BillingSeed.StatisticsModuleId };
-        var created = await CreateStoreViaApiAsync(moduleIds);
+        var created = await CreateStoreViaApiAsync();
         var actor = await AuthzSeed.SeedOwnerAdminAsync(_f, withManagementModule: true);
         try
         {
             var originalStartDate = await ReadPaymentStartDateAsync(created.StoreId);
 
-            // Same module list used at creation, so UpdateStoreCommandHandler's
+            // Same module list the store was born with, so UpdateStoreCommandHandler's
             // PaymentStartDate is null && hasPaidModuleRequested branch is skipped — it's not
             // null already. This isolates the SuperAdmin-only PaymentStartDate gate.
+            var birthModuleIds = await ReadStoreModuleIdsAsync(created.StoreId);
             var response = await DbTestHelpers.AuthedClient(_f, actor.UserId, actor.Login)
                 .PutAsJsonAsync($"/api/v1/stores/{created.StoreId}", new
                 {
@@ -307,7 +293,7 @@ public sealed class StoreCreationTrialTests
                     Address = (string?)null,
                     Description = (string?)null,
                     Approved = true,
-                    ModuleIds = moduleIds,
+                    ModuleIds = birthModuleIds,
                     IsActive = true,
                     PaymentStartDate = "2020-01-01",
                 });
@@ -501,9 +487,10 @@ public sealed class StoreCreationTrialTests
     {
         await using var cfg = await BillingConfigSeed.PinAsync(_f);
         using var atCreation = _fixture.Clock.Pin(AnchorInstant);
-        // Not via register (design D8 corollary: register assigns all six paid modules, too many
-        // to make a crisp assertion) — one free + one paid module via the admin endpoint.
-        var created = await CreateStoreViaApiAsync(new[] { StoreSeed.ManagementModuleId, BillingSeed.StatisticsModuleId });
+        // store-birth-superior (2026-10-11): the create request no longer names modules; every new
+        // store carries the Superior catalog, which holds both a free member (Gestión, 7) and a
+        // paid one (Estadísticas, 6). At Vencido the paid member is cut and the free one survives.
+        var created = await CreateStoreViaApiAsync();
         try
         {
             // Creation is still via the real API; only the "which store" pointer is seeded,
@@ -564,17 +551,24 @@ public sealed class StoreCreationTrialTests
     {
         await using var cfg = await BillingConfigSeed.PinAsync(_f);
         using var atCreation = _fixture.Clock.Pin(AnchorInstant);
-        // A registered store has paid modules and cannot demonstrate this — free-only via the
-        // admin endpoint.
-        var created = await CreateStoreViaApiAsync(new[] { StoreSeed.ManagementModuleId });
-        var adminLogin = $"admin-{Guid.NewGuid():N}@test.com";
-        var adminId = await DbTestHelpers.SeedSuperAdminAsync(_f, adminLogin, "Password123");
+        // store-birth-superior (2026-10-11): the create request no longer accepts a module subset,
+        // so every new store is born with the Superior catalog's priced members and cannot show a
+        // zero amount. This still pins the to-collect price rule (only ACTIVE, NOT price-included
+        // modules contribute) by moving the store to Gratis — a genuinely free plan — through the
+        // real plan-change endpoint, which deactivates the paid members and keeps the billing anchor.
+        var created = await CreateStoreViaApiAsync();
         try
         {
+            var toGratis = await DbTestHelpers.AuthedClient(_f, created.AdminId, created.AdminLogin)
+                .PostAsJsonAsync($"/api/v1/stores/{created.StoreId}/change-plan",
+                    new { storePlanId = (int)StorePlanType.Gratis });
+            toGratis.StatusCode.Should().Be(HttpStatusCode.OK);
+
             var due = Start.AddMonths(2);
             using var atAssertion = _fixture.Clock.Pin(AtUtc(due.AddDays(-3)));
 
-            var response = await DbTestHelpers.AuthedClient(_f, adminId, adminLogin).GetAsync("/api/v1/stores/to-collect");
+            var response = await DbTestHelpers.AuthedClient(_f, created.AdminId, created.AdminLogin)
+                .GetAsync("/api/v1/stores/to-collect");
             response.StatusCode.Should().Be(HttpStatusCode.OK);
             var body = await response.Content.ReadFromJsonAsync<ApiResponse<List<StoreToCollectDto>>>(ApiResponse.Json);
             body!.Succeeded.Should().BeTrue();
@@ -585,7 +579,6 @@ public sealed class StoreCreationTrialTests
         }
         finally
         {
-            await DbTestHelpers.CleanupUserAsync(_f, adminId);
             await CleanupCreatedStoreAsync(created);
         }
     }

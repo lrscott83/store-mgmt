@@ -16,8 +16,10 @@ public sealed class StoreCreateTests
     public StoreCreateTests(WebAppFixture fixture) => _f = fixture.Factory;
 
     // Approved is ignored on every creation path (2026-09-10); kept in the body for contract compat.
-    private static object Body(Guid ownerId, string name, IEnumerable<int> moduleIds) => new
-    { OwnerId = ownerId, Name = name, Address = (string?)null, Description = (string?)null, Approved = false, ModuleIds = moduleIds };
+    // store-birth-superior (2026-10-11): no ModuleIds — the birth module set is the Superior
+    // plan catalog, derived server-side.
+    private static object Body(Guid ownerId, string name) => new
+    { OwnerId = ownerId, Name = name, Address = (string?)null, Description = (string?)null, Approved = false };
 
     [Fact]
     public async Task Create_with_valid_payload_persists_store_and_modules()
@@ -30,7 +32,7 @@ public sealed class StoreCreateTests
         try
         {
             var response = await DbTestHelpers.AuthedClient(_f, adminId, login)
-                .PostAsJsonAsync("/api/v1/stores", Body(owner.OwnerId, name, new[] { StoreSeed.ManagementModuleId }));
+                .PostAsJsonAsync("/api/v1/stores", Body(owner.OwnerId, name));
             response.StatusCode.Should().Be(HttpStatusCode.Created);
             var body = await response.Content.ReadFromJsonAsync<ApiResponse<StoreData>>(ApiResponse.Json);
             body!.Succeeded.Should().BeTrue();
@@ -53,23 +55,56 @@ public sealed class StoreCreateTests
 
     [Fact]
     public async Task Create_with_empty_name_returns_400_code_Name()
-        => await AssertCreate400(owner => Body(owner.OwnerId, "", new[] { StoreSeed.ManagementModuleId }), "Name");
+        => await AssertCreate400(owner => Body(owner.OwnerId, ""), "Name");
 
     [Fact]
     public async Task Create_with_empty_owner_returns_400_code_OwnerId()
-        => await AssertCreate400(_ => Body(Guid.Empty, $"S-{Guid.NewGuid():N}", new[] { StoreSeed.ManagementModuleId }), "OwnerId", seedOwner: false);
+        => await AssertCreate400(_ => Body(Guid.Empty, $"S-{Guid.NewGuid():N}"), "OwnerId", seedOwner: false);
 
     [Fact]
     public async Task Create_with_unknown_owner_returns_400_code_OwnerId()
-        => await AssertCreate400(_ => Body(Guid.NewGuid(), $"S-{Guid.NewGuid():N}", new[] { StoreSeed.ManagementModuleId }), "OwnerId", seedOwner: false);
+        => await AssertCreate400(_ => Body(Guid.NewGuid(), $"S-{Guid.NewGuid():N}"), "OwnerId", seedOwner: false);
 
     [Fact]
-    public async Task Create_with_empty_modules_returns_400_code_ModuleIds()
-        => await AssertCreate400(owner => Body(owner.OwnerId, $"S-{Guid.NewGuid():N}", Array.Empty<int>()), "ModuleIds");
+    public async Task Create_with_an_unavailable_module_in_the_body_still_creates()
+    {
+        // store-birth-superior (2026-10-11): the ModuleIds validator rules are gone, so the
+        // old "Module 999999 is not AvailableToStore -> 400 ModuleIds" case cannot exist any more.
+        // A legacy field naming a non-catalog module is IGNORED (System.Text.Json drops unknown
+        // members) and the store is born on the catalog — the pin is the 201, so a future
+        // re-introduction of a ModuleIds rule fails here instead of passing unnoticed.
+        var login = $"admin-{Guid.NewGuid():N}@test.com";
+        var adminId = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
+        var owner = await StoreSeed.SeedOwnerAsync(_f);
+        Guid created = Guid.Empty;
+        try
+        {
+            var response = await DbTestHelpers.AuthedClient(_f, adminId, login)
+                .PostAsJsonAsync("/api/v1/stores", new
+                {
+                    OwnerId = owner.OwnerId,
+                    Name = $"S-{Guid.NewGuid():N}",
+                    Address = (string?)null,
+                    Description = (string?)null,
+                    Approved = true,
+                    ModuleIds = new[] { StoreSeed.UnavailableModuleId },
+                });
+            response.StatusCode.Should().Be(HttpStatusCode.Created);
+            created = (await response.Content.ReadFromJsonAsync<ApiResponse<StoreData>>(ApiResponse.Json))!.Data!.Id;
 
-    [Fact]
-    public async Task Create_with_unavailable_module_returns_400_code_ModuleIds()
-        => await AssertCreate400(owner => Body(owner.OwnerId, $"S-{Guid.NewGuid():N}", new[] { StoreSeed.UnavailableModuleId }), "ModuleIds");
+            using var scope = _f.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            (await db.Set<Domain.Entities.StoreModules.StoreModule>().IgnoreQueryFilters()
+                .AnyAsync(m => m.StoreId == created && m.ModuleId == StoreSeed.UnavailableModuleId))
+                .Should().BeFalse("a module the caller named but the plan does not carry is never granted");
+        }
+        finally
+        {
+            if (created != Guid.Empty) await StoreSeed.CleanupStoreAsync(_f, created);
+            await StoreSeed.CleanupOwnerAsync(_f, owner.OwnerId, owner.UserId);
+            await DbTestHelpers.CleanupUserAsync(_f, adminId);
+        }
+    }
 
     [Fact]
     public async Task Create_with_duplicate_name_returns_400()
@@ -83,12 +118,12 @@ public sealed class StoreCreateTests
         try
         {
             var client = DbTestHelpers.AuthedClient(_f, adminId, login);
-            var r1 = await client.PostAsJsonAsync("/api/v1/stores", Body(o1.OwnerId, dup, new[] { StoreSeed.ManagementModuleId }));
+            var r1 = await client.PostAsJsonAsync("/api/v1/stores", Body(o1.OwnerId, dup));
             r1.StatusCode.Should().Be(HttpStatusCode.Created);
             var b1 = await r1.Content.ReadFromJsonAsync<ApiResponse<StoreData>>(ApiResponse.Json);
             b1!.Succeeded.Should().BeTrue(); s1 = b1.Data!.Id;
 
-            var r2 = await client.PostAsJsonAsync("/api/v1/stores", Body(o2.OwnerId, dup, new[] { StoreSeed.ManagementModuleId }));
+            var r2 = await client.PostAsJsonAsync("/api/v1/stores", Body(o2.OwnerId, dup));
             r2.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         }
         finally
@@ -103,7 +138,7 @@ public sealed class StoreCreateTests
     [Fact]
     public async Task Create_without_token_returns_401()
     {
-        var response = await _f.CreateClient().PostAsJsonAsync("/api/v1/stores", Body(Guid.NewGuid(), "x", new[] { StoreSeed.ManagementModuleId }));
+        var response = await _f.CreateClient().PostAsJsonAsync("/api/v1/stores", Body(Guid.NewGuid(), "x"));
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 

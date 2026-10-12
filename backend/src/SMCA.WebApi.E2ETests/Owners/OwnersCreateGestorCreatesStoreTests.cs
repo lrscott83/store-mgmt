@@ -29,7 +29,7 @@ namespace SMCA.WebApi.E2ETests.Owners;
 [Collection("e2e")]
 public sealed class OwnersCreateGestorCreatesStoreTests
 {
-    private const int PagoPlanId = (int)StorePlanType.Pago;
+    private const int SuperiorPlanId = (int)StorePlanType.Superior;
 
     private readonly AppTestFactory _f;
     public OwnersCreateGestorCreatesStoreTests(WebAppFixture fixture) => _f = fixture.Factory;
@@ -78,7 +78,7 @@ public sealed class OwnersCreateGestorCreatesStoreTests
     }
 
     /// <summary>
-    /// ACCEPTANCE CRITERION — a Gestor-created owner comes WITH a store, on the Pago birth plan,
+    /// ACCEPTANCE CRITERION — a Gestor-created owner comes WITH a store, on the Superior birth plan,
     /// approved, with that plan's modules granted and the owner's SelectedStoreId pointing at it.
     /// </summary>
     [Fact]
@@ -109,7 +109,7 @@ public sealed class OwnersCreateGestorCreatesStoreTests
             // relationship fixup populates the collection during the SaveChanges that runs BEFORE
             // the mapping in the handler. Measured, not assumed: before the shared flow this
             // endpoint returned StoreModules=[] and Approved=false because no store existed at all.
-            b.Data!.StoreModules.Should().HaveCount(1);
+            b.Data!.StoreModules.Should().NotBeEmpty();
             b.Data.Approved.Should().BeTrue();
 
             var createdUser = await DbTestHelpers.GetUserByLoginAsync(_f, login);
@@ -126,16 +126,18 @@ public sealed class OwnersCreateGestorCreatesStoreTests
                 "the Gestor flow must build the same store the self-registration flow builds; " +
                 "before the shared RegisterService this row simply did not exist.");
             store!.Name.Should().Be(storeName);
-            store.StorePlanId.Should().Be(PagoPlanId);
+            store.StorePlanId.Should().Be(SuperiorPlanId);
             store.IsActive.Should().BeTrue();
             store.Approved.Should().BeTrue("all creation paths force approved=true");
             store.TenantId.Should().Be(tenantId);
 
-            // The plan's modules, and only those: a Pago store must not receive Superior/VIP-only
-            // modules. Same invariant self-registration already holds.
+            // The plan's modules, and only those: a Superior-born store gets the Superior catalog
+            // filtered by Module.IsActive && Module.AvailableToStore. Same invariant self-registration
+            // already holds.
             var expectedModuleIds = await db.Set<Domain.Entities.Plans.StorePlanModule>()
                 .IgnoreQueryFilters()
-                .Where(spm => spm.PlanId == PagoPlanId)
+                .Where(spm => spm.PlanId == SuperiorPlanId
+                    && spm.Module.IsActive && spm.Module.AvailableToStore)
                 .Select(spm => spm.ModuleId)
                 .ToListAsync();
 

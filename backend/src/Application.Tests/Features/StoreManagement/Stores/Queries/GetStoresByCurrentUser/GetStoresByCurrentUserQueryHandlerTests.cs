@@ -276,8 +276,8 @@ public class GetStoresByCurrentUserQueryHandlerTests
         // catalog, PlanProfile's formula) — two stores on the same plan with wildly
         // different StoreModule snapshots must expose identical canonical prices.
         ArrangeRoles(isSuperAdmin: true, isReSeller: false);
-        var bloated = CreateStore("Bloated");   // StorePlanId defaults to Pago
-        var lean = CreateStore("Lean");         // StorePlanId defaults to Pago
+        var bloated = CreateStore("Bloated");   // Pago — stated explicitly, not the Store.Create default
+        var lean = CreateStore("Lean");         // Pago — stated explicitly
         _mockStoreRepository
             .Setup(x => x.GetAllStoresIncludingOwnerAndIgnoreQueryFiltersAsync(It.IsAny<Guid?>()))
             .ReturnsAsync(new List<Store> { bloated, lean });
@@ -327,12 +327,13 @@ public class GetStoresByCurrentUserQueryHandlerTests
     [Fact]
     public async Task Handle_plan_prices_are_looked_up_once_per_distinct_plan()
     {
-        // Memoization: two Pago stores + one Superior ⇒ exactly two plan lookups.
+        // Memoization: two Pago stores + one Superior ⇒ exactly two plan lookups. The Pago pair is
+        // stated explicitly — the Store.Create default is Superior since store-birth-superior
+        // (2026-10-11), so relying on it would collapse the test to a single distinct plan.
         ArrangeRoles(isSuperAdmin: true, isReSeller: false);
         var a = CreateStore("A");
         var b = CreateStore("B");
-        var c = CreateStore("C");
-        c.StorePlanId = (int)StorePlanType.Superior;
+        var c = CreateStore("C", storePlanId: (int)StorePlanType.Superior);
         _mockStoreRepository
             .Setup(x => x.GetAllStoresIncludingOwnerAndIgnoreQueryFiltersAsync(It.IsAny<Guid?>()))
             .ReturnsAsync(new List<Store> { a, b, c });
@@ -388,9 +389,16 @@ public class GetStoresByCurrentUserQueryHandlerTests
             .ReturnsAsync((StorePayment?)null);
     }
 
-    private static Store CreateStore(string name, DateOnly? paymentStartDate = null, bool approved = true)
+    /// <summary>
+    /// The plan is an EXPLICIT parameter, never the <c>Store.Create</c> default: these tests are
+    /// about plan-keyed canonical pricing, and store-birth-superior (2026-10-11) moved that default
+    /// from Pago to Superior — a silent default here would change what "two stores sharing a plan"
+    /// even means.
+    /// </summary>
+    private static Store CreateStore(string name, DateOnly? paymentStartDate = null, bool approved = true,
+        int storePlanId = (int)StorePlanType.Pago)
     {
-        return Store.Create(name, Guid.NewGuid(), approved, Guid.NewGuid(), paymentStartDate);
+        return Store.Create(name, Guid.NewGuid(), approved, Guid.NewGuid(), paymentStartDate, storePlanId: storePlanId);
     }
 
     private static StorePayment CreatePayment(Guid storeId, DateOnly paidBefore)

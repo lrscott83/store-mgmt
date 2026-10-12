@@ -8,7 +8,7 @@ import { hasOwnersAvailableFeature } from '~/shared/lib/auth/authorization-servi
 import { storeHttpService } from '~/management/stores/lib/services/store-http-service';
 import { StoreForm } from '~/management/stores/components/store-form';
 import { httpErrorKey } from '~/shared/lib/http/http-error';
-import type { Store, Owner, Plan } from '@store-mgmt/domain';
+import type { Store, Owner } from '@store-mgmt/domain';
 
 export const clientLoader = ownerStoresGate();
 
@@ -34,11 +34,9 @@ interface EditStorePageProps {
  *
  * Plan split: the store-DATA form never touches the plan — no module catalog,
  * no PlanPicker, and edit saves omit `moduleIds` (the backend leaves the plan
- * untouched). A CREATED store is born on the Superior plan: the container
- * resolves the Superior plan's member module ids once from the plan catalog
- * (`GET /v1/plans`) and sends them with the create payload — the backend
- * requires a non-empty `moduleIds` and grants exactly those modules, while the
- * store entity's plan defaults to Superior (`CreateStoreService`). The PLAN
+ * untouched). A CREATED store is born on the Superior plan with that plan's
+ * active, AvailableToStore catalog: the server derives both (CreateStoreService,
+ * store-birth-superior 2026-10-11) and the request names no modules. The PLAN
  * view lives on its own page (`store-plan.tsx`) at `management/stores`, and
  * owners reach it from the list and from a plan modal in my-stores.
  *
@@ -60,7 +58,6 @@ export function EditStorePage({ allowCreate = true }: EditStorePageProps) {
 
   const [store, setStore] = useState<Store | undefined>(undefined);
   const [owners, setOwners] = useState<Owner[]>([]);
-  const [superiorModuleIds, setSuperiorModuleIds] = useState<number[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState('');
   const [error, setError] = useState('');
@@ -86,24 +83,16 @@ export function EditStorePage({ allowCreate = true }: EditStorePageProps) {
           setLoadError(intl.formatMessage({ id: httpErrorKey(error, 'STORES.ERROR') }));
         });
     } else if (allowCreate) {
-      Promise.all([
-        isSuperAdmin || isOwnerAdmin
-          ? storeHttpService.listOwners()
-          : Promise.resolve(success([] as Owner[])),
-        storeHttpService.getPlans(),
-      ])
-        .then(([ownersRes, plansRes]) => {
-          if (!ownersRes.succeeded || !plansRes.succeeded) {
+      (isSuperAdmin || isOwnerAdmin
+        ? storeHttpService.listOwners()
+        : Promise.resolve(success([] as Owner[]))
+      )
+        .then((ownersRes) => {
+          if (!ownersRes.succeeded) {
             setLoadError(intl.formatMessage({ id: 'STORES.ERROR' }));
             return;
           }
           setOwners(ownersRes.data);
-          const superior = plansRes.data.find((plan: Plan) => plan.planType === 'Superior');
-          if (!superior) {
-            setLoadError(intl.formatMessage({ id: 'STORES.ERROR' }));
-            return;
-          }
-          setSuperiorModuleIds(superior.modules.map((m) => m.moduleId));
           setLoadError('');
         })
         .catch((error) => {
@@ -157,10 +146,9 @@ export function EditStorePage({ allowCreate = true }: EditStorePageProps) {
           address: values.address,
           description: values.description,
           approved: values.approved,
-          // Birth provisioning: the store is created on the Superior plan — the
-          // container resolves its member module ids from GET /v1/plans and the
-          // backend grants exactly those modules (CreateStoreService).
-          moduleIds: superiorModuleIds,
+          // Birth provisioning (store-birth-superior, 2026-10-11): the server
+          // births the store on the Superior plan with that plan's active,
+          // AvailableToStore catalog — the request names no modules.
         });
         navigate('/management/users/create/');
       }

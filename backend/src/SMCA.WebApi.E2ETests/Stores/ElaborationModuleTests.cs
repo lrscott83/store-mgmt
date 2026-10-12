@@ -26,8 +26,8 @@ namespace SMCA.WebApi.E2ETests.Stores;
 /// This suite pins the FULL chain a user experiences:
 ///
 ///   EM1  OwnerAdmin creates a store from a Superior selected store {7,14,17}: the child
-///        INHERITS only the Pago-catalog member (7) — 17/120/121 never reach it (strict
-///        birth invariant, 2026-09-25, store-birth-pago-only).
+///        is born on the Superior catalog, so 17/120/121 DO reach it (store-birth-superior,
+///        2026-10-11 — replaced the old clamp-to-Pago).
 ///   EM2  OwnerAdmin CANNOT elevate the plan to Superior (403 — SuperAdmin-reserved
 ///        since the 2026-09-18 caller matrix, user decision 2026-09-19); the SuperAdmin
 ///        change activates 17/120/121 through the SAME runtime chain
@@ -128,14 +128,14 @@ public sealed class ElaborationModuleTests
     }
 
     [Fact]
-    public async Task EM1_created_store_clamps_inheritance_to_pago_catalog()
+    public async Task EM1_created_store_is_born_on_the_superior_catalog()
     {
-        // OwnerAdmin creation contract (OwnerCreateStoreTests): the body ModuleIds are
-        // IGNORED — the new store INHERITS the selected store's module set, and the
-        // handler gates on MultiStores (14) being active on the selected store. Strict birth
-        // invariant (2026-09-25, store-birth-pago-only): the inherited set is CLAMPED to the
-        // active Pago catalog. Seed the selected store with {7, 14, 17}: creating now
-        // propagates ONLY 7 — 17 and features 120/121 never reach the child.
+        // OwnerAdmin creation contract (OwnerCreateStoreTests): the handler gates on MultiStores
+        // (14) being active on the SELECTED store and then hands everything to the service.
+        // store-birth-superior (2026-10-11) REPLACED the old clamp-to-Pago inheritance: the child
+        // is born on the Superior plan catalog, so Elaboration (17) and features 120/121 — which
+        // the old invariant kept OUT — now reach it. Seed the selected store with {7, 14, 17} to
+        // reproduce the old shape and pin the NEW outcome.
         var seeded = await SeedOwnerAdminStoreAsync(planId: (int)StorePlanType.Superior);
         try
         {
@@ -158,7 +158,6 @@ public sealed class ElaborationModuleTests
                 Address = "",
                 Description = "",
                 Approved = true,
-                ModuleIds = Array.Empty<int>(), // ignored for OwnerAdmin: modules inherit
             };
             var create = await OwnerClient(_f, seeded).PostAsJsonAsync("/api/v1/stores", body);
             create.StatusCode.Should().Be(HttpStatusCode.Created);
@@ -173,11 +172,9 @@ public sealed class ElaborationModuleTests
                 var childModuleIds = await db.Set<StoreModule>().IgnoreQueryFilters()
                     .Where(sm => sm.StoreId == newStoreId && sm.IsActive)
                     .Select(sm => sm.ModuleId).ToListAsync();
-                childModuleIds.Should().BeEquivalentTo(new[] { 7 /* Management */ },
-                    "the child inherits ONLY the Pago-catalog member (7); 14/17 are Superior/VIP-only");
-                (await db.Set<StoreModule>().IgnoreQueryFilters().CountAsync(sm =>
-                    sm.StoreId == newStoreId && sm.ModuleId == ElaborationModuleId && sm.IsActive))
-                    .Should().Be(0, "Elaboration (17) must NOT reach the child");
+                childModuleIds.Should().Contain(7 /* Management */);
+                childModuleIds.Should().Contain(ElaborationModuleId,
+                    "Elaboration (17) is a Superior member — store-birth-superior grants it");
 
                 var grantedFeatureIds = await db.Set<StoreRoleFeature>().IgnoreQueryFilters()
                     .Where(srf => srf.StoreId == newStoreId
@@ -185,8 +182,8 @@ public sealed class ElaborationModuleTests
                     .Select(srf => srf.FeatureId)
                     .Distinct()
                     .ToListAsync();
-                grantedFeatureIds.Should().NotContain(new[] { RecipesFeatureId, ElaborationsFeatureId },
-                    "features 120/121 must not be granted to the child");
+                grantedFeatureIds.Should().Contain(new[] { RecipesFeatureId, ElaborationsFeatureId },
+                    "features 120/121 flow with the module at birth");
             }
             finally
             {
