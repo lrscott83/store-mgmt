@@ -456,3 +456,17 @@ documenta `AGENTS.md`).
   nombres válidos; ninguna clave del backend se ve afectada); (b) el test de `OpenAsync` no dispone un
   stream si alguna vez devolviera uno. `Application.Tests` **1274 verde**; E2E `Catalog` 49/52 (los 3
   pre-existentes). Push `1c3e5cdb..`.
+- 2026-10-12 — **Advisories del Controller 4 CERRADOS (solo tests; sin tocar producción)**:
+  - **R3-1 + R3-3** — nuevo `Catalog/PublicCatalogRepositoryPersistenceTests.cs`: **10 casos contra
+    PostgreSQL real** para los 3 métodos SQL (`GetPublishedPageAsync`, `CountPublishedAsync`,
+    `GetPublishedCategoryCountsAsync`): paginación en SQL y orden (categoría, producto), filtro por slug
+    y por búsqueda insensible a mayúsculas/espacios (`Trim().ToLowerInvariant()` + `ToLower()` del SQL),
+    conteo alineado con la página, `GROUP BY` con conteos, y exclusión de inactivos/fuera de venta/
+    categoría inactiva. Dejan de estar cubiertos solo con mocks.
+  - **R3-2** — test del guard de SEPARADOR de `ResolveFullPath` con una clave ABSOLUTA que apunta a una
+    carpeta hermana que comparte el prefijo textual (`.../catalog-backup`). **Mutación verificada**: sin
+    el separador, el test cae (la lectura escaparía de la raíz). Es alcanzable porque `Path.Combine` con
+    una ruta absoluta descarta la raíz — no era redundante.
+  - **R4-1** (el rate limit por IP colapsa un NAT/egress en un cubo) y **R4-2** (el endpoint de media sin
+    límite, pre-existente): **DIFERIDOS** — son decisión de diseño/alcance, no huecos de test.
+  - Evidencia: `Application.Tests` **1283 verde**; nuevo E2E de repositorio **10/10**.
