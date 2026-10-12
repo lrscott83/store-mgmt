@@ -47,24 +47,26 @@ namespace Application.Features.WebCatalog.Public.Queries.GetPublicCatalog
                 throw new ApiException(_localizer["CatalogStoreNotFound"], HttpStatusCode.NotFound);
 
             string storeSlug = store.CatalogSlug;
-            var products = await _productRepository.GetPublishedByStoreIdAsync(store.Id, null, null);
+
+            // Categorías y conteos en SQL (`GROUP BY`): antes se traían TODOS los productos y se
+            // contaba en memoria dentro de un bucle por categoría — O(categorías × productos).
+            IList<PublishedCategoryCount> categories = await _productRepository
+                .GetPublishedCategoryCountsAsync(store.Id, cancellationToken);
 
             return ResponseResult.Success(new PublicCatalogDto
             {
                 StoreId = store.Id,
                 StoreName = store.Name,
                 StoreSlug = storeSlug,
-                Categories = products
-                    .Where(product => product.Category is { IsActive: true } && product.Category.Slug != null)
-                    .GroupBy(product => product.CategoryId)
-                    .Select(group => group.First().Category)
-                    .OrderBy(category => category!.Order).ThenBy(category => category!.Name)
+                Categories = categories
+                    .OrderBy(category => category.Order)
+                    .ThenBy(category => category.Name)
                     .Select(category => new PublicCatalogCategoryDto
                     {
-                        Id = category!.Id,
+                        Id = category.CategoryId,
                         Name = category.Name,
-                        Slug = category.Slug!,
-                        ProductsCount = products.Count(product => product.CategoryId == category.Id),
+                        Slug = category.Slug,
+                        ProductsCount = category.ProductsCount,
                     })
                     .ToList(),
             });

@@ -190,8 +190,18 @@ namespace Infrastructure.Storage
             if (string.IsNullOrWhiteSpace(key))
                 return false;
 
+            string normalized = key.Replace('\\', '/');
+
+            // La clave se compone de segmentos y un segmento `.`/`..` cambia el destino al normalizar
+            // la ruta: `{tenantA}/{storeA}/../{tenantB}/…` EMPIEZA por el prefijo esperado pero
+            // `Path.GetFullPath` lo resolvería leyendo otra tienda. Se rechaza aquí, ANTES de comparar,
+            // para que la pertenencia se decida sobre la MISMA forma que se resuelve al leer.
+            if (normalized.Split('/', StringSplitOptions.RemoveEmptyEntries)
+                .Any(segment => segment is "." or ".."))
+                return false;
+
             string expectedPrefix = tenantId.ToString("N") + "/" + storeId.ToString("N") + "/";
-            return key.Replace('\\', '/').StartsWith(expectedPrefix, StringComparison.OrdinalIgnoreCase);
+            return normalized.StartsWith(expectedPrefix, StringComparison.OrdinalIgnoreCase);
         }
 
         private string ResolveFullPath(string key)
@@ -205,7 +215,14 @@ namespace Infrastructure.Storage
             // Defensa contra traversal: la clave se compone en el backend, pero nunca se confía.
             string fullPath = Path.GetFullPath(Path.Combine(root, relative));
             string fullRoot = Path.GetFullPath(root);
-            if (!fullPath.StartsWith(fullRoot, StringComparison.OrdinalIgnoreCase))
+
+            // El prefijo termina en el SEPARADOR: sin él, `.../catalog-backup/x` comparte el prefijo
+            // textual con `.../catalog` y escaparía a una carpeta hermana.
+            string rootPrefix = fullRoot.EndsWith(Path.DirectorySeparatorChar)
+                ? fullRoot
+                : fullRoot + Path.DirectorySeparatorChar;
+
+            if (!fullPath.StartsWith(rootPrefix, StringComparison.OrdinalIgnoreCase))
                 throw new InvalidOperationException($"Clave de imagen fuera de la raíz del catálogo: '{key}'.");
 
             return fullPath;
