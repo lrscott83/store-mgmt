@@ -104,4 +104,14 @@ L2 (verbatim, 2026-10-12):
   - E2E de config con la migración aplicada de verdad (WebAppFixture): `OrderingSettingsRouteAuthE2ETests` + `PublicOrdering*` → **17 passed**.
   - Frontend: `pnpm typecheck` 0; `pnpm lint` 0; `pnpm vitest run app/catalog/ app/sales/` → **85 archivos / 1765 tests** verdes.
 - Riesgo: item 1 (migración) — cambio de esquema persistido. Verificación independiente pendiente/decidida por el flujo.
-- Pendiente: revisión nativa (RDD) si el switch del owner está activo; push/PR = decisión del owner.
+- Verificación independiente (subagente `gentle-ai-verify`, read-only, sobre `f1cae8e5..HEAD`):
+  - `dotnet build`: 0 errores; `Application.Tests`: **1250 passed**; E2E config (`OrderingSettingsRouteAuthE2ETests` + `PublicOrdering*`): **17 passed** (31.7 s, `[E2E Guard] Database=smca_test`); `pnpm typecheck`/`lint` 0; `vitest app/catalog app/sales`: **1765 passed**.
+  - Verdicts: **S3 PASS, S4 PASS, S5 PASS, S7 PASS**; S6 (`boutique` intacta) y S8 (E2E sin tocar) PASS. **Sin blockers.**
+  - Columna en vivo: `MobileColumns | integer | NOT NULL | default 2`; historial con la migración.
+  - Advisories (no bloqueantes, no requieren corrección):
+    1. Pre-existente: el helper de reset E2E (`DbTestHelpers.cs`) no borra `StoreCatalogSettings`, así que un run abortado deja residuo y rompe los siguientes (FK 23503). No es regresión de este cambio.
+    2. Crash del testhost en el primer intento E2E, no reproducido en el reintento (17/17).
+  - S7 por HTTP real no se ejercitó (S8 prohíbe E2E nuevos); probado por unit + cadena de middleware ya cubierta.
+  - Sondas de regresión propuestas por el verificador: no se añaden — duplican los casos 0/3/-1 ya cubiertos por los tests del validador (disciplina del repo: "no añadir otros casos"). El texto de la sonda llegó parcialmente corrupto, así que no se commitea.
+- RDD (`gentle-ai review mode status` = on): `review assess --base-ref f1cae8e5 --committed-only` → `risk: medium`, **`review_due: false`** (`under_budget`) → **no abre revisión nativa**.
+- Pendiente: push/PR = decisión del owner.
