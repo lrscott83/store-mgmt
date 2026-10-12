@@ -470,6 +470,7 @@ export function PublicCatalogPage() {
           setCreatedOrder(null);
         }}
         storeSlug={storeSlug}
+        storeName={catalog?.storeName}
         createdOrder={createdOrder}
       />
     </>

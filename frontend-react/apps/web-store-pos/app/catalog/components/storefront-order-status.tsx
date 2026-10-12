@@ -59,14 +59,19 @@ import type { PublicOrderCreated } from '~/sales/lib/services/catalog-http-servi
 export function StorefrontOrderStatus({
   open,
   onClose,
-  // `storeSlug` solo lo usaba la consulta de estado (segunda parte, comentada); se conserva la
-  // prop por compatibilidad con el llamador y se marca con `_` para el lint de args sin usar.
-  storeSlug: _storeSlug,
+  storeSlug,
+  storeName,
   createdOrder,
 }: {
   readonly open: boolean;
   readonly onClose: () => void;
   readonly storeSlug: string;
+  /**
+   * Nombre de la tienda para el encabezado del modal. Opcional: si quien lo abre no lo pasa, se
+   * usa el slug, que al menos dice de qué tienda es el pedido. Sustituye al antiguo título
+   * "Consultar mi pedido", que ya no aplica: la consulta de estado está comentada.
+   */
+  readonly storeName?: string | null;
   /**
    * Pedido recién creado por el checkout, si lo hubo. Se pinta para que el cliente apunte el
    * código: con él —y su teléfono— podía volver a consultar el estado, pero esa consulta está
@@ -125,7 +130,7 @@ export function StorefrontOrderStatus({
     <Modal
       open={open}
       onClose={onClose}
-      title={intl.formatMessage({ id: 'ORDER.STATUS_TITLE' })}
+      title={storeName?.trim() || storeSlug}
       testId="catalog-order-status-modal"
     >
       <div className="space-y-4">
