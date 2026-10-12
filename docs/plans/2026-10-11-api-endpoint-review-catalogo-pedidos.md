@@ -198,34 +198,38 @@ owners distintos (pendiente de confirmar; si aplica, recupera la severidad de se
 `GET /public/catalog/{slug}` · `.../products` · `.../products/{id}` · `.../media/{**key}`
 
 ### HIGH
-- [ ] **4.1 — `BelongsToStore` valida la clave CRUDA pero se lee la NORMALIZADA.**
-      `CatalogImageStorage.cs:188-195` vs `:197-212`: un `..` pasa la pertenencia
-      (`{tenantA}/{storeA}/../{tenantB}/{storeB}/x`) y `Path.GetFullPath` lo resuelve leyendo **otra
-      tienda** dentro de la raíz. Fix: comparar segmento a segmento + rechazar `.`/`..`.
-- [ ] **4.2 — Guard de traversal sin separador final.** `CatalogImageStorage.cs:208`:
-      `fullPath.StartsWith(fullRoot)` deja escapar a una carpeta hermana
-      (`.../catalog-backup/...`). Fix: terminar el prefijo en `Path.DirectorySeparatorChar`.
-- [ ] **4.3 — `page` desborda int → `Skip(-120)` → 500 anónimo.** `GetPublicCatalogProductsQuery.cs:75,81`
-      (`?page=2147483647`). Fix: acotar el offset en `long` + tope de página.
-- [ ] **4.4 — La paginación es un no-op: materializa TODO el catálogo por request.**
-      `GetPublicCatalogProductsQuery.cs:56-84` filtra/pagina en memoria (el repo ya filtra en SQL,
-      pero se llama con `null,null`). Fix: filtro + `Skip/Take` en SQL; quitar el `Include(Images)`.
+- [x] **4.1 — `BelongsToStore` valida la clave CRUDA pero se lee la NORMALIZADA.** — **HECHO 2026-10-12**
+      (`255ade42`): se rechazan los segmentos `.`/`..` antes de comparar, así la pertenencia se decide
+      sobre la misma forma que se resuelve al leer.
+- [x] **4.2 — Guard de traversal sin separador final.** — **HECHO 2026-10-12** (`255ade42`): el prefijo
+      de la raíz termina en `Path.DirectorySeparatorChar`.
+- [x] **4.3 — `page` desborda int → `Skip(-120)` → 500 anónimo.** — **HECHO 2026-10-12** (`255ade42`):
+      offset en `long` + `Skip` acotado al total; una página enorme devuelve lista vacía.
+- [x] **4.4 — La paginación es un no-op.** — **HECHO 2026-10-12** (`255ade42`): filtro + `Skip/Take` en
+      SQL (métodos nuevos `GetPublishedPageAsync`/`CountPublishedAsync`) y sin `Include(Images)` en el
+      listado.
 
 ### MEDIUM
-- [ ] **4.5 — Lecturas anónimas sin rate limit.** Fix: política `PublicCatalogPolicy` (patrón ya
-      existente para pedidos).
-- [ ] **4.6 — Sin `X-Content-Type-Options: nosniff`** al servir media inline.
-- [ ] **4.7 — `GET` de cabecera hace O(categorías × productos)** para contar. Fix: `GROUP BY` en SQL.
-- [ ] **4.8 — `CancellationToken` descartado (ver X7).**
-- [ ] **4.9 — Inconsistencia de error de media**: clave fuera de raíz → `InvalidOperationException` →
-      500, rompiendo el "404 uniforme". Fix: 404.
-- [ ] **4.10 — Feature envy**: el handler reimplementa filtros que el repo ya tiene.
+- [x] **4.5 — Lecturas anónimas sin rate limit.** — **HECHO 2026-10-12** (`255ade42`):
+      `PublicCatalogPolicy` (120/min por IP) en cabecera/listado/detalle; **media excluida** (una página
+      pide ~24 imágenes cacheadas).
+- [x] **4.6 — Sin `X-Content-Type-Options: nosniff`.** — **YA ESTABA** (`cd53081e`, `PublicCatalogController.cs:61`).
+- [x] **4.7 — Cabecera O(categorías × productos).** — **HECHO 2026-10-12** (`255ade42`):
+      `GetPublishedCategoryCountsAsync` con `GROUP BY` en SQL.
+- [x] **4.8 — `CancellationToken` descartado.** — **HECHO 2026-10-12** (`255ade42`): se propaga a los
+      métodos del repositorio.
+- [x] **4.9 — Inconsistencia de error de media.** — **HECHO 2026-10-12** (`255ade42`): con 4.1/4.2, una
+      clave con `.`/`..` o fuera de la tienda cae en el **404** uniforme (ya no llega al 500).
+- [x] **4.10 — Feature envy.** — **HECHO 2026-10-12** (`255ade42`): el filtro/paginación viven en el
+      repositorio.
 
 ### LOW
-- [ ] **4.11 — Slug resuelto 4×** (extraer resolver); `store.CatalogSlug == null` inalcanzable;
-      `24` mágico; `ContentDisposition` no-op; ids internos en el DTO público.
-- [ ] **4.12 — OpenAPI dice JSON para el endpoint de media** (`[Produces]` heredado). Fix: override.
-- [ ] **4.13 — Sin tests de handler** (solo mapper). `[ProducesResponseType]` incompletos.
+- [ ] **4.11 — Slug resuelto 4×**; `CatalogSlug == null` inalcanzable; `24` mágico; `ContentDisposition`
+      no-op; ids internos en el DTO público. — **DIFERIDO** (cosmético).
+- [x] **4.12 — OpenAPI dice JSON para el endpoint de media.** — **HECHO 2026-10-12** (`255ade42`):
+      `[Produces(...)]` con los tipos reales.
+- [x] **4.13 — Sin tests de handler/servicio.** — **HECHO 2026-10-12** (`255ade42`): tests de los 3
+      handlers + `BelongsToStore` (traversal). `Application.Tests` **1269 verde**.
 
 ---
 
@@ -430,3 +434,9 @@ documenta `AGENTS.md`).
   posterior abortaría a 5 s como 500 sin traducir); (c) el 409 no registra log/métrica; (d) los
   archivos retenidos por commit desconocido acumulan deuda de disco sin reconciliación/métrica. La lente
   de riesgo no encontró hallazgos.
+- 2026-10-12 — **Controller 4 (`PublicCatalogController`) HECHO** (`255ade42`): 4.1/4.2 (traversal
+  rechazado por segmento + prefijo con separador) · 4.3 (offset `long`) · 4.4/4.10 (filtro + paginación
+  en SQL, sin `Include(Images)`) · 4.5 (`PublicCatalogPolicy`) · 4.7 (`GROUP BY` en SQL) · 4.8
+  (`CancellationToken`) · 4.12 (`[Produces]`) · 4.13 (tests). 4.6 ya estaba. **Diferido**: 4.11
+  (cosmético). `dotnet build` 0 errores; `Application.Tests` **1269 verde**; E2E `Catalog` **49/52**
+  (los 3 fallos son los pre-existentes C1-E2E-2/3, sin fallos nuevos). Siguiente: RDD del Controller 4.
