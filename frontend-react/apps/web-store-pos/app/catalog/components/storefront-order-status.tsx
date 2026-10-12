@@ -1,18 +1,18 @@
 import { useIntl } from 'react-intl';
 import { Modal } from '~/shared/components/ui/modal';
+import { formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency';
 import type { PublicOrderCreated } from '~/sales/lib/services/catalog-http-service';
 
 /*
  * ─── SEGUNDA PARTE COMENTADA: consulta pública del estado del pedido ─────────────────────────
  * A petición: se comenta TODO lo relativo a consultar el estado del pedido (formulario código +
- * teléfono, botón de búsqueda, errores y bloque de resultado). En la vista solo queda el pedido
- * recién creado, y de él SOLO su código. El código original se deja comentado, tal cual, para
- * poder restaurarlo sin volver a escribirlo.
+ * teléfono, botón de búsqueda, errores y bloque de resultado), y también el texto de la tarjeta
+ * que invitaba a consultar el código. La tarjeta del pedido recién creado se queda como estaba:
+ * título, código y total. El código original se deja comentado, tal cual, para poder restaurarlo.
  *
  * import { useState } from 'react';
  * import { Button } from '~/shared/components/ui/button';
  * import { InfoBox } from '~/shared/components/ui/info-box';
- * import { formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency';
  * import {
  *   catalogHttpService,
  *   PublicOrderDeliveryType,
@@ -51,10 +51,10 @@ import type { PublicOrderCreated } from '~/sales/lib/services/catalog-http-servi
  */
 
 /**
- * Confirmación del pedido recién creado: el CÓDIGO es lo único que el cliente necesita apuntar.
- *
- * La consulta pública del estado del pedido (código + teléfono) está comentada en esta vista a
- * petición: nada relativo a consultar el estado se muestra aquí.
+ * Confirmación del pedido recién creado: la TARJETA se mantiene como estaba (título, código y
+ * total). La consulta pública del estado del pedido (código + teléfono) está comentada en esta
+ * vista a petición: nada relativo a consultar el estado se muestra aquí — y por eso también se
+ * comenta el texto de la tarjeta que invitaba a consultar el código.
  */
 export function StorefrontOrderStatus({
   open,
@@ -131,11 +131,11 @@ export function StorefrontOrderStatus({
       <div className="space-y-4">
         {createdOrder && (
           <div className="rounded-md border border-primary/20 bg-primary-light p-3">
-            {/*
-            ─── Resto de la tarjeta del pedido recién creado (comentado): solo queda el código ───
             <h3 className="text-sm font-semibold text-primary" data-testid="order-created-title">
               {intl.formatMessage({ id: 'ORDER.CREATED_TITLE' })}
             </h3>
+            {/*
+            ─── Texto que invita a CONSULTAR el pedido: comentado junto con la consulta ──────────
             <p className="mt-1 text-xs text-text">
               {intl.formatMessage({ id: 'ORDER.CREATED_LEAD' })}
             </p>
@@ -151,7 +151,6 @@ export function StorefrontOrderStatus({
                 {createdOrder.code}
               </span>
             </p>
-            {/*
             <p className="mt-2 text-right text-sm text-text">
               <span className="text-xs text-text-muted">
                 {intl.formatMessage({ id: 'ORDER.TOTAL' })}
@@ -160,7 +159,6 @@ export function StorefrontOrderStatus({
                 {formatMoneyWithCurrency(createdOrder.total, createdOrder.currency)}
               </span>
             </p>
-            */}
           </div>
         )}
 

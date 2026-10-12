@@ -1000,8 +1000,9 @@ describe('storefront cart / checkout / order status (F3)', () => {
     it('muestra el código del pedido recién creado', () => {
       renderStatus(CREATED);
 
-      // La tarjeta del pedido recién creado queda reducida a su CÓDIGO: el título, el texto guía
-      // y el total están comentados en `storefront-order-status.tsx` a petición.
+      // La tarjeta del pedido recién creado se mantiene: título + código (y total). El texto que
+      // invitaba a consultar el estado está comentado junto con la consulta de estado.
+      expect(screen.getByTestId('order-created-title')).toHaveTextContent('Pedido creado');
       expect(screen.getByTestId('order-code')).toHaveTextContent('K7M2QX');
     });
 
