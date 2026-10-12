@@ -365,11 +365,13 @@ owners distintos (pendiente de confirmar; si aplica, recupera la severidad de se
 
 ---
 
-## Hallazgos E2E pre-existentes (fuera del Controller 3, detectados 2026-10-12)
+## Problemas de errores en los tests E2E (registro, detectados 2026-10-12)
 
 Al correr el E2E del namespace `Catalog` para verificar los cambios globales (sobre 400 unificado)
-aparecieron fallos **PRE-EXISTENTES** (también presentes en el baseline `d9e7c35f`: 6 fallos/48) que
-**no** son del Controller 3. Son de **Controller 1**, y el E2E nunca se había corrido tras ese trabajo.
+aparecieron fallos **PRE-EXISTENTES** (también presentes en el baseline `d9e7c35f`: **6 fallos/48**;
+con los fixes y los 4 tests nuevos: **3 fallos/52**). Son de **Controller 1**, y el E2E nunca se había
+corrido tras ese trabajo (solo `Application.Tests`, con repos mockeados — el mismo blind spot que ya
+documenta `AGENTS.md`).
 
 - [x] **C1-E2E-1 — `CatalogImagePathTooLong` con 1 argumento.** La clave está **duplicada** en
       `I18n.resx`/`I18n.en.resx` (una con 2 placeholders) y `ReorderProductImagesCommandValidator` +
