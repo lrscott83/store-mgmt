@@ -342,9 +342,6 @@
   <data name="BrandingInvalidTemplate" xml:space="preserve">
     <value>El id de la plantilla {0} no es válido</value>
   </data>
-  <data name="CatalogImagePathTooLong" xml:space="preserve">
-    <value>La ruta de la imagen no puede superar los {0} caracteres</value>
-  </data>
   <data name="ShowcaseImageKindInvalid" xml:space="preserve">
     <value>El tipo de imagen {0} no es válido</value>
   </data>

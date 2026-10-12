@@ -21,7 +21,7 @@ namespace Application.Features.WebCatalog.Images.Commands.RemoveProductImage
                 .NotEmpty()
                 .WithMessage(localizer["IsRequired", "{PropertyName}"])
                 .MaximumLength(ProductEntityLimits.ImagePathMaxLength)
-                .WithMessage(localizer["CatalogImagePathTooLong", ProductEntityLimits.ImagePathMaxLength]);
+                .WithMessage(localizer["CatalogImagePathTooLong", "{PropertyName}", ProductEntityLimits.ImagePathMaxLength]);
         }
     }
 }

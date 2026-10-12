@@ -603,9 +603,6 @@
   <data name="BrandingInvalidTemplate" xml:space="preserve">
     <value>The template id {0} is not valid</value>
   </data>
-  <data name="CatalogImagePathTooLong" xml:space="preserve">
-    <value>The image path cannot be longer than {0} characters</value>
-  </data>
   <data name="ShowcaseImageKindInvalid" xml:space="preserve">
     <value>The image type {0} is not valid</value>
   </data>
