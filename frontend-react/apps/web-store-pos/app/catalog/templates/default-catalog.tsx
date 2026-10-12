@@ -86,6 +86,13 @@ export function DefaultCatalogTemplate(props: CatalogTemplateProps) {
   const items = page?.items ?? [];
   const storeName = catalog?.storeName ?? '';
 
+  /**
+   * Elementos por fila en MÓVIL (decisión del owner, 2026-10-12): arranca en 1 o 2 columnas según lo
+   * que el dueño eligió en la configuración del Catálogo Web. Desde `sm` el comportamiento no cambia
+   * (2 columnas) y en `lg` sigue en 3. Sin ajuste —o con una plantilla que lo ignora— usa 2, como hoy.
+   */
+  const mobileGridColumns = orderingConfig?.mobileColumns === 1 ? 'grid-cols-1' : 'grid-cols-2';
+
   return (
     <div className="min-h-screen scroll-smooth bg-background">
       {/* Cabecera FIJA con la marca y la navegación. Va PRIMERO y se queda pegada al scroll:
@@ -114,8 +121,11 @@ export function DefaultCatalogTemplate(props: CatalogTemplateProps) {
             {/* Las TRES secciones, en línea en escritorio (D2). En móvil el mismo grupo de
                 enlaces sale del desplegable de al lado: no son dos navegaciones, es una. */}
             <CatalogNavLinks className="hidden shrink-0 items-center gap-1 md:flex" />
-            <CatalogNavMenu className="md:hidden" />
             {/* Carrito (F3) con la misma forma que el del POS: ícono + contador SIEMPRE visible.
+                Va ENTRE los enlaces de escritorio y el desplegable de móvil: en una barra
+                estrecha la lectura es marca · carrito · menú, y el menú se queda en la esquina
+                derecha; en escritorio los enlaces se quedan a la izquierda y el carrito ocupa
+                su sitio al lado, no en el extremo.
                 Con la tienda cerrada (`enabled: false`) no se ofrece: publicar el catálogo no
                 publica los pedidos, son dos interruptores distintos. Lo gateado es el CARRITO,
                 no la navegación —una tienda cerrada sigue siendo un catálogo que se recorre—. */}
@@ -138,6 +148,7 @@ export function DefaultCatalogTemplate(props: CatalogTemplateProps) {
                 </span>
               </button>
             )}
+            <CatalogNavMenu className="md:hidden" />
           </div>
 
           {!orderingEnabled && orderingConfig && (
@@ -150,20 +161,26 @@ export function DefaultCatalogTemplate(props: CatalogTemplateProps) {
 
       {/* Portada visual de la tienda: el carrusel va DEBAJO de la cabecera (decisión del owner,
           2026-10-08) y es `id="inicio"`, la primera de las tres secciones. Con el array vacío
-          no se pinta ni un marco —la página es exactamente la de antes—. */}
+          no se pinta ni un marco —la página es exactamente la de antes—.
+
+          El `px-4`/`pt-4` son solo desde `sm`: en móvil la portada ocupa la pantalla COMPLETA
+          (`mobileFullBleed`) y de borde a borde, así que un margen la encogería y dejaría una
+          franja de fondo a los lados. */}
       {carouselImages.length > 0 && (
-        <div className="scroll-mt-24 px-4 pt-4" id="inicio">
-          <CatalogCarousel images={carouselImages} storeName={storeName} />
+        <div className="scroll-mt-24 sm:px-4 sm:pt-4" id="inicio">
+          <CatalogCarousel images={carouselImages} storeName={storeName} mobileFullBleed />
         </div>
       )}
 
       <main className="mx-auto max-w-5xl px-4 py-6">
         {/* Destacados: el bloque rotativo del dueño va PRIMERO en el cuerpo, antes de los
             filtros, para que se lea como una vitrina y no como un filtro más. Con el array vacío
-            no hay ni caja ni título. Es la segunda sección, `id="destacados"`. */}
+            no hay ni caja ni título. Es la segunda sección, `id="destacados"`, y lleva margen
+            ABAJO: sin él la vitrina y la barra de buscador con la rejilla se leen como un solo
+            bloque y la página deja de respirar entre las dos cosas. */}
         {dailyImages.length > 0 && (
-          <div className="scroll-mt-24" id="destacados">
-            <CatalogDaily images={dailyImages} storeName={storeName} />
+          <div className="mb-10 scroll-mt-24 sm:mb-12" id="destacados">
+            <CatalogDaily images={dailyImages} storeName={storeName} variant="productCarousel" />
           </div>
         )}
 
@@ -195,10 +212,11 @@ export function DefaultCatalogTemplate(props: CatalogTemplateProps) {
           </form>
 
           <div>
-            <label
-              className="mb-1 block text-xs font-medium text-text-muted"
-              htmlFor="catalog-category"
-            >
+            {/* Rótulo SOLO para lectores de pantalla (`sr-only`): el desplegable ya se
+                reconoce por su primera opción ("Todas las categorías") y el rótulo por encima
+                ocupaba una línea que solo empujaba la rejilla hacia abajo. El `label` NO se
+                borra: sin él el filtro se queda sin nombre accesible. */}
+            <label className="sr-only" htmlFor="catalog-category">
               {intl.formatMessage({ id: 'CATALOG_PUBLIC.CATEGORY' })}
             </label>
             <select
@@ -241,17 +259,16 @@ export function DefaultCatalogTemplate(props: CatalogTemplateProps) {
           </InfoBox>
         )}
 
-        {/* Dos columnas DESDE móvil (decisión del owner, 2026-10-06): la rejilla anterior
-            solo tenía 2 columnas desde `sm`, así que en móvil cada tarjeta ocupaba el ancho
-            completo y la vista desaprovechaba el espacio. Al partirla en dos, la tarjeta se
-            estrecha a la mitad, y por eso el nombre y el precio tienen que ir APILADOS (más
-            abajo): repartidos en horizontal el nombre se sale de su caja y pinta sobre el
-            precio. `gap` también baja en móvil porque a media columna un `gap-4` se come la
-            tarjeta. */}
+        {/* Elementos por fila en MÓVIL configurables (decisión del owner, 2026-10-12): la rejilla
+            arranca en 1 o 2 columnas según el ajuste del Catálogo Web; desde `sm` son 2 y en `lg` 3,
+            igual que antes. Con 1 columna la tarjeta ocupa el ancho completo y con 2 se estrecha a la
+            mitad, y por eso el nombre y el precio van APILADOS (más abajo): repartidos en horizontal
+            el nombre se sale de su caja y pinta sobre el precio. `gap` baja en móvil porque a media
+            columna un `gap-4` se come la tarjeta. */}
         <ul
           ref={gridRef}
           id="productos"
-          className="mt-4 grid scroll-mt-24 grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3"
+          className={`mt-4 grid scroll-mt-24 ${mobileGridColumns} gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3`}
           data-testid="catalog-grid"
         >
           {items.map((product) => (

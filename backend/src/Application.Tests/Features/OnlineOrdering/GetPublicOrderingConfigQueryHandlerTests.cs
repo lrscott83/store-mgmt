@@ -381,6 +381,69 @@ public class GetPublicOrderingConfigQueryHandlerTests
 
     #endregion
 
+    #region Mobile columns (elementos por fila en movil)
+
+    /// <summary>
+    /// Sin fila, los elementos por fila en móvil son el default (2): el storefront siempre tiene que
+    /// poder pintar la rejilla y una tienda recién sincronizada se ve igual que hoy.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenTheStoreHasNoSettings_ShouldReportTheDefaultMobileColumns()
+    {
+        PublishedStore();
+        _settingsRepository.Setup(x => x.GetPublicByStoreIdAsync(_storeId)).ReturnsAsync((StoreCatalogSettings?)null);
+
+        var result = await Handler().Handle(new GetPublicOrderingConfigQuery("tienda-ana"), CancellationToken.None);
+
+        result.Data!.MobileColumns.Should().Be(StoreCatalogSettings.DefaultMobileColumns);
+    }
+
+    /// <summary>El ajuste del dueño viaja tal cual (1 o 2) para que el catálogo lo pinte.</summary>
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    public async Task Handle_WithMobileColumns_ShouldPublishIt(int columns)
+    {
+        PublishedStore();
+        StoreCatalogSettings settings = StoreCatalogSettings.Create(_storeId, _tenantId);
+        settings.MobileColumns = columns;
+        _settingsRepository.Setup(x => x.GetPublicByStoreIdAsync(_storeId)).ReturnsAsync(settings);
+
+        var result = await Handler().Handle(new GetPublicOrderingConfigQuery("tienda-ana"), CancellationToken.None);
+
+        result.Data!.MobileColumns.Should().Be(columns);
+    }
+
+    /// <summary>
+    /// Una fila con un valor fuera de rango se publica como el default (2): el storefront no tiene que
+    /// decidir qué hacer con un número que no entiende.
+    /// </summary>
+    [Theory]
+    [InlineData(0)]
+    [InlineData(5)]
+    public async Task Handle_WithAnOutOfRangeMobileColumns_ShouldPublishTheDefault(int stored)
+    {
+        PublishedStore();
+        StoreCatalogSettings settings = StoreCatalogSettings.Create(_storeId, _tenantId);
+        settings.MobileColumns = stored;
+        _settingsRepository.Setup(x => x.GetPublicByStoreIdAsync(_storeId)).ReturnsAsync(settings);
+
+        var result = await Handler().Handle(new GetPublicOrderingConfigQuery("tienda-ana"), CancellationToken.None);
+
+        result.Data!.MobileColumns.Should().Be(StoreCatalogSettings.DefaultMobileColumns);
+    }
+
+    /// <summary>El contrato lleva el campo: sin la propiedad el storefront no tendría qué pintar.</summary>
+    [Fact]
+    public void PublicOrderingConfigDto_ShouldCarryTheMobileColumns()
+    {
+        typeof(PublicOrderingConfigDto).GetProperties()
+            .Select(p => p.Name)
+            .Should().Contain("MobileColumns");
+    }
+
+    #endregion
+
     #region Showcase (carrusel e imágenes del día)
 
     /// <summary>

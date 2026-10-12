@@ -334,7 +334,10 @@
     <value>{0} no puede superar los {1} caracteres</value>
   </data>
   <data name="BrandingNothingToUpdate" xml:space="preserve">
-    <value>Hay que subir o quitar el logo o el banner, o elegir una plantilla: la petición no trae ningún cambio</value>
+    <value>Hay que subir o quitar el logo o el banner, o elegir 1 o 2 elementos por fila en móvil: la petición no trae ningún cambio</value>
+  </data>
+  <data name="BrandingMobileColumnsRange" xml:space="preserve">
+    <value>{0} solo admite 1 o 2 (elementos por fila en móvil)</value>
   </data>
   <data name="BrandingUploadAndRemoveConflict" xml:space="preserve">
     <value>No se puede subir y quitar {0} en la misma petición</value>

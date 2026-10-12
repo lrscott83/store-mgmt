@@ -152,6 +152,15 @@ namespace Application.Dtos.OnlineOrdering
         /// <see cref="StoreCatalogSettings.DefaultTemplateId"/>: el catálogo se ve como hoy.
         /// </summary>
         public string TemplateId { get; set; } = StoreCatalogSettings.DefaultTemplateId;
+
+        /// <summary>
+        /// Cuántos elementos por fila muestra la rejilla del catálogo público en MÓVIL: 1 o 2
+        /// (decisión del owner, 2026-10-12). Solo lo usa la plantilla `default`. Sin fila, o con
+        /// un valor fuera de rango, se publica <see cref="StoreCatalogSettings.DefaultMobileColumns"/>
+        /// (2, el comportamiento actual), para que el storefront nunca tenga que decidir "qué hacer
+        /// con un número que no entiende".
+        /// </summary>
+        public int MobileColumns { get; set; } = StoreCatalogSettings.DefaultMobileColumns;
     }
 
     /// <summary>

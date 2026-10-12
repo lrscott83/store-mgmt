@@ -84,4 +84,36 @@ public class CatalogImageStorageBelongsToStoreTests
             Directory.Delete(root, recursive: true);
         }
     }
+
+    /// <summary>
+    /// R3-2: el prefijo de la raíz termina en el SEPARADOR. Una clave ABSOLUTA que apunta a una carpeta
+    /// HERMANA que comparte el prefijo textual (`.../catalog-backup`) no puede colarse: `Path.Combine`
+    /// con una ruta absoluta descarta la raíz, así que sin el separador `.../catalog-backup/x` empezaría
+    /// por `.../catalog` y la lectura saldría de la raíz del catálogo.
+    /// </summary>
+    [Fact]
+    public async Task OpenAsync_WithAnAbsoluteKeyInASiblingFolderSharingTheRootPrefix_ShouldThrow()
+    {
+        string parent = Path.Combine(Path.GetTempPath(), "cat-" + Guid.NewGuid().ToString("N"));
+        string root = Path.Combine(parent, "catalog");
+        string sibling = Path.Combine(parent, "catalog-backup");
+        Directory.CreateDirectory(root);
+        Directory.CreateDirectory(sibling);
+        string siblingFile = Path.Combine(sibling, "x.png");
+        await File.WriteAllBytesAsync(siblingFile, new byte[] { 0x89, 0x50, 0x4E, 0x47 });
+
+        var storage = new CatalogImageStorage(Options.Create(new CatalogImageStorageOptions { CatalogImageRoot = root }));
+
+        try
+        {
+            Func<Task> act = () => storage.OpenAsync(siblingFile);
+
+            await act.Should().ThrowAsync<InvalidOperationException>(
+                "la raíz del catálogo no puede resolver a una carpeta hermana");
+        }
+        finally
+        {
+            Directory.Delete(parent, recursive: true);
+        }
+    }
 }

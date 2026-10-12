@@ -500,7 +500,7 @@ export function StorefrontCheckout({
             </div>
           )}
 
-          <div className="flex justify-end">
+          <div className="flex justify-center">
             <Button
               onClick={() => void submit()}
               disabled={submitting}

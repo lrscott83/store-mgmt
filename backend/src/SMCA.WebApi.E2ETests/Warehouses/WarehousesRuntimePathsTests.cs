@@ -14,10 +14,10 @@ namespace SMCA.WebApi.E2ETests.Warehouses;
 
 /// <summary>
 /// WM-TE3 (spec warehouses-module-assignment): runtime paths assign the Warehouses module
-/// and its OwnerAdmin features with no code change — plan elevation to Superior/VIP and
-/// the plan toggle. Self-registration births the store on plan Pago (2026-09-18) whose
-/// catalog does NOT include module 13, so the register→elevate→assign chain is the
-/// runtime path under test (user decision 2026-09-19).
+/// and its OwnerAdmin features with no code change. store-birth-superior (2026-10-11):
+/// self-registration births the store on plan Superior, whose catalog DOES include module 13,
+/// so the register path assigns module 13 and features 36/37 directly (no plan elevation
+/// needed). The paid -> free toggle still deactivates the module and its features.
 /// </summary>
 [Collection("e2e")]
 public sealed class WarehousesRuntimePathsTests
@@ -29,13 +29,10 @@ public sealed class WarehousesRuntimePathsTests
     [Fact]
     public async Task Register_assigns_warehouses_module_and_owner_features()
     {
-        // WMA-3a (repointed 2026-09-19): registration births the store on plan Pago, whose
-        // catalog has NO module 13. The runtime chain under test is: register (no 13) →
-        // SuperAdmin elevates the plan to Superior → change-plan assigns module 13 with
-        // OwnerAdmin features 36/37 through the SAME ApplyPlanModules chain.
+        // store-birth-superior (2026-10-11): registration births the store on plan Superior,
+        // whose catalog includes module 13 — so the register path ITSELF assigns Warehouses 13
+        // with OwnerAdmin features 36/37 (previously this required a later plan elevation).
         var login = $"wh-reg-{Guid.NewGuid():N}@test.com";
-        var saLogin = $"wh-sa-{Guid.NewGuid():N}@test.com";
-        var saId = await DbTestHelpers.SeedSuperAdminAsync(_f, saLogin, "Password123");
         Guid tenantId = Guid.Empty;
         try
         {
@@ -51,28 +48,20 @@ public sealed class WarehousesRuntimePathsTests
             });
             response.StatusCode.Should().Be(HttpStatusCode.Created);
 
+            var user = await DbTestHelpers.GetUserByLoginAsync(_f, login);
+            user.Should().NotBeNull();
+            tenantId = user!.TenantId;
+
             using var scope = _f.Services.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
             var store = await db.Set<Domain.Entities.Stores.Store>().IgnoreQueryFilters()
-                .AsNoTracking().FirstAsync(s => s.Name.StartsWith("WH-Reg-Store"));
-            tenantId = store.TenantId;
+                .AsNoTracking().FirstAsync(s => s.TenantId == tenantId);
 
-            // Precondition: a fresh Pago store must NOT carry the Superior-only module 13.
-            (await db.Set<StoreModule>().IgnoreQueryFilters()
-                .AsNoTracking().FirstOrDefaultAsync(x => x.StoreId == store.Id && x.ModuleId == 13))
-                .Should().BeNull("plan Pago does not include the Warehouses module");
-
-            // Elevation by SuperAdmin (the only caller allowed to target Superior).
-            var user = await DbTestHelpers.GetUserByLoginAsync(_f, login);
-            user.Should().NotBeNull();
-            var elevate = await DbTestHelpers.AuthedClient(_f, saId, saLogin)
-                .PostAsJsonAsync($"/api/v1/stores/{store.Id}/change-plan", new { storePlanId = (int)Domain.Common.Enums.StorePlanType.Superior });
-            elevate.StatusCode.Should().Be(HttpStatusCode.OK);
-
+            // Superior includes module 13 at birth: it is assigned and active.
             var sm = await db.Set<StoreModule>().IgnoreQueryFilters()
                 .AsNoTracking().FirstOrDefaultAsync(x => x.StoreId == store.Id && x.ModuleId == 13);
-            sm.Should().NotBeNull("the plan change assigns module 13 through the runtime chain");
+            sm.Should().NotBeNull("Superior includes the Warehouses module at birth");
             sm!.IsActive.Should().BeTrue();
 
             var srfs = await db.Set<StoreRoleFeature>().IgnoreQueryFilters().AsNoTracking()
@@ -84,7 +73,6 @@ public sealed class WarehousesRuntimePathsTests
         {
             if (tenantId != Guid.Empty)
                 await DbTestHelpers.CleanupTenantCascadeAsync(_f, tenantId);
-            await DbTestHelpers.CleanupUserAsync(_f, saId);
         }
     }
 

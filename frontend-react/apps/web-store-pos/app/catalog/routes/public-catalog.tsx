@@ -432,6 +432,7 @@ export function PublicCatalogPage() {
           open={checkoutOpen}
           onClose={() => setCheckoutOpen(false)}
           storeSlug={storeSlug}
+          storeName={catalog?.storeName}
           config={orderingConfig}
           lines={cartLines}
           staffMode={staffMode}
@@ -452,6 +453,7 @@ export function PublicCatalogPage() {
           setCreatedOrder(null);
         }}
         storeSlug={storeSlug}
+        storeName={catalog?.storeName}
         createdOrder={createdOrder}
       />
     </>

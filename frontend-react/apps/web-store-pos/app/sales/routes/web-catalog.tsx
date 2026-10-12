@@ -562,6 +562,11 @@ export function WebCatalogPage() {
   const [pendingLogo, setPendingLogo] = useState<File | null>(null);
   /** Logo marcado para borrar, NO borrado todavía: lo aplica el botón de marca. */
   const [removeLogo, setRemoveLogo] = useState(false);
+  /**
+   * Elementos por fila en móvil (1 o 2) del borrador. null = sin cargar todavía. Se compara con lo
+   * guardado (`branding.mobileColumns`) para saber si hay cambio pendiente.
+   */
+  const [mobileColumns, setMobileColumns] = useState<number | null>(null);
   const [isSavingBrand, setIsSavingBrand] = useState(false);
 
   /**
@@ -610,6 +615,7 @@ export function WebCatalogPage() {
         return;
       }
       setBranding(result.data);
+      setMobileColumns(result.data.mobileColumns);
       setBrandError('');
     } catch (err) {
       setBrandError(intl.formatMessage({ id: httpErrorKey(err, 'WEB_CATALOG.BRAND_LOAD_ERROR') }));
@@ -935,7 +941,10 @@ export function WebCatalogPage() {
     );
   }
 
-  const hasBrandChanges = pendingLogo !== null || removeLogo;
+  const hasBrandChanges =
+    pendingLogo !== null ||
+    removeLogo ||
+    (mobileColumns !== null && branding !== null && mobileColumns !== branding.mobileColumns);
 
   async function handleSaveBrand() {
     if (!hasBrandChanges) return;
@@ -943,6 +952,10 @@ export function WebCatalogPage() {
     const payload: CatalogBrandingUpdate = {};
     if (pendingLogo) payload.logo = pendingLogo;
     if (removeLogo) payload.removeLogo = true;
+    // Solo viaja si de verdad cambió: un valor igual al guardado reescribiría la fila sin motivo.
+    if (mobileColumns !== null && branding !== null && mobileColumns !== branding.mobileColumns) {
+      payload.mobileColumns = mobileColumns;
+    }
 
     setIsSavingBrand(true);
     try {
@@ -1212,6 +1225,32 @@ export function WebCatalogPage() {
               setRemoveLogo((current) => !current);
             }}
           />
+
+          {/* Elementos por fila en MÓVIL (decisión del owner, 2026-10-12). Solo afecta a la
+              plantilla `default` del catálogo público; se guarda con el MISMO botón de marca, en el
+              mismo PUT parcial. */}
+          <div data-testid="brand-mobile-columns">
+            <label
+              className="mb-1 block text-xs font-medium text-text-muted"
+              htmlFor="brand-mobile-columns-select"
+            >
+              {intl.formatMessage({ id: 'WEB_CATALOG.BRAND_MOBILE_COLUMNS' })}
+            </label>
+            <select
+              id="brand-mobile-columns-select"
+              value={mobileColumns ?? 2}
+              disabled={isSavingBrand || branding === null}
+              onChange={(event) => setMobileColumns(Number(event.target.value))}
+              className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
+              data-testid="brand-mobile-columns-select"
+            >
+              <option value={1}>{intl.formatMessage({ id: 'WEB_CATALOG.BRAND_MOBILE_COLUMNS_ONE' })}</option>
+              <option value={2}>{intl.formatMessage({ id: 'WEB_CATALOG.BRAND_MOBILE_COLUMNS_TWO' })}</option>
+            </select>
+            <p className="mt-1 text-xs text-text-muted">
+              {intl.formatMessage({ id: 'WEB_CATALOG.BRAND_MOBILE_COLUMNS_HINT' })}
+            </p>
+          </div>
         </div>
       </Card>
 

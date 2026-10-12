@@ -170,6 +170,7 @@ const CONFIG_WITHOUT_BRAND: PublicOrderingConfig = {
   deliveryZones: null,
   paletteId: 'default',
   templateId: 'default',
+  mobileColumns: 2,
   logoUrl: null,
   bannerUrl: null,
   pedidosWhatsAppEnabled: true,
@@ -311,6 +312,23 @@ describe('PublicCatalogPage', () => {
     expect(within(card).getByRole('heading', { level: 3 })).toHaveClass('break-words');
   });
 
+  it('una sola columna en móvil cuando el dueño elige 1 elemento por fila', async () => {
+    catalogMock.getPublicOrderingConfig.mockResolvedValue(
+      envelope({ ...CONFIG_WITHOUT_BRAND, mobileColumns: 1 }),
+    );
+    renderPage();
+
+    const grid = await screen.findByTestId('catalog-grid');
+
+    // El ajuste del Catálogo Web decide las columnas en MÓVIL: la clase base deja de ser
+    // `grid-cols-2`. Desde `sm` siguen siendo dos y en `lg` tres, así que NO hay ninguna clase
+    // base que dé dos columnas en móvil.
+    expect(grid).toHaveClass('grid-cols-1');
+    expect(grid).toHaveClass('sm:grid-cols-2');
+    expect(grid).toHaveClass('lg:grid-cols-3');
+    expect(grid.className).not.toMatch(/(^|\s)grid-cols-2(\s|$)/);
+  });
+
   it('abre el detalle con la descripción en texto plano y la galería', async () => {
     const product = makeProduct({
       description: 'Camisa con <b>etiquetas</b>\nSegunda línea',
@@ -379,6 +397,20 @@ describe('PublicCatalogPage', () => {
         pageSize: 12,
       }),
     );
+  });
+
+  it('el filtro por categoría NO tiene rótulo visible: el nombre accesible se queda', async () => {
+    renderPage();
+    await screen.findByTestId('catalog-category-select');
+
+    // El rótulo ya no ocupa una línea por encima del desplegable: la barra de filtros queda
+    // limpia. Oculto de verdad (`sr-only`), NO borrado — sin él el filtro no tiene nombre.
+    const label = document.querySelector('label[for="catalog-category"]');
+    expect(label).not.toBeNull();
+    expect(label).toHaveClass('sr-only');
+    expect(label!.className).not.toContain('mb-1');
+    expect(label).toHaveTextContent('Categoría');
+    expect(screen.getByTestId('catalog-category-select')).toBeInTheDocument();
   });
 
   it('busca por nombre al enviar el formulario', async () => {
@@ -624,6 +656,20 @@ describe('PublicCatalogPage', () => {
       expect(menu).toHaveAttribute('aria-expanded', 'false');
     });
 
+    it('el carrito va ANTES del desplegable: el menú se queda en la esquina derecha', async () => {
+      renderPage();
+
+      const cart = await screen.findByTestId('catalog-cart-button');
+      const menu = screen.getByTestId('catalog-menu-button');
+
+      // Orden REAL en el documento, no el de los estilos: en la barra estrecha se lee
+      // marca · carrito · menú, y el menú queda en la esquina. En escritorio los enlaces van
+      // primero y el carrito queda a su derecha, que también es lo que se ve.
+      const nav = screen.getByTestId('catalog-nav');
+      expect(nav.compareDocumentPosition(cart) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(cart.compareDocumentPosition(menu) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
     it('la navegación existe con la tienda cerrada: lo gateado es el carrito', async () => {
       catalogMock.getPublicOrderingConfig.mockResolvedValue(
         envelope({ ...CONFIG_WITHOUT_BRAND, enabled: false }),
@@ -815,7 +861,9 @@ describe('PublicCatalogPage', () => {
       // en flujo normal, así que el marco medía N×alto y las flechas y los puntos quedaban
       // anclados al fondo de toda la pila.
       expect(carousel).toHaveClass('relative');
-      expect(carousel).toHaveClass('h-56');
+      // La carta `default` pinta la portada A PANTALLA COMPLETA en móvil (`mobileFullBleed`):
+      // una caja de 224 px recortaba la foto que el dueño subió. Desde `sm` vuelve a su marco.
+      expect(carousel).toHaveClass('h-[calc(100svh-5rem)]');
       expect(carousel).toHaveClass('sm:h-72');
       expect(carousel).toHaveClass('lg:h-96');
 
@@ -838,6 +886,57 @@ describe('PublicCatalogPage', () => {
         'aria-hidden',
         'true',
       );
+    });
+
+    it('la portada ocupa la pantalla en móvil y la imagen se ve COMPLETA', async () => {
+      catalogMock.getPublicOrderingConfig.mockResolvedValue(
+        envelope(showcaseConfig({ carouselImages: CAROUSEL })),
+      );
+      renderPage();
+
+      const carousel = await screen.findByTestId('catalog-carousel');
+      // El marco se va de borde a borde en móvil (`mobileFullBleed`) y vuelve a su caja en `sm`.
+      expect(carousel).toHaveClass('sm:max-w-5xl');
+      // Y la foto se ve ENTERA (`object-contain`): `object-cover` recortaba la portada —justo
+      // la imagen que el dueño eligió— para llenar una caja de 224 px.
+      expect(within(carousel).getByTestId('catalog-carousel-image-0')).toHaveClass('object-contain');
+    });
+
+    it('los destacados son fotos COMPLETAS en carrusel, dos por fila en móvil', async () => {
+      catalogMock.getPublicOrderingConfig.mockResolvedValue(
+        envelope(showcaseConfig({ dailyImages: DAILY })),
+      );
+      renderPage();
+
+      const daily = await screen.findByTestId('catalog-daily');
+      const image = within(daily).getByTestId('catalog-daily-image-0');
+      // Sin recorte: la foto del dueño se ve completa (`object-contain`), no a una altura fija.
+      expect(image).toHaveClass('object-contain');
+      expect(image.className).not.toContain('object-cover');
+      // Dos por fila en móvil, y a medida en escritorio: la imagen es lo que se lee.
+      expect(image.closest('li')).toHaveClass('w-1/2');
+      // Con más de una foto hay flechas para pasar a la siguiente sin arrastrar.
+      expect(within(daily).getByTestId('catalog-daily-next')).toHaveAttribute(
+        'aria-label',
+        'Imagen siguiente',
+      );
+      expect(within(daily).getByTestId('catalog-daily-previous')).toBeInTheDocument();
+      // Y el pie de foto sigue debajo de la imagen, como siempre.
+      expect(within(daily).getByTestId('catalog-daily-caption-0')).toHaveTextContent(
+        'Plato del día',
+      );
+    });
+
+    it('los destacados se separan de la rejilla: vitrina y productos no son un bloque', async () => {
+      catalogMock.getPublicOrderingConfig.mockResolvedValue(
+        envelope(showcaseConfig({ dailyImages: DAILY })),
+      );
+      renderPage();
+
+      await screen.findByTestId('catalog-daily');
+      // Margen ABAJO de la sección: sin él el buscador y la rejilla se leen como parte de la
+      // vitrina y la página deja de respirar entre las dos cosas.
+      expect(document.getElementById('destacados')).toHaveClass('mb-10');
     });
 
     it('el botón "Ver productos" baja a la rejilla con scroll suave', async () => {

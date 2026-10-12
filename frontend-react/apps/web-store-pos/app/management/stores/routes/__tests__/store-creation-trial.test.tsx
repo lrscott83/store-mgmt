@@ -251,7 +251,7 @@ describe('Store creation — client never sends paymentStartDate (server owns th
     expect(Object.keys(payload)).not.toContain('paymentStartDate');
   });
 
-  it('sends exactly the five data fields plus the birth moduleIds — no billing field smuggled in', async () => {
+  it('sends exactly the five data fields — no moduleIds, no billing field smuggled in', async () => {
     const { EditStorePage } = await import('../edit-store');
     await act(async () => {
       render(
@@ -263,23 +263,19 @@ describe('Store creation — client never sends paymentStartDate (server owns th
     await submitCreateForm('New Store');
 
     await waitFor(() => expect(mockCreateStore).toHaveBeenCalledTimes(1));
-    // Plan split: create carries store DATA plus birth provisioning. The birth
-    // plan is Pago (backend default, CreateStoreService) — the payload never
-    // carries a planId — while the module ids stay request-driven: the
-    // container resolves Superior's member ids from GET /v1/plans and sends
-    // them, and the backend grants exactly those modules (Option A).
+    // Plan split (store-birth-superior, 2026-10-11): create carries store DATA
+    // only. The server owns the birth plan (Superior) and its module set, so the
+    // payload carries neither a planId nor moduleIds.
     expect(Object.keys(mockCreateStore.mock.calls[0][0]).sort()).toEqual([
       'address',
       'approved',
       'description',
-      'moduleIds',
       'name',
       'ownerId',
     ]);
-    expect(mockCreateStore.mock.calls[0][0].moduleIds).toEqual([2, 3, 4]);
   });
 
-  it('shows no plan UI and sends the birth moduleIds on create', async () => {
+  it('shows no plan UI and names no modules on create', async () => {
     const { EditStorePage } = await import('../edit-store');
     await act(async () => {
       render(
@@ -292,7 +288,8 @@ describe('Store creation — client never sends paymentStartDate (server owns th
 
     await waitFor(() => expect(mockCreateStore).toHaveBeenCalledTimes(1));
     const payload = mockCreateStore.mock.calls[0][0];
-    expect(payload.moduleIds).toEqual([2, 3, 4]);
+    // store-birth-superior: the request names no modules.
+    expect(Object.keys(payload)).not.toContain('moduleIds');
     expect(Object.keys(payload)).not.toContain('paymentStartDate');
     // Plan split: the plan UI lives on the plan page/modal, never in the form.
     expect(screen.queryByRole('tab')).not.toBeInTheDocument();

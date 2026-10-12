@@ -20,7 +20,13 @@ using System.Net;
 
 namespace Application.Features.StoreManagement.Stores.Commands.CreateStore
 {
-    public sealed record CreateStoreCommand(Guid OwnerId, string Name, string? Address, string? Description, bool Approved, List<int> ModuleIds) 
+    /// <summary>
+    /// store-birth-superior (2026-10-11, replaces store-birth-pago-only): there is no
+    /// <c>ModuleIds</c> any more. The birth plan (Superior, 3) and its module set are the
+    /// server's decision — <see cref="ICreateStoreService"/> grants exactly the Superior plan
+    /// catalog filtered by <c>Module.IsActive &amp;&amp; Module.AvailableToStore</c>.
+    /// </summary>
+    public sealed record CreateStoreCommand(Guid OwnerId, string Name, string? Address, string? Description, bool Approved) 
         : ICommand<StoreDto> { }
 
     public class CreateStoreCommandHandler : ICommandHandler<CreateStoreCommand, StoreDto>
@@ -28,7 +34,6 @@ namespace Application.Features.StoreManagement.Stores.Commands.CreateStore
         private readonly IApplicationUnitOfWork _applicationUnitOfWork;
         private readonly IOwnerRepository _ownerRepository;
         private readonly IStoreModuleRepository _storeModuleRepository;
-        private readonly IPlanRepository _planRepository;
         private readonly IBillingService _billingService;
         private readonly IHttpContextService _httpContextService;
         private readonly IMapper _mapper;
@@ -40,7 +45,6 @@ namespace Application.Features.StoreManagement.Stores.Commands.CreateStore
             IApplicationUnitOfWork applicationUnitOfWork,
             IOwnerRepository ownerRepository,
             IStoreModuleRepository storeModuleRepository,
-            IPlanRepository planRepository,
             IBillingService billingService,
             IHttpContextService httpContextService,
             IMapper mapper,
@@ -50,7 +54,6 @@ namespace Application.Features.StoreManagement.Stores.Commands.CreateStore
         {
             _applicationUnitOfWork = applicationUnitOfWork;
             _storeModuleRepository = storeModuleRepository;
-            _planRepository = planRepository;
             _billingService = billingService;
             _httpContextService = httpContextService;
             _ownerRepository = ownerRepository;
@@ -69,7 +72,6 @@ namespace Application.Features.StoreManagement.Stores.Commands.CreateStore
                 throw new ApiException(_localizer["NotAuthorized"], HttpStatusCode.Forbidden);
 
             var ownerId = request.OwnerId;
-            List<int> moduleIds = request.ModuleIds;
             // Approved is forced true on EVERY creation path (SuperAdmin and OwnerAdmin) — product
             // decision 2026-09-10: a store must be usable immediately and never pay/expire until it is
             // disapproved. The request's Approved value is ignored; the DTO field is kept only for
@@ -100,23 +102,12 @@ namespace Application.Features.StoreManagement.Stores.Commands.CreateStore
                 if (!StoreBillingUtils.FilterForBilling(storeModules, billing).Contains((int)ModuleType.MultiStores))
                     throw new ApiException(_localizer["NotAuthorized"], HttpStatusCode.Forbidden);
 
-                // Inheritance (user decision 3): the new store copies the SELECTED store's module set,
-                // then is clamped to the ACTIVE Pago plan catalog (strict birth invariant,
-                // 2026-09-25, store-birth-pago-only): a store born through POST /v1/stores is
-                // born on Pago, so Superior/VIP-only members (12..17 -- WholesaleSales,
-                // Warehouses, MultiStores, MultiMonedas, MultiPayments, Elaboration) inherited
-                // from a Superior/VIP selected store are never copied. Filtering (not 400: the
-                // caller never asked for them; this is server-side derivation) keeps MultiStores
-                // creation working for Superior/VIP owners, one generation deep.
-                var pagoPlan = await _planRepository.GetActivePlanWithModulesByIdAsync((int)StorePlanType.Pago);
-                var pagoCatalog = (pagoPlan?.StorePlanModules ?? Enumerable.Empty<Domain.Entities.Plans.StorePlanModule>())
-                    .Select(spm => spm.ModuleId)
-                    .ToHashSet();
-                var inheritedModules = await _storeModuleRepository.GetStoreModulesByIdAsync(selectedStoreId);
-                moduleIds = inheritedModules.Select(sm => sm.ModuleId).Where(id => pagoCatalog.Contains(id)).ToList();
-                if (moduleIds.Count == 0)
-                    throw new ApiException(_localizer["NotAuthorized"], HttpStatusCode.Forbidden);
-
+                // No module set is read, clamped or passed here. store-birth-superior
+                // (2026-10-11, replaces store-birth-pago-only): the child is born on Superior
+                // with the Superior plan catalog, whatever the selected store carries — so the
+                // MultiStores gate above is the ONLY thing this branch decides. The selected
+                // store must still exist and hold MultiStores; its module set is irrelevant to
+                // the child, which is exactly why the old inheritance + clamp is gone.
                 ownerId = ownOwner.Id;
                 // User decision 6 note: owner-created stores are usable immediately — now universal
                 // (every creation path forces approved=true, 2026-09-10).
@@ -124,7 +115,7 @@ namespace Application.Features.StoreManagement.Stores.Commands.CreateStore
 
             var owner = await _ownerRepository.GetOwnerIncludingUserByIdAsync(ownerId);
             var store = await _createStoreService.CreateStoreAsync(ownerId, owner.TenantId, request.Name, request.Address, 
-                request.Description, approved, moduleIds);
+                request.Description, approved);
 
             // Split, not a ternary: the notice may only ever be emitted on the committed branch.
             if (await _applicationUnitOfWork.SaveChangesAsync(cancellationToken) <= 0)

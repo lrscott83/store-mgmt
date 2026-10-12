@@ -172,7 +172,7 @@ public class RegisterServiceRegistrationTests : RegisterServiceTestFixture
         MockCreateStoreService.Verify(x => x.CreateStoreAsync(
             TestOwnerId, TestTenantId,
             It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<string?>(),
-            It.IsAny<bool>(), It.IsAny<List<int>>()), Times.Once);
+            It.IsAny<bool>()), Times.Once);
     }
 
     [Fact]
@@ -245,7 +245,7 @@ public class RegisterServiceRegistrationTests : RegisterServiceTestFixture
         owner.Should().NotBeNull();
         MockCreateStoreService.Verify(
             x => x.CreateStoreAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(),
-                It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<List<int>>()),
+                It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<bool>()),
             Times.Once);
     }
 
@@ -267,7 +267,7 @@ public class RegisterServiceRegistrationTests : RegisterServiceTestFixture
         await RegisterAsync();
         MockCreateStoreService.Verify(
             x => x.CreateStoreAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(),
-                It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<List<int>>()),
+                It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<bool>()),
             Times.Once);
     }
 }

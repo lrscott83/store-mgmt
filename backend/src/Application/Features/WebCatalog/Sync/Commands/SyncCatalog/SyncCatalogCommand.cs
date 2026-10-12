@@ -136,8 +136,9 @@ namespace Application.Features.WebCatalog.Sync.Commands.SyncCatalog
                 await _applicationUnitOfWork.SaveChangesAsync(cancellationToken);
 
                 // La galería referencia filas de producto que tienen que existir primero: segundo
-                // guardado.
-                await CatalogMirrorWriter.MirrorGalleriesAsync(snapshot, storeId,
+                // guardado. Se pasan los MISMOS productos de la fase 1 (mirror.Products): re-leerlos
+                // daría instancias nuevas con la misma clave y chocaría el tracking del contexto.
+                await CatalogMirrorWriter.MirrorGalleriesAsync(snapshot, mirror.Products,
                     _productRepository, _productImageRepository);
                 await _applicationUnitOfWork.SaveChangesAsync(cancellationToken);
 

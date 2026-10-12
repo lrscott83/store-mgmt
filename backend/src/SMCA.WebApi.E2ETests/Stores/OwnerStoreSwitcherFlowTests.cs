@@ -79,11 +79,14 @@ public sealed class OwnerStoreSwitcherFlowTests
         return new OwnerFixture(user.Id, login, owner.Id, store.Id, tenantId);
     }
 
+    // store-birth-superior (2026-10-11): no ModuleIds in the body — the birth module set is the
+    // Superior plan catalog, derived server-side. This suite is about the store SWITCHER, not the
+    // module set, so the body keeps only what the switcher flow needs.
     private sealed record StoreCreateBody(
-        Guid OwnerId, string Name, string? Address, string? Description, bool Approved, int[] ModuleIds);
+        Guid OwnerId, string Name, string? Address, string? Description, bool Approved);
 
     private static StoreCreateBody OwnerBody(string name) => new(
-        Guid.Empty, name, "", "", true, Array.Empty<int>());
+        Guid.Empty, name, "", "", true);
 
     private static async Task<MeData> MeAsync(HttpClient client)
     {

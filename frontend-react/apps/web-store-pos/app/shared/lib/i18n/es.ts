@@ -214,6 +214,7 @@ const messages: Record<string, string> = {
   // Menu groups (exact Angular MENU.*.TITLE strings from vocabs/es.ts)
   'MENU.ADMIN': 'ADMINISTRACIÓN',
   'MENU.SALES': 'VENTA',
+  'MENU.WEB_CATALOG_GROUP': 'CATÁLOGO WEB',
   'MENU.INVENTORY': 'INVENTARIO',
   'MENU.EXPENSES': 'GASTOS',
   'MENU.SYNCHRONIZATION': 'SINCRONIZACIÓN',
@@ -234,7 +235,7 @@ const messages: Record<string, string> = {
 
   // Menu items — Sales (Angular MENU.SALE_MGMT.*)
   'MENU.PRODUCTS': 'Catálogo Productos',
-  'MENU.WEB_CATALOG': 'Catálogo Web',
+  'MENU.WEB_CATALOG_SETTINGS': 'Configuración',
   'MENU.ONLINE_ORDERS_SETTINGS': 'Pedidos WhatsApp',
   'MENU.ONLINE_ORDERS_DRIVERS': 'Repartidores',
   'MENU.SALE': 'Vender',
@@ -319,8 +320,9 @@ const messages: Record<string, string> = {
   'WEB_CATALOG.MOVE_LEFT': 'Mover antes',
   'WEB_CATALOG.MOVE_RIGHT': 'Mover después',
 
-  // Marca del catálogo público (F8): SOLO logo y banner. Sin paletas — se cancelaron por
-  // decisión del owner (2026-10-07) y el catálogo sigue con la paleta que ya tenía.
+  // Marca del catálogo público (F8): logo y banner, más la presentación de la rejilla en móvil
+  // (elementos por fila). Sin paletas — se cancelaron por decisión del owner (2026-10-07) y el
+  // catálogo sigue con la paleta que ya tenía.
   'WEB_CATALOG.BRAND_TITLE': 'Marca',
   'WEB_CATALOG.BRAND_SUBTITLE':
     'El logo y el banner que tus clientes ven en la cabecera de tu catálogo público.',
@@ -336,6 +338,14 @@ const messages: Record<string, string> = {
   'WEB_CATALOG.BRAND_SAVED': 'Marca guardada',
   'WEB_CATALOG.BRAND_SAVE_ERROR': 'No se pudo guardar la marca',
   'WEB_CATALOG.BRAND_LOAD_ERROR': 'No se pudo cargar la marca',
+
+  // Presentación del catálogo público (decisión del owner, 2026-10-12): elementos por fila en móvil.
+  // Solo afecta a la plantilla `default`.
+  'WEB_CATALOG.BRAND_MOBILE_COLUMNS': 'Productos por fila en móvil',
+  'WEB_CATALOG.BRAND_MOBILE_COLUMNS_ONE': '1 producto por fila',
+  'WEB_CATALOG.BRAND_MOBILE_COLUMNS_TWO': '2 productos por fila',
+  'WEB_CATALOG.BRAND_MOBILE_COLUMNS_HINT':
+    'Cuántos productos muestra cada fila en el teléfono. En pantallas grandes se siguen viendo 2 o 3.',
 
   // Nombres de las plantillas del catálogo público. La plantilla la fija SOLO el SuperAdmin
   // (/admin/stores); el dueño ya no la elige, así que estos textos los muestra el selector del

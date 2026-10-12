@@ -206,6 +206,7 @@ describe('catalogHttpService — endpoints del módulo 18', () => {
       banner,
       removeLogo: true,
       removeBanner: true,
+      mobileColumns: 1,
     });
 
     expect(apiClient.put).toHaveBeenCalledTimes(1);
@@ -220,6 +221,8 @@ describe('catalogHttpService — endpoints del módulo 18', () => {
     expect(body.get('banner')).toBe(banner);
     expect(body.get('removeLogo')).toBe('true');
     expect(body.get('removeBanner')).toBe('true');
+    // Los elementos por fila en móvil viajan como texto; el backend los bindea a `int?`.
+    expect(body.get('mobileColumns')).toBe('1');
     expect(config.headers['Content-Type']).toBe('multipart/form-data');
     if (!result.succeeded) throw new Error('expected succeeded response');
     expect(result.data.logoKey).toBe('t/s/b/logo.png');
@@ -239,5 +242,6 @@ describe('catalogHttpService — endpoints del módulo 18', () => {
     expect(body.has('logo')).toBe(false);
     expect(body.has('banner')).toBe(false);
     expect(body.has('removeBanner')).toBe(false);
+    expect(body.has('mobileColumns')).toBe(false);
   });
 });

@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using Domain.Common.Constants;
+using Domain.Common.Enums;
 using Domain.Entities.Plans;
 using Domain.Entities.StoreModules;
 using Domain.Entities.StoreRoleFeatures;
@@ -15,14 +16,16 @@ using Xunit;
 namespace SMCA.WebApi.E2ETests.Stores;
 
 /// <summary>
-/// E2E tests for the plan dimension of <c>POST /api/v1/stores</c>: every created store
-/// must land on plan Pago (StorePlanId=2) with the trial clock started
-/// (PaymentStartDate=today), the requested module set with catalog price
-/// snapshots, and the StoreRoleFeatures the real flow generates. Strict birth invariant
-/// (2026-09-25, store-birth-pago-only): the birth module set is clamped to the ACTIVE
-/// Pago plan catalog — Superior/VIP-only members (12..17) are rejected 400 and the
-/// 2026-09-18 Option A REQUEST-driven divergence is closed. The exhaustive 12..17 sweep
-/// lives in StoreBirthPagoOnlyTests; this file pins the plan/price/feature shape on Pago members.
+/// E2E tests for the plan dimension of <c>POST /api/v1/stores</c>: every created store must land
+/// on plan Superior (3) with the trial clock started (PaymentStartDate=today), the catalog price
+/// snapshot of every granted module, and the StoreRoleFeatures the real flow generates.
+///
+/// store-birth-superior (2026-10-11, replaces store-birth-pago-only): the birth module set is the
+/// Superior catalog, NOT a request field — <c>ModuleIds</c> was removed from the command, so there
+/// is nothing to request and nothing to reject. The exhaustive rules live in
+/// <see cref="StoreBirthSuperiorTests"/> (exact catalog + VIP-only 16) and
+/// <see cref="StoreBirthCatalogFlagTests"/> (IsActive / AvailableToStore); this file pins the
+/// plan/price/feature SHAPE on the created rows.
 /// </summary>
 [Collection("e2e")]
 public sealed class StoreCreatePlanTests
@@ -30,26 +33,22 @@ public sealed class StoreCreatePlanTests
     private readonly AppTestFactory _f;
     public StoreCreatePlanTests(WebAppFixture fixture) => _f = fixture.Factory;
 
+    private const int SuperiorPlanId = (int)StorePlanType.Superior;
     private const int FreeManagementModuleId = 7;
     private const int StatisticsModuleId = 6;
-    private const int WarehousesModuleId = 13;
-    private const int WholesaleSalesModuleId = 12;
     private const int MultiStoresModuleId = 14;
-    private const int MultiMonedasModuleId = 15;
-    private const int ElaborationModuleId = 17;
-    private const int SuperiorPlanId = (int)Domain.Common.Enums.StorePlanType.Superior;
-    private const int PagoPlanId = (int)Domain.Common.Enums.StorePlanType.Pago;
 
-    private static object Body(Guid ownerId, string name, IEnumerable<int> moduleIds) => new
+    /// <summary>No ModuleIds any more (store-birth-superior) — the body is just the store data.</summary>
+    private static object Body(Guid ownerId, string name) => new
     {
         OwnerId = ownerId, Name = name, Address = (string?)null, Description = (string?)null,
-        Approved = false, ModuleIds = moduleIds
+        Approved = false
     };
 
     // ── Happy Path ─────────────────────────────────────────────────────────
 
     [Fact]
-    public async Task Create_store_gets_pago_plan_modules_and_features()
+    public async Task Create_store_gets_superior_plan_modules_and_features()
     {
         var login = $"sa-cp-{Guid.NewGuid():N}@test.com";
         var adminId = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
@@ -57,11 +56,8 @@ public sealed class StoreCreatePlanTests
         Guid created = Guid.Empty;
         try
         {
-            // Request = Pago members only (strict birth invariant): Management (7, free) +
-            // Statistics (6, paid). Warehouses (13) is Superior/VIP-only since 2026-09-25.
             var response = await DbTestHelpers.AuthedClient(_f, adminId, login)
-                .PostAsJsonAsync("/api/v1/stores",
-                    Body(owner.OwnerId, $"Store-{Guid.NewGuid():N}", new[] { FreeManagementModuleId, StatisticsModuleId }));
+                .PostAsJsonAsync("/api/v1/stores", Body(owner.OwnerId, $"Store-{Guid.NewGuid():N}"));
             response.StatusCode.Should().Be(HttpStatusCode.Created);
             created = (await response.Content.ReadFromJsonAsync<ApiResponse<StoreData>>(ApiResponse.Json))!.Data!.Id;
 
@@ -69,22 +65,29 @@ public sealed class StoreCreatePlanTests
             var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
             var store = await db.Set<Store>().IgnoreQueryFilters().SingleAsync(s => s.Id == created);
-            store.StorePlanId.Should().Be(PagoPlanId); // default plan is Pago (2) since the 2026-09-18 birth-plan change
+            store.StorePlanId.Should().Be(SuperiorPlanId); // birth default (store-birth-superior, 2026-10-11)
             store.PaymentStartDate.Should().Be(DateOnly.FromDateTime(DateTime.UtcNow)); // trial clock starts unconditionally
 
+            var catalog = await SuperiorCatalogAsync(db);
             var storeModules = await db.Set<StoreModule>().IgnoreQueryFilters()
                 .Where(sm => sm.StoreId == created && sm.IsActive).ToListAsync();
-            storeModules.Select(sm => sm.ModuleId).Should().BeEquivalentTo(new[]
-            {
-                FreeManagementModuleId, StatisticsModuleId
-            });
+            storeModules.Select(sm => sm.ModuleId).Should().BeEquivalentTo(catalog);
 
-            // StoreRoleFeatures rows exist for the mapped features of the requested modules.
+            // Price snapshots come from the catalog row, not from anything the caller sent.
+            var catalogById = await db.Set<Domain.Entities.Modules.Module>().IgnoreQueryFilters()
+                .ToDictionaryAsync(m => m.Id);
+            foreach (var sm in storeModules)
+            {
+                var module = catalogById[sm.ModuleId];
+                sm.ModulePrice.Should().Be(module.Price);
+                sm.ModulePriceIncluded.Should().Be(module.PriceIncluded);
+            }
+
+            // StoreRoleFeatures rows exist for the mapped features of the granted modules.
             var srfFeatureIds = await db.Set<StoreRoleFeature>().IgnoreQueryFilters()
                 .Where(srf => srf.StoreId == created && srf.IsActive)
                 .Select(srf => srf.FeatureId).Distinct().ToListAsync();
             srfFeatureIds.Should().Contain(60); // Statistics feature
-            srfFeatureIds.Should().NotContain(new[] { 36, 37, 38, 39 }); // Warehouses/MultiStores/WholesaleSales are not requested
         }
         finally
         {
@@ -95,77 +98,39 @@ public sealed class StoreCreatePlanTests
     }
 
     [Fact]
-    public async Task Create_store_rejects_wholesale_sales_module_for_pago_birth()
+    public async Task Create_store_births_with_catalog_price_snapshots()
     {
-        // Strict birth invariant (2026-09-25, store-birth-pago-only): every store born via
-        // POST /v1/stores lands on Pago (CreateStoreService hardcodes StorePlanType.Pago), so a
-        // request naming ANY Superior/VIP-only member is rejected 400 (ModuleNotAvailableForPagoPlan,
-        // fail-closed). WholesaleSales (12) is the closure case kept here; the exhaustive 12..17
-        // sweep lives in StoreBirthPagoOnlyTests.
-        var login = $"sa-ca-{Guid.NewGuid():N}@test.com";
-        var adminId = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
-        var owner = await StoreSeed.SeedOwnerAsync(_f);
-        try
-        {
-            var response = await DbTestHelpers.AuthedClient(_f, adminId, login)
-                .PostAsJsonAsync("/api/v1/stores",
-                    Body(owner.OwnerId, $"Store-{Guid.NewGuid():N}",
-                        new[] { 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, WholesaleSalesModuleId, WarehousesModuleId, MultiStoresModuleId }));
-            response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-            var b = await response.Content.ReadFromJsonAsync<ApiResponse<object>>(ApiResponse.Json);
-            b!.Errors.Should().Contain(e => e.Code == "ModuleIds");
-
-            // No store may be left behind by the rejected request.
-            using var scope = _f.Services.CreateScope();
-            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-            (await db.Set<Store>().IgnoreQueryFilters().AnyAsync(s => s.OwnerId == owner.OwnerId))
-                .Should().BeFalse("the rejected create must not persist any store");
-        }
-        finally
-        {
-            await StoreSeed.CleanupOwnerAsync(_f, owner.OwnerId, owner.UserId);
-            await DbTestHelpers.CleanupUserAsync(_f, adminId);
-        }
-    }
-
-    [Fact]
-    public async Task Create_store_with_full_pago_catalog_births_exact_request_set()
-    {
-        // Strict birth invariant (2026-09-25, store-birth-pago-only): every created store
-        // births on Pago (2) and the birth module set EQUALS the active Pago plan catalog —
-        // the 2026-09-18 Option A request-driven divergence (Superior members honored on a
-        // Pago birth) is closed. The full catalog request yields exactly the catalog set.
-        var login = $"sa-csc-{Guid.NewGuid():N}@test.com";
+        var login = $"sa-cpc-{Guid.NewGuid():N}@test.com";
         var adminId = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
         var owner = await StoreSeed.SeedOwnerAsync(_f);
         Guid created = Guid.Empty;
         try
         {
-            // The full Pago catalog (10 members) — read from StorePlanModule, the SAME source
-            // the validator uses, so the pin stays honest if the catalog ever changes.
-            using (var scope = _f.Services.CreateScope())
-            {
-                var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-                var catalog = await db.Set<StorePlanModule>().IgnoreQueryFilters()
-                    .Where(spm => spm.PlanId == PagoPlanId)
-                    .Select(spm => spm.ModuleId).ToListAsync();
-                catalog.Should().HaveCount(10,
-                    "Pago is 10 members (WholesaleSales 12 removed 2026-09-23; 13..17 are Superior/VIP-only)");
+            var response = await DbTestHelpers.AuthedClient(_f, adminId, login)
+                .PostAsJsonAsync("/api/v1/stores", Body(owner.OwnerId, $"Store-{Guid.NewGuid():N}"));
+            response.StatusCode.Should().Be(HttpStatusCode.Created);
+            created = (await response.Content.ReadFromJsonAsync<ApiResponse<StoreData>>(ApiResponse.Json))!.Data!.Id;
 
-                var response = await DbTestHelpers.AuthedClient(_f, adminId, login)
-                    .PostAsJsonAsync("/api/v1/stores", Body(owner.OwnerId, $"Store-{Guid.NewGuid():N}", catalog));
-                response.StatusCode.Should().Be(HttpStatusCode.Created);
-                created = (await response.Content.ReadFromJsonAsync<ApiResponse<StoreData>>(ApiResponse.Json))!.Data!.Id;
+            using var scope = _f.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
-                var store = await db.Set<Store>().IgnoreQueryFilters().SingleAsync(s => s.Id == created);
-                store.StorePlanId.Should().Be(PagoPlanId);
+            // Both a free member and a paid one, so the assertion covers PriceIncluded true AND false.
+            var sm = await db.Set<StoreModule>().IgnoreQueryFilters()
+                .Where(x => x.StoreId == created && x.ModuleId == StatisticsModuleId)
+                .SingleAsync();
+            var statistics = await db.Set<Domain.Entities.Modules.Module>().IgnoreQueryFilters()
+                .SingleAsync(m => m.Id == StatisticsModuleId);
 
-                var storeModuleIds = await db.Set<StoreModule>().IgnoreQueryFilters()
-                    .Where(sm => sm.StoreId == created && sm.IsActive)
-                    .Select(sm => sm.ModuleId).ToListAsync();
-                // Divergence closed: the birth module set equals the Pago catalog exactly.
-                storeModuleIds.Should().BeEquivalentTo(catalog);
-            }
+            sm.ModulePriceIncluded.Should().Be(statistics.PriceIncluded).And.BeFalse();
+            sm.ModulePrice.Should().Be(statistics.Price);
+            sm.ModulePercentDiscountPrice.Should().Be(statistics.PercentDiscountPrice);
+            sm.ModuleDiscountPrice.Should().Be(statistics.DiscountPrice);
+
+            var management = await db.Set<StoreModule>().IgnoreQueryFilters()
+                .Where(x => x.StoreId == created && x.ModuleId == FreeManagementModuleId)
+                .SingleAsync();
+            management.ModulePriceIncluded.Should().BeTrue();
+            management.ModulePrice.Should().Be(0f);
         }
         finally
         {
@@ -176,8 +141,11 @@ public sealed class StoreCreatePlanTests
     }
 
     [Fact]
-    public async Task Create_store_free_only_modules_still_plan_pago_with_trial_clock()
+    public async Task Create_store_always_starts_the_trial_clock_on_superior()
     {
+        // store-birth-superior: there is no longer a "free-only module set" request to send — the
+        // catalog always carries paid members, so the trial clock is unconditional by construction.
+        // The body Approved=false is still ignored (every creation path forces approved=true).
         var login = $"sa-cf-{Guid.NewGuid():N}@test.com";
         var adminId = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
         var owner = await StoreSeed.SeedOwnerAsync(_f);
@@ -185,8 +153,7 @@ public sealed class StoreCreatePlanTests
         try
         {
             var response = await DbTestHelpers.AuthedClient(_f, adminId, login)
-                .PostAsJsonAsync("/api/v1/stores",
-                    Body(owner.OwnerId, $"Store-{Guid.NewGuid():N}", new[] { 2, 3, 4, FreeManagementModuleId }));
+                .PostAsJsonAsync("/api/v1/stores", Body(owner.OwnerId, $"Store-{Guid.NewGuid():N}"));
             response.StatusCode.Should().Be(HttpStatusCode.Created);
             created = (await response.Content.ReadFromJsonAsync<ApiResponse<StoreData>>(ApiResponse.Json))!.Data!.Id;
 
@@ -194,10 +161,9 @@ public sealed class StoreCreatePlanTests
             var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
             var store = await db.Set<Store>().IgnoreQueryFilters().SingleAsync(s => s.Id == created);
-            // Plan is Pago and the trial clock starts even for free-only module sets —
-            // but PlanType resolves "Free" (no paid module active) until one is added.
-            store.StorePlanId.Should().Be(PagoPlanId);
+            store.StorePlanId.Should().Be(SuperiorPlanId);
             store.PaymentStartDate.Should().Be(DateOnly.FromDateTime(DateTime.UtcNow));
+            store.Approved.Should().BeTrue("body Approved=false is ignored");
         }
         finally
         {
@@ -210,30 +176,27 @@ public sealed class StoreCreatePlanTests
     // ── Edge Cases ─────────────────────────────────────────────────────────
 
     [Fact]
-    public async Task Create_store_module_ids_duplicates_return_500_pk_collision()
+    public async Task Create_store_grants_multi_stores_because_the_birth_plan_is_superior()
     {
-        // Documented current behavior: CreateStoreService loops over moduleIds WITHOUT
-        // deduplication and StoreModule has PK (StoreId, ModuleId) — a duplicated id in
-        // the request makes the second INSERT collide with the first and the endpoint
-        // fails with 500 (unlike UpdateStoreCommand's DG-7 guard, which dedups with
-        // Distinct()). Asserted as-is; fixing the handler is a production change.
-        var login = $"sa-cd-{Guid.NewGuid():N}@test.com";
+        // The closure case of the OLD invariant (store-birth-pago-only rejected 12..17 with 400
+        // ModuleIds). Under store-birth-superior there is nothing to reject: MultiStores (14) IS a
+        // Superior member, so it is granted like any other catalog entry.
+        var login = $"sa-ca-{Guid.NewGuid():N}@test.com";
         var adminId = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
         var owner = await StoreSeed.SeedOwnerAsync(_f);
         Guid created = Guid.Empty;
         try
         {
             var response = await DbTestHelpers.AuthedClient(_f, adminId, login)
-                .PostAsJsonAsync("/api/v1/stores",
-                    Body(owner.OwnerId, $"Store-{Guid.NewGuid():N}",
-                        new[] { FreeManagementModuleId, FreeManagementModuleId, StatisticsModuleId, StatisticsModuleId }));
-            response.StatusCode.Should().Be(HttpStatusCode.InternalServerError);
+                .PostAsJsonAsync("/api/v1/stores", Body(owner.OwnerId, $"Store-{Guid.NewGuid():N}"));
+            response.StatusCode.Should().Be(HttpStatusCode.Created);
+            created = (await response.Content.ReadFromJsonAsync<ApiResponse<StoreData>>(ApiResponse.Json))!.Data!.Id;
 
-            // The failed transaction must not leave a partial store behind.
             using var scope = _f.Services.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-            (await db.Set<Store>().IgnoreQueryFilters().AnyAsync(s => s.Name != null && s.OwnerId == owner.OwnerId))
-                .Should().BeFalse("the failed create must not persist a partial store");
+            (await db.Set<StoreModule>().IgnoreQueryFilters()
+                .AnyAsync(sm => sm.StoreId == created && sm.ModuleId == MultiStoresModuleId && sm.IsActive))
+                .Should().BeTrue("MultiStores (14) is a Superior member and is granted at birth");
         }
         finally
         {
@@ -244,26 +207,50 @@ public sealed class StoreCreatePlanTests
     }
 
     [Fact]
-    public async Task Create_store_unavailable_module_38_stores_no_row()
+    public async Task Create_store_ignores_an_unknown_moduleIds_field_in_the_body()
     {
-        // Module 1 (Administration) exists in the catalog but is NOT AvailableToStore:
-        // the validator rejects it with 400 ModuleIds.
+        // store-birth-superior removed ModuleIds from the command, but System.Text.Json ignores
+        // unknown members by default — a client still sending it gets the SAME catalog, silently.
+        // That is the contract the React payload removal rides on: no 400, no partial grant.
         var login = $"sa-cu-{Guid.NewGuid():N}@test.com";
         var adminId = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
         var owner = await StoreSeed.SeedOwnerAsync(_f);
+        Guid created = Guid.Empty;
         try
         {
             var response = await DbTestHelpers.AuthedClient(_f, adminId, login)
-                .PostAsJsonAsync("/api/v1/stores",
-                    Body(owner.OwnerId, $"Store-{Guid.NewGuid():N}", new[] { FreeManagementModuleId, 1 }));
-            response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-            var b = await response.Content.ReadFromJsonAsync<ApiResponse<object>>(ApiResponse.Json);
-            b!.Errors.Should().Contain(e => e.Code == "ModuleIds");
+                .PostAsJsonAsync("/api/v1/stores", new
+                {
+                    OwnerId = owner.OwnerId,
+                    Name = $"Store-{Guid.NewGuid():N}",
+                    Address = (string?)null,
+                    Description = (string?)null,
+                    Approved = true,
+                    ModuleIds = new[] { FreeManagementModuleId }, // legacy field, no longer in the command
+                });
+            response.StatusCode.Should().Be(HttpStatusCode.Created);
+            created = (await response.Content.ReadFromJsonAsync<ApiResponse<StoreData>>(ApiResponse.Json))!.Data!.Id;
+
+            using var scope = _f.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var granted = await db.Set<StoreModule>().IgnoreQueryFilters()
+                .Where(sm => sm.StoreId == created && sm.IsActive)
+                .Select(sm => sm.ModuleId).ToListAsync();
+            granted.Should().BeEquivalentTo(await SuperiorCatalogAsync(db),
+                "a legacy ModuleIds field neither narrows nor widens the grant");
         }
         finally
         {
+            if (created != Guid.Empty) await StoreSeed.CleanupStoreAsync(_f, created);
             await StoreSeed.CleanupOwnerAsync(_f, owner.OwnerId, owner.UserId);
             await DbTestHelpers.CleanupUserAsync(_f, adminId);
         }
     }
+
+    private static async Task<List<int>> SuperiorCatalogAsync(ApplicationDbContext db)
+        => await db.Set<StorePlanModule>().IgnoreQueryFilters()
+            .Where(spm => spm.PlanId == SuperiorPlanId
+                && spm.Module.IsActive && spm.Module.AvailableToStore)
+            .Select(spm => spm.ModuleId)
+            .ToListAsync();
 }

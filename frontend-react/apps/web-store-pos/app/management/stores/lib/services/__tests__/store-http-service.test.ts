@@ -113,7 +113,7 @@ describe('storeHttpService.createStore — HTTP-4: POST /v1/stores', () => {
     });
   });
 
-  it('calls POST /v1/stores with payload including moduleIds', async () => {
+  it('calls POST /v1/stores with the create payload and no moduleIds', async () => {
     const { storeHttpService } = await import('../store-http-service');
     const { apiClient } = await import('~/shared/lib/http/api-client');
     const payload = {
@@ -122,7 +122,6 @@ describe('storeHttpService.createStore — HTTP-4: POST /v1/stores', () => {
       address: '123 Main St',
       description: 'A store',
       approved: false,
-      moduleIds: [1, 2],
     };
     await storeHttpService.createStore(payload);
     expect(apiClient.post).toHaveBeenCalledWith('/v1/stores', payload);
@@ -136,7 +135,6 @@ describe('storeHttpService.createStore — HTTP-4: POST /v1/stores', () => {
       address: '123',
       description: '',
       approved: false,
-      moduleIds: [],
     });
     if (!result.succeeded) throw new Error('expected succeeded response');
     expect(result.data.name).toBe('New Store');

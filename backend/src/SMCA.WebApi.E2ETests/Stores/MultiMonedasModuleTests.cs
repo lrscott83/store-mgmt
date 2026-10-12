@@ -25,8 +25,8 @@ namespace SMCA.WebApi.E2ETests.Stores;
 /// and VIP (4) plans. This suite pins the FULL chain a user experiences:
 ///
 ///   MM1  OwnerAdmin creating a store from a Superior selected store {7,14,15}:
-///        the child INHERITS only the Pago-catalog member (7) — 15/43 never reach it
-///        (strict birth invariant, 2026-09-25, store-birth-pago-only).
+///        the child is born on the Superior catalog, so 15 and 43 DO reach it
+///        (store-birth-superior, 2026-10-11 — replaced the old clamp-to-Pago).
 ///   MM2  Changing the plan to Superior activates 15/43 through the SAME
     ///        runtime chain (change-plan → StoreModules → /me). Since the
     ///        2026-09-18 caller matrix, the flip runs as SuperAdmin (Superior/VIP
@@ -111,14 +111,14 @@ public sealed class MultiMonedasModuleTests
         => DbTestHelpers.AuthedClient(f, s.UserId, s.Login);
 
     [Fact]
-    public async Task MM1_created_store_clamps_inheritance_to_pago_catalog()
+    public async Task MM1_created_store_is_born_on_the_superior_catalog()
     {
-        // OwnerAdmin creation contract (OwnerCreateStoreTests): the body ModuleIds are
-        // IGNORED — the new store INHERITS the selected store's module set, and the
-        // handler gates on MultiStores (14) being active on the selected store. Strict birth
-        // invariant (2026-09-25, store-birth-pago-only): the inherited set is CLAMPED to the
-        // active Pago catalog. Seed the selected store with {7, 14, 15} (Superior): creating
-        // now propagates ONLY 7 — 15 and feature 43 never reach the child.
+        // OwnerAdmin creation contract (OwnerCreateStoreTests): the handler gates on MultiStores
+        // (14) being active on the SELECTED store and then hands everything to the service.
+        // store-birth-superior (2026-10-11) REPLACED the old clamp-to-Pago inheritance: the child
+        // is born on the Superior plan catalog, so MultiMonedas (15) and feature 43 — which the
+        // old invariant kept OUT — now reach it. Seed the selected store with {7, 14, 15} to
+        // reproduce the old shape and pin the NEW outcome.
         var seeded = await SeedOwnerAdminStoreAsync(planId: (int)StorePlanType.Superior);
         try
         {
@@ -141,7 +141,6 @@ public sealed class MultiMonedasModuleTests
                 Address = "",
                 Description = "",
                 Approved = true,
-                ModuleIds = Array.Empty<int>(), // ignored for OwnerAdmin: modules inherit
             };
             var create = await OwnerClient(_f, seeded).PostAsJsonAsync("/api/v1/stores", body);
             create.StatusCode.Should().Be(HttpStatusCode.Created);
@@ -156,14 +155,12 @@ public sealed class MultiMonedasModuleTests
                 var childModuleIds = await db.Set<StoreModule>().IgnoreQueryFilters()
                     .Where(sm => sm.StoreId == newStoreId && sm.IsActive)
                     .Select(sm => sm.ModuleId).ToListAsync();
-                childModuleIds.Should().BeEquivalentTo(new[] { 7 /* Management */ },
-                    "the child inherits ONLY the Pago-catalog member (7); 14/15 are Superior/VIP-only");
-                (await db.Set<StoreModule>().IgnoreQueryFilters().CountAsync(sm =>
-                    sm.StoreId == newStoreId && sm.ModuleId == MultiMonedasModuleId && sm.IsActive))
-                    .Should().Be(0, "MultiMonedas (15) must NOT reach the child");
+                childModuleIds.Should().Contain(7 /* Management */);
+                childModuleIds.Should().Contain(MultiMonedasModuleId,
+                    "MultiMonedas (15) is a Superior member — store-birth-superior grants it");
                 (await db.Set<StoreRoleFeature>().IgnoreQueryFilters().CountAsync(srf =>
                     srf.StoreId == newStoreId && srf.FeatureId == MultiMonedasFeatureId))
-                    .Should().Be(0, "feature 43 must not be granted to the child");
+                    .Should().BeGreaterThan(0, "feature 43 flows with the module at birth");
             }
             finally
             {

@@ -93,6 +93,19 @@ public class UpdateStoreCatalogBrandingCommandValidatorTests
             .IsValid.Should().BeTrue();
     }
 
+    /// <summary>
+    /// Elementos por fila en móvil: SOLO 1 o 2 (decisión del owner, 2026-10-12). Los dos valores
+    /// válidos pasan, y el ajuste puede ir solo (sin tocar la marca).
+    /// </summary>
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    public void Validate_WithAValidMobileColumns_ShouldPass(int columns)
+    {
+        Validator().Validate(new UpdateStoreCatalogBrandingCommand(null, false, null, false, columns))
+            .IsValid.Should().BeTrue();
+    }
+
     #endregion
 
     #region Error Handling
@@ -130,6 +143,23 @@ public class UpdateStoreCatalogBrandingCommandValidatorTests
 
         result.IsValid.Should().BeFalse();
         result.Errors.Should().Contain(e => e.ErrorMessage.StartsWith("BrandingUploadAndRemoveConflict", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// Un valor fuera de rango de "elementos por fila en móvil" se rechaza con 400 en vez de
+    /// guardarse: el storefront solo entiende 1 o 2, y normalizarlo en silencio escondería un bug
+    /// del cliente.
+    /// </summary>
+    [Theory]
+    [InlineData(0)]
+    [InlineData(3)]
+    [InlineData(-1)]
+    public void Validate_WithMobileColumnsOutOfRange_ShouldFail(int columns)
+    {
+        var result = Validator().Validate(new UpdateStoreCatalogBrandingCommand(null, false, null, false, columns));
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain(e => e.ErrorMessage.StartsWith("BrandingMobileColumnsRange", StringComparison.Ordinal));
     }
 
     /// <summary>

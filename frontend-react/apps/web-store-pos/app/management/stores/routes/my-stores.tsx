@@ -147,14 +147,14 @@ export function MyStoresPage() {
     try {
       // Owner-branch contract (owner-multistores store-creation): body ownerId is
       // the zero-Guid — the backend derives the caller's own owner, forces
-      // approved=true and inherits the selected store's modules.
+      // approved=true, and births the child on the Superior plan with that plan's
+      // catalog (store-birth-superior, 2026-10-11: no moduleIds is sent).
       await storeHttpService.createStore({
         ownerId: '00000000-0000-0000-0000-000000000000',
         name: values.name,
         address: '',
         description: '',
         approved: true,
-        moduleIds: [],
       });
       // store-list-active-stores: refresh the session so the new store
       // lands in the session's storeList (switcher + Configuraciones

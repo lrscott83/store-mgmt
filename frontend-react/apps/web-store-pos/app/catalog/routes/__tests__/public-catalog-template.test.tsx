@@ -96,6 +96,7 @@ function config(templateId: string): PublicOrderingConfig {
     deliveryZones: null,
     paletteId: 'default',
     templateId,
+    mobileColumns: 2,
     logoUrl: null,
     bannerUrl: null,
     carouselImages: [],

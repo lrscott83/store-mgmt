@@ -52,7 +52,8 @@ namespace Application.Features.WebCatalog.Branding.Commands.UpdateStoreCatalogBr
         CatalogImageUpload? Logo,
         bool RemoveLogo,
         CatalogImageUpload? Banner,
-        bool RemoveBanner) : ICommand<StoreCatalogBrandingDto>;
+        bool RemoveBanner,
+        int? MobileColumns = null) : ICommand<StoreCatalogBrandingDto>;
 
     public class UpdateStoreCatalogBrandingCommandHandler
         : ICommandHandler<UpdateStoreCatalogBrandingCommand, StoreCatalogBrandingDto>
@@ -144,13 +145,20 @@ namespace Application.Features.WebCatalog.Branding.Commands.UpdateStoreCatalogBr
                 settings.BannerKey = await ResolveAsync(
                     request.Banner, request.RemoveBanner, settings.BannerKey, BrandingImageKinds.Banner, tenantId, storeId, obsoleteKeys, newKeys, cancellationToken);
 
+                // Presentación (decisiones del owner, 2026-10-12): elementos por fila en móvil.
+                // `null` = no se toca (parche parcial, como logo/banner): cambiar el logo no debe
+                // resetear este ajuste. El validador ya garantiza 1 o 2 cuando viene.
+                if (request.MobileColumns.HasValue)
+                    settings.MobileColumns = request.MobileColumns.Value;
+
                 // El upsert escribe SOLO las columnas de marca: la fila la comparten los pedidos
                 // (D19), así que un UPDATE de fila completa revertiría un cambio de pedidos
                 // concurrente. `ApplicationDbContext` es NoTracking, así que mutar la fila cargada y
                 // llamar a `SaveChanges` sin marcar no escribiría NADA — sin error y sin aviso.
                 await _storeCatalogSettingsRepository.UpsertAsync(settings, exists,
                     nameof(StoreCatalogSettings.LogoKey),
-                    nameof(StoreCatalogSettings.BannerKey));
+                    nameof(StoreCatalogSettings.BannerKey),
+                    nameof(StoreCatalogSettings.MobileColumns));
                 await _applicationUnitOfWork.SaveChangesAsync(cancellationToken);
             }
             catch
@@ -212,6 +220,9 @@ namespace Application.Features.WebCatalog.Branding.Commands.UpdateStoreCatalogBr
                 PaletteId = string.IsNullOrWhiteSpace(settings.PaletteId)
                     ? StoreCatalogSettings.DefaultPaletteId
                     : settings.PaletteId,
+                MobileColumns = settings.MobileColumns is 1 or 2
+                    ? settings.MobileColumns
+                    : StoreCatalogSettings.DefaultMobileColumns,
             });
         }
 

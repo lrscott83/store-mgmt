@@ -635,6 +635,68 @@ public class UpdateStoreCatalogBrandingCommandHandlerTests
 
     #endregion
 
+    #region Mobile columns (elementos por fila en movil)
+
+    /// <summary>
+    /// El ajuste viaja y se persiste: el dueño elige 1 y la fila lo guarda. La rejilla del catálogo
+    /// público (plantilla `default`) lo lee del config anónimo.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WithMobileColumnsOne_ShouldPersistIt()
+    {
+        ExistingRow();
+
+        var result = await Handler().Handle(
+            new UpdateStoreCatalogBrandingCommand(null, false, null, false, MobileColumns: 1), CancellationToken.None);
+
+        _persisted!.MobileColumns.Should().Be(1);
+        result.Data!.MobileColumns.Should().Be(1);
+    }
+
+    /// <summary>
+    /// Parche parcial: un command sin `MobileColumns` (null) NO toca el ajuste, igual que no toca el
+    /// lado del logo/banner que no menciona. Cambiar el logo no puede resetear las columnas.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WithoutMobileColumns_ShouldKeepTheExistingValue()
+    {
+        ExistingRow().MobileColumns = 1;
+
+        await Handler().Handle(new UpdateStoreCatalogBrandingCommand(Logo(), false, null, false), CancellationToken.None);
+
+        _persisted!.MobileColumns.Should().Be(1);
+    }
+
+    /// <summary>Una fila nueva nace con el default (2), que es el comportamiento actual del catálogo.</summary>
+    [Fact]
+    public async Task Handle_WhenTheRowIsNew_ShouldStartWithTheDefaultMobileColumns()
+    {
+        _settingsRepository.Setup(x => x.GetByStoreIdAsync(_storeId)).ReturnsAsync((StoreCatalogSettings?)null);
+
+        await Handler().Handle(new UpdateStoreCatalogBrandingCommand(Logo(), false, null, false), CancellationToken.None);
+
+        _persisted!.MobileColumns.Should().Be(StoreCatalogSettings.DefaultMobileColumns);
+    }
+
+    /// <summary>Guardar solo las columnas (sin archivos) es una operación completa y válida.</summary>
+    [Fact]
+    public async Task Handle_WithOnlyMobileColumns_ShouldPersistWithoutTouchingTheBrand()
+    {
+        ExistingRow();
+
+        var result = await Handler().Handle(
+            new UpdateStoreCatalogBrandingCommand(null, false, null, false, MobileColumns: 2), CancellationToken.None);
+
+        _persisted!.LogoKey.Should().Be("old-logo.png");
+        _persisted.BannerKey.Should().Be("old-banner.png");
+        result.Data!.MobileColumns.Should().Be(2);
+        _catalogImageStorage.Verify(
+            x => x.SaveBrandingAsync(It.IsAny<CatalogImageUpload>(), It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    #endregion
+
     #region Error Handling
 
     /// <summary>
