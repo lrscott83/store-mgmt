@@ -245,15 +245,12 @@ owners distintos (pendiente de confirmar; si aplica, recupera la severidad de se
       que el storefront nunca leerá). Fix: `[HasPermission(StoreRolesFeatures.PedidosWhatsAppAdmin)]`
       — **nota**: el E2E existente fija módulo 18; cambiarlo requiere autorización (añadir test
       nuevo, no tocar el existente).
-- [ ] **5.1 — Gate en el módulo 18 en vez del 19.** — **BLOQUEADO 2026-10-12**: el cambio a
-      `PedidosWhatsAppAdmin` (módulo 19) es correcto, pero el plan **Superior/VIP YA incluye el módulo
-      19** (`PedidosModulesBackfill` → `StorePlanModule` 19→planes 3 y 4), así que el fixture del E2E
-      (tienda Superior) **no puede expresar** "tiene 19 sin 18": sin contratar nada, el gate del 19
-      responde 200, y el caso negativo exige una tienda en un plan SIN el 19 (Gratis/Pago). Cambiar el
-      gate rompió 8 asserts de `OrderingSettingsRouteAuthE2ETests` (R1_2/R1_3/R1_4/R1_7/R1_8/R1_9)
-      sin poder probar la semántica. **Revertido** el cambio (gate sigue en 18) para no dejar la suite
-      roja. Necesita: un seed en plan inferior + decisión de producto (¿el gate debe ser 19, que es
-      del plan, o 18?). *No es un cambio de una línea.*
+- [x] **5.1 — Gate en el módulo 18 en vez del 19.** — **HECHO 2026-10-12** (`22c46714`): el controlador
+      exige `PedidosWhatsAppAdmin` (feature 124, módulo 19). **Nota de test:** el plan **Superior/VIP ya
+      incluye el módulo 19** (`PedidosModulesBackfill` → `StorePlanModule` 19→planes 3 y 4), así que el
+      E2E del fixture (Superior) no puede representar "sin el módulo": los casos negativos usan una
+      tienda en **plan Gratis** (sin el 19) y el caso que distingue los dos módulos contrata el 18 en
+      esa tienda y espera 403. **E2E `Orders` 30/30.**
 - [x] **5.2 — `TenantId` sale del claim del llamador.** — **HECHO 2026-10-12** (`00acfe44`): el handler
       de settings resuelve el tenant desde `Store.TenantId` al crear; el de marca lo resuelve SIEMPRE
       (es también el prefijo de la clave del archivo). Default de `UpsertAsync` conserva la firma
@@ -474,3 +471,8 @@ documenta `AGENTS.md`).
   **revertido** (el plan Superior/VIP ya incluye el módulo 19 → el fixture no puede probar el caso
   negativo; rompía 8 asserts). **Diferidos**: 5.4b (`23505→409`, X3) y 5.7 (LOW). Pendiente de decisión:
   cómo testear 5.1 (seed en plan inferior) antes de RDD.
+- 2026-10-12 — **Controller 5 COMPLETO**: **5.1 HECHO** (`22c46714`) — gate en el módulo 19
+  (`PedidosWhatsAppAdmin`); el E2E usa una tienda en plan **Gratis** para el caso negativo (el plan
+  Superior ya incluye el 19) y contrata el 18 en esa tienda para demostrar que NO abre la config.
+  `dotnet build` 0 errores; `Application.Tests` **1276 verde**; E2E `Orders` **30/30**. Siguiente: RDD
+  del Controller 5.
