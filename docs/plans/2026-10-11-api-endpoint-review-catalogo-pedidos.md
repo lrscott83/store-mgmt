@@ -476,3 +476,9 @@ documenta `AGENTS.md`).
   Superior ya incluye el 19) y contrata el 18 en esa tienda para demostrar que NO abre la config.
   `dotnet build` 0 errores; `Application.Tests` **1276 verde**; E2E `Orders` **30/30**. Siguiente: RDD
   del Controller 5.
+- 2026-10-12 — **Controller 5: RDD APROBADA** (lineage `review-ba673ce3b616716d`, 3 lentes, autoridad
+  quemada); la lente de riesgo no encontró hallazgos. **Advisories no bloqueantes**: (a) la rama de
+  upsert PARCIAL no sella `UpdatedDate` (la de fila completa sí lo hacía) — revisar si el interceptor
+  de auditoría lo cubre; (b) la marca resuelve el tenant desde la tienda pero **no hay test** que
+  distinga tenant-de-tienda de tenant-del-claim; (c) el upsert de plantilla no asserta su lista de
+  columnas; (d) alta concurrente → `23505` → 500 (= **5.4b**, diferido).
