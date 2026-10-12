@@ -421,3 +421,10 @@ aparecieron fallos **PRE-EXISTENTES** (también presentes en el baseline `d9e7c3
   T6 (archivo conservado si el commit es desconocido). Unit **1250 verde**; E2E nuevos **4/4**.
   Además `f551b031` arregla el bug E2E pre-existente **C1-E2E-1** (ver sección de hallazgos). Siguiente:
   RDD de los advisories + el fix, y decidir los hallazgos C1-E2E-2/3.
+- 2026-10-12 — **Advisories Controller 3 + fix del path: RDD APROBADA** (lineage
+  `review-fb2e7c3a53c0b162`, 3 lentes, sin refuter; autoridad quemada). **Advisories no bloqueantes**:
+  (a) el mapeo `55P03 → ShowcaseSetBusyException` no tiene test que provoque un timeout real (el unit
+  lo stubea); (b) `SET LOCAL lock_timeout` aplica a TODA la transacción, no solo al lock (un lock
+  posterior abortaría a 5 s como 500 sin traducir); (c) el 409 no registra log/métrica; (d) los
+  archivos retenidos por commit desconocido acumulan deuda de disco sin reconciliación/métrica. La lente
+  de riesgo no encontró hallazgos.
