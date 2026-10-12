@@ -3,3 +3,10 @@
 # newline and sh misparses it. Scoped to .githooks/ on purpose: a blanket rule
 # here would silently rewrite line endings across the whole repository.
 .githooks/* text eol=lf
+
+# Shell scripts must also reach disk with LF endings on every platform. These
+# are uploaded to the VPS from a Windows checkout, and `#!/usr/bin/env bash\r`
+# is not a shebang: it is a path to a binary literally named "bash<CR>", so the
+# script dies with `/usr/bin/env: 'bash\r': No such file or directory` before a
+# single line runs. Scoped to shell scripts only (not a blanket rule).
+*.sh text eol=lf
