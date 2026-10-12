@@ -5,6 +5,7 @@ using Application.Exceptions;
 using Application.Features.OnlineOrdering.Commands.UpsertStoreCatalogSettings;
 using Application.UnitOfWorks;
 using Domain.Entities.StoreCatalogSettings;
+using Domain.Entities.Stores;
 using Domain.Interfaces.Repositories;
 using FluentAssertions;
 using Microsoft.Extensions.Localization;
@@ -33,6 +34,7 @@ public class UpsertStoreCatalogSettingsCommandHandlerTests
     private readonly Mock<IApplicationUnitOfWork> _unitOfWork = new();
     private readonly Mock<IHttpContextService> _httpContextService = new();
     private readonly Mock<IDateTimeProvider> _dateTimeProvider = new();
+    private readonly Mock<IStoreRepository> _storeRepository = new();
     private readonly Mock<IStoreCatalogSettingsRepository> _settingsRepository = new();
     private readonly Mock<IStringLocalizer<I18n>> _localizer = new();
 
@@ -55,16 +57,22 @@ public class UpsertStoreCatalogSettingsCommandHandlerTests
         _dateTimeProvider.Setup(x => x.UtcNow).Returns(_now);
         _unitOfWork.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
 
+        // El tenant de la fila sale de la TIENDA, no del claim.
+        _storeRepository
+            .Setup(x => x.GetStoreByIdAsync(_storeId))
+            .ReturnsAsync(Store.Create("Tienda Pedidos", Guid.NewGuid(), true, _tenantId));
+
         _settingsRepository
-            .Setup(x => x.UpsertAsync(It.IsAny<StoreCatalogSettings>()))
-            .Returns((StoreCatalogSettings s) => Task.FromResult(s))
-            .Callback<StoreCatalogSettings>(s => _persisted = s);
+            .Setup(x => x.UpsertAsync(It.IsAny<StoreCatalogSettings>(), It.IsAny<bool?>(), It.IsAny<string[]>()))
+            .Returns((StoreCatalogSettings s, bool? _, string[] _) => Task.FromResult(s))
+            .Callback((StoreCatalogSettings s, bool? _, string[] _) => _persisted = s);
     }
 
     private UpsertStoreCatalogSettingsCommandHandler Handler() => new(
         _unitOfWork.Object,
         _httpContextService.Object,
         _dateTimeProvider.Object,
+        _storeRepository.Object,
         _settingsRepository.Object,
         _localizer.Object);
 
@@ -107,7 +115,55 @@ public class UpsertStoreCatalogSettingsCommandHandlerTests
             s.StoreId == _storeId
             && s.TenantId == _tenantId
             && s.Enabled
-            && s.WhatsappNumber == "+5350000000")), Times.Once);
+            && s.WhatsappNumber == "+5350000000"), It.IsAny<bool?>(), It.IsAny<string[]>()), Times.Once);
+    }
+
+    /// <summary>
+    /// El `TenantId` de la fila sale de la TIENDA, no del claim de quien llama: un SuperAdmin
+    /// escribiendo una tienda de OTRO tenant sellaría la fila con su propio tenant y el owner no
+    /// podría verla ni actualizarla nunca.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenCreating_ShouldUseTheStoreTenantNotTheCallersClaim()
+    {
+        Guid callerTenant = Guid.NewGuid();
+        Guid storeTenant = Guid.NewGuid();
+        _httpContextService.Setup(x => x.TenantId).Returns(callerTenant.ToString());
+        _storeRepository.Setup(x => x.GetStoreByIdAsync(_storeId))
+            .ReturnsAsync(Store.Create("Tienda de otro tenant", Guid.NewGuid(), true, storeTenant));
+        _settingsRepository.Setup(x => x.GetByStoreIdAsync(_storeId)).ReturnsAsync((StoreCatalogSettings?)null);
+
+        await Handler().Handle(OpenCommand(), CancellationToken.None);
+
+        _persisted!.TenantId.Should().Be(storeTenant);
+    }
+
+    /// <summary>
+    /// Guardar los pedidos escribe SOLO sus columnas: la fila la comparte la marca (D19), así que un
+    /// UPDATE de fila completa revertiría un cambio de marca concurrente con los valores leídos.
+    /// </summary>
+    [Fact]
+    public async Task Handle_ShouldWriteOnlyTheOrderingColumns()
+    {
+        ExistingRow();
+        string[] expected =
+        [
+            nameof(StoreCatalogSettings.Enabled),
+            nameof(StoreCatalogSettings.WhatsappNumber),
+            nameof(StoreCatalogSettings.PickupEnabled),
+            nameof(StoreCatalogSettings.DeliveryEnabled),
+            nameof(StoreCatalogSettings.BusinessHours),
+            nameof(StoreCatalogSettings.DeliveryZones),
+            nameof(StoreCatalogSettings.SyncedAt),
+        ];
+
+        await Handler().Handle(OpenCommand(), CancellationToken.None);
+
+        _settingsRepository.Verify(x => x.UpsertAsync(
+            It.IsAny<StoreCatalogSettings>(),
+            true,
+            It.Is<string[]>(columns => columns.Length == expected.Length && expected.All(columns.Contains))),
+            Times.Once);
     }
 
     /// <summary>
@@ -306,7 +362,7 @@ public class UpsertStoreCatalogSettingsCommandHandlerTests
 
         await Handler().Handle(OpenCommand(), CancellationToken.None);
 
-        _settingsRepository.Verify(x => x.UpsertAsync(It.IsAny<StoreCatalogSettings>()), Times.Once);
+        _settingsRepository.Verify(x => x.UpsertAsync(It.IsAny<StoreCatalogSettings>(), It.IsAny<bool?>(), It.IsAny<string[]>()), Times.Once);
         _settingsRepository.Verify(x => x.UpdateAsync(It.IsAny<StoreCatalogSettings>()), Times.Never);
         _settingsRepository.Verify(x => x.AddAsync(It.IsAny<StoreCatalogSettings>()), Times.Never);
     }
@@ -327,7 +383,7 @@ public class UpsertStoreCatalogSettingsCommandHandlerTests
         Func<Task> act = () => Handler().Handle(OpenCommand(), CancellationToken.None);
 
         await act.Should().ThrowAsync<ApiException>();
-        _settingsRepository.Verify(x => x.UpsertAsync(It.IsAny<StoreCatalogSettings>()), Times.Never);
+        _settingsRepository.Verify(x => x.UpsertAsync(It.IsAny<StoreCatalogSettings>(), It.IsAny<bool?>(), It.IsAny<string[]>()), Times.Never);
         _unitOfWork.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 
@@ -352,7 +408,7 @@ public class UpsertStoreCatalogSettingsCommandHandlerTests
         Func<Task> act = () => Handler().Handle(OpenCommand(), CancellationToken.None);
 
         await act.Should().ThrowAsync<ApiException>();
-        _settingsRepository.Verify(x => x.UpsertAsync(It.IsAny<StoreCatalogSettings>()), Times.Never);
+        _settingsRepository.Verify(x => x.UpsertAsync(It.IsAny<StoreCatalogSettings>(), It.IsAny<bool?>(), It.IsAny<string[]>()), Times.Never);
         _unitOfWork.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 

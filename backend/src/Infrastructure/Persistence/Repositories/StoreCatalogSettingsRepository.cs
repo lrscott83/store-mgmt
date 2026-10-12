@@ -43,34 +43,47 @@ namespace Infrastructure.Persistence.Repositories
                 .FirstOrDefaultAsync(s => s.StoreId == storeId);
 
         /// <summary>
-        /// Upsert por IDENTIDAD de la fila: si ese id ya existe la marca como modificada, y si no
-        /// la inserta. El jugador es el id de la entidad que trae el caller — cargada de
-        /// <see cref="GetByStoreIdAsync"/> para editar, o recién creada con id nuevo para dar de alta
-        /// la primera vez.
+        /// Upsert por IDENTIDAD de la fila. El jugador es el id de la entidad que trae el caller
+        /// —cargada de <see cref="GetByStoreIdAsync"/> para editar, o recién creada para el alta.
         ///
-        /// `EntityState.Modified` NO es opcional: `ApplicationDbContext` es NoTracking, así que una
-        /// entidad cargada y mutada por el caller seguiría en `Detached` y `SaveChanges` no escribiría
-        /// NADA — sin excepción y sin aviso. Marcar la entidad convierte la mutación en un UPDATE
-        /// de verdad; sin marca, un upsert "silenciosamente no hace nada".
+        /// <paramref name="modifiedProperties"/> son los nombres de las columnas que el handler
+        /// cambió: marcar SOLO esas es lo que impide que "guardar los pedidos" reescriba la marca (y
+        /// al revés), porque la fila es UNA (D19) y la comparten dos vistas.
         ///
-        /// `IgnoreQueryFilters` en la existencia: la fila podría estar de baja lógica (IsActive=false)
-        /// y reactivarla es un UPDATE legítimo, no un alta nueva.
+        /// Sin `modifiedProperties` (llamada histórica de un solo argumento) se conserva el
+        /// comportamiento anterior: escribir la fila entera. `exists` es opcional por el mismo
+        /// motivo; cuando se omite, se deriva con un `AnyAsync`.
+        ///
+        /// `EntityState.Unchanged` + `IsModified` por columna NO es opcional para la ruta parcial:
+        /// `ApplicationDbContext` es NoTracking, así que una entidad cargada y mutada por el caller
+        /// sigue en `Detached` y `SaveChanges` no escribiría NADA — sin excepción y sin aviso.
         /// </summary>
-        public async Task<StoreCatalogSettings> UpsertAsync(StoreCatalogSettings settings)
+        public async Task<StoreCatalogSettings> UpsertAsync(
+            StoreCatalogSettings settings, bool? exists = null, params string[] modifiedProperties)
         {
-            bool exists = await _settings
+            bool rowExists = exists ?? await _settings
                 .IgnoreQueryFilters()
                 .AnyAsync(s => s.Id == settings.Id);
 
-            if (exists)
+            if (!rowExists)
+            {
+                settings.CreatedDate = DateTimeOffset.UtcNow;
+                return await AddAsync(settings);
+            }
+
+            if (modifiedProperties.Length == 0)
             {
                 settings.UpdatedDate = DateTimeOffset.UtcNow;
                 await UpdateAsync(settings);
                 return settings;
             }
 
-            settings.CreatedDate = DateTimeOffset.UtcNow;
-            return await AddAsync(settings);
+            var entry = _dbContext.Entry(settings);
+            entry.State = EntityState.Unchanged;
+            foreach (string property in modifiedProperties)
+                entry.Property(property).IsModified = true;
+
+            return settings;
         }
     }
 }

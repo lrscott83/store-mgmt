@@ -29,18 +29,18 @@ namespace Infrastructure.Persistence.EntityConfigurations
             builder.HasKey(x => x.Id);
 
             // Claves de imagen: mismo límite que `Product.Image` (ruta de almacenamiento).
-            builder.Property(x => x.LogoKey).HasMaxLength(512);
-            builder.Property(x => x.BannerKey).HasMaxLength(512);
-            builder.Property(x => x.WhatsappNumber).HasMaxLength(32);
-            builder.Property(x => x.PaletteId).HasMaxLength(64).IsRequired();
+            builder.Property(x => x.LogoKey).HasMaxLength(StoreCatalogSettings.ImageKeyMaxLength);
+            builder.Property(x => x.BannerKey).HasMaxLength(StoreCatalogSettings.ImageKeyMaxLength);
+            builder.Property(x => x.WhatsappNumber).HasMaxLength(StoreCatalogSettings.WhatsappNumberMaxLength);
+            builder.Property(x => x.PaletteId).HasMaxLength(StoreCatalogSettings.PaletteIdMaxLength).IsRequired();
 
             // Id de la PLANTILLA (vista) del catálogo. Mismo límite que `PaletteId`; kebab-case
             // validado en el command de marca, con `default` como valor de una fila recién creada.
-            builder.Property(x => x.TemplateId).HasMaxLength(64).IsRequired();
+            builder.Property(x => x.TemplateId).HasMaxLength(StoreCatalogSettings.TemplateIdMaxLength).IsRequired();
 
             // D16: horarios y zonas son texto libre para el dueño, sin estructura que validar.
-            builder.Property(x => x.BusinessHours).HasMaxLength(512);
-            builder.Property(x => x.DeliveryZones).HasMaxLength(512);
+            builder.Property(x => x.BusinessHours).HasMaxLength(StoreCatalogSettings.BusinessHoursMaxLength);
+            builder.Property(x => x.DeliveryZones).HasMaxLength(StoreCatalogSettings.DeliveryZonesMaxLength);
 
             // Importes de dinero: el default del DbContext los dejaría en decimal(18,6) (un tipo de
             // almacenamiento), y el costo de envío y el mínimo se comparan contra un total que el

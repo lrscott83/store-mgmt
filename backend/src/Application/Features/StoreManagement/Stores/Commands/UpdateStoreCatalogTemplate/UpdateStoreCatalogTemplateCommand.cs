@@ -67,12 +67,14 @@ namespace Application.Features.StoreManagement.Stores.Commands.UpdateStoreCatalo
             // Alta o actualización por `StoreId` (D7: una fila por tienda). Reutilizar la fila
             // cargada conserva SUS columnas (pedidos, marca): crear una nueva las traería en blanco.
             StoreCatalogSettings? settings = await _settingsRepository.GetByStoreIdAsync(request.StoreId);
+            bool exists = settings is not null;
             settings ??= StoreCatalogSettings.Create(request.StoreId, store.TenantId);
 
             settings.TemplateId = request.TemplateId.Trim();
 
-            // NoTracking: el upsert marca la entidad explícitamente (Add o Modified).
-            await _settingsRepository.UpsertAsync(settings);
+            // NoTracking: el upsert marca SOLO la columna de plantilla, para no revertir con los
+            // valores leídos un cambio concurrente de pedidos o marca (la fila es UNA, D19).
+            await _settingsRepository.UpsertAsync(settings, exists, nameof(StoreCatalogSettings.TemplateId));
             await _unitOfWork.SaveChangesAsync(cancellationToken);
 
             return ResponseResult.Success(new StoreCatalogTemplateDto

@@ -52,36 +52,10 @@ namespace Application.Features.OnlineOrdering.Queries.GetStoreCatalogSettings
             StoreCatalogSettings? settings = await _storeCatalogSettingsRepository.GetByStoreIdAsync(storeId);
 
             // Sin fila: los mismos valores con los que `StoreCatalogSettings` nace — pedidos
-            // cerrados, sin número y sin modalidades. Es explícita en vez de "new DTO()" para que
-            // añadir un campo a la entidad no se olvide en el DTO de los valores por defecto.
-            return ResponseResult.Success(settings is null ? Default() : Map(settings));
+            // cerrados, sin número y sin modalidades.
+            return ResponseResult.Success(settings is null
+                ? StoreCatalogSettingsDtoMapper.Default()
+                : StoreCatalogSettingsDtoMapper.ToDto(settings));
         }
-
-        private static StoreCatalogSettingsDto Default() => new()
-        {
-            Enabled = false,
-            WhatsappNumber = null,
-            PickupEnabled = false,
-            DeliveryEnabled = false,
-            BusinessHours = null,
-            DeliveryZones = null,
-            SyncedAt = null,
-        };
-
-        /// <summary>
-        /// Solo columnas de pedidos. El mapeo es explícito (no un `new { }` spread) para que un
-        /// campo nuevo de la entidad no aparezca en el DTO por accidente: la marca no debe salir
-        /// de aquí y no lo decidirá un `select *`.
-        /// </summary>
-        private static StoreCatalogSettingsDto Map(StoreCatalogSettings settings) => new()
-        {
-            Enabled = settings.Enabled,
-            WhatsappNumber = settings.WhatsappNumber,
-            PickupEnabled = settings.PickupEnabled,
-            DeliveryEnabled = settings.DeliveryEnabled,
-            BusinessHours = settings.BusinessHours,
-            DeliveryZones = settings.DeliveryZones,
-            SyncedAt = settings.SyncedAt,
-        };
     }
 }

@@ -7,6 +7,7 @@ using Application.ResponseModels;
 using Application.UnitOfWorks;
 using Domain.Common.Extensions;
 using Domain.Entities.StoreCatalogSettings;
+using Domain.Entities.Stores;
 using Domain.Interfaces.Repositories;
 using Microsoft.Extensions.Localization;
 using Resources;
@@ -27,20 +28,19 @@ namespace Application.Features.OnlineOrdering.Commands.UpsertStoreCatalogSetting
     /// </summary>
     public sealed class UpsertStoreCatalogSettingsCommand : ICommand<StoreCatalogSettingsDto>
     {
-        // Límites de formato de la ENTRADA. Son los de las COLUMNAS
-        // (`StoreCatalogSettingsEntityTypeConfiguration`), no una decisión estética: un valor más
-        // largo no lo recorta la base, lo revienta con un 500 en el INSERT. Aquí se convierte en
-        // un 400 con mensaje. Viven en el comando —y no en `Domain/Common/Limits`— porque son
-        // longitudes de esta entrada, no invariantes de una entidad de dominio.
+        // Límites de formato de la ENTRADA. Son los de las COLUMNAS —los declara la entidad
+        // (`StoreCatalogSettings.*MaxLength`, dueña del esquema)—, no una decisión estética: un valor
+        // más largo no lo recorta la base, lo revienta con un 500 en el INSERT. Aquí se convierte en
+        // un 400 con mensaje. Se re-exponen en el comando para no cambiar sus llamadores.
 
         /// <summary>Teléfono con prefijo internacional (D17). 32 como `Order.CustomerPhone`.</summary>
-        public const int WhatsappNumberMaxLength = 32;
+        public const int WhatsappNumberMaxLength = StoreCatalogSettings.WhatsappNumberMaxLength;
 
         /// <summary>Horario como texto libre (D16).</summary>
-        public const int BusinessHoursMaxLength = 512;
+        public const int BusinessHoursMaxLength = StoreCatalogSettings.BusinessHoursMaxLength;
 
         /// <summary>Zonas de reparto como texto libre (D16).</summary>
-        public const int DeliveryZonesMaxLength = 512;
+        public const int DeliveryZonesMaxLength = StoreCatalogSettings.DeliveryZonesMaxLength;
 
         /// <summary>Interruptor maestro: sin esto la tienda NO acepta pedidos.</summary>
         public bool Enabled { get; set; }
@@ -67,6 +67,7 @@ namespace Application.Features.OnlineOrdering.Commands.UpsertStoreCatalogSetting
         private readonly IApplicationUnitOfWork _applicationUnitOfWork;
         private readonly IHttpContextService _httpContextService;
         private readonly IDateTimeProvider _dateTimeProvider;
+        private readonly IStoreRepository _storeRepository;
         private readonly IStoreCatalogSettingsRepository _storeCatalogSettingsRepository;
         private readonly IStringLocalizer<I18n> _localizer;
 
@@ -74,12 +75,14 @@ namespace Application.Features.OnlineOrdering.Commands.UpsertStoreCatalogSetting
             IApplicationUnitOfWork applicationUnitOfWork,
             IHttpContextService httpContextService,
             IDateTimeProvider dateTimeProvider,
+            IStoreRepository storeRepository,
             IStoreCatalogSettingsRepository storeCatalogSettingsRepository,
             IStringLocalizer<I18n> localizer)
         {
             _applicationUnitOfWork = applicationUnitOfWork;
             _httpContextService = httpContextService;
             _dateTimeProvider = dateTimeProvider;
+            _storeRepository = storeRepository;
             _storeCatalogSettingsRepository = storeCatalogSettingsRepository;
             _localizer = localizer;
         }
@@ -95,7 +98,20 @@ namespace Application.Features.OnlineOrdering.Commands.UpsertStoreCatalogSetting
             // Reutilizar la fila cargada conserva SU `Id`: cambiarlo convertiría el guardado en un
             // INSERT que chocaría con ese índice único.
             StoreCatalogSettings? settings = await _storeCatalogSettingsRepository.GetByStoreIdAsync(storeId);
-            settings ??= StoreCatalogSettings.Create(storeId, _httpContextService.TenantId.ToGuid());
+            bool exists = settings is not null;
+
+            if (!exists)
+            {
+                // El `TenantId` de la fila sale de la TIENDA, no del claim de quien llama. Un
+                // SuperAdmin escribiendo una tienda de OTRO tenant sellaría la fila con su propio
+                // tenant: el owner no la vería (filtro global) y no podría actualizarla nunca (cada
+                // PUT chocaría con el índice único). La tienda es la fuente de verdad de su tenant.
+                Store? store = await _storeRepository.GetStoreByIdAsync(storeId);
+                if (store is null)
+                    throw new ApiException(_localizer["StoreNotFound"], HttpStatusCode.NotFound);
+
+                settings = StoreCatalogSettings.Create(storeId, store.TenantId);
+            }
 
             ApplyOrderingSettings(request, settings);
 
@@ -103,13 +119,21 @@ namespace Application.Features.OnlineOrdering.Commands.UpsertStoreCatalogSetting
             // muestra y tiene que ser comprobable.
             settings.SyncedAt = _dateTimeProvider.UtcNow;
 
-            // El upsert del repositorio marca la entidad explícitamente (Add o Modified).
+            // El upsert escribe SOLO las columnas de pedidos: la fila la comparte la marca (D19), así
+            // que un UPDATE de fila completa revertiría un cambio de marca concurrente.
             // `ApplicationDbContext` es NoTracking, así que mutar la fila cargada y llamar a
             // `SaveChanges` sin marcar no escribiría NADA — sin error y sin aviso.
-            await _storeCatalogSettingsRepository.UpsertAsync(settings);
+            await _storeCatalogSettingsRepository.UpsertAsync(settings, exists,
+                nameof(StoreCatalogSettings.Enabled),
+                nameof(StoreCatalogSettings.WhatsappNumber),
+                nameof(StoreCatalogSettings.PickupEnabled),
+                nameof(StoreCatalogSettings.DeliveryEnabled),
+                nameof(StoreCatalogSettings.BusinessHours),
+                nameof(StoreCatalogSettings.DeliveryZones),
+                nameof(StoreCatalogSettings.SyncedAt));
             await _applicationUnitOfWork.SaveChangesAsync(cancellationToken);
 
-            return ResponseResult.Success(ToDto(settings));
+            return ResponseResult.Success(StoreCatalogSettingsDtoMapper.ToDto(settings));
         }
 
         /// <summary>
@@ -134,16 +158,5 @@ namespace Application.Features.OnlineOrdering.Commands.UpsertStoreCatalogSetting
         /// <summary>Texto limpio: sin bordes y `null` si no queda nada (D16: texto libre del dueño).</summary>
         private static string? Trim(string? value)
             => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
-
-        private static StoreCatalogSettingsDto ToDto(StoreCatalogSettings settings) => new()
-        {
-            Enabled = settings.Enabled,
-            WhatsappNumber = settings.WhatsappNumber,
-            PickupEnabled = settings.PickupEnabled,
-            DeliveryEnabled = settings.DeliveryEnabled,
-            BusinessHours = settings.BusinessHours,
-            DeliveryZones = settings.DeliveryZones,
-            SyncedAt = settings.SyncedAt,
-        };
     }
 }

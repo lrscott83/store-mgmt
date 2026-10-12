@@ -53,9 +53,9 @@ public class StoreCatalogTemplateTests
         _unitOfWork.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
 
         _settingsRepository
-            .Setup(x => x.UpsertAsync(It.IsAny<StoreCatalogSettings>()))
-            .Returns((StoreCatalogSettings s) => Task.FromResult(s))
-            .Callback<StoreCatalogSettings>(s => _persisted = s);
+            .Setup(x => x.UpsertAsync(It.IsAny<StoreCatalogSettings>(), It.IsAny<bool?>(), It.IsAny<string[]>()))
+            .Returns((StoreCatalogSettings s, bool? _, string[] _) => Task.FromResult(s))
+            .Callback((StoreCatalogSettings s, bool? _, string[] _) => _persisted = s);
 
         Store store = Store.Create("Tienda Ana", Guid.NewGuid(), true, _tenantId, null);
         _storeByIdService
@@ -147,7 +147,7 @@ public class StoreCatalogTemplateTests
 
         var exception = await act.Should().ThrowAsync<ApiException>();
         exception.Which.StatusCode.Should().Be(System.Net.HttpStatusCode.Forbidden);
-        _settingsRepository.Verify(x => x.UpsertAsync(It.IsAny<StoreCatalogSettings>()), Times.Never);
+        _settingsRepository.Verify(x => x.UpsertAsync(It.IsAny<StoreCatalogSettings>(), It.IsAny<bool?>(), It.IsAny<string[]>()), Times.Never);
     }
 
     [Fact]

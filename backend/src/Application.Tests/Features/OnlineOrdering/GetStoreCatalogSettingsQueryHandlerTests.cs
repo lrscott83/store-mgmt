@@ -152,7 +152,7 @@ public class GetStoreCatalogSettingsQueryHandlerTests
 
         await Handler().Handle(new GetStoreCatalogSettingsQuery(), CancellationToken.None);
 
-        _settingsRepository.Verify(x => x.UpsertAsync(It.IsAny<StoreCatalogSettings>()), Times.Never);
+        _settingsRepository.Verify(x => x.UpsertAsync(It.IsAny<StoreCatalogSettings>(), It.IsAny<bool?>(), It.IsAny<string[]>()), Times.Never);
         _settingsRepository.Verify(x => x.UpdateAsync(It.IsAny<StoreCatalogSettings>()), Times.Never);
         _settingsRepository.Verify(x => x.AddAsync(It.IsAny<StoreCatalogSettings>()), Times.Never);
     }

@@ -5,6 +5,7 @@ using Application.Features.WebCatalog.Branding;
 using Application.Features.WebCatalog.Branding.Commands.UpdateStoreCatalogBranding;
 using Application.UnitOfWorks;
 using Domain.Entities.StoreCatalogSettings;
+using Domain.Entities.Stores;
 using Domain.Interfaces.Repositories;
 using FluentAssertions;
 using Microsoft.Extensions.Localization;
@@ -43,6 +44,7 @@ public class UpdateStoreCatalogBrandingCommandHandlerTests
 
     private readonly Mock<IApplicationUnitOfWork> _unitOfWork = new();
     private readonly Mock<IHttpContextService> _httpContextService = new();
+    private readonly Mock<IStoreRepository> _storeRepository = new();
     private readonly Mock<IStoreCatalogSettingsRepository> _settingsRepository = new();
     private readonly Mock<ICatalogImageStorage> _catalogImageStorage = new();
     private readonly Mock<IStringLocalizer<I18n>> _localizer = new();
@@ -65,10 +67,15 @@ public class UpdateStoreCatalogBrandingCommandHandlerTests
         _httpContextService.Setup(x => x.TenantId).Returns(_tenantId.ToString());
         _unitOfWork.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
 
+        // El tenant (de la fila y de la clave del archivo) sale de la TIENDA, no del claim.
+        _storeRepository
+            .Setup(x => x.GetStoreByIdAsync(_storeId))
+            .ReturnsAsync(Store.Create("Tienda Marca", Guid.NewGuid(), true, _tenantId));
+
         _settingsRepository
-            .Setup(x => x.UpsertAsync(It.IsAny<StoreCatalogSettings>()))
-            .Returns((StoreCatalogSettings s) => Task.FromResult(s))
-            .Callback<StoreCatalogSettings>(s => _persisted = s);
+            .Setup(x => x.UpsertAsync(It.IsAny<StoreCatalogSettings>(), It.IsAny<bool?>(), It.IsAny<string[]>()))
+            .Returns((StoreCatalogSettings s, bool? _, string[] _) => Task.FromResult(s))
+            .Callback((StoreCatalogSettings s, bool? _, string[] _) => _persisted = s);
 
         _catalogImageStorage
             .Setup(x => x.SaveBrandingAsync(
@@ -84,6 +91,7 @@ public class UpdateStoreCatalogBrandingCommandHandlerTests
     private UpdateStoreCatalogBrandingCommandHandler Handler() => new(
         _unitOfWork.Object,
         _httpContextService.Object,
+        _storeRepository.Object,
         _settingsRepository.Object,
         _catalogImageStorage.Object,
         _localizer.Object,
@@ -133,7 +141,7 @@ public class UpdateStoreCatalogBrandingCommandHandlerTests
         _settingsRepository.Verify(x => x.UpsertAsync(It.Is<StoreCatalogSettings>(s =>
             s.StoreId == _storeId
             && s.TenantId == _tenantId
-            && s.LogoKey == NewLogoKey)), Times.Once);
+            && s.LogoKey == NewLogoKey), It.IsAny<bool?>(), It.IsAny<string[]>()), Times.Once);
     }
 
     [Fact]
@@ -204,7 +212,7 @@ public class UpdateStoreCatalogBrandingCommandHandlerTests
 
         result.Data!.LogoKey.Should().Be(NewLogoKey);
         result.Data.BannerKey.Should().Be(NewBannerKey);
-        _settingsRepository.Verify(x => x.UpsertAsync(It.IsAny<StoreCatalogSettings>()), Times.Once);
+        _settingsRepository.Verify(x => x.UpsertAsync(It.IsAny<StoreCatalogSettings>(), It.IsAny<bool?>(), It.IsAny<string[]>()), Times.Once);
     }
 
     /// <summary>El guardado real lo hace el UnitOfWork, una vez, después del upsert.</summary>
@@ -230,7 +238,7 @@ public class UpdateStoreCatalogBrandingCommandHandlerTests
 
         await Handler().Handle(new UpdateStoreCatalogBrandingCommand(Logo(), false, null, false), CancellationToken.None);
 
-        _settingsRepository.Verify(x => x.UpsertAsync(It.IsAny<StoreCatalogSettings>()), Times.Once);
+        _settingsRepository.Verify(x => x.UpsertAsync(It.IsAny<StoreCatalogSettings>(), It.IsAny<bool?>(), It.IsAny<string[]>()), Times.Once);
         _settingsRepository.Verify(x => x.UpdateAsync(It.IsAny<StoreCatalogSettings>()), Times.Never);
         _settingsRepository.Verify(x => x.AddAsync(It.IsAny<StoreCatalogSettings>()), Times.Never);
     }
@@ -555,7 +563,7 @@ public class UpdateStoreCatalogBrandingCommandHandlerTests
         _catalogImageStorage.Verify(
             x => x.SaveBrandingAsync(It.IsAny<CatalogImageUpload>(), It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
             Times.Never);
-        _settingsRepository.Verify(x => x.UpsertAsync(It.IsAny<StoreCatalogSettings>()), Times.Never);
+        _settingsRepository.Verify(x => x.UpsertAsync(It.IsAny<StoreCatalogSettings>(), It.IsAny<bool?>(), It.IsAny<string[]>()), Times.Never);
     }
 
     /// <summary>El límite de tamaño es el de las imágenes de producto: 2 MB.</summary>
@@ -585,7 +593,7 @@ public class UpdateStoreCatalogBrandingCommandHandlerTests
             CancellationToken.None);
 
         await act.Should().ThrowAsync<ApiException>();
-        _settingsRepository.Verify(x => x.UpsertAsync(It.IsAny<StoreCatalogSettings>()), Times.Never);
+        _settingsRepository.Verify(x => x.UpsertAsync(It.IsAny<StoreCatalogSettings>(), It.IsAny<bool?>(), It.IsAny<string[]>()), Times.Never);
     }
 
     /// <summary>
@@ -609,7 +617,7 @@ public class UpdateStoreCatalogBrandingCommandHandlerTests
             x => x.SaveBrandingAsync(It.IsAny<CatalogImageUpload>(), It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
             Times.Never);
         _catalogImageStorage.Verify(x => x.DeleteAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
-        _settingsRepository.Verify(x => x.UpsertAsync(It.IsAny<StoreCatalogSettings>()), Times.Never);
+        _settingsRepository.Verify(x => x.UpsertAsync(It.IsAny<StoreCatalogSettings>(), It.IsAny<bool?>(), It.IsAny<string[]>()), Times.Never);
     }
 
     /// <summary>Un archivo vacío (lo que deja el binding cuando el multipart no trae nada) es inválido.</summary>
@@ -643,7 +651,7 @@ public class UpdateStoreCatalogBrandingCommandHandlerTests
 
         var exception = await act.Should().ThrowAsync<ApiException>();
         exception.Which.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest);
-        _settingsRepository.Verify(x => x.UpsertAsync(It.IsAny<StoreCatalogSettings>()), Times.Never);
+        _settingsRepository.Verify(x => x.UpsertAsync(It.IsAny<StoreCatalogSettings>(), It.IsAny<bool?>(), It.IsAny<string[]>()), Times.Never);
         _catalogImageStorage.Verify(
             x => x.SaveBrandingAsync(It.IsAny<CatalogImageUpload>(), It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
             Times.Never);

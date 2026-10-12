@@ -36,14 +36,20 @@ namespace Domain.Interfaces.Repositories
         Task<StoreCatalogSettings?> GetPublicByStoreIdAsync(Guid storeId);
 
         /// <summary>
-        /// Guarda la configuración de la tienda: si ya existe su fila la ACTUALIZA y si no, la
-        /// inserta. Es un upsert explícito porque el editor de F1 manda la fila completa y la
-        /// tienda puede no tener ninguna todavía.
+        /// Guarda la configuración de la tienda: si ya existe su fila la ACTUALIZA (solo las columnas
+        /// que le pasa <paramref name="modifiedProperties"/>) y si no, la inserta. Es un upsert
+        /// explícito porque el editor manda la fila y la tienda puede no tener ninguna todavía.
         ///
-        /// OJO (`ApplicationDbContext` es NoTracking): actualizar una entidad CARGADA sin
-        /// `Update`/`EntityState.Modified` no escribe NADA — ni error, ni aviso. Por eso el
-        /// upsert marca la entidad explícitamente en vez de confiar en el change tracker.
+        /// <paramref name="modifiedProperties"/> son los nombres de columna que el handler cambió:
+        /// marcar SOLO esas es lo que evita que "guardar los pedidos" reescriba la marca (y al
+        /// revés), porque la fila es UNA (D19) y la comparten dos vistas. Sin columnas indicadas se
+        /// conserva el comportamiento anterior (fila entera); `exists` es opcional por el mismo
+        /// motivo (si se omite, se deriva con un `AnyAsync`).
+        ///
+        /// OJO (`ApplicationDbContext` es NoTracking): actualizar una entidad CARGADA sin marcar sus
+        /// columnas no escribe NADA — ni error, ni aviso. Por eso el upsert las marca explícitamente.
         /// </summary>
-        Task<StoreCatalogSettings> UpsertAsync(StoreCatalogSettings settings);
+        Task<StoreCatalogSettings> UpsertAsync(
+            StoreCatalogSettings settings, bool? exists = null, params string[] modifiedProperties);
     }
 }

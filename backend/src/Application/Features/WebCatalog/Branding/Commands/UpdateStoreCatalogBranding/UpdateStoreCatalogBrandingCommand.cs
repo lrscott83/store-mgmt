@@ -9,6 +9,7 @@ using Application.ResponseModels;
 using Application.UnitOfWorks;
 using Domain.Common.Extensions;
 using Domain.Entities.StoreCatalogSettings;
+using Domain.Entities.Stores;
 using Domain.Interfaces.Repositories;
 using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
@@ -58,6 +59,7 @@ namespace Application.Features.WebCatalog.Branding.Commands.UpdateStoreCatalogBr
     {
         private readonly IApplicationUnitOfWork _applicationUnitOfWork;
         private readonly IHttpContextService _httpContextService;
+        private readonly IStoreRepository _storeRepository;
         private readonly IStoreCatalogSettingsRepository _storeCatalogSettingsRepository;
         private readonly ICatalogImageStorage _catalogImageStorage;
         private readonly IStringLocalizer<I18n> _localizer;
@@ -66,6 +68,7 @@ namespace Application.Features.WebCatalog.Branding.Commands.UpdateStoreCatalogBr
         public UpdateStoreCatalogBrandingCommandHandler(
             IApplicationUnitOfWork applicationUnitOfWork,
             IHttpContextService httpContextService,
+            IStoreRepository storeRepository,
             IStoreCatalogSettingsRepository storeCatalogSettingsRepository,
             ICatalogImageStorage catalogImageStorage,
             IStringLocalizer<I18n> localizer,
@@ -73,6 +76,7 @@ namespace Application.Features.WebCatalog.Branding.Commands.UpdateStoreCatalogBr
         {
             _applicationUnitOfWork = applicationUnitOfWork;
             _httpContextService = httpContextService;
+            _storeRepository = storeRepository;
             _storeCatalogSettingsRepository = storeCatalogSettingsRepository;
             _catalogImageStorage = catalogImageStorage;
             _localizer = localizer;
@@ -86,13 +90,22 @@ namespace Application.Features.WebCatalog.Branding.Commands.UpdateStoreCatalogBr
             if (storeId == Guid.Empty)
                 throw new ApiException(_localizer["StoreNotSelected", _httpContextService.UserExternalId], HttpStatusCode.BadRequest);
 
-            Guid tenantId = _httpContextService.TenantId.ToGuid();
+            // El `TenantId` sale de la TIENDA, no del claim de quien llama: además de sellar la fila,
+            // es el prefijo de la clave del archivo en disco, y el endpoint de media valida que la
+            // clave pertenezca al tenant de la tienda. Un SuperAdmin escribiendo una tienda de otro
+            // tenant guardaría el archivo bajo SU tenant y el catálogo respondería 404.
+            Store? store = await _storeRepository.GetStoreByIdAsync(storeId);
+            if (store is null)
+                throw new ApiException(_localizer["StoreNotFound"], HttpStatusCode.NotFound);
+
+            Guid tenantId = store.TenantId;
 
             // Alta o actualización por `StoreId` (D7: una fila por tienda, índice único).
             // Reutilizar la fila cargada conserva SU `Id` y —esto es lo importante— SUS columnas de
             // pedidos: un id nuevo convertiría el guardado en un INSERT que chocaría con ese índice,
             // y una entidad nueva las traería en blanco.
             StoreCatalogSettings? settings = await _storeCatalogSettingsRepository.GetByStoreIdAsync(storeId);
+            bool exists = settings is not null;
             settings ??= StoreCatalogSettings.Create(storeId, tenantId);
 
             // F8-R1: los DOS archivos se validan ANTES de que ninguno toque el disco. Validar cada
@@ -131,10 +144,13 @@ namespace Application.Features.WebCatalog.Branding.Commands.UpdateStoreCatalogBr
                 settings.BannerKey = await ResolveAsync(
                     request.Banner, request.RemoveBanner, settings.BannerKey, BrandingImageKinds.Banner, tenantId, storeId, obsoleteKeys, newKeys, cancellationToken);
 
-                // El upsert del repositorio marca la entidad explícitamente (Add o Modified).
-                // `ApplicationDbContext` es NoTracking, así que mutar la fila cargada y llamar a
-                // `SaveChanges` sin marcar no escribiría NADA — sin error y sin aviso.
-                await _storeCatalogSettingsRepository.UpsertAsync(settings);
+                // El upsert escribe SOLO las columnas de marca: la fila la comparten los pedidos
+                // (D19), así que un UPDATE de fila completa revertiría un cambio de pedidos
+                // concurrente. `ApplicationDbContext` es NoTracking, así que mutar la fila cargada y
+                // llamar a `SaveChanges` sin marcar no escribiría NADA — sin error y sin aviso.
+                await _storeCatalogSettingsRepository.UpsertAsync(settings, exists,
+                    nameof(StoreCatalogSettings.LogoKey),
+                    nameof(StoreCatalogSettings.BannerKey));
                 await _applicationUnitOfWork.SaveChangesAsync(cancellationToken);
             }
             catch

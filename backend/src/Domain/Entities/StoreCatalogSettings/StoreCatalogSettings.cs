@@ -28,6 +28,29 @@ namespace Domain.Entities.StoreCatalogSettings
         /// </summary>
         public const string DefaultTemplateId = "default";
 
+        // Límites de COLUMNA, en un solo sitio: los usan la configuración de EF (que crea la columna)
+        // y los validadores de entrada (que convierten un valor demasiado largo en un 400 con mensaje
+        // en vez de un 500 en el INSERT). Declararlos dos veces dejaba a uno mintiendo si el otro
+        // cambiaba.
+
+        /// <summary>Teléfono con prefijo internacional (D17).</summary>
+        public const int WhatsappNumberMaxLength = 32;
+
+        /// <summary>Horario como texto libre (D16).</summary>
+        public const int BusinessHoursMaxLength = 512;
+
+        /// <summary>Zonas de reparto como texto libre (D16).</summary>
+        public const int DeliveryZonesMaxLength = 512;
+
+        /// <summary>Clave de las imágenes de marca (logo/banner): misma ruta de almacenamiento que <c>Product.Image</c>.</summary>
+        public const int ImageKeyMaxLength = 512;
+
+        /// <summary>Id de la paleta (o valor por defecto).</summary>
+        public const int PaletteIdMaxLength = 64;
+
+        /// <summary>Id de la plantilla (vista).</summary>
+        public const int TemplateIdMaxLength = 64;
+
         public Guid StoreId { get; set; }
         public Store Store { get; set; } = null!;
 
