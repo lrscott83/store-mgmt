@@ -128,10 +128,20 @@ namespace SMCA.WebApi.Middlewares
 
         /// <summary>
         /// ¿El error es una violación de índice único de PostgreSQL (SQLSTATE 23505)? EF lo envuelve en
-        /// <see cref="DbUpdateException"/>; es un conflicto de cliente, no un fallo del servidor.
+        /// <see cref="DbUpdateException"/>, pero la excepción de PostgreSQL puede venir anidada a más de
+        /// un nivel (envoltorios de batch/retry), así que se recorre la cadena de <c>InnerException</c>
+        /// en vez de mirar solo el primer nivel. Es un conflicto de cliente, no un fallo del servidor.
         /// </summary>
         private static bool IsUniqueViolation(Exception error)
-            => error is DbUpdateException { InnerException: PostgresException { SqlState: PostgresErrorCodes.UniqueViolation } };
+        {
+            for (Exception? current = error; current is not null; current = current.InnerException)
+            {
+                if (current is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
+                    return true;
+            }
+
+            return false;
+        }
 
         /// <summary>
         /// Did the client go away, rather than the server fail?

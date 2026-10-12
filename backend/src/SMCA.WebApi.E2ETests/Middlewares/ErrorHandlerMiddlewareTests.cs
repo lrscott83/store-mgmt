@@ -4,7 +4,9 @@ using Application.Exceptions;
 using Domain.Common.Results;
 using FluentAssertions;
 using Microsoft.AspNetCore.Http;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Npgsql;
 using SMCA.WebApi.E2ETests.Infrastructure;
 using SMCA.WebApi.Middlewares;
 using Xunit;
@@ -152,6 +154,62 @@ public sealed class ErrorHandlerMiddlewareTests
 
         body.Length.Should().Be(0);
         status.Should().Be(200);
+    }
+
+    /// <summary>
+    /// Una violación de índice único (choque de altas concurrentes) es un CONFLICTO del cliente, no un
+    /// fallo del servidor: se mapea a 409 con un código estable y se registra como warning (no como
+    /// error de servidor). Antes salía un 500 opaco.
+    /// </summary>
+    [Fact]
+    public async Task Unique_violation_maps_to_409_conflict_and_logs_warning()
+    {
+        var thrown = new DbUpdateException("save failed",
+            new PostgresException("duplicate key value violates unique constraint \"PK_StoreModule\"",
+                "ERROR", "ERROR", PostgresErrorCodes.UniqueViolation));
+
+        var (status, body, logs) = await Run(thrown);
+
+        logs.Entries.Should().HaveCount(1);
+        logs.Entries[0].Level.Should().Be(LogLevel.Warning);
+        logs.Entries[0].Exception.Should().BeNull();
+        logs.Entries[0].Message.Should().StartWith("Request rejected:");
+
+        status.Should().Be(409);
+
+        var envelope = Deserialize(body);
+        envelope.Succeeded.Should().BeFalse();
+        envelope.ActionCode.Should().Be(409);
+        envelope.Errors.Should().ContainSingle();
+        envelope.Errors[0].Code.Should().Be("App.Conflict");
+    }
+
+    /// <summary>
+    /// La excepción de PostgreSQL puede venir anidada a más de un nivel: el mapeo la encuentra igual.
+    /// </summary>
+    [Fact]
+    public async Task Unique_violation_wrapped_deeper_still_maps_to_409()
+    {
+        var thrown = new DbUpdateException("save failed",
+            new InvalidOperationException("wrapper",
+                new PostgresException("duplicate key value", "ERROR", "ERROR", PostgresErrorCodes.UniqueViolation)));
+
+        var (status, _, _) = await Run(thrown);
+
+        status.Should().Be(409);
+    }
+
+    /// <summary>
+    /// Control negativo: un fallo de guardado que NO es violación de unicidad sigue siendo 500.
+    /// </summary>
+    [Fact]
+    public async Task DbUpdateException_without_a_unique_violation_stays_500()
+    {
+        var thrown = new DbUpdateException("save failed", new InvalidOperationException("boom"));
+
+        var (status, _, _) = await Run(thrown);
+
+        status.Should().Be(500);
     }
 
     /// <summary>
