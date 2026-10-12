@@ -7,6 +7,7 @@ using Application.Features.WebCatalog.Showcase.Queries.GetStoreCatalogImages;
 using Application.ResponseModels;
 using Asp.Versioning;
 using Domain.Common.Enums;
+using Domain.Common.Limits;
 using Microsoft.AspNetCore.Mvc;
 using SMCA.WebApi.Filters;
 
@@ -58,6 +59,7 @@ namespace SMCA.WebApi.Controllers.v1
         /// </summary>
         [HttpPost("~/api/v1/catalog/showcase")]
         [Consumes("multipart/form-data")]
+        [RequestSizeLimit(ProductEntityLimits.MaxImageSizeInBytes + 65536)]
         [ProducesResponseType(typeof(ResponseResult<StoreCatalogImageDto>), StatusCodes.Status200OK)]
         public async Task<IActionResult> AddImageAsync([FromForm] StoreCatalogImageKind kind, IFormFile file, [FromForm] string? caption)
         {

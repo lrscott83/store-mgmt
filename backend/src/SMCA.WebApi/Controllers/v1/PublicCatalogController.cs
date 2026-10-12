@@ -56,6 +56,9 @@ namespace SMCA.WebApi.Controllers.v1
             // Cache agresiva: las claves incluyen un guid, así que un archivo nunca cambia de contenido.
             Response.Headers.CacheControl = "public, max-age=31536000, immutable";
             Response.Headers.ContentDisposition = new ContentDispositionHeaderValue("inline").ToString();
+            // El tipo se decide por la EXTENSIÓN guardada; `nosniff` evita que el navegador "adivine"
+            // un content-type distinto y trate como ejecutable contenido servido como imagen.
+            Response.Headers["X-Content-Type-Options"] = "nosniff";
 
             return File(media.Content, media.ContentType);
         }

@@ -75,6 +75,20 @@ namespace Infrastructure.Persistence.Repositories
                 .ToListAsync();
         }
 
+        public async Task<CatalogProductCounts> CountForCatalogStatusAsync(Guid storeId)
+        {
+            // Tres `COUNT` en SQL: sin `Include`, sin materializar una sola fila. El status solo
+            // muestra números; cargar el grafo entero para contarlo era trabajo tirado.
+            IQueryable<Product> query = _products.Where(product => product.Category.StoreId == storeId);
+
+            int total = await query.CountAsync();
+            int published = await query.CountAsync(product => product.IsActive && product.AvailableToSale);
+            int withoutMainImage = await query.CountAsync(
+                product => product.Image == null || product.Image == string.Empty);
+
+            return new CatalogProductCounts(total, published, withoutMainImage);
+        }
+
         public async Task<bool> HasAnyAvailableToSaleProductByStoreId(Guid id)
         {
             return await _products.AnyAsync(product => product.IsActive && product.AvailableToSale

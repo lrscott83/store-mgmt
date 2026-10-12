@@ -3,6 +3,7 @@ using Application.Abstractions.Messaging;
 using Application.Abstractions.Time;
 using Application.Dtos.WebCatalog;
 using Application.Exceptions;
+using Application.Features.WebCatalog.Public;
 using Application.Features.WebCatalog.Sync;
 using Application.ResponseModels;
 using Application.UnitOfWorks;
@@ -110,11 +111,12 @@ namespace Application.Features.WebCatalog.Sync.Commands.SyncCatalog
             if (request.Snapshot is { } snapshot)
             {
                 // El espejo trae los hechos del dispositivo a las tablas normales y devuelve los
-                // conteos del resumen.
-                CatalogMirrorCounts counts = await CatalogMirrorWriter.MirrorCatalogAsync(
+                // conteos del resumen + las categorías (en el VALOR de retorno, no en un estático).
+                CatalogMirrorResult mirror = await CatalogMirrorWriter.MirrorCatalogAsync(
                     snapshot, storeId, tenantId, _productCategoryRepository, _productRepository, _localizer);
 
-                allCategories = CatalogMirrorWriter.CategoryResult;
+                CatalogMirrorCounts counts = mirror.Counts;
+                allCategories = mirror.Categories;
                 var takenSlugs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 foreach (ProductCategory category in allCategories)
                 {
@@ -172,7 +174,9 @@ namespace Application.Features.WebCatalog.Sync.Commands.SyncCatalog
             return ResponseResult.Success(new CatalogSyncSummaryDto
             {
                 StoreSlug = storeSlug,
-                CatalogUrl = $"/catalog/{storeSlug}",
+                // Una sola fuente para la URL del catálogo: el mismo builder que usa la vista de
+                // estado, para que el prefijo no pueda divergir.
+                CatalogUrl = CatalogPublicUrls.Catalog(storeSlug),
                 SyncedAt = syncedAt,
                 CategoriesCreated = categoriesCreated,
                 CategoriesUpdated = categoriesUpdated,

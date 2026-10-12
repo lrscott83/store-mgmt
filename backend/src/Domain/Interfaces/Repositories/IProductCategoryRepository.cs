@@ -20,5 +20,8 @@ namespace Domain.Interfaces.Repositories
 
         Task<bool> HasAnyAvailableCategoryByStoreId(Guid id);
         Task<bool> IsUniqueLoginAsync(string name);
+
+        /// <summary>Cuenta las categorías de la tienda sin materializarlas.</summary>
+        Task<int> CountByStoreIdAsync(Guid storeId);
     }
 }

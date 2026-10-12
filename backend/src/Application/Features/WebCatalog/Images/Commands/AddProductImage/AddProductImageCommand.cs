@@ -27,6 +27,7 @@ namespace Application.Features.WebCatalog.Images.Commands.AddProductImage
         private readonly IHttpContextService _httpContextService;
         private readonly IProductRepository _productRepository;
         private readonly IProductImageRepository _productImageRepository;
+        private readonly IProductCategoryRepository _productCategoryRepository;
         private readonly ICatalogImageStorage _catalogImageStorage;
         private readonly IStringLocalizer<I18n> _localizer;
 
@@ -35,6 +36,7 @@ namespace Application.Features.WebCatalog.Images.Commands.AddProductImage
             IHttpContextService httpContextService,
             IProductRepository productRepository,
             IProductImageRepository productImageRepository,
+            IProductCategoryRepository productCategoryRepository,
             ICatalogImageStorage catalogImageStorage,
             IStringLocalizer<I18n> localizer)
         {
@@ -42,15 +44,25 @@ namespace Application.Features.WebCatalog.Images.Commands.AddProductImage
             _httpContextService = httpContextService;
             _productRepository = productRepository;
             _productImageRepository = productImageRepository;
+            _productCategoryRepository = productCategoryRepository;
             _catalogImageStorage = catalogImageStorage;
             _localizer = localizer;
         }
 
         public async Task<ResponseResult<string>> Handle(AddProductImageCommand request, CancellationToken cancellationToken)
         {
+            Guid storeId = _httpContextService.StoreId.ToGuid();
+            if (storeId == Guid.Empty)
+                throw new ApiException(_localizer["StoreNotSelected", _httpContextService.UserExternalId], HttpStatusCode.BadRequest);
+
             Product? product = await _productRepository.GetByIdAsync(request.ProductId);
             if (product == null)
                 throw new ApiException(_localizer["ProductNotFound", nameof(request.ProductId)], HttpStatusCode.NotFound);
+
+            // 404 uniforme: un producto de OTRA tienda del mismo tenant responde igual que uno
+            // inexistente, así el catálogo de una tienda nunca se edita desde otra.
+            await ProductStoreAccess.EnsureBelongsToStoreAsync(
+                product, storeId, _productCategoryRepository, _localizer, request.ProductId);
 
             IList<ProductImage> existingImages = await _productImageRepository.GetByProductIdAsync(request.ProductId);
             if (existingImages.Count >= ProductEntityLimits.MaxImagesPerProduct)
@@ -61,7 +73,6 @@ namespace Application.Features.WebCatalog.Images.Commands.AddProductImage
             CatalogImageUploadRules.EnsureValid(request.FileName, request.ContentType, request.Length, _localizer);
 
             Guid tenantId = _httpContextService.TenantId.ToGuid();
-            Guid storeId = _httpContextService.StoreId.ToGuid();
 
             string key = await _catalogImageStorage.SaveAsync(
                 new CatalogImageUpload(request.Content, request.FileName, request.ContentType, request.Length),

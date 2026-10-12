@@ -116,23 +116,21 @@ namespace Application.Features.WebCatalog.Branding.Commands.UpdateStoreCatalogBr
             var obsoleteKeys = new List<string>();
             var newKeys = new List<string>();
 
-            // Los dos lados se resuelven antes de tocar la fila. Nada de ellos puede fallar por
-            // validación (eso ya está hecho arriba), así que si se llega aquí la marca se aplica
-            // entera: el dueño nunca se encuentra con medio formulario guardado.
-            string? logoKey = await ResolveAsync(
-                request.Logo, request.RemoveLogo, settings.LogoKey, BrandingImageKinds.Logo, tenantId, storeId, obsoleteKeys, newKeys, cancellationToken);
-            string? bannerKey = await ResolveAsync(
-                request.Banner, request.RemoveBanner, settings.BannerKey, BrandingImageKinds.Banner, tenantId, storeId, obsoleteKeys, newKeys, cancellationToken);
-
-            // SOLO columnas de marca (D19): logo y banner. Las de pedidos, `PaletteId`, `TemplateId`,
-            // `SyncedAt` e `Id` quedan como estaban: si esta feature los tocara, subir un logo
-            // dejaría al dueño sin los pedidos que tenía abiertos. Su ausencia aquí ES el
-            // comportamiento, no un olvido.
-            settings.LogoKey = logoKey;
-            settings.BannerKey = bannerKey;
-
+            // Los dos lados se resuelven DENTRO del `try`: si escribir el SEGUNDO archivo (banner)
+            // falla a mitad (disco lleno, permiso, cancelación), el primero (logo) ya está en disco
+            // y la compensación de abajo lo borra. Resolverlos FUERA dejaba el logo huérfano — la
+            // MISMA clase de bug que F8-R1/F8-R2 arreglaron, en la tercera ventana.
             try
             {
+                // SOLO columnas de marca (D19): logo y banner. Las de pedidos, `PaletteId`,
+                // `TemplateId`, `SyncedAt` e `Id` quedan como estaban: si esta feature los tocara,
+                // subir un logo dejaría al dueño sin los pedidos que tenía abiertos. Su ausencia
+                // aquí ES el comportamiento, no un olvido.
+                settings.LogoKey = await ResolveAsync(
+                    request.Logo, request.RemoveLogo, settings.LogoKey, BrandingImageKinds.Logo, tenantId, storeId, obsoleteKeys, newKeys, cancellationToken);
+                settings.BannerKey = await ResolveAsync(
+                    request.Banner, request.RemoveBanner, settings.BannerKey, BrandingImageKinds.Banner, tenantId, storeId, obsoleteKeys, newKeys, cancellationToken);
+
                 // El upsert del repositorio marca la entidad explícitamente (Add o Modified).
                 // `ApplicationDbContext` es NoTracking, así que mutar la fila cargada y llamar a
                 // `SaveChanges` sin marcar no escribiría NADA — sin error y sin aviso.
@@ -147,11 +145,16 @@ namespace Application.Features.WebCatalog.Branding.Commands.UpdateStoreCatalogBr
                 //
                 // El borrado va protegido para que un fallo de disco NO enmascare la excepción que hay
                 // que relanzar: el dueño necesita ver el error real, no el del almacenamiento.
+                //
+                // `CancellationToken.None`: la causa más común del fallo a medio escribir es una
+                // CANCELACIÓN (timeout, pestaña cerrada); con el token de la petición ya cancelado,
+                // el borrado lanzaría al instante y la limpieza no ocurriría. La limpieza no es
+                // parte de la petición, así que no hereda su cancelación.
                 foreach (string key in newKeys)
                 {
                     try
                     {
-                        await _catalogImageStorage.DeleteAsync(key, cancellationToken);
+                        await _catalogImageStorage.DeleteAsync(key, CancellationToken.None);
                     }
                     catch (Exception exception)
                     {
@@ -174,7 +177,7 @@ namespace Application.Features.WebCatalog.Branding.Commands.UpdateStoreCatalogBr
             {
                 try
                 {
-                    await _catalogImageStorage.DeleteAsync(key, cancellationToken);
+                    await _catalogImageStorage.DeleteAsync(key, CancellationToken.None);
                 }
                 catch (Exception exception)
                 {

@@ -1,7 +1,9 @@
 using Application.Abstractions.HttpContext;
 using Application.Abstractions.Storage;
+using Application.Exceptions;
 using Application.Features.WebCatalog.Images.Commands.AddProductImage;
 using Application.UnitOfWorks;
+using Domain.Entities.ProductCategories;
 using Domain.Entities.Products;
 using Domain.Interfaces.Repositories;
 using FluentAssertions;
@@ -26,6 +28,7 @@ public class AddProductImageCommandTests
     private readonly Mock<IHttpContextService> _httpContextService = new();
     private readonly Mock<IProductRepository> _productRepository = new();
     private readonly Mock<IProductImageRepository> _productImageRepository = new();
+    private readonly Mock<IProductCategoryRepository> _productCategoryRepository = new();
     private readonly Mock<ICatalogImageStorage> _catalogImageStorage = new();
     private readonly Mock<IStringLocalizer<I18n>> _localizer = new();
 
@@ -49,6 +52,10 @@ public class AddProductImageCommandTests
         _httpContextService.Setup(x => x.TenantId).Returns(_tenantId.ToString());
         _productRepository.Setup(x => x.GetByIdAsync(It.IsAny<Guid>())).ReturnsAsync(_product);
         _productRepository.Setup(x => x.UpdateAsync(It.IsAny<Product>())).ReturnsAsync(true);
+        // La categoría del producto es de ESTA tienda: el guard de scope pasa.
+        _productCategoryRepository
+            .Setup(x => x.GetByIdAsync(It.IsAny<Guid>()))
+            .ReturnsAsync(ProductCategory.Create(_categoryId, _storeId, "Ropa", 1, _tenantId));
         _productImageRepository
             .Setup(x => x.GetByProductIdAsync(It.IsAny<Guid>()))
             .ReturnsAsync(() => _existingImages);
@@ -81,6 +88,7 @@ public class AddProductImageCommandTests
                 _httpContextService.Object,
                 _productRepository.Object,
                 _productImageRepository.Object,
+                _productCategoryRepository.Object,
                 _catalogImageStorage.Object,
                 _localizer.Object)
             .Handle(Command(), CancellationToken.None);
@@ -103,6 +111,7 @@ public class AddProductImageCommandTests
                 _httpContextService.Object,
                 _productRepository.Object,
                 _productImageRepository.Object,
+                _productCategoryRepository.Object,
                 _catalogImageStorage.Object,
                 _localizer.Object)
             .Handle(Command(), CancellationToken.None);
@@ -113,5 +122,35 @@ public class AddProductImageCommandTests
         _productImageRepository.Verify(
             x => x.AddAsync(It.Is<ProductImage>(image => image.Path == UploadedKey && image.Order == 1)),
             Times.Once);
+    }
+
+    /// <summary>
+    /// El `productId` de la ruta es del cliente. Si el producto es de OTRA tienda del mismo tenant
+    /// (el filtro por tenant no lo impide), el guard por tienda responde 404 uniforme —igual que un
+    /// producto inexistente— y NADA se escribe en el almacenamiento.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenTheProductBelongsToAnotherStore_ShouldReturnNotFoundAndNotSave()
+    {
+        _productCategoryRepository
+            .Setup(x => x.GetByIdAsync(It.IsAny<Guid>()))
+            .ReturnsAsync(ProductCategory.Create(Guid.NewGuid(), "Ropa", 1, _tenantId));
+
+        Func<Task> act = () => new AddProductImageCommandHandler(
+                _unitOfWork.Object,
+                _httpContextService.Object,
+                _productRepository.Object,
+                _productImageRepository.Object,
+                _productCategoryRepository.Object,
+                _catalogImageStorage.Object,
+                _localizer.Object)
+            .Handle(Command(), CancellationToken.None);
+
+        var exception = await act.Should().ThrowAsync<ApiException>();
+        exception.Which.StatusCode.Should().Be(System.Net.HttpStatusCode.NotFound);
+        _catalogImageStorage.Verify(
+            x => x.SaveAsync(
+                It.IsAny<CatalogImageUpload>(), It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 }

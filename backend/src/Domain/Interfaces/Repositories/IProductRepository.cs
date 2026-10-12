@@ -38,5 +38,15 @@ namespace Domain.Interfaces.Repositories
         /// id contra la base para leer N filas es el N+1 clásico.
         /// </summary>
         Task<IList<Product>> GetPublishedByIdsAsync(Guid storeId, IReadOnlyCollection<Guid> ids);
+
+        /// <summary>
+        /// Contadores del estado del catálogo (total, publicados, sin imagen principal) calculados
+        /// en SQL: la cabecera de la vista solo necesita números, no materializar el grafo de
+        /// productos con su categoría e imágenes.
+        /// </summary>
+        Task<CatalogProductCounts> CountForCatalogStatusAsync(Guid storeId);
     }
+
+    /// <summary>Contadores del catálogo, sin materializar filas.</summary>
+    public sealed record CatalogProductCounts(int Total, int Published, int WithoutMainImage);
 }
