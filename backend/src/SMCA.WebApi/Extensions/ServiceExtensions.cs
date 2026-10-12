@@ -1,7 +1,12 @@
 ﻿using Asp.Versioning;
 using Application.Abstractions.Authentication;
+using Application.ResponseModels;
+using Domain.Common.Results;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Localization;
 using Microsoft.IdentityModel.Tokens;
+using Resources;
 using System.Globalization;
 using System.IdentityModel.Tokens.Jwt;
 using System.Text;
@@ -105,9 +110,47 @@ namespace SMCA.WebApi.Extensions
                 });
         }
 
-        public static void AddApiVersioningExtension(this IServiceCollection services)
+        /// <summary>
+        /// Unifica el 400 de BINDING con el mismo sobre que el resto de la API.
+        ///
+        /// Sin esto hay DOS formas de 400: un cuerpo que no se puede enlazar (un `enum` inventado, un
+        /// guid mal formado) lo contesta MVC con un <c>ValidationProblemDetails</c>
+        /// (<c>{ title, errors: { campo: [mensajes] } }</c>), mientras que una regla de FluentValidation
+        /// sale por el <c>ErrorHandlerMiddleware</c> como <c>ResponseResult</c>
+        /// (<c>{ succeeded, errors: [{ code, description }] }</c>). El cliente lee <c>errors[0].description</c>
+        /// y en la primera forma recibía `undefined`.
+        ///
+        /// Aquí el binding se proyecta al MISMO <c>ResponseResult</c>: mismo sobre, mismos nombres de
+        /// campo y mismo lugar donde el frontend ya busca el texto.
+        /// </summary>
+        public static void AddUnifiedValidationResponseExtension(this IServiceCollection services)
         {
-            services.AddApiVersioning(config =>
+            services.Configure<ApiBehaviorOptions>(options =>
+            {
+                options.InvalidModelStateResponseFactory = context =>
+                {
+                    var localizer = context.HttpContext.RequestServices.GetRequiredService<IStringLocalizer<I18n>>();
+
+                    List<Error> errors = context.ModelState
+                        .Where(entry => entry.Value?.Errors.Count > 0)
+                        .SelectMany(entry => entry.Value!.Errors.Select(error => new Error(
+                            string.IsNullOrWhiteSpace(entry.Key) ? "App.Validation" : entry.Key,
+                            string.IsNullOrWhiteSpace(error.ErrorMessage)
+                                ? localizer["ApiRequestInvalid"]
+                                : error.ErrorMessage)))
+                        .ToList();
+
+                    if (errors.Count == 0)
+                        errors.Add(new Error("App.Validation", localizer["ApiRequestInvalid"]));
+
+                    return new BadRequestObjectResult(
+                        ResponseResult.Failure<object>(errors, StatusCodes.Status400BadRequest));
+                };
+            });
+        }
+
+        public static void AddApiVersioningExtension(this IServiceCollection services)
+        {            services.AddApiVersioning(config =>
             {
                 // Specify the default API Version as 1.0
                 config.DefaultApiVersion = new ApiVersion(1, 0);

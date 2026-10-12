@@ -75,7 +75,9 @@ public class RemoveStoreCatalogImageCommandHandlerTests
         => StoreCatalogImage.Create(_storeId, _tenantId, kind, $"{_tenantId:N}/{_storeId:N}/catalog/{kind}/{Guid.NewGuid():N}.png", orderIndex, null);
 
     private void Given(params StoreCatalogImage[] images)
-        => _imageRepository.Setup(x => x.GetByStoreIdAsync(_storeId)).ReturnsAsync(images.ToList());
+        => _imageRepository
+            .Setup(x => x.GetByIdAndStoreIdAsync(It.IsAny<Guid>(), _storeId, It.IsAny<CancellationToken>()))
+            .Returns((Guid id, Guid storeId, CancellationToken ct) => Task.FromResult(images.FirstOrDefault(image => image.Id == id)));
 
     #region Happy Path
 
@@ -272,7 +274,7 @@ public class RemoveStoreCatalogImageCommandHandlerTests
 
         var exception = await act.Should().ThrowAsync<ApiException>();
         exception.Which.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest);
-        _imageRepository.Verify(x => x.GetByStoreIdAsync(It.IsAny<Guid>()), Times.Never);
+        _imageRepository.Verify(x => x.GetByIdAndStoreIdAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     #endregion

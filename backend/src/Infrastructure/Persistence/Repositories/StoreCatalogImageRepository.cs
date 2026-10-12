@@ -1,3 +1,4 @@
+using Domain.Common.Enums;
 using Domain.Entities.StoreCatalogImages;
 using Domain.Interfaces.Repositories;
 using Infrastructure.Persistence.Contexts;
@@ -60,5 +61,37 @@ namespace Infrastructure.Persistence.Repositories
                 .ThenBy(image => image.OrderIndex)
                 .ThenBy(image => image.CreatedDate)
                 .ToListAsync();
+
+        /// <summary>
+        /// Una imagen por id acotada a la tienda: la condición viaja en la consulta, no en una
+        /// comprobación posterior sobre una lista completa.
+        /// </summary>
+        public async Task<StoreCatalogImage?> GetByIdAndStoreIdAsync(Guid id, Guid storeId, CancellationToken cancellationToken)
+            => await _images.FirstOrDefaultAsync(image => image.Id == id && image.StoreId == storeId, cancellationToken);
+
+        /// <summary>
+        /// Lock de transacción por (tienda, conjunto). El hash del texto puede colisionar con otro
+        /// (tienda, conjunto), y eso es seguro: una colisión solo serializa de más, nunca de menos.
+        /// </summary>
+        public async Task AcquireSetLockAsync(Guid storeId, StoreCatalogImageKind kind, CancellationToken cancellationToken)
+        {
+            string lockKey = $"{storeId}:{(int)kind}";
+            await _dbContext.Database.ExecuteSqlInterpolatedAsync(
+                $"SELECT pg_advisory_xact_lock(hashtext({lockKey}))", cancellationToken);
+        }
+
+        /// <summary>
+        /// Marca solo <c>OrderIndex</c>. Se adjunta la fila como <c>Unchanged</c> (viene de una lectura
+        /// NoTracking) y después se marca esa única propiedad, para que el UPDATE no reescriba el resto
+        /// de las columnas.
+        /// </summary>
+        public Task<bool> SetOrderIndexAsync(StoreCatalogImage image, int orderIndex)
+        {
+            var entry = _dbContext.Entry(image);
+            entry.State = EntityState.Unchanged;
+            image.OrderIndex = orderIndex;
+            entry.Property(i => i.OrderIndex).IsModified = true;
+            return Task.FromResult(true);
+        }
     }
 }

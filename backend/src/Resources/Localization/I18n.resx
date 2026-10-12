@@ -240,6 +240,9 @@
   <data name="StoreNotSelected" xml:space="preserve">
     <value>El usuario {0} no tiene tienda seleccionada</value>
   </data>
+  <data name="ApiRequestInvalid" xml:space="preserve">
+    <value>La petición no es válida</value>
+  </data>
   <data name="TenantAlreadyExists" xml:space="preserve">
     <value>El tenant ya existe.</value>
   </data>
@@ -356,6 +359,9 @@
   </data>
   <data name="ShowcaseImageNotFound" xml:space="preserve">
     <value>Imagen no encontrada</value>
+  </data>
+  <data name="ShowcaseStoreTenantNotResolved" xml:space="preserve">
+    <value>No se pudo resolver el tenant de la tienda para añadir la imagen de showcase</value>
   </data>
   <data name="ShowcaseOrderMismatch" xml:space="preserve">
     <value>La lista de imágenes debe contener exactamente las imágenes del conjunto indicado, sin repetidas</value>

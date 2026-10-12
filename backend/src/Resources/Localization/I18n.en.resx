@@ -621,6 +621,9 @@
   <data name="ShowcaseImageNotFound" xml:space="preserve">
     <value>Image not found</value>
   </data>
+  <data name="ShowcaseStoreTenantNotResolved" xml:space="preserve">
+    <value>The store tenant could not be resolved for adding the showcase image</value>
+  </data>
   <data name="ShowcaseOrderMismatch" xml:space="preserve">
     <value>The image list must contain exactly the images of the given set, without duplicates</value>
   </data>
@@ -681,6 +684,9 @@
   </data>
   <data name="StoreNotSelected" xml:space="preserve">
     <value>User {0} has no store selected</value>
+  </data>
+  <data name="ApiRequestInvalid" xml:space="preserve">
+    <value>The request is not valid</value>
   </data>
   <data name="DeliveryDriverNameTooLong" xml:space="preserve">
     <value>{0} cannot be longer than {1} characters</value>

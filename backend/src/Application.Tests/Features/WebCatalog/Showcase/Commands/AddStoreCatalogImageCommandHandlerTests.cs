@@ -8,7 +8,9 @@ using Domain.Common.Enums;
 using Domain.Entities.StoreCatalogImages;
 using Domain.Interfaces.Repositories;
 using FluentAssertions;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Localization;
+using Microsoft.Extensions.Logging;
 using Moq;
 using Resources;
 
@@ -47,6 +49,8 @@ public class AddStoreCatalogImageCommandHandlerTests
     private readonly Mock<IStoreCatalogImageRepository> _imageRepository = new();
     private readonly Mock<ICatalogImageStorage> _catalogImageStorage = new();
     private readonly Mock<IStringLocalizer<I18n>> _localizer = new();
+    private readonly Mock<ILogger<AddStoreCatalogImageCommandHandler>> _logger = new();
+    private readonly Mock<IDbContextTransaction> _transaction = new();
 
     private readonly Guid _storeId = Guid.NewGuid();
     private readonly Guid _tenantId = Guid.NewGuid();
@@ -70,6 +74,11 @@ public class AddStoreCatalogImageCommandHandlerTests
         _httpContextService.Setup(x => x.StoreId).Returns(_storeId.ToString());
         _httpContextService.Setup(x => x.TenantId).Returns(_tenantId.ToString());
         _unitOfWork.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
+        // La comprobación del tope es transaccional: el handler abre una transacción y toma un lock
+        // por (tienda, conjunto) antes de recontar. El mock devuelve un handle que no hace nada.
+        _unitOfWork
+            .Setup(x => x.BeginTransactionAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(_transaction.Object);
         _imageRepository.Setup(x => x.GetByStoreIdAsync(It.IsAny<Guid>())).ReturnsAsync([]);
 
         _imageRepository
@@ -92,7 +101,8 @@ public class AddStoreCatalogImageCommandHandlerTests
         _httpContextService.Object,
         _imageRepository.Object,
         _catalogImageStorage.Object,
-        _localizer.Object);
+        _localizer.Object,
+        _logger.Object);
 
     /// <summary>Archivo válido: png de 1 KB. Los bytes no se miran, solo la cabecera.</summary>
     private static Stream ValidContent(int length = 1024) => new MemoryStream(new byte[length]);
@@ -436,6 +446,25 @@ public class AddStoreCatalogImageCommandHandlerTests
             Times.Never);
     }
 
+    /// <summary>
+    /// Sin tenant en el contexto no se puede escribir el `TenantId` de la fila: un token sin ese claim
+    /// dejaría `Guid.Empty`, una fila que el filtro global resuelve a NULL —invisible para siempre— con
+    /// su archivo ya en disco. Se rechaza antes de subir un solo byte.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WithoutATenantInContext_ShouldReportBadRequest()
+    {
+        _httpContextService.Setup(x => x.TenantId).Returns(string.Empty);
+
+        Func<Task> act = () => Handler().Handle(Command(), CancellationToken.None);
+
+        var exception = await act.Should().ThrowAsync<ApiException>();
+        exception.Which.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest);
+        _catalogImageStorage.Verify(
+            x => x.SaveCatalogImageAsync(It.IsAny<CatalogImageUpload>(), It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
     #endregion
 
     #region Compensación archivo↔fila (SC-R1)
@@ -470,6 +499,27 @@ public class AddStoreCatalogImageCommandHandlerTests
         _unitOfWork
             .Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("No se pudo guardar la fila."));
+
+        Func<Task> act = () => Handler().Handle(Command(), CancellationToken.None);
+
+        var exception = await act.Should().ThrowAsync<InvalidOperationException>();
+        exception.Which.Message.Should().Be("No se pudo guardar la fila.");
+    }
+
+    /// <summary>
+    /// Y si la LIMPIEZA también falla, el error que se reporta sigue siendo el original: la
+    /// compensación no puede reemplazar la causa real por el fallo del borrado, o el 500 hablaría del
+    /// disco cuando el problema fue la base. El archivo queda como deuda de disco, registrado.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenTheCleanupFails_ShouldStillRethrowTheOriginalError()
+    {
+        _unitOfWork
+            .Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("No se pudo guardar la fila."));
+        _catalogImageStorage
+            .Setup(x => x.DeleteAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new IOException("El archivo está en uso."));
 
         Func<Task> act = () => Handler().Handle(Command(), CancellationToken.None);
 

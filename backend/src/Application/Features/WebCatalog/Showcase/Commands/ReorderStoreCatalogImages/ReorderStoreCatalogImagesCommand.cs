@@ -91,11 +91,11 @@ namespace Application.Features.WebCatalog.Showcase.Commands.ReorderStoreCatalogI
             for (int index = 0; index < orderedIds.Count; index++)
             {
                 StoreCatalogImage image = current.First(i => i.Id == orderedIds[index]);
-                image.OrderIndex = index;
 
-                // `ApplicationDbContext` es NoTracking: mutar la fila cargada sin marcar no escribiría
-                // NADA — sin error y sin aviso. Por eso el repositorio la marca explícitamente.
-                await _imageRepository.UpdateAsync(image);
+                // `ApplicationDbContext` es NoTracking y reordenar NO reescribe la fila entera: se marca
+                // solo la columna `OrderIndex`, para no revertir un `Caption`/`IsActive` que otro guardó
+                // a la vez. El repositorio lo marca explícitamente.
+                await _imageRepository.SetOrderIndexAsync(image, index);
             }
 
             return ResponseResult.Success(await _applicationUnitOfWork.SaveChangesAsync(cancellationToken) > 0);

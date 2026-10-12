@@ -63,11 +63,10 @@ namespace Application.Features.WebCatalog.Showcase.Commands.RemoveStoreCatalogIm
             if (storeId == Guid.Empty)
                 throw new ApiException(_localizer["StoreNotSelected", _httpContextService.UserExternalId], HttpStatusCode.BadRequest);
 
-            // Se busca DENTRO de las imágenes de la tienda del contexto, y no por id: eso es lo que
-            // convierte "es de mi tienda" en una condición y no en una promesa. Un id de otra tienda no
-            // está en la lista, así que cae en el 404 de abajo.
-            IList<StoreCatalogImage> images = await _imageRepository.GetByStoreIdAsync(storeId);
-            StoreCatalogImage? image = images.FirstOrDefault(i => i.Id == request.Id);
+            // Se busca por id DENTRO de la tienda del contexto: eso es lo que convierte "es de mi
+            // tienda" en una condición de la consulta y no en una promesa. Un id de otra tienda no
+            // coincide, así que cae en el 404 de abajo. Una sola fila, no la lista entera del conjunto.
+            StoreCatalogImage? image = await _imageRepository.GetByIdAndStoreIdAsync(request.Id, storeId, cancellationToken);
 
             if (image == null)
                 throw new ApiException(_localizer["ShowcaseImageNotFound"], HttpStatusCode.NotFound);
