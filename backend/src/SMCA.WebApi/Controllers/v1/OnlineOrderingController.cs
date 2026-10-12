@@ -23,7 +23,7 @@ namespace SMCA.WebApi.Controllers.v1
     /// plantilla del controlador, que es justo lo que hace `PublicCatalogController`.
     /// </summary>
     [ApiVersion("1.0")]
-    [HasPermission(StoreRoleFeatures.WebCatalogAdmin)]
+    [HasPermission(StoreRoleFeatures.PedidosWhatsAppAdmin)]
     public class OnlineOrderingController : BaseApiController
     {
         /// <summary>

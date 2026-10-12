@@ -54,7 +54,10 @@ namespace SMCA.WebApi.E2ETests.Orders;
 [Collection("e2e")]
 public sealed class OrderingSettingsRouteAuthE2ETests
 {
-    /// <summary>Módulo Catálogo Web. El que habilita la vista de configuración de pedidos.</summary>
+    /// <summary>Módulo Pedidos WhatsApp (19): el que habilita la CONFIGURACIÓN de pedidos.</summary>
+    private const int PedidosWhatsAppModuleId = 19;
+
+    /// <summary>Módulo Catálogo Web (18): NO habilita la configuración de pedidos.</summary>
     private const int WebCatalogModuleId = 18;
 
     private readonly AppTestFactory _f;
@@ -141,20 +144,13 @@ public sealed class OrderingSettingsRouteAuthE2ETests
             + new string(' ', 3),
     };
 
-    /// <summary>
-    /// Contrata el módulo 18 en la tienda del fixture con el MISMO snapshot que deja el plan
-    /// Superior (precio 5, 100 % de descuento ⇒ precio 0), que es lo que usa
-    /// <c>WebCatalogSeed</c> y lo que <c>StoreBillingUtils.FilterForBilling</c> no filtra.
-    ///
-    /// Insert es explícito porque <c>ApplicationDbContext</c> es NoTracking: una fila creada,
-    /// mutada y guardada sin <c>.Add</c> no se escribe — sin error y sin aviso.
-    /// </summary>
-    private async Task GrantWebCatalogModuleAsync(PublicOrderingSeed.OrderingFixture fixture)
+    /// <summary>Contrata el módulo 18 (Catálogo Web) en una tienda: NO debe abrir la config de pedidos.</summary>
+    private async Task GrantWebCatalogModuleAsync(Guid storeId, Guid tenantId)
     {
         using var scope = _f.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         db.Set<StoreModule>().Add(StoreModule.Create(
-            fixture.StoreId, WebCatalogModuleId, 5, false, 5, 0, 100, fixture.TenantId));
+            storeId, WebCatalogModuleId, 5, false, 5, 0, 100, tenantId));
         await db.SaveChangesAsync();
     }
 
@@ -186,38 +182,76 @@ public sealed class OrderingSettingsRouteAuthE2ETests
     }
 
     /// <summary>
-    /// 403, no 401: hay sesión (es un Owner) pero la TIENDA seleccionada no tiene el módulo 18. Es
-    /// la mitad que importa del gate — el gating es por tienda, no por rol.
+    /// 403, no 401: hay sesión (es un Owner) pero la TIENDA seleccionada NO tiene el módulo 19
+    /// (Pedidos WhatsApp). El fixture es Superior, y ese plan YA incluye el 19, así que la única
+    /// forma de representar "sin el módulo" es una tienda en un plan inferior (Gratis).
     /// </summary>
     [Theory]
     [InlineData("GET", false)]
     [InlineData("PUT", true)]
-    public async Task R1_2_the_management_endpoint_forbids_an_owner_without_the_web_catalog_module(
+    public async Task R1_2_the_management_endpoint_forbids_an_owner_without_the_ordering_module(
         string method, bool sendsBody)
     {
         var fixture = await PublicOrderingSeed.SeedAsync(_f);
+        Guid storeId = Guid.Empty;
         try
         {
-            // SIN módulo 18 a propósito: el fixture nace con plan Superior pero sin la fila
-            // `StoreModule` que abre la puerta.
+            storeId = await AddLowerPlanStoreAsync(fixture);
+            await SeedSettingsRowAsync(storeId, fixture.TenantId, "+5355555555");
+            await SelectStoreAsync(fixture.UserId, storeId);
+
             var client = DbTestHelpers.AuthedClient(_f, fixture.UserId, fixture.Login);
             var response = sendsBody
                 ? await client.PutAsJsonAsync(SettingsUrl, ValidBody())
                 : await client.GetAsync(SettingsUrl);
 
             response.StatusCode.Should().Be(HttpStatusCode.Forbidden,
-                "configurar los pedidos es de la vista Catálogo Web: sin el módulo no se entra");
+                "configurar los pedidos es de la vista Pedidos WhatsApp: sin el módulo 19 no se entra");
 
-            // Y el PUT no llegó a tocar la fila. El seed YA deja una `StoreCatalogSettings`, así que
-            // la prueba no es "no hay fila" sino "la fila es la que había": si el 403 llegara
-            // después del handler, estos valores serían los del PUT.
-            var row = await ReadRowAsync(fixture.StoreId);
-            row.Should().NotBeNull("el seed crea la fila de la tienda");
+            // Y el PUT no llegó a tocar la fila: si el 403 llegara DESPUÉS del handler, estos
+            // valores serían los del PUT.
+            var row = await ReadRowAsync(storeId);
+            row.Should().NotBeNull();
             row!.WhatsappNumber.Should().Be("+5355555555", "el 403 tiene que venir ANTES del handler");
             row.BusinessHours.Should().BeNull("el PUT rechazado no dejó su horario");
         }
         finally
         {
+            if (storeId != Guid.Empty) await DeleteStoreGraphAsync(storeId);
+            await PublicOrderingSeed.CleanupAsync(_f, fixture);
+        }
+    }
+
+    /// <summary>
+    /// El gate distingue los DOS módulos: con el 18 (Catálogo Web) pero SIN el 19 (Pedidos WhatsApp)
+    /// es un 403. Antes el 18 abría esta vista —un falso 200 que dejaba configurar pedidos que el
+    /// storefront nunca leería.
+    /// </summary>
+    [Theory]
+    [InlineData("GET", false)]
+    [InlineData("PUT", true)]
+    public async Task R1_9_an_owner_with_the_web_catalog_module_but_not_the_ordering_module_is_forbidden(
+        string method, bool sendsBody)
+    {
+        var fixture = await PublicOrderingSeed.SeedAsync(_f);
+        Guid storeId = Guid.Empty;
+        try
+        {
+            storeId = await AddLowerPlanStoreAsync(fixture);
+            await GrantWebCatalogModuleAsync(storeId, fixture.TenantId);
+            await SelectStoreAsync(fixture.UserId, storeId);
+
+            var client = DbTestHelpers.AuthedClient(_f, fixture.UserId, fixture.Login);
+            var response = sendsBody
+                ? await client.PutAsJsonAsync(SettingsUrl, ValidBody())
+                : await client.GetAsync(SettingsUrl);
+
+            response.StatusCode.Should().Be(HttpStatusCode.Forbidden,
+                "el módulo 18 (catálogo web) NO habilita la configuración de pedidos: es del módulo 19");
+        }
+        finally
+        {
+            if (storeId != Guid.Empty) await DeleteStoreGraphAsync(storeId);
             await PublicOrderingSeed.CleanupAsync(_f, fixture);
         }
     }
@@ -233,7 +267,6 @@ public sealed class OrderingSettingsRouteAuthE2ETests
         var fixture = await PublicOrderingSeed.SeedAsync(_f);
         try
         {
-            await GrantWebCatalogModuleAsync(fixture);
             var client = DbTestHelpers.AuthedClient(_f, fixture.UserId, fixture.Login);
 
             var put = await client.PutAsJsonAsync(SettingsUrl, ValidBody());
@@ -272,16 +305,49 @@ public sealed class OrderingSettingsRouteAuthE2ETests
     /// caso preciso: con el módulo en otra tienda, un gate resuelto por "soy OwnerAdmin" abriría
     /// esta de más, y un gate resuelto por "¿alguna de mis tiendas tiene el módulo?" también.
     /// </summary>
-    private async Task<Guid> AddSecondStoreWithoutTheModuleAsync(PublicOrderingSeed.OrderingFixture fixture)
+    /// <summary>
+    /// Tienda del MISMO owner en un plan INFERIOR (Gratis), que NO incluye el módulo 19. Es la única
+    /// forma de representar "sin el módulo": el fixture nace en Superior, y el plan Superior YA trae
+    /// el 19 en su catálogo de módulos.
+    /// </summary>
+    private async Task<Guid> AddLowerPlanStoreAsync(PublicOrderingSeed.OrderingFixture fixture)
     {
         using var scope = _f.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        var store = Store.Create($"E2E Pedidos {Guid.NewGuid():N}", fixture.OwnerId, true,
+        var store = Store.Create($"E2E Pedidos Gratis {Guid.NewGuid():N}", fixture.OwnerId, true,
             fixture.TenantId, DateOnly.FromDateTime(DateTime.UtcNow),
-            storePlanId: (int)StorePlanType.Superior);
+            storePlanId: (int)StorePlanType.Gratis);
         db.Set<Store>().Add(store);
         await db.SaveChangesAsync();
         return store.Id;
+    }
+
+    /// <summary>Fila de configuración para una tienda creada por el test (el seed solo crea la del fixture).</summary>
+    private async Task SeedSettingsRowAsync(Guid storeId, Guid tenantId, string whatsapp)
+    {
+        using var scope = _f.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var settings = StoreCatalogSettings.Create(storeId, tenantId);
+        settings.WhatsappNumber = whatsapp;
+        db.Set<StoreCatalogSettings>().Add(settings);
+        await db.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Borra SOLO el grafo de una tienda creada por el test (settings → módulos → tienda), sin tocar
+    /// el owner: las dos tiendas son del MISMO owner (borrarlo colgaría el FK de la primera).
+    /// `ExecuteDeleteAsync` porque el contexto es NoTracking.
+    /// </summary>
+    private async Task DeleteStoreGraphAsync(Guid storeId)
+    {
+        using var scope = _f.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        await db.Set<StoreCatalogSettings>().IgnoreQueryFilters()
+            .Where(s => s.StoreId == storeId).ExecuteDeleteAsync();
+        await db.Set<StoreModule>().IgnoreQueryFilters()
+            .Where(m => m.StoreId == storeId).ExecuteDeleteAsync();
+        await db.Set<Store>().IgnoreQueryFilters()
+            .Where(s => s.Id == storeId).ExecuteDeleteAsync();
     }
 
     /// <summary>
@@ -295,14 +361,13 @@ public sealed class OrderingSettingsRouteAuthE2ETests
         Guid secondStoreId = Guid.Empty;
         try
         {
-            await GrantWebCatalogModuleAsync(fixture);
 
             // Control positivo primero: en su tienda, el mismo Owner entra.
             (await DbTestHelpers.AuthedClient(_f, fixture.UserId, fixture.Login)
                 .GetAsync(SettingsUrl)).StatusCode
                 .Should().Be(HttpStatusCode.OK, "control positivo: con el módulo en su tienda, entra");
 
-            secondStoreId = await AddSecondStoreWithoutTheModuleAsync(fixture);
+            secondStoreId = await AddLowerPlanStoreAsync(fixture);
             await SelectStoreAsync(fixture.UserId, secondStoreId);
 
             (await DbTestHelpers.AuthedClient(_f, fixture.UserId, fixture.Login)
@@ -319,31 +384,13 @@ public sealed class OrderingSettingsRouteAuthE2ETests
             // hace que el `DELETE FROM "Store"` de la corrida siguiente reviente por FK).
             try
             {
-                if (secondStoreId != Guid.Empty) await DeleteStoreRowAsync(secondStoreId);
+                if (secondStoreId != Guid.Empty) await DeleteStoreGraphAsync(secondStoreId);
             }
             finally
             {
                 await PublicOrderingSeed.CleanupAsync(_f, fixture);
             }
         }
-    }
-
-    /// <summary>
-    /// Borra SOLO la fila de la segunda tienda. No se usa
-    /// <c>AuthzSeed.CleanupStoreGraphAsync</c>: esa limpia también borra el <c>Owner</c>, y aquí las
-    /// dos tiendas son del MISMO owner —borrarlo dejaría a la primera tienda con el FK colgado
-    /// (<c>FK_Store_Owner_OwnerId</c> es Restrict).
-    ///
-    /// La tienda no tiene <c>StoreModule</c>/<c>StoreRoleFeature</c>/<c>StoreUser</c>/settings, así
-    /// que la fila es su único rastro. <c>ExecuteDeleteAsync</c> por la misma razón de siempre: el
-    /// contexto es NoTracking.
-    /// </summary>
-    private async Task DeleteStoreRowAsync(Guid storeId)
-    {
-        using var scope = _f.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        await db.Set<Store>().IgnoreQueryFilters()
-            .Where(s => s.Id == storeId).ExecuteDeleteAsync();
     }
 
     /// <summary>
@@ -420,7 +467,6 @@ public sealed class OrderingSettingsRouteAuthE2ETests
         var fixture = await PublicOrderingSeed.SeedAsync(_f);
         try
         {
-            await GrantWebCatalogModuleAsync(fixture);
             var client = DbTestHelpers.AuthedClient(_f, fixture.UserId, fixture.Login);
 
             var put = await client.PutAsJsonAsync(SettingsUrl, PaddedBodyToTheColumnLimit());
@@ -474,7 +520,6 @@ public sealed class OrderingSettingsRouteAuthE2ETests
         var fixture = await PublicOrderingSeed.SeedAsync(_f);
         try
         {
-            await GrantWebCatalogModuleAsync(fixture);
             var client = DbTestHelpers.AuthedClient(_f, fixture.UserId, fixture.Login);
 
             var before = await ReadRowAsync(fixture.StoreId);
