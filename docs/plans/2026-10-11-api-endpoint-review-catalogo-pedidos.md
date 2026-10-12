@@ -365,6 +365,24 @@ owners distintos (pendiente de confirmar; si aplica, recupera la severidad de se
 
 ---
 
+## Hallazgos E2E pre-existentes (fuera del Controller 3, detectados 2026-10-12)
+
+Al correr el E2E del namespace `Catalog` para verificar los cambios globales (sobre 400 unificado)
+aparecieron fallos **PRE-EXISTENTES** (también presentes en el baseline `d9e7c35f`: 6 fallos/48) que
+**no** son del Controller 3. Son de **Controller 1**, y el E2E nunca se había corrido tras ese trabajo.
+
+- [x] **C1-E2E-1 — `CatalogImagePathTooLong` con 1 argumento.** La clave está **duplicada** en
+      `I18n.resx`/`I18n.en.resx` (una con 2 placeholders) y `ReorderProductImagesCommandValidator` +
+      `RemoveProductImageCommandValidator` (Controller 1, `f649a6f8`) la llamaban con **1** →
+      `FormatException` del localizador → **500** en reorder/delete de imagen de producto.
+      **ARREGLADO 2026-10-12 (`f551b031`)**: los 2 validadores pasan 2 args (como los otros 4) y se
+      elimina la entrada duplicada del `.resx`.
+- [ ] **C1-E2E-2 — `Product cannot be tracked because another instance with the same key is already
+      being tracked`** en el sync/snapshot de galerías → **500** (`WebCatalogSnapshotTests.Null_gallery…`,
+      `WebCatalogSyncTests.Null_gallery…`). Trampa NoTracking/attach en el espejo de galerías. PRE-EXISTENTE.
+- [ ] **C1-E2E-3 — `WebCatalogProductFieldsTests.Saving_the_fields_exposes_them_in_the_catalog_view`**
+      → **400** donde espera 200 (alguna regla de validación rechaza un payload válido). PRE-EXISTENTE.
+
 ## Progreso
 
 - 2026-10-11 — Plan creado a partir de la revisión `api-endpoint-review` (9 unidades / 34 endpoints).
@@ -397,3 +415,9 @@ owners distintos (pendiente de confirmar; si aplica, recupera la severidad de se
   repositorio no tienen test; (c) el mock de `GetByIdAndStoreIdAsync` ignora el `storeId`; (d) el lock
   bloqueante no tiene timeout/`try-lock`; (e) ventana *pre-existente* commit-con-resultado-desconocido →
   borra el archivo. Un hallazgo CRITICAL (`R3-Unified400Untested`) fue **refutado** por el refuter.
+- 2026-10-12 — **Controller 3 advisories CERRADOS** (`9b5e4c18`): T1 (doble respeta storeId) · T2
+  (tests de repositorio + UPDATE parcial probado en Postgres) · T3 (lock transaccional probado con
+  Postgres real) · T4 (sobre 400 unificado cubierto por E2E) · T5 (`lock_timeout` acotado → 409) ·
+  T6 (archivo conservado si el commit es desconocido). Unit **1250 verde**; E2E nuevos **4/4**.
+  Además `f551b031` arregla el bug E2E pre-existente **C1-E2E-1** (ver sección de hallazgos). Siguiente:
+  RDD de los advisories + el fix, y decidir los hallazgos C1-E2E-2/3.
