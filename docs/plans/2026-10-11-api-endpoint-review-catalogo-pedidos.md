@@ -440,3 +440,11 @@ documenta `AGENTS.md`).
   (`CancellationToken`) · 4.12 (`[Produces]`) · 4.13 (tests). 4.6 ya estaba. **Diferido**: 4.11
   (cosmético). `dotnet build` 0 errores; `Application.Tests` **1269 verde**; E2E `Catalog` **49/52**
   (los 3 fallos son los pre-existentes C1-E2E-2/3, sin fallos nuevos). Siguiente: RDD del Controller 4.
+- 2026-10-12 — **Controller 4: RDD APROBADA** (lineage `review-7fbc1c5ccba9e5c0`, 3 lentes, autoridad
+  quemada). **Advisories no bloqueantes**: (a) **R1** el guard de segmentos solo rechaza `.`/`..`
+  exactos; en Windows un segmento `.. ` (con espacio) se recorta al resolver → traversal residual
+  (PRE-EXISTENTE, el baseline no tenía guard alguno); (b) **R3-1** los 3 métodos SQL nuevos no tienen
+  test de repositorio contra Postgres (solo mocks; el E2E público SÍ los ejerce y pasa); (c) R3-2 el
+  guard de separador de `ResolveFullPath` sin test; (d) R3-3 la normalización del filtro no se prueba;
+  (e) **R4-1** el rate limit por IP colapsa todo un NAT/egress en un cubo → lecturas válidas podrían
+  rechazarse; (f) R4-2 (pre-existente) el endpoint de media sigue sin límite.
