@@ -379,6 +379,39 @@ export function StorefrontCheckout({
             </p>
           </div>
 
+          {/* El aviso de validación y el botón van JUSTO DESPUÉS de la sección de resumen (no al
+              final de todo), según lo pedido: juntos, para que el error quede a la vista. */}
+          {error && (
+            <div data-testid="checkout-error">
+              <InfoBox variant="danger">{error}</InfoBox>
+            </div>
+          )}
+
+          <div className="flex justify-center">
+            <Button
+              onClick={() => void submit()}
+              disabled={submitting}
+              data-testid="checkout-submit"
+            >
+              {/* La etiqueta anuncia lo que va a HACER, y sin el módulo 20 eso no es "registrar"
+                  ni "crear": es mandar el resumen por WhatsApp. El modo staff se queda con sus
+                  dos etiquetas solo cuando hay pedido que registrar de verdad. */}
+              {intl.formatMessage({
+                id: !persistsOrders
+                  ? submitting
+                    ? 'CHECKOUT.SUBMITTING_WHATSAPP'
+                    : 'CHECKOUT.SUBMIT_WHATSAPP'
+                  : staffMode
+                    ? submitting
+                      ? 'CHECKOUT.SUBMITTING_STAFF'
+                      : 'CHECKOUT.SUBMIT_STAFF'
+                    : submitting
+                      ? 'CHECKOUT.SUBMITTING'
+                      : 'CHECKOUT.SUBMIT',
+              })}
+            </Button>
+          </div>
+
           <div>
             <label
               className="mb-1 block text-xs font-medium text-text-muted"
@@ -492,37 +525,6 @@ export function StorefrontCheckout({
               className={INPUT_CLASSES}
               data-testid="checkout-notes"
             />
-          </div>
-
-          {error && (
-            <div data-testid="checkout-error">
-              <InfoBox variant="danger">{error}</InfoBox>
-            </div>
-          )}
-
-          <div className="flex justify-center">
-            <Button
-              onClick={() => void submit()}
-              disabled={submitting}
-              data-testid="checkout-submit"
-            >
-              {/* La etiqueta anuncia lo que va a HACER, y sin el módulo 20 eso no es "registrar"
-                  ni "crear": es mandar el resumen por WhatsApp. El modo staff se queda con sus
-                  dos etiquetas solo cuando hay pedido que registrar de verdad. */}
-              {intl.formatMessage({
-                id: !persistsOrders
-                  ? submitting
-                    ? 'CHECKOUT.SUBMITTING_WHATSAPP'
-                    : 'CHECKOUT.SUBMIT_WHATSAPP'
-                  : staffMode
-                    ? submitting
-                      ? 'CHECKOUT.SUBMITTING_STAFF'
-                      : 'CHECKOUT.SUBMIT_STAFF'
-                    : submitting
-                      ? 'CHECKOUT.SUBMITTING'
-                      : 'CHECKOUT.SUBMIT',
-              })}
-            </Button>
           </div>
         </div>
       </Modal>
