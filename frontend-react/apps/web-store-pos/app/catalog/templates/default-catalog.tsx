@@ -86,6 +86,13 @@ export function DefaultCatalogTemplate(props: CatalogTemplateProps) {
   const items = page?.items ?? [];
   const storeName = catalog?.storeName ?? '';
 
+  /**
+   * Elementos por fila en MÓVIL (decisión del owner, 2026-10-12): arranca en 1 o 2 columnas según lo
+   * que el dueño eligió en la configuración del Catálogo Web. Desde `sm` el comportamiento no cambia
+   * (2 columnas) y en `lg` sigue en 3. Sin ajuste —o con una plantilla que lo ignora— usa 2, como hoy.
+   */
+  const mobileGridColumns = orderingConfig?.mobileColumns === 1 ? 'grid-cols-1' : 'grid-cols-2';
+
   return (
     <div className="min-h-screen scroll-smooth bg-background">
       {/* Cabecera FIJA con la marca y la navegación. Va PRIMERO y se queda pegada al scroll:
@@ -252,17 +259,16 @@ export function DefaultCatalogTemplate(props: CatalogTemplateProps) {
           </InfoBox>
         )}
 
-        {/* Dos columnas DESDE móvil (decisión del owner, 2026-10-06): la rejilla anterior
-            solo tenía 2 columnas desde `sm`, así que en móvil cada tarjeta ocupaba el ancho
-            completo y la vista desaprovechaba el espacio. Al partirla en dos, la tarjeta se
-            estrecha a la mitad, y por eso el nombre y el precio tienen que ir APILADOS (más
-            abajo): repartidos en horizontal el nombre se sale de su caja y pinta sobre el
-            precio. `gap` también baja en móvil porque a media columna un `gap-4` se come la
-            tarjeta. */}
+        {/* Elementos por fila en MÓVIL configurables (decisión del owner, 2026-10-12): la rejilla
+            arranca en 1 o 2 columnas según el ajuste del Catálogo Web; desde `sm` son 2 y en `lg` 3,
+            igual que antes. Con 1 columna la tarjeta ocupa el ancho completo y con 2 se estrecha a la
+            mitad, y por eso el nombre y el precio van APILADOS (más abajo): repartidos en horizontal
+            el nombre se sale de su caja y pinta sobre el precio. `gap` baja en móvil porque a media
+            columna un `gap-4` se come la tarjeta. */}
         <ul
           ref={gridRef}
           id="productos"
-          className="mt-4 grid scroll-mt-24 grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3"
+          className={`mt-4 grid scroll-mt-24 ${mobileGridColumns} gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3`}
           data-testid="catalog-grid"
         >
           {items.map((product) => (

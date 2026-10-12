@@ -50,6 +50,7 @@ const CONFIG: PublicOrderingConfig = {
   deliveryZones: null,
   paletteId: 'default',
   templateId: 'boutique',
+  mobileColumns: 2,
   logoUrl: null,
   bannerUrl: null,
   carouselImages: [],
