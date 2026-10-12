@@ -114,4 +114,26 @@ L2 (verbatim, 2026-10-12):
   - S7 por HTTP real no se ejercitó (S8 prohíbe E2E nuevos); probado por unit + cadena de middleware ya cubierta.
   - Sondas de regresión propuestas por el verificador: no se añaden — duplican los casos 0/3/-1 ya cubiertos por los tests del validador (disciplina del repo: "no añadir otros casos"). El texto de la sonda llegó parcialmente corrupto, así que no se commitea.
 - RDD (`gentle-ai review mode status` = on): `review assess --base-ref f1cae8e5 --committed-only` → `risk: medium`, **`review_due: false`** (`under_budget`) → **no abre revisión nativa**.
+- 2026-10-12 — **Advisory 1 (E2E reset helper) ARREGLADO** (autorizado por el owner: "arregla 1").
+  - `DbTestHelpers.ResetDataAsync` no borraba los hijos de `Store` con FK `Restrict`: `StoreCatalogSettings`,
+    `StoreCatalogImage`, `DeliveryDriver`, `ChannelExchangeRate`; tampoco `OrderPayment` (→ `Order`) ni
+    `ProductImage` (→ `Product`). Un run E2E abortado dejaba residuo y **todos** los runs siguientes fallaban con 23503.
+  - **RED** (reproducido): residuo sembrado por SQL en `smca_test` (1 Store + 1 StoreCatalogSettings + User/Owner)
+    → `OrderingSettingsRouteAuthE2ETests` falla con `23503 ... FK_StoreCatalogSettings_Store_StoreId` en
+    `ResetDataAsync` (línea 226): 0/10.
+  - **GREEN**: con el mismo residuo presente, `OrderingSettingsRouteAuthE2ETests` → **10/10**; el reset lo limpia.
+  - Orden FK respetado: `OrderPayment` antes de `Order`; `ProductImage` antes de `Product`; `DeliveryDriver`
+    DESPUÉS de `Order` (`Order.DriverId` es `Restrict` a `DeliveryDriver`).
+  - Comando del README raíz (sección 3) corrido completo (`dotnet test backend/src/SMCA.WebApi.E2ETests/...`):
+    **709 passed / 6 failed** (los 6 son pre-existentes, ver abajo).
+- 2026-10-12 — **Hallazgo PRE-EXISTENTE (no de este cambio)**: con el commit base `f1cae8e5` (el `dev` tras el
+  merge, SIN este feature y SIN el arreglo del helper), estos **6 E2E de catálogo ya fallaban** (mismos 500/400):
+  - `Catalog.WebCatalogImagesTests.Reorder_applies_the_given_order_and_rejects_a_foreign_list`
+  - `Catalog.WebCatalogImagesTests.Delete_removes_the_row_and_the_file`
+  - `Catalog.WebCatalogProductFieldsTests.Saving_the_fields_exposes_them_in_the_catalog_view`
+  - `Catalog.WebCatalogProductFieldsTests.Removing_the_main_image_from_the_gallery_leaves_no_dangling_pointer`
+  - `Catalog.WebCatalogSnapshotTests.Null_gallery_leaves_the_photos_alone_and_an_empty_list_clears_them`
+  - `Catalog.WebCatalogSyncTests.Null_gallery_leaves_the_photos_alone_and_an_empty_list_clears_them`
+  - No son de este cambio (fallan igual en la base) ni estaban en `docs/testing/known-issues/`.
+    **Pendiente de decisión del owner** (regla: un E2E rojo es información, no se toca sin autorización).
 - Pendiente: push/PR = decisión del owner.

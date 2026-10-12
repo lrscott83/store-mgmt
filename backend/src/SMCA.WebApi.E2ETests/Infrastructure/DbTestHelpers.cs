@@ -213,13 +213,30 @@ public static class DbTestHelpers
         await db.Set<StoreUser>().IgnoreQueryFilters().ExecuteDeleteAsync();
 
         // Commerce subtree (empty in E2E, but keep the reset complete): InventoryEntryCost
-        // references both InventoryEntry and OrderItem, so it must go before both.
+        // references both InventoryEntry and OrderItem, so it must go before both. ProductImage
+        // Restricts Product, and OrderPayment Restricts Order, so each goes right before its parent.
         await db.Set<Domain.Entities.InventoryEntryCosts.InventoryEntryCost>().IgnoreQueryFilters().ExecuteDeleteAsync();
         await db.Set<Domain.Entities.OrderItems.OrderItem>().IgnoreQueryFilters().ExecuteDeleteAsync();
+        await db.Set<Domain.Entities.OrderPayments.OrderPayment>().IgnoreQueryFilters().ExecuteDeleteAsync();
         await db.Set<Domain.Entities.Orders.Order>().IgnoreQueryFilters().ExecuteDeleteAsync();
         await db.Set<Domain.Entities.InventoryEntries.InventoryEntry>().IgnoreQueryFilters().ExecuteDeleteAsync();
+        await db.Set<Domain.Entities.Products.ProductImage>().IgnoreQueryFilters().ExecuteDeleteAsync();
         await db.Set<Domain.Entities.Products.Product>().IgnoreQueryFilters().ExecuteDeleteAsync();
         await db.Set<Domain.Entities.ProductCategories.ProductCategory>().IgnoreQueryFilters().ExecuteDeleteAsync();
+
+        // Store-scoped leaves that Restrict-reference Store and are NOT part of the commerce
+        // subtree. DeliveryDriver goes here, not with the Store children above, because
+        // Order.DriverId Restricts DeliveryDriver: the Order delete has to run first.
+        //   - StoreCatalogSettings / StoreCatalogImage: the owner's web-catalog config and its
+        //     showcase images (one settings row per store). They accumulate from the Catalog Web
+        //     view and, left behind, block the Store delete with 23503 — and because the reset runs
+        //     at fixture start, ONE aborted run then fails every later run of the whole suite.
+        //   - DeliveryDriver: online-order drivers.
+        //   - ChannelExchangeRate: multi-payment channel rates.
+        await db.Set<Domain.Entities.DeliveryDrivers.DeliveryDriver>().IgnoreQueryFilters().ExecuteDeleteAsync();
+        await db.Set<Domain.Entities.ChannelExchangeRates.ChannelExchangeRate>().IgnoreQueryFilters().ExecuteDeleteAsync();
+        await db.Set<Domain.Entities.StoreCatalogSettings.StoreCatalogSettings>().IgnoreQueryFilters().ExecuteDeleteAsync();
+        await db.Set<Domain.Entities.StoreCatalogImages.StoreCatalogImage>().IgnoreQueryFilters().ExecuteDeleteAsync();
 
         // Owner subtree (before Owner/User).
         await db.Set<Domain.Entities.ReSellerOwners.ReSellerOwner>().IgnoreQueryFilters().ExecuteDeleteAsync();
