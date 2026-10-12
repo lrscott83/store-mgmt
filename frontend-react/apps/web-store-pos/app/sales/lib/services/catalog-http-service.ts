@@ -182,6 +182,12 @@ export interface CatalogBranding {
   logoKey: string | null;
   bannerKey: string | null;
   paletteId: string;
+  /**
+   * Cuántos elementos por fila muestra la rejilla del catálogo público en MÓVIL: 1 o 2. Solo la
+   * plantilla `default` lo usa; `boutique` lo ignora. Espejo de
+   * `StoreCatalogBrandingDto.MobileColumns` (decisión del owner, 2026-10-12).
+   */
+  mobileColumns: number;
 }
 
 /**
@@ -193,6 +199,8 @@ export interface CatalogBrandingUpdate {
   banner?: File;
   removeLogo?: boolean;
   removeBanner?: boolean;
+  /** Elementos por fila en móvil (1 o 2). Ausente = no se toca. */
+  mobileColumns?: number;
 }
 
 /**
@@ -283,6 +291,12 @@ export interface PublicOrderingConfig {
    * actual. Una tienda sin fila, o con la plantilla en blanco, recibe `default`.
    */
   templateId: string;
+  /**
+   * Cuántos elementos por fila muestra la rejilla del catálogo público en MÓVIL: 1 o 2. Solo lo usa
+   * la plantilla `default`; `boutique` lo ignora. Espejo de `PublicOrderingConfigDto.MobileColumns`
+   * (decisión del owner, 2026-10-12). Un valor leído fuera de rango se normaliza en el backend a 2.
+   */
+  mobileColumns: number;
   logoUrl?: string | null;
   bannerUrl?: string | null;
   /**
@@ -543,6 +557,10 @@ export const catalogHttpService = {
     if (payload.banner) formData.append('banner', payload.banner);
     if (payload.removeLogo) formData.append('removeLogo', 'true');
     if (payload.removeBanner) formData.append('removeBanner', 'true');
+    // Ausente = "no toco el ajuste": el backend lo lee como null.
+    if (payload.mobileColumns !== undefined) {
+      formData.append('mobileColumns', String(payload.mobileColumns));
+    }
     const response = await apiClient.put<BaseResponseModel<CatalogBranding>>(
       '/v1/catalog/branding',
       formData,

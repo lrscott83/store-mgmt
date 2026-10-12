@@ -33,5 +33,12 @@ namespace Application.Dtos.WebCatalog
         /// que una tienda recién sincronizada no se vea rota.
         /// </summary>
         public string PaletteId { get; set; } = StoreCatalogSettings.DefaultPaletteId;
+
+        /// <summary>
+        /// Cuántos elementos por fila muestra la rejilla del catálogo público en MÓVIL: 1 o 2
+        /// (decisión del owner, 2026-10-12). Nunca fuera de rango: el valor por defecto es
+        /// <see cref="StoreCatalogSettings.DefaultMobileColumns"/> (2, el comportamiento actual).
+        /// </summary>
+        public int MobileColumns { get; set; } = StoreCatalogSettings.DefaultMobileColumns;
     }
 }

@@ -170,6 +170,7 @@ const CONFIG_WITHOUT_BRAND: PublicOrderingConfig = {
   deliveryZones: null,
   paletteId: 'default',
   templateId: 'default',
+  mobileColumns: 2,
   logoUrl: null,
   bannerUrl: null,
   pedidosWhatsAppEnabled: true,
@@ -309,6 +310,23 @@ describe('PublicCatalogPage', () => {
     // El nombre tiene que poder partirse: sin esto, un nombre largo sin espacios vuelve a
     // desbordar su caja aunque el precio ya no compita por el espacio.
     expect(within(card).getByRole('heading', { level: 3 })).toHaveClass('break-words');
+  });
+
+  it('una sola columna en móvil cuando el dueño elige 1 elemento por fila', async () => {
+    catalogMock.getPublicOrderingConfig.mockResolvedValue(
+      envelope({ ...CONFIG_WITHOUT_BRAND, mobileColumns: 1 }),
+    );
+    renderPage();
+
+    const grid = await screen.findByTestId('catalog-grid');
+
+    // El ajuste del Catálogo Web decide las columnas en MÓVIL: la clase base deja de ser
+    // `grid-cols-2`. Desde `sm` siguen siendo dos y en `lg` tres, así que NO hay ninguna clase
+    // base que dé dos columnas en móvil.
+    expect(grid).toHaveClass('grid-cols-1');
+    expect(grid).toHaveClass('sm:grid-cols-2');
+    expect(grid).toHaveClass('lg:grid-cols-3');
+    expect(grid.className).not.toMatch(/(^|\s)grid-cols-2(\s|$)/);
   });
 
   it('abre el detalle con la descripción en texto plano y la galería', async () => {

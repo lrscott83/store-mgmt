@@ -128,7 +128,12 @@ const PRODUCT_WITH_IMAGE: CatalogProductView = {
   images: ['t/s/p/foto.jpg'],
 };
 
-const BRAND_WITHOUT_MEDIA: CatalogBranding = { logoKey: null, bannerKey: null, paletteId: 'default' };
+const BRAND_WITHOUT_MEDIA: CatalogBranding = {
+  logoKey: null,
+  bannerKey: null,
+  paletteId: 'default',
+  mobileColumns: 2,
+};
 
 const BRAND_WITH_MEDIA: CatalogBranding = {
   logoKey: 't/s/branding/logo.png',
@@ -137,6 +142,7 @@ const BRAND_WITH_MEDIA: CatalogBranding = {
   // hasta el cliente y la vista la ignora — el fixture la conserva a propósito.
   bannerKey: 't/s/branding/banner.png',
   paletteId: 'default',
+  mobileColumns: 2,
 };
 
 /** Los DOS conjuntos con una imagen cada uno: sirven para comprobar que NO se mezclan. */
@@ -825,6 +831,50 @@ describe('WebCatalogPage (vista Catálogo Web)', () => {
       // La vista no se cae: productos, panels y guardado por lotes siguen ahí.
       fireEvent.click(await screen.findByTestId(`catalog-category-toggle-${PRODUCT.categoryId}`));
       expect(screen.getByTestId(`catalog-product-${PRODUCT.id}`)).toBeInTheDocument();
+    });
+
+    it('deja elegir 1 o 2 elementos por fila en móvil y lo manda en el PUT de marca', async () => {
+      renderPage();
+
+      const select = (await screen.findByTestId(
+        'brand-mobile-columns-select',
+      )) as HTMLSelectElement;
+      // Arranca en lo que el servidor tiene guardado (2: el comportamiento actual).
+      expect(select.value).toBe('2');
+
+      fireEvent.change(select, { target: { value: '1' } });
+
+      // Elegir NO toca la red: se retiene hasta pulsar Guardar marca.
+      expect(catalogMock.updateBranding).not.toHaveBeenCalled();
+      expect(screen.getByTestId('brand-save')).not.toBeDisabled();
+
+      fireEvent.click(screen.getByTestId('brand-save'));
+
+      await waitFor(() =>
+        expect(catalogMock.updateBranding).toHaveBeenCalledWith({ mobileColumns: 1 }),
+      );
+    });
+
+    it('si el ajuste de elementos por fila no cambia, el botón de marca sigue deshabilitado', async () => {
+      renderPage();
+
+      const select = await screen.findByTestId('brand-mobile-columns-select');
+      // Mismo valor que el servidor: no hay cambio pendiente que guardar.
+      fireEvent.change(select, { target: { value: '2' } });
+
+      expect(screen.getByTestId('brand-save')).toBeDisabled();
+      expect(catalogMock.updateBranding).not.toHaveBeenCalled();
+    });
+
+    it('con la marca sin cargar el selector de elementos por fila queda deshabilitado', async () => {
+      catalogMock.getBranding.mockRejectedValue({ response: { status: 403 } });
+      renderPage();
+
+      await screen.findByTestId('brand-error');
+
+      // Sin leer el valor guardado no se puede elegir: guardar escribiría sobre lo real (mismo
+      // criterio que el modal de plantilla del SuperAdmin).
+      expect(screen.getByTestId('brand-mobile-columns-select')).toBeDisabled();
     });
   });
 

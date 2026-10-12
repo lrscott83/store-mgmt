@@ -67,6 +67,7 @@ const CONFIG: PublicOrderingConfig = {
   deliveryZones: null,
   paletteId: 'default',
   templateId: 'default',
+  mobileColumns: 2,
   logoUrl: null,
   bannerUrl: null,
   pedidosWhatsAppEnabled: true,

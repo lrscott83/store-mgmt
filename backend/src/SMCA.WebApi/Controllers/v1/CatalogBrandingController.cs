@@ -53,16 +53,18 @@ namespace SMCA.WebApi.Controllers.v1
         [RequestSizeLimit(2L * ProductEntityLimits.MaxImageSizeInBytes + 131072)]
         [ProducesResponseType(typeof(ResponseResult<StoreCatalogBrandingDto>), StatusCodes.Status200OK)]
         public async Task<IActionResult> UpdateBrandingAsync(
-            IFormFile? logo, IFormFile? banner, bool removeLogo, bool removeBanner)
+            IFormFile? logo, IFormFile? banner, bool removeLogo, bool removeBanner, int? mobileColumns)
         {
             // Si el multipart no trae archivo, el binding deja el IFormFile en null y se traduce a
             // `null`: "no menciono este lado". Un archivo de longitud 0 (o de formato inválido) lo
-            // rechaza `CatalogImageUploadRules` con el 400 localizado.
+            // rechaza `CatalogImageUploadRules` con el 400 localizado. `mobileColumns` ausente queda
+            // en null = "no toco este ajuste".
             return Ok(await Sender.Send(new UpdateStoreCatalogBrandingCommand(
                 ToUpload(logo),
                 removeLogo,
                 ToUpload(banner),
-                removeBanner)));
+                removeBanner,
+                mobileColumns)));
         }
 
         /// <summary>

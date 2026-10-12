@@ -28,6 +28,13 @@ namespace Domain.Entities.StoreCatalogSettings
         /// </summary>
         public const string DefaultTemplateId = "default";
 
+        /// <summary>
+        /// Elementos por fila que la rejilla del catálogo público muestra en MÓVIL por defecto:
+        /// dos, que es el comportamiento actual. El dueño puede bajarlo a uno (decisión del owner,
+        /// 2026-10-12). Solo 1 y 2 son válidos.
+        /// </summary>
+        public const int DefaultMobileColumns = 2;
+
         public Guid StoreId { get; set; }
         public Store Store { get; set; } = null!;
 
@@ -73,6 +80,14 @@ namespace Domain.Entities.StoreCatalogSettings
         /// checkout) es común a todas. NO es un color: eso es <see cref="PaletteId"/>.
         /// </summary>
         public string TemplateId { get; set; } = DefaultTemplateId;
+
+        /// <summary>
+        /// Cuántos elementos por fila muestra la rejilla del catálogo público en MÓVIL: 1 o 2
+        /// (decisión del owner, 2026-10-12). Solo aplica a la plantilla `default`; `boutique` no lo
+        /// usa. Nace en <see cref="DefaultMobileColumns"/> para que una tienda existente no cambie
+        /// de aspecto al migrar.
+        /// </summary>
+        public int MobileColumns { get; set; } = DefaultMobileColumns;
 
         // --- Comunes ---
 
