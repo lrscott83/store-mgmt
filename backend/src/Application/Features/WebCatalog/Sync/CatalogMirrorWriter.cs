@@ -16,15 +16,20 @@ namespace Application.Features.WebCatalog.Sync
         int ProductsUpdated, int ProductsDeactivated);
 
     /// <summary>
-    /// Resultado de la fase 1 del espejo: los conteos del resumen MÁS las categorías tal como
-    /// quedaron.
+    /// Resultado de la fase 1 del espejo: los conteos del resumen MÁS las categorías y los productos
+    /// tal como quedaron.
     ///
-    /// Las categorías viajan en el VALOR DE RETORNO, no en una propiedad `static`: una propiedad
-    /// `static` es ÚNICA para todo el proceso, así que dos sincronizaciones concurrentes se pisaban
-    /// entre sí (una tienda leía las categorías de la otra). El llamador reusa la MISMA instancia
-    /// para evitar la colisión de tracking del `ApplicationDbContext` (NoTracking).
+    /// Categorías y productos viajan en el VALOR DE RETORNO, no en una propiedad `static`: una
+    /// propiedad `static` es ÚNICA para todo el proceso, así que dos sincronizaciones concurrentes
+    /// se pisaban entre sí (una tienda leía el catálogo de la otra). Y el llamador reusa estas MISMAS
+    /// instancias en la fase 2 para evitar la colisión de tracking del `ApplicationDbContext`
+    /// (NoTracking): re-leer de la base daría una segunda instancia con la misma clave y el attach
+    /// fallaría ("another instance with the same key value is already being tracked").
     /// </summary>
-    public sealed record CatalogMirrorResult(CatalogMirrorCounts Counts, IList<ProductCategory> Categories);
+    public sealed record CatalogMirrorResult(
+        CatalogMirrorCounts Counts,
+        IList<ProductCategory> Categories,
+        IList<Product> Products);
     /// <summary>
     /// Escribe el catálogo LOCAL del POS en las tablas de origen del servidor (espejo).
     ///
@@ -105,6 +110,7 @@ namespace Application.Features.WebCatalog.Sync
 
             IList<Product> storedProducts = await productRepository.GetProductsForCatalogSyncAsync(storeId);
             var storedProductsById = storedProducts.ToDictionary(product => product.Id);
+            var createdProducts = new List<Product>();
             var snapshotProductIds = snapshot.Products.Select(product => product.Id).ToHashSet();
             int productsCreated = 0, productsUpdated = 0, productsDeactivated = 0;
 
@@ -135,6 +141,7 @@ namespace Application.Features.WebCatalog.Sync
                         incoming.BusinessId ?? string.Empty, tenantId);
                     created.Currency = ToCurrency(incoming.Currency);
                     await productRepository.AddAsync(created);
+                    createdProducts.Add(created);
                     productsCreated++;
                 }
             }
@@ -157,21 +164,27 @@ namespace Application.Features.WebCatalog.Sync
             return new CatalogMirrorResult(
                 new CatalogMirrorCounts(categoriesCreated, categoriesUpdated, productsCreated,
                     productsUpdated, productsDeactivated),
-                allCategories);
+                allCategories,
+                storedProducts.Concat(createdProducts).ToList());
         }
 
         /// <summary>
         /// Segunda fase: galerías. Va aparte porque las filas de producto tienen que existir antes
         /// (la galería referencia al producto), así que el llamador guarda entre las dos fases.
+        ///
+        /// Recibe los productos que devolvió la fase 1 (`CatalogMirrorResult.Products`) en vez de
+        /// volver a leerlos: el `ApplicationDbContext` no trackea por defecto, así que una segunda
+        /// lectura daría instancias NUEVAS con la misma clave y el `UpdateAsync` de abajo fallaría al
+        /// adjuntarlas ("another instance with the same key value is already being tracked"). Las
+        /// instancias que llegan aquí son las MISMAS que la fase 1 dejó tracked (Modified) o Added.
         /// </summary>
         public static async Task MirrorGalleriesAsync(
             CatalogSnapshotDto snapshot,
-            Guid storeId,
+            IList<Product> products,
             IProductRepository productRepository,
             IProductImageRepository imageRepository)
         {
-            IList<Product> storedProducts = await productRepository.GetProductsForCatalogSyncAsync(storeId);
-            var storedProductsById = storedProducts.ToDictionary(product => product.Id);
+            var storedProductsById = products.ToDictionary(product => product.Id);
 
             foreach (CatalogSnapshotProductDto incoming in snapshot.Products)
             {

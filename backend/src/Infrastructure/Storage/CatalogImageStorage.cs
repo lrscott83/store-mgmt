@@ -190,8 +190,17 @@ namespace Infrastructure.Storage
             if (string.IsNullOrWhiteSpace(key))
                 return false;
 
+            string normalized = key.Replace('\\', '/');
+
+            // La clave se compone de segmentos y un segmento que cambia el destino al normalizar la
+            // ruta (`..`, `.`, y también `.. ` o `...`, que Windows recorta a `..`) haría que
+            // `{tenantA}/{storeA}/.. /{tenantB}/…` EMPEZARA por el prefijo esperado y aun así leyera
+            // otra tienda. Se decide sobre la MISMA forma que se resuelve al abrir, ANTES de comparar.
+            if (normalized.Split('/', StringSplitOptions.RemoveEmptyEntries).Any(IsTraversalSegment))
+                return false;
+
             string expectedPrefix = tenantId.ToString("N") + "/" + storeId.ToString("N") + "/";
-            return key.Replace('\\', '/').StartsWith(expectedPrefix, StringComparison.OrdinalIgnoreCase);
+            return normalized.StartsWith(expectedPrefix, StringComparison.OrdinalIgnoreCase);
         }
 
         private string ResolveFullPath(string key)
@@ -202,14 +211,34 @@ namespace Infrastructure.Storage
 
             string relative = key.Replace('/', Path.DirectorySeparatorChar).Replace('\\', Path.DirectorySeparatorChar);
 
-            // Defensa contra traversal: la clave se compone en el backend, pero nunca se confía.
+            // Defensa contra traversal, para CUALQUIER clave (no solo la que valida la pertenencia):
+            // un segmento que al recortar es `.`/`..`/vacío cambia de carpeta al resolver la ruta.
+            if (relative.Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries).Any(IsTraversalSegment))
+                throw new InvalidOperationException($"Clave de imagen con traversal: '{key}'.");
+
             string fullPath = Path.GetFullPath(Path.Combine(root, relative));
             string fullRoot = Path.GetFullPath(root);
-            if (!fullPath.StartsWith(fullRoot, StringComparison.OrdinalIgnoreCase))
+
+            // El prefijo termina en el SEPARADOR: sin él, `.../catalog-backup/x` comparte el prefijo
+            // textual con `.../catalog` y escaparía a una carpeta hermana.
+            string rootPrefix = fullRoot.EndsWith(Path.DirectorySeparatorChar)
+                ? fullRoot
+                : fullRoot + Path.DirectorySeparatorChar;
+
+            if (!fullPath.StartsWith(rootPrefix, StringComparison.OrdinalIgnoreCase))
                 throw new InvalidOperationException($"Clave de imagen fuera de la raíz del catálogo: '{key}'.");
 
             return fullPath;
         }
+
+        /// <summary>
+        /// ¿El segmento escapa del directorio al normalizarse? Windows recorta espacios y puntos
+        /// FINALES de cada componente de la ruta (`.. ` y `...` colapsan a `..`), así que un segmento
+        /// que se vuelve vacío/`.`/`..` al recortarlos también cambia de carpeta. Se rechaza aunque el
+        /// SO de producción (Linux) no recorte: el contrato es que una clave nunca salga de su tienda.
+        /// </summary>
+        private static bool IsTraversalSegment(string segment)
+            => segment.TrimEnd(' ', '.').Length == 0;
 
         private static string ExtensionFromContentType(string? contentType)
             => contentType?.ToLowerInvariant() switch

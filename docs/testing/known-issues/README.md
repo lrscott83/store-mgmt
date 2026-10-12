@@ -10,7 +10,7 @@ la causa raíz, la evidencia y lo que ya se intentó.
 |---|---|
 | [`../known-issues.md`](../known-issues.md) | **Índice maestro.** Cada corrida con su veredicto, el contrato detallado de una ficha y las decisiones pendientes |
 | [`2026-10-06-e2e-verification/`](2026-10-06-e2e-verification/README.md) | **La única carpeta de fichas del frontend (Playwright).** Las 4 fichas vivas y el inventario de tests que pasan en solitario. Su README es además el **Registro de fichas retiradas** |
-| [`2026-10-12-backend-e2e-verification/`](2026-10-12-backend-e2e-verification/README.md) | **Fichas de la corrida E2E del BACKEND (xUnit).** 6 tests rojos, 3 causas raíz confirmadas (aridad de recursos, tracking EF en el sync, fixture con clave ficticia). Mismo contrato de ficha, referencias `*.cs` |
+| [`2026-10-12-backend-e2e-verification/`](2026-10-12-backend-e2e-verification/README.md) | **Fichas de la corrida E2E del BACKEND (xUnit).** Arrancó con 6 tests rojos y 3 causas raíz; **RESUELTAS las 3** (`f551b031` + `d6bf0de9`) → suite **719/719 verde**. Sin fichas vivas; el README de la carpeta guarda el registro de retiradas. Mismo contrato de ficha, referencias `*.cs` |
 
 Desde el 2026-10-06 **no hay una carpeta por corrida**: las que quedaron sin ninguna ficha de test
 (`2026-10-01-e2e-verification/`, `2026-10-03-e2e-verification/`, `group-g/`, `qa-merge-2026-09-29/`,

@@ -426,21 +426,22 @@ Es la continuación directa de la corrida del 2026-10-04 (346 aprobados, 2 falli
 ## Corrida E2E BACKEND del 2026-10-12 (suite xUnit, NO Playwright)
 
 **Contexto.** `dotnet test backend/src/SMCA.WebApi.E2ETests/SMCA.WebApi.E2ETests.csproj` (README raíz,
-sección 3) contra PostgreSQL real `smca_test`: **715 total → 709 passed / 6 failed**. Los 6 son
-**deterministas** y **pre-existentes**: fallan igual en el commit base `f1cae8e5` (el `dev` tras el
-merge `dev ← test`), **sin** los cambios de la sesión del 2026-10-12 (feature de columnas móviles y
-arreglo del reset). Los introdujo el merge: los commits causantes (`f649a6f8`, `0d28fa97`, `9bcc1e7a`)
-**no** son ancestros de `eac38545`, el `dev` previo al merge.
+sección 3) contra PostgreSQL real `smca_test`. Corrida inicial (base `f1cae8e5`): **715 total →
+709 passed / 6 failed**. Los 6 eran **deterministas** y **pre-existentes**: fallaban igual sin los
+cambios de la sesión del 2026-10-12, y los introdujo el merge `dev ← test` (los commits causantes
+`f649a6f8`, `0d28fa97`, `9bcc1e7a` no son ancestros de `eac38545`). Tras mergear `test` y `qa`
+(HEAD `dd9327fa`): **719 → 716 / 3** (aparecieron 4 E2E nuevos, verdes).
+
+**Estado final (HEAD `d6bf0de9`): 719 total → 719 passed / 0 failed.** Las 3 causas quedaron resueltas.
 
 | # | Tests | Síntoma | Causa raíz (confirmada) | Estado |
 | --- | --- | --- | --- | --- |
-| 01 | `WebCatalogImagesTests.Reorder_…`, `WebCatalogImagesTests.Delete_…`, `WebCatalogProductFieldsTests.Removing_the_main_image_…` | 500 | La clave `CatalogImagePathTooLong` está **duplicada** en `I18n.resx`/`I18n.en.resx` con aridad distinta; los validadores NUEVOS de imágenes llaman a la variante de 2 placeholders con 1 argumento → `FormatException` al construir el validador | 🔴 abierto |
-| 02 | `WebCatalogSyncTests.Null_gallery_…`, `WebCatalogSnapshotTests.Null_gallery_…` | 500 | `CatalogMirrorWriter.MirrorGalleriesAsync` (`CatalogMirrorWriter.cs:204`) adjunta un `Product` ya trackeado en el mismo contexto (NoTracking + `UpdateAsync`) → conflicto de identidad en `SyncCatalog` | 🔴 abierto |
-| 03 | `WebCatalogProductFieldsTests.Saving_the_fields_…` | 400 | El fixture envía la clave ficticia `"k/main.jpg"`; la validación nueva (`UpdateProductCatalogFieldsCommand.cs:135`) exige que la clave pertenezca a la tienda → `CatalogImageNotFound`. La app es correcta; el test quedó desalineado | 🔴 abierto |
+| 01 | `WebCatalogImagesTests.Reorder_…`, `WebCatalogImagesTests.Delete_…`, `WebCatalogProductFieldsTests.Removing_the_main_image_…` | 500 | La clave `CatalogImagePathTooLong` estaba **duplicada** en `I18n.resx`/`I18n.en.resx` con aridad distinta; los validadores NUEVOS de imágenes la llamaban con 1 argumento → `FormatException` al construir el validador | ✅ **RESUELTO** — `f551b031` (2 args + entrada duplicada eliminada) |
+| 02 | `WebCatalogSyncTests.Null_gallery_…`, `WebCatalogSnapshotTests.Null_gallery_…` | 500 | `CatalogMirrorWriter.MirrorGalleriesAsync` (`CatalogMirrorWriter.cs:204`) adjuntaba un `Product` ya trackeado (NoTracking + `UpdateAsync`) → conflicto de identidad en `SyncCatalog` | ✅ **RESUELTO** — `d6bf0de9` (la fase 1 devuelve los productos y la fase 2 los reusa) |
+| 03 | `WebCatalogProductFieldsTests.Saving_the_fields_…` | 400 | El fixture enviaba la clave ficticia `"k/main.jpg"`; la validación (`UpdateProductCatalogFieldsCommand.cs:135`) exige que la clave pertenezca a la tienda | ✅ **RESUELTO** — `d6bf0de9` (el test sube una imagen real; mutación verificada) |
 
 **Fichas:** [`known-issues/2026-10-12-backend-e2e-verification/`](known-issues/2026-10-12-backend-e2e-verification/README.md)
-(01, 02 y 03). **Ninguna propuesta aplicada**: tocar tests E2E existentes o código de la app requiere
-autorización 1 a 1.
+— las 3 retiradas al quedar resueltas; el README de esa carpeta guarda el registro completo.
 
 
 _Actualizado por última vez: 2026-10-05 (corrida completa: 351 aprobados, 0 fallidos, 3 inestables; las fichas de las corridas del 2026-10-01 y del merge de qa quedaron retiradas salvo `precache-split` y el defecto del caché de Vite)._

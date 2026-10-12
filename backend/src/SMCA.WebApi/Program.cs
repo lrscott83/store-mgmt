@@ -163,6 +163,9 @@ builder.Services.AddRateLimiter(options =>
     // (20 pedidos / 10 min por IP + slug). `UseRateLimiter()` ya está en el pipeline, después de
     // `UseAuthorization()`.
     options.AddPolicy("OnlineOrderPolicy", RateLimitPolicies.OnlineOrder);
+
+    // Lecturas anónimas del catálogo público: baratas, pero sin tope cualquiera las recorre en bucle.
+    options.AddPolicy("PublicCatalogPolicy", RateLimitPolicies.PublicCatalog);
 });
 
 var app = builder.Build();

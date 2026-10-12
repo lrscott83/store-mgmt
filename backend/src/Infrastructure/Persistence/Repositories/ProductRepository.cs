@@ -99,19 +99,72 @@ namespace Infrastructure.Persistence.Repositories
         // --- Lecturas del catálogo público (publicación directa sobre esta tabla, decisión del
         // Owner 2026-09-28): activos y en venta, de categorías activas con slug público. ---
 
-        public async Task<IList<Product>> GetPublishedByStoreIdAsync(Guid storeId, Guid? categoryId, string? search)
+        public async Task<IList<Product>> GetPublishedPageAsync(Guid storeId, string? categorySlug, string? search,
+            int skip, int take, CancellationToken cancellationToken = default)
         {
-            IQueryable<Product> query = _products
+            IQueryable<Product> query = ApplyPublishedFilters(PublishedQuery(storeId), categorySlug, search);
+
+            return await query
+                .OrderBy(product => product.Category.Order)
+                .ThenBy(product => product.Order)
+                .ThenBy(product => product.Name)
+                .Skip(skip)
+                .Take(take)
+                .ToListAsync(cancellationToken);
+        }
+
+        public async Task<int> CountPublishedAsync(Guid storeId, string? categorySlug, string? search,
+            CancellationToken cancellationToken = default)
+            => await ApplyPublishedFilters(PublishedQuery(storeId), categorySlug, search)
+                .CountAsync(cancellationToken);
+
+        public async Task<IList<PublishedCategoryCount>> GetPublishedCategoryCountsAsync(Guid storeId,
+            CancellationToken cancellationToken = default)
+            => await PublishedQuery(storeId)
+                .GroupBy(product => new
+                {
+                    product.CategoryId,
+                    product.Category.Name,
+                    product.Category.Slug,
+                    product.Category.Order
+                })
+                .Select(group => new PublishedCategoryCount(
+                    group.Key.CategoryId,
+                    group.Key.Name,
+                    group.Key.Slug!,
+                    group.Key.Order,
+                    group.Count()))
+                .ToListAsync(cancellationToken);
+
+        /// <summary>
+        /// Universo PUBLICADO: activo, en venta, de categoría activa con slug público, de la tienda.
+        /// Trae la categoría (el listado y la cabecera la usan) pero NO la galería: la imagen pública
+        /// tiene una sola fuente, `Product.Image` (columna), así que `Include(Images)` era traer filas
+        /// que nadie lee.
+        /// </summary>
+        private IQueryable<Product> PublishedQuery(Guid storeId)
+            => _products
                 .IgnoreQueryFilters()
+                .Include(product => product.Category)
                 .Where(product => product.Category.StoreId == storeId
                     && product.IsActive && product.AvailableToSale
                     && product.Category.IsActive
-                    && product.Category.Slug != null)
-                .Include(product => product.Images)
-                .Include(product => product.Category);
+                    && product.Category.Slug != null);
 
-            if (categoryId.HasValue)
-                query = query.Where(product => product.CategoryId == categoryId.Value);
+        /// <summary>
+        /// Filtros del listado, aplicados en SQL. El slug de categoría viaja tal cual lo manda el
+        /// cliente; la comparación se hace en minúsculas para preservar la semántica insensible a
+        /// mayúsculas que tenía el filtro en memoria.
+        /// </summary>
+        private static IQueryable<Product> ApplyPublishedFilters(IQueryable<Product> query,
+            string? categorySlug, string? search)
+        {
+            if (!string.IsNullOrWhiteSpace(categorySlug))
+            {
+                string slug = categorySlug.Trim().ToLowerInvariant();
+                query = query.Where(product => product.Category.Slug != null
+                    && product.Category.Slug.ToLower() == slug);
+            }
 
             if (!string.IsNullOrWhiteSpace(search))
             {
@@ -119,11 +172,7 @@ namespace Infrastructure.Persistence.Repositories
                 query = query.Where(product => product.Name.ToLower().Contains(term));
             }
 
-            return await query
-                .OrderBy(product => product.Category.Order)
-                .ThenBy(product => product.Order)
-                .ThenBy(product => product.Name)
-                .ToListAsync();
+            return query;
         }
 
         public async Task<Product?> GetPublishedByIdAsync(Guid storeId, Guid productId)
