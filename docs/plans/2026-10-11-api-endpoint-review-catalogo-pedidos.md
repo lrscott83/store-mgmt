@@ -157,31 +157,39 @@ owners distintos (pendiente de confirmar; si aplica, recupera la severidad de se
 `GET|POST /catalog/showcase` · `DELETE /catalog/showcase/{id}` · `PUT /catalog/showcase/order`
 
 ### HIGH
-- [ ] **3.1 — Límite multipart sin tope real (ver X1).**
-- [ ] **3.2 — `TenantId` sin guard en el alta.**
-      `AddStoreCatalogImageCommand.cs:73`: token sin claim de tenant escribe `TenantId = Guid.Empty`
-      → fila invisible para siempre (el filtro resuelve tenant a NULL) + archivo huérfano. Fix: mismo
-      guard que `StoreId` (400).
+- [x] **3.1 — Límite multipart sin tope real (ver X1).** — **HECHO vía 1.4** (`8449cc2b`): el `POST`
+      ya lleva `[RequestSizeLimit]`, el buffer global vuelca a disco (64 KB) y el cuerpo está acotado a
+      8 MB. Cerrado por cobertura, sin cambio propio.
+- [x] **3.2 — `TenantId` sin guard en el alta.** — **HECHO 2026-10-12** (`d2d6c195`): el handler exige
+      tenant no vacío (400 con mensaje nuevo `ShowcaseStoreTenantNotResolved`) antes de subir el
+      archivo; test del caso añadido.
 
 ### MEDIUM
-- [ ] **3.3 — Contenido de archivo no validado (ver 2.4).**
-- [ ] **3.4 — `DELETE` carga TODO el set de imágenes para borrar una.**
-      `RemoveStoreCatalogImageCommand.cs:69-70`. Fix: `WHERE StoreId AND Id` indexado.
-- [ ] **3.5 — `Reorder` marca toda la fila `Modified`** → revierte `Caption`/`IsActive` concurrentes
-      + hasta 10 UPDATEs. Fix: marcar solo `OrderIndex` (`UpdatePropertiesAsync`).
-- [ ] **3.6 — TOCTOU en el tope de 10 imágenes** → 11 imágenes / orden empatado.
-- [ ] **3.7 — Compensación puede enmascarar el error original.** `AddStoreCatalogImageCommand.cs:112-126`:
-      el `DeleteAsync` de limpieza puede lanzar y reemplazar la excepción real. Fix: envolverlo en
-      try/catch + `LogWarning` y relanzar el original.
-- [ ] **3.8 — Ventana de crash en DELETE** deja archivo huérfano sin reconciliación.
-- [ ] **3.9 — Dos formas de 400**: `ValidationProblemDetails` (binding) vs `ResponseResult`
-      (FluentValidation). Fix: `InvalidModelStateResponseFactory` unificado.
+- [x] **3.3 — Contenido de archivo no validado (ver 2.4).** — *cubierto por 2.4*: queda la
+      verificación por magic bytes **DIFERIDA** junto a 2.4 (misma decisión).
+- [x] **3.4 — `DELETE` carga TODO el set para borrar una.** — **HECHO 2026-10-12** (`d2d6c195`):
+      nuevo `IStoreCatalogImageRepository.GetByIdAndStoreIdAsync(id, storeId, ct)`; el handler borra
+      por id acotado a la tienda.
+- [x] **3.5 — `Reorder` marca toda la fila `Modified`.** — **HECHO 2026-10-12** (`d2d6c195`):
+      nuevo `SetOrderIndexAsync` que marca SOLO `OrderIndex`; ya no revierte `Caption`/`IsActive`
+      concurrentes ni reescribe la fila entera.
+- [x] **3.6 — TOCTOU en el tope de 10 imágenes.** — **HECHO 2026-10-12** (`d2d6c195`): decisión del
+      owner = **check transaccional sin tocar el esquema**. `BeginTransactionAsync` en el UoW +
+      `AcquireSetLockAsync` (lock de transacción `pg_advisory_xact_lock` por (tienda, conjunto)); el
+      handler re-cuenta y calcula el `OrderIndex` dentro del lock. Serializa altas al mismo conjunto,
+      no bloquea tiendas/conjuntos distintos.
+- [x] **3.7 — La compensación puede enmascarar el error original.** — **HECHO 2026-10-12** (`d2d6c195`):
+      la limpieza va en `TryDeleteFileQuietlyAsync` (try/catch + `LogWarning`, `CancellationToken.None`)
+      y el error original se relanza; test del caso añadido.
+- [ ] **3.8 — Ventana de crash en DELETE** deja archivo huérfano sin reconciliación. — **DIFERIDO**:
+      hoy se registra como deuda de disco; la reconciliación es una tarea aparte.
+- [x] **3.9 — Dos formas de 400** (`ValidationProblemDetails` vs `ResponseResult`). — **HECHO
+      2026-10-12** (`d2d6c195`): `InvalidModelStateResponseFactory` unificado
+      (`AddUnifiedValidationResponseExtension`) proyecta el binding al mismo sobre de la API.
 
-### LOW
-- [ ] **3.10 — Folder name en dos ensamblados** (`ShowcaseImageKinds.Folder` muerto vs `CatalogImageStorage.cs:28`).
-- [ ] **3.11 — `IsActive` en el DTO es constante `true`** (siempre filtrado).
-- [ ] **3.12 — `POST` 200 en vez de 201**; `DELETE` 200 en vez de 204; `[ProducesResponseType]` incompletos.
-- [ ] **3.13 — Sin E2E de showcase (ver X8).**
+### LOW (diferidos 2026-10-12 — no críticos)
+- [ ] **3.10–3.13** — diferidos (`ShowcaseImageKinds.Folder` muerto, `IsActive` constante en el DTO,
+      `POST` 200 / `DELETE` 200, `[ProducesResponseType]` incompletos, sin E2E de showcase).
 
 ---
 
@@ -357,6 +365,26 @@ owners distintos (pendiente de confirmar; si aplica, recupera la severidad de se
 
 ---
 
+## Problemas de errores en los tests E2E (registro, detectados 2026-10-12)
+
+Al correr el E2E del namespace `Catalog` para verificar los cambios globales (sobre 400 unificado)
+aparecieron fallos **PRE-EXISTENTES** (también presentes en el baseline `d9e7c35f`: **6 fallos/48**;
+con los fixes y los 4 tests nuevos: **3 fallos/52**). Son de **Controller 1**, y el E2E nunca se había
+corrido tras ese trabajo (solo `Application.Tests`, con repos mockeados — el mismo blind spot que ya
+documenta `AGENTS.md`).
+
+- [x] **C1-E2E-1 — `CatalogImagePathTooLong` con 1 argumento.** La clave está **duplicada** en
+      `I18n.resx`/`I18n.en.resx` (una con 2 placeholders) y `ReorderProductImagesCommandValidator` +
+      `RemoveProductImageCommandValidator` (Controller 1, `f649a6f8`) la llamaban con **1** →
+      `FormatException` del localizador → **500** en reorder/delete de imagen de producto.
+      **ARREGLADO 2026-10-12 (`f551b031`)**: los 2 validadores pasan 2 args (como los otros 4) y se
+      elimina la entrada duplicada del `.resx`.
+- [ ] **C1-E2E-2 — `Product cannot be tracked because another instance with the same key is already
+      being tracked`** en el sync/snapshot de galerías → **500** (`WebCatalogSnapshotTests.Null_gallery…`,
+      `WebCatalogSyncTests.Null_gallery…`). Trampa NoTracking/attach en el espejo de galerías. PRE-EXISTENTE.
+- [ ] **C1-E2E-3 — `WebCatalogProductFieldsTests.Saving_the_fields_exposes_them_in_the_catalog_view`**
+      → **400** donde espera 200 (alguna regla de validación rechaza un payload válido). PRE-EXISTENTE.
+
 ## Progreso
 
 - 2026-10-11 — Plan creado a partir de la revisión `api-endpoint-review` (9 unidades / 34 endpoints).
@@ -376,3 +404,29 @@ owners distintos (pendiente de confirmar; si aplica, recupera la severidad de se
   1.4) + 2.4 parcial (`cd53081e`, `nosniff`) HECHOS. **Diferidos con motivo**: 2.5 (rowversion+migración),
   2.6 (rompe cliente), 2.7/2.8 (refactor), 2.9 (= **X3** transversal 2/5/9) y LOW 2.10–2.12.
   `Application.Tests` 1242 verde.
+- 2026-10-12 — **Controller 3 (`CatalogShowcaseController`) HECHO** (`d2d6c195`): 3.2 (guard de tenant)
+  + 3.4 (borrado por id acotado a la tienda) + 3.5 (solo `OrderIndex`) + 3.6 (check transaccional con
+  lock por (tienda, conjunto) — decisión del owner: **sin tocar el esquema**) + 3.7 (compensación que
+  no enmascara) + 3.9 (un solo sobre de 400). 3.1 cerrado por cobertura (1.4). **Diferidos con motivo**:
+  3.3 (junto a 2.4, magic bytes), 3.8 (deuda de disco/reconciliación) y LOW 3.10–3.13.
+  `dotnet build` 0 errores; `Application.Tests` **1244 verde** (2 tests nuevos). Siguiente: Controller 4.
+- 2026-10-12 — **Controller 3: RDD aprobada** (lineage `review-ef89c1e88fb53bb2`, 3 lentes
+  risk/resilience/reliability, refuter incluido; autoridad quemada). **Advisories no bloqueantes**
+  (trabajo posterior, no reabren este candidato): (a) el lock y la transacción NO tienen test que
+  pruebe la serialización (solo mocks; falta E2E/Postgres de showcase); (b) los 3 métodos nuevos del
+  repositorio no tienen test; (c) el mock de `GetByIdAndStoreIdAsync` ignora el `storeId`; (d) el lock
+  bloqueante no tiene timeout/`try-lock`; (e) ventana *pre-existente* commit-con-resultado-desconocido →
+  borra el archivo. Un hallazgo CRITICAL (`R3-Unified400Untested`) fue **refutado** por el refuter.
+- 2026-10-12 — **Controller 3 advisories CERRADOS** (`9b5e4c18`): T1 (doble respeta storeId) · T2
+  (tests de repositorio + UPDATE parcial probado en Postgres) · T3 (lock transaccional probado con
+  Postgres real) · T4 (sobre 400 unificado cubierto por E2E) · T5 (`lock_timeout` acotado → 409) ·
+  T6 (archivo conservado si el commit es desconocido). Unit **1250 verde**; E2E nuevos **4/4**.
+  Además `f551b031` arregla el bug E2E pre-existente **C1-E2E-1** (ver sección de hallazgos). Siguiente:
+  RDD de los advisories + el fix, y decidir los hallazgos C1-E2E-2/3.
+- 2026-10-12 — **Advisories Controller 3 + fix del path: RDD APROBADA** (lineage
+  `review-fb2e7c3a53c0b162`, 3 lentes, sin refuter; autoridad quemada). **Advisories no bloqueantes**:
+  (a) el mapeo `55P03 → ShowcaseSetBusyException` no tiene test que provoque un timeout real (el unit
+  lo stubea); (b) `SET LOCAL lock_timeout` aplica a TODA la transacción, no solo al lock (un lock
+  posterior abortaría a 5 s como 500 sin traducir); (c) el 409 no registra log/métrica; (d) los
+  archivos retenidos por commit desconocido acumulan deuda de disco sin reconciliación/métrica. La lente
+  de riesgo no encontró hallazgos.

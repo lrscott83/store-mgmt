@@ -59,9 +59,10 @@ public class ReorderStoreCatalogImagesCommandHandlerTests
         _unitOfWork.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
         _imageRepository.Setup(x => x.GetByStoreIdAsync(It.IsAny<Guid>())).ReturnsAsync([]);
         _imageRepository
-            .Setup(x => x.UpdateAsync(It.IsAny<StoreCatalogImage>()))
-            .Returns((StoreCatalogImage i) =>
+            .Setup(x => x.SetOrderIndexAsync(It.IsAny<StoreCatalogImage>(), It.IsAny<int>()))
+            .Returns((StoreCatalogImage i, int order) =>
             {
+                i.OrderIndex = order;
                 if (!_rows.Contains(i))
                     _rows.Add(i);
 
@@ -117,7 +118,7 @@ public class ReorderStoreCatalogImagesCommandHandlerTests
 
         await Handler().Handle(new ReorderStoreCatalogImagesCommand(StoreCatalogImageKind.Carousel, [b.Id, a.Id]), CancellationToken.None);
 
-        _imageRepository.Verify(x => x.UpdateAsync(It.IsAny<StoreCatalogImage>()), Times.Exactly(2));
+        _imageRepository.Verify(x => x.SetOrderIndexAsync(It.IsAny<StoreCatalogImage>(), It.IsAny<int>()), Times.Exactly(2));
     }
 
     /// <summary>El guardado real lo hace el UnitOfWork, una vez, después de reasignar.</summary>
@@ -150,7 +151,7 @@ public class ReorderStoreCatalogImagesCommandHandlerTests
             CancellationToken.None);
 
         result.Succeeded.Should().BeTrue();
-        _imageRepository.Verify(x => x.UpdateAsync(It.IsAny<StoreCatalogImage>()), Times.Exactly(2));
+        _imageRepository.Verify(x => x.SetOrderIndexAsync(It.IsAny<StoreCatalogImage>(), It.IsAny<int>()), Times.Exactly(2));
         _rows.Should().NotContain(daily);
     }
 
@@ -188,7 +189,7 @@ public class ReorderStoreCatalogImagesCommandHandlerTests
 
         var exception = await act.Should().ThrowAsync<ApiException>();
         exception.Which.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest);
-        _imageRepository.Verify(x => x.UpdateAsync(It.IsAny<StoreCatalogImage>()), Times.Never);
+        _imageRepository.Verify(x => x.SetOrderIndexAsync(It.IsAny<StoreCatalogImage>(), It.IsAny<int>()), Times.Never);
     }
 
     /// <summary>
@@ -206,7 +207,7 @@ public class ReorderStoreCatalogImagesCommandHandlerTests
             CancellationToken.None);
 
         await act.Should().ThrowAsync<ApiException>();
-        _imageRepository.Verify(x => x.UpdateAsync(It.IsAny<StoreCatalogImage>()), Times.Never);
+        _imageRepository.Verify(x => x.SetOrderIndexAsync(It.IsAny<StoreCatalogImage>(), It.IsAny<int>()), Times.Never);
     }
 
     /// <summary>
@@ -224,7 +225,7 @@ public class ReorderStoreCatalogImagesCommandHandlerTests
             new ReorderStoreCatalogImagesCommand(StoreCatalogImageKind.Carousel, [a.Id, a.Id]), CancellationToken.None);
 
         await act.Should().ThrowAsync<ApiException>();
-        _imageRepository.Verify(x => x.UpdateAsync(It.IsAny<StoreCatalogImage>()), Times.Never);
+        _imageRepository.Verify(x => x.SetOrderIndexAsync(It.IsAny<StoreCatalogImage>(), It.IsAny<int>()), Times.Never);
     }
 
     /// <summary>
@@ -243,7 +244,7 @@ public class ReorderStoreCatalogImagesCommandHandlerTests
 
         var exception = await act.Should().ThrowAsync<ApiException>();
         exception.Which.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest);
-        _imageRepository.Verify(x => x.UpdateAsync(It.IsAny<StoreCatalogImage>()), Times.Never);
+        _imageRepository.Verify(x => x.SetOrderIndexAsync(It.IsAny<StoreCatalogImage>(), It.IsAny<int>()), Times.Never);
     }
 
     /// <summary>
@@ -264,7 +265,7 @@ public class ReorderStoreCatalogImagesCommandHandlerTests
 
         var exception = await act.Should().ThrowAsync<ApiException>();
         exception.Which.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest);
-        _imageRepository.Verify(x => x.UpdateAsync(It.IsAny<StoreCatalogImage>()), Times.Never);
+        _imageRepository.Verify(x => x.SetOrderIndexAsync(It.IsAny<StoreCatalogImage>(), It.IsAny<int>()), Times.Never);
     }
 
     /// <summary>Un conjunto vacío no tiene nada que reordenar: no es una petición que hacer.</summary>
@@ -301,7 +302,7 @@ public class ReorderStoreCatalogImagesCommandHandlerTests
 
         var exception = await act.Should().ThrowAsync<ApiException>();
         exception.Which.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest);
-        _imageRepository.Verify(x => x.UpdateAsync(It.IsAny<StoreCatalogImage>()), Times.Never);
+        _imageRepository.Verify(x => x.SetOrderIndexAsync(It.IsAny<StoreCatalogImage>(), It.IsAny<int>()), Times.Never);
     }
 
     #endregion

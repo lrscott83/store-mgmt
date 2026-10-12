@@ -143,6 +143,9 @@ builder.Services.AddRouting(options => options.LowercaseUrls = true);
 builder.Services.AddSignalR();
 builder.Services.AddScoped<IMessagePushService, SignalRMessagePushService>();
 builder.Services.AddControllers();
+// Un solo sobre para el 400 de binding (ver AddUnifiedValidationResponseExtension): el cliente lee
+// siempre `errors[0].description`, sea una regla de FluentValidation o un cuerpo que no se pudo enlazar.
+builder.Services.AddUnifiedValidationResponseExtension();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();

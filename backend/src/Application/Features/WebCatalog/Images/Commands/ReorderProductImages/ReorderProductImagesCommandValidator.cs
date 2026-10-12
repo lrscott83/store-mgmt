@@ -26,7 +26,7 @@ namespace Application.Features.WebCatalog.Images.Commands.ReorderProductImages
 
             RuleForEach(x => x.Paths)
                 .MaximumLength(ProductEntityLimits.ImagePathMaxLength)
-                .WithMessage(localizer["CatalogImagePathTooLong", ProductEntityLimits.ImagePathMaxLength]);
+                .WithMessage(localizer["CatalogImagePathTooLong", "{PropertyName}", ProductEntityLimits.ImagePathMaxLength]);
         }
     }
 }

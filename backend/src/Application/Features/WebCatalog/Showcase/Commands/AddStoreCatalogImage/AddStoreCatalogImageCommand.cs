@@ -11,7 +11,9 @@ using Domain.Common.Enums;
 using Domain.Common.Extensions;
 using Domain.Entities.StoreCatalogImages;
 using Domain.Interfaces.Repositories;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Localization;
+using Microsoft.Extensions.Logging;
 using Resources;
 using System.Net;
 
@@ -48,19 +50,22 @@ namespace Application.Features.WebCatalog.Showcase.Commands.AddStoreCatalogImage
         private readonly IStoreCatalogImageRepository _imageRepository;
         private readonly ICatalogImageStorage _catalogImageStorage;
         private readonly IStringLocalizer<I18n> _localizer;
+        private readonly ILogger<AddStoreCatalogImageCommandHandler> _logger;
 
         public AddStoreCatalogImageCommandHandler(
             IApplicationUnitOfWork applicationUnitOfWork,
             IHttpContextService httpContextService,
             IStoreCatalogImageRepository imageRepository,
             ICatalogImageStorage catalogImageStorage,
-            IStringLocalizer<I18n> localizer)
+            IStringLocalizer<I18n> localizer,
+            ILogger<AddStoreCatalogImageCommandHandler> logger)
         {
             _applicationUnitOfWork = applicationUnitOfWork;
             _httpContextService = httpContextService;
             _imageRepository = imageRepository;
             _catalogImageStorage = catalogImageStorage;
             _localizer = localizer;
+            _logger = logger;
         }
 
         public async Task<ResponseResult<StoreCatalogImageDto>> Handle(
@@ -70,7 +75,13 @@ namespace Application.Features.WebCatalog.Showcase.Commands.AddStoreCatalogImage
             if (storeId == Guid.Empty)
                 throw new ApiException(_localizer["StoreNotSelected", _httpContextService.UserExternalId], HttpStatusCode.BadRequest);
 
+            // El tenant se escribe en la fila, así que también tiene que existir: un token sin claim de
+            // tenant dejaría `TenantId = Guid.Empty`, una fila que el filtro global resuelve a NULL y
+            // que por tanto nadie vería ni podría quitar — invisible para siempre, con su archivo en
+            // disco. Mismo guard que la tienda, antes de subir nada.
             Guid tenantId = _httpContextService.TenantId.ToGuid();
+            if (tenantId == Guid.Empty)
+                throw new ApiException(_localizer["ShowcaseStoreTenantNotResolved"], HttpStatusCode.BadRequest);
 
             // Un conjunto que no existe en el enum no se valida solo: el validador lo rechaza, pero el
             // handler no confía en eso porque el comando también se puede enviar por otra vía. Escribir
@@ -82,6 +93,10 @@ namespace Application.Features.WebCatalog.Showcase.Commands.AddStoreCatalogImage
 
             // Tope POR CONJUNTO (decisión C1): los dos conjuntos son independientes, así que un tope
             // compartido dejaría a una tienda con el carrusel lleno sin poder destacar nada.
+            //
+            // Esta lectura es solo un rechazo TEMPRANO, para no subir un archivo que se va a descartar.
+            // La comprobación AUTORITATIVA se repite dentro del lock de abajo: entre esta lectura y la
+            // inserción cabe otra petición concurrente.
             IList<StoreCatalogImage> existing = (await _imageRepository.GetByStoreIdAsync(storeId))
                 .Where(image => image.Kind == request.Kind)
                 .ToList();
@@ -103,25 +118,69 @@ namespace Application.Features.WebCatalog.Showcase.Commands.AddStoreCatalogImage
                 FolderOf(request.Kind),
                 cancellationToken);
 
-            // Al final del conjunto: `Max` y no `Count`, para que un hueco de un borrado anterior no
-            // haga que dos imágenes entren en la misma posición.
-            int orderIndex = existing.Count == 0 ? 0 : existing.Max(image => image.OrderIndex) + 1;
-
-            StoreCatalogImage image = StoreCatalogImage.Create(storeId, tenantId, request.Kind, key, orderIndex, request.Caption);
-
-            // COMPENSACIÓN del archivo↔fila. A estas alturas el archivo YA está escrito en disco, y la
-            // fila es lo único que lo referencia: si la persistencia falla, nadie volvería a pedir esa
-            // clave y quedaría un huérfano que no se limpia solo. `DeleteAsync` es idempotente (no-op
-            // si el archivo no existe), así que compensar es seguro; el error original se relanza tal
-            // cual, porque lo que se quiere reportar es el fallo de guardado, no el de la limpieza.
+            StoreCatalogImage image;
+            bool rowPersisted = false;
             try
             {
+                // Transacción EXPLÍCITA + lock por (tienda, conjunto): la comprobación y la inserción
+                // dejan de ser un check-then-act. Dos subidas concurrentes al mismo conjunto se
+                // serializan aquí, así que la segunda cuenta la fila de la primera y respeta el tope;
+                // tiendas o conjuntos distintos no se bloquean entre sí.
+                await using IDbContextTransaction transaction = await _applicationUnitOfWork.BeginTransactionAsync(cancellationToken);
+                await _imageRepository.AcquireSetLockAsync(storeId, request.Kind, cancellationToken);
+
+                IList<StoreCatalogImage> current = (await _imageRepository.GetByStoreIdAsync(storeId))
+                    .Where(stored => stored.Kind == request.Kind)
+                    .ToList();
+
+                if (current.Count >= StoreCatalogImage.MaxImagesPerKind)
+                    throw new ApiException(
+                        _localizer["ShowcaseImagesLimitReached", request.Kind, StoreCatalogImage.MaxImagesPerKind],
+                        HttpStatusCode.BadRequest);
+
+                // Al final del conjunto: `Max` y no `Count`, para que un hueco de un borrado anterior no
+                // haga que dos imágenes entren en la misma posición. Se calcula DENTRO del lock, sobre
+                // la lectura ya serializada.
+                int orderIndex = current.Count == 0 ? 0 : current.Max(stored => stored.OrderIndex) + 1;
+
+                image = StoreCatalogImage.Create(storeId, tenantId, request.Kind, key, orderIndex, request.Caption);
+
                 await _imageRepository.AddAsync(image);
                 await _applicationUnitOfWork.SaveChangesAsync(cancellationToken);
+
+                // La fila YA está escrita: solo queda el commit. A partir de aquí, si el commit falla
+                // con resultado DESCONOCIDO, NO se borra el archivo (ver el catch): un commit que llegó
+                // a la base dejaría la fila apuntando a un archivo que acabamos de borrar.
+                rowPersisted = true;
+
+                await transaction.CommitAsync(cancellationToken);
+            }
+            catch (ShowcaseSetBusyException)
+            {
+                // Otra petición está modificando el mismo conjunto y la espera acotada se agotó. La fila
+                // NO se escribió, así que el archivo subido queda huérfano y se compensa; se responde
+                // 409 (conflicto) en vez del 500 opaco de un timeout del proveedor.
+                await TryDeleteFileQuietlyAsync(key);
+                throw new ApiException(_localizer["ShowcaseSetBusy"], HttpStatusCode.Conflict);
             }
             catch
             {
-                await _catalogImageStorage.DeleteAsync(key, cancellationToken);
+                // COMPENSACIÓN del archivo↔fila: el archivo YA está escrito en disco y la fila era lo
+                // único que lo referenciaba. Si la persistencia falla —o el lock descubre que el
+                // conjunto se llenó—, nadie volvería a pedir esa clave y quedaría un huérfano que no
+                // se limpia solo. El error original se relanza tal cual: lo que se reporta es el fallo
+                // de la operación, no el de la limpieza.
+                //
+                // PERO si la fila YA se había escrito y solo falló el commit, el resultado es
+                // DESCONOCIDO: puede haber llegado a la base. En ese caso se CONSERVA el archivo
+                // (deuda de disco, registrada) en lugar de borrar el que una fila persistida referencia.
+                if (!rowPersisted)
+                    await TryDeleteFileQuietlyAsync(key);
+                else
+                    _logger.LogWarning(
+                        "Resultado del commit DESCONOCIDO para la imagen de showcase {ImageKey}; se conserva el archivo por si la fila quedó persistida.",
+                        key);
+
                 throw;
             }
 
@@ -134,6 +193,26 @@ namespace Application.Features.WebCatalog.Showcase.Commands.AddStoreCatalogImage
                 Caption = image.Caption,
                 IsActive = image.IsActive,
             });
+        }
+
+        /// <summary>
+        /// Borra el archivo de compensación sin dejar que un fallo de limpieza reemplace el error que se
+        /// va a reportar. Usa <c>CancellationToken.None</c> a propósito: la limpieza no debería
+        /// abandonarse porque el cliente colgó, es justo lo que deja huérfanos.
+        /// </summary>
+        private async Task TryDeleteFileQuietlyAsync(string key)
+        {
+            try
+            {
+                await _catalogImageStorage.DeleteAsync(key, CancellationToken.None);
+            }
+            catch (Exception exception)
+            {
+                _logger.LogWarning(
+                    exception,
+                    "No se pudo borrar el archivo de showcase {ImageKey} durante la compensación; queda como deuda de disco.",
+                    key);
+            }
         }
 
         /// <summary>

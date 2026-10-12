@@ -1,12 +1,21 @@
+using Application.Exceptions;
+using Domain.Common.Enums;
 using Domain.Entities.StoreCatalogImages;
 using Domain.Interfaces.Repositories;
 using Infrastructure.Persistence.Contexts;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace Infrastructure.Persistence.Repositories
 {
     public class StoreCatalogImageRepository : GenericRepository<StoreCatalogImage, Guid>, IStoreCatalogImageRepository
     {
+        /// <summary>
+        /// Tope de espera del lock de conjunto. 5 s es holgadamente más de lo que tarda una subida
+        /// normal y lo bastante corto para no colgar al cliente tras un holder atascado.
+        /// </summary>
+        private const string LockTimeoutSql = "SET LOCAL lock_timeout = '5s'";
+
         private readonly DbSet<StoreCatalogImage> _images;
 
         public StoreCatalogImageRepository(ApplicationDbContext dbContext) : base(dbContext)
@@ -60,5 +69,55 @@ namespace Infrastructure.Persistence.Repositories
                 .ThenBy(image => image.OrderIndex)
                 .ThenBy(image => image.CreatedDate)
                 .ToListAsync();
+
+        /// <summary>
+        /// Una imagen por id acotada a la tienda: la condición viaja en la consulta, no en una
+        /// comprobación posterior sobre una lista completa.
+        /// </summary>
+        public async Task<StoreCatalogImage?> GetByIdAndStoreIdAsync(Guid id, Guid storeId, CancellationToken cancellationToken)
+            => await _images.FirstOrDefaultAsync(image => image.Id == id && image.StoreId == storeId, cancellationToken);
+
+        /// <summary>
+        /// Lock de transacción por (tienda, conjunto). El hash del texto puede colisionar con otro
+        /// (tienda, conjunto), y eso es seguro: una colisión solo serializa de más, nunca de menos.
+        ///
+        /// La espera está ACOTADA: un lock bloqueante sin tope dejaría la petición colgada hasta el
+        /// timeout del comando del proveedor, así que una subida válida fallaría como un error opaco.
+        /// Con <c>lock_timeout</c> a 5 s (mucho más de lo que tarda una subida normal), si el conjunto
+        /// sigue ocupado se lanza <see cref="ShowcaseSetBusyException"/> y el handler lo traduce a un
+        /// 409 claro en lugar de un 500.
+        /// </summary>
+        public async Task AcquireSetLockAsync(Guid storeId, StoreCatalogImageKind kind, CancellationToken cancellationToken)
+        {
+            // SET LOCAL es de transacción: el llamador ya abrió una (BeginTransactionAsync).
+            await _dbContext.Database.ExecuteSqlRawAsync(LockTimeoutSql, cancellationToken);
+
+            string lockKey = $"{storeId}:{(int)kind}";
+            try
+            {
+                await _dbContext.Database.ExecuteSqlInterpolatedAsync(
+                    $"SELECT pg_advisory_xact_lock(hashtext({lockKey}))", cancellationToken);
+            }
+            catch (PostgresException exception) when (exception.SqlState == PostgresErrorCodes.LockNotAvailable)
+            {
+                throw new ShowcaseSetBusyException(
+                    $"No se pudo tomar el lock del conjunto {kind} de la tienda {storeId} dentro del tiempo máximo de espera.",
+                    exception);
+            }
+        }
+
+        /// <summary>
+        /// Marca solo <c>OrderIndex</c>. Se adjunta la fila como <c>Unchanged</c> (viene de una lectura
+        /// NoTracking) y después se marca esa única propiedad, para que el UPDATE no reescriba el resto
+        /// de las columnas.
+        /// </summary>
+        public Task<bool> SetOrderIndexAsync(StoreCatalogImage image, int orderIndex)
+        {
+            var entry = _dbContext.Entry(image);
+            entry.State = EntityState.Unchanged;
+            image.OrderIndex = orderIndex;
+            entry.Property(i => i.OrderIndex).IsModified = true;
+            return Task.FromResult(true);
+        }
     }
 }

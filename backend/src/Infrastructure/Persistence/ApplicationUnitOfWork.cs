@@ -1,5 +1,7 @@
 ﻿using Application.UnitOfWorks;
 using Infrastructure.Persistence.Contexts;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace Infrastructure.Persistence
 {
@@ -13,6 +15,11 @@ namespace Infrastructure.Persistence
         public async Task<int> SaveChangesAsync(CancellationToken cancellationToken)
         {
             return await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+
+        public async Task<IDbContextTransaction> BeginTransactionAsync(CancellationToken cancellationToken)
+        {
+            return await _dbContext.Database.BeginTransactionAsync(cancellationToken);
         }
     }
 }
