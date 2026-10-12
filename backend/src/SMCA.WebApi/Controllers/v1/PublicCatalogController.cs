@@ -7,6 +7,7 @@ using Application.ResponseModels;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Net.Http.Headers;
 
 namespace SMCA.WebApi.Controllers.v1
@@ -22,6 +23,7 @@ namespace SMCA.WebApi.Controllers.v1
     {
         /// <summary>Cabecera del catálogo publicado: tienda + categorías con sus conteos.</summary>
         [HttpGet("~/api/v1/public/catalog/{storeSlug}")]
+        [EnableRateLimiting("PublicCatalogPolicy")]
         [ProducesResponseType(typeof(ResponseResult<PublicCatalogDto>), StatusCodes.Status200OK)]
         public async Task<IActionResult> GetCatalogAsync(string storeSlug)
         {
@@ -30,6 +32,7 @@ namespace SMCA.WebApi.Controllers.v1
 
         /// <summary>Listado público paginado, con filtro por categoría y búsqueda por nombre.</summary>
         [HttpGet("~/api/v1/public/catalog/{storeSlug}/products")]
+        [EnableRateLimiting("PublicCatalogPolicy")]
         [ProducesResponseType(typeof(ResponseResult<PublicCatalogPageDto>), StatusCodes.Status200OK)]
         public async Task<IActionResult> GetProductsAsync(string storeSlug, [FromQuery] string? categorySlug,
             [FromQuery] string? search, [FromQuery] int page = 1, [FromQuery] int pageSize = 24)
@@ -39,6 +42,7 @@ namespace SMCA.WebApi.Controllers.v1
 
         /// <summary>Detalle público de un producto (descripción + galería).</summary>
         [HttpGet("~/api/v1/public/catalog/{storeSlug}/products/{productId}")]
+        [EnableRateLimiting("PublicCatalogPolicy")]
         [ProducesResponseType(typeof(ResponseResult<PublicCatalogProductDto>), StatusCodes.Status200OK)]
         public async Task<IActionResult> GetProductAsync(string storeSlug, Guid productId)
         {
@@ -47,6 +51,7 @@ namespace SMCA.WebApi.Controllers.v1
 
         /// <summary>Sirve una imagen publicada del catálogo (clave relativa, sin exponer rutas del servidor).</summary>
         [HttpGet("~/api/v1/public/catalog/{storeSlug}/media/{**key}")]
+        [Produces("image/jpeg", "image/png", "image/webp", "application/octet-stream")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         public async Task<IActionResult> GetMediaAsync(string storeSlug, string key)
         {

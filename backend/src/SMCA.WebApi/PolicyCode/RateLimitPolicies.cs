@@ -77,6 +77,26 @@ public static class RateLimitPolicies
             });
 
     /// <summary>
+    /// Límite de las lecturas ANÓNIMAS del catálogo público (cabecera, listado y detalle). Baratas por
+    /// request, pero anónimas: sin tope, cualquiera puede recorrer el catálogo en bucle. 120 por
+    /// minuto y por IP, repuestas de 20 en 20 cada 10 s.
+    ///
+    /// NO cubre el endpoint de MEDIA: una sola página pide ~24 imágenes (cacheadas un año), así que
+    /// contarlas en este cubo castigaría la carga normal. El abuso de ancho de banda se contiene por
+    /// otras vías (CORS, proxy/CDN).
+    /// </summary>
+    public static RateLimitPartition<string> PublicCatalog(HttpContext context)
+        => RateLimitPartition.GetSlidingWindowLimiter(
+            partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new SlidingWindowRateLimiterOptions
+            {
+                PermitLimit = 120,
+                Window = TimeSpan.FromMinutes(1),
+                SegmentsPerWindow = 6,
+                QueueLimit = 0
+            });
+
+    /// <summary>
     /// Clave de partición del pedido online: IP + slug, con el slug normalizado. Sin IP (proxy que
     /// no la expone) cae a "unknown" — nunca a cadena vacía, que el runtime trata como caso
     /// degenerado en vez de un cubo real.

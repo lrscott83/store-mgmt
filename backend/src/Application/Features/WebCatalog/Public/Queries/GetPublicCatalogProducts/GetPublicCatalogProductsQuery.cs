@@ -53,36 +53,31 @@ namespace Application.Features.WebCatalog.Public.Queries.GetPublicCatalogProduct
                 throw new ApiException(_localizer["CatalogStoreNotFound"], HttpStatusCode.NotFound);
 
             string storeSlug = store.CatalogSlug;
-            IList<Domain.Entities.Products.Product> products = await _productRepository
-                .GetPublishedByStoreIdAsync(store.Id, null, null);
-
-            if (!string.IsNullOrWhiteSpace(query.CategorySlug))
-            {
-                string categorySlug = query.CategorySlug.Trim();
-                products = products
-                    .Where(product => string.Equals(product.Category?.Slug, categorySlug, StringComparison.OrdinalIgnoreCase))
-                    .ToList();
-            }
-
-            if (!string.IsNullOrWhiteSpace(query.Search))
-            {
-                string term = query.Search.Trim();
-                products = products
-                    .Where(product => product.Name.Contains(term, StringComparison.OrdinalIgnoreCase))
-                    .ToList();
-            }
 
             int page = query.Page < 1 ? 1 : query.Page;
             int pageSize = NormalizePageSize(query.PageSize);
 
+            // Offset en `long`, no en `int`: `(page - 1) * pageSize` desborda con `?page=2147483647` y
+            // `Skip` recibiría un negativo -> 500 anónimo. Se acota al total, así una página muy alta
+            // devuelve la lista vacía en vez de romper.
+            long offset = ((long)page - 1) * pageSize;
+
+            // Filtro y conteo en SQL: antes se traía TODO el catálogo (con la galería) y se filtraba y
+            // paginaba en memoria, así que la "paginación" no acotaba nada.
+            int total = await _productRepository.CountPublishedAsync(
+                store.Id, query.CategorySlug, query.Search, cancellationToken);
+
+            int skip = offset > total ? total : (int)offset;
+
+            IList<Domain.Entities.Products.Product> products = await _productRepository.GetPublishedPageAsync(
+                store.Id, query.CategorySlug, query.Search, skip, pageSize, cancellationToken);
+
             return ResponseResult.Success(new PublicCatalogPageDto
             {
                 Items = products
-                    .Skip((page - 1) * pageSize)
-                    .Take(pageSize)
                     .Select(product => PublicCatalogProductMapper.ToDto(product, storeSlug))
                     .ToList(),
-                Total = products.Count,
+                Total = total,
                 Page = page,
                 PageSize = pageSize,
             });
