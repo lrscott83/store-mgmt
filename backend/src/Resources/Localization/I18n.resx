@@ -357,6 +357,9 @@
   <data name="ShowcaseImagesLimitReached" xml:space="preserve">
     <value>El conjunto de imágenes {0} ya tiene el máximo de {1} imágenes</value>
   </data>
+  <data name="ShowcaseSetBusy" xml:space="preserve">
+    <value>El conjunto de imágenes está siendo modificado por otra petición; inténtalo de nuevo</value>
+  </data>
   <data name="ShowcaseImageNotFound" xml:space="preserve">
     <value>Imagen no encontrada</value>
   </data>

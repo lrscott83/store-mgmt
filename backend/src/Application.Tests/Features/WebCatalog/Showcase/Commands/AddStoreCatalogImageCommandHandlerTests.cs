@@ -528,6 +528,46 @@ public class AddStoreCatalogImageCommandHandlerTests
     }
 
     /// <summary>
+    /// Si el lock del conjunto se agota (otra petición está subiendo al MISMO conjunto), la fila NO
+    /// se escribió: se compensa el archivo y se responde 409 (conflicto). Es mejor un "inténtalo de
+    /// nuevo" claro que el 500 opaco de un timeout del proveedor.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenTheSetLockIsBusy_ShouldDeleteTheFileAndReportConflict()
+    {
+        _imageRepository
+            .Setup(x => x.AcquireSetLockAsync(It.IsAny<Guid>(), It.IsAny<StoreCatalogImageKind>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new ShowcaseSetBusyException("conjunto ocupado", new InvalidOperationException("lock timeout")));
+
+        Func<Task> act = () => Handler().Handle(Command(), CancellationToken.None);
+
+        var exception = await act.Should().ThrowAsync<ApiException>();
+        exception.Which.StatusCode.Should().Be(System.Net.HttpStatusCode.Conflict);
+        _catalogImageStorage.Verify(x => x.DeleteAsync(SavedKey, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>
+    /// Si la fila YA se escribió y solo falla el COMMIT, el resultado es DESCONOCIDO: el commit pudo
+    /// llegar a la base. Borrar el archivo dejaría la fila apuntando a un archivo que ya no existe, así
+    /// que se CONSERVA (deuda de disco registrada) y se relanza el error original.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenTheCommitFails_ShouldKeepTheFileAndRethrow()
+    {
+        _transaction
+            .Setup(x => x.CommitAsync(It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("commit con resultado desconocido"));
+
+        Func<Task> act = () => Handler().Handle(Command(), CancellationToken.None);
+
+        var exception = await act.Should().ThrowAsync<InvalidOperationException>();
+        exception.Which.Message.Should().Be("commit con resultado desconocido");
+        _catalogImageStorage.Verify(
+            x => x.DeleteAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    /// <summary>
     /// La compensación NO toca el camino feliz: con la fila persistida el archivo se queda, porque es
     /// la clave que esa fila publica.
     /// </summary>

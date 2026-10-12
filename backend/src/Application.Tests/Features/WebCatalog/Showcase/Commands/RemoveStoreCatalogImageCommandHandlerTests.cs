@@ -77,7 +77,8 @@ public class RemoveStoreCatalogImageCommandHandlerTests
     private void Given(params StoreCatalogImage[] images)
         => _imageRepository
             .Setup(x => x.GetByIdAndStoreIdAsync(It.IsAny<Guid>(), _storeId, It.IsAny<CancellationToken>()))
-            .Returns((Guid id, Guid storeId, CancellationToken ct) => Task.FromResult(images.FirstOrDefault(image => image.Id == id)));
+            .Returns((Guid id, Guid storeId, CancellationToken ct) => Task.FromResult(
+                images.FirstOrDefault(image => image.Id == id && image.StoreId == storeId)));
 
     #region Happy Path
 
@@ -171,6 +172,28 @@ public class RemoveStoreCatalogImageCommandHandlerTests
         StoreCatalogImage foreign = StoreCatalogImage.Create(
             Guid.NewGuid(), Guid.NewGuid(), StoreCatalogImageKind.Carousel, "other/store/catalog/carousel/x.png", 0, null);
         Given(Image(StoreCatalogImageKind.Carousel, 0));
+
+        Func<Task> act = () => Handler().Handle(new RemoveStoreCatalogImageCommand(foreign.Id), CancellationToken.None);
+
+        var exception = await act.Should().ThrowAsync<ApiException>();
+        exception.Which.StatusCode.Should().Be(System.Net.HttpStatusCode.NotFound);
+        _imageRepository.Verify(x => x.DeleteAsync(It.IsAny<StoreCatalogImage>()), Times.Never);
+        _catalogImageStorage.Verify(x => x.DeleteAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    /// <summary>
+    /// La pertenencia la decide el `StoreId` DENTRO de la consulta, no una comprobación posterior. El
+    /// doble respeta ahora esa condición: una imagen sembrada que es de OTRA tienda no se encuentra al
+    /// buscar por (id, tienda-del-contexto), aunque su id sea el correcto — el mismo 404 que produce
+    /// la consulta real. Sin este ajuste, el doble devolvía cualquier fila por id y el guardián de
+    /// arriba pasaba sin probar nada.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenTheRowBelongsToAnotherStore_ShouldNotFindItEvenIfSeeded()
+    {
+        StoreCatalogImage foreign = StoreCatalogImage.Create(
+            Guid.NewGuid(), _tenantId, StoreCatalogImageKind.Carousel, "foreign/store/catalog/carousel/x.png", 0, null);
+        Given(foreign);
 
         Func<Task> act = () => Handler().Handle(new RemoveStoreCatalogImageCommand(foreign.Id), CancellationToken.None);
 

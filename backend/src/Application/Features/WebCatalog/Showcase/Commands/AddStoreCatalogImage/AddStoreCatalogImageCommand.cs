@@ -119,6 +119,7 @@ namespace Application.Features.WebCatalog.Showcase.Commands.AddStoreCatalogImage
                 cancellationToken);
 
             StoreCatalogImage image;
+            bool rowPersisted = false;
             try
             {
                 // Transacción EXPLÍCITA + lock por (tienda, conjunto): la comprobación y la inserción
@@ -146,7 +147,21 @@ namespace Application.Features.WebCatalog.Showcase.Commands.AddStoreCatalogImage
 
                 await _imageRepository.AddAsync(image);
                 await _applicationUnitOfWork.SaveChangesAsync(cancellationToken);
+
+                // La fila YA está escrita: solo queda el commit. A partir de aquí, si el commit falla
+                // con resultado DESCONOCIDO, NO se borra el archivo (ver el catch): un commit que llegó
+                // a la base dejaría la fila apuntando a un archivo que acabamos de borrar.
+                rowPersisted = true;
+
                 await transaction.CommitAsync(cancellationToken);
+            }
+            catch (ShowcaseSetBusyException)
+            {
+                // Otra petición está modificando el mismo conjunto y la espera acotada se agotó. La fila
+                // NO se escribió, así que el archivo subido queda huérfano y se compensa; se responde
+                // 409 (conflicto) en vez del 500 opaco de un timeout del proveedor.
+                await TryDeleteFileQuietlyAsync(key);
+                throw new ApiException(_localizer["ShowcaseSetBusy"], HttpStatusCode.Conflict);
             }
             catch
             {
@@ -155,7 +170,17 @@ namespace Application.Features.WebCatalog.Showcase.Commands.AddStoreCatalogImage
                 // conjunto se llenó—, nadie volvería a pedir esa clave y quedaría un huérfano que no
                 // se limpia solo. El error original se relanza tal cual: lo que se reporta es el fallo
                 // de la operación, no el de la limpieza.
-                await TryDeleteFileQuietlyAsync(key);
+                //
+                // PERO si la fila YA se había escrito y solo falló el commit, el resultado es
+                // DESCONOCIDO: puede haber llegado a la base. En ese caso se CONSERVA el archivo
+                // (deuda de disco, registrada) en lugar de borrar el que una fila persistida referencia.
+                if (!rowPersisted)
+                    await TryDeleteFileQuietlyAsync(key);
+                else
+                    _logger.LogWarning(
+                        "Resultado del commit DESCONOCIDO para la imagen de showcase {ImageKey}; se conserva el archivo por si la fila quedó persistida.",
+                        key);
+
                 throw;
             }
 
