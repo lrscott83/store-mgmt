@@ -390,3 +390,10 @@ owners distintos (pendiente de confirmar; si aplica, recupera la severidad de se
   no enmascara) + 3.9 (un solo sobre de 400). 3.1 cerrado por cobertura (1.4). **Diferidos con motivo**:
   3.3 (junto a 2.4, magic bytes), 3.8 (deuda de disco/reconciliación) y LOW 3.10–3.13.
   `dotnet build` 0 errores; `Application.Tests` **1244 verde** (2 tests nuevos). Siguiente: Controller 4.
+- 2026-10-12 — **Controller 3: RDD aprobada** (lineage `review-ef89c1e88fb53bb2`, 3 lentes
+  risk/resilience/reliability, refuter incluido; autoridad quemada). **Advisories no bloqueantes**
+  (trabajo posterior, no reabren este candidato): (a) el lock y la transacción NO tienen test que
+  pruebe la serialización (solo mocks; falta E2E/Postgres de showcase); (b) los 3 métodos nuevos del
+  repositorio no tienen test; (c) el mock de `GetByIdAndStoreIdAsync` ignora el `storeId`; (d) el lock
+  bloqueante no tiene timeout/`try-lock`; (e) ventana *pre-existente* commit-con-resultado-desconocido →
+  borra el archivo. Un hallazgo CRITICAL (`R3-Unified400Untested`) fue **refutado** por el refuter.
