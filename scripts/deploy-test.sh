@@ -455,6 +455,13 @@ log "image ready: $BACKEND_IMAGE and ${BACKEND_IMAGE%:*}:$SHORT_SHA"
 # --- STEP 6: deploy the isolated test stack (rollback on failure) -------------
 log "STEP 6 — deploying test stack (project $TEST_PROJECT)"
 compose down || log "[WARN] compose down returned non-zero (nothing running?)"
+# Belt and braces: that `compose down` only WARNS on failure, and the `api` service
+# is IMAGE-based (`image: …:latest` with `build:` commented out in
+# docker-compose.test.yml). A surviving container would NOT be recreated by
+# `compose up` — its service definition is unchanged, so it would keep the OLD
+# image while the rebuilt frontend already calls the new endpoints (404s).
+# Removing it makes the recreation unconditional. Same fix as deploy-prod.sh.
+podman rm -f smca_test_backend 2>/dev/null || true
 if ! compose up -d --build 2>&1 | redact | tee -a "$LOG_FILE"; then
   log "[FATAL] compose up failed — rolling back (test DB + catalog images + :previous image)"
   restore_test_db
