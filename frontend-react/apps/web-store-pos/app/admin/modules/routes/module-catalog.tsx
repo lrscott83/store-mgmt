@@ -75,9 +75,12 @@ export function ModuleCatalogPage() {
     try {
       // The plan catalog drives the VISUAL grouping only; it never gates, filters or reorders
       // what is saved. Both reads are needed before the first render, hence Promise.all.
+      // `includeInactiveModules: true` is what keeps a deactivated module grouped under its
+      // own plan instead of the catch-all bucket: without it `GET /v1/plans` drops inactive
+      // modules from `plan.modules` and the delta grouping has nowhere to place them.
       const [modulesRes, plansRes] = await Promise.all([
         storeHttpService.getModuleCatalog(),
-        storeHttpService.getPlans(),
+        storeHttpService.getPlans(true),
       ]);
       if (!modulesRes.succeeded || !plansRes.succeeded) {
         setError(formatMessage({ id: 'MODULE_CATALOG.ERROR' }));

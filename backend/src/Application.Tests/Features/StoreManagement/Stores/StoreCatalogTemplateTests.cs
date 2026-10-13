@@ -66,6 +66,23 @@ public class StoreCatalogTemplateTests
     private UpdateStoreCatalogTemplateCommandHandler CommandHandler() => new(
         _unitOfWork.Object, _storeByIdService.Object, _settingsRepository.Object, _httpContextService.Object, _localizer.Object);
 
+    /// <summary>
+    /// Escribe SOLO la columna de plantilla: la fila la comparten pedidos y marca (D19), así que un
+    /// UPDATE de fila completa revertiría con los valores leídos un cambio concurrente de esas vistas.
+    /// </summary>
+    [Fact]
+    public async Task Handle_ShouldWriteOnlyTheTemplateColumn()
+    {
+        await CommandHandler().Handle(
+            new UpdateStoreCatalogTemplateCommand(_storeId, "boutique"), CancellationToken.None);
+
+        _settingsRepository.Verify(x => x.UpsertAsync(
+            It.IsAny<StoreCatalogSettings>(),
+            It.IsAny<bool?>(),
+            It.Is<string[]>(columns => columns.Length == 1 && columns[0] == nameof(StoreCatalogSettings.TemplateId))),
+            Times.Once);
+    }
+
     private GetStoreCatalogTemplateQueryHandler QueryHandler() => new(
         _storeByIdService.Object, _settingsRepository.Object, _httpContextService.Object, _localizer.Object);
 

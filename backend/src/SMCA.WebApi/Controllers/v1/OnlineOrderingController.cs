@@ -32,6 +32,9 @@ namespace SMCA.WebApi.Controllers.v1
         /// </summary>
         [HttpGet("~/api/v1/online-ordering/settings")]
         [ProducesResponseType(typeof(ResponseResult<StoreCatalogSettingsDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
         public async Task<IActionResult> GetSettingsAsync()
         {
             return Ok(await Sender.Send(new GetStoreCatalogSettingsQuery()));
@@ -44,6 +47,11 @@ namespace SMCA.WebApi.Controllers.v1
         /// </summary>
         [HttpPut("~/api/v1/online-ordering/settings")]
         [ProducesResponseType(typeof(ResponseResult<StoreCatalogSettingsDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status409Conflict)]
         public async Task<IActionResult> UpsertSettingsAsync([FromBody] UpsertStoreCatalogSettingsCommand request)
         {
             return Ok(await Sender.Send(request));

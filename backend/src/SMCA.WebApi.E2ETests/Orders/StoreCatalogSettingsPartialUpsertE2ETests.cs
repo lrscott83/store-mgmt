@@ -57,6 +57,7 @@ public sealed class StoreCatalogSettingsPartialUpsertE2ETests
 
             // El guardado de PEDIDOS toca solo sus columnas.
             stale.Enabled = true;
+            DateTimeOffset stamp = DateTimeOffset.UtcNow.AddSeconds(-1);
             using (var scope = _f.Services.CreateScope())
             {
                 var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -74,6 +75,10 @@ public sealed class StoreCatalogSettingsPartialUpsertE2ETests
                 after.Enabled.Should().BeTrue("la columna de pedidos sí se escribió");
                 after.LogoKey.Should().Be("brand/logo-new.png",
                     "el guardado de pedidos no puede revertir un cambio de marca que no tocó");
+                // El UPDATE parcial deja la entidad en `Modified`, así que `SetAuditableColumns`
+                // (ApplicationDbContext.SaveChangesAsync) sella `UpdatedDate` igual que la fila completa.
+                after.UpdatedDate.Should().NotBeNull("la auditoría se sella en SaveChanges");
+                after.UpdatedDate!.Value.Should().BeOnOrAfter(stamp);
             }
         }
         finally
