@@ -124,7 +124,7 @@ describe('ReSellerCommissionsPage — rows', () => {
     await waitFor(() => {
       expect(screen.getByText('07/2026')).toBeInTheDocument();
       expect(screen.getByText('5')).toBeInTheDocument();
-      expect(screen.getByText('$1 234.50')).toBeInTheDocument();
+      expect(screen.getByText('1 234.50 USD')).toBeInTheDocument();
     });
 
     expect(storeHttpService.getReSellerCommissions).toHaveBeenCalledTimes(1);
@@ -150,7 +150,7 @@ describe('ReSellerCommissionsPage — rows', () => {
 
     await waitFor(() => {
       expect(screen.getByText('12/2025')).toBeInTheDocument();
-      expect(screen.getByText('$10')).toBeInTheDocument();
+      expect(screen.getByText('10 USD')).toBeInTheDocument();
     });
   });
 
@@ -173,8 +173,8 @@ describe('ReSellerCommissionsPage — rows', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId('commission-usd-2026-7')).toHaveTextContent('$30');
-      expect(screen.getByTestId('commission-cup-2026-7')).toHaveTextContent('$7 500');
+      expect(screen.getByTestId('commission-usd-2026-7')).toHaveTextContent('30 USD');
+      expect(screen.getByTestId('commission-cup-2026-7')).toHaveTextContent('7 500 CUP');
     });
   });
 });
