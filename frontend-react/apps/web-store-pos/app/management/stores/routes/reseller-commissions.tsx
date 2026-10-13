@@ -4,7 +4,6 @@ import { EFeatures } from '@store-mgmt/domain';
 import { resellerFeatureLoader } from '~/auth/routes/loaders';
 import { storeHttpService } from '~/management/stores/lib/services/store-http-service';
 import { httpErrorKey } from '~/shared/lib/http/http-error';
-import { formatCurrency } from '~/shared/lib/format-currency';
 import type { ReSellerCommission } from '@store-mgmt/domain';
 
 // Req: Route Gating is Reseller Feature Loader, Not Admin Feature Loader — mirrors
@@ -15,6 +14,19 @@ export const clientLoader = resellerFeatureLoader([EFeatures.StorePayment]);
 
 function formatPeriod(month: number, year: number): string {
   return `${String(month).padStart(2, '0')}/${year}`;
+}
+
+/**
+ * Commission amounts carry an EXPLICIT currency label, not the app-wide `$`: the monthly total
+ * is split into USD and CUP, and a single `$` made the two columns indistinguishable. Grouping
+ * matches `formatCurrency` (non-breaking-space thousands, decimals only when non-zero).
+ */
+function formatCommission(amount: number, currency: 'USD' | 'CUP'): string {
+  const sign = amount < 0 ? '-' : '';
+  const [intPart, decPart] = Math.abs(amount).toFixed(2).split('.');
+  const grouped = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, '\u00A0');
+  const decimals = decPart === '00' ? '' : `.${decPart}`;
+  return `${sign}${grouped}${decimals} ${currency}`;
 }
 
 /**
@@ -76,6 +88,9 @@ export function ReSellerCommissionsPage() {
                 <th className="px-4 py-2 text-right font-medium text-text-muted">
                   {intl.formatMessage({ id: 'BILLING.COMMISSIONS.TOTAL' })}
                 </th>
+                <th className="px-4 py-2 text-right font-medium text-text-muted">
+                  {intl.formatMessage({ id: 'BILLING.COMMISSIONS.TOTAL_CUP' })}
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -85,8 +100,17 @@ export function ReSellerCommissionsPage() {
                     {formatPeriod(row.month, row.year)}
                   </td>
                   <td className="px-4 py-3 text-right text-text">{row.paymentCount}</td>
-                  <td className="px-4 py-3 text-right text-text">
-                    {formatCurrency(row.totalCommission)}
+                  <td
+                    className="px-4 py-3 text-right text-text"
+                    data-testid={`commission-usd-${row.year}-${row.month}`}
+                  >
+                    {formatCommission(row.totalCommission, 'USD')}
+                  </td>
+                  <td
+                    className="px-4 py-3 text-right text-text"
+                    data-testid={`commission-cup-${row.year}-${row.month}`}
+                  >
+                    {formatCommission(row.totalCommissionCup, 'CUP')}
                   </td>
                 </tr>
               ))}

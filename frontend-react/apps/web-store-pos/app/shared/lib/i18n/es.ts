@@ -1673,12 +1673,17 @@ const messages: Record<string, string> = {
   'BILLING.COLLECTIONS.REGISTER_PAYMENT': 'Registrar pago',
   'BILLING.COLLECTIONS.EMPTY_STATE': 'No hay cobros pendientes.',
   'BILLING.COLLECTIONS.ERROR': 'Ocurrió un error. Intente de nuevo.',
+  'BILLING.COLLECTIONS.CONFIRM_TITLE': 'Confirmar pago',
+  'BILLING.COLLECTIONS.EXCHANGE_RATE': 'Tasa de cambio (CUP por 1 USD)',
+  'BILLING.COLLECTIONS.TOTAL_PAID': 'Total pagado',
+  'BILLING.COLLECTIONS.CONFIRM_PAYMENT': 'Registrar el pago',
 
   // Billing — reseller commissions view
   'BILLING.COMMISSIONS.TITLE': 'Comisiones',
   'BILLING.COMMISSIONS.PERIOD': 'Período',
   'BILLING.COMMISSIONS.PAYMENT_COUNT': 'Cantidad de pagos',
-  'BILLING.COMMISSIONS.TOTAL': 'Total',
+  'BILLING.COMMISSIONS.TOTAL': 'Total (USD)',
+  'BILLING.COMMISSIONS.TOTAL_CUP': 'Total (CUP)',
   'BILLING.COMMISSIONS.EMPTY_STATE': 'No hay comisiones registradas.',
   'BILLING.COMMISSIONS.ERROR': 'Ocurrió un error. Intente de nuevo.',
 

@@ -355,4 +355,133 @@ public class RegisterStorePaymentCommandHandlerTests
     }
 
     #endregion
+
+    #region Exchange rate and total paid (store-payment-exchange-rate)
+
+    [Fact]
+    public async Task Handle_persistsExchangeRateAndAmountPaid_andLeavesPriceUnchanged()
+    {
+        // Arrange
+        var paidModule = CreateStoreModule(2, 2000, false);
+        var store = CreateStore(paymentStartDate: DateOnly.FromDateTime(DateTime.UtcNow));
+        store.StoreModules.Add(paidModule);
+
+        _mockHttpContextService.Setup(x => x.IsSuperAdmin).Returns(true);
+        _mockHttpContextService.Setup(x => x.IsReSeller).Returns(false);
+
+        _mockStoreRepository
+            .Setup(x => x.GetStoreWithModulesAndReSellerOwnerAsync(It.IsAny<Guid>()))
+            .ReturnsAsync(store);
+
+        _mockStorePaymentRepository
+            .Setup(x => x.GetLastByStoreIdAsync(It.IsAny<Guid>()))
+            .ReturnsAsync((StorePayment?)null);
+
+        StorePayment? capturedPayment = null;
+        _mockStorePaymentRepository
+            .Setup(x => x.AddAsync(It.IsAny<StorePayment>()))
+            .Callback<StorePayment>(sp => capturedPayment = sp);
+
+        var handler = CreateHandler();
+
+        // Act
+        var result = await handler.Handle(
+            new RegisterStorePaymentCommand(Guid.NewGuid(), ExchangeRate: 400m, AmountPaid: 10000m),
+            CancellationToken.None);
+
+        // Assert
+        result.Succeeded.Should().BeTrue();
+        capturedPayment.Should().NotBeNull();
+        capturedPayment!.Price.Should().Be(2000f, "the charged amount does not change");
+        capturedPayment.ExchangeRate.Should().Be(400m);
+        capturedPayment.AmountPaid.Should().Be(10000m);
+    }
+
+    [Fact]
+    public async Task Handle_persistsBothValuesAsNull_whenNotProvided()
+    {
+        // Arrange
+        var paidModule = CreateStoreModule(2, 2000, false);
+        var store = CreateStore(paymentStartDate: DateOnly.FromDateTime(DateTime.UtcNow));
+        store.StoreModules.Add(paidModule);
+
+        _mockHttpContextService.Setup(x => x.IsSuperAdmin).Returns(true);
+        _mockHttpContextService.Setup(x => x.IsReSeller).Returns(false);
+
+        _mockStoreRepository
+            .Setup(x => x.GetStoreWithModulesAndReSellerOwnerAsync(It.IsAny<Guid>()))
+            .ReturnsAsync(store);
+
+        _mockStorePaymentRepository
+            .Setup(x => x.GetLastByStoreIdAsync(It.IsAny<Guid>()))
+            .ReturnsAsync((StorePayment?)null);
+
+        StorePayment? capturedPayment = null;
+        _mockStorePaymentRepository
+            .Setup(x => x.AddAsync(It.IsAny<StorePayment>()))
+            .Callback<StorePayment>(sp => capturedPayment = sp);
+
+        var handler = CreateHandler();
+
+        // Act
+        await handler.Handle(new RegisterStorePaymentCommand(Guid.NewGuid()), CancellationToken.None);
+
+        // Assert
+        capturedPayment.Should().NotBeNull();
+        capturedPayment!.ExchangeRate.Should().BeNull();
+        capturedPayment.AmountPaid.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Handle_commissionUsesAmountPaid_whenProvided()
+    {
+        // Arrange — same reseller shape as the charged-amount test, but the operator set a
+        // total paid, so the commission base is that total (and is therefore in CUP).
+        var ownerId = Guid.NewGuid();
+        var paidModule = CreateStoreModule(2, 2000, false);
+        var reSellerOwner = ReSellerOwner.Create(_reSellerId, ownerId, 0, 25, _tenantId);
+        var owner = Owner.Create(ownerId, _reSellerUserId, false, _tenantId, "Test Owner");
+        owner.ReSellerOwner = reSellerOwner;
+
+        var store = CreateStore(paymentStartDate: DateOnly.FromDateTime(DateTime.UtcNow), owner: owner);
+        store.StoreModules.Add(paidModule);
+
+        _mockHttpContextService.Setup(x => x.IsSuperAdmin).Returns(false);
+        _mockHttpContextService.Setup(x => x.IsReSeller).Returns(true);
+        _mockHttpContextService.Setup(x => x.UserExternalId).Returns(_reSellerUserId.ToString());
+
+        _mockStoreRepository
+            .Setup(x => x.GetStoreWithModulesAndReSellerOwnerAsync(It.IsAny<Guid>()))
+            .ReturnsAsync(store);
+        _mockStoreRepository
+            .Setup(x => x.IsStoreOwnedByReSellerUserAsync(It.IsAny<Guid>(), _reSellerUserId))
+            .ReturnsAsync(true);
+
+        _mockStorePaymentRepository
+            .Setup(x => x.GetLastByStoreIdAsync(It.IsAny<Guid>()))
+            .ReturnsAsync((StorePayment?)null);
+
+        StorePayment? capturedPayment = null;
+        _mockStorePaymentRepository
+            .Setup(x => x.AddAsync(It.IsAny<StorePayment>()))
+            .Callback<StorePayment>(sp => capturedPayment = sp);
+
+        var handler = CreateHandler();
+
+        // Act
+        var result = await handler.Handle(
+            new RegisterStorePaymentCommand(Guid.NewGuid(), ExchangeRate: 5m, AmountPaid: 10000m),
+            CancellationToken.None);
+
+        // Assert
+        result.Succeeded.Should().BeTrue();
+        capturedPayment.Should().NotBeNull();
+        capturedPayment!.Price.Should().Be(2000f);
+        capturedPayment.AmountPaid.Should().Be(10000m);
+        // Commission: 10000 - GetCurrentPrice(10000, 25, 0) = 10000 - 7500 = 2500
+        capturedPayment.ReSellerAmount.Should().Be(2500f,
+            "the total paid is the commission base when it has a value");
+    }
+
+    #endregion
 }

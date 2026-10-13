@@ -301,7 +301,20 @@ export interface ReSellerCommission {
   year: number;
   month: number;
   paymentCount: number;
+  /** Commission in USD: payments whose base was the charged amount. */
   totalCommission: number;
+  /** Commission in CUP: payments whose base was the total paid. */
+  totalCommissionCup: number;
+}
+
+/**
+ * Optional values captured when registering a store payment (register-payment popup).
+ * `exchangeRate` is CUP per 1 USD; `amountPaid` is the total paid (in CUP when the rate was
+ * used). Both are optional — omitting them keeps the previous payment shape.
+ */
+export interface RegisterStorePaymentPayload {
+  exchangeRate?: number | null;
+  amountPaid?: number | null;
 }
 
 export interface OwnerStoreModule {

@@ -132,6 +132,43 @@ public class GetReSellerCommissionsQueryHandlerTests
         result.Data.Should().BeEmpty();
     }
 
+    [Fact]
+    public async Task Handle_splitsTheMonthlyTotalIntoUsdAndCup()
+    {
+        // store-payment-exchange-rate: a payment whose commission base was the total paid
+        // (AmountPaid set) counts in CUP; otherwise it counts in USD.
+        var mocks = CreateMocks();
+        mocks.HttpContextService.Setup(x => x.IsSuperAdmin).Returns(true);
+        mocks.HttpContextService.Setup(x => x.IsReSeller).Returns(false);
+
+        var now = DateTimeOffset.UtcNow;
+        mocks.PaymentRepository.Setup(x => x.GetAllPaidWithReSellerAsync())
+            .ReturnsAsync(new List<StorePayment>
+            {
+                StorePayment.Create(Guid.NewGuid(), (int)StorePaymentStatusType.Paid, 2000f, now,
+                    year: 2026, month: 7, tenantId: _tenantId, reSellerId: Guid.NewGuid(),
+                    reSellerPercentDiscountPrice: 25f, reSellerDiscountPrice: 0f, reSellerAmount: 500f,
+                    byReSeller: true, exchangeRate: null, amountPaid: null),
+                StorePayment.Create(Guid.NewGuid(), (int)StorePaymentStatusType.Paid, 2000f, now,
+                    year: 2026, month: 7, tenantId: _tenantId, reSellerId: Guid.NewGuid(),
+                    reSellerPercentDiscountPrice: 25f, reSellerDiscountPrice: 0f, reSellerAmount: 2500f,
+                    byReSeller: true, exchangeRate: 400m, amountPaid: 10000m),
+            });
+
+        var handler = new GetReSellerCommissionsQueryHandler(
+            mocks.PaymentRepository.Object,
+            mocks.HttpContextService.Object,
+            mocks.Localizer.Object);
+
+        var result = await handler.Handle(new GetReSellerCommissionsQuery(), CancellationToken.None);
+
+        result.Succeeded.Should().BeTrue();
+        var row = result.Data!.Single();
+        row.PaymentCount.Should().Be(2);
+        row.TotalCommission.Should().BeApproximately(500f, 0.001f);
+        row.TotalCommissionCup.Should().BeApproximately(2500f, 0.001f);
+    }
+
     #region Helpers
 
     private TestMocks CreateMocks()
