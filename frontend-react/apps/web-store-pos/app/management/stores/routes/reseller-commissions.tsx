@@ -76,6 +76,9 @@ export function ReSellerCommissionsPage() {
                 <th className="px-4 py-2 text-right font-medium text-text-muted">
                   {intl.formatMessage({ id: 'BILLING.COMMISSIONS.TOTAL' })}
                 </th>
+                <th className="px-4 py-2 text-right font-medium text-text-muted">
+                  {intl.formatMessage({ id: 'BILLING.COMMISSIONS.TOTAL_CUP' })}
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -85,8 +88,17 @@ export function ReSellerCommissionsPage() {
                     {formatPeriod(row.month, row.year)}
                   </td>
                   <td className="px-4 py-3 text-right text-text">{row.paymentCount}</td>
-                  <td className="px-4 py-3 text-right text-text">
+                  <td
+                    className="px-4 py-3 text-right text-text"
+                    data-testid={`commission-usd-${row.year}-${row.month}`}
+                  >
                     {formatCurrency(row.totalCommission)}
+                  </td>
+                  <td
+                    className="px-4 py-3 text-right text-text"
+                    data-testid={`commission-cup-${row.year}-${row.month}`}
+                  >
+                    {formatCurrency(row.totalCommissionCup)}
                   </td>
                 </tr>
               ))}

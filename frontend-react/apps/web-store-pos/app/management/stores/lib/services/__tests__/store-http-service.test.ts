@@ -323,11 +323,21 @@ describe('storeHttpService.registerStorePayment — HTTP-13: POST /v1/stores/:id
     (apiClient.post as ReturnType<typeof vi.fn>).mockResolvedValue({ data: { data: true } });
   });
 
-  it('calls POST /v1/stores/:id/payments with no body', async () => {
+  it('calls POST /v1/stores/:id/payments with the optional values as body', async () => {
+    const { storeHttpService } = await import('../store-http-service');
+    const { apiClient } = await import('~/shared/lib/http/api-client');
+    await storeHttpService.registerStorePayment('s1', { exchangeRate: 400, amountPaid: 10000 });
+    expect(apiClient.post).toHaveBeenCalledWith('/v1/stores/s1/payments', {
+      exchangeRate: 400,
+      amountPaid: 10000,
+    });
+  });
+
+  it('sends an empty body when no values are given', async () => {
     const { storeHttpService } = await import('../store-http-service');
     const { apiClient } = await import('~/shared/lib/http/api-client');
     await storeHttpService.registerStorePayment('s1');
-    expect(apiClient.post).toHaveBeenCalledWith('/v1/stores/s1/payments');
+    expect(apiClient.post).toHaveBeenCalledWith('/v1/stores/s1/payments', {});
   });
 
   it('returns the raw boolean response.data', async () => {

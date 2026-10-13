@@ -9,6 +9,7 @@ import type {
   OwnerStoreWithPlan,
   StoreToCollect,
   ReSellerCommission,
+  RegisterStorePaymentPayload,
   SwitchMyStoreResult,
   StoreModulePricingPayload,
   StoreModulePricingResult,
@@ -340,8 +341,19 @@ export const storeHttpService = {
     return response.data;
   },
 
-  async registerStorePayment(id: string): Promise<BaseResponseModel<boolean>> {
-    const response = await apiClient.post<BaseResponseModel<boolean>>(`/v1/stores/${id}/payments`);
+  /**
+   * Registers a store payment. `payload` carries the two OPTIONAL values captured in the
+   * register-payment popup: the CUP-per-USD `exchangeRate` and the `amountPaid`. Sending no
+   * payload keeps the previous behavior (both persisted as null).
+   */
+  async registerStorePayment(
+    id: string,
+    payload: RegisterStorePaymentPayload = {},
+  ): Promise<BaseResponseModel<boolean>> {
+    const response = await apiClient.post<BaseResponseModel<boolean>>(
+      `/v1/stores/${id}/payments`,
+      payload,
+    );
     return response.data;
   },
 
