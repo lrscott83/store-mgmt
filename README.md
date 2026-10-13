@@ -315,8 +315,8 @@ dotnet run --project backend/src/SMCA.WebApi --launch-profile http-e2e
 **Paso 2 — correr la suite** (desde `frontend-react/`):
 
 ```bash
-pnpm test:e2e --workers=4   # suite por defecto, SIN los specs de rate-limit; 4 workers es el
-                            # recomendado en esta máquina (verificado 2026-09-25, docs/testing/known-issues.md)
+pnpm test:e2e --workers=2   # suite por defecto, SIN los specs de rate-limit; 2 workers es el
+                            # recomendado en esta máquina (verificado 2026-10-13, docs/testing/known-issues.md)
 pnpm test:e2e:rate-limit     # on demand: specs de rate-limit (agotan cuotas de registro/login)
 pnpm test:e2e:api            # solo chequeo de conectividad con la API, sin navegador
 
@@ -334,7 +334,7 @@ Notas:
 - `login-offline.spec.ts` es el único spec que corre sin backend levantado.
 - Al terminar, el `globalTeardown` borra automáticamente las filas `e2e-*` de `smca_test`. Si el log dice "0 filas borradas", el backend estaba escribiendo en otra base (p. ej. perfil `http` por error).
 - Cuotas del rate limiter: 40 logins/min y 50 registros/10min por IP (`backend/src/SMCA.WebApi/PolicyCode/RateLimitPolicies.cs`). Dos corridas completas dentro del mismo minuto pueden rozar el techo de login; dejá pasar un minuto entre corridas. Verificado 2026-09-25: tres corridas completas de la suite por defecto (340 tests, 8/4/3 workers) sin un solo 429.
-- Workers: la suite corre `fullyParallel`; con 8 workers en esta máquina (16 CPUs) flakean ~23 tests por contención contra el único dev server + backend + PostgreSQL. Con **4 workers** el flakiness cae a ~2-4, la suite corre en ~8 min y sigue 0 failed (los `retries: 2` del config absorben el resto). Detalle y causa raíz en `docs/testing/known-issues.md`.
+- Workers: la suite corre `fullyParallel`. **En esta máquina el default operativo es `--workers=2`**: con 4 workers la contención contra el único dev server + backend + PostgreSQL marca 0-4 tests en rojo por corrida (todos pasan al reintento y en solitario), mientras que con **2 workers** la corrida completa queda **0 failed / ~2 flaky** (verificado 2026-10-13: **354 passed / 0 failed / 2 flaky**, 12.6 min). Detalle y causa raíz en `docs/testing/known-issues.md`. **Pendiente de investigar si se puede subir por encima de 2 workers** (nota en ese documento).
 
 ### Recorrido completo (resumen)
 

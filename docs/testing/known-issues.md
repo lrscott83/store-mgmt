@@ -29,7 +29,7 @@
 - **Prueba de mutación.** Al arreglar un test, se vuelve el arreglo a su forma vieja y se comprueba que el test **sí** cae, en la aserción tocada. Sin eso no se distingue un fix real de un falso verde (el test podría pasar por otra razón).
 - **Exit code preservado.** Al filtrar la salida de un comando con `grep`/`tail`, se conserva el código de salida del comando real (o se revisa el log completo): un `grep` vacío no es un verde.
 - **Nunca en paralelo.** La suite E2E del backend y la de Playwright no se corren a la vez: el reset de datos del backend borra filas vivas y los fallos que aparecen así son falsos.
-- **Workers.** En esta máquina la suite del frontend se corre con `--workers=4` (con 8 el flakiness se multiplica por contención, no por defectos).
+- **Workers.** En esta máquina la suite del frontend se corre con **`--workers=2`** (verificado 2026-10-13: `--workers=2` → 354 passed / 0 failed / 2 flaky; `--workers=4` → 0-4 failed por contención, todos verdes al correrlos en solitario). **Pendiente de investigar si se puede subir por encima de 2 workers** sin reintroducir el ruido (candidatos: aislar datos por test, una base por worker, o cazar los inestables persistentes).
 - **Una corrida en verde no cierra una ficha que no ejecutó.** Si un spec está en `testIgnore`, sigue ⚠️ sin verificar: eso se dice, no se asume.
 - **Autorización 1 a 1.** Editar un test E2E existente o código de la aplicación requiere autorización explícita del usuario, ficha por ficha.
 
