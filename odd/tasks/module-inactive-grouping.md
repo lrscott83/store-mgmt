@@ -95,3 +95,20 @@ L5 (implementation, 2026-10-13): T1–T4 done inline.
   (`td.nth(1)`); the spec then passed 5/5.
 - RDD: `gentle-ai review assess --base-ref 71af5bb4 --committed-only` → `risk: medium`,
   `review_due: false`, reason `under_budget` (no review transaction due at this budget).
+
+L6 (independent verification, 2026-10-13): a fresh verify agent re-ran the focused suites in a
+scratch copy and probed the grouping with the real domain functions.
+
+- Verdict: PASS, 0 blockers, 3 advisories. Reproduced every L5 number (8/8, 2/2, 18/18, 30/30,
+  5/5, 4/4) and confirmed the change set is 10 in-scope files with no Angular/`frontend/` touch.
+- Probes proved S1/S3: with the flag, a deactivated module stays under its plan and a reactivated
+  member raises THAT plan's total; at the baseline it fell into the catch-all and the plan total
+  did not move.
+- Confirmed MCP1's misalignment pre-dates the feature (`9746f387` is an ancestor of the baseline)
+  and that `store-module-pricing-modal.tsx` has a zero-line diff (S2 unchanged).
+- Advisory A1 (closed, commit `4c3e713f`): the grouping vitest used a `mockResolvedValue` that
+  ignored the `getPlans` argument, so it was not mutation-sensitive; replaced with a
+  backend-faithful `mockImplementation` plus a live-on-activate case, and confirmed RED when the
+  flag is removed from `module-catalog.tsx`. Advisories A2 (a plan whose members are all inactive
+  now renders a heading — expected, in scope) and A3 (Playwright re-run was left to the parent,
+  done: 5/5) are acknowledged.
