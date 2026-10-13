@@ -306,6 +306,9 @@
   <data name="CatalogStoreNotFound" xml:space="preserve">
     <value>No existe un catálogo publicado en esa dirección</value>
   </data>
+  <data name="CatalogSlugInUse" xml:space="preserve">
+    <value>Ese slug ya está en uso por otra tienda</value>
+  </data>
   <data name="CatalogSnapshotTooLarge" xml:space="preserve">
     <value>El catálogo enviado supera el máximo permitido de {0}</value>
   </data>

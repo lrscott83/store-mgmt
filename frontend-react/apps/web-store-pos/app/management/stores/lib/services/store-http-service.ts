@@ -18,10 +18,18 @@ import type {
 } from '@store-mgmt/domain';
 import { apiClient } from '~/shared/lib/http/api-client';
 
-/** Plantilla (vista) del catálogo público de una tienda (SuperAdmin). */
+/** Plantilla (vista) + slug público del catálogo de una tienda (SuperAdmin). */
 export interface StoreCatalogTemplate {
   storeId: string;
   templateId: string;
+  /** Ruta pública (`/catalog/<slug>`). Vacío si la tienda nunca sincronizó su catálogo. */
+  catalogSlug: string;
+}
+
+/** Respuesta de la escritura del slug (`PUT /v1/stores/{id}/catalog-slug`). */
+export interface StoreCatalogSlug {
+  storeId: string;
+  catalogSlug: string;
 }
 
 /**
@@ -245,6 +253,22 @@ export const storeHttpService = {
     const response = await apiClient.put<BaseResponseModel<StoreCatalogTemplate>>(
       `/v1/stores/${id}/catalog-template`,
       { templateId },
+    );
+    return response.data;
+  },
+
+  /**
+   * Fija el SLUG público (`/catalog/<slug>`) del catálogo de una tienda (SuperAdmin-only, misma
+   * capacidad por-tienda que la plantilla). El backend NORMALIZA y rechaza con 409 un slug que ya
+   * use otra tienda; escribe SOLO `Store.CatalogSlug`.
+   */
+  async updateStoreCatalogSlug(
+    id: string,
+    catalogSlug: string,
+  ): Promise<BaseResponseModel<StoreCatalogSlug>> {
+    const response = await apiClient.put<BaseResponseModel<StoreCatalogSlug>>(
+      `/v1/stores/${id}/catalog-slug`,
+      { slug: catalogSlug },
     );
     return response.data;
   },

@@ -3,40 +3,52 @@ import { CATALOG_TEMPLATES, DEFAULT_TEMPLATE_ID } from '~/catalog/templates/temp
 import { Button } from '~/shared/components/ui/button';
 import { CloseIcon } from '~/shared/components/ui/icons';
 import { InfoBox } from '~/shared/components/ui/info-box';
+import { normalizeCatalogSlug } from '~/management/stores/lib/catalog-slug';
 
 interface StoreCatalogTemplateModalProps {
   open: boolean;
-  /** Store whose catalog template is being set (null = closed). */
+  /** Store whose catalog is being set (null = closed). */
   storeId: string | null;
   storeName: string;
   /** Selected template id. */
   value: string;
+  /** Slug draft as TYPED (raw); the preview shows its normalized form. */
+  slug: string;
   loading: boolean;
   saving: boolean;
-  /** La carga de la plantilla falló: guardar queda bloqueado para no escribir un valor que no se leyó. */
+  /** La carga falló: guardar queda bloqueado para no escribir un valor que no se leyó. */
   loadFailed: boolean;
   error?: string;
   onChange: (templateId: string) => void;
+  onSlugChange: (rawSlug: string) => void;
   onClose: () => void;
   onSave: () => void;
 }
 
 /**
- * "Plantilla del catálogo" del SuperAdmin: elige la VISTA del catálogo público de UNA tienda. Es
- * presentacional — el padre (`store-list.tsx`) es dueño de la carga, el borrador y el guardado —
- * igual que `StoreModulePricingModal`. Las opciones salen del registro ligero `CATALOG_TEMPLATES`
- * (sin arrastrar los componentes de plantilla al bundle del panel).
+ * "Catálogo de la tienda" del SuperAdmin: la VISTA del catálogo público de UNA tienda (plantilla)
+ * y su DIRECCIÓN pública (slug), en el mismo modal porque son la misma decisión de plataforma.
+ *
+ * Es presentacional — el padre (`store-list.tsx`) es dueño de la carga, los borradores y el
+ * guardado — igual que `StoreModulePricingModal`. Las opciones salen del registro ligero
+ * `CATALOG_TEMPLATES` (sin arrastrar los componentes de plantilla al bundle del panel).
+ *
+ * El slug se escribe LIBRE y se normaliza al vuelo con `normalizeCatalogSlug` (el mismo alfabeto
+ * que el backend): lo que se ve en la previsualización es lo que se va a guardar. Un slug que no
+ * deja ningún carácter válido deja el guardado bloqueado — nunca se inventa uno.
  */
 export function StoreCatalogTemplateModal({
   open,
   storeId,
   storeName,
   value,
+  slug,
   loading,
   saving,
   loadFailed,
   error,
   onChange,
+  onSlugChange,
   onClose,
   onSave,
 }: StoreCatalogTemplateModalProps) {
@@ -53,7 +65,9 @@ export function StoreCatalogTemplateModal({
 
   // R3-2: si la lectura falló, `value` es el default de relleno, NO lo que tiene la tienda; guardar
   // lo escribiría encima de la plantilla real. Bloquear el guardado hasta una carga correcta.
-  const saveDisabled = loading || saving || loadFailed;
+  const normalizedSlug = normalizeCatalogSlug(slug);
+  const slugIsEmpty = normalizedSlug.length === 0;
+  const saveDisabled = loading || saving || loadFailed || slugIsEmpty;
 
   return (
     <div
@@ -110,6 +124,40 @@ export function StoreCatalogTemplateModal({
         </select>
         <p className="mt-1 text-xs text-text-muted">
           {intl.formatMessage({ id: 'STORES.CATALOG_TEMPLATE.HINT' })}
+        </p>
+
+        {/* Slug público: lo que escribe el SuperAdmin puede traer mayúsculas, tildes o espacios —
+            la previsualización muestra el valor normalizado que se va a guardar. */}
+        <label
+          className="mt-4 mb-1 block text-sm font-medium text-text"
+          htmlFor="store-catalog-slug-input"
+        >
+          {intl.formatMessage({ id: 'STORES.CATALOG_SLUG.LABEL' })}
+        </label>
+        <input
+          id="store-catalog-slug-input"
+          type="text"
+          value={slug}
+          disabled={loading || saving}
+          onChange={(event) => onSlugChange(event.target.value)}
+          className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
+          data-testid="store-catalog-slug-input"
+        />
+        <p className="mt-1 text-xs text-text-muted">
+          {intl.formatMessage({ id: 'STORES.CATALOG_SLUG.HINT' })}
+        </p>
+
+        {slugIsEmpty && !loading && (
+          <p className="mt-1 text-xs text-danger" data-testid="store-catalog-slug-required">
+            {intl.formatMessage({ id: 'STORES.CATALOG_SLUG.REQUIRED' })}
+          </p>
+        )}
+
+        <p className="mt-2 text-xs text-text-muted">
+          {intl.formatMessage({ id: 'STORES.CATALOG_SLUG.PREVIEW' })}:{' '}
+          <span className="font-medium text-text" data-testid="store-catalog-slug-preview">
+            {`/catalog/${normalizedSlug}`}
+          </span>
         </p>
 
         <div className="mt-5 flex justify-end gap-2">

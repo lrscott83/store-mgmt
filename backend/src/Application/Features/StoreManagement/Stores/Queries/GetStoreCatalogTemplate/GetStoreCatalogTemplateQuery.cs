@@ -61,6 +61,9 @@ namespace Application.Features.StoreManagement.Stores.Queries.GetStoreCatalogTem
                 TemplateId = string.IsNullOrWhiteSpace(settings?.TemplateId)
                     ? StoreCatalogSettings.DefaultTemplateId
                     : settings.TemplateId,
+                // El slug vive en `Store`, no en la fila de configuración: puede estar vacío si la
+                // tienda nunca sincronizó su catálogo (todavía no tiene URL pública).
+                CatalogSlug = store.CatalogSlug ?? string.Empty,
             });
         }
     }

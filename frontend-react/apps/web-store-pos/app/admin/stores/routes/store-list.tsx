@@ -9,6 +9,8 @@ import type { PricingDraft, PricingField } from '~/admin/stores/components/store
 import { StoreCatalogTemplateModal } from '~/management/stores/components/store-catalog-template-modal';
 import { DEFAULT_TEMPLATE_ID } from '~/catalog/templates/template-ids';
 import { groupFeaturesByModuleId } from '~/management/stores/lib/plan-utils';
+import { normalizeCatalogSlug } from '~/management/stores/lib/catalog-slug';
+import { apiErrorMessageId } from '~/shared/lib/http/api-error-message';
 import { StoreCardList } from '~/admin/stores/components/store-card-list';
 import { httpErrorKey } from '~/shared/lib/http/http-error';
 import { confirmDialog } from '~/shared/lib/blocking-alert';
@@ -71,6 +73,8 @@ export function AdminStoreListPage() {
   // selected value lives here so the modal stays presentational.
   const [templateStore, setTemplateStore] = useState<Store | null>(null);
   const [templateValue, setTemplateValue] = useState<string>(DEFAULT_TEMPLATE_ID);
+  /** Slug tal como lo escribió el SuperAdmin; se normaliza al guardar y en la previsualización. */
+  const [templateSlug, setTemplateSlug] = useState<string>('');
   const [templateLoading, setTemplateLoading] = useState(false);
   const [templateSaving, setTemplateSaving] = useState(false);
   const [templateError, setTemplateError] = useState('');
@@ -275,6 +279,7 @@ export function AdminStoreListPage() {
     setTemplateError('');
     setTemplateLoadFailed(false);
     setTemplateValue(DEFAULT_TEMPLATE_ID);
+    setTemplateSlug('');
     setTemplateStore(store);
     setTemplateLoading(true);
     try {
@@ -286,6 +291,8 @@ export function AdminStoreListPage() {
       }
       // El backend ya cae a `default` para una fila sin plantilla; el `||` cubre un id vacío.
       setTemplateValue(res.data.templateId || DEFAULT_TEMPLATE_ID);
+      // Sin catálogo sincronizado todavía no hay slug; el campo se pinta vacío.
+      setTemplateSlug(res.data.catalogSlug ?? '');
     } catch (error) {
       setTemplateError(formatMessage({ id: httpErrorKey(error, 'STORES.ERROR') }));
       setTemplateLoadFailed(true);
@@ -299,16 +306,37 @@ export function AdminStoreListPage() {
     setTemplateError('');
     setTemplateSaving(true);
     try {
+      // El SLUG primero: es la escritura que puede fallar por una regla de negocio (409 cuando otra
+      // tienda ya usa ese enlace) y no queremos haber guardado la plantilla de un catálogo que no se
+      // pudo renombrar. El valor viaja normalizado —lo mismo que muestra la previsualización—.
+      const slugSaved = await storeHttpService.updateStoreCatalogSlug(
+        templateStore.id,
+        normalizeCatalogSlug(templateSlug),
+      );
+      if (!slugSaved.succeeded) {
+        setTemplateError(formatMessage({ id: 'STORES.CATALOG_SLUG.SAVE_ERROR' }));
+        return;
+      }
+
       const saved = await storeHttpService.updateStoreCatalogTemplate(templateStore.id, templateValue);
       if (!saved.succeeded) {
         setTemplateError(formatMessage({ id: 'STORES.ERROR' }));
         return;
       }
+
       setTemplateValue(saved.data.templateId);
+      setTemplateSlug(slugSaved.data.catalogSlug);
       showToastSuccess(formatMessage({ id: 'STORES.UPDATE_SUCCESS' }));
       setTemplateStore(null);
     } catch (error) {
-      setTemplateError(formatMessage({ id: httpErrorKey(error, 'STORES.ERROR') }));
+      setTemplateError(
+        formatMessage({
+          id: apiErrorMessageId(error, {
+            fallback: 'STORES.CATALOG_SLUG.SAVE_ERROR',
+            byStatus: { 409: 'STORES.CATALOG_SLUG.IN_USE' },
+          }),
+        }),
+      );
     } finally {
       setTemplateSaving(false);
     }
@@ -407,11 +435,13 @@ export function AdminStoreListPage() {
         storeId={templateStore?.id ?? null}
         storeName={templateStore?.name ?? ''}
         value={templateValue}
+        slug={templateSlug}
         loading={templateLoading}
         saving={templateSaving}
         loadFailed={templateLoadFailed}
         error={templateError}
         onChange={setTemplateValue}
+        onSlugChange={setTemplateSlug}
         onClose={() => {
           setTemplateStore(null);
           setTemplateError('');
