@@ -56,7 +56,7 @@
 | `multimonedas` MMF1 — sin el módulo MultiMonedas el selector de moneda NO aparece | Que el selector está gateado por el módulo | ⚠️ **Parcial** — el gate es puro; **visual:** el selector ausente | `shared/components/multimonedas/__tests__/` (2), `shared/lib/auth/__tests__/` |
 | `multimonedas` MMF2 — un producto en USD muestra "10 USD" en la venta, sin `$` | Que el precio se pinta con la moneda del producto | ⚠️ **Parcial** — `formatMoneyWithCurrency` es puro; **visual:** el texto | `shared/lib/__tests__/` (7) |
 | `multimonedas` MMF3 — el total del carrito lleva la moneda de la venta | Que el total usa la moneda del carrito | ⚠️ **Parcial** — `cartCurrency()` es puro; **visual:** el total | `shared/lib/stores/__tests__/` (10) |
-| `multimonedas` MMF4 — no se puede mezclar monedas en el carrito | Que mezclar monedas se bloquea | ⚠️ **Parcial** — `guardCurrency` es puro; **visual:** el aviso | `shared/lib/__tests__/` (currency-guard) |
+| `multimonedas` MMF4 — se pueden mezclar monedas en el carrito | Que mezclar monedas **ya NO** se bloquea (regla retirada 2026-10-13) | ✅ **Cubierto** — MMF4 invertido + `sale.test.tsx` (carrito mixto sin módulos) | `shared/lib/__tests__/` (currency-guard) |
 | `multimonedas` MMF5 — dos productos de la misma moneda se agregan sin bloqueo | Que la misma moneda no se bloquea | ⚠️ **Parcial** — ídem, en positivo | ídem |
 | `multimonedas` MMF6 — con el módulo sembrado el selector aparece con las 7 monedas | Que el selector ofrece el catálogo completo de monedas | ⚠️ **Parcial** — el catálogo es del dominio; **visual:** las opciones | dominio `channel-conversion`/`payment-channel` |
 

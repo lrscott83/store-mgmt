@@ -26,10 +26,10 @@
  *         ("10 USD") on the sale list — never a `$` sign.
  *   MMF3  The cart total in the header shows the cart's currency label —
  *         a CUP cart reads "X CUP".
- *   MMF4  Adding a second product in a DIFFERENT currency is BLOCKED with a
- *         descriptive popup and the line never enters the cart (one currency
- *         per order) — on a store WITHOUT module 15, which is what lifts the
- *         guard today (sale.tsx:232,259; see the test for the full note).
+ *   MMF4  Adding a second product in a DIFFERENT currency is ALLOWED — both
+ *         lines enter the cart and no blocking popup appears, even on a store
+ *         WITHOUT module 15 (the "one currency per order" rule was retired by
+ *         owner decision 2026-10-13; see the test for the full note).
  *   MMF5  Same-currency additions keep working (control): both lines enter
  *         the cart and the badge counts both.
  *   MMF6  WITH module 15 present, the selector renders in the create-product
@@ -272,7 +272,7 @@ async function refreshSessionFromMe(page: Page): Promise<void> {
   await page.reload();
 }
 
-test.describe.serial('MultiMonedas — selector, precios con moneda y regla de una moneda', () => {
+test.describe.serial('MultiMonedas — selector, precios con moneda y mezcla de monedas', () => {
   test.describe.configure({ timeout: 120_000 });
 
   test.use({ persona: 'owner-admin-with-products' });
@@ -343,17 +343,17 @@ test.describe.serial('MultiMonedas — selector, precios con moneda y regla de u
     await expect(headerTotal).not.toContainText('$');
   });
 
-  test('MMF4 no se puede mezclar monedas en el carrito', async ({ page }) => {
-    // ── Constructed precondition (2026-10-13) ──────────────────────────────
-    // The one-currency-per-sale guard is LIFTED by module 15: both add paths
-    // pass `allowMixedCurrencies: hasMultiMonedasModuleAvailable(user)`
-    // (sale.tsx:232 and :259). `currency-guard.ts:14-17` documents that lift as
-    // module 16 (MultiPayments) — a discrepancy in the APP, out of this spec's
-    // scope. What matters for the test: with the Superior birth plan every
-    // store carries module 15, so the blocked popup is only reachable for a
-    // store WITHOUT it. MMF4 therefore mints a PRIVATE identity (removing a
-    // module is a server-side mutation — e2e/README.md) and constructs that
-    // store explicitly. The assertion itself is unchanged.
+  test('MMF4 se pueden mezclar monedas en el carrito', async ({ page }) => {
+    // ── Retired rule (owner decision 2026-10-13) ───────────────────────────
+    // The "one currency per sale" guard no longer exists: `guardCurrency` was
+    // deleted and the add paths in sale.tsx / wholesale.tsx / egress.tsx no
+    // longer check currency at all. Mixing currencies in a sale is ALWAYS
+    // allowed. This test pins the retirement on the HARDEST store — one
+    // WITHOUT module 15, which used to be the only way to reach the blocked
+    // popup at all. The construction is kept for that reason (and because
+    // removing a module is a server-side mutation, so it needs a PRIVATE
+    // identity — e2e/README.md): with the module absent, a passing MMF4 proves
+    // the rule is gone rather than merely lifted.
     const identity = newTestIdentity();
     const registerPage = new RegisterPage(page);
     await registerPage.goto();
@@ -394,18 +394,18 @@ test.describe.serial('MultiMonedas — selector, precios con moneda y regla de u
       .click();
     await expect(page.getByTestId('cart-badge')).toHaveText('1');
 
-    // Add the USD product while the cart holds a CUP line → blocked popup.
+    // Add the USD product while the cart holds a CUP line → SUCCEEDS: no popup.
     await page
       .locator('form', { has: page.getByText(usdName) })
       .first()
       .getByRole('button', { name: ADD_BUTTON })
       .click();
 
-    await expect(page.getByText(/moneda.*distinta/i)).toBeVisible();
-    await page.locator('.swal2-confirm').click();
-
-    // The line never entered the cart: badge still 1.
-    await expect(page.getByTestId('cart-badge')).toHaveText('1');
+    // Both lines are in the cart now — this is the assertion the block used to
+    // invert (the badge stayed at 1 and a popup named both currencies appeared).
+    await expect(page.getByTestId('cart-badge')).toHaveText('2');
+    await expect(page.getByText(/moneda.*distinta/i)).toHaveCount(0);
+    await expect(page.locator('.swal2-popup')).toHaveCount(0);
   });
 
   test('MMF5 dos productos de la misma moneda se agregan sin bloqueo', async ({ signedInPage }) => {

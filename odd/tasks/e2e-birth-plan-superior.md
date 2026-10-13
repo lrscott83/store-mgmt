@@ -78,6 +78,23 @@ L1 (verbatim, 2026-10-13):
 - Corrida completa tras el corpus: **347 passed / 2 failed / 3 flaky / 4 did not run** (13.6 min). Los 2
   fallos son los de arriba; los 3 flaky son de carga (`channel-rates-catalogue` ×2 + `diagnostics`).
 
+### ✅ Decisión tomada: la regla de mezcla de monedas quedó RETIRADA (2026-10-13)
+
+El owner eligió la opción 2: **"Múltiples monedas" permite mezclar y la regla se retira.** Implementado:
+
+- `currency-guard.ts`: eliminado `guardCurrency` (y su `currencyCode`); se conserva `productCurrency`.
+- Los 4 call sites ya no comprueban la moneda: `sales/routes/sale.tsx` (×2), `sales/routes/wholesale.tsx`,
+  `inventory/routes/egress.tsx`.
+- Tests: `sale.test.tsx` con un caso RED→GREEN de carrito mixto sin módulos; MMF4 de `multimonedas.spec.ts`
+  **invertido** (ahora prueba que mezclar está permitido, incluso sin el módulo).
+- Verificación: unit focalizado 29/29 y 121/121; `typecheck` 5/5; `lint` 4/4; E2E `multimonedas` **6 passed
+  (retries=0)**.
+
+**Deuda de docs pendiente** (históricos que aún describen la regla viva; fuera del alcance del worker):
+`docs/plans/2026-09-17-multimonedas-module-plan.md` (nota añadida), `docs/testing/integrations/sales/README.md`
+(fila MMF4 actualizada), `odd/tasks/multimoneda-module-gating-and-store-currency-config.md`,
+`odd/tasks/multipayments.md` (T8).
+
 ### ⚠️ Hallazgo de APP (NO corregido — fuera de alcance)
 `sale.tsx:229-234` y `:256-263` levantan la guarda de **"una sola moneda por venta"** con el módulo **15**
 (`hasMultiMonedasModuleAvailable`), mientras `currency-guard.ts:14-17` la documenta con el módulo **16**

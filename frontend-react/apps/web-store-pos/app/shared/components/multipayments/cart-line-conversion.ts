@@ -10,9 +10,9 @@ import { productCurrency } from '~/shared/lib/currency-guard';
  * (`convertLineAmount`, enteros en centavos, un solo redondeo HALF-UP).
  *
  * Pureza: la función no toca el store ni la UI; recibe ítems, moneda de venta,
- * tasas y el instante `at`, y devuelve un resultado inmutable. Sin el módulo 16
- * el carrito sigue siendo de una sola moneda (guard intacto) y este módulo no
- * se usa.
+ * tasas y el instante `at`, y devuelve un resultado inmutable. El carrito ya
+ * admite monedas mezcladas sin condición (regla de una sola moneda retirada el
+ * 2026-10-13); este módulo solo decide si al cobrar se convierte cada línea.
  *
  * Frontera de unidades: el dominio trabaja en CENTAVOS enteros, la UI en
  * UNIDADES (mismo criterio que `multi-payment-list`/`multi-payment-settlement`).
