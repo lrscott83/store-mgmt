@@ -443,6 +443,29 @@ cambios de la sesión del 2026-10-12, y los introdujo el merge `dev ← test` (l
 **Fichas:** [`known-issues/2026-10-12-backend-e2e-verification/`](known-issues/2026-10-12-backend-e2e-verification/README.md)
 — las 3 retiradas al quedar resueltas; el README de esa carpeta guarda el registro completo.
 
+---
+
+## Corrida E2E FRONTEND del 2026-10-13 (Playwright)
+
+**Contexto.** Backend con `--launch-profile http-e2e` en `:5019` (BD `smca_test`), `pnpm test:e2e
+--workers=4` desde `frontend-react/` (README raíz, sección 6). **Dos corridas completas**:
+304 passed / 17 failed / 12 flaky y 311 passed / 17 failed / 5 flaky (18.4 / 18.2 min). El README espera
+~0 failed y ~8 min a 4 workers: el tiempo doblado y la dispersión por specs no relacionados apuntan a
+**contención**, así que lo que falla se re-verifica **en aislamiento** (`--retries=0`, 1-2 workers).
+
+| # | Spec | Síntoma | Causa raíz | Estado |
+| --- | --- | --- | --- | --- |
+| 05 | `store-create-security.spec.ts:51` | El OwnerAdmin sin MultiStores se queda en `/management/stores/create` (espera `my-stores`) | NO confirmada (gate/loader de la ruta) | 🔴 abierto |
+| 06 | `plan-catalog-superadmin.spec.ts:59` (PCF2) | El popup de planes no muestra "Múltiples monedas" en Superior | NO confirmada (catálogo de planes) | 🔴 abierto |
+| 07 | `web-catalog.spec.ts:77` | `locator('input[type="file"]')` casa con 4 inputs → strict mode violation | **CONFIRMADA** — defecto del test (locator sin acotar) | 🔴 abierto |
+| 08 | `channel-rates-catalogue.spec.ts:106` (**primer fallo de la corrida**) y `:197` | La sesión trae el módulo 15 donde el test exige que no esté | **CONFIRMADA** — las tiendas nuevas nacen en plan **Superior** (`CreateStoreService.cs:45,53`, trae 15); el spec y `main` asumen plan **Pago** | 🔴 abierto — **decisión del owner** |
+
+**Fichas:** [`known-issues/2026-10-06-e2e-verification/`](known-issues/2026-10-06-e2e-verification/README.md)
+(05 a 08 nuevas; 01 a 04 **verdes en aislamiento** — su spec pasa; no se retiran porque no están verdes de
+forma sostenida en la corrida completa). El `category-crud` (primer fallo de la 1.ª corrida) pasa en
+aislamiento → inestable de carga. **Ninguna propuesta aplicada**: editar un test E2E o la app requiere
+autorización 1 a 1.
+
 
 _Actualizado por última vez: 2026-10-05 (corrida completa: 351 aprobados, 0 fallidos, 3 inestables; las fichas de las corridas del 2026-10-01 y del merge de qa quedaron retiradas salvo `precache-split` y el defecto del caché de Vite)._
 
