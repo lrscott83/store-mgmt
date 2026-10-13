@@ -29,6 +29,7 @@ using Asp.Versioning;
 using Domain.Common.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using SMCA.WebApi.Filters;
 
 namespace SMCA.WebApi.Controllers.v1
@@ -240,11 +241,18 @@ namespace SMCA.WebApi.Controllers.v1
             return Ok(await Sender.Send(command));
         }
 
+        /// <summary>
+        /// Registers a store's payment. The body is OPTIONAL and carries the two values
+        /// captured in the register-payment popup: the CUP-per-USD exchange rate and the total
+        /// paid. Both are optional; a request with no body keeps the previous behavior.
+        /// </summary>
         [HttpPost("{storeId}/payments")]
         [HasPermission(StoreRoleFeatures.SuperAdmin, StoreRoleFeatures.StorePaymentAdmin)]
         [ProducesResponseType(typeof(ResponseResult<bool>), StatusCodes.Status200OK)]
-        public async Task<IActionResult> RegisterStorePaymentAsync(Guid storeId)
-            => Ok(await Sender.Send(new RegisterStorePaymentCommand(storeId)));
+        public async Task<IActionResult> RegisterStorePaymentAsync(
+            Guid storeId,
+            [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] RegisterStorePaymentCommand? command)
+            => Ok(await Sender.Send(new RegisterStorePaymentCommand(storeId, command?.ExchangeRate, command?.AmountPaid)));
 
         /// <summary>
         /// Atomic Free &lt;-&gt; Paid plan toggle. No request body. Gated by the same

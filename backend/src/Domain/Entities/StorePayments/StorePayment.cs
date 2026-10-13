@@ -23,6 +23,20 @@ namespace Domain.Entities.StorePayments
         public float ReSellerDiscountPrice { get; set; }
         public float ReSellerAmount { get; set; }
         public bool ByReSeller { get; set; }
+
+        /// <summary>
+        /// CUP per 1 USD, captured in the register-payment popup. Optional: null when the
+        /// operator did not enter a rate. Shown wherever the payment's charged amount is.
+        /// </summary>
+        public decimal? ExchangeRate { get; set; }
+
+        /// <summary>
+        /// Total paid, in CUP when <see cref="ExchangeRate"/> was used; whatever the operator
+        /// confirmed. Optional and NOT editable after registration. When present it is the base
+        /// for the reseller commission instead of <see cref="Price"/>.
+        /// </summary>
+        public decimal? AmountPaid { get; set; }
+
         public Guid TenantId { get; private set; }
         private StorePayment(Guid id, Guid storeId, int storePaymentStatusId, float price, DateTimeOffset paymentBeforeDate,
             int year, int month, Guid tenantId) : base(id)
@@ -38,7 +52,8 @@ namespace Domain.Entities.StorePayments
 
         public static StorePayment Create(Guid storeId, int storePaymentStatusId, float price, DateTimeOffset paymentBeforeDate,
             int year, int month, Guid tenantId,
-            Guid? reSellerId, float reSellerPercentDiscountPrice, float reSellerDiscountPrice, float reSellerAmount, bool byReSeller)
+            Guid? reSellerId, float reSellerPercentDiscountPrice, float reSellerDiscountPrice, float reSellerAmount, bool byReSeller,
+            decimal? exchangeRate = null, decimal? amountPaid = null)
         {
             var storePayment = new StorePayment(Guid.NewGuid(), storeId, storePaymentStatusId, price, paymentBeforeDate,
                 year, month, tenantId);
@@ -47,6 +62,8 @@ namespace Domain.Entities.StorePayments
             storePayment.ReSellerDiscountPrice = reSellerDiscountPrice;
             storePayment.ReSellerAmount = reSellerAmount;
             storePayment.ByReSeller = byReSeller;
+            storePayment.ExchangeRate = exchangeRate;
+            storePayment.AmountPaid = amountPaid;
             storePayment.PaidDate = DateTimeOffset.UtcNow;
             storePayment.Raise(new StorePaymentCreatedEvent(storePayment.Id));
             return storePayment;

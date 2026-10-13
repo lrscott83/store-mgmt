@@ -27,6 +27,11 @@ namespace Infrastructure.Persistence.EntityConfigurations
                 .OnDelete(DeleteBehavior.Restrict)
                 .IsRequired(false);
             builder.HasIndex(x => x.ReSellerId);
+
+            // Explicit money column types: the exchange rate keeps the default 6 decimals;
+            // the paid total is a currency amount and mirrors OrderPayment.Amount at 18,2.
+            builder.Property(x => x.ExchangeRate).HasColumnType("decimal(18,6)");
+            builder.Property(x => x.AmountPaid).HasColumnType("decimal(18,2)");
         }
     }
 }

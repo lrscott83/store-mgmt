@@ -2380,6 +2380,9 @@ namespace Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<decimal?>("AmountPaid")
+                        .HasColumnType("decimal(18,2)");
+
                     b.Property<bool>("ByReSeller")
                         .HasColumnType("boolean");
 
@@ -2388,6 +2391,9 @@ namespace Infrastructure.Migrations
 
                     b.Property<DateTimeOffset>("CreatedDate")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal?>("ExchangeRate")
+                        .HasColumnType("decimal(18,6)");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
