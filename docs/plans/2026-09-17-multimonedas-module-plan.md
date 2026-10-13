@@ -46,7 +46,7 @@ Nuevo módulo **MultiMonedas (15)** — replicando el patrón exacto de MultiSto
 > tiendas nuevas; el owner eligió retirar la regla en vez de re-acotarla. El resto del documento es
 > histórico.
 
-- `currency-guard.ts` (espejo de `order-type-guard.ts`): primer ítem fija `cartCurrency`; producto de otra moneda → alerta bloqueante, no se agrega (también en escáner).
+- ~~`currency-guard.ts` (espejo de `order-type-guard.ts`): primer ítem fija `cartCurrency`; producto de otra moneda → alerta bloqueante, no se agrega (también en escáner).~~ **RETIRADO 2026-10-13** — la regla de una sola moneda por venta ya no existe (ver la nota de la sección 6).
 - `Order.currency` = moneda del carrito.
 - **Totales por moneda**: ventas del día, órdenes, dashboard, cuadre, créditos agrupan por moneda; total primario (CUP) + chips de desglose ("30 USD · 5 EUR").
 
