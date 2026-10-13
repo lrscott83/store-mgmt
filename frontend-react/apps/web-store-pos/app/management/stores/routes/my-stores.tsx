@@ -79,8 +79,8 @@ export function MyStoresPage() {
 
   /**
    * Catalog kept for the EditPlanModal; no longer merged into the cards — the
-   * canonical price (docs/plans/2026-09-15-store-plan-canonical-price-plan.md)
-   * arrives serialized per store and renders as-is.
+   * store price arrives serialized per store (the backend sums the store's own
+   * assigned, active modules) and renders as-is.
    */
   async function handleEditSave(values: { name: string; isActive: boolean }) {
     if (!editingStore) return;

@@ -54,11 +54,11 @@ interface PlanPriceInfo {
 }
 
 /**
- * Store's paid price — CANONICAL (docs/plans/2026-09-15-store-plan-canonical-price-plan.md):
- * the backend serializes planCurrentPrice/planPrice (Σ over the plan's member
- * modules from the LIVE catalog, the same formula GET /v1/plans uses). The card no
- * longer reads the store's module snapshot, so the card price can never disagree
- * with the plan view. Null fields (disapproved store / missing plan) hide the price.
+ * Store's paid price: the backend serializes planCurrentPrice/planPrice — the sum
+ * over the modules THIS store has assigned and that are ACTIVE, the same billing
+ * rule the charge uses. It is not the plan catalog's total, so a store whose
+ * module set differs from its plan shows what it actually pays. Null fields
+ * (disapproved store) hide the price.
  */
 function getPlanPriceInfo(store: Store): PlanPriceInfo | null {
   if (store.planCurrentPrice === null || store.planCurrentPrice === undefined) return null;

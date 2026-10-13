@@ -59,6 +59,39 @@ namespace Domain.Common.Utils
         }
 
         /// <summary>
+        /// The BASE (pre-discount) total of the billable catalog modules — the "original"
+        /// column a card shows above the discounted one. Same rows as
+        /// <see cref="CalculateTotal(IEnumerable{Module})"/>, because both re-use the one
+        /// <see cref="IsBillable"/> predicate; the two columns can therefore never disagree
+        /// about which modules are counted. Null or empty → 0.
+        /// </summary>
+        public static float CalculateBaseTotal(IEnumerable<Module>? modules)
+        {
+            if (modules is null)
+                return 0f;
+
+            return modules
+                .Where(static m => IsBillable(m.IsActive, m.PriceIncluded))
+                .Sum(static m => m.Price);
+        }
+
+        /// <summary>
+        /// The BASE (pre-discount) total of the billable store snapshot modules — the
+        /// "original" column beside <see cref="CalculateTotal(IEnumerable{StoreModule})"/>.
+        /// Same rows, same <see cref="IsBillable"/> predicate, plain <c>Price</c> instead of
+        /// the effective price. Null or empty → 0.
+        /// </summary>
+        public static float CalculateBaseTotal(IEnumerable<StoreModule>? storeModules)
+        {
+            if (storeModules is null)
+                return 0f;
+
+            return storeModules
+                .Where(static sm => IsBillable(sm.IsActive, sm.ModulePriceIncluded))
+                .Sum(static sm => sm.Price);
+        }
+
+        /// <summary>
         /// The single-module rule: a module is billable only when it is active and its price is
         /// NOT included in what the store already pays.
         /// </summary>
