@@ -141,3 +141,19 @@ evidence (23 files / 4449 lines, dominated by the generated EF `ApplicationDbCon
 and migration Designer) exceeds the native reviewer context budget, and no review authority was
 created. The native continuation is to reduce the candidate scope (review smaller slices) or to
 disable reviews; the batch assessment is also available to stand as the recorded outcome.
+
+L6 (RDD resolution, 2026-10-13): the owner chose to review only the slice that fits the native
+budget — the frontend candidate (`ff6e92af..HEAD`, 10 files / 543 lines) with the lenses
+`readability` and `reliability`. Consent was relayed and granted; the review **APPROVED** with
+zero blockers and was **acknowledged** (`gentle-ai.review-acknowledged/v1`,
+lineage `review-e6305a046a03894f`, authority `burned`). Non-blocking advisories, recorded for
+later work, never a reason to re-run this candidate:
+- R2-1 (readability, WARNING): the new **CUP** commission column renders through
+  `formatCurrency`, which always emits the USD `$` symbol, so a CUP amount looks like a USD one;
+  the app has no CUP-specific money formatter today.
+- R3-error-surface-untested / R3-numeric-boundary-unproved / R3-save-guard-unproved
+  (reliability, WARNING/SUGGESTION): the popup's failed-save branch, the negative/zero/non-numeric
+  boundaries and the double-submit guard have no test (the endpoint also accepts negatives; the
+  UI only gates `min="0"`).
+The **backend slice remains unreviewed** by the native reviewer (the generated EF migration
+snapshot exceeds its context budget); the owner accepted that limitation.
