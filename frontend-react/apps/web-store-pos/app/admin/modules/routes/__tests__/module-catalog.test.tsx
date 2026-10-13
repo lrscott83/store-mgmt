@@ -663,4 +663,43 @@ describe('ModuleCatalogPage — activation checkbox', () => {
     expect(payload.find((row) => row.moduleId === 1)?.isActive).toBe(false);
     expect(payload.find((row) => row.moduleId === 2)?.isActive).toBe(true);
   });
+
+  // ─── module-inactive-grouping: inactive modules stay grouped and out of the cost ───
+
+  it('requests the plan catalog with inactive modules included', async () => {
+    await renderPage();
+    const { storeHttpService } = await import('~/management/stores/lib/services/store-http-service');
+    // Without the flag the backend strips inactive modules from `plan.modules`, so the
+    // grouping would push a deactivated module into the catch-all bucket. The page opts in.
+    expect(storeHttpService.getPlans).toHaveBeenCalledWith(true);
+  });
+
+  it('keeps a deactivated module under its own plan and out of the plan total', async () => {
+    const catalog = [
+      moduleDto(1, 'Ventas', 10),
+      { ...moduleDto(2, 'Inventario', 20), isActive: false },
+    ];
+    await seedRead(catalog, [plan(1, 'Gratis', [1, 2])]);
+    const { ModuleCatalogPage } = await import('../module-catalog');
+    render(
+      <Wrapper>
+        <ModuleCatalogPage />
+      </Wrapper>,
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId('module-catalog-table')).toBeInTheDocument();
+    });
+
+    // The deactivated module is still a member of Gratis, so it renders UNDER its plan —
+    // never in the catch-all, which would mean the grouping lost it.
+    const gratis =
+      screen.getByTestId('module-catalog-group-Gratis').closest('tbody')?.textContent ?? '';
+    expect(gratis).toContain('Ventas');
+    expect(gratis).toContain('Inventario');
+    expect(screen.queryByTestId('module-catalog-group-no-plan')).toBeNull();
+    expect(screen.getByTestId('module-catalog-active-2')).not.toBeChecked();
+
+    // Only the active member counts: 10, not 30.
+    expect(screen.getByTestId('module-catalog-group-total-Gratis')).toHaveTextContent('10 USD');
+  });
 });

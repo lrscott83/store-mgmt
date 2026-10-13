@@ -306,9 +306,16 @@ export const storeHttpService = {
    * Plan catalog (GET /v1/plans): the three active plans — Gratis, Pago,
    * Superior — with member modules and computed prices. VIP is excluded
    * server-side; raw passthrough, no client mapping.
+   *
+   * `includeInactiveModules` is a SuperAdmin-only opt-in that keeps the inactive
+   * modules in each plan's `modules` (each carrying its own `isActive`). The module
+   * catalog editor needs it so a deactivated module stays grouped under its plan;
+   * the plan-change popup never passes it and keeps seeing active modules only.
    */
-  async getPlans(): Promise<BaseResponseModel<Plan[]>> {
-    const response = await apiClient.get<BaseResponseModel<Plan[]>>('/v1/plans');
+  async getPlans(includeInactiveModules = false): Promise<BaseResponseModel<Plan[]>> {
+    const response = await apiClient.get<BaseResponseModel<Plan[]>>(
+      `/v1/plans${includeInactiveModules ? '?includeInactiveModules=true' : ''}`,
+    );
     return response.data;
   },
 
