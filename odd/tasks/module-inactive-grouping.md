@@ -40,10 +40,10 @@ so the plan-change panels (owner and SuperAdmin) are untouched.
 
 ## Tasks
 
-- [ ] T1 — Backend: optional SuperAdmin-only `includeInactiveModules` on `GET /v1/plans`; when set, `plan.modules` keeps inactive modules (each with `isActive=false`); default unchanged. Route: inline.
-- [ ] T2 — Frontend: `/admin/modules` requests plans with the flag so grouping keeps inactive modules under their plan; the per-store popup is unchanged. Route: inline.
-- [ ] T3 — Tests backend: unit cases for the flag (keeps inactive / non-SuperAdmin refused); new E2E file for the flag + "price counts only active". Route: inline.
-- [ ] T4 — Tests frontend: vitest for the page's grouping/total with an inactive module and for `totalModulePricing` over mixed lists; Playwright mirror update (`module-catalog-pricing.spec.ts` + `store-module-pricing-fixture.ts`) plus a deactivate case. Route: inline.
+- [x] T1 — Backend: optional SuperAdmin-only `includeInactiveModules` on `GET /v1/plans`; when set, `plan.modules` keeps inactive modules (each with `isActive=false`); default unchanged. Route: inline. Commit `f4b6c09d`.
+- [x] T2 — Frontend: `/admin/modules` requests plans with the flag so grouping keeps inactive modules under their plan; the per-store popup is unchanged. Route: inline. Commit `c6022f8f`.
+- [x] T3 — Tests backend: unit cases for the flag (keeps inactive / non-SuperAdmin refused); new E2E file for the flag + "price counts only active". Route: inline. Commit `f4b6c09d`.
+- [x] T4 — Tests frontend: vitest for the page's grouping/total with an inactive module and the `getPlans(true)` wiring; Playwright mirror update (`module-catalog-pricing.spec.ts` + `store-module-pricing-fixture.ts`) plus MCP5 and the MCP1 locator fix. Route: inline. Commit `c6022f8f` + `93e38c18`.
 
 ## Log
 
@@ -80,3 +80,18 @@ plan-change panels and every existing test stay green. User approved and authori
 edits: update `module-catalog-pricing.spec.ts` (+ optional param on
 `readPlanCatalog` in `store-module-pricing-fixture.ts`) so the mirror tracks the new grouping,
 and add coverage; prefer backend E2E for the cases.
+
+L5 (implementation, 2026-10-13): T1–T4 done inline.
+
+- Commits: `f4b6c09d` (T1+T3 backend), `c6022f8f` (T2+T4 frontend), `93e38c18` (T4 E2E).
+- Verified: backend build succeeded; `GetPlansQueryHandlerTests` 8/8; new
+  `PlanCatalogIncludeInactiveModulesTests` 2/2; related backend E2E (PlanCatalogVisibility,
+  ModuleCatalogPricing, StorePlanCanonicalPrice) 18/18; frontend `turbo typecheck` 5/5 and
+  `turbo lint` 4/4; vitest `module-catalog.test.tsx` 30/30, `module-pricing.test.ts` 19/19,
+  `store-module-pricing-modal.test.tsx` 7/7; Playwright `module-catalog-pricing.spec.ts`
+  5/5 (MCP1–MCP5), including the new MCP5.
+- MCP1 had a PRE-EXISTING misaligned assertion: `td.first()` read the activation checkbox
+  cell (added by `9746f387`) instead of the name. User authorized the locator fix
+  (`td.nth(1)`); the spec then passed 5/5.
+- RDD: `gentle-ai review assess --base-ref 71af5bb4 --committed-only` → `risk: medium`,
+  `review_due: false`, reason `under_budget` (no review transaction due at this budget).
