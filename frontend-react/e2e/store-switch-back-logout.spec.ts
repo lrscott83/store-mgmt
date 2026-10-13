@@ -30,10 +30,13 @@ import { E2E_API_URL } from './support/backend-url';
  * ("Inicia sesión en tu cuenta") — logout does NOT navigate to /login.
  *
  * SETUP (same as store-switcher-refresh.spec.ts, owner-authorized 2026-09-22):
- * the owner-admin persona's store is born on the Pago plan WITHOUT
- * MultiStores (14) — the persona needs the module to see the switcher at all,
- * so the spec seeds module 14 into the persona's login store by direct DB and
- * refreshes the cached session through a real GET /v1/auth/me.
+ * the persona needs module 14 to see the switcher at all, so the spec seeds it
+ * into the persona's login store by direct DB and refreshes the cached session
+ * through a real GET /v1/auth/me. That seed was NECESSARY while new stores were
+ * born on the Pago plan, which did not carry MultiStores; since the birth-plan
+ * decision of 2026-10-13 (`store-birth-superior`) the persona's store is born on
+ * Superior WITH the module, so the seed is an idempotent no-op kept as an
+ * explicit, pinned statement of the precondition.
  *
  * NEVER touches existing specs (CLAUDE.md E2E rule) — brand-new file.
  */

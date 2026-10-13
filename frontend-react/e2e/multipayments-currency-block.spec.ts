@@ -25,9 +25,16 @@
  *
  * It used to seed module 16 and wait for the store's sale-currency section,
  * which never renders — its own comment at the call site already said "module 15
- * renders the currency section", fifteen lines above the failure. A freshly
- * registered store is born on the Pago plan, which carries NEITHER 15 NOR 16
- * (`RegisterService.cs`), so seeding 16 alone left the screen missing.
+ * renders the currency section", fifteen lines above the failure. The seed that
+ * fixed it was module 15, because the currency surfaces are MultiMonedas'
+ * (CartCurrencySelect reads `hasMultiMonedasModuleAvailable`).
+ *
+ * BIRTH PLAN (owner decision 2026-10-13): a new store is born on **Superior**,
+ * which already carries module 15 — so `enableStoreModules(CHANNEL_RATES_MODULES)`
+ * below is now an idempotent no-op rather than the thing that builds the
+ * precondition. It is kept (it is the explicit, API-pinned statement of what
+ * this spec needs) and the session assertion after the reload is what proves
+ * the gate really opened.
  */
 
 import { test, expect } from './support/test';

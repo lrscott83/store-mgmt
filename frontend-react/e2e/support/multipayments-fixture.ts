@@ -44,6 +44,15 @@ export const MULTIPAYMENTS_MODULE_ID = 16;
 export const MULTIMONEDAS_MODULE_ID = 15;
 
 /**
+ * ModuleType.MultiStores (domain enums/index.ts). Gates the active-store
+ * selector on `/management/configurations` and the `/management/stores/create`
+ * route (`ownerStoresGate`, loaders.ts:158-169). Also part of the Superior
+ * birth plan, so specs that need its ABSENCE build it with `disableStoreModule`
+ * instead of assuming a Pago store.
+ */
+export const MODISTORES_MODULE_ID = 14;
+
+/**
  * Precondition of the "Tasas de Cambio" page and the cart currency selector:
  * MultiMonedas alone. Seeding module 16 instead leaves the page hidden.
  */

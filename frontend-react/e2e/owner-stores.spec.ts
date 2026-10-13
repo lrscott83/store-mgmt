@@ -20,6 +20,13 @@ import { E2E_API_URL } from './support/backend-url';
  * Matrix E-01..E-10. NEVER touches existing specs (CLAUDE.md E2E rule) — this is a
  * brand-new file.
  *
+ * BIRTH PLAN (owner decision 2026-10-13): a newly registered store is born on the
+ * **Superior** plan (`store-birth-superior`, 2026-10-11), not Pago. E-03 pinned
+ * the paid-plan card shape and named Pago as the plan that granted it; Superior is
+ * a paid plan too (the card gates the due-date and price lines on `isOnPaidPlan`),
+ * so the shape is unchanged and only the label the birth contract produces moved.
+ * E-08 is unaffected: it degrades to Gratis and then ACTIVATES Pago on purpose.
+ *
  * Cost: one real login per test (owner-admin persona), well under the LoginPolicy
  * ceiling (10/min). Direct-DB seeds follow the store-plan-lock-regression pattern
  * (precondition pinning through the real API where reachable).
@@ -137,8 +144,10 @@ test('E-01..E-05 — cards render plan, next due date and discounted price', asy
   // REQ-13/D9 — a silent logout must not become confusing downstream failures.
   await assertStoresFeature(page);
 
-  // The owner-admin persona's store is on the PAID plan by default (auto-register
-  // delivers every module) — pin the listing shape before rendering assertions.
+  // The owner-admin persona's store is on a PAID plan by default — since the
+  // birth-plan decision of 2026-10-13 that is **Superior** (`CreateStoreService`
+  // was changed from Pago to Superior; commit `store-birth-superior`). Pin the
+  // listing shape before rendering assertions.
   const listed = await readMyStores(page, selectedStoreId);
   expect(listed.isActive).toBe(true);
 
@@ -149,10 +158,12 @@ test('E-01..E-05 — cards render plan, next due date and discounted price', asy
   await expect(card).toBeVisible();
   await expect(page.getByTestId(`owner-store-actions-toggle-${selectedStoreId}`)).toBeVisible();
 
-  // E-03: paid plan shape — "Plan: Pago" + next due date + price. The persona
-  // store is created via register (birth plan defaults to Pago, 2026-09-18).
+  // E-03: paid plan shape — the plan label + next due date + price. Superior
+  // is a paid plan (owner-store-card.tsx:91,99 gate both extra lines on
+  // `isOnPaidPlan`), so the whole paid shape this test pins still applies; only
+  // the plan the birth contract grants changed (Pago → Superior).
   await expect(page.getByTestId(`owner-store-body-${selectedStoreId}`)).toContainText(
-    'Plan: Pago',
+    'Plan: Superior',
   );
 
   // E-04: next billing date line renders (paid store — the persona seed sets a
@@ -263,11 +274,11 @@ test('E-09 — Editar el plan popup lets the owner change the PAID store plan (A
 
   // owner-plan-change AD7 (repurposed from the old DG-7 lock, T7.3): the DG-7
   // readOnly lock is DEAD — the owner of the store changes its plan at any
-  // time, in any direction. The persona's store is on the PAID plan, so the
-  // paid panel is the default expanded one; expand the FREE (non-active)
-  // panel — the discriminating panel where the old lock hid the action — and
-  // pin that "Activar Plan" now RENDERS there (this is the assertion that
-  // fails if anyone resurrects the lock).
+  // time, in any direction. The persona's store is on a PAID plan (Superior
+  // since the 2026-10-13 birth-plan decision), so that panel is the default
+  // expanded one; expand the FREE (non-active) panel — the discriminating panel
+  // where the old lock hid the action — and pin that "Activar Plan" now RENDERS
+  // there (this is the assertion that fails if anyone resurrects the lock).
   const freeHeader = modal.getByRole('button', { name: /Gratis/ });
   await freeHeader.click();
   await expect(freeHeader).toHaveAttribute('aria-expanded', 'true');

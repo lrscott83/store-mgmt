@@ -1,8 +1,15 @@
 import { test, expect } from './support/test';
 import type { Page } from '@playwright/test';
-import { Client } from 'pg';
 import { readBearerToken } from './support/auth-storage';
 import { E2E_API_URL } from './support/backend-url';
+import { RegisterPage } from './support/register-page';
+import { newTestIdentity } from './support/identity';
+import { readSelectedStoreId } from './support/session';
+import {
+  MODISTORES_MODULE_ID,
+  disableStoreModule,
+  enableStoreModule,
+} from './support/multipayments-fixture';
 
 /**
  * [FC-B2] Configurations — E2E Playwright
@@ -11,48 +18,35 @@ import { E2E_API_URL } from './support/backend-url';
  * Verifies that `/management/configurations` gates the active-store selector
  * (store-switcher-react) on the MultiStores module (14): without the module
  * the page renders the heading and NO selector (configurations.tsx:110,164);
- * with the module seeded on the store the same page renders the select with
- * at least one option.
+ * with the module on the store the same page renders the select with at least
+ * one option.
  *
- * Uses `owner-admin` persona (has Configurations feature). The persona is a
- * real registered owner with a selectedStoreId, so the list is non-empty.
+ * ── The negative half is CONSTRUCTED, not assumed (2026-10-13) ────────────
+ * BIRTH PLAN (owner decision 2026-10-13): a newly registered store is born on
+ * the **Superior** plan (`store-birth-superior`, 2026-10-11), and Superior
+ * INCLUDES MultiStores (14). This test used to lean on the opposite truth —
+ * "the persona registers WITHOUT it" — so the heading-only shape it pins could
+ * no longer happen naturally. The precondition is now built explicitly with
+ * `disableStoreModule`, and pinning the session is done through a real
+ * `GET /v1/auth/me`. The POSITIVE half is built with `enableStoreModule`, so
+ * both sides of the gate pair are constructed rather than inherited from the
+ * plan. Both halves keep every original assertion.
+ *
+ * PRIVATE identity for the negative half (e2e/README.md §"Specs que mutan
+ * estado server-side"): removing a module is a server-side mutation, so the
+ * shared worker-scoped persona must not be used for it. The positive half only
+ * READS the store (its seed is idempotent and pinned through the API), so it
+ * stays on the shared persona, which also has the Configurations feature.
  */
 
-test.use({ persona: 'owner-admin' });
+const MODULE_MULTISTORES = MODISTORES_MODULE_ID;
 
-const DEFAULT_DB_URL = 'postgresql://postgres:postgres@localhost:5432/smca_test';
-const MODULE_MULTISTORES = 14;
-
-async function withDb<T>(fn: (client: Client) => Promise<T>): Promise<T> {
-  const client = new Client({ connectionString: process.env['E2E_DB_URL'] ?? DEFAULT_DB_URL });
-  try {
-    await client.connect();
-    return await fn(client);
-  } finally {
-    await client.end();
-  }
-}
-
-/** Inserts the MultiStores module row for the store if missing (idempotent). */
-async function seedMultiStoresModule(storeId: string): Promise<void> {
-  await withDb(async (client) => {
-    await client.query(
-      `INSERT INTO "StoreModule"
-         ("StoreId", "ModuleId", "ModulePriceIncluded", "Price", "ModulePrice",
-          "ModuleDiscountPrice", "ModulePercentDiscountPrice", "TenantId", "IsActive",
-          "CreatedDate", "CreatedBy", "UpdatedDate", "UpdatedBy")
-       SELECT s."Id", 14, m."PriceIncluded", m."Price", m."Price",
-              m."DiscountPrice", m."PercentDiscountPrice", s."TenantId", true,
-              now(), '00000000-0000-0000-0000-000000000000', NULL, NULL
-         FROM "Module" m, "Store" s
-        WHERE m."Id" = $2 AND s."Id" = $1
-          AND NOT EXISTS (
-            SELECT 1 FROM "StoreModule" sm
-             WHERE sm."StoreId" = $1 AND sm."ModuleId" = $2
-          )`,
-      [storeId, MODULE_MULTISTORES],
-    );
-  });
+/** Module ids the CLIENT session currently carries (the gate's real input). */
+async function sessionModuleIds(page: Page): Promise<number[]> {
+  const raw = await page.evaluate(() => window.localStorage.getItem('currentUser'));
+  if (!raw) throw new Error('configurations: localStorage.currentUser is empty.');
+  const parsed = JSON.parse(raw) as { storeModuleIds?: number[] };
+  return parsed.storeModuleIds ?? [];
 }
 
 /**
@@ -87,10 +81,28 @@ async function refreshSessionFromMe(page: Page): Promise<void> {
 test.describe('FC-B2 — Configurations', () => {
   test.describe.configure({ timeout: 120_000 });
 
+  test.use({ persona: 'owner-admin' });
+
   test('sin MultiStores la página muestra el heading y NO el selector de tienda activa', async ({
-    signedInPage,
+    page,
   }) => {
-    const { page } = signedInPage;
+    // PRIVATE identity: removing module 14 is a server-side mutation, so the
+    // shared persona must not be touched (e2e/README.md §"Specs que mutan
+    // estado server-side"). The store is born on Superior WITH the module.
+    const identity = newTestIdentity();
+    const registerPage = new RegisterPage(page);
+    await registerPage.goto();
+    await registerPage.fillValidForm(identity);
+    await registerPage.acceptTerms.check();
+    await registerPage.submit();
+    await page.waitForURL(/\/sales\/products$/);
+    const storeId = await readSelectedStoreId(page);
+
+    // CONSTRUCT the negative precondition: drop the module the birth plan
+    // granted, then pin the client session through a real /me.
+    await disableStoreModule(page, storeId, MODULE_MULTISTORES);
+    await refreshSessionFromMe(page);
+    expect(await sessionModuleIds(page)).not.toContain(MODULE_MULTISTORES);
 
     await page.goto('/management/configurations');
 
@@ -98,8 +110,8 @@ test.describe('FC-B2 — Configurations', () => {
     await expect(page.getByRole('heading', { name: 'Configuraciones' })).toBeVisible();
 
     // The active-store selector (CONFIGURATIONS.STORE_LABEL) is gated on the
-    // MultiStores module — the owner-admin persona registers WITHOUT it, so
-    // configurations.tsx:164 never renders the block (absent, not disabled).
+    // MultiStores module, so configurations.tsx:164 never renders the block
+    // (absent, not disabled) now that the session really lacks module 14.
     await expect(page.getByLabel('Tienda activa')).toHaveCount(0);
 
     // No error overlay or blank page
@@ -111,11 +123,13 @@ test.describe('FC-B2 — Configurations', () => {
   }) => {
     const { page, selectedStoreId } = signedInPage;
 
-    // Seed module 14 by direct DB + refresh the cached session via a real /me
-    // (owner-store-create.spec.ts pattern): the gate reads user.storeModuleIds
-    // from the client session, which cold-boot takes from localStorage.
-    await seedMultiStoresModule(selectedStoreId);
+    // Build the positive precondition explicitly (the seed is idempotent and
+    // pinned through the real API) and refresh the cached session via a real
+    // /me: the gate reads user.storeModuleIds from the client session, which
+    // cold-boot takes from localStorage.
+    await enableStoreModule(page, selectedStoreId, MODULE_MULTISTORES);
     await refreshSessionFromMe(page);
+    expect(await sessionModuleIds(page)).toContain(MODULE_MULTISTORES);
 
     await page.goto('/management/configurations');
 

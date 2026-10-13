@@ -3,12 +3,21 @@
  * NO existing spec or support file is modified (E2E-untouchable rule).
  *
  * The MultiPayments UI (cart currency selector + multi-payment list) renders
- * ONLY when the client session has module 16 (`hasMultiPaymentsModuleAvailable`).
- * A freshly self-registered store is born on the **Pago** plan, which carries
- * NEITHER module 16 nor module 15 (`RegisterService.cs`) — so this spec mints a
- * PRIVATE identity (real register + login), seeds the modules each test needs
- * through the direct-DB precondition fixture, refreshes the client session from
- * `/v1/auth/me`, and then exercises the real cart.
+ * ONLY when the client session carries the right modules. This spec mints a
+ * PRIVATE identity (real register + login) and builds each test's module
+ * precondition EXPLICITLY through the shared module fixture, refreshes the
+ * client session from `/v1/auth/me`, and then exercises the real cart.
+ *
+ * ── Birth plan is Superior (owner decision 2026-10-13) ───────────────────
+ * A new store is born on the **Superior** plan (`store-birth-superior`,
+ * 2026-10-11), which already grants module 15 (MultiMonedas) and 13/14/17 —
+ * but NOT module 16 (MultiPayments, VIP-only). T10.1 used to assert
+ * `not.toContain(15)` as a Pago-birth precondition pin; that is no longer a
+ * fact of the system, so BOTH halves of its gate are now CONSTRUCTED instead
+ * of inherited: `disableStoreModule(16)` pins the MultiPayments block ABSENT
+ * (the negative, what makes this a "módulo 15" test) and
+ * `enableStoreModules(CHANNEL_RATES_MODULES)` pins the MultiMonedas surfaces
+ * PRESENT. Nothing else about the test changed.
  *
  * ── Two different gates, not one (2026-10-03) ─────────────────────────────
  * This file used to seed module 16 and call that the whole precondition, which
@@ -53,6 +62,7 @@ import {
   MULTIMONEDAS_MODULE_ID,
   MULTIPAYMENTS_MODULE_ID,
   assertModulesInSession,
+  disableStoreModule,
   enableStoreModules,
 } from './support/multipayments-fixture';
 
@@ -290,14 +300,18 @@ test.describe.serial('multipayments — selector y tasas (módulo 15), multi-pag
     await page.waitForURL(/\/sales\/products$/);
     storeId = await readSelectedStoreId(page);
 
-    // Precondition (pinned BEFORE enabling): a Pago store is born with NEITHER
-    // 15 nor 16. T10.1 drives only MultiMonedas surfaces (the cart currency
-    // selector and the "Tasas de Cambio" page), so 15 is the whole precondition —
-    // seeding 16 here used to satisfy the check while leaving the selector
-    // unrendered, because CartCurrencySelect is gated by module 15 alone.
-    expect(await storeModuleIds(page)).not.toContain(MULTIPAYMENTS_MODULE_ID);
-    expect(await storeModuleIds(page)).not.toContain(MULTIMONEDAS_MODULE_ID);
-
+    // Precondition, CONSTRUCTED rather than assumed (birth plan = Superior,
+    // 2026-10-13). The store ALREADY carries module 15 at birth; T10.1 drives
+    // only MultiMonedas surfaces (the cart currency selector and the "Tasas de
+    // Cambio" page), so 15 is the whole precondition — seeding 16 here used to
+    // satisfy the check while leaving the selector unrendered, because
+    // CartCurrencySelect is gated by module 15 alone.
+    //
+    // Both sides are pinned explicitly: 16 (the multi-payment block) is
+    // removed so this really is a "módulo 15" test, and the MultiMonedas
+    // surfaces are enabled so the selector below has to render because the
+    // module is there, not because the plan happened to ship it.
+    await disableStoreModule(page, storeId, MULTIPAYMENTS_MODULE_ID);
     await enableStoreModules(page, storeId, CHANNEL_RATES_MODULES);
 
     // The client session still holds the old module set, and a plain reload is
@@ -313,6 +327,11 @@ test.describe.serial('multipayments — selector y tasas (módulo 15), multi-pag
     await dropDekAndCiphertext(page);
 
     await assertModulesInSession(page, CHANNEL_RATES_MODULES);
+    // The other half of the same pin, read back from the REFRESHED session: the
+    // multi-payment block is genuinely gated off, so everything this test
+    // observes belongs to the MultiMonedas surfaces alone.
+    expect(await storeModuleIds(page)).not.toContain(MULTIPAYMENTS_MODULE_ID);
+    expect(await storeModuleIds(page)).toContain(MULTIMONEDAS_MODULE_ID);
 
     // Seed a CUP (default currency) product.
     await seedProduct(page, 'MPT1');

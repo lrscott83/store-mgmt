@@ -13,11 +13,18 @@ import {
  * the payment select, re-enabling restores it. Efectivo is always on and is NOT
  * toggleable.
  *
- * Persona: `owner-admin` — a self-registered owner whose store is on the Pago
- * birth plan (RegisterCommand.cs:71-75 grants exactly the Pago plan modules;
- * MultiMonedas is Superior/VIP-only), so the expense modal offers only
- * Efectivo + Transferencia (CUP) and Zelle is gated out by the plan (covered
- * by payment-methods-plan-gate.spec.ts).
+ * BIRTH PLAN (owner decision 2026-10-13): the persona's store is now born on
+ * the **Superior** plan, which carries MultiMonedas (15). Two consequences, both
+ * handled without touching an assertion:
+ *   - the expense modal now also renders its CURRENCY select, so the payment
+ *     select is no longer `combobox` #1 — `expense-form-modal.ts` now targets
+ *     the LAST combobox, which is the payment select in either layout;
+ *   - the payment catalogue for the default CUP currency is unchanged
+ *     (`paymentMethodOptionsForCurrency(CUP)` = Efectivo + Transferencia, and
+ *     Zelle is not a CUP channel at all), so the expected option lists are
+ *     identical to the ones this spec pinned under the Pago birth plan.
+ * Zelle's plan/module gate on a store WITHOUT MultiMonedas is covered by
+ * payment-methods-plan-gate.spec.ts.
  *
  * The modal is opened in CREATE mode only — nothing is saved, so this spec
  * performs no server-side mutation (read-only persona rule, e2e/README.md).

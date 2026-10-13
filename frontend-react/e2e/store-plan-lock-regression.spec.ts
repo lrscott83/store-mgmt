@@ -26,6 +26,13 @@ import { readSelectedStoreId } from './support/session';
  *      old lock hid it — now the free panel of a paid store shows "Activar
  *      Plan" when expanded).
  *
+ * ── Plan de nacimiento (2026-10-13) ─────────────────────────────────────
+ * La tienda de este spec nace en **Superior** (decisión del propietario,
+ * commit `store-birth-superior`), no en Pago. Superior es un plan PAGO, así que
+ * la mitad 1 conserva su forma exacta (plan pago activo + fecha nula); lo único
+ * que cambia es el NOMBRE del panel activo que lleva la insignia "Activo". La
+ * mitad 2 degrada a Gratis y activa Pago a propósito, así que no se toca.
+ *
  * El defecto histórico que este spec existía para cazar (el candado que leía
  * `readOnly = !isSuperAdmin && paymentStartDate != null`) ya no puede volver
  * en esa forma: la prop ni la derivación existen más. La forma en la que la
@@ -176,23 +183,25 @@ test('el cambio de plan del owner va por change-plan, nunca por PUT; el ancla pa
   // ── Mitad 1: tienda PAGA con fecha NULA (legacy shape) ⇒ el owner PUEDE
   //    cambiar el plan y el ancla sigue nula tras el cambio.
   //
-  // La tienda de la persona `owner-admin` es paga por defecto (H-1: el
-  // auto-registro entrega TODOS los módulos, incluidos los pagos), así que
-  // anular la fecha deja exactamente la forma "legacy": plan pago activo,
-  // fecha nula. AD7: el botón "Activar Plan" se renderiza igual — el lock
-  // DG-7 ya no existe.
+  // La tienda de este spec es paga por defecto porque nace en el plan SUPERIOR
+  // (decisión del propietario 2026-10-13, commit `store-birth-superior`;
+  // antes era Pago). Superior es un plan PAGO — por eso anular la fecha deja
+  // exactamente la forma "legacy": plan pago activo, fecha nula. AD7: el botón
+  // "Activar Plan" se renderiza igual — el lock DG-7 ya no existe.
   await setPaymentStartDateDirect(selectedStoreId, null);
   await assertPlanPaymentStartDateIs(page, selectedStoreId, null);
 
   await page.goto('/management/stores');
 
-  // The plan view renders the three collapsible panels; the store is on the
-  // PAID plan, so the Pago header is the default-expanded one. The FREE
+  // The plan view renders the three collapsible panels; the store is on a PAID
+  // plan, so THAT header is the default-expanded one and the one carrying the
+  // "Activo" badge. The panel is named after the plan the birth contract grants,
+  // so it follows Superior as of 2026-10-13 (it used to be Pago). The FREE
   // (non-active) panel is where an activation action would render — expand it.
   const freeHeader = page.getByRole('button', { name: /Gratis/ });
-  const paidHeader = page.getByRole('button', { name: /Pago/ });
+  const superiorHeader = page.getByRole('button', { name: /Superior/ });
 
-  await expect(paidHeader.getByText(ACTIVE_BADGE_TEXT)).toBeVisible();
+  await expect(superiorHeader.getByText(ACTIVE_BADGE_TEXT)).toBeVisible();
   await freeHeader.click();
   await expect(freeHeader).toHaveAttribute('aria-expanded', 'true');
 
