@@ -397,6 +397,12 @@ const messages: Record<string, string> = {
   'ORDERING_SETTINGS.WHATSAPP_NUMBER_PLACEHOLDER': 'Con prefijo internacional, por ejemplo 5351234567',
   'ORDERING_SETTINGS.PICKUP_ENABLED': 'Recogida en la tienda',
   'ORDERING_SETTINGS.DELIVERY_ENABLED': 'Envío a domicilio',
+  // Las DOS reglas del backend (`UpsertStoreCatalogSettingsCommandValidator`), dichas donde se
+  // ven: el celular es obligatorio para recibir pedidos, y tiene que quedar al menos una
+  // modalidad abierta.
+  'ORDERING_SETTINGS.WHATSAPP_REQUIRED': 'El número de WhatsApp es obligatorio para recibir pedidos',
+  'ORDERING_SETTINGS.MODE_REQUIRED':
+    'Deja abierta al menos una modalidad: recogida en la tienda o envío a domicilio',
   'ORDERING_SETTINGS.BUSINESS_HOURS': 'Horario de atención',
   'ORDERING_SETTINGS.BUSINESS_HOURS_PLACEHOLDER': 'Texto libre, por ejemplo Lunes a sábado de 8:00 a 18:00',
   'ORDERING_SETTINGS.DELIVERY_ZONES': 'Zonas de reparto',

@@ -65,5 +65,7 @@ actualiza la plantilla de una tienda. Rama: `test`. Runner: `vitest` (frontend) 
   `--max-warnings=0`.
 - **L7** (E2E). Ningún E2E existente toca esta vista (grep en `frontend-react/e2e`: cero
   referencias a `catalog-template`/`Plantilla`), así que no hay E2E que actualizar y no se tocó
-  ninguno. **Pendiente opcional**: un E2E NUEVO del endpoint (solo se permite AÑADIR), que exige
-  PostgreSQL y no se añadió en esta pasada.
+  ninguno. **AÑADIDO** `StoreCatalogSlugE2ETests` (la regla solo permite añadir): 6 casos contra
+  PostgreSQL real —normaliza+persiste, el catálogo público resuelve por el slug nuevo y ya no por
+  el viejo, colisión 409, blanco 400, OwnerAdmin 403 y la lectura combinada— **6/6 verdes**
+  (`[E2E Guard] Database=smca_test`).
