@@ -163,12 +163,12 @@ export function DefaultCatalogTemplate(props: CatalogTemplateProps) {
           2026-10-08) y es `id="inicio"`, la primera de las tres secciones. Con el array vacío
           no se pinta ni un marco —la página es exactamente la de antes—.
 
-          El `px-4`/`pt-4` son solo desde `sm`: en móvil la portada ocupa la pantalla COMPLETA
-          (`mobileFullBleed`) y de borde a borde, así que un margen la encogería y dejaría una
-          franja de fondo a los lados. */}
+          La portada ocupa la primera pantalla ENTERA (`fullBleed`) y de borde a borde en todos
+          los breakpoints, así que el wrapper no lleva margen ni relleno: cualquiera de los dos
+          la encogería y dejaría una franja de fondo a los lados. */}
       {carouselImages.length > 0 && (
-        <div className="scroll-mt-24 sm:px-4 sm:pt-4" id="inicio">
-          <CatalogCarousel images={carouselImages} storeName={storeName} mobileFullBleed />
+        <div className="scroll-mt-24" id="inicio">
+          <CatalogCarousel images={carouselImages} storeName={storeName} fullBleed />
         </div>
       )}
 
