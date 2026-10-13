@@ -1,4 +1,5 @@
 import { test, expect } from './support/test';
+import { mintStoreWithoutMultiMonedas } from './support/store-without-multimonedas';
 
 /**
  * [FC-A5] Dashboard de estadísticas — métricas con valores — E2E Playwright
@@ -9,9 +10,17 @@ import { test, expect } from './support/test';
  *
  * Uses `owner-admin-with-products` persona which has sales, expenses,
  * credits, and products data.
+ *
+ * EXCEPTION (birth plan Superior, owner decision 2026-10-13): the legacy
+ * "Moneda: CUP/USD + tasa" toggle lives in its OWN describe below. It renders
+ * only without MultiMonedas (`dashboard.tsx:257`, `legacyCurrencySelector =
+ * !multiMonedas && …`), and since `store-birth-superior` a newly registered
+ * store already carries module 15 — so the persona's store can no longer
+ * satisfy that precondition by accident.
  */
 
 const DASHBOARD_HEADER = 'Panel de Control';
+const DASHBOARD_PATH = '/stats/dashboard';
 
 test.describe.serial('FC-A5 — Dashboard: métricas con valores', () => {
   test.describe.configure({ timeout: 120_000 });
@@ -20,7 +29,7 @@ test.describe.serial('FC-A5 — Dashboard: métricas con valores', () => {
 
   test.beforeEach(async ({ signedInPage }) => {
     const { page } = signedInPage;
-    await page.goto('/stats/dashboard');
+    await page.goto(DASHBOARD_PATH);
     await expect(page.getByText(DASHBOARD_HEADER)).toBeVisible();
   });
 
@@ -57,24 +66,6 @@ test.describe.serial('FC-A5 — Dashboard: métricas con valores', () => {
     expect(count).toBeGreaterThanOrEqual(3); // at least 3 (Ventas, Gastos, Ganancias)
   });
 
-  test('currency toggle switches from CUP to USD', async ({ signedInPage }) => {
-    const { page } = signedInPage;
-
-    // Default currency is CUP
-    const currencySelect = page.locator('#dashboard-currency');
-    await expect(currencySelect).toHaveValue('CUP');
-
-    // Switch to USD
-    await currencySelect.selectOption('USD');
-
-    // A rate input should appear
-    const rateInput = page.locator('input[type="number"][placeholder*="USD"]');
-    await expect(rateInput).toBeVisible();
-
-    // All KPI values should show "vs anterior" trend text
-    await expect(page.locator('small:has-text("vs anterior")').first()).toBeVisible();
-  });
-
   test('sales and profit charts render with data or empty state', async ({ signedInPage }) => {
     const { page } = signedInPage;
 
@@ -99,5 +90,38 @@ test.describe.serial('FC-A5 — Dashboard: métricas con valores', () => {
 
     // Top sold products
     await expect(page.getByText('Productos más vendidos')).toBeVisible();
+  });
+});
+
+/**
+ * The legacy CUP/USD + exchange-rate toggle — the pre-MultiMonedas dashboard.
+ * `dashboard.tsx:74-80, 213-225, 257` documents it as the surface that exists
+ * ONLY without module 15 (with the module the amounts are grouped per currency
+ * and the selector is not rendered at all), so the precondition is BUILT with
+ * `disableStoreModule` instead of being assumed from the birth plan. Every
+ * assertion is the one the shared-persona version made.
+ */
+test.describe('FC-A5 — Dashboard: toggle de moneda legado (sin MultiMonedas)', () => {
+  test.describe.configure({ timeout: 180_000 });
+
+  test('currency toggle switches from CUP to USD', async ({ page }) => {
+    await mintStoreWithoutMultiMonedas(page);
+
+    await page.goto(DASHBOARD_PATH);
+    await expect(page.getByText(DASHBOARD_HEADER)).toBeVisible();
+
+    // Default currency is CUP
+    const currencySelect = page.locator('#dashboard-currency');
+    await expect(currencySelect).toHaveValue('CUP');
+
+    // Switch to USD
+    await currencySelect.selectOption('USD');
+
+    // A rate input should appear
+    const rateInput = page.locator('input[type="number"][placeholder*="USD"]');
+    await expect(rateInput).toBeVisible();
+
+    // All KPI values should show "vs anterior" trend text
+    await expect(page.locator('small:has-text("vs anterior")').first()).toBeVisible();
   });
 });

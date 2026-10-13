@@ -1,20 +1,48 @@
 /**
  * payment-history-normalization — NEW E2E (payment-channels-and-multipayment, 2026-09-23).
+ * Birth-plan precondition corrected 2026-10-13.
  *
  * Pins the read-path normalization of ALREADY-REGISTERED sales (D2/T9):
  * Efectivo stays "Efectivo"; Transferencia and Zelle (in any currency) present as
  * "Transferencia (CUP)" — in the sales history, today's orders, the dynamic
  * payment-method filters and the edit-order modal. Persisted data is untouched.
  *
- * Uses the shared `owner-admin-with-products` persona and seeds orders straight
- * into the offline orders key as PLAINTEXT (the pre-encryption format the read
- * path must keep tolerating) — same seam as `payment-methods.spec.ts`. The
- * persona restores its snapshot before each test, so seeds do not leak across
- * tests. No existing spec or support file is modified.
+ * ── Why a PRIVATE store without module 15 (2026-10-13) ─────────────────────
+ * Both halves of what this spec asserts are produced by the SAME
+ * `!multiMonedas` flag, so a Superior-born store cannot show either of them:
+ *
+ *   1. LABEL. `orders.tsx:632` / `today-orders.tsx:160` render
+ *      `paymentMethodKeyToLabel(key, !multiMonedas)`, so with module 15 the
+ *      suffix is deliberately dropped — "Transferencia", not "Transferencia
+ *      (CUP)" — because the per-view currency selector on the same screen
+ *      already scopes the currency (`payment-filter-options.ts:103-118`,
+ *      `mayorista-sale.spec.ts:239-245`).
+ *   2. VISIBLE SET. With module 15 the currency filter turns on as soon as two
+ *      currencies are present (`use-currency-filter.ts:31`) and defaults to
+ *      `currencies[0]`, which is USD in the agreed order
+ *      (`currency-totals.ts:34`, USD → EUR → CUP). This spec's own data has a
+ *      CUP Efectivo + CUP Transferencia and a USD Zelle, so the CUP orders fall
+ *      outside the selection and the method filter offers ONLY the USD Zelle —
+ *      normalized to "Transferencia". Observed 2026-10-13: the radio group on
+ *      `/sales/orders` rendered `Todas` + `Transferencia` and no `Efectivo`.
+ *
+ * Neither is an app defect: both are documented, intentional behavior. So the
+ * spec no longer leans on the shared persona's plan — it BUILDS the
+ * precondition it is about through
+ * `support/store-without-multimonedas.ts::mintStoreWithoutMultiMonedas` (private
+ * identity + `disableStoreModule` + session refresh + pinned absence), because
+ * removing a module is a server-side mutation
+ * (`e2e/README.md` §"Specs que mutan estado server-side").
+ *
+ * The seeds still go straight into the offline orders key as PLAINTEXT (the
+ * pre-encryption format the read path must keep tolerating) — same seam as
+ * `payment-methods.spec.ts` — and every assertion below is byte-for-byte the
+ * one the persona version made.
  */
 
 import { test, expect } from './support/test';
 import type { Page } from '@playwright/test';
+import { mintStoreWithoutMultiMonedas } from './support/store-without-multimonedas';
 
 // i18n literals from es.ts — hardcoded, never imported.
 const CASH = 'Efectivo';
@@ -65,17 +93,15 @@ function mixedOrders(): Record<string, unknown>[] {
   ];
 }
 
-test.describe.serial('payment history normalization — Efectivo y Transferencia (CUP)', () => {
-  test.describe.configure({ timeout: 120_000 });
+test.describe('payment history normalization — Efectivo y Transferencia (CUP)', () => {
+  test.describe.configure({ timeout: 180_000 });
 
-  test.use({ persona: 'owner-admin-with-products' });
-
-  test("el historial de ventas muestra solo Efectivo y Transferencia (CUP) en el filtro", async ({
-    signedInPage,
+  test('el historial de ventas muestra solo Efectivo y Transferencia (CUP) en el filtro', async ({
+    page,
   }) => {
-    const { page, selectedStoreId } = signedInPage;
+    const storeId = await mintStoreWithoutMultiMonedas(page);
 
-    await seedPlainOrders(page, selectedStoreId, mixedOrders());
+    await seedPlainOrders(page, storeId, mixedOrders());
     await page.goto('/sales/orders');
     await page.waitForLoadState('networkidle');
 
@@ -97,10 +123,10 @@ test.describe.serial('payment history normalization — Efectivo y Transferencia
     await expect(page.locator('[data-testid^="order-panel-toggle-"]')).toHaveCount(1);
   });
 
-  test("las ventas del día muestran el mismo filtro normalizado", async ({ signedInPage }) => {
-    const { page, selectedStoreId } = signedInPage;
+  test('las ventas del día muestran el mismo filtro normalizado', async ({ page }) => {
+    const storeId = await mintStoreWithoutMultiMonedas(page);
 
-    await seedPlainOrders(page, selectedStoreId, mixedOrders());
+    await seedPlainOrders(page, storeId, mixedOrders());
     await page.goto('/sales/today-orders');
     await page.waitForLoadState('networkidle');
 
@@ -113,14 +139,12 @@ test.describe.serial('payment history normalization — Efectivo y Transferencia
   });
 
   test('el modal de edición de una venta Zelle ofrece Transferencia (CUP), no Zelle', async ({
-    signedInPage,
+    page,
   }) => {
-    const { page, selectedStoreId } = signedInPage;
+    const storeId = await mintStoreWithoutMultiMonedas(page);
 
     // A single order recorded as Zelle (USD).
-    await seedPlainOrders(page, selectedStoreId, [
-      baseOrder({ salePaymentMethod: 1, currency: 1 }),
-    ]);
+    await seedPlainOrders(page, storeId, [baseOrder({ salePaymentMethod: 1, currency: 1 })]);
     await page.goto('/sales/today-orders');
     await page.waitForLoadState('networkidle');
 

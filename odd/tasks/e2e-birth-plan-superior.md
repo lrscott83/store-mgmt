@@ -68,8 +68,17 @@ L1 (verbatim, 2026-10-13):
   acordeón de estado único y el clic sobre el panel ya activo lo colapsaba—; `MMF4` estaba **oculto**
   tras `test.describe.serial` (nadie lo había ejecutado).
 
-### ⚠️ Hallazgo de APP (NO corregido — fuera de alcance)
+- 2026-10-13 — **Los 2 fallos restantes de la corrida completa** (`dashboard-metrics-values.spec.ts:60` y
+  `payment-history-normalization.spec.ts:73`) adaptados: ambos eran **expectativas obsoletas** por el
+  módulo 15 (el selector legacy `#dashboard-currency` se pinta solo **sin** el 15 —
+  `dashboard.tsx:257`—; y con el 15 se **omite** el sufijo `(CUP)` y el filtro de moneda por defecto es
+  **USD**, que oculta las filas CUP). Se construyó la precondición "tienda sin MultiMonedas" en identidad
+  privada (nuevo `e2e/support/store-without-multimonedas.ts`), **sin** debilitar ninguna aserción.
+  Verificación (orquestador): **8 passed**. No son defectos de app.
+- Corrida completa tras el corpus: **347 passed / 2 failed / 3 flaky / 4 did not run** (13.6 min). Los 2
+  fallos son los de arriba; los 3 flaky son de carga (`channel-rates-catalogue` ×2 + `diagnostics`).
 
+### ⚠️ Hallazgo de APP (NO corregido — fuera de alcance)
 `sale.tsx:229-234` y `:256-263` levantan la guarda de **"una sola moneda por venta"** con el módulo **15**
 (`hasMultiMonedasModuleAvailable`), mientras `currency-guard.ts:14-17` la documenta con el módulo **16**
 (MultiPayments). Consecuencia del nacimiento en Superior: el popup de bloqueo por mezcla de monedas queda
