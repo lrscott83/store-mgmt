@@ -21,8 +21,8 @@ function makeOwnerStore(overrides: Partial<OwnerStoreWithPlan> = {}): OwnerStore
     paymentStartDate: '2026-01-10',
     nextDueDate: '2026-03-10',
     planType: 'Pago',
-    // Canonical plan price (plan 2026-09-15): Pago costs 2,000 originally, the
-    // discount takes it to 2,000 — no strikethrough by default.
+    // Price the backend sends: the sum of the store's OWN active modules (billing
+    // formula, owner decision 2026-10-13) — 2,000 with no discount, so no strikethrough.
     planPrice: 2000,
     planCurrentPrice: 2000,
     modules: [],
@@ -31,7 +31,7 @@ function makeOwnerStore(overrides: Partial<OwnerStoreWithPlan> = {}): OwnerStore
 }
 
 describe('OwnerStoreCard — disapproved stores (planType Gratis)', () => {
-  it('hides price and next-due date on a disapproved store (null canonical price)', async () => {
+  it('hides price and next-due date on a disapproved store (null price)', async () => {
     const { OwnerStoreCard } = await import('../owner-store-card');
     render(
       <Wrapper>
@@ -53,14 +53,14 @@ describe('OwnerStoreCard — disapproved stores (planType Gratis)', () => {
 
     // Plan name always renders, even for disapproved stores.
     expect(screen.getByText(/Plan: Gratis/)).toBeInTheDocument();
-    // The backend nulled the canonical price — no price or next-due date may leak.
+    // The backend nulls the price for a disapproved store — nothing may leak.
     expect(screen.queryByTestId('owner-store-price-ds1')).not.toBeInTheDocument();
     expect(screen.queryByTestId('owner-store-price-original-ds1')).not.toBeInTheDocument();
     expect(screen.queryByTestId('owner-store-next-due-ds1')).not.toBeInTheDocument();
   });
 });
 
-describe('OwnerStoreCard — approved stores (canonical price)', () => {
+describe('OwnerStoreCard — approved stores (price)', () => {
   it('shows price and next-due date on an approved paid store', async () => {
     const { OwnerStoreCard } = await import('../owner-store-card');
     render(
@@ -85,7 +85,7 @@ describe('OwnerStoreCard — approved stores (canonical price)', () => {
     expect(screen.getByTestId('owner-store-next-due-a1')).toBeInTheDocument();
   });
 
-  it('strikes the original through when the canonical price is discounted', async () => {
+  it('strikes the original through when the price is discounted', async () => {
     const { OwnerStoreCard } = await import('../owner-store-card');
     render(
       <Wrapper>
@@ -108,7 +108,7 @@ describe('OwnerStoreCard — approved stores (canonical price)', () => {
     expect(screen.getByTestId('owner-store-price-a4')).toHaveTextContent('1,000 USD');
   });
 
-  it('renders no price line when the canonical price is null (missing/inactive plan)', async () => {
+  it('renders no price line when the price is null', async () => {
     const { OwnerStoreCard } = await import('../owner-store-card');
     render(
       <Wrapper>

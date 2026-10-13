@@ -18,7 +18,8 @@ function makeStore(overrides: Partial<Store> = {}): Store {
     nextPaymentDate: null,
     ownerPhone: null,
     planType: 'Pago',
-    // Canonical plan price (plan 2026-09-15): Pago costs 10 originally, 10 now.
+    // Price the backend sends: the sum of the store's OWN active modules (billing
+    // formula, owner decision 2026-10-13) — 10 with no discount.
     planPrice: 10,
     planCurrentPrice: 10,
     modules: [],
@@ -179,8 +180,8 @@ describe('StoreCardList — card body (plan line, owner, phone, description)', (
               approved: false,
               planType: 'Gratis',
               nextPaymentDate: null,
-              // A stale paid snapshot must not leak: the backend nulls the canonical
-              // price for disapproved stores — the card shows the plan name only.
+              // A stale paid snapshot must not leak: the backend nulls the price
+              // for disapproved stores — the card shows the plan name only.
               planPrice: null,
               planCurrentPrice: null,
               modules: [

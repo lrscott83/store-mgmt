@@ -24,8 +24,9 @@ function makeOwnerStore(overrides: Partial<OwnerStoreWithPlan> = {}): OwnerStore
     nextDueDate: '2026-11-01',
     modules: [],
     planType: 'Pago',
-    // Canonical plan price (plan 2026-09-15): Pago costs 10 originally, 8 with the
-    // discount — matching the P2 struck-through shape the price tests assert on.
+    // Price the backend sends for the store: the sum of its OWN active modules (the
+    // billing formula, owner decision 2026-10-13) — 10 originally, 8 with the
+    // discount, the P2 struck-through shape the price tests assert on.
     planPrice: 10,
     planCurrentPrice: 8,
     ...overrides,
@@ -372,10 +373,11 @@ describe('MyStoresPage — card rendering', () => {
     expect(screen.queryByTestId('owner-store-price-s1')).toBeNull();
   });
 
-  it('renders the canonical price even when the module snapshot disagrees (plan 2026-09-15)', async () => {
-    // The whole point of the canonical price: the frozen StoreModule snapshot may
-    // carry whatever historical prices it wants — the card shows the plan's
-    // catalog price (original 20 struck through, current 12).
+  it('renders the price the backend sends as-is, without recomputing it from the module rows', async () => {
+    // The price fields carry the store's OWN active-module sum (billing formula,
+    // owner decision 2026-10-13). The card must render exactly what the backend
+    // sends — original 20 struck through, current 12 — and never fall back to the
+    // module rows it also receives.
     mockGetMyStores.mockResolvedValue({
       succeeded: true,
       data: [
@@ -401,8 +403,9 @@ describe('MyStoresPage — card rendering', () => {
   });
 
   it('shows the paid plan with the next due date and the struck-through discounted price (P2)', async () => {
-    // Canonical price arrives serialized per store (plan 2026-09-15) — the card
-    // renders it as-is; no catalog merge participates.
+    // Price arrives serialized per store (the sum of its active modules, owner
+    // decision 2026-10-13) — the card renders it as-is; no client-side price
+    // computation participates.
     mockGetMyStores.mockResolvedValue({
       succeeded: true,
       data: [makeOwnerStore({ id: 's1' })],
