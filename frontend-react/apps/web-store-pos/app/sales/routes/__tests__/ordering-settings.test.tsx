@@ -225,7 +225,6 @@ describe('OrderingSettingsPage (vista Pedidos WhatsApp)', () => {
     await screen.findByTestId('ordering-panel');
 
     fireEvent.change(screen.getByLabelText('Número de WhatsApp'), { target: { value: '5351234567' } });
-    fireEvent.click(await pickupSwitch());
     fireEvent.click(await deliverySwitch());
     fireEvent.change(screen.getByLabelText('Horario de atención'), {
       target: { value: 'Lunes a sábado de 8:00 a 18:00' },
@@ -252,33 +251,44 @@ describe('OrderingSettingsPage (vista Pedidos WhatsApp)', () => {
     expect(orderingMock.getSettings).toHaveBeenCalledTimes(2);
   });
 
-  it('un texto vacío viaja como null, no como cadena en blanco', async () => {
+  it('los campos de texto vacíos viajan como null, no como cadena en blanco', async () => {
     orderingMock.getSettings.mockResolvedValue(
       envelope({ ...DISABLED_SETTINGS, enabled: true, pickupEnabled: true }),
     );
     renderPage();
 
-    fireEvent.click(await enabledSwitch());
+    // La fila guardada ya trae el interruptor encendido: NO se pulsa (lo apagaría).
+    await screen.findByTestId('ordering-panel');
+    // El celular es obligatorio: sin él el guardado está bloqueado (regla nueva), así que se
+    // rellena para poder llegar al PUT y pinchar el resto de campos.
+    fireEvent.change(screen.getByLabelText('Número de WhatsApp'), { target: { value: '5351234567' } });
     fireEvent.click(await syncButton());
 
     await waitFor(() => expect(orderingMock.updateSettings).toHaveBeenCalledTimes(1));
     expect(orderingMock.updateSettings).toHaveBeenCalledWith(
-      expect.objectContaining({ whatsappNumber: null, businessHours: null, deliveryZones: null }),
+      expect.objectContaining({
+        whatsappNumber: '5351234567',
+        businessHours: null,
+        deliveryZones: null,
+      }),
     );
   });
 
   it('un rechazo del servidor se muestra con SU mensaje de validación', async () => {
     orderingMock.updateSettings.mockResolvedValue(
-      failure('El campo WhatsappNumber es obligatorio.'),
+      failure('El campo BusinessHours es demasiado largo.'),
     );
     renderPage();
 
     fireEvent.click(await enabledSwitch());
     await screen.findByTestId('ordering-panel');
+    // El celular se rellena porque la regla del cliente ya bloquea enviarlo vacío: lo que este
+    // test fija es que un rechazo del SERVIDOR llega con su propio texto y no con uno genérico.
+    fireEvent.change(screen.getByLabelText('Número de WhatsApp'), { target: { value: '5351234567' } });
     fireEvent.click(await syncButton());
 
     await waitFor(() => expect(showBlockingErrorMock).toHaveBeenCalled());
-    expect(showBlockingErrorMock).toHaveBeenCalledWith('Error', 'El campo WhatsappNumber es obligatorio.');
+    expect(showBlockingErrorMock).toHaveBeenCalledWith('Error', 'El campo BusinessHours es demasiado largo.');
     expect(showToastSuccessMock).not.toHaveBeenCalled();
   });
 
@@ -290,6 +300,7 @@ describe('OrderingSettingsPage (vista Pedidos WhatsApp)', () => {
 
     fireEvent.click(await enabledSwitch());
     await screen.findByTestId('ordering-panel');
+    fireEvent.change(screen.getByLabelText('Número de WhatsApp'), { target: { value: '5351234567' } });
     fireEvent.click(await syncButton());
 
     await waitFor(() => expect(showBlockingErrorMock).toHaveBeenCalled());
@@ -405,6 +416,7 @@ describe('OrderingSettingsPage (vista Pedidos WhatsApp)', () => {
 
     // Sin pulsar el interruptor: la fila guardada ya lo tiene encendido.
     await screen.findByTestId('ordering-panel');
+    fireEvent.change(screen.getByLabelText('Número de WhatsApp'), { target: { value: '5351234567' } });
 
     orderingMock.getSettings.mockResolvedValue(failure('Tienda no seleccionada.'));
     fireEvent.click(await syncButton());
@@ -425,6 +437,7 @@ describe('OrderingSettingsPage (vista Pedidos WhatsApp)', () => {
     renderPage();
 
     await screen.findByTestId('ordering-panel');
+    fireEvent.change(screen.getByLabelText('Número de WhatsApp'), { target: { value: '5351234567' } });
 
     orderingMock.getSettings.mockRejectedValueOnce(new Error('boom'));
     fireEvent.click(await syncButton());
@@ -475,6 +488,49 @@ describe('OrderingSettingsPage (vista Pedidos WhatsApp)', () => {
     expect(await screen.findByTestId('ordering-error')).toBeInTheDocument();
     expect(screen.queryByTestId('ordering-stale-warning')).not.toBeInTheDocument();
     expect(showBlockingErrorMock).not.toHaveBeenCalled();
+  });
+
+  // ── Reglas nuevas de la vista, espejo del validador del backend ──────────────────────────────
+
+  it('en una tienda sin configurar la RECOGIDA nace encendida', async () => {
+    renderPage();
+
+    fireEvent.click(await enabledSwitch());
+
+    // Sin ninguna modalidad guardada la recogida viene abierta: es el modo que evita que el
+    // interruptor maestro no se pueda guardar (el backend exige al menos una).
+    expect(await pickupSwitch()).toHaveAttribute('aria-checked', 'true');
+    expect(await deliverySwitch()).toHaveAttribute('aria-checked', 'false');
+  });
+
+  it('sin celular el guardado se bloquea y lo dice, sin llamar al servidor', async () => {
+    renderPage();
+
+    fireEvent.click(await enabledSwitch());
+    await screen.findByTestId('ordering-panel');
+
+    expect(screen.getByTestId('ordering-whatsapp-required')).toBeInTheDocument();
+    expect(await syncButton()).toBeDisabled();
+
+    fireEvent.click(await syncButton());
+    expect(orderingMock.updateSettings).not.toHaveBeenCalled();
+  });
+
+  it('sin ninguna modalidad abierta el guardado se bloquea y lo dice', async () => {
+    renderPage();
+
+    fireEvent.click(await enabledSwitch());
+    await screen.findByTestId('ordering-panel');
+    fireEvent.change(screen.getByLabelText('Número de WhatsApp'), { target: { value: '5351234567' } });
+
+    // La recogida viene encendida: apagarla deja el pedido sin ninguna modalidad.
+    fireEvent.click(await pickupSwitch());
+
+    expect(screen.getByTestId('ordering-mode-required')).toBeInTheDocument();
+    expect(await syncButton()).toBeDisabled();
+
+    fireEvent.click(await syncButton());
+    expect(orderingMock.updateSettings).not.toHaveBeenCalled();
   });
 });
 
