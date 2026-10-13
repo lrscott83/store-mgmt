@@ -455,10 +455,14 @@ cambios de la sesión del 2026-10-12, y los introdujo el merge `dev ← test` (l
 
 | # | Spec | Síntoma | Causa raíz | Estado |
 | --- | --- | --- | --- | --- |
-| 05 | `store-create-security.spec.ts:51` | El OwnerAdmin sin MultiStores se queda en `/management/stores/create` (espera `my-stores`) | NO confirmada (gate/loader de la ruta) | 🔴 abierto |
-| 06 | `plan-catalog-superadmin.spec.ts:59` (PCF2) | El popup de planes no muestra "Múltiples monedas" en Superior | NO confirmada (catálogo de planes) | 🔴 abierto |
-| 07 | `web-catalog.spec.ts:77` | `locator('input[type="file"]')` casa con 4 inputs → strict mode violation | **CONFIRMADA** — defecto del test (locator sin acotar) | 🔴 abierto |
-| 08 | `channel-rates-catalogue.spec.ts:106` (**primer fallo de la corrida**) y `:197` | La sesión trae el módulo 15 donde el test exige que no esté | **CONFIRMADA** — las tiendas nuevas nacen en plan **Superior** (`CreateStoreService.cs:45,53`, trae 15); el spec y `main` asumen plan **Pago** | 🔴 abierto — **decisión del owner** |
+| 05 | `store-create-security.spec.ts:51` | El OwnerAdmin sin MultiStores se queda en `/management/stores/create` (espera `my-stores`) | **CONFIRMADA** — la tienda nace en Superior (con el 14); premisa obsoleta | ✅ **resuelto** (2026-10-13, test) |
+| 06 | `plan-catalog-superadmin.spec.ts:59` (PCF2) | El popup de planes no muestra "Múltiples monedas" en Superior | **CONFIRMADA** — `PlanPanels` (acordeón de estado único) se **colapsaba** al pulsar el panel ya activo | ✅ **resuelto** (2026-10-13, test) |
+| 07 | `web-catalog.spec.ts:77` | `input[type="file"]` casaba con 4 y `Guardar` con 2 → strict mode | **CONFIRMADA** — defecto del test (locators sin acotar) | ✅ **resuelto** (2026-10-13, test) |
+| 08 | `channel-rates-catalogue.spec.ts:106` (**primer fallo de la corrida**) y `:197` | La sesión trae el módulo 15 donde el test exige que no esté | **CONFIRMADA** — las tiendas nuevas nacen en plan **Superior** (`CreateStoreService.cs:45,53`) | ✅ **resuelto** (2026-10-13, `8f203dfe`) |
+
+> Además, el **corpus completo** que asumía el plan Pago se adaptó al nacimiento en Superior
+> (commit `22b73679`): 15 specs + 4 fixtures. Nueva ficha de seguimiento del hallazgo de app en
+> [`../../known-issues.md`](../../known-issues.md).
 
 **Fichas:** [`known-issues/2026-10-06-e2e-verification/`](known-issues/2026-10-06-e2e-verification/README.md)
 (05 a 08 nuevas; 01 a 04 **verdes en aislamiento** — su spec pasa; no se retiran porque no están verdes de

@@ -124,7 +124,7 @@ test.describe.serial('Catálogo Web (módulo 18) — publicar el catálogo local
     // Sin los campos de actualización (comentados), el editor solo permite tocar la imagen:
     // UNA sola por producto. Se retiene al elegirla (anuncio "quedará como imagen principal")
     // y SOLO se sube al pulsar Guardar.
-    await page.locator('input[type="file"]').setInputFiles({
+    await page.locator('[data-testid^="catalog-upload-"]').setInputFiles({
       name: 'principal.jpg',
       mimeType: 'image/jpeg',
       buffer: TINY_JPEG,
@@ -137,7 +137,7 @@ test.describe.serial('Catálogo Web (módulo 18) — publicar el catálogo local
     // producto, hay UN "Guardar cambios" al final de la página, y su aviso de éxito es el
     // del lote ("Se guardó 1 producto en el catálogo"), no el antiguo aviso por producto
     // ("Producto guardado en el catálogo"), que ya no emite ninguna rama del código.
-    await page.getByRole('button', { name: 'Guardar' }).click();
+    await page.getByTestId('catalog-save-all-button').click();
     await expect(page.getByText('Se guardó 1 producto en el catálogo')).toBeVisible();
     // Tras el guardado la imagen es la principal y la ÚNICA (la galería está comentada).
     const editorImage = page.locator(`img[alt="${productName}"]`);

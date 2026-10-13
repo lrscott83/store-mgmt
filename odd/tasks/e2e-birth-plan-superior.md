@@ -54,3 +54,25 @@ L1 (verbatim, 2026-10-13):
 
 - Causa raíz confirmada: `CreateStoreService.cs:45,53` (Superior) y `RegisterService.cs:58-66` (delega).
 - Ficha 08 abierta en `docs/testing/known-issues/2026-10-06-e2e-verification/`.
+
+### Progreso
+
+- 2026-10-13 — **T1 + T2 hechos** (`8f203dfe`): helper `disableStoreModule` + `channel-rates-catalogue`
+  rediseñado. Verificación aislada: **2 passed**.
+- 2026-10-13 — **Corpus adaptado** (`22b73679`, delegado a un worker y verificado por el orquestador):
+  15 specs + 4 fixtures. Verificación por spec en aislamiento (`--retries=0`) y agrupada → **37 passed /
+  1 flaky** (`multipayments-currency-block`; pasa aislado, no reproduce). Ninguna aserción de gate se
+  debilitó; se completaron dos pares de gate que estaban a medias.
+- 2026-10-13 — **Fichas 05, 06, 07 y 08 RESUELTAS** (ver `docs/testing/known-issues/...`).
+- **Hallazgos del worker** (no del plan de nacimiento): PCF2 tenía **otra** causa —`PlanPanels` es un
+  acordeón de estado único y el clic sobre el panel ya activo lo colapsaba—; `MMF4` estaba **oculto**
+  tras `test.describe.serial` (nadie lo había ejecutado).
+
+### ⚠️ Hallazgo de APP (NO corregido — fuera de alcance)
+
+`sale.tsx:229-234` y `:256-263` levantan la guarda de **"una sola moneda por venta"** con el módulo **15**
+(`hasMultiMonedasModuleAvailable`), mientras `currency-guard.ts:14-17` la documenta con el módulo **16**
+(MultiPayments). Consecuencia del nacimiento en Superior: el popup de bloqueo por mezcla de monedas queda
+**inalcanzable para toda tienda nueva**. **Necesita decisión del owner**: corregir el call site a
+`hasMultiPaymentsModuleAvailable`, o aceptar el 15 como el disparador real y retirar la regla. El mismo
+cableado existe en `inventory/routes/egress.tsx:89-92` y `sales/routes/wholesale.tsx:227-230`.

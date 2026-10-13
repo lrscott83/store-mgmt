@@ -1,72 +1,58 @@
-# 7. web-catalog.spec.ts:77 — el locator genérico `input[type="file"]` casa con 4 inputs de archivo (strict mode)
+# 7. web-catalog.spec.ts:77 — dos locators genéricos quedaron ambiguos en la vista Catálogo Web
 
 ## Qué prueba el test
 
-`web-catalog.spec.ts:77:7` — *"crear el producto en el POS, sincronizar, ponerle imagen y verlo
-publicado en /catalog/<slug>"*. Recorre el flujo completo del Catálogo Web: crea categoría y producto
-en el POS, sincroniza el catálogo, le pone la imagen principal al producto y comprueba que se ve
-publicado en el catálogo público.
+`web-catalog.spec.ts:77:7` — *"crear el producto en el POS, sincronizar, ponerle imagen y verlo publicado
+en /catalog/<slug>"*. Recorre el flujo completo del Catálogo Web: crea categoría y producto en el POS,
+sincroniza, le pone la imagen principal y comprueba que se ve publicado.
 
-En negocio: publicar un producto con su foto desde la vista Catálogo Web.
+## Qué fallaba
 
-## Qué falla (en simple)
-
-Falla en el paso de subir la imagen, en la **línea 127** del spec:
+Primero, al subir la imagen (línea 127):
 
 ```
 Error: locator.setInputFiles: Error: strict mode violation: locator('input[type="file"]') resolved to 4 elements:
-    1) <input type="file" … data-testid="brand-logo-upload"/>
-    2) <input multiple type="file" … data-testid="showcase-carousel-upload"/>
-    3) <input multiple type="file" … data-testid="showcase-daily-upload"/>
-    4) <input type="file" … data-testid="catalog-upload-42e5f0b9-…"/>
-
-> 127 |     await page.locator('input[type="file"]').setInputFiles({ … });
+    1) data-testid="brand-logo-upload"   2) data-testid="showcase-carousel-upload"
+    3) data-testid="showcase-daily-upload"   4) data-testid="catalog-upload-<productId>"
 ```
 
-Playwright **rehúsa** operar sobre un locator que casa con más de un elemento (strict mode), así que
-el `setInputFiles` nunca llega a elegir el input correcto.
+Y, al corregirlo, apareció un SEGUNDO locator ambiguo (línea 140):
+
+```
+Error: locator.click: Error: strict mode violation: getByRole('button', { name: 'Guardar' }) resolved to 2 elements:
+    1) data-testid="brand-save"   2) data-testid="catalog-save-all-button"
+```
 
 ## Evidencia
 
-- Corrida completa del **2026-10-13** (`pnpm test:e2e --workers=4`): 304 passed / 17 failed / 12 flaky;
-  este test entre los fallidos.
-- **Reproducido en aislamiento** el 2026-10-13 (`--workers=2 --retries=0`): 11 passed / **3 failed** —
-  este es uno. **Sin reintentos** → determinista.
-- Snapshot: `test-results\web-catalog-Catálogo-Web-m-5f3c0--publicado-en-catalog-slug--chromium\error-context.md`.
+- Corrida completa del 2026-10-13 y **reproducido en aislamiento** (`--workers=2 --retries=0`). El segundo
+  locator solo se ve tras corregir el primero (el test muere en el primero).
+- Snapshots: `test-results\web-catalog-…-chromium\error-context.md`.
 
 ## Causa raíz — CONFIRMADA
 
-La vista **Catálogo Web** hoy renderiza **cuatro** `<input type="file">` a la vez:
+**Defecto del test.** La vista Catálogo Web creció y hoy tiene **varios** controles que casan con los
+locators genéricos del spec:
+- **4** `<input type="file">` (logo de marca, carrusel, imágenes del día y la imagen del producto);
+- **2+** botones con nombre accesible "Guardar…" (guardar marca y guardar por lotes del catálogo).
 
-| # | `data-testid` | Qué es |
-| --- | --- | --- |
-| 1 | `brand-logo-upload` | Logo de la marca (sección Marca) |
-| 2 | `showcase-carousel-upload` | Imágenes del carrusel (showcase) |
-| 3 | `showcase-daily-upload` | Imágenes del día (showcase) |
-| 4 | `catalog-upload-<productId>` | Imagen principal del producto |
-
-El spec usa el locator **genérico** `page.locator('input[type="file"]')`, que casó con **uno** cuando el
-spec se escribió y hoy casa con **cuatro**. El error de Playwright prueba el conteo exacto (los cuatro
-`data-testid`), así que no es un problema de la app: la vista tiene varios controles de archivo
-legítimos.
+Los locators se escribieron cuando cada uno casaba con **un** elemento. La app es correcta (varios
+controles de archivo y de guardado son legítimos).
 
 ## Clasificación
 
-**Defecto del test** (locator obsoleto, no acotado). La app es correcta.
-
-## Propuesta de solución — NO APLICADA
-
-Acotar el locator al input de la **imagen del producto**, que es el que el paso quiere usar. Opciones:
-- `page.locator('[data-testid^="catalog-upload-"]')` (un solo producto en este test → 1 elemento), o
-- el input dentro de la tarjeta del producto / del editor que el flujo tenga a mano.
-
-Requiere **autorización 1 a 1** (toca un test E2E existente). **Prueba de mutación** al aplicarlo:
-volver al locator genérico y comprobar que vuelve a caer en la misma aserción.
+**Defecto del test** (locators sin acotar).
 
 ## Aplicación y verificación
 
-No aplicada.
+**APLICADA (2026-10-13, autorizada).**
+- El input de la imagen principal: `locator('input[type="file"]')` → `locator('[data-testid^="catalog-upload-"]')`.
+- El botón de guardado del lote: `getByRole('button', { name: 'Guardar' })` → `getByTestId('catalog-save-all-button')`.
+
+**Prueba de mutación:** la forma vieja de cada locator es el fallo observado (el RED de arriba), así que
+el arreglo es real y no un falso verde.
+Verificación: `pnpm exec playwright test e2e/web-catalog.spec.ts --workers=1 --retries=0` → **1 passed**.
 
 ## Estado final
 
-🔴 **Abierto** — 2026-10-13.
+✅ **Resuelto** — 2026-10-13.
