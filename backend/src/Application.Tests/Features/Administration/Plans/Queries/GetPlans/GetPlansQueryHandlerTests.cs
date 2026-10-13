@@ -29,6 +29,7 @@ public class GetPlansQueryHandlerTests
         _mapper = new Mock<IMapper>();
         _localizer = new Mock<IStringLocalizer<I18n>>();
         _localizer.Setup(x => x["UserNotFound"]).Returns(new LocalizedString("UserNotFound", "User not found"));
+        _localizer.Setup(x => x["Forbidden"]).Returns(new LocalizedString("Forbidden", "Forbidden"));
         _handler = new GetPlansQueryHandler(
             _httpContextService.Object,
             _planRepository.Object,
@@ -191,5 +192,58 @@ public class GetPlansQueryHandlerTests
         modules.Should().ContainSingle(m => m.ModuleId == 6);
         modules.Should().NotContain(m => m.ModuleId == 7,
             "a deactivated module must not appear in the store plan editing panels");
+    }
+
+    // ─── module-inactive-grouping: the module catalog editor opts OUT of the filter ───
+
+    [Fact]
+    public async Task Handle_IncludeInactiveModules_KeepsInactiveModulesUnderTheirPlan()
+    {
+        _httpContextService.Setup(x => x.IsSuperAdminOrOwnerAdmin).Returns(true);
+        _httpContextService.Setup(x => x.IsSuperAdmin).Returns(true);
+        var plans = new List<StorePlan>
+        {
+            StorePlan.Create((int)StorePlanType.Gratis, "Gratis", 1, true),
+        };
+        _planRepository
+            .Setup(x => x.GetActivePlansIncludingModulesForCatalogAsync())
+            .ReturnsAsync(plans);
+        _mapper
+            .Setup(x => x.Map<IEnumerable<PlanDto>>(plans))
+            .Returns(new List<PlanDto>
+            {
+                new()
+                {
+                    Id = 1,
+                    Name = "Gratis",
+                    Order = 1,
+                    Modules = new List<PlanModuleDto>
+                    {
+                        new() { ModuleId = 6, Name = "Estadisticas", IsActive = true },
+                        new() { ModuleId = 7, Name = "Gestion", IsActive = false },
+                    },
+                },
+            });
+
+        var result = await _handler.Handle(new GetPlansQuery(IncludeInactiveModules: true), CancellationToken.None);
+
+        result.Succeeded.Should().BeTrue();
+        var modules = result.Data!.Single().Modules;
+        modules.Should().ContainSingle(m => m.ModuleId == 6 && m.IsActive);
+        modules.Should().ContainSingle(m => m.ModuleId == 7 && !m.IsActive,
+            "the module catalog editor must keep a deactivated module under its own plan");
+    }
+
+    [Fact]
+    public async Task Handle_IncludeInactiveModules_NonSuperAdmin_ThrowsForbidden()
+    {
+        _httpContextService.Setup(x => x.IsSuperAdminOrOwnerAdmin).Returns(true);
+        _httpContextService.Setup(x => x.IsSuperAdmin).Returns(false);
+
+        var act = () => _handler.Handle(new GetPlansQuery(IncludeInactiveModules: true), CancellationToken.None);
+
+        await act.Should().ThrowAsync<ApiException>()
+            .Where(e => e.StatusCode == HttpStatusCode.Forbidden);
+        _planRepository.Verify(x => x.GetActivePlansIncludingModulesForCatalogAsync(), Times.Never);
     }
 }
