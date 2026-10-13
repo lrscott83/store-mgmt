@@ -423,6 +423,16 @@ log "pending scripts applied: $APPLIED_COUNT"
 
 # --- STEP 6: deploy the production stack ---------------------------------------
 log "STEP 6 — deploying production stack (project $PROD_PROJECT)"
+# The `api` service is IMAGE-based (`image: …:latest` with `build:` commented out
+# in docker-compose.yml), so `compose up` does NOT recreate its container when the
+# service definition is unchanged: the reference string stays the same even though
+# `:latest` now points at the build this run just produced. The container then keeps
+# running the OLD image while the frontend (which DOES have `build:`) is rebuilt —
+# every endpoint added after that container was created answers 404
+# (`/v1/modules/catalog`, `/negotiate`, `/conversations`, …) while old ones
+# (`/v1/plans`) still work. Production incident 2026-10-12. Removing the container
+# forces compose to create it again from the image just built.
+podman rm -f smca_backend 2>/dev/null || true
 compose up -d --build 2>&1 | redact | tee -a "$LOG_FILE"
 log "production stack deployed"
 

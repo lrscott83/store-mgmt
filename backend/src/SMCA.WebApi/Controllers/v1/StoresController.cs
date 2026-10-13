@@ -16,6 +16,7 @@ using Application.Features.StoreManagement.Stores.Commands.SwitchMyStore;
 using Application.Features.StoreManagement.Stores.Commands.SetStoreActivation;
 using Application.Features.StoreManagement.Stores.Commands.UpdateStore;
 using Application.Features.StoreManagement.Stores.Commands.UpdateStoreCatalogTemplate;
+using Application.Features.StoreManagement.Stores.Commands.UpdateStoreCatalogSlug;
 using Application.Features.StoreManagement.Stores.Commands.UpdateStoreModulePricing;
 using Application.Features.StoreManagement.Stores.Queries.GetMyStores;
 using Application.Features.StoreManagement.Stores.Queries.GetStoreById;
@@ -327,6 +328,22 @@ namespace SMCA.WebApi.Controllers.v1
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
         public async Task<IActionResult> UpdateStoreCatalogTemplateAsync(
             Guid storeId, [FromBody] UpdateStoreCatalogTemplateCommand command)
+            => Ok(await Sender.Send(command with { StoreId = storeId }));
+
+        /// <summary>
+        /// Fija el SLUG público (`/catalog/&lt;slug&gt;`) del catálogo web de UNA tienda. SuperAdmin
+        /// only, misma capacidad por-tienda que `catalog-template`: la URL pública es una decisión de
+        /// plataforma. El handler NORMALIZA el valor y escribe SOLO `Store.CatalogSlug`; un slug ya
+        /// tomado por otra tienda responde 409 (<c>CatalogSlugInUse</c>).
+        /// </summary>
+        [HttpPut("{storeId}/catalog-slug")]
+        [HasPermission(StoreRoleFeatures.SuperAdmin)]
+        [ProducesResponseType(typeof(ResponseResult<StoreCatalogSlugDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status409Conflict)]
+        public async Task<IActionResult> UpdateStoreCatalogSlugAsync(
+            Guid storeId, [FromBody] UpdateStoreCatalogSlugCommand command)
             => Ok(await Sender.Send(command with { StoreId = storeId }));
 
         /// <summary>

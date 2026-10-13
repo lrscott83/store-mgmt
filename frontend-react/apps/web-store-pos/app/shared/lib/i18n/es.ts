@@ -1473,11 +1473,21 @@ const messages: Record<string, string> = {
   // because GET /v1/plans excludes VIP) so every module in the table is still reachable.
   // Plantilla (vista) del catálogo público de una tienda: la fija SOLO el SuperAdmin desde
   // /admin/stores (por tienda), no el dueño. Todas las plantillas ofrecen las mismas funciones.
-  'STORES.CATALOG_TEMPLATE.MENU_LABEL': 'Plantilla del catálogo',
-  'STORES.CATALOG_TEMPLATE.TITLE': 'Plantilla del catálogo',
+  'STORES.CATALOG_TEMPLATE.MENU_LABEL': 'Catálogo de la tienda',
+  'STORES.CATALOG_TEMPLATE.TITLE': 'Catálogo de la tienda',
   'STORES.CATALOG_TEMPLATE.LABEL': 'Plantilla',
   'STORES.CATALOG_TEMPLATE.HINT':
     'Cómo se ve el catálogo público de esta tienda. Todas las plantillas ofrecen las mismas funciones.',
+  // Slug público del catálogo (SuperAdmin, misma vista que la plantilla): es la dirección
+  // `/catalog/<slug>` de la tienda. Se normaliza al escribir y el backend rechaza un slug que ya
+  // use otra tienda.
+  'STORES.CATALOG_SLUG.LABEL': 'Enlace del catálogo (slug)',
+  'STORES.CATALOG_SLUG.HINT':
+    'La dirección pública de la tienda. Se normaliza al escribir: minúsculas, sin tildes y con guiones en vez de espacios. Cambiarla cambia la URL que usan los clientes.',
+  'STORES.CATALOG_SLUG.PREVIEW': 'URL pública',
+  'STORES.CATALOG_SLUG.REQUIRED': 'El enlace del catálogo no puede quedar vacío',
+  'STORES.CATALOG_SLUG.IN_USE': 'Ese enlace ya está en uso por otra tienda',
+  'STORES.CATALOG_SLUG.SAVE_ERROR': 'No se pudo guardar el catálogo. Intente de nuevo.',
   'STORES.MODULE_PRICING.MENU_LABEL': 'Precios de módulos',
   'STORES.MODULE_PRICING.TITLE': 'Precios de módulos',
   'STORES.MODULE_PRICING.HINT':

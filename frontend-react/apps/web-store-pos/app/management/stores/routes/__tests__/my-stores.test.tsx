@@ -685,6 +685,47 @@ describe('MyStoresPage — Editar el plan popup', () => {
     ).toBeInTheDocument();
   });
 
+  it('shows the store OWN Superior plan even though the owner cannot target it', async () => {
+    mockGetMyStores.mockResolvedValue({
+      succeeded: true,
+      data: [
+        makeOwnerStore({
+          id: 's1',
+          name: 'Alpha',
+          planType: 'Superior',
+          modules: [],
+          nextDueDate: '2026-08-01',
+        }),
+      ],
+    } as BaseResponseModel<OwnerStoreWithPlan[]>);
+    const { MyStoresPage } = await import('../my-stores');
+    render(
+      <Wrapper>
+        <MyStoresPage />
+      </Wrapper>,
+    );
+    await waitFor(() => {
+      expect(screen.getByText('Alpha')).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByTestId('owner-store-actions-toggle-s1'));
+    fireEvent.click(screen.getByTestId('owner-store-edit-plan-s1'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('owner-store-plan-modal-s1')).toBeInTheDocument();
+    });
+    // Every self-registered store is born on Superior (2026-10-11): the owner
+    // must SEE the plan they are on, or no panel would be active at all.
+    const superiorHeader = screen.getByRole('button', { name: /Superior/ });
+    expect(superiorHeader).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText('Incluye todo lo del plan Pago y además:')).toBeInTheDocument();
+    // Gratis stays available as the downgrade…
+    expect(screen.getByRole('button', { name: /Gratis/ })).toBeInTheDocument();
+    // …and the reserved plan is read-only: no activation button for it.
+    expect(
+      screen.queryByRole('button', { name: esMessages['STORES.PLAN.ACTIVATE_PLAN'] }),
+    ).not.toBeInTheDocument();
+  });
+
   it('lets an owner on a FREE store activate a paid plan', async () => {
     mockGetMyStores.mockResolvedValue({
       succeeded: true,
