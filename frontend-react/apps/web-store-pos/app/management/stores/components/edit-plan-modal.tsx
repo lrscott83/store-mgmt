@@ -49,9 +49,19 @@ export function EditPlanModal({
   const { user } = useAuthStore();
   // Caller matrix (billing/spec.md): non-SuperAdmin callers may only target
   // Gratis or Pago — Superior/VIP are SuperAdmin-reserved (backend enforces it).
-  const visiblePlans = user?.isSuperAdmin
+  //
+  // The store's OWN plan is always included, even when the matrix reserves it:
+  // every self-registered store is born on Superior (2026-10-11), so an owner
+  // whose store is on Superior would otherwise see NO active panel at all. It
+  // renders as the active panel and exposes no activation button, so the matrix
+  // is not bypassed.
+  const isSuperAdmin = user?.isSuperAdmin === true;
+  const visiblePlans = isSuperAdmin
     ? plans
-    : plans.filter((p) => p.planType === 'Gratis' || p.planType === 'Pago');
+    : plans.filter(
+        (p) =>
+          p.planType === 'Gratis' || p.planType === 'Pago' || p.planType === storePlanType,
+      );
 
   if (!open || !storeId) return null;
 
