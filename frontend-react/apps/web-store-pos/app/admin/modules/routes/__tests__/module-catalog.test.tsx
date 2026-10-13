@@ -663,4 +663,97 @@ describe('ModuleCatalogPage — activation checkbox', () => {
     expect(payload.find((row) => row.moduleId === 1)?.isActive).toBe(false);
     expect(payload.find((row) => row.moduleId === 2)?.isActive).toBe(true);
   });
+
+  // ─── module-inactive-grouping: inactive modules stay grouped and out of the cost ───
+
+  it('requests the plan catalog with inactive modules included', async () => {
+    await renderPage();
+    const { storeHttpService } = await import('~/management/stores/lib/services/store-http-service');
+    // Without the flag the backend strips inactive modules from `plan.modules`, so the
+    // grouping would push a deactivated module into the catch-all bucket. The page opts in.
+    expect(storeHttpService.getPlans).toHaveBeenCalledWith(true);
+  });
+
+  // ─── S1: a backend-faithful getPlans mock, so the grouping assertion itself is
+  //     mutation-sensitive — a flagless call MUST land the module in the catch-all. ───
+  it('keeps a deactivated module under its own plan and out of the plan total', async () => {
+    const catalog = [
+      moduleDto(1, 'Ventas', 10),
+      { ...moduleDto(2, 'Inventario', 500), isActive: false },
+    ];
+    const withFlag = [plan(1, 'Gratis', [1, 2])];
+    // What the backend returns with the flag ABSENT: the inactive module is stripped.
+    const withoutFlag = [
+      { ...withFlag[0], modules: withFlag[0].modules.filter((m) => m.moduleId !== 2) },
+    ];
+    const { storeHttpService } = await import('~/management/stores/lib/services/store-http-service');
+    vi.mocked(storeHttpService.getModuleCatalog).mockResolvedValue({
+      succeeded: true,
+      data: catalog as unknown as Module[],
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
+    vi.mocked(storeHttpService.getPlans).mockImplementation(
+      async (includeInactiveModules?: boolean) => ({
+        succeeded: true,
+        data: (includeInactiveModules ? withFlag : withoutFlag) as never,
+        message: '',
+        actionCode: 0,
+        errors: [],
+      }),
+    );
+    const { ModuleCatalogPage } = await import('../module-catalog');
+    render(
+      <Wrapper>
+        <ModuleCatalogPage />
+      </Wrapper>,
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId('module-catalog-table')).toBeInTheDocument();
+    });
+
+    // The deactivated module is still a member of Gratis, so it renders UNDER its plan —
+    // never in the catch-all, which a flagless read would produce.
+    const gratis =
+      screen.getByTestId('module-catalog-group-Gratis').closest('tbody')?.textContent ?? '';
+    expect(gratis).toContain('Ventas');
+    expect(gratis).toContain('Inventario');
+    expect(screen.queryByTestId('module-catalog-group-no-plan')).toBeNull();
+    expect(screen.getByTestId('module-catalog-active-2')).not.toBeChecked();
+
+    // Only the active member counts: 10, never 10 + 500.
+    expect(screen.getByTestId('module-catalog-group-total-Gratis')).toHaveTextContent('10 USD');
+  });
+
+  // ─── S3: the live-on-activate half, which the baseline actually got wrong. ───
+  it('activating a deactivated plan member raises THAT plan total, live, with no save', async () => {
+    const catalog = [
+      moduleDto(1, 'Ventas', 10),
+      { ...moduleDto(2, 'Inventario', 500), isActive: false },
+    ];
+    await seedRead(catalog, [plan(1, 'Gratis', [1, 2])]);
+    const { storeHttpService } = await import('~/management/stores/lib/services/store-http-service');
+    const { ModuleCatalogPage } = await import('../module-catalog');
+    render(
+      <Wrapper>
+        <ModuleCatalogPage />
+      </Wrapper>,
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId('module-catalog-table')).toBeInTheDocument();
+    });
+
+    expect(screen.getByTestId('module-catalog-group-total-Gratis')).toHaveTextContent('10 USD');
+    fireEvent.click(screen.getByTestId('module-catalog-active-2'));
+
+    // Same plan, and its total now carries the module it always belonged to.
+    const gratis =
+      screen.getByTestId('module-catalog-group-Gratis').closest('tbody')?.textContent ?? '';
+    expect(gratis).toContain('Inventario');
+    expect(screen.queryByTestId('module-catalog-group-no-plan')).toBeNull();
+    expect(screen.getByTestId('module-catalog-group-total-Gratis')).toHaveTextContent('510 USD');
+    // The number moved with NO traffic: the browser owns it until "Guardar".
+    expect(storeHttpService.updateModulePricing).not.toHaveBeenCalled();
+  });
 });
