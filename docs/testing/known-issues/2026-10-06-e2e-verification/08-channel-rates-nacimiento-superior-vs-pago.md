@@ -73,8 +73,13 @@ Decisión del owner, dos caminos excluyentes:
 
 ## Aplicación y verificación
 
-No aplicada — **requiere tu decisión** (¿Pago o Superior?).
+**APLICADA (2026-10-13, autorizada).** Decisión del owner: la tienda nace en **Superior** → el corpus E2E
+se actualiza, no la app. Se agregó el helper `disableStoreModule` (borra la fila `StoreModule`) y se
+rediseñaron los dos tests de este spec: la mitad negativa se construye **desactivando** el 15 (la tienda
+ya lo trae al nacer) y la segunda describe pasó de la persona compartida a **identidad privada** (mutar
+módulos es server-side). Verificación: `pnpm exec playwright test e2e/channel-rates-catalogue.spec.ts
+--workers=1 --retries=0` → **2 passed (51.9 s)**.
 
 ## Estado final
 
-🔴 **Abierto** — 2026-10-13.
+✅ **Resuelto** — 2026-10-13.
