@@ -116,3 +116,28 @@ L3 (explored state, 2026-10-13): payments are registered manually via
 (`management/stores/routes/collections.tsx`) lists due stores and registers the payment; the
 commissions page (`management/stores/routes/reseller-commissions.tsx`) shows one monthly total.
 No screen shows a registered payment's charged amount today.
+
+L4 (implementation, 2026-10-13): T1–T6 done inline.
+
+- Commits: `ff6e92af` (backend: entity + config + migration `20261013155058` + script
+  `scripts/34-...` + command + controller + DTO/query + unit tests + E2E),
+  `3380e593` (frontend: domain types + service + `payment-confirm-modal.tsx` + collections +
+  commissions two columns + i18n + vitest), `949f0ce2` (this doc).
+- Verified: backend build OK; unit `RegisterStorePaymentCommandHandlerTests` 9/9 and
+  `GetReSellerCommissionsQueryHandlerTests` 5/5; E2E `StorePaymentExchangeRateTests` 3/3 and the
+  related `RegisterStorePayment`/`StoreCreationTrial` set 22/22 (no-body still works); frontend
+  `turbo typecheck` 5/5, `turbo lint` 4/4, vitest collections/commissions/service 62/62.
+- Independent verification (fresh verify agent): PASS, 0 blockers. Reproduced every number and
+  probed the popup, the money rule, the migration columns and the currency split. Advisories:
+  a malformed body is now 400 (baseline accepted anything — unavoidable with a typed optional
+  body); negative values are accepted by the endpoint (the UI gates `min="0"`; validation was
+  not requested); `PaymentCount` still counts both currencies together.
+
+L5 (RDD outcome, 2026-10-13): the native assessment over the batch was `risk: medium`,
+`review_due: false`, reason `under_budget`. Because the change ships a DB migration, it was
+escalated to `risk: high` (item 1), which set `review_due: true`. The review START then
+returned a TERMINAL stop: `lens_context_budget_exceeded` — the candidate's complete reviewer
+evidence (23 files / 4449 lines, dominated by the generated EF `ApplicationDbContextModelSnapshot`
+and migration Designer) exceeds the native reviewer context budget, and no review authority was
+created. The native continuation is to reduce the candidate scope (review smaller slices) or to
+disable reviews; the batch assessment is also available to stand as the recorded outcome.
