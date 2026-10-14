@@ -164,6 +164,16 @@ export const MENU_GROUPS: MenuGroup[] = [
         helpContent:
           'Realiza una nueva venta. Escanea o busca el producto, agrega cantidades, selecciona el método de pago y confirma la venta. También puedes generar ventas a crédito.',
       },
+      // cierre-efectivo (2026-10-14): justo debajo de "Vender" (S5). Mismo gate
+      // que la venta (feature Sale + módulo Sales).
+      {
+        label: 'MENU.CASH_CLOSING',
+        path: '/sales/cash-closing',
+        featureIds: [EFeatures.Sale],
+        moduleId: EModules.Sales,
+        helpContent:
+          'Cierre Efectivo. Cuadra el efectivo de la venta del día: escribe la Apertura, cuenta los billetes y monedas en el Conteo y revisa el Esperado, el Contado y la Diferencia. Solo efectivo. Pulsa Cerrar Caja al final del día; si la diferencia no es cero, el comentario es obligatorio. Solo se ofrece con el módulo MultiMonedas para elegir entre varias monedas.',
+      },
       {
         label: 'MENU.WHOLESALE',
         path: '/sales/wholesale',

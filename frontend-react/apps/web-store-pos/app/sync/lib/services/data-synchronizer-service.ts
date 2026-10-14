@@ -16,6 +16,7 @@ import type {
 import type { ParsedData } from './data-serializer-service';
 import type { StorePaymentMethodsConfig } from '~/shared/lib/payment-methods/store-payment-methods-config-service';
 import type { QueuedMessage } from '~/shared/lib/messages/messages-offline-service';
+import type { CashClosingStore } from '~/sales/lib/cash-closing/cash-closing-types';
 
 // ---------------------------------------------------------------------------
 // Result types
@@ -115,6 +116,10 @@ export const SynchronizerErrors = {
   MessagesQueueUnexpectedError: {
     code: 'Synchronizer.MessagesQueueUnexpectedError',
     message: 'Ocurrió un error inesperado al sincronizar la cola de mensajes.',
+  },
+  CashClosingsUnexpectedError: {
+    code: 'Synchronizer.CashClosingsUnexpectedError',
+    message: 'Ocurrió un error inesperado al sincronizar los cierres de efectivo.',
   },
 } as const;
 
@@ -297,6 +302,17 @@ export interface MessagesQueueImportService {
   addImportedQueuedMessage(message: QueuedMessage): Result;
 }
 
+/**
+ * Cash-closing store import routes through the offline SERVICE
+ * (cierre-efectivo). The merge is a store-level fusion: closings upsert by id
+ * (a local `Closed` record wins — frozen), and the denomination catalog is
+ * unioned per currency. There is no add-vs-update axis to report, so the merge
+ * reports zero inserted/updated — the record counts are informational only.
+ */
+export interface CashClosingImportService {
+  setImportedCashClosings(store: CashClosingStore): Result;
+}
+
 // ---------------------------------------------------------------------------
 // Per-type merge outcome (internal)
 // ---------------------------------------------------------------------------
@@ -377,6 +393,9 @@ export class DataSynchronizerService {
     // predate the offline message queue omit it — the merge then degrades to a
     // zero-count no-op.
     private readonly messagesQueueService?: MessagesQueueImportService,
+    // Optional (cierre-efectivo): legacy call sites/tests that predate the daily
+    // cash-closing omit it — the merge then degrades to a zero-count no-op.
+    private readonly cashClosingService?: CashClosingImportService,
   ) {}
 
   async sync(data: ParsedData): Promise<SyncResult> {
@@ -462,6 +481,14 @@ export class DataSynchronizerService {
     // legacy constructor call sites keep their merge contract.
     if (this.messagesQueueService) {
       push(this.mergeMessagesQueueViaService(data.messagesQueue ?? []));
+    }
+
+    // 15. CashClosings — routed through the offline SERVICE (cierre-efectivo),
+    // store-level fusion (closings upsert by id, catalog unioned). Only when the
+    // service was injected: legacy constructor call sites keep their merge
+    // contract.
+    if (this.cashClosingService && data.cashClosings) {
+      push(this.mergeCashClosingsViaService(data.cashClosings));
     }
 
     return { succeeded: errors.length === 0, errors, merges };
@@ -1269,6 +1296,48 @@ export class DataSynchronizerService {
           entity,
           code: SynchronizerErrors.MessagesQueueUnexpectedError.code,
           message: SynchronizerErrors.MessagesQueueUnexpectedError.message,
+        },
+      };
+    }
+  }
+
+  /**
+   * Store-level fusion of the imported cash-closing store (cierre-efectivo):
+   * the offline service upserts closings by id (a local `Closed` record wins —
+   * frozen) and unions the denomination catalog per currency. There is no
+   * add-vs-update axis to report, so the merge reports the incoming counts.
+   * Break-only (no revert); an unexpected throw yields
+   * `CashClosingsUnexpectedError`. When the service was not injected (legacy
+   * constructor call sites) the merge is a zero-count no-op.
+   */
+  private mergeCashClosingsViaService(incoming: CashClosingStore): MergeOutcome {
+    const entity = 'cashClosings';
+    if (!this.cashClosingService) {
+      return { merge: { entity, inserted: 0, updated: 0 } };
+    }
+
+    const inserted = incoming.closings?.length ?? 0;
+    try {
+      const result = this.cashClosingService.setImportedCashClosings(incoming);
+      if (!result.succeeded) {
+        return {
+          merge: { entity, inserted: 0, updated: 0 },
+          error: {
+            entity,
+            code: SynchronizerErrors.CashClosingsUnexpectedError.code,
+            message: SynchronizerErrors.CashClosingsUnexpectedError.message,
+          },
+        };
+      }
+      return { merge: { entity, inserted, updated: 0 } };
+    } catch {
+      // Break-only: no revert — the service writes one key atomically.
+      return {
+        merge: { entity, inserted: 0, updated: 0 },
+        error: {
+          entity,
+          code: SynchronizerErrors.CashClosingsUnexpectedError.code,
+          message: SynchronizerErrors.CashClosingsUnexpectedError.message,
         },
       };
     }

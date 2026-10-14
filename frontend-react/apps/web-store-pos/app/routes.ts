@@ -59,6 +59,8 @@ export default [
     route('sales/online-orders/sales', 'sales/routes/ordering-sales.tsx'),
     // Sales â€” POS & Orders
     route('sales/new', 'sales/routes/sale.tsx'),
+    // Cierre Efectivo (cierre-efectivo, 2026-10-14): cuadre diario del efectivo.
+    route('sales/cash-closing', 'sales/routes/cash-closing.tsx'),
     // Sales â€” Wholesale (mismo guard de Ventas)
     route('sales/wholesale', 'sales/routes/wholesale.tsx'),
     route('sales/today-orders', 'sales/routes/today-orders.tsx'),

@@ -13,6 +13,7 @@ import { RecipeOfflineService } from '~/inventory/lib/services/recipe-offline-se
 import { ElaborationOfflineService } from '~/inventory/lib/services/elaboration-offline-service';
 import { StorePaymentMethodsConfigService } from '~/shared/lib/payment-methods/store-payment-methods-config-service';
 import { MessagesOfflineService } from '~/shared/lib/messages/messages-offline-service';
+import { CashClosingOfflineService } from '~/sales/lib/cash-closing/cash-closing-offline-service';
 import { DataSerializerService } from '~/sync/lib/services/data-serializer-service';
 import { DataSynchronizerService } from '~/sync/lib/services/data-synchronizer-service';
 import { ImportForm } from '~/sync/components/import-form';
@@ -72,6 +73,10 @@ export function ImportPage() {
     // (getStorageMessagesQueueJson, always exported) and the synchronizer's
     // write seam (addImportedQueuedMessage, append/skip-on-duplicate).
     const messagesQueueSvc = new MessagesOfflineService(storeId);
+    // cierre-efectivo: serves BOTH the serializer's read seam
+    // (getStorageCashClosingsJson, always exported) and the synchronizer's write
+    // seam (setImportedCashClosings, store-level fusion).
+    const cashClosingSvc = new CashClosingOfflineService(storeId);
 
     const serializer = new DataSerializerService(
       storeId,
@@ -87,6 +92,7 @@ export function ImportPage() {
       elaborationSvc,
       storePaymentMethodsSvc,
       messagesQueueSvc,
+      cashClosingSvc,
     );
 
     // Read file bytes
@@ -128,6 +134,7 @@ export function ImportPage() {
       elaborationSvc,
       storePaymentMethodsSvc,
       messagesQueueSvc,
+      cashClosingSvc,
     );
 
     return synchronizer.sync(parsedData);
