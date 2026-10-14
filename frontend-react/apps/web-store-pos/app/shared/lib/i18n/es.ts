@@ -239,6 +239,8 @@ const messages: Record<string, string> = {
   'MENU.ONLINE_ORDERS_SETTINGS': 'Pedidos WhatsApp',
   'MENU.ONLINE_ORDERS_DRIVERS': 'Repartidores',
   'MENU.SALE': 'Vender',
+  // cierre-efectivo: ítem justo debajo de "Vender" (S5).
+  'MENU.CASH_CLOSING': 'Cierre Caja',
   'MENU.WHOLESALE': 'Vender Mayorista',
   'MENU.TODAY_ORDERS': 'Ventas del día',
   'MENU.TODAY_CREDITS': 'Créditos del día',
@@ -1040,6 +1042,32 @@ const messages: Record<string, string> = {
 
   // Category Stats (category-stats.component.html has no i18n keys — currency-formatted
   // numbers and category/product names only, no static Spanish text at all).
+
+  // Cierre Efectivo (cierre-efectivo, 2026-10-14) — cuadre diario del efectivo.
+  'CASH_CLOSING.TITLE': 'Cierre Efectivo',
+  'CASH_CLOSING.CLOSE_BUTTON': 'Cerrar Caja',
+  'CASH_CLOSING.EXPECTED': 'Esperado',
+  'CASH_CLOSING.COUNTED': 'Contado',
+  'CASH_CLOSING.DIFFERENCE': 'Diferencia',
+  'CASH_CLOSING.OPENING': 'Apertura',
+  'CASH_CLOSING.COUNT_TITLE': 'Conteo',
+  'CASH_CLOSING.DENOMINATION': 'Denominación',
+  'CASH_CLOSING.QUANTITY': 'Cantidad',
+  'CASH_CLOSING.TOTAL': 'Total',
+  'CASH_CLOSING.NEW_DENOMINATION': 'Nueva denominación',
+  'CASH_CLOSING.ADD_DENOMINATION': 'Agregar',
+  'CASH_CLOSING.COMMENT': 'Comentario',
+  'CASH_CLOSING.COMMENT_REQUIRED': 'La caja no cuadra: el comentario es obligatorio.',
+  'CASH_CLOSING.STATUS_OPEN': 'Abierta',
+  'CASH_CLOSING.STATUS_CLOSED': 'Cerrada',
+  'CASH_CLOSING.CONFIRM_TITLE': 'Confirmar cierre de caja',
+  'CASH_CLOSING.CONFIRM_MESSAGE':
+    '¿Seguro que quieres cerrar la caja? Una vez cerrada no se podrá editar.',
+  'CASH_CLOSING.CLOSED_NOTICE': 'La caja de este día está cerrada y no se puede editar.',
+  'CASH_CLOSING.CLOSED_SUCCESS': 'Caja cerrada correctamente.',
+  'CASH_CLOSING.SAVE_ERROR': 'No se pudo guardar el cierre de caja.',
+  'CASH_CLOSING.HELP':
+    'Cierre Efectivo. Cuadra el efectivo de la venta del día: escribe la Apertura, cuenta los billetes y monedas en el Conteo y revisa el Esperado, el Contado y la Diferencia. Solo efectivo. Pulsa Cerrar Caja al final del día; si la diferencia no es cero, el comentario es obligatorio. Solo se ofrece con el módulo MultiMonedas para elegir entre varias monedas.',
 
   // Sale Credit (Angular SALE_CREDIT.* — vocabs/es.ts, byte-identical. PAYMENT_CREDIT is
   // Angular's literal title for BOTH edit-sale-credit-modal AND sale-credit-payment-modal
