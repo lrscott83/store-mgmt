@@ -69,22 +69,19 @@ namespace Application.Features.StoreManagement.Stores.Queries.GetStoreModulePric
             if (store is null)
                 throw new ApiException(_localizer["StoreNotFound"], HttpStatusCode.BadRequest);
 
-            // The EXACT universe the operator is shown, from the SAME repository call behind
-            // GET /v1/modules/ToStore (IsActive && AvailableToStore, ordered by PriceIncluded
-            // then Order). Reusing it guarantees the read can never list a module the save
-            // would reject, and guarantees the save payload — the whole list, ticked or not —
-            // is the whole universe.
+            // The catalog universe: the SAME repository call behind GET /v1/modules/ToStore
+            // (IsActive && AvailableToStore, ordered by PriceIncluded then Order). It is the
+            // SEED for the modules the store does not hold.
             IEnumerable<Module> catalog = await _moduleRepository.GetAvailableModulesToStore();
 
             // Every row the store holds, ACTIVE AND INACTIVE. The inactive ones matter: their
             // stored prices are what the operator must see, because ticking the row back on
             // writes exactly what is displayed. Reading active rows only would silently replace
             // a store's own prices with catalog ones.
-            IEnumerable<StoreModule> existing = await _storeModuleRepository.GetStoreModulesByIdAsync(query.StoreId);
+            var existing = (await _storeModuleRepository.GetStoreModulesByIdAsync(query.StoreId)).ToList();
             var existingByModuleId = existing.ToDictionary(storeModule => storeModule.ModuleId);
 
             var rows = new List<StoreModulePricingReadDto>();
-            double totalCurrentPrice = 0d;
 
             foreach (var module in catalog)
             {
@@ -103,13 +100,9 @@ namespace Application.Features.StoreManagement.Stores.Queries.GetStoreModulePric
                 bool priceIncluded = storeModule?.ModulePriceIncluded ?? module.PriceIncluded;
 
                 // The one formula — reused, never reimplemented. Computed for EVERY row so an
-                // unticked row still reports what it would cost; summed for billable rows only,
-                // through the single price rule (IsBillable = active AND not price-included).
+                // unticked row still reports what it would cost.
                 float currentPrice = CurrentPriceServiceUtils.GetCurrentPrice(
                     price, percentDiscountPrice, discountPrice);
-
-                if (ModulePriceCalculator.IsBillable(isActive, priceIncluded))
-                    totalCurrentPrice += currentPrice;
 
                 rows.Add(new StoreModulePricingReadDto
                 {
@@ -123,6 +116,34 @@ namespace Application.Features.StoreManagement.Stores.Queries.GetStoreModulePric
                     CurrentPrice = currentPrice
                 });
             }
+
+            // Rows the store holds whose module the catalog no longer offers. They are NOT part
+            // of the catalog universe above, so before this fix they were invisible here while
+            // the store card and the charge still counted them (owner report 2026-10-14:
+            // per-store view 10 vs card 12.5). The store's OWN configuration is the source of
+            // truth for its price, so every row it holds must be shown and priceable —
+            // otherwise an active row nobody can see is charged and can never be turned off.
+            var catalogIds = catalog.Select(module => module.Id).ToHashSet();
+            foreach (var storeModule in existing.Where(sm => !catalogIds.Contains(sm.ModuleId)))
+            {
+                rows.Add(new StoreModulePricingReadDto
+                {
+                    ModuleId = storeModule.ModuleId,
+                    Name = storeModule.Module.Name,
+                    IsActive = storeModule.IsActive,
+                    Price = storeModule.Price,
+                    DiscountPrice = storeModule.ModuleDiscountPrice,
+                    PercentDiscountPrice = storeModule.ModulePercentDiscountPrice,
+                    PriceIncluded = storeModule.ModulePriceIncluded,
+                    CurrentPrice = CurrentPriceServiceUtils.GetCurrentPrice(
+                        storeModule.Price, storeModule.ModulePercentDiscountPrice, storeModule.ModuleDiscountPrice)
+                });
+            }
+
+            // THE total: the SAME single rule the card and the billing charge apply, over the
+            // store's OWN rows — never over the catalog universe. This is what makes the
+            // per-store view and the card report ONE number (S1/S2/S4).
+            double totalCurrentPrice = ModulePriceCalculator.CalculateTotal(existing);
 
             return ResponseResult.Success(new StoreModulePricingReadResultDto
             {
