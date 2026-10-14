@@ -45,6 +45,8 @@
 | D2 | Codificación de la señalización: **deflate + base45** (alfabeto base45 = exactamente el alfanumérico de QR, por eso gana a base58). | Plan §3.2 |
 | D3 | Verificación del motor WebRTC: **unit con `RTCPeerConnection` mockeado en Vitest + loopback real como E2E de Playwright**. El plan §5-P2 asumía loopback en Vitest, pero jsdom no implementa `RTCPeerConnection`. | Owner, 2026-10-14 |
 | D4 | Prueba de emparejamiento: **PBKDF2 (210k) sobre `sha256(code)` + salt de sesión público** en vez de un hash simple. | Implementación (documentada, no del owner) |
+| D5 | Generación de QR con **`qrcode.react@4.2.0`** (0 deps de runtime, trae tipos, declara React 19), cargada con **import dinámico** dentro de `qr-code.tsx`. | Implementación (autorizada por el owner) |
+| D6 | SHA-256 **al final** (payload completo / buffer reensamblado), no incremental: `crypto.subtle` no tiene digest en streaming y un SHA-256 incremental exigiría una dependencia nueva. Aceptable para exports de pocos MB. | Implementación (documentada) |
 
 ---
 
@@ -103,8 +105,8 @@
 - [x] **T1** — `sdp-codec.ts`: deflate + base45/base58, round-trip. *(S2, S3)* · ruta: inline · commit `e0378bb0`
 - [x] **T2** — `pairing-code.ts`: código 6 dígitos + verificación (reusa `pbkdf2Base64`). *(S4)* · ruta: inline · commit `a97d0de9`
 - [x] **T3** — `peer-connection.ts`: non-trickle, ICE `complete`, sin STUN; unit con RTC mockeado + loopback real en el E2E (T10). *(S2)* · ruta: inline · commit `40497bb2`
-- [ ] **T4** — `chunker.ts` + `transfer-protocol.ts`: 16 KiB, contrapresión, metadatos, SHA-256 streaming, progreso. *(S5)* · ruta: inline
-- [ ] **T5** — Lib de generación de QR (lazy, supuesto A3) + `qr-code.tsx`. *(S3)* · ruta: inline
+- [x] **T4** — `chunker.ts` + `transfer-protocol.ts`: 16 KiB, contrapresión, metadatos, SHA-256, progreso. *(S5)* · ruta: inline · commit `70d34e80`
+- [x] **T5** — Lib de generación de QR (`qrcode.react`, lazy) + `qr-code.tsx`. *(S3)* · ruta: inline · commit `c795ee79`
 - [ ] **T6** — `hotspot-share-modal.tsx` (emisor): elegir export, contraseña, QR+código, progreso. *(S1, S3, S6, S8)* · ruta: inline
 - [ ] **T7** — `hotspot-receive-modal.tsx` (receptor): escanear/teclear, emparejar, QR de respuesta, progreso, handoff a `import-form`. *(S3, S7)* · ruta: inline
 - [ ] **T8** — Integrar entradas en `roster-export-panel.tsx` y `sync/routes/import.tsx` + i18n (`es.ts`). *(S8)* · ruta: inline
@@ -158,6 +160,8 @@ Por tarea:
 - **T1** — `pnpm exec vitest run app/sync/lib/hotspot` → **16 passed**, 0 fallos (KAT RFC 9285 + round-trip). `pnpm typecheck` → 0 errores. `pnpm lint` → 0 errores. Commit `e0378bb0`.
 - **T2** — `pnpm exec vitest run app/sync/lib/hotspot` → **25 passed** (16 T1 + 9 T2). `pnpm typecheck` → 0 errores. `pnpm lint` → 0 errores. Commit `a97d0de9`. RDD (`assess` sobre `affae51f..`): risk `medium`, `review_due` según presupuesto de la rebanada.
 - **T3** — `pnpm exec vitest run app/sync/lib/hotspot` → **33 passed** (25 + 8 T3). `pnpm typecheck` → 0 errores. `pnpm lint` → 0 errores. Commit `40497bb2`. El loopback real queda para el E2E de T10 (decisión D3).
+- **T4** — `pnpm exec vitest run app/sync/lib/hotspot` → **42 passed** (33 + 9 T4). `pnpm typecheck` → 0 errores. `pnpm lint` → 0 errores. Commit `70d34e80`.
+- **T5** — `pnpm exec vitest run app/sync/components/__tests__/qr-code.test.tsx` → **2 passed**. `pnpm typecheck` → 0 errores. `pnpm lint` → 0 errores. Commit `c795ee79`.
 
 Cierre de feature (se rellena al final):
 
@@ -181,3 +185,6 @@ Cierre de feature (se rellena al final):
 - 2026-10-14 — **T1 completada** (`sdp-codec.ts`, commit `e0378bb0`): base45 (RFC 9285, KAT verificados) + deflate. Hallazgo durante el test-first: el **espacio es un símbolo válido de base45**, así que el decodificador solo debe eliminar ruido de línea (`\t\r\n`), nunca espacios — el primer intento los eliminaba y corrompía el payload. Corregido con test que lo fija.
 - **Hallazgo para T3 (no afecta T1/T2):** el plan §5-P2 propone un test de integración con dos `RTCPeerConnection` reales "en el mismo proceso… runners basados en Chromium", pero el runner de este repo es **Vitest sobre jsdom**, donde `RTCPeerConnection` NO existe. → **Resuelto (D3)**: unit con RTC mockeado + loopback real en el E2E de Playwright (T10).
 - 2026-10-14 — **T2 completada** (`pairing-code.ts`, commit `a97d0de9`): código de 6 dígitos uniforme (rejection sampling, sin sesgo de módulo), salt de sesión, y prueba PBKDF2 (210k) que reusa `sha256Base64`/`pbkdf2Base64` de `offline-crypto.ts`. Decisión de implementación tomada (no del owner): **PBKDF2 en vez de hash simple** porque 10^6 candidatos se fuerzan al instante con un hash rápido; el salt de 16 bytes es público pero ata la prueba a la sesión.
+- 2026-10-14 — **T4 completada** (`chunker.ts` + `transfer-protocol.ts`, commit `70d34e80`): frame de metadatos JSON + chunks de 16 KiB con contrapresión (`bufferedamountlow`), progreso y verificación SHA-256. **D6**: digest al final, no incremental. Trampa de test detectada por el propio test: las opciones se pasaban dentro del objeto `source` en vez de como tercer argumento.
+- 2026-10-14 — **T5 completada** (`qr-code.tsx` + test, commit `c795ee79`): dependencia **`qrcode.react@4.2.0`** añadida (0 deps de runtime, tipos propios, React 19 en peerDeps) y cargada con import dinámico para no entrar en el bundle inicial.
+- **Pendiente decisión del owner (plan §8.1):** sigue abierta. Toca antes de **T6**.
