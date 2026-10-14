@@ -1846,6 +1846,12 @@ const messages: Record<string, string> = {
   'HOTSPOT.SENT': 'Transferencia completada.',
   'HOTSPOT.ERROR': 'No se pudo completar la transferencia.',
   'HOTSPOT.ERROR_PAIRING': 'El emparejamiento no coincide. Vuelve a escanear el código.',
+  'HOTSPOT.SCAN_PROMPT': 'Escanea el código del otro dispositivo.',
+  'HOTSPOT.ACCEPT': 'Aceptar',
+  'HOTSPOT.INCOMING_FILE': 'Archivo a recibir',
+  'HOTSPOT.ANSWER_READY': 'Muestra este código al otro dispositivo.',
+  'HOTSPOT.RECEIVING': 'Recibiendo archivo...',
+  'HOTSPOT.RECEIVED': 'Archivo recibido.',
 
   // At-rest encryption — the two decryption failures the app-wide policy
   // announces (decryption-failure-policy.ts). They are worded differently on
