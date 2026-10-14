@@ -115,7 +115,7 @@
 - [x] **T7** — `hotspot-receive-modal.tsx` (receptor): escanear oferta, QR de respuesta, recibir, handoff a `import-form`. *(S3, S7)* · ruta: inline · commit `c9f229db`
 - [x] **T8** — Integración: `roster-export-panel`, `sync/routes/export`, `sync/routes/import` + `ImportForm`/`FileInput` con fichero precargado. *(S8)* · ruta: inline · commit `69f783f5`
 - [x] **T9** — Robustez: aviso de aislamiento AP (`SignalingTimeoutError`), Wake Lock, límite de tamaño. *(S9)* · ruta: inline · commit `3a1a5029`
-- [ ] **T10** — E2E **nuevos** (Playwright, 2 contextos en `localhost`, escaneo sustituido por inyección del código). *(S1, S3, S5, S7)* · ruta: inline
+- [x] **T10** — E2E **nuevo** de motor: 2 contextos reales + WebRTC real, sin backend (`e2e/hotspot-transfer.spec.ts` + `playwright.hotspot.config.ts`). *(S1, S3, S5, S7)* · ruta: inline · commit `73881e0e`
 - [ ] **T11** — Verificación final: `typecheck`, `lint`, `vitest`, y confirmar el chunk lazy en `pnpm build`.
 
 Verificación por tarea con **test-first** (RED observado → GREEN → refactor) para los módulos con comportamiento determinista; los componentes UI llevan test de componente. Las líneas de `Evidencia de verificación` se rellenan al cerrar cada tarea.
@@ -172,6 +172,7 @@ Por tarea:
 - **T7** — `pnpm exec vitest run app/sync/components/__tests__/hotspot-receive-modal.test.tsx` → **4 passed**. `pnpm typecheck` → 0 errores. `pnpm lint` → 0 errores. Commit `c9f229db`.
 - **T8** — `pnpm test` (suite completa del app) → **382 archivos, 5588 passed**, 6 skipped, 0 fallos. `pnpm typecheck` → 0 errores. `pnpm lint` → 0 errores. Commit `69f783f5`. Nuevo test de integración `hotspot-wiring.test.tsx` (3 casos): recibir→precarga el `File`, y los dos botones de compartir.
 - **T9** — `pnpm exec vitest run app/sync/lib/hotspot app/sync/components` → **12 archivos, 92 passed**. `pnpm typecheck` → 0 errores. `pnpm lint` → 0 errores. Commit `3a1a5029`.
+- **T10** — `pnpm test:e2e:hotspot` (desde `frontend-react/`) → **1 passed** (loopback WebRTC real entre 2 contextos, ~0.7 s). Commit `73881e0e`.
 
 Cierre de feature (se rellena al final):
 
@@ -204,3 +205,5 @@ Cierre de feature (se rellena al final):
 - 2026-10-14 — **T7 completada** (`hotspot-receive-modal.tsx`, commit `c9f229db`): escanear oferta → ver código+fichero → Aceptar → QR de respuesta → recibir con progreso → **handoff de `File` por `onReceived`**. Si el SHA-256 no coincide, rechaza y no entrega el archivo. La importación existente (contraseña/corrupto/tienda) se hereda en T8.
 - 2026-10-14 — **T8 completada** (commit `69f783f5`): "Compartir por hotspot" en `roster-export-panel` y `sync/export` (reutilizando el mismo payload que la descarga; en export se extrajo `buildExportPayload`/`buildExportFileName`); "Recibir por hotspot" en `sync/import`. `ImportForm` acepta `initialFile` y `FileInput` `initialFileName`, así el archivo recibido queda **precargado** y el usuario solo teclea la contraseña del bundle. Se remonta el formulario con `key` cuando llega un archivo nuevo. **No se tocó ningún E2E ni el backend.**
 - 2026-10-14 — **T9 completada** (commit `3a1a5029`): `SignalingTimeoutError` en `peer-connection` (los tres timeouts) y `TransferTooLargeError`+`assertTransferSize` en `transfer-protocol`; los modales traducen el error a **aviso de aislamiento AP** o **demasiado grande** en vez del genérico. Nuevo `wake-lock.ts` (Wake Lock durante la transferencia, no-op si no está disponible). **D8**: límite de 64 MB (revisable).
+- **Decisión del owner (T10):** E2E **del motor** con 2 contextos y sin backend (no E2E de UI completa).
+- 2026-10-14 — **T10 completada** (commit `73881e0e`): nuevo `e2e/hotspot-transfer.spec.ts` + `playwright.hotspot.config.ts` (sin `webServer`, sin `globalSetup`, sin backend) + `apps/web-store-pos/scripts/build-hotspot-harness.mjs` (esbuild empaqueta los módulos reales en un IIFE que expone `window.__hotspot`) + script `test:e2e:hotspot`. **Por qué así:** los modales leen el QR con la cámara y Playwright no tiene cámara; el loopback real del motor se prueba mejor sin UI. Se sirve por `http://127.0.0.1` porque `about:blank` no es contexto seguro y `crypto.subtle` no existiría. **No se tocó ningún E2E ni support existente.**
