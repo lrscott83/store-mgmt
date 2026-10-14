@@ -98,8 +98,8 @@
 
 ## Tareas
 
-- [ ] **T1** — `sdp-codec.ts`: deflate + base45/base58, round-trip. *(S2, S3)* · ruta: inline
-- [ ] **T2** — `pairing-code.ts`: código 6 dígitos + verificación (reusa `pbkdf2Base64`). *(S4)* · ruta: inline
+- [x] **T1** — `sdp-codec.ts`: deflate + base45/base58, round-trip. *(S2, S3)* · ruta: inline · commit `e0378bb0`
+- [x] **T2** — `pairing-code.ts`: código 6 dígitos + verificación (reusa `pbkdf2Base64`). *(S4)* · ruta: inline · commit `a97d0de9`
 - [ ] **T3** — `peer-connection.ts`: non-trickle, ICE `complete`, sin STUN; test de integración loopback. *(S2)* · ruta: inline
 - [ ] **T4** — `chunker.ts` + `transfer-protocol.ts`: 16 KiB, contrapresión, metadatos, SHA-256 streaming, progreso. *(S5)* · ruta: inline
 - [ ] **T5** — Lib de generación de QR (lazy, supuesto A3) + `qr-code.tsx`. *(S3)* · ruta: inline
@@ -151,10 +151,17 @@ pnpm exec playwright test e2e/hotspot-transfer.spec.ts
 
 ## Evidencia de verificación
 
+Por tarea:
+
+- **T1** — `pnpm exec vitest run app/sync/lib/hotspot` → **16 passed**, 0 fallos (KAT RFC 9285 + round-trip). `pnpm typecheck` → 0 errores. `pnpm lint` → 0 errores. Commit `e0378bb0`.
+- **T2** — `pnpm exec vitest run app/sync/lib/hotspot` → **25 passed** (16 T1 + 9 T2). `pnpm typecheck` → 0 errores. `pnpm lint` → 0 errores. Commit `a97d0de9`. RDD (`assess` sobre `affae51f..`): risk `medium`, `review_due` según presupuesto de la rebanada.
+
+Cierre de feature (se rellena al final):
+
 | Comando | Resultado |
 | --- | --- |
-| `pnpm typecheck` | pendiente |
-| `pnpm lint` | pendiente |
+| `pnpm typecheck` | 0 errores (a fecha de T1) |
+| `pnpm lint` | 0 errores (a fecha de T1) |
 | `pnpm exec vitest run app/sync` | pendiente |
 | E2E nuevo | pendiente |
 
@@ -168,3 +175,6 @@ pnpm exec playwright test e2e/hotspot-transfer.spec.ts
 - **L4 (owner, verbatim):** "Solo Chromium (Android + PC) en v1" (respuesta a la pregunta de matriz de navegadores, §8.2 del plan). → decisión **D1**.
 - 2026-10-14 — Rama `feat/hotspot-device-transfer` creada desde `qa`. Empieza **T1** (`sdp-codec.ts`) con test-first.
 - **Pendiente de decisión del owner (plan §8.1):** ¿el emisor también recibe (sesión bidireccional) o basta una dirección por sesión en v1? No bloquea T1; se preguntará antes de **T6**.
+- 2026-10-14 — **T1 completada** (`sdp-codec.ts`, commit `e0378bb0`): base45 (RFC 9285, KAT verificados) + deflate. Hallazgo durante el test-first: el **espacio es un símbolo válido de base45**, así que el decodificador solo debe eliminar ruido de línea (`\t\r\n`), nunca espacios — el primer intento los eliminaba y corrompía el payload. Corregido con test que lo fija.
+- **Hallazgo para T3 (no afecta T1/T2):** el plan §5-P2 propone un test de integración con dos `RTCPeerConnection` reales "en el mismo proceso… runners basados en Chromium", pero el runner de este repo es **Vitest sobre jsdom**, donde `RTCPeerConnection` NO existe. La estrategia de prueba de T3 debe decidirse (unit con RTC mockeado en Vitest + integración real como E2E de Playwright, o añadir entorno de navegador). Se resolverá al empezar T3.
+- 2026-10-14 — **T2 completada** (`pairing-code.ts`, commit `a97d0de9`): código de 6 dígitos uniforme (rejection sampling, sin sesgo de módulo), salt de sesión, y prueba PBKDF2 (210k) que reusa `sha256Base64`/`pbkdf2Base64` de `offline-crypto.ts`. Decisión de implementación tomada (no del owner): **PBKDF2 en vez de hash simple** porque 10^6 candidatos se fuerzan al instante con un hash rápido; el salt de 16 bytes es público pero ata la prueba a la sesión.
