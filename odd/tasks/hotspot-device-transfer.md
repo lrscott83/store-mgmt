@@ -110,7 +110,7 @@
 - [x] **T4** — `chunker.ts` + `transfer-protocol.ts`: 16 KiB, contrapresión, metadatos, SHA-256, progreso. *(S5)* · ruta: inline · commit `70d34e80`
 - [x] **T5** — Lib de generación de QR (`qrcode.react`, lazy) + `qr-code.tsx`. *(S3)* · ruta: inline · commit `c795ee79`
 - [x] **T6** — `hotspot-share-modal.tsx` (emisor) + `qr-scanner.tsx`: contraseña, QR+código, escaneo de la respuesta, progreso. *(S1, S3, S6, S8)* · ruta: inline · commit `e1d4dd09`
-- [ ] **T7** — `hotspot-receive-modal.tsx` (receptor): escanear/teclear, emparejar, QR de respuesta, progreso, handoff a `import-form`. *(S3, S7)* · ruta: inline
+- [x] **T7** — `hotspot-receive-modal.tsx` (receptor): escanear oferta, QR de respuesta, recibir, handoff a `import-form`. *(S3, S7)* · ruta: inline · commit `c9f229db`
 - [ ] **T8** — Integrar entradas en `roster-export-panel.tsx` y `sync/routes/import.tsx` + i18n (`es.ts`). *(S8)* · ruta: inline
 - [ ] **T9** — Robustez: aviso aislamiento AP/ICE timeout, Wake Lock, límites de tamaño. *(S9)* · ruta: inline
 - [ ] **T10** — E2E **nuevos** (Playwright, 2 contextos en `localhost`, escaneo sustituido por inyección del código). *(S1, S3, S5, S7)* · ruta: inline
@@ -167,6 +167,7 @@ Por tarea:
 - **Sobre de señalización (`handshake.ts`)** — `pnpm exec vitest run app/sync/lib/hotspot` → **49 passed** (42 + 7). `pnpm typecheck` → 0 errores. `pnpm lint` → 0 errores. Commit `bd230de1`. (Pieza añadida por **D7**: el plan listaba la UI para T6/T7 pero no el sobre; sin él los modales no serían testeables.)
 - **Refactor previo a T6** — `peer-connection` pasa a exponer **SDP crudo** (la codificación es exclusiva de `handshake`), evitando codificar dos veces. Commit `35fd7b96`. Tests de `peer-connection` → **10 passed**.
 - **T6** — `pnpm exec vitest run app/sync/components` → **28 passed** (2 qr-code + 3 qr-scanner + 5 hotspot-share-modal + 18 preexistentes). `pnpm typecheck` → 0 errores. `pnpm lint` → 0 errores. Commit `e1d4dd09`.
+- **T7** — `pnpm exec vitest run app/sync/components/__tests__/hotspot-receive-modal.test.tsx` → **4 passed**. `pnpm typecheck` → 0 errores. `pnpm lint` → 0 errores. Commit `c9f229db`.
 
 Cierre de feature (se rellena al final):
 
@@ -196,3 +197,4 @@ Cierre de feature (se rellena al final):
 - 2026-10-14 — **Decisiones del owner**: §8.1 → **una dirección por sesión** (el emisor envía; para el sentido contrario, otra sesión). §3.3 → **código dentro del QR, sin teclear** (**D7**). Consecuencia: se añade `handshake.ts` (sobre de señalización versionado) como paso previo a los modales; commit `bd230de1`.
 - **Hallazgo de alcance:** el plan no contemplaba un módulo de sobre de señalización. Se añadió, porque sin él la lógica de oferta/respuesta/prueba quedaría enterrada en los modales y no sería testeable en jsdom.
 - 2026-10-14 — **T6 completada** (`hotspot-share-modal.tsx` + `qr-scanner.tsx`, commit `e1d4dd09`): flujo contraseña → QR+código → escanear respuesta → progreso → hecho. La lógica de oferta/respuesta/prueba vive en `handshake`/`pairing-code`; el modal solo orquesta. Se añadió `qr-scanner.tsx` (escáner QR dedicado, sin tocar el escáner de ventas). Claves i18n `HOTSPOT.*` añadidas a `es.ts` (el resto de T8 será la integración en las pantallas).
+- 2026-10-14 — **T7 completada** (`hotspot-receive-modal.tsx`, commit `c9f229db`): escanear oferta → ver código+fichero → Aceptar → QR de respuesta → recibir con progreso → **handoff de `File` por `onReceived`**. Si el SHA-256 no coincide, rechaza y no entrega el archivo. La importación existente (contraseña/corrupto/tienda) se hereda en T8.
