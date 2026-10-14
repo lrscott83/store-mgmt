@@ -1099,6 +1099,11 @@ const messages: Record<string, string> = {
   // pasa de "Buscar" a "Buscar producto" (deja claro qué se filtra) y lleva lupa
   // al inicio. Sustituye a GENERAL.SEARCH solo en esta vista.
   'INVENTORY.SEARCH_PRODUCT': 'Buscar producto',
+  // Conteo físico (manual de referencia, captura 20 + §7.4): SOLO VISUAL — la lista de
+  // Inventario Disponible muestra la cantidad del sistema, la contada (editable) y la
+  // diferencia resaltada. No ajusta stock ni persiste.
+  'INVENTORY.COUNT.COUNTED': 'Contada',
+  'INVENTORY.COUNT.DIFFERENCE': 'Diferencia',
   'INVENTORY.TODAY_ENTRIES.TITLE': 'Entradas del día',
   'INVENTORY.TODAY_ENTRIES.NEW_ENTRY': 'Nueva entrada',
   // 2026-09-18 (permiso del usuario): el header ahora es «Entradas (n)» — el
