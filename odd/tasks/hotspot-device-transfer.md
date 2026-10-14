@@ -116,7 +116,7 @@
 - [x] **T8** — Integración: `roster-export-panel`, `sync/routes/export`, `sync/routes/import` + `ImportForm`/`FileInput` con fichero precargado. *(S8)* · ruta: inline · commit `69f783f5`
 - [x] **T9** — Robustez: aviso de aislamiento AP (`SignalingTimeoutError`), Wake Lock, límite de tamaño. *(S9)* · ruta: inline · commit `3a1a5029`
 - [x] **T10** — E2E **nuevo** de motor: 2 contextos reales + WebRTC real, sin backend (`e2e/hotspot-transfer.spec.ts` + `playwright.hotspot.config.ts`). *(S1, S3, S5, S7)* · ruta: inline · commit `73881e0e`
-- [ ] **T11** — Verificación final: `typecheck`, `lint`, `vitest`, y confirmar el chunk lazy en `pnpm build`.
+- [x] **T11** — Verificación final: `typecheck`, `lint`, `vitest` (suite completa), E2E y `build` + chunk lazy del QR. · ruta: inline
 
 Verificación por tarea con **test-first** (RED observado → GREEN → refactor) para los módulos con comportamiento determinista; los componentes UI llevan test de componente. Las líneas de `Evidencia de verificación` se rellenan al cerrar cada tarea.
 
@@ -174,14 +174,16 @@ Por tarea:
 - **T9** — `pnpm exec vitest run app/sync/lib/hotspot app/sync/components` → **12 archivos, 92 passed**. `pnpm typecheck` → 0 errores. `pnpm lint` → 0 errores. Commit `3a1a5029`.
 - **T10** — `pnpm test:e2e:hotspot` (desde `frontend-react/`) → **1 passed** (loopback WebRTC real entre 2 contextos, ~0.7 s). Commit `73881e0e`.
 
-Cierre de feature (se rellena al final):
+Cierre de feature (2026-10-14):
 
 | Comando | Resultado |
 | --- | --- |
-| `pnpm typecheck` | 0 errores (a fecha de T1) |
-| `pnpm lint` | 0 errores (a fecha de T1) |
-| `pnpm exec vitest run app/sync` | pendiente |
-| E2E nuevo | pendiente |
+| `pnpm typecheck` | **0 errores** |
+| `pnpm lint` | **0 errores** (`--max-warnings=0`) |
+| `pnpm test` (suite completa del app) | **383 archivos, 5597 passed**, 6 skipped, **0 fallos** |
+| `pnpm test:e2e:hotspot` | **1 passed** (loopback WebRTC real, 2 contextos) |
+| `pnpm build` | **OK** — incluye `verify-sw-precache: OK` y `verify-csp: OK` |
+| Chunk lazy del QR | Ningún warning de "statically and dynamically imported" para `qrcode.react`; los chunks que definen `QRCodeSVG` **no** están en los `modulepreload` de `index.html` |
 
 ## Log
 
@@ -207,3 +209,6 @@ Cierre de feature (se rellena al final):
 - 2026-10-14 — **T9 completada** (commit `3a1a5029`): `SignalingTimeoutError` en `peer-connection` (los tres timeouts) y `TransferTooLargeError`+`assertTransferSize` en `transfer-protocol`; los modales traducen el error a **aviso de aislamiento AP** o **demasiado grande** en vez del genérico. Nuevo `wake-lock.ts` (Wake Lock durante la transferencia, no-op si no está disponible). **D8**: límite de 64 MB (revisable).
 - **Decisión del owner (T10):** E2E **del motor** con 2 contextos y sin backend (no E2E de UI completa).
 - 2026-10-14 — **T10 completada** (commit `73881e0e`): nuevo `e2e/hotspot-transfer.spec.ts` + `playwright.hotspot.config.ts` (sin `webServer`, sin `globalSetup`, sin backend) + `apps/web-store-pos/scripts/build-hotspot-harness.mjs` (esbuild empaqueta los módulos reales en un IIFE que expone `window.__hotspot`) + script `test:e2e:hotspot`. **Por qué así:** los modales leen el QR con la cámara y Playwright no tiene cámara; el loopback real del motor se prueba mejor sin UI. Se sirve por `http://127.0.0.1` porque `about:blank` no es contexto seguro y `crypto.subtle` no existiría. **No se tocó ningún E2E ni support existente.**
+- 2026-10-14 — **T11 completada — feature cerrada.** `typecheck` 0, `lint` 0, suite completa **383 archivos / 5597 passed / 0 fallos**, `test:e2e:hotspot` **1 passed**, `pnpm build` OK (con `verify-sw-precache` y `verify-csp`), y el QR no entra en el bundle inicial.
+- **Estado RDD:** el switch estaba **on**, pero `assess` del rango `affae51f..HEAD` se mantuvo siempre en **`under_budget`** (`review_due: false`), así que **no se ejecutó ninguna revisión nativa** y el boundary nunca avanzó. El slice completo queda **sin revisar**; la entrega es decisión de política ordinaria del owner.
+- **Pendiente para el owner:** revisar **D8** (límite de 64 MB) y decidir si mantiene el arreglo, lo cambia o lo quita.
