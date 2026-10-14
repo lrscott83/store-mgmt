@@ -74,5 +74,13 @@ L4 (implementación, 2026-10-14): T1–T4 hechos inline.
   `--filter "FullyQualifiedName~SMCA.WebApi.E2ETests.Stores"` → 206/206 (sin regresión).
 - Frontend: sin cambio; el modal usa las filas de la lectura y `totalModulePricing` (espejo).
   El spec Playwright `store-module-pricing.spec.ts` deriva su expectativa del MISMO endpoint
-  (`readStoreModulePricing`), así que se mueve con el cambio; no se ejecutó Playwright aquí
-  (requiere app+backend en vivo).
+  (`readStoreModulePricing`), así que se mueve con el cambio.
+
+L5 (verificación Playwright, 2026-10-14): corrida real con backend `http-e2e` (base `smca_test`),
+cache de Vite borrado, `--workers=2`, desde `frontend-react/`.
+
+- `e2e/store-module-pricing.spec.ts` (vista de módulos por tienda) → **8/8 passed** (SMP1–SMP8).
+- `e2e/module-catalog-pricing.spec.ts` (catálogo global, hermano) → **5/5 passed** (MCP1–MCP5).
+- Nota: la 1ª corrida del spec por tienda falló en el `beforeAll` (`beforeAll hook timeout of
+  30000ms exceeded`) al mintear las personas sobre un dev server Vite **frío**; el reintento con
+  el server caliente pasó 8/8. Es un fallo de arranque de entorno, no de la app ni del cambio.
