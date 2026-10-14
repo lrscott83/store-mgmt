@@ -79,7 +79,7 @@ describe('StorageKeys.entityKey — per-entity, per-store scoping', () => {
 });
 
 describe('BUSINESS_ENTITY_NAMES — the encrypt/wipe/report registry', () => {
-  it('is exactly these sixteen entities, in this order', () => {
+  it('is exactly these seventeen entities, in this order', () => {
     // elaboration-module added recipes + elaborations;
     // store-payment-methods-config (2026-09-22) added storePaymentMethods on
     // 2026-09-23 — its absence let one damaged entry keep a store locked out,
@@ -88,6 +88,8 @@ describe('BUSINESS_ENTITY_NAMES — the encrypt/wipe/report registry', () => {
     // must be wiped with the rest so a store reset leaves no pending sends.
 // store-currency-config added storeCurrencyConfig — the per-store buy/sell
     // currency config, which must be encrypted, wiped and reported like the rest.
+    // cierre-efectivo (2026-10-14) added cashClosings — the daily cash-closing
+    // records and their per-store denomination catalog.
     expect([...BUSINESS_ENTITY_NAMES]).toEqual([
       'products',
       'product-categories',
@@ -105,6 +107,7 @@ describe('BUSINESS_ENTITY_NAMES — the encrypt/wipe/report registry', () => {
       'storePaymentMethods',
       'messagesQueue',
       'storeCurrencyConfig',
+      'cashClosings',
     ]);
   });
 
