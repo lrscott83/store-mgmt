@@ -111,7 +111,7 @@
 - [x] **T5** — Lib de generación de QR (`qrcode.react`, lazy) + `qr-code.tsx`. *(S3)* · ruta: inline · commit `c795ee79`
 - [x] **T6** — `hotspot-share-modal.tsx` (emisor) + `qr-scanner.tsx`: contraseña, QR+código, escaneo de la respuesta, progreso. *(S1, S3, S6, S8)* · ruta: inline · commit `e1d4dd09`
 - [x] **T7** — `hotspot-receive-modal.tsx` (receptor): escanear oferta, QR de respuesta, recibir, handoff a `import-form`. *(S3, S7)* · ruta: inline · commit `c9f229db`
-- [ ] **T8** — Integrar entradas en `roster-export-panel.tsx` y `sync/routes/import.tsx` + i18n (`es.ts`). *(S8)* · ruta: inline
+- [x] **T8** — Integración: `roster-export-panel`, `sync/routes/export`, `sync/routes/import` + `ImportForm`/`FileInput` con fichero precargado. *(S8)* · ruta: inline · commit `69f783f5`
 - [ ] **T9** — Robustez: aviso aislamiento AP/ICE timeout, Wake Lock, límites de tamaño. *(S9)* · ruta: inline
 - [ ] **T10** — E2E **nuevos** (Playwright, 2 contextos en `localhost`, escaneo sustituido por inyección del código). *(S1, S3, S5, S7)* · ruta: inline
 - [ ] **T11** — Verificación final: `typecheck`, `lint`, `vitest`, y confirmar el chunk lazy en `pnpm build`.
@@ -168,6 +168,7 @@ Por tarea:
 - **Refactor previo a T6** — `peer-connection` pasa a exponer **SDP crudo** (la codificación es exclusiva de `handshake`), evitando codificar dos veces. Commit `35fd7b96`. Tests de `peer-connection` → **10 passed**.
 - **T6** — `pnpm exec vitest run app/sync/components` → **28 passed** (2 qr-code + 3 qr-scanner + 5 hotspot-share-modal + 18 preexistentes). `pnpm typecheck` → 0 errores. `pnpm lint` → 0 errores. Commit `e1d4dd09`.
 - **T7** — `pnpm exec vitest run app/sync/components/__tests__/hotspot-receive-modal.test.tsx` → **4 passed**. `pnpm typecheck` → 0 errores. `pnpm lint` → 0 errores. Commit `c9f229db`.
+- **T8** — `pnpm test` (suite completa del app) → **382 archivos, 5588 passed**, 6 skipped, 0 fallos. `pnpm typecheck` → 0 errores. `pnpm lint` → 0 errores. Commit `69f783f5`. Nuevo test de integración `hotspot-wiring.test.tsx` (3 casos): recibir→precarga el `File`, y los dos botones de compartir.
 
 Cierre de feature (se rellena al final):
 
@@ -198,3 +199,4 @@ Cierre de feature (se rellena al final):
 - **Hallazgo de alcance:** el plan no contemplaba un módulo de sobre de señalización. Se añadió, porque sin él la lógica de oferta/respuesta/prueba quedaría enterrada en los modales y no sería testeable en jsdom.
 - 2026-10-14 — **T6 completada** (`hotspot-share-modal.tsx` + `qr-scanner.tsx`, commit `e1d4dd09`): flujo contraseña → QR+código → escanear respuesta → progreso → hecho. La lógica de oferta/respuesta/prueba vive en `handshake`/`pairing-code`; el modal solo orquesta. Se añadió `qr-scanner.tsx` (escáner QR dedicado, sin tocar el escáner de ventas). Claves i18n `HOTSPOT.*` añadidas a `es.ts` (el resto de T8 será la integración en las pantallas).
 - 2026-10-14 — **T7 completada** (`hotspot-receive-modal.tsx`, commit `c9f229db`): escanear oferta → ver código+fichero → Aceptar → QR de respuesta → recibir con progreso → **handoff de `File` por `onReceived`**. Si el SHA-256 no coincide, rechaza y no entrega el archivo. La importación existente (contraseña/corrupto/tienda) se hereda en T8.
+- 2026-10-14 — **T8 completada** (commit `69f783f5`): "Compartir por hotspot" en `roster-export-panel` y `sync/export` (reutilizando el mismo payload que la descarga; en export se extrajo `buildExportPayload`/`buildExportFileName`); "Recibir por hotspot" en `sync/import`. `ImportForm` acepta `initialFile` y `FileInput` `initialFileName`, así el archivo recibido queda **precargado** y el usuario solo teclea la contraseña del bundle. Se remonta el formulario con `key` cuando llega un archivo nuevo. **No se tocó ningún E2E ni el backend.**
