@@ -18,5 +18,12 @@ namespace Domain.Interfaces.Repositories
         /// entidades: el gating solo necesita la pregunta "¿este módulo está activo?".
         /// </summary>
         Task<IReadOnlyCollection<int>> GetPublicActiveModuleIdsByStoreIdAsync(Guid storeId);
+
+        /// <summary>
+        /// Todas las filas ACTIVAS, de TODAS las tiendas (sin filtro de tenant), para los módulos
+        /// indicados. La usa la cascada del catálogo global: al apagar un módulo, sus
+        /// <c>StoreModule</c> activos se apagan también (decisión del owner 2026-10-14).
+        /// </summary>
+        Task<IEnumerable<StoreModule>> GetAllActiveByModuleIdsAsync(IEnumerable<int> moduleIds, CancellationToken cancellationToken = default);
     }
 }

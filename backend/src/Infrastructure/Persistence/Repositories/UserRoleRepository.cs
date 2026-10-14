@@ -46,6 +46,7 @@ namespace Infrastructure.Persistence.Repositories
                                                                      ur.IsActive &&
                                                                      ur.Role.IsActive)
                 .SelectMany(ur => ur.Role.StoreRoleFeatures.Where(x => x.IsActive && x.Feature.IsActive && x.Role.IsActive
+                    && x.Feature.Module.IsActive
                     && x.Store.IsActive && x.Store.Owner.IsActive && x.StoreId == storeId)
                 .Select(ra => ra.FeatureId))
                 .Distinct()

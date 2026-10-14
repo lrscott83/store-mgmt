@@ -17,7 +17,8 @@ namespace Infrastructure.Persistence.Repositories
 
         public async Task<List<int>> FilterAvailableToStoreByIds(List<int> featureIds)
         {
-            return await _features.Where(f => featureIds.Contains(f.Id) && f.IsActive && f.AvailableToStore)
+            return await _features.Where(f => featureIds.Contains(f.Id) && f.IsActive && f.AvailableToStore
+                    && f.Module.IsActive)
                 .Select(f => f.Id)
                 .ToListAsync();
         }

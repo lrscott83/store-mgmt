@@ -3,6 +3,7 @@ using Application.Exceptions;
 using Application.Features.Administration.Modules.Commands.UpdateModuleCatalogPricing;
 using Application.UnitOfWorks;
 using Domain.Entities.Modules;
+using Domain.Entities.StoreModules;
 using Domain.Interfaces.Repositories;
 using FluentAssertions;
 using Microsoft.Extensions.Localization;
@@ -16,6 +17,7 @@ public class UpdateModuleCatalogPricingCommandHandlerTests
 {
     private readonly Mock<IApplicationUnitOfWork> _applicationUnitOfWork;
     private readonly Mock<IModuleRepository> _moduleRepository;
+    private readonly Mock<IStoreModuleRepository> _storeModuleRepository;
     private readonly Mock<IHttpContextService> _httpContextService;
     private readonly Mock<IStringLocalizer<I18n>> _localizer;
     private readonly UpdateModuleCatalogPricingCommandHandler _handler;
@@ -24,6 +26,12 @@ public class UpdateModuleCatalogPricingCommandHandlerTests
     {
         _applicationUnitOfWork = new Mock<IApplicationUnitOfWork>();
         _moduleRepository = new Mock<IModuleRepository>();
+        _storeModuleRepository = new Mock<IStoreModuleRepository>();
+        // The global-deactivation cascade reads the store rows it must switch off; default
+        // to "none" so a module going inactive is a no-op for these handler-scoped tests.
+        _storeModuleRepository
+            .Setup(x => x.GetAllActiveByModuleIdsAsync(It.IsAny<IEnumerable<int>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IEnumerable<StoreModule>)Array.Empty<StoreModule>());
         _httpContextService = new Mock<IHttpContextService>();
         _localizer = new Mock<IStringLocalizer<I18n>>();
         _localizer.Setup(x => x["Forbidden"]).Returns(new LocalizedString("Forbidden", "Forbidden"));
@@ -31,6 +39,7 @@ public class UpdateModuleCatalogPricingCommandHandlerTests
         _handler = new UpdateModuleCatalogPricingCommandHandler(
             _applicationUnitOfWork.Object,
             _moduleRepository.Object,
+            _storeModuleRepository.Object,
             _httpContextService.Object,
             _localizer.Object);
     }

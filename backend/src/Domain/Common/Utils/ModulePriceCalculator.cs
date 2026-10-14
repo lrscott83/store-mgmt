@@ -14,6 +14,9 @@ namespace Domain.Common.Utils
     ///   <list type="bullet">
     ///     <item>An INACTIVE module contributes nothing.</item>
     ///     <item>An INCLUDED (already paid / bundled) module contributes nothing.</item>
+    ///     <item>For a STORE SNAPSHOT, a row whose Module is globally inactive
+    ///     (<c>Module.IsActive == false</c>) contributes nothing either: a module switched off in
+    ///     the catalog is gone for every store (owner decision 2026-10-14).</item>
     ///     <item>Everything else contributes its EFFECTIVE price, i.e. exactly
     ///     <see cref="CurrentPriceServiceUtils.GetCurrentPrice"/> — that formula is never
     ///     re-implemented here.</item>
@@ -53,7 +56,8 @@ namespace Domain.Common.Utils
                 return 0f;
 
             return storeModules
-                .Where(static sm => IsBillable(sm.IsActive, sm.ModulePriceIncluded))
+                .Where(static sm => IsBillable(sm.IsActive, sm.ModulePriceIncluded)
+                    && (sm.Module is null || sm.Module.IsActive))
                 .Sum(static sm => CurrentPriceServiceUtils.GetCurrentPrice(
                     sm.Price, sm.ModulePercentDiscountPrice, sm.ModuleDiscountPrice));
         }
@@ -87,7 +91,8 @@ namespace Domain.Common.Utils
                 return 0f;
 
             return storeModules
-                .Where(static sm => IsBillable(sm.IsActive, sm.ModulePriceIncluded))
+                .Where(static sm => IsBillable(sm.IsActive, sm.ModulePriceIncluded)
+                    && (sm.Module is null || sm.Module.IsActive))
                 .Sum(static sm => sm.Price);
         }
 

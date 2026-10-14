@@ -123,8 +123,13 @@ namespace Application.Features.StoreManagement.Stores.Queries.GetStoreModulePric
             // per-store view 10 vs card 12.5). The store's OWN configuration is the source of
             // truth for its price, so every row it holds must be shown and priceable —
             // otherwise an active row nobody can see is charged and can never be turned off.
+            //
+            // A module switched off in the catalog (Module.IsActive == false) is the ONE
+            // exception: it is gone for every store (owner decision 2026-10-14), so its row is
+            // neither listed nor priced here.
             var catalogIds = catalog.Select(module => module.Id).ToHashSet();
-            foreach (var storeModule in existing.Where(sm => !catalogIds.Contains(sm.ModuleId)))
+            foreach (var storeModule in existing.Where(sm =>
+                !catalogIds.Contains(sm.ModuleId) && sm.Module is not null && sm.Module.IsActive))
             {
                 rows.Add(new StoreModulePricingReadDto
                 {
