@@ -47,6 +47,7 @@
 | D4 | Prueba de emparejamiento: **PBKDF2 (210k) sobre `sha256(code)` + salt de sesión público** en vez de un hash simple. | Implementación (documentada, no del owner) |
 | D5 | Generación de QR con **`qrcode.react@4.2.0`** (0 deps de runtime, trae tipos, declara React 19), cargada con **import dinámico** dentro de `qr-code.tsx`. | Implementación (autorizada por el owner) |
 | D6 | SHA-256 **al final** (payload completo / buffer reensamblado), no incremental: `crypto.subtle` no tiene digest en streaming y un SHA-256 incremental exigiría una dependencia nueva. Aceptable para exports de pocos MB. | Implementación (documentada) |
+| D7 | Emparejamiento: **el código de 6 dígitos viaja dentro del QR**; el receptor **NO teclea nada**. El código se muestra en ambas pantallas para confirmación visual y la prueba del sobre detecta un emparejamiento cruzado (integridad, no secreto). | Owner, 2026-10-14 (plan §3.3 era ambiguo) |
 
 ---
 
@@ -82,6 +83,7 @@
 | `peer-connection.ts` | Oferta/respuesta non-trickle, espera ICE `complete`, mDNS | Integración: 2 `RTCPeerConnection` en loopback |
 | `chunker.ts` | Fragmentos 16 KiB + contrapresión | Unit con `RTCDataChannel` mockeado |
 | `transfer-protocol.ts` | Frame de metadatos, progreso, SHA-256 streaming | Unit + integración loopback |
+| `handshake.ts` | Sobre de señalización en el QR: oferta (SDP + código + salt + fichero) y respuesta (SDP + prueba), versionado | Unit: round-trip, versión/tipo inválidos |
 
 ### Puntos de anclaje (ya verificados en código)
 
@@ -162,6 +164,7 @@ Por tarea:
 - **T3** — `pnpm exec vitest run app/sync/lib/hotspot` → **33 passed** (25 + 8 T3). `pnpm typecheck` → 0 errores. `pnpm lint` → 0 errores. Commit `40497bb2`. El loopback real queda para el E2E de T10 (decisión D3).
 - **T4** — `pnpm exec vitest run app/sync/lib/hotspot` → **42 passed** (33 + 9 T4). `pnpm typecheck` → 0 errores. `pnpm lint` → 0 errores. Commit `70d34e80`.
 - **T5** — `pnpm exec vitest run app/sync/components/__tests__/qr-code.test.tsx` → **2 passed**. `pnpm typecheck` → 0 errores. `pnpm lint` → 0 errores. Commit `c795ee79`.
+- **Sobre de señalización (`handshake.ts`)** — `pnpm exec vitest run app/sync/lib/hotspot` → **49 passed** (42 + 7). `pnpm typecheck` → 0 errores. `pnpm lint` → 0 errores. Commit `bd230de1`. (Pieza añadida por **D7**: el plan listaba la UI para T6/T7 pero no el sobre; sin él los modales no serían testeables.)
 
 Cierre de feature (se rellena al final):
 
@@ -187,4 +190,6 @@ Cierre de feature (se rellena al final):
 - 2026-10-14 — **T2 completada** (`pairing-code.ts`, commit `a97d0de9`): código de 6 dígitos uniforme (rejection sampling, sin sesgo de módulo), salt de sesión, y prueba PBKDF2 (210k) que reusa `sha256Base64`/`pbkdf2Base64` de `offline-crypto.ts`. Decisión de implementación tomada (no del owner): **PBKDF2 en vez de hash simple** porque 10^6 candidatos se fuerzan al instante con un hash rápido; el salt de 16 bytes es público pero ata la prueba a la sesión.
 - 2026-10-14 — **T4 completada** (`chunker.ts` + `transfer-protocol.ts`, commit `70d34e80`): frame de metadatos JSON + chunks de 16 KiB con contrapresión (`bufferedamountlow`), progreso y verificación SHA-256. **D6**: digest al final, no incremental. Trampa de test detectada por el propio test: las opciones se pasaban dentro del objeto `source` en vez de como tercer argumento.
 - 2026-10-14 — **T5 completada** (`qr-code.tsx` + test, commit `c795ee79`): dependencia **`qrcode.react@4.2.0`** añadida (0 deps de runtime, tipos propios, React 19 en peerDeps) y cargada con import dinámico para no entrar en el bundle inicial.
-- **Pendiente decisión del owner (plan §8.1):** sigue abierta. Toca antes de **T6**.
+- **Decisión del owner (plan §8.1):** resuelta el 2026-10-14 → **una dirección por sesión**.
+- 2026-10-14 — **Decisiones del owner**: §8.1 → **una dirección por sesión** (el emisor envía; para el sentido contrario, otra sesión). §3.3 → **código dentro del QR, sin teclear** (**D7**). Consecuencia: se añade `handshake.ts` (sobre de señalización versionado) como paso previo a los modales; commit `bd230de1`.
+- **Hallazgo de alcance:** el plan no contemplaba un módulo de sobre de señalización. Se añadió, porque sin él la lógica de oferta/respuesta/prueba quedaría enterrada en los modales y no sería testeable en jsdom.
