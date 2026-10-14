@@ -22,11 +22,16 @@ export interface ImportFormProps {
    * any write).
    */
   onImport: (file: File, password: string) => Promise<SyncResult>;
+  /**
+   * Payload received over the hotspot, shown pre-selected so the user only has
+   * to type the bundle's password and press Importar.
+   */
+  initialFile?: File | null;
 }
 
-export function ImportForm({ onImport }: ImportFormProps) {
+export function ImportForm({ onImport, initialFile = null }: ImportFormProps) {
   const intl = useIntl();
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(initialFile);
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -95,6 +100,7 @@ export function ImportForm({ onImport }: ImportFormProps) {
               accept=".zip"
               onFileChange={handleFileChange}
               disabled={busy}
+              initialFileName={initialFile?.name}
             />
           </div>
         </div>

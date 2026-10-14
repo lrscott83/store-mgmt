@@ -9,6 +9,8 @@ interface FileInputProps {
   disabled?: boolean;
   /** Forwarded to the native input so an external `<label htmlFor>` can associate with it. */
   id?: string;
+  /** Pre-selected file name shown on first render (e.g. a hotspot-received payload). */
+  initialFileName?: string;
   'data-testid'?: string;
 }
 
@@ -24,11 +26,12 @@ export function FileInput({
   accept,
   disabled = false,
   id,
+  initialFileName,
   'data-testid': dataTestId,
 }: FileInputProps) {
   const intl = useIntl();
   const inputRef = useRef<HTMLInputElement>(null);
-  const [fileName, setFileName] = useState<string | null>(null);
+  const [fileName, setFileName] = useState<string | null>(initialFileName ?? null);
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0] ?? null;
