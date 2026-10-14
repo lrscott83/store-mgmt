@@ -1,21 +1,20 @@
-# Imágenes del Manual Soluciones 360 v3.5 — qué debe mostrar cada captura y su equivalente en el POS
+# Imágenes del manual de referencia v3.5 — qué debe mostrar cada captura y su equivalente en el POS
 
 **Fecha:** 2026-10-13
-**Origen:** extracción PDF → Markdown del manual con la herramienta `normas-extrartor`
+**Origen:** extracción PDF → Markdown del manual de referencia con la herramienta `normas-extrartor`
 (`pdf_a_texto.py`, markitdown) de `D:\Projects\Tester\gaceta-cuba\gaceta-cuba-tools`.
-- PDF fuente: `D:\Projects\AutoBusinessPro\Store\Facebook\Manual_Soluciones360_v3.5.pdf`
-- Markdown generado: `D:\Projects\AutoBusinessPro\Store\Facebook\Manual_Soluciones360_v3.5.md`
-  (34 038 caracteres / 557 líneas)
+El PDF y el Markdown de origen (34 038 caracteres / 557 líneas) viven fuera de este repositorio.
 
 **Importante:** el Markdown **no contiene las imágenes** (markitdown extrae solo texto). El manual trae
 un **Índice de imágenes** con **26 capturas esperadas** y *qué debe mostrar cada una*. Este documento
 copia esa especificación y la cruza con las vistas de nuestro POS React
 (`frontend-react/apps/web-store-pos`, menú en `app/shared/lib/config/menu-config.ts`).
 
-> **Soluciones 360 vs. nuestro POS:** mismo dominio (inventario · almacenes · punto de venta), pero **no
-> es la misma aplicación**. 360 tiene licencia local, ciclo de caja con arqueo por denominaciones,
-> auditorías de conteo físico y pantalla de Nube; nuestro POS tiene catálogo web, pedidos
-> WhatsApp/online, ventas mayoristas y multi-moneda. Por eso varias capturas no tienen equivalente.
+> **La aplicación de referencia vs. nuestro POS:** mismo dominio (inventario · almacenes · punto de
+> venta), pero **no es la misma aplicación**. La de referencia tiene licencia local, ciclo de caja con
+> arqueo por denominaciones, auditorías de conteo físico y pantalla de Nube; nuestro POS tiene catálogo
+> web, pedidos WhatsApp/online, ventas mayoristas y multi-moneda. Por eso varias capturas no tienen
+> equivalente.
 
 ## Las 26 capturas
 
@@ -68,5 +67,5 @@ copia esa especificación y la cruza con las vistas de nuestro POS React
 - Las capturas marcadas ⚠️ requieren revisar la vista real en la app para confirmar si el detalle del
   manual coincide (p. ej. si el descuento exige motivo, si existe la casilla "pago en línea", si se
   aprueban compras).
-- Las 6 sin equivalente son features que 360 tiene y nuestro POS no: licencia local, ciclo de caja
-  (apertura/cierre/denominaciones), auditoría de conteo físico y pantalla de Nube.
+- Las 6 sin equivalente son features que la aplicación de referencia tiene y nuestro POS no: licencia
+  local, ciclo de caja (apertura/cierre/denominaciones), auditoría de conteo físico y pantalla de Nube.
