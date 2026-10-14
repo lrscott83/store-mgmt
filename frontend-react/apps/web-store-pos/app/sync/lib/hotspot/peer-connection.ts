@@ -1,12 +1,14 @@
 // WebRTC engine for the hotspot device-to-device transfer
 // (plan docs/deploy/2026-09-09-device-to-device-file-transfer-plan.md §3.1–3.2).
 //
-// Non-trickle signaling: the offer/answer is only encoded once ICE gathering
-// has finished, so the complete SDP (host/mDNS candidates only) fits in one QR
-// code. No STUN/TURN is configured — both devices are on the hotspot LAN, so
-// there is nothing to discover beyond local candidates.
-import { decodeSdp, encodeSdp } from './sdp-codec';
-
+// Non-trickle signaling: the offer/answer is only exposed once ICE gathering
+// has finished, so the complete SDP (host/mDNS candidates only) is ready to be
+// packed into one QR code by `handshake.ts`. No STUN/TURN is configured — both
+// devices are on the hotspot LAN, so there is nothing to discover beyond local
+// candidates.
+//
+// This module deals in RAW SDP strings; encoding for the QR is `handshake.ts`'s
+// job, so the payload is compressed exactly once.
 export const DATA_CHANNEL_LABEL = 'hotspot-transfer';
 export const SIGNALING_TIMEOUT_MS = 10_000;
 
@@ -20,50 +22,50 @@ export interface PeerTiming {
 export interface StartedOffer {
   readonly connection: RTCPeerConnection;
   readonly channel: RTCDataChannel;
-  readonly encodedOffer: string;
+  readonly sdp: string;
 }
 
 export interface AcceptedOffer {
   readonly connection: RTCPeerConnection;
   readonly channel: Promise<RTCDataChannel>;
-  readonly encodedAnswer: string;
+  readonly sdp: string;
 }
 
 export function createPeerConnection(): RTCPeerConnection {
   return new RTCPeerConnection(RTC_CONFIG);
 }
 
-/** Emitter side: open the channel, build the offer, and encode it for the QR. */
+/** Emitter side: open the channel, build the offer, and expose its raw SDP. */
 export async function createOffer(timing: PeerTiming = {}): Promise<StartedOffer> {
   const connection = createPeerConnection();
   const channel = connection.createDataChannel(DATA_CHANNEL_LABEL, { ordered: true });
   const offer = await connection.createOffer();
   await connection.setLocalDescription(offer);
   await waitForIceGatheringComplete(connection, timing.iceGatheringTimeoutMs);
-  return { connection, channel, encodedOffer: await encodeSdp(localSdp(connection)) };
+  return { connection, channel, sdp: localSdp(connection) };
 }
 
-/** Receiver side: apply the scanned offer, answer it, and encode the answer. */
+/** Receiver side: apply the offer SDP and expose the raw answer SDP. */
 export async function acceptOffer(
-  encodedOffer: string,
+  offerSdp: string,
   timing: PeerTiming = {},
 ): Promise<AcceptedOffer> {
   const connection = createPeerConnection();
   // Register the listener BEFORE applying the offer so the event is never missed.
   const channel = waitForDataChannel(connection, timing.dataChannelTimeoutMs);
-  await connection.setRemoteDescription({ type: 'offer', sdp: await decodeSdp(encodedOffer) });
+  await connection.setRemoteDescription({ type: 'offer', sdp: offerSdp });
   const answer = await connection.createAnswer();
   await connection.setLocalDescription(answer);
   await waitForIceGatheringComplete(connection, timing.iceGatheringTimeoutMs);
-  return { connection, channel, encodedAnswer: await encodeSdp(localSdp(connection)) };
+  return { connection, channel, sdp: localSdp(connection) };
 }
 
-/** Emitter side: apply the scanned answer, which opens the data channel. */
+/** Emitter side: apply the answer SDP, which opens the data channel. */
 export async function completeConnection(
   connection: RTCPeerConnection,
-  encodedAnswer: string,
+  answerSdp: string,
 ): Promise<void> {
-  await connection.setRemoteDescription({ type: 'answer', sdp: await decodeSdp(encodedAnswer) });
+  await connection.setRemoteDescription({ type: 'answer', sdp: answerSdp });
 }
 
 export function waitForIceGatheringComplete(
@@ -106,6 +108,25 @@ export function waitForDataChannel(
       timeoutMs,
     );
     connection.addEventListener('datachannel', onDataChannel);
+  });
+}
+
+/** Resolves once the data channel is open (or rejects on timeout/close). */
+export function waitForChannelOpen(
+  channel: RTCDataChannel,
+  timeoutMs = SIGNALING_TIMEOUT_MS,
+): Promise<void> {
+  if (channel.readyState === 'open') return Promise.resolve();
+  return new Promise<void>((resolve, reject) => {
+    const finish = (error?: Error) => {
+      clearTimeout(timer);
+      channel.removeEventListener('open', onOpen);
+      if (error) reject(error);
+      else resolve();
+    };
+    const onOpen = () => finish();
+    const timer = setTimeout(() => finish(new Error('The data channel never opened')), timeoutMs);
+    channel.addEventListener('open', onOpen);
   });
 }
 
