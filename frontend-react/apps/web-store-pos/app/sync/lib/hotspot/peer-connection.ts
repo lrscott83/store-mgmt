@@ -14,6 +14,19 @@ export const SIGNALING_TIMEOUT_MS = 10_000;
 
 const RTC_CONFIG: RTCConfiguration = { iceServers: [] };
 
+/**
+ * Raised when the handshake times out — gathering ICE, receiving the data
+ * channel, or the channel opening. In practice this is the signature of the
+ * hotspot's AP/client isolation blocking device-to-device traffic (plan §4), so
+ * the UI maps it to that specific guidance rather than a generic failure.
+ */
+export class SignalingTimeoutError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'SignalingTimeoutError';
+  }
+}
+
 export interface PeerTiming {
   readonly iceGatheringTimeoutMs?: number;
   readonly dataChannelTimeoutMs?: number;
@@ -84,7 +97,7 @@ export function waitForIceGatheringComplete(
       if (connection.iceGatheringState === 'complete') finish();
     };
     const timer = setTimeout(
-      () => finish(new Error('ICE gathering did not complete in time')),
+      () => finish(new SignalingTimeoutError('ICE gathering did not complete in time')),
       timeoutMs,
     );
     connection.addEventListener('icegatheringstatechange', onChange);
@@ -104,7 +117,7 @@ export function waitForDataChannel(
     };
     const onDataChannel = (event: RTCDataChannelEvent) => finish(null, event.channel);
     const timer = setTimeout(
-      () => finish(new Error('The remote peer never opened the data channel')),
+      () => finish(new SignalingTimeoutError('The remote peer never opened the data channel')),
       timeoutMs,
     );
     connection.addEventListener('datachannel', onDataChannel);
@@ -125,7 +138,10 @@ export function waitForChannelOpen(
       else resolve();
     };
     const onOpen = () => finish();
-    const timer = setTimeout(() => finish(new Error('The data channel never opened')), timeoutMs);
+    const timer = setTimeout(
+      () => finish(new SignalingTimeoutError('The data channel never opened')),
+      timeoutMs,
+    );
     channel.addEventListener('open', onOpen);
   });
 }

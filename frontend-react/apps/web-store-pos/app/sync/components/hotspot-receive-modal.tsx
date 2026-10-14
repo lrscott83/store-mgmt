@@ -6,7 +6,7 @@ import { InfoBox } from '~/shared/components/ui/info-box';
 import { CloseIcon } from '~/shared/components/ui/icons';
 import { QrCode } from '~/sync/components/qr-code';
 import { QrScanner } from '~/sync/components/qr-scanner';
-import { acceptOffer } from '~/sync/lib/hotspot/peer-connection';
+import { SignalingTimeoutError, acceptOffer } from '~/sync/lib/hotspot/peer-connection';
 import { pairingProof } from '~/sync/lib/hotspot/pairing-code';
 import {
   HANDSHAKE_VERSION,
@@ -14,7 +14,11 @@ import {
   encodeAnswerPayload,
   type OfferPayload,
 } from '~/sync/lib/hotspot/handshake';
-import { receiveTransfer } from '~/sync/lib/hotspot/transfer-protocol';
+import {
+  TransferTooLargeError,
+  receiveTransfer,
+} from '~/sync/lib/hotspot/transfer-protocol';
+import { acquireWakeLock, type WakeLockHandle } from '~/sync/lib/hotspot/wake-lock';
 
 export interface HotspotReceiveModalProps {
   /** Called with the received payload so the caller can open the import flow. */
@@ -23,6 +27,13 @@ export interface HotspotReceiveModalProps {
 }
 
 type Step = 'idle' | 'answering' | 'receiving';
+
+/** Maps a handshake/transfer failure to its user-facing message key. */
+function messageKeyFor(error: unknown): string {
+  if (error instanceof SignalingTimeoutError) return 'HOTSPOT.ERROR_UNREACHABLE';
+  if (error instanceof TransferTooLargeError) return 'HOTSPOT.ERROR_TOO_LARGE';
+  return 'HOTSPOT.ERROR';
+}
 
 /**
  * Receiver side of the hotspot transfer (plan §3.1/§3.6, one direction per
@@ -41,10 +52,17 @@ export function HotspotReceiveModal({ onReceived, onClose }: HotspotReceiveModal
   const [progress, setProgress] = useState(0);
   const [scanning, setScanning] = useState(true);
   const connectionRef = useRef<RTCPeerConnection | null>(null);
+  const wakeLockRef = useRef<WakeLockHandle | null>(null);
+
+  async function releaseWakeLock() {
+    await wakeLockRef.current?.release();
+    wakeLockRef.current = null;
+  }
 
   function handleClose() {
     connectionRef.current?.close();
     connectionRef.current = null;
+    void releaseWakeLock();
     onClose();
   }
 
@@ -80,6 +98,8 @@ export function HotspotReceiveModal({ onReceived, onClose }: HotspotReceiveModal
       const channel = await accepted.channel;
       setStep('receiving');
       setProgress(0);
+      // Keep the screen awake: a sleeping tab can be frozen mid-transfer.
+      wakeLockRef.current = await acquireWakeLock();
       const result = await receiveTransfer(channel, {
         onProgress: ({ transferred, total }) =>
           setProgress(total === 0 ? 1 : transferred / total),
@@ -88,10 +108,11 @@ export function HotspotReceiveModal({ onReceived, onClose }: HotspotReceiveModal
       onReceived(
         new File([result.bytes], result.metadata.name, { type: 'application/octet-stream' }),
       );
-    } catch {
+    } catch (err) {
       setStep('idle');
-      setError(intl.formatMessage({ id: 'HOTSPOT.ERROR' }));
+      setError(intl.formatMessage({ id: messageKeyFor(err) }));
     } finally {
+      await releaseWakeLock();
       setBusy(false);
     }
   }

@@ -10,9 +10,14 @@ const mocks = vi.hoisted(() => ({
   decodeOfferPayload: vi.fn(),
   encodeAnswerPayload: vi.fn(async () => 'ENCODED-ANSWER'),
   receiveTransfer: vi.fn(),
+  SignalingTimeoutError: class SignalingTimeoutError extends Error {},
+  TransferTooLargeError: class TransferTooLargeError extends Error {},
 }));
 
-vi.mock('~/sync/lib/hotspot/peer-connection', () => ({ acceptOffer: mocks.acceptOffer }));
+vi.mock('~/sync/lib/hotspot/peer-connection', () => ({
+  acceptOffer: mocks.acceptOffer,
+  SignalingTimeoutError: mocks.SignalingTimeoutError,
+}));
 vi.mock('~/sync/lib/hotspot/pairing-code', () => ({ pairingProof: mocks.pairingProof }));
 vi.mock('~/sync/lib/hotspot/handshake', () => ({
   HANDSHAKE_VERSION: 1,
@@ -21,6 +26,7 @@ vi.mock('~/sync/lib/hotspot/handshake', () => ({
 }));
 vi.mock('~/sync/lib/hotspot/transfer-protocol', () => ({
   receiveTransfer: mocks.receiveTransfer,
+  TransferTooLargeError: mocks.TransferTooLargeError,
 }));
 vi.mock('~/sync/components/qr-code', () => ({
   QrCode: ({ value }: { value: string }) => <div data-testid="qr-code">{value}</div>,
@@ -121,5 +127,25 @@ describe('HotspotReceiveModal', () => {
     const { onClose } = renderModal();
     fireEvent.click(screen.getByTestId('hotspot-receive-close'));
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the hotspot-unreachable guidance when the peer never answers', async () => {
+    mocks.acceptOffer.mockRejectedValue(new mocks.SignalingTimeoutError());
+    renderModal();
+    await scanOffer();
+
+    fireEvent.click(screen.getByTestId('hotspot-accept'));
+
+    expect(await screen.findByText(esMessages['HOTSPOT.ERROR_UNREACHABLE'])).toBeInTheDocument();
+  });
+
+  it('reports an oversized payload', async () => {
+    mocks.receiveTransfer.mockRejectedValue(new mocks.TransferTooLargeError());
+    renderModal();
+    await scanOffer();
+
+    fireEvent.click(screen.getByTestId('hotspot-accept'));
+
+    expect(await screen.findByText(esMessages['HOTSPOT.ERROR_TOO_LARGE'])).toBeInTheDocument();
   });
 });

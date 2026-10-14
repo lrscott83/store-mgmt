@@ -17,6 +17,25 @@ import { splitIntoChunks } from './chunker';
 export const DEFAULT_BUFFER_LOW_THRESHOLD = 64 * 1024;
 export const DEFAULT_HIGH_WATER_MARK = 512 * 1024;
 export const DEFAULT_TRANSFER_TIMEOUT_MS = 120_000;
+/**
+ * Guards the receiver's memory: it accumulates every chunk before verifying the
+ * digest (crypto.subtle has no streaming digest), so an unbounded transfer is a
+ * real OOM risk. Exports are a few MB; 64 MB is far above anything legitimate.
+ */
+export const MAX_TRANSFER_BYTES = 64 * 1024 * 1024;
+
+/** Thrown when a payload exceeds {@link MAX_TRANSFER_BYTES}. */
+export class TransferTooLargeError extends Error {
+  constructor() {
+    super('Transfer exceeds the maximum allowed size');
+    this.name = 'TransferTooLargeError';
+  }
+}
+
+/** Throws {@link TransferTooLargeError} when `size` exceeds the cap. */
+export function assertTransferSize(size: number): void {
+  if (size > MAX_TRANSFER_BYTES) throw new TransferTooLargeError();
+}
 
 export interface TransferMetadata {
   readonly name: string;
@@ -60,6 +79,7 @@ export async function sendTransfer(
   options: SendTransferOptions = {},
 ): Promise<void> {
   const total = source.bytes.length;
+  assertTransferSize(total);
   const metadata: TransferMetadata = {
     name: source.name,
     size: total,
@@ -128,6 +148,7 @@ export function receiveTransfer(
       const data = event.data as string | ArrayBuffer;
       if (typeof data === 'string') {
         metadata = parseMetadata(data);
+        assertTransferSize(metadata.size);
         options.onProgress?.({ transferred: 0, total: metadata.size });
         if (metadata.size === 0) succeed();
         return;

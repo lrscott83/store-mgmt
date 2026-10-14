@@ -2,6 +2,9 @@ import { describe, it, expect, vi } from 'vitest';
 import {
   sendTransfer,
   receiveTransfer,
+  assertTransferSize,
+  MAX_TRANSFER_BYTES,
+  TransferTooLargeError,
   type TransferMetadata,
 } from '../transfer-protocol';
 import { CHUNK_SIZE, splitIntoChunks } from '../chunker';
@@ -169,5 +172,21 @@ describe('receiveTransfer', () => {
     const receiving = receiveTransfer(asChannel(channel), { timeoutMs: 1000 });
     channel.emitMessage('not json');
     await expect(receiving).rejects.toThrow(/metadata/i);
+  });
+});
+
+describe('size limit', () => {
+  it('accepts a payload at the cap and rejects one above it', () => {
+    expect(() => assertTransferSize(MAX_TRANSFER_BYTES)).not.toThrow();
+    expect(() => assertTransferSize(MAX_TRANSFER_BYTES + 1)).toThrow(TransferTooLargeError);
+  });
+
+  it('rejects an inbound metadata frame that exceeds the cap', async () => {
+    const channel = new MockDataChannel();
+    const receiving = receiveTransfer(asChannel(channel), { timeoutMs: 1000 });
+    channel.emitMessage(
+      JSON.stringify({ name: 'x', size: MAX_TRANSFER_BYTES + 1, sha256: 'x', kind: 'roster' }),
+    );
+    await expect(receiving).rejects.toThrow(TransferTooLargeError);
   });
 });

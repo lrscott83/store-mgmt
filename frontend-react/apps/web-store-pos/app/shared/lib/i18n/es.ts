@@ -1852,6 +1852,9 @@ const messages: Record<string, string> = {
   'HOTSPOT.ANSWER_READY': 'Muestra este código al otro dispositivo.',
   'HOTSPOT.RECEIVING': 'Recibiendo archivo...',
   'HOTSPOT.RECEIVED': 'Archivo recibido.',
+  'HOTSPOT.ERROR_UNREACHABLE':
+    'No se pudo conectar con el otro dispositivo. Desactiva el aislamiento AP del hotspot o usa el hotspot del otro dispositivo.',
+  'HOTSPOT.ERROR_TOO_LARGE': 'El archivo es demasiado grande para transferirlo por hotspot.',
 
   // At-rest encryption — the two decryption failures the app-wide policy
   // announces (decryption-failure-policy.ts). They are worded differently on

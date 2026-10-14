@@ -14,12 +14,15 @@ const mocks = vi.hoisted(() => ({
   encodeOfferPayload: vi.fn(async () => 'ENCODED-OFFER'),
   decodeAnswerPayload: vi.fn(),
   sendTransfer: vi.fn(),
+  SignalingTimeoutError: class SignalingTimeoutError extends Error {},
+  TransferTooLargeError: class TransferTooLargeError extends Error {},
 }));
 
 vi.mock('~/sync/lib/hotspot/peer-connection', () => ({
   createOffer: mocks.createOffer,
   completeConnection: mocks.completeConnection,
   waitForChannelOpen: mocks.waitForChannelOpen,
+  SignalingTimeoutError: mocks.SignalingTimeoutError,
 }));
 vi.mock('~/sync/lib/hotspot/pairing-code', () => ({
   generatePairingCode: mocks.generatePairingCode,
@@ -33,6 +36,7 @@ vi.mock('~/sync/lib/hotspot/handshake', () => ({
 }));
 vi.mock('~/sync/lib/hotspot/transfer-protocol', () => ({
   sendTransfer: mocks.sendTransfer,
+  TransferTooLargeError: mocks.TransferTooLargeError,
 }));
 vi.mock('~/sync/components/qr-code', () => ({
   QrCode: ({ value }: { value: string }) => <div data-testid="qr-code">{value}</div>,
@@ -148,5 +152,41 @@ describe('HotspotShareModal', () => {
     const { onClose } = renderModal();
     fireEvent.click(screen.getByTestId('hotspot-share-close'));
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the hotspot-unreachable guidance when the channel never opens', async () => {
+    mocks.verifyPairingProof.mockResolvedValue(true);
+    mocks.decodeAnswerPayload.mockResolvedValue({
+      v: 1,
+      type: 'answer',
+      sdp: 'v=0\r\nanswer',
+      proof: 'PROOF',
+    });
+    mocks.waitForChannelOpen.mockRejectedValue(new mocks.SignalingTimeoutError());
+    renderModal();
+    await reachWaiting();
+
+    fireEvent.click(screen.getByTestId('hotspot-scan-answer'));
+    fireEvent.click(await screen.findByTestId('fake-scan'));
+
+    expect(await screen.findByText(esMessages['HOTSPOT.ERROR_UNREACHABLE'])).toBeInTheDocument();
+  });
+
+  it('reports a payload that is too large', async () => {
+    mocks.verifyPairingProof.mockResolvedValue(true);
+    mocks.decodeAnswerPayload.mockResolvedValue({
+      v: 1,
+      type: 'answer',
+      sdp: 'v=0\r\nanswer',
+      proof: 'PROOF',
+    });
+    mocks.sendTransfer.mockRejectedValue(new mocks.TransferTooLargeError());
+    renderModal();
+    await reachWaiting();
+
+    fireEvent.click(screen.getByTestId('hotspot-scan-answer'));
+    fireEvent.click(await screen.findByTestId('fake-scan'));
+
+    expect(await screen.findByText(esMessages['HOTSPOT.ERROR_TOO_LARGE'])).toBeInTheDocument();
   });
 });

@@ -7,6 +7,7 @@ import { CloseIcon, EyeIcon, EyeOffIcon } from '~/shared/components/ui/icons';
 import { QrCode } from '~/sync/components/qr-code';
 import { QrScanner } from '~/sync/components/qr-scanner';
 import {
+  SignalingTimeoutError,
   completeConnection,
   createOffer,
   waitForChannelOpen,
@@ -21,7 +22,12 @@ import {
   decodeAnswerPayload,
   encodeOfferPayload,
 } from '~/sync/lib/hotspot/handshake';
-import { sendTransfer, type TransferSource } from '~/sync/lib/hotspot/transfer-protocol';
+import {
+  TransferTooLargeError,
+  sendTransfer,
+  type TransferSource,
+} from '~/sync/lib/hotspot/transfer-protocol';
+import { acquireWakeLock, type WakeLockHandle } from '~/sync/lib/hotspot/wake-lock';
 
 export interface HotspotShareModalProps {
   /** Produces the payload to share once the master password is entered. */
@@ -41,6 +47,14 @@ interface PendingSession {
 
 class PairingMismatchError extends Error {}
 
+/** Maps a handshake/transfer failure to its user-facing message key. */
+function messageKeyFor(error: unknown): string {
+  if (error instanceof PairingMismatchError) return 'HOTSPOT.ERROR_PAIRING';
+  if (error instanceof SignalingTimeoutError) return 'HOTSPOT.ERROR_UNREACHABLE';
+  if (error instanceof TransferTooLargeError) return 'HOTSPOT.ERROR_TOO_LARGE';
+  return 'HOTSPOT.ERROR';
+}
+
 /**
  * Emitter side of the hotspot transfer (plan §3.1/§3.6, one direction per
  * session — owner decision). Shows the offer QR plus the pairing code, then
@@ -59,10 +73,17 @@ export function HotspotShareModal({ prepare, onClose }: HotspotShareModalProps) 
   const [progress, setProgress] = useState(0);
   const [scanning, setScanning] = useState(false);
   const sessionRef = useRef<PendingSession | null>(null);
+  const wakeLockRef = useRef<WakeLockHandle | null>(null);
+
+  async function releaseWakeLock() {
+    await wakeLockRef.current?.release();
+    wakeLockRef.current = null;
+  }
 
   function handleClose() {
     sessionRef.current?.connection.close();
     sessionRef.current = null;
+    void releaseWakeLock();
     onClose();
   }
 
@@ -90,8 +111,8 @@ export function HotspotShareModal({ prepare, onClose }: HotspotShareModalProps) 
       });
       setOffer({ encoded, code });
       setStep('waiting');
-    } catch {
-      setError(intl.formatMessage({ id: 'HOTSPOT.ERROR' }));
+    } catch (err) {
+      setError(intl.formatMessage({ id: messageKeyFor(err) }));
     } finally {
       setBusy(false);
     }
@@ -120,6 +141,8 @@ export function HotspotShareModal({ prepare, onClose }: HotspotShareModalProps) 
       if (!paired) throw new PairingMismatchError();
       await completeConnection(session.connection, answer.sdp);
       await waitForChannelOpen(session.channel);
+      // Keep the screen awake: a sleeping tab can be frozen mid-transfer.
+      wakeLockRef.current = await acquireWakeLock();
       await sendTransfer(session.channel, session.source, {
         onProgress: ({ transferred, total }) =>
           setProgress(total === 0 ? 1 : transferred / total),
@@ -127,11 +150,9 @@ export function HotspotShareModal({ prepare, onClose }: HotspotShareModalProps) 
       setStep('done');
     } catch (err) {
       setStep('waiting');
-      setError(
-        intl.formatMessage({
-          id: err instanceof PairingMismatchError ? 'HOTSPOT.ERROR_PAIRING' : 'HOTSPOT.ERROR',
-        }),
-      );
+      setError(intl.formatMessage({ id: messageKeyFor(err) }));
+    } finally {
+      await releaseWakeLock();
     }
   }
 
