@@ -74,7 +74,7 @@ estado Abierta→Cerrada y comentario obligatorio cuando no cuadra.
   para que el usuario tenga una idea de como va la cosa. Si tienes alguna pregunta me dices para no asumir
   nada de nada."
 - **L2** — Contexto: existe `docs/plans/sesion-de-caja-apertura-cierre-pos.md` (investigación por turnos,
-  2026-07-24) y `docs/plans/imagenes-manual-soluciones360.md` (capturas 14/15). El pedido de L1 es una
+  2026-07-24) y `docs/plans/imagenes-manual-referencia-pos.md` (capturas 14/15). El pedido de L1 es una
   versión **diaria y más simple**; se implementa L1, no el plan por turnos.
 - **L3** — Decisiones del owner (respuestas 2026-10-14): Esperado = solo ventas Efectivo del día;
   **Multimoneda = un registro por día y moneda**; persistencia **local + export/import**; estados
