@@ -1872,6 +1872,34 @@ const messages: Record<string, string> = {
   'SYNC.SHOW_PASSWORD': 'Mostrar contraseña',
   'SYNC.HIDE_PASSWORD': 'Ocultar contraseña',
 
+  // Hotspot device-to-device transfer (odd/tasks/hotspot-device-transfer.md).
+  // Both devices run the same PWA; the transfer never leaves the hotspot LAN.
+  'HOTSPOT.SHARE_TITLE': 'Compartir por hotspot',
+  'HOTSPOT.RECEIVE_TITLE': 'Recibir por hotspot',
+  'HOTSPOT.GENERATE': 'Generar código',
+  'HOTSPOT.PAIRING_CODE': 'Código de emparejamiento',
+  'HOTSPOT.OFFER_READY': 'Escanea este código desde el otro dispositivo.',
+  'HOTSPOT.COPY_CODE': 'Copiar código',
+  'HOTSPOT.COPIED': 'Código copiado.',
+  'HOTSPOT.SCAN_ANSWER': 'Escanear respuesta',
+  'HOTSPOT.SCAN_OFFER': 'Escanear código',
+  'HOTSPOT.SCAN_TITLE': 'Escanear código QR',
+  'HOTSPOT.SCANNING': 'Buscando el código...',
+  'HOTSPOT.CAMERA_DENIED': 'No se pudo abrir la cámara. Revisa los permisos del navegador.',
+  'HOTSPOT.SENDING': 'Enviando archivo...',
+  'HOTSPOT.SENT': 'Transferencia completada.',
+  'HOTSPOT.ERROR': 'No se pudo completar la transferencia.',
+  'HOTSPOT.ERROR_PAIRING': 'El emparejamiento no coincide. Vuelve a escanear el código.',
+  'HOTSPOT.SCAN_PROMPT': 'Escanea el código del otro dispositivo.',
+  'HOTSPOT.ACCEPT': 'Aceptar',
+  'HOTSPOT.INCOMING_FILE': 'Archivo a recibir',
+  'HOTSPOT.ANSWER_READY': 'Muestra este código al otro dispositivo.',
+  'HOTSPOT.RECEIVING': 'Recibiendo archivo...',
+  'HOTSPOT.RECEIVED': 'Archivo recibido.',
+  'HOTSPOT.ERROR_UNREACHABLE':
+    'No se pudo conectar con el otro dispositivo. Desactiva el aislamiento AP del hotspot o usa el hotspot del otro dispositivo.',
+  'HOTSPOT.ERROR_TOO_LARGE': 'El archivo es demasiado grande para transferirlo por hotspot.',
+
   // At-rest encryption — the two decryption failures the app-wide policy
   // announces (decryption-failure-policy.ts). They are worded differently on
   // purpose: the first is recoverable and names both recovery routes, the
