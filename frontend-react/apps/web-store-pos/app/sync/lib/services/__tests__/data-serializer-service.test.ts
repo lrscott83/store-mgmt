@@ -31,6 +31,9 @@ import { ProductCategoryRepository } from '~/sales/lib/repositories/product-cate
 import { ProductRepository } from '~/sales/lib/repositories/product-repository';
 import type { StorePaymentMethodsConfig } from '~/shared/lib/payment-methods/store-payment-methods-config-service';
 import { StorePaymentMethodsConfigService } from '~/shared/lib/payment-methods/store-payment-methods-config-service';
+import { CashClosingOfflineService } from '~/sales/lib/cash-closing/cash-closing-offline-service';
+import { CashClosingStatus } from '~/sales/lib/cash-closing/cash-closing-types';
+import type { CashClosing, CashClosingStore } from '~/sales/lib/cash-closing/cash-closing-types';
 import type { QueuedMessage } from '~/shared/lib/messages/messages-offline-service';
 import type {
   ProductCategory,
@@ -76,6 +79,8 @@ const ALL_ENTRY_NAMES = [
   'elaborations.json',
   // messaging-background-offline: the per-store offline message queue.
   'messages-queue.json',
+  // cierre-efectivo: the per-store cash-closing store.
+  'cash-closings.json',
 ];
 
 const mockCategory: ProductCategory = {
@@ -219,6 +224,9 @@ function makeService(
     // messaging-background-offline: undefined = reader present but empty queue
     // (the entry is still written as []); rows = reader present with a queue.
     messagesQueue?: QueuedMessage[];
+    // cierre-efectivo: undefined = reader present but empty store; store = reader
+    // present with the given cash-closing store.
+    cashClosings?: CashClosingStore;
   },
   storeId: string = STORE_ID,
 ): DataSerializerService {
@@ -249,6 +257,10 @@ function makeService(
   const messagesQueueReader = {
     getStorageMessagesQueueJson: () => JSON.stringify(overrides?.messagesQueue ?? []),
   };
+  const cashClosingService = new CashClosingOfflineService(storeId);
+  if (overrides?.cashClosings) {
+    cashClosingService.setImportedCashClosings(overrides.cashClosings, storeId);
+  }
 
   return new DataSerializerService(
     storeId,
@@ -264,6 +276,9 @@ function makeService(
     undefined,
     storePaymentMethodsReader,
     messagesQueueReader,
+    // A store with a local record has a reader; a never-used store does not
+    // (the entry is then written as an empty store by the serializer's fallback).
+    overrides?.cashClosings ? cashClosingService : undefined,
   );
 }
 
@@ -503,8 +518,7 @@ describe('DataSerializerService', () => {
   // -------------------------------------------------------------------------
 
   describe('T2 — v2 envelope: meta.json + all data entries', () => {
-    it('produces meta.json plus exactly the 14 data entries', async () => {
-      const svc = makeService();
+    it('produces meta.json plus exactly the 14 data entries', async () => {      const svc = makeService();
       const payload = await svc.export(PASSWORD);
       const { entries } = await readRawEntriesV2(payload, PASSWORD);
       const names = entries.map((e) => e.filename).sort();
@@ -529,6 +543,7 @@ describe('DataSerializerService', () => {
         Elaborations: 'elaborations.json',
         StorePaymentMethods: 'store-payment-methods.json',
         MessagesQueue: 'messages-queue.json',
+        CashClosings: 'cash-closings.json',
       });
     });
 
@@ -1115,6 +1130,71 @@ describe('DataSerializerService', () => {
       const withoutQueue = makeService({ categories: [], products: [] });
       const plainWithout = await withoutQueue.exportPlainData();
       expect(plainWithout.messagesQueue).toEqual([]);
+    });
+  });
+
+  describe('T11 — cash-closings entry (cierre-efectivo)', () => {
+    const CLOSING: CashClosing = {
+      id: '2026-10-14|0',
+      dayKey: '2026-10-14',
+      currency: 0,
+      openingCash: 1_000,
+      denominations: [{ value: 1_000, count: 2 }],
+      comment: '',
+      status: CashClosingStatus.Open,
+      countedTotal: 2_000,
+      expectedTotal: 1_000,
+      difference: 1_000,
+      createdDate: '2026-10-14T08:00:00.000Z',
+      createdByName: 'cashier',
+      updatedDate: '2026-10-14T08:00:00.000Z',
+      updatedByName: 'cashier',
+    };
+    const STORE: CashClosingStore = {
+      closings: [CLOSING],
+      denominationCatalog: { '1': [100, 50] },
+    };
+
+    it('export writes cash-closings.json and import parses the store back', async () => {
+      const svc = makeService({ categories: [], products: [], cashClosings: STORE });
+
+      const payload = await svc.export(PASSWORD);
+      const { entries } = await readRawEntriesV2(payload, PASSWORD);
+      expect(entries.map((e) => e.filename)).toContain(EDataFileName.CashClosings);
+
+      const parsed = await svc.import(payload, PASSWORD);
+      expect(parsed.cashClosings?.closings).toHaveLength(1);
+      expect(parsed.cashClosings?.closings[0].id).toBe('2026-10-14|0');
+      expect(parsed.cashClosings?.denominationCatalog['1']).toEqual([100, 50]);
+    });
+
+    it('an export with no reader still carries an empty cash-closings.json entry', async () => {
+      const svc = makeService({ categories: [], products: [] });
+
+      const payload = await svc.export(PASSWORD);
+      const { entries } = await readRawEntriesV2(payload, PASSWORD);
+      expect(entries.map((e) => e.filename)).toContain(EDataFileName.CashClosings);
+
+      const parsed = await svc.import(payload, PASSWORD);
+      expect(parsed.cashClosings).toEqual({ closings: [], denominationCatalog: {} });
+    });
+
+    it('a legacy archive WITHOUT cash-closings.json imports with an empty store', async () => {
+      const legacyPayload = await buildLegacyV1Zip(makeV1Payloads(), PASSWORD + STORE_ID);
+
+      const parsed = await makeService().import(legacyPayload, PASSWORD);
+
+      expect(parsed.cashClosings).toEqual({ closings: [], denominationCatalog: {} });
+    });
+
+    it('exportPlainData returns the store when present and an empty store when absent', async () => {
+      const withStore = makeService({ categories: [], products: [], cashClosings: STORE });
+      const plainWith = await withStore.exportPlainData();
+      expect(plainWith.cashClosings?.closings).toHaveLength(1);
+
+      const withoutStore = makeService({ categories: [], products: [] });
+      const plainWithout = await withoutStore.exportPlainData();
+      expect(plainWithout.cashClosings).toEqual({ closings: [], denominationCatalog: {} });
     });
   });
 });

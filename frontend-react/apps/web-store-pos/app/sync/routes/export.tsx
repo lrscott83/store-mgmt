@@ -13,6 +13,7 @@ import { RecipeOfflineService } from '~/inventory/lib/services/recipe-offline-se
 import { ElaborationOfflineService } from '~/inventory/lib/services/elaboration-offline-service';
 import { StorePaymentMethodsConfigService } from '~/shared/lib/payment-methods/store-payment-methods-config-service';
 import { MessagesOfflineService } from '~/shared/lib/messages/messages-offline-service';
+import { CashClosingOfflineService } from '~/sales/lib/cash-closing/cash-closing-offline-service';
 import { DataSerializerService } from '~/sync/lib/services/data-serializer-service';
 import { ExportForm } from '~/sync/components/export-form';
 
@@ -48,6 +49,7 @@ export function ExportPage() {
     );
     const storePaymentMethodsSvc = new StorePaymentMethodsConfigService(storeId);
     const messagesQueueSvc = new MessagesOfflineService(storeId);
+    const cashClosingSvc = new CashClosingOfflineService(storeId);
 
     const serializer = new DataSerializerService(
       storeId,
@@ -63,6 +65,7 @@ export function ExportPage() {
       elaborationSvc,
       storePaymentMethodsSvc,
       messagesQueueSvc,
+      cashClosingSvc,
     );
 
     const payload = await serializer.export(password);
@@ -120,6 +123,7 @@ export function ExportPage() {
     );
     const storePaymentMethodsSvc = new StorePaymentMethodsConfigService(storeId);
     const messagesQueueSvc = new MessagesOfflineService(storeId);
+    const cashClosingSvc = new CashClosingOfflineService(storeId);
 
     const serializer = new DataSerializerService(
       storeId,
@@ -135,6 +139,7 @@ export function ExportPage() {
       elaborationSvc,
       storePaymentMethodsSvc,
       messagesQueueSvc,
+      cashClosingSvc,
     );
 
     const data = await serializer.exportPlainData();
