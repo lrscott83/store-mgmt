@@ -48,6 +48,8 @@
 | D5 | Generación de QR con **`qrcode.react@4.2.0`** (0 deps de runtime, trae tipos, declara React 19), cargada con **import dinámico** dentro de `qr-code.tsx`. | Implementación (autorizada por el owner) |
 | D6 | SHA-256 **al final** (payload completo / buffer reensamblado), no incremental: `crypto.subtle` no tiene digest en streaming y un SHA-256 incremental exigiría una dependencia nueva. Aceptable para exports de pocos MB. | Implementación (documentada) |
 | D7 | Emparejamiento: **el código de 6 dígitos viaja dentro del QR**; el receptor **NO teclea nada**. El código se muestra en ambas pantallas para confirmación visual y la prueba del sobre detecta un emparejamiento cruzado (integridad, no secreto). | Owner, 2026-10-14 (plan §3.3 era ambiguo) |
+| D8 | Límite de tamaño **64 MB** por transferencia (`assertTransferSize`, aplicado en emisor y receptor). Los exports son de pocos MB; el receptor acumula todo el buffer para el digest, así que un límite protege su memoria. **Revisable por el owner.** | Implementación (documentada) |
+| D9 | Aislamiento AP: el timeout de señalización (`SignalingTimeoutError`) se traduce al aviso específico del plan; cualquier otro fallo usa el mensaje genérico. | Implementación (documentada) |
 
 ---
 
@@ -112,7 +114,7 @@
 - [x] **T6** — `hotspot-share-modal.tsx` (emisor) + `qr-scanner.tsx`: contraseña, QR+código, escaneo de la respuesta, progreso. *(S1, S3, S6, S8)* · ruta: inline · commit `e1d4dd09`
 - [x] **T7** — `hotspot-receive-modal.tsx` (receptor): escanear oferta, QR de respuesta, recibir, handoff a `import-form`. *(S3, S7)* · ruta: inline · commit `c9f229db`
 - [x] **T8** — Integración: `roster-export-panel`, `sync/routes/export`, `sync/routes/import` + `ImportForm`/`FileInput` con fichero precargado. *(S8)* · ruta: inline · commit `69f783f5`
-- [ ] **T9** — Robustez: aviso aislamiento AP/ICE timeout, Wake Lock, límites de tamaño. *(S9)* · ruta: inline
+- [x] **T9** — Robustez: aviso de aislamiento AP (`SignalingTimeoutError`), Wake Lock, límite de tamaño. *(S9)* · ruta: inline · commit `3a1a5029`
 - [ ] **T10** — E2E **nuevos** (Playwright, 2 contextos en `localhost`, escaneo sustituido por inyección del código). *(S1, S3, S5, S7)* · ruta: inline
 - [ ] **T11** — Verificación final: `typecheck`, `lint`, `vitest`, y confirmar el chunk lazy en `pnpm build`.
 
@@ -169,6 +171,7 @@ Por tarea:
 - **T6** — `pnpm exec vitest run app/sync/components` → **28 passed** (2 qr-code + 3 qr-scanner + 5 hotspot-share-modal + 18 preexistentes). `pnpm typecheck` → 0 errores. `pnpm lint` → 0 errores. Commit `e1d4dd09`.
 - **T7** — `pnpm exec vitest run app/sync/components/__tests__/hotspot-receive-modal.test.tsx` → **4 passed**. `pnpm typecheck` → 0 errores. `pnpm lint` → 0 errores. Commit `c9f229db`.
 - **T8** — `pnpm test` (suite completa del app) → **382 archivos, 5588 passed**, 6 skipped, 0 fallos. `pnpm typecheck` → 0 errores. `pnpm lint` → 0 errores. Commit `69f783f5`. Nuevo test de integración `hotspot-wiring.test.tsx` (3 casos): recibir→precarga el `File`, y los dos botones de compartir.
+- **T9** — `pnpm exec vitest run app/sync/lib/hotspot app/sync/components` → **12 archivos, 92 passed**. `pnpm typecheck` → 0 errores. `pnpm lint` → 0 errores. Commit `3a1a5029`.
 
 Cierre de feature (se rellena al final):
 
@@ -200,3 +203,4 @@ Cierre de feature (se rellena al final):
 - 2026-10-14 — **T6 completada** (`hotspot-share-modal.tsx` + `qr-scanner.tsx`, commit `e1d4dd09`): flujo contraseña → QR+código → escanear respuesta → progreso → hecho. La lógica de oferta/respuesta/prueba vive en `handshake`/`pairing-code`; el modal solo orquesta. Se añadió `qr-scanner.tsx` (escáner QR dedicado, sin tocar el escáner de ventas). Claves i18n `HOTSPOT.*` añadidas a `es.ts` (el resto de T8 será la integración en las pantallas).
 - 2026-10-14 — **T7 completada** (`hotspot-receive-modal.tsx`, commit `c9f229db`): escanear oferta → ver código+fichero → Aceptar → QR de respuesta → recibir con progreso → **handoff de `File` por `onReceived`**. Si el SHA-256 no coincide, rechaza y no entrega el archivo. La importación existente (contraseña/corrupto/tienda) se hereda en T8.
 - 2026-10-14 — **T8 completada** (commit `69f783f5`): "Compartir por hotspot" en `roster-export-panel` y `sync/export` (reutilizando el mismo payload que la descarga; en export se extrajo `buildExportPayload`/`buildExportFileName`); "Recibir por hotspot" en `sync/import`. `ImportForm` acepta `initialFile` y `FileInput` `initialFileName`, así el archivo recibido queda **precargado** y el usuario solo teclea la contraseña del bundle. Se remonta el formulario con `key` cuando llega un archivo nuevo. **No se tocó ningún E2E ni el backend.**
+- 2026-10-14 — **T9 completada** (commit `3a1a5029`): `SignalingTimeoutError` en `peer-connection` (los tres timeouts) y `TransferTooLargeError`+`assertTransferSize` en `transfer-protocol`; los modales traducen el error a **aviso de aislamiento AP** o **demasiado grande** en vez del genérico. Nuevo `wake-lock.ts` (Wake Lock durante la transferencia, no-op si no está disponible). **D8**: límite de 64 MB (revisable).
