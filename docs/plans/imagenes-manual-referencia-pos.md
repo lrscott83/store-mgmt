@@ -42,7 +42,7 @@ copia esa especificación y la cruza con las vistas de nuestro POS React
 | 17 | Valor de Inventario: resumen abajo y lista de productos con su valor | `/inventory/available` | ⚠️ Equivalente aproximado |
 | 18 | Formulario de transferencia: origen, destino, campo de nombre y líneas de producto | `/inventory/warehouse-movements` | ✅ Existe |
 | 19 | Vale de salida: un vale con el tipo de salida seleccionado y sus líneas | `/inventory/egress` (Salida) | ✅ Existe |
-| 20 | Auditoría en curso: lista con cantidad del sistema, la contada y la diferencia resaltada | — | ❌ No existe |
+| 20 | Auditoría en curso: lista con cantidad del sistema, la contada y la diferencia resaltada | `/inventory/count` (Conteo de productos) | ✅ Existe (solo visual: no ajusta stock) |
 | 21 | Pantalla de Resultados: período seleccionado y tarjeta de Métodos de pago con las tres vías | `/stats/cuadre-por-fechas` | ✅ Existe |
 | 22 | IPV por Sesión: columnas Apertura, Entradas, Ventas, Salidas y Cierre | `/inventory/today-quantities` + `/sales/today-stats` + `/sales/cash-closing` | ⚠️ Repartido en varias vistas |
 | 23 | Costo de Productos: lista con costo, precio actual y precio sugerido, y botón para aplicar los sugeridos | `/sales/products` / `/inventory/today-sales-profit` | ⚠️ Equivalente aproximado |
@@ -54,9 +54,9 @@ copia esa especificación y la cruza con las vistas de nuestro POS React
 
 | Estado | Cantidad | Capturas |
 |---|---|---|
-| ✅ Equivalente claro | 12 | 2, 5, 6, 7, 11, 14, 15, 18, 19, 21, 24, 26 |
+| ✅ Equivalente claro | 13 | 2, 5, 6, 7, 11, 14, 15, 18, 19, 20, 21, 24, 26 |
 | ⚠️ Equivalente aproximado (revisar el detalle) | 11 | 1, 4, 8, 9, 10, 12, 13, 16, 17, 22, 23 |
-| ❌ No existe en nuestro POS | 3 | 3, 20, 25 |
+| ❌ No existe en nuestro POS | 2 | 3, 25 |
 
 ## Reglas del manual para tomar las capturas
 
@@ -70,5 +70,5 @@ copia esa especificación y la cruza con las vistas de nuestro POS React
 - Las capturas marcadas ⚠️ requieren revisar la vista real en la app para confirmar si el detalle del
   manual coincide (p. ej. si el descuento exige motivo, si existe la casilla "pago en línea", si se
   aprueban compras).
-- Las 3 sin equivalente son features que la aplicación de referencia tiene y nuestro POS no: licencia
-  local, auditoría de conteo físico y pantalla de Nube.
+- Las 2 sin equivalente son features que la aplicación de referencia tiene y nuestro POS no: licencia
+  local y pantalla de Nube.

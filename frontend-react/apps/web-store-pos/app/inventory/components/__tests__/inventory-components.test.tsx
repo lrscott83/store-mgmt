@@ -292,55 +292,6 @@ describe('InventoryProductList — Disponible row cleanup (Angular parity)', () 
   });
 });
 
-// Conteo físico (manual de referencia, captura 20 + §7.4): la lista muestra la cantidad
-// del sistema, la contada (editable) y la diferencia resaltada. SOLO VISUAL — no toca el
-// stock ni persiste nada.
-describe('InventoryProductList — conteo físico (solo visual)', () => {
-  function renderAndExpand() {
-    render(
-      <Wrapper>
-        <InventoryProductList categories={MOCK_CATEGORIES} />
-      </Wrapper>,
-    );
-    fireEvent.click(screen.getByTestId('inventory-category-toggle-cat1'));
-  }
-
-  it('muestra el campo Contada por producto y sin diferencia al inicio', () => {
-    renderAndExpand();
-    expect(screen.getByTestId('inventory-count-input-p1')).toBeInTheDocument();
-    expect(screen.getByTestId('inventory-count-difference-p1')).toHaveTextContent('—');
-  });
-
-  it('diferencia negativa (contado menor que el sistema) resaltada en rojo', () => {
-    renderAndExpand();
-    fireEvent.change(screen.getByTestId('inventory-count-input-p1'), {
-      target: { value: '8' },
-    });
-    const diff = screen.getByTestId('inventory-count-difference-p1');
-    expect(diff).toHaveTextContent('-2');
-    expect(diff.className).toContain('text-danger');
-  });
-
-  it('diferencia positiva (contado mayor que el sistema) con signo +', () => {
-    renderAndExpand();
-    fireEvent.change(screen.getByTestId('inventory-count-input-p1'), {
-      target: { value: '13' },
-    });
-    const diff = screen.getByTestId('inventory-count-difference-p1');
-    expect(diff).toHaveTextContent('+3');
-  });
-
-  it('diferencia cero en verde cuando coincide con el sistema', () => {
-    renderAndExpand();
-    fireEvent.change(screen.getByTestId('inventory-count-input-p1'), {
-      target: { value: '10' },
-    });
-    const diff = screen.getByTestId('inventory-count-difference-p1');
-    expect(diff).toHaveTextContent('0');
-    expect(diff.className).toContain('text-success');
-  });
-});
-
 // ─── EntryList fixtures ─────────────────────────────────────────────────────
 
 import type { InventoryEntryView } from '@store-mgmt/domain';

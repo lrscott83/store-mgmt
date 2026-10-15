@@ -314,6 +314,14 @@ export const MENU_GROUPS: MenuGroup[] = [
           'Consulta el inventario disponible. Lista todos los productos con su cantidad en stock, precio y estado. Puedes buscar y filtrar productos.',
       },
       {
+        label: 'MENU.PRODUCT_COUNT',
+        path: '/inventory/count',
+        featureIds: [EFeatures.Available],
+        moduleId: EModules.Inventory,
+        helpContent:
+          'Conteo de productos. Compara la cantidad del sistema con la que cuentas físicamente y muestra la diferencia. Es solo una ayuda visual: no modifica el inventario.',
+      },
+      {
         label: 'MENU.TODAY_ENTRIES',
         path: '/inventory/today-entries',
         featureIds: [EFeatures.Entries],
