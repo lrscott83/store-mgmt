@@ -637,7 +637,6 @@ async function main() {
     ['14-cuadre-dia', '/sales/today-stats'],
     ['15-ventas-del-dia', '/sales/today-orders'],
     ['16-reportes', '/reports/today'],
-    ['17-dashboard', '/stats/dashboard'],
     ['18-cuadre-fechas', '/stats/cuadre-por-fechas'],
     ['19-configuraciones', '/management/configurations'],
     ['20-tasas-cambio', '/management/channel-rates'],
@@ -658,6 +657,24 @@ async function main() {
     await goto(page, path);
     await capture(page, name);
   }
+
+  // ── 17: Panel de Control — con el rango llevado a HOY ─────────────────
+  // El default del panel es "7 días inclusivos terminando AYER", así que las ventas de hoy
+  // quedan fuera; aquí se fija el rango a los últimos 7 días INCLUYENDO hoy.
+  await goto(page, '/stats/dashboard');
+  {
+    const today = new Date();
+    const start = new Date(today);
+    start.setDate(start.getDate() - 6);
+    const iso = (d) =>
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    await page.getByTestId('date-range-filter-input').first().click();
+    await page.getByTestId('date-range-filter-start').first().fill(iso(start));
+    await page.getByTestId('date-range-filter-end').first().fill(iso(today));
+    await page.getByTestId('date-range-filter-select').first().click();
+    await page.waitForTimeout(800);
+  }
+  await capture(page, '17-dashboard');
 
   // ── 40: Conteo de productos (vista PROPIA, solo conteo) ────────────────
   await goto(page, '/inventory/count');

@@ -479,6 +479,12 @@ dicen cuántas categorías, productos, publicados y sin imagen tienes.
 
 ![Catálogo Web: dirección pública, métricas, marca y carrusel](img/23-catalogo-web.png)
 
+**Así lo ve el cliente** (ejemplo real del catálogo publicado):
+
+![Catálogo público: marca, buscador, destacados y la rejilla de productos con sus precios](img/41-catalogo-publico.jpg)
+
+![Detalle de un producto en el catálogo público](img/42-catalogo-producto.jpg)
+
 
 ## 20. Editar los productos del catálogo (descripción e imagen)
 
@@ -536,6 +542,12 @@ estado. Todo va contra el servidor: tras cada acción la pantalla se recarga. La
 **📷 Imagen sugerida.**
 
 ![Pedidos: la cola de pedidos con sus filtros y acciones](img/25-pedidos.png)
+
+**Cómo pide el cliente** (el carrito y el checkout los ve el cliente, no el POS):
+
+![Carrito del catálogo público: el producto añadido y el total](img/43-catalogo-carrito.jpg)
+
+![Checkout del catálogo público: nombre, teléfono, entrega y notas; el pedido se envía por WhatsApp](img/44-catalogo-checkout.jpg)
 
 
 ## 23. Repartidores
@@ -783,9 +795,10 @@ comercializadores, módulos, cobros y comisiones).
   «El encabezado (barra superior)», pero conviene destacarlo cuando se capture el menú.
 - **Conteo de inventario — HECHO** (llega en `qa`): el conteo ya es una **vista propia**
   (`/inventory/count`, sección 14.1) y *Disponible* se regeneró **sin** la columna de conteo.
-- **Panel de Control (imagen `17-dashboard`).** Sale en **0** aunque hay ventas: su rango por
-  defecto son los **7 días que terminan AYER**, así que las ventas de hoy quedan fuera. Hay que
-  **ajustar el filtro de fechas** antes de capturar para que muestre el día.
+- **Panel de Control (imagen `17-dashboard`).** La captura ya lleva el rango a **hoy** (7 días
+  terminando hoy), así que el filtro es correcto; pero los KPI siguen en **0 CUP** aunque
+  *Ventas del día* muestra las 3 ventas (4 800 CUP). Es un problema del **agregador del panel**
+  (`computeSingleStoreDashboardRange`), no del filtro: **queda por investigar**.
 - **Pedidos online (imágenes `25`, `27`).** Salen vacíos porque no hay pedidos en el servidor. Se
   pueden sembrar publicando el catálogo (`/sales/web-catalog` → *Sincronizar Catálogo*) y creando
   pedidos por el endpoint público `POST /v1/public/ordering/<slug>/orders`.
