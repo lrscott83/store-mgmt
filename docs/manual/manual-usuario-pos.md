@@ -314,7 +314,11 @@ monedas, hay un registro por **día y moneda** (usa el filtro de moneda).
 
 **📷 Imagen sugerida.**
 
-![Cierre Efectivo: Apertura, Esperado/Contado/Diferencia y la tarjeta Conteo](img/09-cierre-caja.png)
+![Cierre Efectivo — parte 1 de 3: Apertura, Esperado/Contado/Diferencia y el arranque del conteo](img/09-cierre-caja-1.png)
+
+![Cierre Efectivo — parte 2 de 3: la tarjeta Conteo con las denominaciones](img/09-cierre-caja-2.png)
+
+![Cierre Efectivo — parte 3 de 3: comentario y el botón Cerrar Caja](img/09-cierre-caja-3.png)
 
 ## 13. Ver tus ventas y el cuadre del día
 
@@ -477,7 +481,17 @@ dicen cuántas categorías, productos, publicados y sin imagen tienes.
 
 **📷 Imagen sugerida.**
 
-![Catálogo Web: dirección pública, métricas, marca y carrusel](img/23-catalogo-web.png)
+![Catálogo Web — parte 1 de 3: dirección pública, métricas y marca](img/23-catalogo-web-1.png)
+
+![Catálogo Web — parte 2 de 3](img/23-catalogo-web-2.png)
+
+![Catálogo Web — parte 3 de 3](img/23-catalogo-web-3.png)
+
+**Así lo ve el cliente** (ejemplo real del catálogo publicado):
+
+![Catálogo público: marca, buscador, destacados y la rejilla de productos con sus precios](img/41-catalogo-publico.jpg)
+
+![Detalle de un producto en el catálogo público](img/42-catalogo-producto.jpg)
 
 
 ## 20. Editar los productos del catálogo (descripción e imagen)
@@ -537,6 +551,12 @@ estado. Todo va contra el servidor: tras cada acción la pantalla se recarga. La
 
 ![Pedidos: la cola de pedidos con sus filtros y acciones](img/25-pedidos.png)
 
+**Cómo pide el cliente** (el carrito y el checkout los ve el cliente, no el POS):
+
+![Carrito del catálogo público: el producto añadido y el total](img/43-catalogo-carrito.jpg)
+
+![Checkout del catálogo público: nombre, teléfono, entrega y notas; el pedido se envía por WhatsApp](img/44-catalogo-checkout.jpg)
+
 
 ## 23. Repartidores
 
@@ -575,7 +595,11 @@ métricas. Aquí solo se consulta: para operar un pedido se usa **Pedidos**.
 
 **📷 Imagen sugerida.**
 
-![Ventas de pedidos: métricas del periodo e histórico](img/27-ventas-pedidos.png)
+![Ventas de pedidos — parte 1 de 3: las métricas del periodo](img/27-ventas-pedidos-1.png)
+
+![Ventas de pedidos — parte 2 de 3](img/27-ventas-pedidos-2.png)
+
+![Ventas de pedidos — parte 3 de 3: el histórico](img/27-ventas-pedidos-3.png)
 
 
 ---
@@ -633,7 +657,15 @@ conversión. Las secciones de **Gastos** y **Créditos** solo aparecen si esos m
 
 **📷 Imagen sugerida.**
 
-![Panel de Control: rango de fechas, KPI y gráficas](img/17-dashboard.png)
+![Panel de Control — parte 1 de 5: el rango de fechas y los KPI principales](img/17-dashboard-1.png)
+
+![Panel de Control — parte 2 de 5](img/17-dashboard-2.png)
+
+![Panel de Control — parte 3 de 5: las gráficas](img/17-dashboard-3.png)
+
+![Panel de Control — parte 4 de 5](img/17-dashboard-4.png)
+
+![Panel de Control — parte 5 de 5](img/17-dashboard-5.png)
 
 
 ## 28. Cuadre por fechas
@@ -783,9 +815,10 @@ comercializadores, módulos, cobros y comisiones).
   «El encabezado (barra superior)», pero conviene destacarlo cuando se capture el menú.
 - **Conteo de inventario — HECHO** (llega en `qa`): el conteo ya es una **vista propia**
   (`/inventory/count`, sección 14.1) y *Disponible* se regeneró **sin** la columna de conteo.
-- **Panel de Control (imagen `17-dashboard`).** Sale en **0** aunque hay ventas: su rango por
-  defecto son los **7 días que terminan AYER**, así que las ventas de hoy quedan fuera. Hay que
-  **ajustar el filtro de fechas** antes de capturar para que muestre el día.
+- **Panel de Control (imagen `17-dashboard`).** La captura ya lleva el rango a **hoy** (7 días
+  terminando hoy), así que el filtro es correcto; pero los KPI siguen en **0 CUP** aunque
+  *Ventas del día* muestra las 3 ventas (4 800 CUP). Es un problema del **agregador del panel**
+  (`computeSingleStoreDashboardRange`), no del filtro: **queda por investigar**.
 - **Pedidos online (imágenes `25`, `27`).** Salen vacíos porque no hay pedidos en el servidor. Se
   pueden sembrar publicando el catálogo (`/sales/web-catalog` → *Sincronizar Catálogo*) y creando
   pedidos por el endpoint público `POST /v1/public/ordering/<slug>/orders`.
