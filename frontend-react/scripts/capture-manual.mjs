@@ -264,6 +264,36 @@ async function main() {
   await goto(page, '/expenses/today');
   await capture(page, '10-gastos');
 
+  // ── Lote: resto de pantallas (sin interacción) ─────────────────────────
+  const ROUTES = [
+    ['11-entradas-dia', '/inventory/today-entries'],
+    ['12-cantidades-dia', '/inventory/today-quantities'],
+    ['13-ganancias-dia', '/inventory/today-sales-profit'],
+    ['14-cuadre-dia', '/sales/today-stats'],
+    ['15-ventas-del-dia', '/sales/today-orders'],
+    ['16-reportes', '/reports/today'],
+    ['17-dashboard', '/stats/dashboard'],
+    ['18-cuadre-fechas', '/stats/cuadre-por-fechas'],
+    ['19-configuraciones', '/management/configurations'],
+    ['20-tasas-cambio', '/management/channel-rates'],
+    ['21-empleados', '/management/users'],
+    ['22-mis-tiendas', '/management/my-stores'],
+    ['23-catalogo-web', '/sales/web-catalog'],
+    ['24-pedidos-whatsapp', '/sales/online-orders/settings'],
+    ['25-pedidos', '/sales/online-orders'],
+    ['26-repartidores', '/sales/online-orders/drivers'],
+    ['27-ventas-pedidos', '/sales/online-orders/sales'],
+    ['28-mayorista', '/sales/wholesale'],
+    ['29-creditos-dia', '/sales/today-credits'],
+    ['30-exportar', '/sync/export'],
+    ['31-importar', '/sync/import'],
+    ['32-diagnostico', '/diagnostics'],
+  ];
+  for (const [name, path] of ROUTES) {
+    await goto(page, path);
+    await capture(page, name);
+  }
+
   await ctx.close();
   await browser.close();
   console.log(`\nListo. Imágenes en ${OUT_DIR}`);

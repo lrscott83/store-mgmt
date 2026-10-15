@@ -121,8 +121,10 @@ aceptas y a qué tasa cambias.
 **A tener en cuenta.** El catálogo de **categorías de producto** no está aquí: se gestiona en
 **Productos**. Esta pantalla guarda al instante (verás **Guardado**).
 
-**📷 Imagen sugerida.** Configuraciones con los tres bloques visibles: **Tienda activa**, **Monedas
-de compra y venta** y **Métodos de pago** (con algunos métodos activos y el de efectivo fijo).
+**📷 Imagen sugerida.**
+
+![Configuraciones: Tienda activa, Monedas de compra y venta, y Métodos de pago](img/19-configuraciones.png)
+
 
 ## 4. Cargar el catálogo de productos
 
@@ -176,8 +178,10 @@ del día con un par de entradas.
 **A tener en cuenta.** Esta pantalla necesita **conexión**. Los datos del empleado pertenecen a
 la tienda que tengas seleccionada.
 
-**📷 Imagen sugerida.** La lista de **Empleados** con 3 tarjetas (una inactiva) y los botones de
-acción visibles.
+**📷 Imagen sugerida.**
+
+![Empleados: la lista de los empleados de la tienda y sus acciones](img/21-empleados.png)
+
 
 ## 7. Activar el acceso sin conexión en los equipos
 
@@ -257,8 +261,10 @@ moneda, los métodos de pago, el campo *con cuánto paga* y el **Vuelto**.
 **+** y **−** mueven **paquetes** (no unidades), y bajar por debajo del primer rango elimina la
 línea.
 
-**📷 Imagen sugerida.** **Ventas Mayoristas** con un producto, el popup de **rangos** abierto y una
-fila con la cotización calculada.
+**📷 Imagen sugerida.**
+
+![Vender Mayorista: productos por paquetes](img/28-mayorista.png)
+
 
 ## 11. Cobrar un crédito
 
@@ -272,8 +278,10 @@ fila con la cotización calculada.
 **A tener en cuenta.** En el historial (**Créditos**), el filtro arranca en **Por Pagar**. Puedes
 filtrar por rango de fechas y por estado (**Todos / Por Pagar / Pagados**).
 
-**📷 Imagen sugerida.** **Créditos del día** con tres clientes (uno pagado en verde, dos impagos en
-ámbar) y el botón **Pagar** visible.
+**📷 Imagen sugerida.**
+
+![Créditos del día: clientes y su estado de pago](img/29-creditos-dia.png)
+
 
 ## 12. Cierre de caja
 
@@ -312,8 +320,10 @@ monedas, hay un registro por **día y moneda** (usa el filtro de moneda).
 **A tener en cuenta.** El **Cuadre del día** es una foto de control; el cierre formal del efectivo
 es la sección 12.
 
-**📷 Imagen sugerida.** **Cuadre del día** con el panel **Resumen Efectivo** abierto y los demás
-paneles colapsados.
+**📷 Imagen sugerida.**
+
+![Cuadre del día: paneles de Resumen Efectivo, transferencias, gastos, créditos y ventas](img/14-cuadre-dia.png)
+
 
 ---
 
@@ -357,8 +367,10 @@ deliberadamente no.)
 **A tener en cuenta.** Solo el **Dueño** ve la columna de costo y las acciones del día. Una entrada
 que ya se vendió no se puede anular. La fecha siempre es la del día.
 
-**📷 Imagen sugerida.** **Entradas del día** con el modal de **Entrada** abierto y un par de filas en
-la lista.
+**📷 Imagen sugerida.**
+
+![Entradas del día: las compras registradas hoy](img/11-entradas-dia.png)
+
 
 ## 16. Cantidades del día
 
@@ -371,7 +383,10 @@ la lista.
 **A tener en cuenta.** Es **solo lectura**, sin filtros. Los valores negativos y los movimientos se
 resaltan con color para que salten a la vista.
 
-**📷 Imagen sugerida.** La tabla de **Cantidades del Día** con 4–5 productos y las cinco columnas.
+**📷 Imagen sugerida.**
+
+![Cantidades del Día: Inicio, Entradas, Disponible, Vendido y Final por producto](img/12-cantidades-dia.png)
+
 
 ## 17. Ganancias del día
 
@@ -385,7 +400,10 @@ resaltan con color para que salten a la vista.
 **A tener en cuenta.** El costo sale del desglose **grabado en el momento de la venta** (no se
 recalcula). La ganancia total se pinta en verde si es positiva y en rojo si es negativa.
 
-**📷 Imagen sugerida.** **Ganancias del Día** con 3–4 productos, sus costos, y la fila **Total**.
+**📷 Imagen sugerida.**
+
+![Ganancias del Día: precio, costo y ganancia por producto](img/13-ganancias-dia.png)
+
 
 ## 18. Salida
 
@@ -430,8 +448,10 @@ sus productos.
 **Sincronizar Catálogo**. El logo del banner ya no se edita aquí. Los contadores de la cabecera te
 dicen cuántas categorías, productos, publicados y sin imagen tienes.
 
-**📷 Imagen sugerida.** **Catálogo Web** con la tarjeta principal (dirección pública + métricas), la
-tarjeta **Marca** con un logo de ejemplo, y los bloques **Carrusel** e **Imágenes del día**.
+**📷 Imagen sugerida.**
+
+![Catálogo Web: dirección pública, métricas, marca y carrusel](img/23-catalogo-web.png)
+
 
 ## 20. Editar los productos del catálogo (descripción e imagen)
 
@@ -466,8 +486,10 @@ y la **Imagen**, y el resumen de pendientes con **Guardar cambios**.
 del pedido salen del catálogo. Si el guardado va bien pero falla la recarga, se te avisa sin
 perder lo escrito.
 
-**📷 Imagen sugerida.** **Pedidos WhatsApp** con el interruptor encendido y el panel completo
-(número, recogida y envío, horario y zonas).
+**📷 Imagen sugerida.**
+
+![Pedidos WhatsApp: interruptor de pedidos online y su configuración](img/24-pedidos-whatsapp.png)
+
 
 ## 22. Atender los pedidos
 
@@ -484,8 +506,10 @@ perder lo escrito.
 estado. Todo va contra el servidor: tras cada acción la pantalla se recarga. La lista se pagina de
 20 en 20 (**Anterior / Siguiente**).
 
-**📷 Imagen sugerida.** La tabla de **Pedidos** con varios pedidos en distintos estados, los filtros
-arriba y los controles de una fila visibles.
+**📷 Imagen sugerida.**
+
+![Pedidos: la cola de pedidos con sus filtros y acciones](img/25-pedidos.png)
+
 
 ## 23. Repartidores
 
@@ -500,8 +524,10 @@ arriba y los controles de una fila visibles.
 los pedidos ya repartidos: por eso los inactivos siguen apareciendo, tachados. Aquí solo se
 gestionan personas; **asignar** repartidores se hace en **Pedidos**.
 
-**📷 Imagen sugerida.** **Repartidores** con el formulario de alta abierto y una tabla con un
-repartidor activo y otro inactivo (tachado).
+**📷 Imagen sugerida.**
+
+![Repartidores: alta y listado de repartidores](img/26-repartidores.png)
+
 
 ## 24. Ventas de pedidos
 
@@ -517,8 +543,10 @@ repartidor activo y otro inactivo (tachado).
 **A tener en cuenta.** Los pedidos **cancelados** aparecen en el histórico pero **no** suman en las
 métricas. Aquí solo se consulta: para operar un pedido se usa **Pedidos**.
 
-**📷 Imagen sugerida.** **Ventas** con las cinco tarjetas de métricas, los dos desgloses y unas
-líneas de la tabla histórica.
+**📷 Imagen sugerida.**
+
+![Ventas de pedidos: métricas del periodo e histórico](img/27-ventas-pedidos.png)
+
 
 ---
 
@@ -553,8 +581,10 @@ alimentan el **Cuadre del día** y las **Estadísticas**.
 **A tener en cuenta.** El PDF **respeta el filtro de moneda** (si eliges una, el archivo lleva solo
 esa moneda; no convierte).
 
-**📷 Imagen sugerida.** **Reportes de hoy** con las cuatro tarjetas y el botón **Inventario a precio
-de venta**.
+**📷 Imagen sugerida.**
+
+![Reportes de hoy: Pedidos, Ingresos, Costo y Ganancia bruta](img/16-reportes.png)
+
 
 ## 27. Panel de Control
 
@@ -568,8 +598,10 @@ de venta**.
 **A tener en cuenta.** Si tienes varias monedas, los importes se muestran **por moneda**, sin
 conversión. Las secciones de **Gastos** y **Créditos** solo aparecen si esos módulos están activos.
 
-**📷 Imagen sugerida.** El **Panel de Control** con el selector de rango, 3–4 tarjetas KPI y una
-gráfica de ventas.
+**📷 Imagen sugerida.**
+
+![Panel de Control: rango de fechas, KPI y gráficas](img/17-dashboard.png)
+
 
 ## 28. Cuadre por fechas
 
@@ -584,8 +616,10 @@ gráfica de ventas.
 **A tener en cuenta.** **Ganancias Bruta** es la ganancia **sin** restar gastos; **Ganancias** es
 la bruta **menos** los gastos. La fecha de inicio debe ser anterior o igual a la de fin.
 
-**📷 Imagen sugerida.** **Cuadre por fechas** con las dos fechas elegidas, los cuatro KPI y el panel
-**Resumen Efectivo** del cuadre abierto.
+**📷 Imagen sugerida.**
+
+![Cuadre por fechas: los cuatro KPI y el cuadre del periodo](img/18-cuadre-fechas.png)
+
 
 ---
 
@@ -597,7 +631,10 @@ Ver la **sección 6** para crear empleados y la **sección 7** para el acceso si
 gestionar empleados **necesita conexión**, y el roster exportado es lo que habilita el equipo de un
 empleado para trabajar sin internet.
 
-**📷 Imagen sugerida.** El panel **Exportar roster** con el campo de contraseña maestra.
+**📷 Imagen sugerida.**
+
+![Empleados y roster: la lista desde donde se exporta el roster](img/21-empleados.png)
+
 
 ## 30. Tasas de Cambio
 
@@ -615,8 +652,10 @@ históricas **no se editan ni se borran**. La papelera solo **desactiva** (la sa
 la deja en el historial). **USD no aparece** en el selector (es la referencia). El **método** se
 limita a los válidos para la moneda elegida.
 
-**📷 Imagen sugerida.** **Tasas de Cambio** con el modal (`Moneda`, `Método`, valores de compra y
-venta, fecha) y debajo **Tasas Vigentes** con 2–3 monedas.
+**📷 Imagen sugerida.**
+
+![Tasas de Cambio: tasas vigentes e historial](img/20-tasas-cambio.png)
+
 
 ## 31. Configuraciones
 
@@ -624,7 +663,10 @@ Ver la **sección 3** (monedas y métodos de pago). En resumen, esta pantalla of
 activa** (solo multi-tienda), **Monedas de compra y venta** (solo con múltiples monedas) y
 **Métodos de pago**. Guarda al instante.
 
-**📷 Imagen sugerida.** Las tres tarjetas de **Configuraciones**, con el estado **Guardado** visible.
+**📷 Imagen sugerida.**
+
+![Configuraciones: Tienda activa, Monedas y Métodos de pago](img/19-configuraciones.png)
+
 
 ## 32. Mis tiendas
 
@@ -640,8 +682,10 @@ activa** (solo multi-tienda), **Monedas de compra y venta** (solo con múltiples
 plan Superior** con su catálogo. Desactivar una tienda pide confirmación (puede ser la que tienes en
 uso).
 
-**📷 Imagen sugerida.** **Mis tiendas** con dos tarjetas (una activa, una inactiva), el plan y el
-próximo cobro visibles, y el engranaje abierto.
+**📷 Imagen sugerida.**
+
+![Mis tiendas: las tarjetas de tus tiendas con su plan y próximo cobro](img/22-mis-tiendas.png)
+
 
 ## 33. Sincronización: exportar e importar
 
@@ -662,8 +706,12 @@ próximo cobro visibles, y el engranaje abierto.
 incluye catálogo, inventario, ventas, gastos, créditos, métodos de pago, cierres de efectivo y más.
 Al importar, los datos se **fusionan** con los del dispositivo (no se pisa a ciegas).
 
-**📷 Imagen sugerida.** **Exportar datos** con el campo de contraseña y el botón **Exportar**, y al
-lado **Importar datos** con el selector de archivo.
+**📷 Imagen sugerida.**
+
+![Exportar datos: contraseña de cifrado y botón Exportar](img/30-exportar.png)
+
+![Importar datos: archivo de respaldo y contraseña](img/31-importar.png)
+
 
 ## 34. Diagnóstico
 
@@ -679,8 +727,10 @@ ven el **Dueño** y el administrador de la plataforma.
 **A tener en cuenta.** Se actualiza solo cada segundo. Es la pantalla que conviene abrir cuando algo
 falla, para enviar el detalle.
 
-**📷 Imagen sugerida.** **Diagnóstico** con la tarjeta de información del dispositivo y la lista con
-una entrada de error y una de aviso.
+**📷 Imagen sugerida.**
+
+![Diagnóstico: información del dispositivo y el registro de eventos](img/32-diagnostico.png)
+
 
 ---
 
@@ -690,3 +740,14 @@ Este manual se limita a los módulos del plan **Pago** más **Catálogo Web**, *
 las **configuraciones**. Quedan **fuera**: los módulos de **Almacenes** y **Elaboración** (plan
 Superior) y todas las pantallas de **Administración de la plataforma** (SuperAdmin: tiendas, dueños,
 comercializadores, módulos, cobros y comisiones).
+
+## Pendiente (capturas y ajustes acordados)
+
+- **Falta la imagen del MENÚ.** No hay ninguna captura que muestre **dónde está la barra lateral y
+  todas sus opciones**. El manual no puede prescindir de ella: el usuario tiene que saber dónde
+  vive cada vista. Se añadirá junto con las capturas de las dos vistas de conteo (ver abajo).
+- **El signo de interrogación (?) del encabezado es la AYUDA** (el Tutorial). Está detallado en
+  «El encabezado (barra superior)», pero conviene destacarlo cuando se capture el menú.
+- **Conteo de inventario.** El conteo dejará de estar dentro de **Disponible** y pasará a una
+  **vista propia, solo de conteo**. Cuando esté implementada: se **regenera** la imagen de
+  *Disponible* (sin la columna de conteo) y se **añade** la de la vista nueva.
