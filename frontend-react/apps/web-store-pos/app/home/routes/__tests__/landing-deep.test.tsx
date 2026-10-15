@@ -163,7 +163,7 @@ describe('LandingDeep — public landing route', () => {
   });
 
   describe('Features grid + scroll-reveal', () => {
-    it('renders all 9 FEATURES titles, each inside a shared Card', () => {
+    it('renders all 11 FEATURES titles, each inside a shared Card', () => {
       renderLanding();
       const titles = [
         'Seguridad total',
@@ -175,6 +175,8 @@ describe('LandingDeep — public landing route', () => {
         'Facturación integrada',
         'Panel de decisiones',
         'Sincronización flexible',
+        'Venta mayorista y minorista',
+        'Catálogo web con pedidos por WhatsApp',
       ];
       for (const title of titles) {
         const heading = screen.getByText(title);

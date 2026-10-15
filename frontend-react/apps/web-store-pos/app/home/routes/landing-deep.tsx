@@ -395,6 +395,55 @@ const FEATURES: Array<{ title: string; desc: string; icon: React.ReactNode }> = 
       </svg>
     ),
   },
+  {
+    title: 'Venta mayorista y minorista',
+    desc: 'Vende al detal y al por mayor, con listas y precios distintos en la misma tienda.',
+    icon: (
+      <svg
+        width="28"
+        height="28"
+        viewBox="0 0 28 28"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <path
+          d="M14.5 3.5h6a2 2 0 0 1 2 2v6l-9.7 9.7a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8l9.7-9.7Z"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinejoin="round"
+        />
+        <circle cx="18.5" cy="9.5" r="1.75" stroke="currentColor" strokeWidth="1.5" />
+      </svg>
+    ),
+  },
+  {
+    title: 'Catálogo web con pedidos por WhatsApp',
+    desc: 'Publica tu catálogo web y recibe pedidos por WhatsApp, sin que el cliente instale nada.',
+    icon: (
+      <svg
+        width="28"
+        height="28"
+        viewBox="0 0 28 28"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <rect x="3.5" y="4.5" width="21" height="16" rx="2" stroke="currentColor" strokeWidth="1.5" />
+        <path d="M3.5 9h21" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        <path
+          d="M8 13.5h7M8 16.5h4.5"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+        />
+        <path
+          d="M17.5 24.5v-3h6v3h-4l-2 2v-2Z"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinejoin="round"
+        />
+      </svg>
+    ),
+  },
 ];
 
 const STEPS = [
@@ -635,7 +684,7 @@ export default function LandingDeep() {
             {/* Left: Copy */}
             <div>
               <p className="landing-animate-in mb-6 text-xs font-medium tracking-[0.2em] text-accent uppercase [animation-delay:100ms]">
-                Punto de venta offline
+                POS offline + catálogo web con pedidos por WhatsApp
               </p>
               <h1 className="landing-animate-in mb-6 text-5xl leading-[0.95] font-bold tracking-tight sm:text-6xl lg:text-7xl [animation-delay:250ms]">
                 Vende más.
@@ -666,6 +715,20 @@ export default function LandingDeep() {
                   </svg>
                   Ver características
                 </a>
+                <a href="#precios" className={ctaOutline}>
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <path
+                      d="M2.5 3.5h2l1.6 7.2a1 1 0 0 0 1 .8h5.4a1 1 0 0 0 1-.8l1-4.2H4.3"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <circle cx="6.5" cy="13" r="1" fill="currentColor" />
+                    <circle cx="11.5" cy="13" r="1" fill="currentColor" />
+                  </svg>
+                  Plan Gratis para el uso diario
+                </a>
               </div>
             </div>
 
@@ -675,7 +738,7 @@ export default function LandingDeep() {
                 <div className="mb-3 flex items-baseline gap-2">
                   <span className="text-4xl leading-none font-bold text-accent">24</span>
                   <span className="text-xs font-medium tracking-wide text-text-muted uppercase">
-                    hrs, sin conexión
+                    las 24 horas, sin conexión
                   </span>
                 </div>
                 <div className="mb-3 flex items-baseline gap-2">
@@ -713,7 +776,7 @@ export default function LandingDeep() {
             </div>
             <div className="flex items-end">
               <p className="max-w-[500px] text-lg text-text-muted">
-                Una herramienta completa que crece contigo. Sin suscripciones, sin complicaciones,
+                Una herramienta completa que crece contigo. Sin contratos ni cargos ocultos, sin complicaciones,
                 sin internet.
               </p>
             </div>
