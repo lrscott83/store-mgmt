@@ -138,6 +138,18 @@ async function main() {
   await waitForPathChange(page, (url) => !url.pathname.startsWith('/register'));
   // El botón flotante INSTALAR APP se MANTIENE: el paso de instalación vive aquí.
   await capture(page, '02-inicio', { keepFixed: true });
+
+  // ── Encabezado y pie (íconos y contacto) — capturas de ELEMENTO ────────
+  await settle(page);
+  await page
+    .locator('header')
+    .first()
+    .screenshot({ path: resolve(OUT_DIR, '04-encabezado.png') });
+  await page
+    .locator('footer')
+    .first()
+    .screenshot({ path: resolve(OUT_DIR, '05-pie.png') });
+  console.log('guardadas 04-encabezado.png / 05-pie.png');
   await ctx.close();
 
   await browser.close();

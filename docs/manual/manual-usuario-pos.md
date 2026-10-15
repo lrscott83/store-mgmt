@@ -25,6 +25,33 @@ tienda. Las **Partes 2 a 6** son el uso del día a día. Cada sección termina c
 - **El carrito es global.** El ícono del carrito vive en el encabezado de la app y se comparte
   entre las pantallas de venta: armas la venta y la confirmas desde ahí (Parte 2).
 
+### El encabezado (barra superior)
+
+De izquierda a derecha:
+
+- **Doble flecha** — abre la **barra lateral** de menú cuando está cerrada.
+- **Tienda** — **cambiar de tienda** (solo el Dueño, y solo si tiene más de una tienda).
+- **Signo de interrogación** — abre el **Tutorial** (la ayuda de la app); al pulsarlo de nuevo,
+  vuelve a la vista donde estabas.
+- **Carrito** — la **venta en curso**: cuántos artículos llevas (el número) y el **total** al
+  lado. Se usa desde cualquier pantalla de venta.
+- **Burbuja de chat (verde)** — el **chat de soporte** con el administrador de la plataforma;
+  el número indica mensajes sin leer.
+- **Campana** — avisos de la plataforma (solo para la administración).
+- **Persona** — **menú de usuario**: tu usuario y tu nombre, y las opciones **Editar Perfil**,
+  **Cambiar Contraseña** y **Salir**.
+
+![Encabezado del POS: doble flecha · tienda · interrogación · carrito · mensajes · usuario](img/04-encabezado.png)
+
+### El pie de página
+
+- **Políticas de Privacidad** y **Términos y Condiciones** — los documentos legales (abren en
+  una pestaña nueva).
+- **Contáctanos** — abre un chat de **WhatsApp** con el soporte. **Solo aparece con la sesión
+  iniciada** (en la pantalla de acceso no se muestra).
+
+![Pie del POS: Políticas de Privacidad · Términos y Condiciones · Contáctanos · copyright](img/05-pie.png)
+
 ---
 
 # Parte 1 — Puesta en marcha (el Dueño, una sola vez)
