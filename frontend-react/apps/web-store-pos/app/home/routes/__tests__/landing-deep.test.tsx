@@ -3,6 +3,15 @@ import { render, screen, fireEvent, within, act } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import LandingDeep from '../landing-deep';
 
+// The landing's "Precios" section reads the public plan endpoint. The suite blocks real HTTP, so
+// the service is mocked here; `plan-pricing-section.test.tsx` exercises the request path itself.
+// A PLAIN function, not `vi.fn()`: this file's `afterEach` calls `vi.restoreAllMocks()`, which
+// strips a mock's implementation and would leave the section reading `undefined` on every test
+// after the first.
+vi.mock('~/home/lib/public-plan-pricing', () => ({
+  fetchPublicPlanPricing: async () => [],
+}));
+
 /**
  * `IntersectionObserver` is not implemented in jsdom and is used only by this
  * route (feature-card scroll reveal). Stub it globally, capturing the
@@ -154,7 +163,7 @@ describe('LandingDeep — public landing route', () => {
   });
 
   describe('Features grid + scroll-reveal', () => {
-    it('renders all 9 FEATURES titles, each inside a shared Card', () => {
+    it('renders all 11 FEATURES titles, each inside a shared Card', () => {
       renderLanding();
       const titles = [
         'Seguridad total',
@@ -166,6 +175,8 @@ describe('LandingDeep — public landing route', () => {
         'Facturación integrada',
         'Panel de decisiones',
         'Sincronización flexible',
+        'Venta mayorista y minorista',
+        'Catálogo web con pedidos por WhatsApp',
       ];
       for (const title of titles) {
         const heading = screen.getByText(title);
