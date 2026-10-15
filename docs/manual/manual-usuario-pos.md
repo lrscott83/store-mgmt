@@ -343,27 +343,43 @@ es la sección 12.
 > El inventario de la tienda es **local**: se consulta sin conexión y refleja lo que se ha
 > registrado en el dispositivo.
 
-## 14. Inventario disponible y conteo físico
+## 14. Inventario disponible
 
-**Qué es.** Consultar el stock por categoría y producto, su costo y su valor, y **contar** para
-comparar lo que hay contra lo que dice el sistema.
+**Qué es.** Consultar el stock por categoría y producto, su costo y su valor.
 
 **Cómo se hace.**
 1. Ve a **Inventario → Disponible** (título: **Inventario**). Verás las categorías colapsadas.
 2. Expande la categoría y revisa cada producto: nombre, **cantidad del sistema** entre paréntesis,
    costo unitario y valor total.
 3. Usa el buscador (**Buscar producto**) para localizar uno.
-4. Para contar: en la fila de cada producto escribe la cantidad **Contada**. La app muestra la
-   **Diferencia** (contada − sistema): **rojo** si no coincide, **verde** si coincide, **—**
-   mientras no has escrito nada.
 
-**A tener en cuenta.** El conteo es **solo visual**: **no ajusta el stock** ni se guarda. Si
-recargas o cambias de categoría, se pierde. (El sistema de referencia ajusta al confirmar; aquí
-deliberadamente no.)
+**A tener en cuenta.** El **conteo** no está en esta vista: tiene la suya propia (la siguiente).
 
 **📷 Imagen sugerida.**
 
-![Inventario disponible: total, categorías y, por producto, cantidad del sistema, campo Contada y Diferencia](img/08-disponible.png)
+![Inventario disponible: total, categorías y, por producto, cantidad del sistema, costo y valor](img/08-disponible.png)
+
+## 14.1 Conteo de productos
+
+**Qué es.** La vista de **conteo**: recorrer los productos, escribir lo que hay realmente y ver la
+**diferencia** contra el sistema. Es **solo de conteo** y **no ajusta** el stock.
+
+**Cómo se hace.**
+1. Ve a **Inventario → Conteo de productos** (título **Conteo de productos** con el número de
+   productos).
+2. Expande una categoría (paneles colapsables, como en las otras vistas).
+3. En cada producto verás el número de fila, el nombre y **Sistema: N uds**. Escribe lo contado en
+   **Conteo**.
+4. La **diferencia** (contada − sistema) se resalta: **negativa** con signo `-` en **rojo**; **cero
+   o positiva** en **verde** con `+`. Sin escribir nada, muestra `—`.
+5. Para empezar de cero, pulsa **Limpiar**: borra todos los conteos y deja la vista en blanco.
+
+**A tener en cuenta.** Es **solo visual**: no guarda nada (ni en el dispositivo) y **no** modifica
+el stock. Si recargas o sales de la vista, los conteos se pierden.
+
+**📷 Imagen sugerida.**
+
+![Conteo de productos: buscador, categorías y, por producto, Sistema, Conteo y la diferencia resaltada](img/40-conteo-productos.png)
 
 ## 15. Entradas: del día e historial
 
@@ -765,9 +781,8 @@ comercializadores, módulos, cobros y comisiones).
   vive cada vista. Se añadirá junto con las capturas de las dos vistas de conteo (ver abajo).
 - **El signo de interrogación (?) del encabezado es la AYUDA** (el Tutorial). Está detallado en
   «El encabezado (barra superior)», pero conviene destacarlo cuando se capture el menú.
-- **Conteo de inventario.** El conteo dejará de estar dentro de **Disponible** y pasará a una
-  **vista propia, solo de conteo**. Cuando esté implementada: se **regenera** la imagen de
-  *Disponible* (sin la columna de conteo) y se **añade** la de la vista nueva.
+- **Conteo de inventario — HECHO** (llega en `qa`): el conteo ya es una **vista propia**
+  (`/inventory/count`, sección 14.1) y *Disponible* se regeneró **sin** la columna de conteo.
 - **Panel de Control (imagen `17-dashboard`).** Sale en **0** aunque hay ventas: su rango por
   defecto son los **7 días que terminan AYER**, así que las ventas de hoy quedan fuera. Hay que
   **ajustar el filtro de fechas** antes de capturar para que muestre el día.

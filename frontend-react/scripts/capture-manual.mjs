@@ -659,6 +659,18 @@ async function main() {
     await capture(page, name);
   }
 
+  // ── 40: Conteo de productos (vista PROPIA, solo conteo) ────────────────
+  await goto(page, '/inventory/count');
+  await page
+    .locator('[data-testid^="product-count-category-toggle-"]')
+    .first()
+    .click();
+  const firstCountInput = page.locator('[data-testid^="inventory-count-input-"]').first();
+  await firstCountInput.waitFor({ state: 'visible', timeout: 20_000 });
+  // Sistema 40 (Arroz) → contada 35 → diferencia −5, en rojo.
+  await firstCountInput.fill('35');
+  await capture(page, '40-conteo-productos');
+
   // ── Lote final: los modales de adición (33..36) ────────────────────────
   console.log('Capturando los modales de adición ...');
   await captureCreationModals(page, captureModal);
