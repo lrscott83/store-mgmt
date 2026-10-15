@@ -42,10 +42,11 @@ instalado en el dispositivo.
 4. Marca la casilla de **términos y condiciones** (hay un enlace para leerlos).
 5. Pulsa **Registrar**. La cuenta se crea, **entra automáticamente** y te lleva a tu **página
    de inicio** (el catálogo **Productos**, todavía vacío porque aún no has cargado nada).
-6. **Instala la app en el dispositivo.** Pulsa el botón flotante **INSTALAR APP**. El
-   dispositivo **añade el ícono de la app automáticamente**: espera a verlo aparecer en la
-   pantalla de inicio (o en el escritorio) y abre la app desde ahí a partir de ahora. Es lo
-   que permite trabajar **sin conexión**.
+6. **Instala la app en el dispositivo.** En tu **página de inicio** verás el botón flotante
+   **INSTALAR APP**: púlsalo. El dispositivo **añade el ícono de la app automáticamente**;
+   espera a verlo aparecer en la pantalla de inicio (o en el escritorio) y abre la app desde
+   ahí a partir de ahora — así trabaja **sin conexión**. Cuando la app queda instalada, el
+   botón **desaparece** (ya no hace falta).
 
 **A tener en cuenta.** Todo es obligatorio salvo el email. Si el alta se interrumpe justo al
 final, la cuenta ya puede existir: se te avisa y se te lleva a la pantalla de acceso.

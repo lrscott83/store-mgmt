@@ -136,7 +136,8 @@ async function main() {
   await page.check('#acceptTerms');
   await page.getByRole('button', { name: 'Registrar', exact: true }).click();
   await waitForPathChange(page, (url) => !url.pathname.startsWith('/register'));
-  await capture(page, '02-inicio');
+  // El botón flotante INSTALAR APP se MANTIENE: el paso de instalación vive aquí.
+  await capture(page, '02-inicio', { keepFixed: true });
   await ctx.close();
 
   await browser.close();
