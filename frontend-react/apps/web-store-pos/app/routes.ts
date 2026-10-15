@@ -185,6 +185,11 @@ export default [
   // does NOT re-export authLoader as its clientLoader.
   layout('shared/components/public-app-layout.tsx', { id: 'public-app-layout' }, [
     route('help/tutorial', 'help/routes/tutorial.tsx'),
+    // Páginas legales (PÚBLICAS): el footer las enlaza también desde el layout de
+    // invitado y el register las abre en otra pestaña, así que NO pueden pasar por
+    // authLoader. El contenido se genera desde docs/legal/*.md (generate:legal).
+    route('private-police', 'legal/routes/privacy-policy.tsx'),
+    route('terms-conditions', 'legal/routes/terms-conditions.tsx'),
   ]),
 
   // Utility routes
