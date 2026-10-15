@@ -7,7 +7,6 @@ import type { InventoryCategoryView } from '../lib/services/inventory-offline-se
 import { formatMoneyWithCurrency } from '~/shared/lib/format-money-with-currency';
 import { CurrencyTotalAmount } from '~/shared/components/multimonedas/currency-total-amount';
 import { nonEmptyCurrencyRows } from '~/shared/lib/currency-totals';
-import { round2 } from '~/shared/lib/money';
 
 interface InventoryProductListProps {
   categories: InventoryCategoryView[];
@@ -73,10 +72,6 @@ export function InventoryProductList({
   // Angular parity: inventory-available.component.html:19-33 `mat-accordion` with
   // `[expanded]="false"` — categories are collapsed by default, click header to expand.
   const [expandedCategoryIds, setExpandedCategoryIds] = useState<Set<string>>(new Set());
-  // Conteo físico (manual de referencia, captura 20 + §7.4): cantidad contada por producto,
-  // efímera — vive solo mientras la pantalla está montada. Es SOLO VISUAL: no toca el stock
-  // ni persiste nada.
-  const [counted, setCounted] = useState<Record<string, string>>({});
 
   const filtered = filterInventoryCategories(categories, search);
   const isSearching = search.trim() !== '';
@@ -152,83 +147,26 @@ export function InventoryProductList({
               </button>
               {isExpanded && (
                 <div className="divide-y divide-border border-t border-border bg-surface">
-                  {cat.products.map((p) => {
-                    // Diferencia = contada − sistema (Σ available). Vacío o no numérico → sin
-                    // diferencia: el operador todavía no ha contado esa fila.
-                    const rawValue = counted[p.productId];
-                    const parsed =
-                      rawValue === undefined || rawValue.trim() === '' ? null : Number(rawValue);
-                    const difference =
-                      parsed !== null && Number.isFinite(parsed)
-                        ? round2(parsed - p.totalAvailable)
-                        : null;
-                    return (
-                      <div
-                        key={p.productId}
-                        className="flex items-center justify-between gap-3 px-4 py-3"
-                      >
-                        <div className="min-w-0">
-                          <p className="font-medium text-text">
-                            {p.productName} ({p.totalAvailable})
-                          </p>
-                          {/* Conteo físico (manual, captura 20): la contada editable y la
-                              diferencia resaltada junto a la cantidad del sistema de arriba.
-                              Solo visual — no ajusta stock. */}
-                          <div className="mt-1 flex items-center gap-2">
-                            <label
-                              className="text-xs text-text-muted"
-                              htmlFor={`inventory-count-${p.productId}`}
-                            >
-                              {intl.formatMessage({ id: 'INVENTORY.COUNT.COUNTED' })}
-                            </label>
-                            <input
-                              id={`inventory-count-${p.productId}`}
-                              data-testid={`inventory-count-input-${p.productId}`}
-                              type="number"
-                              min="0"
-                              step="any"
-                              value={rawValue ?? ''}
-                              onChange={(e) =>
-                                setCounted((current) => ({
-                                  ...current,
-                                  [p.productId]: e.target.value,
-                                }))
-                              }
-                              className="w-20 rounded border border-border px-2 py-0.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                            />
-                            <span className="text-xs text-text-muted">
-                              {intl.formatMessage({ id: 'INVENTORY.COUNT.DIFFERENCE' })}
-                            </span>
-                            <span
-                              data-testid={`inventory-count-difference-${p.productId}`}
-                              className={`text-xs font-semibold ${
-                                difference === null
-                                  ? 'text-text-muted'
-                                  : difference === 0
-                                    ? 'text-success'
-                                    : 'text-danger'
-                              }`}
-                            >
-                              {difference === null
-                                ? '—'
-                                : `${difference > 0 ? '+' : ''}${difference}`}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          {/* Weighted-average unit cost + per-product total value — Angular's
-                              product.costPrice / product.costPrice*product.quantity currency cells
-                              (inventory-product-list.component.html:20-29). */}
-                          <p className="text-sm font-semibold text-success whitespace-nowrap">
-                            {formatMoneyWithCurrency(p.avgCostPrice, p.currency)}
-                          </p>
-                          <p className="text-sm font-semibold text-primary whitespace-nowrap">
-                            {formatMoneyWithCurrency(p.avgCostPrice * p.totalAvailable, p.currency)}
-                          </p>
-                        </div>
+                  {cat.products.map((p) => (
+                    <div key={p.productId} className="flex items-center justify-between px-4 py-3">
+                      <div>
+                        <p className="font-medium text-text">
+                          {p.productName} ({p.totalAvailable})
+                        </p>
                       </div>
-                    );
-                  })}
+                      <div className="text-right">
+                        {/* Weighted-average unit cost + per-product total value — Angular's
+                            product.costPrice / product.costPrice*product.quantity currency cells
+                            (inventory-product-list.component.html:20-29). */}
+                        <p className="text-sm font-semibold text-success whitespace-nowrap">
+                          {formatMoneyWithCurrency(p.avgCostPrice, p.currency)}
+                        </p>
+                        <p className="text-sm font-semibold text-primary whitespace-nowrap">
+                          {formatMoneyWithCurrency(p.avgCostPrice * p.totalAvailable, p.currency)}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
