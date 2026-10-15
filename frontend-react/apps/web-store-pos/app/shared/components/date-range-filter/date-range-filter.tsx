@@ -5,7 +5,7 @@ import { SearchIcon } from '~/shared/components/ui/icons';
 export interface DateRangeFilterProps {
   /** Applied range — start/end as LOCAL calendar dates (midnight). null = no bound. */
   value: { start: Date | null; end: Date | null };
-  /** Fired when the user clicks the magnifier button with the COMMITTED selection. */
+  /** Fired when the user applies a range ("Filtrar", the magnifier, or "Limpiar"). */
   onApply: (range: { start: Date | null; end: Date | null }) => void;
   /** Extra classes (e.g. "flex-1 min-w-0") to help the filter stretch in a wrapping row. */
   className?: string;
@@ -38,10 +38,10 @@ function fromIsoLocal(iso: string): Date | null {
  * Shared date-range filter: one readonly textbox showing the COMMITTED
  * selection (dd/mm/yyyy, no leading zeros) next to a magnifying-glass button
  * that applies the committed selection to the current view. The textbox opens
- * a small popover with two native date inputs — "Seleccionar" commits the
- * draft to the selection (the lupa then applies it), "Limpiar" resets both
- * selection and draft and immediately applies an empty range. Only the lupa
- * triggers `onApply`.
+ * a small popover with two native date inputs — "Filtrar" commits the draft to
+ * the selection AND applies it in one step; "Limpiar" resets both and
+ * immediately applies an empty range. The magnifier re-applies the committed
+ * selection, kept as a one-click shortcut for the range already on screen.
  */
 export function DateRangeFilter({ value, onApply, className = '' }: DateRangeFilterProps) {
   const [open, setOpen] = useState(false);
@@ -157,12 +157,14 @@ export function DateRangeFilter({ value, onApply, className = '' }: DateRangeFil
                   data-testid="date-range-filter-select"
                   disabled={invalid}
                   onClick={() => {
+                    // One step: commit the draft to the selection AND apply it.
                     setSelection({ start: draft.start, end: draft.end });
                     setOpen(false);
+                    onApply({ start: draft.start, end: draft.end });
                   }}
                   className="rounded bg-primary px-2 py-1 text-sm text-white hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  Seleccionar
+                  Filtrar
                 </button>
               </div>
             </div>

@@ -74,6 +74,25 @@ describe('DateRangeFilter', () => {
     });
   });
 
+  it('el botón "Filtrar" aplica el borrador en UN solo paso (sin la lupa)', () => {
+    const onApply = vi.fn();
+    render(<DateRangeFilter value={{ start: null, end: null }} onApply={onApply} />);
+    fireEvent.click(screen.getByTestId('date-range-filter-input'));
+    expect(screen.getByRole('button', { name: 'Filtrar' })).toBeInTheDocument();
+    fireEvent.change(screen.getByTestId('date-range-filter-start'), {
+      target: { value: '2026-02-03' },
+    });
+    fireEvent.change(screen.getByTestId('date-range-filter-end'), {
+      target: { value: '2026-02-05' },
+    });
+    fireEvent.click(screen.getByTestId('date-range-filter-select'));
+    expect(onApply).toHaveBeenCalledTimes(1);
+    expect(onApply).toHaveBeenCalledWith({
+      start: new Date(2026, 1, 3),
+      end: new Date(2026, 1, 5),
+    });
+  });
+
   it('rejects an invalid range: end before start disables "Seleccionar", shows the hint and a min on the end input', () => {
     render(<DateRangeFilter value={{ start: null, end: null }} onApply={vi.fn()} />);
     fireEvent.click(screen.getByTestId('date-range-filter-input'));

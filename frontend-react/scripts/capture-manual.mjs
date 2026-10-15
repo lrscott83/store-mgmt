@@ -759,9 +759,9 @@ async function main() {
 
   // ── 17: Panel de Control — con el rango llevado a HOY ─────────────────
   // El default del panel es "7 días inclusivos terminando AYER", así que las ventas de hoy
-  // quedan fuera. El filtro tiene DOS pasos: "Seleccionar" solo confirma el borrador en el
-  // input; la lupa (`date-range-filter-button`) es la ÚNICA que dispara `onApply` y fija
-  // `appliedRange`. Sin la lupa la captura sale con el rango por defecto y todo en 0.
+  // quedan fuera. Se rellenan Desde/Hasta y se pulsa "Filtrar" (`date-range-filter-select`),
+  // que desde el arreglo del 2026-10-15 aplica el rango en UN solo paso. La lupa se pulsa
+  // igual como red de seguridad (re-aplica la selección ya comprometida; no daña).
   await goto(page, '/stats/dashboard');
   {
     const today = new Date();
