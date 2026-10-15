@@ -1,13 +1,10 @@
 import { useIntl } from 'react-intl';
 import type { User } from '@store-mgmt/domain';
 import { Card } from '~/shared/components/ui/card';
-import { Button } from '~/shared/components/ui/button';
-import { PlusIcon } from '~/shared/components/ui/icons';
 import { ActionMenu, ActionMenuItem } from '~/shared/components/ui/action-menu';
 
 interface UserCardListProps {
   users: User[];
-  onCreate: () => void;
   onEdit: (id: string) => void;
   onActivate: (id: string) => void;
   onDeactivate: (id: string) => void;
@@ -23,10 +20,12 @@ interface UserCardListProps {
  * shared `ActionMenu` primitive (per-instance open state, gear-menu-action-styling change).
  * Deactivated users get a red/danger card indicator (`users.component.scss:3-6`
  * `.deactive-user`).
+ *
+ * 2026-10-15 (decisión del owner): el botón de crear dejó de vivir aquí y pasó al
+ * ENCABEZADO de la vista (`user-list.tsx`), junto a las acciones del roster.
  */
 export function UserCardList({
   users,
-  onCreate,
   onEdit,
   onActivate,
   onDeactivate,
@@ -35,13 +34,6 @@ export function UserCardList({
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
-        <Button variant="fab" onClick={onCreate}>
-          <PlusIcon />
-          {intl.formatMessage({ id: 'USERS.CREATE' })}
-        </Button>
-      </div>
-
       {users.length === 0 ? (
         <p className="text-sm text-text-muted">{intl.formatMessage({ id: 'USERS.EMPTY' })}</p>
       ) : (

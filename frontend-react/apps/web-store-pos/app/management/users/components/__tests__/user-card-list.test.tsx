@@ -25,7 +25,6 @@ function Wrapper({ children }: { children: React.ReactNode }) {
 }
 
 const baseProps = {
-  onCreate: vi.fn(),
   onEdit: vi.fn(),
   onActivate: vi.fn(),
   onDeactivate: vi.fn(),
@@ -81,29 +80,10 @@ describe('UserCardList — empty state', () => {
   });
 });
 
-describe('UserCardList — FAB triggers onCreate', () => {
-  it('calls onCreate when the FAB is clicked', async () => {
-    const onCreate = vi.fn();
-    const { UserCardList } = await import('../user-card-list');
-    render(
-      <Wrapper>
-        <UserCardList {...baseProps} users={[]} onCreate={onCreate} />
-      </Wrapper>,
-    );
-    fireEvent.click(screen.getByRole('button', { name: esMessages['USERS.CREATE'] }));
-    expect(onCreate).toHaveBeenCalledTimes(1);
-  });
-
-  it('FAB reads exactly "Adicionar", not "Crear usuario" (Req: Copy Matches Angular Terminology Exactly)', async () => {
-    const { UserCardList } = await import('../user-card-list');
-    render(
-      <Wrapper>
-        <UserCardList {...baseProps} users={[]} />
-      </Wrapper>,
-    );
-    expect(screen.getByRole('button', { name: 'Adicionar' })).toBeInTheDocument();
-  });
-});
+// 2026-10-15 (decisión del owner): el botón de crear se movió al ENCABEZADO de la vista
+// (`user-list.tsx`) y su texto pasó de "Adicionar" a "Empleado". Aquí ya no vive, así que
+// sus dos casos (el FAB llama a onCreate / lee exactamente "Adicionar") se retiraron de este
+// archivo y el disparo del botón se cubre en `routes/__tests__/user-routes.test.tsx`.
 
 describe('UserCardList — gear action menu (Req: Users List Uses Shared Chrome and Deactivated Indicator)', () => {
   it('menu is closed by default, opens on gear click, always shows Editar and calls onEdit', async () => {

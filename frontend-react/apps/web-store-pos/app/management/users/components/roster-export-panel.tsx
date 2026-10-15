@@ -89,19 +89,23 @@ export function RosterExportPanel() {
 
   return (
     <>
-      <Button type="button" variant="outline" disabled={disabled} onClick={() => setOpen(true)}>
-        <DownloadIcon className="h-4 w-4" />
-        {intl.formatMessage({ id: 'USERS.EXPORT_ROSTER' })}
-      </Button>
-      <Button
-        type="button"
-        variant="outline"
-        disabled={disabled}
-        onClick={() => setSharing(true)}
-        data-testid="hotspot-open-share-roster"
-      >
-        {intl.formatMessage({ id: 'HOTSPOT.SHARE_TITLE' })}
-      </Button>
+      {/* Las dos acciones del roster, con el mismo estilo ovalado que «+ Empleado»
+          y una debajo de la otra (decisión del owner, 2026-10-15). */}
+      <div className="flex flex-col items-stretch gap-2">
+        <Button type="button" variant="fab" disabled={disabled} onClick={() => setOpen(true)}>
+          <DownloadIcon className="h-4 w-4" />
+          {intl.formatMessage({ id: 'USERS.EXPORT_ROSTER' })}
+        </Button>
+        <Button
+          type="button"
+          variant="fab"
+          disabled={disabled}
+          onClick={() => setSharing(true)}
+          data-testid="hotspot-open-share-roster"
+        >
+          {intl.formatMessage({ id: 'HOTSPOT.SHARE_TITLE' })}
+        </Button>
+      </div>
 
       {sharing && (
         <HotspotShareModal prepare={prepareShare} onClose={() => setSharing(false)} />

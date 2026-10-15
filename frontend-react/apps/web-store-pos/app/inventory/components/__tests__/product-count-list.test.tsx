@@ -145,13 +145,16 @@ describe('ProductCountList — fila del producto (número, nombre, Sistema, Cont
     expect(difference.className).toContain('text-danger');
   });
 
-  it('diferencia cero en verde con signo +', () => {
+  it('diferencia cero muestra el checkbox verde de "correcto" en vez del número', () => {
     renderList({ counts: { p2: '88' } });
     fireEvent.click(screen.getByTestId('product-count-category-toggle-cat1'));
 
-    const difference = screen.getByTestId('inventory-count-difference-p2');
-    expect(difference).toHaveTextContent('+0');
-    expect(difference.className).toContain('text-success');
+    const checkbox = screen.getByTestId('inventory-count-correct-p2');
+    expect(checkbox).toBeChecked();
+    expect(checkbox).toBeDisabled();
+    expect(checkbox.className).toContain('accent-success');
+    // El número se sustituye por el checkbox, no conviven.
+    expect(screen.getByTestId('inventory-count-difference-p2')).not.toHaveTextContent('+0');
   });
 
   it('diferencia positiva en verde con signo +', () => {

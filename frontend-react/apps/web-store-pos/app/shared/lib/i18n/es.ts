@@ -1106,6 +1106,7 @@ const messages: Record<string, string> = {
   'INVENTORY.COUNT.SYSTEM': 'Sistema: {quantity} uds',
   'INVENTORY.COUNT.SEARCH_PLACEHOLDER': 'Buscar producto por nombre…',
   'INVENTORY.COUNT.CLEAR': 'Limpiar',
+  'INVENTORY.COUNT.CORRECT': 'Correcto',
   'INVENTORY.TODAY_ENTRIES.TITLE': 'Entradas del día',
   'INVENTORY.TODAY_ENTRIES.NEW_ENTRY': 'Nueva entrada',
   // 2026-09-18 (permiso del usuario): el header ahora es «Entradas (n)» — el
@@ -1747,7 +1748,7 @@ const messages: Record<string, string> = {
   'USERS.PASSWORDS_MUST_MATCH': 'Las contraseñas no coinciden.',
   'USERS.ERROR': 'Ocurrió un error. Intente de nuevo.',
   'USERS.EDIT': 'Editar',
-  'USERS.CREATE': 'Adicionar',
+  'USERS.CREATE': 'Empleado',
   'USERS.LIFECYCLE_ERROR': 'No se pudo realizar la acción. Intente de nuevo.',
   // Admin export of the encrypted offline roster bundle (offline-auth-frontend,
   // design correction #5). BLOCKED-for-verification: the backend endpoint

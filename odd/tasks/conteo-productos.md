@@ -26,6 +26,9 @@ colapsables y un botón **Limpiar** que borra todos los conteos y deja la vista 
 - **S8** — Título de la vista `"Conteo de productos"` con el número de productos.
 - **S9** — La vista se alcanza desde el menú (grupo INVENTARIO), con la misma autorización que
   Disponible (`EFeatures.Available`).
+- **S10** — Cuando la **diferencia es cero**, en vez del número la fila muestra un **checkbox
+  verde** para saber que está correcta: `"cuando es cero mostrar un checkbox con ese color verde
+  para saber que esta correcto"`.
 
 ## Assumptions (marcadas, corregibles)
 
@@ -36,6 +39,8 @@ colapsables y un botón **Limpiar** que borra todos los conteos y deja la vista 
 - **A4** — Se conservan los estilos del POS (tema claro), no los del mockup oscuro de la
 
   imagen: mismos componentes y clases que las otras vistas.
+- **A5** — El checkbox de S10 es un **indicador**, no una acción: va marcado y deshabilitado
+  (no lo toca el usuario; su estado sale del conteo).
 
 ## Tasks
 
@@ -80,3 +85,9 @@ colapsables y un botón **Limpiar** que borra todos los conteos y deja la vista 
   existentes, ni concurrencia, ni entrega.
 - **L7 (pendiente)** — Sin commit todavía: la rama sigue con los cambios en el árbol a la espera
   de la decisión del owner.
+- **L8 (2026-10-15, verbatim)** — `"en el conteo de productos cuando es cero mostrar un checkbox
+  con ese color verde para saber que esta correcto"`. Implementado: `difference === 0` deja de
+  pintar `+0` y pinta un checkbox marcado y deshabilitado con `accent-success` (testid
+  `inventory-count-correct-<productId>`), dentro de la misma celda de diferencia (fondo verde
+  `bg-success/10`). Clave i18n nueva `INVENTORY.COUNT.CORRECT` = `"Correcto"` (aria-label). El
+  resto de los casos no cambia (`—` sin conteo, `+N`/`-N` con su color).
