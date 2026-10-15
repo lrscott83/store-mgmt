@@ -3,6 +3,7 @@ import { Link } from 'react-router';
 import { Button } from '~/shared/components/ui/button';
 import { Card } from '~/shared/components/ui/card';
 import { CloseIcon } from '~/shared/components/ui/icons';
+import { PlanPricingSection } from '../components/plan-pricing-section';
 import './landing-deep.css';
 
 // Mirrors Button's primary variant (ui/button.tsx VARIANT_CLASSES.primary) for
@@ -527,6 +528,12 @@ export default function LandingDeep() {
               >
                 Cómo funciona
               </a>
+              <a
+                className="text-sm font-medium uppercase tracking-wide text-text-muted hover:text-accent"
+                href="#precios"
+              >
+                Precios
+              </a>
               {showLoginButton && (
                 <Link
                   className="text-sm font-medium uppercase tracking-wide text-text-muted hover:text-accent"
@@ -592,6 +599,13 @@ export default function LandingDeep() {
                     onClick={closeMenu}
                   >
                     Cómo funciona
+                  </a>
+                  <a
+                    className="block px-6 py-2 text-sm text-text hover:bg-accent/5 hover:text-accent"
+                    href="#precios"
+                    onClick={closeMenu}
+                  >
+                    Precios
                   </a>
                   <Link
                     className="block px-6 py-2 text-sm text-text hover:bg-accent/5 hover:text-accent"
@@ -757,6 +771,9 @@ export default function LandingDeep() {
           </div>
         </div>
       </section>
+
+      {/* PRICING */}
+      <PlanPricingSection />
 
       {/* CTA */}
       <section id="registro" className="px-4 py-24">
