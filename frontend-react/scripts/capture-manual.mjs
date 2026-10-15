@@ -794,6 +794,38 @@ async function main() {
   console.log('Capturando los modales de adición ...');
   await captureCreationModals(page, captureModal);
 
+  // ── Menú: la barra lateral con TODAS sus opciones (al final: no hay que cerrarla) ──
+  await goto(page, '/sales/products');
+  await page.getByRole('button', { name: 'Alternar barra lateral' }).first().click();
+  await page.waitForTimeout(900);
+  {
+    const panelInfo = async () =>
+      page.evaluate(() => {
+        const candidates = Array.from(document.querySelectorAll('aside, nav, div')).filter(
+          (el) => el.querySelectorAll('a[href]').length >= 8,
+        );
+        const panel = candidates.sort((a, b) => b.scrollHeight - a.scrollHeight)[0];
+        if (!panel) return { found: false, scrollHeight: 0, clientHeight: 0 };
+        return { found: true, scrollHeight: panel.scrollHeight, clientHeight: panel.clientHeight };
+      });
+    const info = await panelInfo();
+    console.log(`menú: encontrado=${info.found} alto=${info.scrollHeight} visible=${info.clientHeight}`);
+    const per = Math.max(1, info.clientHeight || 584);
+    const count = Math.max(1, Math.ceil((info.scrollHeight || per) / per));
+    console.log(`menú: ${count} tramo(s)`);
+    for (let i = 0; i < count; i += 1) {
+      await page.evaluate((index) => {
+        const candidates = Array.from(document.querySelectorAll('aside, nav, div')).filter(
+          (el) => el.querySelectorAll('a[href]').length >= 8,
+        );
+        const panel = candidates.sort((a, b) => b.scrollHeight - a.scrollHeight)[0];
+        if (panel) panel.scrollTop = index * panel.clientHeight;
+      }, i);
+      await page.waitForTimeout(400);
+      await capture(page, count === 1 ? '45-menu' : `45-menu-${i + 1}`, { fullPage: false });
+    }
+  }
+
   await ctx.close();
   await browser.close();
   printHeightTable();

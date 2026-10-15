@@ -25,6 +25,19 @@ tienda. Las **Partes 2 a 6** son el uso del día a día. Cada sección termina c
 - **El carrito es global.** El ícono del carrito vive en el encabezado de la app y se comparte
   entre las pantallas de venta: armas la venta y la confirmas desde ahí (Parte 2).
 
+### El menú (barra lateral)
+
+Aquí viven **todas las vistas**. Se abre con la **doble flecha** del encabezado y se cierra con la
+**doble flecha** de su propio encabezado. Está agrupado por bloques (**VENTA**, **CATÁLOGO WEB**,
+**INVENTARIO**, **GASTOS**, **SINCRONIZACIÓN**, **REPORTES**, **ESTADÍSTICAS**, **GESTIÓN**), y
+**cada opción lleva un `?` que abre la ayuda de esa vista**.
+
+![Menú — parte 1 de 3: el bloque VENTA y el arranque de CATÁLOGO WEB](img/45-menu-1.png)
+
+![Menú — parte 2 de 3](img/45-menu-2.png)
+
+![Menú — parte 3 de 3](img/45-menu-3.png)
+
 ### El encabezado (barra superior)
 
 De izquierda a derecha:
@@ -808,9 +821,9 @@ comercializadores, módulos, cobros y comisiones).
 
 ## Pendiente (capturas y ajustes acordados)
 
-- **Falta la imagen del MENÚ.** No hay ninguna captura que muestre **dónde está la barra lateral y
-  todas sus opciones**. El manual no puede prescindir de ella: el usuario tiene que saber dónde
-  vive cada vista. Se añadirá junto con las capturas de las dos vistas de conteo (ver abajo).
+- **Imagen del MENÚ — HECHA.** El menú (barra lateral) está capturado en **3 tramos**
+  (`45-menu-1..3`) y documentado en «El menú (barra lateral)», incluido el **`?` de ayuda de cada
+  opción**.
 - **El signo de interrogación (?) del encabezado es la AYUDA** (el Tutorial). Está detallado en
   «El encabezado (barra superior)», pero conviene destacarlo cuando se capture el menú.
 - **Conteo de inventario — HECHO** (llega en `qa`): el conteo ya es una **vista propia**
