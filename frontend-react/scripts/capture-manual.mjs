@@ -1,14 +1,15 @@
 // Captura de pantallas para el manual de usuario (docs/manual/manual-usuario-pos.md).
 //
-// Script STANDALONE: no forma parte de la suite Playwright (no vive en `e2e/`, no lo
-// recoge `playwright.config.ts`). Usa el navegador ya instalado y apunta al dev server
-// local (que debe estar levantado con `API_URL=.../api` y el backend `http-e2e`).
+// Script STANDALONE: no forma parte de la suite Playwright. Vive en `scripts/`, fuera del
+// `testDir: './e2e'` del config, así que `pnpm test:e2e` NUNCA lo ejecuta. Usa el navegador
+// ya instalado y apunta al dev server local (levantado con `API_URL=.../api` y el backend
+// `http-e2e`).
 //
 // Todas las capturas son en modo MOBILE (decisión del owner, 2026-10-15).
 //
 // Regla de composición (opción 2): antes de capturar se OCULTAN los elementos con
-// `position: fixed` (botones flotantes), que en una captura `fullPage` se pegan a media
-// pantalla y tapan contenido. Una captura puede pedir `keepFixed: true` para conservarlos.
+// `position: fixed`/`sticky` (botones flotantes), que en una captura `fullPage` se pegan a
+// media pantalla y tapan contenido. Una captura puede pedir `keepFixed: true` para conservarlos.
 //
 // Uso:
 //   node scripts/capture-manual.mjs
@@ -100,9 +101,8 @@ async function main() {
   await mkdir(OUT_DIR, { recursive: true });
 
   const browser = await chromium.launch();
-  const page = await browser.newPage({ ...MOBILE });
 
-  const capture = async (name, { keepFixed = false } = {}) => {
+  const capture = async (page, name, { keepFixed = false } = {}) => {
     await settle(page);
     if (!keepFixed) await hideFixedElements(page);
     const file = resolve(OUT_DIR, `${name}.png`);
@@ -110,10 +110,19 @@ async function main() {
     console.log(`guardada ${file}`);
   };
 
-  // ── 01: Creación de cuenta ─────────────────────────────────────────────
-  // Relleno con datos de ejemplo. Se MANTIENE el botón flotante «INSTALAR APP»
-  // (es parte de lo que la imagen debe mostrar).
+  // ── Sección 2: pantalla de acceso (contexto público, SIN sesión) ───────
+  const publicCtx = await browser.newContext({ ...MOBILE });
+  const publicPage = await publicCtx.newPage();
+  await publicPage.goto(`${BASE}/login`, { waitUntil: 'networkidle', timeout: 60_000 });
+  await publicPage.locator('#login').waitFor({ state: 'visible', timeout: 30_000 });
+  await capture(publicPage, '03-iniciar-sesion');
+  await publicCtx.close();
+
+  // ── Sección 1: registro → inicio (contexto con sesión) ─────────────────
+  const ctx = await browser.newContext({ ...MOBILE });
+  const page = await ctx.newPage();
   const identity = makeExampleIdentity();
+
   await page.goto(`${BASE}/register`, { waitUntil: 'networkidle', timeout: 60_000 });
   await page.locator('#acceptTerms').waitFor({ state: 'visible', timeout: 30_000 });
   await page.fill('#fullName', identity.fullName);
@@ -122,15 +131,16 @@ async function main() {
   await page.fill('#password', identity.password);
   await page.fill('#passwordConfirmation', identity.password);
   await page.fill('#cellPhone', identity.cellPhone);
-  await capture('01-crear-cuenta', { keepFixed: true });
+  await capture(page, '01-crear-cuenta', { keepFixed: true });
 
-  // ── 02: Página de inicio tras registrar ────────────────────────────────
   await page.check('#acceptTerms');
   await page.getByRole('button', { name: 'Registrar', exact: true }).click();
   await waitForPathChange(page, (url) => !url.pathname.startsWith('/register'));
-  await capture('02-inicio');
+  await capture(page, '02-inicio');
+  await ctx.close();
 
   await browser.close();
+  console.log(`\nListo. Imágenes en ${OUT_DIR}`);
 }
 
 main().catch((error) => {

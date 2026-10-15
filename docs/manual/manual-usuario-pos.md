@@ -71,8 +71,9 @@ final, la cuenta ya puede existir: se te avisa y se te lleva a la pantalla de ac
 avisa con un mensaje claro. Una sesión ya iniciada que vuelve a la pantalla de acceso se
 redirige sola a su inicio.
 
-**📷 Imagen sugerida.** La pantalla de acceso con los dos campos, el botón **Iniciar sesión**, el
-enlace *¿No tienes cuenta? Crear cuenta* y el blob inferior de **Acceso sin conexión**.
+**📷 Imagen sugerida.**
+
+![Pantalla de acceso — Usuario y Contraseña, botón Iniciar sesión, enlace Crear cuenta y el botón Activar acceso sin conexión](img/03-iniciar-sesion.png)
 
 ## 3. Configurar la tienda (monedas, métodos de pago y tasas)
 
