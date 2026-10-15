@@ -29,9 +29,10 @@ tienda. Las **Partes 2 a 6** son el uso del día a día. Cada sección termina c
 
 # Parte 1 — Puesta en marcha (el Dueño, una sola vez)
 
-## 1. Crear la cuenta
+## 1. Crear la cuenta e instalar la app
 
-**Qué es.** El alta del propietario: crea tu cuenta y tu primera tienda a la vez.
+**Qué es.** El alta del propietario: crea tu cuenta y tu primera tienda a la vez, y deja el POS
+instalado en el dispositivo.
 
 **Cómo se hace.**
 1. Entra en la pantalla de **Creación de cuenta**.
@@ -39,13 +40,21 @@ tienda. Las **Partes 2 a 6** son el uso del día a día. Cada sección termina c
    **Confirmar contraseña**, **Teléfono celular** y **Email** (el único opcional).
 3. La contraseña debe tener al menos **8 caracteres, una mayúscula y un número**.
 4. Marca la casilla de **términos y condiciones** (hay un enlace para leerlos).
-5. Pulsa **Registrar**. La cuenta se crea y **entra automáticamente**.
+5. Pulsa **Registrar**. La cuenta se crea, **entra automáticamente** y te lleva a tu **página
+   de inicio** (el catálogo **Productos**, todavía vacío porque aún no has cargado nada).
+6. **Instala la app en el dispositivo.** Pulsa el botón flotante **INSTALAR APP**. El
+   dispositivo **añade el ícono de la app automáticamente**: espera a verlo aparecer en la
+   pantalla de inicio (o en el escritorio) y abre la app desde ahí a partir de ahora. Es lo
+   que permite trabajar **sin conexión**.
 
 **A tener en cuenta.** Todo es obligatorio salvo el email. Si el alta se interrumpe justo al
 final, la cuenta ya puede existir: se te avisa y se te lleva a la pantalla de acceso.
 
-**📷 Imagen sugerida.** La pantalla de *Creación de cuenta* con los campos rellenos de ejemplo
-(nombre real de fantasía, teléfono y email visibles) y la casilla de términos marcada.
+**📷 Imagen sugerida.**
+
+![Creación de cuenta — formulario relleno con datos de ejemplo y el botón INSTALAR APP visible](img/01-crear-cuenta.png)
+
+![Página de inicio tras registrarse — el catálogo Productos, aún vacío](img/02-inicio.png)
 
 ## 2. Primer acceso
 
