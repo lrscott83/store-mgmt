@@ -149,6 +149,10 @@ atenuado como inactivo, y puede reactivarse.
 
 ![Catálogo de productos: categorías y productos con su precio de venta, y el engranaje de cada categoría](img/06-productos.png)
 
+![Crear categoría: el modal con el nombre y el orden](img/33-nueva-categoria.png)
+![Nuevo producto: el modal con costo, precio y cantidad](img/34-nuevo-producto.png)
+
+
 ## 5. Registrar las primeras entradas de inventario
 
 **Qué es.** Meter el stock inicial de los productos.
@@ -162,8 +166,10 @@ atenuado como inactivo, y puede reactivarse.
 entrada con fecha pasada. Corregir el costo de una entrada **se propaga** a las ventas ya hechas
 de ese producto.
 
-**📷 Imagen sugerida.** El modal de **Entrada** con producto, cantidad y costo, y detrás la lista
-del día con un par de entradas.
+**📷 Imagen sugerida.**
+
+![Nueva entrada de inventario: producto, cantidad y costo](img/35-nueva-entrada.png)
+
 
 ## 6. Crear los empleados y sus roles
 
@@ -243,8 +249,10 @@ sistema te lo dice antes de dejarlo añadir. Tras registrar, las cantidades se r
 total, ni dejar un **crédito sin cliente**. No se pueden mezclar ventas normales y mayoristas en
 el mismo carrito.
 
-**📷 Imagen sugerida.** El panel del carrito abierto con la línea de un producto, el selector de
-moneda, los métodos de pago, el campo *con cuánto paga* y el **Vuelto**.
+**📷 Imagen sugerida.**
+
+![El carrito: moneda, método de pago y vuelto, crédito y las líneas de la venta](img/37-carrito.png)
+
 
 ## 10. Vender al mayor (por paquetes)
 
@@ -281,6 +289,9 @@ filtrar por rango de fechas y por estado (**Todos / Por Pagar / Pagados**).
 **📷 Imagen sugerida.**
 
 ![Créditos del día: clientes y su estado de pago](img/29-creditos-dia.png)
+
+![Pagar un crédito: la forma de pago y la nota](img/38-pagar-credito.png)
+
 
 
 ## 12. Cierre de caja
@@ -528,6 +539,9 @@ gestionan personas; **asignar** repartidores se hace en **Pedidos**.
 
 ![Repartidores: alta y listado de repartidores](img/26-repartidores.png)
 
+![Nuevo repartidor: nombre y teléfono](img/39-nuevo-repartidor.png)
+
+
 
 ## 24. Ventas de pedidos
 
@@ -568,6 +582,9 @@ alimentan el **Cuadre del día** y las **Estadísticas**.
 **📷 Imagen sugerida.**
 
 ![Gastos del día: botón Gasto y la lista de gastos del día](img/10-gastos.png)
+
+![Nuevo gasto: tipo, total, moneda, tipo de pago y nota](img/36-nuevo-gasto.png)
+
 
 ## 26. Reportes
 
@@ -751,3 +768,9 @@ comercializadores, módulos, cobros y comisiones).
 - **Conteo de inventario.** El conteo dejará de estar dentro de **Disponible** y pasará a una
   **vista propia, solo de conteo**. Cuando esté implementada: se **regenera** la imagen de
   *Disponible* (sin la columna de conteo) y se **añade** la de la vista nueva.
+- **Panel de Control (imagen `17-dashboard`).** Sale en **0** aunque hay ventas: su rango por
+  defecto son los **7 días que terminan AYER**, así que las ventas de hoy quedan fuera. Hay que
+  **ajustar el filtro de fechas** antes de capturar para que muestre el día.
+- **Pedidos online (imágenes `25`, `27`).** Salen vacíos porque no hay pedidos en el servidor. Se
+  pueden sembrar publicando el catálogo (`/sales/web-catalog` → *Sincronizar Catálogo*) y creando
+  pedidos por el endpoint público `POST /v1/public/ordering/<slug>/orders`.
