@@ -72,6 +72,7 @@ export default [
 
     // Inventory
     route('inventory/available', 'inventory/routes/available.tsx'),
+    route('inventory/count', 'inventory/routes/count.tsx'),
     route('inventory/today-entries', 'inventory/routes/today-entries.tsx'),
     route('inventory/entries', 'inventory/routes/entries.tsx'),
     route('inventory/today-quantities', 'inventory/routes/today-quantities.tsx'),
