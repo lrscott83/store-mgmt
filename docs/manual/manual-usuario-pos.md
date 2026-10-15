@@ -143,8 +143,9 @@ productos no se puede vender.
 **entrada de inventario** del día. Desactivar un producto **no lo borra**: queda listado y
 atenuado como inactivo, y puede reactivarse.
 
-**📷 Imagen sugerida.** El catálogo con 2–3 categorías expandidas, productos de ejemplo con su
-precio, y el engranaje abierto mostrando *Categoría / Productos / Producto*.
+**📷 Imagen sugerida.**
+
+![Catálogo de productos: categorías y productos con su precio de venta, y el engranaje de cada categoría](img/06-productos.png)
 
 ## 5. Registrar las primeras entradas de inventario
 
@@ -218,8 +219,9 @@ pérdida.
 **A tener en cuenta.** Si un producto descuenta del inventario y no hay stock suficiente, el
 sistema te lo dice antes de dejarlo añadir. Tras registrar, las cantidades se refrescan solas.
 
-**📷 Imagen sugerida.** La pantalla **Vender** con el buscador, un par de categorías y dos filas de
-producto con su cantidad y botón **Añadir**.
+**📷 Imagen sugerida.**
+
+![Pantalla Vender: buscador, categorías y filas de producto con su cantidad](img/07-vender.png)
 
 ## 9. Cobrar (método de pago, crédito y vuelto)
 
@@ -291,8 +293,9 @@ denominaciones y la diferencia.
 está **Abierta** puedes seguir llenándolo; al cerrar, todo queda bloqueado. Si tienes varias
 monedas, hay un registro por **día y moneda** (usa el filtro de moneda).
 
-**📷 Imagen sugerida.** **Cierre Efectivo** con la **Apertura** puesta, la tarjeta **Conteo** con
-varias denominaciones y cantidades, y las tres tarjetas de **Esperado / Contado / Diferencia**.
+**📷 Imagen sugerida.**
+
+![Cierre Efectivo: Apertura, Esperado/Contado/Diferencia y la tarjeta Conteo](img/09-cierre-caja.png)
 
 ## 13. Ver tus ventas y el cuadre del día
 
@@ -337,8 +340,9 @@ comparar lo que hay contra lo que dice el sistema.
 recargas o cambias de categoría, se pierde. (El sistema de referencia ajusta al confirmar; aquí
 deliberadamente no.)
 
-**📷 Imagen sugerida.** La categoría expandida con dos productos, el campo **Contada** con un
-número en uno, y la **Diferencia** en rojo mostrando la falta.
+**📷 Imagen sugerida.**
+
+![Inventario disponible: total, categorías y, por producto, cantidad del sistema, campo Contada y Diferencia](img/08-disponible.png)
 
 ## 15. Entradas: del día e historial
 
@@ -533,8 +537,9 @@ líneas de la tabla histórica.
 **A tener en cuenta.** La **fecha la pone el sistema**. El historial es **solo lectura**. Los gastos
 alimentan el **Cuadre del día** y las **Estadísticas**.
 
-**📷 Imagen sugerida.** **Gastos del día** con el modal (`Tipo`, `Total`, `Moneda`, `Tipo de pago`,
-`Nota`) y dos gastos listados.
+**📷 Imagen sugerida.**
+
+![Gastos del día: botón Gasto y la lista de gastos del día](img/10-gastos.png)
 
 ## 26. Reportes
 

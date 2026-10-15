@@ -5,11 +5,14 @@
 // ya instalado y apunta al dev server local (levantado con `API_URL=.../api` y el backend
 // `http-e2e`).
 //
-// Todas las capturas son en modo MOBILE (decisión del owner, 2026-10-15).
+// Flujo: registra un Owner de ejemplo → siembra el catálogo por la UI real → captura las
+// pantallas en modo MOBILE (decisión del owner, 2026-10-15).
 //
-// Regla de composición (opción 2): antes de capturar se OCULTAN los elementos con
-// `position: fixed`/`sticky` (botones flotantes), que en una captura `fullPage` se pegan a
-// media pantalla y tapan contenido. Una captura puede pedir `keepFixed: true` para conservarlos.
+// Reglas de composición:
+// - Opción 2: se OCULTAN los elementos `position: fixed`/`sticky` (botones flotantes), que en
+//   una captura `fullPage` se pegan a media pantalla. Una captura puede pedir `keepFixed: true`.
+// - Siempre: se ocultan los halos `animate-ping` (pulsación de "sin leer"), que estáticos
+//   quedan como un círculo suelto.
 //
 // Uso:
 //   node scripts/capture-manual.mjs
@@ -27,6 +30,38 @@ const OUT_DIR =
   process.env.CAPTURE_OUT ?? resolve(process.cwd(), '..', 'docs', 'manual', 'img');
 
 const MOBILE = devices['iPhone 13'];
+
+/** Catálogo de ejemplo de la tienda del manual (decisión del owner, 2026-10-15). */
+const CATALOG = [
+  [
+    'Alimentos',
+    [
+      { name: 'Arroz Bolsa 1 kg', cost: 800, price: 900, qty: 40 },
+      { name: 'Azúcar Bolsa 1 kg', cost: 1150, price: 1300, qty: 30 },
+    ],
+  ],
+  [
+    'Bebidas',
+    [
+      { name: 'Cerveza Cristal Lata', cost: 600, price: 700, qty: 48 },
+      { name: 'Refresco Cola Pomo', cost: 1100, price: 1200, qty: 12 },
+    ],
+  ],
+  [
+    'Pizzas',
+    [
+      { name: 'Pizza con Queso', cost: 275, price: 350, qty: 100 },
+      { name: 'Pizza con Jamón', cost: 450, price: 500, qty: 50 },
+    ],
+  ],
+  [
+    'Confituras',
+    [
+      { name: 'Galletas Dulces Coco', cost: 700, price: 800, qty: 20 },
+      { name: 'Sorbetos Chocolate', cost: 450, price: 550, qty: 30 },
+    ],
+  ],
+];
 
 /** Datos de EJEMPLO para las capturas (login `e2e-` para que la suite los limpie). */
 function makeExampleIdentity() {
@@ -74,10 +109,9 @@ async function hideFixedElements(page) {
 }
 
 /**
- * Oculta los puntos `animate-ping` — el halo que PULSA junto a los indicadores de
- * "sin leer". En una captura estática no se ve como una pulsación, sino como un círculo
- * suelto de color; el contador (verde/púrpura) ya comunica lo mismo. Se oculta SIEMPRE,
- * también en las capturas con `keepFixed`.
+ * Oculta los puntos `animate-ping` — el halo que PULSA junto a los indicadores de "sin leer".
+ * En una captura estática no se ve como pulsación, sino como un círculo suelto; el contador ya
+ * comunica lo mismo. Se oculta SIEMPRE, también en las capturas con `keepFixed`.
  */
 async function hidePingDots(page) {
   await page.evaluate(() => {
@@ -95,8 +129,8 @@ async function settle(page) {
 
 /**
  * Espera a que la URL cumpla `predicate`. Se SONDEA `page.url()` en vez de usar
- * `page.waitForURL`: tras el auto-login la app navega del lado del cliente (SPA) y no
- * dispara el evento `load` que `waitForURL` espera por defecto.
+ * `page.waitForURL`: tras el auto-login la app navega del lado del cliente (SPA) y no dispara
+ * el evento `load` que `waitForURL` espera por defecto.
  */
 async function waitForPathChange(page, predicate, timeoutMs = 90_000) {
   const start = Date.now();
@@ -106,6 +140,48 @@ async function waitForPathChange(page, predicate, timeoutMs = 90_000) {
       throw new Error(`La URL no cambió tras ${timeoutMs} ms; sigue en ${page.url()}`);
     }
     await page.waitForTimeout(500);
+  }
+}
+
+/** Navega a una ruta de la app y espera a que cargue. */
+async function goto(page, path) {
+  await page.goto(`${BASE}${path}`, { waitUntil: 'networkidle', timeout: 60_000 });
+  await page.waitForTimeout(400);
+}
+
+/** Siembra el catálogo (categorías + productos con costo, precio y stock) por la UI real. */
+async function seedCatalog(page) {
+  await goto(page, '/sales/products');
+
+  for (const [categoryName, products] of CATALOG) {
+    await page.getByTestId('add-category-button').click();
+    await page.getByTestId('category-name-input').fill(categoryName);
+    await page.getByTestId('category-save-button').click();
+
+    const nameButton = page
+      .locator('[data-testid^="category-panel-toggle-"]')
+      .filter({ hasText: categoryName })
+      .first();
+    await nameButton.waitFor({ state: 'visible', timeout: 20_000 });
+    const testId = await nameButton.getAttribute('data-testid');
+    const categoryId = (testId ?? '').replace('category-panel-toggle-', '');
+    console.log(`categoría lista: ${categoryName} (${categoryId})`);
+
+    for (const product of products) {
+      await page.getByTestId(`category-actions-toggle-${categoryId}`).click();
+      await page.getByTestId('add-product-button').click();
+      await page.getByTestId('product-name-input').fill(product.name);
+      const cost = page.getByTestId('product-cost-input');
+      if (await cost.count()) await cost.fill(String(product.cost));
+      await page.getByTestId('product-price-input').fill(String(product.price));
+      const quantity = page.getByTestId('product-quantity-input');
+      if (await quantity.count()) await quantity.fill(String(product.qty));
+      await page.getByTestId('create-product-submit').click();
+      await page
+        .getByTestId('product-name-input')
+        .waitFor({ state: 'hidden', timeout: 20_000 });
+      console.log(`  producto listo: ${product.name}`);
+    }
   }
 }
 
@@ -128,7 +204,7 @@ async function main() {
   // ── Sección 2: pantalla de acceso (contexto público, SIN sesión) ───────
   const publicCtx = await browser.newContext({ ...MOBILE });
   const publicPage = await publicCtx.newPage();
-  await publicPage.goto(`${BASE}/login`, { waitUntil: 'networkidle', timeout: 60_000 });
+  await goto(publicPage, '/login');
   await publicPage.locator('#login').waitFor({ state: 'visible', timeout: 30_000 });
   await capture(publicPage, '03-iniciar-sesion');
   await publicCtx.close();
@@ -138,7 +214,7 @@ async function main() {
   const page = await ctx.newPage();
   const identity = makeExampleIdentity();
 
-  await page.goto(`${BASE}/register`, { waitUntil: 'networkidle', timeout: 60_000 });
+  await goto(page, '/register');
   await page.locator('#acceptTerms').waitFor({ state: 'visible', timeout: 30_000 });
   await page.fill('#fullName', identity.fullName);
   await page.fill('#storeName', identity.storeName);
@@ -157,17 +233,38 @@ async function main() {
   // ── Encabezado y pie (íconos y contacto) — capturas de ELEMENTO ────────
   await settle(page);
   await hidePingDots(page);
-  await page
-    .locator('header')
-    .first()
-    .screenshot({ path: resolve(OUT_DIR, '04-encabezado.png') });
-  await page
-    .locator('footer')
-    .first()
-    .screenshot({ path: resolve(OUT_DIR, '05-pie.png') });
+  await page.locator('header').first().screenshot({ path: resolve(OUT_DIR, '04-encabezado.png') });
+  await page.locator('footer').first().screenshot({ path: resolve(OUT_DIR, '05-pie.png') });
   console.log('guardadas 04-encabezado.png / 05-pie.png');
-  await ctx.close();
 
+  // ── Sembrado del catálogo ──────────────────────────────────────────────
+  console.log('Sembrando el catálogo ...');
+  await seedCatalog(page);
+
+  // ── 06: Catálogo, con una categoría expandida ──────────────────────────
+  await goto(page, '/sales/products');
+  await page.locator('[data-testid^="category-panel-toggle-"]').first().click();
+  await capture(page, '06-productos');
+
+  // ── 07: Vender ─────────────────────────────────────────────────────────
+  await goto(page, '/sales/new');
+  await capture(page, '07-vender');
+
+  // ── 08: Inventario disponible (con una categoría expandida) ────────────
+  await goto(page, '/inventory/available');
+  const invToggle = page.locator('[data-testid^="inventory-category-toggle-"]').first();
+  await invToggle.click();
+  await capture(page, '08-disponible');
+
+  // ── 09: Cierre de caja ─────────────────────────────────────────────────
+  await goto(page, '/sales/cash-closing');
+  await capture(page, '09-cierre-caja');
+
+  // ── 10: Gastos del día ─────────────────────────────────────────────────
+  await goto(page, '/expenses/today');
+  await capture(page, '10-gastos');
+
+  await ctx.close();
   await browser.close();
   console.log(`\nListo. Imágenes en ${OUT_DIR}`);
 }
