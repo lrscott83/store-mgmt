@@ -73,6 +73,20 @@ async function hideFixedElements(page) {
   });
 }
 
+/**
+ * Oculta los puntos `animate-ping` — el halo que PULSA junto a los indicadores de
+ * "sin leer". En una captura estática no se ve como una pulsación, sino como un círculo
+ * suelto de color; el contador (verde/púrpura) ya comunica lo mismo. Se oculta SIEMPRE,
+ * también en las capturas con `keepFixed`.
+ */
+async function hidePingDots(page) {
+  await page.evaluate(() => {
+    for (const el of document.querySelectorAll('.animate-ping')) {
+      el.style.setProperty('visibility', 'hidden', 'important');
+    }
+  });
+}
+
 /** Espera a que la página esté estable para la captura. */
 async function settle(page) {
   await page.waitForLoadState('networkidle').catch(() => {});
@@ -104,6 +118,7 @@ async function main() {
 
   const capture = async (page, name, { keepFixed = false } = {}) => {
     await settle(page);
+    await hidePingDots(page);
     if (!keepFixed) await hideFixedElements(page);
     const file = resolve(OUT_DIR, `${name}.png`);
     await page.screenshot({ path: file, fullPage: true });
@@ -141,6 +156,7 @@ async function main() {
 
   // ── Encabezado y pie (íconos y contacto) — capturas de ELEMENTO ────────
   await settle(page);
+  await hidePingDots(page);
   await page
     .locator('header')
     .first()
