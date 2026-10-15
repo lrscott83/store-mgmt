@@ -1106,6 +1106,7 @@ const messages: Record<string, string> = {
   'INVENTORY.COUNT.SYSTEM': 'Sistema: {quantity} uds',
   'INVENTORY.COUNT.SEARCH_PLACEHOLDER': 'Buscar producto por nombre…',
   'INVENTORY.COUNT.CLEAR': 'Limpiar',
+  'INVENTORY.COUNT.CORRECT': 'Correcto',
   'INVENTORY.TODAY_ENTRIES.TITLE': 'Entradas del día',
   'INVENTORY.TODAY_ENTRIES.NEW_ENTRY': 'Nueva entrada',
   // 2026-09-18 (permiso del usuario): el header ahora es «Entradas (n)» — el
