@@ -10,7 +10,8 @@
     "lint": "eslint . --max-warnings=0",
     "typecheck": "react-router typegen && tsc",
     "clean": "rimraf build .react-router",
-    "test": "vitest run"
+    "test": "vitest run",
+    "generate:legal": "node scripts/generate-legal-content.mjs"
   },
   "dependencies": {
     "@microsoft/signalr": "^8.0.29",

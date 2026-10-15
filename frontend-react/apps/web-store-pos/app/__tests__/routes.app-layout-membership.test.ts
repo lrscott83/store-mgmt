@@ -24,6 +24,14 @@ interface RouteEntry {
 // `encryptEntity`/`decryptEntity` seam and has no clientLoader of its own, so §3's
 // conclusion (nothing outside `app-layout` reaches the encrypted entity store) still
 // holds for it.
+// §3 RE-VERIFIED 2026-10-15 (páginas legales del POS): `legal/routes/privacy-policy.tsx`
+// y `legal/routes/terms-conditions.tsx` son las páginas de Políticas de Privacidad y
+// Términos y Condiciones. MUST stay anonymous: el footer las enlaza también desde el
+// layout de invitado y el register las abre en otra pestaña, así que detrás de
+// `app-layout` un visitante sin sesión acabaría en `/login`. Ninguna de las dos tiene
+// `clientLoader` y su único contenido es el Markdown generado desde `docs/legal/*.md`
+// (`generate:legal`) más un renderizador sin estado: no tocan ningún seam
+// `encryptEntity`/`decryptEntity`, así que §3 sigue en pie.
 const FROZEN_OUTSIDE_APP_LAYOUT = [
   'auth/routes/login.tsx',
   'auth/routes/provision.tsx',
@@ -31,6 +39,8 @@ const FROZEN_OUTSIDE_APP_LAYOUT = [
   'catalog/routes/public-catalog.tsx',
   'help/routes/tutorial.tsx',
   'home/routes/landing-deep.tsx',
+  'legal/routes/privacy-policy.tsx',
+  'legal/routes/terms-conditions.tsx',
   'shared/routes/$.tsx',
   'shared/routes/health.tsx',
 ].sort();
@@ -52,7 +62,7 @@ function collectLeafFilesOutsideAppLayout(
 }
 
 describe('routes.ts — the set of route files outside app-layout is frozen (device-wrapped-dek design §3)', () => {
-  it('equals the exact 8-item list §3 verified nothing bypasses the authLoader/DEK-bootstrap gate', () => {
+  it('equals the exact 10-item list §3 verified nothing bypasses the authLoader/DEK-bootstrap gate', () => {
     const outside = collectLeafFilesOutsideAppLayout(routes as RouteEntry[], false).sort();
     expect(outside).toEqual(FROZEN_OUTSIDE_APP_LAYOUT);
   });

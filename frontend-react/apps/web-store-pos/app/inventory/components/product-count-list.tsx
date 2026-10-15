@@ -146,12 +146,32 @@ export function ProductCountList({
                             />
                           </div>
                         </div>
-                        <span
-                          data-testid={`inventory-count-difference-${p.productId}`}
-                          className={`shrink-0 rounded-md px-3 py-1 text-sm font-semibold ${differenceClass}`}
-                        >
-                          {difference === null ? '—' : `${difference >= 0 ? '+' : ''}${difference}`}
-                        </span>
+                        {difference === 0 ? (
+                          /* Coincide con el sistema: en vez del número se muestra un
+                             checkbox verde para saber de un vistazo que esa fila está
+                             correcta. Es un indicador (no una acción), por eso va
+                             deshabilitado y con la opacidad forzada. */
+                          <span
+                            data-testid={`inventory-count-difference-${p.productId}`}
+                            className={`shrink-0 rounded-md px-3 py-1 ${differenceClass}`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked
+                              disabled
+                              aria-label={intl.formatMessage({ id: 'INVENTORY.COUNT.CORRECT' })}
+                              data-testid={`inventory-count-correct-${p.productId}`}
+                              className="h-5 w-5 accent-success disabled:opacity-100"
+                            />
+                          </span>
+                        ) : (
+                          <span
+                            data-testid={`inventory-count-difference-${p.productId}`}
+                            className={`shrink-0 rounded-md px-3 py-1 text-sm font-semibold ${differenceClass}`}
+                          >
+                            {difference === null ? '—' : `+${difference}`}
+                          </span>
+                        )}
                       </div>
                     );
                   })}
