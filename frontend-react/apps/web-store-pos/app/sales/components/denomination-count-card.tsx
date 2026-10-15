@@ -61,20 +61,20 @@ function DenominationRow({
 
   return (
     <div
-      className="flex items-center gap-2 border-b border-border py-2 last:border-0"
+      className="flex items-center gap-1.5 border-b border-border py-1.5 text-sm last:border-0"
       data-testid={`denomination-row-${value}`}
     >
-      <span className="min-w-[7rem] flex-1 font-medium text-text" data-testid="denomination-value">
+      <span className="min-w-0 flex-1 font-medium text-text" data-testid="denomination-value">
         {formatAmount(value)}
       </span>
-      <div className="flex items-center gap-1">
+      <div className="flex shrink-0 items-center gap-1">
         <button
           type="button"
           onClick={() => step(-1)}
           disabled={disabled}
           aria-label={`- ${formatAmount(value)}`}
           data-testid={`denomination-minus-${value}`}
-          className="h-8 w-8 rounded-md border border-border text-lg leading-none text-text hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50"
+          className="h-7 w-7 rounded-md border border-border text-base leading-none text-text hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50"
         >
           −
         </button>
@@ -86,7 +86,7 @@ function DenominationRow({
           onChange={(e) => commit(e.target.value)}
           aria-label={`Cantidad ${formatAmount(value)}`}
           data-testid={`denomination-qty-${value}`}
-          className="h-8 w-16 rounded-md border border-gray-300 px-2 text-center text-sm focus:outline-none focus:ring-1 focus:ring-cyan-500 disabled:bg-surface-hover"
+          className="h-7 w-12 rounded-md border border-gray-300 px-1 text-center text-sm focus:outline-none focus:ring-1 focus:ring-cyan-500 disabled:bg-surface-hover"
         />
         <button
           type="button"
@@ -94,13 +94,13 @@ function DenominationRow({
           disabled={disabled}
           aria-label={`+ ${formatAmount(value)}`}
           data-testid={`denomination-plus-${value}`}
-          className="h-8 w-8 rounded-md border border-border text-lg leading-none text-text hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50"
+          className="h-7 w-7 rounded-md border border-border text-base leading-none text-text hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50"
         >
           +
         </button>
       </div>
       <span
-        className="min-w-[7rem] flex-1 text-right font-medium text-text"
+        className="min-w-0 flex-1 text-right font-semibold tabular-nums text-text"
         data-testid={`denomination-total-${value}`}
       >
         {formatAmount(value * count)}
@@ -133,14 +133,14 @@ export function DenominationCountCard({
 
   return (
     <div data-testid="denomination-count-card">
-      <div className="flex items-center gap-2 border-b border-border pb-2 text-xs font-semibold uppercase tracking-wide text-text-muted">
-        <span className="min-w-[7rem] flex-1">
+      <div className="flex items-center gap-1.5 border-b border-border pb-2 text-[0.7rem] font-semibold uppercase tracking-wide text-text-muted">
+        <span className="min-w-0 flex-1">
           {intl.formatMessage({ id: 'CASH_CLOSING.DENOMINATION' })}
         </span>
-        <span className="w-[8.5rem] text-center">
+        <span className="w-28 shrink-0 text-center">
           {intl.formatMessage({ id: 'CASH_CLOSING.QUANTITY' })}
         </span>
-        <span className="min-w-[7rem] flex-1 text-right">
+        <span className="min-w-0 flex-1 text-right">
           {intl.formatMessage({ id: 'CASH_CLOSING.TOTAL' })}
         </span>
       </div>
