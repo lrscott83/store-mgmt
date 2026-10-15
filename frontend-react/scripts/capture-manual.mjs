@@ -23,6 +23,11 @@
 //   ocultados; como el botón PWA "Instalar App" es `z-[9999]`, en esas capturas se oculta
 //   puntualmente (`hideInstallButton`) para que no tape el modal, y son de `viewport` (no
 //   `fullPage`) porque el overlay solo ocupa la primera pantalla.
+// - VISTAS LONGUES: el documento no scrollea (la app scrollea su `<main>`, `flex-1
+//   overflow-y-auto`), así que `fullPage` mide UNA pantalla y el panel de control sale
+//   ilegible. Toda vista que pase de ~2 pantallas se parte en un tramo por pantalla
+//   (`17-dashboard-1`, `17-dashboard-2`, …); las cortas siguen en una sola imagen. Al final
+//   se imprime la tabla de alturas reales.
 //
 // Uso:
 //   node scripts/capture-manual.mjs
@@ -182,6 +187,61 @@ async function hidePingDots(page) {
       el.style.setProperty('visibility', 'hidden', 'important');
     }
   });
+}
+
+/** Una vista se parte en varios tramos a partir de esta cantidad de pantallas de alto. */
+const MIN_SLICE_SCREENS = 2;
+
+/** Una fila por vista capturada: ruta, altura en pantallas y nº de imágenes generadas. */
+const HEIGHTS = [];
+
+/**
+ * Geometría REAL de la vista. El documento NO scrollea: la app scrollea su `<main>`
+ * (`app-layout.tsx`, `flex-1 overflow-y-auto`), así que `document.body.scrollHeight` mide
+ * siempre UNA pantalla y una captura `fullPage` sale del alto de UNA pantalla. Por eso se
+ * mide el contenedor que scrollea de verdad y no el `body`.
+ */
+async function measureScroll(page) {
+  return page.evaluate(() => {
+    const doc = document.scrollingElement ?? document.documentElement;
+    const main = Array.from(document.querySelectorAll('main')).find((el) =>
+      /(auto|scroll)/.test(getComputedStyle(el).overflowY),
+    );
+    const scroller = main ?? doc;
+    const viewport = Math.max(1, scroller === doc ? window.innerHeight : scroller.clientHeight);
+    const content = Math.max(viewport, scroller.scrollHeight);
+    return { viewport, content, screens: content / viewport };
+  });
+}
+
+/** Mueve a `top` px el MISMO contenedor que mide `measureScroll`. */
+async function scrollTo(page, top) {
+  await page.evaluate((top) => {
+    const doc = document.scrollingElement ?? document.documentElement;
+    const main = Array.from(document.querySelectorAll('main')).find((el) =>
+      /(auto|scroll)/.test(getComputedStyle(el).overflowY),
+    );
+    (main ?? doc).scrollTop = top;
+  }, top);
+}
+
+/** Imprime la tabla final de alturas (ruta, pantallas, nº de imágenes). */
+function printHeightTable() {
+  const pad = (value, width) => String(value).padEnd(width);
+  console.log('\n=== Alturas de las vistas capturadas ===');
+  console.log(`${pad('ruta', 36)}${pad('pantallas', 11)}imágenes`);
+  for (const row of HEIGHTS) {
+    const images =
+      row.parts > 1
+        ? `${row.parts}  (${row.name}-1 … ${row.name}-${row.parts})`
+        : `1  (${row.name})`;
+    console.log(`${pad(row.path, 36)}${pad(row.screens.toFixed(2), 11)}${images}`);
+  }
+  const split = HEIGHTS.filter((row) => row.parts > 1);
+  console.log(
+    `\n${HEIGHTS.length} vistas capturadas · ${split.length} partidas en varios tramos · ` +
+      `${HEIGHTS.reduce((sum, row) => sum + row.parts, 0)} imágenes de página en total.`,
+  );
 }
 
 /** Espera a que la página esté estable para la captura. */
@@ -530,13 +590,52 @@ async function main() {
 
   const browser = await chromium.launch();
 
-  const capture = async (page, name, { keepFixed = false, fullPage = true } = {}) => {
+  /**
+   * Captura de página. Las vistas CORTAS salen en una sola imagen (comportamiento de siempre);
+   * las que pasan de ~2 pantallas se PARTEN en un tramo por pantalla (`nombre-1`, `nombre-2`, …)
+   * porque una sola imagen `fullPage` de un panel con KPIs y gráficas queda ilegible en el
+   * manual. Las capturas de `viewport` (modales, carrito) nunca se parten.
+   */
+  const capture = async (page, name, { keepFixed = false, fullPage = true, slice = true } = {}) => {
     await settle(page);
     await hidePingDots(page);
     if (!keepFixed) await hideFixedElements(page);
-    const file = resolve(OUT_DIR, `${name}.png`);
-    await page.screenshot({ path: file, fullPage });
-    console.log(`guardada ${file}`);
+
+    const path = new URL(page.url()).pathname;
+    const geo = fullPage
+      ? await measureScroll(page)
+      : { viewport: 0, content: 0, screens: MIN_SLICE_SCREENS };
+
+    if (!fullPage || !slice || geo.screens <= MIN_SLICE_SCREENS) {
+      const file = resolve(OUT_DIR, `${name}.png`);
+      await page.mouse.move(0, 0);
+      await page.screenshot({ path: file, fullPage });
+      console.log(`guardada ${file}`);
+      HEIGHTS.push({ path, screens: fullPage ? geo.screens : 1, parts: 1, name });
+      return;
+    }
+
+    const parts = Math.ceil(geo.screens);
+    console.log(
+      `  ${path}: ${geo.screens.toFixed(2)} pantallas de alto → se parte en ${parts} imágenes`,
+    );
+    for (let part = 1; part <= parts; part++) {
+      await scrollTo(page, (part - 1) * geo.viewport);
+      // El scroll dispara el render perezoso de las gráficas que entran en el tramo.
+      await page.waitForTimeout(450);
+      // El puntero queda donde lo dejó la última interacción y, al desplazarse el scroll,
+      // ApexCharts abre un tooltip flotante sobre la gráfica: se aparta a una esquina.
+      await page.mouse.move(0, 0);
+      await page.waitForTimeout(150);
+      const file = resolve(OUT_DIR, `${name}-${part}.png`);
+      await page.screenshot({ path: file, fullPage: false });
+      console.log(`guardada ${file} (tramo ${part}/${parts})`);
+    }
+    await scrollTo(page, 0);
+    console.log(
+      `  AVISO: "${name}.png" de la corrida anterior quedó obsoleta; este juego la reemplaza.`,
+    );
+    HEIGHTS.push({ path, screens: geo.screens, parts, name });
   };
 
   /**
@@ -660,7 +759,9 @@ async function main() {
 
   // ── 17: Panel de Control — con el rango llevado a HOY ─────────────────
   // El default del panel es "7 días inclusivos terminando AYER", así que las ventas de hoy
-  // quedan fuera; aquí se fija el rango a los últimos 7 días INCLUYENDO hoy.
+  // quedan fuera. El filtro tiene DOS pasos: "Seleccionar" solo confirma el borrador en el
+  // input; la lupa (`date-range-filter-button`) es la ÚNICA que dispara `onApply` y fija
+  // `appliedRange`. Sin la lupa la captura sale con el rango por defecto y todo en 0.
   await goto(page, '/stats/dashboard');
   {
     const today = new Date();
@@ -672,7 +773,8 @@ async function main() {
     await page.getByTestId('date-range-filter-start').first().fill(iso(start));
     await page.getByTestId('date-range-filter-end').first().fill(iso(today));
     await page.getByTestId('date-range-filter-select').first().click();
-    await page.waitForTimeout(800);
+    await page.getByTestId('date-range-filter-button').first().click();
+    await page.waitForTimeout(1200);
   }
   await capture(page, '17-dashboard');
 
@@ -694,6 +796,7 @@ async function main() {
 
   await ctx.close();
   await browser.close();
+  printHeightTable();
   console.log(`\nListo. Imágenes en ${OUT_DIR}`);
 }
 

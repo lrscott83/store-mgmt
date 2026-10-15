@@ -314,7 +314,11 @@ monedas, hay un registro por **día y moneda** (usa el filtro de moneda).
 
 **📷 Imagen sugerida.**
 
-![Cierre Efectivo: Apertura, Esperado/Contado/Diferencia y la tarjeta Conteo](img/09-cierre-caja.png)
+![Cierre Efectivo — parte 1 de 3: Apertura, Esperado/Contado/Diferencia y el arranque del conteo](img/09-cierre-caja-1.png)
+
+![Cierre Efectivo — parte 2 de 3: la tarjeta Conteo con las denominaciones](img/09-cierre-caja-2.png)
+
+![Cierre Efectivo — parte 3 de 3: comentario y el botón Cerrar Caja](img/09-cierre-caja-3.png)
 
 ## 13. Ver tus ventas y el cuadre del día
 
@@ -477,7 +481,11 @@ dicen cuántas categorías, productos, publicados y sin imagen tienes.
 
 **📷 Imagen sugerida.**
 
-![Catálogo Web: dirección pública, métricas, marca y carrusel](img/23-catalogo-web.png)
+![Catálogo Web — parte 1 de 3: dirección pública, métricas y marca](img/23-catalogo-web-1.png)
+
+![Catálogo Web — parte 2 de 3](img/23-catalogo-web-2.png)
+
+![Catálogo Web — parte 3 de 3](img/23-catalogo-web-3.png)
 
 **Así lo ve el cliente** (ejemplo real del catálogo publicado):
 
@@ -587,7 +595,11 @@ métricas. Aquí solo se consulta: para operar un pedido se usa **Pedidos**.
 
 **📷 Imagen sugerida.**
 
-![Ventas de pedidos: métricas del periodo e histórico](img/27-ventas-pedidos.png)
+![Ventas de pedidos — parte 1 de 3: las métricas del periodo](img/27-ventas-pedidos-1.png)
+
+![Ventas de pedidos — parte 2 de 3](img/27-ventas-pedidos-2.png)
+
+![Ventas de pedidos — parte 3 de 3: el histórico](img/27-ventas-pedidos-3.png)
 
 
 ---
@@ -645,7 +657,15 @@ conversión. Las secciones de **Gastos** y **Créditos** solo aparecen si esos m
 
 **📷 Imagen sugerida.**
 
-![Panel de Control: rango de fechas, KPI y gráficas](img/17-dashboard.png)
+![Panel de Control — parte 1 de 5: el rango de fechas y los KPI principales](img/17-dashboard-1.png)
+
+![Panel de Control — parte 2 de 5](img/17-dashboard-2.png)
+
+![Panel de Control — parte 3 de 5: las gráficas](img/17-dashboard-3.png)
+
+![Panel de Control — parte 4 de 5](img/17-dashboard-4.png)
+
+![Panel de Control — parte 5 de 5](img/17-dashboard-5.png)
 
 
 ## 28. Cuadre por fechas
