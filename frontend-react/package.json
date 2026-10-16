@@ -13,11 +13,13 @@
     "test:e2e:api": "playwright test --config playwright.api.config.ts",
     "test:e2e:hotspot": "playwright test --config playwright.hotspot.config.ts",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
+    "generate:manual": "node scripts/build-manual.mjs",
     "clean": "turbo run clean && rimraf node_modules/.cache .turbo"
   },
   "devDependencies": {
     "@playwright/test": "^1.62.1",
     "@types/pg": "^8.21.0",
+    "marked": "^18.1.1",
     "pg": "^8.23.0",
     "prettier": "^3.6.2",
     "rimraf": "^6.0.1",

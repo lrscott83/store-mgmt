@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{TITLE}}</title>
+    <style>
+      :root {
+        --text: #1f2933;
+        --text-muted: #52606d;
+        --border: #e4e7eb;
+        --surface: #ffffff;
+        --bg: #f5f7fa;
+        --accent: #06b6d4;
+        --code-bg: #f0f4f8;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        -webkit-text-size-adjust: 100%;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family:
+          system-ui,
+          -apple-system,
+          'Segoe UI',
+          Roboto,
+          'Helvetica Neue',
+          Arial,
+          sans-serif;
+        font-size: 16px;
+        line-height: 1.65;
+      }
+      .doc {
+        max-width: 820px;
+        margin: 0 auto;
+        padding: 32px 20px 64px;
+      }
+      .doc__header {
+        border-bottom: 3px solid var(--accent);
+        padding-bottom: 12px;
+        margin-bottom: 24px;
+      }
+      .doc__header h1 {
+        margin: 0;
+        font-size: 1.6rem;
+      }
+      .doc__header p {
+        margin: 4px 0 0;
+        color: var(--text-muted);
+        font-size: 0.85rem;
+      }
+      main h1 {
+        font-size: 1.55rem;
+        margin: 2rem 0 0.75rem;
+        padding-bottom: 0.3rem;
+        border-bottom: 1px solid var(--border);
+      }
+      main h2 {
+        font-size: 1.25rem;
+        margin: 1.75rem 0 0.5rem;
+      }
+      main h3 {
+        font-size: 1.05rem;
+        margin: 1.25rem 0 0.5rem;
+      }
+      main p {
+        margin: 0.6rem 0;
+      }
+      main ul,
+      main ol {
+        margin: 0.6rem 0;
+        padding-left: 1.4rem;
+      }
+      main li {
+        margin: 0.25rem 0;
+      }
+      main img {
+        display: block;
+        max-width: 100%;
+        height: auto;
+        margin: 0.9rem 0;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--surface);
+      }
+      main blockquote {
+        margin: 0.8rem 0;
+        padding: 0.5rem 1rem;
+        border-left: 4px solid var(--accent);
+        background: var(--surface);
+        color: var(--text-muted);
+      }
+      main code {
+        background: var(--code-bg);
+        border-radius: 4px;
+        padding: 0.1em 0.35em;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 0.9em;
+      }
+      main hr {
+        border: none;
+        border-top: 1px solid var(--border);
+        margin: 2rem 0;
+      }
+      main strong {
+        color: #111827;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="doc">
+      <header class="doc__header">
+        <h1>{{TITLE}}</h1>
+        <p>Generado el {{GENERATED_AT}} · documento público de ayuda</p>
+      </header>
+      <main>{{CONTENT}}</main>
+    </div>
+  </body>
+</html>

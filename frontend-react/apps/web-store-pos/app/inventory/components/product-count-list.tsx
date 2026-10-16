@@ -169,7 +169,7 @@ export function ProductCountList({
                             data-testid={`inventory-count-difference-${p.productId}`}
                             className={`shrink-0 rounded-md px-3 py-1 text-sm font-semibold ${differenceClass}`}
                           >
-                            {difference === null ? '—' : `+${difference}`}
+                            {difference === null ? '—' : difference > 0 ? `+${difference}` : `${difference}`}
                           </span>
                         )}
                       </div>

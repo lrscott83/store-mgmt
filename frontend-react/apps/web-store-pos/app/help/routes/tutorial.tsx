@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useIntl } from 'react-intl';
 import { ChevronDownIcon } from '~/shared/components/ui/icons';
+import { apiFileUrl } from '~/shared/lib/http/media-url';
 
 /**
  * Single grouped collapsible panel — mirrors Angular's ONE `mat-expansion-panel`
@@ -37,6 +38,24 @@ export function TutorialPage() {
   return (
     <div className="space-y-4 p-4">
       <h1 className="text-2xl font-bold">{intl.formatMessage({ id: 'TUTORIAL.TITLE' })}</h1>
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <a
+          href={apiFileUrl('/api/manual/')}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-sm font-medium text-primary hover:underline"
+        >
+          {intl.formatMessage({ id: 'TUTORIAL.MANUAL_LINK' })}
+        </a>
+        <a
+          href={apiFileUrl('/api/manual/manual-usuario-pos.pdf')}
+          download
+          className="text-sm font-medium text-primary hover:underline"
+        >
+          {intl.formatMessage({ id: 'TUTORIAL.MANUAL_PDF' })}
+        </a>
+      </div>
 
       <TutorialPanel>
         <h6 className="font-semibold">1. Adicionar un producto al catálogo.</h6>

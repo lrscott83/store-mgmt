@@ -220,3 +220,56 @@ describe('TutorialPage — S-HELP-TEST-2: public access, no auth required', () =
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Tutorial');
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// S1 (help-manual) — the page links the PUBLIC manual and its PDF ABOVE the panel,
+// each opening in a new tab. The manual is served under /api/manual (backend),
+// so it stays out of the offline POS bundle/precache.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('TutorialPage — S1: manual + PDF links above the panel', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('renders a link to the manual that opens in another tab', async () => {
+    const { TutorialPage } = await import('../tutorial');
+    render(
+      <Wrapper>
+        <TutorialPage />
+      </Wrapper>,
+    );
+    const link = screen.getByRole('link', { name: 'Manual de usuario' });
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link.getAttribute('href')).toContain('/api/manual/');
+  });
+
+  it('renders a PDF download link to the fixed filename', async () => {
+    const { TutorialPage } = await import('../tutorial');
+    render(
+      <Wrapper>
+        <TutorialPage />
+      </Wrapper>,
+    );
+    const link = screen.getByRole('link', { name: 'Descargar manual (PDF)' });
+    expect(link).toHaveAttribute('download');
+    expect(link.getAttribute('href')).toMatch(/\/api\/manual\/manual-usuario-pos\.pdf$/);
+  });
+
+  it('places both links BEFORE the collapsible panel', async () => {
+    const { TutorialPage } = await import('../tutorial');
+    const { container } = render(
+      <Wrapper>
+        <TutorialPage />
+      </Wrapper>,
+    );
+    const links = Array.from(container.querySelectorAll('a'));
+    const panelButton = container.querySelector('button[aria-expanded]');
+    expect(links).toHaveLength(2);
+    expect(panelButton).not.toBeNull();
+    for (const link of links) {
+      const position = link.compareDocumentPosition(panelButton as Node);
+      expect(position & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
+    }
+  });
+});
