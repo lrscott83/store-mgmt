@@ -15,6 +15,13 @@ namespace Application.Features.WebCatalog.Public
 
         /// <summary>Directorio raíz bajo el que se escriben <c>catalog/&lt;slug&gt;/index.html</c>.</summary>
         public string? OutputRoot { get; set; }
+
+        /// <summary>
+        /// URL pública absoluta del sitio (p. ej. <c>https://pos.playground.sceiba.net</c>), sin
+        /// barra final. La usan el canonical y las URLs de imagen, que deben ser absolutas porque el
+        /// HTML se sirve estático y los rastreadores no resuelven rutas relativas.
+        /// </summary>
+        public string? PublicBaseUrl { get; set; }
     }
 
     /// <summary>Escribe la página estática de un catálogo público (feature public-catalog-static-pages, S1/S2).</summary>
