@@ -10,6 +10,9 @@ namespace Application.Features.WebCatalog.Public
     /// </summary>
     public sealed class CatalogStaticPageOptions
     {
+        /// <summary>Nombre de la sección de configuración (appsettings).</summary>
+        public const string SectionName = "CatalogStaticPage";
+
         /// <summary>Ruta al <c>index.html</c> del SPA (shell) que se usa como plantilla.</summary>
         public string? ShellPath { get; set; }
 

@@ -52,6 +52,7 @@ namespace Application.Features.WebCatalog.Sync.Commands.SyncCatalog
         private readonly IProductRepository _productRepository;
         private readonly IProductImageRepository _productImageRepository;
         private readonly IStringLocalizer<I18n> _localizer;
+        private readonly ICatalogStaticPageRegenerator _catalogPageRegenerator;
 
         public SyncCatalogCommandHandler(
             IApplicationUnitOfWork applicationUnitOfWork,
@@ -61,7 +62,8 @@ namespace Application.Features.WebCatalog.Sync.Commands.SyncCatalog
             IProductCategoryRepository productCategoryRepository,
             IProductRepository productRepository,
             IProductImageRepository productImageRepository,
-            IStringLocalizer<I18n> localizer)
+            IStringLocalizer<I18n> localizer,
+            ICatalogStaticPageRegenerator catalogPageRegenerator)
         {
             _applicationUnitOfWork = applicationUnitOfWork;
             _httpContextService = httpContextService;
@@ -71,6 +73,7 @@ namespace Application.Features.WebCatalog.Sync.Commands.SyncCatalog
             _productRepository = productRepository;
             _productImageRepository = productImageRepository;
             _localizer = localizer;
+            _catalogPageRegenerator = catalogPageRegenerator;
         }
 
         public async Task<ResponseResult<CatalogSyncSummaryDto>> Handle(SyncCatalogCommand request, CancellationToken cancellationToken)
@@ -171,6 +174,11 @@ namespace Application.Features.WebCatalog.Sync.Commands.SyncCatalog
 
             await _storeRepository.UpdateAsync(store);
             await _applicationUnitOfWork.SaveChangesAsync(cancellationToken);
+
+            // public-catalog-static-pages (T4): el catálogo acaba de publicarse/actualizarse (slug
+            // asignado, productos y categorías escritos), así que se regenera su página estática.
+            // Best-effort: si falla, el guardado ya está hecho y el SPA sigue sirviendo el catálogo.
+            await _catalogPageRegenerator.RegenerateAsync(storeId, cancellationToken);
 
             return ResponseResult.Success(new CatalogSyncSummaryDto
             {
