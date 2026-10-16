@@ -26,7 +26,7 @@ descripción, canonical, Open Graph y (después) JSON-LD — para que Google **y
 
 | ID | Qué | S# | Ruta | Estado |
 |---|---|---|---|---|
-| T1 | Builder puro: inyecta meta en el HTML shell (title, description, canonical, OG, twitter) + tests | S1 | inline | EN CURSO |
+| T1 | Builder puro: inyecta meta en el HTML shell (title, description, canonical, OG, twitter) + tests | S1 | inline | COMPLETADO (`b4967ea7`) |
 | T2 | Servicio de escritura: lee el shell de un directorio configurable y escribe `/catalog/<slug>/index.html` | S1,S2 | — | PENDIENTE |
 | T3 | Disparador: regenerar al guardar la config/estado del catálogo público | S2 | — | PENDIENTE |
 | T4 | Servido: nginx (alias + fallback) + directorio compartido + publicar el shell del SPA en él | S1,S4 | — | PENDIENTE |
@@ -49,3 +49,6 @@ descripción, canonical, Open Graph y (después) JSON-LD — para que Google **y
   `<title>` ni `meta` en el shell; el POS depende de estado en `localStorage` (por eso no se activa
   SSR). `/catalog/:storeSlug` → `app/catalog/routes/public-catalog.tsx`; datos por
   `catalogHttpService` desde el cliente. nginx: `try_files $uri /index.html`.
+- **L4 (progreso):** T1 completado (`b4967ea7`) — builder puro `CatalogStaticPageBuilder` +
+  6 tests. Suites: Application.Tests 1291/1291, Domain.UnitTests 165/165. Nota: se trabaja en `main`
+  (rama que despliega el owner); `main` va por detrás de `test`.
