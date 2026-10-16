@@ -43,11 +43,12 @@ descripción, canonical, Open Graph y (después) JSON-LD — para que Google **y
 | T1 | Builder puro: inyecta meta en el HTML shell (title, description, canonical, OG, twitter) + tests | S1 | inline | COMPLETADO (`dc03913e`) |
 | T2 | Servicio de escritura: lee el shell de un directorio configurable y escribe `/catalog/<slug>/index.html` | S1,S2 | inline | COMPLETADO (`0cda93ac`) |
 | T3 | Servicio de generación: carga tienda + marca del catálogo de la BD → meta → writer | S1,S2 | inline | COMPLETADO (`bdff2f10`) |
-| T4 | Disparador: regenerar al guardar la config/estado del catálogo público | S2 | — | PENDIENTE |
-| T5 | Servido: nginx (alias + fallback, **solo la ruta exacta** — S10) + directorio compartido + publicar el shell del SPA en él | S1,S4,S10 | — | PENDIENTE |
+| T4 | Disparador: regenerar al guardar la config/estado del catálogo público (sync + marca) | S2 | inline | COMPLETADO (`21a6c935`) |
+| T5 | Servido: nginx (alias + fallback, **solo la ruta exacta** — S10) + directorio compartido + publicar el shell del SPA en él + **conservar assets del build anterior** (mitigación S9) | S1,S4,S9,S10 | — | PENDIENTE |
 | T6 | Backfill de catálogos existentes + **regeneración en cada deploy (obligatoria — S9)** | S3,S9 | — | PENDIENTE |
 | T7 | `sitemap.xml` + `robots.txt` | S5 | — | PENDIENTE |
 | T8 | Campos de ubicación por tienda + JSON-LD | S6 | — | PENDIENTE |
+| T9 | Disparador por renombre de tienda (`UpdateStoreCommand`: nombre/descripción → title/description) | S2 | — | PENDIENTE |
 
 ## Log
 
@@ -76,12 +77,26 @@ descripción, canonical, Open Graph y (después) JSON-LD — para que Google **y
   `CatalogStaticPageGenerator` arma la página desde tienda + marca (logo/banner) con canonical y
   media absolutos. Suites: Application.Tests 1335/1335, Domain.UnitTests 165/165.
 - **L7 (owner, verbatim):** "los pedidos por whatsapp y la gestion de pedidos todo eso se mantiene
-  funcionando no? porque todo debe seguir funcionando. revisa bien todos los features del catalago web
-  con los tres modulos que tenemos que todo debe seguir funcionando" → **Sí, verificado**: la página
-  generada es el mismo shell del SPA + meta (mismos assets y bootstrap), la API pública y las rutas del
-  POS no se tocan, y los tres módulos (18/19/20) siguen igual (S8). Hallazgo que se añade al plan:
-  **S9** (regenerar en cada deploy es requisito de corrección por los assets hasheados) y **S10**
-  (nginx sirve la página solo para la ruta exacta del catálogo). Evidencia: `app/routes.ts`
-  (`catalog/:storeSlug`; detalle de producto y estado del pedido son modales, no rutas), rutas del POS
-  `sales/web-catalog`, `sales/online-orders`, `.../settings`, `.../drivers`, `.../sales`,
-  `sales/today-orders`, `sales/orders`; endpoints `PublicCatalogController` y `PublicOrderingController`.
+  funcionando no? ... revisa bien todos los features del catalago web con los tres modulos ..." →
+  **Sí, verificado**: la página generada es el mismo shell del SPA + meta, la API pública y las rutas
+  del POS no se tocan, y los tres módulos (18/19/20) siguen igual (S8). Hallazgos: **S9** (regenerar en
+  cada deploy es requisito de corrección por los assets hasheados) y **S10** (nginx sirve la página
+  solo para la ruta exacta del catálogo). Evidencia: `app/routes.ts`, `PublicCatalogController`,
+  `PublicOrderingController`.
+- **L8 (owner, verbatim):** "pero no es mejor hacer una pagina normal y se le pone a la tienda en el
+  catalogo id y ya?" → explicado el compromiso (una página plana para todos rompería carrito/pedidos);
+  el owner eligió **opción 1** (copia del SPA + meta), más la mitigación de **conservar los assets del
+  build anterior** (anotada en T5) para eliminar el riesgo de S9.
+- **L9 (owner, verbatim):** "y como se sabe que ese catalogo es de la tienda correspondiente? o todos
+  los cambios son en el template default?" → **por el slug**: `CatalogSlug` es **único global**
+  (índice parcial único, `StoreEntityTypeConfiguration.cs:29-31`), el SPA lo lee de la URL
+  (`public-catalog.tsx:50`) y el backend resuelve la tienda con `GetStoreByCatalogSlugAsync`. Cada
+  página vive en `catalog/<slug>/`. El template NO es compartido: es por tienda
+  (`StoreCatalogSettings.TemplateId`), "default" es solo el respaldo, y la página generada es
+  **independiente del template** (solo inyecta meta; el SPA aplica la vista al cargar). Los templates
+  son vistas sin lógica propia (`templates/registry.ts`, `template-ids.ts`), así que **T4 resuelve
+  igual con cualquier template presente o futuro**.
+- **L10 (progreso):** **T4 completado (`21a6c935`)** — `CatalogStaticPageRegenerator` best-effort +
+  wiring en `SyncCatalogCommandHandler` y `UpdateStoreCatalogBrandingCommandHandler` + registro en DI
+  y binding de `CatalogStaticPageOptions`. Nueva tarea **T9** (renombre de tienda) anotada. Suites:
+  Application.Tests 1338/1338, Domain.UnitTests 165/165.
