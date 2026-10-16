@@ -21,6 +21,20 @@ descripción, canonical, Open Graph y (después) JSON-LD — para que Google **y
 - **S6** (fase posterior) — Campos de ubicación por tienda (dirección estructurada, teléfono,
   coordenadas, horario) + JSON-LD `schema.org` para la ficha de Google Maps/Search.
 - **S7** — El POS no se toca: las rutas autenticadas y su SPA quedan idénticas.
+- **S8** — **Todo el catálogo web sigue funcionando igual**: la página servida es el **MISMO shell del
+  SPA** (mismos assets hasheados, mismo bootstrap) con metadatos añadidos en `<head>`. El navegador
+  carga la misma app, así que carrito, checkout, pedidos por WhatsApp, estado del pedido, catálogo,
+  marca, escaparate y **gestión de pedidos** (módulos 18 WebCatalog, 19 PedidosWhatsApp y 20
+  GestionPedidos) no cambian. La API pública (`/api/v1/public/catalog/**`, `/public/ordering/**`) y
+  las rutas del POS (`sales/web-catalog`, `sales/online-orders*`, `sales/orders`, `sales/today-orders`)
+  **no se tocan**.
+- **S9** — **La página generada debe regenerarse en CADA deploy del frontend.** Copia el shell del
+  build, y ese shell referencia assets con hash que cambian en cada build; una página no regenerada
+  apuntaría a assets inexistentes y rompería el catálogo. Por eso T6 (regeneración en deploy) es
+  REQUISITO DE CORRECCIÓN, no solo frescura, y el deploy debe dejar la ventana sin páginas válidas lo
+  más corta posible.
+- **S10** — nginx sirve la página pre-generada **solo** para la ruta exacta del catálogo
+  (`/catalog/<slug>`); cualquier otra ruta (assets, `/api`, `/hubs`, el resto del SPA) sigue como hoy.
 
 ## Tasks
 
@@ -30,8 +44,8 @@ descripción, canonical, Open Graph y (después) JSON-LD — para que Google **y
 | T2 | Servicio de escritura: lee el shell de un directorio configurable y escribe `/catalog/<slug>/index.html` | S1,S2 | inline | COMPLETADO (`0cda93ac`) |
 | T3 | Servicio de generación: carga tienda + marca del catálogo de la BD → meta → writer | S1,S2 | inline | COMPLETADO (`bdff2f10`) |
 | T4 | Disparador: regenerar al guardar la config/estado del catálogo público | S2 | — | PENDIENTE |
-| T5 | Servido: nginx (alias + fallback) + directorio compartido + publicar el shell del SPA en él | S1,S4 | — | PENDIENTE |
-| T6 | Backfill de catálogos existentes + regeneración en cada deploy | S3 | — | PENDIENTE |
+| T5 | Servido: nginx (alias + fallback, **solo la ruta exacta** — S10) + directorio compartido + publicar el shell del SPA en él | S1,S4,S10 | — | PENDIENTE |
+| T6 | Backfill de catálogos existentes + **regeneración en cada deploy (obligatoria — S9)** | S3,S9 | — | PENDIENTE |
 | T7 | `sitemap.xml` + `robots.txt` | S5 | — | PENDIENTE |
 | T8 | Campos de ubicación por tienda + JSON-LD | S6 | — | PENDIENTE |
 
@@ -61,3 +75,13 @@ descripción, canonical, Open Graph y (después) JSON-LD — para que Google **y
   commits originales en main quedaron obsoletos tras el reset). **T3 completado (`bdff2f10`)**:
   `CatalogStaticPageGenerator` arma la página desde tienda + marca (logo/banner) con canonical y
   media absolutos. Suites: Application.Tests 1335/1335, Domain.UnitTests 165/165.
+- **L7 (owner, verbatim):** "los pedidos por whatsapp y la gestion de pedidos todo eso se mantiene
+  funcionando no? porque todo debe seguir funcionando. revisa bien todos los features del catalago web
+  con los tres modulos que tenemos que todo debe seguir funcionando" → **Sí, verificado**: la página
+  generada es el mismo shell del SPA + meta (mismos assets y bootstrap), la API pública y las rutas del
+  POS no se tocan, y los tres módulos (18/19/20) siguen igual (S8). Hallazgo que se añade al plan:
+  **S9** (regenerar en cada deploy es requisito de corrección por los assets hasheados) y **S10**
+  (nginx sirve la página solo para la ruta exacta del catálogo). Evidencia: `app/routes.ts`
+  (`catalog/:storeSlug`; detalle de producto y estado del pedido son modales, no rutas), rutas del POS
+  `sales/web-catalog`, `sales/online-orders`, `.../settings`, `.../drivers`, `.../sales`,
+  `sales/today-orders`, `sales/orders`; endpoints `PublicCatalogController` y `PublicOrderingController`.
