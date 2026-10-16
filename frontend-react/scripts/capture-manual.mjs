@@ -579,18 +579,28 @@ async function fillCashClosing(page) {
  */
 async function seedChannelRates(page) {
   await goto(page, '/management/channel-rates');
-  for (const rate of CHANNEL_RATES) {
-    await page.getByTestId('channel-rate-add').click();
-    const dialog = page.getByTestId('channel-rate-add-dialog');
-    await mustSee(page, dialog, 'el formulario de alta de tasa');
-    await dialog.getByTestId('channel-rate-currency').selectOption(rate.currency);
-    await dialog.getByTestId('channel-rate-method').selectOption(rate.method);
-    await dialog.getByTestId('channel-rate-buy-value').fill(String(rate.value));
-    await dialog.getByTestId('channel-rate-sell-value').fill(String(rate.value));
-    await dialog.getByTestId('channel-rate-effective-from').fill(rate.effectiveFrom);
-    await dialog.getByTestId('channel-rate-submit').click();
-    await dialog.waitFor({ state: 'hidden', timeout: 20_000 });
-    console.log(`  tasa lista: ${rate.value} CUP por USD en efectivo (rige desde ${rate.effectiveFrom})`);
+  try {
+    for (const rate of CHANNEL_RATES) {
+      await page.getByTestId('channel-rate-add').click();
+      const dialog = page.getByTestId('channel-rate-add-dialog');
+      await mustSee(page, dialog, 'el formulario de alta de tasa');
+      await dialog.getByTestId('channel-rate-currency').selectOption(rate.currency);
+      await dialog.getByTestId('channel-rate-method').selectOption(rate.method);
+      await dialog.getByTestId('channel-rate-buy-value').fill(String(rate.value));
+      await dialog.getByTestId('channel-rate-sell-value').fill(String(rate.value));
+      await dialog.getByTestId('channel-rate-effective-from').fill(rate.effectiveFrom);
+      await dialog.getByTestId('channel-rate-submit').click();
+      await dialog.waitFor({ state: 'hidden', timeout: 20_000 });
+      console.log(
+        `  tasa lista: ${rate.value} CUP por USD en efectivo (rige desde ${rate.effectiveFrom})`,
+      );
+    }
+  } catch (error) {
+    const shot = resolve(OUT_DIR, '_debug-tasas.png');
+    await page.screenshot({ path: shot, fullPage: false }).catch(() => {});
+    console.log(
+      `  AVISO: no se pudieron sembrar las tasas (${String(error).slice(0, 160)}); URL=${page.url()} · captura ${shot}`,
+    );
   }
 }
 
