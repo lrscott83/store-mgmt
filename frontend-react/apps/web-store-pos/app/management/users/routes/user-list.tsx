@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router';
 import { useIntl } from 'react-intl';
 import { EFeatures } from '@store-mgmt/domain';
 import { adminFeatureLoader } from '~/auth/routes/loaders';
+import { Button } from '~/shared/components/ui/button';
+import { PlusIcon } from '~/shared/components/ui/icons';
 import { useOnlineStatus } from '~/shared/lib/hooks/use-online-status';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { userHttpService } from '~/management/users/lib/services/user-http-service';
@@ -59,16 +61,24 @@ export function UserListPage() {
 
   return (
     <div className="space-y-4 p-4">
-      <div className="flex items-center justify-between">
+      {/* Encabezado de la vista: título a la izquierda y las acciones alineadas a la
+          derecha, una debajo de otra (decisión del owner, 2026-10-15): «+ Empleado»
+          y debajo las dos acciones del roster. */}
+      <div className="flex items-start justify-between gap-4">
         <h1 className="text-xl font-semibold">{intl.formatMessage({ id: 'USERS.LIST_TITLE' })}</h1>
-        <RosterExportPanel />
+        <div className="flex flex-col items-stretch gap-2">
+          <Button variant="fab" onClick={() => navigate('/management/users/create')}>
+            <PlusIcon />
+            {intl.formatMessage({ id: 'USERS.CREATE' })}
+          </Button>
+          <RosterExportPanel />
+        </div>
       </div>
 
       {error && <p className="text-sm text-red-600">{error}</p>}
 
       <UserCardList
         users={users}
-        onCreate={() => navigate('/management/users/create')}
         onEdit={(id) => navigate(`/management/users/edit/${id}`)}
         onActivate={(id) =>
           handleLifecycleAction((userId) => userHttpService.activateUser(userId, true), id)

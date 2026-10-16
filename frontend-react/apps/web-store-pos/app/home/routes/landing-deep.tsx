@@ -683,7 +683,8 @@ export default function LandingDeep() {
           <div className="grid grid-cols-1 items-center gap-8 lg:grid-cols-2">
             {/* Left: Copy */}
             <div>
-              <p className="landing-animate-in mb-6 text-xs font-medium tracking-[0.2em] text-accent uppercase [animation-delay:100ms]">
+              <p className="landing-animate-in mb-6 flex items-center gap-3 text-sm font-semibold text-text-muted [animation-delay:100ms]">
+                <span className="block h-px w-6 bg-accent" aria-hidden="true"></span>
                 POS offline + catálogo web con pedidos por WhatsApp
               </p>
               <h1 className="landing-animate-in mb-6 text-5xl leading-[0.95] font-bold tracking-tight sm:text-6xl lg:text-7xl [animation-delay:250ms]">

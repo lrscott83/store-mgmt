@@ -1748,7 +1748,7 @@ const messages: Record<string, string> = {
   'USERS.PASSWORDS_MUST_MATCH': 'Las contraseñas no coinciden.',
   'USERS.ERROR': 'Ocurrió un error. Intente de nuevo.',
   'USERS.EDIT': 'Editar',
-  'USERS.CREATE': 'Adicionar',
+  'USERS.CREATE': 'Empleado',
   'USERS.LIFECYCLE_ERROR': 'No se pudo realizar la acción. Intente de nuevo.',
   // Admin export of the encrypted offline roster bundle (offline-auth-frontend,
   // design correction #5). BLOCKED-for-verification: the backend endpoint
