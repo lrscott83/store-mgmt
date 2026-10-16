@@ -64,4 +64,12 @@ offline**.
   en otra tarea. No se ha commiteado: la rama actual es `qa` (compartida), no una feature branch.
 - **L7 (pendiente/opcional):** no hay test que garantice que `help/index.html` esté sincronizado con
   el `.md` (el patrón legal sí lo tiene). Añadible como guard futuro (hash MD→HTML).
+- **L8 (prod + cierre):** `dotnet publish` incluye `help/` (56 archivos → `/app/help`), y el `api`
+  de prod reconstruye su imagen desde `backend/src`, así que el manual viaja en la imagen. Build de
+  producción del frontend **verde**: `verify-sw-precache` OK (215 entries, 7 familias → el manual NO
+  entra al precache) y `verify-csp` OK. El manual cumple la CSP enforcing de prod (estilos inline
+  permitidos por `style-src 'unsafe-inline'`; imágenes mismo origen por `img-src 'self'`; sin
+  scripts). Enlaces: manual → otra pestaña; PDF → descarga en sitio (`download`).
+- **L9 (commits):** `ca79d9ad` feat(help) … + `80479458` fix(help) … → rama **`qa`** pusheada.
+
 
