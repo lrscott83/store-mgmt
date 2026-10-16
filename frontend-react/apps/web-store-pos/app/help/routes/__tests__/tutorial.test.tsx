@@ -244,7 +244,7 @@ describe('TutorialPage — S1: manual + PDF links above the panel', () => {
     expect(link.getAttribute('href')).toContain('/api/manual/');
   });
 
-  it('renders a PDF download link to the fixed filename, in another tab', async () => {
+  it('renders a PDF download link to the fixed filename', async () => {
     const { TutorialPage } = await import('../tutorial');
     render(
       <Wrapper>
@@ -252,7 +252,7 @@ describe('TutorialPage — S1: manual + PDF links above the panel', () => {
       </Wrapper>,
     );
     const link = screen.getByRole('link', { name: 'Descargar manual (PDF)' });
-    expect(link).toHaveAttribute('target', '_blank');
+    expect(link).toHaveAttribute('download');
     expect(link.getAttribute('href')).toMatch(/\/api\/manual\/manual-usuario-pos\.pdf$/);
   });
 

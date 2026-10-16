@@ -50,8 +50,6 @@ export function TutorialPage() {
         </a>
         <a
           href={apiFileUrl('/api/manual/manual-usuario-pos.pdf')}
-          target="_blank"
-          rel="noopener noreferrer"
           download
           className="text-sm font-medium text-primary hover:underline"
         >
