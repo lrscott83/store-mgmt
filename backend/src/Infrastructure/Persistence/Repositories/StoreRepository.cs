@@ -196,6 +196,9 @@ namespace Infrastructure.Persistence.Repositories
             return await _stores.Where(store => store.IsActive).CountAsync();
         }
 
+        public async Task<bool> HasAnyStoreByOwnerIdAsync(Guid ownerId)
+            => await _stores.AnyAsync(s => s.OwnerId == ownerId);
+
         public async Task<Store?> GetStoreWithModulesAndReSellerOwnerAsync(Guid storeId)
             => await _stores
                 .Include(s => s.StoreModules)

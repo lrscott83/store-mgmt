@@ -92,14 +92,29 @@ public class CreateStoreServiceTests
         return plan;
     }
 
-    private static StorePlanModule NewCatalogEntry(int planId, int moduleId, bool isActive, bool availableToStore)
+    private static StorePlanModule NewCatalogEntry(int planId, int moduleId, bool isActive, bool availableToStore,
+        float price = 100f, float percentDiscountPrice = 0f)
     {
         var module = Module.Create(moduleId, $"Test Module {moduleId}", 1, priceIncluded: false,
-            price: 100f, discountPrice: 0, percentDiscountPrice: 0, availableToStore: availableToStore,
+            price: price, discountPrice: 0, percentDiscountPrice: percentDiscountPrice, availableToStore: availableToStore,
             isActive: isActive);
         var entry = StorePlanModule.Create(planId, moduleId);
         entry.Module = module;
         return entry;
+    }
+
+    /// <summary>
+    /// A Superior plan carrying ONLY the given members, each with a real catalog price/percent
+    /// discount. Used by the additional-store rule tests, which need MultiStores (14) in the
+    /// catalog with its actual snapshot values instead of the fixed test module.
+    /// </summary>
+    private static StorePlan CreateSuperiorPlanWith(params (int ModuleId, float Price, float PercentDiscount)[] members)
+    {
+        var plan = StorePlan.Create((int)StorePlanType.Superior, "Superior", 3, true);
+        foreach (var m in members)
+            plan.StorePlanModules.Add(NewCatalogEntry(plan.Id, m.ModuleId, isActive: true,
+                availableToStore: true, price: m.Price, percentDiscountPrice: m.PercentDiscount));
+        return plan;
     }
 
     private void SetupDefaultSuccessfulScenarios()
@@ -108,6 +123,12 @@ public class CreateStoreServiceTests
         _mockStoreRepository
             .Setup(x => x.AddAsync(It.IsAny<Store>()))
             .ReturnsAsync((Store s) => s);
+
+        // Default: the owner has NO other store, so birth behaves exactly as before the
+        // additional-store MultiStores rule. Tests for that rule override this.
+        _mockStoreRepository
+            .Setup(x => x.HasAnyStoreByOwnerIdAsync(It.IsAny<Guid>()))
+            .ReturnsAsync(false);
 
         // Date time provider setup — mandatory: an unconfigured Mock<IDateTimeProvider>.UtcNow
         // returns default(DateTimeOffset) (0001-01-01), which would silently poison every other
@@ -381,6 +402,70 @@ public class CreateStoreServiceTests
         // Assert — no silent crash, and no module outside the (absent) catalog.
         store.StorePlanId.Should().Be((int)StorePlanType.Superior);
         _mockStoreModuleRepository.Verify(x => x.AddRangeAsync(It.IsAny<IEnumerable<StoreModule>>()), Times.Never);
+    }
+
+    #endregion
+
+    #region Additional store — MultiStores charged once (owner decision 2026-10-16)
+
+    private const int MultiStoresModuleId = (int)ModuleType.MultiStores;
+    private const int OtherPaidModuleId = 6;
+
+    [Fact]
+    public async Task CreateStoreAsync_OnAdditionalStore_GrantsMultiStoresAt100PercentDiscount()
+    {
+        // Arrange: the owner already has a store, so the new one is an ADDITIONAL store.
+        _mockStoreRepository
+            .Setup(x => x.HasAnyStoreByOwnerIdAsync(_testOwnerId))
+            .ReturnsAsync(true);
+        _mockPlanRepository
+            .Setup(x => x.GetActivePlanWithModulesByIdAsync((int)StorePlanType.Superior))
+            .ReturnsAsync(CreateSuperiorPlanWith(
+                (MultiStoresModuleId, 5f, 50f),
+                (OtherPaidModuleId, 100f, 25f)));
+        var service = CreateService();
+        List<StoreModule> granted = new();
+        _mockStoreModuleRepository
+            .Setup(x => x.AddRangeAsync(It.IsAny<IEnumerable<StoreModule>>()))
+            .Callback<IEnumerable<StoreModule>>(m => granted = m.ToList())
+            .Returns(Task.CompletedTask);
+
+        // Act
+        await service.CreateStoreAsync(_testOwnerId, _testTenantId, "Second Store", null, null, false);
+
+        // Assert: MultiStores pays 0 on that store...
+        var multiStores = granted.Single(sm => sm.ModuleId == MultiStoresModuleId);
+        multiStores.ModulePercentDiscountPrice.Should().Be(100f);
+        multiStores.ModulePrice.Should().Be(5f, "only the discount changes, never the catalog price");
+
+        // ...and no OTHER module is touched.
+        var other = granted.Single(sm => sm.ModuleId == OtherPaidModuleId);
+        other.ModulePercentDiscountPrice.Should().Be(25f);
+    }
+
+    [Fact]
+    public async Task CreateStoreAsync_OnFirstStore_KeepsMultiStoresCatalogDiscount()
+    {
+        // Arrange: the owner has no store yet — this is the FIRST one, so nothing is discounted.
+        _mockStoreRepository
+            .Setup(x => x.HasAnyStoreByOwnerIdAsync(It.IsAny<Guid>()))
+            .ReturnsAsync(false);
+        _mockPlanRepository
+            .Setup(x => x.GetActivePlanWithModulesByIdAsync((int)StorePlanType.Superior))
+            .ReturnsAsync(CreateSuperiorPlanWith((MultiStoresModuleId, 5f, 50f)));
+        var service = CreateService();
+        List<StoreModule> granted = new();
+        _mockStoreModuleRepository
+            .Setup(x => x.AddRangeAsync(It.IsAny<IEnumerable<StoreModule>>()))
+            .Callback<IEnumerable<StoreModule>>(m => granted = m.ToList())
+            .Returns(Task.CompletedTask);
+
+        // Act
+        await service.CreateStoreAsync(_testOwnerId, _testTenantId, "First Store", null, null, false);
+
+        // Assert
+        granted.Single().ModulePercentDiscountPrice.Should().Be(50f,
+            "the MultiStores discount only kicks in for an ADDITIONAL store");
     }
 
     #endregion

@@ -29,6 +29,15 @@ namespace Domain.Interfaces.Repositories
         Task<IEnumerable<Store>> GetAllStoresWithModulesAsync(Guid? excludeStoreId = null);
         Task<int> GetActiveStoreCountAsync();
 
+        /// <summary>
+        /// ¿El owner ya tiene al menos una tienda (activa o inactiva, misma llave que
+        /// <c>Store.OwnerId</c> = <c>Owner.Id</c>)? El alta de tienda lo usa para saber si la nueva
+        /// es una tienda ADICIONAL: a partir de la segunda, MultiStores nace al 100% de descuento
+        /// para que su precio se cobre una sola vez por owner (decisión del owner 2026-10-16).
+        /// No ignora el filtro de tenant, igual que <c>GetAllStoresByOwnerUserIdAsync</c>.
+        /// </summary>
+        Task<bool> HasAnyStoreByOwnerIdAsync(Guid ownerId);
+
         Task<Store?> GetStoreWithModulesAndReSellerOwnerAsync(Guid storeId);
         Task<bool> IsStoreOwnedByReSellerUserAsync(Guid storeId, Guid reSellerUserId);
         Task<IEnumerable<Store>> GetActiveStoresByReSellerUserIdAsync(Guid reSellerUserId, Guid? excludeStoreId = null);
