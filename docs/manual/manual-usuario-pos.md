@@ -385,7 +385,7 @@ es la sección 12.
 1. Ve a **Inventario → Conteo de productos** (título **Conteo de productos** con el número de
    productos).
 2. Expande una categoría (paneles colapsables, como en las otras vistas).
-3. En cada producto verás el número de fila, el nombre y **Sistema: N uds**. Escribe lo contado en
+3. En cada producto verás el número de fila, el nombre y **Sistema: N**. Escribe lo contado en
    **Conteo**.
 4. La **diferencia** (contada − sistema) se resalta: **negativa** con signo `-` en **rojo**; **cero
    o positiva** en **verde** con `+`. Sin escribir nada, muestra `—`.
