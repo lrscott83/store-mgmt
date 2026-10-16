@@ -6,10 +6,15 @@
 // `http-e2e`).
 //
 // Flujo: registra un Owner de ejemplo → siembra el catálogo Y los datos de ejemplo (entradas,
-// gastos, repartidor y ventas) por la UI real → captura las pantallas en modo MOBILE
-// (decisión del owner, 2026-10-15) → vuelve a capturar las vistas CON datos → y cierra con
-// las capturas de los MODALES de adición (categoría, producto, entrada, gasto, pago de
-// crédito y repartidor).
+// gastos, ventas, tasas de cambio y conteo de caja) por la UI real → captura las pantallas en
+// modo MOBILE (decisión del owner, 2026-10-15) → vuelve a capturar las vistas CON datos → y
+// cierra con las capturas de los MODALES de adición (categoría, producto, entrada, gasto y
+// pago de crédito).
+//
+// Fuera de este flujo, por decisión del owner (2026-10-15): el bloque "Gestión de pedidos"
+// (la cola de pedidos, Repartidores y Ventas de pedidos) NO se captura ni se documenta. Se
+// conserva la CONFIGURACIÓN "Pedidos WhatsApp", que es otra cosa: la pantalla del Dueño que
+// enciende el módulo.
 //
 // Los datos sembrados son CONSTANTES: la misma corrida produce las mismas capturas. Lo único
 // aleatorio es el login `e2e-…` del Owner de ejemplo, para que la suite E2E lo limpie.
@@ -28,6 +33,10 @@
 //   ilegible. Toda vista que pase de ~2 pantallas se parte en un tramo por pantalla
 //   (`17-dashboard-1`, `17-dashboard-2`, …); las cortas siguen en una sola imagen. Al final
 //   se imprime la tabla de alturas reales.
+// - CORTES FIJOS: una vista se puede forzar a un número EXACTO de imágenes con `parts`, que
+//   reparte el contenido en tramos sin huecos ajustando el alto de la ventana (ver
+//   `captureCoveringSlices`). Lo usan las vistas que el owner quiere en otro número de
+//   imágenes o que han crecido con los datos nuevos y no caben en una sola.
 //
 // Uso:
 //   node scripts/capture-manual.mjs
@@ -94,8 +103,6 @@ const EXPENSES = [
   { typeValue: 4, type: 'Corriente', total: 1200, paymentMethod: 2, note: 'Electricidad del mes' },
 ];
 
-const DRIVER = { name: 'Carlos Ruiz', phone: '5355512345' };
-
 /** Venta de contado: efectivo, con vuelto (paga con 5000). */
 const CASH_SALE = {
   lines: [
@@ -117,6 +124,39 @@ const CREDIT_TO_PAY = 'Ana Gómez';
 /** Datos de la categoría y del producto que se crean DENTRO de sus modales (33 / 34). */
 const MODAL_CATEGORY = { name: 'Snacks' };
 const MODAL_PRODUCT = { name: 'Papas Fritas', cost: 80, price: 120, qty: 20 };
+
+/**
+ * Caja del día para la captura 09 (decisión del owner, 2026-10-15): la Apertura y el conteo por
+ * DENOMINACIONES van con valores, no a cero, que es como se ve una caja de verdad.
+ *
+ * Las denominaciones son las de CUP por defecto (`DEFAULT_CUP_DENOMINATIONS`) y el ejemplo
+ * cuadra con un Billete de 50 faltante: la diferencia sale en ROJO y, con ella, el aviso de
+ * "el comentario es obligatorio" — que es justo lo que el manual explica en la sección 12.
+ */
+const CASH_CLOSING = {
+  opening: 5000,
+  counts: [
+    [5_000, 1],
+    [1_000, 2],
+    [500, 2],
+    [100, 1],
+    [50, 1],
+  ],
+};
+
+/**
+ * Tasas de cambio para la captura 20 (decisión del owner, 2026-10-15): tres registros del canal
+ * **Efectivo / CUP** —el CUP que vale 1 USD— en tres días seguidos, para que la vista salga con
+ * las **Vigentes** y el **Historial** llenos en vez de los dos "todavía no hay nada".
+ *
+ * `Currency.CUP` = 0 y `SalePaymentMethod.Efectivo` = 0 en el enum del dominio; la fecha es la
+ * de vigencia (`channel-rate-effective-from`), en ISO porque el input es `type="date"`.
+ */
+const CHANNEL_RATES = [
+  { currency: '0', method: '0', value: 680, effectiveFrom: '2026-10-13' },
+  { currency: '0', method: '0', value: 690, effectiveFrom: '2026-10-14' },
+  { currency: '0', method: '0', value: 700, effectiveFrom: '2026-10-15' },
+];
 
 /** Datos de EJEMPLO para las capturas (login `e2e-` para que la suite los limpie). */
 function makeExampleIdentity() {
@@ -223,6 +263,62 @@ async function scrollTo(page, top) {
     );
     (main ?? doc).scrollTop = top;
   }, top);
+}
+
+/**
+ * Captura partida en EXACTAMENTE `parts` tramos que se reparten el contenido SIN huecos.
+ *
+ * Repartir con el alto de ventana de siempre no alcanza: la captura mide UNA pantalla, así que
+ * dos tramos sólo cubren dos pantallas y una vista de dos y media se quedaría sin el final (el
+ * Comentario y el botón de Cierre Caja, en el caso de la 09). La solución es AJUSTAR la ventana
+ * a un tramo: el `<main>` de la app es `flex-1`, así que crece con ella y el alto que queda libre
+ * es justo `contenido / partes`.
+ *
+ * El ajuste se re-mide en bucle porque encoger la ventana puede hacer que el contenido CREZCA
+ * (texto que pasa a más líneas) y entonces un tramo se quedaría corto otra vez.
+ */
+async function captureCoveringSlices(page, name, parts) {
+  const original = page.viewportSize();
+  if (!original) {
+    throw new Error(`La página de "${name}" no tiene viewport: no se puede repartir en tramos.`);
+  }
+  // Lo que la ventana le quita al `<main>` (la cabecera de la app): hay que devolverlo para que
+  // el alto pedido corresponda al alto del contenido que scrollea.
+  const chrome = Math.max(0, original.height - (await measureScroll(page)).viewport);
+  let geo = await measureScroll(page);
+  let windowHeight = Math.ceil(geo.content / parts) + chrome;
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    await page.setViewportSize({ width: original.width, height: Math.max(320, windowHeight) });
+    geo = await measureScroll(page);
+    if (parts * geo.viewport >= geo.content) break;
+    if (attempt === 4) {
+      console.log(
+        `  AVISO: "${name}" no llegó a repartirse en ${parts} tramos; ` +
+          `quedan ${(geo.content - parts * geo.viewport).toFixed(0)} px sin capturar.`,
+      );
+    }
+    windowHeight = Math.ceil(geo.content / parts) + chrome;
+  }
+
+  console.log(
+    `  ${name}: ${geo.screens.toFixed(2)} pantallas de alto → ${parts} tramos de ` +
+      `${geo.viewport} px (ventana ${windowHeight} px)`,
+  );
+  for (let part = 1; part <= parts; part += 1) {
+    await settle(page);
+    await hidePingDots(page);
+    await hideFixedElements(page);
+    await scrollTo(page, (part - 1) * geo.viewport);
+    await page.waitForTimeout(450);
+    await page.mouse.move(0, 0);
+    await page.waitForTimeout(150);
+    const file = resolve(OUT_DIR, `${name}-${part}.png`);
+    await page.screenshot({ path: file, fullPage: false });
+    console.log(`guardada ${file} (tramo ${part}/${parts})`);
+  }
+  await scrollTo(page, 0);
+  await page.setViewportSize(original);
+  return geo;
 }
 
 /** Imprime la tabla final de alturas (ruta, pantallas, nº de imágenes). */
@@ -454,17 +550,70 @@ async function seedExpenses(page) {
   }
 }
 
-/** Siembra el repartidor; la captura 39 sale del formulario de alta ya RELLENO. */
-async function seedDriver(page, captureView) {
-  await goto(page, '/sales/online-orders/drivers');
-  await page.getByTestId('drivers-new').click();
-  await mustSee(page, page.getByTestId('drivers-form'), 'el formulario de alta de repartidor');
-  await page.getByTestId('drivers-name').fill(DRIVER.name);
-  await page.getByTestId('drivers-phone').fill(DRIVER.phone);
-  await captureView(page, '39-nuevo-repartidor');
-  await page.getByTestId('drivers-save').click();
-  await page.getByTestId('drivers-form').waitFor({ state: 'hidden', timeout: 30_000 });
-  console.log(`  repartidor listo: ${DRIVER.name}`);
+/**
+ * Llena el CONTEO de la caja: la Apertura y varias denominaciones con valores (captura 09).
+ * Los inputs son `denomination-qty-<valor>`; se buscan EXACTOS porque `getByTestId` sin
+ * `exact` hace subcadena y `denomination-qty-100` también pegaría con `…-1000`.
+ */
+async function fillCashClosing(page) {
+  await goto(page, '/sales/cash-closing');
+  await mustSee(
+    page,
+    page.getByTestId('cash-closing-opening'),
+    'el campo de Apertura del cierre de caja',
+  );
+  await page.getByTestId('cash-closing-opening').fill(String(CASH_CLOSING.opening));
+  for (const [value, count] of CASH_CLOSING.counts) {
+    const field = page.getByTestId(`denomination-qty-${value}`, { exact: true });
+    await mustSee(page, field, `la casilla de conteo de la denominación ${value}`);
+    await field.fill(String(count));
+  }
+  console.log(
+    `  caja lista: apertura ${CASH_CLOSING.opening} y ${CASH_CLOSING.counts.length} denominaciones contadas`,
+  );
+}
+
+/**
+ * Registra las tasas de cambio por el formulario real (`+ Tasa`), una por día, para que la
+ * captura 20 salga con las **Tasas Vigentes** y el **Historial** con contenido.
+ */
+async function seedChannelRates(page) {
+  await goto(page, '/management/channel-rates');
+  for (const rate of CHANNEL_RATES) {
+    await page.getByTestId('channel-rate-add').click();
+    const dialog = page.getByTestId('channel-rate-add-dialog');
+    await mustSee(page, dialog, 'el formulario de alta de tasa');
+    await dialog.getByTestId('channel-rate-currency').selectOption(rate.currency);
+    await dialog.getByTestId('channel-rate-method').selectOption(rate.method);
+    await dialog.getByTestId('channel-rate-buy-value').fill(String(rate.value));
+    await dialog.getByTestId('channel-rate-sell-value').fill(String(rate.value));
+    await dialog.getByTestId('channel-rate-effective-from').fill(rate.effectiveFrom);
+    await dialog.getByTestId('channel-rate-submit').click();
+    await dialog.waitFor({ state: 'hidden', timeout: 20_000 });
+    console.log(`  tasa lista: ${rate.value} CUP por USD en efectivo (rige desde ${rate.effectiveFrom})`);
+  }
+}
+
+/**
+ * Lleva el Cuadre por fechas a una ventana que CONTENGA las ventas sembradas y lo genera: sin
+ * esto la vista sale con los dos campos de fecha vacíos y cero en todas partes (decisión del
+ * owner, 2026-10-15). El input nativo es `opacity-0` bajo el texto `dd-mm-yyyy` —Playwright lo
+ * considera visible—, así que se rellena directamente por su `data-testid`.
+ */
+async function filterCuadrePorFechas(page) {
+  await goto(page, '/stats/cuadre-por-fechas');
+  const today = new Date();
+  const start = new Date(today);
+  start.setDate(start.getDate() - 6);
+  const iso = (d) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  await mustSee(page, page.getByTestId('cuadre-start-date'), 'el campo Fecha inicio');
+  await page.getByTestId('cuadre-start-date').fill(iso(start));
+  await page.getByTestId('cuadre-end-date').fill(iso(today));
+  await page.getByTestId('cuadre-generate').click();
+  await page.waitForTimeout(1_200);
+  await mustSee(page, page.getByTestId('cuadre-kpi-grid'), 'los KPI del cuadre por fechas');
+  console.log(`  cuadre por fechas generado: ${iso(start)} → ${iso(today)}`);
 }
 
 /**
@@ -595,8 +744,17 @@ async function main() {
    * las que pasan de ~2 pantallas se PARTEN en un tramo por pantalla (`nombre-1`, `nombre-2`, …)
    * porque una sola imagen `fullPage` de un panel con KPIs y gráficas queda ilegible en el
    * manual. Las capturas de `viewport` (modales, carrito) nunca se parten.
+   *
+   * `parts` FUERZA el número de imágenes: `true` = "las que hagan falta para que no se corte
+   * nada" (una por pantalla, aunque la vista pase de las dos) y un entero = exactamente esas.
+   * Sin él, una vista de UNA pantalla y media sale en una sola imagen `fullPage` que, como
+   * `fullPage` solo mide el documento —que no scrollea—, se trunca sin avisar.
    */
-  const capture = async (page, name, { keepFixed = false, fullPage = true, slice = true } = {}) => {
+  const capture = async (
+    page,
+    name,
+    { keepFixed = false, fullPage = true, slice = true, parts = null } = {},
+  ) => {
     await settle(page);
     await hidePingDots(page);
     if (!keepFixed) await hideFixedElements(page);
@@ -605,6 +763,13 @@ async function main() {
     const geo = fullPage
       ? await measureScroll(page)
       : { viewport: 0, content: 0, screens: MIN_SLICE_SCREENS };
+
+    const forced = fullPage && parts ? (parts === true ? Math.ceil(geo.screens) : parts) : 0;
+    if (forced > 1) {
+      const sliced = await captureCoveringSlices(page, name, forced);
+      HEIGHTS.push({ path, screens: sliced.screens, parts: forced, name });
+      return;
+    }
 
     if (!fullPage || !slice || geo.screens <= MIN_SLICE_SCREENS) {
       const file = resolve(OUT_DIR, `${name}.png`);
@@ -615,11 +780,11 @@ async function main() {
       return;
     }
 
-    const parts = Math.ceil(geo.screens);
+    const natural = Math.ceil(geo.screens);
     console.log(
-      `  ${path}: ${geo.screens.toFixed(2)} pantallas de alto → se parte en ${parts} imágenes`,
+      `  ${path}: ${geo.screens.toFixed(2)} pantallas de alto → se parte en ${natural} imágenes`,
     );
-    for (let part = 1; part <= parts; part++) {
+    for (let part = 1; part <= natural; part++) {
       await scrollTo(page, (part - 1) * geo.viewport);
       // El scroll dispara el render perezoso de las gráficas que entran en el tramo.
       await page.waitForTimeout(450);
@@ -629,13 +794,13 @@ async function main() {
       await page.waitForTimeout(150);
       const file = resolve(OUT_DIR, `${name}-${part}.png`);
       await page.screenshot({ path: file, fullPage: false });
-      console.log(`guardada ${file} (tramo ${part}/${parts})`);
+      console.log(`guardada ${file} (tramo ${part}/${natural})`);
     }
     await scrollTo(page, 0);
     console.log(
       `  AVISO: "${name}.png" de la corrida anterior quedó obsoleta; este juego la reemplaza.`,
     );
-    HEIGHTS.push({ path, screens: geo.screens, parts, name });
+    HEIGHTS.push({ path, screens: geo.screens, parts: natural, name });
   };
 
   /**
@@ -665,13 +830,20 @@ async function main() {
   await page.locator('#acceptTerms').waitFor({ state: 'visible', timeout: 30_000 });
   await page.fill('#fullName', identity.fullName);
   await page.fill('#storeName', identity.storeName);
-  await page.fill('#login', identity.login);
+  // El USUARIO de la captura 01 es un nombre normal (`pedro`, decisión del owner 2026-10-15),
+  // no el login `e2e-…` que se lepone al alta REAL después de capturar: la cuenta del ejemplo
+  // tiene que poder limpiarse sola y ese es el único dato que la identifica.
+  await page.fill('#login', 'pedro');
   await page.fill('#password', identity.password);
   await page.fill('#passwordConfirmation', identity.password);
   await page.fill('#cellPhone', identity.cellPhone);
+  // Los términos se marcan ANTES de capturar: la captura tiene que enseñar el formulario tal
+  // como se envía, con la casilla aceptada.
+  await page.check('#acceptTerms');
   await capture(page, '01-crear-cuenta', { keepFixed: true });
 
-  await page.check('#acceptTerms');
+  // Solo ahora se cambia al login único y se envía.
+  await page.fill('#login', identity.login);
   await page.getByRole('button', { name: 'Registrar', exact: true }).click();
   await waitForPathChange(page, (url) => !url.pathname.startsWith('/register'));
   // El botón flotante INSTALAR APP se MANTIENE: el paso de instalación vive aquí.
@@ -693,9 +865,6 @@ async function main() {
 
   console.log('Sembrando los gastos del día ...');
   await seedExpenses(page);
-
-  console.log('Sembrando el repartidor ...');
-  await seedDriver(page, capture);
 
   console.log('Sembrando las ventas ...');
   await seedCashSale(page, capture);
@@ -720,15 +889,20 @@ async function main() {
   await invToggle.click();
   await capture(page, '08-disponible');
 
-  // ── 09: Cierre de caja ─────────────────────────────────────────────────
-  await goto(page, '/sales/cash-closing');
-  await capture(page, '09-cierre-caja');
+  // ── 09: Cierre de caja — CON el conteo de las denominaciones ya escrito ──
+  // La vista sale en ~3 pantallas de alto y el owner la quiere en 2 (decisión 2026-10-15), así
+  // que el corte se FUERZA a 2 tramos: `captureCoveringSlices` reparte el alto de la ventana
+  // para que entre entero y no se pierda el final (Comentario + botón Cerrar Caja).
+  await fillCashClosing(page);
+  await capture(page, '09-cierre-caja', { parts: 2 });
 
   // ── 10: Gastos del día ─────────────────────────────────────────────────
   await goto(page, '/expenses/today');
   await capture(page, '10-gastos');
 
   // ── Lote: resto de pantallas (sin interacción) ─────────────────────────
+  // 18 (Cuadre por fechas), 20 (Tasas de cambio) y 21 (Empleados) salen de aquí: las tres
+  // necesitan preparación (filtrar, sembrar tasas) antes de capturar.
   const ROUTES = [
     ['11-entradas-dia', '/inventory/today-entries'],
     ['12-cantidades-dia', '/inventory/today-quantities'],
@@ -736,16 +910,10 @@ async function main() {
     ['14-cuadre-dia', '/sales/today-stats'],
     ['15-ventas-del-dia', '/sales/today-orders'],
     ['16-reportes', '/reports/today'],
-    ['18-cuadre-fechas', '/stats/cuadre-por-fechas'],
     ['19-configuraciones', '/management/configurations'],
-    ['20-tasas-cambio', '/management/channel-rates'],
-    ['21-empleados', '/management/users'],
     ['22-mis-tiendas', '/management/my-stores'],
     ['23-catalogo-web', '/sales/web-catalog'],
     ['24-pedidos-whatsapp', '/sales/online-orders/settings'],
-    ['25-pedidos', '/sales/online-orders'],
-    ['26-repartidores', '/sales/online-orders/drivers'],
-    ['27-ventas-pedidos', '/sales/online-orders/sales'],
     ['28-mayorista', '/sales/wholesale'],
     ['29-creditos-dia', '/sales/today-credits'],
     ['30-exportar', '/sync/export'],
@@ -756,6 +924,21 @@ async function main() {
     await goto(page, path);
     await capture(page, name);
   }
+
+  // ── 18: Cuadre por fechas — con un rango QUE CONTENGA las ventas ───────
+  // Sin filtrar, la vista sale con las fechas vacías y todo en cero (decisión del owner,
+  // 2026-10-15). `parts: true` garantiza que, con los KPI ya dentro, no se corte el final.
+  await filterCuadrePorFechas(page);
+  await capture(page, '18-cuadre-fechas', { parts: true });
+
+  // ── 20: Tasas de cambio — con las tres tasas sembradas ────────────────
+  console.log('Sembrando las tasas de cambio ...');
+  await seedChannelRates(page);
+  await capture(page, '20-tasas-cambio', { parts: true });
+
+  // ── 21: Empleados ─────────────────────────────────────────────────────
+  await goto(page, '/management/users');
+  await capture(page, '21-empleados', { parts: true });
 
   // ── 17: Panel de Control — con el rango llevado a HOY ─────────────────
   // El default del panel es "7 días inclusivos terminando AYER", así que las ventas de hoy
