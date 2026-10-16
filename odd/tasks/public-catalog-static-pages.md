@@ -26,14 +26,14 @@ descripción, canonical, Open Graph y (después) JSON-LD — para que Google **y
 
 | ID | Qué | S# | Ruta | Estado |
 |---|---|---|---|---|
-| T1 | Builder puro: inyecta meta en el HTML shell (title, description, canonical, OG, twitter) + tests | S1 | inline | COMPLETADO (`b4967ea7`) |
-| T2 | Servicio de escritura: lee el shell de un directorio configurable y escribe `/catalog/<slug>/index.html` | S1,S2 | inline | COMPLETADO (`00fb4caa`) |
-| T3 | Disparador: regenerar al guardar la config/estado del catálogo público | S2 | — | PENDIENTE |
-| T4 | Servido: nginx (alias + fallback) + directorio compartido + publicar el shell del SPA en él | S1,S4 | — | PENDIENTE |
-| T5 | Backfill de catálogos existentes + regeneración en cada deploy | S3 | — | PENDIENTE |
-| T6 | `sitemap.xml` + `robots.txt` | S5 | — | PENDIENTE |
-| T7 | Campos de ubicación por tienda + JSON-LD | S6 | — | PENDIENTE |
-| T8 | Registrar en BD la generación de cada catálogo (decisión pendiente: qué guardar) | S2 | — | PENDIENTE |
+| T1 | Builder puro: inyecta meta en el HTML shell (title, description, canonical, OG, twitter) + tests | S1 | inline | COMPLETADO (`dc03913e`) |
+| T2 | Servicio de escritura: lee el shell de un directorio configurable y escribe `/catalog/<slug>/index.html` | S1,S2 | inline | COMPLETADO (`0cda93ac`) |
+| T3 | Servicio de generación: carga tienda + marca del catálogo de la BD → meta → writer | S1,S2 | inline | COMPLETADO (`bdff2f10`) |
+| T4 | Disparador: regenerar al guardar la config/estado del catálogo público | S2 | — | PENDIENTE |
+| T5 | Servido: nginx (alias + fallback) + directorio compartido + publicar el shell del SPA en él | S1,S4 | — | PENDIENTE |
+| T6 | Backfill de catálogos existentes + regeneración en cada deploy | S3 | — | PENDIENTE |
+| T7 | `sitemap.xml` + `robots.txt` | S5 | — | PENDIENTE |
+| T8 | Campos de ubicación por tienda + JSON-LD | S6 | — | PENDIENTE |
 
 ## Log
 
@@ -54,7 +54,10 @@ descripción, canonical, Open Graph y (después) JSON-LD — para que Google **y
   6 tests. Suites: Application.Tests 1291/1291, Domain.UnitTests 165/165. Nota: se trabaja en `main`
   (rama que despliega el owner); `main` va por detrás de `test`.
 - **L5 (owner, verbatim):** "dale y eso tiene que actualizar en la BD el template del catalogo que se
-  genero." → T2 completado (`00fb4caa`) — `CatalogStaticPageWriter`. Sobre la BD: recomendación técnica
-  anotada en T8 — **no** guardar el HTML generado en la BD (referencia assets con hash que cambian en
-  cada build del frontend; quedaría obsoleto), sino un registro ligero (fecha de generación + slug +
-  template del catálogo). Decisión pendiente del owner.
+  genero." → T2 completado. Sobre la BD: **descartado** por el owner (2026-10-16: "olvida lo de la
+  BD") — no se añade registro de generación; el template ya vive en `StoreCatalogSettings.TemplateId`.
+- **L6 (corrección de rama + progreso):** el owner ordenó que la feature viva en **test** (main solo
+  la verificación de Google). Cherry-pick a `test`: T1 `dc03913e`, T2 `0cda93ac` (los SHAs de los
+  commits originales en main quedaron obsoletos tras el reset). **T3 completado (`bdff2f10`)**:
+  `CatalogStaticPageGenerator` arma la página desde tienda + marca (logo/banner) con canonical y
+  media absolutos. Suites: Application.Tests 1335/1335, Domain.UnitTests 165/165.
