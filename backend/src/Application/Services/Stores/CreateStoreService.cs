@@ -37,6 +37,13 @@ namespace Application.Services.Stores
         public async Task<Store> CreateStoreAsync(Guid ownerId, Guid tenantId, string name, string? address, string? description,
             bool approved)
         {
+            // Tienda ADICIONAL (el owner ya tiene otra): MultiStores nace al 100% de descuento para
+            // que su precio se cobre UNA sola vez por owner (decisión del owner 2026-10-16). Se
+            // decide aquí, en el punto único de alta, así vale igual si la crea el Owner, el
+            // SuperAdmin o el registro. Se consulta ANTES de AddAsync: la tienda nueva aún no está
+            // persistida, así que la pregunta es exactamente "¿ya existe otra?".
+            var isAdditionalStore = await _storeRepository.HasAnyStoreByOwnerIdAsync(ownerId);
+
             // Every created store starts its trial clock unconditionally (paid or free-only modules).
             // Identical derivation to UpdateStoreCommandHandler.cs's activation-on-first-paid conditional,
             // so the two paths cannot drift.
@@ -59,8 +66,16 @@ namespace Application.Services.Stores
             var storeModules = new List<StoreModule>(birthModules.Count);
             foreach (var module in birthModules)
             {
+                // En una tienda ADICIONAL, MultiStores se snapshotea con el descuento en 100% (esa
+                // tienda paga 0 por ese módulo). El precio de catálogo NO se toca; solo se cambia el
+                // porcentaje de descuento, y solo para MultiStores.
+                var percentDiscountPrice =
+                    isAdditionalStore && module.Id == (int)ModuleType.MultiStores
+                        ? 100f
+                        : module.PercentDiscountPrice;
+
                 var storeModule = StoreModule.Create(store.Id, module.Id, module.Price, module.PriceIncluded,
-                    module.Price, module.DiscountPrice, module.PercentDiscountPrice, tenantId);
+                    module.Price, module.DiscountPrice, percentDiscountPrice, tenantId);
                 storeModules.Add(storeModule);
             }
             if (storeModules.Count > 0)
