@@ -45,7 +45,7 @@ descripción, canonical, Open Graph y (después) JSON-LD — para que Google **y
 | T3 | Servicio de generación: carga tienda + marca del catálogo de la BD → meta → writer | S1,S2 | inline | COMPLETADO (`bdff2f10`) |
 | T4 | Disparador: regenerar al guardar la config/estado del catálogo público (sync + marca) | S2 | inline | COMPLETADO (`21a6c935`) |
 | T5 | Servido: nginx (alias + fallback, **solo la ruta exacta** — S10) + directorio compartido + publicar el shell del SPA en él + **conservar assets del build anterior** (mitigación S9) | S1,S4,S9,S10 | inline (infra) | COMPLETADO (`14131b21` + `ec8c114c`) |
-| T6 | Backfill de catálogos existentes + **regeneración en cada deploy (obligatoria — S9)** | S3,S9 | — | PENDIENTE |
+| T6 | Backfill de catálogos existentes + **regeneración en cada deploy (obligatoria — S9)** | S3,S9 | inline | COMPLETADO (`6b4c4bc8`) |
 | T7 | `sitemap.xml` + `robots.txt` | S5 | — | PENDIENTE |
 | T8 | Campos de ubicación por tienda + JSON-LD | S6 | — | PENDIENTE |
 | T9 | Disparador por renombre de tienda (`UpdateStoreCommand`: nombre/descripción → title/description) | S2 | — | PENDIENTE |
@@ -118,3 +118,25 @@ descripción, canonical, Open Graph y (después) JSON-LD — para que Google **y
   `exit` dentro de él mataba el arranque de nginx → quedó sin `exit` ni `set -e`/`set -u`.
   Pendiente en el VPS: subir `PUBLIC_BASE_URL` al `.env` solo si cambia el dominio (el compose trae el
   default) y comprobar el arranque real de los dos contenedores durante el deploy (T6).
+- **L12 (2026-10-17, progreso + verificación):** **T6 completado (`6b4c4bc8`)** — mecanismo: sincronizador
+  automático del lado de la API, sin tocar los deploy scripts. `CatalogStaticPageSyncService`
+  (BackgroundService, registrado en `Program.cs`) corre una pasada completa al arrancar — **backfill** de
+  los catálogos existentes (S3) — y vigila la firma SHA-256 del shell del SPA cada 30 s (default; mínimo
+  efectivo 5 s): firma nueva = build nuevo del frontend = pasada completa de nuevo (S9). Con la feature sin
+  configurar el servicio no hace nada (ni abre la BD). El generador pasó a lecturas **públicas**
+  (`GetStoreByIdIgnoreQueryFiltersAsync` / `GetPublicByStoreIdAsync`): sin sesión el filtro global de tenant
+  no coincide con ninguna fila y la pasada habría generado CERO páginas en silencio — los flujos de guardado
+  (T4) obtienen la misma fila. Compose de test cableado igual que producción
+  (`catalog_pages:/srv/catalog-pages` en API y web-store-pos; `CatalogStaticPage__*` con
+  `PublicBaseUrl` default `https://vdt.playground.sceiba.net`).
+  **Evidencia:** RED 18 fallidos/28 pasan/46 → **GREEN 46/46** (filter `CatalogStaticPage`, 18 pruebas
+  nuevas); Application.Tests **1357/1357**; Domain.UnitTests **165/165**; E2E `WebCatalogPublicApiTests`
+  **8/8** (fixture real). **Sonda local end-to-end** con la API real contra `smca_test` (shell y salida en
+  temp fuera del repo; `CatalogSlug` temporal en la tienda `613b6022`, revertido después): (a) el arranque
+  escribió `pages/catalog/probe-bodega-t6/index.html` con title/canonical/OG de la tienda (1/1 escritas en
+  el log); (b) shell reescrito → página regenerada ~5 s después con el marcador y los assets nuevos, dos
+  "Shell nuevo detectado" con firma distinta; (c) sin cambio de shell no hay reescritura (mtime estable,
+  exactamente 2 detecciones). Fuera de T6 (anotado, no hecho): renombrar un slug
+  (`UpdateStoreCatalogSlugCommand`) deja huérfana la página del slug viejo — candidato a tarea propia.
+  Pendiente en el VPS: redeploy de test y comprobar el arranque real (backfill en la primera página y
+  regeneración ante un build nuevo del frontend).
