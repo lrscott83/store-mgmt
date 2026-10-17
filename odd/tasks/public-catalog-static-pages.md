@@ -44,7 +44,7 @@ descripción, canonical, Open Graph y (después) JSON-LD — para que Google **y
 | T2 | Servicio de escritura: lee el shell de un directorio configurable y escribe `/catalog/<slug>/index.html` | S1,S2 | inline | COMPLETADO (`0cda93ac`) |
 | T3 | Servicio de generación: carga tienda + marca del catálogo de la BD → meta → writer | S1,S2 | inline | COMPLETADO (`bdff2f10`) |
 | T4 | Disparador: regenerar al guardar la config/estado del catálogo público (sync + marca) | S2 | inline | COMPLETADO (`21a6c935`) |
-| T5 | Servido: nginx (alias + fallback, **solo la ruta exacta** — S10) + directorio compartido + publicar el shell del SPA en él + **conservar assets del build anterior** (mitigación S9) | S1,S4,S9,S10 | — | PENDIENTE |
+| T5 | Servido: nginx (alias + fallback, **solo la ruta exacta** — S10) + directorio compartido + publicar el shell del SPA en él + **conservar assets del build anterior** (mitigación S9) | S1,S4,S9,S10 | inline (infra) | COMPLETADO (`14131b21` + `ec8c114c`) |
 | T6 | Backfill de catálogos existentes + **regeneración en cada deploy (obligatoria — S9)** | S3,S9 | — | PENDIENTE |
 | T7 | `sitemap.xml` + `robots.txt` | S5 | — | PENDIENTE |
 | T8 | Campos de ubicación por tienda + JSON-LD | S6 | — | PENDIENTE |
@@ -100,3 +100,21 @@ descripción, canonical, Open Graph y (después) JSON-LD — para que Google **y
   wiring en `SyncCatalogCommandHandler` y `UpdateStoreCatalogBrandingCommandHandler` + registro en DI
   y binding de `CatalogStaticPageOptions`. Nueva tarea **T9** (renombre de tienda) anotada. Suites:
   Application.Tests 1338/1338, Domain.UnitTests 165/165.
+- **L11 (progreso + verificación):** **T5 completado** (`14131b21` infra + `ec8c114c` apagado/roto).
+  Volumen compartido `catalog_pages` montado en `/srv/catalog-pages` por la API y por nginx; el
+  entrypoint del frontend publica el shell del build en `<volumen>/shell/index.html` y **archiva los
+  assets de builds anteriores** (sin sobrescribir, sin borrar); nginx sirve la página generada **solo**
+  para la ruta exacta `/catalog/<slug>`, cae al SPA en todo lo demás y rescata del archivo el asset
+  cuyo hash ya no está en el build actual (S9). Config por entorno: `CatalogStaticPage__ShellPath`,
+  `__OutputRoot`, `__PublicBaseUrl` (default `https://pos.playground.sceiba.net`).
+  **Verificado con nginx real** — contenedor `nginx:alpine`, el `nginx.conf` del repo, no una copia:
+  **22/22 aserciones**. Página generada en la ruta exacta; SPA en slug inexistente, sub-ruta y slug
+  con mayúsculas (**S10**); CSP y `Cache-Control: no-cache` heredados en la generada; `/` y
+  `/sales/new` intactos (**S7/S8**); asset del build actual igual que antes; asset de un build anterior
+  servido desde el archivo; asset inexistente **404 y nunca HTML**; y el entrypoint publica el shell,
+  lo refresca en un build nuevo, archiva el asset nuevo, conserva el anterior y no sobrescribe lo ya
+  archivado — **con nginx arriba en los cuatro escenarios**.
+  Hallazgo de la verificación: si el script llega *sourceado* (archivo sin permiso de ejecución) un
+  `exit` dentro de él mataba el arranque de nginx → quedó sin `exit` ni `set -e`/`set -u`.
+  Pendiente en el VPS: subir `PUBLIC_BASE_URL` al `.env` solo si cambia el dominio (el compose trae el
+  default) y comprobar el arranque real de los dos contenedores durante el deploy (T6).
