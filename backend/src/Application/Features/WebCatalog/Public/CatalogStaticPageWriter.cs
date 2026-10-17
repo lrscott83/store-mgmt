@@ -25,6 +25,16 @@ namespace Application.Features.WebCatalog.Public
         /// HTML se sirve estático y los rastreadores no resuelven rutas relativas.
         /// </summary>
         public string? PublicBaseUrl { get; set; }
+
+        /// <summary>
+        /// La pre-generación está CONFIGURADA en este entorno. Distingue "apagada" de "rota": sin
+        /// <see cref="ShellPath"/> ni <see cref="OutputRoot"/> la feature no aplica (dev, tests, un
+        /// contenedor sin el volumen montado), así que el regenerador best-effort se calla en vez de
+        /// registrar un fallo por cada guardado. Un error real —configurada pero no puede escribir—
+        /// sí se registra.
+        /// </summary>
+        public bool IsEnabled =>
+            !string.IsNullOrWhiteSpace(ShellPath) && !string.IsNullOrWhiteSpace(OutputRoot);
     }
 
     /// <summary>Escribe la página estática de un catálogo público (feature public-catalog-static-pages, S1/S2).</summary>

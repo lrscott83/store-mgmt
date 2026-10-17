@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Application.Features.WebCatalog.Public
 {
@@ -18,22 +19,32 @@ namespace Application.Features.WebCatalog.Public
     /// registra y se traga — guardar la marca del catálogo no puede fallar porque la página estática
     /// no se haya podido escribir. La cancelación también se traga, por la misma razón: el guardado ya
     /// ocurrió y la cancelación no es un error de la página.
+    ///
+    /// Y si la feature está APAGADA en este entorno (<see cref="CatalogStaticPageOptions.IsEnabled"/>
+    /// falso: dev, tests, un contenedor sin el volumen) se calla sin registrar nada: no poder
+    /// pre-generar donde no está configurada no es un fallo.
     /// </summary>
     public sealed class CatalogStaticPageRegenerator : ICatalogStaticPageRegenerator
     {
         private readonly ICatalogStaticPageGenerator _generator;
+        private readonly CatalogStaticPageOptions _options;
         private readonly ILogger<CatalogStaticPageRegenerator> _logger;
 
         public CatalogStaticPageRegenerator(
             ICatalogStaticPageGenerator generator,
+            IOptions<CatalogStaticPageOptions> options,
             ILogger<CatalogStaticPageRegenerator> logger)
         {
             _generator = generator;
+            _options = options.Value;
             _logger = logger;
         }
 
         public async Task RegenerateAsync(Guid storeId, CancellationToken cancellationToken = default)
         {
+            if (!_options.IsEnabled)
+                return;
+
             try
             {
                 await _generator.GenerateAsync(storeId, cancellationToken);
