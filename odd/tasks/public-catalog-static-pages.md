@@ -140,3 +140,8 @@ descripción, canonical, Open Graph y (después) JSON-LD — para que Google **y
   (`UpdateStoreCatalogSlugCommand`) deja huérfana la página del slug viejo — candidato a tarea propia.
   Pendiente en el VPS: redeploy de test y comprobar el arranque real (backfill en la primera página y
   regeneración ante un build nuevo del frontend).
+- **L13 (2026-10-17, RDD):** assessment nativo del slice de T6 (`gentle-ai review assess --base-ref
+  36a30639 --committed-only --json`; cubre `6b4c4bc8` + `e3e1db53`): risk **`medium`** (13 paths,
+  576 líneas), `review_due: false`, motivo **`under_budget`** → ninguna review nativa forzada; el slice
+  queda pendiente con base `36a30639` hasta que un commit posterior alcance el presupuesto. El modo RDD
+  está `on` (global). Los cierres de T1–T5 no registran assessment RDD en este documento.
