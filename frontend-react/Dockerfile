@@ -31,4 +31,16 @@ RUN pnpm install --frozen-lockfile \
 FROM nginx:alpine
 COPY deploy/nginx.conf /etc/nginx/nginx.conf
 COPY --from=build /app/apps/web-store-pos/build/client /usr/share/nginx/html
+
+# public-catalog-static-pages (T5): volumen compartido con la API (`catalog_pages` en
+# docker-compose.yml). Se crea con 0777 a propósito — el dueño inicial de un named volume depende de
+# cuál de los dos contenedores lo monte primero, y la API corre sin privilegios (uid `dotnet`).
+RUN mkdir -p /srv/catalog-pages && chmod 0777 /srv/catalog-pages
+
+# Publica el shell del build y conserva los assets de builds anteriores en el volumen, antes de
+# arrancar nginx (nginx:alpine ejecuta /docker-entrypoint.d/*.sh). Ver
+# deploy/10-publish-catalog-shell.sh.
+COPY deploy/10-publish-catalog-shell.sh /docker-entrypoint.d/10-publish-catalog-shell.sh
+RUN chmod +x /docker-entrypoint.d/10-publish-catalog-shell.sh
+
 EXPOSE 80

@@ -5,7 +5,10 @@ EXPOSE 8000
 ENV ASPNETCORE_URLS=http://+:8000
 ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=0
 RUN groupadd -g 2000 dotnet \
-    && useradd -m -u 2000 -g 2000 dotnet
+    && useradd -m -u 2000 -g 2000 dotnet \
+    && mkdir -p /srv/catalog-pages \
+    && chown dotnet:dotnet /srv/catalog-pages \
+    && chmod 0777 /srv/catalog-pages
 USER dotnet
 
 # This stage is used to build the service project
