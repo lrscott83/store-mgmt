@@ -116,7 +116,7 @@
     <div class="doc">
       <header class="doc__header">
         <h1>Manual de usuario — VendeDTo</h1>
-        <p>Generado el 2026-10-16 · documento público de ayuda</p>
+        <p>Generado el 2026-10-17 · documento público de ayuda</p>
       </header>
       <main><h1>Manual de usuario — VendeDTo</h1>
 <p><strong>Versión:</strong> 1.1 · <strong>Fecha:</strong> 2026-10-16
@@ -687,28 +687,9 @@ falla, para enviar el detalle.</p>
 <h2>Anexo — Qué NO cubre este manual</h2>
 <p>Este manual se limita a los módulos del plan <strong>Pago</strong> más <strong>Catálogo Web</strong>, <strong>Pedidos WhatsApp</strong> y
 las <strong>configuraciones</strong>. Quedan <strong>fuera</strong>: los módulos de <strong>Almacenes</strong> y <strong>Elaboración</strong> (plan
-Superior) y todas las pantallas de <strong>Administración de la plataforma</strong> (SuperAdmin: tiendas, dueños,
+Superior), las pantallas de <strong>Gestión de pedidos</strong> (atender los pedidos, repartidores y ventas de
+pedidos) y todas las pantallas de <strong>Administración de la plataforma</strong> (SuperAdmin: tiendas, dueños,
 comercializadores, módulos, cobros y comisiones).</p>
-<h2>Pendiente (capturas y ajustes acordados)</h2>
-<ul>
-<li><strong>Imagen del MENÚ — HECHA.</strong> El menú (barra lateral) está capturado en <strong>3 tramos</strong>
-(<code>45-menu-1..3</code>) y documentado en «El menú (barra lateral)», incluido el <strong><code>?</code> de ayuda de cada
-opción</strong>.</li>
-<li><strong>El signo de interrogación (?) del encabezado es la AYUDA</strong> (el Tutorial). Está detallado en
-«El encabezado (barra superior)», pero conviene destacarlo cuando se capture el menú.</li>
-<li><strong>Conteo de inventario — HECHO</strong> (llega en <code>qa</code>): el conteo ya es una <strong>vista propia</strong>
-(<code>/inventory/count</code>, sección 14.1) y <em>Disponible</em> se regeneró <strong>sin</strong> la columna de conteo.</li>
-<li><strong>Panel de Control (imagen <code>17-dashboard</code>).</strong> La captura ya lleva el rango a <strong>hoy</strong> (7 días
-terminando hoy), así que el filtro es correcto; pero los KPI siguen en <strong>0 CUP</strong> aunque
-<em>Ventas del día</em> muestra las 3 ventas (4 800 CUP). Es un problema del <strong>agregador del panel</strong>
-(<code>computeSingleStoreDashboardRange</code>), no del filtro: <strong>queda por investigar</strong>.</li>
-<li><strong>Gestión de pedidos — FUERA del manual</strong> (decisión del owner, 2026-10-15). Se retiraron las
-secciones <em>Atender los pedidos</em>, <em>Repartidores</em> y <em>Ventas de pedidos</em>, con sus imágenes
-(<code>25-pedidos</code>, <code>26-repartidores</code>, <code>27-ventas-pedidos-*</code>, <code>39-nuevo-repartidor</code>). Se conserva la
-sección 21, <strong>Configurar los Pedidos WhatsApp</strong>, que es la pantalla del Dueño que enciende el
-módulo. Las capturas del <strong>carrito</strong> y del <strong>checkout</strong> moved a la sección 19 (Catálogo Web),
-porque las ve el cliente y no el POS.</li>
-</ul>
 </main>
     </div>
   </body>

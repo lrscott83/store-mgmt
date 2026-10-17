@@ -762,25 +762,6 @@ falla, para enviar el detalle.
 
 Este manual se limita a los módulos del plan **Pago** más **Catálogo Web**, **Pedidos WhatsApp** y
 las **configuraciones**. Quedan **fuera**: los módulos de **Almacenes** y **Elaboración** (plan
-Superior) y todas las pantallas de **Administración de la plataforma** (SuperAdmin: tiendas, dueños,
+Superior), las pantallas de **Gestión de pedidos** (atender los pedidos, repartidores y ventas de
+pedidos) y todas las pantallas de **Administración de la plataforma** (SuperAdmin: tiendas, dueños,
 comercializadores, módulos, cobros y comisiones).
-
-## Pendiente (capturas y ajustes acordados)
-
-- **Imagen del MENÚ — HECHA.** El menú (barra lateral) está capturado en **3 tramos**
-  (`45-menu-1..3`) y documentado en «El menú (barra lateral)», incluido el **`?` de ayuda de cada
-  opción**.
-- **El signo de interrogación (?) del encabezado es la AYUDA** (el Tutorial). Está detallado en
-  «El encabezado (barra superior)», pero conviene destacarlo cuando se capture el menú.
-- **Conteo de inventario — HECHO** (llega en `qa`): el conteo ya es una **vista propia**
-  (`/inventory/count`, sección 14.1) y *Disponible* se regeneró **sin** la columna de conteo.
-- **Panel de Control (imagen `17-dashboard`).** La captura ya lleva el rango a **hoy** (7 días
-  terminando hoy), así que el filtro es correcto; pero los KPI siguen en **0 CUP** aunque
-  *Ventas del día* muestra las 3 ventas (4 800 CUP). Es un problema del **agregador del panel**
-  (`computeSingleStoreDashboardRange`), no del filtro: **queda por investigar**.
-- **Gestión de pedidos — FUERA del manual** (decisión del owner, 2026-10-15). Se retiraron las
-  secciones *Atender los pedidos*, *Repartidores* y *Ventas de pedidos*, con sus imágenes
-  (`25-pedidos`, `26-repartidores`, `27-ventas-pedidos-*`, `39-nuevo-repartidor`). Se conserva la
-  sección 21, **Configurar los Pedidos WhatsApp**, que es la pantalla del Dueño que enciende el
-  módulo. Las capturas del **carrito** y del **checkout** moved a la sección 19 (Catálogo Web),
-  porque las ve el cliente y no el POS.
