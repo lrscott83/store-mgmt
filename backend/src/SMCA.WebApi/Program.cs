@@ -74,6 +74,10 @@ builder.Services.AddScoped<IStoreDataKeyProvider>(_ =>
 builder.Services.AddScoped<IOfflinePreHashProtector>(_ =>
     new OfflinePreHashProtector(builder.Configuration.GetValue<string>("StoreEncryption:MasterSecret")!));
 
+// public-catalog-static-pages (T6): backfills and keeps the pre-generated catalog pages in sync
+// with the deployed SPA shell. No-op unless CatalogStaticPage is configured.
+builder.Services.AddHostedService<CatalogStaticPageSyncService>();
+
 builder.Services.Configure<TenantConnectionSettings>(options =>
     builder.Configuration.GetSection(nameof(TenantConnectionSettings)).Bind(options));
 

@@ -43,7 +43,7 @@ public sealed class CatalogStaticPageGeneratorTests
     {
         var store = Store.Create(name, Guid.NewGuid(), approved: true, _tenantId, address: null, description: description);
         store.CatalogSlug = slug;
-        _storeRepository.Setup(r => r.GetStoreByIdAsync(_storeId)).ReturnsAsync(store);
+        _storeRepository.Setup(r => r.GetStoreByIdIgnoreQueryFiltersAsync(_storeId)).ReturnsAsync(store);
         return store;
     }
 
@@ -52,7 +52,7 @@ public sealed class CatalogStaticPageGeneratorTests
         var settings = StoreCatalogSettings.Create(_storeId, _tenantId);
         settings.LogoKey = logoKey;
         settings.BannerKey = bannerKey;
-        _settingsRepository.Setup(r => r.GetByStoreIdAsync(_storeId)).ReturnsAsync(settings);
+        _settingsRepository.Setup(r => r.GetPublicByStoreIdAsync(_storeId)).ReturnsAsync(settings);
     }
 
     [Fact]
@@ -90,7 +90,7 @@ public sealed class CatalogStaticPageGeneratorTests
     public async Task Generate_omits_the_image_when_the_store_has_no_branding()
     {
         ArrangeStore();
-        _settingsRepository.Setup(r => r.GetByStoreIdAsync(_storeId)).ReturnsAsync((StoreCatalogSettings?)null);
+        _settingsRepository.Setup(r => r.GetPublicByStoreIdAsync(_storeId)).ReturnsAsync((StoreCatalogSettings?)null);
 
         await CreateGenerator().GenerateAsync(_storeId);
 
@@ -121,7 +121,7 @@ public sealed class CatalogStaticPageGeneratorTests
     [Fact]
     public async Task Generate_does_nothing_when_the_store_does_not_exist()
     {
-        _storeRepository.Setup(r => r.GetStoreByIdAsync(_storeId)).ReturnsAsync((Store?)null);
+        _storeRepository.Setup(r => r.GetStoreByIdIgnoreQueryFiltersAsync(_storeId)).ReturnsAsync((Store?)null);
 
         var generated = await CreateGenerator().GenerateAsync(_storeId);
 

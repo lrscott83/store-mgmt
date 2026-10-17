@@ -27,6 +27,15 @@ namespace Application.Features.WebCatalog.Public
         public string? PublicBaseUrl { get; set; }
 
         /// <summary>
+        /// Segundos entre comprobaciones del shell del SPA (T6). El valor mínimo efectivo es 5 s
+        /// (<see cref="SynchronizationInterval"/>): un 0 accidental no puede convertirse en un bucle.
+        /// </summary>
+        public int SynchronizationIntervalSeconds { get; set; } = 30;
+
+        /// <summary>Intervalo efectivo del sincronizador, ya acotado al mínimo.</summary>
+        public TimeSpan SynchronizationInterval => TimeSpan.FromSeconds(Math.Max(5, SynchronizationIntervalSeconds));
+
+        /// <summary>
         /// La pre-generación está CONFIGURADA en este entorno. Distingue "apagada" de "rota": sin
         /// <see cref="ShellPath"/> ni <see cref="OutputRoot"/> la feature no aplica (dev, tests, un
         /// contenedor sin el volumen montado), así que el regenerador best-effort se calla en vez de

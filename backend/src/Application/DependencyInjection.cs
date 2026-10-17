@@ -89,6 +89,9 @@ namespace Application
             services.AddScoped<ICatalogStaticPageWriter, CatalogStaticPageWriter>();
             services.AddScoped<ICatalogStaticPageGenerator, CatalogStaticPageGenerator>();
             services.AddScoped<ICatalogStaticPageRegenerator, CatalogStaticPageRegenerator>();
+            // T6: full regeneration pass over every published catalog; the API host runs it at
+            // startup (backfill) and whenever the SPA shell changes (every frontend deploy).
+            services.AddScoped<ICatalogStaticPageSynchronizer, CatalogStaticPageSynchronizer>();
 
             return services;
         }

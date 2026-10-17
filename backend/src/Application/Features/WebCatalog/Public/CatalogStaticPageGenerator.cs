@@ -39,7 +39,14 @@ namespace Application.Features.WebCatalog.Public
 
         public async Task<bool> GenerateAsync(Guid storeId, CancellationToken cancellationToken = default)
         {
-            var store = await _storeRepository.GetStoreByIdAsync(storeId);
+            // Lecturas PÚBLICAS a propósito (T6): la página de un catálogo es pública, igual que
+            // /catalog/<slug>, así que se resuelve sin sesión y sin filtro de tenant
+            // (GetStoreByIdIgnoreQueryFiltersAsync / GetPublicByStoreIdAsync). Con los métodos que
+            // aplican el filtro, la pasada del sincronizador —arranque de la API, sin tenant en el
+            // contexto— no encontraría NADA: el filtro no puede coincidir con ninguna fila y
+            // devolvería vacío sin error ni aviso. Los flujos que guardan (T4) siguen igual:
+            // resuelven la tienda de su propio tenant y obtienen la misma fila.
+            var store = await _storeRepository.GetStoreByIdIgnoreQueryFiltersAsync(storeId);
             if (store is null || string.IsNullOrWhiteSpace(store.CatalogSlug))
                 return false;
 
@@ -47,7 +54,7 @@ namespace Application.Features.WebCatalog.Public
             if (string.IsNullOrWhiteSpace(baseUrl))
                 throw new InvalidOperationException("CatalogStaticPageOptions.PublicBaseUrl is not configured");
 
-            var settings = await _settingsRepository.GetByStoreIdAsync(storeId);
+            var settings = await _settingsRepository.GetPublicByStoreIdAsync(storeId);
 
             // Preferencia de imagen: logo, si no banner, si no nada.
             var imageKey = string.IsNullOrWhiteSpace(settings?.LogoKey) ? settings?.BannerKey : settings!.LogoKey;
