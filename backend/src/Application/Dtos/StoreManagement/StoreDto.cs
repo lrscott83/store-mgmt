@@ -42,5 +42,9 @@ namespace Application.Dtos.StoreManagement
         public float? PlanPrice { get; set; }
         public float? PlanCurrentPrice { get; set; }
         public List<ModuleDto> Modules { get; set; } = new();
+        // Public catalog slug (Store.CatalogSlug): the store's `/catalog/<slug>` public route.
+        // Null when the store never synced its catalog — the super-admin store cards render the
+        // catalog link only when it is present.
+        public string? CatalogSlug { get; set; }
     }
 }

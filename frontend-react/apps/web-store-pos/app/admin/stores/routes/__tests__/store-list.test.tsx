@@ -154,6 +154,7 @@ function makeStore(overrides: Partial<Store> = {}): Store {
     paymentStartDate: '2024-01-01',
     nextPaymentDate: null,
     ownerPhone: null,
+    catalogSlug: null,
     modules: [],
     publicPhone: null,
     addressCity: null,
