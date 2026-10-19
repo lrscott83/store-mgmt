@@ -61,7 +61,7 @@ export interface CashClosingStore {
 
 /** Denominaciones por defecto de CUP (S11), de mayor a menor. */
 export const DEFAULT_CUP_DENOMINATIONS: readonly number[] = [
-  20_000, 10_000, 5_000, 1_000, 500, 200, 100, 50, 20, 10, 5, 1,
+  20_000, 10_000, 5_000, 2_000, 1_000, 500, 200, 100, 50, 20, 10, 5, 1,
 ];
 
 /** Almacén vacío: sin cierres y sin catálogo propio. */

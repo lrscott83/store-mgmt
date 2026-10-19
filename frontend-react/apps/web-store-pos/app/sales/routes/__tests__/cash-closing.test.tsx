@@ -77,6 +77,7 @@ describe('CashClosingPage', () => {
     expect(screen.getByText('Conteo')).toBeInTheDocument();
     // Denominaciones por defecto (S11), de mayor a menor.
     expect(screen.getByTestId('denomination-row-20000')).toBeInTheDocument();
+    expect(screen.getByTestId('denomination-row-2000')).toBeInTheDocument();
     expect(screen.getByTestId('denomination-row-1')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Cerrar Caja' })).toBeInTheDocument();
   });
