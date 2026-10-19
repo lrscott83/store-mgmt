@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import { EModules } from '@store-mgmt/domain';
-import type { UserModel } from '@store-mgmt/domain';
+import type { Store, UserModel } from '@store-mgmt/domain';
 import esMessages from '~/shared/lib/i18n/es';
 import type {
   CatalogBranding,
@@ -82,6 +82,19 @@ const showToastSuccessMock = vi.hoisted(() => vi.fn());
 vi.mock('~/shared/lib/toast', () => ({
   showToastSuccess: (...args: unknown[]) => showToastSuccessMock(...args),
 }));
+
+// La tarjeta de ubicación (T8a) lee y guarda la tienda por su cuenta, aparte del servicio del
+// catálogo: el módulo se sustituye ENTERO solo para estas dos llamadas.
+const storeMock = vi.hoisted(() => ({
+  getStore: vi.fn(),
+  updateStore: vi.fn(),
+}));
+vi.mock('~/management/stores/lib/services/store-http-service', async () => {
+  const actual = await vi.importActual<
+    typeof import('~/management/stores/lib/services/store-http-service')
+  >('~/management/stores/lib/services/store-http-service');
+  return { ...actual, storeHttpService: { ...actual.storeHttpService, ...storeMock } };
+});
 
 import { buildCatalogSnapshot } from '~/sales/lib/catalog/catalog-snapshot';
 import { WebCatalogPage, clientLoader } from '../web-catalog';
@@ -217,6 +230,31 @@ function visibleCarouselIds(): (string | undefined)[] {
     .map((image) => image.getAttribute('data-testid')?.replace('showcase-image-', ''));
 }
 
+const STORE: Store = {
+  id: 's1',
+  name: 'Store One',
+  displayName: 'Store One',
+  ownerId: 'o1',
+  ownerName: 'Owner One',
+  address: '123 Main St',
+  description: 'A store',
+  approved: true,
+  paymentStartDate: '2024-01-01',
+  nextPaymentDate: null,
+  ownerPhone: null,
+  planType: 'Pago',
+  planPrice: 10,
+  planCurrentPrice: 10,
+  modules: [],
+  publicPhone: '+53 5555 1234',
+  addressCity: 'La Habana',
+  addressProvince: 'Playa',
+  latitude: 23.13,
+  longitude: -82.38,
+  openingHours: [{ day: 'Monday', opens: '09:00', closes: '17:00' }],
+  isActive: true,
+};
+
 function makeUser(overrides: Partial<UserModel> = {}): UserModel {
   return {
     id: 'u1',
@@ -265,6 +303,7 @@ describe('WebCatalogPage (vista Catálogo Web)', () => {
     catalogMock.uploadShowcaseImage.mockResolvedValue(envelope(SHOWCASE.carousel[0]));
     catalogMock.removeShowcaseImage.mockResolvedValue(envelope(true));
     catalogMock.reorderShowcaseImages.mockResolvedValue(envelope(true));
+    storeMock.getStore.mockResolvedValue(envelope(STORE));
     catalogMock.sync.mockResolvedValue(
       envelope({
         storeSlug: 'mi-tienda',
@@ -314,6 +353,27 @@ describe('WebCatalogPage (vista Catálogo Web)', () => {
       ),
     ).toBeInTheDocument();
     expect(screen.queryByTestId(`catalog-product-${PRODUCT.id}`)).not.toBeInTheDocument();
+  });
+
+  it('la ubicación pública se captura antes de los productos y arranca expandida', async () => {
+    renderPage();
+
+    const toggle = await screen.findByTestId('location-toggle');
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+
+    // La tarjeta vive antes de los productos — el orden pedido por el owner.
+    const categoryToggle = await screen.findByTestId(
+      `catalog-category-toggle-${PRODUCT.categoryId}`,
+    );
+    expect(
+      toggle.compareDocumentPosition(categoryToggle) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+
+    // Plegada oculta sus campos; el guardado propio sigue en la cabecera.
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByTestId('location-public-phone')).not.toBeInTheDocument();
+    expect(screen.getByTestId('location-save')).toBeInTheDocument();
   });
 
   it('sincronizar envía el catálogo local de la tienda y resume el resultado', async () => {

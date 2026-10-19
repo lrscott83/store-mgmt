@@ -344,6 +344,37 @@ const messages: Record<string, string> = {
   'WEB_CATALOG.BRAND_SAVE_ERROR': 'No se pudo guardar la marca',
   'WEB_CATALOG.BRAND_LOAD_ERROR': 'No se pudo cargar la marca',
 
+  // Ubicación pública del catálogo (public-catalog-static-pages, T8a): teléfono, ciudad, provincia,
+  // coordenadas y horario. La captura se movió del formulario de tienda a esta vista (decisión del
+  // owner, 2026-10-19) y alimenta la ficha LocalBusiness de la página generada.
+  'WEB_CATALOG.LOCATION_TITLE': 'Ubicación y contacto',
+  'WEB_CATALOG.LOCATION_SUBTITLE':
+    'El teléfono, la ubicación y el horario que se muestran con tu catálogo público.',
+  'WEB_CATALOG.LOCATION_PUBLIC_PHONE': 'Teléfono público',
+  'WEB_CATALOG.LOCATION_ADDRESS_CITY': 'Ciudad',
+  'WEB_CATALOG.LOCATION_ADDRESS_PROVINCE': 'Provincia',
+  'WEB_CATALOG.LOCATION_LATITUDE': 'Latitud',
+  'WEB_CATALOG.LOCATION_LONGITUDE': 'Longitud',
+  'WEB_CATALOG.LOCATION_OPENING_HOURS': 'Horario',
+  'WEB_CATALOG.LOCATION_OPENING_HOURS_HINT': 'Deja un día vacío para marcarlo como cerrado.',
+  'WEB_CATALOG.LOCATION_OPENS': 'Apertura',
+  'WEB_CATALOG.LOCATION_CLOSES': 'Cierre',
+  'WEB_CATALOG.LOCATION_DAY_MONDAY': 'Lunes',
+  'WEB_CATALOG.LOCATION_DAY_TUESDAY': 'Martes',
+  'WEB_CATALOG.LOCATION_DAY_WEDNESDAY': 'Miércoles',
+  'WEB_CATALOG.LOCATION_DAY_THURSDAY': 'Jueves',
+  'WEB_CATALOG.LOCATION_DAY_FRIDAY': 'Viernes',
+  'WEB_CATALOG.LOCATION_DAY_SATURDAY': 'Sábado',
+  'WEB_CATALOG.LOCATION_DAY_SUNDAY': 'Domingo',
+  'WEB_CATALOG.LOCATION_COORDINATES_PAIR_REQUIRED': 'La latitud y la longitud deben venir juntas.',
+  'WEB_CATALOG.LOCATION_OPENING_HOURS_INCOMPLETE':
+    'Cada día con horario necesita apertura y cierre.',
+  'WEB_CATALOG.LOCATION_SAVE': 'Guardar ubicación',
+  'WEB_CATALOG.LOCATION_SAVING': 'Guardando...',
+  'WEB_CATALOG.LOCATION_SAVED': 'Ubicación guardada',
+  'WEB_CATALOG.LOCATION_SAVE_ERROR': 'No se pudo guardar la ubicación',
+  'WEB_CATALOG.LOCATION_LOAD_ERROR': 'No se pudo cargar la ubicación',
+
   // Presentación del catálogo público (decisión del owner, 2026-10-12): elementos por fila en móvil.
   // Solo afecta a la plantilla `default`.
   'WEB_CATALOG.BRAND_MOBILE_COLUMNS': 'Productos por fila en móvil',
@@ -1474,27 +1505,6 @@ const messages: Record<string, string> = {
   // L6 parity (GENERAL.ACTIVE:154 'Activo')
   'STORES.IS_ACTIVE': 'Activo',
   'STORES.PAYMENT_START_DATE': 'Fecha de inicio de pago',
-  // public-catalog-static-pages (T8): public location block of the store form.
-  // This data feeds the generated catalog page's LocalBusiness JSON-LD.
-  'STORES.LOCATION_TITLE': 'Ubicación y contacto',
-  'STORES.PUBLIC_PHONE': 'Teléfono público',
-  'STORES.ADDRESS_CITY': 'Ciudad',
-  'STORES.ADDRESS_PROVINCE': 'Provincia',
-  'STORES.LATITUDE': 'Latitud',
-  'STORES.LONGITUDE': 'Longitud',
-  'STORES.OPENING_HOURS': 'Horario',
-  'STORES.OPENING_HOURS_HINT': 'Deja un día vacío para marcarlo como cerrado.',
-  'STORES.OPENS': 'Apertura',
-  'STORES.CLOSES': 'Cierre',
-  'STORES.DAY_MONDAY': 'Lunes',
-  'STORES.DAY_TUESDAY': 'Martes',
-  'STORES.DAY_WEDNESDAY': 'Miércoles',
-  'STORES.DAY_THURSDAY': 'Jueves',
-  'STORES.DAY_FRIDAY': 'Viernes',
-  'STORES.DAY_SATURDAY': 'Sábado',
-  'STORES.DAY_SUNDAY': 'Domingo',
-  'STORES.COORDINATES_PAIR_REQUIRED': 'La latitud y la longitud deben venir juntas.',
-  'STORES.OPENING_HOURS_INCOMPLETE': 'Cada día con horario necesita apertura y cierre.',
   'STORES.SAVE': 'Guardar',
   'STORES.SAVING': 'Guardando...',
   'STORES.EDIT': 'Editar',
