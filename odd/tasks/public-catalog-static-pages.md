@@ -46,7 +46,7 @@ descripción, canonical, Open Graph y (después) JSON-LD — para que Google **y
 | T4 | Disparador: regenerar al guardar la config/estado del catálogo público (sync + marca) | S2 | inline | COMPLETADO (`21a6c935`) |
 | T5 | Servido: nginx (alias + fallback, **solo la ruta exacta** — S10) + directorio compartido + publicar el shell del SPA en él + **conservar assets del build anterior** (mitigación S9) | S1,S4,S9,S10 | inline (infra) | COMPLETADO (`14131b21` + `ec8c114c`) |
 | T6 | Backfill de catálogos existentes + **regeneración en cada deploy (obligatoria — S9)** | S3,S9 | inline | COMPLETADO (`6b4c4bc8`) |
-| T7 | `sitemap.xml` + `robots.txt` | S5 | — | PENDIENTE |
+| T7 | `sitemap.xml` + `robots.txt` | S5 | inline | COMPLETADO (`917a4fa5`) |
 | T8 | Campos de ubicación por tienda + JSON-LD | S6 | — | PENDIENTE |
 | T9 | Disparador por renombre de tienda (`UpdateStoreCommand`: nombre/descripción → title/description) | S2 | — | PENDIENTE |
 
@@ -160,3 +160,39 @@ descripción, canonical, Open Graph y (después) JSON-LD — para que Google **y
   solo-lectura). Decisión del owner: **no se reporta**; la review queda estacionada con su estado intacto
   (autoridad sin quemar, sin comandos sustitutos) y se continúa con T7–T9. El fix vale por sí mismo
   (commiteado y probado); la review era control adicional.
+- **L15 (2026-10-19, progreso + verificación):** **T7 completado (`917a4fa5`)** — el pase completo de
+  regeneración escribe además el índice de descubrimiento en la **raíz del volumen**: `sitemap.xml`
+  (una URL absoluta por catálogo público, la misma del canonical) y `robots.txt` (`User-agent: *` /
+  `Allow: /` / `Sitemap:` absoluto). Reglas:
+  - Solo se listan slugs que **resuelven público** (`GetStoreByCatalogSlugAsync`: tienda + owner + user
+    activos): `GetCatalogSlugsAsync` usa `IgnoreQueryFilters` sin filtros activos y podía listar
+    catálogos desactivados. Una página que falla al escribirse **no se quita** del sitemap (su URL sigue
+    siendo la canónica; el SPA la sirve).
+  - El índice se refresca solo en la **pasada completa** (arranque + shell nuevo del deploy), no en la
+    regeneración por guardado (S5: "arranque de indexación"); los share links cubren el descubrimiento a
+    mitad de ciclo. Escritura best-effort (aviso + se traga el error; `OperationCanceledException`
+    propaga) con el mismo writer atómico del R4 (temp en el mismo directorio + `File.Move(overwrite:true)`,
+    UTF-8 sin BOM).
+  - nginx: dos `location` exactas (`= /sitemap.xml`, `= /robots.txt`) con `root /srv/catalog-pages`,
+    `expires -1`, `try_files … @spa` — si el archivo falta cae al SPA como hoy; ninguna otra ruta cambia
+    (S10).
+  - **Evidencia:** RED 16 fallidos/52 pasan/68 → GREEN filter `CatalogStaticPage` **68/68** (20 pruebas
+    nuevas: 9 builder + 6 writer + 5 sincronizador); Application.Tests **1379/1379**; Domain.UnitTests
+    **165/165**; E2E `WebCatalogPublicApi` **8/8**. **nginx real 17/17** (`nginx:alpine` + el `nginx.conf`
+    del repo): sitemap/robots con su content-type (`text/xml`/`text/plain`), `Cache-Control: no-cache`,
+    CSP heredada, página de T5 intacta, `/` y `/sales/new` SPA, slug sin página → SPA, sub-ruta NO sirve
+    el archivo, y con el volumen vacío ambos caen al SPA.
+  - **Sonda end-to-end con la API real** (perfil `http-e2e` → `smca_test`; tienda `probe-t7` sembrada y
+    revertida después): `sitemap.xml` 185 B con
+    `<loc>https://vdt.playground.sceiba.net/catalog/probe-t7</loc>`, `robots.txt` 79 B con la línea
+    `Sitemap:`, y `catalog/probe-t7/index.html` 685 B con title/description/canonical/OG de la tienda (T6
+    intacto). Log: "Páginas estáticas de catálogo regeneradas: 1/1 escritas, 0 fallidas; sitemap.xml con
+    1 catálogos públicos." BD restaurada (0 tiendas/owners/slugs; el usuario `admin` es el SuperAdmin
+    pre-existente).
+  - **RDD:** assessment del slice T7 (`--base-ref 59262408 --committed-only`): **`medium`** (8 paths,
+    519 líneas), `review_due: false` (`under_budget`). El acumulado (`b5f05daf..HEAD`, 30 paths/2278
+    líneas) da `high` por la señal `shell_process` del deploy de T6 — `review_due: true`, pero **no se
+    inicia línea nueva**: hay una transacción ya ligada a ese rango (estacionada por el defecto de
+    herramienta, L14) y el owner dejó ese candidato sin revisar.
+  - **Fuera de T7 (anotado):** una tienda desactivada conserva su página servida (misma familia que el
+    huérfano del renombre de slug) — el sitemap sí deja de listarla.
